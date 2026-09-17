@@ -6,6 +6,7 @@ import {
   UnofficialRunContext,
 } from '@/components/unofficial-run-provider';
 import ScatterGraph from '@/components/inference/ui/ScatterGraph';
+import { useParetoHighlightToggle } from '@/components/inference/hooks/useParetoHighlightToggle';
 import ChartDisplay from '@/components/inference/ui/ChartDisplay';
 import { mountWithProviders } from '../support/test-utils';
 import { expandLegendAdvanced } from '../support/legend-advanced';
@@ -25,6 +26,212 @@ const defaultChartDef = createMockChartDefinition();
 const hwConfig = createMockHardwareConfig();
 
 describe('ScatterGraph', () => {
+  it('toggles global Pareto highlights independently and removes dismissed overlay winners', () => {
+    const official = [
+      createMockInferenceData({ hwKey: 'h100', precision: Precision.FP8, x: 20, y: 80 }),
+      createMockInferenceData({ hwKey: 'h100', precision: Precision.FP8, x: 80, y: 20 }),
+    ];
+    const overlay = [
+      createMockInferenceData({ hwKey: 'h100', precision: Precision.FP8, x: 90, y: 90 }),
+    ];
+    const base = createMockInferenceContextValues();
+    function ParetoHarness() {
+      const {
+        visible: showParetoFrontier,
+        playful: paretoFrontierPlayful,
+        setVisible: setShowParetoFrontier,
+      } = useParetoHighlightToggle();
+      const {
+        visible: showParetoHinterland,
+        playful: paretoHinterlandPlayful,
+        setVisible: setShowParetoHinterland,
+      } = useParetoHighlightToggle();
+      const [showOverlay, setShowOverlay] = useState(true);
+      const inference = {
+        ...base,
+        hardwareConfig: hwConfig,
+        activeHwTypes: new Set(['h100']),
+        hwTypesWithData: new Set(['h100']),
+        selectedPrecisions: [Precision.FP8],
+        hideNonOptimal: false,
+        showParetoFrontier,
+        setShowParetoFrontier,
+        showParetoHinterland,
+        paretoFrontierPlayful,
+        paretoHinterlandPlayful,
+        setShowParetoHinterland,
+      };
+      return (
+        <InferenceContextsProvider
+          data={inference}
+          filters={inference}
+          display={inference}
+          actions={inference}
+        >
+          <button onClick={() => setShowOverlay(false)}>Dismiss test overlay</button>
+          <div style={{ width: 1000 }}>
+            <ScatterGraph
+              chartId="global-pareto-test"
+              modelLabel="DeepSeek R1"
+              data={official}
+              overlayData={
+                showOverlay ? { data: overlay, hardwareConfig: hwConfig, label: 'test' } : undefined
+              }
+              xLabel="Interactivity"
+              yLabel="Throughput"
+              chartDefinition={{ ...defaultChartDef, y_tpPerGpu_roofline: 'upper_left' }}
+              transitionDuration={0}
+            />
+          </div>
+        </InferenceContextsProvider>
+      );
+    }
+    mountWithProviders(<ParetoHarness />, {
+      unofficial: {
+        activeOverlayHwTypes: new Set(['h100']),
+        allOverlayHwTypes: new Set(['h100']),
+      },
+    });
+    cy.get('.global-pareto-frontier, .pareto-hinterland').should('not.exist');
+    cy.get('#global-pareto-test-pareto-frontier').should('not.exist');
+    cy.get('#global-pareto-test-pareto-hinterland').should('not.exist');
+    expandLegendAdvanced();
+    cy.get('#global-pareto-test-pareto-frontier').click();
+    cy.get('.global-pareto-frontier').should('have.attr', 'stroke-dasharray', '1,6');
+    cy.get('.global-pareto-highlight circle').should('have.length', 1);
+    cy.get('.pareto-hinterland').should('not.exist');
+    cy.get('#global-pareto-test-pareto-hinterland').click();
+    cy.get('.pareto-hinterland').should('have.attr', 'pointer-events', 'none');
+    cy.get('.pareto-hinterland')
+      .should('have.attr', 'fill', 'none')
+      .and('have.attr', 'stroke-dasharray', '8,5');
+    cy.get('.global-pareto-hinterland-highlight circle').should('have.length', 2);
+    cy.get('.pareto-hinterland')
+      .invoke('attr', 'd')
+      .then((hinterlandPath) => {
+        cy.get('.global-pareto-frontier').invoke('attr', 'd').should('not.equal', hinterlandPath);
+      });
+    cy.contains('button', 'Dismiss test overlay').click();
+    cy.get('.global-pareto-highlight circle').should('have.length', 2);
+    cy.get('#global-pareto-test-pareto-frontier').click();
+    cy.get('.global-pareto-frontier').should('not.exist');
+    cy.get('.pareto-hinterland').should('exist');
+    cy.get('#global-pareto-test-pareto-hinterland').click();
+    cy.get('.pareto-hinterland').should('not.exist');
+    cy.get('#global-pareto-test-pareto-frontier').click();
+    cy.get('#global-pareto-test-pareto-hinterland').click();
+    cy.get('.global-pareto-frontier-area, .pareto-hinterland-area')
+      .should('have.length', 2)
+      .each(($area) => {
+        expect($area.attr('data-style')).to.equal('playful');
+        expect($area.attr('fill')).to.match(/^url\(#/);
+      });
+    cy.get('pattern[id$="-scene"]').should('have.length', 2);
+    cy.get('pattern[id$="-scene"] text').should('not.exist');
+    cy.get('pattern[id$="-scene"] image')
+      .should('have.length', 2)
+      .each(($image) => {
+        expect($image.attr('preserveAspectRatio')).to.equal('xMidYMid slice');
+        expect(Number($image.attr('width'))).to.be.greaterThan(160);
+        expect($image.attr('width')).to.equal($image.parent().attr('width'));
+        expect($image.attr('height')).to.equal($image.parent().attr('height'));
+        expect($image.attr('href')).to.match(/\/decorative\/pareto\/.+\.webp$/);
+      });
+    cy.get('.global-pareto-frontier-area,.pareto-hinterland-area').each(($area) => {
+      expect($area.attr('fill-opacity')).to.equal('0.3');
+    });
+    cy.get('#global-pareto-test-pareto-frontier').click();
+    cy.get('.global-pareto-frontier-area').should('not.exist');
+    cy.get('.pareto-hinterland-area').should('exist');
+    cy.get('#global-pareto-test-pareto-frontier').click();
+    cy.get('.global-pareto-frontier-area').should('have.attr', 'data-style', 'plain');
+    cy.get('.global-pareto-frontier-area').should('have.attr', 'fill', '#22c55e');
+    cy.get('#global-pareto-test-pareto-hinterland').click();
+    cy.get('#global-pareto-test-pareto-hinterland').click();
+    cy.get('.pareto-hinterland-area').should('have.attr', 'fill', '#ef4444');
+    cy.get('[data-testid="legend-advanced-toggle"]').click();
+    cy.get('#global-pareto-test-pareto-frontier').should('not.exist');
+    cy.get('.global-pareto-frontier-area,.pareto-hinterland-area').should('have.length', 2);
+  });
+
+  for (const mixedRuns of [false, true]) {
+    it(`${mixedRuns ? 'hides' : 'shows'} the refresh changelog for a ${mixedRuns ? 'mixed' : 'matching'} run series`, () => {
+      const refreshUrl =
+        'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/33219708211/attempts/1';
+      const point = createMockInferenceData({
+        hwKey: 'gb300_dynamo-trt',
+        model: Model.Qwen3_5,
+        run_url: refreshUrl,
+        benchmark_type: 'agentic_traces',
+      });
+      const description = 'Refresh to collect TensorRT-LLM server metrics.';
+      mountWithProviders(
+        <div style={{ width: 1000, height: 600 }}>
+          <ScatterGraph
+            chartId="changelog-provenance"
+            modelLabel="Qwen3.5 397B"
+            data={
+              mixedRuns
+                ? [
+                    point,
+                    {
+                      ...point,
+                      x: 50,
+                      run_url:
+                        'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/31927376673/attempts/1',
+                    },
+                  ]
+                : [point]
+            }
+            xLabel="Interactivity"
+            yLabel="Throughput"
+            chartDefinition={defaultChartDef}
+          />
+        </div>,
+        {
+          inference: {
+            selectedModel: Model.Qwen3_5,
+            selectedSequence: Sequence.AgenticTraces,
+            selectedRunId: '33219708211',
+            selectedPrecisions: [Precision.FP4],
+            activeHwTypes: new Set(['gb300_dynamo-trt']),
+            hwTypesWithData: new Set(['gb300_dynamo-trt']),
+            hardwareConfig: {
+              'gb300_dynamo-trt': {
+                name: 'gb300-dynamo-trt',
+                label: 'GB300',
+                suffix: '(Dynamo TRTLLM)',
+                gpu: 'GB300',
+              },
+            },
+            availableRuns: {
+              '33219708211': {
+                runId: '33219708211',
+                runUrl: refreshUrl,
+                runDate: '2026-09-01',
+                conclusion: 'success',
+                changelog: {
+                  entries: [
+                    {
+                      config_keys: ['qwen3.5-fp4-gb300-dynamo-trt-agentic-disagg'],
+                      description,
+                      pr_link: null,
+                    },
+                  ],
+                },
+              },
+            },
+          },
+          unofficial: {},
+        },
+      );
+      cy.get('label[for="checkbox-gb300_dynamo-trt"]')
+        .parent()
+        .trigger('pointermove', { pointerType: 'mouse' });
+      cy.contains('[role="tooltip"]', description).should(mixedRuns ? 'not.exist' : 'exist');
+    });
+  }
+
   it('offers the complete table when matching official points are all clipped', () => {
     const point = createMockInferenceData({ hwKey: 'b200_trt', precision: Precision.FP4 });
     mountWithProviders(
@@ -113,6 +320,37 @@ describe('ScatterGraph', () => {
     cy.contains('No data available').should('be.visible');
   });
 
+  it('explains when the selected dataset lacks role-local energy', () => {
+    mountWithProviders(
+      <div style={{ width: 800, height: 600 }}>
+        <ScatterGraph
+          chartId="test-scatter-role-energy-empty"
+          modelLabel="DeepSeek R1"
+          data={[]}
+          xLabel="Interactivity"
+          yLabel="Measured Prefill J per Input Token"
+          chartDefinition={defaultChartDef}
+        />
+      </div>,
+      {
+        inference: {
+          hardwareConfig: hwConfig,
+          activeHwTypes: new Set(['mi355x']),
+          hwTypesWithData: new Set(),
+          selectedYAxisMetric: 'y_measuredPrefillJPerInputToken',
+        },
+        unofficial: {},
+      },
+    );
+
+    cy.contains('This dataset does not report role-level prefill/decode energy.').should(
+      'be.visible',
+    );
+    cy.contains(
+      'No measurements to plot for this selection. Review the benchmark controls above or adjust quick filters.',
+    ).should('not.exist');
+  });
+
   it('localizes the complete Chinese empty state', () => {
     mountWithProviders(
       <PathnameContext.Provider value="/zh/inference">
@@ -141,39 +379,79 @@ describe('ScatterGraph', () => {
     cy.contains('No data available').should('not.exist');
   });
 
-  it('offers targeted quick-filter recovery without changing model, precision or date', () => {
+  it('localizes the missing role-energy explanation', () => {
     mountWithProviders(
-      <div style={{ width: 800 }}>
-        <ScatterGraph
-          chartId="empty-filtered"
-          modelLabel="DeepSeek R1"
-          data={[]}
-          xLabel="Concurrency"
-          yLabel="Throughput"
-          chartDefinition={defaultChartDef}
-        />
-      </div>,
+      <PathnameContext.Provider value="/zh/inference">
+        <div style={{ width: 375, height: 600 }}>
+          <ScatterGraph
+            chartId="test-scatter-role-energy-empty-zh"
+            modelLabel="DeepSeek R1"
+            data={[]}
+            xLabel="交互性"
+            yLabel="每输入 token 实测 Prefill 能耗"
+            chartDefinition={defaultChartDef}
+          />
+        </div>
+      </PathnameContext.Provider>,
       {
         inference: {
-          quickFilters: {
-            vendors: ['AMD'],
-            frameworks: ['vllm'],
-            deployment: [],
-            spec: [],
-            power: [],
-          },
+          hardwareConfig: hwConfig,
+          activeHwTypes: new Set(['mi355x']),
+          hwTypesWithData: new Set(),
+          selectedYAxisMetric: 'y_measuredPrefillJPerInputToken',
         },
         unofficial: {},
       },
     );
-    cy.get('[data-testid="scatter-empty-state"]').should('have.attr', 'data-reason', 'filtered');
-    cy.get('[data-testid="scatter-empty-clear-filters"]').click();
-    cy.get('@setQuickFilterVendors').should('have.been.calledWith', []);
-    cy.get('@setQuickFilterFrameworks').should('have.been.calledWith', []);
-    cy.get('@setSelectedModel').should('not.have.been.called');
-    cy.get('@setSelectedPrecisions').should('not.have.been.called');
-    cy.get('@setSelectedDateRange').should('not.have.been.called');
+
+    cy.contains('当前数据集未提供 Prefill/Decode 各角色的能耗数据。').should('be.visible');
+    cy.contains('当前选择没有可绘制的测量数据。请检查上方的基准测试设置，或调整快捷筛选。').should(
+      'not.exist',
+    );
   });
+
+  for (const selectedYAxisMetric of ['y_tpPerGpu', 'y_measuredPrefillJPerInputToken'] as const) {
+    it(`offers targeted quick-filter recovery on ${selectedYAxisMetric} without changing model, precision or date`, () => {
+      mountWithProviders(
+        <div style={{ width: 800 }}>
+          <ScatterGraph
+            chartId="empty-filtered"
+            modelLabel="DeepSeek R1"
+            data={[]}
+            xLabel="Concurrency"
+            yLabel="Throughput"
+            chartDefinition={defaultChartDef}
+          />
+        </div>,
+        {
+          inference: {
+            selectedYAxisMetric,
+            quickFilters: {
+              vendors: ['AMD'],
+              frameworks: ['vllm'],
+              deployment: [],
+              spec: [],
+              power: [],
+            },
+          },
+          unofficial: {},
+        },
+      );
+      cy.get('[data-testid="scatter-empty-state"]').should('have.attr', 'data-reason', 'filtered');
+      cy.contains('No points match this selection. Try removing a quick filter;').should(
+        'be.visible',
+      );
+      cy.contains('This dataset does not report role-level prefill/decode energy.').should(
+        'not.exist',
+      );
+      cy.get('[data-testid="scatter-empty-clear-filters"]').click();
+      cy.get('@setQuickFilterVendors').should('have.been.calledWith', []);
+      cy.get('@setQuickFilterFrameworks').should('have.been.calledWith', []);
+      cy.get('@setSelectedModel').should('not.have.been.called');
+      cy.get('@setSelectedPrecisions').should('not.have.been.called');
+      cy.get('@setSelectedDateRange').should('not.have.been.called');
+    });
+  }
 
   it('restores hidden matching official and unofficial chip series together', () => {
     const restore = cy.stub().as('restoreUnified');
@@ -1379,6 +1657,119 @@ describe('ScatterGraph', () => {
     cy.get('#test-scatter-dismiss-preview svg .unofficial-overlay-pt').should('not.exist');
     cy.get('#test-scatter-dismiss-preview svg .overlay-roofline-path').should('not.exist');
   });
+
+  it('clears perf rulers when the y-axis or x-axis metric changes', () => {
+    const chartId = 'test-scatter-perf-ruler-axis-reset';
+    // Distinct `conc` per point keeps the D3 join keys unique, as they are
+    // for real runs; the metric-change update matches marks by that key.
+    const officialData = ['b200_sglang', 'h100_vllm'].flatMap((hwKey, hwIndex) =>
+      [8, 16, 32].map((x, index) =>
+        createMockInferenceData({
+          hwKey,
+          x,
+          y: 320 - hwIndex * 120 - index * 40,
+          conc: x,
+          precision: Precision.FP4,
+        }),
+      ),
+    );
+    const baseInference = createMockInferenceContextValues();
+
+    function AxisMetricHarness() {
+      const [yMetric, setYMetric] = useState('y_tpPerGpu');
+      const [xField, setXField] = useState('p90_e2el');
+      const chartDefinition = createMockChartDefinition({
+        chartType: 'interactivity',
+        x_scale_field: xField,
+        y_tpPerGpu_roofline: 'upper_left',
+        y_totalTokensPerDollarTco_roofline: 'upper_left',
+      });
+      const inference = {
+        ...baseInference,
+        hardwareConfig: hwConfig,
+        activeHwTypes: new Set(['b200_sglang', 'h100_vllm']),
+        hwTypesWithData: new Set(['b200_sglang', 'h100_vllm']),
+        selectedModel: Model.DeepSeek_V4_Pro,
+        selectedSequence: Sequence.AgenticTraces,
+        selectedPrecisions: [Precision.FP4],
+        selectedYAxisMetric: yMetric,
+      };
+
+      return (
+        <InferenceContextsProvider
+          data={inference}
+          filters={inference}
+          display={inference}
+          actions={inference}
+        >
+          <button
+            data-testid="change-y-metric"
+            onClick={() => setYMetric('y_totalTokensPerDollarTco')}
+          >
+            Change y metric
+          </button>
+          <button data-testid="change-x-metric" onClick={() => setXField('p90_ttft')}>
+            Change x metric
+          </button>
+          <div style={{ width: 800, height: 600 }}>
+            <ScatterGraph
+              chartId={chartId}
+              modelLabel={Model.DeepSeek_V4_Pro}
+              data={officialData}
+              xLabel="P90 End-to-end Latency (s)"
+              yLabel="Throughput / Chip (tok/s)"
+              chartDefinition={chartDefinition}
+            />
+          </div>
+        </InferenceContextsProvider>
+      );
+    }
+
+    mountWithProviders(<AxisMetricHarness />, { unofficial: {} });
+
+    // Ruler mode exposes one widened hit stroke per visible roofline; clicking
+    // two of them completes a measurement.
+    const placeRuler = () => {
+      cy.get(`#${chartId} svg .perf-ruler-hit`).should('have.length', 2);
+      cy.get(`#${chartId} svg .perf-ruler-hit`).eq(0).click({ force: true });
+      cy.get(`#${chartId} svg .perf-ruler-hit`).eq(1).click({ force: true });
+      cy.get(`#${chartId} svg .perf-ruler`).should('have.length', 1);
+    };
+
+    // Clearing the rulers also drops the "clear rulers" legend entry, which
+    // narrows the sidebar and rebuilds the chart while the metric-change
+    // tween is still running. Both three-point curves must still be drawn
+    // as real curves afterwards (a stale tween used to collapse them onto a
+    // single coordinate).
+    const expectCurvesIntact = () => {
+      cy.get(`#${chartId} svg .roofline-path`)
+        .should('have.length', 2)
+        .each(($path) => {
+          expect($path.attr('d')).to.match(/C/);
+        });
+    };
+
+    expectCurvesIntact();
+    expandLegendAdvanced();
+    cy.get('#scatter-perf-ruler').click({ force: true });
+    placeRuler();
+
+    // Switching the y-axis metric redraws the curves in new units: the ruler
+    // must not survive. Ruler mode itself stays on so the user can measure
+    // again without re-enabling it.
+    cy.get('[data-testid="change-y-metric"]').click();
+    cy.get(`#${chartId} svg .perf-ruler`).should('not.exist');
+    cy.get('#scatter-perf-ruler').should('have.attr', 'aria-checked', 'true');
+    expectCurvesIntact();
+    placeRuler();
+
+    // Same for the x-axis metric (the resolved `x_scale_field`).
+    cy.get('[data-testid="change-x-metric"]').click();
+    cy.get(`#${chartId} svg .perf-ruler`).should('not.exist');
+    cy.get('#scatter-perf-ruler').should('have.attr', 'aria-checked', 'true');
+    expectCurvesIntact();
+    placeRuler();
+  });
 });
 
 describe('ChartDisplay responsive status notes', () => {
@@ -2099,4 +2490,654 @@ describe('ChartDisplay engine comparison guard', () => {
     cy.get('[data-testid="inference-chart-view-btn"]').click();
     cy.get('#chart-0 svg .unofficial-overlay-pt').should('not.exist');
   });
+});
+
+// Reproduces Qwen3.5 power sweeps: fastest is also lowest watts, while the
+// upper power boundary shows measured power across operating configurations.
+describe('Power envelopes', () => {
+  const powerMetrics = [
+    ['y_measuredAvgPower', 'Watts'],
+    ['y_measuredP75Power', 'P75'],
+    ['y_measuredP90Power', 'P90'],
+    ['y_measuredPrefillAvgPower', 'Prefill'],
+    ['y_measuredDecodeAvgPower', 'Decode'],
+    ['y_measuredPowerPercentTdp', 'Percent TDP'],
+  ] as const;
+
+  for (const optimal of [false, true]) {
+    it(`suppresses power-envelope clipping continuations with Optimal Only ${optimal ? 'on' : 'off'}`, () => {
+      const runUrl = 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/102';
+      const visible = createMockInferenceData({
+        hwKey: 'b200_trt',
+        tp: 4,
+        conc: 1,
+        x: 100,
+        y: 600,
+        run_url: runUrl,
+      });
+      const clipped = { ...visible, tp: 8, conc: 8, x: 1500, y: 300 };
+      mountWithProviders(
+        <div style={{ width: 1000, height: 600 }}>
+          <ScatterGraph
+            chartId="power-clipped"
+            modelLabel="Qwen3.5 397B"
+            data={[visible]}
+            clippedData={[{ point: clipped, reasons: ['latency'] }]}
+            xLabel="TTFT"
+            yLabel="Power"
+            chartDefinition={createMockChartDefinition({
+              y_measuredAvgPower_roofline: 'lower_left',
+              y_latency_limit: 1000,
+            })}
+            overlayData={{
+              data: [visible],
+              clippedData: [{ point: clipped, reasons: ['latency'] }],
+              hardwareConfig: hwConfig,
+              label: 'Power replay',
+              runUrl,
+            }}
+            transitionDuration={0}
+          />
+        </div>,
+        {
+          inference: {
+            selectedYAxisMetric: 'y_measuredAvgPower',
+            hideNonOptimal: optimal,
+            selectedPrecisions: [Precision.FP4],
+            hardwareConfig: hwConfig,
+            activeHwTypes: new Set(['b200_trt']),
+            hwTypesWithData: new Set(['b200_trt']),
+          },
+          unofficial: {
+            activeOverlayHwTypes: new Set(['b200_trt']),
+            allOverlayHwTypes: new Set(['b200_trt']),
+            runIndexByUrl: { [runUrl]: 0, '102': 0 },
+          },
+        },
+      );
+      cy.get('#power-clipped .dot-group').should('have.length', 1);
+      cy.get('#power-clipped .overflow-continuation').should('not.exist');
+    });
+  }
+
+  function PowerHarness({ singleConfiguration = false }: { singleConfiguration?: boolean }) {
+    const [optimal, setOptimal] = useState(true);
+    const [gradientLabels, setGradientLabels] = useState(false);
+    const [metric, setMetric] = useState('y_measuredAvgPower');
+    const power = metric !== 'y_measuredJPerOutputToken';
+    const powerScale = metric === 'y_measuredPowerPercentTdp' ? 0.1 : 1;
+    const rows = [1, 8, 32].map((conc, i) =>
+      createMockInferenceData({
+        hwKey: 'b200_trt',
+        tp: singleConfiguration || i === 0 ? 2 : 4,
+        conc,
+        x: 100 - i * 30,
+        y: power ? (400 + i * 200) * powerScale : 4 - i,
+        measuredAvgPower: { y: 400 + i * 200, roof: false },
+        measuredPowerPercentTdp: { y: 40 + i * 20, roof: false },
+        measuredJPerOutputToken: { y: 4 - i, roof: false },
+        run_url: 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/100',
+        power_tier: i === 1 ? 'legacy' : 'certified',
+      }),
+    );
+    rows.push(
+      createMockInferenceData({
+        hwKey: 'b200_trt',
+        tp: 8,
+        conc: 16,
+        x: 60,
+        y: power ? 500 * powerScale : 3.5,
+        measuredAvgPower: { y: 500, roof: false },
+        measuredPowerPercentTdp: { y: 50, roof: false },
+        measuredJPerOutputToken: { y: 3.5, roof: false },
+        power_tier: 'legacy',
+      }),
+    );
+    const value = createMockInferenceContextValues({
+      selectedYAxisMetric: metric,
+      hideNonOptimal: optimal,
+      setHideNonOptimal: setOptimal,
+      showGradientLabels: gradientLabels,
+      setShowGradientLabels: setGradientLabels,
+      selectedPrecisions: [Precision.FP4],
+      hardwareConfig: hwConfig,
+      activeHwTypes: new Set(['b200_trt']),
+      hwTypesWithData: new Set(['b200_trt']),
+    });
+    const definition = createMockChartDefinition({
+      chartType: 'interactivity',
+      [`${metric}_roofline`]: 'lower_right',
+    });
+    return (
+      <InferenceContextsProvider data={value} filters={value} display={value} actions={value}>
+        {powerMetrics.map(([key, label]) => (
+          <button key={key} onClick={() => setMetric(key)}>
+            {label}
+          </button>
+        ))}
+        <button onClick={() => setMetric('y_measuredJPerOutputToken')}>Energy</button>
+        <div style={{ width: 1000, height: 600 }}>
+          <ScatterGraph
+            chartId="power-sweep"
+            modelLabel="Qwen3.5 397B"
+            data={rows}
+            xLabel="Interactivity"
+            yLabel="Power"
+            chartDefinition={definition}
+            transitionDuration={0}
+          />
+        </div>
+      </InferenceContextsProvider>
+    );
+  }
+
+  it('measures displayed power boundaries across official and dated overlay runs', () => {
+    const runUrls = [101, 102].map(
+      (id) => `https://github.com/SemiAnalysisAI/InferenceX/actions/runs/${id}`,
+    );
+    const samples = [
+      [100, 400],
+      [70, 600],
+      [40, 800],
+      [60, 100], // An off-boundary measurement must select its curve, not its raw y.
+    ];
+    const official = samples.map(([x, y], index) =>
+      createMockInferenceData({ hwKey: 'h100', x, y, conc: index + 1 }),
+    );
+    const overlay = runUrls.flatMap((runUrl, run) =>
+      official.map((point) => ({
+        ...point,
+        y: point.conc === 4 ? 75 : point.y / (run === 0 ? 2 : 4),
+        date: `2026-09-${10 + run}`,
+        run_url: runUrl,
+      })),
+    );
+    function PowerRulerHarness() {
+      const [optimal, setOptimal] = useState(false);
+      const [visible, setVisible] = useState(true);
+      const [dismissed, setDismissed] = useState(false);
+      const value = createMockInferenceContextValues({
+        selectedYAxisMetric: 'y_measuredAvgPower',
+        hideNonOptimal: optimal,
+        setHideNonOptimal: setOptimal,
+        selectedPrecisions: [Precision.FP4],
+        hardwareConfig: hwConfig,
+        activeHwTypes: new Set(['h100']),
+        hwTypesWithData: new Set(['h100']),
+      });
+      const unofficial = createMockUnofficialRunContext({
+        activeOverlayHwTypes: new Set(visible ? ['h100'] : []),
+        allOverlayHwTypes: new Set(['h100']),
+        runIndexByUrl: { [runUrls[0]]: 0, '101': 0, [runUrls[1]]: 1, '102': 1 },
+      });
+      return (
+        <InferenceContextsProvider data={value} filters={value} display={value} actions={value}>
+          <UnofficialRunContext.Provider value={unofficial}>
+            <button onClick={() => setVisible((current) => !current)}>Toggle overlay</button>
+            <button onClick={() => setDismissed(true)}>Dismiss overlay</button>
+            <div style={{ width: 1000, height: 600 }}>
+              <ScatterGraph
+                chartId="power-ruler"
+                modelLabel="Qwen3.5 397B"
+                data={official}
+                xLabel="Interactivity"
+                yLabel="Power"
+                chartDefinition={createMockChartDefinition({
+                  chartType: 'interactivity',
+                  y_measuredAvgPower_roofline: 'lower_right',
+                })}
+                overlayData={
+                  dismissed
+                    ? undefined
+                    : {
+                        data: overlay,
+                        hardwareConfig: hwConfig,
+                        label: 'Power replay',
+                        runUrl: runUrls[0],
+                      }
+                }
+                transitionDuration={0}
+              />
+            </div>
+          </UnofficialRunContext.Provider>
+        </InferenceContextsProvider>
+      );
+    }
+    mountWithProviders(<PowerRulerHarness />);
+    expandLegendAdvanced();
+    cy.get('#scatter-perf-ruler').click({ force: true });
+    cy.get('#power-ruler .perf-ruler-hit').should('have.length', 3);
+    cy.get('#power-ruler .dot-group').last().click({ force: true });
+    cy.get('#power-ruler .unofficial-overlay-pt').eq(3).click({ force: true });
+
+    const chartId = 'power-ruler';
+    const expectBoundaryRuler = () => {
+      cy.get(`#${chartId} .perf-ruler .pr-text-ratio`).should('have.text', '2.00x');
+      cy.get<SVGSVGElement>('#power-ruler svg').should(($svg) => {
+        const svg = $svg[0];
+        const line = svg.querySelector<SVGLineElement>('.pr-line')!;
+        const endpoints = [Number(line.getAttribute('y1')), Number(line.getAttribute('y2'))];
+        const x = Number(line.getAttribute('x1'));
+        const paths = [
+          svg.querySelector<SVGPathElement>('.roofline-path')!,
+          svg.querySelector<SVGPathElement>('.overlay-roofline-path')!,
+        ];
+        // Sample native SVG geometry independently of the ruler's interpolation helper.
+        for (const [index, path] of paths.entries()) {
+          const length = path.getTotalLength();
+          const distance = Math.min(
+            ...Array.from({ length: 1001 }, (_, step) => {
+              const point = path.getPointAtLength((length * step) / 1000);
+              return Math.hypot(point.x - x, point.y - endpoints[index]);
+            }),
+          );
+          expect(distance, 'ruler endpoint lies on the drawn upper boundary').to.be.lessThan(2);
+        }
+      });
+    };
+    expectBoundaryRuler();
+    cy.get('#power-ruler .roofline-path, #power-ruler .overlay-roofline-path').then(($paths) => {
+      const geometry = [...$paths].map((path) => path.getAttribute('d'));
+      cy.get('#scatter-hide-non-optimal').click({ force: true });
+      cy.get('#power-ruler .roofline-path, #power-ruler .overlay-roofline-path').should(
+        ($current) => {
+          expect([...$current].map((path) => path.getAttribute('d'))).to.deep.equal(geometry);
+        },
+      );
+      expectBoundaryRuler();
+    });
+    cy.get('#power-ruler .roofline-path')
+      .invoke('attr', 'd')
+      .then((before) => {
+        cy.get('#power-ruler svg').then(($svg) => {
+          const bounds = $svg[0].getBoundingClientRect();
+          $svg[0].dispatchEvent(
+            new WheelEvent('wheel', {
+              deltaY: -120,
+              clientX: bounds.x + bounds.width / 2,
+              clientY: bounds.y + bounds.height / 2,
+              shiftKey: true,
+              bubbles: true,
+              cancelable: true,
+            }),
+          );
+        });
+        cy.get('#power-ruler .roofline-path').invoke('attr', 'd').should('not.equal', before);
+      });
+    expectBoundaryRuler();
+    cy.get('#scatter-perf-ruler').click({ force: true });
+    cy.get('#power-ruler .perf-ruler').should('not.exist');
+    cy.get('#scatter-perf-ruler').click({ force: true });
+    cy.get('#power-ruler .perf-ruler-hit').eq(0).click({ force: true });
+    cy.get('#power-ruler .perf-ruler-hit').eq(2).click({ force: true });
+    cy.get(`#${chartId} .perf-ruler .pr-text-ratio`).should('have.text', '4.00x');
+    cy.contains('button', 'Toggle overlay').click();
+    cy.get('#power-ruler .perf-ruler-hit').should('have.length', 1);
+    cy.get('#power-ruler .perf-ruler').should('not.exist');
+    cy.contains('button', 'Toggle overlay').click();
+    cy.get('#power-ruler .perf-ruler-hit').should('have.length', 3);
+    cy.get('#power-ruler .perf-ruler').should('not.exist');
+    cy.get('#power-ruler .perf-ruler-hit').eq(0).click({ force: true });
+    cy.get('#power-ruler .perf-ruler-hit').eq(2).click({ force: true });
+    cy.get(`#${chartId} .perf-ruler .pr-text-ratio`).should('have.text', '4.00x');
+    cy.contains('button', 'Dismiss overlay').click();
+    cy.get('#power-ruler .perf-ruler-hit').should('have.length', 1);
+    cy.get('#power-ruler .perf-ruler').should('not.exist');
+  });
+
+  it('colors measured-power boundaries by configuration without changing their geometry', () => {
+    mountWithProviders(<PowerHarness />, { unofficial: {} });
+    cy.get('#scatter-gradient-labels').should('have.attr', 'data-state', 'unchecked');
+    cy.get('#power-sweep .roofline-path')
+      .invoke('attr', 'd')
+      .then((boundary) => {
+        cy.get('#scatter-gradient-labels').click({ force: true });
+        cy.get('#power-sweep .roofline-path')
+          .should('have.attr', 'd', boundary)
+          .and('have.attr', 'stroke')
+          .and('match', /^url\(#roofline-gradient-/u);
+        cy.get('#power-sweep .dot-group')
+          .filter((_, element) => element.style.opacity !== '0')
+          .should('have.length', 3);
+        cy.get('#power-sweep .parallelism-label .pl-text').should(($labels) => {
+          expect([...$labels].map((label) => label.textContent)).to.have.members(['TP2', 'TP4']);
+        });
+        cy.get('#power-sweep linearGradient[id^="roofline-gradient-"] stop').should(($stops) => {
+          expect(new Set([...$stops].map((stop) => stop.getAttribute('stop-color'))).size).to.equal(
+            2,
+          );
+        });
+        cy.get('#scatter-hide-non-optimal').click({ force: true });
+        cy.get('#power-sweep .dot-group')
+          .filter((_, element) => element.style.opacity !== '0')
+          .should('have.length', 4);
+        cy.get('#power-sweep .roofline-path').should('have.attr', 'd', boundary);
+        cy.get('#power-sweep .parallelism-label').should('not.contain.text', 'TP8');
+        cy.get('#scatter-hide-non-optimal').click({ force: true });
+        cy.get('#power-sweep .dot-group')
+          .filter((_, element) => element.style.opacity !== '0')
+          .should('have.length', 3);
+        cy.get('#power-sweep .roofline-path').should('have.attr', 'd', boundary);
+        cy.get('#scatter-gradient-labels').click({ force: true });
+        cy.get('#power-sweep .roofline-path')
+          .should('have.attr', 'd', boundary)
+          .and('have.attr', 'stroke')
+          .and('not.match', /^url\(/u);
+        cy.get('#power-sweep .parallelism-label').should('not.exist');
+        cy.get('#power-sweep .dot-group')
+          .filter((_, element) => element.style.opacity !== '0')
+          .should('have.length', 3);
+      });
+    cy.get('#scatter-gradient-labels').click({ force: true });
+    for (const [, label] of powerMetrics) {
+      cy.contains('button', label).click();
+      cy.get('#scatter-gradient-labels').should('have.attr', 'data-state', 'checked');
+      cy.get('#power-sweep .roofline-path[data-curve-kind="power-envelope"]')
+        .should('have.attr', 'stroke')
+        .and('match', /^url\(#roofline-gradient-/u);
+      cy.get('#power-sweep .parallelism-label .pl-text').should(($labels) => {
+        expect([...$labels].map((node) => node.textContent)).to.have.members(['TP2', 'TP4']);
+      });
+    }
+    cy.get('#power-sweep svg').then(($svg) => {
+      const svg = $svg[0];
+      const beforePath = svg.querySelector('.roofline-path')!.getAttribute('d');
+      const beforeLabels = [...svg.querySelectorAll('.parallelism-label')].map((node) =>
+        node.getAttribute('transform'),
+      );
+      const bounds = svg.getBoundingClientRect();
+      svg.dispatchEvent(
+        new WheelEvent('wheel', {
+          deltaY: -240,
+          clientX: bounds.x + bounds.width / 2,
+          clientY: bounds.y + bounds.height / 2,
+          shiftKey: true,
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
+      cy.get('#power-sweep .roofline-path')
+        .should('not.have.attr', 'd', beforePath)
+        .and('have.attr', 'stroke')
+        .and('match', /^url\(#roofline-gradient-/u);
+      cy.get('#power-sweep .parallelism-label')
+        .should(($labels) => {
+          expect([...$labels].map((node) => node.getAttribute('transform'))).not.to.deep.equal(
+            beforeLabels,
+          );
+        })
+        .then(($labels) => {
+          const zoomedLabels = [...$labels].map((node) => node.getAttribute('transform'));
+          cy.get('#power-sweep .roofline-path')
+            .invoke('attr', 'd')
+            .then((zoomedPath) => {
+              cy.get('#scatter-gradient-labels').click({ force: true });
+              cy.get('#power-sweep .parallelism-label').should('not.exist');
+              cy.get('#power-sweep .roofline-path').should('have.attr', 'd', zoomedPath);
+              cy.get('#scatter-gradient-labels').click({ force: true });
+              cy.get('#power-sweep .roofline-path')
+                .should('have.attr', 'd', zoomedPath)
+                .and('have.attr', 'stroke')
+                .and('match', /^url\(#roofline-gradient-/u);
+              cy.get('#power-sweep .parallelism-label').should(($restored) => {
+                expect([...$restored].map((node) => node.getAttribute('transform'))).to.deep.equal(
+                  zoomedLabels,
+                );
+              });
+            });
+        });
+    });
+    cy.contains('button', 'Energy').click();
+    cy.get('#power-sweep .roofline-path[data-curve-kind="pareto"]')
+      .should('have.attr', 'stroke')
+      .and('match', /^url\(#roofline-gradient-/u);
+    cy.get('#power-sweep .parallelism-label').should('not.contain.text', 'TP8');
+  });
+
+  it('keeps a single-configuration power boundary solid with its configuration label', () => {
+    mountWithProviders(<PowerHarness singleConfiguration />, { unofficial: {} });
+    cy.get('#scatter-gradient-labels').click({ force: true });
+    cy.get('#power-sweep .roofline-path')
+      .should('have.attr', 'stroke')
+      .and('not.match', /^url\(/u);
+    cy.get('#power-sweep linearGradient[id^="roofline-gradient-"]').should('not.exist');
+    cy.get('#power-sweep .parallelism-label .pl-text')
+      .should('have.length', 1)
+      .and('have.text', 'TP2');
+  });
+
+  it('keeps a fixed measured-power boundary while Optimal Only changes measurement visibility', () => {
+    mountWithProviders(<PowerHarness />, { unofficial: {} });
+    cy.get('#power-sweep .roofline-path[data-curve-kind="power-envelope"]').should(
+      'have.length',
+      1,
+    );
+    cy.get('#power-sweep .dot-group')
+      .filter((_, element) => element.style.opacity !== '0')
+      .should('have.length', 3);
+    cy.get('#power-sweep .roofline-path[data-curve-kind="power-envelope"]')
+      .should('have.length', 1)
+      .invoke('attr', 'd')
+      .should('match', /^M[^C]+C/u);
+    cy.get('#power-sweep .dot-group')
+      .filter((_, element) => element.style.opacity !== '0')
+      .should('have.length', 3)
+      .each(($point) => cy.wrap($point).should('have.css', 'opacity', '1'));
+    cy.get('#scatter-show-all-measurements').should('not.exist');
+    cy.get('[data-testid="measured-power-summary"]')
+      .should('contain.text', 'Showing 3 of 4 measured points')
+      .and('contain.text', '1/2 historical');
+    cy.get('#power-sweep .dot-group')
+      .filter((_, element) => element.style.opacity !== '0')
+      .find('.legacy-power-ring')
+      .should('have.length', 1);
+    cy.get('#power-sweep .dot-group')
+      .filter((_, element) => element.style.opacity === '0')
+      .should('have.css', 'pointer-events', 'none');
+    cy.get('#power-sweep .roofline-path')
+      .invoke('attr', 'd')
+      .then((boundary) => {
+        cy.get('#scatter-hide-non-optimal').click({ force: true });
+        cy.get('#power-sweep .dot-group')
+          .should('have.length', 4)
+          .each(($point) => cy.wrap($point).should('have.css', 'opacity', '1'));
+        cy.get('#power-sweep .roofline-path').should('have.attr', 'd', boundary);
+        cy.get('[data-testid="measured-power-summary"]').should(
+          'contain.text',
+          'Showing 4 of 4 measured points',
+        );
+        cy.get('#power-sweep .legacy-power-ring').should('have.length', 2);
+        cy.get('#scatter-show-all-measurements').should('not.exist');
+        cy.get('#scatter-hide-non-optimal').click({ force: true });
+        cy.get('#power-sweep .dot-group')
+          .filter((_, element) => element.style.opacity !== '0')
+          .should('have.length', 3);
+        cy.get('#power-sweep .roofline-path').should('have.attr', 'd', boundary);
+      });
+    for (const [, label] of powerMetrics) {
+      cy.contains('button', label).click();
+      cy.get('#scatter-hide-non-optimal').should('have.attr', 'data-state', 'checked');
+      cy.get('#power-sweep .roofline-path[data-curve-kind="power-envelope"]')
+        .should('have.length', 1)
+        .invoke('attr', 'd')
+        .should('match', /^M[^C]+C/u);
+      cy.get('#power-sweep .dot-group')
+        .filter((_, element) => element.style.opacity !== '0')
+        .should('have.length', 3);
+      cy.get('#scatter-show-all-measurements').should('not.exist');
+    }
+    cy.contains('button', 'Energy').click();
+    cy.get('#scatter-hide-non-optimal').should('have.attr', 'data-state', 'checked');
+    cy.get('#power-sweep .roofline-path[data-curve-kind="pareto"]').should('have.length', 1);
+    cy.get('[data-testid="power-curve-description"]').should('not.exist');
+    cy.get('#scatter-show-all-measurements').should('not.exist');
+  });
+
+  for (const metric of ['measuredAvgPower', 'measuredP75Power'] as const) {
+    it(`smooths ${metric} across configurations and preserves overlay runs through zoom`, () => {
+      const runUrl = 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/101';
+      const secondRunUrl = 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/102';
+      // The H100 Qwen3.5 8k/1k measurements that produced loops when joined
+      // in concurrency order. EP1 and EP8 contribute to the same upper boundary.
+      const rows = [
+        [16, 62.737, 399.728, 8],
+        [32, 55.742, 448.775, 8],
+        [64, 20.506, 344.948, 8],
+        [128, 25.686, 502.536, 8],
+        [256, 4.645, 372.904, 8],
+        [1, 172.488, 252.217, 1],
+        [2, 149.322, 291.378, 1],
+        [4, 121.477, 318.845, 1],
+        [8, 65.346, 283.477, 1],
+      ].map(([conc, x, y, ep]) =>
+        createMockInferenceData({
+          hwKey: 'h100',
+          model: Model.Qwen3_5,
+          precision: Precision.FP8,
+          date: '2026-07-05',
+          ep,
+          conc,
+          x,
+          y,
+          [metric]: { y, roof: false },
+          run_url: runUrl,
+        }),
+      );
+      const secondRunRows = [1, 8, 32].map((conc, i) =>
+        createMockInferenceData({
+          hwKey: 'h100',
+          model: Model.Qwen3_5,
+          precision: Precision.FP8,
+          date: '2026-07-05',
+          conc,
+          x: 100 - i * 30,
+          y: 400 + i * 200,
+          [metric]: { y: 400 + i * 200, roof: false },
+          run_url: secondRunUrl,
+        }),
+      );
+      function OverlayPowerHarness() {
+        const [optimal, setOptimal] = useState(true);
+        const value = createMockInferenceContextValues({
+          selectedYAxisMetric: `y_${metric}`,
+          hideNonOptimal: optimal,
+          setHideNonOptimal: setOptimal,
+          selectedModel: Model.Qwen3_5,
+          selectedSequence: Sequence.EightK_OneK,
+          selectedPrecisions: [Precision.FP8],
+          hardwareConfig: hwConfig,
+          activeHwTypes: new Set(['h100']),
+          hwTypesWithData: new Set(['h100']),
+        });
+        return (
+          <InferenceContextsProvider data={value} filters={value} display={value} actions={value}>
+            <div style={{ width: 1000, height: 600 }}>
+              <ScatterGraph
+                chartId="power-overlay"
+                modelLabel="Qwen3.5 397B"
+                data={rows}
+                xLabel="Interactivity"
+                yLabel="Power"
+                chartDefinition={createMockChartDefinition({
+                  chartType: 'interactivity',
+                  [`y_${metric}_roofline`]: 'lower_right',
+                })}
+                overlayData={{
+                  data: [...rows, ...secondRunRows],
+                  hardwareConfig: hwConfig,
+                  label: 'Power replay',
+                  runUrl,
+                }}
+                transitionDuration={0}
+              />
+            </div>
+          </InferenceContextsProvider>
+        );
+      }
+      mountWithProviders(<OverlayPowerHarness />, {
+        unofficial: {
+          activeOverlayHwTypes: new Set(['h100']),
+          allOverlayHwTypes: new Set(['h100']),
+          runIndexByUrl: { [runUrl]: 0, '101': 0, [secondRunUrl]: 1, '102': 1 },
+        },
+      });
+      const officialSelector = '#power-overlay .roofline-path[data-curve-kind="power-envelope"]';
+      const overlaySelector =
+        '#power-overlay .overlay-roofline-path[data-curve-kind="power-envelope"]';
+      function assertEnvelopes() {
+        cy.get<SVGPathElement>(`${officialSelector}, ${overlaySelector}`)
+          .should('have.length', 2)
+          .should(($paths) => {
+            const segmentCounts = [...$paths].map((path) => {
+              const segments = path.getAttribute('d')!.match(/C/gu) ?? [];
+              const length = path.getTotalLength();
+              let previous = path.getPointAtLength(0);
+              for (let step = 1; step <= 20; step++) {
+                const point = path.getPointAtLength((length * step) / 20);
+                expect(point.x, 'interactivity never reverses').to.be.at.least(previous.x);
+                expect(point.y, 'upper boundary never turns back').to.be.at.least(previous.y);
+                previous = point;
+              }
+              return segments.length;
+            });
+            expect(segmentCounts.every((count) => count > 0)).to.equal(true);
+          });
+      }
+      cy.get(officialSelector).should('have.length', 1);
+      cy.get(overlaySelector).should('have.length', 1);
+      cy.get('#power-overlay .dot-group').should('have.length', 9);
+      cy.get('#power-overlay .unofficial-overlay-pt').should('have.length', 12);
+      cy.get('#power-overlay .dot-group')
+        .filter((_, element) => element.style.opacity !== '0')
+        .should('have.length', 6);
+      cy.get('#power-overlay .unofficial-overlay-pt')
+        .filter((_, element) => element.style.opacity !== '0')
+        .should('have.length', 6);
+      assertEnvelopes();
+      cy.get(`${officialSelector}, ${overlaySelector}`).then(($paths) => {
+        const geometry = [...$paths].map((path) => path.getAttribute('d'));
+        cy.get('#scatter-hide-non-optimal').click({ force: true });
+        cy.get('#scatter-show-all-measurements').should('not.exist');
+        cy.get('#power-overlay .dot-group')
+          .filter((_, element) => element.style.opacity !== '0')
+          .should('have.length', 9);
+        cy.get('#power-overlay .unofficial-overlay-pt')
+          .filter((_, element) => element.style.opacity !== '0')
+          .should('have.length', 12);
+        cy.get(`${officialSelector}, ${overlaySelector}`).should(($current) => {
+          expect([...$current].map((path) => path.getAttribute('d'))).to.deep.equal(geometry);
+        });
+        cy.get('#scatter-hide-non-optimal').click({ force: true });
+        cy.get('#power-overlay .dot-group')
+          .filter((_, element) => element.style.opacity !== '0')
+          .should('have.length', 6);
+        cy.get('#power-overlay .unofficial-overlay-pt')
+          .filter((_, element) => element.style.opacity !== '0')
+          .should('have.length', 6);
+        cy.get(`${officialSelector}, ${overlaySelector}`).should(($current) => {
+          expect([...$current].map((path) => path.getAttribute('d'))).to.deep.equal(geometry);
+        });
+      });
+      cy.get(officialSelector)
+        .invoke('attr', 'd')
+        .then((beforeZoom) => {
+          cy.get('#power-overlay svg').then(($svg) => {
+            const svg = $svg[0];
+            const bounds = svg.getBoundingClientRect();
+            svg.dispatchEvent(
+              new WheelEvent('wheel', {
+                deltaY: -240,
+                clientX: bounds.x + bounds.width / 2,
+                clientY: bounds.y + bounds.height / 2,
+                shiftKey: true,
+                bubbles: true,
+                cancelable: true,
+              }),
+            );
+          });
+          cy.get(officialSelector).invoke('attr', 'd').should('not.equal', beforeZoom);
+        });
+      assertEnvelopes();
+    });
+  }
 });

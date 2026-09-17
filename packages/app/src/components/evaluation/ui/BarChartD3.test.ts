@@ -6,6 +6,7 @@ import type { EvaluationChartData } from '../types';
 import {
   evaluationChartBlockingState,
   evaluationChartIsInitializing,
+  generateEvaluationTooltipContent,
   sizeScoreLabelBackgrounds,
 } from './BarChartD3';
 import * as barChartModule from './BarChartD3';
@@ -78,6 +79,26 @@ describe('sizeScoreLabelBackgrounds', () => {
 });
 
 describe('evaluation chart locale presentation', () => {
+  for (const unofficialBranch of [undefined, 'tpuv7_updates']) {
+    it.each([
+      { dp: undefined, expected: '' },
+      { dp: 1, expected: '' },
+      { dp: 8, expected: '<strong>DP:</strong> 8' },
+    ])(
+      `shows only non-default DP in ${unofficialBranch ? 'unofficial' : 'official'} tooltips ($dp)`,
+      ({ dp, expected }) => {
+        const html = generateEvaluationTooltipContent(
+          { ...makeDatum('TPU7x (vLLM)', 0.9), dp, physicalChips: 4 },
+          false,
+          unofficialBranch,
+        );
+        expect(html).toContain('<strong>Chips:</strong> 4');
+        if (expected) expect(html).toContain(expected);
+        else expect(html).not.toContain('<strong>DP:</strong>');
+      },
+    );
+  }
+
   it('preserves the raw English tooltip date while formatting the Chinese date', () => {
     const module = barChartModule as typeof barChartModule & {
       formatEvaluationDate?: (date: string, locale: 'en' | 'zh') => string;

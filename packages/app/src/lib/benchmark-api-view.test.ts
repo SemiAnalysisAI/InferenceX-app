@@ -14,6 +14,8 @@ const rows = [
       unused_debug_metric: 99,
     },
     workers: [{ rank: 0, avg_power_w: 700 }],
+    power_invalid_reasons: ['sampling_gap_exceeded'],
+    power_audit: { sample_count: 4800, producer_sha: null, exporter_image_sha256: null },
   },
   {
     benchmark_type: 'single_turn',
@@ -46,9 +48,18 @@ describe('toCalculatorBenchmarkRows', () => {
     ]);
   });
 
+  it('strips workers and the power audit provenance from the payload-trimmed view', () => {
+    const [row] = toCalculatorBenchmarkRows(rows, '1k/1k');
+    expect(row).not.toHaveProperty('workers');
+    expect(row).not.toHaveProperty('power_invalid_reasons');
+    expect(row).not.toHaveProperty('power_audit');
+  });
+
   it('keeps all three cache tiers — the trim cannot know which one a row will use', () => {
     // `measuredCacheHitRate` picks between external and CPU per row, so the allowlist
     // has to pass all three through or the choice is made for it by the trim.
+    // `pricingCacheHitRate` additionally falls back to the theoretical ceiling on
+    // GB300 rows with no server measurement, so that survives too.
     // This runs on every calculator response, agentic included.
     const cached = toCalculatorBenchmarkRows(
       [
@@ -72,6 +83,7 @@ describe('toCalculatorBenchmarkRows', () => {
       server_gpu_cache_hit_rate: 0.77,
       server_external_cache_hit_rate: 0.06,
       server_cpu_cache_hit_rate: 0.055,
+      theoretical_cache_hit_rate: 0.95,
     });
   });
 

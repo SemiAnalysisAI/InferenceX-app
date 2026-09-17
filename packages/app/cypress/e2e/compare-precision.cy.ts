@@ -9,17 +9,17 @@ describe('Compare precision index page', () => {
     cy.visit('/compare');
     cy.get('[data-testid="compare-agentx-primary"]').within(() => {
       cy.get('h1').should('have.text', 'Compare Realistic Agentic Inference Perf');
-      cy.get('[data-testid^="compare-agentx-model-"]').should('have.length', 6);
+      cy.get('[data-testid^="compare-agentx-model-"]').should('have.length', 7);
       cy.get('[data-testid="compare-agentx-model-kimi-k3"]').should(
         'have.attr',
         'href',
         '/inference/kimi-k3',
       );
-      cy.get('[data-testid="compare-agentx-overview-link"]')
-        .should('contain.text', 'Overview')
-        .and('have.attr', 'href', '/overview');
+      cy.get('[data-testid="compare-agentx-revenue-calculator-link"]')
+        .should('contain.text', 'Token Revenue Calculator')
+        .and('have.attr', 'href', '/profit-estimator-per-gigawatt');
       cy.get('[data-testid="compare-agentx-dashboard-link"]')
-        .should('contain.text', 'Full dashboard')
+        .should('have.text', 'Dashboard')
         .and('have.attr', 'href', '/inference/kimi-k3');
       cy.get('[data-testid="compare-agentx-methodology-link"]').should('not.exist');
     });
@@ -52,21 +52,24 @@ describe('Compare precision index page', () => {
     cy.visit('/zh/compare');
     cy.get('[data-testid="compare-agentx-primary"]').within(() => {
       cy.get('h1').should('have.text', '真实智能体工作负载下的推理性能对比');
-      cy.get('[data-testid^="compare-agentx-model-"]').should('have.length', 6);
+      cy.get('[data-testid^="compare-agentx-model-"]').should('have.length', 7);
       cy.get('[data-testid="compare-agentx-model-deepseek-v4"]').should(
         'have.attr',
         'href',
         '/zh/inference/deepseek-v4',
       );
-      cy.get('[data-testid="compare-agentx-overview-link"]')
-        .should('contain.text', '总览')
-        .and('have.attr', 'href', '/zh/overview');
+      cy.get('[data-testid="compare-agentx-revenue-calculator-link"]')
+        .should('contain.text', 'Token 收入计算器')
+        .and('have.attr', 'href', '/zh/profit-estimator-per-gigawatt');
       cy.get('[data-testid="compare-agentx-dashboard-link"]')
-        .should('contain.text', '查看完整仪表板')
+        .should('have.text', '仪表板')
         .and('have.attr', 'href', '/zh/inference/kimi-k3');
       cy.get('[data-testid="compare-agentx-methodology-link"]').should('not.exist');
     });
-    cy.get('[data-testid="compare-model-catalog"]').should('contain.text', 'AgentX 与 8K/1K 结果');
+    cy.get('[data-testid="compare-model-catalog"]').should(
+      'contain.text',
+      'AgentX 与 8K/1K 测试结果',
+    );
     cy.get('#deepseek-v4 a[data-scenario="AgentX"]')
       .first()
       .should('have.attr', 'href')

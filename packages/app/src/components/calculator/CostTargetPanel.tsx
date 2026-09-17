@@ -1,5 +1,7 @@
 'use client';
 
+import { useGlobalFilterSelection } from '@/components/GlobalFilterContext';
+
 import Link from 'next/link';
 import { useCallback, useMemo, useState } from 'react';
 
@@ -142,6 +144,7 @@ export default function CostTargetPanel({
   mwInput,
   onMwInputChange,
 }: CostTargetPanelProps) {
+  const { tcoBasis } = useGlobalFilterSelection();
   const locale = useLocale();
   const t = STRINGS[locale];
 
@@ -199,7 +202,7 @@ export default function CostTargetPanel({
       }
 
       const atIv = interpolateForGPU(points, maxIv, 'interactivity_to_throughput', costProvider);
-      const specs = getGpuSpecs(hwKey);
+      const specs = getGpuSpecs(hwKey, tcoBasis);
       const stats =
         atIv && mw
           ? computeFleetStats({
@@ -229,7 +232,7 @@ export default function CostTargetPanel({
     return rows.toSorted(
       (a, b) => (b.maxInteractivity ?? -Infinity) - (a.maxInteractivity ?? -Infinity),
     );
-  }, [costCap, visibleGroupKeys, gpuDataByGroupKey, costProvider, costType, mw]);
+  }, [costCap, visibleGroupKeys, gpuDataByGroupKey, costProvider, costType, mw, tcoBasis]);
 
   const costCapColumns = useMemo<DataTableColumn<CostCapRow>[]>(() => {
     const columns: DataTableColumn<CostCapRow>[] = [

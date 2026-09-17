@@ -23,6 +23,12 @@
  */
 
 import fs from 'fs';
+import { createHash } from 'node:crypto';
+import {
+  powerPublicationPoint,
+  publicationIdentity,
+  type PowerPublicationPoint,
+} from './etl/power-publication';
 import os from 'os';
 import path from 'path';
 
@@ -53,7 +59,11 @@ import {
   flattenReusedIngestArtifactBundle,
   readReusedIngestMetadata,
 } from './etl/reused-ingest-metadata';
-import { mapBenchmarkRow } from './etl/benchmark-mapper';
+import { mapBenchmarkRow, type BenchmarkParams } from './etl/benchmark-mapper';
+import {
+  assertRequiredPowerPointsRetained,
+  verifyRequiredPowerArtifacts,
+} from './etl/required-power-publication';
 import {
   bulkIngestBenchmarkRows,
   bulkIngestRunStats,
@@ -84,6 +94,9 @@ import {
 // ── Config ──────────────────────────────────────────────────────────────────
 
 const DEFAULT_REPO = 'SemiAnalysisAI/InferenceX';
+const powerPublicationPoints = new Map<string, PowerPublicationPoint>();
+const powerPublicationErrors: string[] = [];
+const tracker = createSkipTracker();
 const isDownloadMode = process.argv[2] === '--download';
 
 let artifactsDir: string;
@@ -133,7 +146,10 @@ if (isDownloadMode) {
   }
 
   runIdStr = parsedId;
-  REPO = args[1] ?? DEFAULT_REPO;
+  REPO =
+    args[1] ??
+    input.match(/^https:\/\/github\.com\/(?<repo>[^/]+\/[^/]+)\/actions\/runs\/\d+/u)?.[1] ??
+    DEFAULT_REPO;
 
   // Download artifacts
   tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ingest-'));
@@ -216,10 +232,6 @@ if (reusedIngestMetadata) {
 }
 
 const runIdNum = parseInt(runIdStr, 10);
-if (isRunAttemptPurged(runIdNum, runAttemptNum)) {
-  console.log(`  Run ${runIdStr} attempt ${runAttemptNum} is purged via run-overrides — skipping.`);
-  process.exit(0);
-}
 
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN!;
 
@@ -265,11 +277,20 @@ function findJsonFiles(dir: string): string[] {
 // ── Main ────────────────────────────────────────────────────────────────────
 
 async function main(): Promise<void> {
+  // Return through the finalizer so skipped runs still write their publication manifest.
+  if (isRunAttemptPurged(runIdNum, runAttemptNum)) {
+    console.log(
+      `  Run ${runIdStr} attempt ${runAttemptNum} is purged via run-overrides — skipping.`,
+    );
+    return;
+  }
+
   validateRunBackfills();
-  const tracker = createSkipTracker();
   const configCache = createConfigCache(sql);
   const { getOrCreateConfig, preloadConfigs } = configCache;
-  const { fetchGithubRun, getOrCreateWorkflowRun } = createWorkflowRunServices(sql, GITHUB_TOKEN);
+  const { fetchGithubRun, getOrCreateWorkflowRun } = createWorkflowRunServices(sql, GITHUB_TOKEN, [
+    REPO,
+  ]);
 
   const runId = parseInt(runIdStr, 10);
   const ghInfo = await fetchGithubRun(runId);
@@ -311,6 +332,14 @@ async function main(): Promise<void> {
       console.log(`  PR #${pr.number}:      ${pr.htmlUrl}`);
     }
   }
+
+  const requiredPowerPoints = verifyRequiredPowerArtifacts(artifactsDir, {
+    runId,
+    runAttempt: runAttemptNum,
+    headSha: ghInfo?.headSha ?? null,
+  });
+  if (requiredPowerPoints.length > 0)
+    console.log(`  Required power: ${requiredPowerPoints.length} source benchmark points verified`);
 
   await preloadConfigs();
   console.log(`  ${configCache.size} configs preloaded`);
@@ -377,6 +406,8 @@ async function main(): Promise<void> {
   }
   const appendOnly = hasAppendOnlyFlag(changelogs);
   const evalsOnly = hasEvalsOnlyFlag(changelogs);
+  if (evalsOnly && requiredPowerPoints.length > 0)
+    throw new Error('Required power: benchmark scope cannot be published as an evals-only run');
 
   const workflowRunId = await getOrCreateWorkflowRun({
     githubRunId: runId,
@@ -434,6 +465,7 @@ async function main(): Promise<void> {
   // ── Ingest benchmark results ──────────────────────────────────────────
 
   console.log('\n--- Benchmark Results ---');
+  const retainedPowerPoints: BenchmarkParams[] = [];
   if (evalsOnly) {
     console.log('  Skipped (evals-only run)');
   } else {
@@ -481,11 +513,13 @@ async function main(): Promise<void> {
     for (const [fileIndex, file] of allBmkFiles.entries()) {
       const fileStart = Date.now();
       const relativeFile = path.relative(artifactsDir, file);
+      const artifactSha256 = createHash('sha256').update(fs.readFileSync(file)).digest('hex');
       console.log(
         `  [${fileIndex + 1}/${allBmkFiles.length}] ${relativeFile} (${formatBytes(fileSize(file))})`,
       );
       const data = readJson(file);
       if (!data) {
+        powerPublicationErrors.push(`Unreadable benchmark JSON: ${relativeFile}`);
         console.log(`    skipped unreadable JSON (${elapsed(fileStart)})`);
         continue;
       }
@@ -503,7 +537,13 @@ async function main(): Promise<void> {
 
       const rows = rawRows
         .filter((r) => typeof r === 'object' && r !== null)
-        .map((r) => mapBenchmarkRow(r, tracker))
+        .map((r) => {
+          const mapped = mapBenchmarkRow(r, tracker, undefined, runIdStr);
+          if (!mapped && Number(r.isl) === 8192 && Number(r.osl) === 1024) {
+            powerPublicationErrors.push(`Unmapped or failed 8K/1K result: ${relativeFile}`);
+          }
+          return mapped;
+        })
         .filter((r): r is NonNullable<typeof r> => r !== null);
 
       console.log(`    mapped rows: ${rows.length}`);
@@ -554,6 +594,13 @@ async function main(): Promise<void> {
               `config ${configId}, conc ${row.conc}`,
           );
         }
+        const publication = powerPublicationPoint(
+          applied.point,
+          `https://github.com/${REPO}/actions/runs/${runIdNum}/attempts/${runAttemptNum}`,
+          { path: relativeFile, sha256: artifactSha256 },
+        );
+        if (publication)
+          powerPublicationPoints.set(publicationIdentity(publication.identity), publication);
         toInsert.push(applied.point);
       }
       console.log(`    rows with resolved configs: ${toInsert.length}`);
@@ -573,6 +620,7 @@ async function main(): Promise<void> {
           );
           totalNewBmk += newCount;
           totalDupBmk += dupCount;
+          if (requiredPowerPoints.length > 0) retainedPowerPoints.push(...toInsert);
 
           // Build availability only after successful insert
           for (const r of toInsert) {
@@ -713,6 +761,7 @@ async function main(): Promise<void> {
       await Promise.all(traceTasks);
     }
     await traceWorkerPool.close();
+    assertRequiredPowerPointsRetained(requiredPowerPoints, retainedPowerPoints);
     console.log(`  Benchmarks: +${totalNewBmk} new, ${totalDupBmk} dup`);
     if (totalTraceReplayLinked > 0 || tracker.skips.traceReplayMissing > 0) {
       console.log(
@@ -815,7 +864,7 @@ async function main(): Promise<void> {
 
     for (const row of data) {
       if (typeof row !== 'object' || row === null) continue;
-      const mapped = mapAggEvalRow(row as Record<string, any>, tracker);
+      const mapped = mapAggEvalRow(row as Record<string, any>, tracker, runIdStr);
       if (!mapped) continue;
 
       try {
@@ -860,7 +909,7 @@ async function main(): Promise<void> {
     const results = readJson(path.join(dir, resultsName)) as Record<string, any> | null;
     if (!meta || !results) continue;
 
-    const evalParamsList = mapEvalRow(meta, results, tracker);
+    const evalParamsList = mapEvalRow(meta, results, tracker, runIdStr);
     if (evalParamsList.length === 0) continue;
 
     // Map each task name → samples jsonl text. lm-eval names them
@@ -989,10 +1038,31 @@ async function main(): Promise<void> {
 
 main()
   .catch((error) => {
+    powerPublicationErrors.push(error instanceof Error ? error.message : String(error));
     console.error('ingest-ci-run failed:', error);
     process.exitCode = 1;
   })
   .finally(() => {
+    const publicationPath = process.env.POWER_PUBLICATION_MANIFEST;
+    if (publicationPath) {
+      fs.writeFileSync(
+        publicationPath,
+        `${JSON.stringify(
+          {
+            version: 1,
+            runId: runIdNum,
+            runAttempt: runAttemptNum,
+            points: [...powerPublicationPoints.values()],
+            ingestErrors: [
+              ...powerPublicationErrors,
+              ...(tracker.skips.dbError ? [`${tracker.skips.dbError} database ingest errors`] : []),
+            ],
+          },
+          null,
+          2,
+        )}\n`,
+      );
+    }
     if (tempDir) {
       try {
         fs.rmSync(tempDir, { recursive: true, force: true });

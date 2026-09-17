@@ -22,21 +22,17 @@ import {
   pickRotated,
   type SsrInterpolatedRow,
 } from '@/lib/compare-ssr';
-import {
-  type VariantBoth,
-  type VariantCompareKind,
-  variantJsonLdEntryFor,
-} from '@/lib/compare-variant-ssr';
+import { type VariantBoth, type VariantCompareKind } from '@/lib/compare-variant-ssr';
 
 // ---------------------------------------------------------------------------
 // Band phrase -- Chinese
 // ---------------------------------------------------------------------------
 
-const BAND_PHRASE_ZH: Record<'low' | 'middle' | 'high', string> = {
-  low: '低端',
-  middle: '中部',
-  high: '高端',
-};
+function bandPositionZh(target: number, range: string, band: 'low' | 'middle' | 'high'): string {
+  if (band === 'low') return `${target} tok/s/user 接近 ${range} 交互性区间的下限`;
+  if (band === 'high') return `${target} tok/s/user 接近 ${range} 交互性区间的上限`;
+  return `${target} tok/s/user 位于 ${range} 交互性区间的中段`;
+}
 
 // ---------------------------------------------------------------------------
 // Shared template-input type — imported from the EN module so the two files
@@ -44,18 +40,29 @@ const BAND_PHRASE_ZH: Record<'low' | 'middle' | 'high', string> = {
 // ---------------------------------------------------------------------------
 
 function variantFullSummaryZh(i: VariantBoth): string {
+  const cheaper = i.cheaper === '关闭' || i.cheaper === 'Off' ? '关闭投机解码' : i.cheaper;
+  const faster = i.faster === '关闭' || i.faster === 'Off' ? '关闭投机解码' : i.faster;
   const costPart = i.costTied
     ? '每 token 成本基本持平'
     : i.costRatio === null
       ? null
-      : `${i.cheaper} 每 token 成本低 ${fmtPctDelta(i.costRatio)}`;
+      : `${cheaper} 的成本效率高出 ${fmtPctDelta(i.costRatio)}`;
   const tputPart = i.tputTied
-    ? '每芯片吞吐量基本持平'
+    ? '单芯片吞吐量基本持平'
     : i.tputRatio === null
       ? null
-      : `${i.faster} 每芯片吞吐量高出 ${fmtPctDelta(i.tputRatio)}`;
+      : `${faster} 的单芯片吞吐量高出 ${fmtPctDelta(i.tputRatio)}`;
   const both = [costPart, tputPart].filter(Boolean).join('；');
-  return both.length > 0 ? both : '差距极小，难以判定优劣';
+  return both.length > 0 ? both : '缺少可比较的有效数据';
+}
+
+function specDecodeStateZh(label: string): string {
+  return label === '关闭' || label === 'Off' ? '关闭投机解码' : `启用 ${label}`;
+}
+
+function variantStateAtZh(kind: VariantCompareKind, label: string): string {
+  if (kind === 'precision') return `采用 ${label} 时`;
+  return label === '关闭' || label === 'Off' ? '关闭投机解码时' : `启用 ${label} 时`;
 }
 
 // ---------------------------------------------------------------------------
@@ -64,13 +71,13 @@ function variantFullSummaryZh(i: VariantBoth): string {
 
 const PRECISION_BOTH_TEMPLATES_ZH: ((i: VariantBoth) => string)[] = [
   (i) =>
-    `在 ${i.modelLabel}（${i.gpuLabel}）上以 ${i.target} tok/s/user 交互性运行时，${i.aLabel} 吞吐量为 ${i.aValue.toFixed(0)} tok/s/chip，每百万 token 成本 ${fmtCost(i.aCost)}；${i.bLabel} 吞吐量为 ${i.bValue.toFixed(0)} tok/s/chip，成本 ${fmtCost(i.bCost)}。${variantFullSummaryZh(i)}。低精度量化以模型精度换取吞吐量——请查看评估页面了解质量影响。`,
+    `在 ${i.gpuLabel} 上运行 ${i.modelLabel}，目标交互性为 ${i.target} tok/s/user 时，${i.aLabel} 的吞吐量为 ${i.aValue.toFixed(0)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.aCost)}；${i.bLabel} 的吞吐量为 ${i.bValue.toFixed(0)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.bCost)}。${variantFullSummaryZh(i)}。较低的量化精度以模型准确率为代价换取更高吞吐量；如需了解对模型质量的影响，请查看评估页。`,
   (i) =>
-    `${i.aLabel} 在 ${i.modelLabel}（${i.gpuLabel}）上以 ${i.target} tok/s/user 运行时达到 ${i.aValue.toFixed(0)} tok/s/chip（每百万 token ${fmtCost(i.aCost)}）；${i.bLabel} 达到 ${i.bValue.toFixed(0)} tok/s/chip（${fmtCost(i.bCost)}）。${variantFullSummaryZh(i)}。量化级别的精度差异在评估页面中跟踪。`,
+    `当 ${i.modelLabel} 在 ${i.gpuLabel} 上的目标交互性为 ${i.target} tok/s/user 时，${i.aLabel} 的吞吐量为 ${i.aValue.toFixed(0)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.aCost)}；${i.bLabel} 的吞吐量为 ${i.bValue.toFixed(0)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.bCost)}。${variantFullSummaryZh(i)}。不同量化精度下的模型准确率差异可在评估页查看。`,
   (i) =>
-    `${i.modelLabel}（${i.gpuLabel}）在 ${i.target} tok/s/user 交互性下的吞吐量：${i.aLabel} 为 ${i.aValue.toFixed(0)} tok/s/chip，${i.bLabel} 为 ${i.bValue.toFixed(0)}。每百万 token 成本分别为 ${fmtCost(i.aCost)} 和 ${fmtCost(i.bCost)}。${variantFullSummaryZh(i)}。低精度带来的成本-吞吐量权衡只是全貌的一部分——请参阅评估页面的精度数据。`,
+    `在 ${i.gpuLabel} 上运行 ${i.modelLabel}，目标交互性为 ${i.target} tok/s/user 时，${i.aLabel} 与 ${i.bLabel} 的吞吐量分别为 ${i.aValue.toFixed(0)} 和 ${i.bValue.toFixed(0)} tok/s/chip，每百万 token 成本分别为 ${fmtCost(i.aCost)} 和 ${fmtCost(i.bCost)}。${variantFullSummaryZh(i)}。较低量化精度下的成本与吞吐量权衡只是整体考量的一部分；模型准确率数据请参阅评估页。`,
   (i) =>
-    `在 ${i.range} 交互性区间的${BAND_PHRASE_ZH[i.band]}，即 ${i.modelLabel}（${i.gpuLabel}）上以 ${i.target} tok/s/user 运行时：${i.aLabel} 达到 ${i.aValue.toFixed(0)} tok/s/chip（${fmtCost(i.aCost)}/百万 token），${i.bLabel} 达到 ${i.bValue.toFixed(0)}（${fmtCost(i.bCost)}/百万）。${variantFullSummaryZh(i)}。精度变更同时影响推理速度和模型质量——请查阅评估页面的精度基准测试。`,
+    `${bandPositionZh(i.target, i.range, i.band)}。在这一运行点，${i.aLabel} 在 ${i.gpuLabel} 上运行 ${i.modelLabel} 的吞吐量为 ${i.aValue.toFixed(0)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.aCost)}；${i.bLabel} 的吞吐量为 ${i.bValue.toFixed(0)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.bCost)}。${variantFullSummaryZh(i)}。调整量化精度会同时影响推理速度和模型质量；模型准确率基准测试请参阅评估页。`,
 ];
 
 // ---------------------------------------------------------------------------
@@ -79,17 +86,18 @@ const PRECISION_BOTH_TEMPLATES_ZH: ((i: VariantBoth) => string)[] = [
 
 const SPEC_DECODE_BOTH_TEMPLATES_ZH: ((i: VariantBoth) => string)[] = [
   (i) =>
-    `在 ${i.modelLabel}（${i.gpuLabel}）上以 ${i.target} tok/s/user 交互性运行时，${i.aLabel} 吞吐量为 ${i.aValue.toFixed(0)} tok/s/chip，每百万 token 成本 ${fmtCost(i.aCost)}；${i.bLabel} 吞吐量为 ${i.bValue.toFixed(0)} tok/s/chip，成本 ${fmtCost(i.bCost)}。${variantFullSummaryZh(i)}。投机解码通过接受草稿 token 来降低每 token 延迟——收益因工作负载和提示分布而异。`,
+    `在 ${i.gpuLabel} 上运行 ${i.modelLabel}，目标交互性设为 ${i.target} tok/s/user：${variantStateAtZh('spec-decode', i.aLabel)}，吞吐量为 ${i.aValue.toFixed(0)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.aCost)}；${variantStateAtZh('spec-decode', i.bLabel)}，吞吐量为 ${i.bValue.toFixed(0)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.bCost)}。${variantFullSummaryZh(i)}。投机解码通过接受 draft token 降低每 token 延迟；收益因工作负载和 prompt 分布而异。`,
   (i) =>
-    `${i.aLabel} 在 ${i.modelLabel}（${i.gpuLabel}）上以 ${i.target} tok/s/user 运行时达到 ${i.aValue.toFixed(0)} tok/s/chip（每百万 token ${fmtCost(i.aCost)}）；${i.bLabel} 达到 ${i.bValue.toFixed(0)} tok/s/chip（${fmtCost(i.bCost)}）。${variantFullSummaryZh(i)}。草稿 token 的接受率决定了投机解码在给定并发水平下是否有效。`,
+    `${i.modelLabel} 在 ${i.gpuLabel} 上的目标交互性设为 ${i.target} tok/s/user：${variantStateAtZh('spec-decode', i.aLabel)}，吞吐量为 ${i.aValue.toFixed(0)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.aCost)}；${variantStateAtZh('spec-decode', i.bLabel)}，吞吐量为 ${i.bValue.toFixed(0)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.bCost)}。${variantFullSummaryZh(i)}。draft token 接受率决定了在给定并发数下，投机解码是提升性能还是拖累性能。`,
   (i) =>
-    `${i.modelLabel}（${i.gpuLabel}）在 ${i.target} tok/s/user 交互性下的吞吐量：${i.aLabel} 为 ${i.aValue.toFixed(0)} tok/s/chip，${i.bLabel} 为 ${i.bValue.toFixed(0)}。每百万 token 成本分别为 ${fmtCost(i.aCost)} 和 ${fmtCost(i.bCost)}。${variantFullSummaryZh(i)}。投机解码以额外的草稿 token 计算换取更少的解码步骤——收益取决于序列长度和批大小。`,
+    `在 ${i.gpuLabel} 上运行 ${i.modelLabel}，目标交互性设为 ${i.target} tok/s/user：${variantStateAtZh('spec-decode', i.aLabel)}，吞吐量为 ${i.aValue.toFixed(0)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.aCost)}；${variantStateAtZh('spec-decode', i.bLabel)}，吞吐量为 ${i.bValue.toFixed(0)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.bCost)}。${variantFullSummaryZh(i)}。投机解码会增加 draft token 的计算量，以减少解码步数；收益取决于序列长度和批大小。`,
   (i) =>
-    `在 ${i.range} 交互性区间的${BAND_PHRASE_ZH[i.band]}，即 ${i.modelLabel}（${i.gpuLabel}）上以 ${i.target} tok/s/user 运行时：${i.aLabel} 达到 ${i.aValue.toFixed(0)} tok/s/chip（${fmtCost(i.aCost)}/百万 token），${i.bLabel} 达到 ${i.bValue.toFixed(0)}（${fmtCost(i.bCost)}/百万）。${variantFullSummaryZh(i)}。投机解码的收益因工作负载而异；短输出提示获益通常较小。`,
+    `${bandPositionZh(i.target, i.range, i.band)}。在这一运行点，${variantStateAtZh('spec-decode', i.aLabel)}，吞吐量为 ${i.aValue.toFixed(0)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.aCost)}；${variantStateAtZh('spec-decode', i.bLabel)}，吞吐量为 ${i.bValue.toFixed(0)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.bCost)}。${variantFullSummaryZh(i)}。投机解码的收益因工作负载而异；输出较短的 prompt 通常收益较小。`,
 ];
 
 // Single-side templates -- Chinese (shared by both kinds)
 const VARIANT_SINGLE_TEMPLATES_ZH: ((args: {
+  kind: VariantCompareKind;
   modelLabel: string;
   gpuLabel: string;
   presentLabel: string;
@@ -99,11 +107,11 @@ const VARIANT_SINGLE_TEMPLATES_ZH: ((args: {
   presentCost: number;
 }) => string)[] = [
   (i) =>
-    `在 ${i.modelLabel}（${i.gpuLabel}）上以 ${i.target} tok/s/user 运行时，${i.presentLabel} 吞吐量为 ${i.presentValue.toFixed(0)} tok/s/chip，每百万 token 成本 ${fmtCost(i.presentCost)}；${i.missingLabel} 在此目标点没有基准测试数据。`,
+    `在 ${i.gpuLabel} 上运行 ${i.modelLabel}，目标交互性设为 ${i.target} tok/s/user：${variantStateAtZh(i.kind, i.presentLabel)}，吞吐量为 ${i.presentValue.toFixed(0)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.presentCost)}；${variantStateAtZh(i.kind, i.missingLabel)}，该运行点暂无基准测试数据。`,
   (i) =>
-    `${i.presentLabel} 在 ${i.modelLabel}（${i.gpuLabel}）上以 ${i.target} tok/s/user 运行时达到 ${i.presentValue.toFixed(0)} tok/s/chip（每百万 token ${fmtCost(i.presentCost)}）。${i.missingLabel} 在此工作点没有数据。`,
+    `${i.modelLabel} 在 ${i.gpuLabel} 上的目标交互性设为 ${i.target} tok/s/user：${variantStateAtZh(i.kind, i.presentLabel)}，吞吐量为 ${i.presentValue.toFixed(0)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.presentCost)}；${variantStateAtZh(i.kind, i.missingLabel)}，该运行点暂无数据。`,
   (i) =>
-    `${i.presentLabel}：${i.presentValue.toFixed(0)} tok/s/chip，每百万 token ${fmtCost(i.presentCost)}（${i.modelLabel}（${i.gpuLabel}）上以 ${i.target} tok/s/user 运行）。${i.missingLabel} 在此点尚未测试。`,
+    `在 ${i.gpuLabel} 上运行 ${i.modelLabel}，目标交互性设为 ${i.target} tok/s/user：${variantStateAtZh(i.kind, i.presentLabel)}，吞吐量为 ${i.presentValue.toFixed(0)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.presentCost)}；${variantStateAtZh(i.kind, i.missingLabel)}，该运行点尚未测试。`,
 ];
 
 // ---------------------------------------------------------------------------
@@ -169,6 +177,7 @@ export function variantCompareNarrativeZh(
         pageSeed,
         rowIndex,
       )({
+        kind,
         modelLabel,
         gpuLabel,
         presentLabel: a ? aLabel : bLabel,
@@ -187,6 +196,42 @@ export function variantCompareNarrativeZh(
 // JSON-LD -- Chinese
 // ---------------------------------------------------------------------------
 
+function variantJsonLdEntryForZh(label: string, summary: PairSummary, position: number) {
+  const props: { name: string; value: string | number }[] = [{ name: '类别', value: '配置方案' }];
+  if (summary.bestThroughputPerGpu !== null) {
+    props.push({
+      name: '最高单芯片吞吐量（tok/s）',
+      value: Number(summary.bestThroughputPerGpu.toFixed(2)),
+    });
+  }
+  if (summary.bestMedianTtft !== null) {
+    props.push({
+      name: '最低 TTFT 中位数（s）',
+      value: Number(summary.bestMedianTtft.toFixed(3)),
+    });
+  }
+  if (summary.bestMedianTpot !== null) {
+    props.push({
+      name: '最低 TPOT 中位数（s）',
+      value: Number(summary.bestMedianTpot.toFixed(4)),
+    });
+  }
+  props.push({ name: '基准测试配置数', value: summary.configCount });
+  return {
+    '@type': 'ListItem',
+    position,
+    item: {
+      '@type': 'Thing',
+      name: label,
+      additionalProperty: props.map((property) => ({
+        '@type': 'PropertyValue',
+        name: property.name,
+        value: property.value,
+      })),
+    },
+  };
+}
+
 export function buildVariantJsonLdZh(
   kind: VariantCompareKind,
   model: CompareModelSlug,
@@ -203,46 +248,51 @@ export function buildVariantJsonLdZh(
 ) {
   const gpuMeta = HW_REGISTRY[gpuKey];
   const gpuDisplayLabel = gpuMeta?.label ?? gpuKey.toUpperCase();
-  const kindLabel = kind === 'precision' ? '精度对比' : '投机解码对比';
+  const kindLabel = kind === 'precision' ? '量化精度对比' : '投机解码对比';
+  const aDisplayLabel = kind === 'precision' ? aLabel : specDecodeStateZh(aLabel);
+  const bDisplayLabel = kind === 'precision' ? bLabel : specDecodeStateZh(bLabel);
+  const pairLabel =
+    kind === 'precision' ? `${aLabel} 与 ${bLabel}` : `${aDisplayLabel} 与 ${bDisplayLabel}`;
 
-  const itemListName = `${model.label} ${kindLabel} — ${aLabel} vs ${bLabel}（${gpuDisplayLabel}）`;
+  const itemListName = `${model.label} ${kindLabel}：${pairLabel}（${gpuDisplayLabel}）`;
   const itemListDescription =
     kind === 'precision'
-      ? `${model.label} 在 ${gpuDisplayLabel} 上的 ${aLabel} 与 ${bLabel} 精度对比。在相同交互性水平下对齐的吞吐量、成本和交互性。`
-      : `${model.label} 在 ${gpuDisplayLabel} 上的 ${aLabel} 与 ${bLabel} 投机解码对比。在相同交互性水平下对齐的吞吐量、成本和交互性。`;
-  const datasetName = `${aLabel} vs ${bLabel}（${model.label}，${gpuDisplayLabel}）${kindLabel}`;
+      ? `对比 ${model.label} 在 ${gpuDisplayLabel} 上采用 ${aLabel} 与 ${bLabel} 两种量化精度时的表现，并在相同交互性水平下比较吞吐量和成本。`
+      : `对比 ${model.label} 在 ${gpuDisplayLabel} 上的两种配置（${aDisplayLabel}、${bDisplayLabel}），并在相同交互性水平下比较吞吐量和成本。`;
+  const datasetName = `${model.label} ${kindLabel}：${pairLabel}（${gpuDisplayLabel}）`;
   const datasetDescription =
     kind === 'precision'
-      ? `${model.label}（${gpuDisplayLabel}）上 ${aLabel} 与 ${bLabel} 精度在相同交互性水平下的插值吞吐量和成本。`
-      : `${model.label}（${gpuDisplayLabel}）上 ${aLabel} 与 ${bLabel} 投机解码在相同交互性水平下的插值吞吐量和成本。`;
+      ? `${model.label} 在 ${gpuDisplayLabel} 上采用 ${aLabel} 与 ${bLabel} 两种量化精度时的插值对比数据；在相同交互性水平下比较吞吐量和成本。`
+      : `${model.label} 在 ${gpuDisplayLabel} 上两种配置（${aDisplayLabel}、${bDisplayLabel}）的插值对比数据；在相同交互性水平下比较吞吐量和成本。`;
 
   const comparisonRows = ssrRows
     .filter((row) => row.a || row.b)
     .map((row) => {
       const metrics: { name: string; value: string }[] = [
-        { name: 'Model', value: model.displayName },
-        { name: 'Chip', value: gpuDisplayLabel },
-        { name: 'Target Interactivity (tok/s/user)', value: String(row.target) },
+        { name: '模型', value: model.displayName },
+        { name: '芯片', value: gpuDisplayLabel },
+        { name: '目标交互性（tok/s/user）', value: String(row.target) },
       ];
       if (row.a) {
         metrics.push(
-          { name: `${aLabel} Throughput (tok/s/chip)`, value: row.a.value.toFixed(1) },
-          { name: `${aLabel} Cost ($/M tok)`, value: row.a.cost.toFixed(3) },
-          { name: `${aLabel} tok/s/MW`, value: row.a.tpPerMw.toFixed(0) },
-          { name: `${aLabel} Concurrency`, value: String(Math.round(row.a.concurrency)) },
+          { name: `${aDisplayLabel}：吞吐量（tok/s/chip）`, value: row.a.value.toFixed(1) },
+          { name: `${aDisplayLabel}：成本（$/M tok）`, value: row.a.cost.toFixed(3) },
+          { name: `${aDisplayLabel}：能效（tok/s/MW）`, value: row.a.tpPerMw.toFixed(0) },
+          { name: `${aDisplayLabel}：并发数`, value: String(Math.round(row.a.concurrency)) },
         );
       }
       if (row.b) {
         metrics.push(
-          { name: `${bLabel} Throughput (tok/s/chip)`, value: row.b.value.toFixed(1) },
-          { name: `${bLabel} Cost ($/M tok)`, value: row.b.cost.toFixed(3) },
-          { name: `${bLabel} tok/s/MW`, value: row.b.tpPerMw.toFixed(0) },
-          { name: `${bLabel} Concurrency`, value: String(Math.round(row.b.concurrency)) },
+          { name: `${bDisplayLabel}：吞吐量（tok/s/chip）`, value: row.b.value.toFixed(1) },
+          { name: `${bDisplayLabel}：成本（$/M tok）`, value: row.b.cost.toFixed(3) },
+          { name: `${bDisplayLabel}：能效（tok/s/MW）`, value: row.b.tpPerMw.toFixed(0) },
+          { name: `${bDisplayLabel}：并发数`, value: String(Math.round(row.b.concurrency)) },
         );
       }
       return {
         '@type': 'Dataset',
-        name: `${model.label} 在 ${row.target} tok/s/user 交互性下的${kind === 'precision' ? '精度' : '投机解码'}对比`,
+        name: `${model.label}：目标交互性 ${row.target} tok/s/user 下的${kindLabel}`,
+        inLanguage: 'zh-CN',
         variableMeasured: metrics.map((m) => ({
           '@type': 'PropertyValue',
           name: m.name,
@@ -254,14 +304,14 @@ export function buildVariantJsonLdZh(
   const keywords = [
     ...new Set(
       [
-        'AI inference benchmark',
-        kind === 'precision' ? 'precision comparison' : 'speculative decoding comparison',
-        'inference throughput',
-        'tokens per second',
+        'AI 推理基准测试',
+        kind === 'precision' ? '精度对比' : '投机解码对比',
+        '推理吞吐量',
+        '每秒 token 数',
         model.label,
         gpuDisplayLabel,
-        aLabel,
-        bLabel,
+        aDisplayLabel,
+        bDisplayLabel,
         gpuMeta?.vendor,
       ].filter(Boolean),
     ),
@@ -280,8 +330,8 @@ export function buildVariantJsonLdZh(
         itemListOrder: 'https://schema.org/ItemListOrderAscending',
         numberOfItems: 2,
         itemListElement: [
-          variantJsonLdEntryFor(aLabel, summaryA, 1),
-          variantJsonLdEntryFor(bLabel, summaryB, 2),
+          variantJsonLdEntryForZh(aDisplayLabel, summaryA, 1),
+          variantJsonLdEntryForZh(bDisplayLabel, summaryB, 2),
         ],
       },
       ...(comparisonRows.length > 0
@@ -295,7 +345,7 @@ export function buildVariantJsonLdZh(
               license: 'https://www.apache.org/licenses/LICENSE-2.0',
               isAccessibleForFree: true,
               measurementTechnique:
-                'Open-source automated chip CI/CD inference benchmark (github.com/SemiAnalysisAI/InferenceX)',
+                '通过开源 CI/CD 自动执行的芯片推理基准测试（github.com/SemiAnalysisAI/InferenceX）',
               keywords,
               ...(datePublished && { datePublished }),
               ...(dateModified && { dateModified }),

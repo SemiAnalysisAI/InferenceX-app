@@ -15,6 +15,9 @@ const CALCULATOR_METRIC_KEYS = new Set([
   // per row — so it has to survive the allowlist either way. See
   // `measuredCacheHitRate` for why the two are not simply summed.
   'server_cpu_cache_hit_rate',
+  // GB300 AgentX rows without a server measurement price cached input from the
+  // trace's theoretical ceiling instead. See `pricingCacheHitRate`.
+  'theoretical_cache_hit_rate',
   ...['median', 'p75', 'p90'].flatMap((percentile) =>
     ['intvty', 'itl', 'full_response_itl', 'e2el', 'ttlt'].map(
       (metric) => `${percentile}_${metric}`,
@@ -28,6 +31,8 @@ interface BenchmarkViewRow {
   osl: number | null;
   metrics: Record<string, unknown>;
   workers?: unknown;
+  power_invalid_reasons?: unknown;
+  power_audit?: unknown;
 }
 
 /**
@@ -42,7 +47,12 @@ export function toCalculatorBenchmarkRows<T extends BenchmarkViewRow>(
   return rows
     .filter((row) => rowToSequence(row) === sequence)
     .map((row) => {
-      const { workers: _workers, ...rest } = row;
+      const {
+        workers: _workers,
+        power_invalid_reasons: _powerInvalidReasons,
+        power_audit: _powerAudit,
+        ...rest
+      } = row;
       return {
         ...rest,
         metrics: Object.fromEntries(

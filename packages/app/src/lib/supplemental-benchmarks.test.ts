@@ -1,3 +1,5 @@
+import { transformBenchmarkRows } from './benchmark-transform';
+import { getPointLabel } from '@/components/inference/utils/tooltipUtils';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -10,8 +12,8 @@ import {
 } from './supplemental-benchmarks';
 
 describe('supplemental benchmark snapshots', () => {
-  it('ships every supplied Jalapeño and July VR200 point', () => {
-    expect(SUPPLEMENTAL_BENCHMARK_ROWS).toHaveLength(50);
+  it('ships every supplied Jalapeño, July VR200, and TPUv7 point', () => {
+    expect(SUPPLEMENTAL_BENCHMARK_ROWS).toHaveLength(57);
     expect(SUPPLEMENTAL_BENCHMARK_ROWS.filter((row) => row.hardware === 'jalapeno')).toHaveLength(
       36,
     );
@@ -27,6 +29,40 @@ describe('supplemental benchmark snapshots', () => {
         'https://www.coreweave.com/blog/nvidia-vera-rubin-nvl72-on-coreweave-10x-more-tokens-per-megawatt-than-blackwell',
       ]),
     );
+  });
+
+  it('keeps TPUv7 FP8 rows and availability separate from legacy FP4 snapshots', () => {
+    const rows = withSupplementalBenchmarks([], { model: 'Qwen-3.5-397B-A17B' }).filter(
+      (row) => row.hardware === 'tpuv7',
+    );
+    expect(rows.map((row) => row.conc)).toEqual([4, 8, 16, 32, 64, 128, 256]);
+    for (const row of rows) {
+      expect(row).toMatchObject({
+        precision: 'fp8',
+        isl: 8192,
+        osl: 1024,
+        date: '2026-08-26',
+        framework: 'vllm',
+      });
+    }
+    expect(rows[0].metrics.output_tput_per_gpu).toBeCloseTo(123.001518);
+    expect(withSupplementalAvailability([]).find((row) => row.hardware === 'tpuv7')).toMatchObject({
+      model: 'qwen3.5',
+      precision: 'fp8',
+      isl: 8192,
+      osl: 1024,
+    });
+    expect(
+      SUPPLEMENTAL_BENCHMARK_ROWS.filter((row) => row.hardware !== 'tpuv7').every(
+        (row) => row.precision === 'fp4',
+      ),
+    ).toBe(true);
+    const history = withSupplementalBenchmarkHistory([], {
+      model: 'qwen3.5',
+      isl: 8192,
+      osl: 1024,
+    });
+    expect(history.filter((row) => row.hardware === 'tpuv7')).toHaveLength(7);
   });
 
   it('resolves the newest snapshot independently per hardware curve', () => {
@@ -54,8 +90,8 @@ describe('supplemental benchmark snapshots', () => {
     );
 
     const availability = withSupplementalAvailability([]);
-    expect(availability).toHaveLength(5);
-    expect(withSupplementalAvailability(availability)).toHaveLength(5);
+    expect(availability).toHaveLength(6);
+    expect(withSupplementalAvailability(availability)).toHaveLength(6);
   });
 
   it('limits only the July VR200 snapshot to output-token metrics', () => {
@@ -80,5 +116,29 @@ describe('supplemental benchmark snapshots', () => {
     expect(supportsChartTokenMetric('vr200_coreweave-vera-rubin', '2026-09-01', 'total')).toBe(
       true,
     );
+  });
+});
+
+describe('TPUv7 recorded topology and metrics', () => {
+  it('counts physical chips separately from TP and preserves the DP8 configuration', () => {
+    const rows = withSupplementalBenchmarks([], { model: 'qwen3.5' }).filter(
+      (row) => row.hardware === 'tpuv7',
+    );
+    expect(rows).toHaveLength(7);
+    expect(rows.every((row) => row.num_decode_gpu === 4 && row.num_prefill_gpu === 4)).toBe(true);
+    const { chartData } = transformBenchmarkRows(rows);
+    const low = chartData[0].find((p) => p.conc === 4)!;
+    const high = chartData[0].find((p) => p.conc === 256)!;
+    expect(low.tp).toBe(4);
+    expect(low.decode_tp).toBe(8);
+    expect(low.dp).toBe(1);
+    expect(high.tp).toBe(4);
+    expect(high.decode_tp).toBe(1);
+    expect(high.dp).toBe(8);
+    expect(getPointLabel(high)).toBe('TP1/DP8');
+    expect(high.tpPerGpu.y).toBeCloseTo(9363.824997632008);
+    expect(high.p90_ttft).not.toBe(high.median_ttft);
+    expect(rows[0].run_url).toBeNull();
+    expect(rows[0].image).toBeNull();
   });
 });

@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { notFound, permanentRedirect } from 'next/navigation';
+import { notFound } from 'next/navigation';
 
 import { AUTHOR_NAME, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
@@ -21,7 +21,6 @@ import {
 
 interface Props {
   params: Promise<{ model: string }>;
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
 export function generateStaticParams(): { model: string }[] {
@@ -54,24 +53,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
-export default async function ZhInferenceModelPage({ params, searchParams }: Props) {
+export default async function ZhInferenceModelPage({ params }: Props) {
   const { model } = await params;
   const entry = getInferenceModelBySlug(model);
   if (!entry) notFound();
-  // Preserves the query string so share-link params like `?i_seq=` and
-  // `?i_prec=` survive the redirect — same treatment as the compare pages.
-  if (model !== entry.slug) {
-    const sp = await searchParams;
-    const qs = Object.entries(sp)
-      .flatMap(([k, v]) => {
-        if (Array.isArray(v)) return v.map((vv) => [k, vv] as const);
-        if (v === undefined) return [];
-        return [[k, v] as const];
-      })
-      .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
-      .join('&');
-    permanentRedirect(`${zhPath(inferenceModelPath(entry.slug))}${qs ? `?${qs}` : ''}`);
-  }
+  // Known aliases are canonicalized in next.config.ts before this SSG route
+  // renders. Next's config redirect also preserves the incoming query string.
   return (
     <>
       <ZhTabIntro tab="inference" />

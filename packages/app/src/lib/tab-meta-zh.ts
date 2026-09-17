@@ -40,7 +40,17 @@ export const TAB_META_ZH: Record<DashboardRouteKey, { title: string; description
   fleet: {
     title: '集群生命周期经济性',
     description:
-      '测算固定 AI 推理集群在整个生命周期内的经济性：按设施功率预算确定集群规模，并跟踪实测软件配置随时间改进带来的收入、成本与利润率变化。',
+      '测算固定 AI 推理集群在整个生命周期内的经济性：按设施功率预算确定集群规模，并跟踪实测软件配置随时间改进带来的收入、成本与利润变化。',
+  },
+  'profit-estimator': {
+    title: '推理利润估算器',
+    description:
+      '估算每款芯片每小时的 AI 推理收益：在选定交互性与利用率下的收入，拆分为算力支出（TCO $/chip/hr）、模型许可费与运营方利润。',
+  },
+  'profit-estimator-per-gigawatt': {
+    title: '每吉瓦推理利润估算器',
+    description:
+      '估算每款芯片一个吉瓦年的 AI 推理收益：在选定交互性与利用率下的收入，拆分为算力支出（TCO）、模型许可费与运营方利润。',
   },
   reliability: {
     title: '服务商可靠性指标',
@@ -54,6 +64,11 @@ export const TAB_META_ZH: Record<DashboardRouteKey, { title: string; description
   'gpu-metrics': {
     title: '芯片功耗与能效指标',
     description: 'AI 推理负载下的芯片功耗与能效指标。跨硬件对比每瓦 token 数。',
+  },
+  operatorx: {
+    title: 'OperatorX GEMM、Attention 和 MoE 基准测试',
+    description:
+      '查看 OperatorX 实测 GEMM、attention 和路由 MoE 的单卡 TFLOPS 与延迟，按形状、精度和后端筛选，并检查运行覆盖情况。',
   },
   collectivex: {
     title: 'CollectiveX 通信基准测试',
@@ -73,6 +88,10 @@ export const TAB_META_ZH: Record<DashboardRouteKey, { title: string; description
     title: 'InferenceX 当前镜像',
     description:
       '各模型、芯片 SKU 和配置的当前 InferenceX Docker 镜像标签。对比已部署镜像与最新 vLLM 和 SGLang 发布版本，标记过期标签。',
+  },
+  video: {
+    title: 'H3 视频基准测试',
+    description: '查看 H3 原始视频、音频、测量结果与 CI 来源记录。',
   },
   feedback: {
     title: '用户反馈',
@@ -95,13 +114,19 @@ export const TAB_INTRO_ZH: Record<DashboardRouteKey, string> = {
   calculator:
     '本页面提供吞吐量与总拥有成本（TCO）计算器：基于真实基准测试数据，估算不同芯片配置下 LLM 推理服务的每百万 token 成本与性价比。',
   fleet:
-    '本页面提供集群生命周期经济性分析：按设施功率预算确定固定集群的规模，从模型发布之日起，基于历史基准测试中实测的软件配置改进，测算收入、成本、利润率与回本时间。',
+    '本页面提供集群生命周期经济性分析：按设施功率预算确定固定集群的规模，从模型发布之日起，基于历史基准测试中实测的软件配置改进，测算收入、成本、利润与回本时间。',
+  'profit-estimator':
+    '本页面提供推理利润估算器：在选定的交互性与利用率下，按每芯片每小时计算各芯片的收入，并以堆叠柱形拆分为算力支出（TCO $/chip/hr）、模型实验室从收入中抽取的许可费，以及运营方所剩利润。',
+  'profit-estimator-per-gigawatt':
+    '本页面提供每吉瓦推理利润估算器：在选定的交互性与利用率下，按每全电源配置吉瓦每年计算各芯片的收入，并以堆叠柱形拆分为算力支出（TCO）、模型实验室从收入中抽取的许可费，以及运营方所剩利润。',
   reliability:
     '本页面展示基准测试基础设施的可靠性指标：各芯片集群与服务商的运行成功率、错误率与可用性。',
   'gpu-specs':
     '本页面提供芯片规格对比：NVIDIA、AMD 等厂商加速器的显存容量、显存带宽、FLOPS、互连拓扑与功耗规格。',
   'gpu-metrics':
     '本页面展示芯片功耗与能效指标（PowerX）：推理负载下的实测功耗、每瓦 token 数与每兆瓦 token 产出。',
+  operatorx:
+    '本页面展示 OperatorX 的 GEMM、attention 和路由 MoE 单卡 TFLOPS、实测延迟及完整测试覆盖情况。',
   collectivex:
     '本页面展示 CollectiveX 专家并行（EP）通信基准测试结果：在统一工作负载、正确性校验与采样协议下，对比 DeepEP、MoRI、UCCL 及 NCCL/RCCL 参考实现的分发（dispatch）、合并（combine）与完整往返延迟。跨芯片速率均按逻辑载荷计算；只有发布器确认完整且稳定的官方队列才会生成排名与推荐。',
   submissions:
@@ -110,6 +135,8 @@ export const TAB_INTRO_ZH: Record<DashboardRouteKey, string> = {
     '本页面提供 AI 驱动的图表生成工具：用自然语言描述您想查看的图表，系统会根据 InferenceX 基准测试数据自动生成可视化结果。',
   'current-inferencex-image':
     '本页面展示 InferenceX 当前使用的 Docker 镜像标签：按模型、芯片 SKU 和配置列出已部署版本，并与上游 vLLM、SGLang 最新发布版本对比，方便排查过期镜像。',
+  video:
+    '本页面在浏览器中读取 H3 CI 产物，展示执行状态、测量数据与比较结论；比较阈值在后端标注校准前保持未校准。',
   feedback:
     '本页面为内部反馈查看器：使用解密密钥在浏览器中解密并查阅用户提交的反馈内容，密钥不会离开此页面。',
 };
@@ -121,13 +148,17 @@ export const TAB_LABELS_ZH: Record<DashboardRouteKey, string> = {
   historical: '历史趋势',
   calculator: 'TCO 计算器',
   fleet: '集群生命周期',
+  'profit-estimator': '利润估算',
+  'profit-estimator-per-gigawatt': '每吉瓦利润估算',
   reliability: '可靠性',
   'gpu-specs': '芯片规格',
   'gpu-metrics': '芯片功耗',
+  operatorx: 'OperatorX 算子',
   collectivex: 'CollectiveX 通信',
   submissions: '提交记录',
   'ai-chart': 'AI 图表',
   'current-inferencex-image': '镜像',
+  video: '视频基准测试',
   feedback: '反馈',
 };
 
@@ -176,6 +207,20 @@ export const MODEL_TAB_META_ZH: Record<
       `计算 ${seoName} 推理的吞吐量与总拥有成本（TCO）。跨硬件配置对比 ${seoName} 推理服务的芯片成本效益。`,
     intro: (seoName) =>
       `本页面提供 ${seoName} 吞吐量与总拥有成本（TCO）计算器：基于真实基准测试数据，估算不同芯片配置下 ${seoName} 推理服务的每百万 token 成本与性价比。`,
+  },
+  'profit-estimator': {
+    title: (seoName) => `${seoName} 推理利润估算器`,
+    description: (seoName) =>
+      `估算每款芯片每小时运行 ${seoName} 智能体推理的收益：在选定交互性与利用率下的收入，拆分为算力支出（TCO $/chip/hr）、模型许可费与运营方利润。`,
+    intro: (seoName) =>
+      `本页面按芯片估算每小时运行 ${seoName} 智能体推理的收入、算力支出（TCO $/chip/hr）、模型许可费与运营方利润，可自定义交互性、利用率、模型许可费与 token 售价。`,
+  },
+  'profit-estimator-per-gigawatt': {
+    title: (seoName) => `${seoName} 每吉瓦推理利润估算器`,
+    description: (seoName) =>
+      `估算每款芯片一个吉瓦年运行 ${seoName} 智能体推理的收益：在选定交互性与利用率下的收入，拆分为算力支出（TCO）、模型许可费与运营方利润。`,
+    intro: (seoName) =>
+      `本页面按芯片估算一个全电源配置吉瓦年运行 ${seoName} 智能体推理的收入、算力支出（TCO）、模型许可费与运营方利润，可自定义交互性、利用率、模型许可费与 token 售价。`,
   },
 };
 

@@ -4,7 +4,7 @@ import {
   openXAxisMenu,
   selectXAxisMode,
 } from '../support/e2e';
-import { agenticMetrics } from '../support/agentic-fixtures';
+import { agenticMetrics, measuredPowerMetrics } from '../support/agentic-fixtures';
 import { expandLegendAdvanced } from '../support/legend-advanced';
 
 // This spec exercises the agentic x-axis modes, which only exist when the
@@ -371,6 +371,39 @@ describe('X-axis mode URL param', () => {
 });
 
 describe('Default scenario', () => {
+  for (const width of [1280, 375]) {
+    it(`keeps the labeled scenario field discoverable at ${width}px and recovers from empty data`, () => {
+      cy.viewport(width, 800);
+      interceptAgenticData();
+      interceptDerivedAgenticMetrics();
+      cy.visit('/inference');
+      cy.get('fieldset [data-testid="scenario-selector"]')
+        .should('be.visible')
+        .and('contain.text', 'Agentic');
+      cy.get('label[for="scenario-select"]').should('be.visible').and('contain.text', 'Scenario');
+      cy.get('h2 [data-testid="scenario-selector"]').should('not.exist');
+      cy.get('fieldset [data-testid="scenario-selector"]').click('right', {
+        scrollBehavior: 'center',
+      });
+      cy.contains('[data-select-option]', '8K / 1K').click();
+      cy.contains('No measurements to plot for this selection.').should('be.visible');
+      cy.get('fieldset [data-testid="scenario-selector"]')
+        .should('contain.text', '8K / 1K')
+        .click('right', { scrollBehavior: 'center' });
+      cy.contains('[data-select-option]', 'Agentic').click();
+      cy.get('[data-testid="chart-figure"] h2').should('contain.text', 'Agentic');
+      cy.get('fieldset [data-testid="scenario-selector"]').should('contain.text', 'Agentic');
+    });
+  }
+
+  it('restores the labeled scenario field on the Chinese dashboard', () => {
+    interceptAgenticData();
+    cy.visit('/zh/inference');
+    cy.get('label[for="scenario-select"]').should('be.visible').and('have.text', '场景');
+    cy.get('fieldset [data-testid="scenario-selector"]').should('be.visible');
+    cy.get('h2 [data-testid="scenario-selector"]').should('not.exist');
+  });
+
   it('bare /inference opens on the Agentic scenario when the model has corresponding data', () => {
     // Availability contains BOTH agentic and fixed-seq rows for DeepSeek-V4-Pro,
     // so the untouched 8K/1K selection must not win.
@@ -537,6 +570,126 @@ const interceptAgenticDataWithOverlay = () => {
     },
   }).as('unofficialRun');
 };
+
+const expectCoordinates = (selector: string, expected: number[]) => {
+  cy.get<SVGGElement & { __data__: { x: number } }>(`#chart-0 ${selector}`).should(($points) => {
+    expect($points.length).to.equal(expected.length);
+    expect(Array.from($points, (point) => point.__data__.x).sort((a, b) => a - b)).to.deep.equal(
+      [...expected].sort((a, b) => a - b),
+    );
+    const renderedXs = Array.from($points, (point) => {
+      const transform = point.getAttribute('transform');
+      return Number(transform?.match(/translate\((?<x>[^,]+),/u)?.groups?.x);
+    });
+    expect(renderedXs.every(Number.isFinite), 'finite rendered coordinates').to.equal(true);
+    expect(new Set(renderedXs).size, 'points spread across x-axis').to.equal(expected.length);
+  });
+};
+const expectInteractivity = () => {
+  cy.get('#chart-0 .x-axis-label').should('have.text', 'Interactivity (tok/s/user)');
+  cy.get('[data-testid="chart-figure"] h2').should('contain.text', 'vs. Interactivity');
+  expectCoordinates('.dot-group', [80, 40, 20]);
+  expectCoordinates('.unofficial-overlay-pt', [60, 30]);
+};
+
+describe('Measured prefill metrics preserve the selected x-axis', () => {
+  it('keeps real interactivity and median TTFT coordinates for official and overlay points', () => {
+    const powerRows = fixedSequenceBenchmarks.slice(0, 3).map((row, index) => ({
+      ...row,
+      framework: 'dynamo-sglang',
+      disagg: true,
+      // Fixed-sequence telemetry has medians but no P90 latency fields.
+      metrics: {
+        ...measuredPowerMetrics(row.conc, { disagg: true }),
+        median_intvty: [80, 40, 20][index],
+        median_ttft: [0.5, 2, 8][index],
+        prefill_avg_power_w: 600 + index * 50,
+      },
+    }));
+    const overlayRows = powerRows.slice(0, 2).map((row, index) => ({
+      ...row,
+      id: 930000 + index,
+      run_url: OVERLAY_RUN_URL,
+      metrics: {
+        ...row.metrics,
+        median_intvty: [60, 30][index],
+        median_ttft: [1, 4][index],
+      },
+    }));
+    cy.intercept('GET', '/api/v1/availability', {
+      body: [{ ...agenticAvailability[2], framework: 'dynamo-sglang', disagg: true }],
+    });
+    cy.intercept('GET', '/api/v1/benchmarks*', { body: powerRows });
+    cy.intercept('GET', '/api/unofficial-run*', {
+      body: {
+        runInfos: [
+          {
+            id: OVERLAY_RUN_ID,
+            url: OVERLAY_RUN_URL,
+            name: 'Prefill axis regression',
+            branch: 'test/prefill-axis',
+            sha: 'abc000',
+            createdAt: `${AGENTIC_DATE}T00:00:00Z`,
+            conclusion: 'success',
+            status: 'completed',
+            isNonMainBranch: true,
+          },
+        ],
+        benchmarks: overlayRows,
+        evaluations: [],
+      },
+    }).as('prefillOverlay');
+    cy.visit(
+      `/inference?g_model=DeepSeek-V4-Pro&i_seq=8k%2F1k&i_prec=fp4&i_metric=y_measuredPrefillAvgPower&i_xmode=interactivity&i_best=0&i_optimal=0&i_active=b200_dynamo-sglang&unofficialrun=${OVERLAY_RUN_ID}`,
+      {
+        onBeforeLoad(win) {
+          win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+        },
+      },
+    );
+    cy.wait('@prefillOverlay');
+
+    expectInteractivity();
+    cy.get('[data-testid="yaxis-metric-selector"]').click('right');
+    cy.get('input[aria-label="Search options"]').type('Measured Prefill Joules per Input Token');
+    cy.contains('[data-select-option]', 'Measured Prefill Joules per Input Token')
+      .scrollIntoView()
+      .click();
+    cy.get('[data-testid="chart-figure"] h2').should(
+      'contain.text',
+      'Measured Prefill Joules per Input Token',
+    );
+    expectInteractivity();
+
+    selectXAxisMode('ttft', 'TTFT');
+    cy.get('#chart-0 .x-axis-label').should('have.text', 'Median Time To First Token (s)');
+    cy.get('[data-testid="chart-figure"] h2').should(
+      'contain.text',
+      'vs. Median Time To First Token',
+    );
+    expectCoordinates('.dot-group', [0.5, 2, 8]);
+    expectCoordinates('.unofficial-overlay-pt', [1, 4]);
+
+    selectXAxisMode('interactivity', 'Interactivity');
+    expectInteractivity();
+
+    cy.intercept('GET', '/api/v1/benchmarks*', { body: [] }).as('emptyOfficialBenchmarks');
+    cy.location('href').then((href) => {
+      const url = new URL(href);
+      url.searchParams.set('i_xmode', 'ttft');
+      url.searchParams.set('i_metric', 'y_measuredPrefillJPerInputToken');
+      cy.visit(url.toString());
+    });
+    cy.wait(['@emptyOfficialBenchmarks', '@prefillOverlay']);
+    cy.get('#chart-0 .x-axis-label').should('have.text', 'Median Time To First Token (s)');
+    cy.get('[data-testid="chart-figure"] h2').should(
+      'contain.text',
+      'vs. Median Time To First Token',
+    );
+    cy.get('#chart-0 .dot-group').should('not.exist');
+    expectCoordinates('.unofficial-overlay-pt', [1, 4]);
+  });
+});
 
 describe('X-Axis Mode Toggle — overlay path (finding #8 regression guard)', () => {
   before(() => {

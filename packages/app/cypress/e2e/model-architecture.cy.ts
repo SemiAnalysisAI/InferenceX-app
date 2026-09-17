@@ -480,7 +480,7 @@ describe('Model Architecture Diagram', () => {
         .and('contain.text', '2.8T')
         .and('have.attr', 'href', '/model/kimi-k3');
       // Models without a MODEL_ARCHITECTURES entry still get a card (no badges).
-      cy.get('[data-testid="model-index-link-glm-5-2"]').should('contain.text', 'GLM-5.2');
+      cy.get('[data-testid="model-index-link-glm-5-3"]').should('contain.text', 'GLM-5.3');
     });
 
     it('navigates to a model deep-dive page', () => {

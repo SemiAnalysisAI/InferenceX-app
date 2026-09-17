@@ -80,6 +80,7 @@ export interface OverlayScopeInput {
 export interface UnofficialRunContextType {
   isUnofficialRun: boolean;
   removeUnofficialBg: boolean;
+  setRemoveUnofficialBg?: (checked: boolean) => void;
   unofficialRunInfo: UnofficialRunInfo | null;
   unofficialRunInfos: UnofficialRunInfo[];
   runIndexByUrl: Record<string, number>;
@@ -137,7 +138,11 @@ export function buildChartData(benchmarks: BenchmarkRow[]): UnofficialChartData 
 
   const result: UnofficialChartData = {};
   for (const [key, rows] of groups) {
-    const { chartData, hardwareConfig } = transformBenchmarkRows(rows);
+    // Overlay points are always priced on the external basis here;
+    // `processOverlayChartDataWithClipping` reprices them to the selected
+    // basis at render time, so seeding them with the app default would
+    // double-apply the internal/external ratio.
+    const { chartData, hardwareConfig } = transformBenchmarkRows(rows, 'median', 'external');
     const e2eIdx = (chartDefinitions as ChartDefinition[]).findIndex((d) => d.chartType === 'e2e');
     const interactivityIdx = (chartDefinitions as ChartDefinition[]).findIndex(
       (d) => d.chartType === 'interactivity',
@@ -366,7 +371,13 @@ async function fetchUnofficialRuns(
   );
 }
 
-export function UnofficialRunProvider({ children }: { children: ReactNode }) {
+export function UnofficialRunProvider({
+  children,
+  showBanner = true,
+}: {
+  children: ReactNode;
+  showBanner?: boolean;
+}) {
   const [removeUnofficialBg, setRemoveUnofficialBg] = useState(false);
   const queryClient = useQueryClient();
   const search = useClientSearch();
@@ -482,6 +493,7 @@ export function UnofficialRunProvider({ children }: { children: ReactNode }) {
     () => ({
       isUnofficialRun: unofficialRunInfos.length > 0,
       removeUnofficialBg,
+      setRemoveUnofficialBg,
       unofficialRunInfo,
       unofficialRunInfos,
       runIndexByUrl,
@@ -526,16 +538,29 @@ export function UnofficialRunProvider({ children }: { children: ReactNode }) {
 
   return (
     <UnofficialRunContext.Provider value={contextValue}>
-      {unofficialRunInfos.length > 0 && (
-        <UnofficialBanner
-          runs={unofficialRunInfos}
-          removeUnofficialBg={removeUnofficialBg}
-          onRemoveUnofficialBgChange={setRemoveUnofficialBg}
-          onDismissRun={dismissRun}
-          onDismissAll={clearUnofficialRun}
-        />
-      )}
+      {showBanner && <UnofficialRunBanner />}
       {children}
     </UnofficialRunContext.Provider>
+  );
+}
+
+/** Allows dashboard navigation to own banner placement while the provider owns its state. */
+export function UnofficialRunBanner({ attached = false }: { attached?: boolean }) {
+  const {
+    unofficialRunInfos,
+    dismissRun,
+    clearUnofficialRun,
+    removeUnofficialBg,
+    setRemoveUnofficialBg,
+  } = useUnofficialRun();
+  return (
+    <UnofficialBanner
+      runs={unofficialRunInfos}
+      attached={attached}
+      removeUnofficialBg={removeUnofficialBg}
+      onRemoveUnofficialBgChange={setRemoveUnofficialBg}
+      onDismissRun={dismissRun}
+      onDismissAll={clearUnofficialRun}
+    />
   );
 }

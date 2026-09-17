@@ -14,12 +14,7 @@ import {
   type ScenarioSegment,
   sequenceForScenarioSegment,
 } from '@/lib/compare-scenario-route';
-import {
-  canonicalCompareSlug,
-  compareDisplayLabel,
-  compareModelDisplayLabel,
-  parseCompareSlug,
-} from '@/lib/compare-slug';
+import { canonicalCompareSlug, parseCompareSlug } from '@/lib/compare-slug';
 import { getGpuSpecs } from '@/lib/constants';
 import { KNOWN_MODELS, KNOWN_PRECISIONS, KNOWN_SEQUENCES, pickString } from '@/lib/compare-ssr';
 import {
@@ -62,6 +57,12 @@ function scenarioPath(canonical: string, scenarioSegment?: ScenarioSegment): str
     : `/zh/compare-per-dollar/${canonical}`;
 }
 
+function gpuPairLabelZh(a: string, b: string): string {
+  const aLabel = HW_REGISTRY[a]?.label ?? a.toUpperCase();
+  const bLabel = HW_REGISTRY[b]?.label ?? b.toUpperCase();
+  return `${aLabel} 与 ${bLabel}`;
+}
+
 interface Props {
   params: Promise<{ slug: string }>;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -78,8 +79,8 @@ export function buildPerDollarMetadataZh(
 ): Metadata {
   const parsed = parseCompareSlug(slug);
   if (!parsed) return {};
-  const fullLabel = compareModelDisplayLabel(parsed.model, parsed.a, parsed.b);
-  const gpuLabel = compareDisplayLabel(parsed.a, parsed.b);
+  const gpuLabel = gpuPairLabelZh(parsed.a, parsed.b);
+  const fullLabel = `${parsed.model.label} — ${gpuLabel}`;
   const canonical = canonicalCompareSlug(parsed.model.slug, parsed.a, parsed.b);
   // The scenario segments are views of one comparison, so the bare slug URL
   // stays the indexable representative and every segment canonicalizes to it.
@@ -87,7 +88,7 @@ export function buildPerDollarMetadataZh(
   // byte-identical pages, each claiming to be canonical.
   const routePath = scenarioPath(canonical, scenarioSegment);
   const url = `${SITE_URL}${routePath}`;
-  const description = `${gpuLabel} 在 ${parsed.model.label} 上的每美元性能：来自 InferenceX（SemiAnalysis 推出的独立开源基准测试平台）的经验证、可复现的每百万 token 成本结果，基于云服务商 TCO 归一化。${SUPPORTERS_LINE_ZH}查看哪款芯片在各交互性水平下更经济。`;
+  const description = `${gpuLabel} 在 ${parsed.model.label} 上的每美元性能对比。InferenceX 是 SemiAnalysis 推出的独立开源基准测试平台；本页提供经过验证、可复现的每百万 token 成本数据，并采用 Hyperscaler 自有设备 TCO 口径。${SUPPORTERS_LINE_ZH}比较各交互性水平下哪款芯片的成本更低。`;
   return {
     title: `${fullLabel} — 每美元性能`,
     description,
@@ -169,7 +170,7 @@ export async function renderPerDollarPageZh(
 
   const url = `${SITE_URL}${scenarioPath(canonical, scenarioSegment)}`;
   // The PNG route exists only under the EN tree; zh JSON-LD references it there.
-  const imageUrl = `${SITE_URL}/compare-per-dollar/${canonical}/performance-per-dollar.png`;
+  const imageUrl = `${SITE_URL}/compare-per-dollar/${canonical}/performance-per-dollar.png?lang=zh`;
   const jsonLd = buildJsonLdZh(
     'per-dollar',
     parsed.model,
@@ -184,12 +185,8 @@ export async function renderPerDollarPageZh(
     newest,
     parsed.model.displayName,
   );
-  const breadcrumbJsonLd = buildBreadcrumbJsonLdZh(
-    'per-dollar',
-    compareModelDisplayLabel(parsed.model, parsed.a, parsed.b),
-    url,
-  );
-  const label = compareModelDisplayLabel(parsed.model, parsed.a, parsed.b);
+  const label = `${parsed.model.label} — ${gpuPairLabelZh(parsed.a, parsed.b)}`;
+  const breadcrumbJsonLd = buildBreadcrumbJsonLdZh('per-dollar', label, url);
   const aMeta = HW_REGISTRY[parsed.a];
   const bMeta = HW_REGISTRY[parsed.b];
   const aLabel = aMeta?.label ?? parsed.a.toUpperCase();
@@ -234,7 +231,7 @@ export async function renderPerDollarPageZh(
         bArch={bMeta?.arch ?? ''}
         aCostPerGpuHr={aCostPerGpuHr}
         bCostPerGpuHr={bCostPerGpuHr}
-        heroImageSrc={`/compare-per-dollar/${canonical}/performance-per-dollar.png`}
+        heroImageSrc={`/compare-per-dollar/${canonical}/performance-per-dollar.png?lang=zh`}
         locale="zh"
       />
     </>

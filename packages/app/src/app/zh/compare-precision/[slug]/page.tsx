@@ -94,13 +94,14 @@ export function buildPrecisionMetadataZh(
   // byte-identical pages, each claiming to be canonical.
   const routePath = scenarioPath(canonical, scenarioSegment);
   const url = `${SITE_URL}${routePath}`;
-  const description = `${gpuLabel} 上 ${aLabel} 与 ${bLabel} 精度对比（${parsed.model.label}）：来自 InferenceX（SemiAnalysis 推出的独立开源基准测试平台）的经验证、可复现的结果。${SUPPORTERS_LINE_ZH}查看哪种量化精度在各交互性水平下吞吐量和成本更优。`;
+  const description = `在 ${gpuLabel} 上比较 ${aLabel} 与 ${bLabel} 两种量化精度对 ${parsed.model.label} 推理性能的影响。InferenceX 是 SemiAnalysis 推出的独立开源基准测试平台，结果均经过验证且可复现。${SUPPORTERS_LINE_ZH}查看不同量化精度在各交互性水平下的吞吐量和成本表现。`;
+  const title = `${parsed.model.label} — ${gpuLabel}：${aLabel} 与 ${bLabel} 精度对比`;
   return {
-    title: `${parsed.model.label} — ${gpuLabel} ${aLabel} vs ${bLabel} — 精度对比`,
+    title,
     description,
     alternates: zhAlternates(enScenarioPath(canonical)),
     openGraph: {
-      title: `${parsed.model.label} — ${gpuLabel} ${aLabel} vs ${bLabel} — 精度对比 | ${SITE_NAME}`,
+      title: `${title} | ${SITE_NAME}`,
       description,
       url,
       type: 'website',
@@ -108,7 +109,7 @@ export function buildPrecisionMetadataZh(
     },
     twitter: {
       card: 'summary_large_image',
-      title: `${parsed.model.label} — ${gpuLabel} ${aLabel} vs ${bLabel} — 精度对比`,
+      title,
       description,
     },
   };
@@ -184,7 +185,7 @@ export async function renderPrecisionPageZh(
 
   const url = `${SITE_URL}${scenarioPath(canonical, scenarioSegment)}`;
   // The PNG route exists only under the EN tree; zh JSON-LD references it there.
-  const imageUrl = `${SITE_URL}/compare-precision/${canonical}/precision-comparison.png`;
+  const imageUrl = `${SITE_URL}/compare-precision/${canonical}/precision-comparison.png?lang=zh`;
   const { oldest, newest } = dateRangeForVariantPair(rows, parsed.gpu, sideA, sideB);
   const jsonLd = buildVariantJsonLdZh(
     'precision',
@@ -200,7 +201,7 @@ export async function renderPrecisionPageZh(
     oldest,
     newest,
   );
-  const pairLabel = `${parsed.model.label} — ${gpuLabel} ${aLabel} vs ${bLabel}`;
+  const pairLabel = `${parsed.model.label} — ${gpuLabel}：${aLabel} 与 ${bLabel}`;
   const breadcrumbJsonLd = buildVariantBreadcrumbJsonLdZh('precision', pairLabel, url);
   const narrative = variantCompareNarrativeZh(
     'precision',
@@ -232,7 +233,7 @@ export async function renderPrecisionPageZh(
         gpuArch={gpuMeta?.arch ?? ''}
         aLabel={aLabel}
         bLabel={bLabel}
-        heroImageSrc={`/compare-precision/${canonical}/precision-comparison.png`}
+        heroImageSrc={`/compare-precision/${canonical}/precision-comparison.png?lang=zh`}
         locale="zh"
       />
     </>

@@ -12,14 +12,14 @@ import { ComparePairCardLink } from '@/components/compare/compare-pair-card-link
 import { JsonLd } from '@/components/json-ld';
 import { Card } from '@/components/ui/card';
 import { COMPARE_MODEL_SLUGS } from '@/lib/compare-slug';
-import { formatModelList } from '@/lib/compare-ssr';
+import { formatModelListZh } from '@/lib/compare-ssr-zh';
 import { ZH_OG_LOCALE, zhAlternates } from '@/lib/i18n';
 import { getPrecisionPairsByModelSlug } from '@/lib/compare-variant-availability';
 import { canonicalPrecisionCompareSlug, precisionDisplayLabel } from '@/lib/compare-variant-slug';
 
 export const dynamic = 'force-dynamic';
 
-const DESCRIPTION = `精度如何影响芯片推理性能？InferenceX 是 SemiAnalysis 推出的独立开源基准测试平台，提供经过验证的、可复现的测试结果。${SUPPORTERS_LINE_ZH}在同一芯片上横向对比 FP4、FP8、BF16、INT4 等多种量化精度对 DeepSeek V4 Pro、DeepSeek R1、Kimi K2、MiniMax M3、GLM 5、Qwen 3.5 等模型的影响。`;
+const DESCRIPTION = `数值精度如何影响芯片推理性能？InferenceX 是 SemiAnalysis 推出的独立开源基准测试平台，测试结果均经过验证且可复现。${SUPPORTERS_LINE_ZH}在同一芯片上直接对比 FP4、FP8、BF16、INT4 等不同精度格式，观察它们对 DeepSeek V4 Pro、DeepSeek R1、Kimi K2、MiniMax M3、GLM 5、Qwen 3.5 等模型推理性能的影响。`;
 
 export const metadata: Metadata = {
   title: '芯片精度对比',
@@ -62,9 +62,9 @@ export default async function ComparePrecisionIndexPageZh() {
         <Card>
           <h1 className="text-2xl lg:text-4xl font-bold tracking-tight">芯片精度对比</h1>
           <p className="mt-3 text-base lg:text-lg text-muted-foreground max-w-3xl">
-            {totalUrls.toLocaleString()} 组精度正面对比，涵盖 {formatModelList(modelsWithPairs)}
-            。查看 FP4、FP8、BF16、INT4 等多种量化精度如何影响同一芯片
-            上的吞吐量、成本和交互性——每个页面展示推理图表及插值对比表格。
+            共 {totalUrls.toLocaleString()} 组精度对比，涵盖 {formatModelListZh(modelsWithPairs)}
+            。查看 FP4、FP8、BF16、INT4
+            等精度格式如何影响同一芯片的吞吐量、成本和交互性；每个页面均展示推理图表和插值对比表。
           </p>
           <div className="mt-6 flex flex-wrap gap-3" data-testid="compare-precision-index-links">
             <Link
@@ -107,7 +107,7 @@ export default async function ComparePrecisionIndexPageZh() {
               <div>
                 <h2 className="text-xl lg:text-2xl font-bold tracking-tight">{model.label}</h2>
                 <p className="text-sm text-muted-foreground mt-1">
-                  {pairs.length} 组精度对比具有 {model.label} 的基准测试数据。
+                  在 {model.label} 上共有 {pairs.length} 组精度对比，均有基准测试数据。
                 </p>
               </div>
               {[...gpuGroups.entries()].map(([gpu, gpuPairs]) => {
@@ -123,7 +123,7 @@ export default async function ComparePrecisionIndexPageZh() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                       {gpuPairs.map(({ gpu: g, precA, precB }) => {
                         const slug = canonicalPrecisionCompareSlug(model.slug, g, precA, precB);
-                        const label = `${gpuLabel} — ${precisionDisplayLabel(precA)} vs ${precisionDisplayLabel(precB)}`;
+                        const label = `${gpuLabel} — ${precisionDisplayLabel(precA)} 与 ${precisionDisplayLabel(precB)}`;
                         return (
                           <ComparePairCardLink
                             key={slug}
@@ -131,6 +131,7 @@ export default async function ComparePrecisionIndexPageZh() {
                             slug={slug}
                             label={label}
                             archLine={archLine}
+                            locale="zh"
                           />
                         );
                       })}

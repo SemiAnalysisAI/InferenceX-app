@@ -211,6 +211,7 @@ export function updateLayerDecorationOnZoom<T>(
         layer.rooflines,
         newXScale as ContinuousScale,
         newYScale as ContinuousScale,
+        layer.config.curve,
       );
       break;
     }

@@ -1,5 +1,13 @@
-import { describe, it, expect } from 'vitest';
-import { extractWorkers, mapBenchmarkRow } from './benchmark-mapper';
+import { describe, it, expect, vi } from 'vitest';
+import { MEASURED_POWER_METRIC_KEYS } from '@semianalysisai/inferencex-constants';
+import {
+  extractPowerAudit,
+  extractPowerInvalidReasons,
+  extractWorkers,
+  mapBenchmarkRow,
+  normalizePowerContractMetrics,
+  scrubWithheldPowerMetrics,
+} from './benchmark-mapper';
 import { createSkipTracker } from './skip-tracker';
 
 /** Minimal valid v1 benchmark row. */
@@ -58,6 +66,32 @@ function makeV2Row(overrides: Record<string, any> = {}): Record<string, any> {
     num_decode_gpu: 8,
     tput_per_gpu: 567.8,
     ...overrides,
+  };
+}
+
+function dirtyPowerPayload(): Record<string, any> {
+  return {
+    avg_power_w: 685.5,
+    p75_power_w: 670,
+    p75_total_gpu_power_w: 5360,
+    p90_power_w: 710,
+    p90_total_gpu_power_w: 5680,
+    joules_per_successful_query: 1542.75,
+    joules_per_output_token: 8.4,
+    joules_per_total_token: 0.8,
+    prefill_avg_power_w: 612.3,
+    decode_avg_power_w: 701.5,
+    joules_per_input_token: 1.2,
+    prefill_joules_per_input_token: 0.4,
+    decode_joules_per_output_token: 5.1,
+    avg_temp_c: 68.4,
+    peak_temp_c: 79.2,
+    avg_util_pct: 88.5,
+    avg_mem_used_mb: 71234.5,
+    workers: [
+      { role: 'prefill', worker_idx: 0, hosts: ['pn0'], num_gpus: 4, avg_power_w: 612.3 },
+      { role: 'decode', worker_idx: 0, hosts: ['dn0'], num_gpus: 8, avg_power_w: 701.5 },
+    ],
   };
 }
 
@@ -278,6 +312,142 @@ describe('mapBenchmarkRow', () => {
 
       expect(result!.config.numPrefillGpu).toBe(8); // 4 * 2
       expect(result!.config.numDecodeGpu).toBe(8); // 2 * 4
+    });
+  });
+
+  describe('power_valid=0 measured-power scrub (defense-in-depth)', () => {
+    it('strips every measured key and the workers payload on an explicit invalid verdict', () => {
+      const tracker = createSkipTracker();
+      const result = mapBenchmarkRow(
+        makeV2Row({
+          power_valid: 0,
+          power_metric_schema_version: 2,
+          median_ttft: 50.2,
+          ...dirtyPowerPayload(),
+        }),
+        tracker,
+      );
+
+      expect(result).not.toBeNull();
+      expect(result!.metrics.power_valid).toBe(0);
+      expect(result!.metrics.power_metric_schema_version).toBe(2);
+      for (const key of MEASURED_POWER_METRIC_KEYS) {
+        expect(result!.metrics).not.toHaveProperty(key);
+      }
+      expect(result!.workers).toBeUndefined();
+      expect(result!.metrics.tput_per_gpu).toBe(567.8);
+      expect(result!.metrics.median_ttft).toBe(50.2);
+    });
+
+    it('keeps every measured key and the workers payload on a valid verdict', () => {
+      const tracker = createSkipTracker();
+      const dirty = dirtyPowerPayload();
+      const result = mapBenchmarkRow(
+        makeV2Row({ power_valid: 1, power_metric_schema_version: 2, ...dirty }),
+        tracker,
+      );
+
+      expect(result!.metrics.power_valid).toBe(1);
+      for (const key of MEASURED_POWER_METRIC_KEYS) {
+        expect(result!.metrics[key]).toBe(dirty[key]);
+      }
+      expect(result!.workers).toHaveLength(2);
+    });
+
+    it('leaves legacy rows without a verdict untouched (historical measurements kept)', () => {
+      const tracker = createSkipTracker();
+      const dirty = dirtyPowerPayload();
+      const result = mapBenchmarkRow(makeV2Row(dirty), tracker);
+
+      expect(result!.metrics).not.toHaveProperty('power_valid');
+      for (const key of MEASURED_POWER_METRIC_KEYS) {
+        expect(result!.metrics[key]).toBe(dirty[key]);
+      }
+      expect(result!.workers).toHaveLength(2);
+    });
+
+    it.each([true, 'garbage', 2, Number.NaN])(
+      'scrubs after failing closed on malformed verdict %j',
+      (powerValid) => {
+        const tracker = createSkipTracker();
+        const result = mapBenchmarkRow(
+          makeV2Row({ power_valid: powerValid, ...dirtyPowerPayload() }),
+          tracker,
+        );
+
+        expect(result!.metrics.power_valid).toBe(0);
+        for (const key of MEASURED_POWER_METRIC_KEYS) {
+          expect(result!.metrics).not.toHaveProperty(key);
+        }
+        expect(result!.workers).toBeUndefined();
+      },
+    );
+
+    it('converges a dirty pv=0 artifact to exactly what a clean producer would ship', () => {
+      // Upserts replace metrics and workers wholesale, so re-ingest must
+      // converge to the same row as a producer-clean artifact.
+      const tracker = createSkipTracker();
+      const dirtyResult = mapBenchmarkRow(
+        makeV2Row({ power_valid: 0, power_metric_schema_version: 2, ...dirtyPowerPayload() }),
+        tracker,
+      );
+      const cleanResult = mapBenchmarkRow(
+        makeV2Row({ power_valid: 0, power_metric_schema_version: 2 }),
+        tracker,
+      );
+
+      expect(dirtyResult!.metrics).toEqual(cleanResult!.metrics);
+      expect(dirtyResult!.workers).toBeUndefined();
+      expect(cleanResult!.workers).toBeUndefined();
+    });
+
+    it('scrubs agentic rows after the preferFullResponseMetrics reassignment', () => {
+      const tracker = createSkipTracker();
+      const result = mapBenchmarkRow(
+        makeAgenticRow({
+          power_valid: 0,
+          ...dirtyPowerPayload(),
+          mean_full_response_itl: 0.02,
+        }),
+        tracker,
+      );
+
+      expect(result!.metrics.power_valid).toBe(0);
+      expect(result!.metrics.mean_itl).toBe(0.02);
+      for (const key of MEASURED_POWER_METRIC_KEYS) {
+        expect(result!.metrics).not.toHaveProperty(key);
+      }
+      expect(result!.workers).toBeUndefined();
+    });
+
+    it('keeps structured invalid-verdict companions outside the numeric metrics record', () => {
+      const tracker = createSkipTracker();
+      const result = mapBenchmarkRow(
+        makeV2Row({
+          power_valid: 0,
+          power_metric_schema_version: 2,
+          ...dirtyPowerPayload(),
+          power_invalid_reasons: ['window_too_short'],
+          power_audit: { window_start_unix: 1, window_end_unix: 2 },
+        }),
+        tracker,
+      );
+
+      expect(result).not.toBeNull();
+      expect(result!.metrics.power_valid).toBe(0);
+      expect(result!.metrics.power_metric_schema_version).toBe(2);
+      for (const key of MEASURED_POWER_METRIC_KEYS) {
+        expect(result!.metrics).not.toHaveProperty(key);
+      }
+      expect(result!.metrics).not.toHaveProperty('power_invalid_reasons');
+      expect(result!.metrics).not.toHaveProperty('power_audit');
+      expect(result!.powerInvalidReasons).toEqual(['window_too_short']);
+      expect(result!.powerAudit).toEqual({
+        window_start_unix: 1,
+        window_end_unix: 2,
+        producer_sha: null,
+        exporter_image_sha256: null,
+      });
     });
   });
 
@@ -695,6 +865,68 @@ describe('mapBenchmarkRow', () => {
   });
 });
 
+describe('scrubWithheldPowerMetrics (direct — supplemental ingest path)', () => {
+  function supplementalMetrics(overrides: Record<string, any> = {}): Record<string, number> {
+    const { workers: _workers, ...measured } = dirtyPowerPayload();
+    return { tput_per_gpu: 567.8, ...measured, ...overrides };
+  }
+
+  it('strips every measured key on power_valid=0 and reports withheld', () => {
+    const metrics = supplementalMetrics({ power_valid: 0, power_metric_schema_version: 2 });
+
+    expect(scrubWithheldPowerMetrics(metrics)).toBe(true);
+    for (const key of MEASURED_POWER_METRIC_KEYS) {
+      expect(metrics).not.toHaveProperty(key);
+    }
+    expect(metrics.power_valid).toBe(0);
+    expect(metrics.power_metric_schema_version).toBe(2);
+    expect(metrics.tput_per_gpu).toBe(567.8);
+  });
+
+  it('leaves power_valid=1 and legacy no-verdict records untouched', () => {
+    for (const metrics of [supplementalMetrics({ power_valid: 1 }), supplementalMetrics()]) {
+      const before = { ...metrics };
+      expect(scrubWithheldPowerMetrics(metrics)).toBe(false);
+      expect(metrics).toEqual(before);
+    }
+  });
+
+  it('fails closed on a malformed verdict when composed with normalization', () => {
+    const metrics = supplementalMetrics({ power_valid: 2 });
+    normalizePowerContractMetrics(metrics, metrics);
+    expect(scrubWithheldPowerMetrics(metrics)).toBe(true);
+
+    expect(metrics.power_valid).toBe(0);
+    for (const key of MEASURED_POWER_METRIC_KEYS) {
+      expect(metrics).not.toHaveProperty(key);
+    }
+  });
+
+  it('recovers provenance companions nested under metrics and leaves the record flat', () => {
+    const metrics = supplementalMetrics({
+      power_valid: 0,
+      power_invalid_reasons: ['sampling_gap_exceeded', 'sampling_gap_exceeded', '<img src=x>'],
+      power_audit: { sample_count: 12, producer_sha: 'abc123', unknown_key: true },
+    });
+    normalizePowerContractMetrics(metrics, metrics);
+    scrubWithheldPowerMetrics(metrics);
+    const reasons = extractPowerInvalidReasons(metrics.power_invalid_reasons);
+    const audit = extractPowerAudit(metrics.power_audit);
+    delete metrics.power_invalid_reasons;
+    delete metrics.power_audit;
+
+    expect(reasons).toEqual(['sampling_gap_exceeded']);
+    expect(audit).toEqual({
+      sample_count: 12,
+      producer_sha: 'abc123',
+      exporter_image_sha256: null,
+    });
+    expect(metrics).not.toHaveProperty('power_invalid_reasons');
+    expect(metrics).not.toHaveProperty('power_audit');
+    expect(metrics.tput_per_gpu).toBe(567.8);
+  });
+});
+
 describe('extractWorkers', () => {
   it('returns undefined for non-array input', () => {
     expect(extractWorkers(undefined)).toBeUndefined();
@@ -776,6 +1008,236 @@ describe('extractWorkers', () => {
 
   it('returns undefined when every entry is malformed', () => {
     expect(extractWorkers([null, 'bad', 0, undefined])).toBeUndefined();
+  });
+});
+
+describe('extractPowerInvalidReasons', () => {
+  it('keeps valid snake_case codes in first-seen order', () => {
+    expect(
+      extractPowerInvalidReasons(['sampling_gap_exceeded', 'expected_gpu_count_mismatch']),
+    ).toEqual(['sampling_gap_exceeded', 'expected_gpu_count_mismatch']);
+  });
+
+  it('deduplicates preserving first-seen order', () => {
+    expect(
+      extractPowerInvalidReasons([
+        'telemetry_file_missing',
+        'no_usable_power_samples',
+        'telemetry_file_missing',
+      ]),
+    ).toEqual(['telemetry_file_missing', 'no_usable_power_samples']);
+  });
+
+  it.each([
+    ['non-string entry', [42]],
+    ['empty string', ['']],
+    ['hyphenated code', ['Bad-Reason']],
+    ['uppercase code', ['UPPER']],
+    ['leading digit', ['9lives']],
+    ['65-char code', ['a'.repeat(65)]],
+  ])('silently drops %s', (_name, raw) => {
+    expect(extractPowerInvalidReasons(raw)).toBeUndefined();
+  });
+
+  it('drops malformed entries while keeping valid siblings', () => {
+    expect(extractPowerInvalidReasons([42, 'sampling_gap_exceeded', '<img src=x>', null])).toEqual([
+      'sampling_gap_exceeded',
+    ]);
+  });
+
+  it('keeps a 64-char code (boundary)', () => {
+    const code = 'a'.repeat(64);
+    expect(extractPowerInvalidReasons([code])).toEqual([code]);
+  });
+
+  it('caps the result at 32 codes', () => {
+    const raw = Array.from({ length: 40 }, (_v, i) => `reason_${i}`);
+    const result = extractPowerInvalidReasons(raw);
+    expect(result).toHaveLength(32);
+    expect(result![0]).toBe('reason_0');
+    expect(result![31]).toBe('reason_31');
+  });
+
+  it.each([
+    ['empty array', []],
+    ['non-array object', { reason: 'x' }],
+    ['string', 'sampling_gap_exceeded'],
+    ['null', null],
+    ['undefined', undefined],
+  ])('returns undefined (never []) for %s', (_name, raw) => {
+    expect(extractPowerInvalidReasons(raw)).toBeUndefined();
+  });
+});
+
+describe('extractPowerAudit', () => {
+  const fullAudit = {
+    window_start_unix: 1756174800.25,
+    window_end_unix: 1756175400.75,
+    expected_gpu_count: 16,
+    observed_gpu_count: 16,
+    sample_count: 9600,
+    max_sample_gap_s: 1.013,
+    producer_sha: '887a6cb7c2ec174e5e2b977468a12ab34cd56ef7',
+    exporter_image_sha256:
+      'sha256:0b7f1a2c3d4e5f60718293a4b5c6d7e8f9012a3b4c5d6e7f8091a2b3c4d5e6f7',
+  };
+
+  it('round-trips a full valid object across all 8 fields', () => {
+    expect(extractPowerAudit(fullAudit)).toEqual(fullAudit);
+  });
+
+  it('omits Infinity / NaN / junk-string numerics (partial audit beats none)', () => {
+    expect(
+      extractPowerAudit({
+        ...fullAudit,
+        window_start_unix: Number.POSITIVE_INFINITY,
+        window_end_unix: Number.NaN,
+        max_sample_gap_s: 'garbage',
+      }),
+    ).toEqual({
+      expected_gpu_count: 16,
+      observed_gpu_count: 16,
+      sample_count: 9600,
+      producer_sha: fullAudit.producer_sha,
+      exporter_image_sha256: fullAudit.exporter_image_sha256,
+    });
+  });
+
+  it('rejects negative and non-safe-integer counts', () => {
+    expect(
+      extractPowerAudit({
+        ...fullAudit,
+        expected_gpu_count: -1,
+        observed_gpu_count: Number.MAX_SAFE_INTEGER + 1,
+        sample_count: Number.POSITIVE_INFINITY,
+      }),
+    ).toEqual({
+      window_start_unix: fullAudit.window_start_unix,
+      window_end_unix: fullAudit.window_end_unix,
+      max_sample_gap_s: fullAudit.max_sample_gap_s,
+      producer_sha: fullAudit.producer_sha,
+      exporter_image_sha256: fullAudit.exporter_image_sha256,
+    });
+  });
+
+  it('keeps shas trimmed and collapses null / number / oversized shas to null', () => {
+    expect(
+      extractPowerAudit({
+        sample_count: 1,
+        producer_sha: '  abc123  ',
+        exporter_image_sha256: null,
+      }),
+    ).toEqual({ sample_count: 1, producer_sha: 'abc123', exporter_image_sha256: null });
+    expect(
+      extractPowerAudit({
+        sample_count: 1,
+        producer_sha: 42,
+        exporter_image_sha256: 'x'.repeat(129),
+      }),
+    ).toEqual({ sample_count: 1, producer_sha: null, exporter_image_sha256: null });
+  });
+
+  it('nulls the explicit-null numeric fields a producer emits without a benchmark window', () => {
+    expect(
+      extractPowerAudit({
+        window_start_unix: null,
+        window_end_unix: null,
+        expected_gpu_count: 8,
+        observed_gpu_count: 0,
+        sample_count: 0,
+        max_sample_gap_s: null,
+        producer_sha: null,
+        exporter_image_sha256: null,
+      }),
+    ).toEqual({
+      expected_gpu_count: 8,
+      observed_gpu_count: 0,
+      sample_count: 0,
+      producer_sha: null,
+      exporter_image_sha256: null,
+    });
+  });
+
+  it('drops unknown keys (fixed 8-key shape bounds the stored object)', () => {
+    expect(extractPowerAudit({ sample_count: 3, integration_method: 'trapezoid' })).toEqual({
+      sample_count: 3,
+      producer_sha: null,
+      exporter_image_sha256: null,
+    });
+  });
+
+  it.each([
+    ['string', 'audit'],
+    ['array', [1, 2]],
+    ['null', null],
+    ['undefined', undefined],
+    ['number', 7],
+  ])('returns undefined for non-object input: %s', (_name, raw) => {
+    expect(extractPowerAudit(raw)).toBeUndefined();
+  });
+
+  it('returns undefined for an empty husk (no numerics, both shas null)', () => {
+    expect(extractPowerAudit({})).toBeUndefined();
+    expect(extractPowerAudit({ producer_sha: null, exporter_image_sha256: 42 })).toBeUndefined();
+    expect(extractPowerAudit({ window_start_unix: 'junk' })).toBeUndefined();
+  });
+});
+
+describe('mapBenchmarkRow — power audit provenance', () => {
+  const reasons = ['sampling_gap_exceeded', 'expected_gpu_count_mismatch'];
+  const audit = {
+    window_start_unix: 1756174800,
+    window_end_unix: 1756175400,
+    expected_gpu_count: 8,
+    observed_gpu_count: 8,
+    sample_count: 4800,
+    max_sample_gap_s: 1.013,
+    producer_sha: null,
+    exporter_image_sha256: null,
+  };
+
+  it.each([
+    ['v1', makeV1Row],
+    ['v2', makeV2Row],
+    ['agentic', makeAgenticRow],
+  ])('lands the contract fields on BenchmarkParams for %s rows', (_name, makeRow) => {
+    const tracker = createSkipTracker();
+    const result = mapBenchmarkRow(
+      makeRow({ power_valid: 0, power_invalid_reasons: reasons, power_audit: audit }),
+      tracker,
+    );
+    expect(result!.powerInvalidReasons).toEqual(reasons);
+    expect(result!.powerAudit).toEqual(audit);
+  });
+
+  it('stores provenance from valid rows too (tolerance in both directions)', () => {
+    const tracker = createSkipTracker();
+    const result = mapBenchmarkRow(makeV2Row({ power_valid: 1, power_audit: audit }), tracker);
+    expect(result!.metrics.power_valid).toBe(1);
+    expect(result!.powerAudit).toEqual(audit);
+    expect(result!.powerInvalidReasons).toBeUndefined();
+  });
+
+  it('leaves both fields undefined on legacy rows', () => {
+    const tracker = createSkipTracker();
+    const result = mapBenchmarkRow(makeV2Row(), tracker);
+    expect(result!.powerInvalidReasons).toBeUndefined();
+    expect(result!.powerAudit).toBeUndefined();
+  });
+
+  it("never captures a malformed ['5'] reasons array as a numeric metric", () => {
+    const tracker = createSkipTracker();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const result = mapBenchmarkRow(makeV2Row({ power_invalid_reasons: ['5'] }), tracker);
+      expect(result!.metrics).not.toHaveProperty('power_invalid_reasons');
+      expect(result!.powerInvalidReasons).toBeUndefined();
+      expect(warn.mock.calls.map((call) => String(call[0]))).not.toContainEqual(
+        expect.stringContaining('power_invalid_reasons'),
+      );
+    } finally {
+      warn.mockRestore();
+    }
   });
 });
 
@@ -977,6 +1439,41 @@ function makeV3AgenticRow(overrides: Record<string, any> = {}): Record<string, a
 }
 
 describe('mapBenchmarkRow — v3 agentic nested agg schema', () => {
+  it.each<[Record<string, unknown>, number]>([
+    [{}, 4],
+    [{ tp: 8, ep: 8, pp: 2, dcp_size: 8 }, 16],
+    [{ pcp_size: 2 }, 8],
+    [{ tp: '4', ep: '4', pp: '1', pcp_size: '1' }, 4],
+    [{ num_gpus: 8 }, 8],
+    [{ num_gpus: true }, 16],
+    [{ is_multinode: undefined }, 16],
+    [{ disagg: true }, 16],
+    [{ framework: 'mori-sglang' }, 16],
+    [{ pp: true }, 16],
+    [{ pp: null }, 16],
+    [{ request_metrics: undefined }, 16],
+  ])('counts physical GPUs for the AgentX producer shape %j', (overrides, expected) => {
+    // Qwen3.8 H200 run 33038487711 uses TP4/EP4 on four GPUs, not sixteen.
+    const result = mapBenchmarkRow(
+      makeV3AgenticRow({
+        infmax_model_prefix: 'qwen3.8next',
+        hw: 'cluster:h200-dgxc',
+        framework: 'sglang',
+        precision: 'fp8',
+        tp: 4,
+        ep: 4,
+        pp: 1,
+        pcp_size: 1,
+        ...overrides,
+      }),
+      createSkipTracker(),
+    );
+
+    expect(result!.config.numPrefillGpu).toBe(expected);
+    expect(result!.config.numDecodeGpu).toBe(expected);
+    expect(result!.config.prefillEp).toBe(Number(overrides.ep ?? 4));
+  });
+
   it('maps identity/routing and flattens the nested containers', () => {
     const tracker = createSkipTracker();
     const result = mapBenchmarkRow(makeV3AgenticRow(), tracker);

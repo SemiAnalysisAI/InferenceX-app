@@ -1,5 +1,7 @@
 'use client';
 
+import { TcoBasisToggle } from '@/components/ui/tco-basis-toggle';
+
 import { ControlPanel } from '@/components/ui/control-panel';
 import { useEffect, useMemo, useState } from 'react';
 
@@ -23,6 +25,7 @@ import {
 } from '@/components/ui/chart-selectors';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
+import { isCostMetric } from '@/components/ui/chart-display-helpers';
 import { MultiSelect } from '@/components/ui/multi-select';
 import {
   Select,
@@ -37,6 +40,14 @@ import { MobileControlSection } from '@/components/ui/mobile-control-section';
 import {
   METRIC_CONTROL_GROUPS,
   METRIC_REGISTRY,
+  costMetricFamily,
+  isMetricKey,
+  metricChartTitle,
+  metricCostTier,
+  metricForCostTier,
+  metricOptionTitle,
+  type CostMetricFamilyId,
+  type CostTier,
   type MetricKey,
 } from '@/components/inference/metric-registry';
 import {
@@ -47,19 +58,32 @@ import {
 import { useOpenDropdown } from '@/hooks/useOpenDropdown';
 import { ModelArchitectureInfoLink } from './ModelArchitectureInfoLink';
 import { MetricExplanation } from './MetricExplanation';
+import { PowerMetricAvailability } from './PowerMetricAvailability';
+import { MeasuredMetricControls } from './MeasuredMetricControls';
+import {
+  getMeasuredMetricConfig,
+  MEASURED_METRIC_DEFAULTS,
+  type MeasuredMetricFamily,
+} from '../measured-metric-config';
 import { XAxisModeSelector } from './XAxisModeSelector';
-import { Sequence, type Model, type Percentile } from '@/lib/data-mappings';
+import { showsTcoBasisSelector, Sequence, type Model, type Percentile } from '@/lib/data-mappings';
 import { useLocale } from '@/lib/use-locale';
 import { DEFAULT_Y_AXIS_METRIC } from '@/lib/url-state';
 
 const STRINGS = {
   en: {
-    benchmarkControls: 'Configuration',
-    chartControls: 'Chart',
+    measuredPower: 'Measured Power',
+    measuredEnergy: 'Measured Energy',
+    measuredGroup: 'Measured',
+    tcoBasis: 'TCO Basis',
+    tcoBasisTooltip:
+      'Choose External customer pricing or Internal owner cost. Internal changes only hardware with a separate owner cost, currently TPUv7.',
+    benchmarkControls: 'Benchmark Config',
+    chartControls: 'Chart Config',
     compareHistory: 'Compare history',
     yAxisMetric: 'Y-Axis Metric',
     yAxisMetricTooltip:
-      "The performance metric displayed on the chart's Y-axis. Options include throughput, token revenue per GPU hour, cost per million tokens, tokens per $1 USD or ¥1 CNY, and custom user-defined values.",
+      "The performance metric displayed on the chart's Y-axis. Options include throughput, token revenue per GPU hour, cost per million tokens, tokens per $1 TCO, and custom user-defined values.",
     xAxisMetric: 'X-Axis Metric',
     xAxisMetricTooltip:
       "The latency metric displayed on the chart's X-axis: P90 Time To First Token.",
@@ -93,8 +117,14 @@ const STRINGS = {
     changed: 'changed',
   },
   zh: {
-    benchmarkControls: '配置',
-    chartControls: '图表',
+    measuredPower: '实测功率',
+    measuredEnergy: '实测能耗',
+    measuredGroup: '实测',
+    tcoBasis: 'TCO 口径',
+    tcoBasisTooltip:
+      '选择按外部客户价格还是内部持有成本计算 TCO。只有另有内部持有成本的硬件才会受影响，目前仅 TPUv7。',
+    benchmarkControls: '基准测试配置',
+    chartControls: '图表配置',
     compareHistory: '对比历史趋势',
     yAxisMetric: 'Y 轴指标',
     yAxisMetricTooltip:
@@ -134,23 +164,38 @@ const STRINGS = {
 
 const METRIC_GROUPS = METRIC_CONTROL_GROUPS;
 
+// Full option titles carry the cost tier ("… (Owning at Large Hyperscaler
+// Volume)"). The y-axis selector collapses the published tiers of a metric
+// into one option and hands the tier to the Cost Tier selector in the chart
+// caption, so these maps serve analytics labels and the Custom User Values
+// entries.
 const METRIC_TITLE_MAP = new Map(
-  Object.entries(METRIC_REGISTRY).map(([key, metric]) => [`y_${key}`, metric.title]),
+  (Object.keys(METRIC_REGISTRY) as MetricKey[]).map((key) => [
+    `y_${key}`,
+    metricOptionTitle(key, 'en'),
+  ]),
 );
 
 const METRIC_TITLE_ZH_MAP = new Map(
-  Object.entries(METRIC_REGISTRY).map(([key, metric]) => [`y_${key}`, metric.titleZh]),
+  (Object.keys(METRIC_REGISTRY) as MetricKey[]).map((key) => [
+    `y_${key}`,
+    metricOptionTitle(key, 'zh'),
+  ]),
 );
 
 interface ChartControlsProps {
   /** Hide GPU Config selector and related date pickers (used by Historical Trends tab) */
   hideGpuComparison?: boolean;
+  tcoSource?: 'inference' | 'historical';
+  showTcoBasis?: boolean;
   /** Inference-only: historical trends use dates on the horizontal axis. */
   showXAxisMode?: boolean;
 }
 
 export default function ChartControls({
   hideGpuComparison = false,
+  tcoSource = 'inference',
+  showTcoBasis = false,
   showXAxisMode = false,
 }: ChartControlsProps) {
   const locale = useLocale();
@@ -163,7 +208,6 @@ export default function ChartControls({
   useEffect(() => setMounted(true), []);
 
   const { openDropdown, handleDropdownOpenChange } = useOpenDropdown<string>();
-
   const { selectedModel, selectedSequence, selectedPrecisions, selectedGPUs, selectedDateRange } =
     useInferenceFilters();
   const {
@@ -201,11 +245,20 @@ export default function ChartControls({
   } = useInferenceActions();
 
   // Y-axis options come from the canonical registry and need no API data.
-  // Gated groups appear only after the feature gate unlocks.
+  // Gated groups appear only after the feature gate unlocks. A gated metric
+  // that arrived through a shared URL keeps its own group visible while the
+  // gate is locked so the selector never shows an option it cannot name;
+  // this mirrors how tab-nav keeps a gated route's tab for the current page.
   const featureGateUnlocked = useFeatureGate();
   const visibleGroups = useMemo(
-    () => METRIC_GROUPS.filter((g) => !g.gated || featureGateUnlocked),
-    [featureGateUnlocked],
+    () =>
+      METRIC_GROUPS.filter(
+        (g) =>
+          !g.gated ||
+          featureGateUnlocked ||
+          (g.metrics as readonly string[]).includes(selectedYAxisMetric),
+      ),
+    [featureGateUnlocked, selectedYAxisMetric],
   );
   const metricGroupMap = useMemo(
     () =>
@@ -214,24 +267,88 @@ export default function ChartControls({
       ),
     [visibleGroups],
   );
-  const groupedYAxisOptions = useMemo(
-    () =>
-      visibleGroups
-        .map((group) => ({
-          groupLabel: locale === 'zh' ? group.labelZh : group.label,
-          options: group.metrics
-            .filter((m) => METRIC_TITLE_MAP.has(m))
-            .map((m) => ({
+  const selectedMetricKey = selectedYAxisMetric.replace(/^y_/u, '');
+  const selectedTier: CostTier | undefined = isMetricKey(selectedMetricKey)
+    ? metricCostTier(selectedMetricKey)
+    : undefined;
+  // Switching metric keeps the tier the reader is on, including Custom User
+  // Values: the tier is picked in the chart caption, not here.
+  const carriedTier: CostTier = selectedTier ?? 'hyperscaler';
+
+  const searchableYAxisOptions = useMemo(() => {
+    // Shared across groups so a family listed under Custom User Values does
+    // not reappear after its published entry.
+    const seenFamilies = new Set<CostMetricFamilyId>();
+    return visibleGroups
+      .map((group) => {
+        const options = group.metrics.flatMap((m) => {
+          if (!METRIC_TITLE_MAP.has(m)) return [];
+          const key = m.replace(/^y_/u, '') as MetricKey;
+          const family = costMetricFamily(key);
+          if (family) {
+            // Every pricing basis of a metric, published or custom,
+            // collapses into one option per metric family. The option
+            // tracks the tier in force so the selection highlight follows
+            // the metric; the Cost Tier selector in the chart caption
+            // changes the pricing basis.
+            if (seenFamilies.has(family)) return [];
+            seenFamilies.add(family);
+            const tieredKey = metricForCostTier(family, carriedTier) ?? key;
+            return [
+              {
+                value: `y_${tieredKey}`,
+                help: <MetricExplanation metricKey={tieredKey} />,
+                label: metricChartTitle(key, locale),
+              },
+            ];
+          }
+          return [
+            {
               value: m,
-              help: <MetricExplanation metricKey={m.replace(/^y_/u, '') as MetricKey} />,
+              help: <MetricExplanation metricKey={key} />,
               label:
                 (locale === 'zh' ? METRIC_TITLE_ZH_MAP.get(m) : undefined) ??
                 METRIC_TITLE_MAP.get(m)!,
-            })),
-        }))
-        .filter((g) => g.options.length > 0),
-    [visibleGroups, locale],
-  );
+            },
+          ];
+        });
+        return {
+          groupLabel: locale === 'zh' ? group.labelZh : group.label,
+          options,
+        };
+      })
+      .filter((g) => g.options.length > 0);
+  }, [visibleGroups, locale, carriedTier]);
+
+  // Keep the existing metric key in state and shared URLs. Only the menu's
+  // default presentation collapses; full metric names remain searchable.
+  const groupedYAxisOptions = useMemo(() => {
+    const selectedConfig = getMeasuredMetricConfig(selectedYAxisMetric);
+    const seen = new Set<MeasuredMetricFamily>();
+    return searchableYAxisOptions.map((group) => ({
+      ...group,
+      groupLabel: group.options.some((option) => getMeasuredMetricConfig(option.value))
+        ? t.measuredGroup
+        : group.groupLabel,
+      options: group.options.flatMap((option) => {
+        const config = getMeasuredMetricConfig(option.value);
+        if (!config) return [option];
+        if (seen.has(config.family)) return [];
+        seen.add(config.family);
+        const value =
+          selectedConfig?.family === config.family
+            ? selectedYAxisMetric
+            : MEASURED_METRIC_DEFAULTS[config.family];
+        return [
+          {
+            value,
+            label: config.family === 'power' ? t.measuredPower : t.measuredEnergy,
+            help: <MetricExplanation metricKey={value.replace(/^y_/u, '') as MetricKey} />,
+          },
+        ];
+      }),
+    }));
+  }, [searchableYAxisOptions, selectedYAxisMetric, t]);
 
   const trackCombinedFilters = () => {
     if (selectedModel && selectedSequence && selectedPrecisions.length > 0 && selectedYAxisMetric) {
@@ -335,6 +452,11 @@ export default function ChartControls({
     (scaleType === 'auto' ? 0 : 1) +
     (selectedGPUs.length > 0 ? 1 : 0) +
     (selectedDateRange.startDate && selectedDateRange.endDate ? 1 : 0);
+  const tcoVisible =
+    mounted &&
+    showTcoBasis &&
+    isCostMetric(selectedYAxisMetric) &&
+    showsTcoBasisSelector(selectedModel, selectedSequence);
   const showPercentile =
     mounted && selectedSequence === Sequence.AgenticTraces && featureGateUnlocked;
 
@@ -398,9 +520,12 @@ export default function ChartControls({
         >
           <ControlPanel
             legend={t.chartControls}
+            data-testid="inference-chart-configuration"
             className={showXAxisMode ? 'lg:col-span-2' : undefined}
           >
-            <div className="grid min-w-0 gap-3 sm:grid-cols-2">
+            <div
+              className={`grid min-w-0 items-start gap-3 ${showXAxisMode ? (selectedSequence === Sequence.AgenticTraces ? 'sm:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]' : 'sm:grid-cols-[11rem_minmax(0,1fr)]') : 'sm:grid-cols-2'} ${tcoVisible && showXAxisMode ? 'xl:grid-cols-[11rem_minmax(0,1fr)_10rem]' : ''}`}
+            >
               {showXAxisMode && <XAxisModeSelector />}
               <div
                 className={`flex min-w-0 flex-col space-y-1.5 ${showXAxisMode ? '' : 'sm:col-span-2'}`}
@@ -421,12 +546,47 @@ export default function ChartControls({
                     label: g.groupLabel,
                     options: g.options,
                   }))}
+                  searchGroups={groupedYAxisOptions.map((g, index) => ({
+                    label: g.groupLabel,
+                    options: [
+                      ...g.options.filter((option) => getMeasuredMetricConfig(option.value)),
+                      ...searchableYAxisOptions[index].options,
+                    ],
+                  }))}
                   searchPlaceholder={locale === 'zh' ? '搜索…' : undefined}
                   searchAriaLabel={locale === 'zh' ? '搜索指标选项' : undefined}
                   noResultsLabel={locale === 'zh' ? '无结果' : undefined}
                   clearSearchLabel={locale === 'zh' ? '清除搜索' : undefined}
                 />
+                {mounted && !getMeasuredMetricConfig(selectedYAxisMetric) && (
+                  <PowerMetricAvailability
+                    metric={selectedYAxisMetric}
+                    onSelect={handleYAxisMetricChange}
+                  />
+                )}
               </div>
+
+              {mounted && getMeasuredMetricConfig(selectedYAxisMetric) && (
+                <>
+                  <MeasuredMetricControls
+                    metric={selectedYAxisMetric}
+                    onChange={handleYAxisMetricChange}
+                  />
+                  <div className="col-span-full">
+                    <PowerMetricAvailability
+                      metric={selectedYAxisMetric}
+                      onSelect={handleYAxisMetricChange}
+                    />
+                  </div>
+                </>
+              )}
+
+              {tcoVisible && (
+                <div className="flex min-w-0 w-full max-w-48 flex-col gap-1.5 sm:col-span-2 xl:col-span-1">
+                  <LabelWithTooltip label={t.tcoBasis} tooltip={t.tcoBasisTooltip} />
+                  <TcoBasisToggle source={tcoSource} className="md:h-9" />
+                </div>
+              )}
 
               {mounted && usesTokenSalePricing(selectedYAxisMetric) && (
                 <div className="flex min-w-0 flex-col space-y-1.5 sm:col-span-2">

@@ -8,9 +8,15 @@ import type { AggDataEntry, HardwareConfig } from '@/components/inference/types'
 import { useBenchmarks } from '@/hooks/api/use-benchmarks';
 import type { BenchmarkRow } from '@/lib/api';
 import { rowToAggDataEntry } from '@/lib/benchmark-transform';
-import { measuredCacheHitRate } from '@/lib/cache-pricing';
+import { pricingCacheHitRate } from '@/lib/cache-pricing';
 import { getHardwareKey } from '@/lib/chart-utils';
-import { getModelSortIndex, getHardwareConfig, getGpuSpecs } from '@/lib/constants';
+import {
+  DEFAULT_TCO_BASIS,
+  getModelSortIndex,
+  getHardwareConfig,
+  getGpuSpecs,
+  type TcoBasis,
+} from '@/lib/constants';
 import { Percentile, Sequence, type Model } from '@/lib/data-mappings';
 import { overlayRunIndex } from '@/lib/overlay-run-style';
 import { supportsTokenMetric } from '@/lib/supplemental-benchmarks';
@@ -157,6 +163,7 @@ export function buildGpuGroups<M extends GroupMeta>(
     percentile?: Percentile;
     /** Token basis selected by the consumer; applies to official and overlay rows. */
     tokenType?: CostType;
+    tcoBasis?: TcoBasis;
     /** Derive a row's group key + metadata. Return null to drop the row. */
     classify: (hwKey: string, row: BenchmarkRow) => { key: string; meta: M } | null;
   },
@@ -170,6 +177,7 @@ export function buildGpuGroups<M extends GroupMeta>(
     precisions,
     percentile = Percentile.P90,
     tokenType = 'total',
+    tcoBasis = DEFAULT_TCO_BASIS,
     classify,
   } = options;
   const grouped: Record<string, GPUDataPoint[]> = {};
@@ -196,15 +204,16 @@ export function buildGpuGroups<M extends GroupMeta>(
     const tput = m.tput_per_gpu ?? 0;
     const outputTput = m.output_tput_per_gpu ?? tput;
     const inputTput = m.input_tput_per_gpu ?? 0;
-    const cacheHitRate = measuredCacheHitRate(m);
+    const cacheHitRate = pricingCacheHitRate({ ...m, hw: row.hardware });
     const tokenShare = inputTokenShare(row, inputTput, outputTput);
-    const specs = getGpuSpecs(hwKey);
+    const specs = getGpuSpecs(hwKey, tcoBasis);
     const power = specs.power;
 
     if (!grouped[groupKey]) grouped[groupKey] = [];
     groupMeta[groupKey] = meta;
 
     grouped[groupKey].push({
+      sourceRow: row,
       hwKey,
       interactivity:
         sequence === Sequence.AgenticTraces
@@ -223,18 +232,16 @@ export function buildGpuGroups<M extends GroupMeta>(
       ...(tokenShare === null ? {} : { inputTokenShare: tokenShare }),
       concurrency: row.conc,
       tp: row.decode_tp,
+      dp: entry.dp,
       precision: row.precision,
       ep: row.decode_ep,
       dp_attention: row.decode_dp_attention,
       disagg: row.disagg,
       costh: computeGpuCost(specs.costh, tput),
-      costn: computeGpuCost(specs.costn, tput),
       costr: computeGpuCost(specs.costr, tput),
       costhi: computeGpuCost(specs.costh, inputTput),
-      costni: computeGpuCost(specs.costn, inputTput),
       costri: computeGpuCost(specs.costr, inputTput),
       costhOutput: computeGpuCost(specs.costh, outputTput),
-      costnOutput: computeGpuCost(specs.costn, outputTput),
       costrOutput: computeGpuCost(specs.costr, outputTput),
       tpPerMw: power && power > 0 ? (tput * 1000) / power : 0,
       inputTpPerMw: power && power > 0 ? (inputTput * 1000) / power : 0,
@@ -267,6 +274,8 @@ export function useThroughputData(
   initialRows?: BenchmarkRow[],
   enabled = true,
   selectedTokenType: CostType = 'total',
+  tcoBasis: TcoBasis = DEFAULT_TCO_BASIS,
+  includePower = false,
 ) {
   const initialCacheScope = useMemo(
     () =>
@@ -286,12 +295,15 @@ export function useThroughputData(
     enabled,
     undefined,
     undefined,
-    {
-      type: 'calculator',
-      sequence: selectedSequence,
-      ...(initialCacheScope ? { cacheScope: initialCacheScope } : {}),
-    },
-    initialRows,
+    includePower
+      ? undefined
+      : {
+          type: 'calculator',
+          sequence: selectedSequence,
+          ...(initialCacheScope ? { cacheScope: initialCacheScope } : {}),
+        },
+    // A calculator projection cannot seed the raw-power query cache.
+    includePower ? undefined : initialRows,
   );
 
   const loading = queryLoading || !allRows;
@@ -328,6 +340,7 @@ export function useThroughputData(
       precisions: selectedPrecisions,
       percentile: selectedPercentile,
       tokenType: selectedTokenType,
+      tcoBasis,
     };
 
     const official = buildGpuGroups<GroupMeta>(allRows, {
@@ -382,6 +395,7 @@ export function useThroughputData(
     selectedPrecisions,
     selectedPercentile,
     selectedTokenType,
+    tcoBasis,
     overlayRows,
     runIndexByUrl,
   ]);

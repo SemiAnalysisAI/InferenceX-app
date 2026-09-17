@@ -5,14 +5,17 @@ import React, { useCallback, useMemo, useRef } from 'react';
 
 import { formatLargeNumber } from '@/lib/chart-rendering';
 import { getChartWatermark } from '@/lib/data-mappings';
+import type { AnyScale } from '@/lib/d3-chart/chart-update';
 import {
   D3Chart,
+  type AxisConfig,
   type D3ChartHandle,
   type LayerConfig,
   type RenderContext,
   type ScaleConfig,
 } from '@/lib/d3-chart/D3Chart';
 import { escapeHtml } from '@/lib/utils';
+import { useLocale } from '@/lib/use-locale';
 
 import {
   isBreakEvenAnchored,
@@ -36,6 +39,11 @@ const LABEL_MIN_GAP = 13;
  * half its glyphs above the SVG edge without this inset.
  */
 const LABEL_HALF_HEIGHT = 6;
+
+const DATE_FORMATS = {
+  en: { axis: '%b %Y', tooltip: '%d %b %Y' },
+  zh: { axis: '%Y年%-m月', tooltip: '%Y年%-m月%-d日' },
+} as const;
 
 /** One plotted series: an hwKey's margin staircase since the model shipped. */
 export interface LifecycleChartSeries {
@@ -151,6 +159,8 @@ const FleetLifecycleChart = React.memo(
     legendElement,
     caption,
   }: FleetLifecycleChartProps) => {
+    const locale = useLocale();
+    const dateFormats = DATE_FORMATS[locale];
     const chartRef = useRef<D3ChartHandle | null>(null);
     const toMs = useCallback((month: number) => anchorMs + month * MS_PER_MONTH, [anchorMs]);
     const valueOf = useCallback((point: LifecyclePoint) => metricValue(point, metric), [metric]);
@@ -503,7 +513,7 @@ const FleetLifecycleChart = React.memo(
       [valueOf],
     );
 
-    const sliceDate = useMemo(() => d3.timeFormat('%d %b %Y'), []);
+    const sliceDate = useMemo(() => d3.timeFormat(dateFormats.tooltip), [dateFormats]);
 
     /**
      * Was the readout frozen when the current click started?
@@ -634,12 +644,30 @@ const FleetLifecycleChart = React.memo(
       [anchorMs, bySafeKey, data, labels, metric, readingAt, sliceDate, sliceSpacing, stepsOnAxis],
     );
 
-    const xAxisConfig = useMemo(
+    const xAxisConfig = useMemo<AxisConfig>(
       () => ({
-        tickFormat: d3.timeFormat('%b %Y') as any,
+        tickFormat: d3.timeFormat(dateFormats.axis) as any,
         tickCount: 8,
+        ...(locale === 'zh'
+          ? {
+              tickValues: (scale: AnyScale) => {
+                const timeScale = scale as d3.ScaleTime<number, number>;
+                // Chinese year/month labels need more room on narrow plots.
+                // Keep the same calendar candidates as English, then thin them
+                // by their positions on the current (possibly zoomed) scale.
+                const ticks = timeScale.ticks(8);
+                let previousX = -Infinity;
+                return ticks.filter((tick) => {
+                  const x = timeScale(tick);
+                  if (x - previousX < 96) return false;
+                  previousX = x;
+                  return true;
+                });
+              },
+            }
+          : {}),
       }),
-      [],
+      [dateFormats, locale],
     );
 
     const yAxisConfig = useMemo(

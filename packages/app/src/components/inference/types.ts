@@ -1,9 +1,10 @@
 import type React from 'react';
-import type { WorkerPower } from '@semianalysisai/inferencex-db/queries/benchmarks';
+import type { PowerAudit, WorkerPower } from '@semianalysisai/inferencex-db/queries/benchmarks';
 
 import type { HardwareEntry } from '@/lib/constants';
 import type { Model, Sequence } from '@/lib/data-mappings';
 import type { PowerTier } from '@/lib/power-tier';
+import type { SystemPowerEstimate } from '@/lib/modeled-system-power';
 import type { MetricKey } from './metric-registry';
 
 export type { WorkerPower };
@@ -55,6 +56,7 @@ export type WorkerRole = 'prefill' | 'decode' | 'agg' | 'frontend';
  * @property {number} p99_e2el - 99th percentile of End-to-End Latency.
  */
 export interface AggDataEntry {
+  /** Numeric data-parallel replica count, distinct from DP Attention. */
   /** Metric keys present in the source row before missing values are normalized to zero. */
   rawMetricKeys?: string[];
   /** Stable per-point id from benchmark_results — for trace_replay lookups. */
@@ -64,6 +66,9 @@ export interface AggDataEntry {
   hw: string;
   mtp?: string;
   hwKey: string;
+  /** Physical chips are independent of logical tensor/data parallelism. */
+  physicalChips?: number;
+  dp?: number;
   tp: number;
   conc: number;
   model: string;
@@ -115,6 +120,8 @@ export interface AggDataEntry {
   // Measured GPU telemetry (emitted by runner's aggregate_power.py).
   // Optional because historical runs predate the fields.
   power_valid?: number;
+  power_invalid_reasons?: string[];
+  power_audit?: PowerAudit;
   power_metric_schema_version?: number;
   /**
    * Certification tier for the measured power telemetry, derived by
@@ -125,6 +132,10 @@ export interface AggDataEntry {
    */
   power_tier?: PowerTier;
   avg_power_w?: number;
+  p75_power_w?: number;
+  p90_power_w?: number;
+  /** Chassis AC estimate from validated telemetry, with explicit support/provenance. */
+  modeledSystemPower?: SystemPowerEstimate;
   joules_per_successful_query?: number;
   joules_per_output_token?: number;
   joules_per_total_token?: number;
@@ -289,39 +300,23 @@ export interface InferenceData extends Partial<Omit<AggDataEntry, AggDataConflic
   tokenRevenuePerGpuHour?: { y: number; roof: boolean };
   /** Total tokens produced per dollar of modeled infrastructure spend. */
   tokensPerDollarH?: { y: number; roof: boolean };
-  tokensPerDollarN?: { y: number; roof: boolean };
   tokensPerDollarR?: { y: number; roof: boolean };
   tpPerMw: { y: number; roof: boolean };
   inputTputPerMw?: { y: number; roof: boolean };
   outputTputPerMw?: { y: number; roof: boolean };
   // Cost per million tokens.
   costh: { y: number; roof: boolean };
-  costn: { y: number; roof: boolean };
   costr: { y: number; roof: boolean };
   costhOutput?: { y: number; roof: boolean };
-  costnOutput?: { y: number; roof: boolean };
   costrOutput?: { y: number; roof: boolean };
   costhi: { y: number; roof: boolean };
-  costni: { y: number; roof: boolean };
   costri: { y: number; roof: boolean };
   costUser?: { y: number; roof: boolean };
   // Tokens purchasable per $1.
   outputTokensPerDollarH?: { y: number; roof: boolean };
-  outputTokensPerDollarN?: { y: number; roof: boolean };
   outputTokensPerDollarR?: { y: number; roof: boolean };
   inputTokensPerDollarH?: { y: number; roof: boolean };
-  inputTokensPerDollarN?: { y: number; roof: boolean };
   inputTokensPerDollarR?: { y: number; roof: boolean };
-  // Tokens purchasable per ¥1 — the $ metrics converted at USD_TO_CNY.
-  tokensPerRmbH?: { y: number; roof: boolean };
-  tokensPerRmbN?: { y: number; roof: boolean };
-  tokensPerRmbR?: { y: number; roof: boolean };
-  outputTokensPerRmbH?: { y: number; roof: boolean };
-  outputTokensPerRmbN?: { y: number; roof: boolean };
-  outputTokensPerRmbR?: { y: number; roof: boolean };
-  inputTokensPerRmbH?: { y: number; roof: boolean };
-  inputTokensPerRmbN?: { y: number; roof: boolean };
-  inputTokensPerRmbR?: { y: number; roof: boolean };
   tokensPerDollarUser?: { y: number; roof: boolean };
   powerUser?: { y: number; roof: boolean };
 
@@ -334,11 +329,21 @@ export interface InferenceData extends Partial<Omit<AggDataEntry, AggDataConflic
   // pre-aggregate_power.py runs (and runs with monitoring disabled) won't
   // emit these fields.
   measuredAvgPower?: { y: number; roof: boolean };
+  measuredP75Power?: { y: number; roof: boolean };
+  measuredP90Power?: { y: number; roof: boolean };
+  /**
+   * Summed modeled chassis AC ÷ modeled chassis GPU count (chassisCount × 8).
+   * Partially allocated chassis are extrapolated; see modeled-system-power.ts chassisBasis.
+   */
+  modeledChassisPowerPerGpu?: { y: number; roof: boolean };
   measuredPrefillAvgPower?: { y: number; roof: boolean };
   measuredDecodeAvgPower?: { y: number; roof: boolean };
   measuredJPerOutputToken?: { y: number; roof: boolean };
   measuredJPerTotalToken?: { y: number; roof: boolean };
   measuredJPerInputToken?: { y: number; roof: boolean };
+  // Role-local energy (prefill/decode workers only) — disagg-only in practice.
+  measuredPrefillJPerInputToken?: { y: number; roof: boolean };
+  measuredDecodeJPerOutputToken?: { y: number; roof: boolean };
   measuredJPerSuccessfulQuery?: { y: number; roof: boolean };
   measuredWhPerSuccessfulQuery?: { y: number; roof: boolean };
   measuredPowerPercentTdp?: { y: number; roof: boolean };
@@ -590,6 +595,8 @@ export interface InferenceDataContextType {
   hwTypesWithData: Set<string>;
   hardwareConfig: HardwareConfig;
   graphs: RenderableGraph[];
+  /** Missing metrics must remain countable after chart filtering hides their points. */
+  selectionPoints: InferenceData[];
   loading: boolean;
   /** True while `graphs` shows previous-key data (placeholder) or a background
    *  refetch is in flight — i.e. content is visible but about to update. */
@@ -625,6 +632,13 @@ export interface InferenceFiltersContextType {
   activePresetId: string | null;
   presetGuardRef: React.RefObject<boolean>;
   compareGpuPair: readonly [string, string] | null;
+  /**
+   * Framework families the provider is pinned to (embed routes), or null. When
+   * set, `quickFilters.frameworks` mirrors it and cannot be edited.
+   */
+  lockedFrameworks: readonly string[] | null;
+  /** Chart-only rendering for embeds; see `InferenceProvider.minimalChrome`. */
+  minimalChrome: boolean;
 }
 
 /** Axis choices and visual presentation state. */
@@ -642,6 +656,7 @@ export interface InferenceDisplayContextType {
   scaleType: 'auto' | 'linear' | 'log';
   isLegendExpanded: boolean;
   hideNonOptimal: boolean;
+  showAllMeasurements: boolean;
   showPointLabels: boolean;
   highContrast: boolean;
   logScale: boolean;
@@ -649,6 +664,10 @@ export interface InferenceDisplayContextType {
   showConcurrencyLabels: boolean;
   showGradientLabels: boolean;
   showLineLabels: boolean;
+  showParetoFrontier: boolean;
+  showParetoHinterland: boolean;
+  paretoFrontierPlayful: boolean;
+  paretoHinterlandPlayful: boolean;
 }
 
 /** Stable commands that mutate inference state. */
@@ -687,6 +706,7 @@ export interface InferenceActionsContextType {
   setQuickFilterPower: (tiers: PowerTier[]) => void;
   setIsLegendExpanded: (expanded: boolean) => void;
   setHideNonOptimal: (hide: boolean) => void;
+  setShowAllMeasurements: (show: boolean) => void;
   setShowPointLabels: (show: boolean) => void;
   setHighContrast: (highContrast: boolean) => void;
   setLogScale: (logScale: boolean) => void;
@@ -694,6 +714,8 @@ export interface InferenceActionsContextType {
   setShowConcurrencyLabels: (showConcurrencyLabels: boolean) => void;
   setShowGradientLabels: (showGradientLabels: boolean) => void;
   setShowLineLabels: (showLineLabels: boolean) => void;
+  setShowParetoFrontier: (show: boolean) => void;
+  setShowParetoHinterland: (show: boolean) => void;
   setSelectedGPUs: (gpus: string[]) => void;
   setSelectedDates: (dates: string[] | ((prev: string[]) => string[])) => void;
   setSelectedDatesFromRunExpansion: (dates: string[] | ((prev: string[]) => string[])) => void;

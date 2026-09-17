@@ -12,6 +12,16 @@ const artifact = (id: number, name: string, created_at: string, expired = false)
 });
 
 describe('buildArtifactPlan', () => {
+  it('keeps the source required manifest and successful artifacts on reuse', () => {
+    const rows = [
+      artifact(1, 'required-power-sweep-manifest', '2026-01-02T00:01:00Z'),
+      artifact(2, 'bmk_qwen', '2026-01-02T00:02:00Z'),
+    ];
+    const plan = buildArtifactPlan('100', '200', rows, [
+      artifact(3, 'changelog-metadata', '2026-01-03T00:00:00Z'),
+    ]);
+    expect(plan.artifacts.map((item) => item.id)).toEqual([2, 3, 1]);
+  });
   it('matches normal ingestion by keeping the newest upload for each exact name', () => {
     const plan = buildArtifactPlan('100', '100', [
       artifact(1, 'bmk_model_runner_01', '2026-01-01T00:00:00Z'),

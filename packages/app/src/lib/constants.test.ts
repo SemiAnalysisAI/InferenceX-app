@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { HW_REGISTRY } from '@semianalysisai/inferencex-constants';
 
 import {
+  DEFAULT_TCO_BASIS,
   GPU_ALIAS_TO_CANONICAL,
   GPU_KEY_ALIASES,
   getGpuSpecs,
@@ -130,33 +131,36 @@ describe('getHardwareConfig', () => {
 
   it('labels the July Vera Rubin snapshot without the hosting provider', () => {
     const config = getHardwareConfig('vr200_rubin-july');
-    expect(config.label).toBe('Vera Rubin');
+    expect(config.label).toBe('Vera Rubin NVL72');
     expect(config.suffix).toBe('(July)');
     expect(config.alwaysShowPrecision).toBe(true);
     expect(getHardwareConfig('vr200_coreweave-vera-rubin').suffix).toBe('');
+    expect(getHardwareConfig('vr200_trt')).toMatchObject({
+      label: 'Vera Rubin NVL72',
+      suffix: '(TRTLLM)',
+    });
   });
 
-  it('keeps the Teacup attribution in the Jalapeño display label', () => {
+  it('uses the OpenAI vendor while preserving the Teacup framework', () => {
     const config = getHardwareConfig('jalapeno_teacup');
     expect(config.label).toBe('Jalapeño');
     expect(config.suffix).toBe('(Teacup)');
-    expect(HW_REGISTRY.jalapeno.badgeLabel).toBe('Jalapeño (Teacup)');
+    expect(HW_REGISTRY.jalapeno.vendor).toBe('OpenAI');
+    expect(HW_REGISTRY.jalapeno.badgeLabel).toBe('Jalapeño (OpenAI)');
   });
 
   it('uses the published Jalapeño and VR200 power and TCO assumptions', () => {
     expect(getGpuSpecs('jalapeno_teacup')).toEqual({
       tdp: 700,
       power: 1.125,
-      costh: 1.47,
-      costn: 1.56,
-      costr: 1.79,
+      costh: 1.27,
+      costr: 1.27,
     });
     expect(getGpuSpecs('vr200_coreweave-vera-rubin')).toEqual({
       tdp: 1800,
       power: 3.3,
       costh: 3.61,
-      costn: 3.61,
-      costr: 3.61,
+      costr: 8.5,
     });
   });
 
@@ -207,23 +211,23 @@ describe('getHardwareConfig', () => {
     expect(getHardwareConfig('b200_vllm_mtp').suffix).toBe('(vLLM, MTP)');
   });
 
-  it('HW_REGISTRY has non-zero power for all entries', () => {
+  it('registered power is positive for every published hardware entry', () => {
     for (const entry of Object.values(HW_REGISTRY)) {
       expect(entry.power).toBeGreaterThan(0);
+      expect(entry.tdp).toBeGreaterThan(0);
     }
   });
 
   it('HW_REGISTRY has non-negative cost rates for all entries', () => {
     for (const entry of Object.values(HW_REGISTRY)) {
       expect(entry.costh).toBeGreaterThanOrEqual(0);
-      expect(entry.costn).toBeGreaterThanOrEqual(0);
       expect(entry.costr).toBeGreaterThanOrEqual(0);
     }
   });
 
   it('states every cost tier to at most two decimal places', () => {
     for (const [gpu, entry] of Object.entries(HW_REGISTRY)) {
-      for (const tier of ['costh', 'costn', 'costr'] as const) {
+      for (const tier of ['costh', 'costr'] as const) {
         const value = entry[tier];
         // A published rate, never a raw TCO-model output with 16 digits.
         expect(`${gpu}.${tier}=${value}`).toBe(`${gpu}.${tier}=${Math.round(value * 100) / 100}`);
@@ -233,19 +237,19 @@ describe('getHardwareConfig', () => {
 
   it('uses the July 2026 TCO rates for modeled datacenter GPUs', () => {
     const expectedRates = {
-      h100: [1.17, 1.55, 1.78],
-      h200: [1.22, 1.59, 2.05],
-      b200: [1.73, 2.07, 2.6],
-      b300: [2.26, 2.52, 3],
-      gb200: [1.86, 2.26, 2.6],
-      gb300: [2.31, 2.79, 3.3],
-      mi300x: [0.95, 1.16, 1.3],
-      mi325x: [1.1, 1.32, 1.6],
-      mi355x: [1.5, 2.09, 2.1],
+      h100: [1.17, 2],
+      h200: [1.22, 2.9],
+      b200: [1.73, 3.7],
+      b300: [2.26, 4.25],
+      gb200: [1.86, 4],
+      gb300: [2.31, 5],
+      mi300x: [0.95, 1.3],
+      mi325x: [1.1, 1.6],
+      mi355x: [1.5, 2.9],
     } as const;
 
-    for (const [gpu, [costh, costn, costr]] of Object.entries(expectedRates)) {
-      expect(HW_REGISTRY[gpu]).toMatchObject({ costh, costn, costr });
+    for (const [gpu, [costh, costr]] of Object.entries(expectedRates)) {
+      expect(HW_REGISTRY[gpu]).toMatchObject({ costh, costr });
     }
   });
 });
@@ -259,8 +263,7 @@ describe('getGpuSpecs', () => {
     expect(specs.tdp).toBe(700);
     expect(specs.power).toBe(1.37);
     expect(specs.costh).toBe(1.17);
-    expect(specs.costn).toBe(1.55);
-    expect(specs.costr).toBe(1.78);
+    expect(specs.costr).toBe(2);
   });
 
   it('extracts base from compound key (e.g. h100_vllm)', () => {
@@ -279,17 +282,47 @@ describe('getGpuSpecs', () => {
     expect(specs.power).toBe(0);
     expect(specs.tdp).toBe(0);
     expect(specs.costh).toBe(0);
-    expect(specs.costn).toBe(0);
     expect(specs.costr).toBe(0);
   });
 
-  it('returns correct specs for all base GPUs in HW_REGISTRY', () => {
+  it('returns registry external rates for all base GPUs in HW_REGISTRY', () => {
     for (const [base, entry] of Object.entries(HW_REGISTRY)) {
-      const result = getGpuSpecs(base);
+      const result = getGpuSpecs(base, 'external');
       expect(result.power).toBe(entry.power);
       expect(result.tdp).toBe(entry.tdp);
       expect(result.costh).toBe(entry.costh);
     }
+  });
+
+  it('switches TPUv7 to owner cost without changing power', () => {
+    const external = getGpuSpecs('tpuv7_vllm', 'external');
+    const internal = getGpuSpecs('tpuv7_vllm', 'internal');
+
+    expect(external).toMatchObject({
+      power: 1.207,
+      costh: 1.21,
+      costr: 2,
+    });
+    expect(internal).toMatchObject({
+      power: 1.207,
+      costh: 1.03,
+      costr: 2,
+    });
+  });
+
+  it('keeps the TPUv7 3-year rental rate at $2/hr on both bases', () => {
+    expect(getGpuSpecs('tpuv7_vllm', 'external').costr).toBe(2);
+    expect(getGpuSpecs('tpuv7_vllm', 'internal').costr).toBe(2);
+  });
+
+  it('defaults to the internal owner cost basis', () => {
+    expect(DEFAULT_TCO_BASIS).toBe('internal');
+    expect(getGpuSpecs('tpuv7_vllm')).toEqual(getGpuSpecs('tpuv7_vllm', 'internal'));
+    expect(getGpuSpecs('tpuv7_vllm').costh).toBe(1.03);
+  });
+
+  it('keeps hardware without an owner cost on external rates', () => {
+    expect(getGpuSpecs('h100_vllm', 'internal')).toEqual(getGpuSpecs('h100_vllm', 'external'));
   });
 });
 

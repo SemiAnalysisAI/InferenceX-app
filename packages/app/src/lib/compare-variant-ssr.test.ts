@@ -468,12 +468,14 @@ describe('variantCompareNarrativeZh', () => {
       'DeepSeek R1',
       'H200',
       'MTP',
-      'Off',
+      '关闭',
       makeNarrativeRows(),
       { min: 10, max: 40 },
     );
     expect(result.length).toBeGreaterThan(0);
     expect(result.some((p) => /[一-鿿]/.test(p))).toBe(true);
+    expect(result.join('')).toContain('关闭投机解码');
+    expect(result.join('')).not.toContain('Off');
   });
 });
 
@@ -581,21 +583,51 @@ describe('buildVariantJsonLdZh', () => {
     bestMedianTpot: 0.001,
   };
 
-  it('carries inLanguage zh-CN', () => {
+  it('localizes human-readable structured-data fields', () => {
     const ld = buildVariantJsonLdZh(
-      'precision',
+      'spec-decode',
       MODEL_SLUG,
       'h200',
-      'FP8',
-      'BF16',
-      'https://example.com/zh/compare-precision/test',
+      'MTP',
+      '关闭',
+      'https://example.com/zh/compare-spec-decode/test',
       summary,
       summary,
-      [],
+      makeNarrativeRows().slice(0, 1),
     );
     const graph = ld['@graph'] as Record<string, unknown>[];
     const itemList = graph[0] as Record<string, unknown>;
     expect(itemList.inLanguage).toBe('zh-CN');
+    const serialized = JSON.stringify(ld);
+    for (const name of [
+      '类别',
+      '最高单芯片吞吐量（tok/s）',
+      '最低 TTFT 中位数（s）',
+      '最低 TPOT 中位数（s）',
+      '基准测试配置数',
+      '模型',
+      '芯片',
+      '目标交互性（tok/s/user）',
+    ]) {
+      expect(serialized).toContain(`"name":"${name}"`);
+    }
+    for (const name of [
+      'Category',
+      'Best Throughput per Chip (tok/s)',
+      'Best Median TTFT (s)',
+      'Best Median TPOT (s)',
+      'Benchmark Configurations',
+      'Model',
+      'Chip',
+      'Target Interactivity (tok/s/user)',
+    ]) {
+      expect(serialized).not.toContain(`"name":"${name}"`);
+    }
+    expect(serialized).not.toContain(' vs ');
+    expect(serialized).not.toContain('Off');
+    expect(serialized).toContain('"name":"启用 MTP"');
+    expect(serialized).toContain('"name":"关闭投机解码"');
+    expect(serialized).not.toContain('"name":"关闭"');
   });
 });
 

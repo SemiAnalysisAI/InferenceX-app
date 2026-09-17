@@ -10,7 +10,8 @@
     "./etl/*": "./src/etl/*.ts",
     "./lib/*": "./src/lib/*.ts",
     "./migrate": "./src/migrate.ts",
-    "./queries/*": "./src/queries/*.ts"
+    "./queries/*": "./src/queries/*.ts",
+    "./operatorx/*": "./src/operatorx/*.ts"
   },
   "scripts": {
     "db:prepare:ci": "bun src/prepare-ci-artifacts.ts",
@@ -33,7 +34,8 @@
     "db:reset": "bun --env-file=../../.env src/reset-db.ts",
     "db:verify": "bun --env-file=../../.env src/verify-db.ts",
     "test:unit": "vitest run",
-    "test:unit:coverage": "vitest run --coverage"
+    "test:unit:coverage": "vitest run --coverage",
+    "db:migrate:operatorx": "bun --env-file=../../.env src/migrate-operatorx.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",
@@ -44,6 +46,7 @@
     "stream-json": "^3.6.0"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
     "@types/adm-zip": "^0.5.8",
     "@types/node": "^26.4.0",
     "@types/stream-json": "^1.7.8",

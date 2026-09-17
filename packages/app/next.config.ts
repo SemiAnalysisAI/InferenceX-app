@@ -1,6 +1,7 @@
 import { withPostHogConfig } from '@posthog/nextjs-config';
 import type { NextConfig } from 'next';
 import { allowedDevOriginsFromEnv } from './src/lib/allowed-dev-origins';
+import { INFERENCE_MODEL_ALIAS_REDIRECTS } from './src/lib/inference-model-redirects';
 
 const nextConfig: NextConfig = {
   // Allow a second, isolated dev server (e.g. a dump-mode instance on another
@@ -14,6 +15,7 @@ const nextConfig: NextConfig = {
   serverExternalPackages: ['shiki'],
   redirects() {
     return Promise.resolve([
+      ...INFERENCE_MODEL_ALIAS_REDIRECTS,
       {
         source: '/datasets/:path*',
         destination: '/agentx/:path*',

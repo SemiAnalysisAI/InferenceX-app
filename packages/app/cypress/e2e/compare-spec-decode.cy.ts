@@ -98,7 +98,7 @@ describe('Compare spec-decode zh index', () => {
     });
   });
 
-  it('renders Chinese hero and /zh card hrefs', () => {
+  it('renders Chinese hero and keeps the none side localized through the slug flow', () => {
     cy.visit('/zh/compare-spec-decode');
     cy.contains('h1', /投机解码对比/u).should('be.visible');
     cy.get('body').then(($body) => {
@@ -107,6 +107,13 @@ describe('Compare spec-decode zh index', () => {
       // If cards exist, verify they use /zh prefixed hrefs.
       if (cards.length > 0) {
         cy.get('a[href^="/zh/compare-spec-decode/"]').should('have.length.greaterThan', 0);
+        const href = cards.first().attr('href')!;
+        cy.visit(href);
+        cy.location('pathname').should('eq', href);
+        cy.get('h1').should('contain', '关闭').and('not.contain', 'Off');
+        cy.get('[data-testid="compare-interpolated-table"]')
+          .should('contain', '关闭')
+          .and('not.contain', 'Off');
       }
     });
   });

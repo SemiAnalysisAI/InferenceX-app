@@ -1,20 +1,26 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
+import path from 'node:path';
 
 import { OG_IMAGE, SITE_URL } from '@semianalysisai/inferencex-constants';
 
 import {
   type BlogPostMeta,
   blogDescription,
+  blogOgImagePath,
   blogOgImageUrl,
   buildBlogBreadcrumbJsonLd,
   buildBlogBreadcrumbJsonLdZh,
   buildBlogPostingJsonLd,
   extractHeadings,
+  formatBlogDate,
   getAdjacentPosts,
   getAllPosts,
   getPostBySlug,
+  getPostThumbnail,
+  getRelatedPosts,
   getReadingTime,
+  getTopTags,
   getWordCount,
   hasZhTranslation,
   slugify,
@@ -777,5 +783,143 @@ describe('buildBlogBreadcrumbJsonLdZh', () => {
       expect(String(el.item)).toMatch(/^https:\/\/[^/]+\/zh/u);
     }
     expect(crumb.itemListElement.map((el: any) => el.position)).toEqual([1, 2, 3]);
+  });
+});
+
+const mk = (slug: string, date: string, tags: string[]): BlogPostMeta => ({
+  slug,
+  title: slug,
+  subtitle: `${slug} subtitle`,
+  date,
+  tags,
+  readingTime: 3,
+});
+
+describe('article index helpers', () => {
+  // Newest first, matching getAllPosts ordering.
+  const posts = [
+    mk('newest', '2026-05-01', ['nvidia', 'b200', 'agentx']),
+    mk('mid', '2026-04-01', ['amd', 'mi355x', 'agentx']),
+    mk('old', '2026-03-01', ['nvidia', 'agentx']),
+    mk('untagged', '2026-02-01', []),
+    mk('oldest', '2026-01-01', ['sglang']),
+  ];
+
+  it('getTopTags ranks by frequency then alphabetically and respects the limit', () => {
+    expect(getTopTags(posts, 2)).toEqual(['agentx', 'nvidia']);
+    expect(getTopTags(posts, 10)).toEqual(['agentx', 'nvidia', 'amd', 'b200', 'mi355x', 'sglang']);
+    expect(getTopTags([], 5)).toEqual([]);
+  });
+
+  it('getRelatedPosts prefers the most shared tags and never returns the post itself', () => {
+    const related = getRelatedPosts('newest', posts);
+    expect(related.map((p) => p.slug)).toEqual(['old', 'mid', 'untagged']);
+    expect(related.some((p) => p.slug === 'newest')).toBe(false);
+  });
+
+  it('getRelatedPosts falls back to recency for posts with no tag overlap', () => {
+    expect(getRelatedPosts('oldest', posts).map((p) => p.slug)).toEqual(['newest', 'mid', 'old']);
+    expect(getRelatedPosts('missing', posts, 2).map((p) => p.slug)).toEqual(['newest', 'mid']);
+  });
+
+  it('formatBlogDate renders long dates per locale without timezone drift', () => {
+    expect(formatBlogDate('2026-08-19')).toBe('August 19, 2026');
+    expect(formatBlogDate('2026-08-19', 'zh')).toBe('2026年8月19日');
+    expect(formatBlogDate('2026-01-01', 'en')).toBe('January 1, 2026');
+  });
+
+  it('blogOgImagePath points at the locale-specific opengraph route', () => {
+    expect(blogOgImagePath('gb200-vs-mi355x')).toBe('/blog/gb200-vs-mi355x/opengraph-image');
+    expect(blogOgImagePath('gb200-vs-mi355x', 'zh')).toBe(
+      '/zh/blog/gb200-vs-mi355x/opengraph-image',
+    );
+  });
+});
+
+/** Mock `public/images/post/` with the given file names; null means the folder is missing. */
+function mockPost(mdx: string | null, files: string[] | null = null) {
+  vi.spyOn(fs, 'existsSync').mockImplementation((p) => {
+    const target = String(p);
+    if (target.endsWith(path.join('content', 'blog', 'post.mdx'))) return mdx !== null;
+    if (target.endsWith(path.join('public', 'images', 'post'))) return files !== null;
+    return false;
+  });
+  vi.spyOn(fs, 'readFileSync').mockReturnValue(mdx ?? '');
+  vi.spyOn(fs, 'readdirSync').mockReturnValue((files ?? []) as any);
+}
+
+const FRONT = '---\ntitle: T\ndate: 2026-01-01\nsubtitle: S\n---\n';
+
+describe('getPostThumbnail', () => {
+  it('returns null when the post has no figure and the folder is missing or empty', () => {
+    mockPost(null, null);
+    expect(getPostThumbnail('post')).toBeNull();
+    mockPost(`${FRONT}No figures here.`, ['notes.txt', 'diagram.svg']);
+    expect(getPostThumbnail('post')).toBeNull();
+  });
+
+  it('uses the first Figure in the body, local or allow-listed remote', () => {
+    mockPost(
+      `${FRONT}Intro\n\n<Figure\n  src="https://substack-post-media.s3.amazonaws.com/public/images/abc_2048x1300.png"\n  caption="x"\n/>\n\n<Figure src="/images/post/second.png" />`,
+    );
+    expect(getPostThumbnail('post')).toEqual({
+      light: 'https://substack-post-media.s3.amazonaws.com/public/images/abc_2048x1300.png',
+      dark: 'https://substack-post-media.s3.amazonaws.com/public/images/abc_2048x1300.png',
+    });
+  });
+
+  it('splits srcLight and srcDark per theme', () => {
+    mockPost(
+      `${FRONT}<Figure srcLight="/images/post/a-light.png" srcDark="/images/post/a-dark.png" alt="" />`,
+    );
+    expect(getPostThumbnail('post')).toEqual({
+      light: '/images/post/a-light.png',
+      dark: '/images/post/a-dark.png',
+    });
+  });
+
+  it('skips figures whose source is not an allowed raster image', () => {
+    mockPost(
+      `${FRONT}<Figure src="https://evil.example/x.png" />\n<Figure src="/images/post/chart.svg" />\n<Figure src="/images/post/ok.webp" />`,
+    );
+    expect(getPostThumbnail('post')).toEqual({
+      light: '/images/post/ok.webp',
+      dark: '/images/post/ok.webp',
+    });
+  });
+
+  it('prefers a frontmatter thumbnail override over body figures', () => {
+    mockPost(
+      `---\ntitle: T\ndate: 2026-01-01\nsubtitle: S\nthumbnail: /images/post/hero.png\nthumbnailDark: /images/post/hero-dark.png\n---\n<Figure src="/images/post/first.png" />`,
+    );
+    expect(getPostThumbnail('post')).toEqual({
+      light: '/images/post/hero.png',
+      dark: '/images/post/hero-dark.png',
+    });
+  });
+
+  it('falls back to the image folder, splitting light and dark variants when both exist', () => {
+    mockPost(`${FRONT}text only`, [
+      'specs-radar-light.png',
+      'benchmark-dark.png',
+      'benchmark-light.png',
+    ]);
+    expect(getPostThumbnail('post')).toEqual({
+      light: '/images/post/benchmark-light.png',
+      dark: '/images/post/benchmark-dark.png',
+    });
+  });
+
+  it('folder fallback uses the first figure by name for both themes when variants are not paired', () => {
+    mockPost(`${FRONT}text only`, ['zeta.webp', 'Alpha.JPG', 'readme.md']);
+    expect(getPostThumbnail('post')).toEqual({
+      light: '/images/post/Alpha.JPG',
+      dark: '/images/post/Alpha.JPG',
+    });
+    mockPost(`${FRONT}text only`, ['hbm-dark.png', 'context.png']);
+    expect(getPostThumbnail('post')).toEqual({
+      light: '/images/post/hbm-dark.png',
+      dark: '/images/post/hbm-dark.png',
+    });
   });
 });

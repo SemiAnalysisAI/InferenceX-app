@@ -11,6 +11,8 @@
  * Usage:
  *   bun run db:apply-overrides            # preview + confirm
  *   bun run db:apply-overrides --yes      # skip confirmation
+ *   bun run db:apply-overrides --run-id 33219708211 --yes  # one registered run
+ *   bun run db:apply-overrides --run-id 33721476500 --allow-unregistered-run --yes  # ingest
  *
  * Commits to run-overrides.ts are applied to production automatically after merge.
  * Use this command directly only for local preview or manual recovery.
@@ -22,18 +24,24 @@ import { confirm, hasNoSslFlag, hasYesFlag } from './cli-utils.js';
 import { configCacheKey } from './etl/config-cache.js';
 import { type Sql, createAdminSql, refreshLatestBenchmarks } from './etl/db-utils.js';
 import { jsonbParam } from './lib/backfill-runner.js';
+import { planBenchmarkPointBackfill } from './lib/benchmark-point-backfill.js';
+import { selectRunOverrides } from './lib/run-override-selection.js';
 import {
   type BenchmarkPointBackfill,
   type ChangelogBackfill,
   type PurgedBenchmarkPoint,
-  BENCHMARK_POINT_BACKFILLS,
-  CHANGELOG_BACKFILLS,
-  CONCLUSION_OVERRIDES,
-  PURGED_BENCHMARK_POINTS,
-  PURGED_RUN_ATTEMPTS,
-  PURGED_RUNS,
   validateRunBackfills,
 } from './etl/run-overrides.js';
+
+const {
+  runId,
+  benchmarks: BENCHMARK_POINT_BACKFILLS,
+  changelogs: CHANGELOG_BACKFILLS,
+  conclusions: CONCLUSION_OVERRIDES,
+  purgedPoints: PURGED_BENCHMARK_POINTS,
+  purgedAttempts: PURGED_RUN_ATTEMPTS,
+  purgedRuns: PURGED_RUNS,
+} = selectRunOverrides(process.argv.slice(2));
 
 const sql = createAdminSql({
   noSsl: hasNoSslFlag(),
@@ -188,76 +196,14 @@ interface BenchmarkPointBackfillTarget {
   metrics: Record<string, unknown>;
 }
 
-function asMetricsRecord(value: unknown): Record<string, unknown> | null {
-  return value !== null && typeof value === 'object' && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : null;
-}
-
-function benchmarkPointMetricsPatch(backfill: BenchmarkPointBackfill): Record<string, unknown> {
-  const desiredOffloadMode = backfill.set.offloadMode ?? backfill.offloadMode;
-  return {
-    ...backfill.set.metricsMerge,
-    ...(backfill.set.offloadMode === undefined ? {} : { offload_mode: desiredOffloadMode }),
-  };
-}
-
-/**
- * Recognize the exact malformed value written by the first benchmark-point
- * backfill implementation. It concatenated a metrics object with a JSONB
- * string, producing `[originalMetrics, "{...patch}"]`.
- */
-function recoverMalformedBenchmarkPointMetrics(
-  value: unknown,
-  backfill: BenchmarkPointBackfill,
-): Record<string, unknown> | null {
-  if (!Array.isArray(value) || value.length !== 2) return null;
-  const originalMetrics = asMetricsRecord(value[0]);
-  if (!originalMetrics || typeof value[1] !== 'string') return null;
-
-  try {
-    const appendedPatch = JSON.parse(value[1]) as unknown;
-    if (!isDeepStrictEqual(appendedPatch, benchmarkPointMetricsPatch(backfill))) return null;
-  } catch {
-    return null;
-  }
-  return originalMetrics;
-}
-
-function patchedBenchmarkPointMetrics(
-  sourceMetrics: Record<string, unknown>,
-  backfill: BenchmarkPointBackfill,
-): Record<string, unknown> {
-  const metrics = { ...sourceMetrics };
-  for (const key of backfill.set.metricsRemove ?? []) delete metrics[key];
-  Object.assign(metrics, benchmarkPointMetricsPatch(backfill));
-  return metrics;
-}
-
-function benchmarkPointBackfillIsApplied(
-  row: Record<string, unknown>,
-  backfill: BenchmarkPointBackfill,
-): boolean {
-  const desiredOffloadMode = backfill.set.offloadMode ?? backfill.offloadMode;
-  if (row.offload_mode !== desiredOffloadMode) return false;
-  const metrics = asMetricsRecord(row.metrics);
-  if (!metrics) return false;
-  if (backfill.set.offloadMode !== undefined && metrics.offload_mode !== desiredOffloadMode) {
-    return false;
-  }
-  for (const [key, value] of Object.entries(backfill.set.metricsMerge ?? {})) {
-    if (!isDeepStrictEqual(metrics[key], value)) return false;
-  }
-  for (const key of backfill.set.metricsRemove ?? []) {
-    if (Object.hasOwn(metrics, key)) return false;
-  }
-  return true;
-}
-
 function benchmarkPointDescription(backfill: BenchmarkPointBackfill): string {
+  const auditId =
+    backfill.productionConfigId === undefined
+      ? `production benchmark id ${backfill.productionBenchmarkId}`
+      : `production config id ${backfill.productionConfigId}`;
   return (
     `run ${backfill.githubRunId} attempt ${backfill.runAttempt}, ` +
-    `config ${configCacheKey(backfill.config)} (production id ${backfill.productionConfigId}), ` +
+    `config ${configCacheKey(backfill.config)} (${auditId}), ` +
     `${backfill.benchmarkType}, isl ${backfill.isl}, osl ${backfill.osl}, ` +
     `conc ${backfill.conc}, offload ${backfill.offloadMode}, ` +
     `recipe ${backfill.recipeFingerprint ?? 'legacy'}`
@@ -270,9 +216,11 @@ async function previewBenchmarkPointBackfill(
 ): Promise<BenchmarkPointBackfillTarget | null> {
   const desiredOffloadMode = backfill.set.offloadMode ?? backfill.offloadMode;
   const offloadModes = [...new Set([backfill.offloadMode, desiredOffloadMode])];
+  const sourceRecipeFingerprint = backfill.recipeFingerprint ?? null;
+  const desiredRecipeFingerprint = backfill.set.recipeFingerprint ?? sourceRecipeFingerprint;
   const { config } = backfill;
   const rows = await sql`
-    SELECT br.id, br.offload_mode, br.metrics
+    SELECT br.id, br.offload_mode, br.recipe_fingerprint, br.metrics
     FROM benchmark_results br
     JOIN workflow_runs wr ON wr.id = br.workflow_run_id
     JOIN configs c ON c.id = br.config_id
@@ -300,7 +248,10 @@ async function previewBenchmarkPointBackfill(
       AND br.osl IS NOT DISTINCT FROM ${backfill.osl}
       AND br.conc = ${backfill.conc}
       AND br.offload_mode = ANY(${offloadModes})
-      AND br.recipe_fingerprint IS NOT DISTINCT FROM ${backfill.recipeFingerprint ?? null}
+      AND (
+        br.recipe_fingerprint IS NOT DISTINCT FROM ${sourceRecipeFingerprint}
+        OR br.recipe_fingerprint IS NOT DISTINCT FROM ${desiredRecipeFingerprint}
+      )
   `;
   if (rows.length !== 1) {
     throw new Error(
@@ -311,33 +262,27 @@ async function previewBenchmarkPointBackfill(
   const [row] = rows;
   console.log(`    ${backfill.id}: ${benchmarkPointDescription(backfill)}`);
   console.log(`      reason: ${backfill.reason}`);
-  if (benchmarkPointBackfillIsApplied(row, backfill)) {
+  const metrics = planBenchmarkPointBackfill(
+    {
+      offload_mode: row.offload_mode,
+      recipe_fingerprint: row.recipe_fingerprint,
+      metrics: row.metrics,
+    },
+    backfill,
+  );
+  if (metrics === null) {
     console.log('      already applied.');
     return null;
   }
 
-  const malformedMetrics = recoverMalformedBenchmarkPointMetrics(row.metrics, backfill);
-  if (
-    row.offload_mode === desiredOffloadMode &&
-    desiredOffloadMode !== backfill.offloadMode &&
-    malformedMetrics === null
-  ) {
-    throw new Error(
-      `${backfill.id}: source identity is missing and the desired identity has unexpected data`,
-    );
-  }
-  const sourceMetrics = asMetricsRecord(row.metrics) ?? malformedMetrics;
-  if (!sourceMetrics) {
-    throw new Error(`${backfill.id}: benchmark metrics have an unexpected JSON shape`);
-  }
-  if (malformedMetrics) {
+  if (Array.isArray(row.metrics)) {
     console.log('      repair malformed metrics written by the previous backfill attempt');
   }
   console.log(`      set ${JSON.stringify(backfill.set)}`);
   return {
     backfill,
     resultId: row.id as number,
-    metrics: patchedBenchmarkPointMetrics(sourceMetrics, backfill),
+    metrics,
   };
 }
 
@@ -346,9 +291,12 @@ async function applyBenchmarkPointBackfillToDatabase(
 ): Promise<void> {
   const { backfill, resultId, metrics } = target;
   const desiredOffloadMode = backfill.set.offloadMode ?? backfill.offloadMode;
+  const desiredRecipeFingerprint =
+    backfill.set.recipeFingerprint ?? backfill.recipeFingerprint ?? null;
   const [updated] = await sql`
     UPDATE benchmark_results
     SET offload_mode = ${desiredOffloadMode},
+        recipe_fingerprint = ${desiredRecipeFingerprint},
         metrics = ${jsonbParam(sql, metrics)}
     WHERE id = ${resultId}
     RETURNING id
@@ -600,6 +548,7 @@ async function purgeBenchmarkPoints(resultIds: number[]): Promise<void> {
 async function main(): Promise<void> {
   validateRunBackfills();
   console.log('=== apply-overrides ===');
+  if (runId !== undefined) console.log(`  Scoped to GitHub run ${runId}`);
 
   // Phase 1: preview (read-only)
   let hasWork = false;

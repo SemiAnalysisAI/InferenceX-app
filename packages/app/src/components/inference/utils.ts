@@ -1,3 +1,4 @@
+import { getGpuSpecs, type TcoBasis } from '@/lib/constants';
 /**
  * @file utils.ts
  * @description Inference-specific utility functions for filtering chart data.
@@ -9,6 +10,7 @@ import { resolveXAxisField } from '@/components/inference/utils/resolveXAxisFiel
 import { remapInferencePoint } from '@/lib/chart-utils';
 
 import type { ChartDefinition, ClippedInferenceData, InferenceData, YAxisMetricKey } from './types';
+import type { XAxisMode } from './hooks/useChartData';
 
 /**
  * Select the matching unofficial-run overlay for a chart mode. E2E Normalized Interactivity
@@ -58,13 +60,10 @@ export const filterDataByCostLimit = (
   // Map of metric keys to their corresponding data point fields
   const costFieldMap: Record<string, (point: InferenceData) => number | undefined> = {
     costh: (point) => point.costh?.y,
-    costn: (point) => point.costn?.y,
     costr: (point) => point.costr?.y,
     costhOutput: (point) => point.costhOutput?.y,
-    costnOutput: (point) => point.costnOutput?.y,
     costrOutput: (point) => point.costrOutput?.y,
     costhi: (point) => point.costhi?.y,
-    costni: (point) => point.costni?.y,
     costri: (point) => point.costri?.y,
     costUser: (point) => point.costUser?.y,
   };
@@ -108,6 +107,7 @@ export function partitionChartDataByLimits(
   const clippedData: ClippedInferenceData[] = [];
 
   for (const point of data) {
+    if (!Number.isFinite(point.x)) continue;
     const reasons: ClippedInferenceData['reasons'] = [];
     if (costLimitApplies && point.y > chartDefinition.y_cost_limit!) reasons.push('cost');
     if (latencyLimitApplies && point.x > chartDefinition.y_latency_limit!) {
@@ -142,7 +142,9 @@ export function processOverlayChartData(
   options?: {
     isAgentic?: boolean;
     selectedPercentile?: string;
+    selectedXAxisMode?: XAxisMode;
     restrictToNormalizedFrontier?: boolean;
+    tcoBasis?: TcoBasis;
   },
 ): InferenceData[] {
   return processOverlayChartDataWithClipping(
@@ -166,7 +168,9 @@ export function processOverlayChartDataWithClipping(
   options?: {
     isAgentic?: boolean;
     selectedPercentile?: string;
+    selectedXAxisMode?: XAxisMode;
     restrictToNormalizedFrontier?: boolean;
+    tcoBasis?: TcoBasis;
   },
 ): ProcessedChartData {
   const chartDef = (chartDefinitions as ChartDefinition[]).find((d) => d.chartType === chartType);
@@ -175,19 +179,50 @@ export function processOverlayChartDataWithClipping(
   const metricKey = selectedYAxisMetric.replace('y_', '') as YAxisMetricKey;
   const isAgentic = options?.isAgentic === true;
   const selectedPercentile = options?.selectedPercentile ?? 'median';
+  const sourceData =
+    options?.tcoBasis === 'internal'
+      ? data.map((point) => {
+          const external = getGpuSpecs(point.hwKey, 'external');
+          const internal = getGpuSpecs(point.hwKey, 'internal');
+          const repriced = { ...point };
+          for (const [provider, suffix] of [
+            ['costh', 'H'],
+            ['costr', 'R'],
+          ] as const) {
+            if (external[provider] <= 0 || internal[provider] <= 0) continue;
+            const ratio = internal[provider] / external[provider];
+            const costs = [provider, `${provider}i`, `${provider}Output`] as const;
+            const purchasingPower = [
+              `tokensPerDollar${suffix}`,
+              `inputTokensPerDollar${suffix}`,
+              `outputTokensPerDollar${suffix}`,
+            ] as const;
+            for (const key of [...costs, ...purchasingPower]) {
+              const value = point[key];
+              if (value)
+                repriced[key] = {
+                  ...value,
+                  y: value.y * (key.startsWith('cost') ? ratio : 1 / ratio),
+                };
+            }
+          }
+          return repriced;
+        })
+      : data;
 
   // selectedXAxisMetric is already the effective metric for this chart type
   // (interactivity uses selectedXAxisMetric, e2e uses selectedE2eXAxisMetric).
   const { xAxisField } = resolveXAxisField(chartDef, selectedYAxisMetric, selectedXAxisMetric, {
     isAgentic,
     percentile: selectedPercentile,
+    xAxisMode: options?.selectedXAxisMode,
   });
 
   // The latency limit targets overload outliers on the TTFT axis only; skip it
   // for the natural axis and for agentic (long TTFTs are normal there).
   const isTtftX = xAxisField.endsWith('_ttft');
 
-  const processedData = data
+  const processedData = sourceData
     .filter((d) => metricKey in d)
     .map((d) => remapInferencePoint(d, metricKey, xAxisField));
 

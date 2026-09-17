@@ -1,9 +1,12 @@
 import GPUGraph from '@/components/inference/ui/GPUGraph';
+import { InferenceContextsProvider } from '@/components/inference/InferenceContext';
+import { useState } from 'react';
 import { mountWithProviders } from '../support/test-utils';
 import {
   createMockInferenceData,
   createMockChartDefinition,
   createMockHardwareConfig,
+  createMockInferenceContextValues,
 } from '../support/mock-data';
 import { Precision, Sequence } from '@/lib/data-mappings';
 import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.shared-runtime';
@@ -74,6 +77,36 @@ describe('GPUGraph', () => {
     );
 
     cy.contains('No data available').should('be.visible');
+  });
+
+  it('explains missing role-local energy in GPU comparison mode', () => {
+    mountWithProviders(
+      <div style={{ width: 800, height: 600 }}>
+        <GPUGraph
+          chartId="test-gpu-role-energy-empty"
+          modelLabel="DeepSeek R1"
+          data={[]}
+          xLabel="Interactivity"
+          yLabel="Measured Decode J per Output Token"
+          chartDefinition={defaultChartDef}
+        />
+      </div>,
+      {
+        inference: {
+          hardwareConfig: hwConfig,
+          selectedGPUs: ['mi355x'],
+          selectedDates: ['2026-07-25'],
+          selectedDateRange: { startDate: '', endDate: '' },
+          activeDates: new Set(['2026-07-25_mi355x']),
+          selectedPrecisions: [Precision.FP8],
+          selectedYAxisMetric: 'y_measuredDecodeJPerOutputToken',
+        },
+      },
+    );
+
+    cy.contains('This dataset does not report role-level prefill/decode energy.').should(
+      'be.visible',
+    );
   });
 
   it('localizes the Chinese comparison empty state', () => {
@@ -454,5 +487,203 @@ describe('GPUGraph', () => {
     cy.get('.sidebar-legend').should('exist');
     // Legend should show at least one entry (date + GPU combo)
     cy.get('.sidebar-legend label').should('have.length.greaterThan', 0);
+  });
+});
+
+describe('GPU comparison power envelopes', () => {
+  function PowerComparison({ latency = false }: { latency?: boolean }) {
+    const [optimal, setOptimal] = useState(true);
+    const [metric, setMetric] = useState('y_measuredAvgPower');
+    const [activeDates, setActiveDates] = useState(new Set(['2026-09-09_h100', '2026-09-10_h100']));
+    const rows = ['2026-09-09', '2026-09-10'].flatMap((date) =>
+      [4, 8].flatMap((tp) =>
+        [1, 8, 32].map((conc, index) => {
+          const interactivity =
+            metric === 'y_measuredJPerOutputToken' || tp === 8
+              ? 200 - index * 70
+              : [200, 120, 130][index];
+          return createMockInferenceData({
+            hwKey: 'h100',
+            precision: Precision.FP8,
+            date,
+            tp,
+            conc,
+            x: latency ? 1000 / interactivity : interactivity,
+            y:
+              metric === 'y_measuredJPerOutputToken'
+                ? 4 - index
+                : (350 + index * 200 + tp) * (metric === 'y_measuredPowerPercentTdp' ? 0.1 : 1),
+            run_url: `https://github.com/SemiAnalysisAI/InferenceX/actions/runs/${date}`,
+            power_tier: tp === 4 ? 'legacy' : 'certified',
+          });
+        }),
+      ),
+    );
+    const value = createMockInferenceContextValues({
+      selectedYAxisMetric: metric,
+      hideNonOptimal: optimal,
+      setHideNonOptimal: setOptimal,
+      selectedGPUs: ['h100'],
+      selectedDates: ['2026-09-09', '2026-09-10'],
+      selectedDateRange: { startDate: '', endDate: '' },
+      activeDates,
+      selectedPrecisions: [Precision.FP8],
+      hardwareConfig: hwConfig,
+      showLineLabels: true,
+    });
+    return (
+      <InferenceContextsProvider data={value} filters={value} display={value} actions={value}>
+        <button onClick={() => setMetric('y_measuredPowerPercentTdp')}>Percent TDP</button>
+        <button onClick={() => setMetric('y_measuredP75Power')}>P75</button>
+        <button onClick={() => setMetric('y_measuredP90Power')}>P90</button>
+        <button onClick={() => setMetric('y_measuredJPerOutputToken')}>Energy</button>
+        <button onClick={() => setActiveDates(new Set(['2026-09-10_h100']))}>
+          Hide older date
+        </button>
+        <div style={{ width: 1000, height: 600 }}>
+          <GPUGraph
+            chartId="gpu-power-curves"
+            modelLabel="Qwen3.5 397B"
+            data={rows}
+            xLabel={latency ? 'Latency' : 'Interactivity'}
+            yLabel="Power"
+            chartDefinition={createMockChartDefinition({
+              chartType: latency ? 'e2e' : 'interactivity',
+              [`${metric}_roofline`]: latency ? 'lower_left' : 'lower_right',
+            })}
+          />
+        </div>
+      </InferenceContextsProvider>
+    );
+  }
+
+  it('reveals off-boundary measurements and historical rings without changing power envelopes or axes', () => {
+    mountWithProviders(<PowerComparison />);
+    cy.get('#gpu-show-all-measurements').should('not.exist');
+    cy.get('#gpu-power-curves .dot-group').should('have.length', 6);
+    cy.get('#gpu-power-curves .legacy-power-ring').should('have.length', 2);
+    cy.get('[data-testid="measured-power-summary"]')
+      .should('contain.text', 'Showing 6 of 12 measured points')
+      .and('contain.text', '4/6 validated')
+      .and('contain.text', '2/6 historical');
+    cy.get('#gpu-power-curves .roofline-path')
+      .should('have.length', 2)
+      .each(($path) => {
+        expect($path.attr('d')).to.contain('C');
+        expect($path.attr('stroke')).not.to.equal('#6b7280');
+      });
+    cy.get('#gpu-power-curves svg').then(($svg) => {
+      const paths = Array.from($svg[0].querySelectorAll('.roofline-path'), (p) =>
+        p.getAttribute('d'),
+      );
+      const axes = Array.from(
+        $svg[0].querySelectorAll('.x-axis, .y-axis'),
+        (axis) => axis.innerHTML,
+      );
+      cy.get('#gpu-hide-non-optimal').click({ force: true });
+      cy.get('#gpu-power-curves .dot-group').should('have.length', 12);
+      cy.get('#gpu-power-curves .legacy-power-ring').should('have.length', 6);
+      cy.get('[data-testid="measured-power-summary"]').should(
+        'contain.text',
+        'Showing 12 of 12 measured points',
+      );
+      cy.get('#gpu-hide-non-optimal').should('have.attr', 'data-state', 'unchecked');
+      cy.get('#gpu-power-curves svg').should(($current) => {
+        expect(
+          Array.from($current[0].querySelectorAll('.roofline-path'), (p) => p.getAttribute('d')),
+        ).to.deep.equal(paths);
+        expect(
+          Array.from($current[0].querySelectorAll('.x-axis, .y-axis'), (axis) => axis.innerHTML),
+        ).to.deep.equal(axes);
+      });
+      cy.get('#gpu-show-all-measurements').should('not.exist');
+      cy.get('#gpu-hide-non-optimal').click({ force: true });
+      cy.get('#gpu-power-curves .dot-group').should('have.length', 6);
+      cy.get('#gpu-power-curves .legacy-power-ring').should('have.length', 2);
+    });
+    cy.get('#gpu-power-curves .line-label').should('have.length', 2);
+    cy.get('[data-testid="legend-advanced-toggle"]').click();
+    cy.get('#gpu-perf-ruler').should('exist');
+    cy.contains('button', 'Hide older date').click();
+    cy.get('#gpu-power-curves .roofline-path').should('have.length', 1);
+    cy.get('#gpu-power-curves .dot-group').should('have.length', 3);
+    cy.get('#gpu-power-curves .line-label').should('have.length', 1);
+  });
+
+  it('measures power boundaries by comparison date and resets rulers when the metric changes', () => {
+    mountWithProviders(<PowerComparison />);
+    cy.get('[data-testid="legend-advanced-toggle"]').click();
+    cy.get('#gpu-perf-ruler').click({ force: true });
+    const chartId = 'gpu-power-curves';
+    const placeRuler = () => {
+      cy.get('#gpu-power-curves .perf-ruler-hit').should('have.length', 2);
+      cy.get('#gpu-power-curves .perf-ruler-hit').eq(0).click({ force: true });
+      cy.get('#gpu-power-curves .perf-ruler-hit').eq(1).click({ force: true });
+      cy.get(`#${chartId} .perf-ruler .pr-text-ratio`).should('have.text', '1.00x');
+    };
+    placeRuler();
+    cy.get('#gpu-hide-non-optimal').click({ force: true });
+    cy.get('#gpu-power-curves .dot-group').should('have.length', 12);
+    cy.get(`#${chartId} .perf-ruler .pr-text-ratio`).should('have.text', '1.00x');
+    cy.get('#gpu-power-curves svg').should(($svg) => {
+      const paths = [...$svg[0].querySelectorAll('.roofline-path')].map((path) =>
+        path.getAttribute('d'),
+      );
+      const hits = [...$svg[0].querySelectorAll('.perf-ruler-hit')].map((path) =>
+        path.getAttribute('d'),
+      );
+      expect(hits, 'ruler targets the drawn upper boundaries').to.deep.equal(paths);
+    });
+    cy.contains('button', 'P75').click();
+    cy.get('#gpu-power-curves .perf-ruler').should('not.exist');
+    cy.get('#gpu-perf-ruler').should('have.attr', 'aria-checked', 'true');
+    placeRuler();
+    cy.contains('button', 'Energy').click();
+    cy.get('#gpu-power-curves .perf-ruler').should('not.exist');
+    cy.get('#gpu-perf-ruler').should('have.attr', 'aria-checked', 'true');
+    placeRuler();
+    cy.contains('button', 'Hide older date').click();
+    cy.get('#gpu-power-curves .perf-ruler-hit').should('have.length', 1);
+    cy.get('#gpu-power-curves .perf-ruler').should('not.exist');
+  });
+
+  it('keeps boundary measurements by default toward lower latency', () => {
+    mountWithProviders(<PowerComparison latency />);
+    cy.get('#gpu-power-curves .dot-group').should('have.length', 6);
+    cy.get('#gpu-power-curves .roofline-path')
+      .should('have.length', 2)
+      .each(($path) => expect($path.attr('d')).to.contain('C'));
+    cy.get('#gpu-power-curves [data-testid="power-curve-description"]')
+      .should('contain.text', 'upper power boundary')
+      .and('contain.text', 'not efficiency frontiers');
+  });
+
+  it('uses the same boundary toggle for percent TDP and fleet percentiles while preserving energy Pareto', () => {
+    mountWithProviders(
+      <PathnameContext.Provider value="/zh/inference">
+        <PowerComparison />
+      </PathnameContext.Provider>,
+    );
+    for (const label of ['Percent TDP', 'P75', 'P90']) {
+      cy.contains('button', label).click();
+      cy.get('#gpu-hide-non-optimal').should('have.attr', 'data-state', 'checked');
+      cy.get('#gpu-power-curves .dot-group').should('have.length', 6);
+      cy.get('#gpu-power-curves .roofline-path').should('have.length', 2);
+      cy.get('[data-testid="power-curve-description"]').should('contain', '不代表能效 Pareto 前沿');
+      cy.get('#gpu-show-all-measurements').should('not.exist');
+      cy.get('#gpu-hide-non-optimal').click({ force: true });
+      cy.get('#gpu-power-curves .dot-group').should('have.length', 12);
+      cy.get('#gpu-power-curves .roofline-path').should('have.length', 2);
+      cy.get('#gpu-show-all-measurements').should('not.exist');
+      cy.get('#gpu-hide-non-optimal').click({ force: true });
+      cy.get('#gpu-power-curves .dot-group').should('have.length', 6);
+    }
+    cy.contains('button', 'Energy').click();
+    cy.get('#gpu-show-all-measurements').should('not.exist');
+    cy.get('#gpu-hide-non-optimal').should('have.attr', 'data-state', 'checked');
+    cy.get('#gpu-power-curves .roofline-path')
+      .should('have.length', 2)
+      .each(($path) => expect($path.attr('d')).to.contain('C'));
+    cy.get('[data-testid="power-curve-description"]').should('not.exist');
   });
 });

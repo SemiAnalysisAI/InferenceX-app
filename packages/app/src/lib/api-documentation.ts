@@ -1,10 +1,21 @@
-import { DB_MODEL_TO_DISPLAY, DISPLAY_MODEL_TO_DB } from '@semianalysisai/inferencex-constants';
+import {
+  DB_MODEL_TO_DISPLAY,
+  DISPLAY_MODEL_TO_DB,
+  POWER_METRIC_KEYS,
+} from '@semianalysisai/inferencex-constants';
 import { COLLECTIVEX_VERSIONS } from '@semianalysisai/inferencex-db/collectivex/types';
 
+import { POWER_VALIDITY_FILTERS } from './benchmark-power-validity';
 import { PUBLIC_API_ERRORS } from './public-api-errors';
 
 export type ApiDocumentationLocale = 'en' | 'zh';
-export type ApiGroupId = 'core' | 'external' | 'datasets' | 'collectivex' | 'diagnostics';
+export type ApiGroupId =
+  | 'core'
+  | 'external'
+  | 'datasets'
+  | 'collectivex'
+  | 'operatorx'
+  | 'diagnostics';
 export type ApiHttpMethod = 'GET';
 export type ApiParameterLocation = 'path' | 'query';
 export type ApiAudience = 'public';
@@ -192,6 +203,72 @@ const errorResponse = (
   mediaType: 'application/json',
 });
 
+const powerMetricDescriptions: Readonly<Record<(typeof POWER_METRIC_KEYS)[number], string>> = {
+  power_valid:
+    'Publication verdict: 1 = validated measurement window; 0 = failed validation — measured power/energy values are withheld from this row end-to-end, so treat any that remain as unreliable; absent = no validation verdict is available in this response. Absence alone establishes neither the reason, the measurement age, nor invalidity.',
+  power_metric_schema_version:
+    'Power schema version. Version 2 defines every unprefixed joules_per_* field as whole-deployment energy, including on disaggregated runs.',
+  avg_power_w: 'Mean per-GPU power draw in watts during the measured load window.',
+  avg_total_gpu_power_w: 'Mean total GPU power draw in watts across the measured deployment.',
+  total_gpu_energy_j:
+    'Total GPU energy integrated over the measured deployment load window, in joules.',
+  p75_power_w:
+    'Time-weighted P75 of synchronized total GPU-board watts, divided by participating GPU count, over the validated benchmark window with piecewise-linear interpolation. Not a percentile of individual-device percentiles; absent when not measured.',
+  p75_total_gpu_power_w:
+    'Time-weighted P75 of synchronized total GPU-board watts over the validated benchmark window with piecewise-linear interpolation. Accelerator boards only, not chassis or facility power.',
+  p90_power_w:
+    'Time-weighted P90 of synchronized total GPU-board watts, divided by participating GPU count, over the validated benchmark window with piecewise-linear interpolation. Not a percentile of individual-device percentiles; absent when not measured.',
+  p90_total_gpu_power_w:
+    'Time-weighted P90 of synchronized total GPU-board watts over the validated benchmark window with piecewise-linear interpolation. Accelerator boards only, not chassis or facility power.',
+  joules_per_successful_query: 'Whole-deployment energy in joules divided by successful requests.',
+  joules_per_output_token:
+    'Energy per generated output token in joules; cluster-wide on schema-version-2 rows, including disaggregated runs.',
+  joules_per_total_token:
+    'Total system energy divided by input plus output tokens; a workload-shape-fair view that does not treat prompt tokens as free.',
+  prefill_avg_power_w:
+    'Mean per-GPU power draw in watts across prefill workers; emitted only for deployments with distinct prefill and decode roles.',
+  decode_avg_power_w:
+    'Mean per-GPU power draw in watts across decode workers; emitted only for deployments with distinct prefill and decode roles.',
+  joules_per_input_token:
+    'Energy per input token in joules; cluster-wide on schema-version-2 rows.',
+  prefill_joules_per_input_token: 'Role-local prefill energy per input token in joules.',
+  decode_joules_per_output_token: 'Role-local decode energy per generated output token in joules.',
+  avg_temp_c: 'Mean per-GPU temperature in degrees Celsius during the load window.',
+  peak_temp_c:
+    'Maximum instantaneous per-GPU temperature in degrees Celsius during the load window.',
+  avg_util_pct: 'Mean per-GPU utilization percentage (0-100) during the load window.',
+  avg_mem_used_mb: 'Mean per-GPU memory used in MB during the load window.',
+};
+const benchmarkMetricsSchema: ApiSchema = {
+  type: 'object',
+  additionalProperties: numberSchema,
+  description:
+    'Scalar metric map. Time metrics, including p99_itl and p99_tpot, are in seconds. p99_itl measures inter-token latency; p99_tpot measures per-request time per output token. Use the actual p99_itl field for an inter-token latency requirement, not the reciprocal of p99_intvty. Throughput metrics use tokens per second per GPU unless their name states otherwise; output_tput_per_gpu counts output tokens. Keys evolve independently; measured power / energy / GPU-telemetry keys are typed below.',
+  properties: Object.fromEntries(
+    POWER_METRIC_KEYS.map((key): [string, ApiSchema] => [
+      key,
+      { type: 'number', description: powerMetricDescriptions[key] },
+    ]),
+  ),
+};
+const powerAuditSchema: ApiSchema = {
+  type: 'object',
+  properties: {
+    window_start_unix: numberSchema,
+    window_end_unix: numberSchema,
+    expected_gpu_count: integerSchema,
+    observed_gpu_count: integerSchema,
+    sample_count: integerSchema,
+    max_sample_gap_s: numberSchema,
+    producer_sha: nullableStringSchema,
+    exporter_image_sha256: nullableStringSchema,
+    source: stringSchema,
+    observed_gpu_ids: arraySchema(stringSchema),
+  },
+  additionalProperties: true,
+  description:
+    'Compact power measurement-window audit emitted alongside the power_valid verdict: window bounds, expected vs. observed GPU counts, sample statistics, and producer identity (producer_sha / exporter_image_sha256 are null for single-node telemetry without an srt-slurm producer). source is a relative path within the source run artifact bundle; observed_gpu_ids contains producer device identifiers, which may be indices rather than physical UUIDs. Present on valid and invalid rows when emitted; absence alone does not establish age or validity.',
+};
 const workerPowerSchema = objectSchemaWithOptional(
   {
     role: stringSchema,
@@ -225,8 +302,16 @@ const benchmarkRowSchema = objectSchemaWithOptional(
     decode_ep: integerSchema,
     decode_dp_attention: booleanSchema,
     decode_num_workers: integerSchema,
-    num_prefill_gpu: integerSchema,
-    num_decode_gpu: integerSchema,
+    num_prefill_gpu: {
+      ...integerSchema,
+      description:
+        'Physical prefill chips; aggregate engines may mirror their single chip count in both role columns.',
+    },
+    num_decode_gpu: {
+      ...integerSchema,
+      description:
+        'Physical decode chips, independent of logical TP and DP. Sum role counts only for disaggregated engines.',
+    },
     benchmark_type: stringSchema,
     isl: nullableNumberSchema,
     osl: nullableNumberSchema,
@@ -234,14 +319,20 @@ const benchmarkRowSchema = objectSchemaWithOptional(
     offload_mode: stringSchema,
     image: nullableStringSchema,
     recipe_fingerprint: nullableStringSchema,
-    metrics: metricMapSchema,
+    metrics: benchmarkMetricsSchema,
     workers: arraySchema(workerPowerSchema),
+    power_invalid_reasons: {
+      ...arraySchema(stringSchema),
+      description:
+        'Producer snake_case reason codes explaining a withheld measurement, present when metrics.power_valid == 0. Absent on legacy rows and validated rows.',
+    },
+    power_audit: powerAuditSchema,
     date: { type: 'string', format: 'date' },
     workflow_run_id: integerSchema,
     run_started_at: { type: ['string', 'null'], format: 'date-time' },
     run_url: nullableStringSchema,
   },
-  ['workers', 'workflow_run_id', 'run_started_at'],
+  ['workers', 'power_invalid_reasons', 'power_audit', 'workflow_run_id', 'run_started_at'],
 );
 const benchmarkRowsSchema = arraySchema(benchmarkRowSchema);
 const benchmarkExample = [
@@ -271,7 +362,17 @@ const benchmarkExample = [
     offload_mode: 'off',
     image: 'vllm/vllm-openai:v0.10.2',
     recipe_fingerprint: '7d72a33d7d72a33d7d72a33d7d72a33d7d72a33d7d72a33d7d72a33d7d72a33d',
-    metrics: { median_ttft: 0.42, median_tpot: 0.018, tput_per_gpu: 128.4 },
+    metrics: {
+      median_ttft: 0.42,
+      median_tpot: 0.018,
+      tput_per_gpu: 128.4,
+      power_valid: 1,
+      power_metric_schema_version: 2,
+      avg_power_w: 678.5,
+      joules_per_output_token: 5.3,
+      joules_per_total_token: 2.65,
+      avg_temp_c: 61.2,
+    },
     date: '2026-08-08',
     run_url: 'https://github.com/semianalysis/inference-benchmarks/actions/runs/123456789',
   },
@@ -310,8 +411,16 @@ const evaluationsSchema = arraySchema(
     decode_ep: integerSchema,
     decode_dp_attention: booleanSchema,
     decode_num_workers: integerSchema,
-    num_prefill_gpu: integerSchema,
-    num_decode_gpu: integerSchema,
+    num_prefill_gpu: {
+      ...integerSchema,
+      description:
+        'Physical prefill chips; aggregate engines may mirror their single chip count in both role columns.',
+    },
+    num_decode_gpu: {
+      ...integerSchema,
+      description:
+        'Physical decode chips, independent of logical TP and DP. Sum role counts only for disaggregated engines.',
+    },
     task: stringSchema,
     date: { type: 'string', format: 'date' },
     conc: nullableNumberSchema,
@@ -377,8 +486,16 @@ const submissionsSchema = objectSchema({
       spec_method: stringSchema,
       disagg: booleanSchema,
       is_multinode: booleanSchema,
-      num_prefill_gpu: integerSchema,
-      num_decode_gpu: integerSchema,
+      num_prefill_gpu: {
+        ...integerSchema,
+        description:
+          'Physical prefill chips; aggregate engines may mirror their single chip count in both role columns.',
+      },
+      num_decode_gpu: {
+        ...integerSchema,
+        description:
+          'Physical decode chips, independent of logical TP and DP. Sum role counts only for disaggregated engines.',
+      },
       prefill_tp: integerSchema,
       prefill_ep: integerSchema,
       decode_tp: integerSchema,
@@ -454,14 +571,43 @@ const collectiveXDatasetSchema = objectSchema(
         terminal_points: integerSchema,
         measured_points: integerSchema,
         covered_skus: arraySchema(stringSchema),
+        swap_requested_cases: integerSchema,
+        swap_measured_cases: integerSchema,
         kv_requested_cases: integerSchema,
         kv_measured_cases: integerSchema,
       },
-      ['kv_requested_cases', 'kv_measured_cases'],
+      ['kv_requested_cases', 'kv_measured_cases', 'swap_requested_cases', 'swap_measured_cases'],
     ),
     coverage: arraySchema(anyObjectSchema),
     series: arraySchema(anyObjectSchema),
     kv: arraySchema(anyObjectSchema),
+    swap_blocks: arraySchema(
+      objectSchema({
+        result_id: stringSchema,
+        sku: stringSchema,
+        runtime: anyObjectSchema,
+        timing: stringSchema,
+        warmup: integerSchema,
+        iterations: integerSchema,
+        max_payload_bytes: { oneOf: [integerSchema, { type: 'null' }] },
+        skipped_points: integerSchema,
+        points: arraySchema(
+          objectSchema({
+            direction: { type: 'string', enum: ['h2d', 'd2h', 'd2d'] },
+            layout: { type: 'string', enum: ['contiguous', 'random'] },
+            block_bytes: integerSchema,
+            num_blocks: integerSchema,
+            payload_bytes: integerSchema,
+            seed: integerSchema,
+            host_memory: stringSchema,
+            api: stringSchema,
+            sample_count: integerSchema,
+            latency_us: anyObjectSchema,
+            payload_gbps_at_latency_percentile: anyObjectSchema,
+          }),
+        ),
+      }),
+    ),
   },
   ['version', 'run', 'coverage', 'series'],
 );
@@ -481,12 +627,13 @@ const collectiveRunSummarySchema = objectSchemaWithOptional(
       unsupported: integerSchema,
       failed: integerSchema,
     }),
+    swap_cases: objectSchema({ requested: integerSchema, measured: integerSchema }),
     kv_cases: objectSchema({
       requested: integerSchema,
       measured: integerSchema,
     }),
   },
-  ['kv_cases'],
+  ['kv_cases', 'swap_cases'],
 );
 const percentileSchema = objectSchema({
   mean: numberSchema,
@@ -500,6 +647,97 @@ const percentileSchema = objectSchema({
 const nullablePercentileSchema: ApiSchema = { oneOf: [percentileSchema, { type: 'null' }] };
 const idListSchema: ApiSchema = { type: 'string', pattern: '^\\d+(,\\d+)*$' };
 const positiveIdSchema: ApiSchema = { type: 'integer', minimum: 1 };
+
+const operatorXRunSchema = objectSchema({
+  run_id: stringSchema,
+  run_attempt: numberSchema,
+  source_sha: stringSchema,
+  source_branch: { type: ['string', 'null'] },
+  generated_at: stringSchema,
+  conclusion: { type: ['string', 'null'] },
+  requested: numberSchema,
+  measured: numberSchema,
+  unsupported: numberSchema,
+  failed: numberSchema,
+  missing: numberSchema,
+  clusters: arraySchema(stringSchema),
+  testlists: arraySchema(stringSchema),
+});
+const operatorXAttentionSchema = {
+  ...objectSchema({
+    batch_size: numberSchema,
+    seq_len_q: numberSchema,
+    seq_len_kv: numberSchema,
+    num_heads: numberSchema,
+    num_heads_kv: numberSchema,
+    head_dim_qk: numberSchema,
+    head_dim_v: numberSchema,
+    kv_lora_rank: nullableNumberSchema,
+    dtype_q: stringSchema,
+    dtype_k: stringSchema,
+    dtype_v: stringSchema,
+    dtype_o: stringSchema,
+    causal: { type: 'boolean' },
+  }),
+  type: ['object', 'null'],
+} satisfies ApiSchema;
+const operatorXMoeSchema = {
+  ...objectSchema({
+    num_tokens: numberSchema,
+    hidden: numberSchema,
+    intermediate: numberSchema,
+    local_intermediate: numberSchema,
+    num_experts: numberSchema,
+    local_experts: numberSchema,
+    top_k: numberSchema,
+    expert_parallel_size: numberSchema,
+    routed_tensor_parallel_size: numberSchema,
+    shared_tensor_parallel_size: numberSchema,
+    n_shared_experts: numberSchema,
+    dtype_act: stringSchema,
+    dtype_weight: stringSchema,
+    expert_distribution: stringSchema,
+  }),
+  type: ['object', 'null'],
+} satisfies ApiSchema;
+const operatorXPointSchema = objectSchema({
+  type: { type: 'string', enum: ['gemm', 'attention_mha', 'attention_mla', 'moe_gemm'] },
+  args: anyObjectSchema,
+  attention: operatorXAttentionSchema,
+  moe: operatorXMoeSchema,
+  id: stringSchema,
+  shard: stringSchema,
+  attempt: nullableNumberSchema,
+  cluster: stringSchema,
+  backend: stringSchema,
+  testlist: stringSchema,
+  name: { type: ['string', 'null'] },
+  m: nullableNumberSchema,
+  n: nullableNumberSchema,
+  k: nullableNumberSchema,
+  dtype_a: { type: ['string', 'null'] },
+  dtype_b: { type: ['string', 'null'] },
+  dtype_out: { type: ['string', 'null'] },
+  status: { type: 'string', enum: ['ok', 'unsupported', 'error', 'missing'] },
+  message: { type: ['string', 'null'] },
+  latency_us: nullableNumberSchema,
+  tflops: nullableNumberSchema,
+});
+const operatorXExampleRun = {
+  run_id: '123456789',
+  run_attempt: 1,
+  source_sha: '0123456789abcdef',
+  source_branch: 'example',
+  generated_at: '2026-09-16T12:00:00Z',
+  conclusion: 'success',
+  requested: 1,
+  measured: 1,
+  unsupported: 0,
+  failed: 0,
+  missing: 0,
+  clusters: ['h100_dgxc_8x'],
+  testlists: ['gemm'],
+};
 
 export const apiDocumentationGroups: readonly ApiDocumentationGroup[] = [
   {
@@ -535,6 +773,14 @@ export const apiDocumentationGroups: readonly ApiDocumentationGroup[] = [
     ),
   },
   {
+    id: 'operatorx',
+    title: text('OperatorX', 'OperatorX'),
+    description: text(
+      'GEMM, attention, and routed MoE measurements with complete run coverage.',
+      'GEMM、attention 和路由 MoE 实测数据及完整运行覆盖情况。',
+    ),
+  },
+  {
     id: 'diagnostics',
     title: text('Diagnostic reads', '诊断读取'),
     description: text(
@@ -545,6 +791,247 @@ export const apiDocumentationGroups: readonly ApiDocumentationGroup[] = [
 ];
 
 export const apiOperations: readonly ApiOperation[] = [
+  {
+    id: 'list-operatorx-runs',
+    group: 'operatorx',
+    method: 'GET',
+    path: '/api/v1/operatorx/runs',
+    summary: text('List OperatorX runs', '列出 OperatorX 运行'),
+    description: text(
+      'Lists stored completed manual OperatorX sweeps from any branch, newest first. Lazily imports at most four runs per request from the last 44 days; discovery_complete=false requests another pass. Raw documents persist beyond artifact expiry. Summary caches from reader versions before 3 are rebuilt from stored documents when listing runs. Cached for 60 seconds when discovery completes; incomplete responses are not cached. Requires server-side GitHub access and DATABASE_OPERATORX_WRITE_URL. Development on loopback hosts can explicitly read downloaded bundles through OPERATORX_LOCAL_ARTIFACT_DIR; production never reads local files.',
+      '列出已存储的手动 OperatorX 运行，按运行 ID 从新到旧排序，不限制分支。每次请求最多从最近 44 天的记录导入四次运行；discovery_complete=false 表示需要继续获取。原始文档在产物过期后仍会保留。列出运行时，根据已保存文档重建读取器版本 3 之前的摘要缓存。发现完成时缓存 60 秒，未完成时不缓存。服务端需要 GitHub 访问权限和 DATABASE_OPERATORX_WRITE_URL。本机开发环境可通过 OPERATORX_LOCAL_ARTIFACT_DIR 显式读取已下载的数据；生产环境不读取本地文件。',
+    ),
+    audience: 'public',
+    stability: 'beta',
+    parameters: [],
+    responses: [
+      success(
+        'Run summaries.',
+        '运行摘要。',
+        objectSchema({
+          runs: arraySchema(operatorXRunSchema),
+          discovery_complete: { type: 'boolean' },
+        }),
+        { runs: [operatorXExampleRun], discovery_complete: true },
+      ),
+      errorResponse('404', 'Workflow unavailable.', '工作流不可用。', 'OperatorX unavailable'),
+      errorResponse('409', 'Run still in progress.', '运行尚未结束。', 'OperatorX unavailable'),
+      errorResponse(
+        '502',
+        'GitHub source unavailable.',
+        'GitHub 来源不可用。',
+        'OperatorX unavailable',
+      ),
+      errorResponse(
+        '503',
+        'Storage or configuration unavailable.',
+        '存储或配置不可用。',
+        'OperatorX unavailable',
+      ),
+    ],
+    responseShapeName: 'OperatorXRunList',
+    curlUrl: `${API_BASE_URL}/api/v1/operatorx/runs`,
+  },
+  {
+    id: 'get-operatorx-run',
+    group: 'operatorx',
+    method: 'GET',
+    path: '/api/v1/operatorx/runs/{runId}',
+    summary: text('Read an OperatorX run', '读取 OperatorX 运行'),
+    description: text(
+      'Reads GEMM, MHA/GQA, materialized MLA, and routed MoE cases matched against the requested manifest. Version 3 adds moe_gemm and a nullable moe object with local/global dimensions, EP/TP, top-k, routing distribution and precision. Inapplicable GEMM, attention and MoE fields are null. MoE TFLOPS = 6*T*H*(top_k*local_intermediate+n_shared_experts*intermediate/shared_tensor_parallel_size)/(latency_us*1e6); local_intermediate=intermediate/routed_tensor_parallel_size. EP is not divided out again. The Kimi K3 vLLM benchmark profile measures generic SiLU experts with precomputed local routing, excluding native K3 SITU, latent projections, shared experts and communication. Attention TFLOPS = 2*B*Hq*P*(Dqk+Dv)/(latency_us*1e6), where P=Sq*Sk for noncausal attention, or R*(2*Sk-R+1)/2 with R=min(Sq,Sk) for bottom-right causality. This counts useful QK and AV matmul work, including the diagonal, and excludes softmax, cache projection and RoPE. GQA uses query heads; MLA uses materialized Q/K/V dimensions. Existing saved attention bundles gain TFLOPS on read. Newest shard attempts replace older results, while untouched shards survive partial reruns. Source/run/attempt/cluster provenance is validated. GEMM TFLOPS = 2*M*N*K/(latency_us*1e6), per GPU; unsupported, failed, missing, or zero-sized cases have null TFLOPS. A completed failed run may still contain measurements. The server lazily stores raw artifacts and serves stored data during a GitHub outage. Cached for 60 seconds. The same explicit loopback development preview as the runs endpoint is available.',
+      '按执行清单读取 GEMM、MHA/GQA、物化 MLA 和路由 MoE 测试。版本 3 增加 moe_gemm 及可空的 moe 对象，保留本地/全局维度、EP/TP、top-k、路由分布和精度。不适用的 GEMM、attention 和 MoE 字段为 null。MoE TFLOPS = 6*T*H*(top_k*local_intermediate+n_shared_experts*intermediate/shared_tensor_parallel_size)/(latency_us*1e6)，其中 local_intermediate=intermediate/routed_tensor_parallel_size，不再除以 EP。Kimi K3 vLLM benchmark profile 测量通用 SiLU 专家，使用预先生成的本地路由，不包含原生 K3 的 SITU、latent 投影、共享专家或通信。Attention TFLOPS = 2*B*Hq*P*(Dqk+Dv)/(latency_us*1e6)，其中非因果 attention 的 P=Sq*Sk；右下对齐的因果掩码使用 R*(2*Sk-R+1)/2，R=min(Sq,Sk)。该指标统计 QK 和 AV 矩阵乘法的有效计算量，包含对角线，不计 softmax、缓存投影和 RoPE。GQA 使用 query head 数；MLA 使用物化 Q/K/V 维度。已有 attention 运行在读取时即可获得 TFLOPS。每个分片采用最新尝试的结果，局部重跑时保留未重跑分片的数据。校验源码、运行、尝试次数和集群来源。GEMM 单卡 TFLOPS = 2*M*N*K/(latency_us*1e6)；不支持、失败、缺失或零维度测试的 TFLOPS 为 null。已结束但失败的运行仍可能包含实测数据。服务端按需保存原始产物，GitHub 不可用时返回已存储结果，缓存 60 秒。支持与运行列表相同的本机开发预览。',
+    ),
+    audience: 'public',
+    stability: 'beta',
+    parameters: [
+      parameter(
+        'runId',
+        'path',
+        true,
+        'integer',
+        'Positive GitHub Actions run ID.',
+        'GitHub Actions 正整数运行 ID。',
+        positiveIdSchema,
+        123456789,
+      ),
+    ],
+    responses: [
+      success(
+        'Run coverage and measurements.',
+        '运行覆盖情况和测量结果。',
+        objectSchema({
+          version: { type: 'integer', enum: [3] },
+          run: operatorXRunSchema,
+          points: arraySchema(operatorXPointSchema),
+        }),
+        {
+          version: 3,
+          run: {
+            ...operatorXExampleRun,
+            requested: 3,
+            measured: 3,
+            testlists: ['gemm', 'attention', 'moe'],
+          },
+          points: [
+            {
+              type: 'gemm',
+              args: {
+                m: 1000,
+                n: 1000,
+                k: 1000,
+                dtype_a: 'bf16',
+                dtype_b: 'bf16',
+                dtype_out: 'bf16',
+              },
+              attention: null,
+              moe: null,
+              id: 'shard:0:torch',
+              shard: 'shard',
+              attempt: 1,
+              cluster: 'h100_dgxc_8x',
+              backend: 'torch',
+              testlist: 'gemm',
+              name: null,
+              m: 1000,
+              n: 1000,
+              k: 1000,
+              dtype_a: 'bf16',
+              dtype_b: 'bf16',
+              dtype_out: 'bf16',
+              status: 'ok',
+              message: null,
+              latency_us: 1000,
+              tflops: 2,
+            },
+            {
+              type: 'attention_mha',
+              args: {
+                batch_size: 8,
+                seq_len_q: 1,
+                seq_len_kv: 4096,
+                num_heads: 32,
+                num_heads_kv: 8,
+                head_dim: 128,
+                dtype_q: 'bf16',
+                dtype_k: 'bf16',
+                dtype_v: 'bf16',
+                dtype_o: 'bf16',
+                causal: true,
+              },
+              attention: {
+                batch_size: 8,
+                seq_len_q: 1,
+                seq_len_kv: 4096,
+                num_heads: 32,
+                num_heads_kv: 8,
+                head_dim_qk: 128,
+                head_dim_v: 128,
+                kv_lora_rank: null,
+                dtype_q: 'bf16',
+                dtype_k: 'bf16',
+                dtype_v: 'bf16',
+                dtype_o: 'bf16',
+                causal: true,
+              },
+              moe: null,
+              id: 'shard:1:torch',
+              shard: 'shard',
+              attempt: 1,
+              cluster: 'h100_dgxc_8x',
+              backend: 'torch',
+              testlist: 'attention',
+              name: null,
+              m: null,
+              n: null,
+              k: null,
+              dtype_a: null,
+              dtype_b: null,
+              dtype_out: null,
+              status: 'ok',
+              message: null,
+              latency_us: 12.5,
+              tflops: 42.94967296,
+            },
+            {
+              type: 'moe_gemm',
+              args: {
+                num_tokens: 128,
+                hidden: 1024,
+                intermediate: 2048,
+                num_experts: 64,
+                top_k: 4,
+                expert_parallel_size: 8,
+                routed_tensor_parallel_size: 2,
+                shared_tensor_parallel_size: 1,
+                n_shared_experts: 0,
+                dtype_act: 'bf16',
+                dtype_weight: 'bf16',
+                expert_distribution: 'uniform',
+              },
+              moe: {
+                num_tokens: 128,
+                hidden: 1024,
+                intermediate: 2048,
+                local_intermediate: 1024,
+                num_experts: 64,
+                local_experts: 8,
+                top_k: 4,
+                expert_parallel_size: 8,
+                routed_tensor_parallel_size: 2,
+                shared_tensor_parallel_size: 1,
+                n_shared_experts: 0,
+                dtype_act: 'bf16',
+                dtype_weight: 'bf16',
+                expert_distribution: 'uniform',
+              },
+              attention: null,
+              id: 'moe-shard:0:vllm',
+              shard: 'moe-shard',
+              attempt: 1,
+              cluster: 'h100_dgxc_8x',
+              backend: 'vllm',
+              testlist: 'moe',
+              name: 'Controlled routed expert profile',
+              m: null,
+              n: null,
+              k: null,
+              dtype_a: null,
+              dtype_b: null,
+              dtype_out: null,
+              status: 'ok',
+              message: null,
+              latency_us: 100,
+              tflops: 32.21225472,
+            },
+          ],
+        },
+      ),
+      errorResponse('400', 'Invalid run ID.', '运行 ID 无效。', 'OperatorX run unavailable'),
+      errorResponse(
+        '404',
+        'Run or artifacts not found.',
+        '找不到运行或产物。',
+        'OperatorX run unavailable',
+      ),
+      errorResponse('409', 'Run still in progress.', '运行尚未结束。', 'OperatorX run unavailable'),
+      errorResponse(
+        '502',
+        'GitHub source unavailable.',
+        'GitHub 来源不可用。',
+        'OperatorX run unavailable',
+      ),
+      errorResponse(
+        '503',
+        'Storage, configuration, or artifact validation failed.',
+        '存储、配置或产物校验失败。',
+        'OperatorX run unavailable',
+      ),
+    ],
+    responseShapeName: 'OperatorXDataset',
+    curlUrl: `${API_BASE_URL}/api/v1/operatorx/runs/123456789`,
+  },
+
   {
     id: 'get-availability',
     group: 'core',
@@ -590,8 +1077,8 @@ export const apiOperations: readonly ApiOperation[] = [
     path: '/api/v1/benchmarks',
     summary: text('Read benchmark results', '读取基准结果'),
     description: text(
-      'Returns raw benchmark rows for a display model. Use date for an as-of snapshot, exact=true for that exact date, runId to constrain the latest lookup, or exactRun=true with a numeric runId to return only that workflow run. The page-owned calculator view is not part of this public contract.',
-      '返回指定展示模型的原始基准测试数据行。使用 date 可获取截至指定日期的快照；exact=true 仅返回该日期的数据；runId 用于限定最新结果的查询范围；将 exactRun=true 与数值型 runId 搭配使用，则只返回该工作流运行的数据。页面内部使用的 calculator 视图不属于此公开契约。',
+      'Returns raw benchmark rows for a display model. Use date for an as-of snapshot, exact=true for that exact date, runId to constrain the latest lookup, or exactRun=true with a numeric runId for that run’s logical snapshot. An AgentX curve is scoped by model, hardware, framework, precision, and workload: a normal run replaces all prior topology, speculative-decoding, and offload variants in that curve. Explicit append-only runs may include the preceding same-image snapshot; producer IDs and URLs are preserved. Historical snapshots remain accessible. view=calculator returns a trimmed page-owned projection (measured power metrics and workers are removed; its allowlist may change). powerValid=strictV2 selects validated schema-v2 power measurements and cannot be combined with view=calculator. Omit powerValid to keep general benchmark results regardless of power validity.',
+      '返回指定展示模型的原始基准测试数据行。使用 date 可获取截至指定日期的快照；exact=true 仅返回该日期的数据；runId 用于限定最新结果的查询范围；将 exactRun=true 与数值型 runId 搭配使用，可获取该次运行对应的逻辑快照。AgentX 按模型、硬件、框架、精度和工作负载划分曲线；常规运行会整体替换同一曲线中此前的所有拓扑、推测解码和 offload 变体。显式标记为 append-only 的运行可继承此前使用相同镜像的快照，并保留各数据点来源运行的 ID 和 URL。历史快照仍可查询。view=calculator 返回页面专用的裁剪投影（会移除实测功率指标和 workers，其允许列表可能变化）。powerValid=strictV2 仅返回采用 schema v2 且功率测量通过验证的数据行，不能与 view=calculator 组合使用。省略 powerValid 则保留常规基准测试结果，不按功率有效性筛选。',
     ),
     audience: 'public',
     stability: 'stable',
@@ -641,10 +1128,40 @@ export const apiOperations: readonly ApiOperation[] = [
         'query',
         false,
         'boolean',
-        'With a numeric runId, return only that run instead of an as-of result.',
-        '与数字 runId 一起使用时，仅返回该次运行而非截至日期的结果。',
+        'With a numeric runId, return that run’s logical snapshot, including same-image predecessors for append-only runs.',
+        '与数字 runId 一起使用时，返回该次运行对应的逻辑快照；append-only 运行的快照包含此前使用相同镜像的数据。',
         { type: 'boolean', default: false },
         false,
+      ),
+      parameter(
+        'view',
+        'query',
+        false,
+        'enum',
+        'calculator trims each row to the page-owned metric allowlist the throughput calculator consumes and removes workers; measured power metrics are excluded from this view. Requires sequence. Omit for every stored metric, including measured power.',
+        'calculator 会将每行裁剪为吞吐量计算器所需的页面专用指标允许列表并移除 workers；此视图不包含实测功率指标。需要同时提供 sequence。省略则返回全部已存储指标，包括实测功率。',
+        { type: 'string', enum: ['calculator'] },
+        'calculator',
+      ),
+      parameter(
+        'sequence',
+        'query',
+        false,
+        'enum',
+        'Required when view=calculator and ignored otherwise. Unknown values yield 400 Unknown calculator sequence.',
+        '当 view=calculator 时必填，其余情况会被忽略。未知值返回 400 Unknown calculator sequence。',
+        { type: 'string', enum: ['1k/1k', '1k/8k', '8k/1k', 'agentic-traces'] },
+        '1k/1k',
+      ),
+      parameter(
+        'powerValid',
+        'query',
+        false,
+        'enum',
+        'Only strictV2 is accepted. It keeps rows whose metrics.power_valid is the number 1 and metrics.power_metric_schema_version is the number 2 (whole-deployment energy semantics). Omit this parameter to apply no power filter, preserving throughput and latency results even when power is missing or invalid. Other values, including an empty value, yield 400 Unknown powerValid filter. Cannot be combined with view=calculator.',
+        '仅接受 strictV2：保留 metrics.power_valid 为数字 1、且 metrics.power_metric_schema_version 为数字 2 的数据行，其能耗指标采用整个部署的统计口径。省略此参数则不按功率筛选，即使功率缺失或无效，也会保留吞吐量和延迟结果。其他取值（包括空值）返回 400 Unknown powerValid filter。不能与 view=calculator 组合使用。',
+        { type: 'string', enum: POWER_VALIDITY_FILTERS },
+        'strictV2',
       ),
     ],
     responses: [
@@ -656,8 +1173,8 @@ export const apiOperations: readonly ApiOperation[] = [
       ),
       errorResponse(
         '400',
-        'The model is missing or unsupported.',
-        '模型缺失或不受支持。',
+        'The model is missing or unsupported, the calculator sequence is unknown, a supplied powerValid value is not strictV2, or powerValid=strictV2 is combined with view=calculator.',
+        '模型缺失或不受支持、计算器序列未知、提供的 powerValid 取值不是 strictV2，或 powerValid=strictV2 与 view=calculator 组合使用。',
         PUBLIC_API_ERRORS.unknownModel,
       ),
       errorResponse(
@@ -677,8 +1194,8 @@ export const apiOperations: readonly ApiOperation[] = [
     path: '/api/v1/benchmarks/history',
     summary: text('Read benchmark history', '读取基准历史'),
     description: text(
-      'Returns every dated benchmark row for one model and either a fixed input/output token pair or Agentic Traces.',
-      '返回指定模型在固定输入/输出 token 组合或 Agentic Traces 条件下的全部历史基准测试数据行。',
+      'Returns historical logical snapshots for one model and either a fixed input/output token pair or Agentic Traces. Replaced AgentX variants remain in their earlier snapshots. Append-only snapshots include inherited points with original producer metadata and separate curve snapshot metadata.',
+      '返回指定模型在固定输入/输出 token 组合或 Agentic Traces 条件下的历史逻辑快照。被替换的 AgentX 变体仍保留在此前的快照中。append-only 快照包含继承的数据点，并分别提供各点的原始来源运行元数据和曲线快照元数据。',
     ),
     audience: 'public',
     stability: 'stable',
@@ -728,8 +1245,8 @@ export const apiOperations: readonly ApiOperation[] = [
         'query',
         false,
         'enum',
-        'calculator trims each row to the metrics the throughput calculator consumes, for a smaller payload. Omit for every stored metric, including measured power.',
-        'calculator 会将每行裁剪为吞吐量计算器所需的指标，以减小响应体积。省略则返回全部已存储指标，包括实测功率。',
+        'calculator trims each row to the metrics the throughput calculator consumes, for a smaller payload. Omit to retain other history metrics, including measured power when present. Both views omit mean_* and std_* statistics for ttft, tpot, itl, e2el, and intvty.',
+        'calculator 会将每行裁剪为吞吐量计算器所需的指标，以减小响应体积。省略后会保留历史接口提供的其他指标，包括已记录的实测功率。两种视图都不返回 ttft、tpot、itl、e2el 和 intvty 的 mean_* 与 std_* 统计值。',
         { type: 'string', enum: ['calculator'] },
         'calculator',
       ),
@@ -1025,8 +1542,15 @@ export const apiOperations: readonly ApiOperation[] = [
               hardware: 'h200_sxm',
               workload: '1024x1024',
               tier: 50,
-              tput_per_gpu: 118.2,
+              output_tput_per_gpu: 118.2,
+              boundary: 'interpolated',
               is_interpolated: true,
+              frontier_points: 3,
+              frontier_min_interactivity: 30,
+              frontier_max_interactivity: 75,
+              latest_date: '2026-08-08',
+              oldest_frontier_date: '2026-08-06',
+              evidence_date: { from: '2026-08-06', to: '2026-08-08' },
             },
           ],
         },
@@ -1034,7 +1558,8 @@ export const apiOperations: readonly ApiOperation[] = [
           {
             mediaType: 'text/csv',
             schema: stringSchema,
-            example: 'model,hardware,workload,tier,tput_per_gpu\ndsv4,h200_sxm,1024x1024,50,118.2',
+            example:
+              'hardware,workload,tier,output_tput_per_gpu,boundary,frontier_points,frontier_min_interactivity,frontier_max_interactivity,latest_date,oldest_frontier_date\nh200_sxm,1024x1024,50,118.2,interpolated,3,30,75,2026-08-08,2026-08-06\n',
           },
         ],
       ),
@@ -1442,8 +1967,8 @@ export const apiOperations: readonly ApiOperation[] = [
     path: '/api/v1/collectivex/latest',
     summary: text('Read the latest CollectiveX dataset', '读取最新 CollectiveX 数据集'),
     description: text(
-      'Discovers and ingests the latest sweep when needed, then returns its versioned neutral dataset. A stored run is served if refresh fails.',
-      '按需发现并导入最新扫描，然后返回带版本的中立数据集。若刷新失败，会返回已存储的运行。',
+      'Discovers and ingests the latest sweep when needed, then returns its versioned neutral dataset. A stored run is served if refresh fails. Optional swap_blocks results contain verified copy latency in microseconds and payload GB/s (bytes counted once), with block_bytes, num_blocks, runtime provenance and skipped-point counts. Multi-pool sweeps preserve each GPU pool as an independent result.',
+      '按需发现并导入最新扫描，然后返回带版本的中立数据集。若刷新失败，会返回已存储的运行。可选的 swap_blocks 结果包含校验通过的复制延迟（微秒）和有效载荷 GB/s（字节数仅计算一次），并保留 block_bytes、num_blocks、运行环境来源及未测量组合数。多平台扫描分别保留各 GPU 池的独立结果。',
     ),
     audience: 'public',
     stability: 'beta',
@@ -1487,6 +2012,7 @@ export const apiOperations: readonly ApiOperation[] = [
           coverage: [],
           series: [],
           kv: [],
+          swap_blocks: [],
         },
       ),
       errorResponse(
@@ -1666,6 +2192,7 @@ export const apiOperations: readonly ApiOperation[] = [
           coverage: [],
           series: [],
           kv: [],
+          swap_blocks: [],
         },
       ),
       errorResponse(
@@ -1770,8 +2297,8 @@ export const apiOperations: readonly ApiOperation[] = [
     path: '/api/v1/benchmark-siblings',
     summary: text('Read sibling benchmark points', '读取同组基准点'),
     description: text(
-      'Returns the benchmark SKU and every point in the same hardware, framework, model, precision, method, benchmark type, and workflow run.',
-      '返回基准 SKU，以及同一硬件、框架、模型、精度、方法、基准类型和工作流运行中的全部点。',
+      'Returns the benchmark SKU and every point in the same hardware, framework, model, precision, method, benchmark type, and workflow run. Siblings may have different workloads. is_current is true only for the requested result ID; false does not mean stale, invalid, or superseded.',
+      '返回基准 SKU，以及同一硬件、框架、模型、精度、方法、基准类型和工作流运行中的全部点。同组结果的工作负载可能不同。is_current 仅在结果 ID 与请求的 ID 相同时为 true；false 不表示结果已过时、无效或已被替代。',
     ),
     audience: 'public',
     stability: 'beta',
@@ -2564,11 +3091,26 @@ const overview = {
       id: 'benchmark-row',
       title: text('BenchmarkRow', 'BenchmarkRow'),
       description: text(
-        'Configuration fields sit beside a metrics map. Metric keys evolve independently; values are numbers, time metrics are seconds, and throughput metrics use tokens per second per GPU unless their name states otherwise.',
-        '配置字段与 metrics 映射位于同一层级。metrics 的键可独立扩展，各项指标值均为数字；时间指标以秒为单位。除非指标名另有说明，吞吐量指标均以 token/s/GPU 为单位。',
+        'Configuration fields sit beside a metrics map. Time metrics are seconds. Throughput fields ending in _per_gpu retain their legacy names but measure tokens per second per physical chip, including TPUs. num_prefill_gpu and num_decode_gpu count physical chips independently of logical TP; aggregate engines may mirror one count in both columns, so only disaggregated counts should be summed. Optional metrics.dp records data parallelism when supplied. For a P99 inter-token latency requirement, compare p99_itl in seconds (multiply by 1000 for milliseconds). p99_tpot measures per-request time per output token; the reciprocal of p99_intvty is not a substitute for p99_itl.',
+        '配置字段与 metrics 映射位于同一层级，时间指标以秒为单位。以 _per_gpu 结尾的吞吐量字段保留历史名称，实际表示每颗物理芯片每秒处理的 token 数，TPU 也使用此单位。num_prefill_gpu 和 num_decode_gpu 表示物理芯片数，与逻辑 TP 独立；聚合部署可能在两列中重复记录同一芯片数，只有分离式部署才应将两列相加。可选字段 metrics.dp 记录产物中提供的数据并行度。判断 P99 inter-token latency 是否达标时，应使用以秒为单位的 p99_itl（乘以 1000 可换算为毫秒）。p99_tpot 表示请求内每个输出 token 的平均耗时；不能用 p99_intvty 的倒数代替 p99_itl。',
       ),
       shape: 'BenchmarkRows',
       example: benchmarkExample[0],
+    },
+    {
+      id: 'measured-power',
+      title: text('Measured power', '实测功率'),
+      description: text(
+        'Benchmark rows may carry measured power, energy, and GPU-telemetry metric keys (avg_power_w, avg_total_gpu_power_w, total_gpu_energy_j, p75_power_w, p75_total_gpu_power_w, p90_power_w, p90_total_gpu_power_w, joules_per_*, avg_temp_c, peak_temp_c, avg_util_pct, avg_mem_used_mb). power_valid is tri-state: 1 means the measurement window was validated; 0 means validation failed and measured values are withheld end-to-end (the producer strips them and ingest scrubs them — treat any that remain as unreliable); absent means no validation verdict is available in this response. Legacy rows can lack the field, but absence alone establishes neither the reason, the measurement age, nor invalidity. power_metric_schema_version == 2 defines every unprefixed joules_per_* field as whole-deployment energy — unversioned disaggregated joules are ambiguous because those fields previously carried role-local values. workers[] carries the per-worker power/telemetry breakdown on multinode and disaggregated runs. power_invalid_reasons lists producer reason codes. power_audit optionally carries measurement-window bounds, device and sample counts, producer identity and the retained audit reference on valid and invalid rows. Missing audit metadata does not establish the measurement age or validity. For measured-power requests, use powerValid=strictV2 to require power_valid == 1 and power_metric_schema_version == 2. It is the only supported power filter. Omit powerValid for general benchmark requests so results remain available even when they lack valid power measurements.',
+        '基准测试数据行可能包含实测功率、能耗和 GPU 遥测指标（avg_power_w、avg_total_gpu_power_w、total_gpu_energy_j、p75_power_w、p75_total_gpu_power_w、p90_power_w、p90_total_gpu_power_w、joules_per_*、avg_temp_c、peak_temp_c、avg_util_pct、avg_mem_used_mb）。power_valid 有三种状态：1 表示测量窗口已通过验证；0 表示验证失败，生产端会移除实测值，摄取端也会再次清除，若仍有残留，应视为不可靠；缺失表示当前响应未提供验证结论。旧数据可能缺少该字段，但仅凭字段缺失，既无法判断缺失原因，也无法判断数据新旧或测量是否无效。power_metric_schema_version == 2 规定所有无前缀的 joules_per_* 字段均按整个部署统计能耗。未标注版本的分离式部署数据中，这些字段曾记录单个角色的能耗，因此其统计口径不明确。多节点和分离式运行中，各 worker 的功率和遥测明细位于 workers[]。power_invalid_reasons 列出生产端的原因码。power_audit 可在有效与无效行上提供测量窗口、设备和采样数量、生产端标识及保留的审计产物引用。缺少审计信息不能证明测量的新旧或有效性。查询实测功率时，使用 powerValid=strictV2，仅保留 power_valid == 1 且 power_metric_schema_version == 2 的行。这是唯一支持的功率筛选值。常规基准测试请求应省略 powerValid，以保留缺少有效功率测量的结果。',
+      ),
+      shape: 'BenchmarkRows',
+      example: {
+        power_valid: 1,
+        power_metric_schema_version: 2,
+        avg_power_w: 678.5,
+        joules_per_output_token: 5.3,
+      },
     },
     {
       id: 'metric-maps',

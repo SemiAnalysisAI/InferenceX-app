@@ -26,7 +26,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { track } from '@/lib/analytics';
 import { useLocale } from '@/lib/use-locale';
 import { HW_REGISTRY, type HwEntry } from '@semianalysisai/inferencex-constants';
-type GpuValuePanelKind = 'costs' | 'powers';
+// Custom $/chip/hr moved into the chart caption's TCO badges
+// (`InferenceTcoBadges`), so only the power panel remains.
+type GpuValuePanelKind = 'powers';
 
 const STRINGS = {
   en: {
@@ -60,20 +62,6 @@ const PANEL_CONFIG: Record<
     getDefaultValue: (specs: HwEntry) => number;
   }
 > = {
-  costs: {
-    title: 'Custom Chip Costs',
-    titleZh: '自定义芯片成本',
-    description:
-      'Enter your own TCO (Total Cost of Ownership) values for each chip in $/chip/hr. These values determine the selected token cost metric.',
-    descriptionZh:
-      '输入每个芯片的自定义 TCO（总拥有成本），单位为 $/chip/hr。这些值用于计算所选 token 成本指标。',
-    sectionTestId: 'custom-costs-section',
-    calculateTestId: 'custom-costs-calculate',
-    inputIdPrefix: 'cost-input',
-    resetEvent: 'inference_custom_costs_reset',
-    calculatedEvent: 'inference_custom_costs_calculated',
-    getDefaultValue: (specs) => specs.costr,
-  },
   powers: {
     title: 'Custom Chip Powers',
     titleZh: '自定义芯片功耗',
@@ -158,12 +146,12 @@ const CustomGpuValuePanel = memo(
     const t = STRINGS[locale];
     const { selectedYAxisMetric } = useInferenceDisplay();
     const { selectedPrecisions, selectedModel, selectedSequence } = useInferenceFilters();
-    const { setUserCosts, setUserPowers } = useInferenceActions();
+    const { setUserPowers } = useInferenceActions();
 
     const config = PANEL_CONFIG[kind];
     const title = locale === 'zh' ? config.titleZh : config.title;
     const description = locale === 'zh' ? config.descriptionZh : config.description;
-    const applyValues = kind === 'costs' ? setUserCosts : setUserPowers;
+    const applyValues = setUserPowers;
 
     const [inputErrors, setInputErrors] = useState<Record<string, string>>({});
     const [defaultValues, setDefaultValues] = useState<Record<string, string>>({});

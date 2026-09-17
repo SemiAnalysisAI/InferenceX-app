@@ -14,6 +14,7 @@ export enum Model {
   GLM_5 = 'GLM-5',
   GLM_5_2 = 'GLM-5.2',
   DeepSeek_V4_Pro = 'DeepSeek-V4-Pro',
+  DeepSeek_V4_1_Flash = 'DeepSeek-V4.1-Flash',
 }
 
 export type CategoryTag = 'default' | 'experimental' | 'maintenance' | 'deprecated' | 'hidden';
@@ -141,6 +142,18 @@ const MODEL_CONFIG: Record<Model, ModelConfig> = {
     openRouterModelId: 'deepseek/deepseek-v4-pro-0813',
     logo: 'deepseek-color.svg',
     exclusion: MTP_ENGINE_EXCLUSION,
+  },
+  [Model.DeepSeek_V4_1_Flash]: {
+    // Separate architecture from V4-Pro (Causal Encoder-Decoder + CSA2), not a
+    // point release, so it keeps its own DB bucket and dropdown entry. Label
+    // carries the 552B backbone total; the 196B Engram conditional-memory table
+    // is sparsely accessed via token lookup and is excluded, matching how the
+    // separate MTP head is excluded elsewhere.
+    label: 'DeepSeek V4.1 Flash 552B',
+    prefix: 'dsv41flash',
+    category: 'default',
+    openRouterModelId: 'deepseek/deepseek-v4.1-flash',
+    logo: 'deepseek-color.svg',
   },
   [Model.Kimi_K3]: {
     // K3 is a separate 2.8T KDA/MLA-hybrid architecture, not a K2 point release,
@@ -514,9 +527,14 @@ export function getSequenceCategory(sequence: Sequence): CategoryTag {
  * MiniMax M3: the Single-turn 8k1k sweep was removed on 2026-08-04
  * (InferenceX#2493, per MODELS.md "Scenario and precision retirements");
  * Agentic coding is the model's only active scenario.
+ *
+ * DeepSeek V4 Pro: 2026-09-08 was the last day of its Single-turn 8k1k sweep
+ * (InferenceX#2728, per MODELS.md "Deprecation Notice"); Agentic coding,
+ * including the MTP and DSpark arms, stays active and the model is not retired.
  */
 const MODEL_DEPRECATED_SEQUENCES: Partial<Record<Model, ReadonlySet<Sequence>>> = {
   [Model.MiniMax_M3]: new Set([Sequence.EightK_OneK]),
+  [Model.DeepSeek_V4_Pro]: new Set([Sequence.EightK_OneK]),
 };
 
 /** Whether this model retired the scenario even though it is globally active. */
@@ -533,6 +551,45 @@ export function isSequenceDeprecatedForModel(model: Model, sequence: Sequence): 
 export function getSequenceCategoryForModel(sequence: Sequence, model?: Model | null): CategoryTag {
   if (model && isSequenceDeprecatedForModel(model, sequence)) return 'deprecated';
   return getSequenceCategory(sequence);
+}
+
+/**
+ * Model + scenario pairs where Best per SKU starts switched off. The Quick
+ * Filters toggle stays available and an explicit `i_best` URL value still wins;
+ * only the default for readers who have not chosen changes, so these charts
+ * open with every configuration visible.
+ *
+ * Qwen3.5 397B: both the 8K/1K sweep and Agentic coding open with all configs.
+ */
+const MODEL_BEST_PER_SKU_DEFAULT_OFF: Partial<Record<Model, ReadonlySet<Sequence>>> = {
+  [Model.Qwen3_5]: new Set([Sequence.EightK_OneK, Sequence.AgenticTraces]),
+};
+
+/** Whether Best per SKU defaults to off for this model and scenario. */
+export function isBestPerSkuDefaultOff(
+  model: Model | null | undefined,
+  sequence: Sequence | null | undefined,
+): boolean {
+  if (!model || !sequence) return false;
+  return MODEL_BEST_PER_SKU_DEFAULT_OFF[model]?.has(sequence) ?? false;
+}
+
+/**
+ * Model/scenario pairs that expose the external/internal TCO Basis selector.
+ * The basis only reprices hardware with a distinct owner cost (TPUv7 today),
+ * so the control is shown only where that hardware is benchmarked.
+ */
+const MODEL_TCO_BASIS_SELECTOR: Partial<Record<Model, ReadonlySet<Sequence>>> = {
+  [Model.Qwen3_5]: new Set([Sequence.EightK_OneK]),
+};
+
+/** Whether the TCO Basis selector is shown for this model and scenario. */
+export function showsTcoBasisSelector(
+  model: Model | null | undefined,
+  sequence: Sequence | null | undefined,
+): boolean {
+  if (!model || !sequence) return false;
+  return MODEL_TCO_BASIS_SELECTOR[model]?.has(sequence) ?? false;
 }
 
 export function getSequenceLabel(sequence: Sequence, locale: 'en' | 'zh' = 'en'): string {

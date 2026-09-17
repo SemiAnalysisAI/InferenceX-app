@@ -152,3 +152,8 @@ export function getCollectiveXDb(overrides?: DatabaseClientOverrides): DbClient 
 export function getCollectiveXWriteDb(overrides?: DatabaseClientOverrides): DbClient {
   return memoizedClient('DATABASE_COLLECTIVEX_WRITE_URL', overrides);
 }
+
+/** OperatorX primary for lazy persistence and read-after-write consistency. */
+export function getOperatorXWriteDb(overrides?: DatabaseClientOverrides): DbClient {
+  return memoizedClient('DATABASE_OPERATORX_WRITE_URL', overrides);
+}

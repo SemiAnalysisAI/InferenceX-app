@@ -40,10 +40,8 @@ function pt(overrides: Partial<InferenceData> = {}): InferenceData {
     tpPerGpu: { y: 1000, roof: false },
     tpPerMw: { y: 50, roof: false },
     costh: { y: 2, roof: false },
-    costn: { y: 1.5, roof: false },
     costr: { y: 1, roof: false },
     costhi: { y: 5, roof: false },
-    costni: { y: 3, roof: false },
     costri: { y: 1.5, roof: false },
     ...overrides,
   };
@@ -87,13 +85,6 @@ describe('filterDataByCostLimit', () => {
     const result = filterDataByCostLimit(data, chartDef({ y_cost_limit: 2 }), 'y_costh');
     expect(result).toHaveLength(2);
     expect(result.every((p) => p.costh.y <= 2)).toBe(true);
-  });
-
-  it('filters by costn.y <= y_cost_limit', () => {
-    const data = [pt({ costn: { y: 1, roof: false } }), pt({ costn: { y: 3, roof: false } })];
-    const result = filterDataByCostLimit(data, chartDef({ y_cost_limit: 1.5 }), 'y_costn');
-    expect(result).toHaveLength(1);
-    expect(result[0].costn.y).toBe(1);
   });
 
   it('filters by costr.y <= y_cost_limit', () => {
@@ -194,6 +185,76 @@ describe('partitionChartDataByLimits', () => {
 // processOverlayChartData
 // ===========================================================================
 describe('processOverlayChartData', () => {
+  const prefillEnergyPoint = (interactivity: number, medianTtft?: number) =>
+    pt({
+      date: '2026-09-01',
+      hw: 'b200',
+      hwKey: 'b200_dynamo-sglang',
+      framework: 'dynamo-sglang',
+      precision: 'fp4',
+      disagg: true,
+      power_valid: 1,
+      // These are the post-transform coordinates for a fixed-sequence row
+      // without P90 measurements. The stored median measurements survive.
+      x: 0,
+      p90_ttft: 0,
+      median_ttft: medianTtft ?? 0,
+      median_intvty: interactivity,
+      median_e2el: 12,
+      rawMetricKeys: [
+        'median_intvty',
+        'median_e2el',
+        'prefill_joules_per_input_token',
+        ...(medianTtft === undefined ? [] : ['median_ttft']),
+      ],
+      measuredPrefillJPerInputToken: { y: 0.2, roof: false },
+    });
+
+  it('keeps prefill-energy overlays on Interactivity despite a stale legacy P90 override', () => {
+    const result = processOverlayChartDataWithClipping(
+      [prefillEnergyPoint(68, 1.5), prefillEnergyPoint(55, 2)],
+      'interactivity',
+      'y_measuredPrefillJPerInputToken',
+      'p90_ttft',
+      { isAgentic: false, selectedPercentile: 'p90', selectedXAxisMode: 'interactivity' },
+    );
+
+    expect(result.data.map((point) => [point.x, point.y])).toEqual([
+      [68, 0.2],
+      [55, 0.2],
+    ]);
+    expect(result.clippedData).toEqual([]);
+  });
+
+  it('uses median TTFT for fixed-sequence overlays in TTFT mode and omits missing measurements', () => {
+    const result = processOverlayChartDataWithClipping(
+      [prefillEnergyPoint(68, 1.5), prefillEnergyPoint(55)],
+      'e2e',
+      'y_measuredPrefillJPerInputToken',
+      'p90_ttft',
+      { isAgentic: false, selectedPercentile: 'p90', selectedXAxisMode: 'ttft' },
+    );
+
+    expect(result.data.map((point) => [point.x, point.y])).toEqual([[1.5, 0.2]]);
+    expect(result.clippedData).toEqual([]);
+  });
+
+  it('uses natural E2E latency for overlays when E2E mode supersedes the legacy P90 override', () => {
+    const result = processOverlayChartDataWithClipping(
+      [prefillEnergyPoint(68, 1.5), prefillEnergyPoint(55)],
+      'e2e',
+      'y_measuredPrefillJPerInputToken',
+      'p90_ttft',
+      { isAgentic: false, selectedPercentile: 'p90', selectedXAxisMode: 'e2e' },
+    );
+
+    expect(result.data.map((point) => [point.x, point.y])).toEqual([
+      [12, 0.2],
+      [12, 0.2],
+    ]);
+    expect(result.clippedData).toEqual([]);
+  });
+
   it('remaps y to the selected metric value', () => {
     const data = [pt({ y: 999, tpPerGpu: { y: 42, roof: false }, median_intvty: 10 } as any)];
     const result = processOverlayChartData(data, 'interactivity', 'y_tpPerGpu', null);
@@ -202,10 +263,9 @@ describe('processOverlayChartData', () => {
   });
 
   it('filters out points missing the selected metric', () => {
-    // Point without inputTputPerGpu field — should be excluded
-    const withMetric = pt({ inputTputPerGpu: { y: 5, roof: false } } as any);
-    const withoutMetric = pt();
-    delete (withoutMetric as any).inputTputPerGpu;
+    // Both points have the selected latency; only one has the selected Y metric.
+    const withMetric = pt({ inputTputPerGpu: { y: 5, roof: false }, p90_ttft: 0.25 });
+    const withoutMetric = pt({ p90_ttft: 0.25 });
     const result = processOverlayChartData(
       [withMetric, withoutMetric],
       'interactivity',
@@ -312,10 +372,10 @@ describe('processOverlayChartData', () => {
 
   it('keeps all unofficial-run tokens-per-dollar points without the former cost clamp', () => {
     const data = [
-      pt({ tokensPerDollarN: { y: 500_000, roof: false }, median_intvty: 10 } as any),
-      pt({ tokensPerDollarN: { y: 2_000_000, roof: false }, median_intvty: 20 } as any),
+      pt({ tokensPerDollarH: { y: 500_000, roof: false }, median_intvty: 10 } as any),
+      pt({ tokensPerDollarH: { y: 2_000_000, roof: false }, median_intvty: 20 } as any),
     ];
-    const result = processOverlayChartData(data, 'interactivity', 'y_tokensPerDollarN', null);
+    const result = processOverlayChartData(data, 'interactivity', 'y_tokensPerDollarH', null);
     expect(result.map((point) => point.y)).toEqual([500_000, 2_000_000]);
   });
 
@@ -330,12 +390,12 @@ describe('processOverlayChartData', () => {
 
   it('does not classify unofficial-run purchasing-power points as cost overflows', () => {
     const visible = pt({
-      tokensPerDollarN: { y: 500_000, roof: false },
+      tokensPerDollarH: { y: 500_000, roof: false },
       median_intvty: 10,
       run_url: 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/123',
     } as any);
     const highValue = pt({
-      tokensPerDollarN: { y: 2_000_000, roof: false },
+      tokensPerDollarH: { y: 2_000_000, roof: false },
       median_intvty: 20,
       run_url: 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/123',
     } as any);
@@ -343,7 +403,7 @@ describe('processOverlayChartData', () => {
     const result = processOverlayChartDataWithClipping(
       [visible, highValue],
       'interactivity',
-      'y_tokensPerDollarN',
+      'y_tokensPerDollarH',
       null,
     );
 
@@ -528,5 +588,38 @@ describe('processOverlayChartData', () => {
     });
     expect(result).toHaveLength(1);
     expect(result[0].x).toBe(0.4);
+  });
+});
+
+describe('TPUv7 overlay TCO basis', () => {
+  it('reprices costs and purchasing power without mutating the source or other hardware', () => {
+    const tpu = pt({
+      hwKey: 'tpuv7_vllm',
+      costh: { y: 1.21, roof: false },
+      costhi: { y: 2.42, roof: false },
+      costhOutput: { y: 3.63, roof: false },
+      tokensPerDollarH: { y: 100, roof: false },
+      outputTokensPerDollarH: { y: 40, roof: false },
+    });
+    const nvidia = pt({ ...tpu, hwKey: 'h200_vllm' });
+    const points = processOverlayChartData(
+      [tpu, nvidia],
+      'interactivity',
+      'y_tokensPerDollarH',
+      null,
+      { tcoBasis: 'internal' },
+    );
+    const repriced = points.find((p) => p.hwKey === 'tpuv7_vllm')!;
+    expect(repriced.costh!.y).toBeCloseTo(1.03);
+    expect(repriced.costhi!.y).toBeCloseTo(2.06);
+    expect(repriced.costhOutput!.y).toBeCloseTo(3.09);
+    expect(repriced.y).toBeCloseTo((100 * 1.21) / 1.03);
+    expect(repriced.outputTokensPerDollarH!.y).toBeCloseTo((40 * 1.21) / 1.03);
+    expect(points.find((p) => p.hwKey === 'h200_vllm')!.costh).toEqual(nvidia.costh);
+    expect(tpu.costh!.y).toBe(1.21);
+    expect(
+      processOverlayChartData([tpu], 'interactivity', 'y_costh', null, { tcoBasis: 'external' })[0]
+        .y,
+    ).toBe(1.21);
   });
 });

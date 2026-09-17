@@ -51,7 +51,9 @@ export function XAxisModeSelector() {
 
   return (
     <TooltipProvider delayDuration={0}>
-      <div className="flex min-w-0 flex-col space-y-1.5">
+      <div
+        className={`flex w-full min-w-0 flex-col space-y-1.5 ${isAgentic ? 'max-w-72' : 'max-w-44'}`}
+      >
         <LabelWithTooltip htmlFor="x-axis-mode-select" label={t.label} tooltip={t.help} />
         <SearchableSelect
           value={value}

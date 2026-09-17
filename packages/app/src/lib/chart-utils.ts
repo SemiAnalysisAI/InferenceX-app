@@ -4,7 +4,7 @@
  * They do NOT import Node.js-specific modules (fs, path) or build-time dependencies.
  */
 
-import { resolveFrameworkAlias, USD_TO_CNY } from '@semianalysisai/inferencex-constants';
+import { GOOGLE_BLUE, resolveFrameworkAlias } from '@semianalysisai/inferencex-constants';
 import iwanthue from 'iwanthue';
 
 import type {
@@ -17,7 +17,7 @@ import {
   BENCHMARK_METRIC_CONFIG_KEYS,
   type BenchmarkMetricKey,
 } from '@/components/inference/metric-registry';
-import { getGpuSpecs, isKnownGpu } from '@/lib/constants';
+import { DEFAULT_TCO_BASIS, getGpuSpecs, isKnownGpu, type TcoBasis } from '@/lib/constants';
 import { getVendor, type Vendor } from '@/lib/dynamic-colors';
 import type { Locale } from '@/lib/i18n';
 
@@ -34,7 +34,8 @@ import type { Locale } from '@/lib/i18n';
 const BANNED_HUE_TEST: Record<Vendor, ((hue: number) => boolean) | null> = {
   nvidia: (hue) => hue >= 320 || hue <= 40, // red/rose/pink zone
   amd: (hue) => hue >= 120 && hue <= 195, // green zone
-  teacup: (hue) => hue < 170 || hue > 300, // keep the blue/cyan zone
+  openai: (hue) => hue < 290 || hue > 350, // keep the purple/violet zone
+  google: (hue) => hue < 255 || hue > 300, // keep blue separate from teal and purple
   unknown: null,
 };
 
@@ -48,7 +49,8 @@ const PREFERRED_ZONE: Record<
 > = {
   nvidia: { hmin: 100, hmax: 195 }, // greens/teals
   amd: { hmin: 20, hmax: 50, cmin: 70, lmin: 50 }, // vivid reds/oranges
-  teacup: { hmin: 190, hmax: 280 }, // cyans/blues
+  openai: { hmin: 300, hmax: 340 }, // purples/violets
+  google: { hmin: 265, hmax: 295 }, // blues (brand hue ~284)
   unknown: null,
 };
 
@@ -118,6 +120,10 @@ export const generateHighContrastColors = (
 
   for (const [vendor, vendorKeys] of groups) {
     const count = vendorKeys.length;
+    if (vendor === 'google' && count === 1) {
+      colors[vendorKeys[0]] = GOOGLE_BLUE;
+      continue;
+    }
     const isBanned = BANNED_HUE_TEST[vendor] ?? null;
     const preferred = PREFERRED_ZONE[vendor] ?? null;
 
@@ -296,20 +302,24 @@ const chartMetric = (y: number): { y: number; roof: boolean } => ({ y, roof: fal
 export function buildDerivedChartFields(
   entry: AggDataEntry,
   currentHwKey: string,
+  requestedMetrics?: undefined,
+  tcoBasis?: TcoBasis,
 ): DerivedChartFields;
 export function buildDerivedChartFields(
   entry: AggDataEntry,
   currentHwKey: string,
   requestedMetrics: readonly DerivedMetricKey[],
+  tcoBasis?: TcoBasis,
 ): Partial<DerivedChartFields>;
 export function buildDerivedChartFields(
   entry: AggDataEntry,
   currentHwKey: string,
   requestedMetrics?: readonly DerivedMetricKey[],
+  tcoBasis: TcoBasis = DEFAULT_TCO_BASIS,
 ): Partial<DerivedChartFields> {
   const requested = requestedMetrics ? new Set<DerivedMetricKey>(requestedMetrics) : null;
   const wants = (key: DerivedMetricKey) => requested === null || requested.has(key);
-  const specs = getGpuSpecs(currentHwKey);
+  const specs = getGpuSpecs(currentHwKey, tcoBasis);
   const hardwarePower = specs.power;
   const tputPerGpu = entry.tput_per_gpu ?? 0;
   const outputTputPerGpu = entry.output_tput_per_gpu ?? 0;
@@ -334,13 +344,14 @@ export function buildDerivedChartFields(
     // numerically equal to gross token revenue in $/GPU/hr.
     fields.tokenRevenuePerGpuHour = chartMetric(millionTokensPerHour);
   }
-  if (wants('tpPerMw')) fields.tpPerMw = chartMetric((tputPerGpu * 1000) / hardwarePower);
-  if (wants('inputTputPerMw') && inputTputPerGpu) {
+  if (hardwarePower > 0 && wants('tpPerMw'))
+    fields.tpPerMw = chartMetric((tputPerGpu * 1000) / hardwarePower);
+  if (hardwarePower > 0 && wants('inputTputPerMw') && inputTputPerGpu) {
     fields.inputTputPerMw = chartMetric(
       hardwarePower ? (inputTputPerGpu * 1000) / hardwarePower : 0,
     );
   }
-  if (wants('outputTputPerMw') && outputTputPerGpu) {
+  if (hardwarePower > 0 && wants('outputTputPerMw') && outputTputPerGpu) {
     fields.outputTputPerMw = chartMetric(
       hardwarePower ? (outputTputPerGpu * 1000) / hardwarePower : 0,
     );
@@ -349,20 +360,12 @@ export function buildDerivedChartFields(
   if (wants('costh')) {
     fields.costh = chartMetric(millionTokensPerHour ? specs.costh / millionTokensPerHour : 0);
   }
-  if (wants('costn')) {
-    fields.costn = chartMetric(millionTokensPerHour ? specs.costn / millionTokensPerHour : 0);
-  }
   if (wants('costr')) {
     fields.costr = chartMetric(millionTokensPerHour ? specs.costr / millionTokensPerHour : 0);
   }
   if (wants('costhOutput')) {
     fields.costhOutput = chartMetric(
       millionOutputTokensPerHour ? specs.costh / millionOutputTokensPerHour : 0,
-    );
-  }
-  if (wants('costnOutput')) {
-    fields.costnOutput = chartMetric(
-      millionOutputTokensPerHour ? specs.costn / millionOutputTokensPerHour : 0,
     );
   }
   if (wants('costrOutput')) {
@@ -375,11 +378,6 @@ export function buildDerivedChartFields(
       millionInputTokensPerHour ? specs.costh / millionInputTokensPerHour : 0,
     );
   }
-  if (wants('costni')) {
-    fields.costni = chartMetric(
-      millionInputTokensPerHour ? specs.costn / millionInputTokensPerHour : 0,
-    );
-  }
   if (wants('costri')) {
     fields.costri = chartMetric(
       millionInputTokensPerHour ? specs.costr / millionInputTokensPerHour : 0,
@@ -388,20 +386,12 @@ export function buildDerivedChartFields(
   if (wants('tokensPerDollarH')) {
     fields.tokensPerDollarH = chartMetric(specs.costh ? tokensPerHour / specs.costh : 0);
   }
-  if (wants('tokensPerDollarN')) {
-    fields.tokensPerDollarN = chartMetric(specs.costn ? tokensPerHour / specs.costn : 0);
-  }
   if (wants('tokensPerDollarR')) {
     fields.tokensPerDollarR = chartMetric(specs.costr ? tokensPerHour / specs.costr : 0);
   }
   if (wants('outputTokensPerDollarH')) {
     fields.outputTokensPerDollarH = chartMetric(
       specs.costh ? outputTokensPerHour / specs.costh : 0,
-    );
-  }
-  if (wants('outputTokensPerDollarN')) {
-    fields.outputTokensPerDollarN = chartMetric(
-      specs.costn ? outputTokensPerHour / specs.costn : 0,
     );
   }
   if (wants('outputTokensPerDollarR')) {
@@ -412,68 +402,19 @@ export function buildDerivedChartFields(
   if (wants('inputTokensPerDollarH')) {
     fields.inputTokensPerDollarH = chartMetric(specs.costh ? inputTokensPerHour / specs.costh : 0);
   }
-  if (wants('inputTokensPerDollarN')) {
-    fields.inputTokensPerDollarN = chartMetric(specs.costn ? inputTokensPerHour / specs.costn : 0);
-  }
   if (wants('inputTokensPerDollarR')) {
     fields.inputTokensPerDollarR = chartMetric(specs.costr ? inputTokensPerHour / specs.costr : 0);
   }
 
-  if (wants('tokensPerRmbH')) {
-    fields.tokensPerRmbH = chartMetric(
-      specs.costh ? tokensPerHour / (specs.costh * USD_TO_CNY) : 0,
-    );
-  }
-  if (wants('tokensPerRmbN')) {
-    fields.tokensPerRmbN = chartMetric(
-      specs.costn ? tokensPerHour / (specs.costn * USD_TO_CNY) : 0,
-    );
-  }
-  if (wants('tokensPerRmbR')) {
-    fields.tokensPerRmbR = chartMetric(
-      specs.costr ? tokensPerHour / (specs.costr * USD_TO_CNY) : 0,
-    );
-  }
-  if (wants('outputTokensPerRmbH')) {
-    fields.outputTokensPerRmbH = chartMetric(
-      specs.costh ? outputTokensPerHour / (specs.costh * USD_TO_CNY) : 0,
-    );
-  }
-  if (wants('outputTokensPerRmbN')) {
-    fields.outputTokensPerRmbN = chartMetric(
-      specs.costn ? outputTokensPerHour / (specs.costn * USD_TO_CNY) : 0,
-    );
-  }
-  if (wants('outputTokensPerRmbR')) {
-    fields.outputTokensPerRmbR = chartMetric(
-      specs.costr ? outputTokensPerHour / (specs.costr * USD_TO_CNY) : 0,
-    );
-  }
-  if (wants('inputTokensPerRmbH')) {
-    fields.inputTokensPerRmbH = chartMetric(
-      specs.costh ? inputTokensPerHour / (specs.costh * USD_TO_CNY) : 0,
-    );
-  }
-  if (wants('inputTokensPerRmbN')) {
-    fields.inputTokensPerRmbN = chartMetric(
-      specs.costn ? inputTokensPerHour / (specs.costn * USD_TO_CNY) : 0,
-    );
-  }
-  if (wants('inputTokensPerRmbR')) {
-    fields.inputTokensPerRmbR = chartMetric(
-      specs.costr ? inputTokensPerHour / (specs.costr * USD_TO_CNY) : 0,
-    );
-  }
-
-  if (wants('jTotal')) {
+  if (hardwarePower > 0 && wants('jTotal')) {
     fields.jTotal = chartMetric(
       hardwarePower && tputPerGpu ? (hardwarePower * 1000) / tputPerGpu : 0,
     );
   }
-  if (wants('jOutput') && outputTputPerGpu) {
+  if (hardwarePower > 0 && wants('jOutput') && outputTputPerGpu) {
     fields.jOutput = chartMetric(hardwarePower ? (hardwarePower * 1000) / outputTputPerGpu : 0);
   }
-  if (wants('jInput') && inputTputPerGpu) {
+  if (hardwarePower > 0 && wants('jInput') && inputTputPerGpu) {
     fields.jInput = chartMetric(hardwarePower ? (hardwarePower * 1000) / inputTputPerGpu : 0);
   }
 
@@ -485,7 +426,37 @@ export function buildDerivedChartFields(
     if (wants(key)) fields[key] = value;
   }
 
+  if (wants('modeledChassisPowerPerGpu') && entry.modeledSystemPower?.status === 'supported') {
+    fields.modeledChassisPowerPerGpu = chartMetric(entry.modeledSystemPower.chassisAcWattsPerGpu);
+  }
+
   return fields;
+}
+
+/** Physical deployment size, retaining the legacy PP floor and TPU core/chip distinction. */
+export function deploymentChipCount(
+  entry: Pick<AggDataEntry, 'disagg' | 'num_prefill_gpu' | 'num_decode_gpu' | 'tp' | 'pp'>,
+  currentHwKey: string,
+): number {
+  // Aggregate role counts describe the same deployment, so never sum them.
+  // TP alone is not the chip count (e.g. Jalapeño TP1/EP8 uses eight chips).
+  // Ingested legacy counts can default to TP × EP without PP. Keep TP × PP
+  // as a floor even when counts are positive, including for unofficial overlays.
+  return entry.disagg
+    ? entry.num_prefill_gpu + entry.num_decode_gpu
+    : Math.max(
+        entry.num_decode_gpu > 0
+          ? entry.num_decode_gpu
+          : entry.num_prefill_gpu > 0
+            ? entry.num_prefill_gpu
+            : 0,
+        // TPU tensor widths count logical cores, not physical chips. Explicit
+        // counts are authoritative for these rows (including unofficial runs).
+        currentHwKey.split('_')[0] === 'tpuv7' &&
+          (entry.num_decode_gpu > 0 || entry.num_prefill_gpu > 0)
+          ? 0
+          : entry.tp * (entry.pp && entry.pp > 1 ? entry.pp : 1),
+      );
 }
 
 /**
@@ -501,15 +472,15 @@ export function createChartDataPoint(
   currentHwKey: string,
   derivedFields: DerivedChartFields = buildDerivedChartFields(entry, currentHwKey),
 ): InferenceData {
+  const physicalChips = deploymentChipCount(entry, currentHwKey);
   return {
     ...entry,
     date,
     x: (entry[xKey] ?? 0) as number,
     y: (entry[yKey] ?? 0) as number,
     hwKey: currentHwKey,
-    tp: entry.disagg
-      ? entry.num_prefill_gpu + entry.num_decode_gpu
-      : entry.tp * (entry.pp && entry.pp > 1 ? entry.pp : 1),
+    tp: physicalChips,
+    physicalChips,
     image: entry.image ?? undefined,
     dp_attention:
       entry.dp_attention !== null && entry.dp_attention !== undefined
@@ -538,11 +509,15 @@ type MeasuredPowerChartFields = Partial<
   Pick<
     InferenceData,
     | 'measuredAvgPower'
+    | 'measuredP75Power'
+    | 'measuredP90Power'
     | 'measuredPrefillAvgPower'
     | 'measuredDecodeAvgPower'
     | 'measuredJPerOutputToken'
     | 'measuredJPerTotalToken'
     | 'measuredJPerInputToken'
+    | 'measuredPrefillJPerInputToken'
+    | 'measuredDecodeJPerOutputToken'
     | 'measuredJPerSuccessfulQuery'
     | 'measuredWhPerSuccessfulQuery'
     | 'measuredPowerPercentTdp'
@@ -558,6 +533,12 @@ function buildMeasuredPowerChartFields(
     ...(typeof entry.avg_power_w === 'number'
       ? { measuredAvgPower: chartMetric(entry.avg_power_w) }
       : {}),
+    ...(typeof entry.p75_power_w === 'number' && Number.isFinite(entry.p75_power_w)
+      ? { measuredP75Power: chartMetric(entry.p75_power_w) }
+      : {}),
+    ...(typeof entry.p90_power_w === 'number' && Number.isFinite(entry.p90_power_w)
+      ? { measuredP90Power: chartMetric(entry.p90_power_w) }
+      : {}),
     ...(typeof entry.prefill_avg_power_w === 'number'
       ? { measuredPrefillAvgPower: chartMetric(entry.prefill_avg_power_w) }
       : {}),
@@ -572,6 +553,14 @@ function buildMeasuredPowerChartFields(
       : {}),
     ...(typeof entry.joules_per_input_token === 'number'
       ? { measuredJPerInputToken: chartMetric(entry.joules_per_input_token) }
+      : {}),
+    // Role-local energy is not additionally gated on power_valid here —
+    // rowToAggDataEntry already scrubbed it, same as the role-watts fields.
+    ...(typeof entry.prefill_joules_per_input_token === 'number'
+      ? { measuredPrefillJPerInputToken: chartMetric(entry.prefill_joules_per_input_token) }
+      : {}),
+    ...(typeof entry.decode_joules_per_output_token === 'number'
+      ? { measuredDecodeJPerOutputToken: chartMetric(entry.decode_joules_per_output_token) }
       : {}),
     ...(typeof entry.joules_per_successful_query === 'number'
       ? {
@@ -596,9 +585,13 @@ export function remapInferencePoint(
 ): InferenceData {
   const metric = point[metricKey];
   const xCandidate = (point as Partial<AggDataEntry>)[xAxisField];
+  // Absent TTFT values are zero-filled by the row transform. Neither that
+  // sentinel nor an unrelated fallback coordinate is a latency measurement.
+  const missingTtft =
+    xAxisField.endsWith('_ttft') && (typeof xCandidate !== 'number' || xCandidate <= 0);
   return {
     ...point,
-    x: typeof xCandidate === 'number' ? xCandidate : point.x,
+    x: missingTtft ? NaN : typeof xCandidate === 'number' ? xCandidate : point.x,
     y: metric?.y ?? point.y,
     roof: metric?.roof ?? false,
   };
@@ -772,6 +765,21 @@ export function metricTitle(chartDef: ChartDefinition, metricKey: string, locale
     if (typeof zh === 'string' && zh) return zh;
   }
   return (chartDef[`${metricKey}_title`] as string) || '';
+}
+
+/** Heading title for a metric: the metric alone, without its cost tier. */
+export function metricChartTitle(
+  chartDef: ChartDefinition,
+  metricKey: string,
+  locale: Locale,
+): string {
+  if (locale === 'zh') {
+    const zh = chartDef[`${metricKey}_chartTitleZh`];
+    if (typeof zh === 'string' && zh) return zh;
+  }
+  return (
+    (chartDef[`${metricKey}_chartTitle`] as string) || metricTitle(chartDef, metricKey, locale)
+  );
 }
 
 export function metricLabel(chartDef: ChartDefinition, metricKey: string, locale: Locale): string {

@@ -1,3 +1,5 @@
+import { SUPPORTERS_LINE_ZH } from '@semianalysisai/inferencex-constants';
+
 describe('Chinese (/zh) pages', () => {
   describe('zh landing page', () => {
     before(() => {
@@ -32,13 +34,17 @@ describe('Chinese (/zh) pages', () => {
     it('renders the AgentX hero on the Chinese landing page', () => {
       cy.get('[data-testid="compare-agentx-primary"]').within(() => {
         cy.get('h2').should('have.text', '真实智能体工作负载下的推理性能对比');
-        cy.get('[data-testid="compare-agentx-overview-link"]')
-          .should('contain.text', '总览')
-          .and('have.attr', 'href', '/zh/overview');
+        cy.get('[data-testid="compare-agentx-revenue-calculator-link"]')
+          .should('contain.text', 'Token 收入计算器')
+          .and('have.attr', 'href', '/zh/profit-estimator-per-gigawatt');
+        cy.get('[data-testid="compare-agentx-dashboard-link"]')
+          .should('have.text', '仪表板')
+          .and('have.attr', 'href', '/zh/inference/kimi-k3');
         cy.get('[data-testid="compare-agentx-methodology-link"]').should('not.exist');
         // Ledger NEW pills localize to 新 on the Chinese landing page.
+        cy.get('[data-testid^="compare-agentx-model-"]').should('have.length', 7);
         cy.get('[data-testid^="compare-agentx-model-"] [data-new-badge="agentx-ledger"]')
-          .should('have.length', 6)
+          .should('have.length', 4)
           .each(($badge) => expect($badge.text()).to.equal('新'));
       });
     });
@@ -152,6 +158,55 @@ describe('Chinese (/zh) pages', () => {
         '/zh/blog/inferencex-v2-nvidia-blackwell-vs-amd-vs-hopper',
       );
     });
+  });
+
+  describe('Run and Rankings model links', () => {
+    it('adds index supporter attribution only to the search description, matching English scope', () => {
+      for (const path of ['/zh/run', '/zh/rankings']) {
+        cy.request(path).then(({ body }) => {
+          const document = new DOMParser().parseFromString(body, 'text/html');
+          const content = (selector: string) =>
+            document.querySelector(selector)?.getAttribute('content');
+          const baseDescription = content('meta[property="og:description"]');
+          expect(baseDescription).to.be.a('string').and.not.include(SUPPORTERS_LINE_ZH);
+          expect(content('meta[name="description"]')).to.eq(
+            `${baseDescription}${SUPPORTERS_LINE_ZH}`,
+          );
+          expect(content('meta[name="twitter:description"]')).to.eq(baseDescription);
+          const collection = [...document.querySelectorAll('script[type="application/ld+json"]')]
+            .map((script) => JSON.parse(script.textContent ?? '{}'))
+            .find((data) => data['@type'] === 'CollectionPage');
+          expect(collection?.description).to.eq(baseDescription);
+        });
+      }
+    });
+
+    for (const [path, section] of [
+      ['/zh/run/deepseek-r1-on-b300', 'run-explore'],
+      ['/zh/rankings/fastest-gpu-for-deepseek-r1', 'ranking-explore'],
+    ] as const) {
+      it(`opens the matching Chinese model detail from ${path}`, () => {
+        cy.viewport(390, 844);
+        cy.visit(path, {
+          onBeforeLoad(win) {
+            win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+          },
+        });
+
+        cy.get('meta[name="description"]')
+          .invoke('attr', 'content')
+          .should('match', new RegExp(`${SUPPORTERS_LINE_ZH}$`, 'u'))
+          .then((description) => {
+            cy.get('meta[property="og:description"]').should('have.attr', 'content', description);
+            cy.get('meta[name="twitter:description"]').should('have.attr', 'content', description);
+          });
+        cy.get(`[aria-labelledby="${section}"] a[href="/zh/model/deepseek-r1"]`)
+          .should('contain.text', 'DeepSeek R1')
+          .click();
+        cy.location('pathname').should('eq', '/zh/model/deepseek-r1');
+        cy.get('h1').should('have.text', 'DeepSeek R1 0528');
+      });
+    }
   });
 
   describe('Glossary pages', () => {
@@ -320,6 +375,7 @@ describe('Chinese (/zh) pages', () => {
         .and('contain.text', '聚合推理芯片数：');
       // Disaggregated deployments split the chip pool, so their expanded
       // details localize the prefill/decode fields instead of the aggregate ones.
+      cy.get('input[placeholder="搜索配置……"]').type('atom-disagg');
       cy.contains('tr', 'Mooncake ATOMesh')
         .first()
         .find('button[aria-label="展开配置详情"]')

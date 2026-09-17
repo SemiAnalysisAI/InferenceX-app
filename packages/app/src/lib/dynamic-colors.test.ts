@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
+import { hsl } from 'd3';
 
-import { VENDOR_OKLCH_ZONES } from '@semianalysisai/inferencex-constants';
+import { VENDOR_OKLCH_ZONES, VENDOR_HSL_ZONES } from '@semianalysisai/inferencex-constants';
 
 import {
   generateHighContrastGpuDateColors,
+  generateGpuDateColors,
   generateVendorColors,
   getVendor,
 } from './dynamic-colors';
@@ -18,7 +20,9 @@ describe('getVendor', () => {
   it('classifies registered GPU base keys through GPU_VENDORS', () => {
     expect(getVendor('h100_vllm')).toBe('nvidia');
     expect(getVendor('mi300x_sglang')).toBe('amd');
-    expect(getVendor('jalapeno_teacup')).toBe('teacup');
+    expect(getVendor('jalapeno_teacup')).toBe('openai');
+    expect(getVendor('tpuv7')).toBe('google');
+    expect(getVendor('tpuv7_vllm')).toBe('google');
   });
 
   it('classifies keys that lead with a literal vendor token', () => {
@@ -26,6 +30,7 @@ describe('getVendor', () => {
     // registered GPU key (their SKUs, e.g. "h200-dgxc", are not registry keys).
     expect(getVendor('nvidia_h200-dgxc_normal_ep8')).toBe('nvidia');
     expect(getVendor('amd_mi355x-oam_normal_ep8')).toBe('amd');
+    expect(getVendor('google_ironwood_normal_tp8')).toBe('google');
   });
 
   it('falls back to unknown for unclassifiable keys', () => {
@@ -41,13 +46,13 @@ describe('generateVendorColors', () => {
     );
     const nvidia = VENDOR_OKLCH_ZONES.nvidia;
     const amd = VENDOR_OKLCH_ZONES.amd;
-    const teacup = VENDOR_OKLCH_ZONES.teacup;
+    const openai = VENDOR_OKLCH_ZONES.openai;
     expect(hueOf(colors['nvidia_series-a'])).toBeGreaterThanOrEqual(nvidia.start);
     expect(hueOf(colors['nvidia_series-a'])).toBeLessThanOrEqual(nvidia.end);
     expect(hueOf(colors['amd_series-b'])).toBeGreaterThanOrEqual(amd.start);
     expect(hueOf(colors['amd_series-b'])).toBeLessThanOrEqual(amd.end);
-    expect(hueOf(colors.jalapeno_teacup)).toBeGreaterThanOrEqual(teacup.start);
-    expect(hueOf(colors.jalapeno_teacup)).toBeLessThanOrEqual(teacup.end);
+    expect(hueOf(colors.jalapeno_teacup)).toBeGreaterThanOrEqual(openai.start);
+    expect(hueOf(colors.jalapeno_teacup)).toBeLessThanOrEqual(openai.end);
   });
 
   it('keeps unclassifiable keys in the unknown zone', () => {
@@ -112,5 +117,48 @@ describe('generateHighContrastGpuDateColors', () => {
     const colors = generateHighContrastGpuDateColors({ gpu: 'var(--foreground)' }, 2, 'light');
     expect(colors['0_gpu']).toBe('var(--foreground)');
     expect(colors['1_gpu']).toBe('var(--foreground)');
+  });
+});
+
+describe('TPUv7 vendor colors', () => {
+  it.each(['light', 'dark'] as const)(
+    'keeps Google distinct across normal and historical charts (%s)',
+    (theme) => {
+      const keys = ['tpuv7_vllm', 'b200_vllm', 'b300_vllm', 'mystery_series'];
+      const colors = generateVendorColors(keys, theme);
+      expect(colors.tpuv7_vllm).toBe('#4285F4');
+      expect(colors.tpuv7_vllm).not.toBe(colors.mystery_series);
+      const historical = generateGpuDateColors(keys, 2, theme);
+      const hue = hueOf(historical['0_tpuv7_vllm']);
+      expect(hue).toBeGreaterThan(255);
+      expect(hue).toBeLessThan(265);
+      expect(generateGpuDateColors(keys, 1, theme)['0_tpuv7_vllm']).toBe('#4285F4');
+      expect(hueOf(historical['1_tpuv7_vllm'])).toBe(hue);
+      expect(historical['0_tpuv7_vllm']).not.toBe(historical['1_tpuv7_vllm']);
+    },
+  );
+
+  it('reserves a separate Google HSL band', () => {
+    const hue = hsl('#4285F4').h;
+    const [google] = VENDOR_HSL_ZONES.google;
+    expect(hue >= google.start && hue < google.start + google.span).toBe(true);
+    for (const [vendor, segments] of Object.entries(VENDOR_HSL_ZONES)) {
+      if (vendor === 'google') continue;
+      for (const segment of segments) {
+        expect(
+          segment.start >= google.start + google.span ||
+            segment.start + segment.span <= google.start,
+        ).toBe(true);
+      }
+    }
+  });
+
+  it('keeps Jalapeño purple and apart from Google blue', () => {
+    const colors = generateVendorColors(['jalapeno_teacup', 'tpuv7_vllm'], 'light');
+    const jalapenoHue = hueOf(colors.jalapeno_teacup);
+    expect(jalapenoHue).toBeGreaterThanOrEqual(290);
+    expect(jalapenoHue).toBeLessThanOrEqual(330);
+    expect(colors.tpuv7_vllm).toBe('#4285F4');
+    expect(VENDOR_OKLCH_ZONES.openai.start).toBeGreaterThan(VENDOR_OKLCH_ZONES.google.end);
   });
 });

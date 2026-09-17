@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 
-import { SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
+import { SITE_NAME, SITE_URL, SUPPORTERS_LINE_ZH } from '@semianalysisai/inferencex-constants';
 
 import { JsonLd } from '@/components/json-ld';
 import { Card } from '@/components/ui/card';
@@ -16,7 +16,7 @@ const description =
 
 export const metadata: Metadata = {
   title,
-  description,
+  description: `${description}${SUPPORTERS_LINE_ZH}`,
   keywords: [
     'LLM 推理最快 GPU',
     'LLM 推理最便宜 GPU',

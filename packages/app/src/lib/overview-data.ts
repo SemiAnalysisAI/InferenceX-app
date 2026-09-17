@@ -343,11 +343,13 @@ export function overviewScenarioForModel(
   }
   if (rows.some((row) => row.benchmark_type === 'agentic_traces')) return 'agentx';
   // AgentX-only models: Kimi K3, GLM 5.2 and Qwen3.8 Flash Next never swept
-  // 8K/1K; MiniMax M3 retired it on 2026-08-04 (InferenceX#2493, MODELS.md).
+  // 8K/1K; MiniMax M3 retired it on 2026-08-04 (InferenceX#2493, MODELS.md)
+  // and DeepSeek V4 Pro after 2026-09-08 (InferenceX#2728, MODELS.md).
   return model === Model.Kimi_K3 ||
     model === Model.GLM_5_2 ||
     model === Model.Qwen3_8_Flash_Next ||
-    model === Model.MiniMax_M3
+    model === Model.MiniMax_M3 ||
+    model === Model.DeepSeek_V4_Pro
     ? 'agentx'
     : 'single_turn_8k1k';
 }
@@ -359,7 +361,11 @@ export function overviewScenarioForModel(
  * both get one matrix row each, in OVERVIEW_SCENARIOS order.
  */
 const OVERVIEW_MODEL_SCENARIOS: Partial<Record<Model, readonly OverviewScenario[]>> = {
-  [Model.DeepSeek_V4_Pro]: ['single_turn_8k1k', 'agentx'],
+  // DeepSeek V4 Pro's single-turn 8k1k sweep ran for the last time on
+  // 2026-09-08 (InferenceX#2728, MODELS.md Deprecation Notice). Historical
+  // 8K/1K rows stay queryable, but the matrix must not keep a fixed-sequence
+  // row that will never refresh; AgentX is the model's only active scenario.
+  [Model.DeepSeek_V4_Pro]: ['agentx'],
   // MiniMax M3's single-turn 8k1k sweep was retired on 2026-08-04
   // (InferenceX#2493, MODELS.md), so the matrix must not keep a fixed-sequence
   // row that will never refresh; AgentX is the model's only active scenario.
@@ -368,6 +374,9 @@ const OVERVIEW_MODEL_SCENARIOS: Partial<Record<Model, readonly OverviewScenario[
   [Model.Kimi_K3]: ['agentx'],
   [Model.GLM_5_2]: ['agentx'],
   [Model.Qwen3_8_Flash_Next]: ['agentx'],
+  // V4.1 Flash entered the fleet on AgentX only (first sweep 2026-09-10,
+  // InferenceX#2961, GB300 agentic traces); no 8K/1K sweep exists yet.
+  [Model.DeepSeek_V4_1_Flash]: ['agentx'],
 };
 
 /** The scenarios this model gets a row for. Unlisted models keep the single
@@ -624,7 +633,7 @@ function missingReasonForPlatform(
  *   $ / 1M total tokens = HW_REGISTRY.costh × 1,000,000
  *                       ÷ (total tok/s per deployed GPU × 3,600)
  *
- * `costh` is the HYPERSCALER $/GPU/hr tier (not neocloud `costn` or retail
+ * `costh` is the owning-at-large-hyperscaler-volume $/GPU/hr tier (not retail
  * `costr`), and the denominator counts TOTAL (input + output) tokens over
  * every deployed GPU — prefill + decode for disaggregated serving.
  */

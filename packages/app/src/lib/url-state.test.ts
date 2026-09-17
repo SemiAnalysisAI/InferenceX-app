@@ -31,6 +31,11 @@ describe('PARAM_DEFAULTS', () => {
     expect(PARAM_DEFAULTS.g_model).toBe('DeepSeek-V4-Pro');
   });
 
+  it('defaults TCO to External so only Internal is share-link state', async () => {
+    const { PARAM_DEFAULTS } = await import('@/lib/url-state');
+    expect(PARAM_DEFAULTS.g_tco).toBe('internal');
+  });
+
   it('has an EMPTY default for i_seq so the selected scenario is always written', async () => {
     // Per-route `initialSequence` seeds (e.g. /compare pages) make the no-param
     // resolution route-dependent. An '8k/1k' default would strip an explicit
@@ -73,6 +78,20 @@ describe('PARAM_DEFAULTS', () => {
     const { PARAM_DEFAULTS } = await import('@/lib/url-state');
     expect(PARAM_DEFAULTS.i_gradlabel).toBe('');
   });
+
+  it.each(['1', '2'])(
+    'keeps Pareto highlights opt-in and preserves mode %s in share links',
+    async (mode) => {
+      setupWindow(`?i_frontier=${mode}&i_hinterland=${mode}`);
+      const { PARAM_DEFAULTS, readUrlParams, buildShareUrl } = await import('@/lib/url-state');
+      expect(PARAM_DEFAULTS.i_frontier).toBe('');
+      expect(PARAM_DEFAULTS.i_hinterland).toBe('');
+      expect(readUrlParams()).toMatchObject({ i_frontier: mode, i_hinterland: mode });
+      const url = new URL(buildShareUrl());
+      expect(url.searchParams.get('i_frontier')).toBe(mode);
+      expect(url.searchParams.get('i_hinterland')).toBe(mode);
+    },
+  );
 
   it('has empty string default for i_advlabel', async () => {
     const { PARAM_DEFAULTS } = await import('@/lib/url-state');
@@ -120,6 +139,12 @@ describe('readUrlParams', () => {
     const params = readUrlParams();
     expect(params.g_model).toBe('llama-3');
     expect(params.i_seq).toBe('2k/4k');
+  });
+
+  it('reads the Internal TCO basis from the URL', async () => {
+    setupWindow('?g_tco=internal');
+    const { readUrlParams } = await import('@/lib/url-state');
+    expect(readUrlParams().g_tco).toBe('internal');
   });
 
   it('reads i_gradlabel and i_advlabel from URL', async () => {
@@ -433,6 +458,33 @@ describe('writeUrlParams + buildShareUrl', () => {
     writeUrlParams({ g_model: 'DeepSeek-V4-Pro' });
 
     expect(readUrlParams().g_model).toBeUndefined();
+  });
+
+  it('preserves all-measurement visibility across metric changes and shared links', async () => {
+    const { location } = setupWindow('?i_optimal=0', '/inference');
+    const { readUrlParams, writeUrlParams, buildShareUrl, refreshUrlParams } =
+      await import('@/lib/url-state');
+
+    expect(readUrlParams().i_allpoints).toBeUndefined();
+    expect(buildShareUrl()).not.toContain('i_allpoints');
+
+    writeUrlParams({ i_allpoints: '1', i_metric: 'y_measuredAvgPower' });
+    const powerUrl = new URL(buildShareUrl());
+    expect(powerUrl.searchParams.get('i_allpoints')).toBe('1');
+    expect(powerUrl.searchParams.get('i_optimal')).toBe('0');
+
+    writeUrlParams({ i_metric: 'y_tpPerGpu' });
+    location.search = new URL(buildShareUrl()).search;
+    expect(refreshUrlParams()).toMatchObject({
+      i_allpoints: '1',
+      i_metric: 'y_tpPerGpu',
+      i_optimal: '0',
+    });
+
+    writeUrlParams({ i_allpoints: '' });
+    expect(buildShareUrl()).not.toContain('i_allpoints');
+    expect(readUrlParams().i_allpoints).toBeUndefined();
+    expect(readUrlParams().i_optimal).toBe('0');
   });
 });
 

@@ -53,7 +53,7 @@ export const FAQ_ITEMS: readonly FaqItem[] = [
       'Token throughput per MW (tok/s/MW)',
       'P99 time to first token (TTFT)',
       'For AgentX: end-to-end latency, ITL, output throughput, prefix-cache behavior, and session/subagent execution',
-      'Cost per million tokens (total, input, output) across hyperscaler, neocloud, and rental pricing',
+      'Cost per million tokens (total, input, output) across large-hyperscaler-volume ownership and rental pricing',
       'Joules per token (total, input, output)',
       'Custom user-defined cost and power calculations',
     ],

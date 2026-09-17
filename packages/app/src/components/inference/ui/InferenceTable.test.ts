@@ -6,6 +6,8 @@ import { formatInferenceTableNumber } from '@/components/inference/ui/InferenceT
 // Test the pure logic used by InferenceTable — sorting and value resolution
 import { getNestedYValue } from '@/lib/chart-utils';
 import * as inferenceTableModule from './InferenceTable';
+import { chartDefinitions } from '../metric-registry';
+import { sortRowsByYMetric } from './inference-table-sort';
 
 const CHART_DEF = {
   chartType: 'interactivity',
@@ -39,10 +41,8 @@ function makePoint(overrides: Partial<InferenceData>): InferenceData {
     tpPerGpu: { y: 500, roof: false },
     tpPerMw: { y: 200, roof: false },
     costh: { y: 0.5, roof: false },
-    costn: { y: 0.4, roof: false },
     costr: { y: 0.3, roof: false },
     costhi: { y: 0.2, roof: false },
-    costni: { y: 0.15, roof: false },
     costri: { y: 0.1, roof: false },
     tokensPerDollarH: { y: 2_000_000, roof: false },
     ...overrides,
@@ -50,6 +50,17 @@ function makePoint(overrides: Partial<InferenceData>): InferenceData {
 }
 
 describe('InferenceTable sorting logic', () => {
+  it('sorts supported modeled estimates by ascending power', () => {
+    const definition = chartDefinitions[0];
+    const metric = 'y_modeledChassisPowerPerGpu';
+    const points = [
+      makePoint({ modeledChassisPowerPerGpu: { y: 1200, roof: false } }),
+      makePoint({ modeledChassisPowerPerGpu: { y: 750, roof: false } }),
+    ];
+    const sorted = sortRowsByYMetric(points, definition, metric);
+    expect(sorted.map((point) => point.modeledChassisPowerPerGpu?.y)).toEqual([750, 1200]);
+  });
+
   it('provides locale-aware table headers without changing the English source', () => {
     const headerLabels = (
       inferenceTableModule as typeof inferenceTableModule & {

@@ -1,9 +1,15 @@
+function visitReliability(path: string) {
+  // Keep the June snapshot inside its date windows regardless of when CI runs.
+  cy.clock(Date.UTC(2026, 5, 15, 12), ['Date']);
+  cy.visit(path);
+}
+
 describe('Reliability Chart', () => {
   before(() => {
     cy.window().then((win) => {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
     });
-    cy.visit('/reliability');
+    visitReliability('/reliability');
     cy.get('[data-testid="reliability-chart-display"]').should('exist');
   });
 
@@ -60,7 +66,7 @@ describe('Reliability Chart — Content & Interactions', () => {
     cy.window().then((win) => {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
     });
-    cy.visit('/reliability');
+    visitReliability('/reliability');
     cy.get('[data-testid="reliability-chart-display"]').should('be.visible');
   });
 
@@ -77,12 +83,7 @@ describe('Reliability Chart — Content & Interactions', () => {
         cy.get('[data-testid="reliability-date-range"]').click();
         cy.contains('[role="option"]', 'Last 7 days').click();
 
-        // "Last 7 days" may have fewer bars or no bars at all (empty overlay shown).
-        cy.get('#reliability-chart svg').should('exist');
-        cy.document().then((doc) => {
-          const newCount = doc.querySelectorAll('#reliability-chart svg rect.bar').length;
-          expect(newCount !== initialCount || newCount === 0).to.equal(true);
-        });
+        cy.get('#reliability-chart svg rect.bar').should('have.length.lessThan', initialCount);
 
         // Reset back to All time so subsequent tests have data
         cy.get('[data-testid="reliability-date-range"]').click();
@@ -169,7 +170,7 @@ describe('Reliability Chart — Content & Interactions', () => {
 describe('Reliability Chart — Chinese route and settled states', () => {
   it('localizes chart chrome, SVG labels, and accessibility text', () => {
     cy.viewport(1440, 900);
-    cy.visit('/zh/reliability');
+    visitReliability('/zh/reliability');
     cy.get('[data-testid="reliability-chart-display"]').should('be.visible');
     cy.contains('h2', '芯片可靠性').should('be.visible');
     cy.get('#reliability-chart svg').should('contain.text', '成功率（%）');
@@ -185,7 +186,7 @@ describe('Reliability Chart — Chinese route and settled states', () => {
 
   it('shows a Chinese empty state only after an empty response settles', () => {
     cy.intercept('GET', '**/api/v1/reliability', []).as('emptyReliability');
-    cy.visit('/zh/reliability');
+    visitReliability('/zh/reliability');
     cy.wait('@emptyReliability');
     cy.contains('所选时间范围内暂无可靠性数据。').should('be.visible');
     cy.contains('正在加载可靠性数据……').should('not.exist');
@@ -205,7 +206,7 @@ describe('Reliability Chart — Chinese route and settled states', () => {
         );
       }).as('retryReliability');
     });
-    cy.visit('/zh/reliability');
+    visitReliability('/zh/reliability');
     cy.wait('@retryReliability');
     cy.wait('@retryReliability');
     cy.get('[data-testid="reliability-error"]')
@@ -223,7 +224,7 @@ describe('Reliability Chart — Chinese route and settled states', () => {
 
   it('keeps controls reachable without body overflow at 375px', () => {
     cy.viewport(375, 844);
-    cy.visit('/zh/reliability');
+    visitReliability('/zh/reliability');
     cy.get('[data-testid="reliability-date-range"]').should('be.visible').click();
     cy.contains('[role="option"]', '全部时间').should('be.visible');
     cy.document().then((doc) => {

@@ -2,7 +2,7 @@
  * Transforms raw BenchmarkRow[] from the API into InferenceData[] for charts.
  */
 
-import { DB_MODEL_TO_DISPLAY } from '@semianalysisai/inferencex-constants';
+import { benchmarkCurveScope, DB_MODEL_TO_DISPLAY } from '@semianalysisai/inferencex-constants';
 
 import chartDefinitions from '@/components/inference/metric-registry';
 import type {
@@ -14,12 +14,15 @@ import type {
 import {
   buildDerivedChartFields,
   createChartDataPoint,
+  deploymentChipCount,
   getHardwareKey,
   type DerivedChartFields,
 } from '@/lib/chart-utils';
-import { getHardwareConfig } from '@/lib/constants';
+import { DEFAULT_TCO_BASIS, type TcoBasis } from '@/lib/constants';
+import { getInferenceHardwareConfig } from '@/lib/inference-labels';
 import { isPersistedBenchmarkId } from '@/lib/benchmark-id';
 import { resolvePowerTier } from '@/lib/power-tier';
+import { modelSystemPower } from '@/lib/modeled-system-power';
 import type { BenchmarkRow } from '@/lib/api';
 
 /**
@@ -119,10 +122,12 @@ export function rowToAggDataEntry(row: BenchmarkRow): AggDataEntry {
   // failure that made versioning necessary in the first place.
   const hasWholeDeploymentEnergySemantics =
     !row.disagg || m.power_metric_schema_version === WHOLE_DEPLOYMENT_ENERGY_SCHEMA_VERSION;
-  // Gated measured power values, hoisted so the tier below can see exactly
-  // what the chart will render (behavior identical to the previous inline
-  // conditionals in the returned object).
+  // Tier derivation must see exactly the measured values the chart can render.
   const avgPowerW = measuredPowerValid ? m.avg_power_w : undefined;
+  const p75PowerW =
+    m.power_valid === 1 && m.power_metric_schema_version === 2 ? m.p75_power_w : undefined;
+  const p90PowerW =
+    m.power_valid === 1 && m.power_metric_schema_version === 2 ? m.p90_power_w : undefined;
   const prefillAvgPowerW = measuredPowerValid ? m.prefill_avg_power_w : undefined;
   const decodeAvgPowerW = measuredPowerValid ? m.decode_avg_power_w : undefined;
   const joulesPerSuccessfulQuery =
@@ -137,6 +142,8 @@ export function rowToAggDataEntry(row: BenchmarkRow): AggDataEntry {
     measuredPowerValid && hasWholeDeploymentEnergySemantics ? m.joules_per_input_token : undefined;
   const hasMeasuredTelemetry = [
     avgPowerW,
+    p75PowerW,
+    p90PowerW,
     prefillAvgPowerW,
     decodeAvgPowerW,
     joulesPerSuccessfulQuery,
@@ -219,13 +226,22 @@ export function rowToAggDataEntry(row: BenchmarkRow): AggDataEntry {
     // rows predating the field so downstream chart code can distinguish
     // "no measurement" from "0 W" via createChartDataPoint's typeof guard.
     power_valid: m.power_valid,
+    power_audit: row.power_audit ?? undefined,
+    // SQL NULL and omitted legacy fields both mean no diagnostic was supplied.
+    power_invalid_reasons:
+      Array.isArray(row.power_invalid_reasons) && row.power_invalid_reasons.length > 0
+        ? row.power_invalid_reasons
+        : undefined,
     power_metric_schema_version: m.power_metric_schema_version,
+    modeledSystemPower: modelSystemPower(row),
     power_tier: resolvePowerTier({
       powerValid: m.power_valid,
       wholeDeploymentSemantics: hasWholeDeploymentEnergySemantics,
       hasMeasuredTelemetry,
     }),
     avg_power_w: avgPowerW,
+    p75_power_w: p75PowerW,
+    p90_power_w: p90PowerW,
     joules_per_successful_query: joulesPerSuccessfulQuery,
     joules_per_output_token: joulesPerOutputToken,
     joules_per_total_token: joulesPerTotalToken,
@@ -251,6 +267,16 @@ export function rowToAggDataEntry(row: BenchmarkRow): AggDataEntry {
     // scalar `metrics` dict (see api.ts). Narrow defensively so a malformed
     // payload can't poison downstream consumers.
     workers: measuredPowerValid && Array.isArray(row.workers) ? row.workers : undefined,
+    physicalChips: deploymentChipCount(
+      {
+        disagg: row.disagg,
+        num_prefill_gpu: row.num_prefill_gpu,
+        num_decode_gpu: row.num_decode_gpu,
+        tp: aggregateTp,
+        pp: aggregatePp,
+      },
+      row.hardware,
+    ),
     disagg: row.disagg,
     num_prefill_gpu: row.num_prefill_gpu,
     num_decode_gpu: row.num_decode_gpu,
@@ -262,6 +288,7 @@ export function rowToAggDataEntry(row: BenchmarkRow): AggDataEntry {
     // it from there. Undefined for artifacts predating the field.
     pp: aggregatePp,
     dp_attention: aggregateDpAttention,
+    dp: m.dp,
     is_multinode: row.is_multinode,
     prefill_tp: row.disagg ? row.prefill_tp : aggregateTp,
     prefill_ep: row.disagg ? row.prefill_ep : aggregateEp,
@@ -322,7 +349,7 @@ export function withPercentile(key: string, percentile: string): string {
   return key.replace(/^(?:mean|median|p75|p90|p95|p99|p99\.9)_/u, `${percentile}_`);
 }
 
-// Replacement granularity for single-run scoping is an exact generated topology.
+// Fixed-sequence replacement granularity is an exact generated topology.
 // An append-only run may touch one TP/EP search-space row while the displayed
 // curve also contains sibling topologies from the preceding snapshot.
 const runScopeKey = (r: BenchmarkRow): string =>
@@ -347,29 +374,31 @@ const runScopeKey = (r: BenchmarkRow): string =>
     r.osl,
     r.offload_mode ?? 'off',
     r.recipe_fingerprint ?? null,
+    r.num_prefill_gpu,
+    r.num_decode_gpu,
+    r.metrics.dp ?? null,
   ]);
 
 /**
  * Merge run-scoped benchmark rows with the normal latest-per-config rows.
  *
- * When the user picks a specific workflow run (to disambiguate two same-day
- * sweeps of the same config), only the configs that run actually produced
- * should be pinned to it — every other config must keep its normal
- * carry-forward rows. Scoping the whole chart to the run (the old behavior)
- * silently hid complementary configs that happened to land on the same date,
- * e.g. selecting one of two same-day vLLM runs made the day's SGLang curve
- * vanish because it lived in a different workflow run.
- *
- * Run rows win for every exact generated topology they cover; base rows fill
- * in sibling topologies and unrelated series.
+ * A selected AgentX run owns every point in its curve scope. Other engines,
+ * hardware, precisions and workloads retain their normal carry-forward rows.
+ * Fixed-sequence rows retain exact generated-topology replacement. This also
+ * keeps a same-day run selection from hiding unrelated curves.
  */
 export function mergeRunScopedRows(
   runRows: BenchmarkRow[],
   baseRows: BenchmarkRow[],
 ): BenchmarkRow[] {
   if (runRows.length === 0) return baseRows;
-  const claimed = new Set(runRows.map(runScopeKey));
-  return [...runRows, ...baseRows.filter((r) => !claimed.has(runScopeKey(r)))];
+  // AgentX run reads already reconstruct the complete logical snapshot, including
+  // explicit append-only ancestors. Filling from the current base would reinsert
+  // removed topologies or points from a later run into a historical selection.
+  const key = (row: BenchmarkRow) =>
+    row.benchmark_type === 'agentic_traces' ? benchmarkCurveScope(row) : runScopeKey(row);
+  const claimed = new Set(runRows.map(key));
+  return [...runRows, ...baseRows.filter((row) => !claimed.has(key(row)))];
 }
 
 /**
@@ -386,14 +415,15 @@ export function mergeRunScopedRows(
 export function transformBenchmarkRows(
   rows: BenchmarkRow[],
   percentile = 'median',
+  tcoBasis: TcoBasis = DEFAULT_TCO_BASIS,
 ): {
   chartData: InferenceData[][];
   hardwareConfig: HardwareConfig;
 } {
   const gpuConfig: HardwareConfig = {};
 
-  // Phase 1: Convert rows once + resolve hardware keys (cache config lookups)
-  const hwConfigCache = new Map<string, ReturnType<typeof getHardwareConfig>>();
+  // Phase 1: Convert rows once + resolve hardware keys.
+  const entriesByHw = new Map<string, AggDataEntry[]>();
   const prepared: PreparedEntry[] = Array.from({ length: rows.length });
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
@@ -401,17 +431,23 @@ export function transformBenchmarkRows(
     const hwKey = getHardwareKey(entry);
     entry.hwKey = hwKey;
 
-    if (!hwConfigCache.has(hwKey)) {
-      const hwConfig = getHardwareConfig(hwKey, entry.model);
-      hwConfigCache.set(hwKey, hwConfig);
-      if (hwConfig) gpuConfig[hwKey] = { ...hwConfig, name: hwKey };
-    }
+    const entries = entriesByHw.get(hwKey) ?? [];
+    entries.push(entry);
+    entriesByHw.set(hwKey, entries);
 
     prepared[i] = {
       entry,
       hwKey,
       date: row.date,
-      derivedFields: buildDerivedChartFields(entry, hwKey),
+      derivedFields: buildDerivedChartFields(entry, hwKey, undefined, tcoBasis),
+    };
+  }
+
+  // Labels depend on contributing runs, not only on the canonical hardware key.
+  for (const [hwKey, entries] of entriesByHw) {
+    gpuConfig[hwKey] = {
+      ...getInferenceHardwareConfig(hwKey, entries[0].model, entries),
+      name: hwKey,
     };
   }
 

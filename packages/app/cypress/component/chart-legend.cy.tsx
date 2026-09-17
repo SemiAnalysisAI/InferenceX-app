@@ -455,10 +455,8 @@ function mockPoint(overrides: Partial<InferenceData> = {}): InferenceData {
     tpPerGpu: { y: 1500.5, roof: false },
     tpPerMw: { y: 50, roof: false },
     costh: { y: 1, roof: false },
-    costn: { y: 1, roof: false },
     costr: { y: 1, roof: false },
     costhi: { y: 1, roof: false },
-    costni: { y: 1, roof: false },
     costri: { y: 1, roof: false },
     ...overrides,
   } as InferenceData;

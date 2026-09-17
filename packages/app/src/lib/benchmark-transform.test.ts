@@ -1,3 +1,4 @@
+import { MEASURED_POWER_METRIC_KEYS } from '@semianalysisai/inferencex-constants';
 import { describe, it, expect, vi } from 'vitest';
 
 import { getPointLabel } from '@/components/inference/utils/tooltipUtils';
@@ -68,6 +69,51 @@ function makeRow(overrides: Partial<BenchmarkRow> = {}): BenchmarkRow {
 }
 
 describe('rowToAggDataEntry', () => {
+  it.each([1, undefined])(
+    'keeps canonical identity but labels UMBP for official/overlay rows (DB id %s)',
+    (id) => {
+      const run_url =
+        'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/34926284365/attempts/1';
+      const row = makeRow({ id, hardware: 'mi355x', framework: 'mori-sglang', run_url });
+      const { chartData, hardwareConfig } = transformBenchmarkRows([row]);
+      expect(Object.keys(hardwareConfig)).toEqual(['mi355x_mori-sglang']);
+      expect(hardwareConfig['mi355x_mori-sglang'].suffix).toBe('(MoRI UMBP SGLang)');
+      for (const points of chartData) {
+        expect(points).toHaveLength(1);
+        expect(points[0]).toMatchObject({
+          hwKey: 'mi355x_mori-sglang',
+          framework: 'mori-sglang',
+          run_url,
+        });
+      }
+      const historical = transformBenchmarkRows([
+        { ...row, run_url: run_url.replace('34926284365', '34926284364') },
+      ]);
+      expect(historical.hardwareConfig['mi355x_mori-sglang'].suffix).toBe('(MoRI SGLang)');
+    },
+  );
+
+  it.each(['p75_power_w', 'p90_power_w'] as const)(
+    'only exposes %s from validated schema-2 rows, including overlays without DB IDs',
+    (metric) => {
+      for (const id of [1, undefined]) {
+        const row = makeRow({
+          id,
+          metrics: { power_valid: 1, power_metric_schema_version: 2, [metric]: 620 },
+        });
+        expect(rowToAggDataEntry(row)[metric]).toBe(620);
+        const unavailableMetrics: Record<string, number>[] = [
+          { power_valid: 0, power_metric_schema_version: 2, [metric]: 620 },
+          { power_valid: 1, [metric]: 620 },
+          { power_valid: 1, power_metric_schema_version: 3, [metric]: 620 },
+          { avg_power_w: 500 },
+        ];
+        for (const metrics of unavailableMetrics) {
+          expect(rowToAggDataEntry(makeRow({ id, metrics }))[metric]).toBeUndefined();
+        }
+      }
+    },
+  );
   it('preserves DCP and PCP metrics for point tooltips', () => {
     const entry = rowToAggDataEntry(
       makeRow({
@@ -279,6 +325,25 @@ describe('rowToAggDataEntry', () => {
     expect(entry.joules_per_output_token).toBe(8.4);
   });
 
+  it('passes through producer power_invalid_reasons on withheld rows', () => {
+    const entry = rowToAggDataEntry(
+      makeRow({
+        metrics: { power_valid: 0 },
+        power_invalid_reasons: ['thermal_throttle', 'sample_gap'],
+      }),
+    );
+    expect(entry.power_invalid_reasons).toEqual(['thermal_throttle', 'sample_gap']);
+  });
+
+  it.each([
+    ['legacy row without the field', {}],
+    ['API null (SQL NULL column)', { power_invalid_reasons: null }],
+    ['empty array', { power_invalid_reasons: [] }],
+  ])('leaves power_invalid_reasons undefined for %s', (_name, overrides) => {
+    const entry = rowToAggDataEntry(makeRow({ metrics: {}, ...overrides }));
+    expect(entry.power_invalid_reasons).toBeUndefined();
+  });
+
   it('passes through versioned whole-deployment joules per successful query', () => {
     const entry = rowToAggDataEntry(
       makeRow({
@@ -424,6 +489,22 @@ describe('rowToAggDataEntry', () => {
     expect(point.measuredPowerPercentTdp).toBeUndefined();
   });
 
+  it('withholds every MEASURED_POWER_METRIC_KEYS field when power_valid=0 (ETL parity)', () => {
+    const metrics: BenchmarkRow['metrics'] = { power_valid: 0 };
+    for (const key of MEASURED_POWER_METRIC_KEYS) metrics[key] = 123.45;
+    const entry = rowToAggDataEntry(
+      makeRow({
+        metrics,
+        workers: [{ role: 'agg', worker_idx: 0, num_gpus: 8, avg_power_w: 123.45 }],
+      }),
+    );
+
+    for (const key of MEASURED_POWER_METRIC_KEYS) {
+      expect((entry as unknown as Record<string, unknown>)[key]).toBeUndefined();
+    }
+    expect(entry.workers).toBeUndefined();
+  });
+
   it('keeps measured telemetry compatible when a legacy row omits power_valid', () => {
     const workers = [{ role: 'agg', worker_idx: 0, num_gpus: 8, avg_power_w: 560 }];
     const row = makeRow({
@@ -491,8 +572,8 @@ describe('rowToAggDataEntry', () => {
       }),
     );
     expect(entry.power_tier).toBe('legacy');
-    // The tier is informational only — telemetry still renders (G2 is
-    // distinguish, not exclude).
+    // The tier is informational only: historical telemetry remains visible
+    // so users can distinguish measurement status without losing older data.
     expect(entry.avg_power_w).toBe(560);
   });
 
@@ -650,6 +731,108 @@ describe('rowToAggDataEntry', () => {
   });
 });
 
+describe('rowToAggDataEntry — agentic measured power', () => {
+  // AgentX (agentic_traces) rows carry the same measured-power contract as
+  // fixed-seq rows; nothing in the transform may key off benchmark_type.
+  const agenticPowerMetrics = {
+    tput_per_gpu: 100,
+    power_valid: 1,
+    power_metric_schema_version: 2,
+    avg_power_w: 685.5,
+    prefill_avg_power_w: 612.3,
+    decode_avg_power_w: 701.5,
+    joules_per_input_token: 1.2,
+    joules_per_output_token: 9.7,
+    joules_per_total_token: 0.8,
+    joules_per_successful_query: 1542.75,
+    prefill_joules_per_input_token: 0.4,
+    decode_joules_per_output_token: 5.1,
+    avg_temp_c: 68.4,
+    peak_temp_c: 79.2,
+    avg_util_pct: 88.5,
+    avg_mem_used_mb: 71234.5,
+  };
+  const agenticWorkers = [
+    {
+      role: 'prefill' as const,
+      worker_idx: 0,
+      hosts: ['pn0'],
+      num_gpus: 8,
+      avg_power_w: 612.3,
+      avg_temp_c: 68.4,
+      avg_util_pct: 88.5,
+    },
+    { role: 'decode' as const, worker_idx: 0, hosts: ['dn0'], num_gpus: 8, avg_power_w: 701.5 },
+  ];
+  const agenticPowerRow = (metricOverrides: Record<string, number> = {}) =>
+    makeRow({
+      benchmark_type: 'agentic_traces',
+      isl: null,
+      osl: null,
+      disagg: true,
+      metrics: { ...agenticPowerMetrics, ...metricOverrides },
+      workers: agenticWorkers,
+    });
+
+  it('passes the full measured-power payload through for a validated agentic disagg row', () => {
+    const entry = rowToAggDataEntry(agenticPowerRow());
+
+    expect(entry.benchmark_type).toBe('agentic_traces');
+    expect(entry.power_valid).toBe(1);
+    expect(entry.power_metric_schema_version).toBe(2);
+    expect(entry.power_tier).toBe('certified');
+    expect(entry.avg_power_w).toBe(685.5);
+    expect(entry.prefill_avg_power_w).toBe(612.3);
+    expect(entry.decode_avg_power_w).toBe(701.5);
+    expect(entry.joules_per_input_token).toBe(1.2);
+    expect(entry.joules_per_output_token).toBe(9.7);
+    expect(entry.joules_per_total_token).toBe(0.8);
+    expect(entry.joules_per_successful_query).toBe(1542.75);
+    expect(entry.prefill_joules_per_input_token).toBe(0.4);
+    expect(entry.decode_joules_per_output_token).toBe(5.1);
+    expect(entry.avg_temp_c).toBe(68.4);
+    expect(entry.peak_temp_c).toBe(79.2);
+    expect(entry.avg_util_pct).toBe(88.5);
+    expect(entry.avg_mem_used_mb).toBe(71234.5);
+    expect(entry.workers).toEqual(agenticWorkers);
+  });
+
+  it('carries agentic role energy onto chart points as the new role-local axes', () => {
+    const { chartData } = transformBenchmarkRows([agenticPowerRow()]);
+    const point = chartData.find((data) => data.length > 0)![0];
+    expect(point.measuredPrefillJPerInputToken?.y).toBe(0.4);
+    expect(point.measuredDecodeJPerOutputToken?.y).toBe(5.1);
+    expect(point.workers).toEqual(agenticWorkers);
+  });
+
+  it('scrubs all measured telemetry (including workers) on an agentic power_valid=0 row', () => {
+    const row = agenticPowerRow({ power_valid: 0 });
+    const entry = rowToAggDataEntry(row);
+
+    expect(entry.avg_power_w).toBeUndefined();
+    expect(entry.prefill_avg_power_w).toBeUndefined();
+    expect(entry.decode_avg_power_w).toBeUndefined();
+    expect(entry.joules_per_input_token).toBeUndefined();
+    expect(entry.joules_per_output_token).toBeUndefined();
+    expect(entry.joules_per_total_token).toBeUndefined();
+    expect(entry.joules_per_successful_query).toBeUndefined();
+    expect(entry.prefill_joules_per_input_token).toBeUndefined();
+    expect(entry.decode_joules_per_output_token).toBeUndefined();
+    expect(entry.avg_temp_c).toBeUndefined();
+    expect(entry.peak_temp_c).toBeUndefined();
+    expect(entry.avg_util_pct).toBeUndefined();
+    expect(entry.avg_mem_used_mb).toBeUndefined();
+    expect(entry.workers).toBeUndefined();
+    expect(entry.power_tier).toBeUndefined();
+
+    const { chartData } = transformBenchmarkRows([row]);
+    const point = chartData.find((data) => data.length > 0)![0];
+    expect(point.measuredPrefillJPerInputToken).toBeUndefined();
+    expect(point.measuredDecodeJPerOutputToken).toBeUndefined();
+    expect(point.workers).toBeUndefined();
+  });
+});
+
 describe('transformBenchmarkRows', () => {
   it('returns empty arrays for empty input', () => {
     const { chartData, hardwareConfig } = transformBenchmarkRows([]);
@@ -713,7 +896,13 @@ describe('transformBenchmarkRows', () => {
     // (buildChartData → transformBenchmarkRows), so it exercises the overlay
     // rendering path for PP configs end to end.
     const base = makeRow();
-    const rows = [makeRow({ metrics: { ...base.metrics, prefill_pp: 2, decode_pp: 2 } })];
+    const rows = [
+      makeRow({
+        num_prefill_gpu: 0,
+        num_decode_gpu: 0,
+        metrics: { ...base.metrics, prefill_pp: 2, decode_pp: 2 },
+      }),
+    ];
     const { chartData } = transformBenchmarkRows(rows);
     const point = chartData.find((d) => d.length > 0)![0];
     // tp8 × pp2 = 16 total GPUs
@@ -1257,8 +1446,8 @@ describe('transformBenchmarkRows — data point values', () => {
     // Cost fields should be computed
     expect(point.costh).toBeDefined();
     expect(point.costh.y).toBeGreaterThan(0);
-    expect(point.costn).toBeDefined();
-    expect(point.costn.y).toBeGreaterThan(0);
+    expect(point.costr).toBeDefined();
+    expect(point.costr.y).toBeGreaterThan(0);
   });
 
   it('sets outputTputPerGpu and inputTputPerGpu when values are non-zero', () => {
@@ -1518,7 +1707,7 @@ describe('rowToAggDataEntry — id coercion', () => {
 // ---------------------------------------------------------------------------
 // mergeRunScopedRows — offload-aware scoping (data-loss guard)
 // ---------------------------------------------------------------------------
-describe('mergeRunScopedRows — offload variants are distinct series', () => {
+describe('mergeRunScopedRows — AgentX snapshots own all offload variants', () => {
   const agenticRow = (over: Partial<BenchmarkRow> = {}) =>
     makeRow({
       model: 'dsr1',
@@ -1531,16 +1720,16 @@ describe('mergeRunScopedRows — offload variants are distinct series', () => {
       ...over,
     });
 
-  it('a run row for offload=on does NOT claim/suppress the base offload=off rows', () => {
-    // The selected run produced only the offload=on variant. The offload=off base
-    // rows are a separate series and must carry forward, not vanish.
+  it('a full run snapshot replaces old points across offload variants', () => {
+    // A selected AgentX snapshot already contains its complete point set.
+    // A removed offload-off point must not be borrowed from the base snapshot.
     const runRows = [agenticRow({ id: 10, offload_mode: 'on' })];
     const baseRows = [
       agenticRow({ id: 90, offload_mode: 'on' }), // same series as the run → replaced
-      agenticRow({ id: 91, offload_mode: 'off' }), // distinct series → kept
+      agenticRow({ id: 91, offload_mode: 'off' }), // old point → replaced
     ];
     const merged = mergeRunScopedRows(runRows, baseRows);
-    expect(merged.map((r) => r.id).toSorted((a, b) => a - b)).toEqual([10, 91]);
+    expect(merged.map((r) => r.id).toSorted((a, b) => a - b)).toEqual([10]);
   });
 
   it('a run covering both offload variants pins both', () => {

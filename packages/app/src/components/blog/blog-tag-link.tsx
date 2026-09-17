@@ -1,30 +1,51 @@
 'use client';
 
 import Link from 'next/link';
+
 import { track } from '@/lib/analytics';
+
+import { tagChipClass } from './blog-tag-chip';
 
 interface BlogTagLinkProps {
   tag: string;
   active?: boolean;
   /** Blog list base path, e.g. '/zh/blog' on Chinese pages. */
   basePath?: string;
+  /** Optional post count shown after the tag name. */
+  count?: number;
+  /** When set, the chip links to the unfiltered index (the "All" chip). */
+  clear?: boolean;
+  children?: React.ReactNode;
 }
 
-export function BlogTagLink({ tag, active, basePath = '/blog' }: BlogTagLinkProps) {
+/**
+ * Tag filter chip. Filtering is a plain `?tag=` query on the index route, so
+ * every state is a real URL that can be shared and crawled.
+ */
+export function BlogTagLink({
+  tag,
+  active,
+  basePath = '/blog',
+  count,
+  clear = false,
+  children,
+}: BlogTagLinkProps) {
   return (
     <Link
-      href={`${basePath}?tag=${encodeURIComponent(tag)}`}
-      className={`rounded-full px-3 py-0.5 text-xs transition-colors ${
-        active
-          ? 'bg-primary/15 text-primary ring-1 ring-primary/30'
-          : 'bg-muted text-muted-foreground hover:bg-muted/80'
-      }`}
+      href={clear ? basePath : `${basePath}?tag=${encodeURIComponent(tag)}`}
+      className={tagChipClass(active)}
+      aria-current={active ? 'page' : undefined}
       onClick={(e) => {
         e.stopPropagation();
-        track('blog_tag_filtered', { tag });
+        track('blog_tag_filtered', { tag: clear ? 'all' : tag });
       }}
     >
-      {tag}
+      {children ?? tag}
+      {count !== undefined && (
+        <span className="text-muted-foreground/80 tabular-nums" aria-hidden="true">
+          {count}
+        </span>
+      )}
     </Link>
   );
 }

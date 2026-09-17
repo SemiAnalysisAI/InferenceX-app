@@ -46,6 +46,23 @@ export type ApiRouteCatalogEntry = PublishedApiRouteCatalogEntry | ExcludedApiRo
  */
 export const apiRouteCatalog = [
   {
+    source: 'src/app/api/v1/operatorx/runs/route.ts',
+    path: '/api/v1/operatorx/runs',
+    method: 'GET',
+    classification: 'published-read',
+    operationId: 'list-operatorx-runs',
+    sourceSha256: 'f8e7049d1f3d16e3f4b6005b3c18eb9d1d427078b193e198d754a4e72fb516f7',
+  },
+  {
+    source: 'src/app/api/v1/operatorx/runs/[runId]/route.ts',
+    path: '/api/v1/operatorx/runs/{runId}',
+    method: 'GET',
+    classification: 'published-read',
+    operationId: 'get-operatorx-run',
+    sourceSha256: '8337605725c6aefab2df6853f1a04446fdfcf6083c536fd8cce49c2abd771262',
+  },
+
+  {
     source: 'src/app/api/gpu-metrics/route.ts',
     path: '/api/gpu-metrics',
     method: 'GET',
@@ -68,15 +85,26 @@ export const apiRouteCatalog = [
     sourceSha256: '5ea5c034c837fda109ca3b7218db51a6ac78bca3eac545371de0f2a45880d533',
   },
   {
+    source: 'src/app/api/video-runs/route.ts',
+    path: '/api/video-runs',
+    method: 'GET',
+    classification: 'ui-artifact-read',
+    exclusionReason: {
+      en: 'Hidden H3 viewer transport for live public CI runs and checksum-verified artifact ZIPs; uses the backend result contract rather than a published data API.',
+      zh: '供隐藏的 H3 查看器实时读取公开 CI 运行及校验和已验证的产物 ZIP；依赖后端结果契约，不作为公开数据 API 发布。',
+    },
+    sourceSha256: '51278d05e223947e6a9c7b89b5f79a67afcd941ca091dbd794d3816c26805327',
+  },
+  {
     source: 'src/app/api/unofficial-run/route.ts',
     path: '/api/unofficial-run',
     method: 'GET',
     classification: 'ui-artifact-read',
     exclusionReason: {
-      en: 'UI-only overlay for unofficial workflow artifacts; upstream artifact availability and shape are not stable.',
-      zh: '仅供界面叠加非官方工作流制品；上游制品的可用性和结构并不稳定。',
+      en: 'UI-only overlay for unofficial workflow artifacts. Development on loopback hosts may explicitly opt into local artifact files via INFERENCEX_LOCAL_ARTIFACT_DIR; production only reads the public GitHub source. Artifact availability and shape are not stable.',
+      zh: '仅供界面叠加非官方工作流产物。开发环境通过本机地址访问时，可用 INFERENCEX_LOCAL_ARTIFACT_DIR 显式启用本地文件；生产环境仅从公开 GitHub 来源读取。产物的可用性和结构并不稳定。',
     },
-    sourceSha256: '4a3f3da8399c741c26f0f502d44b1870a8ccdc05775edfd6ea3dee4e020df25c',
+    sourceSha256: '39c7d93afe59aa7def2c196713735908907496552be9afc3ec736cbc7133d582',
   },
   {
     source: 'src/app/api/v1/agentic-aggregates/route.ts',
@@ -108,7 +136,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'list-benchmarks',
-    sourceSha256: 'c6a5b78108b7e0d523b11590e1e34ef2e8c2d5457673eb41338d93d3d8f04909',
+    sourceSha256: 'ce70784354b0d541899cfa90c3615ca294863fda67c489ea90e034b6996d52d3',
   },
   {
     source: 'src/app/api/v1/benchmarks/history/route.ts',
@@ -116,7 +144,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'list-benchmark-history',
-    sourceSha256: '42ba4d72298084ffe079ffcee7b6309ef3fb94d1df4769be4485d95097aa8cbe',
+    sourceSha256: '882c7c2515568c6ee89eb9f506d626289df807369aded6de300dadb7fa81320f',
   },
   {
     source: 'src/app/api/v1/collectivex/latest/route.ts',
@@ -443,7 +471,7 @@ export const stablePublicApiContracts = [
   },
   {
     operationId: 'list-benchmarks',
-    parameters: ['model', 'date', 'exact', 'runId', 'exactRun'],
+    parameters: ['model', 'date', 'exact', 'runId', 'exactRun', 'view', 'sequence', 'powerValid'],
     statuses: ['200', '400', '500'],
     auth: 'none',
     cachePolicy: 'public-db-day',
@@ -587,6 +615,30 @@ export interface ApiContractSourceDigest {
  */
 export const apiContractSourceDigests = [
   {
+    source: 'src/lib/operatorx-ingest.ts',
+    sourceSha256: 'bec2e115e006457816fc8e915b51128ea57b1c481b06b50fb4698ec37d94b425',
+    reviewArea: {
+      en: 'OperatorX provenance, run discovery, raw persistence, coverage, per-GPU GEMM, attention and routed MoE throughput, and latency.',
+      zh: 'OperatorX 来源校验、运行发现、原始数据持久化、覆盖情况、GEMM、attention 和路由 MoE 单卡吞吐量及延迟。',
+    },
+  },
+  {
+    source: '../db/src/operatorx/reader.ts',
+    sourceSha256: '4aa675bbf8e8f33ffe11d3ba322374c712cc721314b657478b25321bb3548d7b',
+    reviewArea: {
+      en: 'OperatorX provenance, run discovery, raw persistence, coverage, per-GPU GEMM, attention and routed MoE throughput, and latency.',
+      zh: 'OperatorX 来源校验、运行发现、原始数据持久化、覆盖情况、GEMM、attention 和路由 MoE 单卡吞吐量及延迟。',
+    },
+  },
+  {
+    source: '../db/src/queries/operatorx.ts',
+    sourceSha256: '104621edcb978e23a1a32a5a4c4bb57e2eafdc2058d67953aebc34c4b7c15e6f',
+    reviewArea: {
+      en: 'OperatorX provenance, run discovery, raw persistence, coverage, per-GPU GEMM, attention and routed MoE throughput, and latency.',
+      zh: 'OperatorX 来源校验、运行发现、原始数据持久化、覆盖情况、GEMM、attention 和路由 MoE 单卡吞吐量及延迟。',
+    },
+  },
+  {
     source: 'src/lib/api-cache.ts',
     sourceSha256: 'b710c4ce4c2dd0a6eb3b662c9e426e301aee3afe3d64fba35745b9323be39ddd',
     reviewArea: {
@@ -668,11 +720,10 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/overview-data.ts',
-    // Reviewed for the MiniMax M3 8k1k retirement (InferenceX#2493): only the
-    // curated OVERVIEW_MODEL_SCENARIOS list and the no-rows scenario fallback
-    // changed — no parameter or OverviewPageData shape change, so the docs
-    // stand.
-    sourceSha256: 'e80e92dc4c87fd4cbdd7194877b91cedab0e8a3267bfe5ec63731388be82b692',
+    // Reviewed for the DeepSeek-V4.1-Flash addition (InferenceX#2961): the
+    // model joins OVERVIEW_MODEL_SCENARIOS as AgentX-only. Curated scenario
+    // data, no parameter or OverviewPageData shape change, so the docs stand.
+    sourceSha256: '18ffcb420cc933479c67025415848966294a8ebd28c084471cd58474ce96133f',
     reviewArea: {
       en: 'Overview BFF tier, engine, comparison-window, reference, and model-scope parameters plus the OverviewPageData response shape.',
       zh: '概览 BFF 的档位、引擎、对比时间窗口、参考硬件和模型范围参数，以及 OverviewPageData 响应结构。',
@@ -691,7 +742,7 @@ export const apiContractSourceDigests = [
     // Reviewed again for the release-date corrections: values inside
     // MODEL_RELEASE_DATES only. No published model name, alias, or parameter enum
     // is touched, and no endpoint exposes a release date, so the docs stand.
-    sourceSha256: '9faf1ed1ed1712ee04741b6aa2291d42b2c202c2dadbb1a2681b5391da555e6c',
+    sourceSha256: 'bb58d43160c2b83ce61e7c34326a6d316fd751e435c6819f1991ed69e4f1b45c',
     reviewArea: {
       en: 'Published benchmark and TCO model names, aliases, and parameter enums.',
       zh: '已发布基准与 TCO 模型名称、别名和参数枚举。',
@@ -699,7 +750,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/collectivex/types.ts',
-    sourceSha256: 'd988f0c348d187667aedaba63848bf5c0afd038c7fee6bcaf830747ee6c0dc61',
+    sourceSha256: 'a4478f8c939f20a31c2e862348e03ad24990a43f90550fc567df8f19aea69799',
     reviewArea: {
       en: 'CollectiveX version negotiation and versioned dataset/run response types.',
       zh: 'CollectiveX 版本协商以及带版本的数据集与运行响应类型。',
@@ -731,7 +782,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/benchmarks.ts',
-    sourceSha256: '486e34d55275170c7e0544af24c151199752eb5628191d38606b1ecec289dfdf',
+    sourceSha256: '5e3fec29e193c9b7964fa3faf2226112aa5ac30cc8f5e5fff13d298909cdd8fc',
     reviewArea: {
       en: 'Benchmark row fields and latest, exact-run, history, and TCO query semantics.',
       zh: '基准行字段以及最新、精确运行、历史和 TCO 查询语义。',

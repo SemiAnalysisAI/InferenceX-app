@@ -5,7 +5,7 @@
  * the metric selector, and selecting it reveals the token sale price source.
  * Fixed-sequence Quick Filters remain available from the chart legend.
  */
-describe('Tokens per currency and agentic controls', () => {
+describe('Tokens per dollar and agentic controls', () => {
   beforeEach(() => {
     cy.window().then((win) => {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
@@ -16,7 +16,11 @@ describe('Tokens per currency and agentic controls', () => {
     cy.visit('/inference');
     cy.get('[data-testid="yaxis-metric-selector"]').should(
       'contain.text',
-      'Total Tokens per $1 TCO (Owning - Hyperscaler)',
+      'Total Tokens per $1 TCO',
+    );
+    cy.get('[data-testid="cost-tier-selector"]').should(
+      'contain.text',
+      'Owning at Large Hyperscaler Volume',
     );
     // The default axis derives from measured throughput and TCO alone, so the
     // token sale price source does not apply and stays hidden.
@@ -42,18 +46,6 @@ describe('Tokens per currency and agentic controls', () => {
       'contain.text',
       'Token Throughput per Chip',
     );
-  });
-
-  it('offers the same quantities priced in yuan', () => {
-    cy.visit('/inference');
-    cy.get('[data-testid="yaxis-metric-selector"]').click('right', { force: true });
-    cy.get('[data-slot="select-item"]')
-      .contains('Total Tokens per ¥1 TCO (Owning - Hyperscaler)')
-      .click({ force: true });
-    cy.get('[data-testid="scatter-graph"]')
-      .first()
-      .find('svg .dot-group')
-      .should('have.length.greaterThan', 0);
   });
 
   it('keeps Quick Filters for a fixed-sequence scenario', () => {

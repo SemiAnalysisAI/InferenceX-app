@@ -1,12 +1,16 @@
+import type { BenchmarkRow } from '@/lib/api';
+
 export type CalculatorMode = 'interactivity_to_throughput' | 'throughput_to_interactivity';
 
-export type CostProvider = 'costh' | 'costn' | 'costr';
+export type CostProvider = 'costh' | 'costr';
 
 export type CostType = 'total' | 'input' | 'output';
 
 export type BarMetric = 'throughput' | 'power' | 'cost';
 
 export interface GPUDataPoint {
+  /** Preserve the source of each frontier knot for paired power estimates. */
+  sourceRow?: BenchmarkRow;
   hwKey: string;
   interactivity: number; // tokens/sec/user (median_intvty = x in interactivity chart)
   /**
@@ -46,19 +50,17 @@ export interface GPUDataPoint {
    */
   inputTokenShare?: number;
   concurrency: number;
+  dp?: number;
   tp: number;
   precision: string;
   ep?: number;
   dp_attention?: boolean;
   disagg?: boolean;
-  costh: number; // cost per million total tokens (hyperscaler)
-  costn: number; // cost per million total tokens (neocloud)
+  costh: number; // cost per million total tokens (owning at large hyperscaler volume)
   costr: number; // cost per million total tokens (rental)
-  costhi: number; // cost per million input tokens (hyperscaler)
-  costni: number; // cost per million input tokens (neocloud)
+  costhi: number; // cost per million input tokens (owning at large hyperscaler volume)
   costri: number; // cost per million input tokens (rental)
-  costhOutput: number; // cost per million output tokens (hyperscaler)
-  costnOutput: number; // cost per million output tokens (neocloud)
+  costhOutput: number; // cost per million output tokens (owning at large hyperscaler volume)
   costrOutput: number; // cost per million output tokens (rental)
   tpPerMw: number; // total throughput per megawatt
   inputTpPerMw: number; // input throughput per megawatt

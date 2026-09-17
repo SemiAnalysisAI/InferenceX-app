@@ -11,13 +11,7 @@ import {
   sequenceForScenarioSegment,
 } from '@/lib/compare-scenario-route';
 import { comparisonScenarioForModel } from '@/lib/compare-agentx';
-import {
-  canonicalCompareSlug,
-  compareDisplayLabel,
-  compareModelDisplayLabel,
-  compareModelSeoName,
-  parseCompareSlug,
-} from '@/lib/compare-slug';
+import { canonicalCompareSlug, compareModelSeoName, parseCompareSlug } from '@/lib/compare-slug';
 import { KNOWN_MODELS, KNOWN_PRECISIONS, KNOWN_SEQUENCES, pickString } from '@/lib/compare-ssr';
 import {
   getComparePageDerivedData,
@@ -59,6 +53,12 @@ function scenarioPath(canonical: string, scenarioSegment?: ScenarioSegment): str
     : `/zh/compare/${canonical}`;
 }
 
+function gpuPairLabelZh(a: string, b: string): string {
+  const aLabel = HW_REGISTRY[a]?.label ?? a.toUpperCase();
+  const bLabel = HW_REGISTRY[b]?.label ?? b.toUpperCase();
+  return `${aLabel} 与 ${bLabel}`;
+}
+
 interface Props {
   params: Promise<{ slug: string }>;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -75,8 +75,8 @@ export async function buildCompareMetadataZh(
 ): Promise<Metadata> {
   const parsed = parseCompareSlug(slug);
   if (!parsed) return {};
-  const fullLabel = compareModelDisplayLabel(parsed.model, parsed.a, parsed.b);
-  const gpuLabel = compareDisplayLabel(parsed.a, parsed.b);
+  const gpuLabel = gpuPairLabelZh(parsed.a, parsed.b);
+  const fullLabel = `${parsed.model.label} — ${gpuLabel}`;
   const modelSeoName = compareModelSeoName(parsed.model);
   const canonical = canonicalCompareSlug(parsed.model.slug, parsed.a, parsed.b);
   // The scenario segments are views of one comparison, so the bare slug URL
@@ -223,12 +223,8 @@ async function CompareDetailZh({
     newest,
     parsed.model.displayName,
   );
-  const breadcrumbJsonLd = buildBreadcrumbJsonLdZh(
-    'full',
-    compareModelDisplayLabel(parsed.model, parsed.a, parsed.b),
-    url,
-  );
-  const label = compareModelDisplayLabel(parsed.model, parsed.a, parsed.b);
+  const label = `${parsed.model.label} — ${gpuPairLabelZh(parsed.a, parsed.b)}`;
+  const breadcrumbJsonLd = buildBreadcrumbJsonLdZh('full', label, url);
   const aMeta = HW_REGISTRY[parsed.a];
   const bMeta = HW_REGISTRY[parsed.b];
   const aLabel = aMeta?.label ?? parsed.a.toUpperCase();

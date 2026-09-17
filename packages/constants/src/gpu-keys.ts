@@ -9,15 +9,13 @@ export interface HwEntry {
   badgeLabel?: string;
   /** Chart sort order (lower = first) */
   sort: number;
-  /** Thermal design power in watts */
+  /** Thermal design power in watts; 0 means not yet available. */
   tdp: number;
   /** All-in kW per GPU (chip + per-GPU share of host/NICs) — SemiAnalysis AI Cloud
    * TCO Model, "Chip Specifications" sheet, Power → "All-In (W)" column */
   power: number;
-  /** $/GPU/hr — hyperscaler tier */
+  /** $/GPU/hr — owning at large hyperscaler volume */
   costh: number;
-  /** $/GPU/hr — neocloud tier */
-  costn: number;
   /** $/GPU/hr — retail tier */
   costr: number;
 }
@@ -27,13 +25,12 @@ export const HW_REGISTRY: Record<string, HwEntry> = {
   vr200: {
     vendor: 'NVIDIA',
     arch: 'Vera Rubin',
-    label: 'Vera Rubin',
+    label: 'Vera Rubin NVL72',
     sort: -1,
     tdp: 1800,
     power: 3.3,
     costh: 3.61,
-    costn: 3.61,
-    costr: 3.61,
+    costr: 8.5,
   },
   h100: {
     vendor: 'NVIDIA',
@@ -43,8 +40,7 @@ export const HW_REGISTRY: Record<string, HwEntry> = {
     tdp: 700,
     power: 1.37,
     costh: 1.17,
-    costn: 1.55,
-    costr: 1.78,
+    costr: 2,
   },
   h200: {
     vendor: 'NVIDIA',
@@ -54,8 +50,7 @@ export const HW_REGISTRY: Record<string, HwEntry> = {
     tdp: 700,
     power: 1.37,
     costh: 1.22,
-    costn: 1.59,
-    costr: 2.05,
+    costr: 2.9,
   },
   b200: {
     vendor: 'NVIDIA',
@@ -65,8 +60,7 @@ export const HW_REGISTRY: Record<string, HwEntry> = {
     tdp: 1000,
     power: 1.71,
     costh: 1.73,
-    costn: 2.07,
-    costr: 2.6,
+    costr: 3.7,
   },
   b300: {
     vendor: 'NVIDIA',
@@ -76,8 +70,7 @@ export const HW_REGISTRY: Record<string, HwEntry> = {
     tdp: 1200,
     power: 1.9,
     costh: 2.26,
-    costn: 2.52,
-    costr: 3,
+    costr: 4.25,
   },
   gb200: {
     vendor: 'NVIDIA',
@@ -87,8 +80,7 @@ export const HW_REGISTRY: Record<string, HwEntry> = {
     tdp: 1200,
     power: 1.87,
     costh: 1.86,
-    costn: 2.26,
-    costr: 2.6,
+    costr: 4,
   },
   gb300: {
     vendor: 'NVIDIA',
@@ -98,8 +90,7 @@ export const HW_REGISTRY: Record<string, HwEntry> = {
     tdp: 1400,
     power: 2.12,
     costh: 2.31,
-    costn: 2.79,
-    costr: 3.3,
+    costr: 5,
   },
   mi300x: {
     vendor: 'AMD',
@@ -109,7 +100,6 @@ export const HW_REGISTRY: Record<string, HwEntry> = {
     tdp: 750,
     power: 1.39,
     costh: 0.95,
-    costn: 1.16,
     costr: 1.3,
   },
   mi325x: {
@@ -120,7 +110,6 @@ export const HW_REGISTRY: Record<string, HwEntry> = {
     tdp: 1000,
     power: 1.69,
     costh: 1.1,
-    costn: 1.32,
     costr: 1.6,
   },
   mi355x: {
@@ -131,8 +120,7 @@ export const HW_REGISTRY: Record<string, HwEntry> = {
     tdp: 1400,
     power: 2.09,
     costh: 1.5,
-    costn: 2.09,
-    costr: 2.1,
+    costr: 2.9,
   },
   // NVIDIA RTX PRO 6000 Blackwell Server Edition (GB202, PCIe Gen5, 96 GB GDDR7).
   // A workstation-class PCIe card benchmarked in 8× TP configs (no NVLink/NVSwitch);
@@ -146,20 +134,29 @@ export const HW_REGISTRY: Record<string, HwEntry> = {
     tdp: 600,
     power: 0.975,
     costh: 0.68,
-    costn: 0.75,
     costr: 0.52,
   },
   jalapeno: {
-    vendor: 'Teacup',
+    vendor: 'OpenAI',
     arch: 'Jalapeño',
     label: 'Jalapeño',
-    badgeLabel: 'Jalapeño (Teacup)',
+    badgeLabel: 'Jalapeño (OpenAI)',
     sort: 10,
     tdp: 700,
     power: 1.125,
-    costh: 1.47,
-    costn: 1.56,
-    costr: 1.79,
+    costh: 1.27,
+    costr: 1.27,
+  },
+  tpuv7: {
+    vendor: 'Google',
+    arch: 'Ironwood',
+    label: 'TPU7x',
+    sort: 11,
+    tdp: 980,
+    power: 1.207,
+    costh: 1.21,
+    /** GCP 3-year commit rental rate per chip-hour (SemiAnalysis AI Cloud TCO Model). */
+    costr: 2,
   },
 };
 
@@ -178,6 +175,9 @@ export const GPU_VENDORS: Record<string, string> = Object.fromEntries(
 // zones to both maps below (OKLch for normal mode, HSL for high-contrast).
 // ---------------------------------------------------------------------------
 
+/** Google brand blue, used unchanged for a single Google hardware series. */
+export const GOOGLE_BLUE = '#4285F4';
+
 /**
  * OKLch hue zones for normal-mode vendor-aware colors.
  * Narrow, precise bands for assigning brand-matching color shades.
@@ -187,8 +187,12 @@ export const GPU_VENDORS: Record<string, string> = Object.fromEntries(
  *   12-42   AMD reds/oranges
  *   42-120  (gap)
  *   120-170 NVIDIA greens
- *   170-275 (gap)
- *   275-330 unknown / fallback (purples)
+ *   170-185 (gap)
+ *   185-235 unknown / fallback (cyans/teals)
+ *   235-250 (gap)
+ *   250-275 Google blues (brand hue ~260)
+ *   275-290 (gap)
+ *   290-330 OpenAI purples
  *   330-360 (gap)
  */
 export const VENDOR_OKLCH_ZONES: Record<
@@ -197,33 +201,36 @@ export const VENDOR_OKLCH_ZONES: Record<
 > = {
   amd: { start: 12, end: 42, chroma: { light: 0.18, dark: 0.22 } },
   nvidia: { start: 120, end: 170, chroma: { light: 0.15, dark: 0.15 } },
-  teacup: { start: 235, end: 270, chroma: { light: 0.14, dark: 0.16 } },
-  unknown: { start: 275, end: 330, chroma: { light: 0.14, dark: 0.16 } },
+  openai: { start: 290, end: 330, chroma: { light: 0.16, dark: 0.18 } },
+  google: { start: 250, end: 275, chroma: { light: 0.16, dark: 0.18 } },
+  unknown: { start: 185, end: 235, chroma: { light: 0.12, dark: 0.14 } },
 };
 
 /**
  * Preferred HSL hue zones for high-contrast mode.
  * Each vendor gets a non-overlapping slice of the 360° hue wheel so items
  * from different vendors are visually distinct and vendor-appropriate
- * (NVIDIA = greens, AMD = reds/oranges, unknown = blues/purples).
+ * (NVIDIA = greens, AMD = reds/oranges, Google = blues, OpenAI = purples).
  * When a vendor has too many items to fit with sufficient spacing, the zone
  * expands symmetrically — these are preferred zones, not hard constraints.
  *
  * Layout (360° wheel):
- *   NVIDIA:  60–195  (135°) — greens through cyans
- *   AMD:     300–360 + 0–60  (120°, wraps) — magentas through oranges
- *   Teacup:  195–240 (45°) — cyan/blues
- *   unknown: 240–300 (60°) — blues/purples
+ *   NVIDIA:  40–180  (140°) — yellow-greens through cyans
+ *   unknown: 180–205 (25°) — cyans
+ *   Google:  205–235 (30°) — blues (brand hue ~217)
+ *   OpenAI:  255–300 (45°) — purples/violets
+ *   AMD:     300–360 + 0–40  (100°, wraps) — magentas through oranges
  *
  * Each entry is an array of linear {start, span} segments (wrapping bands
  * are split into two segments).
  */
 export const VENDOR_HSL_ZONES: Record<string, { start: number; span: number }[]> = {
-  nvidia: [{ start: 60, span: 135 }],
-  teacup: [{ start: 195, span: 45 }],
+  nvidia: [{ start: 40, span: 140 }],
+  openai: [{ start: 255, span: 45 }],
   amd: [
     { start: 300, span: 60 },
-    { start: 0, span: 60 },
+    { start: 0, span: 40 },
   ],
-  unknown: [{ start: 240, span: 60 }],
+  google: [{ start: 205, span: 30 }],
+  unknown: [{ start: 180, span: 25 }],
 };

@@ -18,25 +18,32 @@ export interface GpuSpecs {
   tdp: number;
   power: number;
   costh: number;
-  costn: number;
   costr: number;
 }
 
-const DEFAULT_SPECS: GpuSpecs = { tdp: 0, power: 0, costh: 0, costn: 0, costr: 0 };
+export type TcoBasis = 'external' | 'internal';
+
+/** App-wide TCO basis when no explicit selection or share-link param is present. */
+export const DEFAULT_TCO_BASIS: TcoBasis = 'internal';
+
+const DEFAULT_SPECS: GpuSpecs = { tdp: 0, power: 0, costh: 0, costr: 0 };
 
 /**
  * Look up power/cost specs for a hardware key by extracting the base GPU name.
  * Splits on '_' or '-' to get the base (e.g. "h100_vllm" -> "h100").
  */
-export function getGpuSpecs(hwKey: string): GpuSpecs {
+export function getGpuSpecs(hwKey: string, basis: TcoBasis = DEFAULT_TCO_BASIS): GpuSpecs {
   const base = hwKey.split(/[-_]/u)[0];
   const entry = HW_REGISTRY[base];
   if (!entry) return DEFAULT_SPECS;
+  // The TCO basis only reprices the owning tier: Google's internal owner cost vs
+  // what an external buyer pays. The rental tier is a customer renting from GCP
+  // at the 3-year commit rate, which does not change with the basis.
+  const internalCost = base === 'tpuv7' ? 1.03 : undefined;
   return {
     tdp: entry.tdp,
     power: entry.power,
-    costh: entry.costh,
-    costn: entry.costn,
+    costh: basis === 'internal' ? (internalCost ?? entry.costh) : entry.costh,
     costr: entry.costr,
   };
 }

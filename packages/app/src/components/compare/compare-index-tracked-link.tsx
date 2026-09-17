@@ -8,7 +8,7 @@ import { navigateInApp } from '@/lib/client-navigation';
 
 interface CompareIndexTrackedLinkProps extends React.ComponentProps<typeof Link> {
   analyticsEvent:
-    | 'compare_agentx_overview_clicked'
+    | 'compare_agentx_revenue_calculator_clicked'
     | 'compare_agentx_dashboard_clicked'
     | 'compare_agentx_model_clicked';
   analyticsTarget?: string;

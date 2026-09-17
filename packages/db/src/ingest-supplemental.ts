@@ -27,6 +27,12 @@ import {
   bulkUpsertAvailability,
   type BenchmarkPersistenceInput,
 } from './etl/benchmark-ingest';
+import {
+  extractPowerAudit,
+  extractPowerInvalidReasons,
+  normalizePowerContractMetrics,
+  scrubWithheldPowerMetrics,
+} from './etl/benchmark-mapper';
 import { ingestEvalRow } from './etl/eval-ingest';
 
 const sql = createAdminSql({
@@ -179,6 +185,8 @@ interface SupplementalBmk {
   is_multinode?: boolean;
   prefill_num_workers?: number;
   decode_num_workers?: number;
+  power_invalid_reasons?: unknown;
+  power_audit?: unknown;
 }
 
 async function ingestSupplementalBmk(
@@ -265,6 +273,19 @@ async function ingestSupplementalBmk(
         numDecodeGpu: entry.tp * entry.ep,
       });
 
+      // Supplemental metrics bypass mapBenchmarkRow, so apply the power
+      // publication contract here too: fail-closed verdict normalization,
+      // then strip withheld measurements when power_valid=0.
+      normalizePowerContractMetrics(entry.metrics, entry.metrics);
+      scrubWithheldPowerMetrics(entry.metrics);
+      // Supplemental data bypasses mapBenchmarkRow's numeric-only metric boundary.
+      const powerInvalidReasons = extractPowerInvalidReasons(
+        entry.power_invalid_reasons ?? entry.metrics.power_invalid_reasons,
+      );
+      const powerAudit = extractPowerAudit(entry.power_audit ?? entry.metrics.power_audit);
+      delete entry.metrics.power_invalid_reasons;
+      delete entry.metrics.power_audit;
+
       rows.push({
         configId,
         benchmarkType: 'single_turn',
@@ -275,6 +296,8 @@ async function ingestSupplementalBmk(
         image: entry.image,
         recipeFingerprint: null,
         metrics: entry.metrics,
+        powerInvalidReasons,
+        powerAudit,
       });
     }
 

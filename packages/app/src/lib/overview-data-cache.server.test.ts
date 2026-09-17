@@ -1,3 +1,4 @@
+import type * as Constants from '@semianalysisai/inferencex-constants';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
@@ -28,7 +29,8 @@ vi.mock('next/cache', () => ({
   },
 }));
 
-vi.mock('@semianalysisai/inferencex-constants', () => ({
+vi.mock('@semianalysisai/inferencex-constants', async (importOriginal) => ({
+  ...(await importOriginal<typeof Constants>()),
   DISPLAY_MODEL_TO_DB: { TestModel: ['test-model'] },
 }));
 

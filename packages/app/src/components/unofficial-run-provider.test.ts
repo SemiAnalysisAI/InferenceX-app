@@ -198,6 +198,27 @@ describe('buildChartData', () => {
     expect(Object.keys(result)).toEqual(['DeepSeek-R1-0528_8k/1k']);
   });
 
+  it('prices TPUv7 overlay points on the external basis for later repricing', () => {
+    // processOverlayChartDataWithClipping reprices from external at render
+    // time, so the source overlay data must not already carry the internal
+    // owner cost even though internal is the app default.
+    const rows = [
+      stubRow({
+        model: 'qwen3.5-397b',
+        hardware: 'tpuv7',
+        framework: 'vllm',
+        isl: 8192,
+        osl: 1024,
+      }),
+    ];
+    const result = buildChartData(rows);
+    const [key] = Object.keys(result);
+    const point = result[key].interactivity.data[0];
+    expect(point.hwKey.startsWith('tpuv7')).toBe(true);
+    expect(point.costh!.y).toBeCloseTo(1.21 / (100 * 3600 * 1e-6));
+    expect(point.costh!.y).not.toBeCloseTo(1.03 / (100 * 3600 * 1e-6));
+  });
+
   it('skips rows with unmapped ISL/OSL', () => {
     const rows = [stubRow({ model: 'dsr1', isl: 4096, osl: 4096 })];
     const result = buildChartData(rows);
@@ -247,6 +268,29 @@ describe('buildChartData', () => {
     expect(group.e2e.data[0].x).toBe(5);
     // interactivity chart x-axis is median_intvty
     expect(group.interactivity.data[0].x).toBe(150);
+  });
+
+  it('includes pipeline stages when an unofficial artifact omits GPU counts', () => {
+    const raw = rawPowerArtifact({
+      disagg: false,
+      prefill_tp: 4,
+      decode_tp: 4,
+      prefill_pp: 2,
+      decode_pp: 2,
+    });
+    delete raw.num_prefill_gpu;
+    delete raw.num_decode_gpu;
+    const rows = normalizeArtifactRows([raw], '2026-08-12');
+    // Reproduce the ingest default that used to bypass the chart's PP fallback.
+    expect(rows[0].num_decode_gpu).toBe(4);
+    expect(rows[0].num_prefill_gpu).toBe(4);
+    const group = buildChartData(rows)['DeepSeek-R1-0528_1k/1k'];
+    for (const chart of [group.e2e, group.interactivity]) {
+      expect(chart.data[0].tp).toBe(8);
+      expect(chart.data[0].decode_tp).toBe(4);
+      expect(chart.data[0].pp).toBe(2);
+      expect(chart.data[0].tpPerGpu.y).toBe(100.5);
+    }
   });
 
   it('preserves all data points for disagg configs with different parallelism but same tp', () => {

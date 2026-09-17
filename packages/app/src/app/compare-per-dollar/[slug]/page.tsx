@@ -210,7 +210,7 @@ export async function renderPerDollarPage(
     ssrRows,
     interactivityRange,
   );
-  // Owning-hyperscaler $/GPU/hr — the same `costh` value the per-dollar math
+  // Large-hyperscaler-volume ownership $/GPU/hr — the same `costh` value the per-dollar math
   // upstream uses to derive cost per million tokens. Rendered in the header
   // so the reader can audit the underlying pricing inputs without leaving
   // the page.

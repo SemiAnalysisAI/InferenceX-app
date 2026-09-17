@@ -76,6 +76,13 @@ export interface ChartLegendProps {
    * the axis-metric info footer below the chart instead of in the legend.
    */
   hideAtomFootnote?: boolean;
+  /**
+   * Render the legend as a plain key: no display switches, no action buttons,
+   * no per-series remove / points-table affordances, no changelog tooltips.
+   * Items stay clickable so a reader can still isolate a series. Used by the
+   * `/embed` chart, which hands every other control to the host page.
+   */
+  readOnly?: boolean;
 }
 
 export default function ChartLegend({
@@ -96,10 +103,31 @@ export default function ChartLegend({
   onItemRemove,
   onAdvancedExpandedChange,
   hideAtomFootnote = false,
+  readOnly = false,
 }: ChartLegendProps) {
   const locale = useLocale();
   const t = STRINGS[locale];
   const isSidebar = variant === 'sidebar';
+  if (readOnly) {
+    switches = undefined;
+    actions = undefined;
+    onItemRemove = undefined;
+    enableTooltips = false;
+  }
+  const items = useMemo(
+    () =>
+      readOnly
+        ? legendItems.map((item) => ({
+            ...item,
+            onShowPoints: undefined,
+            tooltip: null,
+            // Highlight marks the run selected in the changelog, which a
+            // read-only legend has no way to change.
+            isHighlighted: false,
+          }))
+        : legendItems,
+    [legendItems, readOnly],
+  );
   const scrollRef = useRef<HTMLDivElement>(null);
   const [isOverflowing, setIsOverflowing] = useState(false);
   const [isAdvancedExpanded, setIsAdvancedExpanded] = useState(false);
@@ -112,8 +140,8 @@ export default function ChartLegend({
   // emptying the chart, and label-only entries (unofficial runs) are not
   // something removing leaves you without.
   const activeCount = useMemo(
-    () => legendItems.filter((item) => item.isActive && item.isRemovable !== false).length,
-    [legendItems],
+    () => items.filter((item) => item.isActive && item.isRemovable !== false).length,
+    [items],
   );
   const effectiveRemove = onItemRemove && activeCount > 1 ? onItemRemove : undefined;
   const removeFor = (item: CommonLegendItemProps) =>
@@ -131,17 +159,17 @@ export default function ChartLegend({
 
   // Sort items for sidebar mode (active-first); filtering is done via CSS hide
   const sortedItems = useMemo(() => {
-    if (!isSidebar) return legendItems;
-    return filterAndSortLegendItems(legendItems, '', !disableActiveSort);
-  }, [legendItems, isSidebar, disableActiveSort]);
+    if (!isSidebar) return items;
+    return filterAndSortLegendItems(items, '', !disableActiveSort);
+  }, [items, isSidebar, disableActiveSort]);
 
   const rows = useMemo(() => {
     if (!grouped) return null;
-    const items = isSidebar ? sortedItems : legendItems;
-    const hwKeys = items.map((item) => item.name.split(' ')[0]);
+    const source = isSidebar ? sortedItems : items;
+    const hwKeys = source.map((item) => item.name.split(' ')[0]);
     const uniqueNames = [...new Set(hwKeys)];
     const result = uniqueNames.map((name) =>
-      items.filter((item) => item.name.split(' ')[0] === name),
+      source.filter((item) => item.name.split(' ')[0] === name),
     );
     // In sidebar mode, sort groups so those with active items come first
     if (isSidebar && !disableActiveSort) {
@@ -152,7 +180,7 @@ export default function ChartLegend({
       });
     }
     return result.filter((row) => row.length > 0);
-  }, [grouped, legendItems, sortedItems, isSidebar]);
+  }, [grouped, items, sortedItems, isSidebar]);
 
   const toggleLegendOpen = () => {
     onExpandedChange(!isLegendExpanded);
@@ -189,9 +217,8 @@ export default function ChartLegend({
 
   // Show ATOM footnote when any legend item label contains the ¹ marker
   const hasAtomFootnote = useMemo(
-    () =>
-      !hideAtomFootnote && legendItems.some((item) => item.label.includes(ATOM_FOOTNOTE_MARKER)),
-    [legendItems, hideAtomFootnote],
+    () => !hideAtomFootnote && items.some((item) => item.label.includes(ATOM_FOOTNOTE_MARKER)),
+    [items, hideAtomFootnote],
   );
 
   const hasSidebarControls =
@@ -235,37 +262,38 @@ export default function ChartLegend({
   // Keep the same button mounted in the same padded header in both states.
   // Only its arrow and accessible label change; focus and pointer position stay put.
   const LegendToggleIcon = isLegendExpanded ? PanelRightClose : PanelRightOpen;
-  const panelHeader = isSidebar ? (
-    <div
-      data-testid="legend-toolbar"
-      className="-mx-1 -mt-1 pb-1 no-export flex shrink-0 items-start gap-1"
-    >
-      <div className="min-w-0 flex-1">{isLegendExpanded && actionElements}</div>
-      <button
-        type="button"
-        data-testid={isLegendExpanded ? 'legend-close-button' : 'legend-open-button'}
-        onClick={toggleLegendOpen}
-        aria-expanded={isLegendExpanded}
-        aria-label={isLegendExpanded ? t.hideLegend : t.showLegend}
-        title={isLegendExpanded ? t.hideLegend : t.showLegend}
-        className="inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors cursor-pointer"
+  const panelHeader =
+    isSidebar && !readOnly ? (
+      <div
+        data-testid="legend-toolbar"
+        className="-mx-1 -mt-1 pb-1 no-export flex shrink-0 items-start gap-1"
       >
-        <LegendToggleIcon size={16} aria-hidden="true" />
-      </button>
-    </div>
-  ) : null;
+        <div className="min-w-0 flex-1">{isLegendExpanded && actionElements}</div>
+        <button
+          type="button"
+          data-testid={isLegendExpanded ? 'legend-close-button' : 'legend-open-button'}
+          onClick={toggleLegendOpen}
+          aria-expanded={isLegendExpanded}
+          aria-label={isLegendExpanded ? t.hideLegend : t.showLegend}
+          title={isLegendExpanded ? t.hideLegend : t.showLegend}
+          className="inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors cursor-pointer"
+        >
+          <LegendToggleIcon size={16} aria-hidden="true" />
+        </button>
+      </div>
+    ) : null;
 
   const standardSwitches = switches?.filter((sw) => !sw.advanced) ?? [];
   const advancedSwitches = switches?.filter((sw) => sw.advanced) ?? [];
 
-  const renderSwitches = (items: LegendSwitchConfig[]) =>
-    items.length > 0 ? (
+  const renderSwitches = (list: LegendSwitchConfig[]) =>
+    list.length > 0 ? (
       <div
         className={cn(
           isSidebar || grouped ? 'w-full space-y-0' : 'w-full md:w-auto flex flex-wrap gap-2',
         )}
       >
-        {items.map((sw) => (
+        {list.map((sw) => (
           <div key={sw.id} className="mt-2 flex items-center gap-2">
             <Switch
               id={sw.id}
@@ -460,7 +488,7 @@ export default function ChartLegend({
         style={!isSidebar && isOverflowing ? { scrollbarGutter: 'stable' } : undefined}
         className={cn(scrollClasses, 'custom-scrollbar')}
       >
-        {(isSidebar ? sortedItems : legendItems).map((item) => renderItem(item))}
+        {(isSidebar ? sortedItems : items).map((item) => renderItem(item))}
       </ul>
     );
 

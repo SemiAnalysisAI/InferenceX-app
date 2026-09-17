@@ -4,47 +4,39 @@
  * Catches bugs where custom-value metrics (costUser, powerUser) require clicking
  * "Calculate" before data appears.
  */
+const exact = (label: string) =>
+  new RegExp(`^${label.replaceAll(/[$()]/gu, (char) => `\\${char}`)}$`, 'u');
+
 describe('Y-Axis Metrics All Render Data', () => {
-  const metrics = [
-    'Token Throughput per Chip',
-    'Input Token Throughput per Chip',
-    'Output Token Throughput per Chip',
-    'Token Throughput per All in Utility MW',
-    'Input Token Throughput per All in Utility MW',
-    'Output Token Throughput per All in Utility MW',
-    'Cost per Million Total Tokens (Owning - Hyperscaler)',
-    'Cost per Million Total Tokens (Owning - Neocloud Giant)',
-    'Cost per Million Total Tokens (3 Year Rental)',
-    'Cost per Million Output Tokens (Owning - Hyperscaler)',
-    'Cost per Million Output Tokens (Owning - Neocloud Giant)',
-    'Cost per Million Output Tokens (3 Year Rental)',
-    'Cost per Million Input Tokens (Owning - Hyperscaler)',
-    'Cost per Million Input Tokens (Owning - Neocloud Giant)',
-    'Cost per Million Input Tokens (3 Year Rental)',
-    'Total Tokens per $1 TCO (Owning - Hyperscaler)',
-    'Total Tokens per $1 TCO (Owning - Neocloud Giant)',
-    'Total Tokens per $1 TCO (3 Year Rental)',
-    'Output Tokens per $1 TCO (Owning - Hyperscaler)',
-    'Output Tokens per $1 TCO (Owning - Neocloud Giant)',
-    'Output Tokens per $1 TCO (3 Year Rental)',
-    'Input Tokens per $1 TCO (Owning - Hyperscaler)',
-    'Input Tokens per $1 TCO (Owning - Neocloud Giant)',
-    'Input Tokens per $1 TCO (3 Year Rental)',
-    'Total Tokens per ¥1 TCO (Owning - Hyperscaler)',
-    'Total Tokens per ¥1 TCO (Owning - Neocloud Giant)',
-    'Total Tokens per ¥1 TCO (3 Year Rental)',
-    'Output Tokens per ¥1 TCO (Owning - Hyperscaler)',
-    'Output Tokens per ¥1 TCO (Owning - Neocloud Giant)',
-    'Output Tokens per ¥1 TCO (3 Year Rental)',
-    'Input Tokens per ¥1 TCO (Owning - Hyperscaler)',
-    'Input Tokens per ¥1 TCO (Owning - Neocloud Giant)',
-    'Input Tokens per ¥1 TCO (3 Year Rental)',
-    'Cost per Million Total Tokens (Custom User Values)',
-    'Total Tokens per $1 TCO (Custom User Values)',
-    'Token Throughput per All in Utility MW (Custom User Values)',
-    'All-in Provisioned Joules per Total Token',
-    'All-in Provisioned Joules per Output Token',
-    'All-in Provisioned Joules per Input Token',
+  // Tiered metrics are one Y-axis option each; the Cost Tier selector picks
+  // the pricing basis, so those entries name the tier option to click.
+  const metrics: { label: string; tier?: 'hyperscaler' | 'rental' | 'custom' }[] = [
+    { label: 'Token Throughput per Chip' },
+    { label: 'Input Token Throughput per Chip' },
+    { label: 'Output Token Throughput per Chip' },
+    { label: 'Token Throughput per All in Utility MW' },
+    { label: 'Input Token Throughput per All in Utility MW' },
+    { label: 'Output Token Throughput per All in Utility MW' },
+    { label: 'Cost per Million Total Tokens', tier: 'hyperscaler' },
+    { label: 'Cost per Million Total Tokens', tier: 'rental' },
+    { label: 'Cost per Million Output Tokens', tier: 'hyperscaler' },
+    { label: 'Cost per Million Output Tokens', tier: 'rental' },
+    { label: 'Cost per Million Input Tokens', tier: 'hyperscaler' },
+    { label: 'Cost per Million Input Tokens', tier: 'rental' },
+    { label: 'Total Tokens per $1 TCO', tier: 'hyperscaler' },
+    { label: 'Total Tokens per $1 TCO', tier: 'rental' },
+    { label: 'Output Tokens per $1 TCO', tier: 'hyperscaler' },
+    { label: 'Output Tokens per $1 TCO', tier: 'rental' },
+    { label: 'Input Tokens per $1 TCO', tier: 'hyperscaler' },
+    { label: 'Input Tokens per $1 TCO', tier: 'rental' },
+    // The custom tier is picked from the caption selector, which seeds the
+    // per-chip $/hr from the tier it replaces, so points render at once.
+    { label: 'Cost per Million Total Tokens', tier: 'custom' },
+    { label: 'Total Tokens per $1 TCO', tier: 'custom' },
+    { label: 'Token Throughput per All in Utility MW (Custom User Values)' },
+    { label: 'All-in Provisioned Joules per Total Token' },
+    { label: 'All-in Provisioned Joules per Output Token' },
+    { label: 'All-in Provisioned Joules per Input Token' },
   ];
 
   before(() => {
@@ -58,10 +50,15 @@ describe('Y-Axis Metrics All Render Data', () => {
       .should('have.length.greaterThan', 0);
   });
 
-  metrics.forEach((label) => {
-    it(`"${label}" renders scatter points without extra interaction`, () => {
+  metrics.forEach(({ label, tier }) => {
+    const name = tier ? `${label} [${tier}]` : label;
+    it(`"${name}" renders scatter points without extra interaction`, () => {
       cy.get('[data-testid="yaxis-metric-selector"]').click('right', { force: true });
-      cy.get('[data-slot="select-item"]').contains(label).click({ force: true });
+      cy.get('[data-slot="select-item"]').contains(exact(label)).click({ force: true });
+      if (tier) {
+        cy.get('[data-testid="cost-tier-selector"]').first().click('right', { force: true });
+        cy.get(`[data-testid="cost-tier-${tier}"]`).click({ force: true });
+      }
       cy.get('[data-testid="scatter-graph"]')
         .first()
         .find('svg .dot-group')

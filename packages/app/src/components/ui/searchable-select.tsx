@@ -39,6 +39,8 @@ export interface SearchableSelectOption {
   label: string;
   help?: React.ReactNode;
   testId?: string;
+  /** Optional trailing visual (e.g. a lock glyph) rendered after the label. */
+  badge?: React.ReactNode;
 }
 
 export interface SearchableSelectGroup {
@@ -49,6 +51,8 @@ export interface SearchableSelectGroup {
 
 interface SearchableSelectProps {
   groups: SearchableSelectGroup[];
+  /** Search options may include aliases for the same value; groups owns the selected label. */
+  searchGroups?: SearchableSelectGroup[];
   value: string;
   onValueChange: (value: string) => void;
   placeholder?: string;
@@ -58,6 +62,11 @@ interface SearchableSelectProps {
   contentClassName?: string;
   triggerId?: string;
   triggerTestId?: string;
+  /**
+   * Accessible name for the trigger when no visible <label htmlFor> points at
+   * it, e.g. when the select sits inline in a caption next to a <dt>.
+   */
+  triggerAriaLabel?: string;
   size?: 'sm' | 'default';
   disabled?: boolean;
   open?: boolean;
@@ -73,6 +82,7 @@ interface SearchableSelectProps {
 
 export function SearchableSelect({
   groups,
+  searchGroups,
   value,
   onValueChange,
   placeholder: placeholderProp,
@@ -80,6 +90,7 @@ export function SearchableSelect({
   className,
   contentClassName,
   triggerId,
+  triggerAriaLabel,
   triggerTestId,
   size = 'default',
   disabled = false,
@@ -115,7 +126,9 @@ export function SearchableSelect({
   const tabFocusRef = React.useRef<HTMLElement | null>(null);
   // A grid gives option selection and help their own cells/buttons. A listbox
   // option cannot contain another interactive action accessibly.
-  const hasOptionHelp = groups.some((group) => group.options.some((option) => option.help));
+  const hasOptionHelp = [...groups, ...(searchGroups ?? [])].some((group) =>
+    group.options.some((option) => option.help),
+  );
 
   React.useEffect(() => {
     setMounted(true);
@@ -138,15 +151,20 @@ export function SearchableSelect({
   const filteredGroups = React.useMemo(() => {
     if (!search) return groups;
     const lower = search.toLowerCase();
-    return groups
+    const seen = new Set<string>();
+    return (searchGroups ?? groups)
       .map((g) => ({
         ...g,
-        options: g.options.filter(
-          (opt) => opt.label.toLowerCase().includes(lower) || g.label.toLowerCase().includes(lower),
-        ),
+        options: g.options.filter((opt) => {
+          const matches =
+            opt.label.toLowerCase().includes(lower) || g.label.toLowerCase().includes(lower);
+          if (!matches || seen.has(opt.value)) return false;
+          seen.add(opt.value);
+          return true;
+        }),
       }))
       .filter((g) => g.options.length > 0);
-  }, [groups, search]);
+  }, [groups, searchGroups, search]);
 
   const selectedLabel = React.useMemo(() => {
     for (const group of groups) {
@@ -215,17 +233,18 @@ export function SearchableSelect({
             data-testid={triggerTestId}
             data-slot="select-trigger"
             data-size={size}
-            data-value={value}
+            data-value={mounted ? value : undefined}
             role="combobox"
             aria-expanded={isOpen}
             aria-haspopup={hasOptionHelp ? 'grid' : 'listbox'}
             aria-controls={listboxId}
             aria-label={
-              hasOptionHelp
+              triggerAriaLabel ??
+              (hasOptionHelp
                 ? triggerLabel === placeholder
                   ? placeholder
                   : `${placeholder}: ${triggerLabel}`
-                : undefined
+                : undefined)
             }
             disabled={disabled}
             className={cn(
@@ -439,6 +458,7 @@ export function SearchableSelect({
                             )}
                           >
                             <span className="min-w-0 flex-1">{option.label}</span>
+                            {option.badge}
                             {isSelected && (
                               <CheckIcon
                                 aria-hidden="true"
@@ -493,6 +513,7 @@ export function SearchableSelect({
                         {isSelected && <CheckIcon className="size-4 text-primary" />}
                       </span>
                       <span>{option.label}</span>
+                      {option.badge}
                     </div>
                   );
                 })}

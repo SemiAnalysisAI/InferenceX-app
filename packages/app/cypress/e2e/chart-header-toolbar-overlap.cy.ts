@@ -4,7 +4,7 @@ import { selectXAxisMode } from '../support/e2e';
  * zoom) renders as an absolute overlay in the chart figure's top-right corner
  * from `md` up. The chart heading spanned the full card width, so at reduced
  * tab widths (browser side panel, split screen) a long title — e.g. the
- * default "Total Tokens per $1 TCO (Owning - Hyperscaler) vs. P90
+ * default "DeepSeek V4 Pro 1.6T Agentic Total Tokens per $1 TCO vs. P90
  * Interactivity" — wrapped underneath the toolbar and was covered by it.
  *
  * The heading now reserves the overlay's width (`md:mr-80`), so the title and

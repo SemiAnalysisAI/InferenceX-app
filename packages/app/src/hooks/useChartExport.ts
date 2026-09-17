@@ -1,10 +1,19 @@
 import { useCallback, useState } from 'react';
 
 import { CHART_FONT_MINECRAFT, CHART_FONT_SANS } from '@/lib/d3-chart/typography';
+import { getExportFooterText } from '@/lib/export-footer';
+import { useLocale } from '@/lib/use-locale';
+
+const STRINGS = {
+  en: { exportFailed: 'Failed to export image. Please try again.' },
+  zh: { exportFailed: '图片导出失败，请重试。' },
+};
 
 interface UseChartExportOptions {
   chartId: string;
   setIsLegendExpanded?: (expanded: boolean) => void;
+  /** Omit the legend from the PNG without changing the interactive chart. */
+  hideLegend?: boolean;
   /** Human-readable base name for exported files (e.g. "DeepSeek-R1_throughput_interactivity"). Falls back to chartId. */
   exportFileName?: string;
 }
@@ -198,41 +207,6 @@ function watermarkFont(size: number): string {
   return `bold ${size}px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
 }
 
-/** Fraction of the chart capture the background logo may span (width and height). */
-const LOGO_WATERMARK_MAX_FRACTION = 0.6;
-
-/** Public path of the SemiAnalysis logo to tile behind the chart, per theme. */
-export function getLogoWatermarkSrc(isDark: boolean): string {
-  return isDark ? '/brand/logo-white.png' : '/brand/logo-color.png';
-}
-
-/** Opacity of the background logo, per theme (kept faint so data stays legible). */
-export function getLogoWatermarkOpacity(isDark: boolean): number {
-  return isDark ? 0.09 : 0.08;
-}
-
-/**
- * Fit the logo inside the chart capture, centered, preserving aspect ratio and
- * capped to a fraction of the capture so it reads as a background mark rather
- * than a foreground element.
- */
-export function getLogoWatermarkLayout(
-  capture: { width: number; height: number },
-  logo: { width: number; height: number },
-): { x: number; y: number; width: number; height: number } {
-  const maxWidth = capture.width * LOGO_WATERMARK_MAX_FRACTION;
-  const maxHeight = capture.height * LOGO_WATERMARK_MAX_FRACTION;
-  const scale = Math.min(maxWidth / logo.width, maxHeight / logo.height);
-  const width = Math.round(logo.width * scale);
-  const height = Math.round(logo.height * scale);
-  return {
-    x: Math.round((capture.width - width) / 2),
-    y: Math.round((capture.height - height) / 2),
-    width,
-    height,
-  };
-}
-
 function loadImage(src: string): Promise<HTMLImageElement | null> {
   return new Promise((resolve) => {
     const img = new Image();
@@ -243,10 +217,9 @@ function loadImage(src: string): Promise<HTMLImageElement | null> {
 }
 
 /**
- * Compose the final export: theme background, a faint SemiAnalysis logo
- * behind the chart, the (transparent) chart capture on top, and the branded
- * footer bar. The chart is captured without a background so the logo really
- * sits behind the plot instead of tinting the data on top.
+ * Compose the final export: theme background, the (transparent) chart capture
+ * on top, and the branded footer bar. The chart's own SVG logo watermark is
+ * the only background mark, so nothing else is painted behind the plot.
  */
 async function addWatermark(chartDataUrl: string, bgColor: string): Promise<string> {
   const img = await loadImage(chartDataUrl);
@@ -257,7 +230,7 @@ async function addWatermark(chartDataUrl: string, bgColor: string): Promise<stri
     document.documentElement.classList.contains('minecraft') ||
     bgColor.includes('0 0%');
 
-  const WATERMARK_HEIGHT = 240;
+  const WATERMARK_HEIGHT = 120;
   const canvas = document.createElement('canvas');
   canvas.width = img.width;
   canvas.height = img.height + WATERMARK_HEIGHT;
@@ -268,33 +241,20 @@ async function addWatermark(chartDataUrl: string, bgColor: string): Promise<stri
   ctx.fillStyle = bgColor || (isDark ? '#131416' : '#eaebec');
   ctx.fillRect(0, 0, canvas.width, img.height);
 
-  // Faint SemiAnalysis logo centered behind the chart. Skip silently if the
-  // asset fails to load so export never blocks on branding.
-  const logo = await loadImage(getLogoWatermarkSrc(isDark));
-  if (logo && logo.naturalWidth > 0 && logo.naturalHeight > 0) {
-    const layout = getLogoWatermarkLayout(
-      { width: img.width, height: img.height },
-      { width: logo.naturalWidth, height: logo.naturalHeight },
-    );
-    ctx.save();
-    ctx.globalAlpha = getLogoWatermarkOpacity(isDark);
-    ctx.drawImage(logo, layout.x, layout.y, layout.width, layout.height);
-    ctx.restore();
-  }
-
-  // Draw chart capture over the background + logo
+  // Draw chart capture over the background
   ctx.drawImage(img, 0, 0);
 
   // Draw watermark bar
   ctx.fillStyle = isDark ? '#1a1a2e' : '#f5f5f5';
   ctx.fillRect(0, img.height, canvas.width, WATERMARK_HEIGHT);
 
-  // Draw watermark text (shrink to fit on narrow exports)
-  const WATERMARK_TEXT = 'InferenceX — github.com/SemiAnalysisAI/InferenceX';
-  let fontSize = 80;
+  // Draw footer text: the page route this export came from (shrink to fit on
+  // narrow exports), e.g. "inferencex.semianalysis.com/inference/kimi-k3".
+  const footerText = getExportFooterText();
+  let fontSize = 40;
   ctx.font = watermarkFont(fontSize);
   const maxTextWidth = canvas.width - 48;
-  const textWidth = ctx.measureText(WATERMARK_TEXT).width;
+  const textWidth = ctx.measureText(footerText).width;
   if (textWidth > maxTextWidth) {
     fontSize = Math.max(16, Math.floor((fontSize * maxTextWidth) / textWidth));
     ctx.font = watermarkFont(fontSize);
@@ -302,7 +262,7 @@ async function addWatermark(chartDataUrl: string, bgColor: string): Promise<stri
   ctx.fillStyle = isDark ? '#aaa' : '#555';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(WATERMARK_TEXT, canvas.width / 2, img.height + WATERMARK_HEIGHT / 2);
+  ctx.fillText(footerText, canvas.width / 2, img.height + WATERMARK_HEIGHT / 2);
 
   return canvas.toDataURL('image/png');
 }
@@ -313,8 +273,11 @@ async function addWatermark(chartDataUrl: string, bgColor: string): Promise<stri
 export function useChartExport({
   chartId,
   setIsLegendExpanded,
+  hideLegend = false,
   exportFileName,
 }: UseChartExportOptions) {
+  const locale = useLocale();
+  const t = STRINGS[locale];
   const [isExporting, setIsExporting] = useState(false);
 
   const exportToImage = useCallback(async () => {
@@ -324,7 +287,7 @@ export function useChartExport({
     // .legend-container), so temporarily open it for the clone and restore
     // the closed state right after.
     let wasClosed = false;
-    if (setIsLegendExpanded) {
+    if (setIsLegendExpanded && !hideLegend) {
       const el = document.querySelector(`#${chartId}`);
       wasClosed = Boolean(el?.querySelector('[data-testid="legend-open-button"]'));
       if (wasClosed) {
@@ -347,6 +310,15 @@ export function useChartExport({
       // Remove duplicate export container from the clone to avoid DOM id conflicts
       const nestedExport = clone.querySelector(`[id="${chartId}-export"]`);
       if (nestedExport) nestedExport.remove();
+      if (hideLegend) {
+        // Remove the entire column, including its spacing and closed-state
+        // reopen button. Labels already identify the series in the plot.
+        for (const legend of clone.querySelectorAll(
+          '[data-slot="chart-legend-wrapper"], .legend-container',
+        )) {
+          legend.remove();
+        }
+      }
 
       // Bake computed text colors on the figcaption — html-to-image can't resolve
       // CSS custom properties (e.g. text-muted-foreground → var(--muted-foreground)).
@@ -446,6 +418,11 @@ export function useChartExport({
       for (const el of clone.querySelectorAll('.no-export')) {
         (el as HTMLElement).style.display = 'none';
       }
+      // Reveal export-only twins: plain-text stand-ins for interactive
+      // controls in the caption (e.g. the Cost Tier selector's label).
+      for (const el of clone.querySelectorAll('.export-only')) {
+        (el as HTMLElement).style.display = 'inline';
+      }
       for (const el of clone.querySelectorAll('[id$="-export"]')) {
         (el as HTMLElement).parentElement!.style.display = 'none';
       }
@@ -527,7 +504,7 @@ export function useChartExport({
       }
       const captureDimensions = getExportCaptureDimensions(exportElement);
       // Capture without a background: addWatermark paints the theme background
-      // and the SemiAnalysis logo underneath, then layers this capture on top.
+      // and layers this capture on top.
       const chartDataUrl = await toPng(exportElement, {
         ...captureDimensions,
         quality: 1,
@@ -543,7 +520,7 @@ export function useChartExport({
         },
       });
 
-      // Compose background + SemiAnalysis logo watermark + chart + footer bar
+      // Compose background + chart + footer bar
       const dataUrl = await addWatermark(chartDataUrl, bgColor);
 
       const link = document.createElement('a');
@@ -555,14 +532,14 @@ export function useChartExport({
       window.dispatchEvent(new CustomEvent('inferencex:action'));
     } catch (error) {
       console.error('Error exporting image:', error);
-      alert('Failed to export image. Please try again.');
+      alert(t.exportFailed);
       if (wasClosed && setIsLegendExpanded) setIsLegendExpanded(false);
     } finally {
       setIsExporting(false);
       const exportElement = document.querySelector<HTMLElement>(`#${chartId}-export`);
       if (exportElement) exportElement.innerHTML = '';
     }
-  }, [chartId, setIsLegendExpanded]);
+  }, [chartId, setIsLegendExpanded, hideLegend, exportFileName, t]);
 
   return { isExporting, exportToImage };
 }

@@ -30,10 +30,11 @@ there are no duplicated metric-specific columns on `benchmark_results` or
 ### Why a Materialized View (latest_benchmarks)
 
 Computing the newest logical curve from the full result table is expensive. The
-materialized view pre-computes the newest successful snapshot for each config,
-scenario, sequence, offload mode, recipe fingerprint, and concurrency, including
-the same-image append-only history when applicable. API routes use the view when no
-date filter is specified; date-filtered requests hit the base table.
+materialized view pre-computes the newest logical curve snapshot, including
+same-image append-only history when applicable. Point identity within that snapshot
+remains config, scenario, sequence, offload mode, recipe fingerprint, and concurrency.
+API routes use the view when no date filter is specified; date-filtered requests
+use the same `benchmark_curve_runs` view and `benchmark_curve_scope` function.
 
 `REFRESH CONCURRENTLY` allows reads during refresh (no downtime). The trade-off is a brief window where the view is stale after ingest — acceptable since data changes at most daily.
 
@@ -47,6 +48,59 @@ Every INSERT uses `ON CONFLICT DO UPDATE` or `DO NOTHING`. This means:
 
 The unique constraints match natural keys (for benchmarks, workflow/config/scenario,
 concurrency, offload mode, and the nullable recipe fingerprint), not surrogate keys.
+
+### AgentX Curve Replacement Scope
+
+For `agentic_traces`, a curve is identified by model, hardware, framework, precision,
+and workload (benchmark type and sequence lengths). AGG/disagg, parallelism,
+speculative decoding, offload mode, and recipe fingerprint describe individual
+points within that curve; they do not start independently replaceable curves.
+A new normal sweep owns the complete curve, including which variants are absent.
+If one sweep contains both AGG and disagg points, both remain visible.
+Fixed-sequence workloads retain their existing separate spec-method, disagg, and
+offload scopes. Models, hardware, frameworks and precisions always stay separate.
+
+For example, producer PR #2939 replaced GLM-5.2 / GB300 / Dynamo TensorRT-LLM / FP4
+with six disagg points in run `34413290524`. The old AGG TP8 concurrency-1 point
+from run `33219706372` belongs to the earlier snapshot and is no longer in latest.
+It remains accessible through history, the earlier date, and the earlier exact run.
+No benchmark rows, logs, trace sidecars, or recipe attributes are removed.
+The client uses the same replacement scope when selecting official runs. An
+unofficial overlay remains a separate comparison; it does not replace official data.
+
+Migration `014_agentic_curve_snapshots.sql` adds the shared SQL scope/view and
+rebuilds `latest_benchmarks`. Apply it before deploying the new readers. The existing
+application can read the rebuilt materialized view; the new readers require the
+migration. Deployment must invalidate the shared data cache (including derived
+pages); benchmark API cache keys are versioned in this change. No re-ingest is needed.
+
+Eligibility is unchanged: successful benchmark rows from the latest stored run
+attempt. Overall workflow status is not a completeness signal: accepted benchmarks
+can come from workflows whose later upload or evaluation failed. Detecting an
+incomplete sweep requires an explicit producer completion manifest and publication
+contract; this change does not infer completion from a missing config or workflow
+conclusion. A normal partial sweep still replaces its curve, so intentional deltas
+must use the append-only contract below.
+
+### Required Power Publication
+
+Ordinary sweeps that opt into `require-power` upload the producer's
+`required-power-sweep-manifest/sweep_manifest.json`. Before any CI ingest upsert,
+the app matches its required benchmark rows by recipe fingerprint, concurrency,
+and scenario/sequence lengths, then requires valid v2 power and positive energy.
+Disaggregated recipes also require both role energy measurements. Identical
+per-job and collected artifact copies are allowed; conflicting copies fail.
+Matching uses the ingest mapper's canonical identity, including AgentX `users`
+precedence over `conc`. After benchmark writes, any required point omitted by a
+purge or another filter fails the run; purged data is never restored to satisfy
+the declaration.
+
+The manifest must name the source run and head. A successful earlier attempt of
+that same run may supply the scope and retained points when failed jobs are
+rerun; ingestion logs both declared and current attempts. Sweeps without this
+optional manifest keep historical behavior. The separate PowerX publication
+receipt compares ingested 8K/1K and AgentX measurements with the database and
+public API after cache invalidation; it does not assert browser rendering.
 
 ### Append-Only Curve Extensions
 
@@ -113,6 +167,15 @@ Benchmark point backfills use the same complete point selector as audited point 
 updates both the first-class column and `metrics.offload_mode`; for example, a missed CPU
 KV offload annotation can set `offloadMode: 'on'` and merge `kv_offloading` plus backend
 metadata in one correction. Unrelated metrics remain unchanged.
+
+When extending an already-applied identity-changing correction, record its old
+`set` as `previousSet`. The recovery command accepts that declared prior patch
+before applying the new fields; unrecognized destination states still fail closed.
+
+Post-ingest workflows scope recovery to the ingested run with `--run-id` and
+`--allow-unregistered-run` (a no-op for runs without corrections). They do not
+reapply unrelated historical corrections that may be absent from a staging branch.
+The standalone recovery command remains strict by default.
 
 Run `bun run admin:db:apply-overrides` to preview the exact rows, reasons, and patches;
 the command requires confirmation unless passed `--yes`. It fails before writing when a
@@ -220,6 +283,24 @@ The Recompute Agentic Metrics workflow accepts an optional `neon-branch` to
 rebuild a stored run in an existing child database. It verifies the child and
 connection endpoint before writing; production recomputation still requires
 `master`. Preview environments use branch-scoped database and cache settings.
+After a child-database repair, refresh its isolated `CACHE_NAMESPACE` and
+`BLOB_CACHE_PREFIX` and redeploy that preview to retire cached payloads.
+
+Use `run-id: all` for a stale-only repair across historical and current AgentX
+points. Eight independent shards recompute charts, aggregates, and request
+timelines using the checked-out code's versions. Each shard records database-side
+fingerprints before writing and verifies that benchmark rows, raw artifacts, and
+already-current timelines are unchanged afterward. Previously populated metrics
+cannot be replaced with empty output; parsing failures fail the job and preserve
+the old payload. Integrity manifests are retained as workflow artifacts.
+
+Relevant backfill/parser changes merged to `master` run this stale-only repair
+against production and invalidate the cache only after every shard passes.
+Test on a snapshot branch first, then staging using the preview's parser version.
+Production must use its own deployed parser version, not an unmerged preview's.
+Runs without original metrics or trace artifacts are reported separately: a
+version upgrade cannot reconstruct data that was never captured. To deliberately
+rebuild an already-current run, set `stale-only: false` with its numeric run ID.
 
 ### Summed Series and the Canonical Grid
 
@@ -409,9 +490,58 @@ All normalizer logic lives in `packages/db/src/etl/normalizers.ts`. The function
 
 ### Schema Version Detection
 
-`mapBenchmarkRow()` detects which artifact schema version is present by checking for the `prefill_tp` field:
+`mapBenchmarkRow()` distinguishes legacy flat and role-shaped topology with the `prefill_tp` field, and recognizes modern AgentX single-node metadata separately:
 
 - **v1 (pre-2025-12-19)**: Only `tp`, `ep`, and `dp_attention` are present. These are copied symmetrically: `prefillTp = decodeTp = tp`, `prefillEp = decodeEp = ep`. Both `numPrefillGpu` and `numDecodeGpu` are set to `tp * ep`.
 - **v2 (2025-12-19+)**: Separate `prefill_tp` / `decode_tp` / `prefill_ep` / `decode_ep` / `prefill_dp_attention` / `decode_dp_attention` / `prefill_num_workers` / `decode_num_workers` / `num_prefill_gpu` / `num_decode_gpu` fields are present. These map directly; `num_prefill_gpu` / `num_decode_gpu` fall back to `tp * ep` if absent.
+- **v3 AgentX single-node**: Nested `request_metrics` with explicit `is_multinode: false` and `disagg: false` uses the producer's physical count, `tp * pp * pcp_size`, when `num_gpus` is absent. EP and DCP share TP devices. Explicit counts win; flat legacy rows and role-shaped multinode rows retain their existing rules. For example, Qwen3.8 H200 TP4/EP4 uses four GPUs, mirrored into both aggregate role columns. GPU counts participate in config identity, so correcting ingestion does not repair existing rows: historical data needs explicit reconciliation against retained artifacts rather than blind reingestion.
 
-Detection is a single `'prefill_tp' in row` check — no version field is required in the artifact.
+The v1/v2 role-shape check is `'prefill_tp' in row`; the v3 fallback additionally checks the nested metrics and explicit topology flags. No version field is required in the artifact.
+
+Backfill audit provenance may identify the production config or an exact public
+benchmark row (`productionBenchmarkId`); at least one positive ID is required.
+Both are audit references only. Selection still uses all stable config dimensions
+and the complete run/attempt/point key so staging and rebuilt databases remain
+safe. Without a known config ID, the registry conservatively rejects any purge
+with the same remaining point identity. The P90 power backfill records original
+artifact hashes and windows in `docs/data/power-p90-backfill.json`.
+
+Corrections with `expectedMetrics` are bound to their original telemetry: ingest
+requires a known, matching run attempt and leaves the row unchanged if those
+source values differ. Database recovery rejects the mismatch before writing.
+P90 replays require numeric `power_valid: 1`, schema version 2, and the exact
+original average power, including when checking an already-applied correction.
+
+### Power Audit Provenance (`power_invalid_reasons`, `power_audit`)
+
+Producers (`aggregate_power.py`) annotate every aggregate result row with two optional provenance fields alongside the `power_valid` verdict:
+
+- **`power_invalid_reasons`** — array of snake_case reason-code strings explaining a withheld verdict (emitted when `power_valid == 0`), e.g. `sampling_gap_exceeded`, `expected_gpu_count_mismatch`.
+- **`power_audit`** — compact measurement-window audit object with optional fields: `window_start_unix`, `window_end_unix`, `expected_gpu_count`, `observed_gpu_count`, `sample_count`, `max_sample_gap_s`, `producer_sha`, `exporter_image_sha256`, `source`, `observed_gpu_ids`. `source` is a safe relative path inside the original artifact bundle, and device identifiers may be indices on older collectors. Present on valid and invalid rows alike.
+
+`mapBenchmarkRow()` narrows them defensively (`extractPowerInvalidReasons` / `extractPowerAudit`): reason codes must match `/^[a-z][a-z0-9_]*$/` (≤ 64 chars, deduplicated, capped at 32), audit numerics must be finite (counts: non-negative safe integers), shas collapse to `null` unless a non-empty string ≤ 128 chars, and unknown audit keys are dropped. A failed `benchmark_outcome.status` is rejected as a performance point, retaining its original artifact as evidence. An empty result maps to `undefined`, so the dedicated `benchmark_results.power_invalid_reasons` / `power_audit` JSONB columns (migration 015, mirroring the `workers` precedent from migration 006) store SQL NULL — never `[]` or `{}`. Legacy artifacts without the fields flow through every layer as NULL/undefined.
+
+Reads are **permanently tolerant**: `queries/benchmarks.ts` selects the columns as `to_jsonb(br) -> 'power_invalid_reasons'` (and `lb` on the matview branch) rather than bare column references. A bare reference fails during query planning until the next ingest workflow applies the migration, because migrations run in the ingest workflows rather than at Vercel deploy. The key lookup degrades to NULL while the column is missing and is byte-identical once it exists, making deploy order irrelevant.
+
+### PowerX publication receipts
+
+The normal CI importer writes `POWER_PUBLICATION_MANIFEST` when configured. Each
+8K/1K point records the mapped, override-adjusted metric contract, all configuration
+dimensions, original source run/attempt, structured audit, and input file SHA-256.
+Reused sweeps keep their original source identity. Failed or unmapped explicit 8K/1K
+results and database errors remain in the manifest; they cannot pass verification.
+
+After ingestion and cache invalidation, `bun packages/db/src/verify-power-publication.ts
+power-publication.json` compares every expected point against the exact database
+run attempt and public `runId=…&exactRun=true` response. It checks missing values and
+withheld telemetry as well as numbers; legacy missing measurements remain missing.
+A `matched` receipt establishes transport fidelity, not collection coverage. An
+empty receipt says `no_8k1k_points`, never that power coverage was validated.
+The workflow retains both the input manifest and verification receipt. Cache
+invalidation errors fail the workflow instead of being swallowed. Imported P75/P90
+ledger edits trigger the existing reviewed override workflow.
+
+The dashboard availability panel uses scoped points before Y-metric filtering,
+including visible unofficial overlays. It distinguishes schema-2 validation,
+other validated data, missing verdicts, withheld measurements, unavailable metrics,
+and non-applicable separate-pool metrics without filling missing values.

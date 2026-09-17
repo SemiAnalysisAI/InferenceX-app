@@ -14,7 +14,7 @@ function clearAllNudgeStorage(win: Cypress.AUTWindow) {
   const keys = [
     'inferencex-starred',
     'inferencex-star-modal-dismissed',
-    'inferencex-openai-rubin-banner-dismissed',
+    'inferencex-rubin-banner-dismissed',
     'inferencex-reproducibility-nudge-shown',
     'inferencex-star-nudge-shown',
     'inferencex-export-nudge-shown',
@@ -41,23 +41,21 @@ beforeEach(() => {
 // Landing — modal priority & dismissal
 // ---------------------------------------------------------------------------
 
-describe('Landing nudges — modals', () => {
+describe('Landing nudges — modals', { testIsolation: true }, () => {
   it('shows the launch banner on fresh first load', () => {
     cy.visit('/', {
       onBeforeLoad: clearAllNudgeStorage,
     });
     cy.get('[data-testid="launch-banner"]')
       .should('be.visible')
-      .and('contain.text', "OpenAI's Latest In House Chip verus Rubin NVL72")
-      .and(
-        'contain.text',
-        'Compare Jalapeño (Teacup) with Vera Rubin (July) NVL72 on DeepSeek R1 at 8K / 1K.',
-      )
+      .and('contain.text', 'Rubin Agentic Inference Performance')
+      .and('contain.text', '67x Faster than Blackwell Ultra')
       .and('contain.text', 'View results');
-    // Banner + header-nav badges, plus the six AgentX hero ledger rows — the
-    // shared pill must render at the same fixed size everywhere it appears.
+    // Banner + header-nav badges, plus the four still-new AgentX hero ledger
+    // rows (AGENTX_NEW_MODEL_SLUGS) — the shared pill must render at the same
+    // fixed size everywhere it appears.
     cy.get('[data-new-badge]')
-      .should('have.length', 8)
+      .should('have.length', 6)
       .then(($badges) => {
         const sizes = [...$badges].map((badge) => {
           const rect = badge.getBoundingClientRect();
@@ -98,17 +96,14 @@ describe('Landing nudges — modals', () => {
       });
   });
 
-  it('localizes the Rubin comparison banner title in Chinese', () => {
+  it('localizes the Rubin banner title in Chinese', () => {
     cy.visit('/zh', {
       onBeforeLoad: clearAllNudgeStorage,
     });
     cy.get('[data-testid="launch-banner"]')
       .should('be.visible')
-      .and('contain.text', 'OpenAI 最新自研芯片对比 Rubin NVL72')
-      .and(
-        'contain.text',
-        '对比 Jalapeño (Teacup) 与 Vera Rubin (July) NVL72 在 DeepSeek R1 8K / 1K 工作负载下的表现。',
-      )
+      .and('contain.text', 'Rubin 智能体推理性能')
+      .and('contain.text', '速度达 Blackwell Ultra 的 67 倍')
       .and('contain.text', '查看结果');
   });
 
@@ -119,7 +114,10 @@ describe('Landing nudges — modals', () => {
     cy.visit('/', {
       onBeforeLoad: clearAllNudgeStorage,
     });
-    cy.get('[data-testid="launch-banner"]').should('be.visible');
+    cy.get('[data-testid="launch-banner"]')
+      .should('be.visible')
+      .and('contain.text', 'Rubin Agentic Inference Performance')
+      .and('contain.text', '67x Faster than Blackwell Ultra');
     cy.get('[data-testid="github-star-modal"]').should('not.exist');
     cy.get('[data-testid="footer-star-cta"]').should('exist');
   });
@@ -129,7 +127,20 @@ describe('Landing nudges — modals', () => {
 // Landing — banner
 // ---------------------------------------------------------------------------
 
-describe('Landing nudges — banner', () => {
+describe('Landing nudges — banner', { testIsolation: true }, () => {
+  it('wraps the full Rubin title on mobile without clipping', () => {
+    cy.viewport(375, 812);
+    cy.visit('/', { onBeforeLoad: clearAllNudgeStorage });
+    cy.get('[data-testid="launch-banner"] p')
+      .first()
+      .should('contain.text', 'Rubin Agentic Inference Performance')
+      .and('have.css', 'white-space', 'normal')
+      .should(($title) => {
+        expect($title[0].scrollWidth).to.be.at.most($title[0].clientWidth);
+        expect($title[0].scrollHeight).to.be.at.most($title[0].clientHeight);
+      });
+  });
+
   it('shows launch banner on landing page', () => {
     cy.visit('/', {
       onBeforeLoad: clearAllNudgeStorage,
@@ -165,7 +176,7 @@ describe('Landing nudges — banner', () => {
     cy.get('[data-testid="launch-banner"]').should('be.visible');
     cy.window().then((win) => {
       // Only the X button should persist a dismissal — show alone must not.
-      expect(win.localStorage.getItem('inferencex-openai-rubin-banner-dismissed')).to.eq(null);
+      expect(win.localStorage.getItem('inferencex-rubin-banner-dismissed')).to.eq(null);
     });
   });
 
@@ -173,22 +184,21 @@ describe('Landing nudges — banner', () => {
     cy.visit('/', {
       onBeforeLoad: clearAllNudgeStorage,
     });
-    cy.get('[data-testid="launch-banner"]').should('be.visible');
+    cy.get('[data-testid="launch-banner"]')
+      .should('be.visible')
+      .and('have.attr', 'href', '/inference/deepseek-v4');
     cy.get('[data-testid="launch-banner"]').click();
-    cy.location('pathname', { timeout: 10000 }).should('eq', '/inference');
-    cy.location('search')
-      .should('include', 'g_model=DeepSeek-R1-0528')
-      .and('include', 'i_seq=8k%2F1k')
-      .and('include', 'i_prec=fp4')
-      .and('include', 'i_metric=y_outputTputPerMw');
+
+    cy.location('pathname').should('eq', '/inference/deepseek-v4');
 
     // Body click must not write the dismissal key — the banner should still
-    // render on a fresh visit to landing.
+    // render after returning home and reloading the landing page.
+    cy.get('[data-testid="nav-link-home"]').click();
+    cy.location('pathname').should('eq', '/');
+    cy.reload();
     cy.window().then((win) => {
-      expect(win.localStorage.getItem('inferencex-openai-rubin-banner-dismissed')).to.eq(null);
+      expect(win.localStorage.getItem('inferencex-rubin-banner-dismissed')).to.eq(null);
     });
-
-    cy.visit('/');
     cy.get('[data-testid="launch-banner"]').should('be.visible');
   });
 });
@@ -363,7 +373,7 @@ describe('Nudge scope isolation', () => {
       onBeforeLoad(win) {
         clearAllNudgeStorage(win);
         // Dismiss all landing nudges so nothing blocks visibility checks
-        win.localStorage.setItem('inferencex-openai-rubin-banner-dismissed', '1');
+        win.localStorage.setItem('inferencex-rubin-banner-dismissed', '1');
         win.localStorage.setItem('inferencex-starred', '1');
       },
     });

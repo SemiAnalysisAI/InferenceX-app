@@ -6,6 +6,13 @@ import { getAllChipRouteSlugs } from '@/lib/chip-pages';
 import { INFERENCE_MODEL_SLUGS } from '@/lib/inference-model-slug';
 import { zhPath } from '@/lib/i18n';
 import { getModelPageSlugs } from '@/lib/model-pages';
+import {
+  defaultRouteModel,
+  MODEL_ROUTE_TABS,
+  MODEL_ROUTES,
+  modelRoutePath,
+  modelRoutesForTab,
+} from '@/lib/model-routes';
 const mocks = vi.hoisted(() => ({
   fixturesMode: false,
   getDb: vi.fn(() => ({})),
@@ -36,6 +43,7 @@ vi.mock('@/lib/run-rankings-data.server', () => ({
 }));
 
 import { getAllRankingPageEntries } from '@/lib/rankings';
+import { getAllWhitepapers } from '@/lib/whitepapers';
 
 import sitemap from './sitemap';
 
@@ -66,6 +74,24 @@ describe('sitemap locale parity', () => {
     for (const entry of INFERENCE_MODEL_SLUGS) {
       expect(urls.has(`${SITE_URL}/inference/${entry.slug}`)).toBe(true);
       expect(urls.has(`${SITE_URL}${zhPath(`/inference/${entry.slug}`)}`)).toBe(true);
+    }
+  });
+
+  it("emits per-model tab pages in both locales for the models each tab serves, skipping the tab's default model", async () => {
+    const entries = await sitemap();
+    const urls = new Set(entries.map((entry) => entry.url));
+    for (const tab of MODEL_ROUTE_TABS) {
+      const served = new Set(modelRoutesForTab(tab).map((route) => route.model));
+      for (const route of MODEL_ROUTES) {
+        // The default model's page canonicalizes to the bare tab path, which
+        // the dashboard-route loop above already covers. Models a tab does not
+        // serve (the profit estimator is Kimi K3, GLM 5.2/5.3, MiniMax M3,
+        // DeepSeek V4 Pro and DeepSeek V4.1 Flash only) 404 and stay out.
+        const expected = served.has(route.model) && route.model !== defaultRouteModel(tab);
+        const enPath = modelRoutePath(tab, route.slug);
+        expect(urls.has(`${SITE_URL}${enPath}`)).toBe(expected);
+        expect(urls.has(`${SITE_URL}${zhPath(enPath)}`)).toBe(expected);
+      }
     }
   });
 
@@ -123,6 +149,24 @@ describe('sitemap locale parity', () => {
     const urls = new Set(entries.map((entry) => entry.url));
     expect(urls.has(`${SITE_URL}/agentx/agentx-fixture`)).toBe(true);
     expect(urls.has(`${SITE_URL}/zh/agentx/agentx-fixture`)).toBe(true);
+  });
+
+  it('emits both locales for the whitepaper index and every whitepaper with its hero image', async () => {
+    const entries = await sitemap();
+    const byUrl = new Map(entries.map((entry) => [entry.url, entry]));
+    expect(byUrl.has(`${SITE_URL}/whitepaper`)).toBe(true);
+    expect(byUrl.has(`${SITE_URL}${zhPath('/whitepaper')}`)).toBe(true);
+    const papers = getAllWhitepapers();
+    expect(papers.length).toBeGreaterThan(0);
+    for (const paper of papers) {
+      const enPath = `/whitepaper/${paper.slug}`;
+      const en = byUrl.get(`${SITE_URL}${enPath}`);
+      const zh = byUrl.get(`${SITE_URL}${zhPath(enPath)}`);
+      expect(en?.images).toEqual([`${SITE_URL}${paper.heroImagePath}`]);
+      expect(zh?.images).toEqual([`${SITE_URL}${paper.heroImagePath}`]);
+      expect(en?.lastModified).toBe(`${paper.publishedDate}T00:00:00.000Z`);
+      expect(en?.alternates?.languages).toEqual(zh?.alternates?.languages);
+    }
   });
 
   it('does not require a database connection in fixture mode', async () => {

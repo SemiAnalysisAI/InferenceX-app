@@ -38,16 +38,31 @@ describe('METRIC_EXPLANATIONS completeness', () => {
     }
   });
 
+  it('limits system power to GPU chassis while retaining their CPU and DRAM assumptions', () => {
+    const { description, formula } = METRIC_EXPLANATIONS.modeledChassisPowerPerGpu;
+    expect(description.en).toContain(
+      'divided by the modeled chassis GPU count (eight per chassis)',
+    );
+    expect(description.en).not.toContain('deployment GPU count');
+    expect(formula.en).toContain('÷ modeled chassis GPU count (8 per chassis)');
+    expect(description.zh).toContain('再除以建模机箱的 GPU 总数（每机箱 8 张）');
+    expect(formula.zh).toContain('÷ 建模机箱的 GPU 总数（每机箱 8 张）');
+    expect(description.en).toContain('CPU and DRAM utilization set to 20%');
+    expect(description.en).toContain(
+      'extrapolated to a full chassis at the measured per-GPU power',
+    );
+    expect(description.en).toContain('Separate CPU-only frontend/router hosts are excluded.');
+    expect(description.zh).toContain('CPU 与 DRAM 利用率均设为 20%');
+    expect(description.zh).toContain('不计入独立的纯 CPU 前端或路由主机。');
+  });
+
   it('cost metrics show the $/Mtok formula', () => {
     for (const key of [
       'costh',
-      'costn',
       'costr',
       'costhOutput',
-      'costnOutput',
       'costrOutput',
       'costhi',
-      'costni',
       'costri',
       'costUser',
     ] as const) {
@@ -73,11 +88,11 @@ describe('METRIC_EXPLANATIONS completeness', () => {
   });
 
   it('defines total tokens per dollar as infrastructure purchasing power', () => {
-    const explanation = METRIC_EXPLANATIONS.tokensPerDollarN;
+    const explanation = METRIC_EXPLANATIONS.tokensPerDollarH;
     expect(explanation.description.en).toContain('infrastructure spend');
-    expect(explanation.description.en).toContain('Neocloud Giant');
+    expect(explanation.description.en).toContain('large hyperscaler purchasing volume');
     expect(explanation.description.zh).toContain('基础设施开支');
-    expect(explanation.description.zh).toContain('Neocloud Giant');
+    expect(explanation.description.zh).toContain('超大规模云厂商大批量采购价');
     expect(explanation.formula.en).toContain('all-in cost per chip-hour');
     expect(explanation.description.en).not.toContain('—');
     expect(explanation.description.zh).not.toContain('—');
@@ -165,8 +180,8 @@ describe('metricRowLabel', () => {
     expect(metricRowLabel('tpPerGpu', 'en')).toBe('Token Throughput per Chip');
     expect(metricRowLabel('tpPerGpu', 'zh')).toBe('每芯片 token 吞吐量');
     expect(metricRowLabel('tokenRevenuePerGpuHour', 'en')).toBe('Token Revenue per GPU Hour');
-    expect(metricRowLabel('tokensPerDollarN', 'zh')).toBe(
-      '每 1 美元 TCO 对应的总 token 数（自有 - Neocloud Giant）',
+    expect(metricRowLabel('tokensPerDollarH', 'zh')).toBe(
+      '每 1 美元 TCO 对应的总 token 数（自有 - 超大规模云大批量）',
     );
   });
 });

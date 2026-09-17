@@ -114,10 +114,9 @@ describe('URL Parameter Persistence', () => {
         .then(($inputs) => [...$inputs].map((input) => input.id).toSorted())
         .then((before) => {
           cy.get('[data-testid="yaxis-metric-selector"]').click('right', { force: true });
-          cy.contains(
-            '[data-select-option]',
-            'Cost per Million Total Tokens (Owning - Hyperscaler)',
-          ).click({ force: true });
+          cy.contains('[data-select-option]', /^Cost per Million Total Tokens$/u).click({
+            force: true,
+          });
 
           cy.get('[data-testid="scatter-quick-filters"]').click();
           cy.get('[data-testid="quick-filter-best-per-sku"]').should(
@@ -145,8 +144,8 @@ describe('URL Parameter Persistence', () => {
       cy.contains('[role="option"]', 'Qwen3.5 397B').click();
       cy.get('[data-testid="model-selector"]').should('contain.text', 'Qwen3.5 397B');
       // Navigate immediately to cover pending writes inside the debounce window.
-      cy.get('[data-testid="tab-trigger-gpu-specs"]').click();
-      cy.url().should('include', '/gpu-specs');
+      cy.get('[data-testid="tab-trigger-submissions"]').click();
+      cy.url().should('include', '/submissions');
       cy.get('[data-testid="tab-trigger-inference"]').click();
 
       cy.get('[data-testid="model-selector"]').should('contain.text', 'Qwen3.5 397B');
@@ -175,7 +174,11 @@ describe('URL Parameter Persistence', () => {
 
       cy.get('[data-testid="yaxis-metric-selector"]').should(
         'contain.text',
-        'Cost per Million Total Tokens (Owning - Hyperscaler)',
+        'Cost per Million Total Tokens',
+      );
+      cy.get('[data-testid="cost-tier-selector"]').should(
+        'contain.text',
+        'Owning at Large Hyperscaler Volume',
       );
 
       cy.get('[data-testid="scatter-graph"]')
@@ -195,10 +198,7 @@ describe('URL Parameter Persistence', () => {
         .should('contain.text', 'Total Tokens per $1 TCO');
 
       cy.get('[data-testid="yaxis-metric-selector"]').click('right', { force: true });
-      cy.contains(
-        '[data-select-option]',
-        'Cost per Million Total Tokens (Owning - Hyperscaler)',
-      ).click({
+      cy.contains('[data-select-option]', /^Cost per Million Total Tokens$/u).click({
         force: true,
       });
 
@@ -208,12 +208,16 @@ describe('URL Parameter Persistence', () => {
         .should('have.text', 'Cost per Million Total Tokens ($)');
     });
 
-    it('maps the removed API-pricing URL to Neocloud TCO', () => {
+    it('maps the removed API-pricing URL to hyperscaler-volume TCO', () => {
       visitWithDismissedModal('/inference?i_metric=y_tokensPerDollar');
 
       cy.get('[data-testid="yaxis-metric-selector"]').should(
         'contain.text',
-        'Total Tokens per $1 TCO (Owning - Neocloud Giant)',
+        'Total Tokens per $1 TCO',
+      );
+      cy.get('[data-testid="cost-tier-selector"]').should(
+        'contain.text',
+        'Owning at Large Hyperscaler Volume',
       );
       cy.get('[data-testid="scatter-graph"]')
         .first()

@@ -40,7 +40,7 @@ export default async function OgImage({ params }: { params: Promise<{ slug: stri
   const gpuLabel = HW_REGISTRY[parsed.gpu]?.label ?? parsed.gpu.toUpperCase();
   const precisionLabel = precisionDisplayLabel(parsed.precision);
   const methodLabel = specMethodDisplayLabel(parsed.model.displayName, parsed.method);
-  const title = `${gpuLabel} ${precisionLabel}：${methodLabel} 对比关闭`;
+  const title = `${gpuLabel} ${precisionLabel}：启用 ${methodLabel} 与关闭投机解码`;
   const titleSize = title.length > 34 ? 72 : title.length > 26 ? 80 : title.length > 18 ? 96 : 112;
 
   return renderCompareOg({

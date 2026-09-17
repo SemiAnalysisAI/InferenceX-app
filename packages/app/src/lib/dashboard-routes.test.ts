@@ -27,10 +27,45 @@ describe('dashboard route registry', () => {
     expect(existsSync(chinesePage)).toBe(route.localeMirrored);
   });
 
-  it('keeps reliability footer-only and indexable, and feedback out of the sitemap', () => {
+  it('keeps reliability and gpu-specs footer-only and indexable, and feedback out of the sitemap', () => {
     expect(getDashboardRoute('reliability').navGroup).toBe('footer-only');
     expect(getDashboardRoute('reliability').indexable).toBe(true);
+    expect(getDashboardRoute('gpu-specs').navGroup).toBe('footer-only');
+    expect(getDashboardRoute('gpu-specs').indexable).toBe(true);
     expect(getDashboardRoute('feedback').indexable).toBe(false);
+  });
+
+  it('moves the TCO calculator and fleet lifecycle to the footer but keeps them indexed', () => {
+    expect(getDashboardRoute('calculator').navGroup).toBe('footer-only');
+    expect(getDashboardRoute('calculator').indexable).toBe(true);
+    expect(getDashboardRoute('fleet').navGroup).toBe('footer-only');
+    expect(getDashboardRoute('fleet').indexable).toBe(true);
+  });
+
+  it('moves Historical Trends to the footer but keeps it indexed and locale-mirrored', () => {
+    expect(getDashboardRoute('historical').navGroup).toBe('footer-only');
+    expect(getDashboardRoute('historical').indexable).toBe(true);
+    expect(getDashboardRoute('historical').localeMirrored).toBe(true);
+    expect(dashboardRouteForPathname('/historical/kimi-k3')?.key).toBe('historical');
+  });
+
+  it('puts both profit estimators between Inference Performance and Accuracy Evals', () => {
+    const primary = DASHBOARD_ROUTES.filter((route) => route.navGroup === 'primary').map(
+      (route) => route.key,
+    );
+    expect(primary.slice(0, 4)).toEqual([
+      'inference',
+      'profit-estimator-per-gigawatt',
+      'profit-estimator',
+      'evaluation',
+    ]);
+    expect(primary).not.toContain('calculator');
+    expect(primary).not.toContain('fleet');
+    expect(primary).not.toContain('historical');
+    expect(dashboardRouteForPathname('/profit-estimator-per-gigawatt/kimi-k3')?.key).toBe(
+      'profit-estimator-per-gigawatt',
+    );
+    expect(dashboardRouteForPathname('/profit-estimator/kimi-k3')?.key).toBe('profit-estimator');
   });
 
   it('declares the standalone and self-seeded provider capabilities', () => {

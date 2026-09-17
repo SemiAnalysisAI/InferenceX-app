@@ -3,7 +3,7 @@
 import { GlobalFilterProvider } from '@/components/GlobalFilterContext';
 import { NudgeEngine } from '@/components/nudge-engine';
 import { TabNav } from '@/components/tab-nav';
-import { UnofficialRunProvider } from '@/components/unofficial-run-provider';
+import { UnofficialRunBanner, UnofficialRunProvider } from '@/components/unofficial-run-provider';
 import { dashboardShellCapabilitiesForPathname } from '@/lib/dashboard-routes';
 import { inferenceModelForPathname } from '@/lib/inference-model-slug';
 import { usePathname } from 'next/navigation';
@@ -27,18 +27,23 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       </GlobalFilterProvider>
     );
   }
+  content = (
+    <>
+      <TabNav
+        footer={providerCapabilities.unofficialRuns ? <UnofficialRunBanner attached /> : undefined}
+      />
+      {content}
+    </>
+  );
   if (providerCapabilities.unofficialRuns) {
-    content = <UnofficialRunProvider>{content}</UnofficialRunProvider>;
+    content = <UnofficialRunProvider showBanner={false}>{content}</UnofficialRunProvider>;
   }
 
   return (
     <>
       {dashboardNudge && <NudgeEngine scope="dashboard" />}
       <main className="relative">
-        <div className="container mx-auto px-4 lg:px-8 flex flex-col gap-4">
-          <TabNav />
-          {content}
-        </div>
+        <div className="container mx-auto px-4 lg:px-8 flex flex-col gap-4">{content}</div>
       </main>
     </>
   );

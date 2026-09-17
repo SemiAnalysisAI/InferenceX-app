@@ -16,7 +16,7 @@ import {
   type SpecDecodePair,
 } from '@/lib/compare-variant-availability';
 import { COMPARE_MODEL_SLUGS, type CompareModelSlug } from '@/lib/compare-slug';
-import { formatModelList } from '@/lib/compare-ssr';
+import { formatModelListZh } from '@/lib/compare-ssr-zh';
 import {
   canonicalSpecDecodeCompareSlug,
   precisionDisplayLabel,
@@ -26,7 +26,7 @@ import { ZH_OG_LOCALE, zhAlternates } from '@/lib/i18n';
 
 export const dynamic = 'force-dynamic';
 
-const DESCRIPTION = `投机解码（MTP 多 token 预测、MiniMax M3 的 EAGLE 等模型专用方法）是否能提升推理吞吐量和降低成本？InferenceX 是 SemiAnalysis 推出的独立开源基准测试平台，提供经过验证的、可复现的测试结果。${SUPPORTERS_LINE_ZH}每个页面对比同一模型和芯片上投机解码开启与关闭的性能差异。`;
+const DESCRIPTION = `投机解码（例如 MTP 式多 token 预测，以及 MiniMax M3 所采用的 EAGLE 等模型专用方法）能否提升推理吞吐量并降低成本？InferenceX 是 SemiAnalysis 推出的独立开源基准测试平台，测试结果均经过验证且可复现。${SUPPORTERS_LINE_ZH}每个页面都会在同一模型和芯片上，对比启用某种投机解码方法与关闭投机解码时的表现。`;
 
 export const metadata: Metadata = {
   title: '芯片投机解码对比',
@@ -66,7 +66,7 @@ function buildCards(
     const methodLabel = specMethodDisplayLabel(model.displayName, method);
     return {
       slug: canonicalSpecDecodeCompareSlug(model.slug, gpu, precision, method),
-      label: `${gpuLabel} ${precLabel} — ${methodLabel} vs Off`,
+      label: `${gpuLabel} ${precLabel} — 启用 ${methodLabel} 与关闭投机解码`,
       archLine: `${gpuMeta?.vendor ?? '—'} · ${gpuMeta?.arch ?? '—'}`,
     };
   });
@@ -86,9 +86,10 @@ export default async function CompareSpecDecodeIndexPageZh() {
         <Card>
           <h1 className="text-2xl lg:text-4xl font-bold tracking-tight">芯片投机解码对比</h1>
           <p className="mt-3 text-base lg:text-lg text-muted-foreground max-w-3xl">
-            {totalUrls.toLocaleString()} 组投机解码对比，涵盖 {formatModelList(modelsWithPairs)}
-            。每个页面对比同一模型和芯片上投机解码方法（MTP、EAGLE
-            等）开启与关闭的推理性能——在相同交互性水平下的吞吐量、成本和交互性。
+            共 {totalUrls.toLocaleString()} 组投机解码对比，涵盖{' '}
+            {formatModelListZh(modelsWithPairs)}
+            。每个页面都会在同一模型和芯片上，对比启用某种投机解码方法（MTP、EAGLE
+            等）与关闭投机解码时的推理表现，并在相同交互性水平下比较吞吐量和成本。
           </p>
           <div className="mt-6 flex flex-wrap gap-3" data-testid="compare-spec-decode-index-links">
             <Link
@@ -122,7 +123,7 @@ export default async function CompareSpecDecodeIndexPageZh() {
               <div>
                 <h2 className="text-xl lg:text-2xl font-bold tracking-tight">{model.label}</h2>
                 <p className="text-sm text-muted-foreground mt-1">
-                  {pairs.length} 组投机解码对比具有 {model.label} 的基准测试数据。
+                  在 {model.label} 上共有 {pairs.length} 组投机解码对比，均有基准测试数据。
                 </p>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -133,6 +134,7 @@ export default async function CompareSpecDecodeIndexPageZh() {
                     slug={slug}
                     label={label}
                     archLine={archLine}
+                    locale="zh"
                   />
                 ))}
               </div>

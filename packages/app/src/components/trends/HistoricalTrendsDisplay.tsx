@@ -10,9 +10,11 @@ import {
   useInferenceDisplay,
   useInferenceFilters,
 } from '@/components/inference/InferenceContext';
+import { useGlobalFilterSelection } from '@/components/GlobalFilterContext';
 import { useInterpolatedTrendData } from '@/components/inference/hooks/useInterpolatedTrendData';
 import type { TrendLineConfig } from '@/components/inference/types';
 import ChartControls from '@/components/inference/ui/ChartControls';
+import { CostTierSelector } from '@/components/inference/ui/CostTierSelector';
 import TrendChart from '@/components/inference/ui/TrendChart';
 import { Card } from '@/components/ui/card';
 import { ChartButtons } from '@/components/ui/chart-buttons';
@@ -42,10 +44,17 @@ import { useThemeColors } from '@/hooks/useThemeColors';
 import {
   includesJalapenoResult,
   includesVeraRubinResult,
+  includesTpuv7Result,
   JalapenoOfficialPreviewNotice,
   VeraRubinOfficialPreviewNotice,
+  Tpuv7OfficialPreviewNotice,
 } from '@/components/official-preview-notice';
-import { metricLabel, metricTitle } from '@/lib/chart-utils';
+import { metricChartTitle, metricLabel } from '@/lib/chart-utils';
+import {
+  costTierOptionLabel,
+  metricCostTier,
+  type MetricKey,
+} from '@/components/inference/metric-registry';
 import { Button } from '@/components/ui/button';
 
 const STRINGS = {
@@ -100,6 +109,7 @@ function historicalRunDate(date: string, locale: 'en' | 'zh'): string {
 }
 
 export default function HistoricalTrendsDisplay() {
+  const { tcoBasis } = useGlobalFilterSelection();
   const locale = useLocale();
   const t = STRINGS[locale];
   const { graphs, loading, error, hardwareConfig, hwTypesWithData, availableDates } =
@@ -117,8 +127,11 @@ export default function HistoricalTrendsDisplay() {
     setHighContrast,
   } = useInferenceActions();
 
-  // Check if interactivity chart data exists
-  const hasInteractivityChart = graphs.some((g) => g.chartDefinition.chartType === 'interactivity');
+  // Graph definitions can outlive empty results; hardware metadata is built
+  // from source rows before selected-metric coverage and clipping filters.
+  const hasInteractivityChart =
+    Object.keys(hardwareConfig).length > 0 &&
+    graphs.some((g) => g.chartDefinition.chartType === 'interactivity');
 
   // Get Y-axis label and title from chart definition
   const currentYLabel = useMemo(() => {
@@ -128,7 +141,7 @@ export default function HistoricalTrendsDisplay() {
 
   const currentYTitle = useMemo(() => {
     if (graphs.length === 0) return '';
-    return metricTitle(graphs[0].chartDefinition, selectedYAxisMetric, locale);
+    return metricChartTitle(graphs[0].chartDefinition, selectedYAxisMetric, locale);
   }, [graphs, locale, selectedYAxisMetric]);
 
   // Interactivity range from current chart data
@@ -185,6 +198,7 @@ export default function HistoricalTrendsDisplay() {
     availableDates,
     tokenRevenuePricing,
     enabled: hasInteractivityChart,
+    tcoBasis,
   });
 
   // High contrast color support
@@ -223,6 +237,7 @@ export default function HistoricalTrendsDisplay() {
   );
   const showsJalapenoPreview = includesJalapenoResult(lineConfigs.map((config) => config.hwKey));
   const showsVeraRubinPreview = includesVeraRubinResult(lineConfigs.map((config) => config.hwKey));
+  const showsTpuv7Preview = includesTpuv7Result(lineConfigs.map((config) => config.hwKey));
 
   // Check `error` before the loading skeleton: a failed benchmark query never
   // produces rows, so `loading` (which includes "no rows yet") would otherwise
@@ -259,7 +274,11 @@ export default function HistoricalTrendsDisplay() {
         <Card className="relative z-30">
           <div className="flex flex-col gap-4">
             <DashboardSectionHeader title={t.heading} description={t.description} />
-            <ChartControls hideGpuComparison />
+            <ChartControls
+              tcoSource="historical"
+              hideGpuComparison
+              showTcoBasis={[...activeHwTypes].some((key) => key.split('_')[0] === 'tpuv7')}
+            />
             <div className="space-y-2">
               <Skeleton className="h-5 w-56" />
               <Skeleton className="h-9 w-full" />
@@ -311,7 +330,11 @@ export default function HistoricalTrendsDisplay() {
             description={t.description}
             actions={<ChartShareActions />}
           />
-          <ChartControls hideGpuComparison />
+          <ChartControls
+            tcoSource="historical"
+            hideGpuComparison
+            showTcoBasis={[...activeHwTypes].some((key) => key.split('_')[0] === 'tpuv7')}
+          />
 
           {/* Target interactivity slider */}
           {!loading && hasInteractivityChart && (
@@ -416,6 +439,16 @@ export default function HistoricalTrendsDisplay() {
                         .map((prec: string) => getPrecisionLabel(prec as Precision))
                         .join(', ')}
                       metric={currentYLabel}
+                      costTier={(() => {
+                        const tier = metricCostTier(
+                          selectedYAxisMetric.replace(/^y_/u, '') as MetricKey,
+                        );
+                        // Same copy as the selector so a PNG export matches it.
+                        return tier ? costTierOptionLabel(tier, locale) : undefined;
+                      })()}
+                      // The trend chart prices every point from the published
+                      // tiers, so Custom User Values is not offered here.
+                      costTierControl={<CostTierSelector allowCustom={false} />}
                       target={`${targetInteractivity} tok/s/user`}
                       date={
                         selectedRunDate ? historicalRunDate(selectedRunDate, locale) : undefined
@@ -424,11 +457,13 @@ export default function HistoricalTrendsDisplay() {
                     />
                     {showsJalapenoPreview && <JalapenoOfficialPreviewNotice />}
                     {showsVeraRubinPreview && <VeraRubinOfficialPreviewNotice />}
+                    {showsTpuv7Preview && <Tpuv7OfficialPreviewNotice />}
                     <MetricAssumptionNotes
                       selectedYAxisMetric={selectedYAxisMetric}
                       activeHwKeys={activeHwTypes}
                       includeAllPowerThroughputMetrics={false}
                       includePowerThroughputCaveat={false}
+                      tcoBasis={tcoBasis}
                     />
                     <UnofficialDomainNotice />
                   </>

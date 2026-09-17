@@ -5,7 +5,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BarChart3, Table2 } from 'lucide-react';
 
 import chartDefinitions, {
+  costTierLabel,
+  costTierOptionLabel,
   isMeasuredEnergyConfigKey,
+  isModeledSystemPowerConfigKey,
+  metricCostTier,
   tokenMetricTypeForConfigKey,
   type MetricKey,
 } from '@/components/inference/metric-registry';
@@ -22,6 +26,7 @@ import {
   useInferenceDisplay,
   useInferenceFilters,
 } from '@/components/inference/InferenceContext';
+import { useGlobalFilterSelection } from '@/components/GlobalFilterContext';
 import type {
   ChartDefinition,
   HardwareConfig,
@@ -49,7 +54,7 @@ import { Heading } from '@/components/ui/heading';
 import { type SegmentedToggleOption, SegmentedToggle } from '@/components/ui/segmented-toggle';
 import { MetricAssumptionNotes } from '@/components/ui/chart-display-helpers';
 import { UnofficialDomainNotice } from '@/components/ui/unofficial-domain-notice';
-import { metricLabel, metricTitle, xAxisLabel } from '@/lib/chart-utils';
+import { metricChartTitle, metricLabel, xAxisLabel } from '@/lib/chart-utils';
 import { exportToCsv } from '@/lib/csv-export';
 import { inferenceChartToCsv } from '@/lib/csv-export-helpers';
 import { knownIssueCsvNote, matchKnownConfigIssues } from '@/lib/known-issues';
@@ -91,14 +96,16 @@ import { OffloadHaloLegendKey } from '@/components/inference/ui/OffloadHaloLegen
 import { LegacyPowerLegendKey } from '@/components/inference/ui/LegacyPowerLegendKey';
 import { ActiveQuickFilters } from '@/components/inference/ui/ActiveQuickFilters';
 import { ResultContext } from '@/components/ui/result-context';
+import { ModelLogo } from '@/components/ui/model-logo';
 
 import ChartNotices from './ChartNotices';
 import { MetricExplanation } from './MetricExplanation';
 import { OptionInfo } from '@/components/ui/option-info';
 import ChartControls from './ChartControls';
+import { CostTierSelector } from './CostTierSelector';
+import { InferenceTcoBadges } from './InferenceTcoBadges';
 import { XAxisModeSelector } from './XAxisModeSelector';
 import ComparisonChangelog from './ComparisonChangelog';
-import CustomCosts from './CustomCosts';
 import CustomPowers from './CustomPowers';
 import GPUGraph from './GPUGraph';
 import ReplayLauncher, { type ReplayLauncherHandle } from '../replay/ReplayLauncher';
@@ -123,11 +130,15 @@ const STRINGS = {
     updated: 'Updated:',
     e2eNormIntvtyDisclaimer:
       'E2E Normalized Interactivity requires persisted per-request traces, so unofficial-run overlays are unavailable for this experimental view.',
+    systemPowerAssumptions:
+      '8k1k estimate from validated GPU telemetry · CPU/DRAM utilization 20% · Eight-GPU chassis models; a partially allocated chassis is extrapolated to a full chassis at the measured per-GPU power. Chassis AC includes platform overheads; PUE is applied separately for facility power. Click a point for measured GPU power, topology, and power model provenance. Unsupported inputs are omitted.',
     completedSequenceLengths: (count: string) =>
       `Completed requests across all resident points (n=${count})`,
     viewMode: 'View mode',
     noChartData:
       'No benchmark data matches the current model, scenario, and filter selection. Adjust the filters above to see results.',
+    noSystemPowerData:
+      'No system-power estimates are available for this selection. Choose 8K / 1K with validated GPU telemetry, supported hardware, and known eight-GPU chassis placement. Measured GPU power remains available separately where telemetry exists.',
     vsTtft: (word: string) => `vs. ${word} Time To First Token`,
     vsE2eLatency: (pctl?: string) =>
       pctl ? `vs. ${pctl} End-to-end Latency` : 'vs. End-to-end Latency',
@@ -147,9 +158,13 @@ const STRINGS = {
     updated: '更新时间：',
     e2eNormIntvtyDisclaimer:
       '端到端归一化交互性需要持久化的逐请求 trace 数据，因此该实验性视图不支持非官方运行覆盖。',
+    systemPowerAssumptions:
+      '基于已验证 GPU 遥测的 8k1k 估算 · CPU/DRAM 利用率 20% · 采用八卡机箱模型；仅使用部分 GPU 的机箱按实测每卡功耗外推至满机箱。机箱交流功耗包含平台开销；数据中心功耗另行应用 PUE。点击数据点可查看 GPU 实测功耗、拓扑和功耗模型来源。不支持的输入不绘制。',
     completedSequenceLengths: (count: string) => `当前所有数据点的已完成请求（n=${count}）`,
     viewMode: '视图模式',
     noChartData: '当前模型、场景与筛选条件下没有匹配的基准测试数据。请调整上方筛选条件查看结果。',
+    noSystemPowerData:
+      '当前选择没有可用的系统功耗估算。请选择 8K / 1K 场景；估算仅覆盖 GPU 遥测已验证、硬件受支持、八卡机箱位置已知的运行。存在遥测数据时，仍可单独查看 GPU 实测功耗。',
     vsTtft: (word: string) => `vs. ${word === 'Median' ? '中位' : word} 首 token 延迟（TTFT）`,
     vsE2eLatency: (pctl?: string) => (pctl ? `vs. ${pctl} 端到端延迟` : 'vs. 端到端延迟'),
   },
@@ -232,6 +247,21 @@ export function formatTokenLength(value: number): string {
  * which seed the model/scenario/metric via providers instead of user-facing
  * selectors. The run-date changelog strip and the charts themselves remain.
  */
+// Module-level so the caption's `MetricAssumptionNotes` gets a stable renderer.
+function renderInferenceTcoBadges(props: {
+  label: string;
+  values: Record<string, number>;
+  blankedBases?: string[];
+}) {
+  return (
+    <InferenceTcoBadges
+      label={props.label}
+      values={props.values}
+      blankedBases={props.blankedBases}
+    />
+  );
+}
+
 export default function ChartDisplay({ embedded = false }: { embedded?: boolean } = {}) {
   const locale = useLocale();
   const t = STRINGS[locale];
@@ -249,6 +279,8 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
     activeDates,
     compareGpuPair,
     quickFilters,
+    minimalChrome,
+    userCosts,
   } = useInferenceFilters();
   const {
     selectedYAxisMetric,
@@ -257,6 +289,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
     selectedPercentile,
     selectedXAxisMode,
     tokenRevenuePricing,
+    showLineLabels,
   } = useInferenceDisplay();
   const { setSelectedDates, setSelectedDatesFromRunExpansion, setIsLegendExpanded } =
     useInferenceActions();
@@ -369,6 +402,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
     activeOverlayHwTypes,
     localOfficialOverride,
   } = useUnofficialRun();
+  const { tcoBasis } = useGlobalFilterSelection();
 
   // Compute overlay data for each chart type — must match useChartData processing
   const overlayDataByChartType = useMemo(() => {
@@ -419,6 +453,8 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
         {
           isAgentic,
           selectedPercentile,
+          tcoBasis,
+          selectedXAxisMode,
         },
       );
 
@@ -470,6 +506,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
     selectedPercentile,
     selectedXAxisMode,
     tokenRevenuePricing,
+    tcoBasis,
     compareGpuPair,
   ]);
 
@@ -784,7 +821,11 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
               data-testid="chart-empty-state"
               className="flex min-h-[320px] items-center justify-center"
             >
-              <p className="max-w-md text-center text-sm text-muted-foreground">{t.noChartData}</p>
+              <p className="max-w-md text-center text-sm text-muted-foreground">
+                {isModeledSystemPowerConfigKey(selectedYAxisMetric)
+                  ? t.noSystemPowerData
+                  : t.noChartData}
+              </p>
             </Card>,
           ]
         : renderableGraphs.map((graph, graphIndex) => {
@@ -846,7 +887,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                       <AtomEngineFootnote className="min-w-0 flex-[1_1_24rem] text-xs leading-5" />
                     )}
                   </div>
-                  {residentSequenceLengths && (
+                  {residentSequenceLengths && !minimalChrome && (
                     <p
                       className="text-3xs leading-tight text-muted-foreground/70"
                       data-testid="resident-sequence-lengths"
@@ -873,107 +914,109 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
             return (
               <section key={graphIndex}>
                 <figure data-testid="chart-figure" className="relative min-w-0 rounded-xl">
-                  <ChartButtons
-                    chartId={`chart-${graphIndex}`}
-                    mobileVisible
-                    analyticsPrefix={
-                      isTimelineMode
-                        ? 'gpu_timeseries'
-                        : graph.chartDefinition.chartType === 'e2e'
-                          ? 'latency'
-                          : 'interactivity'
-                    }
-                    leadingControls={
-                      <>
-                        <SegmentedToggle
-                          value={getViewMode(graphIndex)}
-                          options={viewModeOptions}
-                          onValueChange={(v) => handleViewModeChange(graphIndex, v)}
-                          ariaLabel={t.viewMode}
-                          testId={`inference-view-toggle-${graphIndex}`}
-                        />
-                      </>
-                    }
-                    hideImageExport={getViewMode(graphIndex) === 'table'}
-                    setIsLegendExpanded={setIsLegendExpanded}
-                    exportFileName={`InferenceX_${selectedModel}_${graph.chartDefinition.chartType}`}
-                    onExportMp4={
-                      replayAvailable
-                        ? () => replayHandlesRef.current[graphIndex]?.open()
-                        : undefined
-                    }
-                    onExportCsv={() => {
-                      const candidateVisibleData = isTimelineMode
-                        ? graph.data.filter((d) => activeDates.has(`${d.date}_${d.hwKey}`))
-                        : graph.data;
-                      const overlay = selectUnofficialOverlayForMode(
-                        selectedXAxisMode,
-                        graph.chartDefinition.chartType,
-                        overlayDataByChartType,
-                      );
-                      const {
-                        officialRows: visibleData,
-                        overlayRows: visibleOverlayRowsForExport,
-                      } = isTimelineMode
-                        ? { officialRows: candidateVisibleData, overlayRows: [] }
-                        : visibleComparisonRows(candidateVisibleData, overlay);
-                      const { headers, rows } = inferenceChartToCsv(
-                        visibleData,
-                        graph.model,
-                        graph.sequence,
-                        visibleOverlayRowsForExport,
-                        {
-                          yHeader: metricLabel(graph.chartDefinition, selectedYAxisMetric, locale),
-                          yPath: (graph.chartDefinition as ChartDefinition)[
-                            selectedYAxisMetric
-                          ] as string,
-                          xHeader: resolvedXLabel,
-                        },
-                      );
-                      // Match warnings against the same series the chart annotates,
-                      // including visible unofficial-run overlay series.
-                      const issueNotes = matchKnownConfigIssues(graph.model, [
-                        ...visibleData,
-                        ...visibleOverlayRowsForExport,
-                      ]).map((issue) =>
-                        knownIssueCsvNote(issue, getDisplayLabel(getHardwareConfig(issue.hwKey))),
-                      );
-                      exportToCsv(
-                        `InferenceX_${selectedModel}_${graph.chartDefinition.chartType}`,
-                        headers,
-                        rows,
-                        issueNotes,
-                      );
-                    }}
-                  />
+                  {!minimalChrome && (
+                    <ChartButtons
+                      chartId={`chart-${graphIndex}`}
+                      mobileVisible
+                      analyticsPrefix={
+                        isTimelineMode
+                          ? 'gpu_timeseries'
+                          : graph.chartDefinition.chartType === 'e2e'
+                            ? 'latency'
+                            : 'interactivity'
+                      }
+                      leadingControls={
+                        <>
+                          <SegmentedToggle
+                            value={getViewMode(graphIndex)}
+                            options={viewModeOptions}
+                            onValueChange={(v) => handleViewModeChange(graphIndex, v)}
+                            ariaLabel={t.viewMode}
+                            testId={`inference-view-toggle-${graphIndex}`}
+                          />
+                        </>
+                      }
+                      hideImageExport={getViewMode(graphIndex) === 'table'}
+                      setIsLegendExpanded={setIsLegendExpanded}
+                      hideLegendOnExport={showLineLabels}
+                      exportFileName={`InferenceX_${selectedModel}_${graph.chartDefinition.chartType}`}
+                      onExportMp4={
+                        replayAvailable
+                          ? () => replayHandlesRef.current[graphIndex]?.open()
+                          : undefined
+                      }
+                      onExportCsv={() => {
+                        const candidateVisibleData = isTimelineMode
+                          ? graph.data.filter((d) => activeDates.has(`${d.date}_${d.hwKey}`))
+                          : graph.data;
+                        const overlay = selectUnofficialOverlayForMode(
+                          selectedXAxisMode,
+                          graph.chartDefinition.chartType,
+                          overlayDataByChartType,
+                        );
+                        const {
+                          officialRows: visibleData,
+                          overlayRows: visibleOverlayRowsForExport,
+                        } = isTimelineMode
+                          ? { officialRows: candidateVisibleData, overlayRows: [] }
+                          : visibleComparisonRows(candidateVisibleData, overlay);
+                        const { headers, rows } = inferenceChartToCsv(
+                          visibleData,
+                          graph.model,
+                          graph.sequence,
+                          visibleOverlayRowsForExport,
+                          {
+                            yHeader: metricLabel(
+                              graph.chartDefinition,
+                              selectedYAxisMetric,
+                              locale,
+                            ),
+                            yPath: (graph.chartDefinition as ChartDefinition)[
+                              selectedYAxisMetric
+                            ] as string,
+                            xHeader: resolvedXLabel,
+                          },
+                        );
+                        // Match warnings against the same series the chart annotates,
+                        // including visible unofficial-run overlay series.
+                        const issueNotes = matchKnownConfigIssues(graph.model, [
+                          ...visibleData,
+                          ...visibleOverlayRowsForExport,
+                        ]).map((issue) =>
+                          knownIssueCsvNote(issue, getDisplayLabel(getHardwareConfig(issue.hwKey))),
+                        );
+                        exportToCsv(
+                          `InferenceX_${selectedModel}_${graph.chartDefinition.chartType}`,
+                          headers,
+                          rows,
+                          issueNotes,
+                        );
+                      }}
+                    />
+                  )}
                   <Card data-coach-mark-root="">
                     {(() => {
                       const chartCaption = (
                         <>
                           <div className="flex items-start gap-1">
                             <Heading as="h2" level="card">
-                              {metricTitle(graph.chartDefinition, selectedYAxisMetric, locale)}{' '}
+                              {/* Model + workload lead the heading; the cost tier that used
+                                  to trail the metric title lives in the caption's Cost Tier
+                                  line instead, so the title reads as one measurement. */}
+                              <ModelLogo
+                                model={graph.model as Model}
+                                className="mr-2 size-6 align-[-0.3em]"
+                              />
+                              {getModelLabel(graph.model as Model)}{' '}
+                              {getSequenceLabel(graph.sequence as Sequence, locale)}{' '}
+                              {metricChartTitle(graph.chartDefinition, selectedYAxisMetric, locale)}{' '}
                               {(() => {
-                                // For Input metrics with dynamic x-axis, use dynamic heading.
-                                // Classify off the ENGLISH title — the localized one has no
-                                // 'input' substring to match on zh pages.
-                                const isInputMetric = metricTitle(
-                                  graph.chartDefinition,
-                                  selectedYAxisMetric,
-                                  'en',
-                                )
-                                  .toLowerCase()
-                                  .includes('input');
-                                if (
-                                  graph.chartDefinition.chartType === 'interactivity' &&
-                                  isInputMetric &&
-                                  selectedXAxisMetric
-                                ) {
-                                  if (selectedXAxisMetric === 'p99_ttft') {
-                                    return t.vsTtft('P99');
-                                  } else if (selectedXAxisMetric === 'median_ttft') {
-                                    return t.vsTtft('Median');
-                                  }
+                                const xField = graph.chartDefinition.x_scale_field;
+                                if (xField?.endsWith('_ttft')) {
+                                  const percentile = xField.replace(/_ttft$/u, '');
+                                  return t.vsTtft(
+                                    percentile === 'median' ? 'Median' : percentile.toUpperCase(),
+                                  );
                                 }
 
                                 // The e2e chart heading follows the branch-level x-axis
@@ -987,29 +1030,17 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                                         : modeSpec.heading;
                                     return heading(selectedPercentile.toUpperCase());
                                   }
-                                  if (selectedE2eXAxisMetric?.endsWith('_ttft')) {
-                                    const percentile = selectedE2eXAxisMetric.replace(
-                                      /_ttft$/u,
-                                      '',
-                                    );
-                                    const word =
-                                      percentile === 'median' ? 'Median' : percentile.toUpperCase();
-                                    return t.vsTtft(word);
-                                  }
                                   return isAgenticSequence
                                     ? t.vsE2eLatency(selectedPercentile.toUpperCase())
                                     : t.vsE2eLatency();
                                 }
 
                                 // Fall back to configured heading
-                                const configured =
-                                  graph.chartDefinition[
-                                    `${selectedYAxisMetric}_heading` as keyof typeof graph.chartDefinition
-                                  ] || graph.chartDefinition.heading;
+                                const configured = graph.chartDefinition.heading;
                                 return locale === 'zh' ? zhHeading(String(configured)) : configured;
                               })()}
                             </Heading>
-                            {embedded && (
+                            {embedded && !minimalChrome && (
                               <OptionInfo
                                 label={metricRowLabel(
                                   selectedYAxisMetric.replace(/^y_/u, '') as MetricKey,
@@ -1025,12 +1056,35 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                           </div>
                           <ResultContext
                             locale={locale}
-                            model={getModelLabel(graph.model as Model)}
-                            workload={getSequenceLabel(graph.sequence as Sequence, locale)}
-                            precision={selectedPrecisions
-                              .map((prec) => getPrecisionLabel(prec as Precision))
-                              .join(', ')}
-                            metric={metricLabel(graph.chartDefinition, selectedYAxisMetric, locale)}
+                            // The dashboard shows the Precision selector right above the
+                            // chart, so the caption omits it there; embedded model pages
+                            // render no controls and keep it as the only precision cue.
+                            precision={
+                              embedded
+                                ? selectedPrecisions
+                                    .map((precision) => getPrecisionLabel(precision as Precision))
+                                    .join(', ')
+                                : undefined
+                            }
+                            costTier={(() => {
+                              const tier = metricCostTier(
+                                selectedYAxisMetric.replace(/^y_/u, '') as MetricKey,
+                              );
+                              if (!tier) return undefined;
+                              // With the selector in the caption, the export twin
+                              // prints the selector's own copy so a PNG export
+                              // matches the control; plain-text captions keep
+                              // the caption label.
+                              return embedded || minimalChrome
+                                ? costTierLabel(tier, locale)
+                                : costTierOptionLabel(tier, locale);
+                            })()}
+                            // The dashboard picks the pricing basis right here in the
+                            // caption; embedded model pages render no controls and
+                            // keep the plain-text tier.
+                            costTierControl={
+                              embedded || minimalChrome ? undefined : <CostTierSelector />
+                            }
                             date={selectedRunDate}
                             dates={selectedDates}
                             dateRange={
@@ -1067,10 +1121,23 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                                 : undefined
                             }
                           />
-                          <MetricAssumptionNotes
-                            selectedYAxisMetric={selectedYAxisMetric}
-                            activeHwKeys={captionHwKeys}
-                          />
+                          {!minimalChrome && (
+                            <MetricAssumptionNotes
+                              tcoBasis={tcoBasis}
+                              selectedYAxisMetric={selectedYAxisMetric}
+                              activeHwKeys={captionHwKeys}
+                              userCosts={userCosts}
+                              renderCostBadges={renderInferenceTcoBadges}
+                            />
+                          )}
+                          {isModeledSystemPowerConfigKey(selectedYAxisMetric) && (
+                            <p
+                              className="mb-2 text-xs text-muted-foreground"
+                              data-testid="modeled-system-power-assumptions"
+                            >
+                              {t.systemPowerAssumptions}
+                            </p>
+                          )}
                           {isUnofficialRun &&
                             selectedXAxisMode === 'e2e-normalized-interactivity' && (
                               <p className="mb-2 text-xs text-muted-foreground">
@@ -1155,7 +1222,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                       );
                     })()}
                     <ChartNotices chartId={`chart-${graphIndex}`} notices={footerNotices} />
-                    {replayAvailable && (
+                    {replayAvailable && !minimalChrome && (
                       <ReplayLauncher
                         ref={(handle) => {
                           replayHandlesRef.current[graphIndex] = handle;
@@ -1174,67 +1241,66 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
 
   return (
     <div data-testid="inference-chart-display" className="flex flex-col gap-4">
-      <section className="relative z-20">
-        <Card>
-          <div className="flex flex-col gap-4">
-            {!embedded && (
-              <>
-                <DashboardSectionHeader
-                  title={t.inferencePerformance}
-                  description={t.inferencePerformanceDesc}
-                  actions={<ShareButton />}
+      {!minimalChrome && (
+        <section className="relative z-20">
+          <Card>
+            <div className="flex flex-col gap-4">
+              {!embedded && (
+                <>
+                  <DashboardSectionHeader
+                    title={t.inferencePerformance}
+                    description={t.inferencePerformanceDesc}
+                    actions={<ShareButton />}
+                  />
+                  <ChartControls
+                    showXAxisMode
+                    showTcoBasis={[...captionHwKeys].some((key) => key.split('_')[0] === 'tpuv7')}
+                  />
+                </>
+              )}
+              {embedded && (
+                <div className="w-full max-w-sm">
+                  <XAxisModeSelector />
+                </div>
+              )}
+              {selectedGPUs.length === 0 && <WorkflowInfoDisplay />}
+              {selectedGPUs.length > 0 && (
+                <ComparisonChangelog
+                  changelogs={changelogs}
+                  selectedGPUs={selectedGPUs}
+                  selectedPrecisions={selectedPrecisions}
+                  modelDbKeys={modelDbKeys}
+                  selectedSequence={selectedSequence}
+                  defaultExpanded={!embedded}
+                  loading={changelogsLoading}
+                  totalDatesQueried={totalDatesQueried}
+                  selectedDates={selectedDates}
+                  selectedDateRange={selectedDateRange}
+                  onAddDate={(date) => {
+                    // Functional updater: adding several runs in quick succession must
+                    // each build on the latest state, not the value captured at render.
+                    setSelectedDates((prev) => (prev.includes(date) ? prev : [...prev, date]));
+                  }}
+                  onRemoveDate={(date) => {
+                    setSelectedDates((prev) => prev.filter((d) => d !== date));
+                  }}
+                  onAddAllDates={(dates) => {
+                    setSelectedDates((prev) => [...new Set([...prev, ...dates])]);
+                  }}
+                  firstAvailableDate={dateRangeAvailableDates[0]}
                 />
-                <ChartControls showXAxisMode />
-              </>
-            )}
-            {embedded && (
-              <div className="w-full max-w-sm">
-                <XAxisModeSelector />
-              </div>
-            )}
-            {selectedGPUs.length === 0 && <WorkflowInfoDisplay />}
-            {selectedGPUs.length > 0 && (
-              <ComparisonChangelog
-                changelogs={changelogs}
-                selectedGPUs={selectedGPUs}
-                selectedPrecisions={selectedPrecisions}
-                modelDbKeys={modelDbKeys}
-                selectedSequence={selectedSequence}
-                defaultExpanded={!embedded}
-                loading={changelogsLoading}
-                totalDatesQueried={totalDatesQueried}
-                selectedDates={selectedDates}
-                selectedDateRange={selectedDateRange}
-                onAddDate={(date) => {
-                  // Functional updater: adding several runs in quick succession must
-                  // each build on the latest state, not the value captured at render.
-                  setSelectedDates((prev) => (prev.includes(date) ? prev : [...prev, date]));
-                }}
-                onRemoveDate={(date) => {
-                  setSelectedDates((prev) => prev.filter((d) => d !== date));
-                }}
-                onAddAllDates={(dates) => {
-                  setSelectedDates((prev) => [...new Set([...prev, ...dates])]);
-                }}
-                firstAvailableDate={dateRangeAvailableDates[0]}
-              />
-            )}
-          </div>
-        </Card>
-      </section>
-
-      {(selectedYAxisMetric === 'y_costUser' ||
-        selectedYAxisMetric === 'y_tokensPerDollarUser') && (
-        <section>
-          <CustomCosts loading={loading} />
+              )}
+            </div>
+          </Card>
         </section>
       )}
-      {selectedYAxisMetric === 'y_powerUser' && (
+
+      {!minimalChrome && selectedYAxisMetric === 'y_powerUser' && (
         <section>
           <CustomPowers loading={loading} />
         </section>
       )}
-      <ActiveQuickFilters />
+      {!minimalChrome && <ActiveQuickFilters />}
       <div
         className="motion-stale flex flex-col gap-4"
         data-stale={isRefetching || undefined}

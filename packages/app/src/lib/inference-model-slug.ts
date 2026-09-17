@@ -17,8 +17,8 @@
  * (e.g. `/inference/deepseek-v4-pro`), all 308-redirecting to the canonical
  * slug so exactly one URL per model is ever indexed.
  */
-import { COMPARE_MODEL_ALIASES, COMPARE_MODEL_SLUGS } from '@/lib/compare-slug';
-import { getModelCategory, Model } from '@/lib/data-mappings';
+import { COMPARE_MODEL_ALIASES, COMPARE_MODEL_SLUGS } from './compare-slug';
+import { getModelCategory, Model } from './data-mappings';
 
 export interface InferenceModelSlug {
   /** Canonical URL slug, e.g. 'kimi-k3'. Lowercase, matches the compare slug. */

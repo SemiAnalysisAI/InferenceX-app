@@ -74,4 +74,31 @@ describe('SegmentedToggle', () => {
 
     expect(handleValueChange).toHaveBeenCalledExactlyOnceWith('correlation');
   });
+
+  it('does not activate a disabled option', () => {
+    const handleValueChange = vi.fn();
+    act(() => {
+      root.render(
+        React.createElement(SegmentedToggle, {
+          value: 'chart',
+          options: [OPTIONS[0]!, { ...OPTIONS[1]!, disabled: true }],
+          onValueChange: handleValueChange,
+          ariaLabel: 'View mode',
+        }),
+      );
+    });
+
+    const disabledButton = container.querySelector<HTMLButtonElement>(
+      '[data-testid="correlation-option"]',
+    )!;
+    expect(disabledButton.disabled).toBe(true);
+    act(() => disabledButton.click());
+    expect(handleValueChange).not.toHaveBeenCalled();
+
+    const enabledButton = container.querySelector<HTMLButtonElement>(
+      '[data-testid="chart-option"]',
+    )!;
+    act(() => enabledButton.click());
+    expect(handleValueChange).toHaveBeenCalledExactlyOnceWith('chart');
+  });
 });

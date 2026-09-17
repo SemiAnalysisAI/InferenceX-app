@@ -22,6 +22,7 @@ import {
 } from '@/components/favorites/favorite-presets';
 
 import {
+  latestRunId,
   useGlobalFilterActions,
   useGlobalFilterAvailability,
   useGlobalFilterRun,
@@ -54,13 +55,16 @@ import {
   useUrlStateSync,
 } from '@/hooks/useChartContext';
 import { useUrlState } from '@/hooks/useUrlState';
+import { useParetoHighlightToggle } from './hooks/useParetoHighlightToggle';
 import { useOpenRouterPricing } from '@/hooks/api/use-openrouter-pricing';
 import { DEFAULT_Y_AXIS_METRIC } from '@/lib/url-state';
 import { computeToggle } from '@/hooks/useTogglableSet';
 import { buildAvailabilityHwKey } from '@/lib/chart-utils';
 import { getHardwareConfig, getModelSortIndex, isKnownGpu } from '@/lib/constants';
+import { frameworkFamily } from '@/lib/framework-family';
 import {
   getOpenRouterModelId,
+  isBestPerSkuDefaultOff,
   MODEL_PREFIX_MAPPING,
   Sequence,
   sequenceKind,
@@ -206,6 +210,8 @@ export function InferenceProvider({
   initialBenchmarkRows,
   initialYAxisMetric,
   autoSelectAllGpus = false,
+  lockedFrameworks,
+  minimalChrome = false,
 }: {
   children: ReactNode;
   activeTab: string;
@@ -227,7 +233,7 @@ export function InferenceProvider({
   /**
    * Initial y-axis metric key when the URL has no `?i_metric=` param. Used by
    * `/compare-per-dollar/[slug]` to default the chart to
-   * `y_costh` (Cost per Million Total Tokens — Owning Hyperscaler) instead of
+   * `y_costh` (Cost per Million Total Tokens — Owning at Large Hyperscaler Volume) instead of
    * the dashboard's default `y_tokensPerDollarH`. URL param still wins so
    * existing shared links are unaffected.
    */
@@ -241,13 +247,30 @@ export function InferenceProvider({
    * auto-selection (or when the URL provided chips), user deselections stick.
    */
   autoSelectAllGpus?: boolean;
+  /**
+   * Serving-framework families (quick-filter keys such as `vllm`) the chart is
+   * pinned to. Used by the `/embed/model/[slug]` routes so a host page can
+   * scope the chart to the engine it documents. The lock replaces the
+   * user-editable framework quick filter (URL `i_fw` and dialog edits are
+   * ignored) and removes other engines' chip configs from the selectable set,
+   * so nothing outside the lock reaches the plot, legend, or changelog.
+   * `undefined` / empty = no lock.
+   */
+  lockedFrameworks?: readonly string[];
+  /**
+   * Strip the dashboard down to the chart and a plain legend: no x-axis mode
+   * selector, config changelog, chart toolbar, quick-filter chips, or legend
+   * switches/actions. Used by `/embed/model/[slug]`, where the host page owns
+   * the surrounding UI and a bare chart is what gets pasted.
+   */
+  minimalChrome?: boolean;
 }) {
   const locale = useLocale();
   const localeStrings = INFERENCE_CONTEXT_STRINGS[locale];
   const isActive =
     activeTab === 'inference' || activeTab === 'historical' || activeTab === 'compare';
 
-  const { selectedModel, effectiveSequence, sequenceResolved, effectivePrecisions } =
+  const { selectedModel, effectiveSequence, sequenceResolved, effectivePrecisions, tcoBasis } =
     useGlobalFilterSelection();
   const {
     setSelectedModel,
@@ -256,7 +279,8 @@ export function InferenceProvider({
     setSelectedRunDate,
     setSelectedRunId,
   } = useGlobalFilterActions();
-  const { selectedRunDate, selectedRunId, effectiveRunDate } = useGlobalFilterRun();
+  const { selectedRunDate, selectedRunDateRev, selectedRunId, effectiveRunDate } =
+    useGlobalFilterRun();
   const {
     availableModels,
     availableSequences,
@@ -270,6 +294,16 @@ export function InferenceProvider({
   const { isUnofficialRun } = useUnofficialRun();
 
   const { getUrlParam, setUrlParams } = useUrlState();
+  const [hasExplicitRunSelection, setHasExplicitRunSelection] = useState(() =>
+    Boolean(getUrlParam('g_rundate') || getUrlParam('g_runid')),
+  );
+  const selectRunManually = useCallback(
+    (runId: string) => {
+      setHasExplicitRunSelection(true);
+      setSelectedRunId(runId);
+    },
+    [setSelectedRunId],
+  );
 
   const [overviewHistoryPair, setOverviewHistoryPair] = useState(() => {
     const currentConfigKey = getUrlParam('i_overview_current');
@@ -454,7 +488,20 @@ export function InferenceProvider({
   // inactive/disabled even while the chart filters. The URL selections are applied
   // just below, after mount.
   const [quickFilterVendors, setQuickFilterVendors] = useState<string[]>([]);
-  const [quickFilterFrameworks, setQuickFilterFrameworks] = useState<string[]>([]);
+  const [quickFilterFrameworksState, setQuickFilterFrameworksState] = useState<string[]>([]);
+  // A framework lock pins the filter and makes edits no-ops; see the prop doc.
+  const frameworkLock = useMemo<string[] | null>(
+    () => (lockedFrameworks && lockedFrameworks.length > 0 ? [...lockedFrameworks] : null),
+    [lockedFrameworks],
+  );
+  const quickFilterFrameworks = frameworkLock ?? quickFilterFrameworksState;
+  const setQuickFilterFrameworks = useCallback(
+    (next: SetStateAction<string[]>) => {
+      if (frameworkLock) return;
+      setQuickFilterFrameworksState(next);
+    },
+    [frameworkLock],
+  );
   const [quickFilterDeployment, setQuickFilterDeployment] = useState<DeploymentMode[]>([]);
   const [quickFilterSpec, setQuickFilterSpec] = useState<SpecMode[]>([]);
   const [quickFilterPower, setQuickFilterPower] = useState<PowerTier[]>([]);
@@ -475,7 +522,7 @@ export function InferenceProvider({
     if (deployment.length > 0) setQuickFilterDeployment(deployment);
     if (spec.length > 0) setQuickFilterSpec(spec);
     if (power.length > 0) setQuickFilterPower(power);
-  }, [getUrlParam]);
+  }, [getUrlParam, setQuickFilterFrameworks]);
   const quickFilters = useMemo<QuickFilters>(
     () => ({
       vendors: quickFilterVendors,
@@ -510,9 +557,20 @@ export function InferenceProvider({
   });
 
   const [hideNonOptimal, setHideNonOptimal] = useState(() => getUrlParam('i_optimal') !== '0');
-  const [bestPerSku, setBestPerSku] = useState(
-    () => activeTab === 'inference' && getUrlParam('i_best') !== '0',
+  const [showAllMeasurements, setShowAllMeasurements] = useState(
+    () => getUrlParam('i_allpoints') === '1',
   );
+  // `i_best` records an explicit reader choice ('0' off, '1' on). Absent, the
+  // mode follows the model + scenario default, so charts that open with every
+  // configuration (MODEL_BEST_PER_SKU_DEFAULT_OFF) need no URL flag and the
+  // default can change later without breaking share links.
+  const [bestPerSkuChoice, setBestPerSku] = useState<boolean | null>(() => {
+    if (activeTab !== 'inference') return false;
+    const raw = getUrlParam('i_best');
+    return raw === '0' ? false : raw === '1' ? true : null;
+  });
+  const bestPerSkuDefault = !isBestPerSkuDefaultOff(selectedModel, effectiveSequence);
+  const bestPerSku = bestPerSkuChoice ?? bestPerSkuDefault;
   const labelScenarioKind = sequenceKind(effectiveSequence);
   const initialLabelState = useMemo(
     () =>
@@ -534,6 +592,16 @@ export function InferenceProvider({
     () => getUrlParam('i_gradlabel') === '1',
   );
   const [showLineLabels, setShowLineLabels] = useState(initialLabelState.showLineLabels);
+  const {
+    visible: showParetoFrontier,
+    playful: paretoFrontierPlayful,
+    setVisible: setShowParetoFrontier,
+  } = useParetoHighlightToggle(getUrlParam('i_frontier'));
+  const {
+    visible: showParetoHinterland,
+    playful: paretoHinterlandPlayful,
+    setVisible: setShowParetoHinterland,
+  } = useParetoHighlightToggle(getUrlParam('i_hinterland'));
   const [userCosts, setUserCosts] = useState<Record<string, number | undefined> | null>(null);
   const [userPowers, setUserPowers] = useState<Record<string, number | undefined> | null>(null);
 
@@ -577,18 +645,21 @@ export function InferenceProvider({
     [availableRuns, modelPrefixes, effectivePrecisions],
   );
 
+  // The latest run for this model on the selected date, by start time. Run ids
+  // are assigned at dispatch and a queued or re-run sweep can start after a
+  // later-dispatched one, so the greatest id is not necessarily the newest run
+  // (see `latestRunId`). The DB side already tiebreaks by `run_started_at`;
+  // this keeps the client's notion of "latest" consistent with it.
+  const latestRunIdForModel = useMemo(
+    () => latestRunId(filteredAvailableRuns),
+    [filteredAvailableRuns],
+  );
+
   const effectiveSelectedRunId = useMemo(() => {
     const filteredRunIds = Object.keys(filteredAvailableRuns);
     if (filteredRunIds.length === 0 || filteredRunIds.includes(selectedRunId)) return selectedRunId;
-    return filteredRunIds.reduce((max, id) => (id > max ? id : max), filteredRunIds[0]);
-  }, [filteredAvailableRuns, selectedRunId]);
-
-  // The latest run for this model on the selected date. GitHub run ids increase
-  // monotonically with time, so the lexicographically-greatest id is the newest run.
-  const latestRunIdForModel = useMemo(() => {
-    const ids = Object.keys(filteredAvailableRuns);
-    return ids.length > 0 ? ids.reduce((max, id) => (id > max ? id : max), ids[0]) : '';
-  }, [filteredAvailableRuns]);
+    return latestRunIdForModel;
+  }, [filteredAvailableRuns, selectedRunId, latestRunIdForModel]);
 
   // Only constrain the base query when an earlier-than-latest run is selected.
   const asOfRunId =
@@ -692,6 +763,12 @@ export function InferenceProvider({
     overviewHistoryPair,
     benchmarkQueryScope,
     selectedModel === initialBenchmarkModel ? initialBenchmarkRows : undefined,
+    tcoBasis,
+    activeTab === 'inference' &&
+      !autoSelectAllGpus &&
+      !isUnofficialRun &&
+      !hasExplicitRunSelection &&
+      selectedRunDateRev === 0,
   );
 
   // For GPU comparison date picker — use shared availability data from global filters
@@ -739,6 +816,10 @@ export function InferenceProvider({
       if (rowToSequence(r) !== effectiveSequence) continue;
       if (!effectivePrecisions.includes(r.precision)) continue;
       if (!r.hardware) continue;
+      if (frameworkLock) {
+        const family = frameworkFamily(r.framework);
+        if (!family || !frameworkLock.includes(family)) continue;
+      }
       const hwKey = buildAvailabilityHwKey(
         r.hardware,
         r.framework,
@@ -754,7 +835,14 @@ export function InferenceProvider({
         value: hw,
         label: getDisplayLabel(getHardwareConfig(hw, selectedModel)),
       }));
-  }, [availabilityRows, dbModelKeys, effectiveSequence, effectivePrecisions, selectedModel]);
+  }, [
+    availabilityRows,
+    dbModelKeys,
+    effectiveSequence,
+    effectivePrecisions,
+    selectedModel,
+    frameworkLock,
+  ]);
 
   // One-shot auto-selection of every available chip config (see the
   // `autoSelectAllGpus` prop doc). The selection is pre-resolved through the
@@ -1485,7 +1573,13 @@ export function InferenceProvider({
       i_dstart: selectedDateRange.startDate,
       i_dend: selectedDateRange.endDate,
       i_optimal: hideNonOptimal ? '' : '0',
-      i_best: bestPerSku ? '' : '0',
+      i_allpoints: showAllMeasurements ? '1' : '',
+      i_best:
+        bestPerSkuChoice === null || bestPerSkuChoice === bestPerSkuDefault
+          ? ''
+          : bestPerSkuChoice
+            ? '1'
+            : '0',
       i_label: serializedLabelState.i_label,
       i_hc: highContrast ? '1' : '',
       i_log: logScale ? '1' : '',
@@ -1497,6 +1591,8 @@ export function InferenceProvider({
       i_advlabel: serializedLabelState.i_advlabel,
       i_conclabel: showConcurrencyLabels ? '1' : '',
       i_gradlabel: showGradientLabels ? '1' : '',
+      i_frontier: showParetoFrontier ? (paretoFrontierPlayful ? '2' : '1') : '',
+      i_hinterland: showParetoHinterland ? (paretoHinterlandPlayful ? '2' : '1') : '',
       i_linelabel: serializedLabelState.i_linelabel,
       i_active: iActiveStr,
       i_vendor: quickFilterVendors.join(','),
@@ -1516,7 +1612,9 @@ export function InferenceProvider({
       selectedDates,
       selectedDateRange,
       hideNonOptimal,
-      bestPerSku,
+      showAllMeasurements,
+      bestPerSkuChoice,
+      bestPerSkuDefault,
       showPointLabels,
       highContrast,
       logScale,
@@ -1524,6 +1622,10 @@ export function InferenceProvider({
       useAdvancedLabels,
       showConcurrencyLabels,
       showGradientLabels,
+      showParetoFrontier,
+      showParetoHinterland,
+      paretoFrontierPlayful,
+      paretoHinterlandPlayful,
       showLineLabels,
       iActiveStr,
       quickFilterVendors,
@@ -1655,6 +1757,7 @@ export function InferenceProvider({
       hwTypesWithData,
       hardwareConfig,
       graphs,
+      selectionPoints,
       loading,
       refreshing,
       error,
@@ -1672,6 +1775,7 @@ export function InferenceProvider({
       hwTypesWithData,
       hardwareConfig,
       graphs,
+      selectionPoints,
       loading,
       refreshing,
       error,
@@ -1706,6 +1810,8 @@ export function InferenceProvider({
       activePresetId,
       presetGuardRef,
       compareGpuPair: compareGpuPair ?? null,
+      lockedFrameworks: frameworkLock,
+      minimalChrome,
     }),
     [
       activeHwTypes,
@@ -1724,6 +1830,8 @@ export function InferenceProvider({
       userPowers,
       activePresetId,
       compareGpuPair,
+      frameworkLock,
+      minimalChrome,
     ],
   );
 
@@ -1742,12 +1850,17 @@ export function InferenceProvider({
       scaleType,
       isLegendExpanded,
       hideNonOptimal,
+      showAllMeasurements,
       showPointLabels,
       highContrast,
       logScale,
       useAdvancedLabels,
       showConcurrencyLabels,
       showGradientLabels,
+      showParetoFrontier,
+      showParetoHinterland,
+      paretoFrontierPlayful,
+      paretoHinterlandPlayful,
       showLineLabels,
     }),
     [
@@ -1764,12 +1877,17 @@ export function InferenceProvider({
       scaleType,
       isLegendExpanded,
       hideNonOptimal,
+      showAllMeasurements,
       showPointLabels,
       highContrast,
       logScale,
       useAdvancedLabels,
       showConcurrencyLabels,
       showGradientLabels,
+      showParetoFrontier,
+      showParetoHinterland,
+      paretoFrontierPlayful,
+      paretoHinterlandPlayful,
       showLineLabels,
     ],
   );
@@ -1800,12 +1918,15 @@ export function InferenceProvider({
     setQuickFilterPower,
     setIsLegendExpanded,
     setHideNonOptimal,
+    setShowAllMeasurements,
     setShowPointLabels,
     setHighContrast,
     setLogScale,
     setUseAdvancedLabels,
     setShowConcurrencyLabels,
     setShowGradientLabels,
+    setShowParetoFrontier,
+    setShowParetoHinterland,
     setShowLineLabels,
     setSelectedGPUs: setSelectedGPUsAndClear,
     setSelectedDates: setSelectedDatesAndClear,
@@ -1813,7 +1934,7 @@ export function InferenceProvider({
     setSelectedDateRange: setSelectedDateRangeAndClear,
     setUserCosts,
     setSelectedRunDate,
-    setSelectedRunId,
+    setSelectedRunId: selectRunManually,
     setUserPowers,
     setHwFilter: setPendingHwFilter,
     setActivePresetId,

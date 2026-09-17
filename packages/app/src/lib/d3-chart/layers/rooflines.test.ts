@@ -267,6 +267,32 @@ describe('renderRooflines', () => {
 // ── updateRooflinesOnZoom ────────────────────────────────────────────
 
 describe('updateRooflinesOnZoom', () => {
+  it('keeps explicitly linear operating curves straight after zooming', () => {
+    const group = createMockGroup();
+    const { xScale, yScale } = makeScales();
+    renderRooflines(
+      group as any,
+      SAMPLE_ROOFLINES,
+      xScale,
+      yScale,
+      makeConfig({ curve: d3.curveLinear }),
+    );
+    const paths = group.selectAll('.roofline-path');
+    const before = paths.elements.map((element) => String(element.attrs.d));
+    expect(before.every((path) => path.includes('L') && !path.includes('C'))).toBe(true);
+
+    updateRooflinesOnZoom(
+      group as any,
+      SAMPLE_ROOFLINES,
+      xScale.copy().range([0, 1000]),
+      yScale,
+      d3.curveLinear,
+    );
+    const after = paths.elements.map((element) => String(element.attrs.d));
+    expect(after).not.toEqual(before);
+    expect(after.every((path) => path.includes('L') && !path.includes('C'))).toBe(true);
+  });
+
   it('does not throw on empty group', () => {
     const group = createMockGroup();
     const { xScale, yScale } = makeScales();

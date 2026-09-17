@@ -324,21 +324,16 @@ describe('getValueLabel', () => {
 
 describe('getCostProviderLabel', () => {
   it('returns natural Chinese ownership labels', () => {
-    expect(getCostProviderLabel('costh', 'zh')).toBe('自有设备 · Hyperscaler');
-    expect(getCostProviderLabel('costn', 'zh')).toBe('自有设备 · Neocloud');
-    expect(getCostProviderLabel('costr', 'zh')).toBe('租赁设备 · 3 年期');
+    expect(getCostProviderLabel('costh', 'zh')).toBe('自有设备 · 超大规模云大批量');
+    expect(getCostProviderLabel('costr', 'zh')).toBe('租赁设备 · 3 年承诺');
   });
 
-  it('returns "Owning - Hyperscaler" for costh', () => {
-    expect(getCostProviderLabel('costh')).toBe('Owning - Hyperscaler');
+  it('returns "Owning at Large Hyperscaler Volume" for costh', () => {
+    expect(getCostProviderLabel('costh')).toBe('Owning at Large Hyperscaler Volume');
   });
 
-  it('returns "Owning - Neocloud" for costn', () => {
-    expect(getCostProviderLabel('costn')).toBe('Owning - Neocloud');
-  });
-
-  it('returns "Renting - 3yr Rental" for costr', () => {
-    expect(getCostProviderLabel('costr')).toBe('Renting - 3yr Rental');
+  it('returns "Rent - 3 Year Commit" for costr', () => {
+    expect(getCostProviderLabel('costr')).toBe('Rent - 3 Year Commit');
   });
 });
 
@@ -403,28 +398,21 @@ describe('getChartTitle', () => {
   it('returns cost title with provider and cost type', () => {
     const title = getChartTitle('cost', 'interactivity_to_throughput', 30, 'input', 'costh');
     expect(title).toBe(
-      'Cost per Million Input Tokens (Owning - Hyperscaler) at 30 tok/s/user Interactivity',
-    );
-  });
-
-  it('returns cost title with total cost type and neocloud provider', () => {
-    const title = getChartTitle('cost', 'interactivity_to_throughput', 30, 'total', 'costn');
-    expect(title).toBe(
-      'Cost per Million Total Tokens (Owning - Neocloud) at 30 tok/s/user Interactivity',
+      'Cost per Million Input Tokens (Owning at Large Hyperscaler Volume) at 30 tok/s/user Interactivity',
     );
   });
 
   it('returns cost title with output cost type and rental provider', () => {
     const title = getChartTitle('cost', 'interactivity_to_throughput', 30, 'output', 'costr');
     expect(title).toBe(
-      'Cost per Million Output Tokens (Renting - 3yr Rental) at 30 tok/s/user Interactivity',
+      'Cost per Million Output Tokens (Rent - 3 Year Commit) at 30 tok/s/user Interactivity',
     );
   });
 
   it('defaults to hyperscaler when no costProvider is specified for cost', () => {
     const title = getChartTitle('cost', 'throughput_to_interactivity', 500, 'total');
     expect(title).toBe(
-      'Cost per Million Total Tokens (Owning - Hyperscaler) at 500 tok/s/chip Throughput',
+      'Cost per Million Total Tokens (Owning at Large Hyperscaler Volume) at 500 tok/s/chip Throughput',
     );
   });
 });

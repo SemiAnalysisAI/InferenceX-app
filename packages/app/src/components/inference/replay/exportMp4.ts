@@ -1,5 +1,7 @@
 import type { ArrayBufferTarget as ArrayBufferTargetType, Muxer as MuxerType } from 'mp4-muxer';
 
+import { getExportFooterText } from '@/lib/export-footer';
+
 export type Mp4ExportStage = 'init' | 'render' | 'encode' | 'flush' | 'mux';
 
 // Brand check on the `name` field — `instanceof` is unreliable here because
@@ -61,7 +63,6 @@ interface ExportOptions {
 
 const CSS_VAR_RE = /var\(--(?<varName>[^)]+)\)/u;
 const WATERMARK_HEIGHT = 48;
-const WATERMARK_TEXT = 'InferenceX — github.com/SemiAnalysisAI/InferenceX';
 
 // Mutates the supplied root in place — call only on a clone; baking onto the
 // live panel would freeze it on current theme.
@@ -147,7 +148,7 @@ function expandLegendForExport(cloneRoot: HTMLElement) {
 const skipNoExport = (node: Node) =>
   !((node as Element).classList && (node as Element).classList.contains('no-export'));
 
-/** Draw the panel canvas onto a slightly taller canvas with an InferenceX watermark bar. */
+/** Draw the panel canvas onto a slightly taller canvas with a footer bar naming the source route. */
 function drawWithWatermark(
   source: HTMLCanvasElement,
   bgColor: string,
@@ -167,7 +168,7 @@ function drawWithWatermark(
   ctx.font = 'bold 16px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(WATERMARK_TEXT, out.width / 2, source.height + WATERMARK_HEIGHT / 2);
+  ctx.fillText(getExportFooterText(), out.width / 2, source.height + WATERMARK_HEIGHT / 2);
   return out;
 }
 

@@ -1,4 +1,4 @@
-import { ChevronDownIcon } from 'lucide-react';
+import { ChevronDownIcon, ChevronLeft, ChevronRight } from 'lucide-react';
 
 import { track } from '@/lib/analytics';
 import { Button } from '@/components/ui/button';
@@ -32,6 +32,8 @@ const WORKFLOW_STRINGS = {
     conclusions: { success: 'Run succeeded', failure: 'Run failed', cancelled: 'Run cancelled' },
     run: 'Run',
     runCount: (index: number, total: number) => workflowRunCountLabel(index, total, 'en'),
+    previousRun: 'Previous run',
+    nextRun: 'Next run',
     changelog: 'Changelog',
     description: 'Description',
     updatedConfigs: 'Updated Configs',
@@ -43,6 +45,8 @@ const WORKFLOW_STRINGS = {
     conclusions: { success: '运行成功', failure: '运行失败', cancelled: '运行已取消' },
     run: '运行',
     runCount: (index: number, total: number) => workflowRunCountLabel(index, total, 'zh'),
+    previousRun: '上一次运行',
+    nextRun: '下一次运行',
     changelog: '变更日志',
     description: '说明',
     updatedConfigs: '已更新配置',
@@ -54,6 +58,27 @@ const WORKFLOW_STRINGS = {
 
 export function workflowRunCountLabel(index: number, total: number, locale: Locale): string {
   return locale === 'zh' ? `第 ${index} 次运行（共 ${total} 次）` : `Run ${index}/${total}`;
+}
+
+/**
+ * Returns the run id adjacent to `selectedRunId` in `runIds` (which is ordered
+ * oldest → newest, matching the "Run i/n" labels), or `undefined` when there is
+ * no run in that direction or the selection is unknown.
+ */
+export function getAdjacentRunId(
+  runIds: readonly string[],
+  selectedRunId: string,
+  direction: 'previous' | 'next',
+): string | undefined {
+  const index = runIds.indexOf(selectedRunId);
+  if (index === -1) return undefined;
+  const target = direction === 'previous' ? index - 1 : index + 1;
+  return target >= 0 && target < runIds.length ? runIds[target] : undefined;
+}
+
+/** The newest run id, i.e. the last entry of the oldest → newest `runIds` list. */
+export function getLatestRunId(runIds: readonly string[]): string | undefined {
+  return runIds.at(-1);
 }
 
 function RunConclusionDot({ conclusion, locale }: { conclusion: string | null; locale: Locale }) {
@@ -86,6 +111,16 @@ export default function WorkflowInfoDisplay() {
   const { effectivePrecisions } = useGlobalFilterSelection();
 
   const runIds = Object.keys(availableRuns);
+  const latestRunId = getLatestRunId(runIds);
+  const isLatestRunSelected = latestRunId === undefined || selectedRunId === latestRunId;
+  const previousRunId = getAdjacentRunId(runIds, selectedRunId, 'previous');
+  const nextRunId = getAdjacentRunId(runIds, selectedRunId, 'next');
+
+  const selectRun = (runId: string | undefined, source: string) => {
+    if (!runId) return;
+    track('inference_run_selected', { run: runId, source });
+    setSelectedRunId(runId);
+  };
 
   if (runIds.length === 0) {
     return (
@@ -123,16 +158,22 @@ export default function WorkflowInfoDisplay() {
         onChange={(date) => setSelectedRunDate(date)}
         availableDates={availableDates}
         isCheckingAvailableDates={isCheckingAvailableDates}
+        isLatestRunSelected={isLatestRunSelected}
+        onGoToLatestRun={() => selectRun(latestRunId, 'latest')}
       />
       {runIds.length > 0 ? (
         <div className="flex items-center gap-0.5">
-          <Select
-            value={selectedRunId}
-            onValueChange={(value) => {
-              track('inference_run_selected', { run: value });
-              setSelectedRunId(value);
-            }}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => selectRun(previousRunId, 'previous')}
+            disabled={previousRunId === undefined}
+            className="size-11 md:size-8"
+            aria-label={t.previousRun}
           >
+            <ChevronLeft className="size-4" />
+          </Button>
+          <Select value={selectedRunId} onValueChange={(value) => selectRun(value, 'select')}>
             <SelectTrigger
               id="run-select"
               aria-label={t.run}
@@ -185,6 +226,16 @@ export default function WorkflowInfoDisplay() {
               })}
             </SelectContent>
           </Select>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => selectRun(nextRunId, 'next')}
+            disabled={nextRunId === undefined}
+            className="size-11 md:size-8"
+            aria-label={t.nextRun}
+          >
+            <ChevronRight className="size-4" />
+          </Button>
         </div>
       ) : null}
       <div>

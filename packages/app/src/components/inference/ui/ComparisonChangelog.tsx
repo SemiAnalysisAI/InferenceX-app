@@ -135,6 +135,12 @@ interface ComparisonChangelogProps {
   defaultExpanded?: boolean;
   /** Earliest date the selected GPU config has benchmark data */
   firstAvailableDate?: string;
+  /**
+   * Analytics section prefix for the panel's `track()` calls
+   * (`[section]_changelog_add_date`, …). Defaults to `inference`; other pages
+   * that embed the changelog pass their own section.
+   */
+  analyticsSection?: string;
 }
 
 export default function ComparisonChangelog({
@@ -152,6 +158,7 @@ export default function ComparisonChangelog({
   onAddAllDates,
   firstAvailableDate,
   defaultExpanded = true,
+  analyticsSection = 'inference',
 }: ComparisonChangelogProps) {
   const locale = useLocale();
   const t = COMPARISON_CHANGELOG_STRINGS[locale];
@@ -277,7 +284,7 @@ export default function ComparisonChangelog({
   const handleToggle = () => {
     const newState = !isExpanded;
     setIsExpanded(newState);
-    track('inference_comparison_changelog_toggled', { expanded: newState });
+    track(`${analyticsSection}_comparison_changelog_toggled`, { expanded: newState });
   };
 
   // All modelDbKeys for a comparison map to one display model, so [0] suffices
@@ -328,7 +335,9 @@ export default function ComparisonChangelog({
             type="button"
             onClick={() => {
               onAddAllDates(addableEntries);
-              track('inference_changelog_add_all_dates', { count: addableEntries.length });
+              track(`${analyticsSection}_changelog_add_all_dates`, {
+                count: addableEntries.length,
+              });
             }}
             className="text-xs font-medium text-brand hover:text-brand/80 transition-colors flex items-center gap-1"
           >
@@ -373,7 +382,7 @@ export default function ComparisonChangelog({
                             type="button"
                             onClick={() => {
                               onRemoveDate(entry);
-                              track('inference_changelog_remove_run', {
+                              track(`${analyticsSection}_changelog_remove_run`, {
                                 date: item.date,
                                 run: run.runId,
                               });
@@ -388,7 +397,7 @@ export default function ComparisonChangelog({
                             type="button"
                             onClick={() => {
                               onAddDate(entry);
-                              track('inference_changelog_add_run', {
+                              track(`${analyticsSection}_changelog_add_run`, {
                                 date: item.date,
                                 run: run.runId,
                               });
@@ -437,7 +446,7 @@ export default function ComparisonChangelog({
                           type="button"
                           onClick={() => {
                             onRemoveDate(item.date);
-                            track('inference_changelog_remove_date', { date: item.date });
+                            track(`${analyticsSection}_changelog_remove_date`, { date: item.date });
                           }}
                           className="text-xs font-medium text-muted-foreground hover:text-destructive transition-colors flex items-center gap-0.5"
                         >
@@ -455,7 +464,7 @@ export default function ComparisonChangelog({
                         type="button"
                         onClick={() => {
                           onAddDate(item.date);
-                          track('inference_changelog_add_date', { date: item.date });
+                          track(`${analyticsSection}_changelog_add_date`, { date: item.date });
                         }}
                         className="text-xs font-medium text-brand hover:text-brand/80 transition-colors flex items-center gap-0.5"
                       >

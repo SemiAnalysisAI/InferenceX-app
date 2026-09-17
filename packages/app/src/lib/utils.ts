@@ -2,9 +2,9 @@ import { type ClassValue, clsx } from 'clsx';
 import { extendTailwindMerge } from 'tailwind-merge';
 
 import type { AggDataEntry, InferenceData, RunInfo } from '@/components/inference/types';
-import { FRAMEWORK_LABELS, USD_TO_CNY } from '@semianalysisai/inferencex-constants';
+import { FRAMEWORK_LABELS } from '@semianalysisai/inferencex-constants';
 
-import { getGpuSpecs } from './constants';
+import { DEFAULT_TCO_BASIS, getGpuSpecs, type TcoBasis } from './constants';
 
 // Custom letter-spacing tokens from globals.css. tailwind-merge only knows the
 // built-in tracking scale (tighter…widest), so without this, e.g.
@@ -143,6 +143,9 @@ export function calculatePowerForGpus(
       userPowerPerHour = userPowers[baseGpuKey];
     }
     const basePower = getGpuSpecs(baseGpuKey).power;
+    // Legacy custom-power scaling needs a registered baseline. Leave metrics
+    // absent for unregistered hardware instead of dividing by zero.
+    if (!(basePower > 0) || !item.tpPerMw) return item;
     if (userPowerPerHour !== undefined) {
       const powerRounded = parseFloat(((item.tpPerMw.y / basePower) * userPowerPerHour).toFixed(3));
 
@@ -206,24 +209,22 @@ export function getDisplayLabel(config: { label: string; suffix?: string }): str
  *
  * If outputTputPerGpu is not available, falls back to using the total throughput ratio.
  */
-export function computeOutputCostFields(data: InferenceData[]): InferenceData[] {
+export function computeOutputCostFields(
+  data: InferenceData[],
+  tcoBasis: TcoBasis = DEFAULT_TCO_BASIS,
+): InferenceData[] {
   return data.map((item) => {
     if (
       item.costhOutput &&
-      item.costnOutput &&
       item.costrOutput &&
       item.outputTokensPerDollarH &&
-      item.outputTokensPerDollarN &&
-      item.outputTokensPerDollarR &&
-      item.outputTokensPerRmbH &&
-      item.outputTokensPerRmbN &&
-      item.outputTokensPerRmbR
+      item.outputTokensPerDollarR
     ) {
       return item;
     }
 
     // Compute output cost fields from existing data
-    const specs = getGpuSpecs(item.hwKey);
+    const specs = getGpuSpecs(item.hwKey, tcoBasis);
 
     // Get output throughput - either from outputTputPerGpu or estimate from total throughput
     // For sequence pairs like 1k/8k (ISL/OSL), output tokens dominate, typically ~87.5% of total
@@ -232,8 +233,6 @@ export function computeOutputCostFields(data: InferenceData[]): InferenceData[] 
     const millionOutputTokensPerHour = outputTokensPerHour / 1_000_000;
     const costhOutput =
       millionOutputTokensPerHour > 0 ? specs.costh / millionOutputTokensPerHour : 0;
-    const costnOutput =
-      millionOutputTokensPerHour > 0 ? specs.costn / millionOutputTokensPerHour : 0;
     const costrOutput =
       millionOutputTokensPerHour > 0 ? specs.costr / millionOutputTokensPerHour : 0;
 
@@ -241,10 +240,6 @@ export function computeOutputCostFields(data: InferenceData[]): InferenceData[] 
       ...item,
       costhOutput: item.costhOutput ?? {
         y: parseFloat(costhOutput.toFixed(3)),
-        roof: false,
-      },
-      costnOutput: item.costnOutput ?? {
-        y: parseFloat(costnOutput.toFixed(3)),
         roof: false,
       },
       costrOutput: item.costrOutput ?? {
@@ -255,24 +250,8 @@ export function computeOutputCostFields(data: InferenceData[]): InferenceData[] 
         y: specs.costh > 0 ? outputTokensPerHour / specs.costh : 0,
         roof: false,
       },
-      outputTokensPerDollarN: item.outputTokensPerDollarN ?? {
-        y: specs.costn > 0 ? outputTokensPerHour / specs.costn : 0,
-        roof: false,
-      },
       outputTokensPerDollarR: item.outputTokensPerDollarR ?? {
         y: specs.costr > 0 ? outputTokensPerHour / specs.costr : 0,
-        roof: false,
-      },
-      outputTokensPerRmbH: item.outputTokensPerRmbH ?? {
-        y: specs.costh > 0 ? outputTokensPerHour / (specs.costh * USD_TO_CNY) : 0,
-        roof: false,
-      },
-      outputTokensPerRmbN: item.outputTokensPerRmbN ?? {
-        y: specs.costn > 0 ? outputTokensPerHour / (specs.costn * USD_TO_CNY) : 0,
-        roof: false,
-      },
-      outputTokensPerRmbR: item.outputTokensPerRmbR ?? {
-        y: specs.costr > 0 ? outputTokensPerHour / (specs.costr * USD_TO_CNY) : 0,
         roof: false,
       },
     };
@@ -373,6 +352,7 @@ export function computeEnergyFields(data: InferenceData[]): InferenceData[] {
 
     const specs = getGpuSpecs(item.hwKey);
     const hardwarePower = specs.power; // in kW
+    if (!(hardwarePower > 0)) return item;
 
     const tputPerGpu = item.tpPerGpu.y;
     const outputTputPerGpu = item.outputTputPerGpu?.y;
@@ -404,24 +384,17 @@ export function computeEnergyFields(data: InferenceData[]): InferenceData[] {
   });
 }
 
-export function computeInputCostFields(data: InferenceData[]): InferenceData[] {
+export function computeInputCostFields(
+  data: InferenceData[],
+  tcoBasis: TcoBasis = DEFAULT_TCO_BASIS,
+): InferenceData[] {
   return data.map((item) => {
-    if (
-      item.costhi &&
-      item.costni &&
-      item.costri &&
-      item.inputTokensPerDollarH &&
-      item.inputTokensPerDollarN &&
-      item.inputTokensPerDollarR &&
-      item.inputTokensPerRmbH &&
-      item.inputTokensPerRmbN &&
-      item.inputTokensPerRmbR
-    ) {
+    if (item.costhi && item.costri && item.inputTokensPerDollarH && item.inputTokensPerDollarR) {
       return item;
     }
 
     // Compute input cost fields from existing data
-    const specs = getGpuSpecs(item.hwKey);
+    const specs = getGpuSpecs(item.hwKey, tcoBasis);
 
     // Get input throughput - either from inputTputPerGpu or estimate from total throughput
     // For sequence pairs like 1k/8k (ISL/OSL), input tokens are typically ~12.5% of total
@@ -429,17 +402,12 @@ export function computeInputCostFields(data: InferenceData[]): InferenceData[] {
     const inputTokensPerHour = inputTputPerGpu * 3600;
     const millionInputTokensPerHour = inputTokensPerHour / 1_000_000;
     const costhi = millionInputTokensPerHour > 0 ? specs.costh / millionInputTokensPerHour : 0;
-    const costni = millionInputTokensPerHour > 0 ? specs.costn / millionInputTokensPerHour : 0;
     const costri = millionInputTokensPerHour > 0 ? specs.costr / millionInputTokensPerHour : 0;
 
     return {
       ...item,
       costhi: item.costhi ?? {
         y: parseFloat(costhi.toFixed(3)),
-        roof: false,
-      },
-      costni: item.costni ?? {
-        y: parseFloat(costni.toFixed(3)),
         roof: false,
       },
       costri: item.costri ?? {
@@ -450,24 +418,8 @@ export function computeInputCostFields(data: InferenceData[]): InferenceData[] {
         y: specs.costh > 0 ? inputTokensPerHour / specs.costh : 0,
         roof: false,
       },
-      inputTokensPerDollarN: item.inputTokensPerDollarN ?? {
-        y: specs.costn > 0 ? inputTokensPerHour / specs.costn : 0,
-        roof: false,
-      },
       inputTokensPerDollarR: item.inputTokensPerDollarR ?? {
         y: specs.costr > 0 ? inputTokensPerHour / specs.costr : 0,
-        roof: false,
-      },
-      inputTokensPerRmbH: item.inputTokensPerRmbH ?? {
-        y: specs.costh > 0 ? inputTokensPerHour / (specs.costh * USD_TO_CNY) : 0,
-        roof: false,
-      },
-      inputTokensPerRmbN: item.inputTokensPerRmbN ?? {
-        y: specs.costn > 0 ? inputTokensPerHour / (specs.costn * USD_TO_CNY) : 0,
-        roof: false,
-      },
-      inputTokensPerRmbR: item.inputTokensPerRmbR ?? {
-        y: specs.costr > 0 ? inputTokensPerHour / (specs.costr * USD_TO_CNY) : 0,
         roof: false,
       },
     };

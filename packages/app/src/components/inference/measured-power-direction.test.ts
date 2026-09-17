@@ -28,11 +28,17 @@ const MEASURED_POWER_METRICS = [
   'y_measuredAvgPower',
   'y_measuredPrefillAvgPower',
   'y_measuredDecodeAvgPower',
+  'y_measuredPowerPercentTdp',
 ] as const;
 
 const QUERY_ENERGY_METRICS = [
   'y_measuredJPerSuccessfulQuery',
   'y_measuredWhPerSuccessfulQuery',
+] as const;
+
+const ROLE_ENERGY_METRICS = [
+  'y_measuredPrefillJPerInputToken',
+  'y_measuredDecodeJPerOutputToken',
 ] as const;
 
 const defs = chartDefinitions as unknown as ChartDefinition[];
@@ -149,16 +155,26 @@ describe('measured-power Pareto direction', () => {
     }
   });
 
-  it('leaves %TDP without a Pareto direction on either block', () => {
-    // %TDP is a utilization gauge, not an efficiency frontier: a config running
-    // hotter is not "worse" along an axis the roofline can order, so declaring a
-    // corner would draw a frontier with no meaning. The axis still ships as a
-    // plottable, bilingual metric — it just never anchors a roofline.
+  it.each(ROLE_ENERGY_METRICS)('%s is bilingual and lower-is-better', (metric) => {
+    expect(declaredDirection(interactivityDef, metric)).toBe('lower_right');
+    expect(declaredDirection(e2eDef, metric)).toBe('lower_left');
+    for (const chartDef of [interactivityDef, e2eDef]) {
+      expect(chartDef[metric]).toMatch(/\.y$/u);
+      expect(chartDef[`${metric}_label`]).toBeTruthy();
+      expect(chartDef[`${metric}_labelZh`]).toBeTruthy();
+    }
+  });
+
+  it('keeps %TDP bilingual while using the same per-hardware frontier as watts', () => {
+    // A fixed hardware TDP rescales watts without changing dominance within
+    // that hardware series. The shared sweep tests above exercise both axes.
     for (const chartDef of [interactivityDef, e2eDef]) {
       expect(chartDef.y_measuredPowerPercentTdp).toMatch(/\.y$/u);
       expect(chartDef['y_measuredPowerPercentTdp_label']).toBeTruthy();
       expect(chartDef['y_measuredPowerPercentTdp_labelZh']).toBeTruthy();
-      expect(declaredDirection(chartDef, 'y_measuredPowerPercentTdp')).toBeUndefined();
+      expect(declaredDirection(chartDef, 'y_measuredPowerPercentTdp')).toBe(
+        declaredDirection(chartDef, 'y_measuredAvgPower'),
+      );
     }
   });
 });

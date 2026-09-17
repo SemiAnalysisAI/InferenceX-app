@@ -19,11 +19,13 @@ import ChartLegend from '@/components/ui/chart-legend';
 import { Button } from '@/components/ui/button';
 import { OFFICIAL_PREVIEW_SERIES } from '@/components/official-preview-notice';
 import { getHardwareConfig, getModelSortIndex, hardwareKeyMatchesAnyBase } from '@/lib/constants';
+import { getInferenceHardwareConfig } from '@/lib/inference-labels';
 import { getChartWatermark, Sequence } from '@/lib/data-mappings';
 import { generateGpuDateColors, generateHighContrastGpuDateColors } from '@/lib/dynamic-colors';
 import { useLocale } from '@/lib/use-locale';
 import { formatNumber, getDisplayLabel, updateRepoUrl } from '@/lib/utils';
 import { useThemeColors } from '@/hooks/useThemeColors';
+import { perfRulerAxisMetricKey, usePerfRulerAxisReset } from '@/hooks/usePerfRulerAxisReset';
 import { useTraceAvailability } from '@/hooks/api/use-trace-availability';
 import { useLogAvailability } from '@/hooks/api/use-log-availability';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
@@ -41,12 +43,13 @@ import {
   getShapeKeyForPrecision,
   logTickFormat,
 } from '@/lib/chart-rendering';
+import type { ParetoDirection } from '@/lib/chart-utils';
 import {
-  isFrontierEligible,
-  paretoFrontForDirection,
-  type ParetoDirection,
-} from '@/lib/chart-utils';
-import { canonicalParetoIntersection } from '@/components/inference/utils/canonicalFrontier';
+  chartFrontier,
+  upperPowerEnvelope,
+  isPowerCurveMetric,
+  isMeasuredPowerCurveMetric,
+} from '@/components/inference/utils/powerCurves';
 import type {
   ChartDefinition,
   InferenceData,
@@ -68,7 +71,10 @@ import {
 import { matchKnownConfigIssues, pointMatchesIssue } from '@/lib/known-issues';
 import { renderOffloadHalo } from '@/components/inference/utils/offload-halo';
 import { renderLegacyPowerRing } from '@/components/inference/utils/legacy-power-marker';
-import { isMeasuredEnergyConfigKey } from '@/components/inference/metric-registry';
+import {
+  isMeasuredEnergyConfigKey,
+  isRoleLocalMeasuredEnergyConfigKey,
+} from '@/components/inference/metric-registry';
 import {
   clampIsoX,
   clearPerfRulers,
@@ -134,7 +140,7 @@ const currentZoomRenderContext = (svg: SVGSVGElement, ctx: RenderContext): Rende
 // lookup misses (legacy data).
 function labelTextFor(pts: InferenceData[], numbering: Map<string, number>): string {
   const hwKey = String(pts[0].hwKey);
-  const cfg = getHardwareConfig(hwKey, pts[0].model);
+  const cfg = getInferenceHardwareConfig(hwKey, pts[0].model, pts);
   const hwLabel = cfg ? getDisplayLabel(cfg) : hwKey;
   return `${hwLabel} • ${comparisonEntryLabel(String(pts[0].date), numbering)}`;
 }
@@ -144,35 +150,52 @@ const GPU_STRINGS = {
     logScale: 'Log Scale',
     highContrast: 'High Contrast',
     optimalOnly: 'Optimal Only',
+    showAllMeasurements: 'Show all measurements',
+    powerBoundaryInfo:
+      'Show only points on the upper measured power boundary. Turn off to show all measurements; the boundary stays the same. This is a power-load boundary, not an energy-efficiency frontier.',
+    powerCurves:
+      'Smooth lines trace the upper power boundary across tested configurations. Dots are measured; lines are interpolated, not efficiency frontiers.',
+    powerOptimal:
+      'A power Pareto frontier can contain a single point. Turn off Optimal Only to show the upper power boundary.',
     labels: 'Labels',
     parallelismLabels: 'Parallelism Labels',
     concurrencyLabels: '# Concurrent Sessions',
     lineLabels: 'Line Labels',
     perfRuler: 'Perf Ruler',
     perfRulerInfo:
-      'Click two curves to place a vertical ruler, then drag it to measure the performance multiple between them at any x value — across dates of the same chip config or across chip configs. Repeat to add more rulers (up to 8); hover a ruler and click × to delete it. Turning the toggle off clears all rulers.',
+      'Click two curves to place a vertical ruler, then drag it to measure the ratio of their Y-axis values at any x value — across dates of the same chip config or across chip configs. Repeat to add more rulers (up to 8); hover a ruler and click × to delete it. Turning the toggle off clears all rulers.',
     resetFilter: 'Reset filter',
     clearPerfRulers: (count: number) => `Clear rulers (${count})`,
     quickFilters: (count: number) => (count > 0 ? `Quick Filters (${count})` : 'Quick Filters'),
     noData: 'No data available',
     noDataHint: 'Please change the model, sequence, precision, date range or chip selection.',
+    noRoleEnergyDataHint:
+      'This dataset does not report role-level prefill/decode energy. Choose a different model, scenario, precision, date, or measured-energy metric.',
   },
   zh: {
     logScale: '对数缩放',
     highContrast: '高对比度',
     optimalOnly: '仅最优',
+    showAllMeasurements: '显示全部测量点',
+    powerBoundaryInfo:
+      '仅显示实测功率上边界上的点。关闭后显示全部测量点，边界曲线保持不变。这是功率负载边界，不是能效前沿。',
+    powerCurves:
+      '平滑曲线勾勒各测试配置的功耗上边界。数据点来自实测，曲线通过插值得到，不代表能效 Pareto 前沿。',
+    powerOptimal: '功耗的 Pareto 前沿可能只有一个点。关闭“仅最优”即可查看功耗上边界。',
     labels: '标签',
     parallelismLabels: '并行配置标签',
     concurrencyLabels: '并发会话数',
     lineLabels: '曲线标签',
     perfRuler: '性能标尺',
     perfRulerInfo:
-      '先点击两条曲线放置垂直标尺，再拖动标尺，测量任意横坐标下两条曲线之间的性能倍数——既可比较同一芯片配置的不同日期，也可比较不同芯片配置。重复操作可添加多把标尺（最多 8 把）；悬停标尺并点击 × 可删除该标尺。关闭开关将清除所有标尺。',
+      '先点击两条曲线放置垂直标尺，再拖动标尺，比较任意横坐标下两条曲线的纵轴数值之比，既可比较同一芯片配置的不同日期，也可比较不同芯片配置。重复操作可添加多把标尺（最多 8 把）；悬停标尺并点击 × 可删除该标尺。关闭开关将清除所有标尺。',
     resetFilter: '重置筛选',
     clearPerfRulers: (count: number) => `清除标尺（${count}）`,
     quickFilters: (count: number) => (count > 0 ? `快捷筛选（${count}）` : '快捷筛选'),
     noData: '暂无数据',
     noDataHint: '请调整模型、序列长度、精度、日期范围或芯片选项。',
+    noRoleEnergyDataHint:
+      '当前数据集未提供 Prefill/Decode 各角色的能耗数据。请选择其他模型、场景、精度、日期或实测能耗指标。',
   },
 } as const;
 
@@ -196,10 +219,13 @@ const GPUGraph = React.memo(
       selectedSequence,
       quickFilters,
       activeDates,
+      lockedFrameworks,
+      minimalChrome,
     } = useInferenceFilters();
     const {
       selectedYAxisMetric,
-      hideNonOptimal,
+      hideNonOptimal: savedHideNonOptimal,
+      showAllMeasurements: savedShowAllMeasurements,
       showPointLabels,
       logScale,
       isLegendExpanded,
@@ -213,6 +239,7 @@ const GPUGraph = React.memo(
       toggleActiveDate,
       removeActiveDate,
       setHideNonOptimal,
+      setShowAllMeasurements,
       setShowPointLabels,
       setLogScale,
       setIsLegendExpanded,
@@ -229,14 +256,26 @@ const GPUGraph = React.memo(
     } = useInferenceActions();
     const locale = useLocale();
     const legendT = GPU_STRINGS[locale];
+    const frontierDirection = chartDefinition[
+      `${selectedYAxisMetric}_roofline` as keyof ChartDefinition
+    ] as ParetoDirection | undefined;
+    const hideNonOptimal = Boolean(frontierDirection) && savedHideNonOptimal;
+    const powerCurveMetric = isPowerCurveMetric(selectedYAxisMetric);
+    const isMeasuredPowerAxis = isMeasuredPowerCurveMetric(selectedYAxisMetric);
+    const powerEnvelopeMode = powerCurveMetric && (isMeasuredPowerAxis || !hideNonOptimal);
+    const showAllMeasurements = isMeasuredPowerAxis ? !hideNonOptimal : savedShowAllMeasurements;
     const isMeasuredEnergyAxis = isMeasuredEnergyConfigKey(selectedYAxisMetric);
+    const noDataHint = isRoleLocalMeasuredEnergyConfigKey(selectedYAxisMetric)
+      ? legendT.noRoleEnergyDataHint
+      : legendT.noDataHint;
     const ephemeralUrlState = useEphemeralUrlState();
     const { resolvedTheme } = useTheme();
     const chartRef = useRef<D3ChartHandle>(null);
     const [quickFiltersOpen, setQuickFiltersOpen] = useState(false);
+    // A framework lock (embed routes) is not a user filter, so it is not counted.
     const quickFilterCount =
       quickFilters.vendors.length +
-      quickFilters.frameworks.length +
+      (lockedFrameworks ? 0 : quickFilters.frameworks.length) +
       quickFilters.deployment.length +
       quickFilters.power.length +
       (selectedSequence === Sequence.AgenticTraces ? 0 : quickFilters.spec.length);
@@ -390,21 +429,26 @@ const GPUGraph = React.memo(
       return ids;
     }, [groupedData]);
 
-    const rooflines = useMemo(() => {
+    const paretoRooflines = useMemo(() => {
       const result: Record<string, InferenceData[]> = {};
-      const rooflineKey = `${selectedYAxisMetric}_roofline` as keyof ChartDefinition;
-      const dir = chartDefinition[rooflineKey] as ParetoDirection | undefined;
-      const frontier = paretoFrontForDirection(dir ?? 'lower_right');
       for (const key of Object.keys(groupedData)) {
-        const canonicalPoints = canonicalParetoIntersection(groupedData[key], dir ?? 'lower_right');
-        result[key] = (
-          canonicalPoints ?? frontier(groupedData[key].filter(isFrontierEligible))
-        ).toSorted((a, b) => a.x - b.x);
+        result[key] = chartFrontier(groupedData[key], frontierDirection).toSorted(
+          (a, b) => a.x - b.x,
+        );
       }
       return result;
-    }, [groupedData, selectedYAxisMetric, chartDefinition]);
+    }, [groupedData, frontierDirection]);
 
-    const optimalPointKeys = useMemo(() => {
+    const rooflines = useMemo(() => {
+      if (!powerEnvelopeMode) return paretoRooflines;
+      const result: Record<string, InferenceData[]> = {};
+      for (const [key, points] of Object.entries(groupedData)) {
+        result[key] = upperPowerEnvelope(points, chartDefinition.chartType !== 'e2e');
+      }
+      return result;
+    }, [powerEnvelopeMode, groupedData, paretoRooflines, chartDefinition.chartType]);
+
+    const boundaryPointKeys = useMemo(() => {
       const keys = new Set<string>();
       Object.values(rooflines).forEach((pts) =>
         pts.forEach((p) => keys.add(`${p.date}_${p.hwKey}_${p.precision}-${p.x}-${p.y}`)),
@@ -412,16 +456,24 @@ const GPUGraph = React.memo(
       return keys;
     }, [rooflines]);
 
+    const activeData = useMemo(
+      () =>
+        Object.values(groupedData)
+          .flat()
+          .filter((p) => activeDates.has(`${p.date}_${p.hwKey}`)),
+      [groupedData, activeDates],
+    );
+
     const filteredData = useMemo(() => {
-      let pts = Object.values(groupedData)
-        .flat()
-        .filter((p) => activeDates.has(`${p.date}_${p.hwKey}`));
-      if (hideNonOptimal)
-        pts = pts.filter((p) =>
-          optimalPointKeys.has(`${p.date}_${p.hwKey}_${p.precision}-${p.x}-${p.y}`),
+      if (hideNonOptimal || (powerEnvelopeMode && !showAllMeasurements))
+        return activeData.filter((p) =>
+          boundaryPointKeys.has(`${p.date}_${p.hwKey}_${p.precision}-${p.x}-${p.y}`),
         );
-      return pts;
-    }, [groupedData, activeDates, hideNonOptimal, optimalPointKeys]);
+      return activeData;
+    }, [activeData, hideNonOptimal, powerEnvelopeMode, showAllMeasurements, boundaryPointKeys]);
+
+    // Keep domains fixed so revealing off-boundary dots cannot move power curves.
+    const scaleData = powerEnvelopeMode ? activeData : filteredData;
 
     const powerTierCounts = useMemo(
       () => ({
@@ -530,14 +582,14 @@ const GPUGraph = React.memo(
 
     // Compute scale domains
     const xExtent = useMemo(() => {
-      if (filteredData.length === 0) return [0, 100] as [number, number];
-      const ext = d3.extent(filteredData, (d) => d.x) as [number, number];
+      if (scaleData.length === 0) return [0, 100] as [number, number];
+      const ext = d3.extent(scaleData, (d) => d.x) as [number, number];
       return [0, ext[1] * 1.05] as [number, number];
-    }, [filteredData]);
+    }, [scaleData]);
 
     const yDomain = useMemo(() => {
-      if (filteredData.length === 0) return [0, 100] as [number, number];
-      const yExtent = d3.extent(filteredData, (d) => d.y) as [number, number];
+      if (scaleData.length === 0) return [0, 100] as [number, number];
+      const yExtent = d3.extent(scaleData, (d) => d.y) as [number, number];
       const yRange = yExtent[1] - yExtent[0];
       let yMin: number;
       if (logScale) {
@@ -548,7 +600,7 @@ const GPUGraph = React.memo(
         yMin = Math.max(0, yExtent[0] - yRange * 0.05);
       }
       return [yMin, yExtent[1] * 1.05] as [number, number];
-    }, [filteredData, logScale]);
+    }, [scaleData, logScale]);
 
     const dataIdentity = useMemo(
       () =>
@@ -567,6 +619,7 @@ const GPUGraph = React.memo(
           useAdvancedLabels ? 'advanced-labels' : 'basic-labels',
           showConcurrencyLabels ? 'conc-labels' : 'no-conc-labels',
           selectedYAxisMetric,
+          powerEnvelopeMode ? 'power-envelope' : 'pareto-curves',
           `linear:${xExtent.join(',')}`,
           `${logScale ? 'log' : 'linear'}:${yDomain.join(',')}`,
           ...filteredData.map(
@@ -577,6 +630,7 @@ const GPUGraph = React.memo(
           .join('|'),
       [
         selectedYAxisMetric,
+        powerEnvelopeMode,
         useAdvancedLabels,
         showConcurrencyLabels,
         xExtent,
@@ -599,19 +653,18 @@ const GPUGraph = React.memo(
 
     const getRooflineColor = useMemo(
       () => (key: string) => {
-        const graphId = key.split('_').slice(0, -1).join('_');
-        const graphIndex = allGraphs.findIndex((d) => d.id === graphId);
-        return graphIndex === -1 ? '#6b7280' : allGraphs[graphIndex].color;
+        const point = rooflines[key]?.[0];
+        return point ? getColor(point) : '#6b7280';
       },
-      [allGraphs],
+      [rooflines, getColor],
     );
 
     const isRooflineVisible = useMemo(
       () => (key: string) => {
-        const graphId = key.split('_').slice(0, -1).join('_');
-        return activeDates.has(graphId);
+        const point = rooflines[key]?.[0];
+        return point !== undefined && activeDates.has(`${point.date}_${point.hwKey}`);
       },
-      [activeDates],
+      [activeDates, rooflines],
     );
 
     // ── Line labels (date along each roofline) ──
@@ -627,7 +680,7 @@ const GPUGraph = React.memo(
         >();
         for (const [key, points] of Object.entries(rooflines)) {
           if (points.length < 2 || !isRooflineVisible(key)) continue;
-          const graphId = key.slice(0, key.lastIndexOf('_'));
+          const graphId = `${points[0].date}_${points[0].hwKey}`;
           const previous = bestByGraph.get(graphId);
           if (!previous || points.length > previous.points.length) {
             bestByGraph.set(graphId, { key, graphId, points });
@@ -713,12 +766,22 @@ const GPUGraph = React.memo(
     // Same curve-to-curve ISO-X semantics as ScatterGraph, applied to the
     // date/chip comparison view: each measurement is two rendered roofline
     // paths (class tokens `roofline-<date>_<hwKey>_<precision>`) plus an
-    // iso-x stored in DATA space so it survives zoom and metric changes.
+    // iso-x stored in DATA space so it survives zoom (axis-metric changes
+    // clear rulers; see usePerfRulerAxisReset).
     // Any two curves may be paired — two dates of the same chip config, two
     // chip configs on the same date, or a mix — which is the point of this
     // view: quantify the multiple between comparison series at a glance.
-    const [perfRulerMode, setPerfRulerMode] = useState(false);
+    const [savedPerfRulerMode, setPerfRulerMode] = useState(false);
+    const perfRulerMode = savedPerfRulerMode && (!powerEnvelopeMode || isMeasuredPowerAxis);
     const [perfRulerState, setPerfRulerState] = useState<PerfRulerState>(EMPTY_PERF_RULER_STATE);
+    // Changing the x- or y-axis metric clears every ruler: the curves are
+    // redrawn in different units, so a ruler that persisted would measure a
+    // ratio the user never placed. Runs before the draw pass so no stale
+    // ruler ever paints over the new curves.
+    usePerfRulerAxisReset(
+      perfRulerAxisMetricKey(chartDefinition.x_scale_field, selectedYAxisMetric),
+      setPerfRulerState,
+    );
     // Draw passes read mode/state through refs so toggling off clears the
     // rulers in the same pre-paint layout pass (no lingering frame).
     const perfRulerModeRef = useRef(perfRulerMode);
@@ -796,8 +859,8 @@ const GPUGraph = React.memo(
     const perfRulerCurveClickRef = useRef(handlePerfRulerCurveClick);
     perfRulerCurveClickRef.current = handlePerfRulerCurveClick;
 
-    // Points sit on curves: a ruler-mode click on a data point behaves like
-    // clicking the point's (date, chip, precision) curve at that point's x.
+    // A point click selects its (date, chip, precision) curve at that point's
+    // x, including when the measurement itself is off the power boundary.
     // Ruler-mode clicks measure INSTEAD of pinning the tooltip, so drop the
     // pin the shared click handler applied just before this callback ran.
     const handlePerfRulerPointClick = useCallback(
@@ -1111,7 +1174,14 @@ const GPUGraph = React.memo(
     // Dismiss on filter changes
     useEffect(() => {
       chartRef.current?.dismissTooltip();
-    }, [selectedPrecisions, selectedYAxisMetric, selectedGPUs, selectedDates, selectedDateRange]);
+    }, [
+      selectedPrecisions,
+      selectedYAxisMetric,
+      selectedGPUs,
+      selectedDates,
+      selectedDateRange,
+      showAllMeasurements,
+    ]);
 
     // Hover dimming animates via the inline `transition: opacity 150ms ease`
     // onRender puts on dots and rooflines — a single style write per node. A
@@ -1126,8 +1196,8 @@ const GPUGraph = React.memo(
         .selectAll<SVGGElement, InferenceData>('.dot-group')
         .style('opacity', (d) => (`${d.date}_${d.hwKey}` === seriesId ? 1 : 0.15));
       root.selectAll<SVGPathElement, unknown>('.roofline-path').style('opacity', function () {
-        const key = (d3.select(this).datum() as { key: string } | null)?.key ?? '';
-        const series = key.slice(0, key.lastIndexOf('_'));
+        const point = (d3.select(this).datum() as { points: InferenceData[] } | null)?.points[0];
+        const series = point ? `${point.date}_${point.hwKey}` : '';
         return series === seriesId ? null : '0.15';
       });
     }, []);
@@ -1160,7 +1230,7 @@ const GPUGraph = React.memo(
                 />
               </svg>
               <h3 className="text-sm font-medium mb-1">{legendT.noData}</h3>
-              <p className="text-xs">{legendT.noDataHint}</p>
+              <p className="text-xs">{noDataHint}</p>
               <Button
                 type="button"
                 size="sm"
@@ -1184,6 +1254,8 @@ const GPUGraph = React.memo(
     return (
       <D3Chart<InferenceData>
         ref={chartRef}
+        // Embeds drop the zoom/pan hint line; the host page has its own caption.
+        instructions={minimalChrome ? '' : undefined}
         chartId={chartId}
         dataIdentity={dataIdentity}
         metricIdentity={metricIdentity}
@@ -1194,15 +1266,22 @@ const GPUGraph = React.memo(
         testId="gpu-graph"
         grabCursor={true}
         caption={
-          isMeasuredEnergyAxis ? (
+          isMeasuredEnergyAxis || powerCurveMetric ? (
             <>
               {caption}
-              <MeasuredPowerSummary
-                total={powerTierCounts.total}
-                visible={powerTierCounts.visible}
-                bestPerSku={false}
-                optimalOnly={hideNonOptimal}
-              />
+              {isMeasuredEnergyAxis && (
+                <MeasuredPowerSummary
+                  total={powerTierCounts.total}
+                  visible={powerTierCounts.visible}
+                  bestPerSku={false}
+                  optimalOnly={hideNonOptimal}
+                />
+              )}
+              {powerCurveMetric && (
+                <p data-testid="power-curve-description" className="text-muted-foreground text-sm">
+                  {powerEnvelopeMode ? legendT.powerCurves : legendT.powerOptimal}
+                </p>
+              )}
             </>
           ) : (
             caption
@@ -1228,6 +1307,7 @@ const GPUGraph = React.memo(
             config: {
               getColor: getRooflineColor,
               isVisible: isRooflineVisible,
+              curve: d3.curveMonotoneX,
             },
           },
           {
@@ -1469,15 +1549,33 @@ const GPUGraph = React.memo(
                   track('interactivity_high_contrast_toggled', { enabled: c });
                 },
               },
-              {
-                id: 'gpu-hide-non-optimal',
-                label: legendT.optimalOnly,
-                checked: hideNonOptimal,
-                onCheckedChange: (c) => {
-                  setHideNonOptimal(c);
-                  track('interactivity_hide_non_optimal_toggled', { enabled: c });
-                },
-              },
+              ...(frontierDirection
+                ? [
+                    {
+                      id: 'gpu-hide-non-optimal',
+                      label: legendT.optimalOnly,
+                      checked: hideNonOptimal,
+                      ...(isMeasuredPowerAxis ? { infoTooltip: legendT.powerBoundaryInfo } : {}),
+                      onCheckedChange: (c: boolean) => {
+                        setHideNonOptimal(c);
+                        track('interactivity_hide_non_optimal_toggled', { enabled: c });
+                      },
+                    },
+                  ]
+                : []),
+              ...(powerEnvelopeMode && !isMeasuredPowerAxis
+                ? [
+                    {
+                      id: 'gpu-show-all-measurements',
+                      label: legendT.showAllMeasurements,
+                      checked: showAllMeasurements,
+                      onCheckedChange: (c: boolean) => {
+                        setShowAllMeasurements(c);
+                        track('gpu_timeseries_show_all_measurements_toggled', { enabled: c });
+                      },
+                    },
+                  ]
+                : []),
               {
                 id: 'gpu-point-labels',
                 label: legendT.labels,
@@ -1524,24 +1622,28 @@ const GPUGraph = React.memo(
                   if (c && !showPointLabels) setShowPointLabels(true);
                 },
               },
-              {
-                id: 'gpu-perf-ruler',
-                label: legendT.perfRuler,
-                advanced: true,
-                checked: perfRulerMode,
-                infoTooltip: legendT.perfRulerInfo,
-                onCheckedChange: (c) => {
-                  setPerfRulerMode(c);
-                  // Clear synchronously with the mode flip so the rulers vanish
-                  // in the same layout pass (the effect below also clears, for
-                  // programmatic mode changes).
-                  if (!c) setPerfRulerState(clearPerfRulers);
-                  track('gpu_timeseries_perf_ruler_toggled', { enabled: c });
-                },
-              },
+              ...(powerEnvelopeMode && !isMeasuredPowerAxis
+                ? []
+                : [
+                    {
+                      id: 'gpu-perf-ruler',
+                      label: legendT.perfRuler,
+                      advanced: true,
+                      checked: perfRulerMode,
+                      infoTooltip: legendT.perfRulerInfo,
+                      onCheckedChange: (c: boolean) => {
+                        setPerfRulerMode(c);
+                        // Clear synchronously with the mode flip so the rulers vanish
+                        // in the same layout pass (the effect below also clears, for
+                        // programmatic mode changes).
+                        if (!c) setPerfRulerState(clearPerfRulers);
+                        track('gpu_timeseries_perf_ruler_toggled', { enabled: c });
+                      },
+                    },
+                  ]),
             ]}
             actions={[
-              ...(perfRulerState.rulers.length > 0
+              ...(perfRulerMode && perfRulerState.rulers.length > 0
                 ? [
                     {
                       id: 'gpu-clear-perf-rulers',
@@ -1574,6 +1676,7 @@ const GPUGraph = React.memo(
               },
             ]}
             hideAtomFootnote
+            readOnly={minimalChrome}
             keyIndicators={
               <>
                 {fixedLogPointId === null ? null : (

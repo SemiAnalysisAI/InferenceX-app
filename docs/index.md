@@ -4,6 +4,13 @@ Design rationale and non-obvious conventions. See [CLAUDE.md](../CLAUDE.md) for 
 
 ## Docs
 
+- [API Skill Examples](./inferencex-api-examples.md) — Install the public skill, query benchmarks, export measured PowerX data, and explain empty results
+- [PowerX System Power](./powerx-system-power.md) — Pinned chassis model, measured-input guards, assumptions, and reproducible article exports
+- [API Skill Releases](./inferencex-skills-release.md) — Prepare an immutable package, verify clean installations and agent exports, and publish through the package-specific workflow
+- [API Skill Discovery](./inferencex-skills-discovery.md) — Accept or reject implicit skill discovery in fresh Codex and Claude Code projects
+- [CLI Compatibility](./inferencex-cli-compatibility.md) — Contract 1 schemas, bundle and exit semantics, platform scope, and legacy migration
+- [CLI Release Checklist](./inferencex-cli-release-checklist.md) — Candidate evidence and ordered publication gates
+
 - [Architecture](./architecture.md) — Why client-first, route navigation, URL state, provider nesting, server-side caching (unstable_cache + blob), in-memory client cache, color system, analytics enforcement
 - [D3 Charts](./d3-charts.md) — Why 4 effects, in-place mutation, refs for zoom, rAF throttling, HTML tooltips, Pareto directions, gradient labels
 - [Data Pipeline](./data-pipeline.md) — DB schema reasoning, ETL design, transform pipeline, spline method choice, normalizer resolution order (model/GPU/framework)
@@ -19,3 +26,5 @@ Design rationale and non-obvious conventions. See [CLAUDE.md](../CLAUDE.md) for 
 - [CollectiveX](./collectivex.md) — lazy ingest-on-read pipeline (separate Neon DB as a durable GitHub-artifact cache), tombstoned deletes, raw-docs storage + shared reader
 - [Chinese Pages (/zh)](./i18n.md) — Why hand-authored /zh pages instead of an i18n framework, hreflang pairing, blog translation pairing, html lang workaround, CJK reading time/slugs
 - [Chinese Copy Editorial Guide](./chinese-copy.md) — Audience, surface-specific register, context-aware terminology, rewrite workflow, manual-review process, and PR checklist
+
+- [OperatorX](./operatorx.md) — hidden GEMM, attention, and routed MoE explorer, per-GPU TFLOPS, raw artifact persistence, and local verification

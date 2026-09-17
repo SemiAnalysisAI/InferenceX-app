@@ -1,0 +1,1379 @@
+{
+  "modelRevision": "ca4403aa527069857351ad8047dbb726844b3382",
+  "source": "https://github.com/SemiAnalysisAI/inferencex_power_model",
+  "status": "DRAFT / pending human verification",
+  "assumptionsSource": "https://github.com/SemiAnalysisAI/inferencex_power_model/blob/ca4403aa527069857351ad8047dbb726844b3382/README.md#chassis-models",
+  "assumptions": {
+    "u_pcie": 0.05,
+    "u_cpu": 0.2,
+    "u_ram": 0.2,
+    "u_nvme": 0.0,
+    "pue": 1.2
+  },
+  "sourceSha256": {
+    "human_verified/amd_oam_fans/amd_oam_fan_power_model.py": "7ea6f1c65b685311277e6f2c53992d588ec79b598180f2fca300e904ad6dc19a",
+    "human_verified/amd_oam_fans/plot_amd_oam_fan_power.py": "e38118fa4d94412af268eaa1667d2c4086d1dcced4da07c951e761d54ea55b46",
+    "human_verified/amd_oam_psu/amd_oam_psu_power_model.py": "badcf849a82da35bc9bd621d42cd955ec7f8e3879dbc1bc29c7c03a3e0217af1",
+    "human_verified/amd_oam_psu/plot_amd_oam_psu_power.py": "39a1c3eac5a1e6337425948bfd252e422021b67de2ec5c963be1f8db3a8292fc",
+    "human_verified/amd_oam_ubb/amd_oam_ubb_power_model.py": "2f2f685e595d980c3fc353c624ca7183ee4b7f34c52d649066ef266664bccab4",
+    "human_verified/b200_fans/b200_fan_power_model.py": "163c6dd95f460cf6bde1b60cec061cce9be11e69cac1c6fe000b01a7ace81975",
+    "human_verified/b200_fans/plot_b200_fan_power.py": "8172b706c4a882ebb1fed220b3bcd602ea9db49019c4b1ac5a862d83be07bedd",
+    "human_verified/b200_psu/b200_psu_power_model.py": "58e3f81c7fbf722848184ddd73ed94edb065cfa96d6382d74bf42e8f7e15bbe8",
+    "human_verified/b200_psu/plot_b200_psu_power.py": "c96127308dab7105243ca21dcef07dce4fad8f674d9273006e3f4b1c29656b10",
+    "human_verified/b200_ubb/b200_ubb_power_model.py": "e3d3acf16a5ef9ca318ba49dc8b58d40823f8b76144d2999dffc9973db96648a",
+    "human_verified/b200_ubb/b200_ubb_residual_power_model.py": "85ca624b8d85d504f4e8a245f05aac07ab804b3fb262c2f00eb50ed35e22d273",
+    "human_verified/b200_ubb/plot_b200_ubb_residual_power.py": "a0d7a7e5f44948c59262bf62f4f088cb64fb17c29926f7b3327a18fb695903ed",
+    "human_verified/b300_fans/b300_fan_power_model.py": "9c5f85d0b7c9d4ee9fb8d233bb3d150a69643902970a68b475bb266918a495c7",
+    "human_verified/b300_fans/plot_b300_fan_power.py": "761a8c1c80f8efa0fe49bb749897da20764c1a207efe4d77c22a43b001b319c4",
+    "human_verified/b300_psu/b300_psu_power_model.py": "930f30f3a720b964623b35a7ee2d510a03f39ec6751dda5b480c7a8cfb0bd99e",
+    "human_verified/b300_psu/plot_b300_psu_power.py": "241880ab01f8d4012a6d2b358f85648bebb229b4966b1af081ecd331997cefc8",
+    "human_verified/b300_ubb/b300_ubb_power_model.py": "8cd694f1306ca09de53dcc9590dcc47a1b9bd5c10af9837bb875dc417fe74837",
+    "human_verified/blackwell_nvswitch/blackwell_nvswitch_power_model.py": "857d276b552f6118842c0f026cb5e78dbcd70c9bdef2769fae8540842be61ec7",
+    "human_verified/blackwell_nvswitch/plot_blackwell_nvswitch_power.py": "979abfc057320d29d251c100150440fdc10770794b1a05a89053631ffdff64db",
+    "human_verified/chassis_plot_utils.py": "66f5d76f5ae5342433963595e58f665bdd0955eabdb31041a34c2f8180839af5",
+    "human_verified/generic/connectx7/connectx7_power_model.py": "3510ab679846aefbc31d18d410a978533ddc331fc1562511751fedf093a6649f",
+    "human_verified/generic/connectx7/plot_connectx7_power.py": "c9d554aeeeb5b74ff7398686c05d93f0db42b6ac98c902b063645597697de35c",
+    "human_verified/generic/connectx8/connectx8_power_model.py": "7d638ea8524e181b0370601319c780600ff5a45b072589d58bdca58636bfa9cb",
+    "human_verified/generic/connectx8/plot_connectx8_power.py": "97921625373a479f03ad3930c8542e86da6c4ee4521654f77bcb965d93759433",
+    "human_verified/generic/cpu/cpu_power_model.py": "ab4315df415d70474ae4fb5c700fdf5b6de2a8a89f33823fbc8664efa01bf72f",
+    "human_verified/generic/cpu/plot_cpu_power.py": "bc5866234e7af605c8b43664cca1c1e96116d4fefb88c791cbe5e35f6234e821",
+    "human_verified/generic/dpu/dpu_power_model.py": "677cce41b990213c96f73e016c8bf24da9841ef995a7522e1038c832d502e398",
+    "human_verified/generic/dpu/plot_dpu_power.py": "d52357acdabb6a69b2ac87037cc339208e70b1bf7bdd31483b98dbedad06f05b",
+    "human_verified/generic/dram/dram_power_model.py": "b8ace82de182715a003c747710fc62275f2392d883aadb57c05f19beb1367b67",
+    "human_verified/generic/dram/plot_dram_power.py": "8a3d59fbf31492f9de04d8f3f80ddc33719018b6f47e8b0e671d3f63e29acead",
+    "human_verified/generic/nvme/nvme_power_model.py": "53fa1f59edf4427a62c946758d4f3df55b1591f8d43f824e07fd61e6d4196743",
+    "human_verified/generic/nvme/plot_nvme_power.py": "276d013eb26ff13c68e60cbf48bddc88fd6f5ff6c0a59a9854aec11da6ebf8b7",
+    "human_verified/generic/pcie_switches/pcie5_144lane_switch_power_model.py": "23d23322126c4251cb2ad5bee4448b0f9ad71b531607e8353cd96a90410cc28d",
+    "human_verified/generic/pcie_switches/plot_pcie_switch_power.py": "3cf3139b18495efc320c1f3d2754d8f732b16f1775959f66ff222ef97b64de90",
+    "human_verified/generic/pollara400/plot_pollara400_power.py": "22196c3037330b07903109e0f9a6917fd2e9e8e56ee942df552a84efd06a470e",
+    "human_verified/generic/pollara400/pollara400_power_model.py": "8dd5e674d9bfa5e19cb68c5684eb717df61063762afa555cd1a9c43f1d24c5d8",
+    "human_verified/generic/retimers/pcie5_x16_retimer_power_model.py": "393381bb40ef12cb81b681eff742129453136c6ba6c4b6950682e6cdc63a5335",
+    "human_verified/generic/retimers/plot_pcie5_x16_retimer_power.py": "c8f3a9aede8876cebab9f0674926b59f591f71ec1e58e86bdebe3ec63f61a208",
+    "human_verified/generic/thor2/plot_thor2_power.py": "7f03cd9af3dfd4e787e0e9d429a5758e24f4b62990af6d7d7e22a1a5224a78c7",
+    "human_verified/generic/thor2/thor2_power_model.py": "67b8e91a01dccd3abd7bdd37dbef86d1194d398c9326b8774eede1488962c54c",
+    "human_verified/hgx_b200_chassis/b200_chassis_power_model.py": "89d94969ce1acfeee67784ad269c431415995f9b18996d4b28d213d34393864a",
+    "human_verified/hgx_b200_chassis/plot_chassis_inference_gpu_sweep.py": "ed9378b471bf502adda4ac8f2467d803e48a5347ae329e118bfeebc9400ecc79",
+    "human_verified/hgx_b200_chassis_residual/b200_chassis_residual_power_model.py": "d23fe72c6039545e51d6271ddef28bee5d69f9ee7e4f8032a5def60021f973eb",
+    "human_verified/hgx_b200_chassis_residual/plot_chassis_residual_power.py": "a46d81768e0af6982bdb9d146b7e42fdbb86f1afcdb581d808657b5508a65414",
+    "human_verified/hgx_b300_chassis/b300_chassis_power_model.py": "68af8917ead2472cb0f6473784a5a75a24233cb766df8fa2684421a07d660fbc",
+    "human_verified/hgx_b300_chassis/plot_b300_chassis_inference_gpu_sweep.py": "bfe74771dd61b6dbb3dcf1ebbf6451c07b6020dcf0000482225672eb081f1d11",
+    "human_verified/hgx_h100_chassis/h100_chassis_power_model.py": "6850ec92346af1864f724a41d9ea512e0d55f45d683a3d575477aa08ca89a6c8",
+    "human_verified/hgx_h100_chassis/plot_h100_chassis_inference_gpu_sweep.py": "4af0da4e056f2300d271dd041ffb2ff9a76d39aaf80ae227a38ce777b949d852",
+    "human_verified/hgx_h200_chassis/h200_chassis_power_model.py": "56b40c9f13e50d81a02a594f0762f5c498483f261f9aec7b7294b148c65d7eb9",
+    "human_verified/hgx_h200_chassis/plot_h200_chassis_inference_gpu_sweep.py": "326b3baff711b5a322349cb272f83eaa44c8825cdbb9cc87cce52d7433e4b695",
+    "human_verified/hopper_fans/hopper_fan_power_model.py": "8b656f8498b6709b8ac7392999333eef06a529e12af141cc4565a2272c589f24",
+    "human_verified/hopper_fans/plot_hopper_fan_power.py": "006c13f8143ad0ebc853ecba9713660f65daa9ee520ce0b55763ce06a4a436fa",
+    "human_verified/hopper_nvswitch/hopper_nvswitch_power_model.py": "3d3c536bc2af1e75f2cc3c246e0d5337c04809cb90d470227a0d7336b413790c",
+    "human_verified/hopper_nvswitch/plot_hopper_nvswitch_power.py": "c13b291df6426a2117d82f1425009ddf0f55340888a0843dd5f5888503c62e06",
+    "human_verified/hopper_psu/hopper_psu_power_model.py": "a7630454e128e87bc0529a02cebb11138efbe1b07d4e4cb08a9721cc49f8d58d",
+    "human_verified/hopper_psu/plot_hopper_psu_power.py": "4a73fffa633e0a599a8bf746e0868f719669ff59d69a102bf563fcc4596e40a4",
+    "human_verified/hopper_ubb/hopper_ubb_power_model.py": "3f8c6c9560c32dbe1e98d0af82dbafa3fc697efc3d32642afe303455bfd5ab74",
+    "human_verified/mi300x_chassis/mi300x_chassis_power_model.py": "69c4b11e860e9a174664ae040691aab9e349410040ac8524dee6a7f2102afab6",
+    "human_verified/mi300x_chassis/plot_mi300x_chassis_inference_gpu_sweep.py": "1793a7356b95821cd4f7390a4cae55c58ffcc37f1b8f43f873499d84937463e4",
+    "human_verified/mi325x_chassis/mi325x_chassis_power_model.py": "59b6ce4ff626f1c5f42e8d7b0d33318e0e493a3e358dc1f4f92011be94b16c9c",
+    "human_verified/mi325x_chassis/plot_mi325x_chassis_inference_gpu_sweep.py": "c0f350bc4978a18759dd108756290fcd803f30209ccfc2682988bbf7ff0feb4d",
+    "human_verified/mi355x_chassis/mi355x_chassis_power_model.py": "c178f71efe53b424f5a1804fd188a79f99575e821a357b9128added48f154c8d",
+    "human_verified/mi355x_chassis/plot_mi355x_chassis_inference_gpu_sweep.py": "5071db35ce4bb4d7754419877f1e0d9df0c48be4381316b77d80fa1e58fe46c6"
+  },
+  "profiles": {
+    "h100": {
+      "modelPath": "human_verified/hgx_h100_chassis/h100_chassis_power_model.py",
+      "functionName": "h100_chassis_power",
+      "configFactory": "make_h100_config",
+      "gpuCount": 8,
+      "assumptions": {
+        "u_pcie": 0.05,
+        "u_cpu": 0.2,
+        "u_ram": 0.2,
+        "u_nvme": 0.0,
+        "pue": 1.2,
+        "u_nvlink": 0.5,
+        "u_ib": 0.0,
+        "fan_pwm": null
+      },
+      "defaultConfig": {
+        "gpu_label": "H100 SXM5",
+        "gpu_component_key": "h100_sxm_8x_measured",
+        "n_gpu": 8,
+        "gpu_memory_total_gb": 640.0,
+        "gpu_idle_example_w_per_gpu": 100.0,
+        "gpu_decode_example_w_per_gpu": 300.0,
+        "gpu_prefill_example_w_per_gpu": 520.0,
+        "gpu_aggregate_example_w_per_gpu": 480.0,
+        "gpu_peak_w_per_gpu": 700.0,
+        "ubb": {
+          "gpu_label": "H100 SXM5",
+          "gpu_component_key": "h100_sxm_8x_measured",
+          "n_gpu": 8,
+          "nvswitch": {
+            "n_asic": 4,
+            "nvlink_ports_per_asic": 64,
+            "phy_lanes_per_asic": 128,
+            "phy_lane_gbps": 100.0,
+            "serdes_class_gbps": 112.0,
+            "serdes_pj_per_bit": 3.0,
+            "serdes_floor_frac": 0.95,
+            "digital_max_w": 120.0,
+            "digital_floor_frac": 0.4
+          },
+          "retimer": {
+            "n_retimer": 8,
+            "lanes_per_retimer": 16,
+            "pcie_gtps": 32.0,
+            "analog_serdes_equalization_w": 9.5,
+            "digital_floor_w": 2.0,
+            "digital_variable_w": 1.0
+          },
+          "residual": {
+            "baseboard_controller_w": 10.0,
+            "fpga_cpld_sequencing_w": 8.0,
+            "hsc_power_monitor_w": 5.0,
+            "clock_refclk_reset_w": 5.0,
+            "sensors_i2c_fru_led_w": 4.0,
+            "aux_rails_misc_w": 13.0,
+            "normal_low_w": 30.0,
+            "normal_high_w": 70.0,
+            "conservative_cap_w": 90.0
+          }
+        },
+        "cpu": {
+          "name": "2x Intel Xeon Platinum 8480C (Sapphire Rapids, DGX H100/H200)",
+          "n_cpu": 2,
+          "cores_per_cpu": 56,
+          "threads_per_cpu": 112,
+          "package_tdp_w": 350.0,
+          "base_ghz": 2.0,
+          "max_turbo_ghz": 3.8,
+          "l3_cache_mb": 105.0,
+          "memory_channels_per_cpu": 8,
+          "pcie_lanes_per_cpu": 80,
+          "package_static_w": 24.0,
+          "uncore_io_baseline_w": 36.0,
+          "memory_controller_baseline_w": 22.0,
+          "uncore_dynamic_max_w": 8.0,
+          "memory_controller_dynamic_max_w": 6.0,
+          "core_curve_r": 1.72,
+          "vrm_efficiency": 0.92
+        },
+        "dram": {
+          "label": "DGX-H100/H200, 32x64GB DDR5 RDIMM",
+          "status": "DRAFT - pending human verification",
+          "n_sockets": 2,
+          "channels_per_socket": 8,
+          "n_dimm": 32,
+          "capacity_gb_per_dimm": 64.0,
+          "data_rate_mtps": 4800.0,
+          "dimm_type": "RDIMM",
+          "background_w": 2.147,
+          "refresh_w": 0.5509999999999999,
+          "termination_w": 1.102,
+          "io_dynamic_max_w": 2.3400000000000003,
+          "core_dynamic_max_w": 2.86,
+          "activity_exponent": 1.0
+        },
+        "connectx_compute": {
+          "n_nic": 8,
+          "net_serdes_w": 9.5,
+          "pcie_serdes_w": 5.5,
+          "board_w": 2.0,
+          "digital_max_w": 10.0,
+          "digital_floor_frac": 0.65,
+          "include_optic": true,
+          "optic_w": 8.0
+        },
+        "pcie_switch": {
+          "n_switch": 4,
+          "lanes_per_switch": 144,
+          "ports_per_switch": 72,
+          "pcie_gtps": 32.0,
+          "serdes_phy_floor_w": 30.5,
+          "control_leakage_clock_w": 6.0,
+          "fabric_datapath_floor_w": 4.0,
+          "fabric_datapath_variable_w": 8.5,
+          "stress_cap_per_switch_w": 70.0
+        },
+        "nvme": {
+          "n_front_u2": 8,
+          "front_u2_idle_w": 5.0,
+          "n_boot_m2": 2,
+          "boot_m2_idle_w": 2.0,
+          "max_modeled_u_nvme": 0.02
+        },
+        "residual": {
+          "bmc_ipmi_w": 10.0,
+          "onboard_10gbe_w": 8.0,
+          "motherboard_pch_aux_w": 8.0,
+          "cpld_tpm_superio_w": 5.0,
+          "clock_sensor_fru_w": 4.0,
+          "storage_backplane_idle_w": 6.0,
+          "front_panel_usb_led_w": 2.0,
+          "aux_margin_w": 2.0,
+          "normal_low_w": 35.0,
+          "normal_high_w": 70.0
+        },
+        "fans": {
+          "electrical_nameplate_w": 1100.0,
+          "airflow_cfm_at_normal_max_pwm": 1105.0,
+          "min_pwm_frac": 0.22,
+          "normal_max_pwm_frac": 0.8,
+          "full_cooling_load_w": 9500.0,
+          "fan_curve_exponent": 1.1
+        },
+        "psu": {
+          "n_installed_psu": 6,
+          "n_load_sharing_psu": 6,
+          "n_redundant_capacity_psu": 4,
+          "psu_capacity_w": 3300.0,
+          "redundancy": "4+2",
+          "efficiency_curve": {
+            "0.05": 0.885,
+            "0.1": 0.92,
+            "0.2": 0.94,
+            "0.5": 0.96,
+            "1.0": 0.955
+          }
+        },
+        "storage_mgmt_network_static_w": 60.0,
+        "optional_dpu_idle_w": 0.0,
+        "pue": 1.2
+      },
+      "fixedComponentsDcWatts": {
+        "hopper_nvswitch_4x": 485.8,
+        "hopper_pcie_retimers_8x": 92.4,
+        "hopper_ubb_residual_static": 45.0,
+        "host_cpu_2x_socket_input": 367.9,
+        "host_ddr5_dimms": 154.9,
+        "connectx7_compute_8x_with_optics": 252.0,
+        "connectx7_storage_mgmt_2x_static": 60.0,
+        "cpu_tray_pcie_switches_4x": 163.7,
+        "nvme_idle": 44.0,
+        "chassis_residual_static": 45.0
+      },
+      "fan": {
+        "electricalNameplateWatts": 1100.0,
+        "electricalGroupsWatts": [1100.0],
+        "minPwm": 0.22,
+        "maxPwm": 0.8,
+        "fullCoolingLoadWatts": 9500.0,
+        "exponent": 1.1
+      },
+      "psu": {
+        "loadSharingCapacityWatts": 19800.0,
+        "maxDcWatts": 13200.0,
+        "efficiencyCurve": [
+          [0.05, 0.885],
+          [0.1, 0.92],
+          [0.2, 0.94],
+          [0.5, 0.96],
+          [1.0, 0.955]
+        ]
+      }
+    },
+    "h200": {
+      "modelPath": "human_verified/hgx_h200_chassis/h200_chassis_power_model.py",
+      "functionName": "h200_chassis_power",
+      "configFactory": "make_h200_config",
+      "gpuCount": 8,
+      "assumptions": {
+        "u_pcie": 0.05,
+        "u_cpu": 0.2,
+        "u_ram": 0.2,
+        "u_nvme": 0.0,
+        "pue": 1.2,
+        "u_nvlink": 0.5,
+        "u_ib": 0.0,
+        "fan_pwm": null
+      },
+      "defaultConfig": {
+        "gpu_label": "H200 SXM5",
+        "gpu_component_key": "h200_sxm_8x_measured",
+        "n_gpu": 8,
+        "gpu_memory_total_gb": 1128.0,
+        "gpu_idle_example_w_per_gpu": 115.0,
+        "gpu_decode_example_w_per_gpu": 330.0,
+        "gpu_prefill_example_w_per_gpu": 540.0,
+        "gpu_aggregate_example_w_per_gpu": 510.0,
+        "gpu_peak_w_per_gpu": 700.0,
+        "ubb": {
+          "gpu_label": "H200 SXM5",
+          "gpu_component_key": "h200_sxm_8x_measured",
+          "n_gpu": 8,
+          "nvswitch": {
+            "n_asic": 4,
+            "nvlink_ports_per_asic": 64,
+            "phy_lanes_per_asic": 128,
+            "phy_lane_gbps": 100.0,
+            "serdes_class_gbps": 112.0,
+            "serdes_pj_per_bit": 3.0,
+            "serdes_floor_frac": 0.95,
+            "digital_max_w": 120.0,
+            "digital_floor_frac": 0.4
+          },
+          "retimer": {
+            "n_retimer": 8,
+            "lanes_per_retimer": 16,
+            "pcie_gtps": 32.0,
+            "analog_serdes_equalization_w": 9.5,
+            "digital_floor_w": 2.0,
+            "digital_variable_w": 1.0
+          },
+          "residual": {
+            "baseboard_controller_w": 10.0,
+            "fpga_cpld_sequencing_w": 8.0,
+            "hsc_power_monitor_w": 5.0,
+            "clock_refclk_reset_w": 5.0,
+            "sensors_i2c_fru_led_w": 4.0,
+            "aux_rails_misc_w": 13.0,
+            "normal_low_w": 30.0,
+            "normal_high_w": 70.0,
+            "conservative_cap_w": 90.0
+          }
+        },
+        "cpu": {
+          "name": "2x Intel Xeon Platinum 8480C (Sapphire Rapids, DGX H100/H200)",
+          "n_cpu": 2,
+          "cores_per_cpu": 56,
+          "threads_per_cpu": 112,
+          "package_tdp_w": 350.0,
+          "base_ghz": 2.0,
+          "max_turbo_ghz": 3.8,
+          "l3_cache_mb": 105.0,
+          "memory_channels_per_cpu": 8,
+          "pcie_lanes_per_cpu": 80,
+          "package_static_w": 24.0,
+          "uncore_io_baseline_w": 36.0,
+          "memory_controller_baseline_w": 22.0,
+          "uncore_dynamic_max_w": 8.0,
+          "memory_controller_dynamic_max_w": 6.0,
+          "core_curve_r": 1.72,
+          "vrm_efficiency": 0.92
+        },
+        "dram": {
+          "label": "DGX-H100/H200, 32x64GB DDR5 RDIMM",
+          "status": "DRAFT - pending human verification",
+          "n_sockets": 2,
+          "channels_per_socket": 8,
+          "n_dimm": 32,
+          "capacity_gb_per_dimm": 64.0,
+          "data_rate_mtps": 4800.0,
+          "dimm_type": "RDIMM",
+          "background_w": 2.147,
+          "refresh_w": 0.5509999999999999,
+          "termination_w": 1.102,
+          "io_dynamic_max_w": 2.3400000000000003,
+          "core_dynamic_max_w": 2.86,
+          "activity_exponent": 1.0
+        },
+        "connectx_compute": {
+          "n_nic": 8,
+          "net_serdes_w": 9.5,
+          "pcie_serdes_w": 5.5,
+          "board_w": 2.0,
+          "digital_max_w": 10.0,
+          "digital_floor_frac": 0.65,
+          "include_optic": true,
+          "optic_w": 8.0
+        },
+        "pcie_switch": {
+          "n_switch": 4,
+          "lanes_per_switch": 144,
+          "ports_per_switch": 72,
+          "pcie_gtps": 32.0,
+          "serdes_phy_floor_w": 30.5,
+          "control_leakage_clock_w": 6.0,
+          "fabric_datapath_floor_w": 4.0,
+          "fabric_datapath_variable_w": 8.5,
+          "stress_cap_per_switch_w": 70.0
+        },
+        "nvme": {
+          "n_front_u2": 8,
+          "front_u2_idle_w": 5.0,
+          "n_boot_m2": 2,
+          "boot_m2_idle_w": 2.0,
+          "max_modeled_u_nvme": 0.02
+        },
+        "residual": {
+          "bmc_ipmi_w": 10.0,
+          "onboard_10gbe_w": 8.0,
+          "motherboard_pch_aux_w": 8.0,
+          "cpld_tpm_superio_w": 5.0,
+          "clock_sensor_fru_w": 4.0,
+          "storage_backplane_idle_w": 6.0,
+          "front_panel_usb_led_w": 2.0,
+          "aux_margin_w": 2.0,
+          "normal_low_w": 35.0,
+          "normal_high_w": 70.0
+        },
+        "fans": {
+          "electrical_nameplate_w": 1100.0,
+          "airflow_cfm_at_normal_max_pwm": 1105.0,
+          "min_pwm_frac": 0.22,
+          "normal_max_pwm_frac": 0.8,
+          "full_cooling_load_w": 9500.0,
+          "fan_curve_exponent": 1.1
+        },
+        "psu": {
+          "n_installed_psu": 6,
+          "n_load_sharing_psu": 6,
+          "n_redundant_capacity_psu": 4,
+          "psu_capacity_w": 3300.0,
+          "redundancy": "4+2",
+          "efficiency_curve": {
+            "0.05": 0.885,
+            "0.1": 0.92,
+            "0.2": 0.94,
+            "0.5": 0.96,
+            "1.0": 0.955
+          }
+        },
+        "storage_mgmt_network_static_w": 60.0,
+        "optional_dpu_idle_w": 0.0,
+        "pue": 1.2
+      },
+      "fixedComponentsDcWatts": {
+        "hopper_nvswitch_4x": 485.8,
+        "hopper_pcie_retimers_8x": 92.4,
+        "hopper_ubb_residual_static": 45.0,
+        "host_cpu_2x_socket_input": 367.9,
+        "host_ddr5_dimms": 154.9,
+        "connectx7_compute_8x_with_optics": 252.0,
+        "connectx7_storage_mgmt_2x_static": 60.0,
+        "cpu_tray_pcie_switches_4x": 163.7,
+        "nvme_idle": 44.0,
+        "chassis_residual_static": 45.0
+      },
+      "fan": {
+        "electricalNameplateWatts": 1100.0,
+        "electricalGroupsWatts": [1100.0],
+        "minPwm": 0.22,
+        "maxPwm": 0.8,
+        "fullCoolingLoadWatts": 9500.0,
+        "exponent": 1.1
+      },
+      "psu": {
+        "loadSharingCapacityWatts": 19800.0,
+        "maxDcWatts": 13200.0,
+        "efficiencyCurve": [
+          [0.05, 0.885],
+          [0.1, 0.92],
+          [0.2, 0.94],
+          [0.5, 0.96],
+          [1.0, 0.955]
+        ]
+      }
+    },
+    "b200": {
+      "modelPath": "human_verified/hgx_b200_chassis/b200_chassis_power_model.py",
+      "functionName": "b200_chassis_power",
+      "configFactory": "B200ChassisMasterConfig",
+      "gpuCount": 8,
+      "assumptions": {
+        "u_pcie": 0.05,
+        "u_cpu": 0.2,
+        "u_ram": 0.2,
+        "u_nvme": 0.0,
+        "pue": 1.2,
+        "u_nvlink": 0.5,
+        "u_ib": 0.0,
+        "u_dpu": 0.0,
+        "fan_pwm": null
+      },
+      "defaultConfig": {
+        "ubb": {
+          "n_gpu": 8,
+          "nvswitch": {
+            "n_asic": 2,
+            "serdes_lanes": 144,
+            "serdes_lane_gbps": 200.0,
+            "serdes_pj_per_bit": 2.5,
+            "serdes_floor_frac": 0.95,
+            "digital_max_w": 190.0,
+            "digital_floor_frac": 0.4
+          },
+          "retimer": {
+            "n_retimer": 8,
+            "lanes_per_retimer": 16,
+            "pcie_gtps": 32.0,
+            "analog_serdes_equalization_w": 9.5,
+            "digital_floor_w": 2.0,
+            "digital_variable_w": 1.0
+          },
+          "residual": {
+            "include_management_bridge_controller": true,
+            "management_bridge_controller_w": 24.0,
+            "hmc_bmc_w": 6.0,
+            "fpga_cpld_w": 8.0,
+            "erot_security_w": 3.0,
+            "hsc_power_monitor_w": 5.0,
+            "clock_refclk_reset_w": 4.0,
+            "sensors_i2c_fru_led_w": 3.0,
+            "aux_rails_misc_w": 9.0,
+            "normal_low_w": 45.0,
+            "normal_high_w": 85.0,
+            "conservative_cap_w": 100.0
+          }
+        },
+        "cpu": {
+          "name": "2x Intel Xeon Platinum 8570 (Emerald Rapids)",
+          "n_cpu": 2,
+          "cores_per_cpu": 56,
+          "threads_per_cpu": 112,
+          "package_tdp_w": 350.0,
+          "base_ghz": 2.1,
+          "max_turbo_ghz": 4.0,
+          "l3_cache_mb": 300.0,
+          "memory_channels_per_cpu": 8,
+          "pcie_lanes_per_cpu": 80,
+          "package_static_w": 22.0,
+          "uncore_io_baseline_w": 36.0,
+          "memory_controller_baseline_w": 22.0,
+          "uncore_dynamic_max_w": 8.0,
+          "memory_controller_dynamic_max_w": 6.0,
+          "core_curve_r": 1.7,
+          "vrm_efficiency": 0.92
+        },
+        "dram": {
+          "label": "DGX-B200-like Xeon 8570, 32x64GB DDR5-5600 RDIMM",
+          "status": "DRAFT - pending human verification",
+          "n_sockets": 2,
+          "channels_per_socket": 8,
+          "n_dimm": 32,
+          "capacity_gb_per_dimm": 64.0,
+          "data_rate_mtps": 5600.0,
+          "dimm_type": "RDIMM",
+          "background_w": 2.147,
+          "refresh_w": 0.5509999999999999,
+          "termination_w": 1.102,
+          "io_dynamic_max_w": 2.3400000000000003,
+          "core_dynamic_max_w": 2.86,
+          "activity_exponent": 1.0
+        },
+        "connectx7": {
+          "n_nic": 8,
+          "net_serdes_w": 9.5,
+          "pcie_serdes_w": 5.5,
+          "board_w": 2.0,
+          "digital_max_w": 10.0,
+          "digital_floor_frac": 0.65,
+          "include_optic": true,
+          "optic_w": 8.0
+        },
+        "dpu": {
+          "n_dpu": 1,
+          "idle_w_per_dpu": 65.0,
+          "public_max_power_cap_w": 150.0,
+          "max_modeled_u_dpu": 0.02
+        },
+        "pcie_switch": {
+          "n_switch": 4,
+          "lanes_per_switch": 144,
+          "ports_per_switch": 72,
+          "pcie_gtps": 32.0,
+          "serdes_phy_floor_w": 30.5,
+          "control_leakage_clock_w": 6.0,
+          "fabric_datapath_floor_w": 4.0,
+          "fabric_datapath_variable_w": 8.5,
+          "stress_cap_per_switch_w": 70.0
+        },
+        "nvme": {
+          "n_front_u2": 10,
+          "front_u2_idle_w": 5.0,
+          "n_boot_m2": 2,
+          "boot_m2_idle_w": 2.0,
+          "max_modeled_u_nvme": 0.02
+        },
+        "residual": {
+          "bmc_ipmi_w": 10.0,
+          "onboard_10gbe_w": 8.0,
+          "motherboard_pch_aux_w": 8.0,
+          "cpld_tpm_superio_w": 5.0,
+          "clock_sensor_fru_w": 4.0,
+          "storage_backplane_idle_w": 6.0,
+          "front_panel_usb_led_w": 2.0,
+          "aux_margin_w": 2.0,
+          "normal_low_w": 35.0,
+          "normal_high_w": 70.0
+        },
+        "fans": {
+          "n_80mm": 15,
+          "rated_80mm_w": 120.0,
+          "n_60mm": 4,
+          "rated_60mm_w": 25.0,
+          "min_pwm_frac": 0.25,
+          "normal_max_pwm_frac": 0.78,
+          "full_cooling_load_w": 12000.0,
+          "fan_curve_exponent": 1.15
+        },
+        "psu": {
+          "n_installed_psu": 6,
+          "n_active_psu": 3,
+          "psu_capacity_w": 5250.0,
+          "redundancy": "3+3",
+          "efficiency_curve": {
+            "0.05": 0.8864,
+            "0.1": 0.9238,
+            "0.2": 0.9448,
+            "0.5": 0.964,
+            "1.0": 0.9556
+          }
+        },
+        "pue": 1.2
+      },
+      "fixedComponentsDcWatts": {
+        "nvswitch5_2x": 406.4,
+        "ubb_pcie_retimers_8x": 92.4,
+        "ubb_residual_static": 62.0,
+        "host_cpu_2x_socket_input": 363.9,
+        "host_ddr5_dimms": 154.9,
+        "connectx7_8x_with_optics": 252.0,
+        "bluefield3_dpu_idle": 65.0,
+        "cpu_tray_pcie_switches_4x": 163.7,
+        "nvme_idle": 54.0,
+        "chassis_residual_static": 45.0
+      },
+      "fan": {
+        "electricalNameplateWatts": 1900.0,
+        "electricalGroupsWatts": [1800.0, 100.0],
+        "minPwm": 0.25,
+        "maxPwm": 0.78,
+        "fullCoolingLoadWatts": 12000.0,
+        "exponent": 1.15
+      },
+      "psu": {
+        "loadSharingCapacityWatts": 15750.0,
+        "maxDcWatts": 15750.0,
+        "efficiencyCurve": [
+          [0.05, 0.8864],
+          [0.1, 0.9238],
+          [0.2, 0.9448],
+          [0.5, 0.964],
+          [1.0, 0.9556]
+        ]
+      }
+    },
+    "b300": {
+      "modelPath": "human_verified/hgx_b300_chassis/b300_chassis_power_model.py",
+      "functionName": "b300_chassis_power",
+      "configFactory": "B300ChassisConfig",
+      "gpuCount": 8,
+      "assumptions": {
+        "u_pcie": 0.05,
+        "u_cpu": 0.2,
+        "u_ram": 0.2,
+        "u_nvme": 0.0,
+        "pue": 1.2,
+        "u_nvlink": 0.5,
+        "u_ib": 0.0,
+        "u_dpu": 0.0,
+        "fan_pwm": null
+      },
+      "defaultConfig": {
+        "gpu_label": "B300 Blackwell Ultra SXM",
+        "gpu_component_key": "b300_sxm_8x_measured",
+        "n_gpu": 8,
+        "gpu_memory_total_gb": 2304.0,
+        "gpu_idle_example_w_per_gpu": 200.0,
+        "gpu_decode_example_w_per_gpu": 520.0,
+        "gpu_prefill_example_w_per_gpu": 800.0,
+        "gpu_aggregate_example_w_per_gpu": 760.0,
+        "gpu_peak_w_per_gpu": 1100.0,
+        "ubb": {
+          "n_gpu": 8,
+          "gpu_label": "B300 Blackwell Ultra SXM",
+          "gpu_component_key": "b300_sxm_8x_measured",
+          "nvswitch": {
+            "n_asic": 2,
+            "serdes_lanes": 144,
+            "serdes_lane_gbps": 200.0,
+            "serdes_pj_per_bit": 2.5,
+            "serdes_floor_frac": 0.95,
+            "digital_max_w": 190.0,
+            "digital_floor_frac": 0.4
+          },
+          "connectx8": {
+            "n_nic": 8,
+            "include_optic": true,
+            "network_serdes_static_w": 18.0,
+            "pcie_switch_static_w": 28.0,
+            "board_mgmt_static_w": 5.0,
+            "digital_static_w": 12.0,
+            "network_dynamic_max_w": 8.0,
+            "pcie_switch_dynamic_max_w": 5.0,
+            "digital_dynamic_max_w": 10.0,
+            "optic_idle_w": 15.0,
+            "optic_dynamic_max_w": 2.0,
+            "max_nic_slot_power_ref_w": 75.0,
+            "normal_low_w_per_nic_with_optic": 70.0,
+            "normal_high_w_per_nic_with_optic": 100.0
+          },
+          "residual_static_w": 85.0,
+          "residual_normal_low_w": 60.0,
+          "residual_normal_high_w": 120.0
+        },
+        "cpu": {
+          "name": "2x Intel Xeon 6776P (Granite Rapids, DGX B300)",
+          "n_cpu": 2,
+          "cores_per_cpu": 64,
+          "threads_per_cpu": 128,
+          "package_tdp_w": 350.0,
+          "base_ghz": 2.3,
+          "max_turbo_ghz": 3.9,
+          "l3_cache_mb": 336.0,
+          "memory_channels_per_cpu": 8,
+          "pcie_lanes_per_cpu": 88,
+          "package_static_w": 24.0,
+          "uncore_io_baseline_w": 40.0,
+          "memory_controller_baseline_w": 24.0,
+          "uncore_dynamic_max_w": 9.0,
+          "memory_controller_dynamic_max_w": 7.0,
+          "core_curve_r": 1.68,
+          "vrm_efficiency": 0.92
+        },
+        "dram": {
+          "label": "DGX-B300-like Xeon 6776P, 32x64GB DDR5-6400 RDIMM",
+          "status": "DRAFT - pending human verification",
+          "n_sockets": 2,
+          "channels_per_socket": 8,
+          "n_dimm": 32,
+          "capacity_gb_per_dimm": 64.0,
+          "data_rate_mtps": 6400.0,
+          "dimm_type": "RDIMM",
+          "background_w": 2.147,
+          "refresh_w": 0.5509999999999999,
+          "termination_w": 1.102,
+          "io_dynamic_max_w": 2.3400000000000003,
+          "core_dynamic_max_w": 2.86,
+          "activity_exponent": 1.0
+        },
+        "dpu": {
+          "n_dpu": 2,
+          "idle_w_per_dpu": 65.0,
+          "public_max_power_cap_w": 150.0,
+          "max_modeled_u_dpu": 0.02
+        },
+        "nvme": {
+          "n_front_u2": 8,
+          "front_u2_idle_w": 4.5,
+          "n_boot_m2": 2,
+          "boot_m2_idle_w": 2.0,
+          "max_modeled_u_nvme": 0.02
+        },
+        "residual": {
+          "bmc_ipmi_w": 12.0,
+          "onboard_10gbe_w": 4.0,
+          "motherboard_pch_aux_w": 10.0,
+          "cpld_tpm_superio_w": 6.0,
+          "clock_sensor_fru_w": 5.0,
+          "storage_backplane_idle_w": 10.0,
+          "front_panel_usb_led_w": 3.0,
+          "aux_margin_w": 5.0,
+          "normal_low_w": 40.0,
+          "normal_high_w": 80.0
+        },
+        "fans": {
+          "electrical_nameplate_w": 2000.0,
+          "min_pwm_frac": 0.22,
+          "normal_max_pwm_frac": 0.85,
+          "full_cooling_load_w": 12000.0,
+          "fan_curve_exponent": 1.08
+        },
+        "psu": {
+          "n_installed_psu": 12,
+          "n_load_sharing_psu": 12,
+          "n_redundant_capacity_psu": 6,
+          "psu_capacity_w": 3300.0,
+          "system_max_w": 15000.0,
+          "redundancy": "N+N / 6+6",
+          "efficiency_curve": {
+            "0.05": 0.885,
+            "0.1": 0.92,
+            "0.2": 0.94,
+            "0.5": 0.96,
+            "1.0": 0.955
+          }
+        },
+        "pue": 1.2
+      },
+      "fixedComponentsDcWatts": {
+        "nvswitch5_2x": 406.4,
+        "connectx8_8x_integrated_pcie_with_optics": 630.0,
+        "b300_ubb_residual_static": 85.0,
+        "host_cpu_2x_socket_input": 373.4,
+        "host_ddr5_dimms": 154.9,
+        "bluefield3_dpu_2x_idle": 130.0,
+        "nvme_idle": 40.0,
+        "chassis_residual_static": 55.0
+      },
+      "fan": {
+        "electricalNameplateWatts": 2000.0,
+        "electricalGroupsWatts": [2000.0],
+        "minPwm": 0.22,
+        "maxPwm": 0.85,
+        "fullCoolingLoadWatts": 12000.0,
+        "exponent": 1.08
+      },
+      "psu": {
+        "loadSharingCapacityWatts": 39600.0,
+        "maxDcWatts": 15000.0,
+        "efficiencyCurve": [
+          [0.05, 0.885],
+          [0.1, 0.92],
+          [0.2, 0.94],
+          [0.5, 0.96],
+          [1.0, 0.955]
+        ]
+      }
+    },
+    "mi300x": {
+      "modelPath": "human_verified/mi300x_chassis/mi300x_chassis_power_model.py",
+      "functionName": "mi300x_chassis_power",
+      "configFactory": "MI300XChassisConfig",
+      "gpuCount": 8,
+      "assumptions": {
+        "u_pcie": 0.05,
+        "u_cpu": 0.2,
+        "u_ram": 0.2,
+        "u_nvme": 0.0,
+        "pue": 1.2,
+        "u_eth": 0.0,
+        "fan_pwm": null
+      },
+      "defaultConfig": {
+        "gpu_label": "AMD Instinct MI300X OAM",
+        "gpu_component_key": "mi300x_oam_8x_measured",
+        "n_gpu": 8,
+        "gpu_memory_total_gb": 1536.0,
+        "gpu_idle_example_w_per_gpu": 150.0,
+        "gpu_decode_example_w_per_gpu": 380.0,
+        "gpu_prefill_example_w_per_gpu": 620.0,
+        "gpu_aggregate_example_w_per_gpu": 580.0,
+        "gpu_peak_w_per_gpu": 750.0,
+        "ubb": {
+          "gpu_label": "AMD Instinct OAM",
+          "gpu_component_key": "amd_oam_8x_measured",
+          "n_gpu": 8,
+          "retimer": {
+            "n_retimer": 8,
+            "lanes_per_retimer": 16,
+            "pcie_gtps": 32.0,
+            "analog_serdes_equalization_w": 9.5,
+            "digital_floor_w": 2.0,
+            "digital_variable_w": 1.0
+          },
+          "residual": {
+            "management_controller_w": 10.0,
+            "fpga_cpld_sequencing_w": 8.0,
+            "hsc_power_monitor_w": 6.0,
+            "clock_refclk_reset_w": 5.0,
+            "sensors_i2c_fru_led_w": 4.0,
+            "aux_rails_misc_w": 12.0,
+            "normal_low_w": 30.0,
+            "normal_high_w": 70.0,
+            "conservative_cap_w": 90.0
+          }
+        },
+        "cpu": {
+          "name": "2x AMD EPYC 9654 (Genoa, MI300X host baseline)",
+          "n_cpu": 2,
+          "cores_per_cpu": 96,
+          "threads_per_cpu": 192,
+          "package_tdp_w": 360.0,
+          "base_ghz": 2.4,
+          "max_turbo_ghz": 3.7,
+          "l3_cache_mb": 384.0,
+          "memory_channels_per_cpu": 12,
+          "pcie_lanes_per_cpu": 128,
+          "package_static_w": 26.0,
+          "uncore_io_baseline_w": 42.0,
+          "memory_controller_baseline_w": 30.0,
+          "uncore_dynamic_max_w": 12.0,
+          "memory_controller_dynamic_max_w": 12.0,
+          "core_curve_r": 1.65,
+          "vrm_efficiency": 0.92
+        },
+        "dram": {
+          "label": "MI300X host, 24x96GB DDR5-4800 RDIMM",
+          "status": "DRAFT - pending human verification",
+          "n_sockets": 2,
+          "channels_per_socket": 12,
+          "n_dimm": 24,
+          "capacity_gb_per_dimm": 96.0,
+          "data_rate_mtps": 4800.0,
+          "dimm_type": "RDIMM",
+          "background_w": 2.7119999999999997,
+          "refresh_w": 0.696,
+          "termination_w": 1.3920000000000001,
+          "io_dynamic_max_w": 2.79,
+          "core_dynamic_max_w": 3.41,
+          "activity_exponent": 1.0
+        },
+        "thor2": {
+          "n_nic": 8,
+          "ports_per_nic": 2,
+          "aggregate_gbps_per_nic": 400.0,
+          "pcie_generation": 5,
+          "pcie_lanes": 16,
+          "card_idle_w": 12.5,
+          "card_traffic_dynamic_w": 0.4,
+          "include_optics": true,
+          "optical_modules_per_nic": 2,
+          "optics_total_w_per_nic": 10.9,
+          "deployment_margin_w": 6.5,
+          "deployment_traffic_dynamic_w": 2.8
+        },
+        "pcie_switch": {
+          "n_switch": 4,
+          "lanes_per_switch": 144,
+          "ports_per_switch": 72,
+          "pcie_gtps": 32.0,
+          "serdes_phy_floor_w": 30.5,
+          "control_leakage_clock_w": 6.0,
+          "fabric_datapath_floor_w": 4.0,
+          "fabric_datapath_variable_w": 8.5,
+          "stress_cap_per_switch_w": 70.0
+        },
+        "nvme": {
+          "n_front_u2": 12,
+          "front_u2_idle_w": 4.5,
+          "n_boot_m2": 2,
+          "boot_m2_idle_w": 2.0,
+          "max_modeled_u_nvme": 0.02
+        },
+        "residual": {
+          "bmc_ipmi_w": 12.0,
+          "onboard_10gbe_w": 8.0,
+          "motherboard_pch_aux_w": 12.0,
+          "cpld_tpm_superio_w": 6.0,
+          "clock_sensor_fru_w": 5.0,
+          "storage_backplane_idle_w": 12.0,
+          "front_panel_usb_led_w": 3.0,
+          "aux_margin_w": 8.0,
+          "normal_low_w": 45.0,
+          "normal_high_w": 90.0
+        },
+        "fans": {
+          "platform_label": "MI300X 8U air-cooled chassis",
+          "n_fan": 10,
+          "electrical_nameplate_w": 1800.0,
+          "min_pwm_frac": 0.22,
+          "normal_max_pwm_frac": 0.82,
+          "full_cooling_load_w": 8500.0,
+          "fan_curve_exponent": 1.08
+        },
+        "psu": {
+          "platform_label": "MI300X 8U chassis PSU bank",
+          "n_installed_psu": 6,
+          "n_load_sharing_psu": 6,
+          "n_redundant_capacity_psu": 3,
+          "psu_capacity_w": 3000.0,
+          "system_max_w": 9000.0,
+          "redundancy": "N+N / 3+3",
+          "efficiency_curve": {
+            "0.05": 0.885,
+            "0.1": 0.92,
+            "0.2": 0.94,
+            "0.5": 0.96,
+            "1.0": 0.955
+          }
+        },
+        "pue": 1.2
+      },
+      "fixedComponentsDcWatts": {
+        "pcie5_x16_retimers_8x": 92.4,
+        "amd_oam_ubb_residual_static": 45.0,
+        "thor2_8x_with_optics": 239.2,
+        "pcie5_144lane_switches_4x": 163.7,
+        "host_cpu_2x_socket_input": 390.2,
+        "host_ddr5_dimms": 145.0,
+        "nvme_idle": 58.0,
+        "chassis_residual_static": 66.0
+      },
+      "fan": {
+        "electricalNameplateWatts": 1800.0,
+        "electricalGroupsWatts": [1800.0],
+        "minPwm": 0.22,
+        "maxPwm": 0.82,
+        "fullCoolingLoadWatts": 8500.0,
+        "exponent": 1.08
+      },
+      "psu": {
+        "loadSharingCapacityWatts": 18000.0,
+        "maxDcWatts": 9000.0,
+        "efficiencyCurve": [
+          [0.05, 0.885],
+          [0.1, 0.92],
+          [0.2, 0.94],
+          [0.5, 0.96],
+          [1.0, 0.955]
+        ]
+      }
+    },
+    "mi325x": {
+      "modelPath": "human_verified/mi325x_chassis/mi325x_chassis_power_model.py",
+      "functionName": "mi325x_chassis_power",
+      "configFactory": "MI325XChassisConfig",
+      "gpuCount": 8,
+      "assumptions": {
+        "u_pcie": 0.05,
+        "u_cpu": 0.2,
+        "u_ram": 0.2,
+        "u_nvme": 0.0,
+        "pue": 1.2,
+        "u_eth": 0.0,
+        "fan_pwm": null
+      },
+      "defaultConfig": {
+        "gpu_label": "AMD Instinct MI325X OAM",
+        "gpu_component_key": "mi325x_oam_8x_measured",
+        "n_gpu": 8,
+        "gpu_memory_total_gb": 2048.0,
+        "gpu_idle_example_w_per_gpu": 170.0,
+        "gpu_decode_example_w_per_gpu": 450.0,
+        "gpu_prefill_example_w_per_gpu": 800.0,
+        "gpu_aggregate_example_w_per_gpu": 760.0,
+        "gpu_peak_w_per_gpu": 1000.0,
+        "ubb": {
+          "gpu_label": "AMD Instinct OAM",
+          "gpu_component_key": "amd_oam_8x_measured",
+          "n_gpu": 8,
+          "retimer": {
+            "n_retimer": 8,
+            "lanes_per_retimer": 16,
+            "pcie_gtps": 32.0,
+            "analog_serdes_equalization_w": 9.5,
+            "digital_floor_w": 2.0,
+            "digital_variable_w": 1.0
+          },
+          "residual": {
+            "management_controller_w": 10.0,
+            "fpga_cpld_sequencing_w": 8.0,
+            "hsc_power_monitor_w": 6.0,
+            "clock_refclk_reset_w": 5.0,
+            "sensors_i2c_fru_led_w": 4.0,
+            "aux_rails_misc_w": 12.0,
+            "normal_low_w": 30.0,
+            "normal_high_w": 70.0,
+            "conservative_cap_w": 90.0
+          }
+        },
+        "cpu": {
+          "name": "2x AMD EPYC 9575F (Turin, MI325X/MI355X host baseline)",
+          "n_cpu": 2,
+          "cores_per_cpu": 64,
+          "threads_per_cpu": 128,
+          "package_tdp_w": 400.0,
+          "base_ghz": 3.3,
+          "max_turbo_ghz": 4.3,
+          "l3_cache_mb": 384.0,
+          "memory_channels_per_cpu": 12,
+          "pcie_lanes_per_cpu": 160,
+          "package_static_w": 28.0,
+          "uncore_io_baseline_w": 48.0,
+          "memory_controller_baseline_w": 34.0,
+          "uncore_dynamic_max_w": 14.0,
+          "memory_controller_dynamic_max_w": 14.0,
+          "core_curve_r": 1.62,
+          "vrm_efficiency": 0.92
+        },
+        "dram": {
+          "label": "MI325X host, 24x256GB DDR5-6400 RDIMM/MRDIMM",
+          "status": "DRAFT - pending human verification",
+          "n_sockets": 2,
+          "channels_per_socket": 12,
+          "n_dimm": 24,
+          "capacity_gb_per_dimm": 256.0,
+          "data_rate_mtps": 6400.0,
+          "dimm_type": "RDIMM/MRDIMM",
+          "background_w": 3.9549999999999996,
+          "refresh_w": 1.015,
+          "termination_w": 2.0300000000000002,
+          "io_dynamic_max_w": 4.95,
+          "core_dynamic_max_w": 6.05,
+          "activity_exponent": 1.0
+        },
+        "thor2": {
+          "n_nic": 8,
+          "ports_per_nic": 2,
+          "aggregate_gbps_per_nic": 400.0,
+          "pcie_generation": 5,
+          "pcie_lanes": 16,
+          "card_idle_w": 12.5,
+          "card_traffic_dynamic_w": 0.4,
+          "include_optics": true,
+          "optical_modules_per_nic": 2,
+          "optics_total_w_per_nic": 10.9,
+          "deployment_margin_w": 6.5,
+          "deployment_traffic_dynamic_w": 2.8
+        },
+        "pcie_switch": {
+          "n_switch": 4,
+          "lanes_per_switch": 144,
+          "ports_per_switch": 72,
+          "pcie_gtps": 32.0,
+          "serdes_phy_floor_w": 30.5,
+          "control_leakage_clock_w": 6.0,
+          "fabric_datapath_floor_w": 4.0,
+          "fabric_datapath_variable_w": 8.5,
+          "stress_cap_per_switch_w": 70.0
+        },
+        "nvme": {
+          "n_front_u2": 8,
+          "front_u2_idle_w": 4.5,
+          "n_boot_m2": 2,
+          "boot_m2_idle_w": 2.0,
+          "max_modeled_u_nvme": 0.02
+        },
+        "residual": {
+          "bmc_ipmi_w": 12.0,
+          "onboard_10gbe_w": 8.0,
+          "motherboard_pch_aux_w": 14.0,
+          "cpld_tpm_superio_w": 7.0,
+          "clock_sensor_fru_w": 6.0,
+          "storage_backplane_idle_w": 14.0,
+          "front_panel_usb_led_w": 3.0,
+          "aux_margin_w": 10.0,
+          "normal_low_w": 50.0,
+          "normal_high_w": 100.0
+        },
+        "fans": {
+          "platform_label": "MI325X 8U air-cooled chassis",
+          "n_fan": 14,
+          "electrical_nameplate_w": 2600.0,
+          "min_pwm_frac": 0.24,
+          "normal_max_pwm_frac": 0.88,
+          "full_cooling_load_w": 12000.0,
+          "fan_curve_exponent": 1.06
+        },
+        "psu": {
+          "platform_label": "MI325X 8U chassis PSU bank",
+          "n_installed_psu": 6,
+          "n_load_sharing_psu": 6,
+          "n_redundant_capacity_psu": 3,
+          "psu_capacity_w": 5250.0,
+          "system_max_w": 15750.0,
+          "redundancy": "N+N / 3+3",
+          "efficiency_curve": {
+            "0.05": 0.885,
+            "0.1": 0.92,
+            "0.2": 0.94,
+            "0.5": 0.96,
+            "1.0": 0.955
+          }
+        },
+        "pue": 1.2
+      },
+      "fixedComponentsDcWatts": {
+        "pcie5_x16_retimers_8x": 92.4,
+        "amd_oam_ubb_residual_static": 45.0,
+        "thor2_8x_with_optics": 239.2,
+        "pcie5_144lane_switches_4x": 163.7,
+        "host_cpu_2x_socket_input": 432.6,
+        "host_ddr5_dimms": 220.8,
+        "nvme_idle": 40.0,
+        "chassis_residual_static": 74.0
+      },
+      "fan": {
+        "electricalNameplateWatts": 2600.0,
+        "electricalGroupsWatts": [2600.0],
+        "minPwm": 0.24,
+        "maxPwm": 0.88,
+        "fullCoolingLoadWatts": 12000.0,
+        "exponent": 1.06
+      },
+      "psu": {
+        "loadSharingCapacityWatts": 31500.0,
+        "maxDcWatts": 15750.0,
+        "efficiencyCurve": [
+          [0.05, 0.885],
+          [0.1, 0.92],
+          [0.2, 0.94],
+          [0.5, 0.96],
+          [1.0, 0.955]
+        ]
+      }
+    },
+    "mi355x": {
+      "modelPath": "human_verified/mi355x_chassis/mi355x_chassis_power_model.py",
+      "functionName": "mi355x_chassis_power",
+      "configFactory": "MI355XChassisConfig",
+      "gpuCount": 8,
+      "assumptions": {
+        "u_pcie": 0.05,
+        "u_cpu": 0.2,
+        "u_ram": 0.2,
+        "u_nvme": 0.0,
+        "pue": 1.2,
+        "u_eth": 0.0,
+        "fan_pwm": null
+      },
+      "defaultConfig": {
+        "gpu_label": "AMD Instinct MI355X OAM",
+        "gpu_component_key": "mi355x_oam_8x_measured",
+        "n_gpu": 8,
+        "gpu_memory_total_gb": 2304.0,
+        "gpu_idle_example_w_per_gpu": 250.0,
+        "gpu_decode_example_w_per_gpu": 700.0,
+        "gpu_prefill_example_w_per_gpu": 1150.0,
+        "gpu_aggregate_example_w_per_gpu": 1080.0,
+        "gpu_peak_w_per_gpu": 1400.0,
+        "ubb": {
+          "gpu_label": "AMD Instinct OAM",
+          "gpu_component_key": "amd_oam_8x_measured",
+          "n_gpu": 8,
+          "retimer": {
+            "n_retimer": 8,
+            "lanes_per_retimer": 16,
+            "pcie_gtps": 32.0,
+            "analog_serdes_equalization_w": 9.5,
+            "digital_floor_w": 2.0,
+            "digital_variable_w": 1.0
+          },
+          "residual": {
+            "management_controller_w": 10.0,
+            "fpga_cpld_sequencing_w": 8.0,
+            "hsc_power_monitor_w": 6.0,
+            "clock_refclk_reset_w": 5.0,
+            "sensors_i2c_fru_led_w": 4.0,
+            "aux_rails_misc_w": 12.0,
+            "normal_low_w": 30.0,
+            "normal_high_w": 70.0,
+            "conservative_cap_w": 90.0
+          }
+        },
+        "cpu": {
+          "name": "2x AMD EPYC 9575F (Turin, MI325X/MI355X host baseline)",
+          "n_cpu": 2,
+          "cores_per_cpu": 64,
+          "threads_per_cpu": 128,
+          "package_tdp_w": 400.0,
+          "base_ghz": 3.3,
+          "max_turbo_ghz": 4.3,
+          "l3_cache_mb": 384.0,
+          "memory_channels_per_cpu": 12,
+          "pcie_lanes_per_cpu": 160,
+          "package_static_w": 28.0,
+          "uncore_io_baseline_w": 48.0,
+          "memory_controller_baseline_w": 34.0,
+          "uncore_dynamic_max_w": 14.0,
+          "memory_controller_dynamic_max_w": 14.0,
+          "core_curve_r": 1.62,
+          "vrm_efficiency": 0.92
+        },
+        "dram": {
+          "label": "MI355X host, 24x256GB DDR5-6400 RDIMM/MRDIMM",
+          "status": "DRAFT - pending human verification",
+          "n_sockets": 2,
+          "channels_per_socket": 12,
+          "n_dimm": 24,
+          "capacity_gb_per_dimm": 256.0,
+          "data_rate_mtps": 6400.0,
+          "dimm_type": "RDIMM/MRDIMM",
+          "background_w": 3.9549999999999996,
+          "refresh_w": 1.015,
+          "termination_w": 2.0300000000000002,
+          "io_dynamic_max_w": 4.95,
+          "core_dynamic_max_w": 6.05,
+          "activity_exponent": 1.0
+        },
+        "pollara400": {
+          "n_nic": 8,
+          "aggregate_gbps_per_nic": 400.0,
+          "pcie_generation": 5,
+          "pcie_lanes": 16,
+          "net_serdes_w": 10.5,
+          "pcie_serdes_w": 6.0,
+          "board_mgmt_w": 2.5,
+          "packet_engine_max_w": 12.5,
+          "packet_engine_floor_frac": 0.64,
+          "include_optic": true,
+          "optic_w": 8.0
+        },
+        "pcie_switch": {
+          "n_switch": 4,
+          "lanes_per_switch": 144,
+          "ports_per_switch": 72,
+          "pcie_gtps": 32.0,
+          "serdes_phy_floor_w": 30.5,
+          "control_leakage_clock_w": 6.0,
+          "fabric_datapath_floor_w": 4.0,
+          "fabric_datapath_variable_w": 8.5,
+          "stress_cap_per_switch_w": 70.0
+        },
+        "nvme": {
+          "n_front_u2": 8,
+          "front_u2_idle_w": 4.5,
+          "n_boot_m2": 2,
+          "boot_m2_idle_w": 2.0,
+          "max_modeled_u_nvme": 0.02
+        },
+        "residual": {
+          "bmc_ipmi_w": 12.0,
+          "onboard_10gbe_w": 8.0,
+          "motherboard_pch_aux_w": 16.0,
+          "cpld_tpm_superio_w": 8.0,
+          "clock_sensor_fru_w": 6.0,
+          "storage_backplane_idle_w": 16.0,
+          "front_panel_usb_led_w": 4.0,
+          "aux_margin_w": 12.0,
+          "normal_low_w": 60.0,
+          "normal_high_w": 120.0
+        },
+        "fans": {
+          "platform_label": "MI355X 10U air-cooled chassis",
+          "n_fan": 19,
+          "electrical_nameplate_w": 3600.0,
+          "min_pwm_frac": 0.25,
+          "normal_max_pwm_frac": 0.92,
+          "full_cooling_load_w": 15500.0,
+          "fan_curve_exponent": 1.04
+        },
+        "psu": {
+          "platform_label": "MI355X 10U chassis PSU bank",
+          "n_installed_psu": 6,
+          "n_load_sharing_psu": 6,
+          "n_redundant_capacity_psu": 4,
+          "psu_capacity_w": 6600.0,
+          "system_max_w": 26400.0,
+          "redundancy": "4+2",
+          "efficiency_curve": {
+            "0.05": 0.885,
+            "0.1": 0.92,
+            "0.2": 0.94,
+            "0.5": 0.96,
+            "1.0": 0.955
+          }
+        },
+        "pue": 1.2
+      },
+      "fixedComponentsDcWatts": {
+        "pcie5_x16_retimers_8x": 92.4,
+        "amd_oam_ubb_residual_static": 45.0,
+        "pollara400_8x_with_optics": 280.0,
+        "pcie5_144lane_switches_4x": 163.7,
+        "host_cpu_2x_socket_input": 432.6,
+        "host_ddr5_dimms": 220.8,
+        "nvme_idle": 40.0,
+        "chassis_residual_static": 82.0
+      },
+      "fan": {
+        "electricalNameplateWatts": 3600.0,
+        "electricalGroupsWatts": [3600.0],
+        "minPwm": 0.25,
+        "maxPwm": 0.92,
+        "fullCoolingLoadWatts": 15500.0,
+        "exponent": 1.04
+      },
+      "psu": {
+        "loadSharingCapacityWatts": 39600.0,
+        "maxDcWatts": 26400.0,
+        "efficiencyCurve": [
+          [0.05, 0.885],
+          [0.1, 0.92],
+          [0.2, 0.94],
+          [0.5, 0.96],
+          [1.0, 0.955]
+        ]
+      }
+    }
+  }
+}

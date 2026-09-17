@@ -289,10 +289,13 @@ jobs:
           INGEST_ARTIFACTS_PATH: ${{ github.workspace }}/artifacts
           INGEST_REPO: SemiAnalysisAI/InferenceX
           UNMAPPED_ENTITIES_OUTPUT: ${{ github.workspace }}/unmapped-entities.json
+          POWER_PUBLICATION_MANIFEST: ${{ github.workspace }}/power-publication.json
         run: bun run admin:db:ingest:ci
 
       - name: Apply run overrides
-        run: bun run admin:db:apply-overrides --yes
+        env:
+          OVERRIDE_RUN_ID: ${{ steps.artifacts.outputs.merge-run-id }}
+        run: bun run admin:db:apply-overrides --run-id "$OVERRIDE_RUN_ID" --allow-unregistered-run --yes
 
       - name: Verify database
         run: bun run admin:db:verify
@@ -305,12 +308,22 @@ jobs:
           elif [ "$INGEST_DATABASE_TARGET" = "neon-branch" ]; then
             curl --retry 3 --retry-delay 2 --retry-connrefused -sSf -X POST "$CACHE_INVALIDATE_URL" \
               -H "x-vercel-protection-bypass: $CACHE_PROTECTION_BYPASS_SECRET" \
-              -H "Authorization: Bearer $CACHE_INVALIDATE_SECRET" || \
-              echo "::warning::Preview cache invalidation failed; the database ingest is complete"
+              -H "Authorization: Bearer $CACHE_INVALIDATE_SECRET"
           else
-            curl -sSf -X POST "$CACHE_INVALIDATE_URL" \
-              -H "Authorization: Bearer $CACHE_INVALIDATE_SECRET" || true
+            curl --retry 3 --retry-delay 2 --retry-connrefused -sSf -X POST "$CACHE_INVALIDATE_URL" \
+              -H "Authorization: Bearer $CACHE_INVALIDATE_SECRET"
           fi
+
+      - name: Verify PowerX source, database and public API
+        run: bun packages/db/src/verify-power-publication.ts power-publication.json "${CACHE_INVALIDATE_URL%/api/v1/invalidate}"
+
+      - name: Retain PowerX publication receipt
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: power-publication-${{ steps.artifacts.outputs.source-run-id }}
+          path: power-publication.json*
+          if-no-files-found: warn
 
       - name: Check for unmapped entities
         if: always()

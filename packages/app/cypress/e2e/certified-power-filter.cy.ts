@@ -1,10 +1,5 @@
-// Validated-vs-historical measured power (PLAN-02 / gap G2): on the Measured
-// Energy y-axes, points without a producer validation verdict carry a dotted
-// ring and a footer legend key, and Quick Filters gains a "Measured Power"
-// category (Validated/Historical labels, stable `i_power` share-link values).
-// Fixture rows are intercepted so one config is validated (power_valid=1) and
-// one is historical (no verdict), keeping every assertion deterministic regardless of
-// what the production dataset contains.
+// Deterministic intercepted rows exercise the validated/historical power UI:
+// one row has power_valid=1 and one has no validation verdict.
 
 const POWER_MODEL = 'dsv4';
 const POWER_DATE = '2026-08-20';
@@ -85,32 +80,48 @@ const powerBenchmarks = powerConfigs.flatMap((config) =>
   })),
 );
 
-function visitCertifiedPowerChart(extraParams = '') {
+function visitCertifiedPowerChart(extraParams = '', benchmarks = powerBenchmarks) {
   cy.intercept('GET', '/api/v1/availability', { body: powerAvailability }).as('availability');
-  cy.intercept('GET', '/api/v1/benchmarks*', { body: powerBenchmarks }).as('benchmarks');
+  cy.intercept('GET', '/api/v1/benchmarks*', { body: benchmarks }).as('benchmarks');
   cy.visit(`/inference?g_model=DeepSeek-V4-Pro&i_seq=8k/1k&i_prec=fp4${extraParams}`, {
     onBeforeLoad(win) {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+      // Measured Energy sits behind the ↑↑↓↓ gate while power telemetry is WIP.
+      win.localStorage.setItem('inferencex-feature-gate', '1');
     },
   });
   cy.wait(['@availability', '@benchmarks']);
-  cy.get('[data-testid="inference-chart-display"]', { timeout: 30_000 }).should('exist');
+  cy.get('[data-testid="inference-chart-display"]').should('exist');
   cy.get('[data-testid="chart-figure"]').should('have.length.at.least', 1);
 }
 
+const visiblePowerPoints = () =>
+  cy.get<SVGGElement>('.dot-group').filter((_, element) => element.style.opacity !== '0');
+
 describe('Validated vs historical measured power', () => {
+  beforeEach(() => {
+    // Firefox can defer resize notifications while the Radix metric menu
+    // changes layout. Keep the chart assertions active; ignore only this
+    // browser-generated delivery notification, not application exceptions.
+    cy.on('uncaught:exception', (error) => {
+      // Cypress wraps the original error in the second paragraph.
+      if (
+        error.message.split('\n\n')[1]?.trim() ===
+        '> ResizeObserver loop completed with undelivered notifications.'
+      ) {
+        return false;
+      }
+    });
+  });
+
   it('rings legacy points on a measured axis and filters them via Quick Filters', () => {
     visitCertifiedPowerChart();
 
-    // No decorations off the Measured Energy axes.
     cy.get('.legacy-power-ring').should('not.exist');
     cy.get('[data-testid="legacy-power-key"]').should('not.exist');
 
-    // Pick "Measured Average Power per Chip" from the y-axis dropdown. The
-    // select list is a scroll container and Measured Energy sits below the
-    // fold, so scroll before clicking.
     cy.get('[data-testid="yaxis-metric-selector"]').click('right');
-    cy.contains('[data-slot="select-item"]', 'Measured Average Power per Chip')
+    cy.contains('[data-slot="select-item"]', 'Measured Power')
       .scrollIntoView()
       .should('be.visible')
       .click();
@@ -122,14 +133,11 @@ describe('Validated vs historical measured power', () => {
       .and('contain.text', '1/3 historical')
       .and('contain.text', 'Best per SKU and Optimal Only are enabled');
 
-    // The no-verdict config is ringed; the certified one is not. The footer
-    // legend key appears with the ringed points.
     cy.get('.dot-group[data-hw-key^="b200"] .legacy-power-ring').should('exist');
     cy.get('.dot-group[data-hw-key^="mi300x"] .legacy-power-ring').should('not.exist');
     cy.get('[data-testid="legacy-power-key"]').should('be.visible');
     cy.screenshot('legacy-power-rings', { capture: 'viewport' });
 
-    // Quick Filters gains the Measured Power category with both options enabled.
     cy.get('[data-testid="scatter-quick-filters"]').click();
     cy.get('[data-testid="quick-filters-dialog"]').should('be.visible');
     cy.get('[data-testid="quick-filter-power-certified"]').should('be.enabled');
@@ -140,8 +148,6 @@ describe('Validated vs historical measured power', () => {
     cy.contains('Both are shown by default.').should('be.visible');
     cy.get('body').type('{esc}');
 
-    // Certified-only: legacy points (and with them every ring and the legend
-    // key) leave the chart while the certified series stays.
     cy.get('[data-testid="quick-filter-power-certified"]').click();
     cy.get('[data-testid="quick-filters-selected-count"]').should('contain.text', '1 selected');
     cy.get('.dot-group[data-hw-key^="b200"]').should('not.exist');
@@ -151,7 +157,6 @@ describe('Validated vs historical measured power', () => {
     cy.get('[data-testid="inference-chart-display"] svg').should('exist');
     cy.screenshot('certified-only-filter', { capture: 'viewport' });
 
-    // Clear filters restores the legacy series, rings, and legend key.
     cy.contains('button', 'Clear filters').click();
     cy.get('[data-testid="quick-filters-selected-count"]').should('not.exist');
     cy.get('[data-testid="quick-filter-power-certified"]').should(
@@ -181,5 +186,68 @@ describe('Validated vs historical measured power', () => {
       'true',
     );
     cy.get('[data-testid="quick-filters-selected-count"]').should('contain.text', '1 selected');
+  });
+
+  it('uses Optimal Only for measured markers while preserving the power boundary', () => {
+    // Each chip has two boundary vertices and one lower-power interior point.
+    const curveBenchmarks = powerBenchmarks.map((row) => ({
+      ...row,
+      metrics: {
+        ...row.metrics,
+        avg_power_w: row.metrics.avg_power_w + (row.conc === 64 ? 100 : row.conc === 128 ? 50 : 0),
+      },
+    }));
+    const powerView = '&i_metric=y_measuredAvgPower&i_best=0';
+    visitCertifiedPowerChart(`${powerView}&i_optimal=1&i_allpoints=1`, curveBenchmarks);
+    cy.get('#scatter-hide-non-optimal').should('have.attr', 'data-state', 'checked');
+    cy.get('#scatter-show-all-measurements').should('not.exist');
+    visiblePowerPoints().should('have.length', 4);
+    cy.get('[data-testid="measured-power-summary"]').should(
+      'contain.text',
+      'Showing 4 of 6 measured points',
+    );
+
+    // Let the initial ResizeObserver update reach the SVG before saving geometry.
+    cy.get<SVGSVGElement>('[data-testid="d3-chart-svg"]').should(($svg) => {
+      const svg = $svg[0];
+      expect(svg.getBoundingClientRect().width, 'chart matches its container width').to.equal(
+        svg.parentElement!.getBoundingClientRect().width,
+      );
+    });
+    cy.get<SVGPathElement & { __transition?: Record<string, { name?: string }> }>('.roofline-path')
+      .should('have.length', 2)
+      .should(($curves) => {
+        for (const curve of $curves) {
+          expect(
+            Object.values(curve.__transition ?? {}).some(
+              (schedule) => schedule.name === 'data-update',
+            ),
+            'initial curve transition is complete',
+          ).to.equal(false);
+        }
+      })
+      .then(($curves) => {
+        const geometry = Array.from($curves, (curve) => curve.getAttribute('d'));
+        expect(geometry.every((path) => path && !path.includes('NaN'))).to.equal(true);
+
+        cy.get('#scatter-hide-non-optimal').click();
+        visiblePowerPoints().should('have.length', 6);
+        cy.get('#scatter-hide-non-optimal').should('have.attr', 'data-state', 'unchecked');
+        cy.get<SVGPathElement>('.roofline-path').should(($current) => {
+          expect(Array.from($current, (curve) => curve.getAttribute('d'))).to.deep.equal(geometry);
+        });
+
+        cy.get('#scatter-hide-non-optimal').click();
+        visiblePowerPoints().should('have.length', 4);
+        visiblePowerPoints().find('.legacy-power-ring').should('have.length', 2);
+        cy.get<SVGPathElement>('.roofline-path').should(($current) => {
+          expect(Array.from($current, (curve) => curve.getAttribute('d'))).to.deep.equal(geometry);
+        });
+      });
+
+    visitCertifiedPowerChart(`${powerView}&i_optimal=0&i_allpoints=0`, curveBenchmarks);
+    cy.get('#scatter-hide-non-optimal').should('have.attr', 'data-state', 'unchecked');
+    cy.get('#scatter-show-all-measurements').should('not.exist');
+    visiblePowerPoints().should('have.length', 6);
   });
 });

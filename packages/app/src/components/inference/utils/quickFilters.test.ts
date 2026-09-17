@@ -26,6 +26,7 @@ describe('pointVendor', () => {
   it('resolves vendor from the base GPU in the hardware key', () => {
     expect(pointVendor('h100_vllm_mtp')).toBe('NVIDIA');
     expect(pointVendor('mi300x_sglang')).toBe('AMD');
+    expect(pointVendor('tpuv7_vllm')).toBe('Google');
   });
 
   it('returns undefined for an unknown GPU base', () => {
@@ -98,7 +99,6 @@ describe('computeAvailableQuickFilters', () => {
     const certified = point({ power_tier: 'certified' });
     expect(computeAvailableQuickFilters([legacy]).power).toEqual(['legacy']);
     expect(computeAvailableQuickFilters([certified]).power).toEqual(['certified']);
-    // Display order stays certified-first even when legacy points come first.
     expect(computeAvailableQuickFilters([legacy, certified]).power).toEqual([
       'certified',
       'legacy',
@@ -146,6 +146,13 @@ describe('matchesQuickFilters', () => {
     const f = filters({ vendors: ['NVIDIA'] });
     expect(matchesQuickFilters(point({ hwKey: 'h100_vllm' }), f)).toBe(true);
     expect(matchesQuickFilters(point({ hwKey: 'mi300x_sglang' }), f)).toBe(false);
+    expect(matchesQuickFilters(point({ hwKey: 'tpuv7_vllm' }), f)).toBe(false);
+  });
+
+  it('filters TPU points under the Google vendor', () => {
+    const f = filters({ vendors: ['Google'] });
+    expect(matchesQuickFilters(point({ hwKey: 'tpuv7_vllm' }), f)).toBe(true);
+    expect(matchesQuickFilters(point({ hwKey: 'h100_vllm' }), f)).toBe(false);
   });
 
   it('treats multiple vendors as OR', () => {
@@ -198,11 +205,9 @@ describe('matchesQuickFilters', () => {
     expect(matchesQuickFilters(certified, certifiedOnly)).toBe(true);
     expect(matchesQuickFilters(legacy, certifiedOnly)).toBe(false);
     expect(matchesQuickFilters(tierless, certifiedOnly)).toBe(false);
-    // Both tiers still exclude points with no measured telemetry at all.
     expect(matchesQuickFilters(certified, bothTiers)).toBe(true);
     expect(matchesQuickFilters(legacy, bothTiers)).toBe(true);
     expect(matchesQuickFilters(tierless, bothTiers)).toBe(false);
-    // No power constraint keeps tier-less points.
     expect(matchesQuickFilters(tierless, EMPTY_QUICK_FILTERS)).toBe(true);
   });
 

@@ -4,10 +4,15 @@
  */
 import { type NextRequest, NextResponse } from 'next/server';
 
+import { artifactRunId } from '@semianalysisai/inferencex-db/etl/tpu-normalization';
 import { mapBenchmarkRow } from '@semianalysisai/inferencex-db/etl/benchmark-mapper';
 import { mapAggEvalRow, type EvalParams } from '@semianalysisai/inferencex-db/etl/eval-mapper';
 import { createSkipTracker } from '@semianalysisai/inferencex-db/etl/skip-tracker';
 
+import {
+  localArtifactPreviewEnabled,
+  readLocalArtifactPreview,
+} from '@/lib/local-artifact-preview';
 import type { BenchmarkRow, EvalRow } from '@/lib/api';
 import {
   downloadGithubArtifact,
@@ -37,7 +42,12 @@ export function normalizeArtifactRows(
   const tracker = createSkipTracker();
   const results: BenchmarkRow[] = [];
   for (const raw of rawRows) {
-    const params = mapBenchmarkRow(raw as Record<string, any>, tracker);
+    const params = mapBenchmarkRow(
+      raw as Record<string, any>,
+      tracker,
+      undefined,
+      artifactRunId(runUrl),
+    );
     if (!params) continue;
     const { config } = params;
     results.push({
@@ -73,6 +83,8 @@ export function normalizeArtifactRows(
       // Surface the same per-worker payload the DB path emits so unofficial
       // overlays carry the multinode measured-power breakdown too.
       workers: params.workers,
+      power_invalid_reasons: params.powerInvalidReasons,
+      power_audit: params.powerAudit,
       date,
       run_url: runUrl,
     });
@@ -122,7 +134,7 @@ export function normalizeEvalArtifactRows(
   const rows: EvalRow[] = [];
 
   for (const raw of rawRows) {
-    const params = mapAggEvalRow(raw as Record<string, any>, tracker);
+    const params = mapAggEvalRow(raw as Record<string, any>, tracker, artifactRunId(runUrl));
     if (!params) continue;
 
     const key = evalConfigKey(params.config);
@@ -214,6 +226,7 @@ async function processSingleRun(
   runId: string,
   githubToken: string,
   evalConfigIdOffset: number,
+  localPreview = false,
 ): Promise<
   | { errorResponse: NextResponse }
   | {
@@ -224,6 +237,29 @@ async function processSingleRun(
       nextEvalConfigIdOffset: number;
     }
 > {
+  const preview = localPreview ? await readLocalArtifactPreview(runId) : null;
+  if (preview) {
+    const { run } = preview;
+    const date = getRunDate(run);
+    const normalized = normalizeEvalArtifactRows(
+      preview.evaluations,
+      date,
+      run.created_at,
+      run.html_url,
+      evalConfigIdOffset,
+    );
+    return {
+      errorResponse: null,
+      runInfo: { ...normalizeGithubRunInfo(run), isNonMainBranch: true },
+      benchmarks: normalizeArtifactRows(preview.benchmarks, date, run.html_url),
+      evaluations: normalized.rows,
+      nextEvalConfigIdOffset: normalized.maxConfigId,
+    };
+  }
+  if (!githubToken)
+    return {
+      errorResponse: NextResponse.json({ error: 'GitHub token not configured' }, { status: 500 }),
+    };
   const runResp = await fetchGithubWorkflowRun(runId, githubToken);
   if (!runResp.ok) {
     return {
@@ -334,7 +370,8 @@ export async function GET(request: NextRequest) {
   }
 
   const githubToken = getGithubToken();
-  if (!githubToken) {
+  const localPreview = localArtifactPreviewEnabled(request.nextUrl.hostname);
+  if (!githubToken && !localPreview) {
     return NextResponse.json({ error: 'GitHub token not configured' }, { status: 500 });
   }
 
@@ -347,7 +384,12 @@ export async function GET(request: NextRequest) {
     let evalConfigIdOffset = 0;
 
     for (const runId of runIds) {
-      const result = await processSingleRun(runId, githubToken, evalConfigIdOffset);
+      const result = await processSingleRun(
+        runId,
+        githubToken ?? '',
+        evalConfigIdOffset,
+        localPreview,
+      );
       if (result.errorResponse) return result.errorResponse;
 
       runInfos.push(result.runInfo);

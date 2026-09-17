@@ -2,6 +2,8 @@
  * Tests for the "Historical Trends" tab.
  * Shows interpolated GPU performance over time at a user-selected interactivity level.
  */
+import type { BenchmarkRow } from '@/lib/api';
+
 const visitHistoricalWithSetup = () => {
   cy.visit('/historical', {
     onBeforeLoad(win) {
@@ -39,8 +41,11 @@ describe('Historical Trends Tab', () => {
     cy.get('[data-testid="historical-trends-display"]').find('svg').should('exist');
   });
 
-  it('tab trigger is visible in desktop navigation', () => {
-    cy.get('[data-testid="tab-trigger-historical"]').should('contain.text', 'Historical Trends');
+  it('is reachable from the footer, not the tab bar', () => {
+    cy.get('[data-testid="tab-trigger-historical"]').should('not.exist');
+    cy.get('[data-testid="footer-link-historical"]')
+      .should('have.attr', 'href', '/historical')
+      .and('contain.text', 'Historical Trends');
   });
 });
 
@@ -55,7 +60,34 @@ describe('Historical Trends — Content & Interactions', () => {
   });
 
   it('renders data point circles on trend lines', () => {
-    cy.get('[data-testid="trend-chart-svg"] circle').should('have.length.greaterThan', 0);
+    cy.get('[data-testid="trend-chart-svg"] .dot-group circle').should(
+      'have.length.greaterThan',
+      0,
+    );
+  });
+
+  it('loads history when the current snapshot lacks the selected energy metric', () => {
+    cy.fixture<BenchmarkRow[]>('api/benchmarks.json').then((rows) => {
+      const withoutRoleEnergy = rows.map((row) => ({
+        ...row,
+        metrics: { ...row.metrics, prefill_joules_per_input_token: undefined },
+      }));
+      cy.intercept('GET', '**/api/v1/benchmarks?*', withoutRoleEnergy).as('benchmarks');
+      cy.intercept('GET', '**/api/v1/benchmarks/history?*').as('history');
+      cy.visit('/historical?g_model=DeepSeek-R1-0528&i_metric=y_measuredPrefillJPerInputToken');
+      cy.wait('@benchmarks');
+      cy.wait('@history');
+      cy.get('[data-testid="yaxis-metric-selector"]').should('contain.text', 'Measured Energy');
+      cy.get('[data-testid="measured-energy-denominator"]').should('contain.text', 'Input token');
+      cy.get('[data-testid="measured-energy-scope"]').should('contain.text', 'Prefill GPUs');
+      cy.get('[data-testid="historical-target-slider"]').should('be.visible');
+      cy.get('[data-testid="historical-trend-figure"]')
+        .should('be.visible')
+        .and('contain.text', 'No historical data found for the tracked configurations.');
+      cy.contains(
+        'No interactivity chart data available for the selected model and sequence.',
+      ).should('not.exist');
+    });
   });
 
   it('target interactivity slider value updates when the number input is changed', () => {
@@ -91,8 +123,8 @@ describe('Historical Trends — Content & Interactions', () => {
       delete doc.body.dataset.scrollLocked;
       doc.body.style.removeProperty('pointer-events');
     });
-    cy.get('[data-testid="scenario-selector"]').should('be.visible');
-    cy.get('[data-testid="scenario-selector"]').click();
+    cy.get('fieldset [data-testid="scenario-selector"]').should('be.visible');
+    cy.get('fieldset [data-testid="scenario-selector"]').click('right');
     cy.get('[data-select-option]').should('have.length.greaterThan', 0);
     cy.get('body').type('{esc}');
   });
@@ -157,6 +189,27 @@ describe('Historical Trends — Content & Interactions', () => {
       });
   });
 
+  it('offers the published tiers in the caption Cost Tier selector but no Custom User Values', () => {
+    cy.document().then((doc) => {
+      delete doc.body.dataset.scrollLocked;
+      doc.body.style.removeProperty('pointer-events');
+    });
+    cy.get('[data-testid="historical-trend-figure"] [data-testid="cost-tier-selector"]')
+      .should('be.visible')
+      .and('contain.text', 'Owning at Large Hyperscaler Volume')
+      .click('right');
+    cy.get('[data-testid="cost-tier-hyperscaler"]').should('exist');
+    cy.get('[data-testid="cost-tier-rental"]').should('exist');
+    // The trend chart prices every point from the published tiers and has
+    // no TCO badges to type a custom $/chip/hr into.
+    cy.get('[data-testid="cost-tier-custom"]').should('not.exist');
+    cy.get('[data-testid="cost-tier-rental"]').click();
+    cy.get('[data-testid="historical-trend-figure"] [data-testid="cost-tier-selector"]').should(
+      'contain.text',
+      'Rent - 3 Year Commit',
+    );
+  });
+
   it('changing model updates the chart title to reflect the new model', () => {
     cy.document().then((doc) => {
       delete doc.body.dataset.scrollLocked;
@@ -208,7 +261,9 @@ describe('Historical Trends — Chinese route', () => {
     cy.contains('目标交互性（tok/s/user）').should('be.visible');
     cy.get('[data-testid="historical-trend-figure"] h2').should('contain.text', '随时间变化');
     cy.get('[data-testid="historical-trend-figure"]').should('contain.text', 'Shift+滚轮横向缩放');
-    cy.get('[data-testid="trend-chart-svg"] circle').first().click({ force: true });
+    // The figure wraps the caption too, whose Cost Tier help icon is also an
+    // SVG circle, so target a plotted point's hit area.
+    cy.get('[data-testid="trend-chart-svg"] .dot-group circle').first().click({ force: true });
     cy.get('[data-chart-tooltip]:visible')
       .should('contain.text', '点击其他区域关闭')
       .invoke('text')
@@ -246,6 +301,8 @@ describe('Historical Trends — Chinese route', () => {
     cy.wait('@emptyBenchmarks');
     cy.contains('所选模型和序列暂无交互性图表数据。').should('be.visible');
     cy.get('[data-testid="historical-trends-display"] .animate-pulse').should('not.exist');
+    cy.get('[data-testid="historical-target-slider"]').should('not.exist');
+    cy.get('[data-testid="historical-trend-figure"]').should('not.exist');
   });
 
   it('shows a safe Chinese primary error and recovers through the reload control', () => {

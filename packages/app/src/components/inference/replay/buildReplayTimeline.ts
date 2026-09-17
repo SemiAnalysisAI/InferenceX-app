@@ -142,7 +142,10 @@ export function buildReplayTimeline(
     };
   }
 
-  const xAxisField = resolveXAxisField(chartDef, selectedYAxisMetric, selectedXAxisMetric);
+  // Replay receives the live graph's resolved axis; a legacy input-metric
+  // override must not put history points on a different axis.
+  const xAxisField =
+    chartDef.x_scale_field ?? resolveXAxisField(chartDef, selectedYAxisMetric, selectedXAxisMetric);
   const metricKey = selectedYAxisMetric.replace('y_', '') as YAxisMetricKey;
   const isDefaultY = selectedYAxisMetric === 'y' || !selectedYAxisMetric;
 

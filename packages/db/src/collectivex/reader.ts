@@ -10,6 +10,8 @@
  * already-ingested runs.
  */
 
+import { readSwapResults, isSwapMatrix } from './swap-reader';
+
 import type {
   CollectiveXComponent,
   CollectiveXCoverage,
@@ -136,6 +138,7 @@ function toSupportedVendor(raw: string): CollectiveXVendor | null {
 }
 
 function matrixOf(value: unknown): RawMatrix {
+  if (isSwapMatrix(value)) return { version: 1, requested_cases: [] };
   const matrix = value as RawMatrix;
   if (!Number.isSafeInteger(matrix?.version) || !Array.isArray(matrix?.requested_cases)) {
     throw new TypeError('invalid CollectiveX matrix');
@@ -405,6 +408,8 @@ export function buildDatasetFromNeutral(
   run: CollectiveXNeutralRunMeta,
 ): CollectiveXDataset {
   const matrix = matrixOf(matrixRaw);
+  const swap = readSwapResults(matrixRaw, docs, run.source_sha);
+  const swapPoints = swap.reduce((count, result) => count + result.points.length, 0);
   const shards = docs.flatMap((doc) => {
     const shard = shardOf(doc);
     if (!shard) return [];
@@ -487,13 +492,16 @@ export function buildDatasetFromNeutral(
     version: matrix.version,
     run: {
       ...run,
-      requested_cases: coverage.length + kv.length,
+      requested_cases: coverage.length + kv.length + swap.length,
       terminal_cases:
         coverage.filter((item) => item.points.every((point) => point.terminal_status !== 'pending'))
-          .length + kv.filter((item) => item.outcome !== 'pending').length,
+          .length +
+        kv.filter((item) => item.outcome !== 'pending').length +
+        swap.length,
       measured_cases:
         coverage.filter((item) => item.outcome === 'success').length +
-        kv.filter((item) => item.outcome === 'success').length,
+        kv.filter((item) => item.outcome === 'success').length +
+        swap.length,
       unsupported_cases:
         coverage.filter((item) => item.outcome === 'unsupported').length +
         kv.filter((item) => item.outcome === 'unsupported').length,
@@ -501,12 +509,20 @@ export function buildDatasetFromNeutral(
         coverage.filter((item) => ['failed', 'invalid', 'diagnostic'].includes(item.outcome))
           .length +
         kv.filter((item) => ['failed', 'invalid', 'diagnostic'].includes(item.outcome)).length,
-      requested_points: points.length,
-      terminal_points: points.filter((point) => point.terminal_status !== 'pending').length,
-      measured_points: points.filter((point) => point.terminal_status === 'measured').length,
+      requested_points: points.length + swapPoints,
+      terminal_points:
+        points.filter((point) => point.terminal_status !== 'pending').length + swapPoints,
+      measured_points:
+        points.filter((point) => point.terminal_status === 'measured').length + swapPoints,
       covered_skus: [
-        ...new Set([...coverage.map((item) => item.sku), ...kv.map((item) => item.sku)]),
+        ...new Set([
+          ...coverage.map((item) => item.sku),
+          ...kv.map((item) => item.sku),
+          ...swap.map((item) => item.sku),
+        ]),
       ].toSorted(),
+      swap_requested_cases: swap.length,
+      swap_measured_cases: swap.length,
       kv_requested_cases: kv.length,
       kv_measured_cases: kv.filter((item) => item.outcome === 'success').length,
     },
@@ -515,6 +531,7 @@ export function buildDatasetFromNeutral(
       .filter(({ shard }) => !isKvCase(shard.identity.case_factors.case))
       .map(buildSeries),
     kv,
+    swap_blocks: swap,
   };
 }
 
@@ -535,6 +552,10 @@ export function buildRunSummary(dataset: CollectiveXDataset): CollectiveXRunSumm
       unsupported: run.unsupported_cases,
       failed: run.failed_cases,
     },
+    swap_cases: {
+      requested: run.swap_requested_cases ?? 0,
+      measured: run.swap_measured_cases ?? 0,
+    },
     kv_cases: {
       requested: run.kv_requested_cases ?? 0,
       measured: run.kv_measured_cases ?? 0,
@@ -548,6 +569,7 @@ export function buildRunSummary(dataset: CollectiveXDataset): CollectiveXRunSumm
  * numeric `version` — the content axis the frontend selects on.
  */
 export function isMatrixDoc(doc: unknown): boolean {
+  if (isSwapMatrix(doc)) return true;
   const candidate = doc as { requested_cases?: unknown; include?: unknown } | null;
   return (
     Array.isArray(candidate?.requested_cases) &&
@@ -558,6 +580,7 @@ export function isMatrixDoc(doc: unknown): boolean {
 
 /** Read the matrix doc's numeric version tag; null when absent or invalid. */
 export function matrixVersion(doc: unknown): number | null {
+  if (isSwapMatrix(doc)) return 1;
   const value = (doc as { version?: unknown } | null)?.version;
   return typeof value === 'number' && Number.isSafeInteger(value) && value > 0 ? value : null;
 }

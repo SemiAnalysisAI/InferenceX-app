@@ -141,7 +141,7 @@ export function buildRankingRows(summary: OverviewModelSummary, kind: RankingKin
  *  from. EN and ZH variants live together so the two locales cannot drift. */
 export function scenarioLabel(scenario: OverviewScenario, locale: 'en' | 'zh'): string {
   if (scenario === 'agentx') {
-    return locale === 'zh' ? 'AgentX 智能体编码工作负载' : 'the AgentX agentic coding workload';
+    return locale === 'zh' ? 'AgentX coding agent 工作负载' : 'the AgentX agentic coding workload';
   }
   return locale === 'zh'
     ? '单轮对话工作负载（8k 输入 / 1k 输出）'

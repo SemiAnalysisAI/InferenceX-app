@@ -154,10 +154,8 @@ export function createMockInferenceData(overrides?: Partial<InferenceData>): Inf
     inputTputPerGpu: { y: 40, roof: false },
     tpPerMw: { y: 185, roof: false },
     costh: { y: 0.52, roof: false },
-    costn: { y: 0.68, roof: false },
     costr: { y: 0.45, roof: false },
     costhi: { y: 0.4, roof: false },
-    costni: { y: 0.55, roof: false },
     costri: { y: 0.35, roof: false },
     ...overrides,
   };
@@ -177,6 +175,7 @@ export function createMockInferenceContextValues(
 ): MockInferenceContextValues {
   const hwConfig = createMockHardwareConfig();
   return {
+    selectionPoints: [],
     activeHwTypes: new Set(['h100', 'b200', 'b200_trt', 'mi300x', 'h200']),
     hwTypesWithData: new Set(['h100', 'b200', 'b200_trt', 'mi300x', 'h200']),
     toggleHwType: namedStub('toggleHwType'),
@@ -244,6 +243,8 @@ export function createMockInferenceContextValues(
     setIsLegendExpanded: namedStub('setIsLegendExpanded'),
     hideNonOptimal: false,
     setHideNonOptimal: namedStub('setHideNonOptimal'),
+    showAllMeasurements: false,
+    setShowAllMeasurements: namedStub('setShowAllMeasurements'),
     showPointLabels: false,
     setShowPointLabels: namedStub('setShowPointLabels'),
     highContrast: false,
@@ -258,6 +259,12 @@ export function createMockInferenceContextValues(
     setShowGradientLabels: namedStub('setShowGradientLabels'),
     showLineLabels: false,
     setShowLineLabels: namedStub('setShowLineLabels'),
+    showParetoFrontier: false,
+    setShowParetoFrontier: namedStub('setShowParetoFrontier'),
+    showParetoHinterland: false,
+    paretoFrontierPlayful: false,
+    paretoHinterlandPlayful: false,
+    setShowParetoHinterland: namedStub('setShowParetoHinterland'),
     selectedGPUs: [],
     setSelectedGPUs: namedStub('setSelectedGPUs'),
     availableGPUs: [
@@ -291,6 +298,8 @@ export function createMockInferenceContextValues(
     setActivePresetId: namedStub('setActivePresetId'),
     presetGuardRef: { current: false } as React.RefObject<boolean>,
     compareGpuPair: null,
+    lockedFrameworks: null,
+    minimalChrome: false,
     ...overrides,
   };
 }
@@ -473,6 +482,8 @@ export function createMockGlobalFilterContexts(
     setSelectedSequence: namedStub('setSelectedSequence_global'),
     selectedPrecisions: [Precision.FP4],
     setSelectedPrecisions: namedStub('setSelectedPrecisions_global'),
+    tcoBasis: 'internal' as const,
+    setTcoBasis: namedStub('setTcoBasis_global'),
     effectiveSequence: Sequence.EightK_OneK,
     sequenceResolved: true,
     effectivePrecisions: [Precision.FP4],
@@ -499,6 +510,7 @@ export function createMockGlobalFilterContexts(
 
   return {
     selection: {
+      tcoBasis: values.tcoBasis,
       selectedModel: values.selectedModel,
       selectedSequence: values.selectedSequence,
       selectedPrecisions: values.selectedPrecisions,
@@ -507,6 +519,7 @@ export function createMockGlobalFilterContexts(
       effectivePrecisions: values.effectivePrecisions,
     },
     actions: {
+      setTcoBasis: values.setTcoBasis,
       setSelectedModel: values.setSelectedModel,
       setSelectedSequence: values.setSelectedSequence,
       setSelectedPrecisions: values.setSelectedPrecisions,

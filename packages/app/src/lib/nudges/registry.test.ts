@@ -76,8 +76,8 @@ describe('NUDGE_REGISTRY integrity', () => {
       'export',
       'filter-hint',
       'gradient-label',
-      'openai-rubin-comparison-banner',
       'reproducibility',
+      'rubin-agentic-inference-banner',
       'star-nudge',
     ]);
   });
@@ -102,27 +102,28 @@ describe('NUDGE_REGISTRY integrity', () => {
     reproducibility.content.action?.onClick();
     expect(location.href).toBe('/zh/about#reproducibility');
 
-    const banner = NUDGE_REGISTRY.find((nudge) => nudge.id === 'openai-rubin-comparison-banner');
+    const banner = NUDGE_REGISTRY.find((nudge) => nudge.id === 'rubin-agentic-inference-banner');
     if (banner?.type !== 'banner') throw new Error('Missing launch banner');
-    expect(banner.storageKey).toBe('inferencex-openai-rubin-banner-dismissed');
-    expect(banner.content.href).toBe(
-      '/inference?g_model=DeepSeek-R1-0528&i_seq=8k%2F1k&i_prec=fp4&i_metric=y_outputTputPerMw',
-    );
+    // New storage key so visitors who dismissed the previous launch banner
+    // see this one; cypress specs seed/clear this key and must stay in sync.
+    expect(banner.storageKey).toBe('inferencex-rubin-banner-dismissed');
+    expect(banner.content.href).toBe('/inference/deepseek-v4');
+    expect(banner.content.title).toBe('Rubin Agentic Inference Performance');
+    expect(banner.content.description).toBe('67x Faster than Blackwell Ultra');
+    expect(banner.content.titleZh).toBe('Rubin 智能体推理性能');
+    expect(banner.content.descriptionZh).toBe('速度达 Blackwell Ultra 的 67 倍');
     expect(banner.analytics).toEqual({
-      shown: 'inference_rubin_comparison_banner_shown',
-      dismissed: 'inference_rubin_comparison_banner_dismissed',
-      action: 'inference_rubin_comparison_banner_clicked',
+      shown: 'inference_rubin_banner_shown',
+      dismissed: 'inference_rubin_banner_dismissed',
+      action: 'inference_rubin_banner_clicked',
       properties: {
-        banner_id: 'openai-rubin-comparison',
-        scenario: '8k/1k',
-        model: 'DeepSeek-R1-0528',
-        metric: 'y_outputTputPerMw',
+        banner_id: 'rubin-agentic-inference',
+        destination: 'inference',
       },
     });
+    // Clicks preserve the Chinese locale and model-specific destination.
     banner.content.onLinkClick?.();
-    expect(location.href).toBe(
-      '/zh/inference?g_model=DeepSeek-R1-0528&i_seq=8k%2F1k&i_prec=fp4&i_metric=y_outputTputPerMw',
-    );
+    expect(location.href).toBe('/zh/inference/deepseek-v4');
   });
 
   it('gives every coach mark an anchor to point at', () => {

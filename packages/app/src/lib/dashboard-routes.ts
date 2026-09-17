@@ -51,6 +51,12 @@ interface DashboardShellCapabilityRoute extends DashboardShellCapabilities {
  */
 export const DASHBOARD_SHELL_CAPABILITY_ROUTES = [
   {
+    path: '/video',
+    includeChildren: false,
+    providers: STANDALONE_DASHBOARD_PROVIDERS,
+    dashboardNudge: false,
+  },
+  {
     path: '/inference/agentic',
     includeChildren: true,
     providers: STANDALONE_DASHBOARD_PROVIDERS,
@@ -73,6 +79,16 @@ export const DASHBOARD_SHELL_CAPABILITY_ROUTES = [
  */
 export const DASHBOARD_ROUTES = [
   {
+    key: 'video',
+    path: '/video',
+    canonicalPath: '/video',
+    navGroup: 'feature-gated',
+    indexable: false,
+    localeMirrored: true,
+    providers: STANDALONE_DASHBOARD_PROVIDERS,
+    shareParamScopes: [],
+  },
+  {
     key: 'inference',
     path: '/inference',
     canonicalPath: '/',
@@ -81,6 +97,29 @@ export const DASHBOARD_ROUTES = [
     localeMirrored: true,
     providers: FILTERED_DASHBOARD_PROVIDERS,
     shareParamScopes: ['g_', 'i_'],
+  },
+  // The two profit views sit between Inference Performance and Accuracy
+  // Evals; the TCO calculator and fleet lifecycle moved to the footer's
+  // "More" column.
+  {
+    key: 'profit-estimator-per-gigawatt',
+    path: '/profit-estimator-per-gigawatt',
+    canonicalPath: '/profit-estimator-per-gigawatt',
+    navGroup: 'primary',
+    indexable: true,
+    localeMirrored: true,
+    providers: UNOFFICIAL_ONLY_DASHBOARD_PROVIDERS,
+    shareParamScopes: ['g_', 'i_', 'c_'],
+  },
+  {
+    key: 'profit-estimator',
+    path: '/profit-estimator',
+    canonicalPath: '/profit-estimator',
+    navGroup: 'primary',
+    indexable: true,
+    localeMirrored: true,
+    providers: UNOFFICIAL_ONLY_DASHBOARD_PROVIDERS,
+    shareParamScopes: ['g_', 'i_', 'c_'],
   },
   {
     key: 'evaluation',
@@ -92,11 +131,14 @@ export const DASHBOARD_ROUTES = [
     providers: FILTERED_DASHBOARD_PROVIDERS,
     shareParamScopes: ['g_', 'e_'],
   },
+  // Historical Trends moved to the footer as well: almost nobody opened the
+  // view, and people compare curves across dates on the inference dashboard
+  // instead. The route, canonical, /zh mirror, and sitemap entry stay.
   {
     key: 'historical',
     path: '/historical',
     canonicalPath: '/historical',
-    navGroup: 'primary',
+    navGroup: 'footer-only',
     indexable: true,
     localeMirrored: true,
     providers: FILTERED_DASHBOARD_PROVIDERS,
@@ -106,7 +148,7 @@ export const DASHBOARD_ROUTES = [
     key: 'calculator',
     path: '/calculator',
     canonicalPath: '/calculator',
-    navGroup: 'primary',
+    navGroup: 'footer-only',
     indexable: true,
     localeMirrored: true,
     providers: UNOFFICIAL_ONLY_DASHBOARD_PROVIDERS,
@@ -116,7 +158,7 @@ export const DASHBOARD_ROUTES = [
     key: 'fleet',
     path: '/fleet',
     canonicalPath: '/fleet',
-    navGroup: 'primary',
+    navGroup: 'footer-only',
     indexable: true,
     localeMirrored: true,
     providers: UNOFFICIAL_ONLY_DASHBOARD_PROVIDERS,
@@ -136,7 +178,7 @@ export const DASHBOARD_ROUTES = [
     key: 'gpu-specs',
     path: '/gpu-specs',
     canonicalPath: '/gpu-specs',
-    navGroup: 'primary',
+    navGroup: 'footer-only',
     indexable: true,
     localeMirrored: true,
     providers: STANDALONE_DASHBOARD_PROVIDERS,
@@ -152,6 +194,17 @@ export const DASHBOARD_ROUTES = [
     providers: STANDALONE_DASHBOARD_PROVIDERS,
     shareParamScopes: ['g_', 'i_'],
   },
+  {
+    key: 'operatorx',
+    path: '/operatorx',
+    canonicalPath: '/operatorx',
+    navGroup: 'feature-gated',
+    indexable: true,
+    localeMirrored: true,
+    providers: STANDALONE_DASHBOARD_PROVIDERS,
+    shareParamScopes: ['g_', 'i_'],
+  },
+
   {
     key: 'collectivex',
     path: '/collectivex',

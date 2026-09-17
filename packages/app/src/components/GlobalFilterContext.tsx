@@ -44,6 +44,8 @@ import { computeAutoSwitchDecision } from '@/lib/unofficial-run-auto-switch';
 import { countCurvesByPrecision, resolveEffectivePrecisions } from '@/lib/default-precisions';
 import { resolveEffectiveSequence } from '@/lib/default-sequence';
 import type { AvailabilityRow, WorkflowInfoResponse } from '@/lib/api';
+import { DEFAULT_TCO_BASIS, type TcoBasis } from '@/lib/constants';
+
 const RUNDATE_RE = /^\d{4}-\d{2}-\d{2}$/u;
 const RUNID_RE = /^[A-Za-z0-9_-]{1,64}$/u;
 
@@ -59,6 +61,7 @@ export interface GlobalFilterSelectionContextType {
   selectedModel: Model;
   selectedSequence: Sequence;
   selectedPrecisions: string[];
+  tcoBasis: TcoBasis;
   effectiveSequence: Sequence;
   /**
    * Whether `effectiveSequence` reflects the selected model's real availability
@@ -69,6 +72,7 @@ export interface GlobalFilterSelectionContextType {
 }
 
 export interface GlobalFilterActionsContextType {
+  setTcoBasis: (basis: TcoBasis) => void;
   setSelectedModel: (model: Model) => void;
   setSelectedSequence: (sequence: Sequence) => void;
   setSelectedPrecisions: (precisions: string[]) => void;
@@ -170,14 +174,42 @@ export function resolveEffectiveRunDate(
   return availableDates.at(-1)!;
 }
 
+/**
+ * The run that actually happened last on the selected date.
+ *
+ * GitHub run ids are not a chronological key. A re-run keeps its original id,
+ * and same-day sweeps land with ids out of `created_at` order in production
+ * (2026-09-01 DSV4: 33447526958 at 17:10Z vs 33418433573 at 21:35Z) — so the
+ * lexicographically-greatest id is NOT reliably the newest run. Picking by id
+ * opened a fresh page on "Run 2/3" (an older sweep with a larger id) instead of
+ * the day's last sweep, with that older run's changelog.
+ *
+ * `runDate` is `latest_workflow_runs.created_at`, which the API serializes as
+ * a fixed-width ISO-8601 UTC string, so a plain string compare orders it
+ * chronologically. Ties (and missing timestamps) fall back to API order, which
+ * `getWorkflowRunsByDate` sorts by `created_at ASC` — the same order the run
+ * selector numbers its entries, so "latest" and "Run N/N" agree.
+ */
+export function latestRunId(availableRuns: Readonly<Record<string, RunInfo>>): string {
+  let latest = '';
+  let latestDate = '';
+  for (const [runId, info] of Object.entries(availableRuns)) {
+    const runDate = info.runDate ?? '';
+    if (!latest || runDate >= latestDate) {
+      latest = runId;
+      latestDate = runDate;
+    }
+  }
+  return latest;
+}
+
 export function resolveEffectiveRunId(
   requestedRunId: string,
   availableRuns: Readonly<Record<string, RunInfo>>,
 ): string {
-  const runIds = Object.keys(availableRuns);
-  if (runIds.length === 0) return '';
+  if (Object.keys(availableRuns).length === 0) return '';
   if (requestedRunId && Object.hasOwn(availableRuns, requestedRunId)) return requestedRunId;
-  return runIds.reduce((latest, runId) => (runId > latest ? runId : latest), runIds[0]);
+  return latestRunId(availableRuns);
 }
 
 export function getRequestedRunUrlParams(
@@ -287,6 +319,7 @@ export function GlobalFilterProvider({
   );
 
   const [requestedRunId, setRequestedRunId] = useState<string>(() => initialRunId ?? '');
+  const [tcoBasis, setTcoBasis] = useState<TcoBasis>(DEFAULT_TCO_BASIS);
 
   // Apply URL param overrides synchronously after the first commit. Runs only
   // on the client (useEffect on server is a no-op). Updates state before paint
@@ -363,17 +396,29 @@ export function GlobalFilterProvider({
         setPrecisionExplicit(true);
       }
     }
-    applyIfMatches('g_rundate', RUNDATE_RE, (date) => {
-      requestedRunDateExplicitRef.current = true;
-      setRequestedRunDate(date);
-    });
-    applyIfMatches('g_runid', RUNID_RE, setRequestedRunId);
+    // Same guard again for the run pins. The snapshot retains `g_rundate` /
+    // `g_runid` self-writes from an earlier visit (a manual date pick, or a
+    // blog "live chart" link that pinned a date), and `refreshUrlParams` does
+    // not evict keys the live URL no longer carries. Applying them here would
+    // flip `requestedRunDateExplicitRef` and re-pin a stale date on a page the
+    // user reached without any `g_rundate` — so a fresh dashboard would open
+    // on an old run instead of the latest one. Only the CURRENT URL may pin.
+    if (hasExplicitUrlParam('g_rundate')) {
+      applyIfMatches('g_rundate', RUNDATE_RE, (date) => {
+        requestedRunDateExplicitRef.current = true;
+        setRequestedRunDate(date);
+      });
+    }
+    if (hasExplicitUrlParam('g_runid')) {
+      applyIfMatches('g_runid', RUNID_RE, setRequestedRunId);
+    }
     // Re-runs on client-side navigation as well as on mount. Keyed on the
     // pathname, which the Next router owns: the provider's own share-link
     // writes go through `history.replaceState` and never change it, so this
     // cannot fight a user changing filters in place. A param-only navigation
     // within /inference is therefore not picked up — no in-app link does that
     // today, and covering it would mean the Suspense bailout above.
+    setTcoBasis(getUrlParam('g_tco') === 'external' ? 'external' : DEFAULT_TCO_BASIS);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
 
@@ -593,6 +638,7 @@ export function GlobalFilterProvider({
     setUrlParams({
       g_model: selectedModel,
       ...getRequestedRunUrlParams(requestedRunDate, requestedRunId),
+      g_tco: tcoBasis,
       // Don't pin the sequence to the URL until it's resolved from real
       // availability — writing the pre-load placeholder (8k/1k) would clobber a
       // shared `?i_seq=agentic-traces` link before the model's availability
@@ -613,6 +659,7 @@ export function GlobalFilterProvider({
     selectedModel,
     requestedRunDate,
     requestedRunId,
+    tcoBasis,
     effectiveSequence,
     sequenceResolved,
     effectivePrecisions,
@@ -625,6 +672,7 @@ export function GlobalFilterProvider({
       selectedModel,
       selectedSequence,
       selectedPrecisions,
+      tcoBasis,
       effectiveSequence,
       sequenceResolved,
       effectivePrecisions,
@@ -633,6 +681,7 @@ export function GlobalFilterProvider({
       selectedModel,
       selectedSequence,
       selectedPrecisions,
+      tcoBasis,
       effectiveSequence,
       sequenceResolved,
       effectivePrecisions,
@@ -641,6 +690,7 @@ export function GlobalFilterProvider({
 
   const actionsValue = useMemo<GlobalFilterActionsContextType>(
     () => ({
+      setTcoBasis,
       setSelectedModel,
       setSelectedSequence,
       setSelectedPrecisions,

@@ -21,6 +21,7 @@ const URL_STATE_KEYS = [
   'g_model',
   'g_rundate',
   'g_runid',
+  'g_tco',
   // Inference
   'i_seq',
   'i_prec',
@@ -37,6 +38,7 @@ const URL_STATE_KEYS = [
   'i_dstart',
   'i_dend',
   'i_optimal',
+  'i_allpoints',
   'i_best',
   'i_label',
   // Legacy alias of `i_label` with inverted semantics — read-only on load so
@@ -49,6 +51,8 @@ const URL_STATE_KEYS = [
   'i_advlabel',
   'i_conclabel',
   'i_gradlabel',
+  'i_frontier',
+  'i_hinterland',
   'i_linelabel',
   'i_active',
   // Quick filters (vendor / framework / deployment / mtp-stp / power tier).
@@ -93,6 +97,7 @@ const URL_STATE_KEYS = [
   'c_mtbi',
   'c_rec',
   'c_life',
+  'c_power',
 ] as const;
 
 export type UrlStateKey = (typeof URL_STATE_KEYS)[number];
@@ -122,6 +127,7 @@ export const PARAM_DEFAULTS: Record<UrlStateKey, string> = {
   g_model: 'DeepSeek-V4-Pro',
   g_rundate: '',
   g_runid: '',
+  g_tco: 'internal',
   // No strippable default: per-route `initialSequence` seeds (e.g. the /compare
   // pages) make the no-param resolution route-dependent, so stripping '8k/1k'
   // (the global default) would revert an explicit 8K/1K pick back to the route's
@@ -146,6 +152,7 @@ export const PARAM_DEFAULTS: Record<UrlStateKey, string> = {
   i_dstart: '',
   i_dend: '',
   i_optimal: '',
+  i_allpoints: '',
   i_best: '',
   i_label: '',
   i_nolabel: '',
@@ -155,6 +162,8 @@ export const PARAM_DEFAULTS: Record<UrlStateKey, string> = {
   i_advlabel: '',
   i_conclabel: '',
   i_gradlabel: '',
+  i_frontier: '',
+  i_hinterland: '',
   i_linelabel: '',
   i_active: '',
   i_vendor: '',
@@ -184,6 +193,7 @@ export const PARAM_DEFAULTS: Record<UrlStateKey, string> = {
   c_price: '',
   c_oprice: '',
   c_life: '',
+  c_power: 'provisioned',
   // Empty means the default y metric (margin).
   c_ly: '',
   c_ramp: DEFAULT_LIFECYCLE_RAMP_MONTHS,

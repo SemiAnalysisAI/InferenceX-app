@@ -11,6 +11,7 @@ on:
       - 'packages/constants/**'
       - 'packages/db/**'
       - 'packages/mcp/**'
+      - 'packages/skills/**'
       - 'bunfig.toml'
       - 'bun.lock'
       - 'scripts/run-workspace-script.ts'

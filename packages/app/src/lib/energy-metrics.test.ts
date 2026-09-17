@@ -28,13 +28,12 @@ vi.mock('@/lib/constants', async (importOriginal) => {
       );
     }),
     getGpuSpecs: vi.fn((key: string) => {
-      const specs: Record<string, { power: number; costh: number; costn: number; costr: number }> =
-        {
-          h100: { power: 1.73, costh: 2.8, costn: 1.4, costr: 0.7 },
-          b200: { power: 2.17, costh: 3.5, costn: 1.75, costr: 0.88 },
-        };
+      const specs: Record<string, { power: number; costh: number; costr: number }> = {
+        h100: { power: 1.73, costh: 2.8, costr: 0.7 },
+        b200: { power: 2.17, costh: 3.5, costr: 0.88 },
+      };
       const base = key.split(/[-_]/u)[0];
-      return specs[base] ?? { power: 1.73, costh: 2.8, costn: 1.4, costr: 0.7 };
+      return specs[base] ?? { power: 1.73, costh: 2.8, costr: 0.7 };
     }),
   };
 });
@@ -115,10 +114,8 @@ function makeInferenceData(overrides: Partial<InferenceData> = {}): InferenceDat
     tpPerGpu: { y: 5000, roof: false },
     tpPerMw: { y: 50, roof: false },
     costh: { y: 1, roof: false },
-    costn: { y: 1, roof: false },
     costr: { y: 1, roof: false },
     costhi: { y: 1, roof: false },
-    costni: { y: 1, roof: false },
     costri: { y: 1, roof: false },
     ...overrides,
   };

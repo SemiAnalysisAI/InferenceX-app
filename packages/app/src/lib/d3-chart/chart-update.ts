@@ -45,9 +45,9 @@ export function renderAxes(
   if (updateX) {
     let xAxisGen: d3.Axis<d3.AxisDomain>;
     if ('bandwidth' in xScale) {
-      xAxisGen = d3
-        .axisBottom(xScale as d3.ScaleBand<string>)
-        .tickSize(6) as unknown as d3.Axis<d3.AxisDomain>;
+      const bandGen = d3.axisBottom(xScale as d3.ScaleBand<string>).tickSize(6);
+      if (xTickFormat) bandGen.tickFormat(xTickFormat as any);
+      xAxisGen = bandGen as unknown as d3.Axis<d3.AxisDomain>;
     } else {
       const gen = d3.axisBottom(xScale as ContinuousScale).tickSize(6);
       if (xTickCount) gen.ticks(xTickCount);
@@ -85,6 +85,14 @@ export function renderAxes(
 }
 
 /** Render or update grid lines with current scales. */
+/** Which grid line sets to draw; each defaults to true when omitted. */
+export interface GridVisibility {
+  /** Vertical lines at x-axis ticks. */
+  x?: boolean;
+  /** Horizontal lines at y-axis ticks. */
+  y?: boolean;
+}
+
 export function renderGrid(
   layout: ChartLayout,
   xScale: AnyScale,
@@ -94,13 +102,20 @@ export function renderGrid(
   xTickValues?: (number | Date)[],
   yTickValues?: (number | Date)[],
   axes: 'x' | 'y' | 'both' = 'both',
+  visible: GridVisibility = {},
 ): void {
   const { width, height, gridGroup } = layout;
   const dur = transitionDuration;
   const updateX = axes === 'x' || axes === 'both';
   const updateY = axes === 'y' || axes === 'both';
+  const showX = visible.x ?? true;
+  const showY = visible.y ?? true;
 
-  if (updateX) {
+  if (updateX && !showX) {
+    // Vertical grid lines disabled: drop any lines from a previous render so
+    // toggling the flag at runtime does not leave stale lines behind.
+    gridGroup.select('.grid-v').selectAll('line').remove();
+  } else if (updateX) {
     let vGroup = gridGroup.select<SVGGElement>('.grid-v');
     if (vGroup.empty()) vGroup = gridGroup.append('g').attr('class', 'grid-v');
 
@@ -142,7 +157,9 @@ export function renderGrid(
     }
   }
 
-  if (updateY) {
+  if (updateY && !showY) {
+    gridGroup.select('.grid-h').selectAll('line').remove();
+  } else if (updateY) {
     let hGroup = gridGroup.select<SVGGElement>('.grid-h');
     if (hGroup.empty()) hGroup = gridGroup.append('g').attr('class', 'grid-h');
 

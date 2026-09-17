@@ -233,8 +233,8 @@ describe('buildReplayTimeline', () => {
     expect(timeline.dates).toEqual(['2025-01-01']);
     expect(timeline.configs).toHaveLength(2);
     expect(timeline.configs.map(({ configId }) => configId).toSorted()).toEqual([
-      'h100_trt|fp4|0|32|0|0|0|recipe-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-      'h100_trt|fp4|0|32|0|0|0|recipe-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+      'h100_trt|fp4|8|32|0|0|0|recipe-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      'h100_trt|fp4|8|32|0|0|0|recipe-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
     ]);
     expect(timeline.configs.map(({ stepValues }) => stepValues[0].y).toSorted()).toEqual([
       400, 500,
@@ -263,8 +263,8 @@ describe('buildReplayTimeline', () => {
     expect(t.configs).toHaveLength(2);
     expect(new Set(t.configs.map((config) => config.hwKey))).toEqual(new Set(['h100_trt']));
     expect(t.configs.map((config) => config.configId).toSorted()).toEqual([
-      'h100_trt|fp4|0|32|0|0|0|spec-mtp',
-      'h100_trt|fp4|0|32|0|0|0|spec-none',
+      'h100_trt|fp4|8|32|0|0|0|spec-mtp',
+      'h100_trt|fp4|8|32|0|0|0|spec-none',
     ]);
   });
 

@@ -56,7 +56,11 @@ vi.mock('@/components/unofficial-run-provider', () => ({
   useUnofficialRun: () => ({ availableModelsAndSequences: [] }),
 }));
 
-import { GlobalFilterProvider, useGlobalFilterSelection } from './GlobalFilterContext';
+import {
+  GlobalFilterProvider,
+  useGlobalFilterRun,
+  useGlobalFilterSelection,
+} from './GlobalFilterContext';
 
 /** Kimi-K3 availability: both the Agentic and the 8K/1K scenario exist. */
 const KIMI_K3_ROWS = [
@@ -64,15 +68,25 @@ const KIMI_K3_ROWS = [
   { model: 'kimik3', isl: 8192, osl: 1024, benchmark_type: 'single_turn' },
 ];
 
+/** Two Agentic run dates; a retained `g_rundate` snapshot points at the older one. */
+const STALE_RUN_DATE = '2026-08-20';
+const LATEST_RUN_DATE = '2026-09-01';
+const KIMI_K3_DATED_ROWS = [
+  { ...KIMI_K3_ROWS[0], precision: 'fp8', date: STALE_RUN_DATE },
+  { ...KIMI_K3_ROWS[0], precision: 'fp8', date: LATEST_RUN_DATE },
+];
+
 let root: Root | undefined;
 let container: HTMLDivElement | undefined;
 let observedSequence: Sequence | undefined;
 let observedResolved: boolean | undefined;
+let observedRunDate: string | undefined;
 
 const SequenceProbe = memo(() => {
   const selection = useGlobalFilterSelection();
   observedSequence = selection.effectiveSequence;
   observedResolved = selection.sequenceResolved;
+  observedRunDate = useGlobalFilterRun().effectiveRunDate;
   return null;
 });
 
@@ -95,6 +109,7 @@ beforeEach(() => {
   mocks.hasExplicitUrlParam.mockClear();
   observedSequence = undefined;
   observedResolved = undefined;
+  observedRunDate = undefined;
 });
 
 afterEach(() => {
@@ -117,5 +132,38 @@ describe('GlobalFilterProvider stale i_seq snapshot', () => {
     mountProvider();
     expect(observedResolved).toBe(true);
     expect(observedSequence).toBe(Sequence.EightK_OneK);
+  });
+});
+
+/**
+ * The same snapshot-vs-live-URL split applies to the run pins. Every manual
+ * date pick (and every blog "live chart" link) writes `g_rundate` into the
+ * snapshot; `refreshUrlParams` never evicts it. If the provider honored that
+ * retained value on a navigation whose URL carries no `g_rundate`, it would flip
+ * the explicit-date flag and open a fresh dashboard on the OLD date instead of
+ * the latest run — the "run date is not at the latest on a fresh load" bug.
+ */
+describe('GlobalFilterProvider stale g_rundate snapshot', () => {
+  beforeEach(() => {
+    mocks.availability.data = KIMI_K3_DATED_ROWS;
+    mocks.getUrlParam.mockImplementation((key: string) =>
+      key === 'g_rundate' ? STALE_RUN_DATE : undefined,
+    );
+  });
+
+  afterEach(() => {
+    mocks.getUrlParam.mockImplementation((key: string) => (key === 'i_seq' ? '8k/1k' : undefined));
+  });
+
+  it('ignores a retained g_rundate the current URL does not carry — latest date wins', () => {
+    mocks.hasExplicitUrlParam.mockReturnValue(false);
+    mountProvider();
+    expect(observedRunDate).toBe(LATEST_RUN_DATE);
+  });
+
+  it('still pins a g_rundate explicitly present in the current URL', () => {
+    mocks.hasExplicitUrlParam.mockImplementation((key: string) => key === 'g_rundate');
+    mountProvider();
+    expect(observedRunDate).toBe(STALE_RUN_DATE);
   });
 });

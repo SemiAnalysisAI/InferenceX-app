@@ -92,7 +92,7 @@ function buildFaq(entry: RunPageEntry, data: RunPageData): { question: string; a
 
   const costAnswer =
     typeof read?.costPerMtok === 'number'
-      ? `${fmtCostPerMtok(read.costPerMtok)} per million total tokens at hyperscaler $/GPU/hr pricing, at ${data.primaryTier} tokens/s per user. Neocloud and retail rental tiers are tabulated above; slower interactivity targets lower the cost further.`
+      ? `${fmtCostPerMtok(read.costPerMtok)} per million total tokens at large-hyperscaler-volume ownership $/GPU/hr pricing, at ${data.primaryTier} tokens/s per user. The retail rental tier is tabulated above; slower interactivity targets lower the cost further.`
       : `Cost per million tokens is derived from measured throughput and $/GPU/hr rates from the SemiAnalysis AI Cloud TCO model; it appears once this pairing reaches the primary interactivity tier.`;
 
   const servingAnswer = `The runs behind this page used ${data.frameworks.join(', ')} in ${data.precisions.map((p) => p.toUpperCase()).join(', ')}${data.hasDisagg ? ', including disaggregated prefill' : ''}${data.hasMultinode ? ' and multi-node serving' : ''}. Engines are rebuilt and re-benchmarked continuously, so the best config can change between visits.`;
@@ -187,8 +187,7 @@ export default async function RunPage({ params }: Props) {
     colGpuHour: '$ / GPU / hr',
     colCostPerMtok: '$ / 1M tokens',
     priceTierLabels: {
-      hyperscaler: 'Hyperscaler',
-      neocloud: 'Neocloud',
+      hyperscaler: 'Owning at Large Hyperscaler Volume',
       retail: 'Retail',
     },
     emptyState: `The InferenceX fleet has not published benchmark runs for ${entry.model.seoName} on ${entry.chip.label} yet. Benchmarks re-run continuously; this page fills in automatically as soon as results land.`,

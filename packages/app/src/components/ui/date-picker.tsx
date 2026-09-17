@@ -72,6 +72,17 @@ export interface DatePickerProps {
   placeholder?: string;
   availableDates?: string[];
   isCheckingAvailableDates?: boolean;
+  /**
+   * Whether the newest run on the selected date is currently selected. When
+   * false, the external "Latest" button stays enabled even on the latest date
+   * so it can jump to the newest run. Defaults to true.
+   */
+  isLatestRunSelected?: boolean;
+  /**
+   * Called by the external "Latest" button when the latest date is already
+   * selected but an older run is active, so the caller can select the newest run.
+   */
+  onGoToLatestRun?: () => void;
 }
 
 /**
@@ -85,6 +96,8 @@ export function DatePicker({
   placeholder,
   availableDates,
   isCheckingAvailableDates,
+  isLatestRunSelected = true,
+  onGoToLatestRun,
 }: DatePickerProps) {
   const locale = useLocale();
   const t = STRINGS[locale];
@@ -167,12 +180,22 @@ export function DatePicker({
     setTempDate(getLatestDate());
   };
 
-  // Go to latest date directly (for external button)
+  // Go to latest date directly (for external button). When the latest date is
+  // already selected, fall through to the latest run instead.
   const handleGoToLatestExternal = () => {
+    if (isCurrentDateLatest()) {
+      if (!isLatestRunSelected && onGoToLatestRun) {
+        track('date_picker_go_to_latest_run');
+        onGoToLatestRun();
+      }
+      return;
+    }
     const latestDate = getLatestDate();
     track('date_picker_go_to_latest', { date: latestDate });
     onChange(latestDate);
   };
+
+  const isLatestDisabled = isCurrentDateLatest() && isLatestRunSelected;
 
   // Get current date index in available dates
   const getCurrentDateIndex = () => {
@@ -229,7 +252,7 @@ export function DatePicker({
           variant="ghost"
           size="sm"
           onClick={handleGoToLatestExternal}
-          disabled={isCurrentDateLatest() || Boolean(isCheckingAvailableDates)}
+          disabled={isLatestDisabled || Boolean(isCheckingAvailableDates)}
           className="px-2"
         >
           {t.latest}

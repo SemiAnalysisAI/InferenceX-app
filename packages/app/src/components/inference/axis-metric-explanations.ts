@@ -11,7 +11,7 @@
  * (src/lib/glossary.ts) — they describe how a value is computed, they do not
  * restate assumed constants.
  */
-import { METRIC_REGISTRY, type MetricKey } from './metric-registry';
+import { metricOptionTitle, type MetricKey } from './metric-registry';
 
 export interface LocalizedText {
   en: string;
@@ -25,20 +25,18 @@ export interface MetricExplanation {
   formula: LocalizedText;
 }
 
-/** Cost-basis flavor shared by the $/¥/cost metric families. */
-type CostBasis = 'h' | 'n' | 'r';
+/** Cost-basis flavor shared by the $ and cost-per-million metric families. */
+type CostBasis = 'h' | 'r';
 type TokenType = 'total' | 'output' | 'input';
 
 const COST_BASIS_EN: Record<CostBasis, string> = {
-  h: 'all-in hourly ownership cost of a hyperscaler operator',
-  n: 'all-in hourly ownership cost of a Neocloud Giant operator',
-  r: 'all-in hourly cost of a 3-year rental contract',
+  h: 'all-in hourly ownership cost at large hyperscaler purchasing volume',
+  r: 'all-in hourly rental cost on a 3-year commit',
 };
 
 const COST_BASIS_ZH: Record<CostBasis, string> = {
-  h: '超大规模云厂商自有硬件的每小时全包成本',
-  n: 'Neocloud Giant 自有硬件的每小时全包成本',
-  r: '3 年期租赁合同的每小时全包成本',
+  h: '按超大规模云厂商大批量采购价自有硬件的每小时全包成本',
+  r: '3 年承诺期租赁的每小时全包成本',
 };
 
 const TOKEN_TYPE_EN: Record<TokenType, string> = {
@@ -168,28 +166,6 @@ function tokensPerDollar(basis: CostBasis, tokenType: TokenType): MetricExplanat
   };
 }
 
-function tokensPerRmb(basis: CostBasis, tokenType: TokenType): MetricExplanation {
-  return {
-    description: {
-      en:
-        `How many ${TOKEN_TYPE_EN[tokenType]} one Chinese yuan of infrastructure spend buys, ` +
-        `priced with the ${COST_BASIS_EN[basis]} converted at a fixed USD→CNY exchange rate. ` +
-        'Higher means cheaper.',
-      zh:
-        `1 元人民币基础设施开支能换来多少${TOKEN_TYPE_ZH[tokenType]}，` +
-        `按${COST_BASIS_ZH[basis]}以固定 USD→CNY 汇率折算计价。数值越高越便宜。`,
-    },
-    formula: {
-      en:
-        `tok/¥ = (${TOKEN_RATE_EN[tokenType]} × 3,600) ÷ ` +
-        '(all-in cost per chip-hour ($) × USD→CNY exchange rate)',
-      zh:
-        `tok/¥ =（${TOKEN_RATE_ZH[tokenType]} × 3,600）÷` +
-        '（每芯片小时全包成本（$）× USD→CNY 汇率）',
-    },
-  };
-}
-
 function provisionedJoules(tokenType: TokenType): MetricExplanation {
   return {
     description: {
@@ -270,6 +246,41 @@ function measuredJoulesPerToken(tokenType: TokenType): MetricExplanation {
   };
 }
 
+const MEASURED_ROLE_EN: Record<'prefill' | 'decode', { tokens: string; isolates: string }> = {
+  prefill: { tokens: 'input (prompt)', isolates: 'prompt-processing' },
+  decode: { tokens: 'output', isolates: 'token-generation' },
+};
+
+const MEASURED_ROLE_ZH: Record<'prefill' | 'decode', { tokens: string; isolates: string }> = {
+  prefill: { tokens: '输入', isolates: '提示词处理' },
+  decode: { tokens: '输出', isolates: 'token 生成' },
+};
+
+function measuredRoleJoulesPerToken(role: 'prefill' | 'decode'): MetricExplanation {
+  return {
+    description: {
+      en:
+        `Measured accelerator energy consumed by the ${role} workers per ` +
+        `${MEASURED_ROLE_EN[role].tokens} token, from runner power telemetry integrated over ` +
+        `the run. Unlike the whole-deployment J/tok metrics, only that role's energy is ` +
+        `charged, so it isolates ${MEASURED_ROLE_EN[role].isolates} efficiency in ` +
+        `disaggregated deployments.${MEASURED_TIER_NOTE_EN}`,
+      zh:
+        `每个${MEASURED_ROLE_ZH[role].tokens} token 由 ${MEASURED_PHASE_ZH[role]}工作进程消耗的` +
+        `加速器实测能耗，由运行器功耗遥测在整个运行期间积分得到。与全部署 J/tok 指标不同，` +
+        `它只计入该角色的能耗，因此可以在分离式部署中单独衡量${
+          MEASURED_ROLE_ZH[role].isolates
+        }效率。${MEASURED_TIER_NOTE_ZH}`,
+    },
+    formula: {
+      en:
+        `J/tok = measured ${role}-worker energy over the run ÷ ` +
+        `${role === 'prefill' ? 'input' : 'output'} tokens processed`,
+      zh: `J/tok = 运行期间 ${role} 工作进程实测能耗 ÷ 处理的${MEASURED_ROLE_ZH[role].tokens} token 数`,
+    },
+  };
+}
+
 /**
  * Every `METRIC_REGISTRY` key gets a bilingual explanation and a structural
  * formula. Grounded in `buildDerivedChartFields` (src/lib/chart-utils.ts) and
@@ -285,32 +296,17 @@ export const METRIC_EXPLANATIONS: Record<MetricKey, MetricExplanation> = {
   inputTputPerMw: throughputPerMw('input'),
   outputTputPerMw: throughputPerMw('output'),
   costh: costPerMillion('h', 'total'),
-  costn: costPerMillion('n', 'total'),
   costr: costPerMillion('r', 'total'),
   costhOutput: costPerMillion('h', 'output'),
-  costnOutput: costPerMillion('n', 'output'),
   costrOutput: costPerMillion('r', 'output'),
   costhi: costPerMillion('h', 'input'),
-  costni: costPerMillion('n', 'input'),
   costri: costPerMillion('r', 'input'),
   tokensPerDollarH: tokensPerDollar('h', 'total'),
-  tokensPerDollarN: tokensPerDollar('n', 'total'),
   tokensPerDollarR: tokensPerDollar('r', 'total'),
   outputTokensPerDollarH: tokensPerDollar('h', 'output'),
-  outputTokensPerDollarN: tokensPerDollar('n', 'output'),
   outputTokensPerDollarR: tokensPerDollar('r', 'output'),
   inputTokensPerDollarH: tokensPerDollar('h', 'input'),
-  inputTokensPerDollarN: tokensPerDollar('n', 'input'),
   inputTokensPerDollarR: tokensPerDollar('r', 'input'),
-  tokensPerRmbH: tokensPerRmb('h', 'total'),
-  tokensPerRmbN: tokensPerRmb('n', 'total'),
-  tokensPerRmbR: tokensPerRmb('r', 'total'),
-  outputTokensPerRmbH: tokensPerRmb('h', 'output'),
-  outputTokensPerRmbN: tokensPerRmb('n', 'output'),
-  outputTokensPerRmbR: tokensPerRmb('r', 'output'),
-  inputTokensPerRmbH: tokensPerRmb('h', 'input'),
-  inputTokensPerRmbN: tokensPerRmb('n', 'input'),
-  inputTokensPerRmbR: tokensPerRmb('r', 'input'),
   costUser: {
     description: {
       en:
@@ -355,11 +351,43 @@ export const METRIC_EXPLANATIONS: Record<MetricKey, MetricExplanation> = {
   jOutput: provisionedJoules('output'),
   jInput: provisionedJoules('input'),
   measuredAvgPower: measuredPower('run'),
+  measuredP75Power: {
+    description: {
+      en: 'Power stayed at or below this level for 75% of the validated load window. Device telemetry is aligned in time and summed before taking the time-weighted percentile, then divided by the GPU count. This describes fleet draw per chip, not the P75 of an individual GPU; runs without this measurement stay unavailable.',
+      zh: '在通过验证的负载测量窗口内，75% 的时间里功耗不超过此值。各 GPU 遥测按时间对齐后求和，再计算按时间加权的 P75，最后除以 GPU 数量。该指标表示整组 GPU 功耗按芯片均摊后的水平，不是单个 GPU 的 P75；缺少此测量值的运行不显示该指标。',
+    },
+    formula: {
+      en: 'P75 fleet W/chip = time-weighted P75(sum of GPU watts) ÷ GPU count',
+      zh: '整组 GPU P75 功耗（W/芯片）= 各 GPU 功耗之和的时间加权 P75 ÷ GPU 数量',
+    },
+  },
+  measuredP90Power: {
+    description: {
+      en: 'Power stayed at or below this level for 90% of the validated load window. Device telemetry is aligned in time and summed before taking the time-weighted percentile, then divided by the GPU count. This describes fleet draw per chip, not the P90 of an individual GPU; runs without this measurement stay unavailable.',
+      zh: '在通过验证的负载测量窗口内，90% 的时间里功耗不超过此值。各 GPU 遥测按时间对齐后求和，再计算按时间加权的 P90，最后除以 GPU 数量。该指标表示整组 GPU 功耗按芯片均摊后的水平，不是单个 GPU 的 P90；缺少此测量值的运行不显示该指标。',
+    },
+    formula: {
+      en: 'P90 fleet W/chip = time-weighted P90(sum of GPU watts) ÷ GPU count',
+      zh: '整组 GPU P90 功耗（W/芯片）= 各 GPU 功耗之和的时间加权 P90 ÷ GPU 数量',
+    },
+  },
+  modeledChassisPowerPerGpu: {
+    description: {
+      en: 'Estimated chassis AC power from validated measured GPU power for non-agentic 8k1k runs, divided by the modeled chassis GPU count (eight per chassis). Oren’s draft model adds CPU, DRAM, and platform overheads using the fixed README inference sweep, with CPU and DRAM utilization set to 20%. Supported hardware with known eight-GPU chassis placement is included; a partially allocated chassis is extrapolated to a full chassis at the measured per-GPU power, matching the source sweep. Separate CPU-only frontend/router hosts are excluded. Prefill and decode chassis are modeled separately, then summed. Facility power applies PUE after chassis AC and is shown separately in the point tooltip.',
+      zh: '以非智能体 8k1k 运行中通过验证的 GPU 实测功耗为输入，估算机箱交流功耗，再除以建模机箱的 GPU 总数（每机箱 8 张）。Oren 的功耗模型草案按 README 中的固定推理参数扫描，计入 CPU、DRAM 和平台开销，CPU 与 DRAM 利用率均设为 20%。纳入硬件受支持、八卡机箱位置已知的运行；仅使用部分 GPU 的机箱按实测每卡功耗外推至满机箱，与模型源码的扫描口径一致。不计入独立的纯 CPU 前端或路由主机。Prefill 与 Decode 机箱分别计算后求和。数据中心功耗在机箱交流功耗上应用 PUE，单独显示在数据点提示框中。',
+    },
+    formula: {
+      en: 'W/GPU = sum of modeled chassis AC power (W) ÷ modeled chassis GPU count (8 per chassis); facility W = chassis AC W × PUE',
+      zh: 'W/GPU = 各机箱交流功耗估算之和（W）÷ 建模机箱的 GPU 总数（每机箱 8 张）；数据中心 W = 机箱交流 W × PUE',
+    },
+  },
   measuredPrefillAvgPower: measuredPower('prefill'),
   measuredDecodeAvgPower: measuredPower('decode'),
   measuredJPerOutputToken: measuredJoulesPerToken('output'),
   measuredJPerInputToken: measuredJoulesPerToken('input'),
   measuredJPerTotalToken: measuredJoulesPerToken('total'),
+  measuredPrefillJPerInputToken: measuredRoleJoulesPerToken('prefill'),
+  measuredDecodeJPerOutputToken: measuredRoleJoulesPerToken('decode'),
   measuredJPerSuccessfulQuery: {
     description: {
       en:
@@ -538,8 +566,7 @@ export function xAxisPercentileFromLabel(xAxisLabel: string): string | null {
       : pctl.toUpperCase();
 }
 
-/** Locale-aware y-axis row label straight from the metric registry. */
+/** Locale-aware y-axis row label (metric plus cost tier) from the registry. */
 export function metricRowLabel(metricKey: MetricKey, locale: 'en' | 'zh'): string {
-  const metric = METRIC_REGISTRY[metricKey];
-  return locale === 'zh' ? metric.titleZh : metric.title;
+  return metricOptionTitle(metricKey, locale);
 }

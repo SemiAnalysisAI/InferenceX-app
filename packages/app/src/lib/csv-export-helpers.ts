@@ -7,7 +7,9 @@
  * plotted x/y axes.
  */
 
+import { METRIC_REGISTRY } from '@/components/inference/metric-registry';
 import type { InferenceData, TrendDataPoint } from '@/components/inference/types';
+import { chipCounts } from '@/lib/chip-counts';
 import type { SubmissionVolumeRow } from '@/lib/submissions-types';
 
 import { sequenceToIslOsl } from '@semianalysisai/inferencex-constants';
@@ -53,6 +55,8 @@ export function inferenceChartToCsv(
   displayedMetrics?: InferenceCsvDisplayedMetrics,
 ): CsvData {
   const islOsl = sequenceToIslOsl(sequence);
+  const showModeledPower =
+    displayedMetrics?.yPath === METRIC_REGISTRY.modeledChassisPowerPerGpu.field;
   const headers = [
     'Model',
     'ISL',
@@ -104,6 +108,9 @@ export function inferenceChartToCsv(
     'Is Multinode',
     // Provenance (especially important when unofficial-run rows are included)
     'Run URL',
+    'Physical Chips',
+    'DP',
+    ...(showModeledPower ? ['Configured Chip Count'] : []),
   ];
 
   const displayedColumns = displayedMetrics
@@ -124,6 +131,7 @@ export function inferenceChartToCsv(
   const rows = [...data, ...overlayData]
     .filter((d) => !d.hidden)
     .map((d) => {
+      const chips = chipCounts(d, showModeledPower);
       const row = [
         model,
         islOsl?.isl ?? '',
@@ -132,7 +140,7 @@ export function inferenceChartToCsv(
         d.hwKey,
         d.framework ?? '',
         d.precision,
-        d.tp,
+        d.decode_tp ?? d.tp,
         d.conc,
         d.date,
         benchmarkMetric(d, 'tput_per_gpu'),
@@ -166,6 +174,9 @@ export function inferenceChartToCsv(
         d.dp_attention ?? '',
         d.is_multinode ?? '',
         d.run_url ?? '',
+        chips.physical,
+        d.dp ?? '',
+        ...(showModeledPower ? [chips.configured] : []),
       ];
       row.splice(10, 0, ...displayedColumns.map((column) => column.value(d)));
       return row;
@@ -199,6 +210,8 @@ export function reliabilityChartToCsv(
 export function evaluationChartToCsv(
   data: {
     configLabel: string;
+    physicalChips?: number;
+    dp?: number;
     hwKey: string | number;
     score: number;
     scoreError?: number;
@@ -233,6 +246,8 @@ export function evaluationChartToCsv(
     'DP Attention',
     'Concurrency',
     'Date',
+    'Physical Chips',
+    'DP',
   ];
 
   const rows = data.map((d) => [
@@ -252,6 +267,8 @@ export function evaluationChartToCsv(
     d.dp_attention,
     d.conc,
     d.date,
+    d.physicalChips ?? '',
+    d.dp ?? '',
   ]);
 
   return { headers, rows };

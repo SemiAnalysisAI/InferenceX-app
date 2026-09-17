@@ -135,9 +135,11 @@ export function D3ChartWrapper({
             />
             {noDataOverlay}
           </div>
-          <p className="no-export text-xs text-muted-foreground text-center mt-2">
-            {resolvedInstructions}
-          </p>
+          {resolvedInstructions && (
+            <p className="no-export text-xs text-muted-foreground text-center mt-2">
+              {resolvedInstructions}
+            </p>
+          )}
           <div className="overflow-hidden max-h-0">
             <div id={`${chartId}-export`} className="p-4"></div>
           </div>
@@ -150,7 +152,10 @@ export function D3ChartWrapper({
              closed the legend renders only a small reopen button and the
              chart reclaims the width. Height belongs to the legend itself:
              short lists should not reserve an empty chart-height column. */
-          <div className="w-full lg:w-auto lg:shrink-0 lg:self-start relative mt-3 lg:mt-0 lg:has-[.sidebar-legend]:w-fit lg:has-[.sidebar-legend]:min-w-48 lg:has-[.sidebar-legend]:max-w-96">
+          <div
+            data-slot="chart-legend-wrapper"
+            className="w-full lg:w-auto lg:shrink-0 lg:self-start relative mt-3 lg:mt-0 lg:has-[.sidebar-legend]:w-fit lg:has-[.sidebar-legend]:min-w-48 lg:has-[.sidebar-legend]:max-w-96"
+          >
             {legendElement}
           </div>
         )}

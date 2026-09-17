@@ -1,3 +1,4 @@
+import tpuv7Snapshot from './tpuv7-qwen35-snapshot.json';
 import type { AvailabilityRow, BenchmarkRow } from '@/lib/api';
 
 export type TokenMetricType = 'total' | 'input' | 'output';
@@ -28,6 +29,10 @@ interface SupplementalDataset {
   points: readonly PointTuple[];
   /** Omitted means the snapshot is valid for every token metric. */
   supportedTokenMetrics?: readonly TokenMetricType[];
+  /** Defaults to 'fp4' when omitted, matching every pre-existing snapshot. */
+  precision?: string;
+  /** Recorded metrics override synthesized percentile fallbacks when available. */
+  metricsByConcurrency?: ReadonlyMap<number, Record<string, number>>;
 }
 
 const dsr1August17: readonly PointTuple[] = [
@@ -203,6 +208,21 @@ const vrJuly: readonly PointTuple[] = [
   [72, 1, 72, 400, 115.5, 183.535, 0, 400, 0, 0],
 ];
 
+// Four physical chips, each with two logical cores. Preserve the measured
+// TP8/DP1 and TP1/DP8 configurations independently from physical chip count.
+const tpuv7Qwen35August26: readonly PointTuple[] = tpuv7Snapshot.map((row) => [
+  row.tp,
+  row.ep,
+  row.chips,
+  row.conc,
+  row.metrics.tput_per_gpu,
+  row.metrics.output_tput_per_gpu,
+  row.metrics.input_tput_per_gpu,
+  row.metrics.median_intvty,
+  row.metrics.median_ttft,
+  row.metrics.median_e2el,
+]);
+
 const DATASETS: readonly SupplementalDataset[] = [
   {
     id: 'jalapeno-dsr1-2026-08-17',
@@ -241,6 +261,17 @@ const DATASETS: readonly SupplementalDataset[] = [
     points: kimiAugust22,
   },
   {
+    id: 'tpuv7-qwen3.5-2026-08-26',
+    model: 'qwen3.5',
+    modelAliases: ['qwen3.5', 'Qwen-3.5-397B-A17B'],
+    date: '2026-08-26',
+    hardware: 'tpuv7',
+    framework: 'vllm',
+    precision: 'fp8',
+    points: tpuv7Qwen35August26,
+    metricsByConcurrency: new Map(tpuv7Snapshot.map((row) => [row.conc, row.metrics])),
+  },
+  {
     id: 'vr200-dsr1-2026-07-01',
     model: 'dsr1',
     modelAliases: ['dsr1', 'DeepSeek-R1-0528'],
@@ -268,7 +299,7 @@ function toBenchmarkRow(dataset: SupplementalDataset, point: PointTuple): Benchm
     hardware: dataset.hardware,
     framework: dataset.framework,
     model: dataset.model,
-    precision: 'fp4',
+    precision: dataset.precision ?? 'fp4',
     spec_method: 'none',
     disagg: false,
     is_multinode: chips > 8,
@@ -288,7 +319,7 @@ function toBenchmarkRow(dataset: SupplementalDataset, point: PointTuple): Benchm
     conc,
     offload_mode: 'off',
     image: null,
-    metrics: {
+    metrics: dataset.metricsByConcurrency?.get(conc) ?? {
       tput_per_gpu: total,
       output_tput_per_gpu: output,
       input_tput_per_gpu: input,
@@ -409,7 +440,7 @@ export function withSupplementalAvailability(rows: AvailabilityRow[]): Availabil
     model: dataset.model,
     isl: 8192,
     osl: 1024,
-    precision: 'fp4',
+    precision: dataset.precision ?? 'fp4',
     hardware: dataset.hardware,
     framework: dataset.framework,
     spec_method: 'none',

@@ -1,6 +1,6 @@
 import { useMemo, useRef } from 'react';
 
-import { useQueries } from '@tanstack/react-query';
+import { useQueries, useQuery } from '@tanstack/react-query';
 import { rowToSequence } from '@semianalysisai/inferencex-constants';
 
 import chartDefinitions, {
@@ -28,9 +28,11 @@ import {
 import { useBenchmarks, benchmarkQueryOptions } from '@/hooks/api/use-benchmarks';
 import type { BenchmarkRow } from '@/lib/api';
 import {
+  DEFAULT_TCO_BASIS,
   GPU_ALIAS_TO_CANONICAL,
   getModelSortIndex,
   hardwareKeyMatchesAnyBase,
+  type TcoBasis,
 } from '@/lib/constants';
 import { mergeRunScopedRows, transformBenchmarkRows } from '@/lib/benchmark-transform';
 import {
@@ -39,6 +41,7 @@ import {
   dedupeRowsToLatestPerConfig as dedupeLatestBenchmarkSeries,
 } from '@/lib/benchmark-run-selection';
 import { Sequence, type Model } from '@/lib/data-mappings';
+import { isPreferredVrLine, preferVrDefaultRun, VR_DEFAULT_RUN } from '../default-run-preference';
 import { calculateCostsForGpus, calculatePowerForGpus } from '@/lib/utils';
 import { remapInferencePoint } from '@/lib/chart-utils';
 import { overviewServingSeriesKey, type OverviewServingSeriesRow } from '@/lib/overview-data';
@@ -180,11 +183,10 @@ interface DedupeRow {
   run_started_at?: string | null;
 }
 
-// offload_mode normalized `?? 'off'` to match the SQL layer's getBenchmarksForRun
-// lineKey — agentic offload=on and offload=off are distinct series.
+// AgentX replacement scope matches benchmark_curve_scope in the SQL layer.
 /**
- * Keep only the newest workflow run for each chart series. Agentic series omit
- * point-level spec decoding from their curve identity; fixed-sequence series do not.
+ * Keep only the newest workflow run for each chart series. AgentX treats topology,
+ * speculative decoding and offload as point properties within a complete curve.
  */
 export function dedupeRowsToLatestPerConfig<T extends DedupeRow>(rows: T[]): T[] {
   return dedupeLatestBenchmarkSeries(rows);
@@ -248,7 +250,7 @@ export function useChartData(
   comparisonMainRunId?: string,
   /** Current x-axis mode. Canonical agentic-frontier stamping happens later,
    * after ChartDisplay has fetched the trace-derived normalized metric. */
-  _selectedXAxisMode: XAxisMode = 'e2e',
+  selectedXAxisMode?: XAxisMode,
   /**
    * GitHub run id for the "as of run" base view. Set only when an
    * earlier-than-latest run is selected.
@@ -265,6 +267,9 @@ export function useChartData(
   },
   benchmarkQueryScope?: string,
   initialBenchmarkRows?: BenchmarkRow[],
+  tcoBasis: TcoBasis = DEFAULT_TCO_BASIS,
+  /** Opt-in from the inference page only; explicit date/run/history views opt out. */
+  allowDefaultRunPreference = false,
 ) {
   // When the selected date is the latest available, use '' (empty string) to match
   // the initial no-date query key, reusing the eagerly-fetched benchmarks from the
@@ -311,16 +316,40 @@ export function useChartData(
     error: runError,
   } = useBenchmarks(selectedModel, '', enabled && Boolean(selectedRunId), selectedRunId, true);
 
+  const preferVr =
+    allowDefaultRunPreference &&
+    VR_DEFAULT_RUN.enabled &&
+    selectedModel === VR_DEFAULT_RUN.model &&
+    selectedSequence === VR_DEFAULT_RUN.sequence &&
+    !queryDate &&
+    !asOfRunId &&
+    !compareGpuPair &&
+    !overviewHistoryPair &&
+    selectedDates.length === 0 &&
+    !selectedDateRange.startDate &&
+    !selectedDateRange.endDate &&
+    Boolean(baseRows?.some(isPreferredVrLine));
+  const { data: preferredRows, isLoading: preferredLoading } = useQuery(
+    benchmarkQueryOptions(selectedModel, VR_DEFAULT_RUN.date, enabled && preferVr, true),
+  );
+
   const allRows = useMemo(() => {
-    if (!selectedRunId) return baseRows;
     // Wait for the run rows before rendering a scoped view — rendering base
     // rows first would flash the un-scoped chart, then swap contested points.
-    if (!runRows) return undefined;
-    if (!baseRows) return runRows;
-    return mergeRunScopedRows(runRows, baseRows);
-  }, [selectedRunId, runRows, baseRows]);
+    let scopedRows = baseRows;
+    if (selectedRunId) {
+      if (!runRows) return undefined;
+      scopedRows = baseRows ? mergeRunScopedRows(runRows, baseRows) : runRows;
+    }
+    // A missing preferred run falls back to the existing chart. Keep source ids,
+    // dates, metrics and links intact; this is only a presentation preference.
+    return preferVr && scopedRows && preferredRows
+      ? preferVrDefaultRun(scopedRows, preferredRows)
+      : scopedRows;
+  }, [selectedRunId, runRows, baseRows, preferVr, preferredRows]);
 
-  const queryLoading = baseLoading || (Boolean(selectedRunId) && runLoading);
+  const queryLoading =
+    baseLoading || (Boolean(selectedRunId) && runLoading) || (preferVr && preferredLoading);
   const queryError = baseError ?? (selectedRunId ? runError : null);
 
   // GPU comparison: fetch data for each additional comparison date
@@ -378,8 +407,8 @@ export function useChartData(
     );
 
     // Keep only each series' latest-date rows (drops stale config_ids left behind
-    // when parallelism settings change between runs). Keyed per offload variant so
-    // an offload=on sweep can't hide a differently-dated offload=off series.
+    // when parallelism settings change between runs). AgentX replaces the complete
+    // curve; fixed-sequence workloads keep separate offload variants.
     const deduped = dedupeRowsToLatestPerConfig(seqFiltered);
 
     const mainRows = deduped.map((r) => ({
@@ -419,10 +448,10 @@ export function useChartData(
         chartData: [] as InferenceData[][],
         hardwareConfig: {} as HardwareConfig,
       };
-    return transformBenchmarkRows(rows, selectedPercentile);
-  }, [rows, selectedPercentile]);
+    return transformBenchmarkRows(rows, selectedPercentile, tcoBasis);
+  }, [rows, selectedPercentile, tcoBasis]);
 
-  // Sort hardware config — stabilize reference when keys haven't changed.
+  // Sort hardware config — stabilize reference when keys and labels haven't changed.
   // Different sequences for the same model often have the same GPU configs,
   // so avoid creating a new object (which cascades to Effect 2 deps).
   const prevHardwareConfigRef = useRef<{ key: string; config: HardwareConfig }>({
@@ -435,7 +464,7 @@ export function useChartData(
     const sortedKeys = hwKeys.toSorted(
       (a, b) => getModelSortIndex(a) - getModelSortIndex(b) || a.localeCompare(b),
     );
-    const newKey = sortedKeys.join(',');
+    const newKey = JSON.stringify(sortedKeys.map((key) => [key, rawHardwareConfig[key]]));
     if (newKey === prevHardwareConfigRef.current.key) {
       return prevHardwareConfigRef.current.config;
     }
@@ -478,14 +507,13 @@ export function useChartData(
         const resolved = resolveXAxisField(chartDef, selectedYAxisMetric, effectiveXMetric, {
           isAgentic,
           percentile: selectedPercentile,
+          xAxisMode: selectedXAxisMode,
         });
         const naturalX = resolved.naturalX as keyof AggDataEntry;
         const xAxisField = resolved.xAxisField as keyof AggDataEntry;
         const { isTtftOverride } = resolved;
 
-        const ttftPctl = isTtftOverride
-          ? (effectiveXMetric as string).replace(/_ttft$/u, '')
-          : 'p90';
+        const ttftPctl = isTtftOverride ? xAxisField.replace(/_ttft$/u, '') : 'p90';
         const ttftPctlWord = ttftPctl === 'median' ? 'Median' : ttftPctl.toUpperCase();
         const ttftLabel = `${ttftPctlWord} Time To First Token (s)`;
         const ttftLabelZh = `${ttftPctlWord} 首 token 延迟 (s)`;
@@ -519,7 +547,11 @@ export function useChartData(
         // heading ("vs. <latency>") is also rewritten so the title above the
         // plot reflects what's drawn.
         const headingKey = `${selectedYAxisMetric}_heading` as keyof ChartDefinition;
-        let chartHeading = (chartDef[headingKey] as string) || chartDef.heading;
+        let chartHeading = isTtftOverride
+          ? `vs. ${ttftPctlWord} Time To First Token`
+          : selectedXAxisMode === undefined
+            ? (chartDef[headingKey] as string) || chartDef.heading
+            : chartDef.heading;
         if (isAgentic) {
           const pctlWord = selectedPercentile.toUpperCase();
           xAxisLabel = applyAgenticPercentileToXLabel(xAxisLabel, pctlWord);
@@ -564,6 +596,11 @@ export function useChartData(
                     'Token Revenue per GPU Hour at OpenRouter Pricing',
                   y_tokenRevenuePerGpuHour_titleZh:
                     '按 OpenRouter 价格计算的每 GPU 小时 token 收入',
+                  // The heading reads `_chartTitle`; keep the priced source there too.
+                  y_tokenRevenuePerGpuHour_chartTitle:
+                    'Token Revenue per GPU Hour at OpenRouter Pricing',
+                  y_tokenRevenuePerGpuHour_chartTitleZh:
+                    '按 OpenRouter 价格计算的每 GPU 小时 token 收入',
                 }
               : {
                   y_tokenRevenuePerGpuHour_label:
@@ -573,6 +610,9 @@ export function useChartData(
                   y_tokenRevenuePerGpuHour_title:
                     'Token Revenue per GPU Hour at Normalized Pricing',
                   y_tokenRevenuePerGpuHour_titleZh: '按标准化价格计算的每 GPU 小时 token 收入',
+                  y_tokenRevenuePerGpuHour_chartTitle:
+                    'Token Revenue per GPU Hour at Normalized Pricing',
+                  y_tokenRevenuePerGpuHour_chartTitleZh: '按标准化价格计算的每 GPU 小时 token 收入',
                 }
             : {};
         const yLabelKey = `${selectedYAxisMetric}_label` as keyof ChartDefinition;
@@ -595,6 +635,7 @@ export function useChartData(
       }),
     [
       selectedYAxisMetric,
+      selectedXAxisMode,
       selectedXAxisMetric,
       selectedE2eXAxisMetric,
       selectedPercentile,
@@ -605,7 +646,9 @@ export function useChartData(
 
   // Build renderable graphs (data processing + stable chart definitions)
   const graphs: RenderableGraph[] = useMemo(() => {
-    if (chartData.length === 0) return [];
+    // Once loading finishes, retain resolved axes even without official rows
+    // so unofficial-only charts use the same definitions. Keep initial skeletons.
+    if (chartData.length === 0 && loading) return [];
     if (
       usesTokenSalePricing(selectedYAxisMetric) &&
       tokenRevenuePriceSource === 'openrouter' &&
@@ -674,6 +717,7 @@ export function useChartData(
     return result;
   }, [
     chartData,
+    loading,
     selectedModel,
     selectedSequence,
     selectedYAxisMetric,

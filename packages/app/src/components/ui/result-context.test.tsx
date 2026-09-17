@@ -45,6 +45,110 @@ describe('ResultContext', () => {
     expect(context.textContent).toContain('成本口径: Input $1/M tok · Output $8/M tok');
   });
 
+  it('keeps precision with Cost Tier, Updated, and Source when the heading carries other identity', () => {
+    const container = document.createElement('div');
+    act(() => {
+      createRoot(container).render(
+        <ResultContext
+          locale="en"
+          precision="FP8"
+          costTier="Owning at Large Hyperscaler Volume"
+          date="2026-09-01"
+          source="SemiAnalysis InferenceX™"
+        />,
+      );
+    });
+    const text = container.textContent ?? '';
+    expect(text).toContain('Precision: FP8');
+    expect(text).toContain('Cost Tier: Owning at Large Hyperscaler Volume');
+    expect(text).toContain('Updated: 2026-09-01');
+    expect(text).toContain('Source: SemiAnalysis InferenceX™');
+    expect(text).not.toContain('Model:');
+    expect(text).not.toContain('Workload:');
+    expect(text).not.toContain('Metric:');
+    expect(container.querySelector('[data-testid="result-context-cost-tier"]')?.textContent).toBe(
+      'Owning at Large Hyperscaler Volume',
+    );
+  });
+
+  it('hosts an inline Cost Tier control and keeps a plain-text twin for PNG export', () => {
+    const container = document.createElement('div');
+    act(() => {
+      createRoot(container).render(
+        <ResultContext
+          locale="en"
+          costTier="Rent - 3 Year Commit"
+          costTierControl={<button data-testid="tier-control">Rent - 3 Year Commit</button>}
+          date="2026-09-01"
+        />,
+      );
+    });
+    const dd = container.querySelector('[data-testid="result-context-cost-tier"]');
+    expect(container.textContent).toContain('Cost Tier:');
+    expect(dd?.querySelector('.no-export [data-testid="tier-control"]')).not.toBeNull();
+    expect(dd?.querySelector('.export-only')?.textContent).toBe('Rent - 3 Year Commit');
+    expect(dd?.querySelector('.export-only')?.classList.contains('hidden')).toBe(true);
+    expect(container.textContent).toContain('Updated: 2026-09-01');
+  });
+
+  it('shows utilization and the model license fee when given, in both locales', () => {
+    const en = document.createElement('div');
+    act(() => {
+      createRoot(en).render(<ResultContext locale="en" utilization="60%" licenseFee="30%" />);
+    });
+    expect(en.textContent).toContain('Utilization: 60%');
+    expect(en.textContent).toContain('Model License Fee Assumption: 30%');
+    expect(en.querySelector('[data-testid="result-context-license-fee"]')?.textContent).toBe('30%');
+    const zh = document.createElement('div');
+    act(() => {
+      createRoot(zh).render(<ResultContext locale="zh" utilization="60%" licenseFee="30%" />);
+    });
+    expect(zh.textContent).toContain('利用率: 60%');
+    expect(zh.textContent).toContain('模型许可费假设: 30%');
+  });
+
+  it('renders inline editors for utilization and the license fee with export twins', () => {
+    const container = document.createElement('div');
+    act(() => {
+      createRoot(container).render(
+        <ResultContext
+          locale="en"
+          utilization="60%"
+          utilizationControl={<input id="util" data-testid="util-control" defaultValue="60" />}
+          utilizationControlId="util"
+          licenseFee="30%"
+          licenseFeeControl={<input id="fee" data-testid="fee-control" defaultValue="30" />}
+          licenseFeeControlId="fee"
+        />,
+      );
+    });
+    // The caption term becomes the label for the editor's input.
+    expect(container.querySelector('label[for="util"]')?.textContent).toBe('Utilization:');
+    expect(container.querySelector('label[for="fee"]')?.textContent).toBe(
+      'Model License Fee Assumption:',
+    );
+    const util = container.querySelector('[data-testid="result-context-utilization"]');
+    expect(util?.querySelector('.no-export [data-testid="util-control"]')).not.toBeNull();
+    expect(util?.querySelector('.export-only')?.textContent).toBe('60%');
+    // textContent reads as the plain caption, so exports and text assertions match.
+    expect(util?.textContent).toBe('60%');
+    const fee = container.querySelector('[data-testid="result-context-license-fee"]');
+    expect(fee?.querySelector('.no-export [data-testid="fee-control"]')).not.toBeNull();
+    expect(fee?.querySelector('.export-only')?.classList.contains('hidden')).toBe(true);
+    expect(container.textContent).toContain('Utilization: 60%');
+  });
+
+  it('localizes the Cost Tier label', () => {
+    const container = document.createElement('div');
+    act(() => {
+      createRoot(container).render(
+        <ResultContext locale="zh" costTier="自有（超大规模云大批量）" date="2026-09-01" />,
+      );
+    });
+    expect(container.textContent).toContain('成本层级: 自有（超大规模云大批量）');
+    expect(container.textContent).not.toContain('模型:');
+  });
+
   it('does not imply a single date when several dates are selected', () => {
     const container = document.createElement('div');
     act(() => {

@@ -384,7 +384,7 @@ function variantFullSummary(i: VariantBoth): string {
   const both = [costPart, tputPart].filter(Boolean).join('; ');
   return both.length > 0
     ? `${both.charAt(0).toUpperCase()}${both.slice(1)}`
-    : 'numbers are too close to call';
+    : 'comparable data is unavailable at this point';
 }
 
 // Precision-specific "both sides" templates — mention quantization tradeoff.

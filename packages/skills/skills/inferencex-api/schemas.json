@@ -1,0 +1,4015 @@
+{
+  "error": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "urn:inferencex:cli:error:1",
+    "title": "InferenceX error schema 1",
+    "type": "object",
+    "required": ["schema_version", "package", "package_version", "command", "error"],
+    "properties": {
+      "schema_version": {
+        "const": 1
+      },
+      "package": {
+        "const": "@semianalysisai/inferencex-skills"
+      },
+      "package_version": {
+        "type": "string",
+        "pattern": "^\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$"
+      },
+      "command": {
+        "type": "string"
+      },
+      "error": {
+        "type": "object",
+        "required": ["code", "message"],
+        "properties": {
+          "code": {
+            "enum": [
+              "INVALID_ARGUMENT",
+              "HTTP_ERROR",
+              "NETWORK_ERROR",
+              "TIMEOUT",
+              "INVALID_RESPONSE",
+              "INVALID_EVIDENCE",
+              "UNSUPPORTED_CONTRACT",
+              "OUTPUT_ERROR",
+              "CANCELLED",
+              "INSTALLATION_UNHEALTHY",
+              "INTERNAL_ERROR"
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "http_status": {
+            "type": "integer",
+            "minimum": 100,
+            "maximum": 599
+          },
+          "details": {}
+        },
+        "additionalProperties": true
+      }
+    },
+    "additionalProperties": true
+  },
+  "summary": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "urn:inferencex:cli:summary:1",
+    "title": "InferenceX summary schema 1",
+    "type": "object",
+    "required": [
+      "schema_version",
+      "command",
+      "kind",
+      "package_version",
+      "created_at",
+      "validity",
+      "coverage",
+      "policy",
+      "output"
+    ],
+    "properties": {
+      "schema_version": {
+        "const": 1
+      },
+      "command": {
+        "type": "string"
+      },
+      "kind": {
+        "enum": ["powerx", "agentx", "result", "tco", "releases", "collectivex"]
+      },
+      "package_version": {
+        "type": "string",
+        "pattern": "^\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$"
+      },
+      "created_at": {
+        "type": "string",
+        "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{3})?Z$"
+      },
+      "validity": {
+        "const": "valid"
+      },
+      "coverage": {
+        "type": "object",
+        "required": ["status", "selected_records", "comparable_pairs", "hardware", "reasons"],
+        "properties": {
+          "status": {
+            "enum": ["complete", "partial", "empty", "unknown"]
+          },
+          "selected_records": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "comparable_pairs": {
+            "type": ["integer", "null"],
+            "minimum": 0
+          },
+          "hardware": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["hardware", "valid_records"],
+              "properties": {
+                "hardware": {
+                  "type": "string"
+                },
+                "valid_records": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "additionalProperties": true
+            }
+          },
+          "reasons": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["code", "count"],
+              "properties": {
+                "code": {
+                  "type": "string"
+                },
+                "count": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "additionalProperties": true
+            }
+          }
+        },
+        "additionalProperties": true
+      },
+      "policy": {
+        "type": "object",
+        "required": ["status", "requirements", "reasons"],
+        "properties": {
+          "status": {
+            "enum": ["not_requested", "passed", "failed"]
+          },
+          "requirements": {
+            "type": "object",
+            "required": ["require_hardware", "min_comparable_pairs"],
+            "properties": {
+              "require_hardware": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "min_comparable_pairs": {
+                "type": ["integer", "null"],
+                "minimum": 0
+              }
+            },
+            "additionalProperties": true
+          },
+          "reasons": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["code", "required", "actual"],
+              "properties": {
+                "code": {
+                  "enum": ["REQUIRED_HARDWARE_MISSING", "MIN_COMPARABLE_PAIRS_UNMET"]
+                },
+                "required": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "actual": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "if": {
+                "properties": {
+                  "code": {
+                    "const": "REQUIRED_HARDWARE_MISSING"
+                  }
+                },
+                "required": ["code"]
+              },
+              "then": {
+                "required": ["hardware"],
+                "properties": {
+                  "hardware": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              },
+              "additionalProperties": true
+            }
+          }
+        },
+        "additionalProperties": true
+      },
+      "output": {
+        "type": "object",
+        "required": ["result", "manifest"],
+        "properties": {
+          "result": {
+            "type": "string",
+            "pattern": "^(?:result\\.(?:json|csv))$"
+          },
+          "manifest": {
+            "const": "manifest.json"
+          }
+        },
+        "additionalProperties": true
+      }
+    },
+    "additionalProperties": true
+  },
+  "manifest": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "urn:inferencex:cli:manifest:1",
+    "title": "InferenceX manifest schema 1",
+    "type": "object",
+    "required": [
+      "schema_version",
+      "contract_version",
+      "kind",
+      "producer",
+      "created_at",
+      "normalized_arguments",
+      "requests",
+      "result",
+      "coverage",
+      "summary"
+    ],
+    "properties": {
+      "schema_version": {
+        "const": 1
+      },
+      "contract_version": {
+        "const": 1
+      },
+      "kind": {
+        "enum": ["powerx", "agentx", "result", "tco", "releases", "collectivex"]
+      },
+      "producer": {
+        "type": "object",
+        "required": ["package_version"],
+        "properties": {
+          "package_version": {
+            "type": "string",
+            "pattern": "^\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$"
+          }
+        },
+        "additionalProperties": true
+      },
+      "created_at": {
+        "type": "string",
+        "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{3})?Z$"
+      },
+      "normalized_arguments": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "requests": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": ["operation", "url", "allowed_statuses", "attempts", "response"],
+          "properties": {
+            "operation": {
+              "type": "string"
+            },
+            "url": {
+              "type": "string",
+              "pattern": "^https?://"
+            },
+            "allowed_statuses": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "type": "integer",
+                "minimum": 100,
+                "maximum": 599
+              }
+            },
+            "attempts": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 3,
+              "items": {
+                "type": "object",
+                "required": [
+                  "operation",
+                  "url",
+                  "ordinal",
+                  "startedAt",
+                  "endedAt",
+                  "consumedBytes",
+                  "retry"
+                ],
+                "properties": {
+                  "operation": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "type": "string",
+                    "pattern": "^https?://"
+                  },
+                  "ordinal": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 3
+                  },
+                  "startedAt": {
+                    "type": "string",
+                    "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{3})?Z$"
+                  },
+                  "endedAt": {
+                    "type": "string",
+                    "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{3})?Z$"
+                  },
+                  "status": {
+                    "type": "integer",
+                    "minimum": 100,
+                    "maximum": 599
+                  },
+                  "networkCode": {
+                    "type": "string"
+                  },
+                  "consumedBytes": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "retry": {
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "required": ["decision", "reason"],
+                        "properties": {
+                          "decision": {
+                            "const": "accepted"
+                          },
+                          "reason": {
+                            "const": "allowed_status"
+                          }
+                        },
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "required": ["decision", "reason"],
+                        "properties": {
+                          "decision": {
+                            "const": "retry"
+                          },
+                          "reason": {
+                            "enum": [
+                              "transient_network_error",
+                              "retry_after",
+                              "transient_http_status"
+                            ]
+                          },
+                          "delayMs": {
+                            "type": "integer",
+                            "minimum": 0
+                          }
+                        },
+                        "additionalProperties": false
+                      }
+                    ]
+                  }
+                },
+                "additionalProperties": false,
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "required": ["status"],
+                    "properties": {
+                      "status": {}
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": ["networkCode"],
+                    "properties": {
+                      "networkCode": {}
+                    }
+                  }
+                ]
+              }
+            },
+            "response": {
+              "type": "object",
+              "required": ["id", "status", "retrieved_at", "path", "sha256", "size", "encoding"],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "status": {
+                  "type": "integer",
+                  "minimum": 100,
+                  "maximum": 599
+                },
+                "retrieved_at": {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{3})?Z$"
+                },
+                "path": {
+                  "type": "string",
+                  "pattern": "^responses/[a-f0-9]{64}\\.body$"
+                },
+                "sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "size": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 33554432
+                },
+                "encoding": {
+                  "const": "decoded"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "result": {
+        "type": "object",
+        "required": ["path", "format", "sha256", "size"],
+        "properties": {
+          "path": {
+            "type": "string",
+            "pattern": "^result\\.(?:json|csv)$"
+          },
+          "format": {
+            "enum": ["json", "csv"]
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 268435456
+          }
+        },
+        "additionalProperties": false
+      },
+      "coverage": {
+        "$ref": "#/$defs/coverage"
+      },
+      "summary": {
+        "title": "InferenceX summary schema 1",
+        "type": "object",
+        "required": [
+          "schema_version",
+          "command",
+          "kind",
+          "package_version",
+          "created_at",
+          "validity",
+          "coverage",
+          "policy",
+          "output"
+        ],
+        "properties": {
+          "schema_version": {
+            "const": 1
+          },
+          "command": {
+            "type": "string"
+          },
+          "kind": {
+            "enum": ["powerx", "agentx", "result", "tco", "releases", "collectivex"]
+          },
+          "package_version": {
+            "type": "string",
+            "pattern": "^\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$"
+          },
+          "created_at": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{3})?Z$"
+          },
+          "validity": {
+            "const": "valid"
+          },
+          "coverage": {
+            "$ref": "#/$defs/coverage"
+          },
+          "policy": {
+            "type": "object",
+            "required": ["status", "requirements", "reasons"],
+            "properties": {
+              "status": {
+                "enum": ["not_requested", "passed", "failed"]
+              },
+              "requirements": {
+                "type": "object",
+                "required": ["require_hardware", "min_comparable_pairs"],
+                "properties": {
+                  "require_hardware": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "min_comparable_pairs": {
+                    "type": ["integer", "null"],
+                    "minimum": 0
+                  }
+                },
+                "additionalProperties": true
+              },
+              "reasons": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["code", "required", "actual"],
+                  "properties": {
+                    "code": {
+                      "enum": ["REQUIRED_HARDWARE_MISSING", "MIN_COMPARABLE_PAIRS_UNMET"]
+                    },
+                    "required": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "actual": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  },
+                  "if": {
+                    "properties": {
+                      "code": {
+                        "const": "REQUIRED_HARDWARE_MISSING"
+                      }
+                    },
+                    "required": ["code"]
+                  },
+                  "then": {
+                    "required": ["hardware"],
+                    "properties": {
+                      "hardware": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            },
+            "additionalProperties": true
+          },
+          "output": {
+            "type": "object",
+            "required": ["result", "manifest"],
+            "properties": {
+              "result": {
+                "type": "string",
+                "pattern": "^(?:result\\.(?:json|csv))$"
+              },
+              "manifest": {
+                "const": "manifest.json"
+              }
+            },
+            "additionalProperties": true
+          }
+        },
+        "additionalProperties": true
+      }
+    },
+    "additionalProperties": true,
+    "$defs": {
+      "coverage": {
+        "type": "object",
+        "required": ["status", "selected_records", "comparable_pairs", "hardware", "reasons"],
+        "properties": {
+          "status": {
+            "enum": ["complete", "partial", "empty", "unknown"]
+          },
+          "selected_records": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "comparable_pairs": {
+            "type": ["integer", "null"],
+            "minimum": 0
+          },
+          "hardware": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["hardware", "valid_records"],
+              "properties": {
+                "hardware": {
+                  "type": "string"
+                },
+                "valid_records": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "additionalProperties": true
+            }
+          },
+          "reasons": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["code", "count"],
+              "properties": {
+                "code": {
+                  "type": "string"
+                },
+                "count": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "additionalProperties": true
+            }
+          }
+        },
+        "additionalProperties": true
+      }
+    }
+  },
+  "verification": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "urn:inferencex:cli:verification:1",
+    "title": "InferenceX verification schema 1",
+    "type": "object",
+    "required": [
+      "schema_version",
+      "command",
+      "kind",
+      "package_version",
+      "validity",
+      "coverage",
+      "policy",
+      "input"
+    ],
+    "properties": {
+      "schema_version": {
+        "const": 1
+      },
+      "command": {
+        "const": "verify"
+      },
+      "kind": {
+        "enum": ["powerx", "agentx", "result", "tco", "releases", "collectivex"]
+      },
+      "package_version": {
+        "type": "string",
+        "pattern": "^\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$"
+      },
+      "validity": {
+        "const": "valid"
+      },
+      "coverage": {
+        "type": "object",
+        "required": ["status", "selected_records", "comparable_pairs", "hardware", "reasons"],
+        "properties": {
+          "status": {
+            "enum": ["complete", "partial", "empty", "unknown"]
+          },
+          "selected_records": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "comparable_pairs": {
+            "type": ["integer", "null"],
+            "minimum": 0
+          },
+          "hardware": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["hardware", "valid_records"],
+              "properties": {
+                "hardware": {
+                  "type": "string"
+                },
+                "valid_records": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "additionalProperties": true
+            }
+          },
+          "reasons": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["code", "count"],
+              "properties": {
+                "code": {
+                  "type": "string"
+                },
+                "count": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "additionalProperties": true
+            }
+          }
+        },
+        "additionalProperties": true
+      },
+      "policy": {
+        "type": "object",
+        "required": ["status", "requirements", "reasons"],
+        "properties": {
+          "status": {
+            "enum": ["not_requested", "passed", "failed"]
+          },
+          "requirements": {
+            "type": "object",
+            "required": ["require_hardware", "min_comparable_pairs"],
+            "properties": {
+              "require_hardware": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "min_comparable_pairs": {
+                "type": ["integer", "null"],
+                "minimum": 0
+              }
+            },
+            "additionalProperties": true
+          },
+          "reasons": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["code", "required", "actual"],
+              "properties": {
+                "code": {
+                  "enum": ["REQUIRED_HARDWARE_MISSING", "MIN_COMPARABLE_PAIRS_UNMET"]
+                },
+                "required": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "actual": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "if": {
+                "properties": {
+                  "code": {
+                    "const": "REQUIRED_HARDWARE_MISSING"
+                  }
+                },
+                "required": ["code"]
+              },
+              "then": {
+                "required": ["hardware"],
+                "properties": {
+                  "hardware": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              },
+              "additionalProperties": true
+            }
+          }
+        },
+        "additionalProperties": true
+      },
+      "input": {
+        "type": "object",
+        "required": ["directory", "result", "producer_package_version", "contract_version"],
+        "properties": {
+          "directory": {
+            "type": "string"
+          },
+          "result": {
+            "type": "string",
+            "pattern": "^result\\.(?:json|csv)$"
+          },
+          "producer_package_version": {
+            "type": "string",
+            "pattern": "^\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$"
+          },
+          "contract_version": {
+            "const": 1
+          }
+        },
+        "additionalProperties": true
+      }
+    },
+    "additionalProperties": true
+  },
+  "discovery": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "urn:inferencex:cli:discovery:1",
+    "title": "InferenceX discovery schema 1",
+    "type": "object",
+    "required": ["schema_version", "kind", "scope", "items", "sources", "coverage"],
+    "properties": {
+      "schema_version": {
+        "const": 1
+      },
+      "kind": {
+        "enum": ["capabilities", "models", "dates", "datasets", "configs"]
+      },
+      "scope": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "items": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      },
+      "sources": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": ["kind"],
+          "properties": {
+            "kind": {
+              "enum": ["http_response", "local_registry"]
+            },
+            "operation": {
+              "type": "string"
+            },
+            "url": {
+              "type": "string",
+              "pattern": "^https?://"
+            },
+            "response_id": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "status": {
+              "type": "integer",
+              "minimum": 100,
+              "maximum": 599
+            },
+            "retrieved_at": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{3})?Z$"
+            },
+            "path": {
+              "type": "string"
+            },
+            "scope": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "additionalProperties": true
+        }
+      },
+      "coverage": {
+        "type": "object",
+        "required": [
+          "complete_for_scope",
+          "returned_items",
+          "available_items",
+          "limit",
+          "offset",
+          "limitations"
+        ],
+        "properties": {
+          "complete_for_scope": {
+            "type": "boolean"
+          },
+          "returned_items": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "available_items": {
+            "type": ["integer", "null"],
+            "minimum": 0
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "limitations": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "additionalProperties": true
+      }
+    },
+    "additionalProperties": true
+  },
+  "doctor": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "urn:inferencex:cli:doctor:1",
+    "title": "InferenceX doctor schema 1",
+    "type": "object",
+    "required": [
+      "schema_version",
+      "healthy",
+      "executing_package",
+      "runtime",
+      "selected_installation",
+      "checked_files",
+      "api_check",
+      "failures"
+    ],
+    "properties": {
+      "schema_version": {
+        "const": 1
+      },
+      "healthy": {
+        "type": "boolean"
+      },
+      "executing_package": {
+        "type": "object",
+        "required": ["name", "version", "skill_path"],
+        "properties": {
+          "name": {
+            "const": "@semianalysisai/inferencex-skills"
+          },
+          "version": {
+            "type": "string",
+            "pattern": "^\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$"
+          },
+          "skill_path": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": true
+      },
+      "runtime": {
+        "type": "object",
+        "required": ["node", "platform", "architecture"],
+        "properties": {
+          "node": {
+            "type": "string"
+          },
+          "platform": {
+            "type": "string"
+          },
+          "architecture": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": true
+      },
+      "selected_installation": {
+        "type": "object",
+        "required": [
+          "mode",
+          "state",
+          "skill_path",
+          "package",
+          "version",
+          "receipt",
+          "transaction",
+          "publisher_authenticity"
+        ],
+        "properties": {
+          "mode": {
+            "enum": ["executing_package", "target", "directory"]
+          },
+          "target": {
+            "enum": ["codex", "claude", "agents"]
+          },
+          "skills_root": {
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "executing_package",
+              "installed",
+              "unknown",
+              "active",
+              "recovery_needed",
+              "blocked",
+              "invalid"
+            ]
+          },
+          "skill_path": {
+            "type": "string"
+          },
+          "package": {
+            "const": "@semianalysisai/inferencex-skills"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "receipt": {
+            "type": "object",
+            "required": ["status", "package", "version"],
+            "properties": {
+              "status": {
+                "enum": ["present", "invalid_or_missing", "not_applicable"]
+              },
+              "package": {
+                "anyOf": [
+                  {
+                    "const": "@semianalysisai/inferencex-skills"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "version": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "pattern": "^\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "additionalProperties": true
+          },
+          "transaction": {
+            "type": "object",
+            "required": ["state", "phase", "had_destination", "reason"],
+            "properties": {
+              "state": {
+                "enum": ["none", "active", "recovery_needed", "blocked", "invalid"]
+              },
+              "phase": {
+                "type": ["string", "null"]
+              },
+              "had_destination": {
+                "type": ["boolean", "null"]
+              },
+              "reason": {
+                "type": ["string", "null"]
+              }
+            },
+            "additionalProperties": true
+          },
+          "publisher_authenticity": {
+            "const": "not_established"
+          }
+        },
+        "additionalProperties": true
+      },
+      "checked_files": {
+        "type": "integer",
+        "minimum": 0
+      },
+      "api_check": {
+        "type": "object",
+        "required": ["status", "request_count", "scope"],
+        "properties": {
+          "status": {
+            "enum": ["not_requested", "passed", "failed"]
+          },
+          "request_count": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "scope": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string",
+            "pattern": "^https?://"
+          },
+          "openapi": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": true
+      },
+      "failures": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": ["check", "path", "reason", "next_action"],
+          "properties": {
+            "check": {
+              "type": "string"
+            },
+            "path": {
+              "type": ["string", "null"]
+            },
+            "reason": {
+              "type": "string"
+            },
+            "next_action": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": true
+        }
+      }
+    },
+    "additionalProperties": true
+  },
+  "powerx": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "urn:inferencex:cli:powerx:1",
+    "title": "InferenceX powerx schema 1",
+    "type": "object",
+    "required": ["schema_version", "kind", "metadata", "units", "rows"],
+    "properties": {
+      "schema_version": {
+        "const": 1
+      },
+      "kind": {
+        "const": "powerx"
+      },
+      "metadata": {
+        "type": "object",
+        "required": [
+          "package_version",
+          "query_url",
+          "retrieved_at",
+          "requested_model",
+          "requested_date",
+          "date_selection",
+          "benchmark_type",
+          "isl",
+          "osl",
+          "raw_model",
+          "returned_rows",
+          "selected_rows",
+          "returned_models",
+          "selected_models",
+          "excluded_rows",
+          "metric_coverage",
+          "non_finite_values",
+          "contract_version",
+          "source_response_id"
+        ],
+        "properties": {
+          "package_version": {
+            "type": "string",
+            "pattern": "^\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$"
+          },
+          "query_url": {
+            "type": "string",
+            "pattern": "^https?://"
+          },
+          "retrieved_at": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{3})?Z$"
+          },
+          "requested_model": {
+            "type": "string"
+          },
+          "requested_date": {
+            "type": ["string", "null"],
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "date_selection": {
+            "enum": ["latest", "as-of"]
+          },
+          "benchmark_type": {
+            "const": "single_turn"
+          },
+          "isl": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "osl": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "raw_model": {
+            "type": ["string", "null"]
+          },
+          "returned_rows": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "selected_rows": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "returned_models": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "selected_models": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "excluded_rows": {
+            "type": "object",
+            "required": ["outside_requested_scope", "not_strict_v2"],
+            "properties": {
+              "outside_requested_scope": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "not_strict_v2": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "additionalProperties": true
+          },
+          "metric_coverage": {
+            "type": "object",
+            "required": [
+              "avg_power_w",
+              "prefill_avg_power_w",
+              "decode_avg_power_w",
+              "joules_per_successful_query",
+              "joules_per_input_token",
+              "joules_per_output_token",
+              "joules_per_total_token",
+              "prefill_joules_per_input_token",
+              "decode_joules_per_output_token",
+              "avg_temp_c",
+              "peak_temp_c",
+              "avg_util_pct",
+              "avg_mem_used_mb"
+            ],
+            "properties": {
+              "avg_power_w": {
+                "$ref": "#/$defs/metricCoverage"
+              },
+              "prefill_avg_power_w": {
+                "$ref": "#/$defs/metricCoverage"
+              },
+              "decode_avg_power_w": {
+                "$ref": "#/$defs/metricCoverage"
+              },
+              "joules_per_successful_query": {
+                "$ref": "#/$defs/metricCoverage"
+              },
+              "joules_per_input_token": {
+                "$ref": "#/$defs/metricCoverage"
+              },
+              "joules_per_output_token": {
+                "$ref": "#/$defs/metricCoverage"
+              },
+              "joules_per_total_token": {
+                "$ref": "#/$defs/metricCoverage"
+              },
+              "prefill_joules_per_input_token": {
+                "$ref": "#/$defs/metricCoverage"
+              },
+              "decode_joules_per_output_token": {
+                "$ref": "#/$defs/metricCoverage"
+              },
+              "avg_temp_c": {
+                "$ref": "#/$defs/metricCoverage"
+              },
+              "peak_temp_c": {
+                "$ref": "#/$defs/metricCoverage"
+              },
+              "avg_util_pct": {
+                "$ref": "#/$defs/metricCoverage"
+              },
+              "avg_mem_used_mb": {
+                "$ref": "#/$defs/metricCoverage"
+              }
+            },
+            "additionalProperties": true
+          },
+          "non_finite_values": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "contract_version": {
+            "const": 1
+          },
+          "source_response_id": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        },
+        "additionalProperties": true
+      },
+      "units": {
+        "type": "object",
+        "required": [
+          "avg_power_w",
+          "prefill_avg_power_w",
+          "decode_avg_power_w",
+          "joules_per_successful_query",
+          "joules_per_input_token",
+          "joules_per_output_token",
+          "joules_per_total_token",
+          "prefill_joules_per_input_token",
+          "decode_joules_per_output_token",
+          "avg_temp_c",
+          "peak_temp_c",
+          "avg_util_pct",
+          "avg_mem_used_mb"
+        ],
+        "properties": {
+          "avg_power_w": {
+            "const": "measured W per GPU"
+          },
+          "prefill_avg_power_w": {
+            "const": "role-local measured W per GPU"
+          },
+          "decode_avg_power_w": {
+            "const": "role-local measured W per GPU"
+          },
+          "joules_per_successful_query": {
+            "const": "whole-deployment accelerator J/query"
+          },
+          "joules_per_input_token": {
+            "const": "whole-deployment accelerator J/input token"
+          },
+          "joules_per_output_token": {
+            "const": "whole-deployment accelerator J/output token"
+          },
+          "joules_per_total_token": {
+            "const": "whole-deployment accelerator J/total token"
+          },
+          "prefill_joules_per_input_token": {
+            "const": "role-local accelerator J/input token"
+          },
+          "decode_joules_per_output_token": {
+            "const": "role-local accelerator J/output token"
+          },
+          "avg_temp_c": {
+            "const": "per-GPU degrees C"
+          },
+          "peak_temp_c": {
+            "const": "per-GPU degrees C"
+          },
+          "avg_util_pct": {
+            "const": "per-GPU percent"
+          },
+          "avg_mem_used_mb": {
+            "const": "per-GPU MB"
+          }
+        },
+        "additionalProperties": false
+      },
+      "rows": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": [
+            "id",
+            "hardware",
+            "framework",
+            "model",
+            "precision",
+            "spec_method",
+            "disagg",
+            "is_multinode",
+            "prefill_tp",
+            "prefill_ep",
+            "prefill_dp_attention",
+            "prefill_num_workers",
+            "decode_tp",
+            "decode_ep",
+            "decode_dp_attention",
+            "decode_num_workers",
+            "num_prefill_gpu",
+            "num_decode_gpu",
+            "benchmark_type",
+            "isl",
+            "osl",
+            "conc",
+            "offload_mode",
+            "image",
+            "metrics",
+            "date",
+            "run_url"
+          ],
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "hardware": {
+              "type": "string"
+            },
+            "framework": {
+              "type": "string"
+            },
+            "model": {
+              "type": "string"
+            },
+            "precision": {
+              "type": "string"
+            },
+            "spec_method": {
+              "type": "string"
+            },
+            "disagg": {
+              "type": "boolean"
+            },
+            "is_multinode": {
+              "type": "boolean"
+            },
+            "prefill_tp": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "prefill_ep": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "prefill_dp_attention": {
+              "type": "boolean"
+            },
+            "prefill_num_workers": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "decode_tp": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "decode_ep": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "decode_dp_attention": {
+              "type": "boolean"
+            },
+            "decode_num_workers": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "num_prefill_gpu": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "num_decode_gpu": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "benchmark_type": {
+              "type": "string"
+            },
+            "isl": {
+              "type": ["integer", "null"],
+              "minimum": 0
+            },
+            "osl": {
+              "type": ["integer", "null"],
+              "minimum": 0
+            },
+            "conc": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "offload_mode": {
+              "type": "string"
+            },
+            "image": {
+              "type": ["string", "null"]
+            },
+            "recipe_fingerprint": {
+              "type": ["string", "null"]
+            },
+            "metrics": {
+              "type": "object",
+              "required": ["power_valid", "power_metric_schema_version"],
+              "properties": {
+                "power_valid": {
+                  "const": 1
+                },
+                "power_metric_schema_version": {
+                  "const": 2
+                },
+                "avg_power_w": {
+                  "type": ["number", "null"]
+                },
+                "prefill_avg_power_w": {
+                  "type": ["number", "null"]
+                },
+                "decode_avg_power_w": {
+                  "type": ["number", "null"]
+                },
+                "joules_per_successful_query": {
+                  "type": ["number", "null"]
+                },
+                "joules_per_input_token": {
+                  "type": ["number", "null"]
+                },
+                "joules_per_output_token": {
+                  "type": ["number", "null"]
+                },
+                "joules_per_total_token": {
+                  "type": ["number", "null"]
+                },
+                "prefill_joules_per_input_token": {
+                  "type": ["number", "null"]
+                },
+                "decode_joules_per_output_token": {
+                  "type": ["number", "null"]
+                },
+                "avg_temp_c": {
+                  "type": ["number", "null"]
+                },
+                "peak_temp_c": {
+                  "type": ["number", "null"]
+                },
+                "avg_util_pct": {
+                  "type": ["number", "null"]
+                },
+                "avg_mem_used_mb": {
+                  "type": ["number", "null"]
+                }
+              },
+              "additionalProperties": true
+            },
+            "date": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+            },
+            "workflow_run_id": {
+              "type": ["string", "null"]
+            },
+            "run_started_at": {
+              "type": ["string", "null"]
+            },
+            "run_url": {
+              "type": ["string", "null"],
+              "pattern": "^https?://"
+            },
+            "curve_date": {
+              "type": ["string", "null"],
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+            },
+            "curve_workflow_run_id": {
+              "type": ["string", "null"]
+            },
+            "curve_run_started_at": {
+              "type": ["string", "null"]
+            }
+          },
+          "additionalProperties": true
+        }
+      }
+    },
+    "additionalProperties": true,
+    "$defs": {
+      "metricCoverage": {
+        "type": "object",
+        "required": ["available_rows", "unavailable_rows"],
+        "properties": {
+          "available_rows": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "unavailable_rows": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": true
+      }
+    }
+  },
+  "agentx": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "urn:inferencex:cli:agentx:1",
+    "title": "InferenceX agentx schema 1",
+    "type": "object",
+    "required": ["schema_version", "kind", "metadata", "rows"],
+    "properties": {
+      "schema_version": {
+        "const": 1
+      },
+      "kind": {
+        "const": "agentx"
+      },
+      "metadata": {
+        "type": "object",
+        "required": [
+          "package_version",
+          "retrieved_at",
+          "request_urls",
+          "requested_scope",
+          "filters",
+          "outcome",
+          "returned_rows",
+          "returned_agentx_rows",
+          "selected_rows",
+          "available_filter_values",
+          "returned_model_keys",
+          "selected_model_keys",
+          "enrichment_coverage",
+          "non_finite_values",
+          "observation_context",
+          "contract_version",
+          "source_response_ids"
+        ],
+        "properties": {
+          "package_version": {
+            "type": "string",
+            "pattern": "^\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$"
+          },
+          "retrieved_at": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{3})?Z$"
+          },
+          "request_urls": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["operation", "url", "response_id"],
+              "properties": {
+                "operation": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string",
+                  "pattern": "^https?://"
+                },
+                "response_id": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "requested_ids": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "uniqueItems": true
+                }
+              },
+              "additionalProperties": true
+            }
+          },
+          "requested_scope": {
+            "type": "object",
+            "required": [
+              "display_model",
+              "date",
+              "date_selection",
+              "raw_model",
+              "hardware",
+              "framework",
+              "precision",
+              "spec_method",
+              "offload_mode",
+              "concurrency",
+              "benchmark_type"
+            ],
+            "properties": {
+              "display_model": {
+                "type": "string"
+              },
+              "date": {
+                "type": ["string", "null"],
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              },
+              "date_selection": {
+                "enum": ["latest", "as-of"]
+              },
+              "raw_model": {
+                "type": ["string", "null"]
+              },
+              "hardware": {
+                "type": ["string", "null"]
+              },
+              "framework": {
+                "type": ["string", "null"]
+              },
+              "precision": {
+                "type": ["string", "null"]
+              },
+              "spec_method": {
+                "type": ["string", "null"]
+              },
+              "offload_mode": {
+                "type": ["string", "null"]
+              },
+              "concurrency": {
+                "type": ["integer", "null"],
+                "minimum": 0
+              },
+              "benchmark_type": {
+                "const": "agentic_traces"
+              }
+            },
+            "additionalProperties": true
+          },
+          "filters": {
+            "type": "object",
+            "required": [
+              "raw_model",
+              "hardware",
+              "framework",
+              "precision",
+              "spec_method",
+              "offload_mode",
+              "concurrency"
+            ],
+            "properties": {
+              "raw_model": {
+                "$ref": "#/$defs/filter"
+              },
+              "hardware": {
+                "$ref": "#/$defs/filter"
+              },
+              "framework": {
+                "$ref": "#/$defs/filter"
+              },
+              "precision": {
+                "$ref": "#/$defs/filter"
+              },
+              "spec_method": {
+                "$ref": "#/$defs/filter"
+              },
+              "offload_mode": {
+                "$ref": "#/$defs/filter"
+              },
+              "concurrency": {
+                "$ref": "#/$defs/filter"
+              }
+            },
+            "additionalProperties": true
+          },
+          "outcome": {
+            "enum": ["no_agentx_rows", "no_matching_rows", "selected_rows"]
+          },
+          "returned_rows": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "returned_agentx_rows": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "selected_rows": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "available_filter_values": {
+            "type": "object",
+            "required": [
+              "raw_model",
+              "hardware",
+              "framework",
+              "precision",
+              "spec_method",
+              "offload_mode",
+              "concurrency"
+            ],
+            "properties": {
+              "raw_model": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "hardware": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "framework": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "precision": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "spec_method": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "offload_mode": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "concurrency": {
+                "type": "array",
+                "items": {
+                  "type": "integer"
+                }
+              }
+            },
+            "additionalProperties": true
+          },
+          "returned_model_keys": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "selected_model_keys": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "enrichment_coverage": {
+            "type": "object",
+            "required": [
+              "safe_id_rows",
+              "unsupported_id_rows",
+              "unique_safe_ids",
+              "aggregates",
+              "derived_metrics",
+              "trace_availability"
+            ],
+            "properties": {
+              "safe_id_rows": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "unsupported_id_rows": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "unique_safe_ids": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "aggregates": {
+                "type": "object",
+                "required": ["isl", "osl", "kvCacheUtil", "prefixCacheHitRate"],
+                "properties": {
+                  "isl": {
+                    "$ref": "#/$defs/metricCoverage"
+                  },
+                  "osl": {
+                    "$ref": "#/$defs/metricCoverage"
+                  },
+                  "kvCacheUtil": {
+                    "$ref": "#/$defs/metricCoverage"
+                  },
+                  "prefixCacheHitRate": {
+                    "$ref": "#/$defs/metricCoverage"
+                  }
+                },
+                "additionalProperties": true
+              },
+              "derived_metrics": {
+                "type": "object",
+                "required": ["available_rows", "missing_entry_rows", "unsupported_id_rows"],
+                "properties": {
+                  "available_rows": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "missing_entry_rows": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "unsupported_id_rows": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "additionalProperties": true
+              },
+              "trace_availability": {
+                "type": "object",
+                "required": [
+                  "stored_trace_rows",
+                  "no_stored_trace_rows",
+                  "response_key_rows",
+                  "missing_key_rows",
+                  "unsupported_id_rows"
+                ],
+                "properties": {
+                  "stored_trace_rows": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "no_stored_trace_rows": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "response_key_rows": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "missing_key_rows": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "unsupported_id_rows": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "additionalProperties": true
+              }
+            },
+            "additionalProperties": true
+          },
+          "non_finite_values": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "observation_context": {
+            "const": "Existing observations were read; no new benchmark was run."
+          },
+          "contract_version": {
+            "const": 1
+          },
+          "source_response_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "additionalProperties": true
+      },
+      "rows": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": ["benchmark", "agentx"],
+          "properties": {
+            "benchmark": {
+              "type": "object",
+              "required": [
+                "id",
+                "hardware",
+                "framework",
+                "model",
+                "precision",
+                "spec_method",
+                "disagg",
+                "is_multinode",
+                "prefill_tp",
+                "prefill_ep",
+                "prefill_dp_attention",
+                "prefill_num_workers",
+                "decode_tp",
+                "decode_ep",
+                "decode_dp_attention",
+                "decode_num_workers",
+                "num_prefill_gpu",
+                "num_decode_gpu",
+                "benchmark_type",
+                "isl",
+                "osl",
+                "conc",
+                "offload_mode",
+                "image",
+                "recipe_fingerprint",
+                "metrics",
+                "date",
+                "run_url"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "hardware": {
+                  "type": "string"
+                },
+                "framework": {
+                  "type": "string"
+                },
+                "model": {
+                  "type": "string"
+                },
+                "precision": {
+                  "type": "string"
+                },
+                "spec_method": {
+                  "type": "string"
+                },
+                "disagg": {
+                  "type": "boolean"
+                },
+                "is_multinode": {
+                  "type": "boolean"
+                },
+                "prefill_tp": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "prefill_ep": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "prefill_dp_attention": {
+                  "type": "boolean"
+                },
+                "prefill_num_workers": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "decode_tp": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "decode_ep": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "decode_dp_attention": {
+                  "type": "boolean"
+                },
+                "decode_num_workers": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "num_prefill_gpu": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "num_decode_gpu": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "benchmark_type": {
+                  "type": "string"
+                },
+                "isl": {
+                  "type": ["integer", "null"],
+                  "minimum": 0
+                },
+                "osl": {
+                  "type": ["integer", "null"],
+                  "minimum": 0
+                },
+                "conc": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "offload_mode": {
+                  "type": "string"
+                },
+                "image": {
+                  "type": ["string", "null"]
+                },
+                "recipe_fingerprint": {
+                  "type": ["string", "null"]
+                },
+                "metrics": {
+                  "type": "object",
+                  "additionalProperties": true
+                },
+                "date": {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                },
+                "workflow_run_id": {
+                  "type": ["string", "null"]
+                },
+                "run_started_at": {
+                  "type": ["string", "null"]
+                },
+                "run_url": {
+                  "type": ["string", "null"],
+                  "pattern": "^https?://"
+                },
+                "curve_date": {
+                  "type": ["string", "null"],
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                },
+                "curve_workflow_run_id": {
+                  "type": ["string", "null"]
+                },
+                "curve_run_started_at": {
+                  "type": ["string", "null"]
+                }
+              },
+              "additionalProperties": true
+            },
+            "agentx": {
+              "type": "object",
+              "required": [
+                "status",
+                "result_id",
+                "aggregates",
+                "derived_metrics",
+                "trace_availability"
+              ],
+              "properties": {
+                "status": {
+                  "enum": ["complete", "partial", "unsupported_id"]
+                },
+                "result_id": {
+                  "type": ["string", "null"]
+                },
+                "aggregates": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "required": ["status", "value"],
+                      "properties": {
+                        "status": {
+                          "const": "available"
+                        },
+                        "value": {
+                          "type": "object",
+                          "required": ["id", "isl", "osl", "kvCacheUtil", "prefixCacheHitRate"],
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "isl": {
+                              "$ref": "#/$defs/distribution"
+                            },
+                            "osl": {
+                              "$ref": "#/$defs/distribution"
+                            },
+                            "kvCacheUtil": {
+                              "$ref": "#/$defs/distribution"
+                            },
+                            "prefixCacheHitRate": {
+                              "$ref": "#/$defs/distribution"
+                            }
+                          },
+                          "additionalProperties": true
+                        }
+                      },
+                      "additionalProperties": true
+                    },
+                    {
+                      "$ref": "#/$defs/missingEnrichment"
+                    }
+                  ]
+                },
+                "derived_metrics": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "required": ["status", "value"],
+                      "properties": {
+                        "status": {
+                          "const": "available"
+                        },
+                        "value": {
+                          "type": "object",
+                          "required": ["id", "p75_e2e_norm_intvty", "p90_e2e_norm_intvty"],
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "p75_e2e_norm_intvty": {
+                              "type": ["number", "null"]
+                            },
+                            "p90_e2e_norm_intvty": {
+                              "type": ["number", "null"]
+                            }
+                          },
+                          "additionalProperties": true
+                        }
+                      },
+                      "additionalProperties": true
+                    },
+                    {
+                      "$ref": "#/$defs/missingEnrichment"
+                    }
+                  ]
+                },
+                "trace_availability": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "required": ["status", "value", "response_key_present"],
+                      "properties": {
+                        "status": {
+                          "const": "stored_trace"
+                        },
+                        "value": {
+                          "const": true
+                        },
+                        "response_key_present": {
+                          "const": true
+                        }
+                      },
+                      "additionalProperties": true
+                    },
+                    {
+                      "type": "object",
+                      "required": ["status", "value", "response_key_present"],
+                      "properties": {
+                        "status": {
+                          "const": "no_stored_trace"
+                        },
+                        "value": {
+                          "const": false
+                        },
+                        "response_key_present": {
+                          "type": "boolean"
+                        }
+                      },
+                      "additionalProperties": true
+                    },
+                    {
+                      "type": "object",
+                      "required": ["status", "value", "response_key_present"],
+                      "properties": {
+                        "status": {
+                          "const": "unsupported_id"
+                        },
+                        "value": {
+                          "type": "null"
+                        },
+                        "response_key_present": {
+                          "type": "null"
+                        }
+                      },
+                      "additionalProperties": true
+                    }
+                  ]
+                }
+              },
+              "additionalProperties": true
+            }
+          },
+          "additionalProperties": true
+        }
+      }
+    },
+    "additionalProperties": true,
+    "$defs": {
+      "filter": {
+        "type": "object",
+        "required": ["status", "value"],
+        "properties": {
+          "status": {
+            "enum": ["applied", "omitted"]
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": true
+      },
+      "distribution": {
+        "anyOf": [
+          {
+            "type": "object",
+            "required": ["mean", "p50", "p75", "p90", "p95", "p99", "n"],
+            "properties": {
+              "mean": {
+                "type": "number"
+              },
+              "p50": {
+                "type": "number"
+              },
+              "p75": {
+                "type": "number"
+              },
+              "p90": {
+                "type": "number"
+              },
+              "p95": {
+                "type": "number"
+              },
+              "p99": {
+                "type": "number"
+              },
+              "n": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "additionalProperties": true
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "metricCoverage": {
+        "type": "object",
+        "required": ["available_rows", "null_rows", "missing_entry_rows", "unsupported_id_rows"],
+        "properties": {
+          "available_rows": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "null_rows": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "missing_entry_rows": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "unsupported_id_rows": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": true
+      },
+      "missingEnrichment": {
+        "type": "object",
+        "required": ["status", "value"],
+        "properties": {
+          "status": {
+            "enum": ["not_returned", "unsupported_id"]
+          },
+          "value": {
+            "type": "null"
+          }
+        },
+        "additionalProperties": true
+      }
+    }
+  },
+  "result": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "urn:inferencex:cli:result:1",
+    "title": "InferenceX result schema 1",
+    "type": "object",
+    "required": [
+      "schema_version",
+      "kind",
+      "metadata",
+      "selected_result",
+      "producer",
+      "log",
+      "limitations",
+      "evidence"
+    ],
+    "properties": {
+      "schema_version": {
+        "const": 1
+      },
+      "kind": {
+        "const": "result"
+      },
+      "metadata": {
+        "type": "object",
+        "required": [
+          "package_version",
+          "selected_result_id",
+          "ran_new_benchmark",
+          "scope",
+          "log_window",
+          "contract_version"
+        ],
+        "properties": {
+          "package_version": {
+            "type": "string",
+            "pattern": "^\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$"
+          },
+          "selected_result_id": {
+            "type": "string"
+          },
+          "ran_new_benchmark": {
+            "const": false
+          },
+          "scope": {
+            "type": "object",
+            "required": ["display_model", "date", "github_run_id", "selection"],
+            "properties": {
+              "display_model": {
+                "type": "string"
+              },
+              "date": {
+                "type": ["string", "null"],
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              },
+              "github_run_id": {
+                "type": ["string", "null"]
+              },
+              "selection": {
+                "enum": ["latest_snapshot", "as_of_snapshot", "logical_run_snapshot"]
+              }
+            },
+            "additionalProperties": true
+          },
+          "log_window": {
+            "type": "object",
+            "required": ["file", "offset", "limit", "offset_unit"],
+            "properties": {
+              "file": {
+                "type": ["string", "null"]
+              },
+              "offset": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "limit": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "offset_unit": {
+                "const": "Unicode characters"
+              }
+            },
+            "additionalProperties": true
+          },
+          "contract_version": {
+            "const": 1
+          },
+          "generated_at": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{3})?Z$"
+          }
+        },
+        "additionalProperties": true
+      },
+      "selected_result": {
+        "type": "object",
+        "required": [
+          "id",
+          "hardware",
+          "framework",
+          "model",
+          "precision",
+          "spec_method",
+          "disagg",
+          "is_multinode",
+          "prefill_tp",
+          "prefill_ep",
+          "prefill_dp_attention",
+          "prefill_num_workers",
+          "decode_tp",
+          "decode_ep",
+          "decode_dp_attention",
+          "decode_num_workers",
+          "num_prefill_gpu",
+          "num_decode_gpu",
+          "benchmark_type",
+          "isl",
+          "osl",
+          "conc",
+          "offload_mode",
+          "image",
+          "metrics",
+          "date",
+          "run_url"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "hardware": {
+            "type": "string"
+          },
+          "framework": {
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          },
+          "precision": {
+            "type": "string"
+          },
+          "spec_method": {
+            "type": "string"
+          },
+          "disagg": {
+            "type": "boolean"
+          },
+          "is_multinode": {
+            "type": "boolean"
+          },
+          "prefill_tp": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "prefill_ep": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "prefill_dp_attention": {
+            "type": "boolean"
+          },
+          "prefill_num_workers": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "decode_tp": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "decode_ep": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "decode_dp_attention": {
+            "type": "boolean"
+          },
+          "decode_num_workers": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "num_prefill_gpu": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "num_decode_gpu": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "benchmark_type": {
+            "type": "string"
+          },
+          "isl": {
+            "type": ["integer", "null"],
+            "minimum": 0
+          },
+          "osl": {
+            "type": ["integer", "null"],
+            "minimum": 0
+          },
+          "conc": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "offload_mode": {
+            "type": "string"
+          },
+          "image": {
+            "type": ["string", "null"]
+          },
+          "recipe_fingerprint": {
+            "type": ["string", "null"]
+          },
+          "metrics": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "date": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "workflow_run_id": {
+            "type": ["string", "null"]
+          },
+          "run_started_at": {
+            "type": ["string", "null"]
+          },
+          "run_url": {
+            "type": ["string", "null"],
+            "pattern": "^https?://"
+          },
+          "curve_date": {
+            "type": ["string", "null"],
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "curve_workflow_run_id": {
+            "type": ["string", "null"]
+          },
+          "curve_run_started_at": {
+            "type": ["string", "null"]
+          }
+        },
+        "additionalProperties": true
+      },
+      "producer": {
+        "type": "object",
+        "required": ["status", "github_run_id", "run_attempt", "workflow_run", "run_configs"],
+        "properties": {
+          "status": {
+            "enum": ["confirmed", "row_only", "unresolved"]
+          },
+          "github_run_id": {
+            "type": ["string", "null"]
+          },
+          "run_attempt": {
+            "type": ["string", "null"]
+          },
+          "workflow_run": {
+            "anyOf": [
+              {
+                "type": "object",
+                "additionalProperties": true
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "run_configs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          }
+        },
+        "additionalProperties": true
+      },
+      "log": {
+        "type": "object",
+        "required": [
+          "status",
+          "partial",
+          "more_available",
+          "inspected_characters",
+          "file_name",
+          "offset",
+          "next_offset",
+          "text",
+          "source_response_id"
+        ],
+        "properties": {
+          "status": {
+            "enum": ["available", "not_found"]
+          },
+          "partial": {
+            "type": ["boolean", "null"]
+          },
+          "more_available": {
+            "type": ["boolean", "null"]
+          },
+          "inspected_characters": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "file_name": {
+            "type": ["string", "null"]
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "next_offset": {
+            "type": ["integer", "null"],
+            "minimum": 0
+          },
+          "text": {
+            "type": ["string", "null"]
+          },
+          "source_response_id": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        },
+        "additionalProperties": true
+      },
+      "limitations": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "evidence": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": ["operation", "url", "response_id", "http_status", "retrieved_at"],
+          "properties": {
+            "operation": {
+              "type": "string"
+            },
+            "url": {
+              "type": "string",
+              "pattern": "^https?://"
+            },
+            "response_id": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "http_status": {
+              "type": "integer",
+              "minimum": 100,
+              "maximum": 599
+            },
+            "retrieved_at": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{3})?Z$"
+            }
+          },
+          "additionalProperties": true
+        }
+      }
+    },
+    "additionalProperties": true
+  },
+  "tco": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "urn:inferencex:cli:tco:1",
+    "title": "InferenceX tco schema 1",
+    "type": "object",
+    "required": ["schema_version", "kind", "metadata", "units", "source", "coverage", "rows"],
+    "properties": {
+      "schema_version": {
+        "const": 1
+      },
+      "kind": {
+        "const": "tco"
+      },
+      "metadata": {
+        "type": "object",
+        "required": [
+          "package_version",
+          "contract_version",
+          "requested_model",
+          "db_model_keys",
+          "requested_date",
+          "date_selection",
+          "benchmark_type",
+          "workloads",
+          "target_output_tokens_per_second_per_user",
+          "interactivity_statistic",
+          "gpu_hourly_prices_usd",
+          "price_source",
+          "cost_unit",
+          "throughput_unit",
+          "formula",
+          "assumed_throughput_fraction",
+          "cost_scope",
+          "frontier_scope",
+          "offline_verification_scope"
+        ],
+        "properties": {
+          "package_version": {
+            "type": "string",
+            "pattern": "^\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$"
+          },
+          "contract_version": {
+            "const": 1
+          },
+          "requested_model": {
+            "type": "string"
+          },
+          "db_model_keys": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "requested_date": {
+            "type": ["string", "null"],
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "date_selection": {
+            "enum": ["latest", "as-of"]
+          },
+          "benchmark_type": {
+            "const": "single_turn"
+          },
+          "workloads": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "target_output_tokens_per_second_per_user": {
+            "type": "number",
+            "minimum": 0
+          },
+          "interactivity_statistic": {
+            "enum": ["median"]
+          },
+          "gpu_hourly_prices_usd": {
+            "type": "object",
+            "required": [],
+            "properties": {},
+            "additionalProperties": {
+              "type": "number",
+              "minimum": 0
+            }
+          },
+          "price_source": {
+            "const": "user-supplied"
+          },
+          "cost_unit": {
+            "const": "USD per million output tokens"
+          },
+          "throughput_unit": {
+            "const": "output tokens per second per GPU"
+          },
+          "formula": {
+            "const": "USD/GPU-hour * 1000000 / (output tokens/second/GPU * 3600)"
+          },
+          "assumed_throughput_fraction": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 1
+          },
+          "cost_scope": {
+            "type": "string"
+          },
+          "frontier_scope": {
+            "type": "string"
+          },
+          "offline_verification_scope": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": true
+      },
+      "units": {
+        "type": "object",
+        "required": [
+          "gpu_hourly_price",
+          "target_output_throughput",
+          "gpu_output_throughput",
+          "modeled_cost"
+        ],
+        "properties": {
+          "gpu_hourly_price": {
+            "const": "USD per GPU-hour"
+          },
+          "target_output_throughput": {
+            "const": "output tokens per second per user"
+          },
+          "gpu_output_throughput": {
+            "const": "output tokens per second per GPU"
+          },
+          "modeled_cost": {
+            "const": "USD per million output tokens"
+          }
+        },
+        "additionalProperties": false
+      },
+      "source": {
+        "type": "object",
+        "required": [
+          "response_id",
+          "query_url",
+          "retrieved_at",
+          "http_status",
+          "sha256",
+          "body_encoding",
+          "body_bytes"
+        ],
+        "properties": {
+          "response_id": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "query_url": {
+            "type": "string",
+            "pattern": "^https?://"
+          },
+          "retrieved_at": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{3})?Z$"
+          },
+          "http_status": {
+            "type": "integer",
+            "minimum": 100,
+            "maximum": 599
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "body_encoding": {
+            "const": "utf8"
+          },
+          "body_bytes": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": true
+      },
+      "coverage": {
+        "type": "object",
+        "required": [
+          "status",
+          "requested_points",
+          "returned_points",
+          "available_points",
+          "status_counts",
+          "returned_hardware"
+        ],
+        "properties": {
+          "status": {
+            "enum": ["complete", "incomplete", "empty"]
+          },
+          "requested_points": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "returned_points": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "available_points": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "status_counts": {
+            "type": "object",
+            "required": [
+              "available",
+              "missing_point",
+              "clamped_low",
+              "unreachable",
+              "zero_throughput"
+            ],
+            "properties": {
+              "available": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "missing_point": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "clamped_low": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "unreachable": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "zero_throughput": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "additionalProperties": true
+          },
+          "returned_hardware": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "additionalProperties": true
+      },
+      "rows": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": [
+            "hardware",
+            "workload",
+            "status",
+            "usd_per_gpu_hour",
+            "usd_per_million_output_tokens",
+            "point"
+          ],
+          "properties": {
+            "hardware": {
+              "type": "string"
+            },
+            "workload": {
+              "type": "string"
+            },
+            "status": {
+              "enum": [
+                "available",
+                "missing_point",
+                "clamped_low",
+                "unreachable",
+                "zero_throughput"
+              ]
+            },
+            "usd_per_gpu_hour": {
+              "type": "number",
+              "minimum": 0
+            },
+            "usd_per_million_output_tokens": {
+              "type": ["number", "null"]
+            },
+            "point": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/point"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "additionalProperties": true,
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "status": {
+                    "const": "available"
+                  }
+                },
+                "required": ["status"]
+              },
+              "then": {
+                "properties": {
+                  "usd_per_million_output_tokens": {
+                    "type": "number"
+                  },
+                  "point": {
+                    "$ref": "#/$defs/point"
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "status": {
+                    "enum": ["missing_point", "clamped_low", "unreachable", "zero_throughput"]
+                  }
+                },
+                "required": ["status"]
+              },
+              "then": {
+                "properties": {
+                  "usd_per_million_output_tokens": {
+                    "type": "null"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "additionalProperties": true,
+    "$defs": {
+      "point": {
+        "type": "object",
+        "required": [
+          "hardware",
+          "workload",
+          "tier",
+          "output_tput_per_gpu",
+          "boundary",
+          "is_interpolated",
+          "frontier_points",
+          "frontier_min_interactivity",
+          "frontier_max_interactivity",
+          "latest_date",
+          "oldest_frontier_date",
+          "evidence_date"
+        ],
+        "properties": {
+          "hardware": {
+            "type": "string"
+          },
+          "workload": {
+            "type": "string"
+          },
+          "tier": {
+            "type": "number"
+          },
+          "output_tput_per_gpu": {
+            "type": "number"
+          },
+          "boundary": {
+            "enum": ["exact", "interpolated", "clamped_low", "unreachable"]
+          },
+          "is_interpolated": {
+            "type": "boolean"
+          },
+          "frontier_points": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "frontier_min_interactivity": {
+            "type": ["number", "null"]
+          },
+          "frontier_max_interactivity": {
+            "type": ["number", "null"]
+          },
+          "latest_date": {
+            "type": ["string", "null"],
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "oldest_frontier_date": {
+            "type": ["string", "null"],
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "evidence_date": {
+            "anyOf": [
+              {
+                "type": "object",
+                "required": ["from", "to"],
+                "properties": {
+                  "from": {
+                    "type": ["string", "null"],
+                    "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                  },
+                  "to": {
+                    "type": ["string", "null"],
+                    "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                  }
+                },
+                "additionalProperties": true
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": true
+      }
+    }
+  },
+  "releases": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "urn:inferencex:cli:releases:1",
+    "title": "InferenceX releases schema 1",
+    "type": "object",
+    "required": [
+      "schema_version",
+      "metadata",
+      "outcome",
+      "limitations",
+      "selection",
+      "comparisons",
+      "unmatched",
+      "sources"
+    ],
+    "properties": {
+      "schema_version": {
+        "const": 1
+      },
+      "metadata": {
+        "type": "object",
+        "required": [
+          "package_version",
+          "query_url",
+          "retrieved_at",
+          "requested",
+          "ran_new_benchmark",
+          "returned_rows",
+          "outside_requested_scope",
+          "outside_selected_dates",
+          "date_field",
+          "metric_coverage",
+          "release_mapping",
+          "causal_attribution",
+          "statistical_verdict"
+        ],
+        "properties": {
+          "package_version": {
+            "type": "string",
+            "pattern": "^\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$"
+          },
+          "query_url": {
+            "type": "string",
+            "pattern": "^https?://"
+          },
+          "retrieved_at": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{3})?Z$"
+          },
+          "requested": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "ran_new_benchmark": {
+            "const": false
+          },
+          "returned_rows": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "outside_requested_scope": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "outside_selected_dates": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "date_field": {
+            "const": "date"
+          },
+          "metric_coverage": {
+            "type": "object",
+            "required": ["comparable_values", "missing_values"],
+            "properties": {
+              "comparable_values": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "missing_values": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "additionalProperties": true
+          },
+          "release_mapping": {
+            "const": "unknown"
+          },
+          "causal_attribution": {
+            "const": "not_established"
+          },
+          "statistical_verdict": {
+            "const": "not_established"
+          }
+        },
+        "additionalProperties": true
+      },
+      "outcome": {
+        "enum": ["observed_comparisons", "no_comparable_pairs"]
+      },
+      "limitations": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "selection": {
+        "type": "object",
+        "required": ["before", "after"],
+        "properties": {
+          "before": {
+            "$ref": "#/$defs/selection"
+          },
+          "after": {
+            "$ref": "#/$defs/selection"
+          }
+        },
+        "additionalProperties": true
+      },
+      "comparisons": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": [
+            "before_id",
+            "after_id",
+            "configuration",
+            "configuration_metrics",
+            "configuration_verification",
+            "configuration_completeness",
+            "configuration_unknown_fields",
+            "producer",
+            "recipe_fingerprint_match",
+            "full_recipe_verified",
+            "confounders",
+            "metric"
+          ],
+          "properties": {
+            "before_id": {
+              "type": "string"
+            },
+            "after_id": {
+              "type": "string"
+            },
+            "configuration": {
+              "type": "object",
+              "additionalProperties": true
+            },
+            "configuration_metrics": {
+              "type": "object",
+              "additionalProperties": true
+            },
+            "configuration_verification": {
+              "const": "public_fields_only"
+            },
+            "configuration_completeness": {
+              "enum": ["known_fields_present", "incomplete_optional_fields"]
+            },
+            "configuration_unknown_fields": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "producer": {
+              "type": "object",
+              "required": ["before", "after"],
+              "properties": {
+                "before": {
+                  "type": "object",
+                  "additionalProperties": true
+                },
+                "after": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              },
+              "additionalProperties": true
+            },
+            "recipe_fingerprint_match": {
+              "type": ["boolean", "null"]
+            },
+            "full_recipe_verified": {
+              "type": "boolean"
+            },
+            "confounders": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "metric": {
+              "type": "object",
+              "required": ["name", "before", "after", "delta", "percent_change", "status"],
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "before": {
+                  "type": ["number", "null"]
+                },
+                "after": {
+                  "type": ["number", "null"]
+                },
+                "delta": {
+                  "type": ["number", "null"]
+                },
+                "percent_change": {
+                  "type": ["number", "null"]
+                },
+                "status": {
+                  "enum": [
+                    "observed_change",
+                    "zero_baseline",
+                    "arithmetic_not_finite",
+                    "missing_before",
+                    "missing_after",
+                    "missing_both"
+                  ]
+                }
+              },
+              "additionalProperties": true,
+              "allOf": [
+                {
+                  "if": {
+                    "properties": {
+                      "status": {
+                        "const": "observed_change"
+                      }
+                    },
+                    "required": ["status"]
+                  },
+                  "then": {
+                    "properties": {
+                      "before": {
+                        "type": "number"
+                      },
+                      "after": {
+                        "type": "number"
+                      },
+                      "delta": {
+                        "type": "number"
+                      },
+                      "percent_change": {
+                        "type": "number"
+                      }
+                    }
+                  }
+                },
+                {
+                  "if": {
+                    "properties": {
+                      "status": {
+                        "enum": [
+                          "missing_before",
+                          "missing_after",
+                          "missing_both",
+                          "arithmetic_not_finite"
+                        ]
+                      }
+                    },
+                    "required": ["status"]
+                  },
+                  "then": {
+                    "properties": {
+                      "delta": {
+                        "type": "null"
+                      },
+                      "percent_change": {
+                        "type": "null"
+                      }
+                    }
+                  }
+                },
+                {
+                  "if": {
+                    "properties": {
+                      "status": {
+                        "const": "zero_baseline"
+                      }
+                    },
+                    "required": ["status"]
+                  },
+                  "then": {
+                    "properties": {
+                      "before": {
+                        "const": 0
+                      },
+                      "after": {
+                        "type": "number"
+                      },
+                      "delta": {
+                        "type": "number"
+                      },
+                      "percent_change": {
+                        "type": "null"
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "additionalProperties": true
+        }
+      },
+      "unmatched": {
+        "type": "object",
+        "required": ["before", "after"],
+        "properties": {
+          "before": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "after": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          }
+        },
+        "additionalProperties": true
+      },
+      "sources": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": ["operation", "response_id", "status", "retrieved_at", "url"],
+          "properties": {
+            "operation": {
+              "const": "benchmark-history"
+            },
+            "response_id": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "status": {
+              "type": "integer",
+              "minimum": 100,
+              "maximum": 599
+            },
+            "retrieved_at": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{3})?Z$"
+            },
+            "url": {
+              "type": "string",
+              "pattern": "^https?://"
+            }
+          },
+          "additionalProperties": true
+        }
+      }
+    },
+    "additionalProperties": true,
+    "$defs": {
+      "selection": {
+        "type": "object",
+        "required": ["rows", "excluded", "unique_observations", "snapshot_reuses"],
+        "properties": {
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "id",
+                "hardware",
+                "framework",
+                "model",
+                "precision",
+                "spec_method",
+                "disagg",
+                "is_multinode",
+                "prefill_tp",
+                "prefill_ep",
+                "prefill_dp_attention",
+                "prefill_num_workers",
+                "decode_tp",
+                "decode_ep",
+                "decode_dp_attention",
+                "decode_num_workers",
+                "num_prefill_gpu",
+                "num_decode_gpu",
+                "benchmark_type",
+                "isl",
+                "osl",
+                "conc",
+                "offload_mode",
+                "image",
+                "metrics",
+                "date",
+                "run_url"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "hardware": {
+                  "type": "string"
+                },
+                "framework": {
+                  "type": "string"
+                },
+                "model": {
+                  "type": "string"
+                },
+                "precision": {
+                  "type": "string"
+                },
+                "spec_method": {
+                  "type": "string"
+                },
+                "disagg": {
+                  "type": "boolean"
+                },
+                "is_multinode": {
+                  "type": "boolean"
+                },
+                "prefill_tp": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "prefill_ep": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "prefill_dp_attention": {
+                  "type": "boolean"
+                },
+                "prefill_num_workers": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "decode_tp": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "decode_ep": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "decode_dp_attention": {
+                  "type": "boolean"
+                },
+                "decode_num_workers": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "num_prefill_gpu": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "num_decode_gpu": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "benchmark_type": {
+                  "type": "string"
+                },
+                "isl": {
+                  "type": ["integer", "null"],
+                  "minimum": 0
+                },
+                "osl": {
+                  "type": ["integer", "null"],
+                  "minimum": 0
+                },
+                "conc": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "offload_mode": {
+                  "type": "string"
+                },
+                "image": {
+                  "type": ["string", "null"]
+                },
+                "recipe_fingerprint": {
+                  "type": ["string", "null"]
+                },
+                "metrics": {
+                  "type": "object",
+                  "additionalProperties": true
+                },
+                "date": {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                },
+                "workflow_run_id": {
+                  "type": ["string", "null"]
+                },
+                "run_started_at": {
+                  "type": ["string", "null"]
+                },
+                "run_url": {
+                  "type": ["string", "null"],
+                  "pattern": "^https?://"
+                },
+                "curve_date": {
+                  "type": ["string", "null"],
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                },
+                "curve_workflow_run_id": {
+                  "type": ["string", "null"]
+                },
+                "curve_run_started_at": {
+                  "type": ["string", "null"]
+                }
+              },
+              "additionalProperties": true
+            }
+          },
+          "excluded": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "unique_observations": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "snapshot_reuses": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": true
+      }
+    }
+  },
+  "collectivex": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "urn:inferencex:cli:collectivex:1",
+    "title": "InferenceX collectivex schema 1",
+    "type": "object",
+    "required": [
+      "schema_version",
+      "kind",
+      "package_version",
+      "contract_version",
+      "selection",
+      "outcome",
+      "discovery",
+      "comparison_scope",
+      "runs",
+      "summary",
+      "comparisons",
+      "sources"
+    ],
+    "properties": {
+      "schema_version": {
+        "const": 1
+      },
+      "kind": {
+        "const": "collectivex"
+      },
+      "package_version": {
+        "type": "string",
+        "pattern": "^\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$"
+      },
+      "contract_version": {
+        "const": 1
+      },
+      "selection": {
+        "type": "object",
+        "required": ["mode", "run_ids"],
+        "properties": {
+          "mode": {
+            "enum": ["explicit_run_ids", "newest_two_measured_from_one_list"]
+          },
+          "run_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "uniqueItems": true
+          }
+        },
+        "additionalProperties": true
+      },
+      "outcome": {
+        "enum": ["fewer_than_two_measured_runs", "compared", "no_comparable_rows"]
+      },
+      "discovery": {
+        "anyOf": [
+          {
+            "type": "object",
+            "additionalProperties": true
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "comparison_scope": {
+        "type": "object",
+        "required": ["contract_version", "basis", "source_sha_equal"],
+        "properties": {
+          "contract_version": {
+            "const": 1
+          },
+          "basis": {
+            "const": "exact_public_identity"
+          },
+          "source_sha_equal": {
+            "type": ["boolean", "null"]
+          }
+        },
+        "additionalProperties": true
+      },
+      "runs": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": ["run", "response_index", "response_id"],
+          "properties": {
+            "run": {
+              "type": "object",
+              "additionalProperties": true
+            },
+            "response_index": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "response_id": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          },
+          "additionalProperties": true
+        }
+      },
+      "summary": {
+        "type": "object",
+        "required": ["matched", "only_left", "only_right", "ambiguous", "incomparable"],
+        "properties": {
+          "matched": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "only_left": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "only_right": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "ambiguous": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "incomparable": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": true
+      },
+      "comparisons": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": ["identity", "status", "issues", "left", "right", "metrics"],
+          "properties": {
+            "identity": {
+              "type": "object",
+              "required": ["suite", "configuration"],
+              "properties": {
+                "suite": {
+                  "enum": ["ep", "kv"]
+                },
+                "configuration": {
+                  "type": "object",
+                  "additionalProperties": true
+                },
+                "operation": {
+                  "type": "string"
+                },
+                "tokens_per_rank": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "global_tokens": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "payload_bytes": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "sequence_length": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "batch_size": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "additionalProperties": true
+            },
+            "status": {
+              "enum": ["matched", "only_left", "only_right", "ambiguous", "incomparable"]
+            },
+            "issues": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "left": {
+              "$ref": "#/$defs/sourcePointers"
+            },
+            "right": {
+              "$ref": "#/$defs/sourcePointers"
+            },
+            "metrics": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "name",
+                  "unit",
+                  "left",
+                  "right",
+                  "difference_right_minus_left",
+                  "ratio_right_over_left"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "unit": {
+                    "enum": [
+                      "us",
+                      "GB/s aggregate activation",
+                      "GB/s per GPU payload",
+                      "GB/s",
+                      "ms per burst",
+                      "ms per request",
+                      "samples",
+                      "GB/s including prep"
+                    ]
+                  },
+                  "left": {
+                    "$ref": "#/$defs/metricValue"
+                  },
+                  "right": {
+                    "$ref": "#/$defs/metricValue"
+                  },
+                  "difference_right_minus_left": {
+                    "type": ["number", "null"]
+                  },
+                  "ratio_right_over_left": {
+                    "type": ["number", "null"]
+                  }
+                },
+                "additionalProperties": true
+              }
+            }
+          },
+          "additionalProperties": true
+        }
+      },
+      "sources": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": ["operation", "url", "response_id", "http_status", "retrieved_at"],
+          "properties": {
+            "operation": {
+              "enum": ["openapi", "collectivex-runs", "collectivex-run"]
+            },
+            "url": {
+              "type": "string",
+              "pattern": "^https?://"
+            },
+            "response_id": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "http_status": {
+              "type": "integer",
+              "minimum": 100,
+              "maximum": 599
+            },
+            "retrieved_at": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{3})?Z$"
+            }
+          },
+          "additionalProperties": true
+        }
+      }
+    },
+    "additionalProperties": true,
+    "$defs": {
+      "metricValue": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": ["status", "value"],
+            "properties": {
+              "status": {
+                "const": "value"
+              },
+              "value": {
+                "type": "number"
+              }
+            },
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "required": ["status", "value"],
+            "properties": {
+              "status": {
+                "const": "null"
+              },
+              "value": {
+                "type": "null"
+              }
+            },
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "required": ["status"],
+            "properties": {
+              "status": {
+                "const": "missing"
+              }
+            },
+            "additionalProperties": false
+          }
+        ]
+      },
+      "sourcePointers": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": ["response_index", "json_pointer"],
+          "properties": {
+            "response_index": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "json_pointer": {
+              "type": "string",
+              "pattern": "^/"
+            }
+          },
+          "additionalProperties": true
+        }
+      }
+    }
+  }
+}

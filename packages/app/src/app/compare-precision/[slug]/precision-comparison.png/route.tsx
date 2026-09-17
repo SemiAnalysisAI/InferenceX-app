@@ -19,9 +19,10 @@ export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ slug: string }> },
 ): Promise<Response> {
+  const lang = new URL(request.url).searchParams.get('lang') === 'zh' ? 'zh' : 'en';
   const { slug } = await params;
   const parsed = parsePrecisionCompareSlug(slug);
   // Compare case-insensitively. The HTML pages lowercase before their 308, so
@@ -66,18 +67,28 @@ export async function GET(
   const bLabel = precisionDisplayLabel(parsed.precB);
 
   try {
-    return renderComparePngChart({
+    return await renderComparePngChart({
       curveRows,
       plottedRows,
       logoSrc,
       aLabel,
       bLabel,
-      eyebrow: 'InferenceX Precision Comparison',
+      eyebrow: lang === 'zh' ? 'InferenceX 精度对比' : 'InferenceX Precision Comparison',
       title: `${parsed.model.label} · ${gpuLabel}`,
-      subtitle: `${aLabel} vs ${bLabel} | Cost per Million Tokens`,
+      subtitle:
+        lang === 'zh'
+          ? `${aLabel} 与 ${bLabel}｜每百万 token 成本`
+          : `${aLabel} vs ${bLabel} | Cost per Million Tokens`,
       workload: sequence ?? '',
-      rangeNote: "Dashed segments extend to each precision's operating envelope",
-      footer: 'Precision comparison | interpolated from benchmark results',
+      rangeNote:
+        lang === 'zh'
+          ? '虚线延伸至各精度对应的运行区间'
+          : "Dashed segments extend to each precision's operating envelope",
+      footer:
+        lang === 'zh'
+          ? '精度对比｜数据由基准测试结果插值得出'
+          : 'Precision comparison | interpolated from benchmark results',
+      lang,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

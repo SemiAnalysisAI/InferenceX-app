@@ -1,0 +1,215 @@
+# Compare existing CollectiveX runs
+
+Use this cookbook to discover public communication sweeps, compare two returned
+runs, and export the evidence. These are existing observations; no new benchmark
+is run. Public GETs can populate the service's documented lazy cache from existing
+GitHub artifacts. No database credentials, admin operations, or launch tools are
+needed.
+
+For a replayable contract 1 comparison:
+
+```bash
+mkdir -p evidence
+node .agents/skills/inferencex-api/scripts/inferencex.mjs collectivex compare \
+  --left 90071992547409930001 --right 90071992547409930002 \
+  --output-dir evidence/collectivex --min-comparable-pairs 1
+```
+
+No comparable rows is valid scoped output without the predicate. With it, the
+bundle is retained and the command exits 3. Keep run attempts, revisions, source
+pointers, and units with the comparison. See the [CLI contract](cli.md).
+
+## 1. Discover and export
+
+Example request: "Find two recent measured communication runs and compare their
+matching configurations. Save the complete source responses, include unavailable
+cases, and explain which observations cannot be compared."
+
+Run from a project with the npm skill installed for Codex:
+
+```bash
+mkdir -p evidence
+node .agents/skills/inferencex-api/scripts/inferencex.mjs collectivex compare \
+  --output-dir evidence/collectivex
+```
+
+For Claude Code, use the corresponding installed path:
+
+```bash
+mkdir -p evidence
+node .claude/skills/inferencex-api/scripts/inferencex.mjs collectivex compare \
+  --output-dir evidence/collectivex
+```
+
+Requires Node 24 or 26. The command checks the current OpenAPI operations, reads the run
+list **once**, and selects its two newest runs with `measured_cases > 0`, ordered
+by numeric run ID. The older selection is `left`; the newer is `right`. This is a
+bounded example selection, not a representative sample. A cancelled or failed
+workflow can still contain measured cases; its conclusion remains in the export.
+
+For a requested pair, supply both exact string IDs from discovery:
+
+```bash
+node .agents/skills/inferencex-api/scripts/inferencex.mjs collectivex compare \
+  --left <left-run-id> --right <right-run-id> --output-dir evidence/collectivex-pair
+```
+
+### Request boundary
+
+The command has a 120-second total deadline and a shared 32 MiB response budget.
+An explicit pair uses three logical reads; discovery uses at most four. Retry
+attempts and output handling follow the [CLI contract](cli.md). A failed read
+never substitutes a different run.
+
+The public operations require `version=1`:
+
+| Operation                                                                                        | Meaning                                                                          |
+| ------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------- |
+| [`/collectivex/latest`](https://inferencex.semianalysis.com/api/v1/collectivex/latest?version=1) | Newest available run by run ID; it need not contain measurements.                |
+| [`/collectivex/runs`](https://inferencex.semianalysis.com/api/v1/collectivex/runs?version=1)     | Retained summaries and `discovery_complete`; the helper uses this for selection. |
+| `/collectivex/runs/{runId}`                                                                      | One run dataset, possibly refreshed to a newer attempt.                          |
+
+All paths above are under `/api/v1`. Consult the [public API reference](https://inferencex.semianalysis.com/api)
+and [OpenAPI document](https://inferencex.semianalysis.com/api/openapi.json) for the
+current contract. A missing/unsupported version is HTTP 400. HTTP 404, an upstream
+502/503, malformed data, a redirect, or an interrupted response is a failed read,
+not an empty comparison. The command exits nonzero without a completed manifest on
+those failures; it never substitutes a different run.
+
+`discovery_complete=false` means further bounded discovery passes may reveal more
+runs. Report that flag even when two selections were available. The route has no
+documented `limit`, `offset`, or cursor: do not invent pagination parameters. If
+fewer than two measured summaries were returned, the helper exports
+`fewer_than_two_measured_runs` and makes no detail requests. Further discovery, if
+needed, should have an explicit small request budget and retain each response.
+
+Even `discovery_complete=true` does **not** mean complete workflow history. Recent
+discovery has a bounded upstream window, artifacts expire, and retained runs can
+outlive their artifacts. The export therefore always sets `history_complete=false`.
+Stored fallback data can also be served when upstream refresh fails. Compare each
+detail's returned `run_attempt` with its discovery summary; a later attempt is a
+different snapshot, even under the same run ID. Equal attempt numbers do not prove
+identical snapshots; data can refresh within an attempt.
+
+## 2. Check comparability before interpreting differences
+
+The helper creates groups using exact returned identities, with no interpolation,
+aggregation, best-of selection, or hardware ranking:
+
+| Suite       | Required matching identity                                                                                                                                                                                                                                                           |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| EP          | Full series configuration, including `series_id`, backend, phase, kernel mode, precision (dtype), hardware/vendor, and every `system` topology field; operation; `tokens_per_rank`; `global_tokens`; component `payload_bytes`.                                                      |
+| KV-transfer | Case configuration including `case_id`, backend, hardware/vendor, fabric, workload, precision, and topology; row `kind`, `isl`, `page_tokens`, `batch`, `op`, `descs`, and `req_bytes`. Cosmetic labels and outcome/reason text are retained as evidence but excluded from matching. |
+
+Topology includes EP/rank count (`ep_size`), nodes, GPUs per node, scale-up domain,
+scale-up and scale-out transports, and topology class. Keep a declared null
+scale-out transport distinct from a missing topology field. Tokens per rank alone
+do not identify a message size; EP compares the returned aggregate payload bytes
+as well. KV keeps bytes per request separate from burst size (`batch`). Comparing
+different SKUs, backends, dtypes, operations, or topologies requires a separate,
+explicitly qualified analysis; this helper leaves them unmatched.
+
+Read every comparison status:
+
+- `matched`: exactly one observation on each side has the same complete public
+  identity. Only these groups receive metric differences and ratios.
+- `only_left` / `only_right`: no exact counterpart was returned. This does not
+  prove the other system failed, is unsupported, or has zero performance.
+- `ambiguous`: an identity occurs more than once on either side. All source
+  pointers remain; the helper selects none of the duplicates.
+- `incomparable`: an identity field or byte count is missing/invalid, an EP
+  component is unavailable, or a KV case/verification is not successful.
+
+Determine a group's side from its non-empty `left[]` and `right[]` source-pointer
+arrays, not its status. `incomparable` and `ambiguous` groups can contain pointers
+from either or both sides. For per-run series or topology counts, count that
+selected source dataset's `series[]`; unavailable component groups do not add
+measured series.
+
+`summary` counts comparison groups, including EP operation groups, not runs or
+requested cases. Cases with **no measured rows** have no comparison group. Inspect
+the complete datasets' `coverage` and optional `kv` arrays for their outcome,
+disposition, reason, detail, and per-point terminal status. Retain pending,
+unsupported, failed, invalid, diagnostic, and unavailable cases in the answer's
+coverage statement. A successful workflow does not imply complete measurement
+coverage; absence of the optional `kv` field does not imply a failed KV suite.
+Pending data and a cancelled run do not establish whether a case started or why
+measurements are missing. Keep those returned states separate from explanations.
+
+For case accounting, group every returned `coverage[]` (EP) and `kv[]` (KV) entry
+by outcome. Reconcile their combined totals with the run's `requested_cases`,
+`terminal_cases`, `measured_cases`, `unsupported_cases`, and `failed_cases` before
+reporting them. An EP case is terminal only when all its points have a non-pending
+`terminal_status`; a KV case is terminal when its outcome is not `pending`.
+`failed_cases` includes `failed`, `invalid`, and `diagnostic` outcomes.
+These case counters combine EP and KV; `kv_requested_cases` and
+`kv_measured_cases` identify the KV subset, while the run's point counters are
+EP-only. Run-list summaries expose this subset at `kv_cases.requested` and
+`kv_cases.measured`; the flat names above belong to run details. Inspect the
+returned object at the appropriate path when reporting availability.
+A listed subset of SKUs or reasons is not the total. If the returned
+arrays and counters do not reconcile, report that inconsistency.
+
+For EP point accounting, compute a histogram of `coverage[].points[].terminal_status`
+and reconcile it with the point counters. Compute pending points as
+`requested_points - terminal_points` and terminal-but-unmeasured points as
+`terminal_points - measured_points`. Carry those computed values and labels into
+the report; pending and terminal-but-unmeasured are separate populations.
+
+Matching is deliberately conservative: a changed case ID remains unmatched even
+if visible labels look alike. `comparison_scope.basis=exact_public_identity`
+describes the fields exposed by this API, not proof of a controlled experiment.
+The API returns an **assembled dataset**, not the original matrix/shard artifacts,
+software build manifests, or every runtime setting. Preserve each `source_sha`;
+`source_sha_equal=false` is a revision difference, not evidence of its causal
+effect. Equal SHAs also do not establish identical runtime conditions.
+
+## 3. Preserve units, missing values, and sources
+
+| Metric family                                        | Meaning and unit                                                                                                                              |
+| ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| EP `latency_us`                                      | Operation latency in microseconds. Compare the same percentile.                                                                               |
+| EP `activation_data_rate_gbps_at_latency_percentile` | Aggregate activation-data rate in **GB/s**, excluding FP8 scale bytes.                                                                        |
+| EP `payload_data_rate_gbps_at_latency_percentile`    | Full payload rate in **GB/s per GPU**, including recorded scale bytes. `payload_bytes` is aggregate bytes across the EP world.                |
+| EP `roundtrip_token_rate_at_latency_percentile`      | Aggregate tokens/s at the named latency percentile.                                                                                           |
+| KV `latency_ms` / `request_ms`                       | Whole-burst latency / per-request completion latency in milliseconds; `n` is sample count. A missing `request_ms` is not whole-burst latency. |
+| KV `prep_ms`, `gbps_p50`, `gbps_p50_incl_prep`       | Preparation time in ms per burst, GB/s excluding preparation, and GB/s including preparation.                                                 |
+
+`roundtrip_token_rate_at_latency_percentile` belongs to each point, beside
+`components`. The latency, activation/payload data rates, and `payload_bytes`
+belong inside each component. Check availability at the field's documented object
+path: absence from a component does not mean a point-level metric is absent.
+
+The spelling `gbps` in field names does not mean gigabits/s. Rate-at-latency-p99 is
+a rate derived at p99 latency, not an independently measured p99 bandwidth.
+Keep EP microseconds and KV milliseconds distinct. The reader can use wire-byte
+provenance when present and legacy logical/activation-byte fallbacks otherwise;
+the public dataset does not expose all of that provenance. Equal reported bytes
+alone do not prove equal physical wire traffic. Describe reported payload rates,
+not link saturation, bus bandwidth, or a reconstructed raw message distribution.
+
+Each metric retains `status: value`, `null`, or `missing`; real zero is a value.
+`difference_right_minus_left` and `ratio_right_over_left` use only two finite
+values. A zero left denominator yields a null ratio. Null ratios/differences do
+not mean equality. Raw response text preserves omitted fields and additional
+returned fields without inventing defaults. The server's shared reader has its
+own compatibility fallbacks, so returned defaults are not independently verified
+artifact provenance.
+
+Follow the shared [delivery rules](../SKILL.md#deliver-the-requested-result) for
+bundle metadata, retention, and verification. The manifest includes the OpenAPI
+capture. Inspect original datasets in the decoded `responses/*.body` files; the
+result's `sources[]` entries and comparison pointers identify their response
+indices and JSON Pointers. Run IDs remain exact strings, and `runs[].run` retains the returned
+attempt, `generated_at`, conclusion, and source SHA. Retrieval time and generated
+time describe different events. Use URLs and timestamps from **this bundle**,
+never from another selection or an older example.
+
+Report the selected runs and attempts, discovery coverage, matched/unmatched/
+ambiguous/incomparable counts, the specific metric/percentile and units, and
+relevant unmeasured coverage. Summarize numerical differences only from the
+complete requested set of `matched` groups. With no matches, explain the actual
+identity differences and unavailable fields. Do not invent relaxed counterpart
+counts or performance pairs unless the user requests that separate analysis.
+Keep the result scoped to the two
+returned snapshots and state that no new benchmarks were run.

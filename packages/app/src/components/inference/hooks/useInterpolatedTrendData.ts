@@ -28,11 +28,11 @@ import {
 } from '@/components/calculator/useThroughputData';
 import { useBenchmarkHistory } from '@/hooks/api/use-benchmark-history';
 import { buildDerivedChartFields, getHardwareKey, type DerivedMetricKey } from '@/lib/chart-utils';
-import { isKnownGpu } from '@/lib/constants';
+import { DEFAULT_TCO_BASIS, isKnownGpu, type TcoBasis } from '@/lib/constants';
 import { rowToAggDataEntry } from '@/lib/benchmark-transform';
 import type { BenchmarkRow } from '@/lib/api';
 import { benchmarkCurveDate, dedupeAgenticHistoryRuns } from '@/lib/benchmark-run-selection';
-import { measuredCacheHitRate } from '@/lib/cache-pricing';
+import { pricingCacheHitRate } from '@/lib/cache-pricing';
 import { Sequence, type Model } from '@/lib/data-mappings';
 import { supportsTokenMetric } from '@/lib/supplemental-benchmarks';
 
@@ -50,6 +50,7 @@ export function rowToLightweightPoint(
   row: BenchmarkRow,
   requestedMetrics: readonly DerivedMetricKey[],
   tokenRevenuePricing: TokenRevenuePricing | null = NORMALIZED_TOKEN_REVENUE_PRICING,
+  tcoBasis: TcoBasis = DEFAULT_TCO_BASIS,
 ): InferenceData | null {
   const entry = rowToAggDataEntry(row);
   const hwKey = getHardwareKey(entry);
@@ -65,9 +66,12 @@ export function rowToLightweightPoint(
   const point = {
     x: row.metrics.median_intvty ?? 0,
     y: row.metrics.tput_per_gpu ?? 0,
+    hw: row.hardware,
     hwKey,
     precision: row.precision,
     tp: row.decode_tp,
+    physicalChips: entry.physicalChips,
+    dp: entry.dp,
     conc: row.conc,
     date: benchmarkCurveDate(row),
     tput_per_gpu: entry.tput_per_gpu,
@@ -80,7 +84,8 @@ export function rowToLightweightPoint(
     server_gpu_cache_hit_rate: entry.server_gpu_cache_hit_rate,
     server_external_cache_hit_rate: entry.server_external_cache_hit_rate,
     server_cpu_cache_hit_rate: entry.server_cpu_cache_hit_rate,
-    ...buildDerivedChartFields(derivedEntry, hwKey, requestedMetrics),
+    theoretical_cache_hit_rate: entry.theoretical_cache_hit_rate,
+    ...buildDerivedChartFields(derivedEntry, hwKey, requestedMetrics, tcoBasis),
   } as InferenceData;
 
   return requestedMetrics.includes('tokenRevenuePerGpuHour')
@@ -102,13 +107,10 @@ export function rowToLightweightPoint(
 const RECIPROCAL_OF_THROUGHPUT: Partial<Record<YAxisMetricKey, YAxisMetricKey>> = {
   // $/M tok = $/GPU-hr x 1e6 / (tok/s x 3600)
   costh: 'tpPerGpu',
-  costn: 'tpPerGpu',
   costr: 'tpPerGpu',
   costhOutput: 'outputTputPerGpu',
-  costnOutput: 'outputTputPerGpu',
   costrOutput: 'outputTputPerGpu',
   costhi: 'inputTputPerGpu',
-  costni: 'inputTputPerGpu',
   costri: 'inputTputPerGpu',
   // J/token = W / (tok/s)
   jTotal: 'tpPerGpu',
@@ -125,23 +127,11 @@ const RECIPROCAL_OF_THROUGHPUT: Partial<Record<YAxisMetricKey, YAxisMetricKey>> 
 const PROPORTIONAL_TO_THROUGHPUT: Partial<Record<YAxisMetricKey, YAxisMetricKey>> = {
   tokenRevenuePerGpuHour: 'tpPerGpu',
   tokensPerDollarH: 'tpPerGpu',
-  tokensPerDollarN: 'tpPerGpu',
   tokensPerDollarR: 'tpPerGpu',
   outputTokensPerDollarH: 'outputTputPerGpu',
-  outputTokensPerDollarN: 'outputTputPerGpu',
   outputTokensPerDollarR: 'outputTputPerGpu',
   inputTokensPerDollarH: 'inputTputPerGpu',
-  inputTokensPerDollarN: 'inputTputPerGpu',
   inputTokensPerDollarR: 'inputTputPerGpu',
-  tokensPerRmbH: 'tpPerGpu',
-  tokensPerRmbN: 'tpPerGpu',
-  tokensPerRmbR: 'tpPerGpu',
-  outputTokensPerRmbH: 'outputTputPerGpu',
-  outputTokensPerRmbN: 'outputTputPerGpu',
-  outputTokensPerRmbR: 'outputTputPerGpu',
-  inputTokensPerRmbH: 'inputTputPerGpu',
-  inputTokensPerRmbN: 'inputTputPerGpu',
-  inputTokensPerRmbR: 'inputTputPerGpu',
 };
 
 export function trendMetricDependencies(metricKey: YAxisMetricKey): DerivedMetricKey[] {
@@ -248,7 +238,7 @@ export function interpolateMetricAtInteractivity(
     };
     const throughputYs = sorted.map((p) => extractMetric(p, 'tpPerGpu')!);
     const inputShares = sorted.map(inputTokenShareForRevenue);
-    const cacheHitRates = sorted.map(measuredCacheHitRate);
+    const cacheHitRates = sorted.map(pricingCacheHitRate);
     const inputShare = inputShares.every((share): share is number => share !== null)
       ? interpolateBounded(inputShares)
       : null;
@@ -324,6 +314,7 @@ interface UseInterpolatedTrendDataParams {
   availableDates: string[];
   tokenRevenuePricing?: TokenRevenuePricing | null;
   enabled: boolean;
+  tcoBasis?: TcoBasis;
 }
 
 interface UseInterpolatedTrendDataResult {
@@ -350,6 +341,7 @@ export function useInterpolatedTrendData({
   targetInteractivity,
   tokenRevenuePricing = NORMALIZED_TOKEN_REVENUE_PRICING,
   enabled,
+  tcoBasis = DEFAULT_TCO_BASIS,
 }: UseInterpolatedTrendDataParams): UseInterpolatedTrendDataResult {
   const seqIslOsl = useMemo(() => sequenceToIslOsl(selectedSequence), [selectedSequence]);
 
@@ -378,7 +370,7 @@ export function useInterpolatedTrendData({
       if (!selectedPrecisions.includes(row.precision)) continue;
       if (!rowSupportsTrendMetric(row, selectedYAxisMetric)) continue;
 
-      const point = rowToLightweightPoint(row, requestedMetrics, tokenRevenuePricing);
+      const point = rowToLightweightPoint(row, requestedMetrics, tokenRevenuePricing, tcoBasis);
       if (!point) continue;
 
       const curveDate = benchmarkCurveDate(row);
@@ -400,7 +392,14 @@ export function useInterpolatedTrendData({
     }
 
     return result;
-  }, [allRows, selectedPrecisions, requestedMetrics, selectedYAxisMetric, tokenRevenuePricing]);
+  }, [
+    allRows,
+    selectedPrecisions,
+    requestedMetrics,
+    selectedYAxisMetric,
+    tokenRevenuePricing,
+    tcoBasis,
+  ]);
 
   // Interpolation memo — instant when slider moves or metric changes
   const { trendLines, hwKeysWithData } = useMemo(() => {

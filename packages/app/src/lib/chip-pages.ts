@@ -437,7 +437,14 @@ const formatRatio = (x: number, y: number): string => `${(x / y).toFixed(2).repl
 
 export interface ChipVsHighlight {
   /** Stable key so the zh sibling can localize the label. */
-  key: 'memory' | 'memoryBandwidth' | 'fp8' | 'fp4' | 'tdp' | 'costNeocloud' | 'scaleUpWorldSize';
+  key:
+    | 'memory'
+    | 'memoryBandwidth'
+    | 'fp8'
+    | 'fp4'
+    | 'tdp'
+    | 'costHyperscaler'
+    | 'scaleUpWorldSize';
   aValue: string;
   bValue: string;
   /** a over b, e.g. "1.5x" — omitted when either side lacks the number. */
@@ -486,10 +493,10 @@ export function buildChipVsHighlights(page: ChipVsPage): readonly ChipVsHighligh
       ratio: formatRatio(hwA.tdp, hwB.tdp),
     },
     {
-      key: 'costNeocloud',
-      aValue: `$${hwA.costn.toFixed(2)}/hr`,
-      bValue: `$${hwB.costn.toFixed(2)}/hr`,
-      ratio: formatRatio(hwA.costn, hwB.costn),
+      key: 'costHyperscaler',
+      aValue: `$${hwA.costh.toFixed(2)}/hr`,
+      bValue: `$${hwB.costh.toFixed(2)}/hr`,
+      ratio: formatRatio(hwA.costh, hwB.costh),
     },
     {
       key: 'scaleUpWorldSize',
@@ -508,8 +515,8 @@ export function buildChipFaq(entry: ChipPageEntry): readonly ChipFaqItem[] {
     {
       question: `How much does ${entry.label} cost per hour in the cloud?`,
       answer:
-        `The SemiAnalysis AI Cloud TCO model rates ${entry.label} at about $${hw.costh.toFixed(2)}/hr at hyperscalers, ` +
-        `$${hw.costn.toFixed(2)}/hr at neoclouds and $${hw.costr.toFixed(2)}/hr at the retail tier. ` +
+        `The SemiAnalysis AI Cloud TCO model rates ${entry.label} at about $${hw.costh.toFixed(2)}/hr when owned at large hyperscaler volume ` +
+        `and $${hw.costr.toFixed(2)}/hr at the retail tier. ` +
         `InferenceX performance-per-dollar pages use these rates to turn measured throughput into $/M tokens.`,
     },
     {
@@ -544,7 +551,7 @@ export function buildChipFaq(entry: ChipPageEntry): readonly ChipFaqItem[] {
 export function buildChipVsFaq(page: ChipVsPage): readonly ChipFaqItem[] {
   const highlights = buildChipVsHighlights(page);
   const memory = highlights.find((h) => h.key === 'memory');
-  const cost = highlights.find((h) => h.key === 'costNeocloud');
+  const cost = highlights.find((h) => h.key === 'costHyperscaler');
   const fp8 = highlights.find((h) => h.key === 'fp8');
   return [
     {
@@ -554,7 +561,7 @@ export function buildChipVsFaq(page: ChipVsPage): readonly ChipFaqItem[] {
     {
       question: `How do ${page.a.label} and ${page.b.label} prices compare?`,
       answer:
-        `At the neocloud tier the SemiAnalysis TCO model rates ${page.a.label} at ${cost?.aValue} versus ${cost?.bValue} for ${page.b.label}. ` +
+        `When owned at large hyperscaler volume, the SemiAnalysis TCO model rates ${page.a.label} at ${cost?.aValue} versus ${cost?.bValue} for ${page.b.label}. ` +
         `Hourly price alone is misleading; the per-dollar compare pages divide measured throughput by these rates.`,
     },
     {
@@ -573,6 +580,6 @@ export const CHIP_VS_HIGHLIGHT_LABELS_EN: Readonly<Record<ChipVsHighlight['key']
   fp8: 'Dense FP8 compute',
   fp4: 'Dense FP4 compute',
   tdp: 'TDP',
-  costNeocloud: 'Hourly rate (neocloud tier)',
+  costHyperscaler: 'Hourly rate (owning at large hyperscaler volume)',
   scaleUpWorldSize: 'Scale-up world size',
 };

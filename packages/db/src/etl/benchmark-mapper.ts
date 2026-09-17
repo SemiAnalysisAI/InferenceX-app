@@ -6,7 +6,11 @@
 
 import type { ConfigParams } from './config-cache';
 import type { SkipTracker } from './skip-tracker';
-import { METRIC_KEYS, PRECISION_KEYS } from '@semianalysisai/inferencex-constants';
+import {
+  MEASURED_POWER_METRIC_KEYS,
+  METRIC_KEYS,
+  PRECISION_KEYS,
+} from '@semianalysisai/inferencex-constants';
 import { flattenAgenticAggRow } from './agentic-v3-flatten';
 import { preferFullResponseMetrics } from './full-response-interactivity';
 import {
@@ -16,9 +20,11 @@ import {
   normalizePrecision,
   normalizeSpecMethod,
   parseBool,
+  parseOptionalBool,
   parseNum,
   parseInt2,
 } from './normalizers';
+import { normalizeLegacyTpuRow, physicalChipCount, roleChipCount } from './tpu-normalization';
 import { extractRuntimeMetadata } from './runtime-metadata';
 
 export { flattenAgenticAggRow };
@@ -57,8 +63,10 @@ const NON_METRIC_KEYS = new Set([
   'decode_ep',
   'decode_dp_attention',
   'decode_num_workers',
+  'num_gpus',
   'num_prefill_gpu',
   'num_decode_gpu',
+  'num_aggregate_gpu',
   // agentic scenario
   'scenario_type',
   'users',
@@ -82,6 +90,11 @@ const NON_METRIC_KEYS = new Set([
   // sibling of the metrics JSONB by mapBenchmarkRow so the metrics column
   // stays Record<string, number> for the index signature on BenchmarkRow.
   'workers',
+  // Keep structured provenance outside flat numeric metrics. Explicitly
+  // excluding the keys also blocks Number(['5']) coercion.
+  'power_invalid_reasons',
+  'power_audit',
+  'benchmark_outcome',
 ]);
 
 /**
@@ -122,6 +135,25 @@ export interface WorkerPower {
   avg_mem_used_mb?: number;
 }
 
+/**
+ * Narrowed measurement-window audit. Fields are optional because malformed
+ * numerics are omitted; producer identity is null when unavailable.
+ */
+export interface PowerAudit {
+  window_start_unix?: number;
+  window_end_unix?: number;
+  expected_gpu_count?: number;
+  observed_gpu_count?: number;
+  sample_count?: number;
+  max_sample_gap_s?: number;
+  producer_sha?: string | null;
+  exporter_image_sha256?: string | null;
+  /** Relative path within the source run artifact bundle. */
+  source?: string;
+  /** Producer device identifiers; not necessarily physical UUIDs on older traces. */
+  observed_gpu_ids?: string[];
+}
+
 export interface BenchmarkParams {
   config: ConfigParams;
   benchmarkType: BenchmarkType;
@@ -144,6 +176,8 @@ export interface BenchmarkParams {
    * predating the multinode patch.
    */
   workers?: WorkerPower[];
+  powerInvalidReasons?: string[];
+  powerAudit?: PowerAudit;
 }
 
 /**
@@ -168,11 +202,17 @@ export function mapBenchmarkRow(
   row: Record<string, any>,
   tracker: SkipTracker,
   islOslFallback?: { isl: number; osl: number } | null,
+  runId?: string | number | null,
 ): BenchmarkParams | null {
   // v3 agentic rows nest their metrics; flatten to the canonical flat schema
   // first so the rest of the mapper (auto-capture, intvty invariant, guards)
   // is version-agnostic. No-op for v1/v2 rows.
-  row = flattenAgenticAggRow(row);
+  row = normalizeLegacyTpuRow(flattenAgenticAggRow(row), runId);
+  // Failed-client JSON is retained as evidence, never as a performance point.
+  if (row.benchmark_outcome?.status === 'failed') {
+    tracker.skips.failedRun++;
+    return null;
+  }
 
   const modelKey = resolveModelKey(row);
   if (!modelKey) {
@@ -240,7 +280,7 @@ export function mapBenchmarkRow(
   }
   const specMethod = normalizeSpecMethod(row.spec_decoding);
 
-  let parallelism = resolveParallelism(row);
+  let parallelism = resolveParallelism(row, frameworkDisagg);
   // An explicit non-disagg Dynamo artifact is authoritative for direct
   // deployments such as one distributed vLLM server. A non-zero decode worker
   // pool, however, is structural proof of disaggregation and preserves older
@@ -343,12 +383,19 @@ export function mapBenchmarkRow(
       ? rawRecipeFingerprint.trim()
       : null;
 
+  // Keep this after agentic reassignment and runtime metadata merging so no
+  // later mutation can reintroduce a withheld key.
+  const powerWithheld = scrubWithheldPowerMetrics(metrics);
   // Per-worker measured-power breakdown. The runner emits this as an array
   // of objects sibling to the scalar metrics; we surface it on a dedicated
   // BenchmarkParams.workers field so downstream consumers can treat it as
   // structured data without polluting the flat metrics record. Defensive
-  // narrowing — anything other than a non-empty array of objects is dropped.
-  const workers = extractWorkers(row.workers);
+  // narrowing — anything other than a non-empty array of objects is dropped,
+  // and a withheld power verdict drops the payload entirely.
+  const workers = powerWithheld ? undefined : extractWorkers(row.workers);
+  // Audit metadata is independent of the verdict so valid-row provenance is retained.
+  const powerInvalidReasons = extractPowerInvalidReasons(row.power_invalid_reasons);
+  const powerAudit = extractPowerAudit(row.power_audit);
 
   return {
     config: {
@@ -370,6 +417,8 @@ export function mapBenchmarkRow(
     recipeFingerprint,
     metrics,
     workers,
+    powerInvalidReasons,
+    powerAudit,
   };
 }
 
@@ -393,7 +442,7 @@ type ParallelismParams = Pick<
  * carry full disagg fields keyed by the presence of `prefill_tp`; v1 rows have
  * a single `tp`/`ep` that applies to both phases.
  */
-function resolveParallelism(row: Record<string, any>): ParallelismParams {
+function resolveParallelism(row: Record<string, any>, frameworkDisagg: boolean): ParallelismParams {
   if ('prefill_tp' in row) {
     // v2 schema: full disagg parallelism fields
     const prefillTp = parseInt2(row.prefill_tp) ?? 1;
@@ -409,14 +458,43 @@ function resolveParallelism(row: Record<string, any>): ParallelismParams {
       decodeEp,
       decodeDpAttn: parseBool(row.decode_dp_attention),
       decodeNumWorkers: parseInt2(row.decode_num_workers) ?? 0,
-      numPrefillGpu: parseInt2(row.num_prefill_gpu) ?? prefillTp * prefillEp,
-      numDecodeGpu: parseInt2(row.num_decode_gpu) ?? decodeTp * decodeEp,
+      numPrefillGpu:
+        roleChipCount(row.num_prefill_gpu) ??
+        (frameworkDisagg || (parseInt2(row.decode_num_workers) ?? 0) > 0
+          ? undefined
+          : physicalChipCount(row.num_gpus)) ??
+        prefillTp * prefillEp,
+      numDecodeGpu:
+        roleChipCount(row.num_decode_gpu) ??
+        (frameworkDisagg || (parseInt2(row.decode_num_workers) ?? 0) > 0
+          ? undefined
+          : physicalChipCount(row.num_gpus)) ??
+        decodeTp * decodeEp,
     };
   }
   // v1 schema: single tp/ep, prefill = decode
   const tp = parseInt2(row.tp) ?? 1;
   const ep = parseInt2(row.ep) ?? 1;
   const dpAttn = parseBool(row.dp_attention);
+  let numGpus = physicalChipCount(row.num_gpus);
+  if (
+    row.num_gpus === undefined &&
+    !frameworkDisagg &&
+    String(row.scenario_type ?? '').startsWith('agentic') &&
+    row.request_metrics &&
+    typeof row.request_metrics === 'object' &&
+    !Array.isArray(row.request_metrics) &&
+    parseOptionalBool(row.is_multinode) === false &&
+    parseOptionalBool(row.disagg) === false
+  ) {
+    // Match the v3 AgentX producer's physical-device count. EP and DCP share
+    // TP devices; PP and PCP add devices. Legacy flat rows keep their fallback.
+    const physicalTp = physicalChipCount(row.tp);
+    const pp = physicalChipCount(row.pp === undefined ? 1 : row.pp);
+    const pcp = physicalChipCount(row.pcp_size === undefined ? 1 : row.pcp_size);
+    if (physicalTp && pp && pcp) numGpus = physicalChipCount(physicalTp * pp * pcp);
+  }
+  numGpus ??= tp * ep;
   return {
     prefillTp: tp,
     prefillEp: ep,
@@ -426,8 +504,8 @@ function resolveParallelism(row: Record<string, any>): ParallelismParams {
     decodeEp: ep,
     decodeDpAttn: dpAttn,
     decodeNumWorkers: 0,
-    numPrefillGpu: tp * ep,
-    numDecodeGpu: tp * ep,
+    numPrefillGpu: numGpus,
+    numDecodeGpu: numGpus,
   };
 }
 
@@ -458,7 +536,7 @@ function captureNumericMetrics(row: Record<string, any>): Record<string, number>
  * two fields are semantic discriminators, so loose numeric coercion must never
  * turn malformed producer output into an affirmative verdict or schema.
  */
-function normalizePowerContractMetrics(
+export function normalizePowerContractMetrics(
   row: Record<string, any>,
   metrics: Record<string, number>,
 ): void {
@@ -487,6 +565,20 @@ function normalizePowerContractMetrics(
   } else {
     delete metrics.power_metric_schema_version;
   }
+}
+
+/**
+ * Enforces fail-closed power publication at ingest. An explicit normalized
+ * invalid verdict removes every measured field while preserving the contract
+ * and diagnostic fields; legacy rows without a verdict remain unchanged.
+ * Returns true so callers also drop worker telemetry. Paths that bypass
+ * `mapBenchmarkRow` must normalize the verdict before calling this function.
+ * Queries intentionally remain raw; the frontend withholds independently.
+ */
+export function scrubWithheldPowerMetrics(metrics: Record<string, number>): boolean {
+  if (metrics.power_valid !== 0) return false;
+  for (const key of MEASURED_POWER_METRIC_KEYS) delete metrics[key];
+  return true;
 }
 
 /**
@@ -531,4 +623,90 @@ export function extractWorkers(raw: unknown): WorkerPower[] | undefined {
     out.push(w);
   }
   return out.length > 0 ? out : undefined;
+}
+
+const POWER_REASON_CODE_RE = /^[a-z][a-z0-9_]*$/u;
+const MAX_POWER_REASON_CODES = 32;
+const MAX_POWER_REASON_LENGTH = 64;
+const MAX_POWER_AUDIT_SHA_LENGTH = 128;
+
+/**
+ * Empty results become undefined so persistence stores SQL NULL, not `[]`.
+ */
+export function extractPowerInvalidReasons(raw: unknown): string[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const entry of raw) {
+    if (typeof entry !== 'string') continue;
+    const code = entry.trim();
+    if (code.length === 0 || code.length > MAX_POWER_REASON_LENGTH) continue;
+    if (!POWER_REASON_CODE_RE.test(code) || seen.has(code)) continue;
+    seen.add(code);
+    out.push(code);
+    if (out.length >= MAX_POWER_REASON_CODES) break;
+  }
+  return out.length > 0 ? out : undefined;
+}
+
+/** parseNum accepts Infinity, which cannot describe a measurement window. */
+function auditFiniteNum(v: unknown): number | undefined {
+  const n = parseNum(v);
+  return n !== undefined && Number.isFinite(n) ? n : undefined;
+}
+
+function auditCount(v: unknown): number | undefined {
+  const n = parseInt2(v);
+  return n !== undefined && Number.isSafeInteger(n) && n >= 0 ? n : undefined;
+}
+
+function auditSha(v: unknown): string | null {
+  if (typeof v !== 'string') return null;
+  const s = v.trim();
+  return s.length > 0 && s.length <= MAX_POWER_AUDIT_SHA_LENGTH ? s : null;
+}
+
+/**
+ * Missing or malformed audit values must not become a fabricated measurement;
+ * SQL NULL distinguishes absent evidence from an empty recorded object.
+ */
+export function extractPowerAudit(raw: unknown): PowerAudit | undefined {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined;
+  const e = raw as Record<string, unknown>;
+  const audit: PowerAudit = {};
+
+  const window_start_unix = auditFiniteNum(e.window_start_unix);
+  if (window_start_unix !== undefined) audit.window_start_unix = window_start_unix;
+  const window_end_unix = auditFiniteNum(e.window_end_unix);
+  if (window_end_unix !== undefined) audit.window_end_unix = window_end_unix;
+  const max_sample_gap_s = auditFiniteNum(e.max_sample_gap_s);
+  if (max_sample_gap_s !== undefined) audit.max_sample_gap_s = max_sample_gap_s;
+  const expected_gpu_count = auditCount(e.expected_gpu_count);
+  if (expected_gpu_count !== undefined) audit.expected_gpu_count = expected_gpu_count;
+  const observed_gpu_count = auditCount(e.observed_gpu_count);
+  if (observed_gpu_count !== undefined) audit.observed_gpu_count = observed_gpu_count;
+  const sample_count = auditCount(e.sample_count);
+  if (sample_count !== undefined) audit.sample_count = sample_count;
+  if (
+    typeof e.source === 'string' &&
+    e.source.length <= 512 &&
+    /^[a-zA-Z0-9_./-]+$/u.test(e.source) &&
+    !e.source.startsWith('/') &&
+    !e.source.split('/').includes('..')
+  )
+    audit.source = e.source;
+  if (Array.isArray(e.observed_gpu_ids)) {
+    const ids = e.observed_gpu_ids.filter(
+      (id): id is string => typeof id === 'string' && id.length > 0 && id.length <= 128,
+    );
+    if (ids.length > 0) audit.observed_gpu_ids = [...new Set(ids)].slice(0, 1024);
+  }
+  const hasNumericField = Object.keys(audit).length > 0;
+
+  audit.producer_sha = auditSha(e.producer_sha);
+  audit.exporter_image_sha256 = auditSha(e.exporter_image_sha256);
+  if (!hasNumericField && audit.producer_sha === null && audit.exporter_image_sha256 === null) {
+    return undefined;
+  }
+  return audit;
 }

@@ -5,8 +5,15 @@ on:
     branches: [main, master]
     paths:
       - 'packages/db/src/etl/run-overrides.ts'
+      - 'packages/db/src/etl/power-p90-backfills.ts'
+      - 'docs/data/power-p90-backfill.json'
       - '.github/workflows/apply-run-overrides.yml'
   workflow_dispatch:
+    inputs:
+      run_id:
+        description: 'Optional GitHub run ID; only apply its registered overrides'
+        required: false
+        type: string
 
 permissions: {}
 
@@ -49,7 +56,13 @@ jobs:
       - name: Apply run overrides
         env:
           DATABASE_WRITE_URL: ${{ secrets.DATABASE_WRITE_URL }}
-        run: bun run admin:db:apply-overrides --yes
+          RUN_ID: ${{ inputs.run_id }}
+        run: |
+          args=(--yes)
+          if [[ -n "$RUN_ID" ]]; then
+            args+=(--run-id "$RUN_ID")
+          fi
+          bun run admin:db:apply-overrides "${args[@]}"
 
       - name: Verify database
         env:

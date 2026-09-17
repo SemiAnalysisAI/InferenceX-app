@@ -2,9 +2,11 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 
 import { ShareTwitterButton, ShareLinkedInButton } from '@/components/share-buttons';
 import { track } from '@/lib/analytics';
+import { isEmbedPathname } from '@/lib/embed-route';
 import { useLocale } from '@/lib/use-locale';
 
 import { StarButton } from './footer-star-cta';
@@ -30,8 +32,13 @@ const STRINGS = {
     agentx: 'AgentX',
     telemetry: 'Telemetry',
     articles: 'Articles',
+    whitepapers: 'Whitepapers',
     apiReference: 'API Reference',
+    historicalTrends: 'Historical Trends',
+    tcoCalculator: 'TCO Calculator',
+    fleetLifecycle: 'Fleet Lifecycle',
     gpuReliability: 'Chip Reliability',
+    gpuSpecsDashboard: 'Chip Specs Dashboard',
     perfPerDollar: 'Performance per Dollar',
     modelArchitectures: 'Model Architectures',
     glossary: 'AI Inference Glossary',
@@ -61,7 +68,12 @@ const STRINGS = {
     agentx: 'AgentX',
     telemetry: '遥测数据',
     articles: '技术文章',
+    whitepapers: '白皮书',
+    historicalTrends: '历史趋势',
+    tcoCalculator: 'TCO 计算器',
+    fleetLifecycle: '集群生命周期',
     gpuReliability: '芯片可靠性',
+    gpuSpecsDashboard: '芯片规格仪表板',
     apiReference: 'API 文档',
     perfPerDollar: '每美元性能',
     modelArchitectures: '模型架构',
@@ -76,9 +88,12 @@ const STRINGS = {
 
 export const Footer = ({ starCount }: { starCount?: number | null }) => {
   const locale = useLocale();
+  const pathname = usePathname();
   const t = STRINGS[locale];
   // Internal links stay within the current language tree.
   const prefix = locale === 'zh' ? '/zh' : '';
+  // Embeds render one chart inside a third-party iframe; no site chrome.
+  if (isEmbedPathname(pathname)) return null;
   return (
     <footer
       data-testid="footer"
@@ -246,6 +261,14 @@ export const Footer = ({ starCount }: { starCount?: number | null }) => {
                   {t.articles}
                 </Link>
                 <Link
+                  data-testid="footer-link-whitepapers"
+                  href={`${prefix}/whitepaper`}
+                  onClick={() => track('footer_whitepapers_clicked')}
+                  className="inline-flex min-h-11 items-center rounded-sm py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:outline-none md:min-h-8"
+                >
+                  {t.whitepapers}
+                </Link>
+                <Link
                   data-testid="footer-link-api"
                   href={`${prefix}/api`}
                   onClick={() => track('footer_api_clicked')}
@@ -254,11 +277,42 @@ export const Footer = ({ starCount }: { starCount?: number | null }) => {
                   {t.apiReference}
                 </Link>
                 <Link
+                  data-testid="footer-link-historical"
+                  href={`${prefix}/historical`}
+                  className="inline-flex min-h-11 items-center rounded-sm py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:outline-none md:min-h-8"
+                  onClick={() => track('footer_historical_clicked')}
+                >
+                  {t.historicalTrends}
+                </Link>
+                <Link
+                  data-testid="footer-link-calculator"
+                  href={`${prefix}/calculator`}
+                  className="inline-flex min-h-11 items-center rounded-sm py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:outline-none md:min-h-8"
+                  onClick={() => track('footer_calculator_clicked')}
+                >
+                  {t.tcoCalculator}
+                </Link>
+                <Link
+                  data-testid="footer-link-fleet"
+                  href={`${prefix}/fleet`}
+                  className="inline-flex min-h-11 items-center rounded-sm py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:outline-none md:min-h-8"
+                  onClick={() => track('footer_fleet_clicked')}
+                >
+                  {t.fleetLifecycle}
+                </Link>
+                <Link
                   data-testid="footer-link-reliability"
                   href={`${prefix}/reliability`}
                   className="inline-flex min-h-11 items-center rounded-sm py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:outline-none md:min-h-8"
                 >
                   {t.gpuReliability}
+                </Link>
+                <Link
+                  data-testid="footer-link-gpu-specs"
+                  href={`${prefix}/gpu-specs`}
+                  className="inline-flex min-h-11 items-center rounded-sm py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:outline-none md:min-h-8"
+                >
+                  {t.gpuSpecsDashboard}
                 </Link>
                 <Link
                   data-testid="footer-link-compare-per-dollar"

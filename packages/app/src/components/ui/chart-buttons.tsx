@@ -19,6 +19,8 @@ interface ChartButtonsProps {
   zoomResetEvent?: string;
   /** Optional setter to temporarily expand legend during export */
   setIsLegendExpanded?: (expanded: boolean) => void;
+  /** Omit the legend from PNG exports when series are labeled in the plot. */
+  hideLegendOnExport?: boolean;
   /** Hide the zoom reset button (e.g., for charts without zoom) */
   hideZoomReset?: boolean;
   /** Hide the PNG image export button (e.g., for table views) */
@@ -57,6 +59,7 @@ export function ChartButtons({
   analyticsPrefix,
   zoomResetEvent,
   setIsLegendExpanded,
+  hideLegendOnExport,
   hideZoomReset,
   hideImageExport,
   onExportCsv,
@@ -88,6 +91,7 @@ export function ChartButtons({
   const { isExporting, exportToImage } = useChartExport({
     chartId,
     setIsLegendExpanded,
+    hideLegend: hideLegendOnExport,
     exportFileName,
   });
   const [popoverOpen, setPopoverOpen] = useState(false);

@@ -1,0 +1,597 @@
+---
+title: 'TPU 推理外部化全速推进'
+subtitle: 'InferenceX、最高 50% 的每美元性能优势、TPU 软件栈的快速外部化、不断扩大的客户群、Ironwood、TPUv8i，以及正在收窄的 CUDA 护城河'
+seoDescription: 'TPUv7 Ironwood 在 InferenceX Official Preview 上的首批第三方推理结果：与 B200、B300 的 FP8 同口径对比，取代 TorchAX 的原生 TorchTPU PyTorch 软件栈，支撑这些数字的 Pallas kernel 与 MXU 优化，以及 TPUv8i 带来的变化。'
+date: '2026-09-07'
+publishDate: '2026-09-07'
+tags:
+  - benchmark
+  - inference
+  - tpu
+  - google
+  - gpu
+  - nvidia
+  - b200
+  - b300
+  - vllm
+  - qwen
+---
+
+_本文最初于 2026 年 9 月 7 日发布在 [SemiAnalysis 通讯](https://newsletter.semianalysis.com/p/tpu-inferencex-full-steam)。_
+
+十多年来，整个行业都在看着 Google 用自研芯片建起一座帝国。Search、Ads、YouTube 以及历代 Gemini 都跑在 TPU 上。很少有加速器像 TPU 这样，既受到如此多的架构层面审视，又引发如此多关于「离开设计它的公司之后，性能和经济性会是什么样」的争论。Anthropic 是 TPU 最大的使用者，到 2029 年其用量将超过 DeepMind 自身。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/679784de-e6df-4cb4-8bf6-3347cb9ed002_1200x588.png"
+  alt="Google Ironwood TPUv7 宣传图"
+  caption="来源：[Google](https://blog.google/innovation-and-ai/infrastructure-and-cloud/google-cloud/ironwood-google-tpu-things-to-know/)"
+/>
+
+Google 内部的成功从来不是问题。问题在于，这份优势里到底有多少能被行业其他玩家真正拿到手。你能否拿一个开放权重模型，用一个熟悉的推理引擎来部署，并在真正影响业务的经济性指标上击败 NVIDIA？
+
+今天，我们在 [InferenceX](https://inferencex.semianalysis.com/) Official Preview 上发布 TPUv7 Ironwood 的首批第三方推理结果。在与 B200/B300 的同口径对比中，Ironwood 的每美元性能最高领先 50%。这一优势覆盖了 Pareto 曲线的大部分区间，我们也从两个角度考察其经济性：Google 内部的总拥有成本（TCO），以及真实客户实际支付的外部 TCO。
+
+Ironwood（TPUv7）是 Google 第一代真正去争夺他人推理工作负载的 TPU：芯片既可以直接买断，也可以通过 Google 自家云租用。[早在 2025 年 11 月我们就已指出](https://newsletter.semianalysis.com/p/tpuv7-google-takes-a-swing-at-the)，Anthropic 非常青睐 TPU，已承诺采购超过 100 万颗（其中约 40 万颗以上为直接购买，60 万颗以上通过 GCP 租用），主要用于训练，同时也用于推理。[我们的 Accelerator Model 提供 Anthropic TPU 出货量与 Google 整体 TPU 季度出货量的最新数据，以及 TPUv8i、v8t 和多款 v9 / v10 等的预估。](https://semianalysis.com/accelerator-hbm-model/)
+
+面向外部的 TPU 软件栈 TorchTPU 发展之快令我们振奋。本文后面会讨论 TPU 软件外部化接下来需要完成的工作，包括优化投机解码、分离式 prefill、KV cache offload、多轮智能体工作负载等。尽管如此，SemiAnalysis **坚信 TPU 外部化方向正确，且正在全速推进。**此外，AMD 至今仍在学习如何建立测试优先的软件文化，而 Google 拥有数十年的软件工程积累和极其成熟的质量驱动文化，因此我们预计外部 TPU 软件会快速走向成熟。
+
+本文将梳理为开放权重模型所做的全部 TPU kernel 与推理服务栈优化，包括 DP attention 优化、MoE 路由与 kernel 优化，以及减少 GDN kernel 中的 padding。我们还会深入剖析 TPU 系统本身，并讨论这些出色的 TPU 性能工程师为让软件栈广泛可用而正在推进的后续工作。
+
+Google 用十多年时间展示了自己能用 TPU 做出什么。现在，轮到我们来衡量行业其他人能用 TPU 做到什么。
+
+感谢 Google 团队（Chris Chan、Jahangir Hasan、Wangyuan Zhang、Anne Stern、Puneith Kaul、Ruizi Dong、Sangam Jindal、Qi Zhou、Madhan Jaganathan、Gang Ji、Jun Wan、Devanshu Jain、Jiaxin Cao、Srinath Mandalapu、Haowen Ning）与 Inferact 团队打下的这套出色的 TPU 基础和性能！同时也感谢正在推进 TorchTPU SGLang 的 RadixArk 团队。
+
+## InferenceX Official Preview：TPUv7 Ironwood 对比 Blackwell 与 Blackwell Ultra
+
+在与 NVIDIA GPU 的同口径对比中，即将发布的原生 TorchTPU vLLM 软件栈已经拿出了很强的结果。Google 选择 FP8 精度的 Qwen3.5 397B 作为首个 bring-up 模型。后文会深入解释，为什么在面向外部的 TPU vLLM/SGLang 服务上，新的 TorchTPU 路线相比之前的 TorchAX 路线是一次显著改进。
+
+这一基础就位后，Google 计划把支持扩展到其他开放权重模型，包括 Kimi K3 和 GLM 5.3。我们认为，一旦少数几个模型完成充分优化，为大量主流开放模型提供接近 day 0 的优化支持就会容易得多。目前 vLLM 和 SGLang 的 day 0 支持集中在 NVIDIA 上，对 AMD 的 day 0 覆盖尚可。我们预计 TorchTPU 在不久的将来会足够稳定，vLLM 和 SGLang 维护者有可能把 TPU 加入 day 0 名单。该软件栈预计在 10 月前后结束私有测试并开源。
+
+在聚合式部署、FP8 精度、单 token 预测的同口径对比中，TPU 的每美元性能最高比同样以 FP8 聚合式部署的 B200 和 B300 高出 50%。在 NVIDIA GPU 上用 FP4 部署模型时，相比 FP8 会有质量损失。TPUv7 没有原生 FP4 计算能力，因此在 FP4 上 NVIDIA GPU 仍保持领先。这一点会随 TPUv8i 改变：它原生支持 FP4，因此我们坚信 TPUv8i Boardfly 将具备与 Rubin NVL72 竞争的实力。
+
+我们认为，在 Google 启用分离式推理和投机解码之后，即便对比双方都开启 MTP 和分离式推理，TPU 的每美元性能优势也能够延续。后文会讨论 TorchTPU 基础就位后 Google 计划加入的优化。为控制 bring-up 范围，Google 最初把基准测试聚焦在 8k1k 上。不过我们相信 TorchTPU 软件栈在智能体工作负载上同样会表现出色，并将在今年晚些时候发布相应结果。后文还会讨论 TPU 外部推理的后续步骤与路线图。
+
+### TPU 是每美元性能之王
+
+在 100 tokens/s/user 的交互速度下，Ironwood 每百万 total token 的成本约为 $0.181，B200 为 $0.222，B300 为 $0.276。也就是说，在提供相同单用户生成速度的前提下，成本比 B200 低约 19%，比 B300 低约 34%。
+
+这一对比使用的是外部 TPU TCO，即一家超大规模实验室（hyperscaler lab）购买 TPU 时的成本，对照 B200/B300 的 TCO。[去年，SemiAnalysis Accelerator Model 率先披露 Google 正在直接销售 TPU，而不再只是通过 Google Cloud 出租](https://semianalysis.com/accelerator-hbm-model/)。在大部分交互速度区间内，TPU 更低的小时成本足以抵消其较低的吞吐量。[SemiAnalysis TCO Model 提供了 TPU BoM 估算与 TCO 估算的完整拆解。](https://semianalysis.com/ai-cloud-tco-model/)
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/8047a697-0d6f-41fe-8c16-71998778ecb4_2048x1228.png"
+  alt="采用外部 TCO 时，TPUv7 Ironwood、B200、B300 运行 Qwen3.5 397B FP8 在 8k1k 工作负载下每百万 total token 成本随交互速度的变化"
+  caption="来源：SemiAnalysis InferenceX Preview"
+/>
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/d306f42c-a30b-45c7-82c9-dbaff7e654b3_2048x1228.png"
+  alt="TPUv7 Ironwood、B200、B300 运行 Qwen3.5 397B FP8 在 8k1k 工作负载下每芯片 total token 吞吐量随交互速度的变化"
+  caption="来源：InferenceX Preview"
+/>
+
+在原始性能曲线的大部分区间里，TPU 并没有超过 NVIDIA GPU。但这种对比没有考虑 TPU 更低的 TCO。**TPU 的买家真正关心的是能赚多少收入，也就是每美元性能和每瓦性能。**
+
+即便如此，在 20 tok/s/user 的交互速度下，Ironwood 在原始吞吐量上同样领先：达到 9,364 total tokens/s/chip，B200 为 8,903，B300 为 8,925。在这些运行中，这比两款 GPU 都高出约 5%。再叠加更低的建模小时成本，Ironwood 的每美元 token 数比 B200 多 50.4%，比 B300 多 96.0%。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/69317046-6bae-4d80-9b8b-f9777076792d_2048x1228.png"
+  alt="在 20 tok/s/user 交互速度下，TPUv7 Ironwood、B200、B300 运行 Qwen3.5 397B FP8 的每美元 token 数对比"
+  caption="来源：SemiAnalysis InferenceX Preview"
+/>
+
+如果按 Google 内部工作负载的 TPU TCO（每芯片每小时 $1.03）计算，并发 256 下的每美元性能优势进一步扩大到比 B200 高 76.7%、比 B300 高 130.2%。不过，这些高并发结果伴随着延迟上的取舍。例如在并发 256 下，TPU 的平均 TTFT 为 5.41 秒，B200 为 3.75 秒，B300 为 2.40 秒。前面提到的 50% 到 96% 的优势只针对这个具体数据点，并不适用于每一个延迟目标。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/ac73c91e-efa3-4f2a-a9ea-2f5eb15e4a27_2048x1222.png"
+  alt="采用 Google 内部 TCO（每芯片每小时 $1.03）时，TPUv7 Ironwood 对比 B200 与 B300 的每百万 total token 成本随交互速度的变化"
+  caption="来源：SemiAnalysis InferenceX Preview"
+/>
+
+从端到端延迟看，Ironwood 在最高吞吐点之外依然保持竞争力。在 20 秒中位响应时间下，Pareto 曲线显示 TPU 每百万 total token 成本约为 $0.098，B200 为 $0.106，B300 为 $0.132。也就是说，TPU 比 B200 便宜约 8%，比 B300 便宜约 25%。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/01cfa04c-b0fe-456d-ba3c-367c434f373c_2048x1223.png"
+  alt="TPUv7 Ironwood、B200、B300 运行 Qwen3.5 397B FP8 时每百万 total token 成本随端到端延迟中位数的变化"
+  caption="来源：SemiAnalysis InferenceX Preview"
+/>
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/b160a968-2cdc-4ce8-8a74-cd5eb63e1141_2048x1223.png"
+  alt="TPUv7 Ironwood、B200、B300 运行 Qwen3.5 397B FP8 时每芯片 total token 吞吐量随端到端延迟中位数的变化"
+  caption="来源：SemiAnalysis InferenceX Preview"
+/>
+
+尽管如此，在同口径曲线的一小段区间内，B200 仍然可能领先，例如 30 秒中位响应时间附近。但在更长的响应时间下，TPU 重新夺回每百万 token 成本的优势，并且在这里展示的重叠区间内始终保持对 B300 的成本优势。
+
+### 苹果对香蕉：GB300 NVL72 分离式部署对比 TPUv7 聚合式部署
+
+Google 在内部生产环境中运行分离式推理已有多年，那条路径经过了深度优化，但面向外部的 TPU 服务栈目前还没有充分优化的分离式路径。因此在今天的分离式对分离式对比中，GB200/300 NVL72 在每美元性能上更有竞争力。不过，随着 Google、Inferact、RadixArk 和 SemiAnalysis 陆续落地优化，我们预计这一差距会在几个月内收窄，TPUv7 将具备与 GB200/300 NVL72 竞争的能力；我们也会在后续文章中发布 TPUv7 分离式对比 GB200/300 NVL72 分离式的结果。TPUv7 pod 依靠低延迟的 ICI fabric 可以 scale-up 到 1k 颗以上的芯片，因此能够实现大模型分离式部署和超宽 EP 等 NVIDIA NVL72 无法做到的优化。
+
+即使在「苹果对香蕉」式的对比中，也就是 TPUv7 聚合式部署对比 GB300 NVL72 分离式部署，并采用内部 TCO，TPUv7 在高延迟区间以及低到中等偏低的延迟区间仍有相当的竞争力。但在中等偏高的端到端延迟区间，GB300 NVL72 分离式部署相对 TPUv7 聚合式部署占据优势。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/1883d94c-1996-47de-942b-c8eef7cf3eb1_1576x808.png"
+  alt="采用内部 TCO 时，TPUv7 聚合式部署对比 GB300 NVL72 分离式部署的每百万 token 成本随端到端延迟的变化"
+  caption="来源：SemiAnalysis"
+/>
+
+单看 GB300 NVL72 分离式部署对比 TPUv7 聚合式部署，两者在低延迟和高延迟的端到端区间互有胜负，但在中间区间，GB300 相对 TPUv7 聚合式部署有大约 30% 的每美元性能优势。我们坚信，一旦 TPUv7 上的分离式推理得到优化，它将在整条 Pareto 曲线上都具备与 GB300 NVL72 竞争的实力。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/d2210f76-7a91-405e-a3ba-a1692b080618_1550x842.png"
+  alt="GB300 NVL72 分离式部署相对 TPUv7 聚合式部署的每美元性能比值随端到端延迟的变化"
+  caption="来源：SemiAnalysis"
+/>
+
+<DashboardCTA href="https://inferencex.semianalysis.com/inference">
+  点击查看完整 InferenceX 仪表板 →
+</DashboardCTA>
+
+## 全新原生、一等公民的 TorchTPU 后端对比此前的 TorchAX 软件栈
+
+### 此前的 TorchAX vLLM 后端
+
+Google 此前使用 TorchAX 后端，把 vLLM 和 SGLang 中基于 PyTorch 的实现翻译成 JAX。TorchAX 的初衷是让开发者能通过 JAX 运行 PyTorch 的模型定义。但这条路线暴露出的问题，促使 Google 与 PyTorch、vLLM、SGLang 社区共同推进一条名为 TorchTPU 的新路线。它让开发者把 TPU 当作原生 PyTorch 设备来使用，底层执行则由 StableHLO、XLA 和为 TPU 优化的 Pallas kernel 负责。在本文接下来的章节里，我们会展示这一新 TorchTPU 后端相对 NVIDIA Blackwell 和 Blackwell Ultra GPU 的性能。
+
+vLLM 对 TPU 的支持经历了三个阶段：
+
+- 最初的 TPU 原型使用 [PyTorch/XLA](https://docs.pytorch.org/xla/master/learn/xla-overview.html)。它采用惰性执行模型，把算子收集成计算图交给 XLA 编译，而不是逐个立即执行 PyTorch 算子。
+- 当前公开的后端 [tpu-inference](https://vllm.ai/blog/2025-10-16-vllm-tpu) 在有针对 TPU 优化的 JAX 实现时优先使用它；否则由 TorchAX 把原始 PyTorch 模型翻译成 JAX 可以执行的算子。目标是复用成熟的 TPU 原语和并行支持，而不必重写每一个 PyTorch 模型。
+- 即将推出的第三种设计 TorchTPU，让 vLLM 把 TPU 当作原生 PyTorch 设备。它将成为今后 SGLang 和 vLLM 在 TPU 上的首选后端。
+
+下图聚焦第二阶段，展示了 vLLM 的 tpu-inference 后端如何把直接的 JAX 模型与通过 TorchAX 运行的 PyTorch 模型结合起来。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/678ca15d-f0c0-4c36-a63f-b1108939cbb1_2048x1620.png"
+  alt="vLLM tpu-inference 后端把直接 JAX 模型与经 TorchAX 翻译的 PyTorch 模型结合的示意图"
+  caption="来源：SemiAnalysis/vLLM"
+/>
+
+最初选择 JAX 是出于务实考虑。在上一次[公告](https://vllm.ai/blog/2025-10-16-vllm-tpu)中，Google 描述了在底层优化、paged attention 以及把 vLLM 的 worker 模型适配到 TPU 执行方式上遇到的困难。他们认为 JAX 能提供更成熟的 TPU 原语和并行支持。TorchAX 让团队无需重写每个 PyTorch 模型就能利用这些能力，而面向 TPU 的 JAX 实现则可以共享同一套 kernel 和编译器工作。
+
+在 TorchAX 下，开发者仍然用 PyTorch 编写模型，但由 JAX 在 TPU 上执行。TorchAX 是两个框架之间的翻译层。正如 [TorchAX 文档](https://google.github.io/torchax/user_guide/how-it-works/)所述，torchax.tensor.Tensor 的行为与普通 PyTorch 张量一致，但底层由 jax.Array 支撑。当模型调用一个张量算子（在 PyTorch 中称为 ATen 算子）时，TorchAX 通过 \_\_torch_dispatch\_\_ 钩子拦截它，并翻译成一个或多个 JAX 算子。因此模型可以继续用 PyTorch 编写，而计算实际由 JAX 完成。
+
+vLLM 还必须管理生成过程中不断变化的状态，尤其是存储早期 token 注意力信息以供复用的 KV cache。其[模型 wrapper](https://github.com/vllm-project/tpu-inference/blob/a32e183a676cf428cb1cea953f58fdd616accb3e/tpu_inference/models/vllm/vllm_model_wrapper.py#L171-L348) 把模型权重和 KV cache 作为显式状态呈现给 JAX。这一过程称为函数化（functionalization），它把原本发生在 Python 对象内部的修改，转换为编译器可以追踪的输入和输出。随后 jax.jit 就能把每一步推理捕获为计算图，送入 JAX 的编译流水线以便重复执行。
+
+在此基础上，各组件分工明确。Pallas 为性能关键算子提供优化过的 TPU kernel。StableHLO 用编译器可处理的标准化格式表示程序，XLA 再把它转换成 TPU 上的可执行代码。在 vLLM 的标准 PyTorch 路径中，由 torch.compile 负责图捕获和编译；而在 TorchAX 路径中，JAX/XLA 流水线已经完成了这些工作，因此 vLLM 绕开了它惯常的 torch.compile 路线。这些翻译层带来了许多问题，而这正是 TorchTPU vLLM 软件栈希望解决的。
+
+#### 此前的 SGLang JAX 后端
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/63ea9afd-01ea-4df3-b632-3524e2507d04_2048x1742.png"
+  alt="SGLang-JAX 服务引擎把 SGLang 风格的调度与 JAX 模型和 TPU kernel 结合的示意图"
+  caption="来源：SemiAnalysis/SGLang"
+/>
+
+SGLang 当前公开的 TPU 软件栈是 [SGLang-JAX](https://github.com/sgl-project/sglang-jax)。SGLang-JAX 做出了与 vLLM TorchAX 后端类似的取舍，但采取了不同的方式：它是一个独立的 JAX 原生服务引擎，而不是通过 TorchAX 翻译的 PyTorch 版 SGLang 运行时。它把 SGLang 风格的调度和 prefix caching 与 JAX 模型、TPU 专用 kernel 结合在一起。Google 与 RadixArk 已宣布推出 SGL-torchtpu，作为额外的 PyTorch 原生后端，以扩展可用的服务路径。
+
+### 转向全新原生、一等公民的 TorchTPU 后端
+
+[TorchTPU](https://developers.googleblog.com/torchtpu-running-pytorch-natively-on-tpus-at-google-scale/) 把框架边界移入 PyTorch 本身。它利用 PyTorch 的 [PrivateUse1 后端扩展点](https://docs.pytorch.org/tutorials/advanced/privateuseone.html)，在 device="tpu" 上暴露一个普通的 torch.Tensor，而不是由 JAX 数组支撑的包装对象。PyTorch dispatcher 把 ATen 算子路由到 TPU 后端。开发者既可以用 eager 模式运行代码以便 bring-up 和调试，也可以调用 torch.compile 进行图捕获。在编译路径中，TorchDynamo 和 AOTAutograd 生成 FX 图，TorchTPU 将其下沉为 StableHLO，再由 XLA 生成 TPU 可执行文件。Google 的[会议幻灯片](https://hosted-files.sched.co/pytorchconferenceeu2026/cb/TorchTPU%20-%20PyTorch%20Paris%20%2726%20-%20Google%20Slides.pdf)明确了编译器选择：这条路径使用 XLA，而不是 Inductor 和 Triton。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/c09d8e99-682d-43dd-9292-3cf29295f79e_1074x1148.png"
+  alt="TorchTPU 编译路径示意图：从 PyTorch 经 TorchDynamo、AOTAutograd、FX 图、StableHLO 和 XLA 到 TPU 可执行文件"
+  caption="来源：SemiAnalysis/PyTorch/Google"
+/>
+
+因此，「原生」有其明确范围：它覆盖 PyTorch 张量、dispatch、eager 执行、编译入口和分布式 API。XLA 仍是编译器，kernel 层也继续使用 TPU 专用实现。TorchTPU 可以调用 Pallas 以及基于 JAX 的自定义 kernel。[Helion 的 TPU 后端](https://pytorch.org/blog/helion-on-tpu-towards-hardware-heterogeneous-kernel-authoring/)同样输出 Pallas。面向用户的框架变成了 PyTorch 原生，而编译器和性能关键 kernel 仍然是 TPU 感知的。
+
+开发者可以直接使用 .to("tpu")，同时保留熟悉的分布式接口和服务引擎代码。Google 的文档表明其支持 DDP、FSDP2、DTensor、每设备一进程，以及 MPMD 和 SPMD 两种执行方式。这些接口与 PyTorch 服务引擎已经默认的进程模型和分布式模型相契合。
+
+对 vLLM 和 SGLang 而言，机会在于能复用更多上游模型代码、调度器、continuous batching、API 和功能逻辑，而不必跨越 PyTorch 到 JAX 的边界重新构建。这应当能降低模型和引擎功能的 bring-up 成本，即使最终的 TPU 实现仍需要专门的 kernel。
+
+原生 PyTorch 支持并不能消除 TPU 专项优化的需求。Pallas 和 TorchAX 的用途不同：TorchAX 让 PyTorch 模型代码得以通过 JAX 执行，而 Pallas 用于直接为 TPU 硬件实现性能关键算子。去掉 TorchAX 并不意味着去掉它底下的 Pallas kernel。由于 TorchTPU 允许原生 PyTorch 代码调用 Pallas 和 JAX kernel，为早期软件栈开发的 kernel 可以迁移到新软件栈。
+
+与 GPU 上的 PyTorch vLLM 类似，高性能推理仍然需要自定义 kernel。张量形状和布局仍需调优，才能高效利用 TPU 的矩阵乘法单元。我们认为现有的大部分 Pallas kernel 可以轻松迁移到全新的原生 TorchTPU 服务栈，但这不意味着每一个现有 kernel 都能原样迁移。wrapper、张量布局、运行时集成等诸多环节可能仍需要少量适配和验证。
+
+### 与 Google TPU 团队的深度生态协作
+
+vLLM 和 SGLang 是两大主流开源生产级推理服务栈。Inferact、RadixArk 和 Red Hat 都在大力投入与 Google 的协作，力求让 TorchTPU 后端在这两个软件栈中都成为一等公民体验。这种社区支持对 TPU 推理的外部化极其重要。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/9d86a8b7-cc12-4730-9b6a-a77258ad60c5_1860x720.png"
+  alt="Inferact 宣布与 Google 合作推进 vLLM TorchTPU"
+  caption="来源：Inferact"
+/>
+
+截至 9 月初，TorchTPU 仍处于私有测试阶段，计划在 10 月中旬的 PyTorch Conference 期间开源。我们很高兴看到它推动 TPU 在 PyTorch、vLLM 和 SGLang 中走向一等公民体验。待 TorchTPU vLLM 和 TorchTPU SGLang 开源后，我们会把 InferenceX/AgentX 的 TPU 基准测试从我们的 fork 迁移到公开仓库。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/8304bd1c-ed83-4091-a71b-00ec572542a4_1200x675.png"
+  alt="RadixArk 宣布 SGLang TorchTPU 后端"
+  caption="来源：RadixArk"
+/>
+
+## TPU 推理优化深度解析
+
+为原生 TorchTPU 服务栈的首个 bring-up 模型优化 TPU 推理，是一场投入了数百工程小时和大量 PR 的冲刺。正如后文所述，TPU 架构与 GPU 架构不同，因此需要一套专属优化才能高效运行模型。下面介绍在 Ironwood 上提升（某些情况下是首次实现）Qwen3.5-397B 及其他模型性能的各项优化。大部分 Pallas kernel 优化都可以迁移到全新的原生 TorchTPU 软件栈。
+
+### DP Attention 优化
+
+有一个问题并非 TPU 独有：如何把模型架构中的并行性高效映射到硬件上。例如，Qwen3.5 的 GQA 注意力层有 32 个 query head，但只有 2 个共享的 KV head。在 TP8（8 个逻辑设备）下，query 计算可以均匀分到 8 个设备上，每个设备 4 个 query head。但 KV head 无法在这些设备间均分。每个 KV head 被 16 个 query head 共享，意味着有 4 个设备需要同一份 KV 数据来计算各自的本地注意力。当 TP 超过 KV head 数量时，标准做法是在 TP rank 之间复制 KV head。vLLM 已经支持这一点。TPU 后端需要一个[兼容性修复](https://github.com/vllm-project/tpu-inference/pull/2661)来激活这一既有行为，避免不必要的 All-to-All 通信。
+
+针对更高并发的服务场景，TPU 后端还加入了把[八路注意力数据并行（DP8）](https://github.com/vllm-project/tpu-inference/pull/2187)与八路专家并行（EP8）结合的支持，简称「DP attention」或 DEP8。它不再把每个请求的注意力切分到全部 8 个设备上，而是让每个设备处理不同的请求子集，并在本地保留这些请求的两个 KV head。注意力权重是复制的，但各设备的 KV cache 保存的是不同请求的历史，而不是同一份历史的重复副本。同时，512 个路由专家仍然分布在各设备上，避免复制体量大得多的专家权重池。要让这套方案跑通，还需要在服务引擎中[协调请求分配、循环状态槽位和 block table](https://github.com/vllm-project/tpu-inference/pull/2577)。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/e1f13662-fc12-400e-889e-9958d0ad45f7_2048x770.png"
+  alt="在 8 个 TPU 设备上对比复制 KV head 的 TP8 注意力与 DP8 注意力加 EP8 专家的示意图"
+  caption="来源：SemiAnalysis"
+/>
+
+### 优化通信
+
+在 DP attention 加 EP 的配置下，TPU 的 GroupedGEMM 实现会在专家运行前 all-gather token 激活和路由元数据，然后用 reduce-scatter 对专家的加权输出求和，并把每个 token 的结果送回其所属的注意力 rank。后端最初是分别 gather 所选专家 ID 和路由权重的。Google [把二者合并为一次 all-gather](https://github.com/vllm-project/tpu-inference/pull/2174)，省去了一次额外的集合通信；对于这么小的数组，集合通信的延迟往往主导了传输时间。该 PR 在 DeepSeek-V3 测量中报告[每层节省约 80 微秒](https://github.com/vllm-project/tpu-inference/pull/2174)。80 µs 听起来不多，但 DeepSeek-V3/R1 有 58 层需要这次 AllGather。累计下来，单独看一次前向传播可节省约 4.64 ms（80 µs × 58），从而降低 TPOT、提高交互速度。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/59c3d46f-7b88-4e65-8715-f160b83c3d6e_2048x771.png"
+  alt="把专家 ID 与路由权重的两次独立 all-gather 合并为一次 all-gather 集合通信的示意图"
+  caption="来源：SemiAnalysis"
+/>
+
+Google 还[在 SparseCore 上实现了 ReduceScatter 集合通信](https://github.com/vllm-project/tpu-inference/pull/2888)（SparseCore 更适合数据搬运这类不规则操作），并利用 Ironwood 更快的 die 间链路，先在每颗芯片内部合并贡献，再在芯片之间交换部分和。每芯片双设备的布局以及芯片间的 ICI 网络会在下一节介绍。双缓冲让 kernel 可以在累加一个数据块的同时传输另一个数据块，把本地归约和 die 间传输与较慢的芯片间流量重叠起来。把集合通信放到 SparseCore 上运行，也让 TensorCore 得以腾出来执行其他操作。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/4c82923a-c144-4447-8b73-f622ba7df27e_2048x1357.png"
+  alt="SparseCore 上的分层 ReduceScatter 示意图：先通过 die 间链路合并部分和，再跨 ICI 传输"
+  caption="来源：SemiAnalysis"
+/>
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/e9c2975f-0974-414f-8af6-300bc8613121_2048x1202.png"
+  alt="流水线化 ReduceScatter 各阶段的时间线：芯片内 DMA ScatterReduce 与跨 microbatch 的 ICI ScatterReduce 重叠"
+  caption="来源：[Google](https://github.com/vllm-project/tpu-inference/blob/main/tpu_inference/kernels/collectives/hierrs_sc/kernel.py#L109) 与 SemiAnalysis"
+/>
+
+在上图中，各通信阶段相互重叠，缩短了端到端执行时间。以标注为 t₁ 的时刻为例：此时 MB（microbatch）1 的芯片内 DMA ScatterReduce（P1）已经完成，MB0 沿 ICI 维度 0 的 ScatterReduce（P2.0）就可以与下一个 MB 的 P1 _并发进行_。与基线相比，这项优化在 8k1k 上、并发 64 到 512 的范围内带来了 [4.1% 到 14.2% 的吞吐量提升](https://github.com/vllm-project/tpu-inference/pull/2888)，其中并发 256 提升 8.5%；在 1k8k、并发 512 下提升 26.1%。
+
+把这一集合通信从 TensorCore 迁到 SparseCore，还意味着集合通信运行期间可以在 TensorCore 上流水线化执行更多工作。但并非每个集合通信都值得迁移。在某些情况下，把集合通信 offload 到 SparseCore 反而会*拖慢*性能。例如针对 Qwen3.5，现在由一个[阈值决定何时把 all-reduce 和 all-gather 操作 offload 到 SparseCore](https://github.com/vllm-project/tpu-inference/pull/2777)，**当小规模集合通信能放进 VMEM、且 SparseCore offload 的开销反而会使其变慢时，就把它们留在 TensorCore 上**。默认阈值由 VMEM 容量推导得出。该 PR 报告 8k1k 吞吐量在并发 64 下提升 2.7%，在并发 128 下提升 5.7%。
+
+### 优化 MoE 路由与专家 Kernel
+
+混合专家层会为每个专家产生大小不规则的 token 分组，这些参差不齐的分组必须被重排成 TPU 矩阵单元能够高效消费的形式。下面的一些改动是对路由和 grouped-matmul 后端的通用改进，任何 MoE 模型都能受益；另一些则是直接在 Qwen3.5 上测得的。
+
+[第二版 grouped matmul](https://github.com/vllm-project/tpu-inference/pull/1688) 重新设计了向 MXU 馈送专家输入的方式。它去掉了冗余的 tile 计算，按有效行数而非 padding 后的最大值确定传输大小，对专家权重做三重缓冲以便在计算当前分组时下一分组的权重已在传输途中，并把分组元数据的生成融合进 kernel。
+
+随后，专家输入的不规则重排被[迁移到 SparseCore 上](https://github.com/vllm-project/tpu-inference/pull/2137)。SparseCore 负责数据搬运，把每个专家的 token 收集成连续分组，TensorCore 则专注运行专家矩阵乘法。之后的一次[重写](https://github.com/vllm-project/tpu-inference/pull/2836)改进了内存读取流水线，并把 combine 工作沿 token 和 hidden 维度拆分。该 PR 报告 8k1k 服务吞吐量相比最初的 SparseCore kernel 提升 12%，同时 TTFT 和 TPOT 也有所下降。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/c47d1e6a-dad4-48bc-8239-9194bea17544_2048x838.png"
+  alt="MoE token 重排迁到 SparseCore、由 TensorCore 运行专家 grouped matmul 的示意图"
+  caption="来源：SemiAnalysis"
+/>
+
+进一步的优化[把 ragged gather-reduce 路径中的 top-k 权重 gather 迁到了 SparseCore 上](https://github.com/vllm-project/tpu-inference/pull/2634)。这里的 gather 指的是在单个设备上从内存读取选定条目，而不是设备间的 all-gather。此前，TensorCore 在预处理阶段负责 gather 路由权重和源索引，限制了 TensorCore 与 SparseCore 的重叠。把这些 gather 移入 SparseCore kernel 后，在 DeepSeek-V3 微基准（batch 2k、16 路专家并行）中，TensorCore 开销从 29 µs 降到 14 µs，整体操作延迟从 146 µs 降到 137 µs。
+
+对于小 batch，通用的 ragged 路径本身的开销超过了它所整理的工作量。因此一个[专用的小 batch 置换方案](https://github.com/vllm-project/tpu-inference/pull/2674)改为构造 one-hot 矩阵，用普通矩阵乘法把 token 置换到对应专家并把结果还原。在 8k1k 工作负载上，这使并发 64 的吞吐量提升 7.3%，并发 128 提升 5.1%。
+
+一项仍在进行中的改动[把专家 ID 和 token 索引打包成单一排序键](https://github.com/vllm-project/tpu-inference/pull/3488)，让 XLA 执行更简单的排序，同时保持所需顺序。排序延迟从 106.6 µs 降到 21.7 µs。该 PR 报告 8k1k 服务性能提升 0.6% 到 8.5%，而且同一改动还使 FP8 all-gather 成为可能。
+
+### 优化 Gated DeltaNet Pallas Kernel
+
+Gated DeltaNet（GDN）是一种循环计算：在每一步，运行状态先衰减，再用一个秩一项更新，最后投影得到输出。想深入了解 GDN 这类线性注意力机制，可以阅读下面这篇文章：
+
+[Kimi K3：其人、其神话、其传奇](/zh/blog/kimi-k3-the-manos-the-mythos-the) — Kimi K3 一经发布便席卷全球，横扫各大榜单，坐稳了开源前沿模型的位置。社区急于弄清 Kimi K3 究竟是怎么做到的，而支撑其性能的那些非常规技术让不少人感到意外。这篇文章是一篇入门解析，帮助读者理解 Kimi K3 模型架构的核心技术。
+
+下面的改动展示了 GDN 的矩阵运算、向量更新和状态传输是如何在 MXU、VPU、VMEM 和 HBM 之间调度的。[最初的 Qwen3.5 支持](https://github.com/vllm-project/tpu-inference/pull/2004)加入了因果 Conv1D 和 GDN 的纯 JAX 实现，把它们接入 TPU 算子分发，并启用了循环状态缓存。后续 PR 对这些实现做了优化。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/6ff82904-c377-4bbd-97a7-ad6eb54932ec_1875x925.png"
+  alt="tpu-inference 中最初的 Qwen3.5 Gated DeltaNet JAX 实现代码片段"
+  caption="来源：[GitHub](https://github.com/vllm-project/tpu-inference/pull/2004/changes#diff-b7403a18fb4b64c48819d1a527c8488cb85da4134f7f072665e8c3df0c39dfb1R14)"
+/>
+
+另一个唾手可得的优化，是[重排输出投影计算中的代数式，使 MXU 与 VPU 的工作得以重叠](https://github.com/vllm-project/tpu-inference/pull/2498)。此前，VPU 先对衰减后的状态施加秩一更新，然后 MXU 再用更新后的状态乘以 query 得到输出。这一依赖关系迫使 MXU 等待。
+
+把衰减后的状态记为 S，修正向量记为 Δ，key 和 query 记为 k 和 q，输出可以展开为：
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/1c3573d3-b885-4a29-abc4-998df6ab3399_2048x263.png"
+  alt="展开 Gated DeltaNet 输出投影的公式：MXU 直接计算 Sq，同时 VPU 构造秩一状态更新"
+  caption="来源：SemiAnalysis"
+/>
+
+现在 MXU 可以直接从衰减后的状态计算 Sq，同时 VPU 为下一个 token 构造更新后的状态。本次更新对输出的贡献则单独用 kᵀq（每个 head 一个标量点积）计算，再加一次小规模的缩放向量加法。这样就把状态更新从 MXU 的依赖路径上移开了。报告的 8k1k 吞吐量提升为并发 64 下 2.79%，并发 512 下 4.48%。
+
+接下来的改动通过在 decode 循环内切分 Q 和 K，让同时存活的值更少，从而[减少向量寄存器溢出](https://github.com/vllm-project/tpu-inference/pull/2741)。decode-64 kernel 提速约 20%，但端到端收益较小：在并发 512 下，8k1k 提升 0.8%，1k8k 提升 3.8%，因为该 kernel 只是 decode 步骤的一部分。
+
+[异步状态传输](https://github.com/vllm-project/tpu-inference/pull/2650)利用双缓冲让 DMA 与计算重叠。第二组缓冲区额外占用的 VMEM 起初导致数据并行注意力出现回退。通过复用现有 scratch 缓冲区并缩短临时变量的生命周期，这部分容量得以收回，回退也随之消除。报告的 8k1k 吞吐量提升为并发 512 下 11.3%。
+
+[GDN v3](https://github.com/vllm-project/tpu-inference/pull/3016) 把 Conv1D 和 GDN 融合为单个 kernel 以减少 HBM 往返，改进了 prefill 布局，并把 prefill/decode 混合执行统一到一条路径。报告的 kernel 级加速为 decode 1.41 倍、prefill 1.60 倍、混合 batch 2.14 倍。这些测量只覆盖 kernel 本身，并不代表端到端服务收益。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/c6dad690-9354-48a2-846f-1f7107907e3d_2048x672.png"
+  alt="Gated DeltaNet kernel 从独立的 Conv1D 与 GDN kernel 演进到融合的 GDN v3 kernel 的示意图"
+  caption="来源：SemiAnalysis"
+/>
+
+仅仅改善 kernel 内部各操作之间的重叠，就能获得显著的性能提升！
+
+### 管理混合状态与 Paged Attention
+
+Qwen3.5 是一个混合模型，有两类状态：GQA 层积累随每个 token 增长的 KV 历史，而 GDN 层为每个请求保存固定大小的循环状态。状态分配、存储精度、注意力 page 大小和物理数据布局共同决定了实际可用的 HBM 有多少，以及注意力运行的效率有多高。
+
+[批量 ragged paged attention](https://github.com/vllm-project/tpu-inference/pull/1961) 把多个序列批处理在一起，预先计算 page 元数据，并采用三重缓冲以改善流水线、减少 padding。这项改动为注意力后端提供了共享的基础。该 PR 的工作负载示例使用的是 Qwen3-32B，其测量结果应与 Qwen3.5-397B 的结果分开看待。
+
+循环状态现在采用[紧凑分配](https://github.com/vllm-project/tpu-inference/pull/2416)，每个活跃请求大约只占一个槽位，而不是为每个层组分配 num_blocks 个槽位。在报告的配置中，这回收了约 76 GiB 的 HBM，把注意力 block 池扩大了 71%，并在并发 64 下把 1k8k 的输出吞吐量提升了 18%。
+
+[以 BF16 存储循环状态](https://github.com/vllm-project/tpu-inference/pull/2482)把它的 HBM 占用减半，同时在 VMEM 内仍以 FP32 进行运算。这既节省了内存容量和传输带宽，又保留了 FP32 精度的算术。报告的 1k8k 吞吐量提升为并发 512 下 15%。
+
+移除[旧的混合 page 大小对齐约束](https://github.com/vllm-project/tpu-inference/pull/2627)后，批量注意力可以使用合适的 2 的幂次 page 大小，包括 256 个 token。1k8k 吞吐量在并发 512 下提升约 7%。这适用于非 prefix caching 路径，与后来引入的对齐 checkpoint 模式是两回事。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/ab7479c2-7b29-4ede-9796-9e8126a92b40_2048x756.png"
+  alt="混合模型 HBM 分配示意图：紧凑的循环状态槽位为注意力 KV block 池释放出容量"
+  caption="来源：SemiAnalysis"
+/>
+
+通过[按 KV head 数量选择 reshape 路径](https://github.com/vllm-project/tpu-inference/pull/2653)，而不是强加一个只有其他形状才需要的布局约束，避免了不必要的 KV 布局拷贝。Qwen3.5 的 8k1k 吞吐量在并发 512 下提升约 4.1%。
+
+### 减少 Padding 与低并发开销
+
+当在途请求只有四个或八个时，为数百并发请求调优的配置会浪费大量工作。编译后的形状桶过大，元数据按配置的最大值分配，padding token 还会触发无意义的专家计算。InferenceX 的工作点恰好就落在这些低并发上，这促成了下面的改动。
+
+请求元数据现在[按活跃请求数量分桶](https://github.com/vllm-project/tpu-inference/pull/2513)，而不是始终按配置的最大值分配。在 8k1k、并发 64 的测试中，GDN 调度开销从 283 µs 降到 97 µs，吞吐量从 2,328 提升到 2,516 tokens/s/chip。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/35b683ee-7e31-401a-8a8a-31c53e253aa2_2048x819.png"
+  alt="请求元数据按活跃请求数量分桶而不是按配置最大值分配的示意图"
+  caption="来源：SemiAnalysis"
+/>
+
+[针对 InferenceX 的 Qwen3.5 专项调优](https://github.com/vllm-project/tpu-inference/pull/3080)缩小了旋转位置编码表，按每个 DP rank 设置序列长度上限，并为并发 4 增加了专用的注意力桶。并发 4 下的综合收益为 8k1k 提升 13.3%，1k1k 提升 15.5%。
+
+[又一轮低并发调优](https://github.com/vllm-project/tpu-inference/pull/3116)切换到 TP8 注意力加专家并行，降低了最小 token 桶，并把 padding token 路由到 0 号专家，使其不再触发额外的专家权重加载。1k1k 的综合收益为并发 4 下 22.9%、并发 8 下 18.1%。在 8k1k 上，并发 4 的吞吐量提升 9.2%，但并发 8 下降 5.3%。
+
+### 为混合模型启用 Prefix Caching
+
+上述收益都是在随机输入的基准测试中测得的，请求之间没有任何共享。而 prefix caching 对智能体和多轮工作负载至关重要，因为它们会复用很长的系统提示词和对话历史。对混合模型来说，被缓存的前缀既要保留其 KV block，也要保留前缀末尾的 GDN 循环状态。而循环状态通常在请求继续时立刻就会被覆盖，这使得混合模型的 prefix caching 比「常规」注意力模型更难。
+
+[支持 DP 的混合模型 prefix caching](https://github.com/vllm-project/tpu-inference/pull/3422) 通过为 GDN 提供分开的槽位来解决这一问题：一个用于读取 checkpoint，一个用于写入实时状态。这样，继续处理请求时就不会再覆盖与其缓存前缀关联的 checkpoint。状态地址由 block table 推导得出，而 block table 本来就是用来定位 KV block 的结构。checkpoint 按对齐的缓存粒度保存，因此保存下来的状态总是与 KV block 边界对齐。这种模式需要完整的 checkpoint 池，而不是前面提到的按请求紧凑分配，以牺牲部分 HBM 换取跨请求复用。当前缀确实被共享时，收益就会体现出来。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/c0cd68d1-b16d-442d-87e4-ca98067ae979_2048x856.png"
+  alt="混合模型 prefix caching 示意图：GDN 使用分开的槽位读取 checkpoint 和写入实时循环状态"
+  caption="来源：SemiAnalysis"
+/>
+
+### Paged Attention 中的 Lane 布局与流水线深度
+
+有两个硬件事实决定了 KV cache 在 TPU 上的布局方式；下一节会更详细地讨论 TPU 硬件。第一，向量单元处理的 tile 最后一维宽度为 128 个 lane，因此任何末尾维度小于 128 的数组都会被 padding 到 128。第二，Pallas kernel 通过双缓冲来隐藏 HBM 延迟：在计算当前 block 的同时预取下一个 block。两个 block 都必须放进 VMEM，因此计算 block 的大小决定了预取能走多远。这两个约束此前都在消耗容量和吞吐量。
+
+在批量注意力 kernel 中，KV cache 沿 head 维度打包 key 和 value，FP8 下的打包因子为 4。而每个设备只有一个 KV head 的模型只有两样东西可以打包，于是每个 tile 有一半浪费在 padding 上。[sequence-on-lane 布局](https://github.com/vllm-project/tpu-inference/pull/3170)改为把 page 内的 token 放在 128 lane 的轴上，把 head 维度放在 sublane 轴上，从而解决了这一问题。可用 KV page 数翻倍（在报告的配置中从 5,141 增至 10,283），head 维度也只需是 32 的倍数而非 128 的倍数，使 head dim 为 64 的模型同样能使用该 kernel。这一布局在低并发下使每 token 延迟增加约 3%，但在 8k1k、并发 128 下，多出来的容量把吞吐量提升了 16.5%，并把 TTFT 中位数降低了 95%，因为请求不再需要等待 KV 空间。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/725b7e9e-8c46-4d02-880e-5a7de8886e87_2048x915.png"
+  alt="对比沿 head 维度打包、带 padding 的 KV 布局与填满全部 128 个 lane 的 sequence-on-lane 布局"
+  caption="来源：SemiAnalysis"
+/>
+
+RPA v3 的 block 大小启发式规则也有类似的盲点。在 v7x 的 decode 阶段，它把 KV 计算 block 设为与 KV 读取 block 相同，约 16k 个 token，几乎没有给预取缓冲区留下任何 VMEM。[把两者拆开](https://github.com/vllm-project/tpu-inference/pull/3102)后，KV 读取 block 保持 16k 个 token，计算 block 缩小到 4k。这给了流水线在 MXU 之前跑起来的空间，使 decode 吞吐量从 64.9k 提升到 96.3k tokens/s，提升 49%，并在 Qwen3-0.6B 上通过四次运行复现。在 block 大小的扫描中，吞吐量呈现出干净的倒 U 形曲线。由于调优参数表为每种形状只存一个 block 大小，无法表达这一改进，因此该改动最初以环境变量覆盖的形式落地。后续改动扩展了该表，以分别保存读取和计算两个大小。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/72c0863c-a506-404a-8522-70bcadb3a89a_2048x756.png"
+  alt="ragged paged attention 流水线示意图：16k token 的 KV 读取 block 与 4k token 的计算 block，为预取留出 VMEM"
+  caption="来源：SemiAnalysis"
+/>
+
+## TPU 系统级协同设计与网络解析
+
+[正如我们在「TPU 之王」一文中所说，Google 在推理上的每 token 成本优势源于协同设计](https://newsletter.semianalysis.com/p/tpuv7-google-takes-a-swing-at-the)。Google 并不追求单芯片性能最大化，而是把计算 die、芯片间 fabric 和编译器放在一起设计，从而能把计算和通信当作一个整体系统来优化。这种联合优化是 Ironwood 每美元性能表现的重要原因。接下来的几节将考察芯片与网络如何协同工作。[Anthropic 非常青睐 TPU，并大量用于训练。](https://semianalysis.com/accelerator-hbm-model/)
+
+### Ironwood 芯片
+
+TPUv7 Ironwood 打破了 TPU v4 和 TPU v5p 所采用的「MegaCore」惯例：那种设计把两个物理核心融合成一个共享同一内存空间的逻辑加速器。Ironwood 则采用两个独立的计算 die，各自运行独立的逻辑设备。两个 die 之间通过高带宽的 die 间链路相连，而不是统一的内存 fabric。JAX 等框架现在把它们暴露为每颗芯片两个独立设备。每颗 Ironwood 芯片包含 2 个 TensorCore 和 4 个第三代 SparseCore。SparseCore 负责加速 embedding 查找等稀疏操作，否则这些操作会拖垮稠密矩阵引擎。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/2690029e-8ec9-4b9e-b517-ec6d2950e8a2_1999x1130.png"
+  alt="Google 的 Ironwood TPU 芯片示意图，包含两个计算 die、TensorCore、SparseCore 和 HBM 堆栈"
+  caption="来源：[Google](https://cloud.google.com/blog/products/compute/inside-the-ironwood-tpu-codesigned-ai-stack)"
+/>
+
+在内存方面，每颗芯片的 HBM 容量约为 Trillium 的 6 倍，这一跃升直接关系到 KV cache 的余量和 batch 大小。值得注意的是，Ironwood 是第一代原生支持 FP8 硬件的 TPU，此前几代只能用软件模拟 FP8。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/6e6e4785-cd71-4160-90b8-40bf02e1483e_1456x542.png"
+  alt="对比各代 TPU 的 HBM 容量、带宽和 FP8 支持的表格"
+  caption="来源：SemiAnalysis"
+/>
+
+关于 Ironwood 的更多内容，请参阅我们的 TPUv7 文章：
+
+[TPUv7：Google 向王者挥拳](https://newsletter.semianalysis.com/p/tpuv7-google-takes-a-swing-at-the) — 世界上最强的两个模型，Anthropic 的 Claude 4.5 Opus 和 Google 的 Gemini 3，其训练与推理基础设施大部分运行在 Google 的 TPU 和 Amazon 的 Trainium 上。如今 Google 正在向多家公司实体销售 TPU。这是否意味着 NVIDIA 统治地位的终结？
+
+### MXU 以及形状为何重要
+
+矩阵乘法单元（MXU）是真正执行乘法的引擎，它是一个 systolic array：由乘加单元组成的二维网格。权重被加载进阵列并保持不动，激活值从边缘流入，部分和逐格在网格中传递并累加，最终结果从另一侧流出，中途完全不接触内存。直到 v5 的每一代 TPU 都使用 128x128 的 MXU，每周期 16,384 次 MAC。从 TPU v6e 开始并延续到 Ironwood，阵列翻倍为 256x256，即每周期 65,536 次 MAC，每周期 FLOPs 是之前设计的 4 倍。
+
+推荐阅读 [scaling book](https://jax-ml.github.io/scaling-book/tpus/)（人称 ML 系统圣经），其中有关于 TPU 和 scaling 的一流内容。
+
+问题在于，更大的 systolic array 只有在能填满时才是「免费」的。矩阵维度在两个方向上都必须至少 padding 到 MXU 的边长，老一代是 128，v6e 和 v7 是 256，XLA 编译器会忠实地把任何较小的轴 padding 到填满 tile。每个被 padding 的格子在那个周期里仍然占用一个 MAC 单元，只不过是在乘零，对结果毫无贡献。Llama 3 8B 就是一个例子，它的注意力 head 维度是 128。在 Ironwood 的 256x256 MXU 上，这个 head 维度恰好是阵列原生宽度的一半，把两次注意力矩阵乘法的 MXU 利用率上限压到 50%（不是 75%，因为只有 head 维度是 128）。
+
+其影响远不止某个模型的注意力层。过去被视为任意超参数的架构选择（例如 head 维度、张量并行切分后剩余的 KV head 数量、MoE 专家宽度）如今越来越需要考虑 TPU 的 tile 几何，因为形状不匹配会直接对实际吞吐量征税，无论软件栈的其他部分多么出色。kernel 作者也需要显式地考虑这一点。[ragged paged attention](https://arxiv.org/abs/2604.15464v1) 等生产级注意力 kernel 会使用显式的打包维度，在 XLA 默认 tiling 产生低效布局时减少 padding。
+
+#### TPU 很挑剔
+
+GPU 的矩阵核心消费的是小 tile，因此各种 head 维度、专家宽度和切分后的 KV head 数量都能接近峰值。在 H100 或 B200 上，把维度从 128 改成 64 几乎没有代价，还能换来更便宜的注意力层。GPU 架构让研究人员可以优先追求评估表现，而不损失推理性能。但在 TPU 上，这个超参数变成了一种取舍。
+
+如前所述，这些选择在 256 宽的 systolic array 上并不免费。按照把 Llama 3 8B 注意力矩阵乘法上限压到 50% 的同一套算术，head 维度 64 在写下第一行 kernel 代码之前就把上限压到了 25%。gpt-oss 的 head 维度就是 64。DeepSeek 的 MLA 把 query/key 维度拆成 128 加 64、共 192，对任何 2 的幂次阵列都不友好，对更宽的阵列更是如此。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/7e493590-cb03-43cf-851a-816a576d2083_1876x976.png"
+  alt="256x256 systolic array 示意图：head 维度 128 时 MXU 利用率上限为 50%，head 维度 64 时为 25%"
+/>
+
+结果就是，bring-up 成本差异极大，而且与模型的流行程度关系不大。形状恰好合适的模型只需要调度、服务和调优工作，以周为单位；而与 tile 几何相冲突的模型在达到持平之前就需要新的 kernel，更不用说在每美元性能上取胜了。kernel 工程师是有限的，因此优先把外部化工作排向硬件不会一开局就落后一圈的模型，是理性之举，处于同样位置的任何加速器厂商都会这么做。
+
+### Torus 拓扑
+
+大规模推理和训练运行在数千颗需要持续相互通信的芯片上。TPU 通过一种名为 ICI（芯片间互连）的定制网络点对点连接。ICI 完全绕过主机 CPU，让芯片可以直接交换激活值和梯度，而不必经过 PCIe 和通用网卡。ICI 背后的拓扑随代际演进：TPU v2 和 v3 使用 2D torus，每颗芯片连接 4 个邻居；从 TPU v4 和 v5p 开始，Google 转向 3D torus，每颗芯片沿 +/-X、+/-Y、+/-Z 三个轴连接 6 个邻居。Ironwood（TPUv7）沿用了这一 3D torus。基本构建单元是一个由 64 颗芯片组成的 4x4x4 立方体，其规模恰好能整齐地映射到一个物理服务器机架上。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/f07dc2e7-090b-472a-a2bf-82c6fbb1cb67_1456x1956.png"
+  alt="TPU 3D torus 示意图：每颗芯片连接六个邻居，以及由 64 颗芯片组成的 4x4x4 立方体"
+  caption="来源：SemiAnalysis"
+/>
+
+torus 与普通网格的区别在于环绕链路。把一条线的两端连起来就形成一个环，最坏情况下的跳数从 N 降到 N/2。这和让 Pac-Man 迷宫显得比实际更小的技巧是同一个道理。Google 更进一步采用「twisted torus」，一种类似 Möbius 带的环绕方式，把平均跳数进一步压低。要扩展到单个 4x4x4 立方体之外，Google 用光路交换机（Optical Circuit Switch，OCS）把多个立方体拼接起来，在规模大得多的可重构拓扑上保持环绕特性，一路扩展到 Ironwood 完整的 9,216 芯片 superpod 及其 42.5 FP8 exaflops 的总算力。OCS 在运维上的好处是，Google 可以在几秒钟内用镜面绕开故障链路或损坏芯片，重新物理布线，而不必派技术人员到运行中的数据中心里重新熔接铜缆。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/fc7f1e6f-b854-4da5-b6c1-8f1bbdb49cb8_1456x1505.png"
+  alt="用光路交换机把多个 TPU 立方体拼接成更大 torus pod 的示意图"
+  caption="来源：SemiAnalysis"
+/>
+
+这种 scale-out 设计在当时是革命性的。在 NVL72 机架出现之前，放不进单个 8 GPU 节点的模型只能使用流水线并行，因为节点间的 InfiniBand 太慢。而在 TPU pod 上，ICI torus 在整个 pod 范围内提供 NVLink 级别的带宽，v5p 最多可达 8,960 颗芯片。凭借这样的带宽，DSV3 规模的模型可以用张量并行、专家并行和数据并行（FSDP 式权重切分）切分到整个 pod 上，而无需把层拆到多个流水线阶段。
+
+虽然 TPU torus 的跳数多于单跳的 NVLink 交换式设计，但我们即将发布的 CollectiveX/NetworkingX 结果显示，在许多情况下，对于小规模 EP 消息，TPU torus 的延迟低于单跳 NVSwitch。
+
+### 展望：TPUv8i 的 Boardfly 网络
+
+Google 新发布的第八代 TPU 产品线包含两款专用芯片：面向训练的 TPU 8t 和面向推理的 TPU 8i。这是 Google 第一次把训练和推理拆成不同的架构设计，而不是用一套架构同时兼顾两者。TPU 8t 在 scale-up 上延续了 3D torus 血统，而 TPU 8i 则用一种名为「Boardfly」的新拓扑取代了 torus。这个名字致敬了超算领域长期使用的 dragonfly 式高基数网络设计。Boardfly 采用更扁平的、由高基数交换机组成的分层 fabric，而不是最近邻 mesh。[Boardfly 拓扑会影响每颗芯片的网络连接 capex。](https://semianalysis.com/ai-networking-model/)
+
+回报是网络直径比同等规模的 3D torus 缩减一半以上：在 1,024 到 1,152 芯片的可比规模上，从大约 16 跳降到约 7 跳。更少的跳数意味着集合通信的尾延迟显著降低，而一旦要在 MoE 层之间路由 token，或运行每多一跳都会累积成用户可感知延迟的多轮智能体工作负载，这一点就变得极其重要。TPU 8i 还配备 19.2 Tb/s 的 ICI 带宽，是上一代的两倍，以及 384 MB 片上 SRAM，是上一代的 3 倍，专门用于把推理和智能体模型的 KV cache 留在片上，而不必往返 HBM。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/83cff324-fa52-4b79-b901-80da6f9345a9_2000x1268.png"
+  alt="Google 介绍 TPU 8t 与 TPU 8i 及 Boardfly 网络拓扑的幻灯片"
+  caption="来源：Google"
+/>
+
+不过，这些硬件余量不会自动兑现。要把更小的网络直径和更大的片上缓存转化为每 token 成本的收益，软件栈仍需跟上。下一节介绍实现这一目标的路线图，包括投机解码、prefill-decode 分离，以及在生产中充分发挥 TPUv8 所需的更广泛模型支持。
+
+## 夯实 TPU 基础的下一步
+
+这些预览结果为在同一硬件上继续优化确立了起点。随着 TPU 外部化的推进，我们预计性能还会提升，而整个软件栈仍有大量工作要做。
+
+### 启用并优化投机解码（MTP）
+
+Google 团队首先需要聚焦的是优化投机解码。一个廉价的小型 draft 模型提前猜测多个 token，主模型在一次前向传播中验证全部猜测，不匹配的猜测被丢弃。保留下来的部分与模型自行生成的结果完全一致。投机解码是无损的，不会带来任何质量下降。
+
+它之所以有效，是因为 decode 受带宽限制而非算力限制。为单个用户生成一个 token，需要把整个模型的权重从 HBM 中读出来。这次权重读取是主要成本，而无论验证一个 token 还是五个，成本几乎不变。矩阵单元大部分时间处于空闲，所有工作都落在内存系统上。投机解码正是利用这部分闲置算力，把一次极其昂贵的权重读取分摊到多个 token 上，这也是 MTP、DSpark 这类一次起草多个 token 的方法既便宜又高效的原因。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/9126a39f-54f9-4df1-bd09-4d0d64deaf17_2048x559.png"
+  alt="投机解码示意图：小型 draft 模型提出候选 token，目标模型在一次前向传播中完成验证"
+  caption="[来源：vLLM](https://vllm.ai/blog/2024-10-17-spec-decode)"
+/>
+
+### Prefill-Decode 分离与 KV Cache Offload
+
+Prefill-decode（PD）分离是 TPU 团队正在推动外部化的另一项优化。它把 prefill 和 decode 拆到不同的 TPU 资源池上，让每个池都能独立调优和扩缩，以匹配工作负载。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/282af9ce-a0c4-4c7b-8053-00026f16f945_1112x548.png"
+  alt="DistServe 示意图：prefill 与 decode 实例分属不同资源池，并在两者之间传输 KV cache"
+  caption="来源：DistServe"
+/>
+
+Google 早已在内部的 Gemini 服务中长期运行 PD 分离，但将其外部化的工作几个月前才刚刚开始。这些工作包括在 llm-d 中支持 TPU，以及开源 Google 的分离式 KV cache 传输库 TPU-Sync（前身为 TPU-raiden）。TPU-Sync 原生支持 JAX 和原生 TorchTPU 软件栈，并且能通过提取原生 PJRTBuffer 硬件描述符实现零拷贝传输。有了分离式 PD，我们相信 TPUv7 能成为 GB200/GB300 的有力竞争者，甚至在每美元性能上胜出。
+
+[TPU-Sync 还支持原生的 TPU KV cache DRAM offload](https://github.com/google/tpu-sync)，这对大模型以及中到大 batch 的场景是必需的，因为此时 HBM 已经装不下所有用户的 KV cache。很高兴看到 Google 也把自己的 DRAM offload 优化对外开放。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/62a1acf1-77d0-4c16-85da-9a046d56f2f8_1974x1342.png"
+  alt="TPU-Sync README 片段，介绍面向 TPU 的分离式 KV cache 传输和 DRAM offload"
+  caption="[来源：GitHub](https://github.com/google/tpu-sync)"
+/>
+
+Google 正在外部化其原生 TPU offload 软件栈，并[支持业界标准的 Mooncake Store offload 库](https://github.com/kvcache-ai/Mooncake/issues/2662)以及 Mooncake Store 的 DRAM P2P 池化能力。我们认为 Mooncake Store 支持将基于 tpu-sync 中的原语来实现。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/ec6b5d7e-af79-484b-bcf7-ebc50d36c3e3_2048x1204.png"
+  alt="Mooncake GitHub issue，提议为 Mooncake Store offload 库增加 TPU 支持"
+  caption="[来源：GitHub](https://github.com/kvcache-ai/Mooncake/issues/2662)"
+/>
+
+通过 P2P 池化，每台 TPU 主机上的 KV cache 存储被聚合成一个逻辑内存池，任何服务器上的 TPU 都可以访问其他任何服务器上的 KV cache。这样就把多个节点贡献的内存统一成一个共享的逻辑池。
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/f51b3df9-ffa4-408f-b617-1eb3dde40740_2039x975.png"
+  alt="Mooncake 的 DRAM P2P 池化示意图：把多台主机的 KV cache 存储聚合为一个逻辑池"
+  caption="来源：Mooncake"
+/>
+
+[此外，Mooncake Store 还能把多台服务器的 NVMe 存储池化为单一逻辑池](https://kvcache.ai/blog/scaling-kv-cache-beyond-memory/)，并支持 WEKA/Vast 等传统分布式文件系统后端。
+
+### AgentX TPU
+
+KV cache offload 对长上下文、多轮的智能体工作负载尤其重要，经过优化的 KV cache 存储能够带来很高的 KV cache 命中率。
+
+从高层看，智能体工作负载有四个特征：
+
+- 多轮：一个会话包含用户与助手之间数十到数百次交互，而聊天机器人场景只有寥寥几次。这类工作负载把长上下文、高 prefill 复用与子智能体突发和大量工具调用结合在一起。
+- 长上下文：系统提示词、工具定义和大量轮次使上下文迅速累积。
+- 高前缀复用：由于对话是线性推进的，第 n-1 轮的输出（通常）会拼接到第 n 轮，大部分上下文可以直接从 KV cache 提供而不必重新计算（这取决于可用于存储 KV 张量的存储空间）。随着 n 增大，已缓存输入相对未缓存输入的比例通常趋近于 1。
+- 子智能体突发：一个会话会启动多个带全新上下文的短生命周期子智能体，形成突发式的 KV cache 访问模式。
+
+[我们听到许多 Google TPU 客户已经在询问 AgentX 上的性能结果，我们很高兴地宣布，我们正在努力把 TPU 也带到 AgentX 上！](https://newsletter.semianalysis.com/p/agentx-inferencexv3-does-cuda-moat)
+
+<Figure
+  src="https://substack-post-media.s3.amazonaws.com/public/images/9ca94316-e44c-4bec-9d0a-041ad73df31e_2048x909.png"
+  alt="多轮智能体会话示意图：上下文增长、前缀复用与子智能体突发"
+  caption="来源：DeepSeek, SemiAnalysis"
+/>
+
+Ironwood 没有原生 FP4，因此目前公平的同口径对比对象是 FP8 的 Blackwell：FP8 对 FP8 不存在质量损失，而 FP4 对 FP8 会在 FP4 一侧引入质量差异。Google 的 TPUv8i 具备原生 FP4 加速，因此当我们在 InferenceX/AgentX 上 bring-up TPUv8i 时，将以 FP4 对 FP4 进行比较。
+
+我们坚信，在原生 TorchTPU 的稳定基础上构建原生的 vLLM 和 SGLang 支持，是 TPU 外部化的正确方向。TorchTPU 旨在取代此前的 TorchAX 软件栈，后者很快将被弃用。Google 接下来将致力于在单轮和/或 AgentX 这类智能体工作负载上启用 Kimi K3 和 GLM 5.3，以及 Google 自家的开放权重模型如 Gemma 4。一旦有几个模型在 TorchTPU 软件栈上跑起来，添加新模型就会容易得多，TPU 支持也会更接近 day 0 落地。
+
+罗马不是在 day 0 建成的，我们不应期待 TPU 的外部化一蹴而就。但我们坚信，它正在以极快的速度发生。
+
+## TPU 具有成本效益的总拥有成本
+
+我们对 TPUv7 的完整 BOM 和 TCO 估算收录在 [SemiAnalysis AI TCO Model](https://semianalysis.com/ai-cloud-tco-model/) 中。
+
+<DashboardCTA href="https://inferencex.semianalysis.com/inference">
+  点击查看完整 InferenceX 仪表板 →
+</DashboardCTA>
+
+_本文后续内容——TPUv7 BOM 与 TCO 估算的结构概览——请见 [SemiAnalysis 通讯订阅版](https://newsletter.semianalysis.com/p/tpu-inferencex-full-steam)。_
+
+<JsonLd>{`{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "TPUv7 Ironwood 与 B200、B300 的每美元性能相比如何？",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "在 8k1k 工作负载、单 token 预测、FP8 聚合式部署 Qwen3.5 397B 的同口径对比中，按外部 TPU TCO 计算，Ironwood 的每美元性能最高比 B200 和 B300 高 50%。在 100 tok/s/user 下，Ironwood 每百万 total token 成本约为 $0.181，B200 为 $0.222，B300 为 $0.276，分别低约 19% 和 34%。在 20 tok/s/user 下，Ironwood 达到 9,364 total tokens/s/chip，B200 为 8,903，B300 为 8,925；叠加更低的小时成本后，其每美元 token 数比 B200 多 50.4%，比 B300 多 96.0%。"
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "什么是 TorchTPU，它与 TorchAX 软件栈有何不同？",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "TorchAX 通过 __torch_dispatch__ 钩子把 vLLM 和 SGLang 中的 PyTorch 模型代码翻译成 JAX 算子，其 torchax 张量底层由 jax.Array 支撑。TorchTPU 则利用 PyTorch 的 PrivateUse1 后端扩展点，在原生 tpu 设备上暴露普通的 torch.Tensor。PyTorch dispatcher 把 ATen 算子路由到 TPU 后端，torch.compile 通过 TorchDynamo 和 AOTAutograd 捕获 FX 图，TorchTPU 将其下沉为 StableHLO，再由 XLA 生成 TPU 可执行文件。Pallas 和基于 JAX 的自定义 kernel 仍然可以调用，因此为早期软件栈编写的 kernel 可以迁移。截至 2026 年 9 月初，TorchTPU 仍处于私有测试阶段，预计在 10 月中旬的 PyTorch Conference 期间开源。"
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "哪些 TPU kernel 与服务优化推动了 Qwen3.5 在 Ironwood 上的结果？",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "这些优化包括：把八路注意力数据并行与八路专家并行结合的 DP attention；把专家 ID 与路由权重的 all-gather 合并为一次集合通信，每层节省约 80 微秒；SparseCore 上的分层 ReduceScatter，在并发 64 到 512 范围内把 8k1k 吞吐量提升 4.1% 到 14.2%；基于 SparseCore 的 MoE token 重排，带来 12% 的 8k1k 吞吐量提升；Gated DeltaNet kernel 重构，其中异步状态传输在并发 512 下贡献 11.3%；紧凑的循环状态分配回收约 76 GiB HBM；sequence-on-lane KV 布局把可用 KV page 从 5,141 翻倍到 10,283；以及低并发调优，使并发 4 的 8k1k 吞吐量提升 13.3%。"
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "为什么 TPU 在分离式推理上仍落后于 GB300 NVL72？",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Google 在内部生产环境中运行分离式推理，但面向外部的 TPU 服务栈尚未拥有充分优化的分离式路径，因此在今天的分离式对分离式对比中，GB200 和 GB300 NVL72 的每美元性能更有竞争力。按内部 TCO 把 TPUv7 聚合式部署与 GB300 NVL72 分离式部署对比，TPUv7 在低延迟和高延迟的端到端区间具备竞争力，而 GB300 NVL72 在延迟区间中段保持约 30% 的每美元性能优势。SemiAnalysis 预计，随着 Google、Inferact、RadixArk 和 SemiAnalysis 落地分离式推理优化，并由 TPU-Sync 提供 KV cache 传输和 DRAM offload 原语，这一差距将在几个月内收窄。"
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "TPUv8i 及其 Boardfly 网络带来了哪些变化？",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "TPU 8i 是 Google 第一款专为推理设计的 TPU 架构，与面向训练的 TPU 8t 分开。它用 Boardfly 取代 3D torus，这是一种由高基数交换机组成的更扁平的分层 fabric，把网络直径缩减一半以上，在 1,024 到 1,152 芯片规模上从大约 16 跳降到约 7 跳。TPU 8i 拥有 19.2 Tb/s 的 ICI 带宽，是上一代的两倍，以及 384 MB 片上 SRAM，是上一代的 3 倍。它还新增了 Ironwood 所缺少的原生 FP4 支持，因此 SemiAnalysis 预计将在 InferenceX 和 AgentX 上以 FP4 对 FP4 的方式把 TPUv8i 与 Rubin NVL72 进行比较。"
+      }
+    }
+  ]
+}`}</JsonLd>

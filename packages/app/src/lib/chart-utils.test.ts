@@ -1,10 +1,10 @@
 import { describe, it, expect, vi } from 'vitest';
 
-import { USD_TO_CNY } from '@semianalysisai/inferencex-constants';
 import iwanthue from 'iwanthue';
 
 import type * as ConstantsModule from '@/lib/constants';
 import type { AggDataEntry, ChartDefinition, InferenceData } from '@/components/inference/types';
+import { chartDefinitions } from '@/components/inference/metric-registry';
 import {
   buildAvailabilityHwKey,
   generateHighContrastColors,
@@ -17,6 +17,7 @@ import {
   paretoFrontLowerRight,
   paretoFrontLowerLeft,
   paretoFrontUpperLeft,
+  metricChartTitle,
   metricTitle,
   metricLabel,
   xAxisLabel,
@@ -29,7 +30,7 @@ vi.mock('@/lib/constants', async (importOriginal) => {
   return {
     ...actual,
     getHardwareConfig: vi.fn(() => ({ label: 'H100', suffix: '' })),
-    getGpuSpecs: vi.fn(() => ({ power: 700, tdp: 700, costh: 2.8, costn: 1.4, costr: 0.7 })),
+    getGpuSpecs: vi.fn(() => ({ power: 700, tdp: 700, costh: 2.8, costr: 0.7 })),
   };
 });
 
@@ -63,10 +64,8 @@ function pt(
     tpPerGpu: { y: tpPerGpuY, roof: false },
     tpPerMw: { y: 5, roof: false },
     costh: { y: opts.costhY ?? 1, roof: false },
-    costn: { y: 1.5, roof: false },
     costr: { y: 1.2, roof: false },
     costhi: { y: 2, roof: false },
-    costni: { y: 2.5, roof: false },
     costri: { y: 2.2, roof: false },
     ...(opts.outputTputY === undefined
       ? {}
@@ -137,10 +136,8 @@ function paretoPt(x: number, y: number, overrides: Partial<InferenceData> = {}):
     tpPerGpu: { y: 100, roof: false },
     tpPerMw: { y: 50, roof: false },
     costh: { y: 1, roof: false },
-    costn: { y: 1, roof: false },
     costr: { y: 1, roof: false },
     costhi: { y: 1, roof: false },
-    costni: { y: 1, roof: false },
     costri: { y: 1, roof: false },
     ...overrides,
   };
@@ -252,6 +249,15 @@ function isNotGreenish(rgb: [number, number, number]): boolean {
 }
 
 describe('generateHighContrastColors', () => {
+  it.each(['light', 'dark'])(
+    'gives TPUv7 the Google blue high-contrast color alongside Blackwell (%s)',
+    (theme) => {
+      const colors = generateHighContrastColors(['tpuv7_vllm', 'b200_vllm', 'b300_vllm'], theme);
+      expect(colors.tpuv7_vllm).toBe('#4285F4');
+      expect(new Set(Object.values(colors)).size).toBe(3);
+    },
+  );
+
   /** Assert every pair has at least `min` RGB distance. */
   function assertMinDist(colors: Record<string, string>, min: number) {
     const rgbs = Object.values(colors).map(parseRgb);
@@ -743,29 +749,15 @@ describe('createChartDataPoint', () => {
     const e = entry({ tput_per_gpu: 1000 });
     const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
     expect(point.costh.y).toBeCloseTo(2.8 / 3.6, 5);
-    expect(point.costn.y).toBeCloseTo(1.4 / 3.6, 5);
     expect(point.costr.y).toBeCloseTo(0.7 / 3.6, 5);
     expect(point.tokensPerDollarH!.y).toBeCloseTo(3_600_000 / 2.8, 5);
-    expect(point.tokensPerDollarN!.y).toBeCloseTo(3_600_000 / 1.4, 5);
     expect(point.tokensPerDollarR!.y).toBeCloseTo(3_600_000 / 0.7, 5);
-  });
-
-  it('prices the same tokens in yuan at the pinned FX rate', () => {
-    const e = entry({ tput_per_gpu: 1000 });
-    const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
-    // ¥ metrics are the $ metrics over USD_TO_CNY — the same tokens, priced in
-    // the other currency, so the two must stay in exact proportion.
-    expect(point.tokensPerRmbH!.y).toBeCloseTo(3_600_000 / (2.8 * USD_TO_CNY), 5);
-    expect(point.tokensPerRmbN!.y).toBeCloseTo(3_600_000 / (1.4 * USD_TO_CNY), 5);
-    expect(point.tokensPerRmbR!.y).toBeCloseTo(3_600_000 / (0.7 * USD_TO_CNY), 5);
-    expect(point.tokensPerRmbH!.y * USD_TO_CNY).toBeCloseTo(point.tokensPerDollarH!.y, 5);
   });
 
   it('sets cost fields to 0 when throughput is 0', () => {
     const e = entry({ tput_per_gpu: 0 });
     const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
     expect(point.costh.y).toBe(0);
-    expect(point.costn.y).toBe(0);
     expect(point.costr.y).toBe(0);
   });
 
@@ -775,7 +767,6 @@ describe('createChartDataPoint', () => {
     const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
     expect(point.costhOutput!.y).toBeCloseTo(2.8 / 1.8, 5);
     expect(point.outputTokensPerDollarH!.y).toBeCloseTo(1_800_000 / 2.8, 5);
-    expect(point.outputTokensPerDollarN!.y).toBeCloseTo(1_800_000 / 1.4, 5);
     expect(point.outputTokensPerDollarR!.y).toBeCloseTo(1_800_000 / 0.7, 5);
   });
 
@@ -785,7 +776,6 @@ describe('createChartDataPoint', () => {
     const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
     expect(point.costhi.y).toBeCloseTo(2.8 / 0.72, 5);
     expect(point.inputTokensPerDollarH!.y).toBeCloseTo(720_000 / 2.8, 5);
-    expect(point.inputTokensPerDollarN!.y).toBeCloseTo(720_000 / 1.4, 5);
     expect(point.inputTokensPerDollarR!.y).toBeCloseTo(720_000 / 0.7, 5);
   });
 
@@ -881,11 +871,11 @@ describe('buildDerivedChartFields', () => {
 
   it('selectively derives infrastructure total tokens per dollar', () => {
     const historicalFields = buildDerivedChartFields(entry({ tput_per_gpu: 1250 }), 'h100', [
-      'tokensPerDollarN',
+      'tokensPerDollarH',
     ]);
 
     expect(historicalFields).toEqual({
-      tokensPerDollarN: { y: 4_500_000 / 1.4, roof: false },
+      tokensPerDollarH: { y: 4_500_000 / 2.8, roof: false },
     });
   });
 
@@ -999,6 +989,26 @@ describe('createChartDataPoint energy fields', () => {
 // createChartDataPoint — measured power / energy fields (from runner telemetry)
 // ===========================================================================
 describe('createChartDataPoint measured power fields', () => {
+  it('uses measured percentiles independently from average power and omits them when absent', () => {
+    const point = createChartDataPoint(
+      '2025-01-01',
+      entry({ avg_power_w: 500, p75_power_w: 575, p90_power_w: 620 }),
+      'median_e2el',
+      'tput_per_gpu',
+      'h100',
+    );
+    expect(point.measuredP75Power?.y).toBe(575);
+    expect(point.measuredP90Power?.y).toBe(620);
+    const missing = createChartDataPoint(
+      '2025-01-01',
+      entry({ avg_power_w: 500 }),
+      'median_e2el',
+      'tput_per_gpu',
+      'h100',
+    );
+    expect(missing.measuredP75Power).toBeUndefined();
+    expect(missing.measuredP90Power).toBeUndefined();
+  });
   it('emits measuredAvgPower when avg_power_w is present on the entry', () => {
     const e = entry({ avg_power_w: 685.5 });
     const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
@@ -1165,6 +1175,36 @@ describe('createChartDataPoint per-stage measured power fields', () => {
     expect(point.measuredJPerInputToken!.y).toBe(0.18);
     expect(point.measuredJPerOutputToken!.y).toBe(1.64);
   });
+
+  it('emits role-local energy fields when the role joules scalars are present', () => {
+    const e = entry({ prefill_joules_per_input_token: 0.4, decode_joules_per_output_token: 5.1 });
+    const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
+    expect(point.measuredPrefillJPerInputToken).toBeDefined();
+    expect(point.measuredPrefillJPerInputToken!.y).toBe(0.4);
+    expect(point.measuredPrefillJPerInputToken!.roof).toBe(false);
+    expect(point.measuredDecodeJPerOutputToken).toBeDefined();
+    expect(point.measuredDecodeJPerOutputToken!.y).toBe(5.1);
+    expect(point.measuredDecodeJPerOutputToken!.roof).toBe(false);
+  });
+
+  it('omits role-local energy fields on rows without the role joules scalars', () => {
+    // Single-node aggregated (and legacy) rows never carry role energy — the
+    // fields must be absent (not 0) so the coverage filter drops them from the
+    // role-energy axes rather than plotting fake data.
+    const e = entry({ avg_power_w: 685.5, joules_per_output_token: 8.4 });
+    const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
+    expect(point.measuredPrefillJPerInputToken).toBeUndefined();
+    expect(point.measuredDecodeJPerOutputToken).toBeUndefined();
+  });
+
+  it('preserves a zero role-local energy value (not falsy-coerced away)', () => {
+    const e = entry({ prefill_joules_per_input_token: 0, decode_joules_per_output_token: 0 });
+    const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
+    expect(point.measuredPrefillJPerInputToken).toBeDefined();
+    expect(point.measuredPrefillJPerInputToken!.y).toBe(0);
+    expect(point.measuredDecodeJPerOutputToken).toBeDefined();
+    expect(point.measuredDecodeJPerOutputToken!.y).toBe(0);
+  });
 });
 
 // ===========================================================================
@@ -1243,7 +1283,6 @@ describe('createChartDataPoint output cost edge cases', () => {
     const e = entry({ output_tput_per_gpu: 0 });
     const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
     expect(point.costhOutput!.y).toBe(0);
-    expect(point.costnOutput!.y).toBe(0);
     expect(point.costrOutput!.y).toBe(0);
   });
 
@@ -1251,7 +1290,6 @@ describe('createChartDataPoint output cost edge cases', () => {
     const e = entry({ input_tput_per_gpu: 0 });
     const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
     expect(point.costhi.y).toBe(0);
-    expect(point.costni.y).toBe(0);
     expect(point.costri.y).toBe(0);
   });
 
@@ -1264,17 +1302,14 @@ describe('createChartDataPoint output cost edge cases', () => {
     const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
 
     expect(point.tokensPerDollarH!.y).toBeCloseTo(3_600_000 / 2.8, 5);
-    expect(point.tokensPerDollarN!.y).toBeCloseTo(3_600_000 / 1.4, 5);
     expect(point.tokensPerDollarR!.y).toBeCloseTo(3_600_000 / 0.7, 5);
 
     // Output: outputTokensPerHour = 500 * 3600 = 1,800,000
     expect(point.outputTokensPerDollarH!.y).toBeCloseTo(1_800_000 / 2.8, 5);
-    expect(point.outputTokensPerDollarN!.y).toBeCloseTo(1_800_000 / 1.4, 5);
     expect(point.outputTokensPerDollarR!.y).toBeCloseTo(1_800_000 / 0.7, 5);
 
     // Input: inputTokensPerHour = 200 * 3600 = 720,000
     expect(point.inputTokensPerDollarH!.y).toBeCloseTo(720_000 / 2.8, 5);
-    expect(point.inputTokensPerDollarN!.y).toBeCloseTo(720_000 / 1.4, 5);
     expect(point.inputTokensPerDollarR!.y).toBeCloseTo(720_000 / 0.7, 5);
   });
 });
@@ -1727,5 +1762,40 @@ describe('xAxisLabel', () => {
 
     expect(xAxisLabel(chartDef, 'en')).toBe('End-to-end Latency (s)');
     expect(xAxisLabel(chartDef, 'zh')).toBe('端到端延迟 (s)');
+  });
+});
+
+describe('metricChartTitle', () => {
+  const [interactivity] = chartDefinitions;
+
+  it('reads the tier-free heading while metricTitle keeps the option label', () => {
+    expect(metricChartTitle(interactivity, 'y_tokensPerDollarH', 'en')).toBe(
+      'Total Tokens per $1 TCO',
+    );
+    expect(metricTitle(interactivity, 'y_tokensPerDollarH', 'en')).toBe(
+      'Total Tokens per $1 TCO (Owning at Large Hyperscaler Volume)',
+    );
+    expect(metricChartTitle(interactivity, 'y_tokensPerDollarH', 'zh')).toBe(
+      '每 1 美元 TCO 对应的总 token 数',
+    );
+  });
+
+  it('honors per-graph heading overrides such as the token-revenue price source', () => {
+    const patched = {
+      ...interactivity,
+      y_tokenRevenuePerGpuHour_chartTitle: 'Token Revenue per GPU Hour at OpenRouter Pricing',
+      y_tokenRevenuePerGpuHour_chartTitleZh: '按 OpenRouter 价格计算的每 GPU 小时 token 收入',
+    };
+    expect(metricChartTitle(patched, 'y_tokenRevenuePerGpuHour', 'en')).toBe(
+      'Token Revenue per GPU Hour at OpenRouter Pricing',
+    );
+    expect(metricChartTitle(patched, 'y_tokenRevenuePerGpuHour', 'zh')).toBe(
+      '按 OpenRouter 价格计算的每 GPU 小时 token 收入',
+    );
+  });
+
+  it('falls back to the option title when a definition has no chart title', () => {
+    const bare = { ...interactivity, y_tpPerGpu_chartTitle: undefined };
+    expect(metricChartTitle(bare, 'y_tpPerGpu', 'en')).toBe('Token Throughput per Chip');
   });
 });

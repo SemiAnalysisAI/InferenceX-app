@@ -34,7 +34,7 @@ export interface RunStrings {
   colPriceTier: string;
   colGpuHour: string;
   colCostPerMtok: string;
-  priceTierLabels: Record<'hyperscaler' | 'neocloud' | 'retail', string>;
+  priceTierLabels: Record<'hyperscaler' | 'retail', string>;
   emptyState: string;
   faqHeading: string;
   faq: { question: string; answer: string }[];
