@@ -42,6 +42,11 @@ export const TAB_META_ZH: Record<DashboardRouteKey, { title: string; description
     description:
       '测算固定 AI 推理集群在整个生命周期内的经济性：按设施功率预算确定集群规模，并跟踪实测软件配置随时间改进带来的收入、成本与利润变化。',
   },
+  'first-token': {
+    title: '首 token 延迟约束',
+    description:
+      '在给定最低交互性下，按各档首 token 延迟（TTFT）上限，找出各芯片厂商成本最低的实测 AI 推理配置。仅使用实测数据，不做插值，适用于任意模型与工作负载。',
+  },
   'profit-estimator': {
     title: '推理利润估算器',
     description:
@@ -115,6 +120,8 @@ export const TAB_INTRO_ZH: Record<DashboardRouteKey, string> = {
     '本页面提供吞吐量与总拥有成本（TCO）计算器：基于真实基准测试数据，估算不同芯片配置下 LLM 推理服务的每百万 token 成本与性价比。',
   fleet:
     '本页面提供集群生命周期经济性分析：按设施功率预算确定固定集群的规模，从模型发布之日起，基于历史基准测试中实测的软件配置改进，测算收入、成本、利润与回本时间。',
+  'first-token':
+    '本页面展示首 token 延迟约束下的成本对比：在选定的最低交互性下，按 2 s、5 s、10 s 等各档首 token 延迟（TTFT）上限，逐档找出各芯片厂商每百万 token 成本最低的实测配置，并标注最优配置与厂商间的成本差距。所有柱形均来自实际运行过的配置，不做插值，可直接追溯到对应的 GitHub Actions 运行记录。',
   'profit-estimator':
     '本页面提供推理利润估算器：在选定的交互性与利用率下，按每芯片每小时计算各芯片的收入，并以堆叠柱形拆分为算力支出（TCO $/chip/hr）、模型实验室从收入中抽取的许可费，以及运营方所剩利润。',
   'profit-estimator-per-gigawatt':
@@ -148,6 +155,7 @@ export const TAB_LABELS_ZH: Record<DashboardRouteKey, string> = {
   historical: '历史趋势',
   calculator: 'TCO 计算器',
   fleet: '集群生命周期',
+  'first-token': '首 token 延迟约束',
   'profit-estimator': '利润估算',
   'profit-estimator-per-gigawatt': '每吉瓦利润估算',
   reliability: '可靠性',

@@ -67,10 +67,29 @@ export interface OverlayGroupMeta extends GroupMeta {
 function getAgenticMetric(
   entry: AggDataEntry,
   percentile: Percentile,
-  suffix: 'intvty' | 'e2el',
+  suffix: 'intvty' | 'e2el' | 'ttft',
 ): number {
   const value = entry[`${percentile}_${suffix}` as keyof AggDataEntry];
   return typeof value === 'number' ? value : 0;
+}
+
+/**
+ * Time to first token for a row, at the percentile `interactivity` uses for
+ * agentic rows and the median for fixed sequences — the same split the
+ * inference chart's TTFT axis makes. Undefined rather than zero when the row
+ * has no usable measurement: the first-token page filters on this value, and
+ * a zero would clear every cap.
+ */
+function firstTokenSeconds(
+  entry: AggDataEntry,
+  sequence: Sequence,
+  percentile: Percentile,
+): number | undefined {
+  const value =
+    sequence === Sequence.AgenticTraces
+      ? getAgenticMetric(entry, percentile, 'ttft')
+      : entry.median_ttft;
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : undefined;
 }
 
 /**
@@ -212,6 +231,8 @@ export function buildGpuGroups<M extends GroupMeta>(
     if (!grouped[groupKey]) grouped[groupKey] = [];
     groupMeta[groupKey] = meta;
 
+    const ttft = firstTokenSeconds(entry, sequence, percentile);
+
     grouped[groupKey].push({
       sourceRow: row,
       hwKey,
@@ -219,6 +240,7 @@ export function buildGpuGroups<M extends GroupMeta>(
         sequence === Sequence.AgenticTraces
           ? getAgenticMetric(entry, percentile, 'intvty')
           : entry.median_intvty,
+      ...(ttft === undefined ? {} : { ttft }),
       ...(sequence === Sequence.AgenticTraces
         ? {
             e2eLatency: getAgenticMetric(entry, percentile, 'e2el'),

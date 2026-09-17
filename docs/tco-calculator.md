@@ -1206,3 +1206,55 @@ The captured API fixtures carry no `agentic_traces` rows, so the Cypress spec
 (`cypress/e2e/profit-estimator.cy.ts`) intercepts availability and benchmarks with
 synthetic Kimi K3 curves from `cypress/support/profit-fixtures.ts`. The H200 curve
 stops below 45 tok/s/user on purpose so the exclusion path stays covered.
+
+## First-Token Limits (`/first-token`)
+
+> Hosted by `FirstTokenLimitsDisplay.tsx` with the selection in `first-token-limits.ts`
+> and the bars in `FirstTokenLimitsChart.tsx`. Mirrored at `/zh/first-token`. Footer-only
+> navigation, like Fleet Lifecycle.
+
+The calculator answers "what does each chip cost at this interactivity". This tab adds
+the constraint an interactivity target leaves out: how long the user waits for the first
+token. For each cap in a ladder (default 2 / 5 / 10 / 15 / 20 s) it keeps, per vendor, the
+cheapest **measured** row whose interactivity clears a floor (default 150 tok/s/user for
+AgentX, 35 for fixed sequences) and whose TTFT is under the cap. Under each cap it names
+the winning SKU against the runner-up vendor and the gap as a percentage of the runner-up.
+
+It started as a one-off article figure ("First-token limits change the best tested
+systems"); the point of the tab is that every model, workload, and precision gets the
+figure with no regeneration.
+
+- **Measured rows, not the frontier.** The calculator's spline tracks throughput against
+  interactivity; a TTFT cap is a third constraint the frontier does not carry, and a knot
+  that interpolates cheaply can sit between two rows whose first-token waits differ by
+  seconds. Reading rows keeps every bar a configuration that ran under both constraints,
+  and gives the tooltip and table a run URL to cite. The trade is granularity: a cheaper
+  configuration can sit just outside a cap and only appear under the next one, which the
+  note under the chart says.
+- **Two separate percentile statistics.** The floor and the cap are both read on the same
+  row, at the selected percentile for agentic rows (P90 by default, P75 behind the
+  feature gate) and the median for fixed sequences — the split the inference chart's
+  axes make. Clearing both means the row cleared each measure, not that every request
+  did; the note says that too.
+- **`ttft` on `GPUDataPoint`.** The shared row → point mapper (`buildGpuGroups`) sets it,
+  so official and overlay rows get it by the same rule. It is absent, never zero, when
+  the row has no measurement: a zero would clear every cap.
+- **Vendors from the registry.** Series are the vendors of the visible hardware
+  (`HW_REGISTRY[base].vendor`), NVIDIA then AMD then alphabetical, so a third vendor is
+  a third bar with no code change. A vendor with rows but nothing under a cap keeps its
+  slot with a `—` marker: "nothing measured under this limit" is the finding.
+- **Overlays are their own series.** Each `?unofficialrun=` run contributes one bar per
+  cap — its cheapest qualifying row across every chip it touched — in `overlayRunColor`,
+  labelled `✕ branch`. Overlay rows never enter a vendor bar or the gap summary. The
+  legend is the calculator's: one entry per chip governs official and overlay bars
+  together, and overlay-only hardware is merged in so it can be hidden.
+- **URL state.** `c_ivmin` (floor) and `c_ttft` (comma-joined ladder, at most eight
+  values) on top of the calculator seed (`g_model`, `i_seq`, `i_prec`, `i_pctl`,
+  `g_rundate`). Empty means the sequence-aware default and is not written, so a link
+  without them follows the defaults if they change.
+
+### Fixtures
+
+`cypress/e2e/first-token-limits.cy.ts` reuses `interceptCalculatorOverlayRun`: every
+fixed-sequence row reports a 0.5 s median TTFT, so `c_ttft=0.1,2` gives one cap nothing
+clears and one cap everything clears, and the interactivity floor picks the concurrency.

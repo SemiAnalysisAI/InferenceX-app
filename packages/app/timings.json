@@ -129,6 +129,10 @@
       "duration": 12735
     },
     {
+      "spec": "cypress/e2e/first-token-limits.cy.ts",
+      "duration": 4000
+    },
+    {
       "spec": "cypress/e2e/fixed-sequence-logs.cy.ts",
       "duration": 3002
     },

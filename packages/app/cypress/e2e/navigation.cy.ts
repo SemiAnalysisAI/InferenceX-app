@@ -53,6 +53,14 @@ describe('Chart Section Tabs — E2E', () => {
     cy.url().should('include', '/fleet');
   });
 
+  it('opens First-Token Limits from the footer link', () => {
+    cy.get('[data-testid="tab-trigger-first-token"]').should('not.exist');
+
+    cy.get('[data-testid="footer-link-first-token"]').scrollIntoView().click();
+    cy.url().should('include', '/first-token');
+    cy.get('[data-testid="first-token-controls"]').should('exist');
+  });
+
   it('opens GPU Reliability from the footer link', () => {
     cy.get('[data-testid="tab-trigger-reliability"]').should('not.exist');
 
