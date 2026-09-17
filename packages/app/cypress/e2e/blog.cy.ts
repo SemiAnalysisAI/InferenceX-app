@@ -43,7 +43,8 @@ describe('Blog', () => {
     });
 
     it('renders the blog page with heading', () => {
-      cy.get('h2').should('contain.text', 'Articles');
+      cy.get('h1').should('have.length', 1).and('contain.text', 'Articles');
+      cy.get('h2#blog-list-heading').should('contain.text', 'All articles');
     });
 
     it('displays at least one blog post card', () => {

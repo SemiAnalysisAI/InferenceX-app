@@ -32,6 +32,7 @@ const STRINGS = {
     agentx: 'AgentX',
     telemetry: 'Telemetry',
     articles: 'Articles',
+    whitepapers: 'Whitepapers',
     apiReference: 'API Reference',
     historicalTrends: 'Historical Trends',
     tcoCalculator: 'TCO Calculator',
@@ -67,6 +68,7 @@ const STRINGS = {
     agentx: 'AgentX',
     telemetry: '遥测数据',
     articles: '技术文章',
+    whitepapers: '白皮书',
     historicalTrends: '历史趋势',
     tcoCalculator: 'TCO 计算器',
     fleetLifecycle: '集群生命周期',
@@ -257,6 +259,14 @@ export const Footer = ({ starCount }: { starCount?: number | null }) => {
                   className="inline-flex min-h-11 items-center rounded-sm py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:outline-none md:min-h-8"
                 >
                   {t.articles}
+                </Link>
+                <Link
+                  data-testid="footer-link-whitepapers"
+                  href={`${prefix}/whitepaper`}
+                  onClick={() => track('footer_whitepapers_clicked')}
+                  className="inline-flex min-h-11 items-center rounded-sm py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:outline-none md:min-h-8"
+                >
+                  {t.whitepapers}
                 </Link>
                 <Link
                   data-testid="footer-link-api"
