@@ -88,7 +88,7 @@ it('rejects a shard with a foreign cluster rather than labeling it H100', () => 
 });
 
 describe('attention coverage', () => {
-  it('preserves mixed operator identities and reports latency without GEMM TFLOPS', () => {
+  it('preserves mixed operator identities and computes attention TFLOPS from query heads and QK/V dimensions', () => {
     const dataset = readOperatorXBundle(makeOperatorXAttentionBundle());
     expect(dataset.version).toBe(2);
     expect(dataset.run).toMatchObject({ requested: 3, measured: 3 });
@@ -97,7 +97,7 @@ describe('attention coverage', () => {
       m: null,
       dtype_a: null,
       latency_us: 12.5,
-      tflops: null,
+      tflops: 42.94967296,
       attention: {
         batch_size: 8,
         num_heads: 32,
@@ -110,7 +110,6 @@ describe('attention coverage', () => {
     expect(dataset.points[2]).toMatchObject({
       type: 'attention_mla',
       latency_us: 5.5,
-      tflops: null,
       attention: {
         num_heads: 128,
         head_dim_qk: 192,
@@ -120,6 +119,7 @@ describe('attention coverage', () => {
         dtype_v: 'bf16',
       },
     });
+    expect(dataset.points[2].tflops).toBeCloseTo(488.0644654545, 8);
   });
   it('includes unsupported backend pairs and missing attention in coverage', () => {
     const bundle = makeOperatorXAttentionBundle();
@@ -129,8 +129,12 @@ describe('attention coverage', () => {
     rows.pop();
     const dataset = readOperatorXBundle(bundle);
     expect(dataset.run).toMatchObject({ requested: 3, measured: 1, unsupported: 1, missing: 1 });
-    expect(dataset.points[1]).toMatchObject({ status: 'unsupported', latency_us: null });
-    expect(dataset.points[2]).toMatchObject({ status: 'missing', latency_us: null });
+    expect(dataset.points[1]).toMatchObject({
+      status: 'unsupported',
+      latency_us: null,
+      tflops: null,
+    });
+    expect(dataset.points[2]).toMatchObject({ status: 'missing', latency_us: null, tflops: null });
   });
   it('rejects duplicate attention results', () => {
     const bundle = makeOperatorXAttentionBundle();
@@ -144,5 +148,41 @@ describe('attention coverage', () => {
     const cases = object(cells[0]).cases as unknown[];
     object(object(object(cases[1]).shape).args).seq_len_q = 'one';
     expect(() => readOperatorXBundle(bundle)).toThrow('dimension');
+  });
+});
+
+describe('attention useful matmul throughput', () => {
+  // B=2, Hq=4, Hkv=2, Dqk=Dv=8: 256 FLOPs per visible Q/K pair, at 1 µs.
+  it.each([
+    ['dense rectangular', 2, 4, false, 0.002048], // 8 pairs
+    ['causal square with diagonal', 4, 4, true, 0.00256], // 1+2+3+4 pairs
+    ['causal rectangular prefill', 2, 4, true, 0.001792], // 3+4 pairs
+    ['causal decode', 1, 4, true, 0.001024], // all 4 KV positions
+    ['causal queries longer than KV', 4, 2, true, 0.000768], // 0+0+1+2 pairs
+    ['empty queries', 0, 4, false, null],
+  ])('%s', (_label, q, k, causal, expected) => {
+    const bundle = makeOperatorXAttentionBundle();
+    const row = object((object(bundle.shards[0].docs[0]).rows as unknown[])[1]);
+    Object.assign(object(object(row.op).args), {
+      batch_size: 2,
+      num_heads: 4,
+      num_heads_kv: 2,
+      head_dim: 8,
+      seq_len_q: q,
+      seq_len_kv: k,
+      causal,
+    });
+    row.metrics = { latency_us: 1 };
+    expect(readOperatorXBundle(bundle).points[1].tflops).toBe(expected);
+  });
+  it('does not compute throughput from a failed attention measurement', () => {
+    const bundle = makeOperatorXAttentionBundle();
+    const row = object((object(bundle.shards[0].docs[0]).rows as unknown[])[1]);
+    row.status = 'error';
+    expect(readOperatorXBundle(bundle).points[1]).toMatchObject({
+      status: 'error',
+      latency_us: null,
+      tflops: null,
+    });
   });
 });

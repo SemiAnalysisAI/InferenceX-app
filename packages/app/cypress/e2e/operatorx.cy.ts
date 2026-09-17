@@ -66,12 +66,26 @@ describe('OperatorX hidden GEMM explorer', () => {
 });
 
 describe('OperatorX attention selection', () => {
-  it('switches from GEMM throughput to MHA and MLA latency with complete shapes', () => {
-    const mixed = readOperatorXBundle(makeOperatorXAttentionBundle());
+  it('shows MHA and MLA throughput, switches to latency, and preserves complete shapes', () => {
+    const mixedBundle = makeOperatorXAttentionBundle();
+    const mixedCell = object((object(mixedBundle.manifest).include as unknown[])[0]);
+    const cases = mixedCell.cases as unknown[];
+    const fasterDecode = structuredClone(object(cases[1]));
+    object(object(fasterDecode.shape).args).batch_size = 1;
+    cases.push(fasterDecode);
+    (object(mixedBundle.shards[0].docs[0]).rows as unknown[]).push({
+      op: { ...object(fasterDecode.shape), backend: 'torch' },
+      testlist: 'attention',
+      status: 'ok',
+      metrics: { latency_us: 10 },
+    });
+    const mixed = readOperatorXBundle(mixedBundle);
     const attentionOnly = {
       ...mixed,
       run: { ...mixed.run, run_id: '456', requested: 1, measured: 1 },
-      points: mixed.points.filter((p) => p.type === 'attention_mha'),
+      points: mixed.points.filter(
+        (p) => p.type === 'attention_mha' && p.attention?.batch_size === 8,
+      ),
     };
     cy.intercept('GET', '/api/v1/operatorx/runs/456', attentionOnly);
     cy.intercept('GET', '/api/v1/operatorx/runs', {
@@ -82,29 +96,38 @@ describe('OperatorX attention selection', () => {
     cy.visit('/operatorx?run=123');
     cy.get('[data-testid="operatorx-peak"]').should('contain.text', '2.00 TFLOPS / GPU');
     cy.get('select[aria-label="Operator"]').select('attention_mha');
-    cy.get('[data-testid="operatorx-peak"]')
-      .should('contain.text', '12.50 µs')
-      .and('not.contain.text', 'TFLOPS');
+    cy.get('[data-testid="operatorx-peak"]').should('contain.text', '42.95 TFLOPS / GPU');
+    cy.get('[data-testid="operatorx-results"]').should('contain.text', '42.95');
+    cy.get('select[aria-label="Metric"]').select('latency');
+    cy.get('[data-testid="operatorx-peak"]').should('contain.text', '10.00 µs');
+    cy.get('[data-testid="operatorx-results"] tbody tr').first().should('contain.text', 'B=1 ·');
+    cy.get('select[aria-label="Metric"]').select('tflops');
+    cy.get('[data-testid="operatorx-results"] tbody tr').first().should('contain.text', 'B=8 ·');
+    cy.get('[data-testid="operatorx-chart"]').should('contain.text', 'TFLOPS / GPU');
     cy.get('select[aria-label="Metric"]')
-      .should('have.value', 'latency')
+      .should('have.value', 'tflops')
       .find('option')
-      .should('have.length', 1);
-    cy.get('[data-testid="operatorx-chart"] circle.point').should('have.length', 1);
+      .should('have.length', 2);
+    cy.get('[data-testid="operatorx-chart"] circle.point').should('have.length', 2);
     cy.get('[data-testid="operatorx-results"]').should(
       'contain.text',
       'B=8 · Q=1 KV=4096 · H=32/8 · D=128/128',
     );
     cy.get('select[aria-label="Operator"]').select('attention_mla');
     cy.get('[data-testid="operatorx-results"]').should('contain.text', 'D=192/128 · R=512');
+    cy.get('[data-testid="operatorx-peak"]').should('contain.text', '488.06 TFLOPS / GPU');
+    cy.get('select[aria-label="Metric"]').select('latency');
     cy.get('[data-testid="operatorx-peak"]').should('contain.text', '5.50 µs');
+    cy.get('[data-testid="operatorx-chart"]').should('contain.text', 'Latency (µs)');
+    cy.get('select[aria-label="Metric"]').select('tflops');
     cy.get('select[aria-label="Operator"]').select('gemm');
     cy.get('[data-testid="operatorx-peak"]').should('contain.text', '2.00 TFLOPS / GPU');
     cy.get('select[aria-label="Precision (A / B → output)"]').select('bf16 / bf16 → bf16');
     cy.get('select[aria-label="Run"]').select('456');
-    cy.get('[data-testid="operatorx-peak"]').should('contain.text', '12.50 µs');
+    cy.get('[data-testid="operatorx-peak"]').should('contain.text', '42.95 TFLOPS / GPU');
     cy.get('select[aria-label="Operator"]').should('have.value', 'attention_mha');
   });
-  it('defaults an attention-only run to latency in Chinese on mobile', () => {
+  it('defaults an attention-only run to throughput and supports latency in Chinese on mobile', () => {
     const mixed = readOperatorXBundle(makeOperatorXAttentionBundle());
     mixed.points = mixed.points.filter((p) => p.type === 'attention_mha');
     mixed.run.requested = 1;
@@ -114,11 +137,14 @@ describe('OperatorX attention selection', () => {
     cy.viewport(390, 844);
     cy.visit('/zh/operatorx?run=123');
     cy.get('select[aria-label="算子"]').should('have.value', 'attention_mha');
-    cy.get('[data-testid="operatorx-peak"]').should('contain.text', '12.50 µs');
+    cy.get('[data-testid="operatorx-peak"]').should('contain.text', '42.95 TFLOPS / GPU');
     cy.get('select[aria-label="精度（Q / K / V → 输出）"]').should(
       'contain.text',
       'bf16 / bf16 / bf16 → bf16',
     );
-    cy.contains('Attention 实测延迟').should('be.visible');
+    cy.contains('Attention 实测性能').should('be.visible');
+    cy.get('select[aria-label="指标"]').select('latency');
+    cy.get('[data-testid="operatorx-peak"]').should('contain.text', '12.50 µs');
+    cy.get('[data-testid="operatorx-results"]').should('contain.text', '42.95');
   });
 });

@@ -618,24 +618,24 @@ export const apiContractSourceDigests = [
     source: 'src/lib/operatorx-ingest.ts',
     sourceSha256: 'bec2e115e006457816fc8e915b51128ea57b1c481b06b50fb4698ec37d94b425',
     reviewArea: {
-      en: 'OperatorX provenance, run discovery, raw persistence, coverage, and per-GPU GEMM throughput, and attention latency.',
-      zh: 'OperatorX 来源校验、运行发现、原始数据持久化、覆盖情况、单卡 GEMM 性能及 attention 延迟。',
+      en: 'OperatorX provenance, run discovery, raw persistence, coverage, per-GPU GEMM and attention throughput, and latency.',
+      zh: 'OperatorX 来源校验、运行发现、原始数据持久化、覆盖情况、GEMM 和 attention 单卡吞吐量及延迟。',
     },
   },
   {
     source: '../db/src/operatorx/reader.ts',
-    sourceSha256: '1abaa64c0317936f2485561289961400f2cae655ac2d940ac409310a040fa455',
+    sourceSha256: 'b3006dc08f28de67b43276338816916c53a29006bdf46c822d04d92fd1e1bfe5',
     reviewArea: {
-      en: 'OperatorX provenance, run discovery, raw persistence, coverage, and per-GPU GEMM throughput, and attention latency.',
-      zh: 'OperatorX 来源校验、运行发现、原始数据持久化、覆盖情况、单卡 GEMM 性能及 attention 延迟。',
+      en: 'OperatorX provenance, run discovery, raw persistence, coverage, per-GPU GEMM and attention throughput, and latency.',
+      zh: 'OperatorX 来源校验、运行发现、原始数据持久化、覆盖情况、GEMM 和 attention 单卡吞吐量及延迟。',
     },
   },
   {
     source: '../db/src/queries/operatorx.ts',
     sourceSha256: '0fc724e70c55a14a4bed017c7d41e46659dec66f25fbcdf6d0ac0a290cbae144',
     reviewArea: {
-      en: 'OperatorX provenance, run discovery, raw persistence, coverage, and per-GPU GEMM throughput, and attention latency.',
-      zh: 'OperatorX 来源校验、运行发现、原始数据持久化、覆盖情况、单卡 GEMM 性能及 attention 延迟。',
+      en: 'OperatorX provenance, run discovery, raw persistence, coverage, per-GPU GEMM and attention throughput, and latency.',
+      zh: 'OperatorX 来源校验、运行发现、原始数据持久化、覆盖情况、GEMM 和 attention 单卡吞吐量及延迟。',
     },
   },
   {

@@ -12,20 +12,38 @@ MLA (`attention`, `attention_perf`) on NVIDIA and AMD, including the AMD AITER b
 reader matches every requested case/backend against its newest shard attempt,
 retains earlier shards in partial reruns, validates source/run/attempt/cluster
 metadata, and separates measured, unsupported, failed, and missing rows. Zero-size
-GEMMs have no throughput value. Attention reports latency in µs, with null TFLOPS. MLA measures materialized Q/K/V
+GEMMs have no throughput value. Attention reports latency in µs and useful matmul TFLOPS. MLA measures materialized Q/K/V
 attention only; cache projection and RoPE are excluded. PyTorch expands grouped KV
 before timing; AITER retains native grouped heads. Compare identical shapes,
 precisions, and backends. Other operators remain outside this view.
 
-TFLOPS is `2*M*N*K/(latency_us*1e6)`, per GPU. An eight-GPU Slurm allocation does
+GEMM TFLOPS is `2*M*N*K/(latency_us*1e6)`, per GPU. An eight-GPU Slurm allocation does
 not multiply this number. The UI preserves A/B/output precision, latency, shape,
 backend, cluster, source commit, run identity, and diagnostic messages. The operator selector keeps GEMM and each attention family separate. Attention defaults
-to latency versus batch size and preserves query/KV lengths, head counts, head
+to TFLOPS versus batch size, with a latency selector, and preserves query/KV lengths, head counts, head
 dimensions, KV rank, causality, and Q/K/V/output precision. API dataset version 2
 adds `type`, original `args`, and nullable `attention`; GEMM-specific fields are
 null for attention. Existing raw bundles are read without schema migration; old GEMM-only summary caches
-are rebuilt from persisted documents on the next run-list read. The chart
+are rebuilt from persisted documents on the next run-list read. Throughput is derived on read, so existing attention bundles gain TFLOPS without
+rerunning benchmarks or invalidating coverage-only summary caches. The chart
 shows successful measurements; the status filter exposes the other cases.
+
+## Attention TFLOPS
+
+Per-GPU TFLOPS is `2*B*Hq*P*(Dqk+Dv)/(latency_us*1e6)`.
+`P` counts visible query/key pairs per head: `Sq*Sk` without a causal mask;
+with bottom-right causality, `R*(2*Sk-R+1)/2`, where `R=min(Sq,Sk)`.
+This includes the diagonal, counts all KV for single-token decode, and excludes
+fully masked leading rows when `Sq>Sk`. It follows the valid-pair accounting in
+[AITER’s prefill benchmark](https://github.com/ROCm/aiter/blob/main/op_tests/op_benchmarks/triton/bench_batch_prefill.py).
+
+Two FLOPs are counted per multiply-add in QK and AV. GQA uses query heads, not KV
+heads. MLA uses `Dqk=head_dim_qk_nope+head_dim_qk_rope` and `Dv=head_dim_v`;
+`kv_lora_rank` does not add work to materialized attention. This is useful matmul
+throughput, not an instruction count or hardware utilization measurement. Softmax,
+projection, RoPE and masked work are excluded from the numerator; the denominator
+remains the measured attention latency. Failed, unsupported, missing, and empty
+cases have null TFLOPS. Kernel timing and saved measurements are unchanged.
 
 ## Persistence and deployment
 

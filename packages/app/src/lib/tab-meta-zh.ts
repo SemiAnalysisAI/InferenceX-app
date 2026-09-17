@@ -68,7 +68,7 @@ export const TAB_META_ZH: Record<DashboardRouteKey, { title: string; description
   operatorx: {
     title: 'OperatorX GEMM 和 Attention 基准测试',
     description:
-      '查看 OperatorX 实测 GEMM 单卡 TFLOPS 和 attention 延迟，按形状、精度和后端筛选，并检查运行覆盖情况。',
+      '查看 OperatorX 实测 GEMM 和 attention 的单卡 TFLOPS 与延迟，按形状、精度和后端筛选，并检查运行覆盖情况。',
   },
   collectivex: {
     title: 'CollectiveX 通信基准测试',
@@ -125,7 +125,7 @@ export const TAB_INTRO_ZH: Record<DashboardRouteKey, string> = {
     '本页面提供芯片规格对比：NVIDIA、AMD 等厂商加速器的显存容量、显存带宽、FLOPS、互连拓扑与功耗规格。',
   'gpu-metrics':
     '本页面展示芯片功耗与能效指标（PowerX）：推理负载下的实测功耗、每瓦 token 数与每兆瓦 token 产出。',
-  operatorx: '本页面展示 OperatorX 的 GEMM 单卡 TFLOPS、attention 实测延迟和完整测试覆盖情况。',
+  operatorx: '本页面展示 OperatorX 的 GEMM 和 attention 单卡 TFLOPS、实测延迟及完整测试覆盖情况。',
   collectivex:
     '本页面展示 CollectiveX 专家并行（EP）通信基准测试结果：在统一工作负载、正确性校验与采样协议下，对比 DeepEP、MoRI、UCCL 及 NCCL/RCCL 参考实现的分发（dispatch）、合并（combine）与完整往返延迟。跨芯片速率均按逻辑载荷计算；只有发布器确认完整且稳定的官方队列才会生成排名与推荐。',
   submissions:

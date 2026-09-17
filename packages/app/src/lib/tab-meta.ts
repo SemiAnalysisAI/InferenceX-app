@@ -69,7 +69,7 @@ export const TAB_META: Record<DashboardRouteKey, { title: string; description: s
   operatorx: {
     title: 'OperatorX GEMM and Attention Benchmarks',
     description:
-      'Measured GEMM TFLOPS and attention latency from OperatorX, with shape, precision, backend, and run coverage.',
+      'Measured GEMM and attention TFLOPS per GPU and latency from OperatorX, with shape, precision, backend, and run coverage.',
   },
   collectivex: {
     title: 'CollectiveX Communication Benchmarks',
