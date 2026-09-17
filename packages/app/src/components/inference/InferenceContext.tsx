@@ -55,6 +55,7 @@ import {
   useUrlStateSync,
 } from '@/hooks/useChartContext';
 import { useUrlState } from '@/hooks/useUrlState';
+import { useParetoHighlightToggle } from './hooks/useParetoHighlightToggle';
 import { useOpenRouterPricing } from '@/hooks/api/use-openrouter-pricing';
 import { DEFAULT_Y_AXIS_METRIC } from '@/lib/url-state';
 import { computeToggle } from '@/hooks/useTogglableSet';
@@ -591,6 +592,16 @@ export function InferenceProvider({
     () => getUrlParam('i_gradlabel') === '1',
   );
   const [showLineLabels, setShowLineLabels] = useState(initialLabelState.showLineLabels);
+  const {
+    visible: showParetoFrontier,
+    playful: paretoFrontierPlayful,
+    setVisible: setShowParetoFrontier,
+  } = useParetoHighlightToggle(getUrlParam('i_frontier'));
+  const {
+    visible: showParetoHinterland,
+    playful: paretoHinterlandPlayful,
+    setVisible: setShowParetoHinterland,
+  } = useParetoHighlightToggle(getUrlParam('i_hinterland'));
   const [userCosts, setUserCosts] = useState<Record<string, number | undefined> | null>(null);
   const [userPowers, setUserPowers] = useState<Record<string, number | undefined> | null>(null);
 
@@ -1580,6 +1591,8 @@ export function InferenceProvider({
       i_advlabel: serializedLabelState.i_advlabel,
       i_conclabel: showConcurrencyLabels ? '1' : '',
       i_gradlabel: showGradientLabels ? '1' : '',
+      i_frontier: showParetoFrontier ? (paretoFrontierPlayful ? '2' : '1') : '',
+      i_hinterland: showParetoHinterland ? (paretoHinterlandPlayful ? '2' : '1') : '',
       i_linelabel: serializedLabelState.i_linelabel,
       i_active: iActiveStr,
       i_vendor: quickFilterVendors.join(','),
@@ -1609,6 +1622,10 @@ export function InferenceProvider({
       useAdvancedLabels,
       showConcurrencyLabels,
       showGradientLabels,
+      showParetoFrontier,
+      showParetoHinterland,
+      paretoFrontierPlayful,
+      paretoHinterlandPlayful,
       showLineLabels,
       iActiveStr,
       quickFilterVendors,
@@ -1840,6 +1857,10 @@ export function InferenceProvider({
       useAdvancedLabels,
       showConcurrencyLabels,
       showGradientLabels,
+      showParetoFrontier,
+      showParetoHinterland,
+      paretoFrontierPlayful,
+      paretoHinterlandPlayful,
       showLineLabels,
     }),
     [
@@ -1863,6 +1884,10 @@ export function InferenceProvider({
       useAdvancedLabels,
       showConcurrencyLabels,
       showGradientLabels,
+      showParetoFrontier,
+      showParetoHinterland,
+      paretoFrontierPlayful,
+      paretoHinterlandPlayful,
       showLineLabels,
     ],
   );
@@ -1900,6 +1925,8 @@ export function InferenceProvider({
     setUseAdvancedLabels,
     setShowConcurrencyLabels,
     setShowGradientLabels,
+    setShowParetoFrontier,
+    setShowParetoHinterland,
     setShowLineLabels,
     setSelectedGPUs: setSelectedGPUsAndClear,
     setSelectedDates: setSelectedDatesAndClear,

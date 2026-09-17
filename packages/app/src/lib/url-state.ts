@@ -51,6 +51,8 @@ const URL_STATE_KEYS = [
   'i_advlabel',
   'i_conclabel',
   'i_gradlabel',
+  'i_frontier',
+  'i_hinterland',
   'i_linelabel',
   'i_active',
   // Quick filters (vendor / framework / deployment / mtp-stp / power tier).
@@ -160,6 +162,8 @@ export const PARAM_DEFAULTS: Record<UrlStateKey, string> = {
   i_advlabel: '',
   i_conclabel: '',
   i_gradlabel: '',
+  i_frontier: '',
+  i_hinterland: '',
   i_linelabel: '',
   i_active: '',
   i_vendor: '',
