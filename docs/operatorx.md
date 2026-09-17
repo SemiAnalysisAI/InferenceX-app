@@ -7,8 +7,7 @@ existing ↑↑↓↓ unlock exposes both tabs. `/operatorx` and `/zh/operatorx`
 same reader, chart, filters, and coverage. `?run=<GitHub Actions run ID>` opens a
 specific run, including a feature-branch run.
 
-The view covers single-GPU GEMM (`gemm`, `gemm_perf`), MHA/GQA and materialized
-MLA (`attention`, `attention_perf`) on NVIDIA and AMD, including the AMD AITER backend. The
+The view covers single-GPU GEMM (`gemm`, `gemm_perf`), MHA/GQA materialized MLA (`attention`, `attention_perf`), and routed MoE (`moe_gemm`) on NVIDIA and AMD, including the AMD AITER backend. The
 reader matches every requested case/backend against its newest shard attempt,
 retains earlier shards in partial reruns, validates source/run/attempt/cluster
 metadata, and separates measured, unsupported, failed, and missing rows. Zero-size
@@ -19,13 +18,9 @@ precisions, and backends. Other operators remain outside this view.
 
 GEMM TFLOPS is `2*M*N*K/(latency_us*1e6)`, per GPU. An eight-GPU Slurm allocation does
 not multiply this number. The UI preserves A/B/output precision, latency, shape,
-backend, cluster, source commit, run identity, and diagnostic messages. The operator selector keeps GEMM and each attention family separate. Attention defaults
+backend, cluster, source commit, run identity, and diagnostic messages. The operator selector keeps GEMM and each attention family and routed MoE separate. Attention defaults
 to TFLOPS versus batch size, with a latency selector, and preserves query/KV lengths, head counts, head
-dimensions, KV rank, causality, and Q/K/V/output precision. API dataset version 2
-adds `type`, original `args`, and nullable `attention`; GEMM-specific fields are
-null for attention. Existing raw bundles are read without schema migration; old GEMM-only summary caches
-are rebuilt from persisted documents on the next run-list read. Throughput is derived on read, so existing attention bundles gain TFLOPS without
-rerunning benchmarks or invalidating coverage-only summary caches. The chart
+dimensions, KV rank, causality, and Q/K/V/output precision. API dataset version 3 adds `moe_gemm` and nullable `moe` dimensions alongside `type`, original `args`, and nullable `attention`. Inapplicable operator fields are null. Existing raw bundles are read without schema migration; summary caches from earlier reader versions are rebuilt from persisted documents on the next run-list read, including previously omitted MoE coverage. Throughput is derived from measured latency on read. The chart
 shows successful measurements; the status filter exposes the other cases.
 
 ## Attention TFLOPS
@@ -44,6 +39,32 @@ throughput, not an instruction count or hardware utilization measurement. Softma
 projection, RoPE and masked work are excluded from the numerator; the denominator
 remains the measured attention latency. Failed, unsupported, missing, and empty
 cases have null TFLOPS. Kernel timing and saved measurements are unchanged.
+
+## Routed MoE and the Kimi K3 benchmark profile
+
+MoE charts use local token count on the x-axis and show per-GPU TFLOPS or latency.
+Each point preserves the profile name, activation/weight precision, hidden size,
+global and local expert/intermediate dimensions, top-k, EP, routed/shared TP,
+shared expert count, and routing distribution. Select identical shapes before comparing GPUs.
+
+The `kimi_k3_moe_perf` testlist follows the generic dimensions in
+[vLLM PR #50082](https://github.com/vllm-project/vllm/pull/50082): H=7168,
+I=3072, E=896 and top-k=16, with local tokens 1/16/128/1024. EP8 uses 112 local
+experts and I=3072; TP8 uses 896 experts and local I=384. These are single-GPU
+weight shapes, not live distributed groups. All selected routes target local experts;
+routing is prepared before timing. No communication is measured.
+
+This profile runs generic SiLU experts, not the native K3 MoE layer. Native K3 uses
+SITU, routed hidden size 3584, latent projections, and shared experts; those are
+outside this profile. The profile name remains visible so its measurements cannot
+be mistaken for full-model throughput.
+
+Useful gate/up/down matmul TFLOPS is
+`6*T*H*(top_k*I_local+n_shared*I/shared_TP)/(latency_us*1e6)`.
+`I_local=I/routed_TP`; EP changes local expert storage and is not divided out again.
+The K3 profile has `n_shared=0`. The numerator excludes activation and routing work;
+the denominator is the measured fused expert kernel latency. Missing, failed,
+unsupported, and empty cases have no TFLOPS value.
 
 ## Persistence and deployment
 

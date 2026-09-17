@@ -2,6 +2,7 @@ import { readOperatorXBundle, object } from '@semianalysisai/inferencex-db/opera
 import {
   makeOperatorXBundle,
   makeOperatorXAttentionBundle,
+  makeOperatorXMoeBundle,
 } from '@semianalysisai/inferencex-db/operatorx/test-fixture';
 const bundle = makeOperatorXBundle();
 const cell = object((object(bundle.manifest).include as unknown[])[0]);
@@ -146,5 +147,43 @@ describe('OperatorX attention selection', () => {
     cy.get('select[aria-label="指标"]').select('latency');
     cy.get('[data-testid="operatorx-peak"]').should('contain.text', '12.50 µs');
     cy.get('[data-testid="operatorx-results"]').should('contain.text', '42.95');
+  });
+});
+
+describe('OperatorX routed MoE selection', () => {
+  beforeEach(() => {
+    const mixed = readOperatorXBundle(makeOperatorXMoeBundle());
+    cy.intercept('GET', '/api/v1/operatorx/runs', { runs: [mixed.run], discovery_complete: true });
+    cy.intercept('GET', '/api/v1/operatorx/runs/123', mixed);
+  });
+  it('shows measured routed TFLOPS, local shard dimensions, and latency after changing operator', () => {
+    cy.visit('/operatorx?run=123');
+    cy.get('select[aria-label="Operator"]').select('moe_gemm');
+    cy.get('[data-testid="operatorx-peak"]').should('contain.text', '32.21 TFLOPS / GPU');
+    cy.get('[data-testid="operatorx-results"]')
+      .should('contain.text', 'Controlled routed expert profile')
+      .and('contain.text', 'I=1024/2048')
+      .and('contain.text', 'E=8/64')
+      .and('contain.text', 'EP=8 TP=2');
+    cy.get('select[aria-label="Precision (activation / weight)"]').select('bf16 / bf16');
+    cy.get('select[aria-label="Backend"]').select('vllm');
+    cy.get('[data-testid="operatorx-chart"] circle.point').should('have.length', 1);
+    cy.get('[data-testid="operatorx-chart"]').should('contain.text', 'Local tokens');
+    cy.get('select[aria-label="Metric"]').select('latency');
+    cy.get('[data-testid="operatorx-peak"]').should('contain.text', '100.00 µs');
+    cy.get('select[aria-label="Operator"]').select('attention_mha');
+    cy.get('select[aria-label="Metric"]').should('have.value', 'latency');
+    cy.get('[data-testid="operatorx-peak"]').should('contain.text', '12.50 µs');
+  });
+  it('preserves measured values and the profile scope in Chinese on mobile', () => {
+    cy.viewport(390, 844);
+    cy.visit('/zh/operatorx?run=123');
+    cy.get('select[aria-label="算子"]').select('moe_gemm');
+    cy.get('[data-testid="operatorx-peak"]').should('contain.text', '32.21 TFLOPS / GPU');
+    cy.get('select[aria-label="精度（激活 / 权重）"]').should('contain.text', 'bf16 / bf16');
+    cy.contains('路由 MoE 实测性能').should('be.visible');
+    cy.contains('预先生成的本地路由').should('be.visible');
+    cy.get('select[aria-label="指标"]').select('latency');
+    cy.get('[data-testid="operatorx-peak"]').should('contain.text', '100.00 µs');
   });
 });

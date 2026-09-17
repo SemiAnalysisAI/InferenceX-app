@@ -7,17 +7,25 @@ import { useClientSearchParams } from '@/hooks/useClientSearch';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
 import { useLocale } from '@/lib/use-locale';
 import { track } from '@/lib/analytics';
+import { escapeHtml } from '@/lib/utils';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Heading } from '@/components/ui/heading';
 
 const STRINGS = {
   en: {
-    description: 'GEMM and attention performance from OperatorX GitHub Actions runs.',
+    description: 'GEMM, attention and routed MoE performance from OperatorX GitHub Actions runs.',
     operator: 'Operator',
     attention_mha: 'MHA / GQA',
     attention_mla: 'MLA (materialized Q/K/V)',
     gemm: 'GEMM',
+    moe_gemm: 'MoE (routed experts)',
+    moePrecision: 'Precision (activation / weight)',
+    moeShape: 'MoE shape',
+    moeChart: 'Measured routed MoE performance',
+    tokensAxis: 'Local tokens (log scale)',
+    moeMethod:
+      'Per-GPU routed matmul TFLOPS = 6 × local tokens × hidden × (top-k × local intermediate + shared experts × intermediate ÷ shared TP) ÷ latency (µs) ÷ 10⁶. EP/TP describe local weight shapes; one GPU is timed and no communication is included. The Kimi K3 vLLM benchmark profile uses generic SiLU experts and precomputed local routing; native K3 SITU, latent projections and shared experts are outside that profile. Compare the same profile, precision and shard shape.',
     attentionPrecision: 'Precision (Q / K / V → output)',
     attentionShape: 'Attention shape',
     attentionChart: 'Measured attention performance',
@@ -65,11 +73,18 @@ const STRINGS = {
     note: 'Coverage counts refer to the entire selected run. Unsupported, failed, and missing cases have no TFLOPS value.',
   },
   zh: {
-    description: '来自 OperatorX GitHub Actions 运行的 GEMM 和 attention 性能数据。',
+    description: '来自 OperatorX GitHub Actions 运行的 GEMM、attention 和路由 MoE 性能数据。',
     operator: '算子',
     attention_mha: 'MHA / GQA',
     attention_mla: 'MLA（物化 Q/K/V）',
     gemm: 'GEMM',
+    moe_gemm: 'MoE（路由专家）',
+    moePrecision: '精度（激活 / 权重）',
+    moeShape: 'MoE 形状',
+    moeChart: '路由 MoE 实测性能',
+    tokensAxis: '本地 token 数（对数坐标）',
+    moeMethod:
+      '单卡路由矩阵乘法 TFLOPS = 6 × 本地 token 数 × hidden ×（top-k × 本地 intermediate + 共享专家数 × intermediate ÷ shared TP）÷ 延迟（µs）÷ 10⁶。EP/TP 表示本地权重形状；每次只测量一张 GPU，不包含通信。Kimi K3 vLLM benchmark profile 使用通用 SiLU 专家和预先生成的本地路由，不包含原生 K3 的 SITU、latent 投影或共享专家。比较时需保持测试配置、精度和分片形状一致。',
     attentionPrecision: '精度（Q / K / V → 输出）',
     attentionShape: 'Attention 形状',
     attentionChart: 'Attention 实测性能',
@@ -127,18 +142,23 @@ const colors: Record<string, string> = {
   int4: '#f97316',
 };
 function precision(p: OperatorXPoint) {
+  if (p.moe) return `${p.moe.dtype_act} / ${p.moe.dtype_weight}`;
   const a = p.attention;
   return a
     ? `${a.dtype_q} / ${a.dtype_k} / ${a.dtype_v} → ${a.dtype_o}`
     : `${p.dtype_a} / ${p.dtype_b} → ${p.dtype_out}`;
 }
 function shape(p: OperatorXPoint, withBatch = false) {
+  const m = p.moe;
+  if (m)
+    return `${p.name ?? 'MoE'} · ${withBatch ? `T=${m.num_tokens} · ` : ''}H=${m.hidden} I=${m.local_intermediate}/${m.intermediate} · E=${m.local_experts}/${m.num_experts} top-k=${m.top_k} · EP=${m.expert_parallel_size} TP=${m.routed_tensor_parallel_size} · shared=${m.n_shared_experts}/${m.shared_tensor_parallel_size} · ${m.expert_distribution}`;
   const a = p.attention;
   if (!a) return withBatch ? `${p.m} × ${p.n} × ${p.k}` : `${p.n} × ${p.k}`;
   return `${withBatch ? `B=${a.batch_size} · ` : ''}Q=${a.seq_len_q} KV=${a.seq_len_kv} · H=${a.num_heads}/${a.num_heads_kv} · D=${a.head_dim_qk}/${a.head_dim_v}${a.kv_lora_rank === null ? '' : ` · R=${a.kv_lora_rank}`} · causal=${a.causal}`;
 }
-const x = (p: OperatorXPoint) => p.attention?.batch_size ?? p.m ?? 0;
-const pointDtype = (p: OperatorXPoint) => p.attention?.dtype_q ?? p.dtype_a ?? '';
+const x = (p: OperatorXPoint) => p.moe?.num_tokens ?? p.attention?.batch_size ?? p.m ?? 0;
+const pointDtype = (p: OperatorXPoint) =>
+  p.moe?.dtype_act ?? p.attention?.dtype_q ?? p.dtype_a ?? '';
 const selectClass = 'bg-background border-input h-10 w-full rounded-md border px-3 text-sm';
 const format = (value: number | null) =>
   value === null
@@ -199,9 +219,10 @@ export default function OperatorXDisplay() {
   const points = query.data?.points;
   const kinds = [...new Set((points ?? []).map((p) => p.type))];
   const selectedOperator = kinds.find((kind) => kind === operator) ?? kinds[0] ?? 'gemm';
-  const isAttention = selectedOperator !== 'gemm';
-  const precisionLabel = isAttention ? t.attentionPrecision : t.precision;
-  const shapeLabel = isAttention ? t.attentionShape : t.shape;
+  const isAttention = selectedOperator === 'attention_mha' || selectedOperator === 'attention_mla';
+  const isMoe = selectedOperator === 'moe_gemm';
+  const precisionLabel = isMoe ? t.moePrecision : isAttention ? t.attentionPrecision : t.precision;
+  const shapeLabel = isMoe ? t.moeShape : isAttention ? t.attentionShape : t.shape;
   const filtered = useMemo(
     () =>
       (points ?? [])
@@ -397,7 +418,9 @@ export default function OperatorXDisplay() {
           </Card>
           <Card className="overflow-hidden p-3 sm:p-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <Heading as="h2">{isAttention ? t.attentionChart : t.chart}</Heading>
+              <Heading as="h2">
+                {isMoe ? t.moeChart : isAttention ? t.attentionChart : t.chart}
+              </Heading>
               <p data-testid="operatorx-peak" className="text-xl font-semibold tabular-nums">
                 {metric === 'latency' ? t.lowest : t.peak}:{' '}
                 {plotted.length > 0 ? format(peak) : '—'}{' '}
@@ -429,7 +452,10 @@ export default function OperatorXDisplay() {
                 watermark="logo"
                 xScale={{ type: 'log', domain: [minX, maxX * 1.1] }}
                 yScale={{ type: 'linear', domain: [0, maxY * 1.08] }}
-                xAxis={{ label: isAttention ? t.batchAxis : t.xAxis, tickCount: 7 }}
+                xAxis={{
+                  label: isMoe ? t.tokensAxis : isAttention ? t.batchAxis : t.xAxis,
+                  tickCount: 7,
+                }}
                 yAxis={{ label: metric === 'tflops' ? t.tflops : t.latency, tickCount: 5 }}
                 layers={[
                   {
@@ -453,14 +479,14 @@ export default function OperatorXDisplay() {
                   rulerType: 'crosshair',
                   attachToLayer: 0,
                   content: (p) =>
-                    `<div class="rounded border bg-background p-3 text-sm">${shape(p, true)}<br/>${format(p.tflops)} TFLOPS / GPU<br/>${format(p.latency_us)} µs</div>`,
+                    `<div class="rounded border bg-background p-3 text-sm">${escapeHtml(shape(p, true))}<br/>${format(p.tflops)} TFLOPS / GPU<br/>${format(p.latency_us)} µs</div>`,
                 }}
               />
             ) : (
               <p className="py-16 text-center text-muted-foreground">{t.noPoints}</p>
             )}
             <p className="text-muted-foreground mt-4 text-sm">
-              {isAttention ? t.attentionMethod : t.method}
+              {isMoe ? t.moeMethod : isAttention ? t.attentionMethod : t.method}
             </p>
           </Card>
           <Card className="p-5">
@@ -472,7 +498,7 @@ export default function OperatorXDisplay() {
                 <thead>
                   <tr className="border-b">
                     {[
-                      isAttention ? t.attentionShape : 'M × N × K',
+                      isMoe ? t.moeShape : isAttention ? t.attentionShape : 'M × N × K',
                       precisionLabel,
                       t.backend,
                       t.tflops,
@@ -496,7 +522,7 @@ export default function OperatorXDisplay() {
                       <td className="px-3 py-2 tabular-nums">{format(p.latency_us)}</td>
                       <td className="px-3 py-2">{t[p.status]}</td>
                       <td className="max-w-sm px-3 py-2">
-                        {(p.message || p.attention) && (
+                        {(p.message || p.attention || p.moe) && (
                           <details>
                             <summary
                               className="cursor-pointer"

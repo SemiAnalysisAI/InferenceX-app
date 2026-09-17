@@ -6,21 +6,21 @@ OperatorX 与 CollectiveX 一同位于 **Hidden**，通过 ↑↑↓↓ 解锁�
 `/zh/operatorx` 使用相同的读取器、图表、筛选和覆盖统计。`?run=<GitHub Actions run ID>`
 可查看指定运行，包括功能分支。
 
-支持 NVIDIA 和 AMD 的单卡 GEMM、MHA/GQA、物化 MLA，以及 AMD AITER attention 后端。
+支持 NVIDIA 和 AMD 的单卡 GEMM、MHA/GQA、物化 MLA、路由 MoE，以及 AMD AITER attention 后端。
 读取器按分片最新尝试匹配计划中的测试和后端，保留局部重跑未触及的分片，并校验来源。
 已测量、不支持、失败和缺失的测试分别统计。GEMM 单卡 TFLOPS 为
 `2*M*N*K/(latency_us*1e6)`；零维度 GEMM 没有吞吐量。节点分配的 GPU 数不会使指标倍增。
 
 Attention 显示 µs 延迟和有效矩阵乘法 TFLOPS，默认展示 TFLOPS，也可切换为延迟。MLA 仅测量物化 Q/K/V 的 attention，
 不包含缓存投影或 RoPE。PyTorch 在计时前展开分组 KV，AITER 保留原生分组 head。
-比较时需保持形状、精度和后端一致。算子选择器分别展示 GEMM、MHA/GQA 和 MLA。
+比较时需保持形状、精度和后端一致。算子选择器分别展示 GEMM、MHA/GQA、MLA 和路由 MoE。
 Attention 图表以 batch size 为横轴，保留 query/KV 长度、head 数、head dimension、
 KV rank、因果语义及 Q/K/V/输出精度。其他算子暂未纳入。
 
-API 数据集版本 2 增加 `type`、原始 `args` 和可空的 `attention`；attention 的 GEMM
-专用字段为 null。现有原始数据无需迁移表结构即可读取；下次读取运行列表时，会根据已保存文档重建旧版
-仅统计 GEMM 的摘要缓存。读取时根据原始数据计算吞吐量，因此已有 attention 运行无需重跑，
-也不需要清除仅保存覆盖统计的摘要缓存。失败运行中的成功测量仍可显示。
+API 数据集版本 3 增加 `moe_gemm` 和可空的 `moe` 维度对象，并保留 `type`、原始 `args`
+及可空的 `attention`。不适用的算子字段为 null。现有原始数据无需迁移表结构即可读取；
+下次读取运行列表时，会根据已保存文档重建旧版读取器的摘要缓存，纳入此前未统计的 MoE。
+吞吐量在读取时根据实测延迟计算。失败运行中的成功测量仍可显示。
 
 ## Attention TFLOPS
 
@@ -36,6 +36,28 @@ MLA 使用 `Dqk=head_dim_qk_nope+head_dim_qk_rope` 和 `Dv=head_dim_v`；
 不是实际指令数或硬件利用率。分子不计 softmax、投影、RoPE 和被掩码遮挡位置的计算量，
 分母仍是实测 attention 延迟。失败、不支持、缺失及空形状测试的 TFLOPS 为 null。
 内核计时方式和已保存的测量数据均不改变。
+
+## 路由 MoE 与 Kimi K3 benchmark profile
+
+MoE 图表以本地 token 数为横轴，支持单卡 TFLOPS 和延迟。每个数据点保留测试配置名称、
+激活/权重精度、hidden size、全局及本地专家数和 intermediate 维度、top-k、EP、
+路由/共享 TP、共享专家数和路由分布。跨 GPU 比较时需选择相同形状。
+
+`kimi_k3_moe_perf` 使用 [vLLM PR #50082](https://github.com/vllm-project/vllm/pull/50082)
+中的通用维度：H=7168、I=3072、E=896、top-k=16，本地 token 数为 1/16/128/1024。
+EP8 使用 112 个本地专家和 I=3072；TP8 使用 896 个专家和本地 I=384。
+这些参数表示单卡权重形状，并未创建实际分布式进程组。所有选中的路由均指向本地专家，
+路由在计时前生成，不测量通信。
+
+该配置运行通用 SiLU 专家，不代表原生 K3 MoE 层。原生 K3 使用 SITU、3584 维的路由
+hidden size、latent 投影和共享专家，这些均不在本次测量范围内。UI 保留配置名称，
+便于区分这些测量与完整模型吞吐量。
+
+有效 gate/up/down 矩阵乘法 TFLOPS 为
+`6*T*H*(top_k*I_local+n_shared*I/shared_TP)/(latency_us*1e6)`。
+其中 `I_local=I/routed_TP`；EP 改变本地专家存储量，计算时不再除以 EP。
+K3 配置的 `n_shared=0`。分子不计激活和路由计算量，分母为实测融合专家内核延迟。
+缺失、失败、不支持及空形状测试没有 TFLOPS 值。
 
 ## 持久化与部署
 

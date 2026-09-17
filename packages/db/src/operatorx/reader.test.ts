@@ -1,6 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { gemmTflops, readOperatorXBundle, object } from './reader';
-import { makeOperatorXBundle, makeOperatorXAttentionBundle } from './test-fixture';
+import {
+  makeOperatorXBundle,
+  makeOperatorXAttentionBundle,
+  makeOperatorXMoeBundle,
+} from './test-fixture';
 
 describe('OperatorX dense GEMM reader', () => {
   it('computes 2 TFLOPS for one billion multiply-adds in 1 ms on one GPU', () => {
@@ -90,7 +94,7 @@ it('rejects a shard with a foreign cluster rather than labeling it H100', () => 
 describe('attention coverage', () => {
   it('preserves mixed operator identities and computes attention TFLOPS from query heads and QK/V dimensions', () => {
     const dataset = readOperatorXBundle(makeOperatorXAttentionBundle());
-    expect(dataset.version).toBe(2);
+    expect(dataset.version).toBe(3);
     expect(dataset.run).toMatchObject({ requested: 3, measured: 3 });
     expect(dataset.points[1]).toMatchObject({
       type: 'attention_mha',
@@ -182,6 +186,50 @@ describe('attention useful matmul throughput', () => {
     expect(readOperatorXBundle(bundle).points[1]).toMatchObject({
       status: 'error',
       latency_us: null,
+      tflops: null,
+    });
+  });
+});
+
+describe('routed MoE throughput', () => {
+  it('derives local expert/intermediate dimensions and does not divide work by EP twice', () => {
+    const result = readOperatorXBundle(makeOperatorXMoeBundle());
+    expect(result.run).toMatchObject({ requested: 4, measured: 4 });
+    expect(result.points[3]).toMatchObject({
+      type: 'moe_gemm',
+      m: null,
+      attention: null,
+      latency_us: 100,
+      tflops: 32.21225472,
+      moe: { num_tokens: 128, local_experts: 8, local_intermediate: 1024, top_k: 4 },
+    });
+  });
+  it('counts a shared expert with its own TP slice', () => {
+    const bundle = makeOperatorXMoeBundle();
+    const row = object((object(bundle.shards[1].docs[0]).rows as unknown[])[0]);
+    Object.assign(object(object(row.op).args), {
+      n_shared_experts: 1,
+      shared_tensor_parallel_size: 4,
+    });
+    expect(readOperatorXBundle(bundle).points[3].tflops).toBe(36.23878656);
+  });
+  it('rejects indivisible expert shards', () => {
+    const bundle = makeOperatorXMoeBundle();
+    const row = object((object(bundle.shards[1].docs[0]).rows as unknown[])[0]);
+    object(object(row.op).args).expert_parallel_size = 3;
+    expect(() => readOperatorXBundle(bundle)).toThrow('MoE shard');
+  });
+  it('retains unsupported and missing MoE without manufacturing throughput', () => {
+    const bundle = makeOperatorXMoeBundle();
+    const rows = object(bundle.shards[1].docs[0]).rows as Record<string, unknown>[];
+    rows[0].status = 'unsupported';
+    expect(readOperatorXBundle(bundle).points[3]).toMatchObject({
+      status: 'unsupported',
+      tflops: null,
+    });
+    rows.pop();
+    expect(readOperatorXBundle(bundle).points[3]).toMatchObject({
+      status: 'missing',
       tflops: null,
     });
   });
