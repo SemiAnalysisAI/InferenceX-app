@@ -5,6 +5,7 @@ Design rationale and non-obvious conventions. See [CLAUDE.md](../CLAUDE.md) for 
 ## Docs
 
 - [Dashboard Read-only Views](./dashboard-readonly-views.md): API/filter inventory, source audit and verification scope
+- [Pareto Boundary API](./pareto-api.md): Query frontier and hinterland observations, preserve provenance, and distinguish API scope from chart highlights.
 
 - [API Skill Examples](./inferencex-api-examples.md) — Install the public skill, query benchmarks, export measured PowerX data, and explain empty results
 - [PowerX System Power](./powerx-system-power.md) — Pinned chassis model, measured-input guards, assumptions, and reproducible article exports
