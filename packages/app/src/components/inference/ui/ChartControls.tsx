@@ -96,7 +96,7 @@ const STRINGS = {
     gpuConfig: 'Chip Config',
     gpuConfigTooltip:
       'Select up to 4 chip configurations to compare their historical performance over time. This allows for tracking how software updates may affect specific hardware.',
-    gpuConfigPlaceholder: 'Select a Chip Config for comparison',
+    gpuConfigPlaceholder: 'Select Chip Config',
     comparisonDateRange: 'Comparison Date Range',
     comparisonDateRangeTooltip:
       'Select the start and end dates for the historical comparison. The chart will show performance data for the selected chip configs across this time range.',
@@ -140,7 +140,7 @@ const STRINGS = {
     gpuConfig: '芯片配置',
     gpuConfigTooltip:
       '最多选择 4 个芯片配置以对比其历史性能趋势。可用于追踪软件更新对特定硬件的影响。',
-    gpuConfigPlaceholder: '选择芯片配置进行对比',
+    gpuConfigPlaceholder: '选择芯片配置',
     comparisonDateRange: '对比日期范围',
     comparisonDateRangeTooltip:
       '选择历史对比的起止日期。图表将展示所选芯片配置在此时间范围内的性能数据。',
