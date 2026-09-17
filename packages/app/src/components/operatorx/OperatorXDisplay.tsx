@@ -20,11 +20,11 @@ const STRINGS = {
     gemm: 'GEMM',
     attentionPrecision: 'Precision (Q / K / V → output)',
     attentionShape: 'Attention shape',
-    attentionChart: 'Measured attention latency',
+    attentionChart: 'Measured attention performance',
     batchAxis: 'Batch size (log scale)',
     lowest: 'Lowest latency in selection',
     attentionMethod:
-      'Attention is reported as latency in µs. MLA measures attention on materialized Q/K/V; cache projection and RoPE are excluded. PyTorch expands grouped KV before timing; AITER uses native grouped heads. Compare identical shapes, precisions, and backends. GEMM TFLOPS does not apply to attention.',
+      'Attention TFLOPS = 2 × batch size × query heads × valid Q/K pairs × (QK dimension + V dimension) ÷ latency (µs) ÷ 10⁶, per GPU. Causal masks count only visible pairs, including the diagonal; decode sees all KV. This counts useful QK and AV matmul work, excluding softmax, cache projection and RoPE. MLA uses materialized Q/K/V. PyTorch expands grouped KV before timing; AITER uses native grouped heads. Compare identical shapes, precisions, and backends.',
     run: 'Run',
     refresh: 'Refresh',
     loading: 'Loading OperatorX results…',
@@ -72,11 +72,11 @@ const STRINGS = {
     gemm: 'GEMM',
     attentionPrecision: '精度（Q / K / V → 输出）',
     attentionShape: 'Attention 形状',
-    attentionChart: 'Attention 实测延迟',
+    attentionChart: 'Attention 实测性能',
     batchAxis: 'Batch size（对数坐标）',
     lowest: '当前筛选结果最低延迟',
     attentionMethod:
-      'Attention 以 µs 为单位显示延迟。MLA 只测量物化 Q/K/V 的 attention，不包含缓存投影或 RoPE。PyTorch 在计时前展开分组 KV，AITER 使用原生分组 head。比较时需保持形状、精度和后端一致。GEMM 的 TFLOPS 公式不适用于 attention。',
+      'Attention 单卡 TFLOPS = 2 × batch size × query head 数 × 有效 Q/K 对数 ×（QK 维度 + V 维度）÷ 延迟（µs）÷ 10⁶。因果掩码只计入可见位置，包含对角线；decode 可访问全部 KV。该指标统计 QK 和 AV 矩阵乘法的有效计算量，不计 softmax、缓存投影或 RoPE。MLA 使用物化 Q/K/V。PyTorch 在计时前展开分组 KV，AITER 使用原生分组 head。比较时需保持形状、精度和后端一致。',
     run: '运行',
     refresh: '刷新',
     loading: '正在加载 OperatorX 结果…',
@@ -200,7 +200,6 @@ export default function OperatorXDisplay() {
   const kinds = [...new Set((points ?? []).map((p) => p.type))];
   const selectedOperator = kinds.find((kind) => kind === operator) ?? kinds[0] ?? 'gemm';
   const isAttention = selectedOperator !== 'gemm';
-  const visibleMetric = isAttention ? 'latency' : metric;
   const precisionLabel = isAttention ? t.attentionPrecision : t.precision;
   const shapeLabel = isAttention ? t.attentionShape : t.shape;
   const filtered = useMemo(
@@ -216,11 +215,11 @@ export default function OperatorXDisplay() {
             (!filters.status || p.status === filters.status),
         )
         .sort((a, b) =>
-          isAttention
+          metric === 'latency'
             ? (a.latency_us ?? Infinity) - (b.latency_us ?? Infinity)
             : (b.tflops ?? -1) - (a.tflops ?? -1),
         ),
-    [points, filters, selectedOperator, isAttention],
+    [points, filters, selectedOperator, metric],
   );
   const plotted = useMemo(
     () =>
@@ -228,9 +227,9 @@ export default function OperatorXDisplay() {
         (p) =>
           p.status === 'ok' &&
           x(p) > 0 &&
-          (isAttention ? p.latency_us !== null : p.tflops !== null),
+          (metric === 'latency' ? p.latency_us !== null : p.tflops !== null),
       ),
-    [filtered, isAttention],
+    [filtered, metric],
   );
   const displayedPage = Math.min(page, Math.max(0, Math.ceil(filtered.length / 100) - 1));
   const options = (key: 'precision' | 'shape' | 'backend' | 'cluster') => [
@@ -250,15 +249,16 @@ export default function OperatorXDisplay() {
     setPage(0);
     track('operatorx_filter_changed', { filter: key, value });
   };
-  const y = (p: OperatorXPoint) => (visibleMetric === 'tflops' ? p.tflops! : p.latency_us!);
+  const y = (p: OperatorXPoint) => (metric === 'tflops' ? p.tflops! : p.latency_us!);
   const xValues = plotted.map(x);
   const yValues = plotted.map(y);
   const minX = xValues.length > 0 ? Math.min(...xValues) : 1;
   const maxX = Math.max(...xValues, 2);
   const maxY = Math.max(...yValues, 1);
-  const peak = isAttention
-    ? Math.min(...plotted.map((p) => p.latency_us!))
-    : Math.max(...plotted.map((p) => p.tflops!), 0);
+  const peak =
+    metric === 'latency'
+      ? Math.min(...plotted.map((p) => p.latency_us!))
+      : Math.max(...plotted.map((p) => p.tflops!), 0);
   const run = query.data?.run;
   return (
     <div className="space-y-6" data-testid="operatorx-display">
@@ -371,17 +371,14 @@ export default function OperatorXDisplay() {
               />
               <Filter
                 label={t.metric}
-                value={visibleMetric}
-                options={
-                  isAttention
-                    ? [{ value: 'latency', label: t.latency }]
-                    : [
-                        { value: 'tflops', label: t.tflops },
-                        { value: 'latency', label: t.latency },
-                      ]
-                }
+                value={metric}
+                options={[
+                  { value: 'tflops', label: t.tflops },
+                  { value: 'latency', label: t.latency },
+                ]}
                 onChange={(value) => {
                   setMetric(value);
+                  setPage(0);
                   track('operatorx_metric_changed', { value });
                 }}
               />
@@ -402,8 +399,9 @@ export default function OperatorXDisplay() {
             <div className="flex flex-wrap items-center justify-between gap-3">
               <Heading as="h2">{isAttention ? t.attentionChart : t.chart}</Heading>
               <p data-testid="operatorx-peak" className="text-xl font-semibold tabular-nums">
-                {isAttention ? t.lowest : t.peak}: {plotted.length > 0 ? format(peak) : '—'}{' '}
-                {isAttention ? 'µs' : 'TFLOPS / GPU'}
+                {metric === 'latency' ? t.lowest : t.peak}:{' '}
+                {plotted.length > 0 ? format(peak) : '—'}{' '}
+                {metric === 'latency' ? 'µs' : 'TFLOPS / GPU'}
                 {plotted[0] && (
                   <span className="text-muted-foreground ml-2 text-sm">
                     {precision(plotted[0])}
@@ -432,7 +430,7 @@ export default function OperatorXDisplay() {
                 xScale={{ type: 'log', domain: [minX, maxX * 1.1] }}
                 yScale={{ type: 'linear', domain: [0, maxY * 1.08] }}
                 xAxis={{ label: isAttention ? t.batchAxis : t.xAxis, tickCount: 7 }}
-                yAxis={{ label: visibleMetric === 'tflops' ? t.tflops : t.latency, tickCount: 5 }}
+                yAxis={{ label: metric === 'tflops' ? t.tflops : t.latency, tickCount: 5 }}
                 layers={[
                   {
                     type: 'point',
@@ -455,7 +453,7 @@ export default function OperatorXDisplay() {
                   rulerType: 'crosshair',
                   attachToLayer: 0,
                   content: (p) =>
-                    `<div class="rounded border bg-background p-3 text-sm">${shape(p, true)}<br/>${p.type === 'gemm' ? `${format(p.tflops)} TFLOPS / GPU<br/>` : ''}${format(p.latency_us)} µs</div>`,
+                    `<div class="rounded border bg-background p-3 text-sm">${shape(p, true)}<br/>${format(p.tflops)} TFLOPS / GPU<br/>${format(p.latency_us)} µs</div>`,
                 }}
               />
             ) : (
@@ -477,7 +475,7 @@ export default function OperatorXDisplay() {
                       isAttention ? t.attentionShape : 'M × N × K',
                       precisionLabel,
                       t.backend,
-                      ...(isAttention ? [] : [t.tflops]),
+                      t.tflops,
                       t.latency,
                       t.status,
                       t.details,
@@ -494,9 +492,7 @@ export default function OperatorXDisplay() {
                       <td className="px-3 py-2 whitespace-nowrap font-mono">{shape(p, true)}</td>
                       <td className="px-3 py-2 whitespace-nowrap">{precision(p)}</td>
                       <td className="px-3 py-2">{p.backend}</td>
-                      {!isAttention && (
-                        <td className="px-3 py-2 tabular-nums">{format(p.tflops)}</td>
-                      )}
+                      <td className="px-3 py-2 tabular-nums">{format(p.tflops)}</td>
                       <td className="px-3 py-2 tabular-nums">{format(p.latency_us)}</td>
                       <td className="px-3 py-2">{t[p.status]}</td>
                       <td className="max-w-sm px-3 py-2">

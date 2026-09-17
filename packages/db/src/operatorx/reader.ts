@@ -106,6 +106,18 @@ export function gemmTflops(m: number, n: number, k: number, latencyUs: number): 
   return Number.isFinite(result) ? result : null;
 }
 
+/** Useful QK + AV matmul work; excludes softmax, projection, RoPE and masked pairs. */
+function attentionTflops(a: OperatorXAttention, latencyUs: number): number | null {
+  const { batch_size: b, seq_len_q: q, seq_len_kv: k, num_heads: h } = a;
+  if (![b, q, k, h, a.head_dim_qk, a.head_dim_v].every((v) => v > 0)) return null;
+  // Bottom-right causality: decode sees all KV; q > k starts with fully masked rows.
+  // Count the diagonal too, rather than halving every causal workload.
+  const rows = Math.min(q, k);
+  const pairs = a.causal ? (rows * (2 * k - rows + 1)) / 2 : q * k;
+  const result = (2 * b * h * pairs * (a.head_dim_qk + a.head_dim_v)) / (latencyUs * 1e6);
+  return Number.isFinite(result) ? result : null;
+}
+
 export function readOperatorXBundle(bundle: OperatorXBundle): OperatorXDataset {
   const manifest = object(bundle.manifest);
   if (
@@ -216,8 +228,10 @@ export function readOperatorXBundle(bundle: OperatorXBundle): OperatorXDataset {
           latency_us: status === 'ok' ? Number(latency) : null,
           tflops: null,
         };
-        if (gemm && point.latency_us !== null)
-          point.tflops = gemmTflops(point.m!, point.n!, point.k!, point.latency_us);
+        if (point.latency_us !== null)
+          point.tflops = attention
+            ? attentionTflops(attention, point.latency_us)
+            : gemmTflops(point.m!, point.n!, point.k!, point.latency_us);
         points.push(point);
       }
     }
