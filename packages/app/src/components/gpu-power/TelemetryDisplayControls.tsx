@@ -17,6 +17,7 @@ import {
   type SmoothingWindowS,
   type TelemetryDisplayMode,
   type TelemetryDisplayState,
+  type TelemetrySeriesMode,
 } from './telemetry-smoothing';
 
 const STRINGS = {
@@ -26,6 +27,10 @@ const STRINGS = {
     rolling: 'Rolling average',
     window: 'Window',
     windowOption: (s: number) => `${s} s`,
+    series: 'Lines',
+    chips: 'Per chip',
+    mean: 'Mean of chips',
+    both: 'Both',
   },
   zh: {
     display: '显示方式',
@@ -33,6 +38,10 @@ const STRINGS = {
     rolling: '滚动平均',
     window: '窗口',
     windowOption: (s: number) => `${s} 秒`,
+    series: '曲线',
+    chips: '单芯片',
+    mean: '芯片均值',
+    both: '两者',
   },
 } as const;
 
@@ -48,7 +57,8 @@ interface Props {
 
 /**
  * Display-mode controls shared by the PowerX explorer and the per-point PowerX
- * tab: raw samples vs. a time-window rolling average.
+ * tab: raw samples vs. a time-window rolling average, and per-chip lines vs.
+ * the mean across the visible chips.
  */
 export function TelemetryDisplayControls({
   value,
@@ -63,6 +73,11 @@ export function TelemetryDisplayControls({
   const modeOptions: SegmentedToggleOption<TelemetryDisplayMode>[] = [
     { value: 'points', label: t.points, testId: `${idPrefix}-mode-points` },
     { value: 'rolling', label: t.rolling, testId: `${idPrefix}-mode-rolling` },
+  ];
+  const seriesOptions: SegmentedToggleOption<TelemetrySeriesMode>[] = [
+    { value: 'chips', label: t.chips, testId: `${idPrefix}-series-chips` },
+    { value: 'mean', label: t.mean, testId: `${idPrefix}-series-mean` },
+    { value: 'both', label: t.both, testId: `${idPrefix}-series-both` },
   ];
 
   return (
@@ -105,6 +120,19 @@ export function TelemetryDisplayControls({
             </Select>
           </div>
         )}
+        <div className="space-y-1">
+          <Label id={`${idPrefix}-series-label`}>{t.series}</Label>
+          <SegmentedToggle
+            value={value.series}
+            options={seriesOptions}
+            role="group"
+            ariaLabel={t.series}
+            onValueChange={(series) => {
+              track(`${analyticsPrefix}_series_mode_changed`, { series });
+              onChange({ ...value, series });
+            }}
+          />
+        </div>
       </div>
     </div>
   );

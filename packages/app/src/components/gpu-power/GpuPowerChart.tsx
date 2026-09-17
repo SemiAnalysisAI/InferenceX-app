@@ -7,6 +7,8 @@ import { D3Chart } from '@/lib/d3-chart/D3Chart';
 import { useLocale } from '@/lib/use-locale';
 import {
   DEFAULT_TELEMETRY_DISPLAY,
+  estimateSampleIntervalMs,
+  meanAcrossSeries,
   rollingTimeAverage,
   type TelemetryDisplayState,
 } from './telemetry-smoothing';
@@ -31,6 +33,8 @@ const STRINGS = {
     temp: 'Temp',
     utilization: 'Chip Util',
     rollingSuffix: (windowS: number) => `${windowS} s rolling avg`,
+    meanChips: 'Mean of visible chips',
+    meanCount: (n: number) => `${n} chips`,
   },
   zh: {
     empty: '暂无可显示的芯片指标数据。',
@@ -42,6 +46,8 @@ const STRINGS = {
     temp: '温度',
     utilization: '芯片利用率',
     rollingSuffix: (windowS: number) => `${windowS} 秒滚动平均`,
+    meanChips: '可见芯片均值',
+    meanCount: (n: number) => `${n} 个芯片`,
   },
 } as const;
 
@@ -53,6 +59,8 @@ interface ParsedPoint {
   gpuIndex: number;
   /** The raw sample behind this point; null once the value has been averaged. */
   raw: GpuMetricRow | null;
+  /** For the mean line: how many chips contributed at this timestamp. */
+  count?: number;
 }
 
 interface GpuMetricsChartProps {
@@ -82,7 +90,7 @@ function buildGroupedData(
   data: GpuMetricRow[],
   visibleGpus: Set<number>,
   metricKey: GpuMetricKey,
-): Map<number, ParsedPoint[]> {
+): { t0Ms: number; groups: Map<number, ParsedPoint[]> } {
   // t=0 is the first sample of the whole series, not of the visible chips, so
   // hiding a chip never shifts the time axis under the remaining lines.
   let minTime = Infinity;
@@ -109,7 +117,23 @@ function buildGroupedData(
   for (const points of groups.values()) {
     points.sort((a, b) => a.seconds - b.seconds);
   }
-  return groups;
+  return { t0Ms: minTime, groups };
+}
+
+/** Mean across the visible chips, aligned by nearest sample within one poll interval. */
+function buildMeanSeries(groups: Map<number, ParsedPoint[]>, t0Ms: number): ParsedPoint[] {
+  const arrays = [...groups.values()];
+  if (arrays.length === 0) return [];
+  const longest = arrays.reduce((a, b) => (b.length > a.length ? b : a));
+  const mean = meanAcrossSeries(arrays, estimateSampleIntervalMs(longest));
+  return mean.map((p) => ({
+    seconds: (p.ms - t0Ms) / 1000,
+    ms: p.ms,
+    value: p.value,
+    gpuIndex: MEAN_INDEX,
+    raw: null,
+    count: p.count,
+  }));
 }
 
 /** Replace each point's value with its centered time-window mean. */
@@ -120,6 +144,18 @@ function smoothSeries(points: ParsedPoint[], windowS: number): ParsedPoint[] {
 
 /** Per-chip palette shared with legends that toggle chips on and off. */
 export const GPU_COLORS = d3.schemeTableau10;
+/** Pseudo chip index and line key for the mean across visible chips. */
+const MEAN_INDEX = -1;
+const MEAN_KEY = 'mean';
+const MEAN_COLOR = 'var(--foreground)';
+
+function lineKey(gpuIndex: number): string {
+  return gpuIndex === MEAN_INDEX ? MEAN_KEY : String(gpuIndex);
+}
+
+function colorFor(gpuIndex: number): string {
+  return gpuIndex === MEAN_INDEX ? MEAN_COLOR : GPU_COLORS[gpuIndex % GPU_COLORS.length]!;
+}
 const CHART_ID = 'gpu-metrics-line';
 const MARGIN = { top: 24, right: 20, bottom: 60, left: 60 };
 
@@ -138,20 +174,30 @@ const GpuMetricsChart = React.memo(
     const t = STRINGS[locale];
     const metricConfig = ALL_METRIC_OPTIONS.find((m) => m.key === metricKey)!;
     const rolling = display.mode === 'rolling';
+    const showChips = display.series !== 'mean';
+    const showMean = display.series !== 'chips';
 
-    const rawGroups = useMemo(
+    const { t0Ms, groups: rawGroups } = useMemo(
       () => buildGroupedData(data, visibleGpus, metricKey),
       [data, visibleGpus, metricKey],
     );
 
+    // Displayed series keyed by chip index (MEAN_INDEX for the mean line):
+    // per-chip and/or mean, then optionally smoothed.
     const groupedData = useMemo(() => {
-      if (!rolling) return rawGroups;
+      const series = new Map<number, ParsedPoint[]>();
+      if (showChips) for (const [gpuIndex, points] of rawGroups) series.set(gpuIndex, points);
+      if (showMean) {
+        const mean = buildMeanSeries(rawGroups, t0Ms);
+        if (mean.length > 0) series.set(MEAN_INDEX, mean);
+      }
+      if (!rolling) return series;
       const smoothed = new Map<number, ParsedPoint[]>();
-      for (const [gpuIndex, points] of rawGroups) {
+      for (const [gpuIndex, points] of series) {
         smoothed.set(gpuIndex, smoothSeries(points, display.windowS));
       }
       return smoothed;
-    }, [rawGroups, rolling, display.windowS]);
+    }, [rawGroups, t0Ms, showChips, showMean, rolling, display.windowS]);
 
     const allPoints = useMemo(() => {
       const pts: ParsedPoint[] = [];
@@ -163,10 +209,34 @@ const GpuMetricsChart = React.memo(
     const lineData = useMemo(() => {
       const result: Record<string, { x: number; y: number }[]> = {};
       for (const [gpuIndex, points] of groupedData) {
-        result[String(gpuIndex)] = points.map((p) => ({ x: p.seconds, y: p.value }));
+        result[lineKey(gpuIndex)] = points.map((p) => ({ x: p.seconds, y: p.value }));
       }
       return result;
     }, [groupedData]);
+
+    const hasMeanLine = groupedData.has(MEAN_INDEX);
+    const keyRow = hasMeanLine ? (
+      <div
+        className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground"
+        data-testid="gpu-metrics-chart-keys"
+      >
+        <span className="inline-flex items-center gap-1.5">
+          <span
+            aria-hidden
+            className="inline-block h-0.5 w-4 rounded"
+            style={{ background: MEAN_COLOR }}
+          />
+          {t.meanChips}
+        </span>
+      </div>
+    ) : null;
+    const resolvedCaption =
+      caption || keyRow ? (
+        <>
+          {caption}
+          {keyRow}
+        </>
+      ) : undefined;
 
     // Scale domains
     const xDomain = useMemo(() => {
@@ -247,8 +317,8 @@ const GpuMetricsChart = React.memo(
             key: 'gpu-lines',
             lines: lineData,
             config: {
-              getColor: (key) => GPU_COLORS[parseInt(key, 10) % GPU_COLORS.length],
-              strokeWidth: rolling ? 1.75 : 1.5,
+              getColor: (key) => (key === MEAN_KEY ? MEAN_COLOR : colorFor(parseInt(key, 10))),
+              getStrokeWidth: (key) => (key === MEAN_KEY ? 2.5 : rolling ? 1.75 : 1.5),
               curve: d3.curveMonotoneX,
             },
           },
@@ -264,8 +334,7 @@ const GpuMetricsChart = React.memo(
               getY: (d) => d.value,
               // Averaged mode draws lines only; the circles stay as invisible
               // hover targets so the tooltip and crosshair keep working.
-              getColor: (d) =>
-                rolling ? 'transparent' : GPU_COLORS[d.gpuIndex % GPU_COLORS.length],
+              getColor: (d) => (rolling ? 'transparent' : colorFor(d.gpuIndex)),
               getRadius: () => (rolling ? 3 : 2),
               maxPoints,
             },
@@ -280,11 +349,15 @@ const GpuMetricsChart = React.memo(
         tooltip={{
           rulerType: 'crosshair',
           content: (d: ParsedPoint, isPinned: boolean) => {
-            const color = GPU_COLORS[d.gpuIndex % GPU_COLORS.length];
+            const color = colorFor(d.gpuIndex);
             const sep = locale === 'zh' ? '：' : ':';
+            const title =
+              d.gpuIndex === MEAN_INDEX
+                ? `${t.meanChips}${d.count ? ` · ${t.meanCount(d.count)}` : ''}`
+                : `${t.chip} ${d.gpuIndex}`;
             return `<div class="rounded-md border bg-background/95 px-3 py-2 text-xs shadow-md backdrop-blur-sm" style="min-width: 160px; user-select: ${isPinned ? 'text' : 'none'}">
               ${isPinned ? `<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">${t.dismiss}</div>` : ''}
-              <div class="font-semibold mb-1" style="color: ${color}">${t.chip} ${d.gpuIndex}</div>
+              <div class="font-semibold mb-1" style="color: ${color}">${title}</div>
               <div class="text-muted-foreground">${d.seconds.toFixed(1)}${locale === 'zh' ? ' 秒' : 's'}</div>
               <div class="mt-1 font-medium">${getGpuMetricLabel(metricConfig, locale)}${sep} ${d.value.toFixed(1)} ${metricConfig.unit}</div>
               ${rolling ? `<div class="text-muted-foreground">${t.rollingSuffix(display.windowS)}</div>` : ''}
@@ -302,20 +375,20 @@ const GpuMetricsChart = React.memo(
           onHoverStart: (sel, d) => {
             sel
               .attr('r', 5)
-              .attr('fill', GPU_COLORS[d.gpuIndex % GPU_COLORS.length])
+              .attr('fill', colorFor(d.gpuIndex))
               .attr('stroke', 'white')
               .attr('stroke-width', 1);
           },
           onHoverEnd: (sel, d) => {
             sel
               .attr('r', rolling ? 3 : 2)
-              .attr('fill', rolling ? 'transparent' : GPU_COLORS[d.gpuIndex % GPU_COLORS.length])
+              .attr('fill', rolling ? 'transparent' : colorFor(d.gpuIndex))
               .attr('stroke', 'none');
           },
           attachToLayer: 2,
         }}
         legendElement={legendElement}
-        caption={caption}
+        caption={resolvedCaption}
       />
     );
   },
