@@ -116,7 +116,8 @@ def main() -> None:
         sys.exit(__doc__)
     spec_path, out_dir = sys.argv[1], sys.argv[2]
     spec_dir = os.path.dirname(os.path.abspath(spec_path))
-    spec = json.load(open(spec_path))
+    with open(spec_path, encoding="utf-8") as f:
+        spec = json.load(f)
     os.makedirs(out_dir, exist_ok=True)
     load_fonts()
     mark_rgba = plt.imread(resolve(spec_dir, spec["chart"]["vendor_mark"]))

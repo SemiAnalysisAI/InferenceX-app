@@ -42,7 +42,7 @@ export interface WhitepaperComparisonItem {
 
 /** One-line secondary scenario shown under the KPI tiles. */
 export interface WhitepaperComparison {
-  /** Scenario name, e.g. `Rented at $3.00/chip-hr (August 2026 3-year pricing)`. */
+  /** Scenario name, e.g. `Rented at $3.00/GPU/hr (August 2026 3-year pricing)`. */
   lead: string;
   items: readonly WhitepaperComparisonItem[];
 }
@@ -221,7 +221,8 @@ export const WHITEPAPERS: readonly Whitepaper[] = [
         {
           value: '$16.5B',
           label: 'Profit per GW-year',
-          caption: 'Owned at hyperscaler volume, $1.50/chip-hr ($3.95 per chip-hour)',
+          caption:
+            'Owned at hyperscaler volume at $1.50/GPU/hr compute; $3.95 of profit per chip-hour',
           icon: 'trending',
         },
         {
@@ -232,7 +233,7 @@ export const WHITEPAPERS: readonly Whitepaper[] = [
         },
       ],
       comparison: {
-        lead: 'Rented at $3.00/chip-hr (August 2026 3-year pricing)',
+        lead: 'Rented at $3.00/GPU/hr (August 2026 3-year pricing)',
         items: [
           { value: '$10.3B', label: 'profit' },
           { value: '31.5%', label: 'margin' },
@@ -350,7 +351,7 @@ export const WHITEPAPERS: readonly Whitepaper[] = [
         {
           value: '$16.5B',
           label: '每 GW·年利润',
-          caption: '按超大规模云厂商采购规模自建，$1.50/chip-hr（每芯片小时 $3.95）',
+          caption: '按超大规模云厂商采购规模自建，算力成本 $1.50/GPU/hr；每芯片小时利润 $3.95',
           icon: 'trending',
         },
         {
@@ -361,7 +362,7 @@ export const WHITEPAPERS: readonly Whitepaper[] = [
         },
       ],
       comparison: {
-        lead: '按 $3.00/chip-hr 租用（2026 年 8 月 3 年期租约价格）',
+        lead: '按 $3.00/GPU/hr 租用（2026 年 8 月 3 年期租约价格）',
         items: [
           { value: '$10.3B', label: '利润' },
           { value: '31.5%', label: '利润率' },

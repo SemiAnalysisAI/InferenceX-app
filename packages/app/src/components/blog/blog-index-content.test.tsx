@@ -60,11 +60,20 @@ describe('BlogIndexContent', () => {
   it('uses post figures as thumbnails and a text-free tile when a post has none', () => {
     const html = renderToStaticMarkup(<BlogIndexContent locale="en" />);
 
-    // Paired light/dark figures go through the themed image (per-theme data attributes).
-    expect(html).toContain('data-src-light="/images/newest/benchmark-light.png"');
-    expect(html).toContain('data-src-dark="/images/newest/benchmark-dark.png"');
-    // A single theme-neutral figure renders as a plain image.
-    expect(html).toContain('src="/images/mid/context.png"');
+    // Paired light/dark figures go through the themed image (per-theme data
+    // attributes), resized by the Next image optimizer. The featured card asks
+    // for the wide variant.
+    expect(html).toContain(
+      'data-src-light="/_next/image?url=%2Fimages%2Fnewest%2Fbenchmark-light.png&amp;w=1200&amp;q=75"',
+    );
+    expect(html).toContain(
+      'data-src-dark="/_next/image?url=%2Fimages%2Fnewest%2Fbenchmark-dark.png&amp;w=1200&amp;q=75"',
+    );
+    // A single theme-neutral figure renders as a plain responsive image.
+    expect(html).toContain(
+      'src="/_next/image?url=%2Fimages%2Fmid%2Fcontext.png&amp;w=640&amp;q=75"',
+    );
+    expect(html).toContain('sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"');
     // Posts without figures get the tile; the title never appears inside it.
     expect(html.match(/data-testid="blog-thumbnail-tile"/gu)).toHaveLength(2);
     expect(html.match(/data-testid="blog-thumbnail-figure"/gu)).toHaveLength(2);

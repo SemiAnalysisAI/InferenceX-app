@@ -837,36 +837,86 @@ describe('article index helpers', () => {
 });
 
 /** Mock `public/images/post/` with the given file names; null means the folder is missing. */
-function mockFigures(files: string[] | null) {
-  vi.spyOn(fs, 'existsSync').mockImplementation(
-    (p) => files !== null && String(p).endsWith(path.join('public', 'images', 'post')),
-  );
+function mockPost(mdx: string | null, files: string[] | null = null) {
+  vi.spyOn(fs, 'existsSync').mockImplementation((p) => {
+    const target = String(p);
+    if (target.endsWith(path.join('content', 'blog', 'post.mdx'))) return mdx !== null;
+    if (target.endsWith(path.join('public', 'images', 'post'))) return files !== null;
+    return false;
+  });
+  vi.spyOn(fs, 'readFileSync').mockReturnValue(mdx ?? '');
   vi.spyOn(fs, 'readdirSync').mockReturnValue((files ?? []) as any);
 }
 
+const FRONT = '---\ntitle: T\ndate: 2026-01-01\nsubtitle: S\n---\n';
+
 describe('getPostThumbnail', () => {
-  it('returns null when the folder is missing or has no raster image', () => {
-    mockFigures(null);
+  it('returns null when the post has no figure and the folder is missing or empty', () => {
+    mockPost(null, null);
     expect(getPostThumbnail('post')).toBeNull();
-    mockFigures(['notes.txt', 'diagram.svg']);
+    mockPost(`${FRONT}No figures here.`, ['notes.txt', 'diagram.svg']);
     expect(getPostThumbnail('post')).toBeNull();
   });
 
-  it('splits light and dark variants per theme when both exist', () => {
-    mockFigures(['specs-radar-light.png', 'benchmark-dark.png', 'benchmark-light.png']);
+  it('uses the first Figure in the body, local or allow-listed remote', () => {
+    mockPost(
+      `${FRONT}Intro\n\n<Figure\n  src="https://substack-post-media.s3.amazonaws.com/public/images/abc_2048x1300.png"\n  caption="x"\n/>\n\n<Figure src="/images/post/second.png" />`,
+    );
+    expect(getPostThumbnail('post')).toEqual({
+      light: 'https://substack-post-media.s3.amazonaws.com/public/images/abc_2048x1300.png',
+      dark: 'https://substack-post-media.s3.amazonaws.com/public/images/abc_2048x1300.png',
+    });
+  });
+
+  it('splits srcLight and srcDark per theme', () => {
+    mockPost(
+      `${FRONT}<Figure srcLight="/images/post/a-light.png" srcDark="/images/post/a-dark.png" alt="" />`,
+    );
+    expect(getPostThumbnail('post')).toEqual({
+      light: '/images/post/a-light.png',
+      dark: '/images/post/a-dark.png',
+    });
+  });
+
+  it('skips figures whose source is not an allowed raster image', () => {
+    mockPost(
+      `${FRONT}<Figure src="https://evil.example/x.png" />\n<Figure src="/images/post/chart.svg" />\n<Figure src="/images/post/ok.webp" />`,
+    );
+    expect(getPostThumbnail('post')).toEqual({
+      light: '/images/post/ok.webp',
+      dark: '/images/post/ok.webp',
+    });
+  });
+
+  it('prefers a frontmatter thumbnail override over body figures', () => {
+    mockPost(
+      `---\ntitle: T\ndate: 2026-01-01\nsubtitle: S\nthumbnail: /images/post/hero.png\nthumbnailDark: /images/post/hero-dark.png\n---\n<Figure src="/images/post/first.png" />`,
+    );
+    expect(getPostThumbnail('post')).toEqual({
+      light: '/images/post/hero.png',
+      dark: '/images/post/hero-dark.png',
+    });
+  });
+
+  it('falls back to the image folder, splitting light and dark variants when both exist', () => {
+    mockPost(`${FRONT}text only`, [
+      'specs-radar-light.png',
+      'benchmark-dark.png',
+      'benchmark-light.png',
+    ]);
     expect(getPostThumbnail('post')).toEqual({
       light: '/images/post/benchmark-light.png',
       dark: '/images/post/benchmark-dark.png',
     });
   });
 
-  it('uses the first figure by name for both themes when variants are not paired', () => {
-    mockFigures(['zeta.webp', 'Alpha.JPG', 'readme.md']);
+  it('folder fallback uses the first figure by name for both themes when variants are not paired', () => {
+    mockPost(`${FRONT}text only`, ['zeta.webp', 'Alpha.JPG', 'readme.md']);
     expect(getPostThumbnail('post')).toEqual({
       light: '/images/post/Alpha.JPG',
       dark: '/images/post/Alpha.JPG',
     });
-    mockFigures(['hbm-dark.png', 'context.png']);
+    mockPost(`${FRONT}text only`, ['hbm-dark.png', 'context.png']);
     expect(getPostThumbnail('post')).toEqual({
       light: '/images/post/hbm-dark.png',
       dark: '/images/post/hbm-dark.png',

@@ -57,16 +57,14 @@ export function BlogFeaturedPost({
         <BlogThumbnail
           thumbnail={thumbnail}
           priority
+          variant="card"
           className="rounded-xl border border-border/50"
         />
       ) : (
         <BlogGridTexture variant="card" />
       )}
       <div
-        className={cn(
-          'relative flex min-w-0 flex-col gap-4',
-          thumbnail ? 'lg:justify-center' : 'max-w-4xl',
-        )}
+        className={cn('flex min-w-0 flex-col gap-4', thumbnail ? 'lg:justify-center' : 'max-w-4xl')}
       >
         <Eyebrow as="p" wide>
           {labels.eyebrow}

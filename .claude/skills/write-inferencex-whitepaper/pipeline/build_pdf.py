@@ -31,11 +31,13 @@ def resolve(spec_dir: str, path: str) -> str:
 
 
 def b64(path: str) -> str:
-    return base64.b64encode(open(path, "rb").read()).decode()
+    with open(path, "rb") as f:
+        return base64.b64encode(f.read()).decode()
 
 
 def inline_svg(path: str) -> str:
-    s = open(path).read()
+    with open(path, encoding="utf-8") as f:
+        s = f.read()
     s = s[s.index("<svg") :]
     s = re.sub(r'<svg([^>]*?) width="[^"]*" height="[^"]*"', r"<svg\1", s, count=1)
     return re.sub(r"<metadata>.*?</metadata>", "", s, flags=re.S)
@@ -136,7 +138,8 @@ def main() -> None:
         sys.exit(__doc__)
     spec_path, out_dir = sys.argv[1], sys.argv[2]
     spec_dir = os.path.dirname(os.path.abspath(spec_path))
-    spec = json.load(open(spec_path))
+    with open(spec_path, encoding="utf-8") as f:
+        spec = json.load(f)
     scenarios = spec["scenarios"]
     if len(scenarios) != 2:
         sys.exit("this template lays out exactly two scenarios (one figure per page); edit build_pdf.py for another shape")
@@ -147,7 +150,8 @@ def main() -> None:
     )
     mosaic, trace, badge = (b64(os.path.join(ASSETS, f"{n}.png")) for n in ("cover_mosaic", "trace", "badge"))
     chip = b64(resolve(spec_dir, spec["cover"]["hardware_image"]))
-    logo = open(resolve(spec_dir, spec["chart"]["model_logo_svg"])).read().replace('height="1em"', 'height="18"').replace('width="1em"', 'width="18"')
+    with open(resolve(spec_dir, spec["chart"]["model_logo_svg"]), encoding="utf-8") as f:
+        logo = f.read().replace('height="1em"', 'height="18"').replace('width="1em"', 'width="18"')
     plots = [inline_svg(os.path.join(out_dir, f"chart-{sc['id']}-light.svg")) for sc in scenarios]
     notes = spec["kpi_notes"]
     a, b = scenarios
@@ -197,7 +201,8 @@ def main() -> None:
 
     html = f"<!doctype html><html><head><meta charset='utf-8'><title>{spec['title']}</title><style>{css(fonts, mosaic)}</style></head><body>{cover}{page1}{page2}</body></html>"
     out = os.path.join(out_dir, "paper.html")
-    open(out, "w").write(html)
+    with open(out, "w", encoding="utf-8") as f:
+        f.write(html)
     print(out)
 
 

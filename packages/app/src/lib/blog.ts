@@ -18,6 +18,13 @@ export interface BlogFrontmatter {
    *  Keep it ≤155 chars (English) / ≤~78 CJK chars and compelling. */
   seoDescription?: string;
   tags?: string[];
+  /** Optional article-card thumbnail override: a `/images/...` path or an
+   *  allow-listed remote image. When absent the first `<Figure>` in the body is
+   *  used, then the first raster file under `public/images/<slug>/`. */
+  thumbnail?: string;
+  /** Per-theme overrides; each falls back to `thumbnail`. */
+  thumbnailLight?: string;
+  thumbnailDark?: string;
 }
 
 export interface BlogPostMeta extends BlogFrontmatter {
@@ -342,7 +349,8 @@ export function getRelatedPosts(
   const current = posts.find((p) => p.slug === slug);
   const others = posts.filter((p) => p.slug !== slug);
   if (!current) return others.slice(0, limit);
-  const tags = new Set(current.tags);
+  const currentTags: readonly string[] = current.tags ?? [];
+  const tags = new Set(currentTags);
   const scored = others.map((post, index) => ({
     post,
     index,
@@ -378,14 +386,46 @@ export interface PostThumbnail {
 
 const THUMBNAIL_EXTENSIONS = new Set(['.png', '.webp', '.jpg', '.jpeg']);
 
+/** Local figure path or an image on a host `next.config` already allows. */
+const THUMBNAIL_SRC_PATTERN =
+  /^(?:\/images\/[\w./-]+|https:\/\/substack-post-media\.s3\.amazonaws\.com\/[\w./-]+)$/u;
+
+const FIGURE_TAG_PATTERN = /<Figure\b(?<attrs>[^>]*)\/?>/gu;
+const FIGURE_ATTR_PATTERN = /\b(?<name>src|srcLight|srcDark)\s*=\s*"(?<value>[^"]*)"/gu;
+
+/** Returns the source when it is a raster image at an allowed location, else undefined. */
+function safeThumbnailSrc(src: string | undefined): string | undefined {
+  if (!src || !THUMBNAIL_SRC_PATTERN.test(src)) return undefined;
+  const ext = path
+    .extname(new URL(src, 'https://inferencex.semianalysis.com').pathname)
+    .toLowerCase();
+  return THUMBNAIL_EXTENSIONS.has(ext) ? src : undefined;
+}
+
 /**
- * First raster figure under `public/images/<slug>/`, sorted by file name, for
- * use as the article-card thumbnail. Files named with `light` or `dark` are
- * split per theme when both exist; otherwise the first figure serves both.
- * Returns null when the folder is missing or holds no raster image.
- * Server-only (reads the filesystem).
+ * First `<Figure>` in the post body with a usable raster source, in document
+ * order, so the card shows the same image a reader meets first in the article.
+ * `srcLight`/`srcDark` split per theme; a lone `src` serves both.
  */
-export function getPostThumbnail(slug: string): PostThumbnail | null {
+function firstFigureThumbnail(body: string): PostThumbnail | null {
+  for (const tag of body.matchAll(FIGURE_TAG_PATTERN)) {
+    const attrs: Record<string, string> = {};
+    for (const attr of (tag.groups?.attrs ?? '').matchAll(FIGURE_ATTR_PATTERN)) {
+      if (attr.groups) attrs[attr.groups.name] = attr.groups.value;
+    }
+    const light = safeThumbnailSrc(attrs.srcLight ?? attrs.src);
+    const dark = safeThumbnailSrc(attrs.srcDark ?? attrs.src);
+    if (light || dark) return { light: light ?? dark, dark: dark ?? light };
+  }
+  return null;
+}
+
+/**
+ * Folder fallback: first raster figure under `public/images/<slug>/`, sorted by
+ * file name. Files named with `light` or `dark` are split per theme when both
+ * exist; otherwise the first figure serves both.
+ */
+function folderThumbnail(slug: string): PostThumbnail | null {
   const dir = path.join(process.cwd(), 'public', 'images', slug);
   if (!fs.existsSync(dir)) return null;
   const files = fs
@@ -393,10 +433,31 @@ export function getPostThumbnail(slug: string): PostThumbnail | null {
     .filter((name) => THUMBNAIL_EXTENSIONS.has(path.extname(name).toLowerCase()))
     .sort((a, b) => a.localeCompare(b, 'en'));
   if (files.length === 0) return null;
-  const url = (name: string) => `/images/${slug}/${name}`;
+  const url = (name: string) =>
+    safeThumbnailSrc(`/images/${encodeURIComponent(slug)}/${encodeURIComponent(name)}`);
   const light = files.find((name) => /light/i.test(name));
   const dark = files.find((name) => /dark/i.test(name));
   if (light && dark) return { light: url(light), dark: url(dark) };
   const only = url(light ?? dark ?? files[0]);
-  return { light: only, dark: only };
+  return only ? { light: only, dark: only } : null;
+}
+
+/**
+ * Article-card thumbnail for a post: the `thumbnail` frontmatter override when
+ * set, else the first `<Figure>` in the English MDX body (local or allow-listed
+ * remote raster image), else the first raster file under `public/images/<slug>/`. Returns null when the post has no
+ * usable figure. Server-only (reads the filesystem).
+ */
+export function getPostThumbnail(slug: string): PostThumbnail | null {
+  const mdxPath = path.join(CONTENT_DIR, `${slug}.mdx`);
+  if (fs.existsSync(mdxPath)) {
+    const { data, content } = matter(fs.readFileSync(mdxPath, 'utf8'));
+    const front = data as BlogFrontmatter;
+    const light = safeThumbnailSrc(front.thumbnailLight ?? front.thumbnail);
+    const dark = safeThumbnailSrc(front.thumbnailDark ?? front.thumbnail);
+    if (light || dark) return { light: light ?? dark, dark: dark ?? light };
+    const fromBody = firstFigureThumbnail(content);
+    if (fromBody) return fromBody;
+  }
+  return folderThumbnail(slug);
 }

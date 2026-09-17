@@ -5,6 +5,7 @@ import type { CSSProperties } from 'react';
 import { ThemedFigureImage } from '@/components/blog/themed-figure-image';
 import { Badge } from '@/components/ui/badge';
 import type { PostThumbnail } from '@/lib/blog';
+import { optimizedThumbnailSrc, THUMBNAIL_WIDTHS } from '@/lib/blog-thumbnail-src';
 import { cn } from '@/lib/utils';
 
 export interface BlogThumbnailProps {
@@ -16,8 +17,13 @@ export interface BlogThumbnailProps {
   readingLabel?: string;
   /** Eager-load the figure (featured card and first row of the index). */
   priority?: boolean;
+  /** `tile` is a grid card (one third of the row); `card` is the featured post. */
+  variant?: 'tile' | 'card';
   className?: string;
 }
+
+const TILE_SIZES = '(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw';
+const CARD_SIZES = '(min-width: 1024px) 50vw, 100vw';
 
 const IMG_CLASS =
   'block h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]';
@@ -90,9 +96,11 @@ export function BlogThumbnail({
   tag,
   readingLabel,
   priority = false,
+  variant = 'tile',
   className,
 }: BlogThumbnailProps) {
   const loading = priority ? 'eager' : 'lazy';
+  const width = variant === 'card' ? THUMBNAIL_WIDTHS.card : THUMBNAIL_WIDTHS.tile;
   if (!thumbnail) {
     return (
       <div
@@ -120,6 +128,7 @@ export function BlogThumbnail({
       </div>
     );
   }
+  const single = thumbnail.dark ?? thumbnail.light;
   return (
     <div
       className={cn('relative aspect-[1200/630] w-full overflow-hidden bg-background', className)}
@@ -127,15 +136,17 @@ export function BlogThumbnail({
     >
       {thumbnail.light && thumbnail.dark && thumbnail.light !== thumbnail.dark ? (
         <ThemedFigureImage
-          srcLight={thumbnail.light}
-          srcDark={thumbnail.dark}
+          srcLight={optimizedThumbnailSrc(thumbnail.light, width)}
+          srcDark={optimizedThumbnailSrc(thumbnail.dark, width)}
           alt=""
           loading={loading}
           className={IMG_CLASS}
         />
-      ) : (
+      ) : single ? (
         <img
-          src={thumbnail.dark ?? thumbnail.light}
+          src={optimizedThumbnailSrc(single, width)}
+          srcSet={`${optimizedThumbnailSrc(single, THUMBNAIL_WIDTHS.tile)} ${THUMBNAIL_WIDTHS.tile}w, ${optimizedThumbnailSrc(single, THUMBNAIL_WIDTHS.card)} ${THUMBNAIL_WIDTHS.card}w`}
+          sizes={variant === 'card' ? CARD_SIZES : TILE_SIZES}
           alt=""
           width={1200}
           height={630}
@@ -143,7 +154,7 @@ export function BlogThumbnail({
           decoding="async"
           className={IMG_CLASS}
         />
-      )}
+      ) : null}
     </div>
   );
 }
