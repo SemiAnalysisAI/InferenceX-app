@@ -311,13 +311,13 @@ export const WHITEPAPERS: readonly Whitepaper[] = [
         'Kimi K3 2.8T Agentic Revenue & Profit Estimates per GigaWatt Per Year at P90 45 tok/s/user Interactivity',
       figures: [
         {
-          costTier: 'Owning Hyperscaler',
+          costTier: 'Owning at Large Hyperscaler Volume',
           caption:
             'Figure 1. Revenue and profit per GW-year, owned at hyperscaler volume ($1.50 per chip-hour). The bar totals $32.6B of revenue; segments from bottom to top are compute expense ($6.3B), model license fee ($9.8B), and profit ($16.5B, 50.7% margin).',
           alt: 'Figure 1: stacked bar of revenue per GW-year for MI355X on Kimi K3 2.8T, owned at $1.50 per GPU-hour. $32.6B of revenue splits into $6.3B compute expense, $9.8B model license fee, and $16.5B profit at a 50.7% margin.',
         },
         {
-          costTier: 'Custom User Values (3-year rental, August 2026)',
+          costTier: 'Custom $/GPU/hr (August 2026 3-Year Rental Pricing)',
           caption:
             'Figure 2. Revenue and profit per GW-year, rented at $3.00 per chip-hour (August 2026 3-year pricing, entered as a custom $/GPU/hr). Revenue is unchanged at $32.6B; compute expense doubles to $12.6B and profit falls to $10.3B, a 31.5% margin.',
           alt: 'Figure 2: stacked bar of revenue per GW-year for MI355X on Kimi K3 2.8T, rented at $3.00 per GPU-hour. $32.6B of revenue splits into $12.6B compute expense, $9.8B model license fee, and $10.3B profit at a 31.5% margin.',
@@ -433,13 +433,13 @@ export const WHITEPAPERS: readonly Whitepaper[] = [
       figureTitle: 'Kimi K3 2.8T 智能体 每吉瓦每年收入与利润估算（P90 交互性 45 tok/s/user）',
       figures: [
         {
-          costTier: '自有（超大规模）',
+          costTier: '自有（超大规模云大批量）',
           caption:
             '图 1. 按超大规模云厂商采购规模自建（每芯片小时 $1.50）时每 GW·年的收入与利润。柱子合计收入 326 亿美元；自下而上的分段依次为算力支出（63 亿美元）、模型授权费（98 亿美元）和利润（165 亿美元，利润率 50.7%）。',
           alt: '图 1：MI355X 运行 Kimi K3 2.8T、按每 GPU 小时 $1.50 自建时每 GW·年收入的堆叠柱状图。326 亿美元收入分为 63 亿美元算力支出、98 亿美元模型授权费和 165 亿美元利润，利润率 50.7%。',
         },
         {
-          costTier: '自定义值（3 年租赁，2026 年 8 月）',
+          costTier: '自定义 $/GPU/hr（2026 年 8 月 3 年期租约价格）',
           caption:
             '图 2. 按每芯片小时 $3.00 租用（2026 年 8 月 3 年期租约价格，以自定义 $/GPU/hr 输入）时每 GW·年的收入与利润。收入仍为 326 亿美元；算力支出翻倍至 126 亿美元，利润降至 103 亿美元，利润率 31.5%。',
           alt: '图 2：MI355X 运行 Kimi K3 2.8T、按每 GPU 小时 $3.00 租用时每 GW·年收入的堆叠柱状图。326 亿美元收入分为 126 亿美元算力支出、98 亿美元模型授权费和 103 亿美元利润，利润率 31.5%。',
