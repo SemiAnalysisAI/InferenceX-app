@@ -1,4 +1,12 @@
-import { buildRunSummary } from '@semianalysisai/inferencex-db/collectivex/reader';
+import {
+  makeSwapDoc,
+  swapMatrix,
+  swapMeta,
+} from '@semianalysisai/inferencex-db/collectivex/swap-test-fixture';
+import {
+  buildDatasetFromNeutral,
+  buildRunSummary,
+} from '@semianalysisai/inferencex-db/collectivex/reader';
 import {
   buildDataset,
   makeCollectiveXDataset,
@@ -994,5 +1002,59 @@ describe('CollectiveX kv-transfer card', () => {
     cy.get('[data-testid="collectivex-kv-table"]').should('not.exist');
     cy.get(`[data-testid="collectivex-run-suite-ep-${runId}"]`).should('be.visible');
     cy.get(`[data-testid="collectivex-run-suite-kv-${runId}"]`).should('not.exist');
+  });
+});
+
+describe('CollectiveX swap_blocks', () => {
+  beforeEach(() => {
+    const swap = buildDatasetFromNeutral(swapMatrix, [makeSwapDoc()], swapMeta);
+    installRuns([swap]);
+    installRun(swap);
+  });
+  it('shows a swap-only run, byte units and linear bandwidth, then switches latency and direction', () => {
+    openCollectiveX();
+    cy.get('[data-testid="collectivex-run-suite-swap-170"]').should('contain.text', 'swap_blocks');
+    cy.get('[data-testid="collectivex-run-suite-ep-170"]').should('not.exist');
+    cy.get('[data-testid="collectivex-chart-filters"]').should('not.exist');
+    cy.get('[data-testid="collectivex-swap-chart"]')
+      .as('swapChart')
+      .should('contain.text', '1 GiB')
+      .and('contain.text', 'GB/s');
+    cy.get('@swapChart')
+      .find('.y-axis .tick text')
+      .then((labels) => {
+        const values = [...labels].map((label) => Number(label.textContent));
+        expect(values[0]).to.eq(0);
+        expect(values.length).to.be.greaterThan(3);
+        const step = values[1] - values[0];
+        values.slice(1).forEach((value, i) => expect(value - values[i]).to.eq(step));
+      });
+    cy.get('@swapChart').find('.point').should('have.length', 2).last().click({ force: true });
+    cy.get('body')
+      .should('contain.text', '32.768 GB/s')
+      .and('contain.text', 'Copied payload: 1 GiB');
+    cy.get('[data-testid="swap-metric"]').contains('Latency').click();
+    cy.get('@swapChart').should('contain.text', 'µs, log');
+    cy.get('[data-testid="swap-direction"]').contains('GPU → GPU').click();
+    cy.get('[data-testid="swap-layout"]').contains('Random').click();
+    cy.get('[data-testid="swap-percentile"]').contains('p99').click();
+    cy.get('@swapChart').find('.point').should('have.length', 1).click({ force: true });
+    cy.get('body').should('contain.text', '8.000 µs').and('contain.text', 'Copied payload: 4 KiB');
+    cy.get('[data-testid="swap-metric"]').contains('Bandwidth').click();
+    cy.get('@swapChart').should('contain.text', 'GB/s').and('not.contain.text', 'µs, log');
+    cy.get('[data-testid="collectivex-suite-filter"]').contains('EP').click();
+    cy.get('[data-testid="collectivex-run-suite-swap-170"]').should('not.exist');
+    cy.get('[data-testid="collectivex-suite-filter"]').contains('swap_blocks').click();
+    cy.get('[data-testid="collectivex-run-suite-swap-170"]').should('exist');
+  });
+  it('renders the translated controls and tooltip on the Chinese route', () => {
+    cy.visit('/zh/collectivex');
+    cy.wait('@run');
+    cy.get('[data-testid="swap-metric"]').contains('延迟').click();
+    cy.get('[data-testid="collectivex-swap-chart"]').should('contain.text', '块大小（字节，对数）');
+    cy.get('[data-testid="collectivex-swap-chart"] .point').last().click({ force: true });
+    cy.get('body')
+      .should('contain.text', '复制的有效载荷: 1 GiB')
+      .and('contain.text', '正确性校验通过');
   });
 });

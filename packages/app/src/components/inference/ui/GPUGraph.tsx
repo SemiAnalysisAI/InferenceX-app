@@ -1229,7 +1229,6 @@ const GPUGraph = React.memo(
     if (data.length === 0) {
       return (
         <div className="relative w-full p-3">
-          {caption}
           <div className="flex flex-col items-center justify-center min-h-100 text-center">
             <div className="text-muted-foreground">
               <svg

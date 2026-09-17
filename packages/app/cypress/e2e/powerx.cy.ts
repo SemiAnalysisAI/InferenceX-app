@@ -552,6 +552,6 @@ describe('PowerX within the existing measured dashboards', () => {
     );
     cy.get(comparisonChart).should('contain', 'J/output token');
     expectNoPageOverflow();
-    cy.get(comparisonChart).screenshot('powerx-request-energy-desktop');
+    cy.screenshot('powerx-request-energy-desktop', { capture: 'fullPage' });
   });
 });

@@ -3619,7 +3619,6 @@ const ScatterGraph = React.memo(
     if (data.length === 0 && !overlayData?.data?.length) {
       return (
         <div className="relative w-full p-3">
-          {caption}
           <div className="flex min-h-100 items-center justify-center">{emptyState}</div>
           <QuickFiltersDialog
             open={quickFiltersOpen}

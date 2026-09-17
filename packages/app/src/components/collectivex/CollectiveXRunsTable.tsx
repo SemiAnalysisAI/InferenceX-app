@@ -26,6 +26,7 @@ const STRINGS = {
     shown: 'Shown',
     run: 'Run',
     result: 'Result',
+    swapSuite: (m: number, n: number) => `swap_blocks: ${m}/${n} measured`,
     suites: 'Suites',
     cases: 'Measured cases',
     points: 'Terminal points',
@@ -45,6 +46,7 @@ const STRINGS = {
     shown: '显示',
     run: '运行',
     result: '结果',
+    swapSuite: (m: number, n: number) => `swap_blocks：已测量 ${m}/${n}`,
     suites: '测试套件',
     cases: '实测用例',
     points: '终态数据点',
@@ -129,8 +131,10 @@ export function CollectiveXRunsTable({
             // Summaries stored before the kv suite carry no kv_cases: EP-only.
             const kvRequested = run.kv_cases?.requested ?? 0;
             const kvMeasured = run.kv_cases?.measured ?? 0;
-            const epRequested = run.requested_cases - kvRequested;
-            const epMeasured = run.measured_cases - kvMeasured;
+            const swapRequested = run.swap_cases?.requested ?? 0;
+            const swapMeasured = run.swap_cases?.measured ?? 0;
+            const epRequested = run.requested_cases - kvRequested - swapRequested;
+            const epMeasured = run.measured_cases - kvMeasured - swapMeasured;
             const lineDasharray =
               selectedRunIndex === undefined ? null : collectiveXRunDasharray(selectedRunIndex);
             return (
@@ -222,6 +226,15 @@ export function CollectiveXRunsTable({
                         )}
                       >
                         EP
+                      </span>
+                    )}
+                    {swapRequested > 0 && (
+                      <span
+                        title={t.swapSuite(swapMeasured, swapRequested)}
+                        data-testid={`collectivex-run-suite-swap-${run.run_id}`}
+                        className="inline-flex rounded-md border px-2 py-0.5 text-2xs font-medium"
+                      >
+                        swap_blocks
                       </span>
                     )}
                     {kvRequested > 0 && (

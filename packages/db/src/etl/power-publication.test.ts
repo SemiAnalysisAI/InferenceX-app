@@ -51,6 +51,31 @@ function actual(point = expected()): PublishedPowerRow {
 }
 
 describe('PowerX publication', () => {
+  it('verifies AgentX source identity, nullable sequences, energy and audit through DB/API', () => {
+    const point = expected({
+      scenario_type: 'agentic-coding',
+      isl: undefined,
+      osl: undefined,
+      recipe_fingerprint: 'agentic-recipe',
+      joules_per_output_token: 4.5,
+      total_gpu_energy_j: 12000,
+    });
+    expect(point.identity).toMatchObject({
+      benchmark_type: 'agentic_traces',
+      isl: null,
+      osl: null,
+    });
+    expect(verifyPowerPublication([point], [actual(point)], 'database')).toEqual([]);
+    expect(verifyPowerPublication([point], [], 'public API')[0]).toContain('found 0');
+    const missingEnergy = actual(point);
+    delete missingEnergy.metrics.joules_per_output_token;
+    expect(verifyPowerPublication([point], [missingEnergy], 'public API')).toContainEqual(
+      expect.stringContaining('joules_per_output_token expected 4.5'),
+    );
+    expect(
+      verifyPowerPublication([point], [{ ...actual(point), power_audit: null }], 'public API'),
+    ).toContainEqual(expect.stringContaining('power_audit differs'));
+  });
   it('matches the exact ordinary source and attempt through mapping, while ignoring unrelated performance metrics', () => {
     const point = expected();
     expect(verifyPowerPublication([point], [actual(point)], 'API')).toEqual([]);
