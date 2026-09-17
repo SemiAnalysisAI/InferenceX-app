@@ -62,7 +62,7 @@ import { PowerMetricAvailability } from './PowerMetricAvailability';
 import { MeasuredMetricControls } from './MeasuredMetricControls';
 import {
   getMeasuredMetricConfig,
-  MEASURED_METRIC_DEFAULTS,
+  changeMeasuredMetricConfig,
   type MeasuredMetricFamily,
 } from '../measured-metric-config';
 import { XAxisModeSelector } from './XAxisModeSelector';
@@ -221,6 +221,7 @@ export default function ChartControls({
   } = useInferenceData();
   const {
     selectedYAxisMetric,
+    measuredComparison,
     tokenRevenuePriceSource,
     tokenRevenuePricing,
     openRouterModelId,
@@ -236,6 +237,7 @@ export default function ChartControls({
     setSelectedSequence,
     setSelectedPrecisions,
     setSelectedYAxisMetric,
+    setMeasuredComparison,
     setTokenRevenuePriceSource,
     setSelectedPercentile,
     setSelectedGPUs,
@@ -338,7 +340,7 @@ export default function ChartControls({
         const value =
           selectedConfig?.family === config.family
             ? selectedYAxisMetric
-            : MEASURED_METRIC_DEFAULTS[config.family];
+            : changeMeasuredMetricConfig(selectedYAxisMetric, { family: config.family });
         return [
           {
             value,
@@ -571,13 +573,17 @@ export default function ChartControls({
                   <MeasuredMetricControls
                     metric={selectedYAxisMetric}
                     onChange={handleYAxisMetricChange}
+                    comparison={measuredComparison}
+                    onComparisonChange={setMeasuredComparison}
                   />
-                  <div className="col-span-full">
-                    <PowerMetricAvailability
-                      metric={selectedYAxisMetric}
-                      onSelect={handleYAxisMetricChange}
-                    />
-                  </div>
+                  {measuredComparison === 'single' && (
+                    <div className="col-span-full">
+                      <PowerMetricAvailability
+                        metric={selectedYAxisMetric}
+                        onSelect={handleYAxisMetricChange}
+                      />
+                    </div>
+                  )}
                 </>
               )}
 

@@ -4,7 +4,13 @@ import type { InferenceData } from '@/components/inference/types';
 import { chartDefinitions } from '@/components/inference/metric-registry';
 import type { ParetoDirection } from '@/lib/chart-utils';
 
-import { chartFrontier, isPowerCurveMetric, upperPowerEnvelope } from './powerCurves';
+import {
+  chartFrontier,
+  isPowerCurveMetric,
+  isMeasuredPowerCurveMetric,
+  isDerivedPowerCurveMetric,
+  upperPowerEnvelope,
+} from './powerCurves';
 
 function point(conc: number, x: number, y: number, overrides: Partial<InferenceData> = {}) {
   return {
@@ -103,6 +109,23 @@ describe('upper power envelope', () => {
         true,
       ).map((p) => p.y),
     ).toEqual([950, 700, 350]);
+  });
+
+  it('retains flat derived power support without changing legacy envelopes', () => {
+    const samples = [point(1, 50, 700), point(2, 75, 700), point(4, 100, 700), point(8, 75, 700)];
+    expect(upperPowerEnvelope(samples, true).map((p) => p.x)).toEqual([100]);
+    expect(upperPowerEnvelope(samples, true, true).map((p) => p.x)).toEqual([50, 75, 100]);
+    expect(upperPowerEnvelope(samples, false, true).map((p) => p.x)).toEqual([50, 75, 100]);
+    for (const metric of [
+      'y_modeledChassisPowerPerGpu',
+      'y_powerxGpuProvisionedWatts',
+      'y_powerxUtilityProvisionedWatts',
+      'y_powerxUtilityModeledWatts',
+    ]) {
+      expect(isDerivedPowerCurveMetric(metric)).toBe(true);
+      expect(isPowerCurveMetric(metric)).toBe(true);
+      expect(isMeasuredPowerCurveMetric(metric)).toBe(false);
+    }
   });
 
   it('uses only finite positive coordinates and preserves singleton boundaries', () => {

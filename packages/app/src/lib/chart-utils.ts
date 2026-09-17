@@ -1,3 +1,4 @@
+import { POWERX_METRICS, powerValue } from '@/components/powerx/powerx-data';
 /**
  * Runtime-compatible chart utility functions.
  * These functions can be used in API routes and client-side code.
@@ -416,6 +417,15 @@ export function buildDerivedChartFields(
   }
   if (hardwarePower > 0 && wants('jInput') && inputTputPerGpu) {
     fields.jInput = chartMetric(hardwarePower ? (hardwarePower * 1000) / inputTputPerGpu : 0);
+  }
+
+  for (const [key, metric] of Object.entries(POWERX_METRICS) as [
+    keyof typeof POWERX_METRICS,
+    (typeof POWERX_METRICS)[keyof typeof POWERX_METRICS],
+  ][]) {
+    if (!wants(key)) continue;
+    const result = powerValue(entry, metric.basis, metric.quantity, specs);
+    if (result.value !== null) fields[key] = chartMetric(result.value);
   }
 
   const measured = buildMeasuredPowerChartFields(entry, specs.tdp);

@@ -39,6 +39,7 @@ import type {
   TokenRevenuePriceSource,
 } from '@/components/inference/types';
 import { resolveMetricConfigKey } from '@/components/inference/metric-registry';
+import { resolveMeasuredComparison } from '@/components/inference/measured-metric-config';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -406,6 +407,9 @@ export function InferenceProvider({
   }, [selectedGpuResolution]);
   const [selectedYAxisMetric, setSelectedYAxisMetric] = useState<string>(() =>
     resolveMetricConfigKey(getUrlParam('i_metric'), initialYAxisMetric ?? DEFAULT_Y_AXIS_METRIC),
+  );
+  const [measuredComparison, setMeasuredComparison] = useState(() =>
+    resolveMeasuredComparison(getUrlParam('i_mcompare')),
   );
   const [tokenRevenuePriceSource, setTokenRevenuePriceSource] = useState<TokenRevenuePriceSource>(
     () => (getUrlParam('i_revenue') === 'openrouter' ? 'openrouter' : 'normalized'),
@@ -1555,6 +1559,7 @@ export function InferenceProvider({
   useUrlStateSync(
     {
       i_metric: selectedYAxisMetric,
+      i_mcompare: measuredComparison,
       i_revenue: usesTokenSalePricing(selectedYAxisMetric) ? tokenRevenuePriceSource : 'normalized',
       i_pctl: selectedPercentile,
       i_gpus: selectedGPUs.join(','),
@@ -1590,6 +1595,7 @@ export function InferenceProvider({
     },
     [
       selectedYAxisMetric,
+      measuredComparison,
       tokenRevenuePriceSource,
       selectedXAxisMetric,
       selectedE2eXAxisMetric,
@@ -1821,6 +1827,7 @@ export function InferenceProvider({
   const displayValue = useMemo<InferenceDisplayContextType>(
     () => ({
       selectedYAxisMetric,
+      measuredComparison,
       tokenRevenuePriceSource,
       tokenRevenuePricing,
       openRouterModelId,
@@ -1844,6 +1851,7 @@ export function InferenceProvider({
     }),
     [
       selectedYAxisMetric,
+      measuredComparison,
       tokenRevenuePriceSource,
       tokenRevenuePricing,
       openRouterModelId,
@@ -1881,6 +1889,7 @@ export function InferenceProvider({
     setSelectedSequence: setSelectedSequenceAndClear,
     setSelectedPrecisions: setSelectedPrecisionsAndClear,
     setSelectedYAxisMetric: setSelectedYAxisMetricAndClear,
+    setMeasuredComparison,
     setTokenRevenuePriceSource,
     setSelectedPercentile,
     setSelectedXAxisMetric,

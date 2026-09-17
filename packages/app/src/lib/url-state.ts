@@ -23,6 +23,13 @@ const URL_STATE_KEYS = [
   'g_runid',
   'g_tco',
   // Inference
+  'i_rulers',
+  'i_iso',
+  'i_iso_axis',
+  'i_mbase',
+  'i_mcomp',
+  'i_mcompare',
+  'i_mstat',
   'i_seq',
   'i_prec',
   'i_metric',
@@ -122,6 +129,14 @@ export const DEFAULT_FLEET_MW = '10';
 export const DEFAULT_LIFECYCLE_RAMP_MONTHS = '0.5';
 
 export const PARAM_DEFAULTS: Record<UrlStateKey, string> = {
+  // The no-target default varies by X axis; never strip an explicit number.
+  i_rulers: '',
+  i_iso: '',
+  i_iso_axis: '',
+  i_mbase: '',
+  i_mcomp: '',
+  i_mcompare: 'single',
+  i_mstat: 'median',
   g_model: 'DeepSeek-V4-Pro',
   g_rundate: '',
   g_runid: '',

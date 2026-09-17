@@ -210,7 +210,17 @@ describe('metric registry', () => {
     );
 
     const measuredGroup = METRIC_CONTROL_GROUPS.find((group) => group.label === 'Measured Energy');
-    expect(measuredGroup?.metrics).toBe(MEASURED_ENERGY_METRIC_CONFIG_KEYS);
+    expect(measuredGroup?.gated).toBe(true);
+    expect(measuredGroup?.metrics).toEqual([
+      ...MEASURED_ENERGY_METRIC_CONFIG_KEYS,
+      'y_powerxGpuProvisionedWatts',
+      'y_powerxGpuProvisionedEnergy',
+      'y_powerxUtilityProvisionedWatts',
+      'y_powerxUtilityProvisionedEnergy',
+      'y_powerxUtilityModeledWatts',
+      'y_powerxUtilityModeledEnergy',
+    ]);
+    expect(METRIC_CONTROL_GROUPS.some((group) => group.label === 'PowerX')).toBe(false);
   });
 
   it('classifies measured-energy config keys', () => {
@@ -219,6 +229,8 @@ describe('metric registry', () => {
     expect(isMeasuredEnergyConfigKey('y_tpPerGpu')).toBe(false);
     expect(isMeasuredEnergyConfigKey('y_jTotal')).toBe(false);
     expect(isMeasuredEnergyConfigKey('y')).toBe(false);
+    expect(isMeasuredEnergyConfigKey('y_powerxGpuProvisionedEnergy')).toBe(false);
+    expect(isMeasuredEnergyConfigKey('y_powerxUtilityModeledWatts')).toBe(false);
     expect(isMeasuredEnergyConfigKey('y_modeledChassisPowerPerGpu')).toBe(false);
     expect(isModeledSystemPowerConfigKey('y_modeledChassisPowerPerGpu')).toBe(true);
     expect(isModeledSystemPowerConfigKey('y_measuredAvgPower')).toBe(false);

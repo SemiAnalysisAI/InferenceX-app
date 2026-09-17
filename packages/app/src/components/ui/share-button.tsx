@@ -12,7 +12,15 @@ import { useLocale } from '@/lib/use-locale';
 import { Button } from './button';
 import { Popover, PopoverContent, PopoverTrigger } from './popover';
 
-export function ShareButton({ className }: { className?: string } = {}) {
+export function ShareButton({
+  className,
+  getShareUrl = buildShareUrl,
+  disabled,
+}: {
+  className?: string;
+  getShareUrl?: () => string;
+  disabled?: boolean;
+} = {}) {
   const locale = useLocale();
   const t = {
     en: {
@@ -41,7 +49,7 @@ export function ShareButton({ className }: { className?: string } = {}) {
 
   useEffect(() => {
     if (!open) return;
-    const next = buildShareUrl();
+    const next = getShareUrl();
     setUrl(next);
     setCopied(false);
     track('share_popover_opened');
@@ -50,10 +58,10 @@ export function ShareButton({ className }: { className?: string } = {}) {
       inputRef.current?.focus();
       inputRef.current?.select();
     });
-  }, [open]);
+  }, [open, getShareUrl]);
 
   const handleCopy = useCallback(async () => {
-    const target = url || buildShareUrl();
+    const target = url || getShareUrl();
     track('share_link_copied');
 
     try {
@@ -70,13 +78,14 @@ export function ShareButton({ className }: { className?: string } = {}) {
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
     window.dispatchEvent(new CustomEvent('inferencex:action'));
-  }, [url]);
+  }, [url, getShareUrl]);
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
           data-testid="share-button"
+          disabled={disabled}
           size="sm"
           className={cn(
             'h-11 gap-1.5 bg-brand text-primary-foreground hover:bg-brand/90 text-xs font-medium md:h-8',
@@ -137,8 +146,8 @@ export function ShareButton({ className }: { className?: string } = {}) {
           <div className="flex items-center justify-between border-t pt-3">
             <span className="text-muted-foreground text-xs">{t.shareOn}</span>
             <div className="flex items-center gap-1.5">
-              <ShareTwitterButton />
-              <ShareLinkedInButton />
+              <ShareTwitterButton url={url} />
+              <ShareLinkedInButton url={url} />
             </div>
           </div>
         </div>

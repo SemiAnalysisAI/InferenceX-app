@@ -68,10 +68,10 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'ui-artifact-read',
     exclusionReason: {
-      en: 'UI-only live GPU metric artifact lookup; its run artifact shape is not a stable public contract.',
-      zh: '仅供界面读取实时 GPU 指标制品；其运行制品结构不是稳定的公开契约。',
+      en: 'UI-only live GPU telemetry and serving-window power audit lookup. The optional source=power-audit selects raw manifest, samples, windows and validation; run artifact shapes are not a stable public contract.',
+      zh: '仅供界面读取实时 GPU 遥测与 serving 窗口功耗审计数据。可选参数 source=power-audit 返回原始清单、采样、窗口和验证结果；运行产物结构不是稳定的公开契约。',
     },
-    sourceSha256: '28e6cee4d67396ee8ea2e5a7e18271c6ee86228c33f33a20bf573f3a601ba8ed',
+    sourceSha256: '4a4aadf1ad497f1c4f964556a0dbd3c3d851923c6befdceecf7183e4978298f6',
   },
   {
     source: 'src/app/api/openapi.json/route.ts',

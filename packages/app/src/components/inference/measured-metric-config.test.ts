@@ -5,9 +5,17 @@ import {
   changeMeasuredMetricConfig,
   getMeasuredMetricConfig,
   MEASURED_METRIC_DEFAULTS,
+  resolveMeasuredComparison,
 } from './measured-metric-config';
 
 describe('measured metric configuration', () => {
+  it('restores supported comparison modes and defaults unknown shared values', () => {
+    for (const mode of ['single', 'boundaries', 'roles', 'role-energy', 'relative'] as const) {
+      expect(resolveMeasuredComparison(mode)).toBe(mode);
+    }
+    expect(resolveMeasuredComparison(undefined)).toBe('single');
+    expect(resolveMeasuredComparison('article')).toBe('single');
+  });
   it.each(MEASURED_ENERGY_METRIC_CONFIG_KEYS)(
     'round-trips the existing share-link metric %s',
     (key) => {
@@ -20,11 +28,39 @@ describe('measured metric configuration', () => {
 
   it('does not group unrelated metrics or unknown persisted values', () => {
     const grouped = METRIC_CONFIG_KEYS.filter((key) => getMeasuredMetricConfig(key));
-    expect(grouped).toHaveLength(13);
-    expect(new Set(grouped)).toEqual(new Set(MEASURED_ENERGY_METRIC_CONFIG_KEYS));
+    expect(grouped).toHaveLength(19);
+    expect(grouped).toEqual(expect.arrayContaining([...MEASURED_ENERGY_METRIC_CONFIG_KEYS]));
     expect(getMeasuredMetricConfig('y_modeledChassisPowerPerGpu')).toBeUndefined();
     expect(getMeasuredMetricConfig('y_removedMetric')).toBeUndefined();
     expect(getMeasuredMetricConfig('')).toBeUndefined();
+  });
+
+  it.each([
+    ['gpu-provisioned', 'y_powerxGpuProvisionedWatts', 'y_powerxGpuProvisionedEnergy'],
+    ['utility-provisioned', 'y_powerxUtilityProvisionedWatts', 'y_powerxUtilityProvisionedEnergy'],
+    ['utility-modeled', 'y_powerxUtilityModeledWatts', 'y_powerxUtilityModeledEnergy'],
+  ] as const)('keeps %s within the power and energy families', (basis, power, energy) => {
+    expect(getMeasuredMetricConfig(power)).toMatchObject({ family: 'power', basis });
+    expect(getMeasuredMetricConfig(energy)).toMatchObject({ family: 'energy', basis });
+    expect(changeMeasuredMetricConfig('y_measuredP90Power', { basis })).toBe(power);
+    expect(changeMeasuredMetricConfig('y_measuredWhPerSuccessfulQuery', { basis })).toBe(energy);
+    expect(changeMeasuredMetricConfig(power, {})).toBe(power);
+    expect(changeMeasuredMetricConfig(energy, {})).toBe(energy);
+    expect(changeMeasuredMetricConfig(power, { family: 'energy' })).toBe(energy);
+    expect(changeMeasuredMetricConfig(energy, { family: 'power' })).toBe(power);
+    expect(changeMeasuredMetricConfig(power, { scope: 'decode', statistic: 'p90' })).toBe(power);
+    expect(changeMeasuredMetricConfig(energy, { denominator: 'query', unit: 'wattHours' })).toBe(
+      energy,
+    );
+    expect(changeMeasuredMetricConfig(power, { basis: 'gpu-measured' })).toBe('y_measuredAvgPower');
+    expect(changeMeasuredMetricConfig(energy, { basis: 'gpu-measured' })).toBe(
+      'y_measuredJPerOutputToken',
+    );
+  });
+
+  it('does not expose duplicate measured axes', () => {
+    expect(getMeasuredMetricConfig('y_powerxGpuMeasuredWatts')).toBeUndefined();
+    expect(getMeasuredMetricConfig('y_powerxGpuMeasuredEnergy')).toBeUndefined();
   });
 
   it('starts newly selected families at whole-deployment average power or output energy', () => {

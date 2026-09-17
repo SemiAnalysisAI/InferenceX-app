@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { AIR_COOLED_SYSTEM_PUE } from '@/lib/modeled-system-power';
 
 import {
   METRIC_EXPLANATIONS,
@@ -54,6 +55,16 @@ describe('METRIC_EXPLANATIONS completeness', () => {
     expect(description.en).toContain('Separate CPU-only frontend/router hosts are excluded.');
     expect(description.zh).toContain('CPU 与 DRAM 利用率均设为 20%');
     expect(description.zh).toContain('不计入独立的纯 CPU 前端或路由主机。');
+  });
+
+  it('states the PUE actually used by the facility model in both languages', () => {
+    for (const key of ['powerxUtilityModeledWatts', 'powerxUtilityModeledEnergy'] as const) {
+      for (const locale of ['en', 'zh'] as const) {
+        expect(METRIC_EXPLANATIONS[key].description[locale]).toContain(
+          `PUE ${AIR_COOLED_SYSTEM_PUE}`,
+        );
+      }
+    }
   });
 
   it('cost metrics show the $/Mtok formula', () => {

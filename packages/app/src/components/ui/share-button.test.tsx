@@ -33,9 +33,34 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount());
   container.remove();
+  vi.restoreAllMocks();
 });
 
 describe('ShareButton', () => {
+  it('uses the supplied current-view URL for the popover and both social actions', () => {
+    const target = 'https://example.com/gpu-metrics?gm_runId=123&gm_artifactId=456';
+    const open = vi.spyOn(window, 'open').mockReturnValue(null);
+    renderUi(<ShareButton getShareUrl={() => target} />);
+    act(() => container.querySelector<HTMLButtonElement>('[data-testid="share-button"]')?.click());
+    expect(document.querySelector<HTMLInputElement>('[data-testid="share-url-input"]')?.value).toBe(
+      target,
+    );
+    for (const platform of ['twitter', 'linkedin']) {
+      act(() =>
+        document.querySelector<HTMLButtonElement>(`[data-testid="share-${platform}"]`)?.click(),
+      );
+      expect(new URL(String(open.mock.lastCall?.[0])).searchParams.get('url')).toBe(target);
+    }
+  });
+
+  it('does not open a share popover when the current source is unavailable', () => {
+    renderUi(<ShareButton disabled />);
+    const button = container.querySelector<HTMLButtonElement>('[data-testid="share-button"]');
+    expect(button?.disabled).toBe(true);
+    act(() => button?.click());
+    expect(document.querySelector('[data-testid="share-popover"]')).toBeNull();
+  });
+
   it('renders Chinese trigger, dialog chrome, and accessible input name on a Chinese route', () => {
     localeState.pathname = '/zh/inference';
     renderUi(<ShareButton />);

@@ -1,9 +1,21 @@
 import type { MetricConfigKey } from './metric-registry';
+import type { PowerBasis } from '../powerx/powerx-data';
 
 export type MeasuredMetricFamily = 'power' | 'energy';
+export const MEASURED_COMPARISONS = [
+  'single',
+  'boundaries',
+  'roles',
+  'role-energy',
+  'relative',
+] as const;
+export type MeasuredComparison = (typeof MEASURED_COMPARISONS)[number];
+export function resolveMeasuredComparison(value: string | undefined): MeasuredComparison {
+  return MEASURED_COMPARISONS.find((mode) => mode === value) ?? 'single';
+}
 type MeasuredScope = 'all' | 'prefill' | 'decode';
 
-export type MeasuredMetricConfig =
+export type MeasuredMetricConfig = (
   | {
       family: 'power';
       scope: MeasuredScope;
@@ -15,10 +27,12 @@ export type MeasuredMetricConfig =
       scope: MeasuredScope;
       denominator: 'input' | 'output' | 'total' | 'query';
       unit: 'joules' | 'wattHours';
-    };
+    }
+) & { basis?: PowerBasis };
 
 export type MeasuredMetricConfigChange = Partial<{
   family: MeasuredMetricFamily;
+  basis: PowerBasis;
   scope: MeasuredScope;
   statistic: 'average' | 'p75' | 'p90';
   display: 'watts' | 'tdp';
@@ -76,6 +90,66 @@ const MEASURED_METRIC_CONFIGS: readonly (readonly [MetricConfigKey, MeasuredMetr
     'y_measuredWhPerSuccessfulQuery',
     { family: 'energy', scope: 'all', denominator: 'query', unit: 'wattHours' },
   ],
+  [
+    'y_powerxGpuProvisionedWatts',
+    {
+      family: 'power',
+      basis: 'gpu-provisioned',
+      scope: 'all',
+      statistic: 'average',
+      display: 'watts',
+    },
+  ],
+  [
+    'y_powerxGpuProvisionedEnergy',
+    {
+      family: 'energy',
+      basis: 'gpu-provisioned',
+      scope: 'all',
+      denominator: 'output',
+      unit: 'joules',
+    },
+  ],
+  [
+    'y_powerxUtilityProvisionedWatts',
+    {
+      family: 'power',
+      basis: 'utility-provisioned',
+      scope: 'all',
+      statistic: 'average',
+      display: 'watts',
+    },
+  ],
+  [
+    'y_powerxUtilityProvisionedEnergy',
+    {
+      family: 'energy',
+      basis: 'utility-provisioned',
+      scope: 'all',
+      denominator: 'output',
+      unit: 'joules',
+    },
+  ],
+  [
+    'y_powerxUtilityModeledWatts',
+    {
+      family: 'power',
+      basis: 'utility-modeled',
+      scope: 'all',
+      statistic: 'average',
+      display: 'watts',
+    },
+  ],
+  [
+    'y_powerxUtilityModeledEnergy',
+    {
+      family: 'energy',
+      basis: 'utility-modeled',
+      scope: 'all',
+      denominator: 'output',
+      unit: 'joules',
+    },
+  ],
 ];
 
 export function getMeasuredMetricConfig(metric: string): MeasuredMetricConfig | undefined {
@@ -89,8 +163,14 @@ export function changeMeasuredMetricConfig(
 ): MetricConfigKey {
   const current = getMeasuredMetricConfig(metric);
   const family = change.family ?? current?.family ?? 'power';
+  const basis = change.basis ?? current?.basis ?? 'gpu-measured';
+  if (basis !== 'gpu-measured') {
+    return MEASURED_METRIC_CONFIGS.find(
+      ([, candidate]) => candidate.family === family && candidate.basis === basis,
+    )![0];
+  }
   const config =
-    current?.family === family
+    current?.family === family && !current.basis
       ? current
       : getMeasuredMetricConfig(MEASURED_METRIC_DEFAULTS[family])!;
   let scope = change.scope ?? config.scope;
@@ -102,6 +182,7 @@ export function changeMeasuredMetricConfig(
     return (
       MEASURED_METRIC_CONFIGS.find(
         ([, candidate]) =>
+          !candidate.basis &&
           candidate.family === 'power' &&
           candidate.scope === scope &&
           candidate.statistic === statistic &&
@@ -122,6 +203,7 @@ export function changeMeasuredMetricConfig(
   return (
     MEASURED_METRIC_CONFIGS.find(
       ([, candidate]) =>
+        !candidate.basis &&
         candidate.family === 'energy' &&
         candidate.scope === scope &&
         candidate.denominator === denominator &&

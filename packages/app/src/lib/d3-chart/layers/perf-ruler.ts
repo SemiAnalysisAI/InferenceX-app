@@ -226,6 +226,53 @@ export const MAX_PERF_RULERS = 8;
 
 export const EMPTY_PERF_RULER_STATE: PerfRulerState = { rulers: [], draft: null, nextId: 1 };
 
+export function serializePerfRulers(state: PerfRulerState, axis: string): string {
+  return state.rulers.length === 0
+    ? ''
+    : JSON.stringify({
+        axis,
+        rulers: state.rulers.map(({ curveA, curveB, isoX }) => [curveA, curveB, isoX]),
+      });
+}
+
+export function restorePerfRulers(value: string | undefined, axis: string): PerfRulerState {
+  if (!value || value.length > 12_000) return EMPTY_PERF_RULER_STATE;
+  try {
+    const saved: unknown = JSON.parse(value);
+    if (
+      !saved ||
+      typeof saved !== 'object' ||
+      !('axis' in saved) ||
+      saved.axis !== axis ||
+      !('rulers' in saved) ||
+      !Array.isArray(saved.rulers) ||
+      saved.rulers.length > MAX_PERF_RULERS
+    )
+      return EMPTY_PERF_RULER_STATE;
+    const rulers: PerfRulerMeasurement[] = [];
+    for (const row of saved.rulers) {
+      if (
+        !Array.isArray(row) ||
+        row.length !== 3 ||
+        typeof row[0] !== 'string' ||
+        !row[0] ||
+        row[0].length > 512 ||
+        typeof row[1] !== 'string' ||
+        !row[1] ||
+        row[1].length > 512 ||
+        row[0] === row[1] ||
+        typeof row[2] !== 'number' ||
+        !Number.isFinite(row[2])
+      )
+        return EMPTY_PERF_RULER_STATE;
+      rulers.push({ id: rulers.length + 1, curveA: row[0], curveB: row[1], isoX: row[2] });
+    }
+    return { rulers, draft: null, nextId: rulers.length + 1 };
+  } catch {
+    return EMPTY_PERF_RULER_STATE;
+  }
+}
+
 /**
  * Click-transition table for multi-ruler mode (clicks land on CURVES,
  * either on a widened curve hit stroke or via a data point standing in for

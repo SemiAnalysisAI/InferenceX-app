@@ -2,7 +2,7 @@
 
 import { track } from '@/lib/analytics';
 import { isPersistedBenchmarkId } from '@/lib/benchmark-id';
-import { useEphemeralUrlState } from '@/hooks/useUrlState';
+import { useEphemeralUrlState, useUrlState } from '@/hooks/useUrlState';
 import { rememberChartStateInUrl } from '@/lib/url-state';
 import * as d3 from 'd3';
 import dynamic from 'next/dynamic';
@@ -59,7 +59,8 @@ import type {
 import type { ContinuousScale } from '@/lib/d3-chart/types';
 import { computeTooltipPosition, syncPointShape } from '@/lib/d3-chart/layers/scatter-points';
 import {
-  EMPTY_PERF_RULER_STATE,
+  restorePerfRulers,
+  serializePerfRulers,
   clampIsoX,
   clearPerfRulers,
   computeIsoXRulerGeometry,
@@ -104,7 +105,7 @@ import {
   chartFrontier,
   upperPowerEnvelope,
   isPowerCurveMetric,
-  isMeasuredPowerCurveMetric,
+  isDerivedPowerCurveMetric,
 } from '@/components/inference/utils/powerCurves';
 import type {
   ChartDefinition,
@@ -370,14 +371,15 @@ const SCATTER_STRINGS = {
   en: {
     logScale: 'Log Scale',
     optimalOnly: 'Optimal Only',
-    showAllMeasurements: 'Show all measurements',
     optimalInfo: 'Optimal points form the Pareto frontier for the selected axes.',
+    derivedPowerBoundaryInfo:
+      'Show only tested points on the modeled or provisioned upper power boundary. Turn off to show all points; the boundary stays the same. This is a power-load boundary, not an energy-efficiency frontier.',
     powerBoundaryInfo:
       'Show only points on the upper measured power boundary. Turn off to show all measurements; the boundary stays the same. This is a power-load boundary, not an energy-efficiency frontier.',
     powerCurves:
       'Smooth lines trace the upper power boundary across tested configurations. Dots are measured; lines are interpolated, not efficiency frontiers.',
-    powerOptimal:
-      'A power Pareto frontier can contain a single point. Turn off Optimal Only to show the upper power boundary.',
+    derivedPowerCurves:
+      'Lines trace the upper modeled or provisioned power boundary across tested configurations. Values are estimates; flat segments retain the tested interactivity range.',
     labels: 'Labels',
     highContrast: 'High Contrast',
     parallelismLabels: 'Parallelism Labels',
@@ -405,13 +407,15 @@ const SCATTER_STRINGS = {
   zh: {
     logScale: '对数缩放',
     optimalOnly: '仅最优',
-    showAllMeasurements: '显示全部测量点',
     optimalInfo: '最优点构成当前所选坐标轴的 Pareto 前沿。',
+    derivedPowerBoundaryInfo:
+      '仅显示估算或额定功耗上边界的测试数据点。关闭后显示全部数据点，边界曲线保持不变。这是功率负载边界，不是能效前沿。',
     powerBoundaryInfo:
       '仅显示实测功率上边界上的点。关闭后显示全部测量点，边界曲线保持不变。这是功率负载边界，不是能效前沿。',
     powerCurves:
       '平滑曲线勾勒各测试配置的功耗上边界。数据点来自实测，曲线通过插值得到，不代表能效 Pareto 前沿。',
-    powerOptimal: '功耗的 Pareto 前沿可能只有一个点。关闭“仅最优”即可查看功耗上边界。',
+    derivedPowerCurves:
+      '曲线勾勒测试配置的估算或额定功耗上边界。数值来自计算；水平线段仅覆盖实际测试的交互性范围。',
     labels: '标签',
     highContrast: '高对比度',
     parallelismLabels: '并行配置标签',
@@ -476,7 +480,6 @@ const ScatterGraph = React.memo(
     const {
       selectedYAxisMetric,
       hideNonOptimal: preferOptimalOnly,
-      showAllMeasurements: savedShowAllMeasurements,
       showPointLabels,
       highContrast,
       logScale,
@@ -484,7 +487,7 @@ const ScatterGraph = React.memo(
       isLegendExpanded,
       useAdvancedLabels,
       showConcurrencyLabels,
-      showGradientLabels: preferGradientLabels,
+      showGradientLabels,
       showLineLabels,
     } = useInferenceDisplay();
     const {
@@ -493,7 +496,6 @@ const ScatterGraph = React.memo(
       removeHwType,
       resolveComparisonSelection,
       setHideNonOptimal,
-      setShowAllMeasurements,
       setShowPointLabels,
       selectAllHwTypes,
       setHighContrast,
@@ -514,24 +516,25 @@ const ScatterGraph = React.memo(
       | undefined;
     const hideNonOptimal = preferOptimalOnly && Boolean(paretoDirection);
     const isPowerAxis = isPowerCurveMetric(selectedYAxisMetric);
-    const isMeasuredPowerAxis = isMeasuredPowerCurveMetric(selectedYAxisMetric);
-    // Measured power describes the load sweep. Keep its boundary fixed while
-    // Optimal Only changes marker visibility, as on the other scatter charts.
-    const showPowerEnvelope = isPowerAxis && (isMeasuredPowerAxis || !hideNonOptimal);
-    const showAllMeasurements = isMeasuredPowerAxis ? !hideNonOptimal : savedShowAllMeasurements;
-    const supportsGradientLabels = !showPowerEnvelope || isMeasuredPowerAxis;
-    const showGradientLabels = preferGradientLabels && supportsGradientLabels;
+    const isDerivedPowerAxis = isDerivedPowerCurveMetric(selectedYAxisMetric);
+    // Power describes the load sweep. Keep its boundary fixed while Optimal
+    // Only changes marker visibility, as on the other scatter charts.
+    const showPowerEnvelope = isPowerAxis;
+    const showAllMeasurements = !hideNonOptimal;
     const groupDisplayedPoints = useCallback(
       (points: InferenceData[]) => {
         const groups = groupPointsByDate(points);
         if (showPowerEnvelope) {
           for (const [date, samples] of groups) {
-            groups.set(date, upperPowerEnvelope(samples, chartDefinition.chartType !== 'e2e'));
+            groups.set(
+              date,
+              upperPowerEnvelope(samples, chartDefinition.chartType !== 'e2e', isDerivedPowerAxis),
+            );
           }
         }
         return groups;
       },
-      [showPowerEnvelope, chartDefinition.chartType],
+      [showPowerEnvelope, chartDefinition.chartType, isDerivedPowerAxis],
     );
     const locale = useLocale();
     const legendT = SCATTER_STRINGS[locale];
@@ -552,7 +555,6 @@ const ScatterGraph = React.memo(
       unofficialRunInfos,
     } = useUnofficialRun();
     const chartRef = useRef<D3ChartHandle>(null);
-
     // Pinned line-label anchors (data-space x) keyed by line-label key. Persists
     // across renders so each label keeps a stable spot along its line during
     // replay animation. Only read/written when `pinLineLabels` is true.
@@ -824,11 +826,11 @@ const ScatterGraph = React.memo(
     }, [showPowerEnvelope, groupedData, groupDisplayedPoints]);
 
     const optimalPointKeys = useMemo(() => {
-      if (isMeasuredPowerAxis) return powerEnvelopePointKeys;
+      if (isPowerAxis) return powerEnvelopePointKeys;
       const keys = new Set<string>();
       Object.values(rooflines).forEach((pts) => pts.forEach((p) => keys.add(optimalPointKey(p))));
       return keys;
-    }, [rooflines, isMeasuredPowerAxis, powerEnvelopePointKeys]);
+    }, [rooflines, isPowerAxis, powerEnvelopePointKeys]);
 
     const effectiveActiveHwTypes = useMemo(() => {
       if (showAllHardwareTypes) {
@@ -1118,12 +1120,12 @@ const ScatterGraph = React.memo(
     const overlayOptimalPoints = useMemo(() => {
       const set = new Set<InferenceData>();
       for (const group of Object.values(
-        isMeasuredPowerAxis ? displayedOverlayRooflines : overlayRooflines,
+        isPowerAxis ? displayedOverlayRooflines : overlayRooflines,
       )) {
         for (const p of group.points) set.add(p);
       }
       return set;
-    }, [overlayRooflines, isMeasuredPowerAxis, displayedOverlayRooflines]);
+    }, [overlayRooflines, isPowerAxis, displayedOverlayRooflines]);
 
     const overlayEnvelopePoints = useMemo(
       () => new Set(Object.values(displayedOverlayRooflines).flatMap((group) => group.points)),
@@ -1554,9 +1556,16 @@ const ScatterGraph = React.memo(
     // the curves' rendered paths at the iso-x — neither end needs to be a
     // data point. Multiple rulers accumulate (capped in the pure module);
     // completing one immediately allows starting the next.
-    const [preferPerfRulerMode, setPerfRulerMode] = useState(false);
-    const perfRulerMode = preferPerfRulerMode && (!showPowerEnvelope || isMeasuredPowerAxis);
-    const [perfRulerState, setPerfRulerState] = useState<PerfRulerState>(EMPTY_PERF_RULER_STATE);
+    const { getUrlParam, setUrlParam } = useUrlState();
+    const rulerAxis = perfRulerAxisMetricKey(chartDefinition.x_scale_field, selectedYAxisMetric);
+    const [perfRulerState, setPerfRulerState] = useState<PerfRulerState>(() =>
+      restorePerfRulers(getUrlParam('i_rulers'), rulerAxis),
+    );
+    const [preferPerfRulerMode, setPerfRulerMode] = useState(perfRulerState.rulers.length > 0);
+    const perfRulerMode = preferPerfRulerMode;
+    useEffect(() => {
+      if (!minimalChrome) setUrlParam('i_rulers', serializePerfRulers(perfRulerState, rulerAxis));
+    }, [perfRulerState, rulerAxis, minimalChrome, setUrlParam]);
     // Changing the x- or y-axis metric (including the x percentile, which
     // `x_scale_field` encodes) clears every ruler: the curves are redrawn
     // in different units, so a ruler that persisted would measure a ratio
@@ -2730,7 +2739,7 @@ const ScatterGraph = React.memo(
         const overlayPoints = zoomGroup.selectAll<SVGGElement, InferenceData>(
           '.unofficial-overlay-pt',
         );
-        const powerLabels = isMeasuredPowerAxis && showGradientLabels;
+        const powerLabels = isPowerAxis && showGradientLabels;
         const showLabels = powerLabels || (showPointLabels && !showGradientLabels);
         overlayPoints.each(function (d) {
           const lines = (
@@ -3193,7 +3202,7 @@ const ScatterGraph = React.memo(
       pinLineLabels,
       gradientColorByPoint,
       overlayGradientLabelPoints,
-      isMeasuredPowerAxis,
+      isPowerAxis,
       chartId,
       pointsData,
       showPointLabels,
@@ -3645,7 +3654,7 @@ const ScatterGraph = React.memo(
                   data-testid="power-curve-description"
                   className="mt-2 text-2xs text-muted-foreground"
                 >
-                  {showPowerEnvelope ? legendT.powerCurves : legendT.powerOptimal}
+                  {isDerivedPowerAxis ? legendT.derivedPowerCurves : legendT.powerCurves}
                 </p>
               </>
             ) : (
@@ -3811,26 +3820,15 @@ const ScatterGraph = React.memo(
                           setHideNonOptimal(checked);
                           track('latency_hide_non_optimal_toggled', { enabled: checked });
                         },
-                        ...(isMeasuredPowerAxis || selectedSequence === Sequence.AgenticTraces
+                        ...(isPowerAxis || selectedSequence === Sequence.AgenticTraces
                           ? {
-                              infoTooltip: isMeasuredPowerAxis
-                                ? legendT.powerBoundaryInfo
+                              infoTooltip: isPowerAxis
+                                ? isDerivedPowerAxis
+                                  ? legendT.derivedPowerBoundaryInfo
+                                  : legendT.powerBoundaryInfo
                                 : legendT.optimalInfo,
                             }
                           : {}),
-                      },
-                    ]
-                  : []),
-                ...(showPowerEnvelope && !isMeasuredPowerAxis
-                  ? [
-                      {
-                        id: 'scatter-show-all-measurements',
-                        label: legendT.showAllMeasurements,
-                        checked: showAllMeasurements,
-                        onCheckedChange: (checked: boolean) => {
-                          setShowAllMeasurements(checked);
-                          track('latency_show_all_measurements_toggled', { enabled: checked });
-                        },
                       },
                     ]
                   : []),
@@ -3865,7 +3863,7 @@ const ScatterGraph = React.memo(
                     // Parallelism labels are point labels; turning them on is
                     // pointless if labels are hidden, so auto-enable Labels.
                     if (checked && !showPointLabels) setShowPointLabels(true);
-                    if (checked && !showGradientLabels && supportsGradientLabels) {
+                    if (checked && !showGradientLabels) {
                       window.dispatchEvent(
                         new CustomEvent(GRADIENT_NUDGE_EVENT, {
                           detail: {
@@ -3883,19 +3881,15 @@ const ScatterGraph = React.memo(
                     }
                   },
                 },
-                ...(supportsGradientLabels
-                  ? [
-                      {
-                        id: 'scatter-gradient-labels',
-                        label: legendT.gradientLabels,
-                        checked: showGradientLabels,
-                        onCheckedChange: (checked: boolean) => {
-                          setShowGradientLabels(checked);
-                          track('latency_gradient_labels_toggled', { enabled: checked });
-                        },
-                      },
-                    ]
-                  : []),
+                {
+                  id: 'scatter-gradient-labels',
+                  label: legendT.gradientLabels,
+                  checked: showGradientLabels,
+                  onCheckedChange: (checked: boolean) => {
+                    setShowGradientLabels(checked);
+                    track('latency_gradient_labels_toggled', { enabled: checked });
+                  },
+                },
                 {
                   id: 'scatter-line-labels',
                   label: legendT.lineLabels,
@@ -3906,26 +3900,20 @@ const ScatterGraph = React.memo(
                     track('latency_line_labels_toggled', { enabled: checked });
                   },
                 },
-                ...(showPowerEnvelope && !isMeasuredPowerAxis
-                  ? []
-                  : [
-                      {
-                        id: 'scatter-perf-ruler',
-                        label: legendT.perfRuler,
-                        advanced: true,
-                        checked: perfRulerMode,
-                        infoTooltip: legendT.perfRulerInfo,
-                        onCheckedChange: (checked: boolean) => {
-                          setPerfRulerMode(checked);
-                          // Toggle-off clears ALL rulers in the same state batch —
-                          // the pre-paint decoration effect then removes the rulers
-                          // and the curve hit strokes before the next frame (no
-                          // lingering lines after toggle-off).
-                          if (!checked) setPerfRulerState(clearPerfRulers);
-                          track('latency_perf_ruler_toggled', { enabled: checked });
-                        },
-                      },
-                    ]),
+                {
+                  id: 'scatter-perf-ruler',
+                  label: legendT.perfRuler,
+                  advanced: true,
+                  checked: perfRulerMode,
+                  infoTooltip: legendT.perfRulerInfo,
+                  onCheckedChange: (checked: boolean) => {
+                    setPerfRulerMode(checked);
+                    // Clear the rulers in the same state batch so no decoration
+                    // lingers after the toggle is turned off.
+                    if (!checked) setPerfRulerState(clearPerfRulers);
+                    track('latency_perf_ruler_toggled', { enabled: checked });
+                  },
+                },
                 {
                   id: 'scatter-concurrency-labels',
                   label: legendT.concurrencyLabels,

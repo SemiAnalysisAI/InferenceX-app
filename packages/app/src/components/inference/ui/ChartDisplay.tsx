@@ -1,5 +1,8 @@
 'use client';
 import { DISPLAY_MODEL_TO_DB } from '@semianalysisai/inferencex-constants';
+import { useQueryClient } from '@tanstack/react-query';
+import { readUrlParams } from '@/lib/url-state';
+import { getMeasuredMetricConfig } from '@/components/inference/measured-metric-config';
 import { track } from '@/lib/analytics';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BarChart3, Table2 } from 'lucide-react';
@@ -46,6 +49,14 @@ import { matchesQuickFilters } from '@/components/inference/utils/quickFilters';
 import { bestSeriesPerSku } from '@/components/inference/utils/best-series-per-sku';
 import InferenceTable from '@/components/inference/ui/InferenceTable';
 import ScatterGraph from '@/components/inference/ui/ScatterGraph';
+import MeasuredComparisonCharts from '@/components/inference/ui/MeasuredComparisonCharts';
+import {
+  comparisonSeries,
+  relativeComparisonSeries,
+  measuredComparisonPanels,
+  type ComparisonSource,
+} from '@/components/inference/utils/measured-comparison';
+import { overlayRunIndex } from '@/lib/overlay-run-style';
 import { Card } from '@/components/ui/card';
 import { ChartButtons } from '@/components/ui/chart-buttons';
 import { ShareButton } from '@/components/ui/share-button';
@@ -76,6 +87,7 @@ import {
 } from '@/lib/data-mappings';
 import { useComparisonChangelogs } from '@/hooks/api/use-comparison-changelogs';
 import {
+  applyScopeFilters,
   derivedModeRoofline,
   isAgenticOnlyXAxisMode,
   type RooflineDirection,
@@ -265,7 +277,8 @@ function renderInferenceTcoBadges(props: {
 export default function ChartDisplay({ embedded = false }: { embedded?: boolean } = {}) {
   const locale = useLocale();
   const t = STRINGS[locale];
-  const { graphs, loading, refreshing, error, dateRangeAvailableDates } = useInferenceData();
+  const { graphs, selectionPoints, loading, refreshing, error, dateRangeAvailableDates } =
+    useInferenceData();
   const {
     selectedGPUs,
     selectedPrecisions,
@@ -284,6 +297,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
   } = useInferenceFilters();
   const {
     selectedYAxisMetric,
+    measuredComparison,
     selectedXAxisMetric,
     selectedE2eXAxisMetric,
     selectedPercentile,
@@ -293,6 +307,53 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
   } = useInferenceDisplay();
   const { setSelectedDates, setSelectedDatesFromRunExpansion, setIsLegendExpanded } =
     useInferenceActions();
+  const measuredConfig = getMeasuredMetricConfig(selectedYAxisMetric);
+  const measuredFamily = Boolean(measuredConfig);
+  const comparisonMode =
+    measuredConfig && measuredComparison !== 'single' ? measuredComparison : null;
+  const queryClient = useQueryClient();
+  useEffect(() => {
+    if (!measuredFamily || embedded || minimalChrome) return;
+    const refreshLatest = async () => {
+      const pins = readUrlParams();
+      // The existing Dashboard owns run/history intent. Never clear it on mount.
+      if (
+        document.visibilityState !== 'visible' ||
+        pins.g_rundate ||
+        pins.g_runid ||
+        selectedGPUs.length > 0 ||
+        selectedDates.length > 0 ||
+        selectedDateRange.startDate ||
+        selectedDateRange.endDate
+      )
+        return;
+      await queryClient.invalidateQueries({ queryKey: ['availability'] });
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: ['benchmarks', selectedModel],
+          refetchType: 'active',
+        }),
+        queryClient.invalidateQueries({ queryKey: ['workflow-info'], refetchType: 'active' }),
+      ]);
+    };
+    const update = () => void refreshLatest();
+    const timer = window.setInterval(update, 300_000);
+    window.addEventListener('focus', update);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener('focus', update);
+    };
+  }, [
+    measuredFamily,
+    embedded,
+    minimalChrome,
+    queryClient,
+    selectedModel,
+    selectedGPUs.length,
+    selectedDates.length,
+    selectedDateRange.startDate,
+    selectedDateRange.endDate,
+  ]);
   const selectedBenchmarkType: 'single_turn' | 'agentic_traces' =
     selectedSequence === Sequence.AgenticTraces ? 'agentic_traces' : 'single_turn';
   const workflowInfoBenchmarkType =
@@ -512,7 +573,18 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
 
   const overlayScope = useMemo(() => {
     const eligibleKeys = new Set<string>();
-    for (const overlay of [overlayDataByChartType.e2e, overlayDataByChartType.interactivity]) {
+    const overlays = comparisonMode
+      ? (['e2e', 'interactivity'] as const).map((type) => {
+          const raw = getOverlayData(selectedModel, selectedSequence, type);
+          return raw
+            ? {
+                data: applyScopeFilters(raw.data, selectedGPUs, quickFilters, compareGpuPair),
+                clippedData: [],
+              }
+            : null;
+        })
+      : [overlayDataByChartType.e2e, overlayDataByChartType.interactivity];
+    for (const overlay of overlays) {
       const points = [
         ...(overlay?.data ?? []),
         ...(overlay?.clippedData ?? []).map((entry) => entry.point),
@@ -528,11 +600,23 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
       }
     }
     return eligibleKeys;
-  }, [overlayDataByChartType, selectedPrecisions, quickFilters]);
+  }, [
+    overlayDataByChartType,
+    selectedPrecisions,
+    quickFilters,
+    comparisonMode,
+    getOverlayData,
+    selectedModel,
+    selectedSequence,
+    selectedGPUs,
+    compareGpuPair,
+  ]);
   const officialScope = useMemo(() => {
     const eligibleKeys = new Set<string>();
     for (const graph of graphs) {
-      const points = [...graph.data, ...(graph.clippedData ?? []).map((entry) => entry.point)];
+      const points = comparisonMode
+        ? selectionPoints
+        : [...graph.data, ...(graph.clippedData ?? []).map((entry) => entry.point)];
       for (const point of points) {
         if (
           selectedPrecisions.includes(point.precision) &&
@@ -543,7 +627,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
       }
     }
     return eligibleKeys;
-  }, [graphs, selectedPrecisions, quickFilters]);
+  }, [graphs, selectionPoints, comparisonMode, selectedPrecisions, quickFilters]);
   const scopedBestSelections = useMemo(() => {
     if (!bestPerSku) return { official: officialScope, overlay: overlayScope };
     const wantedType = selectedXAxisMode === 'interactivity' ? 'interactivity' : 'e2e';
@@ -727,7 +811,9 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
     if (!useDerivedXAxis) return [] as number[];
     const ids = new Set<number>();
     for (const graph of visibleGraphs) {
-      const points = [...graph.data, ...(graph.clippedData ?? []).map((entry) => entry.point)];
+      const points = comparisonMode
+        ? selectionPoints
+        : [...graph.data, ...(graph.clippedData ?? []).map((entry) => entry.point)];
       for (const point of points) {
         if (point.benchmark_type === 'agentic_traces' && isPersistedBenchmarkId(point.id)) {
           ids.add(point.id);
@@ -735,7 +821,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
       }
     }
     return [...ids];
-  }, [useDerivedXAxis, visibleGraphs]);
+  }, [useDerivedXAxis, visibleGraphs, comparisonMode, selectionPoints]);
   const derivedQuery = useDerivedAgenticMetrics(derivedTargetIds, isAgenticSequence);
   const derivedMetrics = derivedQuery.data;
   const isDerivedXAxisLoading =
@@ -830,10 +916,48 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
           ]
         : renderableGraphs.map((graph, graphIndex) => {
             const resolvedXLabel = xAxisLabel(graph.chartDefinition, locale);
+            const comparisonSources: ComparisonSource[] = comparisonMode
+              ? [
+                  ...selectionPoints.map((point) => ({ point })),
+                  ...applyScopeFilters(
+                    getOverlayData(selectedModel, selectedSequence, graph.chartDefinition.chartType)
+                      ?.data ?? [],
+                    selectedGPUs,
+                    quickFilters,
+                    compareGpuPair,
+                  ).map((point) => ({
+                    point,
+                    overlayIndex: overlayRunIndex(point.run_url ?? null, runIndexByUrl),
+                  })),
+                ]
+                  .filter(
+                    ({ point }) =>
+                      selectedPrecisions.includes(point.precision) &&
+                      matchesQuickFilters(point, quickFilters),
+                  )
+                  .flatMap((source): ComparisonSource[] => {
+                    if (!derivedSpec) return [source];
+                    const point = source.point;
+                    if ('overlayIndex' in source || !isPersistedBenchmarkId(point.id)) return [];
+                    const raw = derivedSpec.value(derivedMetrics?.[point.id], selectedPercentile);
+                    if (raw === null || raw === undefined || !Number.isFinite(raw)) return [];
+                    return [
+                      {
+                        ...source,
+                        point: {
+                          ...point,
+                          [graph.chartDefinition.x_scale_field]: derivedSpec.toX(raw),
+                        },
+                      },
+                    ];
+                  })
+              : [];
+
             const isTimelineMode = Boolean(
               selectedDateRange.startDate && selectedDateRange.endDate && selectedGPUs.length > 0,
             );
-            const replayAvailable = getViewMode(graphIndex) === 'chart' && !isTimelineMode;
+            const replayAvailable =
+              !comparisonMode && getViewMode(graphIndex) === 'chart' && !isTimelineMode;
             // Chart-level notices: the KV-offload halo
             // key, the agentic optimization note, and the ATOM engine
             // footnote. Detected from the same data the chart plots —
@@ -847,6 +971,12 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
               selectedGPUs.length > 0 &&
               ((selectedDateRange.startDate && selectedDateRange.endDate) ||
                 selectedDates.length > 0);
+            const displayedComparisonSources = isGpuComparison
+              ? comparisonSources.filter(
+                  ({ point, overlayIndex }) =>
+                    overlayIndex === undefined && activeDates.has(`${point.date}_${point.hwKey}`),
+                )
+              : comparisonSources;
             const footerOverlay = isGpuComparison
               ? undefined
               : selectUnofficialOverlayForMode(
@@ -926,19 +1056,21 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                             : 'interactivity'
                       }
                       leadingControls={
-                        <>
-                          <SegmentedToggle
-                            value={getViewMode(graphIndex)}
-                            options={viewModeOptions}
-                            onValueChange={(v) => handleViewModeChange(graphIndex, v)}
-                            ariaLabel={t.viewMode}
-                            testId={`inference-view-toggle-${graphIndex}`}
-                          />
-                        </>
+                        comparisonMode ? undefined : (
+                          <>
+                            <SegmentedToggle
+                              value={getViewMode(graphIndex)}
+                              options={viewModeOptions}
+                              onValueChange={(v) => handleViewModeChange(graphIndex, v)}
+                              ariaLabel={t.viewMode}
+                              testId={`inference-view-toggle-${graphIndex}`}
+                            />
+                          </>
+                        )
                       }
-                      hideImageExport={getViewMode(graphIndex) === 'table'}
+                      hideImageExport={!comparisonMode && getViewMode(graphIndex) === 'table'}
                       setIsLegendExpanded={setIsLegendExpanded}
-                      hideLegendOnExport={showLineLabels}
+                      hideLegendOnExport={!comparisonMode && showLineLabels}
                       exportFileName={`InferenceX_${selectedModel}_${graph.chartDefinition.chartType}`}
                       onExportMp4={
                         replayAvailable
@@ -946,6 +1078,83 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                           : undefined
                       }
                       onExportCsv={() => {
+                        if (comparisonMode && measuredConfig) {
+                          const visible = displayedComparisonSources.filter(
+                            ({ point, overlayIndex }) =>
+                              (overlayIndex === undefined
+                                ? selectedOfficialHwTypes
+                                : activeOverlayHwTypes
+                              ).has(String(point.hwKey)),
+                          );
+                          const comparisonX = visible.every(
+                            ({ point }) => point.benchmark_type !== 'agentic_traces',
+                          )
+                            ? graph.chartDefinition.x_scale_field.replace(
+                                /^(?:mean|median|p\d+(?:\.\d+)?)_/u,
+                                `${readUrlParams().i_mstat === 'mean' ? 'mean' : 'median'}_`,
+                              )
+                            : graph.chartDefinition.x_scale_field;
+                          const rows = measuredComparisonPanels(
+                            comparisonMode,
+                            measuredConfig.family,
+                          ).flatMap((panel) =>
+                            (comparisonMode === 'relative'
+                              ? relativeComparisonSeries(
+                                  visible,
+                                  comparisonX,
+                                  readUrlParams().i_mbase ?? '',
+                                  readUrlParams().i_mcomp ?? '',
+                                  readUrlParams().i_iso_axis === comparisonX
+                                    ? Number(readUrlParams().i_iso) || undefined
+                                    : undefined,
+                                )
+                              : comparisonSeries(visible, panel, comparisonX)
+                            ).flatMap((series) =>
+                              series.points
+                                .filter((point) => Number.isFinite(point.y))
+                                .map((point) => [
+                                  panel.label,
+                                  series.metric.label,
+                                  panel.unit,
+                                  series.hwKey,
+                                  point.x,
+                                  point.y,
+                                  point.relative ? '' : point.point.conc,
+                                  point.point.date,
+                                  point.point.run_url ?? '',
+                                  point.relative ? '' : (point.point.id ?? ''),
+                                  point.overlayIndex === undefined ? 'official' : 'unofficial',
+                                  point.relative ? (readUrlParams().i_mbase ?? '') : '',
+                                  point.relative ? (readUrlParams().i_mcomp ?? '') : '',
+                                  point.relative?.baseline ?? '',
+                                  point.relative?.comparator ?? '',
+                                ]),
+                            ),
+                          );
+                          exportToCsv(
+                            `InferenceX_${selectedModel}_measured_comparison`,
+                            [
+                              'Panel',
+                              'Metric',
+                              'Unit',
+                              'Hardware',
+                              comparisonX,
+                              'Value',
+                              'Concurrency',
+                              'Date',
+                              'Run',
+                              'Benchmark ID',
+                              'Source',
+                              'Baseline configuration/run',
+                              'Comparator configuration/run',
+                              'Baseline interpolated value',
+                              'Comparator interpolated value',
+                            ],
+                            rows,
+                          );
+                          return;
+                        }
+
                         const candidateVisibleData = isTimelineMode
                           ? graph.data.filter((d) => activeDates.has(`${d.date}_${d.hwKey}`))
                           : graph.data;
@@ -1009,9 +1218,43 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                               />
                               {getModelLabel(graph.model as Model)}{' '}
                               {getSequenceLabel(graph.sequence as Sequence, locale)}{' '}
-                              {metricChartTitle(graph.chartDefinition, selectedYAxisMetric, locale)}{' '}
+                              {comparisonMode
+                                ? {
+                                    relative:
+                                      locale === 'zh'
+                                        ? '硬件相对变化'
+                                        : 'Relative Hardware Comparison',
+                                    boundaries:
+                                      locale === 'zh'
+                                        ? '功耗与能耗口径对比'
+                                        : 'Power and Energy Boundaries',
+                                    roles:
+                                      locale === 'zh'
+                                        ? 'Prefill 与 Decode 对比'
+                                        : 'Prefill and Decode',
+                                    'role-energy':
+                                      locale === 'zh'
+                                        ? '完整请求的能耗构成'
+                                        : 'Complete-request Energy',
+                                  }[comparisonMode]
+                                : metricChartTitle(
+                                    graph.chartDefinition,
+                                    selectedYAxisMetric,
+                                    locale,
+                                  )}{' '}
                               {(() => {
                                 const xField = graph.chartDefinition.x_scale_field;
+                                if (comparisonMode && !isAgenticSequence) {
+                                  if (xField.endsWith('_ttft'))
+                                    return locale === 'zh'
+                                      ? 'vs. 首 token 延迟（TTFT）'
+                                      : 'vs. Time To First Token';
+                                  if (xField.endsWith('_e2el'))
+                                    return locale === 'zh'
+                                      ? 'vs. 端到端延迟'
+                                      : 'vs. End-to-end Latency';
+                                  return locale === 'zh' ? 'vs. 交互性' : 'vs. Interactivity';
+                                }
                                 if (xField?.endsWith('_ttft')) {
                                   const percentile = xField.replace(/_ttft$/u, '');
                                   return t.vsTtft(
@@ -1121,7 +1364,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                                 : undefined
                             }
                           />
-                          {!minimalChrome && (
+                          {!minimalChrome && !comparisonMode && (
                             <MetricAssumptionNotes
                               tcoBasis={tcoBasis}
                               selectedYAxisMetric={selectedYAxisMetric}
@@ -1147,6 +1390,21 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                           <UnofficialDomainNotice />
                         </>
                       );
+
+                      if (comparisonMode && measuredConfig) {
+                        return (
+                          <MeasuredComparisonCharts
+                            key={graphIndex}
+                            chartId={`chart-${graphIndex}`}
+                            sources={displayedComparisonSources}
+                            mode={comparisonMode}
+                            family={measuredConfig.family}
+                            xField={graph.chartDefinition.x_scale_field}
+                            xLabel={resolvedXLabel}
+                            caption={chartCaption}
+                          />
+                        );
+                      }
 
                       if (getViewMode(graphIndex) === 'table') {
                         const overlay = selectUnofficialOverlayForMode(

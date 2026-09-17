@@ -1,9 +1,9 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { track } from '@/lib/analytics';
 import * as d3 from 'd3';
-import { BarChart3, Check, Link as LinkIcon, Lock, Loader2, ScatterChart } from 'lucide-react';
+import { BarChart3, Lock, Loader2, ScatterChart } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useCallback, useMemo, useState } from 'react';
 
@@ -33,6 +33,7 @@ import { useClientSearchParams } from '@/hooks/useClientSearch';
 import GpuCorrelationChart from './GpuCorrelationChart';
 import GpuMetricsChart from './GpuPowerChart';
 import GpuStatsTable from './GpuStatsTable';
+import ServingPowerComparison from './ServingPowerComparison';
 import {
   type GpuMetricKey,
   type GpuPowerApiResponse,
@@ -60,8 +61,6 @@ const STRINGS = {
     dataPointsLabel: 'Data points:',
     artifactLabel: 'Artifact',
     metricLabel: 'Metric',
-    copied: 'Copied',
-    share: 'Share',
     xAxis: 'X Axis',
     yAxis: 'Y Axis',
     metricOverTimeSuffix: ' over Time',
@@ -77,10 +76,12 @@ const STRINGS = {
     viewMode: 'View mode',
     lineChart: 'Line chart',
     correlationScatter: 'Correlation scatter',
-    shareTitle: 'Copy share link',
     chip: 'Chip',
     chartToolbar: 'Chart controls',
     correlationAxes: 'Correlation axes',
+    source: 'Data view',
+    rawTelemetry: 'Raw chip telemetry',
+    servingPower: 'Serving-window power',
   },
   zh: {
     heading: 'PowerX',
@@ -98,8 +99,6 @@ const STRINGS = {
     dataPointsLabel: '数据点：',
     artifactLabel: '产物',
     metricLabel: '指标',
-    copied: '已复制',
-    share: '分享',
     xAxis: 'X 轴',
     yAxis: 'Y 轴',
     metricOverTimeSuffix: ' 时间趋势',
@@ -115,10 +114,12 @@ const STRINGS = {
     viewMode: '显示模式',
     lineChart: '折线图',
     correlationScatter: '相关性散点图',
-    shareTitle: '复制分享链接',
     chip: '芯片',
     chartToolbar: '图表控制',
     correlationAxes: '相关性坐标轴',
+    source: '数据视图',
+    rawTelemetry: '原始芯片遥测',
+    servingPower: 'Serving 窗口功耗',
   },
 } as const;
 
@@ -158,6 +159,13 @@ export default function GpuMetricsDisplay() {
   const t = STRINGS[locale];
   const searchParams = useClientSearchParams();
   const searchKey = searchParams.toString();
+  const queryClient = useQueryClient();
+  const [viewSelection, setViewSelection] = useState<{ searchKey: string; value: string } | null>(
+    null,
+  );
+  const servingView =
+    (viewSelection?.searchKey === searchKey ? viewSelection.value : searchParams.get('gm_view')) ===
+    'serving';
   const urlRunId = searchParams.get('gm_runId')?.trim() || null;
   const [runIdDraft, setRunIdDraft] = useState<{ searchKey: string; value: string } | null>(null);
   const runIdInput =
@@ -170,7 +178,7 @@ export default function GpuMetricsDisplay() {
   const query = useQuery({
     queryKey: ['gpu-power-run', requestedRunId] as const,
     queryFn: ({ signal }) => fetchGpuPowerRun(requestedRunId!, signal),
-    enabled: Boolean(requestedRunId),
+    enabled: Boolean(requestedRunId) && !servingView,
     staleTime: 0,
     gcTime: 0,
     retry: false,
@@ -231,7 +239,17 @@ export default function GpuMetricsDisplay() {
     [gpuSelection, gpuScopeKey, allGpuIndices],
   );
 
-  const [copied, setCopied] = useState(false);
+  const servingScopeKey = `${searchKey}|${requestedRunId}`;
+  const [servingShare, setServingShare] = useState<{
+    scopeKey: string;
+    search: string | null;
+  } | null>(null);
+  const onServingShareChange = useCallback(
+    (search: string | null) => {
+      setServingShare({ scopeKey: servingScopeKey, search });
+    },
+    [servingScopeKey],
+  );
   const [isLegendExpanded, setIsLegendExpanded] = useState(true);
   const [downsample, setDownsample] = useState(true);
   const [chartView, setChartView] = useState<GpuMetricsView>('chart');
@@ -260,11 +278,13 @@ export default function GpuMetricsDisplay() {
     if (!runId) return;
     track('gpu_metrics_load_run', { runId });
     if (runId === requestedRunId) {
-      void query.refetch();
+      if (servingView)
+        void queryClient.invalidateQueries({ queryKey: ['gpu-serving-power', runId] });
+      else void query.refetch();
       return;
     }
     setSubmittedRun({ searchKey, runId });
-  }, [runIdInput, requestedRunId, query, searchKey]);
+  }, [runIdInput, requestedRunId, query, searchKey, servingView, queryClient]);
 
   const handleArtifactChange = useCallback(
     (name: string) => {
@@ -314,31 +334,21 @@ export default function GpuMetricsDisplay() {
     [gpuScopeKey, visibleGpus],
   );
 
-  const handleShare = useCallback(async () => {
-    const params = new URLSearchParams();
-    params.set('gm_runId', requestedRunId ?? runIdInput.trim());
-    if (selectedArtifact) params.set('gm_artifact', selectedArtifact);
-    if (selectedMetric !== 'power') params.set('gm_metric', selectedMetric);
-    const url = `${window.location.origin}${window.location.pathname}?${params.toString()}#gpu-metrics`;
-    track('gpu_metrics_share_link_copied', {
-      runId: requestedRunId ?? runIdInput.trim(),
-      artifact: selectedArtifact,
-      metric: selectedMetric,
-    });
-    try {
-      await navigator.clipboard.writeText(url);
-    } catch {
-      const textArea = document.createElement('textarea');
-      textArea.value = url;
-      document.body.append(textArea);
-      textArea.select();
-      document.execCommand('copy');
-      textArea.remove();
-    }
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-    window.dispatchEvent(new CustomEvent('inferencex:action'));
-  }, [requestedRunId, runIdInput, selectedArtifact, selectedMetric]);
+  const rawShareSearch = new URLSearchParams();
+  if (requestedRunId) rawShareSearch.set('gm_runId', requestedRunId);
+  if (selectedArtifact) rawShareSearch.set('gm_artifact', selectedArtifact);
+  if (selectedMetric !== 'power') rawShareSearch.set('gm_metric', selectedMetric);
+  const shareSearch = servingView
+    ? servingShare?.scopeKey === servingScopeKey
+      ? servingShare.search
+      : null
+    : requestedRunId && selectedArtifact
+      ? rawShareSearch.toString()
+      : null;
+  const getShareUrl = useCallback(
+    () => `${window.location.origin}${window.location.pathname}?${shareSearch ?? ''}#gpu-metrics`,
+    [shareSearch],
+  );
 
   const metricConfig = ALL_METRIC_OPTIONS.find((metric) => metric.key === selectedMetric)!;
   const allGpusSelected =
@@ -368,7 +378,9 @@ export default function GpuMetricsDisplay() {
             description={
               <>
                 {t.descPre}{' '}
-                <code className="text-xs bg-muted px-1 py-0.5 rounded">gpu_metrics</code>{' '}
+                <code className="text-xs bg-muted px-1 py-0.5 rounded">
+                  {servingView ? 'power_audit' : 'gpu_metrics'}
+                </code>{' '}
                 {t.descPost}
               </>
             }
@@ -388,12 +400,30 @@ export default function GpuMetricsDisplay() {
                   <Lock className="size-3" />
                   {t.relockButton}
                 </Button>
-                <ChartShareActions />
+                <ChartShareActions getShareUrl={getShareUrl} disabled={!shareSearch} />
               </div>
             }
           />
-          <div className="flex flex-wrap items-end gap-3">
-            <div className="flex-1 max-w-sm space-y-1">
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-3 sm:flex sm:flex-wrap">
+            <div className="col-span-2 space-y-1 sm:col-auto">
+              <Label htmlFor="gpu-metrics-source">{t.source}</Label>
+              <Select
+                value={servingView ? 'serving' : 'raw'}
+                onValueChange={(value) => {
+                  setViewSelection({ searchKey, value });
+                  track('gpu_metrics_source_changed', { value });
+                }}
+              >
+                <SelectTrigger id="gpu-metrics-source" className="w-full sm:w-auto">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="raw">{t.rawTelemetry}</SelectItem>
+                  <SelectItem value="serving">{t.servingPower}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="min-w-0 flex-1 space-y-1 sm:max-w-sm">
               <Label htmlFor="gpu-metrics-run-id">{t.runIdLabel}</Label>
               <Input
                 id="gpu-metrics-run-id"
@@ -424,7 +454,15 @@ export default function GpuMetricsDisplay() {
         </div>
       </Card>
 
-      {error && (
+      {servingView && (
+        <ServingPowerComparison
+          key={servingScopeKey}
+          runId={requestedRunId}
+          onShareSearchChange={onServingShareChange}
+        />
+      )}
+
+      {!servingView && error && (
         <Card className="mb-4 border-destructive" data-testid="gpu-metrics-error">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-sm text-destructive">{error}</p>
@@ -442,13 +480,13 @@ export default function GpuMetricsDisplay() {
         </Card>
       )}
 
-      {runInfo && artifacts.length === 0 && !error && (
+      {!servingView && runInfo && artifacts.length === 0 && !error && (
         <Card className="mb-4" data-testid="gpu-metrics-empty">
           <p className="text-sm text-muted-foreground">{t.empty}</p>
         </Card>
       )}
 
-      {runInfo && artifacts.length > 0 && (
+      {!servingView && runInfo && artifacts.length > 0 && (
         <>
           <Card className="mb-4">
             <dl className="mb-4 grid grid-cols-2 gap-x-4 gap-y-3 text-sm sm:grid-cols-3 lg:grid-cols-6">
@@ -561,26 +599,6 @@ export default function GpuMetricsDisplay() {
                   activeButtonClassName="bg-muted text-foreground"
                   inactiveButtonClassName="text-muted-foreground hover:bg-muted/50 hover:text-foreground"
                 />
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleShare}
-                  className="gap-1.5 text-xs"
-                  title={t.shareTitle}
-                  data-testid="gpu-metrics-share-button"
-                >
-                  {copied ? (
-                    <>
-                      <Check className="size-3" />
-                      {t.copied}
-                    </>
-                  ) : (
-                    <>
-                      <LinkIcon className="size-3" />
-                      {t.share}
-                    </>
-                  )}
-                </Button>
               </div>
             </div>
 

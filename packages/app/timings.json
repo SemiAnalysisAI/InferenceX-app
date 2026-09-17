@@ -141,8 +141,12 @@
       "duration": 1959
     },
     {
+      "spec": "cypress/e2e/gpu-perf-ruler-share.cy.ts",
+      "duration": 6000
+    },
+    {
       "spec": "cypress/e2e/gpu-power.cy.ts",
-      "duration": 11512
+      "duration": 24000
     },
     {
       "spec": "cypress/e2e/gpu-specs.cy.ts",
@@ -227,6 +231,10 @@
     {
       "spec": "cypress/e2e/performance.cy.ts",
       "duration": 2377
+    },
+    {
+      "spec": "cypress/e2e/powerx.cy.ts",
+      "duration": 16000
     },
     {
       "spec": "cypress/e2e/profit-estimator.cy.ts",

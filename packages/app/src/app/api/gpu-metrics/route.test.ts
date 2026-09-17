@@ -18,6 +18,10 @@ const { mockParseCsvData } = vi.hoisted(() => ({
   }),
 }));
 
+const { auditEntries } = vi.hoisted(() => ({
+  auditEntries: { value: null as Record<string, string> | null },
+}));
+
 vi.mock('@semianalysisai/inferencex-constants', () => ({
   GITHUB_API_BASE: 'https://api.github.com',
   GITHUB_OWNER: 'TestOwner',
@@ -32,6 +36,13 @@ vi.mock('adm-zip', () => {
   const csvContent = 'timestamp,index,power\n2026-03-01T00:00:00Z,0,300';
   class MockAdmZip {
     getEntries() {
+      if (auditEntries.value)
+        return Object.entries(auditEntries.value).map(([entryName, contents]) => ({
+          entryName,
+          isDirectory: false,
+          header: { size: contents.length },
+          getData: () => Buffer.from(contents),
+        }));
       return [
         {
           entryName: 'gpu_metrics_0.csv',
@@ -56,6 +67,7 @@ function req(url: string): NextRequest {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  auditEntries.value = null;
   origToken = process.env.GITHUB_TOKEN;
   process.env.GITHUB_TOKEN = 'test-gh-token';
 });
@@ -70,6 +82,75 @@ afterEach(() => {
 });
 
 describe('GET /api/gpu-metrics', () => {
+  it('rejects an unsupported source', async () => {
+    const res = await GET(req('/api/gpu-metrics?runId=123&source=other'));
+    expect(res.status).toBe(400);
+  });
+
+  it('loads raw power-audit provenance only when explicitly selected', async () => {
+    const manifest = {
+      expected_devices: [
+        { hostname: 'a', gpu_index: 0, assignments: [{ worker_role: 'prefill' }] },
+      ],
+      source_metric: 'DCGM_FI_DEV_POWER_USAGE',
+    };
+    auditEntries.value = {
+      'LOGS/power/manifest.json': JSON.stringify(manifest),
+      'LOGS/power/samples.csv':
+        'timestamp_unix,scrape_seq,hostname,gpu_index,gpu_uuid,power_w\n1,1,a,0,GPU-a,200',
+      'LOGS/power/windows/result.json': JSON.stringify({ concurrency: 4 }),
+    };
+    globalThis.fetch = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ id: 123 }) })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            artifacts: [
+              {
+                id: 1,
+                name: 'gpu_metrics_example',
+                archive_download_url: 'https://example.com/raw',
+              },
+              {
+                id: 2,
+                name: 'power_audit_example',
+                archive_download_url: 'https://example.com/audit',
+              },
+            ],
+          }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        headers: new Headers(),
+        arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)),
+      });
+    const res = await GET(req('/api/gpu-metrics?runId=123&source=power-audit'));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.powerAudits[0]).toMatchObject({
+      id: 2,
+      name: 'power_audit_example',
+      manifest,
+      samples: [
+        {
+          timestamp_unix: 1,
+          scrape_seq: 1,
+          hostname: 'a',
+          gpu_index: 0,
+          gpu_uuid: 'GPU-a',
+          power_w: 200,
+        },
+      ],
+    });
+    expect(body).not.toHaveProperty('artifacts');
+    expect(globalThis.fetch).toHaveBeenLastCalledWith(
+      'https://example.com/audit',
+      expect.any(Object),
+    );
+  });
+
   it('returns 400 when runId is missing', async () => {
     const res = await GET(req('/api/gpu-metrics'));
     expect(res.status).toBe(400);

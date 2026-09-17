@@ -85,9 +85,12 @@ function mountWithPowerGroupsUnlocked() {
 
 function StatefulMeasuredControls({ context }: { context: MockInferenceContextValues }) {
   const [selectedYAxisMetric, setSelectedYAxisMetric] = useState(context.selectedYAxisMetric);
+  const [measuredComparison, setMeasuredComparison] = useState(context.measuredComparison);
   const value = {
     ...context,
     selectedYAxisMetric,
+    measuredComparison,
+    setMeasuredComparison,
     setSelectedYAxisMetric(metric: string) {
       context.setSelectedYAxisMetric(metric);
       setSelectedYAxisMetric(metric);
@@ -118,6 +121,28 @@ function selectMeasuredSetting(control: string, value: string) {
 }
 
 describe('Inference ChartControls', () => {
+  it('returns to the chosen P90 metric after comparing a provisioned boundary', () => {
+    mountMeasuredControls('y_measuredP90Power');
+    selectMeasuredSetting('power-boundary', 'gpu-provisioned');
+    selectMeasuredSetting('power-boundary', 'gpu-measured');
+    cy.get('[data-testid="measured-power-statistic-p90"]').should(
+      'have.attr',
+      'aria-pressed',
+      'true',
+    );
+  });
+
+  it('changes graph comparison mode without replacing the selected measured metric', () => {
+    mountMeasuredControls('y_measuredP90Power');
+    selectMeasuredSetting('comparison', 'boundaries');
+    cy.get('[data-testid="measured-power-boundary"]').should('not.exist');
+    selectMeasuredSetting('comparison', 'single');
+    cy.get('[data-testid="measured-power-statistic-p90"]').should(
+      'have.attr',
+      'aria-pressed',
+      'true',
+    );
+  });
   beforeEach(() => {
     mountWithProviders(<InferenceChartControls showXAxisMode />, { inference: {}, unofficial: {} });
   });
@@ -426,7 +451,7 @@ describe('Inference ChartControls grouped measured metrics', () => {
     cy.window().then((win) => win.localStorage.removeItem('inferencex-feature-gate'));
   });
 
-  it('offers two measured families without repeating all thirteen configurations', () => {
+  it('offers two measured families without repeating individual configurations', () => {
     mountMeasuredControls('y_tpPerGpu');
     cy.get('[data-testid="yaxis-metric-selector"]').click('right');
     cy.get('[data-slot="select-item"]').then(($items) => {
@@ -499,6 +524,79 @@ describe('Inference ChartControls grouped measured metrics', () => {
       cy.get('@setSelectedYAxisMetric').should('have.been.calledWith', 'y_measuredP75Power');
     });
   }
+
+  for (const [basis, label, power, energy] of [
+    [
+      'gpu-provisioned',
+      'GPU provisioned (TDP)',
+      'y_powerxGpuProvisionedWatts',
+      'y_powerxGpuProvisionedEnergy',
+    ],
+    [
+      'utility-provisioned',
+      'All-in utility provisioned',
+      'y_powerxUtilityProvisionedWatts',
+      'y_powerxUtilityProvisionedEnergy',
+    ],
+    [
+      'utility-modeled',
+      'All-in utility modeled',
+      'y_powerxUtilityModeledWatts',
+      'y_powerxUtilityModeledEnergy',
+    ],
+  ]) {
+    it(`carries ${basis} between the existing families and restores measured controls`, () => {
+      mountMeasuredControls('y_measuredP90Power');
+      selectMeasuredSetting('power-boundary', basis);
+      cy.get('@setSelectedYAxisMetric').should('have.been.calledWith', power);
+      cy.get('[data-testid="measured-power-boundary"]').should('contain.text', label);
+      cy.get('[data-testid="measured-power-scope"]').should('not.exist');
+      cy.get('[data-testid="measured-power-statistic-p90"]').should('not.exist');
+      cy.get('[data-testid="measured-boundary-assumptions"]').should('contain.text', 'W/chip');
+      cy.get('[data-testid="yaxis-metric-selector"]').click('right');
+      cy.contains('[data-select-option]', /^Measured Energy$/u)
+        .scrollIntoView()
+        .click();
+      cy.get('@setSelectedYAxisMetric').should('have.been.calledWith', energy);
+      cy.get('[data-testid="measured-energy-boundary"]').should('contain.text', label);
+      cy.get('[data-testid="measured-energy-denominator"]').should('not.exist');
+      cy.get('[data-testid="measured-energy-unit"]').should('not.exist');
+      cy.get('[data-testid="measured-boundary-assumptions"]').should(
+        'contain.text',
+        'J/output token',
+      );
+      cy.get('[data-testid="yaxis-metric-selector"]').click('right');
+      cy.contains('[data-select-option]', /^Measured Power$/u)
+        .scrollIntoView()
+        .click();
+      cy.get('@setSelectedYAxisMetric').should('have.been.calledWith', power);
+      selectMeasuredSetting('power-boundary', 'gpu-measured');
+      cy.get('@setSelectedYAxisMetric').should('have.been.calledWith', 'y_measuredP90Power');
+      cy.get('[data-testid="measured-power-statistic-p90"]').should('be.visible');
+      cy.get('[data-testid="measured-boundary-assumptions"]').should('not.exist');
+    });
+  }
+
+  it('hydrates and searches a derived energy boundary without changing its key', () => {
+    mountMeasuredControls('y_powerxUtilityModeledEnergy');
+    cy.get('[data-testid="yaxis-metric-selector"]').should('have.text', 'Measured Energy');
+    cy.get('[data-testid="measured-energy-boundary"]').should(
+      'contain.text',
+      'All-in utility modeled',
+    );
+    cy.get('@setSelectedYAxisMetric').should('not.have.been.called');
+    cy.get('[data-testid="yaxis-metric-selector"]').click('right');
+    cy.get('input[aria-label="Search options"]').type('Utility Provisioned Power');
+    cy.get('[data-select-option]')
+      .should('have.length', 1)
+      .and('have.attr', 'data-value', 'y_powerxUtilityProvisionedWatts')
+      .click();
+    cy.get('@setSelectedYAxisMetric').should(
+      'have.been.calledWith',
+      'y_powerxUtilityProvisionedWatts',
+    );
+    cy.get('[data-testid="yaxis-metric-selector"]').should('have.text', 'Measured Power');
+  });
 
   it('keeps P75 and P90 visible and selects their existing metric keys', () => {
     mountMeasuredControls();

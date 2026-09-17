@@ -274,6 +274,54 @@ export const METRIC_REGISTRY = {
     titleZh: '每输入 token 全电源配置焦耳能耗',
     polarity: 'lower',
   },
+  powerxGpuProvisionedWatts: {
+    field: 'powerxGpuProvisionedWatts.y',
+    label: 'GPU Provisioned (TDP) Power (W/chip)',
+    labelZh: 'GPU 额定（TDP）功率（W/芯片）',
+    title: 'GPU Provisioned (TDP) Power (W/chip)',
+    titleZh: 'GPU 额定（TDP）功率（W/芯片）',
+    polarity: 'lower',
+  },
+  powerxGpuProvisionedEnergy: {
+    field: 'powerxGpuProvisionedEnergy.y',
+    label: 'GPU Provisioned (TDP) Energy (J/output token)',
+    labelZh: 'GPU 额定（TDP）能耗（J/输出 token）',
+    title: 'GPU Provisioned (TDP) Energy (J/output token)',
+    titleZh: 'GPU 额定（TDP）能耗（J/输出 token）',
+    polarity: 'lower',
+  },
+  powerxUtilityProvisionedWatts: {
+    field: 'powerxUtilityProvisionedWatts.y',
+    label: 'All-in Utility Provisioned Power (W/chip)',
+    labelZh: '全设施配置功率（W/芯片）',
+    title: 'All-in Utility Provisioned Power (W/chip)',
+    titleZh: '全设施配置功率（W/芯片）',
+    polarity: 'lower',
+  },
+  powerxUtilityProvisionedEnergy: {
+    field: 'powerxUtilityProvisionedEnergy.y',
+    label: 'All-in Utility Provisioned Energy (J/output token)',
+    labelZh: '全设施配置能耗（J/输出 token）',
+    title: 'All-in Utility Provisioned Energy (J/output token)',
+    titleZh: '全设施配置能耗（J/输出 token）',
+    polarity: 'lower',
+  },
+  powerxUtilityModeledWatts: {
+    field: 'powerxUtilityModeledWatts.y',
+    label: 'All-in Utility Modeled Power (W/chip)',
+    labelZh: '全设施估算功率（W/芯片）',
+    title: 'All-in Utility Modeled Power (W/chip)',
+    titleZh: '全设施估算功率（W/芯片）',
+    polarity: 'lower',
+  },
+  powerxUtilityModeledEnergy: {
+    field: 'powerxUtilityModeledEnergy.y',
+    label: 'All-in Utility Modeled Energy (J/output token)',
+    labelZh: '全设施估算能耗（J/输出 token）',
+    title: 'All-in Utility Modeled Energy (J/output token)',
+    titleZh: '全设施估算能耗（J/输出 token）',
+    polarity: 'lower',
+  },
   measuredAvgPower: {
     field: 'measuredAvgPower.y',
     label: 'Measured Avg Power per Chip (W)',
@@ -530,7 +578,7 @@ export function isBenchmarkMetricKey(metricKey: string): metricKey is BenchmarkM
  * resolve to total/input so output-only snapshots cannot leak into them. */
 export function tokenMetricTypeForConfigKey(metric: string): TokenMetricType {
   const normalized = metric.toLowerCase();
-  if (normalized.includes('output')) return 'output';
+  if (normalized.includes('output') || normalized.startsWith('y_powerx')) return 'output';
   if (normalized.includes('input') || /cost[hnr]i$/u.test(normalized)) return 'input';
   return 'total';
 }
@@ -579,7 +627,7 @@ export interface MetricControlGroup {
 
 /**
  * The runner-telemetry y-axes in the "Measured Energy" control group.
- * Exported (and referenced by the group below, so the two cannot drift) for
+ * Exported separately from the provisioned/modelled comparisons for
  * consumers that treat measured axes specially — the legacy-power point ring,
  * tooltip tier line, and footer legend key.
  */
@@ -674,7 +722,15 @@ export const METRIC_CONTROL_GROUPS: readonly MetricControlGroup[] = [
   {
     label: 'Measured Energy',
     labelZh: '实测能耗',
-    metrics: MEASURED_ENERGY_METRIC_CONFIG_KEYS,
+    metrics: [
+      ...MEASURED_ENERGY_METRIC_CONFIG_KEYS,
+      'y_powerxGpuProvisionedWatts',
+      'y_powerxGpuProvisionedEnergy',
+      'y_powerxUtilityProvisionedWatts',
+      'y_powerxUtilityProvisionedEnergy',
+      'y_powerxUtilityModeledWatts',
+      'y_powerxUtilityModeledEnergy',
+    ],
     gated: true,
   },
   {
