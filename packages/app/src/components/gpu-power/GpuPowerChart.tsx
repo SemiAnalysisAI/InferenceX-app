@@ -6,6 +6,11 @@ import React, { useMemo } from 'react';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
 import { useLocale } from '@/lib/use-locale';
 import {
+  DEFAULT_TELEMETRY_DISPLAY,
+  rollingTimeAverage,
+  type TelemetryDisplayState,
+} from './telemetry-smoothing';
+import {
   type GpuMetricKey,
   type GpuMetricRow,
   ALL_METRIC_OPTIONS,
@@ -25,6 +30,7 @@ const STRINGS = {
     power: 'Power',
     temp: 'Temp',
     utilization: 'Chip Util',
+    rollingSuffix: (windowS: number) => `${windowS} s rolling avg`,
   },
   zh: {
     empty: '暂无可显示的芯片指标数据。',
@@ -35,14 +41,18 @@ const STRINGS = {
     power: '功耗',
     temp: '温度',
     utilization: '芯片利用率',
+    rollingSuffix: (windowS: number) => `${windowS} 秒滚动平均`,
   },
 } as const;
 
 interface ParsedPoint {
   seconds: number;
+  /** Absolute sample time in ms; smoothing and alignment work in this space. */
+  ms: number;
   value: number;
   gpuIndex: number;
-  raw: GpuMetricRow;
+  /** The raw sample behind this point; null once the value has been averaged. */
+  raw: GpuMetricRow | null;
 }
 
 interface GpuMetricsChartProps {
@@ -54,6 +64,8 @@ interface GpuMetricsChartProps {
   caption?: React.ReactNode;
   /** Max interactive points before LTTB downsampling. Infinity to disable. */
   maxPoints?: number;
+  /** Raw samples vs. time-window rolling average. Defaults to raw samples. */
+  display?: TelemetryDisplayState;
 }
 
 function parseTimestamp(raw: string): Date | null {
@@ -71,15 +83,16 @@ function buildGroupedData(
   visibleGpus: Set<number>,
   metricKey: GpuMetricKey,
 ): Map<number, ParsedPoint[]> {
+  // t=0 is the first sample of the whole series, not of the visible chips, so
+  // hiding a chip never shifts the time axis under the remaining lines.
   let minTime = Infinity;
   const parsed: { row: GpuMetricRow; ms: number }[] = [];
   for (const row of data) {
-    if (!visibleGpus.has(row.index)) continue;
     const time = parseTimestamp(row.timestamp);
     if (!time) continue;
     const ms = time.getTime();
-    parsed.push({ row, ms });
     if (ms < minTime) minTime = ms;
+    if (visibleGpus.has(row.index)) parsed.push({ row, ms });
   }
 
   const groups = new Map<number, ParsedPoint[]>();
@@ -87,6 +100,7 @@ function buildGroupedData(
     if (!groups.has(row.index)) groups.set(row.index, []);
     groups.get(row.index)!.push({
       seconds: (ms - minTime) / 1000,
+      ms,
       value: row[metricKey] ?? 0,
       gpuIndex: row.index,
       raw: row,
@@ -98,7 +112,14 @@ function buildGroupedData(
   return groups;
 }
 
-const GPU_COLORS = d3.schemeTableau10;
+/** Replace each point's value with its centered time-window mean. */
+function smoothSeries(points: ParsedPoint[], windowS: number): ParsedPoint[] {
+  const averaged = rollingTimeAverage(points, windowS * 1000);
+  return points.map((point, i) => ({ ...point, value: averaged[i]!.value, raw: null }));
+}
+
+/** Per-chip palette shared with legends that toggle chips on and off. */
+export const GPU_COLORS = d3.schemeTableau10;
 const CHART_ID = 'gpu-metrics-line';
 const MARGIN = { top: 24, right: 20, bottom: 60, left: 60 };
 
@@ -111,15 +132,26 @@ const GpuMetricsChart = React.memo(
     legendElement,
     caption,
     maxPoints,
+    display = DEFAULT_TELEMETRY_DISPLAY,
   }: GpuMetricsChartProps) => {
     const locale = useLocale();
     const t = STRINGS[locale];
     const metricConfig = ALL_METRIC_OPTIONS.find((m) => m.key === metricKey)!;
+    const rolling = display.mode === 'rolling';
 
-    const groupedData = useMemo(
+    const rawGroups = useMemo(
       () => buildGroupedData(data, visibleGpus, metricKey),
       [data, visibleGpus, metricKey],
     );
+
+    const groupedData = useMemo(() => {
+      if (!rolling) return rawGroups;
+      const smoothed = new Map<number, ParsedPoint[]>();
+      for (const [gpuIndex, points] of rawGroups) {
+        smoothed.set(gpuIndex, smoothSeries(points, display.windowS));
+      }
+      return smoothed;
+    }, [rawGroups, rolling, display.windowS]);
 
     const allPoints = useMemo(() => {
       const pts: ParsedPoint[] = [];
@@ -216,7 +248,7 @@ const GpuMetricsChart = React.memo(
             lines: lineData,
             config: {
               getColor: (key) => GPU_COLORS[parseInt(key, 10) % GPU_COLORS.length],
-              strokeWidth: 1.5,
+              strokeWidth: rolling ? 1.75 : 1.5,
               curve: d3.curveMonotoneX,
             },
           },
@@ -230,8 +262,11 @@ const GpuMetricsChart = React.memo(
               getCy: () => 0,
               getX: (d) => d.seconds,
               getY: (d) => d.value,
-              getColor: (d) => GPU_COLORS[d.gpuIndex % GPU_COLORS.length],
-              getRadius: () => 2,
+              // Averaged mode draws lines only; the circles stay as invisible
+              // hover targets so the tooltip and crosshair keep working.
+              getColor: (d) =>
+                rolling ? 'transparent' : GPU_COLORS[d.gpuIndex % GPU_COLORS.length],
+              getRadius: () => (rolling ? 3 : 2),
               maxPoints,
             },
           },
@@ -246,23 +281,36 @@ const GpuMetricsChart = React.memo(
           rulerType: 'crosshair',
           content: (d: ParsedPoint, isPinned: boolean) => {
             const color = GPU_COLORS[d.gpuIndex % GPU_COLORS.length];
+            const sep = locale === 'zh' ? '：' : ':';
             return `<div class="rounded-md border bg-background/95 px-3 py-2 text-xs shadow-md backdrop-blur-sm" style="min-width: 160px; user-select: ${isPinned ? 'text' : 'none'}">
               ${isPinned ? `<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">${t.dismiss}</div>` : ''}
               <div class="font-semibold mb-1" style="color: ${color}">${t.chip} ${d.gpuIndex}</div>
               <div class="text-muted-foreground">${d.seconds.toFixed(1)}${locale === 'zh' ? ' 秒' : 's'}</div>
-              <div class="mt-1 font-medium">${getGpuMetricLabel(metricConfig, locale)}${locale === 'zh' ? '：' : ':'} ${d.value.toFixed(1)} ${metricConfig.unit}</div>
-              <div class="text-muted-foreground">${t.power}${locale === 'zh' ? '：' : ':'} ${d.raw.power.toFixed(1)} W</div>
-              <div class="text-muted-foreground">${t.temp}${locale === 'zh' ? '：' : ':'} ${d.raw.temperature}\u00B0C</div>
-              <div class="text-muted-foreground">${t.utilization}${locale === 'zh' ? '：' : ':'} ${d.raw.gpuUtil}%</div>
+              <div class="mt-1 font-medium">${getGpuMetricLabel(metricConfig, locale)}${sep} ${d.value.toFixed(1)} ${metricConfig.unit}</div>
+              ${rolling ? `<div class="text-muted-foreground">${t.rollingSuffix(display.windowS)}</div>` : ''}
+              ${
+                d.raw
+                  ? `<div class="text-muted-foreground">${t.power}${sep} ${d.raw.power.toFixed(1)} W</div>
+              <div class="text-muted-foreground">${t.temp}${sep} ${d.raw.temperature}\u00B0C</div>
+              <div class="text-muted-foreground">${t.utilization}${sep} ${d.raw.gpuUtil}%</div>`
+                  : ''
+              }
             </div>`;
           },
           getRulerX: (d, xScale) => (xScale as d3.ScaleLinear<number, number>)(d.seconds),
           getRulerY: (d, yScale) => yScale(d.value),
-          onHoverStart: (sel) => {
-            sel.attr('r', 5).attr('stroke', 'white').attr('stroke-width', 1);
+          onHoverStart: (sel, d) => {
+            sel
+              .attr('r', 5)
+              .attr('fill', GPU_COLORS[d.gpuIndex % GPU_COLORS.length])
+              .attr('stroke', 'white')
+              .attr('stroke-width', 1);
           },
-          onHoverEnd: (sel) => {
-            sel.attr('r', 2).attr('stroke', 'none');
+          onHoverEnd: (sel, d) => {
+            sel
+              .attr('r', rolling ? 3 : 2)
+              .attr('fill', rolling ? 'transparent' : GPU_COLORS[d.gpuIndex % GPU_COLORS.length])
+              .attr('stroke', 'none');
           },
           attachToLayer: 2,
         }}

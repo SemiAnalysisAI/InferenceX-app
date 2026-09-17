@@ -2,8 +2,13 @@
 
 import { useMemo, useState } from 'react';
 
-import GpuMetricsChart from '@/components/gpu-power/GpuPowerChart';
+import GpuMetricsChart, { GPU_COLORS } from '@/components/gpu-power/GpuPowerChart';
 import GpuStatsTable from '@/components/gpu-power/GpuStatsTable';
+import { TelemetryDisplayControls } from '@/components/gpu-power/TelemetryDisplayControls';
+import {
+  DEFAULT_TELEMETRY_DISPLAY,
+  type TelemetryDisplayState,
+} from '@/components/gpu-power/telemetry-smoothing';
 import {
   type GpuMetricKey,
   type GpuMetricRow,
@@ -12,6 +17,7 @@ import {
   getGpuMetricLabel,
 } from '@/components/gpu-power/types';
 import { Card } from '@/components/ui/card';
+import ChartLegend from '@/components/ui/chart-legend';
 import { Label } from '@/components/ui/label';
 import { RetryableQueryError } from '@/components/ui/retryable-query-error';
 import {
@@ -43,6 +49,7 @@ const STRINGS = {
     perGpuStats: 'Per-chip statistics',
     chip: 'Chip',
     secondsUnit: 's',
+    resetFilter: 'Show all chips',
   },
   zh: {
     loading: '正在加载 PowerX 遥测数据……',
@@ -61,6 +68,7 @@ const STRINGS = {
     perGpuStats: '单芯片统计信息',
     chip: '芯片',
     secondsUnit: '秒',
+    resetFilter: '显示全部芯片',
   },
 } as const;
 
@@ -101,7 +109,39 @@ export function PowerTelemetryView({ id, enabled }: Props) {
     ? metricSelection
     : 'power';
   const metricConfig = ALL_METRIC_OPTIONS.find((m) => m.key === metricKey)!;
-  const visibleGpus = useMemo(() => new Set(data.map((row) => row.index)), [data]);
+  const allGpuIndices = useMemo(
+    () => [...new Set(data.map((row) => row.index))].toSorted((a, b) => a - b),
+    [data],
+  );
+  // Hidden chips are scoped to the series they were hidden on so switching
+  // series never carries over a stale filter.
+  const [hiddenSelection, setHiddenSelection] = useState<{
+    seriesId: number;
+    hidden: number[];
+  } | null>(null);
+  const hiddenGpus = useMemo(
+    () =>
+      new Set(
+        hiddenSelection && hiddenSelection.seriesId === selectedSeries?.id
+          ? hiddenSelection.hidden
+          : [],
+      ),
+    [hiddenSelection, selectedSeries?.id],
+  );
+  const visibleGpus = useMemo(
+    () => new Set(allGpuIndices.filter((gpuIndex) => !hiddenGpus.has(gpuIndex))),
+    [allGpuIndices, hiddenGpus],
+  );
+  const toggleGpu = (gpuIndex: number) => {
+    if (!selectedSeries) return;
+    track('inference_agentic_power_gpu_toggled', { id, gpuIndex });
+    const next = new Set(hiddenGpus);
+    if (next.has(gpuIndex)) next.delete(gpuIndex);
+    else next.add(gpuIndex);
+    setHiddenSelection({ seriesId: selectedSeries.id, hidden: [...next] });
+  };
+  const [isLegendExpanded, setIsLegendExpanded] = useState(true);
+  const [display, setDisplay] = useState<TelemetryDisplayState>(DEFAULT_TELEMETRY_DISPLAY);
 
   if (!enabled) return null;
 
@@ -229,6 +269,13 @@ export function PowerTelemetryView({ id, enabled }: Props) {
             </Select>
           </div>
         </div>
+        <TelemetryDisplayControls
+          value={display}
+          onChange={setDisplay}
+          analyticsPrefix="inference_agentic_power"
+          idPrefix="power-telemetry-display"
+          className="mt-3 border-t border-border/60 pt-3"
+        />
       </Card>
 
       <Card className="relative" data-testid="power-telemetry-chart">
@@ -238,6 +285,43 @@ export function PowerTelemetryView({ id, enabled }: Props) {
           metricKey={metricKey}
           artifactName={selectedSeries.artifactName}
           maxPoints={2000}
+          display={display}
+          legendElement={
+            <ChartLegend
+              variant="sidebar"
+              legendItems={allGpuIndices.map((gpuIndex) => ({
+                name: `${t.chip} ${gpuIndex}`,
+                hw: String(gpuIndex),
+                label: `${t.chip} ${gpuIndex}`,
+                color: GPU_COLORS[gpuIndex % GPU_COLORS.length],
+                isActive: visibleGpus.has(gpuIndex),
+                onClick: () => toggleGpu(gpuIndex),
+              }))}
+              onItemRemove={(hw) => {
+                const gpuIndex = Number(hw);
+                if (visibleGpus.has(gpuIndex)) toggleGpu(gpuIndex);
+              }}
+              isLegendExpanded={isLegendExpanded}
+              onExpandedChange={(expanded) => {
+                setIsLegendExpanded(expanded);
+                track('inference_agentic_power_legend_expanded', { id, expanded });
+              }}
+              actions={
+                hiddenGpus.size === 0
+                  ? []
+                  : [
+                      {
+                        id: 'power-telemetry-show-all-chips',
+                        label: t.resetFilter,
+                        onClick: () => {
+                          track('inference_agentic_power_gpu_reset_filter', { id });
+                          setHiddenSelection(null);
+                        },
+                      },
+                    ]
+              }
+            />
+          }
           caption={
             <span className="text-xs text-muted-foreground">
               {getGpuMetricLabel(metricConfig, locale)} · {t.sharedNote}
