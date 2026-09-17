@@ -45,6 +45,7 @@ const B200_MINIMAX = 'b200-minimax-m2-5-vllm-nvfp4-vs-h100-fp8-perf-per-dollar';
 const B200_KIMI = 'b200-nvfp4-vs-h200-int4-kimi-k2-vllm-perf-per-dollar';
 const SGLANG_056 = 'sglang-0-5-6-b200-deepseek-r1-fp4-up-to-1-8x';
 const VR_RUBIN = 'vera-rubin-nvl72-vs-gb200-nvl72-inference';
+const VR_RUBIN_AGENTIC = 'vera-rubin-nvl72-agentic-inference';
 const KIMI_K3 = 'kimi-k3-the-manos-the-mythos-the';
 const TILERT = 'ultra-high-interactivity-on-nvidia';
 const AGENT_BENCHMARK = 'agentic-benchmark-agent-benchmark-guide';
@@ -122,7 +123,14 @@ const entries = [
       'closed-loop-benchmark',
       'subagent',
     ],
-    articleSlugs: [AGENTIC_WORKLOADS, AGENT_BENCHMARK, TILERT, VR_RUBIN, AGENTX_V3],
+    articleSlugs: [
+      AGENTIC_WORKLOADS,
+      AGENT_BENCHMARK,
+      TILERT,
+      VR_RUBIN,
+      AGENTX_V3,
+      VR_RUBIN_AGENTIC,
+    ],
   },
   {
     slug: 'agentic-coding-workload',
