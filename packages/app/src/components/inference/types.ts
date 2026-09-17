@@ -347,6 +347,8 @@ export interface InferenceData extends Partial<Omit<AggDataEntry, AggDataConflic
   measuredJPerSuccessfulQuery?: { y: number; roof: boolean };
   measuredWhPerSuccessfulQuery?: { y: number; roof: boolean };
   measuredPowerPercentTdp?: { y: number; roof: boolean };
+  /** Alias of `measuredAvgPower` selecting the per-second telemetry timeline view. */
+  measuredPowerTimeline?: { y: number; roof: boolean };
 
   // Power boundaries beyond the GPU-measured telemetry above (B1). Each pair is
   // W per allocated GPU plus J per successful output token, normalized by every

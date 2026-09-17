@@ -33,7 +33,7 @@ describe('measured metric configuration', () => {
 
   it('does not group unrelated metrics or unknown persisted values', () => {
     const grouped = METRIC_CONFIG_KEYS.filter((key) => getMeasuredMetricConfig(key));
-    expect(grouped).toHaveLength(19);
+    expect(grouped).toHaveLength(20);
     expect(new Set(grouped)).toEqual(
       new Set([...MEASURED_ENERGY_METRIC_CONFIG_KEYS, ...POWER_BASIS_METRIC_CONFIG_KEYS]),
     );
@@ -86,6 +86,36 @@ describe('measured metric configuration', () => {
     expect(
       changeMeasuredMetricConfig('y_measuredDecodeAvgPower', { statistic: 'p75', display: 'tdp' }),
     ).toBe('y_measuredDecodeAvgPower');
+  });
+
+  it('offers the telemetry timeline only for the whole-deployment average', () => {
+    expect(getMeasuredMetricConfig('y_measuredPowerTimeline')).toEqual({
+      family: 'power',
+      basis: 'gpu-measured',
+      scope: 'all',
+      statistic: 'average',
+      display: 'timeline',
+    });
+    expect(changeMeasuredMetricConfig('y_measuredAvgPower', { display: 'timeline' })).toBe(
+      'y_measuredPowerTimeline',
+    );
+    expect(changeMeasuredMetricConfig('y_measuredPowerPercentTdp', { display: 'timeline' })).toBe(
+      'y_measuredPowerTimeline',
+    );
+    // Percentiles and role scopes have no per-second trace; they fall back to watts.
+    expect(changeMeasuredMetricConfig('y_measuredPowerTimeline', { statistic: 'p90' })).toBe(
+      'y_measuredP90Power',
+    );
+    expect(changeMeasuredMetricConfig('y_measuredPowerTimeline', { scope: 'prefill' })).toBe(
+      'y_measuredPrefillAvgPower',
+    );
+    expect(changeMeasuredMetricConfig('y_measuredP75Power', { display: 'timeline' })).toBe(
+      'y_measuredP75Power',
+    );
+    // Leaving the timeline for energy and coming back lands on the family default.
+    expect(changeMeasuredMetricConfig('y_measuredPowerTimeline', { family: 'energy' })).toBe(
+      'y_measuredJPerOutputToken',
+    );
   });
 
   it('changes the energy denominator without silently attributing whole-run energy to a role', () => {

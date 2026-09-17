@@ -431,6 +431,26 @@ export const METRIC_EXPLANATIONS: Record<MetricKey, MetricExplanation> = {
       zh: '% TDP = 每芯片实测平均功耗（W）÷ 额定 TDP（W）× 100',
     },
   },
+  measuredPowerTimeline: {
+    description: {
+      en:
+        `The per-second accelerator power samples behind each measured average, drawn over ` +
+        `the whole benchmark job (server start, warmup, and the validated measurement window, ` +
+        `which is emphasized). One trace per config, mean of its GPUs by default; the rated TDP ` +
+        `is a dashed reference per hardware. Configs whose telemetry artifact is missing are ` +
+        `listed under the chart rather than estimated.${MEASURED_TIER_NOTE_EN}`,
+      zh:
+        `每个实测平均值背后的逐秒加速器功耗采样，覆盖整个基准测试任务（服务启动、warmup ` +
+        `以及被突出显示的有效测量窗口）。每个配置一条曲线，默认取其 GPU 的平均值；` +
+        `每种硬件的额定 TDP 以虚线作为参考。缺少遥测产物的配置会列在图表下方，而不会用估算值代替。${
+          MEASURED_TIER_NOTE_ZH
+        }`,
+    },
+    formula: {
+      en: 'W(t) = mean over GPUs of the sampled power draw in each one-second bucket',
+      zh: 'W(t) = 每个一秒时间桶内各 GPU 功耗采样值的平均',
+    },
+  },
   gpuProvisionedWatts: {
     description: {
       en:

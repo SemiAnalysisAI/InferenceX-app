@@ -36,7 +36,8 @@ const STRINGS = {
     roleHint: 'Prefill and decode power support Average only.',
     display: 'Display',
     displayHelp:
-      'Power per chip in watts, or average power as a percentage of chip TDP. Percent of TDP is available for the all-GPU average only.',
+      'Power per chip in watts, average power as a percentage of chip TDP, or the per-second telemetry timeline behind the average. Percent of TDP and Timeline are available for the all-GPU average only.',
+    timeline: 'Timeline',
     denominator: 'Per',
     denominatorHelp:
       'Choose the energy denominator. All-GPU energy per input or output token includes the whole deployment; role energy is selected separately under Scope.',
@@ -65,7 +66,8 @@ const STRINGS = {
     roleHint: '预填充和解码功率仅支持平均值。',
     display: '显示方式',
     displayHelp:
-      '显示单芯片功率（瓦），或平均功率占芯片 TDP 的百分比。TDP 百分比仅支持全部 GPU 的平均功率。',
+      '显示单芯片功率（瓦）、平均功率占芯片 TDP 的百分比，或平均值背后的逐秒遥测时间线。TDP 百分比和时间线仅支持全部 GPU 的平均功率。',
+    timeline: '时间线',
     denominator: '能耗分母',
     denominatorHelp:
       '选择能耗的分母。按输入或输出 token 归一化的全部 GPU 能耗仍包含整个部署；预填充或解码能耗需在统计范围中单独选择。',
@@ -239,6 +241,13 @@ export function MeasuredMetricControls({
                   disabled={config.scope !== 'all' || config.statistic !== 'average'}
                 >
                   % TDP
+                </SelectItem>
+                <SelectItem
+                  value="timeline"
+                  data-value="timeline"
+                  disabled={config.scope !== 'all' || config.statistic !== 'average'}
+                >
+                  {t.timeline}
                 </SelectItem>
               </SelectContent>
             </Select>

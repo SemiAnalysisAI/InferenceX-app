@@ -49,6 +49,7 @@ import { matchesQuickFilters } from '@/components/inference/utils/quickFilters';
 import { bestSeriesPerSku } from '@/components/inference/utils/best-series-per-sku';
 import InferenceTable from '@/components/inference/ui/InferenceTable';
 import ScatterGraph from '@/components/inference/ui/ScatterGraph';
+import PowerTimeline from '@/components/inference/ui/PowerTimeline';
 import { Card } from '@/components/ui/card';
 import { ChartButtons } from '@/components/ui/chart-buttons';
 import { ShareButton } from '@/components/ui/share-button';
@@ -320,6 +321,12 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
   // The metric key carries the power boundary; the caption discloses it for
   // the derived boundaries (there is no separate URL param).
   const selectedPowerBasis = getMeasuredMetricConfig(selectedYAxisMetric)?.basis;
+  // The Measured Power "Timeline" display swaps the scatter body for the
+  // per-second telemetry traces (PowerTimeline); table view and captions are
+  // unchanged because the metric key aliases the measured average.
+  const selectedMeasuredConfig = getMeasuredMetricConfig(selectedYAxisMetric);
+  const isPowerTimeline =
+    selectedMeasuredConfig?.family === 'power' && selectedMeasuredConfig.display === 'timeline';
   const selectedBenchmarkType: 'single_turn' | 'agentic_traces' =
     selectedSequence === Sequence.AgenticTraces ? 'agentic_traces' : 'single_turn';
   const workflowInfoBenchmarkType =
@@ -1049,6 +1056,8 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                               )}{' '}
                               {metricChartTitle(graph.chartDefinition, selectedYAxisMetric, locale)}{' '}
                               {(() => {
+                                // The timeline's x axis is time, not the scatter x metric.
+                                if (isPowerTimeline) return null;
                                 const xField = graph.chartDefinition.x_scale_field;
                                 if (xField?.endsWith('_ttft')) {
                                   const percentile = xField.replace(/_ttft$/u, '');
@@ -1231,6 +1240,35 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                               selectedYAxisMetric={selectedYAxisMetric}
                             />
                           </>
+                        );
+                      }
+
+                      if (isPowerTimeline) {
+                        return (
+                          <div className="relative">
+                            <PowerTimeline
+                              chartId={`chart-${graphIndex}`}
+                              // Display limits clip outliers from the scatter domain; the
+                              // timeline draws every measured config, so restore them.
+                              data={[
+                                ...graph.data,
+                                ...(graph.clippedData ?? []).map((entry) => entry.point),
+                              ]}
+                              overlayData={
+                                selectUnofficialOverlayForMode(
+                                  selectedXAxisMode,
+                                  graph.chartDefinition.chartType,
+                                  overlayDataByChartType,
+                                ) ?? undefined
+                              }
+                              yLabel={metricLabel(
+                                graph.chartDefinition,
+                                selectedYAxisMetric,
+                                locale,
+                              )}
+                              caption={chartCaption}
+                            />
+                          </div>
                         );
                       }
 

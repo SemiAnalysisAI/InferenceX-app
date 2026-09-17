@@ -51,10 +51,10 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'ui-artifact-read',
     exclusionReason: {
-      en: 'UI-only live GPU metric artifact lookup; its run artifact shape is not a stable public contract.',
-      zh: '仅供界面读取实时 GPU 指标制品；其运行制品结构不是稳定的公开契约。',
+      en: 'UI-only live GPU metric artifact lookup (raw rows, or `series=power` one-second buckets for the PowerX timeline); its run artifact shape is not a stable public contract.',
+      zh: '仅供界面读取实时 GPU 指标制品（原始行，或供 PowerX 时间线使用的 `series=power` 一秒分桶数据）；其运行制品结构不是稳定的公开契约。',
     },
-    sourceSha256: '28e6cee4d67396ee8ea2e5a7e18271c6ee86228c33f33a20bf573f3a601ba8ed',
+    sourceSha256: '25ec089bd7b7c68d886c50dc8d35749c8024530069809c6c4f9a666b23a8d07e',
   },
   {
     source: 'src/app/api/openapi.json/route.ts',

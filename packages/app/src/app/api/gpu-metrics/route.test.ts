@@ -147,6 +147,119 @@ describe('GET /api/gpu-metrics', () => {
     expect(body.artifacts[0].data).toHaveLength(1);
   });
 
+  it('returns 400 for a malformed prefix or an unknown series shape', async () => {
+    const badPrefix = await GET(req('/api/gpu-metrics?runId=12345&prefix=a%20b'));
+    expect(badPrefix.status).toBe(400);
+    const badPrefixBody = await badPrefix.json();
+    expect(badPrefixBody.error).toContain('prefix');
+    const badSeries = await GET(req('/api/gpu-metrics?runId=12345&series=temperature'));
+    expect(badSeries.status).toBe(400);
+    const badSeriesBody = await badSeries.json();
+    expect(badSeriesBody.error).toContain('series');
+  });
+
+  it('narrows downloads to the prefix and returns bucketed power series on demand', async () => {
+    const mockRunData = {
+      id: 12345,
+      name: 'Run Sweep',
+      head_branch: 'main',
+      head_sha: 'abc123',
+      created_at: '2026-03-01T00:00:00Z',
+      html_url: 'https://github.com/TestOwner/TestRepo/actions/runs/12345',
+      conclusion: 'success',
+      status: 'completed',
+    };
+    mockParseCsvData.mockImplementationOnce(() => [
+      {
+        timestamp: '2026/03/01 00:00:00.100',
+        index: 0,
+        power: 300,
+        temperature: 1,
+        smClock: 1,
+        memClock: 1,
+        gpuUtil: 0,
+        memUtil: 0,
+      },
+      {
+        timestamp: '2026/03/01 00:00:00.104',
+        index: 1,
+        power: 310,
+        temperature: 1,
+        smClock: 1,
+        memClock: 1,
+        gpuUtil: 0,
+        memUtil: 0,
+      },
+      {
+        timestamp: '2026/03/01 00:00:01.100',
+        index: 0,
+        power: 500,
+        temperature: 1,
+        smClock: 1,
+        memClock: 1,
+        gpuUtil: 0,
+        memUtil: 0,
+      },
+    ]);
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(mockRunData) })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            artifacts: [
+              // Another model in the same sweep: filtered out before download.
+              {
+                id: 1,
+                name: 'gpu_metrics_dsr1_1k1k_fp8_x',
+                archive_download_url: 'https://example.com/dl/1',
+              },
+              {
+                id: 2,
+                name: 'gpu_metrics_qwen3.5_8k1k_fp8_sglang_conc16',
+                archive_download_url: 'https://example.com/dl/2',
+              },
+              {
+                id: 3,
+                name: 'eval_gpu_metrics_qwen3.5_8k1k_fp8_sglang_conc16',
+                archive_download_url: 'https://example.com/dl/3',
+              },
+            ],
+          }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        headers: new Headers({ 'Content-Length': '1024' }),
+        arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)),
+      });
+    globalThis.fetch = fetchMock;
+
+    const res = await GET(
+      req('/api/gpu-metrics?runId=12345&series=power&prefix=qwen3.5_8k1k_fp8_'),
+    );
+    expect(res.status).toBe(200);
+    // Run info, artifact list, and exactly one artifact download.
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(fetchMock.mock.calls[2][0]).toBe('https://example.com/dl/2');
+    const body = await res.json();
+    expect(body.runInfo.id).toBe(12345);
+    expect(body.artifacts).toBeUndefined();
+    expect(body.series).toEqual([
+      {
+        artifact: 'gpu_metrics_qwen3.5_8k1k_fp8_sglang_conc16',
+        startMs: Date.UTC(2026, 2, 1, 0, 0, 0),
+        bucketSeconds: 1,
+        gpus: [0, 1],
+        t: [0, 1],
+        power: [
+          [300, 500],
+          [310, null],
+        ],
+      },
+    ]);
+  });
+
   it('returns 500 when workflow run fetch fails', async () => {
     globalThis.fetch = vi.fn().mockResolvedValueOnce({
       ok: false,

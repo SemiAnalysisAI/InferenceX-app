@@ -386,6 +386,18 @@ export const METRIC_REGISTRY = {
     titleZh: '实测平均功耗占 TDP 百分比',
     polarity: 'lower',
   },
+  // The per-second telemetry behind `measuredAvgPower`. The field aliases the
+  // same average so the table view, availability panel, and share links keep
+  // working; ChartDisplay swaps the scatter chart for `PowerTimeline`, which
+  // fetches each point's `gpu_metrics_*` artifact and draws the trace.
+  measuredPowerTimeline: {
+    field: 'measuredPowerTimeline.y',
+    label: 'Measured Power per Chip over Time (W)',
+    labelZh: '每芯片实测功耗时间线（W）',
+    title: 'Measured Power per Chip over Time',
+    titleZh: '每芯片实测功耗时间线',
+    polarity: 'lower',
+  },
   // Power boundaries beyond GPU-measured telemetry (`lib/power-basis.ts`).
   // Each boundary publishes W per allocated GPU and J per output token; the
   // Boundary select in the Measured controls resolves to these keys, so the
@@ -657,6 +669,7 @@ export const MEASURED_ENERGY_METRIC_CONFIG_KEYS = [
   'y_measuredJPerSuccessfulQuery',
   'y_measuredWhPerSuccessfulQuery',
   'y_measuredPowerPercentTdp',
+  'y_measuredPowerTimeline',
 ] as const satisfies readonly MetricConfigKey[];
 
 const MEASURED_ENERGY_METRIC_CONFIG_KEY_SET: ReadonlySet<string> = new Set(

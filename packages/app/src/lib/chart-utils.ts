@@ -538,6 +538,7 @@ type MeasuredPowerChartFields = Partial<
     | 'measuredJPerSuccessfulQuery'
     | 'measuredWhPerSuccessfulQuery'
     | 'measuredPowerPercentTdp'
+    | 'measuredPowerTimeline'
   >
 >;
 
@@ -547,8 +548,13 @@ function buildMeasuredPowerChartFields(
   tdpWatts: number,
 ): MeasuredPowerChartFields {
   return {
+    // The timeline axis aliases the validated average: the point set (and
+    // its table row) is the same, only the chart body changes.
     ...(typeof entry.avg_power_w === 'number'
-      ? { measuredAvgPower: chartMetric(entry.avg_power_w) }
+      ? {
+          measuredAvgPower: chartMetric(entry.avg_power_w),
+          measuredPowerTimeline: chartMetric(entry.avg_power_w),
+        }
       : {}),
     ...(typeof entry.p75_power_w === 'number' && Number.isFinite(entry.p75_power_w)
       ? { measuredP75Power: chartMetric(entry.p75_power_w) }

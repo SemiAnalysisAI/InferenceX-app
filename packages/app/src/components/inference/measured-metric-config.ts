@@ -3,6 +3,12 @@ import type { MetricConfigKey } from './metric-registry';
 
 export type MeasuredMetricFamily = 'power' | 'energy';
 type MeasuredScope = 'all' | 'prefill' | 'decode';
+/**
+ * How whole-deployment average power is shown: per-chip watts, percent of
+ * TDP, or the per-second telemetry trace behind the average (`timeline`, which
+ * ChartDisplay renders with `PowerTimeline` instead of the scatter chart).
+ */
+export type MeasuredPowerDisplay = 'watts' | 'tdp' | 'timeline';
 
 export type MeasuredMetricConfig =
   | {
@@ -11,7 +17,7 @@ export type MeasuredMetricConfig =
       basis: PowerBasis;
       scope: MeasuredScope;
       statistic: 'average' | 'p75' | 'p90';
-      display: 'watts' | 'tdp';
+      display: MeasuredPowerDisplay;
     }
   | {
       family: 'energy';
@@ -26,7 +32,7 @@ export type MeasuredMetricConfigChange = Partial<{
   basis: PowerBasis;
   scope: MeasuredScope;
   statistic: 'average' | 'p75' | 'p90';
-  display: 'watts' | 'tdp';
+  display: MeasuredPowerDisplay;
   denominator: 'input' | 'output' | 'total' | 'query';
   unit: 'joules' | 'wattHours';
 }>;
@@ -63,6 +69,10 @@ const MEASURED_METRIC_CONFIGS: readonly (readonly [MetricConfigKey, MeasuredMetr
   [
     'y_measuredPowerPercentTdp',
     { family: 'power', ...measured, scope: 'all', statistic: 'average', display: 'tdp' },
+  ],
+  [
+    'y_measuredPowerTimeline',
+    { family: 'power', ...measured, scope: 'all', statistic: 'average', display: 'timeline' },
   ],
   [
     'y_measuredJPerInputToken',
