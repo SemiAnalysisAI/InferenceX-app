@@ -436,6 +436,13 @@ export function AgentXCompareHero({
   const t = STRINGS[locale];
   const prefix = locale === 'zh' ? '/zh' : '';
   const Heading = headingLevel;
+  // Landing curation must not change compare coverage or dashboard defaults.
+  const ledgerModels =
+    surface === 'landing'
+      ? FEATURED_AGENTX_MODELS.filter(
+          (model) => model.slug !== 'deepseek-v4' && model.slug !== 'qwen-3-8-flash-next',
+        )
+      : FEATURED_AGENTX_MODELS;
 
   return (
     <section data-testid="compare-agentx-primary">
@@ -534,7 +541,7 @@ export function AgentXCompareHero({
             {/* The visible ledger header is dropped; `ledgerTitle` stays as the
                 nav's accessible name so screen readers still get the label. */}
             <nav aria-label={t.ledgerTitle} className="divide-y divide-border/70">
-              {FEATURED_AGENTX_MODELS.map((model) => (
+              {ledgerModels.map((model) => (
                 <CompareIndexTrackedLink
                   key={model.slug}
                   data-testid={`compare-agentx-model-${model.slug}`}
