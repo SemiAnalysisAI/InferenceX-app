@@ -14,6 +14,9 @@ import chartDefinitions, {
   type MetricKey,
 } from '@/components/inference/metric-registry';
 import { metricRowLabel } from '@/components/inference/axis-metric-explanations';
+import { getMeasuredMetricConfig } from '@/components/inference/measured-metric-config';
+import { AIR_COOLED_SYSTEM_PUE } from '@/lib/modeled-system-power';
+import { SYSTEM_POWER_MODEL_REVISION } from '@/lib/system-power-model';
 import {
   applyTokenRevenuePricing,
   cachedInputPricePerMillion,
@@ -140,6 +143,17 @@ const STRINGS = {
       'No benchmark data matches the current model, scenario, and filter selection. Adjust the filters above to see results.',
     noSystemPowerData:
       'No system-power estimates are available for this selection. Choose 8K / 1K with validated GPU telemetry, supported hardware, and known eight-GPU chassis placement. Measured GPU power remains available separately where telemetry exists.',
+    noUtilityModeledData:
+      'No utility modeled values are available for this selection. The utility modeled boundary needs 8K / 1K, validated GPU telemetry, and hardware covered by the chassis power model (not NVL72 systems). Choose another boundary to keep the points.',
+    // Boundary disclosures for the derived power axes (lib/power-basis.ts).
+    // Formulas in words; constants named so a screenshot records its method.
+    powerBasisAssumptions: {
+      'gpu-provisioned':
+        'GPU provisioned boundary · Watts are the rated TDP per GPU from the hardware registry, so the power curve is flat per hardware. Joules per output token = TDP × allocated GPUs ÷ whole-deployment output tok/s; disaggregated configurations count prefill and decode GPUs together. Hardware without a published TDP is omitted.',
+      'utility-provisioned':
+        'Utility provisioned boundary · Watts are the all-in provisioned utility power per GPU from the hardware registry (SemiAnalysis Datacenter Industry Model), so the power curve is flat per hardware. Joules per output token = all-in W × allocated GPUs ÷ whole-deployment output tok/s; disaggregated configurations count prefill and decode GPUs together, unlike the ungated All-in Provisioned J per Output Token, which divides per decode GPU.',
+      'utility-modeled': `Utility modeled boundary · Measured GPU power carried through the modeled chassis (CPU, DRAM, platform, PSU losses) to the utility meter: modeled chassis AC × PUE ${AIR_COOLED_SYSTEM_PUE} (air-cooled, applied once), divided by the measured GPUs; joules per output token scale measured joules by the same ratio. Chassis power model revision ${SYSTEM_POWER_MODEL_REVISION.slice(0, 7)}. Available for 8K / 1K with validated telemetry on supported hardware only; NVL72 systems (GB200, GB300) and points without values are omitted.`,
+    },
     vsTtft: (word: string) => `vs. ${word} Time To First Token`,
     vsE2eLatency: (pctl?: string) =>
       pctl ? `vs. ${pctl} End-to-end Latency` : 'vs. End-to-end Latency',
@@ -166,6 +180,15 @@ const STRINGS = {
     noChartData: '当前模型、场景与筛选条件下没有匹配的基准测试数据。请调整上方筛选条件查看结果。',
     noSystemPowerData:
       '当前选择没有可用的系统功耗估算。请选择 8K / 1K 场景；估算仅覆盖 GPU 遥测已验证、硬件受支持、八卡机箱位置已知的运行。存在遥测数据时，仍可单独查看 GPU 实测功耗。',
+    noUtilityModeledData:
+      '当前选择没有可用的数据中心建模数值。该边界需要 8K / 1K 场景、已验证的 GPU 遥测，且硬件在机箱功耗模型覆盖范围内（不含 NVL72 系统）。可切换到其他功耗边界以保留数据点。',
+    powerBasisAssumptions: {
+      'gpu-provisioned':
+        'GPU 额定边界 · 功率取硬件注册表中每 GPU 的额定 TDP，因此每种硬件的功率曲线为水平线。每输出 token 能耗 = TDP × 分配的 GPU 数 ÷ 整个部署的输出 tok/s；分离式配置将 prefill 与 decode GPU 一并计入。未公布 TDP 的硬件不绘制。',
+      'utility-provisioned':
+        '全电源配置边界 · 功率取硬件注册表中每 GPU 的全电源配置（all-in）市电功率（来源：SemiAnalysis Datacenter Industry Model），因此每种硬件的功率曲线为水平线。每输出 token 能耗 = all-in 功率 × 分配的 GPU 数 ÷ 整个部署的输出 tok/s；分离式配置将 prefill 与 decode GPU 一并计入，这与未加门控的“每输出 token 全电源配置能耗”按 decode GPU 计算不同。',
+      'utility-modeled': `数据中心建模边界 · 将 GPU 实测功耗经机箱功耗模型（CPU、DRAM、平台开销、PSU 损耗）推算至市电侧：机箱交流功耗估算 × PUE ${AIR_COOLED_SYSTEM_PUE}（风冷，仅应用一次），再除以实测 GPU 数；每输出 token 能耗按同一比例放大实测能耗。机箱功耗模型版本 ${SYSTEM_POWER_MODEL_REVISION.slice(0, 7)}。仅适用于 8K / 1K、遥测已验证且硬件受支持的运行；NVL72 系统（GB200、GB300）及缺少数值的数据点不绘制。`,
+    },
     vsTtft: (word: string) => `vs. ${word === 'Median' ? '中位' : word} 首 token 延迟（TTFT）`,
     vsE2eLatency: (pctl?: string) => (pctl ? `vs. ${pctl} 端到端延迟` : 'vs. 端到端延迟'),
   },
@@ -294,6 +317,9 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
   } = useInferenceDisplay();
   const { setSelectedDates, setSelectedDatesFromRunExpansion, setIsLegendExpanded } =
     useInferenceActions();
+  // The metric key carries the power boundary; the caption discloses it for
+  // the derived boundaries (there is no separate URL param).
+  const selectedPowerBasis = getMeasuredMetricConfig(selectedYAxisMetric)?.basis;
   const selectedBenchmarkType: 'single_turn' | 'agentic_traces' =
     selectedSequence === Sequence.AgenticTraces ? 'agentic_traces' : 'single_turn';
   const workflowInfoBenchmarkType =
@@ -830,7 +856,9 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
               <p className="max-w-md text-center text-sm text-muted-foreground">
                 {isModeledSystemPowerConfigKey(selectedYAxisMetric)
                   ? t.noSystemPowerData
-                  : t.noChartData}
+                  : selectedPowerBasis === 'utility-modeled'
+                    ? t.noUtilityModeledData
+                    : t.noChartData}
               </p>
             </Card>,
           ]
@@ -1146,6 +1174,15 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                               data-testid="modeled-system-power-assumptions"
                             >
                               {t.systemPowerAssumptions}
+                            </p>
+                          )}
+                          {selectedPowerBasis && selectedPowerBasis !== 'gpu-measured' && (
+                            <p
+                              className="mb-2 text-xs text-muted-foreground"
+                              data-testid="power-basis-assumptions"
+                              data-power-basis={selectedPowerBasis}
+                            >
+                              {t.powerBasisAssumptions[selectedPowerBasis]}
                             </p>
                           )}
                           {isUnofficialRun &&

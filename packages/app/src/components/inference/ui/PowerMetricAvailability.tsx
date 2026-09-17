@@ -2,8 +2,16 @@
 
 import { useMemo } from 'react';
 import { useInferenceData, useInferenceFilters } from '../InferenceContext';
-import { isMeasuredEnergyConfigKey, metricOptionTitle, type MetricKey } from '../metric-registry';
+import {
+  isMeasuredEnergyConfigKey,
+  isPowerBasisConfigKey,
+  metricOptionTitle,
+  POWER_BASIS_METRIC_CONFIG_KEYS,
+  type MetricKey,
+} from '../metric-registry';
+import { getMeasuredMetricConfig } from '../measured-metric-config';
 import type { InferenceData } from '../types';
+import { powerBasisNormalization } from '@/lib/power-basis';
 import { matchesQuickFilters } from '../utils/quickFilters';
 import {
   powerMetricAvailability,
@@ -33,6 +41,17 @@ const STRINGS = {
       ambiguous: 'Whole-deployment energy schema unavailable',
       missing: 'Metric not reported',
     },
+    basisLabels: {
+      available: 'Value available',
+      noSpec: 'No published spec for this hardware',
+      noThroughput: 'No output throughput reported',
+      noNormalization: 'Whole-deployment GPU count unavailable for this disaggregated row',
+      noTelemetry: 'No validated GPU telemetry',
+      invalid: 'Validation failed',
+      modelWorkload: 'Chassis model covers 8K / 1K only',
+      modelHardware: 'Hardware not in the chassis power model',
+      modelUnsupported: 'Chassis model unsupported for this deployment',
+    },
     note: 'A missing verdict does not establish age or validity. Prefill/decode metrics measure separate worker pools. Missing values are never replaced with zero or TDP estimates.',
     all: 'Availability of all measured metrics',
     evidence: 'Selected metric: source details',
@@ -54,12 +73,116 @@ const STRINGS = {
       ambiguous: '缺少整个部署的能耗 schema',
       missing: '未提供此指标',
     },
+    basisLabels: {
+      available: '有数值',
+      noSpec: '该硬件没有公开的规格参数',
+      noThroughput: '未报告输出吞吐量',
+      noNormalization: '无法确定该分离式部署的 GPU 总数',
+      noTelemetry: '没有已验证的 GPU 遥测',
+      invalid: '验证失败',
+      modelWorkload: '机箱功耗模型仅覆盖 8K / 1K',
+      modelHardware: '硬件不在机箱功耗模型范围内',
+      modelUnsupported: '机箱功耗模型不支持此部署',
+    },
     note: '缺少验证结论不能判断数据新旧或有效性。prefill/decode 指标仅衡量独立 worker 池。缺失值不会被替换为零或 TDP 估算值。',
     all: '所有实测指标的可用性',
     evidence: '当前指标的来源详情',
     run: '来源运行',
   },
 } as const;
+
+/**
+ * Why a point lacks a derived power boundary (lib/power-basis.ts). Provisioned
+ * boundaries are spec constants, so their watts exist for any registered
+ * hardware and their energy additionally needs output throughput plus, for
+ * disaggregated rows, the whole-deployment GPU count that
+ * `powerBasisNormalization` recovers only for fixed-sequence runs with integer
+ * prefill/decode counts. The modeled boundary is measured telemetry carried
+ * through the chassis model, so it inherits the telemetry verdict and the
+ * model's own unsupported reasons.
+ */
+export type PowerBasisAvailabilityState =
+  | 'available'
+  | 'noSpec'
+  | 'noThroughput'
+  | 'noNormalization'
+  | 'noTelemetry'
+  | 'invalid'
+  | 'modelWorkload'
+  | 'modelHardware'
+  | 'modelUnsupported';
+
+const POWER_BASIS_AVAILABILITY_STATES: readonly PowerBasisAvailabilityState[] = [
+  'available',
+  'noSpec',
+  'noThroughput',
+  'noNormalization',
+  'noTelemetry',
+  'invalid',
+  'modelWorkload',
+  'modelHardware',
+  'modelUnsupported',
+];
+
+const hasFiniteValue = (point: InferenceData, key: MetricKey): boolean => {
+  const value = point[key];
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'y' in value &&
+    typeof value.y === 'number' &&
+    Number.isFinite(value.y)
+  );
+};
+
+export function powerBasisState(
+  point: InferenceData,
+  configKey: string,
+): PowerBasisAvailabilityState {
+  const key = configKey.replace(/^y_/u, '') as MetricKey;
+  if (hasFiniteValue(point, key)) return 'available';
+  const config = getMeasuredMetricConfig(configKey);
+  if (config?.basis === 'utility-modeled') {
+    if (point.power_valid === 0) return 'invalid';
+    const model = point.modeledSystemPower;
+    if (model?.status === 'unsupported') {
+      if (model.reason === 'workload') return 'modelWorkload';
+      if (model.reason === 'hardware') return 'modelHardware';
+      if (model.reason === 'telemetry') return 'noTelemetry';
+      return 'modelUnsupported';
+    }
+    // A supported model without a plotted value means B1 is absent (B4 follows B1).
+    return 'noTelemetry';
+  }
+  // Provisioned energy needs the watts sibling plus the whole-deployment
+  // normalization; the same helper that withheld the value says which half is
+  // missing, so the explanation cannot drift from the formula.
+  const wattsKey = (
+    config?.basis === 'gpu-provisioned' ? 'gpuProvisionedWatts' : 'utilityProvisionedWatts'
+  ) satisfies MetricKey;
+  if (!hasFiniteValue(point, wattsKey)) return 'noSpec';
+  const perGpu = point.output_tput_per_gpu;
+  if (typeof perGpu !== 'number' || !Number.isFinite(perGpu) || perGpu <= 0) return 'noThroughput';
+  // Throughput exists, so only the disaggregated GPU count can be missing.
+  // Chart points may lack the counts an aggregate entry always has; an
+  // unknown count is exactly the "unavailable" case the helper reports.
+  const { allocatedGpus } = powerBasisNormalization({
+    output_tput_per_gpu: perGpu,
+    disagg: point.disagg ?? false,
+    benchmark_type: point.benchmark_type,
+    num_prefill_gpu: point.num_prefill_gpu ?? Number.NaN,
+    num_decode_gpu: point.num_decode_gpu ?? Number.NaN,
+  });
+  return allocatedGpus === null ? 'noNormalization' : 'noThroughput';
+}
+
+function powerBasisAvailability(points: readonly InferenceData[], metric: string) {
+  const counts = Object.fromEntries(
+    POWER_BASIS_AVAILABILITY_STATES.map((state) => [state, 0]),
+  ) as Record<PowerBasisAvailabilityState, number>;
+  for (const point of points) counts[powerBasisState(point, metric)]++;
+  return { metric, counts, available: counts.available, total: points.length };
+}
 
 export function PowerMetricAvailabilityPanel({
   points,
@@ -74,16 +197,35 @@ export function PowerMetricAvailabilityPanel({
 }) {
   const locale = useLocale();
   const t = STRINGS[locale];
-  const availability = useMemo(() => powerMetricAvailability(points), [points]);
+  const availability = useMemo(
+    () => [
+      ...powerMetricAvailability(points),
+      ...POWER_BASIS_METRIC_CONFIG_KEYS.map((key) => powerBasisAvailability(points, key)),
+    ],
+    [points],
+  );
   const selected = availability.find((entry) => entry.metric === metric);
   if (!selected) return null;
+  const isBasis = isPowerBasisConfigKey(metric);
+  const stateOf = (point: InferenceData) =>
+    isBasis ? powerBasisState(point, metric) : powerMetricState(point, metric);
+  // The two dictionaries overlap on `invalid`; the selected metric, not the
+  // key, decides which copy applies so the measured strings stay untouched.
+  const labelOf = (state: PowerAvailabilityState | PowerBasisAvailabilityState) =>
+    isBasis
+      ? t.basisLabels[state as PowerBasisAvailabilityState]
+      : t.labels[state as PowerAvailabilityState];
   const sources = new Map<
     string,
-    { point: InferenceData; state: PowerAvailabilityState; count: number }
+    {
+      point: InferenceData;
+      state: PowerAvailabilityState | PowerBasisAvailabilityState;
+      count: number;
+    }
   >();
   for (const point of points) {
-    const state = powerMetricState(point, metric);
-    if (state === 'strict') continue;
+    const state = stateOf(point);
+    if (state === 'strict' || state === 'available') continue;
     const key = JSON.stringify([point.hwKey, point.run_url, state, point.power_invalid_reasons]);
     const group = sources.get(key);
     if (group) group.count++;
@@ -108,7 +250,10 @@ export function PowerMetricAvailabilityPanel({
           <p>
             {Object.entries(selected.counts)
               .filter(([, count]) => count > 0)
-              .map(([state, count]) => `${t.labels[state as PowerAvailabilityState]}: ${count}`)
+              .map(
+                ([state, count]) =>
+                  `${labelOf(state as PowerAvailabilityState | PowerBasisAvailabilityState)}: ${count}`,
+              )
               .join(' · ')}
           </p>
           <details
@@ -139,7 +284,7 @@ export function PowerMetricAvailabilityPanel({
               <ul className="mt-2 max-h-48 space-y-2 overflow-auto">
                 {[...sources.values()].map(({ point, state, count }, index) => (
                   <li key={index}>
-                    {point.hwKey}: {t.labels[state]} ({count})
+                    {point.hwKey}: {labelOf(state)} ({count})
                     {point.power_invalid_reasons?.length
                       ? ` · ${point.power_invalid_reasons.join(', ')}`
                       : ''}
@@ -221,7 +366,7 @@ export function PowerMetricAvailability({
     quickFilters,
     compareGpuPair,
   ]);
-  if (!isMeasuredEnergyConfigKey(metric)) return null;
+  if (!isMeasuredEnergyConfigKey(metric) && !isPowerBasisConfigKey(metric)) return null;
   return (
     <PowerMetricAvailabilityPanel
       points={points}

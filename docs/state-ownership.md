@@ -113,11 +113,63 @@ them.
 Axis and presentation state:
 
 - selected x-axis and y-axis metrics, percentile, and effective x-axis mode
+- the Measured controls (Boundary / Per / Scope / Statistic / Display / Unit) own no state: `measured-metric-config.ts` resolves each selection to the nearest registered metric key and writes it back to `selectedYAxisMetric`, so the power boundary rides on `i_metric` (there is deliberately no `i_pbasis`; see [PowerX Permanent View](./powerx-permanent-view.md))
 - token-revenue price source (`i_revenue`): normalized uncached/cached/output pricing or the selected model's live OpenRouter catalog prices
 - scale, optimal-point, label, contrast, legend, and overlay controls
 
 Display changes stay in this domain. A contrast or label toggle therefore does not
 notify filter-only or data-only consumers.
+
+**`usePerfRulerStore`** (perf rulers, `i_rulers`)
+
+Completed Perf Rulers on the primary inference chart (`chart-0`) are provider state,
+exposed through a dedicated `PerfRulerStoreContext`
+(`packages/app/src/components/inference/perf-ruler-store.ts`) rather than the display domain: a
+ruler commit would otherwise rerender every display consumer, and harnesses that mount
+`InferenceContextsProvider` with static mock values would silently lose ruler
+interactivity. The store is scoped to one chart id on purpose. The replay chart
+(`replay-chart-0`) draws the same curve classes under the same provider, so a shared
+store would render every ruler twice and let the replay's prune pass delete rulers the
+main chart still shows; it and `GPUGraph` keep component-local state, which `ScatterGraph`
+also falls back to when no store is present.
+
+`ScatterGraph` reads `state`/`setState` from the store, so the existing reducers, refs,
+and draw passes are unchanged. The one thing that moved is the axis reset:
+`usePerfRulerAxisReset` adjusts state during the chart's render, which is only legal for
+the chart's own state, so for persisted rulers the same reset (either axis metric changes
+→ rulers, draft, and pending share-link rulers are cleared) runs inside the provider. Its
+key, `persistedPerfRulerAxisKey`, describes the graph `ChartDisplay` renders as `chart-0`,
+not `graphs[0]`: `graphs` is always `[interactivity, e2e]` and ChartDisplay shows the e2e
+graph for every non-interactivity x mode, so the key picks the graph by `selectedXAxisMode`
+(as `bestHwTypes` does), uses its `x_scale_field` (which carries the percentile), and folds
+the mode itself in because the derived agentic modes override the e2e graph's x field inside
+ChartDisplay only. The first chart definition (null → key) and a reload of the same axes
+(key → null → key) are not axis changes, so share-link rulers survive the load.
+
+Restoring from a link is a two-phase commit because of a load race. Rulers parsed from
+`i_rulers` start as `pending`; data, `i_gpus`, comparison dates, and `?unofficialrun=`
+overlays all arrive after the chart's first draw, and the chart prunes any committed
+ruler whose curve path is absent from the DOM. The chart therefore commits a pending
+ruler only once BOTH of its curve paths exist (hidden-at-opacity-0 counts as present, as
+for prune), clamping the iso-x to the pair's overlap through the drawn paths. The commit
+runs inside the perf-ruler D3 layer's draw pass (`drawPerfRuler`), not in a React effect:
+the chart's first draw happens in a `D3Chart`-local re-render after its container is
+measured, which re-renders nothing in `ScatterGraph`, so an effect keyed on the chart's
+props could miss the first draw and leave resolvable rulers pending for the session. No
+commit happens while the ruler mode is off (the power envelope forces it off on
+non-measured axes; the mode-off effect discards pending rulers instead). Rulers whose
+curves never appear stay pending — invisible and unserialized — until an axis change,
+toggle-off, or clear discards them; this is a deliberate choice over a "data settled"
+readiness predicate (fragile across the async order of availability, benchmark, overlay,
+and derived-metric fetches). The visible cost is that a link whose curves the recipient's
+view lacks lands with the ruler switch on and nothing drawn, and a later legend change on
+the same axes can surface the ruler. A non-empty restore switches the ruler mode on for
+that chart instance (rulers only render in mode) and fires
+`interactivity_perf_ruler_shared_load` once per opened link, with `count` = the number of
+rulers the link carried, the first time any of them renders — never per commit batch, so
+the event counts links, not curve arrivals. Because the URL is read in a `useState`
+initialiser, a retained-provider tab switch onto `/inference?i_rulers=…` does not
+re-import the param — the same limitation as the other `i_*` toggles.
 
 **`useInferenceActions`**
 

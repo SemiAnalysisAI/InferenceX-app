@@ -61,6 +61,7 @@ import { MetricExplanation } from './MetricExplanation';
 import { PowerMetricAvailability } from './PowerMetricAvailability';
 import { MeasuredMetricControls } from './MeasuredMetricControls';
 import {
+  changeMeasuredMetricConfig,
   getMeasuredMetricConfig,
   MEASURED_METRIC_DEFAULTS,
   type MeasuredMetricFamily,
@@ -338,10 +339,14 @@ export default function ChartControls({
         if (!config) return [option];
         if (seen.has(config.family)) return [];
         seen.add(config.family);
+        // Keep the selected boundary (and other dimensions) when hopping between
+        // the power and energy families; fall back to the family default otherwise.
         const value =
           selectedConfig?.family === config.family
             ? selectedYAxisMetric
-            : MEASURED_METRIC_DEFAULTS[config.family];
+            : selectedConfig
+              ? changeMeasuredMetricConfig(selectedYAxisMetric, { family: config.family })
+              : MEASURED_METRIC_DEFAULTS[config.family];
         return [
           {
             value,

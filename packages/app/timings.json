@@ -185,6 +185,10 @@
       "duration": 2321
     },
     {
+      "spec": "cypress/e2e/powerx-basis.cy.ts",
+      "duration": 3000
+    },
+    {
       "spec": "cypress/e2e/model-architecture.cy.ts",
       "duration": 11585
     },

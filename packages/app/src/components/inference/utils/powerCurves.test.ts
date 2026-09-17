@@ -4,7 +4,12 @@ import type { InferenceData } from '@/components/inference/types';
 import { chartDefinitions } from '@/components/inference/metric-registry';
 import type { ParetoDirection } from '@/lib/chart-utils';
 
-import { chartFrontier, isPowerCurveMetric, upperPowerEnvelope } from './powerCurves';
+import {
+  chartFrontier,
+  isMeasuredPowerCurveMetric,
+  isPowerCurveMetric,
+  upperPowerEnvelope,
+} from './powerCurves';
 
 function point(conc: number, x: number, y: number, overrides: Partial<InferenceData> = {}) {
   return {
@@ -70,6 +75,23 @@ describe('power chart semantics', () => {
     expect(chartFrontier(points, 'lower_right')).toEqual(points);
   });
 
+  it.each(['y_gpuProvisionedWatts', 'y_utilityProvisionedWatts', 'y_utilityModeledWatts'])(
+    'draws %s as an envelope-locked power gauge like measured watts',
+    (metric) => {
+      expect(isPowerCurveMetric(metric)).toBe(true);
+      expect(isMeasuredPowerCurveMetric(metric)).toBe(true);
+    },
+  );
+
+  it.each([
+    'y_gpuProvisionedJPerOutputToken',
+    'y_utilityProvisionedJPerOutputToken',
+    'y_utilityModeledJPerOutputToken',
+  ])('keeps %s on the energy Pareto frontier', (metric) => {
+    expect(isPowerCurveMetric(metric)).toBe(false);
+    expect(isMeasuredPowerCurveMetric(metric)).toBe(false);
+  });
+
   it('preserves the canonical agentic restriction on Pareto membership', () => {
     const canonical = point(8, 100, 1, { isOnNormalizedInteractivityFrontier: true });
     const nonCanonical = point(1, 200, 4, { isOnNormalizedInteractivityFrontier: false });
@@ -94,15 +116,26 @@ describe('upper power envelope', () => {
   it('mirrors the boundary for latency and resolves tied coordinates deterministically', () => {
     const fast = point(1, 1, 350);
     const middle = point(8, 2, 700);
+    const plateau = point(16, 3, 700);
     const slow = point(32, 4, 950);
-    const samples = [slow, point(16, 3, 700), point(4, 2, 500), middle, { ...middle }, fast];
-    expect(upperPowerEnvelope(samples, false)).toEqual([fast, middle, slow]);
+    // A tie at the running maximum stays on the boundary (the plateau is part
+    // of the outer edge); a repeated X keeps only its first vertex.
+    const samples = [slow, plateau, point(4, 2, 500), middle, { ...middle }, fast];
+    expect(upperPowerEnvelope(samples, false)).toEqual([fast, middle, plateau, slow]);
     expect(
       upperPowerEnvelope(
         samples.map((p) => ({ ...p, x: 1000 / p.x })),
         true,
       ).map((p) => p.y),
-    ).toEqual([950, 700, 350]);
+    ).toEqual([950, 700, 700, 350]);
+  });
+
+  it('keeps a flat provisioned series across its tested range', () => {
+    // A TDP gauge is the same watts at every concurrency: the boundary must
+    // span the sweep, not collapse to the single highest-x marker.
+    const flat = [point(1, 200, 1000), point(8, 120, 1000), point(64, 40, 1000)];
+    expect(upperPowerEnvelope(flat, true)).toEqual(flat.toReversed());
+    expect(upperPowerEnvelope(flat, false).map((p) => p.x)).toEqual([40, 120, 200]);
   });
 
   it('uses only finite positive coordinates and preserves singleton boundaries', () => {
