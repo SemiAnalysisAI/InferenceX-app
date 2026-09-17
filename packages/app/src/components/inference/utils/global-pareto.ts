@@ -1,7 +1,6 @@
-export interface ParetoCoordinate {
-  x: number;
-  y: number;
-}
+import type { ParetoCoordinate } from '@/lib/pareto-frontier';
+
+export { globalParetoFrontier, type ParetoCoordinate } from '@/lib/pareto-frontier';
 
 const coordinates = (point: ParetoCoordinate) => `${point.x},${point.y}`;
 
@@ -20,28 +19,6 @@ export function paretoHighlightArea(
       : [{ x: first.x, y: cornerY }, ...points, { x: cornerX, y: last.y }];
   polygon.push({ x: cornerX, y: cornerY });
   return `M${polygon.map(coordinates).join('L')}Z`;
-}
-
-/** Global, non-dominated observations. Never mutate the chart's bound data. */
-export function globalParetoFrontier<T extends ParetoCoordinate>(
-  points: readonly T[],
-  maximizeX: boolean,
-  maximizeY: boolean,
-): T[] {
-  const xSign = maximizeX ? -1 : 1;
-  const ySign = maximizeY ? -1 : 1;
-  const sorted = points
-    .filter((point) => Number.isFinite(point.x) && Number.isFinite(point.y))
-    .toSorted((a, b) => xSign * (a.x - b.x) || ySign * (a.y - b.y));
-  let bestY = Infinity;
-  return sorted
-    .filter((point) => {
-      const score = ySign * point.y;
-      if (score >= bestY) return false;
-      bestY = score;
-      return true;
-    })
-    .toSorted((a, b) => a.x - b.x);
 }
 
 /**

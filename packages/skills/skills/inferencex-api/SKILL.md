@@ -1,6 +1,6 @@
 ---
 name: inferencex-api
-description: Use when users ask about InferenceX public benchmarks, PowerX measured power or energy, AgentX summaries or traces, result provenance, TCO, framework releases, CollectiveX, evaluations, datasets, evidence bundles, or offline verification.
+description: 'Query InferenceX benchmarks, Pareto frontier/hinterland, PowerX, AgentX, provenance, TCO, releases, CollectiveX, evaluations, datasets, and evidence bundles. Use for existing observations and offline verification, not launching benchmark runs.'
 ---
 
 # InferenceX API
@@ -84,6 +84,9 @@ when a duration is requested, compute and label elapsed or inclusive days.
 
 ## Choose the workflow
 
+- **Pareto frontier or hinterland data, or chart highlight links:** read
+  [Pareto boundaries](references/pareto.md). Use the raw HTTP endpoint for boundary
+  observations; do not invent a formal CLI command or pass chart toggles to the API.
 - **PowerX measured power or energy:** read
   [PowerX](references/powerx.md), then use `inferencex powerx export`. Preserve
   strict-v2 rows with missing metrics, raw topology, observation dates, and source

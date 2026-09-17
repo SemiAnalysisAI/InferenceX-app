@@ -83,6 +83,7 @@ API routes (`packages/app/src/app/api/v1/`):
   `runs/[runId]` also handles admin DELETE. See [CollectiveX](./docs/collectivex.md).
 - `tco-feed?model=dsv4&workloads=1024x1024,8192x1024&tiers=30,50,75,100&format=csv` — per-hardware Pareto-frontier output-throughput reads at fixed interactivity tiers, for external spreadsheet TCO models (Excel Power Query); `view=scores` (optional `weights`, `workload_weights`, `alpha`) folds them into one tier-weighted, workload-blended, output-equivalent score per hardware
 - `overview?tier=50&engine=community&compare=30d&ref=b200` — a compact, cached page-data response used only by `/overview` selector navigation
+- `pareto` — beta derived frontier/hinterland observations with explicit raw model, workload, metrics and axis preferences; see [Pareto API](./docs/pareto-api.md). This is a documented exception to the raw-row rule, reusing the benchmark source and chart dominance algorithm without UI filtering.
 
 **API routes return raw DB data** — no presentation logic. Frontend handles all transformations.
 Exceptions: the CollectiveX routes assemble raw stored documents through the shared reader in

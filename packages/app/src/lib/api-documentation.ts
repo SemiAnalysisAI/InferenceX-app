@@ -7,6 +7,7 @@ import { COLLECTIVEX_VERSIONS } from '@semianalysisai/inferencex-db/collectivex/
 
 import { POWER_VALIDITY_FILTERS } from './benchmark-power-validity';
 import { PUBLIC_API_ERRORS } from './public-api-errors';
+import { PARETO_DIRECTIONS, PARETO_SEQUENCES } from './pareto-api';
 
 export type ApiDocumentationLocale = 'en' | 'zh';
 export type ApiGroupId =
@@ -335,6 +336,53 @@ const benchmarkRowSchema = objectSchemaWithOptional(
   ['workers', 'power_invalid_reasons', 'power_audit', 'workflow_run_id', 'run_started_at'],
 );
 const benchmarkRowsSchema = arraySchema(benchmarkRowSchema);
+const paretoBoundarySchema = arraySchema(
+  objectSchema({
+    x: numberSchema,
+    y: numberSchema,
+    observations: benchmarkRowsSchema,
+  }),
+);
+const paretoResponseSchema = objectSchema({
+  source_url: {
+    type: 'string',
+    description:
+      'Relative raw benchmark request URL, including snapshot and power selectors. Resolve against the API origin.',
+  },
+  selection: objectSchema({
+    model: stringSchema,
+    rawModel: stringSchema,
+    sequence: { type: 'string', enum: PARETO_SEQUENCES },
+    xMetric: stringSchema,
+    yMetric: stringSchema,
+    xDirection: { type: 'string', enum: PARETO_DIRECTIONS },
+    yDirection: { type: 'string', enum: PARETO_DIRECTIONS },
+    hardware: nullableStringSchema,
+    framework: nullableStringSchema,
+    precision: nullableStringSchema,
+  }),
+  counts: objectSchema({
+    returned: {
+      type: 'integer',
+      description: 'Rows from the raw request after any powerValid filter.',
+    },
+    selected: {
+      type: 'integer',
+      description: 'Rows after raw-model, workload, hardware, framework and precision selection.',
+    },
+    eligible: {
+      type: 'integer',
+      description:
+        'Selected observations with both finite numeric axes, including coordinate ties.',
+    },
+    missing_or_nonfinite: {
+      type: 'integer',
+      description: 'Selected observations excluded for absent or non-finite axes.',
+    },
+  }),
+  frontier: paretoBoundarySchema,
+  hinterland: paretoBoundarySchema,
+});
 const benchmarkExample = [
   {
     id: 421,
@@ -959,6 +1007,176 @@ export const apiOperations: readonly ApiOperation[] = [
     curlUrl: `${API_BASE_URL}/api/v1/operatorx/runs/123456789`,
   },
 
+  {
+    id: 'get-pareto',
+    group: 'external',
+    method: 'GET',
+    path: '/api/v1/pareto',
+    summary: text('Read Pareto frontier and hinterland', '读取 Pareto 前沿和最差边界'),
+    description: text(
+      'Computes both global boundaries over stored benchmark observations using the chart’s dominance algorithm. Frontier uses the requested axis preferences; hinterland reverses both. Coordinates are raw metrics (no display-unit conversion), ordered by ascending x; observations preserves all ties and producer/snapshot fields. No interpolation, shaded geometry or scenery is returned. Missing/non-finite axes are excluded and counted; zero and negative finite values remain valid. The selected workload and raw model are required. This is not a reproduction of browser-only Optimal Only, quick filters, hidden series, log-axis exclusions or unofficial artifact overlays. Power axes require powerValid=strictV2. Empty selections return 200 with empty boundaries. Chart Advanced controls are separate: i_frontier/i_hinterland=1 means plain green/red shading, 2 means scenic background; omit to disable. Do not pass those UI parameters to this endpoint.',
+      '使用图表共用的支配关系算法，计算已存储基准测试观测值的两条全局边界。前沿遵循请求指定的坐标轴优劣方向；最差边界将两个方向同时反转。坐标直接使用原始指标，不转换显示单位，并按 x 升序排列；observations 保留同坐标的全部观测值及其来源、快照字段。不返回插值、填充区域或背景图。缺失或非有限的坐标会被排除并计数；有限的零值和负值仍有效。必须指定工作负载和原始模型。此接口不复现浏览器中的 Optimal Only、快捷筛选、隐藏系列、对数轴排除规则或非官方产物叠加。功率或能耗坐标轴必须指定 powerValid=strictV2。空选择返回 200 和空边界。图表高级选项独立于此接口：i_frontier/i_hinterland=1 表示绿色或红色填充，2 表示场景背景，省略则关闭。不要向此端点传入这些界面参数。',
+    ),
+    audience: 'public',
+    stability: 'beta',
+    parameters: [
+      parameter(
+        'model',
+        'query',
+        true,
+        'string',
+        'Display model name.',
+        '展示模型名称。',
+        { type: 'string', enum: SUPPORTED_BENCHMARK_MODELS },
+        'DeepSeek-R1-0528',
+      ),
+      parameter(
+        'rawModel',
+        'query',
+        true,
+        'string',
+        'Exact stored model key belonging to model; prevents pooling variants.',
+        'model 对应的原始模型键，精确匹配，避免混合不同变体。',
+        stringSchema,
+        'dsr1',
+      ),
+      parameter(
+        'sequence',
+        'query',
+        true,
+        'enum',
+        'Exact workload. AgentX uses benchmark_type=agentic_traces; fixed workloads use single_turn and matching ISL/OSL.',
+        '精确工作负载。AgentX 对应 benchmark_type=agentic_traces；固定长度工作负载对应 single_turn 和匹配的 ISL/OSL。',
+        { type: 'string', enum: PARETO_SEQUENCES },
+        '1k/1k',
+      ),
+      ...(['xMetric', 'yMetric'] as const).map((key) =>
+        parameter(
+          key,
+          'query',
+          true,
+          'string',
+          'Raw metrics object key, not a chart label. Unknown or absent keys produce no eligible observations. Units follow BenchmarkRow.metrics.',
+          '原始 metrics 对象中的键，不是图表标签。未知或缺失的键不会产生有效观测值。单位遵循 BenchmarkRow.metrics。',
+          { type: 'string', pattern: '^[a-z][a-z0-9_.]{0,99}$' },
+          key === 'xMetric' ? 'median_intvty' : 'output_tput_per_gpu',
+        ),
+      ),
+      ...(['xDirection', 'yDirection'] as const).map((key) =>
+        parameter(
+          key,
+          'query',
+          true,
+          'enum',
+          'Explicit preference: max for higher-is-better, min for lower-is-better.',
+          '显式指定优劣方向：max 表示越高越好，min 表示越低越好。',
+          { type: 'string', enum: PARETO_DIRECTIONS },
+          'max',
+        ),
+      ),
+      ...(['hardware', 'framework', 'precision'] as const).map((key) =>
+        parameter(
+          key,
+          'query',
+          false,
+          'string',
+          'One exact stored key. Omit to pool all matching values; unknown values produce an empty selection.',
+          '单个原始键，精确匹配。省略则汇总所有匹配值；未知值产生空选择。',
+          stringSchema,
+          { hardware: 'h200_sxm', framework: 'vllm', precision: 'fp8' }[key],
+        ),
+      ),
+      parameter(
+        'date',
+        'query',
+        false,
+        'date',
+        'As-of snapshot date; exact=true selects that snapshot date. Observation dates can be older. Cannot accompany exactRun=true.',
+        '截至指定日期的快照；exact=true 选择该日期的快照。观测日期可能更早。不能与 exactRun=true 同时使用。',
+        { type: 'string', format: 'date' },
+        '2026-08-08',
+      ),
+      parameter(
+        'exact',
+        'query',
+        false,
+        'boolean',
+        'Requires date when true. Only literal true/false accepted.',
+        '为 true 时必须提供 date。仅接受字面值 true/false。',
+        { type: 'boolean', default: false },
+        false,
+      ),
+      parameter(
+        'runId',
+        'query',
+        false,
+        'string',
+        'Positive safe-integer GitHub Actions run ID. Constrains the latest lookup unless exactRun=true; malformed values are rejected.',
+        '正安全整数形式的 GitHub Actions 运行 ID。未指定 exactRun=true 时限定最新结果查询范围；格式错误会被拒绝。',
+        { type: 'string', pattern: '^[1-9][0-9]*$' },
+        '123456789',
+      ),
+      parameter(
+        'exactRun',
+        'query',
+        false,
+        'boolean',
+        'With runId, read its logical stored snapshot, including same-image predecessors for append-only runs. Cannot accompany date or exact. Only literal true/false accepted.',
+        '与 runId 一起读取该运行已存储的逻辑快照；append-only 运行包含此前相同镜像的数据。不能同时提供 date 或 exact。仅接受字面值 true/false。',
+        { type: 'boolean', default: false },
+        false,
+      ),
+      parameter(
+        'powerValid',
+        'query',
+        false,
+        'enum',
+        'strictV2 is required for registered power/energy metric axes; optional otherwise. Filters raw rows before selection and counting.',
+        '已注册的功率或能耗指标作为坐标轴时必须设为 strictV2，其他情况可选。在选择和计数前筛选原始数据行。',
+        { type: 'string', enum: POWER_VALIDITY_FILTERS },
+        'strictV2',
+      ),
+    ],
+    responses: [
+      success(
+        'Boundary coordinates and source observations; empty results are valid.',
+        '边界坐标及来源观测值；空结果有效。',
+        paretoResponseSchema,
+        {
+          source_url: '/api/v1/benchmarks?model=DeepSeek-R1-0528',
+          selection: {
+            model: 'DeepSeek-R1-0528',
+            rawModel: 'dsr1',
+            sequence: '1k/1k',
+            xMetric: 'median_intvty',
+            yMetric: 'output_tput_per_gpu',
+            xDirection: 'max',
+            yDirection: 'max',
+            hardware: null,
+            framework: null,
+            precision: null,
+          },
+          counts: { returned: 0, selected: 0, eligible: 0, missing_or_nonfinite: 0 },
+          frontier: [],
+          hinterland: [],
+        },
+      ),
+      errorResponse(
+        '400',
+        'Missing, invalid, empty, repeated or unknown parameters, incompatible snapshot selectors, or power axes without strictV2.',
+        '参数缺失、无效、为空、重复或未知，快照选择条件冲突，或功率坐标轴未指定 strictV2。',
+        'Invalid xDirection',
+      ),
+      errorResponse(
+        '500',
+        'The source benchmark query or boundary computation failed.',
+        '来源基准测试查询或边界计算失败。',
+        PUBLIC_API_ERRORS.internal,
+      ),
+    ],
+    responseShapeName: 'ParetoBoundaries',
+    curlUrl: `${API_BASE_URL}/api/v1/pareto?model=DeepSeek-R1-0528&rawModel=dsr1&sequence=1k%2F1k&xMetric=median_intvty&yMetric=output_tput_per_gpu&xDirection=max&yDirection=max`,
+  },
   {
     id: 'get-availability',
     group: 'core',
