@@ -69,6 +69,7 @@ import { getDisplayLabel } from '@/lib/utils';
 import {
   DEFAULT_FIRST_TOKEN_CAPS,
   DEFAULT_FIRST_TOKEN_MIN_INTERACTIVITY,
+  formatCap,
   formatFirstTokenCaps,
   parseFirstTokenCaps,
   selectFirstTokenWinners,
@@ -130,6 +131,8 @@ const STRINGS = {
       `No measured configuration reaches ${min} tok/s/user ${stat} interactivity for this selection. Lower the floor to compare first-token limits.`,
     noTtft: (stat: string) =>
       `The measured rows for this selection report no ${stat} time to first token, so there is nothing to cap. Try another workload or run date.`,
+    noneUnderCaps: (cap: string, stat: string) =>
+      `Measured configurations clear the interactivity floor, but none delivers a ${stat} time to first token within the largest cap on this ladder (≤${cap}s). Raise a cap or add a looser one to compare first-token limits.`,
     captionFloor: (min: number, stat: string) => `≥${min} tok/s/user ${stat} interactivity`,
     captionRows: (qualifying: number, measured: number) =>
       `${qualifying} of ${measured} measured rows clear the floor`,
@@ -179,6 +182,8 @@ const STRINGS = {
       `${zhStatPhrase('交互性', stat, '当前选择下没有实测配置的')}达到 ${min} tok/s/user。请降低下限后再比较首 token 延迟约束。`,
     noTtft: (stat: string) =>
       `${zhStatPhrase('首 token 延迟', stat, '当前选择的实测数据行未报告')}，无法施加上限。请尝试其他工作负载或运行日期。`,
+    noneUnderCaps: (cap: string, stat: string) =>
+      `${zhStatPhrase('首 token 延迟', stat, '实测配置达到了交互性下限，但没有任何配置的')}落在本梯度最大上限（≤${cap}s）之内。请提高或新增上限后再比较首 token 延迟约束。`,
     captionFloor: (min: number, stat: string) =>
       `${zhStatPhrase('交互性', stat)} ≥${min} tok/s/user`,
     captionRows: (qualifying: number, measured: number) =>
@@ -941,7 +946,9 @@ function FirstTokenLimitsInner({ initialPercentile }: { initialPercentile: Perce
                 >
                   {result.measuredRows + result.overlayMeasuredRows === 0
                     ? t.noTtft(statLabel)
-                    : t.noneQualify(minInteractivity, statLabel)}
+                    : result.qualifyingRows + result.overlayQualifyingRows === 0
+                      ? t.noneQualify(minInteractivity, statLabel)
+                      : t.noneUnderCaps(formatCap(Math.max(...caps)), statLabel)}
                 </div>
               </>
             )}

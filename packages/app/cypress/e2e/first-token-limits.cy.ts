@@ -121,6 +121,29 @@ describe('First-Token Limits', () => {
     });
   });
 
+  describe('empty states', () => {
+    it('blames the cap ladder, not the floor, when rows qualify but none clears a cap', () => {
+      interceptCalculatorOverlayRun();
+      cy.visit(`/first-token?i_seq=${encodeURIComponent(SEQUENCE)}&c_ttft=0.01`, {
+        onBeforeLoad: dismissNudges,
+      });
+      cy.wait('@benchmarks');
+      cy.get('[data-testid="first-token-none-qualify"]')
+        .should('contain.text', 'largest cap on this ladder (≤0.01s)')
+        .and('not.contain.text', 'Lower the floor');
+      cy.get(BARS).should('not.exist');
+    });
+
+    it('blames the floor when nothing reaches the requested interactivity', () => {
+      interceptCalculatorOverlayRun();
+      cy.visit(`/first-token?i_seq=${encodeURIComponent(SEQUENCE)}&c_ivmin=100000`, {
+        onBeforeLoad: dismissNudges,
+      });
+      cy.wait('@benchmarks');
+      cy.get('[data-testid="first-token-none-qualify"]').should('contain.text', 'Lower the floor');
+    });
+  });
+
   describe('share-link seeding', () => {
     it('reads the interactivity floor and cap ladder from the URL', () => {
       // Share-link params are stripped from the address bar on load and carried

@@ -53,6 +53,11 @@ export function formatFirstTokenCaps(caps: readonly number[]): string {
   return caps.join(',');
 }
 
+/** Two decimals is as fine as a cap gets typed; `Number()` drops the zeros `toFixed` pads. */
+export function formatCap(cap: number): string {
+  return Number.isInteger(cap) ? String(cap) : String(Number(cap.toFixed(2)));
+}
+
 /** Chinese label of the median statistic; percentiles stay `P90` / `P75`. */
 export const ZH_MEDIAN = '中位数';
 
@@ -145,6 +150,7 @@ export interface FirstTokenResult {
   measuredRows: number;
   /** Same, for the loaded unofficial runs; kept apart so the caption stays official-only. */
   overlayMeasuredRows: number;
+  overlayQualifyingRows: number;
 }
 
 export interface FirstTokenSelectionInput {
@@ -319,5 +325,6 @@ export function selectFirstTokenWinners(input: FirstTokenSelectionInput): FirstT
     qualifyingRows: official.filter((c) => c.interactivity >= minInteractivity).length,
     measuredRows: official.length,
     overlayMeasuredRows: overlay.length,
+    overlayQualifyingRows: overlay.filter((c) => c.interactivity >= minInteractivity).length,
   };
 }

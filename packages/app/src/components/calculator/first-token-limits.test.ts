@@ -11,6 +11,7 @@ import {
   UNKNOWN_VENDOR,
   ZH_MEDIAN,
   zhStatPhrase,
+  formatCap,
 } from './first-token-limits';
 import type { GPUDataPoint } from './types';
 
@@ -76,6 +77,12 @@ const winnerOf = (
   cap: number,
   seriesKey: string,
 ) => result.cells.find((c) => c.cap === cap && c.series.key === seriesKey)?.winner ?? null;
+
+describe('formatCap', () => {
+  it('prints caps the way the axis ticks do', () => {
+    expect([2, 0.5, 1 / 3].map(formatCap)).toEqual(['2', '0.5', '0.33']);
+  });
+});
 
 describe('parseFirstTokenCaps', () => {
   it('parses, de-duplicates, sorts, and drops junk', () => {
@@ -291,12 +298,16 @@ describe('selectFirstTokenWinners', () => {
         official: {},
         officialMeta: {},
         overlay: {
-          b200_sglang__run0: [makePoint({ hwKey: 'b200_sglang', ttft: 1, interactivity: 90 })],
+          b200_sglang__run0: [
+            makePoint({ hwKey: 'b200_sglang', ttft: 1, interactivity: 90 }),
+            makePoint({ hwKey: 'b200_sglang', ttft: 40, interactivity: 200 }),
+          ],
         },
         overlayMeta: { b200_sglang__run0: { hwKey: 'b200_sglang', runIndex: 0 } },
       });
       expect(result.measuredRows).toBe(0);
-      expect(result.overlayMeasuredRows).toBe(1);
+      expect(result.overlayMeasuredRows).toBe(2);
+      expect(result.overlayQualifyingRows).toBe(1);
       expect(winnerOf(result, 2, 'run:0')).toBeNull();
     });
 

@@ -15,6 +15,7 @@ import { useLocale } from '@/lib/use-locale';
 import { escapeHtml, getDisplayLabel } from '@/lib/utils';
 
 import {
+  formatCap,
   zhStatPhrase,
   type FirstTokenCell,
   type FirstTokenResult,
@@ -82,11 +83,6 @@ const TOKEN_TYPE_WORD = {
   en: { total: 'total', input: 'input', output: 'output' },
   zh: { total: '总', input: '输入', output: '输出' },
 } as const;
-
-/** Two decimals is as fine as a cap gets typed; `Number()` drops the zeros `toFixed` pads. */
-function formatCap(cap: number): string {
-  return Number.isInteger(cap) ? String(cap) : String(Number(cap.toFixed(2)));
-}
 
 /** Three decimals below a dollar, two above — the calculator's cost labels. */
 export function formatCost(cost: number): string {
