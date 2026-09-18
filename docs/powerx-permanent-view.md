@@ -174,18 +174,35 @@ view and the share link are those of the measured average; only the chart body c
 `ChartDisplay` renders `ui/PowerTimeline.tsx` instead of `ScatterGraph` when the resolved
 config is `display: 'timeline'`.
 
-- **Join.** Each validated row's `power_audit.source` is `power_validation_<RESULT_FILENAME>.json`
-  and the runner uploads the matching `gpu_metrics_<RESULT_FILENAME>` artifact
-  (`benchmark-tmpl.yml`), so a point names its trace exactly (`utils/powerTimeline.ts`
-  `telemetryArtifactForPoint`). Nothing is matched by hardware or concurrency. Rows without an
-  artifact (disaggregated Dynamo rows use another collector; expired artifacts) are listed under
-  the chart (`data-testid="power-timeline-missing"`), never estimated.
+- **Join.** Each validated row's `power_audit.source` is `power_validation_<name>.json`.
+  Two collectors publish the telemetry behind it (`utils/powerTimeline.ts`):
+  - single-node runners upload one `gpu_metrics_<name>` CSV artifact per config
+    (`benchmark-tmpl.yml`), so the source names the artifact exactly
+    (`telemetryArtifactForPoint`);
+  - Slurm / Dynamo disaggregated runners upload one `power_audit_<RESULT_FILENAME>` bundle per
+    concurrency sweep whose `LOGS/power/samples.csv` (DCGM, `<hostname>/<GPU-uuid>` per device)
+    covers every concurrency. The API cuts it into one series per `power_validation_*.json` the
+    bundle contains (`components/gpu-power/power-audit-bundle.ts`: the validation file's
+    `selected_window` ± 60 s, roles from its `per_gpu_role`, manifest `expected_devices` as the
+    fallback) and labels each with that file name in `series.source`, which `joinPowerTimeline`
+    matches before falling back to the artifact name.
+
+  Nothing is matched by hardware or concurrency. Rows whose telemetry is missing (expired
+  artifact, bundle over the download cap, another collector) are listed under the chart
+  (`data-testid="power-timeline-missing"`), never estimated. Trace keys are
+  `<runId>:<name>` (`traceKeyForPoint`), unique per point in both collectors.
+
 - **Fetch.** One request per workflow run in the visible points
   (`planPowerTimelineRequests`, at most `POWER_TIMELINE_MAX_RUNS`), narrowed with
   `prefix=` to the common RESULT_FILENAME prefix so a nightly sweep's other models are not
   downloaded. `/api/gpu-metrics?series=power` returns one-second per-GPU buckets
   (`components/gpu-power/power-series.ts`, ~1 MB for a 25-config run instead of ~27 MB of
-  raw rows). Runner timestamps are UTC wall clock and are parsed as such
+  raw rows); with `series=power` the route also downloads `power_audit_*` bundles whose name
+  shares the prefix (a bundle names the sweep, so the match runs both ways), reads only
+  `LOGS/power/samples.csv`, `LOGS/power/manifest.json` and the top-level
+  `power_validation_*.json` entries, and skips bundles above 256 MiB (the GB200 nw8 sweep is
+  215 MB). A bundle-cut series carries `source` and `devices[] { id, role? }`; CSV series carry
+  neither. Runner timestamps are UTC wall clock and are parsed as such
   (`parseTelemetryTimestampUtc`); `new Date('2026/09/12 20:19:57')` would read browser local
   time and misplace the audit window.
 - **Drawing.** One trace per config, mean of its GPUs (legend switch: one line per GPU),
@@ -197,13 +214,33 @@ config is `display: 'timeline'`.
   vertical resolution. X axis: wall clock (UTC) when the visible traces come from one run,
   otherwise seconds since each trace's start; both are a toolbar toggle. `c<conc>` labels sit
   at the end of the emphasized segment.
-- **State.** Axis mode, per-GPU lines, the all-in switch and hover highlight are component
-  state, not URL state: the share link is `i_metric=y_measuredPowerTimeline` plus the usual
+- **Pools (Figure 1).** The legend switch _Prefill / decode pools_ (shown when a visible
+  trace carries worker roles) sums the board power of each role's GPUs
+  (`tracePools` / `sumPowerAt`) and draws one line per pool — prefill dashed `7 3`, decode
+  `2 3`, the same dashes as the `i_pcompare=roles` series — labelled `c<conc> · prefill` /
+  `· decode`, on a _GPU pool power (W)_ axis. Traces without roles draw their deployment total
+  as one `all` line so single-node configs stay comparable. Reference lines become pool size ×
+  rated TDP per (hardware, role, pool size) (`data-pool` on `.power-reference`), and the
+  all-in switch scales the same way. The tooltip names the pool, its summed watts against the
+  pool TDP, and the mean / min / max per GPU inside it. Pool mode and per-GPU lines are
+  mutually exclusive.
+- **Deep link.** A pinned scatter tooltip on any metric of the measured family offers _View
+  power trace_ (`data-action="view-power-trace"`, official and `?unofficialrun=` points
+  alike). It switches the Display to Timeline in place and records the point's trace key in a
+  one-shot module store (`requestPowerTraceFocus`); the timeline consumes it on mount, dims
+  every other trace, switches to pool mode when the trace has roles, and shows a _Focused on …_
+  chip (`data-testid="power-timeline-focus"`) with _Show all_ to clear. The link's `href` is
+  the current page with `i_metric=y_measuredPowerTimeline`, so open-in-new-tab lands on the
+  timeline (unfocused: the focus is a gesture, not URL state).
+- **State.** Axis mode, line mode (mean / per GPU / pools), the all-in switch, the focused
+  trace and hover highlight are component state, not URL state: the share link is `i_metric=y_measuredPowerTimeline` plus the usual
   scope, and a reader lands on the same defaults.
 - **Analytics.** `inference_power_timeline_loaded { traces, missing, runs }`,
   `inference_power_timeline_axis_changed { mode }`,
-  `inference_power_timeline_lines_changed { lines }`,
-  `inference_power_timeline_utility_toggled { enabled }`.
+  `inference_power_timeline_lines_changed { lines: 'mean' | 'gpu' | 'pool' }`,
+  `inference_power_timeline_utility_toggled { enabled }`,
+  `inference_power_trace_opened { hwKey, conc, overlay }` (scatter tooltip action),
+  `inference_power_timeline_focus_cleared`.
 
 ## Tests
 
@@ -219,12 +256,18 @@ config is `display: 'timeline'`.
   measured dictionary staying separate from the boundary dictionary.
 - `cypress/e2e/powerx-basis.cy.ts`, `measured-power-overlay.cy.ts` — control, URL, table,
   `/zh`, overlay run.
-- `power-series.test.ts` — UTC timestamp parsing, one-second bucketing with `null` gaps.
-- `utils/powerTimeline.test.ts` — artifact-name join, per-run request planning with the common
-  prefix, missing rows, window phases.
-- `api/gpu-metrics/route.test.ts` — `series=power` shape, `prefix=` narrowing the downloads,
-  400s for malformed params.
+- `power-series.test.ts` — UTC timestamp parsing, one-second bucketing with `null` gaps, pool
+  sums.
+- `power-audit-bundle.test.ts` — cutting a DCGM bundle into per-validation series: window
+  clipping, device order and roles (validation file, manifest fallback), malformed entries.
+- `utils/powerTimeline.test.ts` — artifact-name and `source` joins, trace keys, per-run request
+  planning with the common prefix, missing rows, window phases, role pools, the focus store.
+- `api/gpu-metrics/route.test.ts` — `series=power` shape, `prefix=` narrowing the downloads
+  (both ways for bundles), the bundle size cap, the raw shape ignoring bundles, 400s for
+  malformed params.
 - `cypress/component/power-timeline.cy.tsx` — traces, emphasized window, TDP / all-in
-  references, per-GPU lines, axis toggle, overlay-run colour and filter, failed run, `/zh`.
+  references, per-GPU lines, pool lines with per-pool TDP, the focus chip, axis toggle,
+  overlay-run colour and filter, failed run, `/zh`.
 - `cypress/e2e/powerx-timeline.cy.ts` — Display → Timeline round trip through the share link,
-  shared-link entry, Table view on the alias, `?unofficialrun=` overlay traces, `/zh`.
+  shared-link entry, Table view on the alias, `?unofficialrun=` overlay traces, _View power
+  trace_ from a pinned tooltip (official and overlay), `/zh`.

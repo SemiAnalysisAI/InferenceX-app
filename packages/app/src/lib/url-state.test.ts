@@ -1029,3 +1029,37 @@ describe('rememberChartStateInUrl — params this module does not own', () => {
     expect(params.has('unofficialrun')).toBe(false);
   });
 });
+
+describe('chartStateHref', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.resetModules();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it('rebuilds the page URL from the chart state, canonical unofficial-run key and overrides', async () => {
+    setupWindow(
+      '?unofficialrun=31415926535&i_metric=y_tpPerGpu&utm_source=x',
+      '/inference',
+      '#chart',
+    );
+    const { chartStateHref, writeUrlParams } = await import('@/lib/url-state');
+    // A default value (i_prec) is not chart state and stays out of the link.
+    writeUrlParams({ g_model: 'Qwen-3.5-397B-A17B', i_metric: 'y_measuredAvgPower', i_prec: '' });
+
+    const url = new URL(chartStateHref({ i_metric: 'y_measuredPowerTimeline' }));
+    expect(url.origin).toBe('https://example.com');
+    expect(url.pathname).toBe('/inference');
+    expect(url.hash).toBe('#chart');
+    expect(url.searchParams.get('utm_source')).toBe('x');
+    expect(url.searchParams.get('g_model')).toBe('Qwen-3.5-397B-A17B');
+    expect(url.searchParams.has('i_prec')).toBe(false);
+    expect(url.searchParams.get('i_metric')).toBe('y_measuredPowerTimeline');
+    expect(url.searchParams.get('unofficialruns')).toBe('31415926535');
+    expect(url.searchParams.has('unofficialrun')).toBe(false);
+  });
+});

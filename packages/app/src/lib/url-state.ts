@@ -488,6 +488,26 @@ export function rememberChartStateInUrl(): string {
 }
 
 /**
+ * The current page's URL carrying its chart state plus `overrides`,
+ * canonicalised like `rememberChartStateInUrl`: chart params and both
+ * unofficial-run spellings are dropped from the live address bar before the
+ * store's state (and the overrides) are layered on. For anchors that must
+ * work with open-in-new-tab, where the in-memory state would otherwise be lost.
+ */
+export function chartStateHref(overrides: Record<string, string>): string {
+  const { origin, pathname, hash, search } = window.location;
+  const merged = new URLSearchParams(search);
+  for (const key of URL_STATE_KEYS) merged.delete(key);
+  // Collected first: deleting while iterating the params would skip entries.
+  const staleRunKeys = [...merged.keys()].filter((key) => UNOFFICIAL_RUN_PARAM_RE.test(key));
+  for (const key of staleRunKeys) merged.delete(key);
+  for (const [key, value] of collectTabParams()) merged.set(key, value);
+  for (const [key, value] of Object.entries(overrides)) merged.set(key, value);
+  const query = merged.toString();
+  return `${origin}${pathname}${query ? `?${query}` : ''}${hash}`;
+}
+
+/**
  * Append the current chart state to an outbound in-app href, so the page it
  * opens can link back to the chart the user left. Used for the agentic
  * point-detail links, which are full-document navigations.

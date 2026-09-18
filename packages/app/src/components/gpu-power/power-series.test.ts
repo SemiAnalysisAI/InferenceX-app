@@ -5,6 +5,8 @@ import {
   bucketTimeMs,
   meanPowerAt,
   parseTelemetryTimestampUtc,
+  sumPowerAt,
+  type GpuPowerSeries,
 } from './power-series';
 import type { GpuMetricRow } from './types';
 
@@ -83,5 +85,35 @@ describe('bucketPowerSeries', () => {
       bucketPowerSeries('gpu_metrics_empty', [row('2026/09/12 20:00:00', 0, Number.NaN)]),
     ).toBeNull();
     expect(() => bucketPowerSeries('x', [], 0)).toThrow(RangeError);
+  });
+});
+
+describe('sumPowerAt', () => {
+  const series: GpuPowerSeries = {
+    artifact: 'power_audit_sweep',
+    startMs: Date.UTC(2026, 8, 12, 20, 0, 0),
+    bucketSeconds: 1,
+    gpus: [0, 1, 2],
+    t: [0, 1, 2],
+    power: [
+      [100, null, 300],
+      [50, 60, null],
+      [10, null, null],
+    ],
+  };
+
+  it('sums a pool only when every one of its rows has a sample in the bucket', () => {
+    expect(sumPowerAt(series, [0, 1, 2], 0)).toBe(160);
+    expect(sumPowerAt(series, [1, 2], 0)).toBe(60);
+    expect(sumPowerAt(series, [1], 1)).toBe(60);
+  });
+
+  it('returns null for a partial pool, an unsampled bucket, an empty pool or an unknown row', () => {
+    // GPU 0 and 2 have no sample in bucket 1: a partial sum would read as a dip.
+    expect(sumPowerAt(series, [0, 1, 2], 1)).toBeNull();
+    expect(sumPowerAt(series, [0, 1], 2)).toBeNull();
+    expect(sumPowerAt(series, [0, 2], 1)).toBeNull();
+    expect(sumPowerAt(series, [], 0)).toBeNull();
+    expect(sumPowerAt(series, [7], 0)).toBeNull();
   });
 });

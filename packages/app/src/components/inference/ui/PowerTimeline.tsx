@@ -7,14 +7,21 @@
  * ChartDisplay renders this instead of ScatterGraph when the Measured Power
  * Display control is `timeline` (`y_measuredPowerTimeline`). The point set is
  * the same as the Measured Avg Power axis; each point's `power_audit.source`
- * names its `gpu_metrics_*` artifact, which `/api/gpu-metrics?series=power`
- * returns as one-second per-GPU buckets (`components/gpu-power/power-series.ts`).
+ * names its `gpu_metrics_*` artifact — or, for disaggregated Slurm / Dynamo
+ * rows, its validation file inside a `power_audit_*` bundle — which
+ * `/api/gpu-metrics?series=power` returns as one-second per-GPU buckets
+ * (`components/gpu-power/power-series.ts`).
  *
  * One trace per config, coloured by hardware (official) or by run (unofficial
  * overlay). The validated measurement window is emphasized; the rest of the
  * job (server start, warmup) is drawn faint. Rated TDP is a dashed reference
  * per hardware; the all-in provisioned line is opt-in because it would halve
  * the vertical resolution of the traces.
+ *
+ * Pool mode (bundle series carry worker roles) sums each prefill / decode pool
+ * instead, against pool-sized TDP references, so a disaggregated deployment
+ * reads as two lines on a watts axis. A pinned scatter tooltip can deep-link
+ * here focused on one config (`requestPowerTraceFocus`).
  */
 import * as d3 from 'd3';
 import { useQueries } from '@tanstack/react-query';
@@ -24,9 +31,11 @@ import { HW_REGISTRY } from '@semianalysisai/inferencex-constants';
 import {
   bucketTimeMs,
   meanPowerAt,
+  sumPowerAt,
+  type GpuPowerSeries,
   type GpuPowerSeriesResponse,
 } from '@/components/gpu-power/power-series';
-import ChartLegend from '@/components/ui/chart-legend';
+import ChartLegend, { type LegendSwitchConfig } from '@/components/ui/chart-legend';
 import { SegmentedToggle } from '@/components/ui/segmented-toggle';
 import { useUnofficialRun } from '@/components/unofficial-run-provider';
 import { matchesQuickFilters } from '@/components/inference/utils/quickFilters';
@@ -48,13 +57,21 @@ import {
   useInferenceFilters,
 } from '../InferenceContext';
 import type { InferenceData, OverlayData } from '../types';
+import { powerVariantDash } from '../utils/power-compare';
 import {
+  allGpuPool,
+  consumePowerTraceFocus,
   joinPowerTimeline,
   planPowerTimelineRequests,
+  prioritizeRun,
   traceConfigLabel,
+  traceKeyRunId,
+  tracePools,
   windowPhase,
   type MissingTrace,
   type MissingTraceReason,
+  type PowerPool,
+  type PowerPoolRole,
   type PowerTimelineRequest,
   type PowerTimelineTrace,
   type WindowPhase,
@@ -80,6 +97,9 @@ const STRINGS = {
     xElapsed: 'Time since telemetry start (m:ss)',
     perGpu: 'One line per GPU',
     perGpuHelp: 'Draw every GPU of a config instead of the mean across its GPUs.',
+    pools: 'Prefill / decode pools',
+    poolsHelp:
+      'One line per worker-role pool: the summed board power of the prefill GPUs and of the decode GPUs of a config. Dashed references are pool size × rated TDP.',
     utilityLines: 'All-in provisioned lines',
     utilityHelp:
       'Dashed reference at the all-in provisioned utility power per GPU from the hardware registry (SemiAnalysis Datacenter Industry Model). Off by default because it compresses the traces.',
@@ -94,7 +114,7 @@ const STRINGS = {
       'no-run': (count: number) => `${count} carry no workflow run`,
       'run-not-fetched': (count: number) => `${count} come from runs that were not loaded`,
       'not-in-run': (count: number) =>
-        `${count} have no gpu_metrics artifact in their run (another collector, or expired)`,
+        `${count} have no gpu_metrics artifact or power-audit bundle in their run (expired, or another collector)`,
     } satisfies Record<MissingTraceReason, (count: number) => string>,
     missingUndrawn: 'Not drawn',
     noTraces:
@@ -105,7 +125,9 @@ const STRINGS = {
       `Telemetry from ${runs} more run${runs === 1 ? '' : 's'} was not loaded (limit ${POWER_TIMELINE_MAX_RUNS} runs per chart).`,
     telemetry: 'Telemetry',
     method:
-      'One-second means of per-GPU board power (nvidia-smi / amd-smi) over the whole benchmark job; the emphasized segment is the validated window behind the measured average. Dashed lines: rated TDP per hardware from the hardware registry.',
+      'One-second means of per-GPU board power (nvidia-smi / amd-smi, or DCGM on Slurm / Dynamo runs) over the whole benchmark job; the emphasized segment is the validated window behind the measured average. Dashed lines: rated TDP per hardware from the hardware registry.',
+    methodPools:
+      'In pool mode each line is the summed power of one worker-role pool (prefill or decode GPUs) and the dashed references are pool size × rated TDP.',
     instructions:
       'Shift+Scroll to zoom horizontally · Drag to pan · Double-click to reset · Click a point to pin tooltip',
     dismiss: 'Click elsewhere to dismiss',
@@ -123,6 +145,16 @@ const STRINGS = {
     sinceStart: 'since start',
     tdp: 'TDP',
     allIn: 'all-in',
+    poolShort: { prefill: 'prefill', decode: 'decode', all: 'all GPUs' } satisfies Record<
+      PowerPoolRole,
+      string
+    >,
+    yPool: 'GPU pool power (W)',
+    pool: 'Pool',
+    poolPower: 'Pool power',
+    poolTdp: 'pool TDP',
+    focused: (label: string) => `Focused on ${label}`,
+    showAll: 'Show all',
     unofficialRun: 'Unofficial run',
     branch: 'Branch',
     viewWorkflow: 'View workflow run',
@@ -135,6 +167,9 @@ const STRINGS = {
     xElapsed: '距遥测开始的时间（分:秒）',
     perGpu: '每个 GPU 一条线',
     perGpuHelp: '绘制配置中每个 GPU 的曲线，而不是各 GPU 的平均值。',
+    pools: '预填充 / 解码 GPU 池',
+    poolsHelp:
+      '按 worker 角色分池绘制：每条线是同一配置中预填充 GPU 或解码 GPU 的板卡功耗之和。虚线参考为池内 GPU 数量 × 额定 TDP。',
     utilityLines: '全电源配置参考线',
     utilityHelp:
       '按硬件注册表中每 GPU 的全电源配置（all-in）市电功率绘制虚线参考（SemiAnalysis 数据中心行业模型）。默认关闭，因为它会压缩曲线的纵向分辨率。',
@@ -148,7 +183,7 @@ const STRINGS = {
       'no-run': (count: number) => `${count} 个没有工作流运行信息`,
       'run-not-fetched': (count: number) => `${count} 个来自未加载的运行`,
       'not-in-run': (count: number) =>
-        `${count} 个在其运行中没有 gpu_metrics 产物（使用其他采集器，或产物已过期）`,
+        `${count} 个在其运行中没有 gpu_metrics 产物或 power-audit 数据包（产物已过期，或使用其他采集器）`,
     } satisfies Record<MissingTraceReason, (count: number) => string>,
     missingUndrawn: '未绘制',
     noTraces: '当前可见硬件没有遥测曲线。请在图例中启用一个系列或选择其他日期。',
@@ -157,7 +192,9 @@ const STRINGS = {
       `另有 ${runs} 个运行的遥测数据未加载（每张图表最多 ${POWER_TIMELINE_MAX_RUNS} 个运行）。`,
     telemetry: '遥测来源',
     method:
-      '整个基准测试任务期间每个 GPU 板卡功耗（nvidia-smi / amd-smi）的一秒平均值；加粗段为实测平均值所依据的有效测量窗口。虚线：硬件注册表中各硬件的额定 TDP。',
+      '整个基准测试任务期间每个 GPU 板卡功耗（nvidia-smi / amd-smi，Slurm / Dynamo 运行为 DCGM）的一秒平均值；加粗段为实测平均值所依据的有效测量窗口。虚线：硬件注册表中各硬件的额定 TDP。',
+    methodPools:
+      '在 GPU 池模式下，每条线是一个 worker 角色池（预填充或解码 GPU）的功耗总和，虚线参考为池内 GPU 数量 × 额定 TDP。',
     instructions: 'Shift+滚轮横向缩放 · 拖动平移 · 双击重置 · 点击数据点固定提示框',
     dismiss: '点击其他区域关闭',
     phase: {
@@ -174,6 +211,16 @@ const STRINGS = {
     sinceStart: '距起点',
     tdp: 'TDP',
     allIn: 'all-in',
+    poolShort: { prefill: '预填充', decode: '解码', all: '全部 GPU' } satisfies Record<
+      PowerPoolRole,
+      string
+    >,
+    yPool: 'GPU 池功耗（W）',
+    pool: 'GPU 池',
+    poolPower: '池功耗',
+    poolTdp: '池 TDP',
+    focused: (label: string) => `聚焦：${label}`,
+    showAll: '显示全部',
     unofficialRun: '非官方运行',
     branch: '分支',
     viewWorkflow: '查看工作流运行',
@@ -181,7 +228,7 @@ const STRINGS = {
 } as const;
 
 type XMode = 'wall' | 'elapsed';
-type LineMode = 'mean' | 'gpu';
+type LineMode = 'mean' | 'gpu' | 'pool';
 
 interface TimelineSample {
   trace: PowerTimelineTrace;
@@ -191,12 +238,15 @@ interface TimelineSample {
   timeMs: number;
   /** Data-space x for the active mode: epoch ms (wall) or seconds (elapsed). */
   x: number;
-  /** Mean watts across the GPUs sampled in the bucket. */
+  /** Mean watts across the GPUs sampled in the bucket; the pool's summed watts in pool mode. */
   y: number;
   min: number;
   max: number;
+  /** GPUs with a sample in the bucket (inside the pool, in pool mode). */
   gpuCount: number;
   phase: WindowPhase;
+  /** The pool this sample sums and its device count, in pool mode. */
+  pool?: { role: PowerPoolRole; gpuCount: number };
 }
 
 interface TracePoint {
@@ -214,6 +264,8 @@ interface TracePath {
   width: number;
   opacity: number;
   points: TracePoint[];
+  /** Worker-role pool the line sums, in pool mode. */
+  pool?: PowerPoolRole;
 }
 
 interface ReferenceLine {
@@ -222,11 +274,25 @@ interface ReferenceLine {
   label: string;
   color: string;
   kind: 'tdp' | 'utility';
+  /** Pool the line is sized for, in pool mode. */
+  pool?: PowerPoolRole;
+}
+
+interface TraceLabel {
+  /** Join key: the trace key, plus the pool role in pool mode. */
+  id: string;
+  traceKey: string;
+  hwKey: string;
+  pool?: PowerPoolRole;
+  color: string;
+  text: string;
+  x: number;
+  y: number;
 }
 
 interface DrawModel {
   paths: TracePath[];
-  labels: { traceKey: string; hwKey: string; color: string; text: string; x: number; y: number }[];
+  labels: TraceLabel[];
 }
 
 export interface PowerTimelineProps {
@@ -266,12 +332,51 @@ function formatElapsed(totalSeconds: number): string {
 
 const formatUtcClock = d3.utcFormat('%H:%M:%S');
 const formatUtcDate = d3.utcFormat('%Y-%m-%d');
+/** Pool sums run to thousands of watts; group the digits. */
+const formatWatts = d3.format(',.0f');
 
 function baseHardware(hwKey: string): string {
   return hwKey.split('_')[0];
 }
 
-/** Builds the mean or per-GPU polylines plus the window emphasis for one trace. */
+/**
+ * The pools a trace draws in pool mode: its worker-role pools, or every GPU as
+ * one pool when the collector assigned no roles (a single-node trace then shows
+ * its deployment total on the same axis).
+ */
+function drawnPools(series: GpuPowerSeries): PowerPool[] {
+  const pools = tracePools(series);
+  return pools.length > 0 ? pools : [allGpuPool(series)];
+}
+
+/** SVG dash of a pool line: per role from the comparison palette; `all` stays solid. */
+function poolDash(pool: PowerPoolRole): string | null {
+  const dash = powerVariantDash({ kind: 'role', id: pool });
+  return dash === '' ? null : dash;
+}
+
+interface TraceRow {
+  id: string;
+  pool?: PowerPoolRole;
+  values: (number | null)[];
+}
+
+/** One polyline's values per line mode: the GPU mean, each GPU, or each pool's sum. */
+function traceRows(series: GpuPowerSeries, lineMode: LineMode): TraceRow[] {
+  if (lineMode === 'gpu') {
+    return series.gpus.map((gpu, row) => ({ id: `gpu${gpu}`, values: series.power[row] }));
+  }
+  if (lineMode === 'pool') {
+    return drawnPools(series).map((pool) => ({
+      id: `pool:${pool.role}`,
+      pool: pool.role,
+      values: series.t.map((_, column) => sumPowerAt(series, pool.rows, column)),
+    }));
+  }
+  return [{ id: 'mean', values: series.t.map((_, column) => meanPowerAt(series, column)) }];
+}
+
+/** Builds the mean, per-GPU or per-pool polylines plus the window emphasis for one trace. */
 function tracePaths(
   trace: PowerTimelineTrace,
   color: string,
@@ -282,10 +387,7 @@ function tracePaths(
   const { series } = trace;
   const xOf = (column: number) =>
     xMode === 'wall' ? bucketTimeMs(series, column) : series.t[column] - series.t[0];
-  const rows: { id: string; values: (number | null)[] }[] =
-    lineMode === 'gpu'
-      ? series.gpus.map((gpu, row) => ({ id: `gpu${gpu}`, values: series.power[row] }))
-      : [{ id: 'mean', values: series.t.map((_, column) => meanPowerAt(series, column)) }];
+  const rows = traceRows(series, lineMode);
   const faint = lineMode === 'gpu' ? 0.22 : 0.32;
   const strong = lineMode === 'gpu' ? 0.85 : 1;
   const widths = lineMode === 'gpu' ? [1, 1.5] : [1.25, 2.25];
@@ -308,6 +410,7 @@ function tracePaths(
       width: widths[0],
       opacity: faint,
       points: full,
+      pool: row.pool,
     });
     if (window.length > 1) {
       paths.push({
@@ -320,17 +423,44 @@ function tracePaths(
         width: widths[1],
         opacity: strong,
         points: window,
+        pool: row.pool,
       });
     }
   }
   return paths;
 }
 
+/**
+ * Hover targets of one trace: one stream over all its GPUs (mean watts), or in
+ * pool mode one stream per pool (summed watts) so the tooltip can name the pool.
+ */
 function traceSamples(
   trace: PowerTimelineTrace,
   color: string,
   overlayIndex: number | null,
   xMode: XMode,
+  lineMode: LineMode,
+): TimelineSample[] {
+  const { series } = trace;
+  if (lineMode !== 'pool') {
+    const rows = series.power.map((_, row) => row);
+    return sampleRows(trace, color, overlayIndex, xMode, rows, undefined);
+  }
+  return drawnPools(series).flatMap((pool) =>
+    sampleRows(trace, color, overlayIndex, xMode, pool.rows, {
+      role: pool.role,
+      gpuCount: pool.rows.length,
+    }),
+  );
+}
+
+function sampleRows(
+  trace: PowerTimelineTrace,
+  color: string,
+  overlayIndex: number | null,
+  xMode: XMode,
+  rows: readonly number[],
+  pool: TimelineSample['pool'],
 ): TimelineSample[] {
   const { series } = trace;
   const samples: TimelineSample[] = [];
@@ -339,15 +469,16 @@ function traceSamples(
     let count = 0;
     let min = Number.POSITIVE_INFINITY;
     let max = Number.NEGATIVE_INFINITY;
-    for (const row of series.power) {
-      const value = row[column];
+    for (const row of rows) {
+      const value = series.power[row]?.[column];
       if (value === null || value === undefined) continue;
       sum += value;
       count += 1;
       if (value < min) min = value;
       if (value > max) max = value;
     }
-    if (count === 0) continue;
+    // A pool bucket missing a device is a gap, as in `sumPowerAt`, not a dip.
+    if (count === 0 || (pool && count < rows.length)) continue;
     const timeMs = bucketTimeMs(series, column);
     samples.push({
       trace,
@@ -356,11 +487,12 @@ function traceSamples(
       column,
       timeMs,
       x: xMode === 'wall' ? timeMs : series.t[column] - series.t[0],
-      y: sum / count,
+      y: pool ? sum : sum / count,
       min,
       max,
       gpuCount: count,
       phase: windowPhase(trace, timeMs),
+      pool,
     });
   }
   return lttbDownsample(
@@ -402,6 +534,8 @@ function drawTraces(
     .attr('data-hw', (path) => path.hwKey)
     .attr('data-segment', (path) => path.segment)
     .attr('data-run-index', (path) => (path.overlayIndex === null ? null : path.overlayIndex))
+    .attr('data-pool', (path) => path.pool ?? null)
+    .attr('stroke-dasharray', (path) => (path.pool ? poolDash(path.pool) : null))
     .attr('stroke', (path) => path.color)
     .attr('stroke-width', (path) => path.width)
     .attr('opacity', (path) => traceOpacity(path, highlight))
@@ -424,8 +558,8 @@ function drawLabels(
   highlight: string | null,
 ): void {
   const selection = group
-    .selectAll<SVGTextElement, DrawModel['labels'][number]>('text.power-trace-label')
-    .data(model.labels, (label) => label.traceKey);
+    .selectAll<SVGTextElement, TraceLabel>('text.power-trace-label')
+    .data(model.labels, (label) => label.id);
   selection.exit().remove();
   selection
     .enter()
@@ -438,6 +572,7 @@ function drawLabels(
     .attr('pointer-events', 'none')
     .merge(selection)
     .attr('data-hw', (label) => label.hwKey)
+    .attr('data-pool', (label) => label.pool ?? null)
     .attr('fill', (label) => label.color)
     .attr('opacity', (label) =>
       highlight === null || highlight === label.hwKey || highlight === label.traceKey ? 1 : 0.2,
@@ -468,6 +603,7 @@ function drawReferenceLines(
       .append('g')
       .attr('class', 'power-reference')
       .attr('data-reference', line.kind)
+      .attr('data-pool', line.pool ?? null)
       .attr('data-watts', line.watts);
     g.append('line')
       .attr('x1', 0)
@@ -537,6 +673,10 @@ export default function PowerTimeline({
   const [lineMode, setLineMode] = useState<LineMode>('mean');
   const [showUtility, setShowUtility] = useState(false);
   const [highlight, setHighlight] = useState<string | null>(null);
+  /** Trace a "View power trace" deep link asked for, once the join has produced it. */
+  const [focusKey, setFocusKey] = useState<string | null>(null);
+  /** The deep-link request, read once on mount; `undefined` until read, `null` once honoured. */
+  const requestedFocusRef = useRef<string | null | undefined>(undefined);
 
   // The chart's point list still carries every precision, quick-filtered rows
   // and rows without a validated average (ScatterGraph applies those gates at
@@ -578,7 +718,16 @@ export default function PowerTimeline({
 
   // ── Telemetry fetch: one request per workflow run ──────────────────────────
   const requests = useMemo(() => planPowerTimelineRequests(allPoints), [allPoints]);
-  const fetchedRequests = useMemo(() => requests.slice(0, POWER_TIMELINE_MAX_RUNS), [requests]);
+  // The deep-link request is read once, before planning, so its run is fetched
+  // even when the chart spans more runs than the cap.
+  if (requestedFocusRef.current === undefined) {
+    requestedFocusRef.current = consumePowerTraceFocus();
+  }
+  const focusRunRef = useRef(traceKeyRunId(requestedFocusRef.current));
+  const fetchedRequests = useMemo(
+    () => prioritizeRun(requests, focusRunRef.current).slice(0, POWER_TIMELINE_MAX_RUNS),
+    [requests],
+  );
   const droppedRuns = requests.length - fetchedRequests.length;
   const queries = useQueries({
     queries: fetchedRequests.map((request) => ({
@@ -612,6 +761,18 @@ export default function PowerTimeline({
   );
   const hasAnyArtifact = requests.length > 0;
 
+  // Honour the deep link once its trace exists; a disaggregated trace opens in
+  // pool mode because its prefill / decode split is what the reader came for.
+  useEffect(() => {
+    const requested = requestedFocusRef.current;
+    if (!requested) return;
+    const trace = traces.find((entry) => entry.key === requested);
+    if (!trace) return;
+    requestedFocusRef.current = null;
+    setFocusKey(trace.key);
+    if (tracePools(trace.series).length > 0) setLineMode('pool');
+  }, [traces]);
+
   useEffect(() => {
     if (loadingRuns > 0 || responses.size === 0) return;
     track('inference_power_timeline_loaded', {
@@ -644,80 +805,134 @@ export default function PowerTimeline({
       ),
     [traces, overlayPointSet, activeOverlayHwTypes, officialHwTypes],
   );
+  // Focus follows visibility: hiding the focused hardware in the legend lifts
+  // the dimming and the chip instead of dimming everything with nothing lit.
+  const focusedTrace = useMemo(
+    () => visibleTraces.find((trace) => trace.key === focusKey) ?? null,
+    [visibleTraces, focusKey],
+  );
+  /** Legend hover wins over the deep-link focus while it lasts. */
+  const activeHighlight = highlight ?? focusedTrace?.key ?? null;
   const visibleRunCount = useMemo(
     () => new Set(visibleTraces.map((trace) => trace.runId)).size,
     [visibleTraces],
   );
   const xMode: XMode = xModeChoice ?? (visibleRunCount <= 1 ? 'wall' : 'elapsed');
 
+  // The pools switch is offered only where a visible trace carries worker roles;
+  // pool mode left without one would draw deployment totals with no way back.
+  const hasPools = useMemo(
+    () => visibleTraces.some((trace) => tracePools(trace.series).length > 0),
+    [visibleTraces],
+  );
+  useEffect(() => {
+    if (lineMode === 'pool' && !hasPools && visibleTraces.length > 0) setLineMode('mean');
+  }, [lineMode, hasPools, visibleTraces.length]);
+
   const model = useMemo<DrawModel>(() => {
     const paths: TracePath[] = [];
-    const labels: DrawModel['labels'] = [];
+    const labels: TraceLabel[] = [];
     for (const trace of visibleTraces) {
       const { color, overlayIndex } = colorForTrace(trace);
       const tracePathSet = tracePaths(trace, color, overlayIndex, xMode, lineMode);
       paths.push(...tracePathSet);
-      if (visibleTraces.length <= MAX_LABELED_TRACES) {
+      if (visibleTraces.length > MAX_LABELED_TRACES) continue;
+      // One end label per trace; per pool in pool mode, so the role reads off the line.
+      const groups: { pool?: PowerPoolRole; paths: TracePath[] }[] =
+        lineMode === 'pool'
+          ? drawnPools(trace.series).map((pool) => ({
+              pool: pool.role,
+              paths: tracePathSet.filter((path) => path.pool === pool.role),
+            }))
+          : [{ paths: tracePathSet }];
+      for (const group of groups) {
         const anchor =
-          tracePathSet.find((path) => path.segment === 'window') ??
-          tracePathSet.find((path) => path.segment === 'full');
+          group.paths.find((path) => path.segment === 'window') ??
+          group.paths.find((path) => path.segment === 'full');
         const last = anchor?.points.filter((point) => point.y !== null).at(-1);
-        if (last && last.y !== null) {
-          labels.push({
-            traceKey: trace.key,
-            hwKey: trace.point.hwKey,
-            color,
-            text: `c${trace.point.conc}`,
-            x: last.x,
-            y: last.y,
-          });
-        }
+        if (!last || last.y === null) continue;
+        labels.push({
+          id: group.pool ? `${trace.key}:${group.pool}` : trace.key,
+          traceKey: trace.key,
+          hwKey: trace.point.hwKey,
+          pool: group.pool,
+          color,
+          text: group.pool
+            ? `c${trace.point.conc} · ${t.poolShort[group.pool]}`
+            : `c${trace.point.conc}`,
+          x: last.x,
+          y: last.y,
+        });
       }
     }
     return { paths, labels };
-  }, [visibleTraces, colorForTrace, xMode, lineMode]);
+  }, [visibleTraces, colorForTrace, xMode, lineMode, t]);
 
   const samples = useMemo(
     () =>
       visibleTraces.flatMap((trace) => {
         const { color, overlayIndex } = colorForTrace(trace);
-        return traceSamples(trace, color, overlayIndex, xMode);
+        return traceSamples(trace, color, overlayIndex, xMode, lineMode);
       }),
-    [visibleTraces, colorForTrace, xMode],
+    [visibleTraces, colorForTrace, xMode, lineMode],
   );
 
+  // Rated references: per hardware in mean / per-GPU modes; per (hardware,
+  // pool role, pool size) in pool mode, scaled to the pool so the summed line
+  // and its ceiling share the axis.
   const referenceLines = useMemo<ReferenceLine[]>(() => {
-    const seen = new Map<string, string>();
-    for (const trace of visibleTraces) {
-      const base = baseHardware(trace.point.hwKey);
-      if (!seen.has(base)) seen.set(base, colorForTrace(trace).color);
-    }
     const lines: ReferenceLine[] = [];
-    for (const [base, color] of seen) {
+    const pushLines = (
+      base: string,
+      color: string,
+      pool?: { role: PowerPoolRole; size: number },
+    ) => {
       const specs = HW_REGISTRY[base];
-      if (!specs) continue;
+      if (!specs) return;
       const label = specs.label ?? base.toUpperCase();
+      const size = pool?.size ?? 1;
+      const id = pool ? `${base}:${pool.role}:${pool.size}` : base;
+      const name = pool ? `${label} ${t.poolShort[pool.role]} ×${pool.size}` : label;
       if (specs.tdp > 0) {
         lines.push({
-          id: `tdp:${base}`,
-          watts: specs.tdp,
-          label: `${label} ${t.tdp} ${specs.tdp} W`,
+          id: `tdp:${id}`,
+          watts: specs.tdp * size,
+          label: `${name} ${t.tdp} ${specs.tdp * size} W`,
           color,
           kind: 'tdp',
+          pool: pool?.role,
         });
       }
       if (showUtility && specs.power > 0) {
+        const watts = pool ? Math.round(specs.power * 1000) * size : specs.power * 1000;
         lines.push({
-          id: `utility:${base}`,
-          watts: specs.power * 1000,
-          label: `${label} ${t.allIn} ${Math.round(specs.power * 1000)} W`,
+          id: `utility:${id}`,
+          watts,
+          label: `${name} ${t.allIn} ${Math.round(watts)} W`,
           color,
           kind: 'utility',
+          pool: pool?.role,
         });
+      }
+    };
+    const seen = new Set<string>();
+    for (const trace of visibleTraces) {
+      const base = baseHardware(trace.point.hwKey);
+      const { color } = colorForTrace(trace);
+      if (lineMode === 'pool') {
+        for (const pool of drawnPools(trace.series)) {
+          const id = `${base}:${pool.role}:${pool.rows.length}`;
+          if (seen.has(id)) continue;
+          seen.add(id);
+          pushLines(base, color, { role: pool.role, size: pool.rows.length });
+        }
+      } else if (!seen.has(base)) {
+        seen.add(base);
+        pushLines(base, color);
       }
     }
     return lines;
-  }, [visibleTraces, colorForTrace, showUtility, t]);
+  }, [visibleTraces, colorForTrace, showUtility, lineMode, t]);
 
   // ── Scales ─────────────────────────────────────────────────────────────────
   const xDomain = useMemo<[number, number]>(() => {
@@ -753,8 +968,8 @@ export default function PowerTimeline({
   }, [xMode, xDomain]);
 
   // ── Layers ─────────────────────────────────────────────────────────────────
-  const highlightRef = useRef(highlight);
-  highlightRef.current = highlight;
+  const highlightRef = useRef(activeHighlight);
+  highlightRef.current = activeHighlight;
   const layers = useMemo<LayerConfig<TimelineSample>[]>(
     () => [
       {
@@ -797,7 +1012,11 @@ export default function PowerTimeline({
           getY: (sample) => sample.y,
           getColor: (sample) => sample.color,
           getRadius: () => 2,
-          keyFn: (sample) => `${sample.trace.key}:${sample.column}`,
+          // Pool streams of one trace share columns; the role keeps their keys apart.
+          keyFn: (sample) =>
+            sample.pool
+              ? `${sample.trace.key}:${sample.pool.role}:${sample.column}`
+              : `${sample.trace.key}:${sample.column}`,
           maxPoints: Number.POSITIVE_INFINITY,
         },
       },
@@ -834,14 +1053,18 @@ export default function PowerTimeline({
       const root = d3.select(ctx.layout.svg.node() as SVGSVGElement);
       root
         .selectAll<SVGPathElement, TracePath>('path.power-trace')
-        .attr('opacity', (path) => traceOpacity(path, highlight));
+        .attr('opacity', (path) => traceOpacity(path, activeHighlight));
       root
-        .selectAll<SVGTextElement, DrawModel['labels'][number]>('text.power-trace-label')
+        .selectAll<SVGTextElement, TraceLabel>('text.power-trace-label')
         .attr('opacity', (label) =>
-          highlight === null || highlight === label.hwKey || highlight === label.traceKey ? 1 : 0.2,
+          activeHighlight === null ||
+          activeHighlight === label.hwKey ||
+          activeHighlight === label.traceKey
+            ? 1
+            : 0.2,
         );
     },
-    [highlight],
+    [activeHighlight],
   );
 
   const hardwareLabel = useCallback(
@@ -867,18 +1090,28 @@ export default function PowerTimeline({
         xMode === 'wall' ? `${clock} · +${elapsed} ${t.sinceStart}` : `+${elapsed} · ${clock}`;
       const colon = locale === 'zh' ? '：' : ':';
       const validated = point.measuredAvgPower?.y;
+      const { pool } = sample;
+      const readings = pool
+        ? `<div class="mt-1 text-muted-foreground">${t.pool}${colon} ${t.poolShort[pool.role]} · ${t.gpus(pool.gpuCount)}</div>
+        <div class="font-medium">${t.poolPower}${colon} ${formatWatts(sample.y)} W${
+          tdp > 0
+            ? ` <span class="text-muted-foreground">(${((sample.y / (tdp * pool.gpuCount)) * 100).toFixed(0)}% ${t.poolTdp})</span>`
+            : ''
+        }</div>
+        <div class="text-muted-foreground">${t.meanPerGpu}${colon} ${(sample.y / sample.gpuCount).toFixed(1)} W · ${t.min} ${sample.min.toFixed(1)} W · ${t.max} ${sample.max.toFixed(1)} W</div>`
+        : `<div class="mt-1 font-medium">${t.meanPerGpu}${colon} ${sample.y.toFixed(1)} W${
+            tdp > 0
+              ? ` <span class="text-muted-foreground">(${((sample.y / tdp) * 100).toFixed(0)}% ${t.tdp})</span>`
+              : ''
+          }</div>
+        <div class="text-muted-foreground">${t.gpus(sample.gpuCount)} · ${t.min} ${sample.min.toFixed(1)} W · ${t.max} ${sample.max.toFixed(1)} W</div>`;
       return `<div class="rounded-md border bg-background/95 px-3 py-2 text-xs shadow-md backdrop-blur-sm" style="min-width: 210px; user-select: ${isPinned ? 'text' : 'none'}">
         ${isPinned ? `<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">${t.dismiss}</div>` : ''}
         <div class="font-semibold mb-1" style="color: ${sample.color}">${hardwareLabel(point)} · ${traceConfigLabel(point)}${
           overlayInfo ? ` · ✕ ${overlayInfo.branch || `run ${overlayInfo.id}`}` : ''
         }</div>
         <div class="text-muted-foreground">${time}</div>
-        <div class="mt-1 font-medium">${t.meanPerGpu}${colon} ${sample.y.toFixed(1)} W${
-          tdp > 0
-            ? ` <span class="text-muted-foreground">(${((sample.y / tdp) * 100).toFixed(0)}% ${t.tdp})</span>`
-            : ''
-        }</div>
-        <div class="text-muted-foreground">${t.gpus(sample.gpuCount)} · ${t.min} ${sample.min.toFixed(1)} W · ${t.max} ${sample.max.toFixed(1)} W</div>
+        ${readings}
         <div class="text-muted-foreground">${t.phase[sample.phase]}</div>
         ${
           typeof validated === 'number'
@@ -966,6 +1199,41 @@ export default function PowerTimeline({
     t,
   ]);
 
+  // Per-GPU and pools are two views of the same lines, so either switch turns
+  // the other off; both fall back to the mean.
+  const chooseLineMode = (next: LineMode) => {
+    setLineMode(next);
+    track('inference_power_timeline_lines_changed', { lines: next });
+  };
+  const switches: LegendSwitchConfig[] = [
+    {
+      id: 'power-timeline-per-gpu',
+      label: t.perGpu,
+      checked: lineMode === 'gpu',
+      onCheckedChange: (checked) => chooseLineMode(checked ? 'gpu' : 'mean'),
+      infoTooltip: t.perGpuHelp,
+    },
+  ];
+  if (hasPools) {
+    switches.push({
+      id: 'power-timeline-pools',
+      label: t.pools,
+      checked: lineMode === 'pool',
+      onCheckedChange: (checked) => chooseLineMode(checked ? 'pool' : 'mean'),
+      infoTooltip: t.poolsHelp,
+    });
+  }
+  switches.push({
+    id: 'power-timeline-utility',
+    label: t.utilityLines,
+    checked: showUtility,
+    onCheckedChange: (checked) => {
+      setShowUtility(checked);
+      track('inference_power_timeline_utility_toggled', { enabled: checked });
+    },
+    infoTooltip: t.utilityHelp,
+  });
+
   const legendElement = (
     <ChartLegend
       variant="sidebar"
@@ -978,29 +1246,7 @@ export default function PowerTimeline({
       onItemHover={(id) => setHighlight(id)}
       onItemHoverEnd={() => setHighlight(null)}
       hideAtomFootnote
-      switches={[
-        {
-          id: 'power-timeline-per-gpu',
-          label: t.perGpu,
-          checked: lineMode === 'gpu',
-          onCheckedChange: (checked) => {
-            const next: LineMode = checked ? 'gpu' : 'mean';
-            setLineMode(next);
-            track('inference_power_timeline_lines_changed', { lines: next });
-          },
-          infoTooltip: t.perGpuHelp,
-        },
-        {
-          id: 'power-timeline-utility',
-          label: t.utilityLines,
-          checked: showUtility,
-          onCheckedChange: (checked) => {
-            setShowUtility(checked);
-            track('inference_power_timeline_utility_toggled', { enabled: checked });
-          },
-          infoTooltip: t.utilityHelp,
-        },
-      ]}
+      switches={switches}
     />
   );
 
@@ -1062,9 +1308,9 @@ export default function PowerTimeline({
           tickCount: 10,
           tickFormat: xTickFormat,
         }}
-        yAxis={{ label: yLabel, tickCount: 8 }}
+        yAxis={{ label: lineMode === 'pool' ? t.yPool : yLabel, tickCount: 8 }}
         layers={layers}
-        displayIdentity={highlight ?? ''}
+        displayIdentity={activeHighlight ?? ''}
         onDisplayUpdate={onDisplayUpdate}
         zoom={{
           enabled: true,
@@ -1108,6 +1354,29 @@ export default function PowerTimeline({
         className="flex flex-col gap-1 px-1 text-xs text-muted-foreground"
         data-testid="power-timeline-status"
       >
+        {focusedTrace && (
+          <p
+            className="inline-flex items-center gap-2 self-start rounded-full border px-2 py-0.5"
+            data-testid="power-timeline-focus"
+          >
+            <span>
+              {t.focused(
+                `${hardwareLabel(focusedTrace.point)} · ${traceConfigLabel(focusedTrace.point)}`,
+              )}
+            </span>
+            <button
+              type="button"
+              className="underline decoration-dotted hover:text-foreground"
+              data-testid="power-timeline-focus-clear"
+              onClick={() => {
+                setFocusKey(null);
+                track('inference_power_timeline_focus_cleared');
+              }}
+            >
+              {t.showAll}
+            </button>
+          </p>
+        )}
         {errors.map(({ request, error }) => (
           <p key={request.runId} className="text-destructive" role="alert">
             {t.loadError(request.runId, error.message)}
@@ -1140,6 +1409,7 @@ export default function PowerTimeline({
           </p>
         )}
         <p>{t.method}</p>
+        {hasPools && <p>{t.methodPools}</p>}
       </div>
     </div>
   );

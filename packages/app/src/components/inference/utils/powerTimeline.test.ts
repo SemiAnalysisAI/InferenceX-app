@@ -4,12 +4,20 @@ import type { GpuPowerSeriesResponse } from '@/components/gpu-power/power-series
 import type { InferenceData } from '@/components/inference/types';
 
 import {
+  allGpuPool,
+  consumePowerTraceFocus,
   joinPowerTimeline,
   longestCommonPrefix,
   planPowerTimelineRequests,
+  prioritizeRun,
+  requestPowerTraceFocus,
   runIdFromUrl,
   telemetryArtifactForPoint,
+  telemetrySourceForPoint,
   traceConfigLabel,
+  traceKeyForPoint,
+  traceKeyRunId,
+  tracePools,
   windowPhase,
 } from './powerTimeline';
 
@@ -139,7 +147,7 @@ describe('joinPowerTimeline', () => {
       new Map([['34716669498', response]]),
     );
     expect(traces).toHaveLength(1);
-    expect(traces[0].key).toBe(`34716669498:gpu_metrics_${NAME_A}`);
+    expect(traces[0].key).toBe(`34716669498:${NAME_A}`);
     expect(traces[0].series).toBe(response.series[0]);
     expect(traces[0].windowStartMs).toBeCloseTo(1789244883149, 0);
     expect(traces[0].windowEndMs).toBeCloseTo(1789244982413, 0);
@@ -170,5 +178,171 @@ describe('joinPowerTimeline', () => {
     const { traces } = joinPowerTimeline([noWindow], new Map([['34716669498', response]]));
     expect(traces[0].windowStartMs).toBeNull();
     expect(windowPhase(traces[0], response.series[0].startMs)).toBe('unknown');
+  });
+});
+
+describe('trace identity helpers', () => {
+  it('names the validation file and the run-scoped trace key of a point', () => {
+    const audited = point({ power_audit: { source: `power_validation_${NAME_A}.json` } });
+    expect(telemetrySourceForPoint(audited)).toBe(`power_validation_${NAME_A}.json`);
+    // A path prefix is dropped: bundle-cut series carry the basename.
+    expect(
+      telemetrySourceForPoint({
+        power_audit: { source: `nested/power_validation_${NAME_B}.json` },
+      }),
+    ).toBe(`power_validation_${NAME_B}.json`);
+    expect(traceKeyForPoint(audited)).toBe(`34716669498:${NAME_A}`);
+  });
+
+  it('has no key without a run or an audit source', () => {
+    expect(traceKeyForPoint(point({ run_url: undefined, power_audit: { source: 'x.json' } }))).toBe(
+      null,
+    );
+    expect(traceKeyForPoint(point({ power_audit: { source: 'agg_results.json' } }))).toBeNull();
+    expect(telemetrySourceForPoint({})).toBeNull();
+  });
+});
+
+describe('joinPowerTimeline with bundle-cut series', () => {
+  const bundleSource = `power_validation_${NAME_B}.json`;
+  const artifactSeries: GpuPowerSeriesResponse['series'][number] = {
+    artifact: `gpu_metrics_${NAME_B}`,
+    startMs: 1,
+    bucketSeconds: 1,
+    gpus: [0],
+    t: [0],
+    power: [[1]],
+  };
+  const bundleSeries: GpuPowerSeriesResponse['series'][number] = {
+    artifact: 'power_audit_qwen3.5_8k1k_fp8_dynamo-sglang_prefill-tp4-5b35252b29d80b104d11',
+    source: bundleSource,
+    startMs: 2,
+    bucketSeconds: 1,
+    gpus: [0, 1],
+    t: [0],
+    power: [[2], [3]],
+    devices: [
+      { id: 'watchtower-navy-cn01/GPU-aaa', role: 'prefill' },
+      { id: 'watchtower-navy-cn01/GPU-bbb', role: 'decode' },
+    ],
+  };
+  const disagg = point({ conc: 1, disagg: true, power_audit: { source: bundleSource } });
+
+  it('matches a series by its validation-file source', () => {
+    const { traces, missing } = joinPowerTimeline(
+      [disagg],
+      new Map([['34716669498', { runInfo, series: [bundleSeries] }]]),
+    );
+    expect(missing).toEqual([]);
+    expect(traces[0].series).toBe(bundleSeries);
+    expect(traces[0].key).toBe(`34716669498:${NAME_B}`);
+  });
+
+  it('prefers the source match over a gpu_metrics artifact of the same name', () => {
+    const { traces } = joinPowerTimeline(
+      [disagg],
+      new Map([['34716669498', { runInfo, series: [artifactSeries, bundleSeries] }]]),
+    );
+    expect(traces[0].series).toBe(bundleSeries);
+  });
+
+  it('never joins a source-labelled series through its bundle artifact name', () => {
+    const foreign = { ...bundleSeries, source: 'power_validation_other_conc4.json' };
+    const { traces, missing } = joinPowerTimeline(
+      [disagg],
+      new Map([['34716669498', { runInfo, series: [foreign] }]]),
+    );
+    expect(traces).toEqual([]);
+    expect(missing).toEqual([{ point: disagg, reason: 'not-in-run' }]);
+  });
+});
+
+describe('worker-role pools', () => {
+  it('groups rows by role in prefill, decode order regardless of device order', () => {
+    const pools = tracePools({
+      power: [[1], [2], [3], [4], [5]],
+      devices: [
+        { id: 'h/GPU-0', role: 'decode' },
+        { id: 'h/GPU-1', role: 'prefill' },
+        { id: 'h/GPU-2', role: 'decode' },
+        // An unassigned device belongs to no pool.
+        { id: 'h/GPU-3' },
+        { id: 'h/GPU-4', role: 'prefill' },
+      ],
+    });
+    expect(pools).toEqual([
+      { role: 'prefill', rows: [1, 4] },
+      { role: 'decode', rows: [0, 2] },
+    ]);
+  });
+
+  it('yields only the roles present and nothing without roles', () => {
+    expect(
+      tracePools({
+        power: [[1], [2]],
+        devices: [
+          { id: 'a', role: 'decode' },
+          { id: 'b', role: 'decode' },
+        ],
+      }),
+    ).toEqual([{ role: 'decode', rows: [0, 1] }]);
+    expect(tracePools({ power: [[1], [2]], devices: [{ id: '0' }, { id: '1' }] })).toEqual([]);
+    expect(tracePools({ power: [[1], [2]] })).toEqual([]);
+    expect(tracePools({ power: [] })).toEqual([]);
+  });
+
+  it('folds every row into the all-GPU pool', () => {
+    expect(allGpuPool({ power: [[1], [2], [3]] })).toEqual({ role: 'all', rows: [0, 1, 2] });
+    expect(allGpuPool({ power: [] })).toEqual({ role: 'all', rows: [] });
+  });
+});
+
+describe('power trace focus handoff', () => {
+  it('hands the requested key to exactly one consumer', () => {
+    expect(consumePowerTraceFocus()).toBeNull();
+    requestPowerTraceFocus('34716669498:conc16');
+    expect(consumePowerTraceFocus()).toBe('34716669498:conc16');
+    expect(consumePowerTraceFocus()).toBeNull();
+  });
+
+  it('keeps only the latest request', () => {
+    requestPowerTraceFocus('first');
+    requestPowerTraceFocus('second');
+    expect(consumePowerTraceFocus()).toBe('second');
+    expect(consumePowerTraceFocus()).toBeNull();
+  });
+});
+
+describe('prioritizeRun', () => {
+  const requests = ['1', '2', '3', '4', '5'].map((runId) => ({
+    runId,
+    prefix: '',
+    artifacts: [],
+  }));
+
+  it('moves the deep-linked run to the front and keeps the rest in order', () => {
+    expect(prioritizeRun(requests, '5').map((request) => request.runId)).toEqual([
+      '5',
+      '1',
+      '2',
+      '3',
+      '4',
+    ]);
+    expect(prioritizeRun(requests, '3').map((request) => request.runId)).toEqual([
+      '3',
+      '1',
+      '2',
+      '4',
+      '5',
+    ]);
+  });
+
+  it('returns the same array when the run is first, unknown or absent', () => {
+    expect(prioritizeRun(requests, '1')).toBe(requests);
+    expect(prioritizeRun(requests, '9')).toBe(requests);
+    expect(prioritizeRun(requests, null)).toBe(requests);
+    expect(traceKeyRunId('34716669498:qwen_conc8')).toBe('34716669498');
+    expect(traceKeyRunId(null)).toBeNull();
+    expect(traceKeyRunId('')).toBeNull();
   });
 });

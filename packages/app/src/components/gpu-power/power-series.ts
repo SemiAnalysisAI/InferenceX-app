@@ -13,9 +13,29 @@
  */
 import type { GpuMetricRow, GpuPowerRunInfo } from './types';
 
+/** Worker role a GPU served, when the collector's manifest assigns one. */
+export type GpuPowerRole = 'prefill' | 'decode';
+
+export interface GpuPowerDevice {
+  /**
+   * Producer device identifier: the nvidia-smi / amd-smi index (`"3"`) for
+   * `gpu_metrics_*` CSVs, `<hostname>/<GPU-uuid>` for DCGM power-audit
+   * bundles — the same form as `power_audit.observed_gpu_ids` on the row.
+   */
+  id: string;
+  role?: GpuPowerRole;
+}
+
 export interface GpuPowerSeries {
-  /** GitHub artifact name, `gpu_metrics_<RESULT_FILENAME>`. */
+  /** GitHub artifact name: `gpu_metrics_<RESULT_FILENAME>` or `power_audit_<RESULT_FILENAME>`. */
   artifact: string;
+  /**
+   * Basename of the `power_validation_*.json` this series belongs to, for
+   * series cut from a power-audit bundle (one bundle holds a whole
+   * concurrency sweep). Absent for `gpu_metrics_*` series, whose artifact
+   * already names one config.
+   */
+  source?: string;
   /** UTC epoch milliseconds of bucket 0. */
   startMs: number;
   /** Bucket width in seconds. */
@@ -26,6 +46,8 @@ export interface GpuPowerSeries {
   t: number[];
   /** Watts per GPU (outer) per bucket (inner); `null` when no sample landed in the bucket. */
   power: (number | null)[][];
+  /** One entry per row of `power` when the collector reports device identity or roles. */
+  devices?: GpuPowerDevice[];
 }
 
 export interface GpuPowerSeriesResponse {
@@ -130,6 +152,26 @@ export function meanPowerAt(series: GpuPowerSeries, column: number): number | nu
     count += 1;
   }
   return count > 0 ? sum / count : null;
+}
+
+/**
+ * Summed watts over `rows` in bucket `column`, or `null` unless EVERY row has
+ * a sample: a pool total with a device missing would read as a dip against
+ * the pool's TDP, so the bucket is left as a gap instead.
+ */
+export function sumPowerAt(
+  series: GpuPowerSeries,
+  rows: readonly number[],
+  column: number,
+): number | null {
+  if (rows.length === 0) return null;
+  let sum = 0;
+  for (const row of rows) {
+    const value = series.power[row]?.[column];
+    if (value === null || value === undefined) return null;
+    sum += value;
+  }
+  return sum;
 }
 
 /** UTC epoch milliseconds of bucket `column`. */

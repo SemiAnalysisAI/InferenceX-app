@@ -266,4 +266,71 @@ describe('PowerX measured power timeline', () => {
     cy.get('[data-testid="measured-power-display"]').should('contain.text', '时间线');
     cy.get('[data-testid="power-timeline-toolbar"]').should('contain.text', '时间轴');
   });
+
+  // ── "View power trace" on pinned scatter tooltips ─────────────────────────
+
+  const POWER_TRACE_ACTION = '[data-chart-tooltip]:visible [data-action="view-power-trace"]';
+
+  /** Pin the tooltip of the marker plotted for `conc` (official `.dot-group` or overlay X). */
+  function pinPointTooltip(selector: string, conc: number): void {
+    cy.get(`[data-testid="inference-chart-display"] svg ${selector}`)
+      .should('have.length', CONFIGS.length)
+      .then(($points) => {
+        const target = [...$points].find(
+          (node) => (node as unknown as { __data__?: { conc?: number } }).__data__?.conc === conc,
+        );
+        expect(target, `a ${selector} marker at concurrency ${conc}`).to.not.equal(undefined);
+        cy.wrap(target).find('.visible-shape').click({ force: true });
+      });
+  }
+
+  it('jumps from a pinned point to the timeline focused on that config', () => {
+    visitChart({ extraParams: '&i_metric=y_measuredAvgPower' });
+    // Only a pinned tooltip offers the action (the hover gate is unit-tested).
+    pinPointTooltip('.dot-group', 64);
+    cy.get(POWER_TRACE_ACTION)
+      .should('be.visible')
+      .should('contain.text', 'View power trace')
+      .invoke('attr', 'href')
+      .should('contain', 'i_metric=y_measuredPowerTimeline');
+    cy.get(POWER_TRACE_ACTION).click();
+
+    // Same-tab click switches the metric in place instead of navigating.
+    cy.location('pathname').should('eq', '/inference');
+    cy.get('[data-testid="power-timeline"]').should('exist');
+    cy.wait('@series');
+    cy.get(
+      '[data-testid="power-timeline-chart-svg"] path.power-trace[data-segment="window"]',
+    ).should('have.length', CONFIGS.length);
+    assertShareLinkMetric('y_measuredPowerTimeline');
+    cy.get('[data-testid="power-timeline-focus"]').should('contain.text', 'c64');
+  });
+
+  it('offers the action on pinned ?unofficialrun= overlay tooltips and opens the overlay trace', () => {
+    interceptOverlay();
+    visitChart({
+      extraParams: `&unofficialrun=${OVERLAY_RUN_ID}&i_metric=y_measuredAvgPower`,
+    });
+    cy.wait('@unofficialRun');
+    pinPointTooltip('.unofficial-overlay-pt', 64);
+    cy.get(POWER_TRACE_ACTION).should('be.visible').should('contain.text', 'View power trace');
+    cy.get(POWER_TRACE_ACTION).click();
+
+    cy.get('[data-testid="power-timeline"]').should('exist');
+    cy.wait(['@series', '@overlaySeries']);
+    cy.get('[data-testid="power-timeline-chart-svg"]').within(() => {
+      cy.get('path.power-trace[data-run-index="0"][data-segment="window"]').should(
+        'have.length',
+        CONFIGS.length,
+      );
+    });
+    assertShareLinkMetric('y_measuredPowerTimeline');
+    cy.get('[data-testid="power-timeline-focus"]').should('contain.text', 'c64');
+  });
+
+  it('translates the tooltip action on /zh/inference', () => {
+    visitChart({ path: '/zh/inference', extraParams: '&i_metric=y_measuredAvgPower' });
+    pinPointTooltip('.dot-group', 64);
+    cy.get(POWER_TRACE_ACTION).should('be.visible').should('contain.text', '查看功耗曲线');
+  });
 });
