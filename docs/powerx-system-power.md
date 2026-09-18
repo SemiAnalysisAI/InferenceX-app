@@ -69,8 +69,8 @@ result carries `topologyBasis: 'nvl72-trays'`, `measuredBasis`, and `sensorKind`
 A partially allocated tray extrapolates only the GPU-board share (a module reading
 already covers the whole tray) and is labeled `extrapolated`. The pinned revision
 `963ead8b` is the power-model repo's `feat/gb200-nvl72-rack-model` branch, pending
-push upstream. The Profit Estimator gate below still accepts only eight-GPU
-single-node chassis.
+push upstream. The NVL72 section below lists the measured input, the modeled
+residual and the Profit Estimator gate rules.
 
 A partially allocated chassis (one to seven measured GPUs on one host) is
 modeled at measured per-GPU power × 8. That is the same `n_gpu × W/GPU` input
@@ -102,6 +102,63 @@ schema and reports `validated-unversioned-single-node`; it does not upgrade the
 source or admit unversioned disaggregated power. The article receipt additionally
 pins the producer checkout and retains each original audit artifact.
 
+## NVL72 rack estimate (GB200, GB300)
+
+**Measured input.** Every compute tray is fed a measured compute-module figure; the
+Grace CPU and LPDDR5X are never modeled. The producer's CPU power leg (srt-slurm,
+ACPI hwmon) publishes, over the same formal window as GPU energy,
+`avg_cpu_socket_power_w`, `avg_total_cpu_power_w`, `total_cpu_energy_j`, and, when
+the `Module Power Socket` sensor exists on every socket, `avg_total_module_power_w`
+and `total_module_energy_j`, with the independent verdict `cpu_power_valid` and the
+`power_audit.cpu` block (sensor kind, collector, socket coverage, reason codes).
+Admission requires `power_valid=1`, schema 2, `cpu_power_valid=1`, positive Grace
+watts, and `avg_total_cpu_power_w / avg_cpu_socket_power_w` equal to two sockets per
+tray. Basis selection: `module` when `avg_total_module_power_w` is present (the
+reading already contains the GPU boards, so it is never scaled), otherwise
+`gpu-plus-grace` (GPU-board watts × 4 plus the Grace-socket total per tray, with the
+source's regulator-loss allowance `regulatorLossFracOfTdp / (1 − frac)` on the GPU
+share only). A present-but-invalid module key makes the row unavailable
+(`cpu-telemetry`); it never falls back to the Grace socket silently.
+
+**Modeled residual.** Everything outside the compute modules comes from the pinned
+profile (`rackProfiles`), evaluated for a rack of 18 identical trays and amortised
+over 72 GPUs; the parameters marked UNVERIFIED carry a documented range in
+`unverifiedParameters` and no published rail:
+
+| Component (per rack unless noted)      | GB200                                                                                | GB300                                          | Source status                            |
+| -------------------------------------- | ------------------------------------------------------------------------------------ | ---------------------------------------------- | ---------------------------------------- |
+| NVSwitch tray silicon (9 trays)        | 406.4 W / tray at `u_nvlink` 0.5                                                     | same                                           | `blackwell_nvswitch` model               |
+| NVSwitch tray residual                 | 50 W / tray                                                                          | same                                           | UNVERIFIED (20–80 W)                     |
+| Compute-tray NICs with optics          | ConnectX-7, 4 × 31.5 W = 126 W / tray                                                | ConnectX-8 integrated PCIe, 4 × 78.8 W = 315 W | `generic/connectx7`, `generic/connectx8` |
+| Compute-tray BlueField-3 DPUs          | 2 × 65 W idle = 130 W / tray                                                         | same                                           | `generic/dpu`, idle only                 |
+| Compute-tray NVMe                      | 22 W / tray idle                                                                     | same                                           | `generic/nvme`, idle only                |
+| Compute-tray fans                      | 130 W / tray                                                                         | same                                           | UNVERIFIED (40–220 W)                    |
+| Compute-tray board residual            | 40 W / tray                                                                          | same                                           | UNVERIFIED (20–60 W)                     |
+| Management switches                    | 2 × 100 W                                                                            | same                                           | profile constant                         |
+| Tray 50 V → 12 V conversion            | efficiency 0.9725 on tray loads                                                      | same                                           | UNVERIFIED (0.96–0.985)                  |
+| Regulator allowance (`gpu-plus-grace`) | 15% of GPU TDP, GPU share only                                                       | same                                           | Grace tuning guide                       |
+| Power shelf                            | 264 kW installed, 132 kW redundant; efficiency 0.90 → 0.94 → 0.965 at 10/20/30% load | same                                           | profile curve                            |
+| Facility PUE                           | 1.1 (direct liquid cooling)                                                          | same                                           | PowerX policy, applied once to rack AC   |
+
+Rack DC above the installed shelf capacity (264 kW) overflows the efficiency curve
+and the row is unavailable (`model-domain`). Rounding follows the source: rack AC is rounded
+to 0.1 W before PUE. Python-generated `rackCases` prove parity with the pinned
+implementation for both variants, both bases, every shelf knot and PUE 1.0–1.2.
+
+**Gate rules (Profit Estimator).** Planning kW/GPU = deployment facility watts ÷
+measured GPUs ÷ 1000 × 1.1. It accepts a `single-node` eight-GPU chassis with
+`chassisBasis: 'full'`, or an `nvl72-trays` estimate whose trays are all fully
+measured (one host per worker, four GPUs and two sockets each). Partial trays are
+extrapolated in the chart but rejected here, as partial chassis are. Between two
+frontier knots both must share the same measured basis and sensor kind; a module
+knot beside a Grace-socket knot stays unavailable rather than blending sensors. The
+bar tooltip, the caption line under the power note and the CSV columns `Power
+basis`, `Power sensor`, `System power profile` name the basis (measured module, or
+measured GPU board + Grace socket with regulator loss modeled), the sensor kind, and
+the pinned profile (`modelPath @ modelRevision sha256:<source file hash>`) per row.
+The `?unofficialrun=` overlay rule does not apply to the Profit Estimator basis
+control: the estimator prices official frontier points only.
+
 ## Profit Estimator power basis
 
 The per-GW Profit Estimator offers provisioned power, measured + modeled power,
@@ -116,17 +173,21 @@ facility kW/GPU used to calculate capacity per GW. Consequently, revenue,
 compute expense, license fee, and profit scale together; profit margin does not
 change. Electricity expense is not recomputed separately.
 
-This opt-in AgentX estimate requires validated schema-v2 telemetry and a complete
-single-node eight-GPU chassis supported by the pinned model. Partial allocations,
-unsupported GB200/GB300 chassis, and missing/invalid measurements stay unavailable.
-The ordinary 8K/1K transformation keeps its existing admission policy.
+This opt-in AgentX estimate requires validated schema-v2 telemetry and either a
+complete single-node eight-GPU chassis supported by the pinned model or NVL72
+compute trays that are all fully measured (`cpu_power_valid=1`, see the NVL72
+section). Partial allocations, NVL72 rows without CPU-side telemetry, and
+missing/invalid measurements stay unavailable. The ordinary 8K/1K transformation
+keeps its existing admission policy.
 
 At an exact frontier point, use that point's modeled power. Between points,
 estimate power linearly using the same two knots as the existing throughput
-interpolation; never select a different point to fill a power gap. The estimate
-uses PUE 1.3 and an additional 10% planning margin. These assumptions, including
-the fixed CPU/DRAM utilization above, are not validated peak-load provisioning or
-AgentX system calibration. The UI and CSV label the estimate and its assumptions.
+interpolation; never select a different point to fill a power gap, and never blend
+two knots measured on different bases. The estimate uses PowerX's PUE policy (1.3 for
+air-cooled chassis, 1.1 for DLC NVL72 racks) and an additional 10% planning margin.
+These assumptions, including the fixed CPU/DRAM utilization above, are not validated
+peak-load provisioning or AgentX system calibration. The UI and CSV label the
+estimate, its assumptions, and per row the measured basis, sensor kind and profile.
 `c_power=modeled` and `c_power=compare` preserve the selection in share URLs.
 Unavailable historical estimates use the hardware registry when a chip is absent
 from today's results and include the source date/run label.
@@ -140,12 +201,15 @@ from today's results and include the source date/run label.
 `inferencex-feature-gate=1`）。锁定时，`c_power` 不会启用其他估算方式或触发完整功耗
 数据请求；重新锁定后立即恢复预配功耗估算。
 
-AgentX 估算仅接纳通过验证的 schema-v2 功耗，且要求完整的单节点八卡机箱及适用模型。
-部分卡分配、GB200/GB300 等无匹配模型的机箱，以及缺失或无效功耗保持不可用。原有
+AgentX 估算仅接纳通过验证的 schema-v2 功耗，且要求完整的单节点八卡机箱及适用模型，
+或全部 tray 均完整实测（`cpu_power_valid=1`，见下文 NVL72 一节）的 NVL72 计算 tray。
+部分卡分配、缺少 CPU 侧实测的 NVL72 行，以及缺失或无效功耗保持不可用。原有
 8K/1K 转换路径的接纳规则不变。精确前沿点使用自身的功耗；点间采用原吞吐量插值的
-同一对数据点线性估算功耗，不换用其他点填补缺失。PUE 取 1.3，另加 10% 功耗余量；
-这些假设和上述固定 CPU/DRAM 利用率尚未通过 AgentX 系统校准，也不构成峰值供电容量
-验证。界面与 CSV 会注明估算及其假设，分享链接通过 `c_power` 保留所选方式。
+同一对数据点线性估算功耗，不换用其他点填补缺失，也不会把两种实测口径不同的数据点
+混合估算。PUE 按 PowerX 策略取值（风冷机箱 1.3，液冷 NVL72 机架 1.1），另加 10%
+功耗余量；这些假设和上述固定 CPU/DRAM 利用率尚未通过 AgentX 系统校准，也不构成
+峰值供电容量验证。界面与 CSV 会注明估算及其假设，并逐行标出实测口径、传感器类型
+和所用 profile；分享链接通过 `c_power` 保留所选方式。
 历史估算不可用时，若当天结果不含该芯片，则从硬件注册表获取名称；提示会附上来源
 日期或运行标签，避免与当前结果混淆。
 
@@ -245,6 +309,41 @@ frontend/router 主机不在估算范围内，GPU 机箱内的 CPU 功率仍按 
 实际窗口和成功 token 数，按实测 GPU 的份额计算，明确标记为估计值，不改写原有
 GPU 实测指标。当前 API 快照与原文章冻结数据分别导出，避免混用不同时间和配置的
 结果。
+
+**NVL72 机架估算（GB200、GB300）。** 实测输入：每个计算 tray 使用实测的计算模块功耗，
+Grace CPU 与 LPDDR5X 从不建模。生产端的 CPU 功耗采集（srt-slurm，ACPI hwmon）在与
+GPU 能耗相同的正式窗口内输出 `avg_cpu_socket_power_w`、`avg_total_cpu_power_w`、
+`total_cpu_energy_j`，当每个 socket 都有 `Module Power Socket` 传感器时还输出
+`avg_total_module_power_w` 与 `total_module_energy_j`，并附带独立的验证结论
+`cpu_power_valid` 和 `power_audit.cpu`（传感器类型、采集来源、socket 覆盖情况、原因码）。
+接纳条件：`power_valid=1`、schema 2、`cpu_power_valid=1`、Grace 功耗为正，且
+`avg_total_cpu_power_w / avg_cpu_socket_power_w` 等于每 tray 两个 socket。存在
+`avg_total_module_power_w` 时采用 `module` 口径（读数已包含 GPU 板卡，不再缩放），
+否则采用 `gpu-plus-grace` 口径（每 tray GPU 板卡功耗 × 4 加 Grace socket 总功耗，
+并仅对 GPU 份额计入来源模型的稳压损耗余量）。模块指标存在但无效时该行不可用
+（`cpu-telemetry`），不会悄然回退到 Grace socket。
+
+建模残差：计算模块之外的部分全部来自固定版本 profile（`rackProfiles`），按 18 个
+相同 tray 组成的整机架求值并分摊到 72 张 GPU：NVSwitch tray 硅片功耗（9 个 tray，
+`blackwell_nvswitch` 模型，`u_nvlink` 0.5）及 tray 残差（50 W，UNVERIFIED）；每个计算
+tray 的网卡与光模块（GB200 为 ConnectX-7，4 × 31.5 W；GB300 为 ConnectX-8，4 × 78.8 W）、
+BlueField-3 DPU 空闲功耗（2 × 65 W）、NVMe 空闲功耗（22 W）、风扇（130 W，UNVERIFIED）
+和主板残差（40 W，UNVERIFIED）；2 台管理交换机（各 100 W）；tray 内 50 V → 12 V 转换
+效率 0.9725（UNVERIFIED）；电源架装机容量 264 kW、冗余容量 132 kW，效率曲线在 10%/20%/30%
+负载处为 0.90/0.94/0.965；液冷 PUE 1.1，仅对机架交流功率应用一次。机架直流功率超过电源架
+装机容量（264 kW）时该行不可用（`model-domain`）。舍入与来源一致：机架交流功率先四舍五入到 0.1 W
+再乘 PUE；Python 生成的 `rackCases` 对两种变体、两种口径、全部电源架拐点和 PUE 1.0–1.2
+验证了与固定实现的一致性。
+
+门槛规则（利润估算器）：规划 kW/GPU = 部署设施功率 ÷ 实测 GPU 数 ÷ 1000 × 1.1。接受
+`chassisBasis: 'full'` 的单节点八卡机箱，或全部 tray 均完整实测（每个 worker 一台主机，
+各 4 张 GPU、2 个 socket）的 `nvl72-trays` 估算；部分 tray 在图表中外推显示，但与部分
+机箱一样不进入规划门槛。两个前沿数据点之间必须采用相同的实测口径和传感器类型，模块
+读数旁边的 Grace socket 读数保持不可用，不会混合两种传感器。柱形提示、功耗说明下方的
+标注行和 CSV 的 `功耗口径`、`功耗传感器`、`系统功耗 profile` 三列逐行标出实测口径
+（实测模块功耗，或实测 GPU 板卡 + Grace socket 功耗并由模型估算稳压损耗）、传感器类型
+和所用 profile（`modelPath @ modelRevision sha256:<源文件哈希>`）。`?unofficialrun=`
+叠加层规则不适用于利润估算器的功耗口径控件：估算器只对正式前沿数据点定价。
 
 ## Measured P75 and P90 GPU power
 
