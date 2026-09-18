@@ -88,6 +88,12 @@ function dirtyPowerPayload(): Record<string, any> {
     peak_temp_c: 79.2,
     avg_util_pct: 88.5,
     avg_mem_used_mb: 71234.5,
+    // NVL72 CPU-side measurements share the GPU window; withheld with the GPU verdict.
+    avg_cpu_socket_power_w: 250.5,
+    avg_total_cpu_power_w: 1002,
+    total_cpu_energy_j: 601200,
+    avg_total_module_power_w: 17203,
+    total_module_energy_j: 10321800,
     workers: [
       { role: 'prefill', worker_idx: 0, hosts: ['pn0'], num_gpus: 4, avg_power_w: 612.3 },
       { role: 'decode', worker_idx: 0, hosts: ['dn0'], num_gpus: 8, avg_power_w: 701.5 },
@@ -337,6 +343,29 @@ describe('mapBenchmarkRow', () => {
       expect(result!.workers).toBeUndefined();
       expect(result!.metrics.tput_per_gpu).toBe(567.8);
       expect(result!.metrics.median_ttft).toBe(50.2);
+    });
+
+    it('withholds the CPU-side measurements but keeps the independent cpu_power_valid verdict', () => {
+      const tracker = createSkipTracker();
+      const result = mapBenchmarkRow(
+        makeV2Row({
+          power_valid: 0,
+          power_metric_schema_version: 2,
+          cpu_power_valid: 1,
+          ...dirtyPowerPayload(),
+        }),
+        tracker,
+      );
+      expect(result!.metrics.cpu_power_valid).toBe(1);
+      for (const key of [
+        'avg_cpu_socket_power_w',
+        'avg_total_cpu_power_w',
+        'total_cpu_energy_j',
+        'avg_total_module_power_w',
+        'total_module_energy_j',
+      ]) {
+        expect(result!.metrics).not.toHaveProperty(key);
+      }
     });
 
     it('keeps every measured key and the workers payload on a valid verdict', () => {
@@ -828,6 +857,41 @@ describe('mapBenchmarkRow', () => {
       expect(result!.metrics).not.toHaveProperty('workers');
     });
 
+    it('captures the NVL72 CPU-side keys without an unknown-key warning', async () => {
+      // The warning fires once per process per key, so a fresh module instance is
+      // the only way to observe whether these keys are known.
+      vi.resetModules();
+      const fresh = await import('./benchmark-mapper');
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      try {
+        const tracker = createSkipTracker();
+        const result = fresh.mapBenchmarkRow(
+          makeV2Row({
+            power_valid: 1,
+            power_metric_schema_version: 2,
+            cpu_power_valid: 1,
+            avg_cpu_socket_power_w: 250.5,
+            avg_total_cpu_power_w: 1002,
+            total_cpu_energy_j: 601200,
+            avg_total_module_power_w: 17203,
+            total_module_energy_j: 10321800,
+          }),
+          tracker,
+        );
+        expect(result!.metrics).toMatchObject({
+          cpu_power_valid: 1,
+          avg_cpu_socket_power_w: 250.5,
+          avg_total_cpu_power_w: 1002,
+          total_cpu_energy_j: 601200,
+          avg_total_module_power_w: 17203,
+          total_module_energy_j: 10321800,
+        });
+        expect(warn).not.toHaveBeenCalled();
+      } finally {
+        warn.mockRestore();
+      }
+    });
+
     it('captures new cluster-wide temp / util / mem scalars into metrics', () => {
       // These are flat scalars on the agg row (sibling of avg_power_w), so
       // the auto-capture path must store them under their raw keys without
@@ -889,6 +953,22 @@ describe('scrubWithheldPowerMetrics (direct — supplemental ingest path)', () =
       expect(scrubWithheldPowerMetrics(metrics)).toBe(false);
       expect(metrics).toEqual(before);
     }
+  });
+
+  it('normalizes cpu_power_valid as a verdict, independent of power_valid', () => {
+    const metrics = supplementalMetrics({ power_valid: 1, cpu_power_valid: '1' });
+    normalizePowerContractMetrics(metrics, metrics);
+    expect(metrics.cpu_power_valid).toBe(1);
+    expect(scrubWithheldPowerMetrics(metrics)).toBe(false);
+
+    const malformed = supplementalMetrics({ power_valid: 1, cpu_power_valid: 2 });
+    normalizePowerContractMetrics(malformed, malformed);
+    expect(malformed.cpu_power_valid).toBe(0);
+    expect(malformed.avg_total_cpu_power_w).toBe(1002);
+
+    const absent = supplementalMetrics({ power_valid: 1 });
+    normalizePowerContractMetrics(absent, absent);
+    expect(absent).not.toHaveProperty('cpu_power_valid');
   });
 
   it('fails closed on a malformed verdict when composed with normalization', () => {
@@ -1158,7 +1238,43 @@ describe('extractPowerAudit', () => {
     });
   });
 
-  it('drops unknown keys (fixed 8-key shape bounds the stored object)', () => {
+  it('keeps the bounded CPU-side audit block and drops malformed CPU fields', () => {
+    const cpu = {
+      sensor_kind: 'module',
+      source: 'acpi',
+      expected_sockets: 4,
+      observed_sockets: 4,
+      sample_row_count: 2400,
+      reason_codes: [],
+    };
+    expect(extractPowerAudit({ ...fullAudit, cpu })).toEqual({ ...fullAudit, cpu });
+    expect(
+      extractPowerAudit({
+        sample_count: 1,
+        cpu: {
+          sensor_kind: 'thermocouple',
+          source: 'x'.repeat(33),
+          expected_sockets: -1,
+          observed_sockets: Number.NaN,
+          sample_row_count: '12',
+          reason_codes: ['cpu_socket_count_mismatch', 'cpu_socket_count_mismatch', '<img>', 7],
+        },
+      }),
+    ).toEqual({
+      sample_count: 1,
+      producer_sha: null,
+      exporter_image_sha256: null,
+      cpu: { sample_row_count: 12, reason_codes: ['cpu_socket_count_mismatch'] },
+    });
+    expect(extractPowerAudit({ sample_count: 1, cpu: {} })).toEqual({
+      sample_count: 1,
+      producer_sha: null,
+      exporter_image_sha256: null,
+    });
+    expect(extractPowerAudit({ sample_count: 1, cpu: 'acpi' })).not.toHaveProperty('cpu');
+  });
+
+  it('drops unknown keys (fixed 9-key shape bounds the stored object)', () => {
     expect(extractPowerAudit({ sample_count: 3, integration_method: 'trapezoid' })).toEqual({
       sample_count: 3,
       producer_sha: null,

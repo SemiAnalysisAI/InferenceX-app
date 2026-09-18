@@ -238,6 +238,18 @@ const powerMetricDescriptions: Readonly<Record<(typeof POWER_METRIC_KEYS)[number
     'Maximum instantaneous per-GPU temperature in degrees Celsius during the load window.',
   avg_util_pct: 'Mean per-GPU utilization percentage (0-100) during the load window.',
   avg_mem_used_mb: 'Mean per-GPU memory used in MB during the load window.',
+  cpu_power_valid:
+    'NVL72 CPU-side leg verdict, independent of power_valid: 1 = the Grace-side (and module, when present) keys were integrated over the validated window with full socket coverage; 0 = the leg failed and no CPU-side keys are emitted; absent = the run had no CPU-side leg. GPU power and energy never change because of this verdict.',
+  avg_cpu_socket_power_w:
+    'Mean over Grace sockets of each socket’s window-mean Grace-side power in watts (Grace CPU + LPDDR5X, ACPI hwmon Grace Power Socket sensor) over the same validated window as GPU energy. NVL72 only.',
+  avg_total_cpu_power_w:
+    'Sum over every Grace socket in the deployment of window-mean Grace-side power in watts; dividing by avg_cpu_socket_power_w recovers the socket count (two per compute tray). NVL72 only.',
+  total_cpu_energy_j:
+    'Grace-side energy in joules integrated over the validated window across every socket. Additive to total_gpu_energy_j, never included in it.',
+  avg_total_module_power_w:
+    'Sum over sockets of window-mean compute-module power in watts (Grace + its Blackwell GPUs + HBM + LPDDR5X + regulator loss, ACPI hwmon Module Power Socket sensor); emitted only when the module sensor exists on every socket. It already contains the GPU-board watts, so do not add avg_total_gpu_power_w to it.',
+  total_module_energy_j:
+    'Compute-module energy in joules over the validated window across every socket; emitted with avg_total_module_power_w and includes the GPU energy.',
 };
 const benchmarkMetricsSchema: ApiSchema = {
   type: 'object',
@@ -264,10 +276,27 @@ const powerAuditSchema: ApiSchema = {
     exporter_image_sha256: nullableStringSchema,
     source: stringSchema,
     observed_gpu_ids: arraySchema(stringSchema),
+    cpu: {
+      type: 'object',
+      properties: {
+        sensor_kind: { type: 'string', enum: ['module', 'grace_socket', 'dcgm_cpu_rail'] },
+        source: {
+          ...stringSchema,
+          description: 'Collector that produced the CPU-side samples: acpi (hwmon) or dcgm.',
+        },
+        expected_sockets: integerSchema,
+        observed_sockets: integerSchema,
+        sample_row_count: integerSchema,
+        reason_codes: arraySchema(stringSchema),
+      },
+      additionalProperties: true,
+      description:
+        'NVL72 CPU-side leg provenance emitted alongside cpu_power_valid: the sensor kind that fed the Grace-side keys (module preferred over grace_socket over dcgm_cpu_rail), its collector, expected vs. observed Grace sockets (two per compute tray), stored sample rows, and the leg’s reason codes (empty when valid). Absent on runs without the CPU-side leg.',
+    },
   },
   additionalProperties: true,
   description:
-    'Compact power measurement-window audit emitted alongside the power_valid verdict: window bounds, expected vs. observed GPU counts, sample statistics, and producer identity (producer_sha / exporter_image_sha256 are null for single-node telemetry without an srt-slurm producer). source is a relative path within the source run artifact bundle; observed_gpu_ids contains producer device identifiers, which may be indices rather than physical UUIDs. Present on valid and invalid rows when emitted; absence alone does not establish age or validity.',
+    'Compact power measurement-window audit emitted alongside the power_valid verdict: window bounds, expected vs. observed GPU counts, sample statistics, and producer identity (producer_sha / exporter_image_sha256 are null for single-node telemetry without an srt-slurm producer). source is a relative path within the source run artifact bundle; observed_gpu_ids contains producer device identifiers, which may be indices rather than physical UUIDs. cpu carries the NVL72 CPU-side leg’s provenance when that leg ran. Present on valid and invalid rows when emitted; absence alone does not establish age or validity.',
 };
 const workerPowerSchema = objectSchemaWithOptional(
   {
@@ -3101,8 +3130,8 @@ const overview = {
       id: 'measured-power',
       title: text('Measured power', '实测功率'),
       description: text(
-        'Benchmark rows may carry measured power, energy, and GPU-telemetry metric keys (avg_power_w, avg_total_gpu_power_w, total_gpu_energy_j, p75_power_w, p75_total_gpu_power_w, p90_power_w, p90_total_gpu_power_w, joules_per_*, avg_temp_c, peak_temp_c, avg_util_pct, avg_mem_used_mb). power_valid is tri-state: 1 means the measurement window was validated; 0 means validation failed and measured values are withheld end-to-end (the producer strips them and ingest scrubs them — treat any that remain as unreliable); absent means no validation verdict is available in this response. Legacy rows can lack the field, but absence alone establishes neither the reason, the measurement age, nor invalidity. power_metric_schema_version == 2 defines every unprefixed joules_per_* field as whole-deployment energy — unversioned disaggregated joules are ambiguous because those fields previously carried role-local values. workers[] carries the per-worker power/telemetry breakdown on multinode and disaggregated runs. power_invalid_reasons lists producer reason codes. power_audit optionally carries measurement-window bounds, device and sample counts, producer identity and the retained audit reference on valid and invalid rows. Missing audit metadata does not establish the measurement age or validity. For measured-power requests, use powerValid=strictV2 to require power_valid == 1 and power_metric_schema_version == 2. It is the only supported power filter. Omit powerValid for general benchmark requests so results remain available even when they lack valid power measurements.',
-        '基准测试数据行可能包含实测功率、能耗和 GPU 遥测指标（avg_power_w、avg_total_gpu_power_w、total_gpu_energy_j、p75_power_w、p75_total_gpu_power_w、p90_power_w、p90_total_gpu_power_w、joules_per_*、avg_temp_c、peak_temp_c、avg_util_pct、avg_mem_used_mb）。power_valid 有三种状态：1 表示测量窗口已通过验证；0 表示验证失败，生产端会移除实测值，摄取端也会再次清除，若仍有残留，应视为不可靠；缺失表示当前响应未提供验证结论。旧数据可能缺少该字段，但仅凭字段缺失，既无法判断缺失原因，也无法判断数据新旧或测量是否无效。power_metric_schema_version == 2 规定所有无前缀的 joules_per_* 字段均按整个部署统计能耗。未标注版本的分离式部署数据中，这些字段曾记录单个角色的能耗，因此其统计口径不明确。多节点和分离式运行中，各 worker 的功率和遥测明细位于 workers[]。power_invalid_reasons 列出生产端的原因码。power_audit 可在有效与无效行上提供测量窗口、设备和采样数量、生产端标识及保留的审计产物引用。缺少审计信息不能证明测量的新旧或有效性。查询实测功率时，使用 powerValid=strictV2，仅保留 power_valid == 1 且 power_metric_schema_version == 2 的行。这是唯一支持的功率筛选值。常规基准测试请求应省略 powerValid，以保留缺少有效功率测量的结果。',
+        'Benchmark rows may carry measured power, energy, and GPU-telemetry metric keys (avg_power_w, avg_total_gpu_power_w, total_gpu_energy_j, p75_power_w, p75_total_gpu_power_w, p90_power_w, p90_total_gpu_power_w, joules_per_*, avg_temp_c, peak_temp_c, avg_util_pct, avg_mem_used_mb). power_valid is tri-state: 1 means the measurement window was validated; 0 means validation failed and measured values are withheld end-to-end (the producer strips them and ingest scrubs them — treat any that remain as unreliable); absent means no validation verdict is available in this response. Legacy rows can lack the field, but absence alone establishes neither the reason, the measurement age, nor invalidity. power_metric_schema_version == 2 defines every unprefixed joules_per_* field as whole-deployment energy — unversioned disaggregated joules are ambiguous because those fields previously carried role-local values. workers[] carries the per-worker power/telemetry breakdown on multinode and disaggregated runs. power_invalid_reasons lists producer reason codes. power_audit optionally carries measurement-window bounds, device and sample counts, producer identity and the retained audit reference on valid and invalid rows. Missing audit metadata does not establish the measurement age or validity. NVL72 (GB200/GB300) rows may add Grace-side and compute-module keys integrated over the same window: avg_cpu_socket_power_w, avg_total_cpu_power_w, total_cpu_energy_j, and avg_total_module_power_w / total_module_energy_j when the module sensor exists on every socket. cpu_power_valid is their own tri-state verdict, independent of power_valid, and power_audit.cpu records the sensor kind, collector, socket coverage and reason codes. A module reading already contains the GPU-board watts. For measured-power requests, use powerValid=strictV2 to require power_valid == 1 and power_metric_schema_version == 2. It is the only supported power filter. Omit powerValid for general benchmark requests so results remain available even when they lack valid power measurements.',
+        '基准测试数据行可能包含实测功率、能耗和 GPU 遥测指标（avg_power_w、avg_total_gpu_power_w、total_gpu_energy_j、p75_power_w、p75_total_gpu_power_w、p90_power_w、p90_total_gpu_power_w、joules_per_*、avg_temp_c、peak_temp_c、avg_util_pct、avg_mem_used_mb）。power_valid 有三种状态：1 表示测量窗口已通过验证；0 表示验证失败，生产端会移除实测值，摄取端也会再次清除，若仍有残留，应视为不可靠；缺失表示当前响应未提供验证结论。旧数据可能缺少该字段，但仅凭字段缺失，既无法判断缺失原因，也无法判断数据新旧或测量是否无效。power_metric_schema_version == 2 规定所有无前缀的 joules_per_* 字段均按整个部署统计能耗。未标注版本的分离式部署数据中，这些字段曾记录单个角色的能耗，因此其统计口径不明确。多节点和分离式运行中，各 worker 的功率和遥测明细位于 workers[]。power_invalid_reasons 列出生产端的原因码。power_audit 可在有效与无效行上提供测量窗口、设备和采样数量、生产端标识及保留的审计产物引用。缺少审计信息不能证明测量的新旧或有效性。NVL72（GB200/GB300）数据行可能附带 Grace 侧和计算模块指标，它们在同一测量窗口内积分：avg_cpu_socket_power_w、avg_total_cpu_power_w、total_cpu_energy_j，以及在每个 socket 都有模块传感器时的 avg_total_module_power_w / total_module_energy_j。cpu_power_valid 是这些指标独立于 power_valid 的三态验证结论；power_audit.cpu 记录传感器类型、采集来源、socket 覆盖情况和原因码。模块读数已包含 GPU 板卡功耗。查询实测功率时，使用 powerValid=strictV2，仅保留 power_valid == 1 且 power_metric_schema_version == 2 的行。这是唯一支持的功率筛选值。常规基准测试请求应省略 powerValid，以保留缺少有效功率测量的结果。',
       ),
       shape: 'BenchmarkRows',
       example: {
@@ -3110,6 +3139,9 @@ const overview = {
         power_metric_schema_version: 2,
         avg_power_w: 678.5,
         joules_per_output_token: 5.3,
+        cpu_power_valid: 1,
+        avg_cpu_socket_power_w: 250.5,
+        avg_total_cpu_power_w: 501,
       },
     },
     {

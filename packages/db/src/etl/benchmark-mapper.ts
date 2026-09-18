@@ -152,6 +152,24 @@ export interface PowerAudit {
   source?: string;
   /** Producer device identifiers; not necessarily physical UUIDs on older traces. */
   observed_gpu_ids?: string[];
+  /** NVL72 CPU-side leg provenance; present only when the producer ran that leg. */
+  cpu?: PowerAuditCpu;
+}
+
+/** Sensor kinds the consumer's CPU-side leg can select as the headline series. */
+export const POWER_AUDIT_CPU_SENSOR_KINDS = ['module', 'grace_socket', 'dcgm_cpu_rail'] as const;
+
+/**
+ * Bounded CPU-side provenance emitted next to `cpu_power_valid`: which sensor fed
+ * the Grace-side keys, its source, socket coverage, and the leg's reason codes.
+ */
+export interface PowerAuditCpu {
+  sensor_kind?: (typeof POWER_AUDIT_CPU_SENSOR_KINDS)[number];
+  source?: string;
+  expected_sockets?: number;
+  observed_sockets?: number;
+  sample_row_count?: number;
+  reason_codes?: string[];
 }
 
 export interface BenchmarkParams {
@@ -540,11 +558,13 @@ export function normalizePowerContractMetrics(
   row: Record<string, any>,
   metrics: Record<string, number>,
 ): void {
-  if (Object.hasOwn(row, 'power_valid')) {
-    const verdict = row.power_valid;
-    metrics.power_valid = verdict === 1 || verdict === '1' ? 1 : 0;
-  } else {
-    delete metrics.power_valid;
+  for (const field of ['power_valid', 'cpu_power_valid'] as const) {
+    if (Object.hasOwn(row, field)) {
+      const verdict = row[field];
+      metrics[field] = verdict === 1 || verdict === '1' ? 1 : 0;
+    } else {
+      delete metrics[field];
+    }
   }
 
   if (!Object.hasOwn(row, 'power_metric_schema_version')) {
@@ -667,6 +687,32 @@ function auditSha(v: unknown): string | null {
 }
 
 /**
+ * Narrow the CPU-side leg's provenance. Reason codes reuse the producer reason
+ * grammar; an unrecognised sensor kind is dropped rather than stored as a label
+ * the dashboard would misread. Undefined when nothing well-formed remains.
+ */
+function extractPowerAuditCpu(raw: unknown): PowerAuditCpu | undefined {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined;
+  const e = raw as Record<string, unknown>;
+  const cpu: PowerAuditCpu = {};
+  if ((POWER_AUDIT_CPU_SENSOR_KINDS as readonly unknown[]).includes(e.sensor_kind)) {
+    cpu.sensor_kind = e.sensor_kind as PowerAuditCpu['sensor_kind'];
+  }
+  if (typeof e.source === 'string' && e.source.length > 0 && e.source.length <= 32) {
+    cpu.source = e.source;
+  }
+  for (const field of ['expected_sockets', 'observed_sockets', 'sample_row_count'] as const) {
+    const n = auditCount(e[field]);
+    if (n !== undefined) cpu[field] = n;
+  }
+  // An empty list is the producer's "leg valid, nothing to report"; keep it.
+  if (Array.isArray(e.reason_codes)) {
+    cpu.reason_codes = extractPowerInvalidReasons(e.reason_codes) ?? [];
+  }
+  return Object.keys(cpu).length > 0 ? cpu : undefined;
+}
+
+/**
  * Missing or malformed audit values must not become a fabricated measurement;
  * SQL NULL distinguishes absent evidence from an empty recorded object.
  */
@@ -701,6 +747,8 @@ export function extractPowerAudit(raw: unknown): PowerAudit | undefined {
     );
     if (ids.length > 0) audit.observed_gpu_ids = [...new Set(ids)].slice(0, 1024);
   }
+  const cpu = extractPowerAuditCpu(e.cpu);
+  if (cpu !== undefined) audit.cpu = cpu;
   const hasNumericField = Object.keys(audit).length > 0;
 
   audit.producer_sha = auditSha(e.producer_sha);

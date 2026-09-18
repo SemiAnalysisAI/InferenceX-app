@@ -46,6 +46,19 @@ export const MEASURED_POWER_METRIC_KEY_LIST = [
   'peak_temp_c',
   'avg_util_pct',
   'avg_mem_used_mb',
+  // NVL72 Grace-side and compute-module measurements from the srt-slurm CPU power
+  // leg (ACPI hwmon), integrated over the same formal window as GPU energy.
+  // avg_cpu_socket_power_w:   mean over sockets of each socket's window-mean Grace-side W
+  // avg_total_cpu_power_w:    sum over sockets of window-mean Grace-side W
+  // total_cpu_energy_j:       Grace-side energy over the window, all sockets
+  // avg_total_module_power_w / total_module_energy_j: whole compute module
+  //                           (Grace + GPUs + HBM + LPDDR5X + regulator loss), only when
+  //                           the module sensor exists on every socket
+  'avg_cpu_socket_power_w',
+  'avg_total_cpu_power_w',
+  'total_cpu_energy_j',
+  'avg_total_module_power_w',
+  'total_module_energy_j',
 ] as const;
 
 export const MEASURED_POWER_METRIC_KEYS: ReadonlySet<string> = new Set(
@@ -65,6 +78,9 @@ export const POWER_METRIC_KEYS = [
   //                              joules_per_* field as whole-deployment energy
   'power_valid',
   'power_metric_schema_version',
+  // cpu_power_valid: numeric 1/0 verdict for the NVL72 CPU-side leg, independent
+  //                  of power_valid; 0 means the producer emitted no CPU-side keys
+  'cpu_power_valid',
   // measured power / energy / telemetry values, withheld when power_valid = 0
   ...MEASURED_POWER_METRIC_KEY_LIST,
 ] as const;
