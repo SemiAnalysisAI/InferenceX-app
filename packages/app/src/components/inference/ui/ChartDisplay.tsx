@@ -92,6 +92,7 @@ import { useLocale } from '@/lib/use-locale';
 
 import { ATOM_FOOTNOTE_MARKER, AtomEngineFootnote } from '@/components/ui/atom-engine-footnote';
 import { AgenticOptimizationNote } from '@/components/inference/ui/AgenticOptimizationNote';
+import { CacheReuseLink } from '@/components/inference/ui/CacheReuseLink';
 import { OffloadHaloLegendKey } from '@/components/inference/ui/OffloadHaloLegendKey';
 import { LegacyPowerLegendKey } from '@/components/inference/ui/LegacyPowerLegendKey';
 import { ActiveQuickFilters } from '@/components/inference/ui/ActiveQuickFilters';
@@ -883,6 +884,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                     {hasOffloadHalo && <OffloadHaloLegendKey />}
                     {hasLegacyPowerPoints && <LegacyPowerLegendKey />}
                     {isAgenticSequence && <AgenticOptimizationNote />}
+                    {isAgenticSequence && !minimalChrome && <CacheReuseLink />}
                     {hasAtomSeries && (
                       <AtomEngineFootnote className="min-w-0 flex-[1_1_24rem] text-xs leading-5" />
                     )}

@@ -98,6 +98,9 @@ const URL_STATE_KEYS = [
   'c_rec',
   'c_life',
   'c_power',
+  // Cache reuse: the configuration group plotted. Empty means the group with
+  // the most rows reporting cache tiers.
+  'c_cfg',
 ] as const;
 
 export type UrlStateKey = (typeof URL_STATE_KEYS)[number];
@@ -194,6 +197,7 @@ export const PARAM_DEFAULTS: Record<UrlStateKey, string> = {
   c_oprice: '',
   c_life: '',
   c_power: 'provisioned',
+  c_cfg: '',
   // Empty means the default y metric (margin).
   c_ly: '',
   c_ramp: DEFAULT_LIFECYCLE_RAMP_MONTHS,

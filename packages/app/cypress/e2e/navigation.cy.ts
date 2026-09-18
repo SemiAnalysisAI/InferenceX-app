@@ -53,6 +53,14 @@ describe('Chart Section Tabs — E2E', () => {
     cy.url().should('include', '/fleet');
   });
 
+  it('opens Prefix Cache Reuse from the footer link', () => {
+    cy.get('[data-testid="tab-trigger-cache-reuse"]').should('not.exist');
+
+    cy.get('[data-testid="footer-link-cache-reuse"]').scrollIntoView().click();
+    cy.url().should('include', '/cache-reuse');
+    cy.get('[data-testid="cache-reuse-controls"]').should('exist');
+  });
+
   it('opens GPU Reliability from the footer link', () => {
     cy.get('[data-testid="tab-trigger-reliability"]').should('not.exist');
 
