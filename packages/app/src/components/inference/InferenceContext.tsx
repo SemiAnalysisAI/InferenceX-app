@@ -36,6 +36,7 @@ import type {
   InferenceDataContextType,
   InferenceDisplayContextType,
   InferenceFiltersContextType,
+  PowerCompare,
   TokenRevenuePriceSource,
 } from '@/components/inference/types';
 import { resolveMetricConfigKey } from '@/components/inference/metric-registry';
@@ -56,6 +57,7 @@ import {
 } from '@/hooks/useChartContext';
 import { useUrlState } from '@/hooks/useUrlState';
 import { serializePerfRulers } from '@/lib/d3-chart/layers/perf-ruler';
+import { parsePowerCompare } from '@/components/inference/utils/power-compare';
 import {
   PERSISTED_PERF_RULER_CHART_ID,
   PerfRulerStoreContext,
@@ -483,6 +485,12 @@ export function InferenceProvider({
   const [scaleType, setScaleType] = useState<'auto' | 'linear' | 'log'>(
     () => (getUrlParam('i_scale') as 'auto' | 'linear' | 'log') || 'auto',
   );
+  // Comparison series on a gated power metric (`i_pcompare`). Kept while the
+  // metric changes: a key without a common axis simply yields no siblings, and
+  // the Measured controls say so, so a link's intent survives a detour.
+  const [powerCompare, setPowerCompare] = useState<PowerCompare>(() =>
+    parsePowerCompare(getUrlParam('i_pcompare')),
+  );
 
   // ── Quick filters (vendor / framework / deployment / mtp-stp / power tier) ──
   // Coarse pre-filters applied to the point set. Empty = no constraint.
@@ -765,6 +773,7 @@ export function InferenceProvider({
       !isUnofficialRun &&
       !hasExplicitRunSelection &&
       selectedRunDateRev === 0,
+    powerCompare,
   );
 
   // For GPU comparison date picker — use shared availability data from global filters
@@ -1610,6 +1619,7 @@ export function InferenceProvider({
       i_spec: quickFilterSpec.join(','),
       i_power: quickFilterPower.join(','),
       i_rulers: iRulersStr,
+      i_pcompare: powerCompare === 'none' ? '' : powerCompare,
     },
     [
       selectedYAxisMetric,
@@ -1640,6 +1650,7 @@ export function InferenceProvider({
       quickFilterSpec,
       quickFilterPower,
       iRulersStr,
+      powerCompare,
     ],
   );
 
@@ -1855,6 +1866,7 @@ export function InferenceProvider({
       selectedE2eXAxisMetric,
       selectedXAxisMode,
       scaleType,
+      powerCompare,
       isLegendExpanded,
       hideNonOptimal,
       showAllMeasurements,
@@ -1878,6 +1890,7 @@ export function InferenceProvider({
       selectedE2eXAxisMetric,
       selectedXAxisMode,
       scaleType,
+      powerCompare,
       isLegendExpanded,
       hideNonOptimal,
       showAllMeasurements,
@@ -1910,6 +1923,7 @@ export function InferenceProvider({
     setSelectedXAxisMetric,
     setSelectedXAxisMode: handleSetXAxisMode,
     setScaleType,
+    setPowerCompare,
     setQuickFilterVendors,
     setQuickFilterFrameworks,
     setQuickFilterDeployment,

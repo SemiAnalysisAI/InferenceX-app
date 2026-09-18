@@ -749,3 +749,33 @@ describe('historicalTrendToCsv (mirrors HistoricalTrendsDisplay export)', () => 
     expect(rows[1][headers.indexOf('Date')]).toBe('2025-01-15');
   });
 });
+
+describe('inferenceChartToCsv power comparison', () => {
+  it('names each row’s boundary or role only while comparison clones are present', () => {
+    const base = makePoint({
+      hwKey: 'b200_sglang',
+      measuredAvgPower: { y: 600, roof: false },
+    });
+    const clone = {
+      ...base,
+      y: 1000,
+      powerVariant: { kind: 'basis', id: 'gpu-provisioned' },
+    } as InferenceData;
+    const plain = inferenceChartToCsv([base], 'dsv4', '8k/1k', [], {
+      yHeader: 'Measured Power per Chip (W)',
+      yPath: 'measuredAvgPower.y',
+      xHeader: 'Interactivity (tok/s/user)',
+    });
+    expect(plain.headers).not.toContain('Power Series');
+
+    const { headers, rows } = inferenceChartToCsv([base, clone], 'dsv4', '8k/1k', [], {
+      yHeader: 'Measured Power per Chip (W)',
+      yPath: 'measuredAvgPower.y',
+      xHeader: 'Interactivity (tok/s/user)',
+    });
+    const column = headers.indexOf('Power Series');
+    expect(column).toBeGreaterThan(-1);
+    expect(rows.map((row) => row[column])).toEqual(['GPU measured', 'GPU provisioned (TDP)']);
+    expect(rows.every((row) => row.length === headers.length)).toBe(true);
+  });
+});

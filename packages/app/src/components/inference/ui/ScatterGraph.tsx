@@ -113,6 +113,7 @@ import type {
   ClippedInferenceData,
   InferenceData,
   ScatterGraphProps,
+  PowerVariant,
 } from '@/components/inference/types';
 import {
   generateOverlayTooltipContent,
@@ -123,7 +124,15 @@ import { ScatterEmptyState } from '@/components/inference/ui/ScatterEmptyState';
 import {
   scatterPointConfigId,
   scatterPointJoinId,
+  parseScatterSeriesKey,
+  scatterSeriesKey,
 } from '@/components/inference/utils/point-identity';
+import {
+  powerVariantDash,
+  powerVariantId,
+  powerVariantLabel,
+  powerVariantsInData,
+} from '@/components/inference/utils/power-compare';
 import LegendPointsDialog from '@/components/inference/ui/LegendPointsDialog';
 import { renderOffloadHalo } from '@/components/inference/utils/offload-halo';
 import { renderLegacyPowerRing } from '@/components/inference/utils/legacy-power-marker';
@@ -215,6 +224,32 @@ const optimalPointKey = (d: InferenceData): string =>
 // Referentially stable "no overlay data" result (see processedOverlayData).
 const EMPTY_OVERLAY_DATA: InferenceData[] = [];
 const EMPTY_CLIPPED_DATA: ClippedInferenceData[] = [];
+
+/**
+ * Legend ids of the comparison-series rows (`i_pcompare`), distinct from
+ * hardware keys so the shared hover / toggle handlers can tell them apart.
+ */
+const POWER_VARIANT_LEGEND_PREFIX = 'power-variant:';
+/** Comparison clones sit behind the base series they annotate. */
+const POWER_VARIANT_POINT_OPACITY = 0.6;
+const pointOpacityForVariant = (d: InferenceData): number =>
+  d.powerVariant ? POWER_VARIANT_POINT_OPACITY : 1;
+/** Dash for a series key's variant id (`parseScatterSeriesKey().variant`). */
+const powerVariantDashById = (variantId: string | null | undefined): string =>
+  variantId ? (VARIANT_DASH_BY_ID.get(variantId) ?? '') : '';
+const VARIANT_DASH_BY_ID = new Map<string, string>(
+  (
+    [
+      ['basis', 'gpu-measured'],
+      ['basis', 'gpu-provisioned'],
+      ['basis', 'utility-provisioned'],
+      ['basis', 'utility-modeled'],
+      ['role', 'all'],
+      ['role', 'prefill'],
+      ['role', 'decode'],
+    ] as const
+  ).map(([kind, id]) => [id, powerVariantDash({ kind, id } as PowerVariant)]),
+);
 
 function setsEqual<T>(a: Set<T>, b: Set<T>): boolean {
   if (a.size !== b.size) return false;
@@ -537,6 +572,12 @@ const ScatterGraph = React.memo(
     );
     const locale = useLocale();
     const legendT = SCATTER_STRINGS[locale];
+    // Comparison series (`i_pcompare`) switched off from the legend. Chart-local,
+    // like Optimal Only's point set: the URL carries the comparison, not which
+    // of its rows a reader hid while looking.
+    const [hiddenPowerVariants, setHiddenPowerVariants] = useState<ReadonlySet<string>>(
+      () => new Set(),
+    );
     const ephemeralUrlState = useEphemeralUrlState();
     const costLimit = chartDefinition.y_cost_limit ?? 0;
     const latencyLimit = chartDefinition.y_latency_limit ?? 0;
@@ -777,7 +818,7 @@ const ScatterGraph = React.memo(
       () =>
         data.reduce(
           (acc, point) => {
-            const key = `${point.hwKey}_${point.precision}`;
+            const key = scatterSeriesKey(point);
             if (!acc[key]) acc[key] = [];
             acc[key].push(point);
             return acc;
@@ -914,7 +955,7 @@ const ScatterGraph = React.memo(
       }
       const buckets = new Map<string, Bucket>();
       const getBucket = (point: InferenceData) => {
-        const key = `${point.hwKey}|${point.precision}|${point.date}`;
+        const key = `${scatterSeriesKey(point)}|${point.date}`;
         let bucket = buckets.get(key);
         if (!bucket) {
           bucket = {
@@ -963,7 +1004,7 @@ const ScatterGraph = React.memo(
       const buckets = new Map<string, Bucket>();
       const getBucket = (point: InferenceData) => {
         const runIndex = overlayRunIndex(point.run_url ?? null, runIndexByUrl);
-        const key = `${point.hwKey}|${point.precision}|${point.date}|run${runIndex}`;
+        const key = `${scatterSeriesKey(point)}|${point.date}|run${runIndex}`;
         let bucket = buckets.get(key);
         if (!bucket) {
           bucket = {
@@ -1068,6 +1109,8 @@ const ScatterGraph = React.memo(
       interface Entry {
         hwKey: string;
         runIndex: number;
+        /** Comparison variant id for boundary / role clones, null for the run's base series. */
+        variant: string | null;
         points: InferenceData[];
       }
       if (processedOverlayData.length === 0) return {} as Record<string, Entry>;
@@ -1076,8 +1119,15 @@ const ScatterGraph = React.memo(
       const grouped = processedOverlayData.reduce(
         (acc, p) => {
           const runIndex = overlayRunIndex(p.run_url ?? null, runIndexByUrl);
-          const key = `${p.hwKey}_${p.precision}_run${runIndex}`;
-          if (!acc[key]) acc[key] = { hwKey: String(p.hwKey), runIndex, points: [] };
+          const key = `${scatterSeriesKey(p)}_run${runIndex}`;
+          if (!acc[key]) {
+            acc[key] = {
+              hwKey: String(p.hwKey),
+              runIndex,
+              variant: p.powerVariant?.id ?? null,
+              points: [],
+            };
+          }
           acc[key].points.push(p);
           return acc;
         },
@@ -1156,9 +1206,11 @@ const ScatterGraph = React.memo(
     // its X marker sitting on the dashed roofline and read as a pareto point.
     const isOverlayPointVisible = useCallback(
       (d: InferenceData) =>
+        !hiddenPowerVariants.has(powerVariantId(d.powerVariant)) &&
         (!hideNonOptimal || overlayOptimalPoints.has(d)) &&
         (!showPowerEnvelope || showAllMeasurements || overlayEnvelopePoints.has(d)),
       [
+        hiddenPowerVariants,
         hideNonOptimal,
         overlayOptimalPoints,
         showPowerEnvelope,
@@ -1227,6 +1279,7 @@ const ScatterGraph = React.memo(
         const pts = pointsData.filter(
           (p) =>
             p.hwKey === hwKey &&
+            !p.powerVariant &&
             selectedPrecisions.includes(p.precision) &&
             (!hideNonOptimal || optimalPointKeys.has(optimalPointKey(p))),
         );
@@ -1242,6 +1295,7 @@ const ScatterGraph = React.memo(
       const pts = processedOverlayData.filter(
         (p) =>
           overlayRunIndex(p.run_url ?? null, runIndexByUrl) === runIndex &&
+          !p.powerVariant &&
           activeOverlayHwTypes.has(p.hwKey as string) &&
           (!hideNonOptimal || overlayOptimalPoints.has(p)),
       );
@@ -1462,6 +1516,7 @@ const ScatterGraph = React.memo(
       (d: InferenceData) =>
         effectiveActiveHwTypes.has(d.hwKey as string) &&
         selectedPrecisions.includes(d.precision) &&
+        !hiddenPowerVariants.has(powerVariantId(d.powerVariant)) &&
         (!hideNonOptimal || optimalPointKeys.has(optimalPointKey(d))) &&
         (!showPowerEnvelope ||
           showAllMeasurements ||
@@ -1469,6 +1524,7 @@ const ScatterGraph = React.memo(
       [
         effectiveActiveHwTypes,
         selectedPrecisions,
+        hiddenPowerVariants,
         hideNonOptimal,
         optimalPointKeys,
         showPowerEnvelope,
@@ -1477,12 +1533,50 @@ const ScatterGraph = React.memo(
       ],
     );
 
-    const powerTierCounts = useMemo(() => {
-      const officialTotal = pointsData.filter((point) =>
-        selectedPrecisions.includes(point.precision),
+    // One legend row per comparison series present (base first). Rows toggle
+    // chart-local visibility and hover-highlight that series across hardware.
+    const powerVariantLegendItems = useMemo(() => {
+      const variants = powerVariantsInData(
+        [...pointsData, ...processedOverlayData],
+        selectedYAxisMetric,
       );
-      const overlayTotal = processedOverlayData.filter((point) =>
-        selectedPrecisions.includes(point.precision),
+      return variants.map((variant) => {
+        const id = powerVariantId(variant);
+        const legendId = `${POWER_VARIANT_LEGEND_PREFIX}${id}`;
+        const isBase = !pointsData.some((point) => powerVariantId(point.powerVariant) === id);
+        return {
+          name: legendId,
+          hw: legendId,
+          label: powerVariantLabel(variant, locale),
+          color: 'var(--foreground)',
+          // The base series is solid, like its points; siblings carry their dash.
+          lineDasharray: isBase ? '1 0' : powerVariantDash(variant) || '1 0',
+          isActive: !hiddenPowerVariants.has(isBase ? '' : id),
+          isRemovable: false,
+          onClick: () => {
+            const key = isBase ? '' : id;
+            setHiddenPowerVariants((prev) => {
+              const next = new Set(prev);
+              if (next.has(key)) next.delete(key);
+              else next.add(key);
+              return next;
+            });
+            track('inference_power_compare_series_toggled', {
+              series: id,
+              visible: hiddenPowerVariants.has(key),
+            });
+          },
+        };
+      });
+    }, [pointsData, processedOverlayData, selectedYAxisMetric, locale, hiddenPowerVariants]);
+
+    const powerTierCounts = useMemo(() => {
+      // Comparison clones re-plot the same measurements; count each once.
+      const officialTotal = pointsData.filter(
+        (point) => !point.powerVariant && selectedPrecisions.includes(point.precision),
+      );
+      const overlayTotal = processedOverlayData.filter(
+        (point) => !point.powerVariant && selectedPrecisions.includes(point.precision),
       );
       const officialVisible = officialTotal.filter(isPointVisible);
       const overlayVisible = overlayTotal.filter(
@@ -1507,9 +1601,13 @@ const ScatterGraph = React.memo(
         const hw = el.dataset.hwKey;
         const prec = el.dataset.precision;
         if (hw === null || hw === undefined || prec === null || prec === undefined) return false;
-        return effectiveActiveHwTypes.has(hw) && selectedPrecisions.includes(prec);
+        return (
+          effectiveActiveHwTypes.has(hw) &&
+          selectedPrecisions.includes(prec) &&
+          !hiddenPowerVariants.has(el.dataset.powerVariant ?? '')
+        );
       },
-      [effectiveActiveHwTypes, selectedPrecisions],
+      [effectiveActiveHwTypes, selectedPrecisions, hiddenPowerVariants],
     );
 
     // --- Interaction state ref ---
@@ -1526,6 +1624,7 @@ const ScatterGraph = React.memo(
       isPointVisible,
       isOverlayPointVisible,
       effectiveActiveHwTypes,
+      hiddenPowerVariants,
       selectedPrecisions,
       activeOverlayHwTypes,
       getCssColor,
@@ -1538,6 +1637,7 @@ const ScatterGraph = React.memo(
       isPointVisible,
       isOverlayPointVisible,
       effectiveActiveHwTypes,
+      hiddenPowerVariants,
       selectedPrecisions,
       activeOverlayHwTypes,
       getCssColor,
@@ -1727,7 +1827,7 @@ const ScatterGraph = React.memo(
       (point: InferenceData, source: 'official' | 'overlay') => {
         const ctx = perfRulerDrawCtxRef.current;
         if (!ctx) return;
-        const series = `${String(point.hwKey)}_${point.precision}`;
+        const series = scatterSeriesKey(point);
         const base =
           source === 'overlay'
             ? `overlay-roofline-${series}_run${overlayRunIndex(point.run_url ?? null, runIndexByUrl)}`
@@ -2000,16 +2100,29 @@ const ScatterGraph = React.memo(
         const svg = chartRef.current?.getSvgElement?.();
         if (!svg) return;
         const root = d3.select(svg);
+        // A comparison-series legend row highlights that boundary / role
+        // across every hardware instead of one hardware across series.
+        const variantId = hwKey.startsWith(POWER_VARIANT_LEGEND_PREFIX)
+          ? hwKey.slice(POWER_VARIANT_LEGEND_PREFIX.length)
+          : null;
+        const matchesPoint = (d: InferenceData) =>
+          variantId === null
+            ? String(d.hwKey) === hwKey
+            : powerVariantId(d.powerVariant) === variantId;
         root
           .selectAll<SVGGElement, InferenceData>('.dot-group')
           .style('opacity', (d) =>
-            isPointVisible(d) ? (String(d.hwKey) === hwKey ? 1 : 0.15) : 0,
+            isPointVisible(d) ? (matchesPoint(d) ? pointOpacityForVariant(d) : 0.15) : 0,
           );
         root
           .selectAll<SVGElement, unknown>('.roofline-path, .official-overflow-continuation')
           .style('opacity', function () {
             if (!isRooflineVisible(this)) return 0;
-            return this.dataset.hwKey === hwKey ? null : '0.15';
+            const matches =
+              variantId === null
+                ? this.dataset.hwKey === hwKey
+                : (this.dataset.powerVariant ?? '') === variantId;
+            return matches ? null : '0.15';
           });
         root
           .selectAll<SVGGElement, unknown>('.parallelism-label, .line-label')
@@ -2026,7 +2139,7 @@ const ScatterGraph = React.memo(
       const root = d3.select(svg);
       root
         .selectAll<SVGGElement, InferenceData>('.dot-group')
-        .style('opacity', (d) => (isPointVisible(d) ? 1 : 0));
+        .style('opacity', (d) => (isPointVisible(d) ? pointOpacityForVariant(d) : 0));
       root
         .selectAll<SVGElement, unknown>('.roofline-path, .official-overflow-continuation')
         .style('opacity', function () {
@@ -2242,6 +2355,8 @@ const ScatterGraph = React.memo(
             key: string;
             hw: string;
             precision: string;
+            /** Comparison variant id (`i_pcompare`), '' for the base series. */
+            variant: string;
             points: InferenceData[];
             stroke: string;
             visible: boolean;
@@ -2250,10 +2365,11 @@ const ScatterGraph = React.memo(
           const activeGradientIds = new Set<string>();
 
           Object.entries(displayedRooflines).forEach(([key, pts]) => {
-            const hw = key.split('_').slice(0, -1).join('_');
-            const precision = key.split('_').pop()!;
+            const { hw, precision, variant } = parseScatterSeriesKey(key);
             const visible =
-              ir.effectiveActiveHwTypes.has(hw) && ir.selectedPrecisions.includes(precision);
+              ir.effectiveActiveHwTypes.has(hw) &&
+              ir.selectedPrecisions.includes(precision) &&
+              !ir.hiddenPowerVariants.has(variant ?? '');
             const baseStroke = ir.getCssColor(ir.resolveColor(hw));
 
             // Split into per-date sub-paths so the line never crosses dates.
@@ -2298,6 +2414,7 @@ const ScatterGraph = React.memo(
                 key: entryKey,
                 hw,
                 precision,
+                variant: variant ?? '',
                 points: datePoints,
                 stroke,
                 visible,
@@ -2325,9 +2442,12 @@ const ScatterGraph = React.memo(
             .attr('data-curve-kind', showPowerEnvelope ? 'power-envelope' : 'pareto')
             .attr('data-hw-key', (d) => d.hw)
             .attr('data-precision', (d) => d.precision)
+            .attr('data-power-variant', (d) => d.variant || null)
             .attr('fill', 'none')
             .attr('stroke', (d) => d.stroke)
             .attr('stroke-width', 2.5)
+            // Comparison siblings share the hardware colour; the dash tells them apart.
+            .attr('stroke-dasharray', (d) => powerVariantDashById(d.variant) || null)
             .attr('d', (d) => lineGen(d.points))
             .style('transition', 'opacity 150ms ease')
             .style('opacity', (d) => (d.visible ? 1 : 0));
@@ -2348,10 +2468,11 @@ const ScatterGraph = React.memo(
           if (showGradientLabels) {
             Object.entries(allPointLabelsByKey).forEach(([key, pointLabels]) => {
               if (pointLabels.length < 2) return;
-              const hw = key.split('_').slice(0, -1).join('_');
-              const precision = key.split('_').pop()!;
+              const { hw, precision, variant } = parseScatterSeriesKey(key);
               const visible =
-                ir.effectiveActiveHwTypes.has(hw) && ir.selectedPrecisions.includes(precision);
+                ir.effectiveActiveHwTypes.has(hw) &&
+                ir.selectedPrecisions.includes(precision) &&
+                !ir.hiddenPowerVariants.has(variant ?? '');
 
               const segments: { label: string; color: string; points: InferenceData[] }[] = [];
               let cur = {
@@ -2706,11 +2827,11 @@ const ScatterGraph = React.memo(
               { key: string; seriesId: string; points: InferenceData[] }
             >();
             for (const [key, points] of Object.entries(displayedRooflines)) {
-              const hardware = key.split('_').slice(0, -1).join('_');
-              const precision = key.split('_').pop()!;
+              const { hw: hardware, precision, variant } = parseScatterSeriesKey(key);
               if (
                 !ir.effectiveActiveHwTypes.has(hardware) ||
-                !ir.selectedPrecisions.includes(precision)
+                !ir.selectedPrecisions.includes(precision) ||
+                ir.hiddenPowerVariants.has(variant ?? '')
               ) {
                 continue;
               }
@@ -2778,7 +2899,8 @@ const ScatterGraph = React.memo(
             interactionRef.current.getCssColor(
               interactionRef.current.resolveColor(d.hwKey as string),
             ),
-          getOpacity: (d) => (interactionRef.current.isPointVisible(d) ? 1 : 0),
+          getOpacity: (d) =>
+            interactionRef.current.isPointVisible(d) ? pointOpacityForVariant(d) : 0,
           getPointerEvents: (d) => (interactionRef.current.isPointVisible(d) ? 'auto' : 'none'),
           hideLabels: !showPointLabels || showGradientLabels,
           // Concurrency (C=) is appended only when the advanced
@@ -2788,6 +2910,7 @@ const ScatterGraph = React.memo(
           dataAttrs: {
             'hw-key': (d) => String(d.hwKey),
             precision: (d) => d.precision,
+            'power-variant': (d) => d.powerVariant?.id ?? '',
             // Lets the agentic coach mark pick an anchor out of the DOM
             // without knowing anything about React state.
             'benchmark-type': (d) => d.benchmark_type ?? '',
@@ -2866,6 +2989,7 @@ const ScatterGraph = React.memo(
                 points: InferenceData[];
                 stroke: string;
                 runIndex: number;
+                variant: string | null;
               }
               const ovEntries: OvEntry[] = [];
               Object.entries(displayedOverlayRooflines).forEach(([key, group]) => {
@@ -2877,6 +3001,7 @@ const ScatterGraph = React.memo(
                     // Color by run — same palette entry the legend uses, so they match.
                     stroke: overlayRunColor(group.runIndex),
                     runIndex: group.runIndex,
+                    variant: group.variant,
                   });
                 }
               });
@@ -2894,9 +3019,21 @@ const ScatterGraph = React.memo(
                 .attr('fill', 'none')
                 .attr('stroke', (d) => d.stroke)
                 .attr('stroke-width', 2)
-                .attr('stroke-dasharray', (d) => overlayRooflineDasharray(d.runIndex))
+                .attr('data-power-variant', (d) => d.variant)
+                // The run keeps its colour; a comparison sibling takes the
+                // variant dash so it reads like its official counterpart.
+                .attr('stroke-dasharray', (d) =>
+                  d.variant
+                    ? powerVariantDashById(d.variant)
+                    : overlayRooflineDasharray(d.runIndex),
+                )
                 .attr('d', (d) => lineGen(d.points))
-                .style('filter', null);
+                .style('filter', null)
+                // Comparison rows hidden from the legend (the decoration effect
+                // keeps this in step with later toggles).
+                .style('opacity', (d) =>
+                  interactionRef.current.hiddenPowerVariants.has(d.variant ?? '') ? 0 : null,
+                );
 
               // Overlay X-shape points — index-keyed so every point renders
               const overlayPoints = zoomGroup
@@ -2932,7 +3069,7 @@ const ScatterGraph = React.memo(
               overlayPoints.each(function (d) {
                 const visible = interactionRef.current.isOverlayPointVisible(d);
                 d3.select(this)
-                  .style('opacity', visible ? 1 : 0)
+                  .style('opacity', visible ? pointOpacityForVariant(d) : 0)
                   .style('pointer-events', visible ? 'auto' : 'none');
               });
               overlayPoints
@@ -3367,7 +3504,9 @@ const ScatterGraph = React.memo(
       zoomGroup.selectAll<SVGGElement, InferenceData>('.dot-group').each(function (d) {
         const point = d3.select(this);
         const visible = ir.isPointVisible(d);
-        point.style('opacity', visible ? 1 : 0).style('pointer-events', visible ? 'auto' : 'none');
+        point
+          .style('opacity', visible ? pointOpacityForVariant(d) : 0)
+          .style('pointer-events', visible ? 'auto' : 'none');
         const color =
           (showGradientLabels && gradientColorByPoint.get(d)) ||
           ir.getCssColor(ir.resolveColor(d.hwKey as string));
@@ -3387,8 +3526,19 @@ const ScatterGraph = React.memo(
       zoomGroup.selectAll<SVGGElement, InferenceData>('.unofficial-overlay-pt').each(function (d) {
         const visible = ir.isOverlayPointVisible(d);
         d3.select(this)
-          .style('opacity', visible ? 1 : 0)
+          .style('opacity', visible ? pointOpacityForVariant(d) : 0)
           .style('pointer-events', visible ? 'auto' : 'none');
+      });
+      // Overlay rooflines are only drawn for active overlay hardware; a
+      // comparison row hidden from the legend is the one visibility toggle
+      // they answer to here.
+      zoomGroup.selectAll<SVGPathElement, unknown>('.overlay-roofline-path').each(function () {
+        const roofline = d3.select(this);
+        if (ir.hiddenPowerVariants.has(this.dataset.powerVariant ?? '')) {
+          roofline.style('opacity', 0);
+        } else {
+          roofline.style('opacity', null);
+        }
       });
 
       // Rooflines: visibility and solid-stroke recolor as direct writes. Keep
@@ -3399,7 +3549,9 @@ const ScatterGraph = React.memo(
         if (!hw || !precision) return;
         const roofline = d3.select(this);
         const visible =
-          ir.effectiveActiveHwTypes.has(hw) && ir.selectedPrecisions.includes(precision);
+          ir.effectiveActiveHwTypes.has(hw) &&
+          ir.selectedPrecisions.includes(precision) &&
+          !ir.hiddenPowerVariants.has(this.dataset.powerVariant ?? '');
         roofline.style('opacity', visible ? 1 : 0);
         const stroke = roofline.attr('stroke');
         if (stroke && !stroke.startsWith('url(')) {
@@ -3856,6 +4008,9 @@ const ScatterGraph = React.memo(
                         )
                       : null,
                   })),
+                // Comparison series (`i_pcompare`): one dash-swatch row per
+                // boundary / role, toggling that series across every hardware.
+                ...powerVariantLegendItems,
               ]}
               disableActiveSort={false}
               isLegendExpanded={isLegendExpanded}

@@ -234,6 +234,7 @@ export default function ChartControls({
     selectedXAxisMetric,
     selectedXAxisMode,
     scaleType,
+    powerCompare,
   } = useInferenceDisplay();
   const {
     setSelectedModel,
@@ -246,6 +247,7 @@ export default function ChartControls({
     setSelectedDateRange,
     setSelectedXAxisMetric,
     setScaleType,
+    setPowerCompare,
   } = useInferenceActions();
 
   // Y-axis options come from the canonical registry and need no API data.
@@ -582,6 +584,8 @@ export default function ChartControls({
                   <MeasuredMetricControls
                     metric={selectedYAxisMetric}
                     onChange={handleYAxisMetricChange}
+                    compare={powerCompare}
+                    onCompareChange={setPowerCompare}
                   />
                   <div className="col-span-full">
                     <PowerMetricAvailability

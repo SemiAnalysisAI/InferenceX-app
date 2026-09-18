@@ -1355,6 +1355,32 @@ describe('createChartDataPoint per-stage measured power fields', () => {
     expect(point.measuredDecodeJPerOutputToken).toBeDefined();
     expect(point.measuredDecodeJPerOutputToken!.y).toBe(0);
   });
+
+  it('carries the prefill pool energy onto the output-token axis for validated disaggregated rows', () => {
+    const e = entry({
+      disagg: true,
+      power_valid: 1,
+      power_metric_schema_version: 2,
+      joules_per_input_token: 0.3,
+      joules_per_output_token: 2.4,
+      prefill_joules_per_input_token: 0.1,
+      decode_joules_per_output_token: 1.6,
+    });
+    const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
+    // 0.1 J/in × (2.4 ÷ 0.3 = 8 input tokens per output token) = 0.8 J/out,
+    // which with the decode pool's 1.6 J/out reconstructs the 2.4 J/out total.
+    expect(point.reconstructedPrefillJPerOutputToken!.y).toBeCloseTo(0.8, 12);
+    expect(point.reconstructedPrefillJPerOutputToken!.roof).toBe(false);
+    // Aggregate rows have no pools to split.
+    const aggregate = createChartDataPoint(
+      '2025-01-01',
+      entry({ ...e, disagg: false }),
+      'median_e2el',
+      'tput_per_gpu',
+      'h100',
+    );
+    expect(aggregate.reconstructedPrefillJPerOutputToken).toBeUndefined();
+  });
 });
 
 // ===========================================================================

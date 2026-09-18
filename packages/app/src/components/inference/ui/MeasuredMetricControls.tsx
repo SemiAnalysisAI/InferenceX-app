@@ -15,6 +15,8 @@ import {
   getMeasuredMetricConfig,
   type MeasuredMetricConfigChange,
 } from '../measured-metric-config';
+import type { PowerCompare } from '../types';
+import { POWER_COMPARE_MODES, powerCompareAvailable } from '../utils/power-compare';
 
 const STRINGS = {
   en: {
@@ -48,6 +50,14 @@ const STRINGS = {
     unit: 'Unit',
     unitHelp:
       'Energy is shown in joules. Energy per successful query can also be shown in watt-hours.',
+    compare: 'Compare',
+    compareHelp:
+      'Overlay sibling series on the same points, in the hardware colour with a dash per series. All boundaries: GPU measured, GPU provisioned, utility provisioned and utility modeled. Prefill vs decode: each worker pool next to the whole deployment; on the energy axis the prefill pool is carried onto the output-token axis by the served input:output ratio. Available for the whole-deployment average W/chip and J per output token.',
+    compareNone: 'Off',
+    compareBoundaries: 'All boundaries',
+    compareRoles: 'Prefill vs decode',
+    compareUnavailable:
+      'The comparison is paused for this setting: it needs the whole-deployment average W/chip or J per output token.',
   },
   zh: {
     basis: '功耗边界',
@@ -77,20 +87,39 @@ const STRINGS = {
     query: '成功请求',
     unit: '单位',
     unitHelp: '能耗以焦耳显示；每个成功请求的能耗也可显示为瓦时。',
+    compare: '对比',
+    compareHelp:
+      '在同一批数据点上叠加同源系列：颜色仍按硬件区分，每个系列用不同虚线表示。全部边界：GPU 实测、GPU 额定、全电源配置、数据中心建模；预填充 vs 解码：各 worker 池与整个部署并列，能耗轴上的预填充能耗按实际服务的输入/输出 token 比折算到每输出 token。仅适用于整个部署的平均 W/芯片和每输出 token 能耗。',
+    compareNone: '关闭',
+    compareBoundaries: '全部边界',
+    compareRoles: '预填充 vs 解码',
+    compareUnavailable: '当前设置下对比已暂停：需要整个部署的平均 W/芯片或每输出 token 能耗。',
   },
 } as const;
 
 export function MeasuredMetricControls({
   metric,
   onChange,
+  compare = 'none',
+  onCompareChange,
 }: {
   metric: string;
   onChange: (metric: string) => void;
+  /** Comparison series overlaid on the metric (`i_pcompare`). */
+  compare?: PowerCompare;
+  onCompareChange?: (mode: PowerCompare) => void;
 }) {
   const locale = useLocale();
   const t = STRINGS[locale];
   const config = getMeasuredMetricConfig(metric);
   if (!config) return null;
+  const compareLabels: Record<PowerCompare, string> = {
+    none: t.compareNone,
+    boundaries: t.compareBoundaries,
+    roles: t.compareRoles,
+  };
+  const compareActive = compare !== 'none';
+  const compareApplies = powerCompareAvailable(metric, compare);
   const change = (next: MeasuredMetricConfigChange) =>
     onChange(changeMeasuredMetricConfig(metric, next));
   const basisId = `measured-${config.family}-basis`;
@@ -282,12 +311,57 @@ export function MeasuredMetricControls({
           </Select>
         </div>
       )}
+      {onCompareChange && (
+        <div className="flex min-w-0 flex-col gap-1.5">
+          <LabelWithTooltip
+            htmlFor="measured-power-compare"
+            label={t.compare}
+            tooltip={t.compareHelp}
+          />
+          <Select
+            value={compare}
+            onValueChange={(value) => {
+              const mode = value as PowerCompare;
+              track('inference_power_compare_changed', { mode, family: config.family });
+              onCompareChange(mode);
+            }}
+          >
+            <SelectTrigger
+              id="measured-power-compare"
+              data-testid="measured-power-compare"
+              className="w-full"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent portalled={false}>
+              {POWER_COMPARE_MODES.map((mode) => (
+                <SelectItem
+                  key={mode}
+                  value={mode}
+                  data-value={mode}
+                  disabled={!powerCompareAvailable(metric, mode)}
+                >
+                  {compareLabels[mode]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
       {derivedBasis && (
         <p
           className="col-span-full text-xs text-muted-foreground"
           data-testid="measured-basis-hint"
         >
           {t.basisHint}
+        </p>
+      )}
+      {compareActive && !compareApplies && (
+        <p
+          className="col-span-full text-xs text-muted-foreground"
+          data-testid="measured-compare-hint"
+        >
+          {t.compareUnavailable}
         </p>
       )}
     </div>

@@ -6,6 +6,7 @@ import type { Model, Sequence } from '@/lib/data-mappings';
 import type { PowerTier } from '@/lib/power-tier';
 import type { SystemPowerEstimate } from '@/lib/modeled-system-power';
 import type { MetricKey } from './metric-registry';
+import type { PowerBasis } from '@/lib/power-basis';
 
 export type { WorkerPower };
 
@@ -349,6 +350,19 @@ export interface InferenceData extends Partial<Omit<AggDataEntry, AggDataConflic
   measuredPowerPercentTdp?: { y: number; roof: boolean };
   /** Alias of `measuredAvgPower` selecting the per-second telemetry timeline view. */
   measuredPowerTimeline?: { y: number; roof: boolean };
+  /**
+   * Prefill pool energy per OUTPUT token for disaggregated rows:
+   * `prefill_joules_per_input_token` × (J/out ÷ J/in), i.e. carried onto the
+   * output-token axis by the served input:output ratio so it adds to
+   * `measuredDecodeJPerOutputToken` (utils/role-energy.ts, PowerX Figure 7).
+   */
+  reconstructedPrefillJPerOutputToken?: { y: number; roof: boolean };
+  /**
+   * Set on the clones a power comparison (`i_pcompare`) appends to the chart:
+   * which boundary or worker role this point's `y` came from. Base points of
+   * the selected metric never carry it (utils/power-compare.ts).
+   */
+  powerVariant?: PowerVariant;
 
   // Power boundaries beyond the GPU-measured telemetry above (B1). Each pair is
   // W per allocated GPU plus J per successful output token, normalized by every
@@ -372,6 +386,17 @@ export interface InferenceData extends Partial<Omit<AggDataEntry, AggDataConflic
   /** B4 J/out: B1 `joules_per_output_token` × (B4 W ÷ B1 W); inherits B1's token denominator. */
   utilityModeledJPerOutputToken?: { y: number; roof: boolean };
 }
+
+/**
+ * Sibling series the gated power charts can overlay on the selected metric:
+ * every boundary (PowerX Figures 2/3) or every worker role (Figures 6/7).
+ * Rides on the `i_pcompare` URL parameter; `none` draws the metric alone.
+ */
+export type PowerCompare = 'none' | 'boundaries' | 'roles';
+/** Worker-pool scope of a measured figure. */
+export type PowerRole = 'all' | 'prefill' | 'decode';
+/** Identity of one comparison series: a boundary or a role. */
+export type PowerVariant = { kind: 'basis'; id: PowerBasis } | { kind: 'role'; id: PowerRole };
 
 /** InferenceData keys carrying the B2–B4 power-boundary readings. */
 export type PowerBasisFieldKey =
@@ -689,6 +714,8 @@ export interface InferenceDisplayContextType {
   selectedE2eXAxisMetric: string | null;
   selectedXAxisMode: 'ttft' | 'e2e' | 'interactivity' | 'e2e-normalized-interactivity';
   scaleType: 'auto' | 'linear' | 'log';
+  /** Comparison series overlaid on a gated power metric (`i_pcompare`). */
+  powerCompare: PowerCompare;
   isLegendExpanded: boolean;
   hideNonOptimal: boolean;
   showAllMeasurements: boolean;
@@ -730,6 +757,7 @@ export interface InferenceActionsContextType {
     mode: 'ttft' | 'e2e' | 'interactivity' | 'e2e-normalized-interactivity',
   ) => void;
   setScaleType: (type: 'auto' | 'linear' | 'log') => void;
+  setPowerCompare: (mode: PowerCompare) => void;
   setQuickFilterVendors: (vendors: string[]) => void;
   setQuickFilterFrameworks: (frameworks: string[]) => void;
   setQuickFilterDeployment: (modes: DeploymentMode[]) => void;

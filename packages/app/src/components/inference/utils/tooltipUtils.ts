@@ -14,6 +14,9 @@ import {
   isMeasuredEnergyConfigKey,
   isModeledSystemPowerConfigKey,
 } from '@/components/inference/metric-registry';
+import { getMeasuredMetricConfig } from '@/components/inference/measured-metric-config';
+import { powerVariantLabel } from '@/components/inference/utils/power-compare';
+import { reconstructedRoleEnergy } from '@/components/inference/utils/role-energy';
 import {
   meaningfulParallelismSize,
   parallelismLabel,
@@ -157,6 +160,8 @@ const TOOLTIP_STRINGS = {
     powerCertified: 'Validated (current PowerX method)',
     powerLegacy: 'Historical (not validated under the current method)',
     powerWithheld: 'Measured power withheld',
+    series: 'Series',
+    roleEnergyShare: 'Share of request energy',
   },
   zh: {
     dismiss: '点击其他区域关闭',
@@ -176,8 +181,38 @@ const TOOLTIP_STRINGS = {
     powerCertified: '已验证（采用当前 PowerX 方法）',
     powerLegacy: '历史测量（尚未按当前方法验证）',
     powerWithheld: '实测功耗未采信',
+    series: '系列',
+    roleEnergyShare: '在请求能耗中的占比',
   },
 } as const;
+
+/**
+ * Which comparison series (`i_pcompare`) a point belongs to, for the clones a
+ * boundary / role comparison appends. On the energy axis a role clone also
+ * reports its share of the reconstructed request energy (utils/role-energy.ts).
+ */
+const powerVariantHTML = (
+  d: InferenceData,
+  selectedYAxisMetric: string,
+  locale: Locale,
+): string => {
+  const variant = d.powerVariant;
+  if (!variant) return '';
+  const t = TOOLTIP_STRINGS[locale];
+  let html = tooltipLine(t.series, powerVariantLabel(variant, locale));
+  if (
+    variant.kind === 'role' &&
+    variant.id !== 'all' &&
+    getMeasuredMetricConfig(selectedYAxisMetric)?.family === 'energy'
+  ) {
+    const energy = reconstructedRoleEnergy(d);
+    if (energy) {
+      const share = variant.id === 'prefill' ? energy.prefillShare : 100 - energy.prefillShare;
+      html += tooltipLine(t.roleEnergyShare, `${share.toFixed(1)}%`);
+    }
+  }
+  return html;
+};
 
 const totalChipsHTML = (d: InferenceData, selectedYAxisMetric: string, locale: Locale): string => {
   const t = TOOLTIP_STRINGS[locale];
@@ -708,6 +743,7 @@ export const generateTooltipContent = (config: TooltipConfig): string => {
           : ''
       }
       ${powerTierHTML(d, selectedYAxisMetric, locale)}
+      ${powerVariantHTML(d, selectedYAxisMetric, locale)}
       ${modeledSystemPowerHTML(d, selectedYAxisMetric, isPinned, locale)}
       ${totalChipsHTML(d, selectedYAxisMetric, locale)}
       ${generateParallelismHTML(d, locale)}
@@ -752,6 +788,7 @@ export const generateOverlayTooltipContent = (config: OverlayTooltipConfig): str
       ${tooltipLine(xLabel, fmt(d.x))}
       ${tooltipLine(yLabel, fmt(d.y))}
       ${powerTierHTML(d, selectedYAxisMetric, locale)}
+      ${powerVariantHTML(d, selectedYAxisMetric, locale)}
       ${modeledSystemPowerHTML(d, selectedYAxisMetric, isPinned, locale)}
       ${totalChipsHTML(d, selectedYAxisMetric, locale)}
       ${generateParallelismHTML(d, locale)}
@@ -813,6 +850,7 @@ export const generateGPUGraphTooltipContent = (config: TooltipConfig): string =>
           : ''
       }
       ${powerTierHTML(d, selectedYAxisMetric, locale)}
+      ${powerVariantHTML(d, selectedYAxisMetric, locale)}
       ${modeledSystemPowerHTML(d, selectedYAxisMetric, isPinned, locale)}
       ${totalChipsHTML(d, selectedYAxisMetric, locale)}
       ${generateParallelismHTML(d, locale)}

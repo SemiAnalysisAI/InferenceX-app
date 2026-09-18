@@ -315,6 +315,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
     selectedXAxisMode,
     tokenRevenuePricing,
     showLineLabels,
+    powerCompare,
   } = useInferenceDisplay();
   const { setSelectedDates, setSelectedDatesFromRunExpansion, setIsLegendExpanded } =
     useInferenceActions();
@@ -489,6 +490,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
           selectedPercentile,
           tcoBasis,
           selectedXAxisMode,
+          powerCompare,
         },
       );
 
@@ -538,6 +540,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
     selectedXAxisMetric,
     selectedE2eXAxisMetric,
     selectedPercentile,
+    powerCompare,
     selectedXAxisMode,
     tokenRevenuePricing,
     tcoBasis,
@@ -1276,7 +1279,9 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                         <GPUGraph
                           chartId={`chart-${graphIndex}`}
                           modelLabel={graph.model}
-                          data={graph.data}
+                          // Date comparison draws one hardware across runs; the
+                          // boundary / role siblings are a same-run overlay only.
+                          data={graph.data.filter((point) => !point.powerVariant)}
                           xLabel={resolvedXLabel}
                           yLabel={metricLabel(graph.chartDefinition, selectedYAxisMetric, locale)}
                           chartDefinition={graph.chartDefinition}

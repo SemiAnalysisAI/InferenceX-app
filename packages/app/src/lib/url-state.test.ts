@@ -94,6 +94,11 @@ describe('PARAM_DEFAULTS', () => {
     expect(PARAM_DEFAULTS.i_rulers).toBe('');
   });
 
+  it('has an empty default for the power comparison (metric drawn alone)', async () => {
+    const { PARAM_DEFAULTS } = await import('@/lib/url-state');
+    expect(PARAM_DEFAULTS.i_pcompare).toBe('');
+  });
+
   it('has empty string defaults for legend-active params', async () => {
     const { PARAM_DEFAULTS } = await import('@/lib/url-state');
     expect(PARAM_DEFAULTS.i_active).toBe('');

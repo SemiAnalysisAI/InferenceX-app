@@ -103,17 +103,67 @@ Boundary select.
 Base: `/inference?g_model=<model>&i_seq=8k/1k&i_prec=<precision>` plus the hardware legend
 selection. Append:
 
-| Figure | Content                                 | Parameters                                                                                                                                            |
-| ------ | --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 2      | H200 W/GPU, one boundary at a time      | `&i_metric=y_measuredAvgPower` / `y_gpuProvisionedWatts` / `y_utilityProvisionedWatts` / `y_utilityModeledWatts`                                      |
-| 3      | H200 J/output token, one boundary       | `&i_metric=y_measuredJPerOutputToken` / `y_gpuProvisionedJPerOutputToken` / `y_utilityProvisionedJPerOutputToken` / `y_utilityModeledJPerOutputToken` |
-| 4 / 5  | B200 vs B300, GB200 vs GB300 at fixed X | `&i_metric=<measured key>&i_rulers=<x>` (Perf Ruler, T1)                                                                                              |
-| 1      | Measured power over the benchmark job   | `&i_metric=y_measuredPowerTimeline` (Display → Timeline, see below)                                                                                   |
+| Figure | Content                                       | Parameters                                                                                                                                                               |
+| ------ | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 2      | H200 W/GPU, all four boundaries on one chart  | `&i_metric=y_measuredAvgPower&i_pcompare=boundaries` (one boundary at a time: `&i_metric=y_gpuProvisionedWatts` / `y_utilityProvisionedWatts` / `y_utilityModeledWatts`) |
+| 3      | H200 J/output token, all four boundaries      | `&i_metric=y_measuredJPerOutputToken&i_pcompare=boundaries` (single boundary: the matching `…JPerOutputToken` key)                                                       |
+| 4 / 5  | B200 vs B300, GB200 vs GB300 at fixed X       | `&i_metric=<measured key>&i_rulers=<x>` (Perf Ruler, T1)                                                                                                                 |
+| 6      | Prefill vs decode W/GPU with the whole deploy | `&i_metric=y_measuredAvgPower&i_pcompare=roles`                                                                                                                          |
+| 7      | Reconstructed request energy, prefill share   | `&i_metric=y_measuredJPerOutputToken&i_pcompare=roles` (prefill share in the clone's tooltip)                                                                            |
+| 1      | Measured power over the benchmark job         | `&i_metric=y_measuredPowerTimeline` (Display → Timeline, see below)                                                                                                      |
 
-Figures 2 and 3 as a single chart with all four boundaries overlaid, and Figures 6 / 7
-(prefill vs decode roles), wait for the `i_pcompare` overlay series (T4); until then each
-boundary is one link. The `/gpu-metrics` page keeps the raw per-run explorer (every metric,
-one artifact at a time); the timeline below is the chart-scoped view of the same artifacts.
+The `/gpu-metrics` page keeps the raw per-run explorer (every metric, one artifact at a time);
+the timeline below is the chart-scoped view of the same artifacts.
+
+## Comparison series (`i_pcompare`)
+
+`i_pcompare=boundaries|roles` (default `''`, "Off") overlays sibling series on the selected
+metric without changing it. `utils/power-compare.ts` is the single source: `useChartData` and
+the `?unofficialrun=` processor (`processOverlayChartDataWithClipping`) both call
+`expandPowerCompareSeries`, which appends one clone per sibling to every base point — same
+`x`, `y` taken from the sibling's field, `powerVariant` set — and leaves the base points
+untouched, so a chart without a comparison is byte-identical to before. A point lacking a
+sibling's value contributes nothing to that series (never a 0), so each boundary's and
+role's availability rules carry through unchanged.
+
+| Mode         | Base series                                       | Siblings                   | Fields                                                                                                                                                                               |
+| ------------ | ------------------------------------------------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `boundaries` | the selected boundary (`basis` of the metric key) | the other three boundaries | `measuredAvgPower` / `POWER_BASIS_FIELDS[*].watts`, or `measuredJPerOutputToken` / `POWER_BASIS_FIELDS[*].energy`                                                                    |
+| `roles`      | the selected scope (`all`, `prefill`, `decode`)   | the other two worker pools | W: `measuredAvgPower`, `measuredPrefillAvgPower`, `measuredDecodeAvgPower`; J/out: `measuredJPerOutputToken`, `reconstructedPrefillJPerOutputToken`, `measuredDecodeJPerOutputToken` |
+
+Siblings exist only where the metric names the whole-deployment **average W/chip** or **J per
+output token** (the only quantities every boundary and role publishes on one axis); role
+energy additionally excludes the prefill J per input token scope. Elsewhere
+`powerCompareVariants` returns nothing, the Compare select disables the option, and — when a
+link arrives with an inapplicable mode — a hint (`measured-compare-hint`) says the comparison is
+paused. The parameter is kept, so switching back to an applicable setting resumes it.
+
+Rendering (`ScatterGraph`): the series key is `scatterSeriesKey(point)` =
+`<hwKey>_<precision>[-v-<variant>]` (`utils/point-identity.ts`), so rooflines, frontiers,
+Optimal Only, line labels, overflow continuations and the perf ruler treat each sibling as its
+own series; `parseScatterSeriesKey` recovers hardware, precision and variant wherever the key
+was previously split on `_`. Siblings keep the hardware colour (overlay runs keep the run
+colour) and take a per-variant `stroke-dasharray` (`powerVariantDash`); clone points render
+at 0.6 opacity behind their base and carry `data-power-variant`. The legend appends one
+line-swatch row per series present (base first); rows toggle chart-local visibility
+(`hiddenPowerVariants`, not in the URL) and hover-highlight that series across every hardware.
+`scatterPointConfigId` includes the variant so a clone never replaces its base in a D3 join.
+Tooltips add a "Series" line; on the energy axis a role clone also reports its share of the
+reconstructed request energy. Table adds a "Series" column and CSV a trailing "Power Series"
+column only while clones are present. Comparison clones are excluded from `bestSeriesPerSku`,
+the power-tier counts, the legend points table, the availability panel (which reads
+`selectionPoints`) and the date-comparison `GPUGraph`.
+
+Figure 7's reconstruction lives in `utils/role-energy.ts`: schema-2 aggregate energy has one
+numerator, so `J/out ÷ J/in` is the served input:output token ratio and
+`prefill_joules_per_input_token × (J/out ÷ J/in)` is the prefill pool's energy per output
+token; with `decode_joules_per_output_token` it sums back to the deployment's J/out when the
+pool energies partition the total. `buildDerivedChartFields` emits it as
+`reconstructedPrefillJPerOutputToken` for validated (`power_valid === 1`, schema 2)
+disaggregated rows only; it is never a y-axis of its own.
+
+The Compare select tracks `inference_power_compare_changed { mode, family }`; legend rows
+track `inference_power_compare_series_toggled { series, visible }`.
 
 ## Power timeline (Display → Timeline)
 

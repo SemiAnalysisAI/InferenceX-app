@@ -232,6 +232,8 @@ export function createMockInferenceContextValues(
     setSelectedXAxisMode: namedStub('setSelectedXAxisMode'),
     scaleType: 'auto',
     setScaleType: namedStub('setScaleType'),
+    powerCompare: 'none' as const,
+    setPowerCompare: namedStub('setPowerCompare'),
     quickFilters: { vendors: [], frameworks: [], deployment: [], spec: [], power: [] },
     availableQuickFilters: { vendors: [], frameworks: [], deployment: [], spec: [], power: [] },
     setQuickFilterVendors: namedStub('setQuickFilterVendors'),

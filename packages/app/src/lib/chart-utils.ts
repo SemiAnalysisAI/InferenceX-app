@@ -22,6 +22,7 @@ import { DEFAULT_TCO_BASIS, getGpuSpecs, isKnownGpu, type TcoBasis } from '@/lib
 import { getVendor, type Vendor } from '@/lib/dynamic-colors';
 import type { Locale } from '@/lib/i18n';
 import { buildPowerBasisChartFields, type PowerBasisChartFields } from '@/lib/power-basis';
+import { reconstructedRoleEnergy } from '@/components/inference/utils/role-energy';
 
 // ---------------------------------------------------------------------------
 // High-contrast color generation (iwanthue — k-means in CIELab)
@@ -292,8 +293,12 @@ export function buildAvailabilityHwKey(
 }
 
 // Power-boundary fields are derived here before the registry exposes them as
-// axes; the union collapses once METRIC_REGISTRY carries the same keys.
-export type DerivedMetricKey = BenchmarkMetricKey | PowerBasisFieldKey;
+// axes; the union collapses once METRIC_REGISTRY carries the same keys. The
+// reconstructed prefill energy is a comparison-only series (never an axis).
+export type DerivedMetricKey =
+  | BenchmarkMetricKey
+  | PowerBasisFieldKey
+  | 'reconstructedPrefillJPerOutputToken';
 export type DerivedChartFields = Pick<InferenceData, DerivedMetricKey>;
 
 const chartMetric = (y: number): { y: number; roof: boolean } => ({ y, roof: false });
@@ -539,6 +544,7 @@ type MeasuredPowerChartFields = Partial<
     | 'measuredWhPerSuccessfulQuery'
     | 'measuredPowerPercentTdp'
     | 'measuredPowerTimeline'
+    | 'reconstructedPrefillJPerOutputToken'
   >
 >;
 
@@ -585,6 +591,14 @@ function buildMeasuredPowerChartFields(
     ...(typeof entry.decode_joules_per_output_token === 'number'
       ? { measuredDecodeJPerOutputToken: chartMetric(entry.decode_joules_per_output_token) }
       : {}),
+    // Prefill energy on the output-token axis, so the roles comparison can
+    // stack it against the decode pool (PowerX Figure 7).
+    ...(() => {
+      const roleEnergy = reconstructedRoleEnergy(entry);
+      return roleEnergy
+        ? { reconstructedPrefillJPerOutputToken: chartMetric(roleEnergy.prefill) }
+        : {};
+    })(),
     ...(typeof entry.joules_per_successful_query === 'number'
       ? {
           measuredJPerSuccessfulQuery: chartMetric(entry.joules_per_successful_query),

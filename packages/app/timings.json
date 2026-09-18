@@ -233,6 +233,10 @@
       "duration": 24000
     },
     {
+      "spec": "cypress/e2e/powerx-compare.cy.ts",
+      "duration": 24000
+    },
+    {
       "spec": "cypress/e2e/profit-estimator.cy.ts",
       "duration": 11000
     },
