@@ -142,6 +142,22 @@ export const COMPARE_MODEL_SLUGS: CompareModelSlug[] = [
     seoName: 'Qwen3.8-Flash-Next',
   },
   {
+    slug: 'qwen-3-8-27b',
+    displayName: 'Qwen3.8-27B',
+    dbKeys: ['qwen3.827b'],
+    // Dense 27B: total and active parameter counts coincide.
+    label: 'Qwen 3.8 27B',
+    seoName: 'Qwen3.8-27B',
+  },
+  {
+    slug: 'qwen-3-8-27b-eager',
+    displayName: 'Qwen3.8-27B-Eager',
+    dbKeys: ['qwen3.827beager'],
+    // Same checkpoint with CUDA graphs disabled; kept as its own bucket.
+    label: 'Qwen 3.8 27B (eager)',
+    seoName: 'Qwen3.8-27B Eager',
+  },
+  {
     slug: 'qwen-3-5',
     displayName: 'Qwen-3.5-397B-A17B',
     dbKeys: ['qwen3.5'],

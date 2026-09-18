@@ -235,6 +235,7 @@ Authoritative total / active parameter counts for every model in the dashboard. 
 | Kimi-K2.7-Code         | 1T    | 32B         | `moonshotai/Kimi-K2.7-Code`         | HF model card                      |
 | Qwen3.5-397B-A17B      | 397B  | 17B         | `Qwen/Qwen3.5-397B-A17B`            | HF model card                      |
 | Qwen3.8-Flash-Next     | 176B  | 6B          | `Qwen/Qwen3.8-Flash-Next-FP8`       | HF model card                      |
+| Qwen3.8-27B            | 27B   | 27B (dense) | `Qwen/Qwen3.8-27B`                  | HF model card                      |
 | GLM-5                  | 744B  | 40B         | `zai-org/GLM-5`                     | HF model card                      |
 | GLM-5.1                | 744B  | 40B         | `zai-org/GLM-5.1-FP8`               | HF model card (same base as GLM-5) |
 | MiniMax-M2.5           | 230B  | 10B         | `MiniMaxAI/MiniMax-M2.5`            | HF model card                      |
