@@ -75,6 +75,57 @@ describe('glossary content', () => {
 
     expect(referencedArticles).toEqual(new Set(getAllPosts().map((post) => post.slug)));
   });
+
+  it.each([
+    'multi-turn-inference',
+    'subagent-bursts',
+    'p90-interactivity',
+    'end-to-end-latency',
+    'cached-input-tokens',
+    'billable-utilization',
+    'annual-revenue-per-gigawatt',
+    'modeled-profit-per-gigawatt',
+    'utility-power-budget',
+    'dsx-maxlps',
+    'vera-rubin',
+    'extreme-co-design',
+  ])(
+    'makes Rubin concept %s discoverable in both locales with its article and related terms',
+    (slug) => {
+      for (const entry of [getGlossaryEntry(slug), getZhGlossaryEntry(slug)]) {
+        expect(entry, slug).toBeDefined();
+        expect(entry?.articleSlugs).toContain('vera-rubin-nvl72-agentic-inference');
+        expect(entry?.relatedTerms.length).toBeGreaterThanOrEqual(3);
+      }
+      expect(getZhGlossaryEntry(slug)?.definition).not.toBe(getGlossaryEntry(slug)?.definition);
+    },
+  );
+
+  it('separates percentile streaming speed from response completion and normalized interactivity', () => {
+    const p90 = getGlossaryEntry('p90-interactivity')!;
+    expect(p90.measurement?.value).toContain('1000 / P90 full-response ITL (ms)');
+    expect(p90.relatedTerms).toContain('end-to-end-latency');
+    expect(getGlossaryEntry('interactivity')?.relatedTerms).toContain(p90.slug);
+    expect(getGlossaryEntry('end-to-end-latency')?.relatedTerms).toContain(
+      'e2e-normalized-interactivity',
+    );
+    expect(getZhGlossaryEntry(p90.slug)?.measurement?.value).toContain(
+      '1000 / P90 全响应 ITL（毫秒）',
+    );
+  });
+
+  it('keeps NVL72 platform generations and component versus facility power distinct', () => {
+    for (const lookup of [getGlossaryEntry, getZhGlossaryEntry]) {
+      const nvl72 = lookup('nvl72')!;
+      expect(nvl72.aliases).toContain('Vera Rubin NVL72');
+      expect(nvl72.explanation).toContain('NVLink 5');
+      expect(nvl72.explanation).toContain('NVLink 6');
+      expect(lookup('vera-rubin')?.relatedTerms).toContain(nvl72.slug);
+      expect(lookup('utility-power-budget')?.relatedTerms).toContain('tdp');
+    }
+    expect(getGlossaryEntry('tdp')?.aliases).not.toContain('all-in power');
+    expect(getZhGlossaryEntry('tdp')?.aliases).not.toContain('全部包含功耗');
+  });
 });
 
 describe('Chinese glossary content', () => {
