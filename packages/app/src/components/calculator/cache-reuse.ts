@@ -134,7 +134,10 @@ export interface CacheReuseInput {
  * can be read against the published curve concurrency by concurrency.
  */
 export function buildCacheReuse(input: CacheReuseInput): CacheReuseResult {
-  const series: CacheReuseSeries[] = [{ key: 'official', label: 'official' }];
+  // A configuration that exists only in a loaded run has no official slot;
+  // listing one anyway would halve every run bar beside an empty column.
+  const series: CacheReuseSeries[] =
+    input.official.length > 0 ? [{ key: 'official', label: 'official' }] : [];
   const perSeries = new Map<string, readonly GPUDataPoint[]>([['official', input.official]]);
 
   const runIndexes = new Set<number>();

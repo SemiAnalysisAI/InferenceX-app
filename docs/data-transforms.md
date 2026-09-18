@@ -98,7 +98,7 @@ Why the shares are built the way they are:
 
 The configuration selector defaults to the group with the most tiered rows, preferring SGLang on a tie because SGLang separates the two tiers; `c_cfg` seeds it from a share link. Overlay runs on the same hardware become their own outlined series so a branch can be read against the published curve concurrency by concurrency. Cypress fixtures: `interceptOverlayRun` (agentic rows with gpu 0.8 / external 0.1 / cpu 0.05, which must render as 80 / 5 / 15).
 
-The tab is footer-only, so the agentic chart links into it: `CacheReuseLink` sits in the chart's status-notes footer (chart state rides along via `withChartState`) and in the point summary of an agentic detail page, where `cacheReuseHref` (`lib/cache-reuse-link.ts`) writes the point's own `g_model`, `i_seq`, and `c_cfg` because a reader who landed cold has no in-memory chart state to inherit.
+The tab is footer-only, so the agentic chart links into it: `CacheReuseLink` sits in the chart's status-notes footer (chart state rides along via `withChartState`) and in the point summary of an agentic detail page, where `cacheReuseHref` (`lib/cache-reuse-link.ts`) writes the point's own `g_model`, `i_seq`, `i_prec`, and `c_cfg` because a reader who landed cold has no in-memory chart state to inherit; pinning one precision matters because with several selected the groups are keyed `hwKey__precision` and a bare hardware key would miss.
 
 ## Hardware Key Construction
 

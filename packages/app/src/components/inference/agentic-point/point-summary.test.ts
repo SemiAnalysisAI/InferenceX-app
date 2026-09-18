@@ -117,7 +117,7 @@ describe('PointSummary', () => {
 
     expect(html).toContain('Prefix cache reuse for this config');
     expect(html).toContain(
-      'href="/cache-reuse?g_model=DeepSeek-R1-0528&amp;i_seq=agentic-traces&amp;c_cfg=gb200_dynamo-vllm"',
+      'href="/cache-reuse?g_model=DeepSeek-R1-0528&amp;i_seq=agentic-traces&amp;i_prec=fp8&amp;c_cfg=gb200_dynamo-vllm"',
     );
   });
 

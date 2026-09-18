@@ -221,6 +221,22 @@ describe('buildCacheReuse', () => {
     );
   });
 
+  it('gives an overlay-only configuration the full bar width', () => {
+    const result = buildCacheReuse({
+      official: [],
+      config: { hwKey: 'mi355x_sglang' },
+      overlay: {
+        mi355x_sglang__run0: [
+          makePoint({ server_gpu_cache_hit_rate: 0.5 }, { hardware: 'mi355x', conc: 8 }),
+        ],
+      },
+      overlayMeta: { mi355x_sglang__run0: { hwKey: 'mi355x_sglang', runIndex: 0 } },
+    });
+    expect(result.series.map((s) => s.key)).toEqual(['run:0']);
+    expect(result.bars.map((b) => b.seriesKey)).toEqual(['run:0']);
+    expect(result.unmeasured).toEqual([]);
+  });
+
   it('matches overlay groups on precision when the page splits by precision', () => {
     const result = buildCacheReuse({
       official,

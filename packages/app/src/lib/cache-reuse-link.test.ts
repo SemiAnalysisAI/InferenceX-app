@@ -41,12 +41,17 @@ describe('cacheReuseHref', () => {
     expect(url.pathname).toBe('/zh/cache-reuse');
     expect(url.searchParams.get('g_model')).toBe('GLM-5.2');
     expect(url.searchParams.get('i_seq')).toBe('agentic-traces');
+    expect(url.searchParams.get('i_prec')).toBe('fp4');
     expect(url.searchParams.get('c_cfg')).toBe('b200_sglang');
   });
 
-  it('leaves the model to the store when the DB bucket is unknown', () => {
-    const url = new URL(cacheReuseHref('en', { ...point, model: 'mystery' }), 'https://x.test');
+  it('leaves unknown model buckets and precisions to the store', () => {
+    const url = new URL(
+      cacheReuseHref('en', { ...point, model: 'mystery', precision: 'fp6' }),
+      'https://x.test',
+    );
     expect(url.searchParams.has('g_model')).toBe(false);
+    expect(url.searchParams.has('i_prec')).toBe(false);
     expect(url.searchParams.get('c_cfg')).toBe('b200_sglang');
   });
 });
