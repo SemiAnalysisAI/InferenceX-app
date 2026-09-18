@@ -223,10 +223,11 @@ describe('offline modeled PowerX comparisons', () => {
       assumptions: { u_cpu: 0.2 },
       model_path: 'human_verified/hgx_h200_chassis/h200_chassis_power_model.py',
     });
+    // NVL72 rows need the schema-v2 contract; the unversioned exception is x86 single-node only.
     source.rows[0].benchmark.hardware = 'gb200';
     expect(buildComparison(source).rows[0].modeled).toMatchObject({
       status: 'unsupported',
-      reason: 'hardware',
+      reason: 'telemetry',
     });
     expect(csv([{ a: null, b: 0, c: 'a,"b"\nc' }])).toBe('"a","b","c"\r\n,"0","a,""b""\nc"\r\n');
     expect(() => buildComparison({ ...source, rows: [source.rows[0], source.rows[0]] })).toThrow(

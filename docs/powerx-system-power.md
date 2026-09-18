@@ -29,8 +29,9 @@ and `u_nvme=0.0`. The pinned Python model defaults to PUE `1.2`; PowerX uses
 power × PUE (`1.3` air, `1.1` DLC).
 The factor applies after chassis AC; measured GPU power and chassis AC do not change.
 Cooling describes the modeled chassis, not verified benchmark-site cooling.
-The current profiles do not model DLC; `--pue` remains an explicit facility-factor
-override and does not convert an air-cooled chassis model into a DLC model.
+The chassis profiles do not model DLC; `--pue` remains an explicit facility-factor
+override and does not convert an air-cooled chassis model into a DLC model. The
+NVL72 rack profiles below are direct-liquid-cooled and default to `1.1`.
 Platform-specific network assumptions,
 fan control, component counts, and chassis defaults are preserved in the
 generated profile; every JSON export includes that profile and every CSV row
@@ -47,9 +48,29 @@ not measured CPU/DRAM utilization.
 | `mi325x`          | `human_verified/mi325x_chassis/mi325x_chassis_power_model.py` |
 | `mi355x`          | `human_verified/mi355x_chassis/mi355x_chassis_power_model.py` |
 
-All listed profiles describe a complete eight-GPU chassis. GB200 and GB300 have
-no matching model and are unsupported. Their rack topology is not substituted
-with B200 or B300.
+All listed profiles describe a complete eight-GPU chassis. Their topology is not
+substituted onto GB200 or GB300, which use the NVL72 rack profiles instead:
+
+| Hardware identity | Source rack implementation                                        |
+| ----------------- | ----------------------------------------------------------------- |
+| `gb200`           | `human_verified/gb200_nvl72_rack/gb200_nvl72_rack_power_model.py` |
+| `gb300`           | same module, `gb300_nvl72_rack_config`                            |
+
+The rack profiles (`rackProfiles`) take **measured** compute-module watts per tray
+as their input: the module sensor total (`avg_total_module_power_w`) when the
+producer publishes it, otherwise GPU-board watts plus the Grace-socket total
+(`avg_total_cpu_power_w`) with the source's regulator-loss allowance on the GPU
+share. The Grace CPU and LPDDR5X are never modelled; rows without
+`cpu_power_valid=1` and the Grace-side keys stay unavailable (`cpu-telemetry`).
+Each measured worker host is one compute tray (four GPUs, two Grace sockets), and
+a tray's estimate is its 1/18 share of a rack of identical trays, so NVSwitch
+trays, power shelves, and management switches are amortised over 72 GPUs. The
+result carries `topologyBasis: 'nvl72-trays'`, `measuredBasis`, and `sensorKind`.
+A partially allocated tray extrapolates only the GPU-board share (a module reading
+already covers the whole tray) and is labeled `extrapolated`. The pinned revision
+`963ead8b` is the power-model repo's `feat/gb200-nvl72-rack-model` branch, pending
+push upstream. The Profit Estimator gate below still accepts only eight-GPU
+single-node chassis.
 
 A partially allocated chassis (one to seven measured GPUs on one host) is
 modeled at measured per-GPU power × 8. That is the same `n_gpu × W/GPU` input
@@ -200,15 +221,23 @@ PowerX 的系统功耗结果以实测 GPU 功率为输入，使用固定版本�
 固定版本的 Python 模型默认 PUE 为 1.2；PowerX 对当前风冷机箱模型
 采用 1.3。市电侧功率 = IT 负载功率 × PUE，风冷取 1.3，直接液冷（DLC）
 取 1.1。PUE 仅作用于机箱交流功率，不改变 GPU 实测功率或机箱交流功率。这里的
-冷却方式指建模机箱，并非已核实的测试站点配置。当前模型不支持 DLC；`--pue` 仅
-覆盖设施功率系数，不会把风冷机箱模型转换为液冷模型。
+冷却方式指建模机箱，并非已核实的测试站点配置。机箱模型不支持 DLC；`--pue` 仅
+覆盖设施功率系数，不会把风冷机箱模型转换为液冷模型。NVL72 机架 profile 为直接
+液冷，默认 PUE 取 1.1。
 
 仅使用部分 GPU 的机箱（单台主机上实测 1–7 张 GPU）按实测每卡功率 × 8 建模，
 与模型源码 sweep 脚本喂给各机箱模型的 `n_gpu × W/GPU` 输入一致，并假设未实测的
 GPU 运行相同负载。结果标记为 `chassisBasis: 'extrapolated'`：每卡数值按建模机箱
 的 GPU 总数分摊，`deploymentAcWatts` 只保留实测 GPU 在各机箱中的份额。这不是把
 部分分配的机箱按比例分摊：固定组件、风扇曲线和 PSU 效率都在满机箱负载点求值。
-GB200、GB300 没有匹配模型，也不能套用 B200、B300 模型。缺失、无效和不支持的
+GB200、GB300 使用单独的 NVL72 机架 profile，不套用 B200、B300 机箱模型：每台实测
+worker 主机视为一个计算 tray（4 张 GPU、2 个 Grace socket）。输入为实测模块功耗
+（`avg_total_module_power_w`）；缺失时改用 GPU 板卡功耗加 Grace socket 功耗
+（`avg_total_cpu_power_w`），并按来源模型计入 GPU 份额的稳压损耗余量。Grace CPU 与
+LPDDR5X 从不建模，缺少 `cpu_power_valid=1` 和 Grace 侧指标的行保持不可用
+（`cpu-telemetry`）。单个 tray 的估算取由相同 tray 组成的整机架的 1/18，因此 NVSwitch
+tray、电源架和管理交换机按 72 张 GPU 分摊；部分分配的 tray 只外推 GPU 板卡份额
+（模块读数本身已覆盖整个 tray），并标记为 `extrapolated`。缺失、无效和不支持的
 情况保持不可用。纯 CPU frontend worker 不计入 GPU 机箱数；独立的纯 CPU
 frontend/router 主机不在估算范围内，GPU 机箱内的 CPU 功率仍按 20% 利用率计算。
 

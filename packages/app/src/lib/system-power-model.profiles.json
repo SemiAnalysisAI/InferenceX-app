@@ -1,13 +1,21 @@
 {
-  "modelRevision": "ca4403aa527069857351ad8047dbb726844b3382",
+  "modelRevision": "963ead8b20a722595c34f7f4a0041259501cf019",
+  "modelRevisionStatus": "branch feat/gb200-nvl72-rack-model, child of ca4403aa527069857351ad8047dbb726844b3382; pending push upstream",
   "source": "https://github.com/SemiAnalysisAI/inferencex_power_model",
   "status": "DRAFT / pending human verification",
-  "assumptionsSource": "https://github.com/SemiAnalysisAI/inferencex_power_model/blob/ca4403aa527069857351ad8047dbb726844b3382/README.md#chassis-models",
+  "assumptionsSource": "https://github.com/SemiAnalysisAI/inferencex_power_model/blob/963ead8b20a722595c34f7f4a0041259501cf019/README.md#chassis-models",
   "assumptions": {
     "u_pcie": 0.05,
     "u_cpu": 0.2,
     "u_ram": 0.2,
     "u_nvme": 0.0,
+    "pue": 1.2
+  },
+  "rackAssumptionsSource": "https://github.com/SemiAnalysisAI/inferencex_power_model/blob/963ead8b20a722595c34f7f4a0041259501cf019/human_verified/gb200_nvl72_rack/gb200_nvl72_rack_power_model.py",
+  "rackAssumptions": {
+    "u_nvlink": 0.5,
+    "u_ib": 0.0,
+    "u_pcie": 0.05,
     "pue": 1.2
   },
   "sourceSha256": {
@@ -30,7 +38,10 @@
     "human_verified/b300_ubb/b300_ubb_power_model.py": "8cd694f1306ca09de53dcc9590dcc47a1b9bd5c10af9837bb875dc417fe74837",
     "human_verified/blackwell_nvswitch/blackwell_nvswitch_power_model.py": "857d276b552f6118842c0f026cb5e78dbcd70c9bdef2769fae8540842be61ec7",
     "human_verified/blackwell_nvswitch/plot_blackwell_nvswitch_power.py": "979abfc057320d29d251c100150440fdc10770794b1a05a89053631ffdff64db",
-    "human_verified/chassis_plot_utils.py": "66f5d76f5ae5342433963595e58f665bdd0955eabdb31041a34c2f8180839af5",
+    "human_verified/chassis_plot_utils.py": "0f1c809a527788c8c25490420e29e737e6b7f83cb914dc022c3a4e3701b80643",
+    "human_verified/gb200_nvl72_rack/gb200_nvl72_rack_power_model.py": "f907916213a9176a4d82a05b905ed3c7b595035184150a352dc8049952ffd340",
+    "human_verified/gb200_nvl72_rack/plot_gb200_nvl72_rack_inference_gpu_sweep.py": "d0f6903df0348ccb2790e973b0dc10408c6f6022695ce039aad0b1e1fcd39519",
+    "human_verified/gb200_nvl72_rack/test_gb200_nvl72_rack_power_model.py": "4b33288998d4355d1f4812b9f2e014ab4cf2a588fb9fc94ac56fea9ae8922950",
     "human_verified/generic/connectx7/connectx7_power_model.py": "3510ab679846aefbc31d18d410a978533ddc331fc1562511751fedf093a6649f",
     "human_verified/generic/connectx7/plot_connectx7_power.py": "c9d554aeeeb5b74ff7398686c05d93f0db42b6ac98c902b063645597697de35c",
     "human_verified/generic/connectx8/connectx8_power_model.py": "7d638ea8524e181b0370601319c780600ff5a45b072589d58bdca58636bfa9cb",
@@ -1373,6 +1384,338 @@
           [0.5, 0.96],
           [1.0, 0.955]
         ]
+      }
+    }
+  },
+  "rackProfiles": {
+    "gb200": {
+      "modelPath": "human_verified/gb200_nvl72_rack/gb200_nvl72_rack_power_model.py",
+      "functionName": "gb200_nvl72_rack_power",
+      "configFactory": "gb200_nvl72_rack_config",
+      "topology": "nvl72-rack",
+      "gpuCount": 72,
+      "computeTrayCount": 18,
+      "gpusPerComputeTray": 4,
+      "graceSocketsPerComputeTray": 2,
+      "nvswitchTrayCount": 9,
+      "assumptions": {
+        "u_nvlink": 0.5,
+        "u_ib": 0.0,
+        "u_pcie": 0.05,
+        "pue": 1.2
+      },
+      "defaultConfig": {
+        "variant": "gb200",
+        "gpu_label": "GB200 Blackwell (NVL72)",
+        "n_compute_trays": 18,
+        "n_nvswitch_trays": 9,
+        "compute_tray": {
+          "n_gpu": 4,
+          "n_grace": 2,
+          "nic_generation": "connectx7",
+          "connectx7": {
+            "n_nic": 4,
+            "net_serdes_w": 9.5,
+            "pcie_serdes_w": 5.5,
+            "board_w": 2.0,
+            "digital_max_w": 10.0,
+            "digital_floor_frac": 0.65,
+            "include_optic": true,
+            "optic_w": 8.0
+          },
+          "connectx8": {
+            "n_nic": 4,
+            "include_optic": true,
+            "network_serdes_static_w": 18.0,
+            "pcie_switch_static_w": 28.0,
+            "board_mgmt_static_w": 5.0,
+            "digital_static_w": 12.0,
+            "network_dynamic_max_w": 8.0,
+            "pcie_switch_dynamic_max_w": 5.0,
+            "digital_dynamic_max_w": 10.0,
+            "optic_idle_w": 15.0,
+            "optic_dynamic_max_w": 2.0,
+            "max_nic_slot_power_ref_w": 75.0,
+            "normal_low_w_per_nic_with_optic": 70.0,
+            "normal_high_w_per_nic_with_optic": 100.0
+          },
+          "dpu": {
+            "n_dpu": 2,
+            "idle_w_per_dpu": 65.0,
+            "public_max_power_cap_w": 150.0,
+            "max_modeled_u_dpu": 0.02
+          },
+          "nvme": {
+            "n_front_u2": 4,
+            "front_u2_idle_w": 5.0,
+            "n_boot_m2": 1,
+            "boot_m2_idle_w": 2.0,
+            "max_modeled_u_nvme": 0.02
+          },
+          "fans_w": 130.0,
+          "board_residual_w": 40.0
+        },
+        "nvswitch": {
+          "n_asic": 2,
+          "serdes_lanes": 144,
+          "serdes_lane_gbps": 200.0,
+          "serdes_pj_per_bit": 2.5,
+          "serdes_floor_frac": 0.95,
+          "digital_max_w": 190.0,
+          "digital_floor_frac": 0.4
+        },
+        "nvswitch_tray_residual_w": 50.0,
+        "tray_input_conversion_efficiency": 0.9725,
+        "n_management_switches": 2,
+        "management_switch_w": 100.0,
+        "power_shelf": {
+          "n_shelves": 8,
+          "n_psu_per_shelf": 6,
+          "psu_capacity_w": 5500.0,
+          "redundancy": "N+N",
+          "busbar_nominal_v": 50.0,
+          "efficiency_curve": {
+            "0.1": 0.9,
+            "0.2": 0.94,
+            "0.3": 0.965,
+            "1.0": 0.965
+          },
+          "peak_efficiency_ref": 0.975
+        },
+        "regulator_loss_frac_of_tdp": 0.15,
+        "regulator_allowance_includes_grace": false,
+        "pue": 1.2,
+        "cooling": "direct_liquid",
+        "gpu_tdp_example_w_per_gpu": 1200.0,
+        "grace_tdp_example_w_per_socket": 300.0,
+        "module_tdp_example_w_per_superchip": 2700.0
+      },
+      "computeTrayStaticDcWatts": {
+        "connectx7_nics_with_optics": 126.0,
+        "bluefield3_dpu_idle": 130.0,
+        "nvme_idle": 22.0,
+        "compute_tray_fans_unverified": 130.0,
+        "compute_tray_board_residual_unverified": 40.0
+      },
+      "computeTrayStaticDetails": {
+        "nic_generation": "connectx7",
+        "per_nic_w": 31.5,
+        "n_nic": 4,
+        "n_dpu": 2,
+        "dpu_model": "idle_only",
+        "nvme_model": "idle_only"
+      },
+      "nvswitchTraySiliconWatts": 406.4,
+      "nvswitchTrayResidualWatts": 50.0,
+      "managementSwitchCount": 2,
+      "managementSwitchWatts": 100.0,
+      "trayInputConversionEfficiency": 0.9725,
+      "regulatorLossFracOfTdp": 0.15,
+      "regulatorAllowanceIncludesGrace": false,
+      "powerShelf": {
+        "installedCapacityWatts": 264000.0,
+        "redundantCapacityWatts": 132000.0,
+        "efficiencyCurve": [
+          [0.1, 0.9],
+          [0.2, 0.94],
+          [0.3, 0.965],
+          [1.0, 0.965]
+        ]
+      },
+      "unverifiedParameters": {
+        "compute_tray_fans_w": {
+          "low": 40.0,
+          "high": 220.0,
+          "default": 130.0,
+          "unit": "W per compute tray",
+          "why": "8 dual-rotor 40x56 fans per tray are documented (Lenovo LP2357, SemiAnalysis) but no tray fan power is published. High end = 8 x 27.24 W rated Delta GFC0412DS-SM06B0G; low end = deep PWM on a liquid-cooled tray where only NICs/DPU/NVMe/PDB are air cooled."
+        },
+        "compute_tray_board_residual_w": {
+          "low": 20.0,
+          "high": 60.0,
+          "default": 40.0,
+          "unit": "W per compute tray",
+          "why": "BMC module, CPLD/ERoT, clocks, sensors, leak detection and PDB housekeeping. No public rail. Anchored to the repo chassis residual note (35-70 W for a full HGX chassis) scaled to a 1RU tray."
+        },
+        "tray_input_conversion_efficiency": {
+          "low": 0.96,
+          "high": 0.985,
+          "default": 0.9725,
+          "unit": "fraction",
+          "why": "Trays take 50 V DC from the busbar and feed the boards at 12 V (SemiAnalysis: 4x RapidLock 12 V connectors per Bianca board). The 50 V to 12 V stage sits outside the module sensor. No efficiency is published for it."
+        },
+        "nvswitch_tray_residual_w": {
+          "low": 20.0,
+          "high": 80.0,
+          "default": 50.0,
+          "unit": "W per NVLink switch tray",
+          "why": "Switch tray BMC, two OOB 1GbE ports, console, CPLDs, clocks and NVSwitch VR loss outside the ASIC figure. Lenovo front/rear views show coolant, busbar and cartridge connectors and no fans. No public rail."
+        }
+      }
+    },
+    "gb300": {
+      "modelPath": "human_verified/gb200_nvl72_rack/gb200_nvl72_rack_power_model.py",
+      "functionName": "gb200_nvl72_rack_power",
+      "configFactory": "gb300_nvl72_rack_config",
+      "topology": "nvl72-rack",
+      "gpuCount": 72,
+      "computeTrayCount": 18,
+      "gpusPerComputeTray": 4,
+      "graceSocketsPerComputeTray": 2,
+      "nvswitchTrayCount": 9,
+      "assumptions": {
+        "u_nvlink": 0.5,
+        "u_ib": 0.0,
+        "u_pcie": 0.05,
+        "pue": 1.2
+      },
+      "defaultConfig": {
+        "variant": "gb300",
+        "gpu_label": "GB300 Blackwell Ultra (NVL72)",
+        "n_compute_trays": 18,
+        "n_nvswitch_trays": 9,
+        "compute_tray": {
+          "n_gpu": 4,
+          "n_grace": 2,
+          "nic_generation": "connectx8",
+          "connectx7": {
+            "n_nic": 4,
+            "net_serdes_w": 9.5,
+            "pcie_serdes_w": 5.5,
+            "board_w": 2.0,
+            "digital_max_w": 10.0,
+            "digital_floor_frac": 0.65,
+            "include_optic": true,
+            "optic_w": 8.0
+          },
+          "connectx8": {
+            "n_nic": 4,
+            "include_optic": true,
+            "network_serdes_static_w": 18.0,
+            "pcie_switch_static_w": 28.0,
+            "board_mgmt_static_w": 5.0,
+            "digital_static_w": 12.0,
+            "network_dynamic_max_w": 8.0,
+            "pcie_switch_dynamic_max_w": 5.0,
+            "digital_dynamic_max_w": 10.0,
+            "optic_idle_w": 15.0,
+            "optic_dynamic_max_w": 2.0,
+            "max_nic_slot_power_ref_w": 75.0,
+            "normal_low_w_per_nic_with_optic": 70.0,
+            "normal_high_w_per_nic_with_optic": 100.0
+          },
+          "dpu": {
+            "n_dpu": 2,
+            "idle_w_per_dpu": 65.0,
+            "public_max_power_cap_w": 150.0,
+            "max_modeled_u_dpu": 0.02
+          },
+          "nvme": {
+            "n_front_u2": 4,
+            "front_u2_idle_w": 5.0,
+            "n_boot_m2": 1,
+            "boot_m2_idle_w": 2.0,
+            "max_modeled_u_nvme": 0.02
+          },
+          "fans_w": 130.0,
+          "board_residual_w": 40.0
+        },
+        "nvswitch": {
+          "n_asic": 2,
+          "serdes_lanes": 144,
+          "serdes_lane_gbps": 200.0,
+          "serdes_pj_per_bit": 2.5,
+          "serdes_floor_frac": 0.95,
+          "digital_max_w": 190.0,
+          "digital_floor_frac": 0.4
+        },
+        "nvswitch_tray_residual_w": 50.0,
+        "tray_input_conversion_efficiency": 0.9725,
+        "n_management_switches": 2,
+        "management_switch_w": 100.0,
+        "power_shelf": {
+          "n_shelves": 8,
+          "n_psu_per_shelf": 6,
+          "psu_capacity_w": 5500.0,
+          "redundancy": "N+N",
+          "busbar_nominal_v": 50.0,
+          "efficiency_curve": {
+            "0.1": 0.9,
+            "0.2": 0.94,
+            "0.3": 0.965,
+            "1.0": 0.965
+          },
+          "peak_efficiency_ref": 0.975
+        },
+        "regulator_loss_frac_of_tdp": 0.15,
+        "regulator_allowance_includes_grace": false,
+        "pue": 1.2,
+        "cooling": "direct_liquid",
+        "gpu_tdp_example_w_per_gpu": 1400.0,
+        "grace_tdp_example_w_per_socket": 300.0,
+        "module_tdp_example_w_per_superchip": 0.0
+      },
+      "computeTrayStaticDcWatts": {
+        "connectx8_nics_integrated_pcie_with_optics": 315.0,
+        "bluefield3_dpu_idle": 130.0,
+        "nvme_idle": 22.0,
+        "compute_tray_fans_unverified": 130.0,
+        "compute_tray_board_residual_unverified": 40.0
+      },
+      "computeTrayStaticDetails": {
+        "nic_generation": "connectx8",
+        "per_nic_w": 78.8,
+        "n_nic": 4,
+        "n_dpu": 2,
+        "dpu_model": "idle_only",
+        "nvme_model": "idle_only"
+      },
+      "nvswitchTraySiliconWatts": 406.4,
+      "nvswitchTrayResidualWatts": 50.0,
+      "managementSwitchCount": 2,
+      "managementSwitchWatts": 100.0,
+      "trayInputConversionEfficiency": 0.9725,
+      "regulatorLossFracOfTdp": 0.15,
+      "regulatorAllowanceIncludesGrace": false,
+      "powerShelf": {
+        "installedCapacityWatts": 264000.0,
+        "redundantCapacityWatts": 132000.0,
+        "efficiencyCurve": [
+          [0.1, 0.9],
+          [0.2, 0.94],
+          [0.3, 0.965],
+          [1.0, 0.965]
+        ]
+      },
+      "unverifiedParameters": {
+        "compute_tray_fans_w": {
+          "low": 40.0,
+          "high": 220.0,
+          "default": 130.0,
+          "unit": "W per compute tray",
+          "why": "8 dual-rotor 40x56 fans per tray are documented (Lenovo LP2357, SemiAnalysis) but no tray fan power is published. High end = 8 x 27.24 W rated Delta GFC0412DS-SM06B0G; low end = deep PWM on a liquid-cooled tray where only NICs/DPU/NVMe/PDB are air cooled."
+        },
+        "compute_tray_board_residual_w": {
+          "low": 20.0,
+          "high": 60.0,
+          "default": 40.0,
+          "unit": "W per compute tray",
+          "why": "BMC module, CPLD/ERoT, clocks, sensors, leak detection and PDB housekeeping. No public rail. Anchored to the repo chassis residual note (35-70 W for a full HGX chassis) scaled to a 1RU tray."
+        },
+        "tray_input_conversion_efficiency": {
+          "low": 0.96,
+          "high": 0.985,
+          "default": 0.9725,
+          "unit": "fraction",
+          "why": "Trays take 50 V DC from the busbar and feed the boards at 12 V (SemiAnalysis: 4x RapidLock 12 V connectors per Bianca board). The 50 V to 12 V stage sits outside the module sensor. No efficiency is published for it."
+        },
+        "nvswitch_tray_residual_w": {
+          "low": 20.0,
+          "high": 80.0,
+          "default": 50.0,
+          "unit": "W per NVLink switch tray",
+          "why": "Switch tray BMC, two OOB 1GbE ports, console, CPLDs, clocks and NVSwitch VR loss outside the ASIC figure. Lenovo front/rear views show coolant, busbar and cartridge connectors and no fans. No public rail."
+        }
       }
     }
   }

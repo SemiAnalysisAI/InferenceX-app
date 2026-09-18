@@ -240,6 +240,8 @@ const SYSTEM_POWER_STRINGS = {
       topology: 'The available topology does not establish chassis placement.',
       'role-power': 'Valid measured power and topology are required for every GPU worker role.',
       'model-domain': 'The measured input is outside the source model’s supported range.',
+      'cpu-telemetry':
+        'Validated measured Grace-side (CPU) power is required for NVL72 compute trays.',
     } satisfies Record<SystemPowerUnsupportedReason, string>,
   },
   zh: {
@@ -269,6 +271,7 @@ const SYSTEM_POWER_STRINGS = {
       topology: '现有拓扑信息无法确认 GPU 所在的机箱。',
       'role-power': '每个 GPU worker 角色都需要有效的实测功耗和拓扑信息。',
       'model-domain': '实测输入超出功耗模型的支持范围。',
+      'cpu-telemetry': 'NVL72 计算 tray 需要通过验证的 Grace 侧（CPU）实测功耗。',
     } satisfies Record<SystemPowerUnsupportedReason, string>,
   },
 } as const;
