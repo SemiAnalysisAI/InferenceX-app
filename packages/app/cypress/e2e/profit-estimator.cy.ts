@@ -38,6 +38,7 @@ import { interceptVrPublicationData } from '../support/vr-publication-fixtures';
 import {
   interceptProfitData,
   profitBenchmarkRows,
+  profitNvl72Rows,
   PROFIT_CHANGELOG_NOTES,
   PROFIT_DATE,
   PROFIT_HISTORY_DATE,
@@ -204,6 +205,51 @@ describe('Profit estimator power option', () => {
     chart().should('contain', 'B200').and('contain', 'B300').and('contain', 'MI355X');
     chart().should('contain', 'Measured + modeled').and('contain', 'Provisioned');
     cy.get('[data-testid="profit-power-unavailable"]').should('contain', 'GB300');
+  });
+
+  it('prices a GB200 NVL72 tray on its measured compute module and names the basis', () => {
+    stubOpenRouter();
+    cy.intercept('GET', '/api/v1/benchmarks*', (req) => {
+      req.reply({
+        body: [
+          ...profitBenchmarkRows().map((row) => ({
+            ...row,
+            metrics: {
+              ...row.metrics,
+              power_valid: 1,
+              power_metric_schema_version: 2,
+              avg_power_w: 500,
+              avg_total_gpu_power_w: 4000,
+            },
+          })),
+          ...profitNvl72Rows(),
+        ],
+      });
+    });
+    // Locked: the control stays hidden and the tray prices on provisioned power like every SKU.
+    cy.visit('/profit-estimator-per-gigawatt?c_power=compare', {
+      onBeforeLoad: (win) => {
+        suppressNudges(win);
+        win.localStorage.removeItem('inferencex-feature-gate');
+      },
+    });
+    chart().find('text.revenue-label').should('have.length', 5);
+    cy.get('#profit-power').should('not.exist');
+    cy.get('[data-testid="profit-power-basis"]').should('not.exist');
+    cy.get('body').type('{uparrow}{uparrow}{downarrow}{downarrow}');
+    cy.get('#profit-power').should('contain', 'Compare both');
+    // B200, B300, MI355X and the GB200 tray each get a provisioned and a measured bar.
+    chart().find('text.revenue-label').should('have.length', 8);
+    chart().should('contain', 'GB200').and('contain', 'Measured + modeled');
+    cy.get('[data-testid="profit-power-basis"]')
+      .should('contain', 'GB200 NVL72')
+      .and('contain', 'measured module (GPU + HBM + Grace + LPDDR5X; module sensor)')
+      .and('contain', 'NVSwitch trays')
+      .and('contain', 'DLC PUE 1.1');
+    // GB300 has no CPU-side telemetry in these fixtures and stays unavailable; GB200 is priced.
+    cy.get('[data-testid="profit-power-unavailable"]')
+      .should('contain', 'GB300')
+      .and('not.contain', 'GB200');
   });
 
   it('keeps the benchmark settings and restores the original chart after unavailable power', () => {

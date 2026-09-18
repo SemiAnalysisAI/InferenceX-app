@@ -91,6 +91,10 @@ interface ProfitSku {
   precision: string;
   curve: Curve;
   tputScale: number;
+  /** Physical GPUs per row (TP); eight when unset. */
+  gpus?: number;
+  /** Extra metric keys every row of this SKU carries, e.g. validated power telemetry. */
+  metrics?: Record<string, number>;
 }
 
 export const PROFIT_SKUS: ProfitSku[] = [
@@ -101,14 +105,41 @@ export const PROFIT_SKUS: ProfitSku[] = [
   { hardware: 'mi355x', framework: 'vllm', precision: 'fp4', curve: WIDE_CURVE, tputScale: 0.9 },
 ];
 
+/**
+ * One GB200 NVL72 compute tray (four GPUs, two Grace sockets) with the CPU-side
+ * keys the srt-slurm CPU power leg publishes, module sensor included, so the
+ * smart-provisioning basis can price NVL72. Kept out of `PROFIT_SKUS` so the
+ * default bar counts the other specs lock down do not move. Watts are
+ * controlled inputs, not published constants.
+ */
+const NVL72_SKU: ProfitSku = {
+  hardware: 'gb200',
+  framework: 'sglang',
+  precision: 'fp4',
+  curve: WIDE_CURVE,
+  tputScale: 1.3,
+  gpus: 4,
+  metrics: {
+    power_valid: 1,
+    power_metric_schema_version: 2,
+    cpu_power_valid: 1,
+    avg_power_w: 900.25,
+    avg_total_gpu_power_w: 3601,
+    avg_cpu_socket_power_w: 250.5,
+    avg_total_cpu_power_w: 501,
+    avg_total_module_power_w: 4300.75,
+  },
+};
+
 let idCursor = 800_000;
 
 export const profitBenchmarkRows = (
   dbKey: string = PROFIT_MODEL_DB_KEY,
   date = PROFIT_DATE,
   runId?: number,
+  skus: readonly ProfitSku[] = PROFIT_SKUS,
 ) =>
-  PROFIT_SKUS.flatMap((sku) =>
+  skus.flatMap((sku) =>
     sku.curve.map(([conc, intvty, tput, e2el]) => ({
       id: idCursor++,
       hardware: sku.hardware,
@@ -118,21 +149,20 @@ export const profitBenchmarkRows = (
       spec_method: 'none',
       disagg: false,
       is_multinode: false,
-      prefill_tp: 8,
-      decode_tp: 8,
-      num_prefill_gpu: 8,
-      num_decode_gpu: 8,
+      prefill_tp: sku.gpus ?? 8,
+      decode_tp: sku.gpus ?? 8,
+      num_prefill_gpu: sku.gpus ?? 8,
+      num_decode_gpu: sku.gpus ?? 8,
       isl: null,
       osl: null,
       conc,
       offload_mode: 'on',
       benchmark_type: 'agentic_traces',
       image: `${sku.framework}:test`,
-      metrics: metricsFor(
-        intvty,
-        Math.round(tput * sku.tputScale * tputScaleFor(date, runId)),
-        e2el,
-      ),
+      metrics: {
+        ...metricsFor(intvty, Math.round(tput * sku.tputScale * tputScaleFor(date, runId)), e2el),
+        ...sku.metrics,
+      },
       workers: null,
       date,
       workflow_run_id: runId ?? PROFIT_SINGLE_RUN_ID[date],
@@ -140,6 +170,10 @@ export const profitBenchmarkRows = (
       run_url: `https://github.com/SemiAnalysisAI/InferenceX/actions/runs/${runId ?? PROFIT_SINGLE_RUN_ID[date] ?? idCursor}`,
     })),
   );
+
+/** GB200 NVL72 rows with measured compute-module power, for the smart-provisioning basis. */
+export const profitNvl72Rows = (dbKey: string = PROFIT_MODEL_DB_KEY, date = PROFIT_DATE) =>
+  profitBenchmarkRows(dbKey, date, undefined, [NVL72_SKU]);
 
 export const profitAvailabilityRows = (dbKeys: readonly string[] = PROFIT_DB_KEYS) =>
   dbKeys.flatMap((dbKey) =>
