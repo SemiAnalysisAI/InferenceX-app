@@ -49,6 +49,8 @@ export const KNOWN_MODELS = new Set([
   'gpt-oss-120b',
   'Qwen-3.5-397B-A17B',
   'Qwen3.8-Flash-Next',
+  'Qwen3.8-27B',
+  'Qwen3.8-27B-Eager',
   'Kimi-K2.5',
   'Kimi-K3',
   'MiniMax-M2.5',

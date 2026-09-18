@@ -46,7 +46,8 @@
     "admin:db:backfill-full-response-interactivity": "bun run --cwd packages/db db:backfill-full-response-interactivity",
     "admin:db:backfill-server-log-files": "bun run --cwd packages/db db:backfill-server-log-files",
     "admin:db:reset": "bun run --cwd packages/db db:reset",
-    "admin:db:verify": "bun run --cwd packages/db db:verify"
+    "admin:db:verify": "bun run --cwd packages/db db:verify",
+    "admin:db:migrate:operatorx": "bun run --cwd packages/db db:migrate:operatorx"
   },
   "devDependencies": {
     "@babel/core": "^8.0.1",

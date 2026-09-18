@@ -97,7 +97,7 @@ const STRINGS = {
     gpuConfig: 'Chip Config',
     gpuConfigTooltip:
       'Select up to 4 chip configurations to compare their historical performance over time. This allows for tracking how software updates may affect specific hardware.',
-    gpuConfigPlaceholder: 'Select a Chip Config for comparison',
+    gpuConfigPlaceholder: 'Select Chip Config',
     comparisonDateRange: 'Comparison Date Range',
     comparisonDateRangeTooltip:
       'Select the start and end dates for the historical comparison. The chart will show performance data for the selected chip configs across this time range.',
@@ -141,7 +141,7 @@ const STRINGS = {
     gpuConfig: '芯片配置',
     gpuConfigTooltip:
       '最多选择 4 个芯片配置以对比其历史性能趋势。可用于追踪软件更新对特定硬件的影响。',
-    gpuConfigPlaceholder: '选择芯片配置进行对比',
+    gpuConfigPlaceholder: '选择芯片配置',
     comparisonDateRange: '对比日期范围',
     comparisonDateRangeTooltip:
       '选择历史对比的起止日期。图表将展示所选芯片配置在此时间范围内的性能数据。',
@@ -185,8 +185,6 @@ const METRIC_TITLE_ZH_MAP = new Map(
 );
 
 interface ChartControlsProps {
-  /** Hide only when the parent provides a scenario selector in its chart title. */
-  hideScenario?: boolean;
   /** Hide GPU Config selector and related date pickers (used by Historical Trends tab) */
   hideGpuComparison?: boolean;
   tcoSource?: 'inference' | 'historical';
@@ -196,7 +194,6 @@ interface ChartControlsProps {
 }
 
 export default function ChartControls({
-  hideScenario = false,
   hideGpuComparison = false,
   tcoSource = 'inference',
   showTcoBasis = false,
@@ -391,6 +388,14 @@ export default function ChartControls({
     setTimeout(trackCombinedFilters, 0);
   };
 
+  const handleSequenceChange = (value: Sequence) => {
+    setSelectedSequence(value);
+    track('inference_sequence_selected', {
+      sequence: value,
+    });
+    setTimeout(trackCombinedFilters, 0);
+  };
+
   const handlePrecisionChange = (value: string[]) => {
     setSelectedPrecisions(value);
     track('inference_precision_selected', {
@@ -461,13 +466,6 @@ export default function ChartControls({
     showsTcoBasisSelector(selectedModel, selectedSequence);
   const showPercentile =
     mounted && selectedSequence === Sequence.AgenticTraces && featureGateUnlocked;
-  const benchmarkColumns = hideScenario
-    ? showPercentile
-      ? 'md:grid-cols-4'
-      : 'md:grid-cols-3'
-    : showPercentile
-      ? 'md:grid-cols-5'
-      : 'md:grid-cols-4';
 
   return (
     <TooltipProvider delayDuration={0}>
@@ -476,7 +474,9 @@ export default function ChartControls({
           legend={t.benchmarkControls}
           className={hideGpuComparison ? 'lg:col-span-2' : 'lg:col-span-3'}
         >
-          <div className={`grid min-w-0 grid-cols-2 items-start gap-3 ${benchmarkColumns}`}>
+          <div
+            className={`grid min-w-0 grid-cols-2 items-start gap-3 ${showPercentile ? 'md:grid-cols-5' : 'md:grid-cols-4'}`}
+          >
             <div className="min-w-0 col-span-2">
               <ModelSelector
                 value={selectedModel}
@@ -489,21 +489,15 @@ export default function ChartControls({
                 newModels={AGENTX_NEW_MODEL_DISPLAY_NAMES}
               />
             </div>
-            {!hideScenario && (
-              <ScenarioSelector
-                value={selectedSequence}
-                onChange={(sequence) => {
-                  setSelectedSequence(sequence);
-                  track('inference_sequence_selected', { sequence });
-                  setTimeout(trackCombinedFilters, 0);
-                }}
-                open={openDropdown === 'sequence'}
-                onOpenChange={handleDropdownOpenChange('sequence')}
-                availableSequences={availableSequences}
-                model={selectedModel}
-                data-testid="scenario-selector"
-              />
-            )}
+            <ScenarioSelector
+              value={selectedSequence}
+              onChange={handleSequenceChange}
+              open={openDropdown === 'sequence'}
+              onOpenChange={handleDropdownOpenChange('sequence')}
+              availableSequences={availableSequences}
+              model={selectedModel}
+              data-testid="scenario-selector"
+            />
             <PrecisionSelector
               value={selectedPrecisions}
               onChange={handlePrecisionChange}

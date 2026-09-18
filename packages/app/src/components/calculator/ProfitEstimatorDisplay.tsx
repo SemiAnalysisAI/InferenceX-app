@@ -302,7 +302,7 @@ const STRINGS = {
     compareHistory: 'Compare history',
     gpuConfig: 'Chip Config',
     gpuConfigTooltip: `Select up to ${PROFIT_HISTORY_MAX_GPUS} chip configurations to compare how their estimated revenue and profit have moved over time. Each config is priced again on every compared date (the ends of the date range, plus any date or run added from the Config Changelog below) using the run measured then, so software updates show up as a change in the bar.`,
-    gpuConfigPlaceholder: 'Select a Chip Config for comparison',
+    gpuConfigPlaceholder: 'Select Chip Config',
     comparisonDateRange: 'Comparison Date Range',
     comparisonDateRangeTooltip:
       'Select the start and end dates for the historical comparison. The chart adds a bar for each selected chip config at both dates, next to its bar for the run date shown above. Dates in between can be added one at a time from the Config Changelog.',
@@ -416,7 +416,7 @@ const STRINGS = {
     compareHistory: '对比历史趋势',
     gpuConfig: '芯片配置',
     gpuConfigTooltip: `最多选择 ${PROFIT_HISTORY_MAX_GPUS} 个芯片配置，对比其收入与利润估算随时间的变化。每个配置都会用当日实测的运行结果，在每个对比日期（日期范围的起止两端，以及从下方配置变更日志中添加的日期或运行）重新估价，软件更新带来的差异会直接体现在柱形上。`,
-    gpuConfigPlaceholder: '选择芯片配置进行对比',
+    gpuConfigPlaceholder: '选择芯片配置',
     comparisonDateRange: '对比日期范围',
     comparisonDateRangeTooltip:
       '选择历史对比的起止日期。图表会在上方所示运行日期的柱形旁，为所选芯片配置在这两个日期各增加一根柱形。范围内的其他日期可在配置变更日志中逐个添加。',

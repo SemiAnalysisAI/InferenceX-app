@@ -1,6 +1,7 @@
 import type { ArtifactMeta } from './github-artifacts.js';
 
 export const CHANGELOG_ARTIFACT_NAME = 'changelog-metadata';
+export const REQUIRED_POWER_MANIFEST = 'required-power-sweep-manifest';
 
 export interface ArtifactPlan {
   artifacts: ArtifactMeta[];

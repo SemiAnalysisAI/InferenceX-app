@@ -21,9 +21,11 @@ Design rationale and non-obvious conventions. See [CLAUDE.md](../CLAUDE.md) for 
 - [Adding Entities](./adding-entities.md) — Step-by-step checklists for adding new models, GPUs, precisions, sequences, frameworks (ingest + constants + frontend), plus featuring a day-0 model (launch banner, modal, Quick Comparisons preset)
 - [Testing](./testing.md) — Requirements, quality standards, pre-commit checklist
 - [Typography](./typography.md) — Type tokens (text-2xs/3xs, named tracking), Heading/Eyebrow components, TS-based chart font sizes, and the check:typography ratchet gate + allowlist burndown
-- [Data Transforms](./data-transforms.md) — Full pipeline from BenchmarkRow to RenderableGraph: type hierarchy, hardware key construction, derived metrics, memoization strategy
+- [Data Transforms](./data-transforms.md) — Full pipeline from BenchmarkRow to RenderableGraph: type hierarchy, hardware key construction, derived metrics, memoization strategy, prefix-cache tier shares (`/cache-reuse`)
 - [State Ownership](./state-ownership.md) — Which context owns which state, availability filtering cascade, comparison date mechanics, URL param sync
 - [Blog](./blog.md) — MDX content system, SEO features (OG images, RSS, llms.txt, JSON-LD), TOC sidebar, reading progress, heading links, analytics events
 - [CollectiveX](./collectivex.md) — lazy ingest-on-read pipeline (separate Neon DB as a durable GitHub-artifact cache), tombstoned deletes, raw-docs storage + shared reader
 - [Chinese Pages (/zh)](./i18n.md) — Why hand-authored /zh pages instead of an i18n framework, hreflang pairing, blog translation pairing, html lang workaround, CJK reading time/slugs
 - [Chinese Copy Editorial Guide](./chinese-copy.md) — Audience, surface-specific register, context-aware terminology, rewrite workflow, manual-review process, and PR checklist
+
+- [OperatorX](./operatorx.md) — hidden GEMM, attention, and routed MoE explorer, per-GPU TFLOPS, raw artifact persistence, and local verification

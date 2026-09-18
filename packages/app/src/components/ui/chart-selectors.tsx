@@ -332,7 +332,6 @@ export function SequenceSelector({
 }
 
 interface ScenarioSelectorProps {
-  variant?: 'field' | 'title';
   id?: string;
   value: string;
   onChange: (value: Sequence) => void;
@@ -349,11 +348,10 @@ interface ScenarioSelectorProps {
  * agentic-trace rows rendered flat first. Label is "Scenario" (the ISL/OSL
  * framing only applies to the fixed-seq subset).
  *
- * A sole selected scenario is plain text in chart titles, with separate help.
- * Ordinary fields retain their disabled control and selected-option help.
+ * A single selected scenario stays visible in the same control, disabled when
+ * there is no alternative workload to choose.
  */
 export function ScenarioSelector({
-  variant = 'field',
   id = 'scenario-select',
   value,
   onChange,
@@ -403,40 +401,11 @@ export function ScenarioSelector({
         </>
       ),
   });
-  if (variant === 'title' && isOnlySelectedScenario) {
-    const option = toScenarioOption(value);
-    return (
-      <span className="inline-flex max-w-full items-center align-middle">
-        <span data-testid={testId}>{option.label}</span>
-        <InfoHelp label={option.label} value={value}>
-          {option.help}
-        </InfoHelp>
-      </span>
-    );
-  }
-  const Container = variant === 'title' ? 'span' : 'div';
 
   return (
-    <Container
-      className={
-        variant === 'title'
-          ? 'inline-flex max-w-full align-middle'
-          : 'flex flex-col space-y-1.5 lg:col-span-1'
-      }
-    >
-      {variant !== 'title' && (
-        <LabelWithTooltip htmlFor={id} label={t.scenario} tooltip={t.scenarioTooltip} />
-      )}
+    <div className="flex flex-col space-y-1.5 lg:col-span-1">
+      <LabelWithTooltip htmlFor={id} label={t.scenario} tooltip={t.scenarioTooltip} />
       <SearchableSelect
-        inline={variant === 'title'}
-        triggerAriaLabel={
-          variant === 'title' ? `${t.scenario}: ${scenarioLabel(value)}` : undefined
-        }
-        className={
-          variant === 'title'
-            ? 'h-auto min-h-8 w-auto gap-1 rounded-sm border-transparent bg-transparent px-1 py-0 text-base font-semibold shadow-none hover:bg-muted disabled:opacity-100 dark:bg-transparent'
-            : undefined
-        }
         key={isOnlySelectedScenario ? 'fixed' : 'selectable'}
         disabled={isOnlySelectedScenario}
         value={value}
@@ -461,7 +430,7 @@ export function ScenarioSelector({
           },
         ].filter((group) => group.options.length > 0)}
       />
-    </Container>
+    </div>
   );
 }
 

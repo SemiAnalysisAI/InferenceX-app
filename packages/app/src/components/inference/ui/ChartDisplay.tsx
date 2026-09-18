@@ -96,6 +96,7 @@ import { useLocale } from '@/lib/use-locale';
 
 import { ATOM_FOOTNOTE_MARKER, AtomEngineFootnote } from '@/components/ui/atom-engine-footnote';
 import { AgenticOptimizationNote } from '@/components/inference/ui/AgenticOptimizationNote';
+import { CacheReuseLink } from '@/components/inference/ui/CacheReuseLink';
 import { OffloadHaloLegendKey } from '@/components/inference/ui/OffloadHaloLegendKey';
 import { LegacyPowerLegendKey } from '@/components/inference/ui/LegacyPowerLegendKey';
 import { ActiveQuickFilters } from '@/components/inference/ui/ActiveQuickFilters';
@@ -106,7 +107,6 @@ import ChartNotices from './ChartNotices';
 import { MetricExplanation } from './MetricExplanation';
 import { OptionInfo } from '@/components/ui/option-info';
 import ChartControls from './ChartControls';
-import { TitleScenarioSelector } from './TitleScenarioSelector';
 import { CostTierSelector } from './CostTierSelector';
 import { InferenceTcoBadges } from './InferenceTcoBadges';
 import { XAxisModeSelector } from './XAxisModeSelector';
@@ -856,13 +856,8 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
             <Card
               key="empty-0"
               data-testid="chart-empty-state"
-              className="flex min-h-[320px] flex-col items-center justify-center gap-3"
+              className="flex min-h-[320px] items-center justify-center"
             >
-              {!embedded && !minimalChrome && (
-                <Heading as="h2" level="card">
-                  {getModelLabel(selectedModel as Model)} <TitleScenarioSelector />
-                </Heading>
-              )}
               <p className="max-w-md text-center text-sm text-muted-foreground">
                 {isModeledSystemPowerConfigKey(selectedYAxisMetric)
                   ? t.noSystemPowerData
@@ -927,6 +922,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                     {hasOffloadHalo && <OffloadHaloLegendKey />}
                     {hasLegacyPowerPoints && <LegacyPowerLegendKey />}
                     {isAgenticSequence && <AgenticOptimizationNote />}
+                    {isAgenticSequence && !minimalChrome && <CacheReuseLink />}
                     {hasAtomSeries && (
                       <AtomEngineFootnote className="min-w-0 flex-[1_1_24rem] text-xs leading-5" />
                     )}
@@ -1052,11 +1048,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                                 className="mr-2 size-6 align-[-0.3em]"
                               />
                               {getModelLabel(graph.model as Model)}{' '}
-                              {embedded || minimalChrome ? (
-                                getSequenceLabel(graph.sequence as Sequence, locale)
-                              ) : (
-                                <TitleScenarioSelector />
-                              )}{' '}
+                              {getSequenceLabel(graph.sequence as Sequence, locale)}{' '}
                               {metricChartTitle(graph.chartDefinition, selectedYAxisMetric, locale)}{' '}
                               {(() => {
                                 // The timeline's x axis is time, not the scatter x metric.
@@ -1343,7 +1335,6 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                     actions={<ShareButton />}
                   />
                   <ChartControls
-                    hideScenario
                     showXAxisMode
                     showTcoBasis={[...captionHwKeys].some((key) => key.split('_')[0] === 'tpuv7')}
                   />

@@ -165,6 +165,16 @@ export const DASHBOARD_ROUTES = [
     shareParamScopes: ['g_', 'i_', 'c_'],
   },
   {
+    key: 'cache-reuse',
+    path: '/cache-reuse',
+    canonicalPath: '/cache-reuse',
+    navGroup: 'footer-only',
+    indexable: true,
+    localeMirrored: true,
+    providers: UNOFFICIAL_ONLY_DASHBOARD_PROVIDERS,
+    shareParamScopes: ['g_', 'i_', 'c_'],
+  },
+  {
     key: 'reliability',
     path: '/reliability',
     canonicalPath: '/reliability',
@@ -194,6 +204,17 @@ export const DASHBOARD_ROUTES = [
     providers: STANDALONE_DASHBOARD_PROVIDERS,
     shareParamScopes: ['g_', 'i_'],
   },
+  {
+    key: 'operatorx',
+    path: '/operatorx',
+    canonicalPath: '/operatorx',
+    navGroup: 'feature-gated',
+    indexable: true,
+    localeMirrored: true,
+    providers: STANDALONE_DASHBOARD_PROVIDERS,
+    shareParamScopes: ['g_', 'i_'],
+  },
+
   {
     key: 'collectivex',
     path: '/collectivex',

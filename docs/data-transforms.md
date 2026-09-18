@@ -103,6 +103,22 @@ The hook runs a 5-step memoized pipeline:
 
 ---
 
+## Prefix-Cache Tier Shares (`/cache-reuse`)
+
+The Prefix Cache Reuse tab stacks, per concurrency, where one configuration's prompt tokens came from: the chip's HBM KV cache, the host tier behind it, or nowhere (recomputed). It reads the calculator's `GPUDataPoint` groups (`useThroughputData`) and takes the tiers from each point's `sourceRow.metrics`, so official rows and `?unofficialrun=` overlays flow through the same mapper; the pure logic lives in `components/calculator/cache-reuse.ts`.
+
+Why the shares are built the way they are:
+
+- **The host segment is the CPU-offload rate**, falling back to `server_external_cache_hit_rate` only when a row reports no CPU figure, and the two are never summed. This deliberately differs from `measuredCacheHitRate` in `lib/cache-pricing.ts`, which prefers the external figure to price cached input conservatively: that protects a revenue number from double-counting, while this chart names the tier a token came from, and on SGLang HiCache rows the host tier is the CPU figure (it is also what the GLM-5.3 article plotted).
+- **TensorRT-LLM with offload reports one combined figure.** The point summary already labels it "Combined chip + CPU"; the tab draws it as a single reused segment (`combined: true`) instead of inventing a split.
+- **Clamping is visible, not silent.** Some rows report a GPU rate above 1 (GB300 Dynamo, 1.012). Shares are clamped so the bar sums to 100%, and the unclamped `reportedTotal` is kept for the tooltip caveat.
+- **Rows without any tier are drawn as gaps, not zeros.** A GB300 sweep scraped only at the Dynamo frontend has a theoretical ceiling but no server counters; those concurrencies get a marker and are counted in the caption as unmeasured.
+- **Fixed sequences record no cache tier at all**, so the tab keeps the scenario selector and shows an explanatory empty state rather than an empty chart.
+
+The configuration selector defaults to the group with the most tiered rows, preferring SGLang on a tie because SGLang separates the two tiers; `c_cfg` seeds it from a share link. Overlay runs on the same hardware become their own outlined series so a branch can be read against the published curve concurrency by concurrency. Cypress fixtures: `interceptOverlayRun` (agentic rows with gpu 0.8 / external 0.1 / cpu 0.05, which must render as 80 / 5 / 15).
+
+The tab is footer-only, so the agentic chart links into it: `CacheReuseLink` sits in the chart's status-notes footer (chart state rides along via `withChartState`) and in the point summary of an agentic detail page, where `cacheReuseHref` (`lib/cache-reuse-link.ts`) writes the point's own `g_model`, `i_seq`, `i_prec`, and `c_cfg` because a reader who landed cold has no in-memory chart state to inherit; pinning one precision matters because with several selected the groups are keyed `hwKey__precision` and a bare hardware key would miss.
+
 ## Hardware Key Construction
 
 This is the most complex and bug-prone part of the pipeline. A bad hardware key produces either a missing legend entry, zeroed cost/energy metrics (because `getGpuSpecs` returns zeros), or a chart point that never matches the active hardware filter.

@@ -1,11 +1,50 @@
 describe('Blog', () => {
+  describe('Rubin agentic article port', () => {
+    for (const locale of ['', '/zh']) {
+      it(`preserves the article, figures, and source boundary on ${locale || '/en'}`, () => {
+        const slug = 'vera-rubin-nvl72-agentic-inference';
+        cy.visit(`${locale}/blog/${slug}`);
+        cy.get('h1').should('have.length', 1).and('contain.text', 'Rubin NVL72');
+        cy.get('article.prose').within(() => {
+          cy.contains('Bryan Shan').should('exist');
+          cy.contains('276.24').should('exist');
+          cy.contains('171.53').should('exist');
+          cy.get('h2').should('have.length', 4);
+          cy.get(`figure img[src^="/images/${slug}/"]`)
+            .should('have.length', 16)
+            .each(($image) => {
+              cy.wrap($image)
+                .scrollIntoView()
+                .should(($img) => {
+                  expect(($img[0] as HTMLImageElement).naturalWidth).to.be.greaterThan(0);
+                  expect($img.attr('alt')?.length ?? 0).to.be.greaterThan(0);
+                });
+            });
+          cy.contains(locale ? '本站转载原文的公开部分' : 'publicly available portion').should(
+            'exist',
+          );
+          cy.get(`a[href="https://newsletter.semianalysis.com/p/${slug}"]`)
+            .last()
+            .should('contain.text', locale ? '订阅者专属' : 'subscriber-only');
+        });
+        cy.get('link[rel="alternate"][hreflang="en"]')
+          .should('have.attr', 'href')
+          .and('include', `/blog/${slug}`);
+        cy.get('link[rel="alternate"][hreflang="zh-CN"]')
+          .should('have.attr', 'href')
+          .and('include', `/zh/blog/${slug}`);
+      });
+    }
+  });
+
   describe('Blog listing page', () => {
     before(() => {
       cy.visit('/blog');
     });
 
     it('renders the blog page with heading', () => {
-      cy.get('h2').should('contain.text', 'Articles');
+      cy.get('h1').should('have.length', 1).and('contain.text', 'Articles');
+      cy.get('h2#blog-list-heading').should('contain.text', 'All articles');
     });
 
     it('displays at least one blog post card', () => {

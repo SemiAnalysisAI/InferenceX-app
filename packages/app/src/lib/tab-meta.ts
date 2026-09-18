@@ -46,6 +46,11 @@ export const TAB_META: Record<DashboardRouteKey, { title: string; description: s
     description:
       'Project a fixed AI inference fleet across its life: size it against a facility power budget, then track revenue, cost, and margin as measured software configs improve over time.',
   },
+  'cache-reuse': {
+    title: 'Prefix Cache Reuse',
+    description:
+      'See where an AI inference configuration finds its prompt tokens as concurrency rises: HBM cache hits, host-tier cache hits, or recomputation. Measured runtime cache counters for every model and chip.',
+  },
   'profit-estimator': {
     title: 'Inference Profit Estimator',
     description:
@@ -65,6 +70,11 @@ export const TAB_META: Record<DashboardRouteKey, { title: string; description: s
     title: 'Chip Specifications & Comparison',
     description:
       'Detailed chip specifications for AI inference. Compare NVIDIA, AMD, and Intel chips — memory bandwidth, FLOPS, interconnects, and topology.',
+  },
+  operatorx: {
+    title: 'OperatorX GEMM, Attention and MoE Benchmarks',
+    description:
+      'Measured GEMM, attention and routed MoE TFLOPS per GPU and latency from OperatorX, with shape, precision, backend, and run coverage.',
   },
   collectivex: {
     title: 'CollectiveX Communication Benchmarks',
