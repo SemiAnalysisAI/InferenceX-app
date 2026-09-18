@@ -95,9 +95,14 @@ facility kW/GPU used to calculate capacity per GW. Consequently, revenue,
 compute expense, license fee, and profit scale together; profit margin does not
 change. Electricity expense is not recomputed separately.
 
-This opt-in AgentX estimate requires validated schema-v2 telemetry and a complete
-single-node eight-GPU chassis supported by the pinned model. Partial allocations,
-unsupported GB200/GB300 chassis, and missing/invalid measurements stay unavailable.
+This opt-in AgentX estimate requires validated schema-v2 telemetry and fully
+measured eight-GPU chassis supported by the pinned model: one single-node chassis,
+one chassis per measured worker host, or, for an aggregate multinode deployment
+whose producer emits no per-worker telemetry, every chassis at the deployment-mean
+GPU power (`topologyBasis: 'uniform-hosts'`; symmetric TP/PP/DP shards load each
+host alike). Partial allocations, unsupported GB200/GB300 chassis, disaggregated
+deployments without per-worker telemetry, and missing/invalid measurements stay
+unavailable.
 The ordinary 8K/1K transformation keeps its existing admission policy.
 
 At an exact frontier point, use that point's modeled power. Between points,
