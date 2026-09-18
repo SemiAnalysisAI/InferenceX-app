@@ -146,13 +146,14 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     term: '吞吐量',
     aliases: ['throughput', 'token 吞吐量', '总吞吐量'],
     plainEnglish: '吞吐量就是整个系统每秒一共能完成多少工作。',
-    definition: '吞吐量是推理系统在所有活跃请求上生成 token 的总速率。',
+    definition:
+      '吞吐量是系统处理各请求中 token 的速率。输出吞吐量只计生成的 token；总 token 吞吐量则按基准测试规定的统计口径，计入输入和输出 token。',
     explanation:
       'InferenceX 通常使用每芯片每秒 token 数进行归一化，便于比较不同规模的系统。提高批大小或并发往往能摊薄权重读取和计算成本，从而提高总吞吐量，但单个用户收到 token 的速度可能下降。',
     significance:
       '最大吞吐量不是完整的性能结论。某个点即使拥有最高 tok/s，也可能因为交互性过低而不适合实时产品；有效比较应在符合业务需求的延迟或交互性目标下进行。',
     benchmarkContext:
-      'InferenceX 将吞吐量与交互性放在完整并发扫描中共同展示，并用 Pareto 前沿剔除两个轴上都更差的运行点。',
+      'InferenceX 将吞吐量与交互性放在完整并发扫描中共同展示。Rubin AgentX 文章报告的是包含复用输入在内的总 token 吞吐量，不只是新生成的输出。因此，与只统计输出的结果比较前，必须先核对 token 口径。',
     measurement: { label: '常用单位', value: 'tok/s/chip' },
   },
   interactivity: {
@@ -165,7 +166,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     significance:
       '不同产品需要不同运行点。语音和交互式编程要求较高 token 速率，离线摘要则可以牺牲交互性换取更高总吞吐量；在交互性不一致时比较硬件很容易得出误导性结论。',
     benchmarkContext:
-      'InferenceX 将 tok/s/user 与吞吐量或成本一起绘制，并在等交互性表格中沿各自 Pareto 前沿插值，以固定用户体验。由于该坐标轴不计入首 token 之前的等待，agentic 图表还提供端到端归一化交互性，用同一单位把 TTFT 一并纳入。',
+      'InferenceX 将 tok/s/user 与吞吐量或成本一起绘制。Rubin AgentX 文章用 P90 全响应 token 间延迟的倒数表示 P90 交互性。匹配这一速度不代表 TTFT 或端到端延迟也相同；端到端归一化交互性是另一项指标，会把开始输出前的等待计入。',
     measurement: { label: '常用单位', value: 'token/秒/用户（tok/s/user）' },
   },
   latency: {
@@ -253,7 +254,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     explanation:
       '不同方案的并发点很少正好落在相同 tok/s/user。等交互性比较会在各自 Pareto 前沿上对共同目标插值，再比较该点的吞吐量、成本或效率。',
     significance:
-      '固定用户体验可以避免常见基准错误：某系统只有在让每个请求更慢时才达到更高吞吐量，却被错误地称为更快。',
+      '匹配流式输出速度，可以避免仅因系统以更慢的 token 速率服务更多请求，就把它称为更快。但这并未固定完整的用户体验：首 token 前的等待和整段响应耗时仍需单独比较。',
     benchmarkContext:
       'InferenceX 文章使用等交互性表格比较硬件、精度和软件；超出实测前沿的值会标记为不可达，而不会向观测区间之外外推。前沿始终建立在吞吐量与交互性之上，每百万 token 成本和每 token 焦耳则由插值得到的吞吐量推导，而不是各自单独做样条：它们都是每芯片常数除以吞吐量，单独插值会破坏两个 knot 之间的这一恒等关系。',
   },
@@ -297,7 +298,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     significance:
       '芯片峰值 FLOPS 不能单独决定服务经济性；内存、网络、软件成熟度、数值精度和实际利用率都会影响最终比值。',
     benchmarkContext:
-      'InferenceX 在匹配交互性时比较基础设施 perf/$，并明确使用的 TCO 输入。该比值不能跨模型、序列长度、精度或延迟区间直接套用。每百万 token 成本以及总 token、输入 token 和输出 token 购买力轴都采用这套 TCO 经济性口径。',
+      'InferenceX 在匹配交互性时比较基础设施 perf/$，并注明 TCO 假设。Rubin 文章约 67 倍的结果限定于 170 TPS、自有成本口径及文中指定的 TRTLLM NVFP4 Dense 配置，并非适用于整个硬件世代的倍率。目标速度、对比引擎以及自有或租赁成本口径变化时，比值也会变化。',
   },
   'total-cost-of-ownership': {
     term: '总体拥有成本',
@@ -309,7 +310,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     significance:
       'TCO 比标价更适合跨系统经济性比较，尤其是网络与电力基础设施不同的机架级产品；但它仍是模型，必须连同假设一起阅读。',
     benchmarkContext:
-      'InferenceX 将 SemiAnalysis AI Cloud 的 TCO 输入与实测 tok/s/chip 结合，从而把系统每小时成本与决定这一小时 token 产出的软件实现及工作负载特征分开考察。',
+      'InferenceX 将 SemiAnalysis AI Cloud 的 TCO 输入与实测 tok/s/chip 结合。Rubin 文章区分了两种口径：超大规模采购条件下的自有成本，包含硬件、网络、机房、电力和资本成本的摊销；以及客户支付的三年云服务预留价格。两者是可选的成本基础，不能相加；租赁价格还反映服务商的商业条款。',
   },
   'tokens-per-megawatt': {
     term: '每兆瓦 token 吞吐量',
@@ -321,7 +322,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     significance:
       '电力供应往往是新增 AI 部署的硬约束。每兆瓦生成更多 token 的系统，即使单个加速器功耗更高，也能在相同电力配额下服务更多需求。',
     benchmarkContext:
-      '比较 tokens/MW 时必须匹配模型、工作负载、精度与交互性，否则高吞吐低交互点可能看似高效，却无法满足目标用户体验。每 token 能耗表达的是同一份供电预算折算到单位输出上的结果；在遥测可信的前提下，InferenceX 还会给出加速器的实测能耗。',
+      'Rubin 文章在相同 P90 交互性下比较每兆瓦市电容量对应的总 tok/s，且只在各引擎实测区间内插值。引用倍率时须保留引擎、精度、缓存和并行配置。配置的市电功率分母属于容量模型，与加速器实测功耗或能耗遥测不同。',
     measurement: { label: '常用单位', value: '每单位配置市电兆瓦的 token/秒' },
   },
   prefill: {
@@ -368,7 +369,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
       '前缀缓存会记住重复开头的处理结果，例如相同系统提示词，让模型下次可以跳过这部分工作。',
     definition: '当前多个请求以相同 token 序列开头时，前缀缓存会复用已有 KV 缓存状态。',
     explanation:
-      '重复系统提示词、共享文档或共同对话前缀在缓存仍可用时无需再次预填充。命中缓存可显著减少提示词计算与首 token 时间。',
+      '重复系统提示词、共享文档或共同对话前缀可以复用缓存状态。智能体会话持续增长时，前几轮的输出会成为后续输入，可复用前缀也随之增加。但实际命中仍要求相关状态尚未被淘汰且能够访问；缓存淘汰或子智能体的新上下文都可能带来新的 prefill。',
     significance:
       '具有重复前缀的生产工作负载可能明显快于随机 token 基准；收益取决于命中率、缓存容量、淘汰策略与请求能否路由到持有所需状态的节点。',
     benchmarkContext:
@@ -544,7 +545,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     plainEnglish: 'NVLink 是 NVIDIA 芯片之间的高速公路，让多张芯片的协作远快于普通服务器网络。',
     definition: 'NVLink 是 NVIDIA 用于 scale-up 域内芯片直接数据传输的高带宽加速器互连。',
     explanation:
-      'NVSwitch 系统连接多个 NVLink 端点，使集体通信可覆盖八卡服务器，或在 NVL72 产品中覆盖 72 芯片机架级域；该带宽不同于连接独立系统的 InfiniBand/Ethernet。',
+      'NVSwitch 连接多个 NVLink 端点，使集合通信可以覆盖单节点或包含 72 颗芯片的机架级域。互连代际取决于平台：Blackwell NVL72 使用 NVLink 5，Rubin 文章则将 NVLink 6 Switch 列为 Vera Rubin 的组成部分。这种 scale-up 互连与系统之间的网络不同。',
     significance:
       '大型 TP，尤其是 Wide EP，会在每个生成 token 上交换数据。把通信留在 NVLink 上，可让机架级方案显著快于通过 scale-out 连接的相似芯片数量。',
     benchmarkContext:
@@ -1125,13 +1126,13 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
   },
   nvl72: {
     term: 'NVL72',
-    aliases: ['NVL72', 'GB200 NVL72', 'GB300 NVL72', '机架级系统'],
+    aliases: ['NVL72', 'GB200 NVL72', 'GB300 NVL72', 'Vera Rubin NVL72', '机架级系统'],
     plainEnglish:
       'NVL72 是一个机架，其中 72 个加速器共享同一张高速网络，因而更像一台大机器而不是一个集群。',
     definition:
       'NVL72 是 NVIDIA 的机架级系统，把 72 个加速器放进同一个 NVLink scale-up 域，而不是分散在多个八芯片节点中。',
     explanation:
-      '仪表板的规格数据记录为 NVLink 5.0、每颗芯片 900 GB/s 单向带宽、scale-up world size 为 72，并通过 NVSwitch 交换。常规节点把同样的带宽限定在八颗芯片之间，超出后就要退回更慢的 scale-out 网络，因此差别不在于原始速度，而在于换用另一种网络之前能触及多少颗芯片。',
+      'NVL72 描述的是 NVLink 域的规模，并不限定某一代芯片或固定带宽。GB200 和 GB300 使用 Blackwell 世代硬件及 NVLink 5；Vera Rubin 则组合 Rubin GPU、Vera CPU 和 NVLink 6 Switch。比较时应查看具体平台，不能把 Blackwell 规格套用到所有 NVL72 机架。',
     significance:
       '开销以集合通信为主的技术，在大规模 scale-up 域中经济性会发生变化。宽专家并行把专家分散到许多芯片上，每个 token 都要付出 all-to-all 流量；在 scale-up 带宽下这可以承受，在 scale-out 网络上往往不行。',
     benchmarkContext:
@@ -1494,7 +1495,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
   },
   tdp: {
     term: '热设计功耗',
-    aliases: ['TDP', '整卡功耗', '全部包含功耗'],
+    aliases: ['TDP', '热设计功率包络'],
     plainEnglish:
       'TDP 是芯片设计上可持续消耗并以热量形式散发的功率，是每份加速器规格表上的标题瓦数。',
     definition:
@@ -1504,7 +1505,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     significance:
       '电力已成为 AI 扩建的硬约束，在许多市场甚至排在资本之前。每芯片 TDP 的持续上升迫使行业转向液冷，也让每瓦性能与每美元性能一样，成为比较芯片世代的主要维度。',
     benchmarkContext:
-      'InferenceX 用包含散热和基础设施开销的每芯片全部包含功耗来计算每 token 能耗和每兆瓦 token 数，PowerX 工作流正把这些指标从铭牌数值推向运行中的实测功耗。',
+      'Rubin 文章注明所测量产 SKU 的 TDP 为 2300 W，但设施吞吐量采用全口径市电功率归一化。TDP 既不是推理实测功耗，也不是设施总功耗。文中 DSX MaxLPS 部分讨论按工作负载规划供电，并将更细粒度的 PowerX 测量列为后续工作，没有把现有曲线当作实测功耗结果。',
   },
   pue: {
     term: '电源使用效率',
@@ -2307,6 +2308,166 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
       '池化提高了智能体负载可达到的 prefix cache 命中率，这类负载的会话会运行数百轮，子智能体还会带着全新上下文突发出现。没有池化，命中率就受限于单节点能容纳多少内容，以及路由器能否把会话固定在一台机器上。',
     benchmarkContext:
       'TPU-Sync DRAM offload 和 Mooncake Store 池化被列为 TPU InferenceX 预览的后续步骤，排在 AgentX TPU 结果之前。NVIDIA 和 AMD 的 AgentX 文章已经表明，KV 工作集大小和 offload 容量决定智能体负载的每 token 成本。',
+  },
+  'multi-turn-inference': {
+    term: '多轮推理',
+    aliases: ['multi-turn inference', '多轮服务', '多轮工作负载'],
+    plainEnglish: '多轮会话会连续向模型发送相关请求，把之前的对话和工具结果带入后续提示词。',
+    definition: '多轮推理为一系列相关的模型请求提供服务，后续输入包含前几轮留下的状态或对话历史。',
+    explanation:
+      '智能体会话可能包含数十甚至数百轮。模型输出和工具结果会扩展下一轮提示词，因此大量输入可能已有可复用的缓存状态。工具执行和请求依赖关系还会改变工作到达服务器的时间。',
+    significance:
+      '相互独立的提示词序列无法重现这些依赖关系，也无法重现不断增长的缓存工作集。缓存淘汰会导致重复 prefill；即使总吞吐量较高，某次响应过慢仍可能推迟下一轮。',
+    benchmarkContext:
+      'Rubin 文章将多轮结构列为 AgentX 工作负载的主要特征。应在相同智能体场景内比较结果，不能直接套用固定长度、独立请求测试得出的排名。',
+  },
+  'subagent-bursts': {
+    term: '子智能体请求突发',
+    aliases: ['subagent bursts', 'sub-agent bursts', '智能体突发流量'],
+    plainEnglish:
+      '智能体同时启动多个短时运行的子任务，会突然增加请求量和服务器需要保存的新上下文。',
+    definition:
+      '子智能体请求突发是指主智能体启动多个下级任务，各自发出请求序列，从而在短时间内增加推理需求。',
+    explanation:
+      '主会话可能已有很长的可复用前缀，新分支却可能从全新上下文开始。这些分支会产生重叠的 prefill 和 decode 工作，并暂时扩大 KV cache 工作集。分支的启动时间和依赖关系与请求数量同样重要。',
+    significance:
+      '较高的平均缓存命中率可能掩盖某些时段大量新增的 prefill 需求。容量规划还需考虑突发时序、缓存淘汰，以及那些必须完成后主任务才能继续的分支延迟。',
+    benchmarkContext:
+      'Rubin 文章将子智能体突发、多轮会话、长上下文和高前缀复用共同列为工作负载特征。因此，AgentX 比较的是随时间变化的请求模式，而不是由相同提示词组成的恒定批次。',
+  },
+  'p90-interactivity': {
+    term: 'P90 交互性',
+    aliases: ['P90 interactivity', 'P90 TPS', 'P90 流式输出速度'],
+    plainEnglish: 'P90 交互性把较慢尾部的 token 间隔换算成输出速率，数值越高，流式输出越快。',
+    definition:
+      '在 Rubin AgentX 分析中，P90 交互性是 P90 全响应 token 间延迟的倒数，单位为每用户每秒 token 数。',
+    explanation:
+      '计算时先取延迟的 P90，再取倒数并换算单位。P90 全响应 token 间延迟为 10 毫秒时，对应 100 tok/s/user。这并不是 token 速率的第 90 百分位数，因为正数取倒数后，大小顺序会反转。',
+    significance:
+      '分位数和延迟定义共同决定比较采用的速度约束。该指标不包含开始输出前的等待；相同的 P90 交互性仍可能对应明显不同的首 token 时间和端到端延迟。',
+    benchmarkContext:
+      'Rubin 文章在相同 P90 交互性下比较各引擎的性能前沿，只在实测区间内插值。引用吞吐量、成本或功率归一化倍率时，必须保留目标速度与对比引擎。',
+    measurement: { label: '换算关系', value: 'P90 交互性 = 1000 / P90 全响应 ITL（毫秒）' },
+  },
+  'end-to-end-latency': {
+    term: '端到端延迟',
+    aliases: ['E2E latency', 'E2EL', '请求完成时间', 'P90 端到端延迟'],
+    plainEnglish: '端到端延迟是从提交模型请求到收完完整答案的时间，包含开始输出前的等待。',
+    definition: '请求端到端延迟衡量从提交请求到收到响应最后一个 token 之间的耗时。',
+    explanation:
+      '它包含首 token 时间及后续流式输出时长。即使 token 速率相同，更长的答案也需要更多时间，因此比较时须采用可比的输出长度分布。P90 端到端延迟是请求完成时间的第 90 百分位数，不能把各阶段单独计算的 P90 延迟相加得到。',
+    significance:
+      '智能体往往需要等到完整响应到达，才能执行工具或开始下一轮。仅有较快的流式输出无法限定这段等待。单次请求延迟也不同于完整智能体任务时长，后者可能包含多次模型调用和工具执行。',
+    benchmarkContext:
+      'Rubin 文章分别绘制 P90 端到端延迟和 P90 交互性。两者结合阅读，才能区分流式输出加快与排队、prefill 或整段响应耗时缩短。',
+    measurement: { label: '常用单位', value: '每个已完成请求的秒数' },
+  },
+  'cached-input-tokens': {
+    term: '缓存输入 token',
+    aliases: ['cached input tokens', '缓存提示词 token', '缓存读取 token'],
+    plainEnglish:
+      '缓存输入 token 是提示词中可以复用先前处理结果的部分，能减少再次读取同一内容的工作。',
+    definition:
+      '缓存输入 token 是通过复用已有模型状态处理的输入 token，无需为其重新执行完整 prefill。',
+    explanation:
+      '前几轮对话经常再次出现在后续提示词中。是否命中缓存取决于状态是否保留、请求路由和可用存储。服务商可能对缓存输入、未缓存输入和生成输出分别定价，收入计算也必须区分这三类 token。',
+    significance:
+      '缓存 token 仍属于已服务的工作负载，但它不代表与输出 token 相同的新增计算量或销售价值。潜在前缀复用比例、实测缓存命中率和缓存命中的售价，是不同的量。',
+    benchmarkContext:
+      'Rubin 文章在多项比较中使用总 token 吞吐量，并在经济性讨论中区分缓存输入、未缓存输入和输出价格。不能直接将总 token 倍率套用到仅针对输出的价格上估算收入。',
+  },
+  'billable-utilization': {
+    term: '可计费利用率',
+    aliases: ['billable utilization', '可计费容量利用率'],
+    plainEnglish: '可计费利用率表示在估算期间，有多少建模服务容量实际用于付费流量。',
+    definition: '可计费利用率是经济模型中假定用于产生收入的流量占可用服务容量的比例。',
+    explanation:
+      '基准测试确定某一运行点的 token 速率；换算成年收入时，还需假设这些容量长期能售出多少。容量闲置或需求不足会降低可计费产出，即使服务栈在有负载时能达到实测速率。',
+    significance:
+      '这一假设不同于 GPU 利用率遥测或模型 FLOPS 利用率。加速器繁忙并不能证明其工作能够计费，峰值吞吐量测量也不能证明全年都有足够的客户需求。',
+    benchmarkContext:
+      'Rubin 文章的年收入和建模利润示例采用 75 TPS、60% 利用率。引用结果时须同时保留这些假设，不能将其表述为实际收入或纯硬件性能测量。',
+    measurement: { label: '经济模型假设', value: '估算期间售出的服务容量比例（%）' },
+  },
+  'annual-revenue-per-gigawatt': {
+    term: '每吉瓦年收入',
+    aliases: ['annual revenue per gigawatt', '每 GW 收入', '每吉瓦市电容量年 token 收入'],
+    plainEnglish: '这项估算计算在固定一吉瓦数据中心市电容量下，一年的 token 销售可能带来多少收入。',
+    definition: '每吉瓦年收入是将一年的建模 token 销售收入归一化到一吉瓦全口径市电容量后的指标。',
+    explanation:
+      '先在指定交互性目标下，用利用率假设把功率归一化吞吐量换算为全年可计费 token 数；再分别对缓存输入、未缓存输入和输出应用各自价格，最后合计收入。吉瓦表示功率额度，年度则提供时间维度。',
+    significance:
+      '该指标把服务效率与电力受限的商业模型联系起来。它不仅取决于实测吞吐量，还取决于需求、价格、token 构成和利用率；扣除成本及适用的许可费后，才能讨论利润。',
+    benchmarkContext:
+      'Rubin 文章在 75 TPS、60% 利用率下展示年收入。每 GW 数值属于归一化估算，不能证明测试实际部署了一吉瓦设备，也不能证明预计 token 数已经售出。',
+    measurement: { label: '常用单位', value: '美元/市电吉瓦/年' },
+  },
+  'modeled-profit-per-gigawatt': {
+    term: '每吉瓦建模利润',
+    aliases: ['modeled profit per gigawatt', '每 GW 利润', '每吉瓦市电容量年建模利润'],
+    plainEnglish:
+      '该估算从一吉瓦市电容量对应的年度 token 收入中，扣除建模服务成本和适用的模型许可费。',
+    definition:
+      '每吉瓦建模利润是在年度 token 收入中扣除模型所包含的成本和许可费，再按一吉瓦全口径市电容量归一化的结果。',
+    explanation:
+      '该结果沿用收入模型的交互性、token 价格、缓存构成和利用率假设。计算费用使用选定的自有或租赁成本口径。如果模型许可费按收入比例收取，应基于收入计算，而不是先扣除计算费用后的余额。',
+    significance:
+      '这是具有明确口径的经济估算，并非经审计的企业净利润。模型之外的成本会影响实际利润；即使硬件基准性能不变，需求不足或 token 价格下降也会降低收益。',
+    benchmarkContext:
+      'Rubin 文章的 75 TPS 示例采用 60% 利用率，并假设采用 MIT 许可的 DeepSeek V4 Pro 无需模型许可费。将 GW 结果线性缩放到较小部署时，仍沿用这些假设，并非实测的集群利润。',
+    measurement: { label: '常用单位', value: '建模利润美元/市电吉瓦/年' },
+  },
+  'utility-power-budget': {
+    term: '市电功率预算',
+    aliases: ['utility power budget', '全口径市电功率', '数据中心电力额度'],
+    plainEnglish: '市电功率预算是整个数据中心可用的供电容量，包含为服务器供电和制冷的配套设备。',
+    definition: '市电功率预算是在市电接入边界，为 IT 设备和配套基础设施配置的设施供电容量。',
+    explanation:
+      '加速器 TDP 描述组件级设计包络。设施预算还需容纳主机、网络、电力转换、制冷以及口径内的其他开销。在计算能部署多少硬件或提供多少 token 吞吐量之前，必须统一说明系统边界。',
+    significance:
+      '如果一个系统只计算芯片功耗，另一个却计算市电功耗，效率比值就会失真。配置容量与运行实测功耗回答的也是不同问题：前者描述部署额度，后者描述特定负载下的消耗。',
+    benchmarkContext:
+      'Rubin 文章按市电 MW 归一化吞吐量，并按全口径市电 GW 归一化年度经济指标。DSX MaxLPS 部分讨论利用工作负载功耗画像，在该额度内增加硬件部署，而不是把 TDP 当作推理实测功耗。',
+  },
+  'dsx-maxlps': {
+    term: 'DSX MaxLPS',
+    aliases: ['NVIDIA DSX MaxLPS', '动态功率调配'],
+    plainEnglish:
+      'DSX MaxLPS 根据工作负载需求管理数据中心功率，以利用保守峰值供电规划下闲置的容量。',
+    definition:
+      'DSX MaxLPS 是 Rubin 文章讨论的 NVIDIA 功率管理方案，用于在受限的数据中心电力额度内动态管理功率。',
+    explanation:
+      '如果按所有加速器同时达到峰值功耗规划供电，而推理实际功耗低于设计包络，就会留下闲置容量。文章描述了对当前及代表性未来负载进行功耗分析，再在数据中心内调配功率，从而在现有电力容量内提高部署密度。',
+    significance:
+      '可获得的空间取决于实际负载行为和安全的功率控制策略。它不会使供电容量无限增长，也不保证增加加速器后在任何需求模式下都能维持延迟。功耗画像必须覆盖一个有利基准点之外的条件。',
+    benchmarkContext:
+      'Rubin 文章在讨论 MaxLPS 时提到后续 PowerX 集成，但没有在展示的 AgentX 曲线中单独测量 MaxLPS 的加速效果。因此，不能把这些结果解释成该功能贡献的直接测量。',
+  },
+  'vera-rubin': {
+    term: 'Vera Rubin',
+    aliases: ['Vera Rubin 平台', 'Rubin GPU', 'Vera CPU', 'VR NVL72'],
+    plainEnglish: 'Vera Rubin 是 NVIDIA 的平台，组合 Rubin GPU、Vera CPU 及配套的互连与网络组件。',
+    definition:
+      'Vera Rubin 是 NVIDIA 的平台，文章将其描述为 Rubin GPU、Vera CPU、NVLink 6 Switch、ConnectX-9、BlueField-4 和 Spectrum-6 六款产品的协同设计。',
+    explanation:
+      '平台名称涵盖的并不只有加速器。Rubin NVL72 文章评估了采用早期预发布 TensorRT-LLM 软件的完整服务配置，并注明量产 SKU 的 TDP 为 2300 W、每个计算托盘配有 1.5 TB CPU LPDDR5X，不能将所有已公布配置视为相同。',
+    significance:
+      '智能体性能取决于计算、内存容量、通信和服务软件的相互作用。实测优势不能只归因于单一组件；机架级结果也不能证明所有模型或延迟目标下都有同样的提升。',
+    benchmarkContext:
+      '将 Vera Rubin 与 GB300 或单节点系统比较时，应保留文章的模型、引擎、精度、工作负载及交互性目标。已发布结果对应一个软件快照，文中对后续提升的预期属于预测，而非测量。',
+  },
+  'extreme-co-design': {
+    term: '极致协同设计',
+    aliases: ['extreme co-design', '平台协同设计', '软硬件协同设计'],
+    plainEnglish: '协同设计把相互依赖的系统组件一起开发，减少其他环节的瓶颈对局部性能提升的抵消。',
+    definition:
+      '极致协同设计是 Rubin 文章使用的术语，指围绕目标工作负载，协调开发加速器、主机、互连和网络产品。',
+    explanation:
+      '更快的 GPU 仍可能等待内存、通信或请求调度。联合设计这些组件，会改变服务栈能够使用的资源。文章列出了六款协同产品：Rubin GPU、Vera CPU、NVLink 6 Switch、ConnectX-9、BlueField-4 和 Spectrum-6。',
+    significance:
+      '这一概念关注完整系统性能，而不只看峰值算力。它是一种架构设计方法，不是基准指标，也不是通过独立实验验证的某个吞吐量倍率的归因。',
+    benchmarkContext:
+      'AgentX 在多轮流量下测量最终软硬件配置。Rubin 文章并未分别改变六款产品来做控制变量实验，因此不能将实测增益分配给各组件，也不能据此确定通用的协同设计加速倍数。',
   },
 };
 
