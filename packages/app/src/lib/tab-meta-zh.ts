@@ -42,6 +42,11 @@ export const TAB_META_ZH: Record<DashboardRouteKey, { title: string; description
     description:
       '测算固定 AI 推理集群在整个生命周期内的经济性：按设施功率预算确定集群规模，并跟踪实测软件配置随时间改进带来的收入、成本与利润变化。',
   },
+  'cache-reuse': {
+    title: '前缀缓存复用',
+    description:
+      '查看 AI 推理配置在并发数上升时 prompt token 的来源：HBM 缓存命中、主机层缓存命中，还是重新计算。数据取自运行时实测的缓存计数，覆盖全部模型与芯片。',
+  },
   'profit-estimator': {
     title: '推理利润估算器',
     description:
@@ -115,6 +120,8 @@ export const TAB_INTRO_ZH: Record<DashboardRouteKey, string> = {
     '本页面提供吞吐量与总拥有成本（TCO）计算器：基于真实基准测试数据，估算不同芯片配置下 LLM 推理服务的每百万 token 成本与性价比。',
   fleet:
     '本页面提供集群生命周期经济性分析：按设施功率预算确定固定集群的规模，从模型发布之日起，基于历史基准测试中实测的软件配置改进，测算收入、成本、利润与回本时间。',
+  'cache-reuse':
+    '本页面展示前缀缓存复用情况：选定模型与配置后，按并发数逐档以堆叠柱形拆分 prompt token 的来源，分为芯片 HBM 缓存命中、主机层缓存命中与未复用（重新计算）三部分，并可叠加 trace 的理论上限。所有数值均来自运行时实测的缓存计数，可追溯到对应的 GitHub Actions 运行记录。',
   'profit-estimator':
     '本页面提供推理利润估算器：在选定的交互性与利用率下，按每芯片每小时计算各芯片的收入，并以堆叠柱形拆分为算力支出（TCO $/chip/hr）、模型实验室从收入中抽取的许可费，以及运营方所剩利润。',
   'profit-estimator-per-gigawatt':
@@ -148,6 +155,7 @@ export const TAB_LABELS_ZH: Record<DashboardRouteKey, string> = {
   historical: '历史趋势',
   calculator: 'TCO 计算器',
   fleet: '集群生命周期',
+  'cache-reuse': '前缀缓存复用',
   'profit-estimator': '利润估算',
   'profit-estimator-per-gigawatt': '每吉瓦利润估算',
   reliability: '可靠性',

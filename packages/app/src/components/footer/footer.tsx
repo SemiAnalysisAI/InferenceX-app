@@ -37,6 +37,7 @@ const STRINGS = {
     historicalTrends: 'Historical Trends',
     tcoCalculator: 'TCO Calculator',
     fleetLifecycle: 'Fleet Lifecycle',
+    cacheReuse: 'Prefix Cache Reuse',
     gpuReliability: 'Chip Reliability',
     gpuSpecsDashboard: 'Chip Specs Dashboard',
     perfPerDollar: 'Performance per Dollar',
@@ -72,6 +73,7 @@ const STRINGS = {
     historicalTrends: '历史趋势',
     tcoCalculator: 'TCO 计算器',
     fleetLifecycle: '集群生命周期',
+    cacheReuse: '前缀缓存复用',
     gpuReliability: '芯片可靠性',
     gpuSpecsDashboard: '芯片规格仪表板',
     apiReference: 'API 文档',
@@ -299,6 +301,14 @@ export const Footer = ({ starCount }: { starCount?: number | null }) => {
                   onClick={() => track('footer_fleet_clicked')}
                 >
                   {t.fleetLifecycle}
+                </Link>
+                <Link
+                  data-testid="footer-link-cache-reuse"
+                  href={`${prefix}/cache-reuse`}
+                  className="inline-flex min-h-11 items-center rounded-sm py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:outline-none md:min-h-8"
+                  onClick={() => track('footer_cache_reuse_clicked')}
+                >
+                  {t.cacheReuse}
                 </Link>
                 <Link
                   data-testid="footer-link-reliability"
