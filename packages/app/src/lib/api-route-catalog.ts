@@ -54,7 +54,7 @@ export const apiRouteCatalog = [
       en: 'UI-only live GPU metric artifact lookup (raw rows, or `series=power` one-second buckets for the PowerX timeline); its run artifact shape is not a stable public contract.',
       zh: '仅供界面读取实时 GPU 指标制品（原始行，或供 PowerX 时间线使用的 `series=power` 一秒分桶数据）；其运行制品结构不是稳定的公开契约。',
     },
-    sourceSha256: '25ec089bd7b7c68d886c50dc8d35749c8024530069809c6c4f9a666b23a8d07e',
+    sourceSha256: 'e1f311b95dc1f2815b88d11ff9e2f6de5e9f9c4b47217eb3fc04c83faaaaaba4',
   },
   {
     source: 'src/app/api/openapi.json/route.ts',
