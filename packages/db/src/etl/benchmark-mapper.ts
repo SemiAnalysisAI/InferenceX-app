@@ -7,6 +7,7 @@
 import type { ConfigParams } from './config-cache';
 import type { SkipTracker } from './skip-tracker';
 import {
+  CPU_SIDE_POWER_METRIC_KEYS,
   MEASURED_POWER_METRIC_KEYS,
   METRIC_KEYS,
   PRECISION_KEYS,
@@ -589,15 +590,24 @@ export function normalizePowerContractMetrics(
 
 /**
  * Enforces fail-closed power publication at ingest. An explicit normalized
- * invalid verdict removes every measured field while preserving the contract
- * and diagnostic fields; legacy rows without a verdict remain unchanged.
- * Returns true so callers also drop worker telemetry. Paths that bypass
- * `mapBenchmarkRow` must normalize the verdict before calling this function.
- * Queries intentionally remain raw; the frontend withholds independently.
+ * invalid GPU verdict removes every GPU-side measured field while preserving
+ * the contract and diagnostic fields; legacy rows without a verdict remain
+ * unchanged. The NVL72 CPU-side keys follow their own `cpu_power_valid`
+ * verdict instead: anything but a normalized 1 withholds them, because no
+ * legacy rows predate that verdict and the estimator admits rows the same way.
+ * Returns true when GPU power was withheld so callers also drop worker
+ * telemetry. Paths that bypass `mapBenchmarkRow` must normalize the verdicts
+ * before calling this function. Queries intentionally remain raw; the
+ * frontend withholds independently.
  */
 export function scrubWithheldPowerMetrics(metrics: Record<string, number>): boolean {
+  if (metrics.cpu_power_valid !== 1) {
+    for (const key of CPU_SIDE_POWER_METRIC_KEYS) delete metrics[key];
+  }
   if (metrics.power_valid !== 0) return false;
-  for (const key of MEASURED_POWER_METRIC_KEYS) delete metrics[key];
+  for (const key of MEASURED_POWER_METRIC_KEYS) {
+    if (!CPU_SIDE_POWER_METRIC_KEYS.has(key)) delete metrics[key];
+  }
   return true;
 }
 

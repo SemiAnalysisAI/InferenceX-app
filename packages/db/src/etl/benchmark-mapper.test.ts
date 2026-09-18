@@ -1,5 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
-import { MEASURED_POWER_METRIC_KEYS } from '@semianalysisai/inferencex-constants';
+import {
+  CPU_SIDE_POWER_METRIC_KEYS,
+  MEASURED_POWER_METRIC_KEYS,
+} from '@semianalysisai/inferencex-constants';
 import {
   extractPowerAudit,
   extractPowerInvalidReasons,
@@ -88,7 +91,8 @@ function dirtyPowerPayload(): Record<string, any> {
     peak_temp_c: 79.2,
     avg_util_pct: 88.5,
     avg_mem_used_mb: 71234.5,
-    // NVL72 CPU-side measurements share the GPU window; withheld with the GPU verdict.
+    // NVL72 CPU-side measurements share the GPU window but follow their own
+    // cpu_power_valid verdict; tests that want them kept must supply it.
     avg_cpu_socket_power_w: 250.5,
     avg_total_cpu_power_w: 1002,
     total_cpu_energy_j: 601200,
@@ -100,6 +104,11 @@ function dirtyPowerPayload(): Record<string, any> {
     ],
   };
 }
+
+const CPU_SIDE_KEYS = [...CPU_SIDE_POWER_METRIC_KEYS];
+const GPU_SIDE_KEYS = [...MEASURED_POWER_METRIC_KEYS].filter(
+  (key) => !CPU_SIDE_POWER_METRIC_KEYS.has(key),
+);
 
 describe('mapBenchmarkRow', () => {
   describe('v1 schema', () => {
@@ -345,34 +354,69 @@ describe('mapBenchmarkRow', () => {
       expect(result!.metrics.median_ttft).toBe(50.2);
     });
 
-    it('withholds the CPU-side measurements but keeps the independent cpu_power_valid verdict', () => {
+    // Ticket 01 contract: cpu_power_valid is independent of power_valid. Each leg
+    // withholds only its own keys; worker telemetry belongs to the GPU leg.
+    it.each([
+      { power_valid: 1, cpu_power_valid: 1, gpuKept: true, cpuKept: true },
+      { power_valid: 1, cpu_power_valid: 0, gpuKept: true, cpuKept: false },
+      { power_valid: 0, cpu_power_valid: 1, gpuKept: false, cpuKept: true },
+      { power_valid: 0, cpu_power_valid: 0, gpuKept: false, cpuKept: false },
+    ])(
+      'withholds each leg on its own verdict: power_valid=$power_valid cpu_power_valid=$cpu_power_valid',
+      ({ power_valid, cpu_power_valid, gpuKept, cpuKept }) => {
+        const tracker = createSkipTracker();
+        const dirty = dirtyPowerPayload();
+        const result = mapBenchmarkRow(
+          makeV2Row({ power_valid, power_metric_schema_version: 2, cpu_power_valid, ...dirty }),
+          tracker,
+        );
+
+        expect(result!.metrics.power_valid).toBe(power_valid);
+        expect(result!.metrics.cpu_power_valid).toBe(cpu_power_valid);
+        for (const key of GPU_SIDE_KEYS) {
+          if (gpuKept) expect(result!.metrics[key]).toBe(dirty[key]);
+          else expect(result!.metrics).not.toHaveProperty(key);
+        }
+        for (const key of CPU_SIDE_KEYS) {
+          if (cpuKept) expect(result!.metrics[key]).toBe(dirty[key]);
+          else expect(result!.metrics).not.toHaveProperty(key);
+        }
+        if (gpuKept) expect(result!.workers).toHaveLength(2);
+        else expect(result!.workers).toBeUndefined();
+      },
+    );
+
+    it('withholds CPU-side keys that arrive without a cpu_power_valid verdict or with a malformed one', () => {
+      // No legacy rows predate cpu_power_valid, so absence is out of contract and fails closed.
       const tracker = createSkipTracker();
-      const result = mapBenchmarkRow(
+      const dirty = dirtyPowerPayload();
+      const absent = mapBenchmarkRow(
+        makeV2Row({ power_valid: 1, power_metric_schema_version: 2, ...dirty }),
+        tracker,
+      );
+      expect(absent!.metrics).not.toHaveProperty('cpu_power_valid');
+      for (const key of CPU_SIDE_KEYS) expect(absent!.metrics).not.toHaveProperty(key);
+      for (const key of GPU_SIDE_KEYS) expect(absent!.metrics[key]).toBe(dirty[key]);
+
+      const malformed = mapBenchmarkRow(
         makeV2Row({
-          power_valid: 0,
+          power_valid: 1,
           power_metric_schema_version: 2,
-          cpu_power_valid: 1,
-          ...dirtyPowerPayload(),
+          cpu_power_valid: 'garbage',
+          ...dirty,
         }),
         tracker,
       );
-      expect(result!.metrics.cpu_power_valid).toBe(1);
-      for (const key of [
-        'avg_cpu_socket_power_w',
-        'avg_total_cpu_power_w',
-        'total_cpu_energy_j',
-        'avg_total_module_power_w',
-        'total_module_energy_j',
-      ]) {
-        expect(result!.metrics).not.toHaveProperty(key);
-      }
+      expect(malformed!.metrics.cpu_power_valid).toBe(0);
+      for (const key of CPU_SIDE_KEYS) expect(malformed!.metrics).not.toHaveProperty(key);
+      for (const key of GPU_SIDE_KEYS) expect(malformed!.metrics[key]).toBe(dirty[key]);
     });
 
-    it('keeps every measured key and the workers payload on a valid verdict', () => {
+    it('keeps every measured key and the workers payload on valid verdicts', () => {
       const tracker = createSkipTracker();
       const dirty = dirtyPowerPayload();
       const result = mapBenchmarkRow(
-        makeV2Row({ power_valid: 1, power_metric_schema_version: 2, ...dirty }),
+        makeV2Row({ power_valid: 1, power_metric_schema_version: 2, cpu_power_valid: 1, ...dirty }),
         tracker,
       );
 
@@ -383,13 +427,13 @@ describe('mapBenchmarkRow', () => {
       expect(result!.workers).toHaveLength(2);
     });
 
-    it('leaves legacy rows without a verdict untouched (historical measurements kept)', () => {
+    it('leaves legacy rows without a GPU verdict untouched (historical measurements kept)', () => {
       const tracker = createSkipTracker();
       const dirty = dirtyPowerPayload();
       const result = mapBenchmarkRow(makeV2Row(dirty), tracker);
 
       expect(result!.metrics).not.toHaveProperty('power_valid');
-      for (const key of MEASURED_POWER_METRIC_KEYS) {
+      for (const key of GPU_SIDE_KEYS) {
         expect(result!.metrics[key]).toBe(dirty[key]);
       }
       expect(result!.workers).toHaveLength(2);
@@ -947,12 +991,33 @@ describe('scrubWithheldPowerMetrics (direct — supplemental ingest path)', () =
     expect(metrics.tput_per_gpu).toBe(567.8);
   });
 
-  it('leaves power_valid=1 and legacy no-verdict records untouched', () => {
-    for (const metrics of [supplementalMetrics({ power_valid: 1 }), supplementalMetrics()]) {
+  it('leaves power_valid=1 and legacy no-GPU-verdict records untouched', () => {
+    for (const metrics of [
+      supplementalMetrics({ power_valid: 1, cpu_power_valid: 1 }),
+      supplementalMetrics({ cpu_power_valid: 1 }),
+    ]) {
       const before = { ...metrics };
       expect(scrubWithheldPowerMetrics(metrics)).toBe(false);
       expect(metrics).toEqual(before);
     }
+  });
+
+  it('withholds only the CPU-side keys on cpu_power_valid=0 and leaves GPU power published', () => {
+    const metrics = supplementalMetrics({ power_valid: 1, cpu_power_valid: 0 });
+    const before = { ...metrics };
+    expect(scrubWithheldPowerMetrics(metrics)).toBe(false);
+    expect(metrics.cpu_power_valid).toBe(0);
+    for (const key of CPU_SIDE_KEYS) expect(metrics).not.toHaveProperty(key);
+    for (const key of GPU_SIDE_KEYS) expect(metrics[key]).toBe(before[key]);
+    expect(metrics.avg_power_w).toBe(685.5);
+  });
+
+  it('keeps the CPU-side keys on power_valid=0 when cpu_power_valid=1', () => {
+    const metrics = supplementalMetrics({ power_valid: 0, cpu_power_valid: 1 });
+    expect(scrubWithheldPowerMetrics(metrics)).toBe(true);
+    for (const key of GPU_SIDE_KEYS) expect(metrics).not.toHaveProperty(key);
+    for (const key of CPU_SIDE_KEYS) expect(metrics).toHaveProperty(key);
+    expect(metrics.avg_total_module_power_w).toBe(17203);
   });
 
   it('normalizes cpu_power_valid as a verdict, independent of power_valid', () => {
@@ -960,15 +1025,21 @@ describe('scrubWithheldPowerMetrics (direct — supplemental ingest path)', () =
     normalizePowerContractMetrics(metrics, metrics);
     expect(metrics.cpu_power_valid).toBe(1);
     expect(scrubWithheldPowerMetrics(metrics)).toBe(false);
+    expect(metrics.avg_total_cpu_power_w).toBe(1002);
 
     const malformed = supplementalMetrics({ power_valid: 1, cpu_power_valid: 2 });
     normalizePowerContractMetrics(malformed, malformed);
     expect(malformed.cpu_power_valid).toBe(0);
     expect(malformed.avg_total_cpu_power_w).toBe(1002);
+    expect(scrubWithheldPowerMetrics(malformed)).toBe(false);
+    expect(malformed).not.toHaveProperty('avg_total_cpu_power_w');
+    expect(malformed.avg_power_w).toBe(685.5);
 
     const absent = supplementalMetrics({ power_valid: 1 });
     normalizePowerContractMetrics(absent, absent);
     expect(absent).not.toHaveProperty('cpu_power_valid');
+    expect(scrubWithheldPowerMetrics(absent)).toBe(false);
+    for (const key of CPU_SIDE_KEYS) expect(absent).not.toHaveProperty(key);
   });
 
   it('fails closed on a malformed verdict when composed with normalization', () => {

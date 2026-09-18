@@ -550,12 +550,14 @@ describe('NVL72 trays with measured compute-module power', () => {
   });
 
   it('falls back to GPU board plus Grace socket for GB300 trays without module keys', () => {
+    // Low-load prefill and decode trays: the rack DC of their mean sits inside the
+    // shelf curve's nonlinear 20-30% band, where per-tray evaluation would differ.
     const source = nvl72Row(
       {
-        avg_power_w: 900,
-        avg_total_gpu_power_w: 7200,
-        prefill_avg_power_w: 950,
-        decode_avg_power_w: 850,
+        avg_power_w: 500,
+        avg_total_gpu_power_w: 4000,
+        prefill_avg_power_w: 250,
+        decode_avg_power_w: 750,
         avg_cpu_socket_power_w: 260,
         avg_total_cpu_power_w: 1040,
       },
@@ -564,20 +566,18 @@ describe('NVL72 trays with measured compute-module power', () => {
         disagg: true,
         is_multinode: true,
         workers: [
-          { role: 'prefill', worker_idx: 0, num_gpus: 4, hosts: ['tray-a'], avg_power_w: 950 },
-          { role: 'decode', worker_idx: 0, num_gpus: 4, hosts: ['tray-b'], avg_power_w: 850 },
+          { role: 'prefill', worker_idx: 0, num_gpus: 4, hosts: ['tray-a'], avg_power_w: 250 },
+          { role: 'decode', worker_idx: 0, num_gpus: 4, hosts: ['tray-b'], avg_power_w: 750 },
         ],
       },
     );
-    // Grace-side watts are a deployment total; each tray receives the two-socket mean.
-    const prefill = estimateRackPower(
+    // The source model takes one compute-module figure per tray and evaluates the
+    // power-shelf curve once at rack DC load, so both trays are folded into one rack
+    // at their mean GPU-board watts; Grace-side watts are a deployment total, so each
+    // tray receives the two-socket mean.
+    const meanRack = estimateRackPower(
       'gb300',
-      { basis: 'gpu-plus-grace', gpuBoardWattsPerTray: 3800, graceSocketWattsPerTray: 520 },
-      1.1,
-    )!;
-    const decode = estimateRackPower(
-      'gb300',
-      { basis: 'gpu-plus-grace', gpuBoardWattsPerTray: 3400, graceSocketWattsPerTray: 520 },
+      { basis: 'gpu-plus-grace', gpuBoardWattsPerTray: 2000, graceSocketWattsPerTray: 520 },
       1.1,
     )!;
     expect(modelSystemPower(source)).toMatchObject({
@@ -586,15 +586,27 @@ describe('NVL72 trays with measured compute-module power', () => {
       gpuCount: 8,
       chassisCount: 2,
       modeledGpuCount: 8,
-      chassisAcWatts: prefill.rackAcWatts / 18 + decode.rackAcWatts / 18,
-      facilityWatts: prefill.facilityWatts / 18 + decode.facilityWatts / 18,
-      deploymentAcWatts: prefill.rackAcWatts / 18 + decode.rackAcWatts / 18,
+      chassisAcWatts: 2 * (meanRack.rackAcWatts / 18),
+      chassisAcWattsPerGpu: (2 * (meanRack.rackAcWatts / 18)) / 8,
+      facilityWatts: 2 * (meanRack.facilityWatts / 18),
+      deploymentAcWatts: 2 * (meanRack.rackAcWatts / 18),
       pue: 1.1,
       topologyBasis: 'nvl72-trays',
       chassisBasis: 'full',
       measuredBasis: 'gpu-plus-grace',
       sensorKind: 'grace-socket',
     });
+    // Evaluating each tray as its own hypothetical rack would place the light tray
+    // and the heavy tray at different shelf efficiencies and give a different sum.
+    const perTray = [1000, 3000].map(
+      (gpuBoardWattsPerTray) =>
+        estimateRackPower(
+          'gb300',
+          { basis: 'gpu-plus-grace', gpuBoardWattsPerTray, graceSocketWattsPerTray: 520 },
+          1.1,
+        )!.rackAcWatts / 18,
+    );
+    expect(perTray[0] + perTray[1]).not.toBeCloseTo(2 * (meanRack.rackAcWatts / 18), 1);
     // Two hosts carry four Grace sockets; any other socket count is not a tray topology.
     source.metrics.avg_total_cpu_power_w = 260 * 3;
     expect(modelSystemPower(source)).toMatchObject({ reason: 'cpu-telemetry' });

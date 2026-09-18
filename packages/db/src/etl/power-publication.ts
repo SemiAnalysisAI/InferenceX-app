@@ -32,7 +32,13 @@ const IDENTITY_FIELDS = [
   'image',
   'run_url',
 ] as const;
-const POWER_FIELDS = [...MEASURED_POWER_METRIC_KEYS, 'power_valid', 'power_metric_schema_version'];
+// The CPU-side keys are withheld on cpu_power_valid, so the manifest carries that verdict too.
+const POWER_FIELDS = [
+  ...MEASURED_POWER_METRIC_KEYS,
+  'power_valid',
+  'power_metric_schema_version',
+  'cpu_power_valid',
+];
 export interface PowerPublicationPoint {
   identity: Record<string, unknown>;
   metrics: Record<string, number>;

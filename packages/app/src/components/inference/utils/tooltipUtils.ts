@@ -7,7 +7,10 @@ import { frameworkFamily } from '@/lib/framework-family';
 import type { Locale } from '@/lib/i18n';
 import { isKvOffloadEnabled } from '@/lib/kv-offload';
 import { chipCounts } from '@/lib/chip-counts';
-import type { SystemPowerUnsupportedReason } from '@/lib/modeled-system-power';
+import type {
+  SystemPowerSensorKind,
+  SystemPowerUnsupportedReason,
+} from '@/lib/modeled-system-power';
 
 import type { HardwareConfig, InferenceData, OverlayData } from '@/components/inference/types';
 import {
@@ -230,6 +233,24 @@ const SYSTEM_POWER_STRINGS = {
       'Unmeasured chassis GPUs are assumed to run the same workload at the measured per-GPU power; deployment values are the measured GPUs’ share.',
     normalization: 'AC power is divided by all modeled chassis GPUs, including prefill and decode.',
     boundary: 'Includes GPU chassis CPUs; excludes separate CPU-only frontend/router hosts.',
+    // NVL72 compute trays: the compute module is measured, the rack residual modeled.
+    trayTopology: (trays: number, measured: number, modeled: number) => {
+      const unit = trays === 1 ? 'tray' : 'trays';
+      return measured === modeled
+        ? `${trays} full NVL72 compute ${unit} · ${measured} GPUs`
+        : `${trays} NVL72 compute ${unit} · ${measured} of ${modeled} GPUs measured, extrapolated to full ${unit}`;
+    },
+    trayExtrapolation:
+      'Unmeasured tray GPUs are assumed to run the same workload at the measured per-GPU power; a module reading already covers the whole tray. Deployment values are the measured GPUs’ share.',
+    trayAssumptions: {
+      module:
+        'Measured: module sensor (GPU + HBM + Grace + LPDDR5X). Modeled: NVSwitch trays, NICs/DPUs, NVMe, power shelves.',
+      'grace-socket':
+        'Measured: GPU board + Grace socket. Modeled: regulator loss, NVSwitch trays, NICs/DPUs, NVMe, power shelves.',
+    } satisfies Record<SystemPowerSensorKind, string>,
+    trayPlatformAssumptions: 'NVIDIA NVLink: 50%, IB: 0%; PCIe: 5%.',
+    trayNormalization: 'Rack AC is divided by all 72 GPUs of a rack of matching trays.',
+    trayBoundary: 'Grace CPU and LPDDR5X are measured; excludes CPU-only frontend/router hosts.',
     model: 'Power model source',
     unavailable: 'System-power estimate unavailable',
     reasons: {
@@ -261,6 +282,21 @@ const SYSTEM_POWER_STRINGS = {
       '假设机箱内未实测的 GPU 运行相同负载、功耗与实测每卡功耗相同；部署数值为实测 GPU 所占份额。',
     normalization: '交流功耗按所有建模机箱的 GPU 总数分摊，包括 Prefill 与 Decode。',
     boundary: '计入 GPU 机箱内的 CPU；不计入独立的纯 CPU 前端或路由主机。',
+    trayTopology: (trays: number, measured: number, modeled: number) =>
+      measured === modeled
+        ? `${trays} 个完整 NVL72 计算 tray · ${measured} 张 GPU`
+        : `${trays} 个 NVL72 计算 tray · 实测 ${measured}/${modeled} 张 GPU，按满 tray 外推`,
+    trayExtrapolation:
+      '假设 tray 内未实测的 GPU 运行相同负载、功耗与实测每卡功耗相同；模块读数本身已覆盖整个 tray。部署数值为实测 GPU 所占份额。',
+    trayAssumptions: {
+      module:
+        '实测：模块传感器（GPU + HBM + Grace + LPDDR5X）。建模：NVSwitch tray、网卡/DPU、NVMe、电源架。',
+      'grace-socket':
+        '实测：GPU 板卡 + Grace socket。建模：稳压损耗、NVSwitch tray、网卡/DPU、NVMe、电源架。',
+    } satisfies Record<SystemPowerSensorKind, string>,
+    trayPlatformAssumptions: 'NVIDIA NVLink：50%，IB：0%；PCIe：5%。',
+    trayNormalization: '机架交流功耗按由相同 tray 组成的整机架的 72 张 GPU 分摊。',
+    trayBoundary: 'Grace CPU 与 LPDDR5X 为实测值；不计入独立的纯 CPU 前端或路由主机。',
     model: '功耗模型来源',
     unavailable: '无法估算系统功耗',
     reasons: {
@@ -297,6 +333,23 @@ const modeledSystemPowerHTML = (
   }
   const sourceUrl = `https://github.com/SemiAnalysisAI/inferencex_power_model/blob/${estimate.modelRevision}/${estimate.modelPath}`;
   const readmeUrl = `https://github.com/SemiAnalysisAI/inferencex_power_model/blob/${estimate.modelRevision}/README.md`;
+  // Tray estimates measure the compute module; chassis estimates model the CPU/DRAM.
+  const tray = estimate.topologyBasis === 'nvl72-trays' ? estimate : null;
+  const topology = tray
+    ? t.trayTopology(estimate.chassisCount, estimate.gpuCount, estimate.modeledGpuCount)
+    : t.topology(estimate.chassisCount, estimate.gpuCount, estimate.modeledGpuCount);
+  const extrapolation =
+    estimate.chassisBasis === 'extrapolated'
+      ? `<br/>${tray ? t.trayExtrapolation : t.extrapolation}`
+      : '';
+  const notes = tray
+    ? [
+        t.trayAssumptions[tray.sensorKind],
+        t.trayPlatformAssumptions,
+        t.trayNormalization,
+        t.trayBoundary,
+      ]
+    : [t.assumptions, t.platformAssumptions, t.normalization, t.boundary];
   return `<div data-testid="tooltip-modeled-system-power" style="margin-top: 8px; border-top: 1px solid var(--border); padding-top: 6px;">
     <strong>${t.heading}</strong>
     ${tooltipLine(t.measuredGpu, `${fmt(estimate.measuredGpuWattsPerGpu)} W/GPU`)}
@@ -306,7 +359,7 @@ const modeledSystemPowerHTML = (
         ? `
       ${tooltipLine(t.deploymentAc, `${fmt(estimate.deploymentAcWatts)} W`)}
       ${tooltipLine(`${t.facility} (PUE ${fmt(estimate.pue)})`, `${fmt(estimate.deploymentFacilityWatts)} W`)}
-      <div style="color: var(--muted-foreground); margin-bottom: 4px;">${t.topology(estimate.chassisCount, estimate.gpuCount, estimate.modeledGpuCount)}${estimate.chassisBasis === 'extrapolated' ? `<br/>${t.extrapolation}` : ''}<br/>${t.assumptions}<br/>${t.platformAssumptions}<br/>${t.normalization}<br/>${t.boundary}</div>
+      <div style="color: var(--muted-foreground); margin-bottom: 4px;">${topology}${extrapolation}<br/>${notes.join('<br/>')}</div>
       ${tooltipLine(t.model, `<a href="${escapeHtml(sourceUrl)}" target="_blank" rel="noopener noreferrer" style="text-decoration: underline;">${escapeHtml(estimate.hardware)} · ${escapeHtml(estimate.modelRevision.slice(0, 12))}</a>`)}
       <a href="${escapeHtml(readmeUrl)}" target="_blank" rel="noopener noreferrer" style="text-decoration: underline;">${t.sweep}</a>
     `

@@ -15,6 +15,17 @@ export const AIR_COOLED_SYSTEM_PUE = 1.3;
 // Application policy for the direct-liquid-cooled NVL72 rack profiles (docs/powerx-system-power.md).
 export const DLC_SYSTEM_PUE = 1.1;
 
+/**
+ * Facility PUE applied when a caller passes none: the DLC factor for NVL72 rack
+ * profiles, the air-cooled factor for every chassis profile. The dashboard and
+ * the offline exporter share this selection so article figures match chart hovers.
+ */
+export function defaultSystemPue(hardware: string): number {
+  return Object.hasOwn(SYSTEM_POWER_RACK_PROFILES, hardware.toLowerCase())
+    ? DLC_SYSTEM_PUE
+    : AIR_COOLED_SYSTEM_PUE;
+}
+
 /** Every supported chassis model describes one complete eight-GPU HGX/OAM system. */
 const CHASSIS_GPU_COUNT = 8;
 
@@ -48,9 +59,13 @@ interface SupportedSystemPowerEstimate {
   modeledGpuCount: number;
   measuredGpuWattsPerGpu: number;
   /**
-   * Modeled AC for every full unit, summed. A tray's AC is its 1/18 share of a rack
-   * whose trays all match it, so the switch trays, shelves, and management switches
-   * are amortised over all 72 GPUs.
+   * Modeled AC for every full unit, summed. Each chassis is evaluated at its own
+   * load because it owns its fans and PSUs. Trays share the rack's power shelves,
+   * so the measured trays are folded into one rack of 18 trays matching their mean
+   * compute-module input, the shelf efficiency curve is evaluated once at that
+   * rack's DC load (as the source `gb200_nvl72_rack_power` does), and every tray
+   * takes the same 1/18 share; the switch trays, shelves, and management switches
+   * are thereby amortised over all 72 GPUs.
    */
   chassisAcWatts: number;
   /** chassisAcWatts ÷ modeledGpuCount: the plotted metric. */
@@ -140,14 +155,18 @@ function modelChassis(hardware: string, unit: MeasuredUnit, pue: number): UnitPo
 }
 
 /**
- * One tray's share of a rack whose trays all match it. The producer publishes the
- * Grace-side and module readings as deployment totals, so every tray receives the mean.
+ * One tray's 1/18 share of a rack whose 18 trays all match the measured trays' mean.
+ * The source model takes one compute-module figure per tray and evaluates the
+ * power-shelf efficiency curve once at the resulting rack DC load, so heterogeneous
+ * measured trays (prefill beside decode) are averaged before the call rather than
+ * each evaluated as its own hypothetical rack. The producer publishes the Grace-side
+ * and module readings as deployment totals, so their per-tray mean is `total / trays`.
  * The Grace CPU and LPDDR5X are never modelled: they are inside the measured reading.
  */
 function modelTray(
   hardware: string,
   profile: (typeof SYSTEM_POWER_RACK_PROFILES)[SystemPowerRackHardware],
-  unit: MeasuredUnit,
+  meanGpuBoardWattsPerTray: number,
   cpu: CpuSideTelemetry,
   trayCount: number,
   pue: number,
@@ -156,7 +175,7 @@ function modelTray(
     cpu.moduleTotalWatts === undefined
       ? {
           basis: 'gpu-plus-grace',
-          gpuBoardWattsPerTray: unit.gpuBoardWatts,
+          gpuBoardWattsPerTray: meanGpuBoardWattsPerTray,
           graceSocketWattsPerTray: cpu.graceTotalWatts / trayCount,
         }
       : { basis: 'module', moduleWattsPerTray: cpu.moduleTotalWatts / trayCount };
@@ -197,7 +216,7 @@ export function modelSystemPower(
   if (!rack && !(SUPPORTED_SYSTEM_POWER_HARDWARE as readonly string[]).includes(hardware)) {
     return unavailable('hardware');
   }
-  const facilityPue = pue ?? (rack ? DLC_SYSTEM_PUE : AIR_COOLED_SYSTEM_PUE);
+  const facilityPue = pue ?? defaultSystemPue(hardware);
   const unitGpuCount = rack ? rack.gpusPerComputeTray : CHASSIS_GPU_COUNT;
   const unitShare = (n: unknown): n is number => count(n) && n <= unitGpuCount;
   if (typeof row.disagg !== 'boolean' || typeof row.is_multinode !== 'boolean') {
@@ -361,12 +380,23 @@ export function modelSystemPower(
     return unavailable('cpu-telemetry');
   }
 
+  // Chassis own their fans and PSUs, so each is evaluated at its own load. Trays
+  // share the rack's shelves, so one rack is evaluated at the mean tray and every
+  // tray receives the same share (see modelTray).
+  const trayModel =
+    rack && cpu
+      ? modelTray(
+          hardware,
+          rack,
+          units.reduce((sum, unit) => sum + unit.gpuBoardWatts, 0) / units.length,
+          cpu,
+          units.length,
+          facilityPue,
+        )
+      : null;
   const results = units.map((unit) => ({
     ...unit,
-    model:
-      rack && cpu
-        ? modelTray(hardware, rack, unit, cpu, units.length, facilityPue)
-        : modelChassis(hardware, unit, facilityPue),
+    model: rack && cpu ? trayModel : modelChassis(hardware, unit, facilityPue),
   }));
   if (results.some((r) => r.model === null)) return unavailable('model-domain');
   const first = results[0].model!;

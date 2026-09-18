@@ -62,9 +62,13 @@ producer publishes it, otherwise GPU-board watts plus the Grace-socket total
 (`avg_total_cpu_power_w`) with the source's regulator-loss allowance on the GPU
 share. The Grace CPU and LPDDR5X are never modelled; rows without
 `cpu_power_valid=1` and the Grace-side keys stay unavailable (`cpu-telemetry`).
-Each measured worker host is one compute tray (four GPUs, two Grace sockets), and
-a tray's estimate is its 1/18 share of a rack of identical trays, so NVSwitch
-trays, power shelves, and management switches are amortised over 72 GPUs. The
+Each measured worker host is one compute tray (four GPUs, two Grace sockets). The
+measured trays are folded into one rack of 18 trays matching their mean
+compute-module input, the power-shelf efficiency curve is evaluated once at that
+rack's DC load (as the source `gb200_nvl72_rack_power` does with its single
+per-tray input), and every tray takes the same 1/18 share, so NVSwitch trays,
+power shelves, and management switches are amortised over 72 GPUs. Chassis, by
+contrast, own their fans and PSUs and are each evaluated at their own load. The
 result carries `topologyBasis: 'nvl72-trays'`, `measuredBasis`, and `sensorKind`.
 A partially allocated tray extrapolates only the GPU-board share (a module reading
 already covers the whole tray) and is labeled `extrapolated`. The pinned revision
@@ -121,9 +125,10 @@ share only). A present-but-invalid module key makes the row unavailable
 (`cpu-telemetry`); it never falls back to the Grace socket silently.
 
 **Modeled residual.** Everything outside the compute modules comes from the pinned
-profile (`rackProfiles`), evaluated for a rack of 18 identical trays and amortised
-over 72 GPUs; the parameters marked UNVERIFIED carry a documented range in
-`unverifiedParameters` and no published rail:
+profile (`rackProfiles`), evaluated once for a rack of 18 trays at the measured
+trays' mean input (the shelf curve sees the whole rack's DC load, never one tray's)
+and amortised over 72 GPUs; the parameters marked UNVERIFIED carry a documented
+range in `unverifiedParameters` and no published rail:
 
 | Component (per rack unless noted)      | GB200                                                                                | GB300                                          | Source status                            |
 | -------------------------------------- | ------------------------------------------------------------------------------------ | ---------------------------------------------- | ---------------------------------------- |
@@ -227,6 +232,16 @@ bun packages/app/scripts/export-modeled-system-power.ts \
   --output /path/to/new-current-qwen-comparison --pue 1.3
 ```
 
+Without `--pue`, each row uses the dashboard's default for its hardware (`1.3` for
+the air-cooled chassis profiles, `1.1` for the DLC NVL72 rack profiles) through the
+same `modelSystemPower` path the chart uses, so article figures match chart hovers;
+`metadata.pue_override` records an explicit `--pue`, which then applies to every
+row, and `metadata.pue_defaults` records the per-hardware defaults. NVL72 rows also
+carry `measured_basis`, `sensor_kind`, the Grace-socket and module measured inputs
+under their own `cpu_power_valid`, the rack profile's `model_path` and assumptions,
+and rack-specific `calculation_boundary` / `extrapolation_note` text; x86 rows are
+unchanged.
+
 The maintained input shape is `ComparisonInput` in the script:
 
 ```ts
@@ -299,16 +314,23 @@ worker 主机视为一个计算 tray（4 张 GPU、2 个 Grace socket）。输�
 （`avg_total_module_power_w`）；缺失时改用 GPU 板卡功耗加 Grace socket 功耗
 （`avg_total_cpu_power_w`），并按来源模型计入 GPU 份额的稳压损耗余量。Grace CPU 与
 LPDDR5X 从不建模，缺少 `cpu_power_valid=1` 和 Grace 侧指标的行保持不可用
-（`cpu-telemetry`）。单个 tray 的估算取由相同 tray 组成的整机架的 1/18，因此 NVSwitch
-tray、电源架和管理交换机按 72 张 GPU 分摊；部分分配的 tray 只外推 GPU 板卡份额
-（模块读数本身已覆盖整个 tray），并标记为 `extrapolated`。缺失、无效和不支持的
-情况保持不可用。纯 CPU frontend worker 不计入 GPU 机箱数；独立的纯 CPU
-frontend/router 主机不在估算范围内，GPU 机箱内的 CPU 功率仍按 20% 利用率计算。
+（`cpu-telemetry`）。实测的各 tray 先折算为一个由 18 个与其均值相同的 tray 组成的
+整机架，电源架效率曲线只在该机架的直流总负载处求值一次（与来源模型
+`gb200_nvl72_rack_power` 只接受单一 per-tray 输入的做法一致），每个 tray 取其 1/18，
+因此 NVSwitch tray、电源架和管理交换机按 72 张 GPU 分摊；机箱则各自拥有风扇和 PSU，
+仍按各自负载单独求值。部分分配的 tray 只外推 GPU 板卡份额（模块读数本身已覆盖整个
+tray），并标记为 `extrapolated`。缺失、无效和不支持的情况保持不可用。纯 CPU frontend
+worker 不计入 GPU 机箱数；独立的纯 CPU frontend/router 主机不在估算范围内，GPU 机箱内
+的 CPU 功率仍按 20% 利用率计算。
 
 导出时每次测量先独立计算，再对同一 cell 的重复测量取平均。能耗使用审计记录中的
 实际窗口和成功 token 数，按实测 GPU 的份额计算，明确标记为估计值，不改写原有
 GPU 实测指标。当前 API 快照与原文章冻结数据分别导出，避免混用不同时间和配置的
-结果。
+结果。未指定 `--pue` 时，每行按其硬件采用与仪表板相同的默认 PUE（风冷机箱 1.3，
+液冷 NVL72 机架 1.1），因此文章数据与图表悬停一致；显式 `--pue` 记录在
+`metadata.pue_override` 中并覆盖所有行。NVL72 行另附实测口径、传感器类型、
+按 `cpu_power_valid` 保留的 Grace socket 与模块实测输入、机架 profile 及其假设，
+以及机架专用的边界与外推说明；x86 行保持不变。
 
 **NVL72 机架估算（GB200、GB300）。** 实测输入：每个计算 tray 使用实测的计算模块功耗，
 Grace CPU 与 LPDDR5X 从不建模。生产端的 CPU 功耗采集（srt-slurm，ACPI hwmon）在与
@@ -323,8 +345,9 @@ GPU 能耗相同的正式窗口内输出 `avg_cpu_socket_power_w`、`avg_total_c
 并仅对 GPU 份额计入来源模型的稳压损耗余量）。模块指标存在但无效时该行不可用
 （`cpu-telemetry`），不会悄然回退到 Grace socket。
 
-建模残差：计算模块之外的部分全部来自固定版本 profile（`rackProfiles`），按 18 个
-相同 tray 组成的整机架求值并分摊到 72 张 GPU：NVSwitch tray 硅片功耗（9 个 tray，
+建模残差：计算模块之外的部分全部来自固定版本 profile（`rackProfiles`），按实测 tray
+均值构成的 18 tray 整机架求值一次（电源架曲线看到的是整机架直流负载，而非单个
+tray），再分摊到 72 张 GPU：NVSwitch tray 硅片功耗（9 个 tray，
 `blackwell_nvswitch` 模型，`u_nvlink` 0.5）及 tray 残差（50 W，UNVERIFIED）；每个计算
 tray 的网卡与光模块（GB200 为 ConnectX-7，4 × 31.5 W；GB300 为 ConnectX-8，4 × 78.8 W）、
 BlueField-3 DPU 空闲功耗（2 × 65 W）、NVMe 空闲功耗（22 W）、风扇（130 W，UNVERIFIED）

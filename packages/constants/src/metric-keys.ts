@@ -1,8 +1,36 @@
 /**
- * Power, energy, and GPU telemetry withheld at ingest and display when the
- * normalized `power_valid` verdict is 0. Contract and diagnostic fields are
- * excluded so the invalid verdict remains auditable. Add new measured fields
- * here; `METRIC_KEYS` derives from this list.
+ * NVL72 Grace-side and compute-module measurements from the srt-slurm CPU power
+ * leg (ACPI hwmon), integrated over the same formal window as GPU energy. They
+ * are withheld on their own `cpu_power_valid` verdict, never on `power_valid`:
+ * the leg has its own sensors, window bracketing and gap checks, so a failed
+ * GPU leg says nothing about them and vice versa. Unlike `power_valid`, no
+ * legacy rows predate the verdict, so an absent verdict withholds them too.
+ * avg_cpu_socket_power_w:   mean over sockets of each socket's window-mean Grace-side W
+ * avg_total_cpu_power_w:    sum over sockets of window-mean Grace-side W
+ * total_cpu_energy_j:       Grace-side energy over the window, all sockets
+ * avg_total_module_power_w / total_module_energy_j: whole compute module
+ *                           (Grace + GPUs + HBM + LPDDR5X + regulator loss), only when
+ *                           the module sensor exists on every socket
+ */
+export const CPU_SIDE_POWER_METRIC_KEY_LIST = [
+  'avg_cpu_socket_power_w',
+  'avg_total_cpu_power_w',
+  'total_cpu_energy_j',
+  'avg_total_module_power_w',
+  'total_module_energy_j',
+] as const;
+
+export const CPU_SIDE_POWER_METRIC_KEYS: ReadonlySet<string> = new Set(
+  CPU_SIDE_POWER_METRIC_KEY_LIST,
+);
+
+/**
+ * Every measured power, energy, and telemetry field. GPU-side fields are
+ * withheld at ingest and display when the normalized `power_valid` verdict is
+ * 0; the `CPU_SIDE_POWER_METRIC_KEY_LIST` subset follows `cpu_power_valid`
+ * instead. Contract and diagnostic fields are excluded so the invalid verdict
+ * remains auditable. Add new measured fields here; `METRIC_KEYS` derives from
+ * this list.
  */
 export const MEASURED_POWER_METRIC_KEY_LIST = [
   // measured power / energy (emitted by runner's aggregate_power.py)
@@ -46,19 +74,7 @@ export const MEASURED_POWER_METRIC_KEY_LIST = [
   'peak_temp_c',
   'avg_util_pct',
   'avg_mem_used_mb',
-  // NVL72 Grace-side and compute-module measurements from the srt-slurm CPU power
-  // leg (ACPI hwmon), integrated over the same formal window as GPU energy.
-  // avg_cpu_socket_power_w:   mean over sockets of each socket's window-mean Grace-side W
-  // avg_total_cpu_power_w:    sum over sockets of window-mean Grace-side W
-  // total_cpu_energy_j:       Grace-side energy over the window, all sockets
-  // avg_total_module_power_w / total_module_energy_j: whole compute module
-  //                           (Grace + GPUs + HBM + LPDDR5X + regulator loss), only when
-  //                           the module sensor exists on every socket
-  'avg_cpu_socket_power_w',
-  'avg_total_cpu_power_w',
-  'total_cpu_energy_j',
-  'avg_total_module_power_w',
-  'total_module_energy_j',
+  ...CPU_SIDE_POWER_METRIC_KEY_LIST,
 ] as const;
 
 export const MEASURED_POWER_METRIC_KEYS: ReadonlySet<string> = new Set(
@@ -79,9 +95,10 @@ export const POWER_METRIC_KEYS = [
   'power_valid',
   'power_metric_schema_version',
   // cpu_power_valid: numeric 1/0 verdict for the NVL72 CPU-side leg, independent
-  //                  of power_valid; 0 means the producer emitted no CPU-side keys
+  //                  of power_valid; anything but 1 withholds the CPU-side keys
   'cpu_power_valid',
   // measured power / energy / telemetry values, withheld when power_valid = 0
+  // (GPU side) or cpu_power_valid != 1 (CPU side)
   ...MEASURED_POWER_METRIC_KEY_LIST,
 ] as const;
 
