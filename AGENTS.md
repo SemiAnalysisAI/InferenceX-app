@@ -2,6 +2,12 @@
 
 For detailed subsystem docs, see [docs/index.md](./docs/index.md).
 
+## AI model disclosure
+
+Every PR description must include an **AI model disclosure** section naming the exact model/version used to prepare the PR. List each contributing model and its role, including delegated agents. Tool names such as Claude Code, Cursor, or Perplexity Computer are not model identities. Copy the model identifier exposed by the runtime; do not guess an unavailable identifier. If the runtime does not expose the exact model, explicitly state that it could not be verified. Human-only PRs must state `No AI used`. Keep the disclosure current when later edits use another model.
+
+## Contribution requirements
+
 > **PR and GitHub-issue titles & descriptions must be bilingual — include a Simplified Chinese version in addition to English.** Title format: `<English title> / <中文标题>` (keep bracket prefixes at the front untranslated). In the PR/issue body, follow the English content with a `## 中文说明` section mirroring the summary; don't translate code blocks, logs, or stack traces — summarize around them. **Commit messages must include a Chinese translation too**: keep the subject line in English (conventional-commit style) and include the Chinese translation of the subject and key points in the commit body (e.g. a trailing `中文：<translation>` paragraph); squash-merge commits inherit the bilingual PR title, which satisfies the subject requirement automatically.
 
 > **Translation quality bar:** write natural technical Chinese, not word-for-word machine translation (style reference: [`vllm-project/vllm-ascend` `README.zh.md`](https://github.com/vllm-project/vllm-ascend/blob/main/README.zh.md)). Preserve product names, hardware SKUs, framework/library names (Next.js, React Query, D3.js, Tailwind ...), flags, and code identifiers in English. Use parenthetical English clarification for acronyms on first use. Preferred terms: benchmark 基准测试, dashboard 仪表板, chart 图表, config 配置, throughput 吞吐量, latency 延迟, single-node/multi-node 单节点/多节点, evaluation 评估, artifact 产物. In first-party ML infrastructure UI and technical prose, keep established English technical terms and phrases that Chinese engineers normally use in English; decide from real industry usage and the surface, not from a closed list. `warmup`, `seed`, and `offload` are examples, not the whole category. Follow `docs/chinese-copy.md` for explanatory and quotation exceptions.
