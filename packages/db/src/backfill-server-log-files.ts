@@ -22,13 +22,18 @@ import { hasNoSslFlag } from './cli-utils.js';
 import { insertServerLogFilePaths } from './etl/benchmark-ingest.js';
 import { createAdminSql } from './etl/db-utils.js';
 import { listServerLogFilePaths, serverLogArtifactRoot } from './etl/server-log-artifacts.js';
-import { downloadArtifact, listRunArtifacts } from './lib/github-artifacts.js';
+import { downloadArtifact } from './lib/github-artifacts.js';
 import {
   downloadGcsArtifact,
   listGcsServerLogArtifacts,
   type GcsArtifactMeta,
 } from './lib/gcs-artifacts.js';
-import { confirmProceed, parseLimitForceFlags, runBackfillMain } from './lib/backfill-runner.js';
+import {
+  confirmProceed,
+  listBackfillRunArtifacts,
+  parseLimitForceFlags,
+  runBackfillMain,
+} from './lib/backfill-runner.js';
 import { retryArtifactOperation } from './lib/artifact-retry.js';
 import { findBenchmarkResultIds, readMappedBenchmarkRows } from './lib/benchmark-result-lookup.js';
 import { repositoryFromRunUrl } from './lib/runtime-metadata-artifacts.js';
@@ -197,11 +202,8 @@ async function main(): Promise<void> {
         flags.source !== 'gcs' &&
         (flags.source === 'github' || isWithinGithubRetention(run.date))
       ) {
-        const artifacts = await retryArtifactOperation(
-          `listing GitHub artifacts for run ${runId}`,
-          () => listRunArtifacts(repository, String(runId)),
-        );
-        pairs = pairServerLogArtifacts(artifacts.filter((artifact) => !artifact.expired));
+        const artifacts = await listBackfillRunArtifacts(repository, runId);
+        pairs = pairServerLogArtifacts((artifacts ?? []).filter((artifact) => !artifact.expired));
         if (pairs.length > 0) {
           source = 'github';
           githubRuns++;
