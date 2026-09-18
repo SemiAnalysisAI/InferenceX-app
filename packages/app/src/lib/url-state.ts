@@ -98,6 +98,10 @@ const URL_STATE_KEYS = [
   'c_rec',
   'c_life',
   'c_power',
+  // First-token limits: interactivity floor (tok/s/user) and the comma-joined
+  // TTFT cap ladder in seconds. Empty means the page's sequence-aware defaults.
+  'c_ivmin',
+  'c_ttft',
   // Cache reuse: the configuration group plotted. Empty means the group with
   // the most rows reporting cache tiers.
   'c_cfg',
@@ -197,6 +201,8 @@ export const PARAM_DEFAULTS: Record<UrlStateKey, string> = {
   c_oprice: '',
   c_life: '',
   c_power: 'provisioned',
+  c_ivmin: '',
+  c_ttft: '',
   c_cfg: '',
   // Empty means the default y metric (margin).
   c_ly: '',

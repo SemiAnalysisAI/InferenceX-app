@@ -14,6 +14,13 @@ export interface GPUDataPoint {
   hwKey: string;
   interactivity: number; // tokens/sec/user (median_intvty = x in interactivity chart)
   /**
+   * Time to first token in seconds, read at the same percentile as
+   * `interactivity` (agentic rows) or the median (fixed sequences), mirroring
+   * the inference chart's TTFT axis. Absent when the row reported none, so a
+   * missing measurement can never pass a first-token cap as a zero.
+   */
+  ttft?: number;
+  /**
    * End-to-end latency at the selected percentile. Agentic calculator groups
    * use this to keep only the same anti-benchmark-hacking Pareto winners as the
    * main interactivity chart before interpolation.
