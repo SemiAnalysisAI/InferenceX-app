@@ -742,7 +742,10 @@ export const apiContractSourceDigests = [
     // Reviewed again for the release-date corrections: values inside
     // MODEL_RELEASE_DATES only. No published model name, alias, or parameter enum
     // is touched, and no endpoint exposes a release date, so the docs stand.
-    sourceSha256: 'bb58d43160c2b83ce61e7c34326a6d316fd751e435c6819f1991ed69e4f1b45c',
+    // Reviewed for the Qwen3.8-27B addition (InferenceX#3260): two new DB keys
+    // and display names plus their release dates. No published parameter enum
+    // or endpoint changes, so the docs stand.
+    sourceSha256: 'af1053b2ae94b50de51153153dd7a7e268e50bde3e5900310e44f2d8baa86f87',
     reviewArea: {
       en: 'Published benchmark and TCO model names, aliases, and parameter enums.',
       zh: '已发布基准与 TCO 模型名称、别名和参数枚举。',
