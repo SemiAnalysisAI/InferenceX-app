@@ -136,7 +136,7 @@ export function MeasuredMetricControls({
 
   return (
     <div
-      className="col-span-full grid min-w-0 gap-3 sm:grid-cols-2 lg:grid-cols-4"
+      className="col-span-full grid min-w-0 grid-cols-[repeat(auto-fit,minmax(min(100%,12rem),1fr))] gap-3"
       data-testid="measured-metric-controls"
     >
       <div className="flex min-w-0 flex-col gap-1.5">
@@ -226,7 +226,7 @@ export function MeasuredMetricControls({
               role="group"
               size="default"
               className="w-full"
-              buttonClassName="flex-1 justify-center"
+              buttonClassName="min-w-max flex-auto justify-center"
               ariaLabel={t.statistic}
               value={config.statistic}
               onValueChange={(statistic) => change({ statistic })}
