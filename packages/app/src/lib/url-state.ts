@@ -102,6 +102,9 @@ const URL_STATE_KEYS = [
   // TTFT cap ladder in seconds. Empty means the page's sequence-aware defaults.
   'c_ivmin',
   'c_ttft',
+  // Cache reuse: the configuration group plotted. Empty means the group with
+  // the most rows reporting cache tiers.
+  'c_cfg',
 ] as const;
 
 export type UrlStateKey = (typeof URL_STATE_KEYS)[number];
@@ -200,6 +203,7 @@ export const PARAM_DEFAULTS: Record<UrlStateKey, string> = {
   c_power: 'provisioned',
   c_ivmin: '',
   c_ttft: '',
+  c_cfg: '',
   // Empty means the default y metric (margin).
   c_ly: '',
   c_ramp: DEFAULT_LIFECYCLE_RAMP_MONTHS,

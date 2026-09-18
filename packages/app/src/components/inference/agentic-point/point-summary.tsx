@@ -7,6 +7,7 @@ import { frameworkFamily } from '@/lib/framework-family';
 import type { Locale } from '@/lib/i18n';
 import { isKvOffloadEnabled } from '@/lib/kv-offload';
 import { useLocale } from '@/lib/use-locale';
+import { CacheReuseLink } from '@/components/inference/ui/CacheReuseLink';
 import {
   offloadTypeLabel,
   versionedComponentLabel,
@@ -91,16 +92,24 @@ export function PointSummary({ meta }: { meta: PointMeta }) {
           {!meta.disagg && meta.is_multinode ? ` · ${t.multiNodeAggregate}` : ''}
           {meta.spec_method && meta.spec_method !== 'none' ? ` · spec=${meta.spec_method}` : ''}
         </p>
-        {meta.run_url && (
-          <a
-            href={meta.run_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-xs text-muted-foreground hover:text-foreground underline"
-          >
-            {t.githubRun}
-          </a>
-        )}
+        <div className="flex flex-wrap items-baseline justify-end gap-x-4 gap-y-1">
+          {meta.benchmark_type === 'agentic_traces' && (
+            <CacheReuseLink
+              point={meta}
+              className="text-xs text-muted-foreground hover:text-foreground underline"
+            />
+          )}
+          {meta.run_url && (
+            <a
+              href={meta.run_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-muted-foreground hover:text-foreground underline"
+            >
+              {t.githubRun}
+            </a>
+          )}
+        </div>
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         <MetaLine label={t.offloadType} value={offloadDisplay(meta, locale)} />

@@ -47,6 +47,11 @@ export const TAB_META_ZH: Record<DashboardRouteKey, { title: string; description
     description:
       '在给定最低交互性下，按各档首 token 延迟（TTFT）上限，找出各芯片厂商成本最低的实测 AI 推理配置。仅使用实测数据，不做插值，适用于任意模型与工作负载。',
   },
+  'cache-reuse': {
+    title: '前缀缓存复用',
+    description:
+      '查看 AI 推理配置在并发数上升时 prompt token 的来源：HBM 缓存命中、主机层缓存命中，还是重新计算。数据取自运行时实测的缓存计数，覆盖全部模型与芯片。',
+  },
   'profit-estimator': {
     title: '推理利润估算器',
     description:
@@ -122,6 +127,8 @@ export const TAB_INTRO_ZH: Record<DashboardRouteKey, string> = {
     '本页面提供集群生命周期经济性分析：按设施功率预算确定固定集群的规模，从模型发布之日起，基于历史基准测试中实测的软件配置改进，测算收入、成本、利润与回本时间。',
   'first-token':
     '本页面展示首 token 延迟约束下的成本对比：在选定的最低交互性下，按 2 s、5 s、10 s 等各档首 token 延迟（TTFT）上限，逐档找出各芯片厂商每百万 token 成本最低的实测配置，并标注最优配置与厂商间的成本差距。所有柱形均来自实际运行过的配置，不做插值，可直接追溯到对应的 GitHub Actions 运行记录。',
+  'cache-reuse':
+    '本页面展示前缀缓存复用情况：选定模型与配置后，按并发数逐档以堆叠柱形拆分 prompt token 的来源，分为芯片 HBM 缓存命中、主机层缓存命中与未复用（重新计算）三部分，并可叠加 trace 的理论上限。所有数值均来自运行时实测的缓存计数，可追溯到对应的 GitHub Actions 运行记录。',
   'profit-estimator':
     '本页面提供推理利润估算器：在选定的交互性与利用率下，按每芯片每小时计算各芯片的收入，并以堆叠柱形拆分为算力支出（TCO $/chip/hr）、模型实验室从收入中抽取的许可费，以及运营方所剩利润。',
   'profit-estimator-per-gigawatt':
@@ -156,6 +163,7 @@ export const TAB_LABELS_ZH: Record<DashboardRouteKey, string> = {
   calculator: 'TCO 计算器',
   fleet: '集群生命周期',
   'first-token': '首 token 延迟约束',
+  'cache-reuse': '前缀缓存复用',
   'profit-estimator': '利润估算',
   'profit-estimator-per-gigawatt': '每吉瓦利润估算',
   reliability: '可靠性',

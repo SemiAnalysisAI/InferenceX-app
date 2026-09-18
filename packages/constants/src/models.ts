@@ -14,6 +14,13 @@ export const DB_MODEL_TO_DISPLAY: Record<string, string> = {
   // Qwen4-architecture preview, not a Qwen3.5 point release (GatedDeltaNet plus
   // Qwen Sparse Attention, 512 experts), so it gets its own display bucket.
   'qwen3.8next': 'Qwen3.8-Flash-Next',
+  // Qwen3.8-27B is the dense 27B member of the Qwen3.8 family (hybrid GDN linear
+  // attention, 48 of 64 layers), served bf16 with the RadixArk DSpark drafter.
+  // `qwen3.827beager` is the same checkpoint served with CUDA graphs disabled
+  // (--enforce-eager on target and drafter); it keeps its own DB bucket and
+  // display name so the two serving modes never collapse onto one chart point.
+  'qwen3.827b': 'Qwen3.8-27B',
+  'qwen3.827beager': 'Qwen3.8-27B-Eager',
   'kimik2.5': 'Kimi-K2.5',
   'kimik2.6': 'Kimi-K2.5',
   'kimik2.7-code': 'Kimi-K2.5',
@@ -158,6 +165,11 @@ export const MODEL_RELEASE_DATES: Record<string, string> = {
   // precedes the first sweep on 08-27. The model card itself states no date.
   // sweep: 2026-08-27 — day zero.
   'Qwen3.8-Flash-Next': '2026-08-26',
+  // Apache-2.0 weights at Qwen/Qwen3.8-27B: the Hugging Face repo was created
+  // 2026-08-05T08:22Z (its first commit) and last modified 2026-08-14. The eager
+  // bucket is the same checkpoint. sweep: 2026-09-18 (InferenceX#3260).
+  'Qwen3.8-27B': '2026-08-05',
+  'Qwen3.8-27B-Eager': '2026-08-05',
   // Bucket covers M2.5 and M2.7, so the date is M2.5's: announced 2026-02-12
   // with weights on Hugging Face, architecturally unchanged from M2 (230B/10B).
   // Was 2025-10-25, which is M2's launch, not M2.5's — `model-architectures.ts`

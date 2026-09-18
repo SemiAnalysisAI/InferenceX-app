@@ -45,6 +45,10 @@
       "duration": 5253
     },
     {
+      "spec": "cypress/e2e/cache-reuse.cy.ts",
+      "duration": 4000
+    },
+    {
       "spec": "cypress/e2e/calculator-overlay.cy.ts",
       "duration": 8785
     },

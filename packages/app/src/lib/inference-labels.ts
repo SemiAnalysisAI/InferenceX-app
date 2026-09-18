@@ -7,15 +7,20 @@ interface RunProvenance {
   run_url?: string | null;
 }
 
+// Three-week recognition window, ending 2026-10-08 at 21:32 America/New_York.
+const UMBP_DSPARK_LABEL_EXPIRES_AT = Date.parse('2026-10-09T01:32:00Z');
+
 /** Display-only: never change framework/hardware keys used by filters and history. */
 export function inferenceFrameworkLabelOverride(
   framework: string,
   runUrl?: string | null,
 ): string | undefined {
-  return resolveFrameworkAlias(framework) === 'mori-sglang' &&
-    runIdFromRunUrl(runUrl) === '34926284365'
-    ? 'MoRI UMBP SGLang'
-    : undefined;
+  if (resolveFrameworkAlias(framework) !== 'mori-sglang') return undefined;
+  const runId = runIdFromRunUrl(runUrl);
+  const hasLabel =
+    runId === '34926284365' ||
+    (runId === '35166686551' && Date.now() < UMBP_DSPARK_LABEL_EXPIRES_AT);
+  return hasLabel ? 'MoRI UMBP SGLang' : undefined;
 }
 
 /** Keep unofficial-run identity/markers while making its special engine visible. */
