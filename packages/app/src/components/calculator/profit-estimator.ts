@@ -24,6 +24,7 @@ import { tokenRevenueFromRatesPerGpuHour } from '@/components/inference/token-re
 import type { TokenRevenuePricing } from '@/components/inference/types';
 import { Model } from '@/lib/data-mappings';
 
+import type { ProfitPowerSource } from './profit-power';
 import type { InterpolatedResult } from './types';
 
 /** Calendar hours in a year (365 x 24). */
@@ -189,6 +190,8 @@ export interface ProfitEstimatorAssumptions {
 export interface ProfitEstimatorRow {
   /** Distinguish identical hardware bars when both power budgets are shown. */
   powerLabel?: string;
+  /** What the measured + modeled power budget was measured on; unset for provisioned rows. */
+  powerSource?: ProfitPowerSource;
   hwKey: string;
   resultKey: string;
   precision?: string;

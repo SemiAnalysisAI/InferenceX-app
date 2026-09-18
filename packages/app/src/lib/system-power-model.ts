@@ -16,6 +16,12 @@ export const SUPPORTED_SYSTEM_POWER_RACK_HARDWARE = Object.keys(
 
 export type RackMeasuredBasis = 'module' | 'gpu-plus-grace';
 
+/** SHA-256 of the pinned source file behind a profile's `modelPath`, for export provenance. */
+export function systemPowerSourceSha256(modelPath: string): string | null {
+  const hashes: Readonly<Record<string, string>> = profileData.sourceSha256;
+  return Object.hasOwn(hashes, modelPath) ? hashes[modelPath] : null;
+}
+
 /**
  * Measured compute-module input for every tray of one NVL72 rack. `module` is the
  * sum of the two Module Power sensors per tray (Grace + 2 Blackwell + HBM + LPDDR5X +

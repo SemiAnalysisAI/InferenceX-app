@@ -2,10 +2,15 @@ import { describe, expect, it } from 'vitest';
 
 import type { BenchmarkRow } from '@/lib/api';
 import { modelSystemPower } from '@/lib/modeled-system-power';
+import { estimateRackPower } from '@/lib/system-power-model';
 import { Percentile, Sequence } from '@/lib/data-mappings';
 import { buildGpuGroups, interpolateForGPU } from './useThroughputData';
 import { estimateProfitRows } from './profit-estimator';
-import { estimateProfitByPower, modeledPowerAtTarget } from './profit-power';
+import {
+  estimateProfitByPower,
+  modeledPowerAtTarget,
+  type ProfitPowerSource,
+} from './profit-power';
 import type { GPUDataPoint, InterpolatedResult } from './types';
 
 // Power telemetry from MI355X Kimi K3 source row 441385; the target/rates below
@@ -91,6 +96,40 @@ const assumptions = { basis: 'gw-year' as const, utilizationPct: 60, labCutPct: 
 const specs = () => ({ powerKwPerGpu: 2.09, costPerGpuHour: 1.5 });
 const labels = { provisioned: 'Provisioned', modeled: 'Measured + modeled' };
 
+// One GB200 NVL72 compute tray on the AgentX workload: four GPUs on one host, two
+// Grace sockets, module sensor present. Watts are controlled inputs, not published
+// constants; the CPU-side keys follow the ticket-01 contract.
+const GRACE = { avg_cpu_socket_power_w: 250.5, avg_total_cpu_power_w: 501 };
+const traySource: BenchmarkRow = {
+  ...source,
+  hardware: 'gb200',
+  framework: 'sglang',
+  prefill_tp: 4,
+  decode_tp: 4,
+  num_prefill_gpu: 4,
+  num_decode_gpu: 4,
+  metrics: {
+    power_valid: 1,
+    power_metric_schema_version: 2,
+    cpu_power_valid: 1,
+    avg_power_w: 900.25,
+    avg_total_gpu_power_w: 3601,
+    ...GRACE,
+    avg_total_module_power_w: 4300.75,
+  },
+};
+const trayPoint: GPUDataPoint = { ...point, sourceRow: traySource, hwKey: 'gb200_sglang', tp: 4 };
+const trayResult: InterpolatedResult = {
+  ...result,
+  hwKey: trayPoint.hwKey,
+  resultKey: trayPoint.hwKey,
+  nearestPoints: [trayPoint],
+};
+const withPoints = (base: InterpolatedResult, points: GPUDataPoint[]): InterpolatedResult => ({
+  ...base,
+  nearestPoints: points,
+});
+
 describe('profit power basis preview', () => {
   it('keeps raw power attached through official and run-keyed frontier construction', () => {
     const row = {
@@ -118,7 +157,7 @@ describe('profit power basis preview', () => {
     }
   });
 
-  it('rejects partial chassis and unsupported rack hardware despite valid telemetry', () => {
+  it('rejects partial chassis and NVL72 rows without CPU-side telemetry despite valid GPU telemetry', () => {
     for (const hardware of ['gb200', 'gb300']) {
       expect(
         modeledPowerAtTarget(
@@ -140,6 +179,135 @@ describe('profit power basis preview', () => {
     expect(
       modeledPowerAtTarget({ ...result, nearestPoints: [{ ...point, sourceRow: partial }] }, 45),
     ).toBeNull();
+  });
+
+  it('accepts fully measured NVL72 trays and records the measured basis behind the estimate', () => {
+    // 1.1 × the tray's amortised facility watts per GPU from the pinned GB200 rack profile.
+    const rack = estimateRackPower('gb200', { basis: 'module', moduleWattsPerTray: 4300.75 }, 1.1)!;
+    const kw = modeledPowerAtTarget(trayResult, 45)!;
+    expect(kw).toBeCloseTo((rack.facilityWatts / rack.gpuCount / 1000) * 1.1, 8);
+    expect(kw).toBeCloseTo(1.6077325, 7);
+    const output = estimateProfitByPower(
+      [trayResult],
+      specs,
+      pricing,
+      assumptions,
+      'compare',
+      45,
+      labels,
+    );
+    expect(output.skipped).toEqual([]);
+    const [provisioned, modeled] = output.rows;
+    expect(provisioned.powerSource).toBeUndefined();
+    expect(modeled.powerSource).toEqual({
+      topology: 'nvl72-trays',
+      measuredBasis: 'module',
+      sensorKind: 'module',
+      pue: 1.1,
+      modelPath: 'human_verified/gb200_nvl72_rack/gb200_nvl72_rack_power_model.py',
+      modelRevision: rack.modelRevision,
+      profileSha256: expect.stringMatching(/^[0-9a-f]{64}$/u),
+    } satisfies ProfitPowerSource);
+    expect(modeled.gpuHours / provisioned.gpuHours).toBeCloseTo(2.09 / kw, 10);
+
+    // Two fully measured GB300 trays on distinct hosts, Grace-socket basis.
+    const twoTrays: BenchmarkRow = {
+      ...traySource,
+      hardware: 'gb300',
+      disagg: true,
+      is_multinode: true,
+      prefill_tp: 4,
+      decode_tp: 4,
+      metrics: {
+        ...traySource.metrics,
+        avg_power_w: 900,
+        avg_total_gpu_power_w: 7200,
+        prefill_avg_power_w: 950,
+        decode_avg_power_w: 850,
+        avg_cpu_socket_power_w: 260,
+        avg_total_cpu_power_w: 1040,
+      },
+      workers: [
+        { role: 'prefill', worker_idx: 0, num_gpus: 4, hosts: ['tray-a'], avg_power_w: 950 },
+        { role: 'decode', worker_idx: 0, num_gpus: 4, hosts: ['tray-b'], avg_power_w: 850 },
+      ],
+    };
+    delete (twoTrays.metrics as Record<string, unknown>).avg_total_module_power_w;
+    const estimate = modelSystemPower(twoTrays, undefined, true);
+    expect(estimate).toMatchObject({ status: 'supported', chassisBasis: 'full', gpuCount: 8 });
+    const rows = estimateProfitByPower(
+      [withPoints(trayResult, [{ ...trayPoint, sourceRow: twoTrays }])],
+      specs,
+      pricing,
+      assumptions,
+      'modeled',
+      45,
+      labels,
+    ).rows;
+    expect(rows).toHaveLength(1);
+    expect(rows[0].powerSource).toMatchObject({
+      topology: 'nvl72-trays',
+      measuredBasis: 'gpu-plus-grace',
+      sensorKind: 'grace-socket',
+      pue: 1.1,
+    });
+  });
+
+  it('rejects partially measured trays and never mixes measured bases between knots', () => {
+    const partialTray: BenchmarkRow = {
+      ...traySource,
+      prefill_tp: 2,
+      decode_tp: 2,
+      metrics: {
+        ...traySource.metrics,
+        avg_total_gpu_power_w: 1800.5,
+        avg_total_module_power_w: 4300.75,
+      },
+    };
+    expect(modelSystemPower(partialTray, undefined, true)).toMatchObject({
+      status: 'supported',
+      chassisBasis: 'extrapolated',
+    });
+    expect(
+      modeledPowerAtTarget(withPoints(trayResult, [{ ...trayPoint, sourceRow: partialTray }]), 45),
+    ).toBeNull();
+
+    const graceOnly: BenchmarkRow = { ...traySource, metrics: { ...traySource.metrics } };
+    delete (graceOnly.metrics as Record<string, unknown>).avg_total_module_power_w;
+    const mixed = withPoints(trayResult, [
+      { ...trayPoint, interactivity: 30 },
+      { ...trayPoint, interactivity: 60, sourceRow: graceOnly },
+    ]);
+    expect(modeledPowerAtTarget(mixed, 30)).not.toBeNull();
+    expect(modeledPowerAtTarget(mixed, 60)).not.toBeNull();
+    expect(modeledPowerAtTarget(mixed, 45)).toBeNull();
+    const same = withPoints(trayResult, [
+      { ...trayPoint, interactivity: 30 },
+      { ...trayPoint, interactivity: 60 },
+    ]);
+    expect(modeledPowerAtTarget(same, 45)).toBeCloseTo(modeledPowerAtTarget(trayResult, 45)!, 10);
+  });
+
+  it('labels x86 chassis estimates with the air-cooled profile and leaves provisioned rows unlabeled', () => {
+    const [provisioned, modeled] = estimateProfitByPower(
+      [result],
+      specs,
+      pricing,
+      assumptions,
+      'compare',
+      45,
+      labels,
+    ).rows;
+    expect(provisioned.powerSource).toBeUndefined();
+    expect(modeled.powerSource).toMatchObject({
+      topology: 'chassis',
+      pue: 1.3,
+      modelPath: 'human_verified/mi355x_chassis/mi355x_chassis_power_model.py',
+    });
+    expect(
+      estimateProfitByPower([result], specs, pricing, assumptions, 'provisioned', 45, labels)
+        .rows[0].powerSource,
+    ).toBeUndefined();
   });
 
   it('leaves the default estimator and default AgentX model gate unchanged', () => {
