@@ -84,23 +84,36 @@ must use the append-only contract below.
 
 ### Required Power Publication
 
-Ordinary sweeps that opt into `require-power` upload the producer's
-`required-power-sweep-manifest/sweep_manifest.json`. Before any CI ingest upsert,
-the app matches its required benchmark rows by recipe fingerprint, concurrency,
-and scenario/sequence lengths, then requires valid v2 power and positive energy.
-Disaggregated recipes also require both role energy measurements. Identical
-per-job and collected artifact copies are allowed; conflicting copies fail.
-Matching uses the ingest mapper's canonical identity, including AgentX `users`
-precedence over `conc`. After benchmark writes, any required point omitted by a
-purge or another filter fails the run; purged data is never restored to satisfy
-the declaration.
+Required ordinary sweeps upload a versioned
+`required-power-sweep-manifest/sweep_manifest.json`. The [shared v2 fixture and
+contract](./fixtures/powerx-manifest-v2/README.md) bind the complete required
+matrix to source run/head/attempt, point identities, topology, exact measurement
+windows, physical node/GPU roles and hashed evidence. Both repositories test the
+same bytes. Unversioned required manifests fail closed; optional legacy bundles
+retain their existing behavior.
 
-The manifest must name the source run and head. A successful earlier attempt of
-that same run may supply the scope and retained points when failed jobs are
-rerun; ingestion logs both declared and current attempts. Sweeps without this
-optional manifest keep historical behavior. The separate PowerX publication
-receipt compares ingested 8K/1K and AgentX measurements with the database and
-public API after cache invalidation; it does not assert browser rendering.
+Artifact preparation validates required evidence before workflow migrations.
+Required intent also travels in the dispatch payload, so losing both the manifest
+and changelog marker cannot downgrade an ordinary required dispatch. Ingestion
+repeats validation before workflow/config upserts, checks purges/backfills before
+writing, and projects the resulting published curves from base-table state. It
+models the actual latest-attempt, whole-curve and same-image append-only rules.
+An unexplained loss of an existing recipe or concurrency point rejects ingestion.
+Destructive replacement requires exact old-snapshot and lost-point identities in
+the manifest; the ordinary producer supplies no such permission.
+
+The source run and head must match. A successful earlier attempt of that same run
+may supply retained evidence when failed jobs are rerun; ingestion logs declared
+and current attempts. Required energy must be finite and positive. Missing,
+invalid and measured zero remain different values even though all fail this gate.
+Disaggregated deployments require physical evidence for both roles.
+
+This is pure preflight, not atomic publication. Schema migrations occur after
+artifact validation but before the curve check. Concurrent writers and failures
+during the existing per-file importer remain a risk; staging plus an atomic,
+serialized promotion is the follow-up described in the contract. The separate
+PowerX receipt still compares source measurements against the DB and exact-run
+API after ingestion. It does not prove latest-curve visibility or browser rendering.
 
 ### Append-Only Curve Extensions
 
