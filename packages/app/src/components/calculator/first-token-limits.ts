@@ -143,6 +143,8 @@ export interface FirstTokenResult {
   qualifyingRows: number;
   /** Official rows the page could read at all: visible hardware with a TTFT. */
   measuredRows: number;
+  /** Same, for the loaded unofficial runs; kept apart so the caption stays official-only. */
+  overlayMeasuredRows: number;
 }
 
 export interface FirstTokenSelectionInput {
@@ -316,5 +318,6 @@ export function selectFirstTokenWinners(input: FirstTokenSelectionInput): FirstT
     summaries,
     qualifyingRows: official.filter((c) => c.interactivity >= minInteractivity).length,
     measuredRows: official.length,
+    overlayMeasuredRows: overlay.length,
   };
 }

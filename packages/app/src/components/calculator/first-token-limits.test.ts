@@ -286,6 +286,20 @@ describe('selectFirstTokenWinners', () => {
       expect(result.summaries[0].best?.cost).toBe(0.067);
     });
 
+    it('counts readable overlay rows separately so an overlay-only page is not "no TTFT"', () => {
+      const result = select({
+        official: {},
+        officialMeta: {},
+        overlay: {
+          b200_sglang__run0: [makePoint({ hwKey: 'b200_sglang', ttft: 1, interactivity: 90 })],
+        },
+        overlayMeta: { b200_sglang__run0: { hwKey: 'b200_sglang', runIndex: 0 } },
+      });
+      expect(result.measuredRows).toBe(0);
+      expect(result.overlayMeasuredRows).toBe(1);
+      expect(winnerOf(result, 2, 'run:0')).toBeNull();
+    });
+
     it('hides overlay rows for hardware the legend has switched off', () => {
       const result = select({
         overlay: OVERLAY,

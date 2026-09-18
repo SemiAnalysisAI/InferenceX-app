@@ -939,7 +939,7 @@ function FirstTokenLimitsInner({ initialPercentile }: { initialPercentile: Perce
                   className="flex items-center justify-center h-48 text-muted-foreground text-center px-6"
                   data-testid="first-token-none-qualify"
                 >
-                  {result.measuredRows === 0
+                  {result.measuredRows + result.overlayMeasuredRows === 0
                     ? t.noTtft(statLabel)
                     : t.noneQualify(minInteractivity, statLabel)}
                 </div>
