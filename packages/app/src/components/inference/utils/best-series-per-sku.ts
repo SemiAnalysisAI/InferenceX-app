@@ -40,7 +40,9 @@ export function bestSeriesPerSku(points: InferenceData[], direction: Direction):
   const bySku = new Map<string, Map<string, InferenceData[]>>();
   const featured = new Set<string>();
   for (const point of points) {
-    if (!isFrontierEligible(point) || !Number.isFinite(point.y)) continue;
+    // Comparison clones re-plot the same configs at another boundary or role;
+    // the best series per SKU is judged on the selected metric alone.
+    if (point.powerVariant || !isFrontierEligible(point) || !Number.isFinite(point.y)) continue;
     const sku = baseSku(point);
     const key = String(point.hwKey);
     if (point.framework === 'tilert') featured.add(key);
