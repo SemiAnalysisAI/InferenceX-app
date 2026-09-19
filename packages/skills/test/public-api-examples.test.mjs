@@ -74,7 +74,7 @@ before(() => {
       assert.ok(snippet, `execute the installed ${heading} recipe`);
       return snippet.groups.code;
     });
-    installed.set(target, snippets);
+    installed.set(target, { root, snippets });
   }
   writeFileSync(
     preload,
@@ -106,7 +106,11 @@ function run(
   const requestsPath = join(project, 'requests.jsonl');
   writeFileSync(fixturesPath, JSON.stringify(fixtures));
   writeFileSync(requestsPath, '');
-  let code = installed.get(target)[index];
+  const { root, snippets } = installed.get(target);
+  let code = snippets[index].replace(
+    './.agents/skills/inferencex-api/scripts/capture-response.mjs',
+    pathToFileURL(join(root, 'scripts/capture-response.mjs')).href,
+  );
   if (replacement) code = code.replace(...replacement);
   const result = suite.node(['--import', pathToFileURL(preload).href, '--input-type=module'], {
     cwd: project,
@@ -229,6 +233,30 @@ test('raw recipes retain complete UTF-8 and failure bodies before parsing, and r
     assert.notEqual(result.status, 0);
     assert.equal(result.stdout, '');
     assert.equal(assertCaptures(result).records.length, 2);
+  }
+});
+
+test('every installed raw recipe uses the shared capture budget before interpreting OpenAPI', () => {
+  for (const index of [0, 1, 2, 3]) {
+    const result = run(
+      index,
+      {},
+      {
+        replacement: ['createResponseCapture()', 'createResponseCapture({ responseBytes: 1024 })'],
+        openapi: { ...schema, extra: 'x'.repeat(1024) },
+      },
+    );
+    assert.notEqual(result.status, 0);
+    assert.equal(result.stdout, '');
+    assert.match(result.stderr, /1024-byte budget/u);
+    assert.deepEqual(result.requests, [`${base}/api/openapi.json`]);
+    const directory = readdirSync(result.project).find((name) => name.startsWith('api-evidence-'));
+    assert.deepEqual(readdirSync(join(result.project, directory)), ['1.json']);
+    const failed = JSON.parse(readFileSync(join(result.project, directory, '1.json'), 'utf8'));
+    assert.equal(failed.status, 200);
+    assert.equal(failed.body_path, undefined);
+    assert.equal(failed.sha256, undefined);
+    assert.ok(Number.isFinite(Date.parse(failed.failed_at)));
   }
 });
 

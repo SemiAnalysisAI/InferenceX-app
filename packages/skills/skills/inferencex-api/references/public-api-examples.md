@@ -1,13 +1,32 @@
 # Public API worked examples
 
-These Node 24 recipes use public HTTPS and the current OpenAPI document. Run them
-from your project; no repository checkout, database credentials, or extra packages
-are needed. Each creates a fresh `api-evidence-*` directory and saves complete
-decoded response bodies before parsing or filtering. Adjacent JSON records retain
-the request URL, retrieval time, status, byte count and SHA-256; HTTP and malformed
-JSON bodies remain available on failure. Save this directory and the printed JSON
-with the answer. Repeating a recipe creates a new directory and preserves earlier
-attempts. A hash identifies saved bytes, not remote authenticity.
+These Node 24 recipes use public HTTPS, the current OpenAPI document, and the
+installed skill's `scripts/capture-response.mjs` helper. Run them from your project;
+no repository checkout, database credentials, or extra dependencies are needed.
+The imports below use a project Codex installation. For Claude Code, replace
+`.agents/skills` with `.claude/skills`; for a global installation, use the actual
+installed helper path.
+
+`createResponseCapture()` returns `{ read, requests, captureDir }`. Each call creates
+a fresh `api-evidence-*` directory. `read(pathOrUrl)` accepts only the public
+InferenceX HTTPS origin without credentials or fragments, rejects redirects, and
+does not retry. The helper has a 30-second deadline across its requests, a 32 MiB
+decoded-byte limit per response, and a 128 MiB total limit. Optional `timeoutMs`,
+`responseBytes`, and `totalBytes` settings may lower those limits.
+
+For every complete transfer within these limits, the helper saves the decoded
+body and an adjacent JSON record with the request URL, retrieval time, status,
+byte count and SHA-256 before validating HTTP status or parsing JSON. HTTP error,
+malformed JSON, and invalid UTF-8 bodies therefore remain available on failure.
+Save this directory and the printed JSON with the answer. Repeated recipes and
+reads use unique paths, and writes never overwrite existing files. A hash
+identifies saved bytes, not remote authenticity.
+
+A failed or capped transfer saves failure time, URL, known status and error only;
+its partial bytes are not retained or described as a complete body. Process
+termination or a filesystem failure can prevent this record from being written,
+or leave a body without its sidecar. These writes are not an atomic transaction:
+treat a capture as complete only when both files exist and their size/hash agree.
 
 The versioned CLI can list supported capabilities and public model scopes with
 `inferencex discover capabilities` and `inferencex discover models`. See the
@@ -34,32 +53,10 @@ its coverage. Compute a separate summary for every alternative sample discussed.
 
 ```bash
 node --input-type=module <<'JS'
-import { createHash } from 'node:crypto';
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { createResponseCapture } from './.agents/skills/inferencex-api/scripts/capture-response.mjs';
+import { writeFileSync } from 'node:fs';
 const base = 'https://inferencex.semianalysis.com';
-const requests = [];
-const captureDir = mkdtempSync('api-evidence-');
-async function read(path) {
-  const query_url = new URL(path, base).href;
-  const stem = `${captureDir}/${requests.length + 1}`;
-  let response, bytes;
-  try {
-    response = await fetch(query_url, { signal: AbortSignal.timeout(30_000), redirect: 'error' });
-    bytes = Buffer.from(await response.arrayBuffer());
-  } catch (error) {
-    writeFileSync(`${stem}.json`, JSON.stringify({ query_url, failed_at: new Date().toISOString(),
-      status: response?.status ?? null, error: error.message }), { flag: 'wx' });
-    throw error;
-  }
-  const record = { query_url, retrieved_at: new Date().toISOString(), status: response.status,
-    body_path: `${stem}.body`, decoded_bytes: bytes.byteLength,
-    sha256: createHash('sha256').update(bytes).digest('hex') };
-  writeFileSync(record.body_path, bytes, { flag: 'wx' });
-  writeFileSync(`${stem}.json`, JSON.stringify(record), { flag: 'wx' });
-  requests.push(record);
-  if (!response.ok) throw new Error(`HTTP ${response.status}: ${query_url}`);
-  return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
-}
+const { read, requests, captureDir } = createResponseCapture();
 const schema = await read(`${base}/api/openapi.json`);
 const operation = schema.paths['/api/v1/benchmarks']?.get;
 const models = operation?.parameters.find((p) => p.name === 'model')?.schema.enum;
@@ -119,34 +116,11 @@ lists available values so an empty match does not require guessing another alias
 
 ```bash
 node --input-type=module <<'JS'
-import { createHash } from 'node:crypto';
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { createResponseCapture } from './.agents/skills/inferencex-api/scripts/capture-response.mjs';
 const base = 'https://inferencex.semianalysis.com';
 const scope = { model: 'dsv4', task: 'gsm8k', sample_limit: 5 };
-const requests = [];
-const captureDir = mkdtempSync('api-evidence-');
+const { read, requests } = createResponseCapture();
 const object = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
-async function read(path) {
-  const query_url = new URL(path, base).href;
-  const stem = `${captureDir}/${requests.length + 1}`;
-  let response, bytes;
-  try {
-    response = await fetch(query_url, { signal: AbortSignal.timeout(30_000), redirect: 'error' });
-    bytes = Buffer.from(await response.arrayBuffer());
-  } catch (error) {
-    writeFileSync(`${stem}.json`, JSON.stringify({ query_url, failed_at: new Date().toISOString(),
-      status: response?.status ?? null, error: error.message }), { flag: 'wx' });
-    throw error;
-  }
-  const record = { query_url, retrieved_at: new Date().toISOString(), status: response.status,
-    body_path: `${stem}.body`, decoded_bytes: bytes.byteLength,
-    sha256: createHash('sha256').update(bytes).digest('hex') };
-  writeFileSync(record.body_path, bytes, { flag: 'wx' });
-  writeFileSync(`${stem}.json`, JSON.stringify(record), { flag: 'wx' });
-  requests.push(record);
-  if (!response.ok) throw new Error(`HTTP ${response.status}: ${query_url}`);
-  return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
-}
 const schema = await read('/api/openapi.json');
 const operation = schema.paths?.['/api/v1/evaluations']?.get;
 if (!operation || operation.parameters?.some((p) => p.required)) {
@@ -203,35 +177,12 @@ example choice, not a representative sample.
 
 ```bash
 node --input-type=module <<'JS'
-import { createHash } from 'node:crypto';
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { createResponseCapture } from './.agents/skills/inferencex-api/scripts/capture-response.mjs';
 const base = 'https://inferencex.semianalysis.com';
 const requestedSlug = null;
 const scope = { requested_slug: requestedSlug, limit: 3, offset: 0, sort: 'id' };
-const requests = [];
-const captureDir = mkdtempSync('api-evidence-');
+const { read, requests } = createResponseCapture();
 const object = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
-async function read(path) {
-  const query_url = new URL(path, base).href;
-  const stem = `${captureDir}/${requests.length + 1}`;
-  let response, bytes;
-  try {
-    response = await fetch(query_url, { signal: AbortSignal.timeout(30_000), redirect: 'error' });
-    bytes = Buffer.from(await response.arrayBuffer());
-  } catch (error) {
-    writeFileSync(`${stem}.json`, JSON.stringify({ query_url, failed_at: new Date().toISOString(),
-      status: response?.status ?? null, error: error.message }), { flag: 'wx' });
-    throw error;
-  }
-  const record = { query_url, retrieved_at: new Date().toISOString(), status: response.status,
-    body_path: `${stem}.body`, decoded_bytes: bytes.byteLength,
-    sha256: createHash('sha256').update(bytes).digest('hex') };
-  writeFileSync(record.body_path, bytes, { flag: 'wx' });
-  writeFileSync(`${stem}.json`, JSON.stringify(record), { flag: 'wx' });
-  requests.push(record);
-  if (!response.ok) throw new Error(`HTTP ${response.status}: ${query_url}`);
-  return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
-}
 const schema = await read('/api/openapi.json');
 const paths = ['/api/v1/datasets', '/api/v1/datasets/{slug}/conversations',
   '/api/v1/datasets/{slug}/conversations/{convId}'];
@@ -315,40 +266,18 @@ Edit `scope` to match the user's request; discover raw hardware keys from the AP
 
 ```bash
 node --input-type=module <<'JS'
-import { createHash } from 'node:crypto';
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { createResponseCapture } from './.agents/skills/inferencex-api/scripts/capture-response.mjs';
+import { writeFileSync } from 'node:fs';
 const base = 'https://inferencex.semianalysis.com';
 const scope = { model: 'DeepSeek-V4-Pro', hardware: 'b200', benchmark_type: 'single_turn',
   isl: 8192, osl: 1024, date_from: '2026-08-01', date_to: '2026-09-04', date_field: 'date' };
-const requests = [];
-const captureDir = mkdtempSync('api-evidence-');
+const { read, requests, captureDir } = createResponseCapture();
 const object = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
 const validDate = (value) => typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/u.test(value) &&
   Number.isFinite(Date.parse(value)) && new Date(value).toISOString().slice(0, 10) === value;
 if (!validDate(scope.date_from) || !validDate(scope.date_to) || scope.date_from > scope.date_to ||
     ![scope.isl, scope.osl].every((n) => Number.isSafeInteger(n) && n > 0)) {
   throw new Error('Use an ordered YYYY-MM-DD range and positive token counts');
-}
-async function read(path) {
-  const query_url = new URL(path, base).href;
-  const stem = `${captureDir}/${requests.length + 1}`;
-  let response, bytes;
-  try {
-    response = await fetch(query_url, { signal: AbortSignal.timeout(30_000), redirect: 'error' });
-    bytes = Buffer.from(await response.arrayBuffer());
-  } catch (error) {
-    writeFileSync(`${stem}.json`, JSON.stringify({ query_url, failed_at: new Date().toISOString(),
-      status: response?.status ?? null, error: error.message }), { flag: 'wx' });
-    throw error;
-  }
-  const record = { query_url, retrieved_at: new Date().toISOString(), status: response.status,
-    body_path: `${stem}.body`, decoded_bytes: bytes.byteLength,
-    sha256: createHash('sha256').update(bytes).digest('hex') };
-  writeFileSync(record.body_path, bytes, { flag: 'wx' });
-  writeFileSync(`${stem}.json`, JSON.stringify(record), { flag: 'wx' });
-  requests.push(record);
-  if (!response.ok) throw new Error(`HTTP ${response.status}: ${query_url}`);
-  return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
 }
 const schema = await read('/api/openapi.json');
 const operation = schema.paths?.['/api/v1/benchmarks/history']?.get;
