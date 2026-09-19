@@ -18,8 +18,10 @@ const CALCULATOR_METRIC_KEYS = new Set([
   // GB300 AgentX rows without a server measurement price cached input from the
   // trace's theoretical ceiling instead. See `pricingCacheHitRate`.
   'theoretical_cache_hit_rate',
+  // `ttft` feeds the First-Token Limits page, which reads this same view and
+  // caps rows on time to first token at the percentile `intvty` uses.
   ...['median', 'p75', 'p90'].flatMap((percentile) =>
-    ['intvty', 'itl', 'full_response_itl', 'e2el', 'ttlt'].map(
+    ['intvty', 'itl', 'full_response_itl', 'e2el', 'ttlt', 'ttft'].map(
       (metric) => `${percentile}_${metric}`,
     ),
   ),
