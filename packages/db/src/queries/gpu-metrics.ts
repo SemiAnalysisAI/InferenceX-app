@@ -13,11 +13,16 @@ export interface GpuMetricSampleRow {
   timestamp: string;
   index: number;
   power: number;
-  temperature: number;
-  smClock: number;
-  memClock: number;
-  gpuUtil: number;
-  memUtil: number;
+  /**
+   * Absent when the collector did not sample the metric (the multinode DCGM
+   * power bundle scrapes power only), so readers can tell "not collected"
+   * from a genuine zero reading.
+   */
+  temperature?: number;
+  smClock?: number;
+  memClock?: number;
+  gpuUtil?: number;
+  memUtil?: number;
   edgeTemp?: number;
   memTemp?: number;
   gfxVoltage?: number;
@@ -135,11 +140,11 @@ function toSampleRow(raw: RawSampleRow): GpuMetricSampleRow {
     timestamp: isoString(raw.sampled_at),
     index: Number(raw.gpu_index),
     power: raw.power_w ?? 0,
-    temperature: raw.temperature_c ?? 0,
-    smClock: raw.sm_clock_mhz ?? 0,
-    memClock: raw.mem_clock_mhz ?? 0,
-    gpuUtil: raw.gpu_util_pct ?? 0,
-    memUtil: raw.mem_util_pct ?? 0,
+    temperature: optional(raw.temperature_c),
+    smClock: optional(raw.sm_clock_mhz),
+    memClock: optional(raw.mem_clock_mhz),
+    gpuUtil: optional(raw.gpu_util_pct),
+    memUtil: optional(raw.mem_util_pct),
     edgeTemp: optional(raw.edge_temp_c),
     memTemp: optional(raw.mem_temp_c),
     gfxVoltage: optional(raw.gfx_voltage_mv),

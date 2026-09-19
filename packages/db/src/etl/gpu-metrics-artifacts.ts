@@ -9,6 +9,13 @@
  *   gpu_metrics_identity.{json,csv}         SKU / UUID / driver per GPU
  *   gpu_metrics_energy_{start,end}.csv      amd-smi energy counters
  *
+ * Multinode jobs (`benchmark-multinode-tmpl.yml`) upload no `gpu_metrics_`
+ * artifact; their telemetry travels inside `power_audit_<suffix>`:
+ *   LOGS/power/samples.csv                  deployment-wide DCGM power, one row per (host, GPU, s)
+ *   LOGS/power/manifest.json                producer, source metric, cadence
+ * Single-node jobs upload a `power_audit_` bundle too, so it only stands in
+ * for a point when no `gpu_metrics_<suffix>` sibling exists.
+ *
  * `eval_gpu_metrics_<suffix>` (eval-only jobs) is deliberately ignored: those
  * jobs produce no benchmark point to attach the telemetry to.
  */
@@ -16,7 +23,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
+import { isMultinodePowerSamplesPath } from './multinode-power-samples.js';
+
 export const GPU_METRICS_ARTIFACT_PREFIX = 'gpu_metrics_';
+export const POWER_AUDIT_ARTIFACT_PREFIX = 'power_audit_';
 
 export interface GpuMetricsArtifact {
   artifactName: string;
@@ -36,11 +46,17 @@ export interface GpuMetricsSidecars {
   energyEnd: Record<string, number> | null;
 }
 
-/** Return the shared suffix that pairs a gpu_metrics artifact with bmk[_agentic]_<suffix>. */
+/** Return the shared suffix that pairs a telemetry artifact with bmk[_agentic]_<suffix>. */
 export function gpuMetricsArtifactSuffix(artifactName: string): string | null {
-  return artifactName.startsWith(GPU_METRICS_ARTIFACT_PREFIX)
-    ? artifactName.slice(GPU_METRICS_ARTIFACT_PREFIX.length)
-    : null;
+  for (const prefix of [GPU_METRICS_ARTIFACT_PREFIX, POWER_AUDIT_ARTIFACT_PREFIX]) {
+    if (artifactName.startsWith(prefix)) return artifactName.slice(prefix.length);
+  }
+  return null;
+}
+
+/** The nvidia-smi/amd-smi CSV carries clocks, utilization and temperature; the power bundle only power. */
+export function isPowerAuditArtifact(artifactName: string): boolean {
+  return artifactName.startsWith(POWER_AUDIT_ARTIFACT_PREFIX);
 }
 
 function isGpuMetricsCsvName(fileName: string): boolean {
@@ -68,6 +84,32 @@ export function listGpuMetricsCsvFiles(root: string): GpuMetricsCsvFile[] {
   };
   visit(root);
   return files.toSorted((a, b) => a.fileName.localeCompare(b.fileName));
+}
+
+/** Every multinode power CSV under an extracted `power_audit_` root. */
+export function listMultinodePowerSampleFiles(root: string): GpuMetricsCsvFile[] {
+  if (!fs.existsSync(root) || !fs.statSync(root).isDirectory()) return [];
+  const files: GpuMetricsCsvFile[] = [];
+  const visit = (directory: string): void => {
+    for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+      const pathname = path.join(directory, entry.name);
+      if (entry.isDirectory()) visit(pathname);
+      else if (entry.isFile()) {
+        const fileName = path.relative(root, pathname).split(path.sep).join('/');
+        if (isMultinodePowerSamplesPath(fileName)) files.push({ fileName, path: pathname });
+      }
+    }
+  };
+  visit(root);
+  return files.toSorted((a, b) => a.fileName.localeCompare(b.fileName));
+}
+
+/** The producer manifest next to `samples.csv`; null when absent or malformed. */
+export function readMultinodePowerManifest(samplesPath: string): Record<string, unknown> | null {
+  const parsed = readJsonIfPresent(path.join(path.dirname(samplesPath), 'manifest.json'));
+  return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+    ? (parsed as Record<string, unknown>)
+    : null;
 }
 
 function readJsonIfPresent(pathname: string): unknown | null {
@@ -158,16 +200,24 @@ export function contextUtcOffsetMinutes(context: Record<string, unknown> | null)
   return match.groups.sign === '-' ? -minutes : minutes;
 }
 
-/** Index every extracted gpu_metrics artifact by its shared suffix. */
+/**
+ * Index every extracted telemetry artifact by its shared suffix. A
+ * `gpu_metrics_` upload wins over the `power_audit_` bundle for the same
+ * suffix; the bundle only fills in for multinode jobs that have no other.
+ */
 export function discoverGpuMetricsArtifacts(artifactsDir: string): Map<string, GpuMetricsArtifact> {
   const discovered = new Map<string, GpuMetricsArtifact>();
   if (!fs.existsSync(artifactsDir)) return discovered;
-  for (const artifactName of fs.readdirSync(artifactsDir)) {
-    const suffix = gpuMetricsArtifactSuffix(artifactName);
-    if (!suffix) continue;
-    const artifactDir = path.join(artifactsDir, artifactName);
-    if (!fs.statSync(artifactDir).isDirectory()) continue;
-    discovered.set(suffix, { artifactName, artifactDir });
+  const names = fs
+    .readdirSync(artifactsDir)
+    .filter((artifactName) => fs.statSync(path.join(artifactsDir, artifactName)).isDirectory());
+  for (const preferred of [false, true]) {
+    for (const artifactName of names) {
+      if (isPowerAuditArtifact(artifactName) !== preferred) continue;
+      const suffix = gpuMetricsArtifactSuffix(artifactName);
+      if (!suffix || discovered.has(suffix)) continue;
+      discovered.set(suffix, { artifactName, artifactDir: path.join(artifactsDir, artifactName) });
+    }
   }
   return discovered;
 }

@@ -489,11 +489,12 @@ async function main(): Promise<void> {
       console.log(`  Found ${serverLogArtifacts.size} server log artifact(s)`);
     }
     // PowerX telemetry: `gpu_metrics_<key>` is uploaded next to `bmk_<key>` by
-    // every benchmark job (see migration 016). Digested here so the dashboard
-    // never re-downloads GitHub artifacts and keeps the series past retention.
+    // every single-node job; multinode jobs carry it inside `power_audit_<key>`
+    // instead (see migration 016). Digested here so the dashboard never
+    // re-downloads GitHub artifacts and keeps the series past retention.
     const gpuMetricsArtifacts = discoverGpuMetricsArtifacts(artifactsDir);
     if (gpuMetricsArtifacts.size > 0) {
-      console.log(`  Found ${gpuMetricsArtifacts.size} gpu_metrics artifact(s)`);
+      console.log(`  Found ${gpuMetricsArtifacts.size} telemetry artifact(s)`);
     }
 
     // Sibling aiperf artifacts: each `bmk_agentic_<suffix>` is paired with an

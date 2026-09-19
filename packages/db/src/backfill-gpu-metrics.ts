@@ -3,9 +3,10 @@
  * migration-016 tables for runs that were ingested before the CI path
  * digested them.
  *
- * GitHub keeps run artifacts for 90 days and the GCS backup only mirrors
- * bmk_/server_logs_ uploads, so the reachable history is bounded by GitHub
- * retention. Each gpu_metrics artifact is paired with its exact `bmk_<suffix>`
+ * GitHub keeps run artifacts for 90 days and the GCS mirror only covers
+ * scheduled/push runs on main, so the reachable history is bounded by GitHub
+ * retention; runs GitHub has since deleted are reported and skipped. Each
+ * gpu_metrics artifact is paired with its exact `bmk_<suffix>`
  * (or `bmk_agentic_<suffix>`) sibling, the raw rows are mapped through the
  * production mapper, and the series is linked to those persisted points.
  *
@@ -29,9 +30,14 @@ import { AsyncSemaphore } from './etl/async-semaphore.js';
 import { createAdminSql } from './etl/db-utils.js';
 import { ingestGpuMetricsArtifact } from './etl/gpu-metrics-ingest.js';
 import { retryArtifactOperation } from './lib/artifact-retry.js';
-import { confirmProceed, parseLimitForceFlags, runBackfillMain } from './lib/backfill-runner.js';
+import {
+  confirmProceed,
+  listBackfillRunArtifacts,
+  parseLimitForceFlags,
+  runBackfillMain,
+} from './lib/backfill-runner.js';
 import { findBenchmarkResultIds, readMappedBenchmarkRows } from './lib/benchmark-result-lookup.js';
-import { downloadArtifact, listRunArtifacts } from './lib/github-artifacts.js';
+import { downloadArtifact } from './lib/github-artifacts.js';
 import {
   pairGpuMetricsArtifacts,
   type GpuMetricsArtifactPair,
@@ -195,19 +201,23 @@ async function main(): Promise<void> {
   if (flags.dryRun) {
     let pairedRuns = 0;
     let pairs = 0;
+    let goneRuns = 0;
     for (const run of runs) {
       const repository = repositoryFromRunUrl(run.html_url) ?? DEFAULT_REPO;
-      const artifacts = await retryArtifactOperation(
-        `listing GitHub artifacts for run ${run.github_run_id}`,
-        () => listRunArtifacts(repository, String(run.github_run_id)),
-      );
+      const artifacts = await listBackfillRunArtifacts(repository, run.github_run_id);
+      if (artifacts === null) {
+        goneRuns++;
+        console.log(`  run ${run.github_run_id} (${run.date}): gone from GitHub`);
+        continue;
+      }
       const runPairs = pairGpuMetricsArtifacts(artifacts);
       if (runPairs.length > 0) pairedRuns++;
       pairs += runPairs.length;
       console.log(`  run ${run.github_run_id} (${run.date}): ${runPairs.length} pair(s)`);
     }
     console.log(
-      `\n=== dry run: ${runs.length} run(s), ${pairedRuns} with pairs, ${pairs} pair(s) ===`,
+      `\n=== dry run: ${runs.length} run(s), ${pairedRuns} with pairs, ${pairs} pair(s), ` +
+        `${goneRuns} gone from GitHub ===`,
     );
     return;
   }
@@ -225,6 +235,7 @@ async function main(): Promise<void> {
   let artifactFailures = 0;
   let runFailures = 0;
   let missingRuns = 0;
+  let goneRuns = 0;
 
   for (const [runIndex, run] of runs.entries()) {
     const runId = run.github_run_id;
@@ -232,10 +243,14 @@ async function main(): Promise<void> {
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), `gpu-metrics-backfill-${runId}-`));
     const runStart = Date.now();
     try {
-      const artifacts = await retryArtifactOperation(
-        `listing GitHub artifacts for run ${runId}`,
-        () => listRunArtifacts(repository, String(runId)),
-      );
+      const artifacts = await listBackfillRunArtifacts(repository, runId);
+      if (artifacts === null) {
+        goneRuns++;
+        console.log(
+          `  [${runIndex + 1}/${runs.length}] run ${runId} attempt ${run.run_attempt}: gone from GitHub`,
+        );
+        continue;
+      }
       const pairs = pairGpuMetricsArtifacts(artifacts);
       if (pairs.length === 0) {
         missingRuns++;
@@ -293,8 +308,8 @@ async function main(): Promise<void> {
     `\n=== backfill complete: ${artifactsProcessed} artifact(s), ${seriesStored} series, ` +
       `${samplesStored} sample(s), ${pointsLinked} point link(s), ` +
       `${unmatchedArtifacts} unmatched artifact(s), ${emptyArtifacts} empty artifact(s), ` +
-      `${missingRuns} run(s) without pairs, ${artifactFailures} failed artifact(s), ` +
-      `${runFailures} failed run(s) ===`,
+      `${missingRuns} run(s) without pairs, ${goneRuns} run(s) gone from GitHub, ` +
+      `${artifactFailures} failed artifact(s), ${runFailures} failed run(s) ===`,
   );
   console.log('  Invalidate API cache after the backfill: bun run admin:cache:invalidate');
   if (artifactFailures > 0 || runFailures > 0) process.exitCode = 1;

@@ -231,6 +231,8 @@ const SYSTEM_POWER_STRINGS = {
         : `${chassis} eight-GPU chassis · ${measured} of ${modeled} GPUs measured, extrapolated to full chassis`,
     extrapolation:
       'Unmeasured chassis GPUs are assumed to run the same workload at the measured per-GPU power; deployment values are the measured GPUs’ share.',
+    uniformHosts:
+      'No per-host telemetry for this multinode deployment; every chassis is modeled at the deployment-mean GPU power.',
     normalization: 'AC power is divided by all modeled chassis GPUs, including prefill and decode.',
     boundary: 'Includes GPU chassis CPUs; excludes separate CPU-only frontend/router hosts.',
     // NVL72 compute trays: the compute module is measured, the rack residual modeled.
@@ -280,6 +282,7 @@ const SYSTEM_POWER_STRINGS = {
         : `${chassis} 个八卡机箱 · 实测 ${measured}/${modeled} 张 GPU，按满机箱外推`,
     extrapolation:
       '假设机箱内未实测的 GPU 运行相同负载、功耗与实测每卡功耗相同；部署数值为实测 GPU 所占份额。',
+    uniformHosts: '该多节点部署没有逐主机功耗数据；每个机箱按部署平均每卡功耗建模。',
     normalization: '交流功耗按所有建模机箱的 GPU 总数分摊，包括 Prefill 与 Decode。',
     boundary: '计入 GPU 机箱内的 CPU；不计入独立的纯 CPU 前端或路由主机。',
     trayTopology: (trays: number, measured: number, modeled: number) =>
@@ -342,6 +345,7 @@ const modeledSystemPowerHTML = (
     estimate.chassisBasis === 'extrapolated'
       ? `<br/>${tray ? t.trayExtrapolation : t.extrapolation}`
       : '';
+  const uniformHosts = estimate.topologyBasis === 'uniform-hosts' ? `<br/>${t.uniformHosts}` : '';
   const notes = tray
     ? [
         t.trayAssumptions[tray.sensorKind],
@@ -359,7 +363,7 @@ const modeledSystemPowerHTML = (
         ? `
       ${tooltipLine(t.deploymentAc, `${fmt(estimate.deploymentAcWatts)} W`)}
       ${tooltipLine(`${t.facility} (PUE ${fmt(estimate.pue)})`, `${fmt(estimate.deploymentFacilityWatts)} W`)}
-      <div style="color: var(--muted-foreground); margin-bottom: 4px;">${topology}${extrapolation}<br/>${notes.join('<br/>')}</div>
+      <div style="color: var(--muted-foreground); margin-bottom: 4px;">${topology}${extrapolation}${uniformHosts}<br/>${notes.join('<br/>')}</div>
       ${tooltipLine(t.model, `<a href="${escapeHtml(sourceUrl)}" target="_blank" rel="noopener noreferrer" style="text-decoration: underline;">${escapeHtml(estimate.hardware)} · ${escapeHtml(estimate.modelRevision.slice(0, 12))}</a>`)}
       <a href="${escapeHtml(readmeUrl)}" target="_blank" rel="noopener noreferrer" style="text-decoration: underline;">${t.sweep}</a>
     `

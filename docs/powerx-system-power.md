@@ -151,9 +151,12 @@ to 0.1 W before PUE. Python-generated `rackCases` prove parity with the pinned
 implementation for both variants, both bases, every shelf knot and PUE 1.0–1.2.
 
 **Gate rules (Profit Estimator).** Planning kW/GPU = deployment facility watts ÷
-measured GPUs ÷ 1000 × 1.1. It accepts a `single-node` eight-GPU chassis with
-`chassisBasis: 'full'`, or an `nvl72-trays` estimate whose trays are all fully
-measured (one host per worker, four GPUs and two sockets each). Partial trays are
+measured GPUs ÷ 1000 × 1.1. It accepts fully measured eight-GPU chassis
+(`chassisBasis: 'full'` on the `single-node`, `worker-hosts`, or `uniform-hosts`
+basis; see the Profit Estimator power basis section), or an `nvl72-trays` estimate
+whose trays are all fully measured (one host per worker, four GPUs and two sockets
+each; an aggregate multinode NVL72 row without a per-worker array is not modeled
+at the deployment mean and stays `topology`-unavailable). Partial trays are
 extrapolated in the chart but rejected here, as partial chassis are. Between two
 frontier knots both must share the same measured basis and sensor kind; a module
 knot beside a Grace-socket knot stays unavailable rather than blending sensors. The
@@ -178,12 +181,16 @@ facility kW/GPU used to calculate capacity per GW. Consequently, revenue,
 compute expense, license fee, and profit scale together; profit margin does not
 change. Electricity expense is not recomputed separately.
 
-This opt-in AgentX estimate requires validated schema-v2 telemetry and either a
-complete single-node eight-GPU chassis supported by the pinned model or NVL72
-compute trays that are all fully measured (`cpu_power_valid=1`, see the NVL72
-section). Partial allocations, NVL72 rows without CPU-side telemetry, and
-missing/invalid measurements stay unavailable. The ordinary 8K/1K transformation
-keeps its existing admission policy.
+This opt-in AgentX estimate requires validated schema-v2 telemetry and either fully
+measured eight-GPU chassis supported by the pinned model (one single-node chassis,
+one chassis per measured worker host, or, for an aggregate multinode deployment
+whose producer emits no per-worker telemetry, every chassis at the deployment-mean
+GPU power: `topologyBasis: 'uniform-hosts'`, since symmetric TP/PP/DP shards load
+each host alike) or NVL72 compute trays that are all fully measured
+(`cpu_power_valid=1`, see the NVL72 section). Partial allocations, disaggregated
+deployments without per-worker telemetry, NVL72 rows without CPU-side telemetry,
+and missing/invalid measurements stay unavailable. The ordinary 8K/1K
+transformation keeps its existing admission policy.
 
 At an exact frontier point, use that point's modeled power. Between points,
 estimate power linearly using the same two knots as the existing throughput

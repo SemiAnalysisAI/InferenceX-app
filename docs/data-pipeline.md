@@ -529,9 +529,15 @@ Every single-node benchmark job (`benchmark-tmpl.yml`) samples `nvidia-smi` /
 `amd-smi` once per second for its whole lifetime and uploads the CSV as
 `gpu_metrics_<suffix>` next to `bmk_<suffix>` (agentic jobs: `bmk_agentic_<suffix>`,
 still paired by the bare suffix). The multinode template uploads no `gpu_metrics_`
-artifact — its telemetry travels only inside `power_audit_` — so multinode and
-disaggregated points have no series here and their per-point PowerX tab stays
-empty. The PowerX explorer used to download and parse the artifacts from GitHub
+artifact; its telemetry travels inside `power_audit_<suffix>` as
+`LOGS/power/samples.csv`, one deployment-wide CSV written by srt-slurm's
+`dcgm-power` collector (`timestamp_unix, hostname, gpu_index, gpu_uuid, power_w`,
+power only). `etl/multinode-power-samples.ts` regroups it per host and the ingest
+stores one series per host (`file_name` = `LOGS/power/samples.csv#<hostname>`),
+so multinode and disaggregated points get per-GPU power curves with null clocks,
+temperature and utilization. Single-node jobs upload a `power_audit_` bundle too,
+so discovery and backfill pairing use it only for a suffix with no `gpu_metrics_`
+upload. The PowerX explorer used to download and parse the artifacts from GitHub
 on every request and lost them after GitHub's 90-day retention. CI ingest now
 digests them at ingest time, in the same step that links server logs:
 

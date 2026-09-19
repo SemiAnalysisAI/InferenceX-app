@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { BenchmarkRow } from '@/lib/api';
 import { modelSystemPower } from '@/lib/modeled-system-power';
-import { estimateRackPower } from '@/lib/system-power-model';
+import { estimateChassisPower, estimateRackPower } from '@/lib/system-power-model';
 import { Percentile, Sequence } from '@/lib/data-mappings';
 import { buildGpuGroups, interpolateForGPU } from './useThroughputData';
 import { estimateProfitRows } from './profit-estimator';
@@ -308,6 +308,54 @@ describe('profit power basis preview', () => {
       estimateProfitByPower([result], specs, pricing, assumptions, 'provisioned', 45, labels)
         .rows[0].powerSource,
     ).toBeUndefined();
+  });
+
+  it('plans fully measured multi-chassis deployments at the same facility watts per GPU', () => {
+    // Kimi K3 B200 dynamo-vLLM TP8/PP2: sixteen GPUs on two hosts, aggregate
+    // producer without a per-worker array → uniform-hosts basis.
+    const multinode: BenchmarkRow = {
+      ...source,
+      hardware: 'b200',
+      framework: 'dynamo-vllm',
+      is_multinode: true,
+      num_prefill_gpu: 16,
+      num_decode_gpu: 16,
+      decode_num_workers: 1,
+      metrics: {
+        power_valid: 1,
+        power_metric_schema_version: 2,
+        avg_power_w: 715.095,
+        avg_total_gpu_power_w: 11441.513,
+        decode_pp: 2,
+      },
+    };
+    expect(modelSystemPower(multinode, undefined, true)).toMatchObject({
+      status: 'supported',
+      topologyBasis: 'uniform-hosts',
+      chassisBasis: 'full',
+    });
+    const perChassis = estimateChassisPower('b200', 11441.513 / 2, 1.3)!;
+    expect(
+      modeledPowerAtTarget({ ...result, nearestPoints: [{ ...point, sourceRow: multinode }] }, 45),
+    ).toBeCloseTo(((perChassis.facilityWatts * 2) / 16 / 1000) * 1.1, 8);
+    // Every chassis-topology source is labeled alike, whatever the host count.
+    const [modeled] = estimateProfitByPower(
+      [withPoints(result, [{ ...point, sourceRow: multinode }])],
+      specs,
+      pricing,
+      assumptions,
+      'modeled',
+      45,
+      labels,
+    ).rows;
+    expect(modeled.powerSource).toMatchObject({ topology: 'chassis', pue: 1.3 });
+    // Disaggregated multinode rows still need per-worker telemetry.
+    expect(
+      modeledPowerAtTarget(
+        { ...result, nearestPoints: [{ ...point, sourceRow: { ...multinode, disagg: true } }] },
+        45,
+      ),
+    ).toBeNull();
   });
 
   it('leaves the default estimator and default AgentX model gate unchanged', () => {

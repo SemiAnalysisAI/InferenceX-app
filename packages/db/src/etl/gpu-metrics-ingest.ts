@@ -29,10 +29,13 @@ import {
   contextUtcOffsetMinutes,
   gpuMetricsArtifactSuffix,
   listGpuMetricsCsvFiles,
+  listMultinodePowerSampleFiles,
   readGpuMetricsSidecars,
+  readMultinodePowerManifest,
   type GpuMetricsArtifact,
   type GpuMetricsSidecars,
 } from './gpu-metrics-artifacts.js';
+import { multinodePowerVendor, parseMultinodePowerSamples } from './multinode-power-samples.js';
 
 /** Samples are streamed to Postgres in unnest batches of this many rows. */
 const SAMPLE_BATCH_SIZE = 5000;
@@ -56,7 +59,54 @@ export interface GpuMetricsIngestResult {
   seriesSkipped: number;
 }
 
-/** Parse every CSV in an extracted artifact; unparseable files are skipped. */
+/**
+ * One series per host from the multinode power bundle. The deployment-wide
+ * CSV is hashed once, so every host series of one upload shares its sha and
+ * re-ingests stay no-ops together. The `#<hostname>` fragment keeps the
+ * (run, artifact, file) identity unique per host.
+ */
+function prepareMultinodePowerSeries(artifact: GpuMetricsArtifact): PreparedGpuMetricSeries[] {
+  const prepared: PreparedGpuMetricSeries[] = [];
+  for (const file of listMultinodePowerSampleFiles(artifact.artifactDir)) {
+    const csvText = fs.readFileSync(file.path, 'utf8');
+    const hosts = parseMultinodePowerSamples(csvText);
+    if (!hosts) continue;
+    const manifest = readMultinodePowerManifest(file.path);
+    const vendor = multinodePowerVendor(manifest);
+    const csvSha256 = createHash('sha256').update(csvText).digest('hex');
+    for (const host of hosts) {
+      const summary = summarizeGpuMetricSamples(host.samples);
+      if (!summary) continue;
+      prepared.push({
+        fileName: `${file.fileName}#${host.hostname}`,
+        vendor,
+        csvSha256,
+        samples: host.samples,
+        stats: computeGpuMetricStats(host.samples),
+        sampleIntervalS: summary.sampleIntervalS,
+        gpuCount: summary.gpuCount,
+        startedAtMs: summary.startedAtMs,
+        endedAtMs: summary.endedAtMs,
+        sidecars: {
+          context: manifest,
+          identity: Object.entries(host.gpuUuids).map(([index, uuid]) => ({
+            hostname: host.hostname,
+            gpu_index: Number(index),
+            gpu_uuid: uuid,
+          })),
+          energyStart: null,
+          energyEnd: null,
+        },
+      });
+    }
+  }
+  return prepared;
+}
+
+/**
+ * Parse every CSV in an extracted artifact; unparseable files are skipped.
+ * Without any nvidia-smi/amd-smi CSV, fall back to the multinode power bundle.
+ */
 export function prepareGpuMetricsArtifact(artifact: GpuMetricsArtifact): PreparedGpuMetricSeries[] {
   const prepared: PreparedGpuMetricSeries[] = [];
   for (const file of listGpuMetricsCsvFiles(artifact.artifactDir)) {
@@ -81,7 +131,7 @@ export function prepareGpuMetricsArtifact(artifact: GpuMetricsArtifact): Prepare
       sidecars,
     });
   }
-  return prepared;
+  return prepared.length > 0 ? prepared : prepareMultinodePowerSeries(artifact);
 }
 
 const STAT_METRIC_COLUMN: Record<GpuMetricStats['metric'], string> = {

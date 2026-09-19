@@ -8,6 +8,12 @@
 
 import { confirm, hasYesFlag } from '../cli-utils.js';
 import type { Sql } from '../etl/db-utils.js';
+import { retryArtifactOperation } from './artifact-retry.js';
+import {
+  WorkflowRunNotFoundError,
+  listRunArtifacts,
+  type ArtifactMeta,
+} from './github-artifacts.js';
 
 export interface LimitForceFlags {
   limit: number | null;
@@ -165,6 +171,25 @@ export async function runCandidateIdBackfill(
  * class instances/prototypes so postgres.js serializes plain data only —
  * matches what the inline ingest path stores.
  */
+/**
+ * List a candidate run's GitHub artifacts with transient-failure retry.
+ * Returns `null` when GitHub no longer has the run at all, so a sweep over
+ * months of history reports the gap and moves on instead of aborting.
+ */
+export async function listBackfillRunArtifacts(
+  repository: string,
+  runId: number,
+): Promise<ArtifactMeta[] | null> {
+  try {
+    return await retryArtifactOperation(`listing GitHub artifacts for run ${runId}`, () =>
+      listRunArtifacts(repository, String(runId)),
+    );
+  } catch (error) {
+    if (error instanceof WorkflowRunNotFoundError) return null;
+    throw error;
+  }
+}
+
 export function jsonbParam(sql: Sql, value: unknown): ReturnType<Sql['json']> {
   return sql.json(structuredClone(value) as unknown as Parameters<typeof sql.json>[0]);
 }

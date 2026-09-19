@@ -352,7 +352,7 @@ export function AgenticPointDetail({ id }: Props) {
       {view === 'logs' ? (
         <ServerLogViewer id={id} enabled />
       ) : view === 'power' ? (
-        <PowerTelemetryView id={id} enabled />
+        <PowerTelemetryView id={id} enabled hardware={siblingsData?.sku.hardware} />
       ) : view === 'aggregates' ? (
         aggregatesQuery.isError ? (
           <RetryableQueryError

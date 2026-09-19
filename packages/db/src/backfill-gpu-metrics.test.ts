@@ -25,6 +25,8 @@ let db: PGlite;
 let sql: Sql;
 let main: () => Promise<void>;
 const listedRunIds: string[] = [];
+/** GitHub run ids whose artifact listing should 404 (the run was deleted). */
+const goneRunIds = new Set<string>();
 const originalArgv = process.argv;
 
 vi.mock('./etl/db-utils.js', async (importOriginal) => ({
@@ -32,13 +34,19 @@ vi.mock('./etl/db-utils.js', async (importOriginal) => ({
   createAdminSql: () => sql,
 }));
 
-vi.mock('./lib/github-artifacts.js', async (importOriginal) => ({
-  ...(await importOriginal<typeof GithubArtifactsModule>()),
-  listRunArtifacts: (_repository: string, runId: string): Promise<ArtifactMeta[]> => {
-    listedRunIds.push(runId);
-    return Promise.resolve([]);
-  },
-}));
+vi.mock('./lib/github-artifacts.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof GithubArtifactsModule>();
+  return {
+    ...actual,
+    listRunArtifacts: (repository: string, runId: string): Promise<ArtifactMeta[]> => {
+      listedRunIds.push(runId);
+      if (goneRunIds.has(runId)) {
+        return Promise.reject(new actual.WorkflowRunNotFoundError(repository, runId));
+      }
+      return Promise.resolve([]);
+    },
+  };
+});
 
 vi.mock('./lib/backfill-runner.js', async (importOriginal) => ({
   ...(await importOriginal<typeof BackfillRunnerModule>()),
@@ -94,6 +102,7 @@ afterAll(async () => {
  */
 beforeEach(async () => {
   listedRunIds.length = 0;
+  goneRunIds.clear();
   vi.spyOn(console, 'log').mockImplementation(() => {});
   await db.exec(`TRUNCATE workflow_runs, configs RESTART IDENTITY CASCADE;
     INSERT INTO workflow_runs (id, github_run_id, run_attempt, name, html_url, created_at, date)
@@ -141,6 +150,17 @@ describe('candidate selection', () => {
     // An interrupted backfill leaves a run with one of its several artifacts
     // stored. Re-invoking --all silently treats that run as finished.
     expect(await selectedRuns('--all')).toEqual([FRESH_NO_SERIES]);
+  });
+
+  it('a run GitHub has deleted is reported and skipped, not fatal for the sweep', async () => {
+    // GitHub 404s the artifact listing once a run is deleted (or purged past
+    // retention). One such run must not abort a months-long --all pass.
+    goneRunIds.add(String(FRESH_WITH_SERIES));
+    expect(await selectedRuns('--all', '--force')).toEqual([FRESH_WITH_SERIES, FRESH_NO_SERIES]);
+    const lines = vi.mocked(console.log).mock.calls.map((call) => call.join(' '));
+    expect(lines).toContainEqual(expect.stringContaining(`run ${FRESH_WITH_SERIES}`));
+    expect(lines).toContainEqual(expect.stringContaining('gone from GitHub'));
+    expect(lines.at(-1)).toContain('1 gone from GitHub');
   });
 
   it('--run bypasses both the retention cutoff and the already-has-series filter', async () => {

@@ -54,13 +54,18 @@ export function powerSourceKey(source: ProfitPowerSource): string {
 
 /**
  * Planning kW/GPU: facility watts per measured GPU plus the 10% planning margin.
- * Accepted: one complete eight-GPU chassis, or NVL72 compute trays that are all
- * fully measured. A partial unit would price its unmeasured GPUs at a modeled share.
+ * Accepted: fully measured eight-GPU chassis (one single-node chassis, one per
+ * measured worker host, or uniform hosts at the deployment mean), or NVL72 compute
+ * trays that are all fully measured. A partial unit would price its unmeasured
+ * GPUs at a modeled share.
  */
 function planningPower(point: GPUDataPoint): ProfitPlanningPower | null {
   const row = point.sourceRow;
   if (!row || row.metrics.power_metric_schema_version !== 2) return null;
   const estimate = modelSystemPower(row, undefined, true);
+  // Every modeled chassis must be fully measured; a partial allocation's
+  // extrapolated share is not a planning figure. Multi-chassis deployments
+  // (per-worker or uniform hosts) plan at the same facility watts per GPU.
   if (estimate.status !== 'supported' || estimate.chassisBasis !== 'full') return null;
   const profile: ProfitPowerProfile = {
     pue: estimate.pue,
@@ -68,17 +73,15 @@ function planningPower(point: GPUDataPoint): ProfitPlanningPower | null {
     modelRevision: estimate.modelRevision,
     profileSha256: systemPowerSourceSha256(estimate.modelPath),
   };
-  let source: ProfitPowerSource;
-  if (estimate.topologyBasis === 'nvl72-trays') {
-    source = {
-      ...profile,
-      topology: 'nvl72-trays',
-      measuredBasis: estimate.measuredBasis,
-      sensorKind: estimate.sensorKind,
-    };
-  } else if (estimate.topologyBasis === 'single-node' && estimate.gpuCount === 8) {
-    source = { ...profile, topology: 'chassis' };
-  } else return null;
+  const source: ProfitPowerSource =
+    estimate.topologyBasis === 'nvl72-trays'
+      ? {
+          ...profile,
+          topology: 'nvl72-trays',
+          measuredBasis: estimate.measuredBasis,
+          sensorKind: estimate.sensorKind,
+        }
+      : { ...profile, topology: 'chassis' };
   return {
     kwPerGpu: (estimate.deploymentFacilityWatts / estimate.gpuCount / 1000) * 1.1,
     source,

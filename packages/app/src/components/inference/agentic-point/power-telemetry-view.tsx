@@ -95,11 +95,25 @@ const STRINGS = {
 } as const;
 
 const VENDOR_LABEL: Record<string, string> = { nvidia: 'nvidia-smi', amd: 'amd-smi' };
+
+/**
+ * Single-node CSVs come from the vendor CLI; multinode power bundles record
+ * their own producer (e.g. `srt-slurm.dcgm-power`) in the context sidecar.
+ */
+export function collectorLabel(series: Pick<GpuMetricSeries, 'vendor' | 'sidecars'>): string {
+  const context = series.sidecars?.context;
+  const producer =
+    context && typeof context === 'object' ? (context as { producer?: unknown }).producer : null;
+  if (typeof producer === 'string' && producer.trim() !== '') return producer;
+  return VENDOR_LABEL[series.vendor] ?? series.vendor;
+}
 /** Violet: outside the Tableau10 chip palette and the foreground mean line. */
 
 interface Props {
   id: number;
   enabled: boolean;
+  /** The point's hardware key, for the TDP reference line. */
+  hardware?: string;
 }
 
 function seriesLabel(series: GpuMetricSeries, total: number): string {
@@ -111,7 +125,7 @@ function seriesLabel(series: GpuMetricSeries, total: number): string {
  * recorded while this benchmark point ran, read from the ingest-time digest
  * (migration 016) rather than from GitHub artifacts.
  */
-export function PowerTelemetryView({ id, enabled }: Props) {
+export function PowerTelemetryView({ id, enabled, hardware }: Props) {
   const locale = useLocale();
   const t = STRINGS[locale];
   const query = useGpuMetricsPoint(id, enabled);
@@ -246,9 +260,7 @@ export function PowerTelemetryView({ id, enabled }: Props) {
         <dl className="mb-4 grid grid-cols-2 gap-x-4 gap-y-3 text-sm sm:grid-cols-3 lg:grid-cols-5">
           <div className="min-w-0">
             <dt className="text-xs text-muted-foreground">{t.vendor}</dt>
-            <dd className="font-medium">
-              {VENDOR_LABEL[selectedSeries.vendor] ?? selectedSeries.vendor}
-            </dd>
+            <dd className="font-medium">{collectorLabel(selectedSeries)}</dd>
           </div>
           <div className="min-w-0">
             <dt className="text-xs text-muted-foreground">{t.samples}</dt>
@@ -378,6 +390,7 @@ export function PowerTelemetryView({ id, enabled }: Props) {
           visibleGpus={visibleGpus}
           metricKey={metricKey}
           artifactName={selectedSeries.artifactName}
+          hardware={hardware}
           maxPoints={2000}
           display={display}
           overlay={overlay}

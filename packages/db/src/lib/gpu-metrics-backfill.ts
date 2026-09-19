@@ -1,9 +1,10 @@
 /** Pairing rules for the historical gpu_metrics backfill. */
 
-import { gpuMetricsArtifactSuffix } from '../etl/gpu-metrics-artifacts.js';
+import { gpuMetricsArtifactSuffix, isPowerAuditArtifact } from '../etl/gpu-metrics-artifacts.js';
 import { RUNNER_SUFFIX_RE, type ArtifactMeta } from './github-artifacts.js';
 
 export interface GpuMetricsArtifactPair {
+  /** `gpu_metrics_<suffix>`, or the `power_audit_<suffix>` bundle when a multinode job uploaded no other. */
   gpuMetrics: ArtifactMeta;
   benchmarks: ArtifactMeta;
 }
@@ -16,9 +17,11 @@ function isNewerArtifact(candidate: ArtifactMeta, existing: ArtifactMeta): boole
 }
 
 /**
- * Pair every unexpired gpu_metrics artifact with its exact bmk sibling. Retried
+ * Pair every unexpired telemetry artifact with its exact bmk sibling. Retried
  * jobs upload on different runners, so the newest artifact per logical
- * (runner-suffix-stripped) benchmark name wins, matching CI ingest.
+ * (runner-suffix-stripped) benchmark name wins, matching CI ingest. A
+ * `power_audit_` bundle pairs only when its suffix has no `gpu_metrics_`
+ * upload, the same preference `discoverGpuMetricsArtifacts` applies.
  */
 export function pairGpuMetricsArtifacts(
   artifacts: readonly ArtifactMeta[],
@@ -29,10 +32,16 @@ export function pairGpuMetricsArtifacts(
     const existing = byName.get(artifact.name);
     if (!existing || isNewerArtifact(artifact, existing)) byName.set(artifact.name, artifact);
   }
+  const gpuMetricsSuffixes = new Set<string>();
+  for (const name of byName.keys()) {
+    const suffix = gpuMetricsArtifactSuffix(name);
+    if (suffix && !isPowerAuditArtifact(name)) gpuMetricsSuffixes.add(suffix);
+  }
   const byLogicalBenchmark = new Map<string, GpuMetricsArtifactPair>();
   for (const gpuMetrics of byName.values()) {
     const suffix = gpuMetricsArtifactSuffix(gpuMetrics.name);
     if (!suffix) continue;
+    if (isPowerAuditArtifact(gpuMetrics.name) && gpuMetricsSuffixes.has(suffix)) continue;
     const benchmarks = byName.get(`bmk_agentic_${suffix}`) ?? byName.get(`bmk_${suffix}`);
     if (!benchmarks) continue;
     const logicalName = benchmarks.name.replace(RUNNER_SUFFIX_RE, '');
