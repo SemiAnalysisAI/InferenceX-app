@@ -354,7 +354,7 @@ describe('mapBenchmarkRow', () => {
       expect(result!.metrics.median_ttft).toBe(50.2);
     });
 
-    // Ticket 01 contract: cpu_power_valid is independent of power_valid. Each leg
+    // Producer contract: cpu_power_valid is independent of power_valid. Each leg
     // withholds only its own keys; worker telemetry belongs to the GPU leg.
     it.each([
       { power_valid: 1, cpu_power_valid: 1, gpuKept: true, cpuKept: true },

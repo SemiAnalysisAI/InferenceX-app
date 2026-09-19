@@ -98,7 +98,7 @@ const labels = { provisioned: 'Provisioned', modeled: 'Measured + modeled' };
 
 // One GB200 NVL72 compute tray on the AgentX workload: four GPUs on one host, two
 // Grace sockets, module sensor present. Watts are controlled inputs, not published
-// constants; the CPU-side keys follow the ticket-01 contract.
+// constants; the CPU-side keys follow the producer contract (InferenceX docs/results-and-ingestion.md).
 const GRACE = { avg_cpu_socket_power_w: 250.5, avg_total_cpu_power_w: 501 };
 const traySource: BenchmarkRow = {
   ...source,

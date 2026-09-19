@@ -50,7 +50,7 @@ function row(overrides: Partial<BenchmarkRow> = {}): BenchmarkRow {
 }
 
 // One GB200 NVL72 compute tray: four GPUs on one host, two Grace sockets. The
-// CPU-side keys follow the ticket-01 contract (sums over every socket, same window).
+// CPU-side keys follow the producer contract (sums over every socket, same window).
 // Watts are controlled inputs, not published constants.
 const GRACE = { avg_cpu_socket_power_w: 250.5, avg_total_cpu_power_w: 501 };
 function nvl72Row(
