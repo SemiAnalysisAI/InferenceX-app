@@ -11,7 +11,7 @@ import {
 } from './measurement-receipt';
 const fixture = new URL('fixtures/measurement-receipt/', import.meta.url);
 const raw = fs.readFileSync(new URL('receipt.json', fixture));
-const expectedDigest = '00465d715d63cd4df2f55d6662eb4b10982330f14e8e0d35872b88efb2e619d6';
+const expectedDigest = '7112fa0765669dc24b375946b136231df3fcff53d756ab1ce56ea6a83914dd4e';
 const issuerSha = 'd'.repeat(40);
 const roots: string[] = [];
 function copy() {
@@ -26,7 +26,7 @@ afterEach(() =>
 it('reads a Python-sealed snapshot and verifies both mapped families and complete sample coverage', () => {
   const receipt = parseMeasurementReceipt(raw, expectedDigest, issuerSha);
   expect(receipt.receipt_id).toBe(
-    '2e12626c30ec11cf1738c7541a36444af53c29bad4f59f927930618e298e7a01',
+    '924d4040a396a3bd964600c6d1706eb6a51c798e3f43a150751fb4e8a554fa08',
   );
   expect(
     receipt.points.map((point) => [point.kind, point.concurrency, point.source_attempt]),

@@ -12,6 +12,7 @@
   "points": [
     {
       "point_id": "1111111111111111111111111111111111111111111111111111111111111111",
+      "bundle_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
       "execution_id": "org/repo/100/1/101",
       "source_run_id": "100",
       "source_attempt": 1,
@@ -24,18 +25,15 @@
         "tp": 8,
         "ep": 1
       },
-      "artifact_ids": [
-        101
-      ],
+      "artifact_ids": [101],
       "execution_artifact_id": 101,
       "execution_path": "execution.json",
       "native_manifest_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
       "normalized_artifact_id": 101,
       "normalized_path": "agg.json",
-      "required_metrics": [
-        "output_tput_tps",
-        "duration_seconds"
-      ],
+      "normalized_format": "normalized",
+      "metadata_path": null,
+      "required_metrics": ["output_tput_tps", "duration_seconds"],
       "config": {
         "model": "dsr1",
         "hardware": "h200",
@@ -47,13 +45,11 @@
       "sample_count": 0,
       "samples_artifact_id": null,
       "samples_path": null,
-      "dataset": {},
-      "bundle_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "normalized_format": "normalized",
-      "metadata_path": null
+      "dataset": {}
     },
     {
       "point_id": "2222222222222222222222222222222222222222222222222222222222222222",
+      "bundle_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
       "execution_id": "org/repo/100/1/102",
       "source_run_id": "100",
       "source_attempt": 1,
@@ -66,18 +62,15 @@
         "tp": 8,
         "ep": 1
       },
-      "artifact_ids": [
-        102
-      ],
+      "artifact_ids": [102],
       "execution_artifact_id": 102,
       "execution_path": "execution.json",
       "native_manifest_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
       "normalized_artifact_id": 102,
       "normalized_path": "agg.json",
-      "required_metrics": [
-        "em_strict",
-        "n_eff"
-      ],
+      "normalized_format": "normalized",
+      "metadata_path": null,
+      "required_metrics": ["em_strict", "n_eff"],
       "config": {
         "model": "dsr1",
         "hardware": "h200",
@@ -85,21 +78,16 @@
         "precision": "fp8"
       },
       "task": "gsm8k",
-      "filters": [
-        "strict-match",
-        "flexible-extract"
-      ],
+      "filters": ["strict-match", "flexible-extract"],
       "sample_count": 2,
       "samples_artifact_id": 102,
       "samples_path": "samples_gsm8k.jsonl",
-      "dataset": {},
-      "bundle_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "normalized_format": "normalized",
-      "metadata_path": null
+      "dataset": {}
     }
   ],
   "kind": "source-measurement-receipt",
   "version": 1,
+  "receipt_id": "924d4040a396a3bd964600c6d1706eb6a51c798e3f43a150751fb4e8a554fa08",
   "issuer": {
     "repository": "org/repo",
     "run_id": "200",
@@ -111,36 +99,36 @@
     {
       "id": 101,
       "name": "bmk_pilot",
-      "sha256": "b644c12d559428df1845d5ff8d3483aac35e7fdb694d8ce1a7ac891239300fd3",
+      "sha256": "8d54db4e2a112e85bd942732aec2c07a73746a388e7ce0cf7192f016994ddc30",
       "run_id": "100",
       "members": [
         {
           "path": "agg.json",
-          "sha256": "a142da2f49fa4f706c801bd824eea698740b567ad689269fbdd181a9648dd849",
-          "size": 300
+          "sha256": "7021f75ab64617a361af57e749ea26a4700dbfc6e7b336ad5b69fee5a5eddf5c",
+          "size": 373
         },
         {
           "path": "execution.json",
-          "sha256": "41746d1d444ec14e440d5d75e1144a5636d7ef7acaaef7b4957217cde4503c5b",
-          "size": 537
+          "sha256": "25b6262ae1299a88e4d67e4b473c63a19e02213309695a1fe5d4fa3aa38c1336",
+          "size": 592
         }
       ]
     },
     {
       "id": 102,
       "name": "eval_results_all",
-      "sha256": "8c2f42b955bfdb85fac00d6bfca0442475803f2aa7aefd93b1842cacdff7e94c",
+      "sha256": "9dc97db53cd14d7361e8202419cf338e948212c8142ac7ff95b72b1a70c695dc",
       "run_id": "100",
       "members": [
         {
           "path": "agg.json",
-          "sha256": "2a05f61da6ac2bd48a9a5b8c40a4032dbd1f711581fcd8e1df429c0ce619a031",
-          "size": 294
+          "sha256": "f9115ace4cb9bb3dc663d6243b4a1ac40bf4af2cc417140be7bae54a053ca782",
+          "size": 367
         },
         {
           "path": "execution.json",
-          "sha256": "479ff4fc073b1f73508bd76fb13be0fb6fb8a740f113e4f2404bd4139345ecbb",
-          "size": 531
+          "sha256": "339c79f0bd16508d24dbb6049f1632fc66c20e6ee9ff2c6bf10251246b25ead1",
+          "size": 586
         },
         {
           "path": "samples_gsm8k.jsonl",
@@ -149,6 +137,5 @@
         }
       ]
     }
-  ],
-  "receipt_id": "2e12626c30ec11cf1738c7541a36444af53c29bad4f59f927930618e298e7a01"
+  ]
 }

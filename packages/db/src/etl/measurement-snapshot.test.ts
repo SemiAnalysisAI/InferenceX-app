@@ -48,7 +48,7 @@ it('resumes partial imports with the same receipt and rejects replacement after 
     expect(complete.rows).toEqual([
       {
         state: 'complete',
-        receipt_id: '2e12626c30ec11cf1738c7541a36444af53c29bad4f59f927930618e298e7a01',
+        receipt_id: '924d4040a396a3bd964600c6d1706eb6a51c798e3f43a150751fb4e8a554fa08',
       },
     ]);
   } finally {

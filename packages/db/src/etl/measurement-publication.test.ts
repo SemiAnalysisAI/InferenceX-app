@@ -10,7 +10,7 @@ import { parseMeasurementReceipt } from '../lib/measurement-receipt';
 import { expectedPublication, verifyPublishedMeasurements } from './measurement-publication';
 
 const fixture = new URL('../lib/fixtures/measurement-receipt/', import.meta.url);
-const hash = '00465d715d63cd4df2f55d6662eb4b10982330f14e8e0d35872b88efb2e619d6';
+const hash = '7112fa0765669dc24b375946b136231df3fcff53d756ab1ce56ea6a83914dd4e';
 const raw = fs.readFileSync(new URL('receipt.json', fixture));
 const config = {
   model: 'dsr1',

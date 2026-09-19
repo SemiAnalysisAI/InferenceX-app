@@ -1,1 +1,19 @@
-{"schema_version": 1, "point_id": "2222222222222222222222222222222222222222222222222222222222222222", "execution_id": "org/repo/100/1/102", "bundle_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "source": {"repository": "org/repo", "run_id": 100, "attempt": 1, "head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}, "mode": "eval", "native_receipt": {"job_id": "55", "manifest_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", "state": "COMPLETED"}, "client_exit_code": 0}
+{
+  "schema_version": 1,
+  "point_id": "2222222222222222222222222222222222222222222222222222222222222222",
+  "execution_id": "org/repo/100/1/102",
+  "bundle_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "source": {
+    "repository": "org/repo",
+    "run_id": 100,
+    "attempt": 1,
+    "head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "mode": "eval",
+  "native_receipt": {
+    "job_id": "55",
+    "manifest_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+    "state": "COMPLETED"
+  },
+  "client_exit_code": 0
+}
