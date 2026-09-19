@@ -386,6 +386,7 @@ jobs:
           ALLOWED_RECEIPT_ISSUER_SHAS: ${{ vars.INFX_RECEIPT_ISSUER_SHAS }}
           ALLOWED_RECEIPT_ISSUER_WORKFLOW: ${{ vars.INFX_RECEIPT_ISSUER_WORKFLOW }}
           RECEIPT_REQUIRED: ${{ github.event.client_payload.receipt-required || inputs.receipt-required || 'false' }}
+          PUBLICATION_REQUIRED: ${{ env.REQUESTED_DATABASE_TARGET == 'production' && 'true' || 'false' }}
           RECEIPT_ARTIFACT_ID: ${{ github.event.client_payload.receipt-artifact-id || inputs.receipt-artifact-id }}
           RECEIPT_ARTIFACT_SHA256: ${{ github.event.client_payload.receipt-artifact-sha256 || inputs.receipt-artifact-sha256 }}
           RECEIPT_SHA256: ${{ github.event.client_payload.receipt-sha256 || inputs.receipt-sha256 }}

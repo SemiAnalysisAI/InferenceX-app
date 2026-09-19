@@ -448,7 +448,7 @@ export function publicationFromEnvironment(
   env: Record<string, string | undefined> = process.env,
 ): PublicationRecord | null {
   if (!env.INGEST_PUBLICATION_RECORD_PATH) {
-    if (mergeRunId !== receipt.source_run_id)
+    if (env.INGEST_PUBLICATION_REQUIRED === '1' || mergeRunId !== receipt.source_run_id)
       throw new Error('Production/recovery requires a publication record');
     return null;
   }
@@ -474,5 +474,7 @@ export function publicationFromEnvironment(
     )
   )
     throw new Error('Invalid/unsupported publication record');
+  if (env.GITHUB_SHA && record.ingest_sha !== env.GITHUB_SHA)
+    throw new Error('Publication ingest revision differs from the executing app checkout');
   return record;
 }

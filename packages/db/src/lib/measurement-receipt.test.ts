@@ -91,6 +91,9 @@ it.each([
 it('requires a later, immutable publication record when source and merge differ', () => {
   const receipt = parseMeasurementReceipt(raw, expectedDigest, issuerSha);
   expect(publicationFromEnvironment(receipt, '100', {})).toBeNull();
+  expect(() =>
+    publicationFromEnvironment(receipt, '100', { INGEST_PUBLICATION_REQUIRED: '1' }),
+  ).toThrow('requires a publication record');
   expect(() => publicationFromEnvironment(receipt, '200', {})).toThrow(
     'requires a publication record',
   );
@@ -117,6 +120,9 @@ it('requires a later, immutable publication record when source and merge differ'
   };
   expect(publicationFromEnvironment(receipt, '200', env)?.receipt_id).toBe(receipt.receipt_id);
   expect(() => publicationFromEnvironment(receipt, '201', env)).toThrow('Invalid/unsupported');
+  expect(() =>
+    publicationFromEnvironment(receipt, '200', { ...env, GITHUB_SHA: '9'.repeat(40) }),
+  ).toThrow('executing app checkout');
 });
 it('accepts per-job lm-eval results through the real detail mapper without an aggregate collector', () => {
   const receipt = parseMeasurementReceipt(raw, expectedDigest, issuerSha);

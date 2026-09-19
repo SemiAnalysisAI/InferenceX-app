@@ -52,6 +52,7 @@ jobs:
 
       - name: Verify immutable receipt transport
         env:
+          # Existing cross-repository credential reads pinned issuer metadata and receipt artifacts.
           GH_TOKEN: ${{ secrets.INFX_MAIN_PAT }}
           INGEST_REPO: SemiAnalysisAI/InferenceX
           SOURCE_RUN_ID: ${{ github.event.client_payload.source-run-id || github.event.client_payload.run-id }}
@@ -59,6 +60,7 @@ jobs:
           ALLOWED_RECEIPT_ISSUER_SHAS: ${{ vars.INFX_RECEIPT_ISSUER_SHAS }}
           ALLOWED_RECEIPT_ISSUER_WORKFLOW: ${{ vars.INFX_RECEIPT_ISSUER_WORKFLOW }}
           RECEIPT_REQUIRED: ${{ github.event.client_payload.receipt-required || 'false' }}
+          PUBLICATION_REQUIRED: 'true'
           RECEIPT_ARTIFACT_ID: ${{ github.event.client_payload.receipt-artifact-id }}
           RECEIPT_ARTIFACT_SHA256: ${{ github.event.client_payload.receipt-artifact-sha256 }}
           RECEIPT_SHA256: ${{ github.event.client_payload.receipt-sha256 }}

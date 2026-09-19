@@ -182,6 +182,7 @@ jobs:
           CYPRESS_INSTALL_BINARY: '0'
       - name: Verify immutable receipt transport
         env:
+          # Existing cross-repository credential reads pinned issuer metadata and receipt artifacts.
           GH_TOKEN: ${{ secrets.INFX_MAIN_PAT }}
           INGEST_REPO: SemiAnalysisAI/InferenceX
           SOURCE_RUN_ID: ${{ steps.request.outputs.run-id }}
@@ -189,6 +190,7 @@ jobs:
           ALLOWED_RECEIPT_ISSUER_SHAS: ${{ vars.INFX_RECEIPT_ISSUER_SHAS }}
           ALLOWED_RECEIPT_ISSUER_WORKFLOW: ${{ vars.INFX_RECEIPT_ISSUER_WORKFLOW }}
           RECEIPT_REQUIRED: ${{ github.event.client_payload.receipt-required || inputs.receipt-required || 'false' }}
+          PUBLICATION_REQUIRED: 'false'
           RECEIPT_ARTIFACT_ID: ${{ github.event.client_payload.receipt-artifact-id || inputs.receipt-artifact-id }}
           RECEIPT_ARTIFACT_SHA256: ${{ github.event.client_payload.receipt-artifact-sha256 || inputs.receipt-artifact-sha256 }}
           RECEIPT_SHA256: ${{ github.event.client_payload.receipt-sha256 || inputs.receipt-sha256 }}
@@ -343,7 +345,7 @@ jobs:
     needs: [validate, prepare-staging-database]
     permissions:
       contents: read
-    uses: ./.github/workflows/ingest-agentic-results.yml
+    uses: $/.github/workflows/ingest-agentic-results.yml
     with:
       run-id: ${{ needs.validate.outputs.run-id }}
       run-attempt: ${{ needs.validate.outputs.run-attempt }}

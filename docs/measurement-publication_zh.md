@@ -8,7 +8,11 @@ Phase 1 的读取端接受由 InferenceX 独立受信托管签发流程生成的
 
 应用仓库必须配置 `INFX_RECEIPT_ISSUER_SHAS`，其中以逗号分隔经过审查的签发流程版本；同时将 `INFX_RECEIPT_ISSUER_WORKFLOW` 设置为准确的 `.github/workflows/<name>.yml` 路径。只要旧回执仍受支持，就应保留对应的允许版本。接收端检查签发运行已成功完成、仓库及运行归属准确、API digest、ZIP 字节和成员路径一致。payload 不能选择任意下载 URL 或受信代码。签发流程成功完成后，才能调度发布。
 
+读取回执沿用仓库级凭据 `INFX_MAIN_PAT`，并要求它具有读取源 Actions 运行及产物的权限。凭据只传给实际需要它的步骤；迁移到受保护的 GitHub Environment 时，必须同时迁移已存储凭据及其策略，仅在工作流里添加空的 `environment` 无法完成迁移。应用当前配置的 zizmor 检查通过；单独运行 auditor persona 时，会额外提示这种既有凭据架构，包括新增的回执读取步骤。这些提示未被抑制。
+
 调度字段为 `receipt-required`、`receipt-artifact-id`、`receipt-artifact-sha256`、`receipt-sha256`、`receipt-issuer-run-id` 和 `receipt-issuer-sha`。ZIP digest 与 JSON digest 分别校验。回执 ZIP 包含 `receipt.json`。生产发布及恢复还需提供 `publication-artifact-id`、`publication-artifact-sha256`、`publication-sha256`、`publication-issuer-run-id` 和 `publication-issuer-sha`；后续 ZIP 包含 `publication.json`。staging 与 ingest 工作流都会转发这些字段。staging 会先验证传输，再执行可选的数据库重置。
+
+接收工作流根据实际数据库目标确定 `PUBLICATION_REQUIRED`。native 生产发布即使源运行与 merge 运行 ID 相同，也必须提供后续发布记录；staging 可以只使用源回执。签发运行必须由 `main` 上的 `workflow_dispatch` 触发并成功完成，接收端还会通过 API 独立验证源运行的原始 attempt 和 head。在 GitHub Actions 中，记录的 `ingest_sha` 必须匹配应用执行 checkout 的 `GITHUB_SHA`。签发发布记录前，应将源仓库的 `INFX_PHASE1_READER_REVISION` 固定到这个已部署的应用 commit，并保留公开应用确实使用所记录 `app_sha` 的部署证据。
 
 读取端分别支持 `aiperf-1.4`、`agentx-v1` 和 publication contract 1。不支持的必需版本会在导入前报错。每个点都绑定其原始执行及 attempt、prepared bundle、native manifest、物理拓扑、规范化后的模型/硬件/framework/precision、必需指标、完整数据集身份，以及准确的产物和文件引用。输入支持规范化 AgentX JSON，也支持每个任务的原始 lm-eval 结果和 `meta_env.json`。评估必须完整覆盖 `(task, doc_id, filter)`。live preview 与数据库中的文档级样本统一选择 strict-match，不受行顺序影响；同一过滤器的冲突副本会被拒绝。聚合部署元数据映射到一个实际 serving role，兼容字段中的 worker 数量为 0/0。
 

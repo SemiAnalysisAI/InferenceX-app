@@ -20,6 +20,8 @@ export function prepareReceiptTransport(
 ): Record<string, string> {
   if (env.RECEIPT_REQUIRED !== 'true' && env.RECEIPT_REQUIRED !== 'false')
     throw new Error('receipt-required must be explicitly true or false');
+  if (env.PUBLICATION_REQUIRED !== 'true' && env.PUBLICATION_REQUIRED !== 'false')
+    throw new Error('publication-required must be explicitly true or false');
   const repo = required(env.INGEST_REPO, 'INGEST_REPO', /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/u);
   const sourceRun = required(env.SOURCE_RUN_ID, 'source run ID', ID);
   const nativeRequired = listRunArtifacts(repo, sourceRun).some((artifact) =>
@@ -51,6 +53,8 @@ export function prepareReceiptTransport(
       String(run.id) !== runId ||
       run.head_sha !== revision ||
       run.path !== issuerWorkflow ||
+      run.head_branch !== 'main' ||
+      run.event !== 'workflow_dispatch' ||
       run.status !== 'completed' ||
       run.conclusion !== 'success'
     )
@@ -84,11 +88,29 @@ export function prepareReceiptTransport(
     receipt.source_run_id !== env.SOURCE_RUN_ID
   )
     throw new Error('Receipt source or issuer identity differs from requested transport');
+  const attempt = JSON.parse(
+    execFileSync(
+      'gh',
+      ['api', `repos/${repo}/actions/runs/${sourceRun}/attempts/${receipt.source_attempt}`],
+      { encoding: 'utf8' },
+    ),
+  );
+  if (
+    String(attempt.id) !== sourceRun ||
+    attempt.run_attempt !== receipt.source_attempt ||
+    attempt.head_sha !== receipt.source_head_sha ||
+    attempt.status !== 'completed' ||
+    attempt.conclusion !== 'success'
+  )
+    throw new Error('Receipt source does not match its completed original attempt');
+  if (env.PUBLICATION_REQUIRED === 'true' && !env.PUBLICATION_ARTIFACT_ID)
+    throw new Error('Native production requires a later publication record');
   const out: Record<string, string> = {
     INGEST_RECEIPT_REQUIRED: '1',
     INGEST_RECEIPT_PATH: file,
     INGEST_RECEIPT_SHA256: contentDigest,
     INGEST_RECEIPT_ISSUER_SHA: issuerSha,
+    INGEST_PUBLICATION_REQUIRED: env.PUBLICATION_REQUIRED === 'true' ? '1' : '0',
   };
   if (env.PUBLICATION_ARTIFACT_ID) {
     const publicationId = required(env.PUBLICATION_ARTIFACT_ID, 'publication artifact ID', ID);
