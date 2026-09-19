@@ -23,6 +23,15 @@ interface HistoryWrite {
   pathname: string;
 }
 
+function assertTpuView() {
+  cy.get('[data-testid="model-selector"]').should('contain.text', 'Qwen3.5 397B');
+  cy.get('[data-testid="scenario-selector"]').should('contain.text', '8K / 1K');
+  cy.get('[data-testid="precision-multiselect"]').should('contain.text', 'FP8');
+  cy.get('[data-testid="x-axis-mode-selector"]').should('have.attr', 'data-value', 'e2e');
+  cy.get('[data-testid="remove-filter-spec-stp"]').should('exist');
+  cy.get('[data-testid="remove-filter-spec-mtp"]').should('not.exist');
+}
+
 describe('landing model curation', () => {
   for (const prefix of ['', '/zh']) {
     it(`shows the curated ledger on ${prefix || '/'} without changing compare coverage`, () => {
@@ -37,10 +46,23 @@ describe('landing model curation', () => {
         });
         cy.get('[data-testid="compare-agentx-model-deepseek-v4"]').should('not.exist');
         cy.get('[data-testid="compare-agentx-model-qwen-3-8-flash-next"]').should('not.exist');
+        cy.get('[data-testid="compare-agentx-model-qwen-3-5"]')
+          .parent()
+          .next()
+          .should('have.attr', 'data-testid', 'landing-tpu-results-link');
+        cy.get('[data-testid="landing-tpu-results-link"]')
+          .should('contain.text', prefix ? 'TPU 结果' : 'TPU Results')
+          .and(
+            'have.attr',
+            'href',
+            `${prefix}/inference/qwen-3-5?i_seq=8k%2F1k&i_prec=fp8&i_spec=stp&i_xmode=e2e`,
+          );
+        cy.get('[data-testid="landing-tpu-google-logo"] path').should('have.length', 4);
       });
 
       cy.visit(`${prefix}/compare`);
       cy.get('[data-testid="compare-agentx-primary"]').within(() => {
+        cy.get('[data-testid="landing-tpu-results-link"]').should('not.exist');
         cy.get('[data-testid^="compare-agentx-model-"]').should('have.length', 7);
         for (const slug of ['deepseek-v4', 'qwen-3-8-flash-next']) {
           cy.get(`[data-testid="compare-agentx-model-${slug}"]`).should(
@@ -50,6 +72,17 @@ describe('landing model curation', () => {
           );
         }
       });
+    });
+
+    it(`opens the STP-only Qwen TPU view from ${prefix || '/'} and retains it on reload`, () => {
+      cy.visit(prefix || '/');
+      cy.get('[data-testid="landing-tpu-results-link"]').click();
+      cy.location('pathname').should('eq', `${prefix}/inference/qwen-3-5`);
+      assertTpuView();
+      cy.reload();
+      assertTpuView();
+      cy.go('back');
+      cy.location('pathname').should('eq', prefix || '/');
     });
   }
 });

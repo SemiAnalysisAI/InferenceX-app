@@ -10,7 +10,8 @@ interface CompareIndexTrackedLinkProps extends React.ComponentProps<typeof Link>
   analyticsEvent:
     | 'compare_agentx_revenue_calculator_clicked'
     | 'compare_agentx_dashboard_clicked'
-    | 'compare_agentx_model_clicked';
+    | 'compare_agentx_model_clicked'
+    | 'landing_tpu_results_clicked';
   analyticsTarget?: string;
   /** Which page rendered the hero, so `/compare` and `/` clicks stay separable. */
   analyticsSurface?: string;

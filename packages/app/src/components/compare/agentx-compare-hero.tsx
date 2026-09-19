@@ -404,6 +404,7 @@ const STRINGS = {
     dashboard: 'Dashboard',
     ledgerTitle: 'Models with AgentX results',
     modelAction: 'View results',
+    tpuResults: 'TPU Results',
     newModel: 'NEW',
   },
   zh: {
@@ -415,6 +416,7 @@ const STRINGS = {
     dashboard: '仪表板',
     ledgerTitle: '已发布 AgentX 结果的模型',
     modelAction: '查看结果',
+    tpuResults: 'TPU 结果',
     newModel: '新',
   },
 } as const;
@@ -586,6 +588,48 @@ export function AgentXCompareHero({
                 </CompareIndexTrackedLink>
               ))}
             </nav>
+            {surface === 'landing' && (
+              <CompareIndexTrackedLink
+                data-testid="landing-tpu-results-link"
+                href={`${prefix}/inference/qwen-3-5?i_seq=8k%2F1k&i_prec=fp8&i_spec=stp&i_xmode=e2e`}
+                analyticsEvent="landing_tpu_results_clicked"
+                analyticsTarget="qwen-3-5"
+                analyticsSurface={surface}
+                appNavigation
+                className="group flex min-h-14 items-center justify-between gap-4 border-t border-border/70 px-5 py-2.5 transition-colors hover:bg-brand/5 focus-visible:outline-none"
+              >
+                <span className="flex min-w-0 items-center gap-3">
+                  <svg
+                    data-testid="landing-tpu-google-logo"
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox={VENDOR_MARKS[0].viewBox}
+                    width={32}
+                    height={32}
+                    aria-hidden="true"
+                    className="size-8 shrink-0"
+                  >
+                    {VENDOR_MARKS[0].paths.map((path) => (
+                      <path key={path.d} d={path.d} fill={path.fill} />
+                    ))}
+                  </svg>
+                  <span className="min-w-0">
+                    <span className="block text-sm font-semibold leading-tight text-foreground group-hover:text-brand">
+                      {t.tpuResults}
+                    </span>
+                    <span className="mt-1 block font-mono text-3xs tracking-eyebrow text-brand uppercase">
+                      Qwen 3.5 · 8K/1K · FP8 · STP
+                    </span>
+                  </span>
+                </span>
+                <span className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-muted-foreground group-hover:text-foreground">
+                  {t.modelAction}
+                  <ArrowRight
+                    aria-hidden="true"
+                    className="size-3.5 motion-safe:transition-transform motion-safe:duration-200 motion-safe:group-hover:translate-x-0.5"
+                  />
+                </span>
+              </CompareIndexTrackedLink>
+            )}
           </div>
         </div>
       </Card>
