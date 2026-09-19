@@ -5,8 +5,10 @@
  */
 
 import { execFileSync } from 'node:child_process';
-import { extractVerifiedArchive, sha256, type ArchiveMember } from './artifact-archive.js';
+import { extractVerifiedArchive, sha256File, type ArchiveMember } from './artifact-archive.js';
 import path from 'node:path';
+import fs from 'node:fs';
+import os from 'node:os';
 
 export interface ArtifactMeta {
   id?: number;
@@ -92,12 +94,8 @@ export function downloadArtifact(
   if (!repo || (match && Number(match[2]) !== artifact.id))
     throw new Error('Invalid GitHub artifact owner/ID');
   validateRun(repo, String(artifact.id));
-  const bytes = execFileSync('gh', ['api', `repos/${repo}/actions/artifacts/${artifact.id}/zip`], {
-    maxBuffer: 20 * 1024 ** 3,
-    stdio: ['ignore', 'pipe', 'inherit'],
-  });
   const expected = options.sha256 ?? artifact.digest?.replace(/^sha256:/u, '');
-  if (expected && (!/^[a-f0-9]{64}$/u.test(expected) || sha256(bytes) !== expected))
+  if (expected && !/^[a-f0-9]{64}$/u.test(expected))
     throw new Error(`Artifact digest mismatch: ${artifact.id}`);
   if (
     !options.isolated &&
@@ -106,8 +104,28 @@ export function downloadArtifact(
     throw new Error('Unsafe legacy artifact display name');
   }
   const destination = path.join(destRoot, options.isolated ? String(artifact.id) : artifact.name);
-  extractVerifiedArchive(bytes, destination, options.members);
-  return destination;
+  const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'artifact-download-'));
+  const archive = path.join(temporary, 'archive.zip');
+  try {
+    const descriptor = fs.openSync(archive, 'wx', 0o600);
+    try {
+      execFileSync('gh', ['api', `repos/${repo}/actions/artifacts/${artifact.id}/zip`], {
+        stdio: ['ignore', descriptor, 'inherit'],
+      });
+    } finally {
+      fs.closeSync(descriptor);
+    }
+    if (fs.statSync(archive).size > 20 * 1024 ** 3) {
+      throw new Error('Artifact exceeds archive size budget');
+    }
+    if (expected && sha256File(archive) !== expected) {
+      throw new Error(`Artifact digest mismatch: ${artifact.id}`);
+    }
+    extractVerifiedArchive(archive, destination, options.members);
+    return destination;
+  } finally {
+    fs.rmSync(temporary, { recursive: true, force: true });
+  }
 }
 
 /** Fetch a run's current attempt for the explicitly weaker legacy path only. */

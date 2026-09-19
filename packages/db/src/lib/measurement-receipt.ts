@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
-import { sha256, type ArchiveMember } from './artifact-archive';
+import { sha256, sha256File, type ArchiveMember } from './artifact-archive';
 import { mapBenchmarkRow } from '../etl/benchmark-mapper';
 import { mapAggEvalRow, mapEvalRow } from '../etl/eval-mapper';
 import { createSkipTracker } from '../etl/skip-tracker';
@@ -323,8 +323,7 @@ export function verifyMeasurementSnapshot(receipt: MeasurementReceipt, root: str
       const file = path.join(root, artifact.name, member.path);
       const stat = fs.lstatSync(file);
       if (!stat.isFile() || stat.isSymbolicLink()) throw new Error(`Invalid receipt file: ${file}`);
-      const bytes = fs.readFileSync(file);
-      if (bytes.length !== member.size || sha256(bytes) !== member.sha256)
+      if (stat.size !== member.size || sha256File(file) !== member.sha256)
         throw new Error(`Changed receipt member: ${file}`);
     }
   }

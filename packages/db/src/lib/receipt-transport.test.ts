@@ -2,11 +2,14 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import AdmZip from 'adm-zip';
-import { execFileSync } from 'node:child_process';
+import * as childProcess from 'node:child_process';
 import { afterEach, expect, it, vi } from 'vitest';
 import { prepareReceiptTransport } from './receipt-transport';
 import { sha256 } from './artifact-archive';
-vi.mock('node:child_process', () => ({ execFileSync: vi.fn() }));
+vi.mock('node:child_process', async (importOriginal) => ({
+  ...(await importOriginal<typeof childProcess>()),
+  execFileSync: vi.fn(),
+}));
 const roots: string[] = [];
 function root() {
   const value = fs.mkdtempSync(path.join(os.tmpdir(), 'receipt-transport-'));
@@ -34,7 +37,11 @@ const env = {
   ALLOWED_RECEIPT_ISSUER_SHAS: 'd'.repeat(40),
   ALLOWED_RECEIPT_ISSUER_WORKFLOW: '.github/workflows/issue-receipt.yml',
 };
-function api(endpoint: string) {
+function zipResponse(bytes: Buffer, options: unknown): string {
+  fs.writeSync((options as { stdio: number[] }).stdio[1], bytes);
+  return '';
+}
+function api(endpoint: string, options?: unknown) {
   if (endpoint.endsWith('/runs/100/artifacts'))
     return JSON.stringify([
       { artifacts: [{ id: 101, name: 'native-execution-point', created_at: '' }] },
@@ -57,7 +64,7 @@ function api(endpoint: string) {
       status: 'completed',
       conclusion: 'success',
     });
-  if (endpoint.endsWith('/301/zip')) return archive;
+  if (endpoint.endsWith('/301/zip')) return zipResponse(archive, options);
   if (endpoint.endsWith('/artifacts/301'))
     return JSON.stringify({
       id: 301,
@@ -70,7 +77,9 @@ function api(endpoint: string) {
   throw new Error('unrequested endpoint');
 }
 it('enforces native capability from API inventory and accepts only the pinned successful issuer', () => {
-  vi.mocked(execFileSync).mockImplementation((_command, args) => api((args as string[])[1]));
+  vi.mocked(childProcess.execFileSync).mockImplementation((_command, args, options) =>
+    api((args as string[])[1], options),
+  );
   expect(() => prepareReceiptTransport({ ...env, RECEIPT_ARTIFACT_ID: '' }, root())).toThrow(
     'Required source receipt',
   );
@@ -82,7 +91,7 @@ it('enforces native capability from API inventory and accepts only the pinned su
   ).toThrow('not deployed/allowed');
 });
 it('does not promote a same-named candidate workflow artifact to issuer authority', () => {
-  vi.mocked(execFileSync).mockImplementation((_command, args) => {
+  vi.mocked(childProcess.execFileSync).mockImplementation((_command, args, options) => {
     const endpoint = (args as string[])[1];
     if (endpoint.endsWith('/runs/200'))
       return JSON.stringify({
@@ -92,14 +101,14 @@ it('does not promote a same-named candidate workflow artifact to issuer authorit
         status: 'completed',
         conclusion: 'success',
       });
-    return api(endpoint);
+    return api(endpoint, options);
   });
   const destination = root();
   expect(() => prepareReceiptTransport(env, destination)).toThrow('successful allowed workflow');
   expect(fs.readdirSync(destination)).toEqual([]);
 });
 it('keeps explicit legacy behavior only when API inventory does not identify the native lane', () => {
-  vi.mocked(execFileSync).mockReturnValue('[{"artifacts":[]}]');
+  vi.mocked(childProcess.execFileSync).mockReturnValue('[{"artifacts":[]}]');
   expect(
     prepareReceiptTransport(
       {
@@ -114,7 +123,9 @@ it('keeps explicit legacy behavior only when API inventory does not identify the
 });
 
 it('requires later publication for native production even when source and merge IDs are equal', () => {
-  vi.mocked(execFileSync).mockImplementation((_command, args) => api((args as string[])[1]));
+  vi.mocked(childProcess.execFileSync).mockImplementation((_command, args, options) =>
+    api((args as string[])[1], options),
+  );
   expect(() => prepareReceiptTransport({ ...env, PUBLICATION_REQUIRED: 'true' }, root())).toThrow(
     'Native production requires a later publication record',
   );
@@ -139,9 +150,9 @@ it('carries the immutable later record and mandatory-publication flag into produ
   const publicationZip = new AdmZip();
   publicationZip.addFile('publication.json', content);
   const publicationArchive = Buffer.from(publicationZip.toBuffer());
-  vi.mocked(execFileSync).mockImplementation((_command, args) => {
+  vi.mocked(childProcess.execFileSync).mockImplementation((_command, args, options) => {
     const endpoint = (args as string[])[1];
-    if (endpoint.endsWith('/401/zip')) return publicationArchive;
+    if (endpoint.endsWith('/401/zip')) return zipResponse(publicationArchive, options);
     if (endpoint.endsWith('/artifacts/401'))
       return JSON.stringify({
         id: 401,
@@ -151,7 +162,7 @@ it('carries the immutable later record and mandatory-publication flag into produ
         digest: `sha256:${sha256(publicationArchive)}`,
         archive_download_url: 'https://api.github.com/repos/org/repo/actions/artifacts/401/zip',
       });
-    return api(endpoint);
+    return api(endpoint, options);
   });
   const values = prepareReceiptTransport(
     {
@@ -177,9 +188,9 @@ it.each([
   ['/runs/100/attempts/2', { head_sha: 'f'.repeat(40) }, 'completed original attempt'],
   ['/runs/100/attempts/2', { run_attempt: 3 }, 'completed original attempt'],
 ])('rejects wrong issuer branch/event or original attempt: %s %j', (suffix, change, message) => {
-  vi.mocked(execFileSync).mockImplementation((_command, args) => {
+  vi.mocked(childProcess.execFileSync).mockImplementation((_command, args, options) => {
     const endpoint = (args as string[])[1];
-    const result = api(endpoint);
+    const result = api(endpoint, options);
     return endpoint.endsWith(suffix)
       ? JSON.stringify({ ...JSON.parse(result as string), ...change })
       : result;

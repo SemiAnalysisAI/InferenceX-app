@@ -1,13 +1,16 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
+import * as childProcess from 'node:child_process';
 import { afterEach, expect, it, vi } from 'vitest';
 import { prepareReceiptArtifacts } from './receipt-artifact-preparation';
 import { parseMeasurementReceipt } from './measurement-receipt';
 import { downloadArtifact } from './github-artifacts';
 
-vi.mock('node:child_process', () => ({ execFileSync: vi.fn() }));
+vi.mock('node:child_process', async (importOriginal) => ({
+  ...(await importOriginal<typeof childProcess>()),
+  execFileSync: vi.fn(),
+}));
 const fixture = new URL('fixtures/measurement-receipt/', import.meta.url);
 const bytes = fs.readFileSync(new URL('receipt.json', fixture));
 const roots: string[] = [];
@@ -29,13 +32,19 @@ function receipt() {
 }
 it('downloads exact retained IDs and verifies every member before preparing legacy discovery views', () => {
   const accepted = receipt();
-  vi.mocked(execFileSync).mockImplementation((command, args) => {
+  vi.mocked(childProcess.execFileSync).mockImplementation((command, args, options) => {
     if (command !== 'gh') throw new Error('unexpected executable');
     const endpoint = (args as string[])[1];
     const id = Number(endpoint.match(/artifacts\/(?<artifactId>\d+)/u)?.[1]);
     const artifact = accepted.artifacts.find((item) => item.id === id);
     if (!artifact) throw new Error('unrequested newer artifact');
-    if (endpoint.endsWith('/zip')) return fs.readFileSync(new URL(`${id}.zip`, fixture));
+    if (endpoint.endsWith('/zip')) {
+      fs.writeSync(
+        (options as { stdio: number[] }).stdio[1],
+        fs.readFileSync(new URL(`${id}.zip`, fixture)),
+      );
+      return '';
+    }
     return JSON.stringify({
       id,
       name: artifact.name,
@@ -64,7 +73,7 @@ it('downloads exact retained IDs and verifies every member before preparing lega
 });
 it('fails on missing/wrong ownership even if a same-name artifact exists', () => {
   const accepted = receipt();
-  vi.mocked(execFileSync).mockReturnValue(
+  vi.mocked(childProcess.execFileSync).mockReturnValue(
     JSON.stringify({
       id: 999,
       name: 'bmk_pilot',
@@ -79,7 +88,13 @@ it('fails on missing/wrong ownership even if a same-name artifact exists', () =>
   expect(fs.existsSync(path.join(destination, 'bmk_pilot'))).toBe(false);
 });
 it('treats hostile display names as data under numeric roots and never interprets their URL', () => {
-  vi.mocked(execFileSync).mockReturnValue(fs.readFileSync(new URL('101.zip', fixture)));
+  vi.mocked(childProcess.execFileSync).mockImplementation((_command, _args, options) => {
+    fs.writeSync(
+      (options as { stdio: number[] }).stdio[1],
+      fs.readFileSync(new URL('101.zip', fixture)),
+    );
+    return '';
+  });
   const destination = root();
   const output = downloadArtifact(
     {
@@ -94,7 +109,7 @@ it('treats hostile display names as data under numeric roots and never interpret
   expect(output).toBe(path.join(destination, '101'));
   expect(fs.readdirSync(destination)).toEqual(['101']);
   expect(JSON.parse(fs.readFileSync(path.join(output, 'agg.json'), 'utf8'))[0].conc).toBe(1);
-  expect(vi.mocked(execFileSync).mock.calls[0].slice(0, 2)).toEqual([
+  expect(vi.mocked(childProcess.execFileSync).mock.calls[0].slice(0, 2)).toEqual([
     'gh',
     ['api', 'repos/org/repo/actions/artifacts/101/zip'],
   ]);

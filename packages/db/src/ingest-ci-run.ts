@@ -23,15 +23,17 @@
  */
 
 import fs from 'fs';
+import { receiptFromEnvironment, publicationFromEnvironment } from './lib/measurement-receipt';
 import {
-  receiptFromEnvironment,
-  publicationFromEnvironment,
-  verifyMeasurementSnapshot,
-} from './lib/measurement-receipt';
+  prepareReceiptIngestInputs,
+  assertReceiptIngestMode,
+  completeReceiptIngest,
+  ingestReceiptEvaluations,
+  type ReceiptIngestInputs,
+} from './etl/receipt-ingest';
 import { prepareReceiptArtifacts } from './lib/receipt-artifact-preparation';
 import {
   claimMeasurementSnapshot,
-  completeMeasurementSnapshot,
   assertLegacySnapshotUnclaimed,
 } from './etl/measurement-snapshot';
 import { createHash } from 'node:crypto';
@@ -250,6 +252,7 @@ if (reusedIngestMetadata) {
   runAttemptNum = reusedIngestMetadata.sourceRunAttempt;
 }
 
+let receiptInputs: ReceiptIngestInputs | null = null;
 if (measurementReceipt) {
   if (
     measurementReceipt.repository !== REPO ||
@@ -258,7 +261,7 @@ if (measurementReceipt) {
   )
     throw new Error('Receipt source/attempt differs from ingest request');
   publicationFromEnvironment(measurementReceipt, requestedRunIdStr);
-  verifyMeasurementSnapshot(measurementReceipt, artifactsDir);
+  receiptInputs = prepareReceiptIngestInputs(measurementReceipt, artifactsDir, tracker);
 }
 
 const runIdNum = parseInt(runIdStr, 10);
@@ -315,9 +318,6 @@ async function main(): Promise<void> {
     return;
   }
 
-  await (measurementReceipt
-    ? claimMeasurementSnapshot(sql, measurementReceipt)
-    : assertLegacySnapshotUnclaimed(sql, REPO, runIdStr, runAttemptNum));
   validateRunBackfills();
   const configCache = createConfigCache(sql);
   const { getOrCreateConfig, preloadConfigs } = configCache;
@@ -373,9 +373,6 @@ async function main(): Promise<void> {
   });
   if (requiredPowerPoints.length > 0)
     console.log(`  Required power: ${requiredPowerPoints.length} source benchmark points verified`);
-
-  await preloadConfigs();
-  console.log(`  ${configCache.size} configs preloaded`);
 
   if (!fs.existsSync(artifactsDir)) {
     throw new Error(`Artifacts directory does not exist: ${artifactsDir}`);
@@ -439,8 +436,15 @@ async function main(): Promise<void> {
   }
   const appendOnly = hasAppendOnlyFlag(changelogs);
   const evalsOnly = hasEvalsOnlyFlag(changelogs);
+  if (receiptInputs) assertReceiptIngestMode(receiptInputs, evalsOnly);
   if (evalsOnly && requiredPowerPoints.length > 0)
     throw new Error('Required power: benchmark scope cannot be published as an evals-only run');
+
+  await (measurementReceipt
+    ? claimMeasurementSnapshot(sql, measurementReceipt)
+    : assertLegacySnapshotUnclaimed(sql, REPO, runIdStr, runAttemptNum));
+  await preloadConfigs();
+  console.log(`  ${configCache.size} configs preloaded`);
 
   const workflowRunId = await getOrCreateWorkflowRun({
     githubRunId: runId,
@@ -499,6 +503,7 @@ async function main(): Promise<void> {
 
   console.log('\n--- Benchmark Results ---');
   const retainedPowerPoints: BenchmarkParams[] = [];
+  const persistedReceiptBenchmarks = new Map<string, number>();
   if (evalsOnly) {
     console.log('  Skipped (evals-only run)');
   } else {
@@ -539,7 +544,10 @@ async function main(): Promise<void> {
       );
     }
 
-    const allBmkFiles = [...bmkFiles, ...allBmkDirs.flatMap((d) => findJsonFiles(d))];
+    const allBmkFiles = receiptInputs?.benchmarkFiles ?? [
+      ...bmkFiles,
+      ...allBmkDirs.flatMap((d) => findJsonFiles(d)),
+    ];
     const seenPointIdentities = new Map<string, string>();
     console.log(`  Found ${allBmkFiles.length} benchmark JSON file(s)`);
 
@@ -653,6 +661,7 @@ async function main(): Promise<void> {
           );
           totalNewBmk += newCount;
           totalDupBmk += dupCount;
+          if (receiptInputs) persistedReceiptBenchmarks.set(file, insertedIds.length);
           if (requiredPowerPoints.length > 0) retainedPowerPoints.push(...toInsert);
 
           // Build availability only after successful insert
@@ -888,8 +897,20 @@ async function main(): Promise<void> {
   // `metrics`. Samples then attach to the resolved row id.
 
   console.log('\n--- Eval Results ---');
+  if (receiptInputs) {
+    const result = await ingestReceiptEvaluations(
+      sql,
+      receiptInputs,
+      getOrCreateConfig,
+      workflowRunId,
+      date,
+    );
+    totalEvals += result.newEvals;
+    totalSamples += result.newSamples;
+    totalSampleFiles += result.sampleFiles;
+  }
   const evalDir = path.join(artifactsDir, ARTIFACT_NAMES.evals);
-  const evalFiles = findJsonFiles(evalDir);
+  const evalFiles = receiptInputs ? [] : findJsonFiles(evalDir);
 
   for (const file of evalFiles) {
     const data = readJson(file);
@@ -914,17 +935,18 @@ async function main(): Promise<void> {
   // Per-config eval dirs (`eval_*`) — same on-disk shape as the eval ZIPs
   // handled by `ingest-gcs-backup.ts`, but already unzipped. Each dir holds
   // one config's meta_env.json, results JSON, and samples JSONL.
-  const perConfigEvalDirs = fs.existsSync(artifactsDir)
-    ? fs
-        .readdirSync(artifactsDir)
-        .filter(
-          (d) =>
-            d.startsWith('eval_') &&
-            !d.startsWith(ARTIFACT_NAMES.evals) &&
-            fs.statSync(path.join(artifactsDir, d)).isDirectory(),
-        )
-        .map((d) => path.join(artifactsDir, d))
-    : [];
+  const perConfigEvalDirs =
+    !receiptInputs && fs.existsSync(artifactsDir)
+      ? fs
+          .readdirSync(artifactsDir)
+          .filter(
+            (d) =>
+              d.startsWith('eval_') &&
+              !d.startsWith(ARTIFACT_NAMES.evals) &&
+              fs.statSync(path.join(artifactsDir, d)).isDirectory(),
+          )
+          .map((d) => path.join(artifactsDir, d))
+      : [];
 
   if (perConfigEvalDirs.length > 0) {
     console.log(`  Found ${perConfigEvalDirs.length} per-config eval dir(s)`);
@@ -1065,8 +1087,9 @@ async function main(): Promise<void> {
 
   if (measurementReceipt && Object.values(tracker.skips).some((count) => count > 0))
     throw new Error('Accepted snapshot ingestion skipped required input');
-  await refreshLatestBenchmarks(sql);
-  if (measurementReceipt) await completeMeasurementSnapshot(sql, measurementReceipt);
+  await (measurementReceipt && receiptInputs
+    ? completeReceiptIngest(sql, measurementReceipt, receiptInputs, persistedReceiptBenchmarks)
+    : refreshLatestBenchmarks(sql));
 
   console.log('\n=== ingest-ci-run complete ===');
   console.log('  Invalidate API cache: bun run admin:cache:invalidate');
