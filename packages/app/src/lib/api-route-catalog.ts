@@ -68,10 +68,10 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'ui-artifact-read',
     exclusionReason: {
-      en: 'UI-only live GPU metric artifact lookup; its run artifact shape is not a stable public contract.',
-      zh: '仅供界面读取实时 GPU 指标制品；其运行制品结构不是稳定的公开契约。',
+      en: 'UI-only PowerX explorer read for one run: the ingest-time telemetry digest when stored, otherwise the live GPU metric artifacts. Its payload shape is not a stable public contract.',
+      zh: '仅供 PowerX 探索界面按 run 读取：已入库时返回 ingest 阶段生成的 telemetry 摘要，否则回退到实时 GPU 指标制品。其返回结构不是稳定的公开契约。',
     },
-    sourceSha256: '28e6cee4d67396ee8ea2e5a7e18271c6ee86228c33f33a20bf573f3a601ba8ed',
+    sourceSha256: '01d604d77ea73e252f0934f88d14d0e229a803d1b9b1d72bd9756658c506b349',
   },
   {
     source: 'src/app/api/openapi.json/route.ts',
@@ -326,6 +326,17 @@ export const apiRouteCatalog = [
     classification: 'published-read',
     operationId: 'list-reliability',
     sourceSha256: 'ce1c5db78b47548beb77a69797f10fb33853cde01cea5c44675c8ad3519bcf20',
+  },
+  {
+    source: 'src/app/api/v1/gpu-metrics-point/route.ts',
+    path: '/api/v1/gpu-metrics-point',
+    method: 'GET',
+    classification: 'page-bff',
+    exclusionReason: {
+      en: 'Agentic point-detail BFF returning the PowerX telemetry series and per-GPU digest linked to one benchmark point; coupled to the PowerX tab implementation.',
+      zh: '智能体数据点详情页专用 BFF；返回与单个基准测试数据点关联的 PowerX telemetry 序列及每 GPU 统计摘要，与 PowerX 标签页实现紧密耦合。',
+    },
+    sourceSha256: '3929581f54058183344d59a8f6127db3ef1c8487cad26c73faa93b00fe75a82d',
   },
   {
     source: 'src/app/api/v1/request-chart-data/route.ts',
