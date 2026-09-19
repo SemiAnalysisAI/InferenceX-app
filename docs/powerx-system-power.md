@@ -62,7 +62,10 @@ producer publishes it, otherwise GPU-board watts plus the Grace-socket total
 (`avg_total_cpu_power_w`) with the source's regulator-loss allowance on the GPU
 share. The Grace CPU and LPDDR5X are never modelled; rows without
 `cpu_power_valid=1` and the Grace-side keys stay unavailable (`cpu-telemetry`).
-Each measured worker host is one compute tray (four GPUs, two Grace sockets). The
+Each measured worker host is one compute tray (four GPUs, two Grace sockets); an
+aggregate multinode row without a per-worker array is `gpuCount / 4` trays at the
+deployment mean, cross-checked against the Grace-socket count and the CPU leg's
+`power_audit.cpu.observed_sockets`. The
 measured trays are folded into one rack of 18 trays matching their mean
 compute-module input, the power-shelf efficiency curve is evaluated once at that
 rack's DC load (as the source `gb200_nvl72_rack_power` does with its single
@@ -154,9 +157,10 @@ implementation for both variants, both bases, every shelf knot and PUE 1.0–1.2
 measured GPUs ÷ 1000 × 1.1. It accepts fully measured eight-GPU chassis
 (`chassisBasis: 'full'` on the `single-node`, `worker-hosts`, or `uniform-hosts`
 basis; see the Profit Estimator power basis section), or an `nvl72-trays` estimate
-whose trays are all fully measured (one host per worker, four GPUs and two sockets
-each; an aggregate multinode NVL72 row without a per-worker array is not modeled
-at the deployment mean and stays `topology`-unavailable). Partial trays are
+whose trays are all fully measured (four GPUs and two sockets each: one tray per
+measured worker host, or, for an aggregate multinode row without a per-worker
+array, `gpuCount / 4` trays at the deployment mean, cross-checked against the
+Grace-socket count and `power_audit.cpu.observed_sockets`). Partial trays are
 extrapolated in the chart but rejected here, as partial chassis are. Between two
 frontier knots both must share the same measured basis and sensor kind; a module
 knot beside a Grace-socket knot stays unavailable rather than blending sensors. The
@@ -317,7 +321,9 @@ GPU 运行相同负载。结果标记为 `chassisBasis: 'extrapolated'`：每卡
 的 GPU 总数分摊，`deploymentAcWatts` 只保留实测 GPU 在各机箱中的份额。这不是把
 部分分配的机箱按比例分摊：固定组件、风扇曲线和 PSU 效率都在满机箱负载点求值。
 GB200、GB300 使用单独的 NVL72 机架 profile，不套用 B200、B300 机箱模型：每台实测
-worker 主机视为一个计算 tray（4 张 GPU、2 个 Grace socket）。输入为实测模块功耗
+worker 主机视为一个计算 tray（4 张 GPU、2 个 Grace socket）；没有逐 worker 数组的聚合
+多节点行则按 GPU 总数 ÷ 4 推算 tray 数、每个 tray 取部署平均值，并与 Grace socket 数及
+CPU 采集记录的 `power_audit.cpu.observed_sockets` 交叉校验。输入为实测模块功耗
 （`avg_total_module_power_w`）；缺失时改用 GPU 板卡功耗加 Grace socket 功耗
 （`avg_total_cpu_power_w`），并按来源模型计入 GPU 份额的稳压损耗余量。Grace CPU 与
 LPDDR5X 从不建模，缺少 `cpu_power_valid=1` 和 Grace 侧指标的行保持不可用
@@ -366,9 +372,10 @@ BlueField-3 DPU 空闲功耗（2 × 65 W）、NVMe 空闲功耗（22 W）、风�
 验证了与固定实现的一致性。
 
 门槛规则（利润估算器）：规划 kW/GPU = 部署设施功率 ÷ 实测 GPU 数 ÷ 1000 × 1.1。接受
-`chassisBasis: 'full'` 的单节点八卡机箱，或全部 tray 均完整实测（每个 worker 一台主机，
-各 4 张 GPU、2 个 socket）的 `nvl72-trays` 估算；部分 tray 在图表中外推显示，但与部分
-机箱一样不进入规划门槛。两个前沿数据点之间必须采用相同的实测口径和传感器类型，模块
+`chassisBasis: 'full'` 的八卡机箱估算（`single-node`、`worker-hosts` 或 `uniform-hosts`
+拓扑），或全部 tray 均完整实测的 `nvl72-trays` 估算（各 4 张 GPU、2 个 socket：每个实测
+worker 主机一个 tray，或没有逐 worker 数组的聚合多节点行按 GPU 总数 ÷ 4 推算、并与
+socket 数交叉校验）；部分 tray 在图表中外推显示，但与部分机箱一样不进入规划门槛。两个前沿数据点之间必须采用相同的实测口径和传感器类型，模块
 读数旁边的 Grace socket 读数保持不可用，不会混合两种传感器。柱形提示、功耗说明下方的
 标注行和 CSV 的 `功耗口径`、`功耗传感器`、`系统功耗 profile` 三列逐行标出实测口径
 （实测模块功耗，或实测 GPU 板卡 + Grace socket 功耗并由模型估算稳压损耗）、传感器类型

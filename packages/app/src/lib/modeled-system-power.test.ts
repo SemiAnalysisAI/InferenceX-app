@@ -701,28 +701,95 @@ describe('NVL72 trays with measured compute-module power', () => {
     expect(modelSystemPower(source)).toMatchObject({ reason: 'topology' });
   });
 
-  it('does not infer trays from the GPU total for aggregate multinode rows without workers', () => {
-    // Two trays' worth of GPUs and Grace sockets but no per-worker array: the
-    // chassis-only uniform-hosts mean is not applied to trays, so the row stays
-    // on the worker path and reports the missing placement.
+  it('infers trays from the GPU total for aggregate multinode rows without workers', () => {
+    // Kimi K3 GB200 dynamo-vLLM TP16 (fixture kimik3_*_conc2): sixteen GPUs on
+    // four trays, aggregate producer, no per-worker array. GPU watts are the
+    // fixture's; the CPU-side keys are controlled inputs for eight Grace sockets.
     const source = nvl72Row(
-      { avg_total_gpu_power_w: 7202, avg_total_cpu_power_w: 1002 },
-      { is_multinode: true, prefill_tp: 8, decode_tp: 8, num_prefill_gpu: 8, num_decode_gpu: 8 },
+      {
+        avg_power_w: 441.741,
+        avg_total_gpu_power_w: 7067.859,
+        avg_total_cpu_power_w: 2004,
+        avg_total_module_power_w: 9071.859,
+      },
+      {
+        is_multinode: true,
+        prefill_tp: 16,
+        decode_tp: 0,
+        num_prefill_gpu: 16,
+        num_decode_gpu: 16,
+        power_audit: { cpu: { sensor_kind: 'module', observed_sockets: 8 } },
+      },
     );
-    expect(modelSystemPower(source)).toMatchObject({ reason: 'topology' });
-    // The same shape on chassis hardware is the uniform-hosts case.
+    const rack = estimateRackPower(
+      'gb200',
+      { basis: 'module', moduleWattsPerTray: 9071.859 / 4 },
+      1.1,
+    )!;
+    const estimate = modelSystemPower(source);
+    expect(estimate).toMatchObject({
+      status: 'supported',
+      topologyBasis: 'nvl72-trays',
+      measuredBasis: 'module',
+      sensorKind: 'module',
+      chassisBasis: 'full',
+      gpuCount: 16,
+      chassisCount: 4,
+      modeledGpuCount: 16,
+      pue: 1.1,
+    });
+    if (estimate.status !== 'supported') throw new Error('unreachable');
+    expect(estimate.chassisAcWatts).toBeCloseTo(4 * (rack.rackAcWatts / 18), 6);
+    expect(estimate.deploymentFacilityWatts).toBe(estimate.facilityWatts);
+
+    // Without module keys the same trays take GPU board plus Grace socket per tray.
+    const graceOnly = { ...source, metrics: { ...source.metrics } };
+    delete (graceOnly.metrics as Record<string, unknown>).avg_total_module_power_w;
+    const graceRack = estimateRackPower(
+      'gb200',
+      {
+        basis: 'gpu-plus-grace',
+        gpuBoardWattsPerTray: 7067.859 / 4,
+        graceSocketWattsPerTray: 2004 / 4,
+      },
+      1.1,
+    )!;
+    const graceEstimate = modelSystemPower(graceOnly);
+    expect(graceEstimate).toMatchObject({
+      status: 'supported',
+      topologyBasis: 'nvl72-trays',
+      measuredBasis: 'gpu-plus-grace',
+      sensorKind: 'grace-socket',
+      chassisCount: 4,
+    });
+    if (graceEstimate.status !== 'supported') throw new Error('unreachable');
+    expect(graceEstimate.chassisAcWatts).toBeCloseTo(4 * (graceRack.rackAcWatts / 18), 6);
+
+    // The CPU leg's recorded socket coverage must agree with the inferred trays.
+    expect(
+      modelSystemPower({ ...source, power_audit: { cpu: { observed_sockets: 6 } } }),
+    ).toMatchObject({ reason: 'cpu-telemetry' });
+    // So must the socket count the Grace-side keys recover.
     expect(
       modelSystemPower({
         ...source,
-        hardware: 'b200',
-        metrics: {
-          ...source.metrics,
-          avg_power_w: 900.25,
-          avg_total_gpu_power_w: 14404,
-          decode_pp: 2,
-        },
+        metrics: { ...source.metrics, avg_total_cpu_power_w: 250.5 * 6 },
       }),
-    ).toMatchObject({ status: 'supported', topologyBasis: 'uniform-hosts', chassisCount: 2 });
+    ).toMatchObject({ reason: 'cpu-telemetry' });
+    // Eighteen GPUs cannot fill whole four-GPU trays.
+    expect(
+      modelSystemPower({
+        ...source,
+        prefill_tp: 18,
+        metrics: { ...source.metrics, avg_total_gpu_power_w: 441.741 * 18 },
+      }),
+    ).toMatchObject({ reason: 'gpu-count' });
+    // Chassis hardware keeps the base uniform-hosts path for the same shape.
+    expect(modelSystemPower({ ...source, hardware: 'b200' })).toMatchObject({
+      status: 'supported',
+      topologyBasis: 'uniform-hosts',
+      chassisCount: 2,
+    });
   });
 
   it('extrapolates a partially measured tray on the GPU-board share and keeps the measured share', () => {

@@ -288,6 +288,51 @@ describe('profit power basis preview', () => {
     expect(modeledPowerAtTarget(same, 45)).toBeCloseTo(modeledPowerAtTarget(trayResult, 45)!, 10);
   });
 
+  it('plans aggregate multinode NVL72 rows without a worker array as inferred trays', () => {
+    // Kimi K3 GB200 dynamo-vLLM TP16: sixteen GPUs on four trays, no per-worker array.
+    const inferred: BenchmarkRow = {
+      ...traySource,
+      is_multinode: true,
+      prefill_tp: 16,
+      decode_tp: 0,
+      num_prefill_gpu: 16,
+      num_decode_gpu: 16,
+      metrics: {
+        ...traySource.metrics,
+        avg_power_w: 441.741,
+        avg_total_gpu_power_w: 7067.859,
+        avg_total_cpu_power_w: 2004,
+        avg_total_module_power_w: 9071.859,
+      },
+    };
+    const rack = estimateRackPower(
+      'gb200',
+      { basis: 'module', moduleWattsPerTray: 9071.859 / 4 },
+      1.1,
+    )!;
+    const inferredResult = withPoints(trayResult, [{ ...trayPoint, sourceRow: inferred }]);
+    expect(modeledPowerAtTarget(inferredResult, 45)).toBeCloseTo(
+      (((rack.facilityWatts / 18) * 4) / 16 / 1000) * 1.1,
+      8,
+    );
+    const rows = estimateProfitByPower(
+      [inferredResult],
+      specs,
+      pricing,
+      assumptions,
+      'modeled',
+      45,
+      labels,
+    ).rows;
+    expect(rows).toHaveLength(1);
+    expect(rows[0].powerSource).toMatchObject({
+      topology: 'nvl72-trays',
+      measuredBasis: 'module',
+      sensorKind: 'module',
+      pue: 1.1,
+    });
+  });
+
   it('labels x86 chassis estimates with the air-cooled profile and leaves provisioned rows unlabeled', () => {
     const [provisioned, modeled] = estimateProfitByPower(
       [result],

@@ -100,6 +100,10 @@ export type SystemPowerEstimate =
       topologyBasis: 'single-node' | 'worker-hosts' | 'uniform-hosts';
     })
   | (SupportedSystemPowerEstimate & {
+      /**
+       * One tray per measured worker host, or, for an aggregate multinode row
+       * without a worker array, gpuCount ÷ 4 trays at the deployment mean.
+       */
       topologyBasis: 'nvl72-trays';
       /** Which measured reading fed every tray: the module sensor, or GPU board + Grace socket. */
       measuredBasis: RackMeasuredBasis;
@@ -324,19 +328,17 @@ export function modelSystemPower(
       gpuBoardWatts:
         gpuCount === unitGpuCount ? m.avg_total_gpu_power_w : m.avg_power_w * unitGpuCount,
     });
-  } else if (
-    !rack &&
-    row.disagg === false &&
-    (!Array.isArray(row.workers) || row.workers.length === 0)
-  ) {
+  } else if (row.disagg === false && (!Array.isArray(row.workers) || row.workers.length === 0)) {
     // Aggregate multinode producers emit no per-worker telemetry. Symmetric
-    // TP/PP/DP shards load every host alike, so each full eight-GPU chassis is
-    // modeled at the deployment mean; the supported chassis hardware only ships
-    // in eight-GPU hosts, so the count must fill whole chassis on several hosts.
-    // Disaggregated roles differ in load and stay on the worker path; NVL72
-    // trays stay there too (a tray count is not inferred from the GPU total).
-    const hostCount = gpuCount / CHASSIS_GPU_COUNT;
-    if (!count(hostCount) || hostCount < 2) return unavailable('topology');
+    // TP/PP/DP shards load every host alike, so each full unit is modeled at
+    // the deployment mean: chassis hardware only ships in eight-GPU hosts and
+    // NVL72 in four-GPU compute trays, so the count must fill whole units on
+    // several hosts. Disaggregated roles differ in load and stay on the worker path.
+    const hostCount = gpuCount / unitGpuCount;
+    // An uneven chassis count leaves placement unknown; an uneven tray count
+    // contradicts the four-GPU tray itself.
+    if (!count(hostCount)) return unavailable(rack ? 'gpu-count' : 'topology');
+    if (hostCount < 2) return unavailable('topology');
     const tp = row.decode_tp > 0 ? row.decode_tp : row.prefill_tp;
     const pp = Math.max(m.pp ?? 1, m.decode_pp ?? 1, m.prefill_pp ?? 1);
     const pcp = Math.max(m.pcp_size ?? 1, m.decode_pcp_size ?? 1, m.prefill_pcp_size ?? 1);
@@ -351,11 +353,21 @@ export function modelSystemPower(
     ) {
       return unavailable('gpu-count');
     }
+    // The CPU leg records the sockets it covered; when present it must agree
+    // with the trays inferred from the GPU total (two Grace sockets per tray).
+    const observedSockets = row.power_audit?.cpu?.observed_sockets;
+    if (
+      rack &&
+      observedSockets !== undefined &&
+      observedSockets !== hostCount * rack.graceSocketsPerComputeTray
+    ) {
+      return unavailable('cpu-telemetry');
+    }
     topologyBasis = 'uniform-hosts';
     for (let host = 0; host < hostCount; host++) {
       units.push({
-        measuredGpus: CHASSIS_GPU_COUNT,
-        // Partition the producer's exact total so the chassis inputs sum back to it.
+        measuredGpus: unitGpuCount,
+        // Partition the producer's exact total so the unit inputs sum back to it.
         gpuBoardWatts: m.avg_total_gpu_power_w / hostCount,
       });
     }
