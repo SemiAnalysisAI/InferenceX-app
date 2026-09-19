@@ -38,6 +38,62 @@ on:
         default: false
         type: boolean
 
+      receipt-required:
+        description: Immutable publication transport receipt-required
+        required: false
+        type: string
+        default: 'false'
+      receipt-artifact-id:
+        description: Immutable publication transport receipt-artifact-id
+        required: false
+        type: string
+        default: ''
+      receipt-artifact-sha256:
+        description: Immutable publication transport receipt-artifact-sha256
+        required: false
+        type: string
+        default: ''
+      receipt-sha256:
+        description: Immutable publication transport receipt-sha256
+        required: false
+        type: string
+        default: ''
+      receipt-issuer-run-id:
+        description: Immutable publication transport receipt-issuer-run-id
+        required: false
+        type: string
+        default: ''
+      receipt-issuer-sha:
+        description: Immutable publication transport receipt-issuer-sha
+        required: false
+        type: string
+        default: ''
+      publication-artifact-id:
+        description: Immutable publication transport publication-artifact-id
+        required: false
+        type: string
+        default: ''
+      publication-artifact-sha256:
+        description: Immutable publication transport publication-artifact-sha256
+        required: false
+        type: string
+        default: ''
+      publication-sha256:
+        description: Immutable publication transport publication-sha256
+        required: false
+        type: string
+        default: ''
+      publication-issuer-run-id:
+        description: Immutable publication transport publication-issuer-run-id
+        required: false
+        type: string
+        default: ''
+      publication-issuer-sha:
+        description: Immutable publication transport publication-issuer-sha
+        required: false
+        type: string
+        default: ''
+
 permissions: {}
 
 concurrency:
@@ -47,6 +103,8 @@ concurrency:
 jobs:
   validate:
     name: Validate staging request
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     outputs:
       run-id: ${{ steps.request.outputs.run-id }}
@@ -111,6 +169,37 @@ jobs:
             echo "comment-id=$COMMENT_ID"
             echo "reset-staging-database=$RESET_STAGING_DATABASE"
           } >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+      - name: Install receipt reader
+        run: bun install --frozen-lockfile
+        env:
+          CYPRESS_INSTALL_BINARY: '0'
+      - name: Verify immutable receipt transport
+        env:
+          GH_TOKEN: ${{ secrets.INFX_MAIN_PAT }}
+          INGEST_REPO: SemiAnalysisAI/InferenceX
+          SOURCE_RUN_ID: ${{ steps.request.outputs.run-id }}
+          RECEIPT_TRANSPORT_PATH: ${{ github.workspace }}/receipt-transport
+          ALLOWED_RECEIPT_ISSUER_SHAS: ${{ vars.INFX_RECEIPT_ISSUER_SHAS }}
+          ALLOWED_RECEIPT_ISSUER_WORKFLOW: ${{ vars.INFX_RECEIPT_ISSUER_WORKFLOW }}
+          RECEIPT_REQUIRED: ${{ github.event.client_payload.receipt-required || inputs.receipt-required || 'false' }}
+          RECEIPT_ARTIFACT_ID: ${{ github.event.client_payload.receipt-artifact-id || inputs.receipt-artifact-id }}
+          RECEIPT_ARTIFACT_SHA256: ${{ github.event.client_payload.receipt-artifact-sha256 || inputs.receipt-artifact-sha256 }}
+          RECEIPT_SHA256: ${{ github.event.client_payload.receipt-sha256 || inputs.receipt-sha256 }}
+          RECEIPT_ISSUER_RUN_ID: ${{ github.event.client_payload.receipt-issuer-run-id || inputs.receipt-issuer-run-id }}
+          RECEIPT_ISSUER_SHA: ${{ github.event.client_payload.receipt-issuer-sha || inputs.receipt-issuer-sha }}
+          PUBLICATION_ARTIFACT_ID: ${{ github.event.client_payload.publication-artifact-id || inputs.publication-artifact-id }}
+          PUBLICATION_ARTIFACT_SHA256: ${{ github.event.client_payload.publication-artifact-sha256 || inputs.publication-artifact-sha256 }}
+          PUBLICATION_SHA256: ${{ github.event.client_payload.publication-sha256 || inputs.publication-sha256 }}
+          PUBLICATION_ISSUER_RUN_ID: ${{ github.event.client_payload.publication-issuer-run-id || inputs.publication-issuer-run-id }}
+          PUBLICATION_ISSUER_SHA: ${{ github.event.client_payload.publication-issuer-sha || inputs.publication-issuer-sha }}
+        run: bun packages/db/src/prepare-receipt-transport.ts
 
       - name: Report staging start
         env:
@@ -254,11 +343,22 @@ jobs:
     needs: [validate, prepare-staging-database]
     permissions:
       contents: read
-    uses: $/.github/workflows/ingest-agentic-results.yml
+    uses: ./.github/workflows/ingest-agentic-results.yml
     with:
       run-id: ${{ needs.validate.outputs.run-id }}
       run-attempt: ${{ needs.validate.outputs.run-attempt }}
       database-target: staging
+      receipt-required: ${{ github.event.client_payload.receipt-required || inputs.receipt-required || 'false' }}
+      receipt-artifact-id: ${{ github.event.client_payload.receipt-artifact-id || inputs.receipt-artifact-id }}
+      receipt-artifact-sha256: ${{ github.event.client_payload.receipt-artifact-sha256 || inputs.receipt-artifact-sha256 }}
+      receipt-sha256: ${{ github.event.client_payload.receipt-sha256 || inputs.receipt-sha256 }}
+      receipt-issuer-run-id: ${{ github.event.client_payload.receipt-issuer-run-id || inputs.receipt-issuer-run-id }}
+      receipt-issuer-sha: ${{ github.event.client_payload.receipt-issuer-sha || inputs.receipt-issuer-sha }}
+      publication-artifact-id: ${{ github.event.client_payload.publication-artifact-id || inputs.publication-artifact-id }}
+      publication-artifact-sha256: ${{ github.event.client_payload.publication-artifact-sha256 || inputs.publication-artifact-sha256 }}
+      publication-sha256: ${{ github.event.client_payload.publication-sha256 || inputs.publication-sha256 }}
+      publication-issuer-run-id: ${{ github.event.client_payload.publication-issuer-run-id || inputs.publication-issuer-run-id }}
+      publication-issuer-sha: ${{ github.event.client_payload.publication-issuer-sha || inputs.publication-issuer-sha }}
     secrets:
       DATABASE_STAGING_WRITE_URL: ${{ secrets.DATABASE_STAGING_WRITE_URL }}
       VERCEL_STAGING_BYPASS_SECRET: ${{ secrets.VERCEL_STAGING_BYPASS_SECRET }}

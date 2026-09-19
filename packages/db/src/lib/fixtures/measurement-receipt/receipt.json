@@ -1,0 +1,154 @@
+{
+  "repository": "org/repo",
+  "source_run_id": "100",
+  "source_attempt": 2,
+  "source_head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "bundle_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "contracts": {
+    "raw": "aiperf-1.4",
+    "normalized": "agentx-v1",
+    "publication": 1
+  },
+  "points": [
+    {
+      "point_id": "1111111111111111111111111111111111111111111111111111111111111111",
+      "execution_id": "org/repo/100/1/101",
+      "source_run_id": "100",
+      "source_attempt": 1,
+      "kind": "throughput",
+      "concurrency": 1,
+      "topology": {
+        "kind": "aggregate",
+        "nodes": 1,
+        "serving_gpus": 8,
+        "tp": 8,
+        "ep": 1
+      },
+      "artifact_ids": [
+        101
+      ],
+      "execution_artifact_id": 101,
+      "execution_path": "execution.json",
+      "native_manifest_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "normalized_artifact_id": 101,
+      "normalized_path": "agg.json",
+      "required_metrics": [
+        "output_tput_tps",
+        "duration_seconds"
+      ],
+      "config": {
+        "model": "dsr1",
+        "hardware": "h200",
+        "framework": "vllm",
+        "precision": "fp8"
+      },
+      "task": null,
+      "filters": [],
+      "sample_count": 0,
+      "samples_artifact_id": null,
+      "samples_path": null,
+      "dataset": {},
+      "bundle_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "normalized_format": "normalized",
+      "metadata_path": null
+    },
+    {
+      "point_id": "2222222222222222222222222222222222222222222222222222222222222222",
+      "execution_id": "org/repo/100/1/102",
+      "source_run_id": "100",
+      "source_attempt": 1,
+      "kind": "eval",
+      "concurrency": 28,
+      "topology": {
+        "kind": "aggregate",
+        "nodes": 1,
+        "serving_gpus": 8,
+        "tp": 8,
+        "ep": 1
+      },
+      "artifact_ids": [
+        102
+      ],
+      "execution_artifact_id": 102,
+      "execution_path": "execution.json",
+      "native_manifest_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "normalized_artifact_id": 102,
+      "normalized_path": "agg.json",
+      "required_metrics": [
+        "em_strict",
+        "n_eff"
+      ],
+      "config": {
+        "model": "dsr1",
+        "hardware": "h200",
+        "framework": "vllm",
+        "precision": "fp8"
+      },
+      "task": "gsm8k",
+      "filters": [
+        "strict-match",
+        "flexible-extract"
+      ],
+      "sample_count": 2,
+      "samples_artifact_id": 102,
+      "samples_path": "samples_gsm8k.jsonl",
+      "dataset": {},
+      "bundle_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "normalized_format": "normalized",
+      "metadata_path": null
+    }
+  ],
+  "kind": "source-measurement-receipt",
+  "version": 1,
+  "issuer": {
+    "repository": "org/repo",
+    "run_id": "200",
+    "job": "issuer",
+    "workflow_sha": "dddddddddddddddddddddddddddddddddddddddd",
+    "collector_sha": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+  },
+  "artifacts": [
+    {
+      "id": 101,
+      "name": "bmk_pilot",
+      "sha256": "b644c12d559428df1845d5ff8d3483aac35e7fdb694d8ce1a7ac891239300fd3",
+      "run_id": "100",
+      "members": [
+        {
+          "path": "agg.json",
+          "sha256": "a142da2f49fa4f706c801bd824eea698740b567ad689269fbdd181a9648dd849",
+          "size": 300
+        },
+        {
+          "path": "execution.json",
+          "sha256": "41746d1d444ec14e440d5d75e1144a5636d7ef7acaaef7b4957217cde4503c5b",
+          "size": 537
+        }
+      ]
+    },
+    {
+      "id": 102,
+      "name": "eval_results_all",
+      "sha256": "8c2f42b955bfdb85fac00d6bfca0442475803f2aa7aefd93b1842cacdff7e94c",
+      "run_id": "100",
+      "members": [
+        {
+          "path": "agg.json",
+          "sha256": "2a05f61da6ac2bd48a9a5b8c40a4032dbd1f711581fcd8e1df429c0ce619a031",
+          "size": 294
+        },
+        {
+          "path": "execution.json",
+          "sha256": "479ff4fc073b1f73508bd76fb13be0fb6fb8a740f113e4f2404bd4139345ecbb",
+          "size": 531
+        },
+        {
+          "path": "samples_gsm8k.jsonl",
+          "sha256": "910488b869e78c51dd00e5b956515d2e232bba3669f426246e6384c0b7554256",
+          "size": 428
+        }
+      ]
+    }
+  ],
+  "receipt_id": "2e12626c30ec11cf1738c7541a36444af53c29bad4f59f927930618e298e7a01"
+}

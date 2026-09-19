@@ -23,6 +23,17 @@
  */
 
 import fs from 'fs';
+import {
+  receiptFromEnvironment,
+  publicationFromEnvironment,
+  verifyMeasurementSnapshot,
+} from './lib/measurement-receipt';
+import { prepareReceiptArtifacts } from './lib/receipt-artifact-preparation';
+import {
+  claimMeasurementSnapshot,
+  completeMeasurementSnapshot,
+  assertLegacySnapshotUnclaimed,
+} from './etl/measurement-snapshot';
 import { createHash } from 'node:crypto';
 import {
   powerPublicationPoint,
@@ -97,6 +108,7 @@ const DEFAULT_REPO = 'SemiAnalysisAI/InferenceX';
 const powerPublicationPoints = new Map<string, PowerPublicationPoint>();
 const powerPublicationErrors: string[] = [];
 const tracker = createSkipTracker();
+const measurementReceipt = receiptFromEnvironment();
 const isDownloadMode = process.argv[2] === '--download';
 
 let artifactsDir: string;
@@ -160,42 +172,49 @@ if (isDownloadMode) {
   console.log(`  Repo:   ${REPO}`);
   console.log(`\n--- Downloading artifacts to ${artifactsDir} ---`);
 
-  // Retried configs produce artifacts on multiple runners — keep only the
-  // most recent per logical name (see RUNNER_SUFFIX_RE in github-artifacts)
-  // so a failed attempt's empty metrics can't overwrite the good one via
-  // ON CONFLICT DO UPDATE.
-  const artifacts = listRunArtifacts(REPO, runIdStr);
-  const byLogical = dedupeArtifactsByLogicalName(artifacts);
-  // Server-log artifacts from eval and benchmark jobs can share a logical
-  // config but differ by runner suffix. Keep the exact server-log sibling for
-  // each selected bmk artifact instead of letting latest-created eval logs win.
-  for (const [key, artifact] of byLogical) {
-    if (
-      artifact.name.startsWith('server_logs_') ||
-      artifact.name.startsWith('multinode_server_logs_')
-    ) {
-      byLogical.delete(key);
+  if (measurementReceipt) {
+    if (measurementReceipt.repository !== REPO || measurementReceipt.source_run_id !== runIdStr)
+      throw new Error('Receipt source differs from requested run');
+    prepareReceiptArtifacts(measurementReceipt, artifactsDir);
+    runAttemptNum = measurementReceipt.source_attempt;
+  } else {
+    // Retried configs produce artifacts on multiple runners — keep only the
+    // most recent per logical name (see RUNNER_SUFFIX_RE in github-artifacts)
+    // so a failed attempt's empty metrics can't overwrite the good one via
+    // ON CONFLICT DO UPDATE.
+    const artifacts = listRunArtifacts(REPO, runIdStr);
+    const byLogical = dedupeArtifactsByLogicalName(artifacts);
+    // Server-log artifacts from eval and benchmark jobs can share a logical
+    // config but differ by runner suffix. Keep the exact server-log sibling for
+    // each selected bmk artifact instead of letting latest-created eval logs win.
+    for (const [key, artifact] of byLogical) {
+      if (
+        artifact.name.startsWith('server_logs_') ||
+        artifact.name.startsWith('multinode_server_logs_')
+      ) {
+        byLogical.delete(key);
+      }
     }
-  }
-  const selectedBenchmarkNames = new Set(
-    [...byLogical.values()]
-      .filter((artifact) => artifact.name.startsWith('bmk_'))
-      .map((artifact) => artifact.name),
-  );
-  for (const pair of pairServerLogArtifacts(artifacts)) {
-    if (selectedBenchmarkNames.has(pair.benchmarks.name)) {
-      byLogical.set(`server-log:${pair.serverLogs.name}`, pair.serverLogs);
+    const selectedBenchmarkNames = new Set(
+      [...byLogical.values()]
+        .filter((artifact) => artifact.name.startsWith('bmk_'))
+        .map((artifact) => artifact.name),
+    );
+    for (const pair of pairServerLogArtifacts(artifacts)) {
+      if (selectedBenchmarkNames.has(pair.benchmarks.name)) {
+        byLogical.set(`server-log:${pair.serverLogs.name}`, pair.serverLogs);
+      }
     }
+
+    for (const artifact of byLogical.values()) {
+      console.log(`  ${artifact.name}`);
+      downloadArtifact(artifact, artifactsDir);
+    }
+
+    console.log(`\n  Downloaded ${byLogical.size} artifact(s)`);
+
+    runAttemptNum = fetchRunAttempt(REPO, runIdStr);
   }
-
-  for (const artifact of byLogical.values()) {
-    console.log(`  ${artifact.name}`);
-    downloadArtifact(artifact, artifactsDir);
-  }
-
-  console.log(`\n  Downloaded ${byLogical.size} artifact(s)`);
-
-  runAttemptNum = fetchRunAttempt(REPO, runIdStr);
 } else {
   // CI mode — read from env vars
   for (const key of [
@@ -229,6 +248,17 @@ const reusedIngestMetadata = readReusedIngestMetadata(artifactsDir);
 if (reusedIngestMetadata) {
   runIdStr = reusedIngestMetadata.sourceRunId;
   runAttemptNum = reusedIngestMetadata.sourceRunAttempt;
+}
+
+if (measurementReceipt) {
+  if (
+    measurementReceipt.repository !== REPO ||
+    measurementReceipt.source_run_id !== runIdStr ||
+    measurementReceipt.source_attempt !== runAttemptNum
+  )
+    throw new Error('Receipt source/attempt differs from ingest request');
+  publicationFromEnvironment(measurementReceipt, requestedRunIdStr);
+  verifyMeasurementSnapshot(measurementReceipt, artifactsDir);
 }
 
 const runIdNum = parseInt(runIdStr, 10);
@@ -285,6 +315,9 @@ async function main(): Promise<void> {
     return;
   }
 
+  await (measurementReceipt
+    ? claimMeasurementSnapshot(sql, measurementReceipt)
+    : assertLegacySnapshotUnclaimed(sql, REPO, runIdStr, runAttemptNum));
   validateRunBackfills();
   const configCache = createConfigCache(sql);
   const { getOrCreateConfig, preloadConfigs } = configCache;
@@ -1030,7 +1063,10 @@ async function main(): Promise<void> {
     );
   }
 
+  if (measurementReceipt && Object.values(tracker.skips).some((count) => count > 0))
+    throw new Error('Accepted snapshot ingestion skipped required input');
   await refreshLatestBenchmarks(sql);
+  if (measurementReceipt) await completeMeasurementSnapshot(sql, measurementReceipt);
 
   console.log('\n=== ingest-ci-run complete ===');
   console.log('  Invalidate API cache: bun run admin:cache:invalidate');

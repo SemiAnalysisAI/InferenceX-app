@@ -17,6 +17,7 @@ import {
 } from '@/lib/github-artifacts';
 import {
   mapEvalSamples,
+  projectEvalSamples,
   type EvalSampleParams,
 } from '@semianalysisai/inferencex-db/etl/eval-samples-mapper';
 import { createSkipTracker } from '@semianalysisai/inferencex-db/etl/skip-tracker';
@@ -136,7 +137,5 @@ export async function fetchAndParseSamples(
   // (`strict-match`, `flexible-extract`) post-process the same response, and
   // re-run scenarios can also produce multiple samples files in one zip. The DB
   // ingest dedups via `(eval_result_id, doc_id)`; mirror that here so totals match.
-  const seen = new Map<number, EvalSampleParams>();
-  for (const s of collected) if (!seen.has(s.docId)) seen.set(s.docId, s);
-  return [...seen.values()].toSorted((a, b) => a.docId - b.docId);
+  return projectEvalSamples(collected);
 }

@@ -4,8 +4,8 @@
  * `gh` CLI, which picks up GITHUB_TOKEN from the environment.
  */
 
-import { execSync } from 'node:child_process';
-import fs from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { extractVerifiedArchive, sha256, type ArchiveMember } from './artifact-archive.js';
 import path from 'node:path';
 
 export interface ArtifactMeta {
@@ -14,6 +14,8 @@ export interface ArtifactMeta {
   archive_download_url: string;
   created_at: string;
   expired?: boolean;
+  digest?: string;
+  workflow_run?: { id: number };
 }
 
 /**
@@ -34,19 +36,15 @@ export const RUNNER_SUFFIX_RE = /_[a-zA-Z][a-zA-Z0-9.-]*_\d+$/u;
 
 /** List a workflow run's artifacts via `gh api` (paginated). Malformed lines are skipped. */
 export function listRunArtifacts(repo: string, runId: string): ArtifactMeta[] {
-  const json = execSync(
-    `gh api "repos/${repo}/actions/runs/${runId}/artifacts" --paginate --jq '.artifacts[]'`,
+  validateRun(repo, runId);
+  const json = execFileSync(
+    'gh',
+    ['api', `repos/${repo}/actions/runs/${runId}/artifacts`, '--paginate', '--slurp'],
     { encoding: 'utf8', maxBuffer: 50 * 1024 * 1024 },
   );
-  const out: ArtifactMeta[] = [];
-  for (const line of json.trim().split('\n')) {
-    if (!line) continue;
-    try {
-      out.push(JSON.parse(line) as ArtifactMeta);
-    } catch {
-      // skip malformed line
-    }
-  }
+  const pages = JSON.parse(json) as { artifacts: ArtifactMeta[] }[];
+  const out = pages.flatMap((page) => page.artifacts);
+
   return out;
 }
 
@@ -66,25 +64,62 @@ export function dedupeArtifactsByLogicalName(
   return byLogical;
 }
 
-/** Download + unzip one artifact into `<destRoot>/<artifact.name>`; returns that dir. */
-export function downloadArtifact(artifact: ArtifactMeta, destRoot: string): string {
-  const zipPath = path.join(destRoot, 'artifact.zip');
-  execSync(`gh api "${artifact.archive_download_url}" > "${zipPath}"`, {
-    stdio: ['pipe', 'pipe', 'inherit'],
-  });
-  const destDir = path.join(destRoot, artifact.name);
-  fs.mkdirSync(destDir, { recursive: true });
-  execSync(`unzip -oq "${zipPath}" -d "${destDir}"`, { stdio: 'inherit' });
-  fs.unlinkSync(zipPath);
-  return destDir;
+export function validateRun(repo: string, runId: string): void {
+  if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/u.test(repo) || !/^[1-9]\d*$/u.test(runId)) {
+    throw new Error('Invalid repository or run ID');
+  }
 }
 
-/** Fetch a run's current attempt number via `gh api` (defaults to 1). */
+export interface DownloadOptions {
+  repo?: string;
+  sha256?: string;
+  members?: readonly ArchiveMember[];
+  isolated?: boolean;
+}
+
+/** New receipts use numeric ID roots. The legacy view accepts only safe single path components. */
+export function downloadArtifact(
+  artifact: ArtifactMeta,
+  destRoot: string,
+  options: DownloadOptions = {},
+): string {
+  if (!Number.isSafeInteger(artifact.id) || artifact.id! <= 0 || artifact.expired)
+    throw new Error('Invalid/expired artifact ID');
+  const match = artifact.archive_download_url.match(
+    /^https:\/\/api\.github\.com\/repos\/(?<repository>[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)\/actions\/artifacts\/(?<artifactId>\d+)\/zip$/u,
+  );
+  const repo = options.repo ?? match?.[1];
+  if (!repo || (match && Number(match[2]) !== artifact.id))
+    throw new Error('Invalid GitHub artifact owner/ID');
+  validateRun(repo, String(artifact.id));
+  const bytes = execFileSync('gh', ['api', `repos/${repo}/actions/artifacts/${artifact.id}/zip`], {
+    maxBuffer: 20 * 1024 ** 3,
+    stdio: ['ignore', 'pipe', 'inherit'],
+  });
+  const expected = options.sha256 ?? artifact.digest?.replace(/^sha256:/u, '');
+  if (expected && (!/^[a-f0-9]{64}$/u.test(expected) || sha256(bytes) !== expected))
+    throw new Error(`Artifact digest mismatch: ${artifact.id}`);
+  if (
+    !options.isolated &&
+    (!/^[A-Za-z0-9_.-]+$/u.test(artifact.name) || ['.', '..'].includes(artifact.name))
+  ) {
+    throw new Error('Unsafe legacy artifact display name');
+  }
+  const destination = path.join(destRoot, options.isolated ? String(artifact.id) : artifact.name);
+  extractVerifiedArchive(bytes, destination, options.members);
+  return destination;
+}
+
+/** Fetch a run's current attempt for the explicitly weaker legacy path only. */
 export function fetchRunAttempt(repo: string, runId: string): number {
-  const attemptStr = execSync(`gh api "repos/${repo}/actions/runs/${runId}" --jq '.run_attempt'`, {
-    encoding: 'utf8',
-  }).trim();
-  return parseInt(attemptStr || '1', 10);
+  validateRun(repo, runId);
+  const attempt = Number(
+    execFileSync('gh', ['api', `repos/${repo}/actions/runs/${runId}`, '--jq', '.run_attempt'], {
+      encoding: 'utf8',
+    }).trim(),
+  );
+  if (!Number.isSafeInteger(attempt) || attempt < 1) throw new Error('Invalid run attempt');
+  return attempt;
 }
 
 export interface RunMeta {
@@ -116,7 +151,7 @@ export function fetchRunMeta(repo: string, runId: string): RunMeta {
   if (!/^\d+$/u.test(runId)) {
     throw new Error(`Invalid run id: ${runId}`);
   }
-  const json = execSync(`gh api "repos/${repo}/actions/runs/${runId}"`, {
+  const json = execFileSync('gh', ['api', `repos/${repo}/actions/runs/${runId}`], {
     encoding: 'utf8',
     maxBuffer: 10 * 1024 * 1024,
   });

@@ -50,6 +50,27 @@ jobs:
         env:
           CYPRESS_INSTALL_BINARY: '0'
 
+      - name: Verify immutable receipt transport
+        env:
+          GH_TOKEN: ${{ secrets.INFX_MAIN_PAT }}
+          INGEST_REPO: SemiAnalysisAI/InferenceX
+          SOURCE_RUN_ID: ${{ github.event.client_payload.source-run-id || github.event.client_payload.run-id }}
+          RECEIPT_TRANSPORT_PATH: ${{ github.workspace }}/receipt-transport
+          ALLOWED_RECEIPT_ISSUER_SHAS: ${{ vars.INFX_RECEIPT_ISSUER_SHAS }}
+          ALLOWED_RECEIPT_ISSUER_WORKFLOW: ${{ vars.INFX_RECEIPT_ISSUER_WORKFLOW }}
+          RECEIPT_REQUIRED: ${{ github.event.client_payload.receipt-required || 'false' }}
+          RECEIPT_ARTIFACT_ID: ${{ github.event.client_payload.receipt-artifact-id }}
+          RECEIPT_ARTIFACT_SHA256: ${{ github.event.client_payload.receipt-artifact-sha256 }}
+          RECEIPT_SHA256: ${{ github.event.client_payload.receipt-sha256 }}
+          RECEIPT_ISSUER_RUN_ID: ${{ github.event.client_payload.receipt-issuer-run-id }}
+          RECEIPT_ISSUER_SHA: ${{ github.event.client_payload.receipt-issuer-sha }}
+          PUBLICATION_ARTIFACT_ID: ${{ github.event.client_payload.publication-artifact-id }}
+          PUBLICATION_ARTIFACT_SHA256: ${{ github.event.client_payload.publication-artifact-sha256 }}
+          PUBLICATION_SHA256: ${{ github.event.client_payload.publication-sha256 }}
+          PUBLICATION_ISSUER_RUN_ID: ${{ github.event.client_payload.publication-issuer-run-id }}
+          PUBLICATION_ISSUER_SHA: ${{ github.event.client_payload.publication-issuer-sha }}
+        run: bun packages/db/src/prepare-receipt-transport.ts
+
       - name: Prepare artifacts from InferenceX
         id: artifacts
         env:
@@ -101,6 +122,20 @@ jobs:
         env:
           DATABASE_WRITE_URL: ${{ secrets.DATABASE_WRITE_URL }}
         run: bun packages/db/src/verify-power-publication.ts power-publication.json
+
+      - name: Verify accepted measurement publication
+        if: env.INGEST_RECEIPT_REQUIRED == '1'
+        env:
+          INGEST_ARTIFACTS_PATH: ${{ github.workspace }}/artifacts
+        run: bun packages/db/src/verify-measurement-publication.ts "https://inferencex.semianalysis.com" measurement-publication.json
+
+      - name: Retain measurement publication verification
+        if: always() && env.INGEST_RECEIPT_REQUIRED == '1'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: measurement-publication-${{ steps.artifacts.outputs.source-run-id }}
+          path: measurement-publication.json
+          if-no-files-found: warn
 
       - name: Retain PowerX publication receipt
         if: always()
