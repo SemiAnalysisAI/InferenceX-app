@@ -21,6 +21,7 @@ import {
   type GpuMetricRow,
   ALL_METRIC_OPTIONS,
   detectTdpFromArtifactName,
+  tdpForHardware,
   getGpuMetricLabel,
   getGpuMetricYAxisLabel,
 } from './types';
@@ -84,6 +85,12 @@ interface GpuMetricsChartProps {
   visibleGpus: Set<number>;
   metricKey: GpuMetricKey;
   artifactName: string;
+  /**
+   * Hardware key of the benchmark point (`b200`, `h200`, …). Multinode bundle
+   * names are hash-truncated and carry no SKU token, so callers that know the
+   * point pass it explicitly; the artifact-name sniff stays the fallback.
+   */
+  hardware?: string;
   legendElement?: React.ReactNode;
   caption?: React.ReactNode;
   /** Max interactive points before LTTB downsampling. Infinity to disable. */
@@ -123,11 +130,14 @@ function buildGroupedData(
 
   const groups = new Map<number, ParsedPoint[]>();
   for (const { row, ms } of parsed) {
+    const value = row[metricKey];
+    // A metric the collector never sampled has no point, not a zero.
+    if (value === undefined) continue;
     if (!groups.has(row.index)) groups.set(row.index, []);
     groups.get(row.index)!.push({
       seconds: (ms - minTime) / 1000,
       ms,
-      value: row[metricKey] ?? 0,
+      value,
       gpuIndex: row.index,
       raw: row,
     });
@@ -257,6 +267,7 @@ const GpuMetricsChart = React.memo(
     visibleGpus,
     metricKey,
     artifactName,
+    hardware,
     legendElement,
     caption,
     maxPoints,
@@ -367,7 +378,10 @@ const GpuMetricsChart = React.memo(
       return ext;
     }, [allPoints]);
 
-    const tdpInfo = metricKey === 'power' ? detectTdpFromArtifactName(artifactName) : null;
+    const tdpInfo =
+      metricKey === 'power'
+        ? (tdpForHardware(hardware) ?? detectTdpFromArtifactName(artifactName))
+        : null;
 
     const yDomain = useMemo(() => {
       if (allPoints.length === 0) return [0, 100] as [number, number];
@@ -510,9 +524,15 @@ const GpuMetricsChart = React.memo(
               ${rolling ? `<div class="text-muted-foreground">${t.rollingSuffix(display.windowS)}</div>` : ''}
               ${
                 d.raw
-                  ? `<div class="text-muted-foreground">${t.power}${sep} ${d.raw.power.toFixed(1)} W</div>
-              <div class="text-muted-foreground">${t.temp}${sep} ${d.raw.temperature}\u00B0C</div>
-              <div class="text-muted-foreground">${t.utilization}${sep} ${d.raw.gpuUtil}%</div>`
+                  ? `<div class="text-muted-foreground">${t.power}${sep} ${d.raw.power.toFixed(1)} W</div>${
+                      d.raw.temperature === undefined
+                        ? ''
+                        : `<div class="text-muted-foreground">${t.temp}${sep} ${d.raw.temperature}\u00B0C</div>`
+                    }${
+                      d.raw.gpuUtil === undefined
+                        ? ''
+                        : `<div class="text-muted-foreground">${t.utilization}${sep} ${d.raw.gpuUtil}%</div>`
+                    }`
                   : ''
               }
               ${overlayRow}

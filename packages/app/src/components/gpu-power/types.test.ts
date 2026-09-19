@@ -6,6 +6,7 @@ import {
   detectAnomalies,
   detectTdpFromArtifactName,
   getAvailableMetrics,
+  tdpForHardware,
   type GpuMetricRow,
   GPU_METRIC_OPTIONS,
   parseCsvData,
@@ -713,5 +714,48 @@ describe('GPU_METRIC_OPTIONS', () => {
       expect(opt.yAxisLabel.length).toBeGreaterThan(0);
       expect(opt.yAxisLabel).toContain(opt.unit);
     }
+  });
+});
+
+describe('tdpForHardware', () => {
+  it('resolves a benchmark point hardware key regardless of artifact naming', () => {
+    expect(tdpForHardware('b200')).toEqual({
+      sku: 'B200',
+      tdp: detectTdpFromArtifactName('gpu_metrics_x_b200-nb_0')!.tdp,
+    });
+    expect(tdpForHardware('GB300')?.sku).toBe('GB300');
+    expect(tdpForHardware(undefined)).toBeNull();
+    expect(tdpForHardware('not-a-sku')).toBeNull();
+  });
+});
+
+/** A multinode DCGM bundle row: power sampled, nothing else collected. */
+const powerOnly = (index: number, power: number) => ({
+  timestamp: '2026-09-12T22:08:20Z',
+  index,
+  power,
+});
+
+describe('power-only rows', () => {
+  it('offers only the metrics the collector sampled', () => {
+    expect(getAvailableMetrics([powerOnly(0, 700), powerOnly(1, 710)]).map((m) => m.key)).toEqual([
+      'power',
+    ]);
+  });
+
+  it('raises no thermal, clock, or utilization anomalies from absent readings', () => {
+    const rows = Array.from({ length: 40 }, (_, i) => ({
+      ...powerOnly(0, 700 + (i % 2)),
+      timestamp: new Date(1789194365292 + i * 1000).toISOString(),
+    }));
+    expect(
+      detectAnomalies(rows, 'power', 'power_audit_kimik3_conc48').map((a) => a.type),
+    ).not.toContain('thermal');
+    expect(
+      detectAnomalies(rows, 'power', 'power_audit_kimik3_conc48').map((a) => a.type),
+    ).not.toContain('clock_drop');
+    expect(
+      detectAnomalies(rows, 'power', 'power_audit_kimik3_conc48').map((a) => a.type),
+    ).not.toContain('util_drop');
   });
 });

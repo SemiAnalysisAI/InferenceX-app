@@ -229,20 +229,21 @@ describe('getGpuMetricsForRun', () => {
     ]);
   });
 
-  it('reports a dropped sample as zeroes for the core metrics and drops the vendor extras', async () => {
+  it('reports a dropped sample as zero power with every other metric absent', async () => {
     const payload = await getGpuMetricsForRun(sql, WITH_SERIES);
     const dropped = payload?.series[0]?.data.at(-1);
-    // Characterizes the `?? 0` defaulting: a null power reading is indistinguishable
-    // from a genuine 0 W reading once it reaches the chart.
+    // Power keeps the `?? 0` default (a null power reading is indistinguishable
+    // from a genuine 0 W reading once it reaches the chart); the other metrics
+    // stay absent so a power-only collector never shows up as 0 °C / 0 MHz / 0 %.
     expect(dropped).toEqual({
       timestamp: '2026-09-11T04:19:42.000Z',
       index: 0,
       power: 0,
-      temperature: 0,
-      smClock: 0,
-      memClock: 0,
-      gpuUtil: 0,
-      memUtil: 0,
+      temperature: undefined,
+      smClock: undefined,
+      memClock: undefined,
+      gpuUtil: undefined,
+      memUtil: undefined,
       edgeTemp: undefined,
       memTemp: undefined,
       gfxVoltage: undefined,
@@ -252,8 +253,8 @@ describe('getGpuMetricsForRun', () => {
       socClk: undefined,
       mmActivity: undefined,
     });
-    // The AMD-only columns are absent rather than zeroed, so consumers can tell
-    // "not collected" from "collected as zero" for those — but not for the core six.
+    // Absent rather than zeroed, so consumers can tell "not collected" from
+    // "collected as zero" for everything except power.
     expect(Object.hasOwn(dropped!, 'edgeTemp')).toBe(true);
     expect(dropped?.edgeTemp).toBeUndefined();
   });

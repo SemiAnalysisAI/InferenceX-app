@@ -9,6 +9,7 @@ import {
   discoverGpuMetricsArtifacts,
   gpuMetricsArtifactSuffix,
   listGpuMetricsCsvFiles,
+  listMultinodePowerSampleFiles,
   parseEnergyCsv,
   readGpuMetricsSidecars,
 } from './gpu-metrics-artifacts.js';
@@ -32,6 +33,21 @@ describe('gpu_metrics artifact discovery', () => {
     );
     expect(gpuMetricsArtifactSuffix('eval_gpu_metrics_dsr1_8k1k_conc1_b200-x_0')).toBeNull();
     expect(gpuMetricsArtifactSuffix('bmk_dsr1')).toBeNull();
+    expect(gpuMetricsArtifactSuffix('power_audit_kimik3_conc8_b200-slurm_0')).toBe(
+      'kimik3_conc8_b200-slurm_0',
+    );
+  });
+
+  it('lists the multinode power CSV but none of the bundle metadata', () => {
+    const root = tempRoot();
+    fs.mkdirSync(path.join(root, 'LOGS', 'power', 'windows'), { recursive: true });
+    fs.writeFileSync(path.join(root, 'LOGS', 'power', 'samples.csv'), 'schema_version\n');
+    fs.writeFileSync(path.join(root, 'LOGS', 'power', 'manifest.json'), '{}');
+    fs.writeFileSync(path.join(root, 'agg_cfg_conc8.json'), '{}');
+    expect(listMultinodePowerSampleFiles(root).map((file) => file.fileName)).toEqual([
+      'LOGS/power/samples.csv',
+    ]);
+    expect(listGpuMetricsCsvFiles(root)).toEqual([]);
   });
 
   it('lists telemetry CSVs recursively but skips identity and energy sidecars', () => {
@@ -57,6 +73,25 @@ describe('gpu_metrics artifact discovery', () => {
     const discovered = discoverGpuMetricsArtifacts(root);
     expect([...discovered.keys()]).toEqual(['cfg-a_runner_0']);
     expect(discovered.get('cfg-a_runner_0')?.artifactName).toBe('gpu_metrics_cfg-a_runner_0');
+  });
+
+  it('uses the power_audit bundle only for suffixes without a gpu_metrics upload', () => {
+    const root = tempRoot();
+    for (const name of [
+      'power_audit_cfg-a_runner_0',
+      'gpu_metrics_cfg-a_runner_0',
+      'power_audit_cfg-mn_slurm_0',
+      'bmk_cfg-mn_slurm_0',
+    ]) {
+      fs.mkdirSync(path.join(root, name));
+    }
+    const discovered = discoverGpuMetricsArtifacts(root);
+    expect(
+      [...discovered.entries()].map(([suffix, artifact]) => [suffix, artifact.artifactName]),
+    ).toEqual([
+      ['cfg-a_runner_0', 'gpu_metrics_cfg-a_runner_0'],
+      ['cfg-mn_slurm_0', 'power_audit_cfg-mn_slurm_0'],
+    ]);
   });
 });
 

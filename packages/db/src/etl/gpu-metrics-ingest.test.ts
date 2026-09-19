@@ -84,7 +84,77 @@ function writeArtifact(csv: string, contextZone = 'UTC') {
   return { artifactName, artifactDir };
 }
 
+// Multinode bundle: two hosts × two GPUs × two scrapes, host-local indices.
+const MULTINODE_POWER_CSV = [
+  'schema_version,timestamp_unix,scrape_seq,hostname,gpu_index,gpu_uuid,power_w',
+  '1,1789194365.292,4,host-b,0,GPU-b0,401.5',
+  '1,1789194365.292,4,host-a,0,GPU-a0,186.656',
+  '1,1789194365.292,4,host-a,1,GPU-a1,190.1',
+  '1,1789194366.292,5,host-a,0,GPU-a0,700.25',
+  '1,1789194366.292,5,host-a,1,GPU-a1,702.0',
+  '1,1789194366.292,5,host-b,0,GPU-b0,650.0',
+  '1,1789194366.292,5,host-b,1,GPU-b1,655.0',
+].join('\n');
+const MULTINODE_MANIFEST = {
+  schema_version: 1,
+  producer: 'srt-slurm.dcgm-power',
+  source_metric: 'DCGM_FI_DEV_POWER_USAGE',
+  sample_interval_seconds: 1,
+};
+
+function writePowerAuditArtifact(options: { withGpuMetricsCsv?: boolean } = {}) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'gpu-metrics-ingest-'));
+  roots.push(root);
+  const artifactName = 'power_audit_kimik3_conc8_fp4_dynamo-vllm_b200-slurm_0';
+  const artifactDir = path.join(root, artifactName);
+  fs.mkdirSync(path.join(artifactDir, 'LOGS', 'power'), { recursive: true });
+  fs.writeFileSync(path.join(artifactDir, 'LOGS', 'power', 'samples.csv'), MULTINODE_POWER_CSV);
+  fs.writeFileSync(
+    path.join(artifactDir, 'LOGS', 'power', 'manifest.json'),
+    JSON.stringify(MULTINODE_MANIFEST),
+  );
+  fs.writeFileSync(path.join(artifactDir, 'agg_kimik3_conc8.json'), '{}');
+  if (options.withGpuMetricsCsv) {
+    fs.writeFileSync(path.join(artifactDir, 'gpu_metrics.csv'), NVIDIA_CSV);
+  }
+  return { artifactName, artifactDir };
+}
+
 describe('prepareGpuMetricsArtifact', () => {
+  it('falls back to the multinode power bundle, one power-only series per host', () => {
+    const prepared = prepareGpuMetricsArtifact(writePowerAuditArtifact());
+    expect(prepared.map((series) => series.fileName)).toEqual([
+      'LOGS/power/samples.csv#host-a',
+      'LOGS/power/samples.csv#host-b',
+    ]);
+    const [hostA, hostB] = prepared;
+    expect(hostA!.vendor).toBe('nvidia');
+    expect(hostA!.gpuCount).toBe(2);
+    expect(hostA!.samples).toHaveLength(4);
+    expect(hostA!.startedAtMs).toBe(1789194365292);
+    expect(hostA!.endedAtMs).toBe(1789194366292);
+    expect(hostA!.sampleIntervalS).toBe(1);
+    // One deployment-wide CSV: both host series share its hash.
+    expect(hostB!.csvSha256).toBe(hostA!.csvSha256);
+    // Only power was scraped; no zero-filled clock/temperature/utilization digests.
+    expect(new Set(hostA!.stats.map((s) => s.metric))).toEqual(new Set(['powerW']));
+    expect(hostA!.stats.find((s) => s.gpuIndex === 1)?.max).toBe(702);
+    expect(hostA!.sidecars.context).toEqual(MULTINODE_MANIFEST);
+    expect(hostA!.sidecars.identity).toEqual([
+      { hostname: 'host-a', gpu_index: 0, gpu_uuid: 'GPU-a0' },
+      { hostname: 'host-a', gpu_index: 1, gpu_uuid: 'GPU-a1' },
+    ]);
+    expect(hostA!.sidecars.energyStart).toBeNull();
+  });
+
+  it('prefers an nvidia-smi CSV in the same bundle over the power-only samples', () => {
+    // Single-node jobs upload gpu_metrics.csv inside power_audit_ as well.
+    const prepared = prepareGpuMetricsArtifact(
+      writePowerAuditArtifact({ withGpuMetricsCsv: true }),
+    );
+    expect(prepared.map((series) => series.fileName)).toEqual(['gpu_metrics.csv']);
+  });
+
   it('parses each CSV with its sidecars and digest', () => {
     const [series] = prepareGpuMetricsArtifact(writeArtifact(NVIDIA_CSV));
     expect(series?.fileName).toBe('gpu_metrics.csv');
@@ -167,6 +237,46 @@ describe('ingestGpuMetricsArtifact', () => {
     expect(relinked.map((l) => Number(l.benchmark_result_id))).toEqual([10, 11]);
     const [count] = await sql<{ n: number }[]>`select count(*)::int as n from gpu_metric_samples`;
     expect(count!.n).toBe(4);
+  });
+
+  it('stores every host of a multinode power bundle under the bare config key', async () => {
+    const artifact = writePowerAuditArtifact();
+    const first = await ingestGpuMetricsArtifact(sql, {
+      workflowRunId: 1,
+      artifact,
+      benchmarkResultIds: [10],
+    });
+    expect(first.seriesIds).toHaveLength(2);
+    expect(first.samplesInserted).toBe(7);
+
+    const series = await sql<{ config_key: string; file_name: string; gpu_count: number }[]>`
+      select config_key, file_name, gpu_count from gpu_metric_series order by file_name`;
+    expect(series).toEqual([
+      {
+        config_key: 'kimik3_conc8_fp4_dynamo-vllm_b200-slurm_0',
+        file_name: 'LOGS/power/samples.csv#host-a',
+        gpu_count: 2,
+      },
+      {
+        config_key: 'kimik3_conc8_fp4_dynamo-vllm_b200-slurm_0',
+        file_name: 'LOGS/power/samples.csv#host-b',
+        gpu_count: 2,
+      },
+    ]);
+    const metrics = await sql<{ metric: string }[]>`
+      select distinct metric from gpu_metric_gpu_stats`;
+    expect(metrics.map((m) => m.metric)).toEqual(['power_w']);
+    const links = await sql<{ n: number }[]>`
+      select count(*)::int as n from benchmark_result_gpu_metrics where benchmark_result_id = 10`;
+    expect(links[0]!.n).toBe(2);
+
+    const rerun = await ingestGpuMetricsArtifact(sql, {
+      workflowRunId: 1,
+      artifact,
+      benchmarkResultIds: [10],
+    });
+    expect(rerun.samplesInserted).toBe(0);
+    expect(rerun.seriesSkipped).toBe(2);
   });
 
   it('replaces samples and digest when the CSV content changes', async () => {

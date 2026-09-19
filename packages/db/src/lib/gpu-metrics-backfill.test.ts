@@ -33,6 +33,23 @@ describe('pairGpuMetricsArtifacts', () => {
     ]);
   });
 
+  it('lets a power_audit bundle stand in only when its suffix has no gpu_metrics upload', () => {
+    // The bundle is listed before its gpu_metrics sibling on purpose: input
+    // order alone must not decide the winner.
+    const pairs = pairGpuMetricsArtifacts([
+      meta('power_audit_cfg-mn_b200-slurm_0', 1),
+      meta('bmk_cfg-mn_b200-slurm_0', 2),
+      meta('power_audit_cfg-sn_h200-cw_0', 4),
+      meta('gpu_metrics_cfg-sn_h200-cw_0', 3),
+      meta('bmk_cfg-sn_h200-cw_0', 5),
+      meta('power_audit_orphan_b200-slurm_0', 6),
+    ]);
+    expect(pairs.map((pair) => [pair.gpuMetrics.name, pair.benchmarks.name])).toEqual([
+      ['gpu_metrics_cfg-sn_h200-cw_0', 'bmk_cfg-sn_h200-cw_0'],
+      ['power_audit_cfg-mn_b200-slurm_0', 'bmk_cfg-mn_b200-slurm_0'],
+    ]);
+  });
+
   it('keeps only the newest retry per logical benchmark and drops expired uploads', () => {
     const pairs = pairGpuMetricsArtifacts([
       meta('gpu_metrics_cfg-a_h200-cw_0', 1, '2026-09-11T00:00:00Z'),
