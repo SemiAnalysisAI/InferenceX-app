@@ -1,6 +1,10 @@
 // Runs against the E2E_FIXTURES=1 server, which serves the retained
 // H100/H200/B200 observations from cypress/fixtures/api/video-history.json.
 describe('Video hardware dashboard (E2E fixtures)', () => {
+  beforeEach(() => {
+    // The Compare panel fetches two published artifacts once in view; keep the spec offline.
+    cy.intercept('GET', '/api/video-runs?run=*', { statusCode: 204 });
+  });
   it('leads with the cross-hardware chart and restores v_ params from the URL', () => {
     cy.visit('/video?v_y=kjPerVideo&v_tier=r&v_queue=1');
     cy.get('[data-testid="video-hardware-chart"] circle.point').should('have.length', 9);
