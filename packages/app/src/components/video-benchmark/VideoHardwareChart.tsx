@@ -6,80 +6,53 @@ import type { ContinuousScale } from '@/lib/d3-chart/types';
 import { CHART_TYPE, px } from '@/lib/d3-chart/typography';
 import { useLocale } from '@/lib/use-locale';
 import { escapeHtml } from '@/lib/utils';
-import { paretoFrontier } from './frontier';
-import { hardwareLabel } from './hardware';
-import { formatMetric, metricLabel, metricValue, VIDEO_METRICS, type VideoPoint } from './metrics';
-import { latestVideoCells } from './points';
+import { layoutLabel } from './deployment';
+import { formatMetric, metricLabel, type VideoPoint } from './metrics';
+import { plotVideoPoints, type PlottedVideoPoint } from './plot';
 import type { VideoDashboardState } from './video-url-state';
 
 export const VIDEO_CHART_ID = 'video-hardware';
 /** Matches ChartSection's default `${analyticsPrefix}_zoom_reset_${chartId}`. */
 export const VIDEO_ZOOM_RESET_EVENT = `video_zoom_reset_${VIDEO_CHART_ID}`;
 
-export interface PlottedVideoPoint extends VideoPoint {
-  x: number;
-  y: number;
-  color: string;
-  label: string;
-}
-
-/**
- * Points with both axes available (newest observation per hardware cell), the
- * cross-hardware Pareto hull over the C1 cells, and per-hardware queueing tails
- * (C1→C2→C4) when the load control shows them.
- */
-export function plotVideoPoints(
-  points: VideoPoint[],
-  state: VideoDashboardState,
-  colorFor: (hardwareKey: string) => string,
-  hidden: ReadonlySet<string>,
-) {
-  const options = { tier: state.tier, basis: state.basis };
-  const plotted: PlottedVideoPoint[] = latestVideoCells(points).flatMap((p) => {
-    if (!p.hardwareKey || hidden.has(p.hardwareKey)) return [];
-    if (!state.queue && p.concurrency !== 1) return [];
-    const x = metricValue(p, state.x, options);
-    const y = metricValue(p, state.y, options);
-    if (x === null || y === null) return [];
-    return [{ ...p, x, y, color: colorFor(p.hardwareKey), label: hardwareLabel(p.hardwareKey) }];
-  });
-  const frontier = paretoFrontier(
-    plotted.filter((p) => p.concurrency === 1),
-    VIDEO_METRICS[state.x].polarity,
-    VIDEO_METRICS[state.y].polarity,
-  );
-  const optimal = new Set(frontier.map((p) => p.hardwareKey));
-  const visible = state.optimal ? plotted.filter((p) => optimal.has(p.hardwareKey)) : plotted;
-  const tails: Record<string, { x: number; y: number }[]> = {};
-  if (state.queue)
-    for (const p of visible) {
-      if (!p.hardwareKey) continue;
-      (tails[p.hardwareKey] ??= []).push({ x: p.x, y: p.y });
-    }
-  for (const key of Object.keys(tails)) {
-    tails[key].sort((a, b) => a.x - b.x);
-    if (tails[key].length < 2) delete tails[key];
-  }
-  return { plotted: visible, frontier, tails };
-}
-
 const STRINGS = {
   en: {
-    hull: 'Dashed hull joins the Pareto-optimal hardware at C1. Dotted tails show C2/C4 client concurrency on the batch-one server: requests queue, throughput stays flat, so they are evidence, not a frontier.',
+    single: (layouts: string) =>
+      `One deployment measured per hardware so far (${layouts}), so each hardware is a single point. A per-hardware Pareto curve needs the GPUs-per-video sweep.`,
+    multi:
+      "Solid lines join each hardware's Pareto-optimal deployments (GPUs per video and model split); faded points are dominated deployments.",
+    global: 'Dashed line: cross-hardware Pareto frontier over all deployments.',
+    globalOne:
+      'Cross-hardware Pareto frontier: one hardware dominates, so there is no line to draw.',
+    queued:
+      'Small faded markers: C2/C4 client concurrency on the same batch-one deployment. Requests queue and throughput stays flat, so they are evidence, never joined into a curve.',
     controls:
       'Shift+scroll to zoom; drag to pan; double-click to reset. Click a point to pin its details.',
+    deployment: 'Deployment',
+    queuedTag: 'queued',
     n: 'valid samples',
     run: 'run',
     noData: 'No hardware has both selected metrics for this configuration.',
   },
   zh: {
-    hull: '虚线包络连接 C1 下 Pareto 最优的硬件；点线尾迹是 batch-one 服务器上 C2/C4 客户端并发的结果：请求排队、吞吐量基本持平，因此只是证据，不构成前沿。',
+    single: (layouts: string) =>
+      `目前每种硬件只测得一种部署（${layouts}），因此每种硬件只有一个点；要得到每硬件的 Pareto 曲线，还需扫描每条视频占用的 GPU 数。`,
+    multi:
+      '实线连接同一硬件的 Pareto 最优部署（每条视频占用的 GPU 数及模型切分方式）；淡色点为被支配的部署。',
+    global: '虚线为所有部署的跨硬件 Pareto 前沿。',
+    globalOne: '跨硬件 Pareto 前沿：有一种硬件全面占优，因此没有可画的连线。',
+    queued:
+      '小号淡色标记为同一 batch-one 部署上的 C2/C4 客户端并发：请求排队、吞吐量持平，仅作为证据展示，不连成曲线。',
     controls: 'Shift+滚轮缩放，拖动平移，双击重置。点击数据点可固定详情。',
+    deployment: '部署',
+    queuedTag: '排队',
     n: '有效样本',
     run: '运行',
     noData: '当前配置下没有硬件同时具备所选的两个指标。',
   },
 };
+
+const faded = (color: string) => `color-mix(in oklab, ${color} 45%, transparent)`;
 
 export default function VideoHardwareChart({
   points,
@@ -97,9 +70,28 @@ export default function VideoHardwareChart({
   const locale = useLocale();
   const s = STRINGS[locale];
   const options = { tier: state.tier, basis: state.basis };
-  const { plotted, frontier, tails } = plotVideoPoints(points, state, colorFor, hidden);
+  const { plotted, frontiers, global, multiLayout } = plotVideoPoints(
+    points,
+    state,
+    colorFor,
+    hidden,
+  );
   const xLabel = metricLabel(state.x, locale, options);
   const yLabel = metricLabel(state.y, locale, options);
+  const lines: Record<string, { x: number; y: number }[]> = {};
+  const lineColors: Record<string, string> = {};
+  for (const [key, frontier] of Object.entries(frontiers)) {
+    if (frontier.length < 2) continue;
+    lines[key] = frontier.map((p) => ({ x: p.x, y: p.y }));
+    lineColors[key] = frontier[0].color;
+  }
+  const layouts = [
+    ...new Set(plotted.filter((p) => !p.queued).map((p) => layoutLabel(p, locale))),
+  ].join(locale === 'zh' ? '；' : '; ');
+  const pointLabel = (p: PlottedVideoPoint) => {
+    if (p.queued) return `C${p.concurrency}`;
+    return multiLayout ? `${p.label} · ${layoutLabel(p, locale)}` : p.label;
+  };
   const drawLabels = (
     group: Selection<SVGGElement, unknown, null, undefined>,
     x: ContinuousScale,
@@ -113,13 +105,18 @@ export default function VideoHardwareChart({
       .attr('x', (p) => x(p.x) + 10)
       .attr('y', (p) => y(p.y) - 10)
       .attr('font-size', px(CHART_TYPE.axisLabel))
-      .attr('font-weight', (p) => (p.concurrency === 1 ? 600 : 400))
-      .attr('fill', 'var(--foreground)')
+      .attr('font-weight', (p) => (p.optimal ? 600 : 400))
+      .attr('fill', (p) => (p.optimal ? 'var(--foreground)' : 'var(--muted-foreground)'))
       .attr('pointer-events', 'none')
-      .text((p) => (p.concurrency === 1 ? p.label : `C${p.concurrency}`));
+      .text(pointLabel);
   };
   const maxX = Math.max(0, ...plotted.map((p) => p.x));
   const maxY = Math.max(0, ...plotted.map((p) => p.y));
+  const caption = [
+    multiLayout ? s.multi : s.single(layouts || '—'),
+    state.frontier ? (global.length > 1 ? s.global : s.globalOne) : null,
+    state.queue && !state.optimal ? s.queued : null,
+  ].filter((text): text is string => text !== null);
   return (
     <D3Chart
       chartId={VIDEO_CHART_ID}
@@ -136,8 +133,11 @@ export default function VideoHardwareChart({
       layers={[
         {
           type: 'roofline',
-          key: 'pareto-hull',
-          rooflines: frontier.length > 1 ? { hull: frontier.map((p) => ({ x: p.x, y: p.y })) } : {},
+          key: 'pareto-global',
+          rooflines:
+            state.frontier && global.length > 1
+              ? { global: global.map((p) => ({ x: p.x, y: p.y })) }
+              : {},
           config: {
             getColor: () => 'var(--foreground)',
             strokeWidth: 1.5,
@@ -147,12 +147,11 @@ export default function VideoHardwareChart({
         },
         {
           type: 'line',
-          key: 'queueing-tails',
-          lines: tails,
+          key: 'hardware-frontiers',
+          lines,
           config: {
-            getColor: (key) => colorFor(key),
-            getStrokeDasharray: () => '2 4',
-            strokeWidth: 1.5,
+            getColor: (key) => lineColors[key] ?? 'var(--foreground)',
+            strokeWidth: 2,
             curve: curveLinear,
           },
         },
@@ -164,8 +163,8 @@ export default function VideoHardwareChart({
             getCy: () => 0,
             getX: (p) => p.x,
             getY: (p) => p.y,
-            getColor: (p) => p.color,
-            getRadius: (p) => (p.concurrency === 1 ? 7 : 4),
+            getColor: (p) => (p.queued || !p.optimal ? faded(p.color) : p.color),
+            getRadius: (p) => (p.queued ? 3.5 : p.optimal ? 7 : 5),
             stroke: 'var(--foreground)',
             strokeWidth: 1,
             keyFn: (p) => p.id,
@@ -188,7 +187,7 @@ export default function VideoHardwareChart({
       tooltip={{
         rulerType: 'none',
         content: (p) =>
-          `<div class="p-3 text-sm"><strong>${escapeHtml(p.label)}</strong> · C${p.concurrency ?? '?'}<br/>${escapeHtml(xLabel)}: ${formatMetric(p.x, state.x)}<br/>${escapeHtml(yLabel)}: ${formatMetric(p.y, state.y)}<br/>${s.n}: ${p.samples} · ${s.run} #${escapeHtml(p.runId)}</div>`,
+          `<div class="p-3 text-sm"><strong>${escapeHtml(p.label)}</strong> · C${p.concurrency ?? '?'}${p.queued ? ` (${s.queuedTag})` : ''}<br/>${s.deployment}: ${escapeHtml(layoutLabel(p, locale))}<br/>${escapeHtml(xLabel)}: ${formatMetric(p.x, state.x)}<br/>${escapeHtml(yLabel)}: ${formatMetric(p.y, state.y)}<br/>${s.n}: ${p.samples} · ${s.run} #${escapeHtml(p.runId)}</div>`,
         onPointClick: onSelect,
       }}
       zoom={{
@@ -205,7 +204,11 @@ export default function VideoHardwareChart({
           </p>
         ) : undefined
       }
-      caption={<p className="text-xs text-muted-foreground">{s.hull}</p>}
+      caption={
+        <p className="text-xs text-muted-foreground" data-testid="video-chart-caption">
+          {caption.join(' ')}
+        </p>
+      }
     />
   );
 }

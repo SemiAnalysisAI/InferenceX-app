@@ -13,10 +13,12 @@ export interface VideoDashboardState {
   y: YMetricId;
   tier: CostTier;
   basis: GpuBasis;
-  /** Show C2/C4 client-concurrency cells as dotted queueing tails. */
+  /** Also plot queued client-concurrency cells (C > replicas) as faded markers. */
   queue: boolean;
-  /** Show only Pareto-optimal hardware. */
+  /** Hide deployments dominated by another deployment of the same hardware. */
   optimal: boolean;
+  /** Draw the cross-hardware Pareto frontier over all deployments. */
+  frontier: boolean;
   view: 'chart' | 'table';
 }
 
@@ -27,6 +29,7 @@ export const DEFAULT_VIDEO_DASHBOARD_STATE: VideoDashboardState = {
   basis: 'participating',
   queue: false,
   optimal: false,
+  frontier: false,
   view: 'chart',
 };
 
@@ -47,6 +50,7 @@ export function readVideoDashboardState(search: string): VideoDashboardState {
     basis: pick(BASES, p.get('v_basis'), d.basis),
     queue: p.get('v_queue') === '1',
     optimal: p.get('v_opt') === '1',
+    frontier: p.get('v_frontier') === '1',
     view: pick(VIEWS, p.get('v_view'), d.view),
   };
 }
@@ -63,6 +67,7 @@ export function writeVideoDashboardState(url: URL, state: VideoDashboardState): 
   set('v_basis', state.basis === d.basis ? null : state.basis);
   set('v_queue', state.queue ? '1' : null);
   set('v_opt', state.optimal ? '1' : null);
+  set('v_frontier', state.frontier ? '1' : null);
   set('v_view', state.view === d.view ? null : state.view);
   return out;
 }

@@ -3,6 +3,7 @@
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useLocale } from '@/lib/use-locale';
+import { leadCell } from './deployment';
 import { hardwareLabel, VIDEO_HARDWARE_ROSTER } from './hardware';
 import { formatMetric, metricValue, type MetricId, type VideoPoint } from './metrics';
 import { latestVideoCells } from './points';
@@ -42,7 +43,7 @@ const STRINGS = {
   },
 };
 
-/** One card per campaign hardware at C1; hardware without a valid run says so instead of vanishing. */
+/** One card per campaign hardware, showing its most efficient deployment; hardware without a valid run says so instead of vanishing. */
 export default function VideoKpiCards({
   points,
   state,
@@ -62,7 +63,7 @@ export default function VideoKpiCards({
   return (
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" data-testid="video-kpi-cards">
       {VIDEO_HARDWARE_ROSTER.map(({ key, unavailable }) => {
-        const point = cells.find((p) => p.hardwareKey === key && p.concurrency === 1);
+        const point = leadCell(cells, key, options);
         return (
           <Card key={key} className="gap-2 p-4" data-testid="video-kpi-card" data-hardware={key}>
             <div className="flex flex-wrap items-center gap-2">
@@ -74,6 +75,10 @@ export default function VideoKpiCards({
               {point && (
                 <span className="text-2xs text-muted-foreground">
                   {point.participating ?? '—'} {s.of} {point.allocated ?? '—'} {s.gpus}
+                  {point.server?.tp !== null &&
+                    point.server?.tp !== undefined &&
+                    point.server.ulysses !== null &&
+                    ` · TP${point.server.tp} × Ulysses ${point.server.ulysses}`}
                 </span>
               )}
             </div>
