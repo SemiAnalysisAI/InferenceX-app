@@ -11,6 +11,54 @@ import {
 import { selectRunOverrides } from './run-override-selection';
 
 describe('run override selection', () => {
+  it('selects only the whole-run purge for the H200 Kimi-K3 simple-power run 34819961093', () => {
+    expect(selectRunOverrides(['--run-id', '34819961093', '--yes'])).toEqual({
+      runId: 34819961093,
+      conclusions: new Map(),
+      changelogs: [],
+      benchmarks: [],
+      purgedRuns: new Set([34819961093]),
+      purgedAttempts: new Map(),
+      purgedPoints: [],
+    });
+  });
+
+  it('selects only the whole-run purge for run 34819564154', () => {
+    expect(selectRunOverrides(['--run-id', '34819564154', '--yes'])).toEqual({
+      runId: 34819564154,
+      conclusions: new Map(),
+      changelogs: [],
+      benchmarks: [],
+      purgedRuns: new Set([34819564154]),
+      purgedAttempts: new Map(),
+      purgedPoints: [],
+    });
+  });
+
+  it('selects only the whole-run purge for run 35165441471', () => {
+    expect(selectRunOverrides(['--run-id', '35165441471', '--yes'])).toEqual({
+      runId: 35165441471,
+      conclusions: new Map(),
+      changelogs: [],
+      benchmarks: [],
+      purgedRuns: new Set([35165441471]),
+      purgedAttempts: new Map(),
+      purgedPoints: [],
+    });
+  });
+
+  it('selects only the whole-run purge for the uninitialized MTP run', () => {
+    expect(selectRunOverrides(['--run-id', '34926284365', '--yes'])).toEqual({
+      runId: 34926284365,
+      conclusions: new Map(),
+      changelogs: [],
+      benchmarks: [],
+      purgedRuns: new Set([34926284365]),
+      purgedAttempts: new Map(),
+      purgedPoints: [],
+    });
+  });
+
   it('makes an unregistered ingest a no-op without touching historical rows', () => {
     expect(
       selectRunOverrides(['--run-id', '33721476500', '--allow-unregistered-run', '--yes']),

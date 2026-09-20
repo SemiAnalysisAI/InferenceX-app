@@ -79,6 +79,21 @@ describe('PARAM_DEFAULTS', () => {
     expect(PARAM_DEFAULTS.i_gradlabel).toBe('');
   });
 
+  it.each(['1', '2'])(
+    'preserves frontier mode %s and ignores retired hinterland state in share links',
+    async (mode) => {
+      setupWindow(`?i_frontier=${mode}&i_hinterland=${mode}`);
+      const { PARAM_DEFAULTS, readUrlParams, buildShareUrl } = await import('@/lib/url-state');
+      expect(PARAM_DEFAULTS.i_frontier).toBe('');
+      expect(PARAM_DEFAULTS).not.toHaveProperty('i_hinterland');
+      expect(readUrlParams()).toMatchObject({ i_frontier: mode });
+      expect(readUrlParams()).not.toHaveProperty('i_hinterland');
+      const url = new URL(buildShareUrl());
+      expect(url.searchParams.get('i_frontier')).toBe(mode);
+      expect(url.searchParams.has('i_hinterland')).toBe(false);
+    },
+  );
+
   it('has empty string default for i_advlabel', async () => {
     const { PARAM_DEFAULTS } = await import('@/lib/url-state');
     expect(PARAM_DEFAULTS.i_advlabel).toBe('');

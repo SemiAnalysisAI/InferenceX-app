@@ -75,6 +75,45 @@ The metric registry declares whether higher or lower values are preferable. Char
 
 ## Power curves and optimal filtering
 
+### Global Pareto highlights
+
+Every inference scatter chart exposes a **Pareto Frontier** switch under
+**Advanced**, off by default.
+Collapsing Advanced does not turn off an enabled highlight.
+`i_frontier=1` preserves plain shading in share links; value `2` restores the scenic background.
+The frontier pools the currently visible official
+and unofficial observations across the selected series and dates, after hardware,
+precision, quick filters and Optimal Only. It does not replace per-series curves.
+While enabled, hardware series with no observation on the global frontier render
+at 20% alpha, including their curves, points, labels and clipped continuations.
+All observations of a frontier hardware series retain their normal styling, and
+ties at a frontier coordinate keep every tied hardware series prominent.
+The alpha filter composes with visibility and hover opacity; switching the
+frontier off removes it. Official and unofficial marks use the same treatment.
+
+The global dotted line connects non-dominated observations with straight segments
+in rendered coordinates. Rings mark the observed vertices, including singleton
+frontiers. Green shading extends beyond the frontier toward the best corner.
+The line does not claim measured performance between observations.
+The resolved axis directions determine the preferred corner,
+including custom metrics, latency, cost and energy. Power uses lower power as the
+preferred Y direction, separately from the existing upper load-sweep boundaries.
+
+The toggle cycles: off → plain fill → off → scenic background → off →
+plain fill. The frontier uses a sunny castle landscape with butterflies. The
+scene is an original AI-generated decoration, not benchmark data or imagery from a game franchise.
+Switching metrics retains the mode. Switching off hides the line and background.
+The scene covers the full plot once (`xMidYMid slice`) at 30% opacity and is cut
+off by the boundary path. It is not tiled or fitted to the shaded region. The
+background stays fixed in screen coordinates while the boundary follows zoom.
+The optimized WebP asset lives under `public/decorative/pareto/` and loads only when the
+scenic mode is enabled.
+
+These are SVG decorations, so exports include them. Their custom display layer
+updates with visibility, log scales and zoom without taking point pointer events.
+One-dimensional GPU, history and evaluation charts have no two-objective Pareto
+region and do not expose this switch.
+
 The six measured-power metrics (average, prefill, decode, P75, P90 and percentage of TDP) draw a fixed upper power boundary across tested configurations. **Optimal Only** shows boundary points when on and all measurements when off, preserving curve geometry, axis domains and zoom. These views use no separate **Show all measurements** switch. The boundary describes power demand across the load sweep; energy-per-token metrics retain their lower-energy Pareto frontiers.
 
 Modeled chassis power retains its existing behavior: **Optimal Only** on shows the minimum-power Pareto frontier, which can legitimately contain one point. Turning it off draws the upper power boundary. In that mode, the separate **Show all measurements** switch (`i_allpoints=1`) reveals off-boundary points without changing the curve.

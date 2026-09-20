@@ -1148,6 +1148,58 @@ describe('buildGpuGroups', () => {
     expect(first.tpPerMw).toBeGreaterThan(0);
   });
 
+  describe('time to first token', () => {
+    const only = (row: BenchmarkRow, sequence = Sequence.OneK_OneK, percentile?: Percentile) => {
+      const { grouped } = buildGpuGroups([row], {
+        sequence,
+        precisions: ['fp4'],
+        percentile,
+        classify: singlePrecisionClassify,
+      });
+      return Object.values(grouped)[0][0];
+    };
+
+    it('reads the median for fixed-sequence rows, matching the inference TTFT axis', () => {
+      const point = only(
+        makeRow({
+          metrics: { median_intvty: 50, tput_per_gpu: 900, median_ttft: 0.8, p90_ttft: 2.4 },
+        }),
+      );
+      expect(point.ttft).toBe(0.8);
+    });
+
+    it('reads the selected percentile for agentic rows', () => {
+      const agentic = (percentile: Percentile) =>
+        only(
+          makeRow({
+            benchmark_type: 'agentic_traces',
+            isl: null,
+            osl: null,
+            metrics: {
+              p75_itl: 1 / 200,
+              p90_itl: 1 / 160,
+              p75_e2el: 20,
+              p90_e2el: 30,
+              tput_per_gpu: 900,
+              median_ttft: 0.5,
+              p75_ttft: 1.2,
+              p90_ttft: 3.1,
+            },
+          }),
+          Sequence.AgenticTraces,
+          percentile,
+        );
+      expect(agentic(Percentile.P90).ttft).toBe(3.1);
+      expect(agentic(Percentile.P75).ttft).toBe(1.2);
+    });
+
+    it('is absent, not zero, when the row reported no first-token time', () => {
+      // A zero would clear every first-token cap; absence is filtered out.
+      expect(only(makeRow()).ttft).toBeUndefined();
+      expect('ttft' in only(makeRow())).toBe(false);
+    });
+  });
+
   describe('cached-input fraction', () => {
     const withMetrics = (extra: Record<string, number>) =>
       makeRow({

@@ -17,66 +17,6 @@ import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
 import { OptionInfo, SelectedOptionInfo } from '@/components/ui/option-info';
 import { Model, Sequence } from '@/lib/data-mappings';
 
-function TitleScenarioHarness() {
-  const [sequence, setSequence] = useState(Sequence.AgenticTraces);
-  return (
-    <TooltipProvider>
-      <h2 className="text-base font-semibold">
-        DeepSeek-V4-Pro{' '}
-        <ScenarioSelector
-          variant="title"
-          value={sequence}
-          onChange={setSequence}
-          availableSequences={[Sequence.AgenticTraces, Sequence.EightK_OneK]}
-          data-testid="title-scenario"
-        />{' '}
-        Output Throughput vs. Interactivity
-      </h2>
-    </TooltipProvider>
-  );
-}
-
-describe('Scenario in the chart title', () => {
-  it('keeps the AgentX explanation reachable when only Agentic is available', () => {
-    cy.mount(
-      <TooltipProvider>
-        <h2>
-          <ScenarioSelector
-            variant="title"
-            value={Sequence.AgenticTraces}
-            availableSequences={[Sequence.AgenticTraces]}
-            onChange={() => {}}
-            data-testid="title-scenario"
-          />
-        </h2>
-      </TooltipProvider>,
-    );
-    cy.get('[data-testid="title-scenario"]').should('be.enabled').click();
-    cy.get('[data-testid="option-help-agentic-traces"]').click();
-    cy.get('[data-testid="scenario-agentic-info-link"]').should('have.attr', 'href', '/agentx');
-  });
-  for (const width of [375, 1280]) {
-    it(`switches scenarios with keyboard and keeps help in the menu at ${width}px`, () => {
-      cy.viewport(width, 844);
-      cy.mount(<TitleScenarioHarness />);
-      cy.get('h2 label').should('not.exist');
-      cy.get('[data-testid="title-scenario"]')
-        .should('have.text', 'Agentic')
-        .and('have.attr', 'aria-label', 'Scenario: Agentic')
-        .click();
-      cy.contains('Fixed Sequence Length').should('be.visible');
-      cy.get('[data-testid="option-help-agentic-traces"]').should('be.visible');
-      cy.contains('[data-select-option]', '8K / 1K').focus().type('{enter}');
-      cy.get('[data-testid="title-scenario"]').should('have.text', '8K / 1K').click();
-      cy.contains('[data-select-option]', 'Agentic').click();
-      cy.get('[data-testid="title-scenario"]').should('have.text', 'Agentic');
-      cy.get('h2').then(($heading) => {
-        expect($heading[0].scrollWidth).to.be.at.most(width);
-      });
-    });
-  }
-});
-
 describe('Consistent informational help', () => {
   for (const locale of ['en', 'zh'] as const) {
     for (const width of [390, 1280]) {

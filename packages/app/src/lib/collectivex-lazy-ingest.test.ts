@@ -1,3 +1,7 @@
+import {
+  makeSwapDoc,
+  swapMatrix,
+} from '@semianalysisai/inferencex-db/collectivex/swap-test-fixture';
 import AdmZip from 'adm-zip';
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -135,6 +139,24 @@ afterAll(() => {
 });
 
 describe('ensureLatestCollectiveXRun', () => {
+  it('discovers a standalone swap artifact and persists its computed summary', async () => {
+    const doc = makeSwapDoc();
+    doc.runtime.source_sha = 'a'.repeat(40);
+    mockFetch
+      .mockResolvedValueOnce(runListing(runObject()))
+      .mockResolvedValueOnce(Response.json(artifactsBody()))
+      .mockResolvedValueOnce(new Response(zipDocs(swapMatrix)))
+      .mockResolvedValueOnce(new Response(zipDocs(doc)));
+    await ensureLatestCollectiveXRun(1);
+    expect(mockInsert.mock.calls[0][1].summary).toMatchObject({
+      run_id: '160',
+      measured_cases: 1,
+      requested_points: 3,
+      swap_cases: { requested: 1, measured: 1 },
+      kv_cases: { requested: 0, measured: 0 },
+    });
+  });
+
   it('discovers the newest absent run and persists its raw documents', async () => {
     mockFetch
       .mockResolvedValueOnce(Response.json({ total_count: 1, workflow_runs: [runObject()] }))

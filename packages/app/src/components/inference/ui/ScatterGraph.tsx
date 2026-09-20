@@ -47,6 +47,7 @@ import { matchKnownConfigIssues, pointMatchesIssue } from '@/lib/known-issues';
 import { useLocale } from '@/lib/use-locale';
 import { getLineLabelVendorIcon } from '@/lib/vendor-logos';
 import { formatNumber, getDisplayLabel, updateRepoUrl } from '@/lib/utils';
+import { getInferenceHardwareConfig, getInferenceRunLabel } from '@/lib/inference-labels';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
 import type {
   CustomLayerConfig,
@@ -98,7 +99,13 @@ import {
   getShapeKeyForPrecision,
 } from '@/lib/chart-rendering';
 import { useThemeColors } from '@/hooks/useThemeColors';
-import { type ParetoDirection } from '@/lib/chart-utils';
+import { isFrontierEligible, type ParetoDirection } from '@/lib/chart-utils';
+import { frontierHardwareKeys } from '@/components/inference/utils/pareto-series';
+import {
+  globalParetoFrontier,
+  paretoHighlightArea,
+  paretoHighlightGeometry,
+} from '@/components/inference/utils/global-pareto';
 import {
   chartFrontier,
   upperPowerEnvelope,
@@ -351,8 +358,9 @@ const lineLabelText = (
   precision: string,
   includePrecision: boolean,
   model?: string,
+  points: InferenceData[] = [],
 ): string => {
-  const config = getHardwareConfig(hwKey, model);
+  const config = getInferenceHardwareConfig(hwKey, model, points);
   if (config.alwaysShowPrecision) {
     return [getDisplayLabel(config), getPrecisionLabel(precision as Precision)].join(' ');
   }
@@ -368,6 +376,9 @@ const SCATTER_STRINGS = {
   en: {
     logScale: 'Log Scale',
     optimalOnly: 'Optimal Only',
+    paretoFrontier: 'Pareto Frontier',
+    paretoFrontierInfo:
+      'Dotted line connecting the best visible results, with green shading beyond it. Switch off and on again for a sunny butterfly castle background; repeat to return to green.',
     showAllMeasurements: 'Show all measurements',
     optimalInfo: 'Optimal points form the Pareto frontier for the selected axes.',
     powerBoundaryInfo:
@@ -403,6 +414,9 @@ const SCATTER_STRINGS = {
   zh: {
     logScale: '对数缩放',
     optimalOnly: '仅最优',
+    paretoFrontier: 'Pareto 前沿',
+    paretoFrontierInfo:
+      '用点线连接所有可见系列的最优边界点，并在更优一侧填充绿色。关闭后再次开启，切换为阳光、蝴蝶和城堡背景；再重复一次恢复绿色。',
     showAllMeasurements: '显示全部测量点',
     optimalInfo: '最优点构成当前所选坐标轴的 Pareto 前沿。',
     powerBoundaryInfo:
@@ -484,6 +498,8 @@ const ScatterGraph = React.memo(
       showConcurrencyLabels,
       showGradientLabels: preferGradientLabels,
       showLineLabels,
+      showParetoFrontier,
+      paretoFrontierPlayful,
     } = useInferenceDisplay();
     const {
       setBestPerSku,
@@ -501,6 +517,7 @@ const ScatterGraph = React.memo(
       setShowConcurrencyLabels,
       setShowGradientLabels,
       setShowLineLabels,
+      setShowParetoFrontier,
       setQuickFilterVendors,
       setQuickFilterFrameworks,
       setQuickFilterDeployment,
@@ -1473,6 +1490,174 @@ const ScatterGraph = React.memo(
       ],
     );
 
+    // Roofline direction names are historical: upper_left maximizes X,
+    // upper_right minimizes X. Use the resolved definition, which also covers
+    // custom X metrics such as TTFT, rather than inferring from chart type.
+    const maximizeParetoX = paretoDirection === 'upper_left' || paretoDirection === 'lower_right';
+    const maximizeParetoY = paretoDirection?.startsWith('upper') ?? true;
+    const globalParetoPoints = useMemo(
+      () =>
+        !paretoDirection || !showParetoFrontier
+          ? []
+          : [
+              ...pointsData.filter(isPointVisible),
+              ...processedOverlayData.filter(
+                (point) =>
+                  activeOverlayHwTypes.has(String(point.hwKey)) &&
+                  selectedPrecisions.includes(point.precision) &&
+                  isOverlayPointVisible(point),
+              ),
+            ].filter(isFrontierEligible),
+      [
+        paretoDirection,
+        showParetoFrontier,
+        pointsData,
+        isPointVisible,
+        processedOverlayData,
+        activeOverlayHwTypes,
+        selectedPrecisions,
+        isOverlayPointVisible,
+      ],
+    );
+    const globalFrontier = useMemo(
+      () => globalParetoFrontier(globalParetoPoints, maximizeParetoX, maximizeParetoY),
+      [globalParetoPoints, maximizeParetoX, maximizeParetoY],
+    );
+    const frontierHwKeys = useMemo(
+      () => frontierHardwareKeys(globalParetoPoints, globalFrontier),
+      [globalParetoPoints, globalFrontier],
+    );
+    const applyParetoFadeRef = useRef<(group: RenderContext['layout']['zoomGroup']) => void>(
+      () => {},
+    );
+    applyParetoFadeRef.current = (zoomGroup) => {
+      // A separate alpha filter composes with existing visibility/hover opacity.
+      // Hidden marks stay hidden, and hover-end cannot erase the Pareto fade.
+      // Inline SVG styles are retained by chart exports. Apply only to parent
+      // marks, not their children, so point labels/halos are faded once.
+      zoomGroup
+        .selectAll<SVGElement, { hwKey?: string; points?: InferenceData[] }>(
+          '.dot-group, .roofline-path, .unofficial-overlay-pt, .overlay-roofline-path, .overflow-continuation, .parallelism-label, .line-label',
+        )
+        .style('filter', function (d) {
+          const hw = this.dataset.hwKey ?? d?.hwKey ?? d?.points?.[0]?.hwKey;
+          return showParetoFrontier && frontierHwKeys.size > 0 && hw && !frontierHwKeys.has(hw)
+            ? 'opacity(0.2)'
+            : null;
+        });
+    };
+    const paretoHighlightLayer = useMemo<CustomLayerConfig>(() => {
+      const render: NonNullable<CustomLayerConfig['render']> = (zoomGroup, ctx) => {
+        applyParetoFadeRef.current(zoomGroup);
+        const xScale = (ctx.renderedXScale ?? ctx.xScale) as ContinuousScale;
+        const yScale = (ctx.renderedYScale ?? ctx.yScale) as ContinuousScale;
+        const bestX = maximizeParetoX === xScale.range()[1] > xScale.range()[0] ? ctx.width : 0;
+        const bestY = maximizeParetoY === yScale.range()[1] > yScale.range()[0] ? ctx.height : 0;
+        // Fill beyond the frontier toward the preferred corner.
+        // Backgrounds never capture point hover/click events.
+        const boundary = {
+          points: globalFrontier,
+          visible: showParetoFrontier,
+          group: 'global-pareto-highlight',
+          path: 'global-pareto-frontier',
+          color: getCssColor('var(--foreground)'),
+          dash: '1,6',
+          playful: paretoFrontierPlayful,
+          shade: '#22c55e',
+          cornerX: bestX,
+          cornerY: bestY,
+        };
+        const geometry = paretoHighlightGeometry(boundary.points, xScale, yScale);
+        const area = paretoHighlightArea(geometry.points, boundary.cornerX, boundary.cornerY);
+        const patternId = `${chartId}-${boundary.path}-scene`;
+        const pattern = ctx.layout.defs
+          .selectAll<SVGPatternElement, null>(`#${patternId}`)
+          .data(boundary.visible && boundary.playful && area ? [null] : [])
+          .join('pattern')
+          .attr('id', patternId)
+          .attr('patternUnits', 'userSpaceOnUse')
+          .attr('x', 0)
+          .attr('y', 0)
+          .attr('width', ctx.width)
+          .attr('height', ctx.height);
+        // One full-plot image, cropped to cover the plot and then cut off by
+        // the boundary path. Never resize the image to the shaded region.
+        pattern
+          .selectAll<SVGImageElement, string>('image')
+          .data(['/decorative/pareto/sunny-castle.webp'])
+          .join('image')
+          .attr('href', (src) => src)
+          .attr('x', 0)
+          .attr('y', 0)
+          .attr('width', ctx.width)
+          .attr('height', ctx.height)
+          .attr('preserveAspectRatio', 'xMidYMid slice');
+        zoomGroup
+          .selectAll<SVGPathElement, string>(`.${boundary.path}-area`)
+          .data(boundary.visible && area ? [area] : [])
+          .join('path')
+          .attr('class', `${boundary.path}-area`)
+          .attr('d', (path) => path)
+          .attr('fill', boundary.playful ? `url(#${patternId})` : boundary.shade)
+          .attr('fill-opacity', boundary.playful ? 0.3 : 0.14)
+          .attr('data-style', boundary.playful ? 'playful' : 'plain')
+          .attr('pointer-events', 'none')
+          .lower();
+        const highlight = zoomGroup
+          .selectAll<SVGGElement, null>(`.${boundary.group}`)
+          .data(boundary.visible && geometry.line ? [null] : [])
+          .join('g')
+          .attr('class', boundary.group)
+          .attr('pointer-events', 'none');
+        highlight.raise();
+        highlight
+          .selectAll<SVGPathElement, string>(`.${boundary.path}`)
+          .data(geometry.line ? [geometry.line] : [])
+          .join('path')
+          .attr('class', boundary.path)
+          .attr('d', (path) => path)
+          .attr('fill', 'none')
+          .attr('stroke', boundary.color)
+          .attr('stroke-width', 2.5)
+          .attr('stroke-dasharray', boundary.dash)
+          .attr('stroke-linecap', 'round')
+          .attr('pointer-events', 'none');
+        highlight
+          .selectAll<SVGCircleElement, { x: number; y: number }>('circle')
+          .data(geometry.points)
+          .join('circle')
+          .attr('cx', (point) => point.x)
+          .attr('cy', (point) => point.y)
+          .attr('r', 6)
+          .attr('fill', 'none')
+          .attr('stroke', boundary.color)
+          .attr('stroke-width', 1.5);
+      };
+      return {
+        type: 'custom',
+        key: 'global-pareto',
+        displayIdentity: JSON.stringify([
+          showParetoFrontier,
+          paretoFrontierPlayful,
+          globalFrontier.map((point) => [point.x, point.y]),
+          [...frontierHwKeys].sort(),
+        ]),
+        render,
+        onDisplayUpdate: render,
+        onZoom: (group, ctx) =>
+          render(group, { ...ctx, renderedXScale: ctx.newXScale, renderedYScale: ctx.newYScale }),
+      };
+    }, [
+      globalFrontier,
+      frontierHwKeys,
+      showParetoFrontier,
+      paretoFrontierPlayful,
+      maximizeParetoX,
+      maximizeParetoY,
+      chartId,
+      getCssColor,
+    ]);
+
     const powerTierCounts = useMemo(() => {
       const officialTotal = pointsData.filter((point) =>
         selectedPrecisions.includes(point.precision),
@@ -2390,7 +2575,13 @@ const ScatterGraph = React.memo(
             ].map((entry) => ({
               key: entry.key,
               seriesId: entry.hw,
-              label: lineLabelText(entry.hw, entry.precision, multiPrecision, modelLabel),
+              label: lineLabelText(
+                entry.hw,
+                entry.precision,
+                multiPrecision,
+                modelLabel,
+                entry.points,
+              ),
               color: ir.getCssColor(ir.resolveColor(entry.hw)),
               points: entry.points,
               keepVisibleOnCollision: entry.points.length === 1,
@@ -2401,11 +2592,14 @@ const ScatterGraph = React.memo(
               if (!ir.activeOverlayHwTypes.has(group.hwKey)) return [];
               const info = unofficialRunInfos[group.runIndex];
               const precision = group.points[0]?.precision ?? '';
+              const runLabel = info
+                ? getInferenceRunLabel(`✕ ${info.branch || `run ${info.id}`}`, group.points)
+                : '';
               const label = info
                 ? multiPrecision
-                  ? `✕ ${info.branch || `run ${info.id}`} ${getPrecisionLabel(precision as Precision)}`
-                  : `✕ ${info.branch || `run ${info.id}`}`
-                : lineLabelText(group.hwKey, precision, multiPrecision, modelLabel);
+                  ? `${runLabel} ${getPrecisionLabel(precision as Precision)}`
+                  : runLabel
+                : lineLabelText(group.hwKey, precision, multiPrecision, modelLabel, group.points);
               return [
                 {
                   key: `overlay-${overlayKey}`,
@@ -2436,7 +2630,13 @@ const ScatterGraph = React.memo(
               lineLabels.push({
                 key: entry.key,
                 seriesId: entry.hw,
-                label: lineLabelText(entry.hw, entry.precision, multiPrecision, modelLabel),
+                label: lineLabelText(
+                  entry.hw,
+                  entry.precision,
+                  multiPrecision,
+                  modelLabel,
+                  entry.points,
+                ),
                 color: ir.getCssColor(ir.resolveColor(entry.hw)),
                 x: xScale(entry.points[0].x),
                 y: yScale(entry.points[0].y),
@@ -2467,7 +2667,11 @@ const ScatterGraph = React.memo(
               const isHardwareLabel =
                 label.label === hardwareLabel || label.label.startsWith(`${config.label} `);
               const remainingLabel = isHardwareLabel ? label.label.slice(config.label.length) : '';
-              const engineLabel = config.suffix ? ` ${config.suffix}` : '';
+              // Use this curve's resolved suffix, not the generic hwKey label:
+              // official and overlay curves can share a key but differ by run.
+              const engineLabel =
+                remainingLabel.match(/ \([^()]*\)$/u)?.[0] ??
+                (config.suffix ? ` ${config.suffix}` : '');
               const precisionLabel =
                 engineLabel && remainingLabel.endsWith(engineLabel)
                   ? remainingLabel.slice(0, -engineLabel.length)
@@ -2485,7 +2689,7 @@ const ScatterGraph = React.memo(
                           },
                         ]
                       : []),
-                    ...(config.suffix
+                    ...(engineLabel
                       ? [
                           {
                             className: 'll-engine',
@@ -2514,6 +2718,8 @@ const ScatterGraph = React.memo(
                 .text((segment) => segment.text);
             },
           });
+          // Labels can be joined independently of the Pareto display pass.
+          applyParetoFadeRef.current(zoomGroup);
         },
         onDisplayUpdate: (zoomGroup, ctx) => {
           const transform = d3.zoomTransform(ctx.layout.svg.node()!);
@@ -3155,7 +3361,7 @@ const ScatterGraph = React.memo(
 
       const result: LayerConfig<InferenceData>[] = [rooflineLayer, scatterLayer];
       if (overlayLayer) result.push(overlayLayer);
-      result.push(overflowContinuationLayer, perfRulerLayer, knownIssueLayer);
+      result.push(overflowContinuationLayer, paretoHighlightLayer, perfRulerLayer, knownIssueLayer);
       return result;
       // Interaction state (visibility, colors, precision shapes, known-issue
       // annotations) is deliberately NOT a dependency: layer closures read it
@@ -3164,6 +3370,7 @@ const ScatterGraph = React.memo(
       // the layers (and with them, the full chart render).
     }, [
       displayedRooflines,
+      paretoHighlightLayer,
       groupDisplayedPoints,
       showPowerEnvelope,
       allPointLabelsByKey,
@@ -3589,7 +3796,6 @@ const ScatterGraph = React.memo(
     if (data.length === 0 && !overlayData?.data?.length) {
       return (
         <div className="relative w-full p-3">
-          {caption}
           <div className="flex min-h-100 items-center justify-center">{emptyState}</div>
           <QuickFiltersDialog
             open={quickFiltersOpen}
@@ -3673,7 +3879,14 @@ const ScatterGraph = React.memo(
                         const branch = info.branch || `run ${info.id}`;
                         return {
                           name: `✕ unofficial-run-${info.id}`,
-                          label: `✕ ${branch}`,
+                          label: getInferenceRunLabel(
+                            `✕ ${branch}`,
+                            overlayData.data.filter(
+                              (point) =>
+                                overlayRunIndex(point.run_url ?? null, runIndexByUrl) === idx &&
+                                selectedPrecisions.includes(point.precision),
+                            ),
+                          ),
                           color: overlayRunColor(idx),
                           title: legendT.unofficialTitle(branch),
                           isHighlighted: true,
@@ -3791,6 +4004,17 @@ const ScatterGraph = React.memo(
                                 : legendT.optimalInfo,
                             }
                           : {}),
+                      },
+                      {
+                        id: `${chartId}-pareto-frontier`,
+                        label: legendT.paretoFrontier,
+                        advanced: true,
+                        checked: showParetoFrontier,
+                        infoTooltip: legendT.paretoFrontierInfo,
+                        onCheckedChange: (checked: boolean) => {
+                          setShowParetoFrontier(checked);
+                          track('inference_pareto_frontier_toggled', { enabled: checked });
+                        },
                       },
                     ]
                   : []),

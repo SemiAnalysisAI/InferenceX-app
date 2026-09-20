@@ -46,6 +46,23 @@ export type ApiRouteCatalogEntry = PublishedApiRouteCatalogEntry | ExcludedApiRo
  */
 export const apiRouteCatalog = [
   {
+    source: 'src/app/api/v1/operatorx/runs/route.ts',
+    path: '/api/v1/operatorx/runs',
+    method: 'GET',
+    classification: 'published-read',
+    operationId: 'list-operatorx-runs',
+    sourceSha256: 'f8e7049d1f3d16e3f4b6005b3c18eb9d1d427078b193e198d754a4e72fb516f7',
+  },
+  {
+    source: 'src/app/api/v1/operatorx/runs/[runId]/route.ts',
+    path: '/api/v1/operatorx/runs/{runId}',
+    method: 'GET',
+    classification: 'published-read',
+    operationId: 'get-operatorx-run',
+    sourceSha256: '8337605725c6aefab2df6853f1a04446fdfcf6083c536fd8cce49c2abd771262',
+  },
+
+  {
     source: 'src/app/api/gpu-metrics/route.ts',
     path: '/api/gpu-metrics',
     method: 'GET',
@@ -598,6 +615,30 @@ export interface ApiContractSourceDigest {
  */
 export const apiContractSourceDigests = [
   {
+    source: 'src/lib/operatorx-ingest.ts',
+    sourceSha256: 'bec2e115e006457816fc8e915b51128ea57b1c481b06b50fb4698ec37d94b425',
+    reviewArea: {
+      en: 'OperatorX provenance, run discovery, raw persistence, coverage, per-GPU GEMM, attention and routed MoE throughput, and latency.',
+      zh: 'OperatorX 来源校验、运行发现、原始数据持久化、覆盖情况、GEMM、attention 和路由 MoE 单卡吞吐量及延迟。',
+    },
+  },
+  {
+    source: '../db/src/operatorx/reader.ts',
+    sourceSha256: '4aa675bbf8e8f33ffe11d3ba322374c712cc721314b657478b25321bb3548d7b',
+    reviewArea: {
+      en: 'OperatorX provenance, run discovery, raw persistence, coverage, per-GPU GEMM, attention and routed MoE throughput, and latency.',
+      zh: 'OperatorX 来源校验、运行发现、原始数据持久化、覆盖情况、GEMM、attention 和路由 MoE 单卡吞吐量及延迟。',
+    },
+  },
+  {
+    source: '../db/src/queries/operatorx.ts',
+    sourceSha256: '104621edcb978e23a1a32a5a4c4bb57e2eafdc2058d67953aebc34c4b7c15e6f',
+    reviewArea: {
+      en: 'OperatorX provenance, run discovery, raw persistence, coverage, per-GPU GEMM, attention and routed MoE throughput, and latency.',
+      zh: 'OperatorX 来源校验、运行发现、原始数据持久化、覆盖情况、GEMM、attention 和路由 MoE 单卡吞吐量及延迟。',
+    },
+  },
+  {
     source: 'src/lib/api-cache.ts',
     sourceSha256: 'b710c4ce4c2dd0a6eb3b662c9e426e301aee3afe3d64fba35745b9323be39ddd',
     reviewArea: {
@@ -701,7 +742,10 @@ export const apiContractSourceDigests = [
     // Reviewed again for the release-date corrections: values inside
     // MODEL_RELEASE_DATES only. No published model name, alias, or parameter enum
     // is touched, and no endpoint exposes a release date, so the docs stand.
-    sourceSha256: 'bb58d43160c2b83ce61e7c34326a6d316fd751e435c6819f1991ed69e4f1b45c',
+    // Reviewed for the Qwen3.8-27B addition (InferenceX#3260): two new DB keys
+    // and display names plus their release dates. No published parameter enum
+    // or endpoint changes, so the docs stand.
+    sourceSha256: 'af1053b2ae94b50de51153153dd7a7e268e50bde3e5900310e44f2d8baa86f87',
     reviewArea: {
       en: 'Published benchmark and TCO model names, aliases, and parameter enums.',
       zh: '已发布基准与 TCO 模型名称、别名和参数枚举。',
@@ -709,7 +753,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/collectivex/types.ts',
-    sourceSha256: 'd988f0c348d187667aedaba63848bf5c0afd038c7fee6bcaf830747ee6c0dc61',
+    sourceSha256: 'a4478f8c939f20a31c2e862348e03ad24990a43f90550fc567df8f19aea69799',
     reviewArea: {
       en: 'CollectiveX version negotiation and versioned dataset/run response types.',
       zh: 'CollectiveX 版本协商以及带版本的数据集与运行响应类型。',

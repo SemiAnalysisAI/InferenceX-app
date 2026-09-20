@@ -1,4 +1,5 @@
 import { formatNumber, getDisplayLabel } from '@/lib/utils';
+import { getPointHardwareConfig } from '@/lib/inference-labels';
 import { specMethodDisplayLabel } from '@/lib/compare-variant-slug';
 import { agenticDetailHref } from '@/lib/agentic-detail-link';
 import { isPersistedBenchmarkId } from '@/lib/benchmark-id';
@@ -683,7 +684,7 @@ export const generateTooltipContent = (config: TooltipConfig): string => {
     <div style="background: var(--popover); border: 1px solid var(--border); border-radius: 8px; padding: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); user-select: ${isPinned ? 'text' : 'none'};">
       ${isPinned ? `<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">${t.dismiss}</div>` : ''}
       <div style="color: var(--foreground); font-size: 12px; font-weight: 600; margin-bottom: 8px;">
-        ${hardwareConfig[d.hwKey] ? getDisplayLabel(hardwareConfig[d.hwKey]) : d.hwKey}
+        ${hardwareConfig[d.hwKey] ? getDisplayLabel(getPointHardwareConfig(d, hardwareConfig[d.hwKey])) : d.hwKey}
       </div>
       ${tooltipLine(t.date, formatTooltipDate(d.actualDate ?? d.date, locale))}
       ${
@@ -744,7 +745,7 @@ export const generateOverlayTooltipContent = (config: OverlayTooltipConfig): str
         ${t.unofficialRun}
       </div>
       <div style="color: var(--foreground); font-size: 12px; font-weight: 600; margin-bottom: 8px;">
-        ${hwConfig ? getDisplayLabel(hwConfig) : d.hwKey}
+        ${hwConfig ? getDisplayLabel(getPointHardwareConfig(d, hwConfig)) : d.hwKey}
       </div>
       ${tooltipLine(t.branch, `${branch}`)}
       ${tooltipLine(t.date, formatTooltipDate(d.actualDate ?? d.date, locale))}
@@ -790,7 +791,7 @@ export const generateGPUGraphTooltipContent = (config: TooltipConfig): string =>
     <div style="background: var(--popover); border: 1px solid var(--border); border-radius: 8px; padding: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); user-select: ${isPinned ? 'text' : 'none'};">
       ${isPinned ? `<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">${t.dismiss}</div>` : ''}
       ${tooltipLine(t.date, `${formatTooltipDate(d.date, locale)}${d.actualDate && d.actualDate !== d.date ? ` <span style="opacity: 0.7">${t.dataFrom(formatTooltipDate(d.actualDate, locale))}</span>` : ''}`)}
-      ${tooltipLine(t.chipConfig, `${hardwareConfig[d.hwKey] ? getDisplayLabel(hardwareConfig[d.hwKey]) : d.hwKey}`)}
+      ${tooltipLine(t.chipConfig, `${hardwareConfig[d.hwKey] ? getDisplayLabel(getPointHardwareConfig(d, hardwareConfig[d.hwKey])) : d.hwKey}`)}
       ${
         d?.image
           ? `

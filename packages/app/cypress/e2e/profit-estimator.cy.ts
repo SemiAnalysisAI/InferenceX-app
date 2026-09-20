@@ -623,7 +623,7 @@ describe('Profit Estimator per GW — compare history', () => {
     bars()
       .its('length')
       .then((allBars) => {
-        chipTrigger().should('contain.text', 'Select a Chip Config for comparison');
+        chipTrigger().should('contain.text', 'Select Chip Config');
         chipTrigger().click({ force: true });
         // Every agentic SKU at the effective precisions. The lone fp8 curve
         // (H200) keeps both precisions in play (the sparse-precision rule), so
@@ -643,7 +643,7 @@ describe('Profit Estimator per GW — compare history', () => {
         cy.get('[role="option"]').contains('GB300').click();
         cy.get('body').type('{esc}');
         cy.get('[data-testid="profit-history-date-range"]').should('not.exist');
-        chipTrigger().should('contain.text', 'Select a Chip Config for comparison');
+        chipTrigger().should('contain.text', 'Select Chip Config');
       });
   });
 
@@ -695,7 +695,7 @@ describe('Profit Estimator per GW — compare history', () => {
     cy.get('[data-testid="profit-history-date-range"]').should('not.exist');
     cy.get('[data-testid="profit-history-note"]').should('not.exist');
     chart().find('rect.bar-tco').should('have.length', 4);
-    chipTrigger().should('contain.text', 'Select a Chip Config for comparison');
+    chipTrigger().should('contain.text', 'Select Chip Config');
     changelog().should('not.exist');
   });
 
@@ -804,7 +804,7 @@ describe('Profit Estimator per GW — compare history', () => {
     cy.visit('/zh/profit-estimator-per-gigawatt', { onBeforeLoad: suppressNudges });
     waitForChart();
     historyPanel().should('contain.text', '对比历史趋势').and('contain.text', '芯片配置');
-    chipTrigger().should('contain.text', '选择芯片配置进行对比');
+    chipTrigger().should('contain.text', '选择芯片配置');
     pickChip('GB300');
     changelog().should('contain.text', '配置变更日志').and('contain.text', '添加到图表');
   });

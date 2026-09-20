@@ -664,6 +664,8 @@ export interface InferenceDisplayContextType {
   showConcurrencyLabels: boolean;
   showGradientLabels: boolean;
   showLineLabels: boolean;
+  showParetoFrontier: boolean;
+  paretoFrontierPlayful: boolean;
 }
 
 /** Stable commands that mutate inference state. */
@@ -710,6 +712,7 @@ export interface InferenceActionsContextType {
   setShowConcurrencyLabels: (showConcurrencyLabels: boolean) => void;
   setShowGradientLabels: (showGradientLabels: boolean) => void;
   setShowLineLabels: (showLineLabels: boolean) => void;
+  setShowParetoFrontier: (show: boolean) => void;
   setSelectedGPUs: (gpus: string[]) => void;
   setSelectedDates: (dates: string[] | ((prev: string[]) => string[])) => void;
   setSelectedDatesFromRunExpansion: (dates: string[] | ((prev: string[]) => string[])) => void;

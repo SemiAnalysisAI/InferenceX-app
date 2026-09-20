@@ -386,7 +386,9 @@ export function GlobalFilterProvider({
     if (hasExplicitUrlParam('i_seq')) {
       applyIfEnum('i_seq', Sequence, setSelectedSequence);
     }
-    const urlPrec = getUrlParam('i_prec');
+    // The shared snapshot survives Back and retains the TPU shortcut's FP8.
+    // Only a precision carried by this navigation may pin the new model.
+    const urlPrec = hasExplicitUrlParam('i_prec') ? getUrlParam('i_prec') : undefined;
     if (urlPrec) {
       const precs = urlPrec
         .split(',')
@@ -395,6 +397,13 @@ export function GlobalFilterProvider({
         setSelectedPrecisionsRaw(precs);
         setPrecisionExplicit(true);
       }
+    } else if (pathModel !== null) {
+      // Per-model links without a precision use their own availability-driven
+      // default, including when the router reuses this provider.
+      setSelectedPrecisionsRaw(
+        initialValidPrecisions.length > 0 ? initialValidPrecisions : [Precision.FP4],
+      );
+      setPrecisionExplicit(initialValidPrecisions.length > 0);
     }
     // Same guard again for the run pins. The snapshot retains `g_rundate` /
     // `g_runid` self-writes from an earlier visit (a manual date pick, or a

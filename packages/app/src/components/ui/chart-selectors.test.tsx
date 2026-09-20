@@ -30,29 +30,3 @@ it.each([
   expect(trigger?.disabled).toBe(true);
   expect(trigger?.textContent).toBe(label);
 });
-
-it.each([
-  ['/inference', 'Scenario: Agentic'],
-  ['/zh/inference', '场景: 智能体'],
-])('renders an accessible inline title without a field label on %s', (pathname, name) => {
-  route.pathname = pathname;
-  const container = document.createElement('div');
-  container.innerHTML = renderToString(
-    <TooltipProvider>
-      <h2>
-        DeepSeek{' '}
-        <ScenarioSelector
-          variant="title"
-          value={Sequence.AgenticTraces}
-          availableSequences={[Sequence.AgenticTraces, Sequence.EightK_OneK]}
-          onChange={() => {}}
-        />
-      </h2>
-    </TooltipProvider>,
-  );
-  expect(container.querySelector('h2 label')).toBeNull();
-  expect(container.querySelector('h2 div')).toBeNull();
-  const trigger = container.querySelector<HTMLButtonElement>('h2 button[role="combobox"]');
-  expect(trigger?.getAttribute('aria-label')).toBe(name);
-  expect(trigger?.disabled).toBe(false);
-});

@@ -104,7 +104,11 @@ describe('Validated vs historical measured power', () => {
     // changes layout. Keep the chart assertions active; ignore only this
     // browser-generated delivery notification, not application exceptions.
     cy.on('uncaught:exception', (error) => {
-      if (error.message === 'ResizeObserver loop completed with undelivered notifications.') {
+      // Cypress wraps the original error in the second paragraph.
+      if (
+        error.message.split('\n\n')[1]?.trim() ===
+        '> ResizeObserver loop completed with undelivered notifications.'
+      ) {
         return false;
       }
     });

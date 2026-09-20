@@ -18,7 +18,8 @@ import {
   getHardwareKey,
   type DerivedChartFields,
 } from '@/lib/chart-utils';
-import { DEFAULT_TCO_BASIS, getHardwareConfig, type TcoBasis } from '@/lib/constants';
+import { DEFAULT_TCO_BASIS, type TcoBasis } from '@/lib/constants';
+import { getInferenceHardwareConfig } from '@/lib/inference-labels';
 import { isPersistedBenchmarkId } from '@/lib/benchmark-id';
 import { resolvePowerTier } from '@/lib/power-tier';
 import { modelSystemPower } from '@/lib/modeled-system-power';
@@ -421,8 +422,8 @@ export function transformBenchmarkRows(
 } {
   const gpuConfig: HardwareConfig = {};
 
-  // Phase 1: Convert rows once + resolve hardware keys (cache config lookups)
-  const hwConfigCache = new Map<string, ReturnType<typeof getHardwareConfig>>();
+  // Phase 1: Convert rows once + resolve hardware keys.
+  const entriesByHw = new Map<string, AggDataEntry[]>();
   const prepared: PreparedEntry[] = Array.from({ length: rows.length });
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
@@ -430,17 +431,23 @@ export function transformBenchmarkRows(
     const hwKey = getHardwareKey(entry);
     entry.hwKey = hwKey;
 
-    if (!hwConfigCache.has(hwKey)) {
-      const hwConfig = getHardwareConfig(hwKey, entry.model);
-      hwConfigCache.set(hwKey, hwConfig);
-      if (hwConfig) gpuConfig[hwKey] = { ...hwConfig, name: hwKey };
-    }
+    const entries = entriesByHw.get(hwKey) ?? [];
+    entries.push(entry);
+    entriesByHw.set(hwKey, entries);
 
     prepared[i] = {
       entry,
       hwKey,
       date: row.date,
       derivedFields: buildDerivedChartFields(entry, hwKey, undefined, tcoBasis),
+    };
+  }
+
+  // Labels depend on contributing runs, not only on the canonical hardware key.
+  for (const [hwKey, entries] of entriesByHw) {
+    gpuConfig[hwKey] = {
+      ...getInferenceHardwareConfig(hwKey, entries[0].model, entries),
+      name: hwKey,
     };
   }
 

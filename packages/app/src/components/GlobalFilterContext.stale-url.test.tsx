@@ -81,12 +81,14 @@ let container: HTMLDivElement | undefined;
 let observedSequence: Sequence | undefined;
 let observedResolved: boolean | undefined;
 let observedRunDate: string | undefined;
+let observedPrecisions: string[] | undefined;
 
 const SequenceProbe = memo(() => {
   const selection = useGlobalFilterSelection();
   observedSequence = selection.effectiveSequence;
   observedResolved = selection.sequenceResolved;
   observedRunDate = useGlobalFilterRun().effectiveRunDate;
+  observedPrecisions = selection.effectivePrecisions;
   return null;
 });
 
@@ -110,6 +112,7 @@ beforeEach(() => {
   observedSequence = undefined;
   observedResolved = undefined;
   observedRunDate = undefined;
+  observedPrecisions = undefined;
 });
 
 afterEach(() => {
@@ -132,6 +135,36 @@ describe('GlobalFilterProvider stale i_seq snapshot', () => {
     mountProvider();
     expect(observedResolved).toBe(true);
     expect(observedSequence).toBe(Sequence.EightK_OneK);
+  });
+});
+
+describe('GlobalFilterProvider stale i_prec snapshot', () => {
+  beforeEach(() => {
+    mocks.availability.data = ['fp4', 'fp8'].map((precision) => ({
+      ...KIMI_K3_ROWS[0],
+      precision,
+      hardware: precision === 'fp4' ? 'vr200' : 'h200',
+      framework: 'trt',
+      spec_method: 'none',
+      disagg: false,
+    }));
+    mocks.getUrlParam.mockImplementation((key) => (key === 'i_prec' ? 'fp8' : undefined));
+  });
+
+  afterEach(() => {
+    mocks.getUrlParam.mockImplementation((key) => (key === 'i_seq' ? '8k/1k' : undefined));
+  });
+
+  it('ignores retained TPU FP8 when the destination has no precision parameter', () => {
+    mocks.hasExplicitUrlParam.mockReturnValue(false);
+    mountProvider();
+    expect(observedPrecisions).toEqual(['fp4', 'fp8']);
+  });
+
+  it('still honors an explicit FP8 share link', () => {
+    mocks.hasExplicitUrlParam.mockImplementation((key) => key === 'i_prec');
+    mountProvider();
+    expect(observedPrecisions).toEqual(['fp8']);
   });
 });
 

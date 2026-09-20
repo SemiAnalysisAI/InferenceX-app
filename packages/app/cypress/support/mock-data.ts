@@ -259,6 +259,9 @@ export function createMockInferenceContextValues(
     setShowGradientLabels: namedStub('setShowGradientLabels'),
     showLineLabels: false,
     setShowLineLabels: namedStub('setShowLineLabels'),
+    showParetoFrontier: false,
+    setShowParetoFrontier: namedStub('setShowParetoFrontier'),
+    paretoFrontierPlayful: false,
     selectedGPUs: [],
     setSelectedGPUs: namedStub('setSelectedGPUs'),
     availableGPUs: [
