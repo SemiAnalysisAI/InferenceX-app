@@ -84,6 +84,12 @@ Collapsing Advanced does not turn off an enabled highlight.
 The frontier pools the currently visible official
 and unofficial observations across the selected series and dates, after hardware,
 precision, quick filters and Optimal Only. It does not replace per-series curves.
+While enabled, hardware series with no observation on the global frontier render
+at 20% alpha, including their curves, points, labels and clipped continuations.
+All observations of a frontier hardware series retain their normal styling, and
+ties at a frontier coordinate keep every tied hardware series prominent.
+The alpha filter composes with visibility and hover opacity; switching the
+frontier off removes it. Official and unofficial marks use the same treatment.
 
 The global dotted line connects non-dominated observations with straight segments
 in rendered coordinates. Rings mark the observed vertices, including singleton

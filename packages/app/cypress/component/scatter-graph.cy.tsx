@@ -32,7 +32,10 @@ describe('ScatterGraph', () => {
       createMockInferenceData({ hwKey: 'h100', precision: Precision.FP8, x: 80, y: 20 }),
     ];
     const overlay = [
-      createMockInferenceData({ hwKey: 'h100', precision: Precision.FP8, x: 90, y: 90 }),
+      createMockInferenceData({ hwKey: 'b200', precision: Precision.FP8, x: 90, y: 90 }),
+      createMockInferenceData({ hwKey: 'b200', precision: Precision.FP8, x: 80, y: 95 }),
+      createMockInferenceData({ hwKey: 'h200', precision: Precision.FP8, x: 10, y: 15 }),
+      createMockInferenceData({ hwKey: 'h200', precision: Precision.FP8, x: 15, y: 10 }),
     ];
     const base = createMockInferenceContextValues();
     function ParetoHarness() {
@@ -42,6 +45,8 @@ describe('ScatterGraph', () => {
         setVisible: setShowParetoFrontier,
       } = useParetoHighlightToggle();
       const [showOverlay, setShowOverlay] = useState(true);
+      const [showLineLabels, setShowLineLabels] = useState(false);
+      const [showGradientLabels, setShowGradientLabels] = useState(false);
       const inference = {
         ...base,
         hardwareConfig: hwConfig,
@@ -52,6 +57,10 @@ describe('ScatterGraph', () => {
         showParetoFrontier,
         setShowParetoFrontier,
         paretoFrontierPlayful,
+        showLineLabels,
+        setShowLineLabels,
+        showGradientLabels,
+        setShowGradientLabels,
       };
       return (
         <InferenceContextsProvider
@@ -80,8 +89,8 @@ describe('ScatterGraph', () => {
     }
     mountWithProviders(<ParetoHarness />, {
       unofficial: {
-        activeOverlayHwTypes: new Set(['h100']),
-        allOverlayHwTypes: new Set(['h100']),
+        activeOverlayHwTypes: new Set(['b200', 'h200']),
+        allOverlayHwTypes: new Set(['b200', 'h200']),
       },
     });
     cy.get('.global-pareto-frontier, .pareto-hinterland').should('not.exist');
@@ -98,13 +107,75 @@ describe('ScatterGraph', () => {
     cy.get('.global-pareto-frontier-area')
       .should('have.attr', 'fill', '#22c55e')
       .and('have.attr', 'data-style', 'plain');
-    cy.get('.global-pareto-highlight circle').should('have.length', 1);
+    cy.get('.global-pareto-highlight circle').should('have.length', 2);
+    cy.get('.dot-group, .roofline-path').should(($marks) => {
+      expect($marks.length).to.be.greaterThan(2);
+      $marks.each((_, mark) => {
+        expect(mark.style.filter).to.equal('opacity(0.2)');
+      });
+    });
+    cy.get('.unofficial-overlay-pt').should(($marks) => {
+      expect($marks).to.have.length(4);
+      $marks.each((_, mark) => {
+        const hw = (mark as unknown as { __data__: { hwKey: string } }).__data__.hwKey;
+        expect(mark.style.filter).to.equal(hw === 'b200' ? '' : 'opacity(0.2)');
+      });
+    });
+    cy.get('.overlay-roofline-path').should(($curves) => {
+      expect($curves).to.have.length(2);
+      $curves.each((_, curve) => {
+        const hw = (curve as unknown as { __data__: { points: { hwKey: string }[] } }).__data__
+          .points[0].hwKey;
+        expect(curve.style.filter).to.equal(hw === 'b200' ? '' : 'opacity(0.2)');
+      });
+    });
+    // New labels must inherit the fade even when Pareto membership is unchanged.
+    cy.get('#scatter-line-labels').click();
+    cy.get('.line-label[data-hw-key="h100"]').should(($labels) => {
+      $labels.each((_, label) => {
+        expect(label.style.filter).to.equal('opacity(0.2)');
+      });
+    });
+    cy.get('#scatter-line-labels').click();
+    cy.get('#scatter-line-labels').click();
+    cy.get('.line-label[data-hw-key="h100"]').should(($labels) => {
+      $labels.each((_, label) => {
+        expect(label.style.filter).to.equal('opacity(0.2)');
+      });
+    });
+    // Turning the switch off restores official and unofficial marks.
+    cy.get('#global-pareto-test-pareto-frontier').click();
+    cy.get('.dot-group, .roofline-path, .unofficial-overlay-pt, .overlay-roofline-path').should(
+      ($marks) => {
+        $marks.each((_, mark) => {
+          expect(mark.style.filter).to.equal('');
+        });
+      },
+    );
+    cy.get('#global-pareto-test-pareto-frontier').click();
+    cy.get('.dot-group').should(($marks) => {
+      $marks.each((_, mark) => {
+        expect(mark.style.filter).to.equal('opacity(0.2)');
+      });
+    });
     cy.get('.pareto-hinterland').should('not.exist');
     cy.contains('button', 'Dismiss test overlay').click();
     cy.get('.global-pareto-highlight circle').should('have.length', 2);
+    cy.get('.dot-group, .roofline-path').should(($marks) => {
+      $marks.each((_, mark) => {
+        expect(mark.style.filter).to.equal('');
+      });
+    });
     cy.get('#global-pareto-test-pareto-frontier').click();
     cy.get('.global-pareto-frontier').should('not.exist');
     cy.get('.global-pareto-frontier-area').should('not.exist');
+    cy.get('#global-pareto-test-pareto-frontier').click();
+    cy.get('.global-pareto-frontier-area')
+      .should('have.length', 1)
+      .each(($area) => {
+        expect($area.attr('data-style')).to.equal('plain');
+      });
+    cy.get('#global-pareto-test-pareto-frontier').click();
     cy.get('#global-pareto-test-pareto-frontier').click();
     cy.get('.global-pareto-frontier-area')
       .should('have.length', 1)
