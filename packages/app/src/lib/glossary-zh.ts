@@ -29,6 +29,201 @@ type GlossaryTranslation = Pick<
 >;
 
 const translations: Readonly<Record<string, GlossaryTranslation>> = {
+  engram: {
+    term: 'Engram',
+    aliases: ['Engram 条件记忆'],
+    plainEnglish:
+      'Engram 直接检索重复 token 模式对应的已学习向量，减少模型逐层重建这些模式的工作。',
+    definition:
+      'Engram 是一种可学习的条件记忆机制，在单 token embedding 之外增加多 token 查表，并把取回的特征融入模型计算。',
+    explanation:
+      '查表地址取决于 token ID，而非中间隐藏状态。因此，运行时可以在到达 Engram 层之前确定所需行，并让检索与前面层的计算重叠。取回的特征会影响下游层及专家选择。',
+    significance:
+      '稀疏访问使大型参数表具备 offload 到 DRAM 的条件。在推理时移除表会改变已经训练好的模型，因此消融不能代替对分别训练、质量匹配的架构进行比较。',
+    benchmarkContext:
+      '文章中的 DeepSeek-V4.1-Flash 配置约有 189 GiB 的 Engram 内存占用。DRAM 与 SSD 对比保留了 Engram 功能，只改变服务路径；消融实验回答的则是另一类模型质量问题。',
+  },
+  'n-gram-embedding': {
+    term: 'N-gram embedding',
+    aliases: ['多 token embedding'],
+    plainEnglish: 'N-gram embedding 为一小段 token 序列提供可直接查表获取的已学习向量。',
+    definition:
+      'N-gram embedding 将由 n 个 token 组成的局部序列映射为已学习的向量特征，把可表示的模式从单个 token 扩展到多个 token。',
+    explanation:
+      '重复出现的人名、代码片段和常见表述都可能触发这种查表。文章通过 Engram gate 分数检查示例，但按有趣程度选取，并未将其视为具有代表性的记忆使用排名。',
+    significance:
+      '局部 token 模式允许在隐藏状态计算完成前确定地址，因此支持 prefetch 和稀疏参数 offload；但这并不证明每次取回的特征在每次出现时都有用。',
+    benchmarkContext:
+      'Gate 扫描无法确定某类模式在训练中出现的频率，也不能计算其占用的表容量。较高 gate 分数同样不等于高访问频率，不能单凭它决定应缓存哪些行。',
+  },
+  'conditional-memory': {
+    term: '条件记忆',
+    aliases: ['conditional memory'],
+    plainEnglish: '条件记忆根据输入选择相应条目，仅提供本次计算需要的已学习信息。',
+    definition:
+      '条件记忆是一种模型机制：根据输入检索已学习记忆参数的一部分，而不是每处理一个 token 都访问整张记忆表。',
+    explanation:
+      '文章讨论的 Engram 设计由 token 模式决定行地址，再由 gate 控制取回特征的贡献。记忆参数属于已学习的模型数据，与 KV cache 保存的请求相关注意力状态不同。',
+    significance:
+      '记忆表的总大小可以远大于单 token 实际读取的字节数。因此，决定存放层级时，需要分别评估容量要求与每 token 访问流量，不能把两者混为一谈。',
+    benchmarkContext:
+      '文章中的 Engram 表很大，但模型每处理一个 token 位置只需约 12.4 KiB 的行数据。这种稀疏性支持尝试 offload，并不保证任意 CPU 或 SSD 实现都能改善服务成本。',
+  },
+  'embedding-table': {
+    term: 'Embedding 表',
+    aliases: ['embedding table', '嵌入表'],
+    plainEnglish: 'Embedding 表按行保存已学习向量，模型根据输入产生的标识符检索对应行。',
+    definition:
+      'Embedding 表是一组用离散标识符索引的已学习向量参数，索引可以是 token ID，也可以来自多个 token 构成的模式。',
+    explanation:
+      '查表只选择部分行，无需与整张表相乘。Engram 在普通 token embedding 之上增加多 token 查表。表必须占用存储容量，但稀疏访问允许它与频繁使用的稠密权重放在不同层级。',
+    significance:
+      '表容量、实际读取字节数以及获取这些字节的成本是不同量。只要服务路径能高效访问较慢层级中的行，大表就不一定必须驻留在加速器显存。',
+    benchmarkContext:
+      '文章将同一 Engram 表分别放入 HBM、固定页 DRAM 或 SSD 支持的内存映射。比较涵盖协调和传输成本的完整服务配置，而不是仅凭表大小预测吞吐量。',
+  },
+  'parameter-offloading': {
+    term: '参数 offloading',
+    aliases: ['parameter offloading', '模型权重 offload', 'Engram offloading'],
+    plainEnglish: '参数 offloading 把已学习的模型数据放到加速器显存之外，只获取计算需要的部分。',
+    definition:
+      '参数 offloading 将已学习的模型参数存储在主机 DRAM 或 SSD 等较低层级中，再由加速器访问推理所需的数据。',
+    explanation:
+      'Engram 的行地址由 token ID 决定，适合按行稀疏检索。它与 KV cache offloading 不同，后者搬运的是特定请求生成的注意力状态。两者可能竞争同一存储层级，也可能为彼此释放容量。',
+    significance:
+      '把参数移出 HBM 可以为 KV cache 腾出空间，或减少每个副本需要的 GPU 数量。但收益必须超过访问成本，并取决于内核、互连、内存分配以及工作负载。',
+    benchmarkContext:
+      '文章报告 B300 的 DRAM offload 配置从 TP4 改为 TP2 后，Pareto 曲线最多改善 1.6x。未经优化的 B200 SSD 路径却落后于 DRAM，说明存储便宜并不直接意味着每 token 成本更低。',
+  },
+  'sparse-embedding-lookup': {
+    term: '稀疏 embedding 查表',
+    aliases: ['sparse embedding lookup'],
+    plainEnglish: '稀疏查表只读取选中的少量 embedding 行，不读取整张参数表。',
+    definition:
+      '稀疏 embedding 查表根据输入相关的索引集合，只取回被选中的行，因此每 token 访问的数据量可以远小于表的总容量。',
+    explanation:
+      '文章中的 Engram 配置在两个层上分别请求 24 行。整个模型每处理一个 token 位置约读取 12.4 KiB；分布到四个 GPU 时，每 GPU 约为 3.1 KiB。',
+    significance:
+      '稀疏流量使 offload 具备可行性，但也带来不规则访存。行选择、反量化、传输开销和数据复用共同决定较慢层级能否及时供数，避免拖延模型其余部分。',
+    benchmarkContext:
+      '将 Engram 表放回 HBM 只会加速稀疏查表，并不直接加速 decoder 计算或通信。因此文章比较完整 AgentX 服务曲线，而没有假定查表提速必然按同样比例改善端到端性能。',
+  },
+  'embedding-prefetch': {
+    term: 'Embedding prefetch',
+    aliases: ['Engram prefetch', '行预取'],
+    plainEnglish: 'Embedding prefetch 在前面层仍在计算时，就开始取回后续层将要使用的行。',
+    definition:
+      'Embedding prefetch 提前检索指定 embedding 行，使内存访问与使用这些数据之前的模型计算重叠。',
+    explanation:
+      'Engram 行地址取决于 token ID，而不是隐藏状态。只要 ID 已经可用，运行时就能确定所需行，无需等中间各层执行完毕。可用于重叠的时间窗口到消费层需要这些数据时结束。',
+    significance:
+      'Prefetch 可以隐藏部分延迟，但不会减少传输字节数，也不能消除带宽限制。服务系统仍需分配缓冲区、协调完成状态，并保证不会在检索完成前使用数据。',
+    benchmarkContext:
+      '文章把 DRAM 路径的竞争力归因于包括异步执行和重叠在内的优化，并未独立测出通用 prefetch 加速比。应比较完整配置及其并发范围，不能仅从机制推导固定收益。',
+  },
+  'unified-virtual-addressing': {
+    term: '统一虚拟寻址',
+    aliases: ['Unified Virtual Addressing', 'UVA'],
+    plainEnglish: 'UVA 让支持的主机与设备内存分配共享虚拟地址空间，供 GPU 代码访问。',
+    definition:
+      '统一虚拟寻址（UVA）为支持的 CPU 和 GPU 内存分配提供统一虚拟地址空间，但不会让主机内存在物理上等同于 HBM。',
+    explanation:
+      '文章中的 Engram 内核通过 UVA 直接读取固定页主机内存，在 GPU 上完成行选择与反量化，从而避开实验性 SSD 实现中显式把行 ID 送往 CPU 的往返过程。',
+    significance:
+      '统一地址空间不意味着自动页面迁移，也不意味着各类内存具有相同带宽。性能仍取决于地址背后的存储介质，以及访问该介质所经过的互连。',
+    benchmarkContext:
+      'HBM 和 DRAM 版本使用同一行选择内核，均支持完整 decode graph。SSD 实验改变了执行路径，因此其对比结果不能解释为仅测量存储设备延迟。',
+  },
+  'pinned-host-memory': {
+    term: '固定页主机内存',
+    aliases: ['pinned host memory', 'page-locked memory'],
+    plainEnglish: '固定页主机内存驻留在 RAM 中，为设备提供稳定的主机内存分配。',
+    definition:
+      '固定页主机内存是为设备访问或传输而保持驻留的主机 RAM，不同于操作系统可以回收或通过分页处理的普通可分页内存。',
+    explanation:
+      'Engram 的 DRAM 实现通过 UVA 直接读取固定页主机表。SSD 实验则先把选中行收集到固定页缓冲区，再复制到 GPU。两者都使用固定页内存，但协调及传输路径不同。',
+    significance:
+      '固定页内存会消耗主机容量，并非免费存储。稳定驻留有利于高效设备访问，但分配过多会减少应用和文件系统缓存可用的 RAM。',
+    benchmarkContext:
+      '文章中已经缓存的 SSD 文件不等同于固定页 DRAM 表。缓存页可避免物理磁盘读取，但实验路径仍需由 CPU 收集行，并在 graph 片段之间传输相应缓冲区。',
+  },
+  'memory-mapped-file': {
+    term: '内存映射文件',
+    aliases: ['memory-mapped file', '文件支持的映射'],
+    plainEnglish: '内存映射文件通过内存地址暴露文件内容，由操作系统管理哪些页面驻留。',
+    definition:
+      '内存映射文件将文件数据映射到进程地址空间，使操作系统可以根据访问情况加载或回收页面。',
+    explanation:
+      '文章以本地 SSD 文件支持的映射替代 Engram 分配。文件系统缓存中已经驻留的页面可直接满足读取，无需再次访问 SSD；当其他应用需要 RAM 时，操作系统可以回收这些文件页。',
+    significance:
+      '映射文件大小并不等于物理 RAM 占用，也不等于基准测试期间从 SSD 读取的字节数。解释实验时，必须说明缓存驻留状态及内存压力。',
+    benchmarkContext:
+      'B200 实验在 graph 片段之间处理 CPU 行 ID、去重、固定页缓冲区收集以及 GPU 传输，并未启用 GDS。因此，与 DRAM 的实测差距既包含实现开销，也包含可能发生的物理存储活动。',
+  },
+  'filesystem-page-cache': {
+    term: '文件系统页缓存',
+    aliases: ['filesystem page cache', 'OS page cache'],
+    plainEnglish: '文件系统页缓存把近期访问的文件数据留在 RAM 中，让后续读取可以避开存储设备。',
+    definition:
+      '文件系统页缓存是操作系统管理的文件数据内存，其中也包括通过文件映射访问的驻留页面。',
+    explanation:
+      '处于 warm 状态的 Engram 映射可能完全从 RAM 提供所需行。内存紧张时，操作系统可以回收文件页，之后的访问才重新依赖存储设备。因此，文件由 SSD 支持不等于每次查表都读取 SSD。',
+    significance:
+      '缓存状态会改变存储基准测试的含义。需要区分逻辑读取与物理设备 I/O；声称节省主机内存时，也必须把驻留文件页计入占用。',
+    benchmarkContext:
+      '文章中 warm cache 消除了 SSD 读取，但未经优化的路径仍保留 CPU 协调、行收集及传输。该结果支持完整服务实现之间的比较，不能独立说明 NAND 闪存的延迟。',
+  },
+  'cache-hotness': {
+    term: '缓存热度',
+    aliases: ['cache hotness', '热 embedding 行', '行访问频率'],
+    plainEnglish: '热数据行访问频繁或最近被访问，把它留在较快层级可能省去重复检索。',
+    definition:
+      '缓存热度描述数据在特定工作负载和时间窗口内的访问频率或近期访问情况，用来判断哪些数据可能受益于更快的存储。',
+    explanation:
+      '推荐系统通常把高频或近期访问的 embedding 行留在快层，把冷行放到 SSD。Engram gate 分数回答的是另一问题：取回的特征在当前上下文中有多大贡献。',
+    significance:
+      '贡献权重大的行不一定经常被请求。缓存策略需要访问轨迹及资源约束，不能仅根据有趣示例或较大的 gate 激活值来决定。',
+    benchmarkContext:
+      '文章明确指出，强 gate 不能识别缓存热行。示例扫描也没有测量各类内容占据的表容量，因而无法据此分配缓存，更不能证明某些已学习内容浪费了内存。',
+  },
+  'context-dependent-gating': {
+    term: '上下文相关门控',
+    aliases: ['context-dependent gating', 'Engram gate 分数'],
+    plainEnglish: 'Gate 根据模型当前上下文，控制取回的记忆特征贡献多少。',
+    definition:
+      '上下文相关门控根据取回记忆特征与当前表示的匹配程度调整权重，而不是始终给予固定贡献。',
+    explanation:
+      '文章通过 Engram gate 分数检查名字、代码片段和常见短语。计算 gate 本身需要已经取回的 key，因此读取之后发现 gate 很低，并不会自动省掉这次内存读取。',
+    significance:
+      '若要跳过检索，需要另一个在读取之前运行的有用性预测器。这会引入新的实现和准确性问题，并不是利用已有 gate 数值就能免费得到的优化。',
+    benchmarkContext:
+      '公开示例按有趣程度而非 gate 强度选取。示例和强 gate 都不能证明缓存热度，因此评估 Engram 时应将 gate 解读、存储放置以及服务性能分开测量。',
+  },
+  'inference-time-ablation': {
+    term: '推理时消融',
+    aliases: ['inference-time ablation'],
+    plainEnglish: '推理时消融禁用已训练模型的一部分，用来测量模型对该部分的依赖。',
+    definition: '推理时消融在评估期间改变或移除模型组件，但不重新训练模型来适应这种变化。',
+    explanation:
+      '对于训练时使用 Engram 的模型，抑制 Engram 会改变下游特征和专家选择。损失变化测量的是训练与推理不匹配时的依赖程度，而非分别训练的有 Engram 与无 Engram 模型之间的质量差异。',
+    significance:
+      '不同任务和评估流程可能反应不同。文章报告所有评估领域的 token 似然均恶化，而 GSM8K 准确率仍处于实测运行波动范围内。一个分数没有变化，不能证明被移除的组件普遍没有必要。',
+    benchmarkContext:
+      'CRUXEval 实验在 teacher forcing 下分别测试自然重新路由和固定原有专家选择，还比较了仅在 prefill、仅在 decode 和全程移除 Engram。它们与保留记忆、仅更换存储层级的实验不同。',
+  },
+  'teacher-forcing': {
+    term: 'Teacher forcing',
+    aliases: ['教师强制'],
+    plainEnglish: 'Teacher forcing 提供参考 token 历史，让不同模型版本在同一续写序列上评分。',
+    definition:
+      'Teacher forcing 以参考 token 而非模型自己采样的输出作为条件，允许沿固定序列比较 token 级损失。',
+    explanation:
+      '文章使用 teacher forcing 的 CRUXEval 实验，在固定 token 的情况下改变 Engram 和专家路由，从而将参考答案似然的变化与生成不同续写造成的差异区分开。',
+    significance:
+      'Teacher forcing 下的损失与自由生成任务准确率是不同指标。固定 token 历史有助于隔离干预影响，但不代表模型自行选择并扩展答案时的完整行为。',
+    benchmarkContext:
+      '移除 Engram 后，答案损失从 0.2848 增至 0.3093 bits/token；再强制使用原有专家选择，损失升至 0.3375。这说明重新路由在该实验中起到部分补偿作用，不能推导出记忆与推理之间的普遍分工。',
+  },
   'ai-inference': {
     term: 'AI 推理',
     aliases: ['AI inference', 'LLM 推理', '模型服务'],
@@ -800,35 +995,35 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
     significance:
       '长 agentic 会话超出 HBM 中 KV 容量的时间，远早于超出合理的 DRAM 预算，因此 offload 决定了有多少并发对话仍可恢复。它也会转移瓶颈：前缀能够留存之后，store 与 load 路径、传输批量化和索引记账才是值得优化的开销。',
     benchmarkContext:
-      'InferenceX 会给每个使用了 offload 的数据点加上虚线光环，无论它是否位于 Pareto 前沿；点详情视图还会给出 offload 类型、引擎，以及芯片与 CPU 两侧的缓存命中率。offload 属于允许但可选的优化，因此同一条曲线上可以同时存在启用和未启用的数据点。',
+      'InferenceX 会给每个使用了 KV offload 的数据点加上虚线光环，无论它是否位于 Pareto 前沿；点详情视图还会给出 offload 类型、引擎，以及芯片与 CPU 两侧的缓存命中率。Engram 参数 offload 搬运的是已学习的 embedding 行，而非请求相关注意力状态；表位于 HBM 之外本身并不能证明该运行使用了 KV offload。',
   },
   'cpu-offloading': {
     term: 'CPU offloading',
     aliases: ['CPU offload', 'DRAM offloading', '主机内存卸载'],
     plainEnglish:
-      'CPU offloading 把加速器装不下的 KV cache 溢出到主机 DRAM，让长对话可以从内存中恢复，而不必从头重算。',
+      'CPU offloading 把模型数据或可复用注意力状态放到主机 DRAM，释放显存，但增加主机访存成本。',
     definition:
-      'CPU offloading 把可复用的 KV cache block 保存在主机 CPU DRAM 而非加速器 HBM 中，当后续请求复用该前缀时再经主机链路读回。',
+      'CPU offloading 将模型参数或 KV cache 放在主机 CPU DRAM，而非加速器 HBM。由服务实现决定采用显式复制，还是让 GPU 直接访问。',
     explanation:
-      '在推理服务语境下，这个词几乎总是指把 KV cache offload 到 DRAM，与训练侧把权重或优化器状态放到 CPU 的做法不同。引擎通过 connector 访问 DRAM，例如 vLLM 的 CPU offloading connector、LMCache、SGLang HiCache、Mooncake Store 和 Dynamo KVBM。该池通常是写穿实现，因此当用于 offload 的主机 DRAM 约为 HBM KV 容量的 1.5 到 3 倍时收益最大；其余取决于传输效率：在 hipMemcpyBatchAsync 于 ROCm 7.14 落地之前，AMD vLLM 无法批量执行 GPU 到 CPU 的拷贝，其 CPU offload 路径远不如 NVIDIA 上的同类功能好用。',
+      'KV cache offloading 通过 LMCache、SGLang HiCache、Mooncake Store、Dynamo KVBM 等系统保存请求相关注意力状态；参数 offload 则把已学习的模型数据放到 DRAM。Engram 文章中的 GPU 内核通过 UVA 直接从固定页主机内存选择并反量化稀疏 embedding 行，同时保留完整 decode graph。两类路径的访问模式不同，应分别说明。',
     significance:
       '当并发会话的 KV 工作集总量超过 HBM 时，DRAM offloading 决定了有多少智能体会话仍可恢复。它并非免费容量：在高并发下过度依赖 DRAM 层会增加重载流量，可能把交互性拖到可接受水平之下，所以真正值得回答的问题是这一层什么时候有用，而不是它是否存在。',
     benchmarkContext:
-      'AgentX 把 CPU KV offloading 视为允许但可选的优化。用于 offload 的 DRAM 必须随所用 GPU 的比例同步扩缩，非标准化 DRAM 配置的系统另有 3 TB 上限。使用了 offload 的数据点会被虚线光环标记，点详情视图会给出 offload 后端以及 HBM 与 CPU 两侧的缓存命中率。',
+      'AgentX 把 CPU KV offloading 视为允许但可选的优化。KV offload 标记与缓存命中率描述这条路径，不表示 Engram 参数放置。文章报告 B300 配置利用 DRAM offload 从 TP4 改为 TP2，Pareto 曲线最多改善 1.6x；这是特定配置的实测结果，并非 DRAM 的通用加速比。',
   },
   'nvme-offloading': {
     term: 'NVMe offloading',
     aliases: ['NVMe offload', 'SSD offloading', '闪存 KV cache 卸载'],
     plainEnglish:
-      'NVMe offloading 把 KV cache 再向下延伸一层到本地 SSD，让 GPU 和 CPU 内存都装不下的前缀日后仍能重新载入。',
+      'NVMe offloading 将模型数据或注意力状态放到 SSD，以更昂贵的访问路径换取更便宜的容量。',
     definition:
-      'NVMe offloading 把可复用的 KV cache block 保存在 HBM 与主机 DRAM 之下的 NVMe SSD 层，用更慢的重载速度换取大得多的可取回 KV 工作集。',
+      'NVMe offloading 把模型参数或可复用 KV cache 放到加速器和主机内存之下的 NVMe SSD 层。参数查表与 KV 前缀恢复是同一存储层级的两种不同用途。',
     explanation:
-      '存储层级每往下一层，容量成倍增长而带宽成倍下降，因此只有当重新载入长前缀仍然比重算划算时，SSD 层才有收益。LMCache、Mooncake Store 等 KV cache 管理器已经在 DRAM 和远端存储之外支持本地 NVMe 后端。这一层在两种情况下帮助最大：复用工作集超出任何合理的 DRAM 预算，或会话空闲太久、DRAM 淘汰已经把它丢弃之后才回来。',
+      'KV offloading 可以在 DRAM 淘汰后继续保存前缀，Engram offload 则检索已学习的 embedding 行。文章测试了 SSD 支持的内存映射表，其页面可能仍驻留文件系统缓存。未经优化的路径先把行 ID 复制到 CPU，去重并收集行，再传到 GPU。Warm page cache 消除了设备读取，但不能消除这些协调与复制。',
     significance:
       'NVMe offloading 实际上延长了长生命周期智能体会话的缓存存活时间，当 agent 需要等待工具、人类或 CI 数分钟时这一点尤为重要。它高度依赖工作负载：如果高并发部署下 DRAM offloading 已经在拖累延迟，更慢的一层也救不回来，因为瓶颈在重载带宽而不是容量。',
     benchmarkContext:
-      'AgentX v1 测量 HBM 和 DRAM 两层，暂缓 NVMe offloading；SSD/NVMe KV offloading 已列为快速跟进项，用来把工作集扩展到 DRAM 之外。届时回放流当前 5 分钟的空闲上限也可能随之提高，使更长的缓存存活时间变得可测量。',
+      '文章的 B200 配置在约 125 tokens/s/user 时，DRAM 每美元约提供 1.21 亿 total tokens，SSD 约为 5200 万。实验未启用 GDS，测量的是完整服务路径而非孤立的 SSD 延迟。该参数 offload 实验不能证明 AgentX 已支持 NVMe KV offloading。',
   },
   'kv-cache-manager': {
     term: 'KV cache 管理器',
