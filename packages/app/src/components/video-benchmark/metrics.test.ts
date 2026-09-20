@@ -10,6 +10,8 @@ const h200: VideoPoint = {
   hardwareKey: 'h200',
   hardwareName: 'NVIDIA H200',
   runtime: '71de97b264b04dcd514cf904003028aefe9775c8',
+  model: 'MiniMaxAI/MiniMax-H3',
+  workload: '1344 × 768 · 8 s · 24 fps · 50 steps · MiniMaxAI/MiniMax-H3 @ 42ed227ee7df',
   concurrency: 1,
   participating: 4,
   allocated: 4,
