@@ -1,4 +1,0 @@
-{"doc_id": 0, "task_name": "gsm8k", "filter": "strict-match", "filtered_resps": ["9"], "exact_match": 1}
-{"doc_id": 0, "task_name": "gsm8k", "filter": "flexible-extract", "filtered_resps": ["9"], "exact_match": 1}
-{"doc_id": 1, "task_name": "gsm8k", "filter": "strict-match", "filtered_resps": ["9"], "exact_match": 0}
-{"doc_id": 1, "task_name": "gsm8k", "filter": "flexible-extract", "filtered_resps": ["9"], "exact_match": 1}

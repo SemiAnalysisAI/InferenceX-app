@@ -51,61 +51,6 @@ on:
         required: false
         default: ''
         type: string
-      receipt-required:
-        description: Immutable publication transport receipt-required
-        required: false
-        type: string
-        default: 'false'
-      receipt-artifact-id:
-        description: Immutable publication transport receipt-artifact-id
-        required: false
-        type: string
-        default: ''
-      receipt-artifact-sha256:
-        description: Immutable publication transport receipt-artifact-sha256
-        required: false
-        type: string
-        default: ''
-      receipt-sha256:
-        description: Immutable publication transport receipt-sha256
-        required: false
-        type: string
-        default: ''
-      receipt-issuer-run-id:
-        description: Immutable publication transport receipt-issuer-run-id
-        required: false
-        type: string
-        default: ''
-      receipt-issuer-sha:
-        description: Immutable publication transport receipt-issuer-sha
-        required: false
-        type: string
-        default: ''
-      publication-artifact-id:
-        description: Immutable publication transport publication-artifact-id
-        required: false
-        type: string
-        default: ''
-      publication-artifact-sha256:
-        description: Immutable publication transport publication-artifact-sha256
-        required: false
-        type: string
-        default: ''
-      publication-sha256:
-        description: Immutable publication transport publication-sha256
-        required: false
-        type: string
-        default: ''
-      publication-issuer-run-id:
-        description: Immutable publication transport publication-issuer-run-id
-        required: false
-        type: string
-        default: ''
-      publication-issuer-sha:
-        description: Immutable publication transport publication-issuer-sha
-        required: false
-        type: string
-        default: ''
     secrets:
       DATABASE_WRITE_URL:
         description: Production database write connection for direct ingests
@@ -165,62 +110,6 @@ on:
         required: false
         default: ''
         type: string
-
-      receipt-required:
-        description: Immutable publication transport receipt-required
-        required: false
-        type: string
-        default: 'false'
-      receipt-artifact-id:
-        description: Immutable publication transport receipt-artifact-id
-        required: false
-        type: string
-        default: ''
-      receipt-artifact-sha256:
-        description: Immutable publication transport receipt-artifact-sha256
-        required: false
-        type: string
-        default: ''
-      receipt-sha256:
-        description: Immutable publication transport receipt-sha256
-        required: false
-        type: string
-        default: ''
-      receipt-issuer-run-id:
-        description: Immutable publication transport receipt-issuer-run-id
-        required: false
-        type: string
-        default: ''
-      receipt-issuer-sha:
-        description: Immutable publication transport receipt-issuer-sha
-        required: false
-        type: string
-        default: ''
-      publication-artifact-id:
-        description: Immutable publication transport publication-artifact-id
-        required: false
-        type: string
-        default: ''
-      publication-artifact-sha256:
-        description: Immutable publication transport publication-artifact-sha256
-        required: false
-        type: string
-        default: ''
-      publication-sha256:
-        description: Immutable publication transport publication-sha256
-        required: false
-        type: string
-        default: ''
-      publication-issuer-run-id:
-        description: Immutable publication transport publication-issuer-run-id
-        required: false
-        type: string
-        default: ''
-      publication-issuer-sha:
-        description: Immutable publication transport publication-issuer-sha
-        required: false
-        type: string
-        default: ''
 
 permissions: {}
 
@@ -377,28 +266,6 @@ jobs:
           echo "Selected ingest target: $REQUESTED_DATABASE_TARGET"
           echo "Cache invalidate URL: $cache_invalidate_url"
 
-      - name: Verify immutable receipt transport
-        env:
-          GH_TOKEN: ${{ secrets.INFX_MAIN_PAT }}
-          INGEST_REPO: SemiAnalysisAI/InferenceX
-          SOURCE_RUN_ID: ${{ github.event.client_payload.source-run-id || github.event.client_payload.run-id || inputs.run-id }}
-          RECEIPT_TRANSPORT_PATH: ${{ github.workspace }}/receipt-transport
-          ALLOWED_RECEIPT_ISSUER_SHAS: ${{ vars.INFX_RECEIPT_ISSUER_SHAS }}
-          ALLOWED_RECEIPT_ISSUER_WORKFLOW: ${{ vars.INFX_RECEIPT_ISSUER_WORKFLOW }}
-          RECEIPT_REQUIRED: ${{ github.event.client_payload.receipt-required || inputs.receipt-required || 'false' }}
-          PUBLICATION_REQUIRED: ${{ env.REQUESTED_DATABASE_TARGET == 'production' && 'true' || 'false' }}
-          RECEIPT_ARTIFACT_ID: ${{ github.event.client_payload.receipt-artifact-id || inputs.receipt-artifact-id }}
-          RECEIPT_ARTIFACT_SHA256: ${{ github.event.client_payload.receipt-artifact-sha256 || inputs.receipt-artifact-sha256 }}
-          RECEIPT_SHA256: ${{ github.event.client_payload.receipt-sha256 || inputs.receipt-sha256 }}
-          RECEIPT_ISSUER_RUN_ID: ${{ github.event.client_payload.receipt-issuer-run-id || inputs.receipt-issuer-run-id }}
-          RECEIPT_ISSUER_SHA: ${{ github.event.client_payload.receipt-issuer-sha || inputs.receipt-issuer-sha }}
-          PUBLICATION_ARTIFACT_ID: ${{ github.event.client_payload.publication-artifact-id || inputs.publication-artifact-id }}
-          PUBLICATION_ARTIFACT_SHA256: ${{ github.event.client_payload.publication-artifact-sha256 || inputs.publication-artifact-sha256 }}
-          PUBLICATION_SHA256: ${{ github.event.client_payload.publication-sha256 || inputs.publication-sha256 }}
-          PUBLICATION_ISSUER_RUN_ID: ${{ github.event.client_payload.publication-issuer-run-id || inputs.publication-issuer-run-id }}
-          PUBLICATION_ISSUER_SHA: ${{ github.event.client_payload.publication-issuer-sha || inputs.publication-issuer-sha }}
-        run: bun packages/db/src/prepare-receipt-transport.ts
-
       - name: Prepare artifacts from InferenceX
         id: artifacts
         env:
@@ -449,20 +316,6 @@ jobs:
 
       - name: Verify PowerX source, database and public API
         run: bun packages/db/src/verify-power-publication.ts power-publication.json "${CACHE_INVALIDATE_URL%/api/v1/invalidate}"
-
-      - name: Verify accepted measurement publication
-        if: env.INGEST_RECEIPT_REQUIRED == '1'
-        env:
-          INGEST_ARTIFACTS_PATH: ${{ github.workspace }}/artifacts
-        run: bun packages/db/src/verify-measurement-publication.ts "${CACHE_INVALIDATE_URL%/api/v1/invalidate}" measurement-publication.json
-
-      - name: Retain measurement publication verification
-        if: always() && env.INGEST_RECEIPT_REQUIRED == '1'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
-        with:
-          name: measurement-publication-${{ steps.artifacts.outputs.source-run-id }}
-          path: measurement-publication.json
-          if-no-files-found: warn
 
       - name: Retain PowerX publication receipt
         if: always()
