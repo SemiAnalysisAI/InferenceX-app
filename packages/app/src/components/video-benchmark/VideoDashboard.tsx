@@ -89,11 +89,11 @@ const STRINGS = {
   zh: {
     title: 'VideoGenX · MiniMax-H3 跨硬件对比',
     subtitle:
-      '同一冻结的工作负载、同一模型与运行时，在每种 GPU 上实测：出片时间、每 GPU 小时与每美元 TCO 的有效产出、GPU 板卡实测能耗。',
+      '固定的工作负载、模型与运行时，在每种 GPU 上实测：出片时间、每 GPU 小时和每美元 TCO 的有效产出，以及 GPU 板卡的实测能耗。',
     chart: '图表',
     table: '表格',
     viewToggle: '图表或表格视图',
-    tier: '成本分档',
+    tier: '成本档位',
     badges: 'TCO $/chip/hr',
     source: '来源',
     queue: '显示排队尾迹（C2/C4）',

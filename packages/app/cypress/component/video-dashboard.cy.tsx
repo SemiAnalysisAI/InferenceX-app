@@ -112,6 +112,6 @@ describe('Video hardware dashboard (retained fixture)', () => {
       '每 1 美元 TCO 生成视频数（Hyperscaler 自有设备）',
     );
     kpi('mi355x').should('contain', '未测得');
-    cy.get('[data-testid="video-config-bar"]').should('contain', '成本分档');
+    cy.get('[data-testid="video-config-bar"]').should('contain', '成本档位');
   });
 });

@@ -31,8 +31,8 @@ const STRINGS = {
   zh: {
     p50Latency: 'P50 出片时间（s）',
     videosPerGpuHour: '视频数 / GPU 小时',
-    dollarsPerVideo: 'TCO / 条',
-    kjPerVideo: 'kJ / 条',
+    dollarsPerVideo: 'TCO / 条视频',
+    kjPerVideo: 'kJ / 条视频',
     powerPctCap: '板卡功率 / 上限',
     p90: 'P90',
     gpus: '张 GPU',

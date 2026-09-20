@@ -43,7 +43,7 @@ const STRINGS = {
     all: 'C1 + C2/C4 排队尾迹',
     x: 'X 轴指标',
     y: 'Y 轴指标',
-    tier: '成本分档',
+    tier: '成本档位',
     basis: 'GPU 口径',
     participating: '参与计算的 GPU（实际生成视频的板卡）',
     allocated: '已分配的 GPU（作业预留的板卡）',

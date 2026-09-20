@@ -115,7 +115,7 @@ export const VIDEO_METRICS: Record<MetricId, MetricDefinition> = {
   },
   videosPerGpuHour: {
     label: 'Videos per GPU-hour',
-    labelZh: '每 GPU 小时视频数',
+    labelZh: '每 GPU 小时生成视频数',
     unit: 'videos/GPU-hr',
     polarity: 'higher',
     digits: 2,
@@ -138,7 +138,7 @@ export const VIDEO_METRICS: Record<MetricId, MetricDefinition> = {
   },
   dollarsPerVideoSecond: {
     label: 'TCO cost per video-second',
-    labelZh: '每视频秒 TCO 成本',
+    labelZh: '每秒视频时长 TCO 成本',
     unit: '$/video-s',
     polarity: 'lower',
     digits: 4,
@@ -154,7 +154,7 @@ export const VIDEO_METRICS: Record<MetricId, MetricDefinition> = {
   },
   videosPerKwh: {
     label: 'Videos per GPU-board kWh',
-    labelZh: '每 GPU 板卡 kWh 视频数',
+    labelZh: '每 kWh GPU 板卡电能生成视频数',
     unit: 'videos/kWh',
     polarity: 'higher',
     digits: 2,
