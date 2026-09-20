@@ -48,6 +48,7 @@ import {
   chartFrontier,
   upperPowerEnvelope,
   isPowerCurveMetric,
+  isPowerGaugeSeries,
   isMeasuredPowerCurveMetric,
 } from '@/components/inference/utils/powerCurves';
 import type {
@@ -443,10 +444,20 @@ const GPUGraph = React.memo(
       if (!powerEnvelopeMode) return paretoRooflines;
       const result: Record<string, InferenceData[]> = {};
       for (const [key, points] of Object.entries(groupedData)) {
-        result[key] = upperPowerEnvelope(points, chartDefinition.chartType !== 'e2e');
+        result[key] = upperPowerEnvelope(
+          points,
+          chartDefinition.chartType !== 'e2e',
+          isPowerGaugeSeries(selectedYAxisMetric, points[0]),
+        );
       }
       return result;
-    }, [powerEnvelopeMode, groupedData, paretoRooflines, chartDefinition.chartType]);
+    }, [
+      powerEnvelopeMode,
+      groupedData,
+      paretoRooflines,
+      chartDefinition.chartType,
+      selectedYAxisMetric,
+    ]);
 
     const boundaryPointKeys = useMemo(() => {
       const keys = new Set<string>();

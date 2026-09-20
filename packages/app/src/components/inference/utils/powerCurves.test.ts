@@ -8,6 +8,7 @@ import {
   chartFrontier,
   isMeasuredPowerCurveMetric,
   isPowerCurveMetric,
+  isPowerGaugeSeries,
   upperPowerEnvelope,
 } from './powerCurves';
 
@@ -118,24 +119,50 @@ describe('upper power envelope', () => {
     const middle = point(8, 2, 700);
     const plateau = point(16, 3, 700);
     const slow = point(32, 4, 950);
-    // A tie at the running maximum stays on the boundary (the plateau is part
-    // of the outer edge); a repeated X keeps only its first vertex.
+    // Measured watts: a tie at the running maximum is a repeat marker, so the
+    // plateau leaves the boundary and Optimal Only can collapse it; a repeated
+    // X keeps only its first vertex.
     const samples = [slow, plateau, point(4, 2, 500), middle, { ...middle }, fast];
-    expect(upperPowerEnvelope(samples, false)).toEqual([fast, middle, plateau, slow]);
+    expect(upperPowerEnvelope(samples, false)).toEqual([fast, middle, slow]);
     expect(
       upperPowerEnvelope(
         samples.map((p) => ({ ...p, x: 1000 / p.x })),
         true,
       ).map((p) => p.y),
-    ).toEqual([950, 700, 700, 350]);
+    ).toEqual([950, 700, 350]);
+    // A gauge keeps the plateau: it is part of the outer edge it draws.
+    expect(upperPowerEnvelope(samples, false, true)).toEqual([fast, middle, plateau, slow]);
   });
 
-  it('keeps a flat provisioned series across its tested range', () => {
-    // A TDP gauge is the same watts at every concurrency: the boundary must
-    // span the sweep, not collapse to the single highest-x marker.
+  it('keeps a flat provisioned series across its tested range only when asked to', () => {
+    // A TDP gauge is the same watts at every concurrency: with `keepTies` the
+    // boundary spans the sweep; the strict measured rule would collapse it to
+    // the first-sorted marker.
     const flat = [point(1, 200, 1000), point(8, 120, 1000), point(64, 40, 1000)];
-    expect(upperPowerEnvelope(flat, true)).toEqual(flat.toReversed());
-    expect(upperPowerEnvelope(flat, false).map((p) => p.x)).toEqual([40, 120, 200]);
+    expect(upperPowerEnvelope(flat, true, true)).toEqual(flat.toReversed());
+    expect(upperPowerEnvelope(flat, false, true).map((p) => p.x)).toEqual([40, 120, 200]);
+    expect(upperPowerEnvelope(flat, true)).toEqual([flat[0]]);
+    expect(upperPowerEnvelope(flat, false)).toEqual([flat[2]]);
+  });
+
+  it('keeps ties only for provisioned and modelled gauge series', () => {
+    const measured = point(1, 200, 700);
+    const tdpClone = {
+      ...measured,
+      powerVariant: { kind: 'basis', id: 'gpu-provisioned' } as const,
+    };
+    const measuredClone = {
+      ...measured,
+      powerVariant: { kind: 'basis', id: 'gpu-measured' } as const,
+    };
+    const roleClone = { ...measured, powerVariant: { kind: 'role', id: 'decode' } as const };
+    expect(isPowerGaugeSeries('y_gpuProvisionedWatts', measured)).toBe(true);
+    expect(isPowerGaugeSeries('y_utilityModeledWatts', undefined)).toBe(true);
+    expect(isPowerGaugeSeries('y_measuredAvgPower', measured)).toBe(false);
+    expect(isPowerGaugeSeries('y_measuredAvgPower', tdpClone)).toBe(true);
+    expect(isPowerGaugeSeries('y_measuredAvgPower', measuredClone)).toBe(false);
+    expect(isPowerGaugeSeries('y_measuredAvgPower', roleClone)).toBe(false);
+    expect(isPowerGaugeSeries('y_gpuProvisionedWatts', roleClone)).toBe(false);
   });
 
   it('uses only finite positive coordinates and preserves singleton boundaries', () => {

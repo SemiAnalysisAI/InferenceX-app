@@ -111,6 +111,7 @@ import {
   chartFrontier,
   upperPowerEnvelope,
   isPowerCurveMetric,
+  isPowerGaugeSeries,
   isMeasuredPowerCurveMetric,
 } from '@/components/inference/utils/powerCurves';
 import type {
@@ -592,12 +593,19 @@ const ScatterGraph = React.memo(
         const groups = groupPointsByDate(points);
         if (showPowerEnvelope) {
           for (const [date, samples] of groups) {
-            groups.set(date, upperPowerEnvelope(samples, chartDefinition.chartType !== 'e2e'));
+            groups.set(
+              date,
+              upperPowerEnvelope(
+                samples,
+                chartDefinition.chartType !== 'e2e',
+                isPowerGaugeSeries(selectedYAxisMetric, samples[0]),
+              ),
+            );
           }
         }
         return groups;
       },
-      [showPowerEnvelope, chartDefinition.chartType],
+      [showPowerEnvelope, chartDefinition.chartType, selectedYAxisMetric],
     );
     const locale = useLocale();
     const legendT = SCATTER_STRINGS[locale];
