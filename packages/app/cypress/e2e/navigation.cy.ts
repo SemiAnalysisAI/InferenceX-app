@@ -391,6 +391,8 @@ describe('H3 video artifact viewer', () => {
     }).as('history');
     cy.visit('/video');
     cy.wait('@history');
+    // The hardware dashboard leads; the run/history views live in a collapsible section.
+    cy.get('[data-testid="video-runs-section"] summary').click();
     cy.get('[data-testid="video-history"] h1').should('contain', 'Performance history');
     cy.get('[data-testid="video-history-observation"]').should('have.length', 3);
     cy.get('[aria-label="Client concurrency"]').click();
