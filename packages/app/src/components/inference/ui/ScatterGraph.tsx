@@ -139,9 +139,14 @@ import {
   scatterSeriesKey,
 } from '@/components/inference/utils/point-identity';
 import {
-  powerVariantDash,
+  flatSeriesValue,
   inferPowerCompare,
+  lineLabelHardwareKey,
+  lineLabelSeriesId,
+  metricPlotsWatts,
   powerCompareBase,
+  powerLineLabelSuffix,
+  powerVariantDash,
   powerVariantId,
   powerVariantLabel,
   powerVariantsInData,
@@ -1784,17 +1789,25 @@ const ScatterGraph = React.memo(
       getCssColor,
     ]);
 
+    // The comparison in effect and the base series' identity under it. The
+    // base is the selected metric's own series; deriving it from which variant
+    // no official point carries breaks when only an overlay carries the
+    // comparison, and line labels need the same answer as the legend rows.
+    const powerCompareMode = useMemo(() => {
+      const official = inferPowerCompare(pointsData);
+      return official === 'none' ? inferPowerCompare(processedOverlayData) : official;
+    }, [pointsData, processedOverlayData]);
+    const powerCompareBaseId = useMemo(
+      () => powerVariantId(powerCompareBase(selectedYAxisMetric, powerCompareMode)),
+      [selectedYAxisMetric, powerCompareMode],
+    );
+
     // One legend row per comparison series present (base first). Rows toggle
     // chart-local visibility and hover-highlight that series across hardware.
     const powerVariantLegendItems = useMemo(() => {
       const allPoints = [...pointsData, ...processedOverlayData];
       const variants = powerVariantsInData(allPoints, selectedYAxisMetric);
-      // The base row is the selected metric's own series. Deriving it from
-      // which variant no official point carries breaks when only an overlay
-      // carries the comparison: every row would then toggle the base key.
-      const baseId = powerVariantId(
-        powerCompareBase(selectedYAxisMetric, inferPowerCompare(allPoints)),
-      );
+      const baseId = powerCompareBaseId;
       return variants.map((variant) => {
         const id = powerVariantId(variant);
         const legendId = `${POWER_VARIANT_LEGEND_PREFIX}${id}`;
@@ -1823,7 +1836,14 @@ const ScatterGraph = React.memo(
           },
         };
       });
-    }, [pointsData, processedOverlayData, selectedYAxisMetric, locale, hiddenPowerVariants]);
+    }, [
+      pointsData,
+      processedOverlayData,
+      selectedYAxisMetric,
+      powerCompareBaseId,
+      locale,
+      hiddenPowerVariants,
+    ]);
 
     const powerTierCounts = useMemo(() => {
       // Comparison clones re-plot the same measurements; count each once.
@@ -2575,6 +2595,31 @@ const ScatterGraph = React.memo(
 
     // --- Layers ---
     const layers = useMemo((): LayerConfig<InferenceData>[] => {
+      // Line-label identity of one drawn series under a power comparison
+      // (`i_pcompare`): the base series keeps the hardware key, so pinned
+      // anchors and hover hooks keep working; a sibling is `<hw>::<variant>`.
+      const wattsAxis = metricPlotsWatts(selectedYAxisMetric);
+      const lineLabelIdentity = (hw: string, points: readonly InferenceData[]) => {
+        const variant = points[0]?.powerVariant;
+        const variantId = powerVariantId(variant);
+        const isBase = !variant || variantId === powerCompareBaseId;
+        return { variant, variantId, isBase, seriesId: lineLabelSeriesId(hw, variant, isBase) };
+      };
+      // A sibling's label says which series it is; a flat provisioned boundary
+      // (TDP, all-in) on a watts axis also states its value.
+      const lineLabelSuffix = (
+        identity: ReturnType<typeof lineLabelIdentity>,
+        points: readonly InferenceData[],
+      ) =>
+        powerLineLabelSuffix(identity.variant, {
+          isBase: identity.isBase,
+          locale,
+          flatWatts:
+            !identity.isBase && wattsAxis && identity.variant?.kind === 'basis'
+              ? flatSeriesValue(points.map((point) => point.y))
+              : null,
+        });
+
       // ── Layer 0: Rooflines + gradient labels (custom) ──
       const rooflineLayer: CustomLayerConfig = {
         type: 'custom',
@@ -2827,12 +2872,19 @@ const ScatterGraph = React.memo(
 
           // ── Line labels (run name along each roofline) ──
           let lineLabels: LineLabelPlacement[] = [];
+          // Comparison variant and label suffix per label key, for the text
+          // segments and the `data-power-variant` hook on each pill.
+          const lineLabelMeta = new Map<string, { variantId: string; suffix: string }>();
           if (showLineLabels) {
             const multiPrecision = ir.selectedPrecisions.length > 1;
             const officialByGroup = new Map<string, (typeof entries)[number]>();
             for (const entry of entries) {
               if (!entry.visible) continue;
-              const groupKey = multiPrecision ? entry.key : entry.hw;
+              // One label per hardware and, under a power comparison, per
+              // sibling series: the measured line and its boundary / pool
+              // lines each say which one they are, instead of the longest
+              // line taking the hardware's only label.
+              const groupKey = multiPrecision ? entry.key : `${entry.hw}::${entry.variant}`;
               const previous = officialByGroup.get(groupKey);
               if (!previous || entry.points.length > previous.points.length) {
                 officialByGroup.set(groupKey, entry);
@@ -2841,20 +2893,25 @@ const ScatterGraph = React.memo(
 
             const officialSeries: LineLabelSeries<InferenceData>[] = [
               ...officialByGroup.values(),
-            ].map((entry) => ({
-              key: entry.key,
-              seriesId: entry.hw,
-              label: lineLabelText(
-                entry.hw,
-                entry.precision,
-                multiPrecision,
-                modelLabel,
-                entry.points,
-              ),
-              color: ir.getCssColor(ir.resolveColor(entry.hw)),
-              points: entry.points,
-              keepVisibleOnCollision: entry.points.length === 1,
-            }));
+            ].map((entry) => {
+              const identity = lineLabelIdentity(entry.hw, entry.points);
+              const suffix = lineLabelSuffix(identity, entry.points);
+              lineLabelMeta.set(entry.key, { variantId: identity.variantId, suffix });
+              return {
+                key: entry.key,
+                seriesId: identity.seriesId,
+                label: `${lineLabelText(
+                  entry.hw,
+                  entry.precision,
+                  multiPrecision,
+                  modelLabel,
+                  entry.points,
+                )}${suffix}`,
+                color: ir.getCssColor(ir.resolveColor(entry.hw)),
+                points: entry.points,
+                keepVisibleOnCollision: entry.points.length === 1,
+              };
+            });
             const overlaySeries: LineLabelSeries<InferenceData>[] = Object.entries(
               displayedOverlayRooflines,
             ).flatMap(([overlayKey, group]) => {
@@ -2869,11 +2926,15 @@ const ScatterGraph = React.memo(
                   ? `${runLabel} ${getPrecisionLabel(precision as Precision)}`
                   : runLabel
                 : lineLabelText(group.hwKey, precision, multiPrecision, modelLabel, group.points);
+              const identity = lineLabelIdentity(group.hwKey, group.points);
+              const suffix = lineLabelSuffix(identity, group.points);
+              const key = `overlay-${overlayKey}`;
+              lineLabelMeta.set(key, { variantId: identity.variantId, suffix });
               return [
                 {
-                  key: `overlay-${overlayKey}`,
-                  seriesId: group.hwKey,
-                  label,
+                  key,
+                  seriesId: identity.seriesId,
+                  label: `${label}${suffix}`,
                   color: overlayRunColor(group.runIndex),
                   points: group.points,
                 },
@@ -2896,16 +2957,19 @@ const ScatterGraph = React.memo(
             const labeledKeys = new Set(lineLabels.map((label) => label.key));
             for (const entry of entries) {
               if (labeledKeys.has(entry.key)) continue;
+              const identity = lineLabelIdentity(entry.hw, entry.points);
+              const suffix = lineLabelSuffix(identity, entry.points);
+              lineLabelMeta.set(entry.key, { variantId: identity.variantId, suffix });
               lineLabels.push({
                 key: entry.key,
-                seriesId: entry.hw,
-                label: lineLabelText(
+                seriesId: identity.seriesId,
+                label: `${lineLabelText(
                   entry.hw,
                   entry.precision,
                   multiPrecision,
                   modelLabel,
                   entry.points,
-                ),
+                )}${suffix}`,
                 color: ir.getCssColor(ir.resolveColor(entry.hw)),
                 x: xScale(entry.points[0].x),
                 y: yScale(entry.points[0].y),
@@ -2922,20 +2986,28 @@ const ScatterGraph = React.memo(
           }
 
           renderLineLabels(zoomGroup, lineLabels, {
-            seriesAttribute: 'data-hw-key',
-            iconFor: (label) => getLineLabelVendorIcon(label.seriesId),
+            seriesAttribute: 'data-series-id',
+            iconFor: (label) => getLineLabelVendorIcon(lineLabelHardwareKey(label.seriesId)),
             configureGroup: (labelGroup, label) => {
               labelGroup
                 .attr('data-visible', label.visible ? '1' : '0')
+                // Legend hover and filter sync key labels by hardware alone;
+                // the variant names the comparison sibling ('' for the base).
+                .attr('data-hw-key', lineLabelHardwareKey(label.seriesId))
+                .attr('data-power-variant', lineLabelMeta.get(label.key)?.variantId ?? '')
                 .select('.ll-bg')
                 .attr('opacity', 0.95);
             },
             configureText: (text, label) => {
-              const config = getHardwareConfig(label.seriesId, modelLabel);
+              const config = getHardwareConfig(lineLabelHardwareKey(label.seriesId), modelLabel);
+              // Parse the hardware part without the variant suffix, which gets
+              // its own segment so the engine is still matched at the end.
+              const suffix = lineLabelMeta.get(label.key)?.suffix ?? '';
+              const coreLabel = suffix ? label.label.slice(0, -suffix.length) : label.label;
               const hardwareLabel = getDisplayLabel(config);
               const isHardwareLabel =
-                label.label === hardwareLabel || label.label.startsWith(`${config.label} `);
-              const remainingLabel = isHardwareLabel ? label.label.slice(config.label.length) : '';
+                coreLabel === hardwareLabel || coreLabel.startsWith(`${config.label} `);
+              const remainingLabel = isHardwareLabel ? coreLabel.slice(config.label.length) : '';
               // Use this curve's resolved suffix, not the generic hwKey label:
               // official and overlay curves can share a key but differ by run.
               const engineLabel =
@@ -2945,6 +3017,9 @@ const ScatterGraph = React.memo(
                 engineLabel && remainingLabel.endsWith(engineLabel)
                   ? remainingLabel.slice(0, -engineLabel.length)
                   : remainingLabel;
+              const variantSegments = suffix
+                ? [{ className: 'll-variant', text: suffix, fill: 'white', weight: '500' }]
+                : [];
               const segments = isHardwareLabel
                 ? [
                     { className: 'll-gpu', text: config.label, fill: 'white', weight: '700' },
@@ -2968,14 +3043,16 @@ const ScatterGraph = React.memo(
                           },
                         ]
                       : []),
+                    ...variantSegments,
                   ]
                 : [
                     {
                       className: 'll-plain',
-                      text: label.label,
+                      text: coreLabel,
                       fill: 'white',
                       weight: '600',
                     },
+                    ...variantSegments,
                   ];
               text
                 .selectAll<SVGTSpanElement, (typeof segments)[number]>('tspan')
@@ -3096,12 +3173,12 @@ const ScatterGraph = React.memo(
               const singleDate = pointsByDate.size === 1;
               for (const [date, datePoints] of pointsByDate) {
                 const entryKey = singleDate ? key : `${key}__${encodeURIComponent(date)}`;
-                const groupKey = multiPrecision ? entryKey : hardware;
+                const groupKey = multiPrecision ? entryKey : `${hardware}::${variant ?? ''}`;
                 const previous = bestByGroup.get(groupKey);
                 if (!previous || datePoints.length > previous.points.length) {
                   bestByGroup.set(groupKey, {
                     key: entryKey,
-                    seriesId: hardware,
+                    seriesId: lineLabelIdentity(hardware, datePoints).seriesId,
                     points: datePoints,
                   });
                 }
@@ -3122,7 +3199,7 @@ const ScatterGraph = React.memo(
                 ? [
                     {
                       key: `overlay-${overlayKey}`,
-                      seriesId: group.hwKey,
+                      seriesId: lineLabelIdentity(group.hwKey, group.points).seriesId,
                       label: '',
                       color: '',
                       points: group.points,
@@ -3683,6 +3760,7 @@ const ScatterGraph = React.memo(
       xLabel,
       yLabel,
       selectedYAxisMetric,
+      powerCompareBaseId,
       isMeasuredEnergyAxis,
       chartDefinition,
       locale,

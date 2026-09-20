@@ -16,7 +16,12 @@
  * comparison yields no series and the control says so.
  */
 import type { Locale } from '@/lib/i18n';
-import { POWER_BASES, POWER_BASIS_FIELDS, POWER_BASIS_LABELS } from '@/lib/power-basis';
+import {
+  POWER_BASES,
+  POWER_BASIS_FIELDS,
+  POWER_BASIS_LABELS,
+  type PowerBasis,
+} from '@/lib/power-basis';
 
 import { getMeasuredMetricConfig } from '../measured-metric-config';
 import type { InferenceData, PowerCompare, PowerRole, PowerVariant } from '../types';
@@ -219,6 +224,104 @@ export function powerVariantLabel(variant: PowerVariant, locale: Locale): string
   return variant.kind === 'basis'
     ? POWER_BASIS_LABELS[variant.id][locale]
     : ROLE_LABELS[variant.id][locale];
+}
+
+/** Short boundary names for in-chart line labels; the legend keeps the full names. */
+const BASIS_SHORT_LABELS: Record<PowerBasis, { en: string; zh: string }> = {
+  'gpu-measured': { en: 'Measured', zh: '实测' },
+  'gpu-provisioned': { en: 'TDP', zh: 'TDP' },
+  'utility-provisioned': { en: 'All-in', zh: '全站' },
+  'utility-modeled': { en: 'PUE modeled', zh: 'PUE 建模' },
+};
+
+/** Suffix text a line label carries for one comparison series. */
+export function powerVariantShortLabel(variant: PowerVariant, locale: Locale): string {
+  return variant.kind === 'basis'
+    ? BASIS_SHORT_LABELS[variant.id][locale]
+    : ROLE_LABELS[variant.id][locale];
+}
+
+/** `700 W`, `1.37 kW`, `19.2 kW`: kilowatts from 1000 W, at most two decimals, zeros trimmed. */
+export function formatWatts(watts: number): string {
+  if (Math.abs(watts) >= 1000) {
+    return `${(watts / 1000).toFixed(2).replace(/\.?0+$/u, '')} kW`;
+  }
+  return `${Math.round(watts)} W`;
+}
+
+/**
+ * The value a series holds at every point, or null when it varies. A
+ * provisioned boundary (TDP, all-in) is one number per hardware, so its line
+ * label can state it instead of sending the reader to the axis. Non-finite
+ * values are ignored; an empty series is null.
+ */
+export function flatSeriesValue(values: readonly number[], relTolerance = 0.005): number | null {
+  const finite = values.filter((value) => Number.isFinite(value));
+  if (finite.length === 0) return null;
+  const first = finite[0];
+  const tolerance = Math.abs(first) * relTolerance;
+  return finite.every((value) => Math.abs(value - first) <= tolerance) ? first : null;
+}
+
+export interface PowerLineLabelOptions {
+  /** The selected metric's own series keeps the plain hardware label. */
+  isBase: boolean;
+  locale: Locale;
+  /** Shared watts of a flat series (`flatSeriesValue`), appended after the name. */
+  flatWatts?: number | null;
+}
+
+const LINE_LABEL_SUFFIX_SEPARATOR = ' · ';
+
+/** Suffix appended to a comparison sibling's line label; '' for the base series. */
+export function powerLineLabelSuffix(
+  variant: PowerVariant | null | undefined,
+  opts: PowerLineLabelOptions,
+): string {
+  if (opts.isBase || !variant) return '';
+  const watts =
+    typeof opts.flatWatts === 'number' && Number.isFinite(opts.flatWatts)
+      ? ` ${formatWatts(opts.flatWatts)}`
+      : '';
+  return `${LINE_LABEL_SUFFIX_SEPARATOR}${powerVariantShortLabel(variant, opts.locale)}${watts}`;
+}
+
+/**
+ * Line-label text for one drawn series: the hardware label alone for the base
+ * series, `<label> · <variant>` for a sibling, plus the flat watts when known.
+ */
+export function powerLineLabel(
+  baseLabel: string,
+  variant: PowerVariant | null | undefined,
+  opts: PowerLineLabelOptions,
+): string {
+  return `${baseLabel}${powerLineLabelSuffix(variant, opts)}`;
+}
+
+const LINE_LABEL_SERIES_DELIMITER = '::';
+
+/**
+ * Line-label series id: the hardware key for the base series (existing pinned
+ * anchors and hover hooks key on it) and `<hw>::<variant>` for a sibling.
+ */
+export function lineLabelSeriesId(
+  hw: string,
+  variant: PowerVariant | null | undefined,
+  isBase: boolean,
+): string {
+  return isBase || !variant ? hw : `${hw}${LINE_LABEL_SERIES_DELIMITER}${variant.id}`;
+}
+
+/** Inverse of `lineLabelSeriesId`: the hardware key behind a line-label series id. */
+export function lineLabelHardwareKey(seriesId: string): string {
+  const index = seriesId.indexOf(LINE_LABEL_SERIES_DELIMITER);
+  return index === -1 ? seriesId : seriesId.slice(0, index);
+}
+
+/** Whether `metric` plots watts per chip, so a flat boundary's label can state its value. */
+export function metricPlotsWatts(metric: string): boolean {
+  const config = getMeasuredMetricConfig(metric);
+  return config?.family === 'power' && config.display === 'watts';
 }
 
 /**

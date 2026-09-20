@@ -1,17 +1,30 @@
 import { describe, expect, it } from 'vitest';
 
-import type { InferenceData } from '@/components/inference/types';
+import type {
+  InferenceData,
+  PowerBasis,
+  PowerRole,
+  PowerVariant,
+} from '@/components/inference/types';
 
 import {
   expandPowerCompareSeries,
+  flatSeriesValue,
+  formatWatts,
   inferPowerCompare,
+  lineLabelHardwareKey,
+  lineLabelSeriesId,
+  metricPlotsWatts,
   parsePowerCompare,
   powerCompareAvailable,
   powerCompareBase,
   powerCompareVariants,
+  powerLineLabel,
+  powerLineLabelSuffix,
   powerSeriesLabel,
   powerVariantDash,
   powerVariantLabel,
+  powerVariantShortLabel,
   powerVariantsInData,
 } from './power-compare';
 
@@ -176,5 +189,107 @@ describe('labels, dashes and URL values', () => {
       ),
     ).toBe('数据中心建模（含 PUE）');
     expect(powerSeriesLabel({}, 'y_measuredAvgPower', 'none', 'en')).toBe('');
+  });
+});
+
+const basis = (id: PowerBasis): PowerVariant => ({ kind: 'basis', id });
+const role = (id: PowerRole): PowerVariant => ({ kind: 'role', id });
+
+describe('line labels', () => {
+  it('names every variant briefly in both locales', () => {
+    const cases: [PowerVariant, string, string][] = [
+      [basis('gpu-measured'), 'Measured', '实测'],
+      [basis('gpu-provisioned'), 'TDP', 'TDP'],
+      [basis('utility-provisioned'), 'All-in', '全站'],
+      [basis('utility-modeled'), 'PUE modeled', 'PUE 建模'],
+      [role('all'), 'All GPUs', '全部 GPU'],
+      [role('prefill'), 'Prefill GPUs', '预填充 GPU'],
+      [role('decode'), 'Decode GPUs', '解码 GPU'],
+    ];
+    for (const [variant, en, zh] of cases) {
+      expect(powerVariantShortLabel(variant, 'en')).toBe(en);
+      expect(powerVariantShortLabel(variant, 'zh')).toBe(zh);
+    }
+  });
+
+  it('formats watts as integer W below 1 kW and trimmed two-decimal kW above', () => {
+    expect(formatWatts(700)).toBe('700 W');
+    expect(formatWatts(999.6)).toBe('1000 W');
+    expect(formatWatts(1000)).toBe('1 kW');
+    expect(formatWatts(1200)).toBe('1.2 kW');
+    expect(formatWatts(1370)).toBe('1.37 kW');
+    expect(formatWatts(1400)).toBe('1.4 kW');
+    expect(formatWatts(1714.5)).toBe('1.71 kW');
+    expect(formatWatts(19200)).toBe('19.2 kW');
+    expect(formatWatts(100000)).toBe('100 kW');
+  });
+
+  it('leaves the base label alone and suffixes a sibling with its variant and flat watts', () => {
+    const label = 'B300 (SGLang)';
+    const tdp = basis('gpu-provisioned');
+    expect(powerLineLabel(label, undefined, { isBase: true, locale: 'en' })).toBe(label);
+    expect(powerLineLabel(label, null, { isBase: false, locale: 'en' })).toBe(label);
+    // A variant that is itself the base series keeps the plain label.
+    expect(powerLineLabel(label, tdp, { isBase: true, locale: 'en', flatWatts: 1200 })).toBe(label);
+    expect(powerLineLabel(label, tdp, { isBase: false, locale: 'en' })).toBe('B300 (SGLang) · TDP');
+    expect(powerLineLabel(label, tdp, { isBase: false, locale: 'en', flatWatts: 700 })).toBe(
+      'B300 (SGLang) · TDP 700 W',
+    );
+    expect(powerLineLabel(label, tdp, { isBase: false, locale: 'en', flatWatts: 1370 })).toBe(
+      'B300 (SGLang) · TDP 1.37 kW',
+    );
+    expect(
+      powerLineLabel(label, basis('utility-provisioned'), {
+        isBase: false,
+        locale: 'zh',
+        flatWatts: 19200,
+      }),
+    ).toBe('B300 (SGLang) · 全站 19.2 kW');
+    // Non-finite or null watts drop the value, never print NaN.
+    expect(powerLineLabel(label, tdp, { isBase: false, locale: 'en', flatWatts: null })).toBe(
+      'B300 (SGLang) · TDP',
+    );
+    expect(powerLineLabel(label, tdp, { isBase: false, locale: 'en', flatWatts: NaN })).toBe(
+      'B300 (SGLang) · TDP',
+    );
+    expect(powerLineLabel(label, role('decode'), { isBase: false, locale: 'en' })).toBe(
+      'B300 (SGLang) · Decode GPUs',
+    );
+    // The suffix alone is what the renderer splits into its own text segment.
+    expect(powerLineLabelSuffix(role('prefill'), { isBase: false, locale: 'zh' })).toBe(
+      ' · 预填充 GPU',
+    );
+    expect(powerLineLabelSuffix(role('prefill'), { isBase: true, locale: 'zh' })).toBe('');
+  });
+
+  it('detects a flat series within the relative tolerance', () => {
+    expect(flatSeriesValue([1200, 1200, 1200])).toBe(1200);
+    expect(flatSeriesValue([1000, 1004, 996])).toBe(1000);
+    expect(flatSeriesValue([1000, 1005])).toBe(1000);
+    expect(flatSeriesValue([1000, 1005.01])).toBeNull();
+    expect(flatSeriesValue([1000, 1005.01], 0.01)).toBe(1000);
+    expect(flatSeriesValue([600, 640, 710])).toBeNull();
+    expect(flatSeriesValue([])).toBeNull();
+    expect(flatSeriesValue([NaN, Infinity])).toBeNull();
+    expect(flatSeriesValue([NaN, 1200, 1200])).toBe(1200);
+    expect(flatSeriesValue([1200])).toBe(1200);
+  });
+
+  it('keeps the hardware key as the base series id and recovers it from a sibling id', () => {
+    const tdp = basis('gpu-provisioned');
+    expect(lineLabelSeriesId('b200_sglang', undefined, true)).toBe('b200_sglang');
+    expect(lineLabelSeriesId('b200_sglang', tdp, true)).toBe('b200_sglang');
+    expect(lineLabelSeriesId('b200_sglang', tdp, false)).toBe('b200_sglang::gpu-provisioned');
+    expect(lineLabelHardwareKey('b200_sglang::gpu-provisioned')).toBe('b200_sglang');
+    expect(lineLabelHardwareKey('b200_sglang')).toBe('b200_sglang');
+  });
+
+  it('only lets a watts axis state a flat boundary value', () => {
+    expect(metricPlotsWatts('y_measuredAvgPower')).toBe(true);
+    expect(metricPlotsWatts('y_gpuProvisionedWatts')).toBe(true);
+    expect(metricPlotsWatts('y_measuredDecodeAvgPower')).toBe(true);
+    expect(metricPlotsWatts('y_measuredPowerPercentTdp')).toBe(false);
+    expect(metricPlotsWatts('y_measuredJPerOutputToken')).toBe(false);
+    expect(metricPlotsWatts('y_tpPerGpu')).toBe(false);
   });
 });
