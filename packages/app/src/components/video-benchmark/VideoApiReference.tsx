@@ -70,7 +70,7 @@ export default function VideoApiReference({
         <label htmlFor={id} className="text-xs font-medium text-muted-foreground">
           {s.label}
         </label>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Input
             id={id}
             type="number"
@@ -80,7 +80,7 @@ export default function VideoApiReference({
             value={raw}
             aria-label={s.label}
             data-testid="video-api-price"
-            className="tabular-nums"
+            className="min-w-20 flex-1 tabular-nums"
             onFocus={() => {
               valueAtFocus.current = value;
             }}
@@ -102,6 +102,7 @@ export default function VideoApiReference({
             variant="outline"
             title={s.resetTitle}
             data-testid="video-api-price-reset"
+            className="shrink-0"
             onClick={() => {
               setRaw(String(reference));
               commit(reference, true);
