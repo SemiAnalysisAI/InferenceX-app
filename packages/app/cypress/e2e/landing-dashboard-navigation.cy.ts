@@ -71,7 +71,7 @@ describe('landing model curation', () => {
           .and(
             'have.attr',
             'href',
-            `${prefix}/inference/deepseek-r1?i_seq=8k%2F1k&i_prec=fp4&i_spec=stp&i_xmode=e2e`,
+            `${prefix}/inference/deepseek-r1?i_seq=8k%2F1k&i_prec=fp4&i_xmode=e2e`,
           )
           .and('contain.text', 'OpenAI Jalapeño')
           .and('contain.text', 'DeepSeek R1');
@@ -119,6 +119,8 @@ describe('landing model curation', () => {
       cy.visit(prefix || '/');
       cy.get('[data-testid="landing-rubin-results-link"]').click();
       cy.location('pathname').should('eq', `${prefix}/inference/deepseek-v4`);
+      cy.location('search').should('not.contain', 'i_spec=');
+      cy.get('[data-testid^="remove-filter-spec-"]').should('not.exist');
       cy.get('[data-testid="scenario-selector"]').should(
         'contain.text',
         prefix ? '智能体' : 'Agentic',
@@ -126,6 +128,8 @@ describe('landing model curation', () => {
       cy.get('[data-testid="chart-legend"]').should('contain.text', 'Vera Rubin NVL72');
       cy.reload();
       cy.get('[data-testid="chart-legend"]').should('contain.text', 'Vera Rubin NVL72');
+      cy.location('search').should('not.contain', 'i_spec=');
+      cy.get('[data-testid^="remove-filter-spec-"]').should('not.exist');
       cy.go('back');
       cy.location('pathname').should('eq', prefix || '/');
     });
@@ -137,11 +141,13 @@ describe('landing model curation', () => {
       cy.get('[data-testid="scenario-selector"]').should('contain.text', '8K / 1K');
       cy.get('[data-testid="precision-multiselect"]').should('contain.text', 'FP4');
       cy.get('[data-testid="x-axis-mode-selector"]').should('have.attr', 'data-value', 'e2e');
-      cy.get('[data-testid="remove-filter-spec-stp"]').should('exist');
+      cy.location('search').should('not.contain', 'i_spec=');
+      cy.get('[data-testid^="remove-filter-spec-"]').should('not.exist');
       cy.get('[data-testid="chart-legend"]').should('contain.text', 'Jalapeño');
       cy.reload();
       cy.get('[data-testid="x-axis-mode-selector"]').should('have.attr', 'data-value', 'e2e');
-      cy.get('[data-testid="remove-filter-spec-stp"]').should('exist');
+      cy.location('search').should('not.contain', 'i_spec=');
+      cy.get('[data-testid^="remove-filter-spec-"]').should('not.exist');
       cy.get('[data-testid="chart-legend"]').should('contain.text', 'Jalapeño');
     });
   }
