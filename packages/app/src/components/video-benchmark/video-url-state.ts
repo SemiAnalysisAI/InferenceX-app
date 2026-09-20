@@ -1,9 +1,11 @@
+import { H3_API_REFERENCE } from './api-reference';
 import type { CostTier } from './hardware';
 import {
   COST_TIERS,
   X_METRICS,
   Y_METRICS,
   type GpuBasis,
+  type MetricOptions,
   type XMetricId,
   type YMetricId,
 } from './metrics';
@@ -20,6 +22,8 @@ export interface VideoDashboardState {
   /** Draw the cross-hardware Pareto frontier over all deployments. */
   frontier: boolean;
   view: 'chart' | 'table';
+  /** USD per video-second the API-priced metrics assume; the dated reference unless the reader overrides it. */
+  apiPrice: number;
 }
 
 export const DEFAULT_VIDEO_DASHBOARD_STATE: VideoDashboardState = {
@@ -31,6 +35,7 @@ export const DEFAULT_VIDEO_DASHBOARD_STATE: VideoDashboardState = {
   optimal: false,
   frontier: false,
   view: 'chart',
+  apiPrice: H3_API_REFERENCE.pricePerVideoSecondUsd,
 };
 
 const BASES: readonly GpuBasis[] = ['participating', 'allocated'];
@@ -38,6 +43,26 @@ const VIEWS: readonly VideoDashboardState['view'][] = ['chart', 'table'];
 
 const pick = <T extends string>(allowed: readonly T[], value: string | null, fallback: T): T =>
   allowed.includes(value as T) ? (value as T) : fallback;
+
+/**
+ * A USD/video-second price as typed or read from `v_api`: positive, finite,
+ * kept to four decimals so the URL and the input agree. Anything else is null,
+ * so callers fall back to the reference instead of pricing at 0.
+ */
+export function parseApiPrice(raw: string | number | null | undefined): number | null {
+  if (raw === null || raw === undefined) return null;
+  const n = typeof raw === 'number' ? raw : Number(raw.trim() || Number.NaN);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  const rounded = Math.round(n * 1e4) / 1e4;
+  return rounded > 0 ? rounded : null;
+}
+
+/** Metric inputs the dashboard controls select, so no component rebuilds `{ tier, basis }` by hand. */
+export const metricOptions = (state: VideoDashboardState): MetricOptions => ({
+  tier: state.tier,
+  basis: state.basis,
+  apiPricePerVideoSecond: parseApiPrice(state.apiPrice),
+});
 
 /** Dashboard controls live under the `v_` prefix so the run/artifact/view params stay untouched. */
 export function readVideoDashboardState(search: string): VideoDashboardState {
@@ -52,6 +77,7 @@ export function readVideoDashboardState(search: string): VideoDashboardState {
     optimal: p.get('v_opt') === '1',
     frontier: p.get('v_frontier') === '1',
     view: pick(VIEWS, p.get('v_view'), d.view),
+    apiPrice: parseApiPrice(p.get('v_api')) ?? d.apiPrice,
   };
 }
 
@@ -69,5 +95,7 @@ export function writeVideoDashboardState(url: URL, state: VideoDashboardState): 
   set('v_opt', state.optimal ? '1' : null);
   set('v_frontier', state.frontier ? '1' : null);
   set('v_view', state.view === d.view ? null : state.view);
+  const apiPrice = parseApiPrice(state.apiPrice);
+  set('v_api', apiPrice === null || apiPrice === d.apiPrice ? null : String(apiPrice));
   return out;
 }
