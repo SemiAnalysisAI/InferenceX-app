@@ -18,6 +18,8 @@ export interface VideoPoint {
   concurrency: number | null;
   participating: number | null;
   allocated: number | null;
+  /** Model replicas behind the endpoint; null for bundles that predate the deployment record. */
+  replicas: number | null;
   valid: number | null;
   completed: number | null;
   scheduled: number | null;

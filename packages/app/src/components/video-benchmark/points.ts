@@ -1,3 +1,4 @@
+import { deploymentKey } from './deployment';
 import { hardwareKey, hardwareSort } from './hardware';
 import type { VideoHistoryObservation, VideoHistoryPage } from './history';
 import type { VideoPoint } from './metrics';
@@ -51,6 +52,7 @@ function toPoint(
     concurrency: num(o.concurrency),
     participating: num(o.participating),
     allocated: num(o.allocated),
+    replicas: num(o.replicas),
     valid: num(o.valid),
     completed: num(o.completed),
     scheduled: num(o.scheduled),
@@ -78,15 +80,17 @@ function toPoint(
 }
 
 /**
- * Newest published observation per (hardware, concurrency) cell. Points arrive
- * newest publication first, so the first occurrence wins; hardware without a
- * registry key is kept as-is because nothing can be compared against it.
+ * Newest published observation per (hardware, deployment, concurrency) cell.
+ * Points arrive newest publication first, so the first occurrence wins; hardware
+ * without a registry key is kept as-is because nothing can be compared against
+ * it. Two server layouts of one hardware are different cells, so a GPUs-per-video
+ * sweep adds points instead of replacing the existing one.
  */
 export function latestVideoCells(points: VideoPoint[]): VideoPoint[] {
   const seen = new Set<string>();
   return points.filter((point) => {
     if (point.hardwareKey === null) return true;
-    const key = `${point.hardwareKey}:${point.concurrency ?? 'na'}`;
+    const key = `${point.hardwareKey}:${deploymentKey(point)}:${point.concurrency ?? 'na'}`;
     if (seen.has(key)) return false;
     seen.add(key);
     return true;

@@ -56,6 +56,7 @@ describe('video history projection', () => {
     expect(c1).toMatchObject({
       participating: 2,
       allocated: 2,
+      replicas: null,
       wallSeconds: 480,
       durationSeconds: 4,
       frameCount: 107,
