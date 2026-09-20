@@ -394,6 +394,39 @@ const VENDOR_MARKS: readonly {
   },
 ] as const;
 
+const LANDING_HARDWARE_RESULTS = [
+  {
+    id: 'tpu',
+    vendor: 'Google',
+    title: 'TPU Results',
+    titleZh: 'TPU 结果',
+    subtitle: 'Qwen 3.5 · 8K/1K · FP8 · STP',
+    href: '/inference/qwen-3-5?i_seq=8k%2F1k&i_prec=fp8&i_spec=stp&i_xmode=e2e',
+    model: 'qwen-3-5',
+    analyticsEvent: 'landing_tpu_results_clicked',
+  },
+  {
+    id: 'rubin',
+    vendor: 'NVIDIA',
+    title: 'Rubin Results',
+    titleZh: 'Rubin 结果',
+    subtitle: 'DeepSeek V4 Pro · AgentX',
+    href: '/inference/deepseek-v4',
+    model: 'deepseek-v4',
+    analyticsEvent: 'landing_rubin_results_clicked',
+  },
+  {
+    id: 'jalapeno',
+    vendor: 'OpenAI',
+    title: 'OpenAI Jalapeño',
+    titleZh: 'OpenAI Jalapeño',
+    subtitle: 'DeepSeek R1 · 8K/1K · FP4 · STP',
+    href: '/inference/deepseek-r1?i_seq=8k%2F1k&i_prec=fp4&i_spec=stp&i_xmode=e2e',
+    model: 'deepseek-r1',
+    analyticsEvent: 'landing_jalapeno_results_clicked',
+  },
+] as const;
+
 const STRINGS = {
   en: {
     eyebrow: 'AgentX / live results',
@@ -404,7 +437,6 @@ const STRINGS = {
     dashboard: 'Dashboard',
     ledgerTitle: 'Models with AgentX results',
     modelAction: 'View results',
-    tpuResults: 'TPU Results',
     newModel: 'NEW',
   },
   zh: {
@@ -416,7 +448,6 @@ const STRINGS = {
     dashboard: '仪表板',
     ledgerTitle: '已发布 AgentX 结果的模型',
     modelAction: '查看结果',
-    tpuResults: 'TPU 结果',
     newModel: '新',
   },
 } as const;
@@ -588,48 +619,53 @@ export function AgentXCompareHero({
                 </CompareIndexTrackedLink>
               ))}
             </nav>
-            {surface === 'landing' && (
-              <CompareIndexTrackedLink
-                data-testid="landing-tpu-results-link"
-                href={`${prefix}/inference/qwen-3-5?i_seq=8k%2F1k&i_prec=fp8&i_spec=stp&i_xmode=e2e`}
-                analyticsEvent="landing_tpu_results_clicked"
-                analyticsTarget="qwen-3-5"
-                analyticsSurface={surface}
-                appNavigation
-                className="group flex min-h-14 items-center justify-between gap-4 border-t border-border/70 px-5 py-2.5 transition-colors hover:bg-brand/5 focus-visible:outline-none"
-              >
-                <span className="flex min-w-0 items-center gap-3">
-                  <svg
-                    data-testid="landing-tpu-google-logo"
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox={VENDOR_MARKS[0].viewBox}
-                    width={32}
-                    height={32}
-                    aria-hidden="true"
-                    className="size-8 shrink-0"
+            {surface === 'landing' &&
+              LANDING_HARDWARE_RESULTS.map((result) => {
+                const mark = VENDOR_MARKS.find((vendor) => vendor.name === result.vendor)!;
+                return (
+                  <CompareIndexTrackedLink
+                    key={result.id}
+                    data-testid={`landing-${result.id}-results-link`}
+                    href={`${prefix}${result.href}`}
+                    analyticsEvent={result.analyticsEvent}
+                    analyticsTarget={result.model}
+                    analyticsSurface={surface}
+                    appNavigation
+                    className="group flex min-h-14 items-center justify-between gap-4 border-t border-border/70 px-5 py-2.5 transition-colors hover:bg-brand/5 focus-visible:outline-none"
                   >
-                    {VENDOR_MARKS[0].paths.map((path) => (
-                      <path key={path.d} d={path.d} fill={path.fill} />
-                    ))}
-                  </svg>
-                  <span className="min-w-0">
-                    <span className="block text-sm font-semibold leading-tight text-foreground group-hover:text-brand">
-                      {t.tpuResults}
+                    <span className="flex min-w-0 items-center gap-3">
+                      <svg
+                        data-testid={`landing-${result.id}-${result.vendor.toLowerCase()}-logo`}
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox={mark.viewBox}
+                        width={32}
+                        height={32}
+                        aria-hidden="true"
+                        className="size-8 shrink-0 text-foreground"
+                      >
+                        {mark.paths.map((path) => (
+                          <path key={path.d} d={path.d} fill={path.fill} />
+                        ))}
+                      </svg>
+                      <span className="min-w-0">
+                        <span className="block text-sm font-semibold leading-tight text-foreground group-hover:text-brand">
+                          {locale === 'zh' ? result.titleZh : result.title}
+                        </span>
+                        <span className="mt-1 block font-mono text-3xs tracking-eyebrow text-brand uppercase">
+                          {result.subtitle}
+                        </span>
+                      </span>
                     </span>
-                    <span className="mt-1 block font-mono text-3xs tracking-eyebrow text-brand uppercase">
-                      Qwen 3.5 · 8K/1K · FP8 · STP
+                    <span className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-muted-foreground group-hover:text-foreground">
+                      {t.modelAction}
+                      <ArrowRight
+                        aria-hidden="true"
+                        className="size-3.5 motion-safe:transition-transform motion-safe:duration-200 motion-safe:group-hover:translate-x-0.5"
+                      />
                     </span>
-                  </span>
-                </span>
-                <span className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-muted-foreground group-hover:text-foreground">
-                  {t.modelAction}
-                  <ArrowRight
-                    aria-hidden="true"
-                    className="size-3.5 motion-safe:transition-transform motion-safe:duration-200 motion-safe:group-hover:translate-x-0.5"
-                  />
-                </span>
-              </CompareIndexTrackedLink>
-            )}
+                  </CompareIndexTrackedLink>
+                );
+              })}
           </div>
         </div>
       </Card>

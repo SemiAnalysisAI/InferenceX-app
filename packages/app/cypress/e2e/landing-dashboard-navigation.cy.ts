@@ -16,6 +16,8 @@
  * natively.
  */
 
+import { interceptVrPublicationData } from '../support/vr-publication-fixtures';
+
 const TARGET = '/inference/kimi-k3';
 
 interface HistoryWrite {
@@ -58,11 +60,38 @@ describe('landing model curation', () => {
             `${prefix}/inference/qwen-3-5?i_seq=8k%2F1k&i_prec=fp8&i_spec=stp&i_xmode=e2e`,
           );
         cy.get('[data-testid="landing-tpu-google-logo"] path').should('have.length', 4);
+        cy.get('[data-testid="landing-tpu-results-link"]')
+          .next()
+          .should('have.attr', 'data-testid', 'landing-rubin-results-link')
+          .and('have.attr', 'href', `${prefix}/inference/deepseek-v4`)
+          .and('contain.text', 'DeepSeek V4 Pro');
+        cy.get('[data-testid="landing-rubin-results-link"]')
+          .next()
+          .should('have.attr', 'data-testid', 'landing-jalapeno-results-link')
+          .and(
+            'have.attr',
+            'href',
+            `${prefix}/inference/deepseek-r1?i_seq=8k%2F1k&i_prec=fp4&i_spec=stp&i_xmode=e2e`,
+          )
+          .and('contain.text', 'OpenAI Jalapeño')
+          .and('contain.text', 'DeepSeek R1');
+        cy.get('[data-testid="landing-rubin-nvidia-logo"] path').should(
+          'have.attr',
+          'fill',
+          '#76B900',
+        );
+        cy.get('[data-testid="landing-jalapeno-openai-logo"] path').should(
+          'have.attr',
+          'fill',
+          'currentColor',
+        );
       });
 
       cy.visit(`${prefix}/compare`);
       cy.get('[data-testid="compare-agentx-primary"]').within(() => {
         cy.get('[data-testid="landing-tpu-results-link"]').should('not.exist');
+        cy.get('[data-testid="landing-rubin-results-link"]').should('not.exist');
+        cy.get('[data-testid="landing-jalapeno-results-link"]').should('not.exist');
         cy.get('[data-testid^="compare-agentx-model-"]').should('have.length', 7);
         for (const slug of ['deepseek-v4', 'qwen-3-8-flash-next']) {
           cy.get(`[data-testid="compare-agentx-model-${slug}"]`).should(
@@ -83,6 +112,37 @@ describe('landing model curation', () => {
       assertTpuView();
       cy.go('back');
       cy.location('pathname').should('eq', prefix || '/');
+    });
+
+    it(`opens Rubin AgentX results from ${prefix || '/'}`, () => {
+      interceptVrPublicationData();
+      cy.visit(prefix || '/');
+      cy.get('[data-testid="landing-rubin-results-link"]').click();
+      cy.location('pathname').should('eq', `${prefix}/inference/deepseek-v4`);
+      cy.get('[data-testid="scenario-selector"]').should(
+        'contain.text',
+        prefix ? '智能体' : 'Agentic',
+      );
+      cy.get('[data-testid="chart-legend"]').should('contain.text', 'Vera Rubin NVL72');
+      cy.reload();
+      cy.get('[data-testid="chart-legend"]').should('contain.text', 'Vera Rubin NVL72');
+      cy.go('back');
+      cy.location('pathname').should('eq', prefix || '/');
+    });
+
+    it(`opens Jalapeño R1 results from ${prefix || '/'}`, () => {
+      cy.visit(prefix || '/');
+      cy.get('[data-testid="landing-jalapeno-results-link"]').click();
+      cy.location('pathname').should('eq', `${prefix}/inference/deepseek-r1`);
+      cy.get('[data-testid="scenario-selector"]').should('contain.text', '8K / 1K');
+      cy.get('[data-testid="precision-multiselect"]').should('contain.text', 'FP4');
+      cy.get('[data-testid="x-axis-mode-selector"]').should('have.attr', 'data-value', 'e2e');
+      cy.get('[data-testid="remove-filter-spec-stp"]').should('exist');
+      cy.get('[data-testid="chart-legend"]').should('contain.text', 'Jalapeño');
+      cy.reload();
+      cy.get('[data-testid="x-axis-mode-selector"]').should('have.attr', 'data-value', 'e2e');
+      cy.get('[data-testid="remove-filter-spec-stp"]').should('exist');
+      cy.get('[data-testid="chart-legend"]').should('contain.text', 'Jalapeño');
     });
   }
 });
