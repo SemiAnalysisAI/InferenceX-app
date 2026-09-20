@@ -198,7 +198,10 @@ config is `display: 'timeline'`.
   `<runId>:<name>` (`traceKeyForPoint`), unique per point in both collectors.
 
 - **Fetch.** One request per workflow run in the visible points
-  (`planPowerTimelineRequests`, at most `POWER_TIMELINE_MAX_RUNS`), narrowed with
+  (`planPowerTimelineRequests`, at most `POWER_TIMELINE_MAX_RUNS`; a deep-linked trace's run
+  goes first, then `?unofficialrun=` overlay runs, then official runs — `prioritizeRun` /
+  `prioritizeRuns` — so an overlay the user asked for is never the run that gets dropped),
+  narrowed with
   `prefix=` to the common RESULT_FILENAME prefix so a nightly sweep's other models are not
   downloaded. `/api/gpu-metrics?series=power` returns one-second per-GPU buckets
   (`components/gpu-power/power-series.ts`, ~1 MB for a 25-config run instead of ~27 MB of

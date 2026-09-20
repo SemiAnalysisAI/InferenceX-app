@@ -10,6 +10,7 @@ import {
   longestCommonPrefix,
   planPowerTimelineRequests,
   prioritizeRun,
+  prioritizeRuns,
   requestPowerTraceFocus,
   runIdFromUrl,
   telemetryArtifactForPoint,
@@ -310,6 +311,36 @@ describe('power trace focus handoff', () => {
     requestPowerTraceFocus('second');
     expect(consumePowerTraceFocus()).toBe('second');
     expect(consumePowerTraceFocus()).toBeNull();
+  });
+});
+
+describe('prioritizeRuns', () => {
+  const requests = ['1', '2', '3', '4', '5'].map((runId) => ({
+    runId,
+    prefix: '',
+    artifacts: [],
+  }));
+
+  it('moves overlay runs ahead of official runs and keeps both orders', () => {
+    expect(prioritizeRuns(requests, new Set(['5', '3'])).map((request) => request.runId)).toEqual([
+      '3',
+      '5',
+      '1',
+      '2',
+      '4',
+    ]);
+  });
+
+  it('lets the deep-linked run lead the overlay runs', () => {
+    const ordered = prioritizeRun(prioritizeRuns(requests, new Set(['4', '5'])), '2');
+    expect(ordered.map((request) => request.runId)).toEqual(['2', '4', '5', '1', '3']);
+  });
+
+  it('returns the same array when nothing moves', () => {
+    expect(prioritizeRuns(requests, new Set())).toBe(requests);
+    expect(prioritizeRuns(requests, new Set(['9']))).toBe(requests);
+    expect(prioritizeRuns(requests, new Set(['1', '2']))).toBe(requests);
+    expect(prioritizeRuns(requests, new Set(['1', '2', '3', '4', '5']))).toBe(requests);
   });
 });
 

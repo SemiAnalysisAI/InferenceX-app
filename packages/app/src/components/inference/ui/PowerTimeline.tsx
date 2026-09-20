@@ -64,6 +64,8 @@ import {
   joinPowerTimeline,
   planPowerTimelineRequests,
   prioritizeRun,
+  prioritizeRuns,
+  runIdFromUrl,
   traceConfigLabel,
   traceKeyRunId,
   tracePools,
@@ -724,9 +726,24 @@ export default function PowerTimeline({
     requestedFocusRef.current = consumePowerTraceFocus();
   }
   const focusRunRef = useRef(traceKeyRunId(requestedFocusRef.current));
+  // Overlay runs were requested explicitly (`?unofficialrun=`), so they take
+  // the cap's slots before official runs; the deep-linked run still goes first.
+  const overlayRunIds = useMemo(
+    () =>
+      new Set(
+        overlayPoints
+          .map((point) => runIdFromUrl(point.run_url))
+          .filter((runId): runId is string => runId !== null),
+      ),
+    [overlayPoints],
+  );
   const fetchedRequests = useMemo(
-    () => prioritizeRun(requests, focusRunRef.current).slice(0, POWER_TIMELINE_MAX_RUNS),
-    [requests],
+    () =>
+      prioritizeRun(prioritizeRuns(requests, overlayRunIds), focusRunRef.current).slice(
+        0,
+        POWER_TIMELINE_MAX_RUNS,
+      ),
+    [requests, overlayRunIds],
   );
   const droppedRuns = requests.length - fetchedRequests.length;
   const queries = useQueries({

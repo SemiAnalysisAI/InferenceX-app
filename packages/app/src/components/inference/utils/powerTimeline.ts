@@ -129,6 +129,25 @@ export function prioritizeRun(
   return [requests[index], ...requests.slice(0, index), ...requests.slice(index + 1)];
 }
 
+/**
+ * Moves every request whose run is in `runIds` ahead of the others, keeping
+ * the relative order inside both groups. Unofficial-run overlays are loaded
+ * on purpose, so their telemetry must survive the per-chart run cap before
+ * official rows compete for the remaining slots. Returns the same array when
+ * nothing needs moving.
+ */
+export function prioritizeRuns(
+  requests: PowerTimelineRequest[],
+  runIds: ReadonlySet<string>,
+): PowerTimelineRequest[] {
+  if (runIds.size === 0) return requests;
+  const first = requests.filter((request) => runIds.has(request.runId));
+  if (first.length === 0 || first.length === requests.length) return requests;
+  const rest = requests.filter((request) => !runIds.has(request.runId));
+  const moved = first.some((request, index) => requests[index] !== request);
+  return moved ? [...first, ...rest] : requests;
+}
+
 export interface PowerTimelineTrace {
   /** `traceKeyForPoint(point)`. */
   key: string;

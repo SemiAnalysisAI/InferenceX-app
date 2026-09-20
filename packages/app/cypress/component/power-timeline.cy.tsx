@@ -32,6 +32,8 @@ const RUN_ID = '34716669498';
 const RUN_URL = `https://github.com/SemiAnalysisAI/InferenceX/actions/runs/${RUN_ID}`;
 const OVERLAY_RUN_ID = '31415926535';
 const OVERLAY_RUN_URL = `https://github.com/SemiAnalysisAI/InferenceX/actions/runs/${OVERLAY_RUN_ID}`;
+const runUrlFor = (runId: string) =>
+  `https://github.com/SemiAnalysisAI/InferenceX/actions/runs/${runId}`;
 const START_MS = Date.UTC(2026, 8, 12, 20, 20, 0);
 const hwConfig = {
   ...createMockHardwareConfig(),
@@ -327,6 +329,76 @@ describe('PowerTimeline', () => {
       cy.get('.power-reference[data-reference="tdp"]').should('have.length', 2);
     });
     cy.get('[data-testid="chart-legend"]').should('contain.text', '✕ powerx-timeline');
+  });
+
+  it('keeps ?unofficialrun= overlay telemetry inside the per-chart run cap', () => {
+    // Four official runs already fill the cap and all sort before the overlay run
+    // id: the overlay the user asked for is fetched anyway and the last official
+    // run (by id) is the one left out.
+    const officialRuns = ['30000000001', '30000000002', '30000000003', '30000000004'];
+    const officialPoints = officialRuns.map((runId, index) =>
+      measuredPoint('b200', 8 * 2 ** index, 700, { run_url: runUrlFor(runId) }),
+    );
+    officialRuns.forEach((runId, index) => {
+      cy.intercept('GET', `/api/gpu-metrics?runId=${runId}*`, {
+        body: {
+          runInfo: { ...response.runInfo, id: Number(runId), url: runUrlFor(runId) },
+          series: [series('b200', 8 * 2 ** index, 700)],
+        } satisfies GpuPowerSeriesResponse,
+      }).as(`official${index}`);
+    });
+    const overlayPoint = measuredPoint('h200', 16, 500, {
+      run_url: OVERLAY_RUN_URL,
+      power_audit: {
+        source: `power_validation_${resultName('h200', 16)}.json`,
+        ...WINDOW,
+      },
+    });
+    cy.intercept('GET', `/api/gpu-metrics?runId=${OVERLAY_RUN_ID}*`, {
+      body: {
+        runInfo: { ...response.runInfo, id: Number(OVERLAY_RUN_ID), url: OVERLAY_RUN_URL },
+        series: [series('h200', 16, 500)],
+      } satisfies GpuPowerSeriesResponse,
+    }).as('overlay');
+    mountTimeline(officialPoints, {
+      overlay: {
+        data: [overlayPoint],
+        hardwareConfig: hwConfig,
+        label: 'powerx-timeline',
+        runUrl: OVERLAY_RUN_URL,
+      },
+      unofficial: createMockUnofficialRunContext({
+        isUnofficialRun: true,
+        unofficialRunInfos: [
+          {
+            id: Number(OVERLAY_RUN_ID),
+            name: 'powerx-timeline',
+            branch: 'powerx-timeline',
+            sha: 'abc000',
+            createdAt: '2026-09-12T00:00:00Z',
+            url: OVERLAY_RUN_URL,
+            conclusion: 'success',
+            status: 'completed',
+            isNonMainBranch: true,
+          },
+        ],
+        runIndexByUrl: { [OVERLAY_RUN_URL]: 0, [OVERLAY_RUN_ID]: 0 },
+        activeOverlayHwTypes: new Set(['h200']),
+      }),
+    });
+    cy.wait(['@overlay', '@official0', '@official1', '@official2']);
+
+    cy.get('[data-testid="power-timeline-status"]').should(
+      'contain.text',
+      'Telemetry from 1 more run was not loaded',
+    );
+    cy.get('@official3.all').should('have.length', 0);
+    svg().within(() => {
+      cy.get('path.power-trace[data-run-index="0"][data-segment="window"]')
+        .should('have.length', 1)
+        .and('have.attr', 'stroke', overlayRunColor(0));
+      cy.get('path.power-trace[data-hw="b200"][data-segment="window"]').should('have.length', 3);
+    });
   });
 
   it('reports a failed run and hides traces the legend has switched off', () => {
