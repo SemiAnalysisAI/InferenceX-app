@@ -227,6 +227,37 @@ describe('ScatterGraph power comparison series', () => {
     });
   });
 
+  it('keys legend rows by the comparison base when only an overlay carries the series', () => {
+    // No official measured points at all: the base row must still be the
+    // selected metric, and each sibling must keep its own toggle.
+    const overlay = expandPowerCompareSeries(
+      measuredCurve('h100', OVERLAY_RUN_URL),
+      'y_measuredAvgPower',
+      'roles',
+    );
+    mountCompare([], { overlay });
+
+    cy.get(`${svg} .unofficial-overlay-pt`).should('have.length', 9);
+    cy.get('#power-compare-test [data-testid="chart-legend"]').within(() => {
+      cy.contains('All GPUs').should('exist');
+      cy.contains('Decode GPUs').click();
+    });
+    cy.get(`${svg} .overlay-roofline-path[data-power-variant="decode"]`).should(
+      'have.css',
+      'opacity',
+      '0',
+    );
+    cy.get(`${svg} .overlay-roofline-path:not([data-power-variant])`).should(
+      'have.css',
+      'opacity',
+      '1',
+    );
+    cy.get(`${svg} .unofficial-overlay-pt`).then(($points) => {
+      const hidden = [...$points].filter((point) => getComputedStyle(point).opacity === '0');
+      expect(hidden).to.have.length(3);
+    });
+  });
+
   it('translates the comparison legend rows on /zh', () => {
     mountCompare(expandPowerCompareSeries(measuredCurve('b200'), 'y_measuredAvgPower', 'roles'), {
       pathname: '/zh/inference',

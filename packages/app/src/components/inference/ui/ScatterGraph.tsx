@@ -140,6 +140,8 @@ import {
 } from '@/components/inference/utils/point-identity';
 import {
   powerVariantDash,
+  inferPowerCompare,
+  powerCompareBase,
   powerVariantId,
   powerVariantLabel,
   powerVariantsInData,
@@ -1785,14 +1787,18 @@ const ScatterGraph = React.memo(
     // One legend row per comparison series present (base first). Rows toggle
     // chart-local visibility and hover-highlight that series across hardware.
     const powerVariantLegendItems = useMemo(() => {
-      const variants = powerVariantsInData(
-        [...pointsData, ...processedOverlayData],
-        selectedYAxisMetric,
+      const allPoints = [...pointsData, ...processedOverlayData];
+      const variants = powerVariantsInData(allPoints, selectedYAxisMetric);
+      // The base row is the selected metric's own series. Deriving it from
+      // which variant no official point carries breaks when only an overlay
+      // carries the comparison: every row would then toggle the base key.
+      const baseId = powerVariantId(
+        powerCompareBase(selectedYAxisMetric, inferPowerCompare(allPoints)),
       );
       return variants.map((variant) => {
         const id = powerVariantId(variant);
         const legendId = `${POWER_VARIANT_LEGEND_PREFIX}${id}`;
-        const isBase = !pointsData.some((point) => powerVariantId(point.powerVariant) === id);
+        const isBase = id === baseId;
         return {
           name: legendId,
           hw: legendId,
