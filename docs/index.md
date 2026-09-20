@@ -25,6 +25,7 @@ Design rationale and non-obvious conventions. See [CLAUDE.md](../CLAUDE.md) for 
 - [State Ownership](./state-ownership.md) — Which context owns which state, availability filtering cascade, comparison date mechanics, URL param sync
 - [Blog](./blog.md) — MDX content system, SEO features (OG images, RSS, llms.txt, JSON-LD), TOC sidebar, reading progress, heading links, analytics events
 - [CollectiveX](./collectivex.md) — lazy ingest-on-read pipeline (separate Neon DB as a durable GitHub-artifact cache), tombstoned deletes, raw-docs storage + shared reader
+- [VideoGenX dashboard](./videogenx-dashboard.md) — `/video` cross-hardware chart: published-history projection → points → metrics, TCO tiers and GPU basis, C1 default with queueing tails, Pareto hull, unavailable-hardware roster, null rules
 - [Chinese Pages (/zh)](./i18n.md) — Why hand-authored /zh pages instead of an i18n framework, hreflang pairing, blog translation pairing, html lang workaround, CJK reading time/slugs
 - [Chinese Copy Editorial Guide](./chinese-copy.md) — Audience, surface-specific register, context-aware terminology, rewrite workflow, manual-review process, and PR checklist
 

@@ -1,6 +1,6 @@
 # Video performance history
 
-`/video` and `/zh/video` default to **Performance history**. Explicit run/artifact/source/cell URLs retain the existing video viewer. `?view=results` opens the first readable artifact/source from the newest published page; `?view=history` restores history. History filters use `history-hardware`, `history-concurrency`, and `history-query` in the URL. Videos & result follows the same published-first path when no run is selected; empty or failed reads show a recoverable message. Browse CI runs explicitly opens legacy Actions discovery. Returning to History cancels pending result selection; Refresh and reload preserve the selected artifact/source/cell.
+`/video` and `/zh/video` lead with the cross-hardware dashboard (see [VideoGenX dashboard](./videogenx-dashboard.md)); the run, results and **Performance history** views described here live in the collapsible "Runs, videos & evidence" section below it, which opens automatically when the URL carries any of `run`, `artifact`, `source`, `cell`, `view`, `compare` or `history-*`. Explicit run/artifact/source/cell URLs retain the existing video viewer. `?view=results` opens the first readable artifact/source from the newest published page; `?view=history` restores history. History filters use `history-hardware`, `history-concurrency`, and `history-query` in the URL. Videos & result follows the same published-first path when no run is selected; empty or failed reads show a recoverable message. Browse CI runs explicitly opens legacy Actions discovery. Returning to History cancels pending result selection; Refresh and reload preserve the selected artifact/source/cell.
 
 ## Read path
 
@@ -24,7 +24,7 @@ Each observation also carries the cell's participating and allocated GPU counts,
 
 ## 中文说明
 
-`/video` 与 `/zh/video` 默认打开“性能历史”。原有 run/artifact/source/cell 链接仍打开对应结果；`?view=results` 打开最新发布页面中首个可读取的产物与原始运行；未选择运行时，“视频与结果”也使用该入口。空列表或读取失败会显示可恢复的提示；只有点击“浏览 CI 运行”才扫描 GitHub Actions。返回性能历史会取消正在进行的结果选择；刷新和重新加载保留产物、原始运行及并发配置。历史筛选条件保存在 URL，刷新后恢复。
+`/video` 与 `/zh/video` 首屏为跨硬件仪表板（见 [VideoGenX 仪表板](./videogenx-dashboard.md)）；本文描述的运行、结果与“性能历史”视图位于其下方可展开的“运行、视频与证据”区块，URL 带有 `run`、`artifact`、`source`、`cell`、`view`、`compare` 或 `history-*` 参数时自动展开。原有 run/artifact/source/cell 链接仍打开对应结果；`?view=results` 打开最新发布页面中首个可读取的产物与原始运行；未选择运行时，“视频与结果”也使用该入口。空列表或读取失败会显示可恢复的提示；只有点击“浏览 CI 运行”才扫描 GitHub Actions。返回性能历史会取消正在进行的结果选择；刷新和重新加载保留产物、原始运行及并发配置。历史筛选条件保存在 URL，刷新后恢复。
 
 历史读取只列举既有发布索引的元数据，按索引发布时间排序，每页最多读取十份完整索引；不下载或发布媒体。原始执行时间取自 `ci.started_at`，与发布时间、重新导出的时间分开。索引无效时保留错误记录，缺失指标保留 null。每个 cell 另附参与/已分配 GPU 数、测量窗口秒数、视频时长与帧数、板卡平均功率之和、记录的生效功率上限之和（无快照时为 null）以及配置的 `tp_size` / `ulysses_degree` / `attention_backend`；这些都是同一 `schemaVersion: 1` 下可为空的附加字段，硬件仪表板据此推导全部指标，浏览器不再解析产物包。
 
