@@ -26,4 +26,21 @@ describe('Video hardware dashboard (E2E fixtures)', () => {
     );
     cy.get('[data-testid="video-kpi-card"][data-hardware="mi355x"]').should('contain', '未测得');
   });
+  it('fits a phone viewport without horizontal page scroll in both locales', () => {
+    cy.viewport(390, 844);
+    for (const path of ['/video?v_queue=1', '/zh/video']) {
+      cy.visit(path);
+      cy.get('[data-testid="video-hardware-chart"] circle.point').should('have.length.at.least', 3);
+      cy.get('[data-testid="video-kpi-card"]').should('have.length', 4);
+      cy.document().then((doc) => {
+        expect(doc.documentElement.scrollWidth, `${path} page width`).to.be.at.most(
+          doc.documentElement.clientWidth,
+        );
+      });
+      cy.screenshot(`video-dashboard-390${path.startsWith('/zh') ? '-zh' : '-en'}`, {
+        capture: 'fullPage',
+        overwrite: true,
+      });
+    }
+  });
 });

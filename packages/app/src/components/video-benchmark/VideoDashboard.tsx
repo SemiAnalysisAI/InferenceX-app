@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import {
   HW_REGISTRY,
   TCO_SOURCE_TITLE,
@@ -111,6 +111,8 @@ const STRINGS = {
   },
 };
 
+const subscribeNoop = () => () => {};
+
 function csvCell(value: string | number | null): string {
   if (value === null) return '';
   const text = String(value);
@@ -143,9 +145,17 @@ export default function VideoDashboard() {
     highContrast: false,
     activeKeys: hardwareKeys,
   });
+  // Vendor hues depend on the resolved theme and computed styles, which the
+  // server cannot know; render the neutral token until hydration completes so
+  // the first client render matches the server HTML.
+  const mounted = useSyncExternalStore(
+    subscribeNoop,
+    () => true,
+    () => false,
+  );
   const colorFor = useCallback(
-    (key: string) => getCssColor(resolveColor(key)),
-    [resolveColor, getCssColor],
+    (key: string) => (mounted ? getCssColor(resolveColor(key)) : 'var(--muted-foreground)'),
+    [mounted, resolveColor, getCssColor],
   );
 
   const options = { tier: state.tier, basis: state.basis };
@@ -377,7 +387,7 @@ export default function VideoDashboard() {
           )}
         </div>
       </ChartSection>
-      <VideoKpiCards points={points} state={state} colorFor={colorFor} />
+      <VideoKpiCards points={points} state={state} colorFor={colorFor} loading={loading} />
       <details
         className="rounded-xl border px-4 py-3"
         data-testid="video-runs-section"

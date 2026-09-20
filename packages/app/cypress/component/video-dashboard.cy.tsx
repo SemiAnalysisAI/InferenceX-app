@@ -88,6 +88,23 @@ describe('Video hardware dashboard (retained fixture)', () => {
     cy.get('[data-testid="video-runs-section"]').should('have.attr', 'open');
     cy.get('[data-testid="video-ci-runs"]').should('exist');
   });
+  it('shows placeholders while loading instead of a false "Not measured"', () => {
+    cy.intercept('GET', '/api/video-runs?format=history&page=1', (req) => {
+      req.reply({ fixture: 'api/video-history.json', delay: 800 });
+    }).as('slowHistory');
+    cy.intercept('GET', '/api/video-runs?page=*', { runs: [], nextPage: null });
+    cy.mount(
+      <PathnameContext.Provider value="/video">
+        <VideoDashboard />
+      </PathnameContext.Provider>,
+    );
+    cy.get('[data-testid="video-kpi-skeleton"]').should('have.length', 4);
+    cy.get('[data-testid="video-kpi-unavailable"]').should('not.exist');
+    cy.wait('@slowHistory');
+    cy.get('[data-testid="video-kpi-skeleton"]').should('not.exist');
+    kpi('h200').should('contain', '$0.204');
+    kpi('mi355x').find('[data-testid="video-kpi-unavailable"]').should('exist');
+  });
   it('renders Chinese copy on /zh/video', () => {
     mount('/zh/video');
     cy.get('[data-testid="video-chart-card"]').should(
