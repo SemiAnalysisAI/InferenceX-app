@@ -45,6 +45,8 @@ describe('ScatterGraph', () => {
         setVisible: setShowParetoFrontier,
       } = useParetoHighlightToggle();
       const [showOverlay, setShowOverlay] = useState(true);
+      const [showLineLabels, setShowLineLabels] = useState(false);
+      const [showGradientLabels, setShowGradientLabels] = useState(false);
       const inference = {
         ...base,
         hardwareConfig: hwConfig,
@@ -55,6 +57,10 @@ describe('ScatterGraph', () => {
         showParetoFrontier,
         setShowParetoFrontier,
         paretoFrontierPlayful,
+        showLineLabels,
+        setShowLineLabels,
+        showGradientLabels,
+        setShowGradientLabels,
       };
       return (
         <InferenceContextsProvider
@@ -121,6 +127,20 @@ describe('ScatterGraph', () => {
         const hw = (curve as unknown as { __data__: { points: { hwKey: string }[] } }).__data__
           .points[0].hwKey;
         expect(curve.style.filter).to.equal(hw === 'b200' ? '' : 'opacity(0.2)');
+      });
+    });
+    // New labels must inherit the fade even when Pareto membership is unchanged.
+    cy.get('#scatter-line-labels').click();
+    cy.get('.line-label[data-hw-key="h100"]').should(($labels) => {
+      $labels.each((_, label) => {
+        expect(label.style.filter).to.equal('opacity(0.2)');
+      });
+    });
+    cy.get('#scatter-line-labels').click();
+    cy.get('#scatter-line-labels').click();
+    cy.get('.line-label[data-hw-key="h100"]').should(($labels) => {
+      $labels.each((_, label) => {
+        expect(label.style.filter).to.equal('opacity(0.2)');
       });
     });
     // Turning the switch off restores official and unofficial marks.
