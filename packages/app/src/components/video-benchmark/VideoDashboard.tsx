@@ -24,14 +24,18 @@ import {
   type VideoPoint,
 } from './metrics';
 import { latestVideoCells } from './points';
+import { formatApiPrice, H3_API_REFERENCE } from './api-reference';
 import { useVideoPoints } from './use-video-points';
 import VideoCIRuns from './VideoCIRuns';
+import VideoCompare from './VideoCompare';
 import VideoConfigBar from './VideoConfigBar';
+import VideoEvidence from './VideoEvidence';
 import VideoHardwareChart, { VIDEO_CHART_ID } from './VideoHardwareChart';
 import VideoKpiCards from './VideoKpiCards';
 import VideoPointsTable, { videoTableRows } from './VideoPointsTable';
 import {
   DEFAULT_VIDEO_DASHBOARD_STATE,
+  metricOptions,
   readVideoDashboardState,
   writeVideoDashboardState,
   type VideoDashboardState,
@@ -61,6 +65,10 @@ const CSV_METRICS: readonly MetricId[] = [
   'kjPerVideo',
   'videosPerKwh',
   'powerPctCap',
+  'apiPricePerVideo',
+  'revenuePerGpuHour',
+  'profitPerGpuHour',
+  'apiPriceMultiple',
 ];
 
 const STRINGS = {
@@ -74,6 +82,7 @@ const STRINGS = {
     tier: 'Cost tier',
     badges: 'TCO $/chip/hr',
     source: 'Source',
+    apiReference: 'API reference',
     queue: 'Show queued requests (C2/C4)',
     optimal: 'Optimal only',
     frontier: 'Pareto frontier',
@@ -99,6 +108,7 @@ const STRINGS = {
     tier: '成本档位',
     badges: 'TCO $/chip/hr',
     source: '来源',
+    apiReference: 'API 参考价',
     queue: '显示排队请求（C2/C4）',
     optimal: '仅最优',
     frontier: 'Pareto 前沿',
@@ -163,7 +173,7 @@ export default function VideoDashboard() {
     [mounted, resolveColor, getCssColor],
   );
 
-  const options = { tier: state.tier, basis: state.basis };
+  const options = metricOptions(state);
   const cells = useMemo(() => latestVideoCells(points), [points]);
   // Each hardware is represented by its most efficient measured deployment.
   const measured = useMemo(
@@ -224,6 +234,7 @@ export default function VideoDashboard() {
       'scheduled',
       'participating_gpus',
       'allocated_gpus',
+      'api_price_usd_per_video_second',
       'tp_size',
       'ulysses_degree',
       'replicas',
@@ -242,6 +253,7 @@ export default function VideoDashboard() {
         p.scheduled,
         p.participating,
         p.allocated,
+        state.apiPrice,
         p.server?.tp ?? null,
         p.server?.ulysses ?? null,
         p.replicas,
@@ -329,6 +341,10 @@ export default function VideoDashboard() {
                     {costPerGpuHour(key, state.tier)?.toFixed(2) ?? '—'}
                   </span>
                 ))}
+              </span>
+              <span>
+                {s.apiReference}: {formatApiPrice(state.apiPrice)}/video-s (
+                {H3_API_REFERENCE.capturedOn})
               </span>
               <span>
                 {s.source}:{' '}
@@ -423,6 +439,12 @@ export default function VideoDashboard() {
         </div>
       </ChartSection>
       <VideoKpiCards points={points} state={state} colorFor={colorFor} loading={loading} />
+      {!loading && !error && (
+        <>
+          <VideoCompare points={points} options={options} colorFor={colorFor} />
+          <VideoEvidence points={points} options={options} colorFor={colorFor} />
+        </>
+      )}
       <details
         className="rounded-xl border px-4 py-3"
         data-testid="video-runs-section"
