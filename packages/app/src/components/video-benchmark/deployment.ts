@@ -57,7 +57,7 @@ export function sharedLayoutCells<T extends VideoPoint>(cells: T[]): T[] {
   return keys.flatMap((hardwareKey) => {
     const cell =
       deployments.find((p) => p.hardwareKey === hardwareKey && deploymentKey(p) === shared) ??
-      leadCell(deployments, hardwareKey, { tier: 'h', basis: 'participating' });
+      leadCell(deployments, hardwareKey, { tier: 'h' });
     return cell ? [cell as T] : [];
   });
 }

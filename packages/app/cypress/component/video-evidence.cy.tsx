@@ -1,21 +1,18 @@
 import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.shared-runtime';
 import type { VideoHistoryPage } from '@/components/video-benchmark/history';
-import type { GpuBasis, VideoPoint } from '@/components/video-benchmark/metrics';
+import type { VideoPoint } from '@/components/video-benchmark/metrics';
 import { videoPoints } from '@/components/video-benchmark/points';
 import VideoEvidence from '@/components/video-benchmark/VideoEvidence';
 
 // Retained H100/H200/B200 C1/C2/C4 observations (cypress/fixtures/api/video-history.json).
-function mount(
-  pathname = '/video',
-  basis: GpuBasis = 'participating',
-  select = (points: VideoPoint[]) => points,
-) {
+// Nothing in the panel is priced, so it takes no metric options: every per-GPU number
+// divides by the boards that generated the clip.
+function mount(pathname = '/video', select = (points: VideoPoint[]) => points) {
   cy.fixture('api/video-history.json').then((page: VideoHistoryPage) => {
     cy.mount(
       <PathnameContext.Provider value={pathname}>
         <VideoEvidence
           points={select(videoPoints([page]))}
-          options={{ tier: 'h', basis }}
           colorFor={(key) => (key === 'b200' ? 'rgb(1, 2, 3)' : 'rgb(4, 5, 6)')}
         />
       </PathnameContext.Provider>,
@@ -51,7 +48,7 @@ describe('Video compute-bound evidence (retained fixture)', () => {
   it('bounds the power meter to its declared range when mean power exceeds the recorded limit', () => {
     // 2,856 W against the recorded 2,800 W limit: the label keeps the measured 102.0%,
     // the meter reports and fills its 0–100 range.
-    mount('/video', 'participating', (points) =>
+    mount('/video', (points) =>
       points
         .filter((p) => p.hardwareKey === 'h200' && p.concurrency === 1)
         .map((p) => ({ ...p, avgPowerW: 2856 })),
@@ -73,12 +70,18 @@ describe('Video compute-bound evidence (retained fixture)', () => {
     mount();
     exhibit('plateau').find('tbody tr').should('have.length', 9);
     exhibit('plateau').find('tbody th[scope="rowgroup"]').should('have.length', 3);
+    // Throughput divides by the 4 participating boards, never the 8 the B200/H100 jobs reserved.
     exhibit('plateau')
       .find('tr[data-hardware="b200"][data-concurrency="4"]')
       .should('contain', '11.69')
       .and('contain', '307.3')
       .and('contain', '1.01×')
       .and('contain', '3.94×');
+    exhibit('plateau')
+      .find('tr[data-hardware="h100"][data-concurrency="1"]')
+      .should('contain', '5.37')
+      .and('contain', '167.3')
+      .and('contain', '1.00×');
     exhibit('plateau')
       .find('tr[data-hardware="h100"][data-concurrency="4"]')
       .should('contain', '5.37')
@@ -123,21 +126,10 @@ describe('Video compute-bound evidence (retained fixture)', () => {
     exhibit('caveats')
       .should('contain', 'Batch-one, single-replica server')
       .and('contain', '4 participating GPUs per video (TP2 × Ulysses 2)')
+      .and('contain', 'allocated boards beyond those sit idle')
       .and('contain', 'not node, rack or facility power')
       .and('contain', 'n = 20 clips per cell')
       .and('contain', 'Frozen workload 1344 × 768 · 8 s · 24 fps · 50 steps');
-  });
-  it('switches the throughput column to the allocated basis without moving the ratios', () => {
-    mount('/video', 'allocated');
-    exhibit('plateau')
-      .find('tr[data-hardware="h100"][data-concurrency="1"]')
-      .should('contain', '2.69')
-      .and('contain', '1.00×');
-    exhibit('plateau')
-      .find('tr[data-hardware="h100"][data-concurrency="4"]')
-      .should('contain', '2.68')
-      .and('contain', '4.00×');
-    exhibit('plateau-reading').should('contain', 'within 1.4% of C1');
   });
   it('renders Chinese copy on /zh/video', () => {
     mount('/zh/video');
@@ -161,19 +153,9 @@ describe('Video compute-bound evidence (retained fixture)', () => {
       .and('contain', '每个 cell n = 20 条视频');
   });
   it('hides the plateau and scaling exhibits when only one hardware at C1 is measured', () => {
-    cy.fixture('api/video-history.json').then((page: VideoHistoryPage) => {
-      cy.mount(
-        <PathnameContext.Provider value="/video">
-          <VideoEvidence
-            points={videoPoints([page]).filter(
-              (p) => p.hardwareKey === 'h200' && p.concurrency === 1,
-            )}
-            options={{ tier: 'h', basis: 'participating' }}
-            colorFor={() => 'rgb(0, 0, 0)'}
-          />
-        </PathnameContext.Provider>,
-      );
-    });
+    mount('/video', (points) =>
+      points.filter((p) => p.hardwareKey === 'h200' && p.concurrency === 1),
+    );
     exhibit('power').find('[data-testid="video-evidence-power-row"]').should('have.length', 1);
     exhibit('power-reading').should('contain', 'H200 ran at 97% of its enforced power limit');
     exhibit('plateau').should('not.exist');
@@ -183,11 +165,7 @@ describe('Video compute-bound evidence (retained fixture)', () => {
   it('renders nothing when no cell is measured', () => {
     cy.mount(
       <PathnameContext.Provider value="/video">
-        <VideoEvidence
-          points={[]}
-          options={{ tier: 'h', basis: 'participating' }}
-          colorFor={() => 'rgb(0, 0, 0)'}
-        />
+        <VideoEvidence points={[]} colorFor={() => 'rgb(0, 0, 0)'} />
       </PathnameContext.Provider>,
     );
     cy.get('[data-testid="video-evidence"]').should('not.exist');

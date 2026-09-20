@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import type { VideoPoint } from './metrics';
+import history from '../../../cypress/fixtures/api/video-history.json';
+import type { VideoHistoryPage } from './history';
+import { X_METRICS, Y_METRICS, type VideoPoint } from './metrics';
 import { plotVideoPoints } from './plot';
-import { DEFAULT_VIDEO_DASHBOARD_STATE } from './video-url-state';
+import { videoPoints } from './points';
+import { DEFAULT_VIDEO_DASHBOARD_STATE, type VideoDashboardState } from './video-url-state';
 
 const base: VideoPoint = {
   id: 'h200-4g-c1',
@@ -62,8 +65,9 @@ const h200 = [
     p50: 159,
     wallSeconds: 3100,
   }), // 5.81
-  cell({ id: 'h200-4g-c2', concurrency: 2, p90: 300, p50: 299, wallSeconds: 2990 }), // queued, marginally higher rate
 ];
+// Two clients on the one-replica 4-board deployment: queued, with a marginally higher rate than C1.
+const queued = cell({ id: 'h200-4g-c2', concurrency: 2, p90: 300, p50: 299, wallSeconds: 2990 });
 const b200 = cell({
   id: 'b200-4g',
   hardwareKey: 'b200',
@@ -73,63 +77,97 @@ const b200 = cell({
   wallSeconds: 1560,
 });
 const colorFor = (key: string) => `color-${key}`;
-const state = {
+const state: VideoDashboardState = {
   ...DEFAULT_VIDEO_DASHBOARD_STATE,
-  x: 'p90Latency' as const,
-  y: 'videosPerGpuHour' as const,
+  x: 'p90Latency',
+  y: 'videosPerGpuHour',
 };
+const plot = (
+  points: VideoPoint[],
+  s: VideoDashboardState = state,
+  hidden: ReadonlySet<string> = new Set(),
+) => plotVideoPoints(points, s, colorFor, hidden);
+const ids = (points: { id: string }[]) => points.map((p) => p.id);
 
 describe('plotVideoPoints', () => {
-  it('builds a per-hardware frontier over deployments and leaves queued cells out of it', () => {
-    const plot = plotVideoPoints([...h200, b200], state, colorFor, new Set());
-    expect(plot.frontiers.h200.map((p) => p.id)).toEqual(['h200-8g', 'h200-4g-c1', 'h200-2g']);
-    expect(plot.frontiers.b200.map((p) => p.id)).toEqual(['b200-4g']);
-    expect(plot.plotted.map((p) => p.id)).toEqual([
+  it('builds a per-hardware frontier over deployments and marks the points on it', () => {
+    const out = plot([...h200, b200]);
+    expect(Object.keys(out).toSorted()).toEqual(['frontiers', 'multiLayout', 'plotted']);
+    expect(ids(out.frontiers.h200)).toEqual(['h200-8g', 'h200-4g-c1', 'h200-2g']);
+    expect(ids(out.frontiers.b200)).toEqual(['b200-4g']);
+    expect(ids(out.plotted)).toEqual([
       'h200-4g-c1',
       'h200-8g',
       'h200-2g',
       'h200-4g-tp4',
       'b200-4g',
     ]);
-    expect(plot.plotted.find((p) => p.id === 'h200-4g-tp4')?.optimal).toBe(false);
-    expect(plot.multiLayout).toBe(true);
-    // B200 is faster and more efficient than every H200 deployment, so it is the whole global frontier.
-    expect(plot.global.map((p) => p.id)).toEqual(['b200-4g']);
+    expect(out.plotted.map((p) => p.optimal)).toEqual([true, true, true, false, true]);
+    expect(out.plotted[1]).toMatchObject({
+      x: 85,
+      y: expect.closeTo(5.2941, 3),
+      color: 'color-h200',
+      label: 'H200',
+    });
+    expect(out.multiLayout).toBe(true);
   });
-  it('shows queued cells only on request, faded from every frontier', () => {
-    const plot = plotVideoPoints(h200, { ...state, queue: true }, colorFor, new Set());
-    const queued = plot.plotted.filter((p) => p.queued);
-    expect(queued.map((p) => p.id)).toEqual(['h200-4g-c2']);
-    expect(plot.frontiers.h200.map((p) => p.id)).not.toContain('h200-4g-c2');
-    expect(plot.global.map((p) => p.id)).not.toContain('h200-4g-c2');
+  it('never plots a queued cell: more clients than replicas only queue on the batch-one server', () => {
+    const out = plot([...h200, queued]);
+    expect(ids(out.plotted)).not.toContain('h200-4g-c2');
+    expect(ids(out.frontiers.h200)).toEqual(['h200-8g', 'h200-4g-c1', 'h200-2g']);
+    // No axis pair or cost tier re-admits it.
+    for (const x of X_METRICS) {
+      for (const y of Y_METRICS) {
+        expect(ids(plot([base, queued], { ...state, x, y, tier: 'r' }).plotted)).toEqual([
+          'h200-4g-c1',
+        ]);
+      }
+    }
+    // An unrecorded replica count reads as one; one client per replica is not queueing.
+    expect(ids(plot([cell({ id: 'c4-r2', concurrency: 4, replicas: 2 })]).plotted)).toEqual([]);
+    expect(ids(plot([cell({ id: 'c2-r2', concurrency: 2, replicas: 2 })]).plotted)).toEqual([
+      'c2-r2',
+    ]);
+    expect(ids(plot([cell({ id: 'c-na', concurrency: null })]).plotted)).toEqual(['c-na']);
   });
-  it('optimal-only hides dominated deployments and queued cells', () => {
-    const plot = plotVideoPoints(
-      h200,
-      { ...state, queue: true, optimal: true },
-      colorFor,
-      new Set(),
+  it('plots only the C1 cells of the retained campaign, whose C2 and C4 cells queue on one replica', () => {
+    // H100/H200/B200 C1/C2/C4 of 2026-09-09, n = 20 each, replicas unrecorded → one endpoint.
+    const out = plot(
+      videoPoints([history as unknown as VideoHistoryPage]),
+      DEFAULT_VIDEO_DASHBOARD_STATE,
     );
-    expect(plot.plotted.map((p) => p.id)).toEqual(['h200-4g-c1', 'h200-8g', 'h200-2g']);
+    expect(out.plotted.map((p) => [p.hardwareKey, p.concurrency])).toEqual([
+      ['b200', 1],
+      ['h200', 1],
+      ['h100', 1],
+    ]);
+    // P90 time to video against videos per $1 TCO at the hyperscaler tier ($1.73/$1.22/$1.17 GPU-hr).
+    expect(out.plotted.map((p) => [p.x, p.y])).toEqual([
+      [expect.closeTo(78.316, 3), expect.closeTo(6.6625, 3)],
+      [expect.closeTo(151.105, 3), expect.closeTo(4.8961, 3)],
+      [expect.closeTo(168.1135, 3), expect.closeTo(4.5933, 3)],
+    ]);
+    expect(out.multiLayout).toBe(false);
+    expect(Object.values(out.frontiers).map((f) => f.length)).toEqual([1, 1, 1]);
+    expect(out.plotted.every((p) => p.optimal)).toBe(true);
   });
   it('is a scatter of single deployments when each hardware has one layout', () => {
-    const plot = plotVideoPoints([base, b200], state, colorFor, new Set());
-    expect(plot.multiLayout).toBe(false);
-    expect(Object.values(plot.frontiers).every((f) => f.length === 1)).toBe(true);
-    expect(plot.global.map((p) => p.id)).toEqual(['b200-4g']);
+    const out = plot([base, b200]);
+    expect(out.multiLayout).toBe(false);
+    expect(Object.values(out.frontiers).every((f) => f.length === 1)).toBe(true);
+    expect(out.plotted.every((p) => p.optimal)).toBe(true);
   });
   it('drops hidden hardware and cells missing either metric', () => {
-    const plot = plotVideoPoints(
+    const out = plot(
       [
         base,
         b200,
         cell({ id: 'no-p90', hardwareKey: 'h100', hardwareName: 'H100', samples: 4, p90: null }),
       ],
       state,
-      colorFor,
       new Set(['b200']),
     );
-    expect(plot.plotted.map((p) => p.id)).toEqual(['h200-4g-c1']);
-    expect(plot.frontiers).not.toHaveProperty('b200');
+    expect(ids(out.plotted)).toEqual(['h200-4g-c1']);
+    expect(out.frontiers).not.toHaveProperty('b200');
   });
 });

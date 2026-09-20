@@ -1,7 +1,7 @@
 import { GPU_SPECS } from '@/lib/gpu-specs';
 import { deploymentKey, sharedLayoutCells } from './deployment';
 import { hardwareSort } from './hardware';
-import { metricValue, type GpuBasis, type MetricOptions, type VideoPoint } from './metrics';
+import { metricValue, type MetricOptions, type VideoPoint } from './metrics';
 import { latestVideoCells } from './points';
 
 /**
@@ -33,7 +33,7 @@ function measuredCells(points: VideoPoint[]): MeasuredPoint[] {
 }
 
 /** The cost tier only enters priced metrics; nothing read here is priced. */
-const metricOptions = (basis: GpuBasis): MetricOptions => ({ tier: 'h', basis });
+const options: MetricOptions = { tier: 'h' };
 
 export interface PowerUtilizationRow {
   hardwareKey: string;
@@ -50,7 +50,7 @@ export function powerUtilization(points: VideoPoint[]): PowerUtilizationRow[] {
     hardwareKey: p.hardwareKey,
     avgPowerW: positive(p.avgPowerW) ? p.avgPowerW : null,
     enforcedLimitW: positive(p.enforcedLimitW) ? p.enforcedLimitW : null,
-    percentOfCap: metricValue(p, 'powerPctCap', metricOptions('participating')),
+    percentOfCap: metricValue(p, 'powerPctCap', options),
   }));
 }
 
@@ -92,14 +92,9 @@ export interface ConcurrencyPlateauRow {
 /**
  * Every measured cell against its hardware's C1 cell. On a batch-one server a
  * flat throughput ratio with latency scaling by C says client concurrency only
- * queues requests. `basis` picks the GPU denominator the rest of the dashboard
- * shows; ratios within one hardware are unaffected unless its allocation changed.
+ * queues requests. Throughput is per participating GPU, as everywhere else.
  */
-export function concurrencyPlateau(
-  points: VideoPoint[],
-  basis: GpuBasis = 'participating',
-): ConcurrencyPlateauRow[] {
-  const options = metricOptions(basis);
+export function concurrencyPlateau(points: VideoPoint[]): ConcurrencyPlateauRow[] {
   const baseline = new Map(
     sharedLayoutCells(measuredCells(points)).map((p) => [p.hardwareKey, p] as const),
   );

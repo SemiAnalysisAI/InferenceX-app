@@ -12,8 +12,6 @@ const STRINGS = {
   en: {
     hardware: 'Hardware',
     deployment: 'Deployment',
-    c: 'C',
-    queued: 'queued',
     counts: 'Valid / scheduled',
     power: 'Board power (W)',
     run: 'CI run',
@@ -21,8 +19,6 @@ const STRINGS = {
   zh: {
     hardware: '硬件',
     deployment: '部署',
-    c: 'C',
-    queued: '排队',
     counts: '有效 / 计划',
     power: '板卡功率（W）',
     run: 'CI 运行',
@@ -35,21 +31,14 @@ const METRIC_COLUMNS: readonly MetricId[] = [
   'videosPerDollar',
   'dollarsPerVideo',
   'apiPricePerVideo',
-  'revenuePerGpuHour',
-  'profitPerGpuHour',
-  'apiPriceMultiple',
   'kjPerVideo',
   'powerPctCap',
 ];
 
-/** Rows for the plotted cells: every deployment, queued cells on request, plus provenance. */
-export function videoTableRows(
-  points: VideoPoint[],
-  state: VideoDashboardState,
-  hidden: ReadonlySet<string>,
-): VideoPoint[] {
+/** Rows for the plotted cells: every measured deployment, plus provenance. Queued cells stay in the evidence panel. */
+export function videoTableRows(points: VideoPoint[], hidden: ReadonlySet<string>): VideoPoint[] {
   return latestVideoCells(points).filter(
-    (p) => p.hardwareKey && !hidden.has(p.hardwareKey) && (state.queue || !isQueueing(p)),
+    (p) => p.hardwareKey && !hidden.has(p.hardwareKey) && !isQueueing(p),
   );
 }
 
@@ -65,7 +54,7 @@ export default function VideoPointsTable({
   const locale = useLocale();
   const s = STRINGS[locale];
   const options = metricOptions(state);
-  const rows = videoTableRows(points, state, hidden);
+  const rows = videoTableRows(points, hidden);
   const columns: DataTableColumn<VideoPoint>[] = [
     {
       header: s.hardware,
@@ -78,13 +67,6 @@ export default function VideoPointsTable({
       header: s.deployment,
       cell: (p) => layoutLabel(p, locale),
       sortValue: (p) => p.participating ?? 0,
-      importance: 'key',
-    },
-    {
-      header: s.c,
-      align: 'right',
-      cell: (p) => (isQueueing(p) ? `${p.concurrency} · ${s.queued}` : (p.concurrency ?? '—')),
-      sortValue: (p) => p.concurrency ?? 0,
       importance: 'key',
     },
     {

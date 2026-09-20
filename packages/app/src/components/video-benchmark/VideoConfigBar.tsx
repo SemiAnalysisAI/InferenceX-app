@@ -10,7 +10,6 @@ import {
   TIER_LABELS,
   X_METRICS,
   Y_METRICS,
-  type GpuBasis,
   type XMetricId,
   type YMetricId,
 } from './metrics';
@@ -28,9 +27,6 @@ const STRINGS = {
     x: 'X-axis metric',
     y: 'Y-axis metric',
     tier: 'Cost tier',
-    basis: 'GPU basis',
-    participating: 'Participating GPUs (boards generating the clip)',
-    allocated: 'Allocated GPUs (boards the job reserved)',
   },
   zh: {
     benchmark: '基准测试配置',
@@ -41,18 +37,24 @@ const STRINGS = {
     x: 'X 轴指标',
     y: 'Y 轴指标',
     tier: '成本档位',
-    basis: 'GPU 口径',
-    participating: '参与计算的 GPU（实际生成视频的板卡）',
-    allocated: '已分配的 GPU（作业预留的板卡）',
   },
 };
 
+/** A fixed fact of the campaign, laid out like a control so the panel reads as one row. */
+function Fact({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex min-w-0 flex-col gap-1.5" data-testid="video-config-fact">
+      <span className="text-xs font-medium text-muted-foreground">{label}</span>
+      <span className="flex min-h-9 items-center text-sm break-words">{value}</span>
+    </div>
+  );
+}
+
 /**
  * Two control panels mirroring the inference tab: what is being compared
- * (frozen for this campaign, so model, workload and the measured deployments
- * are single-option selects that state the comparison rather than change it)
- * and how it is plotted. Queued cells, optimal-only and the cross-hardware
- * frontier are legend switches, as on the inference chart.
+ * (frozen for this campaign, so model, workload and deployment are stated,
+ * not selectable, beside the one editable input, the API list price) and
+ * how it is plotted (axes and cost tier).
  */
 export default function VideoConfigBar({
   state,
@@ -65,7 +67,7 @@ export default function VideoConfigBar({
   onChange: (patch: Partial<VideoDashboardState>) => void;
   modelLabel: string;
   workloadLabel: string;
-  /** Measured server layouts (GPUs per video and model split), stated rather than selectable. */
+  /** Measured server layouts (GPUs per video and model split). */
   deploymentLabel: string;
 }) {
   const locale = useLocale();
@@ -78,27 +80,12 @@ export default function VideoConfigBar({
   return (
     <div className="grid gap-3 lg:grid-cols-2" data-testid="video-config-bar">
       <ControlPanel legend={s.benchmark} className="sm:grid-cols-2 xl:grid-cols-4">
-        <VideoSelect
-          label={s.model}
-          value="model"
-          onValueChange={() => {}}
-          options={[{ value: 'model', label: modelLabel }]}
-        />
-        <VideoSelect
-          label={s.workload}
-          value="workload"
-          onValueChange={() => {}}
-          options={[{ value: 'workload', label: workloadLabel }]}
-        />
-        <VideoSelect
-          label={s.deployment}
-          value="deployment"
-          onValueChange={() => {}}
-          options={[{ value: 'deployment', label: deploymentLabel }]}
-        />
+        <Fact label={s.model} value={modelLabel} />
+        <Fact label={s.workload} value={workloadLabel} />
+        <Fact label={s.deployment} value={deploymentLabel} />
         <VideoApiReference value={state.apiPrice} onChange={(apiPrice) => onChange({ apiPrice })} />
       </ControlPanel>
-      <ControlPanel legend={s.chart} className="sm:grid-cols-2 xl:grid-cols-4">
+      <ControlPanel legend={s.chart} className="sm:grid-cols-3">
         <VideoSelect
           label={s.x}
           value={state.x}
@@ -116,15 +103,6 @@ export default function VideoConfigBar({
           value={state.tier}
           onValueChange={(value) => change('tier', value as CostTier)}
           options={COST_TIERS.map((tier) => ({ value: tier, label: TIER_LABELS[tier][locale] }))}
-        />
-        <VideoSelect
-          label={s.basis}
-          value={state.basis}
-          onValueChange={(value) => change('basis', value as GpuBasis)}
-          options={[
-            { value: 'participating', label: s.participating },
-            { value: 'allocated', label: s.allocated },
-          ]}
         />
       </ControlPanel>
     </div>

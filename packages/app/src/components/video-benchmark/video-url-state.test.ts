@@ -1,39 +1,47 @@
 import { describe, expect, it } from 'vitest';
 import { H3_API_REFERENCE } from './api-reference';
+import { X_METRICS, Y_METRICS } from './metrics';
 import {
   DEFAULT_VIDEO_DASHBOARD_STATE,
   metricOptions,
   parseApiPrice,
   readVideoDashboardState,
   writeVideoDashboardState,
+  type VideoDashboardState,
 } from './video-url-state';
 
 describe('video dashboard URL state', () => {
   it('falls back to defaults for missing or invalid params', () => {
     expect(readVideoDashboardState('')).toEqual(DEFAULT_VIDEO_DASHBOARD_STATE);
+    expect(readVideoDashboardState('?v_x=bogus&v_y=nope&v_tier=z&v_view=pie&v_api=free')).toEqual(
+      DEFAULT_VIDEO_DASHBOARD_STATE,
+    );
+  });
+  it('ignores retired params and metric ids, so old share links open on the defaults', () => {
+    // The GPU-basis switch, the queue/optimal/frontier toggles and the profit axes are gone.
     expect(
       readVideoDashboardState(
-        '?v_x=bogus&v_y=nope&v_tier=z&v_basis=q&v_view=pie&v_queue=yes&v_api=free',
+        '?v_basis=allocated&v_queue=1&v_opt=1&v_frontier=1&v_x=genSpeed&v_y=profitPerGpuHour',
       ),
     ).toEqual(DEFAULT_VIDEO_DASHBOARD_STATE);
+    // Each axis accepts only its own metrics; the card-only metrics are not axes.
+    expect(readVideoDashboardState('?v_x=videosPerDollar').x).toBe('p90Latency');
+    expect(readVideoDashboardState('?v_y=p50Latency').y).toBe('videosPerDollar');
+    expect(readVideoDashboardState('?v_y=apiPricePerVideo').y).toBe('videosPerDollar');
   });
   it('reads every supported param', () => {
     expect(
-      readVideoDashboardState(
-        '?v_x=genSpeed&v_y=kjPerVideo&v_tier=r&v_basis=allocated&v_queue=1&v_opt=1&v_frontier=1&v_view=table&v_api=0.047',
-      ),
-    ).toEqual({
-      x: 'genSpeed',
-      y: 'kjPerVideo',
-      tier: 'r',
-      basis: 'allocated',
-      queue: true,
-      optimal: true,
-      frontier: true,
-      view: 'table',
-      apiPrice: 0.047,
-    });
-    expect(readVideoDashboardState('?v_y=profitPerGpuHour').y).toBe('profitPerGpuHour');
+      readVideoDashboardState('?v_x=p50Latency&v_y=kjPerVideo&v_tier=r&v_view=table&v_api=0.047'),
+    ).toEqual({ x: 'p50Latency', y: 'kjPerVideo', tier: 'r', view: 'table', apiPrice: 0.047 });
+    expect([...X_METRICS]).toEqual(['p90Latency', 'p50Latency']);
+    expect([...Y_METRICS]).toEqual([
+      'videosPerDollar',
+      'dollarsPerVideo',
+      'videosPerGpuHour',
+      'kjPerVideo',
+    ]);
+    for (const x of X_METRICS) expect(readVideoDashboardState(`?v_x=${x}`).x).toBe(x);
+    for (const y of Y_METRICS) expect(readVideoDashboardState(`?v_y=${y}`).y).toBe(y);
   });
   it('defaults the API price to the dated reference and rejects non-positive or malformed prices', () => {
     expect(DEFAULT_VIDEO_DASHBOARD_STATE.apiPrice).toBe(H3_API_REFERENCE.pricePerVideoSecondUsd);
@@ -55,18 +63,30 @@ describe('video dashboard URL state', () => {
     const out = writeVideoDashboardState(url, {
       ...DEFAULT_VIDEO_DASHBOARD_STATE,
       tier: 'r',
-      queue: true,
+      view: 'table',
     });
     expect(out.searchParams.get('run')).toBe('1');
+    // The page's own `view` param is not the chart/table switch, which lives under `v_view`.
     expect(out.searchParams.get('view')).toBe('results');
     expect(out.searchParams.get('v_tier')).toBe('r');
-    expect(out.searchParams.get('v_queue')).toBe('1');
+    expect(out.searchParams.get('v_view')).toBe('table');
     expect(out.searchParams.has('v_x')).toBe(false);
+    expect(out.searchParams.has('v_y')).toBe(false);
     expect(out.searchParams.has('v_api')).toBe(false);
     expect(url.searchParams.has('v_tier')).toBe(false);
     const reset = writeVideoDashboardState(out, DEFAULT_VIDEO_DASHBOARD_STATE);
     expect([...reset.searchParams.keys()].filter((k) => k.startsWith('v_'))).toEqual([]);
     expect(reset.searchParams.get('run')).toBe('1');
+  });
+  it('round-trips the axis metrics', () => {
+    const chosen: VideoDashboardState = {
+      ...DEFAULT_VIDEO_DASHBOARD_STATE,
+      x: 'p50Latency',
+      y: 'dollarsPerVideo',
+    };
+    const out = writeVideoDashboardState(new URL('https://x.test/video'), chosen);
+    expect(out.search).toBe('?v_x=p50Latency&v_y=dollarsPerVideo');
+    expect(readVideoDashboardState(out.search)).toEqual(chosen);
   });
   it('round-trips an overridden API price and drops an invalid one', () => {
     const url = new URL('https://x.test/video');
@@ -92,20 +112,15 @@ describe('video dashboard URL state', () => {
       }).searchParams.has('v_api'),
     ).toBe(false);
   });
-  it('maps state to metric options, including the API price', () => {
+  it('maps state to metric options: the cost tier and the API price, nothing else', () => {
     expect(metricOptions(DEFAULT_VIDEO_DASHBOARD_STATE)).toEqual({
       tier: 'h',
-      basis: 'participating',
       apiPricePerVideoSecond: 0.034,
     });
-    expect(
-      metricOptions({
-        ...DEFAULT_VIDEO_DASHBOARD_STATE,
-        tier: 'r',
-        basis: 'allocated',
-        apiPrice: 0.05,
-      }),
-    ).toEqual({ tier: 'r', basis: 'allocated', apiPricePerVideoSecond: 0.05 });
+    expect(metricOptions({ ...DEFAULT_VIDEO_DASHBOARD_STATE, tier: 'r', apiPrice: 0.05 })).toEqual({
+      tier: 'r',
+      apiPricePerVideoSecond: 0.05,
+    });
     expect(
       metricOptions({ ...DEFAULT_VIDEO_DASHBOARD_STATE, apiPrice: -1 }).apiPricePerVideoSecond,
     ).toBeNull();

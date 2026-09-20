@@ -1,7 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import { formatMetric, metricLabel, metricValue, type VideoPoint } from './metrics';
+import {
+  formatMetric,
+  metricLabel,
+  metricValue,
+  VIDEO_METRICS,
+  X_METRICS,
+  Y_METRICS,
+  type MetricId,
+  type MetricOptions,
+  type VideoPoint,
+} from './metrics';
 
-// H200 and H100 C1 cells from the retained 2026-09-09 serving-smoke artifacts.
+// H200, H100 and B200 C1 cells from the retained 2026-09-09 serving-smoke artifacts
+// (cypress/fixtures/api/video-history.json).
 const h200: VideoPoint = {
   id: '34342452354.10107476604:c1',
   runId: '34342452354',
@@ -33,6 +44,7 @@ const h200: VideoPoint = {
   status: 'complete',
   observedAt: '2026-09-09T10:00:00Z',
 };
+// H100 and B200 reserved eight boards and generated on four.
 const h100: VideoPoint = {
   ...h200,
   id: 'x',
@@ -45,84 +57,101 @@ const h100: VideoPoint = {
   energyKj: 431.14963489170344,
   avgPowerW: 2574.550733165641,
 };
-const opts = { tier: 'h', basis: 'participating' } as const;
+const b200: VideoPoint = {
+  ...h200,
+  id: 'y',
+  hardwareKey: 'b200',
+  hardwareName: 'NVIDIA B200',
+  p50: 77.94495720259147,
+  p90: 78.31597462110221,
+  wallSeconds: 1561.6792716470081,
+  allocated: 8,
+  energyKj: 301.08754501100987,
+  avgPowerW: 3856.016973742528,
+  enforcedLimitW: 4000,
+};
+const opts: MetricOptions = { tier: 'h' };
 // H3 768p list price captured 2026-09-19 (api-reference.ts), USD per video-second.
-const priced = { ...opts, apiPricePerVideoSecond: 0.034 };
+const priced: MetricOptions = { ...opts, apiPricePerVideoSecond: 0.034 };
 
 describe('video metrics', () => {
-  it('derives throughput per GPU-hour from valid clips, wall time and participating GPUs', () => {
-    expect(metricValue(h200, 'videosPerGpuHour', opts)).toBeCloseTo(5.9732, 3);
-    expect(metricValue(h200, 'videoSecondsPerGpuHour', opts)).toBeCloseTo(47.786, 2);
+  it('registers the two axis groups plus the two card-only metrics', () => {
+    expect([...X_METRICS]).toEqual(['p90Latency', 'p50Latency']);
+    expect([...Y_METRICS]).toEqual([
+      'videosPerDollar',
+      'dollarsPerVideo',
+      'videosPerGpuHour',
+      'kjPerVideo',
+    ]);
+    expect(Object.keys(VIDEO_METRICS).toSorted()).toEqual(
+      [...X_METRICS, ...Y_METRICS, 'powerPctCap', 'apiPricePerVideo'].toSorted(),
+    );
   });
-  it('switches the denominator to allocated GPUs on request', () => {
+  it('derives throughput per GPU-hour from valid clips, wall time and participating GPUs', () => {
+    // 20 clips × 3600 s / (wall s × 4 boards).
+    expect(metricValue(h200, 'videosPerGpuHour', opts)).toBeCloseTo(5.9732, 3);
     expect(metricValue(h100, 'videosPerGpuHour', opts)).toBeCloseTo(5.3741, 3);
-    expect(metricValue(h100, 'videosPerGpuHour', { ...opts, basis: 'allocated' })).toBeCloseTo(
+    expect(metricValue(b200, 'videosPerGpuHour', opts)).toBeCloseTo(11.526, 3);
+  });
+  it('divides by the participating boards, never the allocation', () => {
+    // The idle half of an 8-board reservation is stated beside the numbers, not billed.
+    expect(metricValue({ ...h100, allocated: 4 }, 'videosPerGpuHour', opts)).toBe(
+      metricValue(h100, 'videosPerGpuHour', opts),
+    );
+    expect(metricValue({ ...h100, allocated: null }, 'dollarsPerVideo', opts)).toBe(
+      metricValue(h100, 'dollarsPerVideo', opts),
+    );
+    expect(metricValue({ ...h100, participating: 8 }, 'videosPerGpuHour', opts)).toBeCloseTo(
       2.687,
       3,
     );
   });
   it('prices videos with HW_REGISTRY tiers', () => {
-    expect(metricValue(h200, 'videosPerDollar', opts)).toBeCloseTo(4.896, 2);
+    // Hyperscaler $1.22/$1.17/$1.73 and rental $2.90/$2.00/$3.70 per GPU-hour for H200/H100/B200.
+    expect(metricValue(h200, 'videosPerDollar', opts)).toBeCloseTo(4.8961, 3);
     expect(metricValue(h200, 'dollarsPerVideo', opts)).toBeCloseTo(0.2042, 3);
-    expect(metricValue(h200, 'dollarsPerVideo', { ...opts, tier: 'r' })).toBeCloseTo(0.4855, 3);
-    expect(metricValue(h200, 'dollarsPerVideoSecond', opts)).toBeCloseTo(0.02553, 4);
-    expect(metricValue(h100, 'dollarsPerVideo', { ...opts, basis: 'allocated' })).toBeCloseTo(
-      0.4354,
-      3,
-    );
+    expect(metricValue(h200, 'dollarsPerVideo', { tier: 'r' })).toBeCloseTo(0.4855, 3);
+    expect(metricValue(h100, 'videosPerDollar', opts)).toBeCloseTo(4.5933, 3);
+    expect(metricValue(h100, 'dollarsPerVideo', opts)).toBeCloseTo(0.2177, 3);
+    expect(metricValue(h100, 'dollarsPerVideo', { tier: 'r' })).toBeCloseTo(0.3722, 3);
+    expect(metricValue(b200, 'videosPerDollar', opts)).toBeCloseTo(6.6625, 3);
+    expect(metricValue(b200, 'dollarsPerVideo', opts)).toBeCloseTo(0.1501, 3);
+    expect(metricValue(b200, 'dollarsPerVideo', { tier: 'r' })).toBeCloseTo(0.321, 3);
+    // Videos per $1 TCO is exactly the reciprocal of the TCO cost per video.
+    expect(
+      metricValue(h200, 'videosPerDollar', opts)! * metricValue(h200, 'dollarsPerVideo', opts)!,
+    ).toBeCloseTo(1, 12);
   });
-  it('exposes latency, generation speed, energy and power ratios', () => {
+  it('exposes latency, energy and board power against the enforced limit', () => {
     expect(metricValue(h200, 'p90Latency', opts)).toBeCloseTo(151.105, 3);
     expect(metricValue(h200, 'p50Latency', opts)).toBeCloseTo(150.614, 3);
-    expect(metricValue(h200, 'genSpeed', opts)).toBeCloseTo(192 / 150.61379817902343, 6);
     expect(metricValue(h200, 'kjPerVideo', opts)).toBeCloseTo(410.954, 2);
-    expect(metricValue(h200, 'videosPerKwh', opts)).toBeCloseTo(8.76, 2);
     expect(metricValue(h200, 'powerPctCap', opts)).toBeCloseTo(97.41, 1);
+    expect(metricValue(b200, 'powerPctCap', opts)).toBeCloseTo(96.4, 1);
   });
-  it('prices the clip at the API reference and derives revenue, profit and headroom', () => {
-    // 0.034 $/s × 8 s clip; 5.9732 videos/GPU-hr × $0.272; − $1.22 H200 hyperscaler GPU-hr.
+  it('prices the clip at the API list price, independent of hardware and tier', () => {
+    // 0.034 $/video-s × 8 s clip.
     expect(metricValue(h200, 'apiPricePerVideo', priced)).toBeCloseTo(0.272, 6);
-    expect(metricValue(h200, 'revenuePerGpuHour', priced)).toBeCloseTo(1.6247, 3);
-    expect(metricValue(h200, 'profitPerGpuHour', priced)).toBeCloseTo(0.4047, 3);
-    // $0.272 API ÷ $0.2042 TCO per video.
-    expect(metricValue(h200, 'apiPriceMultiple', priced)).toBeCloseTo(1.332, 3);
-    // Rental tier: same revenue, $2.90 GPU-hr → loss; headroom drops below 1.
-    expect(metricValue(h200, 'profitPerGpuHour', { ...priced, tier: 'r' })).toBeCloseTo(-1.2753, 3);
-    expect(metricValue(h200, 'apiPriceMultiple', { ...priced, tier: 'r' })).toBeCloseTo(0.5603, 3);
+    expect(metricValue(h100, 'apiPricePerVideo', { ...priced, tier: 'r' })).toBeCloseTo(0.272, 6);
+    expect(
+      metricValue({ ...b200, hardwareKey: null, wallSeconds: null }, 'apiPricePerVideo', priced),
+    ).toBeCloseTo(0.272, 6);
+    expect(
+      metricValue(h200, 'apiPricePerVideo', { ...priced, apiPricePerVideoSecond: 0.047 }),
+    ).toBeCloseTo(0.376, 6);
   });
-  it('halves revenue on the allocated basis when only half the reserved GPUs generate', () => {
-    // H100: 4 of 8 allocated boards participate → 2.687 videos/GPU-hr × $0.272 − $1.17.
-    expect(metricValue(h100, 'revenuePerGpuHour', priced)).toBeCloseTo(1.4618, 3);
-    expect(metricValue(h100, 'profitPerGpuHour', priced)).toBeCloseTo(0.2918, 3);
-    const allocated = { ...priced, basis: 'allocated' } as const;
-    expect(metricValue(h100, 'revenuePerGpuHour', allocated)).toBeCloseTo(0.7309, 3);
-    expect(metricValue(h100, 'profitPerGpuHour', allocated)).toBeCloseTo(-0.4391, 3);
-    // The clip price itself does not depend on the GPU basis.
-    expect(metricValue(h100, 'apiPricePerVideo', allocated)).toBeCloseTo(0.272, 6);
-    expect(metricValue(h100, 'apiPriceMultiple', allocated)).toBeCloseTo(0.6247, 3);
-  });
-  it('returns null for every API-priced metric without a positive price or clip length', () => {
-    const ids = [
-      'apiPricePerVideo',
-      'revenuePerGpuHour',
-      'profitPerGpuHour',
-      'apiPriceMultiple',
-    ] as const;
-    for (const id of ids) {
-      expect(metricValue(h200, id, opts)).toBeNull();
-      expect(metricValue(h200, id, { ...opts, apiPricePerVideoSecond: null })).toBeNull();
-      expect(metricValue(h200, id, { ...opts, apiPricePerVideoSecond: 0 })).toBeNull();
-      expect(metricValue(h200, id, { ...opts, apiPricePerVideoSecond: -0.01 })).toBeNull();
-      expect(metricValue(h200, id, { ...opts, apiPricePerVideoSecond: Number.NaN })).toBeNull();
-      expect(metricValue({ ...h200, durationSeconds: null }, id, priced)).toBeNull();
+  it('returns null for the API list price without a positive price or clip length', () => {
+    expect(metricValue(h200, 'apiPricePerVideo', opts)).toBeNull();
+    for (const price of [null, 0, -0.01, Number.NaN, Number.POSITIVE_INFINITY]) {
+      expect(
+        metricValue(h200, 'apiPricePerVideo', { ...opts, apiPricePerVideoSecond: price }),
+      ).toBeNull();
     }
-    // A price alone is not enough: revenue, profit and headroom still need throughput and a tier cost.
-    expect(metricValue({ ...h200, wallSeconds: null }, 'revenuePerGpuHour', priced)).toBeNull();
-    expect(metricValue({ ...h200, hardwareKey: null }, 'profitPerGpuHour', priced)).toBeNull();
-    expect(metricValue({ ...h200, hardwareKey: null }, 'apiPriceMultiple', priced)).toBeNull();
-    expect(metricValue({ ...h200, wallSeconds: null }, 'apiPricePerVideo', priced)).toBeCloseTo(
-      0.272,
-      6,
+    expect(metricValue({ ...h200, durationSeconds: null }, 'apiPricePerVideo', priced)).toBeNull();
+    expect(metricValue({ ...h200, durationSeconds: 0 }, 'apiPricePerVideo', priced)).toBeNull();
+    // The price never leaks into the TCO metrics.
+    expect(metricValue(h200, 'dollarsPerVideo', priced)).toBe(
+      metricValue(h200, 'dollarsPerVideo', opts),
     );
   });
   it('returns null instead of zero for missing inputs', () => {
@@ -134,42 +163,53 @@ describe('video metrics', () => {
       wallSeconds: null,
       enforcedLimitW: null,
     };
-    expect(metricValue(broken, 'videosPerDollar', opts)).toBeNull();
-    expect(metricValue(broken, 'videosPerGpuHour', opts)).toBeNull();
-    expect(metricValue(broken, 'kjPerVideo', opts)).toBeNull();
-    expect(metricValue(broken, 'videosPerKwh', opts)).toBeNull();
+    for (const id of Y_METRICS) expect(metricValue(broken, id, opts)).toBeNull();
     expect(metricValue(broken, 'powerPctCap', opts)).toBeNull();
+    // Same display floor as the run views: P90 needs ten valid samples, P50 does not.
     expect(metricValue({ ...h200, samples: 9 }, 'p90Latency', opts)).toBeNull();
+    expect(metricValue({ ...h200, samples: 9 }, 'p50Latency', opts)).toBeCloseTo(150.614, 3);
     expect(metricValue({ ...h200, participating: null }, 'videosPerGpuHour', opts)).toBeNull();
+    expect(metricValue({ ...h200, participating: 0 }, 'videosPerGpuHour', opts)).toBeNull();
+    expect(metricValue({ ...h200, participating: 2.5 }, 'videosPerGpuHour', opts)).toBeNull();
+    expect(metricValue({ ...h200, energyKj: 0 }, 'kjPerVideo', opts)).toBeNull();
+    expect(metricValue({ ...h200, avgPowerW: 0 }, 'powerPctCap', opts)).toBeNull();
+    // Hardware outside HW_REGISTRY has a rate but no price.
+    expect(
+      metricValue({ ...h200, hardwareKey: 'unknown-gpu' }, 'videosPerGpuHour', opts),
+    ).toBeCloseTo(5.9732, 3);
+    expect(
+      metricValue({ ...h200, hardwareKey: 'unknown-gpu' }, 'dollarsPerVideo', opts),
+    ).toBeNull();
+    expect(
+      metricValue({ ...h200, hardwareKey: 'unknown-gpu' }, 'videosPerDollar', opts),
+    ).toBeNull();
   });
   it('labels tiered metrics with the cost tier and formats by metric', () => {
     expect(metricLabel('videosPerDollar', 'en', opts)).toBe(
       'Videos per $1 TCO (Owning at Large Hyperscaler Volume)',
     );
-    expect(metricLabel('videosPerDollar', 'zh', { ...opts, tier: 'r' })).toBe(
+    expect(metricLabel('videosPerDollar', 'zh', { tier: 'r' })).toBe(
       '每 1 美元 TCO 生成视频数（租赁 - 3 年承诺）',
     );
+    expect(metricLabel('dollarsPerVideo', 'zh', opts)).toBe(
+      '每条视频 TCO 成本（Hyperscaler 自有设备）',
+    );
     expect(metricLabel('p90Latency', 'en', opts)).toBe('P90 time to video (s)');
+    expect(metricLabel('kjPerVideo', 'zh', opts)).toBe('每条视频 GPU 板卡能耗（kJ）');
+    expect(metricLabel('apiPricePerVideo', 'en', opts)).toBe('API list price per video');
+    expect(metricLabel('apiPricePerVideo', 'zh', opts)).toBe('每条视频 API 标价');
+    // Only the priced TCO metrics carry the tier.
+    const tiered = (Object.keys(VIDEO_METRICS) as MetricId[]).filter(
+      (id) => metricLabel(id, 'en', opts) !== metricLabel(id, 'en', { tier: 'r' }),
+    );
+    expect(tiered).toEqual(['videosPerDollar', 'dollarsPerVideo']);
     expect(formatMetric(0.20419, 'dollarsPerVideo')).toBe('$0.204');
+    expect(formatMetric(0.15, 'dollarsPerVideo')).toBe('$0.150');
+    expect(formatMetric(0.272, 'apiPricePerVideo')).toBe('$0.272');
     expect(formatMetric(null, 'kjPerVideo')).toBe('—');
     expect(formatMetric(151.10486, 'p90Latency')).toBe('151.1');
-    expect(formatMetric(1234.5, 'videoSecondsPerGpuHour')).toBe('1,234.5');
-  });
-  it('labels and formats the API-priced metrics, with the sign before the currency symbol', () => {
-    expect(metricLabel('profitPerGpuHour', 'en', opts)).toBe(
-      'Profit per GPU-hour, API list price − TCO (Owning at Large Hyperscaler Volume)',
-    );
-    expect(metricLabel('apiPriceMultiple', 'zh', { ...opts, tier: 'r' })).toBe(
-      'API 标价 ÷ 每条视频 TCO 成本（租赁 - 3 年承诺）',
-    );
-    expect(metricLabel('revenuePerGpuHour', 'en', opts)).toBe(
-      'Revenue per GPU-hour at API list price',
-    );
-    expect(metricLabel('apiPricePerVideo', 'zh', opts)).toBe('每条视频 API 标价');
-    expect(formatMetric(0.272, 'apiPricePerVideo')).toBe('$0.272');
-    expect(formatMetric(1.62471, 'revenuePerGpuHour')).toBe('$1.62');
-    expect(formatMetric(-0.43913, 'profitPerGpuHour')).toBe('-$0.44');
-    expect(formatMetric(1.3318, 'apiPriceMultiple')).toBe('1.33');
-    expect(formatMetric(-1.5, 'p50Latency')).toBe('-1.5');
+    expect(formatMetric(1234.5, 'videosPerGpuHour')).toBe('1,234.5');
+    expect(formatMetric(4.8961, 'videosPerDollar')).toBe('4.9');
+    expect(formatMetric(97.41, 'powerPctCap')).toBe('97.4');
   });
 });

@@ -10,28 +10,24 @@ export interface PlottedVideoPoint extends VideoPoint {
   y: number;
   color: string;
   label: string;
-  /** Client concurrency above one request per replica: the same deployment under load. */
-  queued: boolean;
-  /** On its hardware's Pareto frontier (deployment cells only). */
+  /** On its hardware's Pareto frontier over deployments. */
   optimal: boolean;
 }
 
 export interface VideoPlot {
-  /** Cells to draw: deployments (dominated ones unless `optimal`), plus queued cells when `queue`. */
+  /** Deployment cells to draw, one per hardware until a GPUs-per-video sweep lands. */
   plotted: PlottedVideoPoint[];
   /** Per-hardware Pareto frontier over its deployment cells, ascending x; lines need two or more. */
   frontiers: Record<string, PlottedVideoPoint[]>;
-  /** Cross-hardware Pareto frontier over every deployment cell. */
-  global: PlottedVideoPoint[];
   /** True once any hardware has more than one measured deployment. */
   multiLayout: boolean;
 }
 
 /**
  * The chart's data model. A hardware's curve is the Pareto frontier over its
- * measured deployments (GPUs per video and how they split the model); client
- * concurrency on a batch-one server only queues requests, so queued cells are
- * plotted as evidence but never join a frontier.
+ * measured deployments (GPUs per video and how they split the model). Client
+ * concurrency above one request per replica only queues on the batch-one
+ * server, so those cells stay in the evidence panel and never reach the chart.
  */
 export function plotVideoPoints(
   points: VideoPoint[],
@@ -40,8 +36,8 @@ export function plotVideoPoints(
   hidden: ReadonlySet<string>,
 ): VideoPlot {
   const options = metricOptions(state);
-  const cells: PlottedVideoPoint[] = latestVideoCells(points).flatMap((p) => {
-    if (!p.hardwareKey || hidden.has(p.hardwareKey)) return [];
+  const plotted: PlottedVideoPoint[] = latestVideoCells(points).flatMap((p) => {
+    if (!p.hardwareKey || hidden.has(p.hardwareKey) || isQueueing(p)) return [];
     const x = metricValue(p, state.x, options);
     const y = metricValue(p, state.y, options);
     if (x === null || y === null) return [];
@@ -52,14 +48,12 @@ export function plotVideoPoints(
         y,
         color: colorFor(p.hardwareKey),
         label: hardwareLabel(p.hardwareKey),
-        queued: isQueueing(p),
         optimal: false,
       },
     ];
   });
-  const deployments = cells.filter((p) => !p.queued);
   const byHardware = new Map<string, PlottedVideoPoint[]>();
-  for (const p of deployments) {
+  for (const p of plotted) {
     const list = byHardware.get(p.hardwareKey!) ?? [];
     list.push(p);
     byHardware.set(p.hardwareKey!, list);
@@ -73,12 +67,5 @@ export function plotVideoPoints(
     for (const p of frontiers[key]) p.optimal = true;
     if (new Set(list.map(deploymentKey)).size > 1) multiLayout = true;
   }
-  const shown = state.optimal ? deployments.filter((p) => p.optimal) : deployments;
-  const queued = state.queue && !state.optimal ? cells.filter((p) => p.queued) : [];
-  return {
-    plotted: [...shown, ...queued],
-    frontiers,
-    global: paretoFrontier(deployments, xBetter, yBetter),
-    multiLayout,
-  };
+  return { plotted, frontiers, multiLayout };
 }

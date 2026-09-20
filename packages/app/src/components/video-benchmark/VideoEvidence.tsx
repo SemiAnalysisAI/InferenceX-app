@@ -17,7 +17,7 @@ import {
   type ScalingVsSpecRow,
 } from './evidence';
 import { hardwareLabel } from './hardware';
-import { formatMetric, type MetricOptions, type VideoPoint } from './metrics';
+import { formatMetric, type VideoPoint } from './metrics';
 
 const STRINGS = {
   en: {
@@ -197,8 +197,6 @@ const CELL = 'border-t border-border/40 py-1.5 pr-3';
 
 export interface VideoEvidenceProps {
   points: VideoPoint[];
-  /** Shared with the sibling panels; only `basis` is read, since nothing here is priced. */
-  options: MetricOptions;
   colorFor: (hardwareKey: string) => string;
 }
 
@@ -209,12 +207,12 @@ export interface VideoEvidenceProps {
  * sentence is built from the computed numbers; the section disappears when
  * nothing is measured.
  */
-export default function VideoEvidence({ points, options, colorFor }: VideoEvidenceProps) {
+export default function VideoEvidence({ points, colorFor }: VideoEvidenceProps) {
   const locale = useLocale();
   const s = STRINGS[locale];
   const power = powerUtilization(points);
   const range = powerRange(power);
-  const plateau = concurrencyPlateau(points, options.basis);
+  const plateau = concurrencyPlateau(points);
   const summary = plateauSummary(plateau);
   const scaling = scalingVsSpec(points);
   if (range === null && summary === null && scaling.length === 0) return null;
