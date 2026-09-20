@@ -2433,9 +2433,16 @@ const ScatterGraph = React.memo(
             (this as SVGGElement).dataset,
             effectiveActiveHwTypes,
             selectedPrecisions,
+            activeOverlayHwTypes,
           );
         });
-    }, [isPointVisible, isRooflineVisible, effectiveActiveHwTypes, selectedPrecisions]);
+    }, [
+      isPointVisible,
+      isRooflineVisible,
+      effectiveActiveHwTypes,
+      selectedPrecisions,
+      activeOverlayHwTypes,
+    ]);
 
     // --- Zoom config ---
     const eventPrefix = chartDefinition.chartType === 'e2e' ? 'latency' : 'interactivity';
@@ -3962,6 +3969,7 @@ const ScatterGraph = React.memo(
             (this as SVGGElement).dataset,
             ir.effectiveActiveHwTypes,
             ir.selectedPrecisions,
+            ir.activeOverlayHwTypes,
           );
         });
     }, [

@@ -897,6 +897,11 @@ describe('ScatterGraph', () => {
     cy.get(
       '#test-scatter-overlay-labels svg .line-label[data-line-key^="overlay-"] .ll-gpu',
     ).should('have.text', 'B200');
+    // b200_trt is active only in the overlay legend (official rows: h100), so
+    // the overlay pill must stay visible after the filter-sync effect.
+    cy.get('#test-scatter-overlay-labels svg .line-label[data-line-key^="overlay-"]')
+      .should('have.attr', 'data-visible', '1')
+      .and('have.css', 'opacity', '1');
     cy.get('#test-scatter-overlay-labels [data-testid="chart-legend"]').should(
       'contain.text',
       runBranch,
@@ -1156,6 +1161,14 @@ describe('ScatterGraph', () => {
       },
     );
 
+    // No official hardware is active, yet both overlay pills stay visible: they
+    // follow the overlay legend rows, not the official ones.
+    cy.get('#test-scatter-overlay-run-tags svg .line-label[data-line-key^="overlay-"]')
+      .should('have.length', 2)
+      .each(($label) => {
+        expect($label.attr('data-visible')).to.eq('1');
+        expect($label.css('opacity')).to.eq('1');
+      });
     // Same hardware from two runs: each pill carries a short run tag, the
     // long klaud branch shortened to its date-sha tail.
     cy.get('#test-scatter-overlay-run-tags svg .line-label[data-line-key^="overlay-"] .ll-text')
