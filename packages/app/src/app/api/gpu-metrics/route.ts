@@ -1,22 +1,33 @@
 /**
- * DO NOT ADD CACHING (blob, CDN, or unstable_cache) to this route.
- * It fetches live GitHub Actions artifacts which change while a run is in progress.
+ * PowerX telemetry for one GitHub Actions run.
+ *
+ * Reads the ingest-time telemetry digest first (migration 016: series,
+ * samples, per-GPU statistics, point links). Runs that have not been ingested
+ * yet, including runs still in progress, fall back to the live GitHub
+ * artifacts exactly as before.
+ *
+ * DO NOT ADD CACHING (blob, CDN, or unstable_cache) to this route. The
+ * fallback fetches live GitHub Actions artifacts which change while a run is
+ * in progress, and the database path is already a single indexed read.
  *
  * Two telemetry collectors publish GPU power for a run:
- * - single-node runners (nvidia-smi / amd-smi) upload one `gpu_metrics_<RESULT_FILENAME>`
+ * - single-node runners (nvidia-smi / amd-smi) publish one `gpu_metrics_<RESULT_FILENAME>`
  *   CSV artifact per benchmark config;
- * - Slurm / Dynamo disaggregated runners (DCGM) upload one `power_audit_<RESULT_FILENAME>`
+ * - Slurm / Dynamo disaggregated runners (DCGM) publish one `power_audit_<RESULT_FILENAME>`
  *   bundle per concurrency sweep, holding the sweep's samples plus one
  *   `power_validation_*.json` window per config
  *   (`components/gpu-power/power-audit-bundle.ts`).
  *
- * Two response shapes share one download path:
+ * Two response shapes:
  * - default: every `gpu_metrics_*` artifact's parsed rows (the `/gpu-metrics`
- *   page); bundles are ignored;
+ *   page), from the stored digest when the run is ingested, else from GitHub;
+ *   bundles are ignored on the GitHub path;
  * - `series=power`: compact per-GPU watt series bucketed to one second
  *   (`components/gpu-power/power-series.ts`) for the PowerX timeline, from
  *   CSV artifacts and from bundles cut per validation window. The timeline
  *   joins them to chart points by `source` (bundle) or artifact name (CSV).
+ *   This shape still reads GitHub: the stored digest holds the same samples
+ *   but no per-window cut yet.
  * `prefix=<RESULT_FILENAME prefix>` narrows either shape to the artifacts of
  * one model / workload / precision so a full nightly sweep is not downloaded
  * for one chart. A bundle names a whole sweep, so it also matches when the
@@ -24,7 +35,18 @@
  */
 import { type NextRequest, NextResponse } from 'next/server';
 
-import { parseCsvData } from '@/components/gpu-power/types';
+import { getDb } from '@semianalysisai/inferencex-db/connection';
+import {
+  getGpuMetricsForRun,
+  type GpuMetricSeries,
+  type GpuMetricsRunPayload,
+} from '@semianalysisai/inferencex-db/queries/gpu-metrics';
+
+import {
+  parseCsvData,
+  type GpuMetricRow,
+  type GpuPowerRunInfo,
+} from '@/components/gpu-power/types';
 import {
   cutPowerAuditBundle,
   isPowerAuditBundleEntry,
@@ -54,9 +76,58 @@ const BUNDLE_PREFIX = 'power_audit_';
 /** RESULT_FILENAME characters: model, workload, precision, framework, parallelism, host, hash. */
 const PREFIX_PATTERN = /^[A-Za-z0-9._-]{1,200}$/u;
 
-interface ParsedArtifact {
+export type GpuMetricsSource = 'database' | 'github';
+
+export interface GpuMetricsArtifactPayload {
   name: string;
-  data: ReturnType<typeof parseCsvData>;
+  data: GpuMetricRow[];
+  /** Present only for database-backed artifacts. */
+  series?: Omit<GpuMetricSeries, 'data'>;
+}
+
+export interface GpuMetricsRouteResponse {
+  runInfo: GpuPowerRunInfo;
+  artifacts: GpuMetricsArtifactPayload[];
+  source: GpuMetricsSource;
+}
+
+/** Shape the stored digest like the GitHub payload so the explorer is source-agnostic. */
+export function databasePayloadToResponse(payload: GpuMetricsRunPayload): GpuMetricsRouteResponse {
+  const run = payload.workflowRun;
+  const filesPerArtifact = new Map<string, number>();
+  for (const series of payload.series) {
+    filesPerArtifact.set(series.artifactName, (filesPerArtifact.get(series.artifactName) ?? 0) + 1);
+  }
+  return {
+    source: 'database',
+    runInfo: {
+      id: run.githubRunId,
+      name: run.name,
+      branch: run.headBranch ?? '',
+      sha: run.headSha ?? '',
+      createdAt: run.createdAt ?? `${run.date}T00:00:00Z`,
+      url:
+        run.htmlUrl ??
+        `https://github.com/SemiAnalysisAI/InferenceX/actions/runs/${run.githubRunId}`,
+      conclusion: run.conclusion ?? '',
+      status: run.status ?? '',
+    },
+    artifacts: payload.series.map(({ data, ...series }) => ({
+      // Multinode uploads carry one CSV per node; keep them distinguishable.
+      name:
+        (filesPerArtifact.get(series.artifactName) ?? 1) > 1
+          ? `${series.artifactName}/${series.fileName}`
+          : series.artifactName,
+      data,
+      series,
+    })),
+  };
+}
+
+/** The GitHub path also carries the bundle series the timeline draws. */
+interface GithubGpuMetricsResponse extends GpuMetricsRouteResponse {
+  source: 'github';
+  bundleSeries: GpuPowerSeries[];
 }
 
 type TelemetryJob =
@@ -64,7 +135,7 @@ type TelemetryJob =
   | { kind: 'bundle'; artifact: GithubArtifact };
 
 type TelemetryResult =
-  | { kind: 'csv'; parsed: ParsedArtifact }
+  | { kind: 'csv'; parsed: GpuMetricsArtifactPayload }
   | { kind: 'bundle'; series: GpuPowerSeries[] };
 
 /** Fetches one artifact zip, or `null` (with a warning) when it fails or exceeds `maxBytes`. */
@@ -90,7 +161,7 @@ async function downloadZip(
 async function downloadArtifact(
   artifact: GithubArtifact,
   githubToken: string,
-): Promise<ParsedArtifact | null> {
+): Promise<GpuMetricsArtifactPayload | null> {
   const buffer = await downloadZip(artifact, githubToken, MAX_ARTIFACT_BYTES);
   if (!buffer) return null;
   const rows = extractZipEntries(
@@ -173,7 +244,27 @@ function isWantedBundle(name: string, prefix: string | null): boolean {
   return name.startsWith(wanted) || wanted.startsWith(name);
 }
 
-async function fetchGpuMetrics(runId: string, prefix: string | null, includeBundles: boolean) {
+/**
+ * Narrows a stored run to the artifacts a `prefix` names, mirroring the GitHub
+ * listing filter so both sources answer the same request the same way.
+ */
+function filterArtifactsByPrefix(
+  artifacts: GpuMetricsArtifactPayload[],
+  prefix: string | null,
+): GpuMetricsArtifactPayload[] {
+  if (prefix === null) return artifacts;
+  const wanted = `${ARTIFACT_PREFIX}${prefix}`;
+  return artifacts.filter((artifact) => {
+    const name = artifact.series?.artifactName ?? artifact.name;
+    return name.startsWith(wanted) || isWantedBundle(name, prefix);
+  });
+}
+
+async function fetchGpuMetricsFromGithub(
+  runId: string,
+  prefix: string | null,
+  includeBundles: boolean,
+): Promise<GithubGpuMetricsResponse> {
   const githubToken = getGithubToken();
   if (!githubToken) throw new Error('GitHub token not configured');
 
@@ -204,17 +295,31 @@ async function fetchGpuMetrics(runId: string, prefix: string | null, includeBund
   const results = await downloadTelemetry(jobs, githubToken);
   if (results.length === 0) throw new Error('No Chip metrics data found in artifacts');
 
-  const parsedArtifacts: ParsedArtifact[] = [];
+  const parsedArtifacts: GpuMetricsArtifactPayload[] = [];
   const bundleSeries: GpuPowerSeries[] = [];
   for (const result of results) {
     if (result.kind === 'csv') parsedArtifacts.push(result.parsed);
     else bundleSeries.push(...result.series);
   }
   return {
-    runInfo: normalizeGithubRunInfo(run),
+    source: 'github',
+    runInfo: normalizeGithubRunInfo(run) as GpuPowerRunInfo,
     artifacts: parsedArtifacts,
     bundleSeries,
   };
+}
+
+async function fetchGpuMetricsFromDatabase(runId: string): Promise<GpuMetricsRouteResponse | null> {
+  if (!process.env.DATABASE_READONLY_URL) return null;
+  try {
+    const payload = await getGpuMetricsForRun(getDb(), Number(runId));
+    return payload ? databasePayloadToResponse(payload) : null;
+  } catch (error) {
+    // A schema that predates migration 016 or a transient DB error must not
+    // hide the live GitHub artifacts.
+    console.warn(`gpu-metrics: database lookup failed for run ${runId}, using GitHub:`, error);
+    return null;
+  }
 }
 
 export async function GET(request: NextRequest) {
@@ -237,18 +342,28 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const { runInfo, artifacts, bundleSeries } = await fetchGpuMetrics(
-      runId,
-      prefix,
-      series === 'power',
-    );
     if (series === 'power') {
+      const { runInfo, artifacts, bundleSeries } = await fetchGpuMetricsFromGithub(
+        runId,
+        prefix,
+        true,
+      );
       const powerSeries = artifacts
         .map((artifact) => bucketPowerSeries(artifact.name, artifact.data))
         .filter((entry): entry is GpuPowerSeries => entry !== null);
       return NextResponse.json({ runInfo, series: [...powerSeries, ...bundleSeries] });
     }
-    return NextResponse.json({ runInfo, artifacts });
+    const stored = await fetchGpuMetricsFromDatabase(runId);
+    if (stored) {
+      const artifacts = filterArtifactsByPrefix(stored.artifacts, prefix);
+      if (artifacts.length > 0) return NextResponse.json({ ...stored, artifacts });
+    }
+    const live = await fetchGpuMetricsFromGithub(runId, prefix, false);
+    return NextResponse.json({
+      source: live.source,
+      runInfo: live.runInfo,
+      artifacts: live.artifacts,
+    });
   } catch (error) {
     console.error('Error fetching GPU power data:', error);
     return NextResponse.json(

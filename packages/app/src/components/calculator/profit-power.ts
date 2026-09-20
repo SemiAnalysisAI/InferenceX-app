@@ -17,13 +17,10 @@ function planningKwPerGpu(point: GPUDataPoint): number | null {
   const row = point.sourceRow;
   if (!row || row.metrics.power_metric_schema_version !== 2) return null;
   const estimate = modelSystemPower(row, undefined, true);
-  if (
-    estimate.status !== 'supported' ||
-    estimate.gpuCount !== 8 ||
-    estimate.topologyBasis !== 'single-node' ||
-    estimate.chassisBasis !== 'full'
-  )
-    return null;
+  // Every modeled chassis must be fully measured; a partial allocation's
+  // extrapolated share is not a planning figure. Multi-chassis deployments
+  // (per-worker or uniform hosts) plan at the same facility watts per GPU.
+  if (estimate.status !== 'supported' || estimate.chassisBasis !== 'full') return null;
   return (estimate.deploymentFacilityWatts / estimate.gpuCount / 1000) * 1.1;
 }
 

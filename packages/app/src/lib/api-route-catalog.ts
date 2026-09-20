@@ -68,10 +68,10 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'ui-artifact-read',
     exclusionReason: {
-      en: 'UI-only live GPU telemetry artifact lookup (raw `gpu_metrics_*` rows, or `series=power` one-second buckets for the PowerX timeline, also cut per validation window from `power_audit_*` bundles); its run artifact shape is not a stable public contract.',
-      zh: '仅供界面读取实时 GPU 遥测制品（`gpu_metrics_*` 原始行，或供 PowerX 时间线使用的 `series=power` 一秒分桶数据，后者也会按验证窗口从 `power_audit_*` bundle 中切分得到）；其运行制品结构不是稳定的公开契约。',
+      en: 'UI-only PowerX read for one run: the ingest-time telemetry digest when stored, otherwise the live GPU telemetry artifacts (raw `gpu_metrics_*` rows, or `series=power` one-second buckets for the PowerX timeline, also cut per validation window from `power_audit_*` bundles). Its payload shape is not a stable public contract.',
+      zh: '仅供 PowerX 界面按 run 读取：已入库时返回 ingest 阶段生成的 telemetry 摘要，否则回退到实时 GPU 遥测制品（`gpu_metrics_*` 原始行，或供 PowerX 时间线使用的 `series=power` 一秒分桶数据，后者也会按验证窗口从 `power_audit_*` bundle 中切分得到）。其返回结构不是稳定的公开契约。',
     },
-    sourceSha256: 'b4850c3a6b60fc09a6c5050fdb13671fee632b3346cdcd2144c8a9c77c00795b',
+    sourceSha256: '4d387298f0311a91c319548119382646045fff6cccdf4e871adf89b39a6feee1',
   },
   {
     source: 'src/app/api/openapi.json/route.ts',
@@ -326,6 +326,17 @@ export const apiRouteCatalog = [
     classification: 'published-read',
     operationId: 'list-reliability',
     sourceSha256: 'ce1c5db78b47548beb77a69797f10fb33853cde01cea5c44675c8ad3519bcf20',
+  },
+  {
+    source: 'src/app/api/v1/gpu-metrics-point/route.ts',
+    path: '/api/v1/gpu-metrics-point',
+    method: 'GET',
+    classification: 'page-bff',
+    exclusionReason: {
+      en: 'Agentic point-detail BFF returning the PowerX telemetry series and per-GPU digest linked to one benchmark point; coupled to the PowerX tab implementation.',
+      zh: '智能体数据点详情页专用 BFF；返回与单个基准测试数据点关联的 PowerX telemetry 序列及每 GPU 统计摘要，与 PowerX 标签页实现紧密耦合。',
+    },
+    sourceSha256: '3929581f54058183344d59a8f6127db3ef1c8487cad26c73faa93b00fe75a82d',
   },
   {
     source: 'src/app/api/v1/request-chart-data/route.ts',
