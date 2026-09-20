@@ -7,6 +7,8 @@ function mount(pathname = '/video', search = '') {
     fixture: 'api/video-history.json',
   }).as('history');
   cy.intercept('GET', '/api/video-runs?page=*', { runs: [], nextPage: null });
+  // The Compare panel fetches clips once in view; the component runner publishes none.
+  cy.intercept('GET', '/api/video-runs?run=*', { statusCode: 204 });
   cy.window().then((win) =>
     win.history.replaceState(null, '', `${win.location.pathname}${search}`),
   );
@@ -169,6 +171,7 @@ describe('Video hardware dashboard (retained fixture)', () => {
       req.reply({ fixture: 'api/video-history.json', delay: 800 });
     }).as('slowHistory');
     cy.intercept('GET', '/api/video-runs?page=*', { runs: [], nextPage: null });
+    cy.intercept('GET', '/api/video-runs?run=*', { statusCode: 204 });
     // The AUT keeps the previous test's v_ params; start from the defaults.
     cy.window().then((win) => win.history.replaceState(null, '', win.location.pathname));
     cy.mount(
