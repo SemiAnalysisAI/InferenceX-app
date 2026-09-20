@@ -1,6 +1,6 @@
-import { GET as unofficial } from '@/app/api/unofficial-run/route';
 import {
   validateParams as validateViewParams,
+  matchesHardware,
   parseDateParam,
   parseFormatParam,
   parseFreeListParam,
@@ -8,7 +8,7 @@ import {
   resolveModelParam,
 } from '@/lib/views-api/params';
 import { VIEW_QUERY_PARAMS } from '@/lib/views-api/registry';
-import { readResponse, sourceRequest } from '@/lib/views-api/source';
+import { unofficialRunPayload } from '@/lib/views-api/source';
 import type { NextRequest } from 'next/server';
 
 import { FIXTURES_MODE, getDb } from '@semianalysisai/inferencex-db/connection';
@@ -20,6 +20,7 @@ import {
   buildEvaluationChartRows,
 } from '@/components/evaluation/chart-data';
 import { resolveEvaluationDate } from '@/components/evaluation/date-resolution';
+import type { EvaluationChartData } from '@/components/evaluation/types';
 import { cachedJson, cachedQuery } from '@/lib/api-cache';
 import { loadFixture } from '@/lib/test-fixtures';
 import { csvResponse } from '@/lib/views-api/csv';
@@ -52,6 +53,63 @@ export const dynamic = 'force-dynamic';
 // eval_results rows, so they intentionally share one cached payload.
 const getCachedEvalRows = cachedQuery(() => getAllEvalResults(getDb()), 'evaluations');
 
+interface EvaluationBar {
+  source: string;
+  hwKey: string;
+  label: string;
+  score: EvaluationChartData['score'];
+  stderr: EvaluationChartData['scoreError'];
+  n: number;
+  precision: EvaluationChartData['precision'];
+  framework: EvaluationChartData['framework'];
+  date: EvaluationChartData['date'];
+}
+
+/**
+ * One source's bars: the dashboard's latest-per-config → retry-averaged
+ * pipeline over `sourceRows`, narrowed to the `gpus` filter, with `n` = how
+ * many repeated runs (retries/reruns) each aggregated bar averages. Official
+ * rows pass the resolved snapshot date; an unofficial run is a single snapshot.
+ */
+function aggregatedBars(
+  source: string,
+  sourceRows: EvalRow[],
+  selection: {
+    benchmark: string | undefined;
+    model: string;
+    precisions: string[];
+    gpus: string[];
+  },
+  date?: string,
+): EvaluationBar[] {
+  const chartRows = buildEvaluationChartRows(
+    sourceRows,
+    selection.benchmark,
+    selection.model,
+    selection.precisions,
+    date,
+  );
+  const groupSizes = new Map<string, number>();
+  for (const row of chartRows) {
+    const key = `${row.configId}|${row.conc}`;
+    groupSizes.set(key, (groupSizes.get(key) ?? 0) + 1);
+  }
+  const enabled = new Set(
+    chartRows.map((row) => String(row.hwKey)).filter((key) => matchesHardware(key, selection.gpus)),
+  );
+  return aggregateEvaluationChartRows(chartRows, enabled).map((row) => ({
+    source,
+    hwKey: String(row.hwKey),
+    label: row.configLabel,
+    score: row.score,
+    stderr: row.scoreError,
+    n: groupSizes.get(`${row.configId}|${row.conc}`) ?? 1,
+    precision: row.precision,
+    framework: row.framework,
+    date: row.date,
+  }));
+}
+
 export function GET(request: NextRequest) {
   return runViewsRoute('evaluation', async () => {
     validateViewParams(request.nextUrl.searchParams, VIEW_QUERY_PARAMS['evaluation']);
@@ -65,24 +123,7 @@ export function GET(request: NextRequest) {
     const rows = FIXTURES_MODE ? loadFixture<EvalRow[]>('evaluations') : await getCachedEvalRows();
 
     const unofficialrun = search.get('unofficialrun');
-    const ids = unofficialrun?.split(',') ?? [];
-    if (
-      ids.length > 8 ||
-      ids.some((id) => !/^[1-9]\d*$/.test(id) || !Number.isSafeInteger(Number(id)))
-    )
-      throw new ViewsApiParamError(
-        'unofficialrun',
-        'Expected up to eight positive safe numeric run IDs',
-      );
-    const overlayResponse =
-      ids.length > 0
-        ? await readResponse<{ evaluations: EvalRow[] }>(
-            await unofficial(
-              sourceRequest(request, '/api/unofficial-run', { runId: [...new Set(ids)].join(',') }),
-            ),
-          )
-        : { evaluations: [] };
-    const overlayRows = overlayResponse.evaluations;
+    const { evaluations: overlayRows } = await unofficialRunPayload(request);
     const modelRows = [...rows, ...overlayRows].filter((row) =>
       model.dbModelKeys.includes(row.model),
     );
@@ -113,78 +154,15 @@ export function GET(request: NextRequest) {
         ? requestedPrecisions
         : [...new Set(modelRows.map((row) => row.precision))].toSorted();
 
-    const chartRows = buildEvaluationChartRows(
-      rows,
-      benchmark,
-      model.displayName,
-      precisions,
-      date || undefined,
-    );
-
-    // n = how many repeated runs (retries/reruns) each aggregated bar averages.
-    const groupSizes = new Map<string, number>();
-    for (const row of chartRows) {
-      const key = `${row.configId}|${row.conc}`;
-      groupSizes.set(key, (groupSizes.get(key) ?? 0) + 1);
-    }
-
-    const hardwareWithData = new Set(chartRows.map((row) => String(row.hwKey)));
-    const enabled = new Set(
-      [...hardwareWithData].filter(
-        (key) =>
-          gpus.length === 0 ||
-          gpus.includes(key.toLowerCase()) ||
-          gpus.includes(key.split('_')[0].toLowerCase()),
-      ),
-    );
-    const aggregated = aggregateEvaluationChartRows(chartRows, enabled);
-
-    const outputRows = aggregated.map((row) => ({
-      source: 'official',
-      hwKey: String(row.hwKey),
-      label: row.configLabel,
-      score: row.score,
-      stderr: row.scoreError,
-      n: groupSizes.get(`${row.configId}|${row.conc}`) ?? 1,
-      precision: row.precision,
-      framework: row.framework,
-      date: row.date,
-    }));
-
+    const selection = { benchmark, model: model.displayName, precisions, gpus };
+    const outputRows = aggregatedBars('official', rows, selection, date || undefined);
     for (const runUrl of new Set(overlayRows.map((row) => row.run_url))) {
-      const chart = buildEvaluationChartRows(
-        overlayRows.filter((row) => row.run_url === runUrl),
-        benchmark,
-        model.displayName,
-        precisions,
-      );
-      const overlayEnabled = new Set(
-        chart
-          .map((row) => String(row.hwKey))
-          .filter(
-            (key) =>
-              gpus.length === 0 ||
-              gpus.includes(key.toLowerCase()) ||
-              gpus.includes(key.split('_')[0].toLowerCase()),
-          ),
-      );
-      const sizes = new Map<string, number>();
-      for (const row of chart) {
-        const key = `${row.configId}|${row.conc}`;
-        sizes.set(key, (sizes.get(key) ?? 0) + 1);
-      }
       outputRows.push(
-        ...aggregateEvaluationChartRows(chart, overlayEnabled).map((row) => ({
-          source: runUrl ?? 'unofficial',
-          hwKey: String(row.hwKey),
-          label: row.configLabel,
-          score: row.score,
-          stderr: row.scoreError,
-          n: sizes.get(`${row.configId}|${row.conc}`) ?? 1,
-          precision: row.precision,
-          framework: row.framework,
-          date: row.date,
-        })),
+        ...aggregatedBars(
+          runUrl ?? 'unofficial',
+          overlayRows.filter((row) => row.run_url === runUrl),
+          selection,
+        ),
       );
     }
     const params = {

@@ -1,33 +1,37 @@
 import {
   validateParams as validateViewParams,
+  CALCULATOR_DEFAULT_TARGET,
+  CALCULATOR_MODE_TO_INTERNAL,
+  CALCULATOR_MODE_VALUES,
+  CALCULATOR_PERCENTILE_VALUES,
+  matchesHardware,
   parseBoolParam,
+  parseCostProviderParam,
+  parseCostTypeParam,
   parseDateParam,
   parseEnumParam,
   parseFormatParam,
   parseFreeListParam,
   parseNumberParam,
   parsePrecisionsParam,
+  parseRunIdParam,
   parseSequenceParam,
+  parseTcoBasisParam,
   resolveModelParam,
 } from '@/lib/views-api/params';
 import { VIEW_QUERY_PARAMS } from '@/lib/views-api/registry';
 import { unofficialRows } from '@/lib/views-api/source';
 import type { NextRequest } from 'next/server';
 
-import { FIXTURES_MODE, getDb } from '@semianalysisai/inferencex-db/connection';
-import {
-  getBenchmarksForRun,
-  getLatestBenchmarks,
-  type BenchmarkRow,
-} from '@semianalysisai/inferencex-db/queries/benchmarks';
+import { FIXTURES_MODE } from '@semianalysisai/inferencex-db/connection';
+import type { BenchmarkRow } from '@semianalysisai/inferencex-db/queries/benchmarks';
 
-import { computeFleetStats } from '@/components/calculator/fleet';
+import { sizeFleetForResult } from '@/components/calculator/fleet';
 import { interpolateForGPU, maxInteractivityAtCost } from '@/components/calculator/interpolation';
-import { outputTokPerChip } from '@/components/calculator/lifecycle';
+import { getThroughputForType } from '@/components/calculator/power-ranking';
 import {
   buildGpuGroups,
   resolveRowPrecisions,
-  throughputForType,
   type GroupMeta,
 } from '@/components/calculator/throughput-data';
 import type {
@@ -37,9 +41,13 @@ import type {
   GPUDataPoint,
   InterpolatedResult,
 } from '@/components/calculator/types';
-import { cachedJson, cachedQuery } from '@/lib/api-cache';
+import { cachedJson } from '@/lib/api-cache';
 import { toCalculatorBenchmarkRows } from '@/lib/benchmark-api-view';
-import { getGpuSpecs, getHardwareConfig } from '@/lib/constants';
+import {
+  getCachedBenchmarksForRun,
+  getCachedCalculatorBenchmarks,
+} from '@/lib/benchmark-query-cache.server';
+import { getGpuSpecs, getHardwareConfig, type TcoBasis } from '@/lib/constants';
 import { Percentile, Sequence } from '@/lib/data-mappings';
 import { loadFixture } from '@/lib/test-fixtures';
 import { getDisplayLabel } from '@/lib/utils';
@@ -48,38 +56,23 @@ import { runViewsRoute, ViewsApiParamError } from '@/lib/views-api/errors';
 
 export const dynamic = 'force-dynamic';
 
-/** URL modes are hyphenated; the interpolation engine's are underscored. */
-const MODE_VALUES = ['interactivity-to-throughput', 'throughput-to-interactivity'] as const;
-type ModeParam = (typeof MODE_VALUES)[number];
-const MODE_TO_INTERNAL: Record<ModeParam, CalculatorMode> = {
-  'interactivity-to-throughput': 'interactivity_to_throughput',
-  'throughput-to-interactivity': 'throughput_to_interactivity',
-};
-
-const COST_PROVIDER_VALUES = ['costh', 'costr'] as const;
-const COST_TYPE_VALUES = ['total', 'input', 'output'] as const;
-const PERCENTILE_VALUES = [Percentile.P75, Percentile.P90] as const;
-
-// Same trim the dashboard's calculator fetch applies (`view=calculator` on
-// /api/v1/benchmarks), under a views-owned cache key. runId is pre-validated
-// numeric, so distinct logical requests never alias one key.
-const getCachedCalculatorRows = cachedQuery(
-  async (dbModelKeys: string[], sequence: string, date?: string, runId?: string) =>
-    toCalculatorBenchmarkRows(
-      runId
-        ? await getBenchmarksForRun(getDb(), dbModelKeys, runId)
-        : await getLatestBenchmarks(getDb(), dbModelKeys, date),
-      sequence,
-    ),
-  'views-calculator-benchmarks',
-  { blobOnly: true },
-);
-
-/** Matches a group either by full hwKey or by its base chip segment. */
-function matchesGpuFilter(hwKey: string, gpus: string[]): boolean {
-  if (gpus.length === 0) return true;
-  const base = hwKey.split('_')[0];
-  return gpus.some((gpu) => gpu === hwKey.toLowerCase() || gpu === base.toLowerCase());
+/**
+ * Same rows and trim the dashboard's calculator fetch gets from
+ * `/api/v1/benchmarks?view=calculator` (or `runId=&exactRun=true`), through the
+ * cache slots that endpoint already owns.
+ */
+async function calculatorRows(
+  dbModelKeys: string[],
+  sequence: Sequence,
+  date: string | undefined,
+  runId: string | undefined,
+): Promise<BenchmarkRow[]> {
+  if (FIXTURES_MODE) {
+    return toCalculatorBenchmarkRows(loadFixture<BenchmarkRow[]>('benchmarks'), sequence);
+  }
+  return runId
+    ? toCalculatorBenchmarkRows(await getCachedBenchmarksForRun(dbModelKeys, runId), sequence)
+    : getCachedCalculatorBenchmarks(dbModelKeys, sequence, date);
 }
 
 /**
@@ -180,33 +173,25 @@ export function GET(request: NextRequest): Promise<Response> {
     const model = resolveModelParam(search.get('model'));
     const sequence = parseSequenceParam(search.get('sequence'), Sequence.EightK_OneK);
     const requestedPrecisions = parsePrecisionsParam(search.get('precisions'));
-    const target = parseNumberParam(search.get('target'), 'target', 35, { min: 0 });
+    const target = parseNumberParam(search.get('target'), 'target', CALCULATOR_DEFAULT_TARGET, {
+      min: 0,
+    });
     if (target <= 0) {
       throw new ViewsApiParamError('target', `Invalid target: ${target} (must be > 0)`);
     }
     const modeParam = parseEnumParam(
       search.get('mode'),
       'mode',
-      MODE_VALUES,
+      CALCULATOR_MODE_VALUES,
       'interactivity-to-throughput',
     );
-    const mode = MODE_TO_INTERNAL[modeParam];
-    const costProvider: CostProvider = parseEnumParam(
-      search.get('costProvider'),
-      'costProvider',
-      COST_PROVIDER_VALUES,
-      'costh',
-    );
-    const costType: CostType = parseEnumParam(
-      search.get('costType'),
-      'costType',
-      COST_TYPE_VALUES,
-      'total',
-    );
+    const mode = CALCULATOR_MODE_TO_INTERNAL[modeParam];
+    const costProvider = parseCostProviderParam(search.get('costProvider'));
+    const costType = parseCostTypeParam(search.get('costType'));
     const percentile = parseEnumParam(
       search.get('percentile'),
       'percentile',
-      PERCENTILE_VALUES,
+      CALCULATOR_PERCENTILE_VALUES,
       Percentile.P90,
     );
     const mwRaw = search.get('mw');
@@ -223,20 +208,9 @@ export function GET(request: NextRequest): Promise<Response> {
       throw new ViewsApiParamError('costcap', `Invalid costcap: ${costcap} (must be > 0)`);
     }
     const date = parseDateParam(search.get('date'), 'date');
-    const runIdRaw = search.get('runId');
-    if (runIdRaw !== null && runIdRaw !== '' && !/^\d+$/u.test(runIdRaw)) {
-      throw new ViewsApiParamError('runId', `Invalid runId: ${runIdRaw} (numeric run id required)`);
-    }
-    const runId = runIdRaw
-      ? String(parseNumberParam(runIdRaw, 'runId', 0, { min: 1, integer: true }))
-      : undefined;
+    const runId = parseRunIdParam(search.get('runId'));
     const gpus = parseFreeListParam(search.get('gpus'));
-    const tcoBasis = parseEnumParam(
-      search.get('tcoBasis'),
-      'tcoBasis',
-      ['internal', 'external'],
-      'internal',
-    );
+    const tcoBasis = parseTcoBasisParam(search.get('tcoBasis'));
     const hideSkuAboveConfigLimit = parseBoolParam(
       search.get('hideSkuAboveConfigLimit'),
       'hideSkuAboveConfigLimit',
@@ -244,9 +218,7 @@ export function GET(request: NextRequest): Promise<Response> {
     );
     const format = parseFormatParam(search.get('format'));
 
-    const rows = FIXTURES_MODE
-      ? toCalculatorBenchmarkRows(loadFixture<BenchmarkRow[]>('benchmarks'), sequence)
-      : await getCachedCalculatorRows([...model.dbModelKeys], sequence, date, runId);
+    const rows = await calculatorRows([...model.dbModelKeys], sequence, date, runId);
 
     const overlayRows = await unofficialRows(request);
     const precisions = resolveRowPrecisions(
@@ -287,7 +259,7 @@ export function GET(request: NextRequest): Promise<Response> {
     const hardware: HardwareResult[] = [];
     for (const [groupKey, points] of Object.entries(grouped)) {
       const meta = groupMeta[groupKey];
-      if (!matchesGpuFilter(meta.hwKey, gpus)) continue;
+      if (!matchesHardware(meta.hwKey, gpus)) continue;
       const result = interpolateForGPU(points, target, mode, costProvider);
       if (!result || result.value <= 0 || (hideSkuAboveConfigLimit && result.clampedAbove))
         continue;
@@ -339,7 +311,7 @@ export function GET(request: NextRequest): Promise<Response> {
       costCapResults = [];
       for (const [groupKey, points] of Object.entries(grouped)) {
         const meta = groupMeta[groupKey];
-        if (!matchesGpuFilter(meta.hwKey, gpus)) continue;
+        if (!matchesHardware(meta.hwKey, gpus)) continue;
         const maxIv = maxInteractivityAtCost(points, costcap, costProvider, costType);
         if (maxIv === null) {
           costCapResults.push({
@@ -370,7 +342,7 @@ export function GET(request: NextRequest): Promise<Response> {
           resultKey: groupKey,
           label: labelOf(meta.hwKey),
           maxInteractivity: maxIv,
-          throughput: throughputForType(atIv, costType),
+          throughput: getThroughputForType(atIv, costType),
           concurrentUsers,
         });
       }
@@ -464,27 +436,16 @@ function computeFleetStatsForResult(
   totalThroughput: number,
   hwKey: string,
   mw: number,
-  options: { costProvider: CostProvider; costType: CostType; tcoBasis: 'internal' | 'external' },
+  options: { costProvider: CostProvider; costType: CostType; tcoBasis: TcoBasis },
 ): FleetStats | null {
   // Specs come from the base chip like the dashboard's fleet sizing does.
-  const specs = getGpuSpecs(hwKey, options.tcoBasis);
-  const tputPerGpu =
-    options.costType === 'input'
-      ? result.inputTputValue
-      : options.costType === 'output'
-        ? result.outputTputValue
-        : totalThroughput;
-  const stats = computeFleetStats({
+  const stats = sizeFleetForResult(result, {
     mw,
-    powerKwPerGpu: specs.power,
-    costPerGpuHour: specs[options.costProvider],
-    tputPerGpu,
-    outputTputPerGpu: outputTokPerChip(
-      totalThroughput,
-      result.inputTokenShare,
-      result.outputTputValue,
-    ),
+    specs: getGpuSpecs(hwKey, options.tcoBasis),
+    costProvider: options.costProvider,
+    costType: options.costType,
     interactivity,
+    totalThroughput,
   });
   if (!stats) return null;
   return {

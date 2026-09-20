@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { at, loadBundle, type Json } from './bundle';
 import { servingFixture as fixture } from './serving.fixture';
-import { servingCells } from './serving';
+import { participatingGpuCount, perGpuHour, selectServingRecord, servingCells } from './serving';
 
 function set(value: Json, key: string, replacement: Json) {
   if (value === null || typeof value !== 'object' || Array.isArray(value))
@@ -96,6 +96,42 @@ describe('H3 serving matrix', () => {
       expect(() => servingCells(b)).toThrow();
     },
   );
+});
+
+describe('serving selection helpers', () => {
+  const run: Json = {
+    records: [
+      { slot_id: 'warm-1', phase: 'warmup' },
+      { slot_id: 'slot-1', phase: 'measurement' },
+      { slot_id: 'slot-2', phase: 'measurement' },
+    ],
+  };
+
+  it('resolves the selected slot, else the first measurement record, else the first record', () => {
+    expect(at(selectServingRecord(run, 'slot-2'), 'slot_id')).toBe('slot-2');
+    expect(at(selectServingRecord(run, 'missing'), 'slot_id')).toBe('slot-1');
+    expect(at(selectServingRecord(run, ''), 'slot_id')).toBe('slot-1');
+    expect(at(selectServingRecord(run, null), 'slot_id')).toBe('slot-1');
+    expect(at(selectServingRecord({ records: [{ phase: 'warmup' }] }, null), 'phase')).toBe(
+      'warmup',
+    );
+    expect(selectServingRecord({}, 'slot-1')).toBeNull();
+  });
+
+  it('counts participating GPUs only when every UUID is present and distinct', () => {
+    expect(participatingGpuCount({ gpu_uuids: ['a', 'b', 'c'] })).toBe(3);
+    expect(participatingGpuCount({ gpu_uuids: ['a', 'a'] })).toBeNull();
+    expect(participatingGpuCount({ gpu_uuids: ['a', ''] })).toBeNull();
+    expect(participatingGpuCount({ gpu_uuids: [] })).toBeNull();
+    expect(participatingGpuCount(null)).toBeNull();
+  });
+
+  it('converts per-second rates to per GPU-hour for a usable GPU count', () => {
+    expect(perGpuHour(0.5, 4)).toBeCloseTo(450);
+    expect(perGpuHour(0.5, null)).toBeNull();
+    expect(perGpuHour(0.5, 0)).toBeNull();
+    expect(perGpuHour('0.5', 4)).toBeNull();
+  });
 });
 
 it.skipIf(!process.env.H3_SERVING_ARTIFACT_DIR)(

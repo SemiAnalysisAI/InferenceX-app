@@ -13,7 +13,7 @@ import { runViewsRoute, ViewsApiParamError } from '@/lib/views-api/errors';
 import {
   parseEnumParam,
   parseNumberParam,
-  validateParams,
+  parseRunIdParam,
   validateParams as validateViewParams,
 } from '@/lib/views-api/params';
 import { VIEW_QUERY_PARAMS } from '@/lib/views-api/registry';
@@ -42,29 +42,9 @@ export function GET(request: NextRequest) {
   return runViewsRoute('video', async () => {
     validateViewParams(request.nextUrl.searchParams, VIEW_QUERY_PARAMS['video']);
     const s = request.nextUrl.searchParams;
-    validateParams(s, [
-      'run',
-      'artifact',
-      'page',
-      'compare',
-      'source',
-      'cell',
-      'workload',
-      'xAxis',
-      'yAxis',
-      'selected',
-      'costs',
-      'phase',
-      'gpuBasis',
-      'slot',
-      'view',
-    ]);
-    const numeric = (key: string) =>
-      s.has(key)
-        ? String(parseNumberParam(s.get(key), key, 0, { min: 1, integer: true }))
-        : undefined;
-    const run = numeric('run'),
-      artifact = numeric('artifact');
+    // GitHub run id and artifact id share the positive-digits rule.
+    const run = parseRunIdParam(s.get('run'), 'run');
+    const artifact = parseRunIdParam(s.get('artifact'), 'artifact');
     const page = String(parseNumberParam(s.get('page'), 'page', 1, { min: 1, integer: true }));
     if (artifact && !run) throw new ViewsApiParamError('run', 'run is required with artifact');
     const response = await videoRuns(

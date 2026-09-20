@@ -5,6 +5,8 @@ vi.mock('@/lib/api-cache', () => ({
   cachedJson: (data: unknown) => Response.json(data),
 }));
 
+import { LIFECYCLE_DEFAULTS } from '@/components/calculator/lifecycle';
+import { VENDOR_ORDER } from '@/components/inference/utils/quickFilters';
 import { GET } from './route';
 
 function request(path: string): NextRequest {
@@ -91,7 +93,17 @@ describe('GET /api/v1/views/options', () => {
       percentile: 'p90',
       xmode: 'interactivity',
     });
-    expect(body.quickFilters.vendors).toEqual(['NVIDIA', 'AMD', 'Google', 'OpenAI']);
+    // Same vendors, in the dashboard's quick-filter pill order.
+    expect(body.quickFilters.vendors).toEqual(VENDOR_ORDER);
+    expect(body.quickFilters.deployments).toEqual(['single-node', 'multi-node', 'disagg']);
+    expect(body.fleet.defaults).toEqual({
+      rampMonths: LIFECYCLE_DEFAULTS.rampMonths,
+      cachedInputPricePercent: LIFECYCLE_DEFAULTS.cachedInputPct,
+      mtbiDays: LIFECYCLE_DEFAULTS.mtbiDays,
+      recoveryHours: LIFECYCLE_DEFAULTS.recoveryHours,
+    });
+    expect(body.overview.tiers).toEqual([30, 50, 75, 100, 150, 200]);
+    expect(body.overview.windows).toEqual(['hardware', '7d', '30d', '60d', '90d']);
   });
 
   it('rejects format=csv (JSON-only endpoint)', async () => {

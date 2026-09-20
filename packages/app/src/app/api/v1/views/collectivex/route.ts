@@ -17,10 +17,11 @@ import { swapChartPoints, swapRooflines } from '@/components/collectivex/swap-da
 import { cachedJson } from '@/lib/api-cache';
 import { runViewsRoute, ViewsApiParamError } from '@/lib/views-api/errors';
 import {
+  assertRunIdList,
   parseEnumParam,
   parseListParam,
   parseNumberParam,
-  validateParams,
+  parseRunIdListParam,
   validateParams as validateViewParams,
 } from '@/lib/views-api/params';
 import { VIEW_QUERY_PARAMS } from '@/lib/views-api/registry';
@@ -34,37 +35,10 @@ import {
 import type { NextRequest } from 'next/server';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
-const COLLECTIVEX_PARAMS = [
-  'version',
-  'runs',
-  'suite',
-  'epSize',
-  'phase',
-  'modes',
-  'precision',
-  'operation',
-  'percentile',
-  'yAxis',
-  'sku',
-  'backend',
-  'activeSeries',
-  'kvX',
-  'kvY',
-  'kvOp',
-  'pageTokens',
-  'overlapIsl',
-  'kvSeries',
-  'swapDirection',
-  'swapLayout',
-  'swapMetric',
-  'swapPercentile',
-  'swapSeries',
-] as const;
 export function GET(request: NextRequest) {
   return runViewsRoute('collectivex', async () => {
     validateViewParams(request.nextUrl.searchParams, VIEW_QUERY_PARAMS['collectivex']);
     const s = request.nextUrl.searchParams;
-    validateParams(s, COLLECTIVEX_PARAMS);
     const version = parseNumberParam(s.get('version'), 'version', COLLECTIVEX_DEFAULT_VERSION, {
       integer: true,
     });
@@ -76,15 +50,13 @@ export function GET(request: NextRequest) {
     );
     const suite = parseEnumParam(s.get('suite'), 'suite', ['all', 'ep', 'kv', 'swap'], 'all');
     const runIds = s.has('runs')
-      ? [...new Set(s.get('runs')!.split(',').filter(Boolean))]
+      ? parseRunIdListParam(s.get('runs'), 'runs')
       : [list.runs.find((r) => r.measured_cases > 0)?.run_id ?? list.runs[0]?.run_id].filter(
           (id): id is string => Boolean(id),
         );
-    if (
-      runIds.length > 8 ||
-      runIds.some((id) => !/^[1-9]\d*$/.test(id) || !Number.isSafeInteger(Number(id)))
-    )
-      throw new ViewsApiParamError('runs', 'Expected at most eight safe positive run IDs');
+    // The discovered default is validated too: a malformed run id in the run
+    // list must fail loudly rather than fan out to an odd upstream path.
+    assertRunIdList(runIds, 'runs');
     const datasets = await Promise.all(
       runIds.map(async (runId) =>
         readResponse<CollectiveXDataset>(await run(source, { params: Promise.resolve({ runId }) })),

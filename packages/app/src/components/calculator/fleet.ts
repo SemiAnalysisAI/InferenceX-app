@@ -9,6 +9,12 @@
  * point and owned-datacenter economics for the selected TCO tier.
  */
 
+import type { GpuSpecs } from '@/lib/constants';
+
+import { outputTokPerChip } from './lifecycle';
+import { getThroughputForType } from './power-ranking';
+import type { CostProvider, CostType, InterpolatedResult } from './types';
+
 /** 24h × 365d ÷ 12 — the convention used for $/GPU/hr → $/mo conversions. */
 export const HOURS_PER_MONTH = 730;
 
@@ -64,6 +70,45 @@ export function computeFleetStats(inputs: FleetInputs): FleetStats | null {
     costPerHour,
     costPerMonth: costPerHour * HOURS_PER_MONTH,
   };
+}
+
+export interface FleetSizingOptions {
+  /** Facility power budget in megawatts */
+  mw: number;
+  /** Base-chip specs for the selected TCO basis (`getGpuSpecs`) */
+  specs: Pick<GpuSpecs, 'power' | 'costh' | 'costr'>;
+  costProvider: CostProvider;
+  costType: CostType;
+  /** Operating-point interactivity (output tok/s/user) */
+  interactivity: number;
+  /**
+   * Total throughput actually served at the operating point. Defaults to the
+   * interpolated `result.value`; callers sizing at a clamped frontier edge pass
+   * the edge throughput so the output split follows the served point.
+   */
+  totalThroughput?: number;
+}
+
+/**
+ * Size a fleet from one interpolated operating point: chips from the power
+ * budget, billable throughput on the selected token type, and user streams from
+ * the measured output share. Shared by the views API (calculator, fleet); the
+ * dashboard panels call `computeFleetStats` with the same inputs.
+ */
+export function sizeFleetForResult(
+  result: InterpolatedResult,
+  options: FleetSizingOptions,
+): FleetStats | null {
+  const total = options.totalThroughput ?? result.value;
+  return computeFleetStats({
+    mw: options.mw,
+    powerKwPerGpu: options.specs.power,
+    costPerGpuHour: options.specs[options.costProvider],
+    tputPerGpu:
+      options.costType === 'total' ? total : getThroughputForType(result, options.costType),
+    outputTputPerGpu: outputTokPerChip(total, result.inputTokenShare, result.outputTputValue),
+    interactivity: options.interactivity,
+  });
 }
 
 /** Compact display formatting for fleet-scale magnitudes (1.24M, 48.3k, 950). */

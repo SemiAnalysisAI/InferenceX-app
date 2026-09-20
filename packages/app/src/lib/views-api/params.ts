@@ -1,12 +1,21 @@
-import { DISPLAY_MODEL_TO_DB } from '@semianalysisai/inferencex-constants';
+import { DISPLAY_MODEL_TO_DB, GPU_VENDORS } from '@semianalysisai/inferencex-constants';
 
+import type { CalculatorMode, CostProvider, CostType } from '@/components/calculator/types';
 import {
   DEFAULT_METRIC_CONFIG_KEY,
   isMetricKey,
   type MetricConfigKey,
 } from '@/components/inference/metric-registry';
+import {
+  FRAMEWORK_FAMILIES,
+  parseDeploymentModes,
+  VENDOR_ORDER,
+  type DeploymentMode,
+  type SpecMode,
+} from '@/components/inference/utils/quickFilters';
 import { COMPARE_MODEL_ALIASES, COMPARE_MODEL_SLUGS } from '@/lib/compare-slug';
-import { PRECISION_OPTIONS, Sequence, type Precision } from '@/lib/data-mappings';
+import { DEFAULT_TCO_BASIS, type TcoBasis } from '@/lib/constants';
+import { Percentile, PRECISION_OPTIONS, Sequence, type Precision } from '@/lib/data-mappings';
 
 import { ViewsApiParamError } from './errors';
 
@@ -205,6 +214,138 @@ export function parseMetricParam(
   const metricKey = configKey.slice(2);
   if (isMetricKey(metricKey)) return configKey as MetricConfigKey;
   throw new ViewsApiParamError(param, `Unknown ${param}: ${value}`, METRIC_CONFIG_VALUES);
+}
+
+const RUN_ID_PATTERN = /^[1-9]\d*$/u;
+/** Upper bound on run ids one request may overlay or compare. */
+export const MAX_RUN_ID_LIST = 8;
+
+function isValidRunId(value: string): boolean {
+  return RUN_ID_PATTERN.test(value) && Number.isSafeInteger(Number(value));
+}
+
+/**
+ * Optional GitHub Actions run id: positive digits only (no sign, exponent, or
+ * hex), returned as the string the DB queries key on. Empty means "latest".
+ */
+export function parseRunIdParam(value: string | null, param = 'runId'): string | undefined {
+  if (value === null || value === '') return undefined;
+  if (!isValidRunId(value)) {
+    throw new ViewsApiParamError(param, `Invalid ${param}: ${value} (positive integer required)`);
+  }
+  return value;
+}
+
+/** Bounded list of positive safe run ids (unofficial-run overlays, CollectiveX runs). */
+export function assertRunIdList(ids: readonly string[], param: string): void {
+  if (ids.length > MAX_RUN_ID_LIST || ids.some((id) => !isValidRunId(id))) {
+    throw new ViewsApiParamError(
+      param,
+      `Expected up to ${MAX_RUN_ID_LIST} positive safe numeric run IDs`,
+    );
+  }
+}
+
+/** Comma list of run ids, deduplicated in caller order (overlay precedence is stable). */
+export function parseRunIdListParam(value: string | null, param: string): string[] {
+  if (!value) return [];
+  const ids = [
+    ...new Set(
+      value
+        .split(',')
+        .map((id) => id.trim())
+        .filter((id) => id.length > 0),
+    ),
+  ];
+  assertRunIdList(ids, param);
+  return ids;
+}
+
+/** Percentile tiers the TCO calculator publishes (the dashboard exposes no others there). */
+export const CALCULATOR_PERCENTILE_VALUES = [Percentile.P75, Percentile.P90] as const;
+
+/** URL modes are hyphenated; the interpolation engine's are underscored. */
+export const CALCULATOR_MODE_VALUES = [
+  'interactivity-to-throughput',
+  'throughput-to-interactivity',
+] as const;
+export type CalculatorModeParam = (typeof CALCULATOR_MODE_VALUES)[number];
+export const CALCULATOR_MODE_TO_INTERNAL: Record<CalculatorModeParam, CalculatorMode> = {
+  'interactivity-to-throughput': 'interactivity_to_throughput',
+  'throughput-to-interactivity': 'throughput_to_interactivity',
+};
+/** Default interactivity target (tok/s/user) for the calculator view and its docs. */
+export const CALCULATOR_DEFAULT_TARGET = 35;
+
+export const TCO_BASIS_VALUES = ['internal', 'external'] as const satisfies readonly TcoBasis[];
+export const COST_PROVIDER_VALUES = ['costh', 'costr'] as const satisfies readonly CostProvider[];
+export const COST_TYPE_VALUES = ['total', 'input', 'output'] as const satisfies readonly CostType[];
+export const DEFAULT_COST_PROVIDER: CostProvider = 'costh';
+export const DEFAULT_COST_TYPE: CostType = 'total';
+
+export function parseTcoBasisParam(value: string | null, param = 'tcoBasis'): TcoBasis {
+  return parseEnumParam(value, param, TCO_BASIS_VALUES, DEFAULT_TCO_BASIS);
+}
+
+export function parseCostProviderParam(value: string | null, param = 'costProvider'): CostProvider {
+  return parseEnumParam(value, param, COST_PROVIDER_VALUES, DEFAULT_COST_PROVIDER);
+}
+
+export function parseCostTypeParam(value: string | null, param = 'costType'): CostType {
+  return parseEnumParam(value, param, COST_TYPE_VALUES, DEFAULT_COST_TYPE);
+}
+
+const REGISTRY_VENDORS = new Set(Object.values(GPU_VENDORS));
+/**
+ * Vendors known to the hardware registry, in the dashboard's quick-filter pill
+ * order; any registry vendor the pill order does not list follows, sorted.
+ */
+export const VENDOR_VALUES: readonly string[] = [
+  ...VENDOR_ORDER.filter((vendor) => REGISTRY_VENDORS.has(vendor)),
+  ...[...REGISTRY_VENDORS].filter((vendor) => !VENDOR_ORDER.includes(vendor)).toSorted(),
+];
+/** Serving-framework families, keyed like the dashboard's quick-filter pills. */
+export const FRAMEWORK_FAMILY_VALUES: readonly string[] = FRAMEWORK_FAMILIES.map(
+  (family) => family.key,
+).toSorted();
+/** Deployment modes the dashboard's quick-filter pills expose. */
+export const DEPLOYMENT_MODES = [
+  'single-node',
+  'multi-node',
+  'disagg',
+] as const satisfies readonly DeploymentMode[];
+/** Deployment modes plus the legacy `agg` alias shared dashboard links still carry. */
+export const DEPLOYMENT_VALUES = ['agg', ...DEPLOYMENT_MODES] as const;
+/** Speculative-decoding quick-filter modes. */
+export const SPEC_MODES = ['mtp', 'stp'] as const satisfies readonly SpecMode[];
+
+export function parseVendorsParam(value: string | null, param = 'vendors'): string[] {
+  return parseListParam(value, param, VENDOR_VALUES);
+}
+
+export function parseFrameworkFamiliesParam(value: string | null, param = 'frameworks'): string[] {
+  return parseListParam(value, param, FRAMEWORK_FAMILY_VALUES);
+}
+
+/** `agg` expands to both aggregate modes, mirroring `parseDeploymentModes` in the dashboard. */
+export function parseDeploymentParam(value: string | null, param = 'deployment'): DeploymentMode[] {
+  return parseDeploymentModes(parseListParam(value, param, DEPLOYMENT_VALUES)).toSorted();
+}
+
+export function parseSpecModesParam(value: string | null, param = 'spec'): SpecMode[] {
+  return parseListParam(value, param, SPEC_MODES);
+}
+
+/**
+ * Hardware filter shared by every view with a `gpus=` list: a lowercase entry
+ * matches either the full hwKey (`b200_sglang`) or its base chip (`b200`).
+ * Empty list matches everything.
+ */
+export function matchesHardware(hwKey: string, gpus: readonly string[]): boolean {
+  if (gpus.length === 0) return true;
+  const lowered = hwKey.toLowerCase();
+  const base = lowered.split('_')[0];
+  return gpus.some((gpu) => gpu === lowered || gpu === base);
 }
 
 export const VIEWS_FORMATS = ['json', 'csv'] as const;

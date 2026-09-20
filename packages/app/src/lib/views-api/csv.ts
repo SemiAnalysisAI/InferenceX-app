@@ -1,20 +1,14 @@
 import { cachedText } from '@/lib/api-cache';
+import { escapeCsvCell } from '@/lib/csv-export';
 
 /**
  * Minimal RFC 4180 CSV serialization for views-API alternate representations.
  *
- * Mirrors the `tco-feed` CSV contract: header row from the union of row keys
- * (first-seen order), empty string for null/undefined, quotes only when needed.
+ * Header row from the union of row keys (first-seen order), CRLF line endings,
+ * and the same cell quoting as the dashboard's chart export (`escapeCsvCell`).
+ * Deliberately not the `tco-feed` Power Query contract (LF, unquoted, fixed
+ * columns) and without the download license preamble.
  */
-
-function escapeCsvValue(value: unknown): string {
-  if (value === null || value === undefined) return '';
-  const text = typeof value === 'string' ? value : String(value);
-  if (/[",\n\r]/u.test(text)) {
-    return `"${text.replaceAll('"', '""')}"`;
-  }
-  return text;
-}
 
 export function toCsv(rows: readonly Readonly<Record<string, unknown>>[]): string {
   const columns: string[] = [];
@@ -27,9 +21,9 @@ export function toCsv(rows: readonly Readonly<Record<string, unknown>>[]): strin
       }
     }
   }
-  const lines = [columns.map(escapeCsvValue).join(',')];
+  const lines = [columns.map(escapeCsvCell).join(',')];
   for (const row of rows) {
-    lines.push(columns.map((column) => escapeCsvValue(row[column])).join(','));
+    lines.push(columns.map((column) => escapeCsvCell(row[column])).join(','));
   }
   return `${lines.join('\r\n')}\r\n`;
 }

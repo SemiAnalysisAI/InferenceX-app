@@ -1,11 +1,19 @@
 import { describe, expect, it } from 'vitest';
 
+import { VENDOR_ORDER } from '@/components/inference/utils/quickFilters';
+import { DEFAULT_TCO_BASIS } from '@/lib/constants';
 import { Sequence } from '@/lib/data-mappings';
+import { GPU_VENDORS } from '@semianalysisai/inferencex-constants';
 
 import { ViewsApiParamError } from './errors';
 import {
+  matchesHardware,
+  MAX_RUN_ID_LIST,
   parseBoolParam,
+  parseCostProviderParam,
+  parseCostTypeParam,
   parseDateParam,
+  parseDeploymentParam,
   parseEnumParam,
   parseFormatParam,
   parseFreeListParam,
@@ -13,8 +21,12 @@ import {
   parseMetricParam,
   parseNumberParam,
   parsePrecisionsParam,
+  parseRunIdListParam,
+  parseRunIdParam,
   parseSequenceParam,
+  parseTcoBasisParam,
   resolveModelParam,
+  VENDOR_VALUES,
   VIEWS_MODEL_NAMES,
 } from './params';
 
@@ -146,5 +158,58 @@ describe('parseFormatParam', () => {
     expect(parseFormatParam(null)).toBe('json');
     expect(parseFormatParam('csv')).toBe('csv');
     expect(() => parseFormatParam('xml')).toThrow(ViewsApiParamError);
+  });
+});
+
+describe('parseRunIdParam / parseRunIdListParam', () => {
+  it('accepts positive digit strings and treats empty as absent', () => {
+    expect(parseRunIdParam('123')).toBe('123');
+    expect(parseRunIdParam('')).toBeUndefined();
+    expect(parseRunIdParam(null)).toBeUndefined();
+  });
+
+  it('rejects anything Number() would have coerced', () => {
+    for (const value of ['0', '1e3', '0x10', '+5', '-1', '1.5', 'abc', ' 7']) {
+      expect(() => parseRunIdParam(value, 'runId'), value).toThrow(ViewsApiParamError);
+    }
+  });
+
+  it('trims, drops empties, and dedups a run list before the size limit', () => {
+    expect(parseRunIdListParam(' 3, 1,,3 ', 'runs')).toEqual(['3', '1']);
+    expect(parseRunIdListParam(null, 'runs')).toEqual([]);
+    const nine = Array.from({ length: MAX_RUN_ID_LIST + 1 }, (_, i) => String(i + 1)).join(',');
+    expect(() => parseRunIdListParam(nine, 'runs')).toThrow(ViewsApiParamError);
+    expect(() => parseRunIdListParam('1,x', 'runs')).toThrow(ViewsApiParamError);
+  });
+});
+
+describe('dashboard-derived allowlists', () => {
+  it('exposes vendors in the dashboard pill order and covers the registry', () => {
+    expect(VENDOR_VALUES).toEqual(VENDOR_ORDER);
+    expect(new Set(VENDOR_VALUES)).toEqual(new Set(Object.values(GPU_VENDORS)));
+  });
+
+  it('expands the legacy agg alias like the dashboard and sorts', () => {
+    expect(parseDeploymentParam('agg')).toEqual(['multi-node', 'single-node']);
+    expect(parseDeploymentParam('disagg,single-node')).toEqual(['disagg', 'single-node']);
+    expect(() => parseDeploymentParam('cluster')).toThrow(ViewsApiParamError);
+  });
+
+  it('defaults tcoBasis, cost provider, and cost type to the dashboard defaults', () => {
+    expect(parseTcoBasisParam(null)).toBe(DEFAULT_TCO_BASIS);
+    expect(parseTcoBasisParam('external')).toBe('external');
+    expect(parseCostProviderParam(null)).toBe('costh');
+    expect(parseCostTypeParam(null)).toBe('total');
+    expect(() => parseCostTypeParam('gross')).toThrow(ViewsApiParamError);
+  });
+});
+
+describe('matchesHardware', () => {
+  it('matches the full key or its base chip, case-insensitively, and passes when unfiltered', () => {
+    expect(matchesHardware('B200_sglang', [])).toBe(true);
+    expect(matchesHardware('B200_sglang', ['b200'])).toBe(true);
+    expect(matchesHardware('B200_sglang', ['b200_sglang'])).toBe(true);
+    expect(matchesHardware('B200_sglang', ['b200_vllm'])).toBe(false);
+    expect(matchesHardware('mi355x', ['b200'])).toBe(false);
   });
 });

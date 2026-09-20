@@ -5,6 +5,7 @@ import type {
   ApiSchema,
   BilingualText,
 } from '@/lib/api-documentation';
+import { LIFECYCLE_DEFAULTS } from '@/components/calculator/lifecycle';
 import { API_BASE_URL } from '@/lib/api-documentation-base';
 
 // The 'views' group id is registered by the docs coordinator alongside the
@@ -143,7 +144,7 @@ const successExample = {
     mw: 100,
     price: 0.42,
     oprice: 1.68,
-    ramp: 3,
+    ramp: 0.5,
     cache: 10,
     mtbi: 24,
     recovery: 12,
@@ -162,7 +163,7 @@ const successExample = {
     inputPricePerMTok: 0.42,
     outputPricePerMTok: 1.68,
     outputPriceMultiple: 4,
-    rampMonths: 3,
+    rampMonths: 0.5,
     cachedInputPct: 10,
     cacheReadRatio: 1,
     availability: 0.98,
@@ -297,10 +298,10 @@ export const operations: ApiOperation[] = [
         'ramp',
         false,
         'number',
-        'Months for each config rollout to reach full rate.',
-        '每次配置上线达到满负荷所需的月数。',
-        { type: 'number', default: 3, minimum: 0 },
-        3,
+        'Months for each config rollout to reach full rate. Defaults to the dashboard lifecycle panel (0.5).',
+        '每次配置上线达到满负荷所需的月数。默认与仪表板生命周期面板一致（0.5）。',
+        { type: 'number', default: LIFECYCLE_DEFAULTS.rampMonths, minimum: 0 },
+        LIFECYCLE_DEFAULTS.rampMonths,
       ),
       parameter(
         'cache',
@@ -308,7 +309,7 @@ export const operations: ApiOperation[] = [
         'number',
         'Cached-input percentage billed at the cache-read discount. Applies to agentic traces only.',
         '按缓存读取折扣计费的缓存输入百分比。仅适用于 agentic traces。',
-        { type: 'number', default: 10, minimum: 0, maximum: 100 },
+        { type: 'number', default: LIFECYCLE_DEFAULTS.cachedInputPct, minimum: 0, maximum: 100 },
         10,
       ),
       parameter(
@@ -317,7 +318,7 @@ export const operations: ApiOperation[] = [
         'number',
         'Mean time between interrupts, in days.',
         '平均中断间隔（天）。',
-        { type: 'number', default: 24, minimum: 0 },
+        { type: 'number', default: LIFECYCLE_DEFAULTS.mtbiDays, minimum: 0 },
         24,
       ),
       parameter(
@@ -326,7 +327,7 @@ export const operations: ApiOperation[] = [
         'number',
         'Recovery time per interrupt, in hours.',
         '每次中断的恢复时间（小时）。',
-        { type: 'number', default: 12, minimum: 0 },
+        { type: 'number', default: LIFECYCLE_DEFAULTS.recoveryHours, minimum: 0 },
         12,
       ),
       parameter(

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { computeFleetStats, formatCompact, HOURS_PER_MONTH } from './fleet';
+import type { InterpolatedResult } from './types';
+import { computeFleetStats, formatCompact, HOURS_PER_MONTH, sizeFleetForResult } from './fleet';
 
 describe('computeFleetStats', () => {
   const base = {
@@ -63,5 +64,63 @@ describe('formatCompact', () => {
   it('returns a dash for non-finite values', () => {
     expect(formatCompact(NaN)).toBe('—');
     expect(formatCompact(Infinity)).toBe('—');
+  });
+});
+
+describe('sizeFleetForResult', () => {
+  const specs = { tdp: 1.2, power: 2, costh: 2.5, costr: 3 };
+  const result = {
+    hwKey: 'b200',
+    resultKey: 'b200',
+    value: 500,
+    outputTputValue: 300,
+    inputTputValue: 900,
+    inputTokenShare: 0.1,
+  } as InterpolatedResult;
+
+  it('bills total throughput and derives user streams from the output share', () => {
+    const stats = sizeFleetForResult(result, {
+      mw: 10,
+      specs,
+      costProvider: 'costh',
+      costType: 'total',
+      interactivity: 50,
+    });
+    expect(stats).toEqual(
+      computeFleetStats({
+        mw: 10,
+        powerKwPerGpu: 2,
+        costPerGpuHour: 2.5,
+        tputPerGpu: 500,
+        // outputTokPerChip(500, 0.1, 300) = 500 × (1 − 0.1)
+        outputTputPerGpu: 450,
+        interactivity: 50,
+      }),
+    );
+  });
+
+  it('switches billable throughput and hourly cost with the cost type and provider', () => {
+    const stats = sizeFleetForResult(result, {
+      mw: 10,
+      specs,
+      costProvider: 'costr',
+      costType: 'output',
+      interactivity: 50,
+    });
+    expect(stats!.fleetTokPerSec).toBe(5000 * 300);
+    expect(stats!.costPerHour).toBe(5000 * 3);
+  });
+
+  it('lets a lifecycle step override the total throughput while keeping the token mix', () => {
+    const stats = sizeFleetForResult(result, {
+      mw: 10,
+      specs,
+      costProvider: 'costh',
+      costType: 'total',
+      interactivity: 50,
+      totalThroughput: 1000,
+    });
+    expect(stats!.fleetTokPerSec).toBe(5000 * 1000);
+    expect(stats!.concurrentUsers).toBe(Math.floor((5000 * 900) / 50));
   });
 });

@@ -12,7 +12,6 @@ import {
   parseEnumParam,
   parseFreeListParam,
   parseNumberParam,
-  validateParams,
   validateParams as validateViewParams,
 } from '@/lib/views-api/params';
 import { VIEW_QUERY_PARAMS } from '@/lib/views-api/registry';
@@ -27,18 +26,6 @@ export function GET(request: NextRequest) {
   return runViewsRoute('gpu-metrics', async () => {
     validateViewParams(request.nextUrl.searchParams, VIEW_QUERY_PARAMS['gpu-metrics']);
     const s = request.nextUrl.searchParams;
-    validateParams(s, [
-      'runId',
-      'artifact',
-      'metric',
-      'gpus',
-      'chartView',
-      'corrXMetric',
-      'corrYMetric',
-      'downsample',
-      'sort',
-      'direction',
-    ]);
     if (!s.get('runId')) throw new ViewsApiParamError('runId', 'runId is required');
     const runId = parseNumberParam(s.get('runId'), 'runId', 0, { min: 1, integer: true });
     const data = await readResponse<GpuPowerApiResponse>(

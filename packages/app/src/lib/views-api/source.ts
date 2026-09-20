@@ -7,20 +7,25 @@ import {
   type OverlayGroupMeta,
 } from '@/components/calculator/throughput-data';
 import { resolveComparisonEntries } from '@/components/inference/utils/comparisonEntry';
-import type { BenchmarkRow } from '@/lib/api';
-import { DEFAULT_TCO_BASIS } from '@/lib/constants';
+import type { BenchmarkRow, EvalRow } from '@/lib/api';
 import { Percentile, Sequence } from '@/lib/data-mappings';
 import { NextRequest } from 'next/server';
 import { ViewsApiParamError, ViewsUpstreamError } from './errors';
 import {
+  CALCULATOR_PERCENTILE_VALUES,
+  matchesHardware,
   parseDateParam,
   parseEnumParam,
   parseFreeListParam,
-  parseNumberParam,
   parsePrecisionsParam,
+  parseRunIdListParam,
+  parseRunIdParam,
   parseSequenceParam,
+  parseTcoBasisParam,
   resolveModelParam,
 } from './params';
+
+export { CALCULATOR_PERCENTILE_VALUES, matchesHardware };
 
 /** Call only fixed, first-party GET handlers. No caller-controlled host or fetch URL. */
 export function sourceRequest(
@@ -50,21 +55,14 @@ export function selection(search: URLSearchParams, fallback = Sequence.AgenticTr
   const { displayName: model } = resolveModelParam(search.get('model'));
   const sequence = parseSequenceParam(search.get('sequence'), fallback);
   const date = parseDateParam(search.get('date'), 'date');
-  const runId = search.has('runId')
-    ? String(parseNumberParam(search.get('runId'), 'runId', 0, { min: 1, integer: true }))
-    : undefined;
+  const runId = parseRunIdParam(search.get('runId'));
   const percentile = parseEnumParam(
     search.get('percentile'),
     'percentile',
-    [Percentile.P75, Percentile.P90],
+    CALCULATOR_PERCENTILE_VALUES,
     Percentile.P90,
   );
-  const tcoBasis = parseEnumParam(
-    search.get('tcoBasis'),
-    'tcoBasis',
-    ['internal', 'external'],
-    DEFAULT_TCO_BASIS,
-  );
+  const tcoBasis = parseTcoBasisParam(search.get('tcoBasis'));
   const precisions = parsePrecisionsParam(search.get('precisions'));
   const gpus = parseFreeListParam(search.get('gpus'));
   return { model, sequence, date, runId, percentile, tcoBasis, precisions, gpus };
@@ -88,9 +86,7 @@ export function comparisonSelections(search: URLSearchParams) {
     const match = /^(?<date>\d{4}-\d{2}-\d{2})(?:~r(?<run>[1-9]\d*))?$/.exec(entry);
     if (!match) throw new ViewsApiParamError('dates', 'Use YYYY-MM-DD or YYYY-MM-DD~rRUN_ID');
     const date = parseDateParam(match.groups!.date, 'dates')!;
-    const runId = match.groups!.run
-      ? String(parseNumberParam(match.groups!.run, 'dates', 0, { min: 1, integer: true }))
-      : undefined;
+    const runId = parseRunIdParam(match.groups!.run ?? null, 'dates');
     return { entry, date, runId };
   });
 }
@@ -108,13 +104,6 @@ export async function benchmarkRows(
         exactRun: params.runId ? 'true' : undefined,
       }),
     ),
-  );
-}
-
-export function matchesHardware(hw: string, gpus: readonly string[]) {
-  return (
-    gpus.length === 0 ||
-    gpus.some((g) => hw.toLowerCase() === g || hw.toLowerCase().split('_')[0] === g)
   );
 }
 
@@ -154,25 +143,33 @@ export async function calculatorGroups(request: NextRequest, params: ViewSelecti
   return { rows, params: { ...params, precisions }, official, overlay };
 }
 
+export interface UnofficialRunPayload {
+  readonly benchmarks: BenchmarkRow[];
+  readonly evaluations: EvalRow[];
+}
+
+const EMPTY_UNOFFICIAL: UnofficialRunPayload = { benchmarks: [], evaluations: [] };
+
+/**
+ * Overlay rows for `unofficialrun=` (up to eight run ids) from the first-party
+ * `/api/unofficial-run` handler. Returns both payload halves so the benchmark
+ * views and the evaluation view share one validation and one upstream call.
+ */
+export async function unofficialRunPayload(
+  request: NextRequest,
+  param = 'unofficialrun',
+): Promise<UnofficialRunPayload> {
+  const ids = parseRunIdListParam(request.nextUrl.searchParams.get(param), param);
+  if (ids.length === 0) return EMPTY_UNOFFICIAL;
+  return readResponse<UnofficialRunPayload>(
+    await unofficial(sourceRequest(request, '/api/unofficial-run', { runId: ids.join(',') })),
+  );
+}
+
+/** Unofficial-run benchmark rows narrowed to the request's `model=`. */
 export async function unofficialRows(request: NextRequest): Promise<BenchmarkRow[]> {
-  const raw = request.nextUrl.searchParams.get('unofficialrun');
-  if (!raw) return [];
-  const ids = raw.split(',');
-  if (
-    ids.length > 8 ||
-    ids.some((id) => !/^[1-9]\d*$/.test(id) || !Number.isSafeInteger(Number(id)))
-  )
-    throw new ViewsApiParamError(
-      'unofficialrun',
-      'Expected up to eight positive safe numeric run IDs',
-    );
-  const data = await readResponse<{ benchmarks: BenchmarkRow[] }>(
-    await unofficial(
-      sourceRequest(request, '/api/unofficial-run', { runId: [...new Set(ids)].join(',') }),
-    ),
-  );
+  const { benchmarks: overlayRows } = await unofficialRunPayload(request);
+  if (overlayRows.length === 0) return [];
   const model = resolveModelParam(request.nextUrl.searchParams.get('model'));
-  return data.benchmarks.filter((row) =>
-    (model.dbModelKeys as readonly string[]).includes(row.model),
-  );
+  return overlayRows.filter((row) => (model.dbModelKeys as readonly string[]).includes(row.model));
 }

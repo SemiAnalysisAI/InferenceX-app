@@ -1,26 +1,28 @@
 import { getComparableTpPerMwForType } from '@/components/calculator/power-ranking';
-import { throughputForType, resolveRowPrecisions } from '@/components/calculator/throughput-data';
+import { resolveRowPrecisions } from '@/components/calculator/throughput-data';
 import {
   validateParams as validateViewParams,
+  matchesHardware,
+  parseCostProviderParam,
+  parseCostTypeParam,
   parseEnumParam,
   parseFormatParam,
   parseFreeListParam,
   parseNumberParam,
   parsePrecisionsParam,
   parseSequenceParam,
+  parseTcoBasisParam,
   resolveModelParam,
 } from '@/lib/views-api/params';
 import { VIEW_QUERY_PARAMS } from '@/lib/views-api/registry';
+import { CALCULATOR_PERCENTILE_VALUES } from '@/lib/views-api/source';
 import type { NextRequest } from 'next/server';
 
 import { getModelReleaseDate, sequenceToIslOsl } from '@semianalysisai/inferencex-constants';
-import { FIXTURES_MODE, getDb } from '@semianalysisai/inferencex-db/connection';
-import {
-  getAllBenchmarksForHistory,
-  type BenchmarkRow,
-} from '@semianalysisai/inferencex-db/queries/benchmarks';
+import { FIXTURES_MODE } from '@semianalysisai/inferencex-db/connection';
+import type { BenchmarkRow } from '@semianalysisai/inferencex-db/queries/benchmarks';
 
-import { computeFleetStats } from '@/components/calculator/fleet';
+import { sizeFleetForResult } from '@/components/calculator/fleet';
 import {
   bestSoFarProgression,
   groupHistoryByHwKeyAndDate,
@@ -32,18 +34,22 @@ import {
   breakEvenPricePerMTok,
   computeLifecycle,
   effectiveTokPerSec,
+  LIFECYCLE_DEFAULTS,
+  LIFECYCLE_METRICS,
   metricValue,
   MS_PER_MONTH,
-  outputTokPerChip,
   splitTokenStreams,
   type LifecycleAssumptions,
-  type LifecycleMetric,
   type ThroughputStep,
 } from '@/components/calculator/lifecycle';
 
 import type { InterpolatedResult } from '@/components/calculator/types';
-import { cachedJson, cachedQuery } from '@/lib/api-cache';
+import { cachedJson } from '@/lib/api-cache';
 import { toCalculatorBenchmarkRows } from '@/lib/benchmark-api-view';
+import {
+  getCachedAgenticBenchmarkHistory,
+  getCachedBenchmarkHistory,
+} from '@/lib/benchmark-query-cache.server';
 import { getGpuSpecs, getHardwareConfig } from '@/lib/constants';
 import { Percentile, Sequence } from '@/lib/data-mappings';
 import { loadFixture } from '@/lib/test-fixtures';
@@ -55,40 +61,26 @@ export const dynamic = 'force-dynamic';
 
 /**
  * Fixed internals, matching the dashboard context the Fleet Lifecycle page runs
- * under (`FleetLifecycle.tsx` + its `DEFAULTS`): the fleet is sized at the
+ * under (`FleetLifecycle.tsx` + `LIFECYCLE_DEFAULTS`): the fleet is sized at the
  * default 35 tok/s/user target on H100-rental pricing over total tokens, and the
  * two seeded prices keep the published 4x output:input ratio.
  */
-const OUTPUT_PRICE_MULTIPLE = 4;
+const OUTPUT_PRICE_MULTIPLE = LIFECYCLE_DEFAULTS.outputPriceMultiple;
 
-const METRIC_VALUES = [
-  'margin',
-  'marginPerMw',
-  'revenue',
-  'revenuePerMw',
-  'cumulativeRevenue',
-] as const satisfies readonly LifecycleMetric[];
-const PERCENTILE_VALUES = [Percentile.P75, Percentile.P90] as const;
-
-const getCachedFleetHistory = cachedQuery(
-  async (modelKeys: string[], sequence: Sequence) => {
-    const islOsl = sequenceToIslOsl(sequence);
-    // Agentic history has no ISL/OSL to key on and no sequence to trim by, so it
-    // comes back whole — the same shape `useHistoricalBest` consumes.
-    const rows = islOsl
-      ? await getAllBenchmarksForHistory(getDb(), modelKeys, islOsl.isl, islOsl.osl)
-      : await getAllBenchmarksForHistory(getDb(), modelKeys, null, null, 'agentic_traces');
-    return islOsl ? toCalculatorBenchmarkRows(rows, sequence) : rows;
-  },
-  'views-fleet-history',
-  { blobOnly: true },
-);
-
-/** Matches a chip's history line by full hwKey or by its base chip segment. */
-function matchesGpuFilter(hwKey: string, gpus: string[]): boolean {
-  if (gpus.length === 0) return true;
-  const base = hwKey.split('_')[0];
-  return gpus.some((gpu) => gpu === hwKey.toLowerCase() || gpu === base.toLowerCase());
+/**
+ * Same history rows the dashboard's `useHistoricalBest` consumes, through the
+ * cache slots `/api/v1/benchmarks/history` owns. Fixed sequences are trimmed to
+ * the calculator allowlist after the cache; agentic history has no ISL/OSL to
+ * key on and no sequence to trim by, so it comes back whole.
+ */
+async function fleetHistoryRows(modelKeys: string[], sequence: Sequence): Promise<BenchmarkRow[]> {
+  if (FIXTURES_MODE) return loadFixture<BenchmarkRow[]>('benchmarks-history');
+  const islOsl = sequenceToIslOsl(sequence);
+  if (!islOsl) return getCachedAgenticBenchmarkHistory(modelKeys);
+  return toCalculatorBenchmarkRows(
+    await getCachedBenchmarkHistory(modelKeys, islOsl.isl, islOsl.osl),
+    sequence,
+  );
 }
 
 interface SizedFleet {
@@ -126,10 +118,27 @@ export function GET(request: NextRequest): Promise<Response> {
       opriceRaw === null || opriceRaw === ''
         ? undefined
         : parseNumberParam(opriceRaw, 'oprice', 0, { min: 0 });
-    const ramp = parseNumberParam(search.get('ramp'), 'ramp', 3, { min: 0 });
-    const cache = parseNumberParam(search.get('cache'), 'cache', 10, { min: 0, max: 100 });
-    const mtbi = parseNumberParam(search.get('mtbi'), 'mtbi', 24, { min: 0 });
-    const recovery = parseNumberParam(search.get('recovery'), 'recovery', 12, { min: 0 });
+    const ramp = parseNumberParam(search.get('ramp'), 'ramp', LIFECYCLE_DEFAULTS.rampMonths, {
+      min: 0,
+    });
+    const cache = parseNumberParam(
+      search.get('cache'),
+      'cache',
+      LIFECYCLE_DEFAULTS.cachedInputPct,
+      {
+        min: 0,
+        max: 100,
+      },
+    );
+    const mtbi = parseNumberParam(search.get('mtbi'), 'mtbi', LIFECYCLE_DEFAULTS.mtbiDays, {
+      min: 0,
+    });
+    const recovery = parseNumberParam(
+      search.get('recovery'),
+      'recovery',
+      LIFECYCLE_DEFAULTS.recoveryHours,
+      { min: 0 },
+    );
     const horizonRaw = search.get('horizon');
     const horizonParam =
       horizonRaw === null || horizonRaw === ''
@@ -138,38 +147,21 @@ export function GET(request: NextRequest): Promise<Response> {
     if (horizonParam !== undefined && horizonParam <= 0) {
       throw new ViewsApiParamError('horizon', `Invalid horizon: ${horizonParam} (must be > 0)`);
     }
-    const metric = parseEnumParam(search.get('metric'), 'metric', METRIC_VALUES, 'margin');
+    const metric = parseEnumParam(search.get('metric'), 'metric', LIFECYCLE_METRICS, 'margin');
     const percentile = parseEnumParam(
       search.get('percentile'),
       'percentile',
-      PERCENTILE_VALUES,
+      CALCULATOR_PERCENTILE_VALUES,
       Percentile.P90,
     );
     const gpus = parseFreeListParam(search.get('gpus'));
     const format = parseFormatParam(search.get('format'));
     const target = parseNumberParam(search.get('target'), 'target', 35, { min: 0.001 });
-    const costProvider = parseEnumParam(
-      search.get('costProvider'),
-      'costProvider',
-      ['costh', 'costr'],
-      'costh',
-    );
-    const costType = parseEnumParam(
-      search.get('costType'),
-      'costType',
-      ['total', 'input', 'output'],
-      'total',
-    );
-    const tcoBasis = parseEnumParam(
-      search.get('tcoBasis'),
-      'tcoBasis',
-      ['internal', 'external'],
-      'internal',
-    );
+    const costProvider = parseCostProviderParam(search.get('costProvider'));
+    const costType = parseCostTypeParam(search.get('costType'));
+    const tcoBasis = parseTcoBasisParam(search.get('tcoBasis'));
 
-    const rows = FIXTURES_MODE
-      ? loadFixture<BenchmarkRow[]>('benchmarks-history')
-      : await getCachedFleetHistory([...model.dbModelKeys], sequence);
+    const rows = await fleetHistoryRows([...model.dbModelKeys], sequence);
 
     const precisions = resolveRowPrecisions(rows, sequence, requestedPrecisions);
 
@@ -191,7 +183,7 @@ export function GET(request: NextRequest): Promise<Response> {
       mode: 'interactivity_to_throughput',
       costProvider,
       rank: (result: InterpolatedResult) => getComparableTpPerMwForType(result, costType),
-    }).filter((progression) => matchesGpuFilter(progression.hwKey, gpus));
+    }).filter((progression) => matchesHardware(progression.hwKey, gpus));
     const chips = mergeProgressionsByChip(progressions);
 
     // Month 0 = the model's release date, so every chip's line starts where the
@@ -227,16 +219,11 @@ export function GET(request: NextRequest): Promise<Response> {
 
         for (const step of chip.steps) {
           const totalTput = step.result.value;
-          const stats = computeFleetStats({
+          const stats = sizeFleetForResult(step.result, {
             mw,
-            powerKwPerGpu: specs.power,
-            costPerGpuHour: specs[costProvider],
-            tputPerGpu: throughputForType(step.result, costType),
-            outputTputPerGpu: outputTokPerChip(
-              totalTput,
-              step.result.inputTokenShare,
-              step.result.outputTputValue,
-            ),
+            specs,
+            costProvider,
+            costType,
             interactivity: target,
           });
           if (!stats) continue;

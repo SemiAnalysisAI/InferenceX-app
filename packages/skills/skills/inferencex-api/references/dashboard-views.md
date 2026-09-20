@@ -65,11 +65,17 @@ which controls belong together.
 
 ## Interpretation and maintenance
 
-Use positive safe run IDs. `runId` selects an exact logical snapshot, not necessarily
+Use positive safe run IDs written as plain digits (`1e3`, `0x10`, and `+5` are
+rejected); run lists such as `unofficialrun` and `runs` take up to eight unique IDs.
+`runId` selects an exact logical snapshot, not necessarily
 newly measured producer rows. Comparison entries accept `YYYY-MM-DD` or
 `YYYY-MM-DD~rRUN_ID`; `start` and `end` add the endpoints, not every intervening
 day. Historical `start`/`end` instead bound source observations inclusively.
 Public unofficial overlays must not be relabeled as official results.
+
+Fleet lifecycle defaults (ramp, cached-input percent, MTBI, recovery) follow the
+dashboard's lifecycle panel; read the current values from `/api/v1/views/options`
+rather than hard-coding them.
 
 `costh` means owning and `costr` means renting; there is no `costn` provider.
 Custom chip costs are USD/chip-hour, token prices USD/million tokens,

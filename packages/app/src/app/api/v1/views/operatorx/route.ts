@@ -6,7 +6,7 @@ import { runViewsRoute } from '@/lib/views-api/errors';
 import {
   parseEnumParam,
   parseNumberParam,
-  validateParams,
+  parseRunIdParam,
   validateParams as validateViewParams,
 } from '@/lib/views-api/params';
 import { VIEW_QUERY_PARAMS } from '@/lib/views-api/registry';
@@ -18,25 +18,11 @@ import type {
 import type { NextRequest } from 'next/server';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
-const OPERATOR_PARAMS = [
-  'runId',
-  'operator',
-  'precision',
-  'shape',
-  'backend',
-  'cluster',
-  'status',
-  'metric',
-  'page',
-] as const;
 export function GET(request: NextRequest) {
   return runViewsRoute('operatorx', async () => {
     validateViewParams(request.nextUrl.searchParams, VIEW_QUERY_PARAMS['operatorx']);
     const s = request.nextUrl.searchParams;
-    validateParams(s, OPERATOR_PARAMS);
-    let runId = s.has('runId')
-      ? String(parseNumberParam(s.get('runId'), 'runId', 0, { min: 1, integer: true }))
-      : undefined;
+    let runId = parseRunIdParam(s.get('runId'));
     if (!runId) {
       const list = await readResponse<{ runs: OperatorXRunSummary[] }>(await runs(request));
       runId = list.runs.find((r) => r.measured > 0)?.run_id ?? list.runs[0]?.run_id;

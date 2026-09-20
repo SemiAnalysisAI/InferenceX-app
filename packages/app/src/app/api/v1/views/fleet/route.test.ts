@@ -25,7 +25,11 @@ vi.mock('@/lib/api-cache', () => ({
   cachedText: mockCachedText,
 }));
 
-import { availabilityFromInterrupts, MS_PER_MONTH } from '@/components/calculator/lifecycle';
+import {
+  availabilityFromInterrupts,
+  LIFECYCLE_DEFAULTS,
+  MS_PER_MONTH,
+} from '@/components/calculator/lifecycle';
 import type { BenchmarkRow } from '@/lib/api';
 
 import { GET } from './route';
@@ -199,6 +203,17 @@ describe('GET /api/v1/views/fleet', () => {
     // Break-even prices mean the fully-rolled-out fleet earns exactly its cost.
     const lastPoint = body.series[0].points.at(-1);
     expect(Math.abs(lastPoint.margin)).toBeLessThan(lastPoint.cost * 1e-9);
+  });
+
+  it('defaults ramp, cache, MTBI, and recovery to the dashboard lifecycle panel', async () => {
+    const bodyRes = await GET(
+      request('/api/v1/views/fleet?model=DeepSeek-V4-Pro&sequence=1k/1k&mw=100&price=2'),
+    );
+    const body = await bodyRes.json();
+    expect(body.assumptions.rampMonths).toBe(LIFECYCLE_DEFAULTS.rampMonths);
+    expect(body.assumptions.mtbiDays).toBe(LIFECYCLE_DEFAULTS.mtbiDays);
+    expect(body.assumptions.recoveryHours).toBe(LIFECYCLE_DEFAULTS.recoveryHours);
+    expect(body.params.cache).toBe(LIFECYCLE_DEFAULTS.cachedInputPct);
   });
 
   it('derives the missing price through the fixed output multiple', async () => {

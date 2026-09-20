@@ -59,7 +59,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-calculator-view',
-    sourceSha256: '85bf54da0dda703989ed6b5b489f0fd116e6be7019ed7570a115f9491e75b407',
+    sourceSha256: 'aaf0e77a5df66f281b87674acb6ebe82ffaa50bd9e5db466629603e92f985224',
   },
   {
     source: 'src/app/api/v1/views/collectivex/route.ts',
@@ -67,7 +67,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-collectivex-view',
-    sourceSha256: '222e6b50f495435573c8ee297f85507384daaf8a71137bab5c07b1407bb04c21',
+    sourceSha256: '6d9086dfa9bbeda39c194d0bbc0da96143be5acf8092b3f2e829826dfeff0982',
   },
   {
     source: 'src/app/api/v1/views/compare/route.ts',
@@ -83,7 +83,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-current-inferencex-image-view',
-    sourceSha256: 'ddc535fd47874c2fc6f0f7ef2d98e2ba607e588a8ca19e922a14fa659811a01a',
+    sourceSha256: '6e1f43aedc9641b100afa3bf02e131d056f30012b2abec8e9b4309bf0ba0c3d0',
   },
   {
     source: 'src/app/api/v1/views/evaluation/route.ts',
@@ -91,7 +91,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-evaluation-view',
-    sourceSha256: '28289a928e524c2b5150a51b1f780978d026a76c74daad10412e05b5e8bfa47b',
+    sourceSha256: '9281a35d293a340200894bcf63bd0d0400d9ca8edfe9bd8fc2a58ce90402ddde',
   },
   {
     source: 'src/app/api/v1/views/first-token/route.ts',
@@ -107,7 +107,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-fleet-view',
-    sourceSha256: 'e57c3007bb61d882effdc7a63126ebbb40bf331761aa47fac89136daafffde61',
+    sourceSha256: '58e3d2a5882eecc65ea2da6c07ecf7a30ba8193ce19f49fde206dbac0c500c87',
   },
   {
     source: 'src/app/api/v1/views/gpu-metrics/route.ts',
@@ -115,7 +115,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-gpu-metrics-view',
-    sourceSha256: '02641e8e2e7cb4d9e0984ed9f341c42f1360cf0a27016d2e6539bee2a270a81e',
+    sourceSha256: '34860f3f64e4070bf4c0bf390c3b61f34bdb98b673a90d119bae162226dc1edd',
   },
   {
     source: 'src/app/api/v1/views/gpu-specs/route.ts',
@@ -131,7 +131,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-historical-view',
-    sourceSha256: '168d5228c1269aecf21d09e3792072e5e20d60054cf60172675cbde66f72da5e',
+    sourceSha256: 'ddc361046c9ac4ce6272758441477586fb8e0c47a8e2c98d1405fab73f5ea3d1',
   },
   {
     source: 'src/app/api/v1/views/inference/route.ts',
@@ -139,7 +139,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-inference-view',
-    sourceSha256: 'eef86be605732006f6e688a0e70eeb3d9ee9fd06abb857f29dc9e7f567c62d12',
+    sourceSha256: 'de9192086b27e530ad6b1ece082b4989b3a9771a78195ae9f6d1c3899519588f',
   },
   {
     source: 'src/app/api/v1/views/operatorx/route.ts',
@@ -147,7 +147,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-operatorx-view',
-    sourceSha256: '32f8cbba0b6591446d047bdf67ea585c0655d589c72d3f3781adda909758ab42',
+    sourceSha256: 'a56b89364b11d4289f1b3684ee594df2b67e508ec8b0b5b83cde0f195caeb4a8',
   },
   {
     source: 'src/app/api/v1/views/options/route.ts',
@@ -155,7 +155,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-view-options',
-    sourceSha256: '490a0957d9b9467dca43dce2aa46f45341015d74ba4636ce524cb3830627fb7c',
+    sourceSha256: 'f0f5677cfbf41aae1e602e6bce02016af76c2f8174cc9b77dab18fdba3c7ea87',
   },
   {
     source: 'src/app/api/v1/views/overview/route.ts',
@@ -163,7 +163,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-overview-view',
-    sourceSha256: '868217d9f2267c7ac8485b0f960dff05dabda842d988208e58616cadb2142af5',
+    sourceSha256: '7c778f77e931bd40e29ddbfd80748119386ebcc01a680cd5296afd223c21b69a',
   },
   {
     source: 'src/app/api/v1/views/profit-estimator/route.ts',
@@ -195,7 +195,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-reliability-view',
-    sourceSha256: '57f95609a1f818917891f99752ad1183dddad09b021edff445af8f4862d141db',
+    sourceSha256: '74ad807a04ced873ab51c73fa647f6016b947778b76cc164b81ac6275846a1da',
   },
   {
     source: 'src/app/api/v1/views/submissions/route.ts',
@@ -203,7 +203,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-submissions-view',
-    sourceSha256: '205706474c9947cbd03b11aee1753147fbc85634265a37305b4d104fdf5b02f0',
+    sourceSha256: 'de777b985f67cfdcd282b3c06d617b7e0cc3f6f53b00df217163321ccbc05499',
   },
   {
     source: 'src/app/api/v1/views/video/route.ts',
@@ -211,7 +211,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-video-view',
-    sourceSha256: '9ed902e584a39f03e4a6a375c9a286c95abe5a840aa5531f749fdec4e0dedf15',
+    sourceSha256: '566405f7db1eb5ea141b54384238e1b531bfe616c7fcd65b8653aed30d7ba007',
   },
   {
     source: 'src/app/api/v1/operatorx/runs/route.ts',
@@ -304,7 +304,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'list-benchmarks',
-    sourceSha256: 'ce70784354b0d541899cfa90c3615ca294863fda67c489ea90e034b6996d52d3',
+    sourceSha256: '78ed7172c54119f8a1d29be6d15ac8277de97180767286d07c14a331e354ec57',
   },
   {
     source: 'src/app/api/v1/benchmarks/history/route.ts',
@@ -312,7 +312,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'list-benchmark-history',
-    sourceSha256: '882c7c2515568c6ee89eb9f506d626289df807369aded6de300dadb7fa81320f',
+    sourceSha256: '7550e6691d4b2f1061278580b4d3b81c55494839970d4b94a6a49a1455834ea9',
   },
   {
     source: 'src/app/api/v1/collectivex/latest/route.ts',
@@ -793,7 +793,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/components/video-benchmark/view-selection.ts',
-    sourceSha256: '74f9b6a36aee43b8db3570a64ebff826f1792181f194413d5a0357c55d63c750',
+    sourceSha256: '6025e0ebefaef52e5e7475e2d6584562cb32037e0d7dd4ff43baeef8646d58f4',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -856,7 +856,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/components/calculator/power-ranking.ts',
-    sourceSha256: 'c3c4fbbf1028ca84e278d3f6ec095a74603d93a7b00f1b9c14b44141f36bf50e',
+    sourceSha256: '73baa910ef486df30237222a1280658a87bae544592fd700782eb6308efa6ca8',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -865,7 +865,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/components/calculator/throughput-data.ts',
-    sourceSha256: 'bf370861a120e59c21d4db6fb100adacf5714d13b8d100e71ac78a42771b49fe',
+    sourceSha256: '04355b12bec33926b8cf299a6069014676bdf94360622809bcb60cbfc9a9a587',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -892,7 +892,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/source.ts',
-    sourceSha256: '01a8911afbaa52a0af061c7fc484afd48e7cf703064ba693b083dc8ef4e19bbe',
+    sourceSha256: 'f7d9c81e784894342fc0f9f942c8ac28f1cad1c2a374c706e1e9b3551d243620',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -919,7 +919,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/params.ts',
-    sourceSha256: '3c72df54b236586f7c7c86aeb6912931fb7d91e25fb92eaa85aa3487a564a1ce',
+    sourceSha256: '23dbfce3cc793e0af433090362d291baf743a5544e38524327051d953e49aad7',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -1035,7 +1035,7 @@ export const apiContractSourceDigests = [
     // Reviewed for the DeepSeek-V4.1-Flash addition (InferenceX#2961): the
     // model joins OVERVIEW_MODEL_SCENARIOS as AgentX-only. Curated scenario
     // data, no parameter or OverviewPageData shape change, so the docs stand.
-    sourceSha256: '18ffcb420cc933479c67025415848966294a8ebd28c084471cd58474ce96133f',
+    sourceSha256: '7a4e7961b26e9f09d4d9bb9ef9b2b1da77a138490625483de49abc15480f3fe1',
     reviewArea: {
       en: 'Overview BFF tier, engine, comparison-window, reference, and model-scope parameters plus the OverviewPageData response shape.',
       zh: '概览 BFF 的档位、引擎、对比时间窗口、参考硬件和模型范围参数，以及 OverviewPageData 响应结构。',

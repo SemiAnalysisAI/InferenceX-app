@@ -8,11 +8,21 @@ import type { NextRequest } from 'next/server';
 
 import { cachedJson } from '@/lib/api-cache';
 import {
+  OVERVIEW_DEFAULT_COMPARISON_MODE,
+  OVERVIEW_DEFAULT_ENGINE_SCOPE,
+  OVERVIEW_DEFAULT_HARDWARE_ROW_SCOPE,
+  OVERVIEW_DEFAULT_MODEL_SCOPE,
+  OVERVIEW_DEFAULT_REFERENCE_HARDWARE,
+  OVERVIEW_DEFAULT_ROW_SCOPE,
+  OVERVIEW_ENGINE_SCOPES,
   OVERVIEW_HARDWARE,
   OVERVIEW_HISTORY_WINDOWS,
   OVERVIEW_PRIMARY_TIER,
   OVERVIEW_TIERS,
   type OverviewComparisonMode,
+  type OverviewHardwareRowScope,
+  type OverviewModelScope,
+  type OverviewRowScope,
   type OverviewTier,
 } from '@/lib/overview-data';
 import { getOverviewPageData } from '@/lib/overview-data.server';
@@ -55,33 +65,38 @@ export function GET(request: NextRequest) {
     const engine = parseEnumParam(
       searchParams.get('engine'),
       'engine',
-      ['all', 'community'] as const,
-      'community',
+      OVERVIEW_ENGINE_SCOPES,
+      OVERVIEW_DEFAULT_ENGINE_SCOPE,
     );
     const compare: OverviewComparisonMode = parseEnumParam(
       searchParams.get('compare'),
       'compare',
       COMPARE_VALUES,
-      'hardware',
+      OVERVIEW_DEFAULT_COMPARISON_MODE,
     );
-    const ref = parseEnumParam(searchParams.get('ref'), 'ref', OVERVIEW_HARDWARE, 'b200');
+    const ref = parseEnumParam(
+      searchParams.get('ref'),
+      'ref',
+      OVERVIEW_HARDWARE,
+      OVERVIEW_DEFAULT_REFERENCE_HARDWARE,
+    );
     const models = parseEnumParam(
       searchParams.get('models'),
       'models',
-      ['default', 'all'] as const,
-      'default',
+      ['default', 'all'] as const satisfies readonly OverviewModelScope[],
+      OVERVIEW_DEFAULT_MODEL_SCOPE,
     );
     const rows = parseEnumParam(
       searchParams.get('rows'),
       'rows',
-      ['changed', 'all'] as const,
-      'all',
+      ['changed', 'all'] as const satisfies readonly OverviewRowScope[],
+      OVERVIEW_DEFAULT_ROW_SCOPE,
     );
     const hwrows = parseEnumParam(
       searchParams.get('hwrows'),
       'hwrows',
-      ['priced', 'all'] as const,
-      'all',
+      ['priced', 'all'] as const satisfies readonly OverviewHardwareRowScope[],
+      OVERVIEW_DEFAULT_HARDWARE_ROW_SCOPE,
     );
     const format = parseFormatParam(searchParams.get('format'));
 

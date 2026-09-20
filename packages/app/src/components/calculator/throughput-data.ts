@@ -20,7 +20,7 @@ import {
   recoverReciprocalNumerator,
   sign,
 } from './interpolation';
-import type { CostType, GPUDataPoint, InterpolatedResult } from './types';
+import type { CostType, GPUDataPoint } from './types';
 
 // Re-export pure functions so existing imports from this module keep working.
 export {
@@ -261,21 +261,6 @@ export function buildGpuGroups<M extends GroupMeta>(
   }
 
   return { grouped, groupMeta, hwConfigMap };
-}
-
-/**
- * Interpolated throughput on the selected token basis.
- *
- * Field pick (not math) mirroring `getThroughputForType` in
- * `ThroughputBarChart.tsx` — that module is a 'use client' d3 component, so the
- * server-side views API reads the same fields through this pure twin instead of
- * importing it. If the client accessor ever gains logic, move it here and have
- * the chart import this one.
- */
-export function throughputForType(result: InterpolatedResult, costType: CostType): number {
-  if (costType === 'input') return result.inputTputValue;
-  if (costType === 'output') return result.outputTputValue;
-  return result.value;
 }
 
 /**

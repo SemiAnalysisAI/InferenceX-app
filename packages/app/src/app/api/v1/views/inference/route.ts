@@ -4,7 +4,7 @@ import { NORMALIZED_TOKEN_REVENUE_PRICING } from '@/components/inference/token-r
 import type { TokenRevenuePricing } from '@/components/inference/types';
 import type { DerivedAgenticMetricMap } from '@/hooks/api/use-derived-agentic-metrics';
 import { fetchOpenRouterPricing } from '@/hooks/api/use-openrouter-pricing';
-import { DEFAULT_TCO_BASIS, type TcoBasis } from '@/lib/constants';
+import type { TcoBasis } from '@/lib/constants';
 import {
   getOpenRouterModelId,
   isBestPerSkuDefaultOff,
@@ -16,18 +16,22 @@ import {
 import { ViewsApiParamError, runViewsRoute } from '@/lib/views-api/errors';
 import {
   parseNumberMap,
-  validateParams,
   validateParams as validateViewParams,
   parseBoolParam,
   parseDateParam,
+  parseDeploymentParam,
   parseEnumParam,
   parseFormatParam,
+  parseFrameworkFamiliesParam,
   parseFreeListParam,
   parseListParam,
+  parseSpecModesParam,
   parseMetricParam,
-  parseNumberParam,
   parsePrecisionsParam,
+  parseRunIdParam,
   parseSequenceParam,
+  parseTcoBasisParam,
+  parseVendorsParam,
   resolveModelParam,
 } from '@/lib/views-api/params';
 import { VIEW_QUERY_PARAMS } from '@/lib/views-api/registry';
@@ -40,17 +44,14 @@ import {
 import type { NextRequest } from 'next/server';
 
 import { rowToSequence } from '@semianalysisai/inferencex-constants';
-import { FIXTURES_MODE, getDb } from '@semianalysisai/inferencex-db/connection';
+import { FIXTURES_MODE } from '@semianalysisai/inferencex-db/connection';
 
-import {
-  getBenchmarksForRun,
-  getLatestBenchmarks,
-  type BenchmarkRow,
-} from '@semianalysisai/inferencex-db/queries/benchmarks';
+import type { BenchmarkRow } from '@semianalysisai/inferencex-db/queries/benchmarks';
 
 import { X_AXIS_MODES, type XAxisMode } from '@/components/inference/hooks/chart-data-core';
-import { FRAMEWORK_FAMILIES } from '@/components/inference/utils/quickFilters';
-import { cachedJson, cachedQuery } from '@/lib/api-cache';
+import { POWER_TIER_ORDER } from '@/components/inference/utils/quickFilters';
+import { cachedJson } from '@/lib/api-cache';
+import { getCachedBenchmarks, getCachedBenchmarksForRun } from '@/lib/benchmark-query-cache.server';
 
 import { countCurvesByPrecision, resolveEffectivePrecisions } from '@/lib/default-precisions';
 import { loadFixture } from '@/lib/test-fixtures';
@@ -80,25 +81,7 @@ export const dynamic = 'force-dynamic';
  * frameworks, deployment, spec, optimal, best, format (json|csv).
  */
 
-const VENDOR_VALUES = ['AMD', 'NVIDIA', 'OpenAI', 'Google'] as const;
-const FRAMEWORK_FAMILY_VALUES = FRAMEWORK_FAMILIES.map((family) => family.key).toSorted();
-const DEPLOYMENT_VALUES = ['agg', 'disagg', 'multi-node', 'single-node'] as const;
-const SPEC_VALUES = ['mtp', 'stp'] as const;
 const XMETRIC_VALUES = ['median_ttft', 'p75_ttft', 'p90_ttft', 'p95_ttft', 'p99_ttft'] as const;
-
-// Same cache keys and argument shapes as /api/v1/benchmarks so both routes
-// share one cached copy of the raw rows.
-const getCachedBenchmarks = cachedQuery(
-  (dbModelKeys: string[], date?: string, exact?: boolean, runId?: string) =>
-    getLatestBenchmarks(getDb(), dbModelKeys, date, exact, runId),
-  'benchmarks-agentic-curve-scope-v2',
-  { blobOnly: true },
-);
-const getCachedBenchmarksForRun = cachedQuery(
-  (dbModelKeys: string[], runId: string) => getBenchmarksForRun(getDb(), dbModelKeys, runId),
-  'benchmarks-run-agentic-curve-scope-v2',
-  { blobOnly: true },
-);
 
 interface InferenceViewParams {
   readonly model: string;
@@ -217,35 +200,6 @@ export function GET(request: NextRequest) {
   return runViewsRoute('inference', async () => {
     validateViewParams(request.nextUrl.searchParams, VIEW_QUERY_PARAMS['inference']);
     const search = request.nextUrl.searchParams;
-    validateParams(search, [
-      'model',
-      'sequence',
-      'precisions',
-      'metric',
-      'xmode',
-      'xmetric',
-      'percentile',
-      'date',
-      'runId',
-      'gpus',
-      'vendors',
-      'frameworks',
-      'deployment',
-      'spec',
-      'optimal',
-      'best',
-      'format',
-      'tcoBasis',
-      'power',
-      'allPoints',
-      'userCosts',
-      'userPowers',
-      'priceSource',
-      'dates',
-      'start',
-      'end',
-      'unofficialrun',
-    ]);
 
     const { displayName, dbModelKeys } = resolveModelParam(search.get('model'));
     const sequence = parseSequenceParam(search.get('sequence'), Sequence.EightK_OneK);
@@ -271,27 +225,12 @@ export function GET(request: NextRequest) {
       Percentile.P90,
     );
     const date = parseDateParam(search.get('date'), 'date');
-    const runIdValue = search.get('runId');
-    const runId =
-      runIdValue === null || runIdValue === ''
-        ? undefined
-        : String(parseNumberParam(runIdValue, 'runId', 0, { integer: true, min: 1 }));
+    const runId = parseRunIdParam(search.get('runId'));
     const gpus = parseFreeListParam(search.get('gpus'));
-    const vendors = parseListParam(search.get('vendors'), 'vendors', VENDOR_VALUES);
-    const frameworks = parseListParam(
-      search.get('frameworks'),
-      'frameworks',
-      FRAMEWORK_FAMILY_VALUES,
-    );
-    // Legacy `agg` expands to both aggregate modes, mirroring shared dashboard links.
-    const deployment = [
-      ...new Set(
-        parseListParam(search.get('deployment'), 'deployment', DEPLOYMENT_VALUES).flatMap((mode) =>
-          mode === 'agg' ? (['multi-node', 'single-node'] as const) : [mode],
-        ),
-      ),
-    ].toSorted();
-    const spec = parseListParam(search.get('spec'), 'spec', SPEC_VALUES);
+    const vendors = parseVendorsParam(search.get('vendors'));
+    const frameworks = parseFrameworkFamiliesParam(search.get('frameworks'));
+    const deployment = parseDeploymentParam(search.get('deployment'));
+    const spec = parseSpecModesParam(search.get('spec'));
     const optimal = parseBoolParam(search.get('optimal'), 'optimal', true);
     const best = parseBoolParam(
       search.get('best'),
@@ -299,13 +238,8 @@ export function GET(request: NextRequest) {
       !isBestPerSkuDefaultOff(displayName as Model, sequence),
     );
     const format = parseFormatParam(search.get('format'));
-    const tcoBasis = parseEnumParam(
-      search.get('tcoBasis'),
-      'tcoBasis',
-      ['internal', 'external'],
-      DEFAULT_TCO_BASIS,
-    );
-    const power = parseListParam(search.get('power'), 'power', ['certified', 'legacy']);
+    const tcoBasis = parseTcoBasisParam(search.get('tcoBasis'));
+    const power = parseListParam(search.get('power'), 'power', POWER_TIER_ORDER);
     const allPoints = parseBoolParam(search.get('allPoints'), 'allPoints', false);
     const userCosts = parseNumberMap(search.get('userCosts'), 'userCosts');
     const userPowers = parseNumberMap(search.get('userPowers'), 'userPowers');

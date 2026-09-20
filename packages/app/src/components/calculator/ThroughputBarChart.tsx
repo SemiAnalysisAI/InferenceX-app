@@ -79,15 +79,14 @@ interface ThroughputBarChartProps {
   colorResolver?: (hwKey: string) => string;
 }
 
-/** Get the throughput value for the selected token type. */
-export function getThroughputForType(d: InterpolatedResult, costType: CostType): number {
-  if (costType === 'input') return d.inputTputValue;
-  if (costType === 'output') return d.outputTputValue;
-  return d.value; // total
-}
-
-import { getTpPerMwForType } from './power-ranking';
-export { getComparableTpPerMwForType, getTpPerMwForType } from './power-ranking';
+// Pure accessors live in `power-ranking.ts` so server code (views API) can
+// share them without importing this 'use client' d3 module.
+import { getThroughputForType, getTpPerMwForType } from './power-ranking';
+export {
+  getComparableTpPerMwForType,
+  getThroughputForType,
+  getTpPerMwForType,
+} from './power-ranking';
 
 export function getMetricValue(
   d: InterpolatedResult,

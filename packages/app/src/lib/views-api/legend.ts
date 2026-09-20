@@ -1,4 +1,5 @@
 import { getHardwareConfig } from '@/lib/constants';
+import { getDisplayLabel } from '@/lib/utils';
 
 /**
  * Full dashboard legend text for a hardware key: the base GPU label plus the
@@ -7,6 +8,6 @@ import { getHardwareConfig } from '@/lib/constants';
  * (frontend display name) to apply per-model suffix overrides.
  */
 export function hardwareLegendLabel(hwKey: string, model?: string): string {
-  const entry = getHardwareConfig(hwKey, model);
-  return [entry.label, entry.suffix].filter(Boolean).join(' ');
+  // Same composition the dashboard legend uses (`getDisplayLabel`).
+  return getDisplayLabel(getHardwareConfig(hwKey, model));
 }

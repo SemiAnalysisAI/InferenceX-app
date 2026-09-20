@@ -35,7 +35,9 @@ export const OVERVIEW_PRIMARY_TIER = 50;
 export const OVERVIEW_HARDWARE = ['b200', 'mi355x', 'b300', 'gb200', 'gb300'] as const;
 export type OverviewReferenceHardware = (typeof OVERVIEW_HARDWARE)[number];
 export const OVERVIEW_DEFAULT_REFERENCE_HARDWARE: OverviewReferenceHardware = 'b200';
-export type OverviewEngineScope = 'all' | 'community';
+export const OVERVIEW_ENGINE_SCOPES = ['all', 'community'] as const;
+export type OverviewEngineScope = (typeof OVERVIEW_ENGINE_SCOPES)[number];
+export const OVERVIEW_DEFAULT_ENGINE_SCOPE: OverviewEngineScope = 'community';
 export const OVERVIEW_HISTORY_WINDOWS = ['7d', '30d', '60d', '90d'] as const;
 export type OverviewHistoryWindowKey = (typeof OVERVIEW_HISTORY_WINDOWS)[number];
 export const OVERVIEW_DEFAULT_HISTORY_WINDOW: OverviewHistoryWindowKey = '30d';
@@ -79,7 +81,7 @@ export function resolveOverviewEngineScope(
   raw: string | string[] | undefined,
 ): OverviewEngineScope {
   const candidate = Array.isArray(raw) ? raw[0] : raw;
-  return candidate === 'all' ? 'all' : 'community';
+  return candidate === 'all' ? 'all' : OVERVIEW_DEFAULT_ENGINE_SCOPE;
 }
 
 export function resolveOverviewReferenceHardware(

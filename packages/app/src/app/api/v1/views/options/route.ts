@@ -1,4 +1,16 @@
-import { validateParams as validateViewParams, resolveModelParam } from '@/lib/views-api/params';
+import {
+  validateParams as validateViewParams,
+  CALCULATOR_DEFAULT_TARGET,
+  CALCULATOR_MODE_VALUES,
+  COST_PROVIDER_VALUES,
+  COST_TYPE_VALUES,
+  DEFAULT_COST_PROVIDER,
+  DEFAULT_COST_TYPE,
+  DEPLOYMENT_MODES,
+  resolveModelParam,
+  SPEC_MODES,
+  VENDOR_VALUES,
+} from '@/lib/views-api/params';
 import { VIEW_QUERY_PARAMS } from '@/lib/views-api/registry';
 import {
   FW_REGISTRY,
@@ -17,6 +29,7 @@ import {
   METRIC_REGISTRY,
   type MetricKey,
 } from '@/components/inference/metric-registry';
+import { LIFECYCLE_DEFAULTS, LIFECYCLE_METRICS } from '@/components/calculator/lifecycle';
 import { FRAMEWORK_FAMILIES } from '@/components/inference/utils/quickFilters';
 import { DEFAULT_RELIABILITY_RANGE, RELIABILITY_RANGES } from '@/components/reliability/aggregate';
 import { cachedJson } from '@/lib/api-cache';
@@ -35,6 +48,13 @@ import {
   sequenceKind,
 } from '@/lib/data-mappings';
 import { frameworkFamily } from '@/lib/framework-family';
+import {
+  OVERVIEW_ENGINE_SCOPES,
+  OVERVIEW_HARDWARE,
+  OVERVIEW_HISTORY_WINDOWS,
+  OVERVIEW_SCENARIOS,
+  OVERVIEW_TIERS,
+} from '@/lib/overview-data';
 import { runViewsRoute, ViewsApiParamError } from '@/lib/views-api/errors';
 
 export const dynamic = 'force-dynamic';
@@ -63,6 +83,14 @@ for (const group of METRIC_CONTROL_GROUPS) {
     METRIC_GROUP_BY_CONFIG_KEY.set(configKey, group.label);
   }
 }
+
+/** Fleet-lifecycle defaults as the views expose them (cache ratio as a percent). */
+const lifecycleDefaults = {
+  rampMonths: LIFECYCLE_DEFAULTS.rampMonths,
+  cachedInputPricePercent: LIFECYCLE_DEFAULTS.cachedInputPct,
+  mtbiDays: LIFECYCLE_DEFAULTS.mtbiDays,
+  recoveryHours: LIFECYCLE_DEFAULTS.recoveryHours,
+};
 
 function buildOptionsPayload() {
   const models = MODEL_OPTIONS.map((model) => {
@@ -132,37 +160,34 @@ function buildOptionsPayload() {
     scaleModes: ['auto', 'linear', 'log'],
     metrics,
     quickFilters: {
-      vendors: ['NVIDIA', 'AMD', 'Google', 'OpenAI'],
+      vendors: VENDOR_VALUES,
       frameworkFamilies: FRAMEWORK_FAMILIES.map((family) => family.key),
-      deployments: ['single-node', 'multi-node', 'disagg'],
-      specModes: ['mtp', 'stp'],
+      deployments: DEPLOYMENT_MODES,
+      specModes: SPEC_MODES,
     },
     reliabilityRanges: RELIABILITY_RANGES,
     overview: {
-      tiers: [30, 50, 75, 100, 150, 200],
-      hardware: ['b200', 'mi355x', 'b300', 'gb200', 'gb300'],
-      engines: ['all', 'community'],
-      windows: ['hardware', '7d', '30d', '60d', '90d'],
-      scenarios: ['single_turn_8k1k', 'agentx'],
+      tiers: OVERVIEW_TIERS,
+      hardware: OVERVIEW_HARDWARE,
+      engines: OVERVIEW_ENGINE_SCOPES,
+      windows: ['hardware', ...OVERVIEW_HISTORY_WINDOWS],
+      scenarios: OVERVIEW_SCENARIOS,
     },
     calculator: {
-      modes: ['interactivity-to-throughput', 'throughput-to-interactivity'],
-      costProviders: ['costh', 'costr'],
-      costTypes: ['total', 'input', 'output'],
+      modes: CALCULATOR_MODE_VALUES,
+      costProviders: COST_PROVIDER_VALUES,
+      costTypes: COST_TYPE_VALUES,
       defaults: {
-        target: 35,
-        mode: 'interactivity-to-throughput',
-        costProvider: 'costh',
-        costType: 'total',
-        rampMonths: 3,
-        cachedInputPricePercent: 10,
-        mtbiDays: 24,
-        recoveryHours: 12,
+        target: CALCULATOR_DEFAULT_TARGET,
+        mode: CALCULATOR_MODE_VALUES[0],
+        costProvider: DEFAULT_COST_PROVIDER,
+        costType: DEFAULT_COST_TYPE,
+        ...lifecycleDefaults,
       },
     },
     fleet: {
-      metrics: ['margin', 'marginPerMw', 'revenue', 'revenuePerMw', 'cumulativeRevenue'],
-      defaults: { rampMonths: 3, cachedInputPricePercent: 10, mtbiDays: 24, recoveryHours: 12 },
+      metrics: LIFECYCLE_METRICS,
+      defaults: lifecycleDefaults,
     },
     defaults: {
       model: Model.DeepSeek_V4_Pro as string,
@@ -173,7 +198,7 @@ function buildOptionsPayload() {
       xmetric: 'p90_ttft',
       scale: 'auto',
       precisions: 'auto',
-      target: 35,
+      target: CALCULATOR_DEFAULT_TARGET,
       optimal: true,
       best: 'model-and-sequence-dependent',
       reliabilityRange: DEFAULT_RELIABILITY_RANGE,

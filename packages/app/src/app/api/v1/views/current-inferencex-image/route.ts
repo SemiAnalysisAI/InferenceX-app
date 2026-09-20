@@ -19,28 +19,16 @@ import {
   parseDateParam,
   parseEnumParam,
   parseFreeListParam,
-  validateParams,
   validateParams as validateViewParams,
 } from '@/lib/views-api/params';
 import { VIEW_QUERY_PARAMS } from '@/lib/views-api/registry';
 import { readResponse } from '@/lib/views-api/source';
 import type { NextRequest } from 'next/server';
 export const dynamic = 'force-dynamic';
-const IMAGE_PARAMS = [
-  'model',
-  'precision',
-  'sequence',
-  'spec',
-  'hardware',
-  'nodeType',
-  'frameworks',
-  'asOf',
-] as const;
 export function GET(request: NextRequest) {
   return runViewsRoute('current-inferencex-image', async () => {
     validateViewParams(request.nextUrl.searchParams, VIEW_QUERY_PARAMS['current-inferencex-image']);
     const s = request.nextUrl.searchParams;
-    validateParams(s, IMAGE_PARAMS);
     const model = s.get('model') ?? 'all';
     const precision = s.get('precision') ?? 'all';
     const spec = s.get('spec') ?? 'all';

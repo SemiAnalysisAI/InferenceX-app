@@ -6,6 +6,7 @@ import {
   computeTotalStats,
   getVendor,
   groupVolumeByWeek,
+  selectVolumeRows,
   submissionRowKey,
 } from '@/components/submissions/submissions-utils';
 import { cachedJson } from '@/lib/api-cache';
@@ -16,7 +17,6 @@ import {
   parseEnumParam,
   parseListParam,
   parseNumberParam,
-  validateParams,
   validateParams as validateViewParams,
 } from '@/lib/views-api/params';
 import { VIEW_QUERY_PARAMS } from '@/lib/views-api/registry';
@@ -24,21 +24,10 @@ import { readResponse } from '@/lib/views-api/source';
 import { DB_MODEL_TO_DISPLAY } from '@semianalysisai/inferencex-constants';
 import type { NextRequest } from 'next/server';
 export const dynamic = 'force-dynamic';
-const SUBMISSIONS_PARAMS = [
-  'search',
-  'sort',
-  'direction',
-  'limit',
-  'offset',
-  'mode',
-  'onChangeOnly',
-  'lines',
-] as const;
 export function GET(request: NextRequest) {
   return runViewsRoute('submissions', async () => {
     validateViewParams(request.nextUrl.searchParams, VIEW_QUERY_PARAMS['submissions']);
     const s = request.nextUrl.searchParams;
-    validateParams(s, SUBMISSIONS_PARAMS);
     const search = (s.get('search') ?? '').toLowerCase();
     const sort = parseEnumParam(
       s.get('sort'),
@@ -81,8 +70,7 @@ export function GET(request: NextRequest) {
             ? Number(a[sort]) - Number(b[sort])
             : String(a[sort]).localeCompare(String(b[sort]))) * (direction === 'asc' ? 1 : -1),
       );
-    const selectedVolume =
-      mode === 'weekly' && onChangeOnly ? volume.filter((row) => row.date >= '2025-12-16') : volume;
+    const selectedVolume = selectVolumeRows(volume, mode, onChangeOnly);
     const chart =
       mode === 'weekly'
         ? groupVolumeByWeek(selectedVolume).map((row) => ({ date: row.week, ...row }))

@@ -35,7 +35,6 @@ import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/seg
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { track } from '@/lib/analytics';
 import { exportToCsv } from '@/lib/csv-export';
-import { DEFAULT_CACHED_INPUT_PRICE_RATIO } from '@/lib/cache-pricing';
 import { getGpuSpecs, getHardwareConfig, type TcoBasis } from '@/lib/constants';
 import {
   getModelLabel,
@@ -44,7 +43,7 @@ import {
   type Model,
   type Percentile,
 } from '@/lib/data-mappings';
-import { DEFAULT_LIFECYCLE_RAMP_MONTHS, readUrlParams, writeUrlParams } from '@/lib/url-state';
+import { readUrlParams, writeUrlParams } from '@/lib/url-state';
 import { useLocale } from '@/lib/use-locale';
 import { getDisplayLabel } from '@/lib/utils';
 
@@ -61,6 +60,7 @@ import {
   breakEvenPricePerMTok,
   computeLifecycle,
   effectiveTokPerSec,
+  LIFECYCLE_DEFAULTS,
   MS_PER_MONTH,
   type LifecycleAssumptions,
   type LifecycleSeries,
@@ -383,26 +383,7 @@ const STRINGS = {
   },
 } as const;
 
-const DEFAULTS = {
-  mtbiDays: 24,
-  recoveryHours: 12,
-  // A nominal half-month to bring a fleet to full load. Purely an assumption,
-  // and labelled as one — no measurement in this repo speaks to it.
-  rampMonths: Number(DEFAULT_LIFECYCLE_RAMP_MONTHS),
-  /**
-   * A cached input token sells for a tenth of a fresh one — the ratio DeepSeek
-   * and Anthropic both publish, and the order of magnitude the others sit at.
-   * An assumption like the rest; the cached *fraction* it applies to is measured.
-   */
-  cachedInputPct: DEFAULT_CACHED_INPUT_PRICE_RATIO * 100,
-  /**
-   * An output token sells for four times an input one until the user says
-   * otherwise — DeepSeek's own published API pricing is $0.27 / $1.10, and the
-   * major vendors sit between 2x and 5x. Only used to seed the pair and to hold
-   * their ratio through a reset; once both fields exist they are what is billed.
-   */
-  outputPriceMultiple: 4,
-};
+const DEFAULTS = LIFECYCLE_DEFAULTS;
 
 /**
  * A price for a field, in as few digits as say it.

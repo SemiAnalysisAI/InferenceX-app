@@ -12,10 +12,14 @@ export function csvLicensePreamble(): string {
   ].join('\n');
 }
 
-/** Escape a cell value for CSV: wrap in quotes if it contains commas, quotes, or newlines */
-function escapeCsvCell(value: string | number | boolean | null | undefined): string {
+/**
+ * Escape a cell value for CSV (RFC 4180): wrap in quotes only if it contains a
+ * comma, quote, or line break; null/undefined serialize as an empty cell.
+ * Shared with the views-API CSV representations.
+ */
+export function escapeCsvCell(value: unknown): string {
   if (value === null || value === undefined) return '';
-  const str = String(value);
+  const str = typeof value === 'string' ? value : String(value);
   if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('\r')) {
     return `"${str.replaceAll('"', '""')}"`;
   }

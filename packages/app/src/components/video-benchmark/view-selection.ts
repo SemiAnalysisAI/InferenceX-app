@@ -1,6 +1,6 @@
 import { allocatedGpus } from './allocation';
-import { at, number, ROLES, rows, text, type Json } from './bundle';
-import { servingCells } from './serving';
+import { at, ROLES, rows, text, type Json } from './bundle';
+import { participatingGpuCount, perGpuHour, selectServingRecord, servingCells } from './serving';
 import { storedBundle, storedFidelityBundle, type StoredSource } from './stored';
 
 /** Data behind the public result panels, without browser-only media state. */
@@ -32,23 +32,11 @@ export function selectVideoEvidence(
   if (current) {
     const verified = at(current.cell, 'verified') === true;
     const metrics = verified ? at(current.cell, 'metrics') : null;
-    const records = rows(at(current.run, 'records'));
-    const record =
-      records.find((item) => at(item, 'slot_id') === selection.slot) ??
-      records.find((item) => at(item, 'phase') === 'measurement') ??
-      records[0] ??
-      null;
-    const uuids = rows(at(current.spec, 'gpu_uuids')).map(text);
-    const participating =
-      uuids.length > 0 && uuids.every(Boolean) && new Set(uuids).size === uuids.length
-        ? uuids.length
-        : null;
+    const record = selectServingRecord(current.run, selection.slot);
+    const participating = participatingGpuCount(current.spec);
     const allocated = allocatedGpus(bundle);
     const gpuCount = selection.gpuBasis === 'participating' ? participating : allocated;
-    const rate = (value: Json) => {
-      const n = number(value);
-      return n !== null && gpuCount !== null && gpuCount > 0 ? (n * 3600) / gpuCount : null;
-    };
+    const rate = (value: Json) => perGpuHour(value, gpuCount);
     const phase = at(current.power, 'phases', selection.phase);
     return {
       kind: 'serving',

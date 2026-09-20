@@ -3,27 +3,28 @@ import { fetchOpenRouterPricing } from '@/hooks/api/use-openrouter-pricing';
 import { getOpenRouterModelId, type Model, Sequence } from '@/lib/data-mappings';
 import {
   validateParams as validateViewParams,
+  matchesHardware,
   parseDateParam,
+  parseDeploymentParam,
   parseEnumParam,
   parseFormatParam,
+  parseFrameworkFamiliesParam,
   parseFreeListParam,
-  parseListParam,
   parseMetricParam,
   parseNumberParam,
   parsePrecisionsParam,
   parseSequenceParam,
+  parseTcoBasisParam,
+  parseVendorsParam,
   resolveModelParam,
 } from '@/lib/views-api/params';
 import { VIEW_QUERY_PARAMS } from '@/lib/views-api/registry';
 import type { NextRequest } from 'next/server';
 
-import { GPU_VENDORS, rowToSequence, sequenceToIslOsl } from '@semianalysisai/inferencex-constants';
-import { FIXTURES_MODE, getDb } from '@semianalysisai/inferencex-db/connection';
+import { rowToSequence, sequenceToIslOsl } from '@semianalysisai/inferencex-constants';
+import { FIXTURES_MODE } from '@semianalysisai/inferencex-db/connection';
 
-import {
-  getAllBenchmarksForHistory,
-  type BenchmarkRow,
-} from '@semianalysisai/inferencex-db/queries/benchmarks';
+import type { BenchmarkRow } from '@semianalysisai/inferencex-db/queries/benchmarks';
 
 import {
   buildTrendLines,
@@ -36,8 +37,12 @@ import {
   type MetricKey,
 } from '@/components/inference/metric-registry';
 import type { YAxisMetricKey } from '@/components/inference/types';
-import { FRAMEWORK_FAMILIES } from '@/components/inference/utils/quickFilters';
-import { cachedJson, cachedQuery } from '@/lib/api-cache';
+import { pointDeploymentMode, pointVendor } from '@/components/inference/utils/quickFilters';
+import { cachedJson } from '@/lib/api-cache';
+import {
+  getCachedAgenticBenchmarkHistory,
+  getCachedBenchmarkHistory,
+} from '@/lib/benchmark-query-cache.server';
 import { benchmarkCurveDate } from '@/lib/benchmark-run-selection';
 import { rowToAggDataEntry } from '@/lib/benchmark-transform';
 import { getHardwareKey } from '@/lib/chart-utils';
@@ -69,29 +74,7 @@ export const dynamic = 'force-dynamic';
  * cache-stable. Synthetic extension points carry `synthetic: true`.
  */
 
-const VENDOR_VALUES = ['AMD', 'NVIDIA', 'Google', 'OpenAI'] as const;
-const FRAMEWORK_FAMILY_VALUES = FRAMEWORK_FAMILIES.map((family) => family.key).toSorted();
-const DEPLOYMENT_VALUES = ['agg', 'disagg', 'multi-node', 'single-node'] as const;
 const DEFAULT_TARGET_INTERACTIVITY = 35;
-
-// Same cache keys and argument shapes as /api/v1/benchmarks/history so both
-// routes share one cached copy of the raw history rows.
-const getCachedBenchmarkHistory = cachedQuery(
-  (modelKeys: string[], isl: number, osl: number) =>
-    getAllBenchmarksForHistory(getDb(), modelKeys, isl, osl),
-  'benchmark-history',
-  { blobOnly: true },
-);
-const getCachedAgenticBenchmarkHistory = cachedQuery(
-  (modelKeys: string[]) =>
-    getAllBenchmarksForHistory(getDb(), modelKeys, null, null, 'agentic_traces'),
-  'benchmark-history-agentic',
-  { blobOnly: true },
-);
-
-function rowDeployment(row: BenchmarkRow): string {
-  return row.disagg ? 'disagg' : row.is_multinode ? 'multi-node' : 'single-node';
-}
 
 export function GET(request: NextRequest) {
   return runViewsRoute('historical', async () => {
@@ -107,19 +90,9 @@ export function GET(request: NextRequest) {
     });
     const precisions = parsePrecisionsParam(search.get('precisions'));
     const gpus = parseFreeListParam(search.get('gpus'));
-    const vendors = parseListParam(search.get('vendors'), 'vendors', VENDOR_VALUES);
-    const frameworks = parseListParam(
-      search.get('frameworks'),
-      'frameworks',
-      FRAMEWORK_FAMILY_VALUES,
-    );
-    const deployment = [
-      ...new Set(
-        parseListParam(search.get('deployment'), 'deployment', DEPLOYMENT_VALUES).flatMap((mode) =>
-          mode === 'agg' ? (['multi-node', 'single-node'] as const) : [mode],
-        ),
-      ),
-    ].toSorted();
+    const vendors = parseVendorsParam(search.get('vendors'));
+    const frameworks = parseFrameworkFamiliesParam(search.get('frameworks'));
+    const deployment = parseDeploymentParam(search.get('deployment'));
     const start = parseDateParam(search.get('start'), 'start');
     const end = parseDateParam(search.get('end'), 'end');
     const format = parseFormatParam(search.get('format'));
@@ -128,12 +101,7 @@ export function GET(request: NextRequest) {
     const extendToDate =
       parseDateParam(search.get('extendToDate'), 'extendToDate') ??
       new Date().toISOString().slice(0, 10);
-    const tcoBasis = parseEnumParam(
-      search.get('tcoBasis'),
-      'tcoBasis',
-      ['internal', 'external'],
-      'internal',
-    );
+    const tcoBasis = parseTcoBasisParam(search.get('tcoBasis'));
     const priceSource = parseEnumParam(
       search.get('priceSource'),
       'priceSource',
@@ -168,40 +136,34 @@ export function GET(request: NextRequest) {
     const trendMetricKey = resolveMetricConfigKey(metricConfigKey).slice(2) as YAxisMetricKey;
     const registryEntry = METRIC_REGISTRY[trendMetricKey as MetricKey];
 
-    const gpuSet = new Set(gpus.map((value) => value.toLowerCase()));
     const vendorSet = new Set<string>(vendors);
     const familySet = new Set<string>(frameworks);
     const deploymentSet = new Set<string>(deployment);
     const hasRowFilter =
-      gpuSet.size > 0 ||
+      gpus.length > 0 ||
       vendorSet.size > 0 ||
       familySet.size > 0 ||
       deploymentSet.size > 0 ||
       start !== undefined ||
       end !== undefined;
 
+    // Same vendor/family/topology classification as the dashboard quick filters
+    // (`matchesQuickFilters`), applied to raw rows before trend grouping.
     const rowFilter = hasRowFilter
       ? (row: BenchmarkRow): boolean => {
           const date = benchmarkCurveDate(row);
           if (start !== undefined && date < start) return false;
           if (end !== undefined && date > end) return false;
-          if (deploymentSet.size > 0 && !deploymentSet.has(rowDeployment(row))) return false;
+          if (deploymentSet.size > 0 && !deploymentSet.has(pointDeploymentMode(row))) return false;
           if (familySet.size > 0) {
             const family = frameworkFamily(row.framework);
             if (!family || !familySet.has(family)) return false;
           }
-          if (gpuSet.size > 0 || vendorSet.size > 0) {
+          if (gpus.length > 0 || vendorSet.size > 0) {
             const hwKey = getHardwareKey(rowToAggDataEntry(row));
-            const gpu = hwKey.split('_')[0];
-            if (
-              gpuSet.size > 0 &&
-              !gpuSet.has(hwKey.toLowerCase()) &&
-              !gpuSet.has(gpu.toLowerCase())
-            ) {
-              return false;
-            }
+            if (!matchesHardware(hwKey, gpus)) return false;
             if (vendorSet.size > 0) {
-              const vendor = GPU_VENDORS[gpu];
+              const vendor = pointVendor(hwKey);
               if (!vendor || !vendorSet.has(vendor)) return false;
             }
           }
@@ -241,7 +203,7 @@ export function GET(request: NextRequest) {
           hwKey,
           precision,
           label: hardwareLegendLabel(hwKey),
-          vendor: GPU_VENDORS[hwKey.split('_')[0]] ?? null,
+          vendor: pointVendor(hwKey) ?? null,
           points: points.map((point) => ({
             date: point.date,
             value: point.value,

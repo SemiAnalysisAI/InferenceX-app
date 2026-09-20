@@ -1,5 +1,12 @@
 import type { CostType, InterpolatedResult } from './types';
 
+/** Get the throughput value (tok/s/chip or tok/s/user) for the selected token type. */
+export function getThroughputForType(d: InterpolatedResult, costType: CostType): number {
+  if (costType === 'input') return d.inputTputValue;
+  if (costType === 'output') return d.outputTputValue;
+  return d.value; // total
+}
+
 /** Get the tok/s/MW value for the selected token type. */
 export function getTpPerMwForType(d: InterpolatedResult, costType: CostType): number {
   if (costType === 'input') return d.inputTpPerMw;

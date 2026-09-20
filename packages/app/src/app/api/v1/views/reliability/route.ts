@@ -1,5 +1,6 @@
 import {
   validateParams as validateViewParams,
+  matchesHardware,
   parseDateParam,
   parseEnumParam,
   parseFormatParam,
@@ -68,12 +69,7 @@ export function GET(request: NextRequest) {
     // raw rows, so `now` never leaks into a cache key.
     const bucket = aggregateByDateRange(rows, asOf ? Date.parse(asOf) : Date.now())[range] ?? {};
     const hardware = Object.entries(bucket)
-      .filter(
-        ([key]) =>
-          gpus.length === 0 ||
-          gpus.includes(key.toLowerCase()) ||
-          gpus.includes(key.split('_')[0].toLowerCase()),
-      )
+      .filter(([key]) => matchesHardware(key, gpus))
       .map(([key, stats]) => ({
         key,
         label: hardwareLegendLabel(key),
