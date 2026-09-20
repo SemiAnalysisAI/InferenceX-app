@@ -22,6 +22,18 @@ export interface VideoHistoryObservation {
   p90: number | null;
   clipsGpuHour: number | null;
   energyKj: number | null;
+  /** GPU boards that generated the clips (distinct bound UUIDs); null when the binding is ambiguous. */
+  participating: number | null;
+  /** GPU boards the job reserved (Slurm AllocTRES or the retained AMD binding); null when unknown. */
+  allocated: number | null;
+  wallSeconds: number | null;
+  durationSeconds: number | null;
+  frameCount: number | null;
+  /** Summed mean board W over the recorded generation window; null when the power phase is invalid. */
+  avgPowerW: number | null;
+  /** Summed recorded enforced limits of the same boards; null when a limit was not recorded. */
+  enforcedLimitW: number | null;
+  server: { tp: number | null; ulysses: number | null; attention: string | null } | null;
 }
 export interface VideoHistorySource {
   id: string;
@@ -120,6 +132,21 @@ export function videoHistoryEntry(
             p90: latencyValue(point, 'p90'),
             clipsGpuHour: efficiencyValue(point, 'clipsGpu'),
             energyKj: point.energy === null ? null : point.energy / 1000,
+            participating: point.participating,
+            allocated: point.allocated,
+            wallSeconds: point.wall,
+            durationSeconds: number(at(point.workload, 'generation', 'duration_seconds')),
+            frameCount: number(at(point.workload, 'generation', 'frame_count')),
+            avgPowerW: point.power,
+            enforcedLimitW: point.powerLimit?.watts ?? null,
+            server:
+              point.server !== null && typeof point.server === 'object'
+                ? {
+                    tp: number(at(point.server, 'tp_size')),
+                    ulysses: number(at(point.server, 'ulysses_degree')),
+                    attention: text(at(point.server, 'attention_backend')) || null,
+                  }
+                : null,
           };
         });
       }

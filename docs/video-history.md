@@ -8,6 +8,8 @@
 
 The projection groups all cells under the original source inside one artifact entry. It reuses `storedBundle`, `servingCells`, `storedFidelityBundle`, and the existing tradeoff calculations. Invalid or unavailable indexes remain explicit error entries. Original execution time comes from `ci.started_at`; index publication time is separate and must never be substituted for execution time. Original run IDs and export run IDs remain distinct.
 
+Each observation also carries the cell's participating and allocated GPU counts, measurement wall seconds, clip duration and frame count, summed mean board watts, summed recorded enforced limits (null when no limit snapshot exists) and the configured `tp_size` / `ulysses_degree` / `attention_backend`. These are additive, nullable fields under the same `schemaVersion: 1`; the hardware dashboard derives every displayed metric from them, so the browser never parses an artifact bundle for the chart.
+
 ## Evidence boundaries
 
 - Only descriptive observations are shown: this version has no selected matched baseline and computes no before/after delta.
@@ -24,7 +26,7 @@ The projection groups all cells under the original source inside one artifact en
 
 `/video` 与 `/zh/video` 默认打开“性能历史”。原有 run/artifact/source/cell 链接仍打开对应结果；`?view=results` 打开最新发布页面中首个可读取的产物与原始运行；未选择运行时，“视频与结果”也使用该入口。空列表或读取失败会显示可恢复的提示；只有点击“浏览 CI 运行”才扫描 GitHub Actions。返回性能历史会取消正在进行的结果选择；刷新和重新加载保留产物、原始运行及并发配置。历史筛选条件保存在 URL，刷新后恢复。
 
-历史读取只列举既有发布索引的元数据，按索引发布时间排序，每页最多读取十份完整索引；不下载或发布媒体。原始执行时间取自 `ci.started_at`，与发布时间、重新导出的时间分开。索引无效时保留错误记录，缺失指标保留 null。
+历史读取只列举既有发布索引的元数据，按索引发布时间排序，每页最多读取十份完整索引；不下载或发布媒体。原始执行时间取自 `ci.started_at`，与发布时间、重新导出的时间分开。索引无效时保留错误记录，缺失指标保留 null。每个 cell 另附参与/已分配 GPU 数、测量窗口秒数、视频时长与帧数、板卡平均功率之和、记录的生效功率上限之和（无快照时为 null）以及配置的 `tp_size` / `ulysses_degree` / `attention_backend`；这些都是同一 `schemaVersion: 1` 下可为空的附加字段，硬件仪表板据此推导全部指标，浏览器不再解析产物包。
 
 当前展示观测值，未选择匹配基线，也不计算 before/after。延迟、吞吐量使用提交到下载完成的窗口；板卡能耗使用记录的生成窗口。保真度、阈值校准、发布验收单独展示。筛选仅作用于已加载的页面，可继续加载较早结果。
 
