@@ -40,7 +40,19 @@
               "p50": 167.33339739358053,
               "p90": 168.11354550393298,
               "clipsGpuHour": 5.3741390883412175,
-              "energyKj": 431.14963489170344
+              "energyKj": 431.14963489170344,
+              "participating": 4,
+              "allocated": 8,
+              "wallSeconds": 3349.37367718108,
+              "durationSeconds": 8,
+              "frameCount": 192,
+              "avgPowerW": 2574.550733165641,
+              "enforcedLimitW": 2800,
+              "server": {
+                "tp": 2,
+                "ulysses": 2,
+                "attention": null
+              }
             },
             {
               "id": "7df99e50c015669f4dd9ef62549317870f197cfe0fc5d163cf8bf0fb3b88dd5e:c2",
@@ -59,7 +71,19 @@
               "p50": 334.78318604291417,
               "p90": 336.9140758761205,
               "clipsGpuHour": 5.368742995784034,
-              "energyKj": 431.32628015924786
+              "energyKj": 431.32628015924786,
+              "participating": 4,
+              "allocated": 8,
+              "wallSeconds": 3352.7401133067906,
+              "durationSeconds": 8,
+              "frameCount": 192,
+              "avgPowerW": 2573.016825749808,
+              "enforcedLimitW": 2800,
+              "server": {
+                "tp": 2,
+                "ulysses": 2,
+                "attention": null
+              }
             }
           ],
           "fidelity": null,
@@ -109,7 +133,19 @@
               "p50": 669.2438137787394,
               "p90": 673.7058754772879,
               "clipsGpuHour": 5.368345559881099,
-              "energyKj": 430.80324425396446
+              "energyKj": 430.80324425396446,
+              "participating": 4,
+              "allocated": 8,
+              "wallSeconds": 3352.988327450119,
+              "durationSeconds": 8,
+              "frameCount": 192,
+              "avgPowerW": 2569.709833308179,
+              "enforcedLimitW": 2800,
+              "server": {
+                "tp": 2,
+                "ulysses": 2,
+                "attention": null
+              }
             }
           ],
           "fidelity": null,
@@ -159,7 +195,19 @@
               "p50": 150.61379817902343,
               "p90": 151.10486977093387,
               "clipsGpuHour": 5.973235869122123,
-              "energyKj": 410.954300515549
+              "energyKj": 410.954300515549,
+              "participating": 4,
+              "allocated": 4,
+              "wallSeconds": 3013.44202613004,
+              "durationSeconds": 8,
+              "frameCount": 192,
+              "avgPowerW": 2727.484797810607,
+              "enforcedLimitW": 2800,
+              "server": {
+                "tp": 2,
+                "ulysses": 2,
+                "attention": null
+              }
             },
             {
               "id": "ad62f1b44954b9733cb513b7dd1d54c224759a20956d9a1f257b190ce8d4da35:c2",
@@ -178,7 +226,19 @@
               "p50": 300.09254947002046,
               "p90": 300.1774324030848,
               "clipsGpuHour": 5.997056099146397,
-              "energyKj": 409.91272507134966
+              "energyKj": 409.91272507134966,
+              "participating": 4,
+              "allocated": 4,
+              "wallSeconds": 3001.4726729940157,
+              "durationSeconds": 8,
+              "frameCount": 192,
+              "avgPowerW": 2731.4196931869433,
+              "enforcedLimitW": 2800,
+              "server": {
+                "tp": 2,
+                "ulysses": 2,
+                "attention": null
+              }
             },
             {
               "id": "ad62f1b44954b9733cb513b7dd1d54c224759a20956d9a1f257b190ce8d4da35:c4",
@@ -197,7 +257,19 @@
               "p50": 601.2122122829896,
               "p90": 601.8977232379839,
               "clipsGpuHour": 5.986775861646954,
-              "energyKj": 413.58283766782114
+              "energyKj": 413.58283766782114,
+              "participating": 4,
+              "allocated": 4,
+              "wallSeconds": 3006.626674519968,
+              "durationSeconds": 8,
+              "frameCount": 192,
+              "avgPowerW": 2751.151140021047,
+              "enforcedLimitW": 2800,
+              "server": {
+                "tp": 2,
+                "ulysses": 2,
+                "attention": null
+              }
             }
           ],
           "fidelity": null,
@@ -247,7 +319,19 @@
               "p50": 77.94495720259147,
               "p90": 78.31597462110221,
               "clipsGpuHour": 11.52605424609145,
-              "energyKj": 301.08754501100987
+              "energyKj": 301.08754501100987,
+              "participating": 4,
+              "allocated": 8,
+              "wallSeconds": 1561.6792716470081,
+              "durationSeconds": 8,
+              "frameCount": 192,
+              "avgPowerW": 3856.016973742528,
+              "enforcedLimitW": 4000,
+              "server": {
+                "tp": 2,
+                "ulysses": 2,
+                "attention": null
+              }
             },
             {
               "id": "ab90da9236114cd13de833a364159b8f84e69060de888f3e813635d5b7b26b82:c2",
@@ -266,7 +350,19 @@
               "p50": 153.6016560649732,
               "p90": 154.1683327689534,
               "clipsGpuHour": 11.691563929313219,
-              "energyKj": 300.10551714629605
+              "energyKj": 300.10551714629605,
+              "participating": 4,
+              "allocated": 8,
+              "wallSeconds": 1539.571618376067,
+              "durationSeconds": 8,
+              "frameCount": 192,
+              "avgPowerW": 3898.6355959505895,
+              "enforcedLimitW": 4000,
+              "server": {
+                "tp": 2,
+                "ulysses": 2,
+                "attention": null
+              }
             },
             {
               "id": "ab90da9236114cd13de833a364159b8f84e69060de888f3e813635d5b7b26b82:c4",
@@ -285,7 +381,19 @@
               "p50": 307.28381997847464,
               "p90": 308.79631440097,
               "clipsGpuHour": 11.69172635792307,
-              "energyKj": 299.96858693604275
+              "energyKj": 299.96858693604275,
+              "participating": 4,
+              "allocated": 8,
+              "wallSeconds": 1539.5502297059866,
+              "durationSeconds": 8,
+              "frameCount": 192,
+              "avgPowerW": 3896.903348609339,
+              "enforcedLimitW": 4000,
+              "server": {
+                "tp": 2,
+                "ulysses": 2,
+                "attention": null
+              }
             }
           ],
           "fidelity": null,
