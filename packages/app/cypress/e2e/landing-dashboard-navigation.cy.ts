@@ -16,7 +16,7 @@
  * natively.
  */
 
-import { interceptVrPublicationData } from '../support/vr-publication-fixtures';
+import { interceptVrPublicationData, vrPublicationRows } from '../support/vr-publication-fixtures';
 
 const TARGET = '/inference/kimi-k3';
 
@@ -147,6 +147,52 @@ describe('landing model curation', () => {
       cy.reload();
       cy.get('[data-testid="x-axis-mode-selector"]').should('have.attr', 'data-value', 'e2e');
       cy.location('search').should('not.contain', 'i_spec=');
+      cy.get('[data-testid^="remove-filter-spec-"]').should('not.exist');
+      cy.get('[data-testid="chart-legend"]').should('contain.text', 'Jalapeño');
+    });
+
+    it(`does not carry TPU precision through Back into Rubin on ${prefix || '/'}`, () => {
+      // Include FP8 as well as Rubin's FP4: FP4-only fixtures mask stale FP8
+      // because the availability validator falls back to the only precision.
+      const rubinRows = [
+        ...vrPublicationRows,
+        ...vrPublicationRows
+          .filter((row) => row.hardware === 'vr200')
+          .map((row) => ({
+            ...row,
+            id: row.id + 1000,
+            hardware: 'h200',
+            precision: 'fp8',
+          })),
+      ];
+      cy.fixture('api/availability.json').then((availability) => {
+        cy.intercept('GET', '/api/v1/availability*', {
+          body: [
+            ...availability.filter((row: { model: string }) => row.model !== 'dsv4'),
+            ...rubinRows.map(({ metrics: _metrics, ...row }) => row),
+          ],
+        });
+      });
+      cy.intercept('GET', '/api/v1/benchmarks*', (request) => {
+        if (String(request.query.model).includes('DeepSeek-V4')) {
+          request.reply({ body: rubinRows });
+        }
+      });
+      cy.visit(prefix || '/');
+      cy.get('[data-testid="landing-tpu-results-link"]').click();
+      assertTpuView();
+      cy.go('back');
+      cy.location('pathname').should('eq', prefix || '/');
+      cy.get('[data-testid="landing-rubin-results-link"]').click();
+      cy.get('[data-testid="precision-multiselect"]')
+        .should('contain.text', 'FP4')
+        .and('contain.text', 'FP8');
+      cy.get('[data-testid="chart-legend"]').should('contain.text', 'Vera Rubin NVL72');
+      cy.reload();
+      cy.get('[data-testid="chart-legend"]').should('contain.text', 'Vera Rubin NVL72');
+      cy.go('back');
+      cy.get('[data-testid="landing-jalapeno-results-link"]').click();
+      cy.get('[data-testid="precision-multiselect"]').should('contain.text', 'FP4');
       cy.get('[data-testid^="remove-filter-spec-"]').should('not.exist');
       cy.get('[data-testid="chart-legend"]').should('contain.text', 'Jalapeño');
     });
