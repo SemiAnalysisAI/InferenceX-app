@@ -67,13 +67,13 @@ const STRINGS = {
   zh: {
     title: '对比',
     subtitle:
-      '选择基线与候选硬件（各取其实测中最高效的部署）：并排查看指标差异，再对照两次运行中同一 prompt 与 seed 生成的视频。',
+      '选择基线与候选硬件（各自取实测中最高效的部署）：并排查看指标差异，再对照两次运行中同一 prompt 与 seed 生成的视频。',
     baseline: '基线',
     candidate: '候选',
     needTwo: '至少需要两种已实测的硬件才能对比。',
     metric: '指标',
     change: '变化',
-    assumptions: (tier: string, basis: string) => `成本分档：${tier} · GPU 口径：${basis}。`,
+    assumptions: (tier: string, basis: string) => `成本档位：${tier} · GPU 口径：${basis}。`,
     participating: '参与计算的 GPU',
     allocated: '已分配的 GPU',
     better: '候选更优',

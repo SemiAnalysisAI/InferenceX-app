@@ -37,7 +37,7 @@ const STRINGS = {
   },
   zh: {
     single: (layouts: string) =>
-      `目前每种硬件只测得一种部署（${layouts}），因此每种硬件只有一个点；要得到每硬件的 Pareto 曲线，还需扫描每条视频占用的 GPU 数。`,
+      `目前每种硬件只测得一种部署（${layouts}），因此每种硬件只有一个点；要得到各硬件自己的 Pareto 曲线，还需扫描每条视频占用的 GPU 数。`,
     multi:
       '实线连接同一硬件的 Pareto 最优部署（每条视频占用的 GPU 数及模型切分方式）；淡色点为被支配的部署。',
     global: '虚线为所有部署的跨硬件 Pareto 前沿。',
@@ -89,6 +89,8 @@ export default function VideoHardwareChart({
   const layouts = [
     ...new Set(plotted.filter((p) => !p.queued).map((p) => layoutLabel(p, locale))),
   ].join(locale === 'zh' ? '；' : '; ');
+  const colon = locale === 'zh' ? '：' : ': ';
+  const queuedTag = locale === 'zh' ? `（${s.queuedTag}）` : ` (${s.queuedTag})`;
   const pointLabel = (p: PlottedVideoPoint) => {
     if (p.queued) return `C${p.concurrency}`;
     return multiLayout ? `${p.label} · ${layoutLabel(p, locale)}` : p.label;
@@ -196,7 +198,7 @@ export default function VideoHardwareChart({
       tooltip={{
         rulerType: 'none',
         content: (p) =>
-          `<div class="p-3 text-sm"><strong>${escapeHtml(p.label)}</strong> · C${p.concurrency ?? '?'}${p.queued ? ` (${s.queuedTag})` : ''}<br/>${s.deployment}: ${escapeHtml(layoutLabel(p, locale))}<br/>${escapeHtml(xLabel)}: ${formatMetric(p.x, state.x)}<br/>${escapeHtml(yLabel)}: ${formatMetric(p.y, state.y)}<br/>${s.n}: ${p.samples} · ${s.run} #${escapeHtml(p.runId)}</div>`,
+          `<div class="p-3 text-sm"><strong>${escapeHtml(p.label)}</strong> · C${p.concurrency ?? '?'}${p.queued ? queuedTag : ''}<br/>${s.deployment}${colon}${escapeHtml(layoutLabel(p, locale))}<br/>${escapeHtml(xLabel)}${colon}${formatMetric(p.x, state.x)}<br/>${escapeHtml(yLabel)}${colon}${formatMetric(p.y, state.y)}<br/>${s.n}${colon}${p.samples} · ${s.run} #${escapeHtml(p.runId)}</div>`,
         onPointClick: onSelect,
       }}
       zoom={{

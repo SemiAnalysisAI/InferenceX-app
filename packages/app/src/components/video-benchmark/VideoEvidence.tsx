@@ -98,7 +98,7 @@ const STRINGS = {
       '来自实测 cell 的三组读数，说明该工作负载在固定 runtime 上为何表现为算力受限的扩散模型。所有数字均由已发布运行计算得出，措辞以数字为准。',
     power: '板卡功率 vs. 生效功率上限',
     powerHint:
-      '生成期间参与计算板卡的 GPU 板卡平均功率，对照运行前后记录到的功率上限，而非标称 TDP。',
+      '生成期间各参与计算 GPU 板卡的平均功率，对照运行前后记录到的功率上限，而非标称 TDP。',
     powerOne: (hardware: string, share: string) =>
       `${hardware} 生成期间运行在生效功率上限的 ${share}：接近上限，符合算力饱和型负载的表现。`,
     powerAll: (n: number, share: string) =>
@@ -114,8 +114,8 @@ const STRINGS = {
     c: 'C',
     rate: '视频数 / GPU 小时',
     p50: 'P50（s）',
-    throughput: '吞吐量 × C1',
-    latency: '延迟 × C1',
+    throughput: '吞吐量（相对 C1）',
+    latency: '延迟（相对 C1）',
     scaling: '实测加速比 vs. 规格表比值',
     scalingHint:
       '按 C1 P50 从慢到快排列的相邻硬件。实测值为 P50 比值；规格比值取自 GPU 规格页的单卡 HBM 带宽与 dense tensor-core TFLOPS。',
@@ -151,13 +151,13 @@ const STRINGS = {
     recipe: (tp: number, ulysses: number) => `（TP${tp} × Ulysses ${ulysses}）`,
     caveatPower: 'GPU 板卡级功率，对照记录到的生效上限；不是节点、机柜或设施功率。',
     caveatSamples: (n: string) =>
-      `每个 cell n = ${n} 条视频、每种硬件一个批次：没有误差棒，P90 只是显示下限而非尾延迟 SLO。`,
+      `每个 cell n = ${n} 条视频、每种硬件一个批次：没有误差棒；P90 仅在样本数达到显示门槛时展示，不能当作尾延迟 SLO。`,
     caveatSamplesUnknown: '未记录样本数。',
     caveatWorkload: (workload: string) =>
       `冻结的工作负载 ${workload}；所有比值都是同一条视频在不同硬件上的对比。`,
     caveatWorkloadUnknown: '各 cell 的工作负载标签不一致；跨硬件比值只在同一条视频下成立。',
     caveatAttention: (backends: string) =>
-      `各硬件的 attention 后端不同（${backends}）；每个数据点都是“硬件 + 实测配方”。`,
+      `各硬件的 attention 后端不同（${backends}）；每个数据点都是“硬件 + 实测配置”。`,
   },
 };
 
