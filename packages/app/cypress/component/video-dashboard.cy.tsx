@@ -20,18 +20,25 @@ function mount(pathname = '/video', search = '') {
 const kpi = (hardware: string) =>
   cy.get(`[data-testid="video-kpi-card"][data-hardware="${hardware}"]`);
 const points = () => cy.get('[data-testid="video-hardware-chart"] circle.point');
-const tails = () => cy.get('[data-testid="video-hardware-chart"] path.line-path');
+const lines = () => cy.get('[data-testid="video-hardware-chart"] path.line-path');
+const hull = () => cy.get('[data-testid="video-hardware-chart"] path.roofline-path');
 
 describe('Video hardware dashboard (retained fixture)', () => {
   it('plots one C1 point per measured hardware and lists MI355X as unavailable', () => {
     mount();
     points().should('have.length', 3);
-    tails().should('have.length', 0);
+    lines().should('have.length', 0);
+    hull().should('have.length', 0);
+    cy.get('[data-testid="video-chart-caption"]').should(
+      'contain',
+      'One deployment measured per hardware so far (4 GPU · TP2 × Ulysses 2)',
+    );
+    cy.get('[data-testid="video-config-bar"]').should('contain', '4 GPU · TP2 × Ulysses 2');
     cy.get('[data-testid="video-kpi-card"]').should('have.length', 4);
     kpi('mi355x').find('[data-testid="video-kpi-unavailable"]').should('contain', 'Not measured');
     kpi('h200').should('contain', '$0.204').and('contain', '150.6').and('contain', '97.4');
     kpi('b200').should('contain', '$0.150');
-    kpi('h100').should('contain', '$0.218').and('contain', '4 of 8 GPUs');
+    kpi('h100').should('contain', '$0.218').and('contain', '4 of 8 GPUs · TP2 × Ulysses 2');
     cy.get('[data-testid="video-config-bar"]').should(
       'contain',
       '1344 × 768 · 8 s · 24 fps · 50 steps',
@@ -57,16 +64,28 @@ describe('Video hardware dashboard (retained fixture)', () => {
     kpi('h100').should('contain', '$0.744');
     cy.location('search').should('contain', 'v_basis=allocated');
   });
-  it('adds dotted C2/C4 tails behind the queueing switch and isolates the Pareto-optimal hardware', () => {
+  it('plots queued cells as unjoined markers and never draws a curve through them', () => {
     mount();
     cy.get('[data-testid="video-queue"]').click();
     points().should('have.length', 9);
-    tails().should('have.length', 3);
+    lines().should('have.length', 0);
+    cy.get('[data-testid="video-chart-caption"]').should('contain', 'never joined into a curve');
     cy.location('search').should('contain', 'v_queue=1');
+    cy.contains('button', 'Table').click();
+    cy.get('[data-testid="video-points-table"] tbody tr').should('have.length', 9);
+    cy.get('[data-testid="video-points-table"]').should('contain', '2 · queued');
+    cy.contains('button', 'Chart').click();
+    // Optimal-only keeps every hardware's single deployment and hides the queued cells.
     cy.get('[data-testid="video-optimal"]').click();
     points().should('have.length', 3);
-    tails().should('have.length', 1);
     cy.location('search').should('contain', 'v_opt=1');
+  });
+  it('explains the cross-hardware frontier switch when one hardware dominates', () => {
+    mount();
+    cy.get('[data-testid="video-frontier"]').click();
+    cy.location('search').should('contain', 'v_frontier=1');
+    hull().should('have.length', 0);
+    cy.get('[data-testid="video-chart-caption"]').should('contain', 'one hardware dominates');
   });
   it('hides a hardware from the legend and shows the table view', () => {
     mount();

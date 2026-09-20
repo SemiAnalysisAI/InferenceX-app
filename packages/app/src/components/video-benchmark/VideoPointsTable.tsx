@@ -2,6 +2,7 @@
 
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
 import { useLocale } from '@/lib/use-locale';
+import { isQueueing, layoutLabel } from './deployment';
 import { hardwareLabel } from './hardware';
 import { formatMetric, metricLabel, metricValue, type MetricId, type VideoPoint } from './metrics';
 import { latestVideoCells } from './points';
@@ -10,14 +11,18 @@ import type { VideoDashboardState } from './video-url-state';
 const STRINGS = {
   en: {
     hardware: 'Hardware',
+    deployment: 'Deployment',
     c: 'C',
+    queued: 'queued',
     counts: 'Valid / scheduled',
     power: 'Board power (W)',
     run: 'CI run',
   },
   zh: {
     hardware: '硬件',
+    deployment: '部署',
     c: 'C',
+    queued: '排队',
     counts: '有效 / 计划',
     power: '板卡功率（W）',
     run: 'CI 运行',
@@ -33,14 +38,14 @@ const METRIC_COLUMNS: readonly MetricId[] = [
   'powerPctCap',
 ];
 
-/** Rows for the plotted cells: every metric the chart can show, plus provenance. */
+/** Rows for the plotted cells: every deployment, queued cells on request, plus provenance. */
 export function videoTableRows(
   points: VideoPoint[],
   state: VideoDashboardState,
   hidden: ReadonlySet<string>,
 ): VideoPoint[] {
   return latestVideoCells(points).filter(
-    (p) => p.hardwareKey && !hidden.has(p.hardwareKey) && (state.queue || p.concurrency === 1),
+    (p) => p.hardwareKey && !hidden.has(p.hardwareKey) && (state.queue || !isQueueing(p)),
   );
 }
 
@@ -66,9 +71,15 @@ export default function VideoPointsTable({
       pinned: true,
     },
     {
+      header: s.deployment,
+      cell: (p) => layoutLabel(p, locale),
+      sortValue: (p) => p.participating ?? 0,
+      importance: 'key',
+    },
+    {
       header: s.c,
       align: 'right',
-      cell: (p) => p.concurrency ?? '—',
+      cell: (p) => (isQueueing(p) ? `${p.concurrency} · ${s.queued}` : (p.concurrency ?? '—')),
       sortValue: (p) => p.concurrency ?? 0,
       importance: 'key',
     },

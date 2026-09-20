@@ -13,6 +13,7 @@ import { Heading } from '@/components/ui/heading';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { track } from '@/lib/analytics';
 import { useLocale } from '@/lib/use-locale';
+import { isQueueing, layoutLabel, leadCell } from './deployment';
 import { costPerGpuHour, hardwareLabel, VIDEO_HARDWARE_ROSTER } from './hardware';
 import {
   metricLabel,
@@ -73,8 +74,10 @@ const STRINGS = {
     tier: 'Cost tier',
     badges: 'TCO $/chip/hr',
     source: 'Source',
-    queue: 'Show queueing (C2/C4)',
+    queue: 'Show queued requests (C2/C4)',
     optimal: 'Optimal only',
+    frontier: 'Pareto frontier',
+    deployments: (n: number) => `${n} deployments`,
     runs: 'Runs, videos & evidence',
     runsHint: 'Per-run results, generated clips, fidelity checks and the performance history list.',
     loading: 'Loading published results…',
@@ -96,8 +99,10 @@ const STRINGS = {
     tier: '成本档位',
     badges: 'TCO $/chip/hr',
     source: '来源',
-    queue: '显示排队尾迹（C2/C4）',
+    queue: '显示排队请求（C2/C4）',
     optimal: '仅最优',
+    frontier: 'Pareto 前沿',
+    deployments: (n: number) => `${n} 种部署`,
     runs: '运行、视频与证据',
     runsHint: '按运行查看结果、生成的视频、保真度检查以及性能历史列表。',
     loading: '正在加载已发布结果…',
@@ -160,11 +165,23 @@ export default function VideoDashboard() {
 
   const options = { tier: state.tier, basis: state.basis };
   const cells = useMemo(() => latestVideoCells(points), [points]);
+  // Each hardware is represented by its most efficient measured deployment.
   const measured = useMemo(
-    () => new Map(cells.filter((p) => p.concurrency === 1).map((p) => [p.hardwareKey, p])),
-    [cells],
+    () =>
+      new Map(
+        hardwareKeys.flatMap((key) => {
+          const point = leadCell(cells, key, { tier: state.tier, basis: state.basis });
+          return point ? [[key, point] as const] : [];
+        }),
+      ),
+    [cells, hardwareKeys, state.tier, state.basis],
   );
-  const lead = cells.find((p) => p.concurrency === 1) ?? cells[0];
+  const lead = measured.values().next().value ?? cells[0];
+  const layouts = [
+    ...new Set(cells.filter((p) => !isQueueing(p)).map((p) => layoutLabel(p, locale))),
+  ];
+  const deploymentLabel =
+    layouts.length > 2 ? s.deployments(layouts.length) : layouts.join(' | ') || '—';
   // "1344 × 768 · 8 s · 24 fps · 50 steps · model @ rev · seeds · prompt" → shape, then model @ rev.
   const workloadParts = lead?.workload.split(' · ') ?? [];
   const workloadLabel = workloadParts.slice(0, 4).join(' · ') || '—';
@@ -207,6 +224,10 @@ export default function VideoDashboard() {
       'scheduled',
       'participating_gpus',
       'allocated_gpus',
+      'tp_size',
+      'ulysses_degree',
+      'replicas',
+      'queued',
       ...CSV_METRICS.map((id) => `${id} (${VIDEO_METRICS[id].unit})`),
       'board_power_w',
       'enforced_limit_w',
@@ -221,6 +242,10 @@ export default function VideoDashboard() {
         p.scheduled,
         p.participating,
         p.allocated,
+        p.server?.tp ?? null,
+        p.server?.ulysses ?? null,
+        p.replicas,
+        isQueueing(p) ? 1 : 0,
         ...CSV_METRICS.map((id) => metricValue(p, id, options)),
         p.avgPowerW,
         p.enforcedLimitW,
@@ -254,6 +279,7 @@ export default function VideoDashboard() {
         onChange={update}
         modelLabel={modelLabel}
         workloadLabel={`${workloadLabel}${workloadSuffix}`}
+        deploymentLabel={deploymentLabel}
       />
       <ChartSection
         chartId={VIDEO_CHART_ID}
@@ -378,6 +404,15 @@ export default function VideoDashboard() {
                       onCheckedChange: (checked) => {
                         update({ optimal: checked });
                         track('video_optimal_changed', { value: String(checked) });
+                      },
+                    },
+                    {
+                      id: 'video-frontier',
+                      label: s.frontier,
+                      checked: state.frontier,
+                      onCheckedChange: (checked) => {
+                        update({ frontier: checked });
+                        track('video_frontier_changed', { value: String(checked) });
                       },
                     },
                   ]}

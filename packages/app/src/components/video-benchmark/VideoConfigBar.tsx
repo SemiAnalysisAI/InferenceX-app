@@ -23,9 +23,7 @@ const STRINGS = {
     chart: 'Chart config',
     model: 'Model',
     workload: 'Workload',
-    load: 'Load',
-    c1: 'C1 · one request per deployment',
-    all: 'C1 + C2/C4 queueing tails',
+    deployment: 'Deployment',
     x: 'X-axis metric',
     y: 'Y-axis metric',
     tier: 'Cost tier',
@@ -38,9 +36,7 @@ const STRINGS = {
     chart: '图表配置',
     model: '模型',
     workload: '工作负载',
-    load: '负载',
-    c1: 'C1 · 每个部署一个请求',
-    all: 'C1 + C2/C4 排队尾迹',
+    deployment: '部署',
     x: 'X 轴指标',
     y: 'Y 轴指标',
     tier: '成本档位',
@@ -52,19 +48,24 @@ const STRINGS = {
 
 /**
  * Two control panels mirroring the inference tab: what is being compared
- * (frozen for this campaign, so model and workload are single-option selects
- * that state the comparison rather than change it) and how it is plotted.
+ * (frozen for this campaign, so model, workload and the measured deployments
+ * are single-option selects that state the comparison rather than change it)
+ * and how it is plotted. Queued cells, optimal-only and the cross-hardware
+ * frontier are legend switches, as on the inference chart.
  */
 export default function VideoConfigBar({
   state,
   onChange,
   modelLabel,
   workloadLabel,
+  deploymentLabel,
 }: {
   state: VideoDashboardState;
   onChange: (patch: Partial<VideoDashboardState>) => void;
   modelLabel: string;
   workloadLabel: string;
+  /** Measured server layouts (GPUs per video and model split), stated rather than selectable. */
+  deploymentLabel: string;
 }) {
   const locale = useLocale();
   const s = STRINGS[locale];
@@ -89,13 +90,10 @@ export default function VideoConfigBar({
           options={[{ value: 'workload', label: workloadLabel }]}
         />
         <VideoSelect
-          label={s.load}
-          value={state.queue ? 'all' : 'c1'}
-          onValueChange={(value) => change('queue', value === 'all')}
-          options={[
-            { value: 'c1', label: s.c1 },
-            { value: 'all', label: s.all },
-          ]}
+          label={s.deployment}
+          value="deployment"
+          onValueChange={() => {}}
+          options={[{ value: 'deployment', label: deploymentLabel }]}
         />
       </ControlPanel>
       <ControlPanel legend={s.chart} className="sm:grid-cols-2 xl:grid-cols-4">

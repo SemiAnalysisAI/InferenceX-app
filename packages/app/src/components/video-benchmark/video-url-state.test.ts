@@ -15,7 +15,7 @@ describe('video dashboard URL state', () => {
   it('reads every supported param', () => {
     expect(
       readVideoDashboardState(
-        '?v_x=genSpeed&v_y=kjPerVideo&v_tier=r&v_basis=allocated&v_queue=1&v_opt=1&v_view=table',
+        '?v_x=genSpeed&v_y=kjPerVideo&v_tier=r&v_basis=allocated&v_queue=1&v_opt=1&v_frontier=1&v_view=table',
       ),
     ).toEqual({
       x: 'genSpeed',
@@ -24,6 +24,7 @@ describe('video dashboard URL state', () => {
       basis: 'allocated',
       queue: true,
       optimal: true,
+      frontier: true,
       view: 'table',
     });
   });

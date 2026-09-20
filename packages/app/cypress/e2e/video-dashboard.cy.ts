@@ -4,7 +4,12 @@ describe('Video hardware dashboard (E2E fixtures)', () => {
   it('leads with the cross-hardware chart and restores v_ params from the URL', () => {
     cy.visit('/video?v_y=kjPerVideo&v_tier=r&v_queue=1');
     cy.get('[data-testid="video-hardware-chart"] circle.point').should('have.length', 9);
-    cy.get('[data-testid="video-hardware-chart"] path.line-path').should('have.length', 3);
+    // Queued C2/C4 cells are markers only: no curve is drawn through them.
+    cy.get('[data-testid="video-hardware-chart"] path.line-path').should('have.length', 0);
+    cy.get('[data-testid="video-chart-caption"]').should(
+      'contain',
+      'One deployment measured per hardware',
+    );
     cy.get('[data-testid="video-chart-card"]')
       .should('contain', 'GPU-board energy per video (kJ)')
       .and('contain', 'Rent - 3 Year Commit');
