@@ -11,6 +11,18 @@ import {
 import { selectRunOverrides } from './run-override-selection';
 
 describe('run override selection', () => {
+  it('selects only the whole-run purge for the H200 Kimi-K3 simple-power run 34819961093', () => {
+    expect(selectRunOverrides(['--run-id', '34819961093', '--yes'])).toEqual({
+      runId: 34819961093,
+      conclusions: new Map(),
+      changelogs: [],
+      benchmarks: [],
+      purgedRuns: new Set([34819961093]),
+      purgedAttempts: new Map(),
+      purgedPoints: [],
+    });
+  });
+
   it('selects only the whole-run purge for run 34819564154', () => {
     expect(selectRunOverrides(['--run-id', '34819564154', '--yes'])).toEqual({
       runId: 34819564154,

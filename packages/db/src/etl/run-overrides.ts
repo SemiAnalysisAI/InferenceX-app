@@ -103,6 +103,7 @@ export const PURGED_RUNS: ReadonlySet<number> = new Set([
   35165441471, // 2026-09-19 | Reason: user-requested purge after reported Kimi K3 chart regression; suspected incomplete sweep remains unconfirmed
   34819578354, // 2026-09-19 | Reason: narrower than the curve it supersedes — this kimik3-fp4-h200-vllm-agentic-balanced sweep carries only the TP8/EP32/DPA offload=off arm (c1-c16), so ingesting it made 2026-09-19 the latest H200 date and hid the three-curve 2026-09-13 set (TP16/EP32 c1-c12, TP8/EP32 offload=off c1-c16, TP8/EP32 offload=on c8-c32). Its values match the superseded arm within +/-6%, so nothing is lost by dropping it; re-ingest once the full H200 curve set is collected (source run of the PR #3053 sweep-reuse ingest)
   34819564154, // 2026-09-19 | Reason: user-reported Kimi K3 GB300 chart regression and missing points compared with the pre-PowerX curve
+  34819961093, // 2026-09-19 | Reason: sibling of 34819578354 — this kimik3-fp4-h200-vllm-agentic-simple sweep (PR #3054, feat/kimik3-h200-simple-power) carries only the TP8/EP32/DPA offload=on arm (c8-c32, 13 points). Once 34819578354 was purged it became the latest H200 Kimi-K3 curve and kept hiding the three-arm 2026-09-13 set (35 points: TP16/EP32 c1-c12, TP8/EP32 offload=off c1-c16, TP8/EP32 offload=on c8-c32). Same vllm/vllm-openai:kimi-k3 image and recipe as the arm it duplicates, so no coverage is lost; re-ingest once the full H200 curve set is collected with measured power
 ]);
 
 export const PURGED_RUN_ATTEMPTS: ReadonlyMap<number, ReadonlySet<number>> = new Map([
