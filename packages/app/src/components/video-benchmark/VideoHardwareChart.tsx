@@ -73,7 +73,7 @@ const STRINGS = {
     noData: 'No hardware has both selected metrics for this configuration.',
   },
   zh: {
-    hull: '虚线连接 C1 下 Pareto 最优的硬件；点线尾迹为 batch-one 服务器上 C2/C4 客户端并发的表现：请求排队、吞吐量不变，它们是证据而不是前沿。',
+    hull: '虚线包络连接 C1 下 Pareto 最优的硬件；点线尾迹是 batch-one 服务器上 C2/C4 客户端并发的结果：请求排队、吞吐量基本持平，因此只是证据，不构成前沿。',
     controls: 'Shift+滚轮缩放，拖动平移，双击重置。点击数据点可固定详情。',
     n: '有效样本',
     run: '运行',
