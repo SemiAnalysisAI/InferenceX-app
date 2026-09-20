@@ -28,7 +28,7 @@ Engram 在标准 token embedding 之上增加了可学习的多 token 查表。�
   caption="来源：SemiAnalysis"
 />
 
-**Offload 为模型权重和 KV cache 释放 HBM，**可能支持更大的 batch 或更多并发会话。当 DRAM 成为下一个容量约束时，NVMe 可以再提供一层。推荐系统已经在较快内存中缓存高频或近期访问的 embedding 行，并把较冷的行存放在 SSD。[NVIDIA 调整路线图，将 Rubin Ultra 每芯片 HBM 从 1024GB 大幅下调到约 200GB 之后](https://semianalysis.com/accelerator-hbm-model/)，Engram 这类模型架构优化可能有所帮助。
+**Offload 为模型权重和 KV cache 释放 HBM**，可能支持更大的 batch 或更多并发会话。当 DRAM 成为下一个容量约束时，NVMe 可以再提供一层。推荐系统已经在较快内存中缓存高频或近期访问的 embedding 行，并把较冷的行存放在 SSD。[NVIDIA 调整路线图，将 Rubin Ultra 每芯片 HBM 从 1024GB 大幅下调到约 200GB 之后](https://semianalysis.com/accelerator-hbm-model/)，Engram 这类模型架构优化可能有所帮助。
 
 我们的 DeepSeek-V4.1-Flash 配置中，Engram 约占用 189 GiB 内存。我们将其替换为内存映射（mmap）文件，测量 offload 到 SSD 后的服务性能。
 
