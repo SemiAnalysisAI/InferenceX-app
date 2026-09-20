@@ -389,13 +389,15 @@ export const METRIC_REGISTRY = {
   // The per-second telemetry behind `measuredAvgPower`. The field aliases the
   // same average so the table view, availability panel, and share links keep
   // working; ChartDisplay swaps the scatter chart for `PowerTimeline`, which
-  // fetches each point's `gpu_metrics_*` artifact and draws the trace.
+  // fetches each point's `gpu_metrics_*` artifact and draws the trace. The
+  // label leads with "Measured Average Power", like the %TDP display, so a
+  // "Measured Power" search still finds only the family option.
   measuredPowerTimeline: {
     field: 'measuredPowerTimeline.y',
-    label: 'Measured Power per Chip over Time (W)',
-    labelZh: '每芯片实测功耗时间线（W）',
-    title: 'Measured Power per Chip over Time',
-    titleZh: '每芯片实测功耗时间线',
+    label: 'Measured Average Power per Chip over Time (W)',
+    labelZh: '每芯片实测平均功耗时间线（W）',
+    title: 'Measured Average Power per Chip over Time',
+    titleZh: '每芯片实测平均功耗时间线',
     polarity: 'lower',
   },
   // Power boundaries beyond GPU-measured telemetry (`lib/power-basis.ts`).

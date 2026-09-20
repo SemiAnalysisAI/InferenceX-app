@@ -175,7 +175,7 @@ function mountTimeline(
           chartId="power-timeline-test"
           data={data}
           overlayData={options.overlay}
-          yLabel="Measured Power per Chip over Time (W)"
+          yLabel="Measured Average Power per Chip over Time (W)"
         />
       </div>
     </PathnameContext.Provider>,
@@ -432,7 +432,7 @@ describe('PowerTimeline', () => {
       cy.get('path.power-trace[data-pool]').should('not.exist');
       cy.get('path.power-trace[data-hw="gb200"][data-segment="full"]').should('have.length', 8);
       cy.get(`.power-reference[data-reference="tdp"][data-watts="${GB200_TDP}"]`).should('exist');
-      cy.get('text').contains('Measured Power per Chip over Time (W)').should('exist');
+      cy.get('text').contains('Measured Average Power per Chip over Time (W)').should('exist');
     });
   });
 

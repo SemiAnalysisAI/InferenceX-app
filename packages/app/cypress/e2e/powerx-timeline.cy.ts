@@ -190,7 +190,7 @@ describe('PowerX measured power timeline', () => {
     assertShareLinkMetric('y_measuredPowerTimeline');
     cy.get('[data-testid="chart-figure"] h2').should(
       'contain.text',
-      'Measured Power per Chip over Time',
+      'Measured Average Power per Chip over Time',
     );
     cy.wait('@series').then(({ request }) => {
       const url = new URL(request.url);
@@ -232,7 +232,7 @@ describe('PowerX measured power timeline', () => {
     );
     cy.get('[data-testid="inference-table-view-btn"]').click();
     cy.get('[data-testid="inference-chart-display"] table').within(() => {
-      cy.contains('th', 'Measured Power per Chip over Time (W)').should('be.visible');
+      cy.contains('th', 'Measured Average Power per Chip over Time (W)').should('be.visible');
       cy.contains('td', '700').should('exist');
     });
   });
@@ -262,7 +262,7 @@ describe('PowerX measured power timeline', () => {
   it('translates the display option and chart on /zh/inference', () => {
     visitChart({ path: '/zh/inference', extraParams: '&i_metric=y_measuredPowerTimeline' });
     cy.wait('@series');
-    cy.get('[data-testid="chart-figure"] h2').should('contain.text', '每芯片实测功耗时间线');
+    cy.get('[data-testid="chart-figure"] h2').should('contain.text', '每芯片实测平均功耗时间线');
     cy.get('[data-testid="measured-power-display"]').should('contain.text', '时间线');
     cy.get('[data-testid="power-timeline-toolbar"]').should('contain.text', '时间轴');
   });
