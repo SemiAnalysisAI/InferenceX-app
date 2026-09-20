@@ -4,7 +4,6 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button';
 import { Heading } from '@/components/ui/heading';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Switch } from '@/components/ui/switch';
 import { track } from '@/lib/analytics';
 import { useLocale } from '@/lib/use-locale';
 import {
@@ -12,7 +11,6 @@ import {
   compareMetrics,
   compareSide,
   pairCases,
-  type CasePair,
   type CompareRow,
   type CompareSide,
 } from './compare';
@@ -44,18 +42,11 @@ const STRINGS = {
     baseline: 'Baseline',
     candidate: 'Candidate',
     swap: 'Swap sides',
-    blind: 'Blind mode',
-    blindHint: 'Hide which hardware is which until you reveal it.',
-    reveal: 'Reveal hardware',
-    hidden: { baseline: 'A', candidate: 'B' },
     needTwo: 'Comparison needs at least two measured hardware.',
     metrics: 'Metric deltas',
-    metricsHidden: 'Metric deltas are hidden in blind mode; reveal the hardware to see them.',
     metric: 'Metric',
     change: 'Change',
-    assumptions: (tier: string, basis: string) => `Cost tier: ${tier} · GPU basis: ${basis}.`,
-    participating: 'participating GPUs',
-    allocated: 'allocated GPUs',
+    assumptions: (tier: string) => `Cost tier: ${tier}.`,
     better: 'Candidate better',
     worse: 'Candidate worse',
     neutral: 'No difference',
@@ -70,7 +61,6 @@ const STRINGS = {
     caseOf: (i: number, n: number) => `Case ${i} of ${n}`,
     prev: 'Previous case',
     next: 'Next case',
-    case: 'Case (prompt · seed)',
     playBoth: 'Play both',
     pauseBoth: 'Pause both',
     restart: 'Restart both',
@@ -90,18 +80,11 @@ const STRINGS = {
     baseline: '基线',
     candidate: '候选',
     swap: '交换两侧',
-    blind: '盲测模式',
-    blindHint: '揭晓前隐藏两侧各是哪种硬件。',
-    reveal: '揭晓硬件',
-    hidden: { baseline: 'A', candidate: 'B' },
     needTwo: '至少需要两种已实测的硬件才能对比。',
     metrics: '指标差异',
-    metricsHidden: '盲测模式下隐藏指标差异，揭晓硬件后显示。',
     metric: '指标',
     change: '变化',
-    assumptions: (tier: string, basis: string) => `成本档位：${tier} · GPU 口径：${basis}。`,
-    participating: '参与计算的 GPU',
-    allocated: '已分配的 GPU',
+    assumptions: (tier: string) => `成本档位：${tier}。`,
     better: '候选更优',
     worse: '候选更差',
     neutral: '无差异',
@@ -116,7 +99,6 @@ const STRINGS = {
     caseOf: (i: number, n: number) => `第 ${i} / ${n} 个用例`,
     prev: '上一个用例',
     next: '下一个用例',
-    case: '用例（prompt · seed）',
     playBoth: '同时播放',
     pauseBoth: '同时暂停',
     restart: '从头同时播放',
@@ -139,16 +121,6 @@ const CHIP = {
   worse: 'border-red-600/40 bg-red-500/10 text-red-700 dark:text-red-300',
   neutral: 'border-border text-muted-foreground',
 } as const;
-
-const excerpt = (prompt: string, max = 60) =>
-  prompt.length > max ? `${prompt.slice(0, max).trimEnd()}…` : prompt;
-
-function caseLabel(pair: CasePair, repeated: boolean): string {
-  const parts = [pair.prompt === null ? (pair.caseId ?? '—') : excerpt(pair.prompt)];
-  if (pair.seed !== null) parts.push(`seed ${pair.seed}`);
-  if (repeated) parts.push(`#${pair.repetition + 1}`);
-  return parts.join(' · ');
-}
 
 /** The stored artifact of one side, or null when the deployment publishes no media (HTTP 204). */
 async function fetchSide(point: VideoPoint, signal: AbortSignal): Promise<CompareSide | null> {
@@ -198,7 +170,7 @@ function ClipPlaceholders() {
 
 /**
  * Arena-style baseline vs candidate: the same prompt and seed from both CI runs
- * play side by side (blind mode hides which hardware is which), with the metric
+ * play side by side, with the metric
  * deltas between each hardware's lead deployment below. Media is fetched once
  * the panel scrolls into view, one stored artifact per side.
  */
@@ -214,7 +186,6 @@ export default function VideoCompare({
   const locale = useLocale();
   const s = STRINGS[locale];
   const headingId = useId();
-  const blindId = useId();
   const sectionRef = useRef<HTMLElement | null>(null);
   const videos = useRef<Record<Role, HTMLVideoElement | null>>({ baseline: null, candidate: null });
   const [selection, setSelection] = useState<VideoCompareSelection>(
@@ -225,8 +196,6 @@ export default function VideoCompare({
   const [failure, setFailure] = useState<{ key: string; message: string } | null>(null);
   const [failedMedia, setFailedMedia] = useState<ReadonlySet<string>>(() => new Set());
   const [visible, setVisible] = useState(false);
-  const [blind, setBlind] = useState(false);
-  const [revealedFor, setRevealedFor] = useState<string | null>(null);
   const request = useRef(0);
   const download = useRef<AbortController | null>(null);
   useEffect(() => {
@@ -276,12 +245,9 @@ export default function VideoCompare({
     value: point.hardwareKey ?? '',
     label: hardwareLabel(point.hardwareKey ?? ''),
   }));
-  const masked = blind && revealedFor !== `${pairKey}:${index}`;
   const sideOf = { baseline, candidate } as Record<Role, VideoPoint | null>;
-  const paneLabel = (role: Role) =>
-    masked ? s.hidden[role] : hardwareLabel(sideOf[role]?.hardwareKey ?? '');
-  const paneColor = (role: Role) =>
-    masked ? 'var(--muted-foreground)' : colorFor(sideOf[role]?.hardwareKey ?? '');
+  const paneLabel = (role: Role) => hardwareLabel(sideOf[role]?.hardwareKey ?? '');
+  const paneColor = (role: Role) => colorFor(sideOf[role]?.hardwareKey ?? '');
 
   const update = (patch: Partial<VideoCompareSelection>) => {
     const next = { ...selection, ...patch };
@@ -371,13 +337,6 @@ export default function VideoCompare({
     });
     track('video_compare_playback', { action });
   };
-  const reveal = () => {
-    setRevealedFor(`${pairKey}:${index}`);
-    track('video_compare_revealed', {
-      baseline: baseline?.hardwareKey ?? null,
-      candidate: candidate?.hardwareKey ?? null,
-    });
-  };
 
   return (
     <section
@@ -386,30 +345,11 @@ export default function VideoCompare({
       data-testid="video-compare"
       aria-labelledby={headingId}
     >
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <Heading as="h2" level="card" id={headingId}>
-            {s.title}
-          </Heading>
-          <p className="mt-1 max-w-4xl text-xs text-muted-foreground">{s.subtitle}</p>
-        </div>
-        <label
-          htmlFor={blindId}
-          className="flex shrink-0 items-center gap-2 text-xs"
-          title={s.blindHint}
-        >
-          <Switch
-            id={blindId}
-            checked={blind}
-            onCheckedChange={(checked) => {
-              setBlind(checked);
-              setRevealedFor(null);
-              track('video_compare_blind_toggled', { value: String(checked) });
-            }}
-            data-testid="video-compare-blind"
-          />
-          <span>{s.blind}</span>
-        </label>
+      <div>
+        <Heading as="h2" level="card" id={headingId}>
+          {s.title}
+        </Heading>
+        <p className="mt-1 max-w-4xl text-xs text-muted-foreground">{s.subtitle}</p>
       </div>
       <fieldset
         disabled={measured.length < 2}
@@ -521,11 +461,9 @@ export default function VideoCompare({
                               {label}
                             </span>
                             <span className="text-muted-foreground">· {s[role]}</span>
-                            {!masked && (
-                              <span className="text-muted-foreground">
-                                · {layoutLabel(point, locale)}
-                              </span>
-                            )}
+                            <span className="text-muted-foreground">
+                              · {layoutLabel(point, locale)}
+                            </span>
                             {record.seconds !== null && (
                               <span className="tabular-nums text-muted-foreground">
                                 · {s.timeToVideo}{' '}
@@ -564,57 +502,33 @@ export default function VideoCompare({
                       );
                     })}
                   </div>
-                  <div className="flex flex-wrap items-end gap-2">
-                    <div className="flex flex-wrap gap-2" role="group" aria-label={s.playBoth}>
-                      <Button
-                        type="button"
-                        size="sm"
-                        onClick={() => playback('play')}
-                        data-testid="video-compare-play"
-                      >
-                        {s.playBoth}
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => playback('pause')}
-                        data-testid="video-compare-pause"
-                      >
-                        {s.pauseBoth}
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => playback('restart')}
-                        data-testid="video-compare-restart"
-                      >
-                        {s.restart}
-                      </Button>
-                      {masked && (
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          size="sm"
-                          onClick={reveal}
-                          data-testid="video-compare-reveal"
-                        >
-                          {s.reveal}
-                        </Button>
-                      )}
-                    </div>
-                    <div className="min-w-0 flex-1 sm:max-w-md">
-                      <VideoSelect
-                        label={s.case}
-                        value={String(index)}
-                        onValueChange={(value) => goTo(Number(value))}
-                        options={pairs.map((pair, i) => ({
-                          value: String(i),
-                          label: caseLabel(pair, repeated.has(pair.key)),
-                        }))}
-                      />
-                    </div>
+                  <div className="flex flex-wrap gap-2" role="group" aria-label={s.playBoth}>
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={() => playback('play')}
+                      data-testid="video-compare-play"
+                    >
+                      {s.playBoth}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => playback('pause')}
+                      data-testid="video-compare-pause"
+                    >
+                      {s.pauseBoth}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => playback('restart')}
+                      data-testid="video-compare-restart"
+                    >
+                      {s.restart}
+                    </Button>
                   </div>
                   {(matched.unmatched.baseline > 0 || matched.unmatched.candidate > 0) && (
                     <p
@@ -650,71 +564,62 @@ export default function VideoCompare({
               <ClipPlaceholders />
             )}
           </div>
-          {masked ? (
-            <p className="text-xs text-muted-foreground" data-testid="video-compare-metrics-hidden">
-              {s.metricsHidden}
-            </p>
-          ) : (
-            <div className="space-y-2">
-              <h3 className="text-sm font-medium">{s.metrics}</h3>
-              <div className="overflow-x-auto">
-                <table
-                  className="w-full min-w-xl text-left text-sm"
-                  data-testid="video-compare-table"
-                >
-                  <thead className="text-xs text-muted-foreground">
-                    <tr>
-                      <th scope="col" className="px-3 py-2 font-medium">
-                        {s.metric}
+          <div className="space-y-2">
+            <h3 className="text-sm font-medium">{s.metrics}</h3>
+            <div className="overflow-x-auto">
+              <table
+                className="w-full min-w-xl text-left text-sm"
+                data-testid="video-compare-table"
+              >
+                <thead className="text-xs text-muted-foreground">
+                  <tr>
+                    <th scope="col" className="px-3 py-2 font-medium">
+                      {s.metric}
+                    </th>
+                    {ROLES.map((role) => (
+                      <th
+                        key={role}
+                        scope="col"
+                        className="px-3 py-2 font-medium"
+                        data-testid={`video-compare-${role}`}
+                      >
+                        <span className="inline-flex items-center gap-1.5 text-foreground">
+                          <span
+                            className="size-2.5 shrink-0 rounded-full"
+                            style={{ backgroundColor: paneColor(role) }}
+                          />
+                          {paneLabel(role)}
+                          <span className="font-normal text-muted-foreground">· {s[role]}</span>
+                        </span>
                       </th>
-                      {ROLES.map((role) => (
-                        <th
-                          key={role}
-                          scope="col"
-                          className="px-3 py-2 font-medium"
-                          data-testid={`video-compare-${role}`}
-                        >
-                          <span className="inline-flex items-center gap-1.5 text-foreground">
-                            <span
-                              className="size-2.5 shrink-0 rounded-full"
-                              style={{ backgroundColor: paneColor(role) }}
-                            />
-                            {paneLabel(role)}
-                            <span className="font-normal text-muted-foreground">· {s[role]}</span>
-                          </span>
-                        </th>
-                      ))}
-                      <th scope="col" className="px-3 py-2 font-medium">
-                        {s.change}
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="tabular-nums">
-                    {rows.map((row) => (
-                      <tr key={row.id} className="border-t" data-metric={row.id}>
-                        <th scope="row" className="px-3 py-2 font-normal text-muted-foreground">
-                          {locale === 'zh'
-                            ? VIDEO_METRICS[row.id].labelZh
-                            : VIDEO_METRICS[row.id].label}
-                        </th>
-                        <td className="px-3 py-2">{formatMetric(row.baseline, row.id)}</td>
-                        <td className="px-3 py-2">{formatMetric(row.candidate, row.id)}</td>
-                        <td className="px-3 py-2">
-                          <DeltaChip row={row} s={s} />
-                        </td>
-                      </tr>
                     ))}
-                  </tbody>
-                </table>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {s.assumptions(
-                  TIER_LABELS[options.tier][locale],
-                  options.basis === 'allocated' ? s.allocated : s.participating,
-                )}
-              </p>
+                    <th scope="col" className="px-3 py-2 font-medium">
+                      {s.change}
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="tabular-nums">
+                  {rows.map((row) => (
+                    <tr key={row.id} className="border-t" data-metric={row.id}>
+                      <th scope="row" className="px-3 py-2 font-normal text-muted-foreground">
+                        {locale === 'zh'
+                          ? VIDEO_METRICS[row.id].labelZh
+                          : VIDEO_METRICS[row.id].label}
+                      </th>
+                      <td className="px-3 py-2">{formatMetric(row.baseline, row.id)}</td>
+                      <td className="px-3 py-2">{formatMetric(row.candidate, row.id)}</td>
+                      <td className="px-3 py-2">
+                        <DeltaChip row={row} s={s} />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-          )}
+            <p className="text-xs text-muted-foreground">
+              {s.assumptions(TIER_LABELS[options.tier][locale])}
+            </p>
+          </div>
           <p className="text-xs text-muted-foreground">{s.footnote}</p>
         </>
       )}

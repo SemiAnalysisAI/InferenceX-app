@@ -103,14 +103,6 @@ describe('concurrencyPlateau', () => {
     expect(row('b200', 4)?.throughputRatioVsC1).toBeCloseTo(1.0144, 3);
     expect(row('b200', 4)?.latencyRatioVsC1).toBeCloseTo(3.9423, 3);
   });
-  it('switches the throughput denominator with the basis without moving the ratios', () => {
-    const rows = concurrencyPlateau(points, 'allocated');
-    const h100 = rows.filter((r) => r.hardwareKey === 'h100');
-    expect(h100[0].videosPerGpuHour).toBeCloseTo(2.687, 3);
-    expect(h100[2].throughputRatioVsC1).toBeCloseTo(0.9989, 3);
-    // H200 allocated 4 of 4, so its denominator is unchanged.
-    expect(rows.find((r) => r.hardwareKey === 'h200')?.videosPerGpuHour).toBeCloseTo(5.973, 3);
-  });
   it('leaves ratios null without a C1 baseline and never reports 0', () => {
     const rows = concurrencyPlateau(
       points.filter((p) => !(p.hardwareKey === 'h200' && p.concurrency === 1)),

@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { zeroAnchoredDomain } from './chart-domain';
 
-// Profit per GPU-hour for the retained H100/H200/B200 C1 cells at $0.034/video-s
-// (cypress/fixtures/api/video-history.json, asserted per point in metrics.test.ts):
-// every hardware loses money at the 3-year rental tier ($2.00/$2.90/$3.70 GPU-hr)
-// on the participating basis, while on the allocated basis at the hyperscaler
-// tier only H200 stays positive.
+// Every Y metric the chart plots today is positive-only, but the helper stays
+// sign-agnostic (chart-domain.ts), so two signed samples keep the shapes it must
+// still handle: an all-negative set and a mixed-sign set, sized like $/GPU-hr
+// margins of the retained H100/H200/B200 C1 cells. VIDEOS_PER_DOLLAR is their
+// hyperscaler-tier videos per $1 TCO (cypress/fixtures/api/video-history.json,
+// asserted per point in metrics.test.ts).
 const RENTAL_LOSSES = [-0.5382, -1.2753, -0.5649];
 const ALLOCATED_HYPERSCALER = [-0.4391, 0.4047, -0.16];
 // Videos per $1 TCO at the hyperscaler tier: H100, H200, B200.

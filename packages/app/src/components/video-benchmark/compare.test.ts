@@ -19,7 +19,7 @@ import type { StoredArtifact, StoredSource } from './stored';
 // Retained H100/H200/B200 C1/C2/C4 observations of the 2026-09-09 campaign.
 const points = videoPoints([history as unknown as VideoHistoryPage]);
 const c1 = (key: string) => comparablePoints(points).find((p) => p.hardwareKey === key)!;
-const opts = { tier: 'h', basis: 'participating' } as const;
+const opts = { tier: 'h' } as const;
 const row = (rows: ReturnType<typeof compareMetrics>, id: string) =>
   rows.find((item) => item.id === id)!;
 
@@ -84,43 +84,28 @@ describe('comparablePoints', () => {
 });
 
 describe('compareMetrics', () => {
-  it('reads B200 against H100 at C1: faster, cheaper, less energy, closer to its cap', () => {
+  it('reads B200 against H100 at C1: faster, cheaper and less energy per video', () => {
     const rows = compareMetrics(c1('h100'), c1('b200'), opts);
-    expect(rows.map((r) => r.id)).toEqual([
-      'p50Latency',
-      'p90Latency',
-      'videosPerGpuHour',
-      'videosPerDollar',
-      'dollarsPerVideo',
-      'kjPerVideo',
-      'powerPctCap',
-    ]);
+    expect(rows.map((r) => r.id)).toEqual(['p50Latency', 'dollarsPerVideo', 'kjPerVideo']);
     const p50 = row(rows, 'p50Latency');
     expect(p50.baseline).toBeCloseTo(167.33, 2);
     expect(p50.candidate).toBeCloseTo(77.94, 2);
     expect(p50.ratio).toBeCloseTo(0.4658, 3);
     expect(p50.deltaPercent).toBeCloseTo(-53.42, 1);
     expect(p50.candidateBetter).toBe(true);
-    expect(row(rows, 'p90Latency').ratio).toBeCloseTo(0.4659, 3);
-    const rate = row(rows, 'videosPerGpuHour');
-    expect(rate.baseline).toBeCloseTo(5.374, 3);
-    expect(rate.candidate).toBeCloseTo(11.526, 3);
-    expect(rate.ratio).toBeCloseTo(2.1447, 3);
-    expect(rate.candidateBetter).toBe(true);
+    // Hyperscaler tier: $1.17 / 5.374 and $1.73 / 11.526 videos per participating GPU-hour.
     const cost = row(rows, 'dollarsPerVideo');
     expect(cost.baseline).toBeCloseTo(0.2177, 4);
     expect(cost.candidate).toBeCloseTo(0.1501, 4);
+    expect(cost.ratio).toBeCloseTo(0.6894, 3);
     expect(cost.deltaPercent).toBeCloseTo(-31.06, 1);
     expect(cost.candidateBetter).toBe(true);
-    expect(row(rows, 'videosPerDollar').deltaPercent).toBeCloseTo(45.05, 1);
     const energy = row(rows, 'kjPerVideo');
     expect(energy.baseline).toBeCloseTo(431.1, 1);
     expect(energy.candidate).toBeCloseTo(301.1, 1);
+    expect(energy.ratio).toBeCloseTo(0.6983, 3);
+    expect(energy.deltaPercent).toBeCloseTo(-30.17, 1);
     expect(energy.candidateBetter).toBe(true);
-    const power = row(rows, 'powerPctCap');
-    expect(power.baseline).toBeCloseTo(91.95, 2);
-    expect(power.candidate).toBeCloseTo(96.4, 2);
-    expect(power.candidateBetter).toBe(true);
   });
   it('flips the verdict when the slower hardware is the candidate', () => {
     const rows = compareMetrics(c1('b200'), c1('h200'), opts);
@@ -129,8 +114,8 @@ describe('compareMetrics', () => {
     expect(row(rows, 'dollarsPerVideo').candidateBetter).toBe(false);
   });
   it('propagates missing inputs as null and treats equal values as neither better', () => {
-    const noPower = { ...c1('b200'), energyKj: null, enforcedLimitW: null, samples: 5 };
-    const rows = compareMetrics(c1('h100'), noPower, opts);
+    const unmeasured = { ...c1('b200'), energyKj: null, wallSeconds: null, samples: 5 };
+    const rows = compareMetrics(c1('h100'), unmeasured, opts);
     expect(row(rows, 'kjPerVideo')).toEqual({
       id: 'kjPerVideo',
       baseline: c1('h100').energyKj,
@@ -139,21 +124,41 @@ describe('compareMetrics', () => {
       deltaPercent: null,
       candidateBetter: null,
     });
-    expect(row(rows, 'powerPctCap').candidate).toBeNull();
-    expect(row(rows, 'p90Latency').candidate).toBeNull();
-    expect(row(rows, 'p50Latency').ratio).not.toBeNull();
+    expect(row(rows, 'dollarsPerVideo')).toMatchObject({
+      baseline: expect.closeTo(0.2177, 4),
+      candidate: null,
+      ratio: null,
+      candidateBetter: null,
+    });
+    // P50 has no sample floor, unlike P90 in the run views.
+    expect(row(rows, 'p50Latency').ratio).toBeCloseTo(0.4658, 3);
+    // A zero baseline has no ratio either.
+    expect(
+      row(compareMetrics({ ...c1('h100'), p50: 0 }, c1('b200'), opts), 'p50Latency'),
+    ).toMatchObject({
+      baseline: 0,
+      candidate: expect.closeTo(77.94, 2),
+      ratio: null,
+      deltaPercent: null,
+      candidateBetter: null,
+    });
     for (const same of compareMetrics(c1('h100'), c1('h100'), opts)) {
       expect(same.ratio).toBe(1);
       expect(same.deltaPercent).toBe(0);
       expect(same.candidateBetter).toBeNull();
     }
   });
-  it('moves only the cost rows with the tier and GPU basis', () => {
-    const rows = compareMetrics(c1('h100'), c1('b200'), { tier: 'r', basis: 'allocated' });
-    // H100 8 allocated: 2.00 / 2.687 videos per GPU-hr; B200 8 allocated: 3.70 / 5.763.
-    expect(row(rows, 'dollarsPerVideo').baseline).toBeCloseTo(0.7443, 3);
-    expect(row(rows, 'dollarsPerVideo').candidate).toBeCloseTo(0.642, 3);
-    expect(row(rows, 'videosPerGpuHour').baseline).toBeCloseTo(2.687, 3);
+  it('moves only the cost row with the tier', () => {
+    const rows = compareMetrics(c1('h100'), c1('b200'), { tier: 'r' });
+    // Rental $2.00 / 5.374 and $3.70 / 11.526 videos per GPU-hour, still per participating GPU.
+    const cost = row(rows, 'dollarsPerVideo');
+    expect(cost.baseline).toBeCloseTo(0.3722, 3);
+    expect(cost.candidate).toBeCloseTo(0.321, 3);
+    expect(cost.ratio).toBeCloseTo(0.8626, 3);
+    expect(cost.candidateBetter).toBe(true);
+    const atHyperscaler = compareMetrics(c1('h100'), c1('b200'), opts);
+    expect(row(rows, 'p50Latency')).toEqual(row(atHyperscaler, 'p50Latency'));
+    expect(row(rows, 'kjPerVideo')).toEqual(row(atHyperscaler, 'kjPerVideo'));
     expect(row(rows, 'p50Latency').ratio).toBeCloseTo(0.4658, 3);
     expect(row(rows, 'kjPerVideo').ratio).toBeCloseTo(0.6984, 3);
   });

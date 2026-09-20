@@ -56,19 +56,12 @@ const RUNS_SECTION_PARAMS = [
 const CSV_METRICS: readonly MetricId[] = [
   'p50Latency',
   'p90Latency',
-  'genSpeed',
   'videosPerGpuHour',
-  'videoSecondsPerGpuHour',
   'videosPerDollar',
   'dollarsPerVideo',
-  'dollarsPerVideoSecond',
   'kjPerVideo',
-  'videosPerKwh',
   'powerPctCap',
   'apiPricePerVideo',
-  'revenuePerGpuHour',
-  'profitPerGpuHour',
-  'apiPriceMultiple',
 ];
 
 const STRINGS = {
@@ -83,9 +76,10 @@ const STRINGS = {
     badges: 'TCO $/chip/hr',
     source: 'Source',
     apiReference: 'API reference',
-    queue: 'Show queued requests (C2/C4)',
-    optimal: 'Optimal only',
-    frontier: 'Pareto frontier',
+    idle: (list: string) =>
+      `Per participating GPU: ${list} reserved more boards than one video uses; the idle boards are not counted.`,
+    idleItem: (hardware: string, used: number, reserved: number) =>
+      `${hardware} (${used} of ${reserved})`,
     deployments: (n: number) => `${n} deployments`,
     runs: 'Runs, videos & evidence',
     runsHint: 'Per-run results, generated clips, fidelity checks and the performance history list.',
@@ -109,9 +103,10 @@ const STRINGS = {
     badges: 'TCO $/chip/hr',
     source: '来源',
     apiReference: 'API 参考价',
-    queue: '显示排队请求（C2/C4）',
-    optimal: '仅最优',
-    frontier: 'Pareto 前沿',
+    idle: (list: string) =>
+      `按参与计算的 GPU 计：${list}预留的板卡多于单条视频所需，空闲板卡未计入。`,
+    idleItem: (hardware: string, used: number, reserved: number) =>
+      `${hardware}（${used} / ${reserved} 张）`,
     deployments: (n: number) => `${n} 种部署`,
     runs: '运行、视频与证据',
     runsHint: '按运行查看结果、生成的视频、保真度检查以及性能历史列表。',
@@ -180,11 +175,11 @@ export default function VideoDashboard() {
     () =>
       new Map(
         hardwareKeys.flatMap((key) => {
-          const point = leadCell(cells, key, { tier: state.tier, basis: state.basis });
+          const point = leadCell(cells, key, { tier: state.tier });
           return point ? [[key, point] as const] : [];
         }),
       ),
-    [cells, hardwareKeys, state.tier, state.basis],
+    [cells, hardwareKeys, state.tier],
   );
   const lead = measured.values().next().value ?? cells[0];
   const layouts = [
@@ -199,6 +194,12 @@ export default function VideoDashboard() {
   const otherWorkloads = new Set(cells.map((p) => p.workload.split(' · ').slice(0, 5).join(' · ')))
     .size;
   const workloadSuffix = otherWorkloads > 1 ? s.workloads(otherWorkloads - 1) : '';
+  // Jobs that reserved a whole node but generated on part of it: say so beside the per-GPU numbers.
+  const idle = [...measured.values()]
+    .filter(
+      (p) => p.participating !== null && p.allocated !== null && p.allocated > p.participating,
+    )
+    .map((p) => s.idleItem(hardwareLabel(p.hardwareKey ?? ''), p.participating!, p.allocated!));
 
   const legendItems = VIDEO_HARDWARE_ROSTER.map(({ key, unavailable }) => {
     const point = measured.get(key);
@@ -226,7 +227,7 @@ export default function VideoDashboard() {
   });
 
   const exportCsv = () => {
-    const rows = videoTableRows(points, state, hidden);
+    const rows = videoTableRows(points, hidden);
     const header = [
       'hardware',
       'concurrency',
@@ -238,7 +239,6 @@ export default function VideoDashboard() {
       'tp_size',
       'ulysses_degree',
       'replicas',
-      'queued',
       ...CSV_METRICS.map((id) => `${id} (${VIDEO_METRICS[id].unit})`),
       'board_power_w',
       'enforced_limit_w',
@@ -257,7 +257,6 @@ export default function VideoDashboard() {
         p.server?.tp ?? null,
         p.server?.ulysses ?? null,
         p.replicas,
-        isQueueing(p) ? 1 : 0,
         ...CSV_METRICS.map((id) => metricValue(p, id, options)),
         p.avgPowerW,
         p.enforcedLimitW,
@@ -273,7 +272,7 @@ export default function VideoDashboard() {
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement('a');
     anchor.href = url;
-    anchor.download = `videogenx-${state.y}-vs-${state.x}-${state.tier}-${state.basis}.csv`;
+    anchor.download = `videogenx-${state.y}-vs-${state.x}-${state.tier}.csv`;
     anchor.click();
     URL.revokeObjectURL(url);
   };
@@ -358,6 +357,11 @@ export default function VideoDashboard() {
                 </a>
               </span>
             </p>
+            {idle.length > 0 && (
+              <p className="mt-1 text-xs text-muted-foreground" data-testid="video-idle-note">
+                {s.idle(idle.join(locale === 'zh' ? '、' : ', '))}
+              </p>
+            )}
           </div>
           {replay && (
             <p className="text-xs text-muted-foreground" role="status" data-testid="video-replay">
@@ -403,35 +407,6 @@ export default function VideoDashboard() {
                   isLegendExpanded={legendExpanded}
                   onExpandedChange={setLegendExpanded}
                   disableActiveSort
-                  switches={[
-                    {
-                      id: 'video-queue',
-                      label: s.queue,
-                      checked: state.queue,
-                      onCheckedChange: (checked) => {
-                        update({ queue: checked });
-                        track('video_queue_changed', { value: String(checked) });
-                      },
-                    },
-                    {
-                      id: 'video-optimal',
-                      label: s.optimal,
-                      checked: state.optimal,
-                      onCheckedChange: (checked) => {
-                        update({ optimal: checked });
-                        track('video_optimal_changed', { value: String(checked) });
-                      },
-                    },
-                    {
-                      id: 'video-frontier',
-                      label: s.frontier,
-                      checked: state.frontier,
-                      onCheckedChange: (checked) => {
-                        update({ frontier: checked });
-                        track('video_frontier_changed', { value: String(checked) });
-                      },
-                    },
-                  ]}
                 />
               </div>
             </div>
@@ -442,7 +417,7 @@ export default function VideoDashboard() {
       {!loading && !error && (
         <>
           <VideoCompare points={points} options={options} colorFor={colorFor} />
-          <VideoEvidence points={points} options={options} colorFor={colorFor} />
+          <VideoEvidence points={points} colorFor={colorFor} />
         </>
       )}
       <details

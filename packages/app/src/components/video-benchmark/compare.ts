@@ -14,12 +14,8 @@ import { storedBundle, type StoredArtifact, type StoredSource } from './stored';
 /** Metrics the compare table shows, in row order. */
 export const COMPARE_METRICS = [
   'p50Latency',
-  'p90Latency',
-  'videosPerGpuHour',
-  'videosPerDollar',
   'dollarsPerVideo',
   'kjPerVideo',
-  'powerPctCap',
 ] as const satisfies readonly MetricId[];
 export type CompareMetricId = (typeof COMPARE_METRICS)[number];
 
@@ -37,13 +33,13 @@ export interface CompareRow {
 
 /**
  * One cell a reader can pick per registry hardware: its most efficient
- * non-queued deployment (chip basis) with a P50. Queued cells never qualify.
+ * non-queued deployment (per participating GPU) with a P50. Queued cells never qualify.
  */
 export function comparablePoints(points: VideoPoint[]): VideoPoint[] {
   const cells = latestVideoCells(points);
   const keys = [...new Set(cells.flatMap((p) => (p.hardwareKey === null ? [] : [p.hardwareKey])))];
   return keys.flatMap((key) => {
-    const lead = leadCell(cells, key, { tier: 'h', basis: 'participating' });
+    const lead = leadCell(cells, key, { tier: 'h' });
     return lead && lead.p50 !== null ? [lead] : [];
   });
 }

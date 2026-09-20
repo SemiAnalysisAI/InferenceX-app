@@ -15,7 +15,7 @@ const COLORS: Record<string, string> = {
   b200: 'rgb(70, 80, 90)',
 };
 const colorFor = (key: string) => COLORS[key] ?? 'rgb(0, 0, 0)';
-const OWNING_PARTICIPATING: MetricOptions = { tier: 'h', basis: 'participating' };
+const OWNING: MetricOptions = { tier: 'h' };
 
 const mediaUrl = (point: VideoPoint) =>
   `/api/video-runs?run=${point.runId}&artifact=${point.artifactId}&format=media`;
@@ -32,7 +32,7 @@ function mount(
   pathname = '/video',
   search = '',
   data: VideoPoint[] = points,
-  options: MetricOptions = OWNING_PARTICIPATING,
+  options: MetricOptions = OWNING,
   beforeMount?: () => void,
 ) {
   media(c1('h100'), 'NVIDIA H100 80GB HBM3', 'h100');
@@ -76,37 +76,67 @@ describe('Video compare panel (retained fixture)', () => {
     clip('candidate').should('contain', 'B200').find('video').should('exist');
     cy.get('[data-testid="video-compare-baseline"]').should('contain', 'H100');
     cy.get('[data-testid="video-compare-candidate"]').should('contain', 'B200');
+    // Exactly three delta rows: time to video, TCO cost per video and energy per video.
+    table()
+      .find('tbody tr')
+      .should(($rows) => {
+        expect([...$rows].map((el) => el.dataset.metric)).to.deep.equal([
+          'p50Latency',
+          'dollarsPerVideo',
+          'kjPerVideo',
+        ]);
+      });
     metricRow('p50Latency')
       .should('contain', '167.3')
       .and('contain', '77.9')
       .and('contain', '-53.4%');
     metricRow('p50Latency').find('[data-tone="better"]').should('exist');
+    // $1.17 ÷ 5.3741 videos/GPU-hr vs. $1.73 ÷ 11.526, both per participating GPU.
     metricRow('dollarsPerVideo')
       .should('contain', '$0.218')
       .and('contain', '$0.150')
       .and('contain', '-31.1%');
-    metricRow('powerPctCap').find('[data-tone="better"]').should('exist');
+    metricRow('kjPerVideo')
+      .should('contain', '431.1')
+      .and('contain', '301.1')
+      .and('contain', '-30.2%');
+    metricRow('kjPerVideo').find('[data-tone="better"]').should('exist');
+    cy.contains('[data-testid="video-compare"] p', 'Cost tier:').should(
+      'have.text',
+      'Cost tier: Owning at Large Hyperscaler Volume.',
+    );
     cy.get('[data-testid="video-compare"]')
-      .should('contain', 'Owning at Large Hyperscaler Volume')
-      .and('contain', 'retained CI outputs');
+      .should('contain', 'retained CI outputs')
+      .and('not.contain', 'GPU basis');
+    // Arena only: no blind mode and no case dropdown, just the two hardware selects.
+    cy.get('[data-testid="video-compare-blind"]').should('not.exist');
+    cy.get('[data-testid="video-compare-controls"] [role="combobox"]').should(($boxes) => {
+      expect([...$boxes].map((el) => el.getAttribute('aria-label'))).to.deep.equal([
+        'Baseline',
+        'Candidate',
+      ]);
+    });
     cy.get('@h200.all').should('have.length', 0);
   });
-  it('steps through cases with the arrows and the select, keeping v_case in the URL', () => {
+  it('steps through cases with the arrows, keeping v_case in the URL', () => {
     mount();
     cy.wait(['@h100', '@b200']);
     cy.get('[data-testid="video-compare-prev"]').should('be.disabled');
+    cy.get('[role="combobox"][aria-label="Case (prompt · seed)"]').should('not.exist');
     cy.get('[data-testid="video-compare-next"]').click();
     cy.get('[data-testid="video-compare-clip"] video').each(($video) =>
       expect($video.attr('src')).to.include('measurement-r002-c001.mp4'),
     );
+    cy.get('[data-testid="video-compare-case-of"]').should('contain', 'Case 2 of');
     cy.location('search').should('contain', 'v_case=1');
-    pick('Case (prompt · seed)', '#3');
+    cy.get('[data-testid="video-compare-next"]').click();
     cy.get('[data-testid="video-compare-clip"] video').each(($video) =>
       expect($video.attr('src')).to.include('measurement-r003-c001.mp4'),
     );
     cy.get('[data-testid="video-compare-case-of"]').should('contain', 'Case 3 of');
     cy.location('search').should('contain', 'v_case=2');
     cy.get('[data-testid="video-compare-prev"]').click();
+    cy.get('[data-testid="video-compare-case-of"]').should('contain', 'Case 2 of');
     cy.location('search').should('contain', 'v_case=1');
   });
   it('drives both players together', () => {
@@ -123,23 +153,6 @@ describe('Video compare panel (retained fixture)', () => {
     cy.get('[data-testid="video-compare-restart"]').click();
     cy.get('@play').should('have.callCount', 4);
   });
-  it('hides which hardware is which in blind mode until revealed', () => {
-    mount();
-    cy.wait(['@h100', '@b200']);
-    cy.get('[data-testid="video-compare-blind"]').click();
-    cy.get('[data-testid="video-compare-pane-label"]').should(($labels) => {
-      expect([...$labels].map((el) => el.textContent)).to.deep.equal(['A', 'B']);
-    });
-    clip('baseline').should('not.contain', 'H100').and('contain', 'time to video 120 s');
-    cy.get('[data-testid="video-compare-table"]').should('not.exist');
-    cy.get('[data-testid="video-compare-metrics-hidden"]').should('exist');
-    cy.get('[data-testid="video-compare-reveal"]').click();
-    cy.get('[data-testid="video-compare-pane-label"]').first().should('contain', 'H100');
-    cy.get('[data-testid="video-compare-table"]').should('exist');
-    // The next case is blind again.
-    cy.get('[data-testid="video-compare-next"]').click();
-    cy.get('[data-testid="video-compare-pane-label"]').first().should('have.text', 'A');
-  });
   it('switches the candidate, fetching only the new side, and swaps on collision or request', () => {
     mount();
     cy.wait(['@h100', '@b200']);
@@ -148,7 +161,8 @@ describe('Video compare panel (retained fixture)', () => {
     cy.get('[data-testid="video-compare-candidate"]').should('contain', 'H200');
     clip('candidate').should('contain', 'H200');
     metricRow('p50Latency').should('contain', '150.6').and('contain', '-10%');
-    metricRow('dollarsPerVideo').should('contain', '$0.204');
+    metricRow('dollarsPerVideo').should('contain', '$0.204').and('contain', '-6.2%');
+    metricRow('kjPerVideo').should('contain', '411').and('contain', '-4.7%');
     cy.location('search').should('contain', 'v_cand=h200');
     cy.get('@h100.all').should('have.length', 1);
     cy.get('@h200.all').should('have.length', 1);
@@ -156,14 +170,14 @@ describe('Video compare panel (retained fixture)', () => {
     pick('Candidate', 'H100');
     cy.get('[data-testid="video-compare-baseline"]').should('contain', 'H200');
     cy.get('[data-testid="video-compare-candidate"]').should('contain', 'H100');
-    metricRow('p50Latency').find('[data-tone="worse"]').should('exist');
+    metricRow('p50Latency').should('contain', '+11.1%').find('[data-tone="worse"]').should('exist');
     cy.get('[data-testid="video-compare-swap"]').click();
     cy.get('[data-testid="video-compare-baseline"]').should('contain', 'H100');
     cy.get('[data-testid="video-compare-candidate"]').should('contain', 'H200');
     cy.get('@h200.all').should('have.length', 1);
   });
   it('restores v_base and v_cand from the URL and reports a failed media read with a retry', () => {
-    mount('/video', '?v_base=h200&v_cand=h100', points, OWNING_PARTICIPATING, () => {
+    mount('/video', '?v_base=h200&v_cand=h100', points, OWNING, () => {
       cy.intercept('GET', mediaUrl(c1('h200')), { statusCode: 404, body: { error: 'gone' } }).as(
         'missing',
       );
@@ -177,7 +191,7 @@ describe('Video compare panel (retained fixture)', () => {
     cy.contains('button', 'Retry').should('exist');
   });
   it('says when a run publishes no clips and keeps the metric deltas', () => {
-    mount('/video', '', points, OWNING_PARTICIPATING, () => {
+    mount('/video', '', points, OWNING, () => {
       cy.intercept('GET', mediaUrl(c1('b200')), { statusCode: 204 }).as('unpublished');
     });
     cy.wait(['@h100', '@unpublished']);
@@ -202,16 +216,20 @@ describe('Video compare panel (retained fixture)', () => {
     cy.get('[data-testid="video-compare-table"]').should('not.exist');
   });
   it('renders Chinese copy on /zh/video', () => {
-    mount('/zh/video', '', points, { tier: 'r', basis: 'allocated' });
+    mount('/zh/video', '', points, { tier: 'r' });
     cy.wait(['@h100', '@b200']);
     cy.get('[data-testid="video-compare"]')
       .should('contain', '基线')
       .and('contain', '候选')
       .and('contain', '同时播放')
-      .and('contain', '盲测模式')
-      .and('contain', '租赁 - 3 年承诺')
-      .and('contain', '已分配的 GPU');
+      .and('contain', '成本档位：租赁 - 3 年承诺。');
     metricRow('p50Latency').should('contain', 'P50 出片时间');
+    // Rent - 3 Year Commit: $2.00 ÷ 5.3741 vs. $3.70 ÷ 11.526 per participating GPU-hour.
+    metricRow('dollarsPerVideo')
+      .should('contain', '每条视频 TCO 成本')
+      .and('contain', '$0.372')
+      .and('contain', '$0.321');
+    metricRow('kjPerVideo').should('contain', '每条视频 GPU 板卡能耗');
     cy.get('[data-testid="video-compare-case-of"]').should('contain', '第 1 /');
     clip('baseline').should('contain', '出片时间 120 s');
   });

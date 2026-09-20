@@ -13,21 +13,16 @@ const CARD_METRICS = [
   'p50Latency',
   'videosPerGpuHour',
   'dollarsPerVideo',
-  'apiPricePerVideo',
-  'profitPerGpuHour',
   'kjPerVideo',
-  'powerPctCap',
 ] as const satisfies readonly MetricId[];
 const STRINGS = {
   en: {
     p50Latency: 'P50 time to video (s)',
     videosPerGpuHour: 'Videos / GPU-hr',
     dollarsPerVideo: 'TCO / video',
-    apiPricePerVideo: 'API $/video',
-    profitPerGpuHour: 'Profit / GPU-hr',
     kjPerVideo: 'kJ / video',
-    powerPctCap: 'Board power / limit',
     p90: 'P90',
+    api: 'API list',
     gpus: 'GPUs',
     of: 'of',
     unavailable: 'Not measured',
@@ -37,11 +32,9 @@ const STRINGS = {
     p50Latency: 'P50 出片时间（s）',
     videosPerGpuHour: '视频数 / GPU 小时',
     dollarsPerVideo: 'TCO / 条视频',
-    apiPricePerVideo: 'API 标价 / 条视频',
-    profitPerGpuHour: '利润 / GPU 小时',
     kjPerVideo: 'kJ / 条视频',
-    powerPctCap: '板卡功率 / 上限',
     p90: 'P90',
+    api: 'API 标价',
     gpus: '张 GPU',
     of: '/',
     unavailable: '未测得',
@@ -49,7 +42,11 @@ const STRINGS = {
   },
 };
 
-/** One card per campaign hardware, showing its most efficient deployment; hardware without a valid run says so instead of vanishing. */
+/**
+ * One card per campaign hardware on its most efficient deployment: time to
+ * video, output per GPU-hour, TCO cost per video beside the API list price,
+ * and energy per video. Hardware without a valid run says so instead of vanishing.
+ */
 export default function VideoKpiCards({
   points,
   state,
@@ -66,6 +63,15 @@ export default function VideoKpiCards({
   const s = STRINGS[locale];
   const options = metricOptions(state);
   const cells = latestVideoCells(points);
+  const secondary = (point: VideoPoint, id: (typeof CARD_METRICS)[number]) => {
+    if (id === 'p50Latency')
+      return `${s.p90} ${formatMetric(metricValue(point, 'p90Latency', options), 'p90Latency')}`;
+    if (id === 'dollarsPerVideo') {
+      const api = metricValue(point, 'apiPricePerVideo', options);
+      return api === null ? null : `${s.api} ${formatMetric(api, 'apiPricePerVideo')}`;
+    }
+    return null;
+  };
   return (
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" data-testid="video-kpi-cards">
       {VIDEO_HARDWARE_ROSTER.map(({ key, unavailable }) => {
@@ -96,21 +102,22 @@ export default function VideoKpiCards({
               </div>
             ) : point ? (
               <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
-                {CARD_METRICS.map((id) => (
-                  <div key={id} className="contents">
-                    <dt className="text-muted-foreground">{s[id]}</dt>
-                    <dd className="text-right font-medium tabular-nums">
-                      {formatMetric(metricValue(point, id, options), id)}
-                      {id === 'powerPctCap' && metricValue(point, id, options) !== null && '%'}
-                      {id === 'p50Latency' && (
-                        <span className="ml-1 text-2xs font-normal text-muted-foreground">
-                          {s.p90}{' '}
-                          {formatMetric(metricValue(point, 'p90Latency', options), 'p90Latency')}
-                        </span>
-                      )}
-                    </dd>
-                  </div>
-                ))}
+                {CARD_METRICS.map((id) => {
+                  const note = secondary(point, id);
+                  return (
+                    <div key={id} className="contents">
+                      <dt className="text-muted-foreground">{s[id]}</dt>
+                      <dd className="text-right font-medium tabular-nums">
+                        {formatMetric(metricValue(point, id, options), id)}
+                        {note && (
+                          <span className="ml-1 text-2xs font-normal text-muted-foreground">
+                            {note}
+                          </span>
+                        )}
+                      </dd>
+                    </div>
+                  );
+                })}
               </dl>
             ) : (
               <p className="text-xs text-muted-foreground" data-testid="video-kpi-unavailable">
