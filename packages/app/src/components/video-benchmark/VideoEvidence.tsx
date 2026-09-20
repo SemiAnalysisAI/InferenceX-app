@@ -197,6 +197,7 @@ const CELL = 'border-t border-border/40 py-1.5 pr-3';
 
 export interface VideoEvidenceProps {
   points: VideoPoint[];
+  /** Shared with the sibling panels; only `basis` is read, since nothing here is priced. */
   options: MetricOptions;
   colorFor: (hardwareKey: string) => string;
 }
