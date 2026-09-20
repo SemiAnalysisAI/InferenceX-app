@@ -129,8 +129,8 @@ describe('mapEvalRow', () => {
     expect(cfg.prefillEp).toBe(2);
     expect(cfg.decodeTp).toBe(4);
     expect(cfg.decodeEp).toBe(2);
-    expect(cfg.numPrefillGpu).toBe(4);
-    expect(cfg.numDecodeGpu).toBe(4);
+    expect(cfg.numPrefillGpu).toBe(8);
+    expect(cfg.numDecodeGpu).toBe(8);
   });
 
   it('uses v2 prefill_*/decode_* when present on meta_env', () => {
@@ -346,8 +346,8 @@ describe('mapAggEvalRow', () => {
 
     expect(result!.config.prefillTp).toBe(4);
     expect(result!.config.prefillEp).toBe(2);
-    expect(result!.config.numPrefillGpu).toBe(4);
-    expect(result!.config.numDecodeGpu).toBe(4);
+    expect(result!.config.numPrefillGpu).toBe(8);
+    expect(result!.config.numDecodeGpu).toBe(8);
   });
 
   it('sets isMultinode to false when row omits it', () => {
@@ -685,30 +685,20 @@ describe('evaluation and benchmark allocation identity', () => {
     );
   });
 
-  it('uses legacy PP/PCP allocation without multiplying EP or DCP', () => {
-    const meta = makeMeta({ tp: 2, ep: 2, pp: 2, pcp_size: 3, dcp_size: 2, dp_attention: true });
-    const mapped = mapEvalRow(meta, makeResults(), createSkipTracker())[0];
-    expect(mapped.config).toMatchObject({
-      numPrefillGpu: 12,
-      numDecodeGpu: 12,
-      prefillEp: 2,
-      prefillDpAttn: true,
+  it.each([
+    { fields: {}, expectedGpu: 4 },
+    { fields: { num_gpus: 2 }, expectedGpu: 2 },
+  ])('preserves legacy flat benchmark pairing with $fields', ({ fields, expectedGpu }) => {
+    const meta = makeMeta({ tp: 2, ep: 2, ...fields });
+    const tracker = createSkipTracker();
+    const benchmark = mapBenchmarkRow({ ...meta, tput_per_gpu: 1000 }, tracker)!;
+    const individual = mapEvalRow(meta, makeResults(), tracker)[0];
+    const aggregate = mapAggEvalRow({ ...meta, task: 'gsm8k', em_strict: 0.97 }, tracker)!;
+    expect(individual.config).toMatchObject({
+      numPrefillGpu: expectedGpu,
+      numDecodeGpu: expectedGpu,
     });
-  });
-
-  it('prefers explicit legacy role counts over the aggregate total', () => {
-    const meta = makeMeta({ tp: 2, ep: 2, num_gpus: 16, num_prefill_gpu: 6, num_decode_gpu: 6 });
-    expect(mapEvalRow(meta, makeResults(), createSkipTracker())[0].config).toMatchObject({
-      numPrefillGpu: 6,
-      numDecodeGpu: 6,
-    });
-  });
-
-  it('keeps explicit legacy aggregate GPU counts authoritative', () => {
-    const meta = makeMeta({ tp: 2, ep: 2, pp: 2, num_gpus: 16 });
-    expect(mapEvalRow(meta, makeResults(), createSkipTracker())[0].config).toMatchObject({
-      numPrefillGpu: 16,
-      numDecodeGpu: 16,
-    });
+    expect(configCacheKey(individual.config)).toBe(configCacheKey(benchmark.config));
+    expect(configCacheKey(aggregate.config)).toBe(configCacheKey(benchmark.config));
   });
 });

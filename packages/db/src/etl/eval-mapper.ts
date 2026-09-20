@@ -220,7 +220,7 @@ export function mapAggEvalRow(
 }
 
 /** Match InferenceX Parallelism.gpus_per_worker: EP, DCP and DP attention share GPUs. */
-function evalGpusPerWorker(src: Record<string, any>, tp: number, prefix = ''): number {
+function evalGpusPerWorker(src: Record<string, any>, tp: number, prefix: string): number {
   const pp = parseInt2(src[`${prefix}pp`]) ?? 1;
   const pcp = parseInt2(src[`${prefix}pcp_size`]) ?? 1;
   return tp * pp * pcp;
@@ -289,14 +289,9 @@ function buildEvalConfig(
     decodeDpAttn = dpAttn;
     prefillNumWorkers = 0;
     decodeNumWorkers = 0;
-    numPrefillGpu =
-      roleChipCount(src.num_prefill_gpu) ??
-      physicalChipCount(src.num_gpus) ??
-      evalGpusPerWorker(src, tp);
-    numDecodeGpu =
-      roleChipCount(src.num_decode_gpu) ??
-      physicalChipCount(src.num_gpus) ??
-      evalGpusPerWorker(src, tp);
+    // Preserve the legacy flat benchmark mapper's identity until explicit counts exist.
+    numPrefillGpu = physicalChipCount(src.num_gpus) ?? tp * ep;
+    numDecodeGpu = physicalChipCount(src.num_gpus) ?? tp * ep;
   }
 
   const explicitDisagg = parseOptionalBool(src.disagg);
