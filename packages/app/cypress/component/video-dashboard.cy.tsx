@@ -150,6 +150,20 @@ describe('Video hardware dashboard (retained fixture)', () => {
     kpi('h100').should('contain', '-$0.44');
     kpi('b200').should('contain', '-$0.16');
   });
+  it('caps the y axis at break-even when every hardware loses money at the rental tier', () => {
+    mount('/video', '?v_y=profitPerGpuHour&v_tier=r');
+    // $0.034/video-s on the participating basis against $2.00/$2.90/$3.70 GPU-hr: H100 −$0.54, H200 −$1.28, B200 −$0.56.
+    points().should('have.length', 3);
+    kpi('h100').should('contain', '-$0.54');
+    kpi('h200').should('contain', '-$1.28');
+    kpi('b200').should('contain', '-$0.56');
+    cy.get('[data-testid="video-hardware-chart"] .y-axis .tick text').should(($ticks) => {
+      const values = [...$ticks].map((el) => Number((el.textContent ?? '').replace('−', '-')));
+      // Regression: a zero ceiling used to fall back to 1, leaving the top half of the canvas empty.
+      expect(Math.max(...values)).to.equal(0);
+      expect(Math.min(...values)).to.be.below(-1.2);
+    });
+  });
   it('shows placeholders while loading instead of a false "Not measured"', () => {
     cy.intercept('GET', '/api/video-runs?format=history&page=1', (req) => {
       req.reply({ fixture: 'api/video-history.json', delay: 800 });

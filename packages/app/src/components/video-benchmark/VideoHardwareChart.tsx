@@ -6,6 +6,7 @@ import type { ContinuousScale } from '@/lib/d3-chart/types';
 import { CHART_TYPE, px } from '@/lib/d3-chart/typography';
 import { useLocale } from '@/lib/use-locale';
 import { escapeHtml } from '@/lib/utils';
+import { zeroAnchoredDomain } from './chart-domain';
 import { layoutLabel } from './deployment';
 import { formatMetric, metricLabel, type VideoPoint } from './metrics';
 import { plotVideoPoints, type PlottedVideoPoint } from './plot';
@@ -110,8 +111,16 @@ export default function VideoHardwareChart({
       .attr('pointer-events', 'none')
       .text(pointLabel);
   };
-  const maxX = Math.max(0, ...plotted.map((p) => p.x));
-  const maxY = Math.max(0, ...plotted.map((p) => p.y));
+  const xDomain = zeroAnchoredDomain(
+    plotted.map((p) => p.x),
+    1.12,
+  );
+  // Profit per GPU-hour goes negative when the API price misses the tier cost: those
+  // points stay on the canvas, and when every hardware loses money the top is break-even.
+  const yDomain = zeroAnchoredDomain(
+    plotted.map((p) => p.y),
+    1.15,
+  );
   const caption = [
     multiLayout ? s.multi : s.single(layouts || '—'),
     state.frontier ? (global.length > 1 ? s.global : s.globalOne) : null,
@@ -126,8 +135,8 @@ export default function VideoHardwareChart({
       margin={{ top: 20, right: 28, bottom: 80, left: 85 }}
       watermark="logo"
       transitionDuration={0}
-      xScale={{ type: 'linear', domain: [0, maxX * 1.12 || 1], nice: true }}
-      yScale={{ type: 'linear', domain: [0, maxY * 1.15 || 1], nice: true }}
+      xScale={{ type: 'linear', domain: xDomain, nice: true }}
+      yScale={{ type: 'linear', domain: yDomain, nice: true }}
       xAxis={{ label: xLabel, tickCount: 6 }}
       yAxis={{ label: yLabel, tickCount: 6 }}
       layers={[
