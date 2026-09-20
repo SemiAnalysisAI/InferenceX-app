@@ -23,6 +23,19 @@
  */
 
 import fs from 'fs';
+import { receiptFromEnvironment, publicationFromEnvironment } from './lib/measurement-receipt';
+import {
+  prepareReceiptIngestInputs,
+  assertReceiptIngestMode,
+  completeReceiptIngest,
+  ingestReceiptEvaluations,
+  type ReceiptIngestInputs,
+} from './etl/receipt-ingest';
+import { prepareReceiptArtifacts } from './lib/receipt-artifact-preparation';
+import {
+  claimMeasurementSnapshot,
+  assertLegacySnapshotUnclaimed,
+} from './etl/measurement-snapshot';
 import { createHash } from 'node:crypto';
 import {
   powerPublicationPoint,
@@ -97,6 +110,7 @@ const DEFAULT_REPO = 'SemiAnalysisAI/InferenceX';
 const powerPublicationPoints = new Map<string, PowerPublicationPoint>();
 const powerPublicationErrors: string[] = [];
 const tracker = createSkipTracker();
+const measurementReceipt = receiptFromEnvironment();
 const isDownloadMode = process.argv[2] === '--download';
 
 let artifactsDir: string;
@@ -160,42 +174,49 @@ if (isDownloadMode) {
   console.log(`  Repo:   ${REPO}`);
   console.log(`\n--- Downloading artifacts to ${artifactsDir} ---`);
 
-  // Retried configs produce artifacts on multiple runners — keep only the
-  // most recent per logical name (see RUNNER_SUFFIX_RE in github-artifacts)
-  // so a failed attempt's empty metrics can't overwrite the good one via
-  // ON CONFLICT DO UPDATE.
-  const artifacts = listRunArtifacts(REPO, runIdStr);
-  const byLogical = dedupeArtifactsByLogicalName(artifacts);
-  // Server-log artifacts from eval and benchmark jobs can share a logical
-  // config but differ by runner suffix. Keep the exact server-log sibling for
-  // each selected bmk artifact instead of letting latest-created eval logs win.
-  for (const [key, artifact] of byLogical) {
-    if (
-      artifact.name.startsWith('server_logs_') ||
-      artifact.name.startsWith('multinode_server_logs_')
-    ) {
-      byLogical.delete(key);
+  if (measurementReceipt) {
+    if (measurementReceipt.repository !== REPO || measurementReceipt.source_run_id !== runIdStr)
+      throw new Error('Receipt source differs from requested run');
+    prepareReceiptArtifacts(measurementReceipt, artifactsDir);
+    runAttemptNum = measurementReceipt.source_attempt;
+  } else {
+    // Retried configs produce artifacts on multiple runners — keep only the
+    // most recent per logical name (see RUNNER_SUFFIX_RE in github-artifacts)
+    // so a failed attempt's empty metrics can't overwrite the good one via
+    // ON CONFLICT DO UPDATE.
+    const artifacts = listRunArtifacts(REPO, runIdStr);
+    const byLogical = dedupeArtifactsByLogicalName(artifacts);
+    // Server-log artifacts from eval and benchmark jobs can share a logical
+    // config but differ by runner suffix. Keep the exact server-log sibling for
+    // each selected bmk artifact instead of letting latest-created eval logs win.
+    for (const [key, artifact] of byLogical) {
+      if (
+        artifact.name.startsWith('server_logs_') ||
+        artifact.name.startsWith('multinode_server_logs_')
+      ) {
+        byLogical.delete(key);
+      }
     }
-  }
-  const selectedBenchmarkNames = new Set(
-    [...byLogical.values()]
-      .filter((artifact) => artifact.name.startsWith('bmk_'))
-      .map((artifact) => artifact.name),
-  );
-  for (const pair of pairServerLogArtifacts(artifacts)) {
-    if (selectedBenchmarkNames.has(pair.benchmarks.name)) {
-      byLogical.set(`server-log:${pair.serverLogs.name}`, pair.serverLogs);
+    const selectedBenchmarkNames = new Set(
+      [...byLogical.values()]
+        .filter((artifact) => artifact.name.startsWith('bmk_'))
+        .map((artifact) => artifact.name),
+    );
+    for (const pair of pairServerLogArtifacts(artifacts)) {
+      if (selectedBenchmarkNames.has(pair.benchmarks.name)) {
+        byLogical.set(`server-log:${pair.serverLogs.name}`, pair.serverLogs);
+      }
     }
+
+    for (const artifact of byLogical.values()) {
+      console.log(`  ${artifact.name}`);
+      downloadArtifact(artifact, artifactsDir);
+    }
+
+    console.log(`\n  Downloaded ${byLogical.size} artifact(s)`);
+
+    runAttemptNum = fetchRunAttempt(REPO, runIdStr);
   }
-
-  for (const artifact of byLogical.values()) {
-    console.log(`  ${artifact.name}`);
-    downloadArtifact(artifact, artifactsDir);
-  }
-
-  console.log(`\n  Downloaded ${byLogical.size} artifact(s)`);
-
-  runAttemptNum = fetchRunAttempt(REPO, runIdStr);
 } else {
   // CI mode — read from env vars
   for (const key of [
@@ -229,6 +250,18 @@ const reusedIngestMetadata = readReusedIngestMetadata(artifactsDir);
 if (reusedIngestMetadata) {
   runIdStr = reusedIngestMetadata.sourceRunId;
   runAttemptNum = reusedIngestMetadata.sourceRunAttempt;
+}
+
+let receiptInputs: ReceiptIngestInputs | null = null;
+if (measurementReceipt) {
+  if (
+    measurementReceipt.repository !== REPO ||
+    measurementReceipt.source_run_id !== runIdStr ||
+    measurementReceipt.source_attempt !== runAttemptNum
+  )
+    throw new Error('Receipt source/attempt differs from ingest request');
+  publicationFromEnvironment(measurementReceipt, requestedRunIdStr);
+  receiptInputs = prepareReceiptIngestInputs(measurementReceipt, artifactsDir, tracker);
 }
 
 const runIdNum = parseInt(runIdStr, 10);
@@ -341,9 +374,6 @@ async function main(): Promise<void> {
   if (requiredPowerPoints.length > 0)
     console.log(`  Required power: ${requiredPowerPoints.length} source benchmark points verified`);
 
-  await preloadConfigs();
-  console.log(`  ${configCache.size} configs preloaded`);
-
   if (!fs.existsSync(artifactsDir)) {
     throw new Error(`Artifacts directory does not exist: ${artifactsDir}`);
   }
@@ -406,8 +436,15 @@ async function main(): Promise<void> {
   }
   const appendOnly = hasAppendOnlyFlag(changelogs);
   const evalsOnly = hasEvalsOnlyFlag(changelogs);
+  if (receiptInputs) assertReceiptIngestMode(receiptInputs, evalsOnly);
   if (evalsOnly && requiredPowerPoints.length > 0)
     throw new Error('Required power: benchmark scope cannot be published as an evals-only run');
+
+  await (measurementReceipt
+    ? claimMeasurementSnapshot(sql, measurementReceipt)
+    : assertLegacySnapshotUnclaimed(sql, REPO, runIdStr, runAttemptNum));
+  await preloadConfigs();
+  console.log(`  ${configCache.size} configs preloaded`);
 
   const workflowRunId = await getOrCreateWorkflowRun({
     githubRunId: runId,
@@ -466,6 +503,7 @@ async function main(): Promise<void> {
 
   console.log('\n--- Benchmark Results ---');
   const retainedPowerPoints: BenchmarkParams[] = [];
+  const persistedReceiptBenchmarks = new Map<string, number>();
   if (evalsOnly) {
     console.log('  Skipped (evals-only run)');
   } else {
@@ -506,7 +544,10 @@ async function main(): Promise<void> {
       );
     }
 
-    const allBmkFiles = [...bmkFiles, ...allBmkDirs.flatMap((d) => findJsonFiles(d))];
+    const allBmkFiles = receiptInputs?.benchmarkFiles ?? [
+      ...bmkFiles,
+      ...allBmkDirs.flatMap((d) => findJsonFiles(d)),
+    ];
     const seenPointIdentities = new Map<string, string>();
     console.log(`  Found ${allBmkFiles.length} benchmark JSON file(s)`);
 
@@ -620,6 +661,7 @@ async function main(): Promise<void> {
           );
           totalNewBmk += newCount;
           totalDupBmk += dupCount;
+          if (receiptInputs) persistedReceiptBenchmarks.set(file, insertedIds.length);
           if (requiredPowerPoints.length > 0) retainedPowerPoints.push(...toInsert);
 
           // Build availability only after successful insert
@@ -855,8 +897,20 @@ async function main(): Promise<void> {
   // `metrics`. Samples then attach to the resolved row id.
 
   console.log('\n--- Eval Results ---');
+  if (receiptInputs) {
+    const result = await ingestReceiptEvaluations(
+      sql,
+      receiptInputs,
+      getOrCreateConfig,
+      workflowRunId,
+      date,
+    );
+    totalEvals += result.newEvals;
+    totalSamples += result.newSamples;
+    totalSampleFiles += result.sampleFiles;
+  }
   const evalDir = path.join(artifactsDir, ARTIFACT_NAMES.evals);
-  const evalFiles = findJsonFiles(evalDir);
+  const evalFiles = receiptInputs ? [] : findJsonFiles(evalDir);
 
   for (const file of evalFiles) {
     const data = readJson(file);
@@ -881,17 +935,18 @@ async function main(): Promise<void> {
   // Per-config eval dirs (`eval_*`) — same on-disk shape as the eval ZIPs
   // handled by `ingest-gcs-backup.ts`, but already unzipped. Each dir holds
   // one config's meta_env.json, results JSON, and samples JSONL.
-  const perConfigEvalDirs = fs.existsSync(artifactsDir)
-    ? fs
-        .readdirSync(artifactsDir)
-        .filter(
-          (d) =>
-            d.startsWith('eval_') &&
-            !d.startsWith(ARTIFACT_NAMES.evals) &&
-            fs.statSync(path.join(artifactsDir, d)).isDirectory(),
-        )
-        .map((d) => path.join(artifactsDir, d))
-    : [];
+  const perConfigEvalDirs =
+    !receiptInputs && fs.existsSync(artifactsDir)
+      ? fs
+          .readdirSync(artifactsDir)
+          .filter(
+            (d) =>
+              d.startsWith('eval_') &&
+              !d.startsWith(ARTIFACT_NAMES.evals) &&
+              fs.statSync(path.join(artifactsDir, d)).isDirectory(),
+          )
+          .map((d) => path.join(artifactsDir, d))
+      : [];
 
   if (perConfigEvalDirs.length > 0) {
     console.log(`  Found ${perConfigEvalDirs.length} per-config eval dir(s)`);
@@ -1030,7 +1085,11 @@ async function main(): Promise<void> {
     );
   }
 
-  await refreshLatestBenchmarks(sql);
+  if (measurementReceipt && Object.values(tracker.skips).some((count) => count > 0))
+    throw new Error('Accepted snapshot ingestion skipped required input');
+  await (measurementReceipt && receiptInputs
+    ? completeReceiptIngest(sql, measurementReceipt, receiptInputs, persistedReceiptBenchmarks)
+    : refreshLatestBenchmarks(sql));
 
   console.log('\n=== ingest-ci-run complete ===');
   console.log('  Invalidate API cache: bun run admin:cache:invalidate');

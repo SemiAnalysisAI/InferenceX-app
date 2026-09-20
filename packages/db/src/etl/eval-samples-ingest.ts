@@ -4,7 +4,7 @@
  */
 
 import type postgres from 'postgres';
-import type { EvalSampleParams } from './eval-samples-mapper';
+import { projectEvalSamples, type EvalSampleParams } from './eval-samples-mapper';
 
 type Sql = ReturnType<typeof postgres>;
 
@@ -29,9 +29,7 @@ export async function bulkIngestEvalSamples(
   if (samples.length === 0) return { newCount: 0 };
 
   // Dedupe within the batch on doc_id to avoid ON CONFLICT collisions in one statement.
-  const seen = new Map<number, EvalSampleParams>();
-  for (const s of samples) seen.set(s.docId, s);
-  const deduped = [...seen.values()];
+  const deduped = projectEvalSamples(samples);
 
   let newCount = 0;
   for (let i = 0; i < deduped.length; i += CHUNK_SIZE) {

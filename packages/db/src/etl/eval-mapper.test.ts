@@ -598,3 +598,45 @@ describe('mapAggEvalRow', () => {
     expect(result!.conc).toBeNull();
   });
 });
+
+describe('single-node aggregate deployment contract', () => {
+  it.each([8, 4])('maps both readers to one physical %i-GPU serving role', (gpus) => {
+    const deployment = { kind: 'aggregate', nodes: 1, serving_gpus: gpus, tp: gpus, ep: 1 };
+    const topology = {
+      deployment,
+      disagg: false,
+      is_multinode: false,
+      prefill_tp: gpus,
+      decode_tp: gpus,
+      prefill_num_workers: 1,
+      decode_num_workers: 1,
+    };
+    const detail = mapEvalRow(makeMeta(topology), makeResults(), createSkipTracker())[0];
+    const aggregate = mapAggEvalRow(makeAggRow(topology), createSkipTracker())!;
+    for (const row of [detail, aggregate]) {
+      expect(row.config).toMatchObject({
+        disagg: false,
+        isMultinode: false,
+        prefillNumWorkers: 0,
+        decodeNumWorkers: 0,
+        numPrefillGpu: gpus,
+        numDecodeGpu: gpus,
+        prefillTp: gpus,
+        decodeTp: gpus,
+      });
+    }
+    expect(configCacheKey(detail.config)).toBe(configCacheKey(aggregate.config));
+  });
+  it('rejects a contradictory explicit deployment before mapping', () => {
+    expect(() =>
+      mapEvalRow(
+        makeMeta({
+          deployment: { kind: 'aggregate', nodes: 1, serving_gpus: 8, tp: 8, ep: 1 },
+          disagg: true,
+        }),
+        makeResults(),
+        createSkipTracker(),
+      ),
+    ).toThrow('Invalid single-node aggregate');
+  });
+});

@@ -4,6 +4,9 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 
+import { receiptFromEnvironment, publicationFromEnvironment } from './lib/measurement-receipt';
+import { prepareReceiptArtifacts } from './lib/receipt-artifact-preparation';
+
 import { buildArtifactPlan } from './lib/ci-artifact-preparation.js';
 import { downloadArtifact, listRunArtifacts, type ArtifactMeta } from './lib/github-artifacts.js';
 
@@ -33,6 +36,8 @@ function fetchRunMetadata(repo: string, runId: string): GithubRunMetadata {
 }
 
 function downloadWithRetries(artifact: ArtifactMeta, artifactsPath: string, attempt = 1): void {
+  if (!/^[A-Za-z0-9_.-]+$/u.test(artifact.name) || ['.', '..'].includes(artifact.name))
+    throw new Error('Unsafe legacy artifact display name');
   const zipPath = path.join(artifactsPath, 'artifact.zip');
   const artifactPath = path.join(artifactsPath, artifact.name);
   try {
@@ -107,6 +112,63 @@ function main(): void {
   );
   const repo = process.env.INGEST_REPO ?? DEFAULT_REPO;
   const artifactsPath = process.env.ARTIFACTS_PATH ?? path.resolve('artifacts');
+
+  const receipt = receiptFromEnvironment();
+  if (receipt) {
+    if (receipt.repository !== repo || receipt.source_run_id !== sourceRunId)
+      throw new Error('Receipt source differs from requested source');
+    const publication = publicationFromEnvironment(receipt, mergeRunId);
+    if (dryRun) {
+      console.log(
+        `Verified receipt ${receipt.receipt_id}; ${receipt.artifacts.length} immutable artifacts`,
+      );
+      return;
+    }
+    fs.mkdirSync(artifactsPath, { recursive: true });
+    if (fs.readdirSync(artifactsPath).length > 0) throw new Error('ARTIFACTS_PATH must be empty');
+    prepareReceiptArtifacts(receipt, artifactsPath);
+    let mergeAttempt = receipt.source_attempt;
+    if (publication) {
+      const metadata = JSON.parse(
+        execFileSync(
+          'gh',
+          ['api', `repos/${repo}/actions/artifacts/${publication.changelog_artifact_id}`],
+          { encoding: 'utf8' },
+        ),
+      ) as ArtifactMeta;
+      if (
+        metadata.id !== publication.changelog_artifact_id ||
+        metadata.name !== 'changelog-metadata' ||
+        String(metadata.workflow_run?.id) !== mergeRunId ||
+        metadata.digest !== `sha256:${publication.changelog_artifact_sha256}`
+      )
+        throw new Error('Publication changelog mismatch');
+      downloadArtifact(metadata, artifactsPath, {
+        repo,
+        sha256: publication.changelog_artifact_sha256,
+      });
+      const merge = fetchRunMetadata(repo, mergeRunId);
+      mergeAttempt = merge.run_attempt ?? 1;
+      if (merge.head_sha !== publication.merge_sha)
+        throw new Error('Publication merge revision mismatch');
+      writeReuseMetadata(
+        artifactsPath,
+        sourceRunId,
+        mergeRunId,
+        { head_sha: receipt.source_head_sha, run_attempt: receipt.source_attempt },
+        merge,
+      );
+    }
+    writeOutputs({
+      'source-run-id': sourceRunId,
+      'source-run-attempt': receipt.source_attempt,
+      'merge-run-id': mergeRunId,
+      'merge-run-attempt': mergeAttempt,
+      reused: sourceRunId !== mergeRunId,
+      'receipt-id': receipt.receipt_id,
+    });
+    return;
+  }
 
   const sourceMetadata = fetchRunMetadata(repo, sourceRunId);
   const mergeMetadata =

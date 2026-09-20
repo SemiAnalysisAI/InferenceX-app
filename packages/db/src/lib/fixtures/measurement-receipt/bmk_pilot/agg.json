@@ -1,0 +1,20 @@
+[
+  {
+    "infmax_model_prefix": "dsr1",
+    "hw": "h200-nv",
+    "framework": "vllm",
+    "precision": "fp8",
+    "tp": 8,
+    "ep": 1,
+    "num_gpus": 8,
+    "disagg": false,
+    "is_multinode": false,
+    "prefill_num_workers": 0,
+    "decode_num_workers": 0,
+    "conc": 1,
+    "isl": 1024,
+    "osl": 1024,
+    "output_tput_tps": 100,
+    "duration_seconds": 60
+  }
+]
