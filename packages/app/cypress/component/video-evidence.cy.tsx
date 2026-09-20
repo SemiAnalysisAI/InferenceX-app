@@ -1,16 +1,20 @@
 import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.shared-runtime';
 import type { VideoHistoryPage } from '@/components/video-benchmark/history';
-import type { GpuBasis } from '@/components/video-benchmark/metrics';
+import type { GpuBasis, VideoPoint } from '@/components/video-benchmark/metrics';
 import { videoPoints } from '@/components/video-benchmark/points';
 import VideoEvidence from '@/components/video-benchmark/VideoEvidence';
 
 // Retained H100/H200/B200 C1/C2/C4 observations (cypress/fixtures/api/video-history.json).
-function mount(pathname = '/video', basis: GpuBasis = 'participating') {
+function mount(
+  pathname = '/video',
+  basis: GpuBasis = 'participating',
+  select = (points: VideoPoint[]) => points,
+) {
   cy.fixture('api/video-history.json').then((page: VideoHistoryPage) => {
     cy.mount(
       <PathnameContext.Provider value={pathname}>
         <VideoEvidence
-          points={videoPoints([page])}
+          points={select(videoPoints([page]))}
           options={{ tier: 'h', basis }}
           colorFor={(key) => (key === 'b200' ? 'rgb(1, 2, 3)' : 'rgb(4, 5, 6)')}
         />
@@ -43,6 +47,27 @@ describe('Video compute-bound evidence (retained fixture)', () => {
       'contain',
       'All 3 measured GPU types ran at 92–97% of their enforced power limit',
     );
+  });
+  it('bounds the power meter to its declared range when mean power exceeds the recorded limit', () => {
+    // 2,856 W against the recorded 2,800 W limit: the label keeps the measured 102.0%,
+    // the meter reports and fills its 0–100 range.
+    mount('/video', 'participating', (points) =>
+      points
+        .filter((p) => p.hardwareKey === 'h200' && p.concurrency === 1)
+        .map((p) => ({ ...p, avgPowerW: 2856 })),
+    );
+    exhibit('power')
+      .find('[data-hardware="h200"]')
+      .should('contain', '2,856 W / 2,800 W')
+      .and('contain', '102.0%');
+    exhibit('power')
+      .find('[data-hardware="h200"] [role="meter"]')
+      .should('have.attr', 'aria-valuemax', '100')
+      .and('have.attr', 'aria-valuenow', '100')
+      .find('div')
+      .invoke('attr', 'style')
+      .should('match', /width:\s*100%/u);
+    exhibit('power-reading').should('contain', 'H200 ran at 102% of its enforced power limit');
   });
   it('tabulates the concurrency plateau with ratios against each hardware C1 cell', () => {
     mount();

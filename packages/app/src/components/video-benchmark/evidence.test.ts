@@ -3,6 +3,7 @@ import fixture from '../../../cypress/fixtures/api/video-history.json';
 import {
   concurrencyPlateau,
   evidenceFacts,
+  meterPercent,
   parseBandwidthTbps,
   plateauSummary,
   powerRange,
@@ -60,6 +61,16 @@ describe('powerUtilization', () => {
     expect(powerRange(unlimited)).toBeNull();
     expect(powerUtilization([{ ...cell('h100', 1), avgPowerW: 0 }])[0].percentOfCap).toBeNull();
     expect(powerUtilization(points.filter((p) => p.concurrency !== 1))).toEqual([]);
+  });
+  it('keeps an over-cap share as measured while the meter position stays within 0–100', () => {
+    const [over] = powerUtilization([{ ...cell('h200', 1), avgPowerW: 2856 }]);
+    expect(over.enforcedLimitW).toBe(2800);
+    expect(over.percentOfCap).toBeCloseTo(102, 6);
+    expect(meterPercent(102)).toBe(100);
+    expect(meterPercent(100.04)).toBe(100);
+    expect(meterPercent(97.41)).toBe(97.4);
+    expect(meterPercent(91.948)).toBe(91.9);
+    expect(meterPercent(0)).toBe(0);
   });
 });
 
