@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { configCacheKey } from './config-cache';
+import { mapBenchmarkRow } from './benchmark-mapper';
 import { mapEvalRow, mapAggEvalRow } from './eval-mapper';
 import { createSkipTracker } from './skip-tracker';
 
@@ -128,8 +129,8 @@ describe('mapEvalRow', () => {
     expect(cfg.prefillEp).toBe(2);
     expect(cfg.decodeTp).toBe(4);
     expect(cfg.decodeEp).toBe(2);
-    expect(cfg.numPrefillGpu).toBe(8);
-    expect(cfg.numDecodeGpu).toBe(8);
+    expect(cfg.numPrefillGpu).toBe(4);
+    expect(cfg.numDecodeGpu).toBe(4);
   });
 
   it('uses v2 prefill_*/decode_* when present on meta_env', () => {
@@ -345,8 +346,8 @@ describe('mapAggEvalRow', () => {
 
     expect(result!.config.prefillTp).toBe(4);
     expect(result!.config.prefillEp).toBe(2);
-    expect(result!.config.numPrefillGpu).toBe(8);
-    expect(result!.config.numDecodeGpu).toBe(8);
+    expect(result!.config.numPrefillGpu).toBe(4);
+    expect(result!.config.numDecodeGpu).toBe(4);
   });
 
   it('sets isMultinode to false when row omits it', () => {
@@ -596,5 +597,118 @@ describe('mapAggEvalRow', () => {
     const result = mapAggEvalRow(row, tracker);
 
     expect(result!.conc).toBeNull();
+  });
+});
+
+describe('evaluation and benchmark allocation identity', () => {
+  const base = {
+    infmax_model_prefix: 'qwen3.5',
+    hw: 'b300-dsxe',
+    framework: 'dynamo-sglang',
+    precision: 'fp8',
+    spec_decoding: 'mtp',
+    disagg: true,
+    is_multinode: true,
+    prefill_tp: 2,
+    prefill_ep: 2,
+    prefill_dp_attention: false,
+    prefill_num_workers: 1,
+    decode_tp: 2,
+    decode_ep: 2,
+    decode_dp_attention: false,
+    decode_num_workers: 1,
+    conc: 32,
+  };
+
+  it.each([
+    {
+      name: 'EP4 shares the TP4 prefill GPUs',
+      fields: { prefill_tp: 4, prefill_ep: 4, decode_tp: 4, decode_ep: 1 },
+      gpu: [4, 4],
+    },
+    { name: 'TP2 EP2 uses two GPUs per role', fields: {}, gpu: [2, 2] },
+    {
+      name: 'DP attention uses the same TP ranks',
+      fields: { prefill_dp_attention: 'true', decode_dp_attention: 'true' },
+      gpu: [2, 2],
+    },
+    {
+      name: 'two decode workers each use two GPUs',
+      fields: { decode_num_workers: 2 },
+      gpu: [2, 4],
+    },
+    {
+      name: 'PP and PCP multiply allocation but DCP does not',
+      fields: {
+        prefill_pp: 2,
+        prefill_pcp_size: 3,
+        prefill_dcp_size: 2,
+        decode_pp: 3,
+        decode_pcp_size: 2,
+        decode_dcp_size: 2,
+        decode_num_workers: 2,
+      },
+      gpu: [12, 24],
+    },
+    {
+      name: 'explicit role counts override inferred topology and deployment total',
+      fields: { num_prefill_gpu: 7, num_decode_gpu: 9, num_gpus: 32 },
+      gpu: [7, 9],
+    },
+    {
+      name: 'an explicit zero role count remains zero',
+      fields: { num_prefill_gpu: 0, num_decode_gpu: 2 },
+      gpu: [0, 2],
+    },
+  ])('$name', ({ fields, gpu }) => {
+    const source = { ...base, ...fields };
+    const tracker = createSkipTracker();
+    const benchmark = mapBenchmarkRow(
+      {
+        ...source,
+        isl: 1024,
+        osl: 8192,
+        num_prefill_gpu: gpu[0],
+        num_decode_gpu: gpu[1],
+        tput_per_gpu: 1000,
+      },
+      tracker,
+    )!;
+    const aggregate = mapAggEvalRow({ ...source, task: 'gsm8k', em_strict: 0.97 }, tracker)!;
+    const individual = mapEvalRow(source, makeResults(), tracker)[0];
+
+    expect(aggregate.config).toMatchObject({ numPrefillGpu: gpu[0], numDecodeGpu: gpu[1] });
+    expect(configCacheKey(aggregate.config)).toBe(configCacheKey(benchmark.config));
+    expect(configCacheKey(individual.config)).toBe(configCacheKey(benchmark.config));
+    expect(aggregate.config.prefillDpAttn).toBe(
+      source.prefill_dp_attention === 'true' || source.prefill_dp_attention === true,
+    );
+  });
+
+  it('uses legacy PP/PCP allocation without multiplying EP or DCP', () => {
+    const meta = makeMeta({ tp: 2, ep: 2, pp: 2, pcp_size: 3, dcp_size: 2, dp_attention: true });
+    const mapped = mapEvalRow(meta, makeResults(), createSkipTracker())[0];
+    expect(mapped.config).toMatchObject({
+      numPrefillGpu: 12,
+      numDecodeGpu: 12,
+      prefillEp: 2,
+      prefillDpAttn: true,
+    });
+  });
+
+  it('prefers explicit legacy role counts over the aggregate total', () => {
+    const meta = makeMeta({ tp: 2, ep: 2, num_gpus: 16, num_prefill_gpu: 6, num_decode_gpu: 6 });
+    expect(mapEvalRow(meta, makeResults(), createSkipTracker())[0].config).toMatchObject({
+      numPrefillGpu: 6,
+      numDecodeGpu: 6,
+    });
+  });
+
+  it('keeps explicit legacy aggregate GPU counts authoritative', () => {
+    const meta = makeMeta({ tp: 2, ep: 2, pp: 2, num_gpus: 16 });
+    expect(mapEvalRow(meta, makeResults(), createSkipTracker())[0].config).toMatchObject({
+      numPrefillGpu: 16,
+      numDecodeGpu: 16,
+    });
   });
 });

@@ -219,6 +219,13 @@ export function mapAggEvalRow(
   };
 }
 
+/** Match InferenceX Parallelism.gpus_per_worker: EP, DCP and DP attention share GPUs. */
+function evalGpusPerWorker(src: Record<string, any>, tp: number, prefix = ''): number {
+  const pp = parseInt2(src[`${prefix}pp`]) ?? 1;
+  const pcp = parseInt2(src[`${prefix}pcp_size`]) ?? 1;
+  return tp * pp * pcp;
+}
+
 /**
  * Build a `ConfigParams` from an eval source row (either an agg row or a meta_env dict).
  *
@@ -263,13 +270,13 @@ function buildEvalConfig(
       (disaggFromFw || (parseInt2(src.decode_num_workers) ?? 0) > 0
         ? undefined
         : physicalChipCount(src.num_gpus)) ??
-      prefillTp * prefillEp * Math.max(prefillNumWorkers, 1);
+      evalGpusPerWorker(src, prefillTp, 'prefill_') * Math.max(prefillNumWorkers, 1);
     numDecodeGpu =
       roleChipCount(src.num_decode_gpu) ??
       (disaggFromFw || (parseInt2(src.decode_num_workers) ?? 0) > 0
         ? undefined
         : physicalChipCount(src.num_gpus)) ??
-      decodeTp * decodeEp * Math.max(decodeNumWorkers, 1);
+      evalGpusPerWorker(src, decodeTp, 'decode_') * Math.max(decodeNumWorkers, 1);
   } else {
     const tp = parseInt2(src.tp) ?? 1;
     const ep = parseInt2(src.ep) ?? 1;
@@ -282,8 +289,14 @@ function buildEvalConfig(
     decodeDpAttn = dpAttn;
     prefillNumWorkers = 0;
     decodeNumWorkers = 0;
-    numPrefillGpu = physicalChipCount(src.num_gpus) ?? tp * ep;
-    numDecodeGpu = physicalChipCount(src.num_gpus) ?? tp * ep;
+    numPrefillGpu =
+      roleChipCount(src.num_prefill_gpu) ??
+      physicalChipCount(src.num_gpus) ??
+      evalGpusPerWorker(src, tp);
+    numDecodeGpu =
+      roleChipCount(src.num_decode_gpu) ??
+      physicalChipCount(src.num_gpus) ??
+      evalGpusPerWorker(src, tp);
   }
 
   const explicitDisagg = parseOptionalBool(src.disagg);

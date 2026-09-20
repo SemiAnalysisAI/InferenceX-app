@@ -496,6 +496,17 @@ All normalizer logic lives in `packages/db/src/etl/normalizers.ts`. The function
 - **v2 (2025-12-19+)**: Separate `prefill_tp` / `decode_tp` / `prefill_ep` / `decode_ep` / `prefill_dp_attention` / `decode_dp_attention` / `prefill_num_workers` / `decode_num_workers` / `num_prefill_gpu` / `num_decode_gpu` fields are present. These map directly; `num_prefill_gpu` / `num_decode_gpu` fall back to `tp * ep` if absent.
 - **v3 AgentX single-node**: Nested `request_metrics` with explicit `is_multinode: false` and `disagg: false` uses the producer's physical count, `tp * pp * pcp_size`, when `num_gpus` is absent. EP and DCP share TP devices. Explicit counts win; flat legacy rows and role-shaped multinode rows retain their existing rules. For example, Qwen3.8 H200 TP4/EP4 uses four GPUs, mirrored into both aggregate role columns. GPU counts participate in config identity, so correcting ingestion does not repair existing rows: historical data needs explicit reconciliation against retained artifacts rather than blind reingestion.
 
+Evaluation artifacts have a separate allocation fallback in `eval-mapper.ts`.
+Both individual `meta_env.json` inputs and aggregate eval rows preserve explicit
+role GPU counts. When counts are missing, they use InferenceX's allocation rule:
+`tp * pp * pcp_size` per worker, multiplied by the role's worker count (default
+one). EP, DCP, and DP attention share those GPUs. Missing PP/PCP dimensions default
+to one; the mapper cannot recover dimensions discarded by an older collector.
+An explicit aggregate `num_gpus` remains authoritative. This keeps EP evaluations
+paired with performance artifacts that already report their physical role counts.
+The config key itself is unchanged, and existing persisted evaluation rows need
+explicit reconciliation before any historical backfill.
+
 The v1/v2 role-shape check is `'prefill_tp' in row`; the v3 fallback additionally checks the nested metrics and explicit topology flags. No version field is required in the artifact.
 
 Backfill audit provenance may identify the production config or an exact public
