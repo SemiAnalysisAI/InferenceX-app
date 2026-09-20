@@ -26,6 +26,8 @@ export interface VideoHistoryObservation {
   participating: number | null;
   /** GPU boards the job reserved (Slurm AllocTRES or the retained AMD binding); null when unknown. */
   allocated: number | null;
+  /** Replicas behind the endpoint (`execution.deployment.replica_count`); null before that record existed. */
+  replicas: number | null;
   wallSeconds: number | null;
   durationSeconds: number | null;
   frameCount: number | null;
@@ -134,6 +136,7 @@ export function videoHistoryEntry(
             energyKj: point.energy === null ? null : point.energy / 1000,
             participating: point.participating,
             allocated: point.allocated,
+            replicas: point.replicas,
             wallSeconds: point.wall,
             durationSeconds: number(at(point.workload, 'generation', 'duration_seconds')),
             frameCount: number(at(point.workload, 'generation', 'frame_count')),

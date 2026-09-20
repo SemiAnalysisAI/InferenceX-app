@@ -15,6 +15,7 @@ const h200: VideoPoint = {
   concurrency: 1,
   participating: 4,
   allocated: 4,
+  replicas: null,
   valid: 20,
   completed: 20,
   scheduled: 20,

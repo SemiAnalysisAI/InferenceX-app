@@ -22,6 +22,7 @@ const observation: VideoHistoryObservation = {
   energyKj: 410.95,
   participating: 4,
   allocated: 4,
+  replicas: null,
   wallSeconds: 3013.4,
   durationSeconds: 8,
   frameCount: 192,
