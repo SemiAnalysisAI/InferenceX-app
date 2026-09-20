@@ -102,6 +102,7 @@ export const PURGED_RUNS: ReadonlySet<number> = new Set([
   34926284365, // 2026-09-16 | Reason: wrong data as mtp weights were uninitalized
   35165441471, // 2026-09-19 | Reason: user-requested purge after reported Kimi K3 chart regression; suspected incomplete sweep remains unconfirmed
   34819578354, // 2026-09-19 | Reason: narrower than the curve it supersedes — this kimik3-fp4-h200-vllm-agentic-balanced sweep carries only the TP8/EP32/DPA offload=off arm (c1-c16), so ingesting it made 2026-09-19 the latest H200 date and hid the three-curve 2026-09-13 set (TP16/EP32 c1-c12, TP8/EP32 offload=off c1-c16, TP8/EP32 offload=on c8-c32). Its values match the superseded arm within +/-6%, so nothing is lost by dropping it; re-ingest once the full H200 curve set is collected (source run of the PR #3053 sweep-reuse ingest)
+  34819564154, // 2026-09-19 | Reason: user-reported Kimi K3 GB300 chart regression and missing points compared with the pre-PowerX curve
 ]);
 
 export const PURGED_RUN_ATTEMPTS: ReadonlyMap<number, ReadonlySet<number>> = new Map([

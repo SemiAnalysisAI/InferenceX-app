@@ -11,6 +11,18 @@ import {
 import { selectRunOverrides } from './run-override-selection';
 
 describe('run override selection', () => {
+  it('selects only the whole-run purge for run 34819564154', () => {
+    expect(selectRunOverrides(['--run-id', '34819564154', '--yes'])).toEqual({
+      runId: 34819564154,
+      conclusions: new Map(),
+      changelogs: [],
+      benchmarks: [],
+      purgedRuns: new Set([34819564154]),
+      purgedAttempts: new Map(),
+      purgedPoints: [],
+    });
+  });
+
   it('selects only the whole-run purge for run 35165441471', () => {
     expect(selectRunOverrides(['--run-id', '35165441471', '--yes'])).toEqual({
       runId: 35165441471,

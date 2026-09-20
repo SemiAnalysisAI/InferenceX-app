@@ -622,6 +622,15 @@ describe('PURGED_BENCHMARK_POINTS', () => {
 });
 
 describe('isRunAttemptPurged', () => {
+  it('purges every attempt of run 34819564154 without purging adjacent runs', () => {
+    expect(PURGED_RUNS.has(34819564154)).toBe(true);
+    for (const attempt of [undefined, 1, 2, 99]) {
+      expect(isRunAttemptPurged(34819564154, attempt)).toBe(true);
+    }
+    expect(isRunAttemptPurged(34819564153, 1)).toBe(false);
+    expect(isRunAttemptPurged(34819564155, 1)).toBe(false);
+  });
+
   it('purges every attempt of run 35165441471 without purging adjacent runs', () => {
     expect(PURGED_RUNS.has(35165441471)).toBe(true);
     for (const attempt of [undefined, 1, 2, 99]) {
