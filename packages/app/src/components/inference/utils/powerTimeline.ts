@@ -283,6 +283,46 @@ export function tracePools(series: Pick<GpuPowerSeries, 'devices' | 'power'>): P
   }));
 }
 
+export interface PoolSizeGroup {
+  size: number;
+  roles: PowerPoolRole[];
+}
+
+/**
+ * Pools that hold the same number of GPUs share one rated ceiling, so their
+ * reference draws once, labelled `prefill / decode ×16`, instead of two labels
+ * printed over each other. Sizes ascending, roles in pool order, deduplicated.
+ */
+export function groupPoolsBySize(
+  pools: readonly Pick<PowerPool, 'role' | 'rows'>[],
+): PoolSizeGroup[] {
+  const bySize = new Map<number, Set<PowerPoolRole>>();
+  for (const pool of pools) {
+    if (!bySize.has(pool.rows.length)) bySize.set(pool.rows.length, new Set());
+    bySize.get(pool.rows.length)!.add(pool.role);
+  }
+  return [...bySize.entries()]
+    .toSorted(([a], [b]) => a - b)
+    .map(([size, roles]) => ({
+      size,
+      roles: POOL_ORDER.filter((role) => roles.has(role)),
+    }));
+}
+
+/**
+ * Label row for each reference line: lines at the same watts (different
+ * hardware with an equal pool ceiling) stack their labels upward, slot 0 on
+ * the line and slot n `n` rows above, instead of overprinting. Input order.
+ */
+export function referenceLabelSlots(lines: readonly { watts: number }[]): number[] {
+  const used = new Map<number, number>();
+  return lines.map((line) => {
+    const slot = used.get(line.watts) ?? 0;
+    used.set(line.watts, slot + 1);
+    return slot;
+  });
+}
+
 /** Every GPU of the series as one pool. */
 export function allGpuPool(series: Pick<GpuPowerSeries, 'power'>): PowerPool {
   return { role: 'all', rows: series.power.map((_, row) => row) };

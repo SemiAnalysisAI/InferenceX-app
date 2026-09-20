@@ -235,7 +235,10 @@ config is `display: 'timeline'`.
   `2 3`, the same dashes as the `i_pcompare=roles` series — labelled `c<conc> · prefill` /
   `· decode`, on a _GPU pool power (W)_ axis. Traces without roles draw their deployment total
   as one `all` line so single-node configs stay comparable. Reference lines become pool size ×
-  rated TDP per (hardware, role, pool size) (`data-pool` on `.power-reference`), and the
+  rated TDP per (hardware, pool size): roles of one hardware that hold the same GPU count share
+  one line labelled `prefill / decode ×16` (`data-pool` on `.power-reference` lists the roles,
+  `groupPoolsBySize`), and labels of lines at equal watts stack upward (`referenceLabelSlots`)
+  instead of overprinting; and the
   all-in switch scales the same way. The tooltip names the pool, its summed watts against the
   pool TDP, and the mean / min / max per GPU inside it. Pool mode and per-GPU lines are
   mutually exclusive.

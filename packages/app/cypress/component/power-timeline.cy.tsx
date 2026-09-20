@@ -117,11 +117,11 @@ function series(hwKey: string, conc: number, peak: number, gpus = [0, 1]): GpuPo
  * works at 900 W (+row), decode at 250 W and 700 W (+row), so the pool sums in
  * the window are 3606 W and 2822 W.
  */
-function poolSeries(conc: number): GpuPowerSeries {
+function poolSeries(conc: number, prefillCount = 4): GpuPowerSeries {
   const t = Array.from({ length: 61 }, (_, i) => i);
   const devices: GpuPowerDevice[] = Array.from({ length: 8 }, (_, i) => ({
     id: `${HOST}/GPU-${String(i).padStart(8, '0')}-d62f-0ff2-b4e5-e36f6fac8f1b`,
-    role: i < 4 ? 'prefill' : 'decode',
+    role: i < prefillCount ? 'prefill' : 'decode',
   }));
   return {
     artifact: `power_audit_${DISAGG_RESULT}`,
@@ -511,20 +511,18 @@ describe('PowerTimeline', () => {
         .and('not.have.attr', 'stroke-dasharray');
       cy.get('path.power-trace[data-hw="gb200"][data-segment="window"]').should('have.length', 2);
 
-      // References scale to the pool: 4 GPUs × rated TDP per role, 2 × for the B200 pair.
-      cy.get('.power-reference[data-reference="tdp"][data-pool="prefill"]')
+      // References scale to the pool: both GB200 pools hold 4 GPUs, so they
+      // share one ceiling and one label instead of two printed over each other;
+      // 2 × rated TDP for the B200 pair.
+      cy.get('.power-reference[data-reference="tdp"][data-pool="prefill decode"]')
         .should('have.attr', 'data-watts', String(4 * GB200_TDP))
         .find('text')
-        .should('contain.text', `GB200 NVL72 prefill ×4 TDP ${4 * GB200_TDP} W`);
-      cy.get('.power-reference[data-reference="tdp"][data-pool="decode"]')
-        .should('have.attr', 'data-watts', String(4 * GB200_TDP))
-        .find('text')
-        .should('contain.text', 'decode ×4 TDP');
+        .should('contain.text', `GB200 NVL72 prefill / decode ×4 TDP ${4 * GB200_TDP} W`);
       cy.get('.power-reference[data-reference="tdp"][data-pool="all"]')
         .should('have.attr', 'data-watts', String(2 * HW_REGISTRY.b200.tdp))
         .find('text')
         .should('contain.text', 'B200 all GPUs ×2 TDP');
-      cy.get('.power-reference[data-reference="tdp"]').should('have.length', 3);
+      cy.get('.power-reference[data-reference="tdp"]').should('have.length', 2);
 
       // End labels name the pool; the axis reads pool watts.
       cy.get('text.power-trace-label[data-pool="prefill"]').should('contain.text', 'c8 · prefill');
@@ -548,7 +546,7 @@ describe('PowerTimeline', () => {
     // The all-in switch also scales to the pool.
     cy.get('[data-testid="power-timeline-utility"]').click();
     svg()
-      .find('.power-reference[data-reference="utility"][data-pool="prefill"]')
+      .find('.power-reference[data-reference="utility"][data-pool~="prefill"]')
       .should('have.attr', 'data-watts', String(4 * Math.round(HW_REGISTRY.gb200.power * 1000)));
 
     // Per-GPU and pools are mutually exclusive; per-GPU restores the per-GPU TDP line.
@@ -559,6 +557,30 @@ describe('PowerTimeline', () => {
       cy.get('path.power-trace[data-hw="gb200"][data-segment="full"]').should('have.length', 8);
       cy.get(`.power-reference[data-reference="tdp"][data-watts="${GB200_TDP}"]`).should('exist');
       cy.get('text').contains('Measured Average Power per Chip over Time (W)').should('exist');
+    });
+  });
+
+  it('keeps separate pool references when prefill and decode pools differ in size', () => {
+    cy.intercept('GET', '/api/gpu-metrics*', {
+      body: {
+        runInfo: response.runInfo,
+        series: [poolSeries(8, 6)],
+      } satisfies GpuPowerSeriesResponse,
+    }).as('series');
+    mountTimeline([disaggPoint(8, 800)]);
+    cy.wait('@series');
+    cy.get('[data-testid="power-timeline-pools"]').click();
+
+    svg().within(() => {
+      cy.get('.power-reference[data-reference="tdp"][data-pool="prefill"]')
+        .should('have.attr', 'data-watts', String(6 * GB200_TDP))
+        .find('text')
+        .should('contain.text', `GB200 NVL72 prefill ×6 TDP ${6 * GB200_TDP} W`);
+      cy.get('.power-reference[data-reference="tdp"][data-pool="decode"]')
+        .should('have.attr', 'data-watts', String(2 * GB200_TDP))
+        .find('text')
+        .should('contain.text', `GB200 NVL72 decode ×2 TDP ${2 * GB200_TDP} W`);
+      cy.get('.power-reference[data-reference="tdp"]').should('have.length', 2);
     });
   });
 
@@ -607,7 +629,7 @@ describe('PowerTimeline', () => {
         .and('have.attr', 'stroke', overlayRunColor(0))
         .and('have.attr', 'stroke-dasharray', '7 3');
       cy.get('path.power-trace[data-run-index="0"][data-pool="decode"]').should('have.length', 2);
-      cy.get('.power-reference[data-reference="tdp"][data-pool="prefill"] line').should(
+      cy.get('.power-reference[data-reference="tdp"][data-pool~="prefill"] line').should(
         'have.attr',
         'stroke',
         overlayRunColor(0),
@@ -685,9 +707,9 @@ describe('PowerTimeline', () => {
       cy.get('text').contains('GPU 池功耗（W）').should('exist');
       cy.get('text.power-trace-label[data-pool="prefill"]').should('contain.text', 'c8 · 预填充');
       cy.get('text.power-trace-label[data-pool="decode"]').should('contain.text', 'c8 · 解码');
-      cy.get('.power-reference[data-reference="tdp"][data-pool="decode"] text').should(
+      cy.get('.power-reference[data-reference="tdp"][data-pool~="decode"] text').should(
         'contain.text',
-        `GB200 NVL72 解码 ×4 TDP ${4 * GB200_TDP} W`,
+        `GB200 NVL72 预填充 / 解码 ×4 TDP ${4 * GB200_TDP} W`,
       );
     });
     cy.get('[data-testid="power-timeline-focus"]')

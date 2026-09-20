@@ -8,9 +8,11 @@ import {
   consumePowerTraceFocus,
   joinPowerTimeline,
   longestCommonPrefix,
+  groupPoolsBySize,
   planPowerTimelineRequests,
   prioritizeRun,
   prioritizeRuns,
+  referenceLabelSlots,
   requestPowerTraceFocus,
   runIdFromUrl,
   telemetryArtifactForPoint,
@@ -375,5 +377,45 @@ describe('prioritizeRun', () => {
     expect(traceKeyRunId('34716669498:qwen_conc8')).toBe('34716669498');
     expect(traceKeyRunId(null)).toBeNull();
     expect(traceKeyRunId('')).toBeNull();
+  });
+});
+
+describe('groupPoolsBySize', () => {
+  it('merges pools of one hardware that share a GPU count and keeps pool order', () => {
+    expect(
+      groupPoolsBySize([
+        { role: 'decode', rows: [4, 5, 6, 7] },
+        { role: 'prefill', rows: [0, 1, 2, 3] },
+      ]),
+    ).toEqual([{ size: 4, roles: ['prefill', 'decode'] }]);
+  });
+
+  it('keeps pools of different sizes apart, smallest first, without duplicates', () => {
+    expect(
+      groupPoolsBySize([
+        { role: 'prefill', rows: [0, 1, 2, 3, 4, 5] },
+        { role: 'decode', rows: [6, 7] },
+        { role: 'prefill', rows: [8, 9, 10, 11, 12, 13] },
+        { role: 'all', rows: [0, 1] },
+      ]),
+    ).toEqual([
+      { size: 2, roles: ['all', 'decode'] },
+      { size: 6, roles: ['prefill'] },
+    ]);
+    expect(groupPoolsBySize([])).toEqual([]);
+  });
+});
+
+describe('referenceLabelSlots', () => {
+  it('stacks labels of lines that share a watts value and leaves others on the line', () => {
+    expect(
+      referenceLabelSlots([
+        { watts: 19200 },
+        { watts: 22400 },
+        { watts: 19200 },
+        { watts: 8000 },
+        { watts: 19200 },
+      ]),
+    ).toEqual([0, 0, 1, 0, 2]);
   });
 });

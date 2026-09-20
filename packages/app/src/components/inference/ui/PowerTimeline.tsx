@@ -62,10 +62,12 @@ import { powerVariantDash } from '../utils/power-compare';
 import {
   allGpuPool,
   consumePowerTraceFocus,
+  groupPoolsBySize,
   joinPowerTimeline,
   planPowerTimelineRequests,
   prioritizeRun,
   prioritizeRuns,
+  referenceLabelSlots,
   runIdFromUrl,
   traceConfigLabel,
   traceKeyRunId,
@@ -73,6 +75,7 @@ import {
   windowPhase,
   type MissingTrace,
   type MissingTraceReason,
+  type PoolSizeGroup,
   type PowerPool,
   type PowerPoolRole,
   type PowerTimelineRequest,
@@ -277,9 +280,12 @@ interface ReferenceLine {
   label: string;
   color: string;
   kind: 'tdp' | 'utility';
-  /** Pool the line is sized for, in pool mode. */
-  pool?: PowerPoolRole;
+  /** Pools the line is sized for, in pool mode (roles sharing one GPU count). */
+  pools?: PowerPoolRole[];
 }
+
+/** Vertical distance between stacked reference labels that share a watts value. */
+const REFERENCE_LABEL_ROW = 13;
 
 interface TraceLabel {
   /** Join key: the trace key, plus the pool role in pool mode. */
@@ -600,13 +606,14 @@ function drawReferenceLines(
   lines: ReferenceLine[],
 ): void {
   group.selectAll('.power-reference').remove();
-  for (const line of lines) {
+  const slots = referenceLabelSlots(lines);
+  lines.forEach((line, index) => {
     const y = yScale(line.watts);
     const g = group
       .append('g')
       .attr('class', 'power-reference')
       .attr('data-reference', line.kind)
-      .attr('data-pool', line.pool ?? null)
+      .attr('data-pool', line.pools?.join(' ') ?? null)
       .attr('data-watts', line.watts);
     g.append('line')
       .attr('x1', 0)
@@ -619,14 +626,14 @@ function drawReferenceLines(
       .attr('opacity', 0.9);
     g.append('text')
       .attr('x', width - 4)
-      .attr('y', y - 5)
+      .attr('y', y - 5 - slots[index] * REFERENCE_LABEL_ROW)
       .attr('text-anchor', 'end')
       .attr('fill', line.color)
       .attr('font-family', CHART_FONT_SANS)
       .attr('font-size', px(CHART_TYPE.annotation))
       .attr('font-weight', '600')
       .text(line.label);
-  }
+  });
 }
 
 /** Reasons, then the undrawn configs (named when few, counted per hardware when many). */
@@ -927,21 +934,20 @@ export default function PowerTimeline({
   );
 
   // Rated references: per hardware in mean / per-GPU modes; per (hardware,
-  // pool role, pool size) in pool mode, scaled to the pool so the summed line
-  // and its ceiling share the axis.
+  // pool size) in pool mode, scaled to the pool so the summed line and its
+  // ceiling share the axis. Roles of one hardware that hold the same number
+  // of GPUs share a ceiling and draw as one line (`prefill / decode ×16`).
   const referenceLines = useMemo<ReferenceLine[]>(() => {
     const lines: ReferenceLine[] = [];
-    const pushLines = (
-      base: string,
-      color: string,
-      pool?: { role: PowerPoolRole; size: number },
-    ) => {
+    const pushLines = (base: string, color: string, pool?: PoolSizeGroup) => {
       const specs = HW_REGISTRY[base];
       if (!specs) return;
       const label = specs.label ?? base.toUpperCase();
       const size = pool?.size ?? 1;
-      const id = pool ? `${base}:${pool.role}:${pool.size}` : base;
-      const name = pool ? `${label} ${t.poolShort[pool.role]} ×${pool.size}` : label;
+      const id = pool ? `${base}:${pool.roles.join('+')}:${pool.size}` : base;
+      const name = pool
+        ? `${label} ${pool.roles.map((role) => t.poolShort[role]).join(' / ')} ×${pool.size}`
+        : label;
       if (specs.tdp > 0) {
         lines.push({
           id: `tdp:${id}`,
@@ -949,7 +955,7 @@ export default function PowerTimeline({
           label: `${name} ${t.tdp} ${specs.tdp * size} W`,
           color,
           kind: 'tdp',
-          pool: pool?.role,
+          pools: pool?.roles,
         });
       }
       if (showUtility && specs.power > 0) {
@@ -960,25 +966,23 @@ export default function PowerTimeline({
           label: `${name} ${t.allIn} ${Math.round(watts)} W`,
           color,
           kind: 'utility',
-          pool: pool?.role,
+          pools: pool?.roles,
         });
       }
     };
-    const seen = new Set<string>();
+    // First trace of a hardware sets the reference colour, as before.
+    const perBase = new Map<string, { color: string; pools: PowerPool[] }>();
     for (const trace of visibleTraces) {
       const base = baseHardware(trace.point.hwKey);
-      const { color } = colorForTrace(trace);
-      if (lineMode === 'pool') {
-        for (const pool of drawnPools(trace.series)) {
-          const id = `${base}:${pool.role}:${pool.rows.length}`;
-          if (seen.has(id)) continue;
-          seen.add(id);
-          pushLines(base, color, { role: pool.role, size: pool.rows.length });
-        }
-      } else if (!seen.has(base)) {
-        seen.add(base);
+      if (!perBase.has(base)) perBase.set(base, { color: colorForTrace(trace).color, pools: [] });
+      if (lineMode === 'pool') perBase.get(base)!.pools.push(...drawnPools(trace.series));
+    }
+    for (const [base, { color, pools }] of perBase) {
+      if (lineMode !== 'pool') {
         pushLines(base, color);
+        continue;
       }
+      for (const group of groupPoolsBySize(pools)) pushLines(base, color, group);
     }
     return lines;
   }, [visibleTraces, colorForTrace, showUtility, lineMode, t]);
