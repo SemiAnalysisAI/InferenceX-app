@@ -213,6 +213,11 @@ config is `display: 'timeline'`.
   neither. Runner timestamps are UTC wall clock and are parsed as such
   (`parseTelemetryTimestampUtc`); `new Date('2026/09/12 20:19:57')` would read browser local
   time and misplace the audit window.
+- **Legend with overlays.** Once `?unofficialrun=` data is in, the chart reads
+  `localOfficialOverride`, so the timeline legend writes the unified selection
+  (`setUnifiedOverlaySelection`, `computeToggle` solo semantics) exactly as `ScatterGraph`
+  does; the context's `toggleHwType` alone would change nothing visible there.
+
 - **Drawing.** One trace per config, mean of its GPUs (legend switch: one line per GPU),
   coloured by hardware for official rows and by `overlayRunColor(runIndex)` for
   `?unofficialrun=` rows; legend toggles follow `activeHwTypes` / `activeOverlayHwTypes`

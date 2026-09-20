@@ -41,6 +41,7 @@ import { useUnofficialRun } from '@/components/unofficial-run-provider';
 import { matchesQuickFilters } from '@/components/inference/utils/quickFilters';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { track } from '@/lib/analytics';
+import { computeToggle } from '@/lib/toggle-set';
 import { getModelSortIndex } from '@/lib/constants';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
 import type { LayerConfig, RenderContext, ZoomContext } from '@/lib/d3-chart/D3Chart/types';
@@ -667,9 +668,14 @@ export default function PowerTimeline({
   const { hardwareConfig, hwTypesWithData } = useInferenceData();
   const { activeHwTypes, selectedPrecisions, quickFilters } = useInferenceFilters();
   const { isLegendExpanded, highContrast } = useInferenceDisplay();
-  const { toggleHwType, setIsLegendExpanded } = useInferenceActions();
-  const { unofficialRunInfos, runIndexByUrl, activeOverlayHwTypes, localOfficialOverride } =
-    useUnofficialRun();
+  const { setBestPerSku, toggleHwType, setIsLegendExpanded } = useInferenceActions();
+  const {
+    unofficialRunInfos,
+    runIndexByUrl,
+    activeOverlayHwTypes,
+    localOfficialOverride,
+    setUnifiedOverlaySelection,
+  } = useUnofficialRun();
 
   const [xModeChoice, setXModeChoice] = useState<XMode | null>(null);
   const [lineMode, setLineMode] = useState<LineMode>('mean');
@@ -813,6 +819,32 @@ export default function PowerTimeline({
   // Same visibility source as ScatterGraph: an overlay session may hold a
   // local official selection that has not been written back to the filters.
   const officialHwTypes = localOfficialOverride ?? activeHwTypes;
+  // With an overlay loaded the chart reads localOfficialOverride, so a legend
+  // click must write the unified selection the way ScatterGraph does; the
+  // context's toggleHwType would change activeHwTypes with no visible effect.
+  const handleToggleHwType = useCallback(
+    (key: string) => {
+      if (!overlayData) {
+        toggleHwType(key);
+        return;
+      }
+      setBestPerSku(false, { applySelection: false });
+      const official = new Set([...officialHwTypes].filter((hw) => hwTypesWithData.has(hw)));
+      setUnifiedOverlaySelection(
+        computeToggle(official, key, hwTypesWithData),
+        activeOverlayHwTypes,
+      );
+    },
+    [
+      overlayData,
+      toggleHwType,
+      setBestPerSku,
+      officialHwTypes,
+      hwTypesWithData,
+      setUnifiedOverlaySelection,
+      activeOverlayHwTypes,
+    ],
+  );
   const visibleTraces = useMemo(
     () =>
       traces.filter((trace) =>
@@ -1195,7 +1227,7 @@ export default function PowerTimeline({
           hw: key,
           isActive: officialHwTypes.has(key),
           onClick: () => {
-            toggleHwType(key);
+            handleToggleHwType(key);
             track('latency_hw_type_toggled', { hw: key });
           },
           tooltip: null,
@@ -1212,7 +1244,7 @@ export default function PowerTimeline({
     hardwareConfig,
     resolveColor,
     officialHwTypes,
-    toggleHwType,
+    handleToggleHwType,
     t,
   ]);
 

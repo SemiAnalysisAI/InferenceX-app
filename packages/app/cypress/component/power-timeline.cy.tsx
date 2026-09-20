@@ -331,6 +331,60 @@ describe('PowerTimeline', () => {
     cy.get('[data-testid="chart-legend"]').should('contain.text', '✕ powerx-timeline');
   });
 
+  it('solos an official row through the unified overlay selection while an overlay is loaded', () => {
+    // localOfficialOverride shadows activeHwTypes once an overlay is in, so the
+    // context toggle would be invisible: the legend must write both selections.
+    const overlayPoint = measuredPoint('h200', 16, 500, {
+      run_url: OVERLAY_RUN_URL,
+      power_audit: {
+        source: `power_validation_${resultName('h200', 16)}.json`,
+        ...WINDOW,
+      },
+    });
+    cy.intercept('GET', '/api/gpu-metrics*', { body: response }).as('series');
+    mountTimeline([measuredPoint('b200', 16, 700), measuredPoint('h100', 16, 600)], {
+      overlay: {
+        data: [overlayPoint],
+        hardwareConfig: hwConfig,
+        label: 'powerx-timeline',
+        runUrl: OVERLAY_RUN_URL,
+      },
+      // Plain overrides: mountWithProviders builds the context itself, so the
+      // aliased stubs below are the ones the component receives.
+      unofficial: {
+        isUnofficialRun: true,
+        unofficialRunInfos: [
+          {
+            id: Number(OVERLAY_RUN_ID),
+            name: 'powerx-timeline',
+            branch: 'powerx-timeline',
+            sha: 'abc000',
+            createdAt: '2026-09-12T00:00:00Z',
+            url: OVERLAY_RUN_URL,
+            conclusion: 'success',
+            status: 'completed',
+            isNonMainBranch: true,
+          },
+        ],
+        runIndexByUrl: { [OVERLAY_RUN_URL]: 0, [OVERLAY_RUN_ID]: 0 },
+        activeOverlayHwTypes: new Set(['h200']),
+      },
+    });
+    cy.wait('@series');
+
+    cy.get('[data-testid="chart-legend"] label[for="checkbox-b200"]').click();
+    cy.get('@setUnifiedOverlaySelection')
+      .should('have.been.calledOnce')
+      .then((stub) => {
+        const [official, overlay] = (stub as unknown as sinon.SinonStub).firstCall.args as [
+          Set<string>,
+          Set<string>,
+        ];
+        expect([...official]).to.deep.equal(['b200']);
+        expect([...overlay]).to.deep.equal(['h200']);
+      });
+  });
+
   it('keeps ?unofficialrun= overlay telemetry inside the per-chart run cap', () => {
     // Four official runs already fill the cap and all sort before the overlay run
     // id: the overlay the user asked for is fetched anyway and the last official
