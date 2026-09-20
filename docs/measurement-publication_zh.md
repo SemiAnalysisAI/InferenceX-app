@@ -22,7 +22,24 @@ Phase 1 的读取端接受由 InferenceX 独立受信托管签发流程生成的
 
 如果回执要求导入吞吐量测量点，`evals-only` changelog 不能缩小该范围，读取端会在数据库写入前拒绝这一冲突。在刷新已发布曲线或将 snapshot 标记为完成之前，每个已接受的基准测试文件都必须从数据库写入中返回回执规定的测量点数量，重复导入时已有的数据行也计入。因此，按测量点执行的清除规则若跳过必需数据，snapshot 会保持未完成状态。
 
-部署读取端之前，先应用 `016_measurement_snapshots.sql`。该表保留紧凑回执，并将源仓库/run/attempt 绑定到唯一的已接受 snapshot。渐进式导入中断后，状态保持 `writing`，恢复时只能使用同一回执；成功后的重复导入保持结果稳定。替换测量字节需要独立版本的源执行。执行回滚不会撤销既有数据库写入。对保留的回执版本，必须继续提供兼容读取端。
+启用回执导入或声明已部署读取端就绪之前，先应用 `016_measurement_snapshots.sql`。该表保留紧凑回执，并将源仓库/run/attempt 绑定到唯一的已接受 snapshot。渐进式导入中断后，状态保持 `writing`，恢复时只能使用同一回执；成功后的重复导入保持结果稳定。替换测量字节需要独立版本的源执行。执行回滚不会撤销既有数据库写入。对保留的回执版本，必须继续提供兼容读取端。
+
+## 独立迁移与就绪验证
+
+[Migrate Database workflow](../.github/workflows/migrate-database.yml) 通过 `bun run admin:db:migrate --yes` 应用已纳入版本控制但尚未执行的迁移，仅使用显式选择的 `staging` 或 `production` 目标对应的现有 writer secret。该流程保留数据库及已有测量，不重置 Neon 分支、不导入运行结果，也不刷新公共缓存。迁移步骤获得数据库凭证之前，必须确认准确的 `expected-sha` 与 workflow 提交一致。
+
+此 workflow 合入 `master` 后，先对 staging 执行迁移并检查成功的验证产物，再以同一个已审查应用提交对 production 执行：
+
+```bash
+gh workflow run migrate-database.yml --repo SemiAnalysisAI/InferenceX-app --ref master \
+  -f database-target=staging -f expected-sha=REVIEWED_MASTER_SHA
+gh workflow run migrate-database.yml --repo SemiAnalysisAI/InferenceX-app --ref master \
+  -f database-target=production -f expected-sha=REVIEWED_MASTER_SHA
+```
+
+只读验证器确认 migration `016` 已记录、回执表具有必需的列类型与非空约束，并确认主键绑定源仓库/run/attempt。成功的 `measurement-schema-<target>-<run>-<attempt>` 产物包含 `migration-report.json`，记录目标、准确的 app SHA、workflow 身份及已验证 schema，不包含连接字符串或测量数据。缺失或不兼容的 schema 会使流程失败，且不生成成功报告。保留两个成功运行的链接及产物作为就绪证据。
+
+应用的正常合并会独立触发 Vercel 部署。在 production 部署和迁移验证都针对已审查版本成功之前，继续禁用原生回执导入；随后才将 `INFX_PHASE1_READER_REVISION` 设置为实际部署的 app SHA，并配置 issuer allowlist。仅 preview 或独立迁移成功不能证明发布就绪。新的 workflow 必须先存在于默认分支，才能调度。
 
 缓存刷新后，工作流执行只读校验命令 `packages/db/src/verify-measurement-publication.ts <public-origin> <verification.json>`。它将 exact-run 和最新曲线中的指标与拓扑同已接受的 snapshot 比较，检查评估汇总和 strict 样本计数，并验证 trace 明细可用性。该命令使用 `INGEST_ARTIFACTS_PATH` 及传输步骤生成的回执环境变量。应将其报告与现有 PowerX、数据库诊断一起保留。单次运行通过不代表整个集群覆盖范围均已完成验收。
 

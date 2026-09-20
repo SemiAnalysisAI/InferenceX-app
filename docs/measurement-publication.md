@@ -22,7 +22,24 @@ Receipt ingestion selects benchmark JSON and evaluation samples from the receipt
 
 An `evals-only` changelog cannot narrow a receipt that requires throughput points: the reader rejects it before database writes. Before refreshing the published curve or marking a snapshot complete, every accepted benchmark file must return the receipt's exact point count from database inserts, including existing rows on replay. Per-point purge skips therefore leave the snapshot incomplete.
 
-Apply migration `016_measurement_snapshots.sql` before deploying these readers. The table retains the compact receipt and binds each source repository/run/attempt to one accepted snapshot. An interrupted progressive import remains `writing` and resumes only that same receipt; successful replay remains stable. Replacing measurement bytes requires a separately versioned source execution. Execution rollback does not reverse prior database writes. Preserve a compatible reader for all retained receipt versions.
+Apply migration `016_measurement_snapshots.sql` before enabling receipt ingestion or declaring the deployed reader ready. The table retains the compact receipt and binds each source repository/run/attempt to one accepted snapshot. An interrupted progressive import remains `writing` and resumes only that same receipt; successful replay remains stable. Replacing measurement bytes requires a separately versioned source execution. Execution rollback does not reverse prior database writes. Preserve a compatible reader for all retained receipt versions.
+
+## Migration-only readiness
+
+The [Migrate Database workflow](../.github/workflows/migrate-database.yml) applies pending checked-in migrations through `bun run admin:db:migrate --yes`, using only the existing writer secret for the explicitly selected `staging` or `production` target. It preserves the database and existing measurements; it does not reset a Neon branch, ingest a run or refresh public caches. The exact `expected-sha` must match the workflow commit before the migration step can access a database credential.
+
+After this workflow lands on `master`, dispatch staging first and inspect its successful verification artifact, then repeat for production with the same reviewed app commit:
+
+```bash
+gh workflow run migrate-database.yml --repo SemiAnalysisAI/InferenceX-app --ref master \
+  -f database-target=staging -f expected-sha=REVIEWED_MASTER_SHA
+gh workflow run migrate-database.yml --repo SemiAnalysisAI/InferenceX-app --ref master \
+  -f database-target=production -f expected-sha=REVIEWED_MASTER_SHA
+```
+
+The read-only verifier checks that migration `016` is recorded, the receipt table has its required column types and nullability, and its primary key binds source repository/run/attempt. A successful `measurement-schema-<target>-<run>-<attempt>` artifact contains `migration-report.json` with the target, exact app SHA, workflow identity and verified schema; it contains no connection string or measurement data. Missing or incompatible schema fails without producing a success report. Keep both successful run links and artifacts as readiness evidence.
+
+Normal app merges trigger Vercel deployment separately. Keep native receipt ingestion disabled until production deployment and migration verification both succeed for the reviewed revision, then set `INFX_PHASE1_READER_REVISION` to that deployed app SHA and configure the issuer allowlist. A successful preview or migration-only run alone does not establish publication readiness. The new workflow is not dispatchable until it exists on the default branch.
 
 After cache refresh, the workflows execute the read-only `packages/db/src/verify-measurement-publication.ts <public-origin> <verification.json>`. It compares exact-run and latest curve metrics/topology with the accepted snapshot, checks eval summary visibility and strict sample counts, and verifies trace-detail availability. It uses `INGEST_ARTIFACTS_PATH` and the receipt environment emitted by transport. Retain its report alongside existing PowerX and database diagnostics. Run-specific verification does not silently imply that every fleet lane is qualified.
 
