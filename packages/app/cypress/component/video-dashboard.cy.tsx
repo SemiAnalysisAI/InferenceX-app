@@ -107,6 +107,49 @@ describe('Video hardware dashboard (retained fixture)', () => {
     cy.get('[data-testid="video-runs-section"]').should('have.attr', 'open');
     cy.get('[data-testid="video-ci-runs"]').should('exist');
   });
+  it('reprices the API reference, updating the cards, the table and the URL', () => {
+    mount();
+    // 0.034 $/video-s × 8 s clip = $0.272; 5.9732 videos/GPU-hr × $0.272 − $1.22 = $0.40 profit.
+    kpi('h200').should('contain', 'API $/video').and('contain', '$0.272').and('contain', '$0.40');
+    // H100 on the participating basis: 5.3741 × $0.272 − $1.17 = $0.29.
+    kpi('h100').should('contain', '$0.29');
+    cy.get('[data-testid="video-api-reference-caption"]')
+      .should('contain', 'Reference $0.034/video-s')
+      .and('contain', '$0.034–$0.047')
+      .and('contain', 'captured 2026-09-19')
+      .and('contain', 'MiniMax Design');
+    cy.get('[data-testid="video-api-price"]').clear().type('0.05');
+    // $0.400 per clip; 5.9732 × $0.400 − $1.22 = $1.17 profit.
+    kpi('h200').should('contain', '$0.400').and('contain', '$1.17');
+    cy.location('search').should('contain', 'v_api=0.05');
+    cy.contains('button', 'Table').click();
+    cy.get('[data-testid="data-table-preset-all"]').click();
+    cy.get('[data-testid="video-points-table"] thead')
+      .should('contain', 'Revenue per GPU-hour at API list price')
+      .and('contain', 'API list price ÷ TCO cost per video (Owning at Large Hyperscaler Volume)');
+    // H200 row: revenue 5.9732 × $0.400 = $2.39; multiple $0.400 ÷ $0.2042 = 1.96.
+    cy.contains('[data-testid="video-points-table"] tbody tr', 'H200')
+      .should('contain', '$2.39')
+      .and('contain', '1.96');
+    cy.get('[data-testid="video-api-price-reset"]').click();
+    cy.contains('[data-testid="video-points-table"] tbody tr', 'H200').should('contain', '$1.62');
+    cy.location('search').should('not.contain', 'v_api');
+  });
+  it('keeps negative profit per GPU-hour on the canvas on the allocated basis', () => {
+    mount('/video', '?v_y=profitPerGpuHour&v_basis=allocated');
+    // H100 (−$0.44) and B200 (−$0.16) bill idle boards; only H200 (+$0.40) stays positive.
+    points().should('have.length', 3);
+    cy.get('[data-testid="video-hardware-chart"] .y-axis .tick text').should(($ticks) => {
+      const labels = [...$ticks].map((el) => el.textContent ?? '');
+      expect(labels.some((label) => /^[-−]/u.test(label))).to.equal(true);
+    });
+    cy.get('[data-testid="video-chart-card"]').should(
+      'contain',
+      'Profit per GPU-hour, API list price − TCO (Owning at Large Hyperscaler Volume)',
+    );
+    kpi('h100').should('contain', '-$0.44');
+    kpi('b200').should('contain', '-$0.16');
+  });
   it('shows placeholders while loading instead of a false "Not measured"', () => {
     cy.intercept('GET', '/api/video-runs?format=history&page=1', (req) => {
       req.reply({ fixture: 'api/video-history.json', delay: 800 });
@@ -131,6 +174,10 @@ describe('Video hardware dashboard (retained fixture)', () => {
       '每 1 美元 TCO 生成视频数（Hyperscaler 自有设备）',
     );
     kpi('mi355x').should('contain', '未测得');
-    cy.get('[data-testid="video-config-bar"]').should('contain', '成本档位');
+    kpi('h200').should('contain', 'API 标价 / 条视频').and('contain', '利润 / GPU 小时');
+    cy.get('[data-testid="video-config-bar"]')
+      .should('contain', '成本档位')
+      .and('contain', 'API 价格参考（$/视频秒）')
+      .and('contain', '采集于 2026-09-19');
   });
 });
