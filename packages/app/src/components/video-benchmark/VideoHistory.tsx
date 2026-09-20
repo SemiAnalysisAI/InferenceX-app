@@ -49,7 +49,6 @@ const STRINGS = {
     throughput: 'Valid clips / GPU-hour',
     energy: 'GPU-board kJ / valid clip',
     status: 'Execution',
-    open: 'Open result',
     missing:
       '— means unavailable, invalid or insufficient samples. P90 requires at least 10 valid samples per cell.',
     metricNote:
@@ -93,7 +92,6 @@ const STRINGS = {
     throughput: '有效视频数 / GPU 小时',
     energy: '每有效视频 GPU 板卡能耗（kJ）',
     status: '执行状态',
-    open: '打开结果',
     missing: '— 表示无数据、数据无效或样本不足。每个配置至少有 10 个有效样本才显示 P90。',
     metricNote:
       '延迟与吞吐量涵盖提交到媒体下载完成。能耗使用记录的生成时间窗口，按参与计算的 GPU 板卡统计，越低越好；失败尝试的耗时仍计入对应测量窗口。',
@@ -128,11 +126,7 @@ const filter = (key: string, value: string, setter: (value: string) => void) => 
   track('video_history_filter_changed', { filter: key });
 };
 
-export default function VideoHistory({
-  onOpen,
-}: {
-  onOpen: (run: string, artifact: string, source?: string, cell?: string) => void;
-}) {
+export default function VideoHistory() {
   const locale = useLocale();
   const s = STRINGS[locale];
   const status = (value: string | null) =>
@@ -281,13 +275,6 @@ export default function VideoHistory({
                     {s.execution}: {date(source.observedAt)}
                   </p>
                 </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => onOpen(entry.runId, String(entry.artifact.id), source.id)}
-                >
-                  {s.open}
-                </Button>
               </div>
               <p className="text-xs text-muted-foreground">
                 {s.status}: {status(source.execution)} · {s.fidelity}: {status(source.fidelity)} ·{' '}
@@ -328,19 +315,9 @@ export default function VideoHistory({
                           data-testid="video-history-observation"
                         >
                           <th className="p-2 font-normal">
-                            <button
-                              className="cursor-pointer text-left text-primary underline"
-                              onClick={() =>
-                                onOpen(
-                                  entry.runId,
-                                  String(entry.artifact.id),
-                                  source.id,
-                                  point.cell ?? undefined,
-                                )
-                              }
-                            >
+                            <span>
                               {point.hardware || s.unavailable} · C{point.concurrency ?? '—'}
-                            </button>
+                            </span>
                             <p className="text-xs text-muted-foreground">
                               {point.runtime.slice(0, 12) || '—'}
                             </p>

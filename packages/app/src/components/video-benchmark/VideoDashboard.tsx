@@ -26,7 +26,7 @@ import {
 import { latestVideoCells } from './points';
 import { formatApiPrice, H3_API_REFERENCE } from './api-reference';
 import { useVideoPoints } from './use-video-points';
-import VideoCIRuns from './VideoCIRuns';
+import VideoHistory from './VideoHistory';
 import VideoCompare from './VideoCompare';
 import VideoConfigBar from './VideoConfigBar';
 import VideoEvidence from './VideoEvidence';
@@ -41,18 +41,8 @@ import {
   type VideoDashboardState,
 } from './video-url-state';
 
-/** URL params owned by the run/results/history views; any of them opens that section on load. */
-const RUNS_SECTION_PARAMS = [
-  'run',
-  'artifact',
-  'source',
-  'cell',
-  'view',
-  'compare',
-  'history-hardware',
-  'history-concurrency',
-  'history-query',
-];
+/** History filter params; a deep link carrying one opens the history section on load. */
+const HISTORY_SECTION_PARAMS = ['history-hardware', 'history-concurrency', 'history-query'];
 const CSV_METRICS: readonly MetricId[] = [
   'p50Latency',
   'p90Latency',
@@ -81,8 +71,8 @@ const STRINGS = {
     idleItem: (hardware: string, used: number, reserved: number) =>
       `${hardware} (${used} of ${reserved})`,
     deployments: (n: number) => `${n} deployments`,
-    runs: 'Runs, videos & evidence',
-    runsHint: 'Per-run results, generated clips, fidelity checks and the performance history list.',
+    history: 'Performance history',
+    historyHint: 'Every published H3 result, including older runs.',
     loading: 'Loading published results…',
     error: 'Could not load published results',
     retry: 'Retry',
@@ -108,8 +98,8 @@ const STRINGS = {
     idleItem: (hardware: string, used: number, reserved: number) =>
       `${hardware}（${used} / ${reserved} 张）`,
     deployments: (n: number) => `${n} 种部署`,
-    runs: '运行、视频与证据',
-    runsHint: '按运行查看结果、生成的视频、保真度检查以及性能历史列表。',
+    history: '性能历史',
+    historyHint: '所有已发布的 H3 结果，包括较早的运行。',
     loading: '正在加载已发布结果…',
     error: '无法加载已发布结果',
     retry: '重试',
@@ -136,11 +126,11 @@ export default function VideoDashboard() {
   const [state, setState] = useState<VideoDashboardState>(DEFAULT_VIDEO_DASHBOARD_STATE);
   const [hidden, setHidden] = useState<ReadonlySet<string>>(() => new Set());
   const [legendExpanded, setLegendExpanded] = useState(true);
-  const [runsOpen, setRunsOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   useEffect(() => {
     setState(readVideoDashboardState(location.search));
     const params = new URLSearchParams(location.search);
-    setRunsOpen(RUNS_SECTION_PARAMS.some((key) => params.has(key)));
+    setHistoryOpen(HISTORY_SECTION_PARAMS.some((key) => params.has(key)));
   }, []);
   const update = useCallback((patch: Partial<VideoDashboardState>) => {
     setState((old) => {
@@ -170,7 +160,6 @@ export default function VideoDashboard() {
 
   const options = metricOptions(state);
   const cells = useMemo(() => latestVideoCells(points), [points]);
-  // Each hardware is represented by its most efficient measured deployment.
   const measured = useMemo(
     () =>
       new Map(
@@ -422,20 +411,20 @@ export default function VideoDashboard() {
       )}
       <details
         className="rounded-xl border px-4 py-3"
-        data-testid="video-runs-section"
-        open={runsOpen}
+        data-testid="video-history-section"
+        open={historyOpen}
         onToggle={(event) => {
           const open = event.currentTarget.open;
-          if (open === runsOpen) return;
-          setRunsOpen(open);
-          track('video_runs_section_toggled', { open });
+          if (open === historyOpen) return;
+          setHistoryOpen(open);
+          track('video_history_section_toggled', { open });
         }}
       >
         <summary className="cursor-pointer text-sm font-medium">
-          {s.runs}
-          <span className="ml-2 font-normal text-muted-foreground">{s.runsHint}</span>
+          {s.history}
+          <span className="ml-2 font-normal text-muted-foreground">{s.historyHint}</span>
         </summary>
-        <div className="mt-3">{runsOpen && <VideoCIRuns />}</div>
+        <div className="mt-3">{historyOpen && <VideoHistory />}</div>
       </details>
     </div>
   );

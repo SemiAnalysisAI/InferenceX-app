@@ -1,9 +1,8 @@
 /**
  * Linear axis domain for the hardware chart, anchored at zero and padded past
  * the data by the `pad` multiplier so point labels clear the plot edges.
- * Positive-only data spans [0, pad·max]; all-negative data — profit per
- * GPU-hour when the API price misses every tier cost — spans [pad·min, 0], so
- * break-even is the top edge rather than a synthetic ceiling above the data;
+ * Positive-only data spans [0, pad·max]; all-negative data spans [pad·min, 0],
+ * so break-even is the top edge rather than a synthetic ceiling above the data;
  * mixed data pads both ends. Only empty data gets the unit domain that keeps
  * the axes drawn, and all-zero data keeps that unit height instead of
  * collapsing the scale to a single tick.

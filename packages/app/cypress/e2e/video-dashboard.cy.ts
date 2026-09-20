@@ -76,8 +76,8 @@ describe('Video hardware dashboard (E2E fixtures)', () => {
     cy.get('[data-testid="video-kpi-card"][data-hardware="h100"]')
       .should('contain', '4 of 8 GPUs')
       .and('contain', '$0.372');
-    cy.get('[data-testid="video-runs-section"]').should('not.have.attr', 'open');
-    cy.get('[data-testid="video-ci-runs"]').should('not.exist');
+    cy.get('[data-testid="video-history-section"]').should('not.have.attr', 'open');
+    cy.get('[data-testid="video-history"]').should('not.exist');
   });
   it('lists only the measured deployments in the table view, without a concurrency column', () => {
     cy.visit('/video?v_view=table');
@@ -207,7 +207,6 @@ describe('Video hardware dashboard (E2E fixtures)', () => {
       'contain',
       'Cost tier: Owning at Large Hyperscaler Volume.',
     );
-    // Swapping sides flips the deltas and records the pair in the URL.
     cy.get('[data-testid="video-compare-swap"]').click();
     cy.get('[data-testid="video-compare-baseline"]').should('contain', 'B200');
     cy.get('[data-testid="video-compare-candidate"]').should('contain', 'H100');
@@ -217,9 +216,9 @@ describe('Video hardware dashboard (E2E fixtures)', () => {
       .should('have.attr', 'data-tone', 'worse');
     cy.location('search').should('contain', 'v_base=b200').and('contain', 'v_cand=h100');
   });
-  it('opens the runs section for history deep links and renders the Chinese dashboard', () => {
-    cy.visit('/video?view=history');
-    cy.get('[data-testid="video-runs-section"]').should('have.attr', 'open');
+  it('opens the history section for history deep links and renders the Chinese dashboard', () => {
+    cy.visit('/video?history-hardware=H200');
+    cy.get('[data-testid="video-history-section"]').should('have.attr', 'open');
     cy.get('[data-testid="video-history"] h1').should('contain', 'Performance history');
     cy.visit('/zh/video');
     cy.get('[data-testid="video-hardware-chart"] circle.point').should('have.length', 3);
