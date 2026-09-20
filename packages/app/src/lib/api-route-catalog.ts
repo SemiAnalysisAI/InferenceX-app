@@ -46,6 +46,174 @@ export type ApiRouteCatalogEntry = PublishedApiRouteCatalogEntry | ExcludedApiRo
  */
 export const apiRouteCatalog = [
   {
+    source: 'src/app/api/v1/views/cache-reuse/route.ts',
+    path: '/api/v1/views/cache-reuse',
+    method: 'GET',
+    classification: 'published-read',
+    operationId: 'get-cache-reuse-view',
+    sourceSha256: 'c9a6a39307a62f04f822772e1cbe492de2dbd1b27dba67006f03a84fb278da10',
+  },
+  {
+    source: 'src/app/api/v1/views/calculator/route.ts',
+    path: '/api/v1/views/calculator',
+    method: 'GET',
+    classification: 'published-read',
+    operationId: 'get-calculator-view',
+    sourceSha256: '85bf54da0dda703989ed6b5b489f0fd116e6be7019ed7570a115f9491e75b407',
+  },
+  {
+    source: 'src/app/api/v1/views/collectivex/route.ts',
+    path: '/api/v1/views/collectivex',
+    method: 'GET',
+    classification: 'published-read',
+    operationId: 'get-collectivex-view',
+    sourceSha256: '222e6b50f495435573c8ee297f85507384daaf8a71137bab5c07b1407bb04c21',
+  },
+  {
+    source: 'src/app/api/v1/views/compare/route.ts',
+    path: '/api/v1/views/compare',
+    method: 'GET',
+    classification: 'published-read',
+    operationId: 'get-compare-view',
+    sourceSha256: 'f762f11bd1551832e899c3c27b660ab9ad82312c14c634e13b73f86aafae986b',
+  },
+  {
+    source: 'src/app/api/v1/views/current-inferencex-image/route.ts',
+    path: '/api/v1/views/current-inferencex-image',
+    method: 'GET',
+    classification: 'published-read',
+    operationId: 'get-current-inferencex-image-view',
+    sourceSha256: 'ddc535fd47874c2fc6f0f7ef2d98e2ba607e588a8ca19e922a14fa659811a01a',
+  },
+  {
+    source: 'src/app/api/v1/views/evaluation/route.ts',
+    path: '/api/v1/views/evaluation',
+    method: 'GET',
+    classification: 'published-read',
+    operationId: 'get-evaluation-view',
+    sourceSha256: '28289a928e524c2b5150a51b1f780978d026a76c74daad10412e05b5e8bfa47b',
+  },
+  {
+    source: 'src/app/api/v1/views/first-token/route.ts',
+    path: '/api/v1/views/first-token',
+    method: 'GET',
+    classification: 'published-read',
+    operationId: 'get-first-token-view',
+    sourceSha256: 'a5920ea483e2c9ad551991e90272f16c807de23b2e72647e949dcab13ab353e5',
+  },
+  {
+    source: 'src/app/api/v1/views/fleet/route.ts',
+    path: '/api/v1/views/fleet',
+    method: 'GET',
+    classification: 'published-read',
+    operationId: 'get-fleet-view',
+    sourceSha256: 'e57c3007bb61d882effdc7a63126ebbb40bf331761aa47fac89136daafffde61',
+  },
+  {
+    source: 'src/app/api/v1/views/gpu-metrics/route.ts',
+    path: '/api/v1/views/gpu-metrics',
+    method: 'GET',
+    classification: 'published-read',
+    operationId: 'get-gpu-metrics-view',
+    sourceSha256: '02641e8e2e7cb4d9e0984ed9f341c42f1360cf0a27016d2e6539bee2a270a81e',
+  },
+  {
+    source: 'src/app/api/v1/views/gpu-specs/route.ts',
+    path: '/api/v1/views/gpu-specs',
+    method: 'GET',
+    classification: 'published-read',
+    operationId: 'get-gpu-specs-view',
+    sourceSha256: 'b896689984e65cb0f038cc20e4b47cf7a31e0987ee039ae48b85e363610550d5',
+  },
+  {
+    source: 'src/app/api/v1/views/historical/route.ts',
+    path: '/api/v1/views/historical',
+    method: 'GET',
+    classification: 'published-read',
+    operationId: 'get-historical-view',
+    sourceSha256: '168d5228c1269aecf21d09e3792072e5e20d60054cf60172675cbde66f72da5e',
+  },
+  {
+    source: 'src/app/api/v1/views/inference/route.ts',
+    path: '/api/v1/views/inference',
+    method: 'GET',
+    classification: 'published-read',
+    operationId: 'get-inference-view',
+    sourceSha256: 'eef86be605732006f6e688a0e70eeb3d9ee9fd06abb857f29dc9e7f567c62d12',
+  },
+  {
+    source: 'src/app/api/v1/views/operatorx/route.ts',
+    path: '/api/v1/views/operatorx',
+    method: 'GET',
+    classification: 'published-read',
+    operationId: 'get-operatorx-view',
+    sourceSha256: '32f8cbba0b6591446d047bdf67ea585c0655d589c72d3f3781adda909758ab42',
+  },
+  {
+    source: 'src/app/api/v1/views/options/route.ts',
+    path: '/api/v1/views/options',
+    method: 'GET',
+    classification: 'published-read',
+    operationId: 'get-view-options',
+    sourceSha256: '490a0957d9b9467dca43dce2aa46f45341015d74ba4636ce524cb3830627fb7c',
+  },
+  {
+    source: 'src/app/api/v1/views/overview/route.ts',
+    path: '/api/v1/views/overview',
+    method: 'GET',
+    classification: 'published-read',
+    operationId: 'get-overview-view',
+    sourceSha256: '868217d9f2267c7ac8485b0f960dff05dabda842d988208e58616cadb2142af5',
+  },
+  {
+    source: 'src/app/api/v1/views/profit-estimator/route.ts',
+    path: '/api/v1/views/profit-estimator',
+    method: 'GET',
+    classification: 'published-read',
+    operationId: 'get-profit-estimator-view',
+    sourceSha256: 'e0e6d7316cf605e9f9d6423523028b42f6cf7f0bff6d8339a00cac02653261e2',
+  },
+  {
+    source: 'src/app/api/v1/views/profit-estimator-per-gigawatt/route.ts',
+    path: '/api/v1/views/profit-estimator-per-gigawatt',
+    method: 'GET',
+    classification: 'published-read',
+    operationId: 'get-profit-estimator-per-gigawatt-view',
+    sourceSha256: '3b513949eb51668aa52b07324d2cecc5506f8167df05464e8269446715a9c734',
+  },
+  {
+    source: 'src/app/api/v1/views/rankings/route.ts',
+    path: '/api/v1/views/rankings',
+    method: 'GET',
+    classification: 'published-read',
+    operationId: 'get-rankings-view',
+    sourceSha256: '345eb8b3ffe7a9636edd70d8f3753fac6832753066afaa4ed71cf3cbcb7e1633',
+  },
+  {
+    source: 'src/app/api/v1/views/reliability/route.ts',
+    path: '/api/v1/views/reliability',
+    method: 'GET',
+    classification: 'published-read',
+    operationId: 'get-reliability-view',
+    sourceSha256: '57f95609a1f818917891f99752ad1183dddad09b021edff445af8f4862d141db',
+  },
+  {
+    source: 'src/app/api/v1/views/submissions/route.ts',
+    path: '/api/v1/views/submissions',
+    method: 'GET',
+    classification: 'published-read',
+    operationId: 'get-submissions-view',
+    sourceSha256: '205706474c9947cbd03b11aee1753147fbc85634265a37305b4d104fdf5b02f0',
+  },
+  {
+    source: 'src/app/api/v1/views/video/route.ts',
+    path: '/api/v1/views/video',
+    method: 'GET',
+    classification: 'published-read',
+    operationId: 'get-video-view',
+    sourceSha256: '9ed902e584a39f03e4a6a375c9a286c95abe5a840aa5531f749fdec4e0dedf15',
+  },
+  {
     source: 'src/app/api/v1/operatorx/runs/route.ts',
     path: '/api/v1/operatorx/runs',
     method: 'GET',
@@ -614,6 +782,150 @@ export interface ApiContractSourceDigest {
  * touching a route module. Digest changes require an explicit documentation review.
  */
 export const apiContractSourceDigests = [
+  {
+    source: 'src/lib/views-api/upstream-error.ts',
+    sourceSha256: 'c3f1b4c318e1ae771a67edd85f16d69b7316461334604fd8c892254eface715a',
+    reviewArea: {
+      en: 'Dashboard read-only selector and calculation parity.',
+      zh: '仪表板只读接口的选择项与计算一致性。',
+    },
+  },
+
+  {
+    source: 'src/components/video-benchmark/view-selection.ts',
+    sourceSha256: '74f9b6a36aee43b8db3570a64ebff826f1792181f194413d5a0357c55d63c750',
+    reviewArea: {
+      en: 'Dashboard read-only selector and calculation parity.',
+      zh: '仪表板只读接口的选择项与计算一致性。',
+    },
+  },
+
+  {
+    source: 'src/components/operatorx/view-data.ts',
+    sourceSha256: 'b491ba1680785fd9e732279f05807d0d108674e3db899fdd1e30318f081a007d',
+    reviewArea: {
+      en: 'Dashboard read-only selector and calculation parity.',
+      zh: '仪表板只读接口的选择项与计算一致性。',
+    },
+  },
+
+  {
+    source: 'src/components/gpu-power/chart-data.ts',
+    sourceSha256: '34bdab18810a5e6688d150b71c4c1b22d383a63775672c0c915549b841c48475',
+    reviewArea: {
+      en: 'Dashboard read-only selector and calculation parity.',
+      zh: '仪表板只读接口的选择项与计算一致性。',
+    },
+  },
+
+  {
+    source: 'src/components/evaluation/date-resolution.ts',
+    sourceSha256: 'f1a3d397939d94a17e624c89a9f167c0109e37c8cbc32f902f426bada87529e1',
+    reviewArea: {
+      en: 'Dashboard read-only selector and calculation parity.',
+      zh: '仪表板只读接口的选择项与计算一致性。',
+    },
+  },
+
+  {
+    source: 'src/components/reliability/aggregate.ts',
+    sourceSha256: '23f2d9bbc4c5be22193d1a59b6783326fee8ca636ed5f1e9d18115bc9854b37b',
+    reviewArea: {
+      en: 'Dashboard read-only selector and calculation parity.',
+      zh: '仪表板只读接口的选择项与计算一致性。',
+    },
+  },
+
+  {
+    source: 'src/components/inference/hooks/interpolated-trend-core.ts',
+    sourceSha256: '1710096c62382b30f8ed581cc0464f8e71900502385d0cee55825a088c05ac5f',
+    reviewArea: {
+      en: 'Dashboard read-only selector and calculation parity.',
+      zh: '仪表板只读接口的选择项与计算一致性。',
+    },
+  },
+
+  {
+    source: 'src/components/inference/hooks/chart-data-core.ts',
+    sourceSha256: '0c86987ed025557172a8d020144ca462be1ecac880d53b7d929f93a617086c33',
+    reviewArea: {
+      en: 'Dashboard read-only selector and calculation parity.',
+      zh: '仪表板只读接口的选择项与计算一致性。',
+    },
+  },
+
+  {
+    source: 'src/components/calculator/power-ranking.ts',
+    sourceSha256: 'c3c4fbbf1028ca84e278d3f6ec095a74603d93a7b00f1b9c14b44141f36bf50e',
+    reviewArea: {
+      en: 'Dashboard read-only selector and calculation parity.',
+      zh: '仪表板只读接口的选择项与计算一致性。',
+    },
+  },
+
+  {
+    source: 'src/components/calculator/throughput-data.ts',
+    sourceSha256: 'bf370861a120e59c21d4db6fb100adacf5714d13b8d100e71ac78a42771b49fe',
+    reviewArea: {
+      en: 'Dashboard read-only selector and calculation parity.',
+      zh: '仪表板只读接口的选择项与计算一致性。',
+    },
+  },
+
+  {
+    source: 'src/lib/views-api/errors.ts',
+    sourceSha256: '5b70ecd63603f39a3d887961f8e172752efb3cb4600e7d9fd4412479031b2e88',
+    reviewArea: {
+      en: 'Dashboard read-only selector and calculation parity.',
+      zh: '仪表板只读接口的选择项与计算一致性。',
+    },
+  },
+
+  {
+    source: 'src/lib/views-api/calculator-extensions.ts',
+    sourceSha256: 'c68d8d7b7ca94a28c21452b0d99845b7b07283da8faf2c7d8f7a188768d10bc5',
+    reviewArea: {
+      en: 'Dashboard read-only selector and calculation parity.',
+      zh: '仪表板只读接口的选择项与计算一致性。',
+    },
+  },
+
+  {
+    source: 'src/lib/views-api/source.ts',
+    sourceSha256: '01a8911afbaa52a0af061c7fc484afd48e7cf703064ba693b083dc8ef4e19bbe',
+    reviewArea: {
+      en: 'Dashboard read-only selector and calculation parity.',
+      zh: '仪表板只读接口的选择项与计算一致性。',
+    },
+  },
+
+  {
+    source: 'src/lib/views-api/series.ts',
+    sourceSha256: 'ce3a9c04a591380e7d039fbc83a22d91747d35e85d43b9a5f8ae342d43c372be',
+    reviewArea: {
+      en: 'Dashboard read-only selector and calculation parity.',
+      zh: '仪表板只读接口的选择项与计算一致性。',
+    },
+  },
+
+  {
+    source: 'src/lib/views-api/registry.ts',
+    sourceSha256: 'e7494504b118a7706742e542b3cc3b2543823d8463ac5b32b13ebdb971c84aed',
+    reviewArea: {
+      en: 'Dashboard read-only selector and calculation parity.',
+      zh: '仪表板只读接口的选择项与计算一致性。',
+    },
+  },
+
+  {
+    source: 'src/lib/views-api/params.ts',
+    sourceSha256: '3c72df54b236586f7c7c86aeb6912931fb7d91e25fb92eaa85aa3487a564a1ce',
+    reviewArea: {
+      en: 'Dashboard read-only selector and calculation parity.',
+      zh: '仪表板只读接口的选择项与计算一致性。',
+    },
+  },
+
   {
     source: 'src/lib/operatorx-ingest.ts',
     sourceSha256: 'bec2e115e006457816fc8e915b51128ea57b1c481b06b50fb4698ec37d94b425',

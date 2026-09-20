@@ -1,6 +1,6 @@
 ---
 name: inferencex-api
-description: Use when users ask about InferenceX public benchmarks, PowerX measured power or energy, AgentX summaries or traces, result provenance, TCO, framework releases, CollectiveX, evaluations, datasets, evidence bundles, or offline verification.
+description: 'Query InferenceX public benchmarks, dashboard views and filters, PowerX, AgentX, provenance, TCO, framework releases, CollectiveX, evaluations, datasets, and evidence bundles; verify saved evidence offline. Use for public data analysis, not launching benchmarks or accessing private uploads.'
 ---
 
 # InferenceX API
@@ -83,6 +83,13 @@ comparisons and individual rows are separate populations. Report date endpoints;
 when a duration is requested, compute and label elapsed or inclusive days.
 
 ## Choose the workflow
+
+- **Dashboard views or filter parity:** read
+  [dashboard read-only views](references/dashboard-views.md). Use the documented
+  `/api/v1/views/*` GET endpoint and retain resolved parameters and source identity.
+  These projections use raw capture, not a seventh formal evidence workflow.
+  When changing a non-sensitive public view, update its read-only API, OpenAPI,
+  selector tests, and this package in the same PR; do not create another package.
 
 - **PowerX measured power or energy:** read
   [PowerX](references/powerx.md), then use `inferencex powerx export`. Preserve

@@ -5,6 +5,12 @@ queries existing public InferenceX observations and creates replayable evidence
 bundles for PowerX, AgentX, result provenance, TCO, framework releases, and
 CollectiveX. It never launches benchmarks.
 
+For dashboard filters and computed chart/table data, use the
+[read-only views reference](skills/inferencex-api/references/dashboard-views.md).
+It extends this existing package without changing the six formal evidence
+workflows. The new API routes require deployment of the corresponding app change;
+this source update does not publish a new npm release.
+
 ## Requirements and installation
 
 Use Node 24 or later. Public installation requires npm registry access; live

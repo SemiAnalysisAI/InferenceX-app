@@ -7,9 +7,22 @@ import { COLLECTIVEX_VERSIONS } from '@semianalysisai/inferencex-db/collectivex/
 
 import { POWER_VALIDITY_FILTERS } from './benchmark-power-validity';
 import { PUBLIC_API_ERRORS } from './public-api-errors';
+import { operations as calculatorViews } from './views-api/docs/calculator';
+import { operations as compareViews } from './views-api/docs/compare';
+import { operations as evaluationViews } from './views-api/docs/evaluation';
+import { extendViewOperations, operations as extensionViews } from './views-api/docs/extensions';
+import { operations as fleetViews } from './views-api/docs/fleet';
+import { operations as gpuSpecsViews } from './views-api/docs/gpu-specs';
+import { operations as historicalViews } from './views-api/docs/historical';
+import { operations as inferenceViews } from './views-api/docs/inference';
+import { operations as optionsViews } from './views-api/docs/options';
+import { operations as overviewViews } from './views-api/docs/overview';
+import { operations as rankingsViews } from './views-api/docs/rankings';
+import { operations as reliabilityViews } from './views-api/docs/reliability';
 
 export type ApiDocumentationLocale = 'en' | 'zh';
 export type ApiGroupId =
+  | 'views'
   | 'core'
   | 'external'
   | 'datasets'
@@ -741,6 +754,14 @@ const operatorXExampleRun = {
 
 export const apiDocumentationGroups: readonly ApiDocumentationGroup[] = [
   {
+    id: 'views',
+    title: text('Read-only dashboard views', '仪表板只读视图'),
+    description: text(
+      'Dashboard data and calculations with explicit filters.',
+      '通过显式筛选参数读取仪表板数据和计算结果。',
+    ),
+  },
+  {
     id: 'core',
     title: text('Core benchmark data', '核心基准数据'),
     description: text(
@@ -791,6 +812,20 @@ export const apiDocumentationGroups: readonly ApiDocumentationGroup[] = [
 ];
 
 export const apiOperations: readonly ApiOperation[] = [
+  ...extendViewOperations([
+    ...optionsViews,
+    ...inferenceViews,
+    ...historicalViews,
+    ...calculatorViews,
+    ...fleetViews,
+    ...evaluationViews,
+    ...reliabilityViews,
+    ...gpuSpecsViews,
+    ...overviewViews,
+    ...rankingsViews,
+    ...compareViews,
+  ]),
+  ...extensionViews,
   {
     id: 'list-operatorx-runs',
     group: 'operatorx',
@@ -3259,7 +3294,7 @@ export function buildOpenApiDocument(serverUrl: string = API_BASE_URL): OpenApiD
           {
             description: response.description.en,
             'x-description-zh': response.description.zh,
-            content,
+            ...(response.status === '204' ? {} : { content }),
           },
         ];
       }),
