@@ -1,4 +1,5 @@
 import { GPU_SPECS } from '@/lib/gpu-specs';
+import { deploymentKey, sharedLayoutCells } from './deployment';
 import { hardwareSort } from './hardware';
 import { metricValue, type GpuBasis, type MetricOptions, type VideoPoint } from './metrics';
 import { latestVideoCells } from './points';
@@ -43,16 +44,14 @@ export interface PowerUtilizationRow {
   percentOfCap: number | null;
 }
 
-/** One row per measured hardware at C1. */
+/** One row per measured hardware, on the deployment layout the hardware share. */
 export function powerUtilization(points: VideoPoint[]): PowerUtilizationRow[] {
-  return measuredCells(points)
-    .filter((p) => p.concurrency === 1)
-    .map((p) => ({
-      hardwareKey: p.hardwareKey,
-      avgPowerW: positive(p.avgPowerW) ? p.avgPowerW : null,
-      enforcedLimitW: positive(p.enforcedLimitW) ? p.enforcedLimitW : null,
-      percentOfCap: metricValue(p, 'powerPctCap', metricOptions('participating')),
-    }));
+  return sharedLayoutCells(measuredCells(points)).map((p) => ({
+    hardwareKey: p.hardwareKey,
+    avgPowerW: positive(p.avgPowerW) ? p.avgPowerW : null,
+    enforcedLimitW: positive(p.enforcedLimitW) ? p.enforcedLimitW : null,
+    percentOfCap: metricValue(p, 'powerPctCap', metricOptions('participating')),
+  }));
 }
 
 export interface PowerRange {
@@ -100,11 +99,16 @@ export function concurrencyPlateau(
   points: VideoPoint[],
   basis: GpuBasis = 'participating',
 ): ConcurrencyPlateauRow[] {
-  const cells = measuredCells(points);
   const options = metricOptions(basis);
   const baseline = new Map(
-    cells.filter((p) => p.concurrency === 1).map((p) => [p.hardwareKey, p] as const),
+    sharedLayoutCells(measuredCells(points)).map((p) => [p.hardwareKey, p] as const),
   );
+  // Only cells of the baseline's own layout are concurrency steps of that deployment;
+  // a hardware with no non-queued cell keeps its rows with null ratios.
+  const cells = measuredCells(points).filter((p) => {
+    const base = baseline.get(p.hardwareKey);
+    return base === undefined || deploymentKey(p) === deploymentKey(base);
+  });
   return cells.map((p) => {
     const base = baseline.get(p.hardwareKey);
     const videosPerGpuHour = metricValue(p, 'videosPerGpuHour', options);
@@ -204,13 +208,12 @@ export interface ScalingVsSpecRow {
 }
 
 type TimedPoint = MeasuredPoint & { p50: number };
-const isTimedBaseline = (p: MeasuredPoint): p is TimedPoint =>
-  p.concurrency === 1 && positive(p.p50);
+const isTimed = (p: MeasuredPoint): p is TimedPoint => positive(p.p50);
 
-/** Consecutive measured hardware from slowest to fastest C1 P50, each step against its spec ratios. */
+/** Consecutive measured hardware from slowest to fastest P50 on the shared layout, each step against its spec ratios. */
 export function scalingVsSpec(points: VideoPoint[]): ScalingVsSpecRow[] {
-  const ordered = measuredCells(points)
-    .filter(isTimedBaseline)
+  const ordered = sharedLayoutCells(measuredCells(points))
+    .filter(isTimed)
     .toSorted((a, b) => b.p50 - a.p50);
   return ordered.slice(1).map((to, index) => {
     const from = ordered[index];
@@ -283,16 +286,15 @@ function uniform<T>(values: (T | null)[]): T | null {
 /** Caveat inputs read from the cells so the panel never states a number the data does not carry. */
 export function evidenceFacts(points: VideoPoint[]): EvidenceFacts {
   const cells = measuredCells(points);
+  const shared = sharedLayoutCells(cells);
   const samples = cells.map((p) => p.samples).filter(positive);
-  const attention = cells
-    .filter((p) => p.concurrency === 1)
-    .flatMap((p) =>
-      p.server?.attention ? [{ hardwareKey: p.hardwareKey, attention: p.server.attention }] : [],
-    );
+  const attention = shared.flatMap((p) =>
+    p.server?.attention ? [{ hardwareKey: p.hardwareKey, attention: p.server.attention }] : [],
+  );
   return {
-    participating: uniform(cells.map((p) => (positive(p.participating) ? p.participating : null))),
-    tp: uniform(cells.map((p) => (positive(p.server?.tp) ? p.server.tp : null))),
-    ulysses: uniform(cells.map((p) => (positive(p.server?.ulysses) ? p.server.ulysses : null))),
+    participating: uniform(shared.map((p) => (positive(p.participating) ? p.participating : null))),
+    tp: uniform(shared.map((p) => (positive(p.server?.tp) ? p.server.tp : null))),
+    ulysses: uniform(shared.map((p) => (positive(p.server?.ulysses) ? p.server.ulysses : null))),
     samples: samples.length > 0 ? { min: Math.min(...samples), max: Math.max(...samples) } : null,
     workload: uniform(cells.map((p) => p.workload.split(' · ').slice(0, 4).join(' · ') || null)),
     attention: uniform(attention.map((entry) => entry.attention)) === null ? attention : [],
