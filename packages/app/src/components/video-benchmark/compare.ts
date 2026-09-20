@@ -6,6 +6,7 @@ import {
   type MetricOptions,
   type VideoPoint,
 } from './metrics';
+import { leadCell } from './deployment';
 import { latestVideoCells } from './points';
 import { servingCells, type ServingCell } from './serving';
 import { storedBundle, type StoredArtifact, type StoredSource } from './stored';
@@ -34,11 +35,17 @@ export interface CompareRow {
   candidateBetter: boolean | null;
 }
 
-/** Measured C1 cells a reader can pick for comparison: registry hardware with a P50 (newest per hardware). */
+/**
+ * One cell a reader can pick per registry hardware: its most efficient
+ * non-queued deployment (chip basis) with a P50. Queued cells never qualify.
+ */
 export function comparablePoints(points: VideoPoint[]): VideoPoint[] {
-  return latestVideoCells(points).filter(
-    (p) => p.concurrency === 1 && p.hardwareKey !== null && p.p50 !== null,
-  );
+  const cells = latestVideoCells(points);
+  const keys = [...new Set(cells.flatMap((p) => (p.hardwareKey === null ? [] : [p.hardwareKey])))];
+  return keys.flatMap((key) => {
+    const lead = leadCell(cells, key, { tier: 'h', basis: 'participating' });
+    return lead && lead.p50 !== null ? [lead] : [];
+  });
 }
 
 /** Side-by-side deltas; every null input stays null (never 0). */

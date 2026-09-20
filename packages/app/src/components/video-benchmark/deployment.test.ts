@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { deploymentKey, isQueueing, layoutLabel, leadCell } from './deployment';
+import { deploymentKey, isQueueing, layoutLabel, leadCell, sharedLayoutCells } from './deployment';
 import type { VideoPoint } from './metrics';
 
 const base: VideoPoint = {
@@ -59,6 +59,30 @@ describe('deployment', () => {
     );
     expect(layoutLabel({ ...base, server: null }, 'en')).toBe('4 GPU');
     expect(layoutLabel({ ...base, participating: null, server: null }, 'en')).toBe('—');
+  });
+  it('picks the layout most hardware share, falling back to the lead cell', () => {
+    const b200Eight = {
+      ...base,
+      id: 'b8',
+      hardwareKey: 'b200',
+      participating: 8,
+      server: { tp: 4, ulysses: 2, attention: null },
+      wallSeconds: 900,
+    };
+    const b200Four = { ...base, id: 'b4', hardwareKey: 'b200', wallSeconds: 1500 };
+    const h100Two = {
+      ...base,
+      id: 'h2',
+      hardwareKey: 'h100',
+      participating: 2,
+      server: { tp: 2, ulysses: 1, attention: null },
+    };
+    const queued = { ...base, id: 'q', concurrency: 2 };
+    // 4g:tp2:u2 is shared by h200 and b200; h100 only has a 2-GPU cell and keeps it.
+    expect(
+      sharedLayoutCells([base, queued, b200Eight, b200Four, h100Two]).map((p) => p.id),
+    ).toEqual(['a', 'b4', 'h2']);
+    expect(sharedLayoutCells([])).toEqual([]);
   });
   it('leads with the most efficient non-queued deployment of the hardware', () => {
     const eightBoards = {

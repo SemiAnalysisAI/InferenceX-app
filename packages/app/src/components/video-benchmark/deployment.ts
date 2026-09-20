@@ -37,6 +37,32 @@ export function layoutLabel(p: Layout, locale: 'en' | 'zh'): string {
 }
 
 /**
+ * One non-queued cell per hardware on the deployment layout that the most
+ * hardware share (ties keep the first layout in cell order), so cross-hardware
+ * evidence compares like with like. A hardware without that layout falls back
+ * to its lead cell. Cells arrive in hardware order and stay in it.
+ */
+export function sharedLayoutCells<T extends VideoPoint>(cells: T[]): T[] {
+  const deployments = cells.filter((p) => p.hardwareKey !== null && !isQueueing(p));
+  const hardwareByLayout = new Map<string, Set<string>>();
+  for (const p of deployments) {
+    const set = hardwareByLayout.get(deploymentKey(p)) ?? new Set<string>();
+    set.add(p.hardwareKey!);
+    hardwareByLayout.set(deploymentKey(p), set);
+  }
+  let shared: string | null = null;
+  for (const [key, set] of hardwareByLayout)
+    if (shared === null || set.size > hardwareByLayout.get(shared)!.size) shared = key;
+  const keys = [...new Set(deployments.map((p) => p.hardwareKey!))];
+  return keys.flatMap((hardwareKey) => {
+    const cell =
+      deployments.find((p) => p.hardwareKey === hardwareKey && deploymentKey(p) === shared) ??
+      leadCell(deployments, hardwareKey, { tier: 'h', basis: 'participating' });
+    return cell ? [cell as T] : [];
+  });
+}
+
+/**
  * The cell that stands for a hardware in cards and comparisons: its most
  * efficient deployment under the current GPU basis (highest videos per
  * GPU-hour), lowest P50 on ties. Queued cells never lead; a hardware whose
