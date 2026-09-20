@@ -33,7 +33,7 @@ const base: VideoPoint = {
   status: 'complete',
   observedAt: null,
 };
-const options = { tier: 'h', basis: 'participating' } as const;
+const options = { tier: 'h' } as const;
 
 describe('deployment', () => {
   it('keys a deployment by boards and model split, not by concurrency', () => {
