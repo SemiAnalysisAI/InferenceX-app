@@ -76,7 +76,6 @@ describe('Video compare panel (retained fixture)', () => {
     clip('candidate').should('contain', 'B200').find('video').should('exist');
     cy.get('[data-testid="video-compare-baseline"]').should('contain', 'H100');
     cy.get('[data-testid="video-compare-candidate"]').should('contain', 'B200');
-    // Exactly three delta rows: time to video, TCO cost per video and energy per video.
     table()
       .find('tbody tr')
       .should(($rows) => {
@@ -108,7 +107,6 @@ describe('Video compare panel (retained fixture)', () => {
     cy.get('[data-testid="video-compare"]')
       .should('contain', 'retained CI outputs')
       .and('not.contain', 'GPU basis');
-    // Arena only: no blind mode and no case dropdown, just the two hardware selects.
     cy.get('[data-testid="video-compare-blind"]').should('not.exist');
     cy.get('[data-testid="video-compare-controls"] [role="combobox"]').should(($boxes) => {
       expect([...$boxes].map((el) => el.getAttribute('aria-label'))).to.deep.equal([

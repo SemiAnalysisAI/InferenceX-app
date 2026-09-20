@@ -64,7 +64,7 @@ export function sharedLayoutCells<T extends VideoPoint>(cells: T[]): T[] {
 
 /**
  * The cell that stands for a hardware in cards and comparisons: its most
- * efficient deployment under the current GPU basis (highest videos per
+ * efficient deployment (highest videos per participating
  * GPU-hour), lowest P50 on ties. Queued cells never lead; a hardware whose
  * cells all lack the rate falls back to its first deployment cell.
  */

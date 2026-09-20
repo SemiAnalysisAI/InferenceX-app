@@ -152,7 +152,6 @@ describe('Video hardware dashboard (retained fixture)', () => {
     headers().should(($ths) => {
       expect([...$ths].map((el) => el.textContent?.trim())).to.deep.equal(ALL_COLUMNS);
     });
-    // B200 C1: 77.9 s / 78.3 s, 11.53 videos/GPU-hr, 6.66 videos per $1, $0.150, $0.272 API, 301.1 kJ, 96.4 %, 3,856 W.
     cy.contains('[data-testid="video-points-table"] tbody tr', 'B200').should(($row) => {
       const cells = [...$row.find('td')].map((el) => el.textContent?.trim());
       expect(cells.slice(0, 12)).to.deep.equal([
@@ -183,17 +182,17 @@ describe('Video hardware dashboard (retained fixture)', () => {
       .and('contain', 'B200')
       .and('not.contain', 'H100');
     cy.location('search').should('contain', 'v_view=table');
-    cy.get('[data-testid="video-runs-section"]').should('not.have.attr', 'open');
+    cy.get('[data-testid="video-history-section"]').should('not.have.attr', 'open');
   });
-  it('restores v_ params from the URL and opens the runs section for run deep links', () => {
-    mount('/video', '?v_y=kjPerVideo&v_x=p50Latency&v_tier=r&view=history');
+  it('restores v_ params from the URL and opens the history section for history deep links', () => {
+    mount('/video', '?v_y=kjPerVideo&v_x=p50Latency&v_tier=r&history-hardware=H200');
     points().should('have.length', 3);
     cy.get('[data-testid="video-chart-card"]')
       .should('contain', 'GPU-board energy per video (kJ) vs. P50 time to video (s)')
       .and('contain', 'Cost tier: Rent - 3 Year Commit');
     kpi('h200').should('contain', '$0.485');
-    cy.get('[data-testid="video-runs-section"]').should('have.attr', 'open');
-    cy.get('[data-testid="video-ci-runs"]').should('exist');
+    cy.get('[data-testid="video-history-section"]').should('have.attr', 'open');
+    cy.get('[data-testid="video-history"] h1').should('contain', 'Performance history');
   });
   it('reprices the API list price beside the TCO cost, in the cards, the table and the URL', () => {
     mount();
