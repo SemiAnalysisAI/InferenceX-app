@@ -1,6 +1,7 @@
 'use client';
 
 import { Card } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useLocale } from '@/lib/use-locale';
 import { hardwareLabel, VIDEO_HARDWARE_ROSTER } from './hardware';
 import { formatMetric, metricValue, type MetricId, type VideoPoint } from './metrics';
@@ -46,10 +47,13 @@ export default function VideoKpiCards({
   points,
   state,
   colorFor,
+  loading = false,
 }: {
   points: VideoPoint[];
   state: VideoDashboardState;
   colorFor: (hardwareKey: string) => string;
+  /** While the published history loads, show placeholders rather than a false "Not measured". */
+  loading?: boolean;
 }) {
   const locale = useLocale();
   const s = STRINGS[locale];
@@ -73,7 +77,13 @@ export default function VideoKpiCards({
                 </span>
               )}
             </div>
-            {point ? (
+            {!point && loading ? (
+              <div className="space-y-2" data-testid="video-kpi-skeleton" aria-busy="true">
+                {CARD_METRICS.map((id) => (
+                  <Skeleton key={id} className="h-3 w-full" />
+                ))}
+              </div>
+            ) : point ? (
               <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
                 {CARD_METRICS.map((id) => (
                   <div key={id} className="contents">
