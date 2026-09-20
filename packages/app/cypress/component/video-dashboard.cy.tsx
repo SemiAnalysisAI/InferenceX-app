@@ -169,6 +169,8 @@ describe('Video hardware dashboard (retained fixture)', () => {
       req.reply({ fixture: 'api/video-history.json', delay: 800 });
     }).as('slowHistory');
     cy.intercept('GET', '/api/video-runs?page=*', { runs: [], nextPage: null });
+    // The AUT keeps the previous test's v_ params; start from the defaults.
+    cy.window().then((win) => win.history.replaceState(null, '', win.location.pathname));
     cy.mount(
       <PathnameContext.Provider value="/video">
         <VideoDashboard />
