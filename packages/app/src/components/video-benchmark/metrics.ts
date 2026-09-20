@@ -48,12 +48,26 @@ export type YMetricId =
   | 'videoSecondsPerGpuHour'
   | 'dollarsPerVideo'
   | 'kjPerVideo'
-  | 'videosPerKwh';
-export type MetricId = XMetricId | YMetricId | 'powerPctCap' | 'dollarsPerVideoSecond';
+  | 'videosPerKwh'
+  | 'revenuePerGpuHour'
+  | 'profitPerGpuHour'
+  | 'apiPriceMultiple';
+export type MetricId =
+  | XMetricId
+  | YMetricId
+  | 'powerPctCap'
+  | 'dollarsPerVideoSecond'
+  | 'apiPricePerVideo';
 
 export interface MetricOptions {
   tier: CostTier;
   basis: GpuBasis;
+  /**
+   * USD an API bills per video-second of the same clip (`H3_API_REFERENCE` or
+   * the reader's override). Missing or non-positive → every API-priced metric
+   * is null.
+   */
+  apiPricePerVideoSecond?: number | null;
 }
 
 interface MetricDefinition {
@@ -76,6 +90,9 @@ export const Y_METRICS: readonly YMetricId[] = [
   'dollarsPerVideo',
   'kjPerVideo',
   'videosPerKwh',
+  'revenuePerGpuHour',
+  'profitPerGpuHour',
+  'apiPriceMultiple',
 ];
 export const COST_TIERS: readonly CostTier[] = ['h', 'r'];
 
@@ -168,6 +185,42 @@ export const VIDEO_METRICS: Record<MetricId, MetricDefinition> = {
     polarity: 'higher',
     digits: 1,
   },
+  // API-priced metrics: list price × clip length, seen from the self-hosting
+  // operator's side, so more revenue, profit or price headroom is "higher".
+  apiPricePerVideo: {
+    label: 'API list price per video',
+    labelZh: '每条视频 API 标价',
+    unit: '$/video',
+    polarity: 'higher',
+    digits: 3,
+    currency: true,
+  },
+  revenuePerGpuHour: {
+    label: 'Revenue per GPU-hour at API list price',
+    labelZh: '按 API 标价计的每 GPU 小时收入',
+    unit: '$/GPU-hr',
+    polarity: 'higher',
+    digits: 2,
+    currency: true,
+  },
+  // Tiered labels take the cost tier in parentheses, so they carry no unit parentheses of their own.
+  profitPerGpuHour: {
+    label: 'Profit per GPU-hour, API list price − TCO',
+    labelZh: '每 GPU 小时利润，API 标价 − TCO',
+    unit: '$/GPU-hr',
+    polarity: 'higher',
+    digits: 2,
+    tiered: true,
+    currency: true,
+  },
+  apiPriceMultiple: {
+    label: 'API list price ÷ TCO cost per video',
+    labelZh: 'API 标价 ÷ 每条视频 TCO 成本',
+    unit: '×',
+    polarity: 'higher',
+    digits: 2,
+    tiered: true,
+  },
 };
 
 const finite = (n: number | null | undefined): n is number =>
@@ -189,6 +242,18 @@ function dollarsPerVideo(point: VideoPoint, options: MetricOptions): number | nu
   const rate = videosPerGpuHour(point, options.basis);
   const cost = point.hardwareKey ? costPerGpuHour(point.hardwareKey, options.tier) : null;
   return rate !== null && cost !== null ? cost / rate : null;
+}
+
+/** What an API would bill for one clip of this cell's length at the reference price. */
+function apiPricePerVideo(point: VideoPoint, options: MetricOptions): number | null {
+  const price = options.apiPricePerVideoSecond;
+  return positive(price) && positive(point.durationSeconds) ? price * point.durationSeconds : null;
+}
+
+function revenuePerGpuHour(point: VideoPoint, options: MetricOptions): number | null {
+  const rate = videosPerGpuHour(point, options.basis);
+  const price = apiPricePerVideo(point, options);
+  return rate !== null && price !== null ? rate * price : null;
 }
 
 /** Every formula returns null (never 0) when an input is missing or invalid. */
@@ -253,6 +318,28 @@ export function metricValue(
           : null;
       break;
     }
+    case 'apiPricePerVideo': {
+      value = apiPricePerVideo(point, options);
+      break;
+    }
+    case 'revenuePerGpuHour': {
+      value = revenuePerGpuHour(point, options);
+      break;
+    }
+    case 'profitPerGpuHour': {
+      // Negative when the API list price does not cover the tier's GPU-hour.
+      const revenue = revenuePerGpuHour(point, options);
+      const cost = point.hardwareKey ? costPerGpuHour(point.hardwareKey, options.tier) : null;
+      value = revenue !== null && cost !== null ? revenue - cost : null;
+      break;
+    }
+    case 'apiPriceMultiple': {
+      // > 1 means the API list price exceeds the self-hosted TCO cost of the clip.
+      const price = apiPricePerVideo(point, options);
+      const cost = dollarsPerVideo(point, options);
+      value = price !== null && cost !== null ? price / cost : null;
+      break;
+    }
   }
   return finite(value) ? value : null;
 }
@@ -265,12 +352,14 @@ export function metricLabel(id: MetricId, locale: 'en' | 'zh', options: MetricOp
   return locale === 'zh' ? `${base}（${tier}）` : `${base} (${tier})`;
 }
 
+/** Sign precedes the currency symbol (`-$0.44`), as profit per GPU-hour can be negative. */
 export function formatMetric(value: number | null, id: MetricId): string {
   if (value === null) return '—';
   const def = VIDEO_METRICS[id];
-  const text = value.toLocaleString('en-US', {
+  const text = Math.abs(value).toLocaleString('en-US', {
     minimumFractionDigits: def.currency ? def.digits : 0,
     maximumFractionDigits: def.digits,
   });
-  return def.currency ? `$${text}` : text;
+  const sign = value < 0 ? '-' : '';
+  return def.currency ? `${sign}$${text}` : `${sign}${text}`;
 }
