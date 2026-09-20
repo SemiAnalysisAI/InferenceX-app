@@ -21,7 +21,7 @@ export const H3_API_REFERENCE: ApiPriceReference = {
   capturedOn: '2026-09-19',
   label: {
     en: 'MiniMax Design · H3 768p subscription tier (web search, not verified on the pay-as-you-go page; H3 was listed as not yet supported on the API packages page)',
-    zh: 'MiniMax Design · H3 768p 订阅档（来源为网页搜索，未在按量付费页面核实；API 套餐页当时标注 H3 尚未支持）',
+    zh: 'MiniMax Design · H3 768p 订阅档（价格来自网页搜索，未在按量付费页面核实；API 套餐页当时标注 H3 尚未支持）',
   },
 };
 

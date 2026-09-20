@@ -21,14 +21,15 @@ const STRINGS = {
       'List price, not realized revenue; self-hosted TCO excludes utilization, CPU, storage and network.',
   },
   zh: {
-    label: 'API 价格参考（$/视频秒）',
+    label: 'API 参考价（$/video-s）',
     reset: '重置',
-    resetTitle: '恢复为带日期的参考价格',
+    resetTitle: '恢复为标注采集日期的参考价',
     reference: '参考值',
     range: '标价区间',
     captured: '采集于',
     source: '来源：',
-    disclaimer: '为标价而非实际收入；自托管 TCO 不含利用率、CPU、存储与网络成本。',
+    disclaimer:
+      '此处为 API 标价，而非实际收入；自托管 TCO 未计入利用率，也不含 CPU、存储与网络成本。',
   },
 };
 

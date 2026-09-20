@@ -66,13 +66,13 @@ describe('VideoApiReference', () => {
   });
   it('renders Chinese copy under /zh', () => {
     cy.mount(<Harness initial={0.034} pathname="/zh/video" />);
-    cy.contains('label', 'API 价格参考（$/视频秒）').should('exist');
+    cy.contains('label', 'API 参考价（$/video-s）').should('exist');
     cy.contains('button', '重置').should('exist');
     caption()
       .should('contain', '参考值 $0.034/video-s')
       .and('contain', '标价区间 $0.034–$0.047')
       .and('contain', '采集于 2026-09-19')
       .and('contain', '来源：MiniMax Design · H3 768p 订阅档')
-      .and('contain', '为标价而非实际收入');
+      .and('contain', '此处为 API 标价，而非实际收入');
   });
 });

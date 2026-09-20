@@ -193,7 +193,7 @@ describe('Video hardware dashboard (retained fixture)', () => {
     kpi('h200').should('contain', 'API 标价 / 条视频').and('contain', '利润 / GPU 小时');
     cy.get('[data-testid="video-config-bar"]')
       .should('contain', '成本档位')
-      .and('contain', 'API 价格参考（$/视频秒）')
+      .and('contain', 'API 参考价（$/video-s）')
       .and('contain', '采集于 2026-09-19');
   });
 });
