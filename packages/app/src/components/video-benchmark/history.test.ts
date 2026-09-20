@@ -50,6 +50,21 @@ describe('video history projection', () => {
       [4, 300, null, 15, 168],
     ]);
   });
+  it('carries GPU counts, wall time, clip shape, board power and server layout per cell', () => {
+    const entry = videoHistoryEntry(saved(), null);
+    const c1 = entry.sources[0].observations[0];
+    expect(c1).toMatchObject({
+      participating: 2,
+      allocated: 2,
+      wallSeconds: 480,
+      durationSeconds: 4,
+      frameCount: 107,
+      avgPowerW: 1400,
+      // The synthetic bundle records no power-limit snapshots, so no limit is invented.
+      enforcedLimitW: null,
+      server: { tp: 1, ulysses: 2, attention: null },
+    });
+  });
   it('preserves failed cells and null power without inventing zero-valued performance', () => {
     const artifact = saved();
     const source = artifact.sources[0];
@@ -71,6 +86,9 @@ describe('video history projection', () => {
       p90: null,
       clipsGpuHour: null,
       energyKj: null,
+      wallSeconds: null,
+      avgPowerW: null,
+      enforcedLimitW: null,
     });
   });
   it('retains source provenance and failure when a new artifact contract is unsupported', () => {
