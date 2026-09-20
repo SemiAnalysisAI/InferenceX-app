@@ -597,11 +597,6 @@ export function InferenceProvider({
     playful: paretoFrontierPlayful,
     setVisible: setShowParetoFrontier,
   } = useParetoHighlightToggle(getUrlParam('i_frontier'));
-  const {
-    visible: showParetoHinterland,
-    playful: paretoHinterlandPlayful,
-    setVisible: setShowParetoHinterland,
-  } = useParetoHighlightToggle(getUrlParam('i_hinterland'));
   const [userCosts, setUserCosts] = useState<Record<string, number | undefined> | null>(null);
   const [userPowers, setUserPowers] = useState<Record<string, number | undefined> | null>(null);
 
@@ -1592,7 +1587,6 @@ export function InferenceProvider({
       i_conclabel: showConcurrencyLabels ? '1' : '',
       i_gradlabel: showGradientLabels ? '1' : '',
       i_frontier: showParetoFrontier ? (paretoFrontierPlayful ? '2' : '1') : '',
-      i_hinterland: showParetoHinterland ? (paretoHinterlandPlayful ? '2' : '1') : '',
       i_linelabel: serializedLabelState.i_linelabel,
       i_active: iActiveStr,
       i_vendor: quickFilterVendors.join(','),
@@ -1623,9 +1617,7 @@ export function InferenceProvider({
       showConcurrencyLabels,
       showGradientLabels,
       showParetoFrontier,
-      showParetoHinterland,
       paretoFrontierPlayful,
-      paretoHinterlandPlayful,
       showLineLabels,
       iActiveStr,
       quickFilterVendors,
@@ -1858,9 +1850,7 @@ export function InferenceProvider({
       showConcurrencyLabels,
       showGradientLabels,
       showParetoFrontier,
-      showParetoHinterland,
       paretoFrontierPlayful,
-      paretoHinterlandPlayful,
       showLineLabels,
     }),
     [
@@ -1885,9 +1875,7 @@ export function InferenceProvider({
       showConcurrencyLabels,
       showGradientLabels,
       showParetoFrontier,
-      showParetoHinterland,
       paretoFrontierPlayful,
-      paretoHinterlandPlayful,
       showLineLabels,
     ],
   );
@@ -1926,7 +1914,6 @@ export function InferenceProvider({
     setShowConcurrencyLabels,
     setShowGradientLabels,
     setShowParetoFrontier,
-    setShowParetoHinterland,
     setShowLineLabels,
     setSelectedGPUs: setSelectedGPUsAndClear,
     setSelectedDates: setSelectedDatesAndClear,
