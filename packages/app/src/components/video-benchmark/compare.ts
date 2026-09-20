@@ -8,7 +8,7 @@ import {
 } from './metrics';
 import { latestVideoCells } from './points';
 import { servingCells, type ServingCell } from './serving';
-import { storedBundle, type StoredArtifact } from './stored';
+import { storedBundle, type StoredArtifact, type StoredSource } from './stored';
 
 /** Metrics the compare table shows, in row order. */
 export const COMPARE_METRICS = [
@@ -191,10 +191,34 @@ export interface CompareSide {
 }
 
 /**
+ * The cell's records inside one observation source, with that source's
+ * manifest SHA; null when the source lacks the cell. Contract violations throw,
+ * as in the run views.
+ */
+function sourceSide(
+  source: StoredSource,
+  cellId: string,
+): { side: CompareSide; manifestSha256: string } | null {
+  const bundle = storedBundle(source);
+  const cell = servingCells(bundle).find((item) => item.id === cellId);
+  if (!cell) return null;
+  return {
+    manifestSha256: bundle.manifestSha256,
+    side: {
+      records: caseRecords(cell),
+      urls: new Map(source.assets.map(([path, asset]) => [path, asset.url])),
+    },
+  };
+}
+
+/**
  * Resolve a dashboard point inside its stored artifact (`format=media`): the
  * observation source whose manifest SHA the point id names, else the first
- * source that publishes the point's cell. Contract violations throw, as in the
- * run views; nothing is synthesised for a missing cell.
+ * source that publishes the point's cell. A malformed source is skipped so a
+ * readable sibling still resolves (as `videoHistoryEntry` isolates sources);
+ * its error is rethrown only when no source publishes the cell, so an
+ * unreadable artifact is never reported as one without the cell. Nothing is
+ * synthesised for a missing cell.
  */
 export function compareSide(saved: StoredArtifact, point: VideoPoint): CompareSide {
   if (
@@ -206,18 +230,21 @@ export function compareSide(saved: StoredArtifact, point: VideoPoint): CompareSi
   const wanted = point.id.split(':')[0];
   const cellId = point.cell ?? (point.concurrency === null ? 'c1' : `c${point.concurrency}`);
   let fallback: CompareSide | null = null;
+  let sourceError: Error | null = null;
   for (const source of saved.sources) {
     if (source.kind) continue;
-    const bundle = storedBundle(source);
-    const cell = servingCells(bundle).find((item) => item.id === cellId);
-    if (!cell) continue;
-    const side: CompareSide = {
-      records: caseRecords(cell),
-      urls: new Map(source.assets.map(([path, asset]) => [path, asset.url])),
-    };
-    if (bundle.manifestSha256 === wanted) return side;
-    fallback ??= side;
+    let found: ReturnType<typeof sourceSide>;
+    try {
+      found = sourceSide(source, cellId);
+    } catch (error) {
+      sourceError ??= error instanceof Error ? error : new Error(String(error));
+      continue;
+    }
+    if (found === null) continue;
+    if (found.manifestSha256 === wanted) return found.side;
+    fallback ??= found.side;
   }
-  if (fallback === null) throw new Error(`Published artifact has no ${cellId} cell`);
-  return fallback;
+  if (fallback !== null) return fallback;
+  if (sourceError !== null) throw sourceError;
+  throw new Error(`Published artifact has no ${cellId} cell`);
 }

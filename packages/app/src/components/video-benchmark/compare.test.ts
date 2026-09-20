@@ -14,7 +14,7 @@ import type { VideoHistoryPage } from './history';
 import { videoPoints } from './points';
 import { servingCells } from './serving';
 import { servingFixture } from './serving.fixture';
-import type { StoredArtifact } from './stored';
+import type { StoredArtifact, StoredSource } from './stored';
 
 // Retained H100/H200/B200 C1/C2/C4 observations of the 2026-09-09 campaign.
 const points = videoPoints([history as unknown as VideoHistoryPage]);
@@ -28,6 +28,10 @@ function set(value: Json, key: string, replacement: Json) {
     throw new Error('Expected object');
   value[key] = replacement;
 }
+
+/** The stored copy of one bundle document; mutating it corrupts only that source. */
+const document = (source: StoredSource, path: string): Json =>
+  source.documents.find(([name]) => name === path)?.[1] ?? null;
 
 // Same shape cypress/support/video-artifacts.ts publishes: synthetic contract data, never evidence.
 function stored(
@@ -273,5 +277,57 @@ describe('compareSide', () => {
     const fidelityOnly = stored(h100.runId, h100.artifactId, 'NVIDIA H100 80GB HBM3');
     fidelityOnly.sources[0].kind = 'fidelity';
     expect(() => compareSide(fidelityOnly, h100)).toThrow('Published artifact has no c1 cell');
+  });
+  it('skips a malformed source so a readable sibling still resolves', () => {
+    const sha = h100.id.split(':')[0];
+    const hardware = 'NVIDIA H100 80GB HBM3';
+    // Manifest names another run, so storedBundle rejects the source.
+    const misbundled = stored(h100.runId, h100.artifactId, hardware, 3);
+    set(document(misbundled.sources[0], 'manifest.json'), 'run_id', '999');
+    // Manifest mode no longer matches CI, so servingCells rejects the source.
+    const inconsistent = stored(h100.runId, h100.artifactId, hardware, 5);
+    set(document(inconsistent.sources[0], 'manifest.json'), 'mode', 'fidelity');
+    const corrupt = [...misbundled.sources, ...inconsistent.sources];
+    // The readable sibling wins whether the point names its manifest SHA…
+    const exact = stored(h100.runId, h100.artifactId, hardware, 6, sha);
+    expect(
+      compareSide({ ...exact, sources: [...corrupt, ...exact.sources] }, h100).records,
+    ).toHaveLength(6);
+    // …or it is merely the first source with the cell, before or after the corrupt ones.
+    const other = stored(h100.runId, h100.artifactId, hardware, 4);
+    expect(
+      compareSide({ ...other, sources: [...corrupt, ...other.sources] }, h100).records,
+    ).toHaveLength(4);
+    expect(
+      compareSide({ ...other, sources: [...other.sources, ...corrupt] }, h100).records,
+    ).toHaveLength(4);
+  });
+  it('rethrows the first source error only when no source publishes the cell', () => {
+    const hardware = 'NVIDIA H100 80GB HBM3';
+    const misbundled = stored(h100.runId, h100.artifactId, hardware);
+    set(document(misbundled.sources[0], 'manifest.json'), 'run_id', '999');
+    const inconsistent = stored(h100.runId, h100.artifactId, hardware);
+    set(document(inconsistent.sources[0], 'manifest.json'), 'mode', 'fidelity');
+    expect(() => compareSide(misbundled, h100)).toThrow('Stored result identity mismatch');
+    expect(() => compareSide(inconsistent, h100)).toThrow(
+      'Invalid H3 serving matrix: CI identity does not match the manifest',
+    );
+    expect(() =>
+      compareSide(
+        { ...inconsistent, sources: [...inconsistent.sources, ...misbundled.sources] },
+        h100,
+      ),
+    ).toThrow('Invalid H3 serving matrix: CI identity does not match the manifest');
+    // A readable source without the cell does not prove the unreadable one lacked it.
+    const readable = stored(h100.runId, h100.artifactId, hardware);
+    expect(() =>
+      compareSide(
+        { ...readable, sources: [...misbundled.sources, ...readable.sources] },
+        {
+          ...h100,
+          cell: 'c3',
+        },
+      ),
+    ).toThrow('Stored result identity mismatch');
   });
 });
