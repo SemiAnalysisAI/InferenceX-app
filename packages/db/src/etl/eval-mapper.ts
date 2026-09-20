@@ -243,44 +243,6 @@ function buildEvalConfig(
   specMethod: string,
   disaggFromFw: boolean,
 ): ConfigParams {
-  // New aggregate producers describe runtime topology explicitly. Split-role fields are
-  // compatibility columns, and must not turn one serving role into two GPU pools.
-  if (src.deployment !== undefined) {
-    const deployment = src.deployment;
-    if (
-      !deployment ||
-      deployment.kind !== 'aggregate' ||
-      deployment.nodes !== 1 ||
-      !Number.isSafeInteger(deployment.serving_gpus) ||
-      deployment.serving_gpus < 1 ||
-      !Number.isSafeInteger(deployment.tp) ||
-      deployment.tp < 1 ||
-      !Number.isSafeInteger(deployment.ep) ||
-      deployment.ep < 1 ||
-      parseOptionalBool(src.disagg) !== false ||
-      parseBool(src.is_multinode)
-    )
-      throw new Error('Invalid single-node aggregate evaluation deployment');
-    return {
-      hardware,
-      framework,
-      model,
-      precision,
-      specMethod,
-      disagg: false,
-      isMultinode: false,
-      prefillTp: deployment.tp,
-      decodeTp: deployment.tp,
-      prefillEp: deployment.ep,
-      decodeEp: deployment.ep,
-      prefillDpAttn: parseBool(src.dp_attention),
-      decodeDpAttn: parseBool(src.dp_attention),
-      prefillNumWorkers: 0,
-      decodeNumWorkers: 0,
-      numPrefillGpu: deployment.serving_gpus,
-      numDecodeGpu: deployment.serving_gpus,
-    };
-  }
   const isMultinode = parseBool(src.is_multinode);
 
   let prefillTp: number, prefillEp: number, prefillDpAttn: boolean, prefillNumWorkers: number;
