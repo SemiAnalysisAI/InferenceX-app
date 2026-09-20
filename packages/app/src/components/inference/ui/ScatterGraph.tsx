@@ -100,6 +100,7 @@ import {
 } from '@/lib/chart-rendering';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { isFrontierEligible, type ParetoDirection } from '@/lib/chart-utils';
+import { frontierHardwareKeys } from '@/components/inference/utils/pareto-series';
 import {
   globalParetoFrontier,
   paretoHighlightArea,
@@ -1522,8 +1523,26 @@ const ScatterGraph = React.memo(
       () => globalParetoFrontier(globalParetoPoints, maximizeParetoX, maximizeParetoY),
       [globalParetoPoints, maximizeParetoX, maximizeParetoY],
     );
+    const frontierHwKeys = useMemo(
+      () => frontierHardwareKeys(globalParetoPoints, globalFrontier),
+      [globalParetoPoints, globalFrontier],
+    );
     const paretoHighlightLayer = useMemo<CustomLayerConfig>(() => {
       const render: NonNullable<CustomLayerConfig['render']> = (zoomGroup, ctx) => {
+        // A separate alpha filter composes with existing visibility/hover opacity.
+        // Hidden marks stay hidden, and hover-end cannot erase the Pareto fade.
+        // Inline SVG styles are retained by chart exports. Apply only to parent
+        // marks, not their children, so point labels/halos are faded once.
+        zoomGroup
+          .selectAll<SVGElement, { hwKey?: string; points?: InferenceData[] }>(
+            '.dot-group, .roofline-path, .unofficial-overlay-pt, .overlay-roofline-path, .overflow-continuation, .parallelism-label, .line-label',
+          )
+          .style('filter', function (d) {
+            const hw = this.dataset.hwKey ?? d?.hwKey ?? d?.points?.[0]?.hwKey;
+            return showParetoFrontier && frontierHwKeys.size > 0 && hw && !frontierHwKeys.has(hw)
+              ? 'opacity(0.2)'
+              : null;
+          });
         const xScale = (ctx.renderedXScale ?? ctx.xScale) as ContinuousScale;
         const yScale = (ctx.renderedYScale ?? ctx.yScale) as ContinuousScale;
         const bestX = maximizeParetoX === xScale.range()[1] > xScale.range()[0] ? ctx.width : 0;
@@ -1615,6 +1634,7 @@ const ScatterGraph = React.memo(
           showParetoFrontier,
           paretoFrontierPlayful,
           globalFrontier.map((point) => [point.x, point.y]),
+          [...frontierHwKeys].sort(),
         ]),
         render,
         onDisplayUpdate: render,
@@ -1623,6 +1643,7 @@ const ScatterGraph = React.memo(
       };
     }, [
       globalFrontier,
+      frontierHwKeys,
       showParetoFrontier,
       paretoFrontierPlayful,
       maximizeParetoX,
