@@ -6,7 +6,7 @@ import { isQueueing, layoutLabel } from './deployment';
 import { hardwareLabel } from './hardware';
 import { formatMetric, metricLabel, metricValue, type MetricId, type VideoPoint } from './metrics';
 import { latestVideoCells } from './points';
-import type { VideoDashboardState } from './video-url-state';
+import { metricOptions, type VideoDashboardState } from './video-url-state';
 
 const STRINGS = {
   en: {
@@ -34,6 +34,10 @@ const METRIC_COLUMNS: readonly MetricId[] = [
   'videosPerGpuHour',
   'videosPerDollar',
   'dollarsPerVideo',
+  'apiPricePerVideo',
+  'revenuePerGpuHour',
+  'profitPerGpuHour',
+  'apiPriceMultiple',
   'kjPerVideo',
   'powerPctCap',
 ];
@@ -60,7 +64,7 @@ export default function VideoPointsTable({
 }) {
   const locale = useLocale();
   const s = STRINGS[locale];
-  const options = { tier: state.tier, basis: state.basis };
+  const options = metricOptions(state);
   const rows = videoTableRows(points, state, hidden);
   const columns: DataTableColumn<VideoPoint>[] = [
     {

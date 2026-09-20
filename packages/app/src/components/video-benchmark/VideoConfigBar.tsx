@@ -14,8 +14,9 @@ import {
   type XMetricId,
   type YMetricId,
 } from './metrics';
+import VideoApiReference from './VideoApiReference';
 import VideoSelect from './VideoSelect';
-import type { VideoDashboardState } from './video-url-state';
+import { metricOptions, type VideoDashboardState } from './video-url-state';
 
 const STRINGS = {
   en: {
@@ -69,14 +70,14 @@ export default function VideoConfigBar({
 }) {
   const locale = useLocale();
   const s = STRINGS[locale];
-  const options = { tier: state.tier, basis: state.basis };
+  const options = metricOptions(state);
   const change = <K extends keyof VideoDashboardState>(key: K, value: VideoDashboardState[K]) => {
     onChange({ [key]: value } as Partial<VideoDashboardState>);
     track(`video_${key}_changed`, { value: String(value) });
   };
   return (
     <div className="grid gap-3 lg:grid-cols-2" data-testid="video-config-bar">
-      <ControlPanel legend={s.benchmark} className="sm:grid-cols-3">
+      <ControlPanel legend={s.benchmark} className="sm:grid-cols-2 xl:grid-cols-4">
         <VideoSelect
           label={s.model}
           value="model"
@@ -95,6 +96,7 @@ export default function VideoConfigBar({
           onValueChange={() => {}}
           options={[{ value: 'deployment', label: deploymentLabel }]}
         />
+        <VideoApiReference value={state.apiPrice} onChange={(apiPrice) => onChange({ apiPrice })} />
       </ControlPanel>
       <ControlPanel legend={s.chart} className="sm:grid-cols-2 xl:grid-cols-4">
         <VideoSelect
