@@ -12,6 +12,9 @@ export interface VideoPoint {
   hardwareKey: string | null;
   hardwareName: string;
   runtime: string;
+  model: string;
+  /** Human-readable workload summary from the projection (resolution · duration · fps · steps · model @ rev · seeds · prompt). */
+  workload: string;
   concurrency: number | null;
   participating: number | null;
   allocated: number | null;

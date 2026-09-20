@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { VideoHistoryObservation, VideoHistoryPage } from './history';
-import { videoPoints } from './points';
+import { latestVideoCells, videoPoints } from './points';
 
 const observation: VideoHistoryObservation = {
   id: 'sha:c1',
@@ -152,5 +152,26 @@ describe('videoPoints', () => {
     expect(point.wallSeconds).toBeNull();
     expect(point.server).toBeNull();
     expect(point.hardwareKey).toBe('h200');
+  });
+  it('keeps only the newest observation per hardware cell', () => {
+    const rerun = {
+      ...page.entries[0],
+      id: '5.5',
+      runId: '5',
+      sources: [
+        {
+          ...source,
+          id: '5',
+          observations: [{ ...observation, id: 'again:c1', p50: 140 }],
+        },
+      ],
+    };
+    // Entry order is publication order (newest first): the rerun supersedes the older cell.
+    const points = videoPoints([{ ...page, entries: [rerun, page.entries[0]] }]);
+    expect(points.map((p) => p.id)).toEqual(['again:c1', 'sha:c1', 'sha:c2']);
+    expect(latestVideoCells(points).map((p) => [p.id, p.p50])).toEqual([
+      ['again:c1', 140],
+      ['sha:c2', 150.6],
+    ]);
   });
 });

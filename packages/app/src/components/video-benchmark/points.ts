@@ -46,6 +46,8 @@ function toPoint(
     hardwareKey: hardwareKey(o.hardware),
     hardwareName: o.hardware,
     runtime: o.runtime ?? '',
+    model: o.model ?? '',
+    workload: o.workload ?? '',
     concurrency: num(o.concurrency),
     participating: num(o.participating),
     allocated: num(o.allocated),
@@ -73,4 +75,20 @@ function toPoint(
     status: o.status ?? '',
     observedAt,
   };
+}
+
+/**
+ * Newest published observation per (hardware, concurrency) cell. Points arrive
+ * newest publication first, so the first occurrence wins; hardware without a
+ * registry key is kept as-is because nothing can be compared against it.
+ */
+export function latestVideoCells(points: VideoPoint[]): VideoPoint[] {
+  const seen = new Set<string>();
+  return points.filter((point) => {
+    if (point.hardwareKey === null) return true;
+    const key = `${point.hardwareKey}:${point.concurrency ?? 'na'}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
