@@ -4,8 +4,10 @@ import { getHardwareConfig } from '@/lib/constants';
 import {
   getInferenceHardwareConfig,
   getInferenceRunLabel,
+  getOverlayLineLabel,
   getPointHardwareConfig,
   inferenceFrameworkLabelOverride,
+  shortRunTag,
 } from './inference-labels';
 
 const runUrl = 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/34926284365';
@@ -121,5 +123,38 @@ describe('run-specific MoRI UMBP labels', () => {
     );
     expect(getPointHardwareConfig({ hwKey, ...points[1] }, config).suffix).toBe('(MoRI SGLang)');
     expect(getInferenceHardwareConfig(hwKey, undefined, []).suffix).toBe('(MoRI SGLang)');
+  });
+});
+
+describe('overlay line labels', () => {
+  const klaud = {
+    id: 35319969159,
+    branch: 'klaud/qwen3.5-fp8-gb300-dynamo-sglang-nightly-dev-cu13-20260918-20518d85',
+  };
+
+  it('names the hardware and leaves the branch to the legend when one run draws it', () => {
+    expect(getOverlayLineLabel('GB300 NVL72 (Dynamo SGLang)', klaud, false)).toBe(
+      '✕ GB300 NVL72 (Dynamo SGLang)',
+    );
+  });
+
+  it('adds a short run tag only when several runs draw the same hardware', () => {
+    expect(getOverlayLineLabel('GB200 NVL72 (Dynamo SGLang)', klaud, true)).toBe(
+      '✕ GB200 NVL72 (Dynamo SGLang) · …20260918-20518d85',
+    );
+    expect(getOverlayLineLabel('B300', { id: 31756025413, branch: 'main' }, true)).toBe(
+      '✕ B300 · main',
+    );
+  });
+
+  it.each([
+    ['main', 'main'],
+    ['feat/short-name', 'feat/short-name'],
+    ['release/2026-09-18-hotfix', '2026-09-18-hotfix'],
+    [klaud.branch, '…20260918-20518d85'],
+    ['', 'run 42'],
+    [null, 'run 42'],
+  ])('shortens branch %j to %j', (branch, expected) => {
+    expect(shortRunTag({ id: 42, branch })).toBe(expected);
   });
 });

@@ -500,7 +500,7 @@ describe('ScatterGraph power comparison series', () => {
       });
   });
 
-  it('labels ?unofficialrun= comparison siblings with the run name and the variant', () => {
+  it('labels ?unofficialrun= comparison siblings with the marked hardware and the variant', () => {
     const overlay = expandPowerCompareSeries(
       measuredCurve('h100', { run_url: OVERLAY_RUN_URL }),
       'y_measuredAvgPower',
@@ -516,10 +516,11 @@ describe('ScatterGraph power comparison series', () => {
         expect($label.find('.ll-bg').attr('fill')).to.eq(overlayRunColor(0));
       })
       .then(($labels) => {
+        // The branch stays in the legend; pills name the hardware behind the marker.
         expect(pillTextByVariant($labels)).to.deep.equal({
-          '': '✕ powerx-compare',
-          prefill: '✕ powerx-compare · Prefill GPUs',
-          decode: '✕ powerx-compare · Decode GPUs',
+          '': '✕ H100',
+          prefill: '✕ H100 · Prefill GPUs',
+          decode: '✕ H100 · Decode GPUs',
         });
       });
     cy.get(lineLabel('')).should('have.attr', 'data-series-id', 'h100');

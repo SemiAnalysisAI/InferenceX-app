@@ -48,7 +48,13 @@ import { matchKnownConfigIssues, pointMatchesIssue } from '@/lib/known-issues';
 import { useLocale } from '@/lib/use-locale';
 import { getLineLabelVendorIcon } from '@/lib/vendor-logos';
 import { formatNumber, getDisplayLabel, updateRepoUrl } from '@/lib/utils';
-import { getInferenceHardwareConfig, getInferenceRunLabel } from '@/lib/inference-labels';
+import {
+  getInferenceHardwareConfig,
+  getInferenceRunLabel,
+  getOverlayLineLabel,
+  OVERLAY_LABEL_MARKER,
+  overlayRunTag,
+} from '@/lib/inference-labels';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
 import type {
   CustomLayerConfig,
@@ -2874,7 +2880,10 @@ const ScatterGraph = React.memo(
           let lineLabels: LineLabelPlacement[] = [];
           // Comparison variant and label suffix per label key, for the text
           // segments and the `data-power-variant` hook on each pill.
-          const lineLabelMeta = new Map<string, { variantId: string; suffix: string }>();
+          const lineLabelMeta = new Map<
+            string,
+            { variantId: string; suffix: string; runTag: string }
+          >();
           if (showLineLabels) {
             const multiPrecision = ir.selectedPrecisions.length > 1;
             const officialByGroup = new Map<string, (typeof entries)[number]>();
@@ -2896,7 +2905,7 @@ const ScatterGraph = React.memo(
             ].map((entry) => {
               const identity = lineLabelIdentity(entry.hw, entry.points);
               const suffix = lineLabelSuffix(identity, entry.points);
-              lineLabelMeta.set(entry.key, { variantId: identity.variantId, suffix });
+              lineLabelMeta.set(entry.key, { variantId: identity.variantId, suffix, runTag: '' });
               return {
                 key: entry.key,
                 seriesId: identity.seriesId,
@@ -2912,24 +2921,35 @@ const ScatterGraph = React.memo(
                 keepVisibleOnCollision: entry.points.length === 1,
               };
             });
+            // Runs drawing the same hardware need a run tag on their pills.
+            const overlayRunsByHw = new Map<string, Set<number>>();
+            for (const group of Object.values(displayedOverlayRooflines)) {
+              if (!ir.activeOverlayHwTypes.has(group.hwKey)) continue;
+              if (!overlayRunsByHw.has(group.hwKey)) overlayRunsByHw.set(group.hwKey, new Set());
+              overlayRunsByHw.get(group.hwKey)!.add(group.runIndex);
+            }
             const overlaySeries: LineLabelSeries<InferenceData>[] = Object.entries(
               displayedOverlayRooflines,
             ).flatMap(([overlayKey, group]) => {
               if (!ir.activeOverlayHwTypes.has(group.hwKey)) return [];
               const info = unofficialRunInfos[group.runIndex];
               const precision = group.points[0]?.precision ?? '';
-              const runLabel = info
-                ? getInferenceRunLabel(`✕ ${info.branch || `run ${info.id}`}`, group.points)
-                : '';
+              const hardwareLabel = lineLabelText(
+                group.hwKey,
+                precision,
+                multiPrecision,
+                modelLabel,
+                group.points,
+              );
+              const sharesHardware = (overlayRunsByHw.get(group.hwKey)?.size ?? 0) > 1;
+              const runTag = info && sharesHardware ? overlayRunTag(info) : '';
               const label = info
-                ? multiPrecision
-                  ? `${runLabel} ${getPrecisionLabel(precision as Precision)}`
-                  : runLabel
-                : lineLabelText(group.hwKey, precision, multiPrecision, modelLabel, group.points);
+                ? getOverlayLineLabel(hardwareLabel, info, sharesHardware)
+                : hardwareLabel;
               const identity = lineLabelIdentity(group.hwKey, group.points);
               const suffix = lineLabelSuffix(identity, group.points);
               const key = `overlay-${overlayKey}`;
-              lineLabelMeta.set(key, { variantId: identity.variantId, suffix });
+              lineLabelMeta.set(key, { variantId: identity.variantId, suffix, runTag });
               return [
                 {
                   key,
@@ -2959,7 +2979,7 @@ const ScatterGraph = React.memo(
               if (labeledKeys.has(entry.key)) continue;
               const identity = lineLabelIdentity(entry.hw, entry.points);
               const suffix = lineLabelSuffix(identity, entry.points);
-              lineLabelMeta.set(entry.key, { variantId: identity.variantId, suffix });
+              lineLabelMeta.set(entry.key, { variantId: identity.variantId, suffix, runTag: '' });
               lineLabels.push({
                 key: entry.key,
                 seriesId: identity.seriesId,
@@ -3002,8 +3022,15 @@ const ScatterGraph = React.memo(
               const config = getHardwareConfig(lineLabelHardwareKey(label.seriesId), modelLabel);
               // Parse the hardware part without the variant suffix, which gets
               // its own segment so the engine is still matched at the end.
-              const suffix = lineLabelMeta.get(label.key)?.suffix ?? '';
-              const coreLabel = suffix ? label.label.slice(0, -suffix.length) : label.label;
+              const meta = lineLabelMeta.get(label.key);
+              const suffix = meta?.suffix ?? '';
+              const runTag = meta?.runTag ?? '';
+              let coreLabel = suffix ? label.label.slice(0, -suffix.length) : label.label;
+              if (runTag) coreLabel = coreLabel.slice(0, -runTag.length);
+              // Overlay pills lead with the run marker; the hardware behind it is
+              // parsed like an official pill so the GPU name stays bold.
+              const marker = coreLabel.startsWith(OVERLAY_LABEL_MARKER) ? OVERLAY_LABEL_MARKER : '';
+              coreLabel = coreLabel.slice(marker.length);
               const hardwareLabel = getDisplayLabel(config);
               const isHardwareLabel =
                 coreLabel === hardwareLabel || coreLabel.startsWith(`${config.label} `);
@@ -3017,11 +3044,18 @@ const ScatterGraph = React.memo(
                 engineLabel && remainingLabel.endsWith(engineLabel)
                   ? remainingLabel.slice(0, -engineLabel.length)
                   : remainingLabel;
+              const markerSegments = marker
+                ? [{ className: 'll-marker', text: marker, fill: 'white', weight: '600' }]
+                : [];
+              const runSegments = runTag
+                ? [{ className: 'll-run', text: runTag, fill: '#d1d5db', weight: '400' }]
+                : [];
               const variantSegments = suffix
                 ? [{ className: 'll-variant', text: suffix, fill: 'white', weight: '500' }]
                 : [];
               const segments = isHardwareLabel
                 ? [
+                    ...markerSegments,
                     { className: 'll-gpu', text: config.label, fill: 'white', weight: '700' },
                     ...(precisionLabel
                       ? [
@@ -3043,15 +3077,18 @@ const ScatterGraph = React.memo(
                           },
                         ]
                       : []),
+                    ...runSegments,
                     ...variantSegments,
                   ]
                 : [
+                    ...markerSegments,
                     {
                       className: 'll-plain',
                       text: coreLabel,
                       fill: 'white',
                       weight: '600',
                     },
+                    ...runSegments,
                     ...variantSegments,
                   ];
               text

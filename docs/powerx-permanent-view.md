@@ -157,7 +157,9 @@ Tooltips add a "Series" line; on the energy axis a role clone also reports its s
 reconstructed request energy. Table adds a "Series" column and CSV a trailing "Power Series"
 column only while clones are present. Comparison clones are excluded from `bestSeriesPerSku`,
 the power-tier counts, the legend points table, the availability panel (which reads
-`selectionPoints`) and the date-comparison `GPUGraph`.
+`selectionPoints`) and the date-comparison `GPUGraph`. Unofficial-run pills read `✕ <hardware>` (`getOverlayLineLabel`); the branch stays in the
+legend and a short run tag (` · main`, ` · …<date>-<sha>`) is appended only when several overlay
+runs draw the same hardware.
 
 Figure 7's reconstruction lives in `utils/role-energy.ts`: schema-2 aggregate energy has one
 numerator, so `J/out ÷ J/in` is the served input:output token ratio and

@@ -889,14 +889,14 @@ describe('ScatterGraph', () => {
     cy.get('#test-scatter-overlay-labels svg .line-label')
       .filter('[data-line-key]:not([data-line-key^="overlay-"])')
       .should('have.length.greaterThan', 0);
-    // The exact branch that crashed the production page remains visible in the
-    // overlay line label and legend after ScatterGraph's render-time updates.
-    cy.get('#test-scatter-overlay-labels svg .line-label[data-line-key^="overlay-"]')
-      .find('text')
-      .should('contain.text', runBranch);
+    // The pill names the hardware behind the ✕ marker, parsed like an official
+    // pill; the long branch that crashed the production page stays in the legend.
+    cy.get('#test-scatter-overlay-labels svg .line-label[data-line-key^="overlay-"] .ll-text')
+      .should('have.text', '✕ B200 (TRTLLM)')
+      .and('not.contain.text', runBranch);
     cy.get(
       '#test-scatter-overlay-labels svg .line-label[data-line-key^="overlay-"] .ll-gpu',
-    ).should('not.exist');
+    ).should('have.text', 'B200');
     cy.get('#test-scatter-overlay-labels [data-testid="chart-legend"]').should(
       'contain.text',
       runBranch,
@@ -1058,7 +1058,7 @@ describe('ScatterGraph', () => {
     cy.get('#test-scatter-singleton-overlay-label svg .line-label[data-line-key^="overlay-"]')
       .should('have.length', 1)
       .find('text')
-      .should('contain.text', 'tileRT');
+      .should('have.text', '✕ B200 (TRTLLM)');
 
     cy.get('#test-scatter-singleton-overlay-label svg').then(($svg) => {
       const svg = $svg[0];
@@ -1078,6 +1078,99 @@ describe('ScatterGraph', () => {
     cy.get(
       '#test-scatter-singleton-overlay-label svg .line-label[data-line-key^="overlay-"]',
     ).should('have.css', 'opacity', '1');
+  });
+
+  it('tags overlay line labels with the run only when several runs draw the same hardware', () => {
+    const interactivityChartDef = createMockChartDefinition({
+      chartType: 'interactivity',
+      y_tpPerGpu_roofline: 'upper_left',
+    });
+    const runs = [
+      { id: 31756025413, branch: 'main' },
+      {
+        id: 35319956855,
+        branch: 'klaud/qwen3.5-fp8-gb200-dynamo-sglang-nightly-dev-cu13-20260918-20518d85',
+      },
+    ].map((run) => ({
+      ...run,
+      url: `https://github.com/SemiAnalysisAI/InferenceX/actions/runs/${run.id}`,
+    }));
+    const overlayData = {
+      data: runs.flatMap((run, index) =>
+        [8, 16, 32].map((x, i) =>
+          createMockInferenceData({
+            hwKey: 'b200_trt',
+            x,
+            y: [320, 280, 220][i] - index * 60,
+            precision: Precision.FP4,
+            run_url: run.url,
+          }),
+        ),
+      ),
+      hardwareConfig: hwConfig,
+      label: runs[0].branch,
+      runUrl: runs[0].url,
+    };
+
+    mountWithProviders(
+      <div style={{ width: 800, height: 600 }}>
+        <ScatterGraph
+          chartId="test-scatter-overlay-run-tags"
+          modelLabel="DeepSeek R1"
+          data={[]}
+          xLabel="Concurrency"
+          yLabel="Throughput / Chip (tok/s)"
+          chartDefinition={interactivityChartDef}
+          overlayData={overlayData}
+        />
+      </div>,
+      {
+        inference: {
+          hardwareConfig: hwConfig,
+          activeHwTypes: new Set<string>(),
+          hwTypesWithData: new Set<string>(),
+          selectedPrecisions: [Precision.FP4],
+          showLineLabels: true,
+        },
+        unofficial: {
+          activeOverlayHwTypes: new Set(['b200_trt']),
+          allOverlayHwTypes: new Set(['b200_trt']),
+          runIndexByUrl: Object.fromEntries(
+            runs.flatMap((run, index) => [
+              [run.url, index],
+              [String(run.id), index],
+            ]),
+          ),
+          unofficialRunInfos: runs.map((run) => ({
+            id: run.id,
+            name: 'CI run',
+            branch: run.branch,
+            sha: '7a4a06b',
+            createdAt: '2026-09-18T19:40:51Z',
+            url: run.url,
+            conclusion: 'success',
+            status: 'completed',
+            isNonMainBranch: run.branch !== 'main',
+          })),
+        },
+      },
+    );
+
+    // Same hardware from two runs: each pill carries a short run tag, the
+    // long klaud branch shortened to its date-sha tail.
+    cy.get('#test-scatter-overlay-run-tags svg .line-label[data-line-key^="overlay-"] .ll-text')
+      .should('have.length', 2)
+      .then(($labels) => {
+        expect($labels.toArray().map((label) => label.textContent)).to.have.members([
+          '✕ B200 (TRTLLM) · main',
+          '✕ B200 (TRTLLM) · …20260918-20518d85',
+        ]);
+        for (const label of $labels) {
+          expect(
+            [...label.querySelectorAll('tspan')].map((segment) => segment.className.baseVal),
+          ).to.deep.equal(['ll-marker', 'll-gpu', 'll-engine', 'll-run']);
+        }
+      });
   });
 
   it('renders a line label for a singleton ingested hardware series', () => {
