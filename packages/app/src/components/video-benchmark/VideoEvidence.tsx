@@ -7,6 +7,7 @@ import { useLocale } from '@/lib/use-locale';
 import {
   concurrencyPlateau,
   evidenceFacts,
+  meterPercent,
   plateauSummary,
   powerRange,
   powerUtilization,
@@ -346,13 +347,13 @@ export default function VideoEvidence({ points, options, colorFor }: VideoEviden
                       aria-label={`${hardwareLabel(row.hardwareKey)} ${s.meter}`}
                       aria-valuemin={0}
                       aria-valuemax={100}
-                      aria-valuenow={Math.round(row.percentOfCap * 10) / 10}
+                      aria-valuenow={meterPercent(row.percentOfCap)}
                       className="h-2 w-full overflow-hidden rounded-full bg-muted"
                     >
                       <div
                         className="h-full rounded-full"
                         style={{
-                          width: `${Math.min(100, row.percentOfCap)}%`,
+                          width: `${meterPercent(row.percentOfCap)}%`,
                           backgroundColor: colorFor(row.hardwareKey),
                         }}
                       />

@@ -69,6 +69,16 @@ export function powerRange(rows: PowerUtilizationRow[]): PowerRange | null {
   return { measured: values.length, min: Math.min(...values), max: Math.max(...values) };
 }
 
+/**
+ * Meter position for a share of the enforced limit. The label beside the meter
+ * keeps the measured share, which can exceed 100 % when the mean-power window
+ * and the limit recorded around the run skew; the widget declares 0–100, so its
+ * fill and ARIA value stay inside that range at 0.1 % resolution.
+ */
+export function meterPercent(percentOfCap: number): number {
+  return Math.min(100, Math.max(0, Math.round(percentOfCap * 10) / 10));
+}
+
 export interface ConcurrencyPlateauRow {
   hardwareKey: string;
   concurrency: number;
