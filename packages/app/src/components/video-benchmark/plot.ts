@@ -3,7 +3,7 @@ import { paretoFrontier } from './frontier';
 import { hardwareLabel } from './hardware';
 import { metricValue, VIDEO_METRICS, type VideoPoint } from './metrics';
 import { latestVideoCells } from './points';
-import type { VideoDashboardState } from './video-url-state';
+import { metricOptions, type VideoDashboardState } from './video-url-state';
 
 export interface PlottedVideoPoint extends VideoPoint {
   x: number;
@@ -39,7 +39,7 @@ export function plotVideoPoints(
   colorFor: (hardwareKey: string) => string,
   hidden: ReadonlySet<string>,
 ): VideoPlot {
-  const options = { tier: state.tier, basis: state.basis };
+  const options = metricOptions(state);
   const cells: PlottedVideoPoint[] = latestVideoCells(points).flatMap((p) => {
     if (!p.hardwareKey || hidden.has(p.hardwareKey)) return [];
     const x = metricValue(p, state.x, options);

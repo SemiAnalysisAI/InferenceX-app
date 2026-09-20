@@ -7,12 +7,14 @@ import { leadCell } from './deployment';
 import { hardwareLabel, VIDEO_HARDWARE_ROSTER } from './hardware';
 import { formatMetric, metricValue, type MetricId, type VideoPoint } from './metrics';
 import { latestVideoCells } from './points';
-import type { VideoDashboardState } from './video-url-state';
+import { metricOptions, type VideoDashboardState } from './video-url-state';
 
 const CARD_METRICS = [
   'p50Latency',
   'videosPerGpuHour',
   'dollarsPerVideo',
+  'apiPricePerVideo',
+  'profitPerGpuHour',
   'kjPerVideo',
   'powerPctCap',
 ] as const satisfies readonly MetricId[];
@@ -21,6 +23,8 @@ const STRINGS = {
     p50Latency: 'P50 time to video (s)',
     videosPerGpuHour: 'Videos / GPU-hr',
     dollarsPerVideo: 'TCO / video',
+    apiPricePerVideo: 'API $/video',
+    profitPerGpuHour: 'Profit / GPU-hr',
     kjPerVideo: 'kJ / video',
     powerPctCap: 'Board power / limit',
     p90: 'P90',
@@ -33,6 +37,8 @@ const STRINGS = {
     p50Latency: 'P50 出片时间（s）',
     videosPerGpuHour: '视频数 / GPU 小时',
     dollarsPerVideo: 'TCO / 条视频',
+    apiPricePerVideo: 'API 标价 / 条视频',
+    profitPerGpuHour: '利润 / GPU 小时',
     kjPerVideo: 'kJ / 条视频',
     powerPctCap: '板卡功率 / 上限',
     p90: 'P90',
@@ -58,7 +64,7 @@ export default function VideoKpiCards({
 }) {
   const locale = useLocale();
   const s = STRINGS[locale];
-  const options = { tier: state.tier, basis: state.basis };
+  const options = metricOptions(state);
   const cells = latestVideoCells(points);
   return (
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" data-testid="video-kpi-cards">

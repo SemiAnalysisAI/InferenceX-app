@@ -9,7 +9,7 @@ import { escapeHtml } from '@/lib/utils';
 import { layoutLabel } from './deployment';
 import { formatMetric, metricLabel, type VideoPoint } from './metrics';
 import { plotVideoPoints, type PlottedVideoPoint } from './plot';
-import type { VideoDashboardState } from './video-url-state';
+import { metricOptions, type VideoDashboardState } from './video-url-state';
 
 export const VIDEO_CHART_ID = 'video-hardware';
 /** Matches ChartSection's default `${analyticsPrefix}_zoom_reset_${chartId}`. */
@@ -69,7 +69,7 @@ export default function VideoHardwareChart({
 }) {
   const locale = useLocale();
   const s = STRINGS[locale];
-  const options = { tier: state.tier, basis: state.basis };
+  const options = metricOptions(state);
   const { plotted, frontiers, global, multiLayout } = plotVideoPoints(
     points,
     state,
