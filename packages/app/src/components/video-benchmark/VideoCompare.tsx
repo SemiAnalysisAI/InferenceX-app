@@ -37,7 +37,7 @@ const STRINGS = {
   en: {
     title: 'Compare',
     subtitle:
-      'Pick a baseline and a candidate hardware (measured C1 cells): metric deltas side by side, then the same generated case from both runs.',
+      'Pick a baseline and a candidate hardware (each on its most efficient measured deployment): metric deltas side by side, then the same generated case from both runs.',
     baseline: 'Baseline',
     candidate: 'Candidate',
     needTwo: 'Comparison needs at least two measured hardware.',
@@ -67,7 +67,7 @@ const STRINGS = {
   zh: {
     title: '对比',
     subtitle:
-      '选择基线与候选硬件（已实测的 C1 单元）：并排查看指标差异，再对照两次运行中同一 prompt 与 seed 生成的视频。',
+      '选择基线与候选硬件（各取其实测中最高效的部署）：并排查看指标差异，再对照两次运行中同一 prompt 与 seed 生成的视频。',
     baseline: '基线',
     candidate: '候选',
     needTwo: '至少需要两种已实测的硬件才能对比。',
@@ -149,7 +149,7 @@ function DeltaChip({ row, s }: { row: CompareRow; s: Strings }) {
 }
 
 /**
- * Arena-style baseline vs candidate: measured C1 metric deltas, then the
+ * Arena-style baseline vs candidate: metric deltas between each hardware's lead deployment, then the
  * retained clips of the same prompt and seed from both CI runs. Media is fetched
  * only on request, one stored artifact per side.
  */
