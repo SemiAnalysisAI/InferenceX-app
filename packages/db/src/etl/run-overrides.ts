@@ -100,6 +100,7 @@ export const PURGED_RUNS: ReadonlySet<number> = new Set([
   34488664680, // 2026-09-13 | Reason: wrong configs ran
   34729188311, // 2026-09-13 | Reason: partial GLM-5.2 GB200 aggregate power refresh replaced the complete curve; restore the prior aggregate + disaggregated snapshot until a full same-image power curve is published
   34926284365, // 2026-09-16 | Reason: wrong data as mtp weights were uninitalized
+  35165441471, // 2026-09-19 | Reason: user-requested purge after reported Kimi K3 chart regression; suspected incomplete sweep remains unconfirmed
 ]);
 
 export const PURGED_RUN_ATTEMPTS: ReadonlyMap<number, ReadonlySet<number>> = new Map([

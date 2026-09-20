@@ -11,6 +11,18 @@ import {
 import { selectRunOverrides } from './run-override-selection';
 
 describe('run override selection', () => {
+  it('selects only the whole-run purge for run 35165441471', () => {
+    expect(selectRunOverrides(['--run-id', '35165441471', '--yes'])).toEqual({
+      runId: 35165441471,
+      conclusions: new Map(),
+      changelogs: [],
+      benchmarks: [],
+      purgedRuns: new Set([35165441471]),
+      purgedAttempts: new Map(),
+      purgedPoints: [],
+    });
+  });
+
   it('selects only the whole-run purge for the uninitialized MTP run', () => {
     expect(selectRunOverrides(['--run-id', '34926284365', '--yes'])).toEqual({
       runId: 34926284365,
