@@ -182,8 +182,9 @@ main-agent requests. Timeline-level `startNs` and `endNs` are wall-clock nanosec
 anchors. Per-request `credit`, `start`, `ack`, and `end` are nanosecond offsets from
 `timeline.startNs`. Keep those two timestamp roles separate. Retain the original
 response text before parsing: JavaScript `Number` can round large integer anchors.
-For anchor differences, parse the original JSON with Python's integer-preserving
-`json.load`, subtract the integer anchors, then convert the difference to seconds.
+For anchor differences, parse the original JSON with an integer-preserving parser
+(Python's `json.load` or the raw-number reviver below), subtract the integer anchors,
+then convert the difference to seconds.
 Reserialized JavaScript numbers cannot recover the original digits.
 
 Inventory every returned scalar and nested server-metric series, including
@@ -193,10 +194,10 @@ and `total`, while scalar series use `value`. Report that series' own sample,
 finite, nonzero, and missing counts; array lengths can differ. A nonzero fraction
 uses that field's finite count as its denominator, with missing samples reported
 separately. An empty series has no samples; zero-valued samples remain recorded
-observations. When relating a request group to metric windows, align timestamp
-origins, state the inclusion rule, and report inside/outside counts for that exact
-group. Retain exceptions; overlapping overall ranges do not establish that every
-member falls inside the same windows.
+observations. When relating a request group to metric windows, use the optional
+calculation below with that group's explicit identities. It counts each sample once
+across the union of the selected windows; summing per-request counts instead measures
+sample/request memberships. Retain exceptions and each series' own denominator.
 
 Compute phase totals per request before taking percentiles; separate phase
 percentiles are distributions, not additive components of the E2E percentile.
@@ -415,3 +416,50 @@ never existed. Do not call the page-owned
 `/api/v1/request-chart-data` or `/api/v1/trace-server-metric-source` operations.
 Do not repeat this recipe across a result set; ask the user to choose another single
 ID first.
+
+### Requested queue-window analysis
+
+Use this only when the question requires queue samples during particular requests.
+Save the recipe output as `selected-point.json` and the chosen raw request identities
+(`cid`, `ri` when present, `ti`, `wid`) as an array in `selected-requests.json`.
+Select those identities from the requested conversation, phase, or slow-request
+group first. The output retains the matched rows and zero-based sample indices so
+subsequent queue statistics can use precisely that population. Equal timestamps
+remain separate observations.
+
+```bash
+node --input-type=module - selected-point.json selected-requests.json <<'JS'
+import { readFileSync } from 'node:fs';
+const capture = JSON.parse(readFileSync(process.argv[2], 'utf8'));
+const identities = JSON.parse(readFileSync(process.argv[3], 'utf8'));
+const raw = (path) => JSON.parse(capture.metadata.requests.find(({ query_url }) =>
+  new URL(query_url).pathname === path).body_utf8,
+  (key, value, context) => key === 'startNs' ? BigInt(context.source) : value);
+const timeline = raw('/api/v1/request-timeline');
+const metrics = raw('/api/v1/trace-server-metrics');
+const selected = identities.map((identity) => {
+  const matches = timeline.requests.filter((row) =>
+    ['cid', 'ri', 'ti', 'wid'].every((key) => row[key] === identity[key]));
+  if (matches.length !== 1) throw new Error('Each identity must match exactly one captured request');
+  return matches[0];
+});
+const offsetS = Number(metrics.startNs - timeline.startNs) / 1e9;
+const inside = [];
+let invalid = 0;
+for (const [index, sample] of metrics.queueDepth.entries()) {
+  if (!Number.isFinite(sample.t)) { invalid++; continue; }
+  const t = offsetS + sample.t;
+  if (selected.some(({ start, end }) => start / 1e9 <= t && t <= end / 1e9)) inside.push(index);
+}
+console.log(JSON.stringify({
+  selected_requests: selected,
+  inclusion_rule: 'start <= (metrics.startNs - timeline.startNs) / 1e9 + t <= end; start/end in seconds',
+  series: 'queueDepth',
+  sample_count: metrics.queueDepth.length,
+  inside_sample_indices: inside,
+  inside_sample_count: inside.length,
+  outside_sample_count: metrics.queueDepth.length - inside.length - invalid,
+  invalid_timestamp_sample_count: invalid,
+}, null, 2));
+JS
+```

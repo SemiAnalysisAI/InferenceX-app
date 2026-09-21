@@ -811,6 +811,46 @@
           }
         },
         "additionalProperties": true
+      },
+      "evidence": {
+        "type": "object",
+        "required": ["artifacts", "request_count", "recorded_policy"],
+        "properties": {
+          "artifacts": {
+            "type": "array",
+            "minItems": 2,
+            "items": {
+              "type": "object",
+              "required": ["path", "size", "sha256"],
+              "properties": {
+                "path": {
+                  "type": "string"
+                },
+                "size": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "sha256": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                }
+              },
+              "additionalProperties": true
+            }
+          },
+          "request_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "recorded_policy": {
+            "$ref": "#/properties/policy"
+          },
+          "result_context": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "additionalProperties": true
       }
     },
     "additionalProperties": true

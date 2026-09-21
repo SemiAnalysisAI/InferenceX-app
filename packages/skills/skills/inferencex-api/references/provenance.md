@@ -59,18 +59,21 @@ find it manually:
    body checksums alongside the collector bundle so the entire discovery is
    reviewable.
 
-The sibling response supplies partial identity and source scope. The captured
-benchmark response can contain full rows for several siblings; look them up by
-ID before describing which workloads or configurations were recovered. Scope
-missing fields to their specific response: `result.json` selects one point, while
-the saved benchmark array may retain the others.
-
-For an ID-only investigation, use siblings to resolve the selected point's scope
-and retain their raw response; do not add classifications of the other IDs. If the
-user asks to compare siblings, join each ID to its own captured full row and check
+The sibling response supplies partial identity and source scope; the saved benchmark
+response can contain full rows for several siblings. `result.json` selects one point.
+For an ID-only investigation, report that point and describe other retained rows as
+context that was not individually analysed. Before calling any workload or
+configuration unavailable, look up that ID in the original benchmark response and
+identify the missing field. If the user asks to compare siblings, join each ID to
+its own captured full row and check
 `model`, `benchmark_type`, `isl`, `osl` and applicable dataset/config identity.
 Matching concurrency or TP cannot establish a shared workload. Missing full rows
 mean unknown workload, including in supplemental JSON lists and field names.
+
+Before interpreting energy fields preserved in `selected_result.metrics`, read
+the [PowerX normalization rules](powerx.md). A legacy row without the required
+power schema leaves energy normalization unknown; a retained numeric value alone
+does not establish its measurement scope.
 
 `is_current` marks the requested result ID: it is true exactly when the sibling's
 `id` equals the request's `id`. A false value means a different result was returned;

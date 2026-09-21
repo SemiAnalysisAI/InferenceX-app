@@ -13,7 +13,9 @@ inferencex verify saved/powerx --require-hardware h200_sxm
 
 The installed equivalent is `node <skill>/scripts/inferencex.mjs verify ...`.
 `--report` must name a new path outside the immutable bundle. Omitting it prints a
-JSON summary; add `--human` for a concise human summary.
+JSON summary; add `--human` for a concise human summary. The generated report
+includes the [evidence appendix](cli.md#exit-and-output-handling): exact file hashes,
+recorded export policy, current verification policy and existing result context.
 
 Branch on the exit code before parsing output:
 

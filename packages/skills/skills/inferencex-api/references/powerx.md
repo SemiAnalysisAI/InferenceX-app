@@ -364,7 +364,9 @@ IDs can arrive as strings, including values beyond JavaScript's safe integer ran
 preserve them exactly. Retain the complete run URL, including any `/attempts/` path.
 Single-turn rows commonly omit producer workflow IDs/start times, while snapshot
 fields remain present. Keep those producer fields absent; a snapshot ID does not
-identify the producer of every observation. Preserve source timestamps as supplied.
+identify the producer of every observation. Check `run_url` independently: it can
+still identify the producing GitHub run and attempt when those optional fields
+are absent. Preserve source timestamps as supplied.
 
 Apply the [shared GPU topology rule](../SKILL.md#evidence-and-interpretation) to
 CSV additions and prose. For example, raw role counts `64/64`, `disagg=false` and

@@ -105,13 +105,25 @@ Formal commands require `--output-dir <new-directory>`. Its parent must already
 exist; the examples create `evidence` first, and the CLI creates the new leaf. They
 never reuse, merge, or overwrite a directory. The manifest is written last and
 records normalized arguments, every request attempt, response hashes, the result
-hash, coverage, policy, and relative paths.
+hash, coverage, export policy at `manifest.summary.policy`, and relative paths.
+The `policy` in `verify` stdout evaluates that verification invocation's requirements;
+it can differ from the recorded export policy.
 
 Once completed, the entire bundle tree is immutable: never add, edit, or delete a
 file or directory inside it. Put a README, explanation, or verification report in a
 sibling path outside the bundle. Finish those surrounding writes first, then run
 `inferencex verify` as the final step. `verify --report` also requires a new path
 outside the bundle.
+
+Use `verify <bundle> --report <new-sibling-path>` for a generated evidence appendix.
+Its JSON `evidence` and Markdown report contain unique artifact paths, decoded byte
+sizes and SHA-256 hashes, including the hash computed from the actual manifest bytes.
+The manifest does not contain its own hash. Logical requests can share a response
+file, so request count and unique file count are separate. `evidence.recorded_policy`
+copies `manifest.summary.policy`; `evidence.result_context` copies the JSON result's
+existing metadata, units, limitations and comparison context. CSV has no extracted
+JSON context. These copied fields do not summarize raw-row availability, and replay
+does not verify claims in a separately written analysis report.
 
 ## Compatibility
 

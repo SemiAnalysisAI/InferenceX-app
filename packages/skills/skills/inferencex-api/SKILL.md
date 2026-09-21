@@ -61,7 +61,10 @@ the user's selectors and acceptance criteria throughout classification and costi
    field is absent, inspect the retained response for those record IDs and name
    that response, population and field path. A projection describes its included
    fields; complete configuration means the unabridged source object.
-2. If the user requests a report, or the raw-API task needs a derived analysis,
+2. For a formal bundle, generate `verify <bundle> --report <sibling-path>` first.
+   Link this appendix for artifact hashes, recorded policy and result context;
+   reuse its values instead of reconstructing the inventory or policy in prose.
+   If the question needs further analysis, or uses raw-API data,
    write a small script that reads the saved results and writes the requested
    report file directly (Markdown by default). Generate quantities, populations,
    dates, IDs and units from the same computed facts, including the conclusion.
