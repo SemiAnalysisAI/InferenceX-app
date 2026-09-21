@@ -396,6 +396,38 @@ describe('new dashboard projections', () => {
       expect(body.comparisons[0].data.rows[0].revenuePerGpuHour).toBeCloseTo(5.8536, 4);
     },
   );
+  it.each(['modeled', 'compare'])(
+    'labels full-chassis extrapolation for official and overlay %s estimates',
+    async (powerBasis) => {
+      const partial = agenticRow({
+        prefill_tp: 4,
+        decode_tp: 4,
+        num_prefill_gpu: 4,
+        num_decode_gpu: 4,
+        metrics: { ...agenticRow().metrics, avg_total_gpu_power_w: 2400 },
+      });
+      mocks.benchmarks.mockImplementation(() => Response.json([partial]));
+      mocks.unofficial.mockImplementation(() =>
+        Response.json({ benchmarks: [{ ...partial, id: 456 }], evaluations: [] }),
+      );
+      const response = await gw(
+        req(
+          'profit-estimator-per-gigawatt',
+          `model=DeepSeek-V4-Pro&target=45&priceSource=custom&powerBasis=${powerBasis}&unofficialrun=456`,
+        ),
+      );
+      expect(response.status).toBe(200);
+      const body = await response.json();
+      for (const output of [body.data, body.overlays]) {
+        expect(output.skipped).toEqual([]);
+        expect(output.rows.map((row: { powerLabel: string }) => row.powerLabel)).toEqual(
+          powerBasis === 'compare'
+            ? ['Provisioned', 'Measured + modeled · Full-chassis extrapolation']
+            : ['Full-chassis extrapolation'],
+        );
+      }
+    },
+  );
   it('rejects unsupported extension options rather than silently ignoring them', async () => {
     for (const query of [
       'caps=-1',

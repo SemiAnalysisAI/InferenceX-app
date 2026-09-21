@@ -201,7 +201,11 @@ export function calculatorExtension(view: CalculatorExtension, request: NextRequ
         assumptions,
         powerBasis,
         target,
-        { provisioned: 'Provisioned', modeled: 'Modeled' },
+        {
+          provisioned: 'Provisioned',
+          modeled: 'Measured + modeled',
+          extrapolated: 'Full-chassis extrapolation',
+        },
       );
     }
     const selections = comparisonSelections(search);

@@ -122,8 +122,8 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
     '模型许可或收入分成百分比，范围 0 至 100，默认值随模型变化。',
   ],
   powerBasis: [
-    'provisioned (default), modeled or compare. Modeled power requires eligible measured source rows; missing coverage is not zero.',
-    'provisioned（默认）、modeled 或 compare。建模功率需要合格的实测来源行；缺失数据不按零处理。',
+    'provisioned (default), modeled or compare. Modeled power requires eligible measured source rows; estimates extrapolated from partial-GPU measurements to a full chassis are identified by powerLabel. Missing coverage is not zero.',
+    'provisioned（默认）、modeled 或 compare。建模功耗需要符合条件的实测数据行；由部分 GPU 的实测数据外推到整机的估算，会通过 powerLabel 标明。缺失数据不按零处理。',
   ],
   power: [
     'Comma-separated certified and/or legacy power tiers. Omit for all tiers.',

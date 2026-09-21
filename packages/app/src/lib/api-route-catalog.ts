@@ -883,7 +883,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/calculator-extensions.ts',
-    sourceSha256: '4c0486425a674e1ca7be509d787fa8fbd8e65eb7d8a1e38642ecee4e72890a7b',
+    sourceSha256: 'da0b569b81c641749acb9ea6fd17faf0eb32fa936eb0570595bc0c71c67db64a',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',

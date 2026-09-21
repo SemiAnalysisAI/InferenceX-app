@@ -63,6 +63,7 @@ const AGENTX_GLM_SGLANG = 'glm-5-3-agentx-nvidia-vs-amd-sglang-150-toks';
 const AGENTX_GLM_ATOM = 'glm-5-3-agentx-mi355x-atom-vs-gb300-nvl72';
 const JALAPENO = 'openai-jalapeno-better-than-nvidia';
 const TPU_IRONWOOD = 'tpu-inferencex-full-steam';
+const ENGRAM = 'engrams-embedding-entendre-codesign';
 
 const entries = [
   {
@@ -1284,7 +1285,7 @@ const entries = [
     significance:
       'Long agentic sessions exceed HBM KV capacity well before they exceed a plausible DRAM budget, so offload decides how many concurrent conversations stay resumable. It also shifts the bottleneck: once prefixes survive, store and load paths, transfer batching, and index bookkeeping become the costs worth optimizing.',
     benchmarkContext:
-      'InferenceX rings every point that used KV offload with a dashed halo, whether or not it is Pareto optimal, and the point detail view names the offload type and engine alongside the chip and CPU cache hit rates. Offload is an allowed but optional optimization, so a single curve can mix points with and without it.',
+      'InferenceX rings every point that used KV offload with a dashed halo, whether or not it is Pareto optimal, and the point detail view names the offload type and engine alongside the chip and CPU cache hit rates. Engram parameter offloading moves learned embedding rows, not request-specific attention state; an Engram table outside HBM does not by itself establish that a run used KV offload.',
     relatedTerms: [
       'kv-cache',
       'prefix-caching',
@@ -1292,8 +1293,9 @@ const entries = [
       'nvme-offloading',
       'kv-cache-manager',
       'high-bandwidth-memory',
+      'parameter-offloading',
     ],
-    articleSlugs: [AGENTX_V3, AGENTIC_WORKLOADS, KIMI_K3, AGENTX_DSV4_B200_B300],
+    articleSlugs: [AGENTX_V3, AGENTIC_WORKLOADS, KIMI_K3, AGENTX_DSV4_B200_B300, ENGRAM],
   },
   {
     slug: 'cpu-offloading',
@@ -1301,15 +1303,15 @@ const entries = [
     aliases: ['CPU offload', 'DRAM offloading', 'host memory offloading'],
     category: 'Serving',
     plainEnglish:
-      'CPU offloading spills KV cache the accelerators cannot hold into the host machine DRAM, so long conversations resume from memory instead of being recomputed from scratch.',
+      'CPU offloading keeps model data or reusable attention state in host DRAM, freeing accelerator memory while adding host-memory access costs.',
     definition:
-      'CPU offloading stores reusable KV cache blocks in host CPU DRAM instead of accelerator HBM and loads them back over the host link when a later request reuses that prefix.',
+      'CPU offloading stores model parameters or KV cache in host CPU DRAM instead of accelerator HBM. The serving implementation determines whether data is explicitly copied or accessed directly by the GPU.',
     explanation:
-      'In inference serving the term almost always means KV cache offloading to DRAM, distinct from the training-side practice of parking weights or optimizer state on the CPU. Engines reach DRAM through connectors such as the vLLM CPU offloading connectors, LMCache, SGLang HiCache, Mooncake Store, and Dynamo KVBM. The pool is usually write-through, so it pays off when host DRAM for offload is roughly 1.5 to 3 times HBM KV capacity, and transfer efficiency decides the rest: AMD vLLM could not batch GPU-to-CPU copies before hipMemcpyBatchAsync landed in ROCm 7.14, which made its CPU offload path far less useful than the same feature on NVIDIA.',
+      'KV cache offloading preserves request-specific attention state through systems such as LMCache, SGLang HiCache, Mooncake Store, and Dynamo KVBM. Parameter offloading instead places learned model data in DRAM. The Engram article describes a GPU kernel selecting and dequantizing sparse embedding rows directly from pinned host memory through UVA, while retaining full decode graphs. These paths have different access patterns and should be named separately.',
     significance:
       'DRAM offloading decides how many concurrent agent sessions stay resumable once their combined KV working set exceeds HBM. It is not free capacity: at high concurrency, heavy reliance on the DRAM tier adds reload traffic that can push interactivity below acceptable levels, so the useful question is when the tier helps rather than whether it exists.',
     benchmarkContext:
-      'AgentX treats CPU KV offloading as an allowed, optional optimization. Offload DRAM must scale with the fraction of GPUs used, with a 3 TB cap for systems without standardized DRAM configurations. Points that used offload are ringed with a dashed halo, and the point detail view reports the offload backend plus HBM and CPU cache hit rates.',
+      'AgentX treats CPU KV offloading as an allowed, optional optimization. Its KV-offload markers and cache hit rates describe that path, not Engram parameter placement. The Engram article reports a B300 configuration moving from TP4 to TP2 with DRAM offload and improving its Pareto curve by up to 1.6x; this is a measured configuration result, not a universal DRAM speedup.',
     relatedTerms: [
       'kv-cache-offload',
       'nvme-offloading',
@@ -1317,7 +1319,7 @@ const entries = [
       'kv-cache',
       'high-bandwidth-memory',
     ],
-    articleSlugs: [AGENTX_V3, AGENTIC_WORKLOADS, AGENTX_DSV4_B200_B300],
+    articleSlugs: [AGENTX_V3, AGENTIC_WORKLOADS, AGENTX_DSV4_B200_B300, ENGRAM],
   },
   {
     slug: 'nvme-offloading',
@@ -1325,23 +1327,24 @@ const entries = [
     aliases: ['NVMe offload', 'SSD offloading', 'flash KV cache offload'],
     category: 'Serving',
     plainEnglish:
-      'NVMe offloading extends the KV cache one tier further, onto local SSDs, so prefixes that no longer fit in GPU or CPU memory can still be reloaded later.',
+      'NVMe offloading stores model data or attention state on SSDs, trading cheaper capacity for a more expensive access path.',
     definition:
-      'NVMe offloading stores reusable KV cache blocks on NVMe SSDs beneath the HBM and host DRAM tiers, trading slower reloads for a much larger retrievable KV working set.',
+      'NVMe offloading places model parameters or reusable KV cache on NVMe SSDs below the accelerator and host-memory tiers. Parameter lookup and KV-prefix restoration are distinct uses of the same storage tier.',
     explanation:
-      'Each step down the memory hierarchy multiplies capacity and divides bandwidth, so the SSD tier only pays off when reloading a long prefix still beats recomputing it. KV cache managers such as LMCache and Mooncake Store already support local NVMe backends alongside DRAM and remote storage. The tier helps most when the reuse working set exceeds any plausible DRAM budget or when sessions return after idle gaps long enough that DRAM eviction has already discarded them.',
+      'KV offloading can preserve prefixes after DRAM eviction. Engram offloading instead retrieves learned embedding rows. The article tests a memory-mapped SSD-backed Engram table whose pages may remain in the filesystem cache. Its unoptimized path copies row IDs to the CPU, deduplicates and gathers rows, then transfers them to the GPU. A warm page cache eliminates storage reads but not this coordination or copying.',
     significance:
       'NVMe offloading effectively lengthens cache lifetime for long-lived agent sessions, which matters as agents wait on tools, humans, or CI for minutes at a time. It is workload dependent: a high-concurrency deployment where DRAM offloading already degrades latency will not be rescued by an even slower tier, because the bottleneck is reload bandwidth rather than capacity.',
     benchmarkContext:
-      'AgentX v1 measures HBM and DRAM tiers and defers NVMe offloading, with SSD/NVMe KV offloading planned as a fast follow to grow the working set beyond DRAM. The current 5 minute idle cap on replayed streams may rise alongside it so that longer cache lifetimes become measurable.',
+      'The Engram article reports about 121 million total tokens per dollar for DRAM versus 52 million for SSD near 125 tokens/s/user on its B200 configurations. GDS was not enabled, and the experiment measures the whole serving path rather than isolated SSD latency. This parameter-offload experiment does not establish support for NVMe KV offloading in AgentX.',
     relatedTerms: [
       'kv-cache-offload',
       'cpu-offloading',
       'kv-cache-manager',
       'kv-cache',
       'prefix-cache-hit-rate',
+      'memory-mapped-file',
     ],
-    articleSlugs: [AGENTX_V3, AGENTIC_WORKLOADS],
+    articleSlugs: [AGENTX_V3, AGENTIC_WORKLOADS, ENGRAM],
   },
   {
     slug: 'long-context',
@@ -3835,6 +3838,302 @@ const entries = [
       'AgentX measures the resulting hardware-and-software configuration under multi-turn traffic. The Rubin article’s comparison does not independently vary all six products, so it cannot allocate the measured gain to each component or establish a universal co-design speedup.',
     relatedTerms: ['vera-rubin', 'nvlink', 'memory-bandwidth', 'inference-engine', 'agentx'],
     articleSlugs: [VR_RUBIN_AGENTIC],
+  },
+  {
+    slug: 'engram',
+    term: 'Engram',
+    aliases: ['Engram conditional memory'],
+    category: 'Model architecture',
+    plainEnglish:
+      'Engram retrieves learned vectors for recurring token patterns instead of rebuilding every pattern through the model layers.',
+    definition:
+      'Engram is a learned conditional-memory mechanism that extends single-token embeddings with multi-token lookups and integrates the retrieved features into the model.',
+    explanation:
+      'Lookup addresses depend on token IDs rather than intermediate hidden states. The runtime can therefore identify needed rows before reaching an Engram layer and overlap their retrieval with earlier computation. The retrieved features interact with downstream layers and expert selection.',
+    significance:
+      'Sparse access makes a large parameter table a candidate for DRAM offload. Removing the table at inference changes the trained model, so an ablation is not a substitute for comparing separately trained architectures at matched quality.',
+    benchmarkContext:
+      'The article reports roughly 189 GiB of Engram memory in its DeepSeek-V4.1-Flash configuration. Its DRAM and SSD comparisons retain Engram functionality while changing the serving path; the ablation experiments ask a separate model-quality question.',
+    relatedTerms: [
+      'n-gram-embedding',
+      'conditional-memory',
+      'parameter-offloading',
+      'inference-time-ablation',
+    ],
+    articleSlugs: [ENGRAM],
+  },
+  {
+    slug: 'n-gram-embedding',
+    term: 'N-gram embedding',
+    aliases: ['multi-token embedding'],
+    category: 'Model architecture',
+    plainEnglish:
+      'An n-gram embedding gives a short sequence of tokens a learned vector that the model can look up.',
+    definition:
+      'An n-gram embedding maps a local sequence of n tokens to learned vector features, extending the vocabulary of patterns beyond individual tokens.',
+    explanation:
+      'Repeated names, code fragments, and common phrasing can activate these lookups. The article examines examples through Engram gate scores, but selects examples for interest rather than treating them as a representative ranking of memory use.',
+    significance:
+      'Local token patterns make lookup addresses available without waiting for hidden-state computation. That property supports prefetching and sparse parameter offload, although it does not prove that every retrieved feature is useful on every occurrence.',
+    benchmarkContext:
+      'The Engram gate scan does not establish how often each pattern appeared during training or how much table capacity a category occupies. A high gate score also does not measure access frequency, so it is insufficient for choosing which rows to cache.',
+    relatedTerms: ['engram', 'embedding-table', 'context-dependent-gating', 'cache-hotness'],
+    articleSlugs: [ENGRAM],
+  },
+  {
+    slug: 'conditional-memory',
+    term: 'Conditional memory',
+    category: 'Model architecture',
+    plainEnglish:
+      'Conditional memory supplies learned information only when the input selects the corresponding memory entries.',
+    definition:
+      'Conditional memory is a model mechanism that retrieves a selected subset of learned memory parameters for an input rather than accessing the complete memory table on every token.',
+    explanation:
+      'In the Engram design discussed in the article, token patterns determine row addresses and a gate controls how the retrieved features contribute. The memory parameters are learned model data, unlike the request-specific attention state stored in a KV cache.',
+    significance:
+      'The total size of a memory table can be much larger than the bytes fetched for one token. Capacity requirements and per-token traffic must therefore be evaluated separately when deciding where the table should reside.',
+    benchmarkContext:
+      'The article reports a large Engram table but only about 12.4 KiB of row data per processed token position across the model. This sparsity motivates offloading; it does not guarantee that a particular CPU or SSD implementation will improve serving economics.',
+    relatedTerms: ['engram', 'sparse-embedding-lookup', 'embedding-table', 'kv-cache'],
+    articleSlugs: [ENGRAM],
+  },
+  {
+    slug: 'embedding-table',
+    term: 'Embedding table',
+    category: 'Model architecture',
+    plainEnglish:
+      'An embedding table stores learned vectors in rows that the model retrieves using input-derived identifiers.',
+    definition:
+      'An embedding table is a collection of learned vector parameters indexed by discrete identifiers, such as token IDs or identifiers derived from multi-token patterns.',
+    explanation:
+      'A lookup selects rows instead of multiplying by the entire table. Engram extends ordinary token embeddings with learned multi-token lookups. The table must be stored somewhere, but sparse access allows its storage tier to differ from that of frequently used dense weights.',
+    significance:
+      'Table capacity, fetched bytes, and the cost of retrieving those bytes are separate quantities. A large table need not consume accelerator memory if the serving path can access its rows efficiently from another tier.',
+    benchmarkContext:
+      'The article places the same Engram table in HBM, pinned DRAM, or an SSD-backed mapping. Its comparisons measure complete serving configurations, including coordination and transfer costs, rather than treating table size alone as a prediction of throughput.',
+    relatedTerms: [
+      'n-gram-embedding',
+      'sparse-embedding-lookup',
+      'parameter-offloading',
+      'high-bandwidth-memory',
+    ],
+    articleSlugs: [ENGRAM],
+  },
+  {
+    slug: 'parameter-offloading',
+    term: 'Parameter offloading',
+    aliases: ['model weight offloading', 'Engram offloading'],
+    category: 'Serving',
+    plainEnglish:
+      'Parameter offloading keeps learned model data outside accelerator memory and fetches the portions needed for computation.',
+    definition:
+      'Parameter offloading stores learned model parameters in a lower memory tier, such as host DRAM or SSD, while the accelerator accesses the data required for inference.',
+    explanation:
+      'Engram is suited to sparse row retrieval because row addresses follow token IDs. This differs from KV cache offloading, which moves attention state generated for particular requests. The two mechanisms can compete for, or free capacity within, the same memory hierarchy.',
+    significance:
+      'Moving parameters out of HBM can leave more room for KV cache or allow fewer GPUs per replica. Those benefits must outweigh access costs and depend on the kernel, interconnect, memory allocation, and workload.',
+    benchmarkContext:
+      'The article reports up to a 1.6x Pareto improvement when its B300 DRAM-offload configuration moves from TP4 to TP2. Its unoptimized B200 SSD path performs worse than DRAM, showing that cheaper storage alone does not establish a lower cost per token.',
+    relatedTerms: ['cpu-offloading', 'nvme-offloading', 'kv-cache-offload', 'engram'],
+    articleSlugs: [ENGRAM],
+  },
+  {
+    slug: 'sparse-embedding-lookup',
+    term: 'Sparse embedding lookup',
+    category: 'Model architecture',
+    plainEnglish:
+      'A sparse lookup reads a few selected embedding rows rather than reading the entire parameter table.',
+    definition:
+      'Sparse embedding lookup retrieves only the rows selected by an input-dependent index set, so accessed data per token can be small relative to total table capacity.',
+    explanation:
+      'The Engram configuration in the article requests 24 rows at each of two layers. It reports about 12.4 KiB per processed token position across the model, or 3.1 KiB per GPU when split across four GPUs.',
+    significance:
+      'Sparse traffic makes offloading plausible but introduces irregular memory access. Row selection, dequantization, transfer overhead, and reuse determine whether a lower memory tier can supply data without delaying the rest of the model.',
+    benchmarkContext:
+      'Moving the Engram table into HBM accelerates its sparse lookup without directly accelerating decoder computation or communication. The article therefore evaluates full AgentX serving curves instead of assuming a faster lookup must produce a proportionate end-to-end gain.',
+    relatedTerms: ['embedding-table', 'engram', 'parameter-offloading', 'memory-bandwidth'],
+    articleSlugs: [ENGRAM],
+  },
+  {
+    slug: 'embedding-prefetch',
+    term: 'Embedding prefetch',
+    aliases: ['Engram prefetch', 'row prefetching'],
+    category: 'Serving',
+    plainEnglish:
+      'Embedding prefetch starts retrieving the rows a later model layer will need while earlier layers are still computing.',
+    definition:
+      'Embedding prefetch is the early retrieval of selected embedding rows so that memory access can overlap computation preceding their use.',
+    explanation:
+      'Engram row addresses depend on token IDs rather than hidden states. Once those IDs are available, the runtime can determine the required rows without waiting for the intervening model layers to finish. The useful overlap window ends when the consuming layer needs the data.',
+    significance:
+      'Prefetch can hide some latency but does not remove transferred bytes or bandwidth limits. A serving system must still allocate buffers, coordinate completion, and avoid consuming data before retrieval has finished.',
+    benchmarkContext:
+      'The article attributes the competitiveness of its DRAM path to optimizations including asynchronous execution and overlap. It does not isolate a universal prefetch speedup, so compare the full configuration and its concurrency range rather than extrapolating from the mechanism.',
+    relatedTerms: ['engram', 'sparse-embedding-lookup', 'double-buffering', 'cpu-offloading'],
+    articleSlugs: [ENGRAM],
+  },
+  {
+    slug: 'unified-virtual-addressing',
+    term: 'Unified Virtual Addressing',
+    abbreviation: 'UVA',
+    category: 'Software',
+    plainEnglish:
+      'UVA lets supported host and device allocations share an address space that GPU code can use.',
+    definition:
+      'Unified Virtual Addressing provides a unified virtual address space for supported CPU and GPU memory allocations. It does not make host memory physically equivalent to HBM.',
+    explanation:
+      'In the article, the Engram kernel reads pinned host memory directly through UVA and performs row selection and dequantization on the GPU. This avoids the explicit CPU row-ID round trip used by the experimental SSD-backed implementation.',
+    significance:
+      'A common address space does not imply automatic page migration or identical access bandwidth. Performance still depends on the memory backing the address and the interconnect used to reach it.',
+    benchmarkContext:
+      'The HBM and DRAM variants use the same row-selection kernel and both support full decode graphs. The SSD experiment changes that execution path, so its comparison cannot be interpreted as a measurement of storage-device latency alone.',
+    relatedTerms: [
+      'pinned-host-memory',
+      'cpu-offloading',
+      'sparse-embedding-lookup',
+      'memory-mapped-file',
+    ],
+    articleSlugs: [ENGRAM],
+  },
+  {
+    slug: 'pinned-host-memory',
+    term: 'Pinned host memory',
+    aliases: ['page-locked memory'],
+    category: 'Hardware',
+    plainEnglish:
+      'Pinned host memory stays resident in RAM so the device can use a stable host-memory allocation.',
+    definition:
+      'Pinned host memory is host RAM held resident for device access or transfer, rather than ordinary pageable memory that the operating system may reclaim or move through paging.',
+    explanation:
+      'The Engram DRAM implementation reads a pinned host table directly through UVA. The SSD experiment instead gathers selected rows into pinned buffers before copying them to the GPU. Both use pinned memory, but they expose different coordination and transfer paths.',
+    significance:
+      'Pinned memory consumes host capacity and should not be confused with free storage. Its stable residency can support efficient device access, while excessive allocation reduces RAM available to applications and the filesystem cache.',
+    benchmarkContext:
+      'A warm SSD-backed file is not equivalent to the pinned DRAM table in the article. Cached pages avoid physical disk reads, but the experimental path still gathers rows on the CPU and transfers the resulting buffers between graph segments.',
+    relatedTerms: [
+      'unified-virtual-addressing',
+      'filesystem-page-cache',
+      'cpu-offloading',
+      'memory-mapped-file',
+    ],
+    articleSlugs: [ENGRAM],
+  },
+  {
+    slug: 'memory-mapped-file',
+    term: 'Memory-mapped file',
+    abbreviation: 'mmap',
+    aliases: ['file-backed mapping'],
+    category: 'Software',
+    plainEnglish:
+      'A memory-mapped file exposes file contents through memory addresses while the operating system manages which pages are resident.',
+    definition:
+      'A memory-mapped file maps file-backed data into a process address space, allowing the operating system to load and reclaim pages as they are accessed.',
+    explanation:
+      'The article replaces the Engram allocation with local SSD-backed mappings. Pages already resident in the filesystem cache can satisfy reads without another SSD access. File backing lets the operating system reclaim those pages when other applications need RAM.',
+    significance:
+      'The mapped file size is not the same as physical RAM use or bytes read from the SSD during a benchmark. Cache residency and memory pressure must be reported to understand what an experiment actually measures.',
+    benchmarkContext:
+      'The B200 experiment uses CPU row-ID handling, deduplication, pinned-buffer gathering, and GPU transfers around graph segments. It did not enable GDS. Consequently its measured gap from DRAM includes the implementation overhead as well as any physical storage activity.',
+    relatedTerms: [
+      'filesystem-page-cache',
+      'nvme-offloading',
+      'pinned-host-memory',
+      'parameter-offloading',
+    ],
+    articleSlugs: [ENGRAM],
+  },
+  {
+    slug: 'filesystem-page-cache',
+    term: 'Filesystem page cache',
+    aliases: ['OS page cache', 'warm filesystem cache'],
+    category: 'Software',
+    plainEnglish:
+      'The filesystem page cache keeps recently accessed file data in RAM so later reads can avoid the storage device.',
+    definition:
+      'The filesystem page cache is operating-system-managed memory holding file data, including resident pages accessed through file-backed mappings.',
+    explanation:
+      'A warm Engram mapping may serve its requested rows entirely from RAM. Under memory pressure the operating system can reclaim file-backed pages, making later accesses depend on storage again. The table being backed by SSD therefore does not prove that each lookup reads the SSD.',
+    significance:
+      'Cache state changes the meaning of storage benchmarks. It is necessary to distinguish logical reads from physical device I/O and to account for resident file pages when claiming host-memory savings.',
+    benchmarkContext:
+      'In the article, a warm cache removes SSD reads but leaves CPU coordination, row gathering, and transfers in the unoptimized path. The measured result supports a comparison of complete serving implementations, not an isolated claim about the latency of NAND flash.',
+    relatedTerms: ['memory-mapped-file', 'cache-hotness', 'nvme-offloading', 'pinned-host-memory'],
+    articleSlugs: [ENGRAM],
+  },
+  {
+    slug: 'cache-hotness',
+    term: 'Cache hotness',
+    aliases: ['hot embedding rows', 'row access frequency'],
+    category: 'Serving',
+    plainEnglish:
+      'A hot row is accessed often or recently enough that keeping it in a faster tier may save repeated retrievals.',
+    definition:
+      'Cache hotness describes the observed access frequency or recency of data within a workload and time window, informing which data may benefit from faster storage.',
+    explanation:
+      'Recommendation systems commonly retain frequently or recently used embedding rows in faster memory while colder rows remain on SSD. Engram gate scores answer a different question: how strongly retrieved features contribute in a given context.',
+    significance:
+      'A strongly weighted row is not necessarily frequently requested. Cache policy needs access traces and resource constraints rather than a ranking of interesting examples or large gate activations alone.',
+    benchmarkContext:
+      'The article explicitly warns that strong gates do not identify cache-hot rows. Its example scan also does not measure table capacity by content category, so it cannot justify a cache allocation or prove that certain learned content wastes memory.',
+    relatedTerms: [
+      'context-dependent-gating',
+      'embedding-table',
+      'filesystem-page-cache',
+      'engram',
+    ],
+    articleSlugs: [ENGRAM],
+  },
+  {
+    slug: 'context-dependent-gating',
+    term: 'Context-dependent gating',
+    aliases: ['Engram gate score'],
+    category: 'Model architecture',
+    plainEnglish:
+      'A gate controls how much a retrieved memory feature contributes in the current model context.',
+    definition:
+      'Context-dependent gating weights retrieved memory features according to their compatibility with the current representation, rather than always applying a fixed contribution.',
+    explanation:
+      'The article probes Engram gate scores to find names, code fragments, and recurring phrases. It also notes that calculating the gate requires the retrieved key, so observing a low gate after retrieval does not automatically avoid the memory read.',
+    significance:
+      'Skipping retrieval would require a separate usefulness predictor that acts before the read. Such a predictor introduces a different implementation and accuracy question; it is not a free consequence of existing gate values.',
+    benchmarkContext:
+      'The published examples were selected for interest rather than gate strength. Neither those examples nor strong gates establish cache hotness. Gate-based interpretation, storage placement, and serving performance should therefore remain separate measurements when evaluating Engram.',
+    relatedTerms: ['engram', 'cache-hotness', 'n-gram-embedding', 'sparse-embedding-lookup'],
+    articleSlugs: [ENGRAM],
+  },
+  {
+    slug: 'inference-time-ablation',
+    term: 'Inference-time ablation',
+    category: 'Model architecture',
+    plainEnglish:
+      'An inference-time ablation disables part of an already trained model to measure how the model depends on that part.',
+    definition:
+      'Inference-time ablation changes or removes a component during evaluation without retraining the model to adapt to that change.',
+    explanation:
+      'Suppressing Engram changes downstream features and expert choices in a model trained to use the memory. The resulting loss therefore measures dependence under a training-inference mismatch, not the quality difference between independently trained models with and without Engram.',
+    significance:
+      'Different tasks and evaluation procedures can respond differently. The article reports worse token likelihood across evaluated domains while GSM8K accuracy remains within measured run-to-run variation. A single unchanged score cannot establish that the removed component is generally unnecessary.',
+    benchmarkContext:
+      'The CRUXEval experiment separately tests natural rerouting and fixed original expert choices under teacher forcing. It also evaluates removing Engram during prefill, decode, or both, keeping those interventions distinct from storage-tier changes that retain the memory.',
+    relatedTerms: ['engram', 'teacher-forcing', 'prefill', 'decode'],
+    articleSlugs: [ENGRAM],
+  },
+  {
+    slug: 'teacher-forcing',
+    term: 'Teacher forcing',
+    category: 'Model architecture',
+    plainEnglish:
+      'Teacher forcing supplies the reference token history so different model variants are scored on the same continuation.',
+    definition:
+      'Teacher forcing conditions a model on reference tokens rather than its own sampled outputs, allowing token-level losses to be compared along a fixed sequence.',
+    explanation:
+      'The article uses a teacher-forced CRUXEval experiment to hold tokens constant while changing Engram and expert routing. This separates changes in reference-answer likelihood from differences caused by models generating different continuations.',
+    significance:
+      'Teacher-forced loss and free-generation task accuracy are different measurements. Fixed token histories help isolate an intervention, but they do not measure the entire behavior of a model choosing and extending its own answers.',
+    benchmarkContext:
+      'Removing Engram raises answer loss from 0.2848 to 0.3093 bits/token; forcing the ablated model to retain the original expert choices raises it further to 0.3375. These results support partial compensation through rerouting in that experiment, not a universal division between memory and reasoning.',
+    relatedTerms: ['inference-time-ablation', 'engram', 'mixture-of-experts', 'decode'],
+    articleSlugs: [ENGRAM],
   },
 ] as const satisfies readonly GlossaryEntry[];
 

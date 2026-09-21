@@ -187,7 +187,7 @@ export interface ProfitEstimatorAssumptions {
 }
 
 export interface ProfitEstimatorRow {
-  /** Distinguish identical hardware bars when both power budgets are shown. */
+  /** Identify the power budget and any full-chassis extrapolation in charts and CSV. */
   powerLabel?: string;
   hwKey: string;
   resultKey: string;
@@ -227,6 +227,9 @@ export interface ProfitEstimatorRow {
  */
 export type ProfitEstimatorSkipReason =
   | 'no-measured-power'
+  | 'unsupported-power-hardware'
+  | 'unsupported-power-topology'
+  | 'outside-power-model'
   | 'outside-measured-range'
   | 'no-power'
   | 'no-cost'
