@@ -3,8 +3,8 @@
  * the per-GPU statistics digest, and links to the benchmark points it covers.
  *
  * Idempotency: a series is identified by (workflow run, artifact name, CSV
- * path). Re-ingesting an identical CSV (same sha256) only refreshes the point
- * links; a changed CSV replaces the stored samples and digest inside one
+ * path). Re-ingesting an identical CSV, sidecars and sample count only refreshes
+ * the point links; a change replaces the stored samples and digest inside one
  * transaction so readers never observe a half-written series.
  */
 
@@ -40,6 +40,17 @@ import { multinodePowerVendor, parseMultinodePowerSamples } from './multinode-po
 /** Samples are streamed to Postgres in unnest batches of this many rows. */
 const SAMPLE_BATCH_SIZE = 5000;
 
+function uniqueSamples(samples: readonly GpuMetricSample[]): GpuMetricSample[] {
+  const seen = new Set<string>();
+  return samples.filter((sample) => {
+    const key = `${sample.gpuIndex}:${sample.timestampMs}`;
+    if (seen.has(key)) return false;
+    // Keep the first row, matching INSERT ... ON CONFLICT DO NOTHING.
+    seen.add(key);
+    return true;
+  });
+}
+
 export interface PreparedGpuMetricSeries {
   fileName: string;
   vendor: GpuMetricsVendor;
@@ -61,8 +72,8 @@ export interface GpuMetricsIngestResult {
 
 /**
  * One series per host from the multinode power bundle. The deployment-wide
- * CSV is hashed once, so every host series of one upload shares its sha and
- * re-ingests stay no-ops together. The `#<hostname>` fragment keeps the
+ * CSV is hashed once, so every host series of one upload shares its source sha.
+ * The `#<hostname>` fragment keeps the
  * (run, artifact, file) identity unique per host.
  */
 function prepareMultinodePowerSeries(artifact: GpuMetricsArtifact): PreparedGpuMetricSeries[] {
@@ -75,14 +86,15 @@ function prepareMultinodePowerSeries(artifact: GpuMetricsArtifact): PreparedGpuM
     const vendor = multinodePowerVendor(manifest);
     const csvSha256 = createHash('sha256').update(csvText).digest('hex');
     for (const host of hosts) {
-      const summary = summarizeGpuMetricSamples(host.samples);
+      const samples = uniqueSamples(host.samples);
+      const summary = summarizeGpuMetricSamples(samples);
       if (!summary) continue;
       prepared.push({
         fileName: `${file.fileName}#${host.hostname}`,
         vendor,
         csvSha256,
-        samples: host.samples,
-        stats: computeGpuMetricStats(host.samples),
+        samples,
+        stats: computeGpuMetricStats(samples),
         sampleIntervalS: summary.sampleIntervalS,
         gpuCount: summary.gpuCount,
         startedAtMs: summary.startedAtMs,
@@ -116,14 +128,15 @@ export function prepareGpuMetricsArtifact(artifact: GpuMetricsArtifact): Prepare
       nvidiaUtcOffsetMinutes: contextUtcOffsetMinutes(sidecars.context),
     });
     if (!parsed) continue;
-    const summary = summarizeGpuMetricSamples(parsed.samples);
+    const samples = uniqueSamples(parsed.samples);
+    const summary = summarizeGpuMetricSamples(samples);
     if (!summary) continue;
     prepared.push({
       fileName: file.fileName,
       vendor: parsed.vendor,
       csvSha256: createHash('sha256').update(csvText).digest('hex'),
-      samples: parsed.samples,
-      stats: computeGpuMetricStats(parsed.samples),
+      samples,
+      stats: computeGpuMetricStats(samples),
       sampleIntervalS: summary.sampleIntervalS,
       gpuCount: summary.gpuCount,
       startedAtMs: summary.startedAtMs,
@@ -225,8 +238,8 @@ async function insertStats(
 
 /**
  * Upsert one prepared series and link it to `benchmarkResultIds`. Returns the
- * series id and how many sample rows were written (0 when the CSV was already
- * stored with the same hash).
+ * series id and how many sample rows were written (0 when the CSV, sidecars,
+ * and unique sample count are unchanged).
  */
 export function upsertGpuMetricSeries(
   sql: Sql,
@@ -242,8 +255,11 @@ export function upsertGpuMetricSeries(
   const sidecarsJson = JSON.stringify(series.sidecars);
 
   return sql.begin(async (tx) => {
-    const existing = await tx<{ id: number; csv_sha256: string }[]>`
-      select id, csv_sha256 from gpu_metric_series
+    const existing = await tx<
+      { id: number; csv_sha256: string; sample_count: number; sidecars_match: boolean }[]
+    >`
+      select id, csv_sha256, sample_count, sidecars = ${sidecarsJson}::jsonb as sidecars_match
+      from gpu_metric_series
       where workflow_run_id = ${workflowRunId}
         and artifact_name = ${artifactName}
         and file_name = ${series.fileName}
@@ -255,7 +271,12 @@ export function upsertGpuMetricSeries(
     let replaced = false;
     if (existing.length > 0) {
       seriesId = Number(existing[0]!.id);
-      if (existing[0]!.csv_sha256 === series.csvSha256) {
+      // Count also detects legacy digests computed before duplicate removal.
+      if (
+        existing[0]!.csv_sha256 === series.csvSha256 &&
+        existing[0]!.sidecars_match &&
+        existing[0]!.sample_count === series.samples.length
+      ) {
         needsSamples = false;
       } else {
         replaced = true;

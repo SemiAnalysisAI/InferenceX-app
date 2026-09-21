@@ -94,6 +94,7 @@ const MULTINODE_POWER_CSV = [
   '1,1789194366.292,5,host-a,1,GPU-a1,702.0',
   '1,1789194366.292,5,host-b,0,GPU-b0,650.0',
   '1,1789194366.292,5,host-b,1,GPU-b1,655.0',
+  '1,1789194366.292,5,host-a,0,GPU-a0,999.0',
 ].join('\n');
 const MULTINODE_MANIFEST = {
   schema_version: 1,
@@ -159,7 +160,7 @@ describe('prepareGpuMetricsArtifact', () => {
     const [series] = prepareGpuMetricsArtifact(writeArtifact(NVIDIA_CSV));
     expect(series?.fileName).toBe('gpu_metrics.csv');
     expect(series?.vendor).toBe('nvidia');
-    expect(series?.samples).toHaveLength(5);
+    expect(series?.samples).toHaveLength(4);
     expect(series?.gpuCount).toBe(2);
     expect(series?.sidecars.context).toEqual({ timestamp_timezone: 'UTC' });
     expect(series?.stats.find((s) => s.gpuIndex === 0 && s.metric === 'powerW')?.max).toBe(912.1);
@@ -175,7 +176,6 @@ describe('ingestGpuMetricsArtifact', () => {
       benchmarkResultIds: [10, 10],
     });
     expect(first.seriesIds).toHaveLength(1);
-    // Five CSV rows, but the repeated final sample collapses on the primary key.
     expect(first.samplesInserted).toBe(4);
     expect(first.seriesSkipped).toBe(0);
 
@@ -195,7 +195,7 @@ describe('ingestGpuMetricsArtifact', () => {
     expect(series!.artifact_name).toBe(artifact.artifactName);
     expect(series!.config_key).toBe('dsr1_8k1k_fp4_sglang_conc32_b200-x_0');
     expect(series!.vendor).toBe('nvidia');
-    expect(series!.sample_count).toBe(5);
+    expect(series!.sample_count).toBe(4);
     expect(series!.gpu_count).toBe(2);
     expect(new Date(series!.started_at).toISOString()).toBe('2026-09-11T04:19:41.982Z');
     expect(new Date(series!.ended_at).toISOString()).toBe('2026-09-11T04:19:42.994Z');
@@ -217,7 +217,7 @@ describe('ingestGpuMetricsArtifact', () => {
       where metric = 'power_w' order by gpu_index`;
     expect(stats).toEqual([
       { gpu_index: 0, metric: 'power_w', sample_count: 2, max_value: 912.1 },
-      { gpu_index: 1, metric: 'power_w', sample_count: 3, max_value: 905.3 },
+      { gpu_index: 1, metric: 'power_w', sample_count: 2, max_value: 905.3 },
     ]);
 
     const links = await sql<{ benchmark_result_id: number }[]>`
@@ -269,6 +269,18 @@ describe('ingestGpuMetricsArtifact', () => {
     const links = await sql<{ n: number }[]>`
       select count(*)::int as n from benchmark_result_gpu_metrics where benchmark_result_id = 10`;
     expect(links[0]!.n).toBe(2);
+    const [hostA] = await sql<{ sample_count: number; mean_value: number; power_w: number }[]>`
+      select stats.sample_count, stats.mean_value, samples.power_w
+      from gpu_metric_series series
+      join gpu_metric_gpu_stats stats on stats.series_id = series.id
+      join gpu_metric_samples samples on samples.series_id = series.id
+        and samples.gpu_index = stats.gpu_index
+      where series.file_name = 'LOGS/power/samples.csv#host-a'
+        and stats.gpu_index = 0 and stats.metric = 'power_w'
+      order by samples.sampled_at desc limit 1`;
+    expect(hostA!.sample_count).toBe(2);
+    expect(hostA!.mean_value).toBeCloseTo((186.656 + 700.25) / 2, 3);
+    expect(hostA!.power_w).toBe(700.25);
 
     const rerun = await ingestGpuMetricsArtifact(sql, {
       workflowRunId: 1,
@@ -295,10 +307,163 @@ describe('ingestGpuMetricsArtifact', () => {
     const [series] = await sql<{ n: number; sample_count: number }[]>`
       select (select count(*)::int from gpu_metric_series) as n, sample_count from gpu_metric_series`;
     expect(series!.n).toBe(1);
-    expect(series!.sample_count).toBe(6);
+    expect(series!.sample_count).toBe(5);
     const [stat] = await sql<{ max_value: number }[]>`
       select max_value from gpu_metric_gpu_stats where gpu_index = 0 and metric = 'power_w'`;
     expect(stat!.max_value).toBe(950);
+  });
+
+  it('uses the first reading per GPU/timestamp for stored samples, metadata, and digest', async () => {
+    const csv = [
+      NVIDIA_CSV.split('\n')[0],
+      '2026/09/11 04:19:41.000, 0, 100 W, 33, 120 MHz, 3996 MHz, 0 %, 0 %',
+      '2026/09/11 04:19:41.000, 1, 200 W, 33, 120 MHz, 3996 MHz, 0 %, 0 %',
+      '2026/09/11 04:19:42.000, 0, 300 W, 33, 120 MHz, 3996 MHz, 0 %, 0 %',
+      '2026/09/11 04:19:42.000, 0, 900 W, 33, 120 MHz, 3996 MHz, 0 %, 0 %',
+    ].join('\n');
+    const artifact = writeArtifact(csv);
+    await ingestGpuMetricsArtifact(sql, { workflowRunId: 1, artifact, benchmarkResultIds: [10] });
+
+    const samples = await sql<{ gpu_index: number; power_w: number }[]>`
+      select gpu_index, power_w from gpu_metric_samples order by sampled_at, gpu_index`;
+    expect(samples).toEqual([
+      { gpu_index: 0, power_w: 100 },
+      { gpu_index: 1, power_w: 200 },
+      { gpu_index: 0, power_w: 300 },
+    ]);
+    const [series] = await sql<{ sample_count: number; gpu_count: number }[]>`
+      select sample_count, gpu_count from gpu_metric_series`;
+    expect(series).toEqual({ sample_count: 3, gpu_count: 2 });
+    const stats = await sql<{ gpu_index: number; sample_count: number; mean_value: number }[]>`
+      select gpu_index, sample_count, mean_value from gpu_metric_gpu_stats
+      where metric = 'power_w' order by gpu_index`;
+    expect(stats).toEqual([
+      { gpu_index: 0, sample_count: 2, mean_value: 200 },
+      { gpu_index: 1, sample_count: 1, mean_value: 200 },
+    ]);
+  });
+
+  it('repairs an existing duplicate-inflated digest when the same CSV is re-ingested', async () => {
+    const artifact = writeArtifact(NVIDIA_CSV);
+    const first = await ingestGpuMetricsArtifact(sql, {
+      workflowRunId: 1,
+      artifact,
+      benchmarkResultIds: [10],
+    });
+    // Model an earlier ingest: SQL stored unique samples, but metadata and stats
+    // counted the repeated final CSV row. Its CSV hash and sidecars still match.
+    await sql`update gpu_metric_series set sample_count = 5`;
+    await sql`update gpu_metric_gpu_stats set sample_count = 3, mean_value = 667.1867
+      where gpu_index = 1 and metric = 'power_w'`;
+
+    const result = await ingestGpuMetricsArtifact(sql, {
+      workflowRunId: 1,
+      artifact,
+      benchmarkResultIds: [10],
+    });
+    expect(result.seriesIds).toEqual(first.seriesIds);
+    expect(result.seriesSkipped).toBe(0);
+    const [series] = await sql<{ sample_count: number; stored_count: number }[]>`
+      select sample_count, (select count(*)::int from gpu_metric_samples) as stored_count
+      from gpu_metric_series`;
+    expect(series).toEqual({ sample_count: 4, stored_count: 4 });
+    const [stat] = await sql<{ sample_count: number; mean_value: number }[]>`
+      select sample_count, mean_value from gpu_metric_gpu_stats
+      where gpu_index = 1 and metric = 'power_w'`;
+    expect(stat!.sample_count).toBe(2);
+    expect(stat!.mean_value).toBeCloseTo((190.96 + 905.3) / 2, 3);
+  });
+
+  it('replaces timestamps when only the context timezone is corrected', async () => {
+    const artifact = writeArtifact(NVIDIA_CSV);
+    const first = await ingestGpuMetricsArtifact(sql, {
+      workflowRunId: 1,
+      artifact,
+      benchmarkResultIds: [10],
+    });
+    const before = await sql<{ sampled_at: Date }[]>`
+      select sampled_at from gpu_metric_samples order by sampled_at, gpu_index`;
+    fs.writeFileSync(
+      path.join(artifact.artifactDir, 'gpu_metrics_context.json'),
+      JSON.stringify({ timestamp_timezone: '+02:00' }),
+    );
+
+    const result = await ingestGpuMetricsArtifact(sql, {
+      workflowRunId: 1,
+      artifact,
+      benchmarkResultIds: [10],
+    });
+    expect(result.seriesIds).toEqual(first.seriesIds);
+    expect(result.samplesInserted).toBe(4);
+    expect(result.seriesSkipped).toBe(0);
+    const after = await sql<{ sampled_at: Date }[]>`
+      select sampled_at from gpu_metric_samples order by sampled_at, gpu_index`;
+    expect(after.map((s) => new Date(s.sampled_at).getTime())).toEqual(
+      before.map((s) => new Date(s.sampled_at).getTime() - 2 * 60 * 60 * 1000),
+    );
+    const [series] = await sql<{ started_at: Date; ended_at: Date; context: unknown }[]>`
+      select started_at, ended_at, sidecars -> 'context' as context from gpu_metric_series`;
+    expect(new Date(series!.started_at).toISOString()).toBe('2026-09-11T02:19:41.982Z');
+    expect(new Date(series!.ended_at).toISOString()).toBe('2026-09-11T02:19:42.994Z');
+    expect(series!.context).toEqual({ timestamp_timezone: '+02:00' });
+  });
+
+  it('persists identity-only sidecar corrections without changing the series or samples', async () => {
+    const artifact = writeArtifact(NVIDIA_CSV);
+    const first = await ingestGpuMetricsArtifact(sql, {
+      workflowRunId: 1,
+      artifact,
+      benchmarkResultIds: [10],
+    });
+    const before = await sql`select * from gpu_metric_samples order by sampled_at, gpu_index`;
+    fs.writeFileSync(
+      path.join(artifact.artifactDir, 'gpu_metrics_identity.csv'),
+      'index, uuid, name\n0, GPU-corrected, NVIDIA B200\n1, GPU-b, NVIDIA B200\n',
+    );
+
+    const result = await ingestGpuMetricsArtifact(sql, {
+      workflowRunId: 1,
+      artifact,
+      benchmarkResultIds: [10],
+    });
+    expect(result.seriesIds).toEqual(first.seriesIds);
+    const [series] = await sql<{ identity: unknown }[]>`
+      select sidecars -> 'identity' as identity from gpu_metric_series`;
+    expect(series!.identity).toEqual([
+      { index: '0', uuid: 'GPU-corrected', name: 'NVIDIA B200' },
+      { index: '1', uuid: 'GPU-b', name: 'NVIDIA B200' },
+    ]);
+    expect(await sql`select * from gpu_metric_samples order by sampled_at, gpu_index`).toEqual(
+      before,
+    );
+  });
+
+  it('keeps reruns as no-ops when only JSON object key order changes', async () => {
+    const artifact = writeArtifact(NVIDIA_CSV);
+    const contextPath = path.join(artifact.artifactDir, 'gpu_metrics_context.json');
+    fs.writeFileSync(
+      contextPath,
+      JSON.stringify({ timestamp_timezone: 'UTC', collector: { name: 'nvidia-smi', version: 1 } }),
+    );
+    const first = await ingestGpuMetricsArtifact(sql, {
+      workflowRunId: 1,
+      artifact,
+      benchmarkResultIds: [10],
+    });
+    const [before] = await sql<{ ingested_at: Date }[]>`select ingested_at from gpu_metric_series`;
+    fs.writeFileSync(
+      contextPath,
+      JSON.stringify({ collector: { version: 1, name: 'nvidia-smi' }, timestamp_timezone: 'UTC' }),
+    );
+
+    const result = await ingestGpuMetricsArtifact(sql, {
+      workflowRunId: 1,
+      artifact,
+      benchmarkResultIds: [10],
+    });
+    expect(result).toEqual({ seriesIds: first.seriesIds, samplesInserted: 0, seriesSkipped: 1 });
+    const [after] = await sql<{ ingested_at: Date }[]>`select ingested_at from gpu_metric_series`;
+    expect(after!.ingested_at).toEqual(before!.ingested_at);
   });
 
   it('ignores artifacts whose CSVs cannot be parsed', async () => {
