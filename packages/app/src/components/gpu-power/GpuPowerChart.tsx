@@ -426,32 +426,31 @@ const GpuMetricsChart = React.memo(
           {
             type: 'custom',
             key: 'tdp-line',
-            render: tdpInfo
-              ? (group, ctx) => {
-                  const yScale = ctx.yScale as d3.ScaleLinear<number, number>;
-                  const tdpY = yScale(tdpInfo.tdp);
-                  group.selectAll('.tdp-line').remove();
-                  const tdpGroup = group.append('g').attr('class', 'tdp-line');
-                  tdpGroup
-                    .append('line')
-                    .attr('x1', 0)
-                    .attr('x2', ctx.width)
-                    .attr('y1', tdpY)
-                    .attr('y2', tdpY)
-                    .attr('stroke', '#ef4444')
-                    .attr('stroke-width', 1.5)
-                    .attr('stroke-dasharray', '6,4');
-                  tdpGroup
-                    .append('text')
-                    .attr('x', ctx.width - 4)
-                    .attr('y', tdpY - 6)
-                    .attr('text-anchor', 'end')
-                    .attr('fill', '#ef4444')
-                    .attr('font-size', '11px')
-                    .attr('font-weight', '600')
-                    .text(`${tdpInfo.sku} TDP: ${tdpInfo.tdp}W`);
-                }
-              : null,
+            render: (group, ctx) => {
+              group.selectAll('.tdp-line').remove();
+              if (!tdpInfo) return;
+              const yScale = ctx.yScale as d3.ScaleLinear<number, number>;
+              const tdpY = yScale(tdpInfo.tdp);
+              const tdpGroup = group.append('g').attr('class', 'tdp-line');
+              tdpGroup
+                .append('line')
+                .attr('x1', 0)
+                .attr('x2', ctx.width)
+                .attr('y1', tdpY)
+                .attr('y2', tdpY)
+                .attr('stroke', '#ef4444')
+                .attr('stroke-width', 1.5)
+                .attr('stroke-dasharray', '6,4');
+              tdpGroup
+                .append('text')
+                .attr('x', ctx.width - 4)
+                .attr('y', tdpY - 6)
+                .attr('text-anchor', 'end')
+                .attr('fill', '#ef4444')
+                .attr('font-size', '11px')
+                .attr('font-weight', '600')
+                .text(`${tdpInfo.sku} TDP: ${tdpInfo.tdp}W`);
+            },
           },
           // GPU lines
           {

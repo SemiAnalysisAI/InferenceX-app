@@ -1,6 +1,7 @@
 import GpuMetricsChart from '@/components/gpu-power/GpuPowerChart';
 import type { GpuMetricRow } from '@/components/gpu-power/types';
 import { HW_REGISTRY } from '@semianalysisai/inferencex-constants';
+import { useState } from 'react';
 
 const svg = () => cy.get('[data-testid="gpu-metrics-chart-svg"]');
 
@@ -85,5 +86,32 @@ describe('PowerX telemetry axis', () => {
       expect(Math.min(...values)).to.be.at.most(300);
       expect(Math.max(...values)).to.be.at.least(HW_REGISTRY.b200.tdp);
     });
+  });
+
+  it('removes the power reference when switching to memory clock and restores it once', () => {
+    function SwitchMetric() {
+      const [metric, setMetric] = useState<'power' | 'memClock'>('power');
+      return (
+        <>
+          <button onClick={() => setMetric(metric === 'power' ? 'memClock' : 'power')}>
+            Switch metric
+          </button>
+          <GpuMetricsChart
+            data={samples(() => 3996)}
+            visibleGpus={new Set([0, 1, 2, 3, 4, 5, 6, 7])}
+            metricKey={metric}
+            artifactName="gpu_metrics_b200"
+            display={{ mode: 'rolling', windowS: 300, series: 'chips' }}
+          />
+        </>
+      );
+    }
+    cy.mount(<SwitchMetric />);
+    svg().find('.tdp-line').should('have.length', 1);
+    cy.contains('button', 'Switch metric').click();
+    svg().find('.tdp-line').should('not.exist');
+    assertReadableAxis(3996);
+    cy.contains('button', 'Switch metric').click();
+    svg().find('.tdp-line').should('have.length', 1);
   });
 });
