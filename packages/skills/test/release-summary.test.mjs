@@ -86,7 +86,7 @@ const exceptionOptions = { allowNativeReportLimitations: true };
 function reportException() {
   const archive = {
     ...release,
-    sha256: '204a22e1e27b6f938f84303688da345a70ea474db93cce0fb55ded8fea4c565f',
+    sha256: 'b6ee16ef5d359f2055e4a86e156f1045e64f2a048ca6662b1859ce4b0f1480a2',
   };
   const record = structuredClone(qualification);
   record.archive_sha256 = archive.sha256;
@@ -94,23 +94,15 @@ function reportException() {
   for (const entry of record.platform_matrix) entry.archive_sha256 = archive.sha256;
   for (const entry of record.native_acceptance) {
     entry.archive_sha256 = archive.sha256;
-    entry.status = entry.runtime === 'codex' ? 'not_run' : 'failed';
-    entry.scope = entry.runtime === 'codex' ? [] : ['agentx', 'tco'];
+    entry.status = 'not_run';
+    entry.scope = [];
     delete entry.prompt_transcript_sha256;
     delete entry.answer_transcript_sha256;
     for (const item of entry.cases) {
-      const status =
-        entry.runtime === 'claude'
-          ? ({ 'agentx-live': 'passed', 'agentx-selected-trace': 'passed', 'tco-live': 'failed' }[
-              item.case_id
-            ] ?? 'not_run')
-          : 'not_run';
-      item.status = status;
-      item.assessor_status = status;
-      if (status === 'not_run') {
-        delete item.prompt_transcript_sha256;
-        delete item.answer_transcript_sha256;
-      }
+      item.status = 'not_run';
+      item.assessor_status = 'not_run';
+      delete item.prompt_transcript_sha256;
+      delete item.answer_transcript_sha256;
     }
   }
   return { archive, record };
@@ -345,7 +337,7 @@ test('qualification is validated before publication and supplied independently o
   assert.equal(JSON.parse(result.stdout).archive_sha256, hash);
 });
 
-test('the explicit 1.0.0 report exception preserves failed and unrun acceptance', () => {
+test('the explicit 1.0.0 report exception records all current-archive native cases as unrun', () => {
   const { archive, record } = reportException();
   const summary = createReleaseSummary(
     archive,
@@ -354,7 +346,7 @@ test('the explicit 1.0.0 report exception preserves failed and unrun acceptance'
     record,
     exceptionOptions,
   );
-  assert.deepEqual(summary.native_report_exception.counts, { passed: 2, failed: 1, not_run: 23 });
+  assert.deepEqual(summary.native_report_exception.counts, { passed: 0, failed: 0, not_run: 26 });
   assert.equal(summary.native_report_exception.code, 'accepted-1.0.0-report-limitations');
   assert.match(summary.native_report_exception.reason, /not fully qualified/u);
   assert.deepEqual(summary.native_acceptance, record.native_acceptance);
@@ -399,7 +391,7 @@ test('the report exception requires both opt-ins and the exact release identity'
   }
 });
 
-test('the report exception rejects changed results, missing evidence and nonpassed platform gates', () => {
+test('the report exception rejects historical results, invented execution and nonpassed platform gates', () => {
   const { archive, record } = reportException();
   for (const mutate of [
     (value) => {
@@ -418,8 +410,26 @@ test('the report exception rejects changed results, missing evidence and nonpass
       value.native_acceptance[0].cases[0].status = 'passed';
     },
     (value) => {
-      value.native_acceptance[1].cases.find((item) => item.case_id === 'tco-live').status =
-        'passed';
+      Object.assign(value.native_acceptance[1], {
+        status: 'failed',
+        scope: ['agentx', 'tco'],
+        cases: value.native_acceptance[1].cases.map((item) => {
+          const previous = {
+            'agentx-live': 'passed',
+            'agentx-selected-trace': 'passed',
+            'tco-live': 'failed',
+          }[item.case_id];
+          return previous
+            ? {
+                ...item,
+                status: previous,
+                assessor_status: previous,
+                prompt_transcript_sha256: hash,
+                answer_transcript_sha256: hash,
+              }
+            : item;
+        }),
+      });
     },
     (value) => {
       Object.assign(
@@ -435,18 +445,23 @@ test('the report exception rejects changed results, missing evidence and nonpass
         'passed';
     },
     (value) => {
-      delete value.native_acceptance[1].cases.find((item) => item.case_id === 'tco-live')
-        .answer_transcript_sha256;
+      value.native_acceptance[1].cases.find(
+        (item) => item.case_id === 'tco-live',
+      ).answer_transcript_sha256 = hash;
     },
     (value) => {
-      delete value.native_acceptance[1].cases.find((item) => item.case_id === 'agentx-live')
-        .prompt_transcript_sha256;
+      value.native_acceptance[1].cases.find(
+        (item) => item.case_id === 'agentx-live',
+      ).prompt_transcript_sha256 = hash;
     },
     (value) => {
       value.native_acceptance[0].cases[0].answer_transcript_sha256 = hash;
     },
     (value) => {
       value.native_acceptance[0].prompt_transcript_sha256 = hash;
+    },
+    (value) => {
+      value.native_acceptance[1].answer_transcript_sha256 = hash;
     },
     (value) => {
       value.native_acceptance[0].status = 'passed';
@@ -513,9 +528,9 @@ test('both CLI modes enable the one-off exception only for the literal true envi
       if (setting === 'true') {
         assert.equal(result.status, 0, result.stderr);
         assert.deepEqual(JSON.parse(result.stdout).native_report_exception.counts, {
-          passed: 2,
-          failed: 1,
-          not_run: 23,
+          passed: 0,
+          failed: 0,
+          not_run: 26,
         });
       } else {
         assert.notEqual(result.status, 0);
