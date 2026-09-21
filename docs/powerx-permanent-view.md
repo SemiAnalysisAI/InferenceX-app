@@ -146,7 +146,7 @@ was previously split on `_`. Siblings keep the hardware colour (overlay runs kee
 colour) and take a per-variant `stroke-dasharray` (`powerVariantDash`); clone points render
 at 0.6 opacity behind their base and carry `data-power-variant`. Line labels are placed per
 hardware _and_ sibling: the base series keeps its plain hardware label, while a sibling appends
-` · <short name>` (`powerLineLabel`: TDP, All-in, PUE modeled, Prefill GPUs, …) and, when a
+` · <short name>` (`powerLineLabelSuffix`: TDP, All-in, PUE modeled, Prefill GPUs, …) and, when a
 boundary is flat on a watts axis, its shared value (`B300 (SGLang) · TDP 1.2 kW`), so an exported
 PNG explains its dashed lines without the legend; each pill carries `data-series-id`
 (`<hw>::<variant>` for a sibling) and `data-power-variant`. The legend appends one

@@ -196,23 +196,16 @@ async function downloadBundle(
  */
 async function runJob(job: TelemetryJob, githubToken: string): Promise<TelemetryResult | null> {
   try {
-    return await runJobUnguarded(job, githubToken);
+    if (job.kind === 'csv') {
+      const parsed = await downloadArtifact(job.artifact, githubToken);
+      return parsed ? { kind: 'csv', parsed } : null;
+    }
+    const series = await downloadBundle(job.artifact, githubToken);
+    return series ? { kind: 'bundle', series } : null;
   } catch (error) {
     console.warn(`Failed to read artifact ${job.artifact.name}:`, error);
     return null;
   }
-}
-
-async function runJobUnguarded(
-  job: TelemetryJob,
-  githubToken: string,
-): Promise<TelemetryResult | null> {
-  if (job.kind === 'csv') {
-    const parsed = await downloadArtifact(job.artifact, githubToken);
-    return parsed ? { kind: 'csv', parsed } : null;
-  }
-  const series = await downloadBundle(job.artifact, githubToken);
-  return series ? { kind: 'bundle', series } : null;
 }
 
 /** Downloads in listing order with a bounded number of requests in flight. */

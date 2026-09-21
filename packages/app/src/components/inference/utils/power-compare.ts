@@ -25,7 +25,6 @@ import {
 
 import { getMeasuredMetricConfig } from '../measured-metric-config';
 import type { InferenceData, PowerCompare, PowerRole, PowerVariant } from '../types';
-import { reconstructedRoleEnergy } from './role-energy';
 
 export const POWER_COMPARE_MODES = [
   'none',
@@ -286,18 +285,6 @@ export function powerLineLabelSuffix(
   return `${LINE_LABEL_SUFFIX_SEPARATOR}${powerVariantShortLabel(variant, opts.locale)}${watts}`;
 }
 
-/**
- * Line-label text for one drawn series: the hardware label alone for the base
- * series, `<label> · <variant>` for a sibling, plus the flat watts when known.
- */
-export function powerLineLabel(
-  baseLabel: string,
-  variant: PowerVariant | null | undefined,
-  opts: PowerLineLabelOptions,
-): string {
-  return `${baseLabel}${powerLineLabelSuffix(variant, opts)}`;
-}
-
 const LINE_LABEL_SERIES_DELIMITER = '::';
 
 /**
@@ -336,9 +323,4 @@ export function powerSeriesLabel(
 ): string {
   const variant = point.powerVariant ?? powerCompareBase(metric, mode);
   return variant ? powerVariantLabel(variant, locale) : '';
-}
-
-/** Prefill share of the reconstructed request energy for a role-energy point, in percent. */
-export function reconstructedPrefillShare(point: InferenceData): number | null {
-  return reconstructedRoleEnergy(point)?.prefillShare ?? null;
 }

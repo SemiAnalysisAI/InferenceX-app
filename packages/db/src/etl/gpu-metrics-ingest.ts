@@ -156,10 +156,6 @@ export function statMetricColumn(metric: GpuMetricStats['metric']): string {
   return STAT_METRIC_COLUMN[metric];
 }
 
-function nullable(values: (number | null)[]): (number | null)[] {
-  return values;
-}
-
 async function insertSampleBatch(
   tx: TxLike,
   seriesId: number,
@@ -177,20 +173,20 @@ async function insertSampleBatch(
         ${seriesId},
         unnest(${tx.array(batch.map((s) => s.gpuIndex))}::smallint[]),
         to_timestamp(unnest(${tx.array(batch.map((s) => s.timestampMs / 1000))}::double precision[])),
-        unnest(${tx.array(nullable(batch.map((s) => s.powerW)))}::real[]),
-        unnest(${tx.array(nullable(batch.map((s) => s.temperatureC)))}::real[]),
-        unnest(${tx.array(nullable(batch.map((s) => s.smClockMhz)))}::real[]),
-        unnest(${tx.array(nullable(batch.map((s) => s.memClockMhz)))}::real[]),
-        unnest(${tx.array(nullable(batch.map((s) => s.gpuUtilPct)))}::real[]),
-        unnest(${tx.array(nullable(batch.map((s) => s.memUtilPct)))}::real[]),
-        unnest(${tx.array(nullable(batch.map((s) => s.edgeTempC)))}::real[]),
-        unnest(${tx.array(nullable(batch.map((s) => s.memTempC)))}::real[]),
-        unnest(${tx.array(nullable(batch.map((s) => s.gfxVoltageMv)))}::real[]),
-        unnest(${tx.array(nullable(batch.map((s) => s.socVoltageMv)))}::real[]),
-        unnest(${tx.array(nullable(batch.map((s) => s.memVoltageMv)))}::real[]),
-        unnest(${tx.array(nullable(batch.map((s) => s.fclkMhz)))}::real[]),
-        unnest(${tx.array(nullable(batch.map((s) => s.socclkMhz)))}::real[]),
-        unnest(${tx.array(nullable(batch.map((s) => s.mmActivityPct)))}::real[])
+        unnest(${tx.array(batch.map((s) => s.powerW))}::real[]),
+        unnest(${tx.array(batch.map((s) => s.temperatureC))}::real[]),
+        unnest(${tx.array(batch.map((s) => s.smClockMhz))}::real[]),
+        unnest(${tx.array(batch.map((s) => s.memClockMhz))}::real[]),
+        unnest(${tx.array(batch.map((s) => s.gpuUtilPct))}::real[]),
+        unnest(${tx.array(batch.map((s) => s.memUtilPct))}::real[]),
+        unnest(${tx.array(batch.map((s) => s.edgeTempC))}::real[]),
+        unnest(${tx.array(batch.map((s) => s.memTempC))}::real[]),
+        unnest(${tx.array(batch.map((s) => s.gfxVoltageMv))}::real[]),
+        unnest(${tx.array(batch.map((s) => s.socVoltageMv))}::real[]),
+        unnest(${tx.array(batch.map((s) => s.memVoltageMv))}::real[]),
+        unnest(${tx.array(batch.map((s) => s.fclkMhz))}::real[]),
+        unnest(${tx.array(batch.map((s) => s.socclkMhz))}::real[]),
+        unnest(${tx.array(batch.map((s) => s.mmActivityPct))}::real[])
       -- nvidia-smi occasionally repeats the final sample when the monitor is
       -- stopped and flushed; the primary key makes that a no-op.
       on conflict (series_id, gpu_index, sampled_at) do nothing

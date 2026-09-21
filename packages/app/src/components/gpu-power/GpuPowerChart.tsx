@@ -60,7 +60,6 @@ const STRINGS = {
 
 /** A second time series drawn over the telemetry on its own right-hand axis. */
 export interface TelemetryOverlaySeries {
-  key: string;
   label: string;
   unit: string;
   color: string;

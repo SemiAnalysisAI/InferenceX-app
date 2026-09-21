@@ -107,7 +107,6 @@ export function collectorLabel(series: Pick<GpuMetricSeries, 'vendor' | 'sidecar
   if (typeof producer === 'string' && producer.trim() !== '') return producer;
   return VENDOR_LABEL[series.vendor] ?? series.vendor;
 }
-/** Violet: outside the Tableau10 chip palette and the foreground mean line. */
 
 interface Props {
   id: number;
@@ -199,7 +198,6 @@ export function PowerTelemetryView({ id, enabled, hardware }: Props) {
       ? serverMetrics.startNs / 1e6
       : new Date(selectedSeries.startedAt).getTime();
     return {
-      key: overlaySource.key,
       label: overlaySourceLabel(overlaySource, locale),
       unit: overlaySource.unit,
       color: overlaySource.color,
