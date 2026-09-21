@@ -387,8 +387,14 @@ const GpuMetricsChart = React.memo(
       if (allPoints.length === 0) return [0, 100] as [number, number];
       const ext = d3.extent(allPoints, (d) => d.value) as [number, number];
       const range = ext[1] - ext[0];
-      const yMin = Math.max(0, ext[0] - range * 0.05);
-      let yMax = ext[1] + range * 0.05;
+      // Constant telemetry and floating-point noise still need a readable axis.
+      const padding = Math.max(
+        range * 0.05,
+        Math.max(Math.abs(ext[0]), Math.abs(ext[1])) * 0.01,
+        1,
+      );
+      const yMin = Math.max(0, ext[0] - padding);
+      let yMax = ext[1] + padding;
       if (tdpInfo && tdpInfo.tdp > yMax) yMax = tdpInfo.tdp * 1.05;
       return [yMin, yMax] as [number, number];
     }, [allPoints, tdpInfo]);
