@@ -31,8 +31,8 @@ import { getDisplayLabel } from '@/lib/utils';
 
 import { interpolateForGPU } from './interpolation';
 import type { ProfitEstimatorRow } from './profit-estimator';
+import { buildGpuGroups, type GroupMeta } from './throughput-data';
 import type { CalculatorMode, CostProvider, InterpolatedResult } from './types';
-import { buildGpuGroups, type GroupMeta } from './useThroughputData';
 
 /** Most chip configs the panel compares at once; the same cap `/inference` applies. */
 export const PROFIT_HISTORY_MAX_GPUS = 4;

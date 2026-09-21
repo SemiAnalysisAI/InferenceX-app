@@ -1,6 +1,6 @@
 ---
 name: inferencex-api
-description: Use when users ask about InferenceX public benchmarks, PowerX measured power or energy, AgentX summaries or traces, result provenance, TCO, framework releases, CollectiveX, evaluations, datasets, evidence bundles, or offline verification.
+description: 'Query InferenceX public benchmarks, dashboard views and filters, PowerX, AgentX, provenance, TCO, framework releases, CollectiveX, evaluations, datasets, and evidence bundles; verify saved evidence offline. Use for public data analysis, not launching benchmarks or accessing private uploads.'
 ---
 
 # InferenceX API
@@ -28,7 +28,7 @@ Claude Code normally uses `.claude/skills/inferencex-api/scripts/inferencex.mjs`
 For an unpublished preview, run installer status, dry-run and reinstall through
 `npm exec --offline --package /absolute/path/candidate.tgz -- inferencex-skills ...`
 using the same supplied archive. If its path is missing, request it; registry
-`@0.12.0` or `latest` is not a substitute for that candidate.
+`@1.0.0` or `latest` is not a substitute for that candidate.
 
 Read the [CLI contract](references/cli.md) before running or recommending a formal command. Create
 the parent directory first; the command creates a new leaf. A completed bundle is
@@ -56,24 +56,34 @@ the user's selectors and acceptance criteria throughout classification and costi
 1. Select the exact records and fields needed for the requested output. Keep the
    complete raw responses as evidence; record which subset the analysis uses.
    Read units and denominators from saved metadata or the API contract, and
-   eligibility rules from the relevant cookbook.
-2. If the user requests a report, or the raw-API task needs a derived analysis,
+   eligibility rules from the relevant cookbook. Keep source field names, grouping
+   keys, and comparison operators attached to each statement. Before claiming a
+   field is absent, inspect the retained response for those record IDs and name
+   that response, population and field path. A projection describes its included
+   fields; complete configuration means the unabridged source object.
+2. For a formal bundle, generate `verify <bundle> --report <sibling-path>` first.
+   Link this appendix for artifact hashes, recorded policy and result context;
+   reuse its values instead of reconstructing the inventory or policy in prose.
+   If the question needs further analysis, or uses raw-API data,
    write a small script that reads the saved results and writes the requested
-   report file directly (Markdown by default). Its quantitative content uses the same
-   variables for quantities, populations, dates, IDs and units. Reuse existing
-   valid calculations for that scope; compute missing quantities in this script.
-3. Keep that report on the requested findings: a direct answer, the requested
-   measures with their scope and units, the applicable limitations, and links to
-   the results and source manifests. Request metadata and file inventories stay
-   in the linked evidence. State the selected analysis scope positively;
-   downloaded records, selected rows and individually investigated points are
-   different sets. Check exact object paths for missing-field claims.
-4. Check the deliverable's claims against the saved results and perform the
-   applicable verification. Finish when the requested outputs, evidence and
-   necessary caveats are complete. Give a short
-   qualitative conclusion, artifact links and the verification outcome in the
-   final reply; keep the quantitative analysis in the generated deliverable unless
-   the user explicitly requests quantities or another format in the reply.
+   report file directly (Markdown by default). Generate quantities, populations,
+   dates, IDs and units from the same computed facts, including the conclusion.
+   Generate statements such as "all", "none" and "complete" from explicit counts
+   or field checks. Reuse existing valid calculations for that scope; compute
+   missing quantities in this script.
+3. Write the report as a direct answer, the requested table or measures with scope
+   and units, source-specific limitations, and evidence links. Include one supported
+   conclusion sentence to reuse in the handoff. Keep request metadata and file
+   inventories in the linked evidence; derive only quantities needed for the question.
+   Downloaded records, selected rows and individually investigated points remain
+   separate populations.
+4. Read the generated report against the saved responses. Check every factual
+   sentence, including limitations and recommendations: its records, field paths
+   and calculation must support the wording. Correct unsupported claims in the
+   generator and regenerate, then perform the applicable verification. In the
+   final reply, copy the checked conclusion sentence verbatim and add artifact
+   links plus the verification outcome. Keep analysis in the report unless the
+   user asks for it in the reply.
 
 For benchmark lookup and history, start from the saved `selection_summary` and
 `sample_summary`; regenerate the sample summary when its rows change. Distinct
@@ -83,6 +93,13 @@ comparisons and individual rows are separate populations. Report date endpoints;
 when a duration is requested, compute and label elapsed or inclusive days.
 
 ## Choose the workflow
+
+- **Dashboard views or filter parity:** read
+  [dashboard read-only views](references/dashboard-views.md). Use the documented
+  `/api/v1/views/*` GET endpoint and retain resolved parameters and source identity.
+  These projections use raw capture, not a seventh formal evidence workflow.
+  When changing a non-sensitive public view, update its read-only API, OpenAPI,
+  selector tests, and this package in the same PR; do not create another package.
 
 - **PowerX measured power or energy:** read
   [PowerX](references/powerx.md), then use `inferencex powerx export`. Preserve
@@ -132,9 +149,10 @@ is a source value, not proof of physical absence or a causal explanation.
 High latency or concurrency alone cannot identify queueing, saturation, or another
 bottleneck. Report observed values and unresolved causes.
 
-Match comparisons on workload and configuration. Claims of "same configuration"
-or "only X differs" require comparing all recorded configuration fields; retain
-additional differences and unknowns instead of matching just a display label.
+Match comparisons on workload and configuration. Name the actual grouping keys,
+such as hardware, framework and concurrency. Full configuration equivalence
+requires comparing every recorded configuration field, including recipe identity;
+report differing or unknown values alongside the shared fields.
 Keep per-GPU watts, deployment GPU joules, token units, and TCO assumptions distinct.
 Preserve numeric-looking IDs as strings. The benchmark API array is not chronological; sort by each row's
 `date` before taking a latest-observation sample.

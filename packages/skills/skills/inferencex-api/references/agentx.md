@@ -137,6 +137,25 @@ validate the bundle with `inferencex verify`, then inspect the saved benchmark
 response. Neither outcome says whether other benchmark jobs, failed runs, source
 artifacts, or data outside that response exist.
 
+### Read the enrichment and coverage states
+
+The status fields describe different objects:
+
+| Source field                                                    | Meaning                                                                                                                       |
+| --------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `row.agentx.status = complete`                                  | Both the aggregate entry and derived-metric entry were returned for this result ID; individual values can be null.            |
+| `row.agentx.aggregates.status = available`                      | The aggregate response contains this ID, including entries whose groups are all null.                                         |
+| `metadata.enrichment_coverage.aggregates[group].available_rows` | Number of selected rows with a non-null distribution for this group; its `n` can be zero.                                     |
+| `manifest.coverage.hardware[].valid_records`                    | Number of rows with at least one recognized aggregate group whose `n > 0`. This is the hardware policy's usable-record count. |
+
+Trace availability is recorded separately. Keep each distribution's `n` with its
+statistics. A row can have both enrichment entries while only some metric groups
+contain samples.
+
+For `agentx.status = complete`, report “rows with both aggregate and derived-metric
+entries.” Use the existing per-group counts in `metadata.enrichment_coverage` to
+describe which optional groups have values, are null, or have missing entries.
+
 An unsupported raw ID remains in the export but is not sent to numeric enrichment
 endpoints. Do not use this summary workflow to bulk-read timelines, histograms, or
 server metrics.
@@ -163,21 +182,28 @@ main-agent requests. Timeline-level `startNs` and `endNs` are wall-clock nanosec
 anchors. Per-request `credit`, `start`, `ack`, and `end` are nanosecond offsets from
 `timeline.startNs`. Keep those two timestamp roles separate. Retain the original
 response text before parsing: JavaScript `Number` can round large integer anchors.
-For anchor differences, parse the original JSON with Python's integer-preserving
-`json.load`, subtract the integer anchors, then convert the difference to seconds.
+For anchor differences, parse the original JSON with an integer-preserving parser
+(Python's `json.load` or the raw-number reviver below), subtract the integer anchors,
+then convert the difference to seconds.
 Reserialized JavaScript numbers cannot recover the original digits.
 
-For each server-metric series used in the requested analysis, inspect its returned
+Inventory every returned scalar and nested server-metric series, including
+`promptTokensBySource`, using the recipe's sample summary. Inspect each series'
 fields before calculating statistics. `queueDepth` carries `running`, `waiting`,
 and `total`, while scalar series use `value`. Report that series' own sample,
 finite, nonzero, and missing counts; array lengths can differ. A nonzero fraction
 uses that field's finite count as its denominator, with missing samples reported
 separately. An empty series has no samples; zero-valued samples remain recorded
-observations. When relating a request group to metric windows, align timestamp
-origins, state the inclusion rule, and report inside/outside counts for that exact
-group. Retain exceptions; overlapping overall ranges do not establish that every
-member falls inside the same windows.
+observations. When relating a request group to metric windows, use the optional
+calculation below with that group's explicit identities. It counts each sample once
+across the union of the selected windows; summing per-request counts instead measures
+sample/request memberships. Retain exceptions and each series' own denominator.
 
+Compute phase totals per request before taking percentiles; separate phase
+percentiles are distributions, not additive components of the E2E percentile.
+For the slowest request in a phase, select the record with the largest `end - start`
+first, then read its IDs, ISL, OSL, and cancellation state from that record. Maxima
+of separate fields can belong to different requests.
 For timeline accounting, `sum(end - start)` is cumulative request latency and can
 exceed elapsed time when requests overlap. The union of `[start, end]` intervals
 is time with at least one request in flight. Neither measures GPU utilization or
@@ -390,3 +416,50 @@ never existed. Do not call the page-owned
 `/api/v1/request-chart-data` or `/api/v1/trace-server-metric-source` operations.
 Do not repeat this recipe across a result set; ask the user to choose another single
 ID first.
+
+### Requested queue-window analysis
+
+Use this only when the question requires queue samples during particular requests.
+Save the recipe output as `selected-point.json` and the chosen raw request identities
+(`cid`, `ri` when present, `ti`, `wid`) as an array in `selected-requests.json`.
+Select those identities from the requested conversation, phase, or slow-request
+group first. The output retains the matched rows and zero-based sample indices so
+subsequent queue statistics can use precisely that population. Equal timestamps
+remain separate observations.
+
+```bash
+node --input-type=module - selected-point.json selected-requests.json <<'JS'
+import { readFileSync } from 'node:fs';
+const capture = JSON.parse(readFileSync(process.argv[2], 'utf8'));
+const identities = JSON.parse(readFileSync(process.argv[3], 'utf8'));
+const raw = (path) => JSON.parse(capture.metadata.requests.find(({ query_url }) =>
+  new URL(query_url).pathname === path).body_utf8,
+  (key, value, context) => key === 'startNs' ? BigInt(context.source) : value);
+const timeline = raw('/api/v1/request-timeline');
+const metrics = raw('/api/v1/trace-server-metrics');
+const selected = identities.map((identity) => {
+  const matches = timeline.requests.filter((row) =>
+    ['cid', 'ri', 'ti', 'wid'].every((key) => row[key] === identity[key]));
+  if (matches.length !== 1) throw new Error('Each identity must match exactly one captured request');
+  return matches[0];
+});
+const offsetS = Number(metrics.startNs - timeline.startNs) / 1e9;
+const inside = [];
+let invalid = 0;
+for (const [index, sample] of metrics.queueDepth.entries()) {
+  if (!Number.isFinite(sample.t)) { invalid++; continue; }
+  const t = offsetS + sample.t;
+  if (selected.some(({ start, end }) => start / 1e9 <= t && t <= end / 1e9)) inside.push(index);
+}
+console.log(JSON.stringify({
+  selected_requests: selected,
+  inclusion_rule: 'start <= (metrics.startNs - timeline.startNs) / 1e9 + t <= end; start/end in seconds',
+  series: 'queueDepth',
+  sample_count: metrics.queueDepth.length,
+  inside_sample_indices: inside,
+  inside_sample_count: inside.length,
+  outside_sample_count: metrics.queueDepth.length - inside.length - invalid,
+  invalid_timestamp_sample_count: invalid,
+}, null, 2));
+JS
+```

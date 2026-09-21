@@ -105,7 +105,9 @@ Formal commands require `--output-dir <new-directory>`. Its parent must already
 exist; the examples create `evidence` first, and the CLI creates the new leaf. They
 never reuse, merge, or overwrite a directory. The manifest is written last and
 records normalized arguments, every request attempt, response hashes, the result
-hash, coverage, policy, and relative paths.
+hash, coverage, export policy at `manifest.summary.policy`, and relative paths.
+The `policy` in `verify` stdout evaluates that verification invocation's requirements;
+it can differ from the recorded export policy.
 
 Once completed, the entire bundle tree is immutable: never add, edit, or delete a
 file or directory inside it. Put a README, explanation, or verification report in a
@@ -113,8 +115,25 @@ sibling path outside the bundle. Finish those surrounding writes first, then run
 `inferencex verify` as the final step. `verify --report` also requires a new path
 outside the bundle.
 
+Use `verify <bundle> --report <new-sibling-path>` for a generated evidence appendix.
+Its JSON `evidence` and Markdown report contain unique artifact paths, decoded byte
+sizes and SHA-256 hashes, including the hash computed from the actual manifest bytes.
+The manifest does not contain its own hash. Logical requests can share a response
+file, so request count and unique file count are separate. `evidence.recorded_policy`
+copies `manifest.summary.policy`; `evidence.result_context` copies the JSON result's
+existing metadata, units, limitations and comparison context. CSV has no extracted
+JSON context. These copied fields do not summarize raw-row availability, and replay
+does not verify claims in a separately written analysis report.
+
 ## Compatibility
 
+- From 1.0.0, supported commands and arguments, documented required output fields
+  and their meanings, and exit-code semantics remain compatible across 1.x. Minor
+  releases may add commands, optional arguments, and optional fields. Breaking
+  these guarantees requires a new major package version; human summary wording
+  and diagnostic message text are outside this promise.
+- Evidence `schema_version: 1` is versioned independently from the npm package.
+  Check the recorded schema and contract versions when consuming a bundle.
 - Contract 1 JSON allows additive optional fields. Consumers should read known
   fields and ignore unknown fields. Fields marked required, nullability, units, and
   closed status enums are stable within contract 1.
@@ -122,7 +141,7 @@ outside the bundle.
   metrics stay in evidence or JSON extensions instead of creating dynamic columns.
 - IDs are strings even when they contain only digits. Dates are `YYYY-MM-DD`;
   evidence timestamps are UTC ISO strings.
-- The 0.12.0 entry rejects removed `--output` and `--evidence-dir` options with a
+- The 1.0.0 entry rejects removed `--output` and `--evidence-dir` options with a
   migration hint. Contract 1 bundles preserve the producer package version.
 
 ## Legacy migration
@@ -137,7 +156,7 @@ outside the bundle.
 | `compare-collectivex.mjs --output x --evidence-dir e` | `inferencex collectivex compare --output-dir e` | Add `--min-comparable-pairs` for a CI gate                |
 | `verify-export.mjs --evidence-dir e --export x`       | `inferencex verify e`                           | Contract 1 finds the result from the manifest             |
 
-The direct helpers and `verify-export.mjs` are not query interfaces in 0.12.0.
+The direct helpers and `verify-export.mjs` are not query interfaces in 1.0.0.
 Exports from 0.11 and earlier require their pinned older package; they are not contract 1
 bundles. Installer upgrades from those versions remain supported and do not make old query
-commands part of the 0.12.0 interface.
+commands part of the 1.0.0 interface.

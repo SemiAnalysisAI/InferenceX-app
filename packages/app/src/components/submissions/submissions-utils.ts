@@ -122,6 +122,23 @@ function getIsoWeekStart(dateStr: string): string {
   return d.toISOString().slice(0, 10);
 }
 
+/**
+ * Nightly runs end on this date; the "on-change only" weekly view starts here
+ * so the run-on-change era is not diluted by nightly volume.
+ */
+export const ON_CHANGE_ONLY_START_DATE = '2025-12-16';
+
+/** Weekly volume narrowed to the run-on-change era when `onChangeOnly` is set. */
+export function selectVolumeRows(
+  volume: SubmissionVolumeRow[],
+  mode: 'weekly' | 'cumulative',
+  onChangeOnly: boolean,
+): SubmissionVolumeRow[] {
+  return mode === 'weekly' && onChangeOnly
+    ? volume.filter((row) => row.date >= ON_CHANGE_ONLY_START_DATE)
+    : volume;
+}
+
 /** Aggregate daily volume rows into weekly totals by vendor. */
 export function groupVolumeByWeek(volume: SubmissionVolumeRow[]): WeeklyVolume[] {
   const weekMap = new Map<string, { nvidia: number; nonNvidia: number }>();

@@ -33,7 +33,7 @@ import { DEFAULT_TCO_BASIS, type TcoBasis } from '@/lib/constants';
 import { Percentile, type Sequence } from '@/lib/data-mappings';
 
 import { interpolateForGPU, paretoFrontUpperLeft } from './interpolation';
-import { buildGpuGroups, type GroupMeta } from './useThroughputData';
+import { buildGpuGroups, type GroupMeta } from './throughput-data';
 import type {
   CalculatorMode,
   CostProvider,

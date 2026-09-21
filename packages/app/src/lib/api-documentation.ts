@@ -5,11 +5,37 @@ import {
 } from '@semianalysisai/inferencex-constants';
 import { COLLECTIVEX_VERSIONS } from '@semianalysisai/inferencex-db/collectivex/types';
 
+import {
+  text,
+  stringSchema,
+  numberSchema,
+  integerSchema,
+  booleanSchema,
+  nullableStringSchema,
+  nullableNumberSchema,
+  errorSchema,
+  objectSchema,
+  arraySchema,
+} from './api-documentation-helpers';
+
 import { POWER_VALIDITY_FILTERS } from './benchmark-power-validity';
 import { PUBLIC_API_ERRORS } from './public-api-errors';
+import { operations as calculatorViews } from './views-api/docs/calculator';
+import { operations as compareViews } from './views-api/docs/compare';
+import { operations as evaluationViews } from './views-api/docs/evaluation';
+import { extendViewOperations, operations as extensionViews } from './views-api/docs/extensions';
+import { operations as fleetViews } from './views-api/docs/fleet';
+import { operations as gpuSpecsViews } from './views-api/docs/gpu-specs';
+import { operations as historicalViews } from './views-api/docs/historical';
+import { operations as inferenceViews } from './views-api/docs/inference';
+import { operations as optionsViews } from './views-api/docs/options';
+import { operations as overviewViews } from './views-api/docs/overview';
+import { operations as rankingsViews } from './views-api/docs/rankings';
+import { operations as reliabilityViews } from './views-api/docs/reliability';
 
 export type ApiDocumentationLocale = 'en' | 'zh';
 export type ApiGroupId =
+  | 'views'
   | 'core'
   | 'external'
   | 'datasets'
@@ -130,26 +156,9 @@ export const SUPPORTED_TCO_MODELS = Object.freeze(
   [...new Set([...Object.keys(DB_MODEL_TO_DISPLAY), ...SUPPORTED_BENCHMARK_MODELS])].toSorted(),
 );
 
-const text = (en: string, zh: string): BilingualText => ({ en, zh });
-const stringSchema: ApiSchema = { type: 'string' };
-const numberSchema: ApiSchema = { type: 'number' };
-const integerSchema: ApiSchema = { type: 'integer' };
-const booleanSchema: ApiSchema = { type: 'boolean' };
-const nullableStringSchema: ApiSchema = { type: ['string', 'null'] };
-const nullableNumberSchema: ApiSchema = { type: ['number', 'null'] };
 const metricMapSchema: ApiSchema = { type: 'object', additionalProperties: numberSchema };
 const anyObjectSchema: ApiSchema = { type: 'object', additionalProperties: true };
-const errorSchema: ApiSchema = {
-  type: 'object',
-  properties: { error: stringSchema },
-  required: ['error'],
-  additionalProperties: true,
-};
 
-const objectSchema = (
-  properties: Readonly<Record<string, ApiSchema>>,
-  required: readonly string[] = Object.keys(properties),
-): ApiSchema => ({ type: 'object', properties, required, additionalProperties: false });
 const objectSchemaWithOptional = (
   properties: Readonly<Record<string, ApiSchema>>,
   optional: readonly string[],
@@ -158,7 +167,6 @@ const objectSchemaWithOptional = (
     properties,
     Object.keys(properties).filter((property) => !optional.includes(property)),
   );
-const arraySchema = (items: ApiSchema): ApiSchema => ({ type: 'array', items });
 const mapSchema = (items: ApiSchema): ApiSchema => ({
   type: 'object',
   additionalProperties: items,
@@ -741,6 +749,14 @@ const operatorXExampleRun = {
 
 export const apiDocumentationGroups: readonly ApiDocumentationGroup[] = [
   {
+    id: 'views',
+    title: text('Read-only dashboard views', '仪表板只读视图'),
+    description: text(
+      'Dashboard data and calculations with explicit filters.',
+      '通过显式筛选参数读取仪表板数据和计算结果。',
+    ),
+  },
+  {
     id: 'core',
     title: text('Core benchmark data', '核心基准数据'),
     description: text(
@@ -791,6 +807,20 @@ export const apiDocumentationGroups: readonly ApiDocumentationGroup[] = [
 ];
 
 export const apiOperations: readonly ApiOperation[] = [
+  ...extendViewOperations([
+    ...optionsViews,
+    ...inferenceViews,
+    ...historicalViews,
+    ...calculatorViews,
+    ...fleetViews,
+    ...evaluationViews,
+    ...reliabilityViews,
+    ...gpuSpecsViews,
+    ...overviewViews,
+    ...rankingsViews,
+    ...compareViews,
+  ]),
+  ...extensionViews,
   {
     id: 'list-operatorx-runs',
     group: 'operatorx',
@@ -3259,7 +3289,7 @@ export function buildOpenApiDocument(serverUrl: string = API_BASE_URL): OpenApiD
           {
             description: response.description.en,
             'x-description-zh': response.description.zh,
-            content,
+            ...(response.status === '204' ? {} : { content }),
           },
         ];
       }),

@@ -125,6 +125,9 @@ for (const variant of Object.keys(coverageAggregates)) {
       assert.equal(JSON.parse(saved.result.stdout).policy.status, usable ? 'passed' : 'failed');
       if (format === 'json') {
         const row = bundles.readResult(saved.directory).rows[0];
+        assert.equal(row.agentx.status, 'complete');
+        assert.equal(row.agentx.aggregates.status, 'available');
+        assert.equal(row.agentx.derived_metrics.status, 'available');
         assert.deepEqual(row.agentx.aggregates.value.extra, { n: 1 });
       }
       const verified = bundles.verify(saved.directory, ['--require-hardware', 'b300']);

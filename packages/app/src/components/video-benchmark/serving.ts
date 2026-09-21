@@ -1,4 +1,4 @@
-import { at, rows, safePath, text, type Bundle, type Json } from './bundle';
+import { at, number, rows, safePath, text, type Bundle, type Json } from './bundle';
 
 export interface ServingCell {
   id: string;
@@ -182,4 +182,33 @@ export function servingCells(
       );
     return { id, concurrency, cell, run, job, power, spec, runPath, jobPath, powerPath, specPath };
   });
+}
+
+/**
+ * The run record behind the selected slot, else the first measurement-phase
+ * record, else the first record. Shared by the serving panel and the video
+ * evidence view so both resolve the same record for the same selection.
+ */
+export function selectServingRecord(run: Json, slot: string | null): Json | null {
+  const records = rows(at(run, 'records'));
+  return (
+    (slot ? records.find((row) => text(at(row, 'slot_id')) === slot) : undefined) ??
+    records.find((row) => at(row, 'phase') === 'measurement') ??
+    records[0] ??
+    null
+  );
+}
+
+/** Distinct, fully identified GPU UUIDs on the spec; null when the list is unusable. */
+export function participatingGpuCount(spec: Json): number | null {
+  const uuids = rows(at(spec, 'gpu_uuids')).map(text);
+  return uuids.length > 0 && uuids.every(Boolean) && new Set(uuids).size === uuids.length
+    ? uuids.length
+    : null;
+}
+
+/** Per-second metric → per GPU-hour for the chosen GPU basis; null without a usable count. */
+export function perGpuHour(value: Json, gpuCount: number | null): number | null {
+  const n = number(value);
+  return n !== null && gpuCount !== null && gpuCount > 0 ? n * (3600 / gpuCount) : null;
 }

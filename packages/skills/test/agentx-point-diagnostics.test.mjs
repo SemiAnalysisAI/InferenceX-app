@@ -363,6 +363,73 @@ test('an empty timeline has zero requests and durations without inventing server
   assert.equal(summary.request_inflight_union_s, 0);
 });
 
+test('requested queue windows count overlapping samples once for the exact selected requests', () => {
+  const project = suite.project('agentx-windows-');
+  const root = suite.install('claude', project);
+  const cookbook = readFileSync(join(root, 'references/agentx.md'), 'utf8');
+  const snippet = cookbook.match(
+    /```bash\nnode --input-type=module - selected-point\.json selected-requests\.json <<'JS'\n(?<code>[\s\S]*?)\nJS\n```/u,
+  );
+  assert.ok(snippet, 'the installed cookbook contains the requested-window calculation');
+  const rows = [
+    request('main-agent', { cid: 'conversation-a', ti: 0, start: 1e9, end: 3e9 }),
+    request('subagent', { cid: 'conversation-a', ti: 1, start: 2e9, end: 4e9 }),
+    request('main-agent', { cid: 'conversation-b', ti: 0, start: 5e9, end: 6e9 }),
+  ];
+  const result = run({
+    ...heavyResponses,
+    '/api/v1/request-timeline?id=421': {
+      body: JSON.stringify({ ...timeline, requests: rows, startNs: 'EXACT_START' }).replace(
+        '"EXACT_START"',
+        '1700000000000000001',
+      ),
+    },
+    '/api/v1/trace-server-metrics?id=421': {
+      body: JSON.stringify({
+        ...serverMetrics,
+        startNs: 'EXACT_START',
+        queueDepth: [-0.5, 0, 1, 1, 2, 3, 4, 5, null].map((t) => ({
+          t,
+          running: 1,
+          waiting: 0,
+          total: 1,
+        })),
+      }).replace('"EXACT_START"', '1700000001000000000'),
+    },
+  });
+  assert.equal(result.status, 0, result.stderr);
+  const capture = join(project, 'selected-point.json');
+  const selection = join(project, 'selected-requests.json');
+  writeFileSync(capture, result.stdout);
+  writeFileSync(
+    selection,
+    JSON.stringify(rows.slice(0, 2).map(({ cid, ri, ti, wid }) => ({ cid, ri, ti, wid }))),
+  );
+  const calculated = suite.node(['--input-type=module', '-', capture, selection], {
+    cwd: project,
+    input: snippet.groups.code,
+  });
+  assert.equal(calculated.status, 0, calculated.stderr);
+  assert.deepEqual(JSON.parse(calculated.stdout), {
+    selected_requests: rows.slice(0, 2),
+    inclusion_rule:
+      'start <= (metrics.startNs - timeline.startNs) / 1e9 + t <= end; start/end in seconds',
+    series: 'queueDepth',
+    sample_count: 9,
+    inside_sample_indices: [2, 3, 4, 5],
+    inside_sample_count: 4,
+    outside_sample_count: 4,
+    invalid_timestamp_sample_count: 1,
+  });
+  writeFileSync(selection, JSON.stringify([{ cid: 'missing', ri: 0, ti: 0, wid: '7' }]));
+  const absent = suite.node(['--input-type=module', '-', capture, selection], {
+    cwd: project,
+    input: snippet.groups.code,
+  });
+  assert.notEqual(absent.status, 0);
+  assert.match(absent.stderr, /must match exactly one captured request/u);
+});
+
 test('one positive safe result ID is required before any HTTP request', () => {
   for (const value of ['0', '1.5', '9007199254740992', '0421']) {
     const result = run(

@@ -46,6 +46,34 @@
  * they are measured.
  */
 
+import { DEFAULT_CACHED_INPUT_PRICE_RATIO } from '@/lib/cache-pricing';
+
+/**
+ * Assumption defaults the Fleet Lifecycle page seeds its controls with and the
+ * read-only `/api/v1/views/fleet` applies when a parameter is omitted. One
+ * object so the API cannot drift from the dashboard.
+ */
+export const LIFECYCLE_DEFAULTS = {
+  mtbiDays: 24,
+  recoveryHours: 12,
+  // A nominal half-month to bring a fleet to full load. Purely an assumption,
+  // and labelled as one — no measurement in this repo speaks to it.
+  rampMonths: 0.5,
+  /**
+   * A cached input token sells for a tenth of a fresh one — the ratio DeepSeek
+   * and Anthropic both publish, and the order of magnitude the others sit at.
+   * An assumption like the rest; the cached *fraction* it applies to is measured.
+   */
+  cachedInputPct: DEFAULT_CACHED_INPUT_PRICE_RATIO * 100,
+  /**
+   * An output token sells for four times an input one until the user says
+   * otherwise — DeepSeek's own published API pricing is $0.27 / $1.10, and the
+   * major vendors sit between 2x and 5x. Only used to seed the pair and to hold
+   * their ratio through a reset; once both fields exist they are what is billed.
+   */
+  outputPriceMultiple: 4,
+} as const;
+
 const HOURS_PER_DAY = 24;
 
 /**
@@ -362,12 +390,15 @@ export interface LifecycleSeries {
  * `isCumulative` rather than assume $/day, and anything anchored to zero as
  * break-even (the dashed rule) applies to margin metrics alone.
  */
-export type LifecycleMetric =
-  | 'margin'
-  | 'marginPerMw'
-  | 'revenue'
-  | 'revenuePerMw'
-  | 'cumulativeRevenue';
+/** Lifecycle series a fleet can be ranked on, in dashboard selector order. */
+export const LIFECYCLE_METRICS = [
+  'margin',
+  'marginPerMw',
+  'revenue',
+  'revenuePerMw',
+  'cumulativeRevenue',
+] as const;
+export type LifecycleMetric = (typeof LIFECYCLE_METRICS)[number];
 
 /** True when the metric is a running total in $ rather than a rate in $/day. */
 export function isCumulative(metric: LifecycleMetric): boolean {

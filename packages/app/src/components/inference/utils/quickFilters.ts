@@ -13,7 +13,7 @@ import type { PowerTier } from '@/lib/power-tier';
 export type { AvailableQuickFilters, DeploymentMode, PowerTier, QuickFilters, SpecMode };
 
 /** Vendor display order for the quick-filter pills. */
-const VENDOR_ORDER = ['NVIDIA', 'AMD', 'OpenAI', 'Google'];
+export const VENDOR_ORDER: readonly string[] = ['NVIDIA', 'AMD', 'OpenAI', 'Google'];
 
 /**
  * Quick filters let users narrow the chart to any combination of GPU vendor,
@@ -37,7 +37,7 @@ export const EMPTY_QUICK_FILTERS: QuickFilters = {
 };
 
 /** Measured-power tier display order for the quick-filter pills. */
-const POWER_TIER_ORDER: readonly PowerTier[] = ['certified', 'legacy'];
+export const POWER_TIER_ORDER: readonly PowerTier[] = ['certified', 'legacy'];
 
 /**
  * Serving-framework families surfaced as quick filters, in display order. Each
@@ -133,7 +133,9 @@ function pointSpecMode(point: InferenceData): SpecMode {
 }
 
 /** Classify serving topology without conflating aggregate multinode with disaggregation. */
-export function pointDeploymentMode(point: InferenceData): DeploymentMode {
+export function pointDeploymentMode(
+  point: Pick<InferenceData, 'disagg' | 'is_multinode'>,
+): DeploymentMode {
   if (point.disagg) return 'disagg';
   return point.is_multinode ? 'multi-node' : 'single-node';
 }

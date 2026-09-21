@@ -15,7 +15,12 @@ import {
 } from '@/lib/d3-chart/D3Chart';
 import type { SubmissionVolumeRow } from '@/lib/submissions-types';
 
-import { computeCumulative, groupVolumeByWeek } from './submissions-utils';
+import {
+  computeCumulative,
+  groupVolumeByWeek,
+  ON_CHANGE_ONLY_START_DATE,
+  selectVolumeRows,
+} from './submissions-utils';
 
 export type ChartMode = 'weekly' | 'cumulative';
 
@@ -30,7 +35,7 @@ const AMD_COLOR = '#ed1c24';
 const TOTAL_COLOR = '#6b7280';
 const CHART_MARGIN = { top: 24, right: 24, bottom: 40, left: 60 };
 const CHART_ID = 'submissions-chart';
-const NIGHTLY_END_DATE = new Date('2025-12-16').getTime();
+const NIGHTLY_END_DATE = new Date(ON_CHANGE_ONLY_START_DATE).getTime();
 const NARROW_VIEWPORT_QUERY = '(max-width: 39.999rem)';
 const NOOP = () => {};
 
@@ -170,11 +175,10 @@ export default function SubmissionsChart({ volume, mode, caption }: SubmissionsC
     [enabledLines, legendT.total, toggleLine],
   );
 
-  const filteredVolume = useMemo(() => {
-    if (!onChangeOnly || mode !== 'weekly') return volume;
-    const cutoff = '2025-12-16';
-    return volume.filter((r) => r.date >= cutoff);
-  }, [volume, onChangeOnly, mode]);
+  const filteredVolume = useMemo(
+    () => selectVolumeRows(volume, mode, onChangeOnly),
+    [volume, onChangeOnly, mode],
+  );
 
   const weeklyData = useMemo(() => groupVolumeByWeek(filteredVolume), [filteredVolume]);
   const cumulativeData = useMemo(() => computeCumulative(filteredVolume), [filteredVolume]);

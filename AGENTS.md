@@ -92,7 +92,9 @@ API routes (`packages/app/src/app/api/v1/`):
 - `tco-feed?model=dsv4&workloads=1024x1024,8192x1024&tiers=30,50,75,100&format=csv` — per-hardware Pareto-frontier output-throughput reads at fixed interactivity tiers, for external spreadsheet TCO models (Excel Power Query); `view=scores` (optional `weights`, `workload_weights`, `alpha`) folds them into one tier-weighted, workload-blended, output-equivalent score per hardware
 - `overview?tier=50&engine=community&compare=30d&ref=b200` — a compact, cached page-data response used only by `/overview` selector navigation
 
-**API routes return raw DB data** — no presentation logic. Frontend handles all transformations.
+**Raw-data API routes return raw DB data**. Dashboard projections under
+`/api/v1/views/*` use shared pure UI transformations server-side and publish their
+selectors and assumptions. Keep raw-data contracts separate from these projections.
 Exceptions: the CollectiveX routes assemble raw stored documents through the shared reader in
 `packages/db/src/collectivex/` (see [docs/collectivex.md](./docs/collectivex.md) for why); and
 `tco-feed`, which runs the calculator's frontier interpolation server-side because its consumers
@@ -103,7 +105,28 @@ initial server render so selector changes can update the matrix without transfer
 raw benchmark history or triggering a React Server Component (RSC) round trip. It is a page-owned
 backend-for-frontend (BFF), not a reusable public data API.
 
-### API Documentation Synchronization
+### Read-only coverage for public views
+
+Every non-sensitive public-facing data view must have a read-only API. A new view
+or a change to an existing view must update its API in the same PR, including
+every data selector, filter, date/run comparison, unit, default, and calculation.
+Reuse the dashboard's pure transformation functions so the API and UI cannot
+silently calculate different results. Return resolved parameters and preserve
+missing measurements and source identities.
+
+Update the documentation registry, OpenAPI schemas, route catalog, and the
+existing `packages/skills` npm package (`@semianalysisai/inferencex-skills`) in
+the same PR. Extend that package; do not create a competing installer or skill
+package. Include tests for filter behavior and UI/API numerical parity, plus a
+view/control coverage inventory. Presentation-only controls may be excluded when
+they do not change the returned data; record that distinction explicitly.
+
+Never expose sensitive feedback, credentials, private artifacts, admin actions,
+or mutation handlers to satisfy coverage. Record a concrete exclusion reason for
+each such surface. A navigation feature gate alone is not evidence that data is
+sensitive.
+
+### API reference and contract synchronization
 
 The public API reference at `/api` and `/zh/api`, plus the OpenAPI 3.1 document at
 `/api/openapi.json`, are generated from `packages/app/src/lib/api-documentation.ts`.

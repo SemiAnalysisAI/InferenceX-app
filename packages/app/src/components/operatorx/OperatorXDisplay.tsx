@@ -1,16 +1,18 @@
 'use client';
 
-import { useMemo, useState } from 'react';
-import type { OperatorXPoint } from '@semianalysisai/inferencex-db/operatorx/reader';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Heading } from '@/components/ui/heading';
 import { useOperatorXRun, useOperatorXRuns } from '@/hooks/api/use-operatorx';
 import { useClientSearchParams } from '@/hooks/useClientSearch';
+import { track } from '@/lib/analytics';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
 import { useLocale } from '@/lib/use-locale';
-import { track } from '@/lib/analytics';
 import { escapeHtml } from '@/lib/utils';
-import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Heading } from '@/components/ui/heading';
+import type { OperatorXPoint } from '@semianalysisai/inferencex-db/operatorx/reader';
+import { useMemo, useState } from 'react';
+
+import { precision, selectOperatorPoints, shape, x } from './view-data';
 
 const STRINGS = {
   en: {
@@ -141,22 +143,6 @@ const colors: Record<string, string> = {
   mxfp4: '#ec4899',
   int4: '#f97316',
 };
-function precision(p: OperatorXPoint) {
-  if (p.moe) return `${p.moe.dtype_act} / ${p.moe.dtype_weight}`;
-  const a = p.attention;
-  return a
-    ? `${a.dtype_q} / ${a.dtype_k} / ${a.dtype_v} → ${a.dtype_o}`
-    : `${p.dtype_a} / ${p.dtype_b} → ${p.dtype_out}`;
-}
-function shape(p: OperatorXPoint, withBatch = false) {
-  const m = p.moe;
-  if (m)
-    return `${p.name ?? 'MoE'} · ${withBatch ? `T=${m.num_tokens} · ` : ''}H=${m.hidden} I=${m.local_intermediate}/${m.intermediate} · E=${m.local_experts}/${m.num_experts} top-k=${m.top_k} · EP=${m.expert_parallel_size} TP=${m.routed_tensor_parallel_size} · shared=${m.n_shared_experts}/${m.shared_tensor_parallel_size} · ${m.expert_distribution}`;
-  const a = p.attention;
-  if (!a) return withBatch ? `${p.m} × ${p.n} × ${p.k}` : `${p.n} × ${p.k}`;
-  return `${withBatch ? `B=${a.batch_size} · ` : ''}Q=${a.seq_len_q} KV=${a.seq_len_kv} · H=${a.num_heads}/${a.num_heads_kv} · D=${a.head_dim_qk}/${a.head_dim_v}${a.kv_lora_rank === null ? '' : ` · R=${a.kv_lora_rank}`} · causal=${a.causal}`;
-}
-const x = (p: OperatorXPoint) => p.moe?.num_tokens ?? p.attention?.batch_size ?? p.m ?? 0;
 const pointDtype = (p: OperatorXPoint) =>
   p.moe?.dtype_act ?? p.attention?.dtype_q ?? p.dtype_a ?? '';
 const selectClass = 'bg-background border-input h-10 w-full rounded-md border px-3 text-sm';
@@ -224,22 +210,7 @@ export default function OperatorXDisplay() {
   const precisionLabel = isMoe ? t.moePrecision : isAttention ? t.attentionPrecision : t.precision;
   const shapeLabel = isMoe ? t.moeShape : isAttention ? t.attentionShape : t.shape;
   const filtered = useMemo(
-    () =>
-      (points ?? [])
-        .filter(
-          (p) =>
-            p.type === selectedOperator &&
-            (!filters.precision || precision(p) === filters.precision) &&
-            (!filters.shape || shape(p) === filters.shape) &&
-            (!filters.backend || p.backend === filters.backend) &&
-            (!filters.cluster || p.cluster === filters.cluster) &&
-            (!filters.status || p.status === filters.status),
-        )
-        .sort((a, b) =>
-          metric === 'latency'
-            ? (a.latency_us ?? Infinity) - (b.latency_us ?? Infinity)
-            : (b.tflops ?? -1) - (a.tflops ?? -1),
-        ),
+    () => selectOperatorPoints(points ?? [], selectedOperator, filters, metric),
     [points, filters, selectedOperator, metric],
   );
   const plotted = useMemo(
