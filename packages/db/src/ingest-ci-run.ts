@@ -60,6 +60,7 @@ import {
   readReusedIngestMetadata,
 } from './etl/reused-ingest-metadata';
 import { mapBenchmarkRow, type BenchmarkParams } from './etl/benchmark-mapper';
+import { preflightRequiredPowerCurves } from './etl/required-power-curve';
 import {
   assertRequiredPowerPointsRetained,
   verifyRequiredPowerArtifacts,
@@ -78,6 +79,8 @@ import {
 import { AsyncSemaphore } from './etl/async-semaphore';
 import { discoverTraceReplayArtifacts } from './etl/trace-artifact-discovery';
 import { discoverServerLogArtifacts, readServerLogArtifact } from './etl/server-log-artifacts';
+import { discoverGpuMetricsArtifacts } from './etl/gpu-metrics-artifacts';
+import { ingestGpuMetricsArtifact } from './etl/gpu-metrics-ingest';
 import { datasetSlugFromBenchmarkRow } from './etl/dataset-provenance';
 import { mapAggEvalRow, mapEvalRow } from './etl/eval-mapper';
 import { ingestEvalRow } from './etl/eval-ingest';
@@ -333,11 +336,15 @@ async function main(): Promise<void> {
     }
   }
 
-  const requiredPowerPoints = verifyRequiredPowerArtifacts(artifactsDir, {
-    runId,
-    runAttempt: runAttemptNum,
-    headSha: ghInfo?.headSha ?? null,
-  });
+  const requiredPowerPoints = verifyRequiredPowerArtifacts(
+    artifactsDir,
+    {
+      runId,
+      runAttempt: runAttemptNum,
+      headSha: ghInfo?.headSha ?? null,
+    },
+    process.env.INGEST_REQUIRE_POWER === 'true',
+  );
   if (requiredPowerPoints.length > 0)
     console.log(`  Required power: ${requiredPowerPoints.length} source benchmark points verified`);
 
@@ -409,6 +416,18 @@ async function main(): Promise<void> {
   if (evalsOnly && requiredPowerPoints.length > 0)
     throw new Error('Required power: benchmark scope cannot be published as an evals-only run');
 
+  if (requiredPowerPoints.length > 0)
+    await preflightRequiredPowerCurves(
+      sql,
+      artifactsDir,
+      {
+        runId,
+        runAttempt: runAttemptNum,
+        headSha: ghInfo?.headSha ?? null,
+      },
+      { date, runStartedAt: workflowGhInfo?.runStartedAt ?? null, appendOnly },
+    );
+
   const workflowRunId = await getOrCreateWorkflowRun({
     githubRunId: runId,
     runAttempt: runAttemptNum,
@@ -452,6 +471,8 @@ async function main(): Promise<void> {
   let totalSampleFiles = 0;
   let totalChangelogs = 0;
   let totalTraceReplayLinked = 0;
+  let totalGpuMetricSeries = 0;
+  let totalGpuMetricSamples = 0;
   const datasetSlugs = new Set<string>();
   // Dataset slugs referenced by this run's agentic rows but absent from the
   // `datasets` table — timeline→dataset deep links 404 until they're ingested.
@@ -483,6 +504,14 @@ async function main(): Promise<void> {
     const serverLogArtifacts = discoverServerLogArtifacts(artifactsDir);
     if (serverLogArtifacts.size > 0) {
       console.log(`  Found ${serverLogArtifacts.size} server log artifact(s)`);
+    }
+    // PowerX telemetry: `gpu_metrics_<key>` is uploaded next to `bmk_<key>` by
+    // every single-node job; multinode jobs carry it inside `power_audit_<key>`
+    // instead (see migration 016). Digested here so the dashboard never
+    // re-downloads GitHub artifacts and keeps the series past retention.
+    const gpuMetricsArtifacts = discoverGpuMetricsArtifacts(artifactsDir);
+    if (gpuMetricsArtifacts.size > 0) {
+      console.log(`  Found ${gpuMetricsArtifacts.size} telemetry artifact(s)`);
     }
 
     // Sibling aiperf artifacts: each `bmk_agentic_<suffix>` is paired with an
@@ -663,6 +692,35 @@ async function main(): Promise<void> {
                 console.log(`    server_logs linked (${elapsed(serverLogStart)})`);
               } catch (error: any) {
                 tracker.recordDbError(`server_logs for ${configKey}`, error);
+              }
+            }
+            // Same pairing rule as server logs: `gpu_metrics_<key>` carries no
+            // `agentic_` prefix, so agentic points fall back to the bare suffix.
+            const gpuMetricsArtifact =
+              gpuMetricsArtifacts.get(configKey) ??
+              gpuMetricsArtifacts.get(stripBmkAndAgenticPrefix(parentDir));
+            if (gpuMetricsArtifact) {
+              try {
+                const gpuMetricsStart = Date.now();
+                const ingested = await ingestGpuMetricsArtifact(sql, {
+                  workflowRunId,
+                  artifact: gpuMetricsArtifact,
+                  benchmarkResultIds: insertedIds,
+                });
+                totalGpuMetricSeries += ingested.seriesIds.length;
+                totalGpuMetricSamples += ingested.samplesInserted;
+                console.log(
+                  `    gpu_metrics ${ingested.seriesIds.length} series, ` +
+                    `+${ingested.samplesInserted} sample(s), ` +
+                    `${ingested.seriesSkipped} unchanged (${elapsed(gpuMetricsStart)})`,
+                );
+              } catch (error: any) {
+                // Non-fatal on purpose: this point's benchmark rows are already
+                // committed and only its telemetry tab is affected, and
+                // `admin:db:backfill-gpu-metrics --run <id>` can re-digest the
+                // artifact later. Recording it as a DB error instead would reach
+                // the publication manifest and fail the whole production ingest.
+                tracker.recordTelemetryError(`gpu_metrics for ${configKey}`, error);
               }
             }
           }
@@ -1057,6 +1115,10 @@ main()
               ...powerPublicationErrors,
               ...(tracker.skips.dbError ? [`${tracker.skips.dbError} database ingest errors`] : []),
             ],
+            // Reported but not fatal — see Skips.telemetryError.
+            telemetryWarnings: tracker.skips.telemetryError
+              ? [`${tracker.skips.telemetryError} gpu_metrics digest errors`]
+              : [],
           },
           null,
           2,

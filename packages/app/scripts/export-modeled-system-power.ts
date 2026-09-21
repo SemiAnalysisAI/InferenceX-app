@@ -6,7 +6,12 @@ import { pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
 
 import type { BenchmarkRow } from '../src/lib/api';
-import { AIR_COOLED_SYSTEM_PUE, modelSystemPower } from '../src/lib/modeled-system-power';
+import {
+  AIR_COOLED_SYSTEM_PUE,
+  DLC_SYSTEM_PUE,
+  defaultSystemPue,
+  modelSystemPower,
+} from '../src/lib/modeled-system-power';
 import profileData from '../src/lib/system-power-model.profiles.json';
 
 interface PowerAudit {
@@ -47,6 +52,34 @@ const mean = (values: (number | null)[]) =>
   values.length > 0 && values.every(finite)
     ? values.reduce((sum, value) => sum + value, 0) / values.length
     : null;
+
+interface SystemPowerProfile {
+  assumptions: Record<string, unknown>;
+  modelPath: string;
+}
+const CHASSIS_PROFILES: Record<string, SystemPowerProfile> = profileData.profiles;
+const RACK_PROFILES: Record<string, SystemPowerProfile> = profileData.rackProfiles;
+const isRackHardware = (hardware: string) => Object.hasOwn(RACK_PROFILES, hardware);
+const profileFor = (hardware: string): SystemPowerProfile | null =>
+  isRackHardware(hardware)
+    ? RACK_PROFILES[hardware]
+    : Object.hasOwn(CHASSIS_PROFILES, hardware)
+      ? CHASSIS_PROFILES[hardware]
+      : null;
+
+// The chassis notes are unchanged for x86 rows; NVL72 rows carry their own.
+const CHASSIS_NOTES = {
+  boundary:
+    'Measured GPU-board inputs; modeled GPU-chassis AC includes their CPU/DRAM, other model components, and PSU loss. Separate CPU-only frontend/router hosts are excluded. Facility power applies PUE after GPU-chassis AC.',
+  extrapolation:
+    'A partially allocated chassis is modeled at measured per-GPU power × 8 (the source sweep input), assuming the unmeasured GPUs run the same workload. Deployment values are the measured GPUs’ share of that chassis; per-GPU values divide by the modeled chassis GPU count.',
+};
+const RACK_NOTES = {
+  boundary:
+    'Measured compute-module input per NVL72 tray (module sensor, or GPU board + Grace socket with the source’s regulator-loss allowance); the Grace CPU and LPDDR5X are never modeled. Modeled rack residual: NVSwitch trays, NICs/DPUs, NVMe, tray fans and board, tray 50 V → 12 V conversion, power shelves and management switches, evaluated once for a rack of 18 trays at the measured trays’ mean input and amortised over 72 GPUs. Separate CPU-only frontend/router hosts are excluded. Facility power applies PUE after rack AC.',
+  extrapolation:
+    'A partially allocated tray is modeled at measured per-GPU power × 4 on the GPU-board share only, assuming the unmeasured GPUs run the same workload; a module reading already covers the whole tray and is never scaled. Deployment values are the measured GPUs’ share of that tray; per-GPU values divide by the modeled tray GPU count.',
+};
 
 function estimatedEnergy(
   row: BenchmarkRow,
@@ -119,13 +152,19 @@ function estimatedEnergy(
   };
 }
 
-export function buildComparison(input: ComparisonInput, pue = AIR_COOLED_SYSTEM_PUE) {
+/**
+ * `pue` overrides every row; without it each row takes the dashboard's default for
+ * its hardware (1.3 air-cooled chassis, 1.1 DLC NVL72 rack) so article figures match
+ * chart hovers.
+ */
+export function buildComparison(input: ComparisonInput, pue?: number) {
   if (!input || typeof input.cohort !== 'string' || !Array.isArray(input.rows)) {
     throw new Error(
       'Expected a cohort envelope with a rows array. See docs/powerx-system-power.md.',
     );
   }
-  if (!finite(pue) || pue < 1) throw new Error('PUE must be a finite number >= 1.');
+  if (pue !== undefined && (!finite(pue) || pue < 1))
+    throw new Error('PUE must be a finite number >= 1.');
   const ids = new Set<string>();
   const rows = input.rows.map((entry) => {
     const row = entry.benchmark;
@@ -141,16 +180,22 @@ export function buildComparison(input: ComparisonInput, pue = AIR_COOLED_SYSTEM_
       throw new Error(`Invalid benchmark input or duplicate id: ${entry.id}`);
     }
     ids.add(entry.id);
+    const hardware = row.hardware.toLowerCase();
+    const rack = isRackHardware(hardware);
+    // Same estimate path and PUE selection as the dashboard (`modelSystemPower(row)`).
     const modeled = modelSystemPower(row, pue);
-    const profile = Object.entries(profileData.profiles).find(
-      ([key]) => key === row.hardware.toLowerCase(),
-    )?.[1];
+    const rowPue = pue ?? defaultSystemPue(hardware);
+    const profile = profileFor(hardware);
     const measurementStatus =
       row.metrics.power_valid === 1
         ? 'producer-valid'
         : row.metrics.power_valid === 0
           ? 'invalid'
           : 'unverified';
+    // The CPU-side keys carry their own verdict; only NVL72 rows report them.
+    const cpuValid = row.metrics.cpu_power_valid === 1;
+    const trayEstimate =
+      modeled.status === 'supported' && modeled.topologyBasis === 'nvl72-trays' ? modeled : null;
     return {
       id: entry.id,
       cell: entry.cell ?? null,
@@ -165,10 +210,28 @@ export function buildComparison(input: ComparisonInput, pue = AIR_COOLED_SYSTEM_
               total_gpu_w: measurement(row.metrics.avg_total_gpu_power_w),
               total_gpu_j: measurement(row.metrics.total_gpu_energy_j),
               gpu_j_per_output_token: measurement(row.metrics.joules_per_output_token),
+              ...(rack
+                ? {
+                    cpu_power_valid: row.metrics.cpu_power_valid ?? null,
+                    total_grace_w: cpuValid ? measurement(row.metrics.avg_total_cpu_power_w) : null,
+                    total_grace_j: cpuValid ? measurement(row.metrics.total_cpu_energy_j) : null,
+                    total_module_w: cpuValid
+                      ? measurement(row.metrics.avg_total_module_power_w)
+                      : null,
+                    total_module_j: cpuValid
+                      ? measurement(row.metrics.total_module_energy_j)
+                      : null,
+                  }
+                : {}),
             }
           : null,
-      assumptions: profile ? { ...profile.assumptions, pue } : null,
+      pue: rowPue,
+      measured_basis: trayEstimate?.measuredBasis ?? null,
+      sensor_kind: trayEstimate?.sensorKind ?? null,
+      assumptions: profile ? { ...profile.assumptions, pue: rowPue } : null,
       model_path: profile?.modelPath ?? null,
+      calculation_boundary: rack ? RACK_NOTES.boundary : CHASSIS_NOTES.boundary,
+      extrapolation_note: rack ? RACK_NOTES.extrapolation : CHASSIS_NOTES.extrapolation,
       modeled,
       estimated_energy: estimatedEnergy(row, modeled, entry.audit),
       audit: entry.audit ?? null,
@@ -214,7 +277,11 @@ export function buildComparison(input: ComparisonInput, pue = AIR_COOLED_SYSTEM_
       model_revision: profileData.modelRevision,
       model_path: replicates[0].model_path,
       assumptions: replicates[0].assumptions,
-      pue,
+      // Replicates share hardware, so they share the PUE selection.
+      pue: replicates[0].pue,
+      measured_bases: [
+        ...new Set(replicates.flatMap((row) => (row.measured_basis ? [row.measured_basis] : []))),
+      ],
       status: complete ? 'supported' : 'unsupported',
       unsupported_reasons: [
         ...new Set(
@@ -276,16 +343,18 @@ export function buildComparison(input: ComparisonInput, pue = AIR_COOLED_SYSTEM_
     metadata: {
       cohort: input.cohort,
       source: input.metadata,
-      pue,
+      // Explicit --pue applies to every row; otherwise each row records its own default.
+      pue_override: pue ?? null,
+      pue_defaults: { air_cooled_chassis: AIR_COOLED_SYSTEM_PUE, dlc_nvl72_rack: DLC_SYSTEM_PUE },
       scope: { benchmark_type: 'single_turn', isl: 8192, osl: 1024 },
       selection:
         'Every supplied row is retained, including unsupported, invalid, and missing-input cases.',
       aggregation:
         'Each replicate is modeled first. Cell means include every replicate; any unavailable value leaves its cell mean unavailable.',
-      boundary:
-        'Measured GPU-board inputs; modeled GPU-chassis AC includes their CPU/DRAM, other model components, and PSU loss. Separate CPU-only frontend/router hosts are excluded. Facility power applies PUE after GPU-chassis AC.',
-      extrapolation:
-        'A partially allocated chassis is modeled at measured per-GPU power × 8 (the source sweep input), assuming the unmeasured GPUs run the same workload. Deployment values are the measured GPUs’ share of that chassis; per-GPU values divide by the modeled chassis GPU count.',
+      boundary: CHASSIS_NOTES.boundary,
+      extrapolation: CHASSIS_NOTES.extrapolation,
+      rack_boundary: RACK_NOTES.boundary,
+      rack_extrapolation: RACK_NOTES.extrapolation,
       energy_caveat:
         'Energy from modeled average power is an estimate. Nonlinear fan/PSU behavior is not integrated over time. Energy requires an exact matching audit window and successful token counts.',
       model: profileData,
@@ -321,7 +390,7 @@ async function main() {
   });
   if (!values.input || !values.output)
     throw new Error(
-      'Usage: bun packages/app/scripts/export-modeled-system-power.ts --input cohort.json --output NEW_DIRECTORY [--pue 1.3]',
+      'Usage: bun packages/app/scripts/export-modeled-system-power.ts --input cohort.json --output NEW_DIRECTORY [--pue 1.3]. Without --pue each row uses the dashboard default for its hardware (1.3 air-cooled chassis, 1.1 DLC NVL72 rack).',
     );
   const inputBytes = await readFile(values.input);
   const result = buildComparison(
@@ -377,6 +446,11 @@ async function main() {
     measured_total_gpu_w: row.measured_inputs?.total_gpu_w,
     measured_total_gpu_j: row.measured_inputs?.total_gpu_j,
     measured_gpu_j_per_output_token: row.measured_inputs?.gpu_j_per_output_token,
+    cpu_power_valid: row.measured_inputs?.cpu_power_valid,
+    measured_total_grace_w: row.measured_inputs?.total_grace_w,
+    measured_total_module_w: row.measured_inputs?.total_module_w,
+    measured_basis: row.measured_basis,
+    sensor_kind: row.sensor_kind,
     modeled_status: row.modeled.status,
     unsupported_reason: row.modeled.status === 'unsupported' ? row.modeled.reason : null,
     modeled_chassis_ac_w: row.modeled.status === 'supported' ? row.modeled.chassisAcWatts : null,
@@ -395,11 +469,11 @@ async function main() {
     topology_basis: row.modeled.status === 'supported' ? row.modeled.topologyBasis : null,
     model_revision: row.modeled.modelRevision,
     model_status: profileData.status,
-    calculation_boundary: metadata.boundary,
-    extrapolation_note: metadata.extrapolation,
+    calculation_boundary: row.calculation_boundary,
+    extrapolation_note: row.extrapolation_note,
     energy_caveat: metadata.energy_caveat,
     model_path: row.model_path,
-    pue: metadata.pue,
+    pue: row.pue,
     assumptions: row.assumptions,
     estimated_energy: row.estimated_energy,
     estimated_energy_status: row.estimated_energy.status,

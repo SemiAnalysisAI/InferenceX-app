@@ -7,6 +7,57 @@ export type SystemPowerHardware = keyof typeof SYSTEM_POWER_PROFILES;
 export const SUPPORTED_SYSTEM_POWER_HARDWARE = Object.keys(
   SYSTEM_POWER_PROFILES,
 ) as SystemPowerHardware[];
+export const SYSTEM_POWER_RACK_ASSUMPTIONS = profileData.rackAssumptions;
+export const SYSTEM_POWER_RACK_PROFILES = profileData.rackProfiles;
+export type SystemPowerRackHardware = keyof typeof SYSTEM_POWER_RACK_PROFILES;
+export const SUPPORTED_SYSTEM_POWER_RACK_HARDWARE = Object.keys(
+  SYSTEM_POWER_RACK_PROFILES,
+) as SystemPowerRackHardware[];
+
+export type RackMeasuredBasis = 'module' | 'gpu-plus-grace';
+
+/** SHA-256 of the pinned source file behind a profile's `modelPath`, for export provenance. */
+export function systemPowerSourceSha256(modelPath: string): string | null {
+  const hashes: Readonly<Record<string, string>> = profileData.sourceSha256;
+  return Object.hasOwn(hashes, modelPath) ? hashes[modelPath] : null;
+}
+
+/**
+ * Measured compute-module input for every tray of one NVL72 rack. `module` is the
+ * sum of the two Module Power sensors per tray (Grace + 2 Blackwell + HBM + LPDDR5X +
+ * regulator loss). `gpu-plus-grace` is four GPU-board readings plus two Grace socket
+ * readings; the model then adds the sourced regulator-loss allowance on the GPU share.
+ */
+export type RackMeasuredInput =
+  | { basis: 'module'; moduleWattsPerTray: number }
+  | { basis: 'gpu-plus-grace'; gpuBoardWattsPerTray: number; graceSocketWattsPerTray: number };
+
+export interface RackPowerEstimate {
+  hardware: SystemPowerRackHardware;
+  basis: RackMeasuredBasis;
+  /** Measured watts handed to the model for every compute tray, before any allowance. */
+  measuredWattsPerTray: number;
+  /** Sourced regulator-loss allowance on the GPU-board share; zero on the module basis. */
+  regulatorAllowanceWattsPerTray: number;
+  computeModulesDcWatts: number;
+  regulatorAllowanceWatts: number;
+  trayStaticDcWatts: number;
+  nvswitchTraysDcWatts: number;
+  trayConversionLossWatts: number;
+  rackDcWatts: number;
+  powerShelfEfficiency: number;
+  powerShelfLossWatts: number;
+  rackAcWatts: number;
+  facilityWatts: number;
+  perGpuAcWatts: number;
+  perGpuFacilityWatts: number;
+  pue: number;
+  computeTrayCount: number;
+  /** GPUs in the modeled rack (72); the rack figures are amortised over all of them. */
+  gpuCount: number;
+  modelRevision: string;
+  modelPath: string;
+}
 
 export interface ChassisPowerEstimate {
   hardware: SystemPowerHardware;
@@ -34,6 +85,21 @@ function pythonRound(value: number, digits = 1): number {
     return lower / factor;
   }
   return Number(value.toFixed(digits));
+}
+
+/** Port of the source's `_interp_efficiency`: clamp outside the knots, linear between them. */
+function interpolateEfficiency(loadFraction: number, curve: number[][]): number {
+  const [first, last] = [curve[0], curve.at(-1)!];
+  if (loadFraction <= first[0]) return first[1];
+  if (loadFraction >= last[0]) return last[1];
+  for (let i = 1; i < curve.length; i++) {
+    const [x0, y0] = curve[i - 1];
+    const [x1, y1] = curve[i];
+    if (x0 <= loadFraction && loadFraction <= x1) {
+      return y0 + ((y1 - y0) * (loadFraction - x0)) / (x1 - x0);
+    }
+  }
+  return last[1];
 }
 
 /**
@@ -77,16 +143,7 @@ export function estimateChassisPower(
   const psu = profile.psu;
   if (dc > psu.maxDcWatts) return null;
 
-  const fraction = dc / psu.loadSharingCapacityWatts;
-  const curve = psu.efficiencyCurve;
-  let efficiency = curve[0][1];
-  for (let i = 1; i < curve.length; i++) {
-    const [x0, y0] = curve[i - 1];
-    const [x1, y1] = curve[i];
-    if (fraction <= x0) break;
-    efficiency = fraction < x1 ? y0 + ((y1 - y0) * (fraction - x0)) / (x1 - x0) : y1;
-    if (fraction <= x1) break;
-  }
+  const efficiency = interpolateEfficiency(dc / psu.loadSharingCapacityWatts, psu.efficiencyCurve);
   const ac = pythonRound(dc / efficiency);
   // The Python chassis wrappers apply PUE to the already-rounded PSU AC output.
   const facility = pythonRound(ac + ac * (pue - 1));
@@ -102,6 +159,97 @@ export function estimateChassisPower(
     chassisAcWatts: ac,
     facilityWatts: facility,
     pue,
+    modelRevision: SYSTEM_POWER_MODEL_REVISION,
+    modelPath: profile.modelPath,
+  };
+}
+
+/**
+ * One NVL72 rack whose 18 compute trays all carry the given measured compute-module
+ * input. Only the power-shelf efficiency curve is load dependent; switch trays, tray
+ * static electronics, management switches, and the tray input-conversion stage stay
+ * fixed at the recorded assumptions. The Grace CPU and LPDDR5X are never modelled:
+ * they are inside the measured reading. Rounding follows the source: rack AC is
+ * rounded before PUE, and every reported total is rounded once at the end.
+ */
+export function estimateRackPower(
+  hardware: string,
+  input: RackMeasuredInput,
+  pue = SYSTEM_POWER_RACK_ASSUMPTIONS.pue,
+): RackPowerEstimate | null {
+  const key = hardware.toLowerCase();
+  const gpuShare = input.basis === 'module' ? 0 : input.gpuBoardWattsPerTray;
+  const graceShare = input.basis === 'module' ? 0 : input.graceSocketWattsPerTray;
+  const measured = input.basis === 'module' ? [input.moduleWattsPerTray] : [gpuShare, graceShare];
+  if (
+    !Object.hasOwn(SYSTEM_POWER_RACK_PROFILES, key) ||
+    measured.some((watts) => !Number.isFinite(watts) || watts <= 0) ||
+    !Number.isFinite(pue) ||
+    pue < 1
+  ) {
+    return null;
+  }
+  const canonicalHardware = key as SystemPowerRackHardware;
+  const profile = SYSTEM_POWER_RACK_PROFILES[canonicalHardware];
+  const trays = profile.computeTrayCount;
+  const measuredWattsPerTray =
+    input.basis === 'module'
+      ? input.moduleWattsPerTray
+      : input.gpuBoardWattsPerTray + input.graceSocketWattsPerTray;
+
+  // Grace tuning guide: regulator loss is 15% of the TDP limit, so loss / delivered =
+  // f / (1 - f) on the GPU-board share. The Grace socket reading already includes its own.
+  const frac = profile.regulatorLossFracOfTdp;
+  const allowanceBase = gpuShare + (profile.regulatorAllowanceIncludesGrace ? graceShare : 0);
+  const allowancePerTray =
+    input.basis === 'gpu-plus-grace' ? (allowanceBase * frac) / (1 - frac) : 0;
+  const computeModulesDc = trays * measuredWattsPerTray + trays * allowancePerTray;
+
+  // Per-tray static blocks keep the source's summation order.
+  const trayStaticPerTray = Object.values(profile.computeTrayStaticDcWatts).reduce(
+    (sum, watts) => sum + watts,
+    0,
+  );
+  const trayStaticDc = trays * trayStaticPerTray;
+  const nvswitchTraysDc =
+    profile.nvswitchTrayCount *
+    (profile.nvswitchTraySiliconWatts + profile.nvswitchTrayResidualWatts);
+  const trayLoads = computeModulesDc + trayStaticDc + nvswitchTraysDc;
+  const trayConversionLoss = trayLoads * (1 / profile.trayInputConversionEfficiency - 1);
+  const managementDc = profile.managementSwitchCount * profile.managementSwitchWatts;
+  const rackDc = trayLoads + trayConversionLoss + managementDc;
+
+  const shelf = profile.powerShelf;
+  if (rackDc > shelf.installedCapacityWatts) return null;
+  const efficiency = interpolateEfficiency(
+    rackDc / shelf.installedCapacityWatts,
+    shelf.efficiencyCurve,
+  );
+  const ac = rackDc / efficiency;
+  const rackAc = pythonRound(ac);
+  // PUE applies once, to the already-rounded shelf AC output.
+  const facility = pythonRound(rackAc + rackAc * (pue - 1));
+  if (!Number.isFinite(facility)) return null;
+  return {
+    hardware: canonicalHardware,
+    basis: input.basis,
+    measuredWattsPerTray,
+    regulatorAllowanceWattsPerTray: allowancePerTray,
+    computeModulesDcWatts: pythonRound(computeModulesDc),
+    regulatorAllowanceWatts: pythonRound(trays * allowancePerTray),
+    trayStaticDcWatts: pythonRound(trayStaticDc),
+    nvswitchTraysDcWatts: pythonRound(nvswitchTraysDc),
+    trayConversionLossWatts: pythonRound(trayConversionLoss),
+    rackDcWatts: pythonRound(rackDc),
+    powerShelfEfficiency: pythonRound(efficiency, 4),
+    powerShelfLossWatts: pythonRound(ac - rackDc),
+    rackAcWatts: rackAc,
+    facilityWatts: facility,
+    perGpuAcWatts: pythonRound(rackAc / profile.gpuCount),
+    perGpuFacilityWatts: pythonRound(facility / profile.gpuCount),
+    pue,
+    computeTrayCount: trays,
+    gpuCount: profile.gpuCount,
     modelRevision: SYSTEM_POWER_MODEL_REVISION,
     modelPath: profile.modelPath,
   };

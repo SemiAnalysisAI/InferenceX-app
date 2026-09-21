@@ -323,6 +323,72 @@ export function prunePerfRulers(
   return { ...prev, rulers, draft };
 }
 
+const PERF_RULER_URL_RULER_SEPARATOR = ';';
+const PERF_RULER_URL_FIELD_SEPARATOR = '|';
+/**
+ * Shape of a curve id the link may reference: one roofline path's identity
+ * class (`roofline-<series>` / `overlay-roofline-<series>`), never the shared
+ * `roofline-path` / `overlay-roofline-path` marker classes or any other node
+ * inside the zoom group — those match many paths, so a hand-edited link
+ * would draw a ruler between whichever two come first in DOM order.
+ */
+const PERF_RULER_CURVE_ID = /^(?:overlay-)?roofline-(?!path$)[\w%.-]+$/u;
+
+/**
+ * Share-link encoding of the COMPLETED rulers (`i_rulers`). One ruler per
+ * `;`, fields joined by `|`: `isoX|curveA|curveB`. Curve ids are the rendered
+ * roofline path identity classes (`roofline-<hwKey>_<precision>`,
+ * `overlay-roofline-<hwKey>_<precision>_run<N>`, optionally `__<encoded
+ * date>`), whose alphabet is `[A-Za-z0-9_%.-]`, so neither separator can
+ * appear inside one; `URLSearchParams` percent-encodes both on the wire.
+ * The iso-x is rounded to four significant digits to keep links short — a
+ * 0.05% shift on the x metric is far below the ruler's visual resolution.
+ * The draft is never serialized: it is an unfinished click, not a
+ * measurement. Empty state serializes to '' so the param strips as default.
+ */
+export function serializePerfRulers(state: PerfRulerState): string {
+  return state.rulers
+    .map((ruler) =>
+      [Number(ruler.isoX.toPrecision(4)), ruler.curveA, ruler.curveB].join(
+        PERF_RULER_URL_FIELD_SEPARATOR,
+      ),
+    )
+    .join(PERF_RULER_URL_RULER_SEPARATOR);
+}
+
+/**
+ * Inverse of {@link serializePerfRulers}. Malformed entries (wrong field
+ * count, non-numeric iso-x, identical curve ids, or ids that are not
+ * roofline identity classes) are dropped silently — a hand-edited or
+ * truncated link degrades to fewer rulers, never to an error. The list is capped at
+ * {@link MAX_PERF_RULERS} keeping the NEWEST (last-serialized) entries, the
+ * same end the click reducer drops from. Ids are reassigned 1..n with
+ * `nextId = n + 1`, so parsed rulers are valid D3 join keys and a ruler
+ * placed afterwards never collides. Returns {@link EMPTY_PERF_RULER_STATE}
+ * (same reference) for '', null, or an all-malformed value.
+ */
+export function parsePerfRulers(raw: string | null | undefined): PerfRulerState {
+  if (!raw) return EMPTY_PERF_RULER_STATE;
+  const parsed: Omit<PerfRulerMeasurement, 'id'>[] = [];
+  for (const entry of raw.split(PERF_RULER_URL_RULER_SEPARATOR)) {
+    const fields = entry.split(PERF_RULER_URL_FIELD_SEPARATOR);
+    if (fields.length !== 3) continue;
+    const [isoXField, curveA, curveB] = fields;
+    if (isoXField.trim() === '' || curveA === curveB) continue;
+    if (!PERF_RULER_CURVE_ID.test(curveA) || !PERF_RULER_CURVE_ID.test(curveB)) continue;
+    const isoX = Number(isoXField);
+    if (!Number.isFinite(isoX)) continue;
+    parsed.push({ curveA, curveB, isoX });
+  }
+  if (parsed.length === 0) return EMPTY_PERF_RULER_STATE;
+  const kept = parsed.slice(-MAX_PERF_RULERS);
+  return {
+    rulers: kept.map((ruler, index) => ({ id: index + 1, ...ruler })),
+    draft: null,
+    nextId: kept.length + 1,
+  };
+}
+
 /** Every curve referenced by any ruler or the draft (hit-halo styling). */
 export function perfRulerCurveSet(state: PerfRulerState): Set<string> {
   const curves = new Set<string>();

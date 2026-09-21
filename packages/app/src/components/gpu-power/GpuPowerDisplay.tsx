@@ -33,6 +33,8 @@ import { useClientSearchParams } from '@/hooks/useClientSearch';
 import GpuCorrelationChart from './GpuCorrelationChart';
 import GpuMetricsChart from './GpuPowerChart';
 import GpuStatsTable from './GpuStatsTable';
+import { DEFAULT_TELEMETRY_DISPLAY, type TelemetryDisplayState } from './telemetry-smoothing';
+import { TelemetryDisplayControls } from './TelemetryDisplayControls';
 import {
   type GpuMetricKey,
   type GpuPowerApiResponse,
@@ -81,6 +83,7 @@ const STRINGS = {
     chip: 'Chip',
     chartToolbar: 'Chart controls',
     correlationAxes: 'Correlation axes',
+    displayControls: 'Line options',
   },
   zh: {
     heading: 'PowerX',
@@ -119,6 +122,7 @@ const STRINGS = {
     chip: '芯片',
     chartToolbar: '图表控制',
     correlationAxes: '相关性坐标轴',
+    displayControls: '曲线选项',
   },
 } as const;
 
@@ -237,6 +241,16 @@ export default function GpuMetricsDisplay() {
   const [chartView, setChartView] = useState<GpuMetricsView>('chart');
   const [corrXMetric, setCorrXMetric] = useState<GpuMetricKey>('power');
   const [corrYMetric, setCorrYMetric] = useState<GpuMetricKey>('temperature');
+  // A power-only series (multinode DCGM bundle) has no temperature axis to
+  // default to; use the first other collected metric instead of an empty plot.
+  const effectiveCorrYMetric = useMemo<GpuMetricKey>(
+    () =>
+      availableMetrics.some((m) => m.key === corrYMetric)
+        ? corrYMetric
+        : (availableMetrics.find((m) => m.key !== corrXMetric)?.key ?? corrXMetric),
+    [availableMetrics, corrXMetric, corrYMetric],
+  );
+  const [display, setDisplay] = useState<TelemetryDisplayState>(DEFAULT_TELEMETRY_DISPLAY);
   const viewOptions = useMemo<SegmentedToggleOption<GpuMetricsView>[]>(
     () => [
       {
@@ -608,7 +622,7 @@ export default function GpuMetricsDisplay() {
                   <div className="space-y-1 min-w-0">
                     <Label htmlFor="gpu-metrics-correlation-y">{t.yAxis}</Label>
                     <Select
-                      value={corrYMetric}
+                      value={effectiveCorrYMetric}
                       onValueChange={(v) => handleCorrelationMetricChange('y', v)}
                     >
                       <SelectTrigger id="gpu-metrics-correlation-y" className="w-full">
@@ -628,12 +642,24 @@ export default function GpuMetricsDisplay() {
             )}
 
             {chartView === 'chart' && (
+              <ControlPanel legend={t.displayControls} className="mb-3 no-export">
+                <TelemetryDisplayControls
+                  value={display}
+                  onChange={setDisplay}
+                  analyticsPrefix="gpu_metrics"
+                  idPrefix="gpu-metrics-display"
+                />
+              </ControlPanel>
+            )}
+
+            {chartView === 'chart' && (
               <GpuMetricsChart
                 data={currentData}
                 visibleGpus={visibleGpus}
                 metricKey={selectedMetric}
                 artifactName={selectedArtifact}
                 maxPoints={downsample ? 2000 : Infinity}
+                display={display}
                 caption={
                   <>
                     <h2 className="text-lg font-semibold">
@@ -691,7 +717,7 @@ export default function GpuMetricsDisplay() {
                 data={currentData}
                 visibleGpus={visibleGpus}
                 xMetric={corrXMetric}
-                yMetric={corrYMetric}
+                yMetric={effectiveCorrYMetric}
                 maxPoints={downsample ? 2000 : Infinity}
                 caption={
                   <>

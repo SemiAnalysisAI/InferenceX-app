@@ -2,7 +2,12 @@ import { describe, expect, it } from 'vitest';
 
 import type { InferenceData } from '@/components/inference/types';
 
-import { scatterPointConfigId, scatterPointJoinId } from './point-identity';
+import {
+  parseScatterSeriesKey,
+  scatterPointConfigId,
+  scatterPointJoinId,
+  scatterSeriesKey,
+} from './point-identity';
 
 const point = (overrides: Partial<InferenceData>): InferenceData =>
   ({
@@ -83,5 +88,28 @@ describe('scatterPointConfigId', () => {
 
     expect(scatterPointJoinId(current, false)).toBe(scatterPointConfigId(current));
     expect(scatterPointJoinId(undated, true)).toBe(scatterPointConfigId(undated));
+  });
+});
+
+describe('scatterSeriesKey', () => {
+  it('keeps comparison clones in their own series and parses the key back', () => {
+    const base = point({});
+    const clone = point({ powerVariant: { kind: 'basis', id: 'gpu-provisioned' } });
+    expect(scatterSeriesKey(base)).toBe('h200_vllm_fp8');
+    expect(scatterSeriesKey(clone)).toBe('h200_vllm_fp8-v-gpu-provisioned');
+    expect(parseScatterSeriesKey('h200_vllm_fp8')).toEqual({
+      hw: 'h200_vllm',
+      precision: 'fp8',
+      variant: null,
+    });
+    expect(parseScatterSeriesKey('b200_sglang_mtp_fp4-v-utility-modeled')).toEqual({
+      hw: 'b200_sglang_mtp',
+      precision: 'fp4',
+      variant: 'utility-modeled',
+    });
+    // The variant is point identity too, so a clone never replaces its base in a D3 join.
+    expect(scatterPointConfigId(clone)).toBe(
+      `${scatterPointConfigId(base)}|variant-gpu-provisioned`,
+    );
   });
 });

@@ -4,11 +4,13 @@ export interface GpuMetricRow {
   timestamp: string;
   index: number;
   power: number;
-  temperature: number;
-  smClock: number;
-  memClock: number;
-  gpuUtil: number;
-  memUtil: number;
+  // Absent when the collector did not sample the metric (multinode DCGM
+  // bundles are power-only); a missing value is never plotted as 0.
+  temperature?: number;
+  smClock?: number;
+  memClock?: number;
+  gpuUtil?: number;
+  memUtil?: number;
   // AMD-specific optional fields
   edgeTemp?: number;
   memTemp?: number;
@@ -210,6 +212,13 @@ export function getAvailableMetrics(data: GpuMetricRow[]): GpuMetricConfig[] {
  * Detect GPU SKU from an artifact name and return its TDP in watts.
  * Artifact names look like: gpu_metrics_dsr1_1k8k_fp8_sglang_tp8_..._h200-nb_0
  */
+/** TDP for a known hardware key, e.g. the benchmark point's own `hardware`. */
+export function tdpForHardware(hardware: string | undefined): { sku: string; tdp: number } | null {
+  const key = hardware?.toLowerCase();
+  const entry = key ? HW_REGISTRY[key] : undefined;
+  return entry ? { sku: key!.toUpperCase(), tdp: entry.tdp } : null;
+}
+
 export function detectTdpFromArtifactName(
   artifactName: string,
 ): { sku: string; tdp: number } | null {
@@ -288,8 +297,11 @@ export function detectAnomalies(
     const mad = median(absDeviations);
 
     // Pre-compute SM clock median for clock_drop detection (avoid O(n^2))
+    const smClocks = rows.map((r) => r.smClock).filter((v): v is number => v !== undefined);
     const smMedian =
-      metricKey === 'smClock' || metricKey === 'power' ? median(rows.map((r) => r.smClock)) : 0;
+      (metricKey === 'smClock' || metricKey === 'power') && smClocks.length > 0
+        ? median(smClocks)
+        : 0;
 
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
@@ -312,7 +324,7 @@ export function detectAnomalies(
       }
 
       // Domain-specific: thermal throttle (temperature > 83°C)
-      if (row.temperature > 83) {
+      if (row.temperature !== undefined && row.temperature > 83) {
         anomalies.push({
           type: 'thermal',
           label: 'Thermal Throttle',
@@ -339,6 +351,7 @@ export function detectAnomalies(
       if (
         (metricKey === 'smClock' || metricKey === 'power') &&
         smMedian > 0 &&
+        row.smClock !== undefined &&
         row.smClock < smMedian * 0.7
       ) {
         anomalies.push({
@@ -352,14 +365,15 @@ export function detectAnomalies(
       }
 
       // Domain-specific: utilization drop (GPU util = 0 after being > 50%)
-      if (row.gpuUtil === 0 && i > 0 && rows[i - 1].gpuUtil > 50) {
+      const previousUtil = i > 0 ? rows[i - 1].gpuUtil : undefined;
+      if (row.gpuUtil === 0 && previousUtil !== undefined && previousUtil > 50) {
         anomalies.push({
           type: 'util_drop',
           label: 'Utilization Drop',
           gpuIndex,
           seconds,
           value: 0,
-          message: `Chip ${gpuIndex} at ${seconds.toFixed(0)}s: utilization dropped to 0% (was ${rows[i - 1].gpuUtil}%)`,
+          message: `Chip ${gpuIndex} at ${seconds.toFixed(0)}s: utilization dropped to 0% (was ${previousUtil}%)`,
         });
       }
     }

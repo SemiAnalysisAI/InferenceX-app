@@ -92,8 +92,8 @@ import {
   type ProfitEstimatorRow,
   type ProfitEstimatorSkipReason,
 } from './profit-estimator';
-import { profitEstimatorChartStrings, rowLabel } from './ProfitEstimatorChart';
-import { estimateProfitByPower, type ProfitPowerBasis } from './profit-power';
+import { powerBasisLabel, profitEstimatorChartStrings, rowLabel } from './ProfitEstimatorChart';
+import { estimateProfitByPower, powerSourceKey, type ProfitPowerBasis } from './profit-power';
 import {
   buildProfitHistoryResults,
   historyFadeShare,
@@ -214,6 +214,9 @@ const STRINGS = {
     powerBarLabels: { provisioned: 'Provisioned', modeled: 'Measured + modeled' },
     powerPreview:
       'PowerX estimate · Same target, throughput, pricing and unit costs. GPU power comes from the same serving-frontier points; power between them is estimated linearly. Server overhead is modeled, with PUE 1.3 and 10% headroom. AgentX system power is not yet qualified.',
+    powerNvl72Note: (hardware: string, basis: string, pue: number) =>
+      `${hardware}: ${basis}. Modeled: NVSwitch trays, NICs/DPUs, NVMe, power shelves, DLC PUE ${pue}.`,
+    csvPowerHeaders: ['Power basis', 'Power sensor', 'System power profile'],
     pricingGroup: 'Pricing Config',
     costProviderLabel: 'Cost Provider',
     costProviderTooltip:
@@ -329,6 +332,9 @@ const STRINGS = {
     powerBarLabels: { provisioned: '预配功耗', modeled: '实测 + 估算' },
     powerPreview:
       'PowerX 估算 · 两种方式采用相同的目标交互性、吞吐量、价格和单位成本。GPU 功耗取自同一组性能前沿数据点，点间功耗采用线性估算。服务器开销由模型估算，PUE 为 1.3，功耗余量为 10%。AgentX 系统功耗模型尚未完成验证。',
+    powerNvl72Note: (hardware: string, basis: string, pue: number) =>
+      `${hardware}：${basis}。建模部分：NVSwitch tray、网卡/DPU、NVMe、电源架，液冷 PUE ${pue}。`,
+    csvPowerHeaders: ['功耗口径', '功耗传感器', '系统功耗 profile'],
     pricingGroup: '定价配置',
     costProviderLabel: '成本供应商',
     costProviderTooltip:
@@ -1356,6 +1362,28 @@ function ProfitEstimatorInner({
     [fullEstimate.skipped, hardwareConfig, historyEntryLabel, t],
   );
 
+  // One line per NVL72 hardware whose bars price a measured compute module, so the
+  // reader sees which share is measured and which is modeled; x86 chassis rows keep
+  // the generic preview line.
+  const powerBasisNotes = useMemo(() => {
+    const notes = new Map<string, string>();
+    for (const row of estimate.rows) {
+      const source = row.powerSource;
+      if (source?.topology !== 'nvl72-trays') continue;
+      const key = `${row.hwKey}|${powerSourceKey(source)}`;
+      if (notes.has(key)) continue;
+      notes.set(
+        key,
+        t.powerNvl72Note(
+          rowLabel({ hwKey: row.hwKey }, hardwareConfig),
+          powerBasisLabel(source, locale),
+          source.pue,
+        ),
+      );
+    }
+    return [...notes.values()];
+  }, [estimate.rows, hardwareConfig, locale, t]);
+
   // Rendered as the chart's figcaption so it is part of the PNG export.
   const caption = useMemo(() => {
     if (!pricing) return null;
@@ -1376,6 +1404,11 @@ function ProfitEstimatorInner({
           <p className="mb-2 text-xs text-muted-foreground" data-testid="profit-power-note">
             {t.powerLabel}: {t.powerOptions[powerBasis]}
             {powerBasis !== 'provisioned' && <>. {t.powerPreview}</>}
+          </p>
+        )}
+        {powerBasisNotes.length > 0 && (
+          <p className="mb-2 text-xs text-muted-foreground" data-testid="profit-power-basis">
+            {powerBasisNotes.join(' ')}
           </p>
         )}
         {basis === 'gw-year' && powerBasis !== 'provisioned' && fullEstimate.skipped.length > 0 && (
@@ -1458,6 +1491,7 @@ function ProfitEstimatorInner({
   }, [
     pricing,
     powerBasis,
+    powerBasisNotes,
     powerControlsEnabled,
     powerUnavailable,
     fullEstimate.skipped,
@@ -1493,6 +1527,18 @@ function ProfitEstimatorInner({
   const handleExportCsv = useCallback(() => {
     // Whole dollars are plenty per GW-year; per chip-hour the cents are the figure.
     const usd = (value: number) => (basis === 'gw-year' ? Math.round(value) : value.toFixed(4));
+    // Measured + modeled rows name their basis, sensor, and pinned profile so a
+    // spreadsheet can tell a measured module from a modeled chassis per row.
+    const includeBasis = powerControlsEnabled && powerBasis !== 'provisioned';
+    const basisColumns = (row: ProfitEstimatorRow) => {
+      const source = row.powerSource;
+      if (!source) return [t.powerBarLabels.provisioned, '', ''];
+      return [
+        powerBasisLabel(source, locale),
+        source.topology === 'nvl72-trays' ? source.sensorKind : '',
+        `${source.modelPath} @ ${source.modelRevision}${source.profileSha256 ? ` sha256:${source.profileSha256}` : ''}`,
+      ];
+    };
     const rows = estimate.rows.map((row) => [
       rowLabel({ ...row, date: undefined }, hardwareConfig),
       row.precision?.toUpperCase() ?? '',
@@ -1506,9 +1552,17 @@ function ProfitEstimatorInner({
       row.revenuePerGpuHour.toFixed(4),
       // GPU-hours is 1 per chip-hour, so that basis has no column for it.
       ...(basis === 'gw-year' ? [Math.round(row.gpuHours)] : []),
+      ...(includeBasis ? basisColumns(row) : []),
     ]);
     const [sku, precision, ...rest] = t.csvHeaders[basis];
-    exportToCsv(exportFileName, [sku, precision, t.csvDateHeader, ...rest], rows, [
+    const headers = [
+      sku,
+      precision,
+      t.csvDateHeader,
+      ...rest,
+      ...(includeBasis ? t.csvPowerHeaders : []),
+    ];
+    exportToCsv(exportFileName, headers, rows, [
       t.captionFormula[basis](assumptions.utilizationPct, assumptions.labCutPct),
       ...(powerControlsEnabled
         ? [
@@ -1522,6 +1576,7 @@ function ProfitEstimatorInner({
     hardwareConfig,
     exportFileName,
     t,
+    locale,
     assumptions,
     basis,
     selectedRunDate,

@@ -1,11 +1,33 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  CPU_SIDE_POWER_METRIC_KEY_LIST,
+  CPU_SIDE_POWER_METRIC_KEYS,
   MEASURED_POWER_METRIC_KEY_LIST,
   MEASURED_POWER_METRIC_KEYS,
   METRIC_KEYS,
   POWER_METRIC_KEYS,
 } from './metric-keys';
+
+describe('CPU_SIDE_POWER_METRIC_KEYS', () => {
+  it('names exactly the NVL72 Grace-side and compute-module keys, all of them measured keys', () => {
+    expect(new Set(CPU_SIDE_POWER_METRIC_KEY_LIST)).toEqual(
+      new Set([
+        'avg_cpu_socket_power_w',
+        'avg_total_cpu_power_w',
+        'total_cpu_energy_j',
+        'avg_total_module_power_w',
+        'total_module_energy_j',
+      ]),
+    );
+    expect(CPU_SIDE_POWER_METRIC_KEYS.size).toBe(5);
+    for (const key of CPU_SIDE_POWER_METRIC_KEYS) {
+      expect(MEASURED_POWER_METRIC_KEYS.has(key)).toBe(true);
+    }
+    // The verdict itself is a discriminator, not a measurement.
+    expect(CPU_SIDE_POWER_METRIC_KEYS.has('cpu_power_valid')).toBe(false);
+  });
+});
 
 describe('MEASURED_POWER_METRIC_KEYS', () => {
   it('is a subset of METRIC_KEYS', () => {
@@ -36,9 +58,15 @@ describe('MEASURED_POWER_METRIC_KEYS', () => {
         'peak_temp_c',
         'avg_util_pct',
         'avg_mem_used_mb',
+        // NVL72 Grace-side and compute-module measurements (same window as GPU energy).
+        'avg_cpu_socket_power_w',
+        'avg_total_cpu_power_w',
+        'total_cpu_energy_j',
+        'avg_total_module_power_w',
+        'total_module_energy_j',
       ]),
     );
-    expect(MEASURED_POWER_METRIC_KEYS.size).toBe(19);
+    expect(MEASURED_POWER_METRIC_KEYS.size).toBe(24);
   });
 
   it('never contains the contract discriminators or invalid-verdict companion fields', () => {
@@ -46,6 +74,7 @@ describe('MEASURED_POWER_METRIC_KEYS', () => {
     for (const key of [
       'power_valid',
       'power_metric_schema_version',
+      'cpu_power_valid',
       'power_invalid_reasons',
       'power_audit',
     ]) {
@@ -69,8 +98,13 @@ describe('POWER_METRIC_KEYS', () => {
     // The public API documentation types every one of these keys on
     // BenchmarkRow.metrics, so membership changes are contract changes.
     expect(new Set(POWER_METRIC_KEYS)).toEqual(
-      new Set(['power_valid', 'power_metric_schema_version', ...MEASURED_POWER_METRIC_KEY_LIST]),
+      new Set([
+        'power_valid',
+        'power_metric_schema_version',
+        'cpu_power_valid',
+        ...MEASURED_POWER_METRIC_KEY_LIST,
+      ]),
     );
-    expect(POWER_METRIC_KEYS).toHaveLength(21);
+    expect(POWER_METRIC_KEYS).toHaveLength(27);
   });
 });

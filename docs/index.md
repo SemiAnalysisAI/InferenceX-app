@@ -6,6 +6,7 @@ Design rationale and non-obvious conventions. See [CLAUDE.md](../CLAUDE.md) for 
 
 - [API Skill Examples](./inferencex-api-examples.md) — Install the public skill, query benchmarks, export measured PowerX data, and explain empty results
 - [PowerX System Power](./powerx-system-power.md) — Pinned chassis model, measured-input guards, assumptions, and reproducible article exports
+- [PowerX Permanent View](./powerx-permanent-view.md) — Power boundaries as gated Measured Energy metrics, `i_metric`/`i_rulers` share links, missing-value states
 - [API Skill Releases](./inferencex-skills-release.md) — Prepare an immutable package, verify clean installations and agent exports, and publish through the package-specific workflow
 - [API Skill Discovery](./inferencex-skills-discovery.md) — Accept or reject implicit skill discovery in fresh Codex and Claude Code projects
 - [CLI Compatibility](./inferencex-cli-compatibility.md) — Contract 1 schemas, bundle and exit semantics, platform scope, and legacy migration

@@ -7,6 +7,7 @@ import { type DataTableColumn, DataTable } from '@/components/ui/data-table';
 import { chipCounts } from '@/lib/chip-counts';
 import { getNestedYValue, metricLabel, xAxisLabel } from '@/lib/chart-utils';
 import { isModeledSystemPowerConfigKey } from '@/components/inference/metric-registry';
+import { inferPowerCompare, powerSeriesLabel } from '@/components/inference/utils/power-compare';
 import { sortRowsByYMetric } from '@/components/inference/ui/inference-table-sort';
 import { type Precision, getPrecisionLabel } from '@/lib/data-mappings';
 import { getDisplayLabel } from '@/lib/utils';
@@ -43,6 +44,7 @@ export function inferenceTableHeaderLabels(
     physicalChips: locale === 'zh' ? '物理芯片数' : 'Physical Chips',
     configuredChips: locale === 'zh' ? '配置中的芯片数' : 'Configured Chip Count',
     concurrency: locale === 'zh' ? '并发数' : 'Conc',
+    series: locale === 'zh' ? '系列' : 'Series',
     yMetric: metricLabel(chartDefinition, selectedYAxisMetric, locale),
     xMetric: xAxisLabel(chartDefinition, locale),
     throughput: locale === 'zh' ? '单芯片吞吐量 (tok/s)' : 'Throughput/Chip (tok/s)',
@@ -66,6 +68,9 @@ export default function InferenceTable({
     () => sortRowsByYMetric(data, chartDefinition, selectedYAxisMetric),
     [data, chartDefinition, selectedYAxisMetric],
   );
+  // Boundary / role clones (`i_pcompare`) share every config column with their
+  // base row; the series column is what tells them apart.
+  const powerCompare = useMemo(() => inferPowerCompare(data), [data]);
 
   const columns = useMemo<DataTableColumn<InferenceData>[]>(
     () => [
@@ -85,6 +90,19 @@ export default function InferenceTable({
         className: 'whitespace-nowrap',
         importance: 'key',
       },
+      ...(powerCompare === 'none'
+        ? []
+        : [
+            {
+              header: headers.series,
+              cell: (row: InferenceData) =>
+                powerSeriesLabel(row, selectedYAxisMetric, powerCompare, locale),
+              sortValue: (row: InferenceData) =>
+                powerSeriesLabel(row, selectedYAxisMetric, powerCompare, locale),
+              className: 'whitespace-nowrap',
+              importance: 'key' as const,
+            },
+          ]),
       {
         header: headers.tensorParallelism,
         align: 'right',
@@ -151,7 +169,7 @@ export default function InferenceTable({
         importance: 'key',
       },
     ],
-    [yPath, headers, showModeledPower],
+    [yPath, headers, showModeledPower, powerCompare, selectedYAxisMetric, locale],
   );
 
   return (

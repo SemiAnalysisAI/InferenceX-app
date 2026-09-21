@@ -21,6 +21,7 @@ function DetailViewProbe() {
     createElement('button', { onClick: () => setView('point') }, 'point'),
     createElement('button', { onClick: () => setView('timeline') }, 'timeline'),
     createElement('button', { onClick: () => setView('aggregates') }, 'aggregates'),
+    createElement('button', { onClick: () => setView('power') }, 'power'),
   );
 }
 
@@ -118,5 +119,26 @@ describe('useDetailView', () => {
       window.dispatchEvent(new PopStateEvent('popstate'));
     });
     expect(renderedView()).toBe('aggregates');
+  });
+
+  it('accepts the PowerX view from the URL and writes it back on selection', () => {
+    nativeReplace('/inference/agentic/42?view=power');
+    renderProbe();
+    expect(renderedView()).toBe('power');
+
+    click('point');
+    expect(new URLSearchParams(window.location.search).has('view')).toBe(false);
+    click('power');
+    expect(renderedView()).toBe('power');
+    expect(new URLSearchParams(window.location.search).get('view')).toBe('power');
+    expect(track).toHaveBeenLastCalledWith('inference_agentic_detail_view_changed', {
+      view: 'power',
+    });
+  });
+
+  it('falls back to the per-point view for unknown view names', () => {
+    nativeReplace('/inference/agentic/42?view=telemetry');
+    renderProbe();
+    expect(renderedView()).toBe('point');
   });
 });

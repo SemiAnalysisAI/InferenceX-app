@@ -68,7 +68,12 @@ const GpuCorrelationChart = React.memo(
       () =>
         data
           .filter((r) => visibleGpus.has(r.index))
-          .map((r) => ({ x: r[xMetric] ?? 0, y: r[yMetric] ?? 0, gpuIndex: r.index, raw: r })),
+          // Rows missing either metric were never sampled for it; skip them.
+          .flatMap((r) => {
+            const x = r[xMetric];
+            const y = r[yMetric];
+            return x === undefined || y === undefined ? [] : [{ x, y, gpuIndex: r.index, raw: r }];
+          }),
       [data, visibleGpus, xMetric, yMetric],
     );
 

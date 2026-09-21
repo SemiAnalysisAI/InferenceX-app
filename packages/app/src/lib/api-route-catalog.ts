@@ -68,10 +68,10 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'ui-artifact-read',
     exclusionReason: {
-      en: 'UI-only live GPU metric artifact lookup; its run artifact shape is not a stable public contract.',
-      zh: '仅供界面读取实时 GPU 指标制品；其运行制品结构不是稳定的公开契约。',
+      en: 'UI-only PowerX read for one run: the ingest-time telemetry digest when stored, otherwise the live GPU telemetry artifacts (raw `gpu_metrics_*` rows, or `series=power` one-second buckets for the PowerX timeline, also cut per validation window from `power_audit_*` bundles). Its payload shape is not a stable public contract.',
+      zh: '仅供 PowerX 界面按 run 读取：已入库时返回 ingest 阶段生成的 telemetry 摘要，否则回退到实时 GPU 遥测制品（`gpu_metrics_*` 原始行，或供 PowerX 时间线使用的 `series=power` 一秒分桶数据，后者也会按验证窗口从 `power_audit_*` bundle 中切分得到）。其返回结构不是稳定的公开契约。',
     },
-    sourceSha256: '28e6cee4d67396ee8ea2e5a7e18271c6ee86228c33f33a20bf573f3a601ba8ed',
+    sourceSha256: '8b15b82fac99c6c0e586fce5312de5a224de454b9d39d15cb0b2c20a2c6d8246',
   },
   {
     source: 'src/app/api/openapi.json/route.ts',
@@ -326,6 +326,17 @@ export const apiRouteCatalog = [
     classification: 'published-read',
     operationId: 'list-reliability',
     sourceSha256: 'ce1c5db78b47548beb77a69797f10fb33853cde01cea5c44675c8ad3519bcf20',
+  },
+  {
+    source: 'src/app/api/v1/gpu-metrics-point/route.ts',
+    path: '/api/v1/gpu-metrics-point',
+    method: 'GET',
+    classification: 'page-bff',
+    exclusionReason: {
+      en: 'Agentic point-detail BFF returning the PowerX telemetry series and per-GPU digest linked to one benchmark point; coupled to the PowerX tab implementation.',
+      zh: '智能体数据点详情页专用 BFF；返回与单个基准测试数据点关联的 PowerX telemetry 序列及每 GPU 统计摘要，与 PowerX 标签页实现紧密耦合。',
+    },
+    sourceSha256: '3929581f54058183344d59a8f6127db3ef1c8487cad26c73faa93b00fe75a82d',
   },
   {
     source: 'src/app/api/v1/request-chart-data/route.ts',

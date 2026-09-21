@@ -1,3 +1,5 @@
+import { assertShareLinkMetric } from '../support/share-link';
+
 // Verifies the new measured-power Y-axis options render on the unofficial-run
 // overlay path against a real GitHub Actions artifact (run 26312107787 — the
 // on-PR sweep for PR #1558 / qwen3.5-fp8-h200-sglang). This is the canonical
@@ -69,5 +71,33 @@ describe('Measured power on unofficial-run overlay', () => {
     );
     cy.screenshot('measured-joules-selected', { capture: 'viewport' });
     cy.get('[data-testid="inference-chart-display"] svg').should('exist');
+  });
+
+  it('switches the power boundary on the overlay view and keeps the derived key in the URL', () => {
+    cy.get('[data-testid="yaxis-metric-selector"]').click('right');
+    cy.contains('[data-slot="select-item"]', /^Measured Power$/u)
+      .scrollIntoView()
+      .click();
+    cy.get('[data-testid="measured-power-basis"]').should('contain.text', 'GPU measured');
+    // The boundary control and its derived key ride the overlay view like any
+    // other Measured setting. Overlay rows plotted on a derived boundary are
+    // covered with intercepted rows in powerx-basis.cy.ts.
+    cy.get('[data-testid="measured-power-basis"]').click();
+    cy.get('[data-slot="select-item"][data-value="utility-provisioned"]').click();
+    assertShareLinkMetric('y_utilityProvisionedWatts');
+    cy.get('[data-testid="chart-figure"] h2').should(
+      'contain.text',
+      'Utility Provisioned Power per Chip (all-in)',
+    );
+    cy.get('[data-testid="measured-basis-hint"]').should('be.visible');
+    cy.get('[data-testid="power-basis-assumptions"]')
+      .should('have.attr', 'data-power-basis', 'utility-provisioned')
+      .and('contain.text', 'all-in provisioned utility power per GPU');
+    cy.get('[data-testid="inference-chart-display"] svg').should('exist');
+    // Any telemetry-only setting returns to the GPU measured boundary.
+    cy.get('[data-testid="measured-power-statistic-p90"]').click();
+    assertShareLinkMetric('y_measuredP90Power');
+    cy.get('[data-testid="measured-power-basis"]').should('contain.text', 'GPU measured');
+    cy.get('[data-testid="measured-basis-hint"]').should('not.exist');
   });
 });

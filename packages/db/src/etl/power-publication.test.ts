@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { mapBenchmarkRow } from './benchmark-mapper';
 import { createSkipTracker } from './skip-tracker';
 import {
+  fatalPublicationErrors,
   powerPublicationPoint,
   verifyPowerPublication,
   type PublishedPowerRow,
@@ -37,7 +38,7 @@ function expected(overrides = {}) {
     'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/123/attempts/2',
     { path: 'bmk_qwen3.5/results.json', sha256: 'abc' },
   );
-  if (!point) throw new Error('Fixture must be 8K/1K');
+  if (!point) throw new Error('Fixture must belong to a supported PowerX workload');
   return point;
 }
 function actual(point = expected()): PublishedPowerRow {
@@ -51,6 +52,12 @@ function actual(point = expected()): PublishedPowerRow {
 }
 
 describe('PowerX publication', () => {
+  it('keeps required 1K/1K measurements in the publication receipt', () => {
+    const point = expected({ isl: 1024, joules_per_output_token: 2.5 });
+    expect(point.identity).toMatchObject({ benchmark_type: 'single_turn', isl: 1024, osl: 1024 });
+    expect(verifyPowerPublication([point], [actual(point)], 'database')).toEqual([]);
+    expect(verifyPowerPublication([point], [], 'public API')[0]).toContain('found 0');
+  });
   it('verifies AgentX source identity, nullable sequences, energy and audit through DB/API', () => {
     const point = expected({
       scenario_type: 'agentic-coding',
@@ -132,5 +139,32 @@ describe('PowerX publication', () => {
       mapBenchmarkRow({ ...raw, benchmark_outcome: { status: 'failed' } }, tracker),
     ).toBeNull();
     expect(tracker.skips.failedRun).toBe(1);
+  });
+});
+
+/**
+ * Regression for the ingest-reddening chain: a gpu_metrics digest failure used to
+ * be recorded as a DB error, reach the publication manifest's `ingestErrors`, and
+ * set exitCode 1 on the required "Verify PowerX source, database and public API"
+ * step — failing a production ingest whose benchmark data had landed fine.
+ */
+describe('fatalPublicationErrors', () => {
+  it('ignores telemetry warnings, so a bad gpu_metrics CSV cannot fail the ingest', () => {
+    expect(
+      fatalPublicationErrors({ telemetryWarnings: ['3 gpu_metrics digest errors'] }, []),
+    ).toEqual([]);
+  });
+
+  it('still fails on real ingest errors and on verification mismatches', () => {
+    expect(
+      fatalPublicationErrors(
+        { ingestErrors: ['2 database ingest errors'], telemetryWarnings: ['1 gpu_metrics'] },
+        ['point 441871 expected absent, got 642'],
+      ),
+    ).toEqual(['2 database ingest errors', 'point 441871 expected absent, got 642']);
+  });
+
+  it('treats both fields as optional', () => {
+    expect(fatalPublicationErrors({}, [])).toEqual([]);
   });
 });
