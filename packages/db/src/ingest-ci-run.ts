@@ -715,7 +715,12 @@ async function main(): Promise<void> {
                     `${ingested.seriesSkipped} unchanged (${elapsed(gpuMetricsStart)})`,
                 );
               } catch (error: any) {
-                tracker.recordDbError(`gpu_metrics for ${configKey}`, error);
+                // Non-fatal on purpose: this point's benchmark rows are already
+                // committed and only its telemetry tab is affected, and
+                // `admin:db:backfill-gpu-metrics --run <id>` can re-digest the
+                // artifact later. Recording it as a DB error instead would reach
+                // the publication manifest and fail the whole production ingest.
+                tracker.recordTelemetryError(`gpu_metrics for ${configKey}`, error);
               }
             }
           }
@@ -1110,6 +1115,10 @@ main()
               ...powerPublicationErrors,
               ...(tracker.skips.dbError ? [`${tracker.skips.dbError} database ingest errors`] : []),
             ],
+            // Reported but not fatal — see Skips.telemetryError.
+            telemetryWarnings: tracker.skips.telemetryError
+              ? [`${tracker.skips.telemetryError} gpu_metrics digest errors`]
+              : [],
           },
           null,
           2,
