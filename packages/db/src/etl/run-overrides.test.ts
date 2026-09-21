@@ -622,6 +622,38 @@ describe('PURGED_BENCHMARK_POINTS', () => {
 });
 
 describe('isRunAttemptPurged', () => {
+  it('purges every attempt of the H200 Kimi-K3 simple-power run 34819961093 while keeping the 2026-09-13 H200 runs', () => {
+    expect(PURGED_RUNS.has(34819961093)).toBe(true);
+    for (const attempt of [undefined, 1, 2, 99]) {
+      expect(isRunAttemptPurged(34819961093, attempt)).toBe(true);
+    }
+    // The sibling H200 purge from #1183 stays registered alongside this one.
+    expect(PURGED_RUNS.has(34819578354)).toBe(true);
+    // Adjacent ids and the 2026-09-13 H200 curve sources must remain ingestible.
+    expect(isRunAttemptPurged(34819961092, 1)).toBe(false);
+    expect(isRunAttemptPurged(34819961094, 1)).toBe(false);
+    expect(isRunAttemptPurged(30781313910, 3)).toBe(false);
+    expect(isRunAttemptPurged(34744300699, 1)).toBe(false);
+  });
+
+  it('purges every attempt of run 34819564154 without purging adjacent runs', () => {
+    expect(PURGED_RUNS.has(34819564154)).toBe(true);
+    for (const attempt of [undefined, 1, 2, 99]) {
+      expect(isRunAttemptPurged(34819564154, attempt)).toBe(true);
+    }
+    expect(isRunAttemptPurged(34819564153, 1)).toBe(false);
+    expect(isRunAttemptPurged(34819564155, 1)).toBe(false);
+  });
+
+  it('purges every attempt of run 35165441471 without purging adjacent runs', () => {
+    expect(PURGED_RUNS.has(35165441471)).toBe(true);
+    for (const attempt of [undefined, 1, 2, 99]) {
+      expect(isRunAttemptPurged(35165441471, attempt)).toBe(true);
+    }
+    expect(isRunAttemptPurged(35165441470, 1)).toBe(false);
+    expect(isRunAttemptPurged(35165441472, 1)).toBe(false);
+  });
+
   it('purges every attempt of run 34926284365 with uninitialized MTP weights', () => {
     expect(PURGED_RUNS.has(34926284365)).toBe(true);
     for (const attempt of [undefined, 1, 2, 99]) {
