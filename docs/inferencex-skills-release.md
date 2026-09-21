@@ -267,13 +267,14 @@ caches for both targets. Evidence is uploaded even when a check fails.
 ### Authorized 1.0.0 native-report exception
 
 The maintainer explicitly accepted the remaining report errors and incomplete retest
-for archive `204a22e1e27b6f938f84303688da345a70ea474db93cce0fb55ded8fea4c565f`.
+for archive `b6ee16ef5d359f2055e4a86e156f1045e64f2a048ca6662b1859ce4b0f1480a2`.
 Only that 1.0.0 archive permits the workflow input
 `accept_native_report_limitations: true`, together with qualification field
 `native_report_exception: "accepted-1.0.0-report-limitations"`.
-The declaration retains all 26 case identities: Claude `agentx-live` and
-`agentx-selected-trace` passed, Claude `tco-live` failed, and the remaining 23 are
-`not_run` on these bytes. Do not substitute older-archive passes or invent transcript
+The declaration retains all 26 case identities as `not_run` on the final archive,
+which includes a subsequent installer concurrency fix. The preceding candidate's
+focused retest had two passes and one failure; those results remain historical.
+Do not substitute older-archive passes or invent transcript
 hashes for unrun cases. The release summary preserves these outcomes and the reason
 for the exception. Other versions, archives, platform failures, and failed
 candidate/public verification remain rejected; the normal all-pass gate is unchanged.

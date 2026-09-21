@@ -9,13 +9,8 @@ import { isMain } from '../skills/inferencex-api/scripts/cli-contract.mjs';
 
 const PACKAGE = '@semianalysisai/inferencex-skills';
 const REPORT_EXCEPTION = 'accepted-1.0.0-report-limitations';
-const REPORT_EXCEPTION_SHA256 = '204a22e1e27b6f938f84303688da345a70ea474db93cce0fb55ded8fea4c565f';
-// This approval covers one retained three-case checkpoint, not future native runs.
-const REPORT_EXCEPTION_RESULTS = {
-  'agentx-live': 'passed',
-  'agentx-selected-trace': 'passed',
-  'tco-live': 'failed',
-};
+const REPORT_EXCEPTION_SHA256 = 'b6ee16ef5d359f2055e4a86e156f1045e64f2a048ca6662b1859ce4b0f1480a2';
+// Native results from the earlier archive do not qualify this installer-fixed archive.
 const HASH = /^[a-f\d]{64}$/u;
 const COMMIT = /^(?:[a-f\d]{40}|[a-f\d]{64})$/u;
 const POSITIVE_INTEGER = /^[1-9]\d*$/u;
@@ -185,7 +180,7 @@ export function validateQualification(
       if (reportException) {
         assert.ok(
           entry[key] === undefined || entry[key] === null,
-          'Partial native acceptance must not claim aggregate transcripts',
+          'Unrun native acceptance must not claim aggregate transcripts',
         );
       } else {
         assert.match(entry[key], HASH, `Native acceptance ${key} is invalid`);
@@ -197,9 +192,7 @@ export function validateQualification(
     );
     const cases = entry.cases.map((item) => {
       assert.ok(CASE_IDS.includes(item.case_id), 'Unknown native acceptance case');
-      const expectedStatus = reportException
-        ? (entry.runtime === 'claude' && REPORT_EXCEPTION_RESULTS[item.case_id]) || 'not_run'
-        : 'passed';
+      const expectedStatus = reportException ? 'not_run' : 'passed';
       assert.equal(item.status, expectedStatus, 'Native acceptance case status differs');
       assert.equal(
         item.assessor_status,
@@ -242,21 +235,9 @@ export function validateQualification(
       CASE_IDS.toSorted(),
       'Native acceptance cases are incomplete or duplicated',
     );
-    const status = cases.every((item) => item.status === 'not_run')
-      ? 'not_run'
-      : cases.some((item) => item.status === 'failed')
-        ? 'failed'
-        : 'passed';
+    const status = reportException ? 'not_run' : 'passed';
     assert.equal(entry.status, status, 'Native acceptance aggregate status differs');
-    const expectedScope = reportException
-      ? [
-          ...new Set(
-            CASES.filter((definition) =>
-              cases.some((item) => item.case_id === definition.id && item.status !== 'not_run'),
-            ).map((definition) => definition.family),
-          ),
-        ].toSorted()
-      : SCOPE_IDS;
+    const expectedScope = reportException ? [] : SCOPE_IDS;
     assert.ok(Array.isArray(entry.scope), 'Native acceptance scope is missing');
     assert.deepEqual(entry.scope.toSorted(), expectedScope, 'Native acceptance scope differs');
     runtimes.add(entry.runtime);
@@ -287,13 +268,13 @@ export function validateQualification(
     for (const entry of nativeAcceptance) for (const item of entry.cases) counts[item.status] += 1;
     assert.deepEqual(
       counts,
-      { passed: 2, failed: 1, not_run: 23 },
+      { passed: 0, failed: 0, not_run: 26 },
       'Native report exception case totals differ',
     );
     nativeReportException = {
       code: REPORT_EXCEPTION,
       reason:
-        'Publication explicitly accepts remaining agent-report errors and incomplete native reruns for this archive; native acceptance is not fully qualified.',
+        'Publication explicitly accepts that native agent cases were not run on this archive; earlier checkpoint results do not qualify this archive, and native acceptance is not fully qualified.',
       counts,
     };
   }
