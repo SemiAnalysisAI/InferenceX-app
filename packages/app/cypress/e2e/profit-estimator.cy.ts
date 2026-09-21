@@ -94,7 +94,8 @@ const chart = () => cy.get('[data-testid="profit-estimator-chart"]');
 const chartSvg = () => chart().find('svg').filter(':has(.chart-root)').first();
 const bars = () => chart().find('rect.bar');
 
-describe('Profit estimator power option', () => {
+// Clear the preceding chart before each case changes the viewport.
+describe('Profit estimator power option', { testIsolation: true }, () => {
   for (const locale of ['en', 'zh'] as const) {
     it(`prices DeepSeek Flash partial chassis with visible assumptions and CSV labels (${locale})`, () => {
       stubOpenRouter();

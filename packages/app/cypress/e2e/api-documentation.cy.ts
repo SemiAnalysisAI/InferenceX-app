@@ -97,8 +97,10 @@ describe('API documentation', () => {
           .and('contain.text', '8192')
           .and('contain.text', '1024')
           .and('contain.text', 'strictV2')
-          .and('contain.text', 'powerx.csv')
-          .and('contain.text', 'powerx.json')
+          .and('contain.text', 'powerx export')
+          .and('contain.text', 'result.csv')
+          .and('contain.text', 'result.json')
+          .and('contain.text', 'manifest.json')
           .and('contain.text', locale.missing)
           .and('contain.text', locale.context)
           .and('contain.text', locale.excluded)
@@ -116,12 +118,24 @@ describe('API documentation', () => {
         .and('contain.text', '.agents/skills/inferencex-api/references/powerx.md')
         .and('contain.text', '.claude/skills/inferencex-api/references/powerx.md')
         .and('contain.text', 'avg_power_w')
-        .and('contain.text', '--format json --output powerx.json')
+        .and('contain.text', '--format json --output-dir evidence/powerx-json')
+        .and('contain.text', 'result.csv')
+        .and('contain.text', 'result.json')
+        .and('contain.text', 'manifest.json')
+        .and('contain.text', 'responses/')
         .within(() => {
           cy.get('pre code')
-            .should('contain.text', 'node .agents/skills/inferencex-api/scripts/export-powerx.mjs')
+            .should('contain.text', 'mkdir -p evidence')
+            .and(
+              'contain.text',
+              'node .agents/skills/inferencex-api/scripts/inferencex.mjs powerx export',
+            )
             .and('contain.text', '--model DeepSeek-V4-Pro --isl 8192 --osl 1024')
-            .and('contain.text', '--format csv --output powerx.csv 2> powerx-report.log')
+            .and('contain.text', '--format csv --output-dir evidence/powerx-csv')
+            .and(
+              'contain.text',
+              'node .agents/skills/inferencex-api/scripts/inferencex.mjs verify evidence/powerx-csv',
+            )
             .invoke('text')
             .then((command) => {
               cy.contains('button', locale.copy).click();
@@ -157,6 +171,17 @@ describe('API documentation', () => {
           });
       });
     }
+    cy.get('#api-powerx-cookbook summary').click();
+    cy.get('#api-powerx-cookbook pre')
+      .should('have.attr', 'tabindex', '0')
+      .and('have.css', 'overflow-x', 'auto')
+      .and('contain.text', 'inferencex.mjs powerx export')
+      .and('contain.text', '--output-dir evidence/powerx-csv')
+      .should(($pre) => {
+        const bounds = $pre[0].getBoundingClientRect();
+        expect(bounds.left).to.be.at.least(0);
+        expect(bounds.right).to.be.at.most(390);
+      });
     cy.get('[data-testid="api-endpoint-list-benchmarks"] summary').click();
     cy.get('[data-testid="api-endpoint-list-benchmarks"]').within(() => {
       cy.get('[role="region"][aria-labelledby="list-benchmarks-parameters"]')
