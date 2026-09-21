@@ -2911,7 +2911,6 @@ const ScatterGraph = React.memo(
                 )}${suffix}`,
                 color: ir.getCssColor(ir.resolveColor(entry.hw)),
                 points: entry.points,
-                keepVisibleOnCollision: entry.points.length === 1,
               };
             });
             // Runs drawing the same hardware need a run tag on their pills.
@@ -3221,7 +3220,6 @@ const ScatterGraph = React.memo(
                 ...entry,
                 label: '',
                 color: '',
-                keepVisibleOnCollision: entry.points.length === 1,
               }),
             );
             const overlaySeries: LineLabelSeries<InferenceData>[] = Object.entries(
