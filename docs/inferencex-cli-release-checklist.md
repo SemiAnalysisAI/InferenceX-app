@@ -44,6 +44,11 @@ Keep detailed captures outside the npm package. A failed attempt remains evidenc
 after a fix, rerun affected checks and every gate invalidated by changed archive
 bytes. Record missing or failed platform jobs as missing or failed.
 
+The explicitly authorized 1.0.0 native-report exception is recorded in the
+[release instructions](./inferencex-skills-release.md#authorized-100-native-report-exception).
+It preserves failed and unrun cases for one exact archive; it does not mark these
+candidate-evidence checkboxes complete or waive the other release checks.
+
 ## Ordered release
 
 - [ ] Complete PR review and required checks, then obtain release direction.

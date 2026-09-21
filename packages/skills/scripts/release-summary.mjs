@@ -8,6 +8,14 @@ import process from 'node:process';
 import { isMain } from '../skills/inferencex-api/scripts/cli-contract.mjs';
 
 const PACKAGE = '@semianalysisai/inferencex-skills';
+const REPORT_EXCEPTION = 'accepted-1.0.0-report-limitations';
+const REPORT_EXCEPTION_SHA256 = '204a22e1e27b6f938f84303688da345a70ea474db93cce0fb55ded8fea4c565f';
+// This approval covers one retained three-case checkpoint, not future native runs.
+const REPORT_EXCEPTION_RESULTS = {
+  'agentx-live': 'passed',
+  'agentx-selected-trace': 'passed',
+  'tco-live': 'failed',
+};
 const HASH = /^[a-f\d]{64}$/u;
 const COMMIT = /^(?:[a-f\d]{40}|[a-f\d]{64})$/u;
 const POSITIVE_INTEGER = /^[1-9]\d*$/u;
@@ -85,10 +93,29 @@ function validateRelease(release) {
   );
 }
 
-export function validateQualification(release, qualification) {
+export function validateQualification(
+  release,
+  qualification,
+  { allowNativeReportLimitations = false } = {},
+) {
   validateRelease(release);
   assert.equal(qualification.package_version, release.version, 'Qualification version differs');
   assert.equal(qualification.archive_sha256, release.sha256, 'Qualification archive differs');
+  const reportException = allowNativeReportLimitations === true;
+  if (reportException || Object.hasOwn(qualification, 'native_report_exception')) {
+    assert.equal(reportException, true, 'Native report exception requires explicit opt-in');
+    assert.equal(
+      qualification.native_report_exception,
+      REPORT_EXCEPTION,
+      'Unknown native report exception',
+    );
+    assert.equal(release.version, '1.0.0', 'Native report exception is only for version 1.0.0');
+    assert.equal(
+      release.sha256,
+      REPORT_EXCEPTION_SHA256,
+      'Native report exception archive differs',
+    );
+  }
   assert.match(
     qualification.tested_source_commit,
     COMMIT,
@@ -152,32 +179,46 @@ export function validateQualification(release, qualification) {
   const runtimes = new Set();
   const nativeAcceptance = native.map((entry) => {
     assert.ok(['codex', 'claude'].includes(entry.runtime), 'Unknown native runtime');
-    assert.equal(entry.status, 'passed', 'Native acceptance did not pass');
     assert.equal(entry.archive_sha256, release.sha256, 'Native runtime tested a different archive');
-    for (const key of ['case_set_sha256', 'prompt_transcript_sha256', 'answer_transcript_sha256']) {
-      assert.match(entry[key], HASH, `Native acceptance ${key} is invalid`);
+    assert.match(entry.case_set_sha256, HASH, 'Native acceptance case_set_sha256 is invalid');
+    for (const key of ['prompt_transcript_sha256', 'answer_transcript_sha256']) {
+      if (reportException) {
+        assert.ok(
+          entry[key] === undefined || entry[key] === null,
+          'Partial native acceptance must not claim aggregate transcripts',
+        );
+      } else {
+        assert.match(entry[key], HASH, `Native acceptance ${key} is invalid`);
+      }
     }
-    assert.ok(
-      Array.isArray(entry.scope) && entry.scope.length === SCOPE_IDS.length,
-      'Native acceptance scope is incomplete',
-    );
-    assert.deepEqual(
-      [...entry.scope].sort(),
-      SCOPE_IDS,
-      'Native acceptance scope is incomplete or duplicated',
-    );
     assert.ok(
       Array.isArray(entry.cases) && entry.cases.length === CASE_IDS.length,
       'Native acceptance cases are incomplete',
     );
     const cases = entry.cases.map((item) => {
       assert.ok(CASE_IDS.includes(item.case_id), 'Unknown native acceptance case');
-      assert.equal(item.status, 'passed', 'A native acceptance case did not pass');
+      const expectedStatus = reportException
+        ? (entry.runtime === 'claude' && REPORT_EXCEPTION_RESULTS[item.case_id]) || 'not_run'
+        : 'passed';
+      assert.equal(item.status, expectedStatus, 'Native acceptance case status differs');
       assert.equal(
         item.assessor_status,
-        'passed',
-        'A native acceptance case assessor did not pass',
+        expectedStatus,
+        'Native acceptance case assessor status differs',
       );
+      if (expectedStatus === 'not_run') {
+        assert.ok(
+          [item.prompt_transcript_sha256, item.answer_transcript_sha256].every(
+            (value) => value === undefined || value === null,
+          ),
+          'Unrun native case must not claim transcripts',
+        );
+        return {
+          case_id: item.case_id,
+          status: item.status,
+          assessor_status: item.assessor_status,
+        };
+      }
       assert.match(
         item.prompt_transcript_sha256,
         HASH,
@@ -190,8 +231,8 @@ export function validateQualification(release, qualification) {
       );
       return {
         case_id: item.case_id,
-        status: 'passed',
-        assessor_status: 'passed',
+        status: item.status,
+        assessor_status: item.assessor_status,
         prompt_transcript_sha256: item.prompt_transcript_sha256,
         answer_transcript_sha256: item.answer_transcript_sha256,
       };
@@ -201,14 +242,35 @@ export function validateQualification(release, qualification) {
       CASE_IDS.toSorted(),
       'Native acceptance cases are incomplete or duplicated',
     );
+    const status = cases.every((item) => item.status === 'not_run')
+      ? 'not_run'
+      : cases.some((item) => item.status === 'failed')
+        ? 'failed'
+        : 'passed';
+    assert.equal(entry.status, status, 'Native acceptance aggregate status differs');
+    const expectedScope = reportException
+      ? [
+          ...new Set(
+            CASES.filter((definition) =>
+              cases.some((item) => item.case_id === definition.id && item.status !== 'not_run'),
+            ).map((definition) => definition.family),
+          ),
+        ].toSorted()
+      : SCOPE_IDS;
+    assert.ok(Array.isArray(entry.scope), 'Native acceptance scope is missing');
+    assert.deepEqual(entry.scope.toSorted(), expectedScope, 'Native acceptance scope differs');
     runtimes.add(entry.runtime);
     return {
       runtime: entry.runtime,
       archive_sha256: entry.archive_sha256,
-      status: 'passed',
+      status,
       case_set_sha256: entry.case_set_sha256,
-      prompt_transcript_sha256: entry.prompt_transcript_sha256,
-      answer_transcript_sha256: entry.answer_transcript_sha256,
+      ...(reportException
+        ? {}
+        : {
+            prompt_transcript_sha256: entry.prompt_transcript_sha256,
+            answer_transcript_sha256: entry.answer_transcript_sha256,
+          }),
       scope: [...entry.scope],
       cases,
     };
@@ -219,6 +281,22 @@ export function validateQualification(release, qualification) {
     1,
     'Native runtimes used different maintained case sets',
   );
+  let nativeReportException;
+  if (reportException) {
+    const counts = { passed: 0, failed: 0, not_run: 0 };
+    for (const entry of nativeAcceptance) for (const item of entry.cases) counts[item.status] += 1;
+    assert.deepEqual(
+      counts,
+      { passed: 2, failed: 1, not_run: 23 },
+      'Native report exception case totals differ',
+    );
+    nativeReportException = {
+      code: REPORT_EXCEPTION,
+      reason:
+        'Publication explicitly accepts remaining agent-report errors and incomplete native reruns for this archive; native acceptance is not fully qualified.',
+      counts,
+    };
+  }
 
   const limitations = qualification.known_limitations;
   assert.ok(Array.isArray(limitations), 'Known limitations are invalid');
@@ -240,12 +318,19 @@ export function validateQualification(release, qualification) {
     tested_source_commit: qualification.tested_source_commit,
     platform_matrix: platforms,
     native_acceptance: nativeAcceptance,
+    ...(nativeReportException ? { native_report_exception: nativeReportException } : {}),
     known_limitations: acceptedLimitations,
   };
 }
 
-export function createReleaseSummary(release, candidate, publicVerification, qualification) {
-  const accepted = validateQualification(release, qualification);
+export function createReleaseSummary(
+  release,
+  candidate,
+  publicVerification,
+  qualification,
+  { allowNativeReportLimitations = false } = {},
+) {
+  const accepted = validateQualification(release, qualification, { allowNativeReportLimitations });
   const releaseIdentity = identity(release);
   validateVerdict(candidate, 'candidate', releaseIdentity);
   validateVerdict(publicVerification, 'public', releaseIdentity);
@@ -268,6 +353,9 @@ export function createReleaseSummary(release, candidate, publicVerification, qua
     tested_source_commit: accepted.tested_source_commit,
     platform_matrix: accepted.platform_matrix,
     native_acceptance: accepted.native_acceptance,
+    ...(accepted.native_report_exception
+      ? { native_report_exception: accepted.native_report_exception }
+      : {}),
     known_limitations: accepted.known_limitations,
     capture_retention: {
       durable_assets: ['release.json', release.filename, 'release-summary.json'],
@@ -283,8 +371,11 @@ function readRecord(path) {
 }
 
 function main(args) {
+  const options = {
+    allowNativeReportLimitations: process.env.ALLOW_NATIVE_REPORT_LIMITATIONS === 'true',
+  };
   if (args[0] === 'check-qualification' && args.length === 3) {
-    const accepted = validateQualification(readRecord(args[1]), readRecord(args[2]));
+    const accepted = validateQualification(readRecord(args[1]), readRecord(args[2]), options);
     process.stdout.write(`${JSON.stringify(accepted)}\n`);
     return;
   }
@@ -300,6 +391,7 @@ function main(args) {
     readRecord(candidatePath),
     readRecord(publicPath),
     readRecord(args[3]),
+    options,
   );
   writeFileSync(outputPath, `${JSON.stringify(summary, null, 2)}\n`, { flag: 'wx' });
   process.stdout.write(`${JSON.stringify(summary)}\n`);

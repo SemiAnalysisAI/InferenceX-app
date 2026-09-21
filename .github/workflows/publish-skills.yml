@@ -8,9 +8,15 @@ on:
         required: true
         type: string
       reviewed_sha256:
-        description: 'Archive SHA-256 after clean installed-agent acceptance'
+        description: 'Exact reviewed archive SHA-256'
         required: true
         type: string
+
+      accept_native_report_limitations:
+        description: 'Accept the recorded native report failures and incomplete retesting for the pinned 1.0.0 archive'
+        required: false
+        default: false
+        type: boolean
       qualification_json:
         description: 'Reviewed evidence declaration: exact archive, Actions job metadata, all maintained cases per runtime, allowed limitation codes'
         required: true
@@ -56,6 +62,7 @@ jobs:
       - name: Validate reviewed platform and native evidence declarations before publication
         env:
           GH_TOKEN: ${{ github.token }}
+          ALLOW_NATIVE_REPORT_LIMITATIONS: ${{ inputs.accept_native_report_limitations }}
         run: |
           node --input-type=module -e 'import {writeFileSync} from "node:fs"; const input=process.env.QUALIFICATION_JSON; if (!input || Buffer.byteLength(input)>1048576) throw Error("Qualification JSON is missing or too large"); const record=JSON.parse(input); writeFileSync(`${process.env.RUNNER_TEMP}/skills-release/qualification.json`, JSON.stringify(record), {flag:"wx"});'
           node packages/skills/scripts/release-summary.mjs check-qualification "$RUNNER_TEMP/skills-release/release.json" "$RUNNER_TEMP/skills-release/qualification.json"
@@ -75,6 +82,8 @@ jobs:
       - name: Verify anonymous pinned public installation and behavior
         run: python3 packages/skills/scripts/verify-release.py public "$RUNNER_TEMP/skills-release/release.json" --model DeepSeek-V4-Pro --isl 8192 --osl 1024 --agentx-model DeepSeek-V4-Pro --evidence "$RUNNER_TEMP/skills-public-verification"
       - name: Create the sanitized durable release summary
+        env:
+          ALLOW_NATIVE_REPORT_LIMITATIONS: ${{ inputs.accept_native_report_limitations }}
         run: >-
           node packages/skills/scripts/release-summary.mjs
           "$RUNNER_TEMP/skills-release/release.json"

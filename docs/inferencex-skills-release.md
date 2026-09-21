@@ -264,6 +264,24 @@ and publishes that same tarball using OIDC. It then verifies public metadata and
 tarball identity and performs anonymous pinned installations/exports with fresh
 caches for both targets. Evidence is uploaded even when a check fails.
 
+### Authorized 1.0.0 native-report exception
+
+The maintainer explicitly accepted the remaining report errors and incomplete retest
+for archive `204a22e1e27b6f938f84303688da345a70ea474db93cce0fb55ded8fea4c565f`.
+Only that 1.0.0 archive permits the workflow input
+`accept_native_report_limitations: true`, together with qualification field
+`native_report_exception: "accepted-1.0.0-report-limitations"`.
+The declaration retains all 26 case identities: Claude `agentx-live` and
+`agentx-selected-trace` passed, Claude `tco-live` failed, and the remaining 23 are
+`not_run` on these bytes. Do not substitute older-archive passes or invent transcript
+hashes for unrun cases. The release summary preserves these outcomes and the reason
+for the exception. Other versions, archives, platform failures, and failed
+candidate/public verification remain rejected; the normal all-pass gate is unchanged.
+
+For recovery of this release's summary, retain the original declaration and supply
+`ALLOW_NATIVE_REPORT_LIMITATIONS=true` only to the `release-summary.mjs` commands
+below. This reuses the original authorization; it does not approve another archive.
+
 Public verification retries only an npm install failure containing `ETARGET` and
 `No matching version found for @semianalysisai/inferencex-skills@<exact-version>.`
 Both must identify the requested package/version. It allows **three attempts per
