@@ -25,6 +25,10 @@ import type {
 } from '@/components/inference/types';
 import { partitionChartDataByLimits } from '@/components/inference/utils';
 import { bestSeriesPerSku } from '@/components/inference/utils/best-series-per-sku';
+import {
+  isMeasuredPowerCurveMetric,
+  upperPowerEnvelope,
+} from '@/components/inference/utils/powerCurves';
 import { pointDeploymentMode, type QuickFilters } from '@/components/inference/utils/quickFilters';
 import { resolveXAxisField } from '@/components/inference/utils/resolveXAxisField';
 import type { DerivedAgenticMetricMap } from '@/hooks/api/use-derived-agentic-metrics';
@@ -72,7 +76,7 @@ export interface InferenceSeriesOptions {
   /** Explicit hwKey / bare-GPU selection; empty = all. */
   readonly gpus: readonly string[];
   readonly quickFilters: QuickFilters;
-  /** Return only Pareto-frontier points. */
+  /** Return only frontier points (upper boundary for measured power). */
   readonly optimal: boolean;
   /** Return only the best series per GPU SKU. */
   readonly best: boolean;
@@ -291,7 +295,15 @@ export function buildInferenceSeries(
       ? flipRooflineDirection(configuredDirection)
       : (configuredDirection ?? null);
 
-  // 7. Frontier flags, scoped per (hwKey, date) exactly like ScatterGraph.
+  // 7. Frontier flags, scoped per (hwKey, precision, date) like ScatterGraph.
+  // Measured power represents load demand, so retain its upper boundary.
+  const isMeasuredPower = isMeasuredPowerCurveMetric(metricConfigKey);
+  const maximizePowerX = chartDef.chartType !== 'e2e';
+  const frontierDirection = isMeasuredPower
+    ? maximizePowerX
+      ? 'upper_right'
+      : 'upper_left'
+    : direction;
   const frontierPoints = new Set<InferenceData>();
   if (direction) {
     const frontierFn = paretoFrontForDirection(direction);
@@ -303,7 +315,10 @@ export function buildInferenceSeries(
       else byHwDate.set(key, [point]);
     }
     for (const bucket of byHwDate.values()) {
-      for (const point of frontierFn(bucket.filter(isFrontierEligible))) {
+      const frontier = isMeasuredPower
+        ? upperPowerEnvelope(bucket, maximizePowerX)
+        : frontierFn(bucket.filter(isFrontierEligible));
+      for (const point of frontier) {
         frontierPoints.add(point);
       }
     }
@@ -380,7 +395,7 @@ export function buildInferenceSeries(
       label: entry.label,
       ...(entry.vendor ? { vendor: entry.vendor } : {}),
     })),
-    frontier: { direction, points: frontierPoints.size },
+    frontier: { direction: frontierDirection, points: frontierPoints.size },
     metric: {
       key: metricKey,
       configKey: metricConfigKey,

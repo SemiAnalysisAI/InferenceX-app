@@ -67,11 +67,20 @@ which controls belong together.
 
 Use positive safe run IDs written as plain digits (`1e3`, `0x10`, and `+5` are
 rejected); run lists such as `unofficialrun` and `runs` take up to eight unique IDs.
+Overlay run indices follow the input order after trimming whitespace and removing
+duplicates. Preserve those indices when attributing results to a run.
 `runId` selects an exact logical snapshot, not necessarily
 newly measured producer rows. Comparison entries accept `YYYY-MM-DD` or
 `YYYY-MM-DD~rRUN_ID`; `start` and `end` add the endpoints, not every intervening
-day. Historical `start`/`end` instead bound source observations inclusively.
+day. Date-only comparisons select that day's exact logical snapshot; the primary
+`date` selector remains an as-of cutoff. Historical `start`/`end` instead bound
+source observations inclusively.
 Public unofficial overlays must not be relabeled as official results.
+
+For measured-power gauges, `optimal=true` keeps the chart's higher-power outer
+envelope. `frontier.direction` describes that boundary; `metric.direction` retains
+the optimization direction used by `best=true`. Interpret the envelope as a load
+boundary, not evidence that those points are more energy efficient.
 
 Fleet lifecycle defaults (ramp, cached-input percent, MTBI, recovery) follow the
 dashboard's lifecycle panel; read the current values from `/api/v1/views/options`

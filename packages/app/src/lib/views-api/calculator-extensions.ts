@@ -259,7 +259,11 @@ export function calculatorExtension(view: CalculatorExtension, request: NextRequ
     const selections = comparisonSelections(search);
     const comparisons = await Promise.all(
       selections.map(async ({ entry, date, runId }) => {
-        const group = await calculatorGroups(request, { ...groups.params, date, runId });
+        const group = await calculatorGroups(
+          request,
+          { ...groups.params, date, runId },
+          { exactDate: true },
+        );
         return { entry, data: estimate(group.official) };
       }),
     );

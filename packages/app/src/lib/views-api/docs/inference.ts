@@ -202,8 +202,8 @@ const parameters: readonly ApiParameter[] = [
     required: false,
     type: 'boolean',
     description: text(
-      'Return only Pareto-frontier points per hardware and snapshot date.',
-      '仅返回每个硬件在各快照日期上的帕累托前沿点。',
+      'Return only boundary points per hardware, precision and snapshot date. Measured-power gauges use the higher-power outer envelope, matching the chart; other metrics use their Pareto frontier. The power envelope is not an efficiency recommendation.',
+      '仅返回每个硬件在各精度、各快照日期上的边界点。实测功耗指标与图表一致，保留较高功耗侧的外包络；其他指标保留各自的帕累托前沿。功耗包络不构成能效推荐。',
     ),
     schema: { type: 'boolean', default: true },
     example: 'true',
@@ -290,13 +290,20 @@ const responseSchema = objectSchema(
         labelZh: stringSchema,
         unit: { type: ['string', 'null'] },
         polarity: { type: ['string', 'null'] },
-        direction: { type: ['string', 'null'] },
+        direction: {
+          type: ['string', 'null'],
+          description: 'Configured optimization direction, also used by best-per-SKU selection.',
+        },
       },
       ['key', 'configKey', 'label', 'labelZh'],
     ),
     xAxis: objectSchema({ mode: stringSchema, field: stringSchema, label: stringSchema }),
     frontier: objectSchema({
-      direction: { type: ['string', 'null'] },
+      direction: {
+        type: ['string', 'null'],
+        description:
+          'Selected boundary direction. Measured-power gauges use upper_right for interactivity or upper_left for latency, independently of metric.direction.',
+      },
       points: integerSchema,
     }),
     hardware: arraySchema(
@@ -437,8 +444,8 @@ export const operations: ApiOperation[] = [
     path: '/api/v1/views/inference',
     summary: text('Get the main inference chart view', '获取主推理图表视图'),
     description: text(
-      'Returns the chart-ready series the /inference scatter chart renders: per hardware config, x/y points at each measured concurrency for the selected metric, sequence, precisions and x-axis mode, with Pareto-frontier and best-per-SKU flags computed by the same code the dashboard runs. Filters mirror the dashboard quick filters (gpus, vendors, framework families, deployment, spec). Use optimal=true or best=true to keep only frontier points or the best series per GPU SKU.',
-      '返回 /inference 散点图渲染的图表就绪序列：按硬件配置分组，在所选指标、序列、精度与 x 轴模式下给出各并发档位的 x/y 数据点，并由与仪表盘相同的代码计算帕累托前沿与 best-per-SKU 标记。筛选参数与仪表盘快捷筛选一致（gpus、vendors、框架系列、部署模式、投机解码）。设置 optimal=true 或 best=true 可只保留前沿点或每个 GPU SKU 的最优曲线。',
+      'Returns the chart-ready series the /inference scatter chart renders: per hardware config, x/y points at each measured concurrency for the selected metric, sequence, precisions and x-axis mode, with boundary and best-per-SKU flags computed by the same code the dashboard runs. Filters mirror the dashboard quick filters (gpus, vendors, framework families, deployment, spec). Use optimal=true for boundary points or best=true for the best series per GPU SKU. Measured-power boundaries follow the higher-power outer envelope: frontier.direction describes that boundary, while metric.direction remains the optimization direction used by best-per-SKU selection.',
+      '返回 /inference 散点图所用的序列：按硬件配置分组，在所选指标、序列、精度与 x 轴模式下给出各并发档位的 x/y 数据点，并复用仪表板代码计算边界与 best-per-SKU 标记。筛选参数与仪表板快捷筛选一致（gpus、vendors、框架系列、部署模式、投机解码）。设置 optimal=true 可只保留边界点，best=true 可只保留每个 GPU SKU 的最优曲线。实测功耗使用较高功耗侧的外包络：frontier.direction 描述这一边界，metric.direction 则保留 best-per-SKU 选择所用的优化方向。',
     ),
     audience: 'public',
     stability: 'beta',

@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { BenchmarkRow } from '@/lib/api';
 
@@ -96,12 +96,16 @@ function curve(date: string, hardware: string, framework: string, scale = 1): Be
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date('2026-03-15T00:30:00Z'));
   mockGetAllBenchmarksForHistory.mockResolvedValue([
     ...curve('2026-02-01', 'h200', 'trt'),
     ...curve('2026-03-01', 'h200', 'trt', 1.2),
     ...curve('2026-02-01', 'mi300x', 'vllm'),
   ]);
 });
+
+afterEach(() => vi.useRealTimers());
 
 describe('GET /api/v1/views/historical', () => {
   it('builds interpolated trend lines at the target interactivity', async () => {
@@ -143,10 +147,29 @@ describe('GET /api/v1/views/historical', () => {
     const body = await bodyRes.json();
 
     const mi300x = body.series.find((s: { hwKey: string }) => s.hwKey.startsWith('mi300x'));
-    // Real 2026-02-01 point plus a synthetic extension to 2026-03-01 (latest data date).
+    expect(body.params.extendToDate).toBe('2026-03-01');
     expect(mi300x.points).toHaveLength(2);
     expect(mi300x.points[1]).toMatchObject({ date: '2026-03-01', synthetic: true });
     expect(mi300x.points[1].value).toBe(mi300x.points[0].value);
+  });
+
+  it('defaults to the current UTC date, preserving the last measured value', async () => {
+    const res = await GET(
+      request('/api/v1/views/historical?model=DeepSeek-R1-0528&metric=tpPerGpu'),
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.params.extendToDate).toBe('2026-03-15');
+    expect(body.series).toHaveLength(2);
+    for (const series of body.series) {
+      const lastMeasured = series.points.at(-2);
+      expect(lastMeasured.synthetic).not.toBe(true);
+      expect(series.points.at(-1)).toMatchObject({
+        date: '2026-03-15',
+        synthetic: true,
+        value: lastMeasured.value,
+      });
+    }
   });
 
   it('applies vendor and date-range row filters', async () => {

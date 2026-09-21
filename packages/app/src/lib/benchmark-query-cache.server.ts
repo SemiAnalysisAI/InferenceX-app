@@ -14,7 +14,8 @@ import { toCalculatorBenchmarkRows } from '@/lib/benchmark-api-view';
  * `/api/v1/benchmarks/history`) and the read-only views that project the same
  * rows (`/api/v1/views/{inference,calculator,historical,fleet}`).
  *
- * One declaration per query keeps every consumer on one cache slot: a view that
+ * One declaration per query shares its versioned key and cache policy; calls
+ * with identical arguments share a cache entry. A view that
  * re-declared its own wrapper "with the same key" drifted the moment the page
  * endpoint rolled its key (`benchmark-history-agentic` vs
  * `benchmark-history-agentic-curve-scope-v2`) and silently doubled the cache.

@@ -26,8 +26,8 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
     '正安全整数格式的工作流运行 ID。不填时选择默认运行；实时 GPU 指标必须填写。',
   ],
   precisions: [
-    'Comma-separated precision keys; omitted selection uses available curve density.',
-    '以逗号分隔的精度键；省略时按可用测试曲线数量选择。',
+    'Comma-separated precision keys; omitted selection uses available curve density. Calculator extensions auto-select the densest official precision and include precisions present in unofficial-run overlays.',
+    '以逗号分隔的精度键；省略时按可用测试曲线数量选择。计算器扩展视图选择官方数据中曲线最多的精度，并纳入 unofficial-run 叠加数据中的精度。',
   ],
   gpus: [
     'Comma-separated hardware/config keys; for gpu-metrics use numeric GPU indices. Omit for all.',
@@ -42,12 +42,12 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
     'internal（默认）或 external，使用与界面相同的自有或租赁成本口径。',
   ],
   unofficialrun: [
-    'Up to eight comma-separated public CI run IDs. Overlay sources remain separate from official data.',
-    '最多八个公开 CI 运行 ID，以逗号分隔。叠加结果与官方数据分开。',
+    'Up to eight comma-separated public CI run IDs. Surrounding whitespace and duplicates are removed; run indices follow the remaining order. Overlay sources remain separate from official data.',
+    '最多八个公开 CI 运行 ID，以逗号分隔。去除各项首尾空白和重复 ID 后，按剩余顺序分配运行索引。叠加结果与官方数据分开。',
   ],
   dates: [
-    'Up to twelve comma-separated YYYY-MM-DD or YYYY-MM-DD~rRUN_ID comparison entries. Each snapshot is evaluated independently.',
-    '最多十二个比较项，以逗号分隔，格式为 YYYY-MM-DD 或 YYYY-MM-DD~rRUN_ID。各快照独立计算。',
+    'Up to twelve comma-separated YYYY-MM-DD or YYYY-MM-DD~rRUN_ID comparison entries. Date-only entries select that exact logical snapshot, not an as-of cutoff; run entries select the exact logical run snapshot. Each snapshot is evaluated independently.',
+    '最多十二个比较项，以逗号分隔，格式为 YYYY-MM-DD 或 YYYY-MM-DD~rRUN_ID。仅含日期时读取当天的逻辑快照，不按截止日期向前回溯；含运行 ID 时读取该次运行的逻辑快照。各快照独立计算。',
   ],
   start: [
     'Comparison range start, YYYY-MM-DD. With end, adds the two endpoints, not every intermediate date. Historical uses an inclusive data bound.',

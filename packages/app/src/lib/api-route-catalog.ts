@@ -59,7 +59,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-calculator-view',
-    sourceSha256: 'aaf0e77a5df66f281b87674acb6ebe82ffaa50bd9e5db466629603e92f985224',
+    sourceSha256: '6edca6b89960a61aacef0091a47595b7c8d96a8de6a5d055080416c012dccc3b',
   },
   {
     source: 'src/app/api/v1/views/collectivex/route.ts',
@@ -131,7 +131,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-historical-view',
-    sourceSha256: 'ddc361046c9ac4ce6272758441477586fb8e0c47a8e2c98d1405fab73f5ea3d1',
+    sourceSha256: '365f8e46891b40d6e0c36995127c92f39d197992212178649211344eb89f2d6d',
   },
   {
     source: 'src/app/api/v1/views/inference/route.ts',
@@ -865,7 +865,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/components/calculator/throughput-data.ts',
-    sourceSha256: '04355b12bec33926b8cf299a6069014676bdf94360622809bcb60cbfc9a9a587',
+    sourceSha256: '4d12f2f267c939def090843b2f221a9ae5d92956b8307c4866ef6c09065096aa',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -883,7 +883,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/calculator-extensions.ts',
-    sourceSha256: 'c68d8d7b7ca94a28c21452b0d99845b7b07283da8faf2c7d8f7a188768d10bc5',
+    sourceSha256: '146b7ea92b2efc51b1357fd6c576157e943dcfa2fdbb9f1242b08f7198eddbc8',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -892,7 +892,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/source.ts',
-    sourceSha256: 'f7d9c81e784894342fc0f9f942c8ac28f1cad1c2a374c706e1e9b3551d243620',
+    sourceSha256: 'd460f626fad79feca7aa333a183f2737bfc2cb7bbfe18ce50971e3707590751d',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -901,7 +901,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/series.ts',
-    sourceSha256: 'ce3a9c04a591380e7d039fbc83a22d91747d35e85d43b9a5f8ae342d43c372be',
+    sourceSha256: 'ebee1b4eff64a91c48e82d920c7544a3b890c000ab4dfc62f61ab8d7deff9341',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -919,7 +919,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/params.ts',
-    sourceSha256: '23dbfce3cc793e0af433090362d291baf743a5544e38524327051d953e49aad7',
+    sourceSha256: 'bfc42a782e1c4a67d5a07b38bb4ebf8ae662a965a4959eed34adc8ba4a00369f',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',

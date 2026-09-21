@@ -87,6 +87,34 @@ function fixtureRows(): BenchmarkRow[] {
   ];
 }
 
+function powerSweepRows(): BenchmarkRow[] {
+  // The H100-style sweep retained in powerCurves.test.ts: the upper boundary
+  // keeps conc=1/2/128 while the minimum-power Pareto frontier keeps only 1.
+  return [
+    [1, 172.49, 252.22],
+    [2, 149.32, 291.38],
+    [128, 25.69, 502.54],
+    [64, 20.51, 344.95],
+    [256, 4.65, 372.9],
+  ].map(([conc, interactivity, watts]) =>
+    makeRow({
+      conc,
+      metrics: metrics({
+        median_intvty: interactivity,
+        median_e2el: 1024 / interactivity,
+        avg_power_w: watts,
+        prefill_avg_power_w: watts * 0.9,
+        decode_avg_power_w: watts * 1.1,
+        p75_power_w: watts * 1.2,
+        p90_power_w: watts * 1.3,
+        power_valid: 1,
+        power_metric_schema_version: 2,
+        joules_per_output_token: watts / 100,
+      }),
+    }),
+  );
+}
+
 describe('buildInferenceSeries', () => {
   it('assembles one series per hardware config with x-sorted points', () => {
     const result = buildInferenceSeries(fixtureRows(), BASE_OPTIONS);
@@ -186,6 +214,59 @@ describe('buildInferenceSeries', () => {
     expect(optimal.series.flatMap((entry) => entry.points).every((point) => point.frontier)).toBe(
       true,
     );
+  });
+
+  describe.each(['interactivity', 'e2e'] as const)('measured power on %s', (xmode) => {
+    it.each([
+      'y_measuredAvgPower',
+      'y_measuredPrefillAvgPower',
+      'y_measuredDecodeAvgPower',
+      'y_measuredP75Power',
+      'y_measuredP90Power',
+      'y_measuredPowerPercentTdp',
+    ] as const)('keeps the upper power boundary for %s', (metricConfigKey) => {
+      const rows = powerSweepRows();
+      const options = { ...BASE_OPTIONS, metricConfigKey, xmode };
+      const all = buildInferenceSeries(rows, options);
+      const optimal = buildInferenceSeries(rows, { ...options, optimal: true });
+      const expectedConcurrencies = xmode === 'interactivity' ? [128, 2, 1] : [1, 2, 128];
+
+      expect(all.count).toBe(5);
+      expect(
+        all.series[0].points.filter((point) => point.frontier).map((point) => point.concurrency),
+      ).toEqual(expectedConcurrencies);
+      expect(optimal.series[0].points.map((point) => point.concurrency)).toEqual(
+        expectedConcurrencies,
+      );
+      expect(optimal.series[0].points).toEqual(
+        all.series[0].points.filter((point) => point.frontier),
+      );
+      expect(optimal.frontier.points).toBe(3);
+      expect(optimal.frontier.direction).toBe(
+        xmode === 'interactivity' ? 'upper_right' : 'upper_left',
+      );
+      // The power-demand boundary does not change the registry's efficiency
+      // polarity or the direction used by Best per SKU.
+      expect(optimal.metric.polarity).toBe('lower');
+      expect(optimal.metric.direction).toBe(
+        xmode === 'interactivity' ? 'lower_right' : 'lower_left',
+      );
+    });
+
+    it('preserves the minimum-energy Pareto frontier', () => {
+      const optimal = buildInferenceSeries(powerSweepRows(), {
+        ...BASE_OPTIONS,
+        xmode,
+        metricConfigKey: 'y_measuredJPerOutputToken',
+        optimal: true,
+      });
+
+      expect(optimal.series[0].points.map((point) => point.concurrency)).toEqual([1]);
+      expect(optimal.series[0].points[0].y).toBe(252.22 / 100);
+      expect(optimal.frontier.direction).toBe(
+        xmode === 'interactivity' ? 'lower_right' : 'lower_left',
+      );
+    });
   });
 
   it('keeps only the best series per GPU SKU when best=true', () => {

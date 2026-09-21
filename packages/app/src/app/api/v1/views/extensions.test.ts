@@ -1,6 +1,7 @@
 import { buildCorrelationData, buildGroupedData } from '@/components/gpu-power/chart-data';
 import { servingFixture } from '@/components/video-benchmark/serving.fixture';
 import type { StoredArtifact } from '@/components/video-benchmark/stored';
+import type { BenchmarkRow } from '@/lib/api';
 import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { GET as cache } from './cache-reuse/route';
@@ -31,6 +32,54 @@ vi.mock('@/app/api/v1/submissions/route', () => ({ GET: mocks.submissions }));
 vi.mock('@/lib/api-cache', () => ({ cachedJson: (data: unknown) => Response.json(data) }));
 const req = (view: string, query = '') =>
   new NextRequest(`https://example.test/api/v1/views/${view}?${query}`);
+
+function agenticRow(overrides: Partial<BenchmarkRow> = {}): BenchmarkRow {
+  return {
+    id: 1,
+    model: 'dsv4',
+    hardware: 'b200',
+    framework: 'sglang',
+    precision: 'fp4',
+    spec_method: 'none',
+    disagg: false,
+    is_multinode: false,
+    prefill_tp: 8,
+    prefill_ep: 1,
+    prefill_dp_attention: false,
+    prefill_num_workers: 1,
+    decode_tp: 8,
+    decode_ep: 1,
+    decode_dp_attention: false,
+    decode_num_workers: 1,
+    num_prefill_gpu: 8,
+    num_decode_gpu: 8,
+    benchmark_type: 'agentic_traces',
+    isl: null,
+    osl: null,
+    conc: 16,
+    offload_mode: 'off',
+    image: 'sglang:test',
+    date: '2026-09-10',
+    run_url: 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/123',
+    metrics: {
+      p90_itl: 1 / 45,
+      p90_ttft: 0.5,
+      tput_per_gpu: 6000,
+      input_tput_per_gpu: 5400,
+      output_tput_per_gpu: 600,
+      server_gpu_cache_hit_rate: 0.9,
+      power_valid: 1,
+      power_metric_schema_version: 2,
+      avg_power_w: 600,
+      avg_total_gpu_power_w: 4800,
+    },
+    ...overrides,
+  };
+}
+
+const hardwareKeys = (data: { rows: { hwKey: string }[] }) =>
+  [...new Set(data.rows.map((row) => row.hwKey))].sort();
+
 const metricRows = [0, 1].flatMap((index) =>
   [0, 1].map((second) => ({
     index,
@@ -166,6 +215,156 @@ describe('new dashboard projections', () => {
     expect(query.get('exactRun')).toBe('true');
     expect(mocks.unofficial.mock.calls[0][0].nextUrl.pathname).toBe('/api/unofficial-run');
   });
+  it.each([false, true])(
+    'retains an explicitly selected overlay-only precision with official rows present: %s',
+    async (hasOfficialRows) => {
+      mocks.benchmarks.mockImplementation(() =>
+        Response.json(hasOfficialRows ? [agenticRow()] : []),
+      );
+      mocks.unofficial.mockImplementation(() =>
+        Response.json({
+          benchmarks: [agenticRow({ id: 200, precision: 'fp8' })],
+          evaluations: [],
+        }),
+      );
+      const response = await first(
+        req(
+          'first-token',
+          'model=DeepSeek-V4-Pro&precisions=fp8&unofficialrun=123&caps=1&minInteractivity=40',
+        ),
+      );
+      expect(response.status).toBe(200);
+      const body = await response.json();
+      expect(body.params.precisions).toEqual(['fp8']);
+      expect(body.data.measuredRows).toBe(0);
+      expect(body.data.overlayMeasuredRows).toBe(1);
+      expect(body.data.cells).toMatchObject([
+        {
+          series: { key: 'run:0' },
+          winner: { precision: 'fp8', point: { sourceRow: { id: 200 } } },
+        },
+      ]);
+    },
+  );
+  it.each([
+    [4, undefined],
+    [5, undefined],
+    [4, 'fp8'],
+    [5, 'fp8'],
+  ])(
+    'keeps the official default alongside %s overlay curves unless precision %s is explicit',
+    async (overlayCurveCount, precision) => {
+      const hardwares = ['h100', 'h200', 'b200', 'b300', 'mi355x'];
+      const officialRows = hardwares
+        .slice(0, 4)
+        .map((hardware, index) => agenticRow({ id: index + 1, hardware }));
+      const overlayRows = hardwares
+        .slice(0, overlayCurveCount)
+        .map((hardware, index) => agenticRow({ id: index + 101, hardware, precision: 'fp8' }));
+      mocks.benchmarks.mockImplementation(() => Response.json(officialRows));
+      mocks.unofficial.mockImplementation(() =>
+        Response.json({ benchmarks: overlayRows, evaluations: [] }),
+      );
+      const response = await first(
+        req(
+          'first-token',
+          `model=DeepSeek-V4-Pro&unofficialrun=123&caps=1&minInteractivity=40${precision ? `&precisions=${precision}` : ''}`,
+        ),
+      );
+      expect(response.status).toBe(200);
+      const body = await response.json();
+      expect(body.params.precisions).toEqual(precision ? ['fp8'] : ['fp4', 'fp8']);
+      expect(body.data.measuredRows).toBe(precision ? 0 : 4);
+      expect(body.data.overlayMeasuredRows).toBe(overlayCurveCount);
+      expect(body.data.series.map((series: { key: string }) => series.key)).toEqual(
+        precision ? ['run:0'] : ['vendor:NVIDIA', 'run:0'],
+      );
+      const overlayWinner = body.data.cells.at(-1).winner;
+      expect(overlayWinner.precision).toBe('fp8');
+      expect(overlayRows.map((row) => row.id)).toContain(overlayWinner.point.sourceRow.id);
+    },
+  );
+  it.each([
+    ['123, 456', ''],
+    ['123,123,456', '/attempts/1'],
+  ])('keeps normalized overlay identities distinct for %s', async (runIds, suffix) => {
+    mocks.unofficial.mockImplementation(() =>
+      Response.json({
+        benchmarks: [
+          agenticRow({ id: 123 }),
+          agenticRow({
+            id: 456,
+            run_url: `https://github.com/SemiAnalysisAI/InferenceX/actions/runs/456${suffix}`,
+          }),
+        ],
+        evaluations: [],
+      }),
+    );
+    const response = await first(
+      req(
+        'first-token',
+        `model=DeepSeek-V4-Pro&unofficialrun=${encodeURIComponent(runIds)}&caps=1&minInteractivity=40`,
+      ),
+    );
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.data.series.map((series: { key: string }) => series.key)).toEqual([
+      'run:0',
+      'run:1',
+    ]);
+    expect(
+      body.data.cells.map(
+        (cell: { winner: { runIndex: number; point: { sourceRow: BenchmarkRow } } }) => [
+          cell.winner.runIndex,
+          cell.winner.point.sourceRow.id,
+        ],
+      ),
+    ).toEqual([
+      [0, 123],
+      [1, 456],
+    ]);
+  });
+  it.each(['modeled', 'compare'])(
+    'uses exact comparison snapshots with %s power while keeping the primary date cutoff',
+    async (powerBasis) => {
+      const rows = [
+        agenticRow({ id: 90, hardware: 'mi355x', date: '2026-09-09' }),
+        agenticRow({ id: 100 }),
+      ];
+      // A pinned run can legitimately contain append-only rows from an older date.
+      const pinned = agenticRow({ id: 789, hardware: 'b300', date: '2026-09-08' });
+      mocks.benchmarks.mockImplementation((request: NextRequest) => {
+        const search = request.nextUrl.searchParams;
+        if (search.get('runId') === '789' && search.get('exactRun') === 'true')
+          return Response.json([pinned]);
+        const date = search.get('date')!;
+        return Response.json(
+          rows.filter((row) =>
+            search.get('exact') === 'true' ? row.date === date : row.date <= date,
+          ),
+        );
+      });
+      const response = await gw(
+        req(
+          'profit-estimator-per-gigawatt',
+          `model=DeepSeek-V4-Pro&date=2026-09-11&dates=2026-09-10,2026-09-10~r789&precisions=fp4&target=45&priceSource=custom&powerBasis=${powerBasis}`,
+        ),
+      );
+      expect(response.status).toBe(200);
+      const body = await response.json();
+      expect(body.params.date).toBe('2026-09-11');
+      expect(hardwareKeys(body.data)).toEqual(['b200_sglang', 'mi355x_sglang']);
+      expect(body.comparisons.map((comparison: { entry: string }) => comparison.entry)).toEqual([
+        '2026-09-10',
+        '2026-09-10~r789',
+      ]);
+      expect(hardwareKeys(body.comparisons[0].data)).toEqual(['b200_sglang']);
+      expect(hardwareKeys(body.comparisons[1].data)).toEqual(['b300_sglang']);
+      expect(body.comparisons[0].data.skipped).toEqual([]);
+      expect(body.comparisons[0].data.rows).toHaveLength(powerBasis === 'compare' ? 2 : 1);
+      expect(body.comparisons[0].data.rows[0].revenuePerGpuHour).toBeCloseTo(5.8536, 4);
+    },
+  );
   it('rejects unsupported extension options rather than silently ignoring them', async () => {
     for (const query of [
       'caps=-1',

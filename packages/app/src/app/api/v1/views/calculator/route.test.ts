@@ -1,14 +1,17 @@
 import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { mockGetLatestBenchmarks, mockCachedJson, mockCachedText } = vi.hoisted(() => ({
-  mockGetLatestBenchmarks: vi.fn(),
-  mockCachedJson: vi.fn((data: unknown) => Response.json(data)),
-  mockCachedText: vi.fn(
-    (data: string, contentType: string) =>
-      new Response(data, { headers: { 'Content-Type': contentType } }),
-  ),
-}));
+const { mockGetLatestBenchmarks, mockUnofficial, mockCachedJson, mockCachedText } = vi.hoisted(
+  () => ({
+    mockGetLatestBenchmarks: vi.fn(),
+    mockUnofficial: vi.fn(),
+    mockCachedJson: vi.fn((data: unknown) => Response.json(data)),
+    mockCachedText: vi.fn(
+      (data: string, contentType: string) =>
+        new Response(data, { headers: { 'Content-Type': contentType } }),
+    ),
+  }),
+);
 
 vi.mock('@semianalysisai/inferencex-db/connection', () => ({
   FIXTURES_MODE: false,
@@ -19,6 +22,8 @@ vi.mock('@semianalysisai/inferencex-db/queries/benchmarks', () => ({
   getLatestBenchmarks: mockGetLatestBenchmarks,
   getBenchmarksForRun: mockGetLatestBenchmarks,
 }));
+
+vi.mock('@/app/api/unofficial-run/route', () => ({ GET: mockUnofficial }));
 
 vi.mock('@/lib/api-cache', () => ({
   // Pass-through: the route's cachedQuery wrapper must not hide the query args.
@@ -94,6 +99,7 @@ const FIXTURE_ROWS: BenchmarkRow[] = [
 beforeEach(() => {
   vi.clearAllMocks();
   mockGetLatestBenchmarks.mockResolvedValue(FIXTURE_ROWS);
+  mockUnofficial.mockImplementation(() => Response.json({ benchmarks: [], evaluations: [] }));
 });
 
 describe('GET /api/v1/views/calculator', () => {
@@ -185,6 +191,56 @@ describe('GET /api/v1/views/calculator', () => {
     const filteredOut = await filteredOutRes.json();
     expect(filteredOut.count).toBe(0);
   });
+
+  it.each([4, 5])(
+    'keeps official FP4 and all %s overlay FP8 curves when precision is omitted',
+    async (overlayCurveCount) => {
+      const hardwares = ['h100', 'h200', 'b200', 'b300', 'mi355x'];
+      const runUrl = 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/456';
+      mockGetLatestBenchmarks.mockResolvedValue(
+        hardwares.slice(0, 4).map((hardware) => makeRow({ hardware })),
+      );
+      mockUnofficial.mockImplementation(() =>
+        Response.json({
+          benchmarks: hardwares.slice(0, overlayCurveCount).map((hardware) =>
+            makeRow({
+              hardware,
+              precision: 'fp8',
+              run_url: runUrl,
+              metrics: {
+                median_intvty: 50,
+                tput_per_gpu: 1200,
+                input_tput_per_gpu: 800,
+                output_tput_per_gpu: 400,
+              },
+            }),
+          ),
+          evaluations: [],
+        }),
+      );
+      const response = await GET(
+        request(
+          '/api/v1/views/calculator?model=DeepSeek-V4-Pro&sequence=1k/1k&target=50&unofficialrun=456',
+        ),
+      );
+      expect(response.status).toBe(200);
+      const body = await response.json();
+      expect(body.params.precisions).toEqual(['fp4', 'fp8']);
+      expect(body.count).toBe(4 + overlayCurveCount);
+      expect(
+        body.hardware
+          .map((row: { resultKey: string; value: number }) => [row.resultKey, row.value])
+          .sort(),
+      ).toEqual(
+        [
+          ...hardwares.slice(0, 4).map((hardware) => [`${hardware}_sglang__fp4`, 900]),
+          ...hardwares
+            .slice(0, overlayCurveCount)
+            .map((hardware) => [`${runUrl}|${hardware}_sglang__fp8`, 1200]),
+        ].sort(),
+      );
+    },
+  );
 
   it('sizes a fleet per bar when mw is set', async () => {
     const response = await GET(

@@ -73,6 +73,10 @@ describe('parseSequenceParam', () => {
     expect(parseSequenceParam(null, Sequence.AgenticTraces)).toBe(Sequence.AgenticTraces);
     expect(() => parseSequenceParam('16k/1k', Sequence.EightK_OneK)).toThrow(ViewsApiParamError);
   });
+
+  it.each(['__proto__', 'constructor'])('rejects inherited sequence name %s', (value) => {
+    expect(() => parseSequenceParam(value, Sequence.EightK_OneK)).toThrow(ViewsApiParamError);
+  });
 });
 
 describe('parseEnumParam / parseListParam', () => {

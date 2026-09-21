@@ -3,11 +3,15 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { BenchmarkRow } from '@/lib/api';
 
-const { mockGetLatestBenchmarks, mockGetBenchmarksForRun, mockGetDb } = vi.hoisted(() => ({
-  mockGetLatestBenchmarks: vi.fn(),
-  mockGetBenchmarksForRun: vi.fn(),
-  mockGetDb: vi.fn(() => 'mock-sql'),
-}));
+const { mockGetLatestBenchmarks, mockGetBenchmarksForRun, mockUnofficialRun, mockGetDb } =
+  vi.hoisted(() => ({
+    mockGetLatestBenchmarks: vi.fn(),
+    mockGetBenchmarksForRun: vi.fn(),
+    mockUnofficialRun: vi.fn(),
+    mockGetDb: vi.fn(() => 'mock-sql'),
+  }));
+
+vi.mock('@/app/api/unofficial-run/route', () => ({ GET: mockUnofficialRun }));
 
 vi.mock('@semianalysisai/inferencex-db/connection', () => ({
   getDb: mockGetDb,
@@ -88,6 +92,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mockGetLatestBenchmarks.mockResolvedValue(ROWS);
   mockGetBenchmarksForRun.mockResolvedValue(ROWS);
+  mockUnofficialRun.mockImplementation(() => Response.json({ benchmarks: [], evaluations: [] }));
 });
 
 describe('GET /api/v1/views/inference', () => {
@@ -165,6 +170,62 @@ describe('GET /api/v1/views/inference', () => {
     expect(mockGetLatestBenchmarks).not.toHaveBeenCalled();
     const resBody = await res.json();
     expect(resBody.params.runId).toBe('99');
+  });
+
+  it('keeps measured-power boundaries separate for official and unofficial runs', async () => {
+    const sweep = [
+      { conc: 1, interactivity: 100, watts: 250 },
+      { conc: 8, interactivity: 50, watts: 500 },
+      { conc: 32, interactivity: 25, watts: 450 },
+    ];
+    const official = sweep.map(({ conc, interactivity, watts }, index) =>
+      makeRow({
+        id: 100 + index,
+        conc,
+        metrics: { ...makeRow().metrics, median_intvty: interactivity, avg_power_w: watts },
+      }),
+    );
+    const runUrl = 'https://github.com/org/repo/actions/runs/888/attempts/1';
+    const overlay = official.map((row, index) => ({
+      ...row,
+      id: 200 + index,
+      run_url: runUrl,
+      metrics: { ...row.metrics, avg_power_w: row.metrics.avg_power_w * 2 },
+    }));
+    mockGetLatestBenchmarks.mockResolvedValue(official);
+    mockUnofficialRun.mockImplementation(() =>
+      Response.json({ benchmarks: overlay, evaluations: [] }),
+    );
+
+    const res = await GET(
+      request(
+        '/api/v1/views/inference?model=DeepSeek-R1-0528&metric=measuredAvgPower&optimal=true&unofficialrun=888',
+      ),
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.params.optimal).toBe(true);
+    expect(body.count).toBe(2);
+    expect(body.frontier).toEqual({ direction: 'upper_right', points: 2 });
+    expect(body.series).toHaveLength(1);
+    expect(body.series[0].points).toMatchObject([
+      { id: 101, concurrency: 8, x: 50, y: 500, runId: 777, frontier: true },
+      { id: 100, concurrency: 1, x: 100, y: 250, runId: 777, frontier: true },
+    ]);
+    expect(body.overlays).toHaveLength(1);
+    expect(body.overlays[0]).toMatchObject({
+      runUrl,
+      count: 2,
+      frontier: { direction: 'upper_right', points: 2 },
+      series: [
+        {
+          points: [
+            { id: 201, concurrency: 8, x: 50, y: 1000, runId: 888, frontier: true },
+            { id: 200, concurrency: 1, x: 100, y: 500, runId: 888, frontier: true },
+          ],
+        },
+      ],
+    });
   });
 
   it('canonicalizes list params and applies quick filters', async () => {

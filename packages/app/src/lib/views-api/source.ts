@@ -9,6 +9,7 @@ import {
 import { resolveComparisonEntries } from '@/components/inference/utils/comparisonEntry';
 import type { BenchmarkRow, EvalRow } from '@/lib/api';
 import { Percentile, Sequence } from '@/lib/data-mappings';
+import { overlayRunIndex } from '@/lib/overlay-run-style';
 import { NextRequest } from 'next/server';
 import { ViewsApiParamError, ViewsUpstreamError } from './errors';
 import {
@@ -94,12 +95,14 @@ export function comparisonSelections(search: URLSearchParams) {
 export async function benchmarkRows(
   request: NextRequest,
   params: Pick<ViewSelection, 'model' | 'date' | 'runId'>,
+  options: { exactDate?: boolean } = {},
 ): Promise<BenchmarkRow[]> {
   return readResponse(
     await benchmarks(
       sourceRequest(request, '/api/v1/benchmarks', {
         model: params.model,
         date: params.date,
+        exact: options.exactDate && !params.runId ? 'true' : undefined,
         runId: params.runId,
         exactRun: params.runId ? 'true' : undefined,
       }),
@@ -107,9 +110,17 @@ export async function benchmarkRows(
   );
 }
 
-export async function calculatorGroups(request: NextRequest, params: ViewSelection) {
-  const rows = await benchmarkRows(request, params);
-  const precisions = resolveRowPrecisions(rows, params.sequence, params.precisions);
+// Extensions retain raw telemetry for modeled-power estimates and carry overlay
+// runIndex metadata for cache-reuse series. The calculator route uses trimmed
+// rows and source-tagged keys; both paths share buildGpuGroups for the math.
+export async function calculatorGroups(
+  request: NextRequest,
+  params: ViewSelection,
+  sourceOptions: { exactDate?: boolean } = {},
+) {
+  const rows = await benchmarkRows(request, params, sourceOptions);
+  const overlayRows = await unofficialRows(request);
+  const precisions = resolveRowPrecisions(rows, params.sequence, params.precisions, overlayRows);
   const options = { ...params, precisions };
   const official = buildGpuGroups<GroupMeta>(rows, {
     ...options,
@@ -121,8 +132,11 @@ export async function calculatorGroups(request: NextRequest, params: ViewSelecti
           }
         : null,
   });
-  const overlayRows = await unofficialRows(request);
-  const overlayIds = (request.nextUrl.searchParams.get('unofficialrun') ?? '').split(',');
+  const overlayIds = parseRunIdListParam(
+    request.nextUrl.searchParams.get('unofficialrun'),
+    'unofficialrun',
+  );
+  const runIndexById = Object.fromEntries(overlayIds.map((id, index) => [id, index]));
   const overlay = buildGpuGroups<OverlayGroupMeta>(overlayRows, {
     ...options,
     classify: (hwKey, row) =>
@@ -132,10 +146,7 @@ export async function calculatorGroups(request: NextRequest, params: ViewSelecti
             meta: {
               hwKey,
               precision: precisions.length > 1 ? row.precision : undefined,
-              runIndex: Math.max(
-                0,
-                overlayIds.findIndex((id) => row.run_url?.endsWith(`/runs/${id}`)),
-              ),
+              runIndex: overlayRunIndex(row.run_url, runIndexById),
             },
           }
         : null,

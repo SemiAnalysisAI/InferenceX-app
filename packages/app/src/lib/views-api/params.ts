@@ -90,11 +90,11 @@ export function parseSequenceParam(
   param = 'sequence',
 ): Sequence {
   if (!value) return fallback;
-  const sequence = SEQUENCE_ALIASES[value.toLowerCase()];
-  if (!sequence) {
+  const alias = value.toLowerCase();
+  if (!Object.hasOwn(SEQUENCE_ALIASES, alias)) {
     throw new ViewsApiParamError(param, `Unknown sequence: ${value}`, VIEWS_SEQUENCE_VALUES);
   }
-  return sequence;
+  return SEQUENCE_ALIASES[alias];
 }
 
 export function parseEnumParam<T extends string>(

@@ -69,9 +69,9 @@ export const dynamic = 'force-dynamic';
  * (default: densest-precision auto-resolution), gpus, vendors, frameworks,
  * deployment, start, end (YYYY-MM-DD snapshot-date bounds), format (json|csv).
  *
- * Unlike the dashboard — which extends each line to wall-clock today — lines
- * here extend only to the latest snapshot date in the data, so responses stay
- * cache-stable. Synthetic extension points carry `synthetic: true`.
+ * Like the dashboard, lines extend to the current UTC date unless extendToDate
+ * is provided. Synthetic extension points carry `synthetic: true` and do not
+ * represent additional measurements.
  */
 
 const DEFAULT_TARGET_INTERACTIVITY = 35;
@@ -179,13 +179,6 @@ export function GET(request: NextRequest) {
       tokenRevenuePricing: pricing,
       ...(rowFilter ? { rowFilter } : {}),
     });
-
-    // Deterministic extension bound: the latest snapshot date in the data
-    // (never wall-clock today, which would break response caching).
-    let latestDate: string | undefined;
-    for (const date of dateGroupedData.keys()) {
-      if (latestDate === undefined || date > latestDate) latestDate = date;
-    }
 
     const { trendLines, hwKeysWithData } = buildTrendLines(dateGroupedData, {
       targetInteractivity: target,
