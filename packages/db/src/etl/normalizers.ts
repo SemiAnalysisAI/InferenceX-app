@@ -102,6 +102,12 @@ export const MODEL_TO_KEY: Record<string, string> = {
   // PREFIX_ALIASES entry is needed.
   'Qwen/Qwen3.8-Flash-Next-FP8': 'qwen3.8next',
   'RadixArk/Qwen3.8-Flash-Next-NVFP4': 'qwen3.8next',
+  // Qwen3.8-27B (dense 27B, bf16). Both recipes serve this checkpoint and report
+  // `infmax_model_prefix` equal to their DB key (`qwen3.827b`, or `qwen3.827beager`
+  // for the --enforce-eager variant), so the prefix resolves first and this path
+  // entry only backs rows that lack the prefix. Seen in run 35362390175
+  // (H200, InferenceX#3263) and run 35359530151 (H100, InferenceX#3260).
+  'Qwen/Qwen3.8-27B': 'qwen3.827b',
   // Kimi-K2.5 / K2.6 / K2.7-Code (same architecture, distinct DB buckets)
   'moonshotai/Kimi-K2.5': 'kimik2.5',
   'moonshotai/Kimi-K2.6': 'kimik2.6',

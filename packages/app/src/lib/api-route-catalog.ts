@@ -68,10 +68,10 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'ui-artifact-read',
     exclusionReason: {
-      en: 'UI-only PowerX explorer read for one run: the ingest-time telemetry digest when stored, otherwise the live GPU metric artifacts. Its payload shape is not a stable public contract.',
-      zh: '仅供 PowerX 探索界面按 run 读取：已入库时返回 ingest 阶段生成的 telemetry 摘要，否则回退到实时 GPU 指标制品。其返回结构不是稳定的公开契约。',
+      en: 'UI-only PowerX read for one run: the ingest-time telemetry digest when stored, otherwise the live GPU telemetry artifacts (raw `gpu_metrics_*` rows, or `series=power` one-second buckets for the PowerX timeline, also cut per validation window from `power_audit_*` bundles). Its payload shape is not a stable public contract.',
+      zh: '仅供 PowerX 界面按 run 读取：已入库时返回 ingest 阶段生成的 telemetry 摘要，否则回退到实时 GPU 遥测制品（`gpu_metrics_*` 原始行，或供 PowerX 时间线使用的 `series=power` 一秒分桶数据，后者也会按验证窗口从 `power_audit_*` bundle 中切分得到）。其返回结构不是稳定的公开契约。',
     },
-    sourceSha256: '01d604d77ea73e252f0934f88d14d0e229a803d1b9b1d72bd9756658c506b349',
+    sourceSha256: '4d387298f0311a91c319548119382646045fff6cccdf4e871adf89b39a6feee1',
   },
   {
     source: 'src/app/api/openapi.json/route.ts',
@@ -753,7 +753,10 @@ export const apiContractSourceDigests = [
     // Reviewed again for the release-date corrections: values inside
     // MODEL_RELEASE_DATES only. No published model name, alias, or parameter enum
     // is touched, and no endpoint exposes a release date, so the docs stand.
-    sourceSha256: 'bb58d43160c2b83ce61e7c34326a6d316fd751e435c6819f1991ed69e4f1b45c',
+    // Reviewed for the Qwen3.8-27B addition (InferenceX#3260): two new DB keys
+    // and display names plus their release dates. No published parameter enum
+    // or endpoint changes, so the docs stand.
+    sourceSha256: 'af1053b2ae94b50de51153153dd7a7e268e50bde3e5900310e44f2d8baa86f87',
     reviewArea: {
       en: 'Published benchmark and TCO model names, aliases, and parameter enums.',
       zh: '已发布基准与 TCO 模型名称、别名和参数枚举。',

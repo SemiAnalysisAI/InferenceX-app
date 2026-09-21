@@ -23,7 +23,45 @@ export function scatterPointConfigId(point: InferenceData): string {
   // Agentic series omit spec decoding from hwKey so one curve can mix methods.
   // It remains point identity to avoid collapsing overlapping MTP/STP results.
   key += agenticSpecDecodingKeySuffix(point);
+  // Comparison clones share every config field with their base point.
+  if (point.powerVariant) key += `|variant-${point.powerVariant.id}`;
   return key;
+}
+
+/**
+ * Comparison-series suffix inside a scatter series key. Letters, digits and
+ * dashes only, so the key stays a valid CSS class token (the perf ruler and
+ * `i_rulers` address rooflines by class) and needs no escaping.
+ */
+const SERIES_VARIANT_DELIMITER = '-v-';
+
+/**
+ * Identity of one drawn series: hardware key, precision and, on a power
+ * comparison, the boundary or role variant. Rooflines, frontiers, line labels
+ * and the perf ruler all key on this string.
+ */
+export function scatterSeriesKey(
+  point: Pick<InferenceData, 'hwKey' | 'precision' | 'powerVariant'>,
+): string {
+  const base = `${point.hwKey}_${point.precision}`;
+  return point.powerVariant ? `${base}${SERIES_VARIANT_DELIMITER}${point.powerVariant.id}` : base;
+}
+
+export interface ScatterSeriesIdentity {
+  hw: string;
+  precision: string;
+  /** Comparison variant id (`gpu-provisioned`, `prefill`, …) or null for the base series. */
+  variant: string | null;
+}
+
+/** Inverse of `scatterSeriesKey`; hardware keys may themselves contain underscores. */
+export function parseScatterSeriesKey(key: string): ScatterSeriesIdentity {
+  const delimiter = key.indexOf(SERIES_VARIANT_DELIMITER);
+  const core = delimiter === -1 ? key : key.slice(0, delimiter);
+  const variant = delimiter === -1 ? null : key.slice(delimiter + SERIES_VARIANT_DELIMITER.length);
+  const parts = core.split('_');
+  const precision = parts.pop() ?? '';
+  return { hw: parts.join('_'), precision, variant };
 }
 
 /**

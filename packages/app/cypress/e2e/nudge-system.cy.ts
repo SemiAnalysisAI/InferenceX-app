@@ -51,11 +51,11 @@ describe('Landing nudges — modals', { testIsolation: true }, () => {
       .and('contain.text', 'Rubin Agentic Inference Performance')
       .and('contain.text', '67x Faster than Blackwell Ultra')
       .and('contain.text', 'View results');
-    // Banner + header-nav badges, plus the four still-new AgentX hero ledger
-    // rows (AGENTX_NEW_MODEL_SLUGS) — the shared pill must render at the same
+    // Banner + header-nav badges, plus the three still-new landing ledger
+    // rows — the shared pill must render at the same
     // fixed size everywhere it appears.
     cy.get('[data-new-badge]')
-      .should('have.length', 6)
+      .should('have.length', 5)
       .then(($badges) => {
         const sizes = [...$badges].map((badge) => {
           const rect = badge.getBoundingClientRect();

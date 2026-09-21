@@ -48,6 +48,36 @@ describe('toCalculatorBenchmarkRows', () => {
     ]);
   });
 
+  it('keeps time to first token at the percentiles the calculator pages read', () => {
+    // The First-Token Limits page caps rows on TTFT through this same view;
+    // without these the page would have nothing to cap. p99 stays out like the
+    // other p99 latency metrics.
+    const [row] = toCalculatorBenchmarkRows(
+      [
+        {
+          benchmark_type: 'agentic_traces',
+          isl: null,
+          osl: null,
+          metrics: {
+            tput_per_gpu: 100,
+            median_ttft: 0.5,
+            p75_ttft: 0.9,
+            p90_ttft: 1.4,
+            p99_ttft: 6,
+            mean_ttft: 0.7,
+          },
+        },
+      ],
+      'agentic-traces',
+    );
+    expect(row.metrics).toEqual({
+      tput_per_gpu: 100,
+      median_ttft: 0.5,
+      p75_ttft: 0.9,
+      p90_ttft: 1.4,
+    });
+  });
+
   it('strips workers and the power audit provenance from the payload-trimmed view', () => {
     const [row] = toCalculatorBenchmarkRows(rows, '1k/1k');
     expect(row).not.toHaveProperty('workers');

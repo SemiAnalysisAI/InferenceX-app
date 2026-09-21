@@ -110,6 +110,25 @@ describe('PointSummary', () => {
     expect(html).toContain('vLLM Router 0.1.14');
   });
 
+  it('links an agentic point to its configuration on the Prefix Cache Reuse tab', () => {
+    const html = renderToStaticMarkup(
+      createElement(PointSummary, { meta: meta({ model: 'dsr1', disagg: false }) }),
+    );
+
+    expect(html).toContain('Prefix cache reuse for this config');
+    expect(html).toContain(
+      'href="/cache-reuse?g_model=DeepSeek-R1-0528&amp;i_seq=agentic-traces&amp;i_prec=fp8&amp;c_cfg=gb200_dynamo-vllm"',
+    );
+  });
+
+  it('offers no cache-reuse link for a fixed-sequence point', () => {
+    const html = renderToStaticMarkup(
+      createElement(PointSummary, { meta: meta({ benchmark_type: 'single_turn' }) }),
+    );
+
+    expect(html).not.toContain('cache-reuse-link');
+  });
+
   it('renders runtime metadata labels in Simplified Chinese on /zh', () => {
     localeState.pathname = '/zh/inference/agentic/206885';
     const html = renderToStaticMarkup(
