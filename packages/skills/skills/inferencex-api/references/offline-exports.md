@@ -36,6 +36,6 @@ testing deliberate tampering, because completed bundles must remain unchanged.
 Matching hashes and reconstructed output establish internal consistency, not
 publisher authenticity or causal performance claims.
 
-The 0.12.0 verifier accepts contract 1 bundle directories only. Separately saved exports from 0.11
+The 1.0.0 verifier accepts contract 1 bundle directories only. Separately saved exports from 0.11
 and earlier and evidence directories require the pinned historical package that created
-them; `verify-export.mjs` is not part of the 0.12.0 query interface.
+them; `verify-export.mjs` is not part of the 1.0.0 query interface.

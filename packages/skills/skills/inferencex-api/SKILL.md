@@ -28,7 +28,7 @@ Claude Code normally uses `.claude/skills/inferencex-api/scripts/inferencex.mjs`
 For an unpublished preview, run installer status, dry-run and reinstall through
 `npm exec --offline --package /absolute/path/candidate.tgz -- inferencex-skills ...`
 using the same supplied archive. If its path is missing, request it; registry
-`@0.12.0` or `latest` is not a substitute for that candidate.
+`@1.0.0` or `latest` is not a substitute for that candidate.
 
 Read the [CLI contract](references/cli.md) before running or recommending a formal command. Create
 the parent directory first; the command creates a new leaf. A completed bundle is

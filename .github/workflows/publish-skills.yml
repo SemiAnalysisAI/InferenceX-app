@@ -66,6 +66,8 @@ jobs:
           fi
       - name: Verify candidate installation and public API behavior
         run: python3 packages/skills/scripts/verify-release.py candidate "$RUNNER_TEMP/skills-release/release.json" --model DeepSeek-V4-Pro --isl 8192 --osl 1024 --agentx-model DeepSeek-V4-Pro --evidence "$RUNNER_TEMP/skills-candidate-verification"
+      - name: Require versioned release notes
+        run: test -s "docs/releases/inferencex-skills-${RELEASE_VERSION}.md"
       - name: Publish the verified archive with OIDC
         run: |
           node packages/skills/scripts/release.mjs check "$RUNNER_TEMP/skills-release/release.json" "$REVIEWED_SHA256"
@@ -95,8 +97,8 @@ jobs:
             "$RUNNER_TEMP/skills-release/release.json" \
             "$RUNNER_TEMP/skills-release/release-summary.json" \
             --target "$GITHUB_SHA" \
-            --title "InferenceX skills ${RELEASE_VERSION}" \
-            --notes "Accepted public package archive, release identity, and sanitized qualification summary."
+            --title "InferenceX skills ${RELEASE_VERSION} / InferenceX 技能包 ${RELEASE_VERSION}" \
+            --notes-file "docs/releases/inferencex-skills-${RELEASE_VERSION}.md"
       - name: Preserve release and verification evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7

@@ -1,11 +1,18 @@
-# InferenceX CLI 0.12.0 migration
+# InferenceX CLI 1.x compatibility and migration
 
-InferenceX 0.12.0 has one query entry: `inferencex`. Formal commands create a new
+InferenceX 1.0.0 has one query entry: `inferencex`. Formal commands create a new
 contract 1 evidence directory and `inferencex verify` replays it offline.
 
-The package remains pre-1.0; CLI changes may ship in later minor releases.
-Evidence format `schema_version: 1` is separate from the package version.
-A stable 1.0 release is deferred.
+Starting with 1.0.0, supported commands and arguments, documented required output
+fields and their meanings, and exit-code semantics remain compatible across 1.x.
+Minor releases may add commands, optional arguments, and optional output fields;
+breaking changes to these guarantees require a new major package version. Human
+summary wording and diagnostic message text are not machine-readable contracts.
+
+Evidence format `schema_version: 1` is versioned independently from the npm
+package. A package version bump alone does not select a new evidence format; consumers
+inspect the recorded schema and contract versions. The 1.0.0 candidate uses the
+existing contract 1 format and remains unpublished until the release gates pass.
 
 ## Supported contract
 
@@ -28,7 +35,7 @@ sibling paths.
 
 ## Move from 0.11 and earlier
 
-| 0.11 and earlier                                | 0.12.0                                    |
+| 0.11 and earlier                                | 1.0.0                                     |
 | ----------------------------------------------- | ----------------------------------------- |
 | `export-powerx.mjs --output x --evidence-dir e` | `inferencex powerx export --output-dir e` |
 | `export-agentx.mjs --output x --evidence-dir e` | `inferencex agentx export --output-dir e` |
@@ -39,9 +46,9 @@ sibling paths.
 | `verify-export.mjs --export x --evidence-dir e` | `inferencex verify e`                     |
 
 The old commands and separately saved export formats from 0.11 and earlier are not supported query
-interfaces in 0.12.0. Use the pinned historical package when an old export must be
+interfaces in 1.0.0. Use the pinned historical package when an old export must be
 replayed. The installer can upgrade an earlier installation with `--force`; this upgrade
-compatibility does not promise that old query commands run under 0.12.0.
+compatibility does not promise that old query commands run under 1.0.0.
 
 The installer preserves unmanaged files. An obsolete helper can therefore remain
 on disk after upgrade, but it is not part of the current package or interface.

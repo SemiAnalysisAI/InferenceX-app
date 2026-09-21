@@ -1,7 +1,9 @@
 # InferenceX CLI release checklist
 
-The 0.12.0 candidate adds one `inferencex` entry point for discovery, six evidence
-workflows, offline verification, and installation diagnostics. Publication is a
+The 1.0.0 candidate establishes the documented 1.x compatibility guarantees for
+commands, arguments, required outputs, and exit codes. It provides one `inferencex`
+entry point for discovery, six evidence workflows, offline verification, and
+installation diagnostics. Publication is a
 separate operation after candidate review. The website remains pinned to the last
 anonymously verified public version until that operation succeeds.
 

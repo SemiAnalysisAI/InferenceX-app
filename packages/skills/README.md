@@ -19,19 +19,19 @@ runtime dependencies.
 
 ```bash
 # Codex
-npm exec --yes --package @semianalysisai/inferencex-skills@0.12.0 -- \
+npm exec --yes --package @semianalysisai/inferencex-skills@1.0.0 -- \
   inferencex-skills install --target codex
 
 # Claude Code
-npm exec --yes --package @semianalysisai/inferencex-skills@0.12.0 -- \
+npm exec --yes --package @semianalysisai/inferencex-skills@1.0.0 -- \
   inferencex-skills install --target claude
 ```
 
-These commands apply after 0.12.0 is published and publicly verified. For a candidate
+These commands apply after 1.0.0 is published and publicly verified. For a candidate
 archive, run from the target project:
 
 ```bash
-INFERENCEX_SKILLS_TGZ='/absolute/path/semianalysisai-inferencex-skills-0.12.0.tgz'
+INFERENCEX_SKILLS_TGZ='/absolute/path/semianalysisai-inferencex-skills-1.0.0.tgz'
 npm exec --yes --offline --package "$INFERENCEX_SKILLS_TGZ" -- \
   inferencex-skills install --target codex
 npm exec --yes --offline --package "$INFERENCEX_SKILLS_TGZ" -- \
@@ -95,21 +95,21 @@ causality.
 ## Upgrade from 0.11 and earlier
 
 ```bash
-npm exec --yes --package @semianalysisai/inferencex-skills@0.12.0 -- \
+npm exec --yes --package @semianalysisai/inferencex-skills@1.0.0 -- \
   inferencex-skills status --target codex --json
-npm exec --yes --package @semianalysisai/inferencex-skills@0.12.0 -- \
+npm exec --yes --package @semianalysisai/inferencex-skills@1.0.0 -- \
   inferencex-skills install --target codex --force --dry-run --json
-npm exec --yes --package @semianalysisai/inferencex-skills@0.12.0 -- \
+npm exec --yes --package @semianalysisai/inferencex-skills@1.0.0 -- \
   inferencex-skills install --target codex --force
 ```
 
 Receipts from 0.12.0 onward use package integrity checks. A receipt from 0.11 or earlier identifies its
 version and can be upgraded with `--force`. Matching packaged files are replaced;
 local edits should be reviewed first. Unmanaged and obsolete files are preserved,
-so a removed helper may remain on disk after upgrade without being a supported 0.12.0
+so a removed helper may remain on disk after upgrade without being a supported 1.0.0
 command.
 
-The 0.12.0 query interface is `inferencex` only. Direct domain scripts and
+The 1.0.0 query interface is `inferencex` only. Direct domain scripts and
 `verify-export.mjs` are not supported query commands. Exports from 0.11 and earlier need
 the pinned package that created them. See the [migration guide](../../docs/inferencex-cli-compatibility.md).
 
@@ -122,11 +122,15 @@ repair arbitrary external edits.
 ## Published history
 
 Versions 0.1.0 through 0.11.0 are immutable published releases. The website remains
-pinned to the anonymously verified 0.11.0 package until 0.12.0 publication and public
+pinned to the anonymously verified 0.11.0 package until 1.0.0 publication and public
 verification complete. Their historical interfaces remain available only by pinning
-those versions; this README documents the 0.12.0 candidate. The package remains pre-1.0: later
-minor releases may change the CLI. Evidence format `schema_version: 1` is separate
-from the package version; a stable 1.0 release is deferred.
+those versions; this README documents the 1.0.0 candidate. Starting with 1.0.0,
+supported commands and arguments, documented required output fields and their
+meanings, and exit-code semantics remain compatible across 1.x. Minor releases
+may add commands, optional arguments, and optional fields; breaking these
+guarantees requires a new major package version. Human summary wording and
+diagnostic message text are outside this compatibility promise. Evidence format
+`schema_version: 1` is versioned independently from the package.
 
 ## 中文说明
 
@@ -137,15 +141,15 @@ AgentX、结果溯源、TCO、框架版本比较和 CollectiveX 生成可离线�
 
 ### 安装
 
-需要 Node 24 或更高版本。0.12.0 发布并完成公开验证后，可执行：
+需要 Node 24 或更高版本。1.0.0 发布并完成公开验证后，可执行：
 
 ```bash
 # Codex
-npm exec --yes --package @semianalysisai/inferencex-skills@0.12.0 -- \
+npm exec --yes --package @semianalysisai/inferencex-skills@1.0.0 -- \
   inferencex-skills install --target codex
 
 # Claude Code
-npm exec --yes --package @semianalysisai/inferencex-skills@0.12.0 -- \
+npm exec --yes --package @semianalysisai/inferencex-skills@1.0.0 -- \
   inferencex-skills install --target claude
 ```
 
@@ -156,7 +160,7 @@ npm exec --yes --package @semianalysisai/inferencex-skills@0.12.0 -- \
 
 ### 统一命令
 
-0.12.0 只提供一个查询入口：`inferencex`。复制 skill 不会把命令长期加入 `PATH`，
+1.0.0 只提供一个查询入口：`inferencex`。复制 skill 不会把命令长期加入 `PATH`，
 因此应通过已安装脚本调用：
 
 ```bash
@@ -184,14 +188,17 @@ policy 和最后写入的 manifest。退出码 0 表示目录完整且显式 pol
 `status --json` 可查看当前安装，`install --force --dry-run --json` 可预览，
 `install --force` 执行升级。0.12.0 起会校验 package 完整性；0.11 及更早版本的 receipt 只用于识别
 旧版本，但仍可强制升级。安装器会保留不归当前 package 管理的文件，因此旧 helper
-可能继续留在磁盘上，但不属于 0.12.0 支持的命令。
+可能继续留在磁盘上，但不属于 1.0.0 支持的命令。
 
-0.12.0 不支持直接执行领域脚本或 `verify-export.mjs`。需要处理旧版导出时，应固定使用
-生成该导出的历史 package。0.1.0 至 0.11.0 均为不可变的已发布版本；网站在 0.12.0
-发布并完成公开验证前继续固定到已验证的 0.11.0。
+1.0.0 不支持直接执行领域脚本或 `verify-export.mjs`。需要处理旧版导出时，应固定使用
+生成该导出的历史 package。0.1.0 至 0.11.0 均为不可变的已发布版本；网站在 1.0.0
+发布并完成公开验证前，继续固定到已通过匿名验证的 0.11.0。
 
-0.12.0 仍处于 1.0 之前的开发阶段，后续次版本可能调整 CLI。证据格式的
-`schema_version: 1` 与包版本分别管理；1.0 稳定版留待后续发布。
+本文对应 1.0.0 候选版本。从 1.0.0 起，1.x 系列将保持以下内容兼容：已支持的命令与参数、
+文档中规定的必需输出字段及其含义，以及退出码语义。次版本可以新增命令、可选参数和
+可选字段；若要打破上述保证，必须发布新的主版本。供人阅读的摘要措辞和诊断信息文本
+不在此兼容性承诺范围内。
+证据格式 `schema_version: 1` 与包版本独立管理。
 
 ## License / 许可证
 
