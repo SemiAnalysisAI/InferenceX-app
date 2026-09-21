@@ -52,20 +52,22 @@ export interface PublishedPowerRow extends Record<string, unknown> {
   metrics: Record<string, number>;
 }
 
+export function stablePowerPointIdentity(row: Record<string, unknown>): string {
+  return JSON.stringify(
+    IDENTITY_FIELDS.filter((key) => key !== 'image' && key !== 'run_url').map(
+      (key) => row[key] ?? null,
+    ),
+  );
+}
+
 export function publicationIdentity(row: Record<string, unknown>): string {
   return JSON.stringify(IDENTITY_FIELDS.map((key) => row[key] ?? null));
 }
 
-export function powerPublicationPoint(
+export function benchmarkPublicationIdentity(
   row: BenchmarkParams,
-  runUrl: string,
-  artifact: PowerPublicationPoint['artifact'],
-): PowerPublicationPoint | null {
-  if (
-    row.benchmarkType !== 'agentic_traces' &&
-    (row.benchmarkType !== 'single_turn' || row.isl !== 8192 || row.osl !== 1024)
-  )
-    return null;
+  runUrl = '',
+): Record<string, unknown> {
   const identity: Record<string, unknown> = Object.fromEntries(
     Object.entries(CONFIG_FIELDS).map(([source, target]) => [
       target,
@@ -82,6 +84,22 @@ export function powerPublicationPoint(
     image: row.image,
     run_url: runUrl,
   });
+  return identity;
+}
+
+export function powerPublicationPoint(
+  row: BenchmarkParams,
+  runUrl: string,
+  artifact: PowerPublicationPoint['artifact'],
+): PowerPublicationPoint | null {
+  if (
+    row.benchmarkType !== 'agentic_traces' &&
+    (row.benchmarkType !== 'single_turn' ||
+      (row.isl !== 1024 && row.isl !== 8192) ||
+      row.osl !== 1024)
+  )
+    return null;
+  const identity = benchmarkPublicationIdentity(row, runUrl);
   return {
     identity,
     metrics: Object.fromEntries(
