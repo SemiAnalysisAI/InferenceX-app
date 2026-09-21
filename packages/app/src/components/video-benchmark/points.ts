@@ -96,3 +96,63 @@ export function latestVideoCells(points: VideoPoint[]): VideoPoint[] {
     return true;
   });
 }
+
+/** Valid clips a cell needs before the dashboard counts it: the same floor as the P90 display. */
+export const DASHBOARD_SAMPLE_FLOOR = 10;
+
+/** Generation settings plus model: the first five label parts, before seeds and prompt text. */
+export function workloadGroup(point: Pick<VideoPoint, 'workload'>): string {
+  return point.workload.split(' · ').slice(0, 5).join(' · ');
+}
+
+/**
+ * Cells the dashboard reads. Published history also carries smoke runs (a few
+ * clips of a shorter plan) and superseded exports, while the chart, cards,
+ * Compare and Evidence must all describe one frozen workload: drop cells under
+ * the sample floor, keep the workload measured on the most hardware (ties: more
+ * cells, then the newer publication), then the newest cell per deployment and
+ * concurrency. Everything else stays visible in the Performance history list.
+ */
+export function dashboardCells(points: VideoPoint[]): {
+  cells: VideoPoint[];
+  workload: string | null;
+  otherWorkloads: number;
+} {
+  const qualified = points.filter((p) => p.samples >= DASHBOARD_SAMPLE_FLOOR);
+  const hardware = new Map<string, Set<string>>();
+  const cellKeys = new Map<string, Set<string>>();
+  for (const p of qualified) {
+    const group = workloadGroup(p);
+    const hardwareId = p.hardwareKey ?? p.hardwareName;
+    hardware.set(group, (hardware.get(group) ?? new Set()).add(hardwareId));
+    cellKeys.set(
+      group,
+      (cellKeys.get(group) ?? new Set()).add(
+        `${hardwareId}:${deploymentKey(p)}:${p.concurrency ?? 'na'}`,
+      ),
+    );
+  }
+  let workload: string | null = null;
+  for (const group of hardware.keys()) {
+    if (workload === null) {
+      workload = group;
+      continue;
+    }
+    const byHardware = hardware.get(group)!.size - hardware.get(workload)!.size;
+    if (
+      byHardware > 0 ||
+      (byHardware === 0 && cellKeys.get(group)!.size > cellKeys.get(workload)!.size)
+    )
+      workload = group;
+  }
+  const others = new Set(points.map(workloadGroup));
+  if (workload !== null) others.delete(workload);
+  return {
+    cells:
+      workload === null
+        ? []
+        : latestVideoCells(qualified.filter((p) => workloadGroup(p) === workload)),
+    workload,
+    otherWorkloads: others.size,
+  };
+}

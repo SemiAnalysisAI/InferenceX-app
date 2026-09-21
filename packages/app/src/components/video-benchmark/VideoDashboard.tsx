@@ -23,7 +23,7 @@ import {
   type MetricId,
   type VideoPoint,
 } from './metrics';
-import { latestVideoCells } from './points';
+import { dashboardCells } from './points';
 import { formatApiPrice, H3_API_REFERENCE } from './api-reference';
 import { useVideoPoints } from './use-video-points';
 import VideoHistory from './VideoHistory';
@@ -80,7 +80,7 @@ const STRINGS = {
     vs: 'vs.',
     notMeasured: 'not measured',
     runtime: 'runtime',
-    workloads: (n: number) => ` (+${n} more)`,
+    workloads: (n: number) => ` (${n} other workloads hidden)`,
   },
   zh: {
     title: 'VideoGenX · MiniMax-H3 跨硬件对比',
@@ -107,7 +107,7 @@ const STRINGS = {
     vs: 'vs.',
     notMeasured: '未测得',
     runtime: 'runtime',
-    workloads: (n: number) => `（另有 ${n} 个）`,
+    workloads: (n: number) => `（另有 ${n} 个工作负载未显示）`,
   },
 };
 
@@ -159,7 +159,11 @@ export default function VideoDashboard() {
   );
 
   const options = metricOptions(state);
-  const cells = useMemo(() => latestVideoCells(points), [points]);
+  const {
+    cells,
+    workload: primaryWorkload,
+    otherWorkloads,
+  } = useMemo(() => dashboardCells(points), [points]);
   const measured = useMemo(
     () =>
       new Map(
@@ -177,12 +181,10 @@ export default function VideoDashboard() {
   const deploymentLabel =
     layouts.length > 2 ? s.deployments(layouts.length) : layouts.join(' | ') || '—';
   // "1344 × 768 · 8 s · 24 fps · 50 steps · model @ rev · seeds · prompt" → shape, then model @ rev.
-  const workloadParts = lead?.workload.split(' · ') ?? [];
+  const workloadParts = primaryWorkload?.split(' · ') ?? [];
   const workloadLabel = workloadParts.slice(0, 4).join(' · ') || '—';
   const modelLabel = workloadParts[4] ?? lead?.model ?? '—';
-  const otherWorkloads = new Set(cells.map((p) => p.workload.split(' · ').slice(0, 5).join(' · ')))
-    .size;
-  const workloadSuffix = otherWorkloads > 1 ? s.workloads(otherWorkloads - 1) : '';
+  const workloadSuffix = otherWorkloads > 0 ? s.workloads(otherWorkloads) : '';
   // Jobs that reserved a whole node but generated on part of it: say so beside the per-GPU numbers.
   const idle = [...measured.values()]
     .filter(
@@ -216,7 +218,7 @@ export default function VideoDashboard() {
   });
 
   const exportCsv = () => {
-    const rows = videoTableRows(points, hidden);
+    const rows = videoTableRows(cells, hidden);
     const header = [
       'hardware',
       'concurrency',
@@ -377,7 +379,7 @@ export default function VideoDashboard() {
               <div className="min-w-0">
                 {state.view === 'chart' ? (
                   <VideoHardwareChart
-                    points={points}
+                    points={cells}
                     state={state}
                     colorFor={colorFor}
                     hidden={hidden}
@@ -386,7 +388,7 @@ export default function VideoDashboard() {
                     }
                   />
                 ) : (
-                  <VideoPointsTable points={points} state={state} hidden={hidden} />
+                  <VideoPointsTable points={cells} state={state} hidden={hidden} />
                 )}
               </div>
               <div data-testid="video-legend">
@@ -402,11 +404,11 @@ export default function VideoDashboard() {
           )}
         </div>
       </ChartSection>
-      <VideoKpiCards points={points} state={state} colorFor={colorFor} loading={loading} />
+      <VideoKpiCards points={cells} state={state} colorFor={colorFor} loading={loading} />
       {!loading && !error && (
         <>
-          <VideoCompare points={points} options={options} colorFor={colorFor} />
-          <VideoEvidence points={points} colorFor={colorFor} />
+          <VideoCompare points={cells} options={options} colorFor={colorFor} />
+          <VideoEvidence points={cells} colorFor={colorFor} />
         </>
       )}
       <details

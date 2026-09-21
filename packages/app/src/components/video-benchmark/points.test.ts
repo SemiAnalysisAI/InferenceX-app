@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { VideoHistoryObservation, VideoHistoryPage } from './history';
-import { latestVideoCells, videoPoints } from './points';
+import { dashboardCells, latestVideoCells, videoPoints } from './points';
 
 const observation: VideoHistoryObservation = {
   id: 'sha:c1',
@@ -174,5 +174,77 @@ describe('videoPoints', () => {
       ['again:c1', 140],
       ['sha:c2', 150.6],
     ]);
+  });
+});
+
+describe('dashboardCells', () => {
+  const FORMAL =
+    '1344 × 768 · 8 s · 24 fps · 50 steps · MiniMaxAI/MiniMax-H3 @ 42ed227ee7df · seed 11, 29 · A single continuous shot';
+  const SHORT =
+    '1344 × 768 · 4 s · 24 fps · 50 steps · MiniMaxAI/MiniMax-H3 @ 42ed227ee7df · seed 11 · A single continuous shot';
+  const cell = (over: Partial<VideoHistoryObservation>): VideoHistoryObservation => ({
+    ...observation,
+    workload: FORMAL,
+    ...over,
+  });
+  const pageOf = (
+    runId: string,
+    hardware: string,
+    observations: VideoHistoryObservation[],
+  ): VideoHistoryPage => ({
+    schemaVersion: 1,
+    nextPage: null,
+    entries: [
+      {
+        ...page.entries[0],
+        id: `${runId}.1`,
+        runId,
+        artifact: { ...artifact, id: Number(runId) },
+        sources: [{ ...source, id: runId, hardware, observations }],
+      },
+    ],
+  });
+
+  it('drops cells under the sample floor even when they are the most efficient', () => {
+    // A two-GPU smoke with four clips: the best videos per GPU-hour, no P90, not a benchmark point.
+    const smoke = cell({
+      id: 'sha:smoke',
+      cell: 'smoke',
+      samples: 4,
+      valid: 4,
+      scheduled: 4,
+      p90: null,
+      clipsGpuHour: 15.06,
+      participating: 2,
+      allocated: 2,
+      server: { tp: 1, ulysses: 2, attention: 'auto' },
+    });
+    const { cells, workload, otherWorkloads } = dashboardCells(
+      videoPoints([pageOf('1', 'NVIDIA H200', [cell({}), smoke])]),
+    );
+    expect(cells.map((p) => p.id)).toEqual(['sha:c1']);
+    expect(workload).toBe(FORMAL.split(' · ').slice(0, 5).join(' · '));
+    expect(otherWorkloads).toBe(0);
+  });
+
+  it('keeps the workload measured on the most hardware and counts the hidden ones', () => {
+    const pages = [
+      pageOf('1', 'NVIDIA H200', [
+        cell({}),
+        cell({ id: 'sha:short', cell: 'c1s', workload: SHORT }),
+      ]),
+      pageOf('2', 'NVIDIA B200', [cell({ id: 'sha:b1', hardware: 'NVIDIA B200' })]),
+    ];
+    const result = dashboardCells(videoPoints(pages));
+    expect(result.workload).toBe(FORMAL.split(' · ').slice(0, 5).join(' · '));
+    expect(result.cells.map((p) => p.id).toSorted()).toEqual(['sha:b1', 'sha:c1']);
+    expect(result.otherWorkloads).toBe(1);
+  });
+
+  it('returns no cells and no workload when nothing reaches the floor', () => {
+    const result = dashboardCells(
+      videoPoints([pageOf('1', 'NVIDIA H200', [cell({ samples: 3 })])]),
+    );
+    expect(result).toEqual({ cells: [], workload: null, otherWorkloads: 1 });
   });
 });
