@@ -95,9 +95,15 @@ facility kW/GPU used to calculate capacity per GW. Consequently, revenue,
 compute expense, license fee, and profit scale together; profit margin does not
 change. Electricity expense is not recomputed separately.
 
-This opt-in AgentX estimate requires validated schema-v2 telemetry and a complete
-single-node eight-GPU chassis supported by the pinned model. Partial allocations,
-unsupported GB200/GB300 chassis, and missing/invalid measurements stay unavailable.
+This opt-in AgentX estimate requires validated schema-v2 telemetry and a
+single-node chassis supported by the pinned model. Validated 1/2/4-GPU allocations
+use the existing full-chassis extrapolation: fill an eight-GPU server with whole
+replicas at the measured per-GPU power and throughput, then divide modeled facility
+power by eight. This assumes replica co-location does not change performance or
+power; it is not a measurement of a partly idle server. The chart, tooltip, and CSV
+label every extrapolated estimate, including interpolation with one partial knot.
+Unsupported GB200/GB300 chassis, multi-node layouts, allocations that cannot tile
+eight GPUs, and missing/invalid measurements stay unavailable with distinct reasons.
 The ordinary 8K/1K transformation keeps its existing admission policy.
 
 At an exact frontier point, use that point's modeled power. Between points,
@@ -119,8 +125,12 @@ from today's results and include the source date/run label.
 `inferencex-feature-gate=1`）。锁定时，`c_power` 不会启用其他估算方式或触发完整功耗
 数据请求；重新锁定后立即恢复预配功耗估算。
 
-AgentX 估算仅接纳通过验证的 schema-v2 功耗，且要求完整的单节点八卡机箱及适用模型。
-部分卡分配、GB200/GB300 等无匹配模型的机箱，以及缺失或无效功耗保持不可用。原有
+AgentX 估算仅接纳通过验证的 schema-v2 功耗，且要求单节点机箱及适用模型。
+实测单卡、双卡或四卡配置可复用现有整机外推：假设在八卡服务器上部署多个完整实例，
+每卡功耗和吞吐量保持不变，再将建模设施功耗除以八。这要求实例共置不改变性能或功耗，
+不代表部分 GPU 闲置时的整机实测功耗。图表、提示框和 CSV 均标注整机外推；若插值
+使用的任一数据点采用外推，也保留该标注。GB200/GB300 等无匹配模型的机箱、多节点
+配置、无法整除八卡的实例，以及缺失或无效功耗仍不可用，并分别说明原因。原有
 8K/1K 转换路径的接纳规则不变。精确前沿点使用自身的功耗；点间采用原吞吐量插值的
 同一对数据点线性估算功耗，不换用其他点填补缺失。PUE 取 1.3，另加 10% 功耗余量；
 这些假设和上述固定 CPU/DRAM 利用率尚未通过 AgentX 系统校准，也不构成峰值供电容量
