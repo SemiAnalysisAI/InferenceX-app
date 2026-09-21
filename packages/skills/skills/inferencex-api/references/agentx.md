@@ -137,6 +137,25 @@ validate the bundle with `inferencex verify`, then inspect the saved benchmark
 response. Neither outcome says whether other benchmark jobs, failed runs, source
 artifacts, or data outside that response exist.
 
+### Read the enrichment and coverage states
+
+The status fields describe different objects:
+
+| Source field                                                    | Meaning                                                                                                                       |
+| --------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `row.agentx.status = complete`                                  | Both the aggregate entry and derived-metric entry were returned for this result ID; individual values can be null.            |
+| `row.agentx.aggregates.status = available`                      | The aggregate response contains this ID, including entries whose groups are all null.                                         |
+| `metadata.enrichment_coverage.aggregates[group].available_rows` | Number of selected rows with a non-null distribution for this group; its `n` can be zero.                                     |
+| `manifest.coverage.hardware[].valid_records`                    | Number of rows with at least one recognized aggregate group whose `n > 0`. This is the hardware policy's usable-record count. |
+
+Trace availability is recorded separately. Keep each distribution's `n` with its
+statistics. A row can have both enrichment entries while only some metric groups
+contain samples.
+
+For `agentx.status = complete`, report “rows with both aggregate and derived-metric
+entries.” Use the existing per-group counts in `metadata.enrichment_coverage` to
+describe which optional groups have values, are null, or have missing entries.
+
 An unsupported raw ID remains in the export but is not sent to numeric enrichment
 endpoints. Do not use this summary workflow to bulk-read timelines, histograms, or
 server metrics.
@@ -181,6 +200,9 @@ member falls inside the same windows.
 
 Compute phase totals per request before taking percentiles; separate phase
 percentiles are distributions, not additive components of the E2E percentile.
+For the slowest request in a phase, select the record with the largest `end - start`
+first, then read its IDs, ISL, OSL, and cancellation state from that record. Maxima
+of separate fields can belong to different requests.
 For timeline accounting, `sum(end - start)` is cumulative request latency and can
 exceed elapsed time when requests overlap. The union of `[start, end]` intervals
 is time with at least one request in flight. Neither measures GPU utilization or

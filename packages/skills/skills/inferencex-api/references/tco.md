@@ -172,10 +172,13 @@ statistic (per-request time per output token). The reciprocal `1000 / p99_intvty
 is not P99 ITL. A median frontier target cannot certify a tail SLA.
 Use only the user's requested predicate for classification and costing. Retain a
 finite `p99_itl < 0.020` pass and its cost on the API-reported basis. Build the priced
-table from those passing rows, then derive best-cost, throughput and concurrency
-summaries from that same table. A narrower comparison names its additional
-selectors and retains the full passing population's counts and extrema. If another
-statistic helps explain a limitation, report its recorded value separately.
+table from those passing rows. Derive best-cost points, price boundaries, their
+dates, and throughput/concurrency extrema from that same named population; reuse
+those values in the report and final answer. Count known, null, and missing
+`recipe_fingerprint` values in that population before describing availability.
+A narrower comparison names its additional selectors or exclusions wherever its
+results appear, and retains the full passing population's counts and extrema.
+If another statistic helps explain a limitation, report its recorded value separately.
 Different percentiles can differ greatly without internal inconsistency; TPOT and
 ITL also measure different statistics. Aggregate ratios alone establish neither
 invalid data nor a delivery pattern. Additional screening thresholds require the

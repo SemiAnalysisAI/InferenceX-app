@@ -57,23 +57,30 @@ the user's selectors and acceptance criteria throughout classification and costi
    complete raw responses as evidence; record which subset the analysis uses.
    Read units and denominators from saved metadata or the API contract, and
    eligibility rules from the relevant cookbook. Keep source field names, grouping
-   keys, and comparison operators attached to each statement; a missing-field
-   claim names the exact absent path.
+   keys, and comparison operators attached to each statement. Before claiming a
+   field is absent, inspect the retained response for those record IDs and name
+   that response, population and field path. A projection describes its included
+   fields; complete configuration means the unabridged source object.
 2. If the user requests a report, or the raw-API task needs a derived analysis,
    write a small script that reads the saved results and writes the requested
-   report file directly (Markdown by default). Its quantitative content uses the same
-   variables for quantities, populations, dates, IDs and units. Reuse existing
-   valid calculations for that scope; compute missing quantities in this script.
+   report file directly (Markdown by default). Generate quantities, populations,
+   dates, IDs and units from the same computed facts, including the conclusion.
+   Generate statements such as "all", "none" and "complete" from explicit counts
+   or field checks. Reuse existing valid calculations for that scope; compute
+   missing quantities in this script.
 3. Write the report as a direct answer, the requested table or measures with scope
    and units, source-specific limitations, and evidence links. Include one supported
    conclusion sentence to reuse in the handoff. Keep request metadata and file
    inventories in the linked evidence; derive only quantities needed for the question.
    Downloaded records, selected rows and individually investigated points remain
    separate populations.
-4. Check that conclusion and the requested output against the saved results, then
-   perform the applicable verification. In the final reply, copy the checked
-   conclusion sentence verbatim and add artifact links plus the verification
-   outcome. Keep analysis in the report unless the user asks for it in the reply.
+4. Read the generated report against the saved responses. Check every factual
+   sentence, including limitations and recommendations: its records, field paths
+   and calculation must support the wording. Correct unsupported claims in the
+   generator and regenerate, then perform the applicable verification. In the
+   final reply, copy the checked conclusion sentence verbatim and add artifact
+   links plus the verification outcome. Keep analysis in the report unless the
+   user asks for it in the reply.
 
 For benchmark lookup and history, start from the saved `selection_summary` and
 `sample_summary`; regenerate the sample summary when its rows change. Distinct

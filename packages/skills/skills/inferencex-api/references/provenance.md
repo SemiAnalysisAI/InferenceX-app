@@ -59,10 +59,11 @@ find it manually:
    body checksums alongside the collector bundle so the entire discovery is
    reviewable.
 
-The sibling response supplies partial identity and source scope. It does not
-return the complete original benchmark row, image, or producing attempt. Keep
-that distinction in the answer even when it identifies an otherwise unavailable
-historical result.
+The sibling response supplies partial identity and source scope. The captured
+benchmark response can contain full rows for several siblings; look them up by
+ID before describing which workloads or configurations were recovered. Scope
+missing fields to their specific response: `result.json` selects one point, while
+the saved benchmark array may retain the others.
 
 For an ID-only investigation, use siblings to resolve the selected point's scope
 and retain their raw response; do not add classifications of the other IDs. If the

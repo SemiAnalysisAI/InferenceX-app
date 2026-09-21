@@ -2127,6 +2127,7 @@
               ],
               "properties": {
                 "status": {
+                  "description": "Enrichment join state for this result ID. complete means both the aggregate entry and derived-metric entry were returned; their values can still be null. partial means at least one entry was not returned. unsupported_id means the ID was not queried. Trace availability is recorded separately.",
                   "enum": ["complete", "partial", "unsupported_id"]
                 },
                 "result_id": {
@@ -2139,6 +2140,7 @@
                       "required": ["status", "value"],
                       "properties": {
                         "status": {
+                          "description": "An aggregate response entry was returned for this ID. Each recognized distribution is independently nullable.",
                           "const": "available"
                         },
                         "value": {
@@ -2178,6 +2180,7 @@
                       "required": ["status", "value"],
                       "properties": {
                         "status": {
+                          "description": "A derived-metric response entry was returned for this ID. The p75 and p90 values are independently nullable.",
                           "const": "available"
                         },
                         "value": {
@@ -2330,6 +2333,7 @@
         "required": ["available_rows", "null_rows", "missing_entry_rows", "unsupported_id_rows"],
         "properties": {
           "available_rows": {
+            "description": "Rows with a non-null distribution for this group. Its n can be zero; sample counts and bundle eligibility are separate.",
             "type": "integer",
             "minimum": 0
           },

@@ -47,7 +47,9 @@ by numeric run ID. The older selection is `left`; the newer is `right`. This is 
 bounded example selection, not a representative sample. A cancelled or failed
 workflow can still contain measured cases; its conclusion remains in the export.
 
-For a requested pair, supply both exact string IDs from discovery:
+Run-list counts identify candidate pairs; exact EP and KV identities in the returned
+details establish whether they have matched groups. For a requested pair, supply
+both exact string IDs from discovery:
 
 ```bash
 node .agents/skills/inferencex-api/scripts/inferencex.mjs collectivex compare \
@@ -212,8 +214,10 @@ never from another selection or an older example.
 Report the selected runs and attempts, discovery coverage, matched/unmatched/
 ambiguous/incomparable counts, the specific metric/percentile and units, and
 relevant unmeasured coverage. Summarize numerical differences only from the
-complete requested set of `matched` groups. With no matches, explain the actual
-identity differences and unavailable fields. Do not invent relaxed counterpart
+complete requested set of `matched` groups. Derive shared and differing runtime
+fields from each saved left/right value pair, including equal software versions.
+With no matches, distinguish empty candidate arrays from actual identity differences
+and unavailable fields. Do not invent relaxed counterpart
 counts or performance pairs unless the user requests that separate analysis.
 Keep the result scoped to the two
 returned snapshots and state that no new benchmarks were run.
