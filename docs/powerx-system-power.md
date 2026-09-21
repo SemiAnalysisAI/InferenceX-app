@@ -61,7 +61,7 @@ as their input: the module sensor total (`avg_total_module_power_w`) when the
 producer publishes it, otherwise GPU-board watts plus the Grace-socket total
 (`avg_total_cpu_power_w`) with the source's regulator-loss allowance on the GPU
 share. The Grace CPU and LPDDR5X are never modelled; rows without
-`cpu_power_valid=1` and the Grace-side keys stay unavailable (`cpu-telemetry`).
+`cpu_power_valid=1` and complete module or Grace provenance stay unavailable (`cpu-telemetry`).
 Each measured worker host is one compute tray (four GPUs, two Grace sockets); an
 aggregate multinode row without a per-worker array is `gpuCount / 4` trays at the
 deployment mean, cross-checked against the Grace-socket count and the CPU leg's
@@ -118,9 +118,12 @@ ACPI hwmon) publishes, over the same formal window as GPU energy,
 the `Module Power Socket` sensor exists on every socket, `avg_total_module_power_w`
 and `total_module_energy_j`, with the independent verdict `cpu_power_valid` and the
 `power_audit.cpu` block (sensor kind, collector, socket coverage, reason codes).
-Admission requires `power_valid=1`, schema 2, `cpu_power_valid=1`, positive Grace
-watts, and `avg_total_cpu_power_w / avg_cpu_socket_power_w` equal to two sockets per
-tray. Basis selection: `module` when `avg_total_module_power_w` is present (the
+Admission requires `power_valid=1`, schema 2, `cpu_power_valid=1`, and
+`power_audit.cpu` with matching expected/observed socket counts: two per tray.
+A module reading requires `sensor_kind: module` and does not need redundant Grace
+metrics. The GPU-plus-Grace path requires `sensor_kind: grace_socket`, positive
+Grace watts and total/mean watts consistent with the audited socket count.
+CPU-rail-only and missing or unknown sensor provenance stay unavailable. Basis selection: `module` when `avg_total_module_power_w` is present (the
 reading already contains the GPU boards, so it is never scaled), otherwise
 `gpu-plus-grace` (GPU-board watts × 4 plus the Grace-socket total per tray, with the
 source's regulator-loss allowance `regulatorLossFracOfTdp / (1 − frac)` on the GPU
@@ -161,7 +164,8 @@ whose trays are all fully measured (four GPUs and two sockets each: one tray per
 measured worker host, or, for an aggregate multinode row without a per-worker
 array, `gpuCount / 4` trays at the deployment mean, cross-checked against the
 Grace-socket count and `power_audit.cpu.observed_sockets`). Partial trays are
-extrapolated in the chart but rejected here, as partial chassis are. Between two
+extrapolated in the chart but rejected here. Single-node 1/2/4-GPU chassis
+allocations use the replica extrapolation below. Between two
 frontier knots both must share the same measured basis and sensor kind; a module
 knot beside a Grace-socket knot stays unavailable rather than blending sensors. The
 bar tooltip, the caption line under the power note and the CSV columns `Power
@@ -185,16 +189,25 @@ facility kW/GPU used to calculate capacity per GW. Consequently, revenue,
 compute expense, license fee, and profit scale together; profit margin does not
 change. Electricity expense is not recomputed separately.
 
-This opt-in AgentX estimate requires validated schema-v2 telemetry and either fully
-measured eight-GPU chassis supported by the pinned model (one single-node chassis,
-one chassis per measured worker host, or, for an aggregate multinode deployment
-whose producer emits no per-worker telemetry, every chassis at the deployment-mean
-GPU power: `topologyBasis: 'uniform-hosts'`, since symmetric TP/PP/DP shards load
-each host alike) or NVL72 compute trays that are all fully measured
-(`cpu_power_valid=1`, see the NVL72 section). Partial allocations, disaggregated
-deployments without per-worker telemetry, NVL72 rows without CPU-side telemetry,
-and missing/invalid measurements stay unavailable. The ordinary 8K/1K
-transformation keeps its existing admission policy.
+This opt-in AgentX estimate requires validated schema-v2 telemetry and a supported
+system profile. It accepts full eight-GPU chassis on the single-node or measured
+worker-host basis. Aggregate multinode rows without per-worker telemetry may use
+the explicit `uniform-hosts` assumption: each complete chassis is evaluated at
+the measured deployment-mean GPU watts. Disaggregated rows require per-host role
+power. NVL72 requires complete four-GPU trays with the CPU provenance above.
+
+Validated single-node 1/2/4-GPU allocations retain full-chassis extrapolation:
+fill an eight-GPU server with whole replicas at the measured per-GPU power and
+throughput, then divide modeled facility power by eight. This assumes replica
+co-location does not change performance or power; it is not a measurement of a
+partly idle server. The chart, tooltip, and CSV label every extrapolated estimate,
+including interpolation with one partial knot. Other partial layouts and missing
+or invalid measurements remain unavailable with distinct reasons.
+The ordinary 8K/1K transformation keeps its existing admission policy.
+
+Compare retains each valid provisioned estimate even when measured + modeled
+power is unavailable. Its notice identifies the missing measured estimate;
+modeled-only mode never substitutes provisioned watts.
 
 At an exact frontier point, use that point's modeled power. Between points,
 estimate power linearly using the same two knots as the existing throughput
@@ -217,9 +230,17 @@ from today's results and include the source date/run label.
 `inferencex-feature-gate=1`）。锁定时，`c_power` 不会启用其他估算方式或触发完整功耗
 数据请求；重新锁定后立即恢复预配功耗估算。
 
-AgentX 估算仅接纳通过验证的 schema-v2 功耗，且要求完整的单节点八卡机箱及适用模型，
-或全部 tray 均完整实测（`cpu_power_valid=1`，见下文 NVL72 一节）的 NVL72 计算 tray。
-部分卡分配、缺少 CPU 侧实测的 NVL72 行，以及缺失或无效功耗保持不可用。原有
+AgentX 估算仅接纳通过验证的 schema-v2 功耗和适用的系统模型。完整八卡机箱可采用
+单节点或各物理主机的实测功耗；没有逐主机遥测的聚合多节点配置，可明确假设各完整
+机箱均采用部署平均功耗。分离式部署仍需要逐主机、逐角色功耗。NVL72 必须具有完整
+四卡 tray，以及 CPU 审计确认的每 tray 两个 socket；完整 module 读数和 Grace socket
+读数分别处理，只有 CPU rail 或缺少传感器来源的记录不能代替整颗 Grace 的功耗。
+
+实测单节点单卡、双卡或四卡配置保留整机外推：假设八卡服务器放置多个完整实例，
+每卡功耗和吞吐量不变，再将建模设施功耗除以八。图表、提示框和 CSV 标注该假设；
+这不代表部分 GPU 闲置时的整机实测。其他部分分配以及缺失或无效功耗仍不可用。
+对比模式保留有效的预配功耗结果，并单独说明实测加建模结果为何缺失；只看实测加
+建模模式时不会用预配功耗代替。原有
 8K/1K 转换路径的接纳规则不变。精确前沿点使用自身的功耗；点间采用原吞吐量插值的
 同一对数据点线性估算功耗，不换用其他点填补缺失，也不会把两种实测口径不同的数据点
 混合估算。PUE 按 PowerX 策略取值（风冷机箱 1.3，液冷 NVL72 机架 1.1），另加 10%
@@ -326,7 +347,7 @@ worker 主机视为一个计算 tray（4 张 GPU、2 个 Grace socket）；没�
 CPU 采集记录的 `power_audit.cpu.observed_sockets` 交叉校验。输入为实测模块功耗
 （`avg_total_module_power_w`）；缺失时改用 GPU 板卡功耗加 Grace socket 功耗
 （`avg_total_cpu_power_w`），并按来源模型计入 GPU 份额的稳压损耗余量。Grace CPU 与
-LPDDR5X 从不建模，缺少 `cpu_power_valid=1` 和 Grace 侧指标的行保持不可用
+LPDDR5X 从不建模，缺少 `cpu_power_valid=1` 或完整 module/Grace 来源与覆盖记录的行保持不可用
 （`cpu-telemetry`）。实测的各 tray 先折算为一个由 18 个与其均值相同的 tray 组成的
 整机架，电源架效率曲线只在该机架的直流总负载处求值一次（与来源模型
 `gb200_nvl72_rack_power` 只接受单一 per-tray 输入的做法一致），每个 tray 取其 1/18，
@@ -351,8 +372,11 @@ GPU 能耗相同的正式窗口内输出 `avg_cpu_socket_power_w`、`avg_total_c
 `total_cpu_energy_j`，当每个 socket 都有 `Module Power Socket` 传感器时还输出
 `avg_total_module_power_w` 与 `total_module_energy_j`，并附带独立的验证结论
 `cpu_power_valid` 和 `power_audit.cpu`（传感器类型、采集来源、socket 覆盖情况、原因码）。
-接纳条件：`power_valid=1`、schema 2、`cpu_power_valid=1`、Grace 功耗为正，且
-`avg_total_cpu_power_w / avg_cpu_socket_power_w` 等于每 tray 两个 socket。存在
+接纳条件：`power_valid=1`、schema 2、`cpu_power_valid=1`，且 `power_audit.cpu`
+记录的预期与实测 socket 数相符，每个 tray 为两个 socket。module 读数须注明
+`sensor_kind: module`，不要求重复提供 Grace 指标；GPU 加 Grace 口径须注明
+`sensor_kind: grace_socket`，Grace 功耗为正，且总功耗除以平均功耗与审计 socket 数
+一致。仅 CPU rail、传感器来源缺失或未知时保持不可用。存在
 `avg_total_module_power_w` 时采用 `module` 口径（读数已包含 GPU 板卡，不再缩放），
 否则采用 `gpu-plus-grace` 口径（每 tray GPU 板卡功耗 × 4 加 Grace socket 总功耗，
 并仅对 GPU 份额计入来源模型的稳压损耗余量）。模块指标存在但无效时该行不可用
@@ -375,7 +399,8 @@ BlueField-3 DPU 空闲功耗（2 × 65 W）、NVMe 空闲功耗（22 W）、风�
 `chassisBasis: 'full'` 的八卡机箱估算（`single-node`、`worker-hosts` 或 `uniform-hosts`
 拓扑），或全部 tray 均完整实测的 `nvl72-trays` 估算（各 4 张 GPU、2 个 socket：每个实测
 worker 主机一个 tray，或没有逐 worker 数组的聚合多节点行按 GPU 总数 ÷ 4 推算、并与
-socket 数交叉校验）；部分 tray 在图表中外推显示，但与部分机箱一样不进入规划门槛。两个前沿数据点之间必须采用相同的实测口径和传感器类型，模块
+socket 数交叉校验）；部分 tray 在图表中外推显示，但不进入规划门槛。单节点 1/2/4 卡
+机箱仍接受上文的完整实例外推。两个前沿数据点之间必须采用相同的实测口径和传感器类型，模块
 读数旁边的 Grace socket 读数保持不可用，不会混合两种传感器。柱形提示、功耗说明下方的
 标注行和 CSV 的 `功耗口径`、`功耗传感器`、`系统功耗 profile` 三列逐行标出实测口径
 （实测模块功耗，或实测 GPU 板卡 + Grace socket 功耗并由模型估算稳压损耗）、传感器类型

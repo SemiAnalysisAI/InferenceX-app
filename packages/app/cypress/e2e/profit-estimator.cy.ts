@@ -96,6 +96,88 @@ const chartSvg = () => chart().find('svg').filter(':has(.chart-root)').first();
 const bars = () => chart().find('rect.bar');
 
 describe('Profit estimator power option', () => {
+  for (const locale of ['en', 'zh'] as const) {
+    it(`prices DeepSeek Flash partial chassis with visible assumptions and CSV labels (${locale})`, () => {
+      stubOpenRouter();
+      cy.viewport(locale === 'en' ? 1280 : 393, 900);
+      cy.intercept('GET', '/api/v1/benchmarks*', {
+        body: profitBenchmarkRows('dsv41flash').map((row) => {
+          const gpus = row.hardware === 'b300' ? 2 : 4;
+          return {
+            ...row,
+            prefill_tp: gpus,
+            decode_tp: gpus,
+            num_prefill_gpu: gpus,
+            num_decode_gpu: gpus,
+            metrics: {
+              ...row.metrics,
+              power_valid: 1,
+              power_metric_schema_version: 2,
+              avg_power_w: 500,
+              avg_total_gpu_power_w: 500 * gpus,
+            },
+          };
+        }),
+      });
+      let csv: Blob | undefined;
+      cy.visit(
+        `${locale === 'zh' ? '/zh' : ''}/profit-estimator-per-gigawatt/deepseek-v41-flash?c_power=modeled`,
+        {
+          onBeforeLoad: (win) => {
+            unlockPowerGate(win);
+            win.URL.createObjectURL = (blob) => {
+              if (blob instanceof win.Blob) csv = blob;
+              return 'blob:profit-csv-test';
+            };
+            win.HTMLAnchorElement.prototype.click = () => {};
+          },
+        },
+      );
+      const label = locale === 'en' ? 'Full-chassis extrapolation' : '整机外推';
+      const cpuReason =
+        locale === 'en'
+          ? 'missing complete Grace or module power'
+          : '缺少完整的 Grace 或 module 功耗';
+      cy.get('#profit-target').should('have.value', '125');
+      chart().find('text.revenue-label').should('have.length', 3);
+      chart()
+        .should('contain', 'B200')
+        .and('contain', 'B300')
+        .and('contain', 'MI355X')
+        .and('contain', label);
+      cy.get('[data-testid="profit-power-unavailable"]')
+        .should('contain', 'GB300')
+        .and('contain', cpuReason);
+      cy.get('[data-testid="profit-power-note"]').should(
+        'contain',
+        locale === 'en' ? 'partly idle server' : '部分 GPU 闲置',
+      );
+      cy.get('[data-testid="profit-power-note"]').then(($note) => {
+        const box = $note[0].getBoundingClientRect();
+        expect(box.left).to.be.at.least(0);
+        expect(box.right).to.be.at.most(locale === 'en' ? 1280 : 393);
+      });
+      chart().scrollIntoView();
+      cy.screenshot(`profit-partial-chassis-${locale}`, { capture: 'viewport', overwrite: true });
+      cy.get('[data-testid="export-button"]').first().click();
+      cy.get('[data-testid="export-csv-button"]').click();
+      cy.then(() => csv!.text()).then((text) => {
+        expect(text).to.contain(label);
+        expect(text).to.contain(
+          locale === 'en' ? 'same per-GPU power and throughput' : '每卡功耗和吞吐量保持不变',
+        );
+        expect(
+          text
+            .split('\n')
+            .filter(
+              (line) =>
+                line.startsWith('B200') || line.startsWith('B300') || line.startsWith('MI355X'),
+            ),
+        ).to.have.length(3);
+      });
+    });
+  }
+
   it('ignores power URL overrides while locked and returns to provisioned estimates on relock', () => {
     stubOpenRouter();
     let rawRequests = 0;
@@ -126,7 +208,7 @@ describe('Profit estimator power option', () => {
     cy.then(() => expect(rawRequests).to.equal(0));
     cy.get('body').type('{uparrow}{uparrow}{downarrow}{downarrow}');
     cy.get('#profit-power').should('contain', 'Compare both');
-    chart().find('text.revenue-label').should('have.length', 6);
+    chart().find('text.revenue-label').should('have.length', 7);
     cy.window().then((win) => {
       win.localStorage.removeItem('inferencex-feature-gate');
       win.dispatchEvent(new Event('inferencex:feature-gate:locked'));
@@ -137,7 +219,7 @@ describe('Profit estimator power option', () => {
   });
 
   for (const currentValid of [true, false]) {
-    it(`dates historical power skips without current hardware metadata (${currentValid ? 'with current bars' : 'empty chart'})`, () => {
+    it(`dates historical power skips without current hardware metadata (${currentValid ? 'with current bars' : 'provisioned bars only'})`, () => {
       stubOpenRouter();
       cy.intercept('GET', '/api/v1/benchmarks*', (req) => {
         const historical = req.query['date'] === PROFIT_HISTORY_DATE;
@@ -170,8 +252,9 @@ describe('Profit estimator power option', () => {
         'contain',
         `B200 (SGLang) (FP4) • ${PROFIT_HISTORY_DATE}`,
       );
-      if (currentValid) chart().find('text.revenue-label').should('have.length', 2);
-      else cy.get('[data-testid="profit-estimator-chart"]').should('not.exist');
+      chart()
+        .find('text.revenue-label')
+        .should('have.length', currentValid ? 4 : 3);
     });
   }
 
@@ -201,7 +284,7 @@ describe('Profit estimator power option', () => {
     cy.wait('@power-rows').its('request.query').should('not.have.property', 'view');
     cy.get('#profit-power').should('contain', 'Compare both');
     cy.get('#profit-target').should('have.value', '45');
-    chart().find('text.revenue-label').should('have.length', 6);
+    chart().find('text.revenue-label').should('have.length', 7);
     chart().should('contain', 'B200').and('contain', 'B300').and('contain', 'MI355X');
     chart().should('contain', 'Measured + modeled').and('contain', 'Provisioned');
     cy.get('[data-testid="profit-power-unavailable"]').should('contain', 'GB300');
@@ -238,18 +321,29 @@ describe('Profit estimator power option', () => {
     cy.get('[data-testid="profit-power-basis"]').should('not.exist');
     cy.get('body').type('{uparrow}{uparrow}{downarrow}{downarrow}');
     cy.get('#profit-power').should('contain', 'Compare both');
-    // B200, B300, MI355X and the GB200 tray each get a provisioned and a measured bar.
-    chart().find('text.revenue-label').should('have.length', 8);
+    // Four supported SKUs get pairs; GB300 keeps its provisioned bar without CPU power.
+    chart().find('text.revenue-label').should('have.length', 9);
     chart().should('contain', 'GB200').and('contain', 'Measured + modeled');
     cy.get('[data-testid="profit-power-basis"]')
       .should('contain', 'GB200 NVL72')
       .and('contain', 'measured module (GPU + HBM + Grace + LPDDR5X; module sensor)')
       .and('contain', 'NVSwitch trays')
       .and('contain', 'DLC PUE 1.1');
-    // GB300 has no CPU-side telemetry in these fixtures and stays unavailable; GB200 is priced.
+    // Only GB300's measured estimate is unavailable; its provisioned estimate remains visible.
     cy.get('[data-testid="profit-power-unavailable"]')
       .should('contain', 'GB300')
       .and('not.contain', 'GB200');
+    chart().scrollIntoView();
+    cy.screenshot('profit-nvl72-compare-desktop', { capture: 'viewport', overwrite: true });
+    cy.viewport(393, 900);
+    cy.get('[data-testid="profit-power-basis"]').then(($note) => {
+      const bounds = $note[0].getBoundingClientRect();
+      expect(bounds.left).to.be.at.least(0);
+      expect(bounds.right).to.be.at.most(393);
+    });
+    chart().find('text.revenue-label').should('have.length', 9);
+    chart().scrollIntoView();
+    cy.screenshot('profit-nvl72-compare-mobile', { capture: 'viewport', overwrite: true });
   });
 
   it('keeps the benchmark settings and restores the original chart after unavailable power', () => {

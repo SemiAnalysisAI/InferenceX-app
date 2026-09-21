@@ -173,7 +173,12 @@ export const profitBenchmarkRows = (
 
 /** GB200 NVL72 rows with measured compute-module power, for the smart-provisioning basis. */
 export const profitNvl72Rows = (dbKey: string = PROFIT_MODEL_DB_KEY, date = PROFIT_DATE) =>
-  profitBenchmarkRows(dbKey, date, undefined, [NVL72_SKU]);
+  profitBenchmarkRows(dbKey, date, undefined, [NVL72_SKU]).map((row) => ({
+    ...row,
+    power_audit: {
+      cpu: { sensor_kind: 'module', expected_sockets: 2, observed_sockets: 2 },
+    },
+  }));
 
 export const profitAvailabilityRows = (dbKeys: readonly string[] = PROFIT_DB_KEYS) =>
   dbKeys.flatMap((dbKey) =>

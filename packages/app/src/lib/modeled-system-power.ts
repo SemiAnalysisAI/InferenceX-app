@@ -264,34 +264,38 @@ export function modelSystemPower(
     return unavailable('gpu-count');
   }
 
-  // NVL72: the CPU-side keys are sums over every Grace socket in the deployment,
-  // integrated over the GPU window. The socket mean recovers the socket count the
-  // same way the GPU mean recovers the GPU count. A module key that is present but
-  // invalid never falls back to the Grace socket silently.
+  // CPU rail alone omits Grace/DRAM power. Match the metric family to the
+  // producer's sensor provenance and complete socket coverage.
   let cpu: CpuSideTelemetry | null = null;
   if (rack) {
-    const moduleTotal = m.avg_total_module_power_w;
+    const audit = row.power_audit?.cpu;
     if (
       m.cpu_power_valid !== 1 ||
-      !positive(m.avg_total_cpu_power_w) ||
-      !positive(m.avg_cpu_socket_power_w) ||
-      (moduleTotal !== undefined && !positive(moduleTotal))
-    ) {
+      !count(audit?.expected_sockets) ||
+      audit.observed_sockets !== audit.expected_sockets
+    )
       return unavailable('cpu-telemetry');
+    const socketCount = audit.observed_sockets;
+    const moduleTotal = m.avg_total_module_power_w;
+    if (moduleTotal === undefined) {
+      if (
+        audit.sensor_kind !== 'grace_socket' ||
+        !positive(m.avg_total_cpu_power_w) ||
+        !positive(m.avg_cpu_socket_power_w) ||
+        !matchingWatts(m.avg_total_cpu_power_w, m.avg_cpu_socket_power_w * socketCount, socketCount)
+      )
+        return unavailable('cpu-telemetry');
+      cpu = {
+        basis: 'gpu-plus-grace',
+        socketCount,
+        graceTotalWatts: m.avg_total_cpu_power_w,
+        moduleTotalWatts: undefined,
+      };
+    } else {
+      if (audit.sensor_kind !== 'module' || !positive(moduleTotal))
+        return unavailable('cpu-telemetry');
+      cpu = { basis: 'module', socketCount, graceTotalWatts: 0, moduleTotalWatts: moduleTotal };
     }
-    const socketCount = Math.round(m.avg_total_cpu_power_w / m.avg_cpu_socket_power_w);
-    if (
-      !count(socketCount) ||
-      !matchingWatts(m.avg_total_cpu_power_w, m.avg_cpu_socket_power_w * socketCount, socketCount)
-    ) {
-      return unavailable('cpu-telemetry');
-    }
-    cpu = {
-      basis: moduleTotal === undefined ? 'gpu-plus-grace' : 'module',
-      socketCount,
-      graceTotalWatts: m.avg_total_cpu_power_w,
-      moduleTotalWatts: moduleTotal,
-    };
   }
 
   const units: MeasuredUnit[] = [];

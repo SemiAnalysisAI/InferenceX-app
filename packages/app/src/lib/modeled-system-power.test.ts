@@ -64,6 +64,17 @@ function nvl72Row(
     decode_tp: 4,
     num_prefill_gpu: 4,
     num_decode_gpu: 4,
+    power_audit: {
+      cpu: {
+        sensor_kind: metrics.avg_total_module_power_w === undefined ? 'grace_socket' : 'module',
+        expected_sockets: Math.round(
+          (metrics.avg_total_cpu_power_w ?? 501) / (metrics.avg_cpu_socket_power_w ?? 250.5),
+        ),
+        observed_sockets: Math.round(
+          (metrics.avg_total_cpu_power_w ?? 501) / (metrics.avg_cpu_socket_power_w ?? 250.5),
+        ),
+      },
+    },
     metrics: {
       power_valid: 1,
       power_metric_schema_version: 2,
@@ -601,6 +612,60 @@ describe('modeled system power admission and accounting', () => {
 describe('NVL72 trays with measured compute-module power', () => {
   const MODULE = { avg_total_module_power_w: 4300.75 };
 
+  it('rejects a CPU rail mislabeled as complete Grace power', () => {
+    const source = nvl72Row(
+      {},
+      {
+        power_audit: {
+          cpu: {
+            sensor_kind: 'dcgm_cpu_rail',
+            expected_sockets: 2,
+            observed_sockets: 2,
+          },
+        },
+      },
+    );
+    expect(modelSystemPower(source)).toMatchObject({
+      status: 'unsupported',
+      reason: 'cpu-telemetry',
+    });
+  });
+
+  it('accepts module power without a redundant Grace measurement', () => {
+    const source = nvl72Row(
+      {
+        ...MODULE,
+        avg_total_cpu_power_w: undefined,
+        avg_cpu_socket_power_w: undefined,
+      },
+      { power_audit: { cpu: { sensor_kind: 'module', expected_sockets: 2, observed_sockets: 2 } } },
+    );
+    expect(modelSystemPower(source)).toMatchObject({
+      status: 'supported',
+      measuredBasis: 'module',
+      sensorKind: 'module',
+      gpuCount: 4,
+    });
+    for (const cpu of [
+      { sensor_kind: 'module' as const, expected_sockets: 2, observed_sockets: 1 },
+      { sensor_kind: 'module' as const, expected_sockets: 4, observed_sockets: 4 },
+      { sensor_kind: 'grace_socket' as const, expected_sockets: 2, observed_sockets: 2 },
+      {},
+    ]) {
+      expect(modelSystemPower({ ...source, power_audit: { cpu } })).toMatchObject({
+        status: 'unsupported',
+        reason: 'cpu-telemetry',
+      });
+    }
+  });
+
+  it('requires explicit Grace sensor provenance', () => {
+    expect(modelSystemPower(nvl72Row({}, { power_audit: undefined }))).toMatchObject({
+      status: 'unsupported',
+      reason: 'cpu-telemetry',
+    });
+  });
+
   it('models a full GB200 tray on the module basis with the DLC PUE applied once', () => {
     const result = modelSystemPower(nvl72Row(MODULE));
     const rack = estimateRackPower('gb200', { basis: 'module', moduleWattsPerTray: 4300.75 }, 1.1)!;
@@ -718,7 +783,7 @@ describe('NVL72 trays with measured compute-module power', () => {
         decode_tp: 0,
         num_prefill_gpu: 16,
         num_decode_gpu: 16,
-        power_audit: { cpu: { sensor_kind: 'module', observed_sockets: 8 } },
+        power_audit: { cpu: { sensor_kind: 'module', expected_sockets: 8, observed_sockets: 8 } },
       },
     );
     const rack = estimateRackPower(
@@ -743,7 +808,11 @@ describe('NVL72 trays with measured compute-module power', () => {
     expect(estimate.deploymentFacilityWatts).toBe(estimate.facilityWatts);
 
     // Without module keys the same trays take GPU board plus Grace socket per tray.
-    const graceOnly = { ...source, metrics: { ...source.metrics } };
+    const graceOnly = {
+      ...source,
+      metrics: { ...source.metrics },
+      power_audit: { cpu: { ...source.power_audit?.cpu, sensor_kind: 'grace_socket' as const } },
+    };
     delete (graceOnly.metrics as Record<string, unknown>).avg_total_module_power_w;
     const graceRack = estimateRackPower(
       'gb200',
@@ -769,11 +838,11 @@ describe('NVL72 trays with measured compute-module power', () => {
     expect(
       modelSystemPower({ ...source, power_audit: { cpu: { observed_sockets: 6 } } }),
     ).toMatchObject({ reason: 'cpu-telemetry' });
-    // So must the socket count the Grace-side keys recover.
+    // Grace-only metrics must agree with the recorded socket count.
     expect(
       modelSystemPower({
-        ...source,
-        metrics: { ...source.metrics, avg_total_cpu_power_w: 250.5 * 6 },
+        ...graceOnly,
+        metrics: { ...graceOnly.metrics, avg_total_cpu_power_w: 250.5 * 6 },
       }),
     ).toMatchObject({ reason: 'cpu-telemetry' });
     // Eighteen GPUs cannot fill whole four-GPU trays.
@@ -862,7 +931,7 @@ describe('NVL72 trays with measured compute-module power', () => {
     { avg_total_module_power_w: NaN },
     { avg_total_module_power_w: '4300' },
   ])('keeps NVL72 rows without valid CPU-side telemetry unavailable: %j', (overrides) => {
-    const source = nvl72Row(MODULE);
+    const source = nvl72Row();
     Object.assign(source.metrics, overrides);
     expect(modelSystemPower(source)).toMatchObject({
       status: 'unsupported',

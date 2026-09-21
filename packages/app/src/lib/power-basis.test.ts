@@ -263,10 +263,13 @@ describe('power boundaries through the derived-field builder', () => {
     // Legacy all-in energy divides one decode GPU's power by that GPU's output.
     expect(y(fields.jOutput)).toBeCloseTo((specs.power * 1000) / 50, 10);
     expect(y(fields.utilityProvisionedJPerOutputToken)).toBeCloseTo(2 * y(fields.jOutput)!, 10);
-    // Telemetry is validated (B1 renders) but GB200 NVL72 has no chassis
-    // model, so the modeled boundary alone is absent.
+    // GPU telemetry is validated (B1 renders), but GB200 lacks the CPU
+    // telemetry required by its NVL72 rack model.
     expect(fields.measuredAvgPower).toBeDefined();
-    expect(entry.modeledSystemPower).toMatchObject({ status: 'unsupported', reason: 'hardware' });
+    expect(entry.modeledSystemPower).toMatchObject({
+      status: 'unsupported',
+      reason: 'cpu-telemetry',
+    });
     expect(fields.utilityModeledWatts).toBeUndefined();
     expect(fields.utilityModeledJPerOutputToken).toBeUndefined();
   });

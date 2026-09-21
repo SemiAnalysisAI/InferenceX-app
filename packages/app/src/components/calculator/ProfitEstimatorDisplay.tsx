@@ -211,9 +211,13 @@ const STRINGS = {
       modeled: 'Measured + modeled power',
       compare: 'Compare both',
     },
-    powerBarLabels: { provisioned: 'Provisioned', modeled: 'Measured + modeled' },
+    powerBarLabels: {
+      provisioned: 'Provisioned',
+      modeled: 'Measured + modeled',
+      extrapolated: 'Full-chassis extrapolation',
+    },
     powerPreview:
-      'PowerX estimate · Same target, throughput, pricing and unit costs. GPU power comes from the same serving-frontier points; power between them is estimated linearly. Server overhead is modeled, with PUE 1.3 and 10% headroom. AgentX system power is not yet qualified.',
+      'PowerX estimate · Same target, throughput, pricing and unit costs. GPU power comes from the same serving-frontier points; power between them is estimated linearly. System overhead is modeled, with PUE 1.3 for air-cooled chassis or 1.1 for NVL72, and 10% headroom. Aggregate multinode hosts use the measured deployment mean. Full-chassis extrapolation fills an eight-GPU server with replicas of the measured 1/2/4-GPU workload at the same per-GPU power and throughput; it does not measure a partly idle server. AgentX system power is not yet qualified.',
     powerNvl72Note: (hardware: string, basis: string, pue: number) =>
       `${hardware}: ${basis}. Modeled: NVSwitch trays, NICs/DPUs, NVMe, power shelves, DLC PUE ${pue}.`,
     csvPowerHeaders: ['Power basis', 'Power sensor', 'System power profile'],
@@ -294,11 +298,17 @@ const STRINGS = {
       ],
     },
     skipped: (entries: string) => `Not priced: ${entries}.`,
+    modeledUnavailable: (entries: string) => `Measured + modeled unavailable: ${entries}.`,
     skipReason: {
       'outside-measured-range': 'no measured point at the target interactivity',
       'no-power': 'no all-in power figure',
-      'no-measured-power':
-        'no usable measured power or supported system model for these benchmark points',
+      'no-measured-power': 'no usable measured power for these benchmark points',
+      'no-cpu-power': 'missing complete Grace or module power for these benchmark points',
+      'incompatible-power-basis': 'bounding points use different power measurement bases',
+      'unsupported-power-hardware': 'no system power model for this hardware',
+      'unsupported-power-topology':
+        'GPU counts, physical hosts or role power do not support this system model',
+      'outside-power-model': 'these benchmark points are outside the supported power model',
       'no-cost': 'no TCO for this tier',
       'no-token-mix': 'no input/output token mix recorded',
     } satisfies Record<ProfitEstimatorSkipReason, string>,
@@ -329,9 +339,9 @@ const STRINGS = {
       modeled: '实测 GPU + 系统功耗估算',
       compare: '对比两种估算方式',
     },
-    powerBarLabels: { provisioned: '预配功耗', modeled: '实测 + 估算' },
+    powerBarLabels: { provisioned: '预配功耗', modeled: '实测 + 估算', extrapolated: '整机外推' },
     powerPreview:
-      'PowerX 估算 · 两种方式采用相同的目标交互性、吞吐量、价格和单位成本。GPU 功耗取自同一组性能前沿数据点，点间功耗采用线性估算。服务器开销由模型估算，PUE 为 1.3，功耗余量为 10%。AgentX 系统功耗模型尚未完成验证。',
+      'PowerX 估算 · 两种方式采用相同的目标交互性、吞吐量、价格和单位成本。GPU 功耗取自同一组性能前沿数据点，点间功耗采用线性估算。系统开销由模型估算，风冷机箱 PUE 为 1.3，NVL72 为 1.1，功耗余量为 10%。聚合多节点按部署平均功耗估算各台服务器。整机外推假设在八卡服务器上部署多个相同的实测单卡、双卡或四卡实例，每卡功耗和吞吐量保持不变；它不代表部分 GPU 闲置时的整机实测功耗。AgentX 系统功耗模型尚未完成验证。',
     powerNvl72Note: (hardware: string, basis: string, pue: number) =>
       `${hardware}：${basis}。建模部分：NVSwitch tray、网卡/DPU、NVMe、电源架，液冷 PUE ${pue}。`,
     csvPowerHeaders: ['功耗口径', '功耗传感器', '系统功耗 profile'],
@@ -412,10 +422,16 @@ const STRINGS = {
       ],
     },
     skipped: (entries: string) => `未定价：${entries}。`,
+    modeledUnavailable: (entries: string) => `实测加建模估算不可用：${entries}。`,
     skipReason: {
       'outside-measured-range': '未在该交互性下实测',
       'no-power': '缺少全电源配置功率数据',
-      'no-measured-power': '同一组基准测试数据点缺少有效功耗或适用的系统模型',
+      'no-measured-power': '同一组基准测试数据点缺少有效功耗',
+      'no-cpu-power': '同一组基准测试数据点缺少完整的 Grace 或 module 功耗',
+      'incompatible-power-basis': '插值两端的功耗测量口径不同',
+      'unsupported-power-hardware': '该硬件暂无适用的系统功耗模型',
+      'unsupported-power-topology': 'GPU 数量、物理主机或各角色功耗不满足系统模型要求',
+      'outside-power-model': '这些基准测试数据点超出功耗模型的适用范围',
       'no-cost': '该层级无 TCO 数据',
       'no-token-mix': '未记录输入/输出 token 比例',
     } satisfies Record<ProfitEstimatorSkipReason, string>,
@@ -1348,7 +1364,7 @@ function ProfitEstimatorInner({
 
   const powerUnavailable = useMemo(
     () =>
-      t.skipped(
+      (powerBasis === 'compare' ? t.modeledUnavailable : t.skipped)(
         fullEstimate.skipped
           .map((row) => {
             const label = rowLabel(
@@ -1359,7 +1375,7 @@ function ProfitEstimatorInner({
           })
           .join('; '),
       ),
-    [fullEstimate.skipped, hardwareConfig, historyEntryLabel, t],
+    [fullEstimate.skipped, hardwareConfig, historyEntryLabel, powerBasis, t],
   );
 
   // One line per NVL72 hardware whose bars price a measured compute module, so the

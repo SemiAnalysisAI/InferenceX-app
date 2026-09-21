@@ -231,6 +231,7 @@ describe('offline modeled PowerX comparisons', () => {
     gb200.audit = undefined;
     Object.assign(gb200.benchmark, {
       hardware: 'gb200',
+      power_audit: { cpu: { sensor_kind: 'module', expected_sockets: 2, observed_sockets: 2 } },
       framework: 'dynamo-trt',
       prefill_tp: 4,
       decode_tp: 4,
