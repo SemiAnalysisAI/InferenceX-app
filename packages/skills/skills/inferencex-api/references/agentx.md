@@ -167,7 +167,8 @@ For anchor differences, parse the original JSON with Python's integer-preserving
 `json.load`, subtract the integer anchors, then convert the difference to seconds.
 Reserialized JavaScript numbers cannot recover the original digits.
 
-For each server-metric series used in the requested analysis, inspect its returned
+Inventory every returned scalar and nested server-metric series, including
+`promptTokensBySource`, using the recipe's sample summary. Inspect each series'
 fields before calculating statistics. `queueDepth` carries `running`, `waiting`,
 and `total`, while scalar series use `value`. Report that series' own sample,
 finite, nonzero, and missing counts; array lengths can differ. A nonzero fraction
@@ -178,6 +179,8 @@ origins, state the inclusion rule, and report inside/outside counts for that exa
 group. Retain exceptions; overlapping overall ranges do not establish that every
 member falls inside the same windows.
 
+Compute phase totals per request before taking percentiles; separate phase
+percentiles are distributions, not additive components of the E2E percentile.
 For timeline accounting, `sum(end - start)` is cumulative request latency and can
 exceed elapsed time when requests overlap. The union of `[start, end]` intervals
 is time with at least one request in flight. Neither measures GPU utilization or

@@ -56,24 +56,24 @@ the user's selectors and acceptance criteria throughout classification and costi
 1. Select the exact records and fields needed for the requested output. Keep the
    complete raw responses as evidence; record which subset the analysis uses.
    Read units and denominators from saved metadata or the API contract, and
-   eligibility rules from the relevant cookbook.
+   eligibility rules from the relevant cookbook. Keep source field names, grouping
+   keys, and comparison operators attached to each statement; a missing-field
+   claim names the exact absent path.
 2. If the user requests a report, or the raw-API task needs a derived analysis,
    write a small script that reads the saved results and writes the requested
    report file directly (Markdown by default). Its quantitative content uses the same
    variables for quantities, populations, dates, IDs and units. Reuse existing
    valid calculations for that scope; compute missing quantities in this script.
-3. Keep that report on the requested findings: a direct answer, the requested
-   measures with their scope and units, the applicable limitations, and links to
-   the results and source manifests. Request metadata and file inventories stay
-   in the linked evidence. State the selected analysis scope positively;
-   downloaded records, selected rows and individually investigated points are
-   different sets. Check exact object paths for missing-field claims.
-4. Check the deliverable's claims against the saved results and perform the
-   applicable verification. Finish when the requested outputs, evidence and
-   necessary caveats are complete. Give a short
-   qualitative conclusion, artifact links and the verification outcome in the
-   final reply; keep the quantitative analysis in the generated deliverable unless
-   the user explicitly requests quantities or another format in the reply.
+3. Write the report as a direct answer, the requested table or measures with scope
+   and units, source-specific limitations, and evidence links. Include one supported
+   conclusion sentence to reuse in the handoff. Keep request metadata and file
+   inventories in the linked evidence; derive only quantities needed for the question.
+   Downloaded records, selected rows and individually investigated points remain
+   separate populations.
+4. Check that conclusion and the requested output against the saved results, then
+   perform the applicable verification. In the final reply, copy the checked
+   conclusion sentence verbatim and add artifact links plus the verification
+   outcome. Keep analysis in the report unless the user asks for it in the reply.
 
 For benchmark lookup and history, start from the saved `selection_summary` and
 `sample_summary`; regenerate the sample summary when its rows change. Distinct
@@ -139,9 +139,10 @@ is a source value, not proof of physical absence or a causal explanation.
 High latency or concurrency alone cannot identify queueing, saturation, or another
 bottleneck. Report observed values and unresolved causes.
 
-Match comparisons on workload and configuration. Claims of "same configuration"
-or "only X differs" require comparing all recorded configuration fields; retain
-additional differences and unknowns instead of matching just a display label.
+Match comparisons on workload and configuration. Name the actual grouping keys,
+such as hardware, framework and concurrency. Full configuration equivalence
+requires comparing every recorded configuration field, including recipe identity;
+report differing or unknown values alongside the shared fields.
 Keep per-GPU watts, deployment GPU joules, token units, and TCO assumptions distinct.
 Preserve numeric-looking IDs as strings. The benchmark API array is not chronological; sort by each row's
 `date` before taking a latest-observation sample.

@@ -126,6 +126,10 @@ from either or both sides. For per-run series or topology counts, count that
 selected source dataset's `series[]`; unavailable component groups do not add
 measured series.
 
+Report returned points and source-reported `skipped_points` as separate counts.
+Their sum describes those two categories only; an execution count needs explicit
+per-point execution evidence. Keep the source's outcome and disposition labels.
+
 `summary` counts comparison groups, including EP operation groups, not runs or
 requested cases. Cases with **no measured rows** have no comparison group. Inspect
 the complete datasets' `coverage` and optional `kv` arrays for their outcome,

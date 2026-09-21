@@ -99,7 +99,7 @@ rateâ€”such as idle time, storage, networking, staffing, or ownership expensesâ€
 outside this calculation. The denominator is output tokens; there is no token
 revenue, input-token value weighting, or measured power/energy calculation.
 
-If reporting sensitivity with supplied prices, equal modeled cost occurs at
+When the user requests price sensitivity, equal modeled cost occurs at
 `price_A / price_B = throughput_A / throughput_B` for comparable points. Equality
 is a tie; crossing that boundary changes the cheaper estimate. Preserve that
 distinction when rounding the saved boundary for prose.
@@ -125,8 +125,9 @@ or workloads to obtain a complete comparison.
 
 Retain `point.evidence_date` for the knot(s) backing the target, plus
 `oldest_frontier_date` and `latest_date` for the whole frontier. Report differing
-dates across GPUs. If reporting a gap, compute elapsed days from those endpoints
-in the saved calculation. The metadata records the requested model and returned
+dates across GPUs. Equal backing-date endpoints identify one date, not one
+observation; retain `is_interpolated` when describing the point. If reporting a gap,
+compute elapsed days from those endpoints in the saved calculation. The metadata records the requested model and returned
 `db_model_keys`. Even a single returned raw key establishes only the API's model
 bucket, not identical checkpoint weights or an exact model revision across the
 frontier's observations. Do not turn a one-key response into a matched-release claim.
@@ -170,12 +171,15 @@ Convert it to milliseconds with `p99_itl * 1000`. `p99_tpot` measures a differen
 statistic (per-request time per output token). The reciprocal `1000 / p99_intvty`
 is not P99 ITL. A median frontier target cannot certify a tail SLA.
 Use only the user's requested predicate for classification and costing. Retain a
-finite `p99_itl < 0.020` pass and its cost on the API-reported basis. If another
+finite `p99_itl < 0.020` pass and its cost on the API-reported basis. Build the priced
+table from those passing rows, then derive best-cost, throughput and concurrency
+summaries from that same table. A narrower comparison names its additional
+selectors and retains the full passing population's counts and extrema. If another
 statistic helps explain a limitation, report its recorded value separately.
 Different percentiles can differ greatly without internal inconsistency; TPOT and
 ITL also measure different statistics. Aggregate ratios alone establish neither
 invalid data nor a delivery pattern. Additional screening thresholds require the
-user's criterion; do not invent a preferred planning subset from those ratios.
+user's criterion.
 
 Capture the complete benchmark/history response using the bounded raw-API recipe,
 then set the workload scope to the user's request. Obtain `scope.model` from
