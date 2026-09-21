@@ -63,6 +63,7 @@ const AGENTX_GLM_SGLANG = 'glm-5-3-agentx-nvidia-vs-amd-sglang-150-toks';
 const AGENTX_GLM_ATOM = 'glm-5-3-agentx-mi355x-atom-vs-gb300-nvl72';
 const JALAPENO = 'openai-jalapeno-better-than-nvidia';
 const TPU_IRONWOOD = 'tpu-inferencex-full-steam';
+const ENGRAM = 'engrams-embedding-entendre-codesign';
 
 const entries = [
   {
@@ -236,16 +237,16 @@ const entries = [
     plainEnglish:
       'Throughput is how much total work the system gets done each second across everyone using it.',
     definition:
-      'Throughput is the total rate at which an inference system produces tokens across all active requests.',
+      'Throughput is the rate of token processing across requests. Output throughput counts generated tokens; total token throughput counts input and output tokens under the stated benchmark accounting.',
     explanation:
       'InferenceX commonly normalizes throughput as tokens per second per chip so systems of different sizes can be compared. Higher batching or concurrency often raises aggregate throughput because weight reads and compute are amortized across more requests, but individual users may receive tokens more slowly.',
     significance:
       'Maximum throughput captures only one operating point. A system can lead in tokens per second while operating at interactivity too low for a real-time product. The useful comparison is throughput at a latency or interactivity target appropriate to the workload.',
     benchmarkContext:
-      'On an InferenceX chart, throughput is read together with interactivity across the full concurrency sweep. The Pareto frontier removes operating points that are worse on both axes.',
+      'On an InferenceX chart, throughput is read together with interactivity across the full concurrency sweep. The Rubin AgentX article reports total token throughput, including reused input, rather than only newly generated output. Check the token accounting before comparing that curve with an output-only result.',
     measurement: { label: 'Typical unit', value: 'tokens/second/chip (tok/s/chip)' },
     relatedTerms: ['interactivity', 'concurrency', 'pareto-frontier', 'iso-interactivity'],
-    articleSlugs: [INFERENCEMAX, INFERENCEX_V2, SGLANG_056],
+    articleSlugs: [INFERENCEMAX, INFERENCEX_V2, SGLANG_056, VR_RUBIN_AGENTIC],
   },
   {
     slug: 'interactivity',
@@ -261,7 +262,7 @@ const entries = [
     significance:
       'Different products need different operating points. Voice and interactive coding demand high token rates, while offline summarization can trade interactivity for much more aggregate throughput. Comparing hardware at unmatched interactivity can therefore produce a misleading winner.',
     benchmarkContext:
-      'InferenceX plots tokens per second per user against throughput or cost. Iso-interactivity tables interpolate each system’s Pareto frontier at the same token rate so the comparison holds user experience constant. Because this axis ignores the wait before the first token, agentic charts also offer E2E Normalized Interactivity, which folds TTFT into the same unit.',
+      'InferenceX plots tokens per second per user against throughput or cost. The Rubin AgentX article uses the reciprocal of P90 full-response inter-token latency for P90 interactivity. Matching that speed does not match TTFT or end-to-end latency. E2E Normalized Interactivity is a separate metric that includes the initial wait.',
     measurement: { label: 'Typical unit', value: 'tokens/second/user (tok/s/user)' },
     relatedTerms: [
       'time-per-output-token',
@@ -269,8 +270,10 @@ const entries = [
       'iso-interactivity',
       'e2e-normalized-interactivity',
       'latency',
+      'p90-interactivity',
+      'end-to-end-latency',
     ],
-    articleSlugs: [INFERENCEMAX, INFERENCEX_V2, MI355X_KIMI, TILERT],
+    articleSlugs: [INFERENCEMAX, INFERENCEX_V2, MI355X_KIMI, TILERT, VR_RUBIN_AGENTIC],
   },
   {
     slug: 'latency',
@@ -399,11 +402,18 @@ const entries = [
     explanation:
       'Benchmark runs rarely land at identical tok/s/user values because each recipe has different concurrency points. An iso-interactivity comparison interpolates each Pareto frontier at a shared target and then compares throughput, cost, or efficiency there.',
     significance:
-      'Holding user experience constant avoids a common benchmark error: declaring a high-throughput system faster when it reaches that throughput only by serving every request more slowly.',
+      'Matching streaming speed avoids declaring a system faster merely because it serves more requests at a slower token rate. It does not hold the entire user experience constant: initial waiting time and total response duration still need separate comparisons.',
     benchmarkContext:
       'InferenceX articles use iso-interactivity tables for hardware, precision, and software comparisons. Values outside a measured frontier are marked unreachable and are not extrapolated beyond observed data. The frontier is always built on throughput against interactivity; cost per million tokens and joules per token are then derived from the interpolated throughput rather than splined on their own, because each is a per-chip constant divided by that throughput and splining it separately would break the identity between knots.',
     relatedTerms: ['interactivity', 'pareto-frontier', 'throughput', 'performance-per-dollar'],
-    articleSlugs: [B200_GLM5, B200_MINIMAX, B200_KIMI, GB300_DSV4, AGENTX_GLM_SGLANG],
+    articleSlugs: [
+      B200_GLM5,
+      B200_MINIMAX,
+      B200_KIMI,
+      GB300_DSV4,
+      AGENTX_GLM_SGLANG,
+      VR_RUBIN_AGENTIC,
+    ],
   },
   {
     slug: 'input-output-sequence-length',
@@ -465,7 +475,7 @@ const entries = [
     significance:
       'Peak chip FLOPS account for only part of serving economics. Memory, networking, software maturity, numerical precision, and achievable utilization all affect the measured output behind the ratio.',
     benchmarkContext:
-      'InferenceX compares infrastructure perf/$ at matched interactivity and names the TCO inputs used. Ratios should not be carried across different model, sequence-length, precision, or latency regimes. Cost per million tokens and the total, input, and output infrastructure purchasing-power axes express those TCO economics.',
+      'InferenceX compares infrastructure perf/$ at matched interactivity and names the TCO inputs used. The Rubin article’s approximately 67x result is scoped to 170 TPS, owning costs, and the specified TRTLLM NVFP4 Dense configurations. It is not a generation-wide multiplier: the ratio changes with the target, comparison engine, and owning versus rental cost basis.',
     relatedTerms: [
       'cost-per-million-tokens',
       'tokens-per-dollar',
@@ -480,6 +490,7 @@ const entries = [
       MI355X_GLM5,
       AGENTX_DSV4_MI355X_B200,
       TPU_IRONWOOD,
+      VR_RUBIN_AGENTIC,
     ],
   },
   {
@@ -496,14 +507,14 @@ const entries = [
     significance:
       'Using TCO instead of list price makes cross-system economics more realistic, especially for rack-scale products whose networking and power infrastructure differ. The result remains a model and should be read with its assumptions.',
     benchmarkContext:
-      'InferenceX combines SemiAnalysis AI Cloud TCO inputs with observed tok/s/chip. This separates hourly system cost from the software and workload behavior that determines how many tokens that hour produces.',
+      'InferenceX combines SemiAnalysis AI Cloud TCO inputs with observed tok/s/chip. The Rubin article distinguishes owning at large hyperscaler volume, including amortized hardware, networking, facilities, power, and capital costs, from the customer price of a three-year cloud reservation. These are alternative cost bases, not costs to add together; rental pricing also reflects the provider’s commercial terms.',
     relatedTerms: [
       'cost-per-million-tokens',
       'performance-per-dollar',
       'tokens-per-megawatt',
       'throughput',
     ],
-    articleSlugs: [INFERENCEMAX, INFERENCEX_V2, GB200_R1, VR_RUBIN, JALAPENO],
+    articleSlugs: [INFERENCEMAX, INFERENCEX_V2, GB200_R1, VR_RUBIN, JALAPENO, VR_RUBIN_AGENTIC],
   },
   {
     slug: 'tokens-per-megawatt',
@@ -519,7 +530,7 @@ const entries = [
     significance:
       'Power availability is often the binding constraint on new AI deployments. A system that produces more tokens per provisioned megawatt can serve more demand from the same utility allocation even if its individual accelerators draw more power.',
     benchmarkContext:
-      'Compare tokens/MW at the same model, workload shape, precision, and interactivity. Otherwise a high-throughput low-interactivity point can appear efficient while failing the target user experience. Energy per token expresses the same provisioned budget per unit of output, and InferenceX additionally reports measured accelerator energy where the telemetry is trustworthy.',
+      'The Rubin article compares total tok/s per utility MW at matched P90 interactivity, with interpolation only inside each engine’s measured range. Preserve the engine, precision, caching, and parallelism labels when quoting a ratio. The provisioned utility-power denominator is a capacity model, distinct from measured accelerator power or energy telemetry.',
     measurement: { label: 'Typical unit', value: 'tokens/second per provisioned utility MW' },
     relatedTerms: [
       'throughput',
@@ -527,8 +538,10 @@ const entries = [
       'interactivity',
       'total-cost-of-ownership',
       'performance-per-dollar',
+      'utility-power-budget',
+      'annual-revenue-per-gigawatt',
     ],
-    articleSlugs: [INFERENCEMAX, DEEPSEEK_V4, VR_RUBIN, JALAPENO],
+    articleSlugs: [INFERENCEMAX, DEEPSEEK_V4, VR_RUBIN, JALAPENO, VR_RUBIN_AGENTIC],
   },
   {
     slug: 'prefill',
@@ -607,7 +620,7 @@ const entries = [
     definition:
       'Prefix caching reuses KV-cache state when multiple requests begin with the same token sequence.',
     explanation:
-      'A repeated system prompt, shared document, or common conversation prefix can reuse cached states. A cache hit can reduce prompt computation and time to first token.',
+      'A repeated system prompt, shared document, or common conversation prefix can reuse cached states. In a growing agent session, earlier outputs become part of later inputs, increasing potential prefix reuse. Actual hits still depend on the state remaining available and reachable; eviction or fresh subagent contexts can require new prefill.',
     significance:
       'Production workloads with repeated prefixes may outperform synthetic random-token benchmarks. The benefit depends on hit rate, cache capacity, eviction policy, and whether requests route to workers that hold the needed state.',
     benchmarkContext:
@@ -619,8 +632,17 @@ const entries = [
       'prefill',
       'time-to-first-token',
       'nvidia-dynamo',
+      'multi-turn-inference',
+      'cached-input-tokens',
     ],
-    articleSlugs: [AGENTIC_WORKLOADS, INFERENCEX_V2, GB200_KIMI, KIMI_K3, AGENTX_V3],
+    articleSlugs: [
+      AGENTIC_WORKLOADS,
+      INFERENCEX_V2,
+      GB200_KIMI,
+      KIMI_K3,
+      AGENTX_V3,
+      VR_RUBIN_AGENTIC,
+    ],
   },
   {
     slug: 'disaggregated-inference',
@@ -890,13 +912,13 @@ const entries = [
     definition:
       'NVLink is NVIDIA’s high-bandwidth accelerator interconnect for moving data directly among chips within a scale-up domain.',
     explanation:
-      'NVSwitch systems connect multiple NVLink endpoints so collectives can span an eight-chip server or, in NVL72 products, a 72-chip rack-scale domain. That bandwidth is distinct from the InfiniBand or Ethernet fabric connecting separate systems.',
+      'NVSwitch systems connect multiple NVLink endpoints so collectives can span a node or a 72-chip rack-scale domain. The generation depends on the platform: Blackwell NVL72 uses NVLink 5, while the Rubin article identifies NVLink 6 Switch as part of Vera Rubin. This scale-up fabric is distinct from the networking used between systems.',
     significance:
       'Large TP and especially wide-EP groups exchange data at every generated token. Keeping those collectives on NVLink can make a rack-scale recipe faster than a similar chip count spread across scale-out links.',
     benchmarkContext:
       'InferenceX compares both node-level chips and NVL72 systems. Interpret the system topology and parallel group width before attributing the entire result to per-chip compute.',
     relatedTerms: ['scale-up-vs-scale-out', 'all-to-all', 'all-reduce', 'wide-expert-parallelism'],
-    articleSlugs: [GB200_R1, GB200_KIMI, INFERENCEX_V2, VR_RUBIN],
+    articleSlugs: [GB200_R1, GB200_KIMI, INFERENCEX_V2, VR_RUBIN, VR_RUBIN_AGENTIC],
   },
   {
     slug: 'quantization',
@@ -1263,7 +1285,7 @@ const entries = [
     significance:
       'Long agentic sessions exceed HBM KV capacity well before they exceed a plausible DRAM budget, so offload decides how many concurrent conversations stay resumable. It also shifts the bottleneck: once prefixes survive, store and load paths, transfer batching, and index bookkeeping become the costs worth optimizing.',
     benchmarkContext:
-      'InferenceX rings every point that used KV offload with a dashed halo, whether or not it is Pareto optimal, and the point detail view names the offload type and engine alongside the chip and CPU cache hit rates. Offload is an allowed but optional optimization, so a single curve can mix points with and without it.',
+      'InferenceX rings every point that used KV offload with a dashed halo, whether or not it is Pareto optimal, and the point detail view names the offload type and engine alongside the chip and CPU cache hit rates. Engram parameter offloading moves learned embedding rows, not request-specific attention state; an Engram table outside HBM does not by itself establish that a run used KV offload.',
     relatedTerms: [
       'kv-cache',
       'prefix-caching',
@@ -1271,8 +1293,9 @@ const entries = [
       'nvme-offloading',
       'kv-cache-manager',
       'high-bandwidth-memory',
+      'parameter-offloading',
     ],
-    articleSlugs: [AGENTX_V3, AGENTIC_WORKLOADS, KIMI_K3, AGENTX_DSV4_B200_B300],
+    articleSlugs: [AGENTX_V3, AGENTIC_WORKLOADS, KIMI_K3, AGENTX_DSV4_B200_B300, ENGRAM],
   },
   {
     slug: 'cpu-offloading',
@@ -1280,15 +1303,15 @@ const entries = [
     aliases: ['CPU offload', 'DRAM offloading', 'host memory offloading'],
     category: 'Serving',
     plainEnglish:
-      'CPU offloading spills KV cache the accelerators cannot hold into the host machine DRAM, so long conversations resume from memory instead of being recomputed from scratch.',
+      'CPU offloading keeps model data or reusable attention state in host DRAM, freeing accelerator memory while adding host-memory access costs.',
     definition:
-      'CPU offloading stores reusable KV cache blocks in host CPU DRAM instead of accelerator HBM and loads them back over the host link when a later request reuses that prefix.',
+      'CPU offloading stores model parameters or KV cache in host CPU DRAM instead of accelerator HBM. The serving implementation determines whether data is explicitly copied or accessed directly by the GPU.',
     explanation:
-      'In inference serving the term almost always means KV cache offloading to DRAM, distinct from the training-side practice of parking weights or optimizer state on the CPU. Engines reach DRAM through connectors such as the vLLM CPU offloading connectors, LMCache, SGLang HiCache, Mooncake Store, and Dynamo KVBM. The pool is usually write-through, so it pays off when host DRAM for offload is roughly 1.5 to 3 times HBM KV capacity, and transfer efficiency decides the rest: AMD vLLM could not batch GPU-to-CPU copies before hipMemcpyBatchAsync landed in ROCm 7.14, which made its CPU offload path far less useful than the same feature on NVIDIA.',
+      'KV cache offloading preserves request-specific attention state through systems such as LMCache, SGLang HiCache, Mooncake Store, and Dynamo KVBM. Parameter offloading instead places learned model data in DRAM. The Engram article describes a GPU kernel selecting and dequantizing sparse embedding rows directly from pinned host memory through UVA, while retaining full decode graphs. These paths have different access patterns and should be named separately.',
     significance:
       'DRAM offloading decides how many concurrent agent sessions stay resumable once their combined KV working set exceeds HBM. It is not free capacity: at high concurrency, heavy reliance on the DRAM tier adds reload traffic that can push interactivity below acceptable levels, so the useful question is when the tier helps rather than whether it exists.',
     benchmarkContext:
-      'AgentX treats CPU KV offloading as an allowed, optional optimization. Offload DRAM must scale with the fraction of GPUs used, with a 3 TB cap for systems without standardized DRAM configurations. Points that used offload are ringed with a dashed halo, and the point detail view reports the offload backend plus HBM and CPU cache hit rates.',
+      'AgentX treats CPU KV offloading as an allowed, optional optimization. Its KV-offload markers and cache hit rates describe that path, not Engram parameter placement. The Engram article reports a B300 configuration moving from TP4 to TP2 with DRAM offload and improving its Pareto curve by up to 1.6x; this is a measured configuration result, not a universal DRAM speedup.',
     relatedTerms: [
       'kv-cache-offload',
       'nvme-offloading',
@@ -1296,7 +1319,7 @@ const entries = [
       'kv-cache',
       'high-bandwidth-memory',
     ],
-    articleSlugs: [AGENTX_V3, AGENTIC_WORKLOADS, AGENTX_DSV4_B200_B300],
+    articleSlugs: [AGENTX_V3, AGENTIC_WORKLOADS, AGENTX_DSV4_B200_B300, ENGRAM],
   },
   {
     slug: 'nvme-offloading',
@@ -1304,23 +1327,24 @@ const entries = [
     aliases: ['NVMe offload', 'SSD offloading', 'flash KV cache offload'],
     category: 'Serving',
     plainEnglish:
-      'NVMe offloading extends the KV cache one tier further, onto local SSDs, so prefixes that no longer fit in GPU or CPU memory can still be reloaded later.',
+      'NVMe offloading stores model data or attention state on SSDs, trading cheaper capacity for a more expensive access path.',
     definition:
-      'NVMe offloading stores reusable KV cache blocks on NVMe SSDs beneath the HBM and host DRAM tiers, trading slower reloads for a much larger retrievable KV working set.',
+      'NVMe offloading places model parameters or reusable KV cache on NVMe SSDs below the accelerator and host-memory tiers. Parameter lookup and KV-prefix restoration are distinct uses of the same storage tier.',
     explanation:
-      'Each step down the memory hierarchy multiplies capacity and divides bandwidth, so the SSD tier only pays off when reloading a long prefix still beats recomputing it. KV cache managers such as LMCache and Mooncake Store already support local NVMe backends alongside DRAM and remote storage. The tier helps most when the reuse working set exceeds any plausible DRAM budget or when sessions return after idle gaps long enough that DRAM eviction has already discarded them.',
+      'KV offloading can preserve prefixes after DRAM eviction. Engram offloading instead retrieves learned embedding rows. The article tests a memory-mapped SSD-backed Engram table whose pages may remain in the filesystem cache. Its unoptimized path copies row IDs to the CPU, deduplicates and gathers rows, then transfers them to the GPU. A warm page cache eliminates storage reads but not this coordination or copying.',
     significance:
       'NVMe offloading effectively lengthens cache lifetime for long-lived agent sessions, which matters as agents wait on tools, humans, or CI for minutes at a time. It is workload dependent: a high-concurrency deployment where DRAM offloading already degrades latency will not be rescued by an even slower tier, because the bottleneck is reload bandwidth rather than capacity.',
     benchmarkContext:
-      'AgentX v1 measures HBM and DRAM tiers and defers NVMe offloading, with SSD/NVMe KV offloading planned as a fast follow to grow the working set beyond DRAM. The current 5 minute idle cap on replayed streams may rise alongside it so that longer cache lifetimes become measurable.',
+      'The Engram article reports about 121 million total tokens per dollar for DRAM versus 52 million for SSD near 125 tokens/s/user on its B200 configurations. GDS was not enabled, and the experiment measures the whole serving path rather than isolated SSD latency. This parameter-offload experiment does not establish support for NVMe KV offloading in AgentX.',
     relatedTerms: [
       'kv-cache-offload',
       'cpu-offloading',
       'kv-cache-manager',
       'kv-cache',
       'prefix-cache-hit-rate',
+      'memory-mapped-file',
     ],
-    articleSlugs: [AGENTX_V3, AGENTIC_WORKLOADS],
+    articleSlugs: [AGENTX_V3, AGENTIC_WORKLOADS, ENGRAM],
   },
   {
     slug: 'long-context',
@@ -1773,14 +1797,14 @@ const entries = [
   {
     slug: 'nvl72',
     term: 'NVL72',
-    aliases: ['GB200 NVL72', 'GB300 NVL72', 'rack-scale system'],
+    aliases: ['GB200 NVL72', 'GB300 NVL72', 'Vera Rubin NVL72', 'rack-scale system'],
     category: 'Hardware',
     plainEnglish:
       'NVL72 is a rack where 72 accelerators share one high-speed fabric, so they behave more like a single large machine than a cluster.',
     definition:
       'NVL72 is a rack-scale NVIDIA system that places 72 accelerators in a single NVLink scale-up domain rather than in separate eight-chip nodes.',
     explanation:
-      'The dashboard specs record NVLink 5.0 at 900 GB/s per chip unidirectional across a scale-up world size of 72, switched through NVSwitch. A conventional node keeps that bandwidth among eight chips and falls back to slower scale-out networking beyond them, so the difference is not raw speed but how many chips are reachable before the fabric changes character.',
+      'NVL72 describes the size of the NVLink domain, not one fixed chip generation or bandwidth. GB200 and GB300 systems use Blackwell-generation hardware and NVLink 5; Vera Rubin pairs Rubin GPUs with Vera CPUs and NVLink 6 Switch. Compare the specific platform rather than applying Blackwell specifications to every NVL72 rack.',
     significance:
       'Techniques whose cost is dominated by collectives change economics inside a large domain. Wide expert parallelism spreads experts across many chips and pays all-to-all traffic for every token, which is tolerable at scale-up bandwidth and often is not across a scale-out fabric.',
     benchmarkContext:
@@ -1792,7 +1816,15 @@ const entries = [
       'all-to-all',
       'total-cost-of-ownership',
     ],
-    articleSlugs: [GB200_R1, GB300_DSV4, GB200_KIMI, VR_RUBIN, AGENTX_K3_ATOM, JALAPENO],
+    articleSlugs: [
+      GB200_R1,
+      GB300_DSV4,
+      GB200_KIMI,
+      VR_RUBIN,
+      AGENTX_K3_ATOM,
+      JALAPENO,
+      VR_RUBIN_AGENTIC,
+    ],
   },
   {
     slug: 'atom',
@@ -2330,7 +2362,7 @@ const entries = [
     slug: 'tdp',
     term: 'Thermal design power',
     abbreviation: 'TDP',
-    aliases: ['TDP', 'board power', 'all-in power'],
+    aliases: ['TDP', 'thermal power envelope'],
     category: 'Hardware',
     plainEnglish:
       'TDP is the sustained power a chip is designed to draw and shed as heat, the headline wattage on every accelerator spec sheet.',
@@ -2341,9 +2373,9 @@ const entries = [
     significance:
       'Power has become the binding constraint of AI buildout, ahead of capital in many markets. Rising per chip TDP forced the shift to liquid cooling and made performance per watt, not just performance per dollar, a primary axis for comparing silicon generations.',
     benchmarkContext:
-      'InferenceX derives energy per token and tokens per megawatt using per chip all in power figures that include cooling and infrastructure overhead above TDP, and the PowerX workstream is extending this from rated figures toward measured draw during runs.',
+      'The Rubin article specifies a 2300 W TDP production SKU but normalizes facility throughput with all-in utility power. TDP is neither measured inference draw nor total facility power. Its DSX MaxLPS discussion concerns workload-aware power provisioning; the article describes finer-grained PowerX measurements as upcoming rather than treating the displayed curves as measured-power results.',
     relatedTerms: ['energy-per-token', 'tokens-per-megawatt', 'pue', 'total-cost-of-ownership'],
-    articleSlugs: [INFERENCEX_V2, VR_RUBIN],
+    articleSlugs: [INFERENCEX_V2, VR_RUBIN, VR_RUBIN_AGENTIC],
   },
   {
     slug: 'pue',
@@ -3547,6 +3579,561 @@ const entries = [
       'kv-aware-routing',
     ],
     articleSlugs: [TPU_IRONWOOD, AGENTX_V3, AGENTIC_WORKLOADS],
+  },
+  {
+    slug: 'multi-turn-inference',
+    term: 'Multi-turn inference',
+    aliases: ['multi-turn serving', 'multi-turn workload'],
+    category: 'Agentic inference',
+    plainEnglish:
+      'A multi-turn session sends several related requests to the model, carrying earlier conversation and tool results into later prompts.',
+    definition:
+      'Multi-turn inference serves a sequence of related model requests whose inputs include state or conversation history from earlier turns.',
+    explanation:
+      'In agentic workloads, a session may span tens or hundreds of turns. Generated output and tool results extend the next prompt, so much of its input may already have cached state. Tool execution and dependent requests also change when work reaches the server.',
+    significance:
+      'A sequence of independent prompts does not reproduce these dependencies or the growing cache working set. Cache eviction can force repeated prefill, while a slow response can delay the next turn even when aggregate throughput appears high.',
+    benchmarkContext:
+      'The Rubin article identifies multi-turn structure as a defining AgentX workload property. Compare these results with the same agentic scenario rather than transferring rankings from fixed-length, independent-request tests.',
+    relatedTerms: ['agentx', 'trace-replay', 'prefix-caching', 'long-context', 'subagent-bursts'],
+    articleSlugs: [VR_RUBIN_AGENTIC, AGENTX_V3],
+  },
+  {
+    slug: 'subagent-bursts',
+    term: 'Subagent bursts',
+    aliases: ['sub-agent bursts', 'bursty agent traffic'],
+    category: 'Agentic inference',
+    plainEnglish:
+      'An agent can launch several short-lived helpers together, suddenly adding requests and new context for the server to hold.',
+    definition:
+      'Subagent bursts are short periods of increased inference demand caused by an agent launching multiple subordinate tasks with their own request sequences.',
+    explanation:
+      'A parent session can have a long reusable prefix while its new branches start with fresh context. These branches create overlapping prefill and decode work and temporarily enlarge the KV-cache working set. Their start times and dependencies matter as much as their request count.',
+    significance:
+      'A high average cache-hit rate can hide periods of heavy new-prefill demand. Capacity planning must account for burst timing, cache eviction, and the latency of branches whose completion blocks the parent task.',
+    benchmarkContext:
+      'The Rubin article names subagent bursts alongside multi-turn sessions, long context, and high prefix reuse. AgentX comparisons therefore concern a time-varying request pattern, not a constant batch of identical prompts.',
+    relatedTerms: ['subagent', 'multi-turn-inference', 'concurrency', 'kv-cache', 'prefill'],
+    articleSlugs: [VR_RUBIN_AGENTIC, AGENTIC_WORKLOADS],
+  },
+  {
+    slug: 'p90-interactivity',
+    term: 'P90 interactivity',
+    aliases: ['P90 TPS', 'P90 token rate', 'P90 streaming speed'],
+    category: 'Benchmark metrics',
+    plainEnglish:
+      'P90 interactivity expresses a slower-tail streaming interval as a token rate, so higher values mean faster response streaming.',
+    definition:
+      'In the Rubin AgentX analysis, P90 interactivity is the reciprocal of P90 full-response inter-token latency, expressed in tokens per second per user.',
+    explanation:
+      'Take the P90 latency statistic first, then invert it with the appropriate unit conversion. A P90 full-response inter-token latency of 10 milliseconds corresponds to 100 tok/s/user. This is not the 90th percentile of token rates: reciprocation reverses the ordering of positive values.',
+    significance:
+      'The percentile and latency definition determine what speed target a comparison enforces. This metric excludes the initial wait before streaming; equal P90 interactivity can coexist with very different time to first token and end-to-end latency.',
+    benchmarkContext:
+      'The Rubin article compares engine-specific frontiers at matched P90 interactivity and interpolates only within measured ranges. Preserve the target and the comparison engine when citing its throughput, cost, or power ratios.',
+    measurement: {
+      label: 'Relationship',
+      value: 'P90 interactivity = 1000 / P90 full-response ITL (ms)',
+    },
+    relatedTerms: [
+      'interactivity',
+      'time-per-output-token',
+      'iso-interactivity',
+      'end-to-end-latency',
+    ],
+    articleSlugs: [VR_RUBIN_AGENTIC],
+  },
+  {
+    slug: 'end-to-end-latency',
+    term: 'End-to-end latency',
+    abbreviation: 'E2E latency',
+    aliases: ['E2EL', 'request completion time', 'P90 E2E latency'],
+    category: 'Benchmark metrics',
+    plainEnglish:
+      'End-to-end latency is the time from sending a model request until its complete answer has arrived, including the initial wait.',
+    definition:
+      'Request end-to-end latency measures elapsed time from request submission to receipt of the final response token.',
+    explanation:
+      'It includes time to first token and the subsequent streaming duration. Longer answers take longer even at the same token rate, so comparisons need compatible output-length distributions. P90 E2E latency is the 90th percentile of request completion times, not a sum of separately calculated P90 stage latencies.',
+    significance:
+      'Agents often wait for a complete response before executing a tool or starting a dependent turn. Fast streaming alone does not bound that wait. Request latency also differs from the duration of a whole agent task, which can include many model calls and tool executions.',
+    benchmarkContext:
+      'The Rubin article plots P90 E2E latency separately from P90 interactivity. Read both to distinguish improved streaming cadence from reduced queueing, prefill, or overall response time.',
+    measurement: { label: 'Typical unit', value: 'seconds per completed request' },
+    relatedTerms: [
+      'latency',
+      'time-to-first-token',
+      'p90-interactivity',
+      'e2e-normalized-interactivity',
+    ],
+    articleSlugs: [VR_RUBIN_AGENTIC],
+  },
+  {
+    slug: 'cached-input-tokens',
+    term: 'Cached input tokens',
+    aliases: ['cached prompt tokens', 'cache-read tokens'],
+    category: 'Serving',
+    plainEnglish:
+      'Cached input tokens are parts of a prompt whose earlier processing can be reused, reducing the work needed to read the prompt again.',
+    definition:
+      'Cached input tokens are input tokens served using reusable cached model state rather than recomputing their full prefill.',
+    explanation:
+      'Earlier conversation turns often reappear in later prompts. Whether those tokens hit the cache depends on retained state, routing, and available storage. A provider may price cached input separately from uncached input and generated output, so the three token classes must remain separate in revenue calculations.',
+    significance:
+      'A cached token still belongs to the served workload but does not imply the same new computation or sales value as an output token. Potential prefix reuse, measured cache-hit rate, and the price charged for a cache hit describe different quantities.',
+    benchmarkContext:
+      'The Rubin article uses total token throughput for several comparisons and distinguishes cached-input, uncached-input, and output prices in its economics discussion. A total-token multiplier cannot be applied directly to an output-only price to estimate revenue.',
+    relatedTerms: [
+      'prefix-caching',
+      'prefix-cache-hit-rate',
+      'throughput',
+      'annual-revenue-per-gigawatt',
+    ],
+    articleSlugs: [VR_RUBIN_AGENTIC, AGENTX_V3],
+  },
+  {
+    slug: 'billable-utilization',
+    term: 'Billable utilization',
+    aliases: ['billable capacity utilization', 'revenue utilization'],
+    category: 'Benchmark metrics',
+    plainEnglish:
+      'Billable utilization is the share of modeled serving capacity that is actually used for paid traffic over the period being estimated.',
+    definition:
+      'Billable utilization is the fraction of available serving capacity assumed to produce revenue-generating traffic in an economic model.',
+    explanation:
+      'A benchmark establishes a token rate at an operating point. Annualization then needs an assumption about how much of that capacity can be sold over time. Idle capacity and insufficient demand reduce billable output even if the serving stack can achieve its measured rate when loaded.',
+    significance:
+      'This assumption is distinct from GPU utilization telemetry or model FLOPS utilization. A busy accelerator does not prove that its work is billable, and a measured peak-throughput result does not establish year-round customer demand.',
+    benchmarkContext:
+      'The Rubin article’s annual revenue and modeled profit example uses 60% utilization at 75 TPS. Keep that assumption with the result rather than presenting the estimate as realized revenue or a hardware-only performance measurement.',
+    measurement: {
+      label: 'Economic assumption',
+      value: 'share of serving capacity sold over time (%)',
+    },
+    relatedTerms: [
+      'gpu-utilization',
+      'model-flops-utilization',
+      'annual-revenue-per-gigawatt',
+      'modeled-profit-per-gigawatt',
+    ],
+    articleSlugs: [VR_RUBIN_AGENTIC],
+  },
+  {
+    slug: 'annual-revenue-per-gigawatt',
+    term: 'Annual revenue per gigawatt',
+    aliases: ['revenue per GW', 'annual token revenue per utility GW'],
+    category: 'Benchmark metrics',
+    plainEnglish:
+      'This estimate asks how much token sales could earn in a year from a fixed gigawatt of datacenter utility power.',
+    definition:
+      'Annual revenue per gigawatt is modeled token-sales revenue over one year, normalized to one gigawatt of all-in utility power capacity.',
+    explanation:
+      'At a chosen interactivity target, convert power-normalized throughput into annual billable token volumes using the utilization assumption. Apply the respective prices to cached input, uncached input, and output volumes, then sum their revenue. A gigawatt is a power allocation; the year supplies the time dimension.',
+    significance:
+      'The result connects serving efficiency to a power-constrained business model. It depends on demand, prices, token mix, and utilization as well as measured throughput, and it does not show profit until costs and any license fees are deducted.',
+    benchmarkContext:
+      'The Rubin article presents annual revenue at 75 TPS and 60% utilization. Its per-GW values are normalized estimates, not evidence that a full gigawatt deployment was benchmarked or that the projected token volumes were sold.',
+    measurement: { label: 'Typical unit', value: 'USD per utility GW per year' },
+    relatedTerms: [
+      'tokens-per-megawatt',
+      'billable-utilization',
+      'cached-input-tokens',
+      'modeled-profit-per-gigawatt',
+      'utility-power-budget',
+    ],
+    articleSlugs: [VR_RUBIN_AGENTIC],
+  },
+  {
+    slug: 'modeled-profit-per-gigawatt',
+    term: 'Modeled profit per gigawatt',
+    aliases: ['profit per GW', 'annual modeled profit per utility GW'],
+    category: 'Benchmark metrics',
+    plainEnglish:
+      'This estimate subtracts modeled serving costs and applicable model-license fees from annual token revenue for a gigawatt of utility power.',
+    definition:
+      'Modeled profit per gigawatt is annual token revenue less the costs and license fees included in the model, normalized to an all-in utility gigawatt.',
+    explanation:
+      'The result inherits the revenue model’s interactivity, token prices, cache mix, and utilization assumptions. Compute expense uses the selected owning or rental cost basis. If a license fee is specified as a percentage of revenue, it is calculated on revenue rather than on the amount left after compute costs.',
+    significance:
+      'This is a defined economic estimate, not audited corporate net income. Costs outside the model can change realized profit, and weak demand or falling token prices can reduce earnings without changing the benchmark performance of the hardware.',
+    benchmarkContext:
+      'The Rubin article’s 75 TPS example assumes 60% utilization and no model-license fee for MIT-licensed DeepSeek V4 Pro. Its linear conversion from a GW to a smaller deployment holds the same assumptions; it is not a measured fleet-scale profit result.',
+    measurement: { label: 'Typical unit', value: 'modeled USD profit per utility GW per year' },
+    relatedTerms: [
+      'annual-revenue-per-gigawatt',
+      'billable-utilization',
+      'total-cost-of-ownership',
+      'utility-power-budget',
+    ],
+    articleSlugs: [VR_RUBIN_AGENTIC],
+  },
+  {
+    slug: 'utility-power-budget',
+    term: 'Utility power budget',
+    aliases: ['all-in utility power', 'provisioned utility power', 'datacenter power allocation'],
+    category: 'Hardware',
+    plainEnglish:
+      'A utility power budget is the electricity capacity available to the whole datacenter, including the equipment that powers and cools the servers.',
+    definition:
+      'A utility power budget is the provisioned facility power capacity available for IT equipment and supporting infrastructure at the utility boundary.',
+    explanation:
+      'Accelerator TDP covers a component-level design envelope. A facility budget must also accommodate hosts, networking, power conversion, cooling, and other included overhead. The system boundary must be stated consistently before using the budget to calculate how much hardware or token throughput fits.',
+    significance:
+      'Comparing one system at chip-only power with another at utility power biases the efficiency ratio. Provisioned capacity and measured operating draw also answer different questions: one describes the deployment allocation, while the other describes consumption during a specific workload.',
+    benchmarkContext:
+      'The Rubin article normalizes throughput per utility MW and annual economics per all-in utility GW. Its DSX MaxLPS discussion considers using workload power profiles to fit more hardware within that allocation without equating TDP to measured inference power.',
+    relatedTerms: ['tdp', 'pue', 'tokens-per-megawatt', 'dsx-maxlps'],
+    articleSlugs: [VR_RUBIN_AGENTIC],
+  },
+  {
+    slug: 'dsx-maxlps',
+    term: 'DSX MaxLPS',
+    aliases: ['NVIDIA DSX MaxLPS', 'dynamic power shifting'],
+    category: 'Software',
+    plainEnglish:
+      'DSX MaxLPS manages datacenter power around workload demand so operators can use capacity that conservative peak-power provisioning would leave unused.',
+    definition:
+      'DSX MaxLPS is NVIDIA’s power-management approach discussed in the Rubin article for dynamically managing power within a constrained datacenter allocation.',
+    explanation:
+      'Provisioning every accelerator for simultaneous peak draw can leave unused capacity when inference workloads consume less than their design envelopes. The article describes profiling current and representative future workloads, then steering power across the datacenter to support a denser deployment within the available power footprint.',
+    significance:
+      'The opportunity depends on actual workload behavior and safe power-control policies. It does not make utility capacity unlimited or guarantee that adding accelerators will preserve latency under every demand pattern. Workload profiles must cover conditions beyond one favorable benchmark point.',
+    benchmarkContext:
+      'The Rubin article describes MaxLPS alongside an upcoming PowerX integration. It does not isolate a measured MaxLPS speedup in the displayed AgentX curves, so those results should not be presented as a direct measurement of this feature’s contribution.',
+    relatedTerms: ['utility-power-budget', 'tdp', 'tokens-per-megawatt', 'energy-per-token'],
+    articleSlugs: [VR_RUBIN_AGENTIC],
+  },
+  {
+    slug: 'vera-rubin',
+    term: 'Vera Rubin',
+    aliases: ['Vera Rubin platform', 'Rubin GPU', 'Vera CPU', 'VR NVL72'],
+    category: 'Hardware',
+    plainEnglish:
+      'Vera Rubin is NVIDIA’s platform combining Rubin GPUs, Vera CPUs, and the interconnect and networking components around them.',
+    definition:
+      'Vera Rubin is the NVIDIA platform that the article describes as co-designed across Rubin GPU, Vera CPU, NVLink 6 Switch, ConnectX-9, BlueField-4, and Spectrum-6.',
+    explanation:
+      'The platform name covers more than an accelerator alone. The Rubin NVL72 article evaluates a complete serving configuration with early pre-release TensorRT-LLM software. It specifies a production SKU with 2300 W TDP and 1.5 TB of CPU LPDDR5X per compute tray, rather than treating every announced configuration as identical.',
+    significance:
+      'Agentic performance reflects the interaction of compute, memory capacity, communication, and serving software. A measured advantage cannot be assigned solely to one component, and a rack-level result does not establish an identical advantage for every model or latency target.',
+    benchmarkContext:
+      'Use the article’s model, engine, precision, workload, and interactivity target when comparing Vera Rubin with GB300 or single-node systems. The published results are a software snapshot; the article’s expectations for later gains are projections rather than measurements.',
+    relatedTerms: ['nvl72', 'nvlink', 'extreme-co-design', 'agentx', 'tensorrt-llm'],
+    articleSlugs: [VR_RUBIN_AGENTIC, VR_RUBIN],
+  },
+  {
+    slug: 'extreme-co-design',
+    term: 'Extreme co-design',
+    aliases: ['platform co-design', 'hardware-software co-design'],
+    category: 'Hardware',
+    plainEnglish:
+      'Co-design means developing connected parts of the system together so a gain in one part is not lost to a bottleneck elsewhere.',
+    definition:
+      'Extreme co-design is the Rubin article’s term for coordinated platform development across accelerator, host, interconnect, and networking products to serve the target workload.',
+    explanation:
+      'A faster GPU can still wait for memory, communication, or request scheduling. Designing these components together changes the resources available to the serving stack. The article names six coordinated products: Rubin GPU, Vera CPU, NVLink 6 Switch, ConnectX-9, BlueField-4, and Spectrum-6.',
+    significance:
+      'The concept directs attention to whole-system performance rather than peak compute alone. It is an architectural approach, not a benchmark metric or an experimentally isolated explanation for a particular throughput multiplier.',
+    benchmarkContext:
+      'AgentX measures the resulting hardware-and-software configuration under multi-turn traffic. The Rubin article’s comparison does not independently vary all six products, so it cannot allocate the measured gain to each component or establish a universal co-design speedup.',
+    relatedTerms: ['vera-rubin', 'nvlink', 'memory-bandwidth', 'inference-engine', 'agentx'],
+    articleSlugs: [VR_RUBIN_AGENTIC],
+  },
+  {
+    slug: 'engram',
+    term: 'Engram',
+    aliases: ['Engram conditional memory'],
+    category: 'Model architecture',
+    plainEnglish:
+      'Engram retrieves learned vectors for recurring token patterns instead of rebuilding every pattern through the model layers.',
+    definition:
+      'Engram is a learned conditional-memory mechanism that extends single-token embeddings with multi-token lookups and integrates the retrieved features into the model.',
+    explanation:
+      'Lookup addresses depend on token IDs rather than intermediate hidden states. The runtime can therefore identify needed rows before reaching an Engram layer and overlap their retrieval with earlier computation. The retrieved features interact with downstream layers and expert selection.',
+    significance:
+      'Sparse access makes a large parameter table a candidate for DRAM offload. Removing the table at inference changes the trained model, so an ablation is not a substitute for comparing separately trained architectures at matched quality.',
+    benchmarkContext:
+      'The article reports roughly 189 GiB of Engram memory in its DeepSeek-V4.1-Flash configuration. Its DRAM and SSD comparisons retain Engram functionality while changing the serving path; the ablation experiments ask a separate model-quality question.',
+    relatedTerms: [
+      'n-gram-embedding',
+      'conditional-memory',
+      'parameter-offloading',
+      'inference-time-ablation',
+    ],
+    articleSlugs: [ENGRAM],
+  },
+  {
+    slug: 'n-gram-embedding',
+    term: 'N-gram embedding',
+    aliases: ['multi-token embedding'],
+    category: 'Model architecture',
+    plainEnglish:
+      'An n-gram embedding gives a short sequence of tokens a learned vector that the model can look up.',
+    definition:
+      'An n-gram embedding maps a local sequence of n tokens to learned vector features, extending the vocabulary of patterns beyond individual tokens.',
+    explanation:
+      'Repeated names, code fragments, and common phrasing can activate these lookups. The article examines examples through Engram gate scores, but selects examples for interest rather than treating them as a representative ranking of memory use.',
+    significance:
+      'Local token patterns make lookup addresses available without waiting for hidden-state computation. That property supports prefetching and sparse parameter offload, although it does not prove that every retrieved feature is useful on every occurrence.',
+    benchmarkContext:
+      'The Engram gate scan does not establish how often each pattern appeared during training or how much table capacity a category occupies. A high gate score also does not measure access frequency, so it is insufficient for choosing which rows to cache.',
+    relatedTerms: ['engram', 'embedding-table', 'context-dependent-gating', 'cache-hotness'],
+    articleSlugs: [ENGRAM],
+  },
+  {
+    slug: 'conditional-memory',
+    term: 'Conditional memory',
+    category: 'Model architecture',
+    plainEnglish:
+      'Conditional memory supplies learned information only when the input selects the corresponding memory entries.',
+    definition:
+      'Conditional memory is a model mechanism that retrieves a selected subset of learned memory parameters for an input rather than accessing the complete memory table on every token.',
+    explanation:
+      'In the Engram design discussed in the article, token patterns determine row addresses and a gate controls how the retrieved features contribute. The memory parameters are learned model data, unlike the request-specific attention state stored in a KV cache.',
+    significance:
+      'The total size of a memory table can be much larger than the bytes fetched for one token. Capacity requirements and per-token traffic must therefore be evaluated separately when deciding where the table should reside.',
+    benchmarkContext:
+      'The article reports a large Engram table but only about 12.4 KiB of row data per processed token position across the model. This sparsity motivates offloading; it does not guarantee that a particular CPU or SSD implementation will improve serving economics.',
+    relatedTerms: ['engram', 'sparse-embedding-lookup', 'embedding-table', 'kv-cache'],
+    articleSlugs: [ENGRAM],
+  },
+  {
+    slug: 'embedding-table',
+    term: 'Embedding table',
+    category: 'Model architecture',
+    plainEnglish:
+      'An embedding table stores learned vectors in rows that the model retrieves using input-derived identifiers.',
+    definition:
+      'An embedding table is a collection of learned vector parameters indexed by discrete identifiers, such as token IDs or identifiers derived from multi-token patterns.',
+    explanation:
+      'A lookup selects rows instead of multiplying by the entire table. Engram extends ordinary token embeddings with learned multi-token lookups. The table must be stored somewhere, but sparse access allows its storage tier to differ from that of frequently used dense weights.',
+    significance:
+      'Table capacity, fetched bytes, and the cost of retrieving those bytes are separate quantities. A large table need not consume accelerator memory if the serving path can access its rows efficiently from another tier.',
+    benchmarkContext:
+      'The article places the same Engram table in HBM, pinned DRAM, or an SSD-backed mapping. Its comparisons measure complete serving configurations, including coordination and transfer costs, rather than treating table size alone as a prediction of throughput.',
+    relatedTerms: [
+      'n-gram-embedding',
+      'sparse-embedding-lookup',
+      'parameter-offloading',
+      'high-bandwidth-memory',
+    ],
+    articleSlugs: [ENGRAM],
+  },
+  {
+    slug: 'parameter-offloading',
+    term: 'Parameter offloading',
+    aliases: ['model weight offloading', 'Engram offloading'],
+    category: 'Serving',
+    plainEnglish:
+      'Parameter offloading keeps learned model data outside accelerator memory and fetches the portions needed for computation.',
+    definition:
+      'Parameter offloading stores learned model parameters in a lower memory tier, such as host DRAM or SSD, while the accelerator accesses the data required for inference.',
+    explanation:
+      'Engram is suited to sparse row retrieval because row addresses follow token IDs. This differs from KV cache offloading, which moves attention state generated for particular requests. The two mechanisms can compete for, or free capacity within, the same memory hierarchy.',
+    significance:
+      'Moving parameters out of HBM can leave more room for KV cache or allow fewer GPUs per replica. Those benefits must outweigh access costs and depend on the kernel, interconnect, memory allocation, and workload.',
+    benchmarkContext:
+      'The article reports up to a 1.6x Pareto improvement when its B300 DRAM-offload configuration moves from TP4 to TP2. Its unoptimized B200 SSD path performs worse than DRAM, showing that cheaper storage alone does not establish a lower cost per token.',
+    relatedTerms: ['cpu-offloading', 'nvme-offloading', 'kv-cache-offload', 'engram'],
+    articleSlugs: [ENGRAM],
+  },
+  {
+    slug: 'sparse-embedding-lookup',
+    term: 'Sparse embedding lookup',
+    category: 'Model architecture',
+    plainEnglish:
+      'A sparse lookup reads a few selected embedding rows rather than reading the entire parameter table.',
+    definition:
+      'Sparse embedding lookup retrieves only the rows selected by an input-dependent index set, so accessed data per token can be small relative to total table capacity.',
+    explanation:
+      'The Engram configuration in the article requests 24 rows at each of two layers. It reports about 12.4 KiB per processed token position across the model, or 3.1 KiB per GPU when split across four GPUs.',
+    significance:
+      'Sparse traffic makes offloading plausible but introduces irregular memory access. Row selection, dequantization, transfer overhead, and reuse determine whether a lower memory tier can supply data without delaying the rest of the model.',
+    benchmarkContext:
+      'Moving the Engram table into HBM accelerates its sparse lookup without directly accelerating decoder computation or communication. The article therefore evaluates full AgentX serving curves instead of assuming a faster lookup must produce a proportionate end-to-end gain.',
+    relatedTerms: ['embedding-table', 'engram', 'parameter-offloading', 'memory-bandwidth'],
+    articleSlugs: [ENGRAM],
+  },
+  {
+    slug: 'embedding-prefetch',
+    term: 'Embedding prefetch',
+    aliases: ['Engram prefetch', 'row prefetching'],
+    category: 'Serving',
+    plainEnglish:
+      'Embedding prefetch starts retrieving the rows a later model layer will need while earlier layers are still computing.',
+    definition:
+      'Embedding prefetch is the early retrieval of selected embedding rows so that memory access can overlap computation preceding their use.',
+    explanation:
+      'Engram row addresses depend on token IDs rather than hidden states. Once those IDs are available, the runtime can determine the required rows without waiting for the intervening model layers to finish. The useful overlap window ends when the consuming layer needs the data.',
+    significance:
+      'Prefetch can hide some latency but does not remove transferred bytes or bandwidth limits. A serving system must still allocate buffers, coordinate completion, and avoid consuming data before retrieval has finished.',
+    benchmarkContext:
+      'The article attributes the competitiveness of its DRAM path to optimizations including asynchronous execution and overlap. It does not isolate a universal prefetch speedup, so compare the full configuration and its concurrency range rather than extrapolating from the mechanism.',
+    relatedTerms: ['engram', 'sparse-embedding-lookup', 'double-buffering', 'cpu-offloading'],
+    articleSlugs: [ENGRAM],
+  },
+  {
+    slug: 'unified-virtual-addressing',
+    term: 'Unified Virtual Addressing',
+    abbreviation: 'UVA',
+    category: 'Software',
+    plainEnglish:
+      'UVA lets supported host and device allocations share an address space that GPU code can use.',
+    definition:
+      'Unified Virtual Addressing provides a unified virtual address space for supported CPU and GPU memory allocations. It does not make host memory physically equivalent to HBM.',
+    explanation:
+      'In the article, the Engram kernel reads pinned host memory directly through UVA and performs row selection and dequantization on the GPU. This avoids the explicit CPU row-ID round trip used by the experimental SSD-backed implementation.',
+    significance:
+      'A common address space does not imply automatic page migration or identical access bandwidth. Performance still depends on the memory backing the address and the interconnect used to reach it.',
+    benchmarkContext:
+      'The HBM and DRAM variants use the same row-selection kernel and both support full decode graphs. The SSD experiment changes that execution path, so its comparison cannot be interpreted as a measurement of storage-device latency alone.',
+    relatedTerms: [
+      'pinned-host-memory',
+      'cpu-offloading',
+      'sparse-embedding-lookup',
+      'memory-mapped-file',
+    ],
+    articleSlugs: [ENGRAM],
+  },
+  {
+    slug: 'pinned-host-memory',
+    term: 'Pinned host memory',
+    aliases: ['page-locked memory'],
+    category: 'Hardware',
+    plainEnglish:
+      'Pinned host memory stays resident in RAM so the device can use a stable host-memory allocation.',
+    definition:
+      'Pinned host memory is host RAM held resident for device access or transfer, rather than ordinary pageable memory that the operating system may reclaim or move through paging.',
+    explanation:
+      'The Engram DRAM implementation reads a pinned host table directly through UVA. The SSD experiment instead gathers selected rows into pinned buffers before copying them to the GPU. Both use pinned memory, but they expose different coordination and transfer paths.',
+    significance:
+      'Pinned memory consumes host capacity and should not be confused with free storage. Its stable residency can support efficient device access, while excessive allocation reduces RAM available to applications and the filesystem cache.',
+    benchmarkContext:
+      'A warm SSD-backed file is not equivalent to the pinned DRAM table in the article. Cached pages avoid physical disk reads, but the experimental path still gathers rows on the CPU and transfers the resulting buffers between graph segments.',
+    relatedTerms: [
+      'unified-virtual-addressing',
+      'filesystem-page-cache',
+      'cpu-offloading',
+      'memory-mapped-file',
+    ],
+    articleSlugs: [ENGRAM],
+  },
+  {
+    slug: 'memory-mapped-file',
+    term: 'Memory-mapped file',
+    abbreviation: 'mmap',
+    aliases: ['file-backed mapping'],
+    category: 'Software',
+    plainEnglish:
+      'A memory-mapped file exposes file contents through memory addresses while the operating system manages which pages are resident.',
+    definition:
+      'A memory-mapped file maps file-backed data into a process address space, allowing the operating system to load and reclaim pages as they are accessed.',
+    explanation:
+      'The article replaces the Engram allocation with local SSD-backed mappings. Pages already resident in the filesystem cache can satisfy reads without another SSD access. File backing lets the operating system reclaim those pages when other applications need RAM.',
+    significance:
+      'The mapped file size is not the same as physical RAM use or bytes read from the SSD during a benchmark. Cache residency and memory pressure must be reported to understand what an experiment actually measures.',
+    benchmarkContext:
+      'The B200 experiment uses CPU row-ID handling, deduplication, pinned-buffer gathering, and GPU transfers around graph segments. It did not enable GDS. Consequently its measured gap from DRAM includes the implementation overhead as well as any physical storage activity.',
+    relatedTerms: [
+      'filesystem-page-cache',
+      'nvme-offloading',
+      'pinned-host-memory',
+      'parameter-offloading',
+    ],
+    articleSlugs: [ENGRAM],
+  },
+  {
+    slug: 'filesystem-page-cache',
+    term: 'Filesystem page cache',
+    aliases: ['OS page cache', 'warm filesystem cache'],
+    category: 'Software',
+    plainEnglish:
+      'The filesystem page cache keeps recently accessed file data in RAM so later reads can avoid the storage device.',
+    definition:
+      'The filesystem page cache is operating-system-managed memory holding file data, including resident pages accessed through file-backed mappings.',
+    explanation:
+      'A warm Engram mapping may serve its requested rows entirely from RAM. Under memory pressure the operating system can reclaim file-backed pages, making later accesses depend on storage again. The table being backed by SSD therefore does not prove that each lookup reads the SSD.',
+    significance:
+      'Cache state changes the meaning of storage benchmarks. It is necessary to distinguish logical reads from physical device I/O and to account for resident file pages when claiming host-memory savings.',
+    benchmarkContext:
+      'In the article, a warm cache removes SSD reads but leaves CPU coordination, row gathering, and transfers in the unoptimized path. The measured result supports a comparison of complete serving implementations, not an isolated claim about the latency of NAND flash.',
+    relatedTerms: ['memory-mapped-file', 'cache-hotness', 'nvme-offloading', 'pinned-host-memory'],
+    articleSlugs: [ENGRAM],
+  },
+  {
+    slug: 'cache-hotness',
+    term: 'Cache hotness',
+    aliases: ['hot embedding rows', 'row access frequency'],
+    category: 'Serving',
+    plainEnglish:
+      'A hot row is accessed often or recently enough that keeping it in a faster tier may save repeated retrievals.',
+    definition:
+      'Cache hotness describes the observed access frequency or recency of data within a workload and time window, informing which data may benefit from faster storage.',
+    explanation:
+      'Recommendation systems commonly retain frequently or recently used embedding rows in faster memory while colder rows remain on SSD. Engram gate scores answer a different question: how strongly retrieved features contribute in a given context.',
+    significance:
+      'A strongly weighted row is not necessarily frequently requested. Cache policy needs access traces and resource constraints rather than a ranking of interesting examples or large gate activations alone.',
+    benchmarkContext:
+      'The article explicitly warns that strong gates do not identify cache-hot rows. Its example scan also does not measure table capacity by content category, so it cannot justify a cache allocation or prove that certain learned content wastes memory.',
+    relatedTerms: [
+      'context-dependent-gating',
+      'embedding-table',
+      'filesystem-page-cache',
+      'engram',
+    ],
+    articleSlugs: [ENGRAM],
+  },
+  {
+    slug: 'context-dependent-gating',
+    term: 'Context-dependent gating',
+    aliases: ['Engram gate score'],
+    category: 'Model architecture',
+    plainEnglish:
+      'A gate controls how much a retrieved memory feature contributes in the current model context.',
+    definition:
+      'Context-dependent gating weights retrieved memory features according to their compatibility with the current representation, rather than always applying a fixed contribution.',
+    explanation:
+      'The article probes Engram gate scores to find names, code fragments, and recurring phrases. It also notes that calculating the gate requires the retrieved key, so observing a low gate after retrieval does not automatically avoid the memory read.',
+    significance:
+      'Skipping retrieval would require a separate usefulness predictor that acts before the read. Such a predictor introduces a different implementation and accuracy question; it is not a free consequence of existing gate values.',
+    benchmarkContext:
+      'The published examples were selected for interest rather than gate strength. Neither those examples nor strong gates establish cache hotness. Gate-based interpretation, storage placement, and serving performance should therefore remain separate measurements when evaluating Engram.',
+    relatedTerms: ['engram', 'cache-hotness', 'n-gram-embedding', 'sparse-embedding-lookup'],
+    articleSlugs: [ENGRAM],
+  },
+  {
+    slug: 'inference-time-ablation',
+    term: 'Inference-time ablation',
+    category: 'Model architecture',
+    plainEnglish:
+      'An inference-time ablation disables part of an already trained model to measure how the model depends on that part.',
+    definition:
+      'Inference-time ablation changes or removes a component during evaluation without retraining the model to adapt to that change.',
+    explanation:
+      'Suppressing Engram changes downstream features and expert choices in a model trained to use the memory. The resulting loss therefore measures dependence under a training-inference mismatch, not the quality difference between independently trained models with and without Engram.',
+    significance:
+      'Different tasks and evaluation procedures can respond differently. The article reports worse token likelihood across evaluated domains while GSM8K accuracy remains within measured run-to-run variation. A single unchanged score cannot establish that the removed component is generally unnecessary.',
+    benchmarkContext:
+      'The CRUXEval experiment separately tests natural rerouting and fixed original expert choices under teacher forcing. It also evaluates removing Engram during prefill, decode, or both, keeping those interventions distinct from storage-tier changes that retain the memory.',
+    relatedTerms: ['engram', 'teacher-forcing', 'prefill', 'decode'],
+    articleSlugs: [ENGRAM],
+  },
+  {
+    slug: 'teacher-forcing',
+    term: 'Teacher forcing',
+    category: 'Model architecture',
+    plainEnglish:
+      'Teacher forcing supplies the reference token history so different model variants are scored on the same continuation.',
+    definition:
+      'Teacher forcing conditions a model on reference tokens rather than its own sampled outputs, allowing token-level losses to be compared along a fixed sequence.',
+    explanation:
+      'The article uses a teacher-forced CRUXEval experiment to hold tokens constant while changing Engram and expert routing. This separates changes in reference-answer likelihood from differences caused by models generating different continuations.',
+    significance:
+      'Teacher-forced loss and free-generation task accuracy are different measurements. Fixed token histories help isolate an intervention, but they do not measure the entire behavior of a model choosing and extending its own answers.',
+    benchmarkContext:
+      'Removing Engram raises answer loss from 0.2848 to 0.3093 bits/token; forcing the ablated model to retain the original expert choices raises it further to 0.3375. These results support partial compensation through rerouting in that experiment, not a universal division between memory and reasoning.',
+    relatedTerms: ['inference-time-ablation', 'engram', 'mixture-of-experts', 'decode'],
+    articleSlugs: [ENGRAM],
   },
 ] as const satisfies readonly GlossaryEntry[];
 

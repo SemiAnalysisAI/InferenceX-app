@@ -36,6 +36,7 @@ import type {
   InferenceDataContextType,
   InferenceDisplayContextType,
   InferenceFiltersContextType,
+  PowerCompare,
   TokenRevenuePriceSource,
 } from '@/components/inference/types';
 import { resolveMetricConfigKey } from '@/components/inference/metric-registry';
@@ -55,6 +56,14 @@ import {
   useUrlStateSync,
 } from '@/hooks/useChartContext';
 import { useUrlState } from '@/hooks/useUrlState';
+import { serializePerfRulers } from '@/lib/d3-chart/layers/perf-ruler';
+import { parsePowerCompare } from '@/components/inference/utils/power-compare';
+import {
+  PERSISTED_PERF_RULER_CHART_ID,
+  PerfRulerStoreContext,
+  persistedPerfRulerAxisKey,
+  usePerfRulerStoreValue,
+} from '@/components/inference/perf-ruler-store';
 import { useParetoHighlightToggle } from './hooks/useParetoHighlightToggle';
 import { useOpenRouterPricing } from '@/hooks/api/use-openrouter-pricing';
 import { DEFAULT_Y_AXIS_METRIC } from '@/lib/url-state';
@@ -477,6 +486,12 @@ export function InferenceProvider({
   const [scaleType, setScaleType] = useState<'auto' | 'linear' | 'log'>(
     () => (getUrlParam('i_scale') as 'auto' | 'linear' | 'log') || 'auto',
   );
+  // Comparison series on a gated power metric (`i_pcompare`). Kept while the
+  // metric changes: a key without a common axis simply yields no siblings, and
+  // the Measured controls say so, so a link's intent survives a detour.
+  const [powerCompare, setPowerCompare] = useState<PowerCompare>(() =>
+    parsePowerCompare(getUrlParam('i_pcompare')),
+  );
 
   // ── Quick filters (vendor / framework / deployment / mtp-stp / power tier) ──
   // Coarse pre-filters applied to the point set. Empty = no constraint.
@@ -597,11 +612,6 @@ export function InferenceProvider({
     playful: paretoFrontierPlayful,
     setVisible: setShowParetoFrontier,
   } = useParetoHighlightToggle(getUrlParam('i_frontier'));
-  const {
-    visible: showParetoHinterland,
-    playful: paretoHinterlandPlayful,
-    setVisible: setShowParetoHinterland,
-  } = useParetoHighlightToggle(getUrlParam('i_hinterland'));
   const [userCosts, setUserCosts] = useState<Record<string, number | undefined> | null>(null);
   const [userPowers, setUserPowers] = useState<Record<string, number | undefined> | null>(null);
 
@@ -769,6 +779,7 @@ export function InferenceProvider({
       !isUnofficialRun &&
       !hasExplicitRunSelection &&
       selectedRunDateRev === 0,
+    powerCompare,
   );
 
   // For GPU comparison date picker — use shared availability data from global filters
@@ -1033,6 +1044,21 @@ export function InferenceProvider({
   const loading = availabilityError ? false : chartDataLoading || openRouterPricingLoading;
   const refreshing = !availabilityError && chartDataRefreshing;
   const error = availabilityError || workflowError || chartDataError;
+
+  // ── Perf rulers (persisted chart) ────────────────────────────────────────
+  // The axis identity follows the graph ChartDisplay renders as `chart-0`
+  // (picked by x mode, like `bestHwTypes` below), so an x-mode switch that
+  // swaps the rendered chart or its x units clears the rulers the same way
+  // the chart's own `usePerfRulerAxisReset` does for local state.
+  const perfRulerStore = usePerfRulerStoreValue(
+    PERSISTED_PERF_RULER_CHART_ID,
+    getUrlParam('i_rulers'),
+    persistedPerfRulerAxisKey(graphs, selectedXAxisMode, selectedYAxisMetric),
+  );
+  const iRulersStr = useMemo(
+    () => serializePerfRulers(perfRulerStore.state),
+    [perfRulerStore.state],
+  );
 
   // ── Toggle sets ───────────────────────────────────────────────────────────
 
@@ -1592,7 +1618,6 @@ export function InferenceProvider({
       i_conclabel: showConcurrencyLabels ? '1' : '',
       i_gradlabel: showGradientLabels ? '1' : '',
       i_frontier: showParetoFrontier ? (paretoFrontierPlayful ? '2' : '1') : '',
-      i_hinterland: showParetoHinterland ? (paretoHinterlandPlayful ? '2' : '1') : '',
       i_linelabel: serializedLabelState.i_linelabel,
       i_active: iActiveStr,
       i_vendor: quickFilterVendors.join(','),
@@ -1600,6 +1625,8 @@ export function InferenceProvider({
       i_disagg: quickFilterDeployment.join(','),
       i_spec: quickFilterSpec.join(','),
       i_power: quickFilterPower.join(','),
+      i_rulers: iRulersStr,
+      i_pcompare: powerCompare === 'none' ? '' : powerCompare,
     },
     [
       selectedYAxisMetric,
@@ -1623,9 +1650,7 @@ export function InferenceProvider({
       showConcurrencyLabels,
       showGradientLabels,
       showParetoFrontier,
-      showParetoHinterland,
       paretoFrontierPlayful,
-      paretoHinterlandPlayful,
       showLineLabels,
       iActiveStr,
       quickFilterVendors,
@@ -1633,6 +1658,8 @@ export function InferenceProvider({
       quickFilterDeployment,
       quickFilterSpec,
       quickFilterPower,
+      iRulersStr,
+      powerCompare,
     ],
   );
 
@@ -1848,6 +1875,7 @@ export function InferenceProvider({
       selectedE2eXAxisMetric,
       selectedXAxisMode,
       scaleType,
+      powerCompare,
       isLegendExpanded,
       hideNonOptimal,
       showAllMeasurements,
@@ -1858,9 +1886,7 @@ export function InferenceProvider({
       showConcurrencyLabels,
       showGradientLabels,
       showParetoFrontier,
-      showParetoHinterland,
       paretoFrontierPlayful,
-      paretoHinterlandPlayful,
       showLineLabels,
     }),
     [
@@ -1875,6 +1901,7 @@ export function InferenceProvider({
       selectedE2eXAxisMetric,
       selectedXAxisMode,
       scaleType,
+      powerCompare,
       isLegendExpanded,
       hideNonOptimal,
       showAllMeasurements,
@@ -1885,9 +1912,7 @@ export function InferenceProvider({
       showConcurrencyLabels,
       showGradientLabels,
       showParetoFrontier,
-      showParetoHinterland,
       paretoFrontierPlayful,
-      paretoHinterlandPlayful,
       showLineLabels,
     ],
   );
@@ -1911,6 +1936,7 @@ export function InferenceProvider({
     setSelectedXAxisMetric,
     setSelectedXAxisMode: handleSetXAxisMode,
     setScaleType,
+    setPowerCompare,
     setQuickFilterVendors,
     setQuickFilterFrameworks,
     setQuickFilterDeployment,
@@ -1926,7 +1952,6 @@ export function InferenceProvider({
     setShowConcurrencyLabels,
     setShowGradientLabels,
     setShowParetoFrontier,
-    setShowParetoHinterland,
     setShowLineLabels,
     setSelectedGPUs: setSelectedGPUsAndClear,
     setSelectedDates: setSelectedDatesAndClear,
@@ -1948,7 +1973,9 @@ export function InferenceProvider({
         display={displayValue}
         actions={actionsValue}
       >
-        {children}
+        <PerfRulerStoreContext.Provider value={perfRulerStore}>
+          {children}
+        </PerfRulerStoreContext.Provider>
       </InferenceContextsProvider>
       <EngineComparisonConflictToast
         detail={isUnofficialRun ? null : engineConflict}

@@ -16,12 +16,188 @@
  * natively.
  */
 
+import { interceptVrPublicationData, vrPublicationRows } from '../support/vr-publication-fixtures';
+
 const TARGET = '/inference/kimi-k3';
 
 interface HistoryWrite {
   kind: 'push' | 'replace';
   pathname: string;
 }
+
+function assertTpuView() {
+  cy.get('[data-testid="model-selector"]').should('contain.text', 'Qwen3.5 397B');
+  cy.get('[data-testid="scenario-selector"]').should('contain.text', '8K / 1K');
+  cy.get('[data-testid="precision-multiselect"]').should('contain.text', 'FP8');
+  cy.get('[data-testid="x-axis-mode-selector"]').should('have.attr', 'data-value', 'e2e');
+  cy.get('[data-testid="remove-filter-spec-stp"]').should('exist');
+  cy.get('[data-testid="remove-filter-spec-mtp"]').should('not.exist');
+}
+
+describe('landing model curation', () => {
+  for (const prefix of ['', '/zh']) {
+    it(`shows the curated ledger on ${prefix || '/'} without changing compare coverage`, () => {
+      cy.visit(prefix || '/');
+      cy.get('[data-testid="compare-agentx-primary"]').within(() => {
+        cy.get('[data-testid^="compare-agentx-model-"]').should(($links) => {
+          expect([...$links].map((link) => link.getAttribute('href'))).to.deep.eq(
+            ['kimi-k3', 'deepseek-v41-flash', 'glm-5-3', 'minimax-m3', 'qwen-3-5'].map(
+              (slug) => `${prefix}/inference/${slug}`,
+            ),
+          );
+        });
+        cy.get('[data-testid="compare-agentx-model-deepseek-v4"]').should('not.exist');
+        cy.get('[data-testid="compare-agentx-model-qwen-3-8-flash-next"]').should('not.exist');
+        cy.get('[data-testid="compare-agentx-model-qwen-3-5"]')
+          .parent()
+          .next()
+          .should('have.attr', 'data-testid', 'landing-tpu-results-link');
+        cy.get('[data-testid="landing-tpu-results-link"]')
+          .should('contain.text', prefix ? 'TPU 结果' : 'TPU Results')
+          .and(
+            'have.attr',
+            'href',
+            `${prefix}/inference/qwen-3-5?i_seq=8k%2F1k&i_prec=fp8&i_spec=stp&i_xmode=e2e`,
+          );
+        cy.get('[data-testid="landing-tpu-google-logo"] path').should('have.length', 4);
+        cy.get('[data-testid="landing-tpu-results-link"]')
+          .next()
+          .should('have.attr', 'data-testid', 'landing-rubin-results-link')
+          .and('have.attr', 'href', `${prefix}/inference/deepseek-v4`)
+          .and('contain.text', 'DeepSeek V4 Pro');
+        cy.get('[data-testid="landing-rubin-results-link"]')
+          .next()
+          .should('have.attr', 'data-testid', 'landing-jalapeno-results-link')
+          .and(
+            'have.attr',
+            'href',
+            `${prefix}/inference/deepseek-r1?i_seq=8k%2F1k&i_prec=fp4&i_xmode=e2e`,
+          )
+          .and('contain.text', 'OpenAI Jalapeño')
+          .and('contain.text', 'DeepSeek R1');
+        cy.get('[data-testid="landing-rubin-nvidia-logo"] path').should(
+          'have.attr',
+          'fill',
+          '#76B900',
+        );
+        cy.get('[data-testid="landing-jalapeno-openai-logo"] path').should(
+          'have.attr',
+          'fill',
+          'currentColor',
+        );
+      });
+
+      cy.visit(`${prefix}/compare`);
+      cy.get('[data-testid="compare-agentx-primary"]').within(() => {
+        cy.get('[data-testid="landing-tpu-results-link"]').should('not.exist');
+        cy.get('[data-testid="landing-rubin-results-link"]').should('not.exist');
+        cy.get('[data-testid="landing-jalapeno-results-link"]').should('not.exist');
+        cy.get('[data-testid^="compare-agentx-model-"]').should('have.length', 7);
+        for (const slug of ['deepseek-v4', 'qwen-3-8-flash-next']) {
+          cy.get(`[data-testid="compare-agentx-model-${slug}"]`).should(
+            'have.attr',
+            'href',
+            `${prefix}/inference/${slug}`,
+          );
+        }
+      });
+    });
+
+    it(`opens the STP-only Qwen TPU view from ${prefix || '/'} and retains it on reload`, () => {
+      cy.visit(prefix || '/');
+      cy.get('[data-testid="landing-tpu-results-link"]').click();
+      cy.location('pathname').should('eq', `${prefix}/inference/qwen-3-5`);
+      assertTpuView();
+      cy.reload();
+      assertTpuView();
+      cy.go('back');
+      cy.location('pathname').should('eq', prefix || '/');
+    });
+
+    it(`opens Rubin AgentX results from ${prefix || '/'}`, () => {
+      interceptVrPublicationData();
+      cy.visit(prefix || '/');
+      cy.get('[data-testid="landing-rubin-results-link"]').click();
+      cy.location('pathname').should('eq', `${prefix}/inference/deepseek-v4`);
+      cy.location('search').should('not.contain', 'i_spec=');
+      cy.get('[data-testid^="remove-filter-spec-"]').should('not.exist');
+      cy.get('[data-testid="scenario-selector"]').should(
+        'contain.text',
+        prefix ? '智能体' : 'Agentic',
+      );
+      cy.get('[data-testid="chart-legend"]').should('contain.text', 'Vera Rubin NVL72');
+      cy.reload();
+      cy.get('[data-testid="chart-legend"]').should('contain.text', 'Vera Rubin NVL72');
+      cy.location('search').should('not.contain', 'i_spec=');
+      cy.get('[data-testid^="remove-filter-spec-"]').should('not.exist');
+      cy.go('back');
+      cy.location('pathname').should('eq', prefix || '/');
+    });
+
+    it(`opens Jalapeño R1 results from ${prefix || '/'}`, () => {
+      cy.visit(prefix || '/');
+      cy.get('[data-testid="landing-jalapeno-results-link"]').click();
+      cy.location('pathname').should('eq', `${prefix}/inference/deepseek-r1`);
+      cy.get('[data-testid="scenario-selector"]').should('contain.text', '8K / 1K');
+      cy.get('[data-testid="precision-multiselect"]').should('contain.text', 'FP4');
+      cy.get('[data-testid="x-axis-mode-selector"]').should('have.attr', 'data-value', 'e2e');
+      cy.location('search').should('not.contain', 'i_spec=');
+      cy.get('[data-testid^="remove-filter-spec-"]').should('not.exist');
+      cy.get('[data-testid="chart-legend"]').should('contain.text', 'Jalapeño');
+      cy.reload();
+      cy.get('[data-testid="x-axis-mode-selector"]').should('have.attr', 'data-value', 'e2e');
+      cy.location('search').should('not.contain', 'i_spec=');
+      cy.get('[data-testid^="remove-filter-spec-"]').should('not.exist');
+      cy.get('[data-testid="chart-legend"]').should('contain.text', 'Jalapeño');
+    });
+
+    it(`does not carry TPU precision through Back into Rubin on ${prefix || '/'}`, () => {
+      // Include FP8 as well as Rubin's FP4: FP4-only fixtures mask stale FP8
+      // because the availability validator falls back to the only precision.
+      const rubinRows = [
+        ...vrPublicationRows,
+        ...vrPublicationRows
+          .filter((row) => row.hardware === 'vr200')
+          .map((row) => ({
+            ...row,
+            id: row.id + 1000,
+            hardware: 'h200',
+            precision: 'fp8',
+          })),
+      ];
+      cy.fixture('api/availability.json').then((availability) => {
+        cy.intercept('GET', '/api/v1/availability*', {
+          body: [
+            ...availability.filter((row: { model: string }) => row.model !== 'dsv4'),
+            ...rubinRows.map(({ metrics: _metrics, ...row }) => row),
+          ],
+        });
+      });
+      cy.intercept('GET', '/api/v1/benchmarks*', (request) => {
+        if (String(request.query.model).includes('DeepSeek-V4')) {
+          request.reply({ body: rubinRows });
+        }
+      });
+      cy.visit(prefix || '/');
+      cy.get('[data-testid="landing-tpu-results-link"]').click();
+      assertTpuView();
+      cy.go('back');
+      cy.location('pathname').should('eq', prefix || '/');
+      cy.get('[data-testid="landing-rubin-results-link"]').click();
+      cy.get('[data-testid="precision-multiselect"]')
+        .should('contain.text', 'FP4')
+        .and('contain.text', 'FP8');
+      cy.get('[data-testid="chart-legend"]').should('contain.text', 'Vera Rubin NVL72');
+      cy.reload();
+      cy.get('[data-testid="chart-legend"]').should('contain.text', 'Vera Rubin NVL72');
+      cy.go('back');
+      cy.get('[data-testid="landing-jalapeno-results-link"]').click();
+      cy.get('[data-testid="precision-multiselect"]').should('contain.text', 'FP4');
+      cy.get('[data-testid^="remove-filter-spec-"]').should('not.exist');
+      cy.get('[data-testid="chart-legend"]').should('contain.text', 'Jalapeño');
+    });
+  }
+});
 
 describe('landing → full dashboard navigation', () => {
   const isChromium = Cypress.browser.family === 'chromium';

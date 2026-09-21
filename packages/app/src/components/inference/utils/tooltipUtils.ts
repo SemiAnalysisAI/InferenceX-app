@@ -6,6 +6,7 @@ import { isPersistedBenchmarkId } from '@/lib/benchmark-id';
 import { frameworkFamily } from '@/lib/framework-family';
 import type { Locale } from '@/lib/i18n';
 import { isKvOffloadEnabled } from '@/lib/kv-offload';
+import { chartStateHref } from '@/lib/url-state';
 import { chipCounts } from '@/lib/chip-counts';
 import type {
   SystemPowerSensorKind,
@@ -17,6 +18,13 @@ import {
   isMeasuredEnergyConfigKey,
   isModeledSystemPowerConfigKey,
 } from '@/components/inference/metric-registry';
+import { getMeasuredMetricConfig } from '@/components/inference/measured-metric-config';
+import { powerVariantLabel } from '@/components/inference/utils/power-compare';
+import {
+  POWER_TIMELINE_METRIC_KEY,
+  traceKeyForPoint,
+} from '@/components/inference/utils/powerTimeline';
+import { reconstructedRoleEnergy } from '@/components/inference/utils/role-energy';
 import {
   meaningfulParallelismSize,
   parallelismLabel,
@@ -160,6 +168,8 @@ const TOOLTIP_STRINGS = {
     powerCertified: 'Validated (current PowerX method)',
     powerLegacy: 'Historical (not validated under the current method)',
     powerWithheld: 'Measured power withheld',
+    series: 'Series',
+    roleEnergyShare: 'Share of request energy',
   },
   zh: {
     dismiss: '点击其他区域关闭',
@@ -179,8 +189,38 @@ const TOOLTIP_STRINGS = {
     powerCertified: '已验证（采用当前 PowerX 方法）',
     powerLegacy: '历史测量（尚未按当前方法验证）',
     powerWithheld: '实测功耗未采信',
+    series: '系列',
+    roleEnergyShare: '在请求能耗中的占比',
   },
 } as const;
+
+/**
+ * Which comparison series (`i_pcompare`) a point belongs to, for the clones a
+ * boundary / role comparison appends. On the energy axis a role clone also
+ * reports its share of the reconstructed request energy (utils/role-energy.ts).
+ */
+const powerVariantHTML = (
+  d: InferenceData,
+  selectedYAxisMetric: string,
+  locale: Locale,
+): string => {
+  const variant = d.powerVariant;
+  if (!variant) return '';
+  const t = TOOLTIP_STRINGS[locale];
+  let html = tooltipLine(t.series, powerVariantLabel(variant, locale));
+  if (
+    variant.kind === 'role' &&
+    variant.id !== 'all' &&
+    getMeasuredMetricConfig(selectedYAxisMetric)?.family === 'energy'
+  ) {
+    const energy = reconstructedRoleEnergy(d);
+    if (energy) {
+      const share = variant.id === 'prefill' ? energy.prefillShare : 100 - energy.prefillShare;
+      html += tooltipLine(t.roleEnergyShare, `${share.toFixed(1)}%`);
+    }
+  }
+  return html;
+};
 
 const totalChipsHTML = (d: InferenceData, selectedYAxisMetric: string, locale: Locale): string => {
   const t = TOOLTIP_STRINGS[locale];
@@ -553,39 +593,91 @@ const generateAgenticHTML = (d: InferenceData, locale: Locale): string => {
 };
 
 const ACTION_STRINGS = {
-  en: { charts: 'View charts', logs: 'View logs' },
-  zh: { charts: '查看图表', logs: '查看日志' },
+  en: { charts: 'View charts', logs: 'View logs', powerTrace: 'View power trace' },
+  zh: { charts: '查看图表', logs: '查看日志', powerTrace: '查看功耗曲线' },
 } as const;
 
-const pointDetailActionLink = (action: 'view-charts' | 'view-logs', href: string, label: string) =>
+type TooltipAction = 'view-charts' | 'view-logs' | 'view-power-trace';
+
+const pointDetailActionLink = (action: TooltipAction, href: string, label: string) =>
   `<a data-action="${action}" href="${href}" style="
     display: block; width: 100%; padding: 4px 8px; font-size: 11px; font-weight: 500;
     border: 1px solid var(--border); border-radius: 6px; cursor: pointer;
     background: var(--accent); color: var(--accent-foreground); text-align: center; text-decoration: none;
   ">${label} &rarr;</a>`;
 
-/** Point-detail links rendered only for persisted, pinned official points. */
-const viewActionsHTML = (
-  isPinned: boolean,
-  hasTraceData: boolean,
-  hasLogData: boolean,
-  pointId: number | undefined,
-  benchmarkType: string | undefined,
-  locale: Locale,
-): string => {
-  const isAgentic = benchmarkType === 'agentic_traces';
-  const showCharts = isAgentic && hasTraceData;
-  if (!isPinned || !isPersistedBenchmarkId(pointId) || (!showCharts && !hasLogData)) return '';
-  const prefix = locale === 'zh' ? '/zh' : '';
-  const agenticHref = agenticDetailHref(pointId, locale);
-  const logHref = isAgentic
-    ? `${agenticHref}${agenticHref.includes('?') ? '&' : '?'}view=logs`
-    : `${prefix}/inference/logs/${pointId}`;
+/**
+ * Whether a point on the measured-power / energy scatter can jump to its
+ * per-second telemetry on the Timeline display. Overlay points qualify too:
+ * the trace is keyed by run id and audit name, not by a persisted row id.
+ */
+export const showsPowerTraceAction = (
+  point: Pick<InferenceData, 'power_audit' | 'run_url'>,
+  selectedYAxisMetric: string,
+): boolean =>
+  selectedYAxisMetric !== POWER_TIMELINE_METRIC_KEY &&
+  getMeasuredMetricConfig(selectedYAxisMetric) !== undefined &&
+  traceKeyForPoint(point) !== null;
+
+/**
+ * Same-tab click is intercepted by the chart (in-page metric switch); the href
+ * keeps open-in-new-tab landing on the Timeline display of THIS chart. The
+ * address bar is stripped of chart state after load, so the share-link store
+ * is layered over the live location first (`chartStateHref`).
+ */
+const powerTraceHref = (): string =>
+  typeof window === 'undefined' ? '#' : chartStateHref({ i_metric: POWER_TIMELINE_METRIC_KEY });
+
+interface ViewActionsInput {
+  isPinned: boolean;
+  hasTraceData: boolean;
+  hasLogData: boolean;
+  point: InferenceData;
+  /**
+   * Metric the chart currently plots, when that chart can switch to the
+   * Timeline display in place (the scatter). Omitted by charts that cannot,
+   * so they never render a "View power trace" link nothing would handle.
+   */
+  powerTraceMetric?: string;
+  locale: Locale;
+}
+
+/**
+ * Point-detail links rendered only on pinned tooltips. "View charts" and
+ * "View logs" need a persisted row id (overlay points have none); "View power
+ * trace" needs only the run and audit source, so it works for overlays too.
+ */
+const viewActionsHTML = ({
+  isPinned,
+  hasTraceData,
+  hasLogData,
+  point,
+  powerTraceMetric,
+  locale,
+}: ViewActionsInput): string => {
+  if (!isPinned) return '';
   const t = ACTION_STRINGS[locale];
-  const actions = [
-    showCharts ? pointDetailActionLink('view-charts', agenticHref, t.charts) : '',
-    hasLogData ? pointDetailActionLink('view-logs', logHref, t.logs) : '',
-  ].filter(Boolean);
+  const actions: string[] = [];
+  const pointId = point.id;
+  const isAgentic = point.benchmark_type === 'agentic_traces';
+  const showCharts = isAgentic && hasTraceData;
+  if (isPersistedBenchmarkId(pointId) && (showCharts || hasLogData)) {
+    const prefix = locale === 'zh' ? '/zh' : '';
+    const agenticHref = agenticDetailHref(pointId, locale);
+    if (showCharts) {
+      actions.push(pointDetailActionLink('view-charts', agenticHref, t.charts));
+    }
+    if (hasLogData) {
+      const logHref = isAgentic
+        ? `${agenticHref}${agenticHref.includes('?') ? '&' : '?'}view=logs`
+        : `${prefix}/inference/logs/${pointId}`;
+      actions.push(pointDetailActionLink('view-logs', logHref, t.logs));
+    }
+  }
+  if (powerTraceMetric !== undefined && showsPowerTraceAction(point, powerTraceMetric)) {
+    actions.push(pointDetailActionLink('view-power-trace', powerTraceHref(), t.powerTrace));
+  }
+  if (actions.length === 0) return '';
   return `<div style="display: grid; gap: 6px; margin-top: 8px;">${actions.join('')}</div>`;
 };
 
@@ -768,6 +860,7 @@ export const generateTooltipContent = (config: TooltipConfig): string => {
           : ''
       }
       ${powerTierHTML(d, selectedYAxisMetric, locale)}
+      ${powerVariantHTML(d, selectedYAxisMetric, locale)}
       ${modeledSystemPowerHTML(d, selectedYAxisMetric, isPinned, locale)}
       ${totalChipsHTML(d, selectedYAxisMetric, locale)}
       ${generateParallelismHTML(d, locale)}
@@ -778,7 +871,14 @@ export const generateTooltipContent = (config: TooltipConfig): string => {
       ${generateAgenticHTML(d, locale)}
       ${generateWorkerPowerHTML(d, isPinned, locale)}
       ${runLinkHTML(runUrl, locale)}
-      ${viewActionsHTML(isPinned, Boolean(hasTrace), Boolean(config.hasLog), d.id, d.benchmark_type, locale)}
+      ${viewActionsHTML({
+        isPinned,
+        hasTraceData: Boolean(hasTrace),
+        hasLogData: Boolean(config.hasLog),
+        point: d,
+        powerTraceMetric: selectedYAxisMetric,
+        locale,
+      })}
     </div>
   `;
 };
@@ -812,6 +912,7 @@ export const generateOverlayTooltipContent = (config: OverlayTooltipConfig): str
       ${tooltipLine(xLabel, fmt(d.x))}
       ${tooltipLine(yLabel, fmt(d.y))}
       ${powerTierHTML(d, selectedYAxisMetric, locale)}
+      ${powerVariantHTML(d, selectedYAxisMetric, locale)}
       ${modeledSystemPowerHTML(d, selectedYAxisMetric, isPinned, locale)}
       ${totalChipsHTML(d, selectedYAxisMetric, locale)}
       ${generateParallelismHTML(d, locale)}
@@ -821,6 +922,14 @@ export const generateOverlayTooltipContent = (config: OverlayTooltipConfig): str
       ${powerWithheldHTML(d, locale)}
       ${generateAgenticHTML(d, locale)}
       ${generateWorkerPowerHTML(d, isPinned, locale)}
+      ${viewActionsHTML({
+        isPinned,
+        hasTraceData: false,
+        hasLogData: false,
+        point: d,
+        powerTraceMetric: selectedYAxisMetric,
+        locale,
+      })}
     </div>
   `;
 };
@@ -873,6 +982,7 @@ export const generateGPUGraphTooltipContent = (config: TooltipConfig): string =>
           : ''
       }
       ${powerTierHTML(d, selectedYAxisMetric, locale)}
+      ${powerVariantHTML(d, selectedYAxisMetric, locale)}
       ${modeledSystemPowerHTML(d, selectedYAxisMetric, isPinned, locale)}
       ${totalChipsHTML(d, selectedYAxisMetric, locale)}
       ${generateParallelismHTML(d, locale)}
@@ -883,7 +993,13 @@ export const generateGPUGraphTooltipContent = (config: TooltipConfig): string =>
       ${generateAgenticHTML(d, locale)}
       ${generateWorkerPowerHTML(d, isPinned, locale)}
       ${runLinkHTML(runUrl, locale)}
-      ${viewActionsHTML(isPinned, Boolean(hasTrace), Boolean(hasLog), d.id, d.benchmark_type, locale)}
+      ${viewActionsHTML({
+        isPinned,
+        hasTraceData: Boolean(hasTrace),
+        hasLogData: Boolean(hasLog),
+        point: d,
+        locale,
+      })}
     </div>
   `;
 };

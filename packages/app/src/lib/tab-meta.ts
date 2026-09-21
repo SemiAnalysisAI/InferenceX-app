@@ -46,6 +46,16 @@ export const TAB_META: Record<DashboardRouteKey, { title: string; description: s
     description:
       'Project a fixed AI inference fleet across its life: size it against a facility power budget, then track revenue, cost, and margin as measured software configs improve over time.',
   },
+  'first-token': {
+    title: 'First-Token Limits',
+    description:
+      'Find the cheapest measured AI inference configuration per chip vendor under each time-to-first-token cap, at a minimum interactivity. Measured rows only, no interpolation, for any model and workload.',
+  },
+  'cache-reuse': {
+    title: 'Prefix Cache Reuse',
+    description:
+      'See where an AI inference configuration finds its prompt tokens as concurrency rises: HBM cache hits, host-tier cache hits, or recomputation. Measured runtime cache counters for every model and chip.',
+  },
   'profit-estimator': {
     title: 'Inference Profit Estimator',
     description:

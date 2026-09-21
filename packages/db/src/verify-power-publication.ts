@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import { DB_MODEL_TO_DISPLAY } from '@semianalysisai/inferencex-constants';
 import { createAdminSql } from './etl/db-utils';
 import {
+  fatalPublicationErrors,
   verifyPowerPublication,
   type PowerPublicationManifest,
   type PublishedPowerRow,
@@ -33,12 +34,12 @@ try {
     join workflow_runs wr on wr.id = br.workflow_run_id
     where wr.github_run_id = ${manifest.runId} and wr.run_attempt = ${manifest.runAttempt}
       and (br.benchmark_type = 'agentic_traces' or
-        (br.benchmark_type = 'single_turn' and br.isl = 8192 and br.osl = 1024))
+        (br.benchmark_type = 'single_turn' and br.isl in (1024, 8192) and br.osl = 1024))
   `;
-  const errors = [
-    ...(manifest.ingestErrors ?? []),
-    ...verifyPowerPublication(manifest.points, rows as unknown as PublishedPowerRow[], 'database'),
-  ];
+  const errors = fatalPublicationErrors(
+    manifest,
+    verifyPowerPublication(manifest.points, rows as unknown as PublishedPowerRow[], 'database'),
+  );
   const publicRows: PublishedPowerRow[] = [];
   const models = [
     ...new Set(manifest.points.map((point) => DB_MODEL_TO_DISPLAY[String(point.identity.model)])),
@@ -86,6 +87,9 @@ try {
     status:
       errors.length > 0 ? 'failed' : manifest.points.length > 0 ? 'matched' : 'no_power_points',
     errors,
+    // Kept out of `errors` on purpose: a telemetry digest failure costs one
+    // point's PowerX tab, not its benchmark data, so it must not fail the ingest.
+    telemetryWarnings: manifest.telemetryWarnings ?? [],
   };
   fs.writeFileSync(`${manifestPath}.verification.json`, `${JSON.stringify(receipt, null, 2)}\n`);
   console.log(JSON.stringify(receipt, null, 2));

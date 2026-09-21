@@ -47,6 +47,8 @@ const TAB_LABELS_EN: Record<DashboardRouteKey, string> = {
   historical: 'Historical Trends',
   calculator: 'TCO Calculator',
   fleet: 'Fleet Lifecycle',
+  'first-token': 'First-Token Limits',
+  'cache-reuse': 'Prefix Cache Reuse',
   'profit-estimator': 'Profit Estimator',
   'profit-estimator-per-gigawatt': 'Profit Estimator per GW',
   reliability: 'Reliability',

@@ -2,6 +2,12 @@ import { useReducer, useState } from 'react';
 import { GlobalFilterSelectionContext } from '@/components/GlobalFilterContext';
 import { InferenceContextsProvider } from '@/components/inference/InferenceContext';
 import {
+  PerfRulerStoreContext,
+  usePerfRulerStoreValue,
+} from '@/components/inference/perf-ruler-store';
+import { perfRulerAxisMetricKey } from '@/hooks/usePerfRulerAxisReset';
+import { serializePerfRulers } from '@/lib/d3-chart/layers/perf-ruler';
+import {
   overlaySelectionReducer,
   UnofficialRunContext,
 } from '@/components/unofficial-run-provider';
@@ -25,14 +31,30 @@ import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.share
 const defaultChartDef = createMockChartDefinition();
 const hwConfig = createMockHardwareConfig();
 
+/** FP4 curve through x = 8, 16, 32 with distinct `conc` join keys. */
+const threePointCurve = (hwKey: string, ys: number[], extra: Partial<{ run_url: string }> = {}) =>
+  ys.map((y, index) =>
+    createMockInferenceData({
+      hwKey,
+      x: [8, 16, 32][index],
+      y,
+      conc: [8, 16, 32][index],
+      precision: Precision.FP4,
+      ...extra,
+    }),
+  );
+
 describe('ScatterGraph', () => {
-  it('toggles global Pareto highlights independently and removes dismissed overlay winners', () => {
+  it('keeps the frontier modes and overlay winners without exposing the retired hinterland', () => {
     const official = [
       createMockInferenceData({ hwKey: 'h100', precision: Precision.FP8, x: 20, y: 80 }),
       createMockInferenceData({ hwKey: 'h100', precision: Precision.FP8, x: 80, y: 20 }),
     ];
     const overlay = [
-      createMockInferenceData({ hwKey: 'h100', precision: Precision.FP8, x: 90, y: 90 }),
+      createMockInferenceData({ hwKey: 'b200', precision: Precision.FP8, x: 90, y: 90 }),
+      createMockInferenceData({ hwKey: 'b200', precision: Precision.FP8, x: 80, y: 95 }),
+      createMockInferenceData({ hwKey: 'h200', precision: Precision.FP8, x: 10, y: 15 }),
+      createMockInferenceData({ hwKey: 'h200', precision: Precision.FP8, x: 15, y: 10 }),
     ];
     const base = createMockInferenceContextValues();
     function ParetoHarness() {
@@ -41,12 +63,9 @@ describe('ScatterGraph', () => {
         playful: paretoFrontierPlayful,
         setVisible: setShowParetoFrontier,
       } = useParetoHighlightToggle();
-      const {
-        visible: showParetoHinterland,
-        playful: paretoHinterlandPlayful,
-        setVisible: setShowParetoHinterland,
-      } = useParetoHighlightToggle();
       const [showOverlay, setShowOverlay] = useState(true);
+      const [showLineLabels, setShowLineLabels] = useState(false);
+      const [showGradientLabels, setShowGradientLabels] = useState(false);
       const inference = {
         ...base,
         hardwareConfig: hwConfig,
@@ -56,10 +75,11 @@ describe('ScatterGraph', () => {
         hideNonOptimal: false,
         showParetoFrontier,
         setShowParetoFrontier,
-        showParetoHinterland,
         paretoFrontierPlayful,
-        paretoHinterlandPlayful,
-        setShowParetoHinterland,
+        showLineLabels,
+        setShowLineLabels,
+        showGradientLabels,
+        setShowGradientLabels,
       };
       return (
         <InferenceContextsProvider
@@ -88,70 +108,124 @@ describe('ScatterGraph', () => {
     }
     mountWithProviders(<ParetoHarness />, {
       unofficial: {
-        activeOverlayHwTypes: new Set(['h100']),
-        allOverlayHwTypes: new Set(['h100']),
+        activeOverlayHwTypes: new Set(['b200', 'h200']),
+        allOverlayHwTypes: new Set(['b200', 'h200']),
       },
     });
     cy.get('.global-pareto-frontier, .pareto-hinterland').should('not.exist');
     cy.get('#global-pareto-test-pareto-frontier').should('not.exist');
     cy.get('#global-pareto-test-pareto-hinterland').should('not.exist');
     expandLegendAdvanced();
+    cy.get('#global-pareto-test-pareto-hinterland').should('not.exist');
+    cy.contains('Pareto Hinterland').should('not.exist');
     cy.get('#global-pareto-test-pareto-frontier').click();
     cy.get('.global-pareto-frontier').should('have.attr', 'stroke-dasharray', '1,6');
-    cy.get('.global-pareto-highlight circle').should('have.length', 1);
-    cy.get('.pareto-hinterland').should('not.exist');
-    cy.get('#global-pareto-test-pareto-hinterland').click();
-    cy.get('.pareto-hinterland').should('have.attr', 'pointer-events', 'none');
-    cy.get('.pareto-hinterland')
-      .should('have.attr', 'fill', 'none')
-      .and('have.attr', 'stroke-dasharray', '8,5');
-    cy.get('.global-pareto-hinterland-highlight circle').should('have.length', 2);
-    cy.get('.pareto-hinterland')
-      .invoke('attr', 'd')
-      .then((hinterlandPath) => {
-        cy.get('.global-pareto-frontier').invoke('attr', 'd').should('not.equal', hinterlandPath);
+    cy.get('.global-pareto-frontier')
+      .should('have.attr', 'pointer-events', 'none')
+      .and('have.attr', 'fill', 'none');
+    cy.get('.global-pareto-frontier-area')
+      .should('have.attr', 'fill', '#22c55e')
+      .and('have.attr', 'data-style', 'plain');
+    cy.get('.global-pareto-highlight circle').should('have.length', 2);
+    cy.get('.dot-group, .roofline-path').should(($marks) => {
+      expect($marks.length).to.be.greaterThan(2);
+      $marks.each((_, mark) => {
+        expect(mark.style.filter).to.equal('opacity(0.2)');
       });
+    });
+    cy.get('.unofficial-overlay-pt').should(($marks) => {
+      expect($marks).to.have.length(4);
+      $marks.each((_, mark) => {
+        const hw = (mark as unknown as { __data__: { hwKey: string } }).__data__.hwKey;
+        expect(mark.style.filter).to.equal(hw === 'b200' ? '' : 'opacity(0.2)');
+      });
+    });
+    cy.get('.overlay-roofline-path').should(($curves) => {
+      expect($curves).to.have.length(2);
+      $curves.each((_, curve) => {
+        const hw = (curve as unknown as { __data__: { points: { hwKey: string }[] } }).__data__
+          .points[0].hwKey;
+        expect(curve.style.filter).to.equal(hw === 'b200' ? '' : 'opacity(0.2)');
+      });
+    });
+    // New labels must inherit the fade even when Pareto membership is unchanged.
+    cy.get('#scatter-line-labels').click();
+    cy.get('.line-label[data-hw-key="h100"]').should(($labels) => {
+      $labels.each((_, label) => {
+        expect(label.style.filter).to.equal('opacity(0.2)');
+      });
+    });
+    cy.get('#scatter-line-labels').click();
+    cy.get('#scatter-line-labels').click();
+    cy.get('.line-label[data-hw-key="h100"]').should(($labels) => {
+      $labels.each((_, label) => {
+        expect(label.style.filter).to.equal('opacity(0.2)');
+      });
+    });
+    // Turning the switch off restores official and unofficial marks.
+    cy.get('#global-pareto-test-pareto-frontier').click();
+    cy.get('.dot-group, .roofline-path, .unofficial-overlay-pt, .overlay-roofline-path').should(
+      ($marks) => {
+        $marks.each((_, mark) => {
+          expect(mark.style.filter).to.equal('');
+        });
+      },
+    );
+    cy.get('#global-pareto-test-pareto-frontier').click();
+    cy.get('.dot-group').should(($marks) => {
+      $marks.each((_, mark) => {
+        expect(mark.style.filter).to.equal('opacity(0.2)');
+      });
+    });
+    cy.get('.pareto-hinterland').should('not.exist');
     cy.contains('button', 'Dismiss test overlay').click();
     cy.get('.global-pareto-highlight circle').should('have.length', 2);
+    cy.get('.dot-group, .roofline-path').should(($marks) => {
+      $marks.each((_, mark) => {
+        expect(mark.style.filter).to.equal('');
+      });
+    });
     cy.get('#global-pareto-test-pareto-frontier').click();
     cy.get('.global-pareto-frontier').should('not.exist');
-    cy.get('.pareto-hinterland').should('exist');
-    cy.get('#global-pareto-test-pareto-hinterland').click();
-    cy.get('.pareto-hinterland').should('not.exist');
+    cy.get('.global-pareto-frontier-area').should('not.exist');
     cy.get('#global-pareto-test-pareto-frontier').click();
-    cy.get('#global-pareto-test-pareto-hinterland').click();
-    cy.get('.global-pareto-frontier-area, .pareto-hinterland-area')
-      .should('have.length', 2)
+    cy.get('.global-pareto-frontier-area')
+      .should('have.length', 1)
+      .each(($area) => {
+        expect($area.attr('data-style')).to.equal('plain');
+      });
+    cy.get('#global-pareto-test-pareto-frontier').click();
+    cy.get('#global-pareto-test-pareto-frontier').click();
+    cy.get('.global-pareto-frontier-area')
+      .should('have.length', 1)
       .each(($area) => {
         expect($area.attr('data-style')).to.equal('playful');
         expect($area.attr('fill')).to.match(/^url\(#/);
       });
-    cy.get('pattern[id$="-scene"]').should('have.length', 2);
+    cy.get('pattern[id$="-scene"]').should('have.length', 1);
     cy.get('pattern[id$="-scene"] text').should('not.exist');
     cy.get('pattern[id$="-scene"] image')
-      .should('have.length', 2)
+      .should('have.length', 1)
       .each(($image) => {
         expect($image.attr('preserveAspectRatio')).to.equal('xMidYMid slice');
         expect(Number($image.attr('width'))).to.be.greaterThan(160);
         expect($image.attr('width')).to.equal($image.parent().attr('width'));
         expect($image.attr('height')).to.equal($image.parent().attr('height'));
-        expect($image.attr('href')).to.match(/\/decorative\/pareto\/.+\.webp$/);
+        expect($image.attr('href')).to.equal('/decorative/pareto/sunny-castle.webp');
       });
-    cy.get('.global-pareto-frontier-area,.pareto-hinterland-area').each(($area) => {
+    cy.get('.global-pareto-frontier-area').each(($area) => {
       expect($area.attr('fill-opacity')).to.equal('0.3');
     });
     cy.get('#global-pareto-test-pareto-frontier').click();
     cy.get('.global-pareto-frontier-area').should('not.exist');
-    cy.get('.pareto-hinterland-area').should('exist');
+    cy.get('pattern[id$="-scene"]').should('not.exist');
     cy.get('#global-pareto-test-pareto-frontier').click();
     cy.get('.global-pareto-frontier-area').should('have.attr', 'data-style', 'plain');
     cy.get('.global-pareto-frontier-area').should('have.attr', 'fill', '#22c55e');
-    cy.get('#global-pareto-test-pareto-hinterland').click();
-    cy.get('#global-pareto-test-pareto-hinterland').click();
-    cy.get('.pareto-hinterland-area').should('have.attr', 'fill', '#ef4444');
     cy.get('[data-testid="legend-advanced-toggle"]').click();
     cy.get('#global-pareto-test-pareto-frontier').should('not.exist');
-    cy.get('.global-pareto-frontier-area,.pareto-hinterland-area').should('have.length', 2);
+    cy.get('.global-pareto-frontier-area').should('have.length', 1);
+    cy.get('.pareto-hinterland, .pareto-hinterland-area').should('not.exist');
   });
 
   for (const mixedRuns of [false, true]) {
@@ -870,14 +944,19 @@ describe('ScatterGraph', () => {
     cy.get('#test-scatter-overlay-labels svg .line-label')
       .filter('[data-line-key]:not([data-line-key^="overlay-"])')
       .should('have.length.greaterThan', 0);
-    // The exact branch that crashed the production page remains visible in the
-    // overlay line label and legend after ScatterGraph's render-time updates.
-    cy.get('#test-scatter-overlay-labels svg .line-label[data-line-key^="overlay-"]')
-      .find('text')
-      .should('contain.text', runBranch);
+    // The pill names the hardware behind the ✕ marker, parsed like an official
+    // pill; the long branch that crashed the production page stays in the legend.
+    cy.get('#test-scatter-overlay-labels svg .line-label[data-line-key^="overlay-"] .ll-text')
+      .should('have.text', '✕ B200 (TRTLLM)')
+      .and('not.contain.text', runBranch);
     cy.get(
       '#test-scatter-overlay-labels svg .line-label[data-line-key^="overlay-"] .ll-gpu',
-    ).should('not.exist');
+    ).should('have.text', 'B200');
+    // b200_trt is active only in the overlay legend (official rows: h100), so
+    // the overlay pill must stay visible after the filter-sync effect.
+    cy.get('#test-scatter-overlay-labels svg .line-label[data-line-key^="overlay-"]')
+      .should('have.attr', 'data-visible', '1')
+      .and('have.css', 'opacity', '1');
     cy.get('#test-scatter-overlay-labels [data-testid="chart-legend"]').should(
       'contain.text',
       runBranch,
@@ -1039,7 +1118,7 @@ describe('ScatterGraph', () => {
     cy.get('#test-scatter-singleton-overlay-label svg .line-label[data-line-key^="overlay-"]')
       .should('have.length', 1)
       .find('text')
-      .should('contain.text', 'tileRT');
+      .should('have.text', '✕ B200 (TRTLLM)');
 
     cy.get('#test-scatter-singleton-overlay-label svg').then(($svg) => {
       const svg = $svg[0];
@@ -1059,6 +1138,107 @@ describe('ScatterGraph', () => {
     cy.get(
       '#test-scatter-singleton-overlay-label svg .line-label[data-line-key^="overlay-"]',
     ).should('have.css', 'opacity', '1');
+  });
+
+  it('tags overlay line labels with the run only when several runs draw the same hardware', () => {
+    const interactivityChartDef = createMockChartDefinition({
+      chartType: 'interactivity',
+      y_tpPerGpu_roofline: 'upper_left',
+    });
+    const runs = [
+      { id: 31756025413, branch: 'main' },
+      {
+        id: 35319956855,
+        branch: 'klaud/qwen3.5-fp8-gb200-dynamo-sglang-nightly-dev-cu13-20260918-20518d85',
+      },
+    ].map((run) => ({
+      ...run,
+      url: `https://github.com/SemiAnalysisAI/InferenceX/actions/runs/${run.id}`,
+    }));
+    const overlayData = {
+      data: runs.flatMap((run, index) =>
+        [8, 16, 32].map((x, i) =>
+          createMockInferenceData({
+            hwKey: 'b200_trt',
+            x,
+            y: [320, 280, 220][i] - index * 60,
+            precision: Precision.FP4,
+            run_url: run.url,
+          }),
+        ),
+      ),
+      hardwareConfig: hwConfig,
+      label: runs[0].branch,
+      runUrl: runs[0].url,
+    };
+
+    mountWithProviders(
+      <div style={{ width: 800, height: 600 }}>
+        <ScatterGraph
+          chartId="test-scatter-overlay-run-tags"
+          modelLabel="DeepSeek R1"
+          data={[]}
+          xLabel="Concurrency"
+          yLabel="Throughput / Chip (tok/s)"
+          chartDefinition={interactivityChartDef}
+          overlayData={overlayData}
+        />
+      </div>,
+      {
+        inference: {
+          hardwareConfig: hwConfig,
+          activeHwTypes: new Set<string>(),
+          hwTypesWithData: new Set<string>(),
+          selectedPrecisions: [Precision.FP4],
+          showLineLabels: true,
+        },
+        unofficial: {
+          activeOverlayHwTypes: new Set(['b200_trt']),
+          allOverlayHwTypes: new Set(['b200_trt']),
+          runIndexByUrl: Object.fromEntries(
+            runs.flatMap((run, index) => [
+              [run.url, index],
+              [String(run.id), index],
+            ]),
+          ),
+          unofficialRunInfos: runs.map((run) => ({
+            id: run.id,
+            name: 'CI run',
+            branch: run.branch,
+            sha: '7a4a06b',
+            createdAt: '2026-09-18T19:40:51Z',
+            url: run.url,
+            conclusion: 'success',
+            status: 'completed',
+            isNonMainBranch: run.branch !== 'main',
+          })),
+        },
+      },
+    );
+
+    // No official hardware is active, yet both overlay pills stay visible: they
+    // follow the overlay legend rows, not the official ones.
+    cy.get('#test-scatter-overlay-run-tags svg .line-label[data-line-key^="overlay-"]')
+      .should('have.length', 2)
+      .each(($label) => {
+        expect($label.attr('data-visible')).to.eq('1');
+        expect($label.css('opacity')).to.eq('1');
+      });
+    // Same hardware from two runs: each pill carries a short run tag, the
+    // long klaud branch shortened to its date-sha tail.
+    cy.get('#test-scatter-overlay-run-tags svg .line-label[data-line-key^="overlay-"] .ll-text')
+      .should('have.length', 2)
+      .then(($labels) => {
+        expect($labels.toArray().map((label) => label.textContent)).to.have.members([
+          '✕ B200 (TRTLLM) · main',
+          '✕ B200 (TRTLLM) · …20260918-20518d85',
+        ]);
+        for (const label of $labels) {
+          expect(
+            [...label.querySelectorAll('tspan')].map((segment) => segment.className.baseVal),
+          ).to.deep.equal(['ll-marker', 'll-gpu', 'll-engine', 'll-run']);
+        }
+      });
   });
 
   it('renders a line label for a singleton ingested hardware series', () => {
@@ -1665,6 +1845,213 @@ describe('ScatterGraph', () => {
     cy.get('#scatter-perf-ruler').should('have.attr', 'aria-checked', 'true');
     expectCurvesIntact();
     placeRuler();
+  });
+
+  it('restores share-link perf rulers from the provider store once their curves render', () => {
+    const chartId = 'chart-0';
+    const runUrl = 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/777';
+    // Three-point curves with a 2x (official pair) and 4x (official vs
+    // overlay) ratio at every knot, so the restored ruler at x=16 reads
+    // exactly on both.
+    const b200 = threePointCurve('b200_sglang', [400, 300, 200]);
+    const h100 = threePointCurve('h100_vllm', [200, 150, 100]);
+    const overlay = threePointCurve('b200_vllm', [100, 75, 50], { run_url: runUrl });
+    const chartDefinition = createMockChartDefinition({
+      chartType: 'interactivity',
+      y_tpPerGpu_roofline: 'upper_left',
+    });
+    const OFFICIAL_RULER = '16|roofline-b200_sglang_fp4|roofline-h100_vllm_fp4';
+    const OVERLAY_RULER = '16|roofline-b200_sglang_fp4|overlay-roofline-b200_vllm_fp4_run0';
+    // The overlay run carries its own hardware config; a roofline is only
+    // drawn for hardware that config knows, so the run's vLLM B200 needs an
+    // entry of its own.
+    const overlayHwConfig = { ...hwConfig, b200_vllm: hwConfig.b200_sglang };
+    const baseInference = createMockInferenceContextValues();
+
+    function StoreHarness() {
+      // The h100 curve arrives after the first draw, like `i_gpus` or a
+      // comparison date resolving on a real share-link load.
+      const [h100Loaded, setH100Loaded] = useState(false);
+      const [overlayDismissed, setOverlayDismissed] = useState(false);
+      const store = usePerfRulerStoreValue(
+        chartId,
+        `${OFFICIAL_RULER};${OVERLAY_RULER}`,
+        perfRulerAxisMetricKey(chartDefinition.x_scale_field, 'y_tpPerGpu'),
+      );
+      const inference = {
+        ...baseInference,
+        hardwareConfig: hwConfig,
+        activeHwTypes: new Set(['b200_sglang', 'h100_vllm']),
+        hwTypesWithData: new Set(h100Loaded ? ['b200_sglang', 'h100_vllm'] : ['b200_sglang']),
+        selectedModel: Model.DeepSeek_V4_Pro,
+        selectedSequence: Sequence.AgenticTraces,
+        selectedPrecisions: [Precision.FP4],
+        selectedYAxisMetric: 'y_tpPerGpu',
+      };
+      const unofficial = createMockUnofficialRunContext({
+        isUnofficialRun: true,
+        activeOverlayHwTypes: new Set(['b200_vllm']),
+        allOverlayHwTypes: new Set(['b200_vllm']),
+        runIndexByUrl: { [runUrl]: 0, '777': 0 },
+      });
+      const overlayData = overlayDismissed
+        ? undefined
+        : { data: overlay, hardwareConfig: overlayHwConfig, label: 'Overlay', runUrl };
+      return (
+        <InferenceContextsProvider
+          data={inference}
+          filters={inference}
+          display={inference}
+          actions={inference}
+        >
+          <UnofficialRunContext.Provider value={unofficial}>
+            <PerfRulerStoreContext.Provider value={store}>
+              <button data-testid="load-h100" onClick={() => setH100Loaded(true)}>
+                Load h100
+              </button>
+              <button data-testid="dismiss-overlay" onClick={() => setOverlayDismissed(true)}>
+                Dismiss overlay
+              </button>
+              <output data-testid="i-rulers">{serializePerfRulers(store.state)}</output>
+              <output data-testid="pending-count">{store.pending?.length ?? 0}</output>
+              <div style={{ width: 800, height: 600 }}>
+                <ScatterGraph
+                  chartId={chartId}
+                  modelLabel={Model.DeepSeek_V4_Pro}
+                  data={h100Loaded ? [...b200, ...h100] : b200}
+                  xLabel="Interactivity"
+                  yLabel="Throughput / Chip (tok/s)"
+                  chartDefinition={chartDefinition}
+                  overlayData={overlayData}
+                  transitionDuration={0}
+                />
+              </div>
+              {/* The replay chart draws the same curve classes under the same
+                  provider and must not pick the persisted rulers up. */}
+              <div style={{ width: 800, height: 600 }}>
+                <ScatterGraph
+                  chartId={`replay-${chartId}`}
+                  modelLabel={Model.DeepSeek_V4_Pro}
+                  data={[...b200, ...h100]}
+                  xLabel="Interactivity"
+                  yLabel="Throughput / Chip (tok/s)"
+                  chartDefinition={chartDefinition}
+                  transitionDuration={0}
+                />
+              </div>
+            </PerfRulerStoreContext.Provider>
+          </UnofficialRunContext.Provider>
+        </InferenceContextsProvider>
+      );
+    }
+
+    mountWithProviders(<StoreHarness />);
+
+    // Nobody clicked anything: the mode is on for the persisted chart only,
+    // the overlay pair renders (both curves exist), and the official pair
+    // waits for its second curve instead of being pruned. Advanced switches
+    // only mount once each legend's drawer is open.
+    cy.get(`#${chartId} svg .roofline-path`).should('have.length', 1);
+    cy.get('[data-testid="legend-advanced-toggle"]')
+      .should('have.length', 2)
+      .click({ multiple: true });
+    // Two charts render the switch under one id; jQuery's `#id` fast path
+    // returns only the first match, so select by attribute.
+    cy.get('[id="scatter-perf-ruler"]').should('have.length', 2);
+    cy.get('[id="scatter-perf-ruler"]').first().should('have.attr', 'aria-checked', 'true');
+    cy.get(`#${chartId} svg .perf-ruler`).should('have.length', 1);
+    cy.get(`#${chartId} svg .perf-ruler .pr-text-ratio`).should('have.text', '4.00x');
+    cy.get('[data-testid="i-rulers"]').should('have.text', OVERLAY_RULER);
+    cy.get('[data-testid="pending-count"]').should('have.text', '1');
+    cy.get(`#replay-${chartId} svg .roofline-path`).should('have.length', 2);
+    cy.get(`#replay-${chartId} svg .perf-ruler`).should('not.exist');
+    cy.get('[id="scatter-perf-ruler"]').eq(1).should('have.attr', 'aria-checked', 'false');
+
+    // The late curve arrives: the pending ruler commits and both render.
+    cy.get('[data-testid="load-h100"]').click();
+    cy.get(`#${chartId} svg .roofline-path`).should('have.length', 2);
+    cy.get(`#${chartId} svg .perf-ruler`).should('have.length', 2);
+    cy.get(`#${chartId} svg .perf-ruler .pr-text-ratio`).then(($labels) => {
+      expect([...$labels].map((label) => label.textContent).sort()).to.deep.equal([
+        '2.00x',
+        '4.00x',
+      ]);
+    });
+    cy.get('[data-testid="pending-count"]').should('have.text', '0');
+    cy.get('[data-testid="i-rulers"]').should('have.text', `${OVERLAY_RULER};${OFFICIAL_RULER}`);
+    cy.get(`#replay-${chartId} svg .perf-ruler`).should('not.exist');
+
+    // Dismissing the overlay run prunes only the ruler that referenced it.
+    cy.get('[data-testid="dismiss-overlay"]').click();
+    cy.get(`#${chartId} svg .overlay-roofline-path`).should('not.exist');
+    cy.get(`#${chartId} svg .perf-ruler`).should('have.length', 1);
+    cy.get(`#${chartId} svg .perf-ruler .pr-text-ratio`).should('have.text', '2.00x');
+    cy.get('[data-testid="i-rulers"]').should('have.text', OFFICIAL_RULER);
+
+    // Toggling the tool off clears the persisted rulers, so the share link
+    // drops the param.
+    cy.get('[id="scatter-perf-ruler"]').first().click({ force: true });
+    cy.get(`#${chartId} svg .perf-ruler`).should('not.exist');
+    cy.get('[data-testid="i-rulers"]').should('have.text', '');
+  });
+
+  it('discards pending share-link rulers when the tool is switched off before their curves load', () => {
+    const chartId = 'chart-0';
+    const chartDefinition = createMockChartDefinition({
+      chartType: 'interactivity',
+      y_tpPerGpu_roofline: 'upper_left',
+    });
+    const b200 = [8, 16, 32].map((x, index) =>
+      createMockInferenceData({ hwKey: 'b200_sglang', x, y: 400 - index * 100, conc: x }),
+    );
+    const baseInference = createMockInferenceContextValues();
+
+    function PendingHarness() {
+      const store = usePerfRulerStoreValue(
+        chartId,
+        '16|roofline-b200_sglang_fp4|roofline-h100_vllm_fp4',
+        perfRulerAxisMetricKey(chartDefinition.x_scale_field, 'y_tpPerGpu'),
+      );
+      const inference = {
+        ...baseInference,
+        hardwareConfig: hwConfig,
+        activeHwTypes: new Set(['b200_sglang']),
+        hwTypesWithData: new Set(['b200_sglang']),
+        selectedYAxisMetric: 'y_tpPerGpu',
+      };
+      return (
+        <InferenceContextsProvider
+          data={inference}
+          filters={inference}
+          display={inference}
+          actions={inference}
+        >
+          <PerfRulerStoreContext.Provider value={store}>
+            <output data-testid="pending-count">{store.pending?.length ?? 0}</output>
+            <div style={{ width: 800, height: 600 }}>
+              <ScatterGraph
+                chartId={chartId}
+                modelLabel={Model.DeepSeek_V4_Pro}
+                data={b200}
+                xLabel="Interactivity"
+                yLabel="Throughput / Chip (tok/s)"
+                chartDefinition={chartDefinition}
+                transitionDuration={0}
+              />
+            </div>
+          </PerfRulerStoreContext.Provider>
+        </InferenceContextsProvider>
+      );
+    }
+
+    mountWithProviders(<PendingHarness />, { unofficial: {} });
+    cy.get(`#${chartId} svg .roofline-path`).should('have.length', 1);
+    expandLegendAdvanced();
+    cy.get('#scatter-perf-ruler').should('have.attr', 'aria-checked', 'true');
+    cy.get('[data-testid="pending-count"]').should('have.text', '1');
+    cy.get('#scatter-perf-ruler').click({ force: true });
+    cy.get('#scatter-perf-ruler').should('have.attr', 'aria-checked', 'false');
+    cy.get('[data-testid="pending-count"]').should('have.text', '0');
   });
 });
 

@@ -15,7 +15,6 @@ export interface LineLabelSeries<TPoint extends CartesianPoint> {
   label: string;
   color: string;
   points: readonly TPoint[];
-  keepVisibleOnCollision?: boolean;
 }
 
 export interface LineLabelPlacement {
@@ -25,6 +24,12 @@ export interface LineLabelPlacement {
   color: string;
   x: number;
   y: number;
+  /**
+   * `placeLineLabels` always emits `true`: every series it is given keeps its
+   * pill, overlapping if it must. The only producer of `false` is the caller's
+   * de-duplication pass, which keeps a hidden data-join entry for a curve that
+   * lost the one-label-per-hardware contest (GH #470).
+   */
   visible: boolean;
 }
 
@@ -145,16 +150,16 @@ interface PillLayoutItem {
  * its anchor, and both mirrors together. Every candidate is clamped into
  * `bounds` before the overlap test, so nothing leaves the plot. When every
  * mirrored candidate collides, nearby rows are tried before the default spot
- * is kept: an overlapped label is still
- * better than a missing one, and the fallback matches what the anchor pass
- * already tolerates for pinned anchors.
+ * is kept: an overlapped label is still better than a missing one, and the
+ * fallback matches what the anchor pass already tolerates.
  *
  * With no bounds — a chart that clips nothing — the anchor offset is applied
  * unchanged and the collision pass is skipped, preserving that chart's
  * existing layout.
  *
  * Hidden pills get their default transform and occupy no space, so a label
- * that later becomes visible reappears where the anchor pass put it.
+ * that later becomes visible reappears where the anchor pass put it. Only the
+ * caller's de-duplication pass hides pills; the anchor pass never does.
  */
 function layoutPills(
   items: readonly PillLayoutItem[],
@@ -318,6 +323,21 @@ function lineCandidates<TPoint extends CartesianPoint>(
   return candidates;
 }
 
+/**
+ * Anchor one pill per series along its line.
+ *
+ * Each series tries `ANCHOR_SLOTS` fractions along its own points, rotated by
+ * its index so converging curves spread out instead of stacking at the
+ * endpoint. A series that finds a clear slot takes it. A series that finds none
+ * is deferred and placed afterwards on its least crowded slot, so it never
+ * steals a clear slot from a series that could have used it.
+ *
+ * Every series gets a visible pill. The overlap that survives here is resolved
+ * by `layoutPills`, which runs later with the pills' real measured boxes; the
+ * crude nominal box used here is far too small to decide that a label is
+ * unplaceable — a rendered pill is routinely two to three times
+ * `collisionWidth`.
+ */
 export function placeLineLabels<TPoint extends CartesianPoint>(
   series: readonly LineLabelSeries<TPoint>[],
   xScale: (value: number) => number,
@@ -345,6 +365,35 @@ export function placeLineLabels<TPoint extends CartesianPoint>(
         Math.abs(other.y - y) < collisionHeight &&
         Math.abs(other.x - x) < other.halfW + labelHalfWidth,
     );
+  /**
+   * Nominal overlap area against the labels already placed. The same crude box
+   * model as `collides`, scored instead of thresholded, so a slot that clips one
+   * neighbour is preferred over one that sits on three.
+   */
+  const collisionCost = (x: number, y: number) =>
+    placed.reduce((cost, other) => {
+      const dx = other.halfW + labelHalfWidth - Math.abs(other.x - x);
+      const dy = collisionHeight - Math.abs(other.y - y);
+      return dx > 0 && dy > 0 ? cost + dx * dy : cost;
+    }, 0);
+
+  const emit = (entry: LineLabelSeries<TPoint>, point: TPoint) => {
+    const x = xScale(point.x);
+    const y = yScale(point.y);
+    placed.push({ x, y, halfW: labelHalfWidth });
+    result.push({
+      key: entry.key,
+      seriesId: entry.seriesId,
+      label: entry.label,
+      color: entry.color,
+      x,
+      y,
+      visible: true,
+    });
+  };
+
+  /** Series with no clear slot, deferred to a second pass — see below. */
+  const crowded: { entry: LineLabelSeries<TPoint>; candidates: TPoint[] }[] = [];
 
   for (const [seriesIndex, entry] of sorted.entries()) {
     if (entry.points.length === 0) continue;
@@ -375,35 +424,37 @@ export function placeLineLabels<TPoint extends CartesianPoint>(
 
     const candidate = candidates.find((point) => !collides(xScale(point.x), yScale(point.y)));
     if (candidate) {
-      const x = xScale(candidate.x);
-      const y = yScale(candidate.y);
-      placed.push({ x, y, halfW: labelHalfWidth });
-      result.push({
-        key: entry.key,
-        seriesId: entry.seriesId,
-        label: entry.label,
-        color: entry.color,
-        x,
-        y,
-        visible: true,
-      });
+      emit(entry, candidate);
       continue;
     }
 
-    const fallback = entry.points[0];
-    const x = xScale(fallback.x);
-    const y = yScale(fallback.y);
-    const visible = entry.keepVisibleOnCollision === true;
-    if (visible) placed.push({ x, y, halfW: labelHalfWidth });
-    result.push({
-      key: entry.key,
-      seriesId: entry.seriesId,
-      label: entry.label,
-      color: entry.color,
-      x,
-      y,
-      visible,
-    });
+    // No clear slot. Defer rather than claim one now: a series that is going to
+    // overlap something must not take a slot a later series could have had to
+    // itself.
+    crowded.push({ entry, candidates });
+  }
+
+  // Every series keeps a pill. `layoutPills` runs after this with the real
+  // measured boxes and can still mirror it, shift it a row and clamp it into the
+  // plot — "an overlapped label is still better than a missing one". Emitting the
+  // crowded ones last also hands that pass the clean labels first, so the crowded
+  // ones do the moving.
+  //
+  // This is where the chart stopped promising that line labels never overlap
+  // (#132 introduced the drop as the only way to honour that, #434 restated it).
+  // The promise was worth less than it cost: a dropped pill is silent, and with
+  // line labels on, PNG export omits the legend, so the series loses its only
+  // identifier. An overlapping pill at least announces itself.
+  for (const { entry, candidates } of crowded) {
+    emit(
+      entry,
+      candidates.reduce((best, point) =>
+        collisionCost(xScale(point.x), yScale(point.y)) <
+        collisionCost(xScale(best.x), yScale(best.y))
+          ? point
+          : best,
+      ),
+    );
   }
 
   return result;

@@ -7,6 +7,8 @@ export enum Model {
   GptOss = 'gpt-oss-120b',
   Qwen3_5 = 'Qwen-3.5-397B-A17B',
   Qwen3_8_Flash_Next = 'Qwen3.8-Flash-Next',
+  Qwen3_8_27B = 'Qwen3.8-27B',
+  Qwen3_8_27B_Eager = 'Qwen3.8-27B-Eager',
   Kimi_K2_5 = 'Kimi-K2.5',
   Kimi_K3 = 'Kimi-K3',
   MiniMax_M2_5 = 'MiniMax-M2.5',
@@ -229,6 +231,27 @@ const MODEL_CONFIG: Record<Model, ModelConfig> = {
     prefix: 'qwen3.8next',
     category: 'default',
     openRouterModelId: 'qwen/qwen3.8-flash',
+    logo: 'qwen-color.svg',
+  },
+  // Dense 27B (27B active) on the Qwen3.8 hybrid GDN backbone, served bf16 on
+  // one GPU with the RadixArk DSpark drafter (single-turn 1k1k, InferenceX#3260).
+  // Experimental until the first sweeps land on the official pipeline.
+  [Model.Qwen3_8_27B]: {
+    label: 'Qwen3.8 27B',
+    prefix: 'qwen3.827b',
+    category: 'experimental',
+    openRouterModelId: 'qwen/qwen3.8-27b',
+    logo: 'qwen-color.svg',
+  },
+  // The same checkpoint served with CUDA graphs disabled on both the target and
+  // the DSpark drafter (--enforce-eager, InferenceX#3262). A separate bucket so
+  // the eager and graph-captured points never overlap on one chart.
+  [Model.Qwen3_8_27B_Eager]: {
+    label: 'Qwen3.8 27B (eager)',
+    prefix: 'qwen3.827beager',
+    category: 'experimental',
+    // Same checkpoint, so the same public catalog id.
+    openRouterModelId: 'qwen/qwen3.8-27b',
     logo: 'qwen-color.svg',
   },
   [Model.GptOss]: {

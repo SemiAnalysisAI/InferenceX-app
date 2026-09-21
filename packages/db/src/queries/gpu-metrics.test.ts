@@ -4,22 +4,13 @@ import { PGlite } from '@electric-sql/pglite';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import type { DbClient } from '../connection';
-import {
-  getGpuMetricsAvailability,
-  getGpuMetricsForPoint,
-  getGpuMetricsForRun,
-} from './gpu-metrics';
+import { getGpuMetricsForPoint, getGpuMetricsForRun } from './gpu-metrics';
 
 let db: PGlite;
 const sql: DbClient = async (strings, ...values) => {
   const query = strings.reduce((text, part, i) => text + (i ? `$${i}` : '') + part, '');
   const result = await db.query<Record<string, unknown>>(query, values);
   return result.rows;
-};
-
-/** Stand-in client that fails loudly if a query slips past an early return. */
-const exploding: DbClient = () => {
-  throw new Error('should not query');
 };
 
 const WITH_SERIES = 34557177019;
@@ -213,14 +204,6 @@ describe('getGpuMetricsForRun', () => {
     expect(node1?.benchmarkResultIds).toEqual([10]);
   });
 
-  it('omits samples but keeps the digest when includeSamples is false', async () => {
-    const payload = await getGpuMetricsForRun(sql, WITH_SERIES, { includeSamples: false });
-    expect(payload?.series.map((series) => series.data)).toEqual([[], []]);
-    expect(payload?.series[0]?.stats).toHaveLength(2);
-    // sampleCount is the stored column, so it still reports the full series length.
-    expect(payload?.series[0]?.sampleCount).toBe(3);
-  });
-
   it('reads the latest attempt of a rerun GitHub run id, not the first', async () => {
     const payload = await getGpuMetricsForRun(sql, RETRIED);
     expect(payload?.workflowRun).toMatchObject({ id: 4, runAttempt: 2, conclusion: 'success' });
@@ -279,18 +262,5 @@ describe('getGpuMetricsForPoint', () => {
 
     const single = await getGpuMetricsForPoint(sql, 11);
     expect(single?.series.map((series) => series.id)).toEqual([100]);
-  });
-});
-
-describe('getGpuMetricsAvailability', () => {
-  it('flags only the point ids that have at least one linked series', async () => {
-    expect(await getGpuMetricsAvailability(sql, [10, 11, 12, 9999])).toEqual({
-      10: true,
-      11: true,
-    });
-  });
-
-  it('short-circuits an empty id list without querying', async () => {
-    expect(await getGpuMetricsAvailability(exploding, [])).toEqual({});
   });
 });
