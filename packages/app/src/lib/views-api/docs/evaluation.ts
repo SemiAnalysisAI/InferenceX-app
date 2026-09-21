@@ -1,11 +1,14 @@
-import type {
-  ApiOperation,
-  ApiParameter,
-  ApiResponse,
-  ApiSchema,
-  BilingualText,
-} from '@/lib/api-documentation';
+import type { ApiOperation, ApiParameter, ApiResponse } from '@/lib/api-documentation';
 import { API_BASE_URL, SUPPORTED_BENCHMARK_MODELS } from '@/lib/api-documentation-base';
+import {
+  text,
+  stringSchema,
+  numberSchema,
+  integerSchema,
+  errorSchema,
+  objectSchema,
+  arraySchema,
+} from '@/lib/api-documentation-helpers';
 
 /**
  * Docs fragment for GET /api/v1/views/evaluation.
@@ -16,22 +19,6 @@ import { API_BASE_URL, SUPPORTED_BENCHMARK_MODELS } from '@/lib/api-documentatio
  */
 
 const VIEWS_GROUP: ApiOperation['group'] = 'views';
-
-const text = (en: string, zh: string): BilingualText => ({ en, zh });
-const stringSchema: ApiSchema = { type: 'string' };
-const numberSchema: ApiSchema = { type: 'number' };
-const integerSchema: ApiSchema = { type: 'integer' };
-const objectSchema = (
-  properties: Readonly<Record<string, ApiSchema>>,
-  required: readonly string[] = Object.keys(properties),
-): ApiSchema => ({ type: 'object', properties, required, additionalProperties: false });
-const arraySchema = (items: ApiSchema): ApiSchema => ({ type: 'array', items });
-const errorSchema: ApiSchema = {
-  type: 'object',
-  properties: { error: stringSchema },
-  required: ['error'],
-  additionalProperties: true,
-};
 
 const parameters: readonly ApiParameter[] = [
   {

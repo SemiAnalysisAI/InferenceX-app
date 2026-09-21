@@ -11,7 +11,7 @@
 
 import type { GpuSpecs } from '@/lib/constants';
 
-import { outputTokPerChip } from './lifecycle';
+import { MS_PER_MONTH, outputTokPerChip, splitTokenStreams } from './lifecycle';
 import { getThroughputForType } from './power-ranking';
 import type { CostProvider, CostType, InterpolatedResult } from './types';
 
@@ -92,8 +92,7 @@ export interface FleetSizingOptions {
 /**
  * Size a fleet from one interpolated operating point: chips from the power
  * budget, billable throughput on the selected token type, and user streams from
- * the measured output share. Shared by the views API (calculator, fleet); the
- * dashboard panels call `computeFleetStats` with the same inputs.
+ * the measured output share. Shared by the calculator API and fleet schedules.
  */
 export function sizeFleetForResult(
   result: InterpolatedResult,
@@ -109,6 +108,43 @@ export function sizeFleetForResult(
     outputTputPerGpu: outputTokPerChip(total, result.inputTokenShare, result.outputTputValue),
     interactivity: options.interactivity,
   });
+}
+
+/**
+ * One chip's measured schedule: opening-rung sizing and cost stay fixed while
+ * concurrent users follow the latest rung. Revenue always uses total tokens,
+ * split onto the same per-chip denominator and discounted for measured cache hits.
+ */
+export function buildFleetSchedule(
+  progression: readonly { date: string; result: InterpolatedResult }[],
+  options: Omit<FleetSizingOptions, 'totalThroughput'> & {
+    anchorMs: number;
+    cacheReadRatio: number;
+  },
+) {
+  const first = progression[0];
+  const last = progression.at(-1);
+  if (!first || !last || !Number.isFinite(options.anchorMs)) return null;
+  const opening = sizeFleetForResult(first.result, options);
+  const latest = sizeFleetForResult(last.result, options);
+  if (!opening || !latest) return null;
+
+  return {
+    gpus: opening.gpus,
+    costPerHour: opening.costPerHour,
+    // Whole chips leave the budget's fractional remainder unprovisioned.
+    provisionedMw: (opening.gpus * options.specs.power) / 1000,
+    concurrentUsersNow: latest.concurrentUsers,
+    steps: progression.map(({ date, result }) => ({
+      month: (Date.parse(`${date}T00:00:00Z`) - options.anchorMs) / MS_PER_MONTH,
+      ...splitTokenStreams(
+        opening.gpus * getThroughputForType(result, 'total'),
+        result.inputTokenShare,
+        result.cacheHitRate,
+        options.cacheReadRatio,
+      ),
+    })),
+  };
 }
 
 /** Compact display formatting for fleet-scale magnitudes (1.24M, 48.3k, 950). */

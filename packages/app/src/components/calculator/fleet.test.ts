@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
 import type { InterpolatedResult } from './types';
-import { computeFleetStats, formatCompact, HOURS_PER_MONTH, sizeFleetForResult } from './fleet';
+import {
+  buildFleetSchedule,
+  computeFleetStats,
+  formatCompact,
+  HOURS_PER_MONTH,
+  sizeFleetForResult,
+} from './fleet';
 
 describe('computeFleetStats', () => {
   const base = {
@@ -122,5 +128,56 @@ describe('sizeFleetForResult', () => {
     });
     expect(stats!.fleetTokPerSec).toBe(5000 * 1000);
     expect(stats!.concurrentUsers).toBe(Math.floor((5000 * 900) / 50));
+  });
+});
+
+describe('buildFleetSchedule', () => {
+  const result = {
+    value: 500,
+    outputTputValue: 300,
+    inputTokenShare: 0.8,
+    cacheHitRate: 0.5,
+  } as InterpolatedResult;
+  const progression = [
+    { date: '2026-06-01', result },
+    {
+      date: '2026-07-01',
+      result: { ...result, value: 1000, inputTokenShare: 0.5, cacheHitRate: 0.8 },
+    },
+  ];
+  const options = {
+    mw: 10.001,
+    specs: { power: 2, costh: 2.5, costr: 3 },
+    costProvider: 'costh' as const,
+    costType: 'output' as const,
+    interactivity: 50,
+    anchorMs: Date.parse('2026-06-01T00:00:00Z'),
+    cacheReadRatio: 0.1,
+  };
+
+  it('keeps whole-chip sizing and cost fixed while using each dated rung’s total token mix', () => {
+    const schedule = buildFleetSchedule(progression, options)!;
+    expect(schedule).toMatchObject({
+      gpus: 5000,
+      costPerHour: 12500,
+      provisionedMw: 10,
+      concurrentUsersNow: 50000,
+    });
+    expect(schedule.steps).toHaveLength(2);
+    expect(schedule.steps[0]!.month).toBe(0);
+    expect(schedule.steps[1]!.month).toBeCloseTo(30 / (365.25 / 12), 12);
+    expect(schedule.steps[0]!.billableInputTokPerSec).toBeCloseTo(1100000, 6);
+    expect(schedule.steps[0]!.outputTokPerSec).toBeCloseTo(500000, 6);
+    expect(schedule.steps[1]!.billableInputTokPerSec).toBeCloseTo(700000, 6);
+    expect(schedule.steps[1]!.outputTokPerSec).toBe(2500000);
+  });
+
+  it('leaves unsizeable or unanchored progressions unplottable', () => {
+    expect(
+      buildFleetSchedule(progression, { ...options, specs: { ...options.specs, power: 0 } }),
+    ).toBeNull();
+    expect(buildFleetSchedule(progression, { ...options, mw: 0.001 })).toBeNull();
+    expect(buildFleetSchedule(progression, { ...options, anchorMs: NaN })).toBeNull();
+    expect(buildFleetSchedule([], options)).toBeNull();
   });
 });

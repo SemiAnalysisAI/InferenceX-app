@@ -22,60 +22,11 @@ import { parseEnumParam, parseNumberMap, parseNumberParam, validateParams } from
 import { VIEW_QUERY_PARAMS } from './registry';
 import { calculatorGroups, comparisonSelections, selection } from './source';
 
-export const CALCULATOR_SELECTION_PARAMS = [
-  'model',
-  'sequence',
-  'date',
-  'runId',
-  'percentile',
-  'tcoBasis',
-  'precisions',
-  'gpus',
-  'unofficialrun',
-] as const;
-export const EXTENSION_PARAMS = {
-  'first-token': [
-    ...CALCULATOR_SELECTION_PARAMS,
-    'caps',
-    'minInteractivity',
-    'costProvider',
-    'costType',
-  ],
-  'cache-reuse': [...CALCULATOR_SELECTION_PARAMS, 'config'],
-  'profit-estimator': [
-    ...CALCULATOR_SELECTION_PARAMS,
-    'target',
-    'costProvider',
-    'customCosts',
-    'priceSource',
-    'inputPrice',
-    'cachedInputPrice',
-    'outputPrice',
-    'utilization',
-    'labCut',
-    'powerBasis',
-    'dates',
-    'start',
-    'end',
-  ],
-  'profit-estimator-per-gigawatt': [
-    ...CALCULATOR_SELECTION_PARAMS,
-    'target',
-    'costProvider',
-    'customCosts',
-    'priceSource',
-    'inputPrice',
-    'cachedInputPrice',
-    'outputPrice',
-    'utilization',
-    'labCut',
-    'powerBasis',
-    'dates',
-    'start',
-    'end',
-  ],
-} as const;
-export type CalculatorExtension = keyof typeof EXTENSION_PARAMS;
+export type CalculatorExtension =
+  | 'first-token'
+  | 'cache-reuse'
+  | 'profit-estimator'
+  | 'profit-estimator-per-gigawatt';
 
 export function calculatorExtension(view: CalculatorExtension, request: NextRequest) {
   return runViewsRoute(view, async () => {

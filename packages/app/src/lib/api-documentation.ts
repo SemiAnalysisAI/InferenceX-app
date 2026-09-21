@@ -5,6 +5,19 @@ import {
 } from '@semianalysisai/inferencex-constants';
 import { COLLECTIVEX_VERSIONS } from '@semianalysisai/inferencex-db/collectivex/types';
 
+import {
+  text,
+  stringSchema,
+  numberSchema,
+  integerSchema,
+  booleanSchema,
+  nullableStringSchema,
+  nullableNumberSchema,
+  errorSchema,
+  objectSchema,
+  arraySchema,
+} from './api-documentation-helpers';
+
 import { POWER_VALIDITY_FILTERS } from './benchmark-power-validity';
 import { PUBLIC_API_ERRORS } from './public-api-errors';
 import { operations as calculatorViews } from './views-api/docs/calculator';
@@ -143,26 +156,9 @@ export const SUPPORTED_TCO_MODELS = Object.freeze(
   [...new Set([...Object.keys(DB_MODEL_TO_DISPLAY), ...SUPPORTED_BENCHMARK_MODELS])].toSorted(),
 );
 
-const text = (en: string, zh: string): BilingualText => ({ en, zh });
-const stringSchema: ApiSchema = { type: 'string' };
-const numberSchema: ApiSchema = { type: 'number' };
-const integerSchema: ApiSchema = { type: 'integer' };
-const booleanSchema: ApiSchema = { type: 'boolean' };
-const nullableStringSchema: ApiSchema = { type: ['string', 'null'] };
-const nullableNumberSchema: ApiSchema = { type: ['number', 'null'] };
 const metricMapSchema: ApiSchema = { type: 'object', additionalProperties: numberSchema };
 const anyObjectSchema: ApiSchema = { type: 'object', additionalProperties: true };
-const errorSchema: ApiSchema = {
-  type: 'object',
-  properties: { error: stringSchema },
-  required: ['error'],
-  additionalProperties: true,
-};
 
-const objectSchema = (
-  properties: Readonly<Record<string, ApiSchema>>,
-  required: readonly string[] = Object.keys(properties),
-): ApiSchema => ({ type: 'object', properties, required, additionalProperties: false });
 const objectSchemaWithOptional = (
   properties: Readonly<Record<string, ApiSchema>>,
   optional: readonly string[],
@@ -171,7 +167,6 @@ const objectSchemaWithOptional = (
     properties,
     Object.keys(properties).filter((property) => !optional.includes(property)),
   );
-const arraySchema = (items: ApiSchema): ApiSchema => ({ type: 'array', items });
 const mapSchema = (items: ApiSchema): ApiSchema => ({
   type: 'object',
   additionalProperties: items,

@@ -1,11 +1,13 @@
-import type {
-  ApiOperation,
-  ApiParameter,
-  ApiResponse,
-  ApiSchema,
-  BilingualText,
-} from '@/lib/api-documentation';
+import type { ApiOperation, ApiParameter, ApiResponse, ApiSchema } from '@/lib/api-documentation';
 import { API_BASE_URL } from '@/lib/api-documentation-base';
+import {
+  text,
+  stringSchema,
+  numberSchema,
+  integerSchema,
+  objectSchema,
+  arraySchema,
+} from '@/lib/api-documentation-helpers';
 
 /**
  * Docs fragment for GET /api/v1/views/reliability.
@@ -17,16 +19,7 @@ import { API_BASE_URL } from '@/lib/api-documentation-base';
 
 const VIEWS_GROUP: ApiOperation['group'] = 'views';
 
-const text = (en: string, zh: string): BilingualText => ({ en, zh });
-const stringSchema: ApiSchema = { type: 'string' };
-const numberSchema: ApiSchema = { type: 'number' };
-const integerSchema: ApiSchema = { type: 'integer' };
 const nullableDateSchema: ApiSchema = { type: ['string', 'null'], format: 'date' };
-const objectSchema = (
-  properties: Readonly<Record<string, ApiSchema>>,
-  required: readonly string[] = Object.keys(properties),
-): ApiSchema => ({ type: 'object', properties, required, additionalProperties: false });
-const arraySchema = (items: ApiSchema): ApiSchema => ({ type: 'array', items });
 
 const RELIABILITY_RANGE_ENUM = [
   'last-3-days',

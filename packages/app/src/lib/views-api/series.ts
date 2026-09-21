@@ -169,12 +169,10 @@ function pointMetrics(point: InferenceData, metricKey: MetricKey): Record<string
 /**
  * Resolve the x-axis label the dashboard would render for this selection.
  * Mirrors the display-label ladder in `useChartData.stableChartDefinitions`
- * (natural label, input-metric override label, TTFT override label, agentic
- * percentile prefix) without the chart-heading bookkeeping.
+ * for the explicit x-axis modes supported by this API.
  */
 function resolveXAxisLabel(
   chartDef: ChartDefinition,
-  metricConfigKey: MetricConfigKey,
   branch: string,
   effectiveXMetric: string | null,
   isAgentic: boolean,
@@ -185,9 +183,6 @@ function resolveXAxisLabel(
     const pctl = (effectiveXMetric ?? 'p90_ttft').replace(/_ttft$/u, '');
     const pctlWord = pctl === 'median' ? 'Median' : pctl.toUpperCase();
     label = `${pctlWord} Time To First Token (s)`;
-  } else if (branch === 'user-input-override' || branch === 'config-input-override') {
-    const override = chartDef[`${metricConfigKey}_x_label` as keyof ChartDefinition];
-    label = typeof override === 'string' && override.length > 0 ? override : chartDef.x_label;
   }
   if (isAgentic) {
     label = applyAgenticPercentileToXLabel(label, percentile.toUpperCase());
@@ -414,14 +409,7 @@ export function buildInferenceSeries(
       label:
         xmode === 'e2e-normalized-interactivity'
           ? `${percentile.toUpperCase()} E2E Normalized Interactivity (tok/s/user)`
-          : resolveXAxisLabel(
-              chartDef,
-              metricConfigKey,
-              resolved.branch,
-              effectiveXMetric,
-              isAgentic,
-              percentile,
-            ),
+          : resolveXAxisLabel(chartDef, resolved.branch, effectiveXMetric, isAgentic, percentile),
     },
     count,
   };

@@ -1,42 +1,14 @@
-import type {
-  ApiOperation,
-  ApiParameter,
-  ApiResponse,
-  ApiSchema,
-  BilingualText,
-} from '@/lib/api-documentation';
+import type { ApiOperation, ApiResponse, ApiSchema } from '@/lib/api-documentation';
 import { API_BASE_URL } from '@/lib/api-documentation-base';
+import {
+  text,
+  queryParameter as parameter,
+  parameterErrorSchema as errorSchema,
+} from '@/lib/api-documentation-helpers';
 
 // The 'views' group id is registered by the docs coordinator alongside the
 // route catalog entries; fragments are written against it ahead of that.
 const VIEWS_GROUP: ApiOperation['group'] = 'views';
-
-const text = (en: string, zh: string): BilingualText => ({ en, zh });
-
-const parameter = (
-  name: string,
-  required: boolean,
-  type: string,
-  en: string,
-  zh: string,
-  schema: ApiSchema,
-  example: boolean | number | string,
-): ApiParameter => ({
-  name,
-  location: 'query',
-  required,
-  type,
-  description: text(en, zh),
-  schema,
-  example,
-});
-
-const errorSchema: ApiSchema = {
-  type: 'object',
-  properties: { error: { type: 'string' }, param: { type: 'string' } },
-  required: ['error'],
-  additionalProperties: true,
-};
 
 const nearestPointSchema: ApiSchema = {
   type: ['object', 'null'],

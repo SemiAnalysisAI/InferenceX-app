@@ -107,7 +107,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-fleet-view',
-    sourceSha256: '58e3d2a5882eecc65ea2da6c07ecf7a30ba8193ce19f49fde206dbac0c500c87',
+    sourceSha256: 'ab0a5c408abb58976f193d53976b494cd54e026b5bebcb7bd119dc7187362bf0',
   },
   {
     source: 'src/app/api/v1/views/gpu-metrics/route.ts',
@@ -883,7 +883,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/calculator-extensions.ts',
-    sourceSha256: '146b7ea92b2efc51b1357fd6c576157e943dcfa2fdbb9f1242b08f7198eddbc8',
+    sourceSha256: '312e0b31487887ea372ee57736e6c933937d9c9e34cd596a62175734f82ccc29',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -901,7 +901,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/series.ts',
-    sourceSha256: 'ebee1b4eff64a91c48e82d920c7544a3b890c000ab4dfc62f61ab8d7deff9341',
+    sourceSha256: '568830d111b7ecae6fbe4ea35ef005fd3a50c883aa29b771d1d8601bff3d5325',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',

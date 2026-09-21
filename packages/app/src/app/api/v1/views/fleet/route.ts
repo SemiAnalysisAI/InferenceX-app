@@ -22,12 +22,11 @@ import { getModelReleaseDate, sequenceToIslOsl } from '@semianalysisai/inference
 import { FIXTURES_MODE } from '@semianalysisai/inferencex-db/connection';
 import type { BenchmarkRow } from '@semianalysisai/inferencex-db/queries/benchmarks';
 
-import { sizeFleetForResult } from '@/components/calculator/fleet';
+import { buildFleetSchedule } from '@/components/calculator/fleet';
 import {
   bestSoFarProgression,
   groupHistoryByHwKeyAndDate,
   mergeProgressionsByChip,
-  type ChipProgression,
 } from '@/components/calculator/historical-best';
 import {
   availabilityFromInterrupts,
@@ -38,9 +37,7 @@ import {
   LIFECYCLE_METRICS,
   metricValue,
   MS_PER_MONTH,
-  splitTokenStreams,
   type LifecycleAssumptions,
-  type ThroughputStep,
 } from '@/components/calculator/lifecycle';
 
 import type { InterpolatedResult } from '@/components/calculator/types';
@@ -81,15 +78,6 @@ async function fleetHistoryRows(modelKeys: string[], sequence: Sequence): Promis
     await getCachedBenchmarkHistory(modelKeys, islOsl.isl, islOsl.osl),
     sequence,
   );
-}
-
-interface SizedFleet {
-  chip: ChipProgression;
-  steps: ThroughputStep[];
-  costPerHour: number;
-  provisionedMw: number;
-  gpus: number;
-  concurrentUsersNow: number;
 }
 
 export function GET(request: NextRequest): Promise<Response> {
@@ -203,70 +191,24 @@ export function GET(request: NextRequest): Promise<Response> {
     const isAgentic = sequence === Sequence.AgenticTraces;
     const cacheReadRatio = isAgentic ? Math.min(1, cache / 100) : 1;
 
-    // Fleet sizing per chip — the exact schedule assembly `FleetLifecycle.tsx`
-    // performs: chip count and $/chip/hr are fixed by the opening rung, each rung
-    // contributes a step at its measured date with the fleet's total token rate
-    // split into billable-input and output streams by the measured mix.
-    const fleets: SizedFleet[] = [];
-    if (Number.isFinite(anchorMs)) {
-      for (const chip of chips) {
-        const specs = getGpuSpecs(chip.baseGpu, tcoBasis);
-        const steps: ThroughputStep[] = [];
-        let costPerHour: number | null = null;
-        let fleetGpus: number | null = null;
-        let provisionedMw: number | null = null;
-        let concurrentUsersNow: number | null = null;
-
-        for (const step of chip.steps) {
-          const totalTput = step.result.value;
-          const stats = sizeFleetForResult(step.result, {
-            mw,
-            specs,
-            costProvider,
-            costType,
-            interactivity: target,
-          });
-          if (!stats) continue;
-          costPerHour ??= stats.costPerHour;
-          provisionedMw ??= (stats.gpus * specs.power) / 1000;
-          fleetGpus ??= stats.gpus;
-          concurrentUsersNow = stats.concurrentUsers;
-          steps.push({
-            month: (Date.parse(`${step.date}T00:00:00Z`) - anchorMs) / MS_PER_MONTH,
-            ...splitTokenStreams(
-              stats.gpus * totalTput,
-              step.result.inputTokenShare,
-              step.result.cacheHitRate,
-              cacheReadRatio,
-            ),
-          });
-        }
-
-        if (
-          steps.length === 0 ||
-          costPerHour === null ||
-          provisionedMw === null ||
-          fleetGpus === null ||
-          concurrentUsersNow === null
-        ) {
-          continue;
-        }
-        fleets.push({
-          chip,
-          steps,
-          costPerHour,
-          provisionedMw,
-          gpus: fleetGpus,
-          concurrentUsersNow,
-        });
-      }
-    }
+    const fleets = chips.flatMap((chip) => {
+      const fleet = buildFleetSchedule(chip.steps, {
+        mw,
+        specs: getGpuSpecs(chip.baseGpu, tcoBasis),
+        costProvider,
+        costType,
+        interactivity: target,
+        anchorMs,
+        cacheReadRatio,
+      });
+      return fleet ? [{ chip, ...fleet }] : [];
+    });
 
     const availability = availabilityFromInterrupts(mtbi, recovery);
 
     // Competitive floor: the cheapest fleet's break-even at its latest config,
     // interrupts included — the price the default seeds sit on.
-    const breakEvenOf = (fleet: SizedFleet): number | null => {
+    const breakEvenOf = (fleet: (typeof fleets)[number]): number | null => {
       const latest = fleet.steps.at(-1);
       if (!latest) return null;
       return breakEvenPricePerMTok(

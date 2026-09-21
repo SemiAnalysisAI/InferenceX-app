@@ -47,7 +47,7 @@ import { readUrlParams, writeUrlParams } from '@/lib/url-state';
 import { useLocale } from '@/lib/use-locale';
 import { getDisplayLabel } from '@/lib/utils';
 
-import { computeFleetStats, formatCompact } from './fleet';
+import { buildFleetSchedule, formatCompact } from './fleet';
 import FleetLifecycleChart, {
   type LifecycleChartSeries,
   type LifecycleMetric,
@@ -55,8 +55,6 @@ import FleetLifecycleChart, {
 import { mergeProgressionsByChip, type ChipProgression } from './historical-best';
 import {
   availabilityFromInterrupts,
-  outputTokPerChip,
-  splitTokenStreams,
   breakEvenPricePerMTok,
   computeLifecycle,
   effectiveTokPerSec,
@@ -64,9 +62,8 @@ import {
   MS_PER_MONTH,
   type LifecycleAssumptions,
   type LifecycleSeries,
-  type ThroughputStep,
 } from './lifecycle';
-import { getCostProviderLabel, getThroughputForType } from './ThroughputBarChart';
+import { getCostProviderLabel } from './ThroughputBarChart';
 import type { CalculatorMode, CostProvider, CostType, InterpolatedResult } from './types';
 import { useHistoricalBest } from './useHistoricalBest';
 
@@ -700,68 +697,20 @@ export default function FleetLifecycle({
     // legend and in no row, with no explanation, reads as a bug in the data.
     const absent: string[] = [];
     const sized = visibleProgressions.flatMap((progression) => {
-      // Power and $/chip/hr come from the base GPU, so they are identical across
-      // the hwKeys pooled into this line — which is what keeps cost flat even
-      // though the winning config changes.
-      const specs = getGpuSpecs(progression.baseGpu, tcoBasis);
-      const steps: ThroughputStep[] = [];
-      let costPerHour: number | null = null;
-      // Chip count is mw / all-in power, so it is the same at every rung. Users
-      // is not: the fleet streams more of them as throughput improves, so it is
-      // the *latest* rung's figure, matching the `tok/s/MW now` column.
-      let gpus: number | null = null;
-      let concurrentUsersNow: number | null = null;
-      // Power the fleet actually occupies, not the budget: chip counts are whole,
-      // so the last fraction of a chip's worth of the budget is never provisioned.
-      let provisionedMw: number | null = null;
-
-      for (const step of progression.steps) {
-        const stats = computeFleetStats({
-          mw,
-          powerKwPerGpu: specs.power,
-          costPerGpuHour: specs[costProvider],
-          tputPerGpu: getThroughputForType(step.result, costType),
-          // Through the accessor even though this one is always the output rate:
-          // the cost-matrix rule exists so every throughput read goes through one
-          // chokepoint, and a direct field read silently diverges if it gains logic.
-          outputTputPerGpu: outputTokPerChip(
-            getThroughputForType(step.result, 'total'),
-            step.result.inputTokenShare,
-            getThroughputForType(step.result, 'output'),
-          ),
-          interactivity: targetValue,
-        });
-        if (!stats) continue;
-        costPerHour ??= stats.costPerHour;
-        provisionedMw ??= (stats.gpus * specs.power) / 1000;
-        gpus ??= stats.gpus;
-        concurrentUsersNow = stats.concurrentUsers;
-        steps.push({
-          month: (Date.parse(`${step.date}T00:00:00Z`) - anchorMs) / MS_PER_MONTH,
-          // Always the total-token rate, never the cost-type one: the fleet sells
-          // everything it produces, whichever token type the cost matrix above is
-          // expressed in. Split by the measured mix so both streams stay on the
-          // per-chip denominator the fleet was sized and costed on.
-          ...splitTokenStreams(
-            stats.gpus * getThroughputForType(step.result, 'total'),
-            step.result.inputTokenShare,
-            step.result.cacheHitRate,
-            cacheReadRatio,
-          ),
-        });
-      }
-
-      if (
-        steps.length === 0 ||
-        costPerHour === null ||
-        provisionedMw === null ||
-        gpus === null ||
-        concurrentUsersNow === null
-      ) {
+      const fleet = buildFleetSchedule(progression.steps, {
+        mw,
+        specs: getGpuSpecs(progression.baseGpu, tcoBasis),
+        costProvider,
+        costType,
+        interactivity: targetValue,
+        anchorMs,
+        cacheReadRatio,
+      });
+      if (!fleet) {
         absent.push(progression.baseGpu);
         return [];
       }
-      return [{ progression, steps, costPerHour, provisionedMw, gpus, concurrentUsersNow }];
+      return [{ progression, ...fleet }];
     });
     return { fleets: sized, unplottable: absent };
   }, [

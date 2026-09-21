@@ -1,11 +1,15 @@
-import type {
-  ApiOperation,
-  ApiParameter,
-  ApiResponse,
-  ApiSchema,
-  BilingualText,
-} from '@/lib/api-documentation';
+import type { ApiOperation, ApiParameter, ApiResponse } from '@/lib/api-documentation';
 import { API_BASE_URL } from '@/lib/api-documentation-base';
+import {
+  text,
+  stringSchema,
+  numberSchema,
+  integerSchema,
+  booleanSchema,
+  objectSchema,
+  arraySchema,
+  listParam,
+} from '@/lib/api-documentation-helpers';
 
 /**
  * Docs fragment for GET /api/v1/views/inference.
@@ -16,33 +20,6 @@ import { API_BASE_URL } from '@/lib/api-documentation-base';
  */
 
 const VIEWS_GROUP: ApiOperation['group'] = 'views';
-
-const text = (en: string, zh: string): BilingualText => ({ en, zh });
-const stringSchema: ApiSchema = { type: 'string' };
-const numberSchema: ApiSchema = { type: 'number' };
-const integerSchema: ApiSchema = { type: 'integer' };
-const booleanSchema: ApiSchema = { type: 'boolean' };
-const objectSchema = (
-  properties: Readonly<Record<string, ApiSchema>>,
-  required: readonly string[] = Object.keys(properties),
-): ApiSchema => ({ type: 'object', properties, required, additionalProperties: false });
-const arraySchema = (items: ApiSchema): ApiSchema => ({ type: 'array', items });
-const listParam = (
-  name: string,
-  description: BilingualText,
-  example: string,
-  enumValues?: readonly string[],
-): ApiParameter => ({
-  name,
-  location: 'query',
-  required: false,
-  type: 'string',
-  description,
-  schema: enumValues
-    ? { type: 'string', enum: enumValues, description: 'Comma-separated list' }
-    : { type: 'string', description: 'Comma-separated list' },
-  example,
-});
 
 const X_MODE_ENUM = ['interactivity', 'ttft', 'e2e', 'e2e-normalized-interactivity'] as const;
 

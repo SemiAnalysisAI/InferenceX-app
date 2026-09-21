@@ -1,8 +1,8 @@
 import type { ApiOperation, ApiParameter, ApiResponse, ApiSchema } from '@/lib/api-documentation';
 import { API_BASE_URL } from '@/lib/api-documentation-base';
+import { text } from '@/lib/api-documentation-helpers';
 import { VIEW_QUERY_PARAMS, type ReadonlyView } from '../registry';
 
-const text = (en: string, zh: string) => ({ en, zh });
 const object: ApiSchema = { type: 'object', additionalProperties: true };
 const objects: ApiSchema = { type: 'array', items: object };
 const strings: ApiSchema = { type: 'array', items: { type: 'string' } };
