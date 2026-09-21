@@ -122,6 +122,27 @@ async function reconstructBundle(directory, { signal, policy = {} }) {
   if (!isDeepStrictEqual(manifest.summary, expectedSummary)) {
     throw responseError('Recorded bundle summary does not match reconstructed evidence');
   }
+  const artifacts = new Map(
+    [
+      replay.manifestFile,
+      manifest.result,
+      ...manifest.requests.map(({ response }) => response),
+    ].map(({ path, size, sha256 }) => [path, { path, size, sha256 }]),
+  );
+  const resultContext =
+    built.format === 'json'
+      ? Object.fromEntries(
+          Object.entries(JSON.parse(built.bytes)).filter(([key]) =>
+            [
+              'metadata',
+              'units',
+              'limitations',
+              'observation_context',
+              'comparison_scope',
+            ].includes(key),
+          ),
+        )
+      : undefined;
   return {
     schema_version: 1,
     command: 'verify',
@@ -136,7 +157,17 @@ async function reconstructBundle(directory, { signal, policy = {} }) {
       producer_package_version: manifest.producer.package_version,
       contract_version: manifest.contract_version,
     },
+    evidence: {
+      artifacts: [...artifacts.values()],
+      request_count: manifest.requests.length,
+      recorded_policy: recordedPolicy,
+      ...(resultContext === undefined ? {} : { result_context: resultContext }),
+    },
   };
+}
+
+function jsonBlock(value) {
+  return `\`\`\`json\n${JSON.stringify(stable(value), null, 2).replaceAll('`', String.raw`\u0060`)}\n\`\`\``;
 }
 
 export function renderVerificationMarkdown(verification) {
@@ -146,12 +177,13 @@ export function renderVerificationMarkdown(verification) {
           .map(({ hardware: key, valid_records: count }) => `- ${key}: ${count} valid record(s)`)
           .join('\n')
       : '- None';
-  const policyReasons =
-    verification.policy.reasons.length > 0
-      ? verification.policy.reasons
-          .map((reason) => `- ${JSON.stringify(stable(reason))}`)
-          .join('\n')
-      : '- None';
+  const { evidence } = verification;
+  const artifacts = evidence.artifacts
+    .map(({ path, size, sha256 }) => `| ${path} | ${size} | ${sha256} |`)
+    .join('\n');
+  const context = Object.entries(evidence.result_context ?? {})
+    .map(([key, value]) => `### ${verification.input.result} → ${key}\n\n${jsonBlock(value)}`)
+    .join('\n\n');
   const report = `# InferenceX evidence verification
 
 - Kind: ${verification.kind}
@@ -168,11 +200,32 @@ export function renderVerificationMarkdown(verification) {
 
 ${hardware}
 
-## Policy
+## Current verification policy
 
-- Status: ${verification.policy.status}
+${jsonBlock(verification.policy)}
 
-${policyReasons}
+## Recorded export policy: manifest.summary.policy
+
+${jsonBlock(evidence.recorded_policy)}
+
+## Evidence files
+
+${evidence.artifacts.length} unique files; ${evidence.request_count} logical requests.
+Paths are relative to the bundle. SHA-256 identifies the bytes read during verification;
+it does not authenticate the remote source. The manifest hash is computed here,
+not stored inside manifest.json.
+
+| Path | Bytes | SHA-256 |
+| --- | ---: | --- |
+${artifacts}
+
+## Saved result context
+
+These fields are copied from the verified result, not inferred from individual rows.
+Omitted fields are outside this appendix; their omission does not establish absence
+from the raw responses. Verification checks bundle replay, not a separate analysis report.
+
+${context || 'No JSON context extracted from this result format.'}
 `;
   const bytes = Buffer.byteLength(report);
   if (bytes > BUNDLE_LIMITS.report) throw responseError('Verification report exceeds 1 MiB');

@@ -11,8 +11,8 @@ import {
   useState,
 } from 'react';
 
-import { DISPLAY_MODEL_TO_DB } from '@semianalysisai/inferencex-constants';
 import { track } from '@/lib/analytics';
+import { DISPLAY_MODEL_TO_DB } from '@semianalysisai/inferencex-constants';
 
 import {
   useGlobalFilterActions,
@@ -21,16 +21,16 @@ import {
   useGlobalFilterSelection,
 } from '@/components/GlobalFilterContext';
 import { useUnofficialRun } from '@/components/unofficial-run-provider';
+import { useEvaluations } from '@/hooks/api/use-evaluations';
 import {
   resolveAvailableSelection,
-  useChartUIState,
   useChartToggleSet,
+  useChartUIState,
   useUrlStateSync,
 } from '@/hooks/useChartContext';
-import { useEvaluations } from '@/hooks/api/use-evaluations';
 import { useUrlState } from '@/hooks/useUrlState';
-import type { Model } from '@/lib/data-mappings';
 import type { EvalRow } from '@/lib/api';
+import type { Model } from '@/lib/data-mappings';
 
 import {
   aggregateEvaluationChartRows,
@@ -42,21 +42,8 @@ import type { EvalChangelogEntry, EvaluationChartContextType, EvaluationChartDat
 /** @internal Exported for test provider wrapping only. */
 export const EvaluationContext = createContext<EvaluationChartContextType | undefined>(undefined);
 
-export function resolveEvaluationDate(
-  requestedDate: string,
-  availableDates: readonly string[],
-): string {
-  if (availableDates.length === 0) return requestedDate;
-  if (!requestedDate) return availableDates.at(-1)!;
-  if (availableDates.includes(requestedDate)) return requestedDate;
-
-  const target = new Date(requestedDate).getTime();
-  return availableDates.reduce((closest, date) => {
-    const closestDifference = Math.abs(new Date(closest).getTime() - target);
-    const difference = Math.abs(new Date(date).getTime() - target);
-    return difference < closestDifference ? date : closest;
-  }, availableDates[0]);
-}
+import { resolveEvaluationDate } from './date-resolution';
+export { resolveEvaluationDate } from './date-resolution';
 
 export function retryFailedEvaluationQueries({
   availabilityFailed,

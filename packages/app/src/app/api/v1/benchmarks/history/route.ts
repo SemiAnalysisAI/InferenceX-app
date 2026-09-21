@@ -1,30 +1,19 @@
 import type { NextRequest } from 'next/server';
 
 import { DISPLAY_MODEL_TO_DB, islOslToSequence } from '@semianalysisai/inferencex-constants';
-import { FIXTURES_MODE, getDb } from '@semianalysisai/inferencex-db/connection';
+import { FIXTURES_MODE } from '@semianalysisai/inferencex-db/connection';
 
-import { getAllBenchmarksForHistory } from '@semianalysisai/inferencex-db/queries/benchmarks';
-
-import { cachedJson, cachedQuery } from '@/lib/api-cache';
+import { cachedJson } from '@/lib/api-cache';
 import { toCalculatorBenchmarkRows } from '@/lib/benchmark-api-view';
+import {
+  getCachedAgenticBenchmarkHistory,
+  getCachedBenchmarkHistory,
+} from '@/lib/benchmark-query-cache.server';
 import { PUBLIC_API_ERRORS, publicApiError } from '@/lib/public-api-errors';
 import { loadFixture } from '@/lib/test-fixtures';
 import { agenticWorkflowMetadataOnly } from '@/lib/agentic-workflow-metadata';
 
 export const dynamic = 'force-dynamic';
-
-const getCachedBenchmarkHistory = cachedQuery(
-  (modelKeys: string[], isl: number, osl: number) =>
-    getAllBenchmarksForHistory(getDb(), modelKeys, isl, osl),
-  'benchmark-history',
-  { blobOnly: true },
-);
-const getCachedAgenticBenchmarkHistory = cachedQuery(
-  (modelKeys: string[]) =>
-    getAllBenchmarksForHistory(getDb(), modelKeys, null, null, 'agentic_traces'),
-  'benchmark-history-agentic-curve-scope-v2',
-  { blobOnly: true },
-);
 
 /**
  * Trim a history response to the calculator's metric allowlist.

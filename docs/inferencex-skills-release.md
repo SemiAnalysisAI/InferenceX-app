@@ -4,7 +4,9 @@ The public package is `@semianalysisai/inferencex-skills`. Versions `0.1.0`,
 `0.2.0`, `0.3.0`, `0.4.0`, `0.5.0`, `0.6.0`, `0.7.0`, `0.8.0`, `0.9.0`, `0.10.0`, and
 `0.11.0` are immutable public releases. The website advertises the verified
 `0.11.0` release. For later releases, keep website commands pinned until publication
-and public verification succeed. The
+and public verification succeed. The current 1.0.0 candidate establishes the
+[1.x compatibility guarantees](./inferencex-cli-compatibility.md); evidence format
+versions remain independent of the package version. The
 [`publish-skills.yml`](../.github/workflows/publish-skills.yml) workflow prepares
 future releases; it does not run on application tags or database-backup releases.
 Adding this workflow does not configure npm access or prove a successful OIDC release.
@@ -88,7 +90,7 @@ each bundle offline, and audits every result against its saved responses with an
 independent Python implementation. Missing and null values remain missing; real
 `0` and `false` values remain explicit. No new benchmarks run.
 
-For the 0.12.0 candidate, retain the exact four platform results (Linux/macOS by Node
+For the 1.0.0 candidate, retain the exact four platform results (Linux/macOS by Node
 24/26) and both native runtime results. Each native result covers PowerX, AgentX,
 result provenance, TCO, releases, CollectiveX, and offline replay, with archive,
 case-set, prompt transcript, and answer transcript hashes. Keep
@@ -261,6 +263,25 @@ It performs a clean candidate install/export, checks the digest again,
 and publishes that same tarball using OIDC. It then verifies public metadata and
 tarball identity and performs anonymous pinned installations/exports with fresh
 caches for both targets. Evidence is uploaded even when a check fails.
+
+### Authorized 1.0.0 native-report exception
+
+The maintainer explicitly accepted the remaining report errors and incomplete retest
+for archive `b6ee16ef5d359f2055e4a86e156f1045e64f2a048ca6662b1859ce4b0f1480a2`.
+Only that 1.0.0 archive permits the workflow input
+`accept_native_report_limitations: true`, together with qualification field
+`native_report_exception: "accepted-1.0.0-report-limitations"`.
+The declaration retains all 26 case identities as `not_run` on the final archive,
+which includes a subsequent installer concurrency fix. The preceding candidate's
+focused retest had two passes and one failure; those results remain historical.
+Do not substitute older-archive passes or invent transcript
+hashes for unrun cases. The release summary preserves these outcomes and the reason
+for the exception. Other versions, archives, platform failures, and failed
+candidate/public verification remain rejected; the normal all-pass gate is unchanged.
+
+For recovery of this release's summary, retain the original declaration and supply
+`ALLOW_NATIVE_REPORT_LIMITATIONS=true` only to the `release-summary.mjs` commands
+below. This reuses the original authorization; it does not approve another archive.
 
 Public verification retries only an npm install failure containing `ETARGET` and
 `No matching version found for @semianalysisai/inferencex-skills@<exact-version>.`

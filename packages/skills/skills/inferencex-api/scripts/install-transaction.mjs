@@ -115,7 +115,13 @@ async function readTransaction(
     return blocked('installer transaction path is not an owned directory');
   }
 
-  const names = readdirSync(transaction);
+  let names;
+  try {
+    names = readdirSync(transaction);
+  } catch (error) {
+    if (error.code === 'ENOENT') return { state: 'missing' };
+    throw error;
+  }
   const markerNames = names.filter((name) => name.startsWith('owner-'));
   if (markerNames.length === 0 && names.length === 0 && recoveryTransactionId !== null) {
     return {
@@ -349,7 +355,12 @@ function removeOwnedContents(paths) {
 function finishTerminalCleanup(destination, paths, record) {
   const recoveryPaths = moveToRecovery(destination, paths, record);
   rmSync(recoveryPaths.marker);
-  rmdirSync(recoveryPaths.transaction);
+  try {
+    rmdirSync(recoveryPaths.transaction);
+  } catch (error) {
+    // A contender can finish the empty tombstone after its owner marker is removed.
+    if (error.code !== 'ENOENT') throw error;
+  }
 }
 
 function finishCleanup(destination, paths, record) {

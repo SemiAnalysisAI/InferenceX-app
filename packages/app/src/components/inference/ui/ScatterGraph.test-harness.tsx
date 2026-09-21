@@ -80,6 +80,10 @@ class MockResizeObserver {
   unobserve() {}
   disconnect() {}
 }
+const originalGetComputedTextLength = Object.getOwnPropertyDescriptor(
+  SVGElement.prototype,
+  'getComputedTextLength',
+);
 const originalGetBBox = Object.getOwnPropertyDescriptor(SVGElement.prototype, 'getBBox');
 
 export const point = (
@@ -220,6 +224,12 @@ export const rebuildCount = () => vi.mocked(setupChartStructure).mock.calls.leng
 beforeEach(() => {
   globalThis.__scatterPathnameState.value = '/inference';
   vi.stubGlobal('ResizeObserver', MockResizeObserver);
+  Object.defineProperty(SVGElement.prototype, 'getComputedTextLength', {
+    configurable: true,
+    value(this: SVGElement) {
+      return (this.textContent?.length ?? 0) * 7;
+    },
+  });
   Object.defineProperty(SVGElement.prototype, 'getBBox', {
     configurable: true,
     value: () =>
@@ -259,6 +269,15 @@ beforeEach(() => {
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
+  if (originalGetComputedTextLength) {
+    Object.defineProperty(
+      SVGElement.prototype,
+      'getComputedTextLength',
+      originalGetComputedTextLength,
+    );
+  } else {
+    Reflect.deleteProperty(SVGElement.prototype, 'getComputedTextLength');
+  }
   if (originalGetBBox) {
     Object.defineProperty(SVGElement.prototype, 'getBBox', originalGetBBox);
   } else {

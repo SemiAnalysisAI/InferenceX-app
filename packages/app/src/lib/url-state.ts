@@ -12,6 +12,7 @@
  *
  * Only non-default values are written to keep URLs short.
  */
+import { LIFECYCLE_DEFAULTS } from '@/components/calculator/lifecycle';
 import { dashboardRouteForPathname, getDashboardRoute } from '@/lib/dashboard-routes';
 import { routeModelForPathname } from '@/lib/model-routes';
 
@@ -133,7 +134,7 @@ export const DEFAULT_Y_AXIS_METRIC = 'y_tokensPerDollarH';
 
 /** Shared defaults for the fleet lifecycle and calculator MW controls. */
 export const DEFAULT_FLEET_MW = '10';
-export const DEFAULT_LIFECYCLE_RAMP_MONTHS = '0.5';
+export const DEFAULT_LIFECYCLE_RAMP_MONTHS = String(LIFECYCLE_DEFAULTS.rampMonths);
 
 export const PARAM_DEFAULTS: Record<UrlStateKey, string> = {
   g_model: 'DeepSeek-V4-Pro',

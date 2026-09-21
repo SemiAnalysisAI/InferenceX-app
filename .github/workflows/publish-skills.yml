@@ -8,9 +8,15 @@ on:
         required: true
         type: string
       reviewed_sha256:
-        description: 'Archive SHA-256 after clean installed-agent acceptance'
+        description: 'Exact reviewed archive SHA-256'
         required: true
         type: string
+
+      accept_native_report_limitations:
+        description: 'Accept the recorded native report failures and incomplete retesting for the pinned 1.0.0 archive'
+        required: false
+        default: false
+        type: boolean
       qualification_json:
         description: 'Reviewed evidence declaration: exact archive, Actions job metadata, all maintained cases per runtime, allowed limitation codes'
         required: true
@@ -49,6 +55,9 @@ jobs:
           node --version
           npm --version
           node --input-type=module -e 'import {execFileSync} from "node:child_process"; const [major,minor,patch]=execFileSync("npm",["--version"],{encoding:"utf8"}).trim().split(".").map(Number); if (major < 11 || (major === 11 && (minor < 5 || (minor === 5 && patch < 1)))) throw Error("npm >=11.5.1 is required for trusted publishing");'
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+      - name: Install pinned test dependencies
+        run: bun install --frozen-lockfile
       - name: Test the packed interfaces
         run: node --test packages/skills/test/*.test.mjs
       - name: Prepare the exact accepted archive
@@ -56,6 +65,7 @@ jobs:
       - name: Validate reviewed platform and native evidence declarations before publication
         env:
           GH_TOKEN: ${{ github.token }}
+          ALLOW_NATIVE_REPORT_LIMITATIONS: ${{ inputs.accept_native_report_limitations }}
         run: |
           node --input-type=module -e 'import {writeFileSync} from "node:fs"; const input=process.env.QUALIFICATION_JSON; if (!input || Buffer.byteLength(input)>1048576) throw Error("Qualification JSON is missing or too large"); const record=JSON.parse(input); writeFileSync(`${process.env.RUNNER_TEMP}/skills-release/qualification.json`, JSON.stringify(record), {flag:"wx"});'
           node packages/skills/scripts/release-summary.mjs check-qualification "$RUNNER_TEMP/skills-release/release.json" "$RUNNER_TEMP/skills-release/qualification.json"
@@ -66,6 +76,8 @@ jobs:
           fi
       - name: Verify candidate installation and public API behavior
         run: python3 packages/skills/scripts/verify-release.py candidate "$RUNNER_TEMP/skills-release/release.json" --model DeepSeek-V4-Pro --isl 8192 --osl 1024 --agentx-model DeepSeek-V4-Pro --evidence "$RUNNER_TEMP/skills-candidate-verification"
+      - name: Require versioned release notes
+        run: test -s "docs/releases/inferencex-skills-${RELEASE_VERSION}.md"
       - name: Publish the verified archive with OIDC
         run: |
           node packages/skills/scripts/release.mjs check "$RUNNER_TEMP/skills-release/release.json" "$REVIEWED_SHA256"
@@ -73,6 +85,8 @@ jobs:
       - name: Verify anonymous pinned public installation and behavior
         run: python3 packages/skills/scripts/verify-release.py public "$RUNNER_TEMP/skills-release/release.json" --model DeepSeek-V4-Pro --isl 8192 --osl 1024 --agentx-model DeepSeek-V4-Pro --evidence "$RUNNER_TEMP/skills-public-verification"
       - name: Create the sanitized durable release summary
+        env:
+          ALLOW_NATIVE_REPORT_LIMITATIONS: ${{ inputs.accept_native_report_limitations }}
         run: >-
           node packages/skills/scripts/release-summary.mjs
           "$RUNNER_TEMP/skills-release/release.json"
@@ -95,8 +109,8 @@ jobs:
             "$RUNNER_TEMP/skills-release/release.json" \
             "$RUNNER_TEMP/skills-release/release-summary.json" \
             --target "$GITHUB_SHA" \
-            --title "InferenceX skills ${RELEASE_VERSION}" \
-            --notes "Accepted public package archive, release identity, and sanitized qualification summary."
+            --title "InferenceX skills ${RELEASE_VERSION} / InferenceX 技能包 ${RELEASE_VERSION}" \
+            --notes-file "docs/releases/inferencex-skills-${RELEASE_VERSION}.md"
       - name: Preserve release and verification evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7

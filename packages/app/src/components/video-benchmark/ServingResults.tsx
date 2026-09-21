@@ -8,7 +8,12 @@ import { useLocale } from '@/lib/use-locale';
 import { track } from '@/lib/analytics';
 import VideoSelect from './VideoSelect';
 import { at, number, rows, safePath, text, type Bundle, type Json } from './bundle';
-import type { ServingCell } from './serving';
+import {
+  participatingGpuCount,
+  perGpuHour,
+  selectServingRecord,
+  type ServingCell,
+} from './serving';
 import { allocatedGpus } from './allocation';
 import { powerLimitComparison } from './power-limit';
 import { requestServerTiming, serverTimingSummary, SERVER_TIMING_COPY } from './server-timing';
@@ -299,25 +304,17 @@ export default function ServingResults({
   const serving = at(metrics, 'serving');
   const completion = at(cell, 'completion');
   const records = rows(at(run, 'records'));
-  const record =
-    records.find((row) => text(at(row, 'slot_id')) === slot) ??
-    records.find((row) => at(row, 'phase') === 'measurement') ??
-    records[0];
+  const record = selectServingRecord(run, slot);
   const serverTiming = serverTimingSummary(run, verified);
-  const requestTiming = requestServerTiming(record ?? null, verified);
+  const requestTiming = requestServerTiming(record, verified);
   const media = at(record, 'media');
   const warmup = at(record, 'phase') === 'warmup';
   const telemetry = at(job, 'roles', 'baseline', 'telemetry_summary');
   const devices = rows(at(telemetry, 'gpu_identity'));
   const allocated = allocatedGpus(bundle);
-  const gpuUuids = rows(at(spec, 'gpu_uuids')).map(text);
-  const participating =
-    gpuUuids.length > 0 && gpuUuids.every(Boolean) && new Set(gpuUuids).size === gpuUuids.length
-      ? gpuUuids.length
-      : null;
+  const participating = participatingGpuCount(spec);
   const gpuCount = gpuBasis === 'participating' ? participating : allocated;
-  const gpuRate = (value: Json) =>
-    gpuCount !== null && gpuCount > 0 ? multiply(value, 3600 / gpuCount) : null;
+  const gpuRate = (value: Json) => perGpuHour(value, gpuCount);
   const powerData = at(power, 'phases', phase);
   const limitComparison = verified
     ? powerLimitComparison(

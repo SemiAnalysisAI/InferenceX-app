@@ -1,7 +1,9 @@
 # InferenceX CLI release checklist
 
-The 0.12.0 candidate adds one `inferencex` entry point for discovery, six evidence
-workflows, offline verification, and installation diagnostics. Publication is a
+The 1.0.0 candidate establishes the documented 1.x compatibility guarantees for
+commands, arguments, required outputs, and exit codes. It provides one `inferencex`
+entry point for discovery, six evidence workflows, offline verification, and
+installation diagnostics. Publication is a
 separate operation after candidate review. The website remains pinned to the last
 anonymously verified public version until that operation succeeds.
 
@@ -41,6 +43,11 @@ defines exit codes, fixed CSV columns, JSON evolution, and the move from 0.11 an
 Keep detailed captures outside the npm package. A failed attempt remains evidence;
 after a fix, rerun affected checks and every gate invalidated by changed archive
 bytes. Record missing or failed platform jobs as missing or failed.
+
+The explicitly authorized 1.0.0 native-report exception is recorded in the
+[release instructions](./inferencex-skills-release.md#authorized-100-native-report-exception).
+It preserves failed and unrun cases for one exact archive; it does not mark these
+candidate-evidence checkboxes complete or waive the other release checks.
 
 ## Ordered release
 

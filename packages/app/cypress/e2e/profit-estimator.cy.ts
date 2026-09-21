@@ -94,7 +94,90 @@ const chart = () => cy.get('[data-testid="profit-estimator-chart"]');
 const chartSvg = () => chart().find('svg').filter(':has(.chart-root)').first();
 const bars = () => chart().find('rect.bar');
 
-describe('Profit estimator power option', () => {
+// Clear the preceding chart before each case changes the viewport.
+describe('Profit estimator power option', { testIsolation: true }, () => {
+  for (const locale of ['en', 'zh'] as const) {
+    it(`prices DeepSeek Flash partial chassis with visible assumptions and CSV labels (${locale})`, () => {
+      stubOpenRouter();
+      cy.viewport(locale === 'en' ? 1280 : 393, 900);
+      cy.intercept('GET', '/api/v1/benchmarks*', {
+        body: profitBenchmarkRows('dsv41flash').map((row) => {
+          const gpus = row.hardware === 'b300' ? 2 : 4;
+          return {
+            ...row,
+            prefill_tp: gpus,
+            decode_tp: gpus,
+            num_prefill_gpu: gpus,
+            num_decode_gpu: gpus,
+            metrics: {
+              ...row.metrics,
+              power_valid: 1,
+              power_metric_schema_version: 2,
+              avg_power_w: 500,
+              avg_total_gpu_power_w: 500 * gpus,
+            },
+          };
+        }),
+      });
+      let csv: Blob | undefined;
+      cy.visit(
+        `${locale === 'zh' ? '/zh' : ''}/profit-estimator-per-gigawatt/deepseek-v41-flash?c_power=modeled`,
+        {
+          onBeforeLoad: (win) => {
+            unlockPowerGate(win);
+            win.URL.createObjectURL = (blob) => {
+              if (blob instanceof win.Blob) csv = blob;
+              return 'blob:profit-csv-test';
+            };
+            win.HTMLAnchorElement.prototype.click = () => {};
+          },
+        },
+      );
+      const label = locale === 'en' ? 'Full-chassis extrapolation' : '整机外推';
+      const hardwareReason =
+        locale === 'en'
+          ? 'no system power model for this hardware'
+          : '该硬件暂无适用的系统功耗模型';
+      cy.get('#profit-target').should('have.value', '125');
+      chart().find('text.revenue-label').should('have.length', 3);
+      chart()
+        .should('contain', 'B200')
+        .and('contain', 'B300')
+        .and('contain', 'MI355X')
+        .and('contain', label);
+      cy.get('[data-testid="profit-power-unavailable"]')
+        .should('contain', 'GB300')
+        .and('contain', hardwareReason);
+      cy.get('[data-testid="profit-power-note"]').should(
+        'contain',
+        locale === 'en' ? 'partly idle server' : '部分 GPU 闲置',
+      );
+      cy.get('[data-testid="profit-power-note"]').then(($note) => {
+        const box = $note[0].getBoundingClientRect();
+        expect(box.left).to.be.at.least(0);
+        expect(box.right).to.be.at.most(locale === 'en' ? 1280 : 393);
+      });
+      chart().scrollIntoView();
+      cy.screenshot(`profit-partial-chassis-${locale}`, { capture: 'viewport', overwrite: true });
+      cy.get('[data-testid="export-button"]').first().click();
+      cy.get('[data-testid="export-csv-button"]').click();
+      cy.then(() => csv!.text()).then((text) => {
+        expect(text).to.contain(label);
+        expect(text).to.contain(
+          locale === 'en' ? 'same per-GPU power and throughput' : '每卡功耗和吞吐量保持不变',
+        );
+        expect(
+          text
+            .split('\n')
+            .filter(
+              (line) =>
+                line.startsWith('B200') || line.startsWith('B300') || line.startsWith('MI355X'),
+            ),
+        ).to.have.length(3);
+      });
+    });
+  }
+
   it('ignores power URL overrides while locked and returns to provisioned estimates on relock', () => {
     stubOpenRouter();
     let rawRequests = 0;

@@ -90,43 +90,58 @@ const pricing = {
 };
 const assumptions = { basis: 'gw-year' as const, utilizationPct: 60, labCutPct: 30 };
 const specs = () => ({ powerKwPerGpu: 2.09, costPerGpuHour: 1.5 });
-const labels = { provisioned: 'Provisioned', modeled: 'Measured + modeled' };
+const labels = {
+  provisioned: 'Provisioned',
+  modeled: 'Measured + modeled',
+  extrapolated: 'Full-chassis extrapolation',
+};
 
 describe('profit power basis preview', () => {
-  it('keeps raw power attached through official and run-keyed frontier construction', () => {
-    const row = {
-      ...source,
-      metrics: {
-        ...source.metrics,
-        p90_itl: 1 / 45,
-        tput_per_gpu: 6000,
-        input_tput_per_gpu: 5940,
-        output_tput_per_gpu: 60,
-      },
-    };
-    for (const suffix of ['', '__run1']) {
-      const { grouped } = buildGpuGroups([row], {
-        sequence: Sequence.AgenticTraces,
-        precisions: ['fp4'],
-        percentile: Percentile.P90,
-        classify: (hwKey) => ({ key: `${hwKey}${suffix}`, meta: { hwKey } }),
-      });
-      const points = Object.values(grouped)[0];
-      expect(points[0].sourceRow).toBe(row);
-      const interpolated = interpolateForGPU(points, 45, 'interactivity_to_throughput', 'costh');
-      expect(interpolated).not.toBeNull();
-      expect(modeledPowerAtTarget(interpolated!, 45)).toBeCloseTo(1.5976675, 8);
-    }
-  });
+  it.each([8, 4, 2])(
+    'keeps raw power attached through official and run-keyed %i-GPU frontiers',
+    (gpus) => {
+      const row = {
+        ...source,
+        prefill_tp: gpus,
+        decode_tp: gpus,
+        num_prefill_gpu: gpus,
+        num_decode_gpu: gpus,
+        metrics: {
+          ...source.metrics,
+          avg_total_gpu_power_w: source.metrics.avg_power_w * gpus,
+          p90_itl: 1 / 45,
+          tput_per_gpu: 6000,
+          input_tput_per_gpu: 5940,
+          output_tput_per_gpu: 60,
+        },
+      };
+      for (const suffix of ['', '__run1']) {
+        const { grouped } = buildGpuGroups([row], {
+          sequence: Sequence.AgenticTraces,
+          precisions: ['fp4'],
+          percentile: Percentile.P90,
+          classify: (hwKey) => ({ key: `${hwKey}${suffix}`, meta: { hwKey } }),
+        });
+        const points = Object.values(grouped)[0];
+        expect(points[0].sourceRow).toBe(row);
+        const interpolated = interpolateForGPU(points, 45, 'interactivity_to_throughput', 'costh');
+        expect(interpolated).not.toBeNull();
+        expect(modeledPowerAtTarget(interpolated!, 45)).toMatchObject({
+          kwPerGpu: expect.closeTo(1.5976675, 5),
+          extrapolated: gpus !== 8,
+        });
+      }
+    },
+  );
 
-  it('rejects partial chassis and unsupported rack hardware despite valid telemetry', () => {
+  it('distinguishes partial chassis from unsupported rack hardware with valid telemetry', () => {
     for (const hardware of ['gb200', 'gb300']) {
       expect(
         modeledPowerAtTarget(
           { ...result, nearestPoints: [{ ...point, sourceRow: { ...source, hardware } }] },
           45,
         ),
-      ).toBeNull();
+      ).toEqual({ reason: 'unsupported-power-hardware' });
     }
     const partial = {
       ...source,
@@ -140,7 +155,7 @@ describe('profit power basis preview', () => {
     });
     expect(
       modeledPowerAtTarget({ ...result, nearestPoints: [{ ...point, sourceRow: partial }] }, 45),
-    ).toBeNull();
+    ).toMatchObject({ extrapolated: true });
   });
 
   it('plans fully measured multi-chassis deployments at the same facility watts per GPU', () => {
@@ -170,14 +185,17 @@ describe('profit power basis preview', () => {
     const perChassis = estimateChassisPower('b200', 11441.513 / 2, 1.3)!;
     expect(
       modeledPowerAtTarget({ ...result, nearestPoints: [{ ...point, sourceRow: multinode }] }, 45),
-    ).toBeCloseTo(((perChassis.facilityWatts * 2) / 16 / 1000) * 1.1, 8);
+    ).toMatchObject({
+      kwPerGpu: expect.closeTo(((perChassis.facilityWatts * 2) / 16 / 1000) * 1.1, 8),
+      extrapolated: false,
+    });
     // Disaggregated multinode rows still need per-worker telemetry.
     expect(
       modeledPowerAtTarget(
         { ...result, nearestPoints: [{ ...point, sourceRow: { ...multinode, disagg: true } }] },
         45,
       ),
-    ).toBeNull();
+    ).toEqual({ reason: 'unsupported-power-topology' });
   });
 
   it('leaves the default estimator and default AgentX model gate unchanged', () => {
@@ -187,8 +205,71 @@ describe('profit power basis preview', () => {
     expect(modelSystemPower(source)).toMatchObject({ status: 'unsupported', reason: 'workload' });
   });
 
+  it.each([2, 4])(
+    'prices a validated %i-GPU allocation as a labeled full-chassis extrapolation',
+    (gpus) => {
+      const partial = {
+        ...source,
+        prefill_tp: gpus,
+        decode_tp: gpus,
+        num_prefill_gpu: gpus,
+        num_decode_gpu: gpus,
+        metrics: { ...source.metrics, avg_power_w: 500, avg_total_gpu_power_w: 500 * gpus },
+      };
+      const partialResult = {
+        ...result,
+        nearestPoints: [{ ...point, tp: gpus, sourceRow: partial }],
+      };
+      const output = estimateProfitByPower(
+        [partialResult],
+        specs,
+        pricing,
+        assumptions,
+        'modeled',
+        45,
+        labels,
+      );
+      expect(output.skipped).toEqual([]);
+      expect(output.rows).toHaveLength(1);
+      expect(output.rows[0].powerLabel).toContain('Full-chassis extrapolation');
+      // Packing identical replicas must not charge all eight GPUs to each replica.
+      const full = {
+        ...source,
+        metrics: { ...source.metrics, avg_power_w: 500, avg_total_gpu_power_w: 4000 },
+      };
+      const fullResult = { ...result, nearestPoints: [{ ...point, sourceRow: full }] };
+      const fullOutput = estimateProfitByPower(
+        [fullResult],
+        specs,
+        pricing,
+        assumptions,
+        'modeled',
+        45,
+        labels,
+      );
+      expect(output.rows[0].gpuHours).toBeCloseTo(fullOutput.rows[0].gpuHours, 5);
+      expect(output.rows[0].revenuePerGpuHour).toBe(fullOutput.rows[0].revenuePerGpuHour);
+      expect(fullOutput.rows[0].powerLabel).toBeUndefined();
+      const paired = estimateProfitByPower(
+        [partialResult],
+        specs,
+        pricing,
+        assumptions,
+        'compare',
+        45,
+        labels,
+      );
+      expect(paired.rows[0].powerLabel).toBe(labels.provisioned);
+      expect(paired.rows[1].powerLabel).toBe(`${labels.modeled} · ${labels.extrapolated}`);
+      expect(partial.metrics.avg_total_gpu_power_w).toBe(500 * gpus);
+    },
+  );
+
   it('only changes GPU-hours in the paired calculation, preserving unit economics and margin', () => {
-    expect(modeledPowerAtTarget(result, 45)).toBeCloseTo(1.5976675, 8);
+    expect(modeledPowerAtTarget(result, 45)).toMatchObject({
+      kwPerGpu: expect.closeTo(1.5976675, 8),
+      extrapolated: false,
+    });
     const output = estimateProfitByPower(
       [result],
       specs,
@@ -217,15 +298,17 @@ describe('profit power basis preview', () => {
       sourceRow: { ...source, metrics: { ...source.metrics, power_valid: 0 } },
     };
     const bracket = { ...result, nearestPoints: [{ ...point, interactivity: 30 }, missing] };
-    expect(modeledPowerAtTarget(bracket, 45)).toBeNull();
+    expect(modeledPowerAtTarget(bracket, 45)).toEqual({ reason: 'no-measured-power' });
     expect(
       estimateProfitByPower([bracket], specs, pricing, assumptions, 'compare', 45, labels),
     ).toMatchObject({ rows: [], skipped: [{ reason: 'no-measured-power' }] });
-    expect(modeledPowerAtTarget({ ...result, nearestPoints: [point, missing] }, 45)).toBeCloseTo(
-      1.5976675,
-      8,
-    );
-    expect(modeledPowerAtTarget({ ...result, clamped: true }, 45)).toBeNull();
+    expect(modeledPowerAtTarget({ ...result, nearestPoints: [point, missing] }, 45)).toMatchObject({
+      kwPerGpu: expect.closeTo(1.5976675, 8),
+      extrapolated: false,
+    });
+    expect(modeledPowerAtTarget({ ...result, clamped: true }, 45)).toEqual({
+      reason: 'outside-measured-range',
+    });
   });
 
   it('estimates power only inside the same valid bracket and scales losses too', () => {
@@ -236,8 +319,11 @@ describe('profit power basis preview', () => {
         { ...point, interactivity: 60 },
       ],
     };
-    expect(modeledPowerAtTarget(bracket, 45)).toBeCloseTo(1.5976675, 8);
-    expect(modeledPowerAtTarget(bracket, 75)).toBeNull();
+    expect(modeledPowerAtTarget(bracket, 45)).toMatchObject({
+      kwPerGpu: expect.closeTo(1.5976675, 8),
+      extrapolated: false,
+    });
+    expect(modeledPowerAtTarget(bracket, 75)).toEqual({ reason: 'outside-measured-range' });
     const [a, b] = estimateProfitByPower(
       [result],
       specs,
@@ -250,5 +336,61 @@ describe('profit power basis preview', () => {
     expect(a.revenue).toBe(0);
     expect(b.revenue).toBe(0);
     expect(b.profit).toBeLessThan(a.profit);
+  });
+
+  it('keeps the extrapolation label when only one interpolation knot is partial', () => {
+    const left = { ...point, interactivity: 30 };
+    const right = {
+      ...point,
+      interactivity: 60,
+      sourceRow: {
+        ...source,
+        decode_tp: 4,
+        prefill_tp: 4,
+        metrics: { ...source.metrics, avg_power_w: 500, avg_total_gpu_power_w: 2000 },
+      },
+    };
+    const bracket = { ...result, nearestPoints: [left, right] };
+    const low = modeledPowerAtTarget(bracket, 30);
+    const high = modeledPowerAtTarget(bracket, 60);
+    if (!('kwPerGpu' in low) || !('kwPerGpu' in high))
+      throw new Error('Expected valid power knots');
+    expect(modeledPowerAtTarget(bracket, 40)).toEqual({
+      kwPerGpu: low.kwPerGpu + (high.kwPerGpu - low.kwPerGpu) / 3,
+      extrapolated: true,
+    });
+    expect(modeledPowerAtTarget(bracket, 30)).toMatchObject({ extrapolated: false });
+  });
+
+  it.each([
+    [{ is_multinode: true }, 'unsupported-power-topology'],
+    [
+      {
+        decode_tp: 3,
+        prefill_tp: 3,
+        metrics: { ...source.metrics, avg_power_w: 500, avg_total_gpu_power_w: 1500 },
+      },
+      'unsupported-power-topology',
+    ],
+    [
+      { metrics: { ...source.metrics, avg_power_w: 500, avg_total_gpu_power_w: 2000 } },
+      'no-measured-power',
+    ],
+    [
+      { metrics: { power_valid: 1, avg_power_w: 796.131, avg_total_gpu_power_w: 6369.045 } },
+      'no-measured-power',
+    ],
+    [
+      { metrics: { ...source.metrics, avg_power_w: 10000, avg_total_gpu_power_w: 80000 } },
+      'outside-power-model',
+    ],
+  ] as const)('reports why a configuration stays unavailable (%j)', (overrides, reason) => {
+    const unsupported = {
+      ...result,
+      nearestPoints: [{ ...point, sourceRow: { ...source, ...overrides } }],
+    };
+    expect(
+      estimateProfitByPower([unsupported], specs, pricing, assumptions, 'modeled', 45, labels),
+    ).toMatchObject({ rows: [], skipped: [{ reason }] });
   });
 });

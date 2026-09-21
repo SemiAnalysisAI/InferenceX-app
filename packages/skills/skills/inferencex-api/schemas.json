@@ -811,6 +811,46 @@
           }
         },
         "additionalProperties": true
+      },
+      "evidence": {
+        "type": "object",
+        "required": ["artifacts", "request_count", "recorded_policy"],
+        "properties": {
+          "artifacts": {
+            "type": "array",
+            "minItems": 2,
+            "items": {
+              "type": "object",
+              "required": ["path", "size", "sha256"],
+              "properties": {
+                "path": {
+                  "type": "string"
+                },
+                "size": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "sha256": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                }
+              },
+              "additionalProperties": true
+            }
+          },
+          "request_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "recorded_policy": {
+            "$ref": "#/properties/policy"
+          },
+          "result_context": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "additionalProperties": true
       }
     },
     "additionalProperties": true
@@ -2127,6 +2167,7 @@
               ],
               "properties": {
                 "status": {
+                  "description": "Enrichment join state for this result ID. complete means both the aggregate entry and derived-metric entry were returned; their values can still be null. partial means at least one entry was not returned. unsupported_id means the ID was not queried. Trace availability is recorded separately.",
                   "enum": ["complete", "partial", "unsupported_id"]
                 },
                 "result_id": {
@@ -2139,6 +2180,7 @@
                       "required": ["status", "value"],
                       "properties": {
                         "status": {
+                          "description": "An aggregate response entry was returned for this ID. Each recognized distribution is independently nullable.",
                           "const": "available"
                         },
                         "value": {
@@ -2178,6 +2220,7 @@
                       "required": ["status", "value"],
                       "properties": {
                         "status": {
+                          "description": "A derived-metric response entry was returned for this ID. The p75 and p90 values are independently nullable.",
                           "const": "available"
                         },
                         "value": {
@@ -2330,6 +2373,7 @@
         "required": ["available_rows", "null_rows", "missing_entry_rows", "unsupported_id_rows"],
         "properties": {
           "available_rows": {
+            "description": "Rows with a non-null distribution for this group. Its n can be zero; sample counts and bundle eligibility are separate.",
             "type": "integer",
             "minimum": 0
           },

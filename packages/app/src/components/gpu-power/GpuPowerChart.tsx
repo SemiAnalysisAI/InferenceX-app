@@ -2,6 +2,7 @@
 
 import * as d3 from 'd3';
 import React, { useMemo } from 'react';
+import { buildTelemetryData, type ParsedPoint } from './chart-data';
 
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
 import type { RenderContext } from '@/lib/d3-chart/D3Chart/types';
@@ -17,13 +18,13 @@ import {
   type TimedSample,
 } from './telemetry-smoothing';
 import {
-  type GpuMetricKey,
-  type GpuMetricRow,
   ALL_METRIC_OPTIONS,
   detectTdpFromArtifactName,
   tdpForHardware,
   getGpuMetricLabel,
   getGpuMetricYAxisLabel,
+  type GpuMetricKey,
+  type GpuMetricRow,
 } from './types';
 
 const STRINGS = {
@@ -67,18 +68,6 @@ export interface TelemetryOverlaySeries {
   points: TimedSample[];
 }
 
-interface ParsedPoint {
-  seconds: number;
-  /** Absolute sample time in ms; smoothing and alignment work in this space. */
-  ms: number;
-  value: number;
-  gpuIndex: number;
-  /** The raw sample behind this point; null once the value has been averaged. */
-  raw: GpuMetricRow | null;
-  /** For the mean line: how many chips contributed at this timestamp. */
-  count?: number;
-}
-
 interface GpuMetricsChartProps {
   data: GpuMetricRow[];
   visibleGpus: Set<number>;
@@ -98,53 +87,6 @@ interface GpuMetricsChartProps {
   display?: TelemetryDisplayState;
   /** Optional secondary series (e.g. decode throughput) on a right y-axis. */
   overlay?: TelemetryOverlaySeries | null;
-}
-
-function parseTimestamp(raw: string): Date | null {
-  const isoDate = new Date(raw);
-  if (!isNaN(isoDate.getTime())) return isoDate;
-  const numeric = parseFloat(raw);
-  if (!isNaN(numeric)) {
-    return numeric < 1e12 ? new Date(numeric * 1000) : new Date(numeric);
-  }
-  return null;
-}
-
-function buildGroupedData(
-  data: GpuMetricRow[],
-  visibleGpus: Set<number>,
-  metricKey: GpuMetricKey,
-): { t0Ms: number; groups: Map<number, ParsedPoint[]> } {
-  // t=0 is the first sample of the whole series, not of the visible chips, so
-  // hiding a chip never shifts the time axis under the remaining lines.
-  let minTime = Infinity;
-  const parsed: { row: GpuMetricRow; ms: number }[] = [];
-  for (const row of data) {
-    const time = parseTimestamp(row.timestamp);
-    if (!time) continue;
-    const ms = time.getTime();
-    if (ms < minTime) minTime = ms;
-    if (visibleGpus.has(row.index)) parsed.push({ row, ms });
-  }
-
-  const groups = new Map<number, ParsedPoint[]>();
-  for (const { row, ms } of parsed) {
-    const value = row[metricKey];
-    // A metric the collector never sampled has no point, not a zero.
-    if (value === undefined) continue;
-    if (!groups.has(row.index)) groups.set(row.index, []);
-    groups.get(row.index)!.push({
-      seconds: (ms - minTime) / 1000,
-      ms,
-      value,
-      gpuIndex: row.index,
-      raw: row,
-    });
-  }
-  for (const points of groups.values()) {
-    points.sort((a, b) => a.seconds - b.seconds);
-  }
-  return { t0Ms: minTime, groups };
 }
 
 /** Mean across the visible chips, aligned by nearest sample within one poll interval. */
@@ -281,7 +223,7 @@ const GpuMetricsChart = React.memo(
     const showMean = display.series !== 'chips';
 
     const { t0Ms, groups: rawGroups } = useMemo(
-      () => buildGroupedData(data, visibleGpus, metricKey),
+      () => buildTelemetryData(data, visibleGpus, metricKey),
       [data, visibleGpus, metricKey],
     );
 
