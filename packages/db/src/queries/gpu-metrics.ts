@@ -174,7 +174,6 @@ function toStatRow(raw: RawStatRow): GpuMetricStatRow {
 async function loadSeriesDetails(
   sql: DbClient,
   seriesRows: readonly RawSeriesRow[],
-  includeSamples: boolean,
 ): Promise<GpuMetricSeries[]> {
   if (seriesRows.length === 0) return [];
   const ids = seriesRows.map((row) => Number(row.id));
@@ -187,16 +186,14 @@ async function loadSeriesDetails(
     order by series_id, gpu_index, metric
   `) as unknown as RawStatRow[];
 
-  const sampleRows = includeSamples
-    ? ((await sql`
-        select series_id, gpu_index, sampled_at, power_w, temperature_c, sm_clock_mhz,
-          mem_clock_mhz, gpu_util_pct, mem_util_pct, edge_temp_c, mem_temp_c,
-          gfx_voltage_mv, soc_voltage_mv, mem_voltage_mv, fclk_mhz, socclk_mhz, mm_activity_pct
-        from gpu_metric_samples
-        where series_id = any(${ids}::bigint[])
-        order by series_id, sampled_at, gpu_index
-      `) as unknown as RawSampleRow[])
-    : [];
+  const sampleRows = (await sql`
+    select series_id, gpu_index, sampled_at, power_w, temperature_c, sm_clock_mhz,
+      mem_clock_mhz, gpu_util_pct, mem_util_pct, edge_temp_c, mem_temp_c,
+      gfx_voltage_mv, soc_voltage_mv, mem_voltage_mv, fclk_mhz, socclk_mhz, mm_activity_pct
+    from gpu_metric_samples
+    where series_id = any(${ids}::bigint[])
+    order by series_id, sampled_at, gpu_index
+  `) as unknown as RawSampleRow[];
 
   const statsBySeries = new Map<number, GpuMetricStatRow[]>();
   for (const raw of statRows) {
@@ -245,7 +242,6 @@ async function loadSeriesDetails(
 export async function getGpuMetricsForRun(
   sql: DbClient,
   githubRunId: number,
-  options: { includeSamples?: boolean } = {},
 ): Promise<GpuMetricsRunPayload | null> {
   const runRows = (await sql`
     select id, github_run_id, run_attempt, name, date, html_url, head_branch, head_sha,
@@ -297,7 +293,7 @@ export async function getGpuMetricsForRun(
       status: run.status,
       createdAt: run.created_at ? isoString(run.created_at) : null,
     },
-    series: await loadSeriesDetails(sql, seriesRows, options.includeSamples ?? true),
+    series: await loadSeriesDetails(sql, seriesRows),
   };
 }
 
@@ -326,22 +322,6 @@ export async function getGpuMetricsForPoint(
   if (seriesRows.length === 0) return null;
   return {
     benchmarkResultId,
-    series: await loadSeriesDetails(sql, seriesRows, true),
+    series: await loadSeriesDetails(sql, seriesRows),
   };
-}
-
-/** `benchmark_results.id` → true for each id that has at least one linked series. */
-export async function getGpuMetricsAvailability(
-  sql: DbClient,
-  benchmarkResultIds: readonly number[],
-): Promise<Record<number, true>> {
-  if (benchmarkResultIds.length === 0) return {};
-  const rows = (await sql`
-    select distinct benchmark_result_id
-    from benchmark_result_gpu_metrics
-    where benchmark_result_id = any(${[...benchmarkResultIds]}::bigint[])
-  `) as unknown as { benchmark_result_id: number | string }[];
-  const out: Record<number, true> = {};
-  for (const row of rows) out[Number(row.benchmark_result_id)] = true;
-  return out;
 }

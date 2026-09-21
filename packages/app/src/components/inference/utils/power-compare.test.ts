@@ -19,7 +19,6 @@ import {
   powerCompareAvailable,
   powerCompareBase,
   powerCompareVariants,
-  powerLineLabel,
   powerLineLabelSuffix,
   powerSeriesLabel,
   powerVariantDash,
@@ -224,36 +223,35 @@ describe('line labels', () => {
     expect(formatWatts(100000)).toBe('100 kW');
   });
 
-  it('leaves the base label alone and suffixes a sibling with its variant and flat watts', () => {
-    const label = 'B300 (SGLang)';
+  it('omits the base suffix and labels a sibling with its variant and flat watts', () => {
     const tdp = basis('gpu-provisioned');
-    expect(powerLineLabel(label, undefined, { isBase: true, locale: 'en' })).toBe(label);
-    expect(powerLineLabel(label, null, { isBase: false, locale: 'en' })).toBe(label);
+    expect(powerLineLabelSuffix(undefined, { isBase: true, locale: 'en' })).toBe('');
+    expect(powerLineLabelSuffix(null, { isBase: false, locale: 'en' })).toBe('');
     // A variant that is itself the base series keeps the plain label.
-    expect(powerLineLabel(label, tdp, { isBase: true, locale: 'en', flatWatts: 1200 })).toBe(label);
-    expect(powerLineLabel(label, tdp, { isBase: false, locale: 'en' })).toBe('B300 (SGLang) · TDP');
-    expect(powerLineLabel(label, tdp, { isBase: false, locale: 'en', flatWatts: 700 })).toBe(
-      'B300 (SGLang) · TDP 700 W',
+    expect(powerLineLabelSuffix(tdp, { isBase: true, locale: 'en', flatWatts: 1200 })).toBe('');
+    expect(powerLineLabelSuffix(tdp, { isBase: false, locale: 'en' })).toBe(' · TDP');
+    expect(powerLineLabelSuffix(tdp, { isBase: false, locale: 'en', flatWatts: 700 })).toBe(
+      ' · TDP 700 W',
     );
-    expect(powerLineLabel(label, tdp, { isBase: false, locale: 'en', flatWatts: 1370 })).toBe(
-      'B300 (SGLang) · TDP 1.37 kW',
+    expect(powerLineLabelSuffix(tdp, { isBase: false, locale: 'en', flatWatts: 1370 })).toBe(
+      ' · TDP 1.37 kW',
     );
     expect(
-      powerLineLabel(label, basis('utility-provisioned'), {
+      powerLineLabelSuffix(basis('utility-provisioned'), {
         isBase: false,
         locale: 'zh',
         flatWatts: 19200,
       }),
-    ).toBe('B300 (SGLang) · 全站 19.2 kW');
+    ).toBe(' · 全站 19.2 kW');
     // Non-finite or null watts drop the value, never print NaN.
-    expect(powerLineLabel(label, tdp, { isBase: false, locale: 'en', flatWatts: null })).toBe(
-      'B300 (SGLang) · TDP',
+    expect(powerLineLabelSuffix(tdp, { isBase: false, locale: 'en', flatWatts: null })).toBe(
+      ' · TDP',
     );
-    expect(powerLineLabel(label, tdp, { isBase: false, locale: 'en', flatWatts: NaN })).toBe(
-      'B300 (SGLang) · TDP',
+    expect(powerLineLabelSuffix(tdp, { isBase: false, locale: 'en', flatWatts: NaN })).toBe(
+      ' · TDP',
     );
-    expect(powerLineLabel(label, role('decode'), { isBase: false, locale: 'en' })).toBe(
-      'B300 (SGLang) · Decode GPUs',
+    expect(powerLineLabelSuffix(role('decode'), { isBase: false, locale: 'en' })).toBe(
+      ' · Decode GPUs',
     );
     // The suffix alone is what the renderer splits into its own text segment.
     expect(powerLineLabelSuffix(role('prefill'), { isBase: false, locale: 'zh' })).toBe(

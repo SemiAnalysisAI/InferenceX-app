@@ -126,6 +126,8 @@ function mountCompare(
     metric?: CompareMetric;
     lineLabels?: boolean;
     precisions?: Precision[];
+    /** Extra `?unofficialrun=` runs beyond the default one, for multi-run tests. */
+    extraRuns?: { id: number; url: string; hwKeys: string[] }[];
   } = {},
 ) {
   const metricKey = options.metric ?? 'y_measuredAvgPower';
@@ -165,9 +167,24 @@ function mountCompare(
       unofficial: options.overlay
         ? {
             isUnofficialRun: true,
-            activeOverlayHwTypes: new Set(['h100']),
-            allOverlayHwTypes: new Set(['h100']),
-            runIndexByUrl: { [OVERLAY_RUN_URL]: 0, [String(OVERLAY_RUN_ID)]: 0 },
+            activeOverlayHwTypes: new Set([
+              'h100',
+              ...(options.extraRuns ?? []).flatMap((run) => run.hwKeys),
+            ]),
+            allOverlayHwTypes: new Set([
+              'h100',
+              ...(options.extraRuns ?? []).flatMap((run) => run.hwKeys),
+            ]),
+            runIndexByUrl: {
+              [OVERLAY_RUN_URL]: 0,
+              [String(OVERLAY_RUN_ID)]: 0,
+              ...Object.fromEntries(
+                (options.extraRuns ?? []).flatMap((run, index) => [
+                  [run.url, index + 1],
+                  [String(run.id), index + 1],
+                ]),
+              ),
+            },
             unofficialRunInfos: [
               {
                 id: OVERLAY_RUN_ID,
@@ -180,6 +197,17 @@ function mountCompare(
                 status: 'completed',
                 isNonMainBranch: true,
               },
+              ...(options.extraRuns ?? []).map((run) => ({
+                id: run.id,
+                name: `powerx-compare-${run.id}`,
+                branch: `powerx-compare-${run.id}`,
+                sha: 'abc001',
+                createdAt: '2026-09-02T00:00:00Z',
+                url: run.url,
+                conclusion: 'success' as const,
+                status: 'completed' as const,
+                isNonMainBranch: true,
+              })),
             ],
           }
         : {},
@@ -498,6 +526,93 @@ describe('ScatterGraph power comparison series', () => {
           decode: 'B200 · 解码 GPU',
         });
       });
+  });
+
+  /**
+   * Regression for the PowerX article's Fig 6. Two `?unofficialrun=` overlays in
+   * roles mode draw six lines, and the anchor pass used to hide whichever series
+   * ran out of anchor slots — in the exported figure that was the GB300 overall
+   * line, leaving a drawn curve the reader could only identify by elimination.
+   *
+   * `crowdedCurve` reproduces the shape that causes it, which a gently spread
+   * curve does not: power falls steeply with interactivity, so every series'
+   * anchors land in the top slice of a tall y domain and compete for the same
+   * few x positions. Pills stay in the DOM at opacity 0 when hidden, so counting
+   * nodes cannot see this bug; the assertions below are on `data-visible`.
+   */
+  const crowdedCurve = (hwKey: string, runUrl: string, offset: number): InferenceData[] =>
+    [
+      [8, 840, 848, 832],
+      [16, 700, 712, 690],
+      [32, 470, 486, 458],
+      [64, 330, 344, 318],
+      [128, 250, 262, 240],
+    ].map(([x, measured, prefill, decode]) =>
+      createMockInferenceData({
+        hwKey,
+        x,
+        conc: x,
+        y: measured + offset,
+        precision: Precision.FP4,
+        run_url: runUrl,
+        disagg: true,
+        measuredAvgPower: metric(measured + offset),
+        measuredPrefillAvgPower: metric(prefill + offset),
+        measuredDecodeAvgPower: metric(decode + offset),
+        gpuProvisionedWatts: metric(1000),
+        utilityProvisionedWatts: metric(1710),
+      }),
+    );
+
+  it('keeps a visible pill on all three role series of every ?unofficialrun= overlay', () => {
+    const secondRunId = 27182818284;
+    const secondRunUrl = `https://github.com/SemiAnalysisAI/InferenceX/actions/runs/${secondRunId}`;
+    const overlay = [
+      ...expandPowerCompareSeries(
+        crowdedCurve('h100', OVERLAY_RUN_URL, 0),
+        'y_measuredAvgPower',
+        'roles',
+      ),
+      ...expandPowerCompareSeries(
+        crowdedCurve('b200', secondRunUrl, 6),
+        'y_measuredAvgPower',
+        'roles',
+      ),
+    ];
+    mountCompare([], {
+      overlay,
+      lineLabels: true,
+      extraRuns: [{ id: secondRunId, url: secondRunUrl, hwKeys: ['b200'] }],
+    });
+
+    cy.get(lineLabels).should('have.length', 6);
+    cy.get(`${lineLabels}[data-visible="1"]`).should('have.length', 6);
+    // The two "overall" pills are the ones the old anchor pass dropped.
+    cy.get(`${svg} ${labelSelector('')}[data-visible="1"]`).should('have.length', 2);
+    // A kept pill is only worth keeping if it is on the chart. (layoutPills'
+    // clamp is unit-tested against the exact clip rect in
+    // line-label-pill-bounds.test.ts; this is the coarse check that nothing was
+    // pushed off the chart entirely.)
+    cy.get(svg).then(($svg) => {
+      const chart = $svg[0].getBoundingClientRect();
+      cy.get(`${lineLabels}[data-visible="1"] .ll-bg`).each(($bg) => {
+        const box = $bg[0].getBoundingClientRect();
+        expect(box.left, 'pill left inside chart').to.be.at.least(chart.left - 1);
+        expect(box.right, 'pill right inside chart').to.be.at.most(chart.right + 1);
+        expect(box.top, 'pill top inside chart').to.be.at.least(chart.top - 1);
+        expect(box.bottom, 'pill bottom inside chart').to.be.at.most(chart.bottom + 1);
+      });
+    });
+    // Both runs contribute all three roles, keyed by line so the runs stay apart.
+    cy.get(`${lineLabels}[data-visible="1"]`).then(($labels) => {
+      const byLine = [...$labels].map((node) => ({
+        line: (node as HTMLElement).dataset.lineKey ?? '',
+        text: pillText(node),
+      }));
+      expect(new Set(byLine.map((entry) => entry.line)).size, 'distinct line keys').to.eq(6);
+      expect(byLine.filter((entry) => /H100/u.test(entry.text)).length).to.eq(3);
+      expect(byLine.filter((entry) => /B200/u.test(entry.text)).length).to.eq(3);
+    });
   });
 
   it('labels ?unofficialrun= comparison siblings with the marked hardware and the variant', () => {

@@ -16,7 +16,6 @@ import {
   requestPowerTraceFocus,
   runIdFromUrl,
   telemetryArtifactForPoint,
-  telemetrySourceForPoint,
   traceConfigLabel,
   traceKeyForPoint,
   traceKeyRunId,
@@ -93,12 +92,10 @@ describe('planPowerTimelineRequests', () => {
       {
         runId: '1',
         prefix: 'dsr1_1k1k_fp8_sglang_conc8_h200-x',
-        artifacts: ['gpu_metrics_dsr1_1k1k_fp8_sglang_conc8_h200-x'],
       },
       {
         runId: '34716669498',
         prefix: 'qwen3.5_8k1k_fp8_',
-        artifacts: [`gpu_metrics_${NAME_B}`, `gpu_metrics_${NAME_A}`],
       },
     ]);
   });
@@ -185,15 +182,8 @@ describe('joinPowerTimeline', () => {
 });
 
 describe('trace identity helpers', () => {
-  it('names the validation file and the run-scoped trace key of a point', () => {
+  it('names the run-scoped trace key of a point', () => {
     const audited = point({ power_audit: { source: `power_validation_${NAME_A}.json` } });
-    expect(telemetrySourceForPoint(audited)).toBe(`power_validation_${NAME_A}.json`);
-    // A path prefix is dropped: bundle-cut series carry the basename.
-    expect(
-      telemetrySourceForPoint({
-        power_audit: { source: `nested/power_validation_${NAME_B}.json` },
-      }),
-    ).toBe(`power_validation_${NAME_B}.json`);
     expect(traceKeyForPoint(audited)).toBe(`34716669498:${NAME_A}`);
   });
 
@@ -202,7 +192,6 @@ describe('trace identity helpers', () => {
       null,
     );
     expect(traceKeyForPoint(point({ power_audit: { source: 'agg_results.json' } }))).toBeNull();
-    expect(telemetrySourceForPoint({})).toBeNull();
   });
 });
 
@@ -231,15 +220,18 @@ describe('joinPowerTimeline with bundle-cut series', () => {
   };
   const disagg = point({ conc: 1, disagg: true, power_audit: { source: bundleSource } });
 
-  it('matches a series by its validation-file source', () => {
-    const { traces, missing } = joinPowerTimeline(
-      [disagg],
-      new Map([['34716669498', { runInfo, series: [bundleSeries] }]]),
-    );
-    expect(missing).toEqual([]);
-    expect(traces[0].series).toBe(bundleSeries);
-    expect(traces[0].key).toBe(`34716669498:${NAME_B}`);
-  });
+  it.each(['', 'nested/'])(
+    'matches a series by its validation-file source with prefix %s',
+    (prefix) => {
+      const { traces, missing } = joinPowerTimeline(
+        [{ ...disagg, power_audit: { source: `${prefix}${bundleSource}` } }],
+        new Map([['34716669498', { runInfo, series: [bundleSeries] }]]),
+      );
+      expect(missing).toEqual([]);
+      expect(traces[0].series).toBe(bundleSeries);
+      expect(traces[0].key).toBe(`34716669498:${NAME_B}`);
+    },
+  );
 
   it('prefers the source match over a gpu_metrics artifact of the same name', () => {
     const { traces } = joinPowerTimeline(
@@ -320,7 +312,6 @@ describe('prioritizeRuns', () => {
   const requests = ['1', '2', '3', '4', '5'].map((runId) => ({
     runId,
     prefix: '',
-    artifacts: [],
   }));
 
   it('moves overlay runs ahead of official runs and keeps both orders', () => {
@@ -350,7 +341,6 @@ describe('prioritizeRun', () => {
   const requests = ['1', '2', '3', '4', '5'].map((runId) => ({
     runId,
     prefix: '',
-    artifacts: [],
   }));
 
   it('moves the deep-linked run to the front and keeps the rest in order', () => {

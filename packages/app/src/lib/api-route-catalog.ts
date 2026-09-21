@@ -71,7 +71,7 @@ export const apiRouteCatalog = [
       en: 'UI-only PowerX read for one run: the ingest-time telemetry digest when stored, otherwise the live GPU telemetry artifacts (raw `gpu_metrics_*` rows, or `series=power` one-second buckets for the PowerX timeline, also cut per validation window from `power_audit_*` bundles). Its payload shape is not a stable public contract.',
       zh: '仅供 PowerX 界面按 run 读取：已入库时返回 ingest 阶段生成的 telemetry 摘要，否则回退到实时 GPU 遥测制品（`gpu_metrics_*` 原始行，或供 PowerX 时间线使用的 `series=power` 一秒分桶数据，后者也会按验证窗口从 `power_audit_*` bundle 中切分得到）。其返回结构不是稳定的公开契约。',
     },
-    sourceSha256: '4d387298f0311a91c319548119382646045fff6cccdf4e871adf89b39a6feee1',
+    sourceSha256: '8b15b82fac99c6c0e586fce5312de5a224de454b9d39d15cb0b2c20a2c6d8246',
   },
   {
     source: 'src/app/api/openapi.json/route.ts',

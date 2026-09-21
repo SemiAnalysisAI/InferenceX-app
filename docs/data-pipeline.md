@@ -567,9 +567,13 @@ digests them at ingest time, in the same step that links server logs:
 - `benchmark_result_gpu_metrics` — links each benchmark point to the series that
   was recorded while it ran (several series per point for multinode artifacts).
 
-Ingest is idempotent: the same CSV hash refreshes only the point links, a changed
-CSV replaces the samples and digest inside one transaction, and repeated final
-samples (the monitor's stop-time flush) collapse on the primary key. Series are
+Ingest is idempotent: the same CSV hash, sidecars, and unique sample count refresh
+only the point links. A change replaces the samples and digest inside one
+transaction, including corrected timezone or identity sidecars. Repeated samples
+keep the first row per (GPU, timestamp) before computing counts and statistics,
+matching the sample table's primary key. Explicitly re-ingesting a run also
+repairs older duplicate-inflated counts and digests; `--all` skips runs already
+containing series, so target those runs with `--run` or use `--force`. Series are
 stored per artifact, not per point: an AgentX per-concurrency job maps to one
 point, while older fixed-sequence jobs that swept several concurrencies in one
 job share one series across points. Windowing a series to the measured serving

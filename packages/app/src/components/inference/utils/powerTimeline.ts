@@ -41,12 +41,6 @@ export function telemetryArtifactForPoint(point: AuditedPoint): string | null {
   return name ? `${ARTIFACT_PREFIX}${name}` : null;
 }
 
-/** Basename of a point's audit source, as a bundle-cut series carries it in `source`. */
-export function telemetrySourceForPoint(point: AuditedPoint): string | null {
-  const name = telemetryNameForPoint(point);
-  return name ? `power_validation_${name}.json` : null;
-}
-
 /**
  * Stable identity of a point's trace: run id plus audit name. Unique within a
  * chart because the audit name carries the config and the concurrency.
@@ -78,7 +72,6 @@ export interface PowerTimelineRequest {
   runId: string;
   /** RESULT_FILENAME prefix shared by every wanted artifact of the run. */
   prefix: string;
-  artifacts: string[];
 }
 
 /**
@@ -104,7 +97,6 @@ export function planPowerTimelineRequests(
       return {
         runId,
         prefix: longestCommonPrefix(names.map((name) => name.slice(ARTIFACT_PREFIX.length))),
-        artifacts: names,
       };
     });
 }
