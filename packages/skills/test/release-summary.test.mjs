@@ -81,6 +81,40 @@ const qualification = {
   known_limitations: ['NO_NEW_BENCHMARKS', 'WINDOWS_UNQUALIFIED'],
 };
 const script = fileURLToPath(new URL('../scripts/release-summary.mjs', import.meta.url));
+const exceptionOptions = { allowNativeReportLimitations: true };
+
+function reportException() {
+  const archive = {
+    ...release,
+    sha256: '204a22e1e27b6f938f84303688da345a70ea474db93cce0fb55ded8fea4c565f',
+  };
+  const record = structuredClone(qualification);
+  record.archive_sha256 = archive.sha256;
+  record.native_report_exception = 'accepted-1.0.0-report-limitations';
+  for (const entry of record.platform_matrix) entry.archive_sha256 = archive.sha256;
+  for (const entry of record.native_acceptance) {
+    entry.archive_sha256 = archive.sha256;
+    entry.status = entry.runtime === 'codex' ? 'not_run' : 'failed';
+    entry.scope = entry.runtime === 'codex' ? [] : ['agentx', 'tco'];
+    delete entry.prompt_transcript_sha256;
+    delete entry.answer_transcript_sha256;
+    for (const item of entry.cases) {
+      const status =
+        entry.runtime === 'claude'
+          ? ({ 'agentx-live': 'passed', 'agentx-selected-trace': 'passed', 'tco-live': 'failed' }[
+              item.case_id
+            ] ?? 'not_run')
+          : 'not_run';
+      item.status = status;
+      item.assessor_status = status;
+      if (status === 'not_run') {
+        delete item.prompt_transcript_sha256;
+        delete item.answer_transcript_sha256;
+      }
+    }
+  }
+  return { archive, record };
+}
 
 function execute(publicRecord = publicVerification) {
   const root = mkdtempSync(join(tmpdir(), 'release-summary-'));
@@ -309,4 +343,184 @@ test('qualification is validated before publication and supplied independently o
   );
   assert.equal(result.status, 0, result.stderr);
   assert.equal(JSON.parse(result.stdout).archive_sha256, hash);
+});
+
+test('the explicit 1.0.0 report exception preserves failed and unrun acceptance', () => {
+  const { archive, record } = reportException();
+  const summary = createReleaseSummary(
+    archive,
+    { ...candidate, candidate: archive },
+    { ...publicVerification, candidate: archive },
+    record,
+    exceptionOptions,
+  );
+  assert.deepEqual(summary.native_report_exception.counts, { passed: 2, failed: 1, not_run: 23 });
+  assert.equal(summary.native_report_exception.code, 'accepted-1.0.0-report-limitations');
+  assert.match(summary.native_report_exception.reason, /not fully qualified/u);
+  assert.deepEqual(summary.native_acceptance, record.native_acceptance);
+  assert.equal(
+    Object.hasOwn(validateQualification(release, qualification), 'native_report_exception'),
+    false,
+  );
+});
+
+test('the report exception requires both opt-ins and the exact release identity', () => {
+  const { archive, record } = reportException();
+  for (const options of [
+    undefined,
+    { allowNativeReportLimitations: false },
+    { allowNativeReportLimitations: 'true' },
+  ])
+    assert.throws(() => validateQualification(archive, record, options));
+  for (const declaration of [
+    undefined,
+    null,
+    true,
+    'accepted',
+    ['accepted-1.0.0-report-limitations'],
+  ])
+    assert.throws(() =>
+      validateQualification(
+        archive,
+        { ...record, native_report_exception: declaration },
+        exceptionOptions,
+      ),
+    );
+  for (const changed of [
+    { ...archive, version: '1.0.1', filename: 'semianalysisai-inferencex-skills-1.0.1.tgz' },
+    { ...archive, sha256: hash },
+  ]) {
+    const rebound = structuredClone(record);
+    rebound.package_version = changed.version;
+    rebound.archive_sha256 = changed.sha256;
+    for (const entry of [...rebound.platform_matrix, ...rebound.native_acceptance])
+      entry.archive_sha256 = changed.sha256;
+    assert.throws(() => validateQualification(changed, rebound, exceptionOptions));
+  }
+});
+
+test('the report exception rejects changed results, missing evidence and nonpassed platform gates', () => {
+  const { archive, record } = reportException();
+  for (const mutate of [
+    (value) => {
+      value.native_acceptance.pop();
+    },
+    (value) => {
+      value.native_acceptance[0].cases.pop();
+    },
+    (value) => {
+      value.native_acceptance[0].cases[0].case_id = 'unknown';
+    },
+    (value) => {
+      value.native_acceptance[0].cases[0] = value.native_acceptance[0].cases[1];
+    },
+    (value) => {
+      value.native_acceptance[0].cases[0].status = 'passed';
+    },
+    (value) => {
+      value.native_acceptance[1].cases.find((item) => item.case_id === 'tco-live').status =
+        'passed';
+    },
+    (value) => {
+      Object.assign(
+        value.native_acceptance[1].cases.find((item) => item.case_id === 'tco-live'),
+        {
+          status: 'passed',
+          assessor_status: 'passed',
+        },
+      );
+    },
+    (value) => {
+      value.native_acceptance[1].cases.find((item) => item.case_id === 'tco-live').assessor_status =
+        'passed';
+    },
+    (value) => {
+      delete value.native_acceptance[1].cases.find((item) => item.case_id === 'tco-live')
+        .answer_transcript_sha256;
+    },
+    (value) => {
+      delete value.native_acceptance[1].cases.find((item) => item.case_id === 'agentx-live')
+        .prompt_transcript_sha256;
+    },
+    (value) => {
+      value.native_acceptance[0].cases[0].answer_transcript_sha256 = hash;
+    },
+    (value) => {
+      value.native_acceptance[0].prompt_transcript_sha256 = hash;
+    },
+    (value) => {
+      value.native_acceptance[0].status = 'passed';
+    },
+    (value) => {
+      value.native_acceptance[1].status = 'passed';
+    },
+    (value) => {
+      value.native_acceptance[0].scope = ['agentx'];
+    },
+    (value) => {
+      value.native_acceptance[1].scope = ['agentx', 'tco', 'powerx'];
+    },
+    (value) => {
+      value.native_acceptance[0].case_set_sha256 = 'invalid';
+    },
+    (value) => {
+      value.platform_matrix[0].status = 'failed';
+    },
+    (value) => {
+      value.platform_matrix[0].archive_sha256 = hash;
+    },
+  ]) {
+    const invalid = structuredClone(record);
+    mutate(invalid);
+    assert.throws(() => validateQualification(archive, invalid, exceptionOptions));
+  }
+  for (const mode of ['candidate', 'public']) {
+    const verified = { ...candidate, candidate: archive };
+    const publicRecord = { ...publicVerification, candidate: archive };
+    (mode === 'candidate' ? verified : publicRecord).status = 'failed';
+    assert.throws(() =>
+      createReleaseSummary(archive, verified, publicRecord, record, exceptionOptions),
+    );
+  }
+});
+
+test('both CLI modes enable the one-off exception only for the literal true environment value', () => {
+  const { archive, record } = reportException();
+  const root = mkdtempSync(join(tmpdir(), 'report-exception-'));
+  for (const [name, value] of [
+    ['release.json', archive],
+    ['qualification.json', record],
+    ['candidate.json', { ...candidate, candidate: archive }],
+    ['public.json', { ...publicVerification, candidate: archive }],
+  ])
+    writeFileSync(join(root, name), JSON.stringify(value));
+  for (const setting of ['', 'false', '1', 'TRUE', 'true']) {
+    for (const mode of ['check', 'summary']) {
+      const output = join(root, `${mode}-${setting || 'unset'}.json`);
+      const args =
+        mode === 'check'
+          ? ['check-qualification', join(root, 'release.json'), join(root, 'qualification.json')]
+          : [
+              ...['release.json', 'candidate.json', 'public.json', 'qualification.json'].map(
+                (name) => join(root, name),
+              ),
+              output,
+            ];
+      const result = spawnSync(process.execPath, [script, ...args], {
+        encoding: 'utf8',
+        env: { ...process.env, ALLOW_NATIVE_REPORT_LIMITATIONS: setting },
+      });
+      if (setting === 'true') {
+        assert.equal(result.status, 0, result.stderr);
+        assert.deepEqual(JSON.parse(result.stdout).native_report_exception.counts, {
+          passed: 2,
+          failed: 1,
+          not_run: 23,
+        });
+      } else {
+        assert.notEqual(result.status, 0);
+        assert.equal(existsSync(output), false);
+      }
+    }
+  }
 });
