@@ -1361,7 +1361,13 @@ export default function PowerTimeline({
         yScale={{ type: 'linear', domain: yDomain, nice: true }}
         xAxis={{
           label: xMode === 'wall' ? t.xWall : t.xElapsed,
-          tickCount: 10,
+          tickValues: (scale) => {
+            const timeScale = scale as
+              | d3.ScaleTime<number, number>
+              | d3.ScaleLinear<number, number>;
+            const [left, right] = timeScale.range();
+            return timeScale.ticks(Math.max(2, Math.min(10, Math.floor((right - left) / 80))));
+          },
           tickFormat: xTickFormat,
         }}
         yAxis={{ label: lineMode === 'pool' ? t.yPool : yLabel, tickCount: 8 }}

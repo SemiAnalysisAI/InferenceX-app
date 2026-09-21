@@ -56,6 +56,47 @@ describe('PowerX telemetry axis', () => {
     });
   }
 
+  for (const width of [1440, 390]) {
+    it(`keeps long telemetry time ticks separated at ${width}px with a right axis`, () => {
+      cy.viewport(width, 844);
+      const data = samples(() => 390).map((row, i) => ({
+        ...row,
+        timestamp: new Date(Date.UTC(2026, 8, 20) + (i % 21) * 340_000).toISOString(),
+      }));
+      cy.mount(
+        <div style={{ width: '100%', padding: 33 }}>
+          <GpuMetricsChart
+            data={data}
+            visibleGpus={new Set([0, 1, 2, 3, 4, 5, 6, 7])}
+            metricKey="power"
+            artifactName="gpu_metrics_h200"
+            overlay={{
+              label: 'Decode throughput',
+              unit: 'tok/s',
+              color: '#a78bfa',
+              points: [
+                { ms: Date.UTC(2026, 8, 20), value: 500 },
+                { ms: Date.UTC(2026, 8, 20) + 6800_000, value: 2000 },
+              ],
+            }}
+          />
+        </div>,
+      );
+      svg()
+        .find('.x-axis .tick text')
+        .should(($ticks) => {
+          expect($ticks.length).to.be.greaterThan(1);
+          const boxes = [...$ticks].map((tick) => tick.getBoundingClientRect());
+          for (let i = 1; i < boxes.length; i++) {
+            expect(boxes[i].left, 'seconds labels do not overlap').to.be.greaterThan(
+              boxes[i - 1].right,
+            );
+          }
+        });
+      svg().screenshot(`gpu-telemetry-time-${width}`);
+    });
+  }
+
   it('does not magnify floating-point noise after rolling averages', () => {
     mountClock(samples((sample) => 390 - (sample % 2) * Number.EPSILON * 256));
     assertReadableAxis(390);

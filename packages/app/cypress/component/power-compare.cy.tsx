@@ -121,6 +121,7 @@ function mountCompare(
   data: InferenceData[],
   options: {
     pathname?: string;
+    width?: number;
     overlay?: InferenceData[];
     hiddenNonOptimal?: boolean;
     metric?: CompareMetric;
@@ -133,7 +134,7 @@ function mountCompare(
   const metricKey = options.metric ?? 'y_measuredAvgPower';
   mountWithProviders(
     <PathnameContext.Provider value={options.pathname ?? '/inference'}>
-      <div style={{ width: 1000, height: 640 }}>
+      <div style={{ width: options.width ?? 1000, height: 640 }}>
         <ScatterGraph
           chartId="power-compare-test"
           modelLabel="DeepSeek V4 Pro"
@@ -249,6 +250,100 @@ describe('ScatterGraph power comparison series', () => {
     cy.on('uncaught:exception', (error) => {
       if (error.message.includes('ResizeObserver loop')) return false;
     });
+  });
+
+  it('wraps long role labels without losing the framework or role on mobile', () => {
+    cy.viewport(390, 844);
+    const data = expandPowerCompareSeries(
+      measuredCurve('gb200_dynamo-sglang'),
+      'y_measuredAvgPower',
+      'roles',
+    );
+    mountWithProviders(
+      <div style={{ width: '100%', maxWidth: 1000, padding: 33 }}>
+        <ScatterGraph
+          chartId="power-compare-test"
+          modelLabel="Qwen3.5 397B"
+          data={data}
+          xLabel="Interactivity"
+          yLabel={Y_LABELS.y_measuredAvgPower}
+          chartDefinition={chartDefinition}
+        />
+      </div>,
+      {
+        inference: {
+          selectedYAxisMetric: 'y_measuredAvgPower',
+          hardwareConfig: {
+            ...hwConfig,
+            'gb200_dynamo-sglang': {
+              name: 'gb200',
+              label: 'GB200 NVL72',
+              suffix: '(Dynamo SGLang)',
+              gpu: 'GB200',
+            },
+          },
+          activeHwTypes: new Set(['gb200_dynamo-sglang']),
+          hwTypesWithData: new Set(['gb200_dynamo-sglang']),
+          selectedPrecisions: [Precision.FP4],
+          hideNonOptimal: false,
+          showLineLabels: true,
+        },
+        unofficial: {},
+      },
+    );
+    cy.get(lineLabel('prefill'))
+      .should('contain.text', 'Dynamo SGLang')
+      .and('contain.text', 'Prefill');
+    cy.get(lineLabel('decode')).should('contain.text', 'Decode');
+    cy.get(svg).should(($svg) => {
+      const clipWidth = Number($svg.find('clipPath rect')[0].getAttribute('width'));
+      const labels = $svg
+        .find('.line-label')
+        .toArray()
+        .filter((el) => el.style.opacity !== '0');
+      expect(labels).to.have.length(3);
+      for (const label of labels) {
+        const box = label.querySelector('.ll-bg')!.getBoundingClientRect();
+        expect(box.width, label.textContent ?? '').to.be.at.most(clipWidth + 1);
+      }
+    });
+    cy.get(svg).first().screenshot('power-roles-mobile-wrapped');
+    cy.viewport(1440, 900);
+    cy.get(lineLabel('prefill'))
+      .find('.ll-bg')
+      .should(($rect) => {
+        expect(
+          $rect[0].getBoundingClientRect().height,
+          'desktop uses a single line',
+        ).to.be.lessThan(30);
+      });
+    cy.get(svg).first().screenshot('power-roles-desktop-unwrapped');
+  });
+
+  it('updates a performance ruler at mobile width when dragged', () => {
+    cy.viewport(390, 844);
+    mountCompare(expandPowerCompareSeries(measuredCurve('b200'), 'y_measuredAvgPower', 'roles'), {
+      width: 324,
+    });
+    cy.contains('button', 'Advanced').click();
+    cy.get('#scatter-perf-ruler').click();
+    cy.get(`${svg} .perf-ruler-hit`).eq(0).click({ force: true });
+    cy.get(`${svg} .perf-ruler-hit`).eq(1).click({ force: true });
+    cy.get(`${svg} .pr-drag`)
+      .should('have.length', 1)
+      .then(($line) => {
+        const line = $line[0];
+        const before = line.getAttribute('x1');
+        const box = line.getBoundingClientRect();
+        const view = line.ownerDocument.defaultView!;
+        const start = { clientX: box.x, clientY: box.y + box.height / 2, view, bubbles: true };
+        line.dispatchEvent(new MouseEvent('mousedown', { ...start, button: 0, buttons: 1 }));
+        view.dispatchEvent(
+          new MouseEvent('mousemove', { ...start, clientX: box.x + 20, buttons: 1 }),
+        );
+        view.dispatchEvent(new MouseEvent('mouseup', { ...start, clientX: box.x + 20 }));
+        cy.get(`${svg} .pr-drag`).invoke('attr', 'x1').should('not.equal', before);
+      });
   });
 
   it('draws each boundary as a dashed sibling series in the hardware colour with a toggling legend row', () => {

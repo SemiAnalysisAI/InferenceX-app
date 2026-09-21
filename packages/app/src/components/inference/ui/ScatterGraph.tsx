@@ -5,6 +5,7 @@ import { isPersistedBenchmarkId } from '@/lib/benchmark-id';
 import { useEphemeralUrlState } from '@/hooks/useUrlState';
 import { rememberChartStateInUrl } from '@/lib/url-state';
 import * as d3 from 'd3';
+import { CHART_TYPE } from '@/lib/d3-chart/typography';
 import dynamic from 'next/dynamic';
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
@@ -3090,7 +3091,24 @@ const ScatterGraph = React.memo(
                 .attr('class', (segment) => segment.className)
                 .attr('fill', (segment) => segment.fill)
                 .attr('font-weight', (segment) => segment.weight)
+                .attr('x', null)
+                .attr('dy', null)
                 .text((segment) => segment.text);
+              // Keep the framework and role visible when a pill is wider than
+              // the mobile plot, without shrinking its text or dropping fields.
+              const textX = Number(text.attr('x') ?? 0);
+              const maxLineWidth = ctx.width - textX - 10;
+              let lineWidth = 0;
+              text.selectAll<SVGTSpanElement, unknown>('tspan').each(function () {
+                const width = this.getComputedTextLength();
+                if (lineWidth > 0 && lineWidth + width > maxLineWidth) {
+                  d3.select(this)
+                    .attr('x', textX)
+                    .attr('dy', CHART_TYPE.lineLabel + 3);
+                  lineWidth = 0;
+                }
+                lineWidth += width;
+              });
             },
           });
           // Labels can be joined independently of the Pareto display pass.

@@ -166,13 +166,14 @@ function mountTimeline(
   data: InferenceData[],
   options: {
     pathname?: string;
+    width?: number;
     overlay?: Parameters<typeof PowerTimeline>[0]['overlayData'];
     unofficial?: Parameters<typeof createMockUnofficialRunContext>[0];
   } = {},
 ) {
   mountWithProviders(
     <PathnameContext.Provider value={options.pathname ?? '/inference'}>
-      <div style={{ width: 1100, height: 700 }}>
+      <div style={{ width: options.width ?? 1100, height: 700 }}>
         <PowerTimeline
           chartId="power-timeline-test"
           data={data}
@@ -226,6 +227,34 @@ describe('PowerTimeline', () => {
         expect(new Set(labels).size).to.equal(labels.length);
       });
     svg().screenshot('power-timeline-multiday');
+  });
+
+  it('keeps mobile wall-clock dates separated', () => {
+    cy.viewport(390, 844);
+    cy.intercept('GET', '/api/gpu-metrics*', {
+      body: {
+        ...response,
+        series: response.series.map((trace, index) => ({
+          ...trace,
+          startMs: trace.startMs + index * 2 * 24 * 60 * 60_000,
+        })),
+      },
+    }).as('series');
+    mountTimeline([measuredPoint('b200', 16, 700), measuredPoint('b200', 64, 900)], {
+      width: 324,
+    });
+    cy.wait('@series');
+    cy.get('[data-testid="power-timeline-axis-wall"]').click();
+    svg()
+      .find('.x-axis .tick text')
+      .should(($ticks) => {
+        expect($ticks.length).to.be.greaterThan(1);
+        const boxes = [...$ticks].map((tick) => tick.getBoundingClientRect());
+        for (let i = 1; i < boxes.length; i++) {
+          expect(boxes[i].left, 'date labels do not overlap').to.be.greaterThan(boxes[i - 1].right);
+        }
+      });
+    svg().screenshot('power-timeline-mobile-dates');
   });
 
   it('fetches one prefixed series request per run and draws the job with its window emphasized', () => {

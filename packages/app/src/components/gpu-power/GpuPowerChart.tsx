@@ -418,7 +418,14 @@ const GpuMetricsChart = React.memo(
         instructions={t.instructions}
         xScale={{ type: 'linear', domain: xDomain, nice: true }}
         yScale={{ type: 'linear', domain: yDomain, nice: true }}
-        xAxis={{ label: t.seconds, tickCount: 10 }}
+        xAxis={{
+          label: t.seconds,
+          tickValues: (scale) => {
+            const secondsScale = scale as d3.ScaleLinear<number, number>;
+            const [left, right] = secondsScale.range();
+            return secondsScale.ticks(Math.max(2, Math.min(10, Math.floor((right - left) / 60))));
+          },
+        }}
         yAxis={{ label: getGpuMetricYAxisLabel(metricConfig, locale), tickCount: 8 }}
         layers={[
           // TDP reference line (power metric only)
