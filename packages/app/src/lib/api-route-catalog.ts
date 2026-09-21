@@ -83,7 +83,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-current-inferencex-image-view',
-    sourceSha256: '6e1f43aedc9641b100afa3bf02e131d056f30012b2abec8e9b4309bf0ba0c3d0',
+    sourceSha256: '3a2eddb860c147214a76d4be01524713caf2eb741dbdf497e0fa21bb824e4d31',
   },
   {
     source: 'src/app/api/v1/views/evaluation/route.ts',
@@ -883,7 +883,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/calculator-extensions.ts',
-    sourceSha256: 'da0b569b81c641749acb9ea6fd17faf0eb32fa936eb0570595bc0c71c67db64a',
+    sourceSha256: '0e2b050b483b505b9118336f6639594c8f82470e885c6356c4f2dc5790d39fec',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',

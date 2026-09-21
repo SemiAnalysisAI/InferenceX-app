@@ -431,6 +431,11 @@ describe('new dashboard projections', () => {
   it('rejects unsupported extension options rather than silently ignoring them', async () => {
     for (const query of [
       'caps=-1',
+      'caps=2,abc',
+      'caps=2,0',
+      'caps=2,-1',
+      'caps=2,Infinity',
+      'caps=2,',
       'costProvider=costn',
       'surprise=true',
       'runId=0',
@@ -443,6 +448,12 @@ describe('new dashboard projections', () => {
       req('profit-estimator', 'model=DeepSeek-V4-Pro&priceSource=custom&utilization=101'),
     );
     expect(invalidUtilization.status).toBe(400);
+  });
+  it('sorts and deduplicates valid first-token caps', async () => {
+    const response = await first(req('first-token', 'model=DeepSeek-V4-Pro&caps=5,2,2,0.5'));
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.params.caps).toEqual([0.5, 2, 5]);
   });
   it('empty OperatorX discovery and submission history are successful empty views', async () => {
     const opResponse = await operator(req('operatorx'));

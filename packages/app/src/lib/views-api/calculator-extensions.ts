@@ -53,10 +53,14 @@ export function calculatorExtension(view: CalculatorExtension, request: NextRequ
       overlayMeta: groups.overlay.groupMeta,
     };
     if (view === 'first-token') {
-      const caps = search.has('caps')
-        ? parseFirstTokenCaps(search.get('caps'))
-        : [...DEFAULT_FIRST_TOKEN_CAPS];
-      if (!caps || (search.get('caps')?.split(',').length ?? 0) > 8)
+      const rawCaps = search.get('caps');
+      const entries = rawCaps?.split(',');
+      const caps = rawCaps === null ? [...DEFAULT_FIRST_TOKEN_CAPS] : parseFirstTokenCaps(rawCaps);
+      if (
+        !caps ||
+        (entries?.length ?? 0) > 8 ||
+        entries?.some((entry) => !Number.isFinite(Number(entry)) || Number(entry) <= 0)
+      )
         throw new ViewsApiParamError(
           'caps',
           'Expected one to eight distinct positive first-token caps in seconds',

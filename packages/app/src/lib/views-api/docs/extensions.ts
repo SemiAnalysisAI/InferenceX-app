@@ -10,8 +10,8 @@ const strings: ApiSchema = { type: 'array', items: { type: 'string' } };
 /** Query values are strings on the wire; resolved params carry typed values. */
 const PARAMETER_NOTES: Record<string, [string, string]> = {
   model: [
-    'Model display name or comparison slug. Required for benchmark-based views.',
-    '模型显示名称或比较页 slug。基于基准测试的视图需要此参数。',
+    'Model display name or comparison slug, case-insensitive. Required for benchmark-based views. The image view also accepts current image-catalog names, trims whitespace and defaults to all; unknown models return 400.',
+    '模型显示名称或比较页 slug，不区分大小写。基于基准测试的视图需要此参数。镜像视图还接受当前镜像列表中的模型名，去除首尾空白后匹配，默认 all；未知模型返回 400。',
   ],
   sequence: [
     'Workload: 1k/1k, 1k/8k, 8k/1k or agentic-traces. AgentX extension views default to agentic-traces.',
@@ -74,8 +74,8 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
     '布尔值，默认为 true。排除目标超出配置实测上限的硬件。',
   ],
   caps: [
-    'One to eight distinct positive first-token caps in seconds; default 2,5,10,15,20.',
-    '一至八个不同的首 token 时间上限，单位秒且必须为正数；默认 2,5,10,15,20。',
+    'One to eight positive finite first-token caps in seconds, sorted and deduplicated; default 2,5,10,15,20. Any invalid entry returns 400.',
+    '一至八个有限正数，表示首 token 时间上限（秒）；排序去重后使用，默认 2,5,10,15,20。任一值无效时返回 400。',
   ],
   minInteractivity: [
     'Minimum tok/s/user, default 150 for AgentX or 35 for fixed-length workloads.',
@@ -163,8 +163,8 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
     '以逗号分隔的 EP 模式键，默认选择全部可用模式。',
   ],
   precision: [
-    'Exact precision key; CollectiveX defaults to fp8 if available. Image view defaults to all.',
-    '精度键；CollectiveX 有 fp8 时默认使用 fp8。镜像视图默认 all。',
+    'Precision key; CollectiveX defaults to fp8 if available. The image view trims whitespace, ignores case and defaults to all.',
+    '精度键；CollectiveX 有 fp8 时默认使用 fp8。镜像视图去除首尾空白、不区分大小写，默认 all。',
   ],
   operation: [
     'EP operation: roundtrip (default), dispatch or combine.',
@@ -276,7 +276,10 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
     'Submission chart lines: comma-separated nvidia, amd, total; amd includes non-NVIDIA rows as in the UI.',
     '提交图曲线：nvidia、amd、total，以逗号分隔；amd 与界面一致，包含非 NVIDIA 行。',
   ],
-  hardware: ['Image-view hardware key or all.', '镜像视图硬件键或 all。'],
+  hardware: [
+    'Image-view hardware key; whitespace is trimmed and case ignored. Default all.',
+    '镜像视图硬件键，去除首尾空白、不区分大小写，默认 all。',
+  ],
   nodeType: [
     'Image deployment: single (default), disagg or all.',
     '镜像部署类型：single（默认）、disagg 或 all。',
@@ -286,8 +289,8 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
     '以逗号分隔的框架系列键；省略时选择全部。',
   ],
   spec: [
-    'Speculative decoding filter; image view uses a single value or all, inference uses a comma-separated list.',
-    '投机解码筛选；镜像视图使用单个值或 all，推理视图使用逗号分隔列表。',
+    'Speculative decoding filter; the image view trims whitespace and ignores case for a single value, default all. Inference uses a comma-separated list.',
+    '投机解码筛选；镜像视图使用单个值，去除首尾空白、不区分大小写，默认 all。推理视图使用逗号分隔列表。',
   ],
   run: ['Public video CI run ID. Omit to discover runs.', '公开视频 CI 运行 ID。省略时列出运行。'],
   compare: [
