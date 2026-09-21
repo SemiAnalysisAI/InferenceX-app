@@ -204,6 +204,30 @@ describe('PowerTimeline', () => {
     });
   });
 
+  it('distinguishes dates when wall-clock traces span multiple days', () => {
+    cy.intercept('GET', '/api/gpu-metrics*', {
+      body: {
+        ...response,
+        series: response.series.map((trace, index) => ({
+          ...trace,
+          startMs: trace.startMs + index * 2 * 24 * 60 * 60_000,
+        })),
+      },
+    }).as('series');
+    mountTimeline([measuredPoint('b200', 16, 700), measuredPoint('b200', 64, 900)]);
+    cy.wait('@series');
+    cy.get('[data-testid="power-timeline-axis-wall"]').click();
+    svg()
+      .find('.x-axis .tick text')
+      .should(($ticks) => {
+        const labels = [...$ticks].map((tick) => tick.textContent);
+        expect(labels.some((label) => label?.includes('09/13'))).to.equal(true);
+        expect(labels.some((label) => label?.includes('09/14'))).to.equal(true);
+        expect(new Set(labels).size).to.equal(labels.length);
+      });
+    svg().screenshot('power-timeline-multiday');
+  });
+
   it('fetches one prefixed series request per run and draws the job with its window emphasized', () => {
     cy.intercept('GET', '/api/gpu-metrics*', { body: response }).as('series');
     mountTimeline([

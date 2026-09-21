@@ -8,6 +8,7 @@ import {
   historicalTrendToCsv,
 } from './csv-export-helpers';
 import type { InferenceData } from '@/components/inference/types';
+import { expandPowerCompareSeries } from '@/components/inference/utils/power-compare';
 
 const makePoint = (overrides: Partial<InferenceData> = {}): InferenceData => ({
   x: 100,
@@ -776,6 +777,43 @@ describe('inferenceChartToCsv power comparison', () => {
     const column = headers.indexOf('Power Series');
     expect(column).toBeGreaterThan(-1);
     expect(rows.map((row) => row[column])).toEqual(['GPU measured', 'GPU provisioned (TDP)']);
+    expect(rows.map((row) => row[headers.indexOf('Measured Power per Chip (W)')])).toEqual([
+      600, 1000,
+    ]);
     expect(rows.every((row) => row.length === headers.length)).toBe(true);
+  });
+
+  it.each([false, true])('exports plotted role values with overlay=%s', (overlay) => {
+    const base = makePoint({
+      hwKey: 'gb300_dynamo-trt',
+      y: 708.1,
+      measuredAvgPower: { y: 708.1, roof: false },
+      measuredPrefillAvgPower: { y: 760.442, roof: false },
+      measuredDecodeAvgPower: { y: 690.652, roof: false },
+      run_url: 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/35532106109',
+    });
+    const points = expandPowerCompareSeries([base], 'y_measuredAvgPower', 'roles');
+    const { headers, rows } = inferenceChartToCsv(
+      overlay ? [] : points,
+      'Kimi-K3',
+      'agentic-traces',
+      overlay ? points : [],
+      {
+        yHeader: 'Measured Power per Chip (W)',
+        yPath: 'measuredAvgPower.y',
+        xHeader: 'Interactivity (tok/s/user)',
+      },
+    );
+    expect(
+      rows.map((row) => [
+        row[headers.indexOf('Power Series')],
+        row[headers.indexOf('Measured Power per Chip (W)')],
+      ]),
+    ).toEqual([
+      ['All GPUs', 708.1],
+      ['Prefill GPUs', 760.442],
+      ['Decode GPUs', 690.652],
+    ]);
+    expect(points.every((point) => point.measuredAvgPower?.y === 708.1)).toBe(true);
   });
 });

@@ -24,7 +24,7 @@ const STRINGS = {
     basisHelp:
       'Where power is counted. GPU measured: runner telemetry from the GPU boards. GPU provisioned: rated TDP per GPU. Utility provisioned: all-in provisioned utility power per GPU. Utility modeled: measured GPU power carried through the modeled chassis to the utility meter with PUE. Points without a value for the chosen boundary are omitted, never replaced with an estimate.',
     basisHint:
-      'Derived boundaries report whole-deployment average power and joules per output token. Changing another setting returns to GPU measured.',
+      'Derived boundaries report average power per chip across all GPUs, and whole-deployment joules per output token. Changing another setting returns to GPU measured.',
     scope: 'Scope',
     scopeHelp:
       'All GPUs measures the whole deployment. Prefill and decode select only GPUs serving that role.',
@@ -63,7 +63,8 @@ const STRINGS = {
     basis: '功耗边界',
     basisHelp:
       '选择功耗的计量边界。GPU 实测：来自 GPU 板卡的运行器遥测；GPU 额定：每 GPU 的额定 TDP；全电源配置：每 GPU 的全电源配置（all-in）市电功率；数据中心建模：将 GPU 实测功耗经机箱功耗模型推算至市电侧并计入 PUE。所选边界缺少数值的数据点将被省略，不会用估算值替代。',
-    basisHint: '推导边界仅提供整个部署的平均功耗和每输出 token 能耗；更改其他设置将返回 GPU 实测。',
+    basisHint:
+      '推导边界提供全部 GPU 的平均每芯片功率，以及整个部署的每输出 token 能耗；更改其他设置将返回 GPU 实测。',
     scope: '统计范围',
     scopeHelp: '全部 GPU 对应整个部署；预填充和解码仅统计承担相应任务的 GPU。',
     all: '全部 GPU',

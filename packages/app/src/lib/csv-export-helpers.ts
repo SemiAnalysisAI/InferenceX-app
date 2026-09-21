@@ -125,7 +125,8 @@ export function inferenceChartToCsv(
     ? [
         {
           header: displayedMetrics.yHeader,
-          value: (point: InferenceData) => nestedMetric(point, displayedMetrics.yPath),
+          value: (point: InferenceData) =>
+            point.powerVariant ? point.y : nestedMetric(point, displayedMetrics.yPath),
         },
         { header: displayedMetrics.xHeader, value: (point: InferenceData) => point.x },
       ].filter(

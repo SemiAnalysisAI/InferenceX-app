@@ -1015,7 +1015,10 @@ export default function PowerTimeline({
   const xTickFormat = useMemo(() => {
     if (xMode === 'elapsed') return (value: d3.AxisDomain) => formatElapsed(Number(value));
     const span = xDomain[1] - xDomain[0];
-    const format = d3.utcFormat(span < 3 * 60_000 ? '%H:%M:%S' : '%H:%M');
+    const crossesDate = formatUtcDate(new Date(xDomain[0])) !== formatUtcDate(new Date(xDomain[1]));
+    const format = d3.utcFormat(
+      crossesDate ? '%m/%d %H:%M' : span < 3 * 60_000 ? '%H:%M:%S' : '%H:%M',
+    );
     return (value: d3.AxisDomain) =>
       format(value instanceof Date ? value : new Date(Number(value)));
   }, [xMode, xDomain]);

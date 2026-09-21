@@ -147,8 +147,12 @@ export default function InferenceTable({
       {
         header: headers.yMetric,
         align: 'right',
-        cell: (row) => formatInferenceTableNumber(yPath ? getNestedYValue(row, yPath) : row.y),
-        sortValue: (row) => (yPath ? getNestedYValue(row, yPath) : row.y),
+        // Comparison clones keep the source metrics; y holds the plotted role/boundary.
+        cell: (row) =>
+          formatInferenceTableNumber(
+            row.powerVariant || !yPath ? row.y : getNestedYValue(row, yPath),
+          ),
+        sortValue: (row) => (row.powerVariant || !yPath ? row.y : getNestedYValue(row, yPath)),
         className: 'tabular-nums',
         importance: 'key',
       },
