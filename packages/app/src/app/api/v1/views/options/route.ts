@@ -11,6 +11,7 @@ import {
   SPEC_MODES,
   VENDOR_VALUES,
 } from '@/lib/views-api/params';
+import { unitFromLabel } from '@/lib/views-api/legend';
 import { VIEW_QUERY_PARAMS } from '@/lib/views-api/registry';
 import {
   FW_REGISTRY,
@@ -66,12 +67,6 @@ export const dynamic = 'force-dynamic';
  * `/api/v1/views/*` endpoints accept, straight from the same registries the
  * dashboard renders its controls from. No database access, JSON only.
  */
-
-/** Trailing parenthesized unit from a registry label, e.g. `(tok/s/gpu)`. */
-function unitFromLabel(label: string): string | null {
-  const match = /\((?<unit>[^()]+)\)\s*$/u.exec(label);
-  return match?.groups?.unit ?? null;
-}
 
 const COMPARE_SLUG_BY_DISPLAY = new Map(
   COMPARE_MODEL_SLUGS.map((entry) => [entry.displayName, entry.slug]),

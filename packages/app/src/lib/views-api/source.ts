@@ -116,10 +116,15 @@ export async function benchmarkRows(
 export async function calculatorGroups(
   request: NextRequest,
   params: ViewSelection,
-  sourceOptions: { exactDate?: boolean } = {},
+  sourceOptions: {
+    exactDate?: boolean;
+    overlayRows?: BenchmarkRow[];
+    includeOverlay?: boolean;
+  } = {},
 ) {
   const rows = await benchmarkRows(request, params, sourceOptions);
-  const overlayRows = await unofficialRows(request);
+  // Comparisons reuse the primary overlay rows for precision resolution only.
+  const overlayRows = sourceOptions.overlayRows ?? (await unofficialRows(request));
   const precisions = resolveRowPrecisions(rows, params.sequence, params.precisions, overlayRows);
   const options = { ...params, precisions };
   const official = buildGpuGroups<GroupMeta>(rows, {
@@ -137,21 +142,24 @@ export async function calculatorGroups(
     'unofficialrun',
   );
   const runIndexById = Object.fromEntries(overlayIds.map((id, index) => [id, index]));
-  const overlay = buildGpuGroups<OverlayGroupMeta>(overlayRows, {
-    ...options,
-    classify: (hwKey, row) =>
-      matchesHardware(hwKey, params.gpus)
-        ? {
-            key: `run:${row.run_url}:${hwKey}:${row.precision}`,
-            meta: {
-              hwKey,
-              precision: precisions.length > 1 ? row.precision : undefined,
-              runIndex: overlayRunIndex(row.run_url, runIndexById),
-            },
-          }
-        : null,
-  });
-  return { rows, params: { ...params, precisions }, official, overlay };
+  const overlay = buildGpuGroups<OverlayGroupMeta>(
+    sourceOptions.includeOverlay === false ? [] : overlayRows,
+    {
+      ...options,
+      classify: (hwKey, row) =>
+        matchesHardware(hwKey, params.gpus)
+          ? {
+              key: `run:${row.run_url}:${hwKey}:${row.precision}`,
+              meta: {
+                hwKey,
+                precision: precisions.length > 1 ? row.precision : undefined,
+                runIndex: overlayRunIndex(row.run_url, runIndexById),
+              },
+            }
+          : null,
+    },
+  );
+  return { rows, overlayRows, params: { ...params, precisions }, official, overlay };
 }
 
 export interface UnofficialRunPayload {

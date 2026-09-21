@@ -18,7 +18,14 @@ import { getGpuSpecs } from '@/lib/constants';
 import { getOpenRouterModelId, Sequence, type Model } from '@/lib/data-mappings';
 import type { NextRequest } from 'next/server';
 import { runViewsRoute, ViewsApiParamError } from './errors';
-import { parseEnumParam, parseNumberMap, parseNumberParam, validateParams } from './params';
+import {
+  parseCostProviderParam,
+  parseCostTypeParam,
+  parseEnumParam,
+  parseNumberMap,
+  parseNumberParam,
+  validateParams,
+} from './params';
 import { VIEW_QUERY_PARAMS } from './registry';
 import { calculatorGroups, comparisonSelections, selection } from './source';
 
@@ -60,18 +67,8 @@ export function calculatorExtension(view: CalculatorExtension, request: NextRequ
         params.sequence === Sequence.AgenticTraces ? 150 : 35,
         { min: 0 },
       );
-      const costProvider = parseEnumParam(
-        search.get('costProvider'),
-        'costProvider',
-        ['costh', 'costr'],
-        'costh',
-      );
-      const costType = parseEnumParam(
-        search.get('costType'),
-        'costType',
-        ['total', 'input', 'output'],
-        'total',
-      );
+      const costProvider = parseCostProviderParam(search.get('costProvider'));
+      const costType = parseCostTypeParam(search.get('costType'));
       return cachedJson({
         ...envelope,
         params: { ...envelope.params, caps, minInteractivity, costProvider, costType },
@@ -213,7 +210,7 @@ export function calculatorExtension(view: CalculatorExtension, request: NextRequ
         const group = await calculatorGroups(
           request,
           { ...groups.params, date, runId },
-          { exactDate: true },
+          { exactDate: true, includeOverlay: false, overlayRows: groups.overlayRows },
         );
         return { entry, data: estimate(group.official) };
       }),

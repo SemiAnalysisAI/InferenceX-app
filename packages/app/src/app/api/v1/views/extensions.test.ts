@@ -324,6 +324,37 @@ describe('new dashboard projections', () => {
       [1, 456],
     ]);
   });
+  it.each(['', '&precisions=fp8'])(
+    'fetches overlays once per comparison request and preserves precision selection %s',
+    async (precision) => {
+      mocks.benchmarks.mockImplementation(() => Response.json([agenticRow()]));
+      let overlay = agenticRow({ id: 456, hardware: 'b300', precision: 'fp8' });
+      mocks.unofficial.mockImplementation(() =>
+        Response.json({ benchmarks: [overlay], evaluations: [] }),
+      );
+      const query = `model=DeepSeek-V4-Pro&date=2026-09-11&dates=2026-09-09,2026-09-10&unofficialrun=456&target=45&priceSource=custom${precision}`;
+      const response = await profit(req('profit-estimator', query));
+      expect(response.status).toBe(200);
+      const body = await response.json();
+      const firstFetchCount = mocks.unofficial.mock.calls.length;
+      expect(body.params.precisions).toEqual(precision ? ['fp8'] : ['fp4', 'fp8']);
+      expect(hardwareKeys(body.data)).toEqual(precision ? [] : ['b200_sglang']);
+      expect(hardwareKeys(body.overlays)).toEqual(['b300_sglang']);
+      expect(body.comparisons.map((comparison: { data: unknown }) => comparison.data)).toEqual([
+        body.data,
+        body.data,
+      ]);
+
+      // An in-progress run can change between requests; the next one must fetch it again.
+      overlay = { ...overlay, hardware: 'mi355x' };
+      const freshResponse = await profit(req('profit-estimator', query));
+      expect(freshResponse.status).toBe(200);
+      const fresh = await freshResponse.json();
+      expect(hardwareKeys(fresh.overlays)).toEqual(['mi355x_sglang']);
+      expect(fresh.comparisons).toEqual(body.comparisons);
+      expect([firstFetchCount, mocks.unofficial.mock.calls.length]).toEqual([1, 2]);
+    },
+  );
   it.each(['modeled', 'compare'])(
     'uses exact comparison snapshots with %s power while keeping the primary date cutoff',
     async (powerBasis) => {

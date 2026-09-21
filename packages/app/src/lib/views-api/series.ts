@@ -50,7 +50,7 @@ import {
 import { Sequence } from '@/lib/data-mappings';
 import { isKvOffloadEnabled } from '@/lib/kv-offload';
 import { calculateCostsForGpus, calculatePowerForGpus } from '@/lib/utils';
-import { hardwareLegendLabel } from '@/lib/views-api/legend';
+import { hardwareLegendLabel, unitFromLabel } from '@/lib/views-api/legend';
 
 /**
  * Server-side equivalent of `useChartData`'s official-data path for the views
@@ -132,12 +132,6 @@ export interface InferenceSeriesResult {
   readonly metric: InferenceSeriesMetricMeta;
   readonly xAxis: { mode: SeriesXMode; field: string; label: string };
   readonly count: number;
-}
-
-/** Trailing parenthesized unit from a registry label, e.g. `(tok/s/gpu)`. */
-function unitFromLabel(label: string): string | null {
-  const match = /\((?<unit>[^()]+)\)\s*$/u.exec(label);
-  return match?.groups?.unit ?? null;
 }
 
 /** GitHub Actions run id parsed from a point's run_url, when present. */

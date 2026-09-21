@@ -11,3 +11,9 @@ export function hardwareLegendLabel(hwKey: string, model?: string): string {
   // Same composition the dashboard legend uses (`getDisplayLabel`).
   return getDisplayLabel(getHardwareConfig(hwKey, model));
 }
+
+/** Trailing parenthesized unit from a registry label, e.g. `(tok/s/gpu)`. */
+export function unitFromLabel(label: string): string | null {
+  const match = /\((?<unit>[^()]+)\)\s*$/u.exec(label);
+  return match?.groups?.unit ?? null;
+}
