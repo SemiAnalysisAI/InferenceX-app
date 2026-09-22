@@ -191,7 +191,10 @@ test('dates accept a display selector by resolving its DB keys through the optio
   );
   assert.deepEqual(unknown.items, []);
   assert.equal(unknown.scope.model_selector, null);
-  assert.match(unknown.coverage.limitations.join(' '), /nope matches no availability DB model key/u);
+  assert.match(
+    unknown.coverage.limitations.join(' '),
+    /nope matches no availability DB model key/u,
+  );
 });
 
 test('normalization accepts argv and canonical objects and rejects ambiguous scope', () => {

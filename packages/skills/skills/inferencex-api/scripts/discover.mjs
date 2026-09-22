@@ -276,8 +276,9 @@ function selectorForKey(entries, key) {
 }
 
 function keysForSelector(entries, selector) {
-  return [...new Set(entries.filter((entry) => entry.name === selector).flatMap((entry) => entry.dbKeys))]
-    .toSorted(compare);
+  return [
+    ...new Set(entries.filter((entry) => entry.name === selector).flatMap((entry) => entry.dbKeys)),
+  ].toSorted(compare);
 }
 
 async function availability(options, get, signal) {
