@@ -189,6 +189,16 @@ describe('dataset and telemetry catalog views', () => {
     const response = await dataset(req('dataset', `slug=dataset&convId=c1&${query}`));
     expect(response.status).toBe(400);
   });
+  it('rejects over-long ID search as a selector error before calling the index', async () => {
+    const accepted = await dataset(req('dataset', `slug=dataset&search=${'a'.repeat(100)}`));
+    expect(accepted.status).toBe(200);
+    expect(mocks.index).toHaveBeenCalledTimes(1);
+    const response = await dataset(req('dataset', `slug=dataset&search=${'a'.repeat(101)}`));
+    expect(response.status).toBe(400);
+    const body = await response.json();
+    expect(body.error).toMatch(/search.*100 characters/u);
+    expect(mocks.index).toHaveBeenCalledTimes(1);
+  });
   it('requires a conversation for deep-link controls and preserves not-found errors', async () => {
     const invalid = await dataset(req('dataset', 'slug=dataset&expanded=all'));
     expect(invalid.status).toBe(400);

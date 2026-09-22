@@ -10,6 +10,7 @@ import {
 } from '@/components/datasets/trace-flamegraph-model';
 import type { ConversationDetail, ConversationList, DatasetDetail } from '@/hooks/api/use-datasets';
 import { cachedJson } from '@/lib/api-cache';
+import { MAX_CONVERSATION_SEARCH_LENGTH } from '@/lib/dataset-conversation-search';
 import { integerParam, requiredText } from '@/lib/views-api/detail-params';
 import { runViewsRoute, ViewsApiParamError } from '@/lib/views-api/errors';
 import { parseEnumParam, validateParams } from '@/lib/views-api/params';
@@ -33,8 +34,12 @@ export function GET(request: NextRequest) {
     const limit = integerParam(search, 'limit', 50, 1, 200);
     const offset = integerParam(search, 'offset', 0);
     const query = search.get('search')?.trim() ?? '';
-    if (query.length > 512)
-      throw new ViewsApiParamError('search', 'search is limited to 512 characters');
+    if (query.length > MAX_CONVERSATION_SEARCH_LENGTH) {
+      throw new ViewsApiParamError(
+        'search',
+        `search is limited to ${MAX_CONVERSATION_SEARCH_LENGTH} characters`,
+      );
+    }
     const expandedInput = search.get('expanded') ?? '';
     if (expandedInput !== 'all' && expandedInput !== '' && !/^\d+(?:,\d+)*$/u.test(expandedInput)) {
       throw new ViewsApiParamError('expanded', 'Use all or comma-separated structure node indices');
