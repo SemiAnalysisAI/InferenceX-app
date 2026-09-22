@@ -216,12 +216,13 @@ describe('GPU comparison agentic point detail', () => {
     cy.intercept('GET', '/api/v1/benchmarks*', { body: agenticBenchmarks }).as('agenticBenchmarks');
     interceptDerivedAgenticMetrics();
 
-    // Agentic surfaces are public, so this spec does NOT seed the ↑↑↓↓ feature
-    // gate: an unlocked gate lifts the cross-engine guard (see the next test),
-    // and this test covers the locked, public-reader behaviour.
+    // Agentic surfaces are public, so this test must run with the ↑↑↓↓ feature
+    // gate LOCKED: an unlocked gate lifts the cross-engine guard (see the next
+    // test). testIsolation is off, so clear the flag an earlier test seeded.
     cy.visit(CONFLICTING_GPU_URL, {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+        win.localStorage.removeItem('inferencex-feature-gate');
       },
     });
 
