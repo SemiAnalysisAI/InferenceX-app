@@ -57,6 +57,56 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+describe('setupZoom input handling', () => {
+  it('requires Shift for wheel zoom and leaves browser zoom and context menus alone', () => {
+    const { svgSelection, hook, cleanup } = setup();
+    try {
+      const zoom = hook.current.setupZoom(svgSelection, 800, 600);
+      const filter = zoom.filter();
+      for (const [type, shiftKey, ctrlKey, button, expected] of [
+        ['wheel', false, false, 0, false],
+        ['wheel', true, false, 0, true],
+        ['wheel', false, true, 0, false],
+        ['wheel', true, true, 0, false],
+        ['mousedown', false, false, 0, true],
+        ['mousedown', false, false, 2, false],
+        ['mousedown', false, true, 0, false],
+      ] as const) {
+        expect(
+          filter.call(svgSelection.node()!, { type, shiftKey, ctrlKey, button }, undefined),
+          JSON.stringify({ type, shiftKey, ctrlKey, button }),
+        ).toBe(expected);
+      }
+    } finally {
+      cleanup();
+    }
+  });
+
+  it('uses the installed wheel delta callback for direction, macOS axis swaps and scroll units', () => {
+    const { svgSelection, hook, cleanup } = setup();
+    try {
+      const zoom = hook.current.setupZoom(svgSelection, 800, 600);
+      // D3 passes a WheelEvent; @types/d3-zoom types the getter as a generic ValueFn.
+      const wheelDelta = zoom.wheelDelta() as (event: WheelEvent) => number;
+      for (const [deltaY, deltaX, deltaMode, expected] of [
+        [100, 0, 0, -0.2],
+        [-100, 0, 0, 0.2],
+        [0, -120, 0, 0.24],
+        [50, 120, 0, -0.1],
+        [3, 0, 1, -0.15],
+        [1, 0, 2, -1],
+      ]) {
+        expect(
+          wheelDelta(new WheelEvent('wheel', { deltaY, deltaX, deltaMode })),
+          JSON.stringify({ deltaY, deltaX, deltaMode }),
+        ).toBeCloseTo(expected);
+      }
+    } finally {
+      cleanup();
+    }
+  });
+});
+
 describe('setupZoom transform replay', () => {
   it('does not emit a zoom event when the stored transform is identity', () => {
     const { svgSelection, hook, cleanup } = setup();
