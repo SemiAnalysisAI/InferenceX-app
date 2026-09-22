@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -58,6 +59,22 @@ afterEach(() => {
 });
 
 describe('artifact preparation gate before migrations', () => {
+  it('preserves earlier successful artifacts when only failed jobs are rerun', async () => {
+    vi.mocked(execFileSync).mockReturnValueOnce(
+      JSON.stringify({
+        head_sha: 'b'.repeat(40),
+        run_attempt: 2,
+        run_started_at: '2026-09-17T00:00:00Z',
+      }),
+    );
+    await import('./prepare-ci-artifacts');
+    expect(process.exitCode).toBeUndefined();
+    expect(fs.readdirSync(directory).toSorted()).toEqual(mocks.names.toSorted());
+    expect(console.log).toHaveBeenCalledWith(
+      expect.stringContaining('declared attempt 1, ingest attempt 2'),
+    );
+  });
+
   it('accepts the actual golden source bundle without a database connection', async () => {
     await import('./prepare-ci-artifacts');
     expect(process.exitCode).toBeUndefined();

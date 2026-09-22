@@ -80,17 +80,26 @@ function findJsonFiles(root: string): string[] {
   return files.toSorted();
 }
 
-/** Map every raw benchmark JSON under an extracted bmk artifact through the production mapper. */
-export function readMappedBenchmarkRows(root: string): BenchmarkParams[] {
+/** Map known successful rows; report unidentifiable rows separately from known failures. */
+export function readMappedBenchmarkRows(
+  root: string,
+  onUnmapped: (error: string) => void = () => {},
+): BenchmarkParams[] {
   const tracker = createSkipTracker();
   const rows: BenchmarkParams[] = [];
   for (const file of findJsonFiles(root)) {
     const parsed = JSON.parse(fs.readFileSync(file, 'utf8')) as unknown;
     const rawRows = Array.isArray(parsed) ? parsed : [parsed];
-    for (const raw of rawRows) {
-      if (!raw || typeof raw !== 'object' || Array.isArray(raw)) continue;
+    for (const [index, raw] of rawRows.entries()) {
+      const error = `Unmappable benchmark row: ${path.relative(root, file)} row ${index + 1}`;
+      if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+        onUnmapped(error);
+        continue;
+      }
+      const failedRuns = tracker.skips.failedRun;
       const mapped = mapBenchmarkRow(raw as Record<string, unknown>, tracker);
       if (mapped) rows.push(mapped);
+      else if (tracker.skips.failedRun === failedRuns) onUnmapped(error);
     }
   }
   return rows;

@@ -1,6 +1,7 @@
 import { isDeepStrictEqual } from 'node:util';
 import { MEASURED_POWER_METRIC_KEYS } from '@semianalysisai/inferencex-constants';
 import type { BenchmarkParams } from './benchmark-mapper';
+import type { TelemetryReceipt } from './telemetry-receipt';
 
 const CONFIG_FIELDS = {
   hardware: 'hardware',
@@ -54,6 +55,8 @@ export interface PowerPublicationManifest {
    * rows landed, and the artifact can be re-digested by the backfill.
    */
   telemetryWarnings?: string[];
+  /** Attachment completeness, separate from benchmark/power publication validity. */
+  telemetry?: TelemetryReceipt;
 }
 /**
  * The errors that fail an ingest. `telemetryWarnings` is deliberately not among

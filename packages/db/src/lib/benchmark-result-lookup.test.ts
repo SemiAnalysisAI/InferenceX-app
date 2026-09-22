@@ -216,4 +216,24 @@ describe('readMappedBenchmarkRows', () => {
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({ conc: 32, isl: 8192, osl: 1024, offloadMode: 'off' });
   });
+
+  it('reports unknown rows without discarding mapped points or treating known failures as unknown', () => {
+    const root = writeArtifact({
+      'results.json': JSON.stringify([
+        rawRow(),
+        rawRow({ hw: 'not-a-gpu' }),
+        null,
+        42,
+        [],
+        rawRow({ benchmark_outcome: { status: 'failed' } }),
+        rawRow({ num_requests_total: 2, num_requests_successful: 0 }),
+      ]),
+    });
+    const errors: string[] = [];
+    const rows = readMappedBenchmarkRows(root, (error) => errors.push(error));
+    expect(rows.map((row) => row.conc)).toEqual([32]);
+    expect(errors).toEqual(
+      [2, 3, 4, 5].map((row) => `Unmappable benchmark row: results.json row ${row}`),
+    );
+  });
 });

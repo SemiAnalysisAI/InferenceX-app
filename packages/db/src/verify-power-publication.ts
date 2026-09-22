@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import { DB_MODEL_TO_DISPLAY } from '@semianalysisai/inferencex-constants';
 import { createAdminSql } from './etl/db-utils';
+import { verifyTelemetryApi } from './etl/telemetry-receipt';
 import {
   fatalPublicationErrors,
   verifyPowerPublication,
@@ -71,6 +72,19 @@ try {
     publicRows.push(...body);
   }
   errors.push(...verifyPowerPublication(manifest.points, publicRows, 'public API'));
+  if (manifest.telemetry) {
+    if (
+      manifest.telemetry.runId !== manifest.runId ||
+      manifest.telemetry.runAttempt !== manifest.runAttempt
+    )
+      throw new Error('Telemetry receipt belongs to a different run/attempt');
+    manifest.telemetry = await verifyTelemetryApi(manifest.telemetry, origin, {
+      headers: process.env.CACHE_PROTECTION_BYPASS_SECRET
+        ? { 'x-vercel-protection-bypass': process.env.CACHE_PROTECTION_BYPASS_SECRET }
+        : undefined,
+    });
+    fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+  }
   const counts = { strict: 0, invalid: 0, other: 0 };
   for (const point of manifest.points) {
     if (point.metrics.power_valid === 1 && point.metrics.power_metric_schema_version === 2)
@@ -90,6 +104,7 @@ try {
     // Kept out of `errors` on purpose: a telemetry digest failure costs one
     // point's PowerX tab, not its benchmark data, so it must not fail the ingest.
     telemetryWarnings: manifest.telemetryWarnings ?? [],
+    ...(manifest.telemetry ? { telemetry: manifest.telemetry } : {}),
   };
   fs.writeFileSync(`${manifestPath}.verification.json`, `${JSON.stringify(receipt, null, 2)}\n`);
   console.log(JSON.stringify(receipt, null, 2));

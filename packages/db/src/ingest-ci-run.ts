@@ -27,6 +27,8 @@ import { createHash } from 'node:crypto';
 import {
   powerPublicationPoint,
   publicationIdentity,
+  benchmarkPublicationIdentity,
+  stablePowerPointIdentity,
   type PowerPublicationPoint,
 } from './etl/power-publication';
 import os from 'os';
@@ -81,6 +83,7 @@ import { discoverTraceReplayArtifacts } from './etl/trace-artifact-discovery';
 import { discoverServerLogArtifacts, readServerLogArtifact } from './etl/server-log-artifacts';
 import { discoverGpuMetricsArtifacts } from './etl/gpu-metrics-artifacts';
 import { ingestGpuMetricsArtifact } from './etl/gpu-metrics-ingest';
+import { readTelemetryReceipt, type TelemetryObservation } from './etl/telemetry-receipt';
 import { datasetSlugFromBenchmarkRow } from './etl/dataset-provenance';
 import { mapAggEvalRow, mapEvalRow } from './etl/eval-mapper';
 import { ingestEvalRow } from './etl/eval-ingest';
@@ -99,6 +102,9 @@ import {
 const DEFAULT_REPO = 'SemiAnalysisAI/InferenceX';
 const powerPublicationPoints = new Map<string, PowerPublicationPoint>();
 const powerPublicationErrors: string[] = [];
+const telemetryObservations = new Map<string, TelemetryObservation>();
+let telemetryExpectationsUnknown = false;
+let checkTelemetry = false;
 const tracker = createSkipTracker();
 const isDownloadMode = process.argv[2] === '--download';
 
@@ -154,6 +160,15 @@ if (isDownloadMode) {
     input.match(/^https:\/\/github\.com\/(?<repo>[^/]+\/[^/]+)\/actions\/runs\/\d+/u)?.[1] ??
     DEFAULT_REPO;
 
+  runAttemptNum = fetchRunAttempt(REPO, runIdStr);
+  const requestedAttempt = input.match(/\/attempts\/(?<attempt>\d+)/u)?.groups?.attempt;
+  if (requestedAttempt && Number(requestedAttempt) !== runAttemptNum) {
+    throw new Error(
+      `GitHub attempt ${runAttemptNum} differs from requested ${requestedAttempt}; ` +
+        'use retained artifacts and exact source metadata for historical-attempt ingestion',
+    );
+  }
+
   // Download artifacts
   tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ingest-'));
   artifactsDir = tempDir;
@@ -197,8 +212,6 @@ if (isDownloadMode) {
   }
 
   console.log(`\n  Downloaded ${byLogical.size} artifact(s)`);
-
-  runAttemptNum = fetchRunAttempt(REPO, runIdStr);
 } else {
   // CI mode — read from env vars
   for (const key of [
@@ -289,6 +302,7 @@ async function main(): Promise<void> {
   }
 
   validateRunBackfills();
+  checkTelemetry = true;
   const configCache = createConfigCache(sql);
   const { getOrCreateConfig, preloadConfigs } = configCache;
   const { fetchGithubRun, getOrCreateWorkflowRun } = createWorkflowRunServices(sql, GITHUB_TOKEN, [
@@ -548,6 +562,7 @@ async function main(): Promise<void> {
       );
       const data = readJson(file);
       if (!data) {
+        telemetryExpectationsUnknown = true;
         powerPublicationErrors.push(`Unreadable benchmark JSON: ${relativeFile}`);
         console.log(`    skipped unreadable JSON (${elapsed(fileStart)})`);
         continue;
@@ -564,16 +579,26 @@ async function main(): Promise<void> {
         if (datasetSlug) datasetSlugs.add(datasetSlug);
       }
 
+      let fileExpectationsUnknown = false;
       const rows = rawRows
-        .filter((r) => typeof r === 'object' && r !== null)
+        .filter((r) => {
+          const isRow = typeof r === 'object' && r !== null;
+          if (!isRow) fileExpectationsUnknown = true;
+          return isRow;
+        })
         .map((r) => {
+          const failedRuns = tracker.skips.failedRun;
           const mapped = mapBenchmarkRow(r, tracker, undefined, runIdStr);
+          // Known failed benchmarks are intentionally excluded; unmappable rows
+          // leave an unknown number of successful attachment expectations.
+          if (!mapped && tracker.skips.failedRun === failedRuns) fileExpectationsUnknown = true;
           if (!mapped && Number(r.isl) === 8192 && Number(r.osl) === 1024) {
             powerPublicationErrors.push(`Unmapped or failed 8K/1K result: ${relativeFile}`);
           }
           return mapped;
         })
         .filter((r): r is NonNullable<typeof r> => r !== null);
+      if (fileExpectationsUnknown) telemetryExpectationsUnknown = true;
 
       console.log(`    mapped rows: ${rows.length}`);
       if (rows.length === 0) {
@@ -582,11 +607,17 @@ async function main(): Promise<void> {
       }
 
       const toInsert = [];
+      const parentDir = path.basename(path.dirname(file));
+      const configKey = parentDir.replace(/^bmk_/u, '');
+      const suffix = stripBmkAndAgenticPrefix(parentDir);
+      const gpuMetricsArtifact =
+        gpuMetricsArtifacts.get(configKey) ?? gpuMetricsArtifacts.get(suffix);
       for (const row of rows) {
         let configId: number;
         try {
           configId = await getOrCreateConfig(row.config);
         } catch (error: any) {
+          telemetryExpectationsUnknown = true;
           tracker.recordDbError(`config for ${path.basename(file)}`, error);
           continue;
         }
@@ -631,6 +662,21 @@ async function main(): Promise<void> {
         if (publication)
           powerPublicationPoints.set(publicationIdentity(publication.identity), publication);
         toInsert.push(applied.point);
+        const identity = benchmarkPublicationIdentity(applied.point);
+        const key = stablePowerPointIdentity(identity);
+        // Aggregate copies may arrive before/after their per-job sibling. Only
+        // the latter establishes whether that exact telemetry artifact exists.
+        if (parentDir.startsWith('bmk_') || !telemetryObservations.has(key)) {
+          telemetryObservations.set(key, {
+            identity,
+            artifactNames: gpuMetricsArtifact
+              ? [gpuMetricsArtifact.artifactName]
+              : parentDir.startsWith('bmk_')
+                ? [`gpu_metrics_${suffix}`, `power_audit_${suffix}`]
+                : [],
+            produced: parentDir.startsWith('bmk_') ? Boolean(gpuMetricsArtifact) : null,
+          });
+        }
       }
       console.log(`    rows with resolved configs: ${toInsert.length}`);
 
@@ -666,14 +712,12 @@ async function main(): Promise<void> {
             });
           }
 
-          const parentDir = path.basename(path.dirname(file));
           if (parentDir.startsWith('bmk_') && insertedIds.length > 0) {
             // Single-turn artifacts are `bmk_<key>` paired with
             // `server_logs_<key>`. Agentic artifacts are `bmk_agentic_<key>`
             // but the server log is still `server_logs_<key>` (no `agentic_`
             // prefix), so fall back to the fully-stripped suffix — otherwise
             // agentic rows never get their server log (and KV-pool size) linked.
-            const configKey = parentDir.replace(/^bmk_/u, '');
             const logArtifact =
               serverLogArtifacts.get(configKey) ??
               serverLogArtifacts.get(stripBmkAndAgenticPrefix(parentDir));
@@ -696,9 +740,6 @@ async function main(): Promise<void> {
             }
             // Same pairing rule as server logs: `gpu_metrics_<key>` carries no
             // `agentic_` prefix, so agentic points fall back to the bare suffix.
-            const gpuMetricsArtifact =
-              gpuMetricsArtifacts.get(configKey) ??
-              gpuMetricsArtifacts.get(stripBmkAndAgenticPrefix(parentDir));
             if (gpuMetricsArtifact) {
               try {
                 const gpuMetricsStart = Date.now();
@@ -707,6 +748,10 @@ async function main(): Promise<void> {
                   artifact: gpuMetricsArtifact,
                   benchmarkResultIds: insertedIds,
                 });
+                if (ingested.seriesIds.length === 0)
+                  throw new Error(
+                    `No parseable telemetry series in ${gpuMetricsArtifact.artifactName}`,
+                  );
                 totalGpuMetricSeries += ingested.seriesIds.length;
                 totalGpuMetricSamples += ingested.samplesInserted;
                 console.log(
@@ -721,6 +766,12 @@ async function main(): Promise<void> {
                 // artifact later. Recording it as a DB error instead would reach
                 // the publication manifest and fail the whole production ingest.
                 tracker.recordTelemetryError(`gpu_metrics for ${configKey}`, error);
+                for (const row of toInsert) {
+                  const point = telemetryObservations.get(
+                    stablePowerPointIdentity(benchmarkPublicationIdentity(row)),
+                  );
+                  if (point) point.error = error instanceof Error ? error.message : String(error);
+                }
               }
             }
           }
@@ -729,7 +780,6 @@ async function main(): Promise<void> {
           // harness emits `agentic_<suffix>/trace_replay/...` next to the
           // `bmk_agentic_<suffix>` artifact we just ingested.
           if (parentDir.startsWith('bmk_agentic_') && insertedIds.length > 0) {
-            const suffix = stripBmkAndAgenticPrefix(parentDir);
             const concMatch = path.basename(file).match(/_conc(?<conc>\d+)\.json$/u);
             const trace =
               (concMatch?.groups?.conc
@@ -1100,9 +1150,24 @@ main()
     console.error('ingest-ci-run failed:', error);
     process.exitCode = 1;
   })
-  .finally(() => {
-    const publicationPath = process.env.POWER_PUBLICATION_MANIFEST;
+  .finally(async () => {
+    const publicationPath =
+      process.env.POWER_PUBLICATION_MANIFEST ??
+      `power-publication-${runIdNum}-attempt-${runAttemptNum}.json`;
     if (publicationPath) {
+      const telemetry = checkTelemetry
+        ? await readTelemetryReceipt(
+            sql,
+            { runId: runIdNum, runAttempt: runAttemptNum },
+            [...telemetryObservations.values()],
+            {
+              expectedSource:
+                !telemetryExpectationsUnknown && telemetryObservations.size > 0
+                  ? 'benchmark_artifacts'
+                  : 'unknown',
+            },
+          )
+        : undefined;
       fs.writeFileSync(
         publicationPath,
         `${JSON.stringify(
@@ -1119,11 +1184,13 @@ main()
             telemetryWarnings: tracker.skips.telemetryError
               ? [`${tracker.skips.telemetryError} gpu_metrics digest errors`]
               : [],
+            ...(telemetry ? { telemetry } : {}),
           },
           null,
           2,
         )}\n`,
       );
+      console.log(`  PowerX ingest receipt: ${publicationPath}`);
     }
     if (tempDir) {
       try {

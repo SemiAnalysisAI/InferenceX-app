@@ -29,6 +29,18 @@ import { hasNoSslFlag } from './cli-utils.js';
 import { AsyncSemaphore } from './etl/async-semaphore.js';
 import { createAdminSql } from './etl/db-utils.js';
 import { ingestGpuMetricsArtifact } from './etl/gpu-metrics-ingest.js';
+import {
+  benchmarkPublicationIdentity,
+  stablePowerPointIdentity,
+  type PowerPublicationManifest,
+} from './etl/power-publication.js';
+import {
+  readTelemetryReceipt,
+  summarizeTelemetryReceipt,
+  telemetryArtifactsForAttempt,
+  type TelemetryObservation,
+  type TelemetryReceipt,
+} from './etl/telemetry-receipt.js';
 import { retryArtifactOperation } from './lib/artifact-retry.js';
 import {
   confirmProceed,
@@ -37,9 +49,10 @@ import {
   runBackfillMain,
 } from './lib/backfill-runner.js';
 import { findBenchmarkResultIds, readMappedBenchmarkRows } from './lib/benchmark-result-lookup.js';
-import { downloadArtifact } from './lib/github-artifacts.js';
+import { downloadArtifact, fetchRunMeta } from './lib/github-artifacts.js';
 import {
   pairGpuMetricsArtifacts,
+  collectMissingTelemetryExpectations,
   type GpuMetricsArtifactPair,
 } from './lib/gpu-metrics-backfill.js';
 import { repositoryFromRunUrl } from './lib/runtime-metadata-artifacts.js';
@@ -64,6 +77,9 @@ interface BackfillFlags {
   fromRun: number | null;
   since: string | null;
   parallel: number;
+  attempt: number | null;
+  artifact: string | null;
+  receipt: string | null;
 }
 
 function positiveIntFlag(flag: string): number | null {
@@ -74,6 +90,14 @@ function positiveIntFlag(flag: string): number | null {
     throw new Error(`${flag} requires a positive integer`);
   }
   return Number(raw);
+}
+
+function stringFlag(flag: string): string | null {
+  const index = process.argv.indexOf(flag);
+  if (index === -1) return null;
+  const value = process.argv[index + 1];
+  if (!value || value.startsWith('--')) throw new Error(`${flag} requires a value`);
+  return value;
 }
 
 function parseFlags(): BackfillFlags {
@@ -89,6 +113,9 @@ function parseFlags(): BackfillFlags {
     fromRun: positiveIntFlag('--from-run'),
     since,
     parallel: positiveIntFlag('--parallel') ?? 4,
+    attempt: positiveIntFlag('--attempt'),
+    artifact: stringFlag('--artifact'),
+    receipt: stringFlag('--receipt'),
   };
 }
 
@@ -109,11 +136,15 @@ async function loadCandidateRuns(
   const rows = await sql<CandidateRun[]>`
     select wr.id, wr.github_run_id, wr.run_attempt, wr.html_url, wr.date::text as date,
       (select count(*)::int from gpu_metric_series s where s.workflow_run_id = wr.id) as series_count
-    from latest_workflow_runs wr
+    from workflow_runs wr
     where exists (select 1 from benchmark_results br where br.workflow_run_id = wr.id)
       and (${flags.run}::bigint is null or wr.github_run_id = ${flags.run})
       and (${flags.fromRun}::bigint is null or wr.github_run_id >= ${flags.fromRun})
       and (${flags.run}::bigint is not null or wr.date >= ${since}::date)
+      and ((${flags.attempt}::integer is not null and wr.run_attempt = ${flags.attempt}) or
+        (${flags.attempt}::integer is null and not exists (
+          select 1 from workflow_runs newer where newer.github_run_id = wr.github_run_id
+            and newer.run_attempt > wr.run_attempt)))
     order by wr.date desc, wr.github_run_id desc
   `;
   const candidates = rows
@@ -128,9 +159,14 @@ async function loadCandidateRuns(
 }
 
 type PairOutcome =
-  | { kind: 'ingested'; seriesCount: number; samplesInserted: number; pointsLinked: number }
+  | {
+      kind: 'ingested';
+      seriesCount: number;
+      samplesInserted: number;
+      pointsLinked: number;
+      expectationsUnknown: boolean;
+    }
   | { kind: 'unmatched' }
-  | { kind: 'empty' }
   | { kind: 'failed' };
 
 /** Download one gpu_metrics/bmk pair, resolve its points, and persist the series. */
@@ -138,16 +174,43 @@ async function processPair(
   run: CandidateRun,
   pair: GpuMetricsArtifactPair,
   tempDir: string,
+  observations: Map<string, TelemetryObservation>,
+  expectationErrors: NonNullable<TelemetryReceipt['expectationErrors']>,
+  uniqueFallbacks: Map<string, number>,
 ): Promise<PairOutcome> {
   let benchmarkDir: string | null = null;
   let gpuMetricsDir: string | null = null;
+  const pointKeys: string[] = [];
+  let expectationsUnknown = false;
   try {
     benchmarkDir = await retryArtifactOperation(`downloading ${pair.benchmarks.name}`, () =>
       downloadArtifact(pair.benchmarks, tempDir),
     );
-    const mappedRows = readMappedBenchmarkRows(benchmarkDir);
-    const resultIds = await findBenchmarkResultIds(sql, run, mappedRows);
+    const mappedRows = readMappedBenchmarkRows(benchmarkDir, (error) => {
+      expectationsUnknown = true;
+      expectationErrors.push({
+        benchmarkArtifact: pair.benchmarks.name,
+        artifactNames: [pair.gpuMetrics.name],
+        error,
+      });
+    });
+    for (const row of mappedRows) {
+      const identity = benchmarkPublicationIdentity(row);
+      const key = stablePowerPointIdentity(identity);
+      pointKeys.push(key);
+      observations.set(key, { identity, artifactNames: [pair.gpuMetrics.name], produced: true });
+    }
+    const matchedIds: number[] = [];
+    for (const row of mappedRows) {
+      const ids = await findBenchmarkResultIds(sql, run, [row], (id) =>
+        uniqueFallbacks.set(stablePowerPointIdentity(benchmarkPublicationIdentity(row)), id),
+      );
+      if (ids.length === 0) throw new Error(`${pair.gpuMetrics.name}: no matching benchmark rows`);
+      matchedIds.push(...ids);
+    }
+    const resultIds = [...new Set(matchedIds)];
     if (resultIds.length === 0) {
+      if (expectationsUnknown) return { kind: 'failed' };
       console.warn(`  [WARN] ${pair.gpuMetrics.name}: no matching benchmark rows`);
       return { kind: 'unmatched' };
     }
@@ -160,16 +223,26 @@ async function processPair(
       benchmarkResultIds: resultIds,
     });
     if (ingested.seriesIds.length === 0) {
-      console.warn(`  [WARN] ${pair.gpuMetrics.name}: no parseable gpu_metrics CSV`);
-      return { kind: 'empty' };
+      throw new Error(`${pair.gpuMetrics.name}: no parseable gpu_metrics CSV`);
     }
     return {
       kind: 'ingested',
       seriesCount: ingested.seriesIds.length,
       samplesInserted: ingested.samplesInserted,
       pointsLinked: resultIds.length,
+      expectationsUnknown,
     };
   } catch (error) {
+    if (pointKeys.length === 0)
+      expectationErrors.push({
+        benchmarkArtifact: pair.benchmarks.name,
+        artifactNames: [pair.gpuMetrics.name],
+        error: error instanceof Error ? error.message : String(error),
+      });
+    for (const key of pointKeys) {
+      const observation = observations.get(key)!;
+      observation.error = error instanceof Error ? error.message : String(error);
+    }
     console.error(`  ✗ run ${run.github_run_id} artifact ${pair.gpuMetrics.name}:`, error);
     return { kind: 'failed' };
   } finally {
@@ -184,6 +257,8 @@ async function main(): Promise<void> {
   if (!flags.all && flags.run === null) {
     throw new Error('Pass --run <github run id> or --all');
   }
+  if ((flags.attempt !== null || flags.artifact || flags.receipt) && flags.run === null)
+    throw new Error('--attempt, --artifact and --receipt require --run');
 
   console.log('=== backfill-gpu-metrics ===');
   const runs = await loadCandidateRuns(flags, limit, force);
@@ -194,6 +269,10 @@ async function main(): Promise<void> {
       : '';
   console.log(`  ${runs.length} candidate run(s)${staleNote}`);
   if (runs.length === 0) {
+    if (flags.attempt !== null || flags.artifact || flags.receipt)
+      throw new Error(
+        `No persisted benchmark target for run ${flags.run} attempt ${flags.attempt ?? 'latest'}`,
+      );
     console.log('\n  Nothing to do.');
     return;
   }
@@ -202,23 +281,39 @@ async function main(): Promise<void> {
     let pairedRuns = 0;
     let pairs = 0;
     let goneRuns = 0;
+    let failedRuns = 0;
     for (const run of runs) {
-      const repository = repositoryFromRunUrl(run.html_url) ?? DEFAULT_REPO;
-      const artifacts = await listBackfillRunArtifacts(repository, run.github_run_id);
-      if (artifacts === null) {
-        goneRuns++;
-        console.log(`  run ${run.github_run_id} (${run.date}): gone from GitHub`);
-        continue;
+      try {
+        const repository = repositoryFromRunUrl(run.html_url) ?? DEFAULT_REPO;
+        const artifacts = await listBackfillRunArtifacts(repository, run.github_run_id);
+        if (artifacts === null) {
+          goneRuns++;
+          console.log(`  run ${run.github_run_id} (${run.date}): gone from GitHub`);
+          continue;
+        }
+        const runPairs = pairGpuMetricsArtifacts(
+          telemetryArtifactsForAttempt(
+            artifacts,
+            fetchRunMeta(repository, String(run.github_run_id)),
+            run.run_attempt,
+          ),
+        ).filter((pair) => !flags.artifact || pair.gpuMetrics.name === flags.artifact);
+        if (runPairs.length > 0) pairedRuns++;
+        pairs += runPairs.length;
+        console.log(`  run ${run.github_run_id} (${run.date}): ${runPairs.length} pair(s)`);
+      } catch (error) {
+        if (flags.run !== null) throw error;
+        failedRuns++;
+        console.error(
+          `  run ${run.github_run_id} (${run.date}): ${error instanceof Error ? error.message : String(error)}`,
+        );
       }
-      const runPairs = pairGpuMetricsArtifacts(artifacts);
-      if (runPairs.length > 0) pairedRuns++;
-      pairs += runPairs.length;
-      console.log(`  run ${run.github_run_id} (${run.date}): ${runPairs.length} pair(s)`);
     }
     console.log(
       `\n=== dry run: ${runs.length} run(s), ${pairedRuns} with pairs, ${pairs} pair(s), ` +
-        `${goneRuns} gone from GitHub ===`,
+        `${goneRuns} gone from GitHub, ${failedRuns} failed ===`,
     );
+    if (failedRuns > 0) process.exitCode = 1;
     return;
   }
 
@@ -231,7 +326,6 @@ async function main(): Promise<void> {
   let samplesStored = 0;
   let pointsLinked = 0;
   let unmatchedArtifacts = 0;
-  let emptyArtifacts = 0;
   let artifactFailures = 0;
   let runFailures = 0;
   let missingRuns = 0;
@@ -242,17 +336,79 @@ async function main(): Promise<void> {
     const repository = repositoryFromRunUrl(run.html_url) ?? DEFAULT_REPO;
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), `gpu-metrics-backfill-${runId}-`));
     const runStart = Date.now();
+    const receiptPath =
+      flags.receipt ?? `power-publication-${runId}-attempt-${run.run_attempt}.json`;
+    const manifest: PowerPublicationManifest = fs.existsSync(receiptPath)
+      ? JSON.parse(fs.readFileSync(receiptPath, 'utf8'))
+      : { version: 1, runId, runAttempt: run.run_attempt, points: [] };
+    if (
+      manifest.version !== 1 ||
+      manifest.runId !== runId ||
+      manifest.runAttempt !== run.run_attempt ||
+      !Array.isArray(manifest.points) ||
+      (manifest.telemetry &&
+        (manifest.telemetry.runId !== runId || manifest.telemetry.runAttempt !== run.run_attempt))
+    )
+      throw new Error('Publication receipt run/attempt does not match the recovery target');
+    const observations = new Map<string, TelemetryObservation>();
+    const uniqueFallbacks = new Map<string, number>();
+    let recoveryError: string | undefined;
+    let expectationErrors: TelemetryReceipt['expectationErrors'];
     try {
-      const artifacts = await listBackfillRunArtifacts(repository, runId);
-      if (artifacts === null) {
+      const listedArtifacts = await listBackfillRunArtifacts(repository, runId);
+      if (listedArtifacts === null) {
         goneRuns++;
+        runFailures++;
+        recoveryError = `Run ${runId} attempt ${run.run_attempt} is gone from GitHub`;
         console.log(
           `  [${runIndex + 1}/${runs.length}] run ${runId} attempt ${run.run_attempt}: gone from GitHub`,
         );
         continue;
       }
-      const pairs = pairGpuMetricsArtifacts(artifacts);
+      const artifacts = telemetryArtifactsForAttempt(
+        listedArtifacts,
+        fetchRunMeta(repository, String(runId)),
+        run.run_attempt,
+      );
+      const allPairs = pairGpuMetricsArtifacts(artifacts);
+      const pairs = allPairs.filter(
+        (pair) => !flags.artifact || pair.gpuMetrics.name === flags.artifact,
+      );
+      // Expectations come from benchmark siblings even when no telemetry was
+      // uploaded. Counting only the successful pairs would hide missing points.
+      const missing = await collectMissingTelemetryExpectations(
+        artifacts,
+        allPairs,
+        flags.artifact,
+        async (artifact, onUnmapped) => {
+          let directory: string | null = null;
+          try {
+            directory = await retryArtifactOperation(`downloading ${artifact.name}`, () =>
+              downloadArtifact(artifact, tempDir),
+            );
+            const rows = readMappedBenchmarkRows(directory, onUnmapped);
+            for (const row of rows)
+              await findBenchmarkResultIds(sql, run, [row], (id) =>
+                uniqueFallbacks.set(
+                  stablePowerPointIdentity(benchmarkPublicationIdentity(row)),
+                  id,
+                ),
+              );
+            return rows;
+          } finally {
+            if (directory) fs.rmSync(directory, { recursive: true, force: true });
+          }
+        },
+      );
+      for (const observation of missing.observations)
+        observations.set(stablePowerPointIdentity(observation.identity), observation);
+      expectationErrors = missing.errors;
+      artifactFailures += new Set(missing.errors.map((error) => error.benchmarkArtifact)).size;
       if (pairs.length === 0) {
+        if (flags.artifact) {
+          artifactFailures++;
+          recoveryError = `No retained telemetry pair for ${flags.artifact}`;
+        }
         missingRuns++;
         console.log(
           `  [${runIndex + 1}/${runs.length}] run ${runId} attempt ${run.run_attempt}: no retained gpu_metrics pairs`,
@@ -262,7 +418,11 @@ async function main(): Promise<void> {
 
       const limiter = new AsyncSemaphore(flags.parallel);
       const outcomes = await Promise.all(
-        pairs.map((pair) => limiter.run(() => processPair(run, pair, tempDir))),
+        pairs.map((pair) =>
+          limiter.run(() =>
+            processPair(run, pair, tempDir, observations, missing.errors, uniqueFallbacks),
+          ),
+        ),
       );
       let runSeries = 0;
       let runSamples = 0;
@@ -270,6 +430,7 @@ async function main(): Promise<void> {
         switch (outcome.kind) {
           case 'ingested': {
             artifactsProcessed++;
+            if (outcome.expectationsUnknown) artifactFailures++;
             runSeries += outcome.seriesCount;
             runSamples += outcome.samplesInserted;
             pointsLinked += outcome.pointsLinked;
@@ -277,10 +438,6 @@ async function main(): Promise<void> {
           }
           case 'unmatched': {
             unmatchedArtifacts++;
-            break;
-          }
-          case 'empty': {
-            emptyArtifacts++;
             break;
           }
           case 'failed': {
@@ -298,8 +455,40 @@ async function main(): Promise<void> {
       );
     } catch (error) {
       runFailures++;
+      recoveryError = error instanceof Error ? error.message : String(error);
       console.error(`  ✗ run ${runId}:`, error);
     } finally {
+      manifest.telemetry = await readTelemetryReceipt(
+        sql,
+        { runId, runAttempt: run.run_attempt },
+        [...observations.values()],
+        { previous: manifest.telemetry, targeted: Boolean(flags.artifact), uniqueFallbacks },
+      );
+      if (recoveryError) {
+        const priorError = manifest.telemetry.recoveryError;
+        const priorScope = manifest.telemetry.recoveryArtifactNames;
+        manifest.telemetry.recoveryError = [
+          ...new Set([priorError, recoveryError].filter(Boolean).join('\n').split('\n')),
+        ].join('\n');
+        if (flags.artifact && (!priorError || priorScope))
+          manifest.telemetry.recoveryArtifactNames = [
+            ...new Set([...(priorScope ?? []), flags.artifact]),
+          ];
+        else delete manifest.telemetry.recoveryArtifactNames;
+      }
+      if (expectationErrors) {
+        const failedBenchmarks = new Set(expectationErrors.map((error) => error.benchmarkArtifact));
+        manifest.telemetry.expectationErrors = [
+          ...(manifest.telemetry.expectationErrors ?? []).filter(
+            (error) => !failedBenchmarks.has(error.benchmarkArtifact),
+          ),
+          ...expectationErrors,
+        ];
+      }
+      summarizeTelemetryReceipt(manifest.telemetry);
+      fs.mkdirSync(path.dirname(path.resolve(receiptPath)), { recursive: true });
+      fs.writeFileSync(receiptPath, `${JSON.stringify(manifest, null, 2)}\n`);
+      console.log(`  PowerX ingest receipt: ${receiptPath}`);
       fs.rmSync(tempDir, { recursive: true, force: true });
     }
   }
@@ -307,11 +496,13 @@ async function main(): Promise<void> {
   console.log(
     `\n=== backfill complete: ${artifactsProcessed} artifact(s), ${seriesStored} series, ` +
       `${samplesStored} sample(s), ${pointsLinked} point link(s), ` +
-      `${unmatchedArtifacts} unmatched artifact(s), ${emptyArtifacts} empty artifact(s), ` +
+      `${unmatchedArtifacts} unmatched artifact(s), ` +
       `${missingRuns} run(s) without pairs, ${goneRuns} run(s) gone from GitHub, ` +
       `${artifactFailures} failed artifact(s), ${runFailures} failed run(s) ===`,
   );
-  console.log('  Point telemetry reads use the stored revision; no manual cache purge is needed.');
+  console.log(
+    '  Point telemetry reads use the stored revision; API verification is recorded separately.',
+  );
   if (artifactFailures > 0 || runFailures > 0) process.exitCode = 1;
 }
 

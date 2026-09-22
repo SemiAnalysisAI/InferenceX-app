@@ -72,6 +72,90 @@ retried on the next read. A database failure remains an API error even if an old
 Old cache generations remain until the existing prefix cleanup runs; repair does not require
 a manual PowerX cache purge. General benchmark cache invalidation still follows normal CI.
 
+## Coverage receipts
+
+The existing `power-publication.json` gains an optional `telemetry` receipt, keyed by run,
+attempt and stable benchmark-point identity. Its stages distinguish expected benchmark
+attachments, produced artifacts, stored series/samples, point links and actual API readback.
+Normal CI builds expectations from benchmark rows before telemetry discovery. Backfill
+also inspects benchmark siblings whose telemetry artifact is absent. Unreadable benchmark
+siblings are recorded in `expectationErrors`; known identities still proceed independently.
+
+`plannedPointCount: null` explicitly means the full planned sweep is unknown. Attachment
+coverage over available benchmark rows does **not** prove full sweep coverage. Point,
+artifact, series and sample counts are separate: a bundle can contain multiple host series
+and multiple points can share those series. Receipt entries list missing identities,
+reasons, and exact run/attempt/artifact recovery targets. DB success leaves API status
+`unknown`; only `verify-power-publication.ts` advances it after an actual HTTP read.
+Telemetry failures remain isolated from benchmark publication failure policy.
+
+The expectation boundary is the successfully mapped, non-purged benchmark rows
+selected for ingestion, plus persisted benchmark identities recovered by the
+receipt query. It is not every raw result or every planned job. Mapping/preflight
+errors remain in the existing ingest diagnostics. Unreadable/unmappable benchmark
+rows and failed config resolution make `expectedSource` unknown while retaining
+known point identities; intentionally failed or purged benchmarks remain excluded.
+The telemetry receipt does not
+reconstruct the planned matrix, even when a separate required-power manifest is
+available; `plannedPointCount` stays null. An unreadable backfill benchmark sibling
+sets `expectationErrors` and makes `expectedPoints` unknown, including when its
+telemetry pair exists.
+Backfill preserves mapped points alongside per-row diagnostics for unmappable rows;
+multiple row errors in one benchmark artifact count as one failed artifact. Every
+mapped point in a correction must match a persisted benchmark before telemetry
+ingest can clear that artifact's recovery failure. An uploaded correction with an
+unmatched point is not a successful repair, even when older data remains readable.
+Later refreshes retain unresolved expectation errors until that exact sibling's
+identities can actually be recovered; an expired sibling cannot disappear from
+the unknown denominator.
+This also applies on the first receipt: a selected expired benchmark sibling records
+an expectation error without attempting a download. Superseded retries and unrelated
+targets remain excluded by the existing logical-name and artifact filters.
+Known failed benchmark rows remain excluded, matching normal CI.
+
+Historical backfill retains the resolver's exact-first, unique-fallback offload matching.
+A proven fallback uses the persisted point's offload identity before receipt counting
+and recovery checks, including benchmark siblings whose telemetry is absent. Repeating
+the recovery removes only the corresponding old null-ID phantom in that artifact's
+scope; real on/off points remain distinct. Conflicting artifact observations or prior
+artifact scope stay visible with an unknown denominator rather than overwriting errors.
+
+Normal CI deliberately retains successful artifacts from earlier attempts of the
+same run/head for `rerun-failed`. Receipt `runAttempt` identifies the persisted
+ingest cohort, not the collection attempt of every artifact. Per-artifact collection
+attempt is unknown unless independently retained in source provenance. Do not
+filter the normal artifact plan to the latest attempt and silently drop successful
+points. Explicit `--download .../attempts/N` rejects a different current attempt;
+targeted GitHub telemetry recovery uses its stricter current-attempt filter below.
+
+An empty or wholly unreadable telemetry correction is an ingest failure, even when
+older stored samples remain readable. A targeted recovery retains unresolved
+`recoveryError` and `recoveryArtifactNames` from other artifacts. Sequential successful
+repairs remove only their own artifact names. Older receipts with an unscoped recovery
+error require a successful full-run refresh to clear that error; repairing a different
+artifact cannot establish recovery. Retained error text describes the failed attempts;
+the remaining artifact names identify the outstanding scope.
+
+| Receipt reason       | Targeted action                                                                                                                                                     |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `artifact_missing`   | Recover the exact listed sibling from the same source provenance; use retained local bytes if GitHub no longer has that attempt. Do not substitute a newer attempt. |
+| `ingest_failed`      | Inspect the recorded error, correct the exact artifact or sidecar, then re-ingest it. Empty/unparseable CSVs do not count as a successful correction.               |
+| `point_link_missing` | Re-ingest the named unchanged artifact for the recorded run/attempt. Existing series/samples remain idempotent and the missing link is restored.                    |
+| `expectationErrors`  | Recover the named benchmark sibling first so its point identities can be enumerated; successful telemetry downloads alone do not establish the denominator.         |
+
+Apply the run/attempt/artifact selectors in each point's `recovery` object to the
+commands below, merge the same receipt, then run the HTTP verifier. A missing explicit
+target or deleted GitHub run reports failure. Neither a successful command nor the
+benchmark-level `matched` status establishes telemetry completeness: inspect the
+separate counts, unknowns and outstanding errors.
+
+The stored inventory distinguishes `storage.status` complete/incomplete/unknown. Missing
+host files and mismatched sample counts remain gaps even when the surviving payload can be
+read. `apiReadablePoints` counts actual successful HTTP reads; `apiCompletePoints` additionally
+requires the retained artifact inventory and every point link. Legacy rows without an inventory
+remain unknown until recovered; they do not silently count as complete. A failed correction or
+receipt recovery error also blocks the complete count, even when older data remains readable.
+
 ## Full-record statistics
 
 The point detail, run explorer and public `/api/v1/views/gpu-metrics` projection use the
@@ -105,7 +189,7 @@ bun run fmt
 bun run check:typography
 bun run --cwd packages/app test:unit src/app/api/v1/gpu-metrics-point/route.test.ts
 bun run --cwd packages/app test:unit src/app/api/v1/views/gpu-metrics/route.test.ts
-bun run --cwd packages/db test:unit src/queries/gpu-metrics-timeline.test.ts
+bun run --cwd packages/db test:unit src/queries/gpu-metrics-timeline.test.ts src/etl/telemetry-receipt.test.ts
 bun run --cwd packages/app test:e2e:component --spec cypress/component/gpu-stats-table.cy.tsx
 ```
 
@@ -122,3 +206,54 @@ POWERX_PG_BIN=/path/to/postgresql/bin bun scripts/powerx-db-acceptance.ts /absol
 
 The ordinary fixture-backed smoke command remains `bun run test:e2e` with an
 `E2E_FIXTURES=1` dev server. The full cross-browser matrix remains the repository CI gate.
+
+## Deployment and targeted data repair (operator review required)
+
+1. Deploy the reviewed application and ingest/backfill code together. Verify migrations
+   `015_power_provenance.sql` and `016_gpu_metrics.sql` already exist on the target. This
+   change adds no migration. Do not run migrations or backfill against production merely
+   to inspect a receipt.
+2. Retain the original publication receipt, exact artifact bytes, sidecars, source run and
+   attempt. Snapshot the target run's telemetry series, samples, digests and point links
+   before correction. Check that the app reads the same database that ingest writes.
+3. Inspect a bounded candidate with the existing command, using explicitly selected
+   target credentials in the operator environment:
+
+   ```sh
+   bun run admin:db:backfill-gpu-metrics --run RUN_ID --attempt ATTEMPT --dry-run
+   ```
+
+4. Once authorized, repair only the named artifact and merge the existing receipt:
+
+   ```sh
+   bun run admin:db:backfill-gpu-metrics --run RUN_ID --attempt ATTEMPT \
+     --artifact EXACT_ARTIFACT_NAME --receipt /path/power-publication.json --yes
+   bun packages/db/src/verify-power-publication.ts /path/power-publication.json https://TARGET_ORIGIN
+   ```
+
+   An explicit `--run` is rechecked even if some series already exist. Unchanged inputs
+   are no-ops. The GitHub backfill route accepts only the current source attempt and
+   filters out earlier attempt artifacts; it refuses a mismatched historical attempt.
+   Expired or older-attempt bytes require retained artifacts through the existing local
+   ingest path (`INGEST_ARTIFACTS_PATH` and exact source-run metadata), after operator
+   review. Never substitute another attempt's bytes. A local sidecar correction must be
+   applied to the retained artifact tree; re-downloading unchanged GitHub bytes cannot fix it.
+   The local ingest entry takes `INGEST_RUN_ID`, `INGEST_RUN_ATTEMPT`,
+   `INGEST_REPO=SemiAnalysisAI/InferenceX`, `INGEST_ARTIFACTS_PATH` and
+   `POWER_PUBLICATION_MANIFEST`, then `bun run admin:db:ingest:ci`. It also requires
+   `GITHUB_TOKEN` and the reviewed `DATABASE_WRITE_URL`. Inspect any retained
+   `reused-ingest-metadata/reuse_source_run.json` first: it overrides run/attempt identity.
+
+5. Inspect per-point receipt gaps and both point/Timeline APIs, then refocus/reload the
+   browser. Check expected hosts, GPU IDs, timestamps and digest values. Ingest success
+   alone is insufficient. No telemetry cache purge is required.
+
+For rollback, revert application code only if needed; additive sidecars/receipt fields are
+compatible with the previous schema. Reverting application code restores its old cache
+behavior, so the existing cache invalidation procedure is required in that case. To undo
+a data correction, re-ingest the retained original bytes/sidecars against the exact same
+run/attempt/point identities, or restore only the snapshotted rows in a reviewed transaction.
+Verify links and counts again. Do not delete a shared series to repair one point.
+
+Local tests do not establish deployment, production repair, expired-artifact recoverability,
+or complete published PowerX coverage.
