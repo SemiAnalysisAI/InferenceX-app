@@ -50,12 +50,12 @@ function snapshot(root) {
   });
 }
 
-test('the real npm archive installs the single skill with all bundled resources', () => {
+test('the real npm archive installs the entry and shared skill with all bundled resources', () => {
   const cwd = project();
   const result = run(['install', '--target', 'codex'], cwd);
   succeeded(result);
   assert.ok(result.stdout.includes(`Installed version: ${packageInfo.version}\n`));
-  assert.deepEqual(readdirSync(join(cwd, '.agents', 'skills')), ['inferencex-api']);
+  assert.deepEqual(readdirSync(join(cwd, '.agents', 'skills')), ['inferencex', 'inferencex-api']);
   assert.ok(suite.packedFiles.includes('package.json'));
   assert.ok(suite.packedFiles.includes('README.md'));
   assert.ok(suite.packedFiles.includes('LICENSE'));
@@ -66,7 +66,8 @@ test('the real npm archive installs the single skill with all bundled resources'
     suite.packedFiles.every(
       (path) =>
         ['package.json', 'README.md', 'LICENSE', 'bin/install.mjs'].includes(path) ||
-        path.startsWith('skills/inferencex-api/'),
+        path.startsWith('skills/inferencex-api/') ||
+        path.startsWith('skills/inferencex/'),
     ),
   );
   for (const path of suite.packedFiles.filter((entry) => entry.startsWith('skills/'))) {
@@ -91,7 +92,7 @@ test('default, Claude, generic agents, and explicit destinations work outside th
   ]) {
     const cwd = project();
     succeeded(run(['install', ...args], cwd));
-    assert.deepEqual(readdirSync(join(cwd, location)), ['inferencex-api']);
+    assert.deepEqual(readdirSync(join(cwd, location)), ['inferencex', 'inferencex-api']);
     const status = run(['status', ...args], cwd);
     succeeded(status);
     assert.ok(status.stdout.includes(`Installed version: ${packageInfo.version}\n`));
@@ -101,7 +102,7 @@ test('default, Claude, generic agents, and explicit destinations work outside th
   const destination = join(project(), 'absolute skills');
   succeeded(run(['install', '--dir', destination], cwd));
   assert.deepEqual(readdirSync(cwd), []);
-  assert.deepEqual(readdirSync(destination), ['inferencex-api']);
+  assert.deepEqual(readdirSync(destination), ['inferencex', 'inferencex-api']);
   const status = run(['status', '--dir', destination], cwd);
   succeeded(status);
   assert.ok(status.stdout.includes(`Skill path: ${join(destination, 'inferencex-api')}\n`));
@@ -152,7 +153,8 @@ test('offline status distinguishes the installer and installed version without c
   succeeded(result);
   assert.equal(
     result.stdout,
-    `Installer version: ${packageInfo.version}\nInstalled version: 0.1.99\nSkill path: ${destination}\n`,
+    `Installer version: ${packageInfo.version}\nInstalled version: 0.1.99\nSkill path: ${destination}\n` +
+      `Installer version: ${packageInfo.version}\nInstalled version: ${packageInfo.version}\nSkill path: ${join(cwd, '.agents/skills/inferencex')}\n`,
   );
   assert.equal(JSON.parse(readFileSync(metadataPath, 'utf8')).version, '0.1.99');
   assert.equal(readFileSync(entry, 'utf8'), 'local edits remain untouched');
@@ -415,6 +417,16 @@ test('JSON status reports absent and installed versions separately from the inst
     installation_state: 'not_installed',
     installed_version: null,
     reason: null,
+    ready: false,
+    entrypoint: {
+      schema_version: 1,
+      package: packageInfo.name,
+      installer_version: packageInfo.version,
+      skill_path: join(cwd, '.agents/skills/inferencex'),
+      installation_state: 'not_installed',
+      installed_version: null,
+      reason: null,
+    },
   });
   assert.deepEqual(readdirSync(cwd), []);
   succeeded(run(['install', '--target', 'codex'], cwd));
