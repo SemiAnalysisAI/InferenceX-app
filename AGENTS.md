@@ -3,6 +3,7 @@
 For detailed subsystem docs, see [docs/index.md](./docs/index.md).
 
 - Pareto logic changes must update both InferenceX and InferenceX-app with matching regression tests and cross-linked PRs.
+- Any added, changed, or removed filter, frontend view, or page MUST include the corresponding API and `inferencex-skills` changes in the same PR. Missing updates are BLOCKING on PR review. See [Read-only coverage for public views](#read-only-coverage-for-public-views) for coverage requirements and documented exclusions.
 
 ## AI model disclosure
 
@@ -107,9 +108,12 @@ backend-for-frontend (BFF), not a reusable public data API.
 
 ### Read-only coverage for public views
 
-Every non-sensitive public-facing data view must have a read-only API. A new view
-or a change to an existing view must update its API in the same PR, including
-every data selector, filter, date/run comparison, unit, default, and calculation.
+Every non-sensitive public-facing data view must have a read-only API. Adding,
+changing, or removing any filter, frontend view, or page MUST include the
+corresponding API and `packages/skills` (`@semianalysisai/inferencex-skills`)
+changes in the same PR. This includes every data selector, filter option,
+date/run comparison, unit, default, and calculation. Missing API or skills
+updates are BLOCKING on PR review; do not defer them to a follow-up PR.
 Reuse the dashboard's pure transformation functions so the API and UI cannot
 silently calculate different results. Return resolved parameters and preserve
 missing measurements and source identities.
