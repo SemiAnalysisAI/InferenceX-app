@@ -55,6 +55,23 @@ The live raw explorer also keeps each CSV as a separate series, matching the dat
 reader. Multi-file artifact labels include the CSV path, so host-local GPU 0 values cannot
 be merged into one device. Single-file labels remain unchanged.
 
+## Cache and browser recovery
+
+`/api/v1/gpu-metrics-point?id=N` checks a live database revision before reading its existing
+Blob cache. The revision includes linked series, ingest time, CSV hash, sidecars and shared
+point links/audits. The payload stays in Blob; the revision query reads only metadata.
+Same-input ingest leaves the revision unchanged. A sidecar correction, series replacement,
+new point link or linked audit correction selects a new cache entry, including for every
+point sharing the series. Missing points are not negatively cached.
+
+Point and Timeline responses use `Cache-Control: no-store`, so CDN/browser response caches
+cannot skip the database check. Client queries revalidate on mount and window focus.
+An already open page refreshes when revisited/refocused or reloaded; there is no continuous
+polling. A failed Blob write logs `serving uncached result`, returns fresh DB data, and is
+retried on the next read. A database failure remains an API error even if an old Blob exists.
+Old cache generations remain until the existing prefix cleanup runs; repair does not require
+a manual PowerX cache purge. General benchmark cache invalidation still follows normal CI.
+
 ## Full-record statistics
 
 The point detail, run explorer and public `/api/v1/views/gpu-metrics` projection use the
@@ -74,3 +91,34 @@ GPU visibility filter changes the full-record table. Window calculations still c
 the selected samples, and serving energy/financial metrics retain their own definitions.
 SQL samples and digests use `real` (float32), so compare stored values with an explicit
 float32 tolerance rather than the tighter tolerance of the in-memory parser tests.
+
+## Local verification
+
+From the repository root:
+
+```sh
+bun install --frozen-lockfile --ignore-scripts
+bun run test:unit
+bun run typecheck
+bun run lint
+bun run fmt
+bun run check:typography
+bun run --cwd packages/app test:unit src/app/api/v1/gpu-metrics-point/route.test.ts
+bun run --cwd packages/app test:unit src/app/api/v1/views/gpu-metrics/route.test.ts
+bun run --cwd packages/db test:unit src/queries/gpu-metrics-timeline.test.ts
+bun run --cwd packages/app test:e2e:component --spec cypress/component/gpu-stats-table.cy.tsx
+```
+
+The focused browser driver creates a disposable localhost PostgreSQL database, ingests
+NVIDIA/AMD/multinode artifacts, starts Next without a GitHub token, and enables the real
+Blob SDK against a local HTTP fixture. It writes logs, screenshots and receipts, then stops
+its owned processes. It uses ports 3137/3138 and requires PostgreSQL 17 tools. Run with a
+fresh output directory while no other dev server is using this checkout's `.next` directory:
+
+```sh
+cd packages/app
+POWERX_PG_BIN=/path/to/postgresql/bin bun scripts/powerx-db-acceptance.ts /absolute/fresh/output
+```
+
+The ordinary fixture-backed smoke command remains `bun run test:e2e` with an
+`E2E_FIXTURES=1` dev server. The full cross-browser matrix remains the repository CI gate.

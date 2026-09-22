@@ -24,6 +24,7 @@
     "test:e2e:full": "cypress run --component && cypress run",
     "test:e2e:component": "cypress run --component",
     "test:e2e:integration": "cypress run",
+    "test:e2e:powerx": "bun scripts/powerx-db-acceptance.ts",
     "test:unit": "bun --env-file=../../.env vitest run",
     "test:unit:coverage": "bun --env-file=../../.env vitest run --coverage",
     "clean": "rimraf .next out",
@@ -83,6 +84,7 @@
   },
   "devDependencies": {
     "@bahmutov/cypress-esbuild-preprocessor": "^2.2.8",
+    "@electric-sql/pglite": "^0.5.8",
     "@mdx-js/mdx": "^3.1.1",
     "@tailwindcss/postcss": "^4.3.3",
     "@types/adm-zip": "^0.5.8",

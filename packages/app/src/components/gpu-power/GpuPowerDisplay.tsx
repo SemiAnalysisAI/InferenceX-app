@@ -179,6 +179,7 @@ export default function GpuMetricsDisplay() {
     gcTime: 0,
     retry: false,
     refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
   });
   const artifacts = query.data?.artifacts ?? [];
   const runInfo = query.data?.runInfo ?? null;

@@ -605,7 +605,12 @@ coverage unknown. Plain CSV fallback applies the adjacent context timezone just 
 ingest and bundle reads. Raw multi-file artifacts retain separate file/host series.
 Successful reads and storage errors use no-store.
 
-`/api/v1/gpu-metrics-point?id=` powers the PowerX point-detail tab.
+`/api/v1/gpu-metrics-point?id=` powers the PowerX point-detail tab. Every request
+checks the current DB revision before reading its Blob payload cache. Sidecar repairs,
+new point links and shared-series changes therefore select fresh payloads without a
+manual purge. Success, missing-point and error responses use no-store; missing data
+is 404 and database failures remain errors. Cache-write failures log a warning and
+serve the fresh uncached result; the next request retries cache population.
 
 The public `/api/v1/views/gpu-metrics` projection and full-record UI table use the
 same stored per-GPU statistics digest for the selected file/host series. Empty or
@@ -622,7 +627,10 @@ Serving-window power, J/token and selected-time-window calculations remain separ
 按来源补齐，GitHub 不可用时仍返回健康的 DB 曲线，并显式标出缺失来源。旧的 GET
 没有预期清单，覆盖状态为 unknown。sourceCoverage 仅描述本次请求，不代表整个 run
 的完整性；普通 CSV 与 bundle、ingest 使用相同的 context 时区。
-全记录统计使用已存摘要，包含启动与 warmup；缺失读数不补零，已有摘要为空时不重新计算。它与 serving-window 功率、J/token 和用户所选时间窗口的统计分别处理。
+点详情每次读取先核对数据库版本，修正 sidecar 或共享关联后
+无需手动清缓存；响应均为 no-store。全记录统计使用已存摘要，包含启动与 warmup；
+缺失读数不补零，已有摘要为空时不重新计算。它与 serving-window 功率、J/token 和
+用户所选时间窗口的统计分别处理。
 
 ### PowerX publication receipts
 

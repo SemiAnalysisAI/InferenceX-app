@@ -311,7 +311,7 @@ async function main(): Promise<void> {
       `${missingRuns} run(s) without pairs, ${goneRuns} run(s) gone from GitHub, ` +
       `${artifactFailures} failed artifact(s), ${runFailures} failed run(s) ===`,
   );
-  console.log('  Invalidate API cache after the backfill: bun run admin:cache:invalidate');
+  console.log('  Point telemetry reads use the stored revision; no manual cache purge is needed.');
   if (artifactFailures > 0 || runFailures > 0) process.exitCode = 1;
 }
 

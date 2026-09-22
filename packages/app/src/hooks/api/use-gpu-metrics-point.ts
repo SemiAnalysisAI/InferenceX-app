@@ -14,5 +14,11 @@ export type { GpuMetricsPointPayload, GpuMetricSeries, GpuMetricStatRow };
  * the whole job (hundreds of KB), so it is not paid for on every page load.
  */
 export function useGpuMetricsPoint(id: number | null, enabled = false) {
-  return useByIdQuery<GpuMetricsPointPayload>('gpu-metrics-point', id, enabled && Boolean(id));
+  return useByIdQuery<GpuMetricsPointPayload>(
+    'gpu-metrics-point',
+    id,
+    enabled && Boolean(id),
+    undefined,
+    { staleTime: 0, refetchOnWindowFocus: true },
+  );
 }

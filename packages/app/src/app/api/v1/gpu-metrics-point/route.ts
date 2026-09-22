@@ -1,4 +1,6 @@
 import { getDb } from '@semianalysisai/inferencex-db/connection';
+import { getGpuMetricsPointRevision } from '@semianalysisai/inferencex-db/queries/gpu-metrics-revision';
+import type { NextRequest } from 'next/server';
 import {
   getGpuMetricsForPoint,
   type GpuMetricsPointPayload,
@@ -10,16 +12,11 @@ import { idQueryRoute } from '../id-routes';
 
 export const dynamic = 'force-dynamic';
 
-/**
- * Blob-cache namespace. Stored series are immutable per (run, artifact, CSV
- * hash), so the payload for a point only changes when the digest schema does;
- * bump the suffix alongside any change to the row shape in
- * `queries/gpu-metrics.ts`.
- */
-export const CACHE_KEY_PREFIX = 'gpu-metrics-point-v1';
+export const CACHE_KEY_PREFIX = 'gpu-metrics-point-v2';
 
 const getCachedGpuMetricsForPoint = cachedQuery(
-  (id: number): Promise<GpuMetricsPointPayload | null> => getGpuMetricsForPoint(getDb(), id),
+  (id: number, _revision: string): Promise<GpuMetricsPointPayload | null> =>
+    getGpuMetricsForPoint(getDb(), id),
   CACHE_KEY_PREFIX,
   { blobOnly: true },
 );
@@ -33,7 +30,17 @@ const getCachedGpuMetricsForPoint = cachedQuery(
  * run predates migration 016 and the artifacts have expired, or the job
  * uploaded no gpu_metrics artifact).
  */
-export const GET = idQueryRoute({
+const handleGet = idQueryRoute({
   logLabel: 'gpu metrics point',
-  fetch: getCachedGpuMetricsForPoint,
+  fetch: async (id) => {
+    const revision = await getGpuMetricsPointRevision(getDb(), id);
+    return revision === null ? null : getCachedGpuMetricsForPoint(id, revision);
+  },
 });
+
+export async function GET(request: NextRequest): Promise<Response> {
+  const response = await handleGet(request);
+  // The live revision check must run even when a point used to be missing.
+  response.headers.set('Cache-Control', 'no-store');
+  return response;
+}

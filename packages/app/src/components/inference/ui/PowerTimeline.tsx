@@ -766,7 +766,8 @@ export default function PowerTimeline({
     queries: fetchedRequests.map((request) => ({
       queryKey: ['power-timeline', request.runId, request.prefix, request.sources] as const,
       queryFn: ({ signal }: { signal: AbortSignal }) => fetchPowerSeries(request, signal),
-      staleTime: 5 * 60_000,
+      staleTime: 0,
+      refetchOnWindowFocus: true,
       retry: 1,
     })),
   });

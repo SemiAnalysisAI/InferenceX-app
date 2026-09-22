@@ -1,0 +1,31 @@
+{
+  "source": {
+    "repository": "SemiAnalysisAI/InferenceX",
+    "run_id": 34175132645,
+    "run_attempt": 1,
+    "run_url": "https://github.com/SemiAnalysisAI/InferenceX/actions/runs/34175132645/attempts/1",
+    "artifact_name": "power_audit_qwen3.5_8k1k_fp8_sglang_tp8-pp1-dcp1-pcp1-ep1-dpafalse_disagg-false_spec-none_conc1_b200-nscale-slurm_00_recipe-4a9cbfa6f11448e8",
+    "file": "gpu_metrics.csv",
+    "sha256": "0c04d4c47ce4ebdd71aa2a56e179cbf481733bb9517021bb9c6e91b261897c0d",
+    "collector_version": null,
+    "timestamp_timezone": null,
+    "head_sha": "931838616543914232d4bab6724bae79742ba371"
+  },
+  "fixture": {
+    "file": "nvidia.csv",
+    "sha256": "833cf864da4618579deeeda89b3ddde6dbf8b7b32b7877fda643f18411ee3481",
+    "physical_lines_inclusive": [
+      [1, 1],
+      [2898, 2921]
+    ],
+    "transformations": [
+      "Retain header and three complete consecutive 8-GPU samples; join unchanged lines with LF and final LF."
+    ],
+    "bytes": 1901,
+    "sample_count": 24,
+    "gpu_count": 8,
+    "utc_start_with_test_context": "2026-09-08T07:20:19.279Z",
+    "utc_end_with_test_context": "2026-09-08T07:20:21.279Z",
+    "gpu0_power_w": [380.42, 336.61, 337.18]
+  }
+}

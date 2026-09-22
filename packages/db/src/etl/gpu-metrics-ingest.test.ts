@@ -25,6 +25,18 @@ function queryClient(database: Pick<PGlite, 'query'>) {
   });
 }
 
+async function storedSeries(seriesId: number) {
+  return {
+    metadata: await sql`select * from gpu_metric_series where id = ${seriesId}`,
+    samples: await sql`select * from gpu_metric_samples where series_id = ${seriesId}
+      order by sampled_at, gpu_index`,
+    stats: await sql`select * from gpu_metric_gpu_stats where series_id = ${seriesId}
+      order by gpu_index, metric`,
+    links: await sql`select * from benchmark_result_gpu_metrics where series_id = ${seriesId}
+      order by benchmark_result_id`,
+  };
+}
+
 beforeAll(async () => {
   db = await PGlite.create();
   for (const name of ['001_initial_schema.sql', '016_gpu_metrics.sql']) {
@@ -344,6 +356,115 @@ describe('ingestGpuMetricsArtifact', () => {
     const [stat] = await sql<{ max_value: number }[]>`
       select max_value from gpu_metric_gpu_stats where gpu_index = 0 and metric = 'power_w'`;
     expect(stat!.max_value).toBe(950);
+  });
+
+  it('rolls back a replacement when point linking fails and retries without losing existing links', async () => {
+    const artifact = writeArtifact(NVIDIA_CSV);
+    const first = await ingestGpuMetricsArtifact(sql, {
+      workflowRunId: 1,
+      artifact,
+      benchmarkResultIds: [10],
+    });
+    const seriesId = first.seriesIds[0]!;
+    const before = await storedSeries(seriesId);
+    fs.writeFileSync(
+      path.join(artifact.artifactDir, 'gpu_metrics.csv'),
+      `${NVIDIA_CSV}\n2026/09/11 04:19:43.990, 0, 950.00 W, 65, 1965 MHz, 3996 MHz, 99 %, 75 %`,
+    );
+    fs.writeFileSync(
+      path.join(artifact.artifactDir, 'gpu_metrics_context.json'),
+      JSON.stringify({ timestamp_timezone: '+02:00' }),
+    );
+
+    // Point links are written last, after replacement metadata, samples and stats.
+    await expect(
+      ingestGpuMetricsArtifact(sql, {
+        workflowRunId: 1,
+        artifact,
+        benchmarkResultIds: [11, 999],
+      }),
+    ).rejects.toMatchObject({ code: '23503' });
+    expect(await storedSeries(seriesId)).toEqual(before);
+
+    const recovered = await ingestGpuMetricsArtifact(sql, {
+      workflowRunId: 1,
+      artifact,
+      benchmarkResultIds: [11],
+    });
+    expect(recovered).toEqual({ seriesIds: [seriesId], samplesInserted: 5, seriesSkipped: 0 });
+    const after = await storedSeries(seriesId);
+    expect(after.metadata).toMatchObject([
+      { sample_count: 5, sidecars: { context: { timestamp_timezone: '+02:00' } } },
+    ]);
+    expect(after.metadata[0]!.csv_sha256).not.toBe(before.metadata[0]!.csv_sha256);
+    expect(after.samples).toHaveLength(5);
+    expect(new Date(after.samples[0]!.sampled_at).toISOString()).toBe('2026-09-11T02:19:41.982Z');
+    expect(
+      after.stats.find((row) => row.gpu_index === 0 && row.metric === 'power_w'),
+    ).toMatchObject({
+      sample_count: 3,
+      max_value: 950,
+    });
+    expect(after.links.map((row) => Number(row.benchmark_result_id))).toEqual([10, 11]);
+  });
+
+  it('retries a partial artifact after a later series fails without rewriting its committed series', async () => {
+    const artifact = writeArtifact(NVIDIA_CSV);
+    const first = await ingestGpuMetricsArtifact(sql, {
+      workflowRunId: 1,
+      artifact,
+      benchmarkResultIds: [10],
+    });
+    const seriesId = first.seriesIds[0]!;
+    const secondFile = path.join(artifact.artifactDir, 'host-b', 'gpu_metrics.csv');
+    fs.mkdirSync(path.dirname(secondFile));
+    // Both CSVs parse, but the second series exceeds the database smallint range.
+    fs.writeFileSync(secondFile, NVIDIA_CSV.replaceAll(', 0,', ', 999999,'));
+    await expect(
+      ingestGpuMetricsArtifact(sql, {
+        workflowRunId: 1,
+        artifact,
+        benchmarkResultIds: [11],
+      }),
+    ).rejects.toMatchObject({ code: '22003' });
+    expect(await sql`select file_name from gpu_metric_series order by file_name`).toEqual([
+      { file_name: 'gpu_metrics.csv' },
+    ]);
+    const committed = await storedSeries(seriesId);
+    expect(committed.samples).toHaveLength(4);
+    expect(committed.stats).toHaveLength(12);
+    expect(committed.links.map((row) => Number(row.benchmark_result_id))).toEqual([10, 11]);
+
+    fs.writeFileSync(secondFile, NVIDIA_CSV);
+    const recovered = await ingestGpuMetricsArtifact(sql, {
+      workflowRunId: 1,
+      artifact,
+      benchmarkResultIds: [11],
+    });
+    expect(recovered.seriesIds).toHaveLength(2);
+    expect(recovered.seriesIds[0]).toBe(seriesId);
+    expect(recovered.samplesInserted).toBe(4);
+    expect(recovered.seriesSkipped).toBe(1);
+    expect(await storedSeries(seriesId)).toEqual(committed);
+    const second = await storedSeries(recovered.seriesIds[1]!);
+    expect(second.samples).toHaveLength(4);
+    expect(second.stats).toHaveLength(12);
+    expect(second.links.map((row) => Number(row.benchmark_result_id))).toEqual([11]);
+    expect(await sql`select count(*)::int as n from gpu_metric_series`).toEqual([{ n: 2 }]);
+    expect(await sql`select count(*)::int as n from gpu_metric_samples`).toEqual([{ n: 8 }]);
+
+    const replay = await ingestGpuMetricsArtifact(sql, {
+      workflowRunId: 1,
+      artifact,
+      benchmarkResultIds: [11],
+    });
+    expect(replay).toEqual({
+      seriesIds: recovered.seriesIds,
+      samplesInserted: 0,
+      seriesSkipped: 2,
+    });
+    expect(await storedSeries(seriesId)).toEqual(committed);
+    expect(await storedSeries(recovered.seriesIds[1]!)).toEqual(second);
   });
 
   it('uses the first reading per GPU/timestamp for stored samples, metadata, and digest', async () => {

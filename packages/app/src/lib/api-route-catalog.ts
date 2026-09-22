@@ -512,10 +512,10 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'page-bff',
     exclusionReason: {
-      en: 'Agentic point-detail BFF returning the PowerX telemetry series and per-GPU digest linked to one benchmark point; coupled to the PowerX tab implementation.',
-      zh: '智能体数据点详情页专用 BFF；返回与单个基准测试数据点关联的 PowerX telemetry 序列及每 GPU 统计摘要，与 PowerX 标签页实现紧密耦合。',
+      en: 'Point-detail BFF returning linked PowerX telemetry series, per-GPU digests and retained validation/audit metadata. Every read checks a live DB revision before using the Blob payload cache; responses use no-store, missing data returns 404, and database failures remain errors. Re-ingest and shared-link changes do not require manual cache purges. Coupled to the PowerX tab implementation.',
+      zh: '数据点详情页专用 BFF；返回关联的 PowerX 遥测序列、每 GPU 统计摘要及保留的验证与审计元数据。每次读取先核对数据库版本再使用 Blob 缓存；响应使用 no-store，数据缺失返回 404，数据库故障仍作为错误返回。重新入库及共享链接变化无需手动清理缓存。与 PowerX 标签页实现紧密耦合。',
     },
-    sourceSha256: '3929581f54058183344d59a8f6127db3ef1c8487cad26c73faa93b00fe75a82d',
+    sourceSha256: 'c04a01fcd8e1cb4cb7101a46a0ba44b227f2696819c499bcc93be8ee7a8ce255',
   },
   {
     source: 'src/app/api/v1/request-chart-data/route.ts',
