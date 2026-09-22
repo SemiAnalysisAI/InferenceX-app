@@ -22,6 +22,16 @@ export interface Quote {
 
 export const QUOTES: Quote[] = [
   {
+    text: "Ray Serve LLM's mission is to be best way to scale Ray-native LLM inference, including ergonomic Python APIs for low-latency serving across heterogeneous clusters and inference engines. Having transparent benchmark runs with engine configurations available gives us trusted reference datapoints to compare against. This makes InferenceX particularly helpful for understanding serving performance and ensuring Ray Serve LLM stays lightweight and performant.",
+    textZh:
+      'Ray Serve LLM 的使命是成为扩展 Ray 原生 LLM 推理的最佳方式，其中包括提供易用的 Python API，支持跨异构集群和推理引擎的低延迟服务。公开透明的基准测试运行记录及其引擎配置，为我们提供了可信赖的参考数据，便于对比。这让 InferenceX 对理解推理服务性能、确保 Ray Serve LLM 保持轻量且高性能尤其有帮助。',
+    name: 'Seiji Eicher',
+    title: 'Anyscale',
+    titleZh: 'Anyscale',
+    org: 'Anyscale',
+    logo: 'anyscale.svg',
+  },
+  {
     text: "Vendor-neutral, continuously updated benchmarking is essential as models and inference stacks co-evolve. MiniMax M3 was built with both frontier capability and real-world deployment efficiency in mind, and the day-one vLLM support from the community reflects the collaborative spirit we're proud to be part of. InferenceX provides the kind of transparent, reproducible data the ecosystem needs.",
     textZh:
       '在模型与推理技术栈协同演进的今天，厂商中立、持续更新的基准测试不可或缺。MiniMax M3 在设计之初就兼顾了前沿能力与实际部署效率，而社区第一时间对 vLLM 的支持也体现了我们引以为豪的协作精神。InferenceX 正是生态所需的透明、可复现的数据平台。',
@@ -577,6 +587,7 @@ export const QUOTES: Quote[] = [
  * controls membership.
  */
 export const CAROUSEL_ORGS = [
+  'Anyscale',
   'MiniMax',
   'Moonshot AI',
   'Alibaba Qwen',

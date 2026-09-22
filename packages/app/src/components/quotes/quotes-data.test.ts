@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { CAROUSEL_LABELS, CAROUSEL_ORGS, QUOTES } from './quotes-data';
+import { CAROUSEL_LABELS, CAROUSEL_ORGS, QUOTES, orgAnchorId } from './quotes-data';
 
 /**
  * The landing carousel renders `QUOTES` filtered by `CAROUSEL_ORGS`, while the
@@ -30,6 +30,21 @@ describe('quote carousel membership', () => {
 
   it('features Mooncake in the landing carousel', () => {
     expect(CAROUSEL_ORGS).toContain('Mooncake');
+  });
+
+  it('features Anyscale with Seiji Eicher’s approved quote and logo', () => {
+    expect(CAROUSEL_ORGS).toContain('Anyscale');
+    const quotes = QUOTES.filter((quote) => quote.org === 'Anyscale');
+    expect(quotes).toHaveLength(1);
+    expect(quotes[0]).toMatchObject({
+      name: 'Seiji Eicher',
+      title: 'Anyscale',
+      titleZh: 'Anyscale',
+      logo: 'anyscale.svg',
+      text: "Ray Serve LLM's mission is to be best way to scale Ray-native LLM inference, including ergonomic Python APIs for low-latency serving across heterogeneous clusters and inference engines. Having transparent benchmark runs with engine configurations available gives us trusted reference datapoints to compare against. This makes InferenceX particularly helpful for understanding serving performance and ensuring Ray Serve LLM stays lightweight and performant.",
+    });
+    expect(quotes[0].textZh).toContain('Ray Serve LLM 的使命');
+    expect(orgAnchorId('Anyscale')).toBe('quote-anyscale');
   });
 
   it('features AMD and NVIDIA in the landing carousel under CEO labels', () => {
