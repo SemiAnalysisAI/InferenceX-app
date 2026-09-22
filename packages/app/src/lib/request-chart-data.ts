@@ -1,0 +1,64 @@
+type RequestChartTuple = [
+  cid: number,
+  phase: number,
+  startUs: number,
+  endUs: number,
+  ttftMs: number | null,
+  tpotMs: number | null,
+  isl: number | null,
+  osl: number | null,
+  cancelled: 0 | 1,
+];
+
+export interface RequestChartDataWire {
+  version: number;
+  timelineVersion: number;
+  startNs: number;
+  endNs: number;
+  durationS: number;
+  cids: string[];
+  phases: string[];
+  requests: RequestChartTuple[];
+}
+
+export interface RequestChartRecord {
+  cid: string;
+  phase: string;
+  start: number;
+  end: number;
+  ttftMs: number | null;
+  tpotMs: number | null;
+  isl: number | null;
+  osl: number | null;
+  cancelled: boolean;
+}
+
+export interface RequestChartData {
+  version: number;
+  timelineVersion: number;
+  startNs: number;
+  endNs: number;
+  durationS: number;
+  requests: RequestChartRecord[];
+}
+
+export function decodeRequestChartData(wire: RequestChartDataWire): RequestChartData {
+  return {
+    version: wire.version,
+    timelineVersion: wire.timelineVersion,
+    startNs: wire.startNs,
+    endNs: wire.endNs,
+    durationS: wire.durationS,
+    requests: wire.requests.map((request) => ({
+      cid: wire.cids[request[0]] ?? '',
+      phase: wire.phases[request[1]] ?? '',
+      start: request[2] * 1_000,
+      end: request[3] * 1_000,
+      ttftMs: request[4],
+      tpotMs: request[5],
+      isl: request[6],
+      osl: request[7],
+      cancelled: request[8] === 1,
+    })),
+  };
+}

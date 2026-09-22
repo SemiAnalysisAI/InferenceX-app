@@ -91,6 +91,7 @@ const responseSchema = objectSchema(
     params: objectSchema({
       metric: { type: ['string', 'null'] },
       format: { type: 'string', enum: ['json', 'csv'] },
+      chips: { type: ['array', 'null'], items: stringSchema },
     }),
     chips: arraySchema(chipSchema),
     metrics: arraySchema(
@@ -104,6 +105,15 @@ const responseSchema = objectSchema(
         rank: integerSchema,
       }),
     ),
+    radar: objectSchema({
+      normalization: { type: 'string', enum: ['all-chips'] },
+      metrics: arraySchema(
+        objectSchema({ key: stringSchema, label: stringSchema, unit: stringSchema }),
+      ),
+      series: arraySchema(
+        objectSchema({ chip: stringSchema, values: arraySchema(nullableNumberSchema) }),
+      ),
+    }),
   },
   ['view', 'apiVersion', 'params', 'chips', 'metrics'],
 );
@@ -111,7 +121,7 @@ const responseSchema = objectSchema(
 const responseExample = {
   view: 'gpu-specs',
   apiVersion: 'v1',
-  params: { metric: 'memoryBandwidth', format: 'json' },
+  params: { metric: 'memoryBandwidth', format: 'json', chips: null },
   chips: [
     {
       key: 'b200-sxm',

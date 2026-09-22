@@ -12,6 +12,12 @@ The benchmark read is stable, while the current AgentX diagnostic operations are
 beta. Read the live OpenAPI document once per task and use the fetched contract for
 that task.
 
+For the telemetry catalog or one point's warmup/profiling and metric-source
+controls, use the public views in [frontend drilldowns](frontend-drilldowns.md).
+Do not call the page-owned compact request or metric-source BFF directly.
+The new projection retains the UI's timestamp precision; exact timestamp work
+still needs the raw request timeline.
+
 Establish the replay dataset and configuration identity before comparing points.
 Match the supplied dataset slug, model, hardware, framework, precision, topology,
 offload mode, concurrency, image, observation, producer, and snapshot identities.

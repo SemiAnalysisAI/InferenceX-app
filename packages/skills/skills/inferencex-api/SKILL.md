@@ -109,6 +109,10 @@ when a duration is requested, compute and label elapsed or inclusive days.
   [AgentX](references/agentx.md), then use `inferencex agentx export`. Summary
   telemetry is not model quality. Require one positive safe result ID before the
   bounded raw-API trace recipe, and stop when availability omits that ID.
+- **Dataset visualizations, telemetry phase/source, evaluation sample drawers, or GPU radar:**
+  read [frontend drilldowns](references/frontend-drilldowns.md). Check deployed
+  availability, capture the public view, and preserve its population, scales and
+  resolved controls. These are raw captures, not formal CLI bundles.
 - **A result's producer, configuration, image, or bounded log:** read
   [provenance](references/provenance.md), then use `inferencex result inspect`.
   Keep the original producer separate from the snapshot carrying the row.
