@@ -38,8 +38,8 @@ const notes: Record<string, [string, string, ApiSchema?, boolean?]> = {
     '可选，指定一个完整对话 ID。查询参数只解码一次。',
   ],
   search: [
-    'Case-insensitive substring. Dataset: conversation IDs across the index. Evaluation: prompt/response/target on the current page only; totals are not search totals.',
-    '不区分大小写的子串。数据集搜索完整索引中的对话 ID；评估仅搜索当前页的 prompt、response、target，total 不代表搜索命中数。',
+    'Case-insensitive substring. Dataset: conversation IDs across the index, at most 100 characters. Evaluation: prompt/response/target on the current page only, at most 512 characters; totals are not search totals.',
+    '不区分大小写的子串。数据集搜索完整索引中的对话 ID，最长 100 个字符；评估仅搜索当前页的 prompt、response、target，最长 512 个字符，total 不代表搜索命中数。',
   ],
   sort: [
     'Conversation ordering, default tokens (total input descending); ties use ID.',

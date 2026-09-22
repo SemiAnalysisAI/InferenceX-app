@@ -67,7 +67,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-dataset-view',
-    sourceSha256: 'a877847554e74a9cb4b48b9f2367b311eeca4ce955aacc1f3967f88450aec257',
+    sourceSha256: '820a3ac1a79702dfde7b43136bb16a4b11bb6992afdc94087647dcf4c9defe0b',
   },
   {
     source: 'src/app/api/v1/views/evaluation-samples/route.ts',
@@ -403,7 +403,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'list-dataset-conversations',
-    sourceSha256: 'f02b0e3c77c6043491ac53a179fb2ca090575f6bb6066119fd78c7919bfc5dbf',
+    sourceSha256: '221595d4b046d0ecaff6efd7d47f8a02c8b85ff426890599892c3ab82ee96aa6',
   },
   {
     source: 'src/app/api/v1/datasets/[slug]/conversations/[convId]/route.ts',

@@ -9,6 +9,7 @@ import {
 } from '@semianalysisai/inferencex-db/queries/datasets';
 
 import { cachedJson, cachedQuery } from '@/lib/api-cache';
+import { MAX_CONVERSATION_SEARCH_LENGTH } from '@/lib/dataset-conversation-search';
 
 export const dynamic = 'force-dynamic';
 
@@ -34,13 +35,6 @@ const getCachedConversations = cachedQuery(
   'dataset-conversations',
 );
 
-// Maximum search string length accepted. Longer strings are rejected with 400
-// rather than being forwarded to the DB: an ILIKE on an unindexed conv_id column
-// with a very long pattern (or many stacked wildcards) can exhaust Neon's
-// statement timeout and return a 500. 100 chars is generous for any real
-// conversation-id prefix while keeping the attack surface small.
-const MAX_SEARCH_LENGTH = 100;
-
 /**
  * GET /api/v1/datasets/[slug]/conversations?search=&limit=&offset=&sort=
  * Paginated conversation list (counts only, no flamegraph structure).
@@ -52,7 +46,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const search = rawSearch.trim();
 
   // Reject search strings that exceed the length cap before touching the DB.
-  if (search.length > MAX_SEARCH_LENGTH) {
+  if (search.length > MAX_CONVERSATION_SEARCH_LENGTH) {
     return NextResponse.json({ error: 'search too long' }, { status: 400 });
   }
 
