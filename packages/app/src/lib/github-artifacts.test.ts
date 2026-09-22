@@ -124,6 +124,7 @@ describe('extractZipEntries', () => {
   it('skips non-matching files and continues after parse errors', () => {
     const zip = new AdmZip();
     zip.addFile('good.json', Buffer.from('{"id":1}', 'utf8'));
+    zip.addFile('upper.JSON', Buffer.from('{"id":2}', 'utf8'));
     zip.addFile('bad.json', Buffer.from('not json', 'utf8'));
     zip.addFile('notes.txt', Buffer.from('ignore me', 'utf8'));
 
@@ -137,7 +138,10 @@ describe('extractZipEntries', () => {
       },
     );
 
-    expect(rows).toEqual([{ entryName: 'good.json', payload: { id: 1 } }]);
+    expect(rows).toEqual([
+      { entryName: 'good.json', payload: { id: 1 } },
+      { entryName: 'upper.JSON', payload: { id: 2 } },
+    ]);
     expect(parseErrors).toEqual(['bad.json']);
   });
 });

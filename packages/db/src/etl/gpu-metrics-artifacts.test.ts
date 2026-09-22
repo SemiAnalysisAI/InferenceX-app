@@ -12,6 +12,7 @@ import {
   listMultinodePowerSampleFiles,
   parseEnergyCsv,
   readGpuMetricsSidecars,
+  readPowerAuditValidations,
 } from './gpu-metrics-artifacts.js';
 
 const roots: string[] = [];
@@ -96,6 +97,29 @@ describe('gpu_metrics artifact discovery', () => {
 });
 
 describe('sidecars', () => {
+  it.each([
+    ['z_gpu_metrics_context.json', 'a_gpu_metrics_context.json', '-07:00'],
+    ['a_gpu_metrics_context.json', 'Z_gpu_metrics_context.json', '+02:00'],
+  ])(
+    'chooses the first valid context in code-unit filename order (%s, %s)',
+    (first, second, expected) => {
+      const root = tempRoot();
+      const csv = path.join(root, 'gpu_metrics.csv');
+      fs.writeFileSync(csv, 'timestamp\n');
+      for (const name of [first, second]) {
+        fs.writeFileSync(
+          path.join(root, name),
+          JSON.stringify({
+            timestamp_timezone: name.startsWith('a_') ? '-07:00' : '+02:00',
+          }),
+        );
+      }
+      fs.writeFileSync(path.join(root, '0_gpu_metrics_context.json'), '{bad json');
+      fs.writeFileSync(path.join(root, '1_gpu_metrics_context.json'), '[]');
+      expect(readGpuMetricsSidecars(csv).context).toEqual({ timestamp_timezone: expected });
+    },
+  );
+
   it('reads context, identity CSV, and energy counters next to the CSV', () => {
     const root = tempRoot();
     const csv = path.join(root, 'gpu_metrics.csv');
@@ -129,5 +153,25 @@ describe('sidecars', () => {
     expect(contextUtcOffsetMinutes({ timestamp_timezone: '-05:00' })).toBe(-300);
     expect(contextUtcOffsetMinutes({ timestamp_timezone: '+0530' })).toBe(330);
     expect(contextUtcOffsetMinutes(null)).toBe(0);
+  });
+});
+
+describe('readPowerAuditValidations', () => {
+  it('retains only valid top-level validation documents and tolerates missing inputs', () => {
+    const root = tempRoot();
+    const validation = {
+      selected_window: { start_time_unix: 10, end_time_unix: 20 },
+      per_gpu_role: { 'host-a/GPU-a': 'prefill' },
+    };
+    fs.writeFileSync(path.join(root, 'power_validation_point.json'), JSON.stringify(validation));
+    fs.writeFileSync(path.join(root, 'power_validation_malformed.json'), '{');
+    fs.writeFileSync(path.join(root, 'power_validation_array.json'), '[]');
+    fs.writeFileSync(path.join(root, 'power_validation_null.json'), 'null');
+    fs.writeFileSync(path.join(root, 'unrelated.json'), '{}');
+    fs.mkdirSync(path.join(root, 'LOGS'));
+    fs.writeFileSync(path.join(root, 'LOGS', 'power_validation_copy.json'), '{}');
+    expect(readPowerAuditValidations(root)).toEqual({ 'power_validation_point.json': validation });
+    expect(readPowerAuditValidations(path.join(root, 'missing'))).toEqual({});
+    expect(readPowerAuditValidations(path.join(root, 'unrelated.json'))).toEqual({});
   });
 });

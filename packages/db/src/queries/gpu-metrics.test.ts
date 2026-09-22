@@ -22,6 +22,7 @@ beforeAll(async () => {
   for (const name of ['001_initial_schema.sql', '016_gpu_metrics.sql']) {
     await db.exec(fs.readFileSync(new URL(`../../migrations/${name}`, import.meta.url), 'utf8'));
   }
+  await db.exec('ALTER TABLE benchmark_results ADD COLUMN power_audit jsonb');
 }, 20_000);
 
 afterAll(async () => {

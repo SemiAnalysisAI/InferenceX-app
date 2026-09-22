@@ -32,6 +32,7 @@ import {
   listMultinodePowerSampleFiles,
   readGpuMetricsSidecars,
   readMultinodePowerManifest,
+  readPowerAuditValidations,
   type GpuMetricsArtifact,
   type GpuMetricsSidecars,
 } from './gpu-metrics-artifacts.js';
@@ -78,6 +79,7 @@ export interface GpuMetricsIngestResult {
  */
 function prepareMultinodePowerSeries(artifact: GpuMetricsArtifact): PreparedGpuMetricSeries[] {
   const prepared: PreparedGpuMetricSeries[] = [];
+  const validations = readPowerAuditValidations(artifact.artifactDir);
   for (const file of listMultinodePowerSampleFiles(artifact.artifactDir)) {
     const csvText = fs.readFileSync(file.path, 'utf8');
     const hosts = parseMultinodePowerSamples(csvText);
@@ -101,6 +103,7 @@ function prepareMultinodePowerSeries(artifact: GpuMetricsArtifact): PreparedGpuM
         endedAtMs: summary.endedAtMs,
         sidecars: {
           context: manifest,
+          validations,
           identity: Object.entries(host.gpuUuids).map(([index, uuid]) => ({
             hostname: host.hostname,
             gpu_index: Number(index),
@@ -116,21 +119,33 @@ function prepareMultinodePowerSeries(artifact: GpuMetricsArtifact): PreparedGpuM
 }
 
 /**
- * Parse every CSV in an extracted artifact; unparseable files are skipped.
- * Without any nvidia-smi/amd-smi CSV, fall back to the multinode power bundle.
+ * Parse every CSV in an extracted artifact; refuse a partly readable CSV set.
+ * Without usable nvidia-smi/amd-smi CSVs, fall back to the multinode power bundle.
  */
 export function prepareGpuMetricsArtifact(artifact: GpuMetricsArtifact): PreparedGpuMetricSeries[] {
   const prepared: PreparedGpuMetricSeries[] = [];
+  const unreadable: string[] = [];
   for (const file of listGpuMetricsCsvFiles(artifact.artifactDir)) {
     const csvText = fs.readFileSync(file.path, 'utf8');
     const sidecars = readGpuMetricsSidecars(file.path);
+    if (artifact.artifactName.startsWith('power_audit_')) {
+      sidecars.validations = readPowerAuditValidations(artifact.artifactDir);
+      const bundleFile = listMultinodePowerSampleFiles(artifact.artifactDir)[0];
+      sidecars.powerManifest = bundleFile ? readMultinodePowerManifest(bundleFile.path) : null;
+    }
     const parsed = parseGpuMetricsCsv(csvText, {
       nvidiaUtcOffsetMinutes: contextUtcOffsetMinutes(sidecars.context),
     });
-    if (!parsed) continue;
+    if (!parsed) {
+      unreadable.push(file.fileName);
+      continue;
+    }
     const samples = uniqueSamples(parsed.samples);
     const summary = summarizeGpuMetricSamples(samples);
-    if (!summary) continue;
+    if (!summary) {
+      unreadable.push(file.fileName);
+      continue;
+    }
     prepared.push({
       fileName: file.fileName,
       vendor: parsed.vendor,
@@ -144,7 +159,18 @@ export function prepareGpuMetricsArtifact(artifact: GpuMetricsArtifact): Prepare
       sidecars,
     });
   }
-  return prepared.length > 0 ? prepared : prepareMultinodePowerSeries(artifact);
+  if (prepared.length > 0 && unreadable.length > 0) {
+    throw new Error(
+      `Incomplete telemetry artifact ${artifact.artifactName}: unreadable CSVs ${unreadable.join(', ')}`,
+    );
+  }
+  const series = prepared.length > 0 ? prepared : prepareMultinodePowerSeries(artifact);
+  const seriesInventory = series.map((entry) => ({
+    fileName: entry.fileName,
+    sampleCount: entry.samples.length,
+  }));
+  for (const entry of series) entry.sidecars.seriesInventory = seriesInventory;
+  return series;
 }
 
 const STAT_METRIC_COLUMN: Record<GpuMetricStats['metric'], string> = {

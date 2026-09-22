@@ -53,6 +53,11 @@ export interface GpuPowerSeries {
 export interface GpuPowerSeriesResponse {
   runInfo: GpuPowerRunInfo;
   series: GpuPowerSeries[];
+  /** Coverage of requested validation identities only, never the full run/sweep. */
+  sourceCoverage?: {
+    status: 'complete' | 'incomplete' | 'unknown';
+    missingSources: string[];
+  };
 }
 
 const RUNNER_TIMESTAMP =
@@ -84,7 +89,8 @@ export function parseTelemetryTimestampUtc(raw: string): number | null {
 
 /**
  * Buckets raw per-GPU rows into the compact series. Samples of one GPU that
- * share a bucket are averaged; buckets nobody sampled are omitted from `t`.
+ * share a bucket are averaged; repeated GPU/timestamps keep the first sample,
+ * matching ingest. Buckets nobody sampled are omitted from `t`.
  * Returns `null` when no row carries a parseable timestamp.
  */
 export function bucketPowerSeries(
@@ -96,10 +102,14 @@ export function bucketPowerSeries(
   const bucketMs = bucketSeconds * 1000;
   let startMs = Number.POSITIVE_INFINITY;
   const parsed: { ms: number; gpu: number; power: number }[] = [];
+  const seen = new Set<string>();
   for (const row of rows) {
     if (!Number.isFinite(row.power) || !Number.isInteger(row.index)) continue;
     const ms = parseTelemetryTimestampUtc(row.timestamp);
     if (ms === null) continue;
+    const key = `${row.index}:${ms}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
     parsed.push({ ms, gpu: row.index, power: row.power });
     if (ms < startMs) startMs = ms;
   }
@@ -139,6 +149,28 @@ export function bucketPowerSeries(
     t: bucketIndices.map((bucket) => bucket * bucketSeconds),
     power,
   };
+}
+
+/** Keep host-local GPU indices distinct when one artifact stages multiple CSVs. */
+export function bucketPowerFiles(
+  artifact: string,
+  files: readonly { name: string; data: readonly GpuMetricRow[] }[],
+): GpuPowerSeries | null {
+  const populated = files
+    .filter((file) => file.data.length > 0)
+    .toSorted((a, b) => a.name.localeCompare(b.name));
+  if (populated.length === 0) return null;
+  if (populated.length === 1) return bucketPowerSeries(artifact, populated[0].data);
+  const devices = populated.flatMap((file) =>
+    [...new Set(file.data.map((row) => row.index))]
+      .toSorted((a, b) => a - b)
+      .map((gpu) => ({ id: `${file.name}/${gpu}`, file, gpu })),
+  );
+  const rows = devices.flatMap(({ file, gpu }, index) =>
+    file.data.filter((row) => row.index === gpu).map((row) => ({ ...row, index })),
+  );
+  const bucketed = bucketPowerSeries(artifact, rows);
+  return bucketed ? { ...bucketed, devices: devices.map(({ id }) => ({ id })) } : null;
 }
 
 /** Mean watts across the GPUs that have a sample in bucket `column`, or `null`. */

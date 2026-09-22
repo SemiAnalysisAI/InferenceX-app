@@ -13,13 +13,16 @@
  * Pure: the route hands over the extracted entry texts; nothing here reads
  * the network or the zip.
  */
+import { parseNvidiaTimestamp } from '@semianalysisai/inferencex-db/etl/gpu-metrics-csv';
+
 import {
   bucketPowerSeries,
+  parseTelemetryTimestampUtc,
   type GpuPowerDevice,
   type GpuPowerRole,
   type GpuPowerSeries,
 } from './power-series';
-import type { GpuMetricRow } from './types';
+import { parseCsvData, type GpuMetricRow } from './types';
 
 /** Seconds of telemetry kept on each side of a validated window (ramp-up / drain context). */
 export const BUNDLE_WINDOW_PAD_SECONDS = 60;
@@ -34,18 +37,29 @@ export function isPowerAuditBundleEntry(entryName: string): boolean {
   return (
     entryName === BUNDLE_SAMPLES_ENTRY ||
     entryName === BUNDLE_MANIFEST_ENTRY ||
-    VALIDATION_ENTRY.test(entryName)
+    VALIDATION_ENTRY.test(entryName) ||
+    isSmiCsv(entryName) ||
+    isContextEntry(entryName)
   );
 }
 
-interface Sample {
+function isSmiCsv(name: string): boolean {
+  return /(?:^|\/)gpu_metrics[^/]*\.csv$/u.test(name) && !/_(?:identity|energy_)/u.test(name);
+}
+
+function isContextEntry(entryName: string): boolean {
+  const name = basename(entryName);
+  return name.includes('gpu_metrics') && name.toLowerCase().endsWith('_context.json');
+}
+
+export interface PowerAuditSample {
   /** Unix seconds. */
   time: number;
   deviceId: string;
   power: number;
 }
 
-interface Device {
+export interface PowerAuditDevice {
   /** `<hostname>/<GPU-uuid>`, the form `power_audit.observed_gpu_ids` uses. */
   id: string;
   hostname: string;
@@ -53,9 +67,9 @@ interface Device {
 }
 
 interface ParsedSamples {
-  samples: Sample[];
+  samples: PowerAuditSample[];
   /** Devices in first-seen order. */
-  devices: Map<string, Device>;
+  devices: Map<string, PowerAuditDevice>;
 }
 
 const SAMPLE_COLUMNS = ['timestamp_unix', 'hostname', 'gpu_index', 'gpu_uuid', 'power_w'] as const;
@@ -84,8 +98,8 @@ function parseSamples(csv: string): ParsedSamples {
   const [timeCol, hostCol, indexCol, uuidCol, powerCol] = columns;
   const width = Math.max(...columns) + 1;
 
-  const samples: Sample[] = [];
-  const devices = new Map<string, Device>();
+  const samples: PowerAuditSample[] = [];
+  const devices = new Map<string, PowerAuditDevice>();
   for (const line of lines.slice(headerIndex + 1)) {
     const cells = line.split(',');
     if (cells.length < width) continue;
@@ -193,7 +207,10 @@ function compareText(a: string, b: string): number {
 }
 
 /** Prefill, then decode, then unassigned; within a role by hostname, then gpu_index. */
-function orderDevices(devices: readonly GpuPowerDevice[], byId: ReadonlyMap<string, Device>) {
+function orderDevices(
+  devices: readonly GpuPowerDevice[],
+  byId: ReadonlyMap<string, PowerAuditDevice>,
+) {
   return devices.toSorted((a, b) => {
     const rank = roleRank(a.role) - roleRank(b.role);
     if (rank !== 0) return rank;
@@ -205,6 +222,26 @@ function orderDevices(devices: readonly GpuPowerDevice[], byId: ReadonlyMap<stri
 
 function basename(entryName: string): string {
   return entryName.slice(entryName.lastIndexOf('/') + 1);
+}
+
+/** Apply the adjacent collector context only to NVIDIA's unzoned wall-clock timestamps. */
+export function parsePowerCsvData(
+  text: string,
+  context: Record<string, unknown> | null,
+): GpuMetricRow[] {
+  const zone = context?.timestamp_timezone;
+  const offset =
+    typeof zone === 'string'
+      ? /^(?<sign>[+-])(?<h>\d{2}):?(?<m>\d{2})$/u.exec(zone.trim())?.groups
+      : null;
+  const offsetMinutes = offset
+    ? (offset.sign === '-' ? -1 : 1) * (Number(offset.h) * 60 + Number(offset.m))
+    : 0;
+  return parseCsvData(text).map((row) => {
+    if (!offsetMinutes) return row;
+    const timestamp = parseNvidiaTimestamp(row.timestamp, offsetMinutes);
+    return timestamp === null ? row : { ...row, timestamp: new Date(timestamp).toISOString() };
+  });
 }
 
 /**
@@ -219,17 +256,77 @@ export function cutPowerAuditBundle(
   artifact: string,
   files: ReadonlyMap<string, string>,
 ): GpuPowerSeries[] {
+  const validations = new Map<string, Record<string, unknown>>();
+  for (const [entryName, text] of files) {
+    if (!VALIDATION_ENTRY.test(entryName)) continue;
+    const validation = parseJsonObject(text);
+    if (validation) validations.set(entryName, validation);
+  }
+  const manifest = parseJsonObject(files.get(BUNDLE_MANIFEST_ENTRY));
+  const contextFiles = [...files]
+    .filter(([name]) => isContextEntry(name))
+    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+  const smiFiles = [...files]
+    .filter(([name]) => isSmiCsv(name))
+    .map(([name, text]) => {
+      const directory = name.slice(0, name.lastIndexOf('/') + 1);
+      let context: Record<string, unknown> | null = null;
+      for (const [entry, contents] of contextFiles) {
+        if (entry.slice(0, entry.lastIndexOf('/') + 1) !== directory) continue;
+        context = parseJsonObject(contents);
+        if (context) break;
+      }
+      const data = parsePowerCsvData(text, context);
+      return { name, data };
+    })
+    .filter((file) => file.data.length > 0);
+  // Ingest prefers the richer SMI CSV when the bundle carries both collectors.
+  if (smiFiles.length > 0) return cutPowerAuditCsvs(artifact, smiFiles, validations, manifest);
   const samplesText = files.get(BUNDLE_SAMPLES_ENTRY);
   if (samplesText === undefined) return [];
   const { samples, devices } = parseSamples(samplesText);
   if (samples.length === 0) return [];
-  const fallbackRoles = manifestRoles(parseJsonObject(files.get(BUNDLE_MANIFEST_ENTRY)));
+  return cutPowerAuditSamples(
+    artifact,
+    samples,
+    devices,
+    validations,
+    parseJsonObject(files.get(BUNDLE_MANIFEST_ENTRY)),
+  );
+}
 
+/** Apply bundle window cuts to the richer SMI CSVs without requiring DCGM UUID sidecars. */
+export function cutPowerAuditCsvs(
+  artifact: string,
+  files: readonly { name: string; data: readonly GpuMetricRow[] }[],
+  validations: ReadonlyMap<string, Record<string, unknown>>,
+  manifest: Record<string, unknown> | null,
+): GpuPowerSeries[] {
+  const populated = files.filter((file) => file.data.length > 0);
+  const devices = new Map<string, PowerAuditDevice>();
+  const samples: PowerAuditSample[] = [];
+  for (const file of populated) {
+    for (const row of file.data) {
+      const id = populated.length === 1 ? String(row.index) : `${file.name}/${row.index}`;
+      devices.set(id, { id, hostname: file.name, gpuIndex: row.index });
+      const time = parseTelemetryTimestampUtc(row.timestamp);
+      if (time !== null) samples.push({ deviceId: id, time: time / 1000, power: row.power });
+    }
+  }
+  return cutPowerAuditSamples(artifact, samples, devices, validations, manifest);
+}
+
+/** The same window/device/bucketing transform for persisted samples and artifact CSVs. */
+export function cutPowerAuditSamples(
+  artifact: string,
+  samples: readonly PowerAuditSample[],
+  devices: ReadonlyMap<string, PowerAuditDevice>,
+  validations: ReadonlyMap<string, Record<string, unknown>>,
+  manifest: Record<string, unknown> | null,
+): GpuPowerSeries[] {
+  const fallbackRoles = manifestRoles(manifest);
   const cut: { start: number; series: GpuPowerSeries }[] = [];
-  for (const [entryName, text] of files) {
-    if (!VALIDATION_ENTRY.test(entryName)) continue;
-    const validation = parseJsonObject(text);
-    if (!validation) continue;
+  for (const [entryName, validation] of validations) {
     const window = validationWindow(validation);
     if (!window) continue;
 
@@ -253,11 +350,6 @@ export function cutPowerAuditBundle(
       timestamp: String(sample.time),
       index: rowOf.get(sample.deviceId)!,
       power: sample.power,
-      temperature: 0,
-      smClock: 0,
-      memClock: 0,
-      gpuUtil: 0,
-      memUtil: 0,
     }));
     const series = bucketPowerSeries(artifact, rows);
     if (!series) continue;

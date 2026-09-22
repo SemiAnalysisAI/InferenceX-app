@@ -118,7 +118,7 @@ function interceptRows() {
   cy.intercept('GET', '/api/v1/workflow-info*', {
     body: { runs: [], changelogs: [], configs: [] },
   });
-  cy.intercept('GET', `/api/gpu-metrics?runId=${RUN_ID}*`, {
+  cy.intercept('POST', `/api/gpu-metrics?runId=${RUN_ID}*`, {
     body: seriesFor('b200', RUN_URL, RUN_ID),
   }).as('series');
 }
@@ -143,7 +143,7 @@ function interceptOverlay() {
       evaluations: [],
     },
   }).as('unofficialRun');
-  cy.intercept('GET', `/api/gpu-metrics?runId=${OVERLAY_RUN_ID}*`, {
+  cy.intercept('POST', `/api/gpu-metrics?runId=${OVERLAY_RUN_ID}*`, {
     body: seriesFor('h200', OVERLAY_RUN_URL, OVERLAY_RUN_ID),
   }).as('overlaySeries');
 }

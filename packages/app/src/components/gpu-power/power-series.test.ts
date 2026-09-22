@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   bucketPowerSeries,
+  bucketPowerFiles,
   bucketTimeMs,
   meanPowerAt,
   parseTelemetryTimestampUtc,
@@ -70,6 +71,30 @@ describe('bucketPowerSeries', () => {
     expect(bucketTimeMs(series!, 2)).toBe(Date.UTC(2026, 8, 12, 20, 20, 43));
   });
 
+  it('keeps the first sample at each GPU/timestamp before averaging distinct samples', () => {
+    const rows = [
+      row('2026/09/12 04:00:00.100', 0, 300),
+      row('2026/09/12 04:00:00.100', 0, 300), // repeated monitor flush
+      row('2026-09-12T04:00:00.100Z', 0, 999), // same instant, conflicting value
+      row('2026/09/12 04:00:00.100', 1, 100), // different GPU remains independent
+      row('2026/09/12 04:00:00.800', 0, 500),
+      row('2026/09/12 04:00:01.100', 0, 700),
+    ];
+    expect(bucketPowerSeries('gpu_metrics_duplicate', rows)).toMatchObject({
+      gpus: [0, 1],
+      t: [0, 1],
+      power: [
+        [400, 700],
+        [100, null],
+      ],
+    });
+    expect(bucketPowerSeries('gpu_metrics_duplicate', rows, 2)).toMatchObject({
+      bucketSeconds: 2,
+      t: [0],
+      power: [[500], [100]],
+    });
+  });
+
   it('omits empty buckets so long gaps do not pad the payload', () => {
     const series = bucketPowerSeries('gpu_metrics_gap', [
       row('2026/09/12 20:00:00.000', 0, 100),
@@ -115,5 +140,33 @@ describe('sumPowerAt', () => {
     expect(sumPowerAt(series, [0, 2], 1)).toBeNull();
     expect(sumPowerAt(series, [], 0)).toBeNull();
     expect(sumPowerAt(series, [7], 0)).toBeNull();
+  });
+});
+
+describe('bucketPowerFiles', () => {
+  it('keeps repeated GPU indices from different host files separate with stable identity', () => {
+    const time = '2026-09-12T04:00:00Z';
+    const files = [
+      { name: 'host-b/gpu_metrics.csv', data: [row(time, 0, 500)] },
+      { name: 'host-a/gpu_metrics.csv', data: [row(time, 0, 100), row(time, 2, 200)] },
+      { name: 'empty.csv', data: [] },
+    ];
+    const expected = {
+      artifact: 'gpu_metrics_multinode',
+      startMs: Date.parse(time),
+      bucketSeconds: 1,
+      gpus: [0, 1, 2],
+      t: [0],
+      power: [[100], [200], [500]],
+      devices: [
+        { id: 'host-a/gpu_metrics.csv/0' },
+        { id: 'host-a/gpu_metrics.csv/2' },
+        { id: 'host-b/gpu_metrics.csv/0' },
+      ],
+    };
+    expect(bucketPowerFiles('gpu_metrics_multinode', files)).toEqual(expected);
+    expect(bucketPowerFiles('gpu_metrics_multinode', files.toReversed())).toEqual(expected);
+    expect(bucketPowerFiles('empty', [])).toBeNull();
+    expect(bucketPowerFiles('single', [files[0]])?.gpus).toEqual([0]);
   });
 });

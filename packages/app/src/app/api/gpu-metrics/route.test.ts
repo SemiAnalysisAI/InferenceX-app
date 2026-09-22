@@ -1,4 +1,5 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
+import type * as GpuPowerTypes from '@/components/gpu-power/types';
 
 const { mockParseCsvData, zipArchives } = vi.hoisted(() => {
   interface ZipEntry {
@@ -9,7 +10,7 @@ const { mockParseCsvData, zipArchives } = vi.hoisted(() => {
     { entryName: 'gpu_metrics_0.csv', data: 'timestamp,index,power\n2026-03-01T00:00:00Z,0,300' },
   ];
   return {
-    mockParseCsvData: vi.fn((csv: string) => {
+    mockParseCsvData: vi.fn((csv: string): GpuPowerTypes.GpuMetricRow[] => {
       if (csv.trim().length === 0) return [];
       return [
         {
@@ -84,6 +85,10 @@ let origReadonlyUrl: string | undefined;
 
 function req(url: string): NextRequest {
   return new NextRequest(new URL(url, 'http://localhost'));
+}
+
+function nvidiaRow(second: number, power: number): string {
+  return `2026/03/01 00:00:0${second}.000, 0, ${power} W, 65, 1500 MHz, 2000 MHz, 95 %, 80 %`;
 }
 
 beforeEach(() => {
@@ -299,18 +304,300 @@ describe('GET /api/gpu-metrics — database first', () => {
     expect(body.artifacts[0].name).toBe('gpu_metrics_live');
   });
 
-  it('falls back to GitHub when the database lookup throws', async () => {
+  it('reports a database failure separately instead of treating it as missing data', async () => {
     process.env.DATABASE_READONLY_URL = 'postgresql://readonly.example.test/db';
     mockGetGpuMetricsForRun.mockRejectedValueOnce(new Error('relation does not exist'));
     globalThis.fetch = vi.fn().mockResolvedValueOnce({ ok: false, status: 404 });
 
     const res = await GET(req('/api/gpu-metrics?runId=99'));
-    expect(res.status).toBe(500);
+    expect(res.status).toBe(503);
+    expect(await res.json()).toMatchObject({ code: 'DATABASE_UNAVAILABLE' });
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+
+  it('renders persisted Timeline series with GitHub unavailable and preserves prefix filtering', async () => {
+    process.env.DATABASE_READONLY_URL = 'postgresql://readonly.example.test/db';
+    mockGetGpuMetricsForRun.mockResolvedValueOnce(storedRunPayload);
+    globalThis.fetch = vi.fn().mockRejectedValue(new Error('GitHub artifacts expired'));
+    const res = await GET(req('/api/gpu-metrics?runId=34557177019&series=power&prefix=dsr1_'));
+    expect(res.status).toBe(200);
+    expect(res.headers.get('Cache-Control')).toBe('no-store');
+    expect(await res.json()).toMatchObject({
+      source: 'database',
+      series: [
+        {
+          artifact: 'gpu_metrics_dsr1_conc32_b200-x_0',
+          startMs: Date.parse('2026-09-11T04:19:41Z'),
+          bucketSeconds: 1,
+          gpus: [0],
+          t: [0, 1],
+          power: [[187.8, 912.1]],
+        },
+      ],
+    });
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+
+  it('uses stored bundle windows when a point prefix extends past the artifact name', async () => {
+    process.env.DATABASE_READONLY_URL = 'postgresql://readonly.example.test/db';
+    const source = 'power_validation_qwen3.5_8k1k_fp8_slurm_conc32.json';
+    const base = storedRunPayload.series[0];
+    const start = Date.parse(base.data[0].timestamp) / 1000;
+    const bundle = (host: string, power: number) => ({
+      ...base,
+      artifactName: 'power_audit_qwen3.5_8k1k_fp8_slurm',
+      fileName: `LOGS/power/samples.csv#${host}`,
+      sidecars: {
+        identity: [{ hostname: host, gpu_index: 0, gpu_uuid: `GPU-${host}` }],
+        validations: {
+          [source]: { selected_window: { start_time_unix: start, end_time_unix: start + 1 } },
+        },
+      },
+      data: [{ ...base.data[0], power }],
+    });
+    mockGetGpuMetricsForRun.mockResolvedValueOnce({
+      ...storedRunPayload,
+      series: [bundle('a', 100), bundle('b', 500)],
+    });
+    globalThis.fetch = vi.fn().mockRejectedValue(new Error('GitHub unavailable'));
+    const res = await GET(
+      req('/api/gpu-metrics?runId=34557177019&series=power&prefix=qwen3.5_8k1k_fp8_slurm_conc32'),
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.series).toMatchObject([
+      {
+        artifact: 'power_audit_qwen3.5_8k1k_fp8_slurm',
+        source,
+        gpus: [0, 1],
+        power: [[100], [500]],
+        devices: [{ id: 'a/GPU-a' }, { id: 'b/GPU-b' }],
+      },
+    ]);
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+
+  it('reports the incomplete artifact and recovery action when partial storage cannot fall back to GitHub', async () => {
+    process.env.DATABASE_READONLY_URL = 'postgresql://readonly.example.test/db';
+    const entry = storedRunPayload.series[0];
+    const artifactName = 'power_audit_qwen3.5_multinode';
+    mockGetGpuMetricsForRun.mockResolvedValueOnce({
+      ...storedRunPayload,
+      series: [
+        {
+          ...entry,
+          artifactName,
+          fileName: 'LOGS/power/samples.csv#host-a',
+          sidecars: {
+            seriesInventory: [
+              { fileName: 'LOGS/power/samples.csv#host-a', sampleCount: 2 },
+              { fileName: 'LOGS/power/samples.csv#host-b', sampleCount: 2 },
+            ],
+          },
+        },
+      ],
+    });
+    globalThis.fetch = vi.fn().mockResolvedValue({ ok: false, status: 404 });
+    const res = await GET(req('/api/gpu-metrics?runId=34557177019&series=power'));
     expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+    expect(res.status).toBe(503);
+    const body = await res.json();
+    expect(body).toMatchObject({ code: 'STORED_TELEMETRY_INCOMPLETE', artifact: artifactName });
+    expect(body.error).toContain('host-b');
+    expect(body.error).toContain('Re-ingest');
+    expect(body.series).toBeUndefined();
+  });
+
+  it.each([
+    'complete',
+    'missing host',
+    'empty host',
+    'truncated host',
+    'second missing artifact',
+    'healthy stored artifact',
+    'healthy stored artifact also live',
+  ])('checks retained file/sample coverage before using a %s CSV fallback', async (coverage) => {
+    process.env.DATABASE_READONLY_URL = 'postgresql://readonly.example.test/db';
+    const { parseCsvData } = await vi.importActual<typeof GpuPowerTypes>(
+      '@/components/gpu-power/types',
+    );
+    const header =
+      'timestamp, index, power.draw [W], temperature.gpu, clocks.current.sm [MHz], clocks.current.memory [MHz], utilization.gpu [%], utilization.memory [%]';
+    const hostA = [header, nvidiaRow(0, 300), nvidiaRow(0, 999), nvidiaRow(1, 310)].join('\n');
+    const hostB =
+      coverage === 'empty host'
+        ? header
+        : [
+            header,
+            nvidiaRow(0, 500),
+            ...(coverage === 'truncated host' ? [] : [nvidiaRow(1, 510)]),
+          ].join('\n');
+    zipArchives.byKey.set('coverage', [
+      { entryName: 'host-a/gpu_metrics.csv', data: hostA },
+      ...(coverage === 'missing host'
+        ? []
+        : [{ entryName: 'host-b/gpu_metrics.csv', data: hostB }]),
+    ]);
+    mockParseCsvData.mockImplementationOnce(parseCsvData);
+    if (coverage !== 'missing host') mockParseCsvData.mockImplementationOnce(parseCsvData);
+    const entry = storedRunPayload.series[0];
+    const healthyStoredArtifact = coverage.startsWith('healthy stored artifact');
+    mockGetGpuMetricsForRun.mockResolvedValueOnce({
+      ...storedRunPayload,
+      series: [
+        {
+          ...entry,
+          artifactName: 'gpu_metrics_live',
+          fileName: 'host-a/gpu_metrics.csv',
+          sidecars: {
+            seriesInventory: [
+              { fileName: 'host-a/gpu_metrics.csv', sampleCount: 2 },
+              { fileName: 'host-b/gpu_metrics.csv', sampleCount: 2 },
+            ],
+          },
+        },
+        ...(healthyStoredArtifact ? [entry] : []),
+        ...(coverage === 'second missing artifact'
+          ? [
+              {
+                ...entry,
+                artifactName: 'gpu_metrics_second',
+                fileName: 'host-a/gpu_metrics.csv',
+                sidecars: {
+                  seriesInventory: [
+                    { fileName: 'host-a/gpu_metrics.csv', sampleCount: 2 },
+                    { fileName: 'host-b/gpu_metrics.csv', sampleCount: 2 },
+                  ],
+                },
+              },
+            ]
+          : []),
+      ],
+    });
+    globalThis.fetch = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            id: 34557177019,
+            name: 'Sweep',
+            head_branch: 'main',
+            head_sha: 'abc',
+            created_at: '2026-03-01T00:00:00Z',
+            html_url: 'https://example.test/run',
+            status: 'completed',
+            conclusion: 'success',
+          }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            artifacts: [
+              {
+                id: 1,
+                name: 'gpu_metrics_live',
+                archive_download_url: 'https://example.test/zip',
+              },
+              ...(coverage === 'healthy stored artifact also live'
+                ? [
+                    {
+                      id: 2,
+                      name: entry.artifactName,
+                      archive_download_url: 'https://example.test/healthy-zip',
+                    },
+                  ]
+                : []),
+            ],
+          }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        headers: new Headers(),
+        arrayBuffer: () => Promise.resolve(new TextEncoder().encode('coverage').buffer),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        headers: new Headers(),
+        arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)),
+      });
+    const res = await GET(req('/api/gpu-metrics?runId=34557177019&series=power'));
+    if (coverage === 'complete' || healthyStoredArtifact) {
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.source).toBe('github');
+      expect(body.series).toHaveLength(healthyStoredArtifact ? 2 : 1);
+      expect(body.series).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            artifact: 'gpu_metrics_live',
+            power: [
+              [300, 310],
+              [500, 510],
+            ],
+          }),
+          ...(healthyStoredArtifact
+            ? [
+                expect.objectContaining({
+                  artifact: entry.artifactName,
+                  power: [[187.8, 912.1]],
+                }),
+              ]
+            : []),
+        ]),
+      );
+    } else {
+      expect(res.status).toBe(503);
+      expect(await res.json()).toMatchObject({
+        code: 'STORED_TELEMETRY_INCOMPLETE',
+        artifact:
+          coverage === 'second missing artifact' ? 'gpu_metrics_second' : 'gpu_metrics_live',
+      });
+    }
+    expect(globalThis.fetch).toHaveBeenCalledTimes(
+      coverage === 'healthy stored artifact also live' ? 4 : 3,
+    );
+  });
+
+  it('reports Timeline database failure even when the GitHub token is absent', async () => {
+    process.env.DATABASE_READONLY_URL = 'postgresql://readonly.example.test/db';
+    delete process.env.GITHUB_TOKEN;
+    mockGetGpuMetricsForRun.mockRejectedValueOnce(new Error('connection unavailable'));
+    globalThis.fetch = vi.fn();
+    const res = await GET(req('/api/gpu-metrics?runId=34557177019&series=power'));
+    expect(res.status).toBe(503);
+    expect(await res.json()).toMatchObject({ code: 'DATABASE_UNAVAILABLE' });
+    expect(globalThis.fetch).not.toHaveBeenCalled();
   });
 });
 
 describe('GET /api/gpu-metrics', () => {
+  it('keeps host-local GPU zero separate in the default live multi-file response', async () => {
+    const { parseCsvData } = await vi.importActual<typeof GpuPowerTypes>(
+      '@/components/gpu-power/types',
+    );
+    const header =
+      'timestamp, index, power.draw [W], temperature.gpu, clocks.current.sm [MHz], clocks.current.memory [MHz], utilization.gpu [%], utilization.memory [%]';
+    zipArchives.byKey.set('multinode-csv', [
+      { entryName: 'host-a/gpu_metrics.csv', data: [header, nvidiaRow(0, 300)].join('\n') },
+      { entryName: 'host-b/gpu_metrics.csv', data: [header, nvidiaRow(0, 500)].join('\n') },
+    ]);
+    mockParseCsvData.mockImplementationOnce(parseCsvData).mockImplementationOnce(parseCsvData);
+    mockGithub([{ name: 'gpu_metrics_live', url: 'https://example.test/dl/multinode' }], {
+      'https://example.test/dl/multinode': { archive: 'multinode-csv' },
+    });
+    const res = await GET(req('/api/gpu-metrics?runId=12345'));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      source: 'github',
+      artifacts: [
+        { name: 'gpu_metrics_live/host-a/gpu_metrics.csv', data: [{ index: 0, power: 300 }] },
+        { name: 'gpu_metrics_live/host-b/gpu_metrics.csv', data: [{ index: 0, power: 500 }] },
+      ],
+    });
+  });
+
   it('returns 400 when runId is missing', async () => {
     const res = await GET(req('/api/gpu-metrics'));
     expect(res.status).toBe(400);
@@ -790,6 +1077,49 @@ describe('GET /api/gpu-metrics?series=power with power_audit bundles', () => {
   beforeEach(() => {
     zipArchives.byKey.set('bundle', BUNDLE_ARCHIVE);
     vi.spyOn(console, 'warn').mockImplementation(() => {});
+  });
+
+  it('does not accept a same-name partial bundle as recovery for known missing stored hosts', async () => {
+    process.env.DATABASE_READONLY_URL = 'postgresql://readonly.example.test/db';
+    mockGetGpuMetricsForRun.mockResolvedValueOnce({
+      ...storedRunPayload,
+      series: [
+        {
+          ...storedRunPayload.series[0],
+          artifactName: BUNDLE_NAME,
+          fileName: 'LOGS/power/samples.csv#cn01',
+          sidecars: {
+            seriesInventory: [
+              { fileName: 'LOGS/power/samples.csv#cn01', sampleCount: 2 },
+              { fileName: 'LOGS/power/samples.csv#cn02', sampleCount: 2 },
+            ],
+          },
+        },
+      ],
+    });
+    zipArchives.byKey.set(
+      'partial-bundle',
+      BUNDLE_ARCHIVE.map((entry) =>
+        entry.entryName === 'LOGS/power/samples.csv'
+          ? {
+              ...entry,
+              data: entry.data
+                .split('\n')
+                .filter((line) => !line.includes(',cn02,'))
+                .join('\n'),
+            }
+          : entry,
+      ),
+    );
+    mockGithub([{ name: BUNDLE_NAME, url: 'https://example.test/dl/bundle' }], {
+      'https://example.test/dl/bundle': { archive: 'partial-bundle' },
+    });
+    const res = await GET(req('/api/gpu-metrics?runId=12345&series=power'));
+    expect(res.status).toBe(503);
+    expect(await res.json()).toMatchObject({
+      code: 'STORED_TELEMETRY_INCOMPLETE',
+      artifact: BUNDLE_NAME,
+    });
   });
 
   it('cuts a bundle into per-window series alongside gpu_metrics series', async () => {

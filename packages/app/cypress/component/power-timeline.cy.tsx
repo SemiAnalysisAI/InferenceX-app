@@ -1,5 +1,6 @@
 import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.shared-runtime';
 import { HW_REGISTRY } from '@semianalysisai/inferencex-constants';
+import { useState, type ReactElement } from 'react';
 
 import type {
   GpuPowerDevice,
@@ -163,7 +164,7 @@ const poolResponse: GpuPowerSeriesResponse = {
 const GB200_TDP = HW_REGISTRY.gb200?.tdp || HW_REGISTRY.b200.tdp;
 
 function mountTimeline(
-  data: InferenceData[],
+  data: InferenceData[] | ReactElement,
   options: {
     pathname?: string;
     width?: number;
@@ -174,12 +175,16 @@ function mountTimeline(
   mountWithProviders(
     <PathnameContext.Provider value={options.pathname ?? '/inference'}>
       <div style={{ width: options.width ?? 1100, height: 700 }}>
-        <PowerTimeline
-          chartId="power-timeline-test"
-          data={data}
-          overlayData={options.overlay}
-          yLabel="Measured Average Power per Chip over Time (W)"
-        />
+        {Array.isArray(data) ? (
+          <PowerTimeline
+            chartId="power-timeline-test"
+            data={data}
+            overlayData={options.overlay}
+            yLabel="Measured Average Power per Chip over Time (W)"
+          />
+        ) : (
+          data
+        )}
       </div>
     </PathnameContext.Provider>,
     {
@@ -206,7 +211,7 @@ describe('PowerTimeline', () => {
   });
 
   it('distinguishes dates when wall-clock traces span multiple days', () => {
-    cy.intercept('GET', '/api/gpu-metrics*', {
+    cy.intercept('POST', '/api/gpu-metrics*', {
       body: {
         ...response,
         series: response.series.map((trace, index) => ({
@@ -231,7 +236,7 @@ describe('PowerTimeline', () => {
 
   it('keeps mobile wall-clock dates separated', () => {
     cy.viewport(390, 844);
-    cy.intercept('GET', '/api/gpu-metrics*', {
+    cy.intercept('POST', '/api/gpu-metrics*', {
       body: {
         ...response,
         series: response.series.map((trace, index) => ({
@@ -258,9 +263,14 @@ describe('PowerTimeline', () => {
   });
 
   it('fetches one prefixed series request per run and draws the job with its window emphasized', () => {
-    cy.intercept('GET', '/api/gpu-metrics*', { body: response }).as('series');
+    cy.intercept('POST', '/api/gpu-metrics*', { body: response }).as('series');
     mountTimeline([
-      measuredPoint('b200', 16, 700),
+      measuredPoint('b200', 16, 700, {
+        power_audit: {
+          source: `results/power_validation_${resultName('b200', 16)}.json`,
+          ...WINDOW,
+        },
+      }),
       measuredPoint('b200', 64, 900),
       // Same run, no artifact uploaded (e.g. a disaggregated Dynamo row).
       measuredPoint('b200', 256, 950, {
@@ -274,6 +284,14 @@ describe('PowerTimeline', () => {
       expect(url.searchParams.get('runId')).to.eq(RUN_ID);
       expect(url.searchParams.get('series')).to.eq('power');
       expect(url.searchParams.get('prefix')).to.eq('dsv4_8k1k_fp4_');
+      expect(request.body).to.deep.equal({
+        sources: [
+          `power_validation_${resultName('b200', 16)}.json`,
+          `power_validation_${resultName('b200', 64)}.json`,
+          'power_validation_dsv4_8k1k_fp4_dynamo-sglang_conc256.json',
+        ].toSorted(),
+      });
+      expect(request.body.sources).to.deep.equal([...new Set(request.body.sources)].toSorted());
     });
 
     svg().within(() => {
@@ -327,6 +345,88 @@ describe('PowerTimeline', () => {
     });
   });
 
+  it('fetches again when wanted sources change within the same run and prefix', () => {
+    const source16 = `power_validation_${resultName('b200', 16)}.json`;
+    const source32 = `power_validation_${resultName('b200', 32)}.json`;
+    const source64 = `power_validation_${resultName('b200', 64)}.json`;
+    cy.intercept('POST', '/api/gpu-metrics*', (request) => {
+      request.reply({
+        body: {
+          ...response,
+          series: request.body.sources.includes(source32)
+            ? [series('b200', 16, 700), series('b200', 32, 800)]
+            : response.series,
+        },
+      });
+    }).as('series');
+
+    function ChangingSelection() {
+      const [changed, setChanged] = useState(false);
+      return (
+        <>
+          <button onClick={() => setChanged(true)}>Select concurrency 32</button>
+          <PowerTimeline
+            chartId="power-timeline-test"
+            data={[
+              measuredPoint('b200', 16, 700),
+              measuredPoint('b200', changed ? 32 : 64, changed ? 800 : 900),
+            ]}
+            yLabel="Measured Average Power per Chip over Time (W)"
+          />
+        </>
+      );
+    }
+
+    mountTimeline(<ChangingSelection />);
+    cy.wait('@series').then(({ request: first }) => {
+      expect(first.body).to.deep.equal({ sources: [source16, source64] });
+      svg().find('text.power-trace-label').should('contain.text', 'c64');
+      cy.contains('button', 'Select concurrency 32').click();
+      cy.wait('@series').then(({ request: second }) => {
+        expect(second.url).to.eq(first.url);
+        expect(second.body).to.deep.equal({ sources: [source16, source32] });
+      });
+    });
+    svg()
+      .find('text.power-trace-label')
+      .should('contain.text', 'c32')
+      .and('not.contain.text', 'c64');
+    cy.get('[data-testid="power-timeline-missing"]').should('not.exist');
+    cy.get('@series.all').should('have.length', 2);
+  });
+
+  for (const [locale, pathname, width] of [
+    ['EN desktop', '/inference', 1280],
+    ['ZH mobile', '/zh/inference', 390],
+  ] as const) {
+    it(`draws the stored and recovered sibling from a hybrid API fixture on ${locale}`, () => {
+      cy.viewport(width, 844);
+      // Transport fixture: the API already retained c16 from DB and recovered c64 from GitHub.
+      // Real database recovery is verified separately by the route integration checks.
+      cy.intercept('POST', '/api/gpu-metrics*', {
+        body: { ...response, source: 'github' },
+      }).as('series');
+      mountTimeline([measuredPoint('b200', 16, 700), measuredPoint('b200', 64, 900)], {
+        pathname,
+        width: width === 390 ? 324 : 1100,
+      });
+      cy.wait('@series').then(({ request }) => {
+        expect(request.body.sources).to.deep.equal([
+          `power_validation_${resultName('b200', 16)}.json`,
+          `power_validation_${resultName('b200', 64)}.json`,
+        ]);
+      });
+      svg().find('path.power-trace[data-segment="window"]').should('have.length', 2);
+      svg().find('text.power-trace-label').should('contain.text', 'c16').and('contain.text', 'c64');
+      cy.get('[data-testid="power-timeline-missing"]').should('not.exist');
+      cy.get('[data-testid="power-timeline-empty"]').should('not.exist');
+      if (pathname.startsWith('/zh')) {
+        cy.get('[data-testid="power-timeline-toolbar"]').should('contain.text', '时间轴');
+      }
+      svg().screenshot(`power-timeline-hybrid-${width === 390 ? 'zh-mobile' : 'en-desktop'}`);
+    });
+  }
+
   it('colours overlay-run traces by run and honours the overlay hardware filter', () => {
     const overlayPoint = measuredPoint('h200', 16, 500, {
       run_url: OVERLAY_RUN_URL,
@@ -339,8 +439,8 @@ describe('PowerTimeline', () => {
       runInfo: { ...response.runInfo, id: Number(OVERLAY_RUN_ID), url: OVERLAY_RUN_URL },
       series: [series('h200', 16, 500)],
     };
-    cy.intercept('GET', `/api/gpu-metrics?runId=${RUN_ID}*`, { body: response }).as('official');
-    cy.intercept('GET', `/api/gpu-metrics?runId=${OVERLAY_RUN_ID}*`, {
+    cy.intercept('POST', `/api/gpu-metrics?runId=${RUN_ID}*`, { body: response }).as('official');
+    cy.intercept('POST', `/api/gpu-metrics?runId=${OVERLAY_RUN_ID}*`, {
       body: overlayResponse,
     }).as('overlay');
     mountTimeline([measuredPoint('b200', 16, 700)], {
@@ -394,7 +494,7 @@ describe('PowerTimeline', () => {
         ...WINDOW,
       },
     });
-    cy.intercept('GET', '/api/gpu-metrics*', { body: response }).as('series');
+    cy.intercept('POST', '/api/gpu-metrics*', { body: response }).as('series');
     mountTimeline([measuredPoint('b200', 16, 700), measuredPoint('h100', 16, 600)], {
       overlay: {
         data: [overlayPoint],
@@ -447,7 +547,7 @@ describe('PowerTimeline', () => {
       measuredPoint('b200', 8 * 2 ** index, 700, { run_url: runUrlFor(runId) }),
     );
     officialRuns.forEach((runId, index) => {
-      cy.intercept('GET', `/api/gpu-metrics?runId=${runId}*`, {
+      cy.intercept('POST', `/api/gpu-metrics?runId=${runId}*`, {
         body: {
           runInfo: { ...response.runInfo, id: Number(runId), url: runUrlFor(runId) },
           series: [series('b200', 8 * 2 ** index, 700)],
@@ -461,7 +561,7 @@ describe('PowerTimeline', () => {
         ...WINDOW,
       },
     });
-    cy.intercept('GET', `/api/gpu-metrics?runId=${OVERLAY_RUN_ID}*`, {
+    cy.intercept('POST', `/api/gpu-metrics?runId=${OVERLAY_RUN_ID}*`, {
       body: {
         runInfo: { ...response.runInfo, id: Number(OVERLAY_RUN_ID), url: OVERLAY_RUN_URL },
         series: [series('h200', 16, 500)],
@@ -509,7 +609,7 @@ describe('PowerTimeline', () => {
   });
 
   it('reports a failed run and hides traces the legend has switched off', () => {
-    cy.intercept('GET', '/api/gpu-metrics*', {
+    cy.intercept('POST', '/api/gpu-metrics*', {
       statusCode: 500,
       body: { error: 'No gpu_metrics artifacts found for this run' },
     }).as('failed');
@@ -524,7 +624,7 @@ describe('PowerTimeline', () => {
   });
 
   it('translates the toolbar, legend switches and status on /zh', () => {
-    cy.intercept('GET', '/api/gpu-metrics*', { body: response }).as('series');
+    cy.intercept('POST', '/api/gpu-metrics*', { body: response }).as('series');
     mountTimeline([measuredPoint('b200', 16, 700)], { pathname: '/zh/inference' });
     cy.wait('@series');
     cy.get('[data-testid="power-timeline-toolbar"]').should('contain.text', '时间轴');
@@ -535,7 +635,7 @@ describe('PowerTimeline', () => {
   });
 
   it('sums prefill and decode pools against pool-sized TDP references in pool mode', () => {
-    cy.intercept('GET', '/api/gpu-metrics*', { body: poolResponse }).as('series');
+    cy.intercept('POST', '/api/gpu-metrics*', { body: poolResponse }).as('series');
     mountTimeline([measuredPoint('b200', 16, 700), disaggPoint(8, 800)]);
     cy.wait('@series');
 
@@ -614,7 +714,7 @@ describe('PowerTimeline', () => {
   });
 
   it('keeps separate pool references when prefill and decode pools differ in size', () => {
-    cy.intercept('GET', '/api/gpu-metrics*', {
+    cy.intercept('POST', '/api/gpu-metrics*', {
       body: {
         runInfo: response.runInfo,
         series: [poolSeries(8, 6)],
@@ -643,8 +743,8 @@ describe('PowerTimeline', () => {
       runInfo: { ...response.runInfo, id: Number(OVERLAY_RUN_ID), url: OVERLAY_RUN_URL },
       series: [poolSeries(8)],
     };
-    cy.intercept('GET', `/api/gpu-metrics?runId=${RUN_ID}*`, { body: response }).as('official');
-    cy.intercept('GET', `/api/gpu-metrics?runId=${OVERLAY_RUN_ID}*`, {
+    cy.intercept('POST', `/api/gpu-metrics?runId=${RUN_ID}*`, { body: response }).as('official');
+    cy.intercept('POST', `/api/gpu-metrics?runId=${OVERLAY_RUN_ID}*`, {
       body: overlayResponse,
     }).as('overlay');
     mountTimeline([measuredPoint('b200', 16, 700)], {
@@ -706,7 +806,7 @@ describe('PowerTimeline', () => {
   it('focuses the deep-linked trace, opens pool mode for it and clears on request', () => {
     const disagg = disaggPoint(8, 800);
     requestPowerTraceFocus(traceKeyForPoint(disagg)!);
-    cy.intercept('GET', '/api/gpu-metrics*', { body: poolResponse }).as('series');
+    cy.intercept('POST', '/api/gpu-metrics*', { body: poolResponse }).as('series');
     mountTimeline([measuredPoint('b200', 16, 700), disagg]);
     cy.wait('@series');
 
@@ -750,7 +850,7 @@ describe('PowerTimeline', () => {
   it('translates the pool switch, pool labels and focus chip on /zh', () => {
     const disagg = disaggPoint(8, 800);
     requestPowerTraceFocus(traceKeyForPoint(disagg)!);
-    cy.intercept('GET', '/api/gpu-metrics*', { body: poolResponse }).as('series');
+    cy.intercept('POST', '/api/gpu-metrics*', { body: poolResponse }).as('series');
     mountTimeline([disagg], { pathname: '/zh/inference' });
     cy.wait('@series');
 

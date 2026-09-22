@@ -41,6 +41,12 @@ export interface GpuMetricsCsvFile {
 
 export interface GpuMetricsSidecars {
   context: Record<string, unknown> | null;
+  /** Original per-window audit documents, keyed by their source filename. */
+  validations?: Record<string, Record<string, unknown>>;
+  /** Expected stored files and deduplicated row counts from this one artifact. */
+  seriesInventory?: { fileName: string; sampleCount: number }[];
+  /** Bundle manifest when the preferred CSV has its own collector context. */
+  powerManifest?: Record<string, unknown> | null;
   identity: unknown | null;
   energyStart: Record<string, number> | null;
   energyEnd: Record<string, number> | null;
@@ -112,6 +118,20 @@ export function readMultinodePowerManifest(samplesPath: string): Record<string, 
     : null;
 }
 
+/** Preserve window boundaries and role overrides before GitHub artifact expiry. */
+export function readPowerAuditValidations(root: string): Record<string, Record<string, unknown>> {
+  const validations: Record<string, Record<string, unknown>> = {};
+  if (!fs.existsSync(root) || !fs.statSync(root).isDirectory()) return validations;
+  for (const name of fs.readdirSync(root).sort()) {
+    if (!/^power_validation_[^/]+\.json$/u.test(name)) continue;
+    const parsed = readJsonIfPresent(path.join(root, name));
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      validations[name] = parsed as Record<string, unknown>;
+    }
+  }
+  return validations;
+}
+
 function readJsonIfPresent(pathname: string): unknown | null {
   if (!fs.existsSync(pathname)) return null;
   try {
@@ -163,8 +183,14 @@ function readIdentity(csvDir: string): unknown | null {
 export function readGpuMetricsSidecars(csvPath: string): GpuMetricsSidecars {
   const dir = path.dirname(csvPath);
   let context: Record<string, unknown> | null = null;
-  for (const entry of fs.readdirSync(dir)) {
-    if (!entry.toLowerCase().endsWith('_context.json') || !entry.includes('gpu_metrics')) continue;
+  // Match live ZIP reads even when filesystem/central-directory orders differ.
+  const contextFiles = fs
+    .readdirSync(dir)
+    .filter(
+      (entry) => entry.toLowerCase().endsWith('_context.json') && entry.includes('gpu_metrics'),
+    )
+    .sort();
+  for (const entry of contextFiles) {
     const parsed = readJsonIfPresent(path.join(dir, entry));
     if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
       context = parsed as Record<string, unknown>;

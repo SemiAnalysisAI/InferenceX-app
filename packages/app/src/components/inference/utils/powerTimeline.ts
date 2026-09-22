@@ -72,6 +72,8 @@ export interface PowerTimelineRequest {
   runId: string;
   /** RESULT_FILENAME prefix shared by every wanted artifact of the run. */
   prefix: string;
+  /** Sorted, unique validation basenames expected by the displayed points. */
+  sources: string[];
 }
 
 /**
@@ -97,6 +99,7 @@ export function planPowerTimelineRequests(
       return {
         runId,
         prefix: longestCommonPrefix(names.map((name) => name.slice(ARTIFACT_PREFIX.length))),
+        sources: names.map((name) => `power_validation_${name.slice(ARTIFACT_PREFIX.length)}.json`),
       };
     });
 }

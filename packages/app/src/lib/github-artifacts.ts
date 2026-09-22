@@ -149,7 +149,7 @@ export function extractZipEntries<T>(
   const rows: T[] = [];
 
   for (const entry of zip.getEntries()) {
-    if (!entry.entryName.endsWith(extension)) {
+    if (!entry.entryName.toLowerCase().endsWith(extension.toLowerCase())) {
       continue;
     }
 

@@ -205,9 +205,11 @@ config is `display: 'timeline'`.
   `prioritizeRuns` — so an overlay the user asked for is never the run that gets dropped),
   narrowed with
   `prefix=` to the common RESULT_FILENAME prefix so a nightly sweep's other models are not
-  downloaded. `/api/gpu-metrics?series=power` returns one-second per-GPU buckets
+  downloaded. `/api/gpu-metrics?series=power` first uses persisted telemetry and returns one-second per-GPU buckets
   (`components/gpu-power/power-series.ts`, ~1 MB for a 25-config run instead of ~27 MB of
-  raw rows); with `series=power` the route also downloads `power_audit_*` bundles whose name
+  raw rows). Missing stored telemetry falls back to artifacts; database failures are explicit errors.
+  See [persistence and repair](./powerx-persistence-recovery.md) for cache freshness and coverage receipts.
+  With `series=power` the artifact fallback also downloads `power_audit_*` bundles whose name
   shares the prefix (a bundle names the sweep, so the match runs both ways), reads only
   `LOGS/power/samples.csv`, `LOGS/power/manifest.json` and the top-level
   `power_validation_*.json` entries, and skips bundles above 256 MiB (the GB200 nw8 sweep is

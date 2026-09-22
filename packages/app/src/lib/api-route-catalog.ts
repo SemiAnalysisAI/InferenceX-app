@@ -236,10 +236,21 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'ui-artifact-read',
     exclusionReason: {
-      en: 'UI-only PowerX read for one run: the ingest-time telemetry digest when stored, otherwise the live GPU telemetry artifacts (raw `gpu_metrics_*` rows, or `series=power` one-second buckets for the PowerX timeline, also cut per validation window from `power_audit_*` bundles). Its payload shape is not a stable public contract.',
-      zh: '仅供 PowerX 界面按 run 读取：已入库时返回 ingest 阶段生成的 telemetry 摘要，否则回退到实时 GPU 遥测制品（`gpu_metrics_*` 原始行，或供 PowerX 时间线使用的 `series=power` 一秒分桶数据，后者也会按验证窗口从 `power_audit_*` bundle 中切分得到）。其返回结构不是稳定的公开契约。',
+      en: 'UI-only PowerX raw/series=power read: DB-first with artifact fallback, separate host/GPU identities and adjacent CSV context timezone normalization. GET has no expected identities and reports sourceCoverage unknown. Healthy stored windows survive fallback; known-incomplete CSVs require retained file/sample inventory and known-incomplete bundles require re-ingest. DB failures return 503 DATABASE_UNAVAILABLE; unresolved stored gaps return 503 STORED_TELEMETRY_INCOMPLETE. Responses use no-store. This is not a stable public API.',
+      zh: '仅供 PowerX 界面读取原始遥测或 series=power：优先 DB，缺失时回退产物，保留主机/GPU 身份，并按相邻 CSV context 规范化时区。GET 没有预期身份清单，sourceCoverage 为 unknown。回退保留健康存储窗口；已知不完整 CSV 须满足文件/样本清单，已知不完整 bundle 须重新 ingest。数据库故障返回 503 DATABASE_UNAVAILABLE，未恢复的存储缺口返回 503 STORED_TELEMETRY_INCOMPLETE。响应使用 no-store，不作为稳定公开 API。',
     },
-    sourceSha256: '8b15b82fac99c6c0e586fce5312de5a224de454b9d39d15cb0b2c20a2c6d8246',
+    sourceSha256: '12a04eb419e8339c1e2f7d9b8f4b295c0abd899f1606e919df21ebf8a2acde6e',
+  },
+  {
+    source: 'src/app/api/gpu-metrics/route.ts',
+    path: '/api/gpu-metrics',
+    method: 'POST',
+    classification: 'ui-artifact-read',
+    exclusionReason: {
+      en: 'Read-only Timeline transport with runId, series=power and optional prefix in the query; JSON sources contains 1–1000 validation basenames with RESULT_FILENAME up to 200 ASCII letters/digits/dot/underscore/hyphen, matching prefix. Invalid input returns 400; bodies over 256 KiB return 413. Fully covered DB reads skip GitHub; missing identities fall back and merge by validation source, preserving stored sibling windows. Offline GitHub preserves healthy DB series with incomplete sourceCoverage. Coverage describes only requested identities, never whole-run/sample completeness. The GET no-store/error/inventory guarantees also apply. UI-owned, excluded from the stable public API.',
+      zh: 'Timeline 只读传输：查询参数为 runId、series=power 和可选 prefix；JSON sources 含 1–1000 个验证文件 basename，RESULT_FILENAME 最长 200 个 ASCII 字母/数字/点/下划线/连字符，且须匹配 prefix。输入错误返回 400，正文超过 256 KiB 返回 413。DB 已覆盖请求时跳过 GitHub，否则按缺失身份回退，以 validation source 为键合并，并保留已存储的同 bundle 兄弟窗口。GitHub 离线仍返回健康 DB 序列，sourceCoverage 标记 incomplete。覆盖仅针对请求身份，不代表整次 run 或样本完整性。沿用 GET 的 no-store、错误和清单约束；属于界面接口，不纳入稳定公开 API。',
+    },
+    sourceSha256: '12a04eb419e8339c1e2f7d9b8f4b295c0abd899f1606e919df21ebf8a2acde6e',
   },
   {
     source: 'src/app/api/openapi.json/route.ts',
@@ -793,6 +804,14 @@ export interface ApiContractSourceDigest {
  * touching a route module. Digest changes require an explicit documentation review.
  */
 export const apiContractSourceDigests = [
+  {
+    source: 'src/components/gpu-power/power-audit-bundle.ts',
+    sourceSha256: 'c288ae25d4702c31a6bef5e5601e5b0b8c4abe89cd978a7eef2a4dc0247a344a',
+    reviewArea: {
+      en: 'Deterministic adjacent context selection and timezone normalization shared by artifact Timeline and run views, plus validation-window and device identity semantics.',
+      zh: '产物 Timeline 和 run 视图共用的确定性相邻 context 选择与时区规范化，以及验证窗口和设备身份语义。',
+    },
+  },
   {
     source: 'src/components/gpu-power/stored-gpu-stats.ts',
     sourceSha256: '90adde200c37694c2e37e427458a8c6a9bdb70873033699e343e8c94a291544a',

@@ -79,6 +79,7 @@ describe('planPowerTimelineRequests', () => {
     const points = [
       point({ power_audit: { source: `power_validation_${NAME_A}.json` } }),
       point({ conc: 1, power_audit: { source: `power_validation_${NAME_B}.json` } }),
+      point({ power_audit: { source: `nested/power_validation_${NAME_A}.json` } }),
       point({
         run_url: 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/1',
         power_audit: { source: 'power_validation_dsr1_1k1k_fp8_sglang_conc8_h200-x.json' },
@@ -92,10 +93,12 @@ describe('planPowerTimelineRequests', () => {
       {
         runId: '1',
         prefix: 'dsr1_1k1k_fp8_sglang_conc8_h200-x',
+        sources: ['power_validation_dsr1_1k1k_fp8_sglang_conc8_h200-x.json'],
       },
       {
         runId: '34716669498',
         prefix: 'qwen3.5_8k1k_fp8_',
+        sources: [`power_validation_${NAME_A}.json`, `power_validation_${NAME_B}.json`].sort(),
       },
     ]);
   });
@@ -312,6 +315,7 @@ describe('prioritizeRuns', () => {
   const requests = ['1', '2', '3', '4', '5'].map((runId) => ({
     runId,
     prefix: '',
+    sources: [],
   }));
 
   it('moves overlay runs ahead of official runs and keeps both orders', () => {
@@ -341,6 +345,7 @@ describe('prioritizeRun', () => {
   const requests = ['1', '2', '3', '4', '5'].map((runId) => ({
     runId,
     prefix: '',
+    sources: [],
   }));
 
   it('moves the deep-linked run to the front and keeps the rest in order', () => {

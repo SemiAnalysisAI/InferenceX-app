@@ -168,6 +168,39 @@ describe('prepareGpuMetricsArtifact', () => {
 });
 
 describe('ingestGpuMetricsArtifact', () => {
+  it.each(['unrecognized telemetry header\nno samples', NVIDIA_CSV.split('\n')[0]!])(
+    'refuses a partial artifact when a discovered host CSV cannot be ingested: %s',
+    async (brokenCsv) => {
+      const artifact = writeArtifact(NVIDIA_CSV);
+      const missingHostFile = path.join(artifact.artifactDir, 'host-b', 'gpu_metrics.csv');
+      fs.mkdirSync(path.dirname(missingHostFile));
+      fs.writeFileSync(missingHostFile, brokenCsv);
+      await expect(
+        ingestGpuMetricsArtifact(sql, {
+          workflowRunId: 1,
+          artifact,
+          benchmarkResultIds: [10],
+        }),
+      ).rejects.toThrow('host-b/gpu_metrics.csv');
+      const before = await sql`select count(*)::int as n from gpu_metric_series`;
+      expect(before).toEqual([{ n: 0 }]);
+      fs.writeFileSync(missingHostFile, NVIDIA_CSV);
+      const recovered = await ingestGpuMetricsArtifact(sql, {
+        workflowRunId: 1,
+        artifact,
+        benchmarkResultIds: [10],
+      });
+      expect(recovered.seriesIds).toHaveLength(2);
+      expect(recovered.samplesInserted).toBe(8);
+      const replay = await ingestGpuMetricsArtifact(sql, {
+        workflowRunId: 1,
+        artifact,
+        benchmarkResultIds: [10],
+      });
+      expect(replay.samplesInserted).toBe(0);
+    },
+  );
+
   it('stores series, samples, digest, and point links; reruns are no-ops', async () => {
     const artifact = writeArtifact(NVIDIA_CSV);
     const first = await ingestGpuMetricsArtifact(sql, {

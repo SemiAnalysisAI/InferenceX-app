@@ -59,6 +59,8 @@ export interface GpuMetricSeries {
   endedAt: string;
   sidecars: Record<string, unknown>;
   benchmarkResultIds: number[];
+  /** Existing benchmark provenance can recover windows from older ingests. */
+  powerAudits?: Record<string, unknown>[];
   stats: GpuMetricStatRow[];
   data: GpuMetricSampleRow[];
 }
@@ -94,6 +96,7 @@ interface RawSeriesRow {
   ended_at: string | Date;
   sidecars: Record<string, unknown> | string;
   benchmark_result_ids: (number | string)[] | null;
+  power_audits: Record<string, unknown>[] | null;
 }
 
 interface RawStatRow {
@@ -228,6 +231,7 @@ async function loadSeriesDetails(
           ? (JSON.parse(row.sidecars) as Record<string, unknown>)
           : row.sidecars,
       benchmarkResultIds: (row.benchmark_result_ids ?? []).map(Number),
+      powerAudits: row.power_audits ?? [],
       stats: statsBySeries.get(id) ?? [],
       data: samplesBySeries.get(id) ?? [],
     };
@@ -272,7 +276,13 @@ export async function getGpuMetricsForRun(
       (
         select array_agg(l.benchmark_result_id order by l.benchmark_result_id)
         from benchmark_result_gpu_metrics l where l.series_id = s.id
-      ) as benchmark_result_ids
+      ) as benchmark_result_ids,
+      (
+        select jsonb_agg(br.power_audit order by br.id)
+        from benchmark_result_gpu_metrics l
+        join benchmark_results br on br.id = l.benchmark_result_id
+        where l.series_id = s.id and br.power_audit is not null
+      ) as power_audits
     from gpu_metric_series s
     where s.workflow_run_id = ${Number(run.id)}
     order by s.artifact_name, s.file_name
@@ -313,7 +323,13 @@ export async function getGpuMetricsForPoint(
       (
         select array_agg(l.benchmark_result_id order by l.benchmark_result_id)
         from benchmark_result_gpu_metrics l where l.series_id = s.id
-      ) as benchmark_result_ids
+      ) as benchmark_result_ids,
+      (
+        select jsonb_agg(br.power_audit order by br.id)
+        from benchmark_result_gpu_metrics l
+        join benchmark_results br on br.id = l.benchmark_result_id
+        where l.series_id = s.id and br.power_audit is not null
+      ) as power_audits
     from benchmark_result_gpu_metrics link
     join gpu_metric_series s on s.id = link.series_id
     where link.benchmark_result_id = ${benchmarkResultId}

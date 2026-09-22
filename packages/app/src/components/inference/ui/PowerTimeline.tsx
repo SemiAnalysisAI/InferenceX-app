@@ -320,6 +320,9 @@ async function fetchPowerSeries(
   const params = new URLSearchParams({ runId: request.runId, series: 'power' });
   if (request.prefix) params.set('prefix', request.prefix);
   const response = await fetch(`/api/gpu-metrics?${params.toString()}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sources: request.sources }),
     cache: 'no-store',
     signal,
   });
@@ -761,7 +764,7 @@ export default function PowerTimeline({
   const droppedRuns = requests.length - fetchedRequests.length;
   const queries = useQueries({
     queries: fetchedRequests.map((request) => ({
-      queryKey: ['power-timeline', request.runId, request.prefix] as const,
+      queryKey: ['power-timeline', request.runId, request.prefix, request.sources] as const,
       queryFn: ({ signal }: { signal: AbortSignal }) => fetchPowerSeries(request, signal),
       staleTime: 5 * 60_000,
       retry: 1,

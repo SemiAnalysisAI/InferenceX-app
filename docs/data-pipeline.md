@@ -589,10 +589,23 @@ run — are never copied. Our own GCS reader (`lib/gcs-artifacts.ts`) additional
 ignores everything but `bmk_`/`server_logs_` objects, so widening the mirror's run
 filter would also need a reader change before backfill could use it.
 
-Readers: `/api/gpu-metrics?runId=` serves the digest when the run is stored and
-falls back to live GitHub artifacts otherwise (in-progress runs), and
-`/api/v1/gpu-metrics-point?id=` powers the PowerX tab of the per-point detail
-page.
+Readers: `/api/gpu-metrics?runId=` serves stored telemetry first, including
+`series=power` Timeline buckets reconstructed with retained windows and device
+identities. Missing storage falls back to GitHub artifacts. Known-incomplete CSV
+fallback must match retained filenames and sample counts; known-incomplete bundles
+need exact-source re-ingest. Healthy DB series remain in mixed fallback responses.
+Database failures return `503 DATABASE_UNAVAILABLE`; incomplete storage without
+usable fallback returns `503 STORED_TELEMETRY_INCOMPLETE` with re-ingest guidance.
+Timeline requests use read-only POST with sorted validation basenames in a `sources`
+JSON body. Stored coverage of those identities permits an artifact-independent response;
+missing siblings, including other windows in the same bundle, use source-level DB-first
+merging. Unavailable artifacts leave healthy DB traces readable with explicit missing
+sources. `sourceCoverage` describes only the requested identities; legacy GET reports
+coverage unknown. Plain CSV fallback applies the adjacent context timezone just like
+ingest and bundle reads. Raw multi-file artifacts retain separate file/host series.
+Successful reads and storage errors use no-store.
+
+`/api/v1/gpu-metrics-point?id=` powers the PowerX point-detail tab.
 
 The public `/api/v1/views/gpu-metrics` projection and full-record UI table use the
 same stored per-GPU statistics digest for the selected file/host series. Empty or
@@ -603,7 +616,13 @@ sample-weighted, percentiles interpolate at `p * (N - 1)`, and standard deviatio
 divides by `N`. GPU visibility and chart downsampling do not alter this population.
 Serving-window power, J/token and selected-time-window calculations remain separate.
 
-中文：全记录统计使用已存摘要，包含启动与 warmup；缺失读数不补零，已有摘要为空时不重新计算。它与 serving-window 功率、J/token 和用户所选时间窗口的统计分别处理。
+中文：历史遥测和 Timeline 优先读取数据库；缺少存储数据时回退到 GitHub 产物，
+文件、主机与 GPU 的身份保持独立。数据库故障返回 503；已知存储不完整且无法恢复时，
+返回带定向重新入库提示的 503。Timeline 通过只读 POST 传入所需来源标识；缺失的兄弟曲线
+按来源补齐，GitHub 不可用时仍返回健康的 DB 曲线，并显式标出缺失来源。旧的 GET
+没有预期清单，覆盖状态为 unknown。sourceCoverage 仅描述本次请求，不代表整个 run
+的完整性；普通 CSV 与 bundle、ingest 使用相同的 context 时区。
+全记录统计使用已存摘要，包含启动与 warmup；缺失读数不补零，已有摘要为空时不重新计算。它与 serving-window 功率、J/token 和用户所选时间窗口的统计分别处理。
 
 ### PowerX publication receipts
 
