@@ -206,6 +206,9 @@ describe('GPU comparison agentic point detail', () => {
     cy.location('pathname').should('eq', '/inference');
   });
 
+  const CONFLICTING_GPU_URL =
+    '/inference?g_model=DeepSeek-V4-Pro&i_seq=agentic-traces&i_prec=fp4&i_gpus=b200_sglang,b200_vllm&i_dates=2026-06-12&i_dstart=2026-06-12&i_dend=2026-06-12';
+
   it('surfaces automatic resolution of conflicting GPU URL state', () => {
     cy.intercept('GET', '/api/v1/availability', { body: agenticAvailability }).as(
       'agenticAvailability',
@@ -213,15 +216,14 @@ describe('GPU comparison agentic point detail', () => {
     cy.intercept('GET', '/api/v1/benchmarks*', { body: agenticBenchmarks }).as('agenticBenchmarks');
     interceptDerivedAgenticMetrics();
 
-    cy.visit(
-      '/inference?g_model=DeepSeek-V4-Pro&i_seq=agentic-traces&i_prec=fp4&i_gpus=b200_sglang,b200_vllm&i_dates=2026-06-12&i_dstart=2026-06-12&i_dend=2026-06-12',
-      {
-        onBeforeLoad(win) {
-          win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-          unlockAgenticGate(win);
-        },
+    // Agentic surfaces are public, so this spec does NOT seed the ↑↑↓↓ feature
+    // gate: an unlocked gate lifts the cross-engine guard (see the next test),
+    // and this test covers the locked, public-reader behaviour.
+    cy.visit(CONFLICTING_GPU_URL, {
+      onBeforeLoad(win) {
+        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
       },
-    );
+    });
 
     // Official DeepSeek-V4-Pro agentic charts prefer vLLM when they first resolve
     // a cross-engine conflict with no sticky selection (comparisonDefaultGroup,
@@ -233,5 +235,28 @@ describe('GPU comparison agentic point detail', () => {
       .should('contain.text', 'vLLM')
       .and('not.contain.text', 'SGLang');
     cy.contains('button', 'Jun 12, 2026').should('be.visible');
+  });
+
+  it('lets vLLM and SGLang share the graph when the feature gate is unlocked', () => {
+    cy.intercept('GET', '/api/v1/availability', { body: agenticAvailability }).as(
+      'agenticAvailability',
+    );
+    cy.intercept('GET', '/api/v1/benchmarks*', { body: agenticBenchmarks }).as('agenticBenchmarks');
+    interceptDerivedAgenticMetrics();
+
+    cy.visit(CONFLICTING_GPU_URL, {
+      onBeforeLoad(win) {
+        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+        unlockAgenticGate(win);
+      },
+    });
+
+    // With the ↑↑↓↓ gate unlocked the comparability guard is lifted, so both
+    // engine families stay selected and no conflict toast is raised.
+    cy.get('[data-testid="gpu-multiselect"] [data-slot="select-trigger"]')
+      .should('contain.text', 'vLLM')
+      .and('contain.text', 'SGLang');
+    cy.contains('button', 'Jun 12, 2026').should('be.visible');
+    cy.get('[data-testid="engine-comparison-conflict-toast"]').should('not.exist');
   });
 });
