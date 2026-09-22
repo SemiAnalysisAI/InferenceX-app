@@ -60,7 +60,7 @@ which controls belong together.
 | `collectivex`                   | Ordered run selection and suite; EP size/phase/modes/precision/operation/percentile/axis/SKU/backend/series; KV page size/x/y/pull/push/overlap ISL/series; swap direction/layout/metric/percentile/series.                                               |
 | `submissions`                   | Search, table sort/direction/offset/limit, weekly/cumulative chart, on-change cutoff and NVIDIA/AMD/total lines. Table search does not filter the independent submission-volume chart.                                                                    |
 | `current-inferencex-image`      | Model, sequence, hardware, precision, speculation, node type, framework families and `asOf` for image age/release status.                                                                                                                                 |
-| `gpu-metrics`                   | Required run, artifact, GPU indices, metric or correlation axes, statistics sorting, chart mode and interactive downsampling preference. Raw rows and statistics remain unsampled; live response is no-store.                                             |
+| `gpu-metrics`                   | Required run, artifact, GPU indices, metric or correlation axes, statistics sorting, chart mode and interactive downsampling preference. Full-record statistics use stored digests. Responses are no-store.                                               |
 | `video`                         | CI run/artifact discovery; only already-published artifact reads; source, serving cell, media/fidelity slot, power phase and GPU denominator; same-workload comparisons, axes, deployment costs and selected tradeoff point. No-store.                    |
 
 ## Interpretation and maintenance
@@ -91,8 +91,12 @@ Custom chip costs are USD/chip-hour, token prices USD/million tokens,
 interactivity tok/s/user, and video costs USD/deployment-hour. Preserve the
 response's resolved TCO, utilization, license share, topology and power basis.
 Modeled and provisioned power are distinct. Missing measured evidence is not zero.
-GPU chart projections preserve the existing renderer's missing-metric zero
-fallback; use unsampled `rows` to distinguish absent optional sensor values.
+GPU chart projections omit missing metric readings; measured zero remains zero.
+The selected series' full-record statistics include startup and warmup
+and cover all chips regardless of visibility or chart downsampling. Stored digests
+are authoritative, including empty or absent metric digests; only live artifacts
+calculate from samples. Keep these sample-weighted statistics separate from
+serving-window power, J/token and selected-time-window calculations.
 
 Zoom, axis scale, theme, labels, report expansion, media playback and download
 buttons are presentation state, not new datasets. AI-chart provider keys and

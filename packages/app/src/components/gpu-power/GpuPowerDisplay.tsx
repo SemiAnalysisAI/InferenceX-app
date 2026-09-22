@@ -204,10 +204,8 @@ export default function GpuMetricsDisplay() {
     artifacts.some((artifact) => artifact.name === selectedArtifactCandidate)
       ? selectedArtifactCandidate
       : (artifacts[0]?.name ?? '');
-  const currentData = useMemo(
-    () => artifacts.find((artifact) => artifact.name === selectedArtifact)?.data ?? [],
-    [artifacts, selectedArtifact],
-  );
+  const currentArtifact = artifacts.find((artifact) => artifact.name === selectedArtifact);
+  const currentData = useMemo(() => currentArtifact?.data ?? [], [currentArtifact]);
   const availableMetrics = useMemo(() => getAvailableMetrics(currentData), [currentData]);
   const urlMetric = searchParams.get('gm_metric');
   const selectedMetricCandidate = selectionApplies ? selection.metric : urlMetric;
@@ -775,7 +773,11 @@ export default function GpuMetricsDisplay() {
             <h3 className="text-sm font-semibold mb-2">
               {t.perGpuStats} ({getGpuMetricLabel(metricConfig, locale)})
             </h3>
-            <GpuStatsTable data={currentData} metricKey={selectedMetric} />
+            <GpuStatsTable
+              data={currentData}
+              metricKey={selectedMetric}
+              storedStats={currentArtifact?.series?.stats}
+            />
           </Card>
         </>
       )}

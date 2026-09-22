@@ -438,7 +438,7 @@ export function PowerTelemetryView({ id, enabled, hardware }: Props) {
 
       <Card>
         <h3 className="mb-2 text-sm font-medium">{t.perGpuStats}</h3>
-        <GpuStatsTable data={data} metricKey={metricKey} />
+        <GpuStatsTable data={data} metricKey={metricKey} storedStats={selectedSeries.stats} />
       </Card>
     </div>
   );

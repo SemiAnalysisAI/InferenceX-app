@@ -1,5 +1,6 @@
 import { GET as metrics } from '@/app/api/gpu-metrics/route';
 import { buildCorrelationData, buildGroupedData } from '@/components/gpu-power/chart-data';
+import { storedGpuStatsForMetric } from '@/components/gpu-power/stored-gpu-stats';
 import {
   ALL_METRIC_OPTIONS,
   computeGpuStats,
@@ -21,7 +22,7 @@ import { type NextRequest, NextResponse } from 'next/server';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
 
-/** Live metrics intentionally bypass both CDN and Blob caching. */
+/** Stored and live metrics bypass response caching so repairs remain observable. */
 export function GET(request: NextRequest) {
   return runViewsRoute('gpu-metrics', async () => {
     validateViewParams(request.nextUrl.searchParams, VIEW_QUERY_PARAMS['gpu-metrics']);
@@ -70,9 +71,11 @@ export function GET(request: NextRequest) {
     );
     const direction = parseEnumParam(s.get('direction'), 'direction', ['asc', 'desc'], 'asc');
     // The UI statistics table uses all chips; chart visibility does not filter it.
-    const stats = computeGpuStats(rows, metric).sort(
-      (a, b) => (a[sort] - b[sort]) * (direction === 'asc' ? 1 : -1),
-    );
+    const stats = (
+      selected?.series
+        ? storedGpuStatsForMetric(selected.series.stats, metric)
+        : computeGpuStats(rows, metric)
+    ).sort((a, b) => (a[sort] - b[sort]) * (direction === 'asc' ? 1 : -1));
     return NextResponse.json(
       {
         view: 'gpu-metrics',

@@ -1,4 +1,9 @@
 import { HW_REGISTRY } from '@semianalysisai/inferencex-constants';
+import {
+  parseAmdTimestamp,
+  parseNvidiaTimestamp,
+} from '@semianalysisai/inferencex-db/etl/gpu-metrics-csv';
+import type { GpuMetricSeries } from '@semianalysisai/inferencex-db/queries/gpu-metrics';
 
 export interface GpuMetricRow {
   timestamp: string;
@@ -36,6 +41,8 @@ export interface GpuPowerRunInfo {
 export interface GpuMetricsArtifact {
   name: string;
   data: GpuMetricRow[];
+  /** Only database-backed artifacts carry the full-record digest. */
+  series?: Omit<GpuMetricSeries, 'data'>;
 }
 
 export interface GpuPowerApiResponse {
@@ -201,11 +208,11 @@ export const ALL_METRIC_OPTIONS: GpuMetricConfig[] = [...GPU_METRIC_OPTIONS, ...
 
 /**
  * Returns the metric options that have data in the given dataset.
- * AMD-specific metrics are only shown when at least one row has a non-undefined value.
+ * A metric is shown only when at least one row has a finite reading.
  */
 export function getAvailableMetrics(data: GpuMetricRow[]): GpuMetricConfig[] {
   if (data.length === 0) return GPU_METRIC_OPTIONS;
-  return ALL_METRIC_OPTIONS.filter((m) => data.some((row) => row[m.key] !== undefined));
+  return ALL_METRIC_OPTIONS.filter((m) => data.some((row) => Number.isFinite(row[m.key])));
 }
 
 /**
@@ -421,7 +428,7 @@ function buildColumnMap(headerLine: string): Map<string, number> {
   const headers = splitCsvLine(headerLine);
   const map = new Map<string, number>();
   for (let i = 0; i < headers.length; i++) {
-    map.set(headers[i].toLowerCase(), i);
+    map.set(headers[i].toLowerCase().replace(/\s*\[.*\]$/u, ''), i);
   }
   return map;
 }
@@ -432,40 +439,39 @@ function buildColumnMap(headerLine: string): Map<string, number> {
  * clocks.current.sm [MHz], clocks.current.memory [MHz], utilization.gpu [%], utilization.memory [%]
  */
 function parseNvidiaCsv(lines: string[]): GpuMetricRow[] {
+  const columns = buildColumnMap(lines[0]);
+  const col = (name: string) => columns.get(name) ?? -1;
+  const iTimestamp = col('timestamp');
+  const iIndex = col('index');
+  const iPower = col('power.draw');
+  if (iTimestamp < 0 || iIndex < 0 || iPower < 0) return [];
   const results: GpuMetricRow[] = [];
   for (let i = 1; i < lines.length; i++) {
     const cols = lines[i].split(',').map((c) => c.trim());
-    if (cols.length < 8) continue;
-
-    const index = parseInt(cols[1], 10);
-    const power = parseFloat(cols[2]);
-    const temperature = parseFloat(cols[3]);
-    const smClock = parseFloat(cols[4]);
-    const memClock = parseFloat(cols[5]);
-    const gpuUtil = parseFloat(cols[6]);
-    const memUtil = parseFloat(cols[7]);
-
-    if ([index, power, temperature, smClock, memClock, gpuUtil, memUtil].some(isNaN)) continue;
+    if (cols.length <= Math.max(iTimestamp, iIndex, iPower)) continue;
+    const index = parseInt(cols[iIndex], 10);
+    const power = safeFloat(cols[iPower]);
+    if (!Number.isInteger(index) || index < 0 || power === undefined) continue;
 
     results.push({
-      timestamp: cols[0],
+      timestamp: cols[iTimestamp],
       index,
       power,
-      temperature,
-      smClock,
-      memClock,
-      gpuUtil,
-      memUtil,
+      temperature: safeFloat(cols[col('temperature.gpu')]),
+      smClock: safeFloat(cols[col('clocks.current.sm')]),
+      memClock: safeFloat(cols[col('clocks.current.memory')]),
+      gpuUtil: safeFloat(cols[col('utilization.gpu')]),
+      memUtil: safeFloat(cols[col('utilization.memory')]),
     });
   }
   return results;
 }
 
-/** Safely parse a float, returning undefined for N/A or unparseable values. */
+/** Missing, unparseable and nonfinite readings stay absent; measured zero is valid. */
 function safeFloat(val: string | undefined): number | undefined {
   if (val === undefined || val === 'N/A' || val === '') return undefined;
   const n = parseFloat(val);
-  return isNaN(n) ? undefined : n;
+  return Number.isFinite(n) ? n : undefined;
 }
 
 /**
@@ -498,28 +504,25 @@ function parseAmdCsv(lines: string[], colMap: Map<string, number>): GpuMetricRow
   const results: GpuMetricRow[] = [];
   for (let i = 1; i < lines.length; i++) {
     const cols = splitCsvLine(lines[i]);
-    if (cols.length < 3) continue;
+    if (cols.length <= Math.max(iTimestamp, iGpu, iPower)) continue;
 
     const index = parseInt(cols[iGpu], 10);
-    const power = parseFloat(cols[iPower]);
+    const power = safeFloat(cols[iPower]);
     // Prefer hotspot temp, fall back to edge
-    let temperature = iHotspot >= 0 ? parseFloat(cols[iHotspot]) : NaN;
-    if (isNaN(temperature) && iEdge >= 0) temperature = parseFloat(cols[iEdge]);
-    const smClock = iGfxClk >= 0 ? parseFloat(cols[iGfxClk]) : 0;
-    const memClock = iMemClk >= 0 ? parseFloat(cols[iMemClk]) : 0;
-    const gpuUtil = iGfxActivity >= 0 ? parseFloat(cols[iGfxActivity]) : 0;
-    const memUtil = iUmcActivity >= 0 ? parseFloat(cols[iUmcActivity]) : 0;
+    const temperature = safeFloat(cols[iHotspot]) ?? safeFloat(cols[iEdge]);
+    const smClock = safeFloat(cols[iGfxClk]);
+    const memClock = safeFloat(cols[iMemClk]);
+    const gpuUtil = safeFloat(cols[iGfxActivity]);
+    const memUtil = safeFloat(cols[iUmcActivity]);
 
-    if (isNaN(index) || isNaN(power)) continue;
-    if (isNaN(temperature)) temperature = 0;
+    if (!Number.isInteger(index) || index < 0 || power === undefined) continue;
 
-    // AMD timestamps are Unix epoch seconds — convert to ms-based string for consistency
-    const rawTimestamp = cols[iTimestamp];
-    const epochSec = parseFloat(rawTimestamp);
-    const timestamp =
-      !isNaN(epochSec) && epochSec > 1e9 && epochSec < 1e11
-        ? new Date(epochSec * 1000).toISOString()
-        : rawTimestamp;
+    // Round epoch fractions exactly as ingest does before constructing the dedup key.
+    const timestampMs = parseAmdTimestamp(cols[iTimestamp]);
+    if (timestampMs === null) continue;
+    const date = new Date(timestampMs);
+    if (!Number.isFinite(date.getTime())) continue;
+    const timestamp = date.toISOString();
 
     // AMD-specific metrics
     const edgeTemp = iEdge >= 0 ? safeFloat(cols[iEdge]) : undefined;
@@ -566,13 +569,22 @@ export function parseCsvData(csvText: string): GpuMetricRow[] {
 
   const headerLower = lines[0].toLowerCase();
 
-  // Detect AMD format by checking for amd-smi specific columns
-  if (headerLower.includes('socket_power') || headerLower.includes('gfx_activity')) {
-    const colMap = buildColumnMap(lines[0]);
-    return parseAmdCsv(lines, colMap);
-  }
-
-  return parseNvidiaCsv(lines);
+  const rows =
+    headerLower.includes('socket_power') || headerLower.includes('gfx_activity')
+      ? parseAmdCsv(lines, buildColumnMap(lines[0]))
+      : parseNvidiaCsv(lines);
+  // Normalize one CSV at a time: host-local indices may repeat in other files.
+  // Keep the first device/timestamp sample, matching the persisted digest.
+  const seen = new Set<string>();
+  return rows.filter((row) => {
+    // NVIDIA's naive collector clock must not use the reader's local DST rules.
+    const ms = parseNvidiaTimestamp(row.timestamp) ?? parseTimestampToMs(row.timestamp);
+    if (ms === null || !Number.isFinite(ms)) return false;
+    const key = `${row.index}:${ms}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 // --- Statistics ---
@@ -601,7 +613,7 @@ export function computeGpuStats(data: GpuMetricRow[], metricKey: GpuMetricKey): 
   const groups = new Map<number, number[]>();
   for (const row of data) {
     const val = row[metricKey];
-    if (val === undefined) continue;
+    if (val === undefined || !Number.isFinite(val)) continue;
     if (!groups.has(row.index)) groups.set(row.index, []);
     groups.get(row.index)!.push(val);
   }

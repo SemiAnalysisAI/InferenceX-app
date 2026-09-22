@@ -22,8 +22,8 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
     '快照截止日期，格式为 YYYY-MM-DD。指定 runId 时改为读取该次运行的逻辑快照。',
   ],
   runId: [
-    'Positive safe integer workflow run ID. Omit to select the default run; required for live GPU metrics.',
-    '正安全整数格式的工作流运行 ID。不填时选择默认运行；实时 GPU 指标必须填写。',
+    'Positive safe integer workflow run ID. Omit to select the default run; required for GPU metrics.',
+    '正安全整数格式的工作流运行 ID。不填时选择默认运行；GPU 指标必须填写。',
   ],
   precisions: [
     'Comma-separated precision keys; omitted selection uses available curve density. Calculator extensions auto-select the densest official precision and include precisions present in unofficial-run overlays.',
@@ -391,9 +391,19 @@ const NEW_VIEWS = {
     { rows: objects, options: object },
   ],
   'gpu-metrics': [
-    'Live GPU metrics and statistics',
-    '实时 GPU 指标与统计',
-    { runInfo: object, artifacts: strings, rows: objects, stats: objects, rendering: object },
+    'GPU telemetry and full-record statistics',
+    'GPU 遥测与全记录统计',
+    {
+      runInfo: object,
+      artifacts: strings,
+      rows: objects,
+      stats: {
+        ...objects,
+        description:
+          'Per-GPU statistics for the selected file/host series, including startup and warmup. Stored digests are authoritative, including an empty or missing metric digest; only live artifacts compute from samples. Count is the finite-reading count after first-wins timestamp/GPU deduplication. Mean is sample-weighted, P50/P95/P99 use linear interpolation at p*(N-1), and standard deviation divides by N. Values use the selected metric unit. GPU visibility and chart downsampling do not change this population. These are not serving-window power or J/token.',
+      },
+      rendering: object,
+    },
   ],
   video: [
     'Published video evidence and tradeoffs',
@@ -422,14 +432,14 @@ export const operations: ApiOperation[] = Object.entries(NEW_VIEWS).map(
           view === 'video'
             ? ' Only already published artifacts are read. Cell, phase, slot and GPU-basis choices select result evidence and normalized serving rates; x/y/cost/workload filters produce computed tradeoff points. Local bundles and arbitrary URLs are excluded. Responses are no-store.'
             : view === 'gpu-metrics'
-              ? ' Live artifact reads are no-store; statistics use all chips and unsampled values, while chart rows respect selected GPU indices. Line time remains relative to the first sample across all chips; missing metric readings are omitted rather than zero-filled. Correlations require both readings.'
+              ? ' Telemetry responses use private, no-store. Full-record statistics include startup and warmup and use the stored per-GPU digest when present; an empty or missing metric digest stays empty. Only live artifacts compute statistics from samples. Statistics cover every chip in the selected series, while raw rows and charts respect selected GPU indices. Chart downsampling does not alter statistics. These sample-weighted statistics are separate from serving-window power, J/token and selected-time-window calculations. Line time remains relative to the first sample across all chips; missing metric readings are omitted rather than zero-filled. Correlations require both readings.'
               : ''
         }`,
         `只读${zh}，使用仪表板的数据读取和计算函数。未知或重复查询键返回 400；响应包含解析后的参数，保留缺失数据。仅影响样式的控件不作为 API 参数。${
           view === 'video'
             ? ' 仅读取已发布产物。cell、阶段、slot 和 GPU 口径选择对应结果证据，并计算 serving 归一化速率；x/y、成本及工作负载筛选生成权衡图数据点。不读取本地数据包或任意 URL。响应不缓存。'
             : view === 'gpu-metrics'
-              ? ' 实时产物读取不缓存；统计量使用所有芯片的未降采样值，图表行则按芯片索引筛选。折线时间以所有芯片的首个采样为起点；缺失指标读数会被跳过，不补零。相关性图要求两个指标均有读数。'
+              ? ' 遥测响应使用 private, no-store。全记录统计包含服务启动与 warmup，已有数据使用数据库中的每 GPU 统计摘要；摘要为空或缺少所选指标时仍返回空统计数组。仅实时产物按样本计算统计。统计覆盖所选序列的全部芯片，原始数据行和图表则按芯片索引筛选；图表降采样不改变统计。这里按样本计算的统计与 serving-window 功率、J/token 及用户所选时间窗口的计算分别处理。折线时间以所有芯片的首个采样为起点；缺失指标读数会被跳过，不补零。相关性图要求两个指标均有读数。'
               : ''
         }`,
       ),

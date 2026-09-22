@@ -115,7 +115,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-gpu-metrics-view',
-    sourceSha256: '34860f3f64e4070bf4c0bf390c3b61f34bdb98b673a90d119bae162226dc1edd',
+    sourceSha256: '2ad6ff9f64b397ed4fea5a0456b2b0f328b46f9e171753fa90af458c1f70f23a',
   },
   {
     source: 'src/app/api/v1/views/gpu-specs/route.ts',
@@ -793,6 +793,22 @@ export interface ApiContractSourceDigest {
  * touching a route module. Digest changes require an explicit documentation review.
  */
 export const apiContractSourceDigests = [
+  {
+    source: 'src/components/gpu-power/stored-gpu-stats.ts',
+    sourceSha256: '90adde200c37694c2e37e427458a8c6a9bdb70873033699e343e8c94a291544a',
+    reviewArea: {
+      en: 'Stored full-record GPU metric mappings, authoritative missing digests, and UI/API statistics parity.',
+      zh: '已存全记录 GPU 指标映射、缺失摘要语义，以及界面和 API 的统计一致性。',
+    },
+  },
+  {
+    source: 'src/components/gpu-power/types.ts',
+    sourceSha256: 'cc75290d20b1f7b3a31c49634ae592f60c69857696cca7697a84c6f897ba2575',
+    reviewArea: {
+      en: 'GPU telemetry units, missing values, timestamp deduplication, and full-record live statistics definitions.',
+      zh: 'GPU 遥测单位、缺失值、时间戳去重，以及实时产物全记录统计的定义。',
+    },
+  },
   {
     source: 'src/lib/views-api/upstream-error.ts',
     sourceSha256: 'c3f1b4c318e1ae771a67edd85f16d69b7316461334604fd8c892254eface715a',

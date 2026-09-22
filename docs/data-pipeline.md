@@ -594,6 +594,17 @@ falls back to live GitHub artifacts otherwise (in-progress runs), and
 `/api/v1/gpu-metrics-point?id=` powers the PowerX tab of the per-point detail
 page.
 
+The public `/api/v1/views/gpu-metrics` projection and full-record UI table use the
+same stored per-GPU statistics digest for the selected file/host series. Empty or
+missing metric digests remain empty; only live artifacts calculate from samples.
+Statistics include startup and warmup, retain measured zero, and exclude missing
+readings per metric after first-wins timestamp/GPU deduplication. Mean is
+sample-weighted, percentiles interpolate at `p * (N - 1)`, and standard deviation
+divides by `N`. GPU visibility and chart downsampling do not alter this population.
+Serving-window power, J/token and selected-time-window calculations remain separate.
+
+中文：全记录统计使用已存摘要，包含启动与 warmup；缺失读数不补零，已有摘要为空时不重新计算。它与 serving-window 功率、J/token 和用户所选时间窗口的统计分别处理。
+
 ### PowerX publication receipts
 
 The normal CI importer writes `POWER_PUBLICATION_MANIFEST` when configured. Each
