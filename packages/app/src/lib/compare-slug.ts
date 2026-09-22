@@ -105,11 +105,12 @@ export const COMPARE_MODEL_SLUGS: CompareModelSlug[] = [
   {
     slug: 'glm-5-3',
     displayName: 'GLM-5.2',
-    dbKeys: ['glm5.2'],
-    // GLM-5.2 and GLM-5.3 share one data bucket (see MODEL_CONFIG); the card
+    dbKeys: ['glm5.2', 'glm5.3'],
+    // GLM-5.2 and GLM-5.3 share one display bucket (see MODEL_CONFIG); the card
     // and the slug follow the current release ("newer version supersedes", as
     // with kimi-k26), and `glm-5-2` aliases here so old links 308. `displayName`
-    // and `dbKeys` stay on 5.2 so the `g_model` param and DB rows keep resolving.
+    // stays on 5.2 so the `g_model` param keeps resolving; `dbKeys` carries both
+    // prefixes because InferenceX reports the GLM-5.3 checkpoint as `glm5.3`.
     label: 'GLM 5.3 744B',
     seoName: 'GLM-5.3',
   },

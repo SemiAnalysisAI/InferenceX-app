@@ -32,7 +32,7 @@ describe('DISPLAY_MODEL_TO_DB', () => {
 
   it('keeps GLM-5.2 separate from the GLM-5/5.1 display bucket', () => {
     expect(DISPLAY_MODEL_TO_DB['GLM-5']).toEqual(['glm5', 'glm5.1']);
-    expect(DISPLAY_MODEL_TO_DB['GLM-5.2']).toEqual(['glm5.2']);
+    expect(DISPLAY_MODEL_TO_DB['GLM-5.2']).toEqual(['glm5.2', 'glm5.3']);
   });
 });
 
