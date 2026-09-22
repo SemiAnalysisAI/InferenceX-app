@@ -1,5 +1,7 @@
 'use client';
 
+import { useFeatureGate } from '@/lib/use-feature-gate';
+import { getMeasuredMetricConfig } from '@/components/inference/measured-metric-config';
 import { track } from '@/lib/analytics';
 import { isPersistedBenchmarkId } from '@/lib/benchmark-id';
 import { useEphemeralUrlState } from '@/hooks/useUrlState';
@@ -192,6 +194,14 @@ import {
   buildFrontierContinuations,
   fitContinuationLabelBaseline,
 } from '@/components/inference/utils/overflowContinuations';
+
+const PowerTelemetryDialog = dynamic(
+  () =>
+    import('@/components/inference/power-telemetry-dialog').then(
+      (module) => module.PowerTelemetryDialog,
+    ),
+  { ssr: false },
+);
 
 const FixedSequenceLogDialog = dynamic(
   () =>
@@ -614,6 +624,9 @@ const ScatterGraph = React.memo(
       [showPowerEnvelope, chartDefinition.chartType, selectedYAxisMetric],
     );
     const locale = useLocale();
+    const featureGateUnlocked = useFeatureGate();
+    const showPowerTelemetry =
+      featureGateUnlocked || getMeasuredMetricConfig(selectedYAxisMetric) !== undefined;
     const legendT = SCATTER_STRINGS[locale];
     // Comparison series (`i_pcompare`) switched off from the legend. Chart-local,
     // like Optimal Only's point set: the URL carries the comparison, not which
@@ -1287,6 +1300,7 @@ const ScatterGraph = React.memo(
     );
     const { data: persistedLogAvailability } = useLogAvailability(persistedPointIds);
     const [fixedLogPointId, setFixedLogPointId] = useState<number | null>(null);
+    const [powerTelemetryPoint, setPowerTelemetryPoint] = useState<InferenceData | null>(null);
 
     // "View power trace" on a pinned tooltip (official or overlay point): the
     // same-tab click stays in-page — remember which trace to emphasise, switch
@@ -1900,6 +1914,7 @@ const ScatterGraph = React.memo(
       knownIssueAnnotations,
       traceAvailability,
       logAvailability: persistedLogAvailability,
+      showPowerTelemetry,
     });
     interactionRef.current = {
       isPointVisible,
@@ -1913,6 +1928,7 @@ const ScatterGraph = React.memo(
       knownIssueAnnotations,
       traceAvailability,
       logAvailability: persistedLogAvailability,
+      showPowerTelemetry,
     };
 
     // --- Perf ruler (opt-in: click two curves, drag the ruler to any iso-x) ---
@@ -2498,6 +2514,7 @@ const ScatterGraph = React.memo(
             yLabel,
             selectedYAxisMetric,
             hardwareConfig,
+            showPowerTelemetry: interactionRef.current.showPowerTelemetry,
             runUrl: d.run_url ? updateRepoUrl(d.run_url) : undefined,
             hasTrace:
               d.benchmark_type === 'agentic_traces' && isPersistedBenchmarkId(d.id)
@@ -2557,6 +2574,15 @@ const ScatterGraph = React.memo(
                 hwKey: String(d.hwKey),
                 conc: d.conc,
               });
+            });
+          }
+          const powerBtn = tooltipEl.querySelector('[data-action="view-power-telemetry"]');
+          if (powerBtn && isPersistedBenchmarkId(d.id)) {
+            powerBtn.addEventListener('click', (event) => {
+              event.stopPropagation();
+              setPowerTelemetryPoint(d);
+              chartRef.current?.dismissTooltip();
+              track('inference_power_telemetry_opened', { id: d.id, hwKey: d.hwKey, conc: d.conc });
             });
           }
           const logsBtn = tooltipEl.querySelector('[data-action="view-logs"]');
@@ -4654,6 +4680,15 @@ const ScatterGraph = React.memo(
                 href: row.href ?? '',
               })
             }
+          />
+        )}
+        {powerTelemetryPoint === null ? null : (
+          <PowerTelemetryDialog
+            key={powerTelemetryPoint.id}
+            point={powerTelemetryPoint}
+            onOpenChange={(open) => {
+              if (!open) setPowerTelemetryPoint(null);
+            }}
           />
         )}
         {fixedLogPointId === null ? null : (

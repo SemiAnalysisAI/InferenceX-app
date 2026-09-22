@@ -97,6 +97,38 @@ const seriesFor = (hardware: string, runUrl: string, runId: string) => ({
   }),
 });
 
+function pointTelemetry(id: number) {
+  const trace = seriesFor('b200', RUN_URL, RUN_ID).series[1];
+  const data = trace.gpus.flatMap((index, gpu) =>
+    trace.t.map((second, sample) => ({
+      timestamp: new Date(START_MS + second * 1000).toISOString(),
+      index,
+      power: trace.power[gpu][sample],
+    })),
+  );
+  return {
+    benchmarkResultId: id,
+    series: [
+      {
+        id: 1,
+        artifactName: trace.artifact,
+        configKey: resultName('b200', 64),
+        fileName: 'gpu_metrics.csv',
+        vendor: 'nvidia',
+        sampleIntervalS: 1,
+        sampleCount: data.length,
+        gpuCount: trace.gpus.length,
+        startedAt: data[0].timestamp,
+        endedAt: data.at(-1)!.timestamp,
+        sidecars: {},
+        benchmarkResultIds: [id],
+        stats: [],
+        data,
+      },
+    ],
+  };
+}
+
 const availability = [
   {
     model: MODEL,
@@ -113,14 +145,16 @@ const availability = [
 ];
 
 function interceptRows() {
+  const benchmarks = rows(RUN_URL, 'b200');
   cy.intercept('GET', '/api/v1/availability', { body: availability }).as('availability');
-  cy.intercept('GET', '/api/v1/benchmarks*', { body: rows(RUN_URL, 'b200') }).as('benchmarks');
+  cy.intercept('GET', '/api/v1/benchmarks*', { body: benchmarks }).as('benchmarks');
   cy.intercept('GET', '/api/v1/workflow-info*', {
     body: { runs: [], changelogs: [], configs: [] },
   });
   cy.intercept('POST', `/api/gpu-metrics?runId=${RUN_ID}*`, {
     body: seriesFor('b200', RUN_URL, RUN_ID),
   }).as('series');
+  return benchmarks;
 }
 
 function interceptOverlay() {
@@ -151,19 +185,23 @@ function interceptOverlay() {
 function visitChart({
   path = '/inference',
   extraParams = '',
+  unlocked = true,
 }: {
   path?: string;
   extraParams?: string;
+  unlocked?: boolean;
 }) {
-  interceptRows();
+  const benchmarks = interceptRows();
   cy.visit(`${path}?g_model=DeepSeek-V4-Pro&i_seq=8k/1k&i_prec=fp4${extraParams}`, {
     onBeforeLoad(win) {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-      win.localStorage.setItem('inferencex-feature-gate', '1');
+      if (unlocked) win.localStorage.setItem('inferencex-feature-gate', '1');
+      else win.localStorage.removeItem('inferencex-feature-gate');
     },
   });
   cy.wait(['@availability', '@benchmarks']);
   cy.get('[data-testid="inference-chart-display"]').should('exist');
+  return benchmarks;
 }
 
 describe('PowerX measured power timeline', () => {
@@ -270,6 +308,8 @@ describe('PowerX measured power timeline', () => {
   // ── "View power trace" on pinned scatter tooltips ─────────────────────────
 
   const POWER_TRACE_ACTION = '[data-chart-tooltip]:visible [data-action="view-power-trace"]';
+  const TELEMETRY_ACTION = '[data-chart-tooltip]:visible [data-action="view-power-telemetry"]';
+  const TELEMETRY_DIALOG = '[data-testid="power-telemetry-dialog"]';
 
   /** Pin the tooltip of the marker plotted for `conc` (official `.dot-group` or overlay X). */
   function pinPointTooltip(selector: string, conc: number): void {
@@ -283,6 +323,91 @@ describe('PowerX measured power timeline', () => {
         cy.wrap(target).find('.visible-shape').click({ force: true });
       });
   }
+
+  for (const [path, width, closeLabel] of [
+    ['/inference', 1280, 'Close'],
+    ['/zh/inference', 390, '关闭'],
+  ] as const) {
+    it(`loads the selected point's PowerX telemetry in place at ${path} ${width}px`, () => {
+      cy.viewport(width, 900);
+      cy.intercept('GET', '/api/v1/gpu-metrics-point*', (request) => {
+        const id = Number(new URL(request.url).searchParams.get('id'));
+        request.reply({ body: pointTelemetry(id) });
+      }).as('pointTelemetry');
+      cy.intercept('GET', '/api/v1/trace-server-metrics*', { statusCode: 404 }).as('serverMetrics');
+      const benchmarks = visitChart({ path, extraParams: '&i_metric=y_measuredAvgPower' });
+      const selectedPointId = benchmarks.find((point) => point.conc === 64)!.id;
+      cy.get('@pointTelemetry.all').should('have.length', 0);
+      pinPointTooltip('.dot-group', 64);
+      cy.get(TELEMETRY_ACTION).should('have.prop', 'tagName', 'BUTTON').click();
+      cy.wait('@pointTelemetry').then(({ request }) => {
+        const id = Number(new URL(request.url).searchParams.get('id'));
+        expect(id).to.eq(selectedPointId);
+      });
+      cy.location('pathname').should('eq', path);
+      cy.get(TELEMETRY_DIALOG)
+        .should('contain.text', 'PowerX')
+        .within(() => {
+          cy.get('[data-testid="gpu-metrics-run-input"]').should('not.exist');
+          cy.get('[data-testid="power-telemetry-sample-count"]').should('have.text', '122');
+          cy.get('[data-testid="gpu-metrics-chart-svg"] path.line-path').should('have.length', 2);
+        });
+      cy.get(TELEMETRY_DIALOG)
+        .should(($dialog) => {
+          const dialog = $dialog[0];
+          expect(dialog.scrollWidth, 'no horizontal dialog overflow').to.be.at.most(
+            dialog.clientWidth + 1,
+          );
+          const bounds = dialog.getBoundingClientRect();
+          expect(bounds.left).to.be.at.least(0);
+          expect(bounds.right).to.be.at.most(width);
+        })
+        .screenshot(`powerx-point-dialog-${width}`);
+      cy.get(TELEMETRY_DIALOG)
+        .scrollTo('bottom')
+        .screenshot(`powerx-point-dialog-${width}-bottom`)
+        .scrollTo('top');
+      cy.get(TELEMETRY_DIALOG).contains('button', closeLabel).click();
+      cy.get(TELEMETRY_DIALOG).should('not.exist');
+      assertShareLinkMetric('y_measuredAvgPower');
+      cy.get('@serverMetrics.all').should('have.length', 0);
+      pinPointTooltip('.dot-group', 64);
+      cy.get(TELEMETRY_ACTION).click();
+      cy.get(TELEMETRY_DIALOG).should('be.visible');
+      cy.get('body').type('{esc}');
+      cy.get(TELEMETRY_DIALOG).should('not.exist');
+    });
+  }
+
+  it('keeps the normal-metric entry gated and reveals it after unlocking PowerX', () => {
+    cy.intercept('GET', '/api/v1/gpu-metrics-point*', { statusCode: 404 }).as('pointTelemetry');
+    visitChart({ extraParams: '&i_metric=y_tpPerGpu', unlocked: false });
+    pinPointTooltip('.dot-group', 64);
+    cy.get(TELEMETRY_ACTION).should('not.exist');
+    cy.get('body').type('{uparrow}{uparrow}{downarrow}{downarrow}');
+    cy.get('[data-testid="tab-trigger-hidden"]').should('be.visible');
+    pinPointTooltip('.dot-group', 16);
+    cy.get(TELEMETRY_ACTION).should('be.visible').click();
+    cy.wait('@pointTelemetry');
+    cy.get(TELEMETRY_DIALOG).should('contain.text', 'PowerX');
+    cy.location('pathname').should('eq', '/inference');
+  });
+
+  it('shows unavailable telemetry instead of a run-ID form when the selected point has no series', () => {
+    cy.intercept('GET', '/api/v1/gpu-metrics-point*', { statusCode: 404 }).as('missingTelemetry');
+    visitChart({ extraParams: '&i_metric=y_measuredAvgPower' });
+    pinPointTooltip('.dot-group', 64);
+    cy.get(TELEMETRY_ACTION).click();
+    cy.wait('@missingTelemetry');
+    cy.get(TELEMETRY_DIALOG).within(() => {
+      cy.get('[data-testid="power-telemetry-missing"]').should(
+        'contain.text',
+        'No PowerX telemetry is stored',
+      );
+      cy.get('[data-testid="power-telemetry-query-error"]').should('not.exist');
+      cy.get('[data-testid="gpu-metrics-run-input"]').should('not.exist');
+    });
+  });
 
   it('jumps from a pinned point to the timeline focused on that config', () => {
     visitChart({ extraParams: '&i_metric=y_measuredAvgPower' });
@@ -313,6 +438,7 @@ describe('PowerX measured power timeline', () => {
     });
     cy.wait('@unofficialRun');
     pinPointTooltip('.unofficial-overlay-pt', 64);
+    cy.get(TELEMETRY_ACTION).should('not.exist');
     cy.get(POWER_TRACE_ACTION).should('be.visible').should('contain.text', 'View power trace');
     cy.get(POWER_TRACE_ACTION).click();
 

@@ -57,6 +57,8 @@ export interface TooltipConfig {
   hasTrace?: boolean;
   /** Whether this official DB-backed point has a linked `server_logs` row. */
   hasLog?: boolean;
+  /** Opt in only when the host handles the dialog action. */
+  showPowerTelemetry?: boolean;
   /** Page locale for tooltip metadata labels. Defaults to English. */
   locale?: Locale;
 }
@@ -536,8 +538,18 @@ const generateAgenticHTML = (d: InferenceData, locale: Locale): string => {
 };
 
 const ACTION_STRINGS = {
-  en: { charts: 'View charts', logs: 'View logs', powerTrace: 'View power trace' },
-  zh: { charts: '查看图表', logs: '查看日志', powerTrace: '查看功耗曲线' },
+  en: {
+    charts: 'View charts',
+    logs: 'View logs',
+    powerTelemetry: 'View PowerX',
+    powerTrace: 'View power trace',
+  },
+  zh: {
+    charts: '查看图表',
+    logs: '查看日志',
+    powerTelemetry: '查看 PowerX',
+    powerTrace: '查看功耗曲线',
+  },
 } as const;
 
 type TooltipAction = 'view-charts' | 'view-logs' | 'view-power-trace';
@@ -582,6 +594,7 @@ interface ViewActionsInput {
    * so they never render a "View power trace" link nothing would handle.
    */
   powerTraceMetric?: string;
+  showPowerTelemetry?: boolean;
   locale: Locale;
 }
 
@@ -596,6 +609,7 @@ const viewActionsHTML = ({
   hasLogData,
   point,
   powerTraceMetric,
+  showPowerTelemetry,
   locale,
 }: ViewActionsInput): string => {
   if (!isPinned) return '';
@@ -616,6 +630,11 @@ const viewActionsHTML = ({
         : `${prefix}/inference/logs/${pointId}`;
       actions.push(pointDetailActionLink('view-logs', logHref, t.logs));
     }
+  }
+  if (showPowerTelemetry && isPersistedBenchmarkId(pointId)) {
+    actions.push(
+      `<button type="button" data-action="view-power-telemetry" class="w-full rounded-md border border-border bg-accent px-2 py-1 text-xs font-medium text-accent-foreground cursor-pointer">${t.powerTelemetry} &rarr;</button>`,
+    );
   }
   if (powerTraceMetric !== undefined && showsPowerTraceAction(point, powerTraceMetric)) {
     actions.push(pointDetailActionLink('view-power-trace', powerTraceHref(), t.powerTrace));
@@ -819,6 +838,7 @@ export const generateTooltipContent = (config: TooltipConfig): string => {
         hasTraceData: Boolean(hasTrace),
         hasLogData: Boolean(config.hasLog),
         point: d,
+        showPowerTelemetry: config.showPowerTelemetry,
         powerTraceMetric: selectedYAxisMetric,
         locale,
       })}
@@ -941,6 +961,7 @@ export const generateGPUGraphTooltipContent = (config: TooltipConfig): string =>
         hasTraceData: Boolean(hasTrace),
         hasLogData: Boolean(hasLog),
         point: d,
+        showPowerTelemetry: config.showPowerTelemetry,
         locale,
       })}
     </div>

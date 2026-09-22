@@ -1,5 +1,7 @@
 'use client';
 
+import { useFeatureGate } from '@/lib/use-feature-gate';
+import { getMeasuredMetricConfig } from '@/components/inference/measured-metric-config';
 import { track } from '@/lib/analytics';
 import { isPersistedBenchmarkId } from '@/lib/benchmark-id';
 import { useEphemeralUrlState } from '@/hooks/useUrlState';
@@ -109,6 +111,14 @@ import {
   type LineLabelSeries,
 } from '@/components/inference/ui/line-label-layer';
 import { QuickFiltersDialog } from '@/components/inference/ui/QuickFiltersDialog';
+
+const PowerTelemetryDialog = dynamic(
+  () =>
+    import('@/components/inference/power-telemetry-dialog').then(
+      (module) => module.PowerTelemetryDialog,
+    ),
+  { ssr: false },
+);
 
 const FixedSequenceLogDialog = dynamic(() =>
   import('@/components/inference/log-viewer/fixed-sequence-log-dialog').then(
@@ -256,6 +266,11 @@ const GPUGraph = React.memo(
       setQuickFilterPower,
     } = useInferenceActions();
     const locale = useLocale();
+    const featureGateUnlocked = useFeatureGate();
+    const showPowerTelemetry =
+      featureGateUnlocked || getMeasuredMetricConfig(selectedYAxisMetric) !== undefined;
+    const showPowerTelemetryRef = useRef(showPowerTelemetry);
+    showPowerTelemetryRef.current = showPowerTelemetry;
     const legendT = GPU_STRINGS[locale];
     const frontierDirection = chartDefinition[
       `${selectedYAxisMetric}_roofline` as keyof ChartDefinition
@@ -522,6 +537,7 @@ const GPUGraph = React.memo(
     const logAvailabilityRef = useRef(logAvailability);
     logAvailabilityRef.current = logAvailability;
     const [fixedLogPointId, setFixedLogPointId] = useState<number | null>(null);
+    const [powerTelemetryPoint, setPowerTelemetryPoint] = useState<InferenceData | null>(null);
 
     // Warning annotations for visible series with known upstream issues —
     // same treatment the scatter view gets, applied to the date-comparison view.
@@ -1262,7 +1278,7 @@ const GPUGraph = React.memo(
       );
     }
 
-    return (
+    const chart = (
       <D3Chart<InferenceData>
         ref={chartRef}
         // Embeds drop the zoom/pan hint line; the host page has its own caption.
@@ -1374,6 +1390,7 @@ const GPUGraph = React.memo(
               yLabel,
               selectedYAxisMetric,
               hardwareConfig,
+              showPowerTelemetry: showPowerTelemetryRef.current,
               runUrl: d.run_url ? updateRepoUrl(d.run_url) : undefined,
               hasTrace: isPersistedBenchmarkId(d.id)
                 ? traceAvailabilityRef.current?.[d.id] === true
@@ -1431,6 +1448,19 @@ const GPUGraph = React.memo(
                 track('gpu_timeseries_view_charts_opened', {
                   id: d.id,
                   hwKey: String(d.hwKey),
+                  conc: d.conc,
+                });
+              });
+            }
+            const powerBtn = tooltipEl.querySelector('[data-action="view-power-telemetry"]');
+            if (powerBtn && isPersistedBenchmarkId(d.id)) {
+              powerBtn.addEventListener('click', (event) => {
+                event.stopPropagation();
+                setPowerTelemetryPoint(d);
+                chartRef.current?.dismissTooltip();
+                track('inference_power_telemetry_opened', {
+                  id: d.id,
+                  hwKey: d.hwKey,
                   conc: d.conc,
                 });
               });
@@ -1704,6 +1734,21 @@ const GPUGraph = React.memo(
           />
         }
       />
+    );
+
+    return (
+      <>
+        {powerTelemetryPoint === null ? null : (
+          <PowerTelemetryDialog
+            key={powerTelemetryPoint.id}
+            point={powerTelemetryPoint}
+            onOpenChange={(open) => {
+              if (!open) setPowerTelemetryPoint(null);
+            }}
+          />
+        )}
+        {chart}
+      </>
     );
   },
 );

@@ -17,6 +17,7 @@ const RUN_URL = 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/34716
 const AUDIT_NAME =
   'dsv4_8k1k_fp4_sglang_tp8-pp1-dcp1-pcp1-ep1-dpafalse_disagg-false_spec-none_conc64_b200-host-0123';
 const ACTION = 'data-action="view-power-trace"';
+const TELEMETRY_ACTION = 'data-action="view-power-telemetry"';
 
 const hardwareConfig = {
   b200: {
@@ -180,5 +181,55 @@ describe('View power trace tooltip action', () => {
 
   it('never renders on the GPU graph tooltip, which has no in-place timeline', () => {
     expect(generateGPUGraphTooltipContent(config({ hasLog: true }))).not.toContain(ACTION);
+  });
+});
+
+describe('View PowerX point telemetry action', () => {
+  for (const [chart, generate] of [
+    ['scatter', generateTooltipContent],
+    ['GPU comparison', generateGPUGraphTooltipContent],
+  ] as const) {
+    it(`opens from a pinned ordinary ${chart} point without requiring logs or artifact provenance`, () => {
+      const html = generate(
+        config({
+          showPowerTelemetry: true,
+          data: measuredPoint({ power_audit: undefined, run_url: undefined }),
+        }),
+      );
+      expect(html).toMatch(/<button\b[^>]*data-action="view-power-telemetry"/u);
+      expect(html).not.toMatch(/<a\b[^>]*data-action="view-power-telemetry"/u);
+      expect(html).toContain('PowerX');
+    });
+
+    it(`keeps ${chart} telemetry hidden until enabled and pinned`, () => {
+      expect(generate(config())).not.toContain(TELEMETRY_ACTION);
+      expect(generate(config({ showPowerTelemetry: false }))).not.toContain(TELEMETRY_ACTION);
+      expect(generate(config({ showPowerTelemetry: true, isPinned: false }))).not.toContain(
+        TELEMETRY_ACTION,
+      );
+    });
+
+    it.each([undefined, 0, -1, 1.5, Number.NaN])(
+      `does not offer a DB lookup for invalid ${chart} point ID %s`,
+      (id) => {
+        expect(
+          generate(config({ showPowerTelemetry: true, data: measuredPoint({ id }) })),
+        ).not.toContain(TELEMETRY_ACTION);
+      },
+    );
+  }
+
+  it('uses the Chinese action label', () => {
+    expect(generateTooltipContent(config({ showPowerTelemetry: true, locale: 'zh' }))).toMatch(
+      /查看\s*PowerX/u,
+    );
+  });
+
+  it.each([0, 980001])('keeps overlay ID %s on its run-backed trace, never the DB action', (id) => {
+    const html = generateOverlayTooltipContent(
+      overlayConfig({ showPowerTelemetry: true, data: measuredPoint({ id }) }),
+    );
+    expect(html).not.toContain(TELEMETRY_ACTION);
+    expect(html).toContain(ACTION);
   });
 });

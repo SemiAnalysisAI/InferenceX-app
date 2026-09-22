@@ -112,6 +112,16 @@ selection. Append:
 | 7      | Reconstructed request energy, prefill share   | `&i_metric=y_measuredJPerOutputToken&i_pcompare=roles` (prefill share in the clone's tooltip)                                                                            |
 | 1      | Measured power over the benchmark job         | `&i_metric=y_measuredPowerTimeline` (Display → Timeline, see below)                                                                                                      |
 
+Pinned official dashboard points now offer **View PowerX** when the feature gate is unlocked
+or a measured-metric share link is active. The lazy in-page dialog reads the existing
+`GET /api/v1/gpu-metrics-point?id=N` API, without entering a run ID or changing chart filters.
+This also works in the hardware/date comparison view. The per-chip chart and statistics span
+the recorded job (including startup/warmup), not just the audited serving window. Fixed-sequence
+points do not request AgentX server-metric overlays. Missing telemetry is shown as unavailable,
+not zero power. Unofficial points have no database ID and retain **View power trace**, which
+resolves their run/audit provenance automatically. No API contract or ingestion changes are
+needed for this presentation-only entry point.
+
 The `/gpu-metrics` page keeps the raw per-run explorer (every metric, one artifact at a time);
 the timeline below is the chart-scoped view of the same artifacts.
 

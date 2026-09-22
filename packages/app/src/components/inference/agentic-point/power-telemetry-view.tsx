@@ -43,7 +43,7 @@ const STRINGS = {
     loading: 'Loading PowerX telemetry…',
     error: 'Failed to load PowerX telemetry.',
     missing:
-      'No PowerX telemetry is stored for benchmark point #{id}. The run predates telemetry ingestion and its gpu_metrics artifact has expired on GitHub, or the job uploaded no telemetry.',
+      'No PowerX telemetry is stored for benchmark point #{id}. Telemetry may not have been collected or ingested.',
     series: 'Telemetry series',
     metric: 'Metric',
     vendor: 'Collector',
@@ -69,8 +69,7 @@ const STRINGS = {
   zh: {
     loading: '正在加载 PowerX 遥测数据……',
     error: 'PowerX 遥测数据加载失败。',
-    missing:
-      '基准测试数据点 #{id} 没有存储的 PowerX 遥测数据。该运行早于遥测入库上线且 GitHub 上的 gpu_metrics 产物已过期，或该任务未上传遥测数据。',
+    missing: '基准测试数据点 #{id} 没有存储的 PowerX 遥测数据。遥测数据可能尚未采集或入库。',
     series: '遥测序列',
     metric: '指标',
     vendor: '采集器',
@@ -113,6 +112,8 @@ interface Props {
   enabled: boolean;
   /** The point's hardware key, for the TDP reference line. */
   hardware?: string;
+  /** Fixed-sequence points do not have AgentX server-metric overlays. */
+  serverMetricsEnabled?: boolean;
 }
 
 function seriesLabel(series: GpuMetricSeries, total: number): string {
@@ -124,7 +125,7 @@ function seriesLabel(series: GpuMetricSeries, total: number): string {
  * recorded while this benchmark point ran, read from the ingest-time digest
  * (migration 016) rather than from GitHub artifacts.
  */
-export function PowerTelemetryView({ id, enabled, hardware }: Props) {
+export function PowerTelemetryView({ id, enabled, hardware, serverMetricsEnabled = true }: Props) {
   const locale = useLocale();
   const t = STRINGS[locale];
   const query = useGpuMetricsPoint(id, enabled);
@@ -181,7 +182,7 @@ export function PowerTelemetryView({ id, enabled, hardware }: Props) {
 
   // Server-metric overlay. The series are fetched as soon as the tab opens so
   // the menu can list exactly the metrics this point has; one source at a time.
-  const metricsQuery = useTraceServerMetrics(id, enabled);
+  const metricsQuery = useTraceServerMetrics(id, enabled && serverMetricsEnabled);
   const serverMetrics = metricsQuery.data;
   const overlaySources = useMemo(() => availableOverlaySources(serverMetrics), [serverMetrics]);
   const [overlaySelection, setOverlaySelection] = useState<{ id: number; key: string } | null>(
@@ -343,43 +344,45 @@ export function PowerTelemetryView({ id, enabled, hardware }: Props) {
           idPrefix="power-telemetry-display"
           className="mt-3 border-t border-border/60 pt-3"
         />
-        <div className="mt-3 flex flex-wrap items-end gap-x-3 gap-y-1">
-          <div className="space-y-1">
-            <Label htmlFor="power-telemetry-overlay">{t.overlayToggle}</Label>
-            <Select
-              value={overlayKey}
-              disabled={overlaySources.length === 0}
-              onValueChange={(value) => {
-                track('inference_agentic_power_overlay_changed', { id, source: value });
-                setOverlaySelection({ id, key: value });
-              }}
-            >
-              <SelectTrigger
-                id="power-telemetry-overlay"
-                data-testid="power-telemetry-overlay-select"
-                className="w-full sm:w-64"
+        {serverMetricsEnabled && (
+          <div className="mt-3 flex flex-wrap items-end gap-x-3 gap-y-1">
+            <div className="space-y-1">
+              <Label htmlFor="power-telemetry-overlay">{t.overlayToggle}</Label>
+              <Select
+                value={overlayKey}
+                disabled={overlaySources.length === 0}
+                onValueChange={(value) => {
+                  track('inference_agentic_power_overlay_changed', { id, source: value });
+                  setOverlaySelection({ id, key: value });
+                }}
               >
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">{t.overlayNone}</SelectItem>
-                {overlaySources.map((source) => (
-                  <SelectItem key={source.key} value={source.key}>
-                    {overlaySourceLabel(source, locale)} ({source.unit})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+                <SelectTrigger
+                  id="power-telemetry-overlay"
+                  data-testid="power-telemetry-overlay-select"
+                  className="w-full sm:w-64"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">{t.overlayNone}</SelectItem>
+                  {overlaySources.map((source) => (
+                    <SelectItem key={source.key} value={source.key}>
+                      {overlaySourceLabel(source, locale)} ({source.unit})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {overlayNote && (
+              <span
+                className="pb-2 text-xs text-muted-foreground"
+                data-testid="power-telemetry-overlay-note"
+              >
+                {overlayNote}
+              </span>
+            )}
           </div>
-          {overlayNote && (
-            <span
-              className="pb-2 text-xs text-muted-foreground"
-              data-testid="power-telemetry-overlay-note"
-            >
-              {overlayNote}
-            </span>
-          )}
-        </div>
+        )}
       </Card>
 
       <Card className="relative" data-testid="power-telemetry-chart">

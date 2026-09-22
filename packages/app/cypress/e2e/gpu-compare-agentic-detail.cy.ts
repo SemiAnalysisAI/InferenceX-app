@@ -234,4 +234,39 @@ describe('GPU comparison agentic point detail', () => {
       .and('not.contain.text', 'SGLang');
     cy.contains('button', 'Jun 12, 2026').should('be.visible');
   });
+
+  it('opens PowerX from a comparison point while the chart legend is collapsed', () => {
+    cy.intercept('GET', '/api/v1/availability', { body: agenticAvailability });
+    cy.intercept('GET', '/api/v1/benchmarks*', { body: agenticBenchmarks });
+    cy.intercept('GET', '/api/v1/gpu-metrics-point*', { statusCode: 404 }).as('pointTelemetry');
+    cy.intercept('GET', '/api/v1/trace-server-metrics*', { statusCode: 404 });
+    interceptDerivedAgenticMetrics();
+    cy.visit(
+      '/inference?g_model=DeepSeek-V4-Pro&i_seq=agentic-traces&i_prec=fp4&i_gpus=b200_vllm&i_dates=2026-06-12&i_dstart=2026-06-12&i_dend=2026-06-12',
+      {
+        onBeforeLoad(win) {
+          win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+          unlockAgenticGate(win);
+        },
+      },
+    );
+    cy.get('[data-testid="gpu-graph"]')
+      .first()
+      .within(() => {
+        cy.get('[data-testid="legend-close-button"]').click();
+        cy.get('[data-testid="legend-open-button"]').should('be.visible');
+        cy.get('svg .dot-group').first().find('.visible-shape').click({ force: true });
+      });
+    cy.get('[data-chart-tooltip]:visible [data-action="view-power-telemetry"]').click();
+    cy.wait('@pointTelemetry').then(({ request }) => {
+      const id = Number(new URL(request.url).searchParams.get('id'));
+      expect(agenticIds.has(id)).to.eq(true);
+      cy.get('[data-testid="power-telemetry-dialog"]').should('contain.text', `#${id}`);
+    });
+    cy.get('[data-testid="power-telemetry-missing"]').should('be.visible');
+    cy.get('[data-testid="power-telemetry-dialog"]').contains('button', 'Close').click();
+    cy.get('[data-testid="power-telemetry-dialog"]').should('not.exist');
+    cy.get('[data-testid="gpu-graph"] [data-testid="legend-open-button"]').should('be.visible');
+    cy.location('pathname').should('eq', '/inference');
+  });
 });
