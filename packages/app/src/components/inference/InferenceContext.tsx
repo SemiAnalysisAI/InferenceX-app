@@ -1322,8 +1322,11 @@ export function InferenceProvider({
   // reset commits as soon as data for the new model arrives — without this, switching models
   // bails on the empty-data tick and never re-fires, leaving the legend at the prior intersection.
   const precisionsKey = effectivePrecisions.join(',');
+  // Keyed on the resolved guard state rather than isUnofficialRun alone: the
+  // feature gate hydrates from localStorage after mount, so the first-paint
+  // official resolution must be revisited once the gate unlocks (or re-locks).
   const hwResetKey = `${selectedModel}|${effectiveSequence}|${precisionsKey}|${
-    isUnofficialRun ? 'preview' : 'official'
+    engineGuardLifted ? 'preview' : 'official'
   }`;
   const lastHwResetKeyRef = useRef('');
 
@@ -1944,7 +1947,7 @@ export function InferenceProvider({
         {children}
       </InferenceContextsProvider>
       <EngineComparisonConflictToast
-        detail={isUnofficialRun ? null : engineConflict}
+        detail={engineGuardLifted ? null : engineConflict}
         onDismiss={dismissEngineConflict}
       />
       <Dialog open={showDateRangeDialog} onOpenChange={setShowDateRangeDialog}>
