@@ -52,6 +52,26 @@ describe('QuotesContent', () => {
     );
   });
 
+  it('renders Seiji Eicher’s Anyscale quote and loads its logo in both locales', () => {
+    for (const locale of ['en', 'zh'] as const) {
+      cy.mount(<QuotesContent locale={locale} />);
+      cy.get('#quote-anyscale').within(() => {
+        cy.contains('Seiji Eicher').should('be.visible');
+        cy.contains(
+          locale === 'en'
+            ? "Ray Serve LLM's mission is to be best way"
+            : 'Ray Serve LLM 的使命是成为',
+        ).should('be.visible');
+        cy.get('img[alt="Anyscale"]')
+          .should('have.attr', 'src', '/logos/anyscale.svg')
+          .and(($logo) => {
+            expect(($logo[0] as HTMLImageElement).naturalWidth).to.be.greaterThan(0);
+          });
+      });
+      cy.get('button').find('img[alt="Anyscale"]').should('have.length', 1);
+    }
+  });
+
   it('scrolls to the matching quote when a logo is clicked', () => {
     const targetOrg = uniqueOrgsWithLogo[0];
 
