@@ -10,6 +10,7 @@ Design rationale and non-obvious conventions. See [CLAUDE.md](../CLAUDE.md) for 
 - [PowerX System Power](./powerx-system-power.md) — Pinned chassis model, measured-input guards, assumptions, and reproducible article exports
 - [API Skill Releases](./inferencex-skills-release.md) — Prepare an immutable package, verify clean installations and agent exports, and publish through the package-specific workflow
 - [API Skill Discovery](./inferencex-skills-discovery.md) — Accept or reject implicit skill discovery in fresh Codex and Claude Code projects
+- [Client Request Analytics](./client-request-analytics.md) — Request counting, privacy controls, UTC reporting and deployment acceptance
 - [CLI Compatibility](./inferencex-cli-compatibility.md) — Contract 1 schemas, bundle and exit semantics, platform scope, and legacy migration
 - [CLI Release Checklist](./inferencex-cli-release-checklist.md) — Candidate evidence and ordered publication gates
 

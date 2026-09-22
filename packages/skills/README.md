@@ -86,6 +86,9 @@ Each export needs a new output directory. Public queries require no API key.
 
 The package queries existing observations; it does not launch benchmarks.
 
+Online requests carry package attribution for aggregate request counts. Set
+`INFERENCEX_TELEMETRY=0` to opt out. [Fields and controls](https://github.com/SemiAnalysisAI/InferenceX-app/blob/master/packages/skills/skills/inferencex-api/references/cli.md#request-usage).
+
 ## Documentation
 
 - [CLI reference](https://github.com/SemiAnalysisAI/InferenceX-app/blob/master/packages/skills/skills/inferencex-api/references/cli.md) — commands, exports and offline verification.
@@ -120,6 +123,8 @@ PowerX 可导出实测功耗与能耗；AgentX 可导出智能体工作负载汇
 还可追溯结果的来源、配置和日志，按自定义价格假设比较 TCO，在框架版本间比较匹配的观测，
 以及比较两次 CollectiveX 通信基准测试。该包查询已有观测，不启动基准测试。
 详细命令、仪表板视图、旧版迁移和接口格式见上方文档链接。
+在线请求会携带包来源标识，用于统计请求总量；设置 `INFERENCEX_TELEMETRY=0` 可关闭，
+采集字段及控制方式见上方链接。
 
 </details>
 
