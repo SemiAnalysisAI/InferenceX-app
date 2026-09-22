@@ -1,8 +1,13 @@
-import { validateParams as validateViewParams, parseFormatParam } from '@/lib/views-api/params';
+import {
+  validateParams as validateViewParams,
+  parseFormatParam,
+  parseListParam,
+} from '@/lib/views-api/params';
 import { VIEW_QUERY_PARAMS } from '@/lib/views-api/registry';
 import type { NextRequest } from 'next/server';
 
 import { cachedJson } from '@/lib/api-cache';
+import { normalizeGpuValues, RADAR_METRICS } from '@/lib/gpu-specs-radar';
 import {
   getScaleUpDomainMemoryBwNumeric,
   getScaleUpDomainMemoryNumeric,
@@ -69,15 +74,22 @@ export function GET(request: NextRequest) {
       throw new ViewsApiParamError('metric', `Unknown metric: ${metricParam}`, METRIC_KEYS);
     }
 
-    const chips = GPU_SPECS.map(buildChip);
+    const selected = search.has('chips')
+      ? parseListParam(search.get('chips'), 'chips', GPU_SPECS.map(chipKey))
+      : null;
+    const selectedSpecs = GPU_SPECS.filter(
+      (spec) => selected === null || selected.includes(chipKey(spec)),
+    );
+    const chips = selectedSpecs.map(buildChip);
     const metrics = GPU_CHART_METRICS.map(({ key, label, unit }) => ({ key, label, unit }));
 
     const ranking = metric
-      ? GPU_SPECS.map((spec) => ({
-          chip: chipKey(spec),
-          label: spec.name,
-          value: metric.getValue(spec),
-        }))
+      ? selectedSpecs
+          .map((spec) => ({
+            chip: chipKey(spec),
+            label: spec.name,
+            value: metric.getValue(spec),
+          }))
           .filter(
             (entry): entry is { chip: string; label: string; value: number } =>
               entry.value !== null,
@@ -108,9 +120,16 @@ export function GET(request: NextRequest) {
       cachedJson({
         view: 'gpu-specs',
         apiVersion: 'v1',
-        params: { metric: metric?.key ?? null, format },
+        params: { metric: metric?.key ?? null, format, chips: selected },
         chips,
         metrics,
+        radar: {
+          normalization: 'all-chips',
+          metrics: RADAR_METRICS.map(({ key, label, unit }) => ({ key, label, unit })),
+          series: normalizeGpuValues(GPU_SPECS)
+            .filter(({ gpu }) => selected === null || selected.includes(chipKey(gpu)))
+            .map(({ gpu, values }) => ({ chip: chipKey(gpu), values })),
+        },
         ...(ranking ? { ranking } : {}),
       }),
     );

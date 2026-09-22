@@ -9,6 +9,18 @@ const strings: ApiSchema = { type: 'array', items: { type: 'string' } };
 
 /** Query values are strings on the wire; resolved params carry typed values. */
 const PARAMETER_NOTES: Record<string, [string, string]> = {
+  chips: [
+    'GPU spec keys from chips[].key. Omit for all; an empty value selects none. Radar normalization retains the full chip catalog.',
+    'chips[].key 中的芯片规格键。省略时全选，空值表示不选。雷达图始终按完整芯片目录归一化。',
+  ],
+  currentConfig: [
+    'Opaque serving-envelope key from an Overview comparison link (i_overview_current). Filters the primary snapshot and unofficial overlays before curve deduplication.',
+    'Overview 比较链接中的推理服务配置键（i_overview_current），按原值传入。在曲线去重前筛选主快照及非官方叠加数据。',
+  ],
+  baselineConfig: [
+    'Opaque serving-envelope key from i_overview_baseline; applied to each comparison snapshot. Requires dates or start/end.',
+    'i_overview_baseline 中的推理服务配置键，应用于各比较快照。必须同时指定 dates 或 start/end。',
+  ],
   model: [
     'Model display name or comparison slug, case-insensitive. Required for benchmark-based views. The image view also accepts current image-catalog names, trims whitespace and defaults to all; unknown models return 400.',
     '模型显示名称或比较页 slug，不区分大小写。基于基准测试的视图需要此参数。镜像视图还接受当前镜像列表中的模型名，去除首尾空白后匹配，默认 all；未知模型返回 400。',

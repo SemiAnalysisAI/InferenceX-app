@@ -3,6 +3,38 @@
  * Update the matching view docs and skills reference with every selector change.
  */
 export const VIEW_QUERY_PARAMS = {
+  'agentx-catalog': [],
+  'agentx-point': ['id', 'phase', 'source', 'percentile', 'latencyMetric', 'throughput'],
+  dataset: [
+    'slug',
+    'convId',
+    'search',
+    'sort',
+    'limit',
+    'offset',
+    'expanded',
+    'turn',
+    'raw',
+    'inner',
+    'sa',
+  ],
+  'evaluation-samples': [
+    'evalResultId',
+    'runId',
+    'task',
+    'model',
+    'framework',
+    'hardware',
+    'precision',
+    'specMethod',
+    'disagg',
+    'concurrency',
+    'filter',
+    'offset',
+    'limit',
+    'docId',
+    'search',
+  ],
   'cache-reuse': [
     'config',
     'date',
@@ -120,7 +152,7 @@ export const VIEW_QUERY_PARAMS = {
     'runId',
     'sort',
   ],
-  'gpu-specs': ['format', 'metric'],
+  'gpu-specs': ['format', 'metric', 'chips'],
   historical: [
     'deployment',
     'end',
@@ -139,6 +171,8 @@ export const VIEW_QUERY_PARAMS = {
     'vendors',
   ],
   inference: [
+    'currentConfig',
+    'baselineConfig',
     'allPoints',
     'best',
     'date',

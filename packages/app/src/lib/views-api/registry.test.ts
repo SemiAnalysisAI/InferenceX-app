@@ -38,9 +38,10 @@ describe('public view contract coverage', () => {
         /export\s+(?:async\s+)?(?:function|const)\s+(?:POST|PUT|PATCH|DELETE)\b/,
       );
       expect(() => validateParams(new URLSearchParams('surprise=1'), keys)).toThrow();
-      expect(() =>
-        validateParams(new URLSearchParams(`${keys[0]}=a&${keys[0]}=b`), keys),
-      ).toThrow();
+      if (keys.length > 0)
+        expect(() =>
+          validateParams(new URLSearchParams(`${keys[0]}=a&${keys[0]}=b`), keys),
+        ).toThrow();
     });
   }
   it('rejects impossible dates, unsafe identifiers and unsafe numeric dictionaries', () => {
