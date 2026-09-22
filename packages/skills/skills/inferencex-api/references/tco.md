@@ -98,8 +98,11 @@ It is not a measured GPU-utilization assertion. Costs outside the supplied hourl
 rate—such as idle time, storage, networking, staffing, or ownership expenses—are
 outside this calculation. The denominator is output tokens; there is no token
 revenue, input-token value weighting, or measured power/energy calculation.
+Power may still be recorded in the captured observations. Describe it as unused
+by this formula; an availability claim requires checking the selected rows' metric
+fields and their validation verdicts.
 
-If reporting sensitivity with supplied prices, equal modeled cost occurs at
+When the user requests price sensitivity, equal modeled cost occurs at
 `price_A / price_B = throughput_A / throughput_B` for comparable points. Equality
 is a tie; crossing that boundary changes the cheaper estimate. Preserve that
 distinction when rounding the saved boundary for prose.
@@ -125,8 +128,9 @@ or workloads to obtain a complete comparison.
 
 Retain `point.evidence_date` for the knot(s) backing the target, plus
 `oldest_frontier_date` and `latest_date` for the whole frontier. Report differing
-dates across GPUs. If reporting a gap, compute elapsed days from those endpoints
-in the saved calculation. The metadata records the requested model and returned
+dates across GPUs. Equal backing-date endpoints identify one date, not one
+observation; retain `is_interpolated` when describing the point. If reporting a gap,
+compute elapsed days from those endpoints in the saved calculation. The metadata records the requested model and returned
 `db_model_keys`. Even a single returned raw key establishes only the API's model
 bucket, not identical checkpoint weights or an exact model revision across the
 frontier's observations. Do not turn a one-key response into a matched-release claim.
@@ -170,12 +174,21 @@ Convert it to milliseconds with `p99_itl * 1000`. `p99_tpot` measures a differen
 statistic (per-request time per output token). The reciprocal `1000 / p99_intvty`
 is not P99 ITL. A median frontier target cannot certify a tail SLA.
 Use only the user's requested predicate for classification and costing. Retain a
-finite `p99_itl < 0.020` pass and its cost on the API-reported basis. If another
-statistic helps explain a limitation, report its recorded value separately.
+finite `p99_itl < 0.020` pass and its cost on the API-reported basis. Build the priced
+table from those passing rows. Derive best-cost points, price boundaries, their
+dates, and throughput/concurrency extrema from that same named population; reuse
+those values in the report and final answer. Count known, null, and missing
+`recipe_fingerprint` values in that population before describing availability.
+A narrower comparison names its additional selectors or exclusions wherever its
+results appear, and retains the full passing population's counts and extrema.
+Report passing concurrency values as observed coverage. A necessary concurrency
+limit requires evidence beyond a selected subset or an observed range; keep every
+eligible observation, including flagged outliers, in that population.
+If another statistic helps explain a limitation, report its recorded value separately.
 Different percentiles can differ greatly without internal inconsistency; TPOT and
 ITL also measure different statistics. Aggregate ratios alone establish neither
 invalid data nor a delivery pattern. Additional screening thresholds require the
-user's criterion; do not invent a preferred planning subset from those ratios.
+user's criterion.
 
 Capture the complete benchmark/history response using the bounded raw-API recipe,
 then set the workload scope to the user's request. Obtain `scope.model` from
@@ -185,7 +198,10 @@ example keeps every selected observation and checks **strictly below 20 ms**
 (`p99_itl < 0.020` seconds). Missing, nonnumeric, nonfinite, and negative values
 remain `unknown`; preserve the source capture alongside this derived report.
 Raw request concurrency is `conc`. The recipe maps it to `concurrency`, retaining
-the raw field and using `null` for missing or invalid values.
+the raw field and using `null` for missing or invalid values. `passing_summary`
+counts all passing rows per hardware, including recorded power fields separately
+from `power_valid` verdicts. Finite-field counts describe availability; measured
+power comparisons still use the [PowerX eligibility rules](powerx.md#selection-and-coverage).
 
 ```bash
 node --input-type=module - evidence/benchmark-history.body <<'JS'
@@ -206,7 +222,27 @@ const checked = selected.map((row) => {
     p99_itl_under_20ms: known ? (seconds < 0.020 ? 'pass' : 'fail') : 'unknown',
   };
 });
-console.log(JSON.stringify({ source_path, scope, matching_rows: checked.length, rows: checked }, null, 2));
+const passing = checked.filter((row) => row.p99_itl_under_20ms === 'pass');
+const passing_summary = [...new Set(passing.map((row) => row.hardware))].sort().map((hardware) => {
+  const population = passing.filter((row) => row.hardware === hardware);
+  const concurrency = population.map((row) => row.concurrency).filter((value) => value !== null);
+  const passed = population.filter((row) => row.metrics.power_valid === 1).length;
+  const failed = population.filter((row) => row.metrics.power_valid === 0).length;
+  return {
+    hardware,
+    rows: population.length,
+    concurrency: {
+      values: [...new Set(concurrency)].sort((a, b) => a - b),
+      unknown_rows: population.length - concurrency.length,
+    },
+    power: {
+      avg_power_w_finite_rows: population.filter((row) => Number.isFinite(row.metrics.avg_power_w)).length,
+      joules_per_output_token_finite_rows: population.filter((row) => Number.isFinite(row.metrics.joules_per_output_token)).length,
+      validation: { passed, failed, unavailable: population.length - passed - failed },
+    },
+  };
+});
+console.log(JSON.stringify({ source_path, scope, matching_rows: checked.length, passing_summary, rows: checked }, null, 2));
 JS
 ```
 

@@ -211,9 +211,13 @@ const STRINGS = {
       modeled: 'Measured + modeled power',
       compare: 'Compare both',
     },
-    powerBarLabels: { provisioned: 'Provisioned', modeled: 'Measured + modeled' },
+    powerBarLabels: {
+      provisioned: 'Provisioned',
+      modeled: 'Measured + modeled',
+      extrapolated: 'Full-chassis extrapolation',
+    },
     powerPreview:
-      'PowerX estimate · Same target, throughput, pricing and unit costs. GPU power comes from the same serving-frontier points; power between them is estimated linearly. Server overhead is modeled, with PUE 1.3 and 10% headroom. AgentX system power is not yet qualified.',
+      'PowerX estimate · Same target, throughput, pricing and unit costs. GPU power comes from the same serving-frontier points; power between them is estimated linearly. Server overhead is modeled, with PUE 1.3 and 10% headroom. Full-chassis extrapolation fills an eight-GPU server with replicas of the measured 1/2/4-GPU workload at the same per-GPU power and throughput; it does not measure a partly idle server. AgentX system power is not yet qualified.',
     pricingGroup: 'Pricing Config',
     costProviderLabel: 'Cost Provider',
     costProviderTooltip:
@@ -294,8 +298,11 @@ const STRINGS = {
     skipReason: {
       'outside-measured-range': 'no measured point at the target interactivity',
       'no-power': 'no all-in power figure',
-      'no-measured-power':
-        'no usable measured power or supported system model for these benchmark points',
+      'no-measured-power': 'no usable measured power for these benchmark points',
+      'unsupported-power-hardware': 'no system power model for this hardware',
+      'unsupported-power-topology':
+        'this topology cannot be modeled as whole replicas on one eight-GPU server',
+      'outside-power-model': 'these benchmark points are outside the supported power model',
       'no-cost': 'no TCO for this tier',
       'no-token-mix': 'no input/output token mix recorded',
     } satisfies Record<ProfitEstimatorSkipReason, string>,
@@ -326,9 +333,9 @@ const STRINGS = {
       modeled: '实测 GPU + 系统功耗估算',
       compare: '对比两种估算方式',
     },
-    powerBarLabels: { provisioned: '预配功耗', modeled: '实测 + 估算' },
+    powerBarLabels: { provisioned: '预配功耗', modeled: '实测 + 估算', extrapolated: '整机外推' },
     powerPreview:
-      'PowerX 估算 · 两种方式采用相同的目标交互性、吞吐量、价格和单位成本。GPU 功耗取自同一组性能前沿数据点，点间功耗采用线性估算。服务器开销由模型估算，PUE 为 1.3，功耗余量为 10%。AgentX 系统功耗模型尚未完成验证。',
+      'PowerX 估算 · 两种方式采用相同的目标交互性、吞吐量、价格和单位成本。GPU 功耗取自同一组性能前沿数据点，点间功耗采用线性估算。服务器开销由模型估算，PUE 为 1.3，功耗余量为 10%。整机外推假设在八卡服务器上部署多个相同的实测单卡、双卡或四卡实例，每卡功耗和吞吐量保持不变；它不代表部分 GPU 闲置时的整机实测功耗。AgentX 系统功耗模型尚未完成验证。',
     pricingGroup: '定价配置',
     costProviderLabel: '成本供应商',
     costProviderTooltip:
@@ -409,7 +416,10 @@ const STRINGS = {
     skipReason: {
       'outside-measured-range': '未在该交互性下实测',
       'no-power': '缺少全电源配置功率数据',
-      'no-measured-power': '同一组基准测试数据点缺少有效功耗或适用的系统模型',
+      'no-measured-power': '同一组基准测试数据点缺少有效功耗',
+      'unsupported-power-hardware': '该硬件暂无适用的系统功耗模型',
+      'unsupported-power-topology': '该拓扑无法按完整实例部署在单台八卡服务器上建模',
+      'outside-power-model': '这些基准测试数据点超出功耗模型的适用范围',
       'no-cost': '该层级无 TCO 数据',
       'no-token-mix': '未记录输入/输出 token 比例',
     } satisfies Record<ProfitEstimatorSkipReason, string>,

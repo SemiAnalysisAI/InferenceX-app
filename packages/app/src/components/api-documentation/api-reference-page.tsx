@@ -41,7 +41,7 @@ const UI_COPY = {
     agentPromptTitle: 'First example: measured PowerX',
     agentPrompt: `Use inferencex-api to export latest available measured PowerX data for DeepSeek-V4-Pro:
 - Select single-turn requests with exactly 8192 input and 1024 output tokens; require strictV2.
-- Create powerx.csv and powerx.json with the installed exporter, outside the InferenceX repository.
+- Use the installed CLI's powerx export command to create separate CSV and JSON evidence bundles outside the InferenceX repository. Keep each result.csv or result.json with its manifest.json and responses/, and verify each bundle before reporting.
 - Keep measured per-GPU watts and whole-deployment GPU energy distinct from provisioned-power estimates.
 - Preserve raw model keys, source IDs/URLs, measurement dates, and separate snapshot metadata.
 - Record the request URL, retrieval time, package version, local filters, and returned/selected counts.
@@ -49,10 +49,10 @@ const UI_COPY = {
 - Keep missing metrics unavailable and genuine zeros unchanged. Explain empty results without inferring that all benchmarks are absent.`,
     agentCookbook: 'PowerX cookbook and direct export',
     agentCookbookDescription:
-      'Open the cookbook at the installed path below for validity, units, missing-data handling, and provenance. The bundled Node 24 exporter also runs directly from your project, without an InferenceX checkout or database credentials.',
-    agentExport: 'Run the installed exporter (Codex)',
+      'Open the cookbook at the installed path below for validity, units, missing-data handling, and provenance. The bundled Node 24 CLI runs directly from your project, without an InferenceX checkout or database credentials.',
+    agentExport: 'Run the installed CLI (Codex)',
     agentExportDescription:
-      'For Claude Code, use the .claude/skills/inferencex-api path. For JSON, use --format json --output powerx.json. Omit --date for latest available observations, or add --date YYYY-MM-DD for an as-of cutoff. Keep the report log: it records request and coverage metadata even for an empty CSV.',
+      'For Claude Code, use the .claude/skills/inferencex-api path. For JSON, use --format json --output-dir evidence/powerx-json and verify that directory. Use a new output directory for each export. It contains result.csv or result.json, manifest.json, and responses/; keep the whole bundle to preserve request and coverage metadata even for an empty result. Omit --date for latest available observations, or add --date YYYY-MM-DD for an as-of cutoff.',
     agentMeasurements:
       'avg_power_w is measured mean watts per GPU. Schema-v2 joules metrics without a role prefix describe whole-deployment GPU energy; prefill/decode-prefixed energy is role-local. These are existing observations, not new benchmark runs or facility-energy measurements.',
     conventions: 'Conventions',
@@ -117,7 +117,7 @@ const UI_COPY = {
     agentPromptTitle: '首个示例：实测 PowerX 数据',
     agentPrompt: `使用 inferencex-api 导出 DeepSeek-V4-Pro 最新可用的实测 PowerX 数据：
 - 仅选取输入恰好为 8192、输出恰好为 1024 个 token 的单轮请求，并要求 strictV2。
-- 在 InferenceX 仓库之外，通过已安装的导出器生成 powerx.csv 和 powerx.json。
+- 在 InferenceX 仓库之外，使用已安装 CLI 的 powerx export 命令，分别生成 CSV 和 JSON 证据包。将 result.csv 或 result.json 与对应的 manifest.json 和 responses/ 一起保留，核验每个证据包后再报告结果。
 - 区分实测单 GPU 功率、整个部署的 GPU 能耗与预留功率估算。
 - 保留原始模型键、来源标识和 URL、测量日期，以及独立的快照元数据。
 - 记录请求 URL、提取时间、包版本、本地筛选条件，以及返回和选中的数据条数。
@@ -125,10 +125,10 @@ const UI_COPY = {
 - 缺失指标保持不可用，真实零值保持为零。说明空结果的含义，不据此推断所有基准测试数据都不存在。`,
     agentCookbook: 'PowerX 指南与直接导出',
     agentCookbookDescription:
-      '打开下方安装路径中的指南，查看验证规则、单位、缺失数据处理和溯源说明。随包提供的 Node 24 导出器也可在项目中直接运行，无需检出 InferenceX 仓库或提供数据库凭据。',
-    agentExport: '运行已安装的导出器（Codex）',
+      '打开下方安装路径中的指南，查看验证规则、单位、缺失数据处理和溯源说明。随包提供的 Node 24 命令行工具（CLI）可在项目中直接运行，无需检出 InferenceX 仓库或提供数据库凭据。',
+    agentExport: '运行已安装的 CLI（Codex）',
     agentExportDescription:
-      'Claude Code 使用 .claude/skills/inferencex-api 路径。导出 JSON 时改用 --format json --output powerx.json。省略 --date 表示查询最新可用观测值，也可添加 --date YYYY-MM-DD 指定截止日期。请保留报告日志：即使 CSV 为空，其中也会记录请求和数据覆盖范围的元数据。',
+      'Claude Code 使用 .claude/skills/inferencex-api 路径。导出 JSON 时改用 --format json --output-dir evidence/powerx-json，并核验该目录。每次导出都使用新的输出目录，其中包含 result.csv 或 result.json、manifest.json 和 responses/。请保留整个证据包：即使结果为空，也能保留请求和数据覆盖范围的元数据。省略 --date 表示查询最新可用观测值，也可添加 --date YYYY-MM-DD 指定截止日期。',
     agentMeasurements:
       'avg_power_w 是实测单 GPU 平均功率，单位为 W。schema v2 中不带角色前缀的 joules 指标表示整个部署的 GPU 能耗；带 prefill/decode 前缀的能耗仅对应相应角色。这些数据是已有观测值，不是新运行的基准测试，也不是设施总能耗测量值。',
     conventions: '约定',
@@ -398,7 +398,7 @@ export function ApiReferencePage({ locale }: { locale: ApiDocumentationLocale })
               </dl>
               <div className="mt-4 min-w-0">
                 <CopyableCodeBlock locale={locale} label={copy.agentExport}>
-                  {`node .agents/skills/inferencex-api/scripts/export-powerx.mjs \\\n  --model DeepSeek-V4-Pro --isl 8192 --osl 1024 \\\n  --format csv --output powerx.csv 2> powerx-report.log`}
+                  {`mkdir -p evidence\nnode .agents/skills/inferencex-api/scripts/inferencex.mjs powerx export \\\n  --model DeepSeek-V4-Pro --isl 8192 --osl 1024 \\\n  --format csv --output-dir evidence/powerx-csv\nnode .agents/skills/inferencex-api/scripts/inferencex.mjs verify evidence/powerx-csv`}
                 </CopyableCodeBlock>
               </div>
               <p className="mt-3 text-sm leading-6 text-muted-foreground">

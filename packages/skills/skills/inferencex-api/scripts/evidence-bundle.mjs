@@ -499,10 +499,10 @@ export async function openReplay(directory, { signal } = {}) {
       throw responseError('Evidence bundle is incomplete: manifest.json is missing');
     throw error;
   }
-  const manifest = parseJson(
-    await readBoundedRegular(manifestPath, BUNDLE_LIMITS.manifest, 'manifest', { signal }),
-    'manifest',
-  );
+  const manifestBytes = await readBoundedRegular(manifestPath, BUNDLE_LIMITS.manifest, 'manifest', {
+    signal,
+  });
+  const manifest = parseJson(manifestBytes, 'manifest');
   validateManifest(manifest);
   const resultPath = await safeBundlePath(root, manifest.result.path, 'result');
   const resultBytes = await readBoundedRegular(resultPath, BUNDLE_LIMITS.result, 'result', {
@@ -540,6 +540,11 @@ export async function openReplay(directory, { signal } = {}) {
   let consumed = 0;
   return {
     manifest,
+    manifestFile: {
+      path: 'manifest.json',
+      size: manifestBytes.length,
+      sha256: sha256(manifestBytes),
+    },
     resultBytes,
     get(spec) {
       return Promise.try(() => {

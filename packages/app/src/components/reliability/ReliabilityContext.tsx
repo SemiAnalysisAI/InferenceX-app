@@ -11,66 +11,23 @@ import {
   useState,
 } from 'react';
 
+import { useReliability } from '@/hooks/api/use-reliability';
 import {
   resolveAvailableSelection,
-  useChartUIState,
   useChartToggleSet,
+  useChartUIState,
   useUrlStateSync,
 } from '@/hooks/useChartContext';
-import { useReliability } from '@/hooks/api/use-reliability';
 import { useUrlState } from '@/hooks/useUrlState';
 import { getHardwareConfig, getModelSortIndex } from '@/lib/constants';
-import type { ReliabilityRow } from '@/lib/api';
 
-import type {
-  DateRangeSuccessRateData,
-  ModelSuccessRateData,
-  ReliabilityChartContextType,
-} from './types';
+import type { ModelSuccessRateData, ReliabilityChartContextType } from './types';
 
 /** @internal Exported for test provider wrapping only. */
 export const ReliabilityContext = createContext<ReliabilityChartContextType | undefined>(undefined);
 
-/** @internal Aggregate raw reliability rows into date-range buckets. */
-export function aggregateByDateRange(rows: ReliabilityRow[]): DateRangeSuccessRateData {
-  const now = Date.now();
-  const ranges = [
-    ['last-3-days', now - 3 * 86400000],
-    ['last-7-days', now - 7 * 86400000],
-    ['last-month', now - 30 * 86400000],
-    ['last-3-months', now - 90 * 86400000],
-    ['all-time', null],
-  ] as const;
-  const aggregates = Object.fromEntries(
-    ranges.map(([range]) => [range, {} as Record<string, { n_success: number; total: number }>]),
-  ) as Record<(typeof ranges)[number][0], Record<string, { n_success: number; total: number }>>;
-
-  for (const row of rows) {
-    const rowTime = new Date(row.date).getTime();
-    for (const [range, cutoff] of ranges) {
-      if (cutoff !== null && rowTime < cutoff) continue;
-      aggregates[range][row.hardware] ??= { n_success: 0, total: 0 };
-      const stats = aggregates[range][row.hardware];
-      stats.n_success += row.n_success;
-      stats.total += row.total;
-    }
-  }
-
-  const result: DateRangeSuccessRateData = {};
-  for (const [range] of ranges) {
-    result[range] = {};
-    for (const [hardware, stats] of Object.entries(aggregates[range])) {
-      if (stats.total === 0) continue;
-      result[range][hardware] = {
-        rate: Math.round((stats.n_success / stats.total) * 10000) / 100,
-        total: stats.total,
-        n_success: stats.n_success,
-      };
-    }
-  }
-
-  return result;
-}
+import { aggregateByDateRange } from './aggregate';
+export { aggregateByDateRange } from './aggregate';
 
 export function ReliabilityProvider({ children }: { children: ReactNode }) {
   const { getUrlParam } = useUrlState();

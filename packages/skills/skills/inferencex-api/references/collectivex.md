@@ -47,7 +47,9 @@ by numeric run ID. The older selection is `left`; the newer is `right`. This is 
 bounded example selection, not a representative sample. A cancelled or failed
 workflow can still contain measured cases; its conclusion remains in the export.
 
-For a requested pair, supply both exact string IDs from discovery:
+Run-list counts identify candidate pairs; exact EP and KV identities in the returned
+details establish whether they have matched groups. For a requested pair, supply
+both exact string IDs from discovery:
 
 ```bash
 node .agents/skills/inferencex-api/scripts/inferencex.mjs collectivex compare \
@@ -126,6 +128,10 @@ from either or both sides. For per-run series or topology counts, count that
 selected source dataset's `series[]`; unavailable component groups do not add
 measured series.
 
+Report returned points and source-reported `skipped_points` as separate counts.
+Their sum describes those two categories only; an execution count needs explicit
+per-point execution evidence. Keep the source's outcome and disposition labels.
+
 `summary` counts comparison groups, including EP operation groups, not runs or
 requested cases. Cases with **no measured rows** have no comparison group. Inspect
 the complete datasets' `coverage` and optional `kv` arrays for their outcome,
@@ -166,14 +172,24 @@ effect. Equal SHAs also do not establish identical runtime conditions.
 
 ## 3. Preserve units, missing values, and sources
 
-| Metric family                                        | Meaning and unit                                                                                                                              |
-| ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| EP `latency_us`                                      | Operation latency in microseconds. Compare the same percentile.                                                                               |
-| EP `activation_data_rate_gbps_at_latency_percentile` | Aggregate activation-data rate in **GB/s**, excluding FP8 scale bytes.                                                                        |
-| EP `payload_data_rate_gbps_at_latency_percentile`    | Full payload rate in **GB/s per GPU**, including recorded scale bytes. `payload_bytes` is aggregate bytes across the EP world.                |
-| EP `roundtrip_token_rate_at_latency_percentile`      | Aggregate tokens/s at the named latency percentile.                                                                                           |
-| KV `latency_ms` / `request_ms`                       | Whole-burst latency / per-request completion latency in milliseconds; `n` is sample count. A missing `request_ms` is not whole-burst latency. |
-| KV `prep_ms`, `gbps_p50`, `gbps_p50_incl_prep`       | Preparation time in ms per burst, GB/s excluding preparation, and GB/s including preparation.                                                 |
+| Metric family                                                    | Meaning and unit                                                                                                                              |
+| ---------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| EP `latency_us`                                                  | Operation latency in microseconds. Compare the same percentile.                                                                               |
+| EP `activation_data_rate_gbps_at_latency_percentile`             | Aggregate activation-data rate in **GB/s**, excluding FP8 scale bytes.                                                                        |
+| EP `payload_data_rate_gbps_at_latency_percentile`                | Full payload rate in **GB/s per GPU**, including recorded scale bytes. `payload_bytes` is aggregate bytes across the EP world.                |
+| EP `roundtrip_token_rate_at_latency_percentile`                  | Aggregate tokens/s at the named latency percentile.                                                                                           |
+| KV `latency_ms` / `request_ms`                                   | Whole-burst latency / per-request completion latency in milliseconds; `n` is sample count. A missing `request_ms` is not whole-burst latency. |
+| KV `prep_ms`, `gbps_p50`, `gbps_p50_incl_prep`                   | Preparation time in ms per burst, GB/s excluding preparation, and GB/s including preparation.                                                 |
+| Swap `swap_blocks[].points[].latency_us`                         | Copy latency in microseconds at the named percentile.                                                                                         |
+| Swap `swap_blocks[].points[].payload_gbps_at_latency_percentile` | Payload GB/s at the named latency percentile, with bytes counted once.                                                                        |
+
+The saved OpenAPI operation description defines the optional swap metrics even
+when their property schemas omit descriptions. Swap points remain in the raw
+datasets, outside the formal EP/KV comparison groups. For supplemental summaries,
+prefer the recorded point percentiles. A requested median across point p50 values
+uses the middle value for odd counts and the mean of the two middle values for even
+counts after sorting. Name that population and count; this is a median of point
+statistics, not the p50 of pooled timing samples.
 
 `roundtrip_token_rate_at_latency_percentile` belongs to each point, beside
 `components`. The latency, activation/payload data rates, and `payload_bytes`
@@ -208,8 +224,10 @@ never from another selection or an older example.
 Report the selected runs and attempts, discovery coverage, matched/unmatched/
 ambiguous/incomparable counts, the specific metric/percentile and units, and
 relevant unmeasured coverage. Summarize numerical differences only from the
-complete requested set of `matched` groups. With no matches, explain the actual
-identity differences and unavailable fields. Do not invent relaxed counterpart
+complete requested set of `matched` groups. Derive shared and differing runtime
+fields from each saved left/right value pair, including equal software versions.
+With no matches, distinguish empty candidate arrays from actual identity differences
+and unavailable fields. Do not invent relaxed counterpart
 counts or performance pairs unless the user requests that separate analysis.
 Keep the result scoped to the two
 returned snapshots and state that no new benchmarks were run.

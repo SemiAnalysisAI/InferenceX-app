@@ -1,45 +1,23 @@
 import { type NextRequest, NextResponse } from 'next/server';
 
 import { DISPLAY_MODEL_TO_DB } from '@semianalysisai/inferencex-constants';
-import { FIXTURES_MODE, getDb } from '@semianalysisai/inferencex-db/connection';
+import { FIXTURES_MODE } from '@semianalysisai/inferencex-db/connection';
 
-import {
-  getBenchmarksForRun,
-  getLatestBenchmarks,
-  type BenchmarkRow,
-} from '@semianalysisai/inferencex-db/queries/benchmarks';
+import type { BenchmarkRow } from '@semianalysisai/inferencex-db/queries/benchmarks';
 
-import { cachedJson, cachedQuery } from '@/lib/api-cache';
+import { cachedJson } from '@/lib/api-cache';
 import { toCalculatorBenchmarkRows } from '@/lib/benchmark-api-view';
+import {
+  getCachedBenchmarks,
+  getCachedBenchmarksForRun,
+  getCachedCalculatorBenchmarks,
+} from '@/lib/benchmark-query-cache.server';
 import { filterByPowerValidity, parsePowerValidityFilter } from '@/lib/benchmark-power-validity';
 import { PUBLIC_API_ERRORS, publicApiError } from '@/lib/public-api-errors';
 import { agenticWorkflowMetadataOnly } from '@/lib/agentic-workflow-metadata';
 import { loadFixture } from '@/lib/test-fixtures';
 
 export const dynamic = 'force-dynamic';
-
-const getCachedBenchmarks = cachedQuery(
-  (dbModelKeys: string[], date?: string, exact?: boolean, runId?: string) =>
-    getLatestBenchmarks(getDb(), dbModelKeys, date, exact, runId),
-  'benchmarks-agentic-curve-scope-v2',
-  { blobOnly: true },
-);
-
-// One logical run snapshot (GPU comparison of individual same-day runs). For an
-// append-only run this includes its same-image predecessor chain. Cached under a
-// distinct key prefix so it never collides with the latest/as-of query.
-const getCachedBenchmarksForRun = cachedQuery(
-  (dbModelKeys: string[], runId: string) => getBenchmarksForRun(getDb(), dbModelKeys, runId),
-  'benchmarks-run-agentic-curve-scope-v2',
-  { blobOnly: true },
-);
-
-const getCachedCalculatorBenchmarks = cachedQuery(
-  async (dbModelKeys: string[], sequence: string, date?: string) =>
-    toCalculatorBenchmarkRows(await getLatestBenchmarks(getDb(), dbModelKeys, date), sequence),
-  'benchmarks-calculator-agentic-curve-scope-v2',
-  { blobOnly: true },
-);
 
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;

@@ -844,6 +844,117 @@ for (const mutation of ['same-inode', 'malformed', 'oversized', 'continuous']) {
   });
 }
 
+test('inspection tolerates a terminal recovery directory removed before its listing', () => {
+  const cwd = project('terminal listing race-');
+  succeeded(run(['install'], cwd));
+  const skillsRoot = join(cwd, '.claude/skills');
+  const destination = join(skillsRoot, 'inferencex-api');
+  const recovery = `${destination}.inferencex-skills-transaction.recovering-${randomUUID()}`;
+  writeFileSync(join(destination, 'local-notes.txt'), 'keep me');
+  mkdirSync(join(skillsRoot, 'neighbor'));
+  writeFileSync(join(skillsRoot, 'neighbor/SKILL.md'), 'neighbor bytes');
+  const before = snapshot(skillsRoot);
+  mkdirSync(recovery);
+  const injected = join(cwd, 'listing-race-injected');
+  const result = runWithPreload(
+    ['install', '--json'],
+    cwd,
+    `
+      import fs from 'node:fs';
+      import { syncBuiltinESMExports } from 'node:module';
+      const original = fs.readdirSync;
+      fs.readdirSync = (path, options) => {
+        if (path === ${JSON.stringify(recovery)}) {
+          fs.rmdirSync(path);
+          fs.writeFileSync(${JSON.stringify(injected)}, 'removed after lstat');
+        }
+        return original(path, options);
+      };
+      syncBuiltinESMExports();
+    `,
+  );
+  assert.equal(existsSync(injected), true);
+  succeeded(result);
+  assert.equal(JSON.parse(result.stdout).outcome, 'skipped');
+  assert.deepEqual(snapshot(skillsRoot), before);
+});
+
+test('the owner tolerates a contender removing its empty terminal recovery directory', () => {
+  const cwd = project('terminal rmdir race-');
+  const skillsRoot = join(cwd, '.claude/skills');
+  const destination = join(skillsRoot, 'inferencex-api');
+  const recoveryPrefix = `${destination}.inferencex-skills-transaction.recovering-`;
+  mkdirSync(join(skillsRoot, 'neighbor'), { recursive: true });
+  writeFileSync(join(skillsRoot, 'neighbor/SKILL.md'), 'neighbor bytes');
+  const neighborBefore = snapshot(join(skillsRoot, 'neighbor'));
+  const injected = join(cwd, 'rmdir-race-injected');
+  const result = runWithPreload(
+    ['install', '--json'],
+    cwd,
+    `
+      import fs from 'node:fs';
+      import { syncBuiltinESMExports } from 'node:module';
+      const original = fs.rmdirSync;
+      fs.rmdirSync = (path, options) => {
+        if (path.startsWith(${JSON.stringify(recoveryPrefix)})) {
+          original(path, options);
+          fs.writeFileSync(${JSON.stringify(injected)}, 'removed before owner rmdir');
+        }
+        return original(path, options);
+      };
+      syncBuiltinESMExports();
+    `,
+  );
+  assert.equal(existsSync(injected), true);
+  succeeded(result);
+  assert.equal(JSON.parse(result.stdout).outcome, 'installed');
+  assert.deepEqual(
+    readFileSync(join(destination, 'SKILL.md')),
+    readFileSync(join(packageRoot, 'skills/inferencex-api/SKILL.md')),
+  );
+  assert.equal(
+    JSON.parse(readFileSync(join(destination, metadataName))).version,
+    packageInfo.version,
+  );
+  assert.deepEqual(snapshot(join(skillsRoot, 'neighbor')), neighborBefore);
+  assert.deepEqual(readdirSync(skillsRoot).sort(), ['inferencex-api', 'neighbor']);
+  assert.equal(JSON.parse(succeeded(run(['install', '--json'], cwd)).stdout).outcome, 'skipped');
+});
+
+for (const operation of ['readdirSync', 'rmdirSync']) {
+  test(`terminal recovery still fails on ${operation} permission errors`, () => {
+    const cwd = project('terminal permission error-');
+    const destination = join(cwd, '.claude/skills/inferencex-api');
+    const recoveryPrefix = `${destination}.inferencex-skills-transaction.recovering-`;
+    if (operation === 'readdirSync') {
+      succeeded(run(['install'], cwd));
+      mkdirSync(`${recoveryPrefix}${randomUUID()}`);
+    }
+    const result = runWithPreload(
+      ['install', '--json'],
+      cwd,
+      `
+        import fs from 'node:fs';
+        import { syncBuiltinESMExports } from 'node:module';
+        const original = fs.${operation};
+        fs.${operation} = (path, options) => {
+          if (path.startsWith(${JSON.stringify(recoveryPrefix)})) {
+            throw Object.assign(new Error('injected terminal EACCES'), { code: 'EACCES' });
+          }
+          return original(path, options);
+        };
+        syncBuiltinESMExports();
+      `,
+    );
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /injected terminal EACCES/u);
+    assert.deepEqual(
+      readFileSync(join(destination, 'SKILL.md')),
+      readFileSync(join(packageRoot, 'skills/inferencex-api/SKILL.md')),
+    );
+  });
+}
+
 test('a contender waits while the transaction owner writes its initial marker', async () => {
   const cwd = project();
   const destination = join(cwd, '.claude/skills/inferencex-api');

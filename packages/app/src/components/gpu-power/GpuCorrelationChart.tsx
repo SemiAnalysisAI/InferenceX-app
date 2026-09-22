@@ -2,6 +2,7 @@
 
 import * as d3 from 'd3';
 import React, { useMemo } from 'react';
+import { buildCorrelationData } from './chart-data';
 
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
 import { useLocale } from '@/lib/use-locale';
@@ -65,10 +66,7 @@ const GpuCorrelationChart = React.memo(
     const yConfig = ALL_METRIC_OPTIONS.find((m) => m.key === yMetric)!;
 
     const points = useMemo(
-      () =>
-        data
-          .filter((r) => visibleGpus.has(r.index))
-          .map((r) => ({ x: r[xMetric] ?? 0, y: r[yMetric] ?? 0, gpuIndex: r.index, raw: r })),
+      () => buildCorrelationData(data, visibleGpus, xMetric, yMetric),
       [data, visibleGpus, xMetric, yMetric],
     );
 
