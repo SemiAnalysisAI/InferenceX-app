@@ -30,6 +30,7 @@ import {
   useGlobalFilterWorkflow,
 } from '@/components/GlobalFilterContext';
 import { useUnofficialRun } from '@/components/unofficial-run-provider';
+import { useFeatureGate } from '@/lib/use-feature-gate';
 import type {
   InferenceActionsContextType,
   InferenceData,
@@ -94,6 +95,7 @@ import {
   comparisonDefaultGroup,
   comparisonExclusionPolicy,
   comparisonExclusion as resolveComparisonExclusion,
+  isEngineGuardLifted,
 } from './utils/comparison-exclusion';
 import { resolveLabelState, serializeLabelState } from './utils/label-defaults';
 import { bestSeriesPerSku } from './utils/best-series-per-sku';
@@ -292,6 +294,10 @@ export function InferenceProvider({
   } = useGlobalFilterAvailability();
   const { availableRuns, workflowError } = useGlobalFilterWorkflow();
   const { isUnofficialRun } = useUnofficialRun();
+  // ↑↑↓↓ insiders' gate: when unlocked, the cross-engine comparability guard is
+  // lifted so vLLM and SGLang configs can share one graph while tuning configs.
+  const featureGateUnlocked = useFeatureGate();
+  const engineGuardLifted = isEngineGuardLifted(isUnofficialRun, featureGateUnlocked);
 
   const { getUrlParam, setUrlParams } = useUrlState();
   const [hasExplicitRunSelection, setHasExplicitRunSelection] = useState(() =>
@@ -322,14 +328,14 @@ export function InferenceProvider({
       resolveComparisonExclusion(
         selectedModel,
         effectiveSequence,
-        isUnofficialRun,
+        engineGuardLifted,
         overviewHistoryPair !== undefined,
       ),
-    [selectedModel, effectiveSequence, isUnofficialRun, overviewHistoryPair],
+    [selectedModel, effectiveSequence, engineGuardLifted, overviewHistoryPair],
   );
   const defaultExclusionGroup = useMemo(
-    () => comparisonDefaultGroup(effectiveSequence, isUnofficialRun),
-    [effectiveSequence, isUnofficialRun],
+    () => comparisonDefaultGroup(effectiveSequence, engineGuardLifted),
+    [effectiveSequence, engineGuardLifted],
   );
   const exclusionPolicy: ExclusionConflictPolicy = comparisonExclusionPolicy(effectiveSequence);
 
@@ -353,8 +359,8 @@ export function InferenceProvider({
   const [engineConflict, setEngineConflict] = useState<EngineComparisonConflictDetail | null>(null);
   const dismissEngineConflict = useCallback(() => setEngineConflict(null), []);
   useEffect(() => {
-    if (isUnofficialRun) setEngineConflict(null);
-  }, [isUnofficialRun]);
+    if (engineGuardLifted) setEngineConflict(null);
+  }, [engineGuardLifted]);
 
   // ── Inference-specific filter state ─────────────────────────────────────────
   // Defer URL restoration until after mount so the first client render matches SSR.
