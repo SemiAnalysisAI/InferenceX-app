@@ -40,6 +40,20 @@ paths, including a missing or damaged entry.
 Replace the package name and version with the absolute path to the supplied `.tgz`
 and add `--offline`. Use that same archive for installation, status checks and upgrades.
 
+If no archive was supplied (for example when reviewing a pull request), build it
+from the checkout with Node 24 or later; `npm pack` refreshes the integrity
+manifests and prints the archive file name:
+
+```sh
+(cd path/to/InferenceX-app/packages/skills && npm pack)
+# semianalysisai-inferencex-skills-1.1.0.tgz
+
+# then, from your project directory:
+npm exec --yes --offline \
+  --package /abs/path/to/InferenceX-app/packages/skills/semianalysisai-inferencex-skills-1.1.0.tgz -- \
+  inferencex-skills install --target claude
+```
+
 </details>
 
 ## Usage
@@ -100,7 +114,8 @@ The package queries existing observations; it does not launch benchmarks.
 导出结果与原始响应，并离线核验已保存的证据。
 
 需要 Node.js 24 或更高版本。上方命令指定 1.1.0；发布前请将包名和版本替换为候选 `.tgz` 的绝对路径，并加上 `--offline`。
-安装、状态检查和升级使用同一份产物。
+安装、状态检查和升级使用同一份产物。若没有现成的候选产物（例如审阅 PR 时），
+在 `packages/skills` 目录执行 `npm pack` 即可生成，随后用它的绝对路径安装。
 
 默认只安装到当前项目；加上 `--scope user` 后，本机所有项目均可使用：
 Codex 安装到 `~/.agents/skills/`，Claude Code 安装到 `~/.claude/skills/`。

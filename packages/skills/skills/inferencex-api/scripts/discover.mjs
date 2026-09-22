@@ -241,23 +241,101 @@ function document(options, scope, allItems, sources, limitations = []) {
   };
 }
 
-async function availability(options, get) {
+function modelRegistryEntry(entry) {
+  return (
+    object(entry) &&
+    typeof entry.name === 'string' &&
+    entry.name.length > 0 &&
+    Array.isArray(entry.dbKeys) &&
+    entry.dbKeys.every((key) => typeof key === 'string' && key.length > 0)
+  );
+}
+
+// The dashboard options view is the public registry that maps display model
+// selectors (OpenAPI `model` enum) to the DB model keys used by availability and
+// benchmark rows. It is consulted only when the requested selector is not
+// already in the form the target endpoint accepts.
+async function modelRegistry(get) {
+  const url = `${API_ORIGIN}/api/v1/views/options`;
+  const response = await get({ operation: 'options', url, allowedStatuses: [200] });
+  const entries = response.body?.models;
+  if (!Array.isArray(entries) || entries.some((entry) => !modelRegistryEntry(entry))) {
+    throw responseError('Unexpected options response shape.');
+  }
+  return {
+    entries,
+    source: responseSource(response, 'options', url, {
+      contract: 'GET /api/v1/views/options models[].name and models[].dbKeys',
+    }),
+  };
+}
+
+function selectorForKey(entries, key) {
+  const matches = [...new Set(entries.filter((entry) => entry.dbKeys.includes(key)))];
+  return matches.length === 1 ? matches[0].name : null;
+}
+
+function keysForSelector(entries, selector) {
+  return [...new Set(entries.filter((entry) => entry.name === selector).flatMap((entry) => entry.dbKeys))]
+    .toSorted(compare);
+}
+
+async function availability(options, get, signal) {
   const url = `${API_ORIGIN}/api/v1/availability`;
   const response = await get({ operation: 'availability', url, allowedStatuses: [200] });
   const rows = validateRows(response.body, availabilityRow, 'availability');
-  const allItems =
-    options.resource === 'models'
-      ? [...new Set(rows.map((row) => row.model))]
-          .toSorted(compare)
-          .map((raw_model) => ({ raw_model }))
-      : [...new Set(rows.filter((row) => row.model === options.model).map((row) => row.date))]
-          .toSorted(compare)
-          .map((value) => ({ date: value }));
+  if (options.resource === 'models') {
+    const allItems = [...new Set(rows.map((row) => row.model))]
+      .toSorted(compare)
+      .map((raw_model) => ({ raw_model }));
+    return {
+      ...page(options, allItems),
+      scope: { raw_model: null },
+      sources: [responseSource(response, 'availability', url, { raw_model: null })],
+    };
+  }
+
+  // `dates` accepts the DB model key that availability rows carry. When the
+  // requested value matches no row, resolve it as a display selector through the
+  // public options registry instead of returning an empty list.
+  let rawModels = [options.model];
+  let modelSelector = null;
+  const sources = [];
+  const limitations = [];
+  if (!rows.some((row) => row.model === options.model)) {
+    signal?.throwIfAborted();
+    const registry = await modelRegistry(get);
+    sources.push(registry.source);
+    const keys = keysForSelector(registry.entries, options.model);
+    if (keys.length > 0) {
+      rawModels = keys;
+      modelSelector = options.model;
+    } else {
+      limitations.push(
+        `${options.model} matches no availability DB model key and is not a display selector in the options registry.`,
+      );
+    }
+  }
+  const scope = {
+    requested_model: options.model,
+    raw_model: rawModels.length === 1 ? rawModels[0] : null,
+    raw_models: rawModels,
+    model_selector: modelSelector,
+  };
+  const allItems = [
+    ...new Set(rows.filter((row) => rawModels.includes(row.model)).map((row) => row.date)),
+  ]
+    .toSorted(compare)
+    .map((value) => ({ date: value }));
+  const projected = page(options, allItems);
   return {
-    ...page(options, allItems),
-    source: responseSource(response, 'availability', url, {
-      raw_model: options.resource === 'dates' ? options.model : null,
-    }),
+    ...projected,
+    coverage: {
+      ...projected.coverage,
+      limitations: [...projected.coverage.limitations, ...limitations],
+    },
+    scope,
+    sources: [responseSource(response, 'availability', url, scope), ...sources],
   };
 }
 
@@ -367,14 +445,34 @@ async function configs(options, get, signal) {
     allowedStatuses: [200],
   });
   const selectors = modelSelectors(openapiResponse.body);
-  const openapiSource = responseSource(openapiResponse, 'openapi', openapiUrl, {
-    contract: 'GET /api/v1/benchmarks model query parameter',
-  });
+  const sources = [
+    responseSource(openapiResponse, 'openapi', openapiUrl, {
+      contract: 'GET /api/v1/benchmarks model query parameter',
+    }),
+  ];
   signal?.throwIfAborted();
-  if (!selectors.includes(options.model)) {
+
+  // `/api/v1/benchmarks` accepts display selectors only. `discover models` lists
+  // DB model keys, so resolve a key to its display selector through the public
+  // options registry before giving up.
+  let modelSelector = selectors.includes(options.model) ? options.model : null;
+  let modelResolution = modelSelector === null ? null : 'openapi_selector';
+  if (modelSelector === null) {
+    const registry = await modelRegistry(get);
+    sources.push(registry.source);
+    signal?.throwIfAborted();
+    const resolved = selectorForKey(registry.entries, options.model);
+    if (resolved !== null && selectors.includes(resolved)) {
+      modelSelector = resolved;
+      modelResolution = 'db_model_key';
+    }
+  }
+
+  if (modelSelector === null) {
     const scope = {
       requested_model: options.model,
       model_selector: null,
+      model_resolution: null,
       requested_date: options.date,
       date_selection: options.date === null ? 'latest' : 'as-of',
     };
@@ -383,7 +481,7 @@ async function configs(options, get, signal) {
       kind: options.resource,
       scope,
       items: [],
-      sources: [openapiSource],
+      sources,
       coverage: {
         complete_for_scope: false,
         returned_items: 0,
@@ -391,20 +489,21 @@ async function configs(options, get, signal) {
         limit: options.limit,
         offset: options.offset,
         limitations: [
-          `${options.model} cannot be resolved to a public model selector from the consumed OpenAPI contract.`,
+          `${options.model} cannot be resolved to a public model selector from the consumed OpenAPI contract or the options registry DB model keys.`,
         ],
       },
     };
   }
 
   const url = new URL('/api/v1/benchmarks', API_ORIGIN);
-  url.searchParams.set('model', options.model);
+  url.searchParams.set('model', modelSelector);
   if (options.date !== null) url.searchParams.set('date', options.date);
   const response = await get({ operation: 'benchmarks', url: url.href, allowedStatuses: [200] });
   const rows = validateRows(response.body, benchmarkRow, 'benchmarks');
   const scope = {
     requested_model: options.model,
-    model_selector: options.model,
+    model_selector: modelSelector,
+    model_resolution: modelResolution,
     requested_date: options.date,
     date_selection: options.date === null ? 'latest' : 'as-of',
   };
@@ -412,7 +511,7 @@ async function configs(options, get, signal) {
     options,
     scope,
     rows.map(configItem).toSorted(compareConfigs),
-    [openapiSource, responseSource(response, 'benchmarks', url.href, scope)],
+    [...sources, responseSource(response, 'benchmarks', url.href, scope)],
     ['Trace availability is unknown because discovery does not request stored traces.'],
   );
 }
@@ -463,16 +562,14 @@ export async function discover(options, { get, signal } = {}) {
     throw new TypeError('discover requires get()');
   }
   if (['models', 'dates'].includes(normalized.resource)) {
-    const projected = await availability(normalized, get);
+    const projected = await availability(normalized, get, signal);
     signal?.throwIfAborted();
     return {
       schema_version: 1,
       kind: normalized.resource,
-      scope: {
-        raw_model: normalized.resource === 'dates' ? normalized.model : null,
-      },
+      scope: projected.scope,
       items: projected.items,
-      sources: [projected.source],
+      sources: projected.sources,
       coverage: projected.coverage,
     };
   }

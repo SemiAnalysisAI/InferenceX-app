@@ -75,6 +75,16 @@ uses `~/.claude/skills` for Claude Code and `~/.agents/skills` for Codex/agents.
 Explicit `--dir` cannot be combined with `--scope`. A project installation does not
 replace a personal installation; check the same scope used for installation.
 
+`discover configs` and `discover dates` accept the DB model key that
+`discover models` lists (for example `dsv4`) in addition to the OpenAPI display
+selector (for example `DeepSeek-V4-Pro`). A key is resolved through the public
+`/api/v1/views/options` registry only when the target endpoint does not accept the
+requested form; the extra request is recorded in `sources`. The discovery `scope`
+gains the optional fields `model_resolution` (`openapi_selector` or `db_model_key`)
+for configs and `requested_model`, `raw_models`, and `model_selector` for dates.
+An ambiguous or unknown key is still reported as unresolved without a benchmark
+request. Existing display-selector calls make the same requests as before.
+
 ### 中文说明
 
 1.1 新增 `inferencex/` 入口：Claude Code 使用 `/inferencex`，Codex 使用
@@ -92,3 +102,11 @@ CLI 路径、参数、输出和证据契约均未改变。
 用户级安装时，Claude Code 使用 `~/.claude/skills`，Codex/agents 使用 `~/.agents/skills`。
 显式指定 `--dir` 时不能同时使用 `--scope`。
 项目级与用户级安装彼此独立，检查状态时应使用安装时选择的 scope。
+
+`discover configs` 和 `discover dates` 的 `--model` 除 OpenAPI 展示名称（如
+`DeepSeek-V4-Pro`）外，也接受 `discover models` 列出的数据库模型键（如 `dsv4`）。
+仅当目标接口不接受所给形式时，才通过公开的 `/api/v1/views/options` 注册表解析，
+额外请求记录在 `sources` 中。discovery 的 `scope` 新增可选字段：configs 的
+`model_resolution`（`openapi_selector` 或 `db_model_key`），dates 的
+`requested_model`、`raw_models` 和 `model_selector`。无法解析或有歧义的键仍报告为
+未解析，不会发起 benchmarks 请求；原有展示名称调用的请求序列不变。
