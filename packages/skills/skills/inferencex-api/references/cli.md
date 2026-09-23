@@ -160,3 +160,22 @@ The direct helpers and `verify-export.mjs` are not query interfaces in 1.0.0.
 Exports from 0.11 and earlier require their pinned older package; they are not contract 1
 bundles. Installer upgrades from those versions remain supported and do not make old query
 commands part of the 1.0.0 interface.
+
+## Request usage
+
+Online CLI requests identify themselves as `inferencex-cli/<package-version>`;
+the packaged raw API recipes use `inferencex-skill/<package-version>`. A skill
+calling the CLI therefore counts as CLI traffic. The shared helper sends these
+headers only to the first-party HTTPS origin. It never contacts PostHog directly.
+
+The API records aggregate received request counts, including retries, with only
+the transport, version, route template, server environment and traffic class.
+This does not measure people, installs, completed analyses or offline commands.
+No prompts, spreadsheet contents, query strings, concrete IDs or persistent
+user/install identifiers are included in the analytics event.
+
+Set `INFERENCEX_TELEMETRY=0` or `DO_NOT_TRACK=1` to omit both attribution headers,
+including retries and raw recipes. Ordinary API access logs are unaffected.
+Use `INFERENCEX_TRAFFIC=validation` for demos and acceptance checks. CI runs are
+classified as `ci` automatically when `CI` is nonempty (except `0` or `false`).
+The production usage report excludes CI, validation and preview traffic.

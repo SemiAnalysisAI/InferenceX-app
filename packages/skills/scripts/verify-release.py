@@ -244,6 +244,8 @@ def install_target(clean_root, target, node, npm, archive, version, public, repo
         for name in ['user.npmrc', 'global.npmrc']:
             (config / name).write_text('')
         env = {'PATH': str(Path(node).parent) + os.pathsep + os.defpath, 'LANG': 'en_US.UTF-8',
+               'INFERENCEX_TRAFFIC': 'validation',
+               **{key: os.environ[key] for key in ['INFERENCEX_TELEMETRY', 'DO_NOT_TRACK'] if key in os.environ},
                'npm_config_registry': REGISTRY, 'npm_config_userconfig': str(config / 'user.npmrc'),
                'npm_config_globalconfig': str(config / 'global.npmrc'), 'npm_config_cache': str(config / 'cache'),
                'npm_config_update_notifier': 'false', 'npm_config_audit': 'false', 'npm_config_fund': 'false',
