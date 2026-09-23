@@ -264,6 +264,7 @@ const GPUGraph = React.memo(
       setQuickFilterDeployment,
       setQuickFilterSpec,
       setQuickFilterPower,
+      setQuickFilterTopologies,
     } = useInferenceActions();
     const locale = useLocale();
     const featureGateUnlocked = useFeatureGate();
@@ -294,6 +295,7 @@ const GPUGraph = React.memo(
       (lockedFrameworks ? 0 : quickFilters.frameworks.length) +
       quickFilters.deployment.length +
       quickFilters.power.length +
+      (quickFilters.topologies?.length ?? 0) +
       (selectedSequence === Sequence.AgenticTraces ? 0 : quickFilters.spec.length);
     const clearQuickFilters = useCallback(() => {
       setQuickFilterVendors([]);
@@ -301,12 +303,14 @@ const GPUGraph = React.memo(
       setQuickFilterDeployment([]);
       setQuickFilterSpec([]);
       setQuickFilterPower([]);
+      setQuickFilterTopologies([]);
     }, [
       setQuickFilterVendors,
       setQuickFilterFrameworks,
       setQuickFilterDeployment,
       setQuickFilterSpec,
       setQuickFilterPower,
+      setQuickFilterTopologies,
     ]);
 
     // Shared date+GPU pairs. `dates` holds comparison-series entries (plain dates

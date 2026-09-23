@@ -40,6 +40,7 @@ import { SegmentedToggle } from '@/components/ui/segmented-toggle';
 import { useUnofficialRun } from '@/components/unofficial-run-provider';
 import { matchesQuickFilters } from '@/components/inference/utils/quickFilters';
 import { useThemeColors } from '@/hooks/useThemeColors';
+import { useUrlState } from '@/hooks/useUrlState';
 import { track } from '@/lib/analytics';
 import { computeToggle } from '@/lib/toggle-set';
 import { getModelSortIndex } from '@/lib/constants';
@@ -63,6 +64,9 @@ import {
   allGpuPool,
   consumePowerTraceFocus,
   groupPoolsBySize,
+  hasPowerTimelineWindow,
+  parsePowerTimelineParams,
+  powerTimelineSampleX,
   joinPowerTimeline,
   planPowerTimelineRequests,
   prioritizeRun,
@@ -78,6 +82,8 @@ import {
   type PoolSizeGroup,
   type PowerPool,
   type PowerPoolRole,
+  type PowerTimelineAxis,
+  type PowerTimelineLines,
   type PowerTimelineRequest,
   type PowerTimelineTrace,
   type WindowPhase,
@@ -98,7 +104,18 @@ const STRINGS = {
   en: {
     timeAxis: 'Time axis',
     wall: 'Wall clock (UTC)',
-    elapsed: 'Since start',
+    elapsed: 'Since telemetry start',
+    serving: 'Since serving start',
+    xServing: 'Time since serving-window start (s)',
+    windowOnly: 'Validated window only',
+    windowOnlyHelp:
+      'Show only retained samples inside each recorded validated serving window. Traces without valid window bounds are omitted.',
+    missingWindow: (count: number) =>
+      `${count} trace${count === 1 ? '' : 's'} omitted: no valid serving-window bounds.`,
+    missingFocus:
+      'The selected trace is unavailable for these filters or has no retained telemetry.',
+    methodWindow:
+      'One-second means of GPU-board power inside each recorded validated serving window; window boundaries are not interpolated. Dashed lines: rated TDP from the hardware registry.',
     xWall: 'Time (UTC)',
     xElapsed: 'Time since telemetry start (m:ss)',
     perGpu: 'One line per GPU',
@@ -168,7 +185,15 @@ const STRINGS = {
   zh: {
     timeAxis: '时间轴',
     wall: '实际时刻（UTC）',
-    elapsed: '相对起点',
+    elapsed: '距遥测起点',
+    serving: '距服务窗口起点',
+    xServing: '距服务窗口开始的时间（秒）',
+    windowOnly: '仅显示有效测量窗口',
+    windowOnlyHelp: '仅显示已记录的有效服务窗口内保留的采样点；缺少有效窗口边界的曲线不绘制。',
+    missingWindow: (count: number) => `${count} 条曲线缺少有效服务窗口边界，未绘制。`,
+    missingFocus: '所选曲线不符合当前筛选条件，或没有保留的遥测数据。',
+    methodWindow:
+      '显示各有效服务窗口内的 GPU 板卡功耗一秒平均值，窗口边界不作插值。虚线为硬件注册表中的额定 TDP。',
     xWall: '时间（UTC）',
     xElapsed: '距遥测开始的时间（分:秒）',
     perGpu: '每个 GPU 一条线',
@@ -232,8 +257,8 @@ const STRINGS = {
   },
 } as const;
 
-type XMode = 'wall' | 'elapsed';
-type LineMode = 'mean' | 'gpu' | 'pool';
+type XMode = PowerTimelineAxis;
+type LineMode = PowerTimelineLines;
 
 interface TimelineSample {
   trace: PowerTimelineTrace;
@@ -394,10 +419,9 @@ function tracePaths(
   overlayIndex: number | null,
   xMode: XMode,
   lineMode: LineMode,
+  windowOnly: boolean,
 ): TracePath[] {
   const { series } = trace;
-  const xOf = (column: number) =>
-    xMode === 'wall' ? bucketTimeMs(series, column) : series.t[column] - series.t[0];
   const rows = traceRows(series, lineMode);
   const faint = lineMode === 'gpu' ? 0.22 : 0.32;
   const strong = lineMode === 'gpu' ? 0.85 : 1;
@@ -407,22 +431,25 @@ function tracePaths(
     const full: TracePoint[] = [];
     const window: TracePoint[] = [];
     row.values.forEach((value, column) => {
-      const point = { x: xOf(column), y: value };
+      const x = powerTimelineSampleX(trace, column, xMode, windowOnly);
+      if (x === null) return;
+      const point = { x, y: value };
       full.push(point);
       if (windowPhase(trace, bucketTimeMs(series, column)) === 'window') window.push(point);
     });
-    paths.push({
-      id: `${trace.key}:${row.id}:full`,
-      traceKey: trace.key,
-      hwKey: trace.point.hwKey,
-      overlayIndex,
-      color,
-      segment: 'full',
-      width: widths[0],
-      opacity: faint,
-      points: full,
-      pool: row.pool,
-    });
+    if (!windowOnly && full.length > 1)
+      paths.push({
+        id: `${trace.key}:${row.id}:full`,
+        traceKey: trace.key,
+        hwKey: trace.point.hwKey,
+        overlayIndex,
+        color,
+        segment: 'full',
+        width: widths[0],
+        opacity: faint,
+        points: full,
+        pool: row.pool,
+      });
     if (window.length > 1) {
       paths.push({
         id: `${trace.key}:${row.id}:window`,
@@ -451,14 +478,15 @@ function traceSamples(
   overlayIndex: number | null,
   xMode: XMode,
   lineMode: LineMode,
+  windowOnly: boolean,
 ): TimelineSample[] {
   const { series } = trace;
   if (lineMode !== 'pool') {
     const rows = series.power.map((_, row) => row);
-    return sampleRows(trace, color, overlayIndex, xMode, rows, undefined);
+    return sampleRows(trace, color, overlayIndex, xMode, windowOnly, rows, undefined);
   }
   return drawnPools(series).flatMap((pool) =>
-    sampleRows(trace, color, overlayIndex, xMode, pool.rows, {
+    sampleRows(trace, color, overlayIndex, xMode, windowOnly, pool.rows, {
       role: pool.role,
       gpuCount: pool.rows.length,
     }),
@@ -470,12 +498,15 @@ function sampleRows(
   color: string,
   overlayIndex: number | null,
   xMode: XMode,
+  windowOnly: boolean,
   rows: readonly number[],
   pool: TimelineSample['pool'],
 ): TimelineSample[] {
   const { series } = trace;
   const samples: TimelineSample[] = [];
   for (let column = 0; column < series.t.length; column++) {
+    const x = powerTimelineSampleX(trace, column, xMode, windowOnly);
+    if (x === null) continue;
     let sum = 0;
     let count = 0;
     let min = Number.POSITIVE_INFINITY;
@@ -497,7 +528,7 @@ function sampleRows(
       overlayIndex,
       column,
       timeMs,
-      x: xMode === 'wall' ? timeMs : series.t[column] - series.t[0],
+      x,
       y: pool ? sum : sum / count,
       min,
       max,
@@ -686,12 +717,23 @@ export default function PowerTimeline({
     setUnifiedOverlaySelection,
   } = useUnofficialRun();
 
-  const [xModeChoice, setXModeChoice] = useState<XMode | null>(null);
-  const [lineMode, setLineMode] = useState<LineMode>('mean');
-  const [showUtility, setShowUtility] = useState(false);
+  const { getUrlParam, setUrlParams } = useUrlState();
+  const [initialView] = useState(() =>
+    parsePowerTimelineParams({
+      i_ptaxis: getUrlParam('i_ptaxis'),
+      i_ptlines: getUrlParam('i_ptlines'),
+      i_ptwindow: getUrlParam('i_ptwindow'),
+      i_ptfocus: getUrlParam('i_ptfocus'),
+      i_ptutility: getUrlParam('i_ptutility'),
+    }),
+  );
+  const [xModeChoice, setXModeChoice] = useState<XMode | null>(initialView.axis);
+  const [lineMode, setLineMode] = useState<LineMode>(initialView.lines);
+  const [windowOnly, setWindowOnly] = useState(initialView.windowOnly);
+  const [showUtility, setShowUtility] = useState(initialView.utility);
   const [highlight, setHighlight] = useState<string | null>(null);
   /** Trace a "View power trace" deep link asked for, once the join has produced it. */
-  const [focusKey, setFocusKey] = useState<string | null>(null);
+  const [focusKey, setFocusKey] = useState<string | null>(initialView.focus);
   /** The deep-link request, read once on mount; `undefined` until read, `null` once honoured. */
   const requestedFocusRef = useRef<string | null | undefined>(undefined);
 
@@ -740,7 +782,7 @@ export default function PowerTimeline({
   if (requestedFocusRef.current === undefined) {
     requestedFocusRef.current = consumePowerTraceFocus();
   }
-  const focusRunRef = useRef(traceKeyRunId(requestedFocusRef.current));
+  const focusRun = traceKeyRunId(requestedFocusRef.current ?? focusKey);
   // Overlay runs were requested explicitly (`?unofficialrun=`), so they take
   // the cap's slots before official runs; the deep-linked run still goes first.
   const overlayRunIds = useMemo(
@@ -754,11 +796,11 @@ export default function PowerTimeline({
   );
   const fetchedRequests = useMemo(
     () =>
-      prioritizeRun(prioritizeRuns(requests, overlayRunIds), focusRunRef.current).slice(
+      prioritizeRun(prioritizeRuns(requests, overlayRunIds), focusRun).slice(
         0,
         POWER_TIMELINE_MAX_RUNS,
       ),
-    [requests, overlayRunIds],
+    [requests, overlayRunIds, focusRun],
   );
   const droppedRuns = requests.length - fetchedRequests.length;
   const queries = useQueries({
@@ -878,22 +920,33 @@ export default function PowerTimeline({
   );
   const xMode: XMode = xModeChoice ?? (visibleRunCount <= 1 ? 'wall' : 'elapsed');
 
-  // The pools switch is offered only where a visible trace carries worker roles;
-  // pool mode left without one would draw deployment totals with no way back.
+  // Retain a shared pool choice while data loads; keep its switch available even
+  // if the current selection has no role-tagged trace, so it can be turned off.
   const hasPools = useMemo(
     () => visibleTraces.some((trace) => tracePools(trace.series).length > 0),
     [visibleTraces],
   );
   useEffect(() => {
-    if (lineMode === 'pool' && !hasPools && visibleTraces.length > 0) setLineMode('mean');
-  }, [lineMode, hasPools, visibleTraces.length]);
+    setUrlParams({
+      i_ptaxis: xModeChoice ?? '',
+      i_ptlines: lineMode === 'mean' ? '' : lineMode,
+      i_ptwindow: windowOnly ? 'window' : '',
+      i_ptfocus: focusKey ?? '',
+      i_ptutility: showUtility ? '1' : '',
+    });
+  }, [xModeChoice, lineMode, windowOnly, focusKey, showUtility, setUrlParams]);
+
+  const missingWindows =
+    windowOnly || xMode === 'serving'
+      ? visibleTraces.filter((trace) => !hasPowerTimelineWindow(trace)).length
+      : 0;
 
   const model = useMemo<DrawModel>(() => {
     const paths: TracePath[] = [];
     const labels: TraceLabel[] = [];
     for (const trace of visibleTraces) {
       const { color, overlayIndex } = colorForTrace(trace);
-      const tracePathSet = tracePaths(trace, color, overlayIndex, xMode, lineMode);
+      const tracePathSet = tracePaths(trace, color, overlayIndex, xMode, lineMode, windowOnly);
       paths.push(...tracePathSet);
       if (visibleTraces.length > MAX_LABELED_TRACES) continue;
       // One end label per trace; per pool in pool mode, so the role reads off the line.
@@ -925,15 +978,15 @@ export default function PowerTimeline({
       }
     }
     return { paths, labels };
-  }, [visibleTraces, colorForTrace, xMode, lineMode, t]);
+  }, [visibleTraces, colorForTrace, xMode, lineMode, windowOnly, t]);
 
   const samples = useMemo(
     () =>
       visibleTraces.flatMap((trace) => {
         const { color, overlayIndex } = colorForTrace(trace);
-        return traceSamples(trace, color, overlayIndex, xMode, lineMode);
+        return traceSamples(trace, color, overlayIndex, xMode, lineMode, windowOnly);
       }),
-    [visibleTraces, colorForTrace, xMode, lineMode],
+    [visibleTraces, colorForTrace, xMode, lineMode, windowOnly],
   );
 
   // Rated references: per hardware in mean / per-GPU modes; per (hardware,
@@ -995,7 +1048,6 @@ export default function PowerTimeline({
     let min = Number.POSITIVE_INFINITY;
     let max = Number.NEGATIVE_INFINITY;
     for (const path of model.paths) {
-      if (path.segment !== 'full') continue;
       for (const point of path.points) {
         if (point.x < min) min = point.x;
         if (point.x > max) max = point.x;
@@ -1004,8 +1056,9 @@ export default function PowerTimeline({
     if (!Number.isFinite(min) || !Number.isFinite(max)) {
       return xMode === 'wall' ? [Date.UTC(2026, 0, 1), Date.UTC(2026, 0, 1, 0, 10)] : [0, 600];
     }
+    if (xMode === 'serving' && windowOnly) min = Math.min(0, min);
     return min === max ? [min, max + (xMode === 'wall' ? 60_000 : 60)] : [min, max];
-  }, [model.paths, xMode]);
+  }, [model.paths, xMode, windowOnly]);
   const yDomain = useMemo<[number, number]>(() => {
     let max = 0;
     for (const path of model.paths) {
@@ -1017,6 +1070,7 @@ export default function PowerTimeline({
 
   const xTickFormat = useMemo(() => {
     if (xMode === 'elapsed') return (value: d3.AxisDomain) => formatElapsed(Number(value));
+    if (xMode === 'serving') return (value: d3.AxisDomain) => d3.format('~g')(Number(value));
     const span = xDomain[1] - xDomain[0];
     const crossesDate = formatUtcDate(new Date(xDomain[0])) !== formatUtcDate(new Date(xDomain[1]));
     const format = d3.utcFormat(
@@ -1146,7 +1200,11 @@ export default function PowerTimeline({
       const elapsed = formatElapsed((sample.timeMs - trace.series.startMs) / 1000);
       const clock = `${formatUtcClock(new Date(sample.timeMs))} UTC`;
       const time =
-        xMode === 'wall' ? `${clock} · +${elapsed} ${t.sinceStart}` : `+${elapsed} · ${clock}`;
+        xMode === 'serving'
+          ? `${sample.x.toFixed(1)} s · ${t.serving} · ${clock}`
+          : xMode === 'wall'
+            ? `${clock} · +${elapsed} ${t.sinceStart}`
+            : `+${elapsed} · ${clock}`;
       const colon = locale === 'zh' ? '：' : ':';
       const validated = point.measuredAvgPower?.y;
       const { pool } = sample;
@@ -1273,7 +1331,7 @@ export default function PowerTimeline({
       infoTooltip: t.perGpuHelp,
     },
   ];
-  if (hasPools) {
+  if (hasPools || lineMode === 'pool') {
     switches.push({
       id: 'power-timeline-pools',
       label: t.pools,
@@ -1282,16 +1340,28 @@ export default function PowerTimeline({
       infoTooltip: t.poolsHelp,
     });
   }
-  switches.push({
-    id: 'power-timeline-utility',
-    label: t.utilityLines,
-    checked: showUtility,
-    onCheckedChange: (checked) => {
-      setShowUtility(checked);
-      track('inference_power_timeline_utility_toggled', { enabled: checked });
+  switches.push(
+    {
+      id: 'power-timeline-window-only',
+      label: t.windowOnly,
+      checked: windowOnly,
+      onCheckedChange: (checked) => {
+        setWindowOnly(checked);
+        track('inference_power_timeline_window_changed', { windowOnly: checked });
+      },
+      infoTooltip: t.windowOnlyHelp,
     },
-    infoTooltip: t.utilityHelp,
-  });
+    {
+      id: 'power-timeline-utility',
+      label: t.utilityLines,
+      checked: showUtility,
+      onCheckedChange: (checked) => {
+        setShowUtility(checked);
+        track('inference_power_timeline_utility_toggled', { enabled: checked });
+      },
+      infoTooltip: t.utilityHelp,
+    },
+  );
 
   const legendElement = (
     <ChartLegend
@@ -1330,6 +1400,7 @@ export default function PowerTimeline({
         options={[
           { value: 'wall', label: t.wall, testId: 'power-timeline-axis-wall' },
           { value: 'elapsed', label: t.elapsed, testId: 'power-timeline-axis-elapsed' },
+          { value: 'serving', label: t.serving, testId: 'power-timeline-axis-serving' },
         ]}
         onValueChange={(mode) => {
           setXModeChoice(mode);
@@ -1343,11 +1414,12 @@ export default function PowerTimeline({
   if (loadingRuns > 0) emptyMessage = t.loading(loadingRuns);
   else if (!hasAnyArtifact) emptyMessage = t.noArtifacts;
   else if (visibleTraces.length === 0) emptyMessage = t.noTraces;
+  else if (missingWindows === visibleTraces.length) emptyMessage = t.missingWindow(missingWindows);
 
   return (
     <div className="relative flex flex-col gap-2" data-testid="power-timeline">
       <D3Chart<TimelineSample>
-        key={`${chartId}-${xMode}-${lineMode}`}
+        key={`${chartId}-${xMode}-${lineMode}-${windowOnly}`}
         chartId={chartId}
         data={samples}
         height={CHART_HEIGHT}
@@ -1363,7 +1435,7 @@ export default function PowerTimeline({
         }
         yScale={{ type: 'linear', domain: yDomain, nice: true }}
         xAxis={{
-          label: xMode === 'wall' ? t.xWall : t.xElapsed,
+          label: xMode === 'wall' ? t.xWall : xMode === 'serving' ? t.xServing : t.xElapsed,
           tickValues: (scale) => {
             const timeScale = scale as
               | d3.ScaleTime<number, number>
@@ -1442,6 +1514,12 @@ export default function PowerTimeline({
             </button>
           </p>
         )}
+        {focusKey && !focusedTrace && loadingRuns === 0 && (
+          <p data-testid="power-timeline-focus-missing">{t.missingFocus}</p>
+        )}
+        {missingWindows > 0 && (
+          <p data-testid="power-timeline-window-missing">{t.missingWindow(missingWindows)}</p>
+        )}
         {errors.map(({ request, error }) => (
           <p key={request.runId} className="text-destructive" role="alert">
             {t.loadError(request.runId, error.message)}
@@ -1473,7 +1551,7 @@ export default function PowerTimeline({
             ))}
           </p>
         )}
-        <p>{t.method}</p>
+        <p>{windowOnly ? t.methodWindow : t.method}</p>
         {hasPools && <p>{t.methodPools}</p>}
       </div>
     </div>

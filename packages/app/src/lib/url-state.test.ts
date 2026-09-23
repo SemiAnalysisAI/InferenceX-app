@@ -26,6 +26,15 @@ describe('PARAM_DEFAULTS', () => {
     vi.unstubAllGlobals();
   });
 
+  it('round-trips mean service statistics while omitting the median default', async () => {
+    setupWindow('?i_mstat=mean');
+    const { readUrlParams, buildShareUrl, writeUrlParams } = await import('@/lib/url-state');
+    expect(readUrlParams().i_mstat).toBe('mean');
+    expect(new URL(buildShareUrl()).searchParams.get('i_mstat')).toBe('mean');
+    writeUrlParams({ i_mstat: 'median' });
+    expect(new URL(buildShareUrl()).searchParams.has('i_mstat')).toBe(false);
+  });
+
   it('has expected default for g_model', async () => {
     const { PARAM_DEFAULTS } = await import('@/lib/url-state');
     expect(PARAM_DEFAULTS.g_model).toBe('DeepSeek-V4-Pro');

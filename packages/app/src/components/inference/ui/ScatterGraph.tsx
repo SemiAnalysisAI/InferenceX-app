@@ -173,6 +173,7 @@ import {
   isRoleLocalMeasuredEnergyConfigKey,
 } from '@/components/inference/metric-registry';
 import { buildLegendPointsRows } from '@/components/inference/utils/legend-points-table';
+import { groupConcurrencySeries } from '@/components/inference/utils/concurrency-series';
 import { resolveScatterXAxisScale } from '@/components/inference/utils/x-axis-scale';
 import { pointLabelText } from './point-label';
 import {
@@ -441,6 +442,8 @@ const pointCountEn = (count: number) => `${count} ${count === 1 ? 'point' : 'poi
 
 const SCATTER_STRINGS = {
   en: {
+    concurrencyCurves:
+      'Dots are observed loads. Straight segments connect only matching topology, recipe and run; repeated loads remain separate markers. Concurrency is not a higher-is-better score.',
     logScale: 'Log Scale',
     optimalOnly: 'Optimal Only',
     paretoFrontier: 'Pareto Frontier',
@@ -479,6 +482,8 @@ const SCATTER_STRINGS = {
     viewWorkflow: 'View workflow run',
   },
   zh: {
+    concurrencyCurves:
+      '点表示实测负载；直线段仅连接相同拓扑、配方和运行的数据，重复负载保留为独立点。并发数不是越高越好的分数。',
     logScale: '对数缩放',
     optimalOnly: '仅最优',
     paretoFrontier: 'Pareto 前沿',
@@ -590,22 +595,27 @@ const ScatterGraph = React.memo(
       setQuickFilterDeployment,
       setQuickFilterSpec,
       setQuickFilterPower,
+      setQuickFilterTopologies,
       setSelectedYAxisMetric,
     } = useInferenceActions();
-    const paretoDirection = chartDefinition[`${selectedYAxisMetric}_roofline`] as
-      | ParetoDirection
-      | undefined;
+    const isConcurrencyAxis = chartDefinition.x_scale_field === 'conc';
+    const paretoDirection = (
+      isConcurrencyAxis ? undefined : chartDefinition[`${selectedYAxisMetric}_roofline`]
+    ) as ParetoDirection | undefined;
     const hideNonOptimal = preferOptimalOnly && Boolean(paretoDirection);
     const isPowerAxis = isPowerCurveMetric(selectedYAxisMetric);
     const isMeasuredPowerAxis = isMeasuredPowerCurveMetric(selectedYAxisMetric);
     // Measured power describes the load sweep. Keep its boundary fixed while
     // Optimal Only changes marker visibility, as on the other scatter charts.
-    const showPowerEnvelope = isPowerAxis && (isMeasuredPowerAxis || !hideNonOptimal);
+    const showPowerEnvelope =
+      !isConcurrencyAxis && isPowerAxis && (isMeasuredPowerAxis || !hideNonOptimal);
     const showAllMeasurements = isMeasuredPowerAxis ? !hideNonOptimal : savedShowAllMeasurements;
-    const supportsGradientLabels = !showPowerEnvelope || isMeasuredPowerAxis;
+    const supportsGradientLabels =
+      !isConcurrencyAxis && (!showPowerEnvelope || isMeasuredPowerAxis);
     const showGradientLabels = preferGradientLabels && supportsGradientLabels;
     const groupDisplayedPoints = useCallback(
       (points: InferenceData[]) => {
+        if (isConcurrencyAxis) return groupConcurrencySeries(points);
         const groups = groupPointsByDate(points);
         if (showPowerEnvelope) {
           for (const [date, samples] of groups) {
@@ -621,7 +631,7 @@ const ScatterGraph = React.memo(
         }
         return groups;
       },
-      [showPowerEnvelope, chartDefinition.chartType, selectedYAxisMetric],
+      [isConcurrencyAxis, showPowerEnvelope, chartDefinition.chartType, selectedYAxisMetric],
     );
     const locale = useLocale();
     const featureGateUnlocked = useFeatureGate();
@@ -908,7 +918,7 @@ const ScatterGraph = React.memo(
       return result;
     }, [groupedData, selectedYAxisMetric, chartDefinition]);
 
-    const displayedRooflines = showPowerEnvelope ? groupedData : rooflines;
+    const displayedRooflines = isConcurrencyAxis || showPowerEnvelope ? groupedData : rooflines;
 
     const powerEnvelopePointKeys = useMemo(() => {
       const keys = new Set<string>();
@@ -957,8 +967,13 @@ const ScatterGraph = React.memo(
       return false;
     }, [data]);
     const buildPointId = useCallback(
-      (point: InferenceData) => scatterPointJoinId(point, distinguishPointDates),
-      [distinguishPointDates],
+      (point: InferenceData) => {
+        const configId = scatterPointJoinId(point, distinguishPointDates);
+        return isConcurrencyAxis
+          ? `${configId}|observation-${point.id ?? data.indexOf(point)}|run-${point.run_url ?? ''}`
+          : configId;
+      },
+      [isConcurrencyAxis, data, distinguishPointDates],
     );
 
     // filteredData: visible points only (for scale domain calculation)
@@ -1206,7 +1221,7 @@ const ScatterGraph = React.memo(
       [overlayGroups, paretoDirection],
     );
     const displayedOverlayRooflines = useMemo(() => {
-      if (!showPowerEnvelope) return overlayRooflines;
+      if (!showPowerEnvelope && !isConcurrencyAxis) return overlayRooflines;
       return Object.fromEntries(
         Object.entries(overlayGroups).flatMap(([key, group]) =>
           [...groupDisplayedPoints(group.points)].map(([segment, points]) => [
@@ -1215,7 +1230,13 @@ const ScatterGraph = React.memo(
           ]),
         ),
       );
-    }, [showPowerEnvelope, overlayRooflines, overlayGroups, groupDisplayedPoints]);
+    }, [
+      isConcurrencyAxis,
+      showPowerEnvelope,
+      overlayRooflines,
+      overlayGroups,
+      groupDisplayedPoints,
+    ]);
 
     // Overlay counterpart of `optimalPointKeys`: the points on any overlay
     // run's drawn roofline (already e2e-restricted for agentic non-e2e modes).
@@ -1349,6 +1370,7 @@ const ScatterGraph = React.memo(
       (lockedFrameworks ? 0 : quickFilters.frameworks.length) +
       quickFilters.deployment.length +
       quickFilters.power.length +
+      (quickFilters.topologies?.length ?? 0) +
       (selectedSequence === Sequence.AgenticTraces ? 0 : quickFilters.spec.length);
     const clearQuickFilters = useCallback(() => {
       setQuickFilterVendors([]);
@@ -1356,12 +1378,14 @@ const ScatterGraph = React.memo(
       setQuickFilterDeployment([]);
       if (selectedSequence !== Sequence.AgenticTraces) setQuickFilterSpec([]);
       setQuickFilterPower([]);
+      setQuickFilterTopologies([]);
     }, [
       setQuickFilterVendors,
       setQuickFilterFrameworks,
       setQuickFilterDeployment,
       setQuickFilterSpec,
       setQuickFilterPower,
+      setQuickFilterTopologies,
       selectedSequence,
     ]);
 
@@ -1552,7 +1576,11 @@ const ScatterGraph = React.memo(
     const metricIdentity = useMemo(
       () =>
         [
-          showPowerEnvelope ? 'power-envelopes' : 'pareto-curves',
+          isConcurrencyAxis
+            ? 'observed-load'
+            : showPowerEnvelope
+              ? 'power-envelopes'
+              : 'pareto-curves',
           useAdvancedLabels ? 'advanced-labels' : 'basic-labels',
           showConcurrencyLabels ? 'conc-labels' : 'no-conc-labels',
           selectedYAxisMetric,
@@ -1570,6 +1598,7 @@ const ScatterGraph = React.memo(
           .toSorted()
           .join('|'),
       [
+        isConcurrencyAxis,
         showPowerEnvelope,
         selectedYAxisMetric,
         useAdvancedLabels,
@@ -1957,7 +1986,8 @@ const ScatterGraph = React.memo(
         persistedRulers !== undefined &&
         (persistedRulers.pending !== null || persistedRulers.state.rulers.length > 0),
     );
-    const perfRulerMode = preferPerfRulerMode && (!showPowerEnvelope || isMeasuredPowerAxis);
+    const perfRulerMode =
+      !isConcurrencyAxis && preferPerfRulerMode && (!showPowerEnvelope || isMeasuredPowerAxis);
     const [localPerfRulerState, setLocalPerfRulerState] =
       useState<PerfRulerState>(EMPTY_PERF_RULER_STATE);
     const perfRulerState = persistedRulers ? persistedRulers.state : localPerfRulerState;
@@ -2664,7 +2694,7 @@ const ScatterGraph = React.memo(
             .line<InferenceData>()
             .x((d) => xScale(d.x))
             .y((d) => yScale(d.y))
-            .curve(d3.curveMonotoneX);
+            .curve(isConcurrencyAxis ? d3.curveLinear : d3.curveMonotoneX);
 
           // Ensure rooflines layer exists before dot-groups
           let rooflinesLayer = zoomGroup.select<SVGGElement>('.rooflines-layer');
@@ -2767,7 +2797,10 @@ const ScatterGraph = React.memo(
             )
             .join('path')
             .attr('class', (d) => `roofline-path roofline-${d.key}`)
-            .attr('data-curve-kind', showPowerEnvelope ? 'power-envelope' : 'pareto')
+            .attr(
+              'data-curve-kind',
+              isConcurrencyAxis ? 'observed-load' : showPowerEnvelope ? 'power-envelope' : 'pareto',
+            )
             .attr('data-hw-key', (d) => d.hw)
             .attr('data-precision', (d) => d.precision)
             .attr('data-power-variant', (d) => d.variant || null)
@@ -2866,7 +2899,10 @@ const ScatterGraph = React.memo(
               (exit) => exit.remove(),
             )
             .attr('data-seg-key', (d) => d.segKey)
-            .attr('data-curve-kind', showPowerEnvelope ? 'power-envelope' : 'pareto')
+            .attr(
+              'data-curve-kind',
+              isConcurrencyAxis ? 'observed-load' : showPowerEnvelope ? 'power-envelope' : 'pareto',
+            )
             .attr('data-hw-key', (d) => d.hw)
             .attr('data-precision', (d) => d.precision)
             .attr('transform', (d) => `translate(${d.x},${d.y})`)
@@ -3159,7 +3195,7 @@ const ScatterGraph = React.memo(
             .line<InferenceData>()
             .x((d) => newXScale(d.x))
             .y((d) => newYScale(d.y))
-            .curve(d3.curveMonotoneX);
+            .curve(isConcurrencyAxis ? d3.curveLinear : d3.curveMonotoneX);
 
           // Update roofline paths — must split per-date so the zoom redraw
           // matches the per-date sub-paths created in the initial render.
@@ -3390,7 +3426,7 @@ const ScatterGraph = React.memo(
                 .line<InferenceData>()
                 .x((d) => xScale(d.x))
                 .y((d) => yScale(d.y))
-                .curve(d3.curveMonotoneX);
+                .curve(isConcurrencyAxis ? d3.curveLinear : d3.curveMonotoneX);
 
               interface OvEntry {
                 key: string;
@@ -3423,7 +3459,14 @@ const ScatterGraph = React.memo(
                 .data(ovEntries, (d) => d.key)
                 .join('path')
                 .attr('class', (d) => `overlay-roofline-path overlay-roofline-${d.key}`)
-                .attr('data-curve-kind', showPowerEnvelope ? 'power-envelope' : 'pareto')
+                .attr(
+                  'data-curve-kind',
+                  isConcurrencyAxis
+                    ? 'observed-load'
+                    : showPowerEnvelope
+                      ? 'power-envelope'
+                      : 'pareto',
+                )
                 .attr('fill', 'none')
                 .attr('stroke', (d) => d.stroke)
                 .attr('stroke-width', 2)
@@ -3577,7 +3620,7 @@ const ScatterGraph = React.memo(
                 .line<InferenceData>()
                 .x((d) => newXScale(d.x))
                 .y((d) => newYScale(d.y))
-                .curve(d3.curveMonotoneX);
+                .curve(isConcurrencyAxis ? d3.curveLinear : d3.curveMonotoneX);
 
               Object.entries(displayedOverlayRooflines).forEach(([key, group]) => {
                 if (group.points.length < 2) return;
@@ -3665,7 +3708,7 @@ const ScatterGraph = React.memo(
             .line<InferenceData>()
             .x((point) => xScale(point.x))
             .y((point) => yScale(point.y))
-            .curve(d3.curveMonotoneX);
+            .curve(isConcurrencyAxis ? d3.curveLinear : d3.curveMonotoneX);
           const continuationPath = group
             .select<SVGPathElement>('.overflow-continuation-line')
             .attr('d', lineGenerator(entry.points) ?? '')
@@ -3806,6 +3849,7 @@ const ScatterGraph = React.memo(
       // existing DOM when it changes. Only data/structure changes recreate
       // the layers (and with them, the full chart render).
     }, [
+      isConcurrencyAxis,
       displayedRooflines,
       paretoHighlightLayer,
       groupDisplayedPoints,
@@ -4257,7 +4301,11 @@ const ScatterGraph = React.memo(
           <QuickFiltersDialog
             open={quickFiltersOpen}
             onOpenChange={setQuickFiltersOpen}
-            bestPerSku={{ checked: bestPerSku, onCheckedChange: handleBestPerSkuChange }}
+            bestPerSku={
+              isConcurrencyAxis
+                ? undefined
+                : { checked: bestPerSku, onCheckedChange: handleBestPerSkuChange }
+            }
           />
         </div>
       );
@@ -4281,14 +4329,18 @@ const ScatterGraph = React.memo(
           testId="scatter-graph"
           grabCursor={true}
           caption={
-            isPowerAxis ? (
+            isPowerAxis || isConcurrencyAxis ? (
               <>
                 {caption}
                 <p
                   data-testid="power-curve-description"
                   className="mt-2 text-2xs text-muted-foreground"
                 >
-                  {showPowerEnvelope ? legendT.powerCurves : legendT.powerOptimal}
+                  {isConcurrencyAxis
+                    ? legendT.concurrencyCurves
+                    : showPowerEnvelope
+                      ? legendT.powerCurves
+                      : legendT.powerOptimal}
                 </p>
               </>
             ) : (
@@ -4563,7 +4615,7 @@ const ScatterGraph = React.memo(
                     track('latency_line_labels_toggled', { enabled: checked });
                   },
                 },
-                ...(showPowerEnvelope && !isMeasuredPowerAxis
+                ...(isConcurrencyAxis || (showPowerEnvelope && !isMeasuredPowerAxis)
                   ? []
                   : [
                       {
@@ -4653,14 +4705,18 @@ const ScatterGraph = React.memo(
           <MeasuredPowerSummary
             total={powerTierCounts.total}
             visible={powerTierCounts.visible}
-            bestPerSku={bestPerSku}
+            bestPerSku={!isConcurrencyAxis && bestPerSku}
             optimalOnly={hideNonOptimal}
           />
         )}
         <QuickFiltersDialog
           open={quickFiltersOpen}
           onOpenChange={setQuickFiltersOpen}
-          bestPerSku={{ checked: bestPerSku, onCheckedChange: handleBestPerSkuChange }}
+          bestPerSku={
+            isConcurrencyAxis
+              ? undefined
+              : { checked: bestPerSku, onCheckedChange: handleBestPerSkuChange }
+          }
         />
         {pointsTable && (
           <LegendPointsDialog

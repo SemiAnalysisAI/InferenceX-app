@@ -139,6 +139,7 @@ export const VIEW_QUERY_PARAMS = {
     'vendors',
   ],
   inference: [
+    'topologies',
     'allPoints',
     'best',
     'date',
@@ -166,6 +167,12 @@ export const VIEW_QUERY_PARAMS = {
     'vendors',
     'xmetric',
     'xmode',
+    'xstat',
+    'serviceCompare',
+    'serviceBaseline',
+    'serviceComparator',
+    'serviceTarget',
+    'roleShare',
   ],
   operatorx: [
     'backend',

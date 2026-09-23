@@ -165,6 +165,9 @@ describe('xAxisPercentileFromLabel', () => {
   it('extracts percentile words', () => {
     expect(xAxisPercentileFromLabel('P90 Time To First Token (s)')).toBe('P90');
     expect(xAxisPercentileFromLabel('Median Time To First Token (s)')).toBe('Median');
+    expect(xAxisPercentileFromLabel('Mean Interactivity (tok/s/user)')).toBe('Mean');
+    expect(xAxisPercentileFromLabel('平均交互性（tok/s/user）')).toBe('Mean');
+    expect(xAxisPercentileFromLabel('中位首 token 延迟 (s)')).toBe('Median');
     expect(xAxisPercentileFromLabel('P75 E2E Normalized Interactivity (tok/s/user)')).toBe('P75');
     expect(xAxisPercentileFromLabel('P99.9 End-to-end Latency (s)')).toBe('P99.9');
   });

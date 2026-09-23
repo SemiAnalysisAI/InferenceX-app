@@ -12,9 +12,15 @@ import { supportsChartTokenMetric, type TokenMetricType } from '@/lib/supplement
  * Chart x-axis variant selected by the dropdown in the Chart panel. The
  * inference provider and ChartDisplay import this single definition.
  */
-export type XAxisMode = 'ttft' | 'e2e' | 'interactivity' | 'e2e-normalized-interactivity';
+export type XAxisMode =
+  | 'ttft'
+  | 'e2e'
+  | 'interactivity'
+  | 'e2e-normalized-interactivity'
+  | 'concurrency';
 
 export const X_AXIS_MODES: readonly XAxisMode[] = [
+  'concurrency',
   'ttft',
   'e2e',
   'interactivity',
@@ -115,7 +121,7 @@ const X_LABEL_STAT_PREFIX_RE = /^(?:Median|Mean|P75|P90|P95|P99(?:\.9)?)\b\s*/iu
  * existing leading statistic word (e.g. the TTFT override's "P90 Time To
  * First Token (s)") or prefixes the percentile when the configured label has
  * none (e.g. "Interactivity (tok/s/user)" → "P90 Interactivity (tok/s/user)").
- * Only call for agentic sequences — fixed-seq labels must stay untouched.
+ * Also used for the explicit Mean/Median labels on fixed-sequence service axes.
  */
 export function applyAgenticPercentileToXLabel(label: string, pctlWord: string): string {
   return X_LABEL_STAT_PREFIX_RE.test(label)

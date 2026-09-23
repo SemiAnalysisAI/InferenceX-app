@@ -15,6 +15,7 @@ import {
 } from '@/components/inference/utils/powerTimeline';
 import { Model, Precision, Sequence } from '@/lib/data-mappings';
 import { overlayRunColor } from '@/lib/overlay-run-style';
+import { buildShareUrl, readUrlParams, writeUrlParams } from '@/lib/url-state';
 
 import {
   createMockHardwareConfig,
@@ -205,9 +206,78 @@ const svg = () => cy.get('[data-testid="power-timeline-chart-svg"]');
 
 describe('PowerTimeline', () => {
   beforeEach(() => {
+    writeUrlParams({ i_ptaxis: '', i_ptlines: '', i_ptwindow: '', i_ptfocus: '', i_ptutility: '' });
+    readUrlParams();
     cy.on('uncaught:exception', (error) => {
       if (error.message.includes('ResizeObserver loop')) return false;
     });
+  });
+
+  it('restores a shared pool view and plots only the validated window from its serving origin', () => {
+    const point = disaggPoint(8, 800);
+    const focus = traceKeyForPoint(point)!;
+    writeUrlParams({
+      i_ptaxis: 'serving',
+      i_ptlines: 'pool',
+      i_ptwindow: 'window',
+      i_ptfocus: focus,
+    });
+    cy.intercept('POST', '/api/gpu-metrics*', { body: poolResponse }).as('series');
+    mountTimeline([point]);
+    cy.wait('@series');
+    cy.get('[data-testid="power-timeline-pools"]').should('have.attr', 'data-state', 'checked');
+    cy.get('[data-testid="power-timeline-window-only"]').should(
+      'have.attr',
+      'data-state',
+      'checked',
+    );
+    cy.get('[data-testid="power-timeline-focus"]').should('contain.text', 'c8');
+    svg().find('path.power-trace[data-segment="full"]').should('not.exist');
+    svg()
+      .find('path.power-trace[data-segment="window"]')
+      .should('have.length', 2)
+      .each(($path) => {
+        const points = ($path[0] as unknown as { __data__: { points: { x: number }[] } }).__data__
+          .points;
+        expect(points[0].x).to.eq(0);
+        expect(points.at(-1)!.x).to.eq(20);
+      });
+    cy.then(() => {
+      const params = new URL(buildShareUrl()).searchParams;
+      expect(params.get('i_ptlines')).to.eq('pool');
+      expect(params.get('i_ptaxis')).to.eq('serving');
+      expect(params.get('i_ptwindow')).to.eq('window');
+      expect(params.get('i_ptfocus')).to.eq(focus);
+    });
+    svg().screenshot('power-timeline-shared-serving-window');
+  });
+
+  it('does not change an explicitly shared per-GPU view to pool mode when focus resolves', () => {
+    const point = disaggPoint(8, 800);
+    writeUrlParams({ i_ptlines: 'gpu', i_ptfocus: traceKeyForPoint(point)! });
+    cy.intercept('POST', '/api/gpu-metrics*', { body: poolResponse }).as('series');
+    mountTimeline([point]);
+    cy.wait('@series');
+    cy.get('[data-testid="power-timeline-per-gpu"]').should('have.attr', 'data-state', 'checked');
+    svg().find('path.power-trace[data-segment="window"]').should('have.length', 8);
+    cy.get('[data-testid="power-timeline-focus-clear"]').click();
+    cy.then(() => expect(new URL(buildShareUrl()).searchParams.has('i_ptfocus')).to.eq(false));
+  });
+
+  it('omits traces without a retained serving window instead of using telemetry start', () => {
+    writeUrlParams({ i_ptaxis: 'serving', i_ptwindow: 'window' });
+    cy.intercept('POST', '/api/gpu-metrics*', { body: response }).as('series');
+    mountTimeline([
+      measuredPoint('b200', 16, 700, {
+        power_audit: { source: `power_validation_${resultName('b200', 16)}.json` },
+      }),
+    ]);
+    cy.wait('@series');
+    cy.get('[data-testid="power-timeline-window-missing"]').should(
+      'contain.text',
+      'no valid serving-window bounds',
+    );
+    svg().find('path.power-trace').should('not.exist');
   });
 
   it('distinguishes dates when wall-clock traces span multiple days', () => {

@@ -6,10 +6,13 @@ import type { InferenceData } from '@/components/inference/types';
 import {
   allGpuPool,
   consumePowerTraceFocus,
+  hasPowerTimelineWindow,
   joinPowerTimeline,
   longestCommonPrefix,
   groupPoolsBySize,
   planPowerTimelineRequests,
+  parsePowerTimelineParams,
+  powerTimelineSampleX,
   prioritizeRun,
   prioritizeRuns,
   referenceLabelSlots,
@@ -21,6 +24,7 @@ import {
   traceKeyRunId,
   tracePools,
   windowPhase,
+  type PowerTimelineTrace,
 } from './powerTimeline';
 
 const RUN_URL = 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/34716669498';
@@ -53,6 +57,82 @@ const runInfo: GpuPowerSeriesResponse['runInfo'] = {
   conclusion: 'success',
   status: 'completed',
 };
+
+describe('shared timeline view', () => {
+  const trace: PowerTimelineTrace = {
+    key: `34716669498:${NAME_A}`,
+    point: point({}),
+    runId: '34716669498',
+    series: {
+      artifact: `gpu_metrics_${NAME_A}`,
+      startMs: 100_000,
+      bucketSeconds: 1,
+      gpus: [0],
+      t: [2, 3, 4, 5],
+      power: [[100, 200, 300, 400]],
+    },
+    windowStartMs: 103_000,
+    windowEndMs: 104_500,
+  };
+
+  it('restores independent pool, axis, window, focus and reference settings', () => {
+    expect(
+      parsePowerTimelineParams({
+        i_ptlines: 'pool',
+        i_ptaxis: 'serving',
+        i_ptwindow: 'window',
+        i_ptfocus: trace.key,
+        i_ptutility: '1',
+      }),
+    ).toEqual({
+      axis: 'serving',
+      lines: 'pool',
+      windowOnly: true,
+      focus: trace.key,
+      utility: true,
+    });
+    expect(parsePowerTimelineParams({ i_ptlines: 'gpu', i_ptfocus: trace.key }).lines).toBe('gpu');
+  });
+
+  it('rejects unsupported URL values without inventing a trace identity', () => {
+    expect(
+      parsePowerTimelineParams({
+        i_ptaxis: 'guess',
+        i_ptlines: 'phase',
+        i_ptwindow: 'all',
+        i_ptfocus: 'not-a-run:../../../secret',
+        i_ptutility: 'true',
+      }),
+    ).toEqual({ axis: null, lines: 'mean', windowOnly: false, focus: null, utility: false });
+  });
+
+  it('uses the retained serving origin, distinct from telemetry origin', () => {
+    expect(powerTimelineSampleX(trace, 0, 'wall', false)).toBe(102_000);
+    expect(powerTimelineSampleX(trace, 0, 'elapsed', false)).toBe(0);
+    expect(powerTimelineSampleX(trace, 0, 'serving', false)).toBe(-1);
+    expect(powerTimelineSampleX(trace, 2, 'serving', true)).toBe(1);
+  });
+
+  it('keeps only retained buckets inside exact audit bounds without interpolating', () => {
+    expect(
+      trace.series.t.map((_, column) => powerTimelineSampleX(trace, column, 'serving', true)),
+    ).toEqual([null, 0, 1, null]);
+  });
+
+  it.each([
+    { windowStartMs: null, windowEndMs: null },
+    { windowStartMs: 103_000, windowEndMs: 103_000 },
+    { windowStartMs: 105_000, windowEndMs: 103_000 },
+    { windowStartMs: Number.NaN, windowEndMs: 104_500 },
+  ])('does not derive a serving window from missing or invalid bounds %j', (bounds) => {
+    const invalid = { ...trace, ...bounds };
+    expect(hasPowerTimelineWindow(invalid)).toBe(false);
+    expect(powerTimelineSampleX(invalid, 1, 'serving', false)).toBeNull();
+    expect(powerTimelineSampleX(invalid, 1, 'elapsed', true)).toBeNull();
+    expect(powerTimelineSampleX(invalid, 1, 'elapsed', false)).toBe(1);
+    expect(windowPhase(invalid, 103_000)).toBe('unknown');
+  });
+});
 
 describe('telemetryArtifactForPoint', () => {
   it('maps the power-audit source to the gpu_metrics artifact of the same RESULT_FILENAME', () => {

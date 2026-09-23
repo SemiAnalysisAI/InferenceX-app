@@ -1,3 +1,5 @@
+import type { InferenceData } from '@/components/inference/types';
+import { expandLegendAdvanced } from '../support/legend-advanced';
 import {
   interceptVrPublicationData,
   VR_FIXTURE_DATE,
@@ -107,11 +109,14 @@ function assertVisibleMeasuredValues(selector: string, expected: number[]) {
 
 describe('Inference Chart', () => {
   before(() => {
+    cy.intercept('GET', '/api/v1/availability').as('chartAvailability');
+    cy.intercept('GET', '/api/v1/benchmarks*').as('chartBenchmarks');
     cy.viewport(1440, 900);
     cy.window().then((win) => {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
     });
     cy.visit('/inference');
+    cy.wait(['@chartAvailability', '@chartBenchmarks']);
   });
 
   it('renders the inference chart display wrapper', () => {
@@ -581,6 +586,8 @@ describe('AgentX replaces a complete curve while preserving an unofficial compar
 });
 
 it('hydrates a direct PowerX metric link and shows availability for the selected workload', () => {
+  cy.intercept('GET', '/api/v1/availability').as('powerLinkAvailability');
+  cy.intercept('GET', '/api/v1/benchmarks*').as('powerLinkBenchmarks');
   cy.viewport(1440, 900);
   cy.visit('/inference/qwen-3-5?i_seq=8k%2F1k&i_prec=fp8&i_metric=y_measuredPowerPercentTdp', {
     onBeforeLoad(win) {
@@ -589,6 +596,7 @@ it('hydrates a direct PowerX metric link and shows availability for the selected
       cy.spy(win.console, 'error').as('powerLinkConsoleErrors');
     },
   });
+  cy.wait(['@powerLinkAvailability', '@powerLinkBenchmarks']);
   cy.get('[data-testid="yaxis-metric-selector"]').should('contain', 'Measured Power');
   cy.get('[data-testid="measured-power-display"]').should('contain', 'TDP');
   cy.get('[data-testid="measured-power-statistic-average"]').should(
@@ -825,4 +833,202 @@ describe('VR default date preference', () => {
     cy.visit('/inference/deepseek-v4?i_metric=y_tpPerGpu');
     assertVrDate(VR_LATEST_FIXTURE_DATE);
   });
+});
+
+const withTp4 = (rows: ReturnType<typeof boundaryRows>) => [
+  ...rows,
+  ...rows.map((row) => ({
+    ...row,
+    id: row.id + 10000,
+    prefill_tp: 4,
+    decode_tp: 4,
+    num_prefill_gpu: 4,
+    num_decode_gpu: 4,
+  })),
+];
+
+const assertObservedLoads = (expected: number[]) => {
+  for (const selector of ['.dot-group', '.unofficial-overlay-pt']) {
+    cy.get<SVGElement & { __data__: InferenceData }>(
+      `[data-testid="inference-chart-display"] svg ${selector}`,
+    ).should(($points) => {
+      expect($points).to.have.length(expected.length);
+      expect([...$points].map((element) => element.__data__.x).sort((a, b) => a - b)).to.deep.equal(
+        expected,
+      );
+      for (const element of $points) expect(getComputedStyle(element).opacity).to.equal('1');
+    });
+  }
+};
+
+describe('Observed concurrency and exact topology', () => {
+  for (const locale of ['en', 'zh'] as const) {
+    it(`preserves official and overlay loads, topology and share state in ${locale}`, () => {
+      const officialRun = 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/800001';
+      const officialBase = boundaryRows(null).map((row) => ({ ...row, run_url: officialRun }));
+      const overlayBase = boundaryRows(OVERLAY_RUN_URL);
+      interceptMeasuredComparison(withTp4(officialBase), withTp4(overlayBase));
+      cy.viewport(1440, 900);
+      cy.visit(
+        `${locale === 'zh' ? '/zh' : ''}/inference?g_model=DeepSeek-V4-Pro&unofficialrun=${OVERLAY_RUN_ID}&i_seq=1k%2F1k&i_prec=fp4&i_metric=y_measuredAvgPower&i_xmode=concurrency&i_optimal=1&i_best=1`,
+        { onBeforeLoad: unlockAgenticGate },
+      );
+      cy.wait('@measuredOverlay');
+      cy.get('[data-testid="x-axis-mode-selector"]')
+        .should('have.attr', 'data-value', 'concurrency')
+        .and('contain.text', locale === 'zh' ? '并发数' : 'Concurrency');
+      cy.get('[data-testid="chart-figure"] h2').should(
+        'contain.text',
+        locale === 'zh' ? '与并发数的关系' : 'vs. Concurrency',
+      );
+
+      assertObservedLoads([1, 1, 2, 2, 8, 8, 48, 48]);
+      cy.get<SVGPathElement & { __data__: { points: InferenceData[] } }>(
+        '[data-testid="inference-chart-display"] path[data-curve-kind="observed-load"]',
+      )
+        .should('have.length', 4)
+        .and(($curves) => {
+          for (const curve of $curves) {
+            expect(new Set(curve.__data__.points.map((point) => point.tp)).size).to.equal(1);
+            expect(curve.__data__.points.map((point) => point.x)).to.deep.equal([1, 2, 8, 48]);
+            expect(curve.getAttribute('d')).to.be.a('string').and.not.match(/[CQ]/u);
+          }
+        });
+      expandLegendAdvanced();
+      cy.get('#scatter-hide-non-optimal, #scatter-perf-ruler, #chart-0-pareto-frontier').should(
+        'not.exist',
+      );
+      cy.get('[data-testid="scatter-quick-filters"]').click();
+      cy.get('[data-testid="quick-filter-best-per-sku"]').should('not.exist');
+      cy.get('[data-testid="quick-filter-topology-options"] button').should('have.length', 2);
+      cy.contains('[data-testid="quick-filter-topology-options"] button', /GPU=?4.*TP=?4/u).click();
+      cy.get('body').type('{esc}');
+      cy.get('[data-testid="quick-filters-dialog"]').should('not.exist');
+      assertObservedLoads([1, 2, 8, 48]);
+      cy.get('[data-testid="chart-figure"]')
+        .first()
+        .screenshot(`powerx-concurrency-${locale}-desktop`);
+      cy.viewport(390, 844);
+      assertObservedLoads([1, 2, 8, 48]);
+      expectNoPageOverflow();
+      cy.get('[data-testid="chart-figure"]')
+        .first()
+        .screenshot(`powerx-concurrency-${locale}-mobile`);
+      cy.viewport(1440, 900);
+      // The address bar stays clean: Share flushes the in-memory filter state.
+      cy.get('[data-testid="share-button"]').first().click();
+      cy.get('[data-testid="share-url-input"]')
+        .invoke('val')
+        .should((value) => {
+          const params = new URL(String(value)).searchParams;
+          expect(params.get('i_xmode')).to.equal('concurrency');
+          expect(params.get('i_topology')).to.include('GPU=4');
+        })
+        .then((value) => {
+          const shared = new URL(String(value));
+          cy.visit(`${shared.pathname}${shared.search}`, { onBeforeLoad: unlockAgenticGate });
+        });
+      cy.wait('@measuredOverlay');
+      assertObservedLoads([1, 2, 8, 48]);
+      cy.get('[data-testid="x-axis-mode-selector"]').should(
+        'have.attr',
+        'data-value',
+        'concurrency',
+      );
+      selectXAxisMode('interactivity');
+      cy.get(
+        '[data-testid="inference-chart-display"] svg path[data-curve-kind="observed-load"]',
+      ).should('not.exist');
+      cy.get('#scatter-hide-non-optimal').should('exist');
+      cy.get<SVGElement & { __data__: InferenceData }>(
+        '[data-testid="inference-chart-display"] svg .dot-group',
+      ).should(($points) => {
+        expect(
+          [...$points].map((element) => element.__data__.x).sort((a, b) => a - b),
+        ).to.deep.equal([10.6, 68.5, 111.1, 130.2]);
+      });
+      selectXAxisMode('concurrency', locale === 'zh' ? '并发数' : 'Concurrency');
+      assertObservedLoads([1, 2, 8, 48]);
+      cy.get('#scatter-hide-non-optimal, #scatter-perf-ruler').should('not.exist');
+      cy.get('[data-testid="inference-view-toggle-0"]')
+        .contains(locale === 'zh' ? '表格' : 'Table')
+        .click();
+      cy.get('[data-testid="inference-results-table"] tbody tr').should('have.length', 8);
+      cy.get('[data-testid="inference-results-table"]').should(
+        'contain.text',
+        locale === 'zh' ? '并发数' : 'Concurrency',
+      );
+    });
+  }
+});
+
+describe('Fixed-sequence service statistics', () => {
+  for (const locale of ['en', 'zh'] as const) {
+    it(`shares mean TPOT-derived speed and switches statistics on desktop/mobile in ${locale}`, () => {
+      const withMeans = (runUrl: string | null) =>
+        measuredRows(runUrl).map((row, index) => ({
+          ...row,
+          metrics: {
+            ...row.metrics,
+            mean_intvty: 999,
+            ...(index < 3
+              ? {
+                  mean_tpot: 1 / [20, 40, 80][index],
+                  mean_ttft: [1, 2, 4][index],
+                  mean_e2el: [10, 20, 40][index],
+                }
+              : {}),
+          },
+        }));
+      const official = withMeans(null);
+      interceptMeasuredComparison(official, withMeans(OVERLAY_RUN_URL));
+      cy.viewport(1440, 900);
+      cy.visit(
+        `${locale === 'zh' ? '/zh' : ''}/inference?g_model=DeepSeek-V4-Pro&unofficialrun=${OVERLAY_RUN_ID}&i_seq=1k%2F1k&i_prec=fp4&i_metric=y_measuredAvgPower&i_xmode=interactivity&i_mstat=mean&i_optimal=0&i_best=0`,
+        { onBeforeLoad: unlockAgenticGate },
+      );
+      cy.wait('@measuredOverlay');
+      cy.get('[data-testid="fixed-sequence-statistic-selector"]')
+        .should('have.attr', 'data-value', 'mean')
+        .and('contain.text', locale === 'zh' ? '平均值' : 'Mean');
+      cy.get('[data-testid="chart-figure"] h2').should(
+        'contain.text',
+        locale === 'zh' ? '平均交互性' : 'Mean Interactivity',
+      );
+      assertObservedLoads([20, 40, 80]);
+      cy.get('[data-testid="fixed-sequence-statistic-selector"]').click();
+      cy.get('[data-testid="fixed-sequence-statistic-median"]').click();
+      assertObservedLoads(
+        singleTurnRows(null)
+          .map((row) => row.metrics.median_intvty)
+          .sort((a, b) => a - b),
+      );
+      cy.viewport(390, 844);
+      selectXAxisMode('interactivity');
+      cy.get('[data-testid="fixed-sequence-statistic-selector"]').click();
+      cy.get('[data-testid="fixed-sequence-statistic-mean"]').click();
+      assertObservedLoads([20, 40, 80]);
+      expectNoPageOverflow();
+      cy.viewport(1440, 900);
+      selectXAxisMode('ttft');
+      assertObservedLoads([1, 2, 4]);
+      selectXAxisMode('e2e');
+      assertObservedLoads([10, 20, 40]);
+      cy.get('[data-testid="share-button"]').first().click();
+      cy.get('[data-testid="share-url-input"]')
+        .invoke('val')
+        .then((value) => {
+          const shared = new URL(String(value));
+          expect(shared.searchParams.get('i_mstat')).to.equal('mean');
+          cy.visit(`${shared.pathname}${shared.search}`, { onBeforeLoad: unlockAgenticGate });
+        });
+      cy.wait('@measuredOverlay');
+      assertObservedLoads([10, 20, 40]);
+      // Click the chevron, away from the label's separate help button and sticky header.
+      cy.get('[data-testid="x-axis-mode-selector"]').click('right', { scrollBehavior: 'center' });
+      cy.get('[data-testid="x-axis-mode-concurrency"]').click();
+      cy.get('[data-testid="fixed-sequence-statistic-selector"]').should('not.exist');
+      assertObservedLoads(official.map((row) => row.conc).sort((a, b) => a - b));
+    });
+  }
 });

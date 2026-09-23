@@ -139,7 +139,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-inference-view',
-    sourceSha256: 'de9192086b27e530ad6b1ece082b4989b3a9771a78195ae9f6d1c3899519588f',
+    sourceSha256: '7b3f1ba020dee0f3ad5b62249294d8532cb1ae40f22f182f70b218fc3426cb1d',
   },
   {
     source: 'src/app/api/v1/views/operatorx/route.ts',
@@ -155,7 +155,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-view-options',
-    sourceSha256: '79571c3e6faf5af977c1afc9c29ebd6c1bfeb54ccf389711fa49668466fb58f4',
+    sourceSha256: '1f441c8726e6adb69d68660e80e854582bbacaba842cea5ec6f3ad2512ff1b5c',
   },
   {
     source: 'src/app/api/v1/views/overview/route.ts',
@@ -805,6 +805,38 @@ export interface ApiContractSourceDigest {
  */
 export const apiContractSourceDigests = [
   {
+    source: 'src/components/inference/utils/resolveXAxisField.ts',
+    sourceSha256: 'd59ad021fbe8e8547a811fc83ce63adb2373c3005d2668844f2dcbcb61448e1f',
+    reviewArea: {
+      en: 'Shared service-axis resolution: fixed-sequence mean/median, reciprocal mean TPOT, and AgentX percentile isolation.',
+      zh: '共用服务轴解析：固定长度工作负载 mean/median、mean TPOT 的倒数，以及 AgentX 独立的分位数选择。',
+    },
+  },
+  {
+    source: 'src/components/inference/utils/equal-service-comparison.ts',
+    sourceSha256: '706ba422ba200845d0eca4b24c95b35feef83a39bcfce61499eb6f5c482f525b',
+    reviewArea: {
+      en: 'Source-scoped equal-service interpolation, comparator-relative changes, endpoint provenance, and prefill share projection.',
+      zh: '按完整来源限定的同等服务插值、相对基准变化、端点来源，以及 prefill 占比视图。',
+    },
+  },
+  {
+    source: 'src/components/inference/utils/role-energy.ts',
+    sourceSha256: 'd3d731769fa5aed6f4d1c94fe3f80c5316beb3dbbf52a9f8f3a9c024362b4825',
+    reviewArea: {
+      en: 'Validated prefill/decode energy reconstruction and shares on a common output-token denominator.',
+      zh: '使用统一 output token 分母的已验证 prefill/decode 能耗重建与占比。',
+    },
+  },
+  {
+    source: 'src/lib/benchmark-transform.ts',
+    sourceSha256: '21f1fe4d63737c74efb2251a64f79eef1b5e9c565769be9b4fb500b1fa4ecc89',
+    reviewArea: {
+      en: 'Raw benchmark means and derived reciprocal mean-TPOT interactivity used by Dashboard and read-only views.',
+      zh: '仪表板和只读视图共用的原始 benchmark 均值与 mean TPOT 倒数形式的 interactivity。',
+    },
+  },
+  {
     source: '../db/src/etl/power-audit-validations.ts',
     sourceSha256: '44a607747b79d038bb8f4e53590efba689d376c143f50a5d750d3552faa0c442',
     reviewArea: {
@@ -901,7 +933,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/components/inference/hooks/chart-data-core.ts',
-    sourceSha256: '0c86987ed025557172a8d020144ca462be1ecac880d53b7d929f93a617086c33',
+    sourceSha256: '8601c33f6979541786362276697e4d4a21278de1d57b50d31f705391b5da041d',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -955,7 +987,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/series.ts',
-    sourceSha256: 'b5ebddee9d9ea6b85a8fdab2cf8fcc50bbf05e0fa10564987698abd38a6d4488',
+    sourceSha256: '9974fe5166ac847f4b9284eda8a901ee0f9c8b432567ef184890453c715d2f4f',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -964,7 +996,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/registry.ts',
-    sourceSha256: 'e7494504b118a7706742e542b3cc3b2543823d8463ac5b32b13ebdb971c84aed',
+    sourceSha256: '266305115106c86b18d1131e3a8916a756b847f569e7de02c82ec74dad1bcf17',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',

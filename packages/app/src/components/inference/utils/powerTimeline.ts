@@ -13,10 +13,11 @@
  * Nothing is matched by hardware or concurrency; points whose telemetry is
  * missing (expired artifact, another collector) are reported, not guessed.
  */
-import type {
-  GpuPowerRole,
-  GpuPowerSeries,
-  GpuPowerSeriesResponse,
+import {
+  bucketTimeMs,
+  type GpuPowerRole,
+  type GpuPowerSeries,
+  type GpuPowerSeriesResponse,
 } from '@/components/gpu-power/power-series';
 import type { InferenceData } from '@/components/inference/types';
 
@@ -154,6 +155,56 @@ export interface PowerTimelineTrace {
   windowEndMs: number | null;
 }
 
+export type PowerTimelineAxis = 'wall' | 'elapsed' | 'serving';
+export type PowerTimelineLines = 'mean' | 'gpu' | 'pool';
+
+/** URL input is optional: an omitted axis retains the existing per-run default. */
+export function parsePowerTimelineParams(params: {
+  i_ptaxis?: string;
+  i_ptlines?: string;
+  i_ptwindow?: string;
+  i_ptfocus?: string;
+  i_ptutility?: string;
+}) {
+  return {
+    axis: (['wall', 'elapsed', 'serving'].includes(params.i_ptaxis ?? '')
+      ? params.i_ptaxis
+      : null) as PowerTimelineAxis | null,
+    lines: (params.i_ptlines === 'gpu' || params.i_ptlines === 'pool'
+      ? params.i_ptlines
+      : 'mean') as PowerTimelineLines,
+    windowOnly: params.i_ptwindow === 'window',
+    focus:
+      params.i_ptfocus && /^[1-9]\d*:[\w.-]+$/u.test(params.i_ptfocus) ? params.i_ptfocus : null,
+    utility: params.i_ptutility === '1',
+  };
+}
+
+export function hasPowerTimelineWindow(trace: PowerTimelineTrace): boolean {
+  return (
+    trace.windowStartMs !== null &&
+    trace.windowEndMs !== null &&
+    Number.isFinite(trace.windowStartMs) &&
+    Number.isFinite(trace.windowEndMs) &&
+    trace.windowEndMs > trace.windowStartMs
+  );
+}
+
+/** Filter and position retained buckets only; never infer a missing serving origin. */
+export function powerTimelineSampleX(
+  trace: PowerTimelineTrace,
+  column: number,
+  axis: PowerTimelineAxis,
+  windowOnly: boolean,
+): number | null {
+  const timeMs = bucketTimeMs(trace.series, column);
+  if ((axis === 'serving' || windowOnly) && !hasPowerTimelineWindow(trace)) return null;
+  if (windowOnly && windowPhase(trace, timeMs) !== 'window') return null;
+  if (axis === 'wall') return timeMs;
+  const origin = axis === 'serving' ? trace.windowStartMs! : bucketTimeMs(trace.series, 0);
+  return (timeMs - origin) / 1000;
+}
+
 /**
  * Why a validated point has no trace:
  * - `no-source`: the row predates `power_audit.source` (older schema), so no
@@ -233,9 +284,9 @@ function unixSecondsToMs(seconds: number | undefined): number | null {
 export type WindowPhase = 'before' | 'window' | 'after' | 'unknown';
 
 export function windowPhase(trace: PowerTimelineTrace, timeMs: number): WindowPhase {
-  if (trace.windowStartMs === null || trace.windowEndMs === null) return 'unknown';
-  if (timeMs < trace.windowStartMs) return 'before';
-  if (timeMs > trace.windowEndMs) return 'after';
+  if (!hasPowerTimelineWindow(trace)) return 'unknown';
+  if (timeMs < trace.windowStartMs!) return 'before';
+  if (timeMs > trace.windowEndMs!) return 'after';
   return 'window';
 }
 
@@ -327,8 +378,8 @@ export function allGpuPool(series: Pick<GpuPowerSeries, 'power'>): PowerPool {
 //
 // "View power trace" on a pinned tooltip switches the metric to the Timeline
 // display; the timeline mounts afterwards and reads the requested trace here
-// so it can emphasise that config. Module state rather than URL state: the
-// focus is a one-shot gesture, and the share link stays `i_metric` alone.
+// so it can emphasise that config. The one-shot gesture takes precedence over
+// restored URL focus; the mounted timeline then persists it with its view state.
 
 let pendingFocus: string | null = null;
 

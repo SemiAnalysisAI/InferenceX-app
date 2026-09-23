@@ -1,4 +1,4 @@
-import { assertShareLinkMetric } from '../support/share-link';
+import { assertShareLinkMetric, assertShareLinkParams } from '../support/share-link';
 
 // The Measured Power "Timeline" display (`y_measuredPowerTimeline`) inside the
 // gated Measured Energy group. Deterministic intercepted rows carry validated
@@ -211,6 +211,33 @@ describe('PowerX measured power timeline', () => {
         return false;
       }
     });
+  });
+
+  it('restores the shared serving-window view and focus on an unofficial trace', () => {
+    interceptOverlay();
+    const focus = `${OVERLAY_RUN_ID}:${resultName('h200', 64)}`;
+    visitChart({
+      extraParams: `&i_metric=y_measuredPowerTimeline&unofficialrun=${OVERLAY_RUN_ID}&i_ptaxis=serving&i_ptlines=gpu&i_ptwindow=window&i_ptfocus=${encodeURIComponent(focus)}`,
+    });
+    cy.wait(['@series', '@unofficialRun', '@overlaySeries']);
+    cy.get('[data-testid="power-timeline-focus"]').should('contain.text', 'c64');
+    cy.get('[data-testid="power-timeline-per-gpu"]').should('have.attr', 'data-state', 'checked');
+    cy.get('[data-testid="power-timeline-window-only"]').should(
+      'have.attr',
+      'data-state',
+      'checked',
+    );
+    cy.get('path.power-trace[data-segment="full"]').should('not.exist');
+    cy.get('path.power-trace[data-run-index="0"][data-segment="window"]').should('exist');
+    assertShareLinkParams({
+      i_metric: 'y_measuredPowerTimeline',
+      i_ptaxis: 'serving',
+      i_ptlines: 'gpu',
+      i_ptwindow: 'window',
+      i_ptfocus: focus,
+    });
+    cy.get('[data-testid="power-timeline-focus-clear"]').click();
+    assertShareLinkParams({ i_ptfocus: null, i_ptlines: 'gpu', i_ptwindow: 'window' });
   });
 
   it('switches the Display control to Timeline and renders the per-second traces', () => {

@@ -34,6 +34,7 @@ export function ActiveQuickFilters() {
     else if (category === 'deployment')
       actions.setQuickFilterDeployment(values as DeploymentMode[]);
     else if (category === 'spec') actions.setQuickFilterSpec(values as SpecMode[]);
+    else if (category === 'topologies') actions.setQuickFilterTopologies(values);
     else actions.setQuickFilterPower(values as PowerTier[]);
   };
 
@@ -56,7 +57,7 @@ export function ActiveQuickFilters() {
           onClick={() => {
             setCategory(
               category,
-              quickFilters[category].filter((item) => item !== value),
+              (quickFilters[category] ?? []).filter((item) => item !== value),
             );
             track('inference_quick_filter_removed', { category, value, source: 'result_summary' });
           }}

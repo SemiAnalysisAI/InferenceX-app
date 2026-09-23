@@ -18,6 +18,7 @@ export function resolveScatterXAxisScale({
   xAxisField,
   scaleType,
 }: ResolveScatterXAxisScaleOptions): ScatterXAxisScale {
+  if (xAxisField === 'conc') return 'linear';
   if (selectedYAxisMetric !== 'y_inputTputPerGpu') return 'linear';
   if (scaleType === 'linear') return 'linear';
   if (scaleType === 'log') return extent[0] > 0 ? 'log' : 'linear';

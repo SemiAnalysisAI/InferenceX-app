@@ -66,6 +66,15 @@ describe('inference requested and effective axis selectors', () => {
     );
   });
 
+  it('uses fixed-sequence mean TTFT without changing Agentic percentile semantics', () => {
+    expect(resolveE2eXAxisMetric(null, 'ttft', Sequence.EightK_OneK, 'p90', 'mean')).toBe(
+      'mean_ttft',
+    );
+    expect(resolveE2eXAxisMetric(null, 'ttft', Sequence.AgenticTraces, 'p90', 'mean')).toBe(
+      'p90_ttft',
+    );
+  });
+
   it('uses natural E2E x-axis and preserves inactive requested metric', () => {
     expect(resolveE2eXAxisMetric('p90_ttft', 'e2e', Sequence.AgenticTraces, 'p75')).toBeNull();
     expect(resolveE2eXAxisMetric('p90_ttft', 'interactivity', Sequence.AgenticTraces, 'p75')).toBe(

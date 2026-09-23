@@ -39,29 +39,29 @@ All paths below are relative to `/api/v1/views/`. The maintained exhaustive
 query-key list is in the app's OpenAPI contract. The following groups explain
 which controls belong together.
 
-| View                            | Selection and calculation                                                                                                                                                                                                                                 |
-| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `options`                       | Static registries and defaults, JSON only. Data-dependent run/config choices come from their own views.                                                                                                                                                   |
-| `inference`                     | Model, sequence, precisions, date/exact run, GPU/vendor/framework/deployment/spec/power filters; metric, xmode, xmetric, percentile, optimal/best/allPoints; TCO, custom costs/powers, pricing, unofficial runs, comparison dates/endpoints. JSON or CSV. |
-| `historical`                    | Model, sequence, target, metric, precisions, GPUs/vendors/frameworks/deployment, start/end, TCO and pricing. `extendToDate` labels synthetic extension, defaults to current UTC date. JSON or CSV.                                                        |
-| `calculator`                    | Model/sequence/run/date, precisions/GPUs, percentile, target/mode, token type, owning/renting cost, TCO, power budget, cost cap, hide-above-limit and public unofficial runs. JSON or CSV.                                                                |
-| `first-token`                   | Benchmark selection plus 1–8 positive TTFT caps in seconds, minimum interactivity, cost provider and token type. Shared dashboard winner selection.                                                                                                       |
-| `cache-reuse`                   | AgentX selection plus exact `config` from returned configurations. Cache-reuse curves retain official versus unofficial evidence.                                                                                                                         |
-| `profit-estimator`              | AgentX selection, comparison dates/runs, target, utilization, lab revenue share, list/OpenRouter/custom token prices, own/rent/custom chip costs, TCO and provisioned/modeled/compare power. USD/chip-hour.                                               |
-| `profit-estimator-per-gigawatt` | Same selectors; USD/GW-year basis and owning-cost default.                                                                                                                                                                                                |
-| `fleet`                         | Model/sequence/precision/GPUs, target/percentile, TCO/token type/cost provider, MW, input/output prices, ramp, cache discount, MTBI, recovery, horizon and metric. JSON or CSV.                                                                           |
-| `evaluation`                    | Model, task, date, precision and GPU selection; public unofficial runs remain separately labeled and independent of the official date cutoff. JSON or CSV.                                                                                                |
-| `reliability`                   | Rolling range, GPU selection and optional `asOf` date for reproducibility. JSON or CSV.                                                                                                                                                                   |
-| `gpu-specs`                     | Full hardware properties or selected metric ranking; table/radar/bar are renderings of these values. JSON or CSV.                                                                                                                                         |
-| `overview`                      | Models, model/hardware row limits, hardware tier, engine, comparison mode and reference. JSON or CSV.                                                                                                                                                     |
-| `rankings`                      | Ranking kind (model or chip), selected model/scenario and format. Use the exact values in OpenAPI.                                                                                                                                                        |
-| `compare`                       | GPU pairs, model/slug, scenario, tier selection and variant. JSON or CSV.                                                                                                                                                                                 |
-| `operatorx`                     | Exact/default measured run, operator, precision, shape, backend, cluster, status, throughput/latency and zero-based table page.                                                                                                                           |
-| `collectivex`                   | Ordered run selection and suite; EP size/phase/modes/precision/operation/percentile/axis/SKU/backend/series; KV page size/x/y/pull/push/overlap ISL/series; swap direction/layout/metric/percentile/series.                                               |
-| `submissions`                   | Search, table sort/direction/offset/limit, weekly/cumulative chart, on-change cutoff and NVIDIA/AMD/total lines. Table search does not filter the independent submission-volume chart.                                                                    |
-| `current-inferencex-image`      | Model, sequence, hardware, precision, speculation, node type, framework families and `asOf` for image age/release status.                                                                                                                                 |
-| `gpu-metrics`                   | Required run, file/host artifact, GPU indices, metric or correlation axes, statistics sorting, chart mode and interactive downsampling preference. DB-first telemetry; full-record statistics use stored digests. Responses are no-store.                 |
-| `video`                         | CI run/artifact discovery; only already-published artifact reads; source, serving cell, media/fidelity slot, power phase and GPU denominator; same-workload comparisons, axes, deployment costs and selected tradeoff point. No-store.                    |
+| View                            | Selection and calculation                                                                                                                                                                                                                                                                                    |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `options`                       | Static registries and defaults, JSON only. Data-dependent run/config choices come from their own views.                                                                                                                                                                                                      |
+| `inference`                     | Model, sequence, precisions, date/exact run, GPU/vendor/framework/deployment/spec/power filters; metric, xmode, xstat, xmetric, percentile, optimal/best/allPoints; equal-service sources/target and roleShare; TCO, custom costs/powers, pricing, unofficial runs, comparison dates/endpoints. JSON or CSV. |
+| `historical`                    | Model, sequence, target, metric, precisions, GPUs/vendors/frameworks/deployment, start/end, TCO and pricing. `extendToDate` labels synthetic extension, defaults to current UTC date. JSON or CSV.                                                                                                           |
+| `calculator`                    | Model/sequence/run/date, precisions/GPUs, percentile, target/mode, token type, owning/renting cost, TCO, power budget, cost cap, hide-above-limit and public unofficial runs. JSON or CSV.                                                                                                                   |
+| `first-token`                   | Benchmark selection plus 1–8 positive TTFT caps in seconds, minimum interactivity, cost provider and token type. Shared dashboard winner selection.                                                                                                                                                          |
+| `cache-reuse`                   | AgentX selection plus exact `config` from returned configurations. Cache-reuse curves retain official versus unofficial evidence.                                                                                                                                                                            |
+| `profit-estimator`              | AgentX selection, comparison dates/runs, target, utilization, lab revenue share, list/OpenRouter/custom token prices, own/rent/custom chip costs, TCO and provisioned/modeled/compare power. USD/chip-hour.                                                                                                  |
+| `profit-estimator-per-gigawatt` | Same selectors; USD/GW-year basis and owning-cost default.                                                                                                                                                                                                                                                   |
+| `fleet`                         | Model/sequence/precision/GPUs, target/percentile, TCO/token type/cost provider, MW, input/output prices, ramp, cache discount, MTBI, recovery, horizon and metric. JSON or CSV.                                                                                                                              |
+| `evaluation`                    | Model, task, date, precision and GPU selection; public unofficial runs remain separately labeled and independent of the official date cutoff. JSON or CSV.                                                                                                                                                   |
+| `reliability`                   | Rolling range, GPU selection and optional `asOf` date for reproducibility. JSON or CSV.                                                                                                                                                                                                                      |
+| `gpu-specs`                     | Full hardware properties or selected metric ranking; table/radar/bar are renderings of these values. JSON or CSV.                                                                                                                                                                                            |
+| `overview`                      | Models, model/hardware row limits, hardware tier, engine, comparison mode and reference. JSON or CSV.                                                                                                                                                                                                        |
+| `rankings`                      | Ranking kind (model or chip), selected model/scenario and format. Use the exact values in OpenAPI.                                                                                                                                                                                                           |
+| `compare`                       | GPU pairs, model/slug, scenario, tier selection and variant. JSON or CSV.                                                                                                                                                                                                                                    |
+| `operatorx`                     | Exact/default measured run, operator, precision, shape, backend, cluster, status, throughput/latency and zero-based table page.                                                                                                                                                                              |
+| `collectivex`                   | Ordered run selection and suite; EP size/phase/modes/precision/operation/percentile/axis/SKU/backend/series; KV page size/x/y/pull/push/overlap ISL/series; swap direction/layout/metric/percentile/series.                                                                                                  |
+| `submissions`                   | Search, table sort/direction/offset/limit, weekly/cumulative chart, on-change cutoff and NVIDIA/AMD/total lines. Table search does not filter the independent submission-volume chart.                                                                                                                       |
+| `current-inferencex-image`      | Model, sequence, hardware, precision, speculation, node type, framework families and `asOf` for image age/release status.                                                                                                                                                                                    |
+| `gpu-metrics`                   | Required run, file/host artifact, GPU indices, metric or correlation axes, statistics sorting, chart mode and interactive downsampling preference. DB-first raw-explorer projection; full-record statistics use stored digests. Not a serving-window/role-pool projection. Responses are no-store.           |
+| `video`                         | CI run/artifact discovery; only already-published artifact reads; source, serving cell, media/fidelity slot, power phase and GPU denominator; same-workload comparisons, axes, deployment costs and selected tradeoff point. No-store.                                                                       |
 
 ## Interpretation and maintenance
 
@@ -81,6 +81,47 @@ For measured-power gauges, `optimal=true` keeps the chart's higher-power outer
 envelope. `frontier.direction` describes that boundary; `metric.direction` retains
 the optimization direction used by `best=true`. Interpret the envelope as a load
 boundary, not evidence that those points are more energy efficient.
+
+Prefer equal-service comparisons for article-facing hardware analysis. Use
+`xstat=mean` only for fixed-sequence service axes when that statistic is intended:
+streaming speed then means **1 / mean TPOT**, not arithmetic mean request speed.
+TTFT/E2E use recorded means. Default is median; absent means are not replaced.
+AgentX still uses `percentile`; concurrency uses no statistic. Check resolved
+`params.xstat` and `xAxis.statistic`, not the requested parameter alone.
+
+`serviceCompare=true` returns exact opaque `serviceSources` keys, an
+`equalServiceCurve`, and an optional `equalServiceComparison` at `serviceTarget`.
+Use returned keys verbatim for `serviceBaseline` and `serviceComparator` via
+`URLSearchParams`; never substitute bare GPU names. Omitted keys select the first
+two sources; unknown explicit keys stay unavailable. Omitted target means no
+selected-target result. Targets are tok/s/user for streaming speed, seconds for
+TTFT/E2E. Concurrency is unsupported for equal-service interpolation.
+
+The same dashboard helper uses scoped observed points before frontier/best
+pruning, with no power-comparison clones. It interpolates raw quantities
+linearly only inside each exact source range, then reports signed
+`100 × (comparator / baseline − 1)`. Metrics are measured GPU W/GPU,
+whole-deployment output tokens/s, and validated GPU J/output token. Negative energy
+change means lower comparator energy. Preserve bracket endpoint identities,
+`interpolated`, missing reasons and nulls. Never call interpolated points new
+measurements or bridge different runs, recipes, topologies or missing endpoints.
+
+`roleShare=true` returns validated disaggregated prefill/decode J/output and their
+shares of reconstructed total energy. It converts prefill J/input using the
+same-window aggregate J/output-to-J/input ratio; it does not compare unlike token
+denominators. Missing roles are omitted. Both panels require JSON; enabling
+either with CSV returns 400. Existing CSV remains a plotted-point export.
+
+For exact-load comparisons, use `xmode=concurrency`. The response resolves
+`optimal=false` and `best=false`, retains every eligible observed load, and sets
+`frontier.direction=null`; concurrency is not a speed or quality preference.
+Filter `topologies` with one or more exact `point.topologyKey` values from a first
+response (encode with `URLSearchParams`). This selects the same GPU count,
+parallelism, role-pool split and offload mode across hardware without removing
+loads. Unknown metadata stays unknown, not equivalent to an explicit setting.
+Keep hardware, precision, recipe, run/date and software provenance separate;
+matching topology alone does not establish a controlled hardware comparison.
+Missing concurrency points must remain absent, not interpolated or extrapolated.
 
 Fleet lifecycle defaults (ramp, cached-input percent, MTBI, recovery) follow the
 dashboard's lifecycle panel; read the current values from `/api/v1/views/options`

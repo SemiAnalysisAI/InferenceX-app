@@ -31,6 +31,7 @@ import {
 } from '@/components/inference/InferenceContext';
 import { useGlobalFilterSelection } from '@/components/GlobalFilterContext';
 import type {
+  AggDataEntry,
   ChartDefinition,
   HardwareConfig,
   InferenceData,
@@ -50,6 +51,7 @@ import { bestSeriesPerSku } from '@/components/inference/utils/best-series-per-s
 import InferenceTable from '@/components/inference/ui/InferenceTable';
 import ScatterGraph from '@/components/inference/ui/ScatterGraph';
 import PowerTimeline from '@/components/inference/ui/PowerTimeline';
+import PowerServiceComparison from '@/components/inference/ui/PowerServiceComparison';
 import { Card } from '@/components/ui/card';
 import { ChartButtons } from '@/components/ui/chart-buttons';
 import { ShareButton } from '@/components/ui/share-button';
@@ -213,7 +215,9 @@ function zhHeading(configured: string): string {
   const subjectZh = match?.groups && HEADING_SUBJECT_ZH[match.groups.subject];
   if (!subjectZh) return configured;
   const pctl = match.groups?.pctl;
-  return `vs. ${pctl ? `${pctl} ` : ''}${subjectZh}`;
+  const statisticZh =
+    pctl === 'Mean' ? '平均' : pctl === 'Median' ? '中位' : pctl ? `${pctl} ` : '';
+  return `vs. ${statisticZh}${subjectZh}`;
 }
 
 /** Presentation and data plumbing for trace-derived agentic x-axis modes. */
@@ -312,6 +316,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
     selectedXAxisMetric,
     selectedE2eXAxisMetric,
     selectedPercentile,
+    fixedSequenceStatistic,
     selectedXAxisMode,
     tokenRevenuePricing,
     showLineLabels,
@@ -488,6 +493,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
         {
           isAgentic,
           selectedPercentile,
+          fixedSequenceStatistic,
           tcoBasis,
           selectedXAxisMode,
           powerCompare,
@@ -540,6 +546,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
     selectedXAxisMetric,
     selectedE2eXAxisMetric,
     selectedPercentile,
+    fixedSequenceStatistic,
     powerCompare,
     selectedXAxisMode,
     tokenRevenuePricing,
@@ -783,7 +790,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
   const derivedSpec = useDerivedXAxis ? DERIVED_X_MODE_SPECS[selectedXAxisMode] : undefined;
 
   const renderableGraphs = useMemo(() => {
-    if (!isAgenticSequence) return visibleGraphs;
+    if (!isAgenticSequence || selectedXAxisMode === 'concurrency') return visibleGraphs;
     if (!derivedMetrics) {
       // Legacy AgentX axes can still render transient/non-persisted rows, which
       // have no ids to request.
@@ -833,6 +840,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
     isAgenticSequence,
     derivedSpec,
     derivedTargetIds.length,
+    selectedXAxisMode,
     visibleGraphs,
     derivedMetrics,
     selectedYAxisMetric,
@@ -870,9 +878,15 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
         : renderableGraphs.map((graph, graphIndex) => {
             const resolvedXLabel = xAxisLabel(graph.chartDefinition, locale);
             const isTimelineMode = Boolean(
-              selectedDateRange.startDate && selectedDateRange.endDate && selectedGPUs.length > 0,
+              selectedXAxisMode !== 'concurrency' &&
+              selectedDateRange.startDate &&
+              selectedDateRange.endDate &&
+              selectedGPUs.length > 0,
             );
-            const replayAvailable = getViewMode(graphIndex) === 'chart' && !isTimelineMode;
+            const replayAvailable =
+              getViewMode(graphIndex) === 'chart' &&
+              !isTimelineMode &&
+              selectedXAxisMode !== 'concurrency';
             // Chart-level notices: the KV-offload halo
             // key, the agentic optimization note, and the ATOM engine
             // footnote. Detected from the same data the chart plots —
@@ -883,6 +897,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
             // points only — skip the unofficial overlay there so the footer
             // can't advertise a halo or ATOM series that isn't on the chart.
             const isGpuComparison =
+              selectedXAxisMode !== 'concurrency' &&
               selectedGPUs.length > 0 &&
               ((selectedDateRange.startDate && selectedDateRange.endDate) ||
                 selectedDates.length > 0);
@@ -1053,6 +1068,12 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                               {(() => {
                                 // The timeline's x axis is time, not the scatter x metric.
                                 if (isPowerTimeline) return null;
+                                if (selectedXAxisMode === 'concurrency')
+                                  return locale === 'zh' ? '与并发数的关系' : 'vs. Concurrency';
+                                if (!isAgenticSequence) {
+                                  const heading = String(graph.chartDefinition.heading);
+                                  return locale === 'zh' ? zhHeading(heading) : heading;
+                                }
                                 const xField = graph.chartDefinition.x_scale_field;
                                 if (xField?.endsWith('_ttft')) {
                                   const percentile = xField.replace(/_ttft$/u, '');
@@ -1303,6 +1324,33 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                         </div>
                       );
                     })()}
+                    {selectedMeasuredConfig &&
+                      !isPowerTimeline &&
+                      getViewMode(graphIndex) !== 'table' &&
+                      (() => {
+                        const overlay = selectUnofficialOverlayForMode(
+                          selectedXAxisMode,
+                          graph.chartDefinition.chartType,
+                          overlayDataByChartType,
+                        );
+                        const { officialRows, overlayRows } = visibleComparisonRows(
+                          isGpuComparison
+                            ? graph.data.filter((point) =>
+                                activeDates.has(`${point.date}_${point.hwKey}`),
+                              )
+                            : graph.data,
+                          isGpuComparison ? undefined : overlay,
+                        );
+                        return (
+                          <PowerServiceComparison
+                            chartId={`chart-${graphIndex}`}
+                            contextLabel={`${getModelLabel(selectedModel)} · ${getSequenceLabel(selectedSequence)}`}
+                            data={[...officialRows, ...overlayRows]}
+                            xField={graph.chartDefinition.x_scale_field as keyof AggDataEntry}
+                            xLabel={resolvedXLabel}
+                          />
+                        );
+                      })()}
                     <ChartNotices chartId={`chart-${graphIndex}`} notices={footerNotices} />
                     {replayAvailable && !minimalChrome && (
                       <ReplayLauncher

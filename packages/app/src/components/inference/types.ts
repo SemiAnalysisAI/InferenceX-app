@@ -6,6 +6,7 @@ import type { Model, Sequence } from '@/lib/data-mappings';
 import type { PowerTier } from '@/lib/power-tier';
 import type { SystemPowerEstimate } from '@/lib/modeled-system-power';
 import type { MetricKey } from './metric-registry';
+import type { FixedSequenceStatistic } from './utils/resolveXAxisField';
 import type { PowerBasis } from '@/lib/power-basis';
 
 export type { WorkerPower };
@@ -88,6 +89,8 @@ export interface AggDataEntry {
   'p99.9_ttft': number;
   mean_tpot: number;
   mean_intvty: number;
+  /** Reciprocal of finite positive mean TPOT (seconds), not raw mean_intvty. */
+  mean_tpot_intvty?: number;
   median_tpot: number;
   median_intvty: number;
   std_tpot: number;
@@ -641,6 +644,8 @@ export interface QuickFilters {
   spec: SpecMode[];
   /** Measured-power certification tiers (see `@/lib/power-tier`). */
   power: PowerTier[];
+  /** Exact allocation and parallelism identities; absent means no constraint. */
+  topologies?: string[];
 }
 
 /**
@@ -710,9 +715,15 @@ export interface InferenceDisplayContextType {
   openRouterPricingLoading: boolean;
   openRouterPricingError: string | null;
   selectedPercentile: string;
+  fixedSequenceStatistic: FixedSequenceStatistic;
   selectedXAxisMetric: string | null;
   selectedE2eXAxisMetric: string | null;
-  selectedXAxisMode: 'ttft' | 'e2e' | 'interactivity' | 'e2e-normalized-interactivity';
+  selectedXAxisMode:
+    | 'ttft'
+    | 'e2e'
+    | 'interactivity'
+    | 'e2e-normalized-interactivity'
+    | 'concurrency';
   scaleType: 'auto' | 'linear' | 'log';
   /** Comparison series overlaid on a gated power metric (`i_pcompare`). */
   powerCompare: PowerCompare;
@@ -754,9 +765,10 @@ export interface InferenceActionsContextType {
   setSelectedYAxisMetric: (metric: string) => void;
   setTokenRevenuePriceSource: (source: TokenRevenuePriceSource) => void;
   setSelectedPercentile: (percentile: string) => void;
+  setFixedSequenceStatistic: (statistic: FixedSequenceStatistic) => void;
   setSelectedXAxisMetric: (metric: string | null) => void;
   setSelectedXAxisMode: (
-    mode: 'ttft' | 'e2e' | 'interactivity' | 'e2e-normalized-interactivity',
+    mode: 'ttft' | 'e2e' | 'interactivity' | 'e2e-normalized-interactivity' | 'concurrency',
   ) => void;
   setScaleType: (type: 'auto' | 'linear' | 'log') => void;
   setPowerCompare: (mode: PowerCompare) => void;
@@ -765,6 +777,7 @@ export interface InferenceActionsContextType {
   setQuickFilterDeployment: (modes: DeploymentMode[]) => void;
   setQuickFilterSpec: (modes: SpecMode[]) => void;
   setQuickFilterPower: (tiers: PowerTier[]) => void;
+  setQuickFilterTopologies: (topologies: string[]) => void;
   setIsLegendExpanded: (expanded: boolean) => void;
   setHideNonOptimal: (hide: boolean) => void;
   setShowAllMeasurements: (show: boolean) => void;

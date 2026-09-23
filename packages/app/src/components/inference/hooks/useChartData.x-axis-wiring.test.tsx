@@ -7,6 +7,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { BenchmarkRow } from '@/lib/api';
 import { Model, Sequence } from '@/lib/data-mappings';
 import { resolveScatterXAxisScale } from '@/components/inference/utils/x-axis-scale';
+import { processOverlayChartData } from '@/components/inference/utils';
+import { transformBenchmarkRows } from '@/lib/benchmark-transform';
 import { buildReplayTimeline } from '@/components/inference/replay/buildReplayTimeline';
 
 const mocks = vi.hoisted(() => ({
@@ -107,9 +109,11 @@ let result: ReturnType<typeof useChartData> | undefined;
 function Probe({
   mode,
   energy = false,
+  statistic = 'median',
   metric = energy ? 'y_measuredPrefillJPerInputToken' : 'y_inputTputPerGpu',
 }: {
   mode?: XAxisMode;
+  statistic?: 'mean' | 'median';
   energy?: boolean;
   metric?: string;
 }) {
@@ -135,6 +139,15 @@ function Probe({
     undefined,
     undefined,
     mode,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    statistic,
   );
   return null;
 }
@@ -154,6 +167,59 @@ afterEach(() => {
 });
 
 describe('useChartData x-axis scale wiring', () => {
+  it.each([
+    ['interactivity', 'interactivity', 'mean_tpot_intvty', 25, 'Mean Interactivity'],
+    ['ttft', 'e2e', 'mean_ttft', 8, 'Mean Time To First Token'],
+    ['e2e', 'e2e', 'mean_e2el', 30, 'Mean End-to-end Latency'],
+  ] as const)(
+    'keeps official, overlay and replay mean %s numerically aligned',
+    (mode, chartType, field, expectedX, label) => {
+      mocks.rows[0].metrics = {
+        ...mocks.rows[0].metrics,
+        mean_tpot: 0.04,
+        mean_intvty: 777,
+        mean_ttft: 8,
+        mean_e2el: 30,
+      };
+      mocks.rows[1].metrics = { ...mocks.rows[1].metrics, mean_intvty: 888 };
+      act(() => root.render(<Probe mode={mode} statistic="mean" metric="y_tpPerGpu" />));
+      const graph = result!.graphs.find((g) => g.chartDefinition.chartType === chartType)!;
+      expect(graph.chartDefinition.x_scale_field).toBe(field);
+      expect(graph.chartDefinition.x_label).toContain(label);
+      expect(graph.chartDefinition.heading).toContain(label);
+      expect(graph.data.map((point) => point.x)).toEqual([expectedX]);
+      expect(graph.data[0].mean_intvty).toBe(777);
+      const { chartData } = transformBenchmarkRows(mocks.rows);
+      const overlay = processOverlayChartData(
+        chartData[chartType === 'interactivity' ? 0 : 1],
+        chartType,
+        'y_tpPerGpu',
+        null,
+        {
+          selectedXAxisMode: mode,
+          fixedSequenceStatistic: 'mean',
+        },
+      );
+      expect(overlay.map((point) => point.x)).toEqual([expectedX]);
+      const replay = buildReplayTimeline(mocks.rows, graph.chartDefinition, 'y_tpPerGpu', null, [
+        'fp8',
+      ]);
+      expect(replay.configs.map((series) => series.template.x)).toEqual([expectedX]);
+    },
+  );
+
+  it('uses observed concurrency, preserves every point and removes preference directions', () => {
+    act(() => root.render(<Probe mode="concurrency" />));
+    for (const graph of result!.graphs) {
+      expect(graph.data.map((point) => point.x)).toEqual([8, 16]);
+      expect(graph.chartDefinition.x_scale_field).toBe('conc');
+      expect(graph.chartDefinition.x_label).toBe('Concurrency');
+      expect(graph.chartDefinition.x_labelZh).toBe('并发数');
+      expect(graph.chartDefinition.y_inputTputPerGpu_roofline).toBeUndefined();
+      expect(graph.clippedData).toEqual([]);
+    }
+  });
+
   it.each([
     ['interactivity', 'interactivity', 'median_intvty'],
     ['ttft', 'e2e', 'median_ttft'],
@@ -204,8 +270,8 @@ describe('useChartData x-axis scale wiring', () => {
     ]);
     expect(energyGraph?.chartDefinition).toMatchObject({
       x_scale_field: 'median_intvty',
-      x_label: 'Interactivity (tok/s/user)',
-      heading: 'vs. Interactivity',
+      x_label: 'Median Interactivity (tok/s/user)',
+      heading: 'vs. Median Interactivity',
       y_measuredPrefillJPerInputToken_roofline: 'lower_right',
     });
     if (!energyGraph) throw new Error('useChartData did not produce the interactivity graph');
@@ -252,8 +318,8 @@ describe('useChartData x-axis scale wiring', () => {
     expect(graph?.data.map((point) => point.x)).toEqual([12, 12]);
     expect(graph?.chartDefinition).toMatchObject({
       x_scale_field: 'median_e2el',
-      x_label: 'End-to-end Latency (s)',
-      heading: 'vs. End-to-end Latency',
+      x_label: 'Median End-to-end Latency (s)',
+      heading: 'vs. Median End-to-end Latency',
     });
   });
 

@@ -11,29 +11,29 @@ All endpoints are GET under /api/v1/views. Unsupported and repeated keys return 
 This table records accepted query names; behavioral tests exercise representative
 combinations, not the full Cartesian product of all possible filter values.
 
-| View                            | Accepted query keys                                                                                                                                                                                                                                                                                      |
-| ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `cache-reuse`                   | `config`, `date`, `gpus`, `model`, `percentile`, `precisions`, `runId`, `sequence`, `tcoBasis`, `unofficialrun`                                                                                                                                                                                          |
-| `calculator`                    | `costProvider`, `costType`, `costcap`, `date`, `format`, `gpus`, `hideSkuAboveConfigLimit`, `mode`, `model`, `mw`, `percentile`, `precisions`, `runId`, `sequence`, `target`, `tcoBasis`, `unofficialrun`                                                                                                |
-| `collectivex`                   | `activeSeries`, `kvSeries`, `swapSeries`, `backend`, `epSize`, `kvOp`, `kvX`, `kvY`, `modes`, `operation`, `overlapIsl`, `pageTokens`, `percentile`, `phase`, `precision`, `runs`, `sku`, `suite`, `swapDirection`, `swapLayout`, `swapMetric`, `swapPercentile`, `version`, `yAxis`                     |
-| `compare`                       | `format`, `gpus`, `model`, `scenario`, `slug`, `tiers`, `variant`                                                                                                                                                                                                                                        |
-| `current-inferencex-image`      | `asOf`, `frameworks`, `hardware`, `model`, `nodeType`, `precision`, `sequence`, `spec`                                                                                                                                                                                                                   |
-| `evaluation`                    | `unofficialrun`, `benchmark`, `date`, `format`, `gpus`, `model`, `precisions`                                                                                                                                                                                                                            |
-| `first-token`                   | `caps`, `costProvider`, `costType`, `date`, `gpus`, `minInteractivity`, `model`, `percentile`, `precisions`, `runId`, `sequence`, `tcoBasis`, `unofficialrun`                                                                                                                                            |
-| `fleet`                         | `cache`, `costProvider`, `costType`, `format`, `gpus`, `horizon`, `metric`, `model`, `mtbi`, `mw`, `oprice`, `percentile`, `precisions`, `price`, `ramp`, `recovery`, `sequence`, `target`, `tcoBasis`                                                                                                   |
-| `gpu-metrics`                   | `artifact`, `chartView`, `corrXMetric`, `corrYMetric`, `direction`, `downsample`, `gpus`, `metric`, `runId`, `sort`                                                                                                                                                                                      |
-| `gpu-specs`                     | `format`, `metric`                                                                                                                                                                                                                                                                                       |
-| `historical`                    | `deployment`, `end`, `extendToDate`, `format`, `frameworks`, `gpus`, `metric`, `model`, `precisions`, `priceSource`, `sequence`, `start`, `target`, `tcoBasis`, `vendors`                                                                                                                                |
-| `inference`                     | `allPoints`, `best`, `date`, `dates`, `deployment`, `end`, `format`, `frameworks`, `gpus`, `metric`, `model`, `optimal`, `percentile`, `power`, `precisions`, `priceSource`, `runId`, `sequence`, `spec`, `start`, `tcoBasis`, `unofficialrun`, `userCosts`, `userPowers`, `vendors`, `xmetric`, `xmode` |
-| `operatorx`                     | `backend`, `cluster`, `metric`, `operator`, `page`, `precision`, `runId`, `shape`, `status`                                                                                                                                                                                                              |
-| `options`                       | `format`                                                                                                                                                                                                                                                                                                 |
-| `overview`                      | `compare`, `engine`, `format`, `hwrows`, `models`, `ref`, `rows`, `tier`                                                                                                                                                                                                                                 |
-| `profit-estimator`              | `cachedInputPrice`, `costProvider`, `customCosts`, `date`, `dates`, `end`, `gpus`, `inputPrice`, `labCut`, `model`, `outputPrice`, `percentile`, `powerBasis`, `precisions`, `priceSource`, `runId`, `sequence`, `start`, `target`, `tcoBasis`, `unofficialrun`, `utilization`                           |
-| `profit-estimator-per-gigawatt` | `cachedInputPrice`, `costProvider`, `customCosts`, `date`, `dates`, `end`, `gpus`, `inputPrice`, `labCut`, `model`, `outputPrice`, `percentile`, `powerBasis`, `precisions`, `priceSource`, `runId`, `sequence`, `start`, `target`, `tcoBasis`, `unofficialrun`, `utilization`                           |
-| `rankings`                      | `format`, `kind`, `model`, `scenario`                                                                                                                                                                                                                                                                    |
-| `reliability`                   | `asOf`, `format`, `gpus`, `range`                                                                                                                                                                                                                                                                        |
-| `submissions`                   | `direction`, `limit`, `lines`, `mode`, `offset`, `onChangeOnly`, `search`, `sort`                                                                                                                                                                                                                        |
-| `video`                         | `artifact`, `cell`, `compare`, `costs`, `gpuBasis`, `page`, `phase`, `run`, `selected`, `slot`, `source`, `view`, `workload`, `xAxis`, `yAxis`                                                                                                                                                           |
+| View                            | Accepted query keys                                                                                                                                                                                                                                                                                                                                                                                                     |
+| ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `cache-reuse`                   | `config`, `date`, `gpus`, `model`, `percentile`, `precisions`, `runId`, `sequence`, `tcoBasis`, `unofficialrun`                                                                                                                                                                                                                                                                                                         |
+| `calculator`                    | `costProvider`, `costType`, `costcap`, `date`, `format`, `gpus`, `hideSkuAboveConfigLimit`, `mode`, `model`, `mw`, `percentile`, `precisions`, `runId`, `sequence`, `target`, `tcoBasis`, `unofficialrun`                                                                                                                                                                                                               |
+| `collectivex`                   | `activeSeries`, `kvSeries`, `swapSeries`, `backend`, `epSize`, `kvOp`, `kvX`, `kvY`, `modes`, `operation`, `overlapIsl`, `pageTokens`, `percentile`, `phase`, `precision`, `runs`, `sku`, `suite`, `swapDirection`, `swapLayout`, `swapMetric`, `swapPercentile`, `version`, `yAxis`                                                                                                                                    |
+| `compare`                       | `format`, `gpus`, `model`, `scenario`, `slug`, `tiers`, `variant`                                                                                                                                                                                                                                                                                                                                                       |
+| `current-inferencex-image`      | `asOf`, `frameworks`, `hardware`, `model`, `nodeType`, `precision`, `sequence`, `spec`                                                                                                                                                                                                                                                                                                                                  |
+| `evaluation`                    | `unofficialrun`, `benchmark`, `date`, `format`, `gpus`, `model`, `precisions`                                                                                                                                                                                                                                                                                                                                           |
+| `first-token`                   | `caps`, `costProvider`, `costType`, `date`, `gpus`, `minInteractivity`, `model`, `percentile`, `precisions`, `runId`, `sequence`, `tcoBasis`, `unofficialrun`                                                                                                                                                                                                                                                           |
+| `fleet`                         | `cache`, `costProvider`, `costType`, `format`, `gpus`, `horizon`, `metric`, `model`, `mtbi`, `mw`, `oprice`, `percentile`, `precisions`, `price`, `ramp`, `recovery`, `sequence`, `target`, `tcoBasis`                                                                                                                                                                                                                  |
+| `gpu-metrics`                   | `artifact`, `chartView`, `corrXMetric`, `corrYMetric`, `direction`, `downsample`, `gpus`, `metric`, `runId`, `sort`                                                                                                                                                                                                                                                                                                     |
+| `gpu-specs`                     | `format`, `metric`                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `historical`                    | `deployment`, `end`, `extendToDate`, `format`, `frameworks`, `gpus`, `metric`, `model`, `precisions`, `priceSource`, `sequence`, `start`, `target`, `tcoBasis`, `vendors`                                                                                                                                                                                                                                               |
+| `inference`                     | `allPoints`, `best`, `date`, `dates`, `deployment`, `end`, `format`, `frameworks`, `gpus`, `metric`, `model`, `optimal`, `percentile`, `power`, `precisions`, `priceSource`, `runId`, `sequence`, `spec`, `start`, `tcoBasis`, `topologies`, `unofficialrun`, `userCosts`, `userPowers`, `vendors`, `xmetric`, `xmode`, `xstat`, `serviceCompare`, `serviceBaseline`, `serviceComparator`, `serviceTarget`, `roleShare` |
+| `operatorx`                     | `backend`, `cluster`, `metric`, `operator`, `page`, `precision`, `runId`, `shape`, `status`                                                                                                                                                                                                                                                                                                                             |
+| `options`                       | `format`                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `overview`                      | `compare`, `engine`, `format`, `hwrows`, `models`, `ref`, `rows`, `tier`                                                                                                                                                                                                                                                                                                                                                |
+| `profit-estimator`              | `cachedInputPrice`, `costProvider`, `customCosts`, `date`, `dates`, `end`, `gpus`, `inputPrice`, `labCut`, `model`, `outputPrice`, `percentile`, `powerBasis`, `precisions`, `priceSource`, `runId`, `sequence`, `start`, `target`, `tcoBasis`, `unofficialrun`, `utilization`                                                                                                                                          |
+| `profit-estimator-per-gigawatt` | `cachedInputPrice`, `costProvider`, `customCosts`, `date`, `dates`, `end`, `gpus`, `inputPrice`, `labCut`, `model`, `outputPrice`, `percentile`, `powerBasis`, `precisions`, `priceSource`, `runId`, `sequence`, `start`, `target`, `tcoBasis`, `unofficialrun`, `utilization`                                                                                                                                          |
+| `rankings`                      | `format`, `kind`, `model`, `scenario`                                                                                                                                                                                                                                                                                                                                                                                   |
+| `reliability`                   | `asOf`, `format`, `gpus`, `range`                                                                                                                                                                                                                                                                                                                                                                                       |
+| `submissions`                   | `direction`, `limit`, `lines`, `mode`, `offset`, `onChangeOnly`, `search`, `sort`                                                                                                                                                                                                                                                                                                                                       |
+| `video`                         | `artifact`, `cell`, `compare`, `costs`, `gpuBasis`, `page`, `phase`, `run`, `selected`, `slot`, `source`, `view`, `workload`, `xAxis`, `yAxis`                                                                                                                                                                                                                                                                          |
 
 ## Source audit and shared computations
 
@@ -67,6 +67,79 @@ J/token and selected-time-window calculations. Run telemetry is DB-first with an
 artifact fallback for missing storage; the public view returns private, no-store
 responses and preserves upstream 503 failures.
 
+The `/inference` Power Timeline is a different surface from the raw `gpu-metrics`
+explorer. Its existing read-only `/api/gpu-metrics?series=power` source returns
+one-second per-device buckets, role assignments and validation-source identities;
+benchmark `power_audit` supplies the exact serving-window bounds. The public
+`/api/v1/views/gpu-metrics` projection alone does not return that combined evidence
+and must not be described as a serving-window or role-pool projection.
+
+Timeline share fields `i_ptaxis`, `i_ptlines`, `i_ptwindow`, `i_ptfocus` and
+`i_ptutility` are renderer state, not parameters of the raw explorer API. Window-only
+display selects retained bucket timestamps within the recorded inclusive bounds;
+serving-relative display uses `(bucket UTC ms - window start UTC ms) / 1000`.
+Missing, nonfinite or non-increasing bounds omit that trace in either mode.
+No boundary samples are interpolated, and no window statistics or energy values
+are recomputed. Per-GPU/mean/role-pool modes reuse the existing device identity and
+pool-sum calculations. Focus only dims other traces and the utility toggle only
+adds registry references. Raw telemetry, full-record statistics and API responses
+are unchanged by all five display settings. The reusable client helpers are
+`parsePowerTimelineParams`, `powerTimelineSampleX` and `tracePools` in
+`components/inference/utils/powerTimeline.ts`, and `sumPowerAt` in
+`components/gpu-power/power-series.ts`.
+
+## Fixed-sequence service comparisons
+
+The inference view exposes the same mean/median selector as the dashboard through
+`xstat=median|mean` (default median). Mean streaming speed is **1 / mean TPOT**;
+it is not the arithmetic mean of per-request speeds. Mean TTFT and E2E use their
+recorded mean values. Missing means remain missing; the view never substitutes a
+median. AgentX keeps its selected `percentile`, and concurrency has no statistic:
+`params.xstat` resolves to null in both cases, while `xAxis.statistic` records the
+effective percentile or null.
+
+`serviceCompare=true` adds `serviceSources`, `equalServiceCurve`, and (when
+`serviceTarget` is present) `equalServiceComparison`. Select exact opaque
+`serviceBaseline` and `serviceComparator` keys returned by `serviceSources`,
+encoded with `URLSearchParams`; omitted selections use its first two entries.
+Stale explicit selections remain unavailable. Missing target returns null, not an
+invented operating point. Streaming-speed targets are tok/s/user; TTFT/E2E targets
+are seconds. Concurrency remains a separate observed-load diagnostic, not an
+equal-service comparison axis.
+
+The dashboard and API share `equal-service-comparison.ts`: both consume scoped
+observed points after chart coverage/limits, before frontier and best-per-SKU
+pruning, with power-comparison clones excluded. `allPoints=true` restores clipped
+observations. Source keys retain hardware, precision, exact run, actual source
+date, recipe, topology and workload identity; changing display dates does not
+create a new measured source. Comparisons never join different sources into one
+interpolation bracket. All three metrics use bounded numerical linear
+interpolation of the underlying quantities, then compute
+`100 × (comparator / baseline − 1)`. No log-axis interpolation, extrapolation,
+missing-endpoint bridging or averaging of conflicting duplicate x-values occurs.
+
+Metrics are mean measured GPU board W/GPU, whole-deployment output tokens/s, and
+validated measured GPU J/output token. Each estimate returns its bracket point
+IDs, source/run/topology/recipe identities, endpoint x/value, and whether it was
+interpolated. Unavailable comparisons return explicit reasons and null metrics,
+not zero. This is an operating-point comparison, not proof of a hardware-only
+causal effect. Official, historical and unofficial source identities remain
+visible.
+
+`roleShare=true` returns `roleEnergyShares` through the same shared role helper.
+Validated disaggregated prefill J/input is multiplied by same-window aggregate
+J/output ÷ J/input, then compared with decode J/output. The percentage denominator
+is reconstructed prefill + decode energy on one output-token basis. Missing or
+invalid role measurements are omitted. This view does not mix pool-local token
+denominators or claim the reconstructed sum was independently measured.
+
+These panel results are JSON-only: `format=csv` with either panel enabled returns
+400, rather than silently exporting only the primary chart. Ordinary CSV retains
+its existing plotted-point contract. Share controls map directly:
+`i_mstat` → `xstat`, `i_servicecompare` → `serviceCompare`, `i_servicebase` →
+`serviceBaseline`, `i_servicepeer` → `serviceComparator`, `i_servicetarget` →
+`serviceTarget`, and `i_roleshare` → `roleShare`.
+
 ## Verification scope
 
 Route tests cover baseline views and selected extension behavior, including
@@ -88,6 +161,16 @@ those properties.
 GPU 视图优先读取已存遥测，缺少存储数据时回退到产物。全记录统计使用所选文件、
 主机序列的全部芯片摘要，包含启动与 warmup；已有摘要为空时不补算，缺失读数不补零。
 芯片显隐和图表降采样不改变该统计，也不改变 serving-window 或 J/token 的计算口径。
+
+`/inference` 的 Power Timeline 与原始 `gpu-metrics` 浏览器是两个不同视图。
+时间线通过现有只读 `/api/gpu-metrics?series=power` 获取逐秒采样、设备角色和验证来源，
+再结合基准测试 `power_audit` 中的服务窗口边界；公开的 `/api/v1/views/gpu-metrics`
+本身不返回这组完整证据，不能称为服务窗口或 GPU 池投影视图。
+五个 `i_pt*` 分享字段只控制显示，不是原始浏览器 API 的参数。窗口模式仅显示已记录
+边界内的采样点（含边界），服务起点模式将 UTC 时间减去窗口起点后换算为秒。
+边界缺失、非有限值或结束不晚于开始时，不绘制对应曲线；不插值补点，也不重算窗口
+统计或能耗。GPU 池模式复用已有设备角色和求和函数；聚焦仅调暗其他曲线，参考线
+使用硬件注册表。原始遥测、全记录统计和 API 响应均不因这些显示设置而改变。
 响应使用 private, no-store，上游 503 保留为错误响应。
 
 测试覆盖契约同步及代表性的筛选行为，并未穷举所有参数组合。生产数据库上的

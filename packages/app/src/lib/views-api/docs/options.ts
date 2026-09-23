@@ -78,6 +78,7 @@ const responseSchema = objectSchema(
     specMethods: arraySchema(stringSchema),
     percentiles: arraySchema(stringSchema),
     xAxisModes: arraySchema(stringSchema),
+    fixedSequenceStatistics: arraySchema(stringSchema),
     scaleModes: arraySchema(stringSchema),
     metrics: arraySchema(
       objectSchema({
@@ -157,6 +158,7 @@ const responseExample = {
   specMethods: ['mtp', 'none'],
   percentiles: ['p75', 'p90'],
   xAxisModes: ['interactivity', 'ttft', 'e2e', 'e2e-normalized-interactivity'],
+  fixedSequenceStatistics: ['median', 'mean'],
   scaleModes: ['auto', 'linear', 'log'],
   metrics: [
     {
@@ -183,6 +185,9 @@ const responseExample = {
     metric: 'y_tokensPerDollarH',
     percentile: 'p90',
     xmode: 'interactivity',
+    xstat: 'median',
+    serviceCompare: false,
+    roleShare: false,
   },
 };
 

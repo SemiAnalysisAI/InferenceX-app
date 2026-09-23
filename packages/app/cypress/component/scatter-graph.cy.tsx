@@ -45,6 +45,58 @@ const threePointCurve = (hwKey: string, ys: number[], extra: Partial<{ run_url: 
   );
 
 describe('ScatterGraph', () => {
+  it('retains the explicit observed-concurrency sweep without frontier or ruler controls', () => {
+    const data = [1, 4, 128].map((conc, index) =>
+      createMockInferenceData({
+        id: 9000 + index,
+        hwKey: 'h100',
+        precision: Precision.FP4,
+        conc,
+        x: conc,
+        y: [500, 600, 470][index],
+        run_url: 'https://github.com/org/repo/actions/runs/123',
+      }),
+    );
+    mountWithProviders(
+      <div style={{ width: 1000 }}>
+        <ScatterGraph
+          chartId="observed-load-test"
+          modelLabel="DeepSeek R1"
+          data={data}
+          xLabel="Concurrency"
+          yLabel="Throughput / Chip (tok/s)"
+          chartDefinition={createMockChartDefinition({ x: 'conc' })}
+          transitionDuration={0}
+        />
+      </div>,
+      {
+        inference: {
+          activeHwTypes: new Set(['h100']),
+          hwTypesWithData: new Set(['h100']),
+          selectedXAxisMode: 'concurrency',
+          hideNonOptimal: true,
+          showParetoFrontier: true,
+          hardwareConfig: hwConfig,
+        },
+        unofficial: {},
+      },
+    );
+    cy.get('#observed-load-test .dot-group')
+      .should('have.length', 3)
+      .each(($point) => {
+        cy.wrap($point).should('have.css', 'opacity', '1');
+      });
+    cy.get('#observed-load-test path[data-curve-kind="observed-load"]')
+      .should('have.length', 1)
+      .invoke('attr', 'd')
+      .should('not.match', /[CQ]/u);
+    expandLegendAdvanced();
+    cy.get(
+      '#scatter-hide-non-optimal, #scatter-perf-ruler, #observed-load-test-pareto-frontier',
+    ).should('not.exist');
+    cy.get('.global-pareto-frontier').should('not.exist');
+  });
+
   it('keeps the frontier modes and overlay winners without exposing the retired hinterland', () => {
     const official = [
       createMockInferenceData({ hwKey: 'h100', precision: Precision.FP8, x: 20, y: 80 }),

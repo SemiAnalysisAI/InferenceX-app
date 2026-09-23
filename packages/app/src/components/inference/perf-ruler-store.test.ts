@@ -212,6 +212,11 @@ describe('persisted perf-ruler store', () => {
       expect(persistedPerfRulerAxisKey(graphs('p90_e2el'), 'e2e', Y)).toBe(e2e);
     });
 
+    it('changes when the effective fixed-sequence statistic changes', () => {
+      const median = persistedPerfRulerAxisKey(graphs('median_e2el'), 'e2e', Y);
+      expect(persistedPerfRulerAxisKey(graphs('mean_e2el'), 'e2e', Y)).not.toBe(median);
+    });
+
     it('changes with the percentile and the y metric', () => {
       const base = persistedPerfRulerAxisKey(graphs('p90_e2el'), 'e2e', Y);
       expect(persistedPerfRulerAxisKey(graphs('p99_e2el'), 'e2e', Y)).not.toBe(base);
