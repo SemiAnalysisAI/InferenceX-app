@@ -580,6 +580,12 @@ job share one series across points. Windowing a series to the measured serving
 interval is a reader concern; the raw series deliberately includes server
 start-up and warm-up so both phases can be inspected.
 
+The point and run readers assemble a series from separate autocommit statements
+(series rows, statistics, samples). After loading, they re-read the series
+version key (`csv_sha256`, `sample_count`, `ingested_at`) and retry the whole
+read when a re-ingest committed in between, so one payload never mixes the
+statistics of one version with the samples of another.
+
 `bun run admin:db:backfill-gpu-metrics --all --yes` attaches telemetry for runs
 ingested before this migration. The reachable history is bounded by GitHub's
 90-day artifact retention (the upload step sets no `retention-days`) because the

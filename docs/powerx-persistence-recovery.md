@@ -82,7 +82,10 @@ Blob cache. The revision includes linked series, ingest time, CSV hash, sidecars
 point links/audits. The payload stays in Blob; the revision query reads only metadata.
 Same-input ingest leaves the revision unchanged. A sidecar correction, series replacement,
 new point link or linked audit correction selects a new cache entry, including for every
-point sharing the series. Missing points are not negatively cached.
+point sharing the series. Missing points are not negatively cached. A re-ingest that
+commits while the reader is between its statements changes the series version key
+(`csv_sha256`, `sample_count`, `ingested_at`), which the reader re-checks after loading
+and retries, so a payload never mixes statistics and samples from two versions.
 
 Point and Timeline responses use `Cache-Control: no-store`, so CDN/browser response caches
 cannot skip the database check. Client queries revalidate on mount and window focus.
