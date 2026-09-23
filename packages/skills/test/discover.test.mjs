@@ -176,16 +176,53 @@ test('dates accept a display selector by resolving its DB keys through the optio
   });
   assert.equal(dates.sources.length, 2);
   assert.equal(dates.coverage.complete_for_scope, true);
+});
 
-  const unknown = await discover(normalizeArgs(['dates', '--model', 'nope']), {
-    get: registryGet([], rows),
-  });
-  assert.deepEqual(unknown.items, []);
-  assert.equal(unknown.scope.model_selector, null);
-  assert.match(
-    unknown.coverage.limitations.join(' '),
-    /nope matches no availability DB model key/u,
-  );
+test('dates recognize registered empty model scopes without including sibling observations', async () => {
+  for (const [model, rows, rawModels] of [
+    ['glm5', [{ ...availability[1], model: 'glm5.1' }], ['glm5']],
+    ['GLM-5', [], ['glm5', 'glm5.1']],
+  ]) {
+    const requests = [];
+    const result = await discover(normalizeArgs(['dates', '--model', model]), {
+      get: registryGet(requests, rows),
+    });
+    assert.deepEqual(result.items, []);
+    assert.deepEqual(result.scope.raw_models, rawModels);
+    assert.equal(result.scope.raw_model, rawModels.length === 1 ? model : null);
+    assert.equal(result.scope.model_selector, 'GLM-5');
+    assert.equal(result.coverage.complete_for_scope, true);
+    assert.equal(result.coverage.available_items, 0);
+    assert.equal(result.coverage.limitations.length, 1, 'Only the pagination limitation applies');
+    assert.deepEqual(
+      requests.map(({ operation }) => operation),
+      ['availability', 'options'],
+    );
+    assert.deepEqual(
+      result.sources.map(({ operation }) => operation),
+      ['availability', 'options'],
+    );
+  }
+});
+
+test('dates do not claim complete coverage for unknown or ambiguous model keys', async () => {
+  for (const [model, registry] of [
+    ['nope', options],
+    ['glm5', { models: options.models.map((entry) => ({ ...entry, dbKeys: ['glm5'] })) }],
+  ]) {
+    const result = await discover(normalizeArgs(['dates', '--model', model]), {
+      get: (spec) => saved(spec.operation === 'options' ? registry : availability),
+    });
+    assert.deepEqual(result.items, []);
+    assert.equal(result.scope.requested_model, model);
+    assert.equal(result.scope.model_selector, null);
+    assert.equal(result.scope.raw_model, null);
+    assert.deepEqual(result.scope.raw_models, []);
+    assert.equal(result.coverage.complete_for_scope, false);
+    assert.equal(result.coverage.available_items, null);
+    assert.equal(result.coverage.returned_items, 0);
+    assert.match(result.coverage.limitations.join(' '), /cannot be resolved/u);
+  }
 });
 
 test('normalization accepts argv and canonical objects and rejects ambiguous scope', () => {

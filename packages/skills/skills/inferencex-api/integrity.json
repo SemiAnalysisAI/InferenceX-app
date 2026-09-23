@@ -21,7 +21,7 @@
     "scripts/compare-releases.mjs": "e76dc5b5b47c58954f1c3fa9861bbe65cea9f846fcc1ef967ba7d399a035c0c7",
     "scripts/compare-tco.mjs": "d483c2c4a098da9cc803ef3acc309e9a4089725a4d0ac6b02f32fb75c79f65d2",
     "scripts/coverage-policy.mjs": "8f4bcb87b25b7e1c1d6065e3abdd04efe4e744bba35874c055d54df4b7e0337c",
-    "scripts/discover.mjs": "f93b02971436a5669c8c6366e5899dc5977e18f0fda6d185de14c41719206ced",
+    "scripts/discover.mjs": "743d06ef6783b6c1445df3a7145f4de5ebd4e9eee707264b2a3616ecafc7b0d0",
     "scripts/doctor.mjs": "0f813408bd795c4ed1fb9171e1e017fb3a9556f053274c20c7446ece2717c7bd",
     "scripts/evidence-bundle.mjs": "125c08a97cd67a5451c780d3a691c131d25c7f95d767669ea531ecd601e1d008",
     "scripts/export-agentx.mjs": "ac4307721957c8d4cb51a0fc225b5e43d5f73773c84e924713a7a3d1b17ec3bc",

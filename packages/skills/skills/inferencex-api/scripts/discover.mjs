@@ -298,13 +298,15 @@ async function availability(options, get, signal) {
     signal?.throwIfAborted();
     const registry = await modelRegistry(get);
     sources.push(registry.source);
+    modelSelector = selectorForKey(registry.entries, options.model);
     const keys = keysForSelector(registry.entries, options.model);
     if (keys.length > 0) {
       rawModels = keys;
       modelSelector = options.model;
-    } else {
+    } else if (modelSelector === null) {
+      rawModels = [];
       limitations.push(
-        `${options.model} matches no availability DB model key and is not a display selector in the options registry.`,
+        `${options.model} cannot be resolved to an availability DB model key or a unique model in the options registry.`,
       );
     }
   }
@@ -319,13 +321,18 @@ async function availability(options, get, signal) {
   ]
     .toSorted(compare)
     .map((value) => ({ date: value }));
-  return document(
+  const result = document(
     options,
     scope,
     allItems,
     [responseSource(response, 'availability', url, scope), ...sources],
     limitations,
   );
+  if (rawModels.length === 0) {
+    result.coverage.complete_for_scope = false;
+    result.coverage.available_items = null;
+  }
+  return result;
 }
 
 function modelSelectors(body) {
