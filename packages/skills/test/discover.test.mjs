@@ -347,6 +347,52 @@ test('configs accept a DB model key listed by discover models and request the di
   );
 });
 
+test('configs keep DB key coverage exact while display selectors include sibling models', async () => {
+  const rows = [
+    benchmark('1', { model: 'glm5', hardware: 'h200_sxm' }),
+    benchmark('2', { model: 'glm5.1', hardware: 'b200' }),
+  ];
+  for (const [model, expectedIds] of [
+    ['glm5', ['1']],
+    ['glm5.1', ['2']],
+    ['GLM-5', ['2', '1']],
+  ]) {
+    const requests = [];
+    const result = await discover(normalizeArgs(['configs', '--model', model]), {
+      get: registryGet(requests, rows),
+    });
+    assert.equal(new URL(requests.at(-1).url).searchParams.get('model'), 'GLM-5');
+    assert.deepEqual(
+      result.items.map(({ result_id }) => result_id),
+      expectedIds,
+    );
+    assert.equal(result.coverage.available_items, expectedIds.length);
+    assert.equal(result.coverage.complete_for_scope, true);
+  }
+});
+
+test('coverage beyond the default configs page requires a complete snapshot', async () => {
+  const rows = Array.from({ length: 101 }, (_, index) =>
+    benchmark(String(index + 1), { hardware: index < 100 ? 'h200_sxm' : 'mi355x' }),
+  );
+  const get = registryGet([], rows);
+  const first = await discover(normalizeArgs(['configs', '--model', 'dsv4']), { get });
+  assert.deepEqual([...new Set(first.items.map(({ hardware }) => hardware))], ['h200_sxm']);
+  assert.equal(first.coverage.returned_items, 100);
+  assert.equal(first.coverage.available_items, 101);
+  assert.equal(first.coverage.complete_for_scope, false);
+
+  const complete = await discover(normalizeArgs(['configs', '--model', 'dsv4', '--limit', '101']), {
+    get,
+  });
+  assert.equal(complete.coverage.complete_for_scope, true);
+  assert.equal(complete.coverage.returned_items, 101);
+  assert.deepEqual(
+    [...new Set(complete.items.map(({ hardware }) => hardware))],
+    ['h200_sxm', 'mi355x'],
+  );
+});
+
 test('a malformed options registry is rejected instead of resolving a selector', async () => {
   await assert.rejects(
     discover(normalizeArgs(['configs', '--model', 'dsv4']), {

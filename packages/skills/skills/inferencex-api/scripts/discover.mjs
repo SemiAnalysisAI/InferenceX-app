@@ -487,6 +487,9 @@ async function configs(options, get, signal) {
   if (options.date !== null) url.searchParams.set('date', options.date);
   const response = await get({ operation: 'benchmarks', url: url.href, allowedStatuses: [200] });
   const rows = validateRows(response.body, benchmarkRow, 'benchmarks');
+  // A display family may contain several DB keys; keep an exact-key request exact.
+  const scopedRows =
+    modelSelector === options.model ? rows : rows.filter((row) => row.model === options.model);
   const scope = {
     requested_model: options.model,
     model_selector: modelSelector,
@@ -497,7 +500,7 @@ async function configs(options, get, signal) {
   return document(
     options,
     scope,
-    rows.map(configItem).toSorted(compareConfigs),
+    scopedRows.map(configItem).toSorted(compareConfigs),
     [...sources, responseSource(response, 'benchmarks', url.href, scope)],
     ['Trace availability is unknown because discovery does not request stored traces.'],
   );

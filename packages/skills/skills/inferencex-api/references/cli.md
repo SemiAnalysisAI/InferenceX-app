@@ -21,6 +21,11 @@ and `discover dates` accept either that key or the display selector from the
 OpenAPI `model` enum (for example `DeepSeek-V4-Pro`). When the two forms differ,
 the key is resolved through the public `/api/v1/views/options` registry and the
 output `scope` records both `requested_model` and the resolved `model_selector`.
+An exact DB key restricts the returned observations to that key; a display
+selector includes every DB key in its family. Discovery slices each fetched
+snapshot locally. Check `coverage.complete_for_scope` before treating counts or
+hardware coverage as exhaustive; use `--limit` up to 1000 at offset 0 to include
+more rows in one response. Separate offset requests can observe different snapshots.
 A formal command creates one new evidence directory containing `result.json` or
 `result.csv`, decoded response bodies, and `manifest.json`. `verify` replays that
 directory without network access.
