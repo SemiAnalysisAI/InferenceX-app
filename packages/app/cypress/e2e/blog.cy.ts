@@ -39,6 +39,15 @@ describe('Blog', () => {
 
   describe('Blog listing page', () => {
     before(() => {
+      // Listing content and links must not depend on remote thumbnail availability.
+      cy.intercept(
+        {
+          method: 'GET',
+          pathname: '/_next/image',
+          query: { url: /^https:\/\/substack-post-media\.s3\.amazonaws\.com\// },
+        },
+        { statusCode: 204 },
+      );
       cy.visit('/blog');
     });
 
