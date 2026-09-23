@@ -20,6 +20,7 @@ import {
   isSequenceDeprecatedForModel,
   getSequenceCategoryForModel,
   isBestPerSkuDefaultOff,
+  getModelDefaultPrecisions,
   showsTcoBasisSelector,
   Model,
   Sequence,
@@ -245,6 +246,12 @@ describe('isSequenceDeprecatedForModel / getSequenceCategoryForModel', () => {
     );
   });
 
+  it('marks 8K/1K deprecated for GLM-5.2 / GLM-5.3 (agentic coding only per MODELS.md)', () => {
+    expect(isSequenceDeprecatedForModel(Model.GLM_5_2, Sequence.EightK_OneK)).toBe(true);
+    expect(getSequenceCategoryForModel(Sequence.EightK_OneK, Model.GLM_5_2)).toBe('deprecated');
+    expect(isSequenceDeprecatedForModel(Model.GLM_5_2, Sequence.AgenticTraces)).toBe(false);
+  });
+
   it('keeps 8K/1K default for models still sweeping it', () => {
     expect(isSequenceDeprecatedForModel(Model.Qwen3_5, Sequence.EightK_OneK)).toBe(false);
     expect(getSequenceCategoryForModel(Sequence.EightK_OneK, Model.Qwen3_5)).toBe('default');
@@ -436,5 +443,21 @@ describe('getEvalBenchmarkLabel', () => {
   it('falls back to the benchmark value for unknown benchmark', () => {
     const result = getEvalBenchmarkLabel('humaneval' as EvalBenchmark);
     expect(result).toBe('humaneval');
+  });
+});
+
+describe('getModelDefaultPrecisions', () => {
+  it('opens GLM-5.2 / GLM-5.3 Agentic coding on FP4 and FP8', () => {
+    expect(getModelDefaultPrecisions(Model.GLM_5_2, Sequence.AgenticTraces)).toEqual([
+      Precision.FP4,
+      Precision.FP8,
+    ]);
+  });
+
+  it('leaves other scenarios and models on the auto default', () => {
+    expect(getModelDefaultPrecisions(Model.GLM_5_2, Sequence.EightK_OneK)).toBeUndefined();
+    expect(getModelDefaultPrecisions(Model.Qwen3_5, Sequence.AgenticTraces)).toBeUndefined();
+    expect(getModelDefaultPrecisions(null, Sequence.AgenticTraces)).toBeUndefined();
+    expect(getModelDefaultPrecisions(Model.GLM_5_2, null)).toBeUndefined();
   });
 });

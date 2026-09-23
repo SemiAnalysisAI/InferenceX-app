@@ -549,10 +549,15 @@ export function getSequenceCategory(sequence: Sequence): CategoryTag {
  * DeepSeek V4 Pro: 2026-09-08 was the last day of its Single-turn 8k1k sweep
  * (InferenceX#2728, per MODELS.md "Deprecation Notice"); Agentic coding,
  * including the MTP and DSpark arms, stays active and the model is not retired.
+ *
+ * GLM-5.2 / GLM-5.3 (one bucket, see MODEL_CONFIG): MODELS.md lists Agentic
+ * coding as the only active scenario for both checkpoints, so 8K/1K rows are
+ * historical and group under Deprecated.
  */
 const MODEL_DEPRECATED_SEQUENCES: Partial<Record<Model, ReadonlySet<Sequence>>> = {
   [Model.MiniMax_M3]: new Set([Sequence.EightK_OneK]),
   [Model.DeepSeek_V4_Pro]: new Set([Sequence.EightK_OneK]),
+  [Model.GLM_5_2]: new Set([Sequence.EightK_OneK]),
 };
 
 /** Whether this model retired the scenario even though it is globally active. */
@@ -646,6 +651,33 @@ export const PRECISION_OPTIONS = Object.keys(PRECISION_CONFIG) as Precision[];
 
 export function getPrecisionLabel(precision: Precision): string {
   return PRECISION_CONFIG[precision]?.label ?? precision;
+}
+
+/**
+ * Model + scenario pairs that open on a fixed precision set instead of the
+ * densest-precision auto default (`resolveEffectivePrecisions`). Only the
+ * default for readers who have not chosen changes: an explicit `i_prec`, a
+ * preset or a manual toggle still wins, and precisions the model lacks for the
+ * scenario are dropped (falling back to the auto default when none remain).
+ *
+ * GLM-5.2 / GLM-5.3 Agentic coding: FP4 and FP8 both carry full fleets, so the
+ * densest-only rule would hide one of them on first load.
+ *
+ * Declared after `Precision`: TypeScript enums are initialised in module order.
+ */
+const MODEL_DEFAULT_PRECISIONS: Partial<
+  Record<Model, Partial<Record<Sequence, readonly Precision[]>>>
+> = {
+  [Model.GLM_5_2]: { [Sequence.AgenticTraces]: [Precision.FP4, Precision.FP8] },
+};
+
+/** The fixed default precision set for this model and scenario, if any. */
+export function getModelDefaultPrecisions(
+  model: Model | string | null | undefined,
+  sequence: Sequence | null | undefined,
+): readonly Precision[] | undefined {
+  if (!model || !sequence) return undefined;
+  return MODEL_DEFAULT_PRECISIONS[model as Model]?.[sequence];
 }
 
 // ---------------------------------------------------------------------------

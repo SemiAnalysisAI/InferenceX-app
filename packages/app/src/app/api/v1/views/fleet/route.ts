@@ -151,7 +151,13 @@ export function GET(request: NextRequest): Promise<Response> {
 
     const rows = await fleetHistoryRows([...model.dbModelKeys], sequence);
 
-    const precisions = resolveRowPrecisions(rows, sequence, requestedPrecisions);
+    const precisions = resolveRowPrecisions(
+      rows,
+      sequence,
+      requestedPrecisions,
+      [],
+      model.displayName,
+    );
 
     // Stage one/two of `useHistoricalBest`: per-(hwKey, date) frontiers, then each
     // hwKey's best-so-far staircase at the target. The rank accessor is

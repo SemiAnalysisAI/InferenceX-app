@@ -125,7 +125,13 @@ export async function calculatorGroups(
   const rows = await benchmarkRows(request, params, sourceOptions);
   // Comparisons reuse the primary overlay rows for precision resolution only.
   const overlayRows = sourceOptions.overlayRows ?? (await unofficialRows(request));
-  const precisions = resolveRowPrecisions(rows, params.sequence, params.precisions, overlayRows);
+  const precisions = resolveRowPrecisions(
+    rows,
+    params.sequence,
+    params.precisions,
+    overlayRows,
+    params.model,
+  );
   const options = { ...params, precisions };
   const official = buildGpuGroups<GroupMeta>(rows, {
     ...options,

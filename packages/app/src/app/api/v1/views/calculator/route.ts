@@ -221,7 +221,13 @@ export function GET(request: NextRequest): Promise<Response> {
     const rows = await calculatorRows([...model.dbModelKeys], sequence, date, runId);
 
     const overlayRows = await unofficialRows(request);
-    const precisions = resolveRowPrecisions(rows, sequence, requestedPrecisions, overlayRows);
+    const precisions = resolveRowPrecisions(
+      rows,
+      sequence,
+      requestedPrecisions,
+      overlayRows,
+      model.displayName,
+    );
     const multiPrecision = precisions.length > 1;
 
     // Same group identity as the dashboard's official path in

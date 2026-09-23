@@ -6,6 +6,7 @@ import type { DerivedAgenticMetricMap } from '@/hooks/api/use-derived-agentic-me
 import { fetchOpenRouterPricing } from '@/hooks/api/use-openrouter-pricing';
 import type { TcoBasis } from '@/lib/constants';
 import {
+  getModelDefaultPrecisions,
   getOpenRouterModelId,
   isBestPerSkuDefaultOff,
   type Model,
@@ -138,6 +139,7 @@ function buildView(
     availablePrecisions,
     curveCounts: countCurvesByPrecision(seqRows),
     explicit: params.precisionsExplicit,
+    modelDefaultPrecisions: getModelDefaultPrecisions(params.model, params.sequence),
   });
 
   const result = buildInferenceSeries(rows, {

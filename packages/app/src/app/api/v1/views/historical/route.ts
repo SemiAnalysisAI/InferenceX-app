@@ -1,6 +1,11 @@
 import { NORMALIZED_TOKEN_REVENUE_PRICING } from '@/components/inference/token-revenue';
 import { fetchOpenRouterPricing } from '@/hooks/api/use-openrouter-pricing';
-import { getOpenRouterModelId, type Model, Sequence } from '@/lib/data-mappings';
+import {
+  getModelDefaultPrecisions,
+  getOpenRouterModelId,
+  type Model,
+  Sequence,
+} from '@/lib/data-mappings';
 import {
   validateParams as validateViewParams,
   matchesHardware,
@@ -131,6 +136,7 @@ export function GET(request: NextRequest) {
       availablePrecisions,
       curveCounts: countCurvesByPrecision(allRows),
       explicit: precisions.length > 0,
+      modelDefaultPrecisions: getModelDefaultPrecisions(displayName, sequence),
     });
 
     const trendMetricKey = resolveMetricConfigKey(metricConfigKey).slice(2) as YAxisMetricKey;

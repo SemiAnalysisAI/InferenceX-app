@@ -32,6 +32,7 @@ import { replaceClientPathname } from '@/lib/client-navigation';
 import { useUnofficialRun } from '@/components/unofficial-run-provider';
 import type { RunInfo } from '@/components/inference/types';
 import {
+  getModelDefaultPrecisions,
   Model,
   MODEL_OPTIONS,
   Precision,
@@ -581,6 +582,7 @@ export function GlobalFilterProvider({
         curveCounts: precisionCurveCounts,
         unofficialPrecisions: unofficialPrecisionsForSelection,
         explicit: precisionExplicit,
+        modelDefaultPrecisions: getModelDefaultPrecisions(selectedModel, effectiveSequence),
       }),
     [
       selectedPrecisions,
@@ -588,6 +590,8 @@ export function GlobalFilterProvider({
       precisionCurveCounts,
       unofficialPrecisionsForSelection,
       precisionExplicit,
+      selectedModel,
+      effectiveSequence,
     ],
   );
 

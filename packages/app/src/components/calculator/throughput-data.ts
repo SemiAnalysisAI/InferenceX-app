@@ -6,7 +6,7 @@ import { rowToAggDataEntry } from '@/lib/benchmark-transform';
 import { pricingCacheHitRate } from '@/lib/cache-pricing';
 import { getHardwareKey } from '@/lib/chart-utils';
 import { DEFAULT_TCO_BASIS, getGpuSpecs, getHardwareConfig, type TcoBasis } from '@/lib/constants';
-import { Percentile, Sequence } from '@/lib/data-mappings';
+import { getModelDefaultPrecisions, Percentile, Sequence } from '@/lib/data-mappings';
 import { supportsTokenMetric } from '@/lib/supplemental-benchmarks';
 
 import {
@@ -278,6 +278,7 @@ export function resolveRowPrecisions(
   sequence: Sequence,
   requested: readonly string[],
   overlayRows: BenchmarkRow[] = [],
+  model?: string,
 ): string[] {
   const forSequence = rows.filter((row) => rowToSequence(row) === sequence);
   const unofficialPrecisions = overlayRows
@@ -292,5 +293,6 @@ export function resolveRowPrecisions(
     curveCounts: countCurvesByPrecision(forSequence),
     unofficialPrecisions,
     explicit: requested.length > 0,
+    modelDefaultPrecisions: getModelDefaultPrecisions(model, sequence),
   });
 }
