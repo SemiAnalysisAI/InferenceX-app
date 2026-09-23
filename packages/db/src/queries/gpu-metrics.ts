@@ -174,6 +174,20 @@ function toStatRow(raw: RawStatRow): GpuMetricStatRow {
   };
 }
 
+function groupBySeries<Raw extends { series_id: number | string }, Row>(
+  rows: readonly Raw[],
+  toRow: (raw: Raw) => Row,
+): Map<number, Row[]> {
+  const groups = new Map<number, Row[]>();
+  for (const raw of rows) {
+    const key = Number(raw.series_id);
+    const bucket = groups.get(key);
+    if (bucket) bucket.push(toRow(raw));
+    else groups.set(key, [toRow(raw)]);
+  }
+  return groups;
+}
+
 async function loadSeriesDetails(
   sql: DbClient,
   seriesRows: readonly RawSeriesRow[],
@@ -198,20 +212,8 @@ async function loadSeriesDetails(
     order by series_id, sampled_at, gpu_index
   `) as unknown as RawSampleRow[];
 
-  const statsBySeries = new Map<number, GpuMetricStatRow[]>();
-  for (const raw of statRows) {
-    const key = Number(raw.series_id);
-    const bucket = statsBySeries.get(key);
-    if (bucket) bucket.push(toStatRow(raw));
-    else statsBySeries.set(key, [toStatRow(raw)]);
-  }
-  const samplesBySeries = new Map<number, GpuMetricSampleRow[]>();
-  for (const raw of sampleRows) {
-    const key = Number(raw.series_id);
-    const bucket = samplesBySeries.get(key);
-    if (bucket) bucket.push(toSampleRow(raw));
-    else samplesBySeries.set(key, [toSampleRow(raw)]);
-  }
+  const statsBySeries = groupBySeries(statRows, toStatRow);
+  const samplesBySeries = groupBySeries(sampleRows, toSampleRow);
 
   return seriesRows.map((row) => {
     const id = Number(row.id);

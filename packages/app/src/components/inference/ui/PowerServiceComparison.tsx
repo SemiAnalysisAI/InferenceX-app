@@ -134,6 +134,7 @@ function ComparisonPlot({
   const yMin = Math.min(0, ...ys),
     yMax = Math.max(reference, ...ys);
   const grouped = Object.fromEntries(d3.groups(points, (p) => p.key));
+  const finitePoints = points.filter((p) => Number.isFinite(p.y));
   const drawReference: NonNullable<CustomLayerConfig['render']> = (group, ctx) => {
     const scale = (ctx.renderedYScale ?? ctx.yScale) as ContinuousScale;
     group
@@ -151,7 +152,7 @@ function ComparisonPlot({
   return (
     <D3Chart<PlotPoint>
       chartId={`${chartId}-plot`}
-      data={points.filter((p) => Number.isFinite(p.y))}
+      data={finitePoints}
       height={360}
       testId={`${chartId}-plot`}
       watermark="logo"
@@ -192,7 +193,7 @@ function ComparisonPlot({
           : []),
         {
           type: 'point',
-          data: points.filter((p) => Number.isFinite(p.y)),
+          data: finitePoints,
           config: {
             getCx: () => 0,
             getCy: () => 0,

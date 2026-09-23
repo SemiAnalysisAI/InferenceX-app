@@ -154,13 +154,12 @@ describe('PowerServiceComparison', () => {
         'have.length',
         9,
       );
-      cy.get('[data-testid="power-service-test-service-plot"] circle.point[r="6"]')
+      cy.get<SVGCircleElement & { __data__: { x: number; y: number } }>(
+        '[data-testid="power-service-test-service-plot"] circle.point[r="6"]',
+      )
         .should('have.length', 3)
         .and(($points) => {
-          const values = Array.from(
-            $points,
-            (element) => (element as unknown as { __data__: { x: number; y: number } }).__data__,
-          );
+          const values = Array.from($points, (element) => element.__data__);
           expect(values.map((entry) => entry.x)).to.deep.equal([40, 40, 40]);
           expect(values.map((entry) => entry.y)).to.deep.equal([50, 50, -40]);
         });
@@ -217,12 +216,10 @@ describe('PowerServiceComparison', () => {
     mountComparison([...roles, { ...roles[0], id: 99, power_valid: 0 }]);
     cy.get('[data-testid="role-share-toggle"]').check();
     roleSvg()
-      .find('circle.point')
+      .find<SVGCircleElement & { __data__: { y: number } }>('circle.point')
       .should('have.length', 3)
       .then(($points) => {
-        const values = [...$points].map(
-          (element) => (element as unknown as { __data__: { y: number } }).__data__.y,
-        );
+        const values = [...$points].map((element) => element.__data__.y);
         expect(values).to.deep.equal([40, 50, 60]);
         const center = Number($points[1].getAttribute('cy'));
         roleSvg()

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.shared-runtime';
+import type { InferenceData } from '@/components/inference/types';
 import {
   PowerMetricAvailability,
   PowerMetricAvailabilityPanel,
@@ -79,30 +80,17 @@ const agenticDisagg = createMockInferenceData({
   modeledSystemPower: { status: 'unsupported', reason: 'workload', modelRevision: 'abc1234' },
 });
 const unregistered = createMockInferenceData({ ...base, hwKey: 'unknown_hw' });
-function BoundaryPanel({ metric: initial }: { metric: string }) {
+const coverage = [missing, invalid, measured];
+const boundaryPoints = [boundaries, outsideModel, failedValidation, agenticDisagg, unregistered];
+
+function Panel({ points, metric: initial }: { points: InferenceData[]; metric: string }) {
   const [metric, select] = useState(initial);
-  return (
-    <PowerMetricAvailabilityPanel
-      points={[boundaries, outsideModel, failedValidation, agenticDisagg, unregistered]}
-      metric={metric}
-      onSelect={select}
-    />
-  );
-}
-function Panel() {
-  const [metric, select] = useState('y_measuredAvgPower');
-  return (
-    <PowerMetricAvailabilityPanel
-      points={[missing, invalid, measured]}
-      metric={metric}
-      onSelect={select}
-    />
-  );
+  return <PowerMetricAvailabilityPanel points={points} metric={metric} onSelect={select} />;
 }
 
 describe('PowerX metric availability', () => {
   it('explains missing GB and withheld AMD data, exposes source links, and switches metrics', () => {
-    cy.mount(<Panel />);
+    cy.mount(<Panel points={coverage} metric="y_measuredAvgPower" />);
     cy.contains('1 of 3 points have this metric');
     cy.contains('Validation failed: 1');
     cy.contains('Metric not reported: 1');
@@ -117,7 +105,7 @@ describe('PowerX metric availability', () => {
   it('uses Chinese copy for the same coverage states', () => {
     cy.mount(
       <PathnameContext.Provider value="/zh/inference/qwen-3-5">
-        <Panel />
+        <Panel points={coverage} metric="y_measuredAvgPower" />
       </PathnameContext.Provider>,
     );
     cy.contains('3 个数据点中有 1 个提供此指标');
@@ -126,7 +114,7 @@ describe('PowerX metric availability', () => {
     cy.contains('缺失值不会被替换为零或 TDP 估算值');
   });
   it('explains why derived power boundaries are missing per point', () => {
-    cy.mount(<BoundaryPanel metric="y_utilityModeledWatts" />);
+    cy.mount(<Panel points={boundaryPoints} metric="y_utilityModeledWatts" />);
     // B4 follows the chassis model and the telemetry verdict.
     cy.contains('1 of 5 points have this metric');
     cy.contains('Value available: 1');
@@ -162,7 +150,7 @@ describe('PowerX metric availability', () => {
   it('uses Chinese copy for the derived boundary states', () => {
     cy.mount(
       <PathnameContext.Provider value="/zh/inference/qwen-3-5">
-        <BoundaryPanel metric="y_utilityModeledJPerOutputToken" />
+        <Panel points={boundaryPoints} metric="y_utilityModeledJPerOutputToken" />
       </PathnameContext.Provider>,
     );
     cy.contains('5 个数据点中有 1 个提供此指标');
@@ -185,7 +173,7 @@ describe('PowerX metric availability', () => {
     // Only the registered B200 and the disaggregated AgentX row carry
     // validated telemetry; the GB200 and the unregistered hardware report
     // nothing and the AMD row failed validation.
-    cy.mount(<BoundaryPanel metric="y_measuredAvgPower" />);
+    cy.mount(<Panel points={boundaryPoints} metric="y_measuredAvgPower" />);
     cy.contains('2 of 5 points have this metric');
     cy.contains('Validation failed: 1');
     cy.contains('Metric not reported: 2');

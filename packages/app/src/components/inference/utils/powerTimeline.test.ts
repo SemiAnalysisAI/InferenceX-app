@@ -391,13 +391,9 @@ describe('power trace focus handoff', () => {
   });
 });
 
-describe('prioritizeRuns', () => {
-  const requests = ['1', '2', '3', '4', '5'].map((runId) => ({
-    runId,
-    prefix: '',
-    sources: [],
-  }));
+const requests = ['1', '2', '3', '4', '5'].map((runId) => ({ runId, prefix: '', sources: [] }));
 
+describe('prioritizeRuns', () => {
   it('moves overlay runs ahead of official runs and keeps both orders', () => {
     expect(prioritizeRuns(requests, new Set(['5', '3'])).map((request) => request.runId)).toEqual([
       '3',
@@ -422,12 +418,6 @@ describe('prioritizeRuns', () => {
 });
 
 describe('prioritizeRun', () => {
-  const requests = ['1', '2', '3', '4', '5'].map((runId) => ({
-    runId,
-    prefix: '',
-    sources: [],
-  }));
-
   it('moves the deep-linked run to the front and keeps the rest in order', () => {
     expect(prioritizeRun(requests, '5').map((request) => request.runId)).toEqual([
       '5',

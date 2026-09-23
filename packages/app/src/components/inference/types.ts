@@ -7,6 +7,7 @@ import type { PowerTier } from '@/lib/power-tier';
 import type { SystemPowerEstimate } from '@/lib/modeled-system-power';
 import type { MetricKey } from './metric-registry';
 import type { FixedSequenceStatistic } from './utils/resolveXAxisField';
+import type { XAxisMode } from './hooks/chart-data-core';
 import type { PowerBasis } from '@/lib/power-basis';
 
 export type { WorkerPower };
@@ -718,12 +719,7 @@ export interface InferenceDisplayContextType {
   fixedSequenceStatistic: FixedSequenceStatistic;
   selectedXAxisMetric: string | null;
   selectedE2eXAxisMetric: string | null;
-  selectedXAxisMode:
-    | 'ttft'
-    | 'e2e'
-    | 'interactivity'
-    | 'e2e-normalized-interactivity'
-    | 'concurrency';
+  selectedXAxisMode: XAxisMode;
   scaleType: 'auto' | 'linear' | 'log';
   /** Comparison series overlaid on a gated power metric (`i_pcompare`). */
   powerCompare: PowerCompare;
@@ -767,9 +763,7 @@ export interface InferenceActionsContextType {
   setSelectedPercentile: (percentile: string) => void;
   setFixedSequenceStatistic: (statistic: FixedSequenceStatistic) => void;
   setSelectedXAxisMetric: (metric: string | null) => void;
-  setSelectedXAxisMode: (
-    mode: 'ttft' | 'e2e' | 'interactivity' | 'e2e-normalized-interactivity' | 'concurrency',
-  ) => void;
+  setSelectedXAxisMode: (mode: XAxisMode) => void;
   setScaleType: (type: 'auto' | 'linear' | 'log') => void;
   setPowerCompare: (mode: PowerCompare) => void;
   setQuickFilterVendors: (vendors: string[]) => void;

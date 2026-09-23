@@ -132,6 +132,8 @@ function mountCompare(
   } = {},
 ) {
   const metricKey = options.metric ?? 'y_measuredAvgPower';
+  const extraRuns = options.extraRuns ?? [];
+  const overlayHwTypes = new Set(['h100', ...extraRuns.flatMap((run) => run.hwKeys)]);
   mountWithProviders(
     <PathnameContext.Provider value={options.pathname ?? '/inference'}>
       <div style={{ width: options.width ?? 1000, height: 640 }}>
@@ -168,19 +170,13 @@ function mountCompare(
       unofficial: options.overlay
         ? {
             isUnofficialRun: true,
-            activeOverlayHwTypes: new Set([
-              'h100',
-              ...(options.extraRuns ?? []).flatMap((run) => run.hwKeys),
-            ]),
-            allOverlayHwTypes: new Set([
-              'h100',
-              ...(options.extraRuns ?? []).flatMap((run) => run.hwKeys),
-            ]),
+            activeOverlayHwTypes: overlayHwTypes,
+            allOverlayHwTypes: overlayHwTypes,
             runIndexByUrl: {
               [OVERLAY_RUN_URL]: 0,
               [String(OVERLAY_RUN_ID)]: 0,
               ...Object.fromEntries(
-                (options.extraRuns ?? []).flatMap((run, index) => [
+                extraRuns.flatMap((run, index) => [
                   [run.url, index + 1],
                   [String(run.id), index + 1],
                 ]),
@@ -198,7 +194,7 @@ function mountCompare(
                 status: 'completed',
                 isNonMainBranch: true,
               },
-              ...(options.extraRuns ?? []).map((run) => ({
+              ...extraRuns.map((run) => ({
                 id: run.id,
                 name: `powerx-compare-${run.id}`,
                 branch: `powerx-compare-${run.id}`,

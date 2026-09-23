@@ -14,7 +14,6 @@ const mocks = vi.hoisted(() => ({
   persistBenchmark: vi.fn(() => Promise.resolve({ newCount: 1, dupCount: 0, insertedIds: [10] })),
   configFailure: false,
   purgeExtra: false,
-  serverLogFailure: false,
 }));
 vi.mock('./etl/db-utils', async (importOriginal) => ({
   ...(await importOriginal<typeof DbUtils>()),
@@ -79,7 +78,6 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.configFailure = false;
   mocks.purgeExtra = false;
-  mocks.serverLogFailure = false;
 });
 
 afterEach(() => {
@@ -142,7 +140,6 @@ it.each(scenarios)(
     try {
       mocks.configFailure = scenario.configFailure ?? false;
       mocks.purgeExtra = scenario.purgeExtra ?? false;
-      mocks.serverLogFailure = scenario.serverLogFailure ?? false;
       process.argv = ['bun', 'ingest-ci-run.ts'];
       process.exitCode = undefined;
       for (const [key, value] of Object.entries({
@@ -184,7 +181,7 @@ it.each(scenarios)(
             : JSON.stringify({ ...row, conc: 2, users: 2, ...scenario.extra }),
         );
       }
-      if (mocks.serverLogFailure) {
+      if (scenario.serverLogFailure) {
         fs.mkdirSync(path.join(dir, 'server_logs_golden'));
         fs.writeFileSync(path.join(dir, 'server_logs_golden', 'server.log'), 'server ready\n');
       }

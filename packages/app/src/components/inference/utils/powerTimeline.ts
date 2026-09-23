@@ -299,8 +299,6 @@ export function traceConfigLabel(point: InferenceData): string {
   return parts.join(' · ');
 }
 
-// ── Worker-role pools ────────────────────────────────────────────────────────
-
 export type PowerPoolRole = GpuPowerRole | 'all';
 
 export interface PowerPool {

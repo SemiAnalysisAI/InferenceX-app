@@ -4,6 +4,7 @@ import { HW_REGISTRY } from '@semianalysisai/inferencex-constants';
 import { useState } from 'react';
 
 const svg = () => cy.get('[data-testid="gpu-metrics-chart-svg"]');
+const ALL_GPUS = new Set([0, 1, 2, 3, 4, 5, 6, 7]);
 
 function samples(clock: (sample: number) => number): GpuMetricRow[] {
   return Array.from({ length: 8 }, (_chip, index) =>
@@ -20,7 +21,7 @@ function mountClock(data: GpuMetricRow[]) {
   cy.mount(
     <GpuMetricsChart
       data={data}
-      visibleGpus={new Set([0, 1, 2, 3, 4, 5, 6, 7])}
+      visibleGpus={ALL_GPUS}
       metricKey="memClock"
       artifactName="gpu_metrics_b200"
       display={{ mode: 'rolling', windowS: 300, series: 'chips' }}
@@ -67,7 +68,7 @@ describe('PowerX telemetry axis', () => {
         <div style={{ width: '100%', padding: 33 }}>
           <GpuMetricsChart
             data={data}
-            visibleGpus={new Set([0, 1, 2, 3, 4, 5, 6, 7])}
+            visibleGpus={ALL_GPUS}
             metricKey="power"
             artifactName="gpu_metrics_h200"
             overlay={{
@@ -112,7 +113,7 @@ describe('PowerX telemetry axis', () => {
     cy.mount(
       <GpuMetricsChart
         data={samples(() => 390)}
-        visibleGpus={new Set([0, 1, 2, 3, 4, 5, 6, 7])}
+        visibleGpus={ALL_GPUS}
         metricKey="power"
         artifactName="gpu_metrics_b200"
         display={{ mode: 'points', windowS: 300, series: 'chips' }}
@@ -139,7 +140,7 @@ describe('PowerX telemetry axis', () => {
           </button>
           <GpuMetricsChart
             data={samples(() => 3996)}
-            visibleGpus={new Set([0, 1, 2, 3, 4, 5, 6, 7])}
+            visibleGpus={ALL_GPUS}
             metricKey={metric}
             artifactName="gpu_metrics_b200"
             display={{ mode: 'rolling', windowS: 300, series: 'chips' }}

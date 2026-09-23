@@ -101,18 +101,7 @@ const STRINGS = {
  * through the chassis model, so it inherits the telemetry verdict and the
  * model's own unsupported reasons.
  */
-export type PowerBasisAvailabilityState =
-  | 'available'
-  | 'noSpec'
-  | 'noThroughput'
-  | 'noNormalization'
-  | 'noTelemetry'
-  | 'invalid'
-  | 'modelWorkload'
-  | 'modelHardware'
-  | 'modelUnsupported';
-
-const POWER_BASIS_AVAILABILITY_STATES: readonly PowerBasisAvailabilityState[] = [
+const POWER_BASIS_AVAILABILITY_STATES = [
   'available',
   'noSpec',
   'noThroughput',
@@ -122,7 +111,8 @@ const POWER_BASIS_AVAILABILITY_STATES: readonly PowerBasisAvailabilityState[] = 
   'modelWorkload',
   'modelHardware',
   'modelUnsupported',
-];
+] as const;
+export type PowerBasisAvailabilityState = (typeof POWER_BASIS_AVAILABILITY_STATES)[number];
 
 const hasFiniteValue = (point: InferenceData, key: MetricKey): boolean => {
   const value = point[key];

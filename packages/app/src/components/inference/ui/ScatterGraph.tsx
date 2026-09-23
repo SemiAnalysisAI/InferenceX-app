@@ -2651,6 +2651,13 @@ const ScatterGraph = React.memo(
 
     // --- Layers ---
     const layers = useMemo((): LayerConfig<InferenceData>[] => {
+      // Observed-load segments join exact measurements; every other curve is smoothed.
+      const lineCurve = isConcurrencyAxis ? d3.curveLinear : d3.curveMonotoneX;
+      const curveKind = isConcurrencyAxis
+        ? 'observed-load'
+        : showPowerEnvelope
+          ? 'power-envelope'
+          : 'pareto';
       // Line-label identity of one drawn series under a power comparison
       // (`i_pcompare`): the base series keeps the hardware key, so pinned
       // anchors and hover hooks keep working; a sibling is `<hw>::<variant>`.
@@ -2694,7 +2701,7 @@ const ScatterGraph = React.memo(
             .line<InferenceData>()
             .x((d) => xScale(d.x))
             .y((d) => yScale(d.y))
-            .curve(isConcurrencyAxis ? d3.curveLinear : d3.curveMonotoneX);
+            .curve(lineCurve);
 
           // Ensure rooflines layer exists before dot-groups
           let rooflinesLayer = zoomGroup.select<SVGGElement>('.rooflines-layer');
@@ -2797,10 +2804,7 @@ const ScatterGraph = React.memo(
             )
             .join('path')
             .attr('class', (d) => `roofline-path roofline-${d.key}`)
-            .attr(
-              'data-curve-kind',
-              isConcurrencyAxis ? 'observed-load' : showPowerEnvelope ? 'power-envelope' : 'pareto',
-            )
+            .attr('data-curve-kind', curveKind)
             .attr('data-hw-key', (d) => d.hw)
             .attr('data-precision', (d) => d.precision)
             .attr('data-power-variant', (d) => d.variant || null)
@@ -2899,10 +2903,7 @@ const ScatterGraph = React.memo(
               (exit) => exit.remove(),
             )
             .attr('data-seg-key', (d) => d.segKey)
-            .attr(
-              'data-curve-kind',
-              isConcurrencyAxis ? 'observed-load' : showPowerEnvelope ? 'power-envelope' : 'pareto',
-            )
+            .attr('data-curve-kind', curveKind)
             .attr('data-hw-key', (d) => d.hw)
             .attr('data-precision', (d) => d.precision)
             .attr('transform', (d) => `translate(${d.x},${d.y})`)
@@ -3195,7 +3196,7 @@ const ScatterGraph = React.memo(
             .line<InferenceData>()
             .x((d) => newXScale(d.x))
             .y((d) => newYScale(d.y))
-            .curve(isConcurrencyAxis ? d3.curveLinear : d3.curveMonotoneX);
+            .curve(lineCurve);
 
           // Update roofline paths — must split per-date so the zoom redraw
           // matches the per-date sub-paths created in the initial render.
@@ -3426,7 +3427,7 @@ const ScatterGraph = React.memo(
                 .line<InferenceData>()
                 .x((d) => xScale(d.x))
                 .y((d) => yScale(d.y))
-                .curve(isConcurrencyAxis ? d3.curveLinear : d3.curveMonotoneX);
+                .curve(lineCurve);
 
               interface OvEntry {
                 key: string;
@@ -3459,14 +3460,7 @@ const ScatterGraph = React.memo(
                 .data(ovEntries, (d) => d.key)
                 .join('path')
                 .attr('class', (d) => `overlay-roofline-path overlay-roofline-${d.key}`)
-                .attr(
-                  'data-curve-kind',
-                  isConcurrencyAxis
-                    ? 'observed-load'
-                    : showPowerEnvelope
-                      ? 'power-envelope'
-                      : 'pareto',
-                )
+                .attr('data-curve-kind', curveKind)
                 .attr('fill', 'none')
                 .attr('stroke', (d) => d.stroke)
                 .attr('stroke-width', 2)
@@ -3620,7 +3614,7 @@ const ScatterGraph = React.memo(
                 .line<InferenceData>()
                 .x((d) => newXScale(d.x))
                 .y((d) => newYScale(d.y))
-                .curve(isConcurrencyAxis ? d3.curveLinear : d3.curveMonotoneX);
+                .curve(lineCurve);
 
               Object.entries(displayedOverlayRooflines).forEach(([key, group]) => {
                 if (group.points.length < 2) return;
@@ -3708,7 +3702,7 @@ const ScatterGraph = React.memo(
             .line<InferenceData>()
             .x((point) => xScale(point.x))
             .y((point) => yScale(point.y))
-            .curve(isConcurrencyAxis ? d3.curveLinear : d3.curveMonotoneX);
+            .curve(lineCurve);
           const continuationPath = group
             .select<SVGPathElement>('.overflow-continuation-line')
             .attr('d', lineGenerator(entry.points) ?? '')

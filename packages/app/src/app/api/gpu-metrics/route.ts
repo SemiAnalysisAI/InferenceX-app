@@ -92,8 +92,6 @@ const MAX_REQUEST_BYTES = 256 * 1024;
 
 export type GpuMetricsSource = 'database' | 'github';
 
-export type GpuMetricsArtifactPayload = GpuMetricsArtifact;
-
 export interface GpuMetricsRouteResponse extends GpuPowerApiResponse {
   source: GpuMetricsSource;
 }
@@ -143,9 +141,10 @@ interface GithubGpuMetricsResponse extends Omit<GpuMetricsRouteResponse, 'artifa
   bundleSeries: GpuPowerSeries[];
 }
 
-type TelemetryJob =
-  | { kind: 'csv'; artifact: GithubArtifact }
-  | { kind: 'bundle'; artifact: GithubArtifact };
+interface TelemetryJob {
+  kind: 'csv' | 'bundle';
+  artifact: GithubArtifact;
+}
 
 type TelemetryResult =
   | { kind: 'csv'; parsed: GithubArtifactPayload }
@@ -315,9 +314,9 @@ function powerSeriesResponse(
  * listing filter so both sources answer the same request the same way.
  */
 function filterArtifactsByPrefix(
-  artifacts: GpuMetricsArtifactPayload[],
+  artifacts: GpuMetricsArtifact[],
   prefix: string | null,
-): GpuMetricsArtifactPayload[] {
+): GpuMetricsArtifact[] {
   if (prefix === null) return artifacts;
   const wanted = `${ARTIFACT_PREFIX}${prefix}`;
   return artifacts.filter((artifact) => {
@@ -545,10 +544,9 @@ async function readGpuMetrics(request: NextRequest, sources: string[] | null) {
         ),
       ];
       for (const missing of incomplete) {
-        const incompleteArtifact = missing.artifact;
-        const live = artifacts.find((artifact) => artifact.name === incompleteArtifact);
+        const live = artifacts.find((artifact) => artifact.name === missing.artifact);
         const inventory = stored?.artifacts.find(
-          (artifact) => artifact.series?.artifactName === incompleteArtifact,
+          (artifact) => artifact.series?.artifactName === missing.artifact,
         )?.series?.sidecars.seriesInventory;
         // A matching name alone cannot prove that missing hosts/samples recovered.
         // Bundle cuts do not retain the raw inventory, so known-incomplete bundles

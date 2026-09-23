@@ -260,11 +260,16 @@ config is `display: 'timeline'`.
   one-shot module store (`requestPowerTraceFocus`); the timeline consumes it on mount, dims
   every other trace, switches to pool mode when the trace has roles, and shows a _Focused on …_
   chip (`data-testid="power-timeline-focus"`) with _Show all_ to clear. The link's `href` is
-  the current page with `i_metric=y_measuredPowerTimeline`, so open-in-new-tab lands on the
-  timeline (unfocused: the focus is a gesture, not URL state).
-- **State.** Axis mode, line mode (mean / per GPU / pools), the all-in switch, the focused
-  trace and hover highlight are component state, not URL state: the share link is `i_metric=y_measuredPowerTimeline` plus the usual
-  scope, and a reader lands on the same defaults.
+  the current page with `i_metric=y_measuredPowerTimeline` only, so open-in-new-tab lands on
+  the unfocused timeline; once the focus is applied it is written to `i_ptfocus` like the other
+  timeline settings.
+- **State.** Axis mode (`i_ptaxis`), line mode (`i_ptlines`: mean / `gpu` / `pool`), window-only
+  display (`i_ptwindow`), the focused trace (`i_ptfocus`) and the all-in switch (`i_ptutility`)
+  are `PowerTimeline` component state mirrored into the URL by the component itself
+  (`parsePowerTimelineParams` on mount, `setUrlParams` on change); defaults serialize as `''`.
+  Hover highlight is never shared. See
+  [Dashboard read-only views](./dashboard-readonly-views.md) for the renderer-only status of
+  these fields against the raw `gpu-metrics` API.
 - **Analytics.** `inference_power_timeline_loaded { traces, missing, runs }`,
   `inference_power_timeline_axis_changed { mode }`,
   `inference_power_timeline_lines_changed { lines: 'mean' | 'gpu' | 'pool' }`,

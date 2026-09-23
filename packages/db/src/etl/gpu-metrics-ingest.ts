@@ -14,9 +14,6 @@ import fs from 'node:fs';
 import type postgres from 'postgres';
 
 import type { Sql } from './db-utils.js';
-
-/** Either a pooled client or the transaction handle passed to `sql.begin` callbacks. */
-type TxLike = Sql | postgres.TransactionSql;
 import {
   computeGpuMetricStats,
   parseGpuMetricsCsv,
@@ -28,6 +25,7 @@ import {
 import {
   contextUtcOffsetMinutes,
   gpuMetricsArtifactSuffix,
+  isPowerAuditArtifact,
   listGpuMetricsCsvFiles,
   listMultinodePowerSampleFiles,
   readGpuMetricsSidecars,
@@ -38,6 +36,9 @@ import {
 } from './gpu-metrics-artifacts.js';
 import { multinodePowerVendor, parseMultinodePowerSamples } from './multinode-power-samples.js';
 import { recoveredPowerAudit } from './power-audit-validations.js';
+
+/** Either a pooled client or the transaction handle passed to `sql.begin` callbacks. */
+type TxLike = Sql | postgres.TransactionSql;
 
 /** Samples are streamed to Postgres in unnest batches of this many rows. */
 const SAMPLE_BATCH_SIZE = 5000;
@@ -73,6 +74,25 @@ export interface GpuMetricsIngestResult {
   metadataUpdatedBenchmarkResultIds: number[];
 }
 
+/** Dedupe, window and digest one CSV's samples; null when nothing usable remains. */
+function digestSeries(
+  base: Pick<PreparedGpuMetricSeries, 'fileName' | 'vendor' | 'csvSha256' | 'sidecars'>,
+  rawSamples: readonly GpuMetricSample[],
+): PreparedGpuMetricSeries | null {
+  const samples = uniqueSamples(rawSamples);
+  const summary = summarizeGpuMetricSamples(samples);
+  if (!summary) return null;
+  return {
+    ...base,
+    samples,
+    stats: computeGpuMetricStats(samples),
+    sampleIntervalS: summary.sampleIntervalS,
+    gpuCount: summary.gpuCount,
+    startedAtMs: summary.startedAtMs,
+    endedAtMs: summary.endedAtMs,
+  };
+}
+
 /**
  * One series per host from the multinode power bundle. The deployment-wide
  * CSV is hashed once, so every host series of one upload shares its source sha.
@@ -90,31 +110,26 @@ function prepareMultinodePowerSeries(artifact: GpuMetricsArtifact): PreparedGpuM
     const vendor = multinodePowerVendor(manifest);
     const csvSha256 = createHash('sha256').update(csvText).digest('hex');
     for (const host of hosts) {
-      const samples = uniqueSamples(host.samples);
-      const summary = summarizeGpuMetricSamples(samples);
-      if (!summary) continue;
-      prepared.push({
-        fileName: `${file.fileName}#${host.hostname}`,
-        vendor,
-        csvSha256,
-        samples,
-        stats: computeGpuMetricStats(samples),
-        sampleIntervalS: summary.sampleIntervalS,
-        gpuCount: summary.gpuCount,
-        startedAtMs: summary.startedAtMs,
-        endedAtMs: summary.endedAtMs,
-        sidecars: {
-          context: manifest,
-          validations,
-          identity: Object.entries(host.gpuUuids).map(([index, uuid]) => ({
-            hostname: host.hostname,
-            gpu_index: Number(index),
-            gpu_uuid: uuid,
-          })),
-          energyStart: null,
-          energyEnd: null,
+      const series = digestSeries(
+        {
+          fileName: `${file.fileName}#${host.hostname}`,
+          vendor,
+          csvSha256,
+          sidecars: {
+            context: manifest,
+            validations,
+            identity: Object.entries(host.gpuUuids).map(([index, uuid]) => ({
+              hostname: host.hostname,
+              gpu_index: Number(index),
+              gpu_uuid: uuid,
+            })),
+            energyStart: null,
+            energyEnd: null,
+          },
         },
-      });
+        host.samples,
+      );
+      if (series) prepared.push(series);
     }
   }
   return prepared;
@@ -130,7 +145,7 @@ export function prepareGpuMetricsArtifact(artifact: GpuMetricsArtifact): Prepare
   for (const file of listGpuMetricsCsvFiles(artifact.artifactDir)) {
     const csvText = fs.readFileSync(file.path, 'utf8');
     const sidecars = readGpuMetricsSidecars(file.path);
-    if (artifact.artifactName.startsWith('power_audit_')) {
+    if (isPowerAuditArtifact(artifact.artifactName)) {
       sidecars.validations = readPowerAuditValidations(artifact.artifactDir, artifact.artifactName);
       const bundleFile = listMultinodePowerSampleFiles(artifact.artifactDir)[0];
       sidecars.powerManifest = bundleFile ? readMultinodePowerManifest(bundleFile.path) : null;
@@ -138,28 +153,22 @@ export function prepareGpuMetricsArtifact(artifact: GpuMetricsArtifact): Prepare
     const parsed = parseGpuMetricsCsv(csvText, {
       nvidiaUtcOffsetMinutes: contextUtcOffsetMinutes(sidecars.context),
     });
-    if (!parsed) {
+    const series =
+      parsed &&
+      digestSeries(
+        {
+          fileName: file.fileName,
+          vendor: parsed.vendor,
+          csvSha256: createHash('sha256').update(csvText).digest('hex'),
+          sidecars,
+        },
+        parsed.samples,
+      );
+    if (!series) {
       unreadable.push(file.fileName);
       continue;
     }
-    const samples = uniqueSamples(parsed.samples);
-    const summary = summarizeGpuMetricSamples(samples);
-    if (!summary) {
-      unreadable.push(file.fileName);
-      continue;
-    }
-    prepared.push({
-      fileName: file.fileName,
-      vendor: parsed.vendor,
-      csvSha256: createHash('sha256').update(csvText).digest('hex'),
-      samples,
-      stats: computeGpuMetricStats(samples),
-      sampleIntervalS: summary.sampleIntervalS,
-      gpuCount: summary.gpuCount,
-      startedAtMs: summary.startedAtMs,
-      endedAtMs: summary.endedAtMs,
-      sidecars,
-    });
+    prepared.push(series);
   }
   if (prepared.length > 0 && unreadable.length > 0) {
     throw new Error(

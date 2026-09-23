@@ -575,7 +575,7 @@ function drawTraces(
     .attr('data-trace-key', (path) => path.traceKey)
     .attr('data-hw', (path) => path.hwKey)
     .attr('data-segment', (path) => path.segment)
-    .attr('data-run-index', (path) => (path.overlayIndex === null ? null : path.overlayIndex))
+    .attr('data-run-index', (path) => path.overlayIndex)
     .attr('data-pool', (path) => path.pool ?? null)
     .attr('stroke-dasharray', (path) => (path.pool ? poolDash(path.pool) : null))
     .attr('stroke', (path) => path.color)
@@ -589,6 +589,10 @@ function traceOpacity(path: TracePath, highlight: string | null): number {
   return highlight === path.hwKey || highlight === path.traceKey
     ? Math.min(1, path.opacity + 0.15)
     : path.opacity * 0.15;
+}
+
+function labelOpacity(label: TraceLabel, highlight: string | null): number {
+  return highlight === null || highlight === label.hwKey || highlight === label.traceKey ? 1 : 0.2;
 }
 
 function drawLabels(
@@ -616,9 +620,7 @@ function drawLabels(
     .attr('data-hw', (label) => label.hwKey)
     .attr('data-pool', (label) => label.pool ?? null)
     .attr('fill', (label) => label.color)
-    .attr('opacity', (label) =>
-      highlight === null || highlight === label.hwKey || highlight === label.traceKey ? 1 : 0.2,
-    )
+    .attr('opacity', (label) => labelOpacity(label, highlight))
     .text((label) => label.text)
     .each(function (label) {
       const x = xScale(label.x);
@@ -775,7 +777,6 @@ export default function PowerTimeline({
     hcKeys: stableHcKeys,
   });
 
-  // ── Telemetry fetch: one request per workflow run ──────────────────────────
   const requests = useMemo(() => planPowerTimelineRequests(allPoints), [allPoints]);
   // The deep-link request is read once, before planning, so its run is fetched
   // even when the chart spans more runs than the cap.
@@ -857,7 +858,6 @@ export default function PowerTimeline({
     });
   }, [loadingRuns, responses.size, traces.length, missing.length]);
 
-  // ── Visible traces and their colours ────────────────────────────────────────
   const colorForTrace = useCallback(
     (trace: PowerTimelineTrace): { color: string; overlayIndex: number | null } => {
       if (overlayPointSet.has(trace.point)) {
@@ -1043,7 +1043,6 @@ export default function PowerTimeline({
     return lines;
   }, [visibleTraces, colorForTrace, showUtility, lineMode, t]);
 
-  // ── Scales ─────────────────────────────────────────────────────────────────
   const xDomain = useMemo<[number, number]>(() => {
     let min = Number.POSITIVE_INFINITY;
     let max = Number.NEGATIVE_INFINITY;
@@ -1080,7 +1079,6 @@ export default function PowerTimeline({
       format(value instanceof Date ? value : new Date(Number(value)));
   }, [xMode, xDomain]);
 
-  // ── Layers ─────────────────────────────────────────────────────────────────
   const highlightRef = useRef(activeHighlight);
   highlightRef.current = activeHighlight;
   const layers = useMemo<LayerConfig<TimelineSample>[]>(
@@ -1169,13 +1167,7 @@ export default function PowerTimeline({
         .attr('opacity', (path) => traceOpacity(path, activeHighlight));
       root
         .selectAll<SVGTextElement, TraceLabel>('text.power-trace-label')
-        .attr('opacity', (label) =>
-          activeHighlight === null ||
-          activeHighlight === label.hwKey ||
-          activeHighlight === label.traceKey
-            ? 1
-            : 0.2,
-        );
+        .attr('opacity', (label) => labelOpacity(label, activeHighlight));
     },
     [activeHighlight],
   );
@@ -1240,7 +1232,6 @@ export default function PowerTimeline({
     [unofficialRunInfos, xMode, t, locale, hardwareLabel],
   );
 
-  // ── Legend ─────────────────────────────────────────────────────────────────
   const legendItems = useMemo(() => {
     const overlayItems =
       overlayData && unofficialRunInfos.length > 0

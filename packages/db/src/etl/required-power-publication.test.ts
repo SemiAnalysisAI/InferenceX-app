@@ -26,6 +26,11 @@ function json(dir: string, file: string): any {
 function write(dir: string, file: string, value: unknown) {
   fs.writeFileSync(path.join(dir, file), JSON.stringify(value));
 }
+function sha256(dir: string, file: string): string {
+  return createHash('sha256')
+    .update(fs.readFileSync(path.join(dir, file)))
+    .digest('hex');
+}
 const manifestPath = 'required-power-sweep-manifest/sweep_manifest.json';
 const benchmarkPath = 'bmk_agentic_golden/agg.json';
 const auditPath = 'agentic_golden/power_validation.json';
@@ -41,10 +46,7 @@ function changeArtifact(dir: string, file: string, edit: (value: any) => void) {
   changeManifest(dir, (manifest) => {
     for (const point of manifest.points)
       for (const artifact of point.artifacts)
-        if (artifact.path === file)
-          artifact.sha256 = createHash('sha256')
-            .update(fs.readFileSync(path.join(dir, file)))
-            .digest('hex');
+        if (artifact.path === file) artifact.sha256 = sha256(dir, file);
   });
 }
 function multinodeFixture() {
@@ -103,13 +105,7 @@ function multinodeFixture() {
       { node: 'decode', gpu_uuid: 'GPU-d', role: 'decode', energy_j: 600 },
     ];
     for (const file of Object.keys(extras))
-      point.artifacts.push({
-        path: file,
-        sha256: createHash('sha256')
-          .update(fs.readFileSync(path.join(dir, file)))
-          .digest('hex'),
-        validation_state: 'valid',
-      });
+      point.artifacts.push({ path: file, sha256: sha256(dir, file), validation_state: 'valid' });
   });
   return dir;
 }
@@ -261,9 +257,7 @@ describe('required power publication contract', () => {
         'agentic_golden/power_validation_conc1.json';
       point.artifacts.push({
         path: amdPath,
-        sha256: createHash('sha256')
-          .update(fs.readFileSync(path.join(dir, amdPath)))
-          .digest('hex'),
+        sha256: sha256(dir, amdPath),
         validation_state: 'valid',
       });
     });

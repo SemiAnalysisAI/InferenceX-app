@@ -589,46 +589,13 @@ run — are never copied. Our own GCS reader (`lib/gcs-artifacts.ts`) additional
 ignores everything but `bmk_`/`server_logs_` objects, so widening the mirror's run
 filter would also need a reader change before backfill could use it.
 
-Readers: `/api/gpu-metrics?runId=` serves stored telemetry first, including
-`series=power` Timeline buckets reconstructed with retained windows and device
-identities. Missing storage falls back to GitHub artifacts. Known-incomplete CSV
-fallback must match retained filenames and sample counts; known-incomplete bundles
-need exact-source re-ingest. Healthy DB series remain in mixed fallback responses.
-Database failures return `503 DATABASE_UNAVAILABLE`; incomplete storage without
-usable fallback returns `503 STORED_TELEMETRY_INCOMPLETE` with re-ingest guidance.
-Timeline requests use read-only POST with sorted validation basenames in a `sources`
-JSON body. Stored coverage of those identities permits an artifact-independent response;
-missing siblings, including other windows in the same bundle, use source-level DB-first
-merging. Unavailable artifacts leave healthy DB traces readable with explicit missing
-sources. `sourceCoverage` describes only the requested identities; legacy GET reports
-coverage unknown. Plain CSV fallback applies the adjacent context timezone just like
-ingest and bundle reads. Raw multi-file artifacts retain separate file/host series.
-Successful reads and storage errors use no-store.
-
-AgentX nested validation documents are matched to the exact root result and retained
-window before receiving a canonical validation filename alias. Original path, result
-filename and validation hash remain in stored sidecars. CI attaches recovered source
-and window metadata before benchmark publication/upsert; targeted telemetry re-ingest
-fills only NULL provenance for a unique explicit run/result/concurrency match, even
-when samples are unchanged. Metrics and validity remain untouched. Benchmark metadata
-repair additionally needs the existing materialized-view refresh and benchmark-cache
-invalidation before the UI planner can discover the restored Timeline source.
-
-`/api/v1/gpu-metrics-point?id=` powers the PowerX point-detail tab. Every request
-checks the current DB revision before reading its Blob payload cache. Sidecar repairs,
-new point links and shared-series changes therefore select fresh payloads without a
-manual purge. Success, missing-point and error responses use no-store; missing data
-is 404 and database failures remain errors. Cache-write failures log a warning and
-serve the fresh uncached result; the next request retries cache population.
-
-The public `/api/v1/views/gpu-metrics` projection and full-record UI table use the
-same stored per-GPU statistics digest for the selected file/host series. Empty or
-missing metric digests remain empty; only live artifacts calculate from samples.
-Statistics include startup and warmup, retain measured zero, and exclude missing
-readings per metric after first-wins timestamp/GPU deduplication. Mean is
-sample-weighted, percentiles interpolate at `p * (N - 1)`, and standard deviation
-divides by `N`. GPU visibility and chart downsampling do not alter this population.
-Serving-window power, J/token and selected-time-window calculations remain separate.
+Readers — `/api/gpu-metrics?runId=` (including the `series=power` Timeline POST),
+the `/api/v1/gpu-metrics-point?id=` point-detail cache and the public
+`/api/v1/views/gpu-metrics` statistics projection — serve stored telemetry first and
+fall back to GitHub artifacts only for storage that is missing; database failures are
+`503` errors, never an empty result. Fallback and coverage rules, AgentX nested
+validation aliases, cache-revision checks and the full-record statistics definitions
+are in [PowerX persistence and repair](./powerx-persistence-recovery.md).
 
 中文：历史遥测和 Timeline 优先读取数据库；缺少存储数据时回退到 GitHub 产物，
 文件、主机与 GPU 的身份保持独立。数据库故障返回 503；已知存储不完整且无法恢复时，

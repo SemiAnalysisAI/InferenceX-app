@@ -139,20 +139,20 @@ function visitBasisChart({
   cy.get('[data-testid="chart-figure"]').should('have.length.at.least', 1);
 }
 
+const sortedAsc = (values: number[]) => [...values].sort((a, b) => a - b);
+
 /** Plotted y values (sorted) of every point matching `selector`, visible or not. */
 function assertPlottedValues(selector: string, expected: number[]) {
   cy.get<SVGElement & { __data__: { y: number } }>(
     `[data-testid="inference-chart-display"] svg ${selector}`,
   ).should(($points) => {
-    const values = Array.from($points, (point) => point.__data__.y).sort((a, b) => a - b);
+    const values = sortedAsc(Array.from($points, (point) => point.__data__.y));
     expect(values).to.have.length(expected.length);
     for (const [index, value] of values.entries()) {
       expect(value).to.be.closeTo(expected[index], 1e-6);
     }
   });
 }
-
-const sortedAsc = (values: number[]) => [...values].sort((a, b) => a - b);
 
 describe('PowerX power boundaries in the Measured Energy group', () => {
   beforeEach(() => {

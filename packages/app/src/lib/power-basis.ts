@@ -75,31 +75,33 @@ export interface PowerBasisInput {
 
 export type PowerBasisValues = Record<PowerBasisFieldKey, number | null>;
 
-const positive = (value: unknown): value is number =>
+export const isPositive = (value: unknown): value is number =>
   typeof value === 'number' && Number.isFinite(value) && value > 0;
-const count = (value: unknown): value is number => positive(value) && Number.isSafeInteger(value);
-const orNull = (value: number): number | null => (positive(value) ? value : null);
+const count = (value: unknown): value is number => isPositive(value) && Number.isSafeInteger(value);
+const orNull = (value: number): number | null => (isPositive(value) ? value : null);
 
 /**
  * Derives the B2–B4 boundary values from plain numbers. Any unavailable input
  * yields `null` for the values that depend on it and leaves the rest intact.
  */
 export function computePowerBasisFields(input: PowerBasisInput): PowerBasisValues {
-  const tdp = positive(input.tdpWatts) ? input.tdpWatts : null;
-  const utility = positive(input.utilityWatts) ? input.utilityWatts : null;
-  const measuredWatts = positive(input.measuredWatts) ? input.measuredWatts : null;
-  const measuredJ = positive(input.measuredJPerOutputToken) ? input.measuredJPerOutputToken : null;
+  const tdp = isPositive(input.tdpWatts) ? input.tdpWatts : null;
+  const utility = isPositive(input.utilityWatts) ? input.utilityWatts : null;
+  const measuredWatts = isPositive(input.measuredWatts) ? input.measuredWatts : null;
+  const measuredJ = isPositive(input.measuredJPerOutputToken)
+    ? input.measuredJPerOutputToken
+    : null;
   // B4 is B1 carried out to the utility meter, so it follows B1's availability:
   // no measured watts, no modeled boundary (B3 ≥ B4 ≥ B1 needs its anchor).
   const modeled =
-    measuredWatts !== null && positive(input.modeledFacilityWattsPerGpu)
+    measuredWatts !== null && isPositive(input.modeledFacilityWattsPerGpu)
       ? input.modeledFacilityWattsPerGpu
       : null;
 
   // Provisioned energy: GPU-seconds spent per output token by the whole
   // deployment (N_alloc ÷ total tok/s) × W per GPU = J per output token.
   const gpuSecondsPerOutputToken =
-    positive(input.allocatedGpus) && positive(input.totalOutputTokPerSec)
+    isPositive(input.allocatedGpus) && isPositive(input.totalOutputTokPerSec)
       ? input.allocatedGpus / input.totalOutputTokPerSec
       : null;
   const provisionedEnergy = (watts: number | null) =>
@@ -154,7 +156,7 @@ export function powerBasisNormalization(
 ): Pick<PowerBasisInput, 'allocatedGpus' | 'totalOutputTokPerSec'> {
   const perGpu = entry.output_tput_per_gpu;
   const unavailable = { allocatedGpus: null, totalOutputTokPerSec: null };
-  if (!positive(perGpu)) return unavailable;
+  if (!isPositive(perGpu)) return unavailable;
   if (!entry.disagg) return { allocatedGpus: 1, totalOutputTokPerSec: perGpu };
   if (entry.benchmark_type !== 'single_turn') return unavailable;
   const prefill = entry.num_prefill_gpu;
@@ -178,7 +180,7 @@ export function modeledFacilityWattsPerGpu(
 ): number | null {
   const model = entry.modeledSystemPower;
   if (model?.status !== 'supported') return null;
-  if (!positive(model.deploymentFacilityWatts) || !count(model.gpuCount)) return null;
+  if (!isPositive(model.deploymentFacilityWatts) || !count(model.gpuCount)) return null;
   return orNull(model.deploymentFacilityWatts / model.gpuCount);
 }
 
@@ -196,7 +198,7 @@ export function buildPowerBasisChartFields(
 ): PowerBasisChartFields {
   const values = computePowerBasisFields({
     tdpWatts: specs.tdp ?? null,
-    utilityWatts: positive(specs.power) ? specs.power * 1000 : null,
+    utilityWatts: isPositive(specs.power) ? specs.power * 1000 : null,
     ...powerBasisNormalization(entry),
     measuredWatts: entry.avg_power_w ?? null,
     measuredJPerOutputToken: entry.joules_per_output_token ?? null,

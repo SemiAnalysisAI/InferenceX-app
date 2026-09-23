@@ -136,14 +136,13 @@ try {
   receipt.exitCode = await new Promise<number>((resolve) => {
     browser.on('exit', (code) => resolve(code ?? 1));
   });
-  const revisions = [...blob.objects.values()]
-    .map((value) => JSON.parse(value))
-    .filter((payload) => payload?.benchmarkResultId === 206885);
-  const producers = revisions.map((payload) => payload.series[0].sidecars.context.producer);
-  const retainedProducers = [...blob.objects.values()]
-    .map((value) => JSON.parse(value))
-    .filter((payload) => [206888, 206889].includes(payload?.benchmarkResultId))
-    .map((payload) => payload.series[0].sidecars.context.producer);
+  const payloads = [...blob.objects.values()].map((value) => JSON.parse(value));
+  const producersOf = (ids: number[]) =>
+    payloads
+      .filter((payload) => ids.includes(payload?.benchmarkResultId))
+      .map((payload) => payload.series[0].sidecars.context.producer);
+  const producers = producersOf([206885]);
+  const retainedProducers = producersOf([206888, 206889]);
   const cacheVerified =
     blob.counts.reads > 0 &&
     producers.includes('collector-before-repair') &&

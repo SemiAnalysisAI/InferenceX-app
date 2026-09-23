@@ -411,8 +411,9 @@ export function useChartData(
           : selectedXAxisMode === undefined
             ? (chartDef[headingKey] as string) || chartDef.heading
             : chartDef.heading;
-        if (resolved.branch === 'concurrency') chartHeading = 'vs. Concurrency';
-        if (isAgentic && resolved.branch !== 'concurrency') {
+        if (resolved.branch === 'concurrency') {
+          chartHeading = 'vs. Concurrency';
+        } else if (isAgentic) {
           const pctlWord = selectedPercentile.toUpperCase();
           xAxisLabel = applyAgenticPercentileToXLabel(xAxisLabel, pctlWord);
           xAxisLabelZh = applyAgenticPercentileToXLabel(xAxisLabelZh, pctlWord);
@@ -420,9 +421,7 @@ export function useChartData(
             /^(?<vsPrefix>vs\.\s+)(?:(?:Median|Mean|P75|P90|P95|P99(?:\.9)?)\s+)?/iu,
             `$1${pctlWord} `,
           );
-        }
-
-        if (!isAgentic && resolved.branch !== 'concurrency') {
+        } else {
           const word = xAxisField.startsWith('mean_')
             ? 'Mean'
             : xAxisField.startsWith('median_')

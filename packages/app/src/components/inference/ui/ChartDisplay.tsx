@@ -324,13 +324,13 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
   } = useInferenceDisplay();
   const { setSelectedDates, setSelectedDatesFromRunExpansion, setIsLegendExpanded } =
     useInferenceActions();
+  const selectedMeasuredConfig = getMeasuredMetricConfig(selectedYAxisMetric);
   // The metric key carries the power boundary; the caption discloses it for
   // the derived boundaries (there is no separate URL param).
-  const selectedPowerBasis = getMeasuredMetricConfig(selectedYAxisMetric)?.basis;
+  const selectedPowerBasis = selectedMeasuredConfig?.basis;
   // The Measured Power "Timeline" display swaps the scatter body for the
   // per-second telemetry traces (PowerTimeline); table view and captions are
   // unchanged because the metric key aliases the measured average.
-  const selectedMeasuredConfig = getMeasuredMetricConfig(selectedYAxisMetric);
   const isPowerTimeline =
     selectedMeasuredConfig?.family === 'power' && selectedMeasuredConfig.display === 'timeline';
   const selectedBenchmarkType: 'single_turn' | 'agentic_traces' =

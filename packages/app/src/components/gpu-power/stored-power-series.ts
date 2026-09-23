@@ -3,14 +3,11 @@ import type { GpuMetricSeries } from '@semianalysisai/inferencex-db/queries/gpu-
 import {
   cutPowerAuditSamples,
   cutPowerAuditCsvs,
+  isRecord,
   type PowerAuditDevice,
   type PowerAuditSample,
 } from './power-audit-bundle';
 import { bucketPowerFiles, type GpuPowerSeries } from './power-series';
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
-}
 
 export class StoredTelemetryIncompleteError extends Error {
   readonly artifact: string;

@@ -130,20 +130,18 @@ function asRole(value: unknown): GpuPowerRole | undefined {
   return value === 'prefill' || value === 'decode' ? value : undefined;
 }
 
+export function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
 function parseJsonObject(text: string | undefined): Record<string, unknown> | null {
   if (text === undefined) return null;
   try {
     const parsed: unknown = JSON.parse(text);
-    return parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)
-      ? (parsed as Record<string, unknown>)
-      : null;
+    return isRecord(parsed) ? parsed : null;
   } catch {
     return null;
   }
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
 function manifestSlot(hostname: string, gpuIndex: number): string {
@@ -262,7 +260,7 @@ export function cutPowerAuditBundle(
   const manifest = parseJsonObject(files.get(BUNDLE_MANIFEST_ENTRY));
   const contextFiles = [...files]
     .filter(([name]) => isContextEntry(name))
-    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+    .sort(([a], [b]) => compareText(a, b));
   const smiFiles = [...files]
     .filter(([name]) => isSmiCsv(name))
     .map(([name, text]) => {
@@ -283,13 +281,7 @@ export function cutPowerAuditBundle(
   if (samplesText === undefined) return [];
   const { samples, devices } = parseSamples(samplesText);
   if (samples.length === 0) return [];
-  return cutPowerAuditSamples(
-    artifact,
-    samples,
-    devices,
-    validations,
-    parseJsonObject(files.get(BUNDLE_MANIFEST_ENTRY)),
-  );
+  return cutPowerAuditSamples(artifact, samples, devices, validations, manifest);
 }
 
 /** Apply bundle window cuts to the richer SMI CSVs without requiring DCGM UUID sidecars. */

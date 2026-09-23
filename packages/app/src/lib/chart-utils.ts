@@ -11,7 +11,6 @@ import type {
   AggDataEntry,
   ChartDefinition,
   InferenceData,
-  PowerBasisFieldKey,
   YAxisMetricKey,
 } from '@/components/inference/types';
 import {
@@ -292,13 +291,8 @@ export function buildAvailabilityHwKey(
   return hwKey;
 }
 
-// Power-boundary fields are derived here before the registry exposes them as
-// axes; the union collapses once METRIC_REGISTRY carries the same keys. The
-// reconstructed prefill energy is a comparison-only series (never an axis).
-export type DerivedMetricKey =
-  | BenchmarkMetricKey
-  | PowerBasisFieldKey
-  | 'reconstructedPrefillJPerOutputToken';
+// The reconstructed prefill energy is a comparison-only series (never an axis).
+export type DerivedMetricKey = BenchmarkMetricKey | 'reconstructedPrefillJPerOutputToken';
 export type DerivedChartFields = Pick<InferenceData, DerivedMetricKey>;
 
 const chartMetric = (y: number): { y: number; roof: boolean } => ({ y, roof: false });
@@ -553,6 +547,9 @@ function buildMeasuredPowerChartFields(
   entry: AggDataEntry,
   tdpWatts: number,
 ): MeasuredPowerChartFields {
+  // Prefill energy on the output-token axis, so the roles comparison can
+  // stack it against the decode pool (PowerX Figure 7).
+  const roleEnergy = reconstructedRoleEnergy(entry);
   return {
     // The timeline axis aliases the validated average: the point set (and
     // its table row) is the same, only the chart body changes.
@@ -591,14 +588,7 @@ function buildMeasuredPowerChartFields(
     ...(typeof entry.decode_joules_per_output_token === 'number'
       ? { measuredDecodeJPerOutputToken: chartMetric(entry.decode_joules_per_output_token) }
       : {}),
-    // Prefill energy on the output-token axis, so the roles comparison can
-    // stack it against the decode pool (PowerX Figure 7).
-    ...(() => {
-      const roleEnergy = reconstructedRoleEnergy(entry);
-      return roleEnergy
-        ? { reconstructedPrefillJPerOutputToken: chartMetric(roleEnergy.prefill) }
-        : {};
-    })(),
+    ...(roleEnergy ? { reconstructedPrefillJPerOutputToken: chartMetric(roleEnergy.prefill) } : {}),
     ...(typeof entry.joules_per_successful_query === 'number'
       ? {
           measuredJPerSuccessfulQuery: chartMetric(entry.joules_per_successful_query),
@@ -623,23 +613,19 @@ export function remapInferencePoint(
   const metric = point[metricKey];
   const xCandidate = (point as Partial<AggDataEntry>)[xAxisField];
   // Absent TTFT values are zero-filled by the row transform. Neither that
-  // sentinel nor an unrelated fallback coordinate is a latency measurement.
-  const missingConcurrency =
-    xAxisField === 'conc' &&
-    (typeof xCandidate !== 'number' || !Number.isFinite(xCandidate) || xCandidate <= 0);
-  const requiresMeasuredServiceValue =
-    xAxisField.endsWith('_ttft') || xAxisField === 'mean_e2el' || xAxisField === 'mean_tpot_intvty';
-  const missingServiceValue =
-    requiresMeasuredServiceValue &&
+  // sentinel nor an unrelated fallback coordinate is a latency measurement;
+  // the same holds for concurrency and the mean service fields.
+  const requiresMeasuredValue =
+    xAxisField === 'conc' ||
+    xAxisField.endsWith('_ttft') ||
+    xAxisField === 'mean_e2el' ||
+    xAxisField === 'mean_tpot_intvty';
+  const missingMeasuredValue =
+    requiresMeasuredValue &&
     (typeof xCandidate !== 'number' || !Number.isFinite(xCandidate) || xCandidate <= 0);
   return {
     ...point,
-    x:
-      missingServiceValue || missingConcurrency
-        ? NaN
-        : typeof xCandidate === 'number'
-          ? xCandidate
-          : point.x,
+    x: missingMeasuredValue ? NaN : typeof xCandidate === 'number' ? xCandidate : point.x,
     y: metric?.y ?? point.y,
     roof: xAxisField === 'conc' ? false : (metric?.roof ?? false),
   };

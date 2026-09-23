@@ -101,9 +101,11 @@ function disaggPoint(
   });
 }
 
-/** 61 one-second buckets: idle 200 W, ramps to `peak` inside the window. */
+/** One-second buckets for a 60 s job. */
+const t = Array.from({ length: 61 }, (_, i) => i);
+
+/** Idle 200 W, ramps to `peak` inside the window. */
 function series(hwKey: string, conc: number, peak: number, gpus = [0, 1]): GpuPowerSeries {
-  const t = Array.from({ length: 61 }, (_, i) => i);
   return {
     artifact: `gpu_metrics_${resultName(hwKey.split('_')[0], conc)}`,
     startMs: START_MS,
@@ -120,7 +122,6 @@ function series(hwKey: string, conc: number, peak: number, gpus = [0, 1]): GpuPo
  * the window are 3606 W and 2822 W.
  */
 function poolSeries(conc: number, prefillCount = 4): GpuPowerSeries {
-  const t = Array.from({ length: 61 }, (_, i) => i);
   const devices: GpuPowerDevice[] = Array.from({ length: 8 }, (_, i) => ({
     id: `${HOST}/GPU-${String(i).padStart(8, '0')}-d62f-0ff2-b4e5-e36f6fac8f1b`,
     role: i < prefillCount ? 'prefill' : 'decode',
@@ -161,6 +162,52 @@ const poolResponse: GpuPowerSeriesResponse = {
   runInfo: response.runInfo,
   series: [series('b200', 16, 700), poolSeries(8)],
 };
+
+/** Traces of the same shape two days apart, so wall-clock ticks must carry dates. */
+const multiDayResponse: GpuPowerSeriesResponse = {
+  ...response,
+  series: response.series.map((trace, index) => ({
+    ...trace,
+    startMs: trace.startMs + index * 2 * 24 * 60 * 60_000,
+  })),
+};
+
+const overlayResponse = (traces: GpuPowerSeries[]): GpuPowerSeriesResponse => ({
+  runInfo: { ...response.runInfo, id: Number(OVERLAY_RUN_ID), url: OVERLAY_RUN_URL },
+  series: traces,
+});
+
+const overlayData = (data: InferenceData[], label = 'powerx-timeline') => ({
+  data,
+  hardwareConfig: hwConfig,
+  label,
+  runUrl: OVERLAY_RUN_URL,
+});
+
+/** Context overrides for one loaded `?unofficialrun=` whose overlay legend shows `hw`. */
+function overlayRun(
+  hw: string,
+  name = 'powerx-timeline',
+): Parameters<typeof createMockUnofficialRunContext>[0] {
+  return {
+    isUnofficialRun: true,
+    unofficialRunInfos: [
+      {
+        id: Number(OVERLAY_RUN_ID),
+        name,
+        branch: name,
+        sha: 'abc000',
+        createdAt: '2026-09-12T00:00:00Z',
+        url: OVERLAY_RUN_URL,
+        conclusion: 'success',
+        status: 'completed',
+        isNonMainBranch: true,
+      },
+    ],
+    runIndexByUrl: { [OVERLAY_RUN_URL]: 0, [OVERLAY_RUN_ID]: 0 },
+    activeOverlayHwTypes: new Set([hw]),
+  };
+}
 
 const GB200_TDP = HW_REGISTRY.gb200?.tdp || HW_REGISTRY.b200.tdp;
 
@@ -281,15 +328,7 @@ describe('PowerTimeline', () => {
   });
 
   it('distinguishes dates when wall-clock traces span multiple days', () => {
-    cy.intercept('POST', '/api/gpu-metrics*', {
-      body: {
-        ...response,
-        series: response.series.map((trace, index) => ({
-          ...trace,
-          startMs: trace.startMs + index * 2 * 24 * 60 * 60_000,
-        })),
-      },
-    }).as('series');
+    cy.intercept('POST', '/api/gpu-metrics*', { body: multiDayResponse }).as('series');
     mountTimeline([measuredPoint('b200', 16, 700), measuredPoint('b200', 64, 900)]);
     cy.wait('@series');
     cy.get('[data-testid="power-timeline-axis-wall"]').click();
@@ -306,15 +345,7 @@ describe('PowerTimeline', () => {
 
   it('keeps mobile wall-clock dates separated', () => {
     cy.viewport(390, 844);
-    cy.intercept('POST', '/api/gpu-metrics*', {
-      body: {
-        ...response,
-        series: response.series.map((trace, index) => ({
-          ...trace,
-          startMs: trace.startMs + index * 2 * 24 * 60 * 60_000,
-        })),
-      },
-    }).as('series');
+    cy.intercept('POST', '/api/gpu-metrics*', { body: multiDayResponse }).as('series');
     mountTimeline([measuredPoint('b200', 16, 700), measuredPoint('b200', 64, 900)], {
       width: 324,
     });
@@ -498,46 +529,14 @@ describe('PowerTimeline', () => {
   }
 
   it('colours overlay-run traces by run and honours the overlay hardware filter', () => {
-    const overlayPoint = measuredPoint('h200', 16, 500, {
-      run_url: OVERLAY_RUN_URL,
-      power_audit: {
-        source: `power_validation_${resultName('h200', 16)}.json`,
-        ...WINDOW,
-      },
-    });
-    const overlayResponse: GpuPowerSeriesResponse = {
-      runInfo: { ...response.runInfo, id: Number(OVERLAY_RUN_ID), url: OVERLAY_RUN_URL },
-      series: [series('h200', 16, 500)],
-    };
+    const overlayPoint = measuredPoint('h200', 16, 500, { run_url: OVERLAY_RUN_URL });
     cy.intercept('POST', `/api/gpu-metrics?runId=${RUN_ID}*`, { body: response }).as('official');
     cy.intercept('POST', `/api/gpu-metrics?runId=${OVERLAY_RUN_ID}*`, {
-      body: overlayResponse,
+      body: overlayResponse([series('h200', 16, 500)]),
     }).as('overlay');
     mountTimeline([measuredPoint('b200', 16, 700)], {
-      overlay: {
-        data: [overlayPoint],
-        hardwareConfig: hwConfig,
-        label: 'powerx-timeline',
-        runUrl: OVERLAY_RUN_URL,
-      },
-      unofficial: createMockUnofficialRunContext({
-        isUnofficialRun: true,
-        unofficialRunInfos: [
-          {
-            id: Number(OVERLAY_RUN_ID),
-            name: 'powerx-timeline',
-            branch: 'powerx-timeline',
-            sha: 'abc000',
-            createdAt: '2026-09-12T00:00:00Z',
-            url: OVERLAY_RUN_URL,
-            conclusion: 'success',
-            status: 'completed',
-            isNonMainBranch: true,
-          },
-        ],
-        runIndexByUrl: { [OVERLAY_RUN_URL]: 0, [OVERLAY_RUN_ID]: 0 },
-        activeOverlayHwTypes: new Set(['h200']),
-      }),
+      overlay: overlayData([overlayPoint]),
+      unofficial: createMockUnofficialRunContext(overlayRun('h200')),
     });
     cy.wait(['@official', '@overlay']);
 
@@ -557,41 +556,13 @@ describe('PowerTimeline', () => {
   it('solos an official row through the unified overlay selection while an overlay is loaded', () => {
     // localOfficialOverride shadows activeHwTypes once an overlay is in, so the
     // context toggle would be invisible: the legend must write both selections.
-    const overlayPoint = measuredPoint('h200', 16, 500, {
-      run_url: OVERLAY_RUN_URL,
-      power_audit: {
-        source: `power_validation_${resultName('h200', 16)}.json`,
-        ...WINDOW,
-      },
-    });
+    const overlayPoint = measuredPoint('h200', 16, 500, { run_url: OVERLAY_RUN_URL });
     cy.intercept('POST', '/api/gpu-metrics*', { body: response }).as('series');
     mountTimeline([measuredPoint('b200', 16, 700), measuredPoint('h100', 16, 600)], {
-      overlay: {
-        data: [overlayPoint],
-        hardwareConfig: hwConfig,
-        label: 'powerx-timeline',
-        runUrl: OVERLAY_RUN_URL,
-      },
+      overlay: overlayData([overlayPoint]),
       // Plain overrides: mountWithProviders builds the context itself, so the
       // aliased stubs below are the ones the component receives.
-      unofficial: {
-        isUnofficialRun: true,
-        unofficialRunInfos: [
-          {
-            id: Number(OVERLAY_RUN_ID),
-            name: 'powerx-timeline',
-            branch: 'powerx-timeline',
-            sha: 'abc000',
-            createdAt: '2026-09-12T00:00:00Z',
-            url: OVERLAY_RUN_URL,
-            conclusion: 'success',
-            status: 'completed',
-            isNonMainBranch: true,
-          },
-        ],
-        runIndexByUrl: { [OVERLAY_RUN_URL]: 0, [OVERLAY_RUN_ID]: 0 },
-        activeOverlayHwTypes: new Set(['h200']),
-      },
+      unofficial: overlayRun('h200'),
     });
     cy.wait('@series');
 
@@ -624,44 +595,13 @@ describe('PowerTimeline', () => {
         } satisfies GpuPowerSeriesResponse,
       }).as(`official${index}`);
     });
-    const overlayPoint = measuredPoint('h200', 16, 500, {
-      run_url: OVERLAY_RUN_URL,
-      power_audit: {
-        source: `power_validation_${resultName('h200', 16)}.json`,
-        ...WINDOW,
-      },
-    });
+    const overlayPoint = measuredPoint('h200', 16, 500, { run_url: OVERLAY_RUN_URL });
     cy.intercept('POST', `/api/gpu-metrics?runId=${OVERLAY_RUN_ID}*`, {
-      body: {
-        runInfo: { ...response.runInfo, id: Number(OVERLAY_RUN_ID), url: OVERLAY_RUN_URL },
-        series: [series('h200', 16, 500)],
-      } satisfies GpuPowerSeriesResponse,
+      body: overlayResponse([series('h200', 16, 500)]),
     }).as('overlay');
     mountTimeline(officialPoints, {
-      overlay: {
-        data: [overlayPoint],
-        hardwareConfig: hwConfig,
-        label: 'powerx-timeline',
-        runUrl: OVERLAY_RUN_URL,
-      },
-      unofficial: createMockUnofficialRunContext({
-        isUnofficialRun: true,
-        unofficialRunInfos: [
-          {
-            id: Number(OVERLAY_RUN_ID),
-            name: 'powerx-timeline',
-            branch: 'powerx-timeline',
-            sha: 'abc000',
-            createdAt: '2026-09-12T00:00:00Z',
-            url: OVERLAY_RUN_URL,
-            conclusion: 'success',
-            status: 'completed',
-            isNonMainBranch: true,
-          },
-        ],
-        runIndexByUrl: { [OVERLAY_RUN_URL]: 0, [OVERLAY_RUN_ID]: 0 },
-        activeOverlayHwTypes: new Set(['h200']),
-      }),
+      overlay: overlayData([overlayPoint]),
+      unofficial: createMockUnofficialRunContext(overlayRun('h200')),
     });
     cy.wait(['@overlay', '@official0', '@official1', '@official2']);
 
@@ -809,39 +749,13 @@ describe('PowerTimeline', () => {
 
   it('draws an overlay-run pool trace in the run colour', () => {
     const overlayPoint = disaggPoint(8, 800, { run_url: OVERLAY_RUN_URL });
-    const overlayResponse: GpuPowerSeriesResponse = {
-      runInfo: { ...response.runInfo, id: Number(OVERLAY_RUN_ID), url: OVERLAY_RUN_URL },
-      series: [poolSeries(8)],
-    };
     cy.intercept('POST', `/api/gpu-metrics?runId=${RUN_ID}*`, { body: response }).as('official');
     cy.intercept('POST', `/api/gpu-metrics?runId=${OVERLAY_RUN_ID}*`, {
-      body: overlayResponse,
+      body: overlayResponse([poolSeries(8)]),
     }).as('overlay');
     mountTimeline([measuredPoint('b200', 16, 700)], {
-      overlay: {
-        data: [overlayPoint],
-        hardwareConfig: hwConfig,
-        label: 'powerx-pools',
-        runUrl: OVERLAY_RUN_URL,
-      },
-      unofficial: createMockUnofficialRunContext({
-        isUnofficialRun: true,
-        unofficialRunInfos: [
-          {
-            id: Number(OVERLAY_RUN_ID),
-            name: 'powerx-pools',
-            branch: 'powerx-pools',
-            sha: 'abc000',
-            createdAt: '2026-09-12T00:00:00Z',
-            url: OVERLAY_RUN_URL,
-            conclusion: 'success',
-            status: 'completed',
-            isNonMainBranch: true,
-          },
-        ],
-        runIndexByUrl: { [OVERLAY_RUN_URL]: 0, [OVERLAY_RUN_ID]: 0 },
-        activeOverlayHwTypes: new Set(['gb200']),
-      }),
+      overlay: overlayData([overlayPoint], 'powerx-pools'),
+      unofficial: createMockUnofficialRunContext(overlayRun('gb200', 'powerx-pools')),
     });
     cy.wait(['@official', '@overlay']);
 

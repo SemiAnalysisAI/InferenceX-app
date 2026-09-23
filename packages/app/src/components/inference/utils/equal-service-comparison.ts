@@ -1,6 +1,6 @@
 import type { AggDataEntry, InferenceData } from '../types';
 import { chipCounts } from '@/lib/chip-counts';
-import { powerBasisNormalization } from '@/lib/power-basis';
+import { isPositive, powerBasisNormalization } from '@/lib/power-basis';
 import { reconstructedRoleEnergy } from './role-energy';
 import { pointTopologyKey, topologyLabel } from './topology-filter';
 
@@ -45,8 +45,6 @@ export interface EqualServiceComparison {
     EqualServiceMetric
   >;
 }
-const positive = (value: unknown): value is number =>
-  typeof value === 'number' && Number.isFinite(value) && value > 0;
 const serviceAxis = (field: string) =>
   field === 'mean_tpot_intvty' ||
   /^(?:mean|median|p\d+(?:\.\d+)?)_(?:intvty|tpot|ttft|e2el|itl)$/u.test(field);
@@ -106,7 +104,7 @@ export function getEqualServiceSources(points: readonly InferenceData[]): EqualS
 }
 
 function deploymentOutput(point: InferenceData): number | undefined {
-  if (!positive(point.output_tput_per_gpu)) return undefined;
+  if (!isPositive(point.output_tput_per_gpu)) return undefined;
   if (point.disagg) {
     return (
       powerBasisNormalization({
@@ -119,7 +117,7 @@ function deploymentOutput(point: InferenceData): number | undefined {
     );
   }
   const count = chipCounts(point, false).physical;
-  return positive(count) && Number.isSafeInteger(count)
+  return isPositive(count) && Number.isSafeInteger(count)
     ? point.output_tput_per_gpu * count
     : undefined;
 }
@@ -138,7 +136,7 @@ function estimate(
   const rows = points
     .flatMap((point) => {
       const x = point[field];
-      return positive(x) ? [{ point, x, value: quantity(point) }] : [];
+      return isPositive(x) ? [{ point, x, value: quantity(point) }] : [];
     })
     .sort((a, b) => a.x - b.x || (a.point.id ?? 0) - (b.point.id ?? 0));
   const xs = [...new Set(rows.map((row) => row.x))];
@@ -152,7 +150,7 @@ function estimate(
     if (matches.some((row) => !Object.is(row.value, matches[0].value)))
       return { estimate: null, reason: 'ambiguous-x' };
     for (const row of matches) {
-      if (!positive(row.value)) return { estimate: null, reason: 'missing-metric' };
+      if (!isPositive(row.value)) return { estimate: null, reason: 'missing-metric' };
       endpoints.push({ ...row, value: row.value });
     }
   }
@@ -162,7 +160,7 @@ function estimate(
     brackets.length === 1
       ? left.value
       : left.value + (right.value - left.value) * ((target - left.x) / (right.x - left.x));
-  return positive(value)
+  return isPositive(value)
     ? { estimate: { value, interpolated: brackets.length === 2, endpoints } }
     : { estimate: null, reason: 'missing-metric' };
 }
@@ -178,7 +176,7 @@ export function buildEqualServiceComparison(
   const sourceB = sources.find((source) => source.key === comparator) ?? null;
   let reason: EqualServiceReason | undefined;
   if (!serviceAxis(xField)) reason = 'unsupported-axis';
-  else if (!positive(target)) reason = 'invalid-target';
+  else if (!isPositive(target)) reason = 'invalid-target';
   else if (baseline === comparator) reason = 'same-source';
   else if (!sourceA || !sourceB) reason = 'unknown-source';
   const rows = observed(points);
@@ -223,7 +221,7 @@ export function getEqualServiceComparisonCurve(
     observed(points)
       .filter((point) => equalServiceSourceKey(point) === key)
       .map((point) => point[options.xField])
-      .filter(positive);
+      .filter(isPositive);
   const a = xs(options.baseline),
     b = xs(options.comparator);
   if (a.length === 0 || b.length === 0) return [];
@@ -244,7 +242,7 @@ export function getPrefillSharePoints(
     .flatMap((point) => {
       const x = point[xField];
       const energy = reconstructedRoleEnergy(point);
-      return positive(x) && energy
+      return isPositive(x) && energy
         ? [{ x, sourceKey: equalServiceSourceKey(point), point, ...energy }]
         : [];
     })

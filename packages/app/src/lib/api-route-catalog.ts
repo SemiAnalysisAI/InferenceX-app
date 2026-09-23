@@ -139,7 +139,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-inference-view',
-    sourceSha256: '7b3f1ba020dee0f3ad5b62249294d8532cb1ae40f22f182f70b218fc3426cb1d',
+    sourceSha256: '5f2d5997fdab9e1e94510bdbefe6e0dba394d65680fec37c5bcdeeb004eefcfd',
   },
   {
     source: 'src/app/api/v1/views/operatorx/route.ts',
@@ -239,7 +239,7 @@ export const apiRouteCatalog = [
       en: 'UI-only PowerX raw/series=power read: DB-first with artifact fallback, separate host/GPU identities and adjacent CSV context timezone normalization. GET has no expected identities and reports sourceCoverage unknown. Healthy stored windows survive fallback; known-incomplete CSVs require retained file/sample inventory and known-incomplete bundles require re-ingest. DB failures return 503 DATABASE_UNAVAILABLE; unresolved stored gaps return 503 STORED_TELEMETRY_INCOMPLETE. Responses use no-store. This is not a stable public API.',
       zh: '仅供 PowerX 界面读取原始遥测或 series=power：优先 DB，缺失时回退产物，保留主机/GPU 身份，并按相邻 CSV context 规范化时区。GET 没有预期身份清单，sourceCoverage 为 unknown。回退保留健康存储窗口；已知不完整 CSV 须满足文件/样本清单，已知不完整 bundle 须重新 ingest。数据库故障返回 503 DATABASE_UNAVAILABLE，未恢复的存储缺口返回 503 STORED_TELEMETRY_INCOMPLETE。响应使用 no-store，不作为稳定公开 API。',
     },
-    sourceSha256: '48930ca8c5c7fb26ab193f872271e21aefadc306d760ad9a7365c7cba4e4029b',
+    sourceSha256: 'e5e542173400ab5012eeff665154e68d62a402f8279e0cb7fe6e3f4dfb548adf',
   },
   {
     source: 'src/app/api/gpu-metrics/route.ts',
@@ -250,7 +250,7 @@ export const apiRouteCatalog = [
       en: 'Read-only Timeline transport with runId, series=power and optional prefix in the query; JSON sources contains 1–1000 validation basenames with RESULT_FILENAME up to 200 ASCII letters/digits/dot/underscore/hyphen, matching prefix. Invalid input returns 400; bodies over 256 KiB return 413. Fully covered DB reads skip GitHub; missing identities fall back and merge by validation source, preserving stored sibling windows. Offline GitHub preserves healthy DB series with incomplete sourceCoverage. Coverage describes only requested identities, never whole-run/sample completeness. The GET no-store/error/inventory guarantees also apply. UI-owned, excluded from the stable public API.',
       zh: 'Timeline 只读传输：查询参数为 runId、series=power 和可选 prefix；JSON sources 含 1–1000 个验证文件 basename，RESULT_FILENAME 最长 200 个 ASCII 字母/数字/点/下划线/连字符，且须匹配 prefix。输入错误返回 400，正文超过 256 KiB 返回 413。DB 已覆盖请求时跳过 GitHub，否则按缺失身份回退，以 validation source 为键合并，并保留已存储的同 bundle 兄弟窗口。GitHub 离线仍返回健康 DB 序列，sourceCoverage 标记 incomplete。覆盖仅针对请求身份，不代表整次 run 或样本完整性。沿用 GET 的 no-store、错误和清单约束；属于界面接口，不纳入稳定公开 API。',
     },
-    sourceSha256: '48930ca8c5c7fb26ab193f872271e21aefadc306d760ad9a7365c7cba4e4029b',
+    sourceSha256: 'e5e542173400ab5012eeff665154e68d62a402f8279e0cb7fe6e3f4dfb548adf',
   },
   {
     source: 'src/app/api/openapi.json/route.ts',
@@ -814,7 +814,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/inference/utils/equal-service-comparison.ts',
-    sourceSha256: '706ba422ba200845d0eca4b24c95b35feef83a39bcfce61499eb6f5c482f525b',
+    sourceSha256: 'e6e1e07a3dfaa4cfa0ea1bd9b6e8f7cc9a6fc43f043b9f07ef1651d4422c01db',
     reviewArea: {
       en: 'Source-scoped equal-service interpolation, comparator-relative changes, endpoint provenance, and prefill share projection.',
       zh: '按完整来源限定的同等服务插值、相对基准变化、端点来源，以及 prefill 占比视图。',
@@ -822,7 +822,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/inference/utils/role-energy.ts',
-    sourceSha256: 'd3d731769fa5aed6f4d1c94fe3f80c5316beb3dbbf52a9f8f3a9c024362b4825',
+    sourceSha256: '36b1ceda97af99731482ed815167a660f1619ab94c2956afe11cf72d58fa5380',
     reviewArea: {
       en: 'Validated prefill/decode energy reconstruction and shares on a common output-token denominator.',
       zh: '使用统一 output token 分母的已验证 prefill/decode 能耗重建与占比。',
@@ -846,7 +846,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/gpu-power/power-audit-bundle.ts',
-    sourceSha256: '35901a329822ae6522fe39522eb1da5509bcecee1afda93a2ce9c0d06b0f27de',
+    sourceSha256: '2f6e82d64380c936178e26795336bb8259a316fa4e547987688effc48e4b28eb',
     reviewArea: {
       en: 'Artifact Timeline validation windows, strict nested AgentX result identity, adjacent context selection, timezone normalization and device identity semantics.',
       zh: '产物 Timeline 验证窗口、严格匹配的嵌套 AgentX result 身份、相邻 context 选择、时区规范化及设备身份语义。',
@@ -862,7 +862,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/gpu-power/types.ts',
-    sourceSha256: 'e8c5460821f5d8228bcf8b7dd087abe14e29a8e220e1d8bcd75112fb5ead1baa',
+    sourceSha256: '207d56219a78a44603bff5d61ca9017caa37ab1a6973792793a2ce2122f5475c',
     reviewArea: {
       en: 'GPU telemetry units, missing values, timestamp deduplication, and full-record live statistics definitions.',
       zh: 'GPU 遥测单位、缺失值、时间戳去重，以及实时产物全记录统计的定义。',

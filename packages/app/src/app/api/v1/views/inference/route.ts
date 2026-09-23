@@ -299,8 +299,8 @@ export function GET(request: NextRequest) {
     const format = parseFormatParam(search.get('format'));
     const serviceCompare = parseBoolParam(search.get('serviceCompare'), 'serviceCompare', false);
     const roleShare = parseBoolParam(search.get('roleShare'), 'roleShare', false);
-    const requestedServiceBaseline = search.get('serviceBaseline') ?? null;
-    const requestedServiceComparator = search.get('serviceComparator') ?? null;
+    const requestedServiceBaseline = search.get('serviceBaseline');
+    const requestedServiceComparator = search.get('serviceComparator');
     const serviceTarget = search.has('serviceTarget')
       ? parseNumberParam(search.get('serviceTarget'), 'serviceTarget', 0, { min: Number.MIN_VALUE })
       : null;
@@ -413,12 +413,15 @@ export function GET(request: NextRequest) {
       );
     const data = await project(rows, params);
     const observedPoints = [...data.result.observedPoints];
+    // Service/role panels pool every scope's observed points; the payload omits them.
+    const collectObserved = ({ observedPoints: points, ...result }: InferenceSeriesResult) => {
+      observedPoints.push(...points);
+      return result;
+    };
     const comparisons = await Promise.all(
       scopes.map(async (scope) => {
         const comparison = await project(await fetchRows(scope.params), scope.params);
-        observedPoints.push(...comparison.result.observedPoints);
-        const { observedPoints: _observedPoints, ...result } = comparison.result;
-        return { entry: scope.entry, ...result };
+        return { entry: scope.entry, ...collectObserved(comparison.result) };
       }),
     );
     const overlayRows = await unofficialRows(request);
@@ -428,9 +431,7 @@ export function GET(request: NextRequest) {
           overlayRows.filter((row) => row.run_url === url),
           params,
         );
-        observedPoints.push(...overlay.result.observedPoints);
-        const { observedPoints: _observedPoints, ...result } = overlay.result;
-        return { runUrl: url, ...result };
+        return { runUrl: url, ...collectObserved(overlay.result) };
       }),
     );
 

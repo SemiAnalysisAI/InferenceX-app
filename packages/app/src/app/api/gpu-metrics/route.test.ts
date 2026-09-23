@@ -87,6 +87,9 @@ function req(url: string): NextRequest {
   return new NextRequest(new URL(url, 'http://localhost'));
 }
 
+const NVIDIA_HEADER =
+  'timestamp, index, power.draw [W], temperature.gpu, clocks.current.sm [MHz], clocks.current.memory [MHz], utilization.gpu [%], utilization.memory [%]';
+
 function nvidiaRow(second: number, power: number): string {
   return `2026/03/01 00:00:0${second}.000, 0, ${power} W, 65, 1500 MHz, 2000 MHz, 95 %, 80 %`;
 }
@@ -421,14 +424,14 @@ describe('GET /api/gpu-metrics — database first', () => {
     const { parseCsvData } = await vi.importActual<typeof GpuPowerTypes>(
       '@/components/gpu-power/types',
     );
-    const header =
-      'timestamp, index, power.draw [W], temperature.gpu, clocks.current.sm [MHz], clocks.current.memory [MHz], utilization.gpu [%], utilization.memory [%]';
-    const hostA = [header, nvidiaRow(0, 300), nvidiaRow(0, 999), nvidiaRow(1, 310)].join('\n');
+    const hostA = [NVIDIA_HEADER, nvidiaRow(0, 300), nvidiaRow(0, 999), nvidiaRow(1, 310)].join(
+      '\n',
+    );
     const hostB =
       coverage === 'empty host'
-        ? header
+        ? NVIDIA_HEADER
         : [
-            header,
+            NVIDIA_HEADER,
             nvidiaRow(0, 500),
             ...(coverage === 'truncated host' ? [] : [nvidiaRow(1, 510)]),
           ].join('\n');
@@ -577,11 +580,9 @@ describe('GET /api/gpu-metrics', () => {
     const { parseCsvData } = await vi.importActual<typeof GpuPowerTypes>(
       '@/components/gpu-power/types',
     );
-    const header =
-      'timestamp, index, power.draw [W], temperature.gpu, clocks.current.sm [MHz], clocks.current.memory [MHz], utilization.gpu [%], utilization.memory [%]';
     zipArchives.byKey.set('multinode-csv', [
-      { entryName: 'host-a/gpu_metrics.csv', data: [header, nvidiaRow(0, 300)].join('\n') },
-      { entryName: 'host-b/gpu_metrics.csv', data: [header, nvidiaRow(0, 500)].join('\n') },
+      { entryName: 'host-a/gpu_metrics.csv', data: [NVIDIA_HEADER, nvidiaRow(0, 300)].join('\n') },
+      { entryName: 'host-b/gpu_metrics.csv', data: [NVIDIA_HEADER, nvidiaRow(0, 500)].join('\n') },
     ]);
     mockParseCsvData.mockImplementationOnce(parseCsvData).mockImplementationOnce(parseCsvData);
     mockGithub([{ name: 'gpu_metrics_live', url: 'https://example.test/dl/multinode' }], {

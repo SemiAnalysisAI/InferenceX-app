@@ -4,8 +4,7 @@ PowerX point detail, the run explorer and Power Timeline read migration-016 tele
 from the database. Timeline applies the same prefix selection, validation-window cuts,
 60-second padding and one-second per-device means as the artifact path. Stored samples
 retain UTC timestamps, original units and separate host-local GPU identities. GitHub
-remains the fallback for telemetry that has not been stored. Database failures return an
-error, not an empty result or an artifact fallback.
+remains the fallback for telemetry that has not been stored.
 
 Timeline sends a read-only `POST /api/gpu-metrics?runId=RUN_ID&series=power&prefix=PREFIX`
 with JSON `{ "sources": ["power_validation_RESULT_FILENAME.json"] }`. The planner sorts
@@ -131,7 +130,6 @@ the unknown denominator.
 This also applies on the first receipt: a selected expired benchmark sibling records
 an expectation error without attempting a download. Superseded retries and unrelated
 targets remain excluded by the existing logical-name and artifact filters.
-Known failed benchmark rows remain excluded, matching normal CI.
 
 Historical backfill retains the resolver's exact-first, unique-fallback offload matching.
 A proven fallback uses the persisted point's offload identity before receipt counting
@@ -201,12 +199,6 @@ float32 tolerance rather than the tighter tolerance of the in-memory parser test
 From the repository root:
 
 ```sh
-bun install --frozen-lockfile --ignore-scripts
-bun run test:unit
-bun run typecheck
-bun run lint
-bun run fmt
-bun run check:typography
 bun run --cwd packages/app test:unit src/app/api/v1/gpu-metrics-point/route.test.ts
 bun run --cwd packages/app test:unit src/app/api/v1/views/gpu-metrics/route.test.ts
 bun run --cwd packages/db test:unit src/queries/gpu-metrics-timeline.test.ts src/etl/telemetry-receipt.test.ts

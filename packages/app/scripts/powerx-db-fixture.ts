@@ -38,7 +38,7 @@ function ingest(index: number) {
   });
 }
 
-async function ingestRetained(repaired: boolean) {
+function ingestRetained(repaired: boolean) {
   // CSV bytes are retained; sidecars deliberately inject a repair scenario.
   write(
     retainedName,
@@ -59,12 +59,11 @@ async function ingestRetained(repaired: boolean) {
       ),
     ].join('\n'),
   );
-  const result = await ingestGpuMetricsArtifact(sql, {
+  return ingestGpuMetricsArtifact(sql, {
     workflowRunId: 2,
     artifact: { artifactName: retainedName, artifactDir: path.join(artifactsDir, retainedName) },
     benchmarkResultIds: [206888, 206889],
   });
-  return result;
 }
 
 async function seed() {
