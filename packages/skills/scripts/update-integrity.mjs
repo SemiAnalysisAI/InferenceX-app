@@ -5,9 +5,10 @@ import process from 'node:process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const packageRoot = new URL('../', import.meta.url);
+const SKILLS = ['inferencex-api', 'inferencex'];
 
-async function generatedIntegrity(root = packageRoot) {
-  const skillRoot = new URL('skills/inferencex-api/', root);
+async function generatedIntegrity(root, skillName) {
+  const skillRoot = new URL(`skills/${skillName}/`, root);
   const skillRootPath = fileURLToPath(skillRoot);
   const metadata = JSON.parse(await readFile(new URL('package.json', root), 'utf8'));
   const files = {};
@@ -49,27 +50,31 @@ async function generatedIntegrity(root = packageRoot) {
 }
 
 export async function checkIntegrity(root = packageRoot) {
-  const expected = await generatedIntegrity(root);
-  const integrityPath = new URL('skills/inferencex-api/integrity.json', root);
-  let actual;
-  try {
-    actual = await readFile(integrityPath, 'utf8');
-  } catch (error) {
-    if (error.code !== 'ENOENT') throw error;
-  }
-  if (actual !== expected) {
-    throw new Error(
-      'Packaged skill integrity manifest is stale; run node packages/skills/scripts/update-integrity.mjs and commit the refreshed manifest',
-    );
+  for (const skillName of SKILLS) {
+    const expected = await generatedIntegrity(root, skillName);
+    const integrityPath = new URL(`skills/${skillName}/integrity.json`, root);
+    let actual;
+    try {
+      actual = await readFile(integrityPath, 'utf8');
+    } catch (error) {
+      if (error.code !== 'ENOENT') throw error;
+    }
+    if (actual !== expected) {
+      throw new Error(
+        'Packaged skill integrity manifest is stale; run node packages/skills/scripts/update-integrity.mjs and commit the refreshed manifest',
+      );
+    }
   }
 }
 
 async function main(args) {
   if (args.length === 0) {
-    await writeFile(
-      new URL('skills/inferencex-api/integrity.json', packageRoot),
-      await generatedIntegrity(),
-    );
+    for (const skillName of SKILLS) {
+      await writeFile(
+        new URL(`skills/${skillName}/integrity.json`, packageRoot),
+        await generatedIntegrity(packageRoot, skillName),
+      );
+    }
     return;
   }
   if (args.length === 1 && args[0] === '--check') {

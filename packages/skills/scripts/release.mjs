@@ -20,6 +20,8 @@ const releaseFiles = [
   'README.md',
   'bin/install.mjs',
   'package.json',
+  'skills/inferencex/SKILL.md',
+  'skills/inferencex/integrity.json',
   'skills/inferencex-api/SKILL.md',
   'skills/inferencex-api/integrity.json',
   'skills/inferencex-api/references/agentx.md',

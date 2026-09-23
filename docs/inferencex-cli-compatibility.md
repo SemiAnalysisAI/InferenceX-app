@@ -54,3 +54,41 @@ The installer preserves unmanaged files. An obsolete helper can therefore remain
 on disk after upgrade, but it is not part of the current package or interface.
 See the installed [CLI reference](../packages/skills/skills/inferencex-api/references/cli.md)
 for commands, policy predicates, and bundle semantics.
+
+## 1.1 skill entry and installation scope
+
+The new `inferencex/` entry exposes `/inferencex` in Claude Code and `$inferencex`
+(or selection through `/skills`) in Codex. It reads the shared guide under
+`inferencex-api/`; CLI paths, arguments, output and evidence contracts are unchanged.
+Both directories are installed together with separate recoverable transactions.
+If interrupted between them, `status --json` reports the runtime at its existing
+fields and the new entry under `entrypoint`; rerunning the same install completes
+missing work. `--force` repairs managed files while preserving unrelated files.
+Each directory has its own integrity manifest and receipt. The additive `ready`
+field is true only when both entries are healthy and match
+the executing installer version. A successful runtime status alone does not establish
+that the task entry is installed. Cancellation between directory commits may leave
+a healthy runtime with a missing entry; rerunning installation completes it.
+
+`install` and `status` accept `--scope project|user` (default `project`). User scope
+uses `~/.claude/skills` for Claude Code and `~/.agents/skills` for Codex/agents.
+Explicit `--dir` cannot be combined with `--scope`. A project installation does not
+replace a personal installation; check the same scope used for installation.
+
+### 中文说明
+
+1.1 新增 `inferencex/` 入口：Claude Code 使用 `/inferencex`，Codex 使用
+`$inferencex` 或从 `/skills` 选择。入口读取 `inferencex-api/` 中的共用指南，
+CLI 路径、参数、输出和证据契约均未改变。
+
+两个目录一同安装，各自使用可恢复的安装事务。中途退出时，`status --json` 的原有字段
+报告运行时（`inferencex-api/`）状态，新增 `entrypoint` 报告任务入口；重新执行相同
+安装命令即可补齐未完成的部分。`--force` 修复由安装器管理的文件，并保留无关文件。
+每个目录都有独立的 integrity 清单和安装记录。新增 `ready` 字段仅在两个目录均正常，
+且版本都与当前安装器一致时为 true。运行时正常不代表入口已安装；两个目录提交之间
+取消安装，可能留下正常的运行时和缺失的入口，重新安装即可补齐。
+
+`install` 和 `status` 支持 `--scope project|user`，默认 `project`。
+用户级安装时，Claude Code 使用 `~/.claude/skills`，Codex/agents 使用 `~/.agents/skills`。
+显式指定 `--dir` 时不能同时使用 `--scope`。
+项目级与用户级安装彼此独立，检查状态时应使用安装时选择的 scope。
