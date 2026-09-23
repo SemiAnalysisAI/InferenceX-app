@@ -91,9 +91,11 @@ export function pickDefaultPrecisions(
  * - When the user has explicitly chosen a precision (URL `i_prec`, a preset, or
  *   a manual toggle), honor it — intersected with what's available, falling back
  *   to the first available precision (preserves prior behavior).
- * - Otherwise auto-pick the densest precision (see `pickDefaultPrecisions`) and
- *   union in any precisions present in a loaded unofficial run, so an overlay the
- *   user explicitly opened is visible by default instead of hidden behind FP4.
+ * - Otherwise start from the model's fixed default set when it has one for this
+ *   scenario (`getModelDefaultPrecisions`, intersected with what is available),
+ *   else auto-pick the densest precision (see `pickDefaultPrecisions`), and union
+ *   in any precisions present in a loaded unofficial run, so an overlay the user
+ *   explicitly opened is visible by default instead of hidden behind FP4.
  */
 export function resolveEffectivePrecisions(opts: {
   selectedPrecisions: string[];
@@ -102,6 +104,8 @@ export function resolveEffectivePrecisions(opts: {
   unofficialPrecisions?: string[];
   explicit: boolean;
   minCurves?: number;
+  /** Per-model default set (`getModelDefaultPrecisions`); ignored when explicit. */
+  modelDefaultPrecisions?: readonly string[];
 }): string[] {
   const { selectedPrecisions, availablePrecisions, curveCounts, explicit } = opts;
   const available = new Set(availablePrecisions);
@@ -112,7 +116,9 @@ export function resolveEffectivePrecisions(opts: {
     return availablePrecisions.length > 0 ? [availablePrecisions[0]] : selectedPrecisions;
   }
 
-  const base = pickDefaultPrecisions(curveCounts, opts.minCurves);
+  const modelDefaults = (opts.modelDefaultPrecisions ?? []).filter((p) => available.has(p));
+  const base =
+    modelDefaults.length > 0 ? modelDefaults : pickDefaultPrecisions(curveCounts, opts.minCurves);
   const merged = [...new Set([...base, ...(opts.unofficialPrecisions ?? [])])]
     .filter((p) => available.has(p))
     .toSorted(byRank);
