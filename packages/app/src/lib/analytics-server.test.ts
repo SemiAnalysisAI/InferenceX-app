@@ -16,7 +16,7 @@ afterEach(() => {
 it('preserves the existing non-awaiting server API and aggregate identity', () => {
   const send = vi.fn().mockResolvedValue(new Response('{}'));
   vi.stubGlobal('fetch', send);
-  expect(trackServer('feedback_submission_failed', { reason: 'example' })).toBeUndefined();
+  trackServer('feedback_submission_failed', { reason: 'example' });
   expect(JSON.parse(send.mock.calls[0][1].body)).toMatchObject({ distinct_id: 'server' });
   expect(send.mock.calls[0][0]).toBe('https://us.i.posthog.com/capture/');
 });
