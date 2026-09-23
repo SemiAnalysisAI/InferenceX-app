@@ -605,6 +605,15 @@ coverage unknown. Plain CSV fallback applies the adjacent context timezone just 
 ingest and bundle reads. Raw multi-file artifacts retain separate file/host series.
 Successful reads and storage errors use no-store.
 
+AgentX nested validation documents are matched to the exact root result and retained
+window before receiving a canonical validation filename alias. Original path, result
+filename and validation hash remain in stored sidecars. CI attaches recovered source
+and window metadata before benchmark publication/upsert; targeted telemetry re-ingest
+fills only NULL provenance for a unique explicit run/result/concurrency match, even
+when samples are unchanged. Metrics and validity remain untouched. Benchmark metadata
+repair additionally needs the existing materialized-view refresh and benchmark-cache
+invalidation before the UI planner can discover the restored Timeline source.
+
 `/api/v1/gpu-metrics-point?id=` powers the PowerX point-detail tab. Every request
 checks the current DB revision before reading its Blob payload cache. Sidecar repairs,
 new point links and shared-series changes therefore select fresh payloads without a

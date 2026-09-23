@@ -22,8 +22,13 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import { createHash } from 'node:crypto';
 
 import { isMultinodePowerSamplesPath } from './multinode-power-samples.js';
+import {
+  isPowerAuditValidationEntry,
+  normalizePowerAuditValidations,
+} from './power-audit-validations.js';
 
 export const GPU_METRICS_ARTIFACT_PREFIX = 'gpu_metrics_';
 export const POWER_AUDIT_ARTIFACT_PREFIX = 'power_audit_';
@@ -41,7 +46,7 @@ export interface GpuMetricsCsvFile {
 
 export interface GpuMetricsSidecars {
   context: Record<string, unknown> | null;
-  /** Original per-window audit documents, keyed by their source filename. */
+  /** Audit documents keyed by canonical source; nested documents retain original path/hash. */
   validations?: Record<string, Record<string, unknown>>;
   /** Expected stored files and deduplicated row counts from this one artifact. */
   seriesInventory?: { fileName: string; sampleCount: number }[];
@@ -119,17 +124,38 @@ export function readMultinodePowerManifest(samplesPath: string): Record<string, 
 }
 
 /** Preserve window boundaries and role overrides before GitHub artifact expiry. */
-export function readPowerAuditValidations(root: string): Record<string, Record<string, unknown>> {
-  const validations: Record<string, Record<string, unknown>> = {};
-  if (!fs.existsSync(root) || !fs.statSync(root).isDirectory()) return validations;
+export function readPowerAuditValidations(
+  root: string,
+  artifactName = path.basename(root),
+): Record<string, Record<string, unknown>> {
+  if (!fs.existsSync(root) || !fs.statSync(root).isDirectory()) return {};
+  const files = new Map<string, string>();
+  const read = (name: string) => {
+    const file = path.join(root, name);
+    if (isPowerAuditValidationEntry(name) && fs.existsSync(file) && fs.statSync(file).isFile()) {
+      files.set(name, fs.readFileSync(file, 'utf8'));
+    }
+  };
   for (const name of fs.readdirSync(root).sort()) {
-    if (!/^power_validation_[^/]+\.json$/u.test(name)) continue;
-    const parsed = readJsonIfPresent(path.join(root, name));
-    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-      validations[name] = parsed as Record<string, unknown>;
+    read(name);
+  }
+  const agentic = path.join(root, 'LOGS', 'agentic');
+  if (fs.existsSync(agentic) && fs.statSync(agentic).isDirectory()) {
+    for (const entry of fs.readdirSync(agentic, { withFileTypes: true })) {
+      const match = /^conc_(?<concurrency>[1-9]\d*)$/u.exec(entry.name);
+      if (!entry.isDirectory() || !match) continue;
+      read(`LOGS/agentic/${entry.name}/power_validation.json`);
+      read(`LOGS/power/windows/agentic_power_concurrency_${match.groups!.concurrency}.json`);
     }
   }
-  return validations;
+  const validations = normalizePowerAuditValidations(artifactName, files);
+  for (const validation of validations.values()) {
+    if (typeof validation.validation_path !== 'string') continue;
+    const original = files.get(validation.validation_path);
+    if (original !== undefined)
+      validation.validation_sha256 = createHash('sha256').update(original).digest('hex');
+  }
+  return Object.fromEntries(validations);
 }
 
 function readJsonIfPresent(pathname: string): unknown | null {

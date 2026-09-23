@@ -805,11 +805,19 @@ export interface ApiContractSourceDigest {
  */
 export const apiContractSourceDigests = [
   {
-    source: 'src/components/gpu-power/power-audit-bundle.ts',
-    sourceSha256: 'c288ae25d4702c31a6bef5e5601e5b0b8c4abe89cd978a7eef2a4dc0247a344a',
+    source: '../db/src/etl/power-audit-validations.ts',
+    sourceSha256: '44a607747b79d038bb8f4e53590efba689d376c143f50a5d750d3552faa0c442',
     reviewArea: {
-      en: 'Deterministic adjacent context selection and timezone normalization shared by artifact Timeline and run views, plus validation-window and device identity semantics.',
-      zh: '产物 Timeline 和 run 视图共用的确定性相邻 context 选择与时区规范化，以及验证窗口和设备身份语义。',
+      en: 'Shared legacy and nested AgentX validation identity normalization for artifact and stored Timeline windows.',
+      zh: '产物与数据库 Timeline 窗口共用的 legacy 和嵌套 AgentX validation 身份规范化。',
+    },
+  },
+  {
+    source: 'src/components/gpu-power/power-audit-bundle.ts',
+    sourceSha256: '35901a329822ae6522fe39522eb1da5509bcecee1afda93a2ce9c0d06b0f27de',
+    reviewArea: {
+      en: 'Artifact Timeline validation windows, strict nested AgentX result identity, adjacent context selection, timezone normalization and device identity semantics.',
+      zh: '产物 Timeline 验证窗口、严格匹配的嵌套 AgentX result 身份、相邻 context 选择、时区规范化及设备身份语义。',
     },
   },
   {

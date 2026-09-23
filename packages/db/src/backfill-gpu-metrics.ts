@@ -29,6 +29,8 @@ import { hasNoSslFlag } from './cli-utils.js';
 import { AsyncSemaphore } from './etl/async-semaphore.js';
 import { createAdminSql } from './etl/db-utils.js';
 import { ingestGpuMetricsArtifact } from './etl/gpu-metrics-ingest.js';
+import { readPowerAuditValidations } from './etl/gpu-metrics-artifacts.js';
+import { recoveredPowerAudit } from './etl/power-audit-validations.js';
 import {
   benchmarkPublicationIdentity,
   stablePowerPointIdentity,
@@ -42,6 +44,11 @@ import {
   type TelemetryReceipt,
 } from './etl/telemetry-receipt.js';
 import { retryArtifactOperation } from './lib/artifact-retry.js';
+import {
+  checkpointBenchmarkRefresh,
+  refreshBackfillBenchmarks,
+  type BenchmarkAuditUpdate,
+} from './lib/backfill-benchmark-refresh.js';
 import {
   confirmProceed,
   listBackfillRunArtifacts,
@@ -80,6 +87,7 @@ interface BackfillFlags {
   attempt: number | null;
   artifact: string | null;
   receipt: string | null;
+  refreshCacheOnly: boolean;
 }
 
 function positiveIntFlag(flag: string): number | null {
@@ -116,6 +124,7 @@ function parseFlags(): BackfillFlags {
     attempt: positiveIntFlag('--attempt'),
     artifact: stringFlag('--artifact'),
     receipt: stringFlag('--receipt'),
+    refreshCacheOnly: process.argv.includes('--refresh-cache-only'),
   };
 }
 
@@ -165,6 +174,7 @@ type PairOutcome =
       samplesInserted: number;
       pointsLinked: number;
       expectationsUnknown: boolean;
+      metadataUpdatedBenchmarkResultIds: number[];
     }
   | { kind: 'unmatched' }
   | { kind: 'failed' };
@@ -177,6 +187,7 @@ async function processPair(
   observations: Map<string, TelemetryObservation>,
   expectationErrors: NonNullable<TelemetryReceipt['expectationErrors']>,
   uniqueFallbacks: Map<string, number>,
+  checkpointMetadata: (updates: BenchmarkAuditUpdate[]) => Promise<void>,
 ): Promise<PairOutcome> {
   let benchmarkDir: string | null = null;
   let gpuMetricsDir: string | null = null;
@@ -201,12 +212,15 @@ async function processPair(
       observations.set(key, { identity, artifactNames: [pair.gpuMetrics.name], produced: true });
     }
     const matchedIds: number[] = [];
+    const mappedPoints: { ids: number[]; identity: Record<string, unknown> }[] = [];
     for (const row of mappedRows) {
       const ids = await findBenchmarkResultIds(sql, run, [row], (id) =>
         uniqueFallbacks.set(stablePowerPointIdentity(benchmarkPublicationIdentity(row)), id),
       );
       if (ids.length === 0) throw new Error(`${pair.gpuMetrics.name}: no matching benchmark rows`);
       matchedIds.push(...ids);
+      if (row.benchmarkType === 'agentic_traces')
+        mappedPoints.push({ ids, identity: benchmarkPublicationIdentity(row) });
     }
     const resultIds = [...new Set(matchedIds)];
     if (resultIds.length === 0) {
@@ -217,6 +231,31 @@ async function processPair(
     gpuMetricsDir = await retryArtifactOperation(`downloading ${pair.gpuMetrics.name}`, () =>
       downloadArtifact(pair.gpuMetrics, tempDir),
     );
+    const validations = Object.entries(
+      readPowerAuditValidations(gpuMetricsDir, pair.gpuMetrics.name),
+    )
+      .map(([source, validation]) => ({
+        powerAudit: recoveredPowerAudit(source, validation),
+        conc: (validation.selected_window as Record<string, unknown> | undefined)?.concurrency,
+      }))
+      .filter((validation) => validation.powerAudit !== null);
+    const auditUpdates: BenchmarkAuditUpdate[] = [];
+    for (const point of mappedPoints) {
+      const candidates = validations.filter(
+        (validation) => validation.conc === point.identity.conc,
+      );
+      if (candidates.length !== 1) continue;
+      const powerAudit = candidates[0]!.powerAudit;
+      if (powerAudit)
+        auditUpdates.push(
+          ...point.ids.map((benchmarkResultId) => ({
+            benchmarkResultId,
+            identity: point.identity,
+            powerAudit,
+          })),
+        );
+    }
+    await checkpointMetadata(auditUpdates);
     const ingested = await ingestGpuMetricsArtifact(sql, {
       workflowRunId: run.id,
       artifact: { artifactName: pair.gpuMetrics.name, artifactDir: gpuMetricsDir },
@@ -231,6 +270,7 @@ async function processPair(
       samplesInserted: ingested.samplesInserted,
       pointsLinked: resultIds.length,
       expectationsUnknown,
+      metadataUpdatedBenchmarkResultIds: ingested.metadataUpdatedBenchmarkResultIds,
     };
   } catch (error) {
     if (pointKeys.length === 0)
@@ -259,6 +299,15 @@ async function main(): Promise<void> {
   }
   if ((flags.attempt !== null || flags.artifact || flags.receipt) && flags.run === null)
     throw new Error('--attempt, --artifact and --receipt require --run');
+  if (
+    flags.refreshCacheOnly &&
+    (!flags.run || !flags.receipt || flags.artifact || flags.all || flags.dryRun)
+  )
+    throw new Error(
+      '--refresh-cache-only requires --run and --receipt, without --all, --artifact or --dry-run',
+    );
+  if (flags.refreshCacheOnly && !fs.existsSync(flags.receipt!))
+    throw new Error('--refresh-cache-only requires an existing receipt');
 
   console.log('=== backfill-gpu-metrics ===');
   const runs = await loadCandidateRuns(flags, limit, force);
@@ -317,7 +366,13 @@ async function main(): Promise<void> {
     return;
   }
 
-  if (!(await confirmProceed(`${runs.length} workflow run(s) will be checked for gpu_metrics.`))) {
+  if (
+    !(await confirmProceed(
+      flags.refreshCacheOnly
+        ? 'Only the recorded benchmark metadata cache will be refreshed.'
+        : `${runs.length} workflow run(s) will be checked for gpu_metrics.`,
+    ))
+  ) {
     return;
   }
 
@@ -334,7 +389,6 @@ async function main(): Promise<void> {
   for (const [runIndex, run] of runs.entries()) {
     const runId = run.github_run_id;
     const repository = repositoryFromRunUrl(run.html_url) ?? DEFAULT_REPO;
-    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), `gpu-metrics-backfill-${runId}-`));
     const runStart = Date.now();
     const receiptPath =
       flags.receipt ?? `power-publication-${runId}-attempt-${run.run_attempt}.json`;
@@ -350,6 +404,50 @@ async function main(): Promise<void> {
         (manifest.telemetry.runId !== runId || manifest.telemetry.runAttempt !== run.run_attempt))
     )
       throw new Error('Publication receipt run/attempt does not match the recovery target');
+    const saveReceipt = () => {
+      fs.mkdirSync(path.dirname(path.resolve(receiptPath)), { recursive: true });
+      const temporary = `${receiptPath}.tmp`;
+      fs.writeFileSync(temporary, `${JSON.stringify(manifest, null, 2)}\n`, { flush: true });
+      fs.renameSync(temporary, receiptPath);
+    };
+    const refresh = async () => {
+      try {
+        await refreshBackfillBenchmarks(sql, manifest, saveReceipt);
+      } catch (error) {
+        process.exitCode = 1;
+        console.error(
+          `  Benchmark metadata refresh failed; retry --refresh-cache-only --run ${runId} --attempt ${run.run_attempt} --receipt ${receiptPath} --yes`,
+          error,
+        );
+      }
+    };
+    if (flags.refreshCacheOnly) {
+      await refresh();
+      continue;
+    }
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), `gpu-metrics-backfill-${runId}-`));
+    const checkpointMetadata = async (updates: BenchmarkAuditUpdate[]) => {
+      if (updates.length === 0) return;
+      const candidates = await sql<{ id: number; offload_mode: string }[]>`
+        select br.id, br.offload_mode from benchmark_results br
+        where br.workflow_run_id = ${run.id}
+          and br.id = any(${sql.array(updates.map((update) => update.benchmarkResultId))}::bigint[])
+          and br.benchmark_type = 'agentic_traces' and br.power_audit is null
+      `;
+      checkpointBenchmarkRefresh(
+        manifest,
+        candidates.map((row) => Number(row.id)),
+        saveReceipt,
+        candidates.map((row) => {
+          const update = updates.find((entry) => entry.benchmarkResultId === Number(row.id))!;
+          return {
+            ...update,
+            sourceIdentity: update.identity,
+            identity: { ...update.identity, offload_mode: row.offload_mode },
+          };
+        }),
+      );
+    };
     const observations = new Map<string, TelemetryObservation>();
     const uniqueFallbacks = new Map<string, number>();
     let recoveryError: string | undefined;
@@ -420,7 +518,15 @@ async function main(): Promise<void> {
       const outcomes = await Promise.all(
         pairs.map((pair) =>
           limiter.run(() =>
-            processPair(run, pair, tempDir, observations, missing.errors, uniqueFallbacks),
+            processPair(
+              run,
+              pair,
+              tempDir,
+              observations,
+              missing.errors,
+              uniqueFallbacks,
+              checkpointMetadata,
+            ),
           ),
         ),
       );
@@ -434,6 +540,11 @@ async function main(): Promise<void> {
             runSeries += outcome.seriesCount;
             runSamples += outcome.samplesInserted;
             pointsLinked += outcome.pointsLinked;
+            checkpointBenchmarkRefresh(
+              manifest,
+              outcome.metadataUpdatedBenchmarkResultIds,
+              saveReceipt,
+            );
             break;
           }
           case 'unmatched': {
@@ -486,8 +597,9 @@ async function main(): Promise<void> {
         ];
       }
       summarizeTelemetryReceipt(manifest.telemetry);
-      fs.mkdirSync(path.dirname(path.resolve(receiptPath)), { recursive: true });
-      fs.writeFileSync(receiptPath, `${JSON.stringify(manifest, null, 2)}\n`);
+      saveReceipt();
+      if (manifest.benchmarkRefresh && manifest.benchmarkRefresh.status !== 'complete')
+        await refresh();
       console.log(`  PowerX ingest receipt: ${receiptPath}`);
       fs.rmSync(tempDir, { recursive: true, force: true });
     }

@@ -14,6 +14,10 @@
  * the network or the zip.
  */
 import { parseNvidiaTimestamp } from '@semianalysisai/inferencex-db/etl/gpu-metrics-csv';
+import {
+  isPowerAuditValidationEntry,
+  normalizePowerAuditValidations,
+} from '@semianalysisai/inferencex-db/etl/power-audit-validations';
 
 import {
   bucketPowerSeries,
@@ -29,15 +33,13 @@ export const BUNDLE_WINDOW_PAD_SECONDS = 60;
 
 export const BUNDLE_SAMPLES_ENTRY = 'LOGS/power/samples.csv';
 export const BUNDLE_MANIFEST_ENTRY = 'LOGS/power/manifest.json';
-/** Top-level `power_validation_<name>.json`; the `LOGS/` copies of results are not validations. */
-const VALIDATION_ENTRY = /^power_validation_[^/]+\.json$/u;
 
 /** Zip entries the route must extract for `cutPowerAuditBundle`; everything else stays compressed. */
 export function isPowerAuditBundleEntry(entryName: string): boolean {
   return (
     entryName === BUNDLE_SAMPLES_ENTRY ||
     entryName === BUNDLE_MANIFEST_ENTRY ||
-    VALIDATION_ENTRY.test(entryName) ||
+    isPowerAuditValidationEntry(entryName) ||
     isSmiCsv(entryName) ||
     isContextEntry(entryName)
   );
@@ -256,12 +258,7 @@ export function cutPowerAuditBundle(
   artifact: string,
   files: ReadonlyMap<string, string>,
 ): GpuPowerSeries[] {
-  const validations = new Map<string, Record<string, unknown>>();
-  for (const [entryName, text] of files) {
-    if (!VALIDATION_ENTRY.test(entryName)) continue;
-    const validation = parseJsonObject(text);
-    if (validation) validations.set(entryName, validation);
-  }
+  const validations = normalizePowerAuditValidations(artifact, files);
   const manifest = parseJsonObject(files.get(BUNDLE_MANIFEST_ENTRY));
   const contextFiles = [...files]
     .filter(([name]) => isContextEntry(name))

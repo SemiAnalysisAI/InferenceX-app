@@ -391,7 +391,12 @@ describe('ingestGpuMetricsArtifact', () => {
       artifact,
       benchmarkResultIds: [11],
     });
-    expect(recovered).toEqual({ seriesIds: [seriesId], samplesInserted: 5, seriesSkipped: 0 });
+    expect(recovered).toEqual({
+      metadataUpdatedBenchmarkResultIds: [],
+      seriesIds: [seriesId],
+      samplesInserted: 5,
+      seriesSkipped: 0,
+    });
     const after = await storedSeries(seriesId);
     expect(after.metadata).toMatchObject([
       { sample_count: 5, sidecars: { context: { timestamp_timezone: '+02:00' } } },
@@ -459,6 +464,7 @@ describe('ingestGpuMetricsArtifact', () => {
       benchmarkResultIds: [11],
     });
     expect(replay).toEqual({
+      metadataUpdatedBenchmarkResultIds: [],
       seriesIds: recovered.seriesIds,
       samplesInserted: 0,
       seriesSkipped: 2,
@@ -615,7 +621,12 @@ describe('ingestGpuMetricsArtifact', () => {
       artifact,
       benchmarkResultIds: [10],
     });
-    expect(result).toEqual({ seriesIds: first.seriesIds, samplesInserted: 0, seriesSkipped: 1 });
+    expect(result).toEqual({
+      metadataUpdatedBenchmarkResultIds: [],
+      seriesIds: first.seriesIds,
+      samplesInserted: 0,
+      seriesSkipped: 1,
+    });
     const [after] = await sql<{ ingested_at: Date }[]>`select ingested_at from gpu_metric_series`;
     expect(after!.ingested_at).toEqual(before!.ingested_at);
   });
@@ -627,6 +638,11 @@ describe('ingestGpuMetricsArtifact', () => {
       artifact,
       benchmarkResultIds: [10],
     });
-    expect(result).toEqual({ seriesIds: [], samplesInserted: 0, seriesSkipped: 0 });
+    expect(result).toEqual({
+      metadataUpdatedBenchmarkResultIds: [],
+      seriesIds: [],
+      samplesInserted: 0,
+      seriesSkipped: 0,
+    });
   });
 });

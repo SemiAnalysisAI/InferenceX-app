@@ -57,6 +57,22 @@ export interface PowerPublicationManifest {
   telemetryWarnings?: string[];
   /** Attachment completeness, separate from benchmark/power publication validity. */
   telemetry?: TelemetryReceipt;
+  /** Durable refresh responsibility when telemetry recovery fills benchmark metadata. */
+  benchmarkRefresh?: {
+    status: 'pending' | 'complete' | 'failed';
+    benchmarkResultIds: number[];
+    /** Expected enrichment comes from retained validation, never a DB snapshot. */
+    auditUpdates?: {
+      benchmarkResultId: number;
+      identity: Record<string, unknown>;
+      /** Original mapped identity when the existing historical offload resolver used a fallback. */
+      sourceIdentity?: Record<string, unknown>;
+      powerAudit: { source: string; window_start_unix: number; window_end_unix: number };
+    }[];
+    endpoint?: string;
+    checkedAt?: string;
+    error?: string;
+  };
 }
 /**
  * The errors that fail an ingest. `telemetryWarnings` is deliberately not among

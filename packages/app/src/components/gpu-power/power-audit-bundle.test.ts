@@ -109,14 +109,19 @@ function bundle(overrides: Record<string, string | undefined> = {}): Map<string,
 }
 
 describe('isPowerAuditBundleEntry', () => {
-  it('selects samples, manifest, and top-level validations only', () => {
+  it('selects samples, manifest and retained validation/result/window documents', () => {
     expect(isPowerAuditBundleEntry(BUNDLE_SAMPLES_ENTRY)).toBe(true);
     expect(isPowerAuditBundleEntry(BUNDLE_MANIFEST_ENTRY)).toBe(true);
     expect(isPowerAuditBundleEntry(validationName(8))).toBe(true);
     expect(isPowerAuditBundleEntry('LOGS/power/windows/results_concurrency_8.json')).toBe(false);
     expect(isPowerAuditBundleEntry(`LOGS/sa-bench_isl_8192_osl_1024/results.json`)).toBe(false);
-    expect(isPowerAuditBundleEntry(`agg_${RESULT}_conc8.json`)).toBe(false);
-    expect(isPowerAuditBundleEntry(`${RESULT}_conc8.json`)).toBe(false);
+    // Root result candidates are matched to the exact artifact by normalization.
+    expect(isPowerAuditBundleEntry(`agg_${RESULT}_conc8.json`)).toBe(true);
+    expect(isPowerAuditBundleEntry(`${RESULT}_conc8.json`)).toBe(true);
+    expect(isPowerAuditBundleEntry('LOGS/agentic/conc_8/power_validation.json')).toBe(true);
+    expect(isPowerAuditBundleEntry('LOGS/power/windows/agentic_power_concurrency_8.json')).toBe(
+      true,
+    );
     expect(isPowerAuditBundleEntry(`nested/${validationName(8)}`)).toBe(false);
     expect(isPowerAuditBundleEntry('power_validation_x.json.bak')).toBe(false);
   });

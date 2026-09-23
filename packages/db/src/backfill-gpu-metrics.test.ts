@@ -141,6 +141,7 @@ afterAll(async () => {
 
 afterEach(() => {
   process.exitCode = originalExitCode;
+  vi.unstubAllEnvs();
   vi.restoreAllMocks();
   for (const root of roots.splice(0)) fs.rmSync(root, { recursive: true, force: true });
 });
@@ -326,8 +327,10 @@ describe('flag validation', () => {
 function fixtureArtifact(name: string, files: Record<string, string>): ArtifactMeta {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'backfill-telemetry-fixture-'));
   roots.push(root);
-  for (const [file, content] of Object.entries(files))
+  for (const [file, content] of Object.entries(files)) {
+    fs.mkdirSync(path.dirname(path.join(root, file)), { recursive: true });
     fs.writeFileSync(path.join(root, file), content);
+  }
   artifactSources.set(name, root);
   return { name, archive_download_url: `fixture://${name}`, created_at: '2026-09-02T00:00:00Z' };
 }
@@ -808,6 +811,212 @@ describe('targeted recovery receipts', () => {
 function point(value: TelemetryReceipt, id: number) {
   return value.points.find((p) => p.benchmarkResultId === id)!;
 }
+
+describe('benchmark metadata cache recovery', () => {
+  const audit = {
+    source: 'power_validation_agentx.json',
+    window_start_unix: 10,
+    window_end_unix: 20,
+  };
+
+  async function pendingReceipt() {
+    vi.stubEnv('CACHE_INVALIDATE_URL', 'http://127.0.0.1:3137/api/v1/invalidate');
+    vi.stubEnv('CACHE_INVALIDATE_SECRET', 'local-test-secret');
+    await sql`UPDATE workflow_runs SET date = current_date WHERE id = 1`;
+    await sql`UPDATE benchmark_results SET power_audit = ${JSON.stringify(audit)}::jsonb, date = current_date WHERE id = 10`;
+    const file = receiptFile();
+    const [identity] =
+      await sql`SELECT c.*, br.id, br.benchmark_type, br.isl, br.osl, br.conc, br.offload_mode, br.recipe_fingerprint
+      FROM benchmark_results br JOIN configs c ON c.id = br.config_id WHERE br.id = 10`;
+    const manifest: PowerPublicationManifest = {
+      version: 1,
+      runId: FRESH_NO_SERIES,
+      runAttempt: 1,
+      points: [],
+      benchmarkRefresh: {
+        status: 'pending',
+        benchmarkResultIds: [10],
+        auditUpdates: [{ benchmarkResultId: 10, identity: identity!, powerAudit: audit }],
+        endpoint: 'http://127.0.0.1:3137/api/v1/invalidate',
+      },
+    };
+    fs.writeFileSync(file, JSON.stringify(manifest));
+    return file;
+  }
+
+  function successfulFetch() {
+    return vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation((_url, init) =>
+        Promise.resolve(
+          Response.json(
+            init?.method === 'POST'
+              ? { invalidated: true, blobsDeleted: 1 }
+              : [{ id: 10, power_audit: audit }],
+          ),
+        ),
+      );
+  }
+
+  it.each([true, false])(
+    'checkpoints source evidence before metadata writes with configured=%s',
+    async (configured) => {
+      vi.stubEnv(
+        'CACHE_INVALIDATE_URL',
+        configured ? 'http://127.0.0.1:3137/api/v1/invalidate' : '',
+      );
+      vi.stubEnv('CACHE_INVALIDATE_SECRET', 'local-test-secret');
+      await sql`UPDATE benchmark_results SET benchmark_type = 'agentic_traces', isl = NULL, osl = NULL WHERE id = 10`;
+      const bmk = benchmarkArtifact('metadata');
+      const source = artifactSources.get(bmk.name)!;
+      const [raw] = JSON.parse(fs.readFileSync(path.join(source, 'results.json'), 'utf8'));
+      fs.writeFileSync(
+        path.join(source, 'results.json'),
+        JSON.stringify([{ ...raw, scenario_type: 'agentic-coding', users: 32 }]),
+      );
+      const expectedAudit = {
+        source: 'power_validation_metadata_conc32.json',
+        window_start_unix: 10,
+        window_end_unix: 20,
+      };
+      const gpu = fixtureArtifact('power_audit_metadata', {
+        'LOGS/power/samples.csv':
+          'schema_version,timestamp_unix,scrape_seq,hostname,gpu_index,gpu_uuid,power_w\n1,10,0,host-a,0,GPU-0,100\n1,11,1,host-a,0,GPU-0,200',
+        'LOGS/power/manifest.json': JSON.stringify({ producer: 'srt-slurm.dcgm-power' }),
+        [expectedAudit.source]: JSON.stringify({
+          validation_path: 'LOGS/agentic/conc_32/power_validation.json',
+          result_file: 'metadata_conc32.json',
+          selected_window: { concurrency: 32, start_time_unix: 10, end_time_unix: 20 },
+        }),
+      });
+      retainedArtifacts.set(String(FRESH_NO_SERIES), [bmk, gpu]);
+      const [mapped] = readMappedBenchmarkRows(source);
+      const identity = benchmarkPublicationIdentity(mapped!);
+      await sql`UPDATE benchmark_results SET offload_mode = ${mapped!.offloadMode} WHERE id = 10`;
+      const original = {
+        identity,
+        metrics: { power_valid: 0, tput_per_gpu: 1234.5 },
+        workers: null,
+        power_invalid_reasons: ['original'],
+        power_audit: null,
+        artifact: { path: 'original.json', sha256: 'preserve-original-hash' },
+      };
+      const unrelated = { ...original, identity: { ...identity, conc: 64 } };
+      const file = receiptFile();
+      fs.writeFileSync(
+        file,
+        JSON.stringify({
+          version: 1,
+          runId: FRESH_NO_SERIES,
+          runAttempt: 1,
+          points: [original, unrelated],
+        }),
+      );
+      const request = vi
+        .spyOn(globalThis, 'fetch')
+        .mockImplementation((_url, init) =>
+          Promise.resolve(
+            Response.json(
+              init?.method === 'POST'
+                ? { invalidated: true, blobsDeleted: 1 }
+                : [{ id: 10, power_audit: expectedAudit }],
+            ),
+          ),
+        );
+      await recover(file, gpu.name);
+      const result: PowerPublicationManifest = JSON.parse(fs.readFileSync(file, 'utf8'));
+      expect(result.benchmarkRefresh?.status).toBe(configured ? 'complete' : 'failed');
+      expect(result.benchmarkRefresh?.auditUpdates?.[0]?.powerAudit).toEqual(expectedAudit);
+      expect(result.points).toEqual([
+        { ...original, power_audit: configured ? expectedAudit : null },
+        unrelated,
+      ]);
+      expect(await sql`SELECT power_audit FROM benchmark_results WHERE id = 10`).toEqual([
+        { power_audit: configured ? expectedAudit : null },
+      ]);
+      if (configured) expect(process.exitCode).toBe(0);
+      else {
+        expect(process.exitCode).toBe(1);
+        expect(request).not.toHaveBeenCalled();
+        expect(await sql`SELECT * FROM gpu_metric_samples`).toEqual([]);
+      }
+    },
+  );
+
+  it('refreshes a saved target without listing/downloading artifacts or changing telemetry', async () => {
+    const file = await pendingReceipt();
+    successfulFetch();
+    const before = await sql`SELECT * FROM gpu_metric_series ORDER BY id`;
+    process.argv = [
+      'bun',
+      'backfill-gpu-metrics.ts',
+      '--refresh-cache-only',
+      '--run',
+      String(FRESH_NO_SERIES),
+      '--attempt',
+      '1',
+      '--receipt',
+      file,
+      '--yes',
+    ];
+    await main();
+    expect(JSON.parse(fs.readFileSync(file, 'utf8')).benchmarkRefresh.status).toBe('complete');
+    expect(listedRunIds).toEqual([]);
+    expect(downloadedNames).toEqual([]);
+    expect(await sql`SELECT * FROM gpu_metric_series ORDER BY id`).toEqual(before);
+    expect(await sql`SELECT power_audit FROM latest_benchmarks WHERE id = 10`).toEqual([
+      { power_audit: audit },
+    ]);
+  });
+
+  it('retries a failed cache phase on unchanged ingest with zero sample rewrites', async () => {
+    const file = await pendingReceipt();
+    const bmk = benchmarkArtifact('metadata');
+    const gpu = telemetryArtifact('metadata');
+    retainedArtifacts.set(String(FRESH_NO_SERIES), [bmk, gpu]);
+    const request = successfulFetch();
+    request.mockResolvedValueOnce(new Response('unavailable', { status: 503 }));
+    await recover(file, gpu.name);
+    expect(process.exitCode).toBe(1);
+    expect(JSON.parse(fs.readFileSync(file, 'utf8')).benchmarkRefresh).toMatchObject({
+      status: 'failed',
+      benchmarkResultIds: [10],
+      error: 'invalidate cache: HTTP 503',
+    });
+    const before =
+      await sql`SELECT * FROM gpu_metric_samples ORDER BY series_id, sampled_at, gpu_index`;
+    await recover(file, gpu.name);
+    expect(process.exitCode).toBe(0);
+    expect(JSON.parse(fs.readFileSync(file, 'utf8')).benchmarkRefresh.status).toBe('complete');
+    expect(
+      await sql`SELECT * FROM gpu_metric_samples ORDER BY series_id, sampled_at, gpu_index`,
+    ).toEqual(before);
+    expect(
+      vi
+        .mocked(console.log)
+        .mock.calls.flat()
+        .some((line) => String(line).includes('+0 samples')),
+    ).toBe(true);
+  });
+
+  it('rejects a receipt for another run before any cache request or artifact download', async () => {
+    const file = await pendingReceipt();
+    const request = successfulFetch();
+    process.argv = [
+      'bun',
+      'backfill-gpu-metrics.ts',
+      '--refresh-cache-only',
+      '--run',
+      String(FRESH_WITH_SERIES),
+      '--receipt',
+      file,
+      '--yes',
+    ];
+    await expect(main()).rejects.toThrow('receipt run/attempt');
+    expect(request).not.toHaveBeenCalled();
+    expect(downloadedNames).toEqual([]);
+  });
+});
 
 describe('real persistence through the recovery CLI', () => {
   it('repairs absent, failed and unlinked points separately without duplicating shared series or crossing attempts', async () => {

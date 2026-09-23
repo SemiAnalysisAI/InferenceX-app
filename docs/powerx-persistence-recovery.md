@@ -55,6 +55,26 @@ The live raw explorer also keeps each CSV as a separate series, matching the dat
 reader. Multi-file artifact labels include the CSV path, so host-local GPU 0 values cannot
 be merged into one device. Single-file labels remain unchanged.
 
+AgentX artifacts may retain their validation at
+`LOGS/agentic/conc_N/power_validation.json`. Both stored and artifact readers recognize
+this layout only when the exact root result filename, its `conc`, and the retained
+`LOGS/power/windows/agentic_power_concurrency_N.json` agree with the validation's
+selected window. Missing, malformed or mismatched evidence does not create a window.
+The normalized source is `power_validation_<root-result-stem>.json`; it is an alias,
+not an invented top-level file. Stored validation sidecars retain `validation_path`,
+`result_file` and the SHA-256 of the original validation bytes. Legacy top-level
+validation documents take precedence, and power-validity and role values stay unchanged.
+
+Normal CI derives missing AgentX benchmark source/window metadata before publication
+and benchmark upsert, retaining it across aggregate copies of the same full point
+identity. Targeted telemetry re-ingest also fills SQL-NULL `power_audit` after all hosts
+are stored and linked, including sample no-ops. It requires one unambiguous AgentX point
+within the caller's explicit run/result IDs with matching concurrency; it neither
+overwrites non-null provenance nor changes metrics, workers or validity. The ingest
+result reports actual `metadataUpdatedBenchmarkResultIds`. Ordinary benchmark reads
+also require the existing `latest_benchmarks` refresh and benchmark cache invalidation;
+point/Timeline revision changes alone do not refresh the UI's benchmark source list.
+
 ## Cache and browser recovery
 
 `/api/v1/gpu-metrics-point?id=N` checks a live database revision before reading its existing
@@ -230,6 +250,42 @@ The ordinary fixture-backed smoke command remains `bun run test:e2e` with an
      --artifact EXACT_ARTIFACT_NAME --receipt /path/power-publication.json --yes
    bun packages/db/src/verify-power-publication.ts /path/power-publication.json https://TARGET_ORIGIN
    ```
+
+   Before a backfill that may fill missing AgentX `power_audit`, set
+   `CACHE_INVALIDATE_URL=https://TARGET_ORIGIN/api/v1/invalidate` and
+   `CACHE_INVALIDATE_SECRET` (or `INVALIDATE_SECRET`); protected previews also need
+   `CACHE_PROTECTION_BYPASS_SECRET`. The selected app must use the same DB and its
+   existing cache namespace/Blob prefix. No new cache scope is introduced.
+
+   The backfill checkpoints NULL-audit AgentX candidates in the existing manifest
+   before ingest writes. `benchmarkRefresh` records IDs, retained source-derived
+   audit updates, target endpoint, pending/complete/failed status, check time and
+   error. DB audits must match that saved source evidence. Only the matching
+   publication points' NULL audit fields are enriched; original artifact hashes,
+   benchmark values and unrelated points remain unchanged. Without `--receipt`, the
+   existing default is `power-publication-RUN_ID-attempt-ATTEMPT.json`. Missing
+   configuration fails that pair before ingest; configuration errors cannot
+   silently turn a metadata write into a successful backfill.
+
+   After ingest, refresh runs in this order: `latest_benchmarks` materialized view,
+   the existing invalidate endpoint, then exact-run benchmark API comparison by ID
+   and structured `power_audit`. Refresh failure exits nonzero and retains the
+   responsibility even if the next ingest changes no samples or metadata.
+   To retry only that phase, without downloading artifacts or rewriting samples:
+
+   ```sh
+   bun run admin:db:backfill-gpu-metrics --run RUN_ID --attempt ATTEMPT \
+     --receipt /path/power-publication.json --refresh-cache-only --yes
+   ```
+
+   The receipt's run/attempt, point IDs and endpoint must still match. A checkpoint
+   interrupted before its metadata UPDATE leaves NULL candidates. They retain a
+   failed refresh responsibility and require targeted artifact re-ingest; a later
+   upsert clearing an already-written audit cannot erase that responsibility.
+   Invalid/string-encoded audits fail explicitly. HTTP calls have a 30-second
+   timeout; retries use the saved receipt rather than an unrecorded manual purge.
+   Dry runs never refresh. `complete` covers the recorded IDs and API metadata,
+   not browser state, energy validity or deployment-wide acceptance.
 
    An explicit `--run` is rechecked even if some series already exist. Unchanged inputs
    are no-ops. The GitHub backfill route accepts only the current source attempt and

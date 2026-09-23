@@ -110,7 +110,7 @@ const STRINGS = {
     utilityHelp:
       'Dashed reference at the all-in provisioned utility power per GPU from the hardware registry (SemiAnalysis Datacenter Industry Model). Off by default because it compresses the traces.',
     loading: (runs: number) =>
-      `Loading GPU telemetry for ${runs} run${runs === 1 ? '' : 's'}… (GitHub artifacts, may take a minute)`,
+      `Loading GPU telemetry for ${runs} run${runs === 1 ? '' : 's'}… (may take a minute)`,
     loadError: (runId: string, message: string) => `Run ${runId}: ${message}`,
     missing: (missing: number, total: number) =>
       `${missing} of ${total} measured configs have no telemetry trace and are not drawn.`,
@@ -179,8 +179,7 @@ const STRINGS = {
     utilityLines: '全电源配置参考线',
     utilityHelp:
       '按硬件注册表中每 GPU 的全电源配置（all-in）市电功率绘制虚线参考（SemiAnalysis 数据中心行业模型）。默认关闭，因为它会压缩曲线的纵向分辨率。',
-    loading: (runs: number) =>
-      `正在加载 ${runs} 个运行的 GPU 遥测数据……（GitHub 产物，可能需要约一分钟）`,
+    loading: (runs: number) => `正在加载 ${runs} 个运行的 GPU 遥测数据……（可能需要约一分钟）`,
     loadError: (runId: string, message: string) => `运行 ${runId}：${message}`,
     missing: (missing: number, total: number) =>
       `${total} 个有实测值的配置中有 ${missing} 个没有遥测曲线，未绘制。`,

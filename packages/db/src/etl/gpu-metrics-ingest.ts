@@ -37,6 +37,7 @@ import {
   type GpuMetricsSidecars,
 } from './gpu-metrics-artifacts.js';
 import { multinodePowerVendor, parseMultinodePowerSamples } from './multinode-power-samples.js';
+import { recoveredPowerAudit } from './power-audit-validations.js';
 
 /** Samples are streamed to Postgres in unnest batches of this many rows. */
 const SAMPLE_BATCH_SIZE = 5000;
@@ -69,6 +70,7 @@ export interface GpuMetricsIngestResult {
   seriesIds: number[];
   samplesInserted: number;
   seriesSkipped: number;
+  metadataUpdatedBenchmarkResultIds: number[];
 }
 
 /**
@@ -79,7 +81,7 @@ export interface GpuMetricsIngestResult {
  */
 function prepareMultinodePowerSeries(artifact: GpuMetricsArtifact): PreparedGpuMetricSeries[] {
   const prepared: PreparedGpuMetricSeries[] = [];
-  const validations = readPowerAuditValidations(artifact.artifactDir);
+  const validations = readPowerAuditValidations(artifact.artifactDir, artifact.artifactName);
   for (const file of listMultinodePowerSampleFiles(artifact.artifactDir)) {
     const csvText = fs.readFileSync(file.path, 'utf8');
     const hosts = parseMultinodePowerSamples(csvText);
@@ -129,7 +131,7 @@ export function prepareGpuMetricsArtifact(artifact: GpuMetricsArtifact): Prepare
     const csvText = fs.readFileSync(file.path, 'utf8');
     const sidecars = readGpuMetricsSidecars(file.path);
     if (artifact.artifactName.startsWith('power_audit_')) {
-      sidecars.validations = readPowerAuditValidations(artifact.artifactDir);
+      sidecars.validations = readPowerAuditValidations(artifact.artifactDir, artifact.artifactName);
       const bundleFile = listMultinodePowerSampleFiles(artifact.artifactDir)[0];
       sidecars.powerManifest = bundleFile ? readMultinodePowerManifest(bundleFile.path) : null;
     }
@@ -374,7 +376,12 @@ export async function ingestGpuMetricsArtifact(
   },
 ): Promise<GpuMetricsIngestResult> {
   const prepared = prepareGpuMetricsArtifact(input.artifact);
-  const result: GpuMetricsIngestResult = { seriesIds: [], samplesInserted: 0, seriesSkipped: 0 };
+  const result: GpuMetricsIngestResult = {
+    seriesIds: [],
+    samplesInserted: 0,
+    seriesSkipped: 0,
+    metadataUpdatedBenchmarkResultIds: [],
+  };
   for (const series of prepared) {
     const upserted = await upsertGpuMetricSeries(sql, {
       workflowRunId: input.workflowRunId,
@@ -385,6 +392,33 @@ export async function ingestGpuMetricsArtifact(
     result.seriesIds.push(upserted.seriesId);
     result.samplesInserted += upserted.samplesInserted;
     if (upserted.samplesInserted === 0 && !upserted.replaced) result.seriesSkipped++;
+  }
+  // The caller has resolved this artifact's exact benchmark identities. Recover
+  // only a unique AgentX point within that explicit set, after every host is
+  // stored/linked. This also repairs metadata when all samples were a no-op.
+  const validations = prepared[0]?.sidecars.validations ?? {};
+  const audits = Object.entries(validations)
+    .map(([source, validation]) => ({
+      audit: recoveredPowerAudit(source, validation),
+      conc: (validation.selected_window as Record<string, unknown> | undefined)?.concurrency,
+    }))
+    .filter((entry) => entry.audit !== null);
+  for (const { audit, conc } of audits) {
+    if (typeof conc !== 'number' || !Number.isSafeInteger(conc) || conc <= 0) continue;
+    if (audits.filter((entry) => entry.conc === conc).length !== 1) continue;
+    const updated = await sql<{ id: number }[]>`
+      with candidates as (
+        select id from benchmark_results
+        where workflow_run_id = ${input.workflowRunId}
+          and id = any(${sql.array([...new Set(input.benchmarkResultIds)])}::bigint[])
+          and benchmark_type = 'agentic_traces' and conc = ${conc}
+      )
+      update benchmark_results set power_audit = ${sql.json(audit)}::jsonb
+      where id in (select id from candidates)
+        and (select count(*) from candidates) = 1 and power_audit is null
+      returning id
+    `;
+    result.metadataUpdatedBenchmarkResultIds.push(...updated.map((row) => Number(row.id)));
   }
   return result;
 }

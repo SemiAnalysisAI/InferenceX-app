@@ -81,7 +81,11 @@ import {
 import { AsyncSemaphore } from './etl/async-semaphore';
 import { discoverTraceReplayArtifacts } from './etl/trace-artifact-discovery';
 import { discoverServerLogArtifacts, readServerLogArtifact } from './etl/server-log-artifacts';
-import { discoverGpuMetricsArtifacts } from './etl/gpu-metrics-artifacts';
+import {
+  discoverGpuMetricsArtifacts,
+  readPowerAuditValidations,
+} from './etl/gpu-metrics-artifacts';
+import { createBenchmarkPowerAuditRecovery } from './etl/power-audit-recovery';
 import { ingestGpuMetricsArtifact } from './etl/gpu-metrics-ingest';
 import { readTelemetryReceipt, type TelemetryObservation } from './etl/telemetry-receipt';
 import { datasetSlugFromBenchmarkRow } from './etl/dataset-provenance';
@@ -551,6 +555,7 @@ async function main(): Promise<void> {
 
     const allBmkFiles = [...bmkFiles, ...allBmkDirs.flatMap((d) => findJsonFiles(d))];
     const seenPointIdentities = new Map<string, string>();
+    const recoverPowerAudit = createBenchmarkPowerAuditRecovery();
     console.log(`  Found ${allBmkFiles.length} benchmark JSON file(s)`);
 
     for (const [fileIndex, file] of allBmkFiles.entries()) {
@@ -612,6 +617,23 @@ async function main(): Promise<void> {
       const suffix = stripBmkAndAgenticPrefix(parentDir);
       const gpuMetricsArtifact =
         gpuMetricsArtifacts.get(configKey) ?? gpuMetricsArtifacts.get(suffix);
+      let auditEvidence;
+      if (parentDir.startsWith('bmk_agentic_') && gpuMetricsArtifact) {
+        try {
+          auditEvidence = {
+            resultFile: path.basename(file),
+            validations: readPowerAuditValidations(
+              gpuMetricsArtifact.artifactDir,
+              gpuMetricsArtifact.artifactName,
+            ),
+          };
+        } catch (error) {
+          tracker.recordTelemetryError(
+            `power audit for ${configKey}`,
+            error instanceof Error ? error : new Error(String(error)),
+          );
+        }
+      }
       for (const row of rows) {
         let configId: number;
         try {
@@ -654,15 +676,18 @@ async function main(): Promise<void> {
               `config ${configId}, conc ${row.conc}`,
           );
         }
+        // Attach exact retained validation metadata before both the receipt and
+        // the upsert. A later aggregate copy must not null this run's recovery.
+        const point = recoverPowerAudit(applied.point, auditEvidence);
         const publication = powerPublicationPoint(
-          applied.point,
+          point,
           `https://github.com/${REPO}/actions/runs/${runIdNum}/attempts/${runAttemptNum}`,
           { path: relativeFile, sha256: artifactSha256 },
         );
         if (publication)
           powerPublicationPoints.set(publicationIdentity(publication.identity), publication);
-        toInsert.push(applied.point);
-        const identity = benchmarkPublicationIdentity(applied.point);
+        toInsert.push(point);
+        const identity = benchmarkPublicationIdentity(point);
         const key = stablePowerPointIdentity(identity);
         // Aggregate copies may arrive before/after their per-job sibling. Only
         // the latter establishes whether that exact telemetry artifact exists.

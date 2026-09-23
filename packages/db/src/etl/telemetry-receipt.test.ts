@@ -94,6 +94,107 @@ async function observations(): Promise<TelemetryObservation[]> {
 }
 
 describe('telemetry attachment receipts', () => {
+  it.each(['object', 'encoded string', 'null', 'malformed', 'array', 'invalid inventory'])(
+    'reads persisted JSONB %s sidecars without confusing unknown inventory with DB failure',
+    async (encoding) => {
+      const points = await observations();
+      const shared = artifact('gpu_metrics_shared');
+      fs.writeFileSync(
+        path.join(shared.artifactDir, 'gpu_metrics_host2.csv'),
+        fs.readFileSync(path.join(shared.artifactDir, 'gpu_metrics.csv')),
+      );
+      await ingestGpuMetricsArtifact(sql, {
+        workflowRunId: 1,
+        artifact: shared,
+        benchmarkResultIds: [10, 11],
+      });
+      const stored = await db.query<{ sidecars: unknown }>(
+        'select sidecars from gpu_metric_series order by id',
+      );
+      const inventory = stored.rows[0]!.sidecars;
+      const value =
+        encoding === 'object'
+          ? inventory
+          : encoding === 'encoded string'
+            ? JSON.stringify(inventory)
+            : encoding === 'null'
+              ? null
+              : encoding === 'malformed'
+                ? '{broken'
+                : encoding === 'array'
+                  ? []
+                  : { seriesInventory: [{ fileName: 'gpu_metrics.csv', sampleCount: '2' }] };
+      await db.query('update gpu_metric_series set sidecars = $1::jsonb', [JSON.stringify(value)]);
+      const raw = await db.query<{ kind: string }>(
+        'select jsonb_typeof(sidecars) as kind from gpu_metric_series',
+      );
+      const kind =
+        encoding === 'encoded string' || encoding === 'malformed'
+          ? 'string'
+          : encoding === 'null'
+            ? 'null'
+            : encoding === 'array'
+              ? 'array'
+              : 'object';
+      expect(raw.rows).toEqual([{ kind }, { kind }]);
+      const receipt = await readTelemetryReceipt(
+        sql,
+        run,
+        points.slice(0, 2).map((point) => ({ ...point, artifactNames: [shared.artifactName] })),
+      );
+      const complete = encoding === 'object' || encoding === 'encoded string';
+      expect(receipt.databaseError).toBeUndefined();
+      expect(receipt.counts).toMatchObject({
+        expectedPoints: 4,
+        storedPoints: complete ? 2 : 0,
+        linkedPoints: complete ? 2 : 0,
+        storageUnknownPoints: complete ? 0 : 2,
+        storedSeries: 2,
+        storedSamples: 4,
+      });
+      for (const point of receipt.points.filter((candidate) =>
+        [10, 11].includes(candidate.benchmarkResultId!),
+      )) {
+        expect(point.storage.status).toBe(complete ? 'complete' : 'unknown');
+        expect(point.reasons).toEqual(complete ? [] : ['series_inventory_unknown']);
+        expect(point.linkedSeriesIds).toHaveLength(2);
+      }
+      const repaired = await readTelemetryReceipt(
+        sql,
+        run,
+        [{ ...points[0]!, artifactNames: [shared.artifactName] }],
+        { previous: receipt, targeted: true },
+      );
+      expect(repaired.points.filter((point) => point.benchmarkResultId !== 10)).toEqual(
+        receipt.points.filter((point) => point.benchmarkResultId !== 10),
+      );
+      expect(repaired.counts).toEqual(receipt.counts);
+    },
+  );
+
+  it('keeps a database query failure separate from an unknown stored inventory', async () => {
+    await db.exec('alter table gpu_metric_series rename to unavailable_gpu_metric_series');
+    try {
+      const receipt = await readTelemetryReceipt(sql, run, await observations());
+      expect(receipt.databaseError).toContain('gpu_metric_series');
+      expect(receipt.counts).toMatchObject({
+        expectedPoints: 4,
+        storedPoints: null,
+        linkedPoints: null,
+        storedSeries: null,
+        storedSamples: null,
+      });
+      expect(receipt.points.every((point) => point.reasons.includes('database_check_failed'))).toBe(
+        true,
+      );
+      expect(
+        receipt.points.every((point) => !point.reasons.includes('series_inventory_unknown')),
+      ).toBe(true);
+    } finally {
+      await db.exec('alter table unavailable_gpu_metric_series rename to gpu_metric_series');
+    }
+  });
+
   it('preserves an unrelated prior artifact failure at the canonical offload identity', async () => {
     await db.exec("UPDATE benchmark_results SET offload_mode = 'on' WHERE id = 10");
     const [canonical] = await observations();

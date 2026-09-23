@@ -84,6 +84,36 @@ function bundle(validation: Record<string, unknown> = VALIDATION) {
   ]);
 }
 
+function agentxBundle() {
+  const files = bundle();
+  files.delete(SOURCE);
+  const resultPath = 'agentic/conc_32/agentic_power_concurrency_32.json';
+  files.set(`${NAME.slice('power_audit_'.length)}_conc32.json`, JSON.stringify({ conc: 32 }));
+  files.set(
+    'LOGS/agentic/conc_32/power_validation.json',
+    JSON.stringify({
+      ...VALIDATION,
+      power_valid: false,
+      selected_window: {
+        ...VALIDATION.selected_window,
+        concurrency: 32,
+        result_path: resultPath,
+        window_file: 'windows/agentic_power_concurrency_32.json',
+      },
+    }),
+  );
+  files.set(
+    'LOGS/power/windows/agentic_power_concurrency_32.json',
+    JSON.stringify({
+      concurrency: 32,
+      result_path: resultPath,
+      benchmark_start_time_unix: START,
+      benchmark_end_time_unix: START + 1,
+    }),
+  );
+  return files;
+}
+
 beforeAll(async () => {
   root = fs.mkdtempSync(path.join(os.tmpdir(), 'powerx-timeline-'));
   db = await PGlite.create();
@@ -117,6 +147,85 @@ beforeEach(async () => {
 });
 
 describe('artifact → ingest → stored Timeline', () => {
+  it('restores nested AgentX provenance on ingest and sample no-op without changing metrics or validity', async () => {
+    await db.exec(`UPDATE benchmark_results SET benchmark_type = 'agentic_traces',
+      metrics = '{"power_valid":0,"throughput":17}' WHERE id = 10`);
+    const files = agentxBundle();
+    const input = {
+      workflowRunId: 1,
+      artifact: writeArtifact(NAME, files),
+      benchmarkResultIds: [10, 11],
+    };
+    const initial = await ingestGpuMetricsArtifact(sql, input);
+    expect(initial.metadataUpdatedBenchmarkResultIds).toEqual([10]);
+    const expected = {
+      source: SOURCE,
+      window_start_unix: START,
+      window_end_unix: START + 1,
+    };
+    const row = () => db.query('SELECT power_audit, metrics FROM benchmark_results WHERE id = 10');
+    const initialRow = await row();
+    expect(initialRow.rows[0]).toEqual({
+      power_audit: expected,
+      metrics: { power_valid: 0, throughput: 17 },
+    });
+    const stored = await getGpuMetricsForRun(readSql, RUN);
+    expect(storedPowerSeries(stored!.series)).toEqual(cutPowerAuditBundle(NAME, files));
+    expect(storedPowerSeries(stored!.series)).toHaveLength(1);
+    expect(stored!.series[0].sidecars).toMatchObject({
+      validations: {
+        [SOURCE]: {
+          validation_path: 'LOGS/agentic/conc_32/power_validation.json',
+          validation_sha256: expect.stringMatching(/^[a-f0-9]{64}$/u),
+          power_valid: false,
+        },
+      },
+    });
+    await db.exec('UPDATE benchmark_results SET power_audit = NULL WHERE id = 10');
+    expect(await ingestGpuMetricsArtifact(sql, input)).toMatchObject({
+      samplesInserted: 0,
+      seriesSkipped: 2,
+      metadataUpdatedBenchmarkResultIds: [10],
+    });
+    const unchanged = await ingestGpuMetricsArtifact(sql, input);
+    expect(unchanged.metadataUpdatedBenchmarkResultIds).toEqual([]);
+    const repaired = await row();
+    expect(repaired.rows[0]).toEqual({
+      power_audit: expected,
+      metrics: { power_valid: 0, throughput: 17 },
+    });
+    const unrelated = await db.query('SELECT power_audit FROM benchmark_results WHERE id = 11');
+    expect(unrelated.rows).toEqual([{ power_audit: null }]);
+  });
+
+  it.each(['explicit', 'wrong-run', 'wrong-id', 'wrong-conc', 'ambiguous'])(
+    'does not infer or overwrite point provenance for %s identity',
+    async (scenario) => {
+      await db.exec("UPDATE benchmark_results SET benchmark_type = 'agentic_traces'");
+      if (scenario === 'explicit')
+        await db.exec(
+          `UPDATE benchmark_results SET power_audit = '{"source":"existing.json"}' WHERE id = 10`,
+        );
+      if (scenario === 'wrong-run') {
+        await db.exec(`INSERT INTO workflow_runs (id, github_run_id, run_attempt, name, status, created_at, date)
+          VALUES (2, 1, 1, 'Other run', 'completed', '2026-09-12', '2026-09-12');
+          UPDATE benchmark_results SET workflow_run_id = 2 WHERE id = 10`);
+      }
+      if (scenario === 'wrong-conc')
+        await db.exec('UPDATE benchmark_results SET conc = 31 WHERE id = 10');
+      if (scenario === 'ambiguous')
+        await db.exec('UPDATE benchmark_results SET conc = 32, isl = 1 WHERE id = 11');
+      const before = await db.query('SELECT id, power_audit FROM benchmark_results ORDER BY id');
+      await ingestGpuMetricsArtifact(sql, {
+        workflowRunId: 1,
+        artifact: writeArtifact(NAME, agentxBundle()),
+        benchmarkResultIds: scenario === 'wrong-id' ? [11] : [10, 11],
+      });
+      const after = await db.query('SELECT id, power_audit FROM benchmark_results ORDER BY id');
+      expect(after.rows).toEqual(before.rows);
+    },
+  );
+
   it('matches artifact windows, host/GPU identity, deduplicated mean watts and gaps for a multinode bundle', async () => {
     const files = bundle();
     const artifact = writeArtifact(NAME, files);
