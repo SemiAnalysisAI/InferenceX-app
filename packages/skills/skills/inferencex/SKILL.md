@@ -1,6 +1,6 @@
 ---
 name: inferencex
-description: 'Analyze InferenceX benchmark data, compare token costs and hardware, check spreadsheet TCO assumptions, inspect provenance and traces, export dashboard views, and verify saved evidence. Use for existing public InferenceX observations and related follow-up analysis.'
+description: 'Analyze InferenceX benchmark data, compare token costs and hardware, check spreadsheet TCO assumptions, inspect provenance and traces, export dashboard views, render AgentX charts, and verify saved evidence. Use for existing public InferenceX observations and related follow-up analysis.'
 ---
 
 # InferenceX
@@ -11,7 +11,7 @@ behalf; they can describe the result they want in natural language.
 
 Read [the shared workflow guide](../inferencex-api/SKILL.md), then only the
 cookbook relevant to the task. It covers every existing CLI workflow and utility,
-as well as dashboard views. Resolve its relative paths from `../inferencex-api/`;
+as well as dashboard views and chart templates. Resolve its relative paths from `../inferencex-api/`;
 the executable is `../inferencex-api/scripts/inferencex.mjs` relative to this
 skill directory. Run it with Node.js 24 or later. No global binary or API key is
 required.

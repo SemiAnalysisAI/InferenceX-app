@@ -75,14 +75,15 @@ node "$inferencex_cli" verify evidence/powerx
 For Claude Code, use `.claude/skills/inferencex-api/scripts/inferencex.mjs` instead.
 Each export needs a new output directory. Public queries require no API key.
 
-| Workflow           | Use it to                                                       |
-| ------------------ | --------------------------------------------------------------- |
-| PowerX             | Export measured power and energy observations.                  |
-| AgentX             | Export agentic workload summaries and check trace availability. |
-| Result provenance  | Investigate a result's producer, configuration and logs.        |
-| TCO                | Compare costs using your price assumptions.                     |
-| Framework releases | Compare matched observations across versions.                   |
-| CollectiveX        | Compare communication benchmark runs.                           |
+| Workflow           | Use it to                                                            |
+| ------------------ | -------------------------------------------------------------------- |
+| PowerX             | Export measured power and energy observations.                       |
+| AgentX             | Export agentic workload summaries and check trace availability.      |
+| AgentX charts      | Render request counts, token lengths and latency by recorded source. |
+| Result provenance  | Investigate a result's producer, configuration and logs.             |
+| TCO                | Compare costs using your price assumptions.                          |
+| Framework releases | Compare matched observations across versions.                        |
+| CollectiveX        | Compare communication benchmark runs.                                |
 
 The package queries existing observations; it does not launch benchmarks.
 
@@ -92,6 +93,7 @@ Online requests carry package attribution for aggregate request counts. Set
 ## Documentation
 
 - [CLI reference](https://github.com/SemiAnalysisAI/InferenceX-app/blob/master/packages/skills/skills/inferencex-api/references/cli.md) — commands, exports and offline verification.
+- [Chart templates](https://github.com/SemiAnalysisAI/InferenceX-app/blob/master/packages/skills/skills/inferencex-api/references/chart-templates.md) — recommended charts and offline AgentX source comparisons.
 - [Dashboard views](https://github.com/SemiAnalysisAI/InferenceX-app/blob/master/packages/skills/skills/inferencex-api/references/dashboard-views.md) — dashboard filters and calculated chart data.
 - [Upgrading and compatibility](https://github.com/SemiAnalysisAI/InferenceX-app/blob/master/docs/inferencex-cli-compatibility.md) — migration from 0.11 and earlier.
 - [Public API](https://inferencex.semianalysis.com/api) — endpoints and response formats.
@@ -120,6 +122,7 @@ Codex 可在 `/skills` 中选择 inferencex，或使用 `$inferencex`。
 每次导出都需要新的输出目录；公开查询不需要 API key。
 
 PowerX 可导出实测功耗与能耗；AgentX 可导出智能体工作负载汇总并检查 trace 可用性。
+通过 `inferencex charts list` 查看图表建议；可从已保存的单点 trace 按记录的来源类别生成请求数、token 长度和延迟分布图。
 还可追溯结果的来源、配置和日志，按自定义价格假设比较 TCO，在框架版本间比较匹配的观测，
 以及比较两次 CollectiveX 通信基准测试。该包查询已有观测，不启动基准测试。
 详细命令、仪表板视图、旧版迁移和接口格式见上方文档链接。

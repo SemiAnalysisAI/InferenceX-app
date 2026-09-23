@@ -97,6 +97,11 @@ when a duration is requested, compute and label elapsed or inclusive days.
 
 ## Choose the workflow
 
+- **Recommended charts or main-agent versus subagent comparison:** run
+  `inferencex charts list`, then read [chart templates](references/chart-templates.md).
+  Render the saved selected-point capture with `charts agentx-sources`; preserve
+  recorded source categories, phase scope and missing/cancelled sample counts.
+
 - **Dashboard views or filter parity:** read
   [dashboard read-only views](references/dashboard-views.md). Use the documented
   `/api/v1/views/*` GET endpoint and retain resolved parameters and source identity.

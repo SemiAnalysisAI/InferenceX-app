@@ -41,7 +41,8 @@ test('both hosts install a discoverable inferencex entry forwarding to every exi
     assert.ok(readFileSync(guidePath).length > 0);
     const cli = join(installed.skill_path, 'scripts/inferencex.mjs');
     const described = output(suite.node([cli, 'describe'], { cwd }));
-    assert.equal(described.operations.length, 11);
+    assert.ok(described.operations.some(({ command }) => command === 'charts'));
+    assert.equal(described.operations.length, 12);
     for (const command of described.operations) {
       const help = succeeded(suite.node([cli, ...command.route, '--help'], { cwd }));
       assert.match(help.stdout, /inferencex/);
