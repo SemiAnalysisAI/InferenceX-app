@@ -32,6 +32,7 @@ import { replaceClientPathname } from '@/lib/client-navigation';
 import { useUnofficialRun } from '@/components/unofficial-run-provider';
 import type { RunInfo } from '@/components/inference/types';
 import {
+  isSequenceHiddenForModel,
   Model,
   MODEL_OPTIONS,
   Precision,
@@ -501,7 +502,9 @@ export function GlobalFilterProvider({
       return unofficialSeqs.length > 0 ? [...new Set(unofficialSeqs)] : [...SEQUENCE_OPTIONS];
     }
     const dbSeqs = modelRows.map((r) => rowToSequence(r)).filter((s): s is Sequence => s !== null);
-    const merged = [...new Set([...dbSeqs, ...unofficialSeqs])];
+    const merged = [...new Set([...dbSeqs, ...unofficialSeqs])].filter(
+      (s) => !isSequenceHiddenForModel(selectedModel, s),
+    );
     return merged.length > 0 ? merged : [...SEQUENCE_OPTIONS];
   }, [availabilityRows, modelRows, unofficialAvailable, selectedModel]);
 

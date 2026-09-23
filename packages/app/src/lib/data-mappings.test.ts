@@ -18,6 +18,7 @@ import {
   isModelMaintenance,
   isSequenceDeprecated,
   isSequenceDeprecatedForModel,
+  isSequenceHiddenForModel,
   getSequenceCategoryForModel,
   isBestPerSkuDefaultOff,
   showsTcoBasisSelector,
@@ -436,5 +437,17 @@ describe('getEvalBenchmarkLabel', () => {
   it('falls back to the benchmark value for unknown benchmark', () => {
     const result = getEvalBenchmarkLabel('humaneval' as EvalBenchmark);
     expect(result).toBe('humaneval');
+  });
+});
+
+describe('isSequenceHiddenForModel', () => {
+  it('hides 8K/1K for GLM-5.2 / GLM-5.3 and keeps Agentic coding', () => {
+    expect(isSequenceHiddenForModel(Model.GLM_5_2, Sequence.EightK_OneK)).toBe(true);
+    expect(isSequenceHiddenForModel(Model.GLM_5_2, Sequence.AgenticTraces)).toBe(false);
+  });
+
+  it('leaves other models untouched', () => {
+    expect(isSequenceHiddenForModel(Model.Qwen3_5, Sequence.EightK_OneK)).toBe(false);
+    expect(isSequenceHiddenForModel(Model.MiniMax_M3, Sequence.EightK_OneK)).toBe(false);
   });
 });

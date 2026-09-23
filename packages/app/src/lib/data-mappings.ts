@@ -561,6 +561,20 @@ export function isSequenceDeprecatedForModel(model: Model, sequence: Sequence): 
 }
 
 /**
+ * Scenarios removed from a model's scenario dropdown entirely. GLM-5.2 and
+ * GLM-5.3 share one bucket (see MODEL_CONFIG) and are benchmarked on Agentic
+ * coding only, so their 8K/1K rows are not offered.
+ */
+const MODEL_HIDDEN_SEQUENCES: Partial<Record<Model, ReadonlySet<Sequence>>> = {
+  [Model.GLM_5_2]: new Set([Sequence.EightK_OneK]),
+};
+
+/** Whether this model's scenario dropdown omits the scenario. */
+export function isSequenceHiddenForModel(model: Model, sequence: Sequence): boolean {
+  return MODEL_HIDDEN_SEQUENCES[model]?.has(sequence) ?? false;
+}
+
+/**
  * Sequence category as seen from one model's point of view: the global
  * category, overridden to `deprecated` when the model retired the scenario.
  * Selectors pass the selected model so a per-model retirement (MiniMax M3's
