@@ -21,6 +21,7 @@ import { readBoundedRegular } from '../skills/inferencex-api/scripts/local-files
 
 const SKILL_NAME = 'inferencex-api';
 const ENTRYPOINT_NAME = 'inferencex';
+const SHORTCUT_NAMES = ['inferencex-to-chart', 'inferencex-to-table'];
 const INSTALL_METADATA = '.inferencex-skills.json';
 const TARGET_DIRS = {
   claude: '.claude/skills',
@@ -57,7 +58,8 @@ It never changes files or uses the network.
 Interrupted owned installs recover on the next install; status and dry-run remain read-only.
 Recovery covers process crashes, without an fsync or power-loss durability guarantee.
 --version reports the executing installer, not an installed skill.
-Bundled entry: inferencex; shared implementation and legacy entry: inferencex-api
+Bundled entries: inferencex, inferencex-to-chart, inferencex-to-table
+Shared implementation and legacy entry: inferencex-api
 `;
 
 function unknownState(reason) {
@@ -280,7 +282,7 @@ async function main(args, signal) {
   }
   if (command === 'list') {
     await writeStdout(
-      `Bundled InferenceX skills:\n  ${ENTRYPOINT_NAME}\n  ${SKILL_NAME} (shared implementation and legacy entry)\n`,
+      `Bundled InferenceX skills:\n  ${[ENTRYPOINT_NAME, ...SHORTCUT_NAMES].join('\n  ')}\n  ${SKILL_NAME} (shared implementation and legacy entry)\n`,
       { signal },
     );
     return;
@@ -300,11 +302,15 @@ async function main(args, signal) {
     values,
     signal,
   );
-  const ready = [runtime, entrypoint].every(
+  const shortcuts = {};
+  for (const name of SHORTCUT_NAMES) {
+    shortcuts[name] = await processSkill(name, root, packageInfo, command, values, signal);
+  }
+  const ready = [runtime, entrypoint, ...Object.values(shortcuts)].every(
     (record) =>
       record.installation_state === 'installed' && record.installed_version === packageInfo.version,
   );
-  const result = { ...runtime, entrypoint, ready };
+  const result = { ...runtime, entrypoint, shortcuts, ready };
   if (values.json) {
     await writeStdout(`${JSON.stringify(result)}\n`, {
       signal: values['dry-run'] ? signal : undefined,
@@ -312,12 +318,18 @@ async function main(args, signal) {
   } else {
     showSkillResult(runtime, SKILL_NAME, command);
     showSkillResult(entrypoint, ENTRYPOINT_NAME, command);
+    for (const [name, record] of Object.entries(shortcuts)) showSkillResult(record, name, command);
     if (command === 'install' && !values['dry-run']) {
       if (ready) {
         console.log(
           target === 'claude'
             ? 'Next: open Claude Code and type /inferencex <your task>.'
             : 'Next: open Codex and select inferencex from /skills, or type $inferencex <your task>.',
+        );
+        console.log(
+          target === 'claude'
+            ? 'For AgentX outputs: /inferencex-to-chart <your task> or /inferencex-to-table <your task>.'
+            : 'For AgentX outputs: $inferencex-to-chart <your task> or $inferencex-to-table <your task>.',
         );
         console.log(
           'Example: Compare the InferenceX TCO assumptions in my spreadsheet with the matching public observations.',
@@ -327,7 +339,7 @@ async function main(args, signal) {
         );
       } else {
         console.log(
-          'Setup is incomplete or uses an older version. Check both skill paths above; rerun install --force with the same target and scope after saving local edits.',
+          'Setup is incomplete or uses an older version. Check the skill paths above; rerun install --force with the same target and scope after saving local edits.',
         );
       }
     }

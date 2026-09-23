@@ -11,7 +11,9 @@ distributions are a recommendation without a bundled rendering recipe.
 
 ## Choose the output style
 
-Handle both styles through the same `inferencex` skill:
+Use `inferencex-to-chart` for a chart or `inferencex-to-table` for tables and CSV.
+The general `inferencex` skill also handles either style. All three entries use
+the same command and calculations:
 
 - “Chart main-agent versus subagent request counts, token lengths and latency” →
   `--style chart`.

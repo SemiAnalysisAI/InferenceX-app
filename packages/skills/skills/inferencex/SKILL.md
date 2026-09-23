@@ -16,6 +16,10 @@ the executable is `../inferencex-api/scripts/inferencex.mjs` relative to this
 skill directory. Run it with Node.js 24 or later. No global binary or API key is
 required.
 
+For direct AgentX presentation requests, [inferencex-to-chart](../inferencex-to-chart/SKILL.md)
+defaults to a chart and [inferencex-to-table](../inferencex-to-table/SKILL.md) defaults
+to tables and CSV. Both use the same shared template and CLI.
+
 If invoked without a task, briefly offer benchmark lookup, token-cost comparison,
 power/AgentX analysis, result provenance, release/CollectiveX comparison, dashboard
 views, charts/tables, or offline verification, and ask which result the user needs. For a

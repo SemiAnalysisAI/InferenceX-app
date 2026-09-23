@@ -58,17 +58,21 @@ for commands, policy predicates, and bundle semantics.
 ## 1.1 skill entry and installation scope
 
 The new `inferencex/` entry exposes `/inferencex` in Claude Code and `$inferencex`
-(or selection through `/skills`) in Codex. It reads the shared guide under
-`inferencex-api/`; CLI paths, arguments, output and evidence contracts are unchanged.
-Both directories are installed together with separate recoverable transactions.
-If interrupted between them, `status --json` reports the runtime at its existing
-fields and the new entry under `entrypoint`; rerunning the same install completes
-missing work. `--force` repairs managed files while preserving unrelated files.
-Each directory has its own integrity manifest and receipt. The additive `ready`
-field is true only when both entries are healthy and match
-the executing installer version. A successful runtime status alone does not establish
-that the task entry is installed. Cancellation between directory commits may leave
-a healthy runtime with a missing entry; rerunning installation completes it.
+(or selection through `/skills`) in Codex. The `inferencex-to-chart/` and
+`inferencex-to-table/` shortcuts use the same invocation conventions and default to
+AgentX charts or tables and CSV. All three read the shared guide and CLI under
+`inferencex-api/`; existing CLI paths and evidence contracts remain compatible.
+
+All four directories are installed together with separate recoverable transactions.
+`status --json` retains the runtime's existing fields and the general entry under
+`entrypoint`; the additive `shortcuts` object maps `inferencex-to-chart` and
+`inferencex-to-table` to their status records. Each directory has its own integrity
+manifest and receipt. The additive `ready` field is true only when all four directories
+are healthy and match the executing installer version. A successful runtime status
+alone does not establish that the task entries are installed. Cancellation between
+directory commits may leave healthy installed entries alongside missing ones;
+rerunning the same installation completes the missing work. `--force` repairs
+managed files while preserving unrelated files.
 
 `install` and `status` accept `--scope project|user` (default `project`). User scope
 uses `~/.claude/skills` for Claude Code and `~/.agents/skills` for Codex/agents.
@@ -83,15 +87,17 @@ See the [CLI reference](../packages/skills/skills/inferencex-api/references/cli.
 ### 中文说明
 
 1.1 新增 `inferencex/` 入口：Claude Code 使用 `/inferencex`，Codex 使用
-`$inferencex` 或从 `/skills` 选择。入口读取 `inferencex-api/` 中的共用指南，
-CLI 路径、参数、输出和证据契约均未改变。
+`$inferencex` 或从 `/skills` 选择。`inferencex-to-chart/` 和 `inferencex-to-table/`
+采用相同的调用方式，前者默认生成 AgentX 图表，后者默认生成表格与 CSV。三个入口共用
+`inferencex-api/` 中的指南与 CLI，现有 CLI 路径和证据契约保持兼容。
 
-两个目录一同安装，各自使用可恢复的安装事务。中途退出时，`status --json` 的原有字段
-报告运行时（`inferencex-api/`）状态，新增 `entrypoint` 报告任务入口；重新执行相同
-安装命令即可补齐未完成的部分。`--force` 修复由安装器管理的文件，并保留无关文件。
-每个目录都有独立的 integrity 清单和安装记录。新增 `ready` 字段仅在两个目录均正常，
-且版本都与当前安装器一致时为 true。运行时正常不代表入口已安装；两个目录提交之间
-取消安装，可能留下正常的运行时和缺失的入口，重新安装即可补齐。
+四个目录一同安装，各自使用可恢复的安装事务。`status --json` 仍用原有字段报告运行时
+（`inferencex-api/`）状态，用 `entrypoint` 报告通用入口；新增的 `shortcuts` 对象以
+`inferencex-to-chart` 和 `inferencex-to-table` 为键，分别记录两者的状态。
+每个目录都有独立的 integrity 清单和安装记录。新增 `ready` 字段仅在四个目录均正常，
+且版本都与当前安装器一致时为 true。运行时正常不代表任务入口均已安装；目录提交之间
+取消安装，可能出现部分入口已正常安装、部分入口缺失的情况。重新执行相同安装命令即可补齐；
+`--force` 修复由安装器管理的文件，并保留无关文件。
 
 `install` 和 `status` 支持 `--scope project|user`，默认 `project`。
 用户级安装时，Claude Code 使用 `~/.claude/skills`，Codex/agents 使用 `~/.agents/skills`。

@@ -2,8 +2,8 @@
 
 > InferenceX benchmark data for coding agents and the command line.
 
-Install the `inferencex` skill for Codex or Claude Code. Query existing public
-benchmarks, export results with their source data, and verify saved evidence offline.
+Install InferenceX skills for Codex or Claude Code. Query existing public benchmarks,
+create AgentX charts and tables, export source data, and verify saved evidence offline.
 
 ## Install
 
@@ -28,11 +28,12 @@ Codex uses `~/.agents/skills/`; Claude Code uses `~/.claude/skills/`. Use
 `--scope project` (the default) for `.agents/skills/` or `.claude/skills/` in the
 current directory. `--dir <skills-root>` is an explicit alternative to `--scope`.
 
-Each installation includes `inferencex/` (the task entry) and `inferencex-api/`
+Each installation includes `inferencex/` (the general entry), `inferencex-to-chart/`
+and `inferencex-to-table/` (AgentX output shortcuts), and `inferencex-api/`
 (the shared CLI and cookbooks). Existing script paths and the old skill name
 continue to work. Upgrade an existing installation with `install --force` using
-the same target and scope; save local edits first. `status --json` reports both
-paths, including a missing or damaged entry.
+the same target and scope; save local edits first. `status --json` reports all four
+paths, including missing or damaged entries.
 
 <details>
 <summary>Installing an unpublished build</summary>
@@ -56,15 +57,20 @@ For example:
 > /inferencex Check the TCO assumptions in this spreadsheet against InferenceX.
 > Keep my workload, latency target, prices and units; flag anything that does not match.
 
-For AgentX source comparisons, the same skill can produce charts, tables or both:
+For AgentX source comparisons, use the output-specific entries:
 
-> /inferencex Chart request counts, token lengths and latency distributions by recorded source
-> category for this AgentX result.
+> /inferencex-to-chart Compare request counts, token lengths and latency distributions
+> by recorded source category for AgentX result `<result-id>`.
 
-> Now give me the same comparison as a table and CSV for my spreadsheet.
+> /inferencex-to-table Compare the recorded source categories in this saved AgentX
+> capture. Give me tables and CSV for my spreadsheet.
 
-The chart uses a dark theme; Markdown tables and CSV share its statistics and
-scope. Each output retains the saved source and sample counts.
+In Codex, use `$inferencex-to-chart` or `$inferencex-to-table`, or select the entry
+from `/skills`. Replace `<result-id>` with your selected result; a saved
+selected-point capture works too. The ready template compares one result's recorded
+source categories. The chart uses a dark theme; Markdown tables and CSV share its
+statistics and scope. Each output retains the saved source and sample counts.
+You can still ask `/inferencex` for either output, or request a chart and table together.
 
 You can also use the CLI directly from the installed skill:
 
@@ -106,8 +112,8 @@ Online requests carry package attribution for aggregate request counts. Set
 <details>
 <summary>简体中文</summary>
 
-为 Codex 或 Claude Code 安装 `inferencex` skill，查询 InferenceX 已有的公开基准测试数据，
-导出结果与原始响应，并离线核验已保存的证据。
+为 Codex 或 Claude Code 安装 InferenceX skills，查询已有的公开基准测试数据，
+生成 AgentX 图表与表格、导出源数据，并离线核验已保存的证据。
 
 需要 Node.js 24 或更高版本。上方命令指定 1.1.0；发布前请将包名和版本替换为候选 `.tgz` 的绝对路径，并加上 `--offline`。
 安装、状态检查和升级使用同一份产物。没有候选包时，在 `packages/skills` 目录执行 `npm pack` 生成。
@@ -115,9 +121,10 @@ Online requests carry package attribution for aggregate request counts. Set
 默认只安装到当前项目；加上 `--scope user` 后，本机所有项目均可使用：
 Codex 安装到 `~/.agents/skills/`，Claude Code 安装到 `~/.claude/skills/`。
 `--scope project` 使用当前项目的对应目录；自定义目录可用 `--dir`，不与 `--scope` 混用。
-每处安装均包含 `inferencex/` 任务入口和 `inferencex-api/` 共用 CLI 与 cookbook。
+每处安装均包含 `inferencex/` 通用入口、`inferencex-to-chart/` 与 `inferencex-to-table/`
+两个 AgentX 输出入口，以及 `inferencex-api/` 共用 CLI 与 cookbook。
 旧脚本路径与技能名称继续可用。升级时使用相同 target 和 scope 并加上 `--force`，
-先保存本地修改；`status --json` 会分别报告两个目录的状态，入口缺失或损坏时也会报告。
+先保存本地修改；`status --json` 会分别报告四个目录的状态，入口缺失或损坏时也会报告。
 
 安装后，新开一个 Claude Code 会话并输入 `/inferencex 核对这份表格里的 TCO 假设`；
 Codex 可在 `/skills` 中选择 inferencex，或使用 `$inferencex`。
@@ -126,8 +133,12 @@ Codex 可在 `/skills` 中选择 inferencex，或使用 `$inferencex`。
 每次导出都需要新的输出目录；公开查询不需要 API key。
 
 PowerX 可导出实测功耗与能耗；AgentX 可导出智能体工作负载汇总并检查 trace 可用性。
-同一个 skill 可将 AgentX 来源比较做成图表、表格或两者。例如：“按这条 AgentX 结果中记录的来源类别，绘制请求数、token 长度和延迟分布。”
-再说“把同一组比较做成表格和 CSV，方便放进我的电子表格”。深色图表、Markdown 表格和 CSV 共用统计结果与数据范围，保留原始响应和样本数。
+在 Claude Code 中，输入 `/inferencex-to-chart 按 AgentX 结果 <result-id> 中记录的来源类别，比较请求数、token 长度和延迟分布` 可生成图表；
+输入 `/inferencex-to-table 将这份已保存的 AgentX capture 按记录的来源类别整理为表格和 CSV` 可生成电子表格所需的数据。
+Codex 对应使用 `$inferencex-to-chart` 或 `$inferencex-to-table`，也可从 `/skills` 选择。
+将 `<result-id>` 替换为选定结果的 ID，也可提供已保存的 selected-point capture。
+现成模板用于比较单条结果中记录的来源类别。深色图表、Markdown 表格和 CSV
+共用统计结果与数据范围，均保留已保存的源数据和样本数。也可以通过通用 `/inferencex` 入口生成其中任一输出，或同时生成图表和表格。
 还可追溯结果的来源、配置和日志，按自定义价格假设比较 TCO，在框架版本间比较匹配的观测，
 以及比较两次 CollectiveX 通信基准测试。该包查询已有观测，不启动基准测试。
 详细命令、仪表板视图、旧版迁移和接口格式见上方文档链接。
