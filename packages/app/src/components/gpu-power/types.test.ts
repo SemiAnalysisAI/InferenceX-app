@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest';
 import {
   ALL_METRIC_OPTIONS,
   computeGpuStats,
-  detectAnomalies,
   detectTdpFromArtifactName,
   getAvailableMetrics,
   tdpForHardware,
@@ -506,164 +505,6 @@ function makeRow(
 }
 
 // ---------------------------------------------------------------------------
-// detectAnomalies
-// ---------------------------------------------------------------------------
-
-describe('detectAnomalies', () => {
-  it('returns empty array for empty data', () => {
-    expect(detectAnomalies([], 'power')).toEqual([]);
-  });
-
-  it('detects statistical outliers via MAD', () => {
-    const rows: GpuMetricRow[] = [];
-    for (let i = 0; i < 10; i++) {
-      rows.push(
-        makeRow({
-          timestamp: `2026/03/07 00:20:${37 + i}.000`,
-          index: 0,
-          power: i === 9 ? 600 : 300 + (i % 3),
-        }),
-      );
-    }
-    const anomalies = detectAnomalies(rows, 'power');
-    expect(anomalies.some((a) => a.type === 'statistical')).toBe(true);
-    const stat = anomalies.find((a) => a.type === 'statistical')!;
-    expect(stat.gpuIndex).toBe(0);
-    expect(stat.value).toBe(600);
-  });
-
-  it('detects thermal throttle above 83°C', () => {
-    const rows = [
-      makeRow({ timestamp: '2026/03/07 00:20:37.000', index: 0, temperature: 65 }),
-      makeRow({ timestamp: '2026/03/07 00:20:38.000', index: 0, temperature: 85 }),
-      makeRow({ timestamp: '2026/03/07 00:20:39.000', index: 0, temperature: 70 }),
-    ];
-    const anomalies = detectAnomalies(rows, 'power');
-    expect(anomalies.some((a) => a.type === 'thermal')).toBe(true);
-    const thermal = anomalies.find((a) => a.type === 'thermal')!;
-    expect(thermal.value).toBe(85);
-  });
-
-  it('detects near-TDP power draw', () => {
-    const rows = [
-      makeRow({ timestamp: '2026/03/07 00:20:37.000', index: 0, power: 300 }),
-      makeRow({ timestamp: '2026/03/07 00:20:38.000', index: 0, power: 650 }),
-      makeRow({ timestamp: '2026/03/07 00:20:39.000', index: 0, power: 300 }),
-    ];
-    const anomalies = detectAnomalies(rows, 'power', 'gpu_metrics_h200_test');
-    expect(anomalies.some((a) => a.type === 'near_tdp')).toBe(true);
-  });
-
-  it('does not flag near-TDP without artifact name', () => {
-    const rows = [
-      makeRow({ timestamp: '2026/03/07 00:20:37.000', index: 0, power: 650 }),
-      makeRow({ timestamp: '2026/03/07 00:20:38.000', index: 0, power: 650 }),
-      makeRow({ timestamp: '2026/03/07 00:20:39.000', index: 0, power: 650 }),
-    ];
-    const anomalies = detectAnomalies(rows, 'power');
-    expect(anomalies.some((a) => a.type === 'near_tdp')).toBe(false);
-  });
-
-  it('detects utilization drop to 0% after high usage', () => {
-    const rows = [
-      makeRow({ timestamp: '2026/03/07 00:20:37.000', index: 0, gpuUtil: 95 }),
-      makeRow({ timestamp: '2026/03/07 00:20:38.000', index: 0, gpuUtil: 0 }),
-      makeRow({ timestamp: '2026/03/07 00:20:39.000', index: 0, gpuUtil: 90 }),
-    ];
-    const anomalies = detectAnomalies(rows, 'power');
-    expect(anomalies.some((a) => a.type === 'util_drop')).toBe(true);
-  });
-
-  it('does not flag all-identical values as anomalies', () => {
-    const rows: GpuMetricRow[] = [];
-    for (let i = 0; i < 10; i++) {
-      rows.push(makeRow({ timestamp: `2026/03/07 00:20:${37 + i}.000`, index: 0, power: 300 }));
-    }
-    const anomalies = detectAnomalies(rows, 'power');
-    expect(anomalies.filter((a) => a.type === 'statistical')).toHaveLength(0);
-  });
-
-  it('deduplicates anomalies at same second', () => {
-    const rows = [
-      makeRow({ timestamp: '2026/03/07 00:20:37.000', index: 0, temperature: 85 }),
-      makeRow({ timestamp: '2026/03/07 00:20:37.500', index: 0, temperature: 86 }),
-      makeRow({ timestamp: '2026/03/07 00:20:38.000', index: 0, temperature: 65 }),
-    ];
-    const anomalies = detectAnomalies(rows, 'power');
-    const thermals = anomalies.filter(
-      (a) => a.type === 'thermal' && a.gpuIndex === 0 && Math.round(a.seconds) === 0,
-    );
-    expect(thermals).toHaveLength(1);
-  });
-
-  it('detects clock drop when SM clock drops >30% below median', () => {
-    const rows: GpuMetricRow[] = [];
-    // 9 rows at 1980 MHz, 1 row at 1000 MHz (49% drop)
-    for (let i = 0; i < 10; i++) {
-      rows.push(
-        makeRow({
-          timestamp: `2026/03/07 00:20:${37 + i}.000`,
-          index: 0,
-          smClock: i === 5 ? 1000 : 1980,
-        }),
-      );
-    }
-    const anomalies = detectAnomalies(rows, 'power');
-    expect(anomalies.some((a) => a.type === 'clock_drop')).toBe(true);
-    const drop = anomalies.find((a) => a.type === 'clock_drop')!;
-    expect(drop.value).toBe(1000);
-  });
-
-  it('detects anomalies independently per GPU', () => {
-    const rows = [
-      makeRow({ timestamp: '2026/03/07 00:20:37.000', index: 0, temperature: 85 }),
-      makeRow({ timestamp: '2026/03/07 00:20:37.000', index: 1, temperature: 85 }),
-      makeRow({ timestamp: '2026/03/07 00:20:38.000', index: 0, temperature: 65 }),
-      makeRow({ timestamp: '2026/03/07 00:20:38.000', index: 1, temperature: 65 }),
-      makeRow({ timestamp: '2026/03/07 00:20:39.000', index: 0, temperature: 65 }),
-      makeRow({ timestamp: '2026/03/07 00:20:39.000', index: 1, temperature: 65 }),
-    ];
-    const anomalies = detectAnomalies(rows, 'temperature');
-    const thermals = anomalies.filter((a) => a.type === 'thermal');
-    expect(thermals).toHaveLength(2);
-    expect(thermals.map((a) => a.gpuIndex).toSorted()).toEqual([0, 1]);
-  });
-
-  it('skips GPU groups with fewer than 3 samples for MAD detection', () => {
-    const rows = [
-      makeRow({ timestamp: '2026/03/07 00:20:37.000', index: 0, power: 100 }),
-      makeRow({ timestamp: '2026/03/07 00:20:38.000', index: 0, power: 900 }),
-    ];
-    const anomalies = detectAnomalies(rows, 'power');
-    // Only 2 samples — MAD-based statistical detection should be skipped
-    expect(anomalies.filter((a) => a.type === 'statistical')).toHaveLength(0);
-  });
-
-  it('anomaly message includes GPU index and metric value', () => {
-    const rows = [
-      makeRow({ timestamp: '2026/03/07 00:20:37.000', index: 2, temperature: 65 }),
-      makeRow({ timestamp: '2026/03/07 00:20:38.000', index: 2, temperature: 90 }),
-      makeRow({ timestamp: '2026/03/07 00:20:39.000', index: 2, temperature: 65 }),
-    ];
-    const anomalies = detectAnomalies(rows, 'temperature');
-    const thermal = anomalies.find((a) => a.type === 'thermal')!;
-    expect(thermal.message).toContain('Chip 2');
-    expect(thermal.message).toContain('90');
-    expect(thermal.message).toContain('83');
-  });
-
-  it('does not flag util_drop when previous utilization is <= 50%', () => {
-    const rows = [
-      makeRow({ timestamp: '2026/03/07 00:20:37.000', index: 0, gpuUtil: 40 }),
-      makeRow({ timestamp: '2026/03/07 00:20:38.000', index: 0, gpuUtil: 0 }),
-      makeRow({ timestamp: '2026/03/07 00:20:39.000', index: 0, gpuUtil: 50 }),
-    ];
-    const anomalies = detectAnomalies(rows, 'power');
-    expect(anomalies.some((a) => a.type === 'util_drop')).toBe(false);
-  });
-});
-
-// ---------------------------------------------------------------------------
 // computeGpuStats
 // ---------------------------------------------------------------------------
 
@@ -794,21 +635,5 @@ describe('power-only rows', () => {
     expect(getAvailableMetrics([powerOnly(0, 700), powerOnly(1, 710)]).map((m) => m.key)).toEqual([
       'power',
     ]);
-  });
-
-  it('raises no thermal, clock, or utilization anomalies from absent readings', () => {
-    const rows = Array.from({ length: 40 }, (_, i) => ({
-      ...powerOnly(0, 700 + (i % 2)),
-      timestamp: new Date(1789194365292 + i * 1000).toISOString(),
-    }));
-    expect(
-      detectAnomalies(rows, 'power', 'power_audit_kimik3_conc48').map((a) => a.type),
-    ).not.toContain('thermal');
-    expect(
-      detectAnomalies(rows, 'power', 'power_audit_kimik3_conc48').map((a) => a.type),
-    ).not.toContain('clock_drop');
-    expect(
-      detectAnomalies(rows, 'power', 'power_audit_kimik3_conc48').map((a) => a.type),
-    ).not.toContain('util_drop');
   });
 });

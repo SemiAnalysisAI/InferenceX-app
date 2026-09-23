@@ -830,7 +830,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/gpu-power/types.ts',
-    sourceSha256: 'cc75290d20b1f7b3a31c49634ae592f60c69857696cca7697a84c6f897ba2575',
+    sourceSha256: '226120667c2b6183ead6f86b6c78913c822c7deed0f27ac9d6226fe63e858fd2',
     reviewArea: {
       en: 'GPU telemetry units, missing values, timestamp deduplication, and full-record live statistics definitions.',
       zh: 'GPU 遥测单位、缺失值、时间戳去重，以及实时产物全记录统计的定义。',
