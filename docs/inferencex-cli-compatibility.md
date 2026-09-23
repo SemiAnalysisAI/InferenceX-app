@@ -75,6 +75,11 @@ uses `~/.claude/skills` for Claude Code and `~/.agents/skills` for Codex/agents.
 Explicit `--dir` cannot be combined with `--scope`. A project installation does not
 replace a personal installation; check the same scope used for installation.
 
+`discover configs` and `discover dates` also accept the other model-name form:
+DB keys such as `dsv4` or display selectors such as `DeepSeek-V4-Pro`.
+Resolution adds optional `scope` fields and records the registry request in `sources`.
+See the [CLI reference](../packages/skills/skills/inferencex-api/references/cli.md).
+
 ### 中文说明
 
 1.1 新增 `inferencex/` 入口：Claude Code 使用 `/inferencex`，Codex 使用
@@ -92,3 +97,7 @@ CLI 路径、参数、输出和证据契约均未改变。
 用户级安装时，Claude Code 使用 `~/.claude/skills`，Codex/agents 使用 `~/.agents/skills`。
 显式指定 `--dir` 时不能同时使用 `--scope`。
 项目级与用户级安装彼此独立，检查状态时应使用安装时选择的 scope。
+
+`discover configs` 和 `discover dates` 均支持数据库模型键（如 `dsv4`）和展示名称
+（如 `DeepSeek-V4-Pro`）。解析结果写入可选的 `scope` 字段，注册表请求记录在 `sources`
+中，详见 [CLI 参考](../packages/skills/skills/inferencex-api/references/cli.md)。

@@ -126,7 +126,17 @@ when a duration is requested, compute and label elapsed or inclusive days.
 - **Two CollectiveX runs:** read [CollectiveX](references/collectivex.md), then use
   `inferencex collectivex compare`. Match exact EP/KV identities and preserve
   attempts, revisions, units, source pointers, and unmatched coverage.
-- **Basic benchmark lookup, evaluation, dataset conversation, or benchmark history queries:**
+- **Which models, hardware, frameworks, precisions, or dates have observations:**
+  use `inferencex discover models` and
+  `inferencex discover configs --model <selector> [--date YYYY-MM-DD]`. Before
+  treating counts or groups of `items` as exhaustive, require
+  `coverage.complete_for_scope: true`.
+  The default page contains at most 100 items; retry at offset 0 with a larger
+  `--limit` (maximum 1000). If coverage remains incomplete, label the result partial;
+  separate offset calls fetch fresh snapshots and cannot prove complete coverage.
+  `--model` accepts a display family selector or an exact DB model key from
+  `discover models`. This returns configuration and provenance identity, not metrics.
+- **Metric values, evaluation, dataset conversation, or benchmark history queries:**
   use the bounded raw-API recipes in
   [public API examples](references/public-api-examples.md#basic-benchmark-lookup).
   These operations are outside the six formal bundle families.

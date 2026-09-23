@@ -18,9 +18,12 @@ with the answer. Repeating a recipe creates a new directory and preserves earlie
 attempts. A hash identifies saved bytes, not remote authenticity.
 
 The versioned CLI can list supported capabilities and public model scopes with
-`inferencex discover capabilities` and `inferencex discover models`. See the
-[CLI contract](cli.md). The recipes below remain useful for API operations that
-do not have a formal evidence-bundle command.
+`inferencex discover capabilities` and `inferencex discover models`, and it lists
+observed configurations for one model with `inferencex discover configs --model
+<display selector or DB model key>`. See the [CLI contract](cli.md). Prefer those
+commands for coverage questions (which hardware, frameworks, precisions or dates
+exist); use the recipes below when the answer needs metric values or an API
+operation that has no formal evidence-bundle command.
 
 ## Basic benchmark lookup
 
