@@ -12,7 +12,7 @@ const METRICS = [
   ['e2e_ms', 'Completed request E2E', 'ms'],
   ['ttft_ms', 'Completed request TTFT', 'ms'],
 ];
-const COLORS = ['#2563eb', '#b45309', '#047857', '#9333ea', '#be123c', '#0e7490'];
+const COLORS = ['#2fa9ef', '#f7b041', '#63d6b3', '#b39aff', '#ff8fab', '#67d4e8'];
 const object = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
 const nonnegative = (value) => typeof value === 'number' && Number.isFinite(value) && value >= 0;
 const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex');
@@ -30,6 +30,8 @@ export function chartTemplates() {
         id: 'agentx-sources',
         status: 'available',
         chart: 'Request-count bars and token/latency box plots by recorded srcKind',
+        table: 'Request counts and per-metric distributions in Markdown and summary CSV',
+        styles: ['chart', 'table', 'both'],
         input: 'Saved selected-point capture from references/agentx.md',
         command: 'inferencex charts agentx-sources --input selected-point.json --output-dir charts',
       },
@@ -57,7 +59,7 @@ export function normalizeChartArgs(args, outputDir) {
   try {
     parsed = parseArgs({
       args,
-      options: { input: { type: 'string' }, phase: { type: 'string' } },
+      options: { input: { type: 'string' }, phase: { type: 'string' }, style: { type: 'string' } },
       allowPositionals: true,
       strict: true,
       tokens: true,
@@ -82,7 +84,10 @@ export function normalizeChartArgs(args, outputDir) {
   const phase = values.phase ?? 'all';
   if (!['all', 'profiling', 'warmup'].includes(phase))
     throw argumentError('--phase must be all, profiling, or warmup.');
-  return { template: 'agentx-sources', input: values.input, outputDir, phase };
+  const style = values.style ?? 'both';
+  if (!['chart', 'table', 'both'].includes(style))
+    throw argumentError('--style must be chart, table, or both.');
+  return { template: 'agentx-sources', input: values.input, outputDir, phase, style };
 }
 
 function parseCapture(capture) {
@@ -270,20 +275,21 @@ export function summarizeSources(capture, phase = 'all') {
 }
 
 const number = (value) =>
-  value === null ? 'unavailable' : Number(value.toPrecision(4)).toLocaleString('en-US');
+  value === null ? 'unavailable' : value.toLocaleString('en-US', { maximumSignificantDigits: 4 });
 const categoryLabel = (value) => (value === null ? '(source missing)' : `srcKind: ${value}`);
 
 export function renderSourceChart(summary) {
   const groups = summary.groups;
-  const panelHeight = Math.max(115, groups.length * 38 + 70);
-  const width = 1120;
-  const height = 210 + panelHeight * 3 + 160;
+  const panelHeight = Math.max(140, groups.length * 50 + 90);
+  const width = 1440;
+  const height = 190 + panelHeight * 3 + 160;
   const pieces = [
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-labelledby="title description"><title id="title">AgentX requests by recorded source category</title><desc id="description">${xml(JSON.stringify(summary.scope))}. Box plots show minimum, p25, median, p75, maximum.</desc><rect width="100%" height="100%" fill="#f8fafc"/><style>text{font-family:Arial,sans-serif;fill:#0f172a} .small{font-size:12px;fill:#475569}.label{font-size:13px}.title{font-size:24px;font-weight:700}</style>`,
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-labelledby="title description"><title id="title">AgentX requests by recorded source category</title><desc id="description">${xml(JSON.stringify(summary.scope))}. Box plots show minimum, p25, median, p75, maximum.</desc><rect width="100%" height="100%" fill="#0a0d10"/><style>text{font-family:Inter,'Helvetica Neue',Arial,sans-serif;fill:#e8eaed}.small{font-size:15px;fill:#8a939c}.label{font-size:16px}.panel{font-size:19px;font-weight:600}.title{font-size:29px;font-weight:600}.brand{font-size:20px;font-weight:600;fill:#2fa9ef}</style>`,
   ];
   const text = (x, y, value, cls = 'label') =>
     pieces.push(`<text x="${x}" y="${y}" class="${cls}">${xml(value)}</text>`);
-  text(32, 43, 'AgentX · request sources', 'title');
+  text(32, 41, 'SemiAnalysis', 'brand');
+  text(205, 43, 'AgentX · request sources', 'title');
   text(
     32,
     72,
@@ -297,24 +303,24 @@ export function renderSourceChart(summary) {
   );
   text(32, 121, 'Recorded srcKind categories; labels do not infer main/subagent roles.', 'small');
   function panel(x, y, title, metric) {
-    const w = 520;
+    const w = 676;
     pieces.push(
-      `<rect x="${x}" y="${y}" width="${w}" height="${panelHeight - 16}" rx="10" fill="white" stroke="#e2e8f0"/>`,
+      `<rect x="${x}" y="${y}" width="${w}" height="${panelHeight - 16}" rx="10" fill="#11161c" stroke="#252c34"/>`,
     );
-    text(x + 16, y + 27, title);
+    text(x + 16, y + 29, title, 'panel');
     const max = Math.max(
       1,
       ...groups.map((group) => (metric ? (group.metrics[metric].max ?? 0) : group.request_count)),
     );
-    const left = x + 192,
-      plotWidth = 185;
-    text(left, y + 47, '0', 'small');
-    text(left + plotWidth - 12, y + 47, number(max), 'small');
+    const left = x + 246,
+      plotWidth = 248;
+    text(left, y + 53, '0', 'small');
+    text(left + plotWidth - 35, y + 53, number(max), 'small');
     for (const [index, group] of groups.entries()) {
-      const cy = y + 70 + index * 38;
+      const cy = y + 80 + index * 50;
       const label = categoryLabel(group.source_category);
       pieces.push(
-        `<text x="${x + 14}" y="${cy}" class="small"><title>${xml(label)}</title>${xml(label.length > 24 ? `${label.slice(0, 23)}…` : label)}</text>`,
+        `<text x="${x + 14}" y="${cy}" class="label"><title>${xml(label)}</title>${xml(label.length > 25 ? `${label.slice(0, 24)}…` : label)}</text>`,
       );
       const color = COLORS[index % COLORS.length];
       if (metric) {
@@ -331,10 +337,10 @@ export function renderSourceChart(summary) {
           stats.valid_count ? `n=${stats.valid_count}` : 'unavailable',
           'small',
         );
-        text(left + plotWidth + 12, cy + 16, `median ${number(stats.median)}`, 'small');
+        text(left + plotWidth + 12, cy + 20, `median ${number(stats.median)}`, 'small');
         text(
           left,
-          cy + 16,
+          cy + 20,
           `missing ${stats.missing_count}; cancelled ${stats.excluded_cancelled_count} excluded`,
           'small',
         );
@@ -355,7 +361,7 @@ export function renderSourceChart(summary) {
   panel(32, 150, 'Request count · all selected requests', null);
   METRICS.forEach(([key, title, unit], index) =>
     panel(
-      32 + (index % 2) * 536,
+      32 + (index % 2) * 700,
       150 + panelHeight * (1 + Math.floor(index / 2)),
       `${title} (${unit}) · log(1+x) scale`,
       key,
@@ -395,6 +401,100 @@ function requestCsv(rows) {
   return `${fields.join(',')}\n${rows.map((row) => fields.map((key) => csvCell(row[key])).join(',')).join('\n')}\n`;
 }
 
+const QUANTILES = ['min', 'p25', 'median', 'p75', 'p95', 'max'];
+const markdownCell = (value) =>
+  xml(value)
+    .replaceAll(/[\r\n]/gu, ' ')
+    .replaceAll(/[\\`*_[\]|]/gu, (char) => `&#${char.codePointAt(0)};`);
+
+function sourceTable(summary) {
+  const lines = [
+    '# AgentX requests by recorded source category',
+    '',
+    `Result ${summary.source.selected_result_id} · phase ${summary.scope.phase} · ${summary.scope.selected_request_count} captured requests selected`,
+    '',
+    '| Recorded source | Requests | Share of selected requests | Cancelled |',
+    '| --- | ---: | ---: | ---: |',
+    ...summary.groups.map(
+      (group) =>
+        `| ${markdownCell(categoryLabel(group.source_category))} | ${group.request_count} | ${number(group.request_share * 100)}% | ${group.cancelled_count} |`,
+    ),
+  ];
+  if (summary.groups.length === 0) lines.push('', 'No requests in the selected phase.');
+  for (const [key, title, unit] of METRICS) {
+    lines.push(
+      '',
+      `## ${title} (${unit})`,
+      '',
+      '| Recorded source | Valid | Missing | Cancelled excluded | Min | p25 | Median | p75 | p95 | Max |',
+      '| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |',
+    );
+    for (const group of summary.groups) {
+      const stats = group.metrics[key];
+      lines.push(
+        `| ${[
+          markdownCell(categoryLabel(group.source_category)),
+          stats.valid_count,
+          stats.missing_count,
+          stats.excluded_cancelled_count,
+          ...QUANTILES.map((field) => number(stats[field])),
+        ].join(' | ')} |`,
+      );
+    }
+  }
+  lines.push(
+    '',
+    `${summary.scope.captured_request_count} rows captured; ${summary.scope.excluded_phase_count} excluded by phase; ${summary.scope.missing_source_count} missing source.`,
+    '',
+    'One captured result; upstream completeness/sampling is unverified. Recorded categories do not establish agent roles or causal overhead.',
+    'Counts and token lengths include cancelled requests; latency excludes them. Missing values remain unavailable; zero is retained.',
+    'Quantiles: linear interpolation at (n - 1) * p (R type 7). Display values use four significant digits; counts are exact. Full precision: [summary.csv](summary.csv) and [summary.json](summary.json).',
+    '',
+    `Source: ${summary.source.query_url} · captured ${markdownCell(summary.source.retrieved_at)} · [retained capture](source.json)`,
+    '',
+  );
+  return lines.join('\n');
+}
+
+function summaryCsv(summary) {
+  const fields = [
+    'result_id',
+    'phase',
+    'source_category',
+    'request_count',
+    'request_share',
+    'cancelled_count',
+    'metric',
+    'unit',
+    'valid_count',
+    'missing_count',
+    'excluded_cancelled_count',
+    ...QUANTILES,
+  ];
+  const rows = summary.groups.flatMap((group) =>
+    METRICS.map(([key, , unit]) => {
+      const stats = group.metrics[key];
+      return [
+        summary.source.selected_result_id,
+        summary.scope.phase,
+        group.source_category,
+        group.request_count,
+        group.request_share,
+        group.cancelled_count,
+        key,
+        unit,
+        stats.valid_count,
+        stats.missing_count,
+        stats.excluded_cancelled_count,
+        ...QUANTILES.map((field) => stats[field]),
+      ]
+        .map(csvCell)
+        .join(',');
+    }),
+  );
+  return [fields.join(','), ...rows, ''].join('\n');
+}
+
 export async function runCharts(args, outputDir, { signal } = {}) {
   const options = normalizeChartArgs(args, outputDir);
   if (options.template === 'list') return chartTemplates();
@@ -412,16 +512,19 @@ export async function runCharts(args, outputDir, { signal } = {}) {
   }
   const { summary, rows } = summarizeSources(capture, options.phase);
   summary.source.capture_sha256 = sha256(bytes);
-  summary.artifacts = ['source.json', 'chart.svg', 'requests.csv', 'summary.json'];
+  const files = [
+    ['source.json', bytes],
+    ['requests.csv', requestCsv(rows)],
+  ];
+  if (options.style !== 'table') files.push(['chart.svg', renderSourceChart(summary)]);
+  if (options.style !== 'chart')
+    files.push(['table.md', sourceTable(summary)], ['summary.csv', summaryCsv(summary)]);
+  summary.artifacts = [...files.map(([name]) => name), 'summary.json'];
+  files.push(['summary.json', `${JSON.stringify(summary, null, 2)}\n`]);
   const directory = resolve(outputDir);
   try {
     await mkdir(directory);
-    for (const [name, data] of [
-      ['source.json', bytes],
-      ['chart.svg', renderSourceChart(summary)],
-      ['requests.csv', requestCsv(rows)],
-      ['summary.json', `${JSON.stringify(summary, null, 2)}\n`],
-    ]) {
+    for (const [name, data] of files) {
       signal?.throwIfAborted();
       await writeFile(join(directory, name), data, { flag: 'wx', signal });
     }

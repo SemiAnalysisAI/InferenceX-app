@@ -258,8 +258,8 @@ const UTILITY_OPERATIONS = Object.freeze([
   operation({
     route: ['charts'],
     kind: 'charts',
-    description: 'List chart templates or render recorded AgentX sources from a saved capture.',
-    formats: ['json', 'svg', 'csv'],
+    description: 'List templates or present recorded AgentX sources as charts and tables.',
+    formats: ['json', 'svg', 'csv', 'markdown'],
     policies: [],
     outputSchema: null,
     formal: false,
@@ -274,6 +274,7 @@ const UTILITY_OPERATIONS = Object.freeze([
       option('--input', 'path', 'Saved selected-point JSON capture; required when rendering.'),
       option('--output-dir', 'path', 'New chart directory; required when rendering.'),
       option('--phase', 'all|profiling|warmup', 'Recorded phase to include.', { default: 'all' }),
+      option('--style', 'chart|table|both', 'Presentation outputs to write.', { default: 'both' }),
       SHARED_OPTIONS.error,
     ]),
     network: null,

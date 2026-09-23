@@ -1,12 +1,29 @@
-# AgentX chart templates
+# AgentX chart and table templates
 
 For “what charts can you generate?”, run `inferencex charts list` offline. The
 catalog distinguishes ready-to-render templates, data-capture cookbooks and
 recommendations needing a custom renderer. The first template compares **recorded request source categories**:
 request-count bars, input/output token-length box plots, and completed-request
-E2E/TTFT box plots. A dataset token histogram and one point's request timeline
-answer different questions. The timeline links its capture cookbook; dataset
+E2E/TTFT box plots, or tables of the same counts and distributions. A dataset token
+histogram and one point's request timeline answer different questions. The timeline
+links its capture cookbook; dataset
 distributions are a recommendation without a bundled rendering recipe.
+
+## Choose the output style
+
+Handle both styles through the same `inferencex` skill:
+
+- “Chart main-agent versus subagent request counts, token lengths and latency” →
+  `--style chart`.
+- “Put the same comparison in a table I can use in my spreadsheet” → `--style table`.
+- “Give me the chart and its numbers” → `--style both` (the default).
+
+Charts use a dark SemiAnalysis palette, large labels and Inter-first font fallbacks.
+The SVG is standalone; it does not download fonts, logos or plotting libraries.
+Tables use a compact count/share overview followed by one distribution table per
+metric, with units and valid/missing/excluded counts beside the quantiles. Use the
+generated values in both styles; changing presentation does not change population
+or statistics.
 
 ## Main-agent versus subagent requests
 
@@ -20,17 +37,20 @@ distributions are a recommendation without a bundled rendering recipe.
 
    ```bash
    inferencex charts agentx-sources --input selected-point.json \
-     --output-dir agentx-source-charts
+     --style both --output-dir agentx-source-comparison
    ```
 
    Add `--phase profiling` or `--phase warmup` for that exact recorded phase.
    The default `all` retains every phase, including unfamiliar phase strings.
    Create the parent directory first; the output leaf must not already exist.
 
-3. Open `chart.svg`, then use `summary.json` for the exact values and denominators.
-   Link the figure and summary in the answer. `requests.csv` contains the selected
-   observations; `source.json` preserves the original capture. These are local
-   chart artifacts, outside the six formal bundles; `inferencex verify` does not
+3. Inspect the requested output: `chart.svg` for charts; `table.md` for readable
+   tables and `summary.csv` for spreadsheets. The CSV has one row per source/metric,
+   including request counts/share, units, sample counts and quantiles.
+   Link the requested artifact and `summary.json`, which retains exact values and
+   denominators. Every style also writes `requests.csv` with selected observations
+   and `source.json` with the original capture. These are local presentation
+   artifacts, outside the six formal bundles; `inferencex verify` does not
    accept them. The input SHA-256 identifies saved bytes, not source authenticity.
 
 Group labels reproduce `srcKind`; absent or blank values have a separate

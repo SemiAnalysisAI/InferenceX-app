@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile, writeFile, rm, stat } from 'node:fs/promises';
+import { mkdtemp, readFile, writeFile, rm, stat, readdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, test } from 'node:test';
@@ -201,6 +201,7 @@ test('chart argument parsing uses existing output-dir and rejects unknown or dup
     input: 'in.json',
     outputDir: 'new',
     phase: 'all',
+    style: 'both',
   });
   for (const [args, out] of [
     [['list', '--phase', 'all'], null],
@@ -209,6 +210,9 @@ test('chart argument parsing uses existing output-dir and rejects unknown or dup
     [['agentx-sources', '--input', 'a', '--input', 'b'], 'new'],
     [['agentx-sources', '--input', 'a', '--phase', 'wat'], 'new'],
     [['list'], 'out'],
+    [['list', '--style', 'table'], null],
+    [['agentx-sources', '--input', 'a', '--style', 'html'], 'new'],
+    [['agentx-sources', '--input', 'a', '--style', 'table', '--style', 'chart'], 'new'],
   ]) {
     assert.throws(() => normalizeChartArgs(args, out), { code: 'INVALID_ARGUMENT' });
   }
@@ -233,6 +237,109 @@ test('saved charts retain evidence, escape SVG, neutralize spreadsheet formulas 
     code: 'OUTPUT_ERROR',
   });
   assert.equal(await readFile(join(out, 'chart.svg'), 'utf8'), svg);
+});
+
+test('chart and table styles share statistics and export only the requested presentation', async () => {
+  const input = join(root, 'styles.json');
+  await writeFile(
+    input,
+    JSON.stringify(
+      capture([
+        request('main', { isl: 0, ttftMs: null }),
+        request('main', { isl: 10, ttftMs: 0 }),
+        request('sub', { cancelled: true }),
+        request(undefined),
+      ]),
+    ),
+  );
+  const reports = [];
+  for (const style of ['chart', 'table', 'both']) {
+    const out = join(root, `${style}-style`);
+    const report = await runCharts(['agentx-sources', '--input', input, '--style', style], out);
+    const expected = ['source.json', 'summary.json', 'requests.csv'];
+    if (style !== 'table') expected.push('chart.svg');
+    if (style !== 'chart') expected.push('table.md', 'summary.csv');
+    const written = await readdir(out);
+    assert.deepEqual(written.sort(), expected.sort());
+    assert.deepEqual([...report.artifacts].sort(), expected.sort());
+    reports.push(report);
+  }
+  assert.deepEqual(reports[0].groups, reports[1].groups);
+  assert.deepEqual(reports[1].groups, reports[2].groups);
+  const table = await readFile(join(root, 'table-style', 'table.md'), 'utf8');
+  assert.match(table, /Result 421.*phase all/u);
+  assert.match(table, /4 captured requests selected/u);
+  assert.match(table, /srcKind: main \| 2 \| 50% \| 0/u);
+  assert.match(table, /Input length \(tokens\)/u);
+  assert.match(table, /Completed request TTFT \(ms\)/u);
+  assert.match(table, /unavailable/u);
+  assert.match(table, /source missing/u);
+  assert.match(table, /upstream.*unverified/iu);
+  const csv = await readFile(join(root, 'table-style', 'summary.csv'), 'utf8');
+  assert.match(
+    csv,
+    /result_id,phase,source_category,request_count,request_share,cancelled_count,metric,unit,valid_count,missing_count,excluded_cancelled_count,min,p25,median,p75,p95,max/u,
+  );
+  assert.match(
+    csv,
+    /"421","all","main","2","0.5","0","ttft_ms","ms","1","1","0","0","0","0","0","0","0"/u,
+  );
+  assert.match(
+    csv,
+    /"421","all","sub","1","0.25","1","e2e_ms","ms","0","0","1","","","","","",""/u,
+  );
+  const svg = await readFile(join(root, 'both-style', 'chart.svg'), 'utf8');
+  assert.match(svg, /#0a0d10/u);
+  assert.match(svg, /Inter/u);
+});
+
+test('table cells cannot inject Markdown or spreadsheet formulas and empty selections stay explicit', async () => {
+  const input = join(root, 'table-escape.json');
+  await writeFile(
+    input,
+    JSON.stringify(capture([request('|[click](https://example.org)\n<script>'), request('=1+2')])),
+  );
+  const out = join(root, 'table-escaped');
+  await runCharts(['agentx-sources', '--input', input, '--style', 'table'], out);
+  const markdown = await readFile(join(out, 'table.md'), 'utf8');
+  assert.ok(!markdown.includes('[click]('));
+  assert.ok(!markdown.includes('<script>'));
+  assert.match(markdown, /&#124;/u);
+  assert.match(await readFile(join(out, 'summary.csv'), 'utf8'), /"'=1\+2"/u);
+  const empty = join(root, 'table-empty');
+  await runCharts(
+    ['agentx-sources', '--input', input, '--style', 'table', '--phase', 'warmup'],
+    empty,
+  );
+  assert.match(
+    await readFile(join(empty, 'table.md'), 'utf8'),
+    /No requests in the selected phase/u,
+  );
+  const emptyCsv = await readFile(join(empty, 'summary.csv'), 'utf8');
+  assert.equal(emptyCsv.trim().split('\n').length, 1);
+});
+
+test('presentation retains tiny positive latencies distinctly from measured zero', async () => {
+  const input = join(root, 'small-latencies.json');
+  await writeFile(
+    input,
+    JSON.stringify(
+      capture([
+        request('tiny', { ttftMs: 0.0004, end: 123400 }),
+        request('zero', { ttftMs: 0, end: 0 }),
+      ]),
+    ),
+  );
+  const out = join(root, 'small-latencies');
+  await runCharts(['agentx-sources', '--input', input], out);
+  const table = await readFile(join(out, 'table.md'), 'utf8');
+  assert.match(table, /srcKind: tiny \| 1 \| 0 \| 0 \| 0\.0004 \|/u);
+  assert.match(table, /srcKind: tiny \| 1 \| 0 \| 0 \| 0\.1234 \|/u);
+  assert.match(table, /srcKind: zero \| 1 \| 0 \| 0 \| 0 \|/u);
+  const svg = await readFile(join(out, 'chart.svg'), 'utf8');
+  assert.match(svg, /median 0\.0004</u);
+  assert.match(svg, /median 0\.1234</u);
+  assert.match(svg, /median 0</u);
 });
 
 test('invalid and oversized inputs create no output directory', async () => {
