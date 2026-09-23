@@ -292,7 +292,11 @@ const UTILITY_OPERATIONS = Object.freeze([
       option('resource', 'capabilities|models|dates|datasets|configs', 'Discovery resource.', {
         required: true,
       }),
-      option('--model', 'string', 'Model selector required for dates and configs.'),
+      option(
+        '--model',
+        'string',
+        'Display model selector or DB model key; required for dates and configs.',
+      ),
       option('--date', 'YYYY-MM-DD', 'Optional configs as-of cutoff.'),
       option('--limit', 'integer', 'Local result limit, from 1 to 1000.', { default: 100 }),
       option('--offset', 'integer', 'Nonnegative local result offset.', { default: 0 }),

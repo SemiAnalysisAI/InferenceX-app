@@ -40,6 +40,8 @@ paths, including a missing or damaged entry.
 Replace the package name and version with the absolute path to the supplied `.tgz`
 and add `--offline`. Use that same archive for installation, status checks and upgrades.
 
+If you need to build the archive, run `npm pack` in `packages/skills`.
+
 </details>
 
 ## Usage
@@ -53,13 +55,6 @@ For example:
 
 > /inferencex Check the TCO assumptions in this spreadsheet against InferenceX.
 > Keep my workload, latency target, prices and units; flag anything that does not match.
-
-Continue with ordinary follow-up questions such as “now compare the same workload
-on B200.” The skill chooses the workflow and command; there is no need to repeat
-“use the CLI.” It can also be selected automatically for relevant InferenceX tasks:
-
-> Export the latest available DeepSeek-V4-Pro PowerX observations for an 8192-input,
-> 1024-output workload. Preserve missing values and save the source responses.
 
 For AgentX source comparisons, the same skill can produce charts, tables or both:
 
@@ -115,7 +110,7 @@ Online requests carry package attribution for aggregate request counts. Set
 导出结果与原始响应，并离线核验已保存的证据。
 
 需要 Node.js 24 或更高版本。上方命令指定 1.1.0；发布前请将包名和版本替换为候选 `.tgz` 的绝对路径，并加上 `--offline`。
-安装、状态检查和升级使用同一份产物。
+安装、状态检查和升级使用同一份产物。没有候选包时，在 `packages/skills` 目录执行 `npm pack` 生成。
 
 默认只安装到当前项目；加上 `--scope user` 后，本机所有项目均可使用：
 Codex 安装到 `~/.agents/skills/`，Claude Code 安装到 `~/.claude/skills/`。
@@ -126,8 +121,7 @@ Codex 安装到 `~/.agents/skills/`，Claude Code 安装到 `~/.claude/skills/`�
 
 安装后，新开一个 Claude Code 会话并输入 `/inferencex 核对这份表格里的 TCO 假设`；
 Codex 可在 `/skills` 中选择 inferencex，或使用 `$inferencex`。
-后续直接提出“再比较同一工作负载下的 B200”等问题即可，技能会选择合适的命令。
-相关的 InferenceX 任务也可能自动触发该 skill。若安装后没有显示入口，重启 agent；
+若安装后没有显示入口，重启 agent；
 项目级安装须从对应项目启动。也可按上方示例直接运行 CLI。
 每次导出都需要新的输出目录；公开查询不需要 API key。
 
