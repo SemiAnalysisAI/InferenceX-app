@@ -2,6 +2,7 @@
 
 import { lstatSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
+import { homedir } from 'node:os';
 import process from 'node:process';
 import { parseArgs } from 'node:util';
 import {
@@ -19,6 +20,7 @@ import { diagnose } from '../skills/inferencex-api/scripts/doctor.mjs';
 import { readBoundedRegular } from '../skills/inferencex-api/scripts/local-files.mjs';
 
 const SKILL_NAME = 'inferencex-api';
+const ENTRYPOINT_NAME = 'inferencex';
 const INSTALL_METADATA = '.inferencex-skills.json';
 const TARGET_DIRS = {
   claude: '.claude/skills',
@@ -40,8 +42,10 @@ Usage:
 Install and status options:
   --target <name>  claude (default), codex, or agents
                   claude: .claude/skills; codex/agents: .agents/skills
-  --dir <path>     Skills directory, relative to your project or absolute
-                  Overrides --target; installs into <path>/inferencex-api
+  --scope <name>  project (default) or user (available across projects)
+                  user: ~/.claude/skills or ~/.agents/skills
+  --dir <path>     Explicit skills directory, relative or absolute
+                  Overrides --target; cannot combine with --scope
   --json          Emit one JSON document (schema_version: 1), without prose
   --force         Install only: overwrite packaged files; retains obsolete files
   --dry-run       Install only: preview the same preflight without changing files
@@ -53,14 +57,14 @@ It never changes files or uses the network.
 Interrupted owned installs recover on the next install; status and dry-run remain read-only.
 Recovery covers process crashes, without an fsync or power-loss durability guarantee.
 --version reports the executing installer, not an installed skill.
-Bundled skill: inferencex-api
+Bundled entry: inferencex; shared implementation and legacy entry: inferencex-api
 `;
 
 function unknownState(reason) {
   return { installation_state: 'unknown', installed_version: null, reason };
 }
 
-async function installedState(destination, packageName, signal) {
+async function installedState(destination, packageName, signal, skillName) {
   const directory = lstatSync(destination, { throwIfNoEntry: false });
   if (!directory) {
     return { installation_state: 'not_installed', installed_version: null, reason: null };
@@ -97,7 +101,7 @@ async function installedState(destination, packageName, signal) {
 
   if (BigInt(versionMatch.groups.major) >= 1n || BigInt(versionMatch.groups.minor) >= 12n) {
     try {
-      await diagnose(['--dir', dirname(destination)], { signal });
+      await diagnose(['--dir', dirname(destination)], { signal, skillName });
     } catch (error) {
       if (error.code !== 'INSTALLATION_UNHEALTHY') throw error;
       const failure = error.details.failures[0];
@@ -107,11 +111,11 @@ async function installedState(destination, packageName, signal) {
   return { installation_state: 'installed', installed_version: metadata.version, reason: null };
 }
 
-async function statusRecord(destination, packageInfo, signal) {
-  const transaction = await inspectInstallTransaction(destination, packageInfo.name, SKILL_NAME);
+async function statusRecord(destination, packageInfo, signal, skillName = SKILL_NAME) {
+  const transaction = await inspectInstallTransaction(destination, packageInfo.name, skillName);
   const installation =
     transaction.state === 'none'
-      ? await installedState(destination, packageInfo.name, signal)
+      ? await installedState(destination, packageInfo.name, signal, skillName)
       : {
           ...unknownState(transaction.reason),
           transaction_state:
@@ -213,6 +217,7 @@ async function main(args, signal) {
         help: { type: 'boolean', short: 'h' },
         version: { type: 'boolean' },
         target: { type: 'string' },
+        scope: { type: 'string' },
         dir: { type: 'string' },
         force: { type: 'boolean' },
         json: { type: 'boolean' },
@@ -233,14 +238,20 @@ async function main(args, signal) {
     if (values.target !== undefined && !Object.hasOwn(TARGET_DIRS, values.target)) {
       throw new Error('Unknown --target. Choose claude, codex, or agents.');
     }
+    if (values.scope !== undefined && !['project', 'user'].includes(values.scope)) {
+      throw new Error('Unknown --scope. Choose project or user.');
+    }
+    if (values.dir !== undefined && values.scope !== undefined) {
+      throw new Error('Choose only one of --dir or --scope.');
+    }
     if (values.dir !== undefined && values.dir.trim() === '') {
       throw new Error('--dir requires a nonempty destination.');
     }
     if (
       !['install', 'status'].includes(command) &&
-      ['target', 'dir'].some((key) => key in values)
+      ['target', 'dir', 'scope'].some((key) => key in values)
     ) {
-      throw new Error('--target and --dir require the install or status command.');
+      throw new Error('--target, --dir and --scope require the install or status command.');
     }
     if (command !== 'install' && (values.force || values['dry-run'])) {
       throw new Error('--force and --dry-run require the install command.');
@@ -267,23 +278,69 @@ async function main(args, signal) {
     await writeStdout(`Installer version: ${packageInfo.version}\n`, { signal });
     return;
   }
-  const source = join(import.meta.dirname, '..', 'skills', SKILL_NAME);
-  readFileSync(join(source, 'SKILL.md'), 'utf8');
   if (command === 'list') {
-    await writeStdout(`Bundled InferenceX skill:\n  ${SKILL_NAME}\n`, { signal });
+    await writeStdout(
+      `Bundled InferenceX skills:\n  ${ENTRYPOINT_NAME}\n  ${SKILL_NAME} (shared implementation and legacy entry)\n`,
+      { signal },
+    );
     return;
   }
 
-  const root = resolve(values.dir ?? TARGET_DIRS[values.target ?? 'claude']);
-  const destination = join(root, SKILL_NAME);
-  const initialStatus = await statusRecord(destination, packageInfo, signal);
+  const target = values.target ?? 'claude';
+  const root =
+    values.dir === undefined
+      ? resolve(values.scope === 'user' ? homedir() : process.cwd(), TARGET_DIRS[target])
+      : resolve(values.dir);
+  const runtime = await processSkill(SKILL_NAME, root, packageInfo, command, values, signal);
+  const entrypoint = await processSkill(
+    ENTRYPOINT_NAME,
+    root,
+    packageInfo,
+    command,
+    values,
+    signal,
+  );
+  const ready = [runtime, entrypoint].every(
+    (record) =>
+      record.installation_state === 'installed' && record.installed_version === packageInfo.version,
+  );
+  const result = { ...runtime, entrypoint, ready };
+  if (values.json) {
+    await writeStdout(`${JSON.stringify(result)}\n`, {
+      signal: values['dry-run'] ? signal : undefined,
+    });
+  } else {
+    showSkillResult(runtime, SKILL_NAME, command);
+    showSkillResult(entrypoint, ENTRYPOINT_NAME, command);
+    if (command === 'install' && !values['dry-run']) {
+      if (ready) {
+        console.log(
+          target === 'claude'
+            ? 'Next: open Claude Code and type /inferencex <your task>.'
+            : 'Next: open Codex and select inferencex from /skills, or type $inferencex <your task>.',
+        );
+        console.log(
+          'Example: Compare the InferenceX TCO assumptions in my spreadsheet with the matching public observations.',
+        );
+        console.log(
+          'Continue with normal follow-up questions; the skill chooses the CLI workflow. Restart the agent if the skill is not listed.',
+        );
+      } else {
+        console.log(
+          'Setup is incomplete or uses an older version. Check both skill paths above; rerun install --force with the same target and scope after saving local edits.',
+        );
+      }
+    }
+  }
+}
+
+async function processSkill(skillName, root, packageInfo, command, values, signal) {
+  const source = join(import.meta.dirname, '..', 'skills', skillName);
+  const destination = join(root, skillName);
+  const initialStatus = await statusRecord(destination, packageInfo, signal, skillName);
   const { transaction } = initialStatus;
   let { record } = initialStatus;
-  if (command === 'status') {
-    if (values.json) await writeStdout(`${JSON.stringify(record)}\n`, { signal });
-    else showStatus(record);
-    return;
-  }
+  if (command === 'status') return record;
   const dryRun = values['dry-run'] ?? false;
   const recoveredDestinationExists = typeof transaction.recovery_source === 'string';
   const plan = dryRun
@@ -298,16 +355,16 @@ async function main(args, signal) {
         destination,
         packageName: packageInfo.name,
         packageVersion: packageInfo.version,
-        skillName: SKILL_NAME,
+        skillName,
         receiptName: INSTALL_METADATA,
         signal,
         prepare: () => installationPlan(source, destination, values.force),
       });
   if (!dryRun) {
-    const installedStatus = await statusRecord(destination, packageInfo);
+    const installedStatus = await statusRecord(destination, packageInfo, undefined, skillName);
     record = installedStatus.record;
   }
-  const result = {
+  return {
     ...record,
     dry_run: dryRun,
     outcome: dryRun
@@ -334,34 +391,38 @@ async function main(args, signal) {
     write_paths: plan.write_paths,
     preserves_extra_files: true,
   };
-  if (values.json) {
-    await writeStdout(`${JSON.stringify(result)}\n`, { signal: dryRun ? signal : undefined });
+}
+
+function showSkillResult(result, skillName, command) {
+  if (command === 'status') {
+    showStatus(result);
     return;
   }
-  if (dryRun) {
+  const destination = result.skill_path;
+  if (result.dry_run) {
     const description = {
-      would_install: `would install ${SKILL_NAME} at ${destination}`,
-      would_overwrite: `would overwrite ${SKILL_NAME} at ${destination}`,
-      would_skip: `would skip ${SKILL_NAME} at ${destination}`,
-      would_recover_then_install: `would recover the interrupted transaction, then install ${SKILL_NAME} at ${destination}`,
-      would_recover_then_overwrite: `would recover the interrupted transaction, then overwrite ${SKILL_NAME} at ${destination}`,
-      would_recover_then_skip: `would recover the interrupted transaction, then skip ${SKILL_NAME} at ${destination}`,
+      would_install: `would install ${skillName} at ${destination}`,
+      would_overwrite: `would overwrite ${skillName} at ${destination}`,
+      would_skip: `would skip ${skillName} at ${destination}`,
+      would_recover_then_install: `would recover the interrupted transaction, then install ${skillName} at ${destination}`,
+      would_recover_then_overwrite: `would recover the interrupted transaction, then overwrite ${skillName} at ${destination}`,
+      would_recover_then_skip: `would recover the interrupted transaction, then skip ${skillName} at ${destination}`,
       would_wait_for_install: `would wait for the active installer transaction at ${destination}`,
       blocked_by_transaction: `is blocked by untrusted installer transaction data at ${destination}`,
     }[result.outcome];
     console.log(`Dry run: ${description}.`);
-    showStatus(record);
+    showStatus(result);
     console.log(
-      `Files to write (relative to skill path, including the installation record):\n${plan.write_paths.map((path) => `  ${path}`).join('\n') || '  (none)'}`,
+      `Files to write (relative to skill path, including the installation record):\n${result.write_paths.map((path) => `  ${path}`).join('\n') || '  (none)'}`,
     );
     console.log('Unrelated and obsolete files remain untouched. No files were changed.');
   } else {
     console.log(
-      plan.outcome === 'skipped'
-        ? `Skipped ${SKILL_NAME}: already exists at ${destination}; use --force to overwrite.`
-        : `Installed ${SKILL_NAME} into ${destination}`,
+      result.outcome === 'skipped'
+        ? `Skipped ${skillName}: already exists at ${destination}; use --force to overwrite.`
+        : `Installed ${skillName} into ${destination}`,
     );
-    showStatus(record);
+    showStatus(result);
   }
 }
 

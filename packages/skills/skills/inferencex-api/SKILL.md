@@ -1,9 +1,12 @@
 ---
 name: inferencex-api
-description: 'Query InferenceX public benchmarks, dashboard views and filters, PowerX, AgentX, provenance, TCO, framework releases, CollectiveX, evaluations, datasets, and evidence bundles; verify saved evidence offline. Use for public data analysis, not launching benchmarks or accessing private uploads.'
+description: 'Legacy inferencex-api entry and shared workflow guide. Use when explicitly requested as inferencex-api; the inferencex skill is the main entry for public benchmark analysis and the CLI.'
 ---
 
 # InferenceX API
+
+Shared instructions for the `inferencex` entry and the legacy `inferencex-api` name.
+Resolve all paths below from this guide's directory, including for personal installs.
 
 Use the versioned `inferencex` entry for the six formal evidence workflows. Copying
 the skill does not add a binary to `PATH`; resolve this `SKILL.md` and run

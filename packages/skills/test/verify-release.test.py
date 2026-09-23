@@ -270,6 +270,30 @@ class RetryTests(unittest.TestCase):
         self.assertIn('Public metadata differs', report['error'])
         self.assertEqual(report['public_retry_policy']['total_deadline_seconds'], 300)
 
+class InstalledEntryTests(unittest.TestCase):
+    def test_new_releases_require_both_complete_installed_entries(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            runtime = root / 'inferencex-api'
+            entry = root / 'inferencex'
+            files = {'SKILL.md': b'guide', 'integrity.json': b'{}'}
+            for folder in (runtime, entry):
+                folder.mkdir()
+                for name, body in files.items():
+                    (folder / name).write_bytes(body)
+                check.save(folder / '.inferencex-skills.json',
+                           {'package': check.PACKAGE, 'version': '1.1.0'})
+            check.check_installed_package(runtime, files, files, '1.1.0')
+            with self.assertRaisesRegex(ValueError, 'missing the inferencex task entry'):
+                check.check_installed_package(runtime, files, {}, '1.1.0')
+            (entry / 'SKILL.md').write_bytes(b'changed entry')
+            with self.assertRaisesRegex(ValueError, 'Installed file differs'):
+                check.check_installed_package(runtime, files, files, '1.1.0')
+            (entry / 'SKILL.md').unlink()
+            with self.assertRaisesRegex(ValueError, 'Unexpected installed files'):
+                check.check_installed_package(runtime, files, files, '1.1.0')
+
+
 class UnifiedAcceptanceSurfaceTests(unittest.TestCase):
     def test_contract_one_starts_at_012(self):
         for version, expected in (('0.11.0', False), ('0.11.99', False),

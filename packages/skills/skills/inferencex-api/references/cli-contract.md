@@ -59,9 +59,9 @@ does not guarantee a persisted request ledger. A completed bundle is immutable.
 Use the pinned installer to inspect the destination and preview an upgrade:
 
 ```bash
-npm exec --yes --package @semianalysisai/inferencex-skills@1.0.0 -- \
+npm exec --yes --package @semianalysisai/inferencex-skills@1.1.0 -- \
   inferencex-skills status --target codex --json
-npm exec --yes --package @semianalysisai/inferencex-skills@1.0.0 -- \
+npm exec --yes --package @semianalysisai/inferencex-skills@1.1.0 -- \
   inferencex-skills install --target codex --force --dry-run --json
 ```
 
