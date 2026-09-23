@@ -447,6 +447,11 @@ describe('isSequenceHiddenForModel', () => {
     expect(isSequenceHiddenForModel(Model.GLM_5_2, Sequence.AgenticTraces)).toBe(false);
   });
 
+  it('also marks the hidden GLM 8K/1K retired for category consumers', () => {
+    expect(getSequenceCategoryForModel(Sequence.EightK_OneK, Model.GLM_5_2)).toBe('deprecated');
+    expect(getSequenceCategoryForModel(Sequence.AgenticTraces, Model.GLM_5_2)).toBe('default');
+  });
+
   it('leaves other models untouched', () => {
     expect(isSequenceHiddenForModel(Model.Qwen3_5, Sequence.EightK_OneK)).toBe(false);
     expect(isSequenceHiddenForModel(Model.MiniMax_M3, Sequence.EightK_OneK)).toBe(false);

@@ -549,10 +549,15 @@ export function getSequenceCategory(sequence: Sequence): CategoryTag {
  * DeepSeek V4 Pro: 2026-09-08 was the last day of its Single-turn 8k1k sweep
  * (InferenceX#2728, per MODELS.md "Deprecation Notice"); Agentic coding,
  * including the MTP and DSpark arms, stays active and the model is not retired.
+ *
+ * GLM-5.2 / GLM-5.3: Agentic coding only. The scenario dropdown also hides
+ * 8K/1K (MODEL_HIDDEN_SEQUENCES); listing it here keeps the other consumers of
+ * the category, such as the latest-images page, from treating it as live.
  */
 const MODEL_DEPRECATED_SEQUENCES: Partial<Record<Model, ReadonlySet<Sequence>>> = {
   [Model.MiniMax_M3]: new Set([Sequence.EightK_OneK]),
   [Model.DeepSeek_V4_Pro]: new Set([Sequence.EightK_OneK]),
+  [Model.GLM_5_2]: new Set([Sequence.EightK_OneK]),
 };
 
 /** Whether this model retired the scenario even though it is globally active. */
