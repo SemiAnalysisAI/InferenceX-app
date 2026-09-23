@@ -59,7 +59,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-calculator-view',
-    sourceSha256: '6edca6b89960a61aacef0091a47595b7c8d96a8de6a5d055080416c012dccc3b',
+    sourceSha256: '0671dc3186a3ab90e133c90d8bb9470e4486db2b9bb88d4f40bc2873be75a891',
   },
   {
     source: 'src/app/api/v1/views/collectivex/route.ts',
@@ -107,7 +107,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-fleet-view',
-    sourceSha256: 'ab0a5c408abb58976f193d53976b494cd54e026b5bebcb7bd119dc7187362bf0',
+    sourceSha256: 'e9bd0e2441d848018fa92a00bf96f1b87fe301747a74b7dd13cd7d19678e97d5',
   },
   {
     source: 'src/app/api/v1/views/gpu-metrics/route.ts',
@@ -131,7 +131,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-historical-view',
-    sourceSha256: '365f8e46891b40d6e0c36995127c92f39d197992212178649211344eb89f2d6d',
+    sourceSha256: '4b1e0a9448152465c11ac953fdbc4f252d81d9f1578960f25aa5a287480a1b74',
   },
   {
     source: 'src/app/api/v1/views/inference/route.ts',
@@ -139,7 +139,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-inference-view',
-    sourceSha256: 'de9192086b27e530ad6b1ece082b4989b3a9771a78195ae9f6d1c3899519588f',
+    sourceSha256: 'caaba42b668136d519e357378f3adcb075693b3572c27096da98a12105bc5783',
   },
   {
     source: 'src/app/api/v1/views/operatorx/route.ts',
@@ -865,7 +865,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/components/calculator/throughput-data.ts',
-    sourceSha256: '4d12f2f267c939def090843b2f221a9ae5d92956b8307c4866ef6c09065096aa',
+    sourceSha256: '7f9fe14b3b47af5ac142b541a170c71c23f87a840d60b506d5250c2d004d5a04',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -892,7 +892,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/source.ts',
-    sourceSha256: '174a843bcc17d2c8bafd49c7e9a382a1bdfb95ac14a2a11e2f0e3d6c99958408',
+    sourceSha256: '5873c66e93b03add09333062127ca7f05cc696150cb00d5e50d701ae7f91631c',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',

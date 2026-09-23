@@ -70,8 +70,8 @@ const parameters: readonly ApiParameter[] = [
     required: false,
     type: 'string',
     description: text(
-      'Comma-separated precisions. When omitted, the densest available precision is auto-selected, matching the dashboard default.',
-      '逗号分隔的精度列表。省略时按数据最密的精度自动选择，与仪表盘默认行为一致。',
+      'Comma-separated precisions. When omitted, the densest available precision is auto-selected, matching the dashboard default. Model and scenario pairs with a fixed default open on it instead (GLM-5.2/GLM-5.3 agentic-traces: fp4 and fp8).',
+      '逗号分隔的精度列表。省略时按数据最密的精度自动选择，与仪表盘默认行为一致。部分模型与场景组合改用固定默认集合（GLM-5.2/GLM-5.3 智能体编码：fp4 与 fp8）。',
     ),
     schema: { type: 'string', description: 'Comma-separated list of fp4|fp4fp8|fp8|bf16|int4' },
     example: 'fp8,bf16',

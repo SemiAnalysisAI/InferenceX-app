@@ -26,8 +26,8 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
     '正安全整数格式的工作流运行 ID。不填时选择默认运行；实时 GPU 指标必须填写。',
   ],
   precisions: [
-    'Comma-separated precision keys; omitted selection uses available curve density. Calculator extensions auto-select the densest official precision and include precisions present in unofficial-run overlays.',
-    '以逗号分隔的精度键；省略时按可用测试曲线数量选择。计算器扩展视图选择官方数据中曲线最多的精度，并纳入 unofficial-run 叠加数据中的精度。',
+    'Comma-separated precision keys; omitted selection uses available curve density. Calculator extensions auto-select the densest official precision and include precisions present in unofficial-run overlays. Model and scenario pairs with a fixed default open on it instead (GLM-5.2/GLM-5.3 agentic-traces: fp4 and fp8).',
+    '以逗号分隔的精度键；省略时按可用测试曲线数量选择。计算器扩展视图选择官方数据中曲线最多的精度，并纳入 unofficial-run 叠加数据中的精度。部分模型与场景组合改用固定默认集合（GLM-5.2/GLM-5.3 智能体编码：fp4 与 fp8）。',
   ],
   gpus: [
     'Comma-separated hardware/config keys; for gpu-metrics use numeric GPU indices. Omit for all.',

@@ -80,8 +80,8 @@ const parameters: readonly ApiParameter[] = [
     required: false,
     type: 'string',
     description: text(
-      'Comma-separated precisions. When omitted, the densest available precision is auto-selected. With multiple precisions, each hardware gets one line per precision (key hwKey__precision).',
-      '逗号分隔的精度列表。省略时按数据最密的精度自动选择。选择多个精度时，每个硬件会按精度分线（键为 hwKey__precision）。',
+      'Comma-separated precisions. When omitted, the densest available precision is auto-selected. Model and scenario pairs with a fixed default open on it instead (GLM-5.2/GLM-5.3 agentic-traces: fp4 and fp8). With multiple precisions, each hardware gets one line per precision (key hwKey__precision).',
+      '逗号分隔的精度列表。省略时按数据最密的精度自动选择。部分模型与场景组合改用固定默认集合（GLM-5.2/GLM-5.3 智能体编码：fp4 与 fp8）。选择多个精度时，每个硬件会按精度分线（键为 hwKey__precision）。',
     ),
     schema: { type: 'string', description: 'Comma-separated list of fp4|fp4fp8|fp8|bf16|int4' },
     example: 'fp8,bf16',
