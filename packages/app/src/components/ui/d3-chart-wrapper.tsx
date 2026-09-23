@@ -10,6 +10,11 @@ const DEFAULT_CHART_INSTRUCTIONS = {
   zh: '按住 Shift 滚动以缩放 · 拖动以平移 · 双击以重置 · 点击数据点固定提示框',
 } as const;
 
+const TOUCH_CHART_INSTRUCTIONS = {
+  en: 'Use one finger to scroll the page • Pinch with two fingers to zoom • Drag with two fingers to pan • Tap a point to pin tooltip',
+  zh: '单指滑动页面 · 双指捏合缩放图表 · 双指拖动平移图表 · 点击数据点固定提示框',
+} as const;
+
 /**
  * Renders the d3 tooltip element via React Portal to document.body so it
  * escapes any parent stacking context (e.g. the chart Card's backdrop-filter
@@ -85,7 +90,18 @@ export function D3ChartWrapper({
   grabCursor = true,
 }: D3ChartWrapperProps) {
   const locale = useLocale();
-  const resolvedInstructions = instructions ?? DEFAULT_CHART_INSTRUCTIONS[locale];
+  const [isTouch, setIsTouch] = useState(false);
+  useEffect(() => {
+    // Detect the primary input, not viewport width or a secondary touchscreen.
+    const query = window.matchMedia('(pointer: coarse)');
+    const update = () => setIsTouch(query.matches);
+    update();
+    query.addEventListener('change', update);
+    return () => query.removeEventListener('change', update);
+  }, []);
+  const resolvedInstructions =
+    instructions ??
+    (isTouch ? TOUCH_CHART_INSTRUCTIONS[locale] : DEFAULT_CHART_INSTRUCTIONS[locale]);
 
   return (
     <div id={chartId} data-testid={testId}>
