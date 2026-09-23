@@ -2,30 +2,15 @@ import { HW_REGISTRY } from '@semianalysisai/inferencex-constants';
 import {
   parseAmdTimestamp,
   parseNvidiaTimestamp,
+  splitCsvLine,
 } from '@semianalysisai/inferencex-db/etl/gpu-metrics-csv';
-import type { GpuMetricSeries } from '@semianalysisai/inferencex-db/queries/gpu-metrics';
+import type {
+  GpuMetricSampleRow,
+  GpuMetricSeries,
+  GpuMetricStatRow,
+} from '@semianalysisai/inferencex-db/queries/gpu-metrics';
 
-export interface GpuMetricRow {
-  timestamp: string;
-  index: number;
-  power: number;
-  // Absent when the collector did not sample the metric (multinode DCGM
-  // bundles are power-only); a missing value is never plotted as 0.
-  temperature?: number;
-  smClock?: number;
-  memClock?: number;
-  gpuUtil?: number;
-  memUtil?: number;
-  // AMD-specific optional fields
-  edgeTemp?: number;
-  memTemp?: number;
-  gfxVoltage?: number;
-  socVoltage?: number;
-  memVoltage?: number;
-  fclk?: number;
-  socClk?: number;
-  mmActivity?: number;
-}
+export type GpuMetricRow = GpuMetricSampleRow;
 
 export interface GpuPowerRunInfo {
   id: number;
@@ -249,28 +234,6 @@ function parseTimestampToMs(raw: string): number | null {
 }
 
 /**
- * Split a CSV line respecting double-quoted fields (which may contain commas).
- * Required for AMD amd-smi CSV where array fields like "['N/A', 'N/A']" are quoted.
- */
-function splitCsvLine(line: string): string[] {
-  const result: string[] = [];
-  let current = '';
-  let inQuotes = false;
-  for (const char of line) {
-    if (char === '"') {
-      inQuotes = !inQuotes;
-    } else if (char === ',' && !inQuotes) {
-      result.push(current.trim());
-      current = '';
-    } else {
-      current += char;
-    }
-  }
-  result.push(current.trim());
-  return result;
-}
-
-/**
  * Build a column-index lookup from a CSV header line.
  * Returns a map of header name → column index.
  */
@@ -439,17 +402,7 @@ export function parseCsvData(csvText: string): GpuMetricRow[] {
 
 // --- Statistics ---
 
-export interface GpuStats {
-  gpuIndex: number;
-  count: number;
-  min: number;
-  max: number;
-  mean: number;
-  median: number;
-  p95: number;
-  p99: number;
-  stddev: number;
-}
+export type GpuStats = Omit<GpuMetricStatRow, 'metric'>;
 
 function percentile(sorted: number[], p: number): number {
   const idx = (p / 100) * (sorted.length - 1);

@@ -372,6 +372,52 @@ export default function GpuMetricsDisplay() {
     else setCorrYMetric(value as GpuMetricKey);
   }, []);
 
+  const legendElement = (
+    <ChartLegend
+      variant="sidebar"
+      onItemRemove={removeGpu}
+      legendItems={allGpuIndices.map((gpuIndex) => ({
+        name: `${t.chip} ${gpuIndex}`,
+        hw: String(gpuIndex),
+        label: `${t.chip} ${gpuIndex}`,
+        color: GPU_COLORS[gpuIndex % GPU_COLORS.length],
+        isActive: visibleGpus.has(gpuIndex),
+        onClick: () => toggleGpu(gpuIndex),
+      }))}
+      isLegendExpanded={isLegendExpanded}
+      onExpandedChange={(expanded) => {
+        setIsLegendExpanded(expanded);
+        track('gpu_metrics_legend_expanded', { expanded });
+      }}
+      actions={
+        allGpusSelected
+          ? []
+          : [
+              {
+                id:
+                  chartView === 'correlation'
+                    ? 'gpu-metrics-reset-filter-2'
+                    : 'gpu-metrics-reset-filter',
+                label: t.resetFilter,
+                onClick: selectAllGpus,
+              },
+            ]
+      }
+      switches={[
+        {
+          id:
+            chartView === 'correlation' ? 'gpu-metrics-downsample-corr' : 'gpu-metrics-downsample',
+          label: t.downsample,
+          checked: downsample,
+          onCheckedChange: (c) => {
+            setDownsample(c);
+            track('gpu_metrics_downsample_toggled', { enabled: c });
+          },
+        },
+      ]}
+    />
+  );
+
   return (
     <section data-testid="gpu-metrics-display">
       <Card className="mb-4">
@@ -668,47 +714,7 @@ export default function GpuMetricsDisplay() {
                     <UnofficialDomainNotice />
                   </>
                 }
-                legendElement={
-                  <ChartLegend
-                    variant="sidebar"
-                    onItemRemove={removeGpu}
-                    legendItems={allGpuIndices.map((gpuIndex) => ({
-                      name: `${t.chip} ${gpuIndex}`,
-                      hw: String(gpuIndex),
-                      label: `${t.chip} ${gpuIndex}`,
-                      color: GPU_COLORS[gpuIndex % GPU_COLORS.length],
-                      isActive: visibleGpus.has(gpuIndex),
-                      onClick: () => toggleGpu(gpuIndex),
-                    }))}
-                    isLegendExpanded={isLegendExpanded}
-                    onExpandedChange={(expanded) => {
-                      setIsLegendExpanded(expanded);
-                      track('gpu_metrics_legend_expanded', { expanded });
-                    }}
-                    actions={
-                      allGpusSelected
-                        ? []
-                        : [
-                            {
-                              id: 'gpu-metrics-reset-filter',
-                              label: t.resetFilter,
-                              onClick: selectAllGpus,
-                            },
-                          ]
-                    }
-                    switches={[
-                      {
-                        id: 'gpu-metrics-downsample',
-                        label: t.downsample,
-                        checked: downsample,
-                        onCheckedChange: (c) => {
-                          setDownsample(c);
-                          track('gpu_metrics_downsample_toggled', { enabled: c });
-                        },
-                      },
-                    ]}
-                  />
-                }
+                legendElement={legendElement}
               />
             )}
             {chartView === 'correlation' && (
@@ -724,47 +730,7 @@ export default function GpuMetricsDisplay() {
                     <UnofficialDomainNotice />
                   </>
                 }
-                legendElement={
-                  <ChartLegend
-                    variant="sidebar"
-                    onItemRemove={removeGpu}
-                    legendItems={allGpuIndices.map((gpuIndex) => ({
-                      name: `${t.chip} ${gpuIndex}`,
-                      hw: String(gpuIndex),
-                      label: `${t.chip} ${gpuIndex}`,
-                      color: GPU_COLORS[gpuIndex % GPU_COLORS.length],
-                      isActive: visibleGpus.has(gpuIndex),
-                      onClick: () => toggleGpu(gpuIndex),
-                    }))}
-                    isLegendExpanded={isLegendExpanded}
-                    onExpandedChange={(expanded) => {
-                      setIsLegendExpanded(expanded);
-                      track('gpu_metrics_legend_expanded', { expanded });
-                    }}
-                    actions={
-                      allGpusSelected
-                        ? []
-                        : [
-                            {
-                              id: 'gpu-metrics-reset-filter-2',
-                              label: t.resetFilter,
-                              onClick: selectAllGpus,
-                            },
-                          ]
-                    }
-                    switches={[
-                      {
-                        id: 'gpu-metrics-downsample-corr',
-                        label: t.downsample,
-                        checked: downsample,
-                        onCheckedChange: (c) => {
-                          setDownsample(c);
-                          track('gpu_metrics_downsample_toggled', { enabled: c });
-                        },
-                      },
-                    ]}
-                  />
-                }
+                legendElement={legendElement}
               />
             )}
           </Card>

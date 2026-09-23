@@ -41,11 +41,15 @@ import { type NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@semianalysisai/inferencex-db/connection';
 import {
   getGpuMetricsForRun,
-  type GpuMetricSeries,
   type GpuMetricsRunPayload,
 } from '@semianalysisai/inferencex-db/queries/gpu-metrics';
 
-import { type GpuMetricRow, type GpuPowerRunInfo } from '@/components/gpu-power/types';
+import type {
+  GpuMetricRow,
+  GpuPowerRunInfo,
+  GpuMetricsArtifact,
+  GpuPowerApiResponse,
+} from '@/components/gpu-power/types';
 import {
   cutPowerAuditBundle,
   isPowerAuditBundleEntry,
@@ -88,16 +92,9 @@ const MAX_REQUEST_BYTES = 256 * 1024;
 
 export type GpuMetricsSource = 'database' | 'github';
 
-export interface GpuMetricsArtifactPayload {
-  name: string;
-  data: GpuMetricRow[];
-  /** Present only for database-backed artifacts. */
-  series?: Omit<GpuMetricSeries, 'data'>;
-}
+export type GpuMetricsArtifactPayload = GpuMetricsArtifact;
 
-export interface GpuMetricsRouteResponse {
-  runInfo: GpuPowerRunInfo;
-  artifacts: GpuMetricsArtifactPayload[];
+export interface GpuMetricsRouteResponse extends GpuPowerApiResponse {
   source: GpuMetricsSource;
 }
 
@@ -301,6 +298,18 @@ function sourceCoverage(series: GpuPowerSeries[], sources: string[] | null) {
   };
 }
 
+function powerSeriesResponse(
+  source: GpuMetricsSource,
+  runInfo: GpuPowerRunInfo,
+  series: GpuPowerSeries[],
+  sources: string[] | null,
+) {
+  return NextResponse.json(
+    { source, runInfo, series, sourceCoverage: sourceCoverage(series, sources) },
+    { headers: { 'Cache-Control': 'no-store' } },
+  );
+}
+
 /**
  * Narrows a stored run to the artifacts a `prefix` names, mirroring the GitHub
  * listing filter so both sources answer the same request the same way.
@@ -502,15 +511,7 @@ async function readGpuMetrics(request: NextRequest, sources: string[] | null) {
           databaseSeries.length > 0 &&
           sourceCoverage(databaseSeries, sources).missingSources.length === 0
         ) {
-          return NextResponse.json(
-            {
-              source: 'database',
-              runInfo: stored.runInfo,
-              series: databaseSeries,
-              sourceCoverage: sourceCoverage(databaseSeries, sources),
-            },
-            { headers: { 'Cache-Control': 'no-store' } },
-          );
+          return powerSeriesResponse('database', stored.runInfo, databaseSeries, sources);
         }
       } else if (artifacts.length > 0) {
         return NextResponse.json(
@@ -578,15 +579,7 @@ async function readGpuMetrics(request: NextRequest, sources: string[] | null) {
         )
           throw missing;
       }
-      return NextResponse.json(
-        {
-          source: 'github',
-          runInfo,
-          series: combined,
-          sourceCoverage: sourceCoverage(combined, sources),
-        },
-        { headers: { 'Cache-Control': 'no-store' } },
-      );
+      return powerSeriesResponse('github', runInfo, combined, sources);
     }
     const live = await fetchGpuMetricsFromGithub(runId, prefix, false);
     return NextResponse.json(
@@ -606,15 +599,7 @@ async function readGpuMetrics(request: NextRequest, sources: string[] | null) {
     console.error('Error fetching GPU power data:', error);
     const missing = error instanceof StoredTelemetryIncompleteError ? error : incomplete[0];
     if (githubFallbackStarted && !missing && stored && databaseSeries.length > 0) {
-      return NextResponse.json(
-        {
-          source: 'database',
-          runInfo: stored.runInfo,
-          series: databaseSeries,
-          sourceCoverage: sourceCoverage(databaseSeries, sources),
-        },
-        { headers: { 'Cache-Control': 'no-store' } },
-      );
+      return powerSeriesResponse('database', stored.runInfo, databaseSeries, sources);
     }
     return NextResponse.json(
       missing
