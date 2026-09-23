@@ -1,6 +1,29 @@
 import { describe, expect, it } from 'vitest';
 
-import { logHistogram, logTicks, positiveValues } from './lognormal';
+import { logHistogram, logTicks, positiveValues, summarizeDistribution } from './lognormal';
+
+describe('summarizeDistribution', () => {
+  it('retains positive samples and reports values excluded from the log axis', () => {
+    const values = [100, 0, 10, NaN, -1, 1, Infinity];
+    const summary = summarizeDistribution(values);
+    expect(summary.sorted).toEqual([1, 10, 100]);
+    expect(summary.excluded).toBe(4);
+    expect(summary.histogram!.counts).toHaveLength(15);
+    expect(summary.histogram!.counts.reduce((sum, count) => sum + count, 0)).toBe(3);
+    expect(values[0]).toBe(100);
+  });
+
+  it.each([{ values: [] }, { values: [0, -1] }])(
+    'preserves an empty distribution for $values',
+    ({ values }) => {
+      expect(summarizeDistribution(values)).toEqual({
+        sorted: [],
+        histogram: null,
+        excluded: values.length,
+      });
+    },
+  );
+});
 
 describe('positiveValues', () => {
   it('drops zero, negative, and non-finite samples that cannot be logged', () => {

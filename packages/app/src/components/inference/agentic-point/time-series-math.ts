@@ -6,7 +6,20 @@
  */
 
 import type { RequestChartRecord } from '@/hooks/api/use-request-chart-data';
-import type { TimeSeriesPoint } from '@/hooks/api/use-trace-server-metrics';
+import type { TimeSeriesPoint, TraceServerMetrics } from '@/hooks/api/use-trace-server-metrics';
+
+export function buildPrefixCacheHitRateSeries(
+  series: Pick<TraceServerMetrics, 'prefixCacheHitRate' | 'prefixCacheHitsTps' | 'prefillTps'>,
+): TimeSeriesPoint[] {
+  const weighted = rollingRatioFromComponents(
+    series.prefixCacheHitRate,
+    series.prefixCacheHitsTps,
+    series.prefillTps,
+    50,
+  );
+  // Older stored rows lack component rates; retain their smoothed ratio series.
+  return weighted.length > 0 ? weighted : rollingAverage(series.prefixCacheHitRate, 50);
+}
 
 /** One drawable line in a TimeSeriesChart. */
 export interface ChartSeries {

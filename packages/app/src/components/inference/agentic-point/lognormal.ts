@@ -33,6 +33,18 @@ export function positiveValues(values: readonly number[]): number[] {
   return values.filter((v) => Number.isFinite(v) && v > 0);
 }
 
+export function summarizeDistribution(values: readonly number[]) {
+  const sorted = positiveValues(values).toSorted((a, b) => a - b);
+  return {
+    sorted,
+    histogram: logHistogram(
+      sorted,
+      Math.min(50, Math.max(15, Math.ceil(Math.sqrt(sorted.length)))),
+    ),
+    excluded: values.length - sorted.length,
+  };
+}
+
 /**
  * Histogram with bins of equal width in ln(x). `bins` is clamped to at least 1.
  * When every sample is the same value the range is widened by a factor of two

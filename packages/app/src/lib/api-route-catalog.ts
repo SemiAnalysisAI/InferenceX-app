@@ -816,7 +816,7 @@ export interface ApiContractSourceDigest {
 export const apiContractSourceDigests = [
   {
     source: 'src/lib/views-api/agentx-charts.ts',
-    sourceSha256: '85326c014bc88ce516aa66bfaec977f03e9b0bb91a2d860cffac1780b6ac1a8d',
+    sourceSha256: '5f4515d2d0cfd7cd6a0f19f9b69eca7c3b97ac38bc32ed3f0dde2d575772f397',
     reviewArea: {
       en: 'AgentX chart controls and numerical projections.',
       zh: 'AgentX 图表控制项与数值投影。',
@@ -824,7 +824,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/inference/agentic-point/time-series-math.ts',
-    sourceSha256: '3a5e8553512f7a94a1cafb6a538ee261f983cf93b24b03996dfb0ca762053165',
+    sourceSha256: '4dcf086737628a24e342d6793b35810f40f07e2fec239474c5827d6cddfb8ab0',
     reviewArea: {
       en: 'Shared request/server chart estimators and populations.',
       zh: '请求与服务端图表共用的估计方法和样本范围。',
@@ -832,7 +832,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/inference/agentic-point/lognormal.ts',
-    sourceSha256: 'fe49796e5ed926ab1e1e7d04494f7ef9934f3cac0ddbbc3c5e66baf5a0e5dff0',
+    sourceSha256: '04a4b30d1bf5a4b124e72d3c9a6c49a3968c7cab5f1dc1607211f026155247d9',
     reviewArea: {
       en: 'Shared log histogram binning and zero exclusions.',
       zh: '共用的对数直方图分箱与零值排除规则。',
