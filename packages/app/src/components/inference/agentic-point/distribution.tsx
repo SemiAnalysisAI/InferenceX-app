@@ -15,7 +15,7 @@ import {
   type ChartLegendEntry,
 } from './chart-shared';
 import { layoutChartLegend } from './chart-legend';
-import { logHistogram, logTicks, positiveValues } from './lognormal';
+import { logTicks, summarizeDistribution } from './lognormal';
 import { quantile } from './time-series-math';
 
 const PAD = CHART_PAD;
@@ -79,22 +79,9 @@ export function Distribution({
   const t = STRINGS[useLocale()];
   const W = width;
 
-  const computed = useMemo(() => {
-    const positive = positiveValues(values);
-    if (positive.length === 0) return null;
-    const nBins = Math.min(50, Math.max(15, Math.ceil(Math.sqrt(positive.length))));
-    const histogram = logHistogram(positive, nBins);
-    if (!histogram) return null;
-    return {
-      sorted: positive.toSorted((a, b) => a - b),
-      histogram,
-      // Zero-token requests are real but unplottable on a log axis; they are
-      // reported under the chart rather than silently folded into bin one.
-      excluded: values.length - positive.length,
-    };
-  }, [values]);
+  const computed = useMemo(() => summarizeDistribution(values), [values]);
 
-  if (!computed) {
+  if (!computed.histogram) {
     return <ChartEmpty height={height} />;
   }
   const { sorted, histogram, excluded } = computed;

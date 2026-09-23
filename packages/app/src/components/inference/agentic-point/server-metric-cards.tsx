@@ -21,9 +21,9 @@ import {
   cumulativeTimeAverage,
   cumulativeUniqueInputTokens,
   buildThroughputChartSeries,
+  buildPrefixCacheHitRateSeries,
   inflightUniqueTokens,
   rollingAverage,
-  rollingRatioFromComponents,
   timeRollingAverage,
   type ThroughputSeriesKey,
 } from './time-series-math';
@@ -357,19 +357,10 @@ export function RequestActivityCard({
 export function PrefixCacheHitRateCard({ sliced }: { sliced: SlicedServerSeries }) {
   const locale = useLocale();
   const t = SERVER_STRINGS[locale];
-  const hitRateData = useMemo(() => {
-    if (!sliced) return [];
-    const serverSeries = sliced.series;
-    const weighted = rollingRatioFromComponents(
-      serverSeries.prefixCacheHitRate,
-      serverSeries.prefixCacheHitsTps,
-      serverSeries.prefillTps,
-      50,
-    );
-    // Older stored rows may not have the component rate series. Preserve
-    // their existing chart rather than turning it into an empty state.
-    return weighted.length > 0 ? weighted : rollingAverage(serverSeries.prefixCacheHitRate, 50);
-  }, [sliced]);
+  const hitRateData = useMemo(
+    () => (sliced ? buildPrefixCacheHitRateSeries(sliced.series) : []),
+    [sliced],
+  );
 
   return (
     <ExpandableChart

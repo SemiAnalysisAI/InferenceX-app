@@ -1,14 +1,14 @@
-import { logHistogram, positiveValues } from '@/components/inference/agentic-point/lognormal';
+import { summarizeDistribution } from '@/components/inference/agentic-point/lognormal';
 import type { ServerSeriesLike } from '@/components/inference/agentic-point/phase-slice';
 import {
   averageSequenceLengthInFlight,
   buildThroughputChartSeries,
+  buildPrefixCacheHitRateSeries,
   cumulativeCompletedRequests,
   cumulativeTimeAverage,
   inflightUniqueTokens,
   quantile,
   rollingAverage,
-  rollingRatioFromComponents,
   rollingRequestMetric,
   timeRollingAverage,
   type RequestPercentile,
@@ -30,16 +30,13 @@ export function agentxCharts(
     const values = requests.requests
       .map((row) => row[metric])
       .filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
-    const positive = positiveValues(values).toSorted((a, b) => a - b);
+    const { sorted: positive, histogram, excluded } = summarizeDistribution(values);
     const raw = averageSequenceLengthInFlight(requests.requests, metric);
     return {
       distribution: {
         count: values.length,
-        excludedFromLog: values.length - positive.length,
-        histogram: logHistogram(
-          positive,
-          Math.min(50, Math.max(15, Math.ceil(Math.sqrt(positive.length)))),
-        ),
+        excludedFromLog: excluded,
+        histogram,
         percentiles:
           positive.length > 0
             ? {
@@ -54,14 +51,6 @@ export function agentxCharts(
     };
   };
   const inflight = inflightUniqueTokens(requests.requests);
-  const weightedHitRate = server
-    ? rollingRatioFromComponents(
-        server.prefixCacheHitRate,
-        server.prefixCacheHitsTps,
-        server.prefillTps,
-        50,
-      )
-    : [];
   return {
     assumptions: {
       requestWindow: 50,
@@ -97,10 +86,7 @@ export function agentxCharts(
             engineLabel,
             points: rollingAverage(points, 50),
           })),
-          prefixCacheHitRate:
-            weightedHitRate.length > 0
-              ? weightedHitRate
-              : rollingAverage(server.prefixCacheHitRate, 50),
+          prefixCacheHitRate: buildPrefixCacheHitRateSeries(server),
           queueDepth: Object.fromEntries(
             (['running', 'waiting', 'total'] as const).map((key) => [
               key,

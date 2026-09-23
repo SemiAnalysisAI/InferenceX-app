@@ -1,12 +1,14 @@
 import type { ApiSchema } from '@/lib/api-documentation';
+import {
+  stringSchema as text,
+  numberSchema as scalar,
+  booleanSchema as bool,
+  nullableNumberSchema as nullableNumber,
+  nullableStringSchema as nullableText,
+  arraySchema as array,
+} from '@/lib/api-documentation-helpers';
 
-const text: ApiSchema = { type: 'string' };
-const scalar: ApiSchema = { type: 'number' };
 const count: ApiSchema = { type: 'integer', minimum: 0 };
-const bool: ApiSchema = { type: 'boolean' };
-const nullableNumber: ApiSchema = { type: ['number', 'null'] };
-const nullableText: ApiSchema = { type: ['string', 'null'] };
-const array = (items: ApiSchema): ApiSchema => ({ type: 'array', items });
 const record = (properties: Record<string, ApiSchema>): ApiSchema => ({
   type: 'object',
   properties,

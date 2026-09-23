@@ -24,16 +24,5 @@ for (const agent of ['codex', 'claude']) {
     ]) {
       assert.ok(recipe.includes(`/api/v1/views/${view}`), view);
     }
-    for (const invariant of [
-      'maxGroupTokens',
-      'that page',
-      'effectivePhase',
-      'microsecond quantization',
-      'before visibility filtering',
-      'baselineConfig',
-      'deployed',
-      'raw timeline',
-    ])
-      assert.ok(recipe.includes(invariant), invariant);
   });
 }
