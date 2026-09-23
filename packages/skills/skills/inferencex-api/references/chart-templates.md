@@ -54,9 +54,10 @@ or statistics.
    accept them. The input SHA-256 identifies saved bytes, not source authenticity.
 
 Group labels reproduce `srcKind`; absent or blank values have a separate
-`(source missing)` group. A loader category such as `weka_flat` does not establish
-a main/subagent role. Use “main agent” or “subagent” only if the source's documented
-category meaning supports that interpretation. Preserve every other category and
+`(source missing)` group. Role meaning remains **unverified** unless source
+documentation establishes it, including for names containing `main` or `subagent`.
+For example: “`weka_flat` is kept separate; its agent role is unverified.” Unknown
+role is different from a confirmed absence of a role. Preserve every category and
 its denominator. This command computes no fixed subagent share or causal overhead.
 
 Counts and token lengths include cancelled requests, with their counts shown.
