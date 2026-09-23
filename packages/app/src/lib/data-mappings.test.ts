@@ -19,6 +19,7 @@ import {
   isSequenceDeprecated,
   isSequenceDeprecatedForModel,
   isSequenceHiddenForModel,
+  getModelDefaultPrecisions,
   getSequenceCategoryForModel,
   isBestPerSkuDefaultOff,
   showsTcoBasisSelector,
@@ -449,5 +450,19 @@ describe('isSequenceHiddenForModel', () => {
   it('leaves other models untouched', () => {
     expect(isSequenceHiddenForModel(Model.Qwen3_5, Sequence.EightK_OneK)).toBe(false);
     expect(isSequenceHiddenForModel(Model.MiniMax_M3, Sequence.EightK_OneK)).toBe(false);
+  });
+});
+
+describe('getModelDefaultPrecisions', () => {
+  it('opens GLM-5.2 / GLM-5.3 Agentic coding on FP4 and FP8', () => {
+    expect(getModelDefaultPrecisions(Model.GLM_5_2, Sequence.AgenticTraces)).toEqual([
+      Precision.FP4,
+      Precision.FP8,
+    ]);
+  });
+
+  it('leaves other scenarios and models on the auto default', () => {
+    expect(getModelDefaultPrecisions(Model.GLM_5_2, Sequence.EightK_OneK)).toBeUndefined();
+    expect(getModelDefaultPrecisions(Model.Qwen3_5, Sequence.AgenticTraces)).toBeUndefined();
   });
 });

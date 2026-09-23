@@ -662,6 +662,29 @@ export function getPrecisionLabel(precision: Precision): string {
   return PRECISION_CONFIG[precision]?.label ?? precision;
 }
 
+/**
+ * Model + scenario pairs whose dashboard opens on a fixed precision set instead
+ * of the densest-precision auto default. An explicit `i_prec`, a preset or a
+ * manual toggle still wins; precisions the scenario lacks are dropped.
+ *
+ * GLM-5.2 / GLM-5.3 Agentic coding: FP4 and FP8 both carry full fleets.
+ *
+ * Declared after `Precision`: TypeScript enums are initialised in module order.
+ */
+const MODEL_DEFAULT_PRECISIONS: Partial<
+  Record<Model, Partial<Record<Sequence, readonly Precision[]>>>
+> = {
+  [Model.GLM_5_2]: { [Sequence.AgenticTraces]: [Precision.FP4, Precision.FP8] },
+};
+
+/** The fixed default precision set for this model and scenario, if any. */
+export function getModelDefaultPrecisions(
+  model: Model,
+  sequence: Sequence,
+): readonly Precision[] | undefined {
+  return MODEL_DEFAULT_PRECISIONS[model]?.[sequence];
+}
+
 // ---------------------------------------------------------------------------
 // Eval benchmarks
 // ---------------------------------------------------------------------------
