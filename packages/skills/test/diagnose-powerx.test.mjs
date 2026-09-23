@@ -23,6 +23,7 @@ const powerKeys = [
   'decode_joules_per_output_token',
 ];
 let diagnosticCode;
+let skillRoot;
 
 function strictMetadata(overrides = {}) {
   return {
@@ -88,6 +89,8 @@ function run(
     body = JSON.stringify(rows),
     status = 200,
     networkError = false,
+    telemetry = true,
+    standalone = false,
   } = {},
 ) {
   const cwd = project();
@@ -131,6 +134,10 @@ function run(
       cwd,
       env: {
         ...environment,
+        INFERENCEX_SKILL_DIR: standalone ? '' : skillRoot,
+        INFERENCEX_TELEMETRY: telemetry ? '1' : '0',
+        DO_NOT_TRACK: '0',
+        INFERENCEX_EXPECT_USER_AGENT: telemetry && !standalone ? `inferencex-skill/${version}` : '',
         INFERENCEX_TEST_RESPONSE: responsePath,
         INFERENCEX_TEST_REQUESTS: requestPath,
       },
@@ -178,6 +185,9 @@ before(() => {
 import { appendFileSync, readFileSync } from 'node:fs';
 const fixture = JSON.parse(readFileSync(process.env.INFERENCEX_TEST_RESPONSE, 'utf8'));
 globalThis.fetch = async (input, options) => {
+  const headers = new Headers(options?.headers);
+  if ((headers.get('user-agent') ?? '') !== process.env.INFERENCEX_EXPECT_USER_AGENT) throw new Error('Unexpected attribution marker');
+  if (!process.env.INFERENCEX_EXPECT_USER_AGENT && headers.has('x-inferencex-traffic')) throw new Error('Opt-out retained traffic marker');
   appendFileSync(process.env.INFERENCEX_TEST_REQUESTS, JSON.stringify({
     url: String(input.url ?? input), method: options?.method ?? input.method ?? 'GET',
   }) + '\\n');
@@ -186,7 +196,8 @@ globalThis.fetch = async (input, options) => {
 };
 `,
   );
-  const cookbook = readFileSync(join(suite.install('codex'), 'references/powerx.md'), 'utf8');
+  skillRoot = suite.install('codex');
+  const cookbook = readFileSync(join(skillRoot, 'references/powerx.md'), 'utf8');
   const section = cookbook.split('## Diagnose an empty strict selection\n')[1]?.split('\n## ')[0];
   assert.ok(section, 'the installed cookbook contains the empty-selection recipe');
   const snippet = section.match(
@@ -536,5 +547,13 @@ test('result URLs cannot change the host, endpoint, query or recorded export sco
     assert.equal(result.status, 1, query_url);
     assert.deepEqual(result.requests, [], query_url);
     assert.equal(result.stdout, '');
+  }
+});
+
+test('installed PowerX diagnostic recipe honors attribution opt-out', () => {
+  for (const options of [{ telemetry: false }, { standalone: true }]) {
+    const result = run([], options);
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.requests.length, 1);
   }
 });
