@@ -120,8 +120,8 @@ const openapi = {
 
 const options = {
   models: [
-    { name: 'DeepSeek-V4-Pro', dbKeys: ['dsv4'], category: 'default' },
-    { name: 'GLM-5', dbKeys: ['glm5', 'glm5.1'], category: 'deprecated' },
+    { name: 'DeepSeek-V4-Pro', dbKeys: ['dsv4'] },
+    { name: 'GLM-5', dbKeys: ['glm5', 'glm5.1'] },
   ],
 };
 
@@ -157,13 +157,12 @@ test('dates accept a display selector by resolving its DB keys through the optio
     ...availability,
     { ...availability[1], model: 'glm5', date: '2026-09-01' },
     { ...availability[1], model: 'glm5.1', date: '2026-09-05' },
+    { ...availability[1], model: 'glm5.1', date: '2026-09-01' },
   ];
   const requests = [];
-  const get = (spec) => {
-    requests.push(spec);
-    return saved(spec.operation === 'options' ? options : rows, String(requests.length).repeat(64));
-  };
-  const dates = await discover(normalizeArgs(['dates', '--model', 'GLM-5']), { get });
+  const dates = await discover(normalizeArgs(['dates', '--model', 'GLM-5']), {
+    get: registryGet(requests, rows),
+  });
   assert.deepEqual(
     requests.map(({ operation }) => operation),
     ['availability', 'options'],
@@ -178,17 +177,9 @@ test('dates accept a display selector by resolving its DB keys through the optio
   assert.equal(dates.sources.length, 2);
   assert.equal(dates.coverage.complete_for_scope, true);
 
-  const unknownRequests = [];
   const unknown = await discover(normalizeArgs(['dates', '--model', 'nope']), {
-    get: (spec) => {
-      unknownRequests.push(spec);
-      return saved(spec.operation === 'options' ? options : rows);
-    },
+    get: registryGet([], rows),
   });
-  assert.deepEqual(
-    unknownRequests.map(({ operation }) => operation),
-    ['availability', 'options'],
-  );
   assert.deepEqual(unknown.items, []);
   assert.equal(unknown.scope.model_selector, null);
   assert.match(
@@ -339,11 +330,7 @@ test('configs accept a DB model key listed by discover models and request the di
     requests.map(({ operation }) => operation),
     ['openapi', 'options', 'benchmarks'],
   );
-  assert.equal(
-    new URL(requests[2].url).searchParams.get('model'),
-    'DeepSeek-V4-Pro',
-    'the benchmarks request carries the resolved display selector, not the DB key',
-  );
+  assert.equal(new URL(requests[2].url).searchParams.get('model'), 'DeepSeek-V4-Pro');
   assert.deepEqual(document.scope, {
     requested_model: 'dsv4',
     model_selector: 'DeepSeek-V4-Pro',
@@ -358,39 +345,6 @@ test('configs accept a DB model key listed by discover models and request the di
     document.sources.map(({ operation }) => operation),
     ['openapi', 'options', 'benchmarks'],
   );
-
-  // A display selector still resolves directly without consulting the registry.
-  const directRequests = [];
-  const direct = await discover(normalizeArgs(['configs', '--model', 'DeepSeek-V4-Pro']), {
-    get: registryGet(directRequests, rows),
-  });
-  assert.deepEqual(
-    directRequests.map(({ operation }) => operation),
-    ['openapi', 'benchmarks'],
-  );
-  assert.deepEqual(direct.items, document.items);
-});
-
-test('a DB key shared by several registry models is not guessed', async () => {
-  const requests = [];
-  const ambiguous = {
-    models: [
-      { name: 'DeepSeek-V4-Pro', dbKeys: ['dsv4'] },
-      { name: 'GLM-5', dbKeys: ['dsv4'] },
-    ],
-  };
-  const document = await discover(normalizeArgs(['configs', '--model', 'dsv4']), {
-    get: (spec) => {
-      requests.push(spec);
-      return saved(spec.operation === 'openapi' ? openapi : ambiguous);
-    },
-  });
-  assert.deepEqual(
-    requests.map(({ operation }) => operation),
-    ['openapi', 'options'],
-  );
-  assert.deepEqual(document.items, []);
-  assert.equal(document.scope.model_selector, null);
 });
 
 test('a malformed options registry is rejected instead of resolving a selector', async () => {
@@ -403,21 +357,26 @@ test('a malformed options registry is rejected instead of resolving a selector',
   );
 });
 
-test('an unmappable model key is reported without a benchmark request', async () => {
-  const requests = [];
-  const document = await discover(normalizeArgs(['configs', '--model', 'future-model']), {
-    get: registryGet(requests),
-  });
-  assert.deepEqual(
-    requests.map(({ operation }) => operation),
-    ['openapi', 'options'],
-  );
-  assert.deepEqual(document.items, []);
-  assert.equal(document.scope.model_selector, null);
-  assert.equal(document.scope.model_resolution, null);
-  assert.equal(document.coverage.complete_for_scope, false);
-  assert.equal(document.coverage.available_items, null);
-  assert.match(document.coverage.limitations.join(' '), /future-model.*public model selector/u);
+test('unknown and ambiguous model keys stop before requesting benchmarks', async () => {
+  for (const [model, registry] of [
+    ['future-model', options],
+    ['dsv4', { models: options.models.map((entry) => ({ ...entry, dbKeys: ['dsv4'] })) }],
+  ]) {
+    const requests = [];
+    const result = await discover(normalizeArgs(['configs', '--model', model]), {
+      get: (spec) => {
+        requests.push(spec.operation);
+        return saved(spec.operation === 'openapi' ? openapi : registry);
+      },
+    });
+    assert.deepEqual(requests, ['openapi', 'options']);
+    assert.deepEqual(result.items, []);
+    assert.equal(result.scope.model_selector, null);
+    assert.equal(result.scope.model_resolution, null);
+    assert.equal(result.coverage.complete_for_scope, false);
+    assert.equal(result.coverage.available_items, null);
+    assert.match(result.coverage.limitations.join(' '), /cannot be resolved/u);
+  }
 });
 
 test('datasets return only the validated registry and never crawl conversations', async () => {

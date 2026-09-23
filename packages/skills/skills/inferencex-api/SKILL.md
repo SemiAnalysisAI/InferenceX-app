@@ -130,9 +130,8 @@ when a duration is requested, compute and label elapsed or inclusive days.
   use `inferencex discover models` and
   `inferencex discover configs --model <selector> [--date YYYY-MM-DD]`, then count
   or group the returned `items`. `--model` accepts the display selector or the DB
-  model key that `discover models` lists. This is one bounded request and needs no
-  capture script; it returns configuration and provenance identity, not metric
-  values.
+  model key that `discover models` lists. This needs no capture script; it returns
+  configuration and provenance identity, not metric values.
 - **Metric values, evaluation, dataset conversation, or benchmark history queries:**
   use the bounded raw-API recipes in
   [public API examples](references/public-api-examples.md#basic-benchmark-lookup).

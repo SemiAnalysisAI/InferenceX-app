@@ -251,17 +251,11 @@ function modelRegistryEntry(entry) {
   );
 }
 
-// The dashboard options view is the public registry that maps display model
-// selectors (OpenAPI `model` enum) to the DB model keys used by availability and
-// benchmark rows. It is consulted only when the requested selector is not
-// already in the form the target endpoint accepts.
+// Resolve DB keys and display selectors only when the endpoint needs the other form.
 async function modelRegistry(get) {
   const url = `${API_ORIGIN}/api/v1/views/options`;
   const response = await get({ operation: 'options', url, allowedStatuses: [200] });
-  const entries = response.body?.models;
-  if (!Array.isArray(entries) || entries.some((entry) => !modelRegistryEntry(entry))) {
-    throw responseError('Unexpected options response shape.');
-  }
+  const entries = validateRows(response.body?.models, modelRegistryEntry, 'options');
   return {
     entries,
     source: responseSource(response, 'options', url, {
@@ -271,7 +265,7 @@ async function modelRegistry(get) {
 }
 
 function selectorForKey(entries, key) {
-  const matches = [...new Set(entries.filter((entry) => entry.dbKeys.includes(key)))];
+  const matches = entries.filter((entry) => entry.dbKeys.includes(key));
   return matches.length === 1 ? matches[0].name : null;
 }
 
@@ -289,16 +283,13 @@ async function availability(options, get, signal) {
     const allItems = [...new Set(rows.map((row) => row.model))]
       .toSorted(compare)
       .map((raw_model) => ({ raw_model }));
-    return {
-      ...page(options, allItems),
-      scope: { raw_model: null },
-      sources: [responseSource(response, 'availability', url, { raw_model: null })],
-    };
+    const scope = { raw_model: null };
+    return document(options, scope, allItems, [
+      responseSource(response, 'availability', url, scope),
+    ]);
   }
 
-  // `dates` accepts the DB model key that availability rows carry. When the
-  // requested value matches no row, resolve it as a display selector through the
-  // public options registry instead of returning an empty list.
+  // Availability rows use DB keys; a display selector can cover several keys.
   let rawModels = [options.model];
   let modelSelector = null;
   const sources = [];
@@ -328,16 +319,13 @@ async function availability(options, get, signal) {
   ]
     .toSorted(compare)
     .map((value) => ({ date: value }));
-  const projected = page(options, allItems);
-  return {
-    ...projected,
-    coverage: {
-      ...projected.coverage,
-      limitations: [...projected.coverage.limitations, ...limitations],
-    },
+  return document(
+    options,
     scope,
-    sources: [responseSource(response, 'availability', url, scope), ...sources],
-  };
+    allItems,
+    [responseSource(response, 'availability', url, scope), ...sources],
+    limitations,
+  );
 }
 
 function modelSelectors(body) {
@@ -457,7 +445,6 @@ async function configs(options, get, signal) {
   // DB model keys, so resolve a key to its display selector through the public
   // options registry before giving up.
   let modelSelector = selectors.includes(options.model) ? options.model : null;
-  let modelResolution = modelSelector === null ? null : 'openapi_selector';
   if (modelSelector === null) {
     const registry = await modelRegistry(get);
     sources.push(registry.source);
@@ -465,7 +452,6 @@ async function configs(options, get, signal) {
     const resolved = selectorForKey(registry.entries, options.model);
     if (resolved !== null && selectors.includes(resolved)) {
       modelSelector = resolved;
-      modelResolution = 'db_model_key';
     }
   }
 
@@ -504,7 +490,7 @@ async function configs(options, get, signal) {
   const scope = {
     requested_model: options.model,
     model_selector: modelSelector,
-    model_resolution: modelResolution,
+    model_resolution: modelSelector === options.model ? 'openapi_selector' : 'db_model_key',
     requested_date: options.date,
     date_selection: options.date === null ? 'latest' : 'as-of',
   };
@@ -565,14 +551,7 @@ export async function discover(options, { get, signal } = {}) {
   if (['models', 'dates'].includes(normalized.resource)) {
     const projected = await availability(normalized, get, signal);
     signal?.throwIfAborted();
-    return {
-      schema_version: 1,
-      kind: normalized.resource,
-      scope: projected.scope,
-      items: projected.items,
-      sources: projected.sources,
-      coverage: projected.coverage,
-    };
+    return projected;
   }
   if (normalized.resource === 'configs') return configs(normalized, get, signal);
   if (normalized.resource === 'datasets') return datasets(normalized, get);
