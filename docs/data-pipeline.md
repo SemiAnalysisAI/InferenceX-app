@@ -560,3 +560,8 @@ trace preparation. Hashed artifact filenames and filesystem enumeration order
 are not attempt provenance. Failed-only reruns retain unrepeated points from
 earlier attempts, and raw uploads remain unchanged. Legacy local bundles without
 this manifest retain their prior ingestion behavior.
+
+Existing trace/log links remain immutable on re-ingest. Their derived cache rates
+and fallback full-response metrics survive metric upserts; fresh artifact fields
+remain authoritative for throughput and request counts. Repairing an already
+incorrect sidecar link requires a separate provenance audit.

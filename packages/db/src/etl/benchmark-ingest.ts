@@ -122,13 +122,20 @@ export async function bulkIngestBenchmarkRows(
       recipe_fingerprint
     )
     do update set
-      -- Replace metrics with the fresh artifact values, but carry over
-      -- kv_cache_pool_tokens: it is derived from the server log at
-      -- insertServerLog time (not present in any artifact JSON), so a later
-      -- upsert from the aggregated results_bmk artifact would silently wipe it.
-      metrics = excluded.metrics || jsonb_strip_nulls(
-        jsonb_build_object('kv_cache_pool_tokens', benchmark_results.metrics->'kv_cache_pool_tokens')
-      ),
+      -- Re-ingest skips already-linked trace blobs. Keep their derived cache
+      -- scope and fallback full-response fields while replacing raw measurements.
+      metrics = case when benchmark_results.trace_replay_id is not null then
+        coalesce((select jsonb_object_agg(key, value)
+          from jsonb_each(benchmark_results.metrics)
+          where strpos(key, '_full_response_') > 0), '{}'::jsonb)
+        else '{}'::jsonb end
+        || excluded.metrics || jsonb_strip_nulls(jsonb_build_object(
+          'kv_cache_pool_tokens', benchmark_results.metrics->'kv_cache_pool_tokens',
+          'server_gpu_cache_hit_rate', case when benchmark_results.trace_replay_id is not null
+            then benchmark_results.metrics->'server_gpu_cache_hit_rate' end,
+          'server_cpu_cache_hit_rate', case when benchmark_results.trace_replay_id is not null
+            then benchmark_results.metrics->'server_cpu_cache_hit_rate' end
+        )),
       image = excluded.image,
       workers = excluded.workers,
       -- Like workers, the fresh artifact is authoritative for provenance: a
