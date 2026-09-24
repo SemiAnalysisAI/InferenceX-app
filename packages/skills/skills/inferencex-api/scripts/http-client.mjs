@@ -10,6 +10,7 @@ import {
   responseError,
 } from './cli-contract.mjs';
 import { createResponseBudget } from './response-budget.mjs';
+import { requestHeaders } from './request-headers.mjs';
 
 const API_ORIGIN = 'https://inferencex.semianalysis.com';
 const RETRYABLE_STATUSES = new Set([429, 502, 503, 504]);
@@ -186,7 +187,7 @@ export function createHttpClient({
           () =>
             fetchImpl(request.url, {
               method: 'GET',
-              headers: { accept: 'application/json' },
+              headers: { accept: 'application/json', ...requestHeaders(request.url) },
               redirect: 'error',
               signal: requestSignal,
             }),

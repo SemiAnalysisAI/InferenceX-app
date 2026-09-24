@@ -40,6 +40,8 @@ paths, including a missing or damaged entry.
 Replace the package name and version with the absolute path to the supplied `.tgz`
 and add `--offline`. Use that same archive for installation, status checks and upgrades.
 
+If you need to build the archive, run `npm pack` in `packages/skills`.
+
 </details>
 
 ## Usage
@@ -53,13 +55,6 @@ For example:
 
 > /inferencex Check the TCO assumptions in this spreadsheet against InferenceX.
 > Keep my workload, latency target, prices and units; flag anything that does not match.
-
-Continue with ordinary follow-up questions such as “now compare the same workload
-on B200.” The skill chooses the workflow and command; there is no need to repeat
-“use the CLI.” It can also be selected automatically for relevant InferenceX tasks:
-
-> Export the latest available DeepSeek-V4-Pro PowerX observations for an 8192-input,
-> 1024-output workload. Preserve missing values and save the source responses.
 
 You can also use the CLI directly from the installed skill:
 
@@ -86,6 +81,9 @@ Each export needs a new output directory. Public queries require no API key.
 
 The package queries existing observations; it does not launch benchmarks.
 
+Online requests carry package attribution for aggregate request counts. Set
+`INFERENCEX_TELEMETRY=0` to opt out. [Fields and controls](https://github.com/SemiAnalysisAI/InferenceX-app/blob/master/packages/skills/skills/inferencex-api/references/cli.md#request-usage).
+
 ## Documentation
 
 - [CLI reference](https://github.com/SemiAnalysisAI/InferenceX-app/blob/master/packages/skills/skills/inferencex-api/references/cli.md) — commands, exports and offline verification.
@@ -100,7 +98,7 @@ The package queries existing observations; it does not launch benchmarks.
 导出结果与原始响应，并离线核验已保存的证据。
 
 需要 Node.js 24 或更高版本。上方命令指定 1.1.0；发布前请将包名和版本替换为候选 `.tgz` 的绝对路径，并加上 `--offline`。
-安装、状态检查和升级使用同一份产物。
+安装、状态检查和升级使用同一份产物。没有候选包时，在 `packages/skills` 目录执行 `npm pack` 生成。
 
 默认只安装到当前项目；加上 `--scope user` 后，本机所有项目均可使用：
 Codex 安装到 `~/.agents/skills/`，Claude Code 安装到 `~/.claude/skills/`。
@@ -111,8 +109,7 @@ Codex 安装到 `~/.agents/skills/`，Claude Code 安装到 `~/.claude/skills/`�
 
 安装后，新开一个 Claude Code 会话并输入 `/inferencex 核对这份表格里的 TCO 假设`；
 Codex 可在 `/skills` 中选择 inferencex，或使用 `$inferencex`。
-后续直接提出“再比较同一工作负载下的 B200”等问题即可，技能会选择合适的命令。
-相关的 InferenceX 任务也可能自动触发该 skill。若安装后没有显示入口，重启 agent；
+若安装后没有显示入口，重启 agent；
 项目级安装须从对应项目启动。也可按上方示例直接运行 CLI。
 每次导出都需要新的输出目录；公开查询不需要 API key。
 
@@ -120,6 +117,8 @@ PowerX 可导出实测功耗与能耗；AgentX 可导出智能体工作负载汇
 还可追溯结果的来源、配置和日志，按自定义价格假设比较 TCO，在框架版本间比较匹配的观测，
 以及比较两次 CollectiveX 通信基准测试。该包查询已有观测，不启动基准测试。
 详细命令、仪表板视图、旧版迁移和接口格式见上方文档链接。
+在线请求会携带包来源标识，用于统计请求总量；设置 `INFERENCEX_TELEMETRY=0` 可关闭，
+采集字段及控制方式见上方链接。
 
 </details>
 

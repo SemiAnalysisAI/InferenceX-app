@@ -1,5 +1,13 @@
 # AgentX cookbook
 
+For version-attributed Node recipes, set `INFERENCEX_SKILL_DIR` to the absolute installed
+`inferencex-api` directory containing this skill's `SKILL.md` (not the
+`inferencex` shortcut directory). This locates the shared request header helper. Standalone recipes still work
+without this optional helper and send no attribution.
+Set `INFERENCEX_TELEMETRY=0` to omit attribution; use
+`INFERENCEX_TRAFFIC=validation` for demos and acceptance checks. See
+[request usage](cli.md#request-usage) for the captured fields.
+
 AgentX observations measure serving-system performance under concurrent,
 closed-loop agent clients. `conc` is the number of clients that issue their next
 request after the previous response; it is not a fixed request batch. Report
@@ -220,6 +228,12 @@ was never limiting or that a cold cache caused the latency.
 
 ```bash
 node --input-type=module <<'JS'
+import { pathToFileURL } from 'node:url';
+let requestHeaders = () => ({});
+if (process.env.INFERENCEX_SKILL_DIR) {
+  try { ({ requestHeaders } = await import(pathToFileURL(`${process.env.INFERENCEX_SKILL_DIR}/scripts/request-headers.mjs`).href)); }
+  catch { /* Optional attribution must not prevent a standalone query. */ }
+}
 const base = 'https://inferencex.semianalysis.com';
 const selectedResultId = '421';
 const diagnosticId = /^(?:[1-9]\d*)$/u.test(selectedResultId) ? Number(selectedResultId) : null;
@@ -236,6 +250,7 @@ const requests = [];
 async function read(path) {
   const query_url = new URL(path, base).href;
   const response = await fetch(query_url, {
+    headers: requestHeaders(query_url, { source: 'skill' }),
     redirect: 'error',
     signal: AbortSignal.timeout(30_000),
   });

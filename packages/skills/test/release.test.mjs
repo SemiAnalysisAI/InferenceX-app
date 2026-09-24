@@ -58,6 +58,7 @@ const EXPECTED_FILES = [
   'skills/inferencex-api/scripts/install-transaction.mjs',
   'skills/inferencex-api/scripts/investigate-result.mjs',
   'skills/inferencex-api/scripts/local-files.mjs',
+  'skills/inferencex-api/scripts/request-headers.mjs',
   'skills/inferencex-api/scripts/response-budget.mjs',
   'skills/inferencex-api/scripts/verify-bundle.mjs',
 ];

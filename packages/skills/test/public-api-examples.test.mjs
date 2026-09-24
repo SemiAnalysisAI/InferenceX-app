@@ -5,12 +5,13 @@ import { join } from 'node:path';
 import { before, test } from 'node:test';
 import { pathToFileURL } from 'node:url';
 
-import { packedSkillSuite, succeeded as expectSuccess } from './packed-skill.mjs';
+import { packageInfo, packedSkillSuite, succeeded as expectSuccess } from './packed-skill.mjs';
 
 const suite = packedSkillSuite();
 const { temporaryRoot, environment } = suite;
 const base = 'https://inferencex.semianalysis.com';
 const installed = new Map();
+const skillRoots = new Map();
 const preload = join(temporaryRoot, 'http-response.mjs');
 const schema = {
   components: {
@@ -60,6 +61,7 @@ const schema = {
 before(() => {
   for (const target of ['codex', 'claude']) {
     const root = suite.install(target);
+    skillRoots.set(target, root);
     const cookbook = readFileSync(join(root, 'references/public-api-examples.md'), 'utf8');
     const snippets = [
       'Evaluation lookup',
@@ -81,8 +83,11 @@ before(() => {
     `
 import { appendFileSync, readFileSync } from 'node:fs';
 const fixtures = JSON.parse(readFileSync(process.env.INFERENCEX_EXAMPLE_FIXTURES, 'utf8'));
-globalThis.fetch = async (input) => {
+globalThis.fetch = async (input, options) => {
   const url = String(input.url ?? input);
+  const headers = new Headers(options?.headers);
+  if ((headers.get('user-agent') ?? '') !== process.env.INFERENCEX_EXPECT_USER_AGENT) throw new Error('Unexpected attribution marker');
+  if (!process.env.INFERENCEX_EXPECT_USER_AGENT && headers.has('x-inferencex-traffic')) throw new Error('Opt-out retained traffic marker');
   appendFileSync(process.env.INFERENCEX_EXAMPLE_REQUESTS, JSON.stringify(url) + '\\n');
   const response = fixtures[url];
   if (!response) throw new Error('Unexpected request: ' + url);
@@ -96,7 +101,14 @@ globalThis.fetch = async (input) => {
 function run(
   index,
   responses,
-  { target = 'codex', replacement, openapi = schema, project = suite.project('request-') } = {},
+  {
+    target = 'codex',
+    replacement,
+    openapi = schema,
+    project = suite.project('request-'),
+    telemetry = true,
+    standalone = false,
+  } = {},
 ) {
   const fixtures = { [`${base}/api/openapi.json`]: { body: JSON.stringify(openapi) } };
   for (const [path, value] of Object.entries(responses)) {
@@ -112,6 +124,11 @@ function run(
     cwd: project,
     env: {
       ...environment,
+      INFERENCEX_SKILL_DIR: standalone ? '' : skillRoots.get(target),
+      INFERENCEX_TELEMETRY: telemetry ? '1' : '0',
+      DO_NOT_TRACK: '0',
+      INFERENCEX_EXPECT_USER_AGENT:
+        telemetry && !standalone ? `inferencex-skill/${packageInfo.version}` : '',
       INFERENCEX_EXAMPLE_FIXTURES: fixturesPath,
       INFERENCEX_EXAMPLE_REQUESTS: requestsPath,
     },
@@ -574,5 +591,18 @@ test('installed history recipe keeps all scoped observations, dates, raw configu
     const result = run(2, { [path]: input });
     assert.notEqual(result.status, 0);
     assert.equal(result.stdout, '');
+  }
+});
+
+test('all four raw lookup recipes omit both attribution headers when opted out', () => {
+  for (const options of [{ telemetry: false }, { standalone: true }]) {
+    for (let index = 0; index < 4; index++) {
+      const result = run(index, {}, { openapi: {}, ...options });
+      assert.equal(result.requests.length, 1);
+      assert.doesNotMatch(
+        result.stderr,
+        /Unexpected attribution marker|Opt-out retained traffic marker/u,
+      );
+    }
   }
 });
