@@ -27,6 +27,7 @@ from urllib.parse import parse_qs, urlencode, urlsplit
 from urllib.request import ProxyHandler, Request, build_opener
 
 PACKAGE = '@semianalysisai/inferencex-skills'
+TASK_ENTRIES = ('inferencex', 'inferencex-to-chart', 'inferencex-to-table')
 REGISTRY = 'https://registry.npmjs.org'
 COLLECTIVEX_POSITIVE_RUN_IDS = ('33378604574', '33412478973')
 MAX_SAFE_INTEGER = 9_007_199_254_740_991
@@ -512,9 +513,11 @@ def check_installed(installed, skill_files, version):
 def check_installed_package(installed, skill_files, entrypoint_files, version):
     check_installed(installed, skill_files, version)
     if version_at_least(version, (1, 1, 0)):
-        require('SKILL.md' in entrypoint_files and 'integrity.json' in entrypoint_files,
-                'Archive is missing the inferencex task entry')
-        check_installed(installed.with_name('inferencex'), entrypoint_files, version)
+        for name in TASK_ENTRIES:
+            files = entrypoint_files.get(name, {})
+            require('SKILL.md' in files and 'integrity.json' in files,
+                    f'Archive is missing the {name} task entry')
+            check_installed(installed.with_name(name), files, version)
 
 
 def _normalized_id_object(value):
@@ -1752,10 +1755,13 @@ def main():
         skill_files = {member.name.removeprefix(prefix): packed.extractfile(member).read()
                        for member in packed.getmembers()
                        if member.isfile() and member.name.startswith(prefix)}
-        entry_prefix = 'package/skills/inferencex/'
-        entrypoint_files = {member.name.removeprefix(entry_prefix): packed.extractfile(member).read()
-                            for member in packed.getmembers()
-                            if member.isfile() and member.name.startswith(entry_prefix)}
+        entrypoint_files = {}
+        for name in TASK_ENTRIES:
+            entry_prefix = f'package/skills/{name}/'
+            entrypoint_files[name] = {
+                member.name.removeprefix(entry_prefix): packed.extractfile(member).read()
+                for member in packed.getmembers()
+                if member.isfile() and member.name.startswith(entry_prefix)}
     require('SKILL.md' in skill_files and 'scripts/inferencex.mjs' in skill_files,
             'Archive is missing the installed CLI')
 

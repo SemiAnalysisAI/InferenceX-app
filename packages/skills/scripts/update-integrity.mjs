@@ -5,7 +5,7 @@ import process from 'node:process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const packageRoot = new URL('../', import.meta.url);
-const SKILLS = ['inferencex-api', 'inferencex'];
+const SKILLS = ['inferencex-api', 'inferencex', 'inferencex-to-chart', 'inferencex-to-table'];
 
 async function generatedIntegrity(root, skillName) {
   const skillRoot = new URL(`skills/${skillName}/`, root);

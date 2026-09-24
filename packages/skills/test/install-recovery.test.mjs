@@ -349,7 +349,12 @@ test('dry-run predicts a skip after recovering an activated first install', () =
   assert.equal(installed.status, 0, `${installed.stdout}\n${installed.stderr}`);
   assert.equal(JSON.parse(installed.stdout).outcome, 'skipped');
   assert.deepEqual(snapshot(destination), before);
-  assert.deepEqual(readdirSync(join(cwd, '.claude/skills')), ['inferencex', 'inferencex-api']);
+  assert.deepEqual(readdirSync(join(cwd, '.claude/skills')), [
+    'inferencex',
+    'inferencex-api',
+    'inferencex-to-chart',
+    'inferencex-to-table',
+  ]);
 });
 
 test('recovery dry-run preflights the tree that recovery retains', () => {
@@ -628,7 +633,12 @@ test('a process killed after committed backup cleanup leaves its owner marker re
   assert.equal(record.installation_state, 'installed');
   assert.equal(record.installed_version, packageInfo.version);
   assert.equal(readFileSync(join(destination, 'local-notes.txt'), 'utf8'), 'keep me');
-  assert.deepEqual(readdirSync(skillsRoot), ['inferencex', 'inferencex-api']);
+  assert.deepEqual(readdirSync(skillsRoot), [
+    'inferencex',
+    'inferencex-api',
+    'inferencex-to-chart',
+    'inferencex-to-table',
+  ]);
   assert.equal(lstatSync(transaction, { throwIfNoEntry: false }), undefined);
 });
 
@@ -774,6 +784,56 @@ test('status rechecks an atomically replaced transaction marker during its read'
   assert.equal(readFileSync(path, 'utf8'), replacement);
 });
 
+for (const retainsPrevious of [false, true]) {
+  test(`cleanup inspection ${retainsPrevious ? 'rejects retained data' : 'rescans an outdated directory listing'}`, () => {
+    const cwd = project();
+    succeeded(run(['install'], cwd));
+    const destination = join(cwd, '.claude/skills/inferencex-api');
+    const transaction = `${destination}.inferencex-skills-transaction`;
+    const before = snapshot(destination);
+    mkdirSync(transaction);
+    mkdirSync(join(transaction, 'previous'));
+    const { path, record } = writeTransactionMarker(transaction, destination, {
+      ownerPid: process.pid,
+      phase: 'activated',
+    });
+    const reads = join(cwd, 'transaction-listings');
+    const result = runWithPreload(
+      ['status', '--json'],
+      cwd,
+      `
+        import fs from 'node:fs';
+        import { syncBuiltinESMExports } from 'node:module';
+        const original = fs.readdirSync;
+        let count = 0;
+        fs.readdirSync = (directory, ...args) => {
+          const names = original(directory, ...args);
+          if (directory === ${JSON.stringify(transaction)}) {
+            fs.writeFileSync(${JSON.stringify(reads)}, String(++count));
+            if (count === 1) {
+              if (!${retainsPrevious}) fs.rmdirSync(${JSON.stringify(join(transaction, 'previous'))});
+              fs.writeFileSync(${JSON.stringify(join(transaction, 'transaction.next.json'))}, ${JSON.stringify(JSON.stringify({ ...record, phase: 'cleanup' }))});
+              fs.renameSync(${JSON.stringify(join(transaction, 'transaction.next.json'))}, ${JSON.stringify(path)});
+            }
+          }
+          return names;
+        };
+        syncBuiltinESMExports();
+      `,
+    );
+    const status = JSON.parse(succeeded(result).stdout);
+    assert.equal(status.transaction_state, retainsPrevious ? 'blocked' : 'busy', status.reason);
+    if (retainsPrevious) {
+      assert.match(status.reason, /terminal installer cleanup contains unexpected data/);
+      assert.equal(existsSync(join(transaction, 'previous')), true);
+    } else {
+      assert.equal(status.transaction_phase, 'cleanup');
+    }
+    assert.ok(Number(readFileSync(reads, 'utf8')) <= 3, 'inspection must remain bounded');
+    assert.deepEqual(snapshot(destination), before);
+  });
+}
+
 for (const mutation of ['same-inode', 'malformed', 'oversized', 'continuous']) {
   test(`transaction marker rescans still block ${mutation} changes`, () => {
     const cwd = project();
@@ -917,7 +977,13 @@ test('the owner tolerates a contender removing its empty terminal recovery direc
     packageInfo.version,
   );
   assert.deepEqual(snapshot(join(skillsRoot, 'neighbor')), neighborBefore);
-  assert.deepEqual(readdirSync(skillsRoot).sort(), ['inferencex', 'inferencex-api', 'neighbor']);
+  assert.deepEqual(readdirSync(skillsRoot).sort(), [
+    'inferencex',
+    'inferencex-api',
+    'inferencex-to-chart',
+    'inferencex-to-table',
+    'neighbor',
+  ]);
   assert.equal(JSON.parse(succeeded(run(['install', '--json'], cwd)).stdout).outcome, 'skipped');
 });
 
@@ -1060,7 +1126,12 @@ test('simultaneous recoverers atomically claim a dead transaction before restori
   assert.equal(JSON.parse(second.output.stdout).outcome, 'skipped');
   assert.deepEqual(snapshot(destination), before);
   assert.equal(readFileSync(join(destination, 'local-notes.txt'), 'utf8'), 'keep me');
-  assert.deepEqual(readdirSync(join(cwd, '.claude/skills')), ['inferencex', 'inferencex-api']);
+  assert.deepEqual(readdirSync(join(cwd, '.claude/skills')), [
+    'inferencex',
+    'inferencex-api',
+    'inferencex-to-chart',
+    'inferencex-to-table',
+  ]);
 });
 
 test('a killed recovery owner leaves its exact owner token reclaimable', async () => {
@@ -1110,7 +1181,12 @@ test('a killed recovery owner leaves its exact owner token reclaimable', async (
   assert.equal(recovered.status, 0, `${recovered.stdout}\n${recovered.stderr}`);
   assert.equal(JSON.parse(recovered.stdout).outcome, 'skipped');
   assert.deepEqual(snapshot(destination), before);
-  assert.deepEqual(readdirSync(join(cwd, '.claude/skills')), ['inferencex', 'inferencex-api']);
+  assert.deepEqual(readdirSync(join(cwd, '.claude/skills')), [
+    'inferencex',
+    'inferencex-api',
+    'inferencex-to-chart',
+    'inferencex-to-table',
+  ]);
 });
 
 test('a stale recovery contender cannot claim a newer transaction at the reused canonical path', async () => {
@@ -1314,7 +1390,12 @@ test('a stale none contender can overlap only cleanup after recovery settles the
   assert.equal(recoveryCode, 0, `${recoveryOwner.output.stdout}\n${recoveryOwner.output.stderr}`);
   assert.equal(JSON.parse(recoveryOwner.output.stdout).outcome, 'skipped');
   assert.deepEqual(snapshot(destination), before);
-  assert.deepEqual(readdirSync(join(cwd, '.claude/skills')), ['inferencex', 'inferencex-api']);
+  assert.deepEqual(readdirSync(join(cwd, '.claude/skills')), [
+    'inferencex',
+    'inferencex-api',
+    'inferencex-to-chart',
+    'inferencex-to-table',
+  ]);
 });
 
 test('terminal cleanup claim crashes cannot block, delete, or hide a newer installation', async () => {
@@ -1525,7 +1606,12 @@ test('terminal cleanup claim crashes cannot block, delete, or hide a newer insta
     readFileSync(join(destination, 'local-notes.txt'), 'utf8'),
     'keep newer installation',
   );
-  assert.deepEqual(readdirSync(skillsRoot), ['inferencex', 'inferencex-api']);
+  assert.deepEqual(readdirSync(skillsRoot), [
+    'inferencex',
+    'inferencex-api',
+    'inferencex-to-chart',
+    'inferencex-to-table',
+  ]);
 });
 
 test('terminal cleanup at the canonical path leaves an identifiable tombstone', async () => {
@@ -1635,7 +1721,12 @@ test('terminal cleanup at the canonical path leaves an identifiable tombstone', 
   const follower = run(['install', '--target', 'codex', '--json'], cwd);
   assert.equal(follower.status, 0, `${follower.stdout}\n${follower.stderr}`);
   assert.equal(JSON.parse(follower.stdout).outcome, 'installed');
-  assert.deepEqual(readdirSync(skillsRoot), ['inferencex', 'inferencex-api']);
+  assert.deepEqual(readdirSync(skillsRoot), [
+    'inferencex',
+    'inferencex-api',
+    'inferencex-to-chart',
+    'inferencex-to-table',
+  ]);
 });
 
 test('malformed, foreign, and symlink transaction markers fail closed without deletion', () => {

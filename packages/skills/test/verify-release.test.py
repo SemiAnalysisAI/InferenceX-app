@@ -271,27 +271,114 @@ class RetryTests(unittest.TestCase):
         self.assertEqual(report['public_retry_policy']['total_deadline_seconds'], 300)
 
 class InstalledEntryTests(unittest.TestCase):
-    def test_new_releases_require_both_complete_installed_entries(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            runtime = root / 'inferencex-api'
-            entry = root / 'inferencex'
-            files = {'SKILL.md': b'guide', 'integrity.json': b'{}'}
-            for folder in (runtime, entry):
-                folder.mkdir()
+    ENTRY_NAMES = ('inferencex', 'inferencex-to-chart', 'inferencex-to-table')
+
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name)
+        self.files = {'SKILL.md': b'guide', 'scripts/inferencex.mjs': b'// fixture'}
+        self.entries = {name: {'SKILL.md': name.encode(), 'integrity.json': b'{}'}
+                        for name in self.ENTRY_NAMES}
+
+    def install(self, target, version='1.1.0'):
+        root = self.root / target / ('.agents' if target == 'codex' else '.claude') / 'skills'
+        if root.exists():
+            shutil.rmtree(root)
+        skills = {'inferencex-api': self.files}
+        if check.version_at_least(version, (1, 1, 0)):
+            skills.update(self.entries)
+        for skill, files in skills.items():
+            folder = root / skill
+            for name, body in files.items():
+                destination = folder / name
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                destination.write_bytes(body)
+            check.save(folder / '.inferencex-skills.json',
+                       {'package': check.PACKAGE, 'version': version})
+        return root / 'inferencex-api'
+
+    def test_new_releases_require_every_complete_archived_entry(self):
+        for target in ('codex', 'claude'):
+            runtime = self.install(target)
+            check.check_installed_package(runtime, self.files, self.entries, '1.1.0')
+            for name in self.ENTRY_NAMES:
+                for missing in ('SKILL.md', 'integrity.json'):
+                    with self.subTest(target=target, entry=name, missing=missing):
+                        entries = {key: dict(value) for key, value in self.entries.items()}
+                        del entries[name][missing]
+                        with self.assertRaisesRegex(ValueError, f'missing the {name} task entry'):
+                            check.check_installed_package(runtime, self.files, entries, '1.1.0')
+
+    def test_shortcuts_reject_missing_or_changed_files_receipts_and_layout(self):
+        for target in ('codex', 'claude'):
+            for name in self.ENTRY_NAMES[1:]:
+                for mutation in ('missing', 'changed', 'receipt', 'extra'):
+                    with self.subTest(target=target, entry=name, mutation=mutation):
+                        runtime = self.install(target)
+                        entry = runtime.with_name(name)
+                        if mutation == 'missing':
+                            (entry / 'SKILL.md').unlink()
+                        elif mutation == 'changed':
+                            (entry / 'SKILL.md').write_bytes(b'changed instructions')
+                        elif mutation == 'receipt':
+                            check.save(entry / '.inferencex-skills.json',
+                                       {'package': check.PACKAGE, 'version': '1.0.0'})
+                        else:
+                            (entry / 'unexpected.txt').write_text('unexpected')
+                        with self.assertRaises(ValueError):
+                            check.check_installed_package(runtime, self.files, self.entries, '1.1.0')
+
+    def test_old_releases_still_require_only_the_shared_runtime(self):
+        for target in ('codex', 'claude'):
+            for version in ('0.12.0', '1.0.0'):
+                with self.subTest(target=target, version=version):
+                    runtime = self.install(target, version)
+                    check.check_installed_package(runtime, self.files, {}, version)
+
+    def test_candidate_extracts_and_checks_each_entry_for_both_targets(self):
+        archive = self.root / 'candidate.tgz'
+        with tarfile.open(archive, 'w:gz') as packed:
+            for skill, files in {'inferencex-api': self.files, **self.entries}.items():
                 for name, body in files.items():
-                    (folder / name).write_bytes(body)
-                check.save(folder / '.inferencex-skills.json',
-                           {'package': check.PACKAGE, 'version': '1.1.0'})
-            check.check_installed_package(runtime, files, files, '1.1.0')
-            with self.assertRaisesRegex(ValueError, 'missing the inferencex task entry'):
-                check.check_installed_package(runtime, files, {}, '1.1.0')
-            (entry / 'SKILL.md').write_bytes(b'changed entry')
+                    member = tarfile.TarInfo(f'package/skills/{skill}/{name}')
+                    member.size = len(body)
+                    packed.addfile(member, io.BytesIO(body))
+        body = archive.read_bytes()
+        record = {'name': check.PACKAGE, 'version': '1.1.0', 'filename': archive.name,
+                  'sha256': hashlib.sha256(body).hexdigest(),
+                  'integrity': 'sha512-' + base64.b64encode(hashlib.sha512(body).digest()).decode()}
+        check.save(self.root / 'release.json', record)
+        args = SimpleNamespace(
+            mode='candidate', manifest=self.root / 'release.json', evidence=self.root / 'evidence',
+            model='Example', date=None, isl=8192, osl=1024, raw_model=None,
+            agentx_model='Example', empty_isl=7, empty_osl=13)
+        clean_root = self.root / 'clean'
+        clean_root.mkdir()
+
+        corrupt = False
+
+        def install(_root, target, *args):
+            runtime = self.install(target)
+            if corrupt and target == 'claude':
+                (runtime.with_name('inferencex-to-table') / 'SKILL.md').write_bytes(b'changed')
+            return self.root / target, {}
+
+        with patch.object(check.argparse.ArgumentParser, 'parse_args', return_value=args), \
+                patch.object(check.tempfile, 'mkdtemp', return_value=str(clean_root)), \
+                patch.object(check.shutil, 'which', side_effect=lambda binary: f'/runtime/{binary}'), \
+                patch.object(check, 'install_target', side_effect=install), \
+                patch.object(check, 'run_contract_one_workflows', return_value={}) as workflows, \
+                patch('sys.stdout', new=io.StringIO()):
+            check.main()
+            report = json.loads((args.evidence / 'verification.json').read_text())
+            self.assertEqual(report['status'], 'passed')
+            self.assertEqual([target['target'] for target in report['targets']], ['codex', 'claude'])
+            self.assertEqual(workflows.call_count, 2)
+            corrupt = True
+            args.evidence = self.root / 'corrupt-evidence'
             with self.assertRaisesRegex(ValueError, 'Installed file differs'):
-                check.check_installed_package(runtime, files, files, '1.1.0')
-            (entry / 'SKILL.md').unlink()
-            with self.assertRaisesRegex(ValueError, 'Unexpected installed files'):
-                check.check_installed_package(runtime, files, files, '1.1.0')
+                check.main()
 
 
 class UnifiedAcceptanceSurfaceTests(unittest.TestCase):

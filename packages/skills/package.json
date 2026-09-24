@@ -29,6 +29,8 @@
     "bin/install.mjs",
     "skills/inferencex-api",
     "skills/inferencex",
+    "skills/inferencex-to-chart",
+    "skills/inferencex-to-table",
     "README.md",
     "LICENSE"
   ],
