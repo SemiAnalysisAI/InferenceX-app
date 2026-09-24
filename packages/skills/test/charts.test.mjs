@@ -434,10 +434,20 @@ test('charts show one metric; the table image combines counts and medians with e
   assert.match(await readFile(join(out, 'summary.csv'), 'utf8'), /"e2e_ms","ms"/u);
 });
 
-test('many sources keep the largest nineteen and fold the rest', () => {
+test('many sources keep the largest nineteen and fold the rest', async () => {
   const requests = Array.from({ length: 40 }, (_, i) =>
     Array.from({ length: 40 - i }, () => request(`source-${String(i).padStart(2, '0')}`)),
   ).flat();
+  const input = join(root, 'many-sources.json');
+  await writeFile(input, JSON.stringify(capture(requests)));
+  const out = join(root, 'many-sources-chart');
+  const report = await runCharts(
+    ['agentx-sources', '--input', input, '--style', 'chart', '--metric', 'e2e'],
+    out,
+  );
+  const saved = await readFile(join(out, 'chart.svg'), 'utf8');
+  const { file } = saved.match(/(?<file>[\w.]+) lists every source/u).groups;
+  assert.ok(report.artifacts.includes(file), file);
   const { summary } = summarizeSources(capture(requests));
   const counts = renderSourceChart(summary);
   assert.match(counts, /top 19 of 40 sources/u);

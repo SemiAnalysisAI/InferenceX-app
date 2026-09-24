@@ -381,7 +381,7 @@ export function renderSourceChart(summary, metric = 'requests') {
     });
   else if (base.hidden)
     footer.unshift(
-      `${base.hidden.count} smaller sources with ${format.share(base.hidden.share)} of requests are not shown; summary.csv lists every source.`,
+      `${base.hidden.count} smaller sources with ${format.share(base.hidden.share)} of requests are not shown; summary.json lists every source.`,
     );
   return barChart({
     eyebrow: base.eyebrow,

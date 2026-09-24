@@ -32,7 +32,7 @@ seven sources with short labels render as columns; eight or more, or labels that
 need more than two lines, render as horizontal bars ranked by value. Past 20
 sources, the 19 with the most requests keep their rows and the rest fold into a
 grey “Other” row for counts, or into a footnote for medians, which cannot be summed;
-`summary.csv` keeps every source. The table image shows sources as columns up to
+`summary.json` keeps every source. The table image shows sources as columns up to
 four and as ranked rows beyond that. Images stay 1200 px wide and grow taller with
 more rows. Labels wrap to two lines; denser charts shorten long labels in the middle
 and keep the full label as the SVG tooltip.
