@@ -12,6 +12,13 @@ const METRICS = [
   ['e2e_ms', 'Completed request E2E', 'ms'],
   ['ttft_ms', 'Completed request TTFT', 'ms'],
 ];
+const IMAGE_METRICS = {
+  requests: { title: 'AgentX request mix', unit: 'requests' },
+  'input-tokens': { title: 'AgentX input length', key: 'isl', unit: 'tokens' },
+  'output-tokens': { title: 'AgentX output length', key: 'osl', unit: 'tokens' },
+  e2e: { title: 'AgentX request latency', key: 'e2e_ms', unit: 'seconds', divisor: 1000 },
+  ttft: { title: 'AgentX time to first token', key: 'ttft_ms', unit: 'seconds', divisor: 1000 },
+};
 const COLORS = ['#2fa9ef', '#f7b041', '#63d6b3', '#b39aff', '#ff8fab', '#67d4e8'];
 const object = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
 const nonnegative = (value) => typeof value === 'number' && Number.isFinite(value) && value >= 0;
@@ -29,8 +36,10 @@ export function chartTemplates() {
       {
         id: 'agentx-sources',
         status: 'available',
-        chart: 'Request-count bars and token/latency box plots by recorded srcKind',
-        table: 'Request counts and per-metric distributions in Markdown and summary CSV',
+        chart: 'One focused bar chart: request counts or a selected token/latency median',
+        table: 'One focused SVG table, with detailed statistics in Markdown and summary CSV',
+        metrics: Object.keys(IMAGE_METRICS),
+        default_metric: 'requests',
         styles: ['chart', 'table', 'both'],
         input: 'Saved selected-point capture from references/agentx.md',
         command: 'inferencex charts agentx-sources --input selected-point.json --output-dir charts',
@@ -59,7 +68,12 @@ export function normalizeChartArgs(args, outputDir) {
   try {
     parsed = parseArgs({
       args,
-      options: { input: { type: 'string' }, phase: { type: 'string' }, style: { type: 'string' } },
+      options: {
+        input: { type: 'string' },
+        phase: { type: 'string' },
+        style: { type: 'string' },
+        metric: { type: 'string' },
+      },
       allowPositionals: true,
       strict: true,
       tokens: true,
@@ -87,7 +101,10 @@ export function normalizeChartArgs(args, outputDir) {
   const style = values.style ?? 'both';
   if (!['chart', 'table', 'both'].includes(style))
     throw argumentError('--style must be chart, table, or both.');
-  return { template: 'agentx-sources', input: values.input, outputDir, phase, style };
+  const metric = values.metric ?? 'requests';
+  if (!Object.hasOwn(IMAGE_METRICS, metric))
+    throw argumentError(`--metric must be ${Object.keys(IMAGE_METRICS).join(', ')}.`);
+  return { template: 'agentx-sources', input: values.input, outputDir, phase, style, metric };
 }
 
 function parseCapture(capture) {
@@ -259,7 +276,8 @@ export function summarizeSources(capture, phase = 'all') {
       methodology: {
         grouping:
           'Exact recorded srcKind; missing or blank is a separate null category. No main/subagent role is inferred.',
-        chart_scale: 'Counts are linear; distribution positions use log(1 + value), retaining zero',
+        chart_scale:
+          'Linear from zero; one selected metric per image. Latency image medians use seconds; detailed statistics retain ms.',
         quantiles: 'Linear interpolation at (n - 1) * p over sorted valid observations (R type 7)',
         tokens:
           'ISL/OSL tokens include cancelled requests when recorded; null is missing, zero is retained',
@@ -278,104 +296,174 @@ const number = (value) =>
   value === null ? 'unavailable' : value.toLocaleString('en-US', { maximumSignificantDigits: 4 });
 const categoryLabel = (value) => (value === null ? '(source missing)' : `srcKind: ${value}`);
 
-export function renderSourceChart(summary) {
+const pictureNumber = (v) =>
+  v !== null && (v >= 1e9 || (v > 0 && v < 0.0001)) ? v.toExponential(3) : number(v);
+
+export function renderSourceChart(summary, metric = 'requests') {
+  return renderSourcePicture(summary, metric, false);
+}
+
+export function renderSourceTable(summary, metric = 'requests') {
+  return renderSourcePicture(summary, metric, true);
+}
+
+function renderSourcePicture(summary, metric, table) {
+  const spec = IMAGE_METRICS[metric];
   const groups = summary.groups;
-  const panelHeight = Math.max(140, groups.length * 50 + 90);
+  const horizontal = groups.length > 6;
+  const rowHeight = table ? 100 : 90;
+  const plotBottom = table || horizontal ? 230 + Math.max(1, groups.length) * rowHeight : 660;
   const width = 1440;
-  const height = 190 + panelHeight * 3 + 160;
+  const height = plotBottom + (table || horizontal ? 175 : 235);
   const pieces = [
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-labelledby="title description"><title id="title">AgentX requests by recorded source category</title><desc id="description">${xml(JSON.stringify(summary.scope))}. Box plots show minimum, p25, median, p75, maximum.</desc><rect width="100%" height="100%" fill="#0a0d10"/><style>text{font-family:Inter,'Helvetica Neue',Arial,sans-serif;fill:#e8eaed}.small{font-size:15px;fill:#8a939c}.label{font-size:16px}.panel{font-size:19px;font-weight:600}.title{font-size:29px;font-weight:600}.brand{font-size:20px;font-weight:600;fill:#2fa9ef}</style>`,
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-labelledby="title description"><title id="title">${xml(spec.title)}</title><desc id="description">${xml(JSON.stringify(summary.scope))}. Recorded source categories; ${spec.key ? `median ${spec.unit}` : 'request counts and shares'}.</desc><rect width="100%" height="100%" fill="#0a0d10"/><style>text{font-family:Inter,'Helvetica Neue',Arial,sans-serif;fill:#e8eaed}.small{font-size:19px;fill:#8a939c}.label{font-size:26px}.value{font-size:44px;font-weight:700}.title{font-size:48px;font-weight:700}.brand{font-size:20px;font-weight:600;fill:#2fa9ef}</style>`,
   ];
-  const text = (x, y, value, cls = 'label') =>
-    pieces.push(`<text x="${x}" y="${y}" class="${cls}">${xml(value)}</text>`);
-  text(32, 41, 'SemiAnalysis', 'brand');
-  text(205, 43, 'AgentX · request sources', 'title');
+  const text = (x, y, value, cls = 'label', anchor = 'start', extra = '') =>
+    pieces.push(
+      `<text x="${x}" y="${y}" class="${cls}" text-anchor="${anchor}" ${extra}>${xml(value)}</text>`,
+    );
+  const label = (x, y, value, maxWidth, anchor = 'start') => {
+    const full = value ?? '(source missing)';
+    const maxLength = Math.floor(maxWidth / 26);
+    const left = anchor === 'middle' ? x - maxWidth / 2 : x;
+    pieces.push(
+      `<svg x="${left}" y="${y - 28}" width="${maxWidth}" height="36" overflow="hidden"><text x="${anchor === 'middle' ? maxWidth / 2 : 0}" y="28" class="label" text-anchor="${anchor}"><title>${xml(full)}</title>${xml(full.length > maxLength ? `${full.slice(0, maxLength - 1)}…` : full)}</text></svg>`,
+    );
+  };
+  const value = (group) => (spec.key ? group.metrics[spec.key].median : group.request_count);
+  const display = (group) => {
+    if (!spec.key) return group.request_count.toLocaleString('en-US');
+    const v = value(group) === null ? null : value(group) / (spec.divisor ?? 1);
+    return pictureNumber(v);
+  };
+  const detail = (group) => {
+    if (!spec.key) return `${number(group.request_share * 100)}%`;
+    const stats = group.metrics[spec.key];
+    return stats.missing_count || stats.excluded_cancelled_count
+      ? `n=${stats.valid_count}; ${stats.missing_count} missing; ${stats.excluded_cancelled_count} cancelled excluded`
+      : '';
+  };
+  text(64, 42, 'SemiAnalysis · InferenceX', 'brand');
+  text(64, 110, spec.title, 'title');
   text(
-    32,
-    72,
-    `Result ${summary.source.selected_result_id} · phase ${summary.scope.phase} · ${summary.scope.selected_request_count} captured requests selected`,
+    64,
+    155,
+    spec.key
+      ? `Median · ${spec.unit}${spec.key.endsWith('_ms') ? ' · completed requests' : ''}`
+      : 'Request count · share of captured requests',
   );
   text(
-    32,
-    97,
-    `${summary.scope.cancelled_request_count} cancelled · ${summary.scope.missing_source_count} missing source · captured ${summary.source.retrieved_at}`,
+    64,
+    191,
+    `Result ${summary.source.selected_result_id} · ${summary.scope.selected_request_count.toLocaleString('en-US')} selected requests · phase ${summary.scope.phase}`,
     'small',
   );
-  text(32, 121, 'Recorded srcKind categories; labels do not infer main/subagent roles.', 'small');
-  function panel(x, y, title, metric) {
-    const w = 676;
-    pieces.push(
-      `<rect x="${x}" y="${y}" width="${w}" height="${panelHeight - 16}" rx="10" fill="#11161c" stroke="#252c34"/>`,
+  if (table) {
+    text(84, 247, 'Recorded source', 'small');
+    text(
+      spec.key ? 1310 : 1010,
+      247,
+      spec.key ? `Median (${spec.unit})` : 'Requests',
+      'small',
+      'end',
     );
-    text(x + 16, y + 29, title, 'panel');
-    const max = Math.max(
-      1,
-      ...groups.map((group) => (metric ? (group.metrics[metric].max ?? 0) : group.request_count)),
-    );
-    const left = x + 246,
-      plotWidth = 248;
-    text(left, y + 53, '0', 'small');
-    text(left + plotWidth - 35, y + 53, number(max), 'small');
+    if (!spec.key) text(1310, 247, 'Share', 'small', 'end');
     for (const [index, group] of groups.entries()) {
-      const cy = y + 80 + index * 50;
-      const label = categoryLabel(group.source_category);
+      const y = 278 + index * rowHeight;
       pieces.push(
-        `<text x="${x + 14}" y="${cy}" class="label"><title>${xml(label)}</title>${xml(label.length > 25 ? `${label.slice(0, 24)}…` : label)}</text>`,
+        `<rect x="64" y="${y}" width="1312" height="88" rx="8" fill="${index % 2 ? '#11161c' : '#151c23'}"/>`,
+        `<rect x="64" y="${y}" width="5" height="88" fill="${COLORS[index % COLORS.length]}"/>`,
       );
-      const color = COLORS[index % COLORS.length];
-      if (metric) {
-        const stats = group.metrics[metric];
-        if (stats.valid_count) {
-          const scale = (v) => left + (plotWidth * Math.log1p(v)) / Math.log1p(max);
-          pieces.push(
-            `<path d="M${scale(stats.min)},${cy - 5}H${scale(stats.max)}" stroke="${color}"/><rect x="${scale(stats.p25)}" y="${cy - 13}" width="${Math.max(1, scale(stats.p75) - scale(stats.p25))}" height="16" fill="${color}" fill-opacity=".3" stroke="${color}"/><path d="M${scale(stats.median)},${cy - 15}v20" stroke="${color}" stroke-width="2"/>`,
-          );
-        }
-        text(
-          left + plotWidth + 12,
-          cy,
-          stats.valid_count ? `n=${stats.valid_count}` : 'unavailable',
-          'small',
-        );
-        text(left + plotWidth + 12, cy + 20, `median ${number(stats.median)}`, 'small');
-        text(
-          left,
-          cy + 20,
-          `missing ${stats.missing_count}; cancelled ${stats.excluded_cancelled_count} excluded`,
-          'small',
-        );
-      } else {
+      label(84, y + 53, group.source_category, spec.key ? 900 : 650);
+      text(spec.key ? 1310 : 1010, y + 54, display(group), 'value', 'end');
+      if (!spec.key) text(1310, y + 54, detail(group), 'value', 'end');
+      else if (detail(group)) text(1310, y + 78, detail(group), 'small', 'end');
+    }
+  } else {
+    const max = Math.max(1, ...groups.map((group) => (value(group) ?? 0) / (spec.divisor ?? 1)));
+    const magnitude = 10 ** Math.floor(Math.log10(max));
+    const ceiling = Math.min(
+      Number.MAX_VALUE,
+      Math.ceil(max / magnitude / 0.5) * (magnitude * 0.5),
+    );
+    if (!horizontal) {
+      for (let tick = 0; tick <= 4; tick++) {
+        const y = plotBottom - tick * 95;
         pieces.push(
-          `<rect x="${left}" y="${cy - 13}" width="${(plotWidth * group.request_count) / max}" height="17" fill="${color}"/>`,
+          `<path d="M140,${y}H1370" stroke="#30363d" stroke-dasharray="${tick ? '4 8' : 'none'}"/>`,
         );
-        text(
-          left + plotWidth + 12,
-          cy,
-          `${group.request_count} (${number(group.request_share * 100)}%)`,
-          'small',
-        );
+        text(120, y + 7, pictureNumber(ceiling * (tick / 4)), 'small', 'end');
       }
     }
-    if (groups.length === 0) text(x + 16, y + 75, 'No requests in the selected phase.', 'small');
+    for (const [index, group] of groups.entries()) {
+      const v = (value(group) ?? 0) / (spec.divisor ?? 1);
+      const color = COLORS[index % COLORS.length];
+      if (horizontal) {
+        const y = 250 + index * rowHeight;
+        label(64, y + 30, group.source_category, 350);
+        pieces.push(
+          `<rect x="440" y="${y}" width="${760 * (v / ceiling)}" height="36" fill="${color}"/>`,
+        );
+        text(1320, y + 30, display(group), 'label', 'end');
+        if (detail(group)) text(440, y + 62, detail(group), 'small');
+      } else {
+        const band = 1230 / Math.max(1, groups.length);
+        const center = 140 + band * (index + 0.5);
+        const barWidth = Math.min(230, band * 0.64);
+        const barHeight = 380 * (v / ceiling);
+        pieces.push(
+          `<rect x="${center - barWidth / 2}" y="${plotBottom - barHeight}" width="${barWidth}" height="${barHeight}" fill="${color}"/>`,
+        );
+        text(
+          center,
+          plotBottom - barHeight - 24,
+          display(group),
+          groups.length > 4 ? 'label' : 'value',
+          'middle',
+        );
+        label(center, plotBottom + 45, group.source_category, band - 20, 'middle');
+        // Keep detailed exclusions in the footer and machine-readable statistics.
+        if (detail(group))
+          text(
+            center,
+            plotBottom + 78,
+            spec.key ? `n=${group.metrics[spec.key].valid_count}` : detail(group),
+            'label',
+            'middle',
+          );
+      }
+    }
   }
-  panel(32, 150, 'Request count · all selected requests', null);
-  METRICS.forEach(([key, title, unit], index) =>
-    panel(
-      32 + (index % 2) * 700,
-      150 + panelHeight * (1 + Math.floor(index / 2)),
-      `${title} (${unit}) · log(1+x) scale`,
-      key,
-    ),
+  if (groups.length === 0) text(84, 310, 'No requests in the selected phase.');
+  const footer = height - 97;
+  const excluded = spec.key
+    ? groups.reduce(
+        (n, group) =>
+          n +
+          group.metrics[spec.key].missing_count +
+          group.metrics[spec.key].excluded_cancelled_count,
+        0,
+      )
+    : 0;
+  text(
+    64,
+    footer,
+    'Captured rows only; upstream completeness and agent roles are unverified.',
+    'small',
   );
-  const bottom = 150 + panelHeight * 3;
-  const notes = [
-    'Boxes: p25–p75, line: median, whiskers: min–max. Distribution axes use log(1+x), retaining zero. Medians use panel units.',
-    'Token lengths include recorded cancelled requests; latency excludes cancelled requests. Missing values are not zero.',
-    `${summary.scope.captured_request_count} rows captured; ${summary.scope.excluded_phase_count} excluded by phase. Upstream completeness/sampling is unverified.`,
-    summary.source.query_url,
-    'Source: source.json. This is one captured result, not a dataset-wide comparison or proof of subagent overhead.',
-  ];
-  notes.forEach((note, index) => text(32, bottom + 14 + index * 23, note, 'small'));
+  if (excluded)
+    text(
+      64,
+      footer + 30,
+      `${excluded} missing/cancelled observations excluded. Per-source counts: summary.json.`,
+      'small',
+    );
+  text(
+    64,
+    footer + (excluded ? 60 : 30),
+    'Source: InferenceX request timeline · full statistics and capture: summary.json / source.json',
+    'small',
+  );
   pieces.push('</svg>');
   return pieces.join('\n');
 }
@@ -512,13 +600,19 @@ export async function runCharts(args, outputDir, { signal } = {}) {
   }
   const { summary, rows } = summarizeSources(capture, options.phase);
   summary.source.capture_sha256 = sha256(bytes);
+  summary.presentation = { metric: options.metric, style: options.style };
   const files = [
     ['source.json', bytes],
     ['requests.csv', requestCsv(rows)],
   ];
-  if (options.style !== 'table') files.push(['chart.svg', renderSourceChart(summary)]);
+  if (options.style !== 'table')
+    files.push(['chart.svg', renderSourceChart(summary, options.metric)]);
   if (options.style !== 'chart')
-    files.push(['table.md', sourceTable(summary)], ['summary.csv', summaryCsv(summary)]);
+    files.push(
+      ['table.svg', renderSourceTable(summary, options.metric)],
+      ['table.md', sourceTable(summary)],
+      ['summary.csv', summaryCsv(summary)],
+    );
   summary.artifacts = [...files.map(([name]) => name), 'summary.json'];
   files.push(['summary.json', `${JSON.stringify(summary, null, 2)}\n`]);
   const directory = resolve(outputDir);

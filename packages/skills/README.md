@@ -59,17 +59,19 @@ For example:
 
 For AgentX source comparisons, use the output-specific entries:
 
-> /inferencex-to-chart Compare request counts, token lengths and latency distributions
-> by recorded source category for AgentX result `<result-id>`.
+> /inferencex-to-chart Show request counts by recorded source category
+> for AgentX result `<result-id>`.
 
 > /inferencex-to-table Compare the recorded source categories in this saved AgentX
-> capture. Give me tables and CSV for my spreadsheet.
+> capture. Give me a simple table image, with CSV for my spreadsheet.
 
 In Codex, use `$inferencex-to-chart` or `$inferencex-to-table`, or select the entry
 from `/skills`. Replace `<result-id>` with your selected result; a saved
 selected-point capture works too. The ready template compares one result's recorded
-source categories. The chart uses a dark theme; Markdown tables and CSV share its
-statistics and scope. Each output retains the saved source and sample counts.
+source categories. Both entries show one focused dark image first: request counts
+by default, or median input tokens, output tokens, E2E or TTFT when requested.
+Detailed statistics remain in JSON, with Markdown and CSV
+also included for tables. Each output retains the saved source and sample counts.
 You can still ask `/inferencex` for either output, or request a chart and table together.
 
 You can also use the CLI directly from the installed skill:
@@ -133,12 +135,14 @@ Codex 可在 `/skills` 中选择 inferencex，或使用 `$inferencex`。
 每次导出都需要新的输出目录；公开查询不需要 API key。
 
 PowerX 可导出实测功耗与能耗；AgentX 可导出智能体工作负载汇总并检查 trace 可用性。
-在 Claude Code 中，输入 `/inferencex-to-chart 按 AgentX 结果 <result-id> 中记录的来源类别，比较请求数、token 长度和延迟分布` 可生成图表；
-输入 `/inferencex-to-table 将这份已保存的 AgentX capture 按记录的来源类别整理为表格和 CSV` 可生成电子表格所需的数据。
+在 Claude Code 中，输入 `/inferencex-to-chart 按 AgentX 结果 <result-id> 中记录的来源类别，画一张请求数对比图`；
+输入 `/inferencex-to-table 将这份已保存的 AgentX capture 按记录的来源类别整理为简明表格图片，并附上 CSV` 可生成表格图片和电子表格所需的数据。
 Codex 对应使用 `$inferencex-to-chart` 或 `$inferencex-to-table`，也可从 `/skills` 选择。
 将 `<result-id>` 替换为选定结果的 ID，也可提供已保存的 selected-point capture。
-现成模板用于比较单条结果中记录的来源类别。深色图表、Markdown 表格和 CSV
-共用统计结果与数据范围，均保留已保存的源数据和样本数。也可以通过通用 `/inferencex` 入口生成其中任一输出，或同时生成图表和表格。
+现成模板用于比较单条结果中记录的来源类别。两个入口都优先展示一张简洁的深色图片，
+每张只呈现一个指标：默认显示请求数，也可按需展示输入 token 数、输出 token 数、E2E 或 TTFT 的中位数。
+完整统计保存在 JSON 中；表格输出另附 Markdown 和 CSV。
+两种输出共用统计结果与数据范围，保留已保存的源数据和样本数。也可以通过通用 `/inferencex` 入口生成其中任一输出，或同时生成图表和表格。
 还可追溯结果的来源、配置和日志，按自定义价格假设比较 TCO，在框架版本间比较匹配的观测，
 以及比较两次 CollectiveX 通信基准测试。该包查询已有观测，不启动基准测试。
 详细命令、仪表板视图、旧版迁移和接口格式见上方文档链接。

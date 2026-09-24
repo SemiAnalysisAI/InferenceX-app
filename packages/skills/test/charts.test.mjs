@@ -7,6 +7,7 @@ import { after, test } from 'node:test';
 import {
   normalizeChartArgs,
   renderSourceChart,
+  renderSourceTable,
   runCharts,
   summarizeSources,
 } from '../skills/inferencex-api/scripts/charts.mjs';
@@ -112,12 +113,12 @@ test('quantiles are reproducible, nullable latency stays unavailable, cancelled 
   assert.equal(summary.groups[0].metrics.ttft_ms.median, null);
   assert.equal(summary.groups[1].metrics.e2e_ms.valid_count, 0);
   assert.equal(summary.groups[1].metrics.e2e_ms.median, null);
-  assert.match(renderSourceChart(summary), /unavailable/u);
-  assert.match(renderSourceChart(summary), /log\(1\+x\) scale/u);
-  assert.match(renderSourceChart(summary), /median 15/u);
+  assert.match(renderSourceChart(summary, 'ttft'), /unavailable/u);
+  assert.match(renderSourceChart(summary, 'input-tokens'), />15</u);
+  assert.ok(!renderSourceChart(summary).includes('log(1+x)'));
   assert.ok(!renderSourceChart(summary).includes('NaN'));
   const zeros = summarizeSources(capture([request('zero', { isl: 0, osl: 0, ttftMs: 0, end: 0 })]));
-  assert.match(renderSourceChart(zeros.summary), /median 0/u);
+  assert.match(renderSourceChart(zeros.summary, 'input-tokens'), />0</u);
   assert.ok(!renderSourceChart(zeros.summary).includes('NaN'));
 });
 
@@ -202,6 +203,7 @@ test('chart argument parsing uses existing output-dir and rejects unknown or dup
     outputDir: 'new',
     phase: 'all',
     style: 'both',
+    metric: 'requests',
   });
   for (const [args, out] of [
     [['list', '--phase', 'all'], null],
@@ -212,6 +214,11 @@ test('chart argument parsing uses existing output-dir and rejects unknown or dup
     [['list'], 'out'],
     [['list', '--style', 'table'], null],
     [['agentx-sources', '--input', 'a', '--style', 'html'], 'new'],
+    ...['toString', '__proto__', 'unknown'].map((metric) => [
+      ['agentx-sources', '--input', 'a', '--metric', metric],
+      'new',
+    ]),
+    [['agentx-sources', '--input', 'a', '--metric', 'requests', '--metric', 'e2e'], 'new'],
     [['agentx-sources', '--input', 'a', '--style', 'table', '--style', 'chart'], 'new'],
   ]) {
     assert.throws(() => normalizeChartArgs(args, out), { code: 'INVALID_ARGUMENT' });
@@ -258,7 +265,7 @@ test('chart and table styles share statistics and export only the requested pres
     const report = await runCharts(['agentx-sources', '--input', input, '--style', style], out);
     const expected = ['source.json', 'summary.json', 'requests.csv'];
     if (style !== 'table') expected.push('chart.svg');
-    if (style !== 'chart') expected.push('table.md', 'summary.csv');
+    if (style !== 'chart') expected.push('table.svg', 'table.md', 'summary.csv');
     const written = await readdir(out);
     assert.deepEqual(written.sort(), expected.sort());
     assert.deepEqual([...report.artifacts].sort(), expected.sort());
@@ -336,10 +343,11 @@ test('presentation retains tiny positive latencies distinctly from measured zero
   assert.match(table, /srcKind: tiny \| 1 \| 0 \| 0 \| 0\.0004 \|/u);
   assert.match(table, /srcKind: tiny \| 1 \| 0 \| 0 \| 0\.1234 \|/u);
   assert.match(table, /srcKind: zero \| 1 \| 0 \| 0 \| 0 \|/u);
-  const svg = await readFile(join(out, 'chart.svg'), 'utf8');
-  assert.match(svg, /median 0\.0004</u);
-  assert.match(svg, /median 0\.1234</u);
-  assert.match(svg, /median 0</u);
+  const { summary } = summarizeSources(JSON.parse(await readFile(input, 'utf8')));
+  const svg = renderSourceChart(summary, 'ttft');
+  assert.match(svg, /4\.000e-7</u);
+  assert.match(renderSourceChart(summary, 'e2e'), /0\.0001234</u);
+  assert.match(svg, />0</u);
 });
 
 test('invalid and oversized inputs create no output directory', async () => {
@@ -382,9 +390,78 @@ test('actual npm package and installed Codex/Claude skills discover and render t
     assert.equal(report.groups.length, 2);
     assert.match(
       await readFile(join(report.output.directory, 'chart.svg'), 'utf8'),
-      /AgentX requests/u,
+      /AgentX request mix/u,
     );
   }
   assert.ok(suite.packedFiles.includes('skills/inferencex-api/scripts/charts.mjs'));
   assert.ok(suite.packedFiles.includes('skills/inferencex-api/references/chart-templates.md'));
+});
+
+test('default pictures focus on counts; selected metrics use medians with explicit units', async () => {
+  const input = join(root, 'focused.json');
+  await writeFile(
+    input,
+    JSON.stringify(
+      capture([
+        request('one', { end: 2_000_000_000, ttftMs: 500, isl: 200 }),
+        request('one', { end: 4_000_000_000, ttftMs: 1500, isl: 400 }),
+        request('two', { cancelled: true }),
+      ]),
+    ),
+  );
+  const { summary } = summarizeSources(JSON.parse(await readFile(input, 'utf8')));
+  for (const render of [renderSourceChart, renderSourceTable]) {
+    const picture = render(summary);
+    assert.match(picture, /66\.67%/u);
+    assert.ok(!picture.includes('Input length'));
+    assert.ok(!picture.includes('p95'));
+    assert.match(render(summary, 'input-tokens'), />300</u);
+    const latency = render(summary, 'e2e');
+    assert.match(latency, /Median.*seconds/u);
+    assert.match(latency, />3</u);
+    assert.match(latency, /unavailable/u);
+    assert.match(latency, /1 missing\/cancelled observations excluded/u);
+    assert.match(render(summary, 'ttft'), />1</u);
+  }
+  const out = join(root, 'focused-latency');
+  const result = await runCharts(['agentx-sources', '--input', input, '--metric', 'e2e'], out);
+  assert.deepEqual(result.presentation, { metric: 'e2e', style: 'both' });
+  assert.equal(result.groups[0].metrics.e2e_ms.median, 3000);
+  assert.match(await readFile(join(out, 'table.svg'), 'utf8'), /Median \(seconds\)/u);
+  assert.match(await readFile(join(out, 'summary.csv'), 'utf8'), /"e2e_ms","ms"/u);
+});
+
+test('table pictures escape labels and preserve empty, missing and many-source cases', () => {
+  const summary = summarizeSources(capture([request('<script>'), request(undefined)])).summary;
+  const svg = renderSourceTable(summary);
+  assert.ok(!svg.includes('<script>'));
+  assert.match(svg, /&lt;script&gt;/u);
+  assert.match(svg, /source missing/u);
+  assert.match(
+    renderSourceTable(summarizeSources(capture([])).summary),
+    /No requests in the selected phase/u,
+  );
+  const many = summarizeSources(
+    capture(Array.from({ length: 40 }, (_, i) => request(`source-${i}`))),
+  ).summary;
+  for (const render of [renderSourceChart, renderSourceTable]) {
+    const picture = render(many);
+    assert.match(picture, /source-39/u);
+    assert.ok(!picture.includes('NaN'));
+  }
+});
+
+test('picture labels retain their full title inside bounded SVG viewports', () => {
+  const name = 'W'.repeat(100);
+  for (const count of [3, 6, 7]) {
+    const summary = summarizeSources(
+      capture(Array.from({ length: count }, (_, i) => request(`${name}-${i}`))),
+    ).summary;
+    for (const render of [renderSourceChart, renderSourceTable]) {
+      const picture = render(summary);
+      assert.match(picture, /overflow="hidden"/u);
+      assert.ok(picture.includes(`<title>${name}-0</title>`));
+      assert.ok(picture.includes('…'));
+    }
+  }
 });

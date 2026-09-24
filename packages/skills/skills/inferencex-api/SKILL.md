@@ -100,7 +100,8 @@ when a duration is requested, compute and label elapsed or inclusive days.
 - **AgentX charts, tables, or main-agent versus subagent comparison:** run
   `inferencex charts list`, then read [chart and table templates](references/chart-templates.md).
   Render the saved selected-point capture with `charts agentx-sources`, setting
-  `--style` to `chart`, `table` or `both` (the default) for the requested output. Preserve recorded
+  `--style` to `chart`, `table` or `both` (the default). Each image shows one
+  `--metric` (default `requests`); table mode produces `table.svg` with detailed files alongside. Preserve recorded
   source categories, phase scope and missing/cancelled sample counts.
 
 - **Dashboard views or filter parity:** read

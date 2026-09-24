@@ -275,6 +275,12 @@ const UTILITY_OPERATIONS = Object.freeze([
       option('--output-dir', 'path', 'New chart directory; required when rendering.'),
       option('--phase', 'all|profiling|warmup', 'Recorded phase to include.', { default: 'all' }),
       option('--style', 'chart|table|both', 'Presentation outputs to write.', { default: 'both' }),
+      option(
+        '--metric',
+        'requests|input-tokens|output-tokens|e2e|ttft',
+        'One image metric; token/latency images show medians.',
+        { default: 'requests' },
+      ),
       SHARED_OPTIONS.error,
     ]),
     network: null,

@@ -49,7 +49,9 @@ test('both hosts install the general entry and output shortcuts sharing one CLI 
       const instructions = readFileSync(join(shortcut.skill_path, 'SKILL.md'), 'utf8');
       assert.ok(instructions.startsWith(`---\nname: ${name}\n`));
       assert.doesNotMatch(instructions, /disable-model-invocation: true/);
-      const links = [...instructions.matchAll(/\]\((?<path>[^)]+)\)/g)];
+      // Example output paths inside code fences are placeholders, not shipped guide links.
+      const prose = instructions.replaceAll(/```[^\n]*\n[\s\S]*?```/gu, '');
+      const links = [...prose.matchAll(/\]\((?<path>[^)]+)\)/g)];
       assert.ok(links.length > 0);
       for (const [, path] of links)
         assert.ok(readFileSync(resolve(shortcut.skill_path, path)).length);
