@@ -218,6 +218,7 @@ function mountTimeline(
     width?: number;
     overlay?: Parameters<typeof PowerTimeline>[0]['overlayData'];
     unofficial?: Parameters<typeof createMockUnofficialRunContext>[0];
+    activeHwTypes?: readonly string[];
   } = {},
 ) {
   mountWithProviders(
@@ -241,7 +242,7 @@ function mountTimeline(
         selectedSequence: Sequence.EightK_OneK,
         selectedYAxisMetric: 'y_measuredPowerTimeline',
         hardwareConfig: hwConfig,
-        activeHwTypes: new Set(HW_TYPES),
+        activeHwTypes: new Set(options.activeHwTypes ?? HW_TYPES),
         hwTypesWithData: new Set(HW_TYPES),
       },
       unofficial: options.unofficial ?? {},
@@ -253,7 +254,14 @@ const svg = () => cy.get('[data-testid="power-timeline-chart-svg"]');
 
 describe('PowerTimeline', () => {
   beforeEach(() => {
-    writeUrlParams({ i_ptaxis: '', i_ptlines: '', i_ptwindow: '', i_ptfocus: '', i_ptutility: '' });
+    writeUrlParams({
+      i_ptaxis: '',
+      i_ptlines: '',
+      i_ptwindow: '',
+      i_ptfocus: '',
+      i_ptutility: '',
+      i_ptconc: '',
+    });
     readUrlParams();
     cy.on('uncaught:exception', (error) => {
       if (error.message.includes('ResizeObserver loop')) return false;
@@ -618,6 +626,41 @@ describe('PowerTimeline', () => {
     });
   });
 
+  it('gives the run cap to runs the legend shows before runs it hides', () => {
+    // Four H100 runs sort first and would fill the cap, but the legend hides
+    // H100, so the B200 run behind them is fetched and drawn instead.
+    const hiddenRuns = ['30000000001', '30000000002', '30000000003', '30000000004'];
+    const hiddenPoints = hiddenRuns.map((runId, index) =>
+      measuredPoint('h100', 8 * 2 ** index, 600, { run_url: runUrlFor(runId) }),
+    );
+    hiddenRuns.forEach((runId, index) => {
+      cy.intercept('POST', `/api/gpu-metrics?runId=${runId}*`, {
+        body: {
+          runInfo: { ...response.runInfo, id: Number(runId), url: runUrlFor(runId) },
+          series: [series('h100', 8 * 2 ** index, 600)],
+        } satisfies GpuPowerSeriesResponse,
+      }).as(`hidden${index}`);
+    });
+    const shownRun = '30000000005';
+    cy.intercept('POST', `/api/gpu-metrics?runId=${shownRun}*`, {
+      body: {
+        runInfo: { ...response.runInfo, id: Number(shownRun), url: runUrlFor(shownRun) },
+        series: [series('b200', 16, 700)],
+      } satisfies GpuPowerSeriesResponse,
+    }).as('shown');
+    mountTimeline(
+      [...hiddenPoints, measuredPoint('b200', 16, 700, { run_url: runUrlFor(shownRun) })],
+      { activeHwTypes: ['b200', 'gb200'] },
+    );
+    cy.wait(['@shown', '@hidden0', '@hidden1', '@hidden2']);
+    cy.get('@hidden3.all').should('have.length', 0);
+    cy.get('[data-testid="power-timeline-status"]').should(
+      'contain.text',
+      'Telemetry from 1 more run was not loaded',
+    );
+    svg().find('path.power-trace[data-hw="b200"][data-segment="window"]').should('have.length', 1);
+  });
+
   it('reports a failed run and hides traces the legend has switched off', () => {
     cy.intercept('POST', '/api/gpu-metrics*', {
       statusCode: 500,
@@ -860,5 +903,132 @@ describe('PowerTimeline', () => {
       .should('contain.text', 'GPU 池： 预填充 · 4 个 GPU')
       .and('contain.text', '池功耗： 1,200 W')
       .and('contain.text', '池 TDP');
+  });
+  describe('same-load comparison across platforms', () => {
+    // B200 and a disaggregated GB200 deployment both measured at c8, plus a
+    // B200 c64 row that the concurrency filter removes.
+    const rolePoint = () =>
+      disaggPoint(8, 800, {
+        measuredPrefillAvgPower: { y: 900, roof: false },
+        measuredDecodeAvgPower: { y: 700, roof: false },
+      });
+    const points = () => [
+      measuredPoint('b200', 8, 650),
+      measuredPoint('b200', 64, 900),
+      rolePoint(),
+    ];
+    const sameLoadResponse: GpuPowerSeriesResponse = {
+      source: 'database',
+      runInfo: response.runInfo,
+      series: [series('b200', 8, 650), series('b200', 64, 900), poolSeries(8)],
+    };
+    const labels = () =>
+      svg()
+        .find('text.power-trace-label')
+        .then(($labels) => [...$labels].map((label) => label.textContent).toSorted());
+
+    it('filters every platform to one concurrency and names the hardware on each line', () => {
+      cy.intercept('POST', '/api/gpu-metrics*', { body: sameLoadResponse }).as('series');
+      mountTimeline(points());
+      cy.wait('@series');
+      labels().should('deep.equal', ['B200 c64', 'B200 c8', 'GB200 NVL72 c8']);
+      cy.get('[data-testid="power-timeline-concurrency"]').select('c8');
+      labels().should('deep.equal', ['B200 c8', 'GB200 NVL72 c8']);
+      svg().find('path.power-trace[data-segment="window"]').should('have.length', 2);
+      cy.get('[data-testid="power-timeline-summary-trace"]').should('have.length', 2);
+      cy.then(() => expect(new URL(buildShareUrl()).searchParams.get('i_ptconc')).to.eq('8'));
+      cy.get('[data-testid="power-timeline-concurrency"]').select('All');
+      svg().find('path.power-trace[data-segment="window"]').should('have.length', 3);
+      cy.then(() => expect(new URL(buildShareUrl()).searchParams.has('i_ptconc')).to.eq(false));
+    });
+
+    it('restores a shared concurrency and requests only the sources at that load', () => {
+      writeUrlParams({ i_ptconc: '8' });
+      cy.intercept('POST', '/api/gpu-metrics*', { body: sameLoadResponse }).as('series');
+      mountTimeline(points());
+      cy.wait('@series').then(({ request }) => {
+        expect(request.body.sources).to.deep.equal(
+          [`power_validation_${resultName('b200', 8)}.json`, disaggSource(8)].toSorted(),
+        );
+      });
+      cy.get('[data-testid="power-timeline-concurrency"]').should('have.value', '8');
+    });
+
+    it('summarises each pool beside its validated average, drawn peak and pool TDP', () => {
+      writeUrlParams({ i_ptconc: '8' });
+      cy.intercept('POST', '/api/gpu-metrics*', { body: sameLoadResponse }).as('series');
+      mountTimeline(points());
+      cy.wait('@series');
+      const trace = () =>
+        cy.get(
+          `[data-testid="power-timeline-summary-trace"][data-trace="${traceKeyForPoint(rolePoint())}"]`,
+        );
+      const cells = (role: string) =>
+        trace()
+          .find(`[data-testid="power-timeline-summary-${role}"] td`)
+          .then(($cells) => [...$cells].map((cell) => cell.textContent));
+      trace()
+        .should('contain.text', 'GB200 NVL72')
+        .and('contain.text', `run ${RUN_ID}`)
+        .and('contain.text', `${disaggSource(8)} · database`);
+      // Window 40–60 s: prefill 900–903 W on four GPUs, decode 704–707 W on four,
+      // beside the rows' validated averages and pool size × rated TDP.
+      // The first pool row also carries the run cell (checked above).
+      const poolTdp = (gpus: number) => (gpus * GB200_TDP).toLocaleString('en-US');
+      cells('all')
+        .then((values) => values.slice(1))
+        .should('deep.equal', ['20', 'All GPUs · 8', '800', '6,428', poolTdp(8)]);
+      cells('prefill').should('deep.equal', ['Prefill · 4', '900', '3,606', poolTdp(4)]);
+      cells('decode').should('deep.equal', ['Decode · 4', '700', '2,822', poolTdp(4)]);
+      cy.get('[data-testid="power-timeline-summary"]').should('contain.text', 'not recomputed');
+    });
+
+    it('marks overlay traces in the summary with their run colour', () => {
+      const overlayPoint = measuredPoint('h200', 16, 500, { run_url: OVERLAY_RUN_URL });
+      cy.intercept('POST', `/api/gpu-metrics?runId=${RUN_ID}*`, { body: response }).as('official');
+      cy.intercept('POST', `/api/gpu-metrics?runId=${OVERLAY_RUN_ID}*`, {
+        body: overlayResponse([series('h200', 16, 500)]),
+      }).as('overlay');
+      mountTimeline([measuredPoint('b200', 16, 700)], {
+        overlay: overlayData([overlayPoint]),
+        unofficial: createMockUnofficialRunContext(overlayRun('h200')),
+      });
+      cy.wait(['@official', '@overlay']);
+      cy.get(
+        `[data-testid="power-timeline-summary-trace"][data-trace="${traceKeyForPoint(overlayPoint)}"]`,
+      )
+        .should('contain.text', 'unofficial')
+        .find('th > span')
+        .first()
+        .should('have.attr', 'style')
+        .and('contain', overlayRunColor(0));
+    });
+
+    it('translates the concurrency filter and summary on /zh', () => {
+      writeUrlParams({ i_ptconc: '8' });
+      cy.intercept('POST', '/api/gpu-metrics*', { body: sameLoadResponse }).as('series');
+      mountTimeline(points(), { pathname: '/zh/inference' });
+      cy.wait('@series');
+      cy.get('[data-testid="power-timeline-toolbar"]').should('contain.text', '并发数');
+      cy.get('[data-testid="power-timeline-summary"]')
+        .should('contain.text', '有效测量窗口汇总')
+        .and('contain.text', '预填充 · 4')
+        .and('contain.text', '数据库');
+    });
+
+    it('keeps the summary table inside its scroller on mobile', () => {
+      cy.viewport(390, 844);
+      writeUrlParams({ i_ptconc: '8' });
+      cy.intercept('POST', '/api/gpu-metrics*', { body: sameLoadResponse }).as('series');
+      mountTimeline(points(), { width: 324 });
+      cy.wait('@series');
+      cy.get('[data-testid="power-timeline-summary"]').should('be.visible');
+      cy.document().should((doc) => {
+        expect(doc.documentElement.scrollWidth).to.be.at.most(doc.documentElement.clientWidth + 1);
+      });
+      cy.get('[data-testid="power-timeline"]').screenshot('power-timeline-same-load-mobile', {
+        overwrite: true,
+      });
+    });
   });
 });

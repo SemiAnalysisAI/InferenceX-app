@@ -60,6 +60,7 @@ import {
 } from '../InferenceContext';
 import type { InferenceData, OverlayData } from '../types';
 import { powerVariantDash } from '../utils/power-compare';
+import PowerTimelineSummary from './PowerTimelineSummary';
 import {
   allGpuPool,
   consumePowerTraceFocus,
@@ -72,6 +73,7 @@ import {
   prioritizeRun,
   prioritizeRuns,
   referenceLabelSlots,
+  stackTraceLabels,
   runIdFromUrl,
   traceConfigLabel,
   traceKeyRunId,
@@ -103,6 +105,8 @@ const MARGIN = { top: 24, right: 84, bottom: 60, left: 64 };
 const STRINGS = {
   en: {
     timeAxis: 'Time axis',
+    concurrency: 'Concurrency',
+    allConcurrencies: 'All',
     wall: 'Wall clock (UTC)',
     elapsed: 'Since telemetry start',
     serving: 'Since serving start',
@@ -184,6 +188,8 @@ const STRINGS = {
   },
   zh: {
     timeAxis: '时间轴',
+    concurrency: '并发数',
+    allConcurrencies: '全部',
     wall: '实际时刻（UTC）',
     elapsed: '距遥测起点',
     serving: '距服务窗口起点',
@@ -371,8 +377,19 @@ const formatUtcDate = d3.utcFormat('%Y-%m-%d');
 /** Pool sums run to thousands of watts; group the digits. */
 const formatWatts = d3.format(',.0f');
 
+/** Rough advance of one label character at the data-label size. */
+const LABEL_CHAR_WIDTH = 6.5;
+
 function baseHardware(hwKey: string): string {
   return hwKey.split('_')[0];
+}
+
+function runIdsOf(points: readonly InferenceData[]): Set<string> {
+  return new Set(
+    points
+      .map((point) => runIdFromUrl(point.run_url))
+      .filter((runId): runId is string => runId !== null),
+  );
 }
 
 /**
@@ -621,17 +638,25 @@ function drawLabels(
     .attr('data-pool', (label) => label.pool ?? null)
     .attr('fill', (label) => label.color)
     .attr('opacity', (label) => labelOpacity(label, highlight))
-    .text((label) => label.text)
-    .each(function (label) {
-      const x = xScale(label.x);
-      const y = yScale(label.y);
-      // Sit just past the last sample; flip inside the plot near the right edge.
-      const overflow = x + 6 + label.text.length * 6.5 > plotWidth;
-      d3.select(this)
-        .attr('text-anchor', overflow ? 'end' : 'start')
-        .attr('x', overflow ? x - 6 : x + 6)
-        .attr('y', y);
-    });
+    .text((label) => label.text);
+  // Sit just past the last sample; flip inside the plot near the right edge.
+  const boxes = model.labels.map((label) => {
+    const x = xScale(label.x);
+    const width = label.text.length * LABEL_CHAR_WIDTH;
+    const flip = x + 6 + width > plotWidth;
+    const left = flip ? x - 6 - width : x + 6;
+    return { flip, left, right: left + width, y: yScale(label.y) };
+  });
+  const rows = stackTraceLabels(boxes, CHART_TYPE.dataLabel + 2);
+  const byId = new Map(model.labels.map((label, index) => [label.id, index]));
+  group.selectAll<SVGTextElement, TraceLabel>('text.power-trace-label').each(function (label) {
+    const index = byId.get(label.id)!;
+    const box = boxes[index];
+    d3.select(this)
+      .attr('text-anchor', box.flip ? 'end' : 'start')
+      .attr('x', box.flip ? box.right : box.left)
+      .attr('y', rows[index]);
+  });
 }
 
 function drawReferenceLines(
@@ -727,6 +752,7 @@ export default function PowerTimeline({
       i_ptwindow: getUrlParam('i_ptwindow'),
       i_ptfocus: getUrlParam('i_ptfocus'),
       i_ptutility: getUrlParam('i_ptutility'),
+      i_ptconc: getUrlParam('i_ptconc'),
     }),
   );
   const [xModeChoice, setXModeChoice] = useState<XMode | null>(initialView.axis);
@@ -738,6 +764,15 @@ export default function PowerTimeline({
   const [focusKey, setFocusKey] = useState<string | null>(initialView.focus);
   /** The deep-link request, read once on mount; `undefined` until read, `null` once honoured. */
   const requestedFocusRef = useRef<string | null | undefined>(undefined);
+  // The deep-link request is read once, before planning, so its run is fetched
+  // even when the chart spans more runs than the cap.
+  if (requestedFocusRef.current === undefined) {
+    requestedFocusRef.current = consumePowerTraceFocus();
+  }
+  /** One load across hardware (e.g. GB200 and GB300 at c4); a deep link names its own trace. */
+  const [concurrency, setConcurrency] = useState<number | null>(() =>
+    requestedFocusRef.current ? null : initialView.concurrency,
+  );
 
   // The chart's point list still carries every precision, quick-filtered rows
   // and rows without a validated average (ScatterGraph applies those gates at
@@ -756,9 +791,20 @@ export default function PowerTimeline({
     [overlayData, plotsHere],
   );
   const overlayPointSet = useMemo(() => new Set<InferenceData>(overlayPoints), [overlayPoints]);
-  const allPoints = useMemo(
-    () => [...measuredData, ...overlayPoints],
+  const concurrencyOptions = useMemo(
+    () =>
+      [...new Set([...measuredData, ...overlayPoints].map((point) => point.conc))]
+        .filter((conc) => Number.isSafeInteger(conc) && conc > 0)
+        .toSorted((a, b) => a - b),
     [measuredData, overlayPoints],
+  );
+  // Filtering before planning keeps the run cap for the runs that hold this load.
+  const allPoints = useMemo(
+    () =>
+      [...measuredData, ...overlayPoints].filter(
+        (point) => concurrency === null || point.conc === concurrency,
+      ),
+    [measuredData, overlayPoints, concurrency],
   );
 
   const hwKeysInData = useMemo(
@@ -778,30 +824,30 @@ export default function PowerTimeline({
   });
 
   const requests = useMemo(() => planPowerTimelineRequests(allPoints), [allPoints]);
-  // The deep-link request is read once, before planning, so its run is fetched
-  // even when the chart spans more runs than the cap.
-  if (requestedFocusRef.current === undefined) {
-    requestedFocusRef.current = consumePowerTraceFocus();
-  }
   const focusRun = traceKeyRunId(requestedFocusRef.current ?? focusKey);
-  // Overlay runs were requested explicitly (`?unofficialrun=`), so they take
-  // the cap's slots before official runs; the deep-linked run still goes first.
-  const overlayRunIds = useMemo(
-    () =>
-      new Set(
-        overlayPoints
-          .map((point) => runIdFromUrl(point.run_url))
-          .filter((runId): runId is string => runId !== null),
-      ),
-    [overlayPoints],
+  // Same visibility source as ScatterGraph: an overlay session may hold a
+  // local official selection that has not been written back to the filters.
+  const officialHwTypes = localOfficialOverride ?? activeHwTypes;
+  const isShown = useCallback(
+    (point: InferenceData) =>
+      overlayPointSet.has(point)
+        ? activeOverlayHwTypes.has(point.hwKey)
+        : officialHwTypes.has(point.hwKey),
+    [overlayPointSet, activeOverlayHwTypes, officialHwTypes],
   );
+  // Overlay runs were requested explicitly (`?unofficialrun=`), so they take
+  // the cap's slots before official runs; runs the legend shows go before runs
+  // it hides entirely, so hiding hardware makes room for the pair compared.
+  // The deep-linked run still goes first.
+  const overlayRunIds = useMemo(() => runIdsOf(overlayPoints), [overlayPoints]);
+  const shownRunIds = useMemo(() => runIdsOf(allPoints.filter(isShown)), [allPoints, isShown]);
   const fetchedRequests = useMemo(
     () =>
-      prioritizeRun(prioritizeRuns(requests, overlayRunIds), focusRun).slice(
-        0,
-        POWER_TIMELINE_MAX_RUNS,
-      ),
-    [requests, overlayRunIds, focusRun],
+      prioritizeRun(
+        prioritizeRuns(prioritizeRuns(requests, overlayRunIds), shownRunIds),
+        focusRun,
+      ).slice(0, POWER_TIMELINE_MAX_RUNS),
+    [requests, overlayRunIds, shownRunIds, focusRun],
   );
   const droppedRuns = requests.length - fetchedRequests.length;
   const queries = useQueries({
@@ -868,9 +914,6 @@ export default function PowerTimeline({
     },
     [overlayPointSet, runIndexByUrl, getCssColor, resolveColor],
   );
-  // Same visibility source as ScatterGraph: an overlay session may hold a
-  // local official selection that has not been written back to the filters.
-  const officialHwTypes = localOfficialOverride ?? activeHwTypes;
   // With an overlay loaded the chart reads localOfficialOverride, so a legend
   // click must write the unified selection the way ScatterGraph does; the
   // context's toggleHwType would change activeHwTypes with no visible effect.
@@ -898,13 +941,8 @@ export default function PowerTimeline({
     ],
   );
   const visibleTraces = useMemo(
-    () =>
-      traces.filter((trace) =>
-        overlayPointSet.has(trace.point)
-          ? activeOverlayHwTypes.has(trace.point.hwKey)
-          : officialHwTypes.has(trace.point.hwKey),
-      ),
-    [traces, overlayPointSet, activeOverlayHwTypes, officialHwTypes],
+    () => traces.filter((trace) => isShown(trace.point)),
+    [traces, isShown],
   );
   // Focus follows visibility: hiding the focused hardware in the legend lifts
   // the dimming and the chip instead of dimming everything with nothing lit.
@@ -933,17 +971,35 @@ export default function PowerTimeline({
       i_ptwindow: windowOnly ? 'window' : '',
       i_ptfocus: focusKey ?? '',
       i_ptutility: showUtility ? '1' : '',
+      i_ptconc: concurrency === null ? '' : String(concurrency),
     });
-  }, [xModeChoice, lineMode, windowOnly, focusKey, showUtility, setUrlParams]);
+  }, [xModeChoice, lineMode, windowOnly, focusKey, showUtility, concurrency, setUrlParams]);
 
   const missingWindows =
     windowOnly || xMode === 'serving'
       ? visibleTraces.filter((trace) => !hasPowerTimelineWindow(trace)).length
       : 0;
 
+  const hardwareLabel = useCallback(
+    (point: InferenceData): string => {
+      const config = overlayPointSet.has(point)
+        ? overlayData?.hardwareConfig[point.hwKey]
+        : hardwareConfig[point.hwKey];
+      return config ? getDisplayLabel(config) : point.hwKey;
+    },
+    [overlayPointSet, overlayData, hardwareConfig],
+  );
+
   const model = useMemo<DrawModel>(() => {
     const paths: TracePath[] = [];
     const labels: TraceLabel[] = [];
+    // Two platforms at one load share `c4`; name the hardware so the end labels differ.
+    const bases = new Set(visibleTraces.map((trace) => baseHardware(trace.point.hwKey)));
+    const hardwarePrefix = (trace: PowerTimelineTrace) => {
+      if (bases.size < 2) return '';
+      const base = baseHardware(trace.point.hwKey);
+      return `${HW_REGISTRY[base]?.label ?? base.toUpperCase()} `;
+    };
     for (const trace of visibleTraces) {
       const { color, overlayIndex } = colorForTrace(trace);
       const tracePathSet = tracePaths(trace, color, overlayIndex, xMode, lineMode, windowOnly);
@@ -969,9 +1025,11 @@ export default function PowerTimeline({
           hwKey: trace.point.hwKey,
           pool: group.pool,
           color,
-          text: group.pool
-            ? `c${trace.point.conc} · ${t.poolShort[group.pool]}`
-            : `c${trace.point.conc}`,
+          text: `${hardwarePrefix(trace)}${
+            group.pool
+              ? `c${trace.point.conc} · ${t.poolShort[group.pool]}`
+              : `c${trace.point.conc}`
+          }`,
           x: last.x,
           y: last.y,
         });
@@ -1170,16 +1228,6 @@ export default function PowerTimeline({
         .attr('opacity', (label) => labelOpacity(label, activeHighlight));
     },
     [activeHighlight],
-  );
-
-  const hardwareLabel = useCallback(
-    (point: InferenceData): string => {
-      const config = overlayPointSet.has(point)
-        ? overlayData?.hardwareConfig[point.hwKey]
-        : hardwareConfig[point.hwKey];
-      return config ? getDisplayLabel(config) : point.hwKey;
-    },
-    [overlayPointSet, overlayData, hardwareConfig],
   );
 
   const tooltipContent = useCallback(
@@ -1383,6 +1431,27 @@ export default function PowerTimeline({
       className="flex flex-wrap items-center justify-end gap-2 pb-1"
       data-testid="power-timeline-toolbar"
     >
+      <label className="flex items-center gap-2 text-xs text-muted-foreground">
+        {t.concurrency}
+        <select
+          className="rounded-md border bg-background px-2 py-1 text-xs text-foreground"
+          data-testid="power-timeline-concurrency"
+          value={concurrency ?? ''}
+          onChange={(event) => {
+            const value = event.target.value === '' ? null : Number(event.target.value);
+            setConcurrency(value);
+            track('inference_power_timeline_concurrency_changed', { concurrency: value });
+          }}
+        >
+          <option value="">{t.allConcurrencies}</option>
+          {concurrency !== null && !concurrencyOptions.includes(concurrency) && (
+            <option value={concurrency}>{`c${concurrency}`}</option>
+          )}
+          {concurrencyOptions.map((conc) => (
+            <option key={conc} value={conc}>{`c${conc}`}</option>
+          ))}
+        </select>
+      </label>
       <span className="text-xs text-muted-foreground">{t.timeAxis}</span>
       <SegmentedToggle<XMode>
         value={xMode}
@@ -1545,6 +1614,15 @@ export default function PowerTimeline({
         <p>{windowOnly ? t.methodWindow : t.method}</p>
         {hasPools && <p>{t.methodPools}</p>}
       </div>
+      {loadingRuns === 0 && visibleTraces.length > 0 && (
+        <PowerTimelineSummary
+          traces={visibleTraces}
+          responses={responses}
+          colorOf={(trace) => colorForTrace(trace).color}
+          hardwareLabel={hardwareLabel}
+          isOverlay={(point) => overlayPointSet.has(point)}
+        />
+      )}
     </div>
   );
 }

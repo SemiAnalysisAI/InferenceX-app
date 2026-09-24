@@ -76,6 +76,8 @@ const URL_STATE_KEYS = [
   'i_ptwindow',
   'i_ptfocus',
   'i_ptutility',
+  // Power Timeline concurrency filter: one positive integer, empty = every load.
+  'i_ptconc',
   // Completed Perf Rulers on the primary inference chart: `isoX|curveA|curveB`
   // entries joined by `;` (see serializePerfRulers in d3-chart/layers/perf-ruler).
   'i_rulers',
@@ -209,6 +211,7 @@ export const PARAM_DEFAULTS: Record<UrlStateKey, string> = {
   i_ptwindow: '',
   i_ptfocus: '',
   i_ptutility: '',
+  i_ptconc: '',
   i_rulers: '',
   i_pcompare: '',
   i_overview_current: '',

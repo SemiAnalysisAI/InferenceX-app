@@ -17,7 +17,10 @@ import {
   prioritizeRuns,
   referenceLabelSlots,
   requestPowerTraceFocus,
+  runAttemptFromUrl,
   runIdFromUrl,
+  stackTraceLabels,
+  summarizeTraceWindow,
   telemetryArtifactForPoint,
   traceConfigLabel,
   traceKeyForPoint,
@@ -83,6 +86,7 @@ describe('shared timeline view', () => {
         i_ptwindow: 'window',
         i_ptfocus: trace.key,
         i_ptutility: '1',
+        i_ptconc: '4',
       }),
     ).toEqual({
       axis: 'serving',
@@ -90,6 +94,7 @@ describe('shared timeline view', () => {
       windowOnly: true,
       focus: trace.key,
       utility: true,
+      concurrency: 4,
     });
     expect(parsePowerTimelineParams({ i_ptlines: 'gpu', i_ptfocus: trace.key }).lines).toBe('gpu');
   });
@@ -102,8 +107,19 @@ describe('shared timeline view', () => {
         i_ptwindow: 'all',
         i_ptfocus: 'not-a-run:../../../secret',
         i_ptutility: 'true',
+        i_ptconc: '0',
       }),
-    ).toEqual({ axis: null, lines: 'mean', windowOnly: false, focus: null, utility: false });
+    ).toEqual({
+      axis: null,
+      lines: 'mean',
+      windowOnly: false,
+      focus: null,
+      utility: false,
+      concurrency: null,
+    });
+    for (const i_ptconc of ['-4', '4.5', 'c4', '1e3', '01']) {
+      expect(parsePowerTimelineParams({ i_ptconc }).concurrency).toBeNull();
+    }
   });
 
   it('uses the retained serving origin, distinct from telemetry origin', () => {
@@ -131,6 +147,68 @@ describe('shared timeline view', () => {
     expect(powerTimelineSampleX(invalid, 1, 'elapsed', true)).toBeNull();
     expect(powerTimelineSampleX(invalid, 1, 'elapsed', false)).toBe(1);
     expect(windowPhase(invalid, 103_000)).toBe('unknown');
+  });
+});
+
+describe('summarizeTraceWindow', () => {
+  // Two prefill and two decode GPUs; the window holds buckets 1–3 (t = 11..13 s).
+  const pooled: PowerTimelineTrace = {
+    key: `34716669498:${NAME_B}`,
+    point: point({ disagg: true, conc: 4 }),
+    runId: '34716669498',
+    series: {
+      artifact: `power_audit_${NAME_B}`,
+      startMs: 1_000_000,
+      bucketSeconds: 1,
+      gpus: [0, 1, 2, 3],
+      t: [10, 11, 12, 13, 14],
+      power: [
+        [900, 250, 260, 270, 900],
+        [900, 250, null, 270, 900],
+        [900, 400, 410, 420, 900],
+        [900, 400, 410, 420, 900],
+      ],
+      devices: [
+        { id: 'a/0', role: 'prefill' },
+        { id: 'a/1', role: 'prefill' },
+        { id: 'b/0', role: 'decode' },
+        { id: 'b/1', role: 'decode' },
+      ],
+    },
+    windowStartMs: 1_011_000,
+    windowEndMs: 1_013_500,
+  };
+
+  it('reports window length and each pool’s peak summed bucket inside the window', () => {
+    const summary = summarizeTraceWindow(pooled, tracePools(pooled.series));
+    expect(summary.windowSeconds).toBe(2.5);
+    expect(summary.bucketSeconds).toBe(1);
+    // The 900 W buckets sit outside the window; bucket 2 lacks one prefill GPU,
+    // so it is a gap, not a 260 W dip.
+    expect(summary.pools).toEqual([
+      { role: 'prefill', gpuCount: 2, peakWatts: 540 },
+      { role: 'decode', gpuCount: 2, peakWatts: 840 },
+    ]);
+  });
+
+  it('summarizes every GPU as one pool and reports nothing without window bounds', () => {
+    const all = summarizeTraceWindow(pooled, [allGpuPool(pooled.series)]);
+    expect(all.pools).toEqual([{ role: 'all', gpuCount: 4, peakWatts: 1380 }]);
+    const unbounded = summarizeTraceWindow(
+      { ...pooled, windowStartMs: null, windowEndMs: null },
+      tracePools(pooled.series),
+    );
+    expect(unbounded.windowSeconds).toBeNull();
+    expect(unbounded.pools.map((pool) => pool.peakWatts)).toEqual([null, null]);
+  });
+});
+
+describe('runAttemptFromUrl', () => {
+  it('reads the attempt only from an explicit attempts segment', () => {
+    expect(runAttemptFromUrl(`${RUN_URL}/attempts/2`)).toBe(2);
+    expect(runAttemptFromUrl(RUN_URL)).toBeNull();
+    expect(runAttemptFromUrl(undefined)).toBeNull();
+    expect(runIdFromUrl(`${RUN_URL}/attempts/2`)).toBe('34716669498');
   });
 });
 
@@ -468,6 +546,23 @@ describe('groupPoolsBySize', () => {
       { size: 6, roles: ['prefill'] },
     ]);
     expect(groupPoolsBySize([])).toEqual([]);
+  });
+});
+
+describe('stackTraceLabels', () => {
+  it('moves overlapping labels one row below the label above and leaves clear ones', () => {
+    expect(
+      stackTraceLabels(
+        [
+          { left: 100, right: 200, y: 600 },
+          { left: 150, right: 260, y: 604 },
+          { left: 120, right: 220, y: 598 },
+          { left: 300, right: 380, y: 600 },
+          { left: 100, right: 200, y: 300 },
+        ],
+        12,
+      ),
+    ).toEqual([610, 622, 598, 600, 300]);
   });
 });
 
