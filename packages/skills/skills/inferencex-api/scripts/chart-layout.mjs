@@ -99,12 +99,14 @@ export function fitText(value, maxWidth, size, weight = 400, maxLines = 1) {
   return { lines: [...kept, middleEllipsis(rest, maxWidth, size, weight)], truncated: true };
 }
 
+const round3 = (value) => Number(value.toPrecision(3));
+
 // Three significant digits without exponents; `keep` retains trailing zeros so
 // neighboring values align (13.0 s beside 8.12 s).
 function significant(value, keep = false) {
-  if (value >= 1000) return Math.round(value).toLocaleString('en-US');
-  const text = value.toPrecision(3);
-  return keep ? text : String(Number(text));
+  const rounded = round3(value);
+  if (rounded >= 1000) return Math.round(value).toLocaleString('en-US');
+  return keep ? rounded.toPrecision(3) : String(rounded);
 }
 
 export const format = {
@@ -116,22 +118,26 @@ export const format = {
     if (fraction < 1 && fraction > 0.9995) return '>99.9%';
     return `${(fraction * 100).toFixed(1)}%`;
   },
-  // Compact magnitude with three significant digits; zero stays zero.
+  // Compact magnitude with three significant digits; the unit follows the rounded
+  // value, so 999,500 reads 1.00M. Zero stays zero.
   quantity: (value) => {
     if (value === null) return '—';
-    if (value >= 1e6) return `${significant(value / 1e6, true)}M`;
-    if (value >= 1e4) return `${significant(value / 1e3, true)}K`;
+    const shown = round3(value);
+    if (shown >= 1e6) return `${significant(shown / 1e6, true)}M`;
+    if (value >= 1e4) return `${significant(shown / 1e3, true)}K`;
     if (value >= 100) return Math.round(value).toLocaleString('en-US');
     return value === 0 ? '0' : significant(value);
   },
-  // Milliseconds in the largest readable unit; tiny positives never round to zero.
+  // Milliseconds in the largest readable unit, chosen after rounding so 999.6 ms
+  // reads 1.00 s; tiny positives never round to zero.
   duration: (ms) => {
     if (ms === null) return '—';
     if (ms === 0) return '0 ms';
+    const shown = round3(ms);
     if (ms >= 1e7) return `${significant(ms / 60_000, true)} min`;
-    if (ms >= 1000) return `${significant(ms / 1000, true)} s`;
-    if (ms >= 1) return `${significant(ms, true)} ms`;
-    if (ms >= 1e-6) return `${significant(ms * 1000, true)} µs`;
+    if (shown >= 1000) return `${significant(shown / 1000, true)} s`;
+    if (shown >= 1) return `${significant(shown, true)} ms`;
+    if (ms >= 1e-6) return `${significant(shown * 1000, true)} µs`;
     return '<0.001 µs';
   },
 };

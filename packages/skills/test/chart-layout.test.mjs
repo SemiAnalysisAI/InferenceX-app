@@ -127,6 +127,24 @@ test('numbers keep three significant digits, readable units and explicit gaps', 
   assert.equal(format.duration(20_000_000), '333 min');
 });
 
+test('values that round up to 1000 move to the next unit, never to exponent notation', () => {
+  assert.equal(format.duration(999.5), '1.00 s');
+  assert.equal(format.duration(999.6), '1.00 s');
+  assert.equal(format.duration(999.4), '999 ms');
+  assert.equal(format.duration(0.9996), '1.00 ms');
+  assert.equal(format.duration(999_600), '1,000 s');
+  assert.equal(format.quantity(999_500), '1.00M');
+  assert.equal(format.quantity(999_499), '999K');
+  assert.equal(format.quantity(1e9), '1,000M');
+  for (const boundary of [1e-3, 1, 1e3, 1e4, 1e6, 1e7, 6e7, 1e9, 1e10]) {
+    for (const scale of [0.9994, 0.9995, 0.9996, 0.99999, 1]) {
+      const value = boundary * scale;
+      for (const text of [format.duration(value), format.quantity(value), format.count(value)])
+        assert.doesNotMatch(text, /e[+-]/u, `${value} → ${text}`);
+    }
+  }
+});
+
 test('labels and titles are escaped once in the SVG', () => {
   const drawing = chart([row('<b>&"x"', 3), row('ok', 2)]);
   assert.ok(!drawing.svg.includes('<b>'));
