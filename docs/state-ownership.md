@@ -114,7 +114,7 @@ Axis and presentation state:
 
 - selected x-axis and y-axis metrics, percentile, and effective x-axis mode
 - the Measured controls (Boundary / Per / Scope / Statistic / Display / Unit) own no state: `measured-metric-config.ts` resolves each selection to the nearest registered metric key and writes it back to `selectedYAxisMetric`, so the power boundary rides on `i_metric` (there is deliberately no `i_pbasis`; see [PowerX Permanent View](./powerx-permanent-view.md))
-- the Measured Power Display value `timeline` (`y_measuredPowerTimeline`) swaps the chart body for `PowerTimeline`; its axis mode, line mode, window-only display, focused trace and all-in reference switch are component state that `PowerTimeline` itself reads and writes through `useUrlState` as `i_ptaxis` / `i_ptlines` / `i_ptwindow` / `i_ptfocus` / `i_ptutility`, so they never pass through the display domain
+- the Measured Power Display value `timeline` (`y_measuredPowerTimeline`) swaps the chart body for `PowerTimeline`; its axis mode, line mode, window-only display, focused trace, all-in reference switch and concurrency filter are component state that `PowerTimeline` itself reads and writes through `useUrlState` as `i_ptaxis` / `i_ptlines` / `i_ptwindow` / `i_ptfocus` / `i_ptutility` / `i_ptconc`, so they never pass through the display domain
 - token-revenue price source (`i_revenue`): normalized uncached/cached/output pricing or the selected model's live OpenRouter catalog prices
 - scale, optimal-point, label, contrast, legend, and overlay controls
 

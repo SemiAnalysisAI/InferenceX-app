@@ -211,8 +211,10 @@ config is `display: 'timeline'`.
 
 - **Fetch.** One request per workflow run in the visible points
   (`planPowerTimelineRequests`, at most `POWER_TIMELINE_MAX_RUNS`; a deep-linked trace's run
-  goes first, then `?unofficialrun=` overlay runs, then official runs — `prioritizeRun` /
-  `prioritizeRuns` — so an overlay the user asked for is never the run that gets dropped),
+  goes first, then runs holding a point the legend shows (`?unofficialrun=` overlay runs before
+  official ones), then runs whose points are all hidden — `prioritizeRun` / `prioritizeRuns` — so
+  an overlay the user asked for, or a pair left visible for comparison, is never the run that gets
+  dropped),
   narrowed with
   `prefix=` to the common RESULT_FILENAME prefix so a nightly sweep's other models are not
   downloaded. `/api/gpu-metrics?series=power` first uses persisted telemetry and returns one-second per-GPU buckets
@@ -240,7 +242,8 @@ config is `display: 'timeline'`.
   the all-in provisioned line is an opt-in legend switch because it halves the traces'
   vertical resolution. X axis: wall clock (UTC) when the visible traces come from one run,
   otherwise seconds since each trace's start; both are a toolbar toggle. `c<conc>` labels sit
-  at the end of the emphasized segment.
+  at the end of the emphasized segment; labels that would overprint stack one row apart
+  (`stackTraceLabels`).
 - **Pools (Figure 1).** The legend switch _Prefill / decode pools_ (shown when a visible
   trace carries worker roles) sums the board power of each role's GPUs
   (`tracePools` / `sumPowerAt`) and draws one line per pool — prefill dashed `7 3`, decode
@@ -263,9 +266,20 @@ config is `display: 'timeline'`.
   the current page with `i_metric=y_measuredPowerTimeline` only, so open-in-new-tab lands on
   the unfocused timeline; once the focus is applied it is written to `i_ptfocus` like the other
   timeline settings.
+- **Same load across platforms.** The toolbar _Concurrency_ select (`i_ptconc`, default all)
+  keeps the chart's rows at one load, so, for example, GB200 and GB300 prefill/decode pools draw
+  side by side; `i_ptaxis=serving` aligns them at each validated window's start. With two or
+  more hardware types visible, every line label leads with the hardware label. A deep link
+  resets the filter so the focused trace is never filtered out.
+- **Validated-window summary.** `ui/PowerTimelineSummary.tsx` lists each drawn trace's
+  hardware and config, run link, attempt, validation file, per-run telemetry source
+  (`database`, or `GitHub artifact fallback` when `/api/gpu-metrics` read any requested series
+  live) and window length. Per pool (all GPUs, prefill, decode) it shows the GPU count, the
+  row's validated average W/GPU as stored, the largest drawn 1-s pool sum inside the window
+  (`summarizeTraceWindow`) and pool TDP = GPUs × `HW_REGISTRY.tdp`. No average is recomputed.
 - **State.** Axis mode (`i_ptaxis`), line mode (`i_ptlines`: mean / `gpu` / `pool`), window-only
-  display (`i_ptwindow`), the focused trace (`i_ptfocus`) and the all-in switch (`i_ptutility`)
-  are `PowerTimeline` component state mirrored into the URL by the component itself
+  display (`i_ptwindow`), the focused trace (`i_ptfocus`), the all-in switch (`i_ptutility`) and
+  the concurrency filter (`i_ptconc`) are `PowerTimeline` component state mirrored into the URL by the component itself
   (`parsePowerTimelineParams` on mount, `setUrlParams` on change); defaults serialize as `''`.
   Hover highlight is never shared. See
   [Dashboard read-only views](./dashboard-readonly-views.md) for the renderer-only status of
@@ -274,8 +288,46 @@ config is `display: 'timeline'`.
   `inference_power_timeline_axis_changed { mode }`,
   `inference_power_timeline_lines_changed { lines: 'mean' | 'gpu' | 'pool' }`,
   `inference_power_timeline_utility_toggled { enabled }`,
+  `inference_power_timeline_concurrency_changed { concurrency }`,
   `inference_power_trace_opened { hwKey, conc, overlay }` (scatter tooltip action),
   `inference_power_timeline_focus_cleared`.
+
+## Analysis panels (article figures 6–16)
+
+Figure numbers here follow the current article draft; the share-link table above predates its
+renumbering. Below the measured chart, `ui/PowerServiceComparison.tsx` offers three opt-in
+panels, and the scatter chart adds a fourth. All read the chart's scoped observed points
+(`observedPoints`: official and `?unofficialrun=` rows, comparison clones excluded), keep one
+source per exact run and recipe (`equalServiceSourceKey`), and colour overlay sources with
+`overlayRunColor`.
+
+| Figures      | Panel                                                                                                                                         | Switch (share param)                                                                                    | Helper                                                 |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| 6 / 7 / 9    | Same-concurrency table: baseline and comparator J/output token, W/GPU and streaming speed, with % change                                      | _Compare at the same speed / latency_ (`i_servicecompare=1`, sources `i_servicebase` / `i_servicepeer`) | `utils/matched-concurrency.ts`                         |
+| 12 / 13 / 14 | Role group: W/GPU by role, role-local J/input and J/output (not added), J/output token by role with the total, prefill share                  | _Prefill / decode roles_ (`i_roleshare=1`)                                                              | `getRolePoints` in `utils/equal-service-comparison.ts` |
+| 15           | Least-squares fit of mean W/GPU against output tok/s per allocated GPU: points, line, dashed extension to zero, P₀, P₀ ÷ TDP, m, R², n, range | _Power vs output-rate fit_ (`i_powerfit=1`)                                                             | `utils/power-fit.ts`                                   |
+| 16           | Frontier points: the drawn cross-platform frontier, its competing scope, points per hardware, and each point's run and attempt                | Legend _Pareto frontier_ (`i_frontier`) on a measured metric                                            | `utils/frontier-points.ts`                             |
+
+- **Same concurrency** pairs only observations; nothing is interpolated. A side missing at a
+  load reads _Not measured_. Disagreeing duplicates of one source read as ambiguous, with none
+  chosen. % change needs both sides. Same load usually means different speed, so the table
+  sits beside the equal-service comparison, not in place of it.
+- **Roles** use validated disaggregated rows. Each panel names its denominator. Missing role
+  telemetry is omitted, never drawn as zero, and share points stay unconnected.
+- **Fit** needs three distinct output rates per source. Output is whole-deployment tok/s over
+  all allocated GPUs, on the same basis as the mean W/GPU. P₀ is an extrapolated intercept,
+  not measured idle power, and R² describes only that line.
+- **Frontier** lists `globalParetoFrontier`'s own output, so the table is exactly what is
+  drawn. Ties keep the first point, official before overlay. It notes when the competing
+  points span several topologies or images.
+- Plots export PNG and CSV; the frontier table exports CSV only. The views API returns
+  `matchedConcurrency`, `rolePoints` and `powerFits`
+  ([Dashboard read-only views](./dashboard-readonly-views.md#fixed-sequence-service-comparisons));
+  it has no global-frontier parameter.
+- Analytics: `inference_equal_service_toggled`, `inference_power_roles_toggled` and
+  `inference_power_fit_toggled` (`{ enabled }`), `inference_equal_service_source_changed
+{ role }`, and chart-button events under `matched_concurrency`, `power_roles`, `power_fit`
+  and `frontier_points`.
 
 ## Tests
 
@@ -303,6 +355,15 @@ config is `display: 'timeline'`.
 - `cypress/component/power-timeline.cy.tsx` — traces, emphasized window, TDP / all-in
   references, per-GPU lines, pool lines with per-pool TDP, the focus chip, axis toggle,
   overlay-run colour and filter, failed run, `/zh`.
+- `utils/matched-concurrency.test.ts`, `utils/power-fit.test.ts`, `utils/frontier-points.test.ts`,
+  `utils/equal-service-comparison.test.ts` — same-load pairing (missing, ambiguous, change),
+  least-squares fits and too-few-point sources, frontier scope and export rows, role points.
+- `cypress/component/power-service-comparison.cy.tsx`, `frontier-points-panel.cy.tsx` — the four
+  analysis panels, CSV exports, overlay colours, `/zh`, mobile width.
+- `cypress/component/power-timeline.cy.tsx` (same-load block) — concurrency filter, hardware
+  labels, the validated-window summary, overlay rows, `/zh`, mobile width.
+- `cypress/e2e/powerx-compare.cy.ts` (article panels) — share params, overlay rows, `/zh`.
+- `api/v1/views/inference/route.test.ts` — `matchedConcurrency`, `rolePoints`, `powerFits`, CSV 400.
 - `cypress/e2e/powerx-timeline.cy.ts` — Display → Timeline round trip through the share link,
   shared-link entry, Table view on the alias, `?unofficialrun=` overlay traces, _View power
   trace_ from a pinned tooltip (official and overlay), `/zh`.
