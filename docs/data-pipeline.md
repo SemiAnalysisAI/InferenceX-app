@@ -548,3 +548,15 @@ The dashboard availability panel uses scoped points before Y-metric filtering,
 including visible unofficial overlays. It distinguishes schema-2 validation,
 other validated data, missing verdicts, withheld measurements, unavailable metrics,
 and non-applicable separate-pool metrics without filling missing values.
+
+### Retried benchmark artifacts
+
+CI preparation records GitHub artifact IDs and upload timestamps in
+`ingest-artifact-manifest.json`. Ingestion visits individual benchmark exports
+newest first and selects one export per persisted point identity (including the
+recipe fingerprint); aggregate exports only supply missing points. This also
+selects the matching server-log and trace-replay siblings before asynchronous
+trace preparation. Hashed artifact filenames and filesystem enumeration order
+are not attempt provenance. Failed-only reruns retain unrepeated points from
+earlier attempts, and raw uploads remain unchanged. Legacy local bundles without
+this manifest retain their prior ingestion behavior.

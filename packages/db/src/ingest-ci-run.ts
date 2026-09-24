@@ -32,6 +32,12 @@ import {
 import os from 'os';
 import path from 'path';
 
+import {
+  benchmarkArtifactOrder,
+  BenchmarkArtifactSelection,
+  writeArtifactManifest,
+} from './etl/benchmark-artifact-order';
+
 import { GPU_KEYS } from '@semianalysisai/inferencex-constants';
 
 import { hasNoSslFlag } from './cli-utils';
@@ -65,6 +71,7 @@ import {
   verifyRequiredPowerArtifacts,
 } from './etl/required-power-publication';
 import {
+  benchmarkPointIngestKey,
   bulkIngestBenchmarkRows,
   bulkIngestRunStats,
   bulkUpsertAvailability,
@@ -193,6 +200,7 @@ if (isDownloadMode) {
     downloadArtifact(artifact, artifactsDir);
   }
 
+  writeArtifactManifest(artifactsDir, [...byLogical.values()]);
   console.log(`\n  Downloaded ${byLogical.size} artifact(s)`);
 
   runAttemptNum = fetchRunAttempt(REPO, runIdStr);
@@ -506,7 +514,12 @@ async function main(): Promise<void> {
       );
     }
 
-    const allBmkFiles = [...bmkFiles, ...allBmkDirs.flatMap((d) => findJsonFiles(d))];
+    const orderedArtifacts = benchmarkArtifactOrder(artifactsDir, [
+      ...bmkFiles,
+      ...allBmkDirs.flatMap((d) => findJsonFiles(d)),
+    ]);
+    const allBmkFiles = orderedArtifacts.files;
+    const artifactSelection = new BenchmarkArtifactSelection(orderedArtifacts.selectNewest);
     const seenPointIdentities = new Map<string, string>();
     console.log(`  Found ${allBmkFiles.length} benchmark JSON file(s)`);
 
@@ -593,6 +606,12 @@ async function main(): Promise<void> {
             `    applied benchmark point backfill ${applied.backfillId}: ` +
               `config ${configId}, conc ${row.conc}`,
           );
+        }
+        if (!artifactSelection.accept(benchmarkPointIngestKey(applied.point), relativeFile)) {
+          console.log(
+            `    skipped superseded benchmark point: config ${configId}, conc ${row.conc}, artifact ${relativeFile}`,
+          );
+          continue;
         }
         const publication = powerPublicationPoint(
           applied.point,
