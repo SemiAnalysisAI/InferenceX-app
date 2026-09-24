@@ -33,13 +33,8 @@ import VideoEvidence from './VideoEvidence';
 import VideoHardwareChart, { VIDEO_CHART_ID } from './VideoHardwareChart';
 import VideoKpiCards from './VideoKpiCards';
 import VideoPointsTable, { videoTableRows } from './VideoPointsTable';
-import {
-  DEFAULT_VIDEO_DASHBOARD_STATE,
-  metricOptions,
-  readVideoDashboardState,
-  writeVideoDashboardState,
-  type VideoDashboardState,
-} from './video-url-state';
+import { useVideoDashboardState } from './use-video-dashboard-state';
+import { metricOptions } from './video-url-state';
 
 /** History filter params; a deep link carrying one opens the history section on load. */
 const HISTORY_SECTION_PARAMS = ['history-hardware', 'history-concurrency', 'history-query'];
@@ -123,21 +118,13 @@ export default function VideoDashboard() {
   const locale = useLocale();
   const s = STRINGS[locale];
   const { points, loading, error, replay, retry } = useVideoPoints();
-  const [state, setState] = useState<VideoDashboardState>(DEFAULT_VIDEO_DASHBOARD_STATE);
+  const { state, update } = useVideoDashboardState();
   const [hidden, setHidden] = useState<ReadonlySet<string>>(() => new Set());
   const [legendExpanded, setLegendExpanded] = useState(true);
   const [historyOpen, setHistoryOpen] = useState(false);
   useEffect(() => {
-    setState(readVideoDashboardState(location.search));
     const params = new URLSearchParams(location.search);
     setHistoryOpen(HISTORY_SECTION_PARAMS.some((key) => params.has(key)));
-  }, []);
-  const update = useCallback((patch: Partial<VideoDashboardState>) => {
-    setState((old) => {
-      const next = { ...old, ...patch };
-      history.replaceState(null, '', writeVideoDashboardState(new URL(location.href), next));
-      return next;
-    });
   }, []);
 
   const hardwareKeys = useMemo(() => VIDEO_HARDWARE_ROSTER.map((item) => item.key), []);
