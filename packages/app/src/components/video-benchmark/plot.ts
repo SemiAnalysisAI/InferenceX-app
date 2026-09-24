@@ -15,7 +15,7 @@ export interface PlottedVideoPoint extends VideoPoint {
 }
 
 export interface VideoPlot {
-  /** Deployment cells to draw, one per hardware until a GPUs-per-video sweep lands. */
+  /** Deployment cells to draw: the frontier cells, plus the dominated ones when Optimal Only is off. */
   plotted: PlottedVideoPoint[];
   /** Per-hardware Pareto frontier over its deployment cells, ascending x; lines need two or more. */
   frontiers: Record<string, PlottedVideoPoint[]>;
@@ -67,5 +67,29 @@ export function plotVideoPoints(
     for (const p of frontiers[key]) p.optimal = true;
     if (new Set(list.map(deploymentKey)).size > 1) multiLayout = true;
   }
-  return { plotted, frontiers, multiLayout };
+  return {
+    plotted: state.optimal ? plotted.filter((p) => p.optimal) : plotted,
+    frontiers,
+    multiLayout,
+  };
+}
+
+/**
+ * Cells the table and CSV list: what the chart draws. With Optimal Only on,
+ * each hardware's frontier deployments for the selected axes; off, every
+ * non-queued deployment, including cells without a value on an axis.
+ */
+export function listedVideoCells(
+  points: VideoPoint[],
+  state: VideoDashboardState,
+  hidden: ReadonlySet<string>,
+): VideoPoint[] {
+  const rows = latestVideoCells(points).filter(
+    (p) => p.hardwareKey && !hidden.has(p.hardwareKey) && !isQueueing(p),
+  );
+  if (!state.optimal) return rows;
+  const optimal = new Set(
+    plotVideoPoints(points, state, () => '', hidden).plotted.map((p) => p.id),
+  );
+  return rows.filter((p) => optimal.has(p.id));
 }

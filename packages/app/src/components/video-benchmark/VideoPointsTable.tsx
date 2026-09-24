@@ -2,10 +2,10 @@
 
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
 import { useLocale } from '@/lib/use-locale';
-import { isQueueing, layoutLabel } from './deployment';
+import { layoutLabel } from './deployment';
 import { hardwareLabel } from './hardware';
 import { formatMetric, metricLabel, metricValue, type MetricId, type VideoPoint } from './metrics';
-import { latestVideoCells } from './points';
+import { listedVideoCells } from './plot';
 import { metricOptions, type VideoDashboardState } from './video-url-state';
 
 const STRINGS = {
@@ -35,11 +35,13 @@ const METRIC_COLUMNS: readonly MetricId[] = [
   'powerPctCap',
 ];
 
-/** Rows for the plotted cells: every measured deployment, plus provenance. Queued cells stay in the evidence panel. */
-export function videoTableRows(points: VideoPoint[], hidden: ReadonlySet<string>): VideoPoint[] {
-  return latestVideoCells(points).filter(
-    (p) => p.hardwareKey && !hidden.has(p.hardwareKey) && !isQueueing(p),
-  );
+/** Rows for the plotted cells, plus provenance. Queued cells stay in the evidence panel. */
+export function videoTableRows(
+  points: VideoPoint[],
+  hidden: ReadonlySet<string>,
+  state: VideoDashboardState,
+): VideoPoint[] {
+  return listedVideoCells(points, state, hidden);
 }
 
 export default function VideoPointsTable({
@@ -54,7 +56,7 @@ export default function VideoPointsTable({
   const locale = useLocale();
   const s = STRINGS[locale];
   const options = metricOptions(state);
-  const rows = videoTableRows(points, hidden);
+  const rows = videoTableRows(points, hidden, state);
   const columns: DataTableColumn<VideoPoint>[] = [
     {
       header: s.hardware,

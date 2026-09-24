@@ -22,6 +22,8 @@ const STRINGS = {
       `One deployment measured per hardware so far (${layouts}), so each hardware is a single point. A per-hardware Pareto curve needs the GPUs-per-video sweep.`,
     multi:
       "Solid lines join each hardware's Pareto-optimal deployments (GPUs per video and model split); faded points are dominated deployments.",
+    multiOptimal:
+      "Solid lines join each hardware's Pareto-optimal deployments (GPUs per video and model split); dominated deployments are hidden. Turn off Optimal Only to show them.",
     controls:
       'Shift+scroll to zoom; drag to pan; double-click to reset. Click a point to pin its details.',
     deployment: 'Deployment',
@@ -34,6 +36,8 @@ const STRINGS = {
       `目前每种硬件只测得一种部署（${layouts}），因此每种硬件只有一个点；要得到各硬件自己的 Pareto 曲线，还需扫描每条视频占用的 GPU 数。`,
     multi:
       '实线连接同一硬件的 Pareto 最优部署（每条视频占用的 GPU 数及模型切分方式）；淡色点为被支配的部署。',
+    multiOptimal:
+      '实线连接同一硬件的 Pareto 最优部署（每条视频占用的 GPU 数及模型切分方式）；被支配的部署已隐藏，关闭“仅最优”可显示。',
     controls: 'Shift+滚轮缩放，拖动平移，双击重置。点击数据点可固定详情。',
     deployment: '部署',
     n: '有效样本',
@@ -178,7 +182,7 @@ export default function VideoHardwareChart({
       }
       caption={
         <p className="text-xs text-muted-foreground" data-testid="video-chart-caption">
-          {multiLayout ? s.multi : s.single(layouts || '—')}
+          {multiLayout ? (state.optimal ? s.multiOptimal : s.multi) : s.single(layouts || '—')}
         </p>
       }
     />

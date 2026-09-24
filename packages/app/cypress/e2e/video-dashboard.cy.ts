@@ -41,19 +41,26 @@ describe('Video hardware dashboard (E2E fixtures)', () => {
       .eq(2)
       .should('contain', 'Deployment')
       .and('contain', '4 GPU · TP2 × Ulysses 2');
-    cy.get('[data-testid="video-config-bar"] [role="combobox"]').should('have.length', 3);
+    cy.get('[data-testid="video-config-bar"] [role="combobox"]').should('have.length', 2);
     cy.get('[data-testid="video-config-bar"] [role="combobox"]')
       .eq(0)
       .should('contain', 'P90 time to video (s)');
     cy.get('[data-testid="video-config-bar"] [role="combobox"]')
       .eq(1)
       .should('contain', 'GPU-board energy per video (kJ)');
-    cy.get('[data-testid="video-config-bar"] [role="combobox"]')
-      .eq(2)
-      .should('contain', 'Rent - 3 Year Commit');
+    // The cost tier is picked in the chart caption, as on /inference.
+    cy.get('[data-testid="video-cost-tier"]').should('contain', 'Rent - 3 Year Commit');
     cy.get('[data-testid="video-config-bar"]').should('not.contain', 'GPU basis');
     cy.get('[data-testid="video-legend"]').should('contain', 'MI355X · not measured');
-    cy.get('[data-testid="video-legend"] [role="switch"]').should('not.exist');
+    cy.get('[data-testid="video-legend"] [role="switch"]').should('have.length', 1);
+    cy.get('[data-testid="video-optimal-only"]').should('have.attr', 'aria-checked', 'true');
+    cy.get('[data-testid="video-dashboard"] h1').should(
+      'contain',
+      'VideoGenX · MiniMax-H3 across hardware',
+    );
+    cy.get('[data-testid="share-button"]').should('be.visible');
+    cy.get('[data-testid="video-compare-toggle"]').should('have.attr', 'aria-expanded', 'false');
+    cy.get('[data-testid="video-evidence-toggle"]').should('have.attr', 'aria-expanded', 'false');
     // KPI cards read each hardware's lead deployment at the selected tier (Rent - 3 Year Commit:
     // $2 / $2.9 / $3.7 per GPU-hour); the API list price sits beside the TCO cost.
     cy.get('[data-testid="video-kpi-card"]').should('have.length', 4);
@@ -166,6 +173,7 @@ describe('Video hardware dashboard (E2E fixtures)', () => {
   });
   it('compares the slowest lead deployment against the fastest with time, cost and energy deltas', () => {
     cy.visit('/video');
+    cy.get('[data-testid="video-compare-toggle"]').click();
     cy.get('[data-testid="video-compare"]').scrollIntoView();
     cy.wait('@media');
     // Default pair: slowest C1 P50 (H100) as baseline, fastest (B200) as candidate. Two hardware
@@ -234,8 +242,9 @@ describe('Video hardware dashboard (E2E fixtures)', () => {
       .should('contain', '模型')
       .and('contain', '工作负载')
       .and('contain', '4 张 GPU · TP2 × Ulysses 2')
-      .and('contain', 'X 轴指标')
-      .and('contain', '成本档位');
+      .and('contain', 'X 轴指标');
+    cy.get('[data-testid="video-cost-tier"]').should('contain', 'Hyperscaler 自有设备');
+    cy.get('[data-testid="video-legend"]').should('contain', '仅最优');
     cy.get('[data-testid="video-kpi-card"][data-hardware="b200"]')
       .should('contain', 'TCO / 条视频')
       .and('contain', '$0.150')

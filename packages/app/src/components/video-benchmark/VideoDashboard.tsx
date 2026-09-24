@@ -7,15 +7,22 @@ import {
   TCO_SOURCE_URL,
 } from '@semianalysisai/inferencex-constants';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import ChartLegend from '@/components/ui/chart-legend';
 import { ChartSection } from '@/components/ui/chart-section';
+import { CollapsibleSection } from '@/components/ui/collapsible-section';
+import { DashboardSectionHeader } from '@/components/ui/dashboard-section-header';
 import { Heading } from '@/components/ui/heading';
+import { captionControlTriggerClassName } from '@/components/ui/result-context';
+import { SearchableSelect } from '@/components/ui/searchable-select';
+import { ShareButton } from '@/components/ui/share-button';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { track } from '@/lib/analytics';
 import { useLocale } from '@/lib/use-locale';
 import { isQueueing, layoutLabel, leadCell } from './deployment';
-import { costPerGpuHour, hardwareLabel, VIDEO_HARDWARE_ROSTER } from './hardware';
+import { costPerGpuHour, hardwareLabel, VIDEO_HARDWARE_ROSTER, type CostTier } from './hardware';
 import {
+  COST_TIERS,
   metricLabel,
   metricValue,
   TIER_LABELS,
@@ -38,6 +45,8 @@ import { metricOptions } from './video-url-state';
 
 /** History filter params; a deep link carrying one opens the history section on load. */
 const HISTORY_SECTION_PARAMS = ['history-hardware', 'history-concurrency', 'history-query'];
+/** Compare choices; a deep link carrying one opens the Compare section on load. */
+const COMPARE_SECTION_PARAMS = ['v_base', 'v_cand', 'v_case'];
 const CSV_METRICS: readonly MetricId[] = [
   'p50Latency',
   'p90Latency',
@@ -57,6 +66,13 @@ const STRINGS = {
     chart: 'Chart',
     table: 'Table',
     viewToggle: 'Chart or table view',
+    optimalOnly: 'Optimal Only',
+    optimalInfo:
+      "Show only each hardware's Pareto-optimal deployments for the selected axes; turn off to see the dominated deployments faded.",
+    compare: 'Compare',
+    evidence: 'Compute-bound evidence',
+    toggleCompare: 'Show or hide the Compare section',
+    toggleEvidence: 'Show or hide the compute-bound evidence',
     tier: 'Cost tier',
     badges: 'TCO $/chip/hr',
     source: 'Source',
@@ -84,6 +100,12 @@ const STRINGS = {
     chart: '图表',
     table: '表格',
     viewToggle: '图表或表格视图',
+    optimalOnly: '仅最优',
+    optimalInfo: '只显示各硬件在当前坐标轴下的 Pareto 最优部署；关闭后以淡色显示被支配的部署。',
+    compare: '对比',
+    evidence: '算力受限（compute-bound）的证据',
+    toggleCompare: '展开或收起“对比”区块',
+    toggleEvidence: '展开或收起算力受限证据',
     tier: '成本档位',
     badges: 'TCO $/chip/hr',
     source: '来源',
@@ -122,9 +144,11 @@ export default function VideoDashboard() {
   const [hidden, setHidden] = useState<ReadonlySet<string>>(() => new Set());
   const [legendExpanded, setLegendExpanded] = useState(true);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [compareOpen, setCompareOpen] = useState(false);
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     setHistoryOpen(HISTORY_SECTION_PARAMS.some((key) => params.has(key)));
+    setCompareOpen(COMPARE_SECTION_PARAMS.some((key) => params.has(key)));
   }, []);
 
   const hardwareKeys = useMemo(() => VIDEO_HARDWARE_ROSTER.map((item) => item.key), []);
@@ -205,7 +229,7 @@ export default function VideoDashboard() {
   });
 
   const exportCsv = () => {
-    const rows = videoTableRows(cells, hidden);
+    const rows = videoTableRows(cells, hidden, state);
     const header = [
       'hardware',
       'concurrency',
@@ -257,19 +281,25 @@ export default function VideoDashboard() {
 
   return (
     <div className="mx-auto min-w-0 w-full max-w-7xl space-y-4 py-2" data-testid="video-dashboard">
-      <div>
-        <Heading as="h1" level="section">
-          {s.title}
-        </Heading>
-        <p className="mt-1 max-w-4xl text-sm text-muted-foreground">{s.subtitle}</p>
-      </div>
-      <VideoConfigBar
-        state={state}
-        onChange={update}
-        modelLabel={modelLabel}
-        workloadLabel={`${workloadLabel}${workloadSuffix}`}
-        deploymentLabel={deploymentLabel}
-      />
+      <section className="relative z-20">
+        <Card>
+          <div className="flex flex-col gap-4">
+            <DashboardSectionHeader
+              headingAs="h1"
+              title={s.title}
+              description={s.subtitle}
+              actions={<ShareButton />}
+            />
+            <VideoConfigBar
+              state={state}
+              onChange={update}
+              modelLabel={modelLabel}
+              workloadLabel={`${workloadLabel}${workloadSuffix}`}
+              deploymentLabel={deploymentLabel}
+            />
+          </div>
+        </Card>
+      </section>
       <ChartSection
         chartId={VIDEO_CHART_ID}
         analyticsPrefix="video"
@@ -302,9 +332,38 @@ export default function VideoDashboard() {
               {modelLabel} · {metricLabel(state.y, locale, options)} {s.vs}{' '}
               {metricLabel(state.x, locale, options)}
             </Heading>
-            <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-              <span>
-                {s.tier}: {TIER_LABELS[state.tier][locale]}
+            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+              <span className="inline-flex flex-wrap items-center gap-x-1">
+                <span className="font-medium text-foreground">{s.tier}:</span>{' '}
+                <span className="no-export inline-flex items-center">
+                  <SearchableSelect
+                    triggerTestId="video-cost-tier"
+                    triggerAriaLabel={s.tier}
+                    value={state.tier}
+                    onValueChange={(value) => {
+                      update({ tier: value as CostTier });
+                      track('video_tier_changed', { value });
+                    }}
+                    placeholder={s.tier}
+                    initialLabel={TIER_LABELS[state.tier][locale]}
+                    searchable={false}
+                    trackPrefix="video_cost_tier"
+                    size="sm"
+                    className={captionControlTriggerClassName}
+                    contentClassName="w-72"
+                    groups={[
+                      {
+                        label: '',
+                        options: COST_TIERS.map((tier) => ({
+                          value: tier,
+                          label: TIER_LABELS[tier][locale],
+                          testId: `video-cost-tier-${tier}`,
+                        })),
+                      },
+                    ]}
+                  />
+                </span>
+                <span className="export-only hidden">{TIER_LABELS[state.tier][locale]}</span>
               </span>
               <span className="flex flex-wrap items-center gap-1">
                 {s.badges}:
@@ -334,7 +393,7 @@ export default function VideoDashboard() {
                   {TCO_SOURCE_TITLE}
                 </a>
               </span>
-            </p>
+            </div>
             {idle.length > 0 && (
               <p className="mt-1 text-xs text-muted-foreground" data-testid="video-idle-note">
                 {s.idle(idle.join(locale === 'zh' ? '、' : ', '))}
@@ -385,6 +444,18 @@ export default function VideoDashboard() {
                   isLegendExpanded={legendExpanded}
                   onExpandedChange={setLegendExpanded}
                   disableActiveSort
+                  switches={[
+                    {
+                      id: 'video-optimal-only',
+                      label: s.optimalOnly,
+                      checked: state.optimal,
+                      infoTooltip: s.optimalInfo,
+                      onCheckedChange: (checked) => {
+                        update({ optimal: checked });
+                        track('video_optimal_toggled', { enabled: checked });
+                      },
+                    },
+                  ]}
                 />
               </div>
             </div>
@@ -392,10 +463,29 @@ export default function VideoDashboard() {
         </div>
       </ChartSection>
       <VideoKpiCards points={cells} state={state} colorFor={colorFor} loading={loading} />
+      {/* These mount after the first fetch resolves, so the deep-link flag read on mount is settled. */}
       {!loading && !error && (
         <>
-          <VideoCompare points={cells} options={options} colorFor={colorFor} />
-          <VideoEvidence points={cells} colorFor={colorFor} />
+          <CollapsibleSection
+            title={s.compare}
+            toggleLabel={s.toggleCompare}
+            defaultOpen={compareOpen}
+            titleWhenOpen={false}
+            testId="video-compare-toggle"
+            onToggle={(open) => track('video_compare_section_toggled', { open })}
+          >
+            <VideoCompare points={cells} options={options} colorFor={colorFor} />
+          </CollapsibleSection>
+          <CollapsibleSection
+            title={s.evidence}
+            toggleLabel={s.toggleEvidence}
+            defaultOpen={false}
+            titleWhenOpen={false}
+            testId="video-evidence-toggle"
+            onToggle={(open) => track('video_evidence_section_toggled', { open })}
+          >
+            <VideoEvidence points={cells} colorFor={colorFor} />
+          </CollapsibleSection>
         </>
       )}
       <details
