@@ -167,7 +167,7 @@ export default function PowerServiceComparison({
   const [baseline, setBaseline] = useState(() => getUrlParam('i_servicebase') ?? '');
   const [comparator, setComparator] = useState(() => getUrlParam('i_servicepeer') ?? '');
   const [target, setTarget] = useState(() => getUrlParam('i_servicetarget') ?? '');
-  const sources = useMemo(() => getEqualServiceSources(data), [data]);
+  const sources = useMemo(() => getEqualServiceSources(data, locale), [data, locale]);
   const base = baseline || sources[0]?.key || '';
   const peer = comparator || sources[1]?.key || '';
   const previousAxis = useRef(xField);

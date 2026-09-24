@@ -84,7 +84,17 @@ export function equalServiceSourceKey(point: InferenceData): string {
   ]);
 }
 
-export function getEqualServiceSources(points: readonly InferenceData[]): EqualServiceSource[] {
+const SOURCE_LABEL_WORDS = {
+  en: { point: 'Point', attempt: (attempt: unknown) => `Attempt ${attempt}`, recipe: 'Recipe' },
+  zh: { point: '数据点', attempt: (attempt: unknown) => `第 ${attempt} 次尝试`, recipe: '配方' },
+};
+
+/** Labels are English by default: the read-only API has no locale. */
+export function getEqualServiceSources(
+  points: readonly InferenceData[],
+  locale: 'en' | 'zh' = 'en',
+): EqualServiceSource[] {
+  const words = SOURCE_LABEL_WORDS[locale];
   const sources = new Map(
     observedPoints(points).map((point) => [equalServiceSourceKey(point), point]),
   );
@@ -96,11 +106,11 @@ export function getEqualServiceSources(points: readonly InferenceData[]): EqualS
       label: [
         point.hwKey,
         point.precision.toUpperCase(),
-        topologyLabel(pointTopologyKey(point), 'en', topologies),
+        topologyLabel(pointTopologyKey(point), locale, topologies),
         point.actualDate ?? point.date,
-        point.run_url ?? `Point ${point.id ?? '?'}`,
-        'run_attempt' in point ? `Attempt ${point.run_attempt}` : null,
-        point.recipe_fingerprint ? `Recipe ${point.recipe_fingerprint}` : null,
+        point.run_url ?? `${words.point} ${point.id ?? '?'}`,
+        'run_attempt' in point ? words.attempt(point.run_attempt) : null,
+        point.recipe_fingerprint ? `${words.recipe} ${point.recipe_fingerprint}` : null,
         point.image ?? null,
       ]
         .filter(Boolean)

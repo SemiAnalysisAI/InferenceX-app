@@ -105,9 +105,10 @@ function mountComparison(
   points = data,
   xField: keyof AggDataEntry = 'mean_tpot_intvty',
   overlay: InferenceData[] = [],
+  pathname = '/inference',
 ) {
   mountWithProviders(
-    <PathnameContext.Provider value="/inference">
+    <PathnameContext.Provider value={pathname}>
       <div style={{ width: '100%', maxWidth: 1120, padding: 12, boxSizing: 'border-box' }}>
         <PowerServiceComparison
           data={[...points, ...overlay]}
@@ -451,6 +452,22 @@ describe('PowerServiceComparison', () => {
       expect(second[header.indexOf('status')]).to.equal('too-few-points');
     });
     cy.get('[data-testid="power-fit-panel"]').screenshot('power-fit-desktop', { overwrite: true });
+  });
+
+  it('labels sources in Chinese on /zh pages', () => {
+    cy.viewport(1280, 1000);
+    mountComparison([...fitLadder, ...comparator], 'mean_tpot_intvty', [], '/zh/inference');
+    cy.get('[data-testid="equal-service-toggle"]').check();
+    cy.get('[data-testid="power-fit-toggle"]').check();
+    cy.get('[data-testid="equal-service-baseline"] option')
+      .should('have.length', 2)
+      .each(($option) => {
+        expect($option.text()).to.include('单节点');
+        expect($option.text()).not.to.include('Single-node');
+      });
+    cy.get('[data-testid="power-fit-row"] th').each(($cell) =>
+      expect($cell.text()).to.include('单节点'),
+    );
   });
 
   it('colours ?unofficialrun= sources with their run colour in every panel', () => {

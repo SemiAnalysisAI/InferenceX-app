@@ -814,7 +814,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/inference/utils/equal-service-comparison.ts',
-    sourceSha256: 'adbc79b5fe8d14d8e16cc6edd757324447f12cf0656631ec9b16415e5e0795e2',
+    sourceSha256: '8611179bb7230362e9aebd79b71d1f8240d8f8e69669ac9fd83c6f2a3e35caf0',
     reviewArea: {
       en: 'Source-scoped equal-service interpolation, comparator-relative changes, endpoint provenance, prefill share projection and role points.',
       zh: '按完整来源限定的同等服务插值、相对基准变化、端点来源、prefill 占比视图以及各角色数据点。',
@@ -830,7 +830,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/inference/utils/power-fit.ts',
-    sourceSha256: '6c39a91e0745cd6432730f7d9094638fe1365c1e6d38a99c696c21359409bafb',
+    sourceSha256: 'a1e30d09648b74897e283b67a4e63e2591a485ed0f92e00acbe606b75967444a',
     reviewArea: {
       en: 'Per-source least-squares power fit on output per allocated GPU: intercept, marginal J/token, R², fitted range and registry TDP.',
       zh: '按来源对每个已分配 GPU 的输出做最小二乘功耗拟合：截距、边际 J/token、R²、拟合范围与注册表 TDP。',

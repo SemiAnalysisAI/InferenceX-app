@@ -75,7 +75,7 @@ export default function PowerFitPanel({
 }) {
   const locale = useLocale();
   const t = STRINGS[locale];
-  const fits = useMemo(() => buildPowerFits(data), [data]);
+  const fits = useMemo(() => buildPowerFits(data, locale), [data, locale]);
   const sectionId = `${chartId}-power-fit`;
 
   const markers: PanelMarker[] = fits.flatMap(({ source, observations }) =>

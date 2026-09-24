@@ -95,9 +95,12 @@ export interface PowerFit {
 }
 
 /** One fit per equal-service source that has any measured observation. */
-export function buildPowerFits(points: readonly InferenceData[]): PowerFit[] {
+export function buildPowerFits(
+  points: readonly InferenceData[],
+  locale: 'en' | 'zh' = 'en',
+): PowerFit[] {
   const rows = observedPoints(points);
-  return getEqualServiceSources(points).flatMap((source): PowerFit[] => {
+  return getEqualServiceSources(points, locale).flatMap((source): PowerFit[] => {
     const observations = rows
       .filter((point) => equalServiceSourceKey(point) === source.key)
       .flatMap((point) => {

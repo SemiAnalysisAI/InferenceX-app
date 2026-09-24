@@ -194,6 +194,21 @@ describe('equal-service comparison', () => {
     expect(getEqualServiceSources([...b, ...a])).toEqual(getEqualServiceSources([...a, ...b]));
   });
 
+  it('labels sources in the page locale and keeps English for the API default', () => {
+    const labelled = {
+      ...point({ id: 1, recipe_fingerprint: 'r1', run_url: undefined }),
+      run_attempt: 2,
+    };
+    const [zh] = getEqualServiceSources([labelled], 'zh');
+    for (const part of ['单节点', '数据点 1', '第 2 次尝试', '配方 r1'])
+      expect(zh.label).toContain(part);
+    expect(zh.label).not.toMatch(/Single-node|Point|Attempt|Recipe/u);
+    const [en] = getEqualServiceSources([labelled]);
+    for (const part of ['Single-node', 'Point 1', 'Attempt 2', 'Recipe r1'])
+      expect(en.label).toContain(part);
+    expect(en.key).toBe(zh.key);
+  });
+
   it('keeps source keys stable across UI display-date overrides and uses the requested mean basis', () => {
     expect(equalServiceSourceKey({ ...a[0], date: '2026-09-24', actualDate: a[0].date })).toBe(
       equalServiceSourceKey(a[0]),
