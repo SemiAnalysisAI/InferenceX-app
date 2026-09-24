@@ -204,6 +204,10 @@ async function readTransaction(
     return blocked('installer transaction marker is foreign or malformed');
   }
   if (record.phase === 'cleanup' && names.length !== 1) {
+    // The owner can finish cleanup between the directory listing and marker read.
+    if (remainingRescans > 0) {
+      return readTransaction(destination, transaction, recoveryTransactionId, remainingRescans - 1);
+    }
     return blocked('terminal installer cleanup contains unexpected data');
   }
   return { state: 'valid', identity, paths, record };

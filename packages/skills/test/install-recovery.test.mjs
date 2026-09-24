@@ -784,6 +784,56 @@ test('status rechecks an atomically replaced transaction marker during its read'
   assert.equal(readFileSync(path, 'utf8'), replacement);
 });
 
+for (const retainsPrevious of [false, true]) {
+  test(`cleanup inspection ${retainsPrevious ? 'rejects retained data' : 'rescans an outdated directory listing'}`, () => {
+    const cwd = project();
+    succeeded(run(['install'], cwd));
+    const destination = join(cwd, '.claude/skills/inferencex-api');
+    const transaction = `${destination}.inferencex-skills-transaction`;
+    const before = snapshot(destination);
+    mkdirSync(transaction);
+    mkdirSync(join(transaction, 'previous'));
+    const { path, record } = writeTransactionMarker(transaction, destination, {
+      ownerPid: process.pid,
+      phase: 'activated',
+    });
+    const reads = join(cwd, 'transaction-listings');
+    const result = runWithPreload(
+      ['status', '--json'],
+      cwd,
+      `
+        import fs from 'node:fs';
+        import { syncBuiltinESMExports } from 'node:module';
+        const original = fs.readdirSync;
+        let count = 0;
+        fs.readdirSync = (directory, ...args) => {
+          const names = original(directory, ...args);
+          if (directory === ${JSON.stringify(transaction)}) {
+            fs.writeFileSync(${JSON.stringify(reads)}, String(++count));
+            if (count === 1) {
+              if (!${retainsPrevious}) fs.rmdirSync(${JSON.stringify(join(transaction, 'previous'))});
+              fs.writeFileSync(${JSON.stringify(join(transaction, 'transaction.next.json'))}, ${JSON.stringify(JSON.stringify({ ...record, phase: 'cleanup' }))});
+              fs.renameSync(${JSON.stringify(join(transaction, 'transaction.next.json'))}, ${JSON.stringify(path)});
+            }
+          }
+          return names;
+        };
+        syncBuiltinESMExports();
+      `,
+    );
+    const status = JSON.parse(succeeded(result).stdout);
+    assert.equal(status.transaction_state, retainsPrevious ? 'blocked' : 'busy', status.reason);
+    if (retainsPrevious) {
+      assert.match(status.reason, /terminal installer cleanup contains unexpected data/);
+      assert.equal(existsSync(join(transaction, 'previous')), true);
+    } else {
+      assert.equal(status.transaction_phase, 'cleanup');
+    }
+    assert.ok(Number(readFileSync(reads, 'utf8')) <= 3, 'inspection must remain bounded');
+    assert.deepEqual(snapshot(destination), before);
+  });
+}
+
 for (const mutation of ['same-inode', 'malformed', 'oversized', 'continuous']) {
   test(`transaction marker rescans still block ${mutation} changes`, () => {
     const cwd = project();
