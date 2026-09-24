@@ -181,7 +181,7 @@ describe('Video hardware dashboard (retained fixture)', () => {
         '11.53',
         '6.66',
         '$0.150',
-        '$0.272',
+        '$0.640',
         '301.1',
         '96.4',
         '3,856',
@@ -214,23 +214,23 @@ describe('Video hardware dashboard (retained fixture)', () => {
   });
   it('reprices the API list price beside the TCO cost, in the cards, the table and the URL', () => {
     mount();
-    // 0.034 $/video-s × 8 s clip = $0.272, read beside each hardware's TCO cost per video.
-    kpi('h200').should('contain', 'API list $0.272').and('contain', '$0.204');
-    kpi('h100').should('contain', 'API list $0.272');
-    kpi('b200').should('contain', 'API list $0.272');
+    // 0.08 $/video-s × 8 s clip = $0.640, read beside each hardware's TCO cost per video.
+    kpi('h200').should('contain', 'API list $0.640').and('contain', '$0.204');
+    kpi('h100').should('contain', 'API list $0.640');
+    kpi('b200').should('contain', 'API list $0.640');
     cy.get('[data-testid="video-chart-card"]').should(
       'contain',
-      'API reference: $0.034/video-s (2026-09-19)',
+      'API reference: $0.080/video-s (2026-09-24)',
     );
     cy.get('[data-testid="video-api-reference-caption"]')
-      .should('contain', 'Reference $0.034/video-s')
-      .and('contain', '$0.034–$0.047')
-      .and('contain', 'captured 2026-09-19')
-      .and('contain', 'MiniMax Design');
+      .should('contain', 'Reference $0.080/video-s')
+      .and('contain', '$0.080–$0.130')
+      .and('contain', 'captured 2026-09-24')
+      .and('contain', 'MiniMax platform');
     cy.get('[data-testid="video-api-price"]').clear().type('0.05');
     // $0.400 per 8 s clip; the TCO cost itself does not move.
     kpi('h200').should('contain', 'API list $0.400').and('contain', '$0.204');
-    kpi('h200').should('not.contain', '$0.272');
+    kpi('h200').should('not.contain', '$0.640');
     cy.location('search').should('contain', 'v_api=0.05');
     cy.contains('button', 'Table').click();
     cy.get('[data-testid="data-table-preset-all"]').click();
@@ -243,8 +243,8 @@ describe('Video hardware dashboard (retained fixture)', () => {
       .should('contain', '$0.400')
       .and('contain', '$0.204');
     cy.get('[data-testid="video-api-price-reset"]').click();
-    cy.contains('[data-testid="video-points-table"] tbody tr', 'H200').should('contain', '$0.272');
-    kpi('h200').should('contain', 'API list $0.272');
+    cy.contains('[data-testid="video-points-table"] tbody tr', 'H200').should('contain', '$0.640');
+    kpi('h200').should('contain', 'API list $0.640');
     cy.location('search').should('not.contain', 'v_api');
   });
   it('toggles Optimal Only from the legend and restores it from v_optimal', () => {
@@ -311,7 +311,7 @@ describe('Video hardware dashboard (retained fixture)', () => {
       .and('contain', 'P50 出片时间（s）')
       .and('contain', '视频数 / GPU 小时')
       .and('contain', 'TCO / 条视频')
-      .and('contain', 'API 标价 $0.272')
+      .and('contain', 'API 标价 $0.640')
       .and('contain', 'kJ / 条视频');
     cy.get('[data-testid="video-config-fact"]').should(($facts) => {
       expect([...$facts].map((el) => el.textContent)).to.deep.equal([
@@ -329,7 +329,7 @@ describe('Video hardware dashboard (retained fixture)', () => {
       .and('contain', 'Y 轴指标')
       .and('not.contain', '成本档位')
       .and('contain', 'API 参考价（$/video-s）')
-      .and('contain', '采集于 2026-09-19');
+      .and('contain', '采集于 2026-09-24');
     cy.contains('button', '表格').click();
     headers().should(($ths) => {
       expect([...$ths].map((el) => el.textContent?.trim())).to.deep.equal([
