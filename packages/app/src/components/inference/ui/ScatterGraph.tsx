@@ -161,6 +161,7 @@ import {
   powerVariantLabel,
   powerVariantsInData,
 } from '@/components/inference/utils/power-compare';
+import FrontierPointsPanel from '@/components/inference/ui/FrontierPointsPanel';
 import LegendPointsDialog from '@/components/inference/ui/LegendPointsDialog';
 import { renderOffloadHalo } from '@/components/inference/utils/offload-halo';
 import { renderLegacyPowerRing } from '@/components/inference/utils/legacy-power-marker';
@@ -1693,6 +1694,25 @@ const ScatterGraph = React.memo(
     const frontierHwKeys = useMemo(
       () => frontierHardwareKeys(globalParetoPoints, globalFrontier),
       [globalParetoPoints, globalFrontier],
+    );
+    // PowerX provenance of the drawn frontier: the same points, listed with their runs.
+    const showFrontierPoints =
+      showParetoFrontier &&
+      globalFrontier.length > 0 &&
+      !minimalChrome &&
+      getMeasuredMetricConfig(selectedYAxisMetric) !== undefined;
+    const frontierHardwareLabel = useCallback(
+      (point: InferenceData) => {
+        const config = processedOverlayData.includes(point)
+          ? overlayData?.hardwareConfig[point.hwKey]
+          : hardwareConfig[point.hwKey];
+        return config ? getDisplayLabel(config) : point.hwKey;
+      },
+      [processedOverlayData, overlayData, hardwareConfig],
+    );
+    const frontierHardwareColor = useCallback(
+      (point: InferenceData) => getCssColor(resolveColor(point.hwKey)),
+      [getCssColor, resolveColor],
     );
     const applyParetoFadeRef = useRef<(group: RenderContext['layout']['zoomGroup']) => void>(
       () => {},
@@ -4730,6 +4750,20 @@ const ScatterGraph = React.memo(
                 href: row.href ?? '',
               })
             }
+          />
+        )}
+        {showFrontierPoints && (
+          <FrontierPointsPanel
+            chartId={chartId}
+            eligible={globalParetoPoints}
+            frontier={globalFrontier}
+            xLabel={xLabel}
+            yLabel={yLabel}
+            maximizeX={maximizeParetoX}
+            maximizeY={maximizeParetoY}
+            overlayPoints={processedOverlayData}
+            hardwareLabel={frontierHardwareLabel}
+            hardwareColor={frontierHardwareColor}
           />
         )}
         {powerTelemetryPoint === null ? null : (

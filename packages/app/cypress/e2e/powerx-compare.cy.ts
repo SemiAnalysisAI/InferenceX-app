@@ -88,9 +88,11 @@ const availability = [
   },
 ];
 
-function interceptRows() {
+/** Official rows; with a run URL they form one source, as ingested runs do. */
+function interceptRows(officialRunUrl: string | null = null) {
+  const official = rows(null, 'b200').map((row) => ({ ...row, run_url: officialRunUrl }));
   cy.intercept('GET', '/api/v1/availability', { body: availability }).as('availability');
-  cy.intercept('GET', '/api/v1/benchmarks*', { body: rows(null, 'b200') }).as('benchmarks');
+  cy.intercept('GET', '/api/v1/benchmarks*', { body: official }).as('benchmarks');
   cy.intercept('GET', '/api/v1/workflow-info*', {
     body: { runs: [], changelogs: [], configs: [] },
   });
@@ -118,14 +120,47 @@ function interceptOverlayRows() {
   }).as('unofficialRun');
 }
 
+/** Overlay rows 10% cheaper per token than the official rows, so they own the frontier. */
+function interceptCheaperOverlayRows() {
+  const cheaper = rows(OVERLAY_RUN_URL, 'h200').map((row) => ({
+    ...row,
+    metrics: {
+      ...row.metrics,
+      joules_per_output_token: row.metrics.joules_per_output_token * 0.9,
+      joules_per_input_token: row.metrics.joules_per_input_token * 0.9,
+    },
+  }));
+  cy.intercept('GET', '/api/unofficial-run*', {
+    body: {
+      runInfos: [
+        {
+          id: OVERLAY_RUN_ID,
+          name: 'powerx-panels',
+          branch: 'powerx-panels',
+          sha: 'abc000',
+          createdAt: `${DATE}T00:00:00Z`,
+          url: OVERLAY_RUN_URL,
+          conclusion: 'success',
+          status: 'completed',
+          isNonMainBranch: true,
+        },
+      ],
+      benchmarks: cheaper,
+      evaluations: [],
+    },
+  }).as('unofficialRun');
+}
+
 function visitChart({
   path = '/inference',
   extraParams = '',
+  officialRunUrl = null,
 }: {
   path?: string;
   extraParams?: string;
+  officialRunUrl?: string | null;
 }) {
-  interceptRows();
+  interceptRows(officialRunUrl);
   cy.visit(`${path}?g_model=DeepSeek-V4-Pro&i_seq=8k/1k&i_prec=fp4${extraParams}`, {
     onBeforeLoad(win) {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
@@ -297,5 +332,97 @@ describe('PowerX comparison series (i_pcompare)', () => {
       .should('contain.text', '全部 GPU')
       .and('contain.text', '预填充 GPU')
       .and('contain.text', '解码 GPU');
+  });
+});
+
+// The article panels under a measured chart: load-matched rows, the role group,
+// the power-vs-output fit and the frontier's provenance, each for official rows
+// and a `?unofficialrun=` overlay together.
+describe('PowerX article panels', () => {
+  const PANELS = '&i_servicecompare=1&i_roleshare=1&i_powerfit=1&i_frontier=1';
+  const OFFICIAL_RUN_URL = 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/27182818284';
+  const OVERLAY_COLOR = 'var(--overlay-run-0)';
+
+  beforeEach(() => {
+    cy.on('uncaught:exception', (error) => {
+      if (error.message === 'ResizeObserver loop completed with undelivered notifications.') {
+        return false;
+      }
+    });
+  });
+
+  it('reproduces matched-load, role, fit and frontier panels for official and overlay rows', () => {
+    interceptCheaperOverlayRows();
+    visitChart({
+      extraParams: `&unofficialrun=${OVERLAY_RUN_ID}&i_metric=y_measuredJPerOutputToken${PANELS}`,
+      officialRunUrl: OFFICIAL_RUN_URL,
+    });
+    cy.wait('@unofficialRun');
+
+    // Official B200 against the overlay H200 at each observed concurrency.
+    for (const [conc] of CONFIGS) {
+      cy.get(`[data-testid="matched-concurrency-row-${conc}"]`).should(($row) => {
+        const text = $row.text().replaceAll('−', '-');
+        expect(text).to.include('-10.0%').and.include('W/GPU +0.0%');
+      });
+    }
+
+    // Role power: prefill and decode W/GPU for both sources; the overlay in its run colour.
+    cy.get('[data-testid="chart-0-role-power-plot"] circle.point').should(
+      'have.length',
+      CONFIGS.length * 4,
+    );
+    cy.get(`[data-testid="chart-0-role-power-plot"] circle.point[fill="${OVERLAY_COLOR}"]`).should(
+      'have.length',
+      CONFIGS.length * 2,
+    );
+    cy.get('[data-testid="chart-0-role-share-plot"] circle.point').should(
+      'have.length',
+      CONFIGS.length * 2,
+    );
+
+    // Output per allocated GPU is output per decode GPU × 4 ÷ 8: 100, 200 and 400 tok/s.
+    // W/GPU 500, 600, 700 → P0 450 W, m 0.643 J/token, R² 0.964.
+    cy.get('[data-testid="power-fit-row"]').should('have.length', 2);
+    cy.get('[data-testid="power-fit-row"]')
+      .filter(':contains("b200")')
+      .should('contain.text', '450')
+      .and('contain.text', '45% · 1,000 W')
+      .and('contain.text', '0.643')
+      .and('contain.text', '0.964')
+      .and('contain.text', '100.0–400.0');
+    cy.get('[data-testid="power-fit-row"]')
+      .filter(':contains("h200")')
+      .should('contain.text', '64% · 700 W');
+
+    // The cheaper overlay rows own the frontier; each lists its run.
+    cy.get('[data-testid="frontier-points-row"]')
+      .should('have.length', CONFIGS.length)
+      .each(($row) => {
+        expect($row.text()).to.include('unofficial');
+        expect($row.find('a').attr('href')).to.eq(OVERLAY_RUN_URL);
+      });
+    cy.get('[data-testid="frontier-points-scope"]').should(
+      'contain.text',
+      `${CONFIGS.length} of ${CONFIGS.length * 2} visible observations`,
+    );
+    assertShareLinkParams({
+      i_servicecompare: '1',
+      i_roleshare: '1',
+      i_powerfit: '1',
+      i_frontier: '1',
+    });
+  });
+
+  it('translates the article panels on /zh/inference', () => {
+    visitChart({
+      path: '/zh/inference',
+      extraParams: `&i_metric=y_measuredJPerOutputToken${PANELS}`,
+      officialRunUrl: OFFICIAL_RUN_URL,
+    });
+    cy.get('[data-testid="matched-concurrency-panel"]').should('contain.text', '相同并发下的对照');
+    cy.get('[data-testid="prefill-share-panel"]').should('contain.text', '预填充与解码角色');
+    cy.get('[data-testid="power-fit-panel"]').should('contain.text', '功耗与输出速率');
+    cy.get('[data-testid="frontier-points-panel"]').should('contain.text', '前沿点');
   });
 });
