@@ -1,6 +1,7 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
 @import './motion.css';
+@import '../components/jumpscare/jumpscare.css';
 @plugin '@tailwindcss/typography';
 
 @custom-variant dark (&:is(.dark *, .minecraft *));
