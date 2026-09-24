@@ -115,6 +115,11 @@ function powerSweepRows(): BenchmarkRow[] {
   );
 }
 
+/** Concurrency of every returned point, in series order. */
+function seriesLoads(result: ReturnType<typeof buildInferenceSeries>): number[] {
+  return result.series.flatMap((series) => series.points).map((point) => point.concurrency);
+}
+
 describe('buildInferenceSeries', () => {
   it.each([
     ['interactivity', 'mean_tpot_intvty', 20],
@@ -338,6 +343,23 @@ describe('buildInferenceSeries', () => {
       expect(result.metric.direction).toBeNull();
     },
   );
+
+  it('keeps concurrency loads that lack end-to-end latency or exceed the cost limit', () => {
+    const withoutE2e = Object.fromEntries(
+      Object.entries(metrics()).filter(([key]) => !key.endsWith('_e2el')),
+    );
+    const rows = [
+      makeRow({ conc: 1, metrics: metrics({ tput_per_gpu: 0.5, output_tput_per_gpu: 0.4 }) }),
+      makeRow({ conc: 4, metrics: withoutE2e }),
+      makeRow({ conc: 16 }),
+    ];
+    const options = { ...BASE_OPTIONS, metricConfigKey: 'y_costh' } as const;
+
+    expect(seriesLoads(buildInferenceSeries(rows, { ...options, xmode: 'e2e' }))).not.toContain(1);
+    expect(seriesLoads(buildInferenceSeries(rows, { ...options, xmode: 'concurrency' }))).toEqual([
+      1, 4, 16,
+    ]);
+  });
 
   it('exports reusable topology keys and preserves every load within the chosen topology', () => {
     const rows = [
