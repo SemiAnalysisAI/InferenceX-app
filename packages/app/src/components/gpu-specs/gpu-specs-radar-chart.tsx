@@ -5,7 +5,8 @@ import { track } from '@/lib/analytics';
 
 import type * as d3 from 'd3';
 
-import { GPU_SPECS, GPU_CHART_METRICS, type GpuSpec } from '@/lib/gpu-specs';
+import { GPU_SPECS, type GpuSpec } from '@/lib/gpu-specs';
+import { normalizeGpuValues, RADAR_METRICS } from '@/lib/gpu-specs-radar';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
 import type { LayerConfig } from '@/lib/d3-chart/D3Chart/types';
 import type { RadarDot } from '@/lib/d3-chart/layers/radar';
@@ -14,11 +15,6 @@ import ChartLegend from '@/components/ui/chart-legend';
 
 const NVIDIA_COLOR = '#76b900';
 const AMD_COLOR = '#ed1c24';
-
-/** Metrics to display on the radar chart axes. Excludes worldSize (discrete) and scaleOutBandwidth (nullable). */
-const RADAR_METRICS = GPU_CHART_METRICS.filter(
-  (m) => m.key !== 'scaleUpWorldSize' && m.key !== 'scaleOutBandwidth',
-);
 
 /** Get a unique color per GPU. NVIDIA GPUs get green-ish hues, AMD gets red-ish hues. */
 function getGpuColor(spec: GpuSpec, _index: number): string {
@@ -43,21 +39,9 @@ interface NormalizedGpu {
 
 /** Normalize values across all GPUs for each metric to 0-1 range. */
 export function normalizeGpuData(specs: GpuSpec[], metrics: typeof RADAR_METRICS): NormalizedGpu[] {
-  const maxValues = metrics.map((metric) => {
-    const values = specs
-      .map((spec) => metric.getValue(spec))
-      .filter((v): v is number => v !== null);
-    return Math.max(...values, 1);
-  });
-
-  return specs.map((spec, idx) => ({
-    gpu: spec,
-    values: metrics.map((metric, i) => {
-      const raw = metric.getValue(spec);
-      if (raw === null) return null;
-      return raw / maxValues[i];
-    }),
-    color: getGpuColor(spec, idx),
+  return normalizeGpuValues(specs, metrics).map((entry, idx) => ({
+    ...entry,
+    color: getGpuColor(entry.gpu, idx),
   }));
 }
 

@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { BenchmarkRow } from '@/lib/api';
+import { overviewServingSeriesKey } from '@/lib/overview-data';
 
 const { mockGetLatestBenchmarks, mockGetBenchmarksForRun, mockUnofficialRun, mockGetDb } =
   vi.hoisted(() => ({
@@ -96,6 +97,31 @@ beforeEach(() => {
 });
 
 describe('GET /api/v1/views/inference', () => {
+  it('pins independent current and baseline serving envelopes, including unofficial overlays', async () => {
+    const current = overviewServingSeriesKey(ROWS[0]);
+    const baseline = overviewServingSeriesKey(ROWS[2]);
+    mockUnofficialRun.mockImplementation(() =>
+      Response.json({ benchmarks: ROWS, evaluations: [] }),
+    );
+    const query = new URLSearchParams({
+      model: 'DeepSeek-R1-0528',
+      metric: 'tpPerGpu',
+      currentConfig: current,
+      baselineConfig: baseline,
+      dates: '2026-03-01',
+      unofficialrun: '777',
+    });
+    const response = await GET(request(`/api/v1/views/inference?${query}`));
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.series.map((s: { gpu: string }) => s.gpu)).toEqual(['h200']);
+    expect(body.comparisons[0].series.map((s: { gpu: string }) => s.gpu)).toEqual(['mi300x']);
+    expect(body.overlays[0].series.map((s: { gpu: string }) => s.gpu)).toEqual(['h200']);
+    expect(body.params).toMatchObject({ currentConfig: current, baselineConfig: baseline });
+    query.delete('dates');
+    const invalid = await GET(request(`/api/v1/views/inference?${query}`));
+    expect(invalid.status).toBe(400);
+  });
   it('returns chart-ready series with resolved params for the default selection', async () => {
     const res = await GET(
       request('/api/v1/views/inference?model=DeepSeek-R1-0528&metric=tpPerGpu'),

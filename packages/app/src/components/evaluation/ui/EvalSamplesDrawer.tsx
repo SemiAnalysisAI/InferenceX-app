@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { useEvalSamples } from '@/hooks/api/use-eval-samples';
 import { track } from '@/lib/analytics';
+import { filterEvalSamplePage } from '@/lib/eval-sample-search';
 import type { EvalSamplesFilter, EvalSamplesLiveContext } from '@/lib/api';
 import { buildShareUrl } from '@/lib/url-state';
 import { useLocale } from '@/lib/use-locale';
@@ -162,14 +163,7 @@ export default function EvalSamplesDrawer({
   // search is overkill at PAGE_SIZE rows.
   const filteredSamples = useMemo(() => {
     if (!data) return [];
-    const q = search.trim().toLowerCase();
-    if (!q) return data.samples;
-    return data.samples.filter(
-      (s) =>
-        (s.prompt && s.prompt.toLowerCase().includes(q)) ||
-        (s.response && s.response.toLowerCase().includes(q)) ||
-        (s.target && s.target.toLowerCase().includes(q)),
-    );
+    return filterEvalSamplePage(data.samples, search);
   }, [data, search]);
 
   const total = data?.total ?? 0;

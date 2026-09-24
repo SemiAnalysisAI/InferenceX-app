@@ -8,6 +8,7 @@ vi.mock('@/lib/api-cache', () => ({
 }));
 
 import { GPU_CHART_METRICS, GPU_SPECS, parseNumericFromString } from '@/lib/gpu-specs';
+import { normalizeGpuValues } from '@/lib/gpu-specs-radar';
 
 import { GET } from './route';
 
@@ -20,6 +21,22 @@ beforeEach(() => {
 });
 
 describe('GET /api/v1/views/gpu-specs', () => {
+  it('filters radar visibility without normalizing against the selected subset', async () => {
+    const response = await GET(request('/api/v1/views/gpu-specs?chips=h100-sxm&metric=memory'));
+    const body = await response.json();
+    const expected = normalizeGpuValues(GPU_SPECS).find(({ gpu }) => gpu.name === 'H100 SXM')!;
+    expect(body.chips).toHaveLength(1);
+    expect(body.ranking).toHaveLength(1);
+    expect(body.radar.series).toEqual([{ chip: 'h100-sxm', values: expected.values }]);
+    expect(body.radar.normalization).toBe('all-chips');
+    expect(body.radar.series[0].values).toContain(null);
+    const emptyResponse = await GET(request('/api/v1/views/gpu-specs?chips='));
+    const empty = await emptyResponse.json();
+    expect(empty.chips).toEqual([]);
+    expect(empty.radar.series).toEqual([]);
+    const invalid = await GET(request('/api/v1/views/gpu-specs?chips=unknown'));
+    expect(invalid.status).toBe(400);
+  });
   it('returns every chip with raw fields plus numeric projections', async () => {
     const res = await GET(request('/api/v1/views/gpu-specs'));
     expect(res.status).toBe(200);
@@ -27,7 +44,7 @@ describe('GET /api/v1/views/gpu-specs', () => {
 
     expect(body.view).toBe('gpu-specs');
     expect(body.apiVersion).toBe('v1');
-    expect(body.params).toEqual({ metric: null, format: 'json' });
+    expect(body.params).toEqual({ metric: null, format: 'json', chips: null });
     expect(body.chips).toHaveLength(GPU_SPECS.length);
     expect(body.ranking).toBeUndefined();
 

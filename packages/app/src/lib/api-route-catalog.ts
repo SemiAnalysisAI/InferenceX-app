@@ -46,6 +46,38 @@ export type ApiRouteCatalogEntry = PublishedApiRouteCatalogEntry | ExcludedApiRo
  */
 export const apiRouteCatalog = [
   {
+    source: 'src/app/api/v1/views/agentx-catalog/route.ts',
+    path: '/api/v1/views/agentx-catalog',
+    method: 'GET',
+    classification: 'published-read',
+    operationId: 'get-agentx-catalog-view',
+    sourceSha256: '92eba2b07dbe19182a617faab46211de511974e8c81335c2dbc1b7c6b7795ab5',
+  },
+  {
+    source: 'src/app/api/v1/views/agentx-point/route.ts',
+    path: '/api/v1/views/agentx-point',
+    method: 'GET',
+    classification: 'published-read',
+    operationId: 'get-agentx-point-view',
+    sourceSha256: 'cd3352f94f2540bb3986c5004df238093c94a0de94202d90b7e88868f06dada0',
+  },
+  {
+    source: 'src/app/api/v1/views/dataset/route.ts',
+    path: '/api/v1/views/dataset',
+    method: 'GET',
+    classification: 'published-read',
+    operationId: 'get-dataset-view',
+    sourceSha256: '820a3ac1a79702dfde7b43136bb16a4b11bb6992afdc94087647dcf4c9defe0b',
+  },
+  {
+    source: 'src/app/api/v1/views/evaluation-samples/route.ts',
+    path: '/api/v1/views/evaluation-samples',
+    method: 'GET',
+    classification: 'published-read',
+    operationId: 'get-evaluation-samples-view',
+    sourceSha256: '9b99c398289043f36d6be24fb0bab7aba405a5a9520dc26b61709290a223737d',
+  },
+  {
     source: 'src/app/api/v1/views/cache-reuse/route.ts',
     path: '/api/v1/views/cache-reuse',
     method: 'GET',
@@ -123,7 +155,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-gpu-specs-view',
-    sourceSha256: 'b896689984e65cb0f038cc20e4b47cf7a31e0987ee039ae48b85e363610550d5',
+    sourceSha256: '8439c05e953392dc15d7fbd60e7426a5d52012f74bfe9662cb7e105a39f66a6a',
   },
   {
     source: 'src/app/api/v1/views/historical/route.ts',
@@ -139,7 +171,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-inference-view',
-    sourceSha256: 'de9192086b27e530ad6b1ece082b4989b3a9771a78195ae9f6d1c3899519588f',
+    sourceSha256: '893bfe45a06731d58349e439af81bfe50132f04033faf4a067f66d44ad61103e',
   },
   {
     source: 'src/app/api/v1/views/operatorx/route.ts',
@@ -371,7 +403,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'list-dataset-conversations',
-    sourceSha256: 'f02b0e3c77c6043491ac53a179fb2ca090575f6bb6066119fd78c7919bfc5dbf',
+    sourceSha256: '221595d4b046d0ecaff6efd7d47f8a02c8b85ff426890599892c3ab82ee96aa6',
   },
   {
     source: 'src/app/api/v1/datasets/[slug]/conversations/[convId]/route.ts',
@@ -395,8 +427,8 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'ui-artifact-read',
     exclusionReason: {
-      en: 'UI-only evaluation sample reader backed by live workflow artifacts with an unstable artifact contract.',
-      zh: '仅供界面读取由实时工作流制品支持的评测样本；该制品契约不稳定。',
+      en: 'Page-owned live artifact reader; the documented public sample projection is /api/v1/views/evaluation-samples.',
+      zh: '页面内部使用的实时产物读取接口；公开样本投影由 /api/v1/views/evaluation-samples 提供。',
     },
     sourceSha256: 'd5b8c36466c5882fa253e653997c7c4dd181489d754aca6fef1f98aaa103cf65',
   },
@@ -406,8 +438,8 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'ui-artifact-read',
     exclusionReason: {
-      en: 'UI drill-down for evaluation samples; its pagination and sample payload remain page-owned.',
-      zh: '用于界面下钻评测样本；其分页和样本载荷仍由页面内部使用。',
+      en: 'Page-owned stored-sample reader; the documented public drawer projection is /api/v1/views/evaluation-samples.',
+      zh: '页面内部使用的已存储样本读取接口；公开详情投影由 /api/v1/views/evaluation-samples 提供。',
     },
     sourceSha256: '865f41e25148e30e5de094af98773eebdfc67a395cac7e1a4b75e9b96b23bf85',
   },
@@ -501,8 +533,8 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'page-bff',
     exclusionReason: {
-      en: 'Agentic point-detail BFF with a compact dictionary-encoded request projection coupled to the chart implementation.',
-      zh: '智能体数据点详情页专用 BFF；其字典编码的精简请求投影与图表实现紧密耦合。',
+      en: 'Page-owned compact wire format; /api/v1/views/agentx-point publishes decoded, phase-scoped request fields instead.',
+      zh: '页面内部使用的精简传输格式；/api/v1/views/agentx-point 公开解码后按阶段筛选的请求字段。',
     },
     sourceSha256: '44f5a6830358417eb1402c948051fe13dd05bee392c0de7b1511654d94bb7c43',
   },
@@ -587,8 +619,8 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'page-bff',
     exclusionReason: {
-      en: 'Agentic point-detail BFF that lazily returns the full time-series arrays for one UI-selected metric source.',
-      zh: '智能体数据点详情页专用 BFF；按界面选择按需返回单个指标来源的完整时间序列。',
+      en: 'Page-owned lazy metric-source reader; /api/v1/views/agentx-point exposes the selected source through its documented source parameter.',
+      zh: '页面内部使用的指标来源按需读取接口；/api/v1/views/agentx-point 通过已文档化的 source 参数公开所选来源。',
     },
     sourceSha256: '6bf3444510f1451dff1c76414a257faec0c657d8a01ae821035a9e80addccd2c',
   },
@@ -783,6 +815,80 @@ export interface ApiContractSourceDigest {
  */
 export const apiContractSourceDigests = [
   {
+    source: 'src/lib/views-api/agentx-charts.ts',
+    sourceSha256: '5f4515d2d0cfd7cd6a0f19f9b69eca7c3b97ac38bc32ed3f0dde2d575772f397',
+    reviewArea: {
+      en: 'AgentX chart controls and numerical projections.',
+      zh: 'AgentX 图表控制项与数值投影。',
+    },
+  },
+  {
+    source: 'src/components/inference/agentic-point/time-series-math.ts',
+    sourceSha256: '4dcf086737628a24e342d6793b35810f40f07e2fec239474c5827d6cddfb8ab0',
+    reviewArea: {
+      en: 'Shared request/server chart estimators and populations.',
+      zh: '请求与服务端图表共用的估计方法和样本范围。',
+    },
+  },
+  {
+    source: 'src/components/inference/agentic-point/lognormal.ts',
+    sourceSha256: '04a4b30d1bf5a4b124e72d3c9a6c49a3968c7cab5f1dc1607211f026155247d9',
+    reviewArea: {
+      en: 'Shared log histogram binning and zero exclusions.',
+      zh: '共用的对数直方图分箱与零值排除规则。',
+    },
+  },
+  {
+    source: 'src/lib/views-api/detail-params.ts',
+    sourceSha256: '6005473e305cbb252b76e3748c101d6ca882cd0abfdb50b8966cdc51876f4153',
+    reviewArea: { en: 'Strict public drilldown selectors.', zh: '公开详情接口的严格参数校验。' },
+  },
+  {
+    source: 'src/lib/eval-sample-search.ts',
+    sourceSha256: '3f56dcedeb2db7fbf70a6d6545f775ac3de3efb2e58bc6af95d6eed45485a693',
+    reviewArea: { en: 'Page-local evaluation sample search.', zh: '评估样本的页内搜索。' },
+  },
+  {
+    source: 'src/lib/gpu-specs-radar.ts',
+    sourceSha256: '7b75204cabe6972b8cfba73569ced46d5921288b1a8a04b0f9eced4e7068d205',
+    reviewArea: {
+      en: 'All-chip radar normalization and missing values.',
+      zh: '雷达图基于全部芯片归一化及缺失值处理。',
+    },
+  },
+  {
+    source: 'src/lib/request-chart-data.ts',
+    sourceSha256: '20c6844d9609b063fa018a604e76506165b34eaa32a6bb3908e94c5fa6e9b2fa',
+    reviewArea: {
+      en: 'Public request projection decoding and units.',
+      zh: '公开请求投影的解码与单位。',
+    },
+  },
+  {
+    source: 'src/components/datasets/trace-flamegraph-model.ts',
+    sourceSha256: 'fa9189805922833b773801ca57a8b95c9434cdff73219e7539e83daff978c3e0',
+    reviewArea: {
+      en: 'Conversation rows, overlap brackets and deep-link targets.',
+      zh: '对话行、重叠标记及深层链接目标。',
+    },
+  },
+  {
+    source: 'src/components/inference/agentic-point/phase-slice.ts',
+    sourceSha256: '3e4d8c35594b6fba9c81b3e8f8a574410447f9bd710a92a8e953e65b59db61a4',
+    reviewArea: {
+      en: 'Request and server phase origins and slicing.',
+      zh: '请求和服务端阶段的时间原点与切片。',
+    },
+  },
+  {
+    source: 'src/lib/agentic-catalog.ts',
+    sourceSha256: '4a72937000acf5ffb755311be19ecf20d2651bc62bca755b658ed2f0e46c0fbb',
+    reviewArea: {
+      en: 'Public telemetry catalog grouping and representative points.',
+      zh: '公开遥测目录的分组与代表性数据点。',
+    },
+  },
+  {
     source: 'src/lib/views-api/upstream-error.ts',
     sourceSha256: 'c3f1b4c318e1ae771a67edd85f16d69b7316461334604fd8c892254eface715a',
     reviewArea: {
@@ -910,7 +1016,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/registry.ts',
-    sourceSha256: 'e7494504b118a7706742e542b3cc3b2543823d8463ac5b32b13ebdb971c84aed',
+    sourceSha256: '65323677e9524354a1cdf6661a49a731f9a92c86f865a5ad29ce74ca48851117',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',

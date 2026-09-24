@@ -23,6 +23,7 @@ import { PUBLIC_API_ERRORS } from './public-api-errors';
 import { operations as calculatorViews } from './views-api/docs/calculator';
 import { operations as compareViews } from './views-api/docs/compare';
 import { operations as evaluationViews } from './views-api/docs/evaluation';
+import { operations as detailViews } from './views-api/docs/details';
 import { extendViewOperations, operations as extensionViews } from './views-api/docs/extensions';
 import { operations as fleetViews } from './views-api/docs/fleet';
 import { operations as gpuSpecsViews } from './views-api/docs/gpu-specs';
@@ -821,6 +822,7 @@ export const apiOperations: readonly ApiOperation[] = [
     ...compareViews,
   ]),
   ...extensionViews,
+  ...detailViews,
   {
     id: 'list-operatorx-runs',
     group: 'operatorx',

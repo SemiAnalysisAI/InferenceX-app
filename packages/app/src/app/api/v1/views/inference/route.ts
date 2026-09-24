@@ -1,4 +1,5 @@
 import { GET as derived } from '@/app/api/v1/derived-agentic-metrics/route';
+import { requiredText } from '@/lib/views-api/detail-params';
 import { preferVrDefaultRun, VR_DEFAULT_RUN } from '@/components/inference/default-run-preference';
 import { NORMALIZED_TOKEN_REVENUE_PRICING } from '@/components/inference/token-revenue';
 import type { TokenRevenuePricing } from '@/components/inference/types';
@@ -48,7 +49,11 @@ import { FIXTURES_MODE } from '@semianalysisai/inferencex-db/connection';
 
 import type { BenchmarkRow } from '@semianalysisai/inferencex-db/queries/benchmarks';
 
-import { X_AXIS_MODES, type XAxisMode } from '@/components/inference/hooks/chart-data-core';
+import {
+  filterOverviewHistoryRows,
+  X_AXIS_MODES,
+  type XAxisMode,
+} from '@/components/inference/hooks/chart-data-core';
 import { POWER_TIER_ORDER } from '@/components/inference/utils/quickFilters';
 import { cachedJson } from '@/lib/api-cache';
 import { getCachedBenchmarks, getCachedBenchmarksForRun } from '@/lib/benchmark-query-cache.server';
@@ -306,6 +311,18 @@ export function GET(request: NextRequest) {
       return buildView(rows, scope, metrics);
     }
     const dates = comparisonSelections(search);
+    const currentConfig = search.has('currentConfig')
+      ? requiredText(search, 'currentConfig', 4096)
+      : undefined;
+    const baselineConfig = search.has('baselineConfig')
+      ? requiredText(search, 'baselineConfig', 4096)
+      : undefined;
+    if (baselineConfig && dates.length === 0) {
+      throw new ViewsApiParamError(
+        'baselineConfig',
+        'baselineConfig requires comparison dates or start/end',
+      );
+    }
     const scopes = dates.map(({ entry, date: comparisonDate, runId: comparisonRunId }) => ({
       entry,
       params: { ...params, date: comparisonDate, runId: comparisonRunId, exact: true },
@@ -325,10 +342,13 @@ export function GET(request: NextRequest) {
         rows,
         await getCachedBenchmarks([...dbModelKeys], VR_DEFAULT_RUN.date, true),
       );
-    const data = await project(rows, params);
+    const data = await project(filterOverviewHistoryRows(rows, currentConfig), params);
     const comparisons = await Promise.all(
       scopes.map(async (scope) => {
-        const comparison = await project(await fetchRows(scope.params), scope.params);
+        const comparison = await project(
+          filterOverviewHistoryRows(await fetchRows(scope.params), baselineConfig),
+          scope.params,
+        );
         return { entry: scope.entry, ...comparison.result };
       }),
     );
@@ -336,7 +356,10 @@ export function GET(request: NextRequest) {
     const overlays = await Promise.all(
       [...new Set(overlayRows.map((row) => row.run_url))].map(async (url) => {
         const overlay = await project(
-          overlayRows.filter((row) => row.run_url === url),
+          filterOverviewHistoryRows(
+            overlayRows.filter((row) => row.run_url === url),
+            currentConfig,
+          ),
           params,
         );
         return { runUrl: url, ...overlay.result };
@@ -369,6 +392,8 @@ export function GET(request: NextRequest) {
       priceSource,
       dates,
       unofficialrun: search.get('unofficialrun') ?? null,
+      currentConfig: currentConfig ?? null,
+      baselineConfig: baselineConfig ?? null,
     };
 
     if (format === 'csv') {
