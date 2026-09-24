@@ -141,6 +141,15 @@ describe('gzipTraceReplayInput', () => {
 });
 
 describe('persistPreparedTraceReplay', () => {
+  it('replaces only SGLang capacity for the benchmark rows linked to the raw metrics', async () => {
+    const { sql, calls } = mockSqlWithTransaction([{ id: 441888 }]);
+    const prepared = { ...preparedFixture(), sglangKvCachePoolTokens: 6_338_048 };
+    await expect(persistPreparedTraceReplay(sql, [441888], prepared)).resolves.toBe(1);
+    const update = calls.find((call) => call.text.includes('update benchmark_results br'));
+    expect(update?.text).toContain("jsonb_set(br.metrics, '{kv_cache_pool_tokens}'");
+    expect(update?.text).toContain("c.framework in ('sglang', 'mori-sglang', 'dynamo-sglang')");
+    expect(update?.values).toEqual([6_338_048, [441888], '6338048']);
+  });
   it('derives ATOM capacity from the stored startup log during ingestion', async () => {
     const { sql, calls } = mockSqlWithTransaction(
       [{ id: 41 }],
