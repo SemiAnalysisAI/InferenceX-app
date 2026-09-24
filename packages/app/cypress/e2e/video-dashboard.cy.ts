@@ -1,8 +1,8 @@
 // Runs against the E2E_FIXTURES=1 server, which serves the retained
 // H100/H200/B200 C1/C2/C4 observations from cypress/fixtures/api/video-history.json.
 // Lead (C1) cells, per participating GPU: H100 5.37 videos/GPU-hr at $1.17/GPU-hr,
-// H200 5.97 at $1.22, B200 11.53 at $1.73. Every clip is 8 s, so the $0.034/video-s
-// API reference lists at $0.272 per video.
+// H200 5.97 at $1.22, B200 11.53 at $1.73. Every clip is 8 s, so the $0.080/video-s
+// API reference lists at $0.640 per video.
 describe('Video hardware dashboard (E2E fixtures)', () => {
   beforeEach(() => {
     // The Compare panel fetches two published artifacts once in view; keep the spec offline.
@@ -73,7 +73,7 @@ describe('Video hardware dashboard (E2E fixtures)', () => {
       .and('contain', '11.53')
       .and('contain', 'TCO / video')
       .and('contain', '$0.321')
-      .and('contain', 'API list $0.272')
+      .and('contain', 'API list $0.640')
       .and('contain', 'kJ / video')
       .and('contain', '301.1')
       .and('not.contain', 'Profit');
@@ -118,7 +118,7 @@ describe('Video hardware dashboard (E2E fixtures)', () => {
       .and('contain', '11.53')
       .and('contain', '6.66')
       .and('contain', '$0.150')
-      .and('contain', '$0.272')
+      .and('contain', '$0.640')
       .and('contain', '301.1')
       .and('contain', '96.4')
       .and('contain', '3,856')
@@ -156,20 +156,20 @@ describe('Video hardware dashboard (E2E fixtures)', () => {
       'API list $0.400',
     );
     cy.get('[data-testid="video-api-price-reset"]').click();
-    cy.get('[data-testid="video-api-price"]').should('have.value', '0.034');
+    cy.get('[data-testid="video-api-price"]').should('have.value', '0.08');
     cy.get('[data-testid="video-kpi-card"][data-hardware="b200"]').should(
       'contain',
-      'API list $0.272',
+      'API list $0.640',
     );
     cy.location('search').should('not.contain', 'v_api');
     // A non-positive price never prices at 0: the dated reference stays in force.
     cy.visit('/video?v_api=0');
-    cy.get('[data-testid="video-api-price"]').should('have.value', '0.034');
+    cy.get('[data-testid="video-api-price"]').should('have.value', '0.08');
     cy.get('[data-testid="video-kpi-card"][data-hardware="h200"]').should(
       'contain',
-      'API list $0.272',
+      'API list $0.640',
     );
-    cy.get('[data-testid="video-api-reference-caption"]').should('contain', 'captured 2026-09-19');
+    cy.get('[data-testid="video-api-reference-caption"]').should('contain', 'captured 2026-09-24');
   });
   it('compares the slowest lead deployment against the fastest with time, cost and energy deltas', () => {
     cy.visit('/video');
@@ -248,7 +248,7 @@ describe('Video hardware dashboard (E2E fixtures)', () => {
     cy.get('[data-testid="video-kpi-card"][data-hardware="b200"]')
       .should('contain', 'TCO / 条视频')
       .and('contain', '$0.150')
-      .and('contain', 'API 标价 $0.272');
+      .and('contain', 'API 标价 $0.640');
     cy.get('[data-testid="video-kpi-card"][data-hardware="mi355x"]').should('contain', '未测得');
   });
   it('fits a phone viewport without horizontal page scroll in both locales', () => {

@@ -24,25 +24,25 @@ const caption = () => cy.get('[data-testid="video-api-reference-caption"]');
 
 describe('VideoApiReference', () => {
   it('shows the dated reference with its source and applies valid prices as typed', () => {
-    cy.mount(<Harness initial={0.034} />);
-    input().should('have.value', '0.034').and('have.attr', 'step', '0.001');
+    cy.mount(<Harness initial={0.08} />);
+    input().should('have.value', '0.08').and('have.attr', 'step', '0.001');
     caption()
-      .should('contain', 'Reference $0.034/video-s')
-      .and('contain', 'listed range $0.034–$0.047')
-      .and('contain', 'captured 2026-09-19')
-      .and('contain', 'Source: MiniMax Design · H3 768p subscription tier')
-      .and('contain', 'not verified on the pay-as-you-go page')
+      .should('contain', 'Reference $0.080/video-s')
+      .and('contain', 'listed range $0.080–$0.130')
+      .and('contain', 'captured 2026-09-24')
+      .and('contain', 'Source: MiniMax platform pay-as-you-go pricing page')
+      .and('contain', 'page shows no effective date')
       .and('contain', 'List price, not realized revenue');
     input().clear().type('0.05');
     value().should('have.text', '0.05');
   });
   it('keeps the last valid price while the box is empty or zero and snaps back on blur', () => {
-    cy.mount(<Harness initial={0.034} />);
+    cy.mount(<Harness initial={0.08} />);
     input().clear();
-    value().should('have.text', '0.034');
+    value().should('have.text', '0.08');
     input().type('0');
-    value().should('have.text', '0.034');
-    input().blur().should('have.value', '0.034');
+    value().should('have.text', '0.08');
+    input().blur().should('have.value', '0.08');
   });
   it('resets to the reference, adopts external values and tracks committed changes', () => {
     const capture = cy.stub().as('capture');
@@ -50,10 +50,10 @@ describe('VideoApiReference', () => {
     cy.mount(<Harness initial={0.05} />);
     input().should('have.value', '0.05');
     cy.get('[data-testid="video-api-price-reset"]').click();
-    value().should('have.text', '0.034');
-    input().should('have.value', '0.034');
+    value().should('have.text', '0.08');
+    input().should('have.value', '0.08');
     cy.get('@capture').should('have.been.calledWith', 'video_api_price_changed', {
-      value: '0.034',
+      value: '0.08',
       reset: true,
     });
     cy.get('[data-testid="api-price-external"]').click();
@@ -65,14 +65,14 @@ describe('VideoApiReference', () => {
     });
   });
   it('renders Chinese copy under /zh', () => {
-    cy.mount(<Harness initial={0.034} pathname="/zh/video" />);
+    cy.mount(<Harness initial={0.08} pathname="/zh/video" />);
     cy.contains('label', 'API 参考价（$/video-s）').should('exist');
     cy.contains('button', '重置').should('exist');
     caption()
-      .should('contain', '参考值 $0.034/video-s')
-      .and('contain', '标价区间 $0.034–$0.047')
-      .and('contain', '采集于 2026-09-19')
-      .and('contain', '来源：MiniMax Design · H3 768p 订阅档')
+      .should('contain', '参考值 $0.080/video-s')
+      .and('contain', '标价区间 $0.080–$0.130')
+      .and('contain', '采集于 2026-09-24')
+      .and('contain', '来源：MiniMax 开放平台按量付费价格页')
       .and('contain', '此处为 API 标价，而非实际收入');
   });
 });

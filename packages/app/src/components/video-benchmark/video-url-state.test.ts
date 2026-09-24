@@ -55,7 +55,7 @@ describe('video dashboard URL state', () => {
   it('defaults the API price to the dated reference and rejects non-positive or malformed prices', () => {
     expect(DEFAULT_VIDEO_DASHBOARD_STATE.apiPrice).toBe(H3_API_REFERENCE.pricePerVideoSecondUsd);
     for (const bad of ['0', '-0.034', 'NaN', 'Infinity', '', ' ', 'abc', '0.00004']) {
-      expect(readVideoDashboardState(`?v_api=${bad}`).apiPrice).toBe(0.034);
+      expect(readVideoDashboardState(`?v_api=${bad}`).apiPrice).toBe(0.08);
       expect(parseApiPrice(bad)).toBeNull();
     }
     expect(parseApiPrice(null)).toBeNull();
@@ -136,7 +136,7 @@ describe('video dashboard URL state', () => {
   it('maps state to metric options: the cost tier and the API price, nothing else', () => {
     expect(metricOptions(DEFAULT_VIDEO_DASHBOARD_STATE)).toEqual({
       tier: 'h',
-      apiPricePerVideoSecond: 0.034,
+      apiPricePerVideoSecond: 0.08,
     });
     expect(metricOptions({ ...DEFAULT_VIDEO_DASHBOARD_STATE, tier: 'r', apiPrice: 0.05 })).toEqual({
       tier: 'r',
