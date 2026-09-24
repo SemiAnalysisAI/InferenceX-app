@@ -97,6 +97,16 @@ interface RawSeriesRow {
   sidecars: Record<string, unknown> | string;
   benchmark_result_ids: (number | string)[] | null;
   power_audits: Record<string, unknown>[] | null;
+  csv_sha256: string;
+  ingested_at: string | Date;
+}
+
+/** The columns `upsertGpuMetricSeries` rewrites whenever it replaces a series. */
+interface RawSeriesVersionRow {
+  id: number | string;
+  csv_sha256: string;
+  sample_count: number;
+  ingested_at: string | Date;
 }
 
 interface RawStatRow {
@@ -137,6 +147,34 @@ const isoString = (value: string | Date): string =>
   value instanceof Date ? value.toISOString() : new Date(value).toISOString();
 
 const optional = (value: number | null): number | undefined => (value === null ? undefined : value);
+
+/**
+ * Thrown by the point/run readers when a series was replaced while its parts
+ * were being read; the caller restarts the whole read (links may have changed).
+ */
+export class TelemetrySnapshotChangedError extends Error {
+  constructor(seriesIds: readonly number[]) {
+    super(`gpu_metric_series ${seriesIds.join(', ')} changed while being read`);
+    this.name = 'TelemetrySnapshotChangedError';
+  }
+}
+
+const MAX_SNAPSHOT_ATTEMPTS = 3;
+
+const seriesVersionKey = (row: RawSeriesVersionRow): string =>
+  `${Number(row.id)}:${row.csv_sha256}:${Number(row.sample_count)}:${isoString(row.ingested_at)}`;
+
+async function withConsistentSnapshot<T>(read: () => Promise<T>): Promise<T> {
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      return await read();
+    } catch (error) {
+      if (!(error instanceof TelemetrySnapshotChangedError) || attempt >= MAX_SNAPSHOT_ATTEMPTS) {
+        throw error;
+      }
+    }
+  }
+}
 
 function toSampleRow(raw: RawSampleRow): GpuMetricSampleRow {
   return {
@@ -198,6 +236,24 @@ async function loadSeriesDetails(
     order by series_id, sampled_at, gpu_index
   `) as unknown as RawSampleRow[];
 
+  // The three statements above run as separate autocommit queries (the DbClient
+  // has no transaction), so a re-ingest can commit between them. The writer
+  // replaces samples, stats and the series row in one transaction and stamps
+  // `ingested_at`, so a version key that is unchanged after the samples were
+  // read proves stats and samples belong to the same series version.
+  const versionRows = (await sql`
+    select id, csv_sha256, sample_count, ingested_at
+    from gpu_metric_series
+    where id = any(${ids}::bigint[])
+  `) as unknown as RawSeriesVersionRow[];
+  const versionKeys = new Set(versionRows.map(seriesVersionKey));
+  if (
+    versionRows.length !== seriesRows.length ||
+    !seriesRows.every((row) => versionKeys.has(seriesVersionKey(row)))
+  ) {
+    throw new TelemetrySnapshotChangedError(ids);
+  }
+
   const statsBySeries = new Map<number, GpuMetricStatRow[]>();
   for (const raw of statRows) {
     const key = Number(raw.series_id);
@@ -243,7 +299,14 @@ async function loadSeriesDetails(
  * Returns null when the run is unknown or has no stored series, so callers can
  * fall back to the live GitHub artifacts for in-flight runs.
  */
-export async function getGpuMetricsForRun(
+export function getGpuMetricsForRun(
+  sql: DbClient,
+  githubRunId: number,
+): Promise<GpuMetricsRunPayload | null> {
+  return withConsistentSnapshot(() => readGpuMetricsForRun(sql, githubRunId));
+}
+
+async function readGpuMetricsForRun(
   sql: DbClient,
   githubRunId: number,
 ): Promise<GpuMetricsRunPayload | null> {
@@ -273,6 +336,7 @@ export async function getGpuMetricsForRun(
   const seriesRows = (await sql`
     select s.id, s.workflow_run_id, s.artifact_name, s.config_key, s.file_name, s.vendor,
       s.sample_interval_s, s.sample_count, s.gpu_count, s.started_at, s.ended_at, s.sidecars,
+      s.csv_sha256, s.ingested_at,
       (
         select array_agg(l.benchmark_result_id order by l.benchmark_result_id)
         from benchmark_result_gpu_metrics l where l.series_id = s.id
@@ -313,13 +377,21 @@ export interface GpuMetricsPointPayload {
 }
 
 /** Series linked to one benchmark point, with samples. Null when none is linked. */
-export async function getGpuMetricsForPoint(
+export function getGpuMetricsForPoint(
+  sql: DbClient,
+  benchmarkResultId: number,
+): Promise<GpuMetricsPointPayload | null> {
+  return withConsistentSnapshot(() => readGpuMetricsForPoint(sql, benchmarkResultId));
+}
+
+async function readGpuMetricsForPoint(
   sql: DbClient,
   benchmarkResultId: number,
 ): Promise<GpuMetricsPointPayload | null> {
   const seriesRows = (await sql`
     select s.id, s.workflow_run_id, s.artifact_name, s.config_key, s.file_name, s.vendor,
       s.sample_interval_s, s.sample_count, s.gpu_count, s.started_at, s.ended_at, s.sidecars,
+      s.csv_sha256, s.ingested_at,
       (
         select array_agg(l.benchmark_result_id order by l.benchmark_result_id)
         from benchmark_result_gpu_metrics l where l.series_id = s.id
