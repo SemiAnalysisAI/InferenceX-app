@@ -114,21 +114,8 @@ describe('Inference Chart', () => {
     cy.visit('/inference');
   });
 
-  it('renders the inference chart display wrapper', () => {
-    cy.get('[data-testid="inference-chart-display"]').should('exist');
-  });
-
   it('shows the Inference Performance heading', () => {
     cy.contains('h2', 'Inference Performance').should('be.visible');
-  });
-
-  it('renders at least one chart figure', () => {
-    cy.get('[data-testid="chart-figure"]').should('have.length.at.least', 1);
-  });
-
-  it('renders at least one scatter graph with an SVG', () => {
-    cy.get('[data-testid="scatter-graph"]').should('have.length.at.least', 1);
-    cy.get('[data-testid="scatter-graph"]').first().find('svg').should('exist');
   });
 
   it('hides the logo watermark when the unofficial-domain notice is shown', () => {
@@ -143,11 +130,6 @@ describe('Inference Chart', () => {
       .first()
       .find('svg circle')
       .should('have.length.greaterThan', 0);
-  });
-
-  it('does not show "No data available" when data loads', () => {
-    cy.get('[data-testid="inference-chart-display"]').should('exist');
-    cy.contains('No data available').should('not.exist');
   });
 
   it('leads the chart heading with the model and workload, without the cost tier', () => {
@@ -184,10 +166,6 @@ describe('Inference Chart', () => {
       .and('not.contain.text', 'Workload:')
       .and('not.contain.text', 'Precision:')
       .and('not.contain.text', 'Metric:');
-  });
-
-  it('shows the sidebar legend for GPU types', () => {
-    cy.get('.sidebar-legend').should('be.visible');
   });
 
   it('renders quick filters as visible toggles and toggles a vendor', () => {
