@@ -96,7 +96,7 @@ if (${JSON.stringify(phase)} === 'staging') {
         JSON.parse(fs.readFileSync(to, 'utf8')).phase === 'activated' &&
         (${JSON.stringify(phase)} === 'activated-runtime'
           ? JSON.parse(fs.readFileSync(to, 'utf8')).skill === 'inferencex-api'
-          : JSON.parse(fs.readFileSync(to, 'utf8')).skill === 'inferencex')) pause();
+          : JSON.parse(fs.readFileSync(to, 'utf8')).skill === 'inferencex-to-table')) pause();
     return result;
   };
 } else {
@@ -181,7 +181,9 @@ for (const signal of ['SIGINT', 'SIGTERM']) {
         assert.deepEqual(snapshot(destination), previous);
         assert.deepEqual(
           readdirSync(dirname(destination)),
-          existing ? ['inferencex', 'inferencex-api'] : [],
+          existing
+            ? ['inferencex', 'inferencex-api', 'inferencex-to-chart', 'inferencex-to-table']
+            : [],
         );
       } finally {
         await cleanup(control);
@@ -233,7 +235,12 @@ test('SIGTERM after committed activation reports the completed installation', as
       JSON.parse(readFileSync(join(destination, '.inferencex-skills.json'), 'utf8')).version,
       packageInfo.version,
     );
-    assert.deepEqual(readdirSync(dirname(destination)), ['inferencex', 'inferencex-api']);
+    assert.deepEqual(readdirSync(dirname(destination)), [
+      'inferencex',
+      'inferencex-api',
+      'inferencex-to-chart',
+      'inferencex-to-table',
+    ]);
     assert.equal(JSON.parse(control.output.stdout).ready, true);
   } finally {
     await cleanup(control);
