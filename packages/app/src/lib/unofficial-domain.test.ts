@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { getChartWatermark } from './data-mappings';
 
 import {
   getDomainAwareChartWatermark,
@@ -20,5 +21,14 @@ describe('unofficial domain branding', () => {
   it('preserves non-logo watermark modes on unofficial domains', () => {
     expect(getDomainAwareChartWatermark('unofficial', 'preview.example.com')).toBe('unofficial');
     expect(getDomainAwareChartWatermark('none', 'preview.example.com')).toBe('none');
+  });
+  it('honors the explicit unofficial background override on every hostname', () => {
+    for (const hostname of [OFFICIAL_HOSTNAME, 'localhost', 'preview.example.com']) {
+      expect(getDomainAwareChartWatermark(getChartWatermark(true, true), hostname)).toBe('logo');
+      expect(getDomainAwareChartWatermark(getChartWatermark(true, false), hostname)).toBe(
+        'unofficial',
+      );
+    }
+    expect(getDomainAwareChartWatermark(getChartWatermark(false, true), 'localhost')).toBe('none');
   });
 });

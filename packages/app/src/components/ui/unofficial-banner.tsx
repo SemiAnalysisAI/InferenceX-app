@@ -2,6 +2,9 @@
 
 import { AlertTriangle, ExternalLink, X } from 'lucide-react';
 
+import { useLocale } from '@/lib/use-locale';
+import { Switch } from '@/components/ui/switch';
+
 import { track } from '@/lib/analytics';
 import { overlayRunColor } from '@/lib/overlay-run-style';
 import { cn } from '@/lib/utils';
@@ -17,6 +20,8 @@ interface RunInfo {
 
 interface UnofficialBannerProps {
   runs: RunInfo[];
+  removeUnofficialBg?: boolean;
+  onRemoveUnofficialBgChange?: (checked: boolean) => void;
   /** Join the bottom edge of the dashboard navigation card. */
   attached?: boolean;
   /** Remove a single run from the URL + state. */
@@ -24,6 +29,11 @@ interface UnofficialBannerProps {
   /** Clear all runs at once. Surfaced as "Dismiss all" when `runs.length > 1`. */
   onDismissAll?: () => void;
 }
+
+const STRINGS = {
+  en: { removeUnofficialBg: 'Remove unofficial BG' },
+  zh: { removeUnofficialBg: '移除非官方背景' },
+};
 
 /**
  * Compact banner that advertises that the page is showing unofficial run data.
@@ -40,7 +50,10 @@ export function UnofficialBanner({
   attached = false,
   onDismissRun,
   onDismissAll,
+  removeUnofficialBg = false,
+  onRemoveUnofficialBgChange,
 }: UnofficialBannerProps) {
+  const locale = useLocale();
   if (runs.length === 0) return null;
   const multiple = runs.length > 1;
 
@@ -72,6 +85,20 @@ export function UnofficialBanner({
             />
           ))}
         </div>
+        {onRemoveUnofficialBgChange && (
+          <label className="flex items-center gap-2 text-xs cursor-pointer">
+            <Switch
+              data-testid="remove-unofficial-bg"
+              checked={removeUnofficialBg}
+              onCheckedChange={(checked) => {
+                track('unofficial_background_toggled', { removed: checked });
+                onRemoveUnofficialBgChange(checked);
+              }}
+              aria-label={STRINGS[locale].removeUnofficialBg}
+            />
+            {STRINGS[locale].removeUnofficialBg}
+          </label>
+        )}
         {multiple && onDismissAll && (
           <button
             type="button"

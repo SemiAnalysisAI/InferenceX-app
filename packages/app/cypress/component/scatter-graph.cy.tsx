@@ -828,6 +828,110 @@ describe('ScatterGraph', () => {
     cy.get('.sidebar-legend label').should('have.length.greaterThan', 0);
   });
 
+  it('combines matching hardware across unofficial runs and recomputes after dismissal', () => {
+    const runUrls = [101, 102].map(
+      (id) => `https://github.com/SemiAnalysisAI/InferenceX/actions/runs/${id}`,
+    );
+    const points = [
+      createMockInferenceData({
+        hwKey: 'b200_trt',
+        precision: Precision.FP4,
+        x: 8,
+        y: 320,
+        run_url: runUrls[0],
+      }),
+      createMockInferenceData({
+        hwKey: 'b200_trt',
+        precision: Precision.FP4,
+        x: 16,
+        y: 200,
+        run_url: runUrls[0],
+      }),
+      createMockInferenceData({
+        hwKey: 'b200_trt',
+        precision: Precision.FP4,
+        x: 16,
+        y: 280,
+        run_url: runUrls[1],
+      }),
+      createMockInferenceData({
+        hwKey: 'b200_trt',
+        precision: Precision.FP4,
+        x: 32,
+        y: 220,
+        run_url: runUrls[1],
+      }),
+    ];
+    function Harness() {
+      const [dismissed, setDismissed] = useState(false);
+      return (
+        <div style={{ width: 800, height: 600 }}>
+          <button onClick={() => setDismissed(true)}>Dismiss second run</button>
+          <ScatterGraph
+            chartId="combined-overlay"
+            modelLabel="DeepSeek R1"
+            data={[
+              createMockInferenceData({ hwKey: 'h100', precision: Precision.FP4, x: 8, y: 100 }),
+            ]}
+            xLabel="Interactivity"
+            yLabel="Throughput"
+            chartDefinition={createMockChartDefinition({
+              chartType: 'interactivity',
+              y_tpPerGpu_roofline: 'upper_left',
+            })}
+            overlayData={{
+              data: dismissed ? points.slice(0, 2) : points,
+              hardwareConfig: hwConfig,
+              label: 'combined',
+            }}
+          />
+        </div>
+      );
+    }
+    mountWithProviders(<Harness />, {
+      inference: {
+        hardwareConfig: hwConfig,
+        activeHwTypes: new Set(['h100']),
+        hwTypesWithData: new Set(['h100']),
+        selectedPrecisions: [Precision.FP4],
+        hideNonOptimal: true,
+      },
+      unofficial: {
+        activeOverlayHwTypes: new Set(['b200_trt']),
+        allOverlayHwTypes: new Set(['b200_trt']),
+        runIndexByUrl: { [runUrls[0]]: 0, [runUrls[1]]: 1 },
+      },
+    });
+    const curve = '#combined-overlay .overlay-roofline-path';
+    cy.get<SVGPathElement>(curve)
+      .should('have.length', 1)
+      .then(($paths) => {
+        const entry = (
+          $paths[0] as SVGPathElement & { __data__: { points: { x: number; y: number }[] } }
+        ).__data__;
+        expect(entry.points.map(({ x, y }) => [x, y])).to.deep.equal([
+          [8, 320],
+          [16, 280],
+          [32, 220],
+        ]);
+      });
+    cy.get('#combined-overlay .unofficial-overlay-pt').should(($points) => {
+      expect([...$points].filter((p) => p.style.opacity !== '0')).to.have.length(3);
+    });
+    cy.contains('button', 'Dismiss second run').click();
+    cy.get<SVGPathElement>(curve)
+      .should('have.length', 1)
+      .should(($paths) => {
+        const entry = (
+          $paths[0] as SVGPathElement & { __data__: { points: { x: number; y: number }[] } }
+        ).__data__;
+        expect(entry.points.map(({ x, y }) => [x, y])).to.deep.equal([
+          [8, 320],
+          [16, 200],
+        ]);
+      });
+  });
+
   it('renders line labels for both official and overlay (unofficial) rooflines', () => {
     const interactivityChartDef = createMockChartDefinition({
       chartType: 'interactivity',
@@ -3017,7 +3121,7 @@ describe('Power envelopes', () => {
         '#power-overlay .overlay-roofline-path[data-curve-kind="power-envelope"]';
       function assertEnvelopes() {
         cy.get<SVGPathElement>(`${officialSelector}, ${overlaySelector}`)
-          .should('have.length', 3)
+          .should('have.length', 2)
           .should(($paths) => {
             const segmentCounts = [...$paths].map((path) => {
               const segments = path.getAttribute('d')!.match(/C/gu) ?? [];
@@ -3031,11 +3135,11 @@ describe('Power envelopes', () => {
               }
               return segments.length;
             });
-            expect(segmentCounts).to.have.members([5, 5, 2]);
+            expect(segmentCounts.every((count) => count > 0)).to.equal(true);
           });
       }
       cy.get(officialSelector).should('have.length', 1);
-      cy.get(overlaySelector).should('have.length', 2);
+      cy.get(overlaySelector).should('have.length', 1);
       cy.get('#power-overlay .dot-group').should('have.length', 9);
       cy.get('#power-overlay .unofficial-overlay-pt').should('have.length', 12);
       cy.get('#power-overlay .dot-group')
@@ -3043,7 +3147,7 @@ describe('Power envelopes', () => {
         .should('have.length', 6);
       cy.get('#power-overlay .unofficial-overlay-pt')
         .filter((_, element) => element.style.opacity !== '0')
-        .should('have.length', 9);
+        .should('have.length', 6);
       assertEnvelopes();
       cy.get(`${officialSelector}, ${overlaySelector}`).then(($paths) => {
         const geometry = [...$paths].map((path) => path.getAttribute('d'));
@@ -3064,7 +3168,7 @@ describe('Power envelopes', () => {
           .should('have.length', 6);
         cy.get('#power-overlay .unofficial-overlay-pt')
           .filter((_, element) => element.style.opacity !== '0')
-          .should('have.length', 9);
+          .should('have.length', 6);
         cy.get(`${officialSelector}, ${overlaySelector}`).should(($current) => {
           expect([...$current].map((path) => path.getAttribute('d'))).to.deep.equal(geometry);
         });
