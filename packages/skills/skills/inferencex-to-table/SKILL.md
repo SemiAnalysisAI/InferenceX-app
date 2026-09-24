@@ -1,6 +1,6 @@
 ---
 name: inferencex-to-table
-description: 'Create a concise table image and supporting spreadsheet CSV for one InferenceX AgentX result, comparing one chosen metric by recorded source category. Use when the requested output is a table or CSV.'
+description: 'Create a concise table image and supporting spreadsheet CSV for one InferenceX AgentX result, comparing request counts and median token lengths and latency by recorded source category. Use when the requested output is a table or CSV.'
 ---
 
 # InferenceX to Table
@@ -15,11 +15,11 @@ capture. The ready template is the recorded-source comparison; use `charts list`
 to explain other template availability when the user requests a different table.
 
 Resolve `../inferencex-api/scripts/inferencex.mjs` from this skill directory and
-run it with Node.js 24 or later. Select the requested metric from the cookbook
-(default: `requests`). Render with
-`charts agentx-sources --input <capture> --metric <metric> --style table --output-dir <new-directory>`.
-Default to `--style table`; honor an explicitly requested style, including
-`--style both` for a chart and table together.
+run it with Node.js 24 or later. Render with
+`charts agentx-sources --input <capture> --style table --output-dir <new-directory>`.
+The table image always shows request counts, share and all four medians. Default to
+`--style table`; honor an explicitly requested style, including `--style both` with
+the chart's `--metric` for a chart and table together.
 
 Inspect the generated image(s). Deliver an image embed, not just a download link:
 

@@ -3,8 +3,8 @@
 For “what charts can you generate?”, run `inferencex charts list` offline. The
 catalog distinguishes ready-to-render templates, data-capture cookbooks and
 recommendations needing a custom renderer. The first template compares **recorded
-request source categories**: one focused chart or table image of request counts,
-token lengths or latency. A dataset token histogram and one point's request timeline
+request source categories**: a chart of one metric (request counts, token lengths or
+latency) or one table image of counts and medians. A dataset token histogram and one point's request timeline
 answer different questions. The timeline links its capture cookbook; dataset
 distributions are a recommendation without a bundled rendering recipe.
 
@@ -12,25 +12,35 @@ distributions are a recommendation without a bundled rendering recipe.
 
 Use `inferencex-to-chart` for a chart or `inferencex-to-table` for a table image and CSV.
 The general `inferencex` skill also handles either style. All three entries use
-the same command and calculations. Choose one metric from the user's question:
+the same command and calculations. Choose the chart metric from the user's question:
 
-| Question                                 | Metric               | Image values                              |
-| ---------------------------------------- | -------------------- | ----------------------------------------- |
-| How many requests came from each source? | `requests` (default) | Request count and share                   |
-| How long were the input prompts?         | `input-tokens`       | Median input tokens                       |
-| How long were the outputs?               | `output-tokens`      | Median output tokens                      |
-| How long did requests take?              | `e2e`                | Median completed-request E2E, in seconds  |
-| How long until the first token?          | `ttft`               | Median completed-request TTFT, in seconds |
+| Question                                 | Metric               | Chart values                                |
+| ---------------------------------------- | -------------------- | ------------------------------------------- |
+| How many requests came from each source? | `requests` (default) | Request count and share                     |
+| How long were the input prompts?         | `input-tokens`       | Median input tokens                         |
+| How long were the outputs?               | `output-tokens`      | Median output tokens                        |
+| How long did requests take?              | `e2e`                | Median completed-request E2E (µs, ms or s)  |
+| How long until the first token?          | `ttft`               | Median completed-request TTFT (µs, ms or s) |
 
 Use `--style chart` for a chart, `--style table` for a table image with supporting
-files, or `--style both` (the CLI default) for both images of the chosen metric.
-When several metrics are requested, create one image per metric in separate output
-directories. Each image answers one question.
+files, or `--style both` (the CLI default) for both. The table image always shows
+request counts, share and all four medians, so `--metric` changes only the chart.
+When several charts are requested, render each metric into its own output directory.
+
+The layout follows the data. One source renders as a single large figure; up to
+seven sources with short labels render as columns; eight or more, or labels that
+need more than two lines, render as horizontal bars ranked by value. Past 20
+sources, the 19 with the most requests keep their rows and the rest fold into a
+grey “Other” row for counts, or into a footnote for medians, which cannot be summed;
+`summary.csv` keeps every source. The table image shows sources as columns up to
+four and as ranked rows beyond that. Images stay 1200 px wide and grow taller with
+more rows. Labels wrap to two lines; denser charts shorten long labels in the middle
+and keep the full label as the SVG tooltip.
 
 Charts use a dark SemiAnalysis palette, large labels and Inter-first font fallbacks.
 The SVG is standalone; it does not download fonts, logos or plotting libraries.
-Each image emphasizes the selected metric with large values and little prose. Full
-quantiles and valid/missing/excluded counts remain in `summary.json`; table outputs also
+Each image labels every value directly, without axes or gridlines. Full quantiles
+and valid/missing/excluded counts remain in `summary.json`; table outputs also
 include detailed Markdown and CSV. Use the generated values in both styles;
 changing presentation does not change population or statistics.
 
@@ -76,9 +86,9 @@ Counts and token lengths include cancelled requests, with their counts shown.
 Latency includes only completed requests: E2E is `(end - start) / 1e6` milliseconds;
 TTFT is the recorded `ttftMs`. Each metric reports valid, missing and excluded
 cancelled counts. Missing observations stay missing; recorded zero stays zero.
-Count bars use a linear scale. Token images show medians in tokens; latency images
-convert the selected median from milliseconds to seconds. The full distribution
-remains in the detailed files, where latency values keep their original millisecond units.
+Bars start at zero on a linear scale. Token values are medians in tokens; latency
+medians use µs, ms or s so tiny positive values never display as zero. The full
+distribution remains in the detailed files, where latency keeps its millisecond units.
 Quantiles linearly interpolate sorted observations at `(n - 1) * p` (R type 7).
 A one-value distribution remains one observation; unavailable latency is labeled.
 

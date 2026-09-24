@@ -45,6 +45,7 @@ const EXPECTED_FILES = [
   'skills/inferencex-api/references/releases.md',
   'skills/inferencex-api/references/tco.md',
   'skills/inferencex-api/schemas.json',
+  'skills/inferencex-api/scripts/chart-layout.mjs',
   'skills/inferencex-api/scripts/charts.mjs',
   'skills/inferencex-api/scripts/cli-contract.mjs',
   'skills/inferencex-api/scripts/commands.mjs',

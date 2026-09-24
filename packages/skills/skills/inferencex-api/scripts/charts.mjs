@@ -3,6 +3,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 
+import { MAX_ROWS, barChart, format, tableImage, xml } from './chart-layout.mjs';
 import { CliError, argumentError, responseError } from './cli-contract.mjs';
 import { readBoundedRegular } from './local-files.mjs';
 
@@ -12,22 +13,37 @@ const METRICS = [
   ['e2e_ms', 'Completed request E2E', 'ms'],
   ['ttft_ms', 'Completed request TTFT', 'ms'],
 ];
+// One focused chart per metric; `requests` is the default view.
 const IMAGE_METRICS = {
-  requests: { title: 'AgentX request mix', unit: 'requests' },
-  'input-tokens': { title: 'AgentX input length', key: 'isl', unit: 'tokens' },
-  'output-tokens': { title: 'AgentX output length', key: 'osl', unit: 'tokens' },
-  e2e: { title: 'AgentX request latency', key: 'e2e_ms', unit: 'seconds', divisor: 1000 },
-  ttft: { title: 'AgentX time to first token', key: 'ttft_ms', unit: 'seconds', divisor: 1000 },
+  requests: { title: 'Requests by recorded source' },
+  'input-tokens': {
+    key: 'isl',
+    title: 'Median input length by recorded source',
+    unit: 'tokens, including cancelled requests',
+    format: format.quantity,
+  },
+  'output-tokens': {
+    key: 'osl',
+    title: 'Median output length by recorded source',
+    unit: 'tokens, including cancelled requests',
+    format: format.quantity,
+  },
+  e2e: {
+    key: 'e2e_ms',
+    title: 'Median end-to-end latency by recorded source',
+    unit: 'completed requests',
+    format: format.duration,
+  },
+  ttft: {
+    key: 'ttft_ms',
+    title: 'Median time to first token by recorded source',
+    unit: 'completed requests',
+    format: format.duration,
+  },
 };
-const COLORS = ['#2fa9ef', '#f7b041', '#63d6b3', '#b39aff', '#ff8fab', '#67d4e8'];
 const object = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
 const nonnegative = (value) => typeof value === 'number' && Number.isFinite(value) && value >= 0;
 const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex');
-const xml = (value) =>
-  String(value).replaceAll(
-    /[<>&"']/gu,
-    (char) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&apos;' })[char],
-  );
 
 export function chartTemplates() {
   return {
@@ -36,8 +52,8 @@ export function chartTemplates() {
       {
         id: 'agentx-sources',
         status: 'available',
-        chart: 'One focused bar chart: request counts or a selected token/latency median',
-        table: 'One focused SVG table, with detailed statistics in Markdown and summary CSV',
+        chart: 'One metric by recorded srcKind; the layout adapts from 1 to 40 sources',
+        table: 'SVG table of counts, share and medians, plus detailed Markdown and summary CSV',
         metrics: Object.keys(IMAGE_METRICS),
         default_metric: 'requests',
         styles: ['chart', 'table', 'both'],
@@ -277,7 +293,7 @@ export function summarizeSources(capture, phase = 'all') {
         grouping:
           'Exact recorded srcKind; missing or blank is a separate null category. No main/subagent role is inferred.',
         chart_scale:
-          'Linear from zero; one selected metric per image. Latency image medians use seconds; detailed statistics retain ms.',
+          'Linear bars from zero; one metric per chart and counts plus medians in the table image. Image latency uses readable units; detailed statistics retain ms.',
         quantiles: 'Linear interpolation at (n - 1) * p over sorted valid observations (R type 7)',
         tokens:
           'ISL/OSL tokens include cancelled requests when recorded; null is missing, zero is retained',
@@ -296,176 +312,136 @@ const number = (value) =>
   value === null ? 'unavailable' : value.toLocaleString('en-US', { maximumSignificantDigits: 4 });
 const categoryLabel = (value) => (value === null ? '(source missing)' : `srcKind: ${value}`);
 
-const pictureNumber = (v) =>
-  v !== null && (v >= 1e9 || (v > 0 && v < 0.0001)) ? v.toExponential(3) : number(v);
+const sourceName = (value) => (value === null ? '(source missing)' : value);
+const unavailable = (stats) =>
+  stats.excluded_cancelled_count > 0 && stats.missing_count === 0
+    ? 'all cancelled'
+    : 'not recorded';
+
+// Shared framing for chart and table images. Past MAX_ROWS sources, the largest
+// keep their rows; the rest fold into one count row or a footnote for medians.
+function presentation(summary) {
+  const { scope, source } = summary;
+  const ranked = summary.groups.toSorted((a, b) => b.request_count - a.request_count);
+  const hidden = ranked.length > MAX_ROWS ? ranked.slice(MAX_ROWS - 1) : [];
+  const hiddenRequests = hidden.reduce((sum, group) => sum + group.request_count, 0);
+  return {
+    eyebrow: 'SemiAnalysis · InferenceX AgentX',
+    scope: `Result ${source.selected_result_id} · ${scope.phase === 'all' ? 'all phases' : `${scope.phase} phase`} · ${format.count(scope.selected_request_count)} requests`,
+    groups: summary.groups.filter((group) => !hidden.includes(group)),
+    top:
+      hidden.length > 0
+        ? ` · top ${ranked.length - hidden.length} of ${ranked.length} sources`
+        : '',
+    hidden:
+      hidden.length > 0
+        ? {
+            count: hidden.length,
+            label: `Other (${hidden.length} sources)`,
+            requests: hiddenRequests,
+            share: hiddenRequests / scope.selected_request_count,
+            cancelled: hidden.reduce((sum, group) => sum + group.cancelled_count, 0),
+          }
+        : null,
+    footer: [
+      'Groups are recorded srcKind values; roles are not inferred. One captured result, not a dataset-wide comparison.',
+      `Source: ${source.query_url} · captured ${source.retrieved_at.slice(0, 10)}`,
+    ],
+    empty: 'No requests in the selected phase.',
+  };
+}
 
 export function renderSourceChart(summary, metric = 'requests') {
-  return renderSourcePicture(summary, metric, false);
-}
-
-export function renderSourceTable(summary, metric = 'requests') {
-  return renderSourcePicture(summary, metric, true);
-}
-
-function renderSourcePicture(summary, metric, table) {
-  const spec = IMAGE_METRICS[metric];
-  const groups = summary.groups;
-  const horizontal = groups.length > 6;
-  const rowHeight = table ? 100 : 90;
-  const plotBottom = table || horizontal ? 230 + Math.max(1, groups.length) * rowHeight : 660;
-  const width = 1440;
-  const height = plotBottom + (table || horizontal ? 175 : 235);
-  const pieces = [
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-labelledby="title description"><title id="title">${xml(spec.title)}</title><desc id="description">${xml(JSON.stringify(summary.scope))}. Recorded source categories; ${spec.key ? `median ${spec.unit}` : 'request counts and shares'}.</desc><rect width="100%" height="100%" fill="#0a0d10"/><style>text{font-family:Inter,'Helvetica Neue',Arial,sans-serif;fill:#e8eaed}.small{font-size:19px;fill:#8a939c}.label{font-size:26px}.value{font-size:44px;font-weight:700}.title{font-size:48px;font-weight:700}.brand{font-size:20px;font-weight:600;fill:#2fa9ef}</style>`,
-  ];
-  const text = (x, y, value, cls = 'label', anchor = 'start', extra = '') =>
-    pieces.push(
-      `<text x="${x}" y="${y}" class="${cls}" text-anchor="${anchor}" ${extra}>${xml(value)}</text>`,
+  const view = IMAGE_METRICS[metric];
+  const base = presentation(summary);
+  const rows = base.groups.map((group) => {
+    if (!view.key)
+      return {
+        label: sourceName(group.source_category),
+        value: group.request_count,
+        text: format.count(group.request_count),
+        detail: format.share(group.request_share),
+      };
+    const stats = group.metrics[view.key];
+    return {
+      label: sourceName(group.source_category),
+      value: stats.median,
+      text: view.format(stats.median),
+      detail: stats.valid_count ? `n = ${format.count(stats.valid_count)}` : unavailable(stats),
+    };
+  });
+  const footer = [...base.footer];
+  if (base.hidden && !view.key)
+    rows.push({
+      label: base.hidden.label,
+      value: base.hidden.requests,
+      text: format.count(base.hidden.requests),
+      detail: format.share(base.hidden.share),
+      muted: true,
+    });
+  else if (base.hidden)
+    footer.unshift(
+      `${base.hidden.count} smaller sources with ${format.share(base.hidden.share)} of requests are not shown; summary.csv lists every source.`,
     );
-  const label = (x, y, value, maxWidth, anchor = 'start') => {
-    const full = value ?? '(source missing)';
-    const maxLength = Math.floor(maxWidth / 26);
-    const left = anchor === 'middle' ? x - maxWidth / 2 : x;
-    pieces.push(
-      `<svg x="${left}" y="${y - 28}" width="${maxWidth}" height="36" overflow="hidden"><text x="${anchor === 'middle' ? maxWidth / 2 : 0}" y="28" class="label" text-anchor="${anchor}"><title>${xml(full)}</title>${xml(full.length > maxLength ? `${full.slice(0, maxLength - 1)}…` : full)}</text></svg>`,
-    );
-  };
-  const value = (group) => (spec.key ? group.metrics[spec.key].median : group.request_count);
-  const display = (group) => {
-    if (!spec.key) return group.request_count.toLocaleString('en-US');
-    const v = value(group) === null ? null : value(group) / (spec.divisor ?? 1);
-    return pictureNumber(v);
-  };
-  const detail = (group) => {
-    if (!spec.key) return `${number(group.request_share * 100)}%`;
-    const stats = group.metrics[spec.key];
-    return stats.missing_count || stats.excluded_cancelled_count
-      ? `n=${stats.valid_count}; ${stats.missing_count} missing; ${stats.excluded_cancelled_count} cancelled excluded`
-      : '';
-  };
-  text(64, 42, 'SemiAnalysis · InferenceX', 'brand');
-  text(64, 110, spec.title, 'title');
-  text(
-    64,
-    155,
-    spec.key
-      ? `Median · ${spec.unit}${spec.key.endsWith('_ms') ? ' · completed requests' : ''}`
-      : 'Request count · share of captured requests',
-  );
-  text(
-    64,
-    191,
-    `Result ${summary.source.selected_result_id} · ${summary.scope.selected_request_count.toLocaleString('en-US')} selected requests · phase ${summary.scope.phase}`,
-    'small',
-  );
-  if (table) {
-    text(84, 247, 'Recorded source', 'small');
-    text(
-      spec.key ? 1310 : 1010,
-      247,
-      spec.key ? `Median (${spec.unit})` : 'Requests',
-      'small',
-      'end',
-    );
-    if (!spec.key) text(1310, 247, 'Share', 'small', 'end');
-    for (const [index, group] of groups.entries()) {
-      const y = 278 + index * rowHeight;
-      pieces.push(
-        `<rect x="64" y="${y}" width="1312" height="88" rx="8" fill="${index % 2 ? '#11161c' : '#151c23'}"/>`,
-        `<rect x="64" y="${y}" width="5" height="88" fill="${COLORS[index % COLORS.length]}"/>`,
-      );
-      label(84, y + 53, group.source_category, spec.key ? 900 : 650);
-      text(spec.key ? 1310 : 1010, y + 54, display(group), 'value', 'end');
-      if (!spec.key) text(1310, y + 54, detail(group), 'value', 'end');
-      else if (detail(group)) text(1310, y + 78, detail(group), 'small', 'end');
-    }
-  } else {
-    const max = Math.max(1, ...groups.map((group) => (value(group) ?? 0) / (spec.divisor ?? 1)));
-    const magnitude = 10 ** Math.floor(Math.log10(max));
-    const ceiling = Math.min(
-      Number.MAX_VALUE,
-      Math.ceil(max / magnitude / 0.5) * (magnitude * 0.5),
-    );
-    if (!horizontal) {
-      for (let tick = 0; tick <= 4; tick++) {
-        const y = plotBottom - tick * 95;
-        pieces.push(
-          `<path d="M140,${y}H1370" stroke="#30363d" stroke-dasharray="${tick ? '4 8' : 'none'}"/>`,
-        );
-        text(120, y + 7, pictureNumber(ceiling * (tick / 4)), 'small', 'end');
-      }
-    }
-    for (const [index, group] of groups.entries()) {
-      const v = (value(group) ?? 0) / (spec.divisor ?? 1);
-      const color = COLORS[index % COLORS.length];
-      if (horizontal) {
-        const y = 250 + index * rowHeight;
-        label(64, y + 30, group.source_category, 350);
-        pieces.push(
-          `<rect x="440" y="${y}" width="${760 * (v / ceiling)}" height="36" fill="${color}"/>`,
-        );
-        text(1320, y + 30, display(group), 'label', 'end');
-        if (detail(group)) text(440, y + 62, detail(group), 'small');
-      } else {
-        const band = 1230 / Math.max(1, groups.length);
-        const center = 140 + band * (index + 0.5);
-        const barWidth = Math.min(230, band * 0.64);
-        const barHeight = 380 * (v / ceiling);
-        pieces.push(
-          `<rect x="${center - barWidth / 2}" y="${plotBottom - barHeight}" width="${barWidth}" height="${barHeight}" fill="${color}"/>`,
-        );
-        text(
-          center,
-          plotBottom - barHeight - 24,
-          display(group),
-          groups.length > 4 ? 'label' : 'value',
-          'middle',
-        );
-        label(center, plotBottom + 45, group.source_category, band - 20, 'middle');
-        // Keep detailed exclusions in the footer and machine-readable statistics.
-        if (detail(group))
-          text(
-            center,
-            plotBottom + 78,
-            spec.key ? `n=${group.metrics[spec.key].valid_count}` : detail(group),
-            'label',
-            'middle',
-          );
-      }
-    }
-  }
-  if (groups.length === 0) text(84, 310, 'No requests in the selected phase.');
-  const footer = height - 97;
-  const excluded = spec.key
-    ? groups.reduce(
-        (n, group) =>
-          n +
-          group.metrics[spec.key].missing_count +
-          group.metrics[spec.key].excluded_cancelled_count,
-        0,
-      )
-    : 0;
-  text(
-    64,
+  return barChart({
+    eyebrow: base.eyebrow,
+    title: view.title,
+    subtitle: [base.scope + base.top, view.unit].filter(Boolean).join(' · '),
+    rows,
     footer,
-    'Captured rows only; upstream completeness and agent roles are unverified.',
-    'small',
-  );
-  if (excluded)
-    text(
-      64,
-      footer + 30,
-      `${excluded} missing/cancelled observations excluded. Per-source counts: summary.json.`,
-      'small',
-    );
-  text(
-    64,
-    footer + (excluded ? 60 : 30),
-    'Source: InferenceX request timeline · full statistics and capture: summary.json / source.json',
-    'small',
-  );
-  pieces.push('</svg>');
-  return pieces.join('\n');
+    emptyText: base.empty,
+    description: `${view.title}. ${base.scope}. ${footer.join(' ')}`,
+  }).svg;
+}
+
+export function renderSourceTable(summary) {
+  const base = presentation(summary);
+  const columns = [
+    { key: 'requests', label: 'Requests', group: 'Volume', format: format.count },
+    { key: 'share', label: 'Share', group: 'Volume', format: format.share, bar: true },
+    ...(summary.scope.cancelled_request_count > 0
+      ? [{ key: 'cancelled', label: 'Cancelled', group: 'Volume', format: format.count }]
+      : []),
+    { key: 'isl', label: 'Input tokens', group: 'Median tokens', format: format.quantity },
+    { key: 'osl', label: 'Output tokens', group: 'Median tokens', format: format.quantity },
+    { key: 'e2e_ms', label: 'E2E latency', group: 'Median latency', format: format.duration },
+    { key: 'ttft_ms', label: 'TTFT', group: 'Median latency', format: format.duration },
+  ];
+  const rows = base.groups.map((group) => ({
+    label: sourceName(group.source_category),
+    values: {
+      requests: group.request_count,
+      share: group.request_share,
+      cancelled: group.cancelled_count,
+      ...Object.fromEntries(METRICS.map(([key]) => [key, group.metrics[key].median])),
+    },
+  }));
+  if (base.hidden)
+    rows.push({
+      label: base.hidden.label,
+      muted: true,
+      values: {
+        requests: base.hidden.requests,
+        share: base.hidden.share,
+        cancelled: base.hidden.cancelled,
+        ...Object.fromEntries(METRICS.map(([key]) => [key, null])),
+      },
+    });
+  const footer = [
+    'Latency medians use completed requests; token medians include cancelled requests. — means unavailable.',
+    ...base.footer,
+  ];
+  return tableImage({
+    eyebrow: base.eyebrow,
+    title: 'AgentX requests by recorded source',
+    subtitle: `${base.scope}${base.top} · medians per source`,
+    nameLabel: 'Recorded source',
+    columns,
+    rows,
+    footer,
+    emptyText: base.empty,
+    description: `AgentX requests by recorded source. ${base.scope}. ${footer.join(' ')}`,
+  }).svg;
 }
 
 // Quote cells and neutralize spreadsheet formulas; JSON preserves exact source strings.
@@ -609,7 +585,7 @@ export async function runCharts(args, outputDir, { signal } = {}) {
     files.push(['chart.svg', renderSourceChart(summary, options.metric)]);
   if (options.style !== 'chart')
     files.push(
-      ['table.svg', renderSourceTable(summary, options.metric)],
+      ['table.svg', renderSourceTable(summary)],
       ['table.md', sourceTable(summary)],
       ['summary.csv', summaryCsv(summary)],
     );

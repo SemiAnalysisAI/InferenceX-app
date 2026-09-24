@@ -113,12 +113,16 @@ test('quantiles are reproducible, nullable latency stays unavailable, cancelled 
   assert.equal(summary.groups[0].metrics.ttft_ms.median, null);
   assert.equal(summary.groups[1].metrics.e2e_ms.valid_count, 0);
   assert.equal(summary.groups[1].metrics.e2e_ms.median, null);
-  assert.match(renderSourceChart(summary, 'ttft'), /unavailable/u);
+  const ttft = renderSourceChart(summary, 'ttft');
+  assert.match(ttft, />—</u);
+  assert.match(ttft, /not recorded/u);
+  assert.match(ttft, /all cancelled/u);
   assert.match(renderSourceChart(summary, 'input-tokens'), />15</u);
   assert.ok(!renderSourceChart(summary).includes('log(1+x)'));
   assert.ok(!renderSourceChart(summary).includes('NaN'));
   const zeros = summarizeSources(capture([request('zero', { isl: 0, osl: 0, ttftMs: 0, end: 0 })]));
   assert.match(renderSourceChart(zeros.summary, 'input-tokens'), />0</u);
+  assert.match(renderSourceChart(zeros.summary, 'e2e'), />0 ms</u);
   assert.ok(!renderSourceChart(zeros.summary).includes('NaN'));
 });
 
@@ -345,9 +349,9 @@ test('presentation retains tiny positive latencies distinctly from measured zero
   assert.match(table, /srcKind: zero \| 1 \| 0 \| 0 \| 0 \|/u);
   const { summary } = summarizeSources(JSON.parse(await readFile(input, 'utf8')));
   const svg = renderSourceChart(summary, 'ttft');
-  assert.match(svg, /4\.000e-7</u);
-  assert.match(renderSourceChart(summary, 'e2e'), /0\.0001234</u);
-  assert.match(svg, />0</u);
+  assert.match(svg, />0\.400 µs</u);
+  assert.match(renderSourceChart(summary, 'e2e'), />123 µs</u);
+  assert.match(svg, />0 ms</u);
 });
 
 test('invalid and oversized inputs create no output directory', async () => {
@@ -390,14 +394,14 @@ test('actual npm package and installed Codex/Claude skills discover and render t
     assert.equal(report.groups.length, 2);
     assert.match(
       await readFile(join(report.output.directory, 'chart.svg'), 'utf8'),
-      /AgentX request mix/u,
+      /Requests by recorded source/u,
     );
   }
   assert.ok(suite.packedFiles.includes('skills/inferencex-api/scripts/charts.mjs'));
   assert.ok(suite.packedFiles.includes('skills/inferencex-api/references/chart-templates.md'));
 });
 
-test('default pictures focus on counts; selected metrics use medians with explicit units', async () => {
+test('charts show one metric; the table image combines counts and medians with explicit units', async () => {
   const input = join(root, 'focused.json');
   await writeFile(
     input,
@@ -410,28 +414,49 @@ test('default pictures focus on counts; selected metrics use medians with explic
     ),
   );
   const { summary } = summarizeSources(JSON.parse(await readFile(input, 'utf8')));
-  for (const render of [renderSourceChart, renderSourceTable]) {
-    const picture = render(summary);
-    assert.match(picture, /66\.67%/u);
-    assert.ok(!picture.includes('Input length'));
-    assert.ok(!picture.includes('p95'));
-    assert.match(render(summary, 'input-tokens'), />300</u);
-    const latency = render(summary, 'e2e');
-    assert.match(latency, /Median.*seconds/u);
-    assert.match(latency, />3</u);
-    assert.match(latency, /unavailable/u);
-    assert.match(latency, /1 missing\/cancelled observations excluded/u);
-    assert.match(render(summary, 'ttft'), />1</u);
-  }
+  const counts = renderSourceChart(summary);
+  assert.match(counts, />66\.7%</u);
+  assert.ok(!counts.includes('p95'));
+  assert.match(renderSourceChart(summary, 'input-tokens'), />300</u);
+  const latency = renderSourceChart(summary, 'e2e');
+  assert.match(latency, />3\.00 s</u);
+  assert.match(latency, /all cancelled/u);
+  assert.match(renderSourceChart(summary, 'ttft'), />1\.00 s</u);
+  const table = renderSourceTable(summary);
+  for (const value of ['66.7%', '300', '3.00 s', '1.00 s', 'Cancelled', 'MEDIAN LATENCY'])
+    assert.ok(table.includes(`>${value}<`), value);
   const out = join(root, 'focused-latency');
   const result = await runCharts(['agentx-sources', '--input', input, '--metric', 'e2e'], out);
   assert.deepEqual(result.presentation, { metric: 'e2e', style: 'both' });
   assert.equal(result.groups[0].metrics.e2e_ms.median, 3000);
-  assert.match(await readFile(join(out, 'table.svg'), 'utf8'), /Median \(seconds\)/u);
+  assert.match(await readFile(join(out, 'chart.svg'), 'utf8'), /Median end-to-end latency/u);
+  assert.match(await readFile(join(out, 'table.svg'), 'utf8'), />E2E latency</u);
   assert.match(await readFile(join(out, 'summary.csv'), 'utf8'), /"e2e_ms","ms"/u);
 });
 
-test('table pictures escape labels and preserve empty, missing and many-source cases', () => {
+test('many sources keep the largest nineteen and fold the rest', () => {
+  const requests = Array.from({ length: 40 }, (_, i) =>
+    Array.from({ length: 40 - i }, () => request(`source-${String(i).padStart(2, '0')}`)),
+  ).flat();
+  const { summary } = summarizeSources(capture(requests));
+  const counts = renderSourceChart(summary);
+  assert.match(counts, /top 19 of 40 sources/u);
+  assert.match(counts, />Other \(21 sources\)</u);
+  assert.match(counts, />source-00</u);
+  assert.ok(!counts.includes('>source-19<'));
+  const latency = renderSourceChart(summary, 'e2e');
+  assert.ok(!latency.includes('Other ('));
+  assert.match(latency, /21 smaller sources with 28\.2% of requests are not shown/u);
+  const table = renderSourceTable(summary);
+  assert.match(table, />Other \(21 sources\)</u);
+  for (const svg of [counts, latency, table]) {
+    const height = Number(svg.match(/height="(?<height>\d+)"/u).groups.height);
+    assert.ok(height < 1300, `height ${height}`);
+    assert.ok(!svg.includes('NaN'));
+  }
+});
+
+test('table images escape labels and keep empty and missing sources explicit', () => {
   const summary = summarizeSources(capture([request('<script>'), request(undefined)])).summary;
   const svg = renderSourceTable(summary);
   assert.ok(!svg.includes('<script>'));
@@ -441,27 +466,4 @@ test('table pictures escape labels and preserve empty, missing and many-source c
     renderSourceTable(summarizeSources(capture([])).summary),
     /No requests in the selected phase/u,
   );
-  const many = summarizeSources(
-    capture(Array.from({ length: 40 }, (_, i) => request(`source-${i}`))),
-  ).summary;
-  for (const render of [renderSourceChart, renderSourceTable]) {
-    const picture = render(many);
-    assert.match(picture, /source-39/u);
-    assert.ok(!picture.includes('NaN'));
-  }
-});
-
-test('picture labels retain their full title inside bounded SVG viewports', () => {
-  const name = 'W'.repeat(100);
-  for (const count of [3, 6, 7]) {
-    const summary = summarizeSources(
-      capture(Array.from({ length: count }, (_, i) => request(`${name}-${i}`))),
-    ).summary;
-    for (const render of [renderSourceChart, renderSourceTable]) {
-      const picture = render(summary);
-      assert.match(picture, /overflow="hidden"/u);
-      assert.ok(picture.includes(`<title>${name}-0</title>`));
-      assert.ok(picture.includes('…'));
-    }
-  }
 });
