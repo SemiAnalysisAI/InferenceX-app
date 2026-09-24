@@ -188,6 +188,7 @@ const responseExample = {
     xstat: 'median',
     serviceCompare: false,
     roleShare: false,
+    powerFit: false,
   },
 };
 

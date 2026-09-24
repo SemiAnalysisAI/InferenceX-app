@@ -7,9 +7,17 @@ import {
   getEqualServiceComparisonCurve,
   getEqualServiceSources,
   getPrefillSharePoints,
+  getRolePoints,
   type EqualServiceComparison,
   type EqualServiceEstimate,
 } from '@/components/inference/utils/equal-service-comparison';
+import {
+  buildMatchedConcurrencyTable,
+  type MatchedConcurrencySide,
+  type MatchedConcurrencyTable,
+} from '@/components/inference/utils/matched-concurrency';
+import { buildPowerFits } from '@/components/inference/utils/power-fit';
+import { resolveServiceField } from '@/components/inference/utils/resolveXAxisField';
 import { pointTopologyKey } from '@/components/inference/utils/topology-filter';
 import type {
   InferenceData,
@@ -254,6 +262,25 @@ function publicServiceComparison(comparison: EqualServiceComparison) {
   };
 }
 
+function publicMatchedSide(side: MatchedConcurrencySide) {
+  if (side.status === 'observed')
+    return { status: side.status, values: side.values, point: observedPointIdentity(side.point) };
+  if (side.status === 'ambiguous')
+    return { status: side.status, points: side.points.map(observedPointIdentity) };
+  return side;
+}
+
+function publicMatchedConcurrency(table: MatchedConcurrencyTable) {
+  return {
+    ...table,
+    rows: table.rows.map((row) => ({
+      ...row,
+      baseline: publicMatchedSide(row.baseline),
+      comparator: publicMatchedSide(row.comparator),
+    })),
+  };
+}
+
 export function GET(request: NextRequest) {
   return runViewsRoute('inference', async () => {
     validateViewParams(request.nextUrl.searchParams, VIEW_QUERY_PARAMS['inference']);
@@ -299,6 +326,7 @@ export function GET(request: NextRequest) {
     const format = parseFormatParam(search.get('format'));
     const serviceCompare = parseBoolParam(search.get('serviceCompare'), 'serviceCompare', false);
     const roleShare = parseBoolParam(search.get('roleShare'), 'roleShare', false);
+    const powerFit = parseBoolParam(search.get('powerFit'), 'powerFit', false);
     const requestedServiceBaseline = search.get('serviceBaseline');
     const requestedServiceComparator = search.get('serviceComparator');
     const serviceTarget = search.has('serviceTarget')
@@ -306,10 +334,10 @@ export function GET(request: NextRequest) {
       : null;
     if (serviceTarget !== null && serviceTarget <= 0)
       throw new ViewsApiParamError('serviceTarget', 'serviceTarget must be positive');
-    if (format === 'csv' && (serviceCompare || roleShare))
+    if (format === 'csv' && (serviceCompare || roleShare || powerFit))
       throw new ViewsApiParamError(
         'format',
-        'Equal-service and role-share panels require format=json',
+        'Equal-service, role-share and power-fit panels require format=json',
       );
     const tcoBasis = parseTcoBasisParam(search.get('tcoBasis'));
     const power = parseListParam(search.get('power'), 'power', POWER_TIER_ORDER);
@@ -458,6 +486,18 @@ export function GET(request: NextRequest) {
           equalServiceCurve: getEqualServiceComparisonCurve(observedPoints, serviceOptions).map(
             publicServiceComparison,
           ),
+          matchedConcurrency: publicMatchedConcurrency(
+            buildMatchedConcurrencyTable(observedPoints, {
+              baseline: serviceBaseline,
+              comparator: serviceComparator,
+              // The dashboard reads streaming speed at the selected statistic.
+              interactivityField: resolveServiceField('median_intvty', {
+                isAgentic: sequence === Sequence.AgenticTraces,
+                percentile,
+                fixedSequenceStatistic: xstat,
+              }),
+            }),
+          ),
         }
       : {};
     const rolePanel = roleShare
@@ -469,6 +509,20 @@ export function GET(request: NextRequest) {
               decodeShare: 100 - energy.prefillShare,
             }),
           ),
+          rolePoints: getRolePoints(observedPoints, serviceOptions.xField).map(
+            ({ point, ...role }) => ({ ...role, point: observedPointIdentity(point) }),
+          ),
+        }
+      : {};
+    const fitPanel = powerFit
+      ? {
+          powerFits: buildPowerFits(observedPoints).map(({ observations, ...fit }) => ({
+            ...fit,
+            observations: observations.map(({ point, ...observation }) => ({
+              ...observation,
+              point: observedPointIdentity(point),
+            })),
+          })),
         }
       : {};
 
@@ -505,6 +559,7 @@ export function GET(request: NextRequest) {
       serviceComparator: serviceCompare ? serviceComparator : null,
       serviceTarget: serviceCompare ? serviceTarget : null,
       roleShare,
+      powerFit,
     };
 
     if (format === 'csv') {
@@ -534,6 +589,7 @@ export function GET(request: NextRequest) {
       pricing,
       ...servicePanels,
       ...rolePanel,
+      ...fitPanel,
     });
   });
 }

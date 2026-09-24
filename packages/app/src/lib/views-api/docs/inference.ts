@@ -221,8 +221,8 @@ const parameters: readonly ApiParameter[] = [
     required: false,
     type: 'boolean',
     description: text(
-      'Include source options, equal-service percentage curves and an optional target comparison, using the same helper as the dashboard. Uses scoped observed points before frontier/best pruning. JSON only.',
-      '返回来源选项、同等服务条件下的百分比对比曲线，以及可选目标值对比；复用仪表板计算逻辑，使用筛选后、前沿和 best 筛选前的实测点。仅支持 JSON。',
+      'Include source options, equal-service percentage curves, an optional target comparison and the same-concurrency diagnostic table (matchedConcurrency), using the same helpers as the dashboard. Uses scoped observed points before frontier/best pruning. JSON only.',
+      '返回来源选项、同等服务条件下的百分比对比曲线、可选目标值对比，以及相同并发下的诊断表（matchedConcurrency）；复用仪表板计算逻辑，使用筛选后、前沿和 best 筛选前的实测点。仅支持 JSON。',
     ),
     schema: { type: 'boolean', default: false },
     example: 'true',
@@ -269,8 +269,20 @@ const parameters: readonly ApiParameter[] = [
     required: false,
     type: 'boolean',
     description: text(
-      'Include validated disaggregated prefill/decode energy shares on one output-token denominator. Uses same-window aggregate J/output ÷ J/input to convert prefill J/input; share denominator is reconstructed prefill + decode energy, not pool-local token counts. Missing/invalid data is omitted. JSON only.',
-      '返回通过验证的分离式 prefill/decode 能耗占比，统一使用 output token 分母。用同窗口总 J/output ÷ J/input 将 prefill J/input 转换为 J/output；占比分母为重建的 prefill + decode 能耗，不使用各池独立的 token 数。缺失或无效数据不返回，仅支持 JSON。',
+      'Include validated disaggregated prefill/decode energy shares on one output-token denominator, plus rolePoints with each pool’s W/GPU and role-local energy. Uses same-window aggregate J/output ÷ J/input to convert prefill J/input; share denominator is reconstructed prefill + decode energy, not pool-local token counts. Missing/invalid data is omitted or null. JSON only.',
+      '返回通过验证的分离式 prefill/decode 能耗占比，统一使用 output token 分母；rolePoints 另含各池的 W/GPU 和按本池 token 计的能耗。用同窗口总 J/output ÷ J/input 将 prefill J/input 转换为 J/output；占比分母为重建的 prefill + decode 能耗，不使用各池独立的 token 数。缺失或无效的数据会被省略或返回 null，仅支持 JSON。',
+    ),
+    schema: { type: 'boolean', default: false },
+    example: 'true',
+  },
+  {
+    name: 'powerFit',
+    location: 'query',
+    required: false,
+    type: 'boolean',
+    description: text(
+      'Include one ordinary least-squares line per source: measured mean W/GPU = P0 + m × output tok/s per allocated GPU (disaggregated output spread over prefill and decode GPUs). P0 is the zero-output intercept, not measured idle power; m is marginal J/output token. Sources with fewer than 3 distinct output rates return observations with fit null. JSON only.',
+      '按数据源分别返回普通最小二乘拟合：实测平均 W/GPU = P0 + m × 每个已分配 GPU 的输出 tok/s（分离式部署的输出量均摊到 prefill 和 decode GPU）。P0 是零输出截距，不是实测空载功耗；m 是每个输出 token 的边际能耗（J）。不同输出速率少于 3 个的数据源返回观测点，fit 为 null。仅支持 JSON。',
     ),
     schema: { type: 'boolean', default: false },
     example: 'true',
@@ -281,8 +293,8 @@ const parameters: readonly ApiParameter[] = [
     required: false,
     type: 'enum',
     description: text(
-      'Response encoding. csv returns one flat row per plotted point; serviceCompare and roleShare panels require JSON and return 400 with CSV.',
-      '响应编码。csv 为每个图表点返回一行平面数据；serviceCompare 和 roleShare 面板仅支持 JSON，与 CSV 同用时返回 400。',
+      'Response encoding. csv returns one flat row per plotted point; serviceCompare, roleShare and powerFit panels require JSON and return 400 with CSV.',
+      '响应编码。csv 为每个图表点返回一行平面数据；serviceCompare、roleShare 和 powerFit 面板仅支持 JSON，与 CSV 同用时返回 400。',
     ),
     schema: { type: 'string', enum: ['json', 'csv'], default: 'json' },
     example: 'csv',
@@ -382,6 +394,30 @@ const comparisonSchema = objectSchema({
   }),
 });
 
+const nullableNumber = (description: string) => ({
+  type: ['number', 'null'] as const,
+  description,
+});
+const matchedValuesSchema = objectSchema({
+  joulesPerOutputToken: { type: ['number', 'null'] },
+  meanWattsPerGpu: { type: ['number', 'null'] },
+  interactivity: { type: ['number', 'null'] },
+});
+const matchedSideSchema = objectSchema(
+  {
+    status: {
+      type: 'string',
+      enum: ['observed', 'missing', 'ambiguous'],
+      description:
+        'observed: one agreeing observation; missing: none at this concurrency; ambiguous: conflicting observations, none chosen.',
+    },
+    values: matchedValuesSchema,
+    point: identitySchema,
+    points: arraySchema(identitySchema),
+  },
+  ['status'],
+);
+
 const responseSchema = objectSchema(
   {
     view: { type: 'string', enum: ['inference'] },
@@ -445,6 +481,70 @@ const responseSchema = objectSchema(
         decodeShare: { ...numberSchema, description: 'Decode percentage of reconstructed total.' },
       }),
     ),
+    matchedConcurrency: objectSchema({
+      baseline: { ...sourceSchema, type: ['object', 'null'] },
+      comparator: { ...sourceSchema, type: ['object', 'null'] },
+      interactivityField: stringSchema,
+      reason: { type: 'string', enum: ['same-source', 'unknown-source'] },
+      rows: arraySchema(
+        objectSchema({
+          concurrency: integerSchema,
+          baseline: matchedSideSchema,
+          comparator: matchedSideSchema,
+          changePercent: {
+            ...matchedValuesSchema,
+            description:
+              '100 × (comparator / baseline − 1); null unless both values were observed.',
+          },
+        }),
+      ),
+    }),
+    rolePoints: arraySchema(
+      objectSchema({
+        x: numberSchema,
+        sourceKey: stringSchema,
+        point: identitySchema,
+        prefillWattsPerGpu: nullableNumber('Mean W/GPU inside the prefill pool.'),
+        decodeWattsPerGpu: nullableNumber('Mean W/GPU inside the decode pool.'),
+        prefillJoulesPerInputToken: nullableNumber('Prefill-pool joules per input token.'),
+        decodeJoulesPerOutputToken: nullableNumber('Decode-pool joules per output token.'),
+        energy: {
+          ...objectSchema({
+            prefill: numberSchema,
+            decode: numberSchema,
+            total: numberSchema,
+            prefillShare: numberSchema,
+          }),
+          type: ['object', 'null'],
+          description: 'Both pools on the output-token denominator (J/output token, share %).',
+        },
+      }),
+    ),
+    powerFits: arraySchema(
+      objectSchema({
+        source: sourceSchema,
+        tdpWatts: nullableNumber('Rated board TDP per GPU; P0 ÷ TDP = fit.intercept / tdpWatts.'),
+        fit: {
+          ...objectSchema({
+            intercept: { ...numberSchema, description: 'P0, W/GPU at zero output (extrapolated).' },
+            slope: { ...numberSchema, description: 'm, J per output token.' },
+            rSquared: { type: ['number', 'null'] },
+            n: integerSchema,
+            xMin: numberSchema,
+            xMax: numberSchema,
+          }),
+          type: ['object', 'null'],
+        },
+        reason: { type: 'string', enum: ['too-few-points'] },
+        observations: arraySchema(
+          objectSchema({
+            x: { ...numberSchema, description: 'Output tok/s per allocated GPU.' },
+            y: { ...numberSchema, description: 'Measured mean W/GPU.' },
+            point: identitySchema,
+          }),
+        ),
+      }),
+    ),
     pricing: { type: ['object', 'null'], additionalProperties: true },
     comparisons: arraySchema({ type: 'object', additionalProperties: true }),
     overlays: arraySchema({ type: 'object', additionalProperties: true }),
@@ -480,6 +580,7 @@ const responseExample = {
     serviceComparator: null,
     serviceTarget: null,
     roleShare: false,
+    powerFit: false,
   },
   metric: {
     key: 'tpPerGpu',

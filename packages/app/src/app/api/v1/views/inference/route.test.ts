@@ -5,6 +5,8 @@ import {
   buildEqualServiceComparison,
   getEqualServiceSources,
 } from '@/components/inference/utils/equal-service-comparison';
+import { buildMatchedConcurrencyTable } from '@/components/inference/utils/matched-concurrency';
+import { buildPowerFits } from '@/components/inference/utils/power-fit';
 import { buildInferenceSeries } from '@/lib/views-api/series';
 import { Sequence } from '@/lib/data-mappings';
 import type { BenchmarkRow } from '@/lib/api';
@@ -197,6 +199,7 @@ describe('GET /api/v1/views/inference', () => {
     for (const extra of [
       'format=csv&serviceCompare=true',
       'format=csv&roleShare=true',
+      'format=csv&powerFit=true',
       'serviceTarget=0',
       'serviceTarget=',
       'serviceTarget=NaN',
@@ -224,6 +227,8 @@ describe('GET /api/v1/views/inference', () => {
         joules_per_output_token: 8,
         prefill_joules_per_input_token: 0.4,
         decode_joules_per_output_token: 4.8,
+        prefill_avg_power_w: 520,
+        decode_avg_power_w: 410,
       },
     });
     mockGetLatestBenchmarks.mockResolvedValue([row]);
@@ -256,7 +261,109 @@ describe('GET /api/v1/views/inference', () => {
         decodeShare: 60,
       });
     }
+    expect(body.rolePoints).toHaveLength(2);
+    for (const role of body.rolePoints) {
+      expect(role).toMatchObject({
+        prefillWattsPerGpu: 520,
+        decodeWattsPerGpu: 410,
+        prefillJoulesPerInputToken: 0.4,
+        decodeJoulesPerOutputToken: 4.8,
+        energy: { prefill: 3.2, decode: 4.8, total: 8, prefillShare: 40 },
+      });
+      expect(Object.keys(role.point)).not.toContain('tpPerGpu');
+    }
     expect(body.overlays[0]).not.toHaveProperty('observedPoints');
+  });
+
+  it('returns the same-concurrency table and per-source power fits the dashboard draws', async () => {
+    const ladder = (hardware: string, loads: [number, number][], base: number) =>
+      loads.map(([conc, output]) =>
+        makeRow({
+          hardware,
+          conc,
+          metrics: {
+            ...makeRow().metrics,
+            median_intvty: 100 / conc,
+            output_tput_per_gpu: output,
+            avg_power_w: base + 0.5 * output,
+            joules_per_output_token: (base + 0.5 * output) / output,
+            power_valid: 1,
+            power_metric_schema_version: 2,
+          },
+        }),
+      );
+    const rows = [
+      ...ladder(
+        'h200',
+        [
+          [1, 20],
+          [4, 60],
+          [16, 120],
+        ],
+        250,
+      ),
+      ...ladder(
+        'mi300x',
+        [
+          [1, 30],
+          [16, 150],
+        ],
+        400,
+      ),
+    ];
+    mockGetLatestBenchmarks.mockResolvedValue(rows);
+    const projected = buildInferenceSeries(rows, {
+      sequence: Sequence.EightK_OneK,
+      percentile: 'p90',
+      precisions: ['fp8'],
+      metricConfigKey: 'y_measuredAvgPower',
+      xmode: 'interactivity',
+      xmetric: 'p90_ttft',
+      gpus: [],
+      quickFilters: { vendors: [], frameworks: [], deployment: [], spec: [], power: [] },
+      optimal: true,
+      best: true,
+    });
+    const sources = getEqualServiceSources(projected.observedPoints);
+    const expected = buildMatchedConcurrencyTable(projected.observedPoints, {
+      baseline: sources[0].key,
+      comparator: sources[1].key,
+      interactivityField: 'median_intvty',
+    });
+    const response = await GET(
+      request(
+        '/api/v1/views/inference?model=DeepSeek-R1-0528&metric=measuredAvgPower&serviceCompare=true&powerFit=true',
+      ),
+    );
+    const body = await response.json();
+    expect(response.status).toBe(200);
+    expect(body.params.powerFit).toBe(true);
+    expect(body.matchedConcurrency.interactivityField).toBe('median_intvty');
+    expect(
+      body.matchedConcurrency.rows.map((row: { concurrency: number }) => row.concurrency),
+    ).toEqual([1, 4, 16]);
+    expect(
+      body.matchedConcurrency.rows.map((row: { changePercent: unknown }) => row.changePercent),
+    ).toEqual(expected.rows.map((row) => row.changePercent));
+    // c4 exists only for H200: the MI300X side stays missing, never borrowed.
+    expect(body.matchedConcurrency.rows[1].comparator).toEqual({ status: 'missing' });
+    expect(body.matchedConcurrency.rows[0].baseline.point.id).toBe(rows[0].id);
+
+    const fits = buildPowerFits(projected.observedPoints);
+    expect(body.powerFits).toHaveLength(2);
+    const h200 = body.powerFits.find(
+      (entry: { source: { key: string } }) => entry.source.key === fits[0].source.key,
+    );
+    expect(h200.fit.intercept).toBeCloseTo(250, 9);
+    expect(h200.fit.slope).toBeCloseTo(0.5, 9);
+    expect(h200.tdpWatts).toBe(700);
+    expect(h200.observations.map((entry: { point: { id: number } }) => entry.point.id)).toEqual(
+      rows.slice(0, 3).map((row) => row.id),
+    );
+    const mi300x = body.powerFits.find(
+      (entry: { source: { key: string } }) => entry.source.key === fits[1].source.key,
+    );
+    expect(mi300x).toMatchObject({ fit: null, reason: 'too-few-points' });
   });
 
   it('resolves the fixed-sequence statistic and rejects unknown values', async () => {

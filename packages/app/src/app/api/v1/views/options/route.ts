@@ -194,6 +194,7 @@ function buildOptionsPayload() {
       xstat: 'median',
       serviceCompare: false,
       roleShare: false,
+      powerFit: false,
       xmetric: 'p90_ttft',
       scale: 'auto',
       precisions: 'auto',

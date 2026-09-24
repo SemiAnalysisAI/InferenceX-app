@@ -173,6 +173,7 @@ export const VIEW_QUERY_PARAMS = {
     'serviceComparator',
     'serviceTarget',
     'roleShare',
+    'powerFit',
   ],
   operatorx: [
     'backend',

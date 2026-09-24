@@ -139,7 +139,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-inference-view',
-    sourceSha256: '5f2d5997fdab9e1e94510bdbefe6e0dba394d65680fec37c5bcdeeb004eefcfd',
+    sourceSha256: 'bafac08dbe6e6e4b75dd15987e79f84b514f3e93351149ad44b296f6dd2a9662',
   },
   {
     source: 'src/app/api/v1/views/operatorx/route.ts',
@@ -155,7 +155,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-view-options',
-    sourceSha256: '1f441c8726e6adb69d68660e80e854582bbacaba842cea5ec6f3ad2512ff1b5c',
+    sourceSha256: 'ceba9504cfc50cb37748c9455f22dca9813789eb0148da740b24678bb540fb27',
   },
   {
     source: 'src/app/api/v1/views/overview/route.ts',
@@ -821,6 +821,22 @@ export const apiContractSourceDigests = [
     },
   },
   {
+    source: 'src/components/inference/utils/matched-concurrency.ts',
+    sourceSha256: 'db81deeff9e6ff64f607b71751d18acc59626f43fecbe037145e3a55c4fe959f',
+    reviewArea: {
+      en: 'Same-concurrency pairing of two exact sources: missing and conflicting observations, signed comparator-relative changes, no interpolation.',
+      zh: '两个完整来源在相同并发下的配对：缺失与冲突观测、相对基准的带符号变化，不做插值。',
+    },
+  },
+  {
+    source: 'src/components/inference/utils/power-fit.ts',
+    sourceSha256: '6c39a91e0745cd6432730f7d9094638fe1365c1e6d38a99c696c21359409bafb',
+    reviewArea: {
+      en: 'Per-source least-squares power fit on output per allocated GPU: intercept, marginal J/token, R², fitted range and registry TDP.',
+      zh: '按来源对每个已分配 GPU 的输出做最小二乘功耗拟合：截距、边际 J/token、R²、拟合范围与注册表 TDP。',
+    },
+  },
+  {
     source: 'src/components/inference/utils/role-energy.ts',
     sourceSha256: '36b1ceda97af99731482ed815167a660f1619ab94c2956afe11cf72d58fa5380',
     reviewArea: {
@@ -996,7 +1012,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/registry.ts',
-    sourceSha256: '266305115106c86b18d1131e3a8916a756b847f569e7de02c82ec74dad1bcf17',
+    sourceSha256: '5770b2b60883003f4203b9db915aee24e39e14ca5dd787b67281520fd11f940c',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',

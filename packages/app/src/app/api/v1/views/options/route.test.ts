@@ -96,6 +96,7 @@ describe('GET /api/v1/views/options', () => {
       xstat: 'median',
       serviceCompare: false,
       roleShare: false,
+      powerFit: false,
     });
     // Same vendors, in the dashboard's quick-filter pill order.
     expect(body.quickFilters.vendors).toEqual(VENDOR_ORDER);
