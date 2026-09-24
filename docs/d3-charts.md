@@ -144,6 +144,15 @@ D3 axis domains are computed from only the visible (non-hidden) data points. Usi
 
 When Effect 2 rebuilds the SVG (data shape change), the current zoom transform is saved at the start and re-applied after rebuild. Without this, users would lose their zoom position every time comparison dates are added or overlay data loads.
 
+## Zoom Gesture Gating (Page Scroll Must Win)
+
+`useChartZoom` gates every d3-zoom source event through `zoomEventFilter`:
+
+- **Wheel** needs Shift. Bare scroll and Ctrl+wheel (trackpad pinch → browser zoom) fall through to the page.
+- **Touch** needs two fingers. d3-zoom calls `preventDefault()` on every `touchmove` for the lifetime of a gesture, so a one-finger gesture would make the chart swallow page scroll on mobile. Rejecting one-finger `touchstart` means no gesture ever begins; when the second finger lands, d3's `touchstarted` reads `event.touches` (every active finger), so both register and the gesture is a pinch-zoom / two-finger pan. `setupZoom` also sets `touch-action: pan-x pan-y` on the SVG so the browser keeps native one-finger scrolling but doesn't race the chart with its own viewport pinch-zoom.
+
+Double-tap-to-reset on touch is intentionally lost by this gating (d3's tap detection lives in the filtered `touchstart` path); the reset button / `resetEventName` covers mobile.
+
 ## Tooltip Pin/Dismiss Lifecycle
 
 1. **Hover**: Show tooltip + rulers, follow cursor
