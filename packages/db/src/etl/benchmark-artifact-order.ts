@@ -46,7 +46,11 @@ export function benchmarkArtifactOrder(root: string, files: readonly string[]) {
 export class BenchmarkArtifactSelection {
   private readonly selected = new Map<string, string>();
 
-  constructor(private readonly enabled: boolean) {}
+  private readonly enabled: boolean;
+
+  constructor(enabled: boolean) {
+    this.enabled = enabled;
+  }
 
   accept(identity: string, file: string): boolean {
     if (!this.enabled) return true;

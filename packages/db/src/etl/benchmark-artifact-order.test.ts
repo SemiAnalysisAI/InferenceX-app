@@ -36,7 +36,7 @@ const artifacts = [
 const raw = (attempt: number) =>
   JSON.parse(
     fs.readFileSync(
-      new URL(`./__fixtures__/h100-retry/attempt${attempt}.json`, import.meta.url),
+      new URL(`__fixtures__/h100-retry/attempt${attempt}.json`, import.meta.url),
       'utf8',
     ),
   );
