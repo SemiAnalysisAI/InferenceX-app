@@ -31,8 +31,17 @@ describe('video dashboard URL state', () => {
   });
   it('reads every supported param', () => {
     expect(
-      readVideoDashboardState('?v_x=p50Latency&v_y=kjPerVideo&v_tier=r&v_view=table&v_api=0.047'),
-    ).toEqual({ x: 'p50Latency', y: 'kjPerVideo', tier: 'r', view: 'table', apiPrice: 0.047 });
+      readVideoDashboardState(
+        '?v_x=p50Latency&v_y=kjPerVideo&v_tier=r&v_view=table&v_optimal=0&v_api=0.047',
+      ),
+    ).toEqual({
+      x: 'p50Latency',
+      y: 'kjPerVideo',
+      tier: 'r',
+      view: 'table',
+      optimal: false,
+      apiPrice: 0.047,
+    });
     expect([...X_METRICS]).toEqual(['p90Latency', 'p50Latency']);
     expect([...Y_METRICS]).toEqual([
       'videosPerDollar',
@@ -57,6 +66,18 @@ describe('video dashboard URL state', () => {
     expect(parseApiPrice('0.03456')).toBe(0.0346);
     expect(parseApiPrice(0.0001)).toBe(0.0001);
     expect(readVideoDashboardState('?v_api=1e-2').apiPrice).toBe(0.01);
+  });
+  it('mirrors the inference tab: Optimal Only is on unless v_optimal is exactly 0', () => {
+    expect(DEFAULT_VIDEO_DASHBOARD_STATE.optimal).toBe(true);
+    expect(readVideoDashboardState('?v_optimal=0').optimal).toBe(false);
+    for (const on of ['1', 'true', 'off', '']) {
+      expect(readVideoDashboardState(`?v_optimal=${on}`).optimal).toBe(true);
+    }
+    const url = new URL('https://x.test/video');
+    const off = writeVideoDashboardState(url, { ...DEFAULT_VIDEO_DASHBOARD_STATE, optimal: false });
+    expect(off.search).toBe('?v_optimal=0');
+    expect(readVideoDashboardState(off.search).optimal).toBe(false);
+    expect(writeVideoDashboardState(off, DEFAULT_VIDEO_DASHBOARD_STATE).search).toBe('');
   });
   it('writes only non-default params and keeps unrelated params', () => {
     const url = new URL('https://x.test/video?run=1&view=results');

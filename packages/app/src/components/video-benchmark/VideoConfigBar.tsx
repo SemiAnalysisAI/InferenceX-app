@@ -3,16 +3,7 @@
 import { ControlPanel } from '@/components/ui/control-panel';
 import { track } from '@/lib/analytics';
 import { useLocale } from '@/lib/use-locale';
-import type { CostTier } from './hardware';
-import {
-  COST_TIERS,
-  metricLabel,
-  TIER_LABELS,
-  X_METRICS,
-  Y_METRICS,
-  type XMetricId,
-  type YMetricId,
-} from './metrics';
+import { metricLabel, X_METRICS, Y_METRICS, type XMetricId, type YMetricId } from './metrics';
 import VideoApiReference from './VideoApiReference';
 import VideoSelect from './VideoSelect';
 import { metricOptions, type VideoDashboardState } from './video-url-state';
@@ -26,7 +17,6 @@ const STRINGS = {
     deployment: 'Deployment',
     x: 'X-axis metric',
     y: 'Y-axis metric',
-    tier: 'Cost tier',
   },
   zh: {
     benchmark: '基准测试配置',
@@ -36,7 +26,6 @@ const STRINGS = {
     deployment: '部署',
     x: 'X 轴指标',
     y: 'Y 轴指标',
-    tier: '成本档位',
   },
 };
 
@@ -54,7 +43,7 @@ function Fact({ label, value }: { label: string; value: string }) {
  * Two control panels mirroring the inference tab: what is being compared
  * (frozen for this campaign, so model, workload and deployment are stated,
  * not selectable, beside the one editable input, the API list price) and
- * how it is plotted (axes and cost tier).
+ * how it is plotted (the axes; the cost tier sits in the chart caption).
  */
 export default function VideoConfigBar({
   state,
@@ -85,7 +74,7 @@ export default function VideoConfigBar({
         <Fact label={s.deployment} value={deploymentLabel} />
         <VideoApiReference value={state.apiPrice} onChange={(apiPrice) => onChange({ apiPrice })} />
       </ControlPanel>
-      <ControlPanel legend={s.chart} className="sm:grid-cols-3">
+      <ControlPanel legend={s.chart} className="sm:grid-cols-2">
         <VideoSelect
           label={s.x}
           value={state.x}
@@ -97,12 +86,6 @@ export default function VideoConfigBar({
           value={state.y}
           onValueChange={(value) => change('y', value as YMetricId)}
           options={Y_METRICS.map((id) => ({ value: id, label: metricLabel(id, locale, options) }))}
-        />
-        <VideoSelect
-          label={s.tier}
-          value={state.tier}
-          onValueChange={(value) => change('tier', value as CostTier)}
-          options={COST_TIERS.map((tier) => ({ value: tier, label: TIER_LABELS[tier][locale] }))}
         />
       </ControlPanel>
     </div>

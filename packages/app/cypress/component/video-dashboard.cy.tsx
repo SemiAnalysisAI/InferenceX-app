@@ -81,7 +81,7 @@ describe('Video hardware dashboard (retained fixture)', () => {
       .and('contain', '431.1');
     kpi('h100').should('not.contain', 'Profit').and('not.contain', 'Board power');
   });
-  it('states model, workload and deployment as facts and offers no GPU basis or legend switches', () => {
+  it('states model, workload and deployment as facts; the legend offers only Optimal Only', () => {
     mount();
     cy.get('[data-testid="video-config-fact"]').should(($facts) => {
       expect([...$facts].map((el) => el.textContent)).to.deep.equal([
@@ -94,20 +94,38 @@ describe('Video hardware dashboard (retained fixture)', () => {
       expect([...$boxes].map((el) => el.getAttribute('aria-label'))).to.deep.equal([
         'X-axis metric',
         'Y-axis metric',
-        'Cost tier',
       ]);
     });
     cy.get('[role="combobox"][aria-label="GPU basis"]').should('not.exist');
+    // Same chrome as /inference: title, description and Share in one card above the panels,
+    // the cost tier picked in the chart caption, Compare and the evidence folded away.
+    cy.get('[data-testid="video-dashboard"] h1').should(
+      'contain',
+      'VideoGenX · MiniMax-H3 across hardware',
+    );
+    cy.get('[data-testid="share-button"]').should('exist');
+    cy.get('[data-testid="video-config-bar"]').should('not.contain', 'Cost tier');
+    cy.get('[data-testid="video-cost-tier"]').should(
+      'contain',
+      'Owning at Large Hyperscaler Volume',
+    );
+    cy.get('[data-testid="video-compare"]').should('not.exist');
+    cy.get('[data-testid="video-compare-toggle"]').should('have.attr', 'aria-expanded', 'false');
+    cy.get('[data-testid="video-evidence-toggle"]').should('have.attr', 'aria-expanded', 'false');
+    cy.contains('[data-testid="video-dashboard"] h2', 'Compare');
+    cy.contains('[data-testid="video-dashboard"] h2', 'Compute-bound evidence');
     cy.get('[data-testid="video-legend"]').should('contain', 'H100').and('contain', 'MI355X');
-    cy.get('[data-testid="video-legend"] [role="switch"]').should('not.exist');
+    cy.get('[data-testid="video-legend"] [role="switch"]').should('have.length', 1);
+    cy.get('[data-testid="video-optimal-only"]').should('have.attr', 'aria-checked', 'true');
+    cy.get('[data-testid="video-legend"]').should('contain', 'Optimal Only');
     for (const id of ['video-queue', 'video-optimal', 'video-frontier'])
       cy.get(`[data-testid="${id}"]`).should('not.exist');
     cy.get('[data-testid="video-idle-note"]').should('have.text', IDLE_NOTE);
   });
   it('switches the cost tier, repricing the cards, the badges and the URL', () => {
     mount();
-    cy.get('[role="combobox"][aria-label="Cost tier"]').click();
-    cy.contains('[role="option"]', 'Rent - 3 Year Commit').click();
+    cy.get('[data-testid="video-cost-tier"]').click();
+    cy.get('[data-testid="video-cost-tier-r"]').click();
     // $2.90/GPU-hr ÷ 5.9732 videos/GPU-hr = 0.48550 → three decimals.
     kpi('h200').should('contain', '$0.485');
     kpi('h100').should('contain', '$0.372');
@@ -229,6 +247,32 @@ describe('Video hardware dashboard (retained fixture)', () => {
     kpi('h200').should('contain', 'API list $0.272');
     cy.location('search').should('not.contain', 'v_api');
   });
+  it('toggles Optimal Only from the legend and restores it from v_optimal', () => {
+    mount('/video', '?v_optimal=0');
+    cy.get('[data-testid="video-optimal-only"]').should('have.attr', 'aria-checked', 'false');
+    // Every fixture deployment is on its hardware's frontier, so the switch changes no point here.
+    points().should('have.length', 3);
+    cy.get('[data-testid="video-optimal-only"]').click();
+    cy.get('[data-testid="video-optimal-only"]').should('have.attr', 'aria-checked', 'true');
+    cy.location('search').should('not.contain', 'v_optimal');
+    cy.get('[data-testid="video-optimal-only"]').click();
+    cy.location('search').should('contain', 'v_optimal=0');
+    points().should('have.length', 3);
+  });
+  it('folds Compare and the evidence by default and opens Compare for compare deep links', () => {
+    mount();
+    cy.get('[data-testid="video-compare"]').should('not.exist');
+    cy.get('[data-testid="video-compare-toggle"]').click();
+    cy.get('[data-testid="video-compare"]').should('exist');
+    cy.get('[data-testid="video-compare-toggle"]').should('have.attr', 'aria-expanded', 'true');
+    cy.get('[data-testid="video-evidence-toggle"]').click();
+    cy.get('[data-testid="video-evidence-toggle"]').should('have.attr', 'aria-expanded', 'true');
+    cy.contains('h2', 'Compute-bound evidence').should('have.length', 1);
+    mount('/video', '?v_cand=h200');
+    cy.get('[data-testid="video-compare"]').should('exist');
+    cy.get('[data-testid="video-compare-candidate"]').should('contain', 'H200');
+    cy.get('[data-testid="video-evidence-toggle"]').should('have.attr', 'aria-expanded', 'false');
+  });
   it('shows placeholders while loading instead of a false "Not measured"', () => {
     cy.intercept('GET', '/api/video-runs?format=history&page=1', (req) => {
       req.reply({ fixture: 'api/video-history.json', delay: 800 });
@@ -276,10 +320,14 @@ describe('Video hardware dashboard (retained fixture)', () => {
         '部署4 张 GPU · TP2 × Ulysses 2',
       ]);
     });
+    cy.get('[data-testid="video-cost-tier"]').should('contain', 'Hyperscaler 自有设备');
+    cy.get('[data-testid="video-legend"]').should('contain', '仅最优');
+    cy.contains('[data-testid="video-dashboard"] h2', '对比');
+    cy.contains('[data-testid="video-dashboard"] h2', '算力受限（compute-bound）的证据');
     cy.get('[data-testid="video-config-bar"]')
       .should('contain', 'X 轴指标')
       .and('contain', 'Y 轴指标')
-      .and('contain', '成本档位')
+      .and('not.contain', '成本档位')
       .and('contain', 'API 参考价（$/video-s）')
       .and('contain', '采集于 2026-09-19');
     cy.contains('button', '表格').click();

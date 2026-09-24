@@ -14,6 +14,8 @@ export interface VideoDashboardState {
   y: YMetricId;
   tier: CostTier;
   view: 'chart' | 'table';
+  /** Only each hardware's Pareto-optimal deployments; off, dominated deployments join, faded. */
+  optimal: boolean;
   /** USD per video-second the API list price assumes; the dated reference unless the reader overrides it. */
   apiPrice: number;
 }
@@ -23,6 +25,7 @@ export const DEFAULT_VIDEO_DASHBOARD_STATE: VideoDashboardState = {
   y: 'videosPerDollar',
   tier: 'h',
   view: 'chart',
+  optimal: true,
   apiPrice: H3_API_REFERENCE.pricePerVideoSecondUsd,
 };
 
@@ -59,6 +62,8 @@ export function readVideoDashboardState(search: string): VideoDashboardState {
     y: pick(Y_METRICS, p.get('v_y'), d.y),
     tier: pick(COST_TIERS, p.get('v_tier'), d.tier),
     view: pick(VIEWS, p.get('v_view'), d.view),
+    // Same shape as the inference tab's `i_optimal`: on unless the URL says `0`.
+    optimal: p.get('v_optimal') !== '0',
     apiPrice: parseApiPrice(p.get('v_api')) ?? d.apiPrice,
   };
 }
@@ -73,6 +78,7 @@ export function writeVideoDashboardState(url: URL, state: VideoDashboardState): 
   set('v_y', state.y === d.y ? null : state.y);
   set('v_tier', state.tier === d.tier ? null : state.tier);
   set('v_view', state.view === d.view ? null : state.view);
+  set('v_optimal', state.optimal ? null : '0');
   const apiPrice = parseApiPrice(state.apiPrice);
   set('v_api', apiPrice === null || apiPrice === d.apiPrice ? null : String(apiPrice));
   return out;

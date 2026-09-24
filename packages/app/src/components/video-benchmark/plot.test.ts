@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import history from '../../../cypress/fixtures/api/video-history.json';
 import type { VideoHistoryPage } from './history';
 import { X_METRICS, Y_METRICS, type VideoPoint } from './metrics';
-import { plotVideoPoints } from './plot';
+import { listedVideoCells, plotVideoPoints } from './plot';
 import { videoPoints } from './points';
 import { DEFAULT_VIDEO_DASHBOARD_STATE, type VideoDashboardState } from './video-url-state';
 
@@ -90,8 +90,8 @@ const plot = (
 const ids = (points: { id: string }[]) => points.map((p) => p.id);
 
 describe('plotVideoPoints', () => {
-  it('builds a per-hardware frontier over deployments and marks the points on it', () => {
-    const out = plot([...h200, b200]);
+  it('builds a per-hardware frontier over deployments and, with Optimal Only off, draws the dominated ones faded', () => {
+    const out = plot([...h200, b200], { ...state, optimal: false });
     expect(Object.keys(out).toSorted()).toEqual(['frontiers', 'multiLayout', 'plotted']);
     expect(ids(out.frontiers.h200)).toEqual(['h200-8g', 'h200-4g-c1', 'h200-2g']);
     expect(ids(out.frontiers.b200)).toEqual(['b200-4g']);
@@ -169,5 +169,46 @@ describe('plotVideoPoints', () => {
     );
     expect(ids(out.plotted)).toEqual(['h200-4g-c1']);
     expect(out.frontiers).not.toHaveProperty('b200');
+  });
+});
+
+describe('Optimal Only', () => {
+  it('hides dominated deployments by default without moving the frontiers', () => {
+    const on = plot([...h200, b200]);
+    const off = plot([...h200, b200], { ...state, optimal: false });
+    expect(ids(on.plotted)).toEqual(['h200-4g-c1', 'h200-8g', 'h200-2g', 'b200-4g']);
+    expect(on.plotted.every((p) => p.optimal)).toBe(true);
+    expect(ids(on.frontiers.h200)).toEqual(ids(off.frontiers.h200));
+    expect(ids(on.frontiers.b200)).toEqual(ids(off.frontiers.b200));
+    expect(on.multiLayout).toBe(true);
+  });
+  it('lists the same cells in the table: frontier only when on, every non-queued deployment when off', () => {
+    const points = [...h200, queued, b200];
+    expect(ids(listedVideoCells(points, state, new Set()))).toEqual([
+      'h200-4g-c1',
+      'h200-8g',
+      'h200-2g',
+      'b200-4g',
+    ]);
+    expect(ids(listedVideoCells(points, { ...state, optimal: false }, new Set()))).toEqual([
+      'h200-4g-c1',
+      'h200-8g',
+      'h200-2g',
+      'h200-4g-tp4',
+      'b200-4g',
+    ]);
+    expect(ids(listedVideoCells(points, state, new Set(['h200'])))).toEqual(['b200-4g']);
+  });
+  it('lists a cell without a value on the selected axis only when Optimal Only is off', () => {
+    const unmetered = cell({
+      id: 'h200-4g-nopower',
+      energyKj: null,
+      server: { tp: 1, ulysses: 4, attention: null },
+    });
+    const energy: VideoDashboardState = { ...state, y: 'kjPerVideo' };
+    expect(ids(listedVideoCells([base, unmetered], energy, new Set()))).toEqual(['h200-4g-c1']);
+    expect(
+      ids(listedVideoCells([base, unmetered], { ...energy, optimal: false }, new Set())),
+    ).toEqual(['h200-4g-c1', 'h200-4g-nopower']);
   });
 });
