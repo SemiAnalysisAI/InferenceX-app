@@ -1,30 +1,36 @@
 'use client';
 
 import * as d3 from 'd3';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { ChartButtons } from '@/components/ui/chart-buttons';
 import { Heading } from '@/components/ui/heading';
+import { useUnofficialRun } from '@/components/unofficial-run-provider';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useUrlState } from '@/hooks/useUrlState';
-import { D3Chart } from '@/lib/d3-chart/D3Chart';
-import type { CustomLayerConfig } from '@/lib/d3-chart/D3Chart/types';
-import type { ContinuousScale } from '@/lib/d3-chart/types';
+import { track } from '@/lib/analytics';
+import { overlayRunColor, overlayRunIndex } from '@/lib/overlay-run-style';
 import { useLocale } from '@/lib/use-locale';
 import type { AggDataEntry, InferenceData } from '../types';
 import {
   buildEqualServiceComparison,
+  equalServiceSourceKey,
   getEqualServiceComparisonCurve,
   getEqualServiceSources,
-  getPrefillSharePoints,
+  observedPoints,
   type EqualServiceEstimate,
   type EqualServiceReason,
 } from '../utils/equal-service-comparison';
+import MatchedConcurrencyTable from './MatchedConcurrencyTable';
+import PowerFitPanel from './PowerFitPanel';
+import { PowerPanelPlot } from './PowerPanelPlot';
+import PowerRoleGroup from './PowerRoleGroup';
 
 const STRINGS = {
   en: {
     compare: 'Compare at the same speed / latency',
-    share: 'Prefill energy share',
+    roles: 'Prefill / decode roles',
+    fit: 'Power vs output-rate fit',
     baseline: 'Baseline',
     comparator: 'Comparator',
     target: 'Target',
@@ -34,15 +40,12 @@ const STRINGS = {
       'Change = (comparator ÷ baseline − 1) × 100%. A negative energy change means lower energy use. Matches the selected axis only; other latencies may differ.',
     interpolation:
       'Within each source, raw quantities are linearly interpolated between neighboring observations, then compared. No extrapolation. Larger markers show the selected target. Lines connect the derived comparisons; they are not additional measurements.',
-    roleMethod:
-      'Prefill and decode energy use the same output-token denominator. Share = prefill ÷ (prefill + decode). Points are observed configurations; the dashed line marks 50%.',
     targetHelp:
       'Enter a target within both source ranges to inspect values and bracketing observations.',
     concurrency:
-      'Concurrency is a load diagnostic, not equal service. Select interactivity, TTFT or end-to-end latency for this comparison.',
+      'Concurrency is a load diagnostic, not equal service. Select interactivity, TTFT or end-to-end latency for the equal-service comparison; the table below pairs observations at each concurrency.',
     metric: 'Metric',
     empty: 'No comparable points in the selected sources’ overlapping range.',
-    roleEmpty: 'No validated prefill/decode energy is available for these filters.',
     measured: 'Observed',
     interpolated: 'Interpolated',
     observation: 'Observation',
@@ -50,12 +53,12 @@ const STRINGS = {
     outputTokensPerSecond: 'Deployment output (tok/s)',
     joulesPerOutputToken: 'GPU energy (J/output token)',
     percent: 'Comparator change (%)',
-    shareAxis: 'Prefill energy share (%)',
     unavailable: 'Unavailable',
   },
   zh: {
     compare: '在相同速度 / 延迟下比较',
-    share: '预填充能耗占比',
+    roles: '预填充 / 解码角色',
+    fit: '功耗与输出速率拟合',
     baseline: '基准',
     comparator: '对比对象',
     target: '目标值',
@@ -65,14 +68,11 @@ const STRINGS = {
       '变化 =（对比对象 ÷ 基准 − 1）× 100%。能耗变化率为负表示能耗更低。只匹配所选横轴，其他延迟可能不同。',
     interpolation:
       '各数据源在相邻观测点间对原始数值进行线性插值，再计算变化率；不做外推。大圆点标记所选目标值。连线连接推导出的比较结果，不代表额外实测。',
-    roleMethod:
-      '预填充与解码能耗均按输出 token 归一化。占比 = 预填充 ÷（预填充 + 解码）。各点为实测配置，虚线标记 50%。',
     targetHelp: '输入两个数据源范围内的目标值，查看数值及插值两端的观测点。',
     concurrency:
-      '并发数用于分析负载，并不代表相同服务水平。请选交互性、首 token 延迟或端到端延迟进行比较。',
+      '并发数用于分析负载，并不代表相同服务水平。相同服务水平的比较请选择交互性、首 token 延迟或端到端延迟；下表按各并发数配对观测值。',
     metric: '指标',
     empty: '所选数据源的重叠范围内没有可比较的数据。',
-    roleEmpty: '当前筛选条件下没有经过验证的预填充 / 解码能耗数据。',
     measured: '实测',
     interpolated: '插值',
     observation: '观测点',
@@ -80,7 +80,6 @@ const STRINGS = {
     outputTokensPerSecond: '部署输出吞吐量（tok/s）',
     joulesPerOutputToken: 'GPU 能耗（J/输出 token）',
     percent: '对比对象变化（%）',
-    shareAxis: '预填充能耗占比（%）',
     unavailable: '不可用',
   },
 };
@@ -103,129 +102,68 @@ const METRICS = ['meanWattsPerGpu', 'outputTokensPerSecond', 'joulesPerOutputTok
 const DASHES = ['', '6,4', '2,3'];
 const number = d3.format(',.4~g');
 const percent = d3.format('+.2f');
-interface PlotPoint {
-  x: number;
-  y: number;
-  key: string;
-  selected?: boolean;
-}
 
-function ComparisonPlot({
-  chartId,
-  points,
-  xLabel,
-  yLabel,
-  reference,
-  colors,
-  lines = true,
+function PanelToggle({
+  checked,
+  onChange,
+  label,
+  testId,
+  event,
 }: {
-  chartId: string;
-  points: PlotPoint[];
-  xLabel: string;
-  yLabel: string;
-  reference: number;
-  colors: Record<string, string>;
-  lines?: boolean;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  label: string;
+  testId: string;
+  event: string;
 }) {
-  const xs = points.map((p) => p.x).filter(Number.isFinite);
-  const ys = points.map((p) => p.y).filter(Number.isFinite);
-  const xMin = Math.min(...xs),
-    xMax = Math.max(...xs);
-  const yMin = Math.min(0, ...ys),
-    yMax = Math.max(reference, ...ys);
-  const grouped = Object.fromEntries(d3.groups(points, (p) => p.key));
-  const finitePoints = points.filter((p) => Number.isFinite(p.y));
-  const drawReference: NonNullable<CustomLayerConfig['render']> = (group, ctx) => {
-    const scale = (ctx.renderedYScale ?? ctx.yScale) as ContinuousScale;
-    group
-      .selectAll('line')
-      .data([reference])
-      .join('line')
-      .attr('x1', 0)
-      .attr('x2', ctx.width)
-      .attr('y1', (v) => scale(v))
-      .attr('y2', (v) => scale(v))
-      .attr('stroke', 'currentColor')
-      .attr('stroke-dasharray', '5,4')
-      .attr('opacity', 0.6);
-  };
   return (
-    <D3Chart<PlotPoint>
-      chartId={`${chartId}-plot`}
-      data={finitePoints}
-      height={360}
-      testId={`${chartId}-plot`}
-      watermark="logo"
-      zoom={{ enabled: false }}
-      grabCursor={false}
-      instructions=""
-      margin={{ top: 20, right: 18, bottom: 64, left: 65 }}
-      xScale={{
-        type: 'linear',
-        domain: xMin === xMax ? [0, xMax * 1.05] : [xMin, xMax],
-        nice: true,
-      }}
-      yScale={{
-        type: 'linear',
-        domain: lines
-          ? [yMin - (yMax - yMin || 1) * 0.1, yMax + (yMax - yMin || 1) * 0.1]
-          : [0, 100],
-        nice: true,
-      }}
-      xAxis={{ label: xLabel, tickCount: 4 }}
-      yAxis={{ label: yLabel, tickCount: 5 }}
-      layers={[
-        { type: 'custom', key: 'reference', render: drawReference },
-        ...(lines
-          ? [
-              {
-                type: 'line' as const,
-                lines: grouped,
-                config: {
-                  curve: d3.curveLinear,
-                  isDefined: (p: { x: number; y: number }) => Number.isFinite(p.y),
-                  getColor: (key: string) => colors[key],
-                  getStrokeDasharray: (key: string) =>
-                    DASHES[METRICS.indexOf(key as (typeof METRICS)[number])],
-                },
-              },
-            ]
-          : []),
-        {
-          type: 'point',
-          data: finitePoints,
-          config: {
-            getCx: () => 0,
-            getCy: () => 0,
-            getX: (p) => p.x,
-            getY: (p) => p.y,
-            getRadius: (p) => (p.selected ? 6 : 3),
-            getColor: (p) => colors[p.key],
-          },
-        },
-      ]}
-    />
+    <label className="flex items-center gap-2">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => {
+          onChange(e.target.checked);
+          track(event, { enabled: e.target.checked });
+        }}
+        data-testid={testId}
+      />
+      {label}
+    </label>
   );
 }
 
+/**
+ * PowerX analysis panels under a measured-power chart: equal-service and
+ * matched-concurrency comparisons, the prefill/decode role group and the
+ * power-vs-output-rate fit. Every panel reads the chart's visible official and
+ * `?unofficialrun=` rows; overlay sources take their run's legend colour.
+ */
 export default function PowerServiceComparison({
   data,
+  overlayData = [],
   xField,
   xLabel,
+  interactivityField,
   chartId,
   contextLabel,
 }: {
   data: InferenceData[];
+  /** The subset of `data` loaded from unofficial runs. */
+  overlayData?: readonly InferenceData[];
   xField: keyof AggDataEntry;
   xLabel: string;
+  /** Streaming-speed field at the selected statistic, for load-matched rows. */
+  interactivityField: keyof AggDataEntry;
   chartId: string;
   contextLabel?: string;
 }) {
   const locale = useLocale();
   const t = STRINGS[locale];
   const { getUrlParam, setUrlParams } = useUrlState();
+  const { runIndexByUrl } = useUnofficialRun();
   const [enabled, setEnabled] = useState(() => getUrlParam('i_servicecompare') === '1');
   const [roleShare, setRoleShare] = useState(() => getUrlParam('i_roleshare') === '1');
+  const [powerFit, setPowerFit] = useState(() => getUrlParam('i_powerfit') === '1');
   const [baseline, setBaseline] = useState(() => getUrlParam('i_servicebase') ?? '');
   const [comparator, setComparator] = useState(() => getUrlParam('i_servicepeer') ?? '');
   const [target, setTarget] = useState(() => getUrlParam('i_servicetarget') ?? '');
@@ -244,11 +182,12 @@ export default function PowerServiceComparison({
     setUrlParams({
       i_servicecompare: enabled ? '1' : '0',
       i_roleshare: roleShare ? '1' : '0',
+      i_powerfit: powerFit ? '1' : '0',
       i_servicebase: enabled ? base : baseline,
       i_servicepeer: enabled ? peer : comparator,
       i_servicetarget: target,
     });
-  }, [enabled, roleShare, base, peer, baseline, comparator, target, setUrlParams]);
+  }, [enabled, roleShare, powerFit, base, peer, baseline, comparator, target, setUrlParams]);
   const curve = useMemo(
     () =>
       enabled
@@ -272,16 +211,24 @@ export default function PowerServiceComparison({
         : null,
     [enabled, data, base, peer, xField, target],
   );
-  const shares = useMemo(
-    () => (roleShare ? getPrefillSharePoints(data, xField) : []),
-    [roleShare, data, xField],
-  );
   const { resolveColor } = useThemeColors({
     highContrast: true,
     identifiers: [...METRICS, ...sources.map((s) => s.key)],
   });
   const metricColors = Object.fromEntries(METRICS.map((key) => [key, resolveColor(key)]));
-  const sourceColors = Object.fromEntries(sources.map((s) => [s.key, resolveColor(s.key)]));
+  const overlaySourceKeys = useMemo(
+    () => new Map(observedPoints(overlayData).map((p) => [equalServiceSourceKey(p), p.run_url])),
+    [overlayData],
+  );
+  const colorOf = useCallback(
+    (key: string) =>
+      overlaySourceKeys.has(key)
+        ? overlayRunColor(overlayRunIndex(overlaySourceKeys.get(key), runIndexByUrl))
+        : resolveColor(key),
+    [overlaySourceKeys, runIndexByUrl, resolveColor],
+  );
+  const sourceLabel = (key: string) =>
+    sources.find((source) => source.key === key)?.label ?? t.unavailable;
   // The percentage of interpolated raw values is not linear in X. Include the
   // exact selected target as a knot so its plotted marker agrees with the table.
   const plottedCurve =
@@ -325,6 +272,7 @@ export default function PowerServiceComparison({
     onChange: (value: string) => void,
     label: string,
     testId: string,
+    role: 'baseline' | 'comparator',
   ) => (
     <label className="min-w-0 space-y-1 text-sm">
       <span>{label}</span>
@@ -333,7 +281,10 @@ export default function PowerServiceComparison({
         aria-label={label}
         data-testid={testId}
         value={value}
-        onChange={(event) => onChange(event.target.value)}
+        onChange={(event) => {
+          onChange(event.target.value);
+          track('inference_equal_service_source_changed', { role });
+        }}
       >
         {!sources.some((source) => source.key === value) && (
           <option value={value}>{t.unavailable}</option>
@@ -349,36 +300,48 @@ export default function PowerServiceComparison({
   return (
     <div className="mt-6 min-w-0 space-y-4 border-t pt-4" data-testid="power-service-comparison">
       <div className="no-export flex flex-wrap gap-4 text-sm">
-        <label className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            checked={enabled}
-            onChange={(e) => setEnabled(e.target.checked)}
-            data-testid="equal-service-toggle"
-          />
-          {t.compare}
-        </label>
-        <label className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            checked={roleShare}
-            onChange={(e) => setRoleShare(e.target.checked)}
-            data-testid="role-share-toggle"
-          />
-          {t.share}
-        </label>
+        <PanelToggle
+          checked={enabled}
+          onChange={setEnabled}
+          label={t.compare}
+          testId="equal-service-toggle"
+          event="inference_equal_service_toggled"
+        />
+        <PanelToggle
+          checked={roleShare}
+          onChange={setRoleShare}
+          label={t.roles}
+          testId="role-share-toggle"
+          event="inference_power_roles_toggled"
+        />
+        <PanelToggle
+          checked={powerFit}
+          onChange={setPowerFit}
+          label={t.fit}
+          testId="power-fit-toggle"
+          event="inference_power_fit_toggled"
+        />
       </div>
-      {enabled &&
-        (xField === 'conc' ? (
-          <p className="text-sm text-muted-foreground" data-testid="equal-service-concurrency-note">
-            {t.concurrency}
-          </p>
-        ) : (
-          <>
-            <div className="no-export grid min-w-0 gap-3 md:grid-cols-2">
-              {sourceSelect(base, setBaseline, t.baseline, 'equal-service-baseline')}
-              {sourceSelect(peer, setComparator, t.comparator, 'equal-service-comparator')}
-            </div>
+      {enabled && (
+        <>
+          <div className="no-export grid min-w-0 gap-3 md:grid-cols-2">
+            {sourceSelect(base, setBaseline, t.baseline, 'equal-service-baseline', 'baseline')}
+            {sourceSelect(
+              peer,
+              setComparator,
+              t.comparator,
+              'equal-service-comparator',
+              'comparator',
+            )}
+          </div>
+          {xField === 'conc' ? (
+            <p
+              className="text-sm text-muted-foreground"
+              data-testid="equal-service-concurrency-note"
+            >
+              {t.concurrency}
+            </p>
+          ) : (
             <section
               id={`${chartId}-service`}
               className="min-w-0 space-y-3"
@@ -390,8 +353,7 @@ export default function PowerServiceComparison({
               <p className="text-sm text-muted-foreground">{contextLabel}</p>
               <p className="text-sm text-muted-foreground">{t.method}</p>
               <p className="break-words text-sm">
-                {t.baseline}: {sources.find((s) => s.key === base)?.label ?? t.unavailable} →{' '}
-                {t.comparator}: {sources.find((s) => s.key === peer)?.label ?? t.unavailable}
+                {t.baseline}: {sourceLabel(base)} → {t.comparator}: {sourceLabel(peer)}
               </p>
 
               <div className="flex flex-wrap gap-x-5 gap-y-2 text-sm">
@@ -413,13 +375,20 @@ export default function PowerServiceComparison({
                 ))}
               </div>
               {plotPoints.some((p) => Number.isFinite(p.y)) ? (
-                <ComparisonPlot
+                <PowerPanelPlot
                   chartId={`${chartId}-service`}
-                  points={plotPoints}
+                  markers={plotPoints.filter((p) => Number.isFinite(p.y))}
+                  lines={METRICS.map((key, index) => ({
+                    key,
+                    color: metricColors[key],
+                    dash: DASHES[index],
+                    points: plotPoints.filter((p) => p.key === key),
+                  }))}
+                  markerColor={(key) => metricColors[key]}
                   xLabel={xLabel}
                   yLabel={t.percent}
                   reference={0}
-                  colors={metricColors}
+                  height={360}
                 />
               ) : (
                 <p className="py-6 text-sm text-muted-foreground">{t.empty}</p>
@@ -486,53 +455,35 @@ export default function PowerServiceComparison({
                 <p className="text-xs text-muted-foreground">{t.targetHelp}</p>
               )}
             </section>
-          </>
-        ))}
-      {roleShare && (
-        <section
-          id={`${chartId}-role-share`}
-          className="min-w-0 space-y-3"
-          data-testid="prefill-share-panel"
-        >
-          <Heading as="h3" level="card">
-            {t.share}
-          </Heading>
-          <p className="text-sm text-muted-foreground">{contextLabel}</p>
-          <p className="text-xs text-muted-foreground">{t.roleMethod}</p>
-          {shares.length > 0 ? (
-            <>
-              <div className="flex flex-wrap gap-3 text-sm">
-                {sources
-                  .filter((s) => shares.some((p) => p.sourceKey === s.key))
-                  .map((s) => (
-                    <span key={s.key} className="min-w-0 break-all">
-                      <span style={{ color: sourceColors[s.key] }}>● </span>
-                      {s.label}
-                    </span>
-                  ))}
-              </div>
-              <ComparisonPlot
-                chartId={`${chartId}-role-share`}
-                points={shares.map((p) => ({ key: p.sourceKey, x: p.x, y: p.prefillShare }))}
-                xLabel={xLabel}
-                yLabel={t.shareAxis}
-                reference={50}
-                colors={sourceColors}
-                lines={false}
-              />
-              <div className="max-h-0 overflow-hidden">
-                <div id={`${chartId}-role-share-export`} className="p-4" />
-              </div>
-              <ChartButtons
-                chartId={`${chartId}-role-share`}
-                analyticsPrefix="prefill_share"
-                hideZoomReset
-              />
-            </>
-          ) : (
-            <p className="py-6 text-sm text-muted-foreground">{t.roleEmpty}</p>
           )}
-        </section>
+          <MatchedConcurrencyTable
+            chartId={chartId}
+            data={data}
+            baseline={base}
+            comparator={peer}
+            interactivityField={interactivityField}
+            sourceLabel={sourceLabel}
+          />
+        </>
+      )}
+      {roleShare && (
+        <PowerRoleGroup
+          chartId={chartId}
+          data={data}
+          xField={xField}
+          xLabel={xLabel}
+          contextLabel={contextLabel}
+          sources={sources}
+          colorOf={colorOf}
+        />
+      )}
+      {powerFit && (
+        <PowerFitPanel
+          chartId={chartId}
+          data={data}
+          contextLabel={contextLabel}
+          colorOf={colorOf}
+        />
       )}
     </div>
   );

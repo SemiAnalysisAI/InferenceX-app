@@ -806,7 +806,7 @@ export interface ApiContractSourceDigest {
 export const apiContractSourceDigests = [
   {
     source: 'src/components/inference/utils/resolveXAxisField.ts',
-    sourceSha256: 'd59ad021fbe8e8547a811fc83ce63adb2373c3005d2668844f2dcbcb61448e1f',
+    sourceSha256: '4783579c7b3c1a21b91968cb03e9c35a57a85251f4992cb5667a855ba7c77497',
     reviewArea: {
       en: 'Shared service-axis resolution: fixed-sequence mean/median, reciprocal mean TPOT, and AgentX percentile isolation.',
       zh: '共用服务轴解析：固定长度工作负载 mean/median、mean TPOT 的倒数，以及 AgentX 独立的分位数选择。',
@@ -814,10 +814,10 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/inference/utils/equal-service-comparison.ts',
-    sourceSha256: 'e6e1e07a3dfaa4cfa0ea1bd9b6e8f7cc9a6fc43f043b9f07ef1651d4422c01db',
+    sourceSha256: 'adbc79b5fe8d14d8e16cc6edd757324447f12cf0656631ec9b16415e5e0795e2',
     reviewArea: {
-      en: 'Source-scoped equal-service interpolation, comparator-relative changes, endpoint provenance, and prefill share projection.',
-      zh: '按完整来源限定的同等服务插值、相对基准变化、端点来源，以及 prefill 占比视图。',
+      en: 'Source-scoped equal-service interpolation, comparator-relative changes, endpoint provenance, prefill share projection and role points.',
+      zh: '按完整来源限定的同等服务插值、相对基准变化、端点来源、prefill 占比视图以及各角色数据点。',
     },
   },
   {

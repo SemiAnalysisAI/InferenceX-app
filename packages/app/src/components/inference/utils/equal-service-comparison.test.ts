@@ -6,6 +6,7 @@ import {
   getEqualServiceComparisonCurve,
   getEqualServiceSources,
   getPrefillSharePoints,
+  getRolePoints,
 } from './equal-service-comparison';
 
 const metric = (y: number) => ({ y, roof: false });
@@ -291,5 +292,58 @@ describe('equal-service comparison', () => {
       point: pd,
     });
     expect(getPrefillSharePoints([pd], 'conc')[0]).toMatchObject({ x: pd.conc, prefillShare: 50 });
+  });
+
+  it('keeps role-local denominators apart from the additive output-token reconstruction', () => {
+    // GB200 1P1D at c4 (PowerX Figure 12): prefill 272 W/GPU, decode 421 W/GPU.
+    const pd = point({
+      hwKey: 'gb200_dynamo-sglang',
+      disagg: true,
+      conc: 4,
+      num_prefill_gpu: 4,
+      num_decode_gpu: 4,
+      power_valid: 1,
+      power_metric_schema_version: 2,
+      joules_per_input_token: 0.65,
+      joules_per_output_token: 5.2,
+      prefill_joules_per_input_token: 0.25,
+      decode_joules_per_output_token: 3.2,
+      measuredPrefillAvgPower: metric(272),
+      measuredDecodeAvgPower: metric(421),
+      measuredPrefillJPerInputToken: metric(0.25),
+      measuredDecodeJPerOutputToken: metric(3.2),
+    });
+    const [role] = getRolePoints([pd], 'conc');
+    expect(role).toMatchObject({
+      x: 4,
+      prefillWattsPerGpu: 272,
+      decodeWattsPerGpu: 421,
+      prefillJoulesPerInputToken: 0.25,
+      decodeJoulesPerOutputToken: 3.2,
+    });
+    // Prefill J/input × served J/out ÷ J/in = 0.25 × 8 = 2 J per output token.
+    expect(role.energy!.prefill).toBeCloseTo(2, 12);
+    expect(role.energy!.total).toBeCloseTo(5.2, 12);
+    expect(role.energy!.prefillShare).toBeCloseTo((100 * 2) / 5.2, 12);
+  });
+
+  it('keeps role watts without reconstructable energy and drops rows with no role figure', () => {
+    const wattsOnly = point({
+      disagg: true,
+      measuredPrefillAvgPower: metric(240),
+      measuredDecodeAvgPower: metric(330),
+    });
+    const [role] = getRolePoints(
+      [wattsOnly, point({ disagg: true }), point({ measuredPrefillAvgPower: metric(1) })],
+      'mean_intvty',
+    );
+    expect(role).toMatchObject({
+      prefillWattsPerGpu: 240,
+      decodeWattsPerGpu: 330,
+      prefillJoulesPerInputToken: null,
+      energy: null,
+    });
+    expect(getRolePoints([wattsOnly, point({ disagg: true })], 'mean_intvty')).toHaveLength(1);
+    expect(getRolePoints([wattsOnly], 'tpPerGpu' as never)).toEqual([]);
   });
 });

@@ -46,6 +46,7 @@ import {
   makeRunComparisonEntry,
 } from '@/components/inference/utils/comparisonEntry';
 import { dataRunsForDate } from '@/components/inference/utils/runEnumeration';
+import { resolveServiceField } from '@/components/inference/utils/resolveXAxisField';
 import { matchesQuickFilters } from '@/components/inference/utils/quickFilters';
 import { bestSeriesPerSku } from '@/components/inference/utils/best-series-per-sku';
 import InferenceTable from '@/components/inference/ui/InferenceTable';
@@ -737,6 +738,12 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
   }, [effectiveGraphs, selectedXAxisMode]);
 
   const isAgenticSequence = sequenceKind(selectedSequence) === 'agentic';
+  // Streaming speed at the selected statistic, read by the load-matched PowerX rows.
+  const serviceInteractivityField = resolveServiceField('median_intvty', {
+    isAgentic: isAgenticSequence,
+    percentile: selectedPercentile,
+    fixedSequenceStatistic,
+  });
   const residentPointIds = useMemo(() => {
     if (!isAgenticSequence) return [] as number[];
     const ids = new Set<number>();
@@ -1346,8 +1353,10 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                             chartId={`chart-${graphIndex}`}
                             contextLabel={`${getModelLabel(selectedModel)} · ${getSequenceLabel(selectedSequence)}`}
                             data={[...officialRows, ...overlayRows]}
+                            overlayData={overlayRows}
                             xField={graph.chartDefinition.x_scale_field as keyof AggDataEntry}
                             xLabel={resolvedXLabel}
+                            interactivityField={serviceInteractivityField}
                           />
                         );
                       })()}

@@ -38,6 +38,22 @@ export interface ResolvedXAxis {
 }
 
 /**
+ * A service-metric field at the selected statistic: the percentile for agentic
+ * rows, mean or median for fixed sequences. Fixed-sequence mean interactivity
+ * is reciprocal mean TPOT, never the raw arithmetic-mean interactivity field.
+ */
+export function resolveServiceField(
+  field: string,
+  opts: { isAgentic: boolean; percentile: string; fixedSequenceStatistic?: FixedSequenceStatistic },
+): keyof AggDataEntry {
+  const { isAgentic, percentile, fixedSequenceStatistic = 'median' } = opts;
+  const resolved = withPercentile(field, isAgentic ? percentile : fixedSequenceStatistic);
+  return (
+    !isAgentic && resolved === 'mean_intvty' ? 'mean_tpot_intvty' : resolved
+  ) as keyof AggDataEntry;
+}
+
+/**
  * Resolve the x-axis data field for a chart definition + metric selection.
  *
  * Rules, in order:
@@ -68,14 +84,8 @@ export function resolveXAxisField(
     fixedSequenceStatistic?: FixedSequenceStatistic;
   },
 ): ResolvedXAxis {
-  const { isAgentic, percentile, xAxisMode, fixedSequenceStatistic = 'median' } = opts;
-  const statistic = isAgentic ? percentile : fixedSequenceStatistic;
-  const serviceField = (field: string): keyof AggDataEntry => {
-    const resolved = withPercentile(field, statistic);
-    return (
-      !isAgentic && resolved === 'mean_intvty' ? 'mean_tpot_intvty' : resolved
-    ) as keyof AggDataEntry;
-  };
+  const { isAgentic, percentile, xAxisMode } = opts;
+  const serviceField = (field: string) => resolveServiceField(field, opts);
   const naturalX = serviceField(chartDef.x);
 
   const metricTitle =

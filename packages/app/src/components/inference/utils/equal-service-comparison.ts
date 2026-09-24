@@ -1,7 +1,7 @@
 import type { AggDataEntry, InferenceData } from '../types';
 import { chipCounts } from '@/lib/chip-counts';
 import { isPositive, powerBasisNormalization } from '@/lib/power-basis';
-import { reconstructedRoleEnergy } from './role-energy';
+import { reconstructedRoleEnergy, type ReconstructedRoleEnergy } from './role-energy';
 import { pointTopologyKey, topologyLabel } from './topology-filter';
 
 export interface EqualServiceSource {
@@ -48,7 +48,10 @@ export interface EqualServiceComparison {
 const serviceAxis = (field: string) =>
   field === 'mean_tpot_intvty' ||
   /^(?:mean|median|p\d+(?:\.\d+)?)_(?:intvty|tpot|ttft|e2el|itl)$/u.test(field);
-const observed = (points: readonly InferenceData[]) =>
+/** A positive finite reading, or null: a missing value is never zero. */
+export const positiveOrNull = (value: unknown): number | null => (isPositive(value) ? value : null);
+/** Measured rows only: hidden rows and power-comparison clones are never sources. */
+export const observedPoints = (points: readonly InferenceData[]) =>
   points.filter((point) => !point.hidden && !point.powerVariant);
 
 /** Concurrency is excluded; unknown run identity must never join distinct rows. */
@@ -82,7 +85,9 @@ export function equalServiceSourceKey(point: InferenceData): string {
 }
 
 export function getEqualServiceSources(points: readonly InferenceData[]): EqualServiceSource[] {
-  const sources = new Map(observed(points).map((point) => [equalServiceSourceKey(point), point]));
+  const sources = new Map(
+    observedPoints(points).map((point) => [equalServiceSourceKey(point), point]),
+  );
   const topologies = [...sources.values()].map(pointTopologyKey);
   return [...sources]
     .sort(([a], [b]) => a.localeCompare(b))
@@ -121,7 +126,8 @@ function deploymentOutput(point: InferenceData): number | undefined {
     ? point.output_tput_per_gpu * count
     : undefined;
 }
-const metrics = {
+/** The measured quantities every service panel compares, read from one point. */
+export const serviceMetricValue = {
   meanWattsPerGpu: (point: InferenceData) => point.measuredAvgPower?.y,
   outputTokensPerSecond: deploymentOutput,
   joulesPerOutputToken: (point: InferenceData) => point.measuredJPerOutputToken?.y,
@@ -179,7 +185,7 @@ export function buildEqualServiceComparison(
   else if (!isPositive(target)) reason = 'invalid-target';
   else if (baseline === comparator) reason = 'same-source';
   else if (!sourceA || !sourceB) reason = 'unknown-source';
-  const rows = observed(points);
+  const rows = observedPoints(points);
   const a = rows.filter((point) => equalServiceSourceKey(point) === baseline);
   const b = rows.filter((point) => equalServiceSourceKey(point) === comparator);
   const compare = (quantity: (point: InferenceData) => number | undefined): EqualServiceMetric => {
@@ -204,9 +210,9 @@ export function buildEqualServiceComparison(
     comparator: sourceB,
     ...(reason ? { reason } : {}),
     metrics: {
-      meanWattsPerGpu: compare(metrics.meanWattsPerGpu),
-      outputTokensPerSecond: compare(metrics.outputTokensPerSecond),
-      joulesPerOutputToken: compare(metrics.joulesPerOutputToken),
+      meanWattsPerGpu: compare(serviceMetricValue.meanWattsPerGpu),
+      outputTokensPerSecond: compare(serviceMetricValue.outputTokensPerSecond),
+      joulesPerOutputToken: compare(serviceMetricValue.joulesPerOutputToken),
     },
   };
 }
@@ -218,7 +224,7 @@ export function getEqualServiceComparisonCurve(
 ): EqualServiceComparison[] {
   if (!serviceAxis(options.xField) || options.baseline === options.comparator) return [];
   const xs = (key: string) =>
-    observed(points)
+    observedPoints(points)
       .filter((point) => equalServiceSourceKey(point) === key)
       .map((point) => point[options.xField])
       .filter(isPositive);
@@ -238,13 +244,62 @@ export function getPrefillSharePoints(
   xField: keyof AggDataEntry,
 ) {
   if (!serviceAxis(xField) && xField !== 'conc') return [];
-  return observed(points)
+  return observedPoints(points)
     .flatMap((point) => {
       const x = point[xField];
       const energy = reconstructedRoleEnergy(point);
       return isPositive(x) && energy
         ? [{ x, sourceKey: equalServiceSourceKey(point), point, ...energy }]
         : [];
+    })
+    .sort((a, b) => a.sourceKey.localeCompare(b.sourceKey) || a.x - b.x);
+}
+
+export interface RolePoint {
+  x: number;
+  sourceKey: string;
+  point: InferenceData;
+  /** Mean board W/GPU inside each pool (role-local). */
+  prefillWattsPerGpu: number | null;
+  decodeWattsPerGpu: number | null;
+  /** Role-local energy: each pool's joules over its own token count. */
+  prefillJoulesPerInputToken: number | null;
+  decodeJoulesPerOutputToken: number | null;
+  /** Both pools on the output-token denominator, when reconstructable. */
+  energy: ReconstructedRoleEnergy | null;
+}
+
+/**
+ * Validated disaggregated rows with any role measurement (PowerX Figures
+ * 12–14). Pool-local denominators stay separate from the additive
+ * output-token reconstruction; a missing figure is null, never zero.
+ */
+export function getRolePoints(
+  points: readonly InferenceData[],
+  xField: keyof AggDataEntry,
+): RolePoint[] {
+  if (!serviceAxis(xField) && xField !== 'conc') return [];
+  return observedPoints(points)
+    .flatMap((point): RolePoint[] => {
+      const x = point[xField];
+      if (!point.disagg || !isPositive(x)) return [];
+      const role: RolePoint = {
+        x,
+        sourceKey: equalServiceSourceKey(point),
+        point,
+        prefillWattsPerGpu: positiveOrNull(point.measuredPrefillAvgPower?.y),
+        decodeWattsPerGpu: positiveOrNull(point.measuredDecodeAvgPower?.y),
+        prefillJoulesPerInputToken: positiveOrNull(point.measuredPrefillJPerInputToken?.y),
+        decodeJoulesPerOutputToken: positiveOrNull(point.measuredDecodeJPerOutputToken?.y),
+        energy: reconstructedRoleEnergy(point) ?? null,
+      };
+      const measured =
+        role.prefillWattsPerGpu !== null ||
+        role.decodeWattsPerGpu !== null ||
+        role.prefillJoulesPerInputToken !== null ||
+        role.decodeJoulesPerOutputToken !== null ||
+        role.energy !== null;
+      return measured ? [role] : [];
     })
     .sort((a, b) => a.sourceKey.localeCompare(b.sourceKey) || a.x - b.x);
 }
