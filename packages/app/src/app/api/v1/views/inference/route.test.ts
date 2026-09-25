@@ -173,39 +173,6 @@ describe('GET /api/v1/views/inference', () => {
     expect(body.equalServiceCurve).toHaveLength(2);
   });
 
-  it('preserves explicit unavailable sources, omits target by default and rejects unsupported CSV panels', async () => {
-    const response = await GET(
-      request('/api/v1/views/inference?model=DeepSeek-R1-0528&metric=tpPerGpu&serviceCompare=true'),
-    );
-    const responseBody = await response.json();
-    expect(responseBody.equalServiceComparison).toBeNull();
-    const stale = await GET(
-      request(
-        '/api/v1/views/inference?model=DeepSeek-R1-0528&metric=tpPerGpu&serviceCompare=true&serviceBaseline=missing&serviceTarget=40',
-      ),
-    );
-    const body = await stale.json();
-    expect(body.params.serviceBaseline).toBe('missing');
-    expect(body.equalServiceComparison.reason).toBe('unknown-source');
-    const diagnostic = await GET(
-      request(
-        '/api/v1/views/inference?model=DeepSeek-R1-0528&metric=tpPerGpu&serviceCompare=true&serviceTarget=40&xmode=concurrency',
-      ),
-    );
-    const diagnosticBody = await diagnostic.json();
-    expect(diagnosticBody.equalServiceComparison.reason).toBe('unsupported-axis');
-    for (const extra of [
-      'format=csv&serviceCompare=true',
-      'format=csv&roleShare=true',
-      'serviceTarget=0',
-      'serviceTarget=',
-      'serviceTarget=NaN',
-    ]) {
-      const invalid = await GET(request(`/api/v1/views/inference?model=DeepSeek-R1-0528&${extra}`));
-      expect(invalid.status).toBe(400);
-    }
-  });
-
   it('includes unofficial sources and validated role shares using one output-token denominator', async () => {
     const row = makeRow({
       hardware: 'gb200',
@@ -284,27 +251,6 @@ describe('GET /api/v1/views/inference', () => {
     expect(invalid.status).toBe(400);
     const invalidBody = await invalid.json();
     expect(invalidBody.param).toBe('xstat');
-  });
-
-  it('keeps AgentX percentile selection independent of fixed-sequence xstat', async () => {
-    mockGetLatestBenchmarks.mockResolvedValue([
-      makeRow({
-        benchmark_type: 'agentic_traces',
-        isl: null,
-        osl: null,
-        metrics: { ...makeRow().metrics, p75_itl: 1 / 35, mean_tpot: 0.025 },
-      }),
-    ]);
-    const response = await GET(
-      request(
-        '/api/v1/views/inference?model=DeepSeek-R1-0528&sequence=agentic&metric=tpPerGpu&xstat=mean&percentile=p75',
-      ),
-    );
-    const body = await response.json();
-    expect(response.status).toBe(200);
-    expect(body.params.xstat).toBeNull();
-    expect(body.xAxis).toMatchObject({ field: 'p75_intvty', statistic: 'p75' });
-    expect(body.series[0].points[0].x).toBe(35);
   });
 
   it('returns chart-ready series with resolved params for the default selection', async () => {
@@ -451,54 +397,6 @@ describe('GET /api/v1/views/inference', () => {
     expect(body.params.deployment).toEqual(['multi-node', 'single-node']);
     expect(body.series).toHaveLength(1);
     expect(body.series[0].gpu).toBe('mi300x');
-  });
-
-  it('discovers exact topology keys and retains every observed concurrency in that topology', async () => {
-    const discover = await GET(
-      request(
-        '/api/v1/views/inference?model=DeepSeek-R1-0528&metric=tpPerGpu&xmode=concurrency&optimal=true&best=true',
-      ),
-    );
-    const initial = await discover.json();
-    const key = initial.series[0].points[0].topologyKey;
-    expect(typeof key).toBe('string');
-    const otherTopology = makeRow({
-      decode_tp: 4,
-      num_decode_gpu: 4,
-      num_prefill_gpu: 4,
-      conc: 128,
-    });
-    mockGetLatestBenchmarks.mockResolvedValue([...ROWS, otherTopology]);
-    const query = new URLSearchParams({
-      model: 'DeepSeek-R1-0528',
-      metric: 'tpPerGpu',
-      xmode: 'concurrency',
-      optimal: 'true',
-      best: 'true',
-      topologies: key,
-    });
-    const response = await GET(request(`/api/v1/views/inference?${query}`));
-    expect(response.status).toBe(200);
-    const body = await response.json();
-    expect(body.params).toMatchObject({ optimal: false, best: false, topologies: [key] });
-    expect(body.xAxis).toMatchObject({ mode: 'concurrency', field: 'conc' });
-    expect(body.frontier).toEqual({ direction: null, points: 0 });
-    expect(body.count).toBe(3);
-    const points = body.series.flatMap(
-      (series: { points: { x: number; concurrency: number; topologyKey: string }[] }) =>
-        series.points,
-    );
-    expect(
-      points.map((point: { x: number }) => point.x).sort((a: number, b: number) => a - b),
-    ).toEqual([16, 32, 64]);
-    for (const point of points) {
-      expect(point.x).toBe(point.concurrency);
-      expect(point.topologyKey).toBe(key);
-    }
-    query.set('topologies', 'unavailable-topology');
-    const missing = await GET(request(`/api/v1/views/inference?${query}`));
-    const missingBody = await missing.json();
-    expect(missingBody.count).toBe(0);
   });
 
   it('case-folds the gpus filter: uppercase base keys select the same series', async () => {

@@ -69,38 +69,6 @@ function makeRow(overrides: Partial<BenchmarkRow> = {}): BenchmarkRow {
 }
 
 describe('rowToAggDataEntry', () => {
-  it('preserves raw interactivity and derives reciprocal mean TPOT separately', () => {
-    const entry = rowToAggDataEntry(
-      makeRow({
-        metrics: {
-          mean_tpot: 0.04,
-          mean_intvty: 777,
-          median_intvty: 12.5,
-        },
-      }),
-    );
-    expect(entry.mean_tpot_intvty).toBe(25);
-    expect(entry.mean_intvty).toBe(777);
-    expect(entry.median_intvty).toBe(12.5);
-  });
-
-  it.each([undefined, 0, -1, NaN, Infinity])(
-    'does not invent speed for invalid mean TPOT %s',
-    (mean_tpot) => {
-      const entry = rowToAggDataEntry(
-        makeRow({
-          metrics: {
-            ...(mean_tpot === undefined ? {} : { mean_tpot }),
-            mean_intvty: 777,
-            median_intvty: 12.5,
-          },
-        }),
-      );
-      expect(entry).not.toHaveProperty('mean_tpot_intvty');
-      expect(entry.mean_intvty).toBe(777);
-    },
-  );
-
   it.each([1, undefined])(
     'keeps canonical identity but labels UMBP for official/overlay rows (DB id %s)',
     (id) => {

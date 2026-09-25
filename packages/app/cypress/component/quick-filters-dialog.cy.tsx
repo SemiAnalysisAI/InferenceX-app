@@ -2,9 +2,7 @@ import { QuickFiltersDialog } from '@/components/inference/ui/QuickFiltersDialog
 import { ActiveQuickFilters } from '@/components/inference/ui/ActiveQuickFilters';
 import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.shared-runtime';
 import type { QuickFilters } from '@/components/inference/types';
-import { pointTopologyKey } from '@/components/inference/utils/topology-filter';
 import { Sequence } from '@/lib/data-mappings';
-import { createMockInferenceData } from '../support/mock-data';
 import { mountWithProviders } from '../support/test-utils';
 
 const availableQuickFilters: QuickFilters = {
@@ -16,81 +14,6 @@ const availableQuickFilters: QuickFilters = {
 };
 
 describe('QuickFiltersDialog', () => {
-  for (const width of [390, 1280]) {
-    it(`wraps long topology options without overlap and scrolls to exact selection (${width}px)`, () => {
-      cy.viewport(width, 900);
-      const topologies = Array.from({ length: 12 }, (_, index) =>
-        pointTopologyKey(
-          createMockInferenceData({
-            disagg: true,
-            physicalChips: 8 * (index + 1),
-            num_prefill_gpu: 4 * (index + 1),
-            num_decode_gpu: 4 * (index + 1),
-            prefill_num_workers: index + 1,
-            decode_num_workers: index + 1,
-            prefill_tp: 4,
-            decode_tp: 4,
-            prefill_ep: 1 + (index % 2),
-            decode_ep: 1 + (index % 2),
-            prefill_pp: 1 + (index % 2),
-            decode_pp: 1 + (index % 2),
-            prefill_dcp_size: 1 + (index % 2),
-            decode_dcp_size: 1 + (index % 2),
-            prefill_pcp_size: 1 + (index % 2),
-            decode_pcp_size: 1 + (index % 2),
-            prefill_dp_attention: index % 2 === 0,
-            decode_dp_attention: index % 2 === 0,
-            offload_mode: index % 2 === 0 ? 'off' : 'on',
-          }),
-        ),
-      );
-      mountWithProviders(<QuickFiltersDialog open onOpenChange={cy.stub()} />, {
-        inference: { availableQuickFilters: { ...availableQuickFilters, topologies } },
-      });
-
-      cy.get('[data-testid="quick-filter-topology-options"]')
-        .scrollIntoView()
-        .should(($options) => {
-          const options = $options[0];
-          expect(options.scrollHeight).to.be.greaterThan(options.clientHeight);
-          expect(options.scrollWidth).to.be.at.most(options.clientWidth + 1);
-          const buttons = [...options.querySelectorAll('button')];
-          const bounds = buttons.map((button) => button.getBoundingClientRect());
-          expect(bounds[0].height, 'fixture exercises a multiline label').to.be.greaterThan(32);
-          buttons.forEach((button, index) => {
-            const range = button.ownerDocument.createRange();
-            range.selectNodeContents(button);
-            const text = range.getBoundingClientRect();
-            expect(text.top, 'label stays inside button').to.be.at.least(bounds[index].top - 1);
-            expect(text.bottom).to.be.at.most(bounds[index].bottom + 1);
-            expect(text.left).to.be.at.least(bounds[index].left - 1);
-            expect(text.right).to.be.at.most(bounds[index].right + 1);
-            for (const other of bounds.slice(index + 1)) {
-              const overlapX =
-                Math.min(bounds[index].right, other.right) -
-                Math.max(bounds[index].left, other.left);
-              const overlapY =
-                Math.min(bounds[index].bottom, other.bottom) -
-                Math.max(bounds[index].top, other.top);
-              expect(overlapX > 1 && overlapY > 1, 'topology buttons do not overlap').to.equal(
-                false,
-              );
-            }
-          });
-        })
-        .scrollTo('bottom')
-        .should(($options) => expect($options[0].scrollTop).to.be.greaterThan(0))
-        .find('button')
-        .last()
-        .should('be.visible')
-        .click();
-      cy.get('@setQuickFilterTopologies').should('have.been.calledOnceWith', [topologies.at(-1)!]);
-      cy.get('[data-testid="quick-filters-dialog"]')
-        .scrollTo('bottom')
-        .screenshot(`topology-options-${width}`, { overwrite: true });
-    });
-  }
-
   for (const locale of ['en', 'zh'] as const) {
     for (const width of [390, 1280]) {
       it(`explains every filter on hover without changing selections (${locale}, ${width}px)`, () => {

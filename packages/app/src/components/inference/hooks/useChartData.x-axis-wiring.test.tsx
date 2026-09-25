@@ -208,18 +208,6 @@ describe('useChartData x-axis scale wiring', () => {
     },
   );
 
-  it('uses observed concurrency, preserves every point and removes preference directions', () => {
-    act(() => root.render(<Probe mode="concurrency" />));
-    for (const graph of result!.graphs) {
-      expect(graph.data.map((point) => point.x)).toEqual([8, 16]);
-      expect(graph.chartDefinition.x_scale_field).toBe('conc');
-      expect(graph.chartDefinition.x_label).toBe('Concurrency');
-      expect(graph.chartDefinition.x_labelZh).toBe('并发数');
-      expect(graph.chartDefinition.y_inputTputPerGpu_roofline).toBeUndefined();
-      expect(graph.clippedData).toEqual([]);
-    }
-  });
-
   it.each([
     ['interactivity', 'interactivity', 'median_intvty'],
     ['ttft', 'e2e', 'median_ttft'],

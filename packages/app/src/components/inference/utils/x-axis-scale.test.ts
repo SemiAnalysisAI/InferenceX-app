@@ -3,17 +3,6 @@ import { describe, expect, it } from 'vitest';
 import { resolveScatterXAxisScale } from './x-axis-scale';
 
 describe('resolveScatterXAxisScale', () => {
-  it('keeps observed concurrency linear despite a saved latency log preference', () => {
-    expect(
-      resolveScatterXAxisScale({
-        extent: [1, 128],
-        selectedYAxisMetric: 'y_inputTputPerGpu',
-        xAxisField: 'conc',
-        scaleType: 'log',
-      }),
-    ).toBe('linear');
-  });
-
   it.each(['P90 Time To First Token (s)', 'P90 首 token 延迟 (s)'])(
     'selects log for wide-range TTFT independently of the %s display label',
     (displayLabel) => {

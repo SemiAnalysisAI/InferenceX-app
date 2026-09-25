@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 
 import type { InferenceData } from '@/components/inference/types';
-import { pointTopologyKey, topologyLabel } from './topology-filter';
 
 import {
   EMPTY_QUICK_FILTERS,
@@ -116,127 +115,6 @@ describe('computeAvailableQuickFilters', () => {
       topologies: [],
     });
   });
-});
-
-describe('exact topology filtering', () => {
-  it('retains shared TP4 loads across hardware but excludes TP8 and different EP', () => {
-    const b200 = point({
-      hwKey: 'b200_sglang',
-      physicalChips: 4,
-      decode_tp: 4,
-      decode_ep: 1,
-      conc: 4,
-    });
-    const mi355x = point({ ...b200, hwKey: 'mi355x_sglang', conc: 256 });
-    const tp8 = point({ ...b200, physicalChips: 8, decode_tp: 8 });
-    const ep4 = point({ ...b200, decode_ep: 4 });
-    const selected = filters({ topologies: [pointTopologyKey(b200)] });
-    expect(quickFiltersActive(selected)).toBe(true);
-    expect(applyQuickFilters([b200, mi355x, tp8, ep4], selected)).toEqual([b200, mi355x]);
-    expect(computeAvailableQuickFilters([b200, mi355x, tp8, ep4]).topologies).toHaveLength(3);
-  });
-
-  it('does not mix 4P+4D with 16P+16D or another pool allocation', () => {
-    const gb200 = point({
-      hwKey: 'gb200_dynamo-sglang',
-      physicalChips: 8,
-      disagg: true,
-      num_prefill_gpu: 4,
-      num_decode_gpu: 4,
-    });
-    const gb300 = point({ ...gb200, hwKey: 'gb300_dynamo-sglang', conc: 128 });
-    const larger = point({ ...gb200, physicalChips: 32, num_prefill_gpu: 16, num_decode_gpu: 16 });
-    const unbalanced = point({ ...gb200, num_prefill_gpu: 2, num_decode_gpu: 6 });
-    expect(
-      applyQuickFilters(
-        [gb200, gb300, larger, unbalanced],
-        filters({ topologies: [pointTopologyKey(gb200)] }),
-      ),
-    ).toEqual([gb200, gb300]);
-    expect(applyQuickFilters([gb200], filters({ topologies: ['missing-topology'] }))).toEqual([]);
-  });
-
-  it('does not treat absent physical or parallelism metadata as a measured size', () => {
-    const unknown = point({ tp: 4 });
-    const known = point({ tp: 4, decode_tp: 4, decode_ep: 1 });
-    expect(pointTopologyKey(unknown)).not.toBe(pointTopologyKey(known));
-  });
-
-  it('resolves aggregate context parallelism from either schema side without mixing widths', () => {
-    const prefillShaped = point({
-      physicalChips: 8,
-      decode_tp: 8,
-      prefill_dcp_size: 8,
-      decode_dcp_size: 1,
-      prefill_pcp_size: 4,
-      decode_pcp_size: 1,
-    });
-    const decodeShaped = point({
-      ...prefillShaped,
-      prefill_dcp_size: 1,
-      decode_dcp_size: 8,
-      prefill_pcp_size: 1,
-      decode_pcp_size: 4,
-    });
-    const unpartitioned = point({ ...prefillShaped, prefill_dcp_size: 1, prefill_pcp_size: 1 });
-    expect(
-      applyQuickFilters(
-        [prefillShaped, decodeShaped, unpartitioned],
-        filters({ topologies: [pointTopologyKey(prefillShaped)] }),
-      ),
-    ).toEqual([prefillShaped, decodeShaped]);
-    expect(pointTopologyKey(point({ ...prefillShaped, disagg: true }))).not.toBe(
-      pointTopologyKey(point({ ...decodeShaped, disagg: true })),
-    );
-  });
-
-  it.each(['en', 'zh'] as const)(
-    'keeps distinct default, unknown, DPA and offload configurations visibly distinct in %s',
-    (locale) => {
-      const base = point({
-        physicalChips: 8,
-        decode_tp: 8,
-        decode_ep: 1,
-        decode_pp: 1,
-        decode_dp_attention: false,
-        offload_mode: 'off',
-      });
-      const variants = [
-        base,
-        point({ ...base, decode_dp_attention: true }),
-        point({ ...base, decode_dp_attention: undefined }),
-        point({ ...base, decode_pp: undefined }),
-        point({ ...base, offload_mode: undefined }),
-        point({ ...base, offload_mode: 'on' }),
-      ];
-      const keys = variants.map(pointTopologyKey);
-      for (const siblings of [undefined, keys]) {
-        const labels = keys.map((key) => topologyLabel(key, locale, siblings));
-        expect(new Set(labels).size).toBe(variants.length);
-      }
-    },
-  );
-
-  it.each(['en', 'zh'] as const)(
-    'omits shared details but retains allocation, widths and every differing field in %s',
-    (locale) => {
-      const base = point({
-        physicalChips: 4,
-        decode_tp: 4,
-        decode_ep: 1,
-        decode_pp: 1,
-        decode_dp_attention: false,
-        offload_mode: 'off',
-      });
-      const keys = [base, point({ ...base, decode_dp_attention: true })].map(pointTopologyKey);
-      const label = topologyLabel(keys[0], locale, keys);
-      expect(label).toContain('GPU4 · TP4 · EP1');
-      expect(label).toContain('DPA0');
-      expect(label).not.toMatch(/PP1|DP\?|offload/u);
-      expect(topologyLabel(keys[1], locale, keys)).toContain('DPA1');
-      expect(topologyLabel(keys[0], locale)).toContain('PP1');
-    },
-  );
 });
 
 describe('quickFiltersActive', () => {

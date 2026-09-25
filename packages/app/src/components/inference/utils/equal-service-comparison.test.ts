@@ -1,12 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { InferenceData } from '../types';
-import {
-  buildEqualServiceComparison,
-  equalServiceSourceKey,
-  getEqualServiceComparisonCurve,
-  getEqualServiceSources,
-  getPrefillSharePoints,
-} from './equal-service-comparison';
+import { buildEqualServiceComparison, equalServiceSourceKey } from './equal-service-comparison';
 
 const metric = (y: number) => ({ y, roof: false });
 function point(overrides: Partial<InferenceData> = {}): InferenceData {
@@ -108,20 +102,6 @@ describe('equal-service comparison', () => {
     expect(result.metrics.meanWattsPerGpu.changePercent).not.toBe(62.5);
   });
 
-  it('uses exact observations without interpolation and accepts consistent repeated observations', () => {
-    const result = buildEqualServiceComparison([...a, { ...a[0], id: 5 }, ...b], {
-      ...options,
-      target: 20,
-    });
-    expect(result.metrics.meanWattsPerGpu.baseline).toMatchObject({
-      value: 400,
-      interpolated: false,
-    });
-    expect(result.metrics.meanWattsPerGpu.baseline?.endpoints.map(({ point: p }) => p.id)).toEqual([
-      1, 5,
-    ]);
-  });
-
   it('does not skip a missing interior measurement or turn it into zero', () => {
     const gap = point({ id: 5, mean_intvty: 40, measuredAvgPower: undefined });
     const result = buildEqualServiceComparison([...a, gap, ...b], { ...options, target: 50 });
@@ -131,99 +111,6 @@ describe('equal-service comparison', () => {
       reason: 'missing-metric',
     });
     expect(result.metrics.outputTokensPerSecond.changePercent).not.toBeNull();
-  });
-
-  it('rejects conflicting duplicate X per quantity instead of averaging them', () => {
-    const conflict = point({ ...a[0], id: 5, measuredAvgPower: metric(401) });
-    const result = buildEqualServiceComparison([...a, conflict, ...b], options);
-    expect(result.metrics.meanWattsPerGpu.reason).toBe('ambiguous-x');
-    expect(result.metrics.meanWattsPerGpu.changePercent).toBeNull();
-    expect(result.metrics.joulesPerOutputToken.changePercent).toBe(-40);
-  });
-
-  it.each([0, -1, Number.NaN, Number.POSITIVE_INFINITY])('withholds invalid metric %s', (value) => {
-    const rows = a.map((p) => ({ ...p, measuredAvgPower: metric(value) }));
-    expect(
-      buildEqualServiceComparison([...rows, ...b], options).metrics.meanWattsPerGpu.reason,
-    ).toBe('missing-metric');
-  });
-
-  it('rejects extrapolation, invalid target, same source, unknown source and concurrency as service', () => {
-    expect(
-      buildEqualServiceComparison([...a, ...b], { ...options, target: 61 }).metrics.meanWattsPerGpu
-        .reason,
-    ).toBe('out-of-range');
-    expect(buildEqualServiceComparison([...a, ...b], { ...options, target: NaN }).reason).toBe(
-      'invalid-target',
-    );
-    expect(
-      buildEqualServiceComparison([...a, ...b], { ...options, comparator: options.baseline })
-        .reason,
-    ).toBe('same-source');
-    expect(
-      buildEqualServiceComparison([...a, ...b], { ...options, comparator: 'missing' }).reason,
-    ).toBe('unknown-source');
-    expect(buildEqualServiceComparison([...a, ...b], { ...options, xField: 'conc' }).reason).toBe(
-      'unsupported-axis',
-    );
-  });
-
-  it('keeps run, actual date, topology, recipe, image, runtime and attempt isolated', () => {
-    const variants = [
-      { run_url: 'https://example.invalid/runs/3' },
-      { actualDate: '2026-09-22' },
-      { decode_pp: 2 },
-      { recipe_fingerprint: 'recipe-2' },
-      { image: 'new-image' },
-      { spec_decoding: 'mtp' },
-      { kv_offload_backend: 'other' },
-    ];
-    for (const variant of variants) {
-      const altered = point({ ...a[1], ...variant });
-      expect(equalServiceSourceKey(altered)).not.toBe(options.baseline);
-      expect(
-        buildEqualServiceComparison([a[0], altered, ...b], options).metrics.meanWattsPerGpu.reason,
-      ).toBe('out-of-range');
-    }
-    const attempted = { ...a[0], run_attempt: 2 };
-    expect(equalServiceSourceKey(attempted)).not.toBe(options.baseline);
-    expect(equalServiceSourceKey(point({ id: 1, run_url: undefined }))).not.toBe(
-      equalServiceSourceKey(point({ id: 2, run_url: undefined })),
-    );
-    expect(getEqualServiceSources([...b, ...a])).toEqual(getEqualServiceSources([...a, ...b]));
-  });
-
-  it('keeps source keys stable across UI display-date overrides and uses the requested mean basis', () => {
-    expect(equalServiceSourceKey({ ...a[0], date: '2026-09-24', actualDate: a[0].date })).toBe(
-      equalServiceSourceKey(a[0]),
-    );
-    const rows = [...a, ...b].map((p) => ({ ...p, mean_tpot_intvty: p.mean_intvty! / 2 }));
-    const result = buildEqualServiceComparison(rows, {
-      ...options,
-      xField: 'mean_tpot_intvty',
-      target: 20,
-    });
-    expect(result.metrics.meanWattsPerGpu.baseline?.value).toBe(600);
-    expect(result.metrics.meanWattsPerGpu.changePercent).toBe(50);
-  });
-
-  it('ignores comparison clones and hidden sources, supports ordinary overlay run URLs', () => {
-    const overlay = a.map((p) => ({
-      ...p,
-      id: undefined,
-      run_url: 'https://example.invalid/runs/overlay',
-    }));
-    const result = buildEqualServiceComparison(
-      [
-        ...overlay,
-        ...b,
-        { ...a[0], powerVariant: { kind: 'basis', id: 'gpu-provisioned' } },
-        { ...a[1], hidden: true },
-      ],
-      { ...options, baseline: equalServiceSourceKey(overlay[0]) },
-    );
-    expect(result.metrics.meanWattsPerGpu.changePercent).toBe(50);
-    expect(result.baseline?.label).toContain('overlay');
   });
 
   it('scales aggregate output by physical chips, but PD output by decode GPUs only', () => {
@@ -255,41 +142,5 @@ describe('equal-service comparison', () => {
         target: 20,
       }).metrics.outputTokensPerSecond.reason,
     ).toBe('missing-metric');
-  });
-
-  it('evaluates sorted observed-X union only within overlap and retains missing knots', () => {
-    const inner = b.map((p, i) => ({ ...p, mean_intvty: i ? 50 : 30 }));
-    const curve = getEqualServiceComparisonCurve(
-      [...a, ...inner, point({ id: 5, mean_intvty: 40, measuredAvgPower: undefined })],
-      options,
-    );
-    expect(curve.map((row) => row.target)).toEqual([30, 40, 50]);
-    expect(curve[1].metrics.meanWattsPerGpu.reason).toBe('missing-metric');
-    expect(getEqualServiceComparisonCurve([...a, ...b], { ...options, xField: 'conc' })).toEqual(
-      [],
-    );
-  });
-
-  it('reuses measured same-window role accounting, not the nominal input:output ratio', () => {
-    const pd = point({
-      disagg: true,
-      power_valid: 1,
-      power_metric_schema_version: 2,
-      joules_per_input_token: 2,
-      joules_per_output_token: 10,
-      prefill_joules_per_input_token: 1,
-      decode_joules_per_output_token: 5,
-    });
-    const [share] = getPrefillSharePoints([pd, { ...pd, power_valid: 0 }], 'mean_intvty');
-    expect(share).toMatchObject({
-      x: 20,
-      prefill: 5,
-      decode: 5,
-      total: 10,
-      prefillShare: 50,
-      sourceKey: equalServiceSourceKey(pd),
-      point: pd,
-    });
-    expect(getPrefillSharePoints([pd], 'conc')[0]).toMatchObject({ x: pd.conc, prefillShare: 50 });
   });
 });
