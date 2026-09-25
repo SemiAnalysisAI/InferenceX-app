@@ -55,8 +55,8 @@ const boundaryRows = (runUrl: string | null) =>
   }));
 
 function interceptMeasuredComparison(
-  official = measuredRows(null),
-  overlay = measuredRows(OVERLAY_RUN_URL),
+  official: object[] = measuredRows(null),
+  overlay: object[] = measuredRows(OVERLAY_RUN_URL),
 ) {
   cy.intercept('GET', '/api/v1/availability', { body: official.slice(0, 1) });
   cy.intercept('GET', '/api/v1/benchmarks*', { body: official });
@@ -631,6 +631,29 @@ it('replots measured settings for official and unofficial data and preserves ove
   cy.get('[aria-label="Dismiss measured-comparison"]').click();
   cy.get('[data-testid="inference-chart-display"] svg .unofficial-overlay-pt').should('not.exist');
   assertMeasuredValues('.dot-group', [2, 3, 4, 5]);
+});
+
+it('says when chosen chip configs report no measured power, and plots them on other metrics', () => {
+  // The config has benchmarks but no power telemetry, like GB200/GB300 NVL72 on DSR1 8K/1K.
+  interceptMeasuredComparison(singleTurnRows(null), []);
+  cy.viewport(1440, 900);
+  cy.visit(
+    '/inference?g_model=DeepSeek-V4-Pro&i_seq=1k%2F1k&i_prec=fp4&i_metric=y_measuredAvgPower&i_gpus=b300_sglang',
+    { onBeforeLoad: unlockAgenticGate },
+  );
+  cy.get('[data-testid="gpu-multiselect"]').should('contain', 'B300 (SGLang)');
+  cy.get('[data-testid="scatter-empty-state"]')
+    .should('have.attr', 'data-reason', 'selection')
+    .and('contain', 'No measured GPU power is reported for this selection.');
+  cy.get('[data-testid="yaxis-metric-selector"]').click('right');
+  cy.contains('[data-slot="select-item"]', /^Token Throughput per Chip/u)
+    .scrollIntoView()
+    .click();
+  cy.get('[data-testid="scatter-empty-state"]').should('not.exist');
+  cy.get('[data-testid="inference-chart-display"] svg .dot-group').should(
+    'have.length.at.least',
+    1,
+  );
 });
 
 it('uses Optimal Only to filter power boundary dots without replacing official or overlay curves', () => {

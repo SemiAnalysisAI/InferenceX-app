@@ -83,6 +83,8 @@ words, the PUE constant and the chassis-model revision so a screenshot records i
 The pinned tooltip's "Modeled system power" block (`tooltipUtils.ts` `modeledSystemPowerHTML`)
 renders only for `measured*` keys and `y_modeledChassisPowerPerGpu`, so on the boundary keys the
 caption is the only per-chart provenance; the caption does not promise more.
+When no point in the selection reports the selected telemetry axis, the chart's empty state says
+the selection has no measured GPU power (`noMeasuredDataHint`) instead of the generic hint.
 
 ## Article figure → share link
 
