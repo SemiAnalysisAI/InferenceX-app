@@ -1241,7 +1241,7 @@ export function InferenceProvider({
   const bestHwTypes = useMemo(() => {
     const wantedType = selectedXAxisMode === 'interactivity' ? 'interactivity' : 'e2e';
     const graph = graphs.find((candidate) => candidate.chartDefinition.chartType === wantedType);
-    if (!graph) return selectableHwTypes;
+    if (!graph) return hwTypesWithData;
     const direction =
       graph.chartDefinition[
         `${selectedYAxisMetric}_roofline` as keyof typeof graph.chartDefinition
@@ -1252,13 +1252,11 @@ export function InferenceProvider({
       direction !== 'lower_left' &&
       direction !== 'lower_right'
     ) {
-      return selectableHwTypes;
+      return hwTypesWithData;
     }
     const best = bestSeriesPerSku(graph.data, direction);
-    // With nothing to rank (no config reports this metric), keep the whole
-    // selection universe: metric coverage never narrows the selection.
-    return best.size > 0 ? best : selectableHwTypes;
-  }, [graphs, selectableHwTypes, selectedXAxisMode, selectedYAxisMetric]);
+    return best.size > 0 ? best : hwTypesWithData;
+  }, [graphs, hwTypesWithData, selectedXAxisMode, selectedYAxisMetric]);
 
   const setBestPerSkuAndApply = useCallback(
     (enabled: boolean, options?: { applySelection?: boolean }) => {
