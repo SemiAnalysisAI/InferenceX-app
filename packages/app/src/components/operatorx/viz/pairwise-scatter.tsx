@@ -86,6 +86,7 @@ function PairwiseScatter({ model }: { model: ComparisonModel }) {
         <EmptyChart>No case was measured on both.</EmptyChart>
       ) : (
         <OpxChart<Pair>
+          inspect={{ model, caseOf: (p) => p.i }}
           chartId="operatorx-pairwise"
           data={pairs}
           height={380}
@@ -146,6 +147,7 @@ function PairwiseScatter({ model }: { model: ComparisonModel }) {
                   `${hardwareLabel(a)} <strong>${metric.format(p.x)}</strong>`,
                   `${hardwareLabel(b)} <strong>${metric.format(p.y)}</strong>`,
                 ],
+                footer: 'Click for kernel timeline',
               }),
           }}
           legendElement={<HardwareLegend model={model} hardware={[a, b]} />}

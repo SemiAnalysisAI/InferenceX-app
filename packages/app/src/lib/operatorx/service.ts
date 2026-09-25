@@ -14,6 +14,10 @@ import {
   type OperatorXDataset,
   type OperatorXResultDetail,
 } from '@semianalysisai/inferencex-db/operatorx/normalize';
+import {
+  compactTimeline,
+  type OperatorXTimeline,
+} from '@semianalysisai/inferencex-db/operatorx/timeline';
 
 import { OperatorXSourceError } from './source';
 import { getOperatorXSource } from './sources';
@@ -73,13 +77,21 @@ export async function getResultDetail(
 }
 
 const OP_TESTLIST_PREFIX: Record<ComparisonOp, string> = { gemm: 'gemm', moe: 'moe' };
-const comparisons = new Map<ComparisonOp, { at: number; value: Promise<Comparison> }>();
+
+/** An op's comparison plus the kernel timeline of every result it holds, by `runId:index`. */
+interface Compared {
+  comparison: Comparison;
+  timelines: Map<string, OperatorXTimeline>;
+}
+
+const compared = new Map<ComparisonOp, { at: number; value: Promise<Compared> }>();
 
 /**
  * The newest timing run of each (runner, testlist) holding the op, combined into one
- * cross-hardware comparison. Runs that fail to load are skipped.
+ * cross-hardware comparison. Runs that fail to load are skipped. The timelines are
+ * assembled here, once, so serving one is a lookup.
  */
-async function compareOp(op: ComparisonOp): Promise<Comparison> {
+async function compareOp(op: ComparisonOp): Promise<Compared> {
   const prefix = OP_TESTLIST_PREFIX[op];
   const covered = new Set<string>();
   const picked: OperatorXRunRef[] = [];
@@ -95,20 +107,43 @@ async function compareOp(op: ComparisonOp): Promise<Comparison> {
   }
   const loaded = await Promise.allSettled(picked.map((run) => normalized(run.run_id)));
   const inputs: ComparisonInput[] = [];
+  const metrics = new Map<string, Normalized['metrics']>();
   loaded.forEach((result, i) => {
-    if (result.status === 'fulfilled')
-      inputs.push({ runner: picked[i].plan!.runner, dataset: result.value });
+    if (result.status !== 'fulfilled') return;
+    inputs.push({ runner: picked[i].plan!.runner, dataset: result.value });
+    metrics.set(picked[i].run_id, result.value.metrics);
   });
-  return buildComparison(op, inputs);
+  const comparison = buildComparison(op, inputs);
+  const timelines = new Map<string, OperatorXTimeline>();
+  for (const row of comparison.rows) {
+    if (row.status !== 'ok') continue;
+    const timeline = compactTimeline(metrics.get(row.runId)?.[row.resultIndex]);
+    if (timeline) timelines.set(`${row.runId}:${row.resultIndex}`, timeline);
+  }
+  return { comparison, timelines };
 }
 
-export function getComparison(op: ComparisonOp): Promise<Comparison> {
-  const hit = comparisons.get(op);
+function getCompared(op: ComparisonOp): Promise<Compared> {
+  const hit = compared.get(op);
   if (hit && Date.now() - hit.at < COMPARISON_TTL_MS) return hit.value;
   const value = compareOp(op);
-  comparisons.set(op, { at: Date.now(), value });
-  value.catch(() => comparisons.delete(op));
+  compared.set(op, { at: Date.now(), value });
+  value.catch(() => compared.delete(op));
   return value;
+}
+
+export async function getComparison(op: ComparisonOp): Promise<Comparison> {
+  const { comparison } = await getCompared(op);
+  return comparison;
+}
+
+/** Kernel timelines of the given `runId:index` results; null where none was profiled. */
+export async function getTimelines(
+  op: ComparisonOp,
+  refs: string[],
+): Promise<Record<string, OperatorXTimeline | null>> {
+  const { timelines } = await getCompared(op);
+  return Object.fromEntries(refs.map((ref) => [ref, timelines.get(ref) ?? null]));
 }
 
 export function errorStatus(error: unknown): number {

@@ -1,6 +1,7 @@
 'use client';
 
 import { Loader2 } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useTheme } from 'next-themes';
 import { useMemo, useState } from 'react';
 
@@ -11,15 +12,16 @@ import { Label } from '@/components/ui/label';
 import { MultiSelect } from '@/components/ui/multi-select';
 import { RetryableQueryError } from '@/components/ui/retryable-query-error';
 import { SearchableSelect } from '@/components/ui/searchable-select';
-import { useOperatorXComparison } from '@/hooks/api/use-operatorx';
+import { prefetchOperatorXTimelines, useOperatorXComparison } from '@/hooks/api/use-operatorx';
 import { useClientSearch } from '@/hooks/useClientSearch';
 import { replaceClientSearch } from '@/lib/client-navigation';
 import { generateVendorColors } from '@/lib/dynamic-colors';
 
+import { CaseDetail } from './CaseDetail';
 import { CoverageStrip } from './CoverageStrip';
 import { hardwareLabel, sortHardware } from './compare/hardware';
 import { METRICS, metricById } from './compare/metrics';
-import { buildModel, type ComparisonModel } from './compare/model';
+import { buildModel, caseRefs, type ComparisonModel } from './compare/model';
 import { VISUALIZATIONS } from './viz';
 import type { VizDefinition } from './viz/types';
 
@@ -73,6 +75,8 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
   const theme = useTheme().resolvedTheme === 'dark' ? 'dark' : 'light';
   const [picked, setPicked] = useState<string[] | null>(null);
   const [pickedBaseline, setBaseline] = useState<string | null>(null);
+  const [inspected, setInspected] = useState<number | null>(null);
+  const queryClient = useQueryClient();
 
   const workload = view?.workloads.find((w) => w.id === view.workload);
   const available = useMemo(() => sortHardware(workload?.hardware ?? []), [workload]);
@@ -94,8 +98,17 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
       const next = hardware.includes(hw) ? hardware.filter((h) => h !== hw) : [...hardware, hw];
       if (next.length > 0) setPicked(next);
     };
-    return buildModel(view, metric, { hardware, available, toggle }, colors, baseline);
-  }, [view, metric, hardware, available, colors, baseline]);
+    const preview = (i: number) =>
+      prefetchOperatorXTimelines(
+        queryClient,
+        op,
+        caseRefs(view, hardware, i).map((r) => r.ref),
+      );
+    return buildModel(view, metric, { hardware, available, toggle }, colors, baseline, {
+      inspect: setInspected,
+      preview,
+    });
+  }, [view, metric, hardware, available, colors, baseline, queryClient, op]);
 
   if (error)
     return (
@@ -190,6 +203,14 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
           <VizCard key={viz.id} model={model} viz={viz} />
         ))}
       </div>
+      <CaseDetail
+        op={op}
+        view={view}
+        hardware={hardware}
+        colors={colors}
+        caseIndex={inspected}
+        onClose={() => setInspected(null)}
+      />
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { type QueryClient, useQuery } from '@tanstack/react-query';
 
 import type { OperatorXRunRef } from '@semianalysisai/inferencex-db/operatorx/bundle';
 import type { ComparisonOp, ComparisonView } from '@semianalysisai/inferencex-db/operatorx/compare';
@@ -6,6 +6,7 @@ import type {
   OperatorXDataset,
   OperatorXResultDetail,
 } from '@semianalysisai/inferencex-db/operatorx/normalize';
+import type { OperatorXTimeline } from '@semianalysisai/inferencex-db/operatorx/timeline';
 
 async function get<T>(url: string, signal: AbortSignal): Promise<T> {
   const response = await fetch(url, { signal });
@@ -52,4 +53,28 @@ export function useOperatorXComparison(op: ComparisonOp | null, workload: string
     staleTime: 5 * 60_000,
     placeholderData: (previous) => (previous?.op === op ? previous : undefined),
   });
+}
+
+export type OperatorXTimelines = Record<string, OperatorXTimeline | null>;
+
+/** Kernel timelines are immutable per `runId:index`, so one fetch per case lasts the session. */
+function timelinesQuery(op: ComparisonOp, refs: string[]) {
+  return {
+    queryKey: ['operatorx', 'timelines', op, refs.join(',')],
+    queryFn: ({ signal }: { signal: AbortSignal }) =>
+      get<OperatorXTimelines>(
+        `/api/v1/operatorx/timelines?${new URLSearchParams({ op, r: refs.join(',') })}`,
+        signal,
+      ),
+    staleTime: Infinity,
+    gcTime: 30 * 60_000,
+  };
+}
+
+export function useOperatorXTimelines(op: ComparisonOp, refs: string[]) {
+  return useQuery({ ...timelinesQuery(op, refs), enabled: refs.length > 0 });
+}
+
+export function prefetchOperatorXTimelines(client: QueryClient, op: ComparisonOp, refs: string[]) {
+  if (refs.length > 0) void client.prefetchQuery(timelinesQuery(op, refs));
 }

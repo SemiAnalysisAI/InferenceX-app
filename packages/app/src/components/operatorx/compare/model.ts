@@ -23,6 +23,9 @@ export interface ComparisonModel {
   latency: (hardware: string, caseIndex: number) => number | null;
   /** Whether `a` beats `b` under the metric's direction. */
   better: (a: number, b: number) => boolean;
+  /** Open a case's drill-down; `preview` warms its data on hover. */
+  inspect: (caseIndex: number) => void;
+  preview: (caseIndex: number) => void;
 }
 
 export function buildModel(
@@ -31,6 +34,7 @@ export function buildModel(
   selection: { hardware: string[]; available: string[]; toggle: (hardware: string) => void },
   colors: Record<string, string>,
   baseline: string | null,
+  drill: { inspect: (caseIndex: number) => void; preview: (caseIndex: number) => void },
 ): ComparisonModel {
   const latency = (hw: string, i: number) => {
     const col = view.measurements[hw];
@@ -48,7 +52,24 @@ export function buildModel(
       return us ? metric.value(view.cases[i], us, hw) : null;
     },
     better: (a, b) => (metric.better === 'higher' ? a > b : a < b),
+    ...drill,
   };
+}
+
+/** `runId:index` of each selected GPU's OK result for a case, for the timeline fetch. */
+export function caseRefs(
+  view: ComparisonView,
+  hardware: string[],
+  caseIndex: number,
+): { hardware: string; ref: string }[] {
+  return hardware.flatMap((hw) => {
+    const col = view.measurements[hw];
+    const runId = col?.runId[caseIndex];
+    const index = col?.resultIndex[caseIndex];
+    return col?.status[caseIndex] === 'ok' && runId && index !== null && index !== undefined
+      ? [{ hardware: hw, ref: `${runId}:${index}` }]
+      : [];
+  });
 }
 
 export function geomean(values: number[]): number | null {

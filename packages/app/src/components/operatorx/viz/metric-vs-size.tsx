@@ -65,6 +65,7 @@ function MetricVsSize({ model }: { model: ComparisonModel }) {
         ]}
       />
       <OpxChart<Point>
+        inspect={{ model, caseOf: (p) => p.i }}
         chartId="operatorx-metric-vs-size"
         data={points}
         height={340}
@@ -117,6 +118,7 @@ function MetricVsSize({ model }: { model: ComparisonModel }) {
               title: hardwareLabel(p.hw),
               color: model.colors[p.hw],
               rows: [esc(caseLabel(view.cases[p.i])), `<strong>${metric.format(p.y)}</strong>`],
+              footer: 'Click for kernel timeline',
             }),
           getRulerX: (p, s) => (s as d3.ScaleLogarithmic<number, number>)(p.x),
           getRulerY: (p, s) => s(p.y),

@@ -78,6 +78,7 @@ function Roofline({ model }: { model: ComparisonModel }) {
         options={precisions.map((p) => ({ value: p, label: p }))}
       />
       <OpxChart<Point>
+        inspect={{ model, caseOf: (p) => p.i }}
         chartId="operatorx-roofline"
         data={points}
         height={400}
@@ -131,6 +132,7 @@ function Roofline({ model }: { model: ComparisonModel }) {
                 esc(`${caseLabel(view.cases[p.i])} · ${view.cases[p.i].precision}`),
                 `<strong>${p.y.toFixed(1)} TFLOPS</strong> at ${p.x.toFixed(0)} FLOP/B`,
               ],
+              footer: 'Click for kernel timeline',
             }),
         }}
         legendElement={<HardwareLegend model={model} />}
