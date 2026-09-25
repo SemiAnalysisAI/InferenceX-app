@@ -693,6 +693,25 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
     },
     [selectedPrecisions, quickFilters, selectedOfficialHwTypes, scopedActiveOverlayHwTypes],
   );
+  // Date comparison (GPUGraph, Timeline): official rows follow the per-date
+  // legend toggles instead of the scatter hardware selection, and unofficial
+  // runs keep the overlay hardware selection. Boundary / role siblings are a
+  // same-run comparison, so neither side draws them here.
+  const visibleDateComparisonRows = useCallback(
+    (officialRows: InferenceData[], overlay: OverlayData | null | undefined) => ({
+      officialRows: officialRows.filter(
+        (point) =>
+          !point.powerVariant &&
+          selectedPrecisions.includes(point.precision) &&
+          matchesQuickFilters(point, quickFilters) &&
+          activeDates.has(`${point.date}_${point.hwKey}`),
+      ),
+      overlayRows: visibleComparisonRows([], overlay).overlayRows.filter(
+        (point) => !point.powerVariant,
+      ),
+    }),
+    [selectedPrecisions, quickFilters, activeDates, visibleComparisonRows],
+  );
 
   if (!loading && error) {
     console.error(error);
@@ -883,10 +902,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
         : renderableGraphs.map((graph, graphIndex) => {
             const resolvedXLabel = xAxisLabel(graph.chartDefinition, locale);
             const isTimelineMode = Boolean(
-              selectedXAxisMode !== 'concurrency' &&
-              selectedDateRange.startDate &&
-              selectedDateRange.endDate &&
-              selectedGPUs.length > 0,
+              selectedDateRange.startDate && selectedDateRange.endDate && selectedGPUs.length > 0,
             );
             const replayAvailable =
               getViewMode(graphIndex) === 'chart' &&
@@ -898,21 +914,17 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
             // official points plus any loaded unofficial-run overlay for
             // this chart type — so they moved out of the legend without
             // changing when they appear.
-            // GPU/date comparison renders GPUGraph, which plots official
-            // points only — skip the unofficial overlay there so the footer
-            // can't advertise a halo or ATOM series that isn't on the chart.
+            // GPU/date comparison renders GPUGraph, which plots the loaded
+            // unofficial runs next to the compared dates on every x-axis.
             const isGpuComparison =
-              selectedXAxisMode !== 'concurrency' &&
               selectedGPUs.length > 0 &&
               ((selectedDateRange.startDate && selectedDateRange.endDate) ||
                 selectedDates.length > 0);
-            const footerOverlay = isGpuComparison
-              ? undefined
-              : selectUnofficialOverlayForMode(
-                  selectedXAxisMode,
-                  graph.chartDefinition.chartType,
-                  overlayDataByChartType,
-                );
+            const footerOverlay = selectUnofficialOverlayForMode(
+              selectedXAxisMode,
+              graph.chartDefinition.chartType,
+              overlayDataByChartType,
+            );
             const footerPoints = [
               ...graph.data,
               ...(footerOverlay?.data ?? []),
@@ -1000,9 +1012,6 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                           : undefined
                       }
                       onExportCsv={() => {
-                        const candidateVisibleData = isTimelineMode
-                          ? graph.data.filter((d) => activeDates.has(`${d.date}_${d.hwKey}`))
-                          : graph.data;
                         const overlay = selectUnofficialOverlayForMode(
                           selectedXAxisMode,
                           graph.chartDefinition.chartType,
@@ -1011,9 +1020,9 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                         const {
                           officialRows: visibleData,
                           overlayRows: visibleOverlayRowsForExport,
-                        } = isTimelineMode
-                          ? { officialRows: candidateVisibleData, overlayRows: [] }
-                          : visibleComparisonRows(candidateVisibleData, overlay);
+                        } = isGpuComparison
+                          ? visibleDateComparisonRows(graph.data, overlay)
+                          : visibleComparisonRows(graph.data, overlay);
                         const { headers, rows } = inferenceChartToCsv(
                           visibleData,
                           graph.model,
@@ -1242,10 +1251,9 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                               ],
                             }
                           : overlay;
-                        const { officialRows, overlayRows } = visibleComparisonRows(
-                          tableOfficialData,
-                          tableOverlay,
-                        );
+                        const { officialRows, overlayRows } = isGpuComparison
+                          ? visibleDateComparisonRows(tableOfficialData, tableOverlay)
+                          : visibleComparisonRows(tableOfficialData, tableOverlay);
                         return (
                           <>
                             {chartCaption}
@@ -1282,6 +1290,8 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                                 locale,
                               )}
                               caption={chartCaption}
+                              comparison={Boolean(isGpuComparison)}
+                              runNumbering={runNumbering}
                             />
                           </div>
                         );
@@ -1298,6 +1308,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                           yLabel={metricLabel(graph.chartDefinition, selectedYAxisMetric, locale)}
                           chartDefinition={graph.chartDefinition}
                           caption={chartCaption}
+                          overlayData={footerOverlay ?? undefined}
                           runNumbering={runNumbering}
                         />
                       ) : (
@@ -1332,14 +1343,9 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                           graph.chartDefinition.chartType,
                           overlayDataByChartType,
                         );
-                        const { officialRows, overlayRows } = visibleComparisonRows(
-                          isGpuComparison
-                            ? graph.data.filter((point) =>
-                                activeDates.has(`${point.date}_${point.hwKey}`),
-                              )
-                            : graph.data,
-                          isGpuComparison ? undefined : overlay,
-                        );
+                        const { officialRows, overlayRows } = isGpuComparison
+                          ? visibleDateComparisonRows(graph.data, overlay)
+                          : visibleComparisonRows(graph.data, overlay);
                         return (
                           <PowerServiceComparison
                             chartId={`chart-${graphIndex}`}

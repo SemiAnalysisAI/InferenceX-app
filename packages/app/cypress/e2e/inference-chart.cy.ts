@@ -871,6 +871,31 @@ const assertObservedLoads = (expected: number[]) => {
   }
 };
 
+describe('Date comparison with unofficial runs', () => {
+  for (const [axis, xMode] of [
+    ['interactivity', ''],
+    ['concurrency', '&i_xmode=concurrency'],
+  ]) {
+    // Every measurement is shown (i_optimal=0), so both runs plot all four loads.
+    it(`keeps ?unofficialrun= overlays on the ${axis} date comparison`, () => {
+      interceptMeasuredComparison();
+      cy.viewport(1440, 900);
+      cy.visit(
+        `/inference?g_model=DeepSeek-V4-Pro&unofficialrun=${OVERLAY_RUN_ID}&i_seq=1k%2F1k&i_prec=fp4&i_metric=y_measuredAvgPower&i_gpus=b300_sglang&i_dstart=${SINGLE_TURN_DATE}&i_dend=${SINGLE_TURN_DATE}&i_optimal=0${xMode}`,
+        { onBeforeLoad: unlockAgenticGate },
+      );
+      cy.wait('@measuredOverlay');
+      cy.get('[data-testid="gpu-graph"]').should('exist');
+      cy.get('[data-testid="scatter-graph"]').should('not.exist');
+      assertMeasuredValues('.dot-group', [450, 460, 470, 480]);
+      assertMeasuredValues('.unofficial-overlay-pt', [450, 460, 470, 480]);
+      cy.get('[aria-label="Dismiss measured-comparison"]').click();
+      cy.get('[data-testid="gpu-graph"] .unofficial-overlay-pt').should('not.exist');
+      assertMeasuredValues('.dot-group', [450, 460, 470, 480]);
+    });
+  }
+});
+
 describe('Observed concurrency and exact topology', () => {
   it('applies the exact-topology filter to official and ?unofficialrun= overlay loads', () => {
     const officialRun = 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/800001';

@@ -221,6 +221,17 @@ config is `display: 'timeline'`.
   (`setUnifiedOverlaySelection`, `computeToggle` solo semantics) exactly as `ScatterGraph`
   does; the context's `toggleHwType` alone would change nothing visible there.
 
+- **Date comparison.** With chip configs and comparison dates selected, `ChartDisplay` passes
+  `comparison`, and official traces become the compared (date, chip config) series of the
+  date-comparison `GPUGraph`. `useComparisonSeries` gives both displays the same series, run
+  numbers and colours. The legend lists one row per series with a trace candidate, grouped
+  under its hardware; a click calls `toggleActiveDate` with the same solo semantics, and a
+  soloed date hides the other dates' traces. Overlay runs stay in one _Unofficial run_ group
+  in their run colour and still follow `activeOverlayHwTypes`. The tooltip header, the focus
+  chip and the summary's hardware column add the date or run
+  (`B200 (SGLang) · 2026-09-23`); end labels lead with it only while more than one entry is
+  visible (`2026-09-23 c1`).
+
 - **Drawing.** One trace per config, mean of its GPUs (legend switch: one line per GPU),
   coloured by hardware for official rows and by `overlayRunColor(runIndex)` for
   `?unofficialrun=` rows; legend toggles follow `activeHwTypes` / `activeOverlayHwTypes`
@@ -332,7 +343,12 @@ source per exact run and recipe (`equalServiceSourceKey`), and colour overlay so
   failure as 503, known missing hosts, and the retained-inventory recount before a CSV
   fallback.
 - `cypress/component/power-timeline.cy.tsx`, `power-compare.cy.tsx` — overlay-run colour and
-  the overlay hardware filter.
+  the overlay hardware filter; in date comparison, per-date trace colours, legend solo toggles
+  and date-prefixed end labels.
+- `cypress/component/gpu-graph.cy.tsx`, `cypress/e2e/inference-chart.cy.ts` and
+  `lib/d3-chart/layers/rooflines.test.ts` — `?unofficialrun=` runs stay on the date-comparison
+  `GPUGraph` in their run colour and dash on the interactivity and concurrency axes, per-curve
+  dashes survive display updates, and concurrency sweeps split per date, run and topology.
 - `utils/matched-concurrency.test.ts`, `utils/power-fit.test.ts`, `utils/powerTimeline.test.ts`
   — signed same-concurrency deltas, the least-squares fit and R², disaggregated fits on output
   per allocated GPU, and the peak pool power inside the validated window.

@@ -135,11 +135,7 @@ import {
   generateOverlayTooltipContent,
   generateTooltipContent,
 } from '@/components/inference/utils/tooltipUtils';
-import {
-  POWER_TIMELINE_METRIC_KEY,
-  requestPowerTraceFocus,
-  traceKeyForPoint,
-} from '@/components/inference/utils/powerTimeline';
+import { usePowerTraceAction } from '@/components/inference/hooks/usePowerTraceAction';
 import { QuickFiltersDialog } from '@/components/inference/ui/QuickFiltersDialog';
 import { ScatterEmptyState } from '@/components/inference/ui/ScatterEmptyState';
 import {
@@ -589,7 +585,6 @@ const ScatterGraph = React.memo(
       setQuickFilterSpec,
       setQuickFilterPower,
       setQuickFilterTopologies,
-      setSelectedYAxisMetric,
     } = useInferenceActions();
     const isConcurrencyAxis = chartDefinition.x_scale_field === 'conc';
     const paretoDirection = (
@@ -1313,43 +1308,7 @@ const ScatterGraph = React.memo(
     const [fixedLogPointId, setFixedLogPointId] = useState<number | null>(null);
     const [powerTelemetryPoint, setPowerTelemetryPoint] = useState<InferenceData | null>(null);
 
-    // "View power trace" on a pinned tooltip (official or overlay point): the
-    // same-tab click stays in-page — remember which trace to emphasise, switch
-    // the metric to the Timeline display, and let the anchor's href keep
-    // serving open-in-new-tab. Listeners are attached per pin because the
-    // tooltip HTML is replaced on every pin.
-    const attachPowerTraceAction = useCallback(
-      (tooltipEl: HTMLElement, d: InferenceData, overlay: boolean) => {
-        const action = tooltipEl.querySelector('[data-action="view-power-trace"]');
-        const traceKey = traceKeyForPoint(d);
-        if (!action || !traceKey) return;
-        action.addEventListener('click', (actionEvent) => {
-          actionEvent.stopPropagation();
-          // Modifier / auxiliary clicks keep the anchor's own behaviour: the
-          // href opens this chart's timeline in a new tab or window.
-          const mouse = actionEvent as MouseEvent;
-          if (
-            mouse.button !== 0 ||
-            mouse.metaKey ||
-            mouse.ctrlKey ||
-            mouse.shiftKey ||
-            mouse.altKey
-          ) {
-            return;
-          }
-          actionEvent.preventDefault();
-          requestPowerTraceFocus(traceKey);
-          chartRef.current?.dismissTooltip();
-          setSelectedYAxisMetric(POWER_TIMELINE_METRIC_KEY);
-          track('inference_power_trace_opened', {
-            hwKey: String(d.hwKey),
-            conc: d.conc,
-            overlay,
-          });
-        });
-      },
-      [setSelectedYAxisMetric],
-    );
+    const attachPowerTraceAction = usePowerTraceAction(chartRef);
 
     // --- Legend points table (per-series drill-down opened from the legend) ---
     const [pointsTableTarget, setPointsTableTarget] = useState<LegendPointsTarget | null>(null);

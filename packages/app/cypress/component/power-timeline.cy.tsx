@@ -1,14 +1,18 @@
 import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.shared-runtime';
+import { useState } from 'react';
 
 import type { GpuPowerSeries, GpuPowerSeriesResponse } from '@/components/gpu-power/power-series';
+import { InferenceContextsProvider } from '@/components/inference/InferenceContext';
 import PowerTimeline from '@/components/inference/ui/PowerTimeline';
 import type { InferenceData } from '@/components/inference/types';
 import { traceKeyForPoint } from '@/components/inference/utils/powerTimeline';
 import { Model, Precision, Sequence } from '@/lib/data-mappings';
 import { overlayRunColor } from '@/lib/overlay-run-style';
+import { computeToggle } from '@/lib/toggle-set';
 
 import {
   createMockHardwareConfig,
+  createMockInferenceContextValues,
   createMockInferenceData,
   createMockUnofficialRunContext,
 } from '../support/mock-data';
@@ -205,5 +209,87 @@ describe('PowerTimeline', () => {
       .first()
       .should('have.attr', 'style')
       .and('contain', overlayRunColor(0));
+  });
+
+  it('follows the date comparison series: colours, legend toggles and labels', () => {
+    const EARLIER_RUN_ID = '34600000001';
+    const EARLIER_RUN_URL = `https://github.com/SemiAnalysisAI/InferenceX/actions/runs/${EARLIER_RUN_ID}`;
+    const DATES = ['2026-09-11', '2026-09-12'];
+    const ALL_SERIES = new Set(DATES.map((date) => `${date}_b200`));
+    cy.intercept('POST', `/api/gpu-metrics?runId=${EARLIER_RUN_ID}*`, {
+      body: {
+        runInfo: { ...response.runInfo, id: Number(EARLIER_RUN_ID), url: EARLIER_RUN_URL },
+        series: [series('b200', 16, 600)],
+      },
+    }).as('earlier');
+    cy.intercept('POST', `/api/gpu-metrics?runId=${RUN_ID}*`, { body: response }).as('later');
+
+    function DateComparison() {
+      const [activeDates, setActiveDates] = useState(new Set(ALL_SERIES));
+      const value = createMockInferenceContextValues({
+        selectedModel: Model.DeepSeek_V4_Pro,
+        selectedSequence: Sequence.EightK_OneK,
+        selectedYAxisMetric: 'y_measuredPowerTimeline',
+        hardwareConfig: hwConfig,
+        activeHwTypes: new Set(HW_TYPES),
+        hwTypesWithData: new Set(HW_TYPES),
+        selectedGPUs: ['b200'],
+        selectedDates: DATES,
+        selectedDateRange: { startDate: '', endDate: '' },
+        activeDates,
+        toggleActiveDate: (id: string) =>
+          setActiveDates((prev) => computeToggle(prev, id, ALL_SERIES)),
+      });
+      return (
+        <InferenceContextsProvider data={value} filters={value} display={value} actions={value}>
+          <div style={{ width: 1100, height: 700 }}>
+            <PowerTimeline
+              chartId="power-timeline-test"
+              comparison
+              data={[
+                measuredPoint('b200', 16, 600, { date: DATES[0], run_url: EARLIER_RUN_URL }),
+                measuredPoint('b200', 16, 700, { date: DATES[1] }),
+              ]}
+              yLabel="Measured Average Power per Chip over Time (W)"
+            />
+          </div>
+        </InferenceContextsProvider>
+      );
+    }
+    mountWithProviders(
+      <PathnameContext.Provider value="/inference">
+        <DateComparison />
+      </PathnameContext.Provider>,
+      { unofficial: {} },
+    );
+    cy.wait(['@earlier', '@later']);
+
+    // One legend row per compared date, under the hardware, as in GPUGraph.
+    cy.get('[data-testid="chart-legend"] .gpu-legend-title').should('have.text', 'B200');
+    cy.get('[data-testid="chart-legend"] label').then(($labels) => {
+      const rows = $labels.toArray().map((label) => label.textContent?.trim());
+      expect(rows).to.include.members(DATES);
+    });
+    svg().within(() => {
+      cy.get('path.power-trace[data-segment="window"]').then(($paths) => {
+        expect($paths).to.have.length(2);
+        const strokes = new Set($paths.toArray().map((path) => path.getAttribute('stroke')));
+        expect(strokes.size, 'each date has its own colour').to.equal(2);
+      });
+      cy.get('text.power-trace-label').then(($labels) => {
+        expect($labels.toArray().map((label) => label.textContent)).to.have.members(
+          DATES.map((date) => `${date} c16`),
+        );
+      });
+    });
+
+    // Soloing the later date removes the earlier date's trace.
+    cy.get('[data-testid="chart-legend"] label').contains(DATES[1]).click();
+    svg().within(() => {
+      cy.get('path.power-trace[data-segment="window"]')
+        .should('have.length', 1)
+        .and('have.attr', 'data-trace-key', `${RUN_ID}:${resultName('b200', 16)}`);
+      cy.get('text.power-trace-label').should('have.length', 1).and('have.text', 'c16');
+    });
   });
 });

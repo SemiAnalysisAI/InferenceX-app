@@ -130,7 +130,11 @@ Upper boundaries use monotone interpolation between unique-X vertices, including
 
 `groupConcurrencySeries` groups straight-line segments by hardware, precision, topology (`pointTopologyKey`), recipe fingerprint, date, run and power-comparison variant. It never joins TP4 to TP8 or 4P/4D to 16P/16D. A group with repeated concurrency values, or points without run provenance, stays as markers instead of being reduced to an arbitrary average or envelope. Markers retain their original values and identities. These segments connect observations; they do not establish a hardware-controlled comparison or estimate untested loads.
 
-Official and unofficial paths share this behavior. Concurrency history comparisons use `ScatterGraph` with independent run segments, not the performance-oriented `GPUGraph` path. Exact topology quick filters retain that topology's entire load sweep. Share URLs, tables and CSV exports preserve the selected `conc` coordinates.
+Official and unofficial paths share this behavior. Date comparisons stay on `GPUGraph` and split each compared (date, hardware) series and each unofficial run into the same segments, drawn with linear curves and without frontier, power envelope, Optimal Only or Perf Ruler; each series keeps one line label, on its longest segment. Exact topology quick filters retain that topology's entire load sweep. Share URLs, tables and CSV exports preserve the selected `conc` coordinates.
+
+### Unofficial runs in date comparisons
+
+`GPUGraph` plots `?unofficialrun=` rows next to the compared dates as their own (run, hardware) series, `overlay-run<index>_<hwKey>`. They pass the same precision, quick-filter and overlay-hardware (`activeOverlayHwTypes`) gates as `ScatterGraph`, draw as X markers in `overlayRunColor(runIndex)`, and their curves take `overlayRooflineDasharray(runIndex)` through the roofline layer's per-curve `getDasharray`. They are not date series, so `activeDates` toggles leave them on; the legend lists them first, one `UNOFFICIAL: <branch>` group per run, and dismissing the run removes them. Pinned overlay tooltips offer **View power trace**, which opens the comparison Timeline focused on that trace; official points keep **View PowerX**.
 
 ## Gradient Roofline Labels
 

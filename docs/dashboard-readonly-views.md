@@ -100,6 +100,14 @@ are unchanged by all six display settings. The reusable client helpers are
 `components/inference/utils/powerTimeline.ts`, and `sumPowerAt` in
 `components/gpu-power/power-series.ts`.
 
+Date comparisons are presentation-only as well. With compared dates, `/inference` keeps the
+date-comparison chart on every x-axis mode, including concurrency, draws `?unofficialrun=`
+rows beside the compared series, and the Timeline display follows the same per-date legend
+toggles and colours. The inference view already returns `comparisons` (one projection per
+`dates` or `start`/`end` entry) and `overlays` (one per unofficial run) for every `xmode`.
+The per-date toggles are renderer state, not query keys, so no API or OpenAPI contract
+change is required.
+
 ## Fixed-sequence service comparisons
 
 The inference view exposes the same mean/median selector as the dashboard through
@@ -214,6 +222,12 @@ GPU 视图优先读取已存遥测，缺少存储数据时回退到产物。全�
 存储的有效平均值、窗口内所绘曲线的最大值，以及 GPU 数 × 注册表 TDP。GPU 池模式复用已有设备角色和求和函数；聚焦仅调暗其他曲线，参考线
 使用硬件注册表。原始遥测、全记录统计和 API 响应均不因这些显示设置而改变。
 响应使用 private, no-store，上游 503 保留为错误响应。
+
+日期对比同样只影响显示。选择对比日期后，`/inference` 在所有 X 轴模式（包括并发数）下都使用日期对比图，
+并与对比序列一同绘制 `?unofficialrun=` 数据；时间线显示沿用同一套按日期切换的图例和配色。
+只读 inference 视图已对每种 `xmode` 返回 `comparisons`（每个 `dates` 或 `start`/`end`
+条目一份投影）和 `overlays`（每个非官方运行一份）。按日期显隐属于渲染状态，不是查询参数，
+因此无需修改 API 或 OpenAPI 契约。
 
 `serviceSources` 中各数据源的 `label` 仅供显示，由硬件和日期组成；只有两个数据源无法区分时，
 才补充精度、拓扑、运行等信息。选择数据源时应使用其 `key`。

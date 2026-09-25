@@ -13,7 +13,9 @@
  * (`components/gpu-power/power-series.ts`).
  *
  * One trace per config, coloured by hardware (official) or by run (unofficial
- * overlay). The validated measurement window is emphasized; the rest of the
+ * overlay); in date comparison, official traces take the GPUGraph colour and
+ * legend toggle of their (date, hardware) series. The validated measurement
+ * window is emphasized; the rest of the
  * job (server start, warmup) is drawn faint. Rated TDP is a dashed reference
  * per hardware; the all-in provisioned line is opt-in because it would halve
  * the vertical resolution of the traces.
@@ -35,6 +37,8 @@ import {
   type GpuPowerSeries,
   type GpuPowerSeriesResponse,
 } from '@/components/gpu-power/power-series';
+import { useComparisonSeries } from '@/components/inference/hooks/useComparisonSeries';
+import { comparisonEntryLabel } from '@/components/inference/utils/comparisonEntry';
 import ChartLegend, { type LegendSwitchConfig } from '@/components/ui/chart-legend';
 import { SegmentedToggle } from '@/components/ui/segmented-toggle';
 import { useUnofficialRun } from '@/components/unofficial-run-provider';
@@ -257,6 +261,8 @@ interface TracePath {
   id: string;
   traceKey: string;
   hwKey: string;
+  /** Date comparison: the official trace's `${date}_${hwKey}` legend series. */
+  series?: string;
   overlayIndex: number | null;
   color: string;
   segment: 'full' | 'window';
@@ -285,6 +291,7 @@ interface TraceLabel {
   id: string;
   traceKey: string;
   hwKey: string;
+  series?: string;
   pool?: PowerPoolRole;
   color: string;
   text: string;
@@ -304,6 +311,10 @@ export interface PowerTimelineProps {
   overlayData?: OverlayData;
   yLabel: string;
   caption?: React.ReactNode;
+  /** Date comparison: official traces follow the per-date legend series. */
+  comparison?: boolean;
+  /** Run numbers shared with the comparison changelog and GPUGraph legend. */
+  runNumbering?: Map<string, number>;
 }
 
 async function fetchPowerSeries(
@@ -564,15 +575,17 @@ function drawTraces(
     .attr('d', (path) => line(path.points));
 }
 
+function isHighlighted(mark: TracePath | TraceLabel, highlight: string): boolean {
+  return highlight === mark.hwKey || highlight === mark.traceKey || highlight === mark.series;
+}
+
 function traceOpacity(path: TracePath, highlight: string | null): number {
   if (highlight === null) return path.opacity;
-  return highlight === path.hwKey || highlight === path.traceKey
-    ? Math.min(1, path.opacity + 0.15)
-    : path.opacity * 0.15;
+  return isHighlighted(path, highlight) ? Math.min(1, path.opacity + 0.15) : path.opacity * 0.15;
 }
 
 function labelOpacity(label: TraceLabel, highlight: string | null): number {
-  return highlight === null || highlight === label.hwKey || highlight === label.traceKey ? 1 : 0.2;
+  return highlight === null || isHighlighted(label, highlight) ? 1 : 0.2;
 }
 
 function drawLabels(
@@ -665,13 +678,17 @@ export default function PowerTimeline({
   overlayData,
   yLabel,
   caption,
+  comparison = false,
+  runNumbering: providedRunNumbering,
 }: PowerTimelineProps) {
   const locale = useLocale();
   const t = STRINGS[locale];
   const { hardwareConfig, hwTypesWithData } = useInferenceData();
-  const { activeHwTypes, selectedPrecisions, quickFilters } = useInferenceFilters();
+  const { activeHwTypes, selectedPrecisions, quickFilters, activeDates } = useInferenceFilters();
   const { isLegendExpanded, highContrast } = useInferenceDisplay();
-  const { setBestPerSku, toggleHwType, setIsLegendExpanded } = useInferenceActions();
+  const { setBestPerSku, toggleHwType, setIsLegendExpanded, toggleActiveDate } =
+    useInferenceActions();
+  const { allGraphs: comparisonSeries, runNumbering } = useComparisonSeries(providedRunNumbering);
   const {
     unofficialRunInfos,
     runIndexByUrl,
@@ -763,13 +780,21 @@ export default function PowerTimeline({
   const focusRun = traceKeyRunId(requestedFocusRef.current ?? focusKey);
   // Same visibility source as ScatterGraph: an overlay session may hold a
   // local official selection that has not been written back to the filters.
+  // Date comparison instead shows the (date, hardware) series toggled on in
+  // the legend, as GPUGraph does.
   const officialHwTypes = localOfficialOverride ?? activeHwTypes;
-  const isShown = useCallback(
+  const comparisonSeriesOf = useCallback(
     (point: InferenceData) =>
-      overlayPointSet.has(point)
-        ? activeOverlayHwTypes.has(point.hwKey)
-        : officialHwTypes.has(point.hwKey),
-    [overlayPointSet, activeOverlayHwTypes, officialHwTypes],
+      comparison && !overlayPointSet.has(point) ? `${point.date}_${point.hwKey}` : undefined,
+    [comparison, overlayPointSet],
+  );
+  const isShown = useCallback(
+    (point: InferenceData) => {
+      if (overlayPointSet.has(point)) return activeOverlayHwTypes.has(point.hwKey);
+      const series = comparisonSeriesOf(point);
+      return series ? activeDates.has(series) : officialHwTypes.has(point.hwKey);
+    },
+    [overlayPointSet, activeOverlayHwTypes, comparisonSeriesOf, activeDates, officialHwTypes],
   );
   // Overlay runs were requested explicitly (`?unofficialrun=`), so they take
   // the cap's slots before official runs; runs the legend shows go before runs
@@ -840,15 +865,29 @@ export default function PowerTimeline({
     });
   }, [loadingRuns, responses.size, traces.length, missing.length]);
 
+  const comparisonColors = useMemo(
+    () => new Map(comparisonSeries.map((series) => [series.id, series.color])),
+    [comparisonSeries],
+  );
   const colorForTrace = useCallback(
     (trace: PowerTimelineTrace): { color: string; overlayIndex: number | null } => {
       if (overlayPointSet.has(trace.point)) {
         const index = overlayRunIndex(trace.point.run_url ?? null, runIndexByUrl);
         return { color: overlayRunColor(index), overlayIndex: index };
       }
-      return { color: getCssColor(resolveColor(trace.point.hwKey)), overlayIndex: null };
+      const series = comparisonSeriesOf(trace.point);
+      const color =
+        (series && comparisonColors.get(series)) ?? getCssColor(resolveColor(trace.point.hwKey));
+      return { color, overlayIndex: null };
     },
-    [overlayPointSet, runIndexByUrl, getCssColor, resolveColor],
+    [
+      overlayPointSet,
+      runIndexByUrl,
+      comparisonSeriesOf,
+      comparisonColors,
+      getCssColor,
+      resolveColor,
+    ],
   );
   // With an overlay loaded the chart reads localOfficialOverride, so a legend
   // click must write the unified selection the way ScatterGraph does; the
@@ -925,6 +964,18 @@ export default function PowerTimeline({
     },
     [overlayPointSet, overlayData, hardwareConfig],
   );
+  const entryLabel = useCallback(
+    (point: InferenceData) => comparisonEntryLabel(String(point.date), runNumbering),
+    [runNumbering],
+  );
+  /** Hardware, plus the compared date or run of an official trace in date comparison. */
+  const seriesLabel = useCallback(
+    (point: InferenceData): string =>
+      comparisonSeriesOf(point)
+        ? `${hardwareLabel(point)} · ${entryLabel(point)}`
+        : hardwareLabel(point),
+    [comparisonSeriesOf, hardwareLabel, entryLabel],
+  );
 
   const model = useMemo<DrawModel>(() => {
     const paths: TracePath[] = [];
@@ -936,9 +987,20 @@ export default function PowerTimeline({
       const base = baseHardware(trace.point.hwKey);
       return `${HW_REGISTRY[base]?.label ?? base.toUpperCase()} `;
     };
+    // Several compared dates share `c4` as well; name the date or run too.
+    const entries = new Set(
+      visibleTraces
+        .filter((trace) => comparisonSeriesOf(trace.point))
+        .map((trace) => trace.point.date),
+    );
+    const entryPrefix = (trace: PowerTimelineTrace) =>
+      entries.size > 1 && comparisonSeriesOf(trace.point) ? `${entryLabel(trace.point)} ` : '';
     for (const trace of visibleTraces) {
       const { color, overlayIndex } = colorForTrace(trace);
-      const tracePathSet = tracePaths(trace, color, overlayIndex, xMode, lineMode, windowOnly);
+      const series = comparisonSeriesOf(trace.point);
+      const tracePathSet = tracePaths(trace, color, overlayIndex, xMode, lineMode, windowOnly).map(
+        (path) => ({ ...path, series }),
+      );
       paths.push(...tracePathSet);
       if (visibleTraces.length > MAX_LABELED_TRACES) continue;
       // One end label per trace; per pool in pool mode, so the role reads off the line.
@@ -959,9 +1021,10 @@ export default function PowerTimeline({
           id: group.pool ? `${trace.key}:${group.pool}` : trace.key,
           traceKey: trace.key,
           hwKey: trace.point.hwKey,
+          series,
           pool: group.pool,
           color,
-          text: `${hardwarePrefix(trace)}${
+          text: `${entryPrefix(trace)}${hardwarePrefix(trace)}${
             group.pool
               ? `c${trace.point.conc} · ${t.poolShort[group.pool]}`
               : `c${trace.point.conc}`
@@ -972,7 +1035,16 @@ export default function PowerTimeline({
       }
     }
     return { paths, labels };
-  }, [visibleTraces, colorForTrace, xMode, lineMode, windowOnly, t]);
+  }, [
+    visibleTraces,
+    colorForTrace,
+    comparisonSeriesOf,
+    entryLabel,
+    xMode,
+    lineMode,
+    windowOnly,
+    t,
+  ]);
 
   const samples = useMemo(
     () =>
@@ -1200,7 +1272,7 @@ export default function PowerTimeline({
         <div class="text-muted-foreground">${t.gpus(sample.gpuCount)} · ${t.min} ${sample.min.toFixed(1)} W · ${t.max} ${sample.max.toFixed(1)} W</div>`;
       return `<div class="rounded-md border bg-background/95 px-3 py-2 text-xs shadow-md backdrop-blur-sm" style="min-width: 210px; user-select: ${isPinned ? 'text' : 'none'}">
         ${isPinned ? `<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">${t.dismiss}</div>` : ''}
-        <div class="font-semibold mb-1" style="color: ${sample.color}">${hardwareLabel(point)} · ${traceConfigLabel(point)}${
+        <div class="font-semibold mb-1" style="color: ${sample.color}">${seriesLabel(point)} · ${traceConfigLabel(point)}${
           overlayInfo ? ` · ✕ ${overlayInfo.branch || `run ${overlayInfo.id}`}` : ''
         }</div>
         <div class="text-muted-foreground">${time}</div>
@@ -1213,7 +1285,7 @@ export default function PowerTimeline({
         }
       </div>`;
     },
-    [unofficialRunInfos, xMode, t, locale, hardwareLabel],
+    [unofficialRunInfos, xMode, t, locale, seriesLabel],
   );
 
   const legendItems = useMemo(() => {
@@ -1230,7 +1302,9 @@ export default function PowerTimeline({
                 name: `✕ unofficial-run-${info.id}`,
                 label: `✕ ${branch}`,
                 color: overlayRunColor(index),
-                title: `${t.unofficialRun}: ${branch}`,
+                // The comparison legend groups on the name's first word: one
+                // "Unofficial run" group over every run.
+                title: comparison ? t.unofficialRun : `${t.unofficialRun}: ${branch}`,
                 isHighlighted: true,
                 hw: `overlay-run-${info.id}`,
                 isActive: true,
@@ -1258,6 +1332,27 @@ export default function PowerTimeline({
             })
             .filter((item): item is NonNullable<typeof item> => item !== null)
         : [];
+    if (comparison) {
+      // GPUGraph's comparison legend: one row per (date, hardware) series with
+      // a trace candidate, grouped by hardware.
+      const seriesWithData = new Set(measuredData.map((point) => `${point.date}_${point.hwKey}`));
+      const comparisonItems = comparisonSeries
+        .filter(({ id }) => seriesWithData.has(id))
+        .map(({ date, hwKey, id, color }) => ({
+          name: `${hwKey} ${comparisonEntryLabel(date, runNumbering)}`,
+          label: comparisonEntryLabel(date, runNumbering),
+          color,
+          title: hardwareConfig[hwKey] ? getDisplayLabel(hardwareConfig[hwKey]) : hwKey,
+          hw: id,
+          isActive: activeDates.has(id),
+          onClick: () => {
+            toggleActiveDate(id);
+            track('interactivity_date_toggled', { date, hw: hwKey, view: 'power_timeline' });
+          },
+          tooltip: null,
+        }));
+      return [...overlayItems, ...comparisonItems];
+    }
     const officialItems = hwKeysInData
       .filter((key) => hwTypesWithData.has(key) && hardwareConfig[key])
       .map((key) => {
@@ -1289,6 +1384,12 @@ export default function PowerTimeline({
     officialHwTypes,
     handleToggleHwType,
     t,
+    comparison,
+    comparisonSeries,
+    measuredData,
+    runNumbering,
+    activeDates,
+    toggleActiveDate,
   ]);
 
   // Per-GPU and pools are two views of the same lines, so either switch turns
@@ -1341,6 +1442,8 @@ export default function PowerTimeline({
   const legendElement = (
     <ChartLegend
       variant="sidebar"
+      grouped={comparison}
+      disableActiveSort={comparison}
       legendItems={legendItems}
       isLegendExpanded={isLegendExpanded}
       onExpandedChange={(expanded) => {
@@ -1494,7 +1597,7 @@ export default function PowerTimeline({
           >
             <span>
               {t.focused(
-                `${hardwareLabel(focusedTrace.point)} · ${traceConfigLabel(focusedTrace.point)}`,
+                `${seriesLabel(focusedTrace.point)} · ${traceConfigLabel(focusedTrace.point)}`,
               )}
             </span>
             <button
@@ -1544,7 +1647,7 @@ export default function PowerTimeline({
           traces={visibleTraces}
           responses={responses}
           colorOf={(trace) => colorForTrace(trace).color}
-          hardwareLabel={hardwareLabel}
+          hardwareLabel={seriesLabel}
           isOverlay={(point) => overlayPointSet.has(point)}
         />
       )}
