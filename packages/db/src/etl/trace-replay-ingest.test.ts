@@ -67,7 +67,10 @@ function mockSqlWithTransaction(
     if (text.includes('for update')) return Promise.resolve(lockedRows);
     if (text.includes('insert into agentic_trace_replay')) return Promise.resolve([{ id: 123 }]);
     if (text.includes('select br.id') && capacityLog) {
-      return Promise.resolve([{ id: 41, capacity_log: capacityLog }]);
+      return Promise.resolve([{ id: 41, server_log_id: 7 }]);
+    }
+    if (text.includes('with chunk') && capacityLog) {
+      return Promise.resolve([{ has_more: false, line: capacityLog }]);
     }
     return Promise.resolve([]);
   };

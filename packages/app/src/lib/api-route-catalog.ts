@@ -1111,7 +1111,10 @@ export const apiContractSourceDigests = [
     // Reviewed for the Qwen3.8-27B addition (InferenceX#3260): two new DB keys
     // and display names plus their release dates. No published parameter enum
     // or endpoint changes, so the docs stand.
-    sourceSha256: 'af1053b2ae94b50de51153153dd7a7e268e50bde3e5900310e44f2d8baa86f87',
+    // Reviewed for the GLM-5.3 DB key (InferenceX#3330): one new key, `glm5.3`,
+    // mapped to the existing GLM-5.2 display name (as glm5.1 -> GLM-5). No
+    // published parameter enum or endpoint changes, so the docs stand.
+    sourceSha256: 'bdc8e287f57107cdf0772c50ad4abc0278757b20db78844cc6cf02e88ea66717',
     reviewArea: {
       en: 'Published benchmark and TCO model names, aliases, and parameter enums.',
       zh: '已发布基准与 TCO 模型名称、别名和参数枚举。',

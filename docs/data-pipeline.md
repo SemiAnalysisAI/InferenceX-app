@@ -288,6 +288,9 @@ or multiply by TP. Checkpoints may share this nominal pool with token KV storage
 Missing or inconsistent capacity metadata stays unset rather than guessed.
 
 Ingestion derives `metrics.kv_cache_pool_tokens` when it links the trace artifact.
+The startup lines are pulled from `server_logs.server_log` in bounded 64 MiB character
+chunks (with a small overlap) because PostgreSQL's regex engine needs 4 bytes per
+character and rejects a single allocation over 1 GiB; LMCache runs store 290–690 MiB logs.
 The `db:backfill-atom-kv-capacity --run-id <id> --yes` command applies the same logic
 to stored artifacts. The workflow's `atom-kv-capacity-only` option skips chart and
 aggregate recomputation; no benchmark rerun or raw-artifact replacement is needed.

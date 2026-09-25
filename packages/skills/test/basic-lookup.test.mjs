@@ -88,6 +88,7 @@ globalThis.fetch = async (input) => {
     cwd: project,
     env: {
       ...environment,
+      INFERENCEX_SKILL_DIR: skillRoot,
       INFERENCEX_TEST_ROWS: fixturePath,
       INFERENCEX_TEST_REQUESTS: requestsPath,
     },

@@ -93,9 +93,9 @@ response's resolved TCO, utilization, license share, topology and power basis.
 Modeled and provisioned power are distinct. Missing measured evidence is not zero.
 GPU chart projections omit missing metric readings; measured zero remains zero.
 The selected file/host series' full-record statistics include startup and warmup
-and cover all chips regardless of visibility or chart downsampling. Stored digests
-are authoritative, including empty or absent metric digests; only live artifacts
-calculate from samples. Keep these sample-weighted statistics separate from
+and cover all chips regardless of visibility or chart downsampling. Current-version stored digests
+are authoritative, including empty or absent metric digests. Outdated or
+unversioned digests are recomputed read-only from retained DB samples. Keep these sample-weighted statistics separate from
 serving-window power, J/token and selected-time-window calculations. The view reads
 stored telemetry first, falls back to artifacts for missing storage, and preserves
 upstream 503 failures. Treat an error as unavailable evidence, not an empty dataset.
@@ -105,6 +105,13 @@ buttons are presentation state, not new datasets. AI-chart provider keys and
 private prompts, feedback, local uploads and administrative mutations are not
 public read projections. AgentX drilldowns use existing availability, aggregates,
 histograms, request timelines, logs and server metrics operations.
+
+Run-specific recognition labels do not rename API framework keys. Run
+`35879254139` displays `UMBP MoRI SGLang` through October 9, 2026 in
+America/New_York (`2026-10-10T04:00:00Z` exclusive); subsequent label resolution
+returns `MoRI SGLang`. An already-open memoized chart may need a refresh.
+Keep using `mori-sglang` for API selectors and raw CSV output throughout.
+This display-only exception changes no API data or OpenAPI contract.
 
 For every new or changed non-sensitive public-facing data view, implement or
 update its read-only API in the same PR. Reuse the UI's pure transforms, test

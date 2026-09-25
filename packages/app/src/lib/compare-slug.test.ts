@@ -333,7 +333,7 @@ describe('getCompareModelBySlug', () => {
     expect(getCompareModelBySlug('deepseek-r1')).toBe(DEEPSEEK_R1);
     expect(getCompareModelBySlug('kimi-k26')).toBe(KIMI_K26);
     expect(getCompareModelBySlug('glm-5-3')).toBe(GLM_53);
-    expect(GLM_53.dbKeys).toEqual(['glm5.2']);
+    expect(GLM_53.dbKeys).toEqual(['glm5.2', 'glm5.3']);
   });
 
   it('resolves alias slugs to their canonical model', () => {

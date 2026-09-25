@@ -67,6 +67,13 @@ J/token and selected-time-window calculations. Run telemetry is DB-first with an
 artifact fallback for missing storage; the public view returns private, no-store
 responses and preserves upstream 503 failures.
 
+Run-specific recognition labels are also presentation-only. Run `35879254139`
+displays `UMBP MoRI SGLang` through October 9, 2026 in America/New_York
+(`2026-10-10T04:00:00Z` exclusive). Label resolution after that cutoff returns
+`MoRI SGLang`; an already-open memoized chart may need a refresh. This changes
+neither API selectors nor response data, framework/hardware keys, or raw CSV
+exports, so no API or OpenAPI contract change is required.
+
 ## Verification scope
 
 Route tests cover baseline views and selected extension behavior, including
