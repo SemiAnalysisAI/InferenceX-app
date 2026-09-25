@@ -115,7 +115,11 @@ function agentxBundle() {
 beforeAll(async () => {
   root = fs.mkdtempSync(path.join(os.tmpdir(), 'powerx-timeline-'));
   db = await PGlite.create();
-  for (const name of ['001_initial_schema.sql', '016_gpu_metrics.sql']) {
+  for (const name of [
+    '001_initial_schema.sql',
+    '016_gpu_metrics.sql',
+    '017_gpu_metric_stats_version.sql',
+  ]) {
     await db.exec(fs.readFileSync(new URL(`../../migrations/${name}`, import.meta.url), 'utf8'));
   }
   await db.exec('ALTER TABLE benchmark_results ADD COLUMN power_audit jsonb');

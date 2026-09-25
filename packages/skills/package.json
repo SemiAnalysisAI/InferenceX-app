@@ -1,6 +1,6 @@
 {
   "name": "@semianalysisai/inferencex-skills",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "InferenceX benchmark data for coding agents and the command line.",
   "keywords": [
     "agent-skills",
@@ -28,6 +28,9 @@
   "files": [
     "bin/install.mjs",
     "skills/inferencex-api",
+    "skills/inferencex",
+    "skills/inferencex-to-chart",
+    "skills/inferencex-to-table",
     "README.md",
     "LICENSE"
   ],

@@ -7,8 +7,25 @@ interface RunProvenance {
   run_url?: string | null;
 }
 
-// Three-week recognition window, ending 2026-10-08 at 21:32 America/New_York.
-const UMBP_DSPARK_LABEL_EXPIRES_AT = Date.parse('2026-10-09T01:32:00Z');
+/** MoRI runs labeled UMBP indefinitely. */
+const UMBP_LABEL_RUNS = new Set(['34926284365']);
+
+/**
+ * Run-specific recognition labels and expiry (epoch ms).
+ * Once expired, the run falls back to the standard label.
+ */
+const TEMPORARY_UMBP_LABEL_RUNS: Record<string, { label: string; expiresAt: number }> = {
+  // DSpark on dsv4 AgentX disagg (InferenceX#3188): ends 2026-10-08 21:32 America/New_York.
+  '35166686551': {
+    label: 'MoRI UMBP SGLang',
+    expiresAt: Date.parse('2026-10-09T01:32:00Z'),
+  },
+  // UMBP linker + DSpark gamma 6 (InferenceX#3256): through October 9, 2026 America/New_York.
+  '35879254139': {
+    label: 'UMBP MoRI SGLang',
+    expiresAt: Date.parse('2026-10-10T04:00:00Z'),
+  },
+};
 
 /** Display-only: never change framework/hardware keys used by filters and history. */
 export function inferenceFrameworkLabelOverride(
@@ -17,10 +34,10 @@ export function inferenceFrameworkLabelOverride(
 ): string | undefined {
   if (resolveFrameworkAlias(framework) !== 'mori-sglang') return undefined;
   const runId = runIdFromRunUrl(runUrl);
-  const hasLabel =
-    runId === '34926284365' ||
-    (runId === '35166686551' && Date.now() < UMBP_DSPARK_LABEL_EXPIRES_AT);
-  return hasLabel ? 'MoRI UMBP SGLang' : undefined;
+  if (runId === null) return undefined;
+  if (UMBP_LABEL_RUNS.has(runId)) return 'MoRI UMBP SGLang';
+  const override = TEMPORARY_UMBP_LABEL_RUNS[runId];
+  return override && Date.now() < override.expiresAt ? override.label : undefined;
 }
 
 /** Leads every unofficial-run label, in line labels and legend rows alike. */
@@ -70,9 +87,15 @@ export function getInferenceRunLabel(
   label: string,
   points: readonly (RunProvenance & { framework?: string })[],
 ): string {
-  const override = points
-    .map((point) => inferenceFrameworkLabelOverride(point.framework ?? '', point.run_url))
-    .find(Boolean);
+  const override = [
+    ...new Set(
+      points
+        .map((point) => inferenceFrameworkLabelOverride(point.framework ?? '', point.run_url))
+        .filter(Boolean),
+    ),
+  ]
+    .sort()
+    .join(' / ');
   return override ? `${label} (${override})` : label;
 }
 
@@ -92,7 +115,9 @@ export function getInferenceHardwareConfig(
     inferenceFrameworkLabelOverride(framework, point.run_url),
   );
   if (!overrides.some(Boolean)) return config;
-  const label = overrides.every(Boolean) ? 'MoRI UMBP SGLang' : 'MoRI SGLang / MoRI UMBP SGLang';
+  const label = [...new Set(overrides.map((override) => override ?? 'MoRI SGLang'))]
+    .sort()
+    .join(' / ');
   return {
     ...config,
     suffix: config.suffix.replace('MoRI SGLang', label),

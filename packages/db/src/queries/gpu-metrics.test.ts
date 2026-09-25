@@ -138,22 +138,23 @@ describe('getGpuMetricsForRun', () => {
       sidecars: { context: { timestamp_timezone: 'UTC' } },
       benchmarkResultIds: [10, 11],
     });
-    expect(node0?.stats).toEqual([
+    // Pre-migration (unversioned) digests are recomputed read-only; null is not zero.
+    expect(node0?.stats.filter((stat) => stat.metric === 'power_w')).toEqual([
       {
         gpuIndex: 0,
-        metric: 'powerW',
-        count: 2,
+        metric: 'power_w',
+        count: 1,
         min: 187.5,
-        max: 912.25,
-        mean: 549.875,
-        median: 549.875,
-        p95: 912.25,
-        p99: 912.25,
-        stddev: 362.375,
+        max: 187.5,
+        mean: 187.5,
+        median: 187.5,
+        p95: 187.5,
+        p99: 187.5,
+        stddev: 0,
       },
       {
         gpuIndex: 1,
-        metric: 'powerW',
+        metric: 'power_w',
         count: 1,
         min: 190.5,
         max: 190.5,
@@ -164,6 +165,13 @@ describe('getGpuMetricsForRun', () => {
         stddev: 0,
       },
     ]);
+    expect(node0?.stats).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ gpuIndex: 0, metric: 'edge_temp_c', mean: 35.5, count: 1 }),
+        expect.objectContaining({ gpuIndex: 0, metric: 'gpu_util_pct', mean: 0, count: 1 }),
+        expect.objectContaining({ gpuIndex: 0, metric: 'mem_voltage_mv', mean: 1350, count: 1 }),
+      ]),
+    );
     expect(node0?.data.map((sample) => [sample.timestamp, sample.index, sample.power])).toEqual([
       ['2026-09-11T04:19:41.000Z', 0, 187.5],
       ['2026-09-11T04:19:41.000Z', 1, 190.5],
@@ -227,4 +235,14 @@ describe('getGpuMetricsForRun', () => {
     expect(Object.hasOwn(dropped!, 'edgeTemp')).toBe(true);
     expect(dropped?.edgeTemp).toBeUndefined();
   });
+});
+
+it('keeps healthy hosts readable when an unversioned sibling has incomplete samples', async () => {
+  await sql`update gpu_metric_series set sample_count = 4 where id = 100`;
+  const payload = await getGpuMetricsForRun(sql, WITH_SERIES);
+  expect(payload?.series[0]?.stats).toEqual([]);
+  expect(payload?.series[0]?.data).toHaveLength(3);
+  expect(payload?.series[1]?.stats).toEqual(
+    expect.arrayContaining([expect.objectContaining({ metric: 'power_w', mean: 500.5, count: 1 })]),
+  );
 });

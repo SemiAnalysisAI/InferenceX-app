@@ -1,9 +1,12 @@
 ---
 name: inferencex-api
-description: 'Query InferenceX public benchmarks, dashboard views and filters, PowerX, AgentX, provenance, TCO, framework releases, CollectiveX, evaluations, datasets, and evidence bundles; verify saved evidence offline. Use for public data analysis, not launching benchmarks or accessing private uploads.'
+description: 'Legacy inferencex-api entry and shared workflow guide. Use when explicitly requested as inferencex-api; the inferencex skill is the main entry for public benchmark analysis and the CLI.'
 ---
 
 # InferenceX API
+
+Shared instructions for the `inferencex` entry and the legacy `inferencex-api` name.
+Resolve all paths below from this guide's directory, including for personal installs.
 
 Use the versioned `inferencex` entry for the six formal evidence workflows. Copying
 the skill does not add a binary to `PATH`; resolve this `SKILL.md` and run
@@ -94,6 +97,14 @@ when a duration is requested, compute and label elapsed or inclusive days.
 
 ## Choose the workflow
 
+- **AgentX charts, tables, or main-agent versus subagent comparison:** run
+  `inferencex charts list`, then read [chart and table templates](references/chart-templates.md).
+  Render the saved selected-point capture with `charts agentx-sources`, setting
+  `--style` to `chart`, `table` or `both` (the default). Each chart shows one
+  `--metric` (default `requests`); table mode produces `table.svg` (counts and all
+  medians) with detailed files alongside. Preserve recorded
+  source categories, phase scope and missing/cancelled sample counts.
+
 - **Dashboard views or filter parity:** read
   [dashboard read-only views](references/dashboard-views.md). Use the documented
   `/api/v1/views/*` GET endpoint and retain resolved parameters and source identity.
@@ -123,7 +134,17 @@ when a duration is requested, compute and label elapsed or inclusive days.
 - **Two CollectiveX runs:** read [CollectiveX](references/collectivex.md), then use
   `inferencex collectivex compare`. Match exact EP/KV identities and preserve
   attempts, revisions, units, source pointers, and unmatched coverage.
-- **Basic benchmark lookup, evaluation, dataset conversation, or benchmark history queries:**
+- **Which models, hardware, frameworks, precisions, or dates have observations:**
+  use `inferencex discover models` and
+  `inferencex discover configs --model <selector> [--date YYYY-MM-DD]`. Before
+  treating counts or groups of `items` as exhaustive, require
+  `coverage.complete_for_scope: true`.
+  The default page contains at most 100 items; retry at offset 0 with a larger
+  `--limit` (maximum 1000). If coverage remains incomplete, label the result partial;
+  separate offset calls fetch fresh snapshots and cannot prove complete coverage.
+  `--model` accepts a display family selector or an exact DB model key from
+  `discover models`. This returns configuration and provenance identity, not metrics.
+- **Metric values, evaluation, dataset conversation, or benchmark history queries:**
   use the bounded raw-API recipes in
   [public API examples](references/public-api-examples.md#basic-benchmark-lookup).
   These operations are outside the six formal bundle families.

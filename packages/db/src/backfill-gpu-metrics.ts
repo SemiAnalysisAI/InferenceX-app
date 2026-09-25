@@ -16,6 +16,12 @@
  *   bun run --cwd packages/db db:backfill-gpu-metrics --all --since 2026-08-01 --dry-run
  *   bun run --cwd packages/db db:backfill-gpu-metrics --all --force --limit 20 --yes
  *
+ *   bun run --cwd packages/db db:backfill-gpu-metrics --stats-only --all --dry-run
+ *   bun run --cwd packages/db db:backfill-gpu-metrics --stats-only --run 34557177019 --yes
+ *
+ * --stats-only upgrades outdated digests from DB samples without GitHub access.
+ * It includes all retained attempts and dates unless explicitly filtered.
+ *
  * Runs that already have at least one stored series are skipped unless
  * --force is passed. --parallel N (default 4) bounds concurrent artifact
  * downloads within one run.
@@ -28,7 +34,7 @@ import path from 'node:path';
 import { hasNoSslFlag } from './cli-utils.js';
 import { AsyncSemaphore } from './etl/async-semaphore.js';
 import { createAdminSql } from './etl/db-utils.js';
-import { ingestGpuMetricsArtifact } from './etl/gpu-metrics-ingest.js';
+import { ingestGpuMetricsArtifact, refreshGpuMetricStats } from './etl/gpu-metrics-ingest.js';
 import { readPowerAuditValidations } from './etl/gpu-metrics-artifacts.js';
 import { recoveredPowerAudit } from './etl/power-audit-validations.js';
 import {
@@ -59,6 +65,7 @@ import { findBenchmarkResultIds, readMappedBenchmarkRows } from './lib/benchmark
 import { downloadArtifact, fetchRunMeta } from './lib/github-artifacts.js';
 import {
   pairGpuMetricsArtifacts,
+  findOutdatedGpuMetricSeries,
   collectMissingTelemetryExpectations,
   type GpuMetricsArtifactPair,
 } from './lib/gpu-metrics-backfill.js';
@@ -89,6 +96,7 @@ interface BackfillFlags {
   artifact: string | null;
   receipt: string | null;
   refreshCacheOnly: boolean;
+  statsOnly: boolean;
 }
 
 function positiveIntFlag(flag: string): number | null {
@@ -126,6 +134,7 @@ function parseFlags(): BackfillFlags {
     artifact: stringFlag('--artifact'),
     receipt: stringFlag('--receipt'),
     refreshCacheOnly: process.argv.includes('--refresh-cache-only'),
+    statsOnly: process.argv.includes('--stats-only'),
   };
 }
 
@@ -304,6 +313,39 @@ async function main(): Promise<void> {
     );
   if (flags.refreshCacheOnly && !fs.existsSync(flags.receipt!))
     throw new Error('--refresh-cache-only requires an existing receipt');
+
+  if (flags.statsOnly) {
+    if (flags.refreshCacheOnly || flags.receipt || force)
+      throw new Error(
+        '--stats-only cannot be combined with --refresh-cache-only, --receipt or --force',
+      );
+    const series = await findOutdatedGpuMetricSeries(sql, flags, limit);
+    console.log(`${series.length} outdated digest(s); --limit counts series in --stats-only mode`);
+    if (flags.dryRun) {
+      console.table(series);
+      return;
+    }
+    if (
+      series.length === 0 ||
+      !(await confirmProceed('Recompute only these stored telemetry digests?'))
+    )
+      return;
+    for (const row of series) {
+      try {
+        const updated = await refreshGpuMetricStats(sql, Number(row.id));
+        console.log(
+          `series ${row.id} run ${row.github_run_id} attempt ${row.run_attempt}: ${updated ? 'updated' : 'current'}`,
+        );
+      } catch (error) {
+        process.exitCode = 1;
+        console.error(
+          `series ${row.id} failed; retry --stats-only --run ${row.github_run_id} --attempt ${row.run_attempt} --artifact ${row.artifact_name} --yes`,
+          error,
+        );
+      }
+    }
+    return;
+  }
 
   console.log('=== backfill-gpu-metrics ===');
   const runs = await loadCandidateRuns(flags, limit, force);

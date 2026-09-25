@@ -3092,6 +3092,14 @@ const overview = {
   },
   conventions: [
     {
+      id: 'client-attribution',
+      title: text('Client request counts', '客户端请求统计'),
+      description: text(
+        'Optional inferencex-cli/<version> or inferencex-skill/<version> User-Agent markers attribute public GET arrivals, including cache hits and retries. X-InferenceX-Traffic separates normal, ci and validation requests. Only route templates, package versions, transport, environment and traffic class are recorded; no query values or user identifiers. Packaged clients can omit attribution with INFERENCEX_TELEMETRY=0. These headers do not affect authentication, response data or caching.',
+        '可选的 inferencex-cli/<version> 或 inferencex-skill/<version> User-Agent 标识用于归类公开 GET 请求，包括缓存命中及重试。X-InferenceX-Traffic 区分 normal、ci 和 validation 流量。仅记录接口路径模板、包版本、客户端类型（CLI 或 skill）、部署环境与流量类别，不记录查询参数值或用户标识。包内客户端可设置 INFERENCEX_TELEMETRY=0 关闭来源标记。这些请求头不影响身份验证、响应数据或缓存。',
+      ),
+    },
+    {
       id: 'errors',
       title: text('Errors', '错误'),
       description: text(
@@ -3326,8 +3334,8 @@ export function buildOpenApiDocument(serverUrl: string = API_BASE_URL): OpenApiD
     info: {
       title: 'InferenceX Data API',
       version: API_DOCUMENT_VERSION,
-      description: overview.description.en,
-      'x-description-zh': overview.description.zh,
+      description: `${overview.description.en}\n\n${overview.conventions.find((item) => item.id === 'client-attribution')!.description.en}`,
+      'x-description-zh': `${overview.description.zh}\n\n${overview.conventions.find((item) => item.id === 'client-attribution')!.description.zh}`,
     },
     servers: [{ url: normalizedServerUrl, description: 'InferenceX production API' }],
     externalDocs: {

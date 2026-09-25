@@ -70,6 +70,34 @@ function makeRow(overrides: Partial<BenchmarkRow> = {}): BenchmarkRow {
 
 describe('rowToAggDataEntry', () => {
   it.each([1, undefined])(
+    'labels run 35879254139 in the official/overlay legend without changing data (DB id %s)',
+    (id) => {
+      const clock = vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-10-09T23:59:59-04:00'));
+      try {
+        const run_url =
+          'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/35879254139/attempts/1';
+        const row = makeRow({ id, hardware: 'mi355x', framework: 'mori-sglang', run_url });
+        const active = transformBenchmarkRows([row]);
+        expect(Object.keys(active.hardwareConfig)).toEqual(['mi355x_mori-sglang']);
+        expect(active.hardwareConfig['mi355x_mori-sglang'].suffix).toBe('(UMBP MoRI SGLang)');
+        for (const points of active.chartData) {
+          expect(points[0]).toMatchObject({
+            hwKey: 'mi355x_mori-sglang',
+            framework: 'mori-sglang',
+            run_url,
+          });
+        }
+        clock.mockReturnValue(Date.parse('2026-10-10T00:00:00-04:00'));
+        const expired = transformBenchmarkRows([row]);
+        expect(expired.hardwareConfig['mi355x_mori-sglang'].suffix).toBe('(MoRI SGLang)');
+        expect(expired.chartData).toEqual(active.chartData);
+      } finally {
+        clock.mockRestore();
+      }
+    },
+  );
+
+  it.each([1, undefined])(
     'keeps canonical identity but labels UMBP for official/overlay rows (DB id %s)',
     (id) => {
       const run_url =

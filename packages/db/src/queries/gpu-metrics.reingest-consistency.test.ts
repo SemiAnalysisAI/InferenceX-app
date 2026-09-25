@@ -29,7 +29,7 @@ import type postgres from 'postgres';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import type { DbClient } from '../connection';
-import { ingestGpuMetricsArtifact } from '../etl/gpu-metrics-ingest';
+import { ingestGpuMetricsArtifact, refreshGpuMetricStats } from '../etl/gpu-metrics-ingest';
 import { getGpuMetricsForPoint, type GpuMetricSeries } from './gpu-metrics';
 
 type Sql = postgres.Sql;
@@ -54,7 +54,11 @@ function queryClient(database: Pick<PGlite, 'query'>) {
 
 beforeAll(async () => {
   db = await PGlite.create();
-  for (const name of ['001_initial_schema.sql', '016_gpu_metrics.sql']) {
+  for (const name of [
+    '001_initial_schema.sql',
+    '016_gpu_metrics.sql',
+    '017_gpu_metric_stats_version.sql',
+  ]) {
     await db.exec(fs.readFileSync(new URL(`../../migrations/${name}`, import.meta.url), 'utf8'));
   }
   // The point reader aggregates benchmark_results.power_audit (migration 015).
@@ -215,4 +219,18 @@ describe('getGpuMetricsForPoint under telemetry re-ingest', () => {
       expectCoherent(series);
     }
   });
+});
+
+it('retries when only the digest version changes between statements', async () => {
+  const first = await ingest(NVIDIA_CSV_V1);
+  await sql`update gpu_metric_series set stats_version = 0`;
+  await sql`update gpu_metric_gpu_stats set mean_value = -1`;
+  const interleaved = interleaveAfterStats(reader, async (index) => {
+    if (index === 1) await refreshGpuMetricStats(sql, first.seriesIds[0]!);
+  });
+  const payload = await getGpuMetricsForPoint(interleaved.client, 10);
+  expect(interleaved.seriesReads()).toBe(2);
+  expect(
+    payload?.series[0]?.stats.find((s) => s.gpuIndex === 0 && s.metric === 'power_w')?.mean,
+  ).toBeCloseTo(549.95, 3);
 });

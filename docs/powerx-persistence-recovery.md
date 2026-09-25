@@ -180,9 +180,13 @@ receipt recovery error also blocks the complete count, even when older data rema
 ## Full-record statistics
 
 The point detail, run explorer and public `/api/v1/views/gpu-metrics` projection use the
-stored per-GPU digest for the existing full-record statistics, with name mappings only.
+current-version per-GPU digest for the existing full-record statistics, with name mappings
+only. Unversioned or outdated digests (`stats_version` ≠ `GPU_STATS_VERSION`) are recomputed
+read-only from retained DB samples with the shared ingest algorithm; incomplete retained
+samples leave statistics empty for the source-gap recovery path (see
+[statistics upgrades](./data-pipeline.md#full-record-statistics-upgrades-migration-017)).
 Units and percentile/stddev definitions are unchanged.
-Zero is a value; missing metrics or an empty digest remain missing. Live, un-ingested
+Zero is a value; missing metrics or an empty current-version digest remain missing. Live, un-ingested
 artifact data still computes statistics in the browser. These tables include startup and
 warmup. They are not serving-window power, energy, or user-selected-window statistics.
 

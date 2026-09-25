@@ -4,8 +4,11 @@ import { describe, expect, it } from 'vitest';
 
 import {
   ATOM_KV_BLOCKS_METRIC,
+  CAPACITY_SCAN_CHUNK_CHARS,
+  CAPACITY_SCAN_OVERLAP_CHARS,
   atomKvCacheBlocksFromMetricPhases,
   atomKvCachePoolTokensFromServerLog,
+  collectAtomCapacityLines,
   updateAtomKvCachePoolTokens,
 } from './atom-kv-capacity';
 import { computeTraceDerivedPayloads } from './compute-trace-derived';
@@ -101,22 +104,61 @@ describe('ATOM KV capacity', () => {
     const execute = (strings: TemplateStringsArray, ...values: unknown[]) => {
       const text = strings.join('?');
       calls.push({ text, values });
-      return Promise.resolve(
-        text.includes('select br.id')
-          ? [{ id: 440703, capacity_log: capacity(60372, 256) }]
-          : Object.assign([], { count: 1 }),
-      );
+      if (text.includes('select br.id'))
+        return Promise.resolve([{ id: 440703, server_log_id: 77 }]);
+      if (text.includes('with chunk')) {
+        return Promise.resolve([{ has_more: false, line: capacity(60372, 256) }]);
+      }
+      return Promise.resolve(Object.assign([], { count: 1 }));
     };
     const sql = Object.assign(execute, {
       array: (values: unknown[]) => values,
     }) as unknown as Parameters<typeof updateAtomKvCachePoolTokens>[0];
     expect(await updateAtomKvCachePoolTokens(sql, [440703], 482735)).toBe(1);
+    expect(calls).toHaveLength(3);
     expect(calls[0].text).toContain("c.framework = 'atom' and not c.disagg");
+    expect(calls[0].text).toContain('br.server_log_id is not null');
     expect(calls[0].values).toContainEqual([440703]);
-    expect(calls[1].text).toContain("jsonb_set(metrics, '{kv_cache_pool_tokens}'");
-    expect(calls[1].text).toContain('is distinct from');
-    expect(calls[1].values).toEqual([123580160, 440703, 123580160]);
+    expect(calls[1].text).toContain('regexp_matches');
+    expect(calls[1].text).not.toMatch(/regexp_matches\(\s*sl\.server_log/u);
+    expect(calls[1].values).toContain(77);
+    expect(calls[2].text).toContain("jsonb_set(metrics, '{kv_cache_pool_tokens}'");
+    expect(calls[2].text).toContain('is distinct from');
+    expect(calls[2].values).toEqual([123580160, 440703, 123580160]);
     expect(await updateAtomKvCachePoolTokens(sql, [440703], null)).toBe(0);
-    expect(calls).toHaveLength(2);
+    expect(calls).toHaveLength(3);
+  });
+
+  it('scans oversized server logs in bounded chunks instead of one regex buffer', async () => {
+    // LMCache runs stored 290-690 MiB logs; PostgreSQL rejects regex buffers over 1 GiB (4 B/char).
+    const chunkCalls: { offset: number; width: number; probe: number }[] = [];
+    const chunks = [
+      { has_more: true, lines: [capacity(60372, 256)] },
+      { has_more: true, lines: [] },
+      { has_more: false, lines: [capacity(60372, 256), capacity(60393, 256)] },
+    ];
+    const execute = (strings: TemplateStringsArray, ...values: unknown[]) => {
+      const text = strings.join('?');
+      if (!text.includes('with chunk')) throw new Error(`unexpected query: ${text}`);
+      const [offset, width, probe] = values as number[];
+      chunkCalls.push({ offset, width, probe });
+      const chunk = chunks[chunkCalls.length - 1];
+      const rows = chunk.lines.map((line) => ({ has_more: chunk.has_more, line }));
+      return Promise.resolve(rows.length > 0 ? rows : [{ has_more: chunk.has_more, line: null }]);
+    };
+    const sql = execute as unknown as Parameters<typeof collectAtomCapacityLines>[0];
+    const lines = await collectAtomCapacityLines(sql, 77);
+    expect(lines).toEqual([capacity(60372, 256), capacity(60393, 256)]);
+    expect(chunkCalls).toEqual(
+      [0, 1, 2].map((index) => ({
+        offset: index * CAPACITY_SCAN_CHUNK_CHARS + 1,
+        width: CAPACITY_SCAN_CHUNK_CHARS + CAPACITY_SCAN_OVERLAP_CHARS,
+        probe: (index + 1) * CAPACITY_SCAN_CHUNK_CHARS + 1,
+      })),
+    );
+    expect(CAPACITY_SCAN_CHUNK_CHARS + CAPACITY_SCAN_OVERLAP_CHARS).toBeLessThan(
+      (1024 * 1024 * 1024) / 4,
+    );
+    expect(atomKvCachePoolTokensFromServerLog(lines.join('\n'), 482735)).toBe(123_580_160);
   });
 });

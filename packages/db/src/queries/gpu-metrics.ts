@@ -7,6 +7,13 @@
  * ISO timestamps so the existing D3 charts consume them unchanged.
  */
 
+import {
+  GPU_STATS_VERSION,
+  computeStoredGpuMetricStats,
+  statMetricColumn,
+  type StoredGpuMetricSample,
+} from '../lib/gpu-metric-stats';
+
 import type { DbClient } from '../connection.js';
 
 export interface GpuMetricSampleRow {
@@ -99,6 +106,7 @@ interface RawSeriesRow {
   power_audits: Record<string, unknown>[] | null;
   csv_sha256: string;
   ingested_at: string | Date;
+  stats_version: number;
 }
 
 /** The columns `upsertGpuMetricSeries` rewrites whenever it replaces a series. */
@@ -107,6 +115,7 @@ interface RawSeriesVersionRow {
   csv_sha256: string;
   sample_count: number;
   ingested_at: string | Date;
+  stats_version: number;
 }
 
 interface RawStatRow {
@@ -123,24 +132,8 @@ interface RawStatRow {
   stddev_value: number;
 }
 
-interface RawSampleRow {
+interface RawSampleRow extends StoredGpuMetricSample {
   series_id: number | string;
-  gpu_index: number;
-  sampled_at: string | Date;
-  power_w: number | null;
-  temperature_c: number | null;
-  sm_clock_mhz: number | null;
-  mem_clock_mhz: number | null;
-  gpu_util_pct: number | null;
-  mem_util_pct: number | null;
-  edge_temp_c: number | null;
-  mem_temp_c: number | null;
-  gfx_voltage_mv: number | null;
-  soc_voltage_mv: number | null;
-  mem_voltage_mv: number | null;
-  fclk_mhz: number | null;
-  socclk_mhz: number | null;
-  mm_activity_pct: number | null;
 }
 
 const isoString = (value: string | Date): string =>
@@ -162,7 +155,7 @@ export class TelemetrySnapshotChangedError extends Error {
 const MAX_SNAPSHOT_ATTEMPTS = 3;
 
 const seriesVersionKey = (row: RawSeriesVersionRow): string =>
-  `${Number(row.id)}:${row.csv_sha256}:${Number(row.sample_count)}:${isoString(row.ingested_at)}`;
+  `${Number(row.id)}:${row.csv_sha256}:${Number(row.sample_count)}:${isoString(row.ingested_at)}:${row.stats_version}`;
 
 async function withConsistentSnapshot<T>(read: () => Promise<T>): Promise<T> {
   for (let attempt = 1; ; attempt += 1) {
@@ -253,11 +246,12 @@ async function loadSeriesDetails(
   // The three statements above run as separate autocommit queries (the DbClient
   // has no transaction), so a re-ingest can commit between them. The writer
   // replaces samples, stats and the series row in one transaction and stamps
-  // `ingested_at`, so a version key that is unchanged after the samples were
-  // read proves stats and samples belong to the same series version.
+  // `ingested_at`; digest-only upgrades change `stats_version`. An unchanged
+  // key after the sample read proves both belong to the same series version.
   const versionRows = (await sql`
-    select id, csv_sha256, sample_count, ingested_at
-    from gpu_metric_series
+    select id, csv_sha256, sample_count, ingested_at,
+      coalesce((to_jsonb(s)->>'stats_version')::integer, 0) as stats_version
+    from gpu_metric_series s
     where id = any(${ids}::bigint[])
   `) as unknown as RawSeriesVersionRow[];
   const versionKeys = new Set(versionRows.map(seriesVersionKey));
@@ -269,6 +263,33 @@ async function loadSeriesDetails(
   }
 
   const statsBySeries = groupBySeries(statRows, toStatRow);
+  const staleIds = new Set(
+    seriesRows
+      .filter((row) => row.stats_version !== GPU_STATS_VERSION)
+      .map((row) => Number(row.id)),
+  );
+  const staleSamples = groupBySeries(
+    sampleRows.filter((sample) => staleIds.has(Number(sample.series_id))),
+    (sample) => sample,
+  );
+  for (const row of seriesRows) {
+    const id = Number(row.id);
+    if (!staleIds.has(id)) continue;
+    const samples = staleSamples.get(id) ?? [];
+    if (samples.length !== Number(row.sample_count)) {
+      // Keep samples available to the existing source-gap recovery path, but
+      // never present a partial-population digest as full-record statistics.
+      statsBySeries.set(id, []);
+      continue;
+    }
+    statsBySeries.set(
+      id,
+      computeStoredGpuMetricStats(samples).map((stat) => ({
+        ...stat,
+        metric: statMetricColumn(stat.metric),
+      })),
+    );
+  }
   const samplesBySeries = groupBySeries(sampleRows, toSampleRow);
 
   return seriesRows.map((row) => {
@@ -339,6 +360,7 @@ async function readGpuMetricsForRun(
     select s.id, s.workflow_run_id, s.artifact_name, s.config_key, s.file_name, s.vendor,
       s.sample_interval_s, s.sample_count, s.gpu_count, s.started_at, s.ended_at, s.sidecars,
       s.csv_sha256, s.ingested_at,
+      coalesce((to_jsonb(s)->>'stats_version')::integer, 0) as stats_version,
       (
         select array_agg(l.benchmark_result_id order by l.benchmark_result_id)
         from benchmark_result_gpu_metrics l where l.series_id = s.id
@@ -394,6 +416,7 @@ async function readGpuMetricsForPoint(
     select s.id, s.workflow_run_id, s.artifact_name, s.config_key, s.file_name, s.vendor,
       s.sample_interval_s, s.sample_count, s.gpu_count, s.started_at, s.ended_at, s.sidecars,
       s.csv_sha256, s.ingested_at,
+      coalesce((to_jsonb(s)->>'stats_version')::integer, 0) as stats_version,
       (
         select array_agg(l.benchmark_result_id order by l.benchmark_result_id)
         from benchmark_result_gpu_metrics l where l.series_id = s.id

@@ -30,6 +30,7 @@ import {
   useGlobalFilterWorkflow,
 } from '@/components/GlobalFilterContext';
 import { useUnofficialRun } from '@/components/unofficial-run-provider';
+import { useFeatureGate } from '@/lib/use-feature-gate';
 import type {
   InferenceActionsContextType,
   InferenceData,
@@ -104,6 +105,7 @@ import {
   comparisonDefaultGroup,
   comparisonExclusionPolicy,
   comparisonExclusion as resolveComparisonExclusion,
+  isEngineGuardLifted,
 } from './utils/comparison-exclusion';
 import { resolveLabelState, serializeLabelState } from './utils/label-defaults';
 import { bestSeriesPerSku } from './utils/best-series-per-sku';
@@ -305,6 +307,10 @@ export function InferenceProvider({
   } = useGlobalFilterAvailability();
   const { availableRuns, workflowError } = useGlobalFilterWorkflow();
   const { isUnofficialRun } = useUnofficialRun();
+  // ↑↑↓↓ insiders' gate: when unlocked, the cross-engine comparability guard is
+  // lifted so vLLM and SGLang configs can share one graph while tuning configs.
+  const featureGateUnlocked = useFeatureGate();
+  const engineGuardLifted = isEngineGuardLifted(isUnofficialRun, featureGateUnlocked);
 
   const { getUrlParam, setUrlParams } = useUrlState();
   const [hasExplicitRunSelection, setHasExplicitRunSelection] = useState(() =>
@@ -335,14 +341,14 @@ export function InferenceProvider({
       resolveComparisonExclusion(
         selectedModel,
         effectiveSequence,
-        isUnofficialRun,
+        engineGuardLifted,
         overviewHistoryPair !== undefined,
       ),
-    [selectedModel, effectiveSequence, isUnofficialRun, overviewHistoryPair],
+    [selectedModel, effectiveSequence, engineGuardLifted, overviewHistoryPair],
   );
   const defaultExclusionGroup = useMemo(
-    () => comparisonDefaultGroup(effectiveSequence, isUnofficialRun),
-    [effectiveSequence, isUnofficialRun],
+    () => comparisonDefaultGroup(effectiveSequence, engineGuardLifted),
+    [effectiveSequence, engineGuardLifted],
   );
   const exclusionPolicy: ExclusionConflictPolicy = comparisonExclusionPolicy(effectiveSequence);
 
@@ -366,8 +372,8 @@ export function InferenceProvider({
   const [engineConflict, setEngineConflict] = useState<EngineComparisonConflictDetail | null>(null);
   const dismissEngineConflict = useCallback(() => setEngineConflict(null), []);
   useEffect(() => {
-    if (isUnofficialRun) setEngineConflict(null);
-  }, [isUnofficialRun]);
+    if (engineGuardLifted) setEngineConflict(null);
+  }, [engineGuardLifted]);
 
   // ── Inference-specific filter state ─────────────────────────────────────────
   // Defer URL restoration until after mount so the first client render matches SSR.
@@ -1365,8 +1371,11 @@ export function InferenceProvider({
   // reset commits as soon as data for the new model arrives — without this, switching models
   // bails on the empty-data tick and never re-fires, leaving the legend at the prior intersection.
   const precisionsKey = effectivePrecisions.join(',');
+  // Keyed on the resolved guard state rather than isUnofficialRun alone: the
+  // feature gate hydrates from localStorage after mount, so the first-paint
+  // official resolution must be revisited once the gate unlocks (or re-locks).
   const hwResetKey = `${selectedModel}|${effectiveSequence}|${precisionsKey}|${
-    isUnofficialRun ? 'preview' : 'official'
+    engineGuardLifted ? 'preview' : 'official'
   }`;
   const lastHwResetKeyRef = useRef('');
 
@@ -2004,7 +2013,7 @@ export function InferenceProvider({
         </PerfRulerStoreContext.Provider>
       </InferenceContextsProvider>
       <EngineComparisonConflictToast
-        detail={isUnofficialRun ? null : engineConflict}
+        detail={engineGuardLifted ? null : engineConflict}
         onDismiss={dismissEngineConflict}
       />
       <Dialog open={showDateRangeDialog} onOpenChange={setShowDateRangeDialog}>

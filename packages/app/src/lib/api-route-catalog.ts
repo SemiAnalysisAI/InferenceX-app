@@ -512,8 +512,8 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'page-bff',
     exclusionReason: {
-      en: 'Point-detail BFF returning linked PowerX telemetry series, per-GPU digests and retained validation/audit metadata. Every read checks a live DB revision before using the Blob payload cache; responses use no-store, missing data returns 404, and database failures remain errors. Re-ingest and shared-link changes do not require manual cache purges. Coupled to the PowerX tab implementation.',
-      zh: '数据点详情页专用 BFF；返回关联的 PowerX 遥测序列、每 GPU 统计摘要及保留的验证与审计元数据。每次读取先核对数据库版本再使用 Blob 缓存；响应使用 no-store，数据缺失返回 404，数据库故障仍作为错误返回。重新入库及共享链接变化无需手动清理缓存。与 PowerX 标签页实现紧密耦合。',
+      en: 'Point-detail BFF returning linked PowerX telemetry series, per-GPU digests and retained validation/audit metadata. Every read checks a live DB revision before using the Blob payload cache; responses use no-store, missing data returns 404, and database failures remain errors. Re-ingest, shared-link and digest algorithm/stored-version changes do not require manual cache purges. Outdated digests are recomputed read-only from retained samples. Coupled to the PowerX tab implementation.',
+      zh: '数据点详情页专用 BFF；返回关联的 PowerX 遥测序列、每 GPU 统计摘要及保留的验证与审计元数据。每次读取先核对数据库版本再使用 Blob 缓存；响应使用 no-store，数据缺失返回 404，数据库故障仍作为错误返回。重新入库、共享链接及摘要算法或存储版本变化无需手动清理缓存；旧摘要从保留样本只读重算。与 PowerX 标签页实现紧密耦合。',
     },
     sourceSha256: 'c04a01fcd8e1cb4cb7101a46a0ba44b227f2696819c499bcc93be8ee7a8ce255',
   },
@@ -1159,7 +1159,10 @@ export const apiContractSourceDigests = [
     // Reviewed for the Qwen3.8-27B addition (InferenceX#3260): two new DB keys
     // and display names plus their release dates. No published parameter enum
     // or endpoint changes, so the docs stand.
-    sourceSha256: 'af1053b2ae94b50de51153153dd7a7e268e50bde3e5900310e44f2d8baa86f87',
+    // Reviewed for the GLM-5.3 DB key (InferenceX#3330): one new key, `glm5.3`,
+    // mapped to the existing GLM-5.2 display name (as glm5.1 -> GLM-5). No
+    // published parameter enum or endpoint changes, so the docs stand.
+    sourceSha256: 'bdc8e287f57107cdf0772c50ad4abc0278757b20db78844cc6cf02e88ea66717',
     reviewArea: {
       en: 'Published benchmark and TCO model names, aliases, and parameter enums.',
       zh: '已发布基准与 TCO 模型名称、别名和参数枚举。',

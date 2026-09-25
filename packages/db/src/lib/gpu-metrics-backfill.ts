@@ -1,3 +1,6 @@
+import type { Sql } from '../etl/db-utils.js';
+import { GPU_STATS_VERSION } from './gpu-metric-stats.js';
+
 /** Pairing rules for the historical gpu_metrics backfill. */
 
 import { gpuMetricsArtifactSuffix, isPowerAuditArtifact } from '../etl/gpu-metrics-artifacts.js';
@@ -102,4 +105,30 @@ export async function collectMissingTelemetryExpectations(
     }
   }
   return { observations, errors };
+}
+
+/** Stored samples outlive artifacts, including superseded attempts. */
+export function findOutdatedGpuMetricSeries(
+  sql: Sql,
+  flags: {
+    run: number | null;
+    attempt: number | null;
+    artifact: string | null;
+    fromRun: number | null;
+    since: string | null;
+  },
+  limit: number | null,
+) {
+  return sql`
+    select s.id, wr.github_run_id, wr.run_attempt, s.artifact_name, s.file_name
+    from gpu_metric_series s join workflow_runs wr on wr.id = s.workflow_run_id
+    where s.stats_version <> ${GPU_STATS_VERSION}
+      and (${flags.run}::bigint is null or wr.github_run_id = ${flags.run})
+      and (${flags.attempt}::integer is null or wr.run_attempt = ${flags.attempt})
+      and (${flags.artifact}::text is null or s.artifact_name = ${flags.artifact})
+      and (${flags.fromRun}::bigint is null or wr.github_run_id >= ${flags.fromRun})
+      and (${flags.since}::date is null or wr.date >= ${flags.since}::date)
+    order by wr.github_run_id, wr.run_attempt, s.id
+    limit ${limit}::integer
+  `;
 }

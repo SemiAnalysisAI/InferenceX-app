@@ -27,6 +27,7 @@ from urllib.parse import parse_qs, urlencode, urlsplit
 from urllib.request import ProxyHandler, Request, build_opener
 
 PACKAGE = '@semianalysisai/inferencex-skills'
+TASK_ENTRIES = ('inferencex', 'inferencex-to-chart', 'inferencex-to-table')
 REGISTRY = 'https://registry.npmjs.org'
 COLLECTIVEX_POSITIVE_RUN_IDS = ('33378604574', '33412478973')
 MAX_SAFE_INTEGER = 9_007_199_254_740_991
@@ -244,6 +245,8 @@ def install_target(clean_root, target, node, npm, archive, version, public, repo
         for name in ['user.npmrc', 'global.npmrc']:
             (config / name).write_text('')
         env = {'PATH': str(Path(node).parent) + os.pathsep + os.defpath, 'LANG': 'en_US.UTF-8',
+               'INFERENCEX_TRAFFIC': 'validation',
+               **{key: os.environ[key] for key in ['INFERENCEX_TELEMETRY', 'DO_NOT_TRACK'] if key in os.environ},
                'npm_config_registry': REGISTRY, 'npm_config_userconfig': str(config / 'user.npmrc'),
                'npm_config_globalconfig': str(config / 'global.npmrc'), 'npm_config_cache': str(config / 'cache'),
                'npm_config_update_notifier': 'false', 'npm_config_audit': 'false', 'npm_config_fund': 'false',
@@ -505,6 +508,16 @@ def check_installed(installed, skill_files, version):
         require((installed / name).read_bytes() == content, f'Installed file differs from archive: {name}')
     receipt = json.loads((installed / '.inferencex-skills.json').read_text())
     require(receipt == {'package': PACKAGE, 'version': version}, 'Installed-version receipt differs')
+
+
+def check_installed_package(installed, skill_files, entrypoint_files, version):
+    check_installed(installed, skill_files, version)
+    if version_at_least(version, (1, 1, 0)):
+        for name in TASK_ENTRIES:
+            files = entrypoint_files.get(name, {})
+            require('SKILL.md' in files and 'integrity.json' in files,
+                    f'Archive is missing the {name} task entry')
+            check_installed(installed.with_name(name), files, version)
 
 
 def _normalized_id_object(value):
@@ -1742,6 +1755,13 @@ def main():
         skill_files = {member.name.removeprefix(prefix): packed.extractfile(member).read()
                        for member in packed.getmembers()
                        if member.isfile() and member.name.startswith(prefix)}
+        entrypoint_files = {}
+        for name in TASK_ENTRIES:
+            entry_prefix = f'package/skills/{name}/'
+            entrypoint_files[name] = {
+                member.name.removeprefix(entry_prefix): packed.extractfile(member).read()
+                for member in packed.getmembers()
+                if member.isfile() and member.name.startswith(entry_prefix)}
     require('SKILL.md' in skill_files and 'scripts/inferencex.mjs' in skill_files,
             'Archive is missing the installed CLI')
 
@@ -1785,7 +1805,7 @@ def main():
                     'Native-agent archive or prompt differs')
             installed = args.project / ('.agents' if target['target'] == 'codex' else '.claude') / \
                 'skills/inferencex-api'
-            check_installed(installed, skill_files, record['version'])
+            check_installed_package(installed, skill_files, entrypoint_files, record['version'])
             bundles = args.project / 'bundles'
             expected = {'powerx', 'agentx', 'result', 'tco', 'releases', 'collectivex'}
             require(bundles.is_dir() and not bundles.is_symlink() and
@@ -1841,10 +1861,10 @@ def main():
                 args.mode == 'public', report, deadline)
             installed = project / ('.agents' if target == 'codex' else '.claude') / \
                 'skills/inferencex-api'
-            check_installed(installed, skill_files, record['version'])
+            check_installed_package(installed, skill_files, entrypoint_files, record['version'])
             workflows = run_contract_one_workflows(
                 node, installed, project, environment, args, record['version'], deadline)
-            check_installed(installed, skill_files, record['version'])
+            check_installed_package(installed, skill_files, entrypoint_files, record['version'])
             report['targets'].append({'target': target, 'project': str(project),
                                       'contract_one': workflows})
         remaining_seconds(deadline, PUBLIC_DEADLINE_SECONDS)
