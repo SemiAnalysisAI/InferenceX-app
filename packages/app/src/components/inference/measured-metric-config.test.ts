@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { MEASURED_ENERGY_METRIC_CONFIG_KEYS, METRIC_CONFIG_KEYS } from './metric-registry';
+import {
+  MEASURED_ENERGY_METRIC_CONFIG_KEYS,
+  METRIC_CONFIG_KEYS,
+  POWER_BASIS_METRIC_CONFIG_KEYS,
+} from './metric-registry';
 import {
   changeMeasuredMetricConfig,
   getMeasuredMetricConfig,
@@ -20,8 +24,13 @@ describe('measured metric configuration', () => {
 
   it('does not group unrelated metrics or unknown persisted values', () => {
     const grouped = METRIC_CONFIG_KEYS.filter((key) => getMeasuredMetricConfig(key));
-    expect(grouped).toHaveLength(13);
-    expect(new Set(grouped)).toEqual(new Set(MEASURED_ENERGY_METRIC_CONFIG_KEYS));
+    expect(grouped).toHaveLength(20);
+    expect(new Set(grouped)).toEqual(
+      new Set([...MEASURED_ENERGY_METRIC_CONFIG_KEYS, ...POWER_BASIS_METRIC_CONFIG_KEYS]),
+    );
+    for (const key of MEASURED_ENERGY_METRIC_CONFIG_KEYS) {
+      expect(getMeasuredMetricConfig(key)?.basis, key).toBe('gpu-measured');
+    }
     expect(getMeasuredMetricConfig('y_modeledChassisPowerPerGpu')).toBeUndefined();
     expect(getMeasuredMetricConfig('y_removedMetric')).toBeUndefined();
     expect(getMeasuredMetricConfig('')).toBeUndefined();
@@ -42,6 +51,7 @@ describe('measured metric configuration', () => {
   it('keeps fleet percentiles, role averages and TDP normalization distinct', () => {
     expect(getMeasuredMetricConfig('y_measuredP90Power')).toEqual({
       family: 'power',
+      basis: 'gpu-measured',
       scope: 'all',
       statistic: 'p90',
       display: 'watts',
@@ -78,6 +88,7 @@ describe('measured metric configuration', () => {
     );
     expect(getMeasuredMetricConfig('y_measuredPrefillJPerInputToken')).toEqual({
       family: 'energy',
+      basis: 'gpu-measured',
       scope: 'prefill',
       denominator: 'input',
       unit: 'joules',

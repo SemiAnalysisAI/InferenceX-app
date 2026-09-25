@@ -431,6 +431,116 @@ export const METRIC_EXPLANATIONS: Record<MetricKey, MetricExplanation> = {
       zh: '% TDP = 每芯片实测平均功耗（W）÷ 额定 TDP（W）× 100',
     },
   },
+  measuredPowerTimeline: {
+    description: {
+      en:
+        `The per-second accelerator power samples behind each measured average, drawn over ` +
+        `the whole benchmark job (server start, warmup, and the validated measurement window, ` +
+        `which is emphasized). One trace per config, mean of its GPUs by default; the rated TDP ` +
+        `is a dashed reference per hardware. Configs whose telemetry artifact is missing are ` +
+        `listed under the chart rather than estimated.${MEASURED_TIER_NOTE_EN}`,
+      zh:
+        `每个实测平均值背后的逐秒加速器功耗采样，覆盖整个基准测试任务（服务启动、warmup ` +
+        `以及被突出显示的有效测量窗口）。每个配置一条曲线，默认取其 GPU 的平均值；` +
+        `每种硬件的额定 TDP 以虚线作为参考。缺少遥测产物的配置会列在图表下方，而不会用估算值代替。${
+          MEASURED_TIER_NOTE_ZH
+        }`,
+    },
+    formula: {
+      en: 'W(t) = mean over GPUs of the sampled power draw in each one-second bucket',
+      zh: 'W(t) = 每个一秒时间桶内各 GPU 功耗采样值的平均',
+    },
+  },
+  gpuProvisionedWatts: {
+    description: {
+      en:
+        'Rated accelerator TDP from the hardware registry, shown as a flat per-chip value so ' +
+        'measured power can be read against the GPU-only provisioning boundary. It does not ' +
+        'depend on the run.',
+      zh:
+        '取硬件注册表中的加速器额定 TDP，以每芯片恒定值显示，用于对照 GPU 侧的额定供电边界与实测功耗。' +
+        '该值与具体运行无关。',
+    },
+    formula: {
+      en: 'W/GPU = rated TDP (W)',
+      zh: 'W/GPU = 额定 TDP（W）',
+    },
+  },
+  gpuProvisionedJPerOutputToken: {
+    description: {
+      en:
+        'Energy per output token if every allocated accelerator drew exactly its rated TDP for ' +
+        'the whole run. Disaggregated deployments count prefill and decode GPUs together, so ' +
+        'this is the GPU-only provisioning boundary the measured J/token can be compared against.',
+      zh:
+        '假设所有已分配加速器在整个运行中恒以额定 TDP 耗电时的每输出 token 能耗。' +
+        '分离式部署将 prefill 与 decode GPU 一并计入，因此它是可与实测 J/token 对照的 GPU 侧额定边界。',
+    },
+    formula: {
+      en: 'J/tok = rated TDP (W) × allocated GPUs ÷ total output tokens per second',
+      zh: 'J/tok = 额定 TDP（W）× 已分配 GPU 数 ÷ 总输出 token 吞吐（tok/s）',
+    },
+  },
+  utilityProvisionedWatts: {
+    description: {
+      en:
+        'All-in provisioned power per chip from the hardware registry: the utility-side capacity ' +
+        'a data center reserves for one accelerator including host, networking, cooling and ' +
+        'power-conversion overheads. It is a flat value independent of the run.',
+      zh:
+        '取硬件注册表中的每芯片全电源配置功耗：数据中心为单张加速器预留的电源侧容量，' +
+        '包含主机、网络、散热与电源转换开销。该值为恒定值，与运行无关。',
+    },
+    formula: {
+      en: 'W/GPU = all-in provisioned power per GPU (kW) × 1000',
+      zh: 'W/GPU = 每 GPU 全电源配置功耗（kW）× 1000',
+    },
+  },
+  utilityProvisionedJPerOutputToken: {
+    description: {
+      en:
+        'Energy per output token at the all-in provisioned power boundary, normalized by every ' +
+        'allocated accelerator. It differs from the public All-in Provisioned J per Output Token ' +
+        'metric only for disaggregated runs, where that metric normalizes by decode GPUs alone.',
+      zh:
+        '在全电源配置边界下的每输出 token 能耗，按全部已分配加速器归一。' +
+        '仅在分离式运行中与公开的 All-in Provisioned J per Output Token 指标不同，后者只按 decode GPU 归一。',
+    },
+    formula: {
+      en: 'J/tok = all-in provisioned power per GPU (W) × allocated GPUs ÷ total output tokens per second',
+      zh: 'J/tok = 每 GPU 全电源配置功耗（W）× 已分配 GPU 数 ÷ 总输出 token 吞吐（tok/s）',
+    },
+  },
+  utilityModeledWatts: {
+    description: {
+      en:
+        'Modeled facility power per allocated accelerator: measured GPU power is scaled to chassis ' +
+        'AC by the system power model and then multiplied once by PUE. Only hardware with a known ' +
+        'eight-GPU chassis profile on 8k1k runs is supported; NVL72 systems show no value.',
+      zh:
+        '每已分配加速器的数据中心建模功耗：先由系统功耗模型将 GPU 实测功耗换算为机箱交流功耗，再乘以一次 PUE。' +
+        '仅支持在 8k1k 运行中具有已知八卡机箱模型的硬件；NVL72 系统不显示数值。',
+    },
+    formula: {
+      en: 'W/GPU = modeled chassis AC power (W) × PUE ÷ allocated GPUs',
+      zh: 'W/GPU = 机箱交流建模功耗（W）× PUE ÷ 已分配 GPU 数',
+    },
+  },
+  utilityModeledJPerOutputToken: {
+    description: {
+      en:
+        'Measured energy per output token scaled to the modeled facility boundary, so its ratio to ' +
+        'measured GPU energy equals the ratio of modeled facility power to measured GPU power. ' +
+        'Missing where the system power model or validated measured power is unavailable.',
+      zh:
+        '将实测每输出 token 能耗按建模的数据中心边界缩放，其与 GPU 实测能耗之比等于数据中心建模功耗与 GPU 实测功耗之比。' +
+        '系统功耗模型或通过验证的实测功耗缺失时不显示。',
+    },
+    formula: {
+      en: 'J/tok = measured J per output token × modeled facility W per GPU ÷ measured W per GPU',
+      zh: 'J/tok = 实测每输出 token 能耗 × 每 GPU 数据中心建模功耗（W）÷ 每 GPU 实测功耗（W）',
+    },
+  },
 };
 
 /**

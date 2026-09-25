@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-
 import { RUNNER_SUFFIX_RE, dedupeArtifactsByLogicalName } from './github-artifacts.js';
 
 const art = (name: string, created_at: string) => ({

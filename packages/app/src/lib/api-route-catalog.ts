@@ -115,7 +115,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-gpu-metrics-view',
-    sourceSha256: '34860f3f64e4070bf4c0bf390c3b61f34bdb98b673a90d119bae162226dc1edd',
+    sourceSha256: '2ad6ff9f64b397ed4fea5a0456b2b0f328b46f9e171753fa90af458c1f70f23a',
   },
   {
     source: 'src/app/api/v1/views/gpu-specs/route.ts',
@@ -236,10 +236,21 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'ui-artifact-read',
     exclusionReason: {
-      en: 'UI-only live GPU metric artifact lookup; its run artifact shape is not a stable public contract.',
-      zh: '仅供界面读取实时 GPU 指标制品；其运行制品结构不是稳定的公开契约。',
+      en: 'UI-only PowerX raw/series=power read: DB-first with artifact fallback, separate host/GPU identities and adjacent CSV context timezone normalization. GET has no expected identities and reports sourceCoverage unknown. Healthy stored windows survive fallback; known-incomplete CSVs require retained file/sample inventory and known-incomplete bundles require re-ingest. DB failures return 503 DATABASE_UNAVAILABLE; unresolved stored gaps return 503 STORED_TELEMETRY_INCOMPLETE. Responses use no-store. This is not a stable public API.',
+      zh: '仅供 PowerX 界面读取原始遥测或 series=power：优先 DB，缺失时回退产物，保留主机/GPU 身份，并按相邻 CSV context 规范化时区。GET 没有预期身份清单，sourceCoverage 为 unknown。回退保留健康存储窗口；已知不完整 CSV 须满足文件/样本清单，已知不完整 bundle 须重新 ingest。数据库故障返回 503 DATABASE_UNAVAILABLE，未恢复的存储缺口返回 503 STORED_TELEMETRY_INCOMPLETE。响应使用 no-store，不作为稳定公开 API。',
     },
-    sourceSha256: '28e6cee4d67396ee8ea2e5a7e18271c6ee86228c33f33a20bf573f3a601ba8ed',
+    sourceSha256: '48930ca8c5c7fb26ab193f872271e21aefadc306d760ad9a7365c7cba4e4029b',
+  },
+  {
+    source: 'src/app/api/gpu-metrics/route.ts',
+    path: '/api/gpu-metrics',
+    method: 'POST',
+    classification: 'ui-artifact-read',
+    exclusionReason: {
+      en: 'Read-only Timeline transport with runId, series=power and optional prefix in the query; JSON sources contains 1–1000 validation basenames with RESULT_FILENAME up to 200 ASCII letters/digits/dot/underscore/hyphen, matching prefix. Invalid input returns 400; bodies over 256 KiB return 413. Fully covered DB reads skip GitHub; missing identities fall back and merge by validation source, preserving stored sibling windows. Offline GitHub preserves healthy DB series with incomplete sourceCoverage. Coverage describes only requested identities, never whole-run/sample completeness. The GET no-store/error/inventory guarantees also apply. UI-owned, excluded from the stable public API.',
+      zh: 'Timeline 只读传输：查询参数为 runId、series=power 和可选 prefix；JSON sources 含 1–1000 个验证文件 basename，RESULT_FILENAME 最长 200 个 ASCII 字母/数字/点/下划线/连字符，且须匹配 prefix。输入错误返回 400，正文超过 256 KiB 返回 413。DB 已覆盖请求时跳过 GitHub，否则按缺失身份回退，以 validation source 为键合并，并保留已存储的同 bundle 兄弟窗口。GitHub 离线仍返回健康 DB 序列，sourceCoverage 标记 incomplete。覆盖仅针对请求身份，不代表整次 run 或样本完整性。沿用 GET 的 no-store、错误和清单约束；属于界面接口，不纳入稳定公开 API。',
+    },
+    sourceSha256: '48930ca8c5c7fb26ab193f872271e21aefadc306d760ad9a7365c7cba4e4029b',
   },
   {
     source: 'src/app/api/openapi.json/route.ts',
@@ -494,6 +505,17 @@ export const apiRouteCatalog = [
     classification: 'published-read',
     operationId: 'list-reliability',
     sourceSha256: 'ce1c5db78b47548beb77a69797f10fb33853cde01cea5c44675c8ad3519bcf20',
+  },
+  {
+    source: 'src/app/api/v1/gpu-metrics-point/route.ts',
+    path: '/api/v1/gpu-metrics-point',
+    method: 'GET',
+    classification: 'page-bff',
+    exclusionReason: {
+      en: 'Point-detail BFF returning linked PowerX telemetry series, per-GPU digests and retained validation/audit metadata. Every read checks a live DB revision before using the Blob payload cache; responses use no-store, missing data returns 404, and database failures remain errors. Re-ingest, shared-link and digest algorithm/stored-version changes do not require manual cache purges. Outdated digests are recomputed read-only from retained samples. Coupled to the PowerX tab implementation.',
+      zh: '数据点详情页专用 BFF；返回关联的 PowerX 遥测序列、每 GPU 统计摘要及保留的验证与审计元数据。每次读取先核对数据库版本再使用 Blob 缓存；响应使用 no-store，数据缺失返回 404，数据库故障仍作为错误返回。重新入库、共享链接及摘要算法或存储版本变化无需手动清理缓存；旧摘要从保留样本只读重算。与 PowerX 标签页实现紧密耦合。',
+    },
+    sourceSha256: 'c04a01fcd8e1cb4cb7101a46a0ba44b227f2696819c499bcc93be8ee7a8ce255',
   },
   {
     source: 'src/app/api/v1/request-chart-data/route.ts',
@@ -783,6 +805,38 @@ export interface ApiContractSourceDigest {
  */
 export const apiContractSourceDigests = [
   {
+    source: '../db/src/etl/power-audit-validations.ts',
+    sourceSha256: '44a607747b79d038bb8f4e53590efba689d376c143f50a5d750d3552faa0c442',
+    reviewArea: {
+      en: 'Shared legacy and nested AgentX validation identity normalization for artifact and stored Timeline windows.',
+      zh: '产物与数据库 Timeline 窗口共用的 legacy 和嵌套 AgentX validation 身份规范化。',
+    },
+  },
+  {
+    source: 'src/components/gpu-power/power-audit-bundle.ts',
+    sourceSha256: '35901a329822ae6522fe39522eb1da5509bcecee1afda93a2ce9c0d06b0f27de',
+    reviewArea: {
+      en: 'Artifact Timeline validation windows, strict nested AgentX result identity, adjacent context selection, timezone normalization and device identity semantics.',
+      zh: '产物 Timeline 验证窗口、严格匹配的嵌套 AgentX result 身份、相邻 context 选择、时区规范化及设备身份语义。',
+    },
+  },
+  {
+    source: 'src/components/gpu-power/stored-gpu-stats.ts',
+    sourceSha256: '90adde200c37694c2e37e427458a8c6a9bdb70873033699e343e8c94a291544a',
+    reviewArea: {
+      en: 'Stored full-record GPU metric mappings, authoritative missing digests, and UI/API statistics parity.',
+      zh: '已存全记录 GPU 指标映射、缺失摘要语义，以及界面和 API 的统计一致性。',
+    },
+  },
+  {
+    source: 'src/components/gpu-power/types.ts',
+    sourceSha256: 'e8c5460821f5d8228bcf8b7dd087abe14e29a8e220e1d8bcd75112fb5ead1baa',
+    reviewArea: {
+      en: 'GPU telemetry units, missing values, timestamp deduplication, and full-record live statistics definitions.',
+      zh: 'GPU 遥测单位、缺失值、时间戳去重，以及实时产物全记录统计的定义。',
+    },
+  },
+  {
     source: 'src/lib/views-api/upstream-error.ts',
     sourceSha256: 'c3f1b4c318e1ae771a67edd85f16d69b7316461334604fd8c892254eface715a',
     reviewArea: {
@@ -811,7 +865,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/components/gpu-power/chart-data.ts',
-    sourceSha256: '34bdab18810a5e6688d150b71c4c1b22d383a63775672c0c915549b841c48475',
+    sourceSha256: '3e4bed7d693f146c97ac52cc0bb64d854a9dee2a1fa8d5dbf534ac4e1e78fa3f',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',

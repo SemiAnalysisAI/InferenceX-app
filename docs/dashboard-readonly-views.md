@@ -45,7 +45,9 @@ combinations, not the full Cartesian product of all possible filter values.
 - Evaluation/reliability: chart-data, date resolution and rolling aggregation.
 - OperatorX/CollectiveX: selected operator sweep, EP/KV/swap chart and fit helpers.
 - Submissions/images: existing table, weekly/cumulative and image freshness helpers.
-- GPU metrics: shared line/correlation transforms and unsampled statistics.
+- GPU metrics: shared line/correlation transforms and stored full-record per-GPU
+  digests. Live artifacts alone calculate statistics from samples; empty stored
+  digests remain empty. File/host identity and missing-versus-zero semantics persist.
 - Video: checksum-verified stored bundles, serving/fidelity selectors and tradeoffs.
 - Overview/rankings/compare: existing discovery-page assembly and scenario helpers.
 
@@ -59,6 +61,11 @@ The AI-chart data source maps to inference; private provider keys, prompts and
 locally generated assets do not become public API data. Feedback is sensitive.
 Zoom, theme, axis scale, labels, media playback and report expansion are renderer
 state. GPU interactive downsampling does not alter returned raw data or statistics.
+The GPU statistics table includes startup and warmup for all chips in the selected
+series, regardless of chip visibility. It is separate from serving-window power,
+J/token and selected-time-window calculations. Run telemetry is DB-first with an
+artifact fallback for missing storage; the public view returns private, no-store
+responses and preserves upstream 503 failures.
 
 Run-specific recognition labels are also presentation-only. Run `35879254139`
 displays `UMBP MoRI SGLang` through October 9, 2026 in America/New_York
@@ -85,6 +92,10 @@ those properties.
 视图）均在覆盖表中登记；上表列出各只读接口接受的全部查询参数名。
 接口复用现有计算函数，公开运行与非官方叠加数据保留各自来源。
 私有上传、密钥、提示词、反馈及管理操作不作为公开读取接口。
+GPU 视图优先读取已存遥测，缺少存储数据时回退到产物。全记录统计使用所选文件、
+主机序列的全部芯片摘要，包含启动与 warmup；已有摘要为空时不补算，缺失读数不补零。
+芯片显隐和图表降采样不改变该统计，也不改变 serving-window 或 J/token 的计算口径。
+响应使用 private, no-store，上游 503 保留为错误响应。
 
 测试覆盖契约同步及代表性的筛选行为，并未穷举所有参数组合。生产数据库上的
 完整 UI/API 对照仍需集成审查，不能仅凭单元测试宣称已完成。

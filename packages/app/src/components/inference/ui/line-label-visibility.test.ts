@@ -53,6 +53,26 @@ describe('labelOpacityForActiveState', () => {
   });
 });
 
+describe('labelOpacityForActiveState with ?unofficialrun= overlays', () => {
+  const official = new Set(['gb200_dynamo-sglang']);
+  const precisions = ['fp8'];
+
+  it('hides an overlay label when its overlay hardware row is off, even if the official row is on', () => {
+    expect(
+      labelOpacityForActiveState(
+        {
+          hwKey: 'gb200_dynamo-sglang',
+          lineKey: 'overlay-gb200_dynamo-sglang_fp8_run1',
+          visible: '1',
+        },
+        official,
+        precisions,
+        new Set(['gb300_dynamo-sglang']),
+      ),
+    ).toBe(0);
+  });
+});
+
 describe('labelOpacityForHover', () => {
   it('lights up the kept label for the hovered hardware', () => {
     expect(labelOpacityForHover({ hwKey: 'b300_sglang', visible: '1' }, 'b300_sglang')).toBe(1);

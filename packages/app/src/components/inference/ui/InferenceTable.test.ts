@@ -1,7 +1,12 @@
 import { describe, it, expect } from 'vitest';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 
 import type { ChartDefinition, InferenceData } from '@/components/inference/types';
-import { formatInferenceTableNumber } from '@/components/inference/ui/InferenceTable';
+import InferenceTable, {
+  formatInferenceTableNumber,
+} from '@/components/inference/ui/InferenceTable';
+import { expandPowerCompareSeries } from '../utils/power-compare';
 
 // Test the pure logic used by InferenceTable — sorting and value resolution
 import { getNestedYValue } from '@/lib/chart-utils';
@@ -50,6 +55,54 @@ function makePoint(overrides: Partial<InferenceData>): InferenceData {
 }
 
 describe('InferenceTable sorting logic', () => {
+  it.each(['roles', 'boundaries'] as const)(
+    'renders and sorts each %s comparison by its plotted value',
+    (mode) => {
+      const base = makePoint({
+        hwKey: 'gb300_dynamo-trt',
+        y: 708.1,
+        measuredAvgPower: { y: 708.1, roof: false },
+        measuredPrefillAvgPower: { y: 760.442, roof: false },
+        measuredDecodeAvgPower: { y: 690.652, roof: false },
+        gpuProvisionedWatts: { y: 1400, roof: false },
+        utilityProvisionedWatts: { y: 1920, roof: false },
+      });
+      const points = expandPowerCompareSeries([base], 'y_measuredAvgPower', mode);
+      const sorted = sortRowsByYMetric(points, chartDefinitions[0], 'y_measuredAvgPower');
+      expect(sorted.map((point) => point.y)).toEqual(
+        mode === 'roles' ? [690.652, 708.1, 760.442] : [708.1, 1400, 1920],
+      );
+
+      const html = renderToStaticMarkup(
+        createElement(InferenceTable, {
+          data: points,
+          chartDefinition: chartDefinitions[0],
+          selectedYAxisMetric: 'y_measuredAvgPower',
+        }),
+      );
+      const body = html.split('<tbody>')[1].split('</tbody>')[0];
+      const cells = [...body.matchAll(/<tr\b[^>]*>(?<row>.*?)<\/tr>/gu)].map((match) =>
+        [...match.groups!.row.matchAll(/<td\b[^>]*>(?<cell>.*?)<\/td>/gu)].map(
+          (cell) => cell.groups!.cell,
+        ),
+      );
+      expect(cells.map((row) => [row[2], row[3]])).toEqual(
+        mode === 'roles'
+          ? [
+              ['Decode GPUs', '691'],
+              ['All GPUs', '708'],
+              ['Prefill GPUs', '760'],
+            ]
+          : [
+              ['GPU measured', '708'],
+              ['GPU provisioned (TDP)', '1,400'],
+              ['Utility provisioned (all-in)', '1,920'],
+            ],
+      );
+      expect(points.every((point) => point.measuredAvgPower?.y === 708.1)).toBe(true);
+    },
+  );
+
   it('sorts supported modeled estimates by ascending power', () => {
     const definition = chartDefinitions[0];
     const metric = 'y_modeledChassisPowerPerGpu';

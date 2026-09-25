@@ -16,10 +16,12 @@ import {
   isPerfRulerCurveVisible,
   movePerfRulerIsoX,
   nextPerfRulerState,
+  parsePerfRulers,
   pathXExtent,
   perfRulerCurveSet,
   prunePerfRulers,
   renderPerfRulers,
+  serializePerfRulers,
   type PerfRulerEndInput,
   type PerfRulerGeometry,
   type PerfRulerLabelLayoutOptions,
@@ -886,6 +888,34 @@ describe('perfRulerCurveSet', () => {
 
   it('is empty for the empty state', () => {
     expect(perfRulerCurveSet(EMPTY_PERF_RULER_STATE).size).toBe(0);
+  });
+});
+
+// ── serializePerfRulers / parsePerfRulers (share links) ─────────────
+
+describe('serializePerfRulers / parsePerfRulers', () => {
+  const OFFICIAL_A = 'roofline-b200_trt_fp8';
+  const OFFICIAL_B = 'roofline-mi355x_sglang_fp4';
+  // Overlay curves carry the unofficial run index; power-envelope curves are
+  // split per date with the encoded date appended (`%2F` from a slash).
+  const OVERLAY = 'overlay-roofline-h100_vllm_fp8_run1__2026-09%2F11';
+
+  it('round-trips completed rulers, including overlay and date-scoped curve ids', () => {
+    const state = complete(
+      complete(EMPTY_PERF_RULER_STATE, OFFICIAL_A, OFFICIAL_B, 41.5),
+      OFFICIAL_A,
+      OVERLAY,
+      120,
+    );
+    const encoded = serializePerfRulers(state);
+    expect(encoded).toBe(`41.5|${OFFICIAL_A}|${OFFICIAL_B};120|${OFFICIAL_A}|${OVERLAY}`);
+    const parsed = parsePerfRulers(encoded);
+    expect(parsed.rulers).toEqual([
+      { id: 1, curveA: OFFICIAL_A, curveB: OFFICIAL_B, isoX: 41.5 },
+      { id: 2, curveA: OFFICIAL_A, curveB: OVERLAY, isoX: 120 },
+    ]);
+    expect(parsed.draft).toBeNull();
+    expect(parsed.nextId).toBe(3);
   });
 });
 

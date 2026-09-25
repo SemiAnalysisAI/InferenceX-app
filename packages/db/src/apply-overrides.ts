@@ -27,6 +27,13 @@ import { jsonbParam } from './lib/backfill-runner.js';
 import { planBenchmarkPointBackfill } from './lib/benchmark-point-backfill.js';
 import { selectRunOverrides } from './lib/run-override-selection.js';
 import {
+  type TelemetryPurgeCounts,
+  countRunTelemetry,
+  deleteRunTelemetry,
+  describeTelemetry,
+  unlinkPointTelemetry,
+} from './lib/telemetry-purge.js';
+import {
   type BenchmarkPointBackfill,
   type ChangelogBackfill,
   type PurgedBenchmarkPoint,
@@ -315,6 +322,7 @@ interface PurgeTarget {
   stats: number;
   evals: number;
   changelogs: number;
+  telemetry: TelemetryPurgeCounts;
 }
 
 /**
@@ -358,17 +366,21 @@ async function previewPurge(
     );
   }
 
-  const [[bmk], [stats], [evals], [changelogs], [logs]] = await Promise.all([
+  const [[bmk], [stats], [evals], [changelogs], [logs], telemetry] = await Promise.all([
     sql`SELECT count(*)::int AS n FROM benchmark_results WHERE workflow_run_id = ANY(${wrIds})`,
     sql`SELECT count(*)::int AS n FROM run_stats WHERE workflow_run_id = ANY(${wrIds})`,
     sql`SELECT count(*)::int AS n FROM eval_results WHERE workflow_run_id = ANY(${wrIds})`,
     sql`SELECT count(*)::int AS n FROM changelog_entries WHERE workflow_run_id = ANY(${wrIds})`,
     sql`SELECT count(DISTINCT server_log_id)::int AS n FROM benchmark_results WHERE workflow_run_id = ANY(${wrIds}) AND server_log_id IS NOT NULL`,
+    countRunTelemetry(sql, wrIds),
   ]);
 
   console.log(
     `    ${bmk.n} benchmarks, ${logs.n} server_logs, ${stats.n} run_stats, ${evals.n} evals, ${changelogs.n} changelogs`,
   );
+  // Surfaced separately: past GitHub's 90-day artifact retention these samples
+  // are the only copy, so the operator should see them before confirming.
+  if (telemetry.series > 0) console.log(`    ${describeTelemetry(telemetry)}`);
 
   return {
     githubRunId,
@@ -378,6 +390,7 @@ async function previewPurge(
     stats: stats.n,
     evals: evals.n,
     changelogs: changelogs.n,
+    telemetry,
   };
 }
 
@@ -403,6 +416,14 @@ async function purgeBenchmarkResults(tx: Sql, resultIds: number[]): Promise<void
     SELECT DISTINCT trace_replay_id AS id FROM benchmark_results
     WHERE id = ANY(${resultIds}) AND trace_replay_id IS NOT NULL
   `;
+
+  // Drop the point→series links explicitly rather than through the cascade on
+  // benchmark_results, so the transcript records it. The series itself stays: it
+  // belongs to the workflow_run, which survives a point purge, and
+  // /api/gpu-metrics?runId= reads series by run rather than through these links.
+  const unlinked = await unlinkPointTelemetry(tx, resultIds);
+  if (unlinked > 0)
+    console.log(`    unlinked ${unlinked} gpu_metric_series link(s); series kept with the run.`);
 
   await tx`DELETE FROM benchmark_results WHERE id = ANY(${resultIds})`;
 
@@ -492,6 +513,11 @@ async function purge(wrIds: number[]): Promise<void> {
     await tx`DELETE FROM run_stats WHERE workflow_run_id = ANY(${wrIds})`;
     await tx`DELETE FROM eval_results WHERE workflow_run_id = ANY(${wrIds})`;
     await tx`DELETE FROM changelog_entries WHERE workflow_run_id = ANY(${wrIds})`;
+
+    // Telemetry too. The workflow_runs delete below would cascade it away anyway,
+    // but silently; deleting it here reports the cost of an irreversible loss.
+    const telemetry = await deleteRunTelemetry(tx, wrIds);
+    if (telemetry.series > 0) console.log(`    deleted ${describeTelemetry(telemetry)}.`);
 
     // Parent last (target the specific workflow_runs rows so partial purges
     // leave sibling attempts of the same github_run_id intact)

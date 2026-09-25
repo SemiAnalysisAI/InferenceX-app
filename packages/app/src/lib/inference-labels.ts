@@ -41,6 +41,48 @@ export function inferenceFrameworkLabelOverride(
 }
 
 /** Keep unofficial-run identity/markers while making its special engine visible. */
+/** Leads every unofficial-run label, in line labels and legend rows alike. */
+export const OVERLAY_LABEL_MARKER = '✕ ';
+const RUN_TAG_MAX = 20;
+const RUN_TAG_TAIL = 17;
+
+export interface OverlayRunIdentity {
+  id: number | string;
+  branch?: string | null;
+}
+
+/**
+ * Short, still recognisable name for a run: the whole branch when it is short,
+ * else its last path segment, else the branch tail (klaud nightlies end in
+ * `<date>-<sha>`). Falls back to the run id when the branch is unknown.
+ */
+export function shortRunTag(run: OverlayRunIdentity): string {
+  const branch = run.branch?.trim() || `run ${run.id}`;
+  if (branch.length <= RUN_TAG_MAX) return branch;
+  const segment = branch.slice(branch.lastIndexOf('/') + 1);
+  if (segment.length > 0 && segment.length <= RUN_TAG_MAX) return segment;
+  return `…${branch.slice(-RUN_TAG_TAIL)}`;
+}
+
+/** ` · <tag>` appended to an overlay line label when other runs draw the same hardware. */
+export function overlayRunTag(run: OverlayRunIdentity): string {
+  return ` · ${shortRunTag(run)}`;
+}
+
+/**
+ * Line-label text for an unofficial-run curve. Pills name the hardware, not the
+ * branch: branch names run to 70+ characters and the legend already carries
+ * them. The run tag is added only when several overlay runs draw the same
+ * hardware, so the pills stay distinguishable.
+ */
+export function getOverlayLineLabel(
+  hardwareLabel: string,
+  run: OverlayRunIdentity,
+  sharesHardware: boolean,
+): string {
+  return `${OVERLAY_LABEL_MARKER}${hardwareLabel}${sharesHardware ? overlayRunTag(run) : ''}`;
+}
+
 export function getInferenceRunLabel(
   label: string,
   points: readonly (RunProvenance & { framework?: string })[],

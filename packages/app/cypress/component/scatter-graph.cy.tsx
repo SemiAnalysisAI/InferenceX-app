@@ -925,14 +925,19 @@ describe('ScatterGraph', () => {
     cy.get('#test-scatter-overlay-labels svg .line-label')
       .filter('[data-line-key]:not([data-line-key^="overlay-"])')
       .should('have.length.greaterThan', 0);
-    // The exact branch that crashed the production page remains visible in the
-    // overlay line label and legend after ScatterGraph's render-time updates.
-    cy.get('#test-scatter-overlay-labels svg .line-label[data-line-key^="overlay-"]')
-      .find('text')
-      .should('contain.text', runBranch);
+    // The pill names the hardware behind the ✕ marker, parsed like an official
+    // pill; the long branch that crashed the production page stays in the legend.
+    cy.get('#test-scatter-overlay-labels svg .line-label[data-line-key^="overlay-"] .ll-text')
+      .should('have.text', '✕ B200 (TRTLLM)')
+      .and('not.contain.text', runBranch);
     cy.get(
       '#test-scatter-overlay-labels svg .line-label[data-line-key^="overlay-"] .ll-gpu',
-    ).should('not.exist');
+    ).should('have.text', 'B200');
+    // b200_trt is active only in the overlay legend (official rows: h100), so
+    // the overlay pill must stay visible after the filter-sync effect.
+    cy.get('#test-scatter-overlay-labels svg .line-label[data-line-key^="overlay-"]')
+      .should('have.attr', 'data-visible', '1')
+      .and('have.css', 'opacity', '1');
     cy.get('#test-scatter-overlay-labels [data-testid="chart-legend"]').should(
       'contain.text',
       runBranch,
@@ -1094,7 +1099,7 @@ describe('ScatterGraph', () => {
     cy.get('#test-scatter-singleton-overlay-label svg .line-label[data-line-key^="overlay-"]')
       .should('have.length', 1)
       .find('text')
-      .should('contain.text', 'tileRT');
+      .should('have.text', '✕ B200 (TRTLLM)');
 
     cy.get('#test-scatter-singleton-overlay-label svg').then(($svg) => {
       const svg = $svg[0];
