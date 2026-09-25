@@ -1,7 +1,7 @@
 /**
- * Cross-hardware comparison: the same cases measured on different GPU pools, aligned by
+ * Cross-hardware comparison: the same cases measured on different GPU runners, aligned by
  * case identity (op args + backend) and grouped into workload sources. Pure; the caller
- * picks which run supplies each pool's results (newest first wins per case).
+ * picks which run supplies each runner's results (newest first wins per case).
  */
 import { opLabels, usefulBytes, usefulFlops } from './describe';
 import { type OperatorXDataset, type OperatorXStatus, stableJson } from './normalize';
@@ -9,11 +9,11 @@ import { type WorkloadSource, workloadSources } from './workloads';
 
 export type ComparisonOp = 'gemm' | 'moe';
 
-/** One GPU pool and the run(s) its results came from. */
+/** One GPU and the run(s) its results came from. */
 export interface ComparisonHardware {
   /** Hardware key (h200, b200, mi355x, ...): the entity that is compared and colored. */
   id: string;
-  pool: string;
+  runner: string;
   runs: { runId: string; generatedAt: string }[];
 }
 
@@ -21,7 +21,7 @@ export interface ComparisonHardware {
 export type ComputePrecision = 'fp4' | 'fp8' | 'bf16' | 'other';
 
 export interface ComparisonRow {
-  /** Case identity shared by the same case on every pool. */
+  /** Case identity shared by the same case on every runner. */
   caseKey: string;
   hardware: string;
   testlist: string;
@@ -56,13 +56,13 @@ export interface Comparison {
 
 export interface ComparisonInput {
   /** Pool name as the sweep planned it (h200-dgxc, mi355x, ...). */
-  pool: string;
+  runner: string;
   dataset: OperatorXDataset;
 }
 
-/** Hardware key of a pool: `h200-dgxc` -> `h200`, `b200-nscale` -> `b200`. */
-export function hardwareKey(pool: string): string {
-  return pool.split('-')[0];
+/** Hardware key of a runner label: `h200-dgxc` -> `h200`, `mi300x-amd` -> `mi300x`. */
+export function hardwareKey(runner: string): string {
+  return runner.split('-')[0];
 }
 
 type Args = Record<string, unknown>;
@@ -115,7 +115,7 @@ function isCurrentSchema(op: ComparisonOp, a: Args): boolean {
   return op === 'gemm' ? isObj(a.a) && isObj(a.b) : isObj(a.experts);
 }
 
-/** Inputs newest first: the first pool result for a case wins. */
+/** Inputs newest first: the first runner's result for a case wins. */
 export function buildComparison(op: ComparisonOp, inputs: ComparisonInput[]): Comparison {
   const hardware = new Map<string, ComparisonHardware>();
   const rows = new Map<string, ComparisonRow>();
@@ -123,8 +123,8 @@ export function buildComparison(op: ComparisonOp, inputs: ComparisonInput[]): Co
     string,
     { source: WorkloadSource; cases: Set<string>; hardware: Set<string> }
   >();
-  for (const { pool, dataset } of inputs) {
-    const hw = hardwareKey(pool);
+  for (const { runner, dataset } of inputs) {
+    const hw = hardwareKey(runner);
     let used = false;
     for (const r of dataset.results) {
       if (r.opType !== op || !isCurrentSchema(op, r.args)) continue;
@@ -159,7 +159,7 @@ export function buildComparison(op: ComparisonOp, inputs: ComparisonInput[]): Co
       });
     }
     if (used) {
-      const h = hardware.get(hw) ?? { id: hw, pool, runs: [] };
+      const h = hardware.get(hw) ?? { id: hw, runner, runs: [] };
       h.runs.push({ runId: dataset.run.runId, generatedAt: dataset.run.generatedAt });
       hardware.set(hw, h);
     }
@@ -174,7 +174,7 @@ export function buildComparison(op: ComparisonOp, inputs: ComparisonInput[]): Co
   };
 }
 
-/** A case as every pool measured it: described once. */
+/** A case as every runner measured it: described once. */
 export interface ComparisonCase {
   key: string;
   testlist: string;
@@ -187,7 +187,7 @@ export interface ComparisonCase {
   bytes: number | null;
 }
 
-/** Per-pool measurements, column arrays indexed like `ComparisonView.cases`. */
+/** Per-GPU measurements, column arrays indexed like `ComparisonView.cases`. */
 export interface ComparisonColumns {
   status: (OperatorXStatus | null)[];
   latencyUs: (number | null)[];

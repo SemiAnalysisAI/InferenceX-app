@@ -76,7 +76,7 @@ const OP_TESTLIST_PREFIX: Record<ComparisonOp, string> = { gemm: 'gemm', moe: 'm
 const comparisons = new Map<ComparisonOp, { at: number; value: Promise<Comparison> }>();
 
 /**
- * The newest timing run of each (pool, testlist) holding the op, combined into one
+ * The newest timing run of each (runner, testlist) holding the op, combined into one
  * cross-hardware comparison. Runs that fail to load are skipped.
  */
 async function compareOp(op: ComparisonOp): Promise<Comparison> {
@@ -87,17 +87,17 @@ async function compareOp(op: ComparisonOp): Promise<Comparison> {
     const plan = run.plan;
     if (!plan || run.unavailable || plan.mode !== 'timing') continue;
     const fresh = plan.testlists.filter(
-      (t) => t.startsWith(prefix) && !covered.has(`${plan.pool}|${t}`),
+      (t) => t.startsWith(prefix) && !covered.has(`${plan.runner}|${t}`),
     );
     if (fresh.length === 0) continue;
-    for (const t of fresh) covered.add(`${plan.pool}|${t}`);
+    for (const t of fresh) covered.add(`${plan.runner}|${t}`);
     picked.push(run);
   }
   const loaded = await Promise.allSettled(picked.map((run) => normalized(run.run_id)));
   const inputs: ComparisonInput[] = [];
   loaded.forEach((result, i) => {
     if (result.status === 'fulfilled')
-      inputs.push({ pool: picked[i].plan!.pool, dataset: result.value });
+      inputs.push({ runner: picked[i].plan!.runner, dataset: result.value });
   });
   return buildComparison(op, inputs);
 }

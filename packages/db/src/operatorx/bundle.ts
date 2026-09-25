@@ -18,7 +18,7 @@ export interface OperatorXRunMeta {
 }
 
 export interface OperatorXShardDocs {
-  /** Manifest cell id (`<pool>-<hash>`). */
+  /** Manifest cell id (`<runner>-<hash>`). */
   id: string;
   /** Actions attempt whose artifact supplied these documents. */
   attempt: number;
@@ -41,7 +41,8 @@ export interface OperatorXRunRef extends OperatorXRunMeta {
 }
 
 export interface OperatorXRunPlan {
-  pool: string;
+  /** Runner label without its `cluster:` prefix: `h200-dgxc`, `mi300x-amd`. */
+  runner: string;
   mode: 'timing' | 'counters';
   testlists: string[];
   backends: string[];
@@ -51,6 +52,11 @@ export interface OperatorXRunPlan {
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/** A manifest cell's runner: `runner` (`cluster:h200-dgxc`), or `pool` in runs before it. */
+function runnerLabel(cell: Record<string, unknown>): string {
+  return String(cell.runner ?? cell.pool ?? '').replace(/^cluster:/u, '');
 }
 
 /** Planned coverage from a manifest document; null when it is not an OperatorX manifest. */
@@ -70,7 +76,7 @@ export function planFromManifest(manifest: unknown): OperatorXRunPlan | null {
       if (isObject(c) && typeof c.testlist === 'string') testlists.add(c.testlist);
   }
   return {
-    pool: String(cells[0].pool ?? ''),
+    runner: runnerLabel(cells[0]),
     mode: cells[0].mode === 'counters' ? 'counters' : 'timing',
     testlists: [...testlists].sort(),
     backends: [...backends].sort(),
