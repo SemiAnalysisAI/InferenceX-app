@@ -16,10 +16,6 @@ import {
 const STRINGS = {
   en: {
     title: 'Matched concurrency (load diagnostic)',
-    method:
-      'Observations of the two sources at the same concurrency. Matched load is not matched service: at one concurrency the sources usually serve different speeds, so use the comparison above for equal service. Change = (comparator ÷ baseline − 1) × 100%.',
-    scope:
-      'Each cell is one observation of the selected source; repeated dispatches are separate sources and are not averaged. Measured GPU energy excludes host-system and facility power.',
     concurrency: 'Concurrency',
     baseline: 'Baseline',
     comparator: 'Comparator',
@@ -36,10 +32,6 @@ const STRINGS = {
   },
   zh: {
     title: '相同并发下的对照（负载诊断）',
-    method:
-      '在相同并发数下对比两个数据源的观测值。相同负载不等于相同服务水平：同一并发数下两者的生成速度通常不同，如需在相同服务水平下比较，请使用上方的对比。变化 =（对比对象 ÷ 基准 − 1）× 100%。',
-    scope:
-      '每个单元格是所选数据源的一次观测；重复运行计为不同的数据源，不做平均。实测 GPU 能耗不含主机系统和数据中心设施功耗。',
     concurrency: '并发数',
     baseline: '基准',
     comparator: '对比对象',
@@ -146,7 +138,6 @@ export default function MatchedConcurrencyTable({
       <Heading as="h3" level="card">
         {t.title}
       </Heading>
-      <p className="text-sm text-muted-foreground">{t.method}</p>
       {table.reason ? (
         <p className="text-sm text-muted-foreground">{t.unavailable}</p>
       ) : table.rows.length === 0 ? (
@@ -203,7 +194,6 @@ export default function MatchedConcurrencyTable({
           </table>
         </div>
       )}
-      <p className="text-xs text-muted-foreground">{t.scope}</p>
       <div className="max-h-0 overflow-hidden">
         <div id={`${sectionId}-export`} className="p-4" />
       </div>

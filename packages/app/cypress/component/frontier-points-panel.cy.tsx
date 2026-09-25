@@ -66,8 +66,6 @@ function mountPanel() {
           frontier={frontier}
           xLabel="Interactivity (tok/s/user)"
           yLabel="J/output token"
-          maximizeX
-          maximizeY={false}
           overlayPoints={overlay}
           hardwareLabel={(entry) => entry.hwKey.split('_')[0].toUpperCase()}
           hardwareColor={() => 'rgb(200, 0, 0)'}

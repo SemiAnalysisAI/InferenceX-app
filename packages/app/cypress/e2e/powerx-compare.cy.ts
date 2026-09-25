@@ -186,14 +186,14 @@ describe('PowerX article panels', () => {
     // W/GPU 500, 600, 700 → P0 450 W, m 0.643 J/token, R² 0.964.
     cy.get('[data-testid="power-fit-row"]').should('have.length', 2);
     cy.get('[data-testid="power-fit-row"]')
-      .filter(':contains("b200")')
+      .filter(':contains("B200")')
       .should('contain.text', '450')
       .and('contain.text', '45% · 1,000 W')
       .and('contain.text', '0.643')
       .and('contain.text', '0.964')
       .and('contain.text', '100.0–400.0');
     cy.get('[data-testid="power-fit-row"]')
-      .filter(':contains("h200")')
+      .filter(':contains("H200")')
       .should('contain.text', '64% · 700 W');
 
     // The cheaper overlay rows own the frontier; each lists its run.
@@ -203,10 +203,6 @@ describe('PowerX article panels', () => {
         expect($row.text()).to.include('unofficial');
         expect($row.find('a').attr('href')).to.eq(OVERLAY_RUN_URL);
       });
-    cy.get('[data-testid="frontier-points-scope"]').should(
-      'contain.text',
-      `${CONFIGS.length} of ${CONFIGS.length * 2} visible observations`,
-    );
     assertShareLinkParams({
       i_servicecompare: '1',
       i_roleshare: '1',

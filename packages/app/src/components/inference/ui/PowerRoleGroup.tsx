@@ -23,8 +23,6 @@ type RolePanelId = 'power' | 'local-energy' | 'output-energy' | 'share';
 const STRINGS = {
   en: {
     title: 'Prefill and decode roles',
-    method:
-      'Validated disaggregated observations only. Each panel names its denominator. Missing role telemetry is omitted, never drawn as zero.',
     empty: 'No validated prefill/decode telemetry is available for these filters.',
     panelEmpty: 'These observations do not report this role figure.',
     roles: { prefill: 'Prefill', decode: 'Decode', total: 'Prefill + decode' },
@@ -60,8 +58,6 @@ const STRINGS = {
   },
   zh: {
     title: '预填充与解码角色',
-    method:
-      '仅包含经过验证的分离式部署观测值。每个面板都注明了分母。缺少角色遥测数据的点不绘制，不会按 0 处理。',
     empty: '当前筛选条件下没有经过验证的预填充 / 解码遥测数据。',
     panelEmpty: '这些观测值没有报告该角色指标。',
     roles: { prefill: '预填充', decode: '解码', total: '预填充 + 解码' },
@@ -279,8 +275,7 @@ export default function PowerRoleGroup({
       <Heading as="h3" level="card">
         {t.title}
       </Heading>
-      <p className="text-sm text-muted-foreground">{contextLabel}</p>
-      <p className="text-xs text-muted-foreground">{t.method}</p>
+      <p className="export-only hidden text-sm text-muted-foreground">{contextLabel}</p>
       {points.length > 0 ? (
         <>
           <div className="flex flex-wrap gap-x-5 gap-y-2 text-sm">

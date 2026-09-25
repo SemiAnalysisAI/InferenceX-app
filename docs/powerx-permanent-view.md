@@ -76,26 +76,13 @@ existing `inference_y_axis_metric_selected` fired by `ChartControls`.
 
 A point without a value for the selected boundary is omitted from that series only (the
 builders never emit `{ y: 0 }`, and both the official and overlay paths filter by
-`metricKey in point`). The PowerX availability panel explains the gap per point:
-
-| State              | Meaning                                                                                                                                                  |
-| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `noSpec`           | hardware has no `tdp` / `power` in `HW_REGISTRY`                                                                                                         |
-| `noThroughput`     | provisioned watts exist but the row has no output throughput                                                                                             |
-| `noNormalization`  | disaggregated row with throughput but no whole-deployment GPU count (`powerBasisNormalization`: not `single_turn`, or non-integer prefill/decode counts) |
-| `noTelemetry`      | modeled boundary needs validated GPU telemetry (B4 follows B1)                                                                                           |
-| `invalid`          | `power_valid === 0`                                                                                                                                      |
-| `modelWorkload`    | chassis model covers 8K / 1K only                                                                                                                        |
-| `modelHardware`    | hardware outside the chassis profiles (GB200 / GB300 NVL72)                                                                                              |
-| `modelUnsupported` | other `modelSystemPower` reasons (gpu-count, topology, role-power …)                                                                                     |
+`metricKey in point`).
 
 The chart caption (`data-testid="power-basis-assumptions"`) names the boundary, the formula in
 words, the PUE constant and the chassis-model revision so a screenshot records its method.
 The pinned tooltip's "Modeled system power" block (`tooltipUtils.ts` `modeledSystemPowerHTML`)
 renders only for `measured*` keys and `y_modeledChassisPowerPerGpu`, so on the boundary keys the
 caption is the only per-chart provenance; the caption does not promise more.
-The empty state for the utility-modeled boundary says why nothing rendered and points at the
-Boundary select.
 
 ## Article figure → share link
 
@@ -143,9 +130,9 @@ role's availability rules carry through unchanged.
 Siblings exist only where the metric names the whole-deployment **average W/chip** or **J per
 output token** (the only quantities every boundary and role publishes on one axis); role
 energy additionally excludes the prefill J per input token scope. Elsewhere
-`powerCompareVariants` returns nothing, the Compare select disables the option, and — when a
-link arrives with an inapplicable mode — a hint (`measured-compare-hint`) says the comparison is
-paused. The parameter is kept, so switching back to an applicable setting resumes it.
+`powerCompareVariants` returns nothing and the Compare select disables the option. A link that
+arrives with an inapplicable mode keeps the parameter, so switching back to an applicable
+setting resumes it.
 
 Rendering (`ScatterGraph`): the series key is `scatterSeriesKey(point)` =
 `<hwKey>_<precision>[-v-<variant>]` (`utils/point-identity.ts`), so rooflines, frontiers,
@@ -165,8 +152,7 @@ line-swatch row per series present (base first); rows toggle chart-local visibil
 Tooltips add a "Series" line; on the energy axis a role clone also reports its share of the
 reconstructed request energy. Table adds a "Series" column and CSV a trailing "Power Series"
 column only while clones are present. Comparison clones are excluded from `bestSeriesPerSku`,
-the power-tier counts, the legend points table, the availability panel (which reads
-`selectionPoints`) and the date-comparison `GPUGraph`. Unofficial-run pills read `✕ <hardware>` (`getOverlayLineLabel`); the branch stays in the
+the legend points table and the date-comparison `GPUGraph`. Unofficial-run pills read `✕ <hardware>` (`getOverlayLineLabel`); the branch stays in the
 legend and a short run tag (` · main`, ` · …<date>-<sha>`) is appended only when several overlay
 runs draw the same hardware.
 
@@ -185,8 +171,8 @@ track `inference_power_compare_series_toggled { series, visible }`.
 
 `y_measuredPowerTimeline` is the third value of the Measured Power **Display** control
 (`watts` / `tdp` / `timeline`, `MeasuredPowerDisplay` in `measured-metric-config.ts`). Its
-registry field aliases `measuredAvgPower`, so the point set, the availability panel, the Table
-view and the share link are those of the measured average; only the chart body changes:
+registry field aliases `measuredAvgPower`, so the point set, the Table view and the share link
+are those of the measured average; only the chart body changes:
 `ChartDisplay` renders `ui/PowerTimeline.tsx` instead of `ScatterGraph` when the resolved
 config is `display: 'timeline'`.
 
@@ -204,8 +190,8 @@ config is `display: 'timeline'`.
     matches before falling back to the artifact name.
 
   Nothing is matched by hardware or concurrency. Rows whose telemetry is missing (expired
-  artifact, bundle over the download cap, another collector) are listed under the chart
-  (`data-testid="power-timeline-missing"`), never estimated. Trace keys are
+  artifact, bundle over the download cap, another collector) are not drawn, never
+  estimated. Trace keys are
   `<runId>:<name>` (`traceKeyForPoint`), unique per point in both collectors.
 
 - **Fetch.** One request per workflow run in the visible points
@@ -305,7 +291,7 @@ source per exact run and recipe (`equalServiceSourceKey`), and colour overlay so
 | 6 / 7 / 9    | Same-concurrency table: baseline and comparator J/output token, W/GPU and streaming speed, with % change                                      | _Compare at the same speed / latency_ (`i_servicecompare=1`, sources `i_servicebase` / `i_servicepeer`) | `utils/matched-concurrency.ts`                         |
 | 12 / 13 / 14 | Role group: W/GPU by role, role-local J/input and J/output (not added), J/output token by role with the total, prefill share                  | _Prefill / decode roles_ (`i_roleshare=1`)                                                              | `getRolePoints` in `utils/equal-service-comparison.ts` |
 | 15           | Least-squares fit of mean W/GPU against output tok/s per allocated GPU: points, line, dashed extension to zero, P₀, P₀ ÷ TDP, m, R², n, range | _Power vs output-rate fit_ (`i_powerfit=1`)                                                             | `utils/power-fit.ts`                                   |
-| 16           | Frontier points: the drawn cross-platform frontier, its competing scope, points per hardware, and each point's run and attempt                | Legend _Pareto frontier_ (`i_frontier`) on a measured metric                                            | `utils/frontier-points.ts`                             |
+| 16           | Frontier points: the drawn cross-platform frontier and each point's run and attempt                                                           | Legend _Pareto frontier_ (`i_frontier`) on a measured metric                                            | `utils/frontier-points.ts`                             |
 
 - **Same concurrency** pairs only observations; nothing is interpolated. A side missing at a
   load reads _Not measured_. Disagreeing duplicates of one source read as ambiguous, with none
@@ -317,8 +303,10 @@ source per exact run and recipe (`equalServiceSourceKey`), and colour overlay so
   all allocated GPUs, on the same basis as the mean W/GPU. P₀ is an extrapolated intercept,
   not measured idle power, and R² describes only that line.
 - **Frontier** lists `globalParetoFrontier`'s own output, so the table is exactly what is
-  drawn. Ties keep the first point, official before overlay. It notes when the competing
-  points span several topologies or images.
+  drawn. Ties keep the first point, official before overlay.
+- **Source labels** (`getEqualServiceSources`) read hardware and date, adding precision,
+  topology, run, attempt, recipe, image or point only where two sources would otherwise look
+  the same. The opaque key stays the exact identity.
 - Plots export PNG and CSV; the frontier table exports CSV only. The views API returns
   `matchedConcurrency`, `rolePoints` and `powerFits`
   ([Dashboard read-only views](./dashboard-readonly-views.md#fixed-sequence-service-comparisons));

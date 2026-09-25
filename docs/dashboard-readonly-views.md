@@ -107,6 +107,8 @@ effective percentile or null.
 `serviceTarget` is present) `equalServiceComparison`. Select exact opaque
 `serviceBaseline` and `serviceComparator` keys returned by `serviceSources`,
 encoded with `URLSearchParams`; omitted selections use its first two entries.
+Each source's `label` is display text only: hardware and date, plus precision, topology,
+run or other details only where two sources would otherwise look the same.
 Stale explicit selections remain unavailable. Missing target returns null, not an
 invented operating point. Streaming-speed targets are tok/s/user; TTFT/E2E targets
 are seconds. Concurrency remains a separate observed-load diagnostic, not an
@@ -205,6 +207,9 @@ GPU 视图优先读取已存遥测，缺少存储数据时回退到产物。全�
 存储的有效平均值、窗口内所绘曲线的最大值，以及 GPU 数 × 注册表 TDP。GPU 池模式复用已有设备角色和求和函数；聚焦仅调暗其他曲线，参考线
 使用硬件注册表。原始遥测、全记录统计和 API 响应均不因这些显示设置而改变。
 响应使用 private, no-store，上游 503 保留为错误响应。
+
+`serviceSources` 中各数据源的 `label` 仅供显示，由硬件和日期组成；只有两个数据源无法区分时，
+才补充精度、拓扑、运行等信息。选择数据源时应使用其 `key`。
 
 `serviceCompare=true` 还返回 `matchedConcurrency`：按并发数逐行配对两个所选数据源，任一方在
 该并发数下有观测即列出一行；每侧为 `observed`、`missing`，或同一负载下观测值不一致时的

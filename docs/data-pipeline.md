@@ -631,8 +631,3 @@ empty receipt says `no_8k1k_points`, never that power coverage was validated.
 The workflow retains both the input manifest and verification receipt. Cache
 invalidation errors fail the workflow instead of being swallowed. Imported P75/P90
 ledger edits trigger the existing reviewed override workflow.
-
-The dashboard availability panel uses scoped points before Y-metric filtering,
-including visible unofficial overlays. It distinguishes schema-2 validation,
-other validated data, missing verdicts, withheld measurements, unavailable metrics,
-and non-applicable separate-pool metrics without filling missing values.

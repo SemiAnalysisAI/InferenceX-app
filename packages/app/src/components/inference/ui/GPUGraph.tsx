@@ -73,11 +73,7 @@ import {
 } from '@/components/inference/utils/knownIssueAnnotations';
 import { matchKnownConfigIssues, pointMatchesIssue } from '@/lib/known-issues';
 import { renderOffloadHalo } from '@/components/inference/utils/offload-halo';
-import { renderLegacyPowerRing } from '@/components/inference/utils/legacy-power-marker';
-import {
-  isMeasuredEnergyConfigKey,
-  isRoleLocalMeasuredEnergyConfigKey,
-} from '@/components/inference/metric-registry';
+import { isRoleLocalMeasuredEnergyConfigKey } from '@/components/inference/metric-registry';
 import {
   clampIsoX,
   clearPerfRulers,
@@ -98,10 +94,6 @@ import {
   type PerfRulerRenderEntry,
   type PerfRulerState,
 } from '@/lib/d3-chart/layers/perf-ruler';
-import {
-  countPowerTiers,
-  MeasuredPowerSummary,
-} from '@/components/inference/ui/MeasuredPowerSummary';
 import {
   keepPointLabelsInPlot,
   parallelismLabelBoxes,
@@ -164,10 +156,6 @@ const GPU_STRINGS = {
     showAllMeasurements: 'Show all measurements',
     powerBoundaryInfo:
       'Show only points on the upper measured power boundary. Turn off to show all measurements; the boundary stays the same. This is a power-load boundary, not an energy-efficiency frontier.',
-    powerCurves:
-      'Smooth lines trace the upper power boundary across tested configurations. Dots are measured; lines are interpolated, not efficiency frontiers.',
-    powerOptimal:
-      'A power Pareto frontier can contain a single point. Turn off Optimal Only to show the upper power boundary.',
     labels: 'Labels',
     parallelismLabels: 'Parallelism Labels',
     concurrencyLabels: '# Concurrent Sessions',
@@ -190,9 +178,6 @@ const GPU_STRINGS = {
     showAllMeasurements: '显示全部测量点',
     powerBoundaryInfo:
       '仅显示实测功率上边界上的点。关闭后显示全部测量点，边界曲线保持不变。这是功率负载边界，不是能效前沿。',
-    powerCurves:
-      '平滑曲线勾勒各测试配置的功耗上边界。数据点来自实测，曲线通过插值得到，不代表能效 Pareto 前沿。',
-    powerOptimal: '功耗的 Pareto 前沿可能只有一个点。关闭“仅最优”即可查看功耗上边界。',
     labels: '标签',
     parallelismLabels: '并行配置标签',
     concurrencyLabels: '并发会话数',
@@ -281,7 +266,6 @@ const GPUGraph = React.memo(
     const isMeasuredPowerAxis = isMeasuredPowerCurveMetric(selectedYAxisMetric);
     const powerEnvelopeMode = powerCurveMetric && (isMeasuredPowerAxis || !hideNonOptimal);
     const showAllMeasurements = isMeasuredPowerAxis ? !hideNonOptimal : savedShowAllMeasurements;
-    const isMeasuredEnergyAxis = isMeasuredEnergyConfigKey(selectedYAxisMetric);
     const noDataHint = isRoleLocalMeasuredEnergyConfigKey(selectedYAxisMetric)
       ? legendT.noRoleEnergyDataHint
       : legendT.noDataHint;
@@ -504,16 +488,6 @@ const GPUGraph = React.memo(
 
     // Keep domains fixed so revealing off-boundary dots cannot move power curves.
     const scaleData = powerEnvelopeMode ? activeData : filteredData;
-
-    const powerTierCounts = useMemo(
-      () => ({
-        total: countPowerTiers(
-          data.filter((point) => selectedPrecisions.includes(point.precision)),
-        ),
-        visible: countPowerTiers(filteredData),
-      }),
-      [data, filteredData, selectedPrecisions],
-    );
 
     // GPU comparison currently renders official DB-backed points only. Unofficial
     // overlays have no benchmark_results id or persisted trace, so they cannot
@@ -1296,28 +1270,7 @@ const GPUGraph = React.memo(
         watermark={getChartWatermark()}
         testId="gpu-graph"
         grabCursor={true}
-        caption={
-          isMeasuredEnergyAxis || powerCurveMetric ? (
-            <>
-              {caption}
-              {isMeasuredEnergyAxis && (
-                <MeasuredPowerSummary
-                  total={powerTierCounts.total}
-                  visible={powerTierCounts.visible}
-                  bestPerSku={false}
-                  optimalOnly={hideNonOptimal}
-                />
-              )}
-              {powerCurveMetric && (
-                <p data-testid="power-curve-description" className="text-muted-foreground text-sm">
-                  {powerEnvelopeMode ? legendT.powerCurves : legendT.powerOptimal}
-                </p>
-              )}
-            </>
-          ) : (
-            caption
-          )
-        }
+        caption={caption}
         xScale={{ type: 'linear', domain: xExtent, nice: true }}
         yScale={{ type: logScale ? 'log' : 'linear', domain: yDomain, nice: true }}
         xAxis={{
@@ -1532,18 +1485,12 @@ const GPUGraph = React.memo(
             .selectAll('.dot-group, .roofline-path')
             .style('transition', 'opacity 150ms ease');
 
-          // Decorations stay inside the point group, so normal zoom transforms
-          // carry them without a separate update pass.
+          // The offload halo stays inside the point group, so normal zoom
+          // transforms carry it without a separate update pass.
           ctx.layout.zoomGroup
             .selectAll<SVGGElement, InferenceData>('.dot-group')
             .each(function (point) {
               renderOffloadHalo(d3.select(this), point, 'var(--foreground)');
-              renderLegacyPowerRing(
-                d3.select(this),
-                point,
-                isMeasuredEnergyAxis,
-                'var(--foreground)',
-              );
             });
         }}
         legendElement={

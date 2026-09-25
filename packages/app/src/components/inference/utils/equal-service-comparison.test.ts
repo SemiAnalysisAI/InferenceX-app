@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { InferenceData } from '../types';
-import { buildEqualServiceComparison, equalServiceSourceKey } from './equal-service-comparison';
+import {
+  buildEqualServiceComparison,
+  equalServiceSourceKey,
+  getEqualServiceSources,
+} from './equal-service-comparison';
 
 const metric = (y: number) => ({ y, roof: false });
 function point(overrides: Partial<InferenceData> = {}): InferenceData {
@@ -142,5 +146,20 @@ describe('equal-service comparison', () => {
         target: 20,
       }).metrics.outputTokensPerSecond.reason,
     ).toBe('missing-metric');
+  });
+
+  it('labels sources by hardware and date, adding only the details that tell them apart', () => {
+    const sources = getEqualServiceSources([
+      point({ id: 1 }),
+      point({ id: 2, physicalChips: 8, decode_tp: 8 }),
+      point({ id: 3, run_url: 'https://example.invalid/runs/3' }),
+      point({ id: 4, hwKey: 'b300_sglang', run_url: 'https://example.invalid/runs/2' }),
+    ]);
+    expect(sources.map((source) => source.label)).toEqual([
+      'B200 (SGLang) · 2026-09-23 · Single-node · GPU4 · TP4 · EP? · Run #1',
+      'B200 (SGLang) · 2026-09-23 · Single-node · GPU8 · TP8 · EP?',
+      'B200 (SGLang) · 2026-09-23 · Single-node · GPU4 · TP4 · EP? · Run #3',
+      'B300 (SGLang) · 2026-09-23',
+    ]);
   });
 });

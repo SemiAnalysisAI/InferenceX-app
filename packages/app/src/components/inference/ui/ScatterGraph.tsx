@@ -164,15 +164,7 @@ import {
 import FrontierPointsPanel from '@/components/inference/ui/FrontierPointsPanel';
 import LegendPointsDialog from '@/components/inference/ui/LegendPointsDialog';
 import { renderOffloadHalo } from '@/components/inference/utils/offload-halo';
-import { renderLegacyPowerRing } from '@/components/inference/utils/legacy-power-marker';
-import {
-  countPowerTiers,
-  MeasuredPowerSummary,
-} from '@/components/inference/ui/MeasuredPowerSummary';
-import {
-  isMeasuredEnergyConfigKey,
-  isRoleLocalMeasuredEnergyConfigKey,
-} from '@/components/inference/metric-registry';
+import { isRoleLocalMeasuredEnergyConfigKey } from '@/components/inference/metric-registry';
 import { buildLegendPointsRows } from '@/components/inference/utils/legend-points-table';
 import { groupConcurrencySeries } from '@/components/inference/utils/concurrency-series';
 import { resolveScatterXAxisScale } from '@/components/inference/utils/x-axis-scale';
@@ -454,10 +446,6 @@ const SCATTER_STRINGS = {
     optimalInfo: 'Optimal points form the Pareto frontier for the selected axes.',
     powerBoundaryInfo:
       'Show only points on the upper measured power boundary. Turn off to show all measurements; the boundary stays the same. This is a power-load boundary, not an energy-efficiency frontier.',
-    powerCurves:
-      'Smooth lines trace the upper power boundary across tested configurations. Dots are measured; lines are interpolated, not efficiency frontiers.',
-    powerOptimal:
-      'A power Pareto frontier can contain a single point. Turn off Optimal Only to show the upper power boundary.',
     labels: 'Labels',
     highContrast: 'High Contrast',
     parallelismLabels: 'Parallelism Labels',
@@ -494,9 +482,6 @@ const SCATTER_STRINGS = {
     optimalInfo: '最优点构成当前所选坐标轴的 Pareto 前沿。',
     powerBoundaryInfo:
       '仅显示实测功率上边界上的点。关闭后显示全部测量点，边界曲线保持不变。这是功率负载边界，不是能效前沿。',
-    powerCurves:
-      '平滑曲线勾勒各测试配置的功耗上边界。数据点来自实测，曲线通过插值得到，不代表能效 Pareto 前沿。',
-    powerOptimal: '功耗的 Pareto 前沿可能只有一个点。关闭“仅最优”即可查看功耗上边界。',
     labels: '标签',
     highContrast: '高对比度',
     parallelismLabels: '并行配置标签',
@@ -648,9 +633,6 @@ const ScatterGraph = React.memo(
     const ephemeralUrlState = useEphemeralUrlState();
     const costLimit = chartDefinition.y_cost_limit ?? 0;
     const latencyLimit = chartDefinition.y_latency_limit ?? 0;
-    // Legacy-power rings decorate points only while a Measured Energy y-axis
-    // is selected (see legacy-power-marker.ts).
-    const isMeasuredEnergyAxis = isMeasuredEnergyConfigKey(selectedYAxisMetric);
 
     const {
       isUnofficialRun,
@@ -1899,31 +1881,6 @@ const ScatterGraph = React.memo(
       powerCompareBaseId,
       locale,
       hiddenPowerVariants,
-    ]);
-
-    const powerTierCounts = useMemo(() => {
-      // Comparison clones re-plot the same measurements; count each once.
-      const officialTotal = pointsData.filter(
-        (point) => !point.powerVariant && selectedPrecisions.includes(point.precision),
-      );
-      const overlayTotal = processedOverlayData.filter(
-        (point) => !point.powerVariant && selectedPrecisions.includes(point.precision),
-      );
-      const officialVisible = officialTotal.filter(isPointVisible);
-      const overlayVisible = overlayTotal.filter(
-        (point) => activeOverlayHwTypes.has(String(point.hwKey)) && isOverlayPointVisible(point),
-      );
-      return {
-        total: countPowerTiers([...officialTotal, ...overlayTotal]),
-        visible: countPowerTiers([...officialVisible, ...overlayVisible]),
-      };
-    }, [
-      pointsData,
-      processedOverlayData,
-      selectedPrecisions,
-      isPointVisible,
-      activeOverlayHwTypes,
-      isOverlayPointVisible,
     ]);
 
     // --- Legend hover highlight ---
@@ -3543,15 +3500,14 @@ const ScatterGraph = React.memo(
                   overlayRunColor(overlayRunIndex(d.run_url ?? null, runIndexByUrl)),
                 );
 
-              // Match official points: KV offload and the measured-axis
-              // legacy-power ring are the only persistent point decorations.
-              // Decode method remains in the tooltip.
+              // Match official points: KV offload is the only persistent point
+              // decoration. Decode method remains in the tooltip.
               overlayPoints.each(function (d) {
-                const overlayStroke = overlayRunColor(
-                  overlayRunIndex(d.run_url ?? null, runIndexByUrl),
+                renderOffloadHalo(
+                  d3.select(this),
+                  d,
+                  overlayRunColor(overlayRunIndex(d.run_url ?? null, runIndexByUrl)),
                 );
-                renderOffloadHalo(d3.select(this), d, overlayStroke);
-                renderLegacyPowerRing(d3.select(this), d, isMeasuredEnergyAxis, overlayStroke);
               });
 
               updateOverlayLabels(zoomGroup);
@@ -3893,7 +3849,6 @@ const ScatterGraph = React.memo(
       yLabel,
       selectedYAxisMetric,
       powerCompareBaseId,
-      isMeasuredEnergyAxis,
       chartDefinition,
       locale,
       drawPerfRuler,
@@ -3917,10 +3872,8 @@ const ScatterGraph = React.memo(
         zoomGroup.selectAll('.dot-group').style('transition', 'opacity 150ms ease');
 
         // Offload halo: dashed ring on every point that used KV offload (Pareto or not).
-        // Legacy-power ring: dotted ring on unvalidated telemetry, measured axes only.
         zoomGroup.selectAll<SVGGElement, InferenceData>('.dot-group').each(function (d) {
           renderOffloadHalo(d3.select(this), d, 'var(--foreground)');
-          renderLegacyPowerRing(d3.select(this), d, isMeasuredEnergyAxis, 'var(--foreground)');
         });
 
         avoidPointLabelCollisions(zoomGroup);
@@ -3950,9 +3903,6 @@ const ScatterGraph = React.memo(
         optimalPointKeys,
         getCssColor,
         resolveColor,
-        // A metric-only change must re-run the decoration pass so legacy-power
-        // rings appear/disappear with the Measured Energy axis selection.
-        isMeasuredEnergyAxis,
       ],
     );
 
@@ -3988,9 +3938,8 @@ const ScatterGraph = React.memo(
           color,
         );
         // A precision toggle may replace and append the visible SVG shape.
-        // Keep the decorations above that shape after the swap.
+        // Keep the offload halo above that shape after the swap.
         point.selectAll('.offload-halo').raise();
-        point.selectAll('.legacy-power-ring').raise();
       });
 
       // Overlay points keep their X marker and run-derived color. Only their
@@ -4343,18 +4292,14 @@ const ScatterGraph = React.memo(
           testId="scatter-graph"
           grabCursor={true}
           caption={
-            isPowerAxis || isConcurrencyAxis ? (
+            isConcurrencyAxis ? (
               <>
                 {caption}
                 <p
-                  data-testid="power-curve-description"
+                  data-testid="concurrency-curve-description"
                   className="mt-2 text-2xs text-muted-foreground"
                 >
-                  {isConcurrencyAxis
-                    ? legendT.concurrencyCurves
-                    : showPowerEnvelope
-                      ? legendT.powerCurves
-                      : legendT.powerOptimal}
+                  {legendT.concurrencyCurves}
                 </p>
               </>
             ) : (
@@ -4715,14 +4660,6 @@ const ScatterGraph = React.memo(
             />
           }
         />
-        {isMeasuredEnergyAxis && (
-          <MeasuredPowerSummary
-            total={powerTierCounts.total}
-            visible={powerTierCounts.visible}
-            bestPerSku={!isConcurrencyAxis && bestPerSku}
-            optimalOnly={hideNonOptimal}
-          />
-        )}
         <QuickFiltersDialog
           open={quickFiltersOpen}
           onOpenChange={setQuickFiltersOpen}
@@ -4759,8 +4696,6 @@ const ScatterGraph = React.memo(
             frontier={globalFrontier}
             xLabel={xLabel}
             yLabel={yLabel}
-            maximizeX={maximizeParetoX}
-            maximizeY={maximizeParetoY}
             overlayPoints={processedOverlayData}
             hardwareLabel={frontierHardwareLabel}
             hardwareColor={frontierHardwareColor}

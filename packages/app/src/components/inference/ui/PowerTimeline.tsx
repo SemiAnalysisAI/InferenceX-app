@@ -79,8 +79,6 @@ import {
   traceKeyRunId,
   tracePools,
   windowPhase,
-  type MissingTrace,
-  type MissingTraceReason,
   type PoolSizeGroup,
   type PowerPool,
   type PowerPoolRole,
@@ -97,8 +95,6 @@ export const POWER_TIMELINE_MAX_RUNS = 4;
 const HIT_POINTS_PER_TRACE = 200;
 /** Above this many visible traces the `c<conc>` end labels would only overlap. */
 const MAX_LABELED_TRACES = 40;
-/** Up to this many undrawn configs are named individually; beyond, per hardware. */
-const MAX_LISTED_MISSING = 8;
 const CHART_HEIGHT = 600;
 const MARGIN = { top: 24, right: 84, bottom: 60, left: 64 };
 
@@ -118,8 +114,6 @@ const STRINGS = {
       `${count} trace${count === 1 ? '' : 's'} omitted: no valid serving-window bounds.`,
     missingFocus:
       'The selected trace is unavailable for these filters or has no retained telemetry.',
-    methodWindow:
-      'One-second means of GPU-board power inside each recorded validated serving window; window boundaries are not interpolated. Dashed lines: rated TDP from the hardware registry.',
     xWall: 'Time (UTC)',
     xElapsed: 'Time since telemetry start (m:ss)',
     perGpu: 'One line per GPU',
@@ -133,17 +127,6 @@ const STRINGS = {
     loading: (runs: number) =>
       `Loading GPU telemetry for ${runs} run${runs === 1 ? '' : 's'}… (may take a minute)`,
     loadError: (runId: string, message: string) => `Run ${runId}: ${message}`,
-    missing: (missing: number, total: number) =>
-      `${missing} of ${total} measured configs have no telemetry trace and are not drawn.`,
-    missingReason: {
-      'no-source': (count: number) =>
-        `${count} predate per-config telemetry provenance in the benchmark row`,
-      'no-run': (count: number) => `${count} carry no workflow run`,
-      'run-not-fetched': (count: number) => `${count} come from runs that were not loaded`,
-      'not-in-run': (count: number) =>
-        `${count} have no gpu_metrics artifact or power-audit bundle in their run (expired, or another collector)`,
-    } satisfies Record<MissingTraceReason, (count: number) => string>,
-    missingUndrawn: 'Not drawn',
     noTraces:
       'No telemetry traces for the visible hardware. Enable a series in the legend or choose another date.',
     noArtifacts:
@@ -151,10 +134,6 @@ const STRINGS = {
     droppedRuns: (runs: number) =>
       `Telemetry from ${runs} more run${runs === 1 ? '' : 's'} was not loaded (limit ${POWER_TIMELINE_MAX_RUNS} runs per chart).`,
     telemetry: 'Telemetry',
-    method:
-      'One-second means of per-GPU board power (nvidia-smi / amd-smi, or DCGM on Slurm / Dynamo runs) over the whole benchmark job; the emphasized segment is the validated window behind the measured average. Dashed lines: rated TDP per hardware from the hardware registry.',
-    methodPools:
-      'In pool mode each line is the summed power of one worker-role pool (prefill or decode GPUs) and the dashed references are pool size × rated TDP.',
     instructions:
       'Shift+Scroll to zoom horizontally · Drag to pan · Double-click to reset · Click a point to pin tooltip',
     dismiss: 'Click elsewhere to dismiss',
@@ -198,8 +177,6 @@ const STRINGS = {
     windowOnlyHelp: '仅显示已记录的有效服务窗口内保留的采样点；缺少有效窗口边界的曲线不绘制。',
     missingWindow: (count: number) => `${count} 条曲线缺少有效服务窗口边界，未绘制。`,
     missingFocus: '所选曲线不符合当前筛选条件，或没有保留的遥测数据。',
-    methodWindow:
-      '显示各有效服务窗口内的 GPU 板卡功耗一秒平均值，窗口边界不作插值。虚线为硬件注册表中的额定 TDP。',
     xWall: '时间（UTC）',
     xElapsed: '距遥测开始的时间（分:秒）',
     perGpu: '每个 GPU 一条线',
@@ -212,25 +189,11 @@ const STRINGS = {
       '按硬件注册表中每 GPU 的全电源配置（all-in）市电功率绘制虚线参考（SemiAnalysis 数据中心行业模型）。默认关闭，因为它会压缩曲线的纵向分辨率。',
     loading: (runs: number) => `正在加载 ${runs} 个运行的 GPU 遥测数据……（可能需要约一分钟）`,
     loadError: (runId: string, message: string) => `运行 ${runId}：${message}`,
-    missing: (missing: number, total: number) =>
-      `${total} 个有实测值的配置中有 ${missing} 个没有遥测曲线，未绘制。`,
-    missingReason: {
-      'no-source': (count: number) => `${count} 个的基准测试行早于按配置记录的遥测来源`,
-      'no-run': (count: number) => `${count} 个没有工作流运行信息`,
-      'run-not-fetched': (count: number) => `${count} 个来自未加载的运行`,
-      'not-in-run': (count: number) =>
-        `${count} 个在其运行中没有 gpu_metrics 产物或 power-audit 数据包（产物已过期，或使用其他采集器）`,
-    } satisfies Record<MissingTraceReason, (count: number) => string>,
-    missingUndrawn: '未绘制',
     noTraces: '当前可见硬件没有遥测曲线。请在图例中启用一个系列或选择其他日期。',
     noArtifacts: '这些数据点早于按配置上传的遥测产物，因此没有可用的时间线。',
     droppedRuns: (runs: number) =>
       `另有 ${runs} 个运行的遥测数据未加载（每张图表最多 ${POWER_TIMELINE_MAX_RUNS} 个运行）。`,
     telemetry: '遥测来源',
-    method:
-      '整个基准测试任务期间每个 GPU 板卡功耗（nvidia-smi / amd-smi，Slurm / Dynamo 运行为 DCGM）的一秒平均值；加粗段为实测平均值所依据的有效测量窗口。虚线：硬件注册表中各硬件的额定 TDP。',
-    methodPools:
-      '在 GPU 池模式下，每条线是一个 worker 角色池（预填充或解码 GPU）的功耗总和，虚线参考为池内 GPU 数量 × 额定 TDP。',
     instructions: 'Shift+滚轮横向缩放 · 拖动平移 · 双击重置 · 点击数据点固定提示框',
     dismiss: '点击其他区域关闭',
     phase: {
@@ -694,33 +657,6 @@ function drawReferenceLines(
       .attr('font-weight', '600')
       .text(line.label);
   });
-}
-
-/** Reasons, then the undrawn configs (named when few, counted per hardware when many). */
-function describeMissing(
-  missing: readonly MissingTrace[],
-  t: (typeof STRINGS)[keyof typeof STRINGS],
-  hardwareLabel: (point: InferenceData) => string,
-): string {
-  const reasons = new Map<MissingTraceReason, number>();
-  for (const { reason } of missing) reasons.set(reason, (reasons.get(reason) ?? 0) + 1);
-  const reasonText = [...reasons.entries()]
-    .map(([reason, count]) => t.missingReason[reason](count))
-    .join('; ');
-  let list: string;
-  if (missing.length <= MAX_LISTED_MISSING) {
-    list = missing
-      .map(({ point }) => `${hardwareLabel(point)} ${traceConfigLabel(point)}`)
-      .join(' · ');
-  } else {
-    const perHardware = new Map<string, number>();
-    for (const { point } of missing) {
-      const label = hardwareLabel(point);
-      perHardware.set(label, (perHardware.get(label) ?? 0) + 1);
-    }
-    list = [...perHardware.entries()].map(([label, count]) => `${label} ×${count}`).join(' · ');
-  }
-  return `${reasonText}. ${t.missingUndrawn}: ${list}`;
 }
 
 export default function PowerTimeline({
@@ -1577,21 +1513,12 @@ export default function PowerTimeline({
         {focusKey && !focusedTrace && loadingRuns === 0 && (
           <p data-testid="power-timeline-focus-missing">{t.missingFocus}</p>
         )}
-        {missingWindows > 0 && (
-          <p data-testid="power-timeline-window-missing">{t.missingWindow(missingWindows)}</p>
-        )}
         {errors.map(({ request, error }) => (
           <p key={request.runId} className="text-destructive" role="alert">
             {t.loadError(request.runId, error.message)}
           </p>
         ))}
         {droppedRuns > 0 && <p>{t.droppedRuns(droppedRuns)}</p>}
-        {loadingRuns === 0 && missing.length > 0 && traces.length > 0 && (
-          <p data-testid="power-timeline-missing">
-            {t.missing(missing.length, traces.length + missing.length)}{' '}
-            {describeMissing(missing, t, hardwareLabel)}
-          </p>
-        )}
         {runInfos.length > 0 && (
           <p data-testid="power-timeline-source">
             {t.telemetry}:{' '}
@@ -1611,8 +1538,6 @@ export default function PowerTimeline({
             ))}
           </p>
         )}
-        <p>{windowOnly ? t.methodWindow : t.method}</p>
-        {hasPools && <p>{t.methodPools}</p>}
       </div>
       {loadingRuns === 0 && visibleTraces.length > 0 && (
         <PowerTimelineSummary

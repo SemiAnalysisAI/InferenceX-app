@@ -1,6 +1,9 @@
 import type { AggDataEntry, InferenceData } from '../types';
 import { chipCounts } from '@/lib/chip-counts';
+import { getHardwareConfig } from '@/lib/constants';
 import { isPositive, powerBasisNormalization } from '@/lib/power-basis';
+import { getDisplayLabel } from '@/lib/utils';
+import { runIdFromUrl } from './powerTimeline';
 import { reconstructedRoleEnergy, type ReconstructedRoleEnergy } from './role-energy';
 import { pointTopologyKey, topologyLabel } from './topology-filter';
 
@@ -85,37 +88,75 @@ export function equalServiceSourceKey(point: InferenceData): string {
 }
 
 const SOURCE_LABEL_WORDS = {
-  en: { point: 'Point', attempt: (attempt: unknown) => `Attempt ${attempt}`, recipe: 'Recipe' },
-  zh: { point: '数据点', attempt: (attempt: unknown) => `第 ${attempt} 次尝试`, recipe: '配方' },
+  en: {
+    point: 'Point',
+    run: (id: string) => `Run #${id}`,
+    attempt: (attempt: unknown) => `Attempt ${attempt}`,
+    recipe: 'Recipe',
+  },
+  zh: {
+    point: '数据点',
+    run: (id: string) => `运行 #${id}`,
+    attempt: (attempt: unknown) => `第 ${attempt} 次尝试`,
+    recipe: '配方',
+  },
 };
+
+/**
+ * Hardware and date, plus only the details that tell otherwise identical
+ * sources apart, in this order; the opaque key stays the exact identity.
+ */
+function sourceLabels(points: readonly InferenceData[], locale: 'en' | 'zh'): string[] {
+  const words = SOURCE_LABEL_WORDS[locale];
+  const details: ((point: InferenceData, group: readonly InferenceData[]) => string | null)[] = [
+    (point) => point.precision.toUpperCase(),
+    (point, group) => topologyLabel(pointTopologyKey(point), locale, group.map(pointTopologyKey)),
+    (point) => {
+      const runId = runIdFromUrl(point.run_url);
+      return runId ? words.run(runId) : null;
+    },
+    (point) => ('run_attempt' in point ? words.attempt(point.run_attempt) : null),
+    (point) =>
+      point.recipe_fingerprint ? `${words.recipe} ${point.recipe_fingerprint.slice(0, 8)}` : null,
+    (point) => point.image ?? null,
+    (point) => `${words.point} ${point.id ?? '?'}`,
+  ];
+  const labels = points.map((point) => {
+    const hardware = getHardwareConfig(point.hwKey);
+    return [
+      hardware.name === 'unknown' ? point.hwKey : getDisplayLabel(hardware),
+      point.actualDate ?? point.date,
+    ].join(' · ');
+  });
+  for (const detail of details) {
+    const groups = new Map<string, number[]>();
+    labels.forEach((label, index) => groups.set(label, [...(groups.get(label) ?? []), index]));
+    for (const indices of groups.values()) {
+      if (indices.length < 2) continue;
+      const group = indices.map((index) => points[index]);
+      const values = group.map((point) => detail(point, group));
+      if (new Set(values).size < 2) continue;
+      indices.forEach((index, position) => {
+        if (values[position]) labels[index] += ` · ${values[position]}`;
+      });
+    }
+  }
+  return labels;
+}
 
 /** Labels are English by default: the read-only API has no locale. */
 export function getEqualServiceSources(
   points: readonly InferenceData[],
   locale: 'en' | 'zh' = 'en',
 ): EqualServiceSource[] {
-  const words = SOURCE_LABEL_WORDS[locale];
-  const sources = new Map(
-    observedPoints(points).map((point) => [equalServiceSourceKey(point), point]),
+  const sources = [
+    ...new Map(observedPoints(points).map((point) => [equalServiceSourceKey(point), point])),
+  ].sort(([a], [b]) => a.localeCompare(b));
+  const labels = sourceLabels(
+    sources.map(([, point]) => point),
+    locale,
   );
-  const topologies = [...sources.values()].map(pointTopologyKey);
-  return [...sources]
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([key, point]) => ({
-      key,
-      label: [
-        point.hwKey,
-        point.precision.toUpperCase(),
-        topologyLabel(pointTopologyKey(point), locale, topologies),
-        point.actualDate ?? point.date,
-        point.run_url ?? `${words.point} ${point.id ?? '?'}`,
-        'run_attempt' in point ? words.attempt(point.run_attempt) : null,
-        point.recipe_fingerprint ? `${words.recipe} ${point.recipe_fingerprint}` : null,
-        point.image ?? null,
-      ]
-        .filter(Boolean)
-        .join(' · '),
-    }));
+  return sources.map(([key], index) => ({ key, label: labels[index] }));
 }
 
 function deploymentOutput(point: InferenceData): number | undefined {

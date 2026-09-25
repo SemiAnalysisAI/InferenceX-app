@@ -584,7 +584,7 @@ describe('AgentX replaces a complete curve while preserving an unofficial compar
   });
 });
 
-it('hydrates a direct PowerX metric link and shows availability for the selected workload', () => {
+it('hydrates a direct PowerX metric link', () => {
   cy.intercept('GET', '/api/v1/availability').as('powerLinkAvailability');
   cy.intercept('GET', '/api/v1/benchmarks*').as('powerLinkBenchmarks');
   cy.viewport(1440, 900);
@@ -603,17 +603,6 @@ it('hydrates a direct PowerX metric link and shows availability for the selected
     'aria-pressed',
     'true',
   );
-  cy.get('[data-testid="power-metric-availability"]').should(
-    'contain',
-    'Current workload and hardware selection',
-  );
-  cy.contains('summary', 'Availability of all measured metrics').click();
-  cy.get('[data-testid="power-metric-availability"]').within(() => {
-    cy.contains('button', 'Measured P75 Fleet Power per Chip').should('contain', '/');
-    cy.contains('button', 'Measured Joules per Output Token').click();
-  });
-  cy.get('[data-testid="yaxis-metric-selector"]').should('contain', 'Measured Energy');
-  cy.get('[data-testid="measured-energy-denominator"]').should('contain', 'Output');
   cy.get('@powerLinkConsoleErrors').should('not.be.calledWithMatch', /hydrat/i);
 });
 
@@ -700,7 +689,6 @@ it('uses Optimal Only to filter power boundary dots without replacing official o
   cy.get('[data-testid="chart-figure"] h2').should('contain', 'Measured Joules per Output Token');
   cy.get('#scatter-hide-non-optimal').should('have.attr', 'data-state', 'checked');
   cy.get('#scatter-show-all-measurements').should('not.exist');
-  cy.get('[data-testid="power-curve-description"]').should('not.exist');
   assertVisibleMeasuredValues('.dot-group', [2, 4, 5]);
   assertVisibleMeasuredValues('.unofficial-overlay-pt', [3, 5, 6]);
   cy.get(curves)

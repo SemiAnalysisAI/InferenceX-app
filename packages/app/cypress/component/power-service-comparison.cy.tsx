@@ -98,10 +98,9 @@ describe('PowerServiceComparison', () => {
       .not('[fill="var(--overlay-run-0)"]')
       .should('have.length', 4);
     cy.get('[data-testid="equal-service-toggle"]').check();
-    cy.get('[data-testid="equal-service-comparator"] option:selected').should(
-      'contain.text',
-      '900000002',
-    );
+    cy.get('[data-testid="equal-service-comparator"]')
+      .invoke('val')
+      .should('contain', OVERLAY_RUN_URL);
     cy.get('[data-testid="matched-concurrency-row-8"]').should('exist');
   });
 });

@@ -36,8 +36,6 @@ const STRINGS = {
     attempt: (attempt: number) => `attempt ${attempt}`,
     unofficial: 'unofficial',
     noWindow: 'Not recorded',
-    method: (bucket: number | null) =>
-      `Validated averages are the benchmark row’s figures, not recomputed here. Peak is the highest ${bucket === null ? '' : `${bucket}-s `}sum of the pool’s GPUs inside the recorded validated window, as drawn; buckets missing a pool GPU are skipped. Pool TDP = GPUs × rated TDP from the hardware registry. The telemetry source is per run: database when every requested series was stored, GitHub artifact fallback when any had to be read live.`,
   },
   zh: {
     title: '有效测量窗口汇总',
@@ -56,8 +54,6 @@ const STRINGS = {
     attempt: (attempt: number) => `第 ${attempt} 次尝试`,
     unofficial: '非官方',
     noWindow: '未记录',
-    method: (bucket: number | null) =>
-      `有效窗口平均值取自基准测试记录，此处不重新计算。峰值是在已记录的有效测量窗口内，${bucket === null ? '' : `按 ${bucket} 秒区间`}对该池各 GPU 功耗求和后的最大值，与图中曲线一致；缺少任一 GPU 采样的区间不计入。池 TDP = GPU 数 × 硬件注册表中的额定 TDP。遥测来源按运行标注：所有请求的序列都已入库时为数据库；只要有序列需要实时读取，就标为 GitHub 产物回退。`,
   },
 };
 
@@ -103,7 +99,6 @@ export default function PowerTimelineSummary({
       })),
     [traces],
   );
-  const buckets = [...new Set(rows.map((row) => row.summary.bucketSeconds))];
   return (
     <section className="min-w-0 space-y-2 px-1" data-testid="power-timeline-summary">
       <h3 className="text-sm font-medium">{t.title}</h3>
@@ -189,9 +184,6 @@ export default function PowerTimelineSummary({
           })}
         </table>
       </div>
-      <p className="text-xs text-muted-foreground">
-        {t.method(buckets.length === 1 ? buckets[0] : null)}
-      </p>
     </section>
   );
 }

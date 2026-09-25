@@ -36,12 +36,6 @@ const STRINGS = {
     target: 'Target',
     change: 'Change',
     title: 'Power, throughput and energy at the same service point',
-    method:
-      'Change = (comparator ÷ baseline − 1) × 100%. A negative energy change means lower energy use. Matches the selected axis only; other latencies may differ.',
-    interpolation:
-      'Within each source, raw quantities are linearly interpolated between neighboring observations, then compared. No extrapolation. Larger markers show the selected target. Lines connect the derived comparisons; they are not additional measurements.',
-    targetHelp:
-      'Enter a target within both source ranges to inspect values and bracketing observations.',
     concurrency:
       'Concurrency is a load diagnostic, not equal service. Select interactivity, TTFT or end-to-end latency for the equal-service comparison; the table below pairs observations at each concurrency.',
     metric: 'Metric',
@@ -64,11 +58,6 @@ const STRINGS = {
     target: '目标值',
     change: '变化',
     title: '相同服务指标下的功耗、吞吐量与能耗',
-    method:
-      '变化 =（对比对象 ÷ 基准 − 1）× 100%。能耗变化率为负表示能耗更低。只匹配所选横轴，其他延迟可能不同。',
-    interpolation:
-      '各数据源在相邻观测点间对原始数值进行线性插值，再计算变化率；不做外推。大圆点标记所选目标值。连线连接推导出的比较结果，不代表额外实测。',
-    targetHelp: '输入两个数据源范围内的目标值，查看数值及插值两端的观测点。',
     concurrency:
       '并发数用于分析负载，并不代表相同服务水平。相同服务水平的比较请选择交互性、首 token 延迟或端到端延迟；下表按各并发数配对观测值。',
     metric: '指标',
@@ -350,12 +339,7 @@ export default function PowerServiceComparison({
               <Heading as="h3" level="card">
                 {t.title}
               </Heading>
-              <p className="text-sm text-muted-foreground">{contextLabel}</p>
-              <p className="text-sm text-muted-foreground">{t.method}</p>
-              <p className="break-words text-sm">
-                {t.baseline}: {sourceLabel(base)} → {t.comparator}: {sourceLabel(peer)}
-              </p>
-
+              <p className="export-only hidden text-sm text-muted-foreground">{contextLabel}</p>
               <div className="flex flex-wrap gap-x-5 gap-y-2 text-sm">
                 {METRICS.map((key, index) => (
                   <span key={key} className="inline-flex items-center gap-2">
@@ -393,7 +377,6 @@ export default function PowerServiceComparison({
               ) : (
                 <p className="py-6 text-sm text-muted-foreground">{t.empty}</p>
               )}
-              <p className="text-xs text-muted-foreground">{t.interpolation}</p>
               <div className="max-h-0 overflow-hidden">
                 <div id={`${chartId}-service-export`} className="p-4" />
               </div>
@@ -414,7 +397,7 @@ export default function PowerServiceComparison({
                   data-testid="equal-service-target"
                 />
               </label>
-              {comparison ? (
+              {comparison && (
                 <div className="min-w-0">
                   <table
                     className="w-full table-fixed break-words text-left text-sm"
@@ -451,8 +434,6 @@ export default function PowerServiceComparison({
                     </tbody>
                   </table>
                 </div>
-              ) : (
-                <p className="text-xs text-muted-foreground">{t.targetHelp}</p>
               )}
             </section>
           )}

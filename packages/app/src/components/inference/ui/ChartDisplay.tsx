@@ -7,7 +7,6 @@ import { BarChart3, Table2 } from 'lucide-react';
 import chartDefinitions, {
   costTierLabel,
   costTierOptionLabel,
-  isMeasuredEnergyConfigKey,
   isModeledSystemPowerConfigKey,
   metricCostTier,
   tokenMetricTypeForConfigKey,
@@ -101,7 +100,6 @@ import { ATOM_FOOTNOTE_MARKER, AtomEngineFootnote } from '@/components/ui/atom-e
 import { AgenticOptimizationNote } from '@/components/inference/ui/AgenticOptimizationNote';
 import { CacheReuseLink } from '@/components/inference/ui/CacheReuseLink';
 import { OffloadHaloLegendKey } from '@/components/inference/ui/OffloadHaloLegendKey';
-import { LegacyPowerLegendKey } from '@/components/inference/ui/LegacyPowerLegendKey';
 import { ActiveQuickFilters } from '@/components/inference/ui/ActiveQuickFilters';
 import { ResultContext } from '@/components/ui/result-context';
 import { ModelLogo } from '@/components/ui/model-logo';
@@ -921,11 +919,6 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
               ...(footerOverlay?.clippedData ?? []).map((entry) => entry.point),
             ];
             const hasOffloadHalo = footerPoints.some((point) => point.offload_mode === 'on');
-            // Legacy-power rings render only on Measured Energy axes, so the
-            // key follows the same gate to never advertise an absent ring.
-            const hasLegacyPowerPoints =
-              isMeasuredEnergyConfigKey(selectedYAxisMetric) &&
-              footerPoints.some((point) => point.power_tier === 'legacy');
             const hasAtomSeries = footerPoints.some(
               (point) =>
                 point.framework !== undefined &&
@@ -935,14 +928,13 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
             // here as the footer's last block rather than in the chart subtitle,
             // keeping the result-context header compact.
             const footerNotices =
-              hasOffloadHalo || hasLegacyPowerPoints || isAgenticSequence || hasAtomSeries ? (
+              hasOffloadHalo || isAgenticSequence || hasAtomSeries ? (
                 <>
                   <div
                     data-testid="chart-status-notes"
                     className="flex flex-wrap items-center gap-x-5 gap-y-2"
                   >
                     {hasOffloadHalo && <OffloadHaloLegendKey />}
-                    {hasLegacyPowerPoints && <LegacyPowerLegendKey />}
                     {isAgenticSequence && <AgenticOptimizationNote />}
                     {isAgenticSequence && !minimalChrome && <CacheReuseLink />}
                     {hasAtomSeries && (

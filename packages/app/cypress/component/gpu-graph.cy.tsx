@@ -195,58 +195,6 @@ describe('GPUGraph', () => {
     cy.get('[data-testid="gpu-graph"] svg .visible-shape').should('have.length.greaterThan', 0);
   });
 
-  it('draws the historical-power ring and reports measured-point coverage', () => {
-    const data = [
-      createMockInferenceData({
-        hwKey: 'h100',
-        x: 32,
-        y: 2.1,
-        date: '2025-03-01',
-        precision: Precision.FP4,
-        power_tier: 'legacy',
-      }),
-      createMockInferenceData({
-        hwKey: 'h100',
-        x: 64,
-        y: 1.8,
-        date: '2025-03-01',
-        precision: Precision.FP4,
-        power_tier: 'certified',
-      }),
-    ];
-
-    mountWithProviders(
-      <div style={{ width: 800, height: 600 }}>
-        <GPUGraph
-          chartId="test-gpu-measured-power"
-          modelLabel="DeepSeek R1"
-          data={data}
-          xLabel="Interactivity (tok/s/user)"
-          yLabel="Measured Joules per Output Token (J/tok)"
-          chartDefinition={defaultChartDef}
-        />
-      </div>,
-      {
-        inference: {
-          hardwareConfig: hwConfig,
-          selectedGPUs: ['h100'],
-          selectedDates: ['2025-03-01'],
-          selectedDateRange: { startDate: '', endDate: '' },
-          activeDates: new Set(['2025-03-01_h100']),
-          selectedPrecisions: [Precision.FP4],
-          selectedYAxisMetric: 'y_measuredJPerOutputToken',
-          hideNonOptimal: false,
-        },
-      },
-    );
-
-    cy.get('#test-gpu-measured-power svg .legacy-power-ring').should('have.length', 1);
-    cy.get('[data-testid="measured-power-summary"]')
-      .should('contain.text', 'Showing 2 of 2 measured points')
-      .and('contain.text', '1/1 validated')
-      .and('contain.text', '1/1 historical');
-  });
-
   it('shows spec decoding only on hover while retaining the offload halo', () => {
     const data = [
       createMockInferenceData({
@@ -557,15 +505,10 @@ describe('GPU comparison power envelopes', () => {
     );
   }
 
-  it('reveals off-boundary measurements and historical rings without changing power envelopes or axes', () => {
+  it('reveals off-boundary measurements without changing power envelopes or axes', () => {
     mountWithProviders(<PowerComparison />);
     cy.get('#gpu-show-all-measurements').should('not.exist');
     cy.get('#gpu-power-curves .dot-group').should('have.length', 6);
-    cy.get('#gpu-power-curves .legacy-power-ring').should('have.length', 2);
-    cy.get('[data-testid="measured-power-summary"]')
-      .should('contain.text', 'Showing 6 of 12 measured points')
-      .and('contain.text', '4/6 validated')
-      .and('contain.text', '2/6 historical');
     cy.get('#gpu-power-curves .roofline-path')
       .should('have.length', 2)
       .each(($path) => {
@@ -582,11 +525,6 @@ describe('GPU comparison power envelopes', () => {
       );
       cy.get('#gpu-hide-non-optimal').click({ force: true });
       cy.get('#gpu-power-curves .dot-group').should('have.length', 12);
-      cy.get('#gpu-power-curves .legacy-power-ring').should('have.length', 6);
-      cy.get('[data-testid="measured-power-summary"]').should(
-        'contain.text',
-        'Showing 12 of 12 measured points',
-      );
       cy.get('#gpu-hide-non-optimal').should('have.attr', 'data-state', 'unchecked');
       cy.get('#gpu-power-curves svg').should(($current) => {
         expect(
@@ -599,7 +537,6 @@ describe('GPU comparison power envelopes', () => {
       cy.get('#gpu-show-all-measurements').should('not.exist');
       cy.get('#gpu-hide-non-optimal').click({ force: true });
       cy.get('#gpu-power-curves .dot-group').should('have.length', 6);
-      cy.get('#gpu-power-curves .legacy-power-ring').should('have.length', 2);
     });
     cy.get('#gpu-power-curves .line-label').should('have.length', 2);
     cy.get('[data-testid="legend-advanced-toggle"]').click();
@@ -653,9 +590,6 @@ describe('GPU comparison power envelopes', () => {
     cy.get('#gpu-power-curves .roofline-path')
       .should('have.length', 2)
       .each(($path) => expect($path.attr('d')).to.contain('C'));
-    cy.get('#gpu-power-curves [data-testid="power-curve-description"]')
-      .should('contain.text', 'upper power boundary')
-      .and('contain.text', 'not efficiency frontiers');
   });
 
   it('uses the same boundary toggle for percent TDP and fleet percentiles while preserving energy Pareto', () => {
@@ -669,7 +603,6 @@ describe('GPU comparison power envelopes', () => {
       cy.get('#gpu-hide-non-optimal').should('have.attr', 'data-state', 'checked');
       cy.get('#gpu-power-curves .dot-group').should('have.length', 6);
       cy.get('#gpu-power-curves .roofline-path').should('have.length', 2);
-      cy.get('[data-testid="power-curve-description"]').should('contain', '不代表能效 Pareto 前沿');
       cy.get('#gpu-show-all-measurements').should('not.exist');
       cy.get('#gpu-hide-non-optimal').click({ force: true });
       cy.get('#gpu-power-curves .dot-group').should('have.length', 12);
@@ -684,6 +617,5 @@ describe('GPU comparison power envelopes', () => {
     cy.get('#gpu-power-curves .roofline-path')
       .should('have.length', 2)
       .each(($path) => expect($path.attr('d')).to.contain('C'));
-    cy.get('[data-testid="power-curve-description"]').should('not.exist');
   });
 });

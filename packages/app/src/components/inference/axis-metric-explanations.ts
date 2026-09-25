@@ -187,11 +187,11 @@ function provisionedJoules(tokenType: TokenType): MetricExplanation {
 /** Validation-status note appended to every Measured Energy explanation. */
 const MEASURED_TIER_NOTE_EN =
   ' Validated points passed the current PowerX telemetry checks. Historical points are real ' +
-  "older measurements but lack the information needed to confirm today's method; a dotted ring " +
-  'marks them. Filter either status under Quick Filters → Measured Power.';
+  "older measurements but lack the information needed to confirm today's method. Filter either " +
+  'status under Quick Filters → Measured Power.';
 const MEASURED_TIER_NOTE_ZH =
-  '已验证数据点通过了当前 PowerX 遥测检查。历史数据点来自真实的旧版测量，但缺少按当前方法完成验证所需的信息；' +
-  '图表以虚线圆环标记这类数据点。可在快捷筛选的“实测功耗”中按测量状态筛选。';
+  '已验证数据点通过了当前 PowerX 遥测检查。历史数据点来自真实的旧版测量，但缺少按当前方法完成验证所需的信息。' +
+  '可在快捷筛选的“实测功耗”中按测量状态筛选。';
 
 type MeasuredPhase = 'run' | 'prefill' | 'decode';
 

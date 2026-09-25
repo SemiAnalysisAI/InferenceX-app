@@ -15,10 +15,6 @@ import { PowerPanelPlot, type PanelLine, type PanelMarker } from './PowerPanelPl
 const STRINGS = {
   en: {
     title: 'Power versus output rate (least-squares fit)',
-    method:
-      'Each source is fitted on its own observations: mean GPU power (W/GPU over all allocated GPUs) = P₀ + m × output rate (output tok/s per allocated GPU). Disaggregated output is spread over the prefill and decode GPUs. Solid lines span the observed range; the dashed segment only extends the line to zero output to read P₀.',
-    reading:
-      'P₀ is a fitted intercept, not measured idle power. m is the marginal GPU energy per output token (W per tok/s = J/token). R² describes this line only.',
     xAxis: 'Output rate (tok/s per allocated GPU)',
     yAxis: 'Mean GPU power (W/GPU)',
     source: 'Source',
@@ -35,10 +31,6 @@ const STRINGS = {
   },
   zh: {
     title: '功耗与输出速率（最小二乘拟合）',
-    method:
-      '每个数据源只用自己的观测值拟合：平均 GPU 功耗（按全部已分配 GPU 计的 W/GPU）= P₀ + m × 输出速率（每个已分配 GPU 的输出 tok/s）。分离式部署的输出量均摊到预填充和解码 GPU 上。实线覆盖观测范围；虚线仅将直线延伸到零输出处，用于读取 P₀。',
-    reading:
-      'P₀ 是拟合截距，不是实测空载功耗。m 是每个输出 token 的边际 GPU 能耗（W/(tok/s) = J/token）。R² 仅描述这条拟合直线。',
     xAxis: '输出速率（每个已分配 GPU 的 tok/s）',
     yAxis: '平均 GPU 功耗（W/GPU）',
     source: '数据源',
@@ -149,8 +141,7 @@ export default function PowerFitPanel({
       <Heading as="h3" level="card">
         {t.title}
       </Heading>
-      <p className="text-sm text-muted-foreground">{contextLabel}</p>
-      <p className="text-xs text-muted-foreground">{t.method}</p>
+      <p className="export-only hidden text-sm text-muted-foreground">{contextLabel}</p>
       {fits.length === 0 ? (
         <p className="py-6 text-sm text-muted-foreground">{t.empty}</p>
       ) : (
@@ -217,7 +208,6 @@ export default function PowerFitPanel({
               </tbody>
             </table>
           </div>
-          <p className="text-xs text-muted-foreground">{t.reading}</p>
           <div className="max-h-0 overflow-hidden">
             <div id={`${sectionId}-export`} className="p-4" />
           </div>
