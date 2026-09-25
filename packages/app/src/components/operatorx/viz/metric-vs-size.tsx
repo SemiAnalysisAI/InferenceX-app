@@ -5,13 +5,13 @@ import { useMemo, useState } from 'react';
 
 import { SearchableSelect } from '@/components/ui/searchable-select';
 
-import { EmptyChart } from '../../charts/empty';
-import { OpxChart, esc, HardwareLegend, tooltipHtml } from '../../charts/kit';
-import { formatCompact, valueScale } from '../../charts/scales';
-import { hardwareLabel } from '../../compare/hardware';
-import type { ComparisonModel } from '../../compare/model';
-import { rankedSlices } from '../../compare/slices';
-import type { VizDefinition } from '../types';
+import { EmptyChart } from '../charts/empty';
+import { OpxChart, esc, HardwareLegend, tooltipHtml } from '../charts/kit';
+import { formatCompact, valueScale } from '../charts/scales';
+import { hardwareLabel } from '../compare/hardware';
+import type { ComparisonModel } from '../compare/model';
+import { caseLabel, rankedSlices } from '../compare/slices';
+import type { VizDefinition } from './types';
 
 interface Point {
   hw: string;
@@ -60,7 +60,7 @@ function MetricVsSize({ model }: { model: ComparisonModel }) {
         groups={[
           {
             label: '',
-            options: groups.map(([k, v]) => ({ value: k, label: `${k} (${v.length} sizes)` })),
+            options: groups.map(([k]) => ({ value: k, label: k })),
           },
         ]}
       />
@@ -116,7 +116,7 @@ function MetricVsSize({ model }: { model: ComparisonModel }) {
             tooltipHtml({
               title: hardwareLabel(p.hw),
               color: model.colors[p.hw],
-              rows: [esc(view.cases[p.i].shape), `<strong>${metric.format(p.y)}</strong>`],
+              rows: [esc(caseLabel(view.cases[p.i])), `<strong>${metric.format(p.y)}</strong>`],
             }),
           getRulerX: (p, s) => (s as d3.ScaleLogarithmic<number, number>)(p.x),
           getRulerY: (p, s) => s(p.y),
@@ -130,8 +130,7 @@ function MetricVsSize({ model }: { model: ComparisonModel }) {
 export const metricVsSize: VizDefinition = {
   id: 'metric-vs-size',
   title: 'Metric vs size',
-  description: 'One shape swept over its size axis (M for GEMM, tokens for MoE), one line per GPU.',
-  ops: ['gemm', 'moe'],
   wide: true,
+  ops: ['gemm', 'moe'],
   Component: MetricVsSize,
 };

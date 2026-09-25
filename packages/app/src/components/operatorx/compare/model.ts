@@ -21,7 +21,6 @@ export interface ComparisonModel {
   /** Metric value of a case on a hardware, or null when not measured OK. */
   value: (hardware: string, caseIndex: number) => number | null;
   latency: (hardware: string, caseIndex: number) => number | null;
-  kernel: (hardware: string, caseIndex: number) => string | null;
   /** Whether `a` beats `b` under the metric's direction. */
   better: (a: number, b: number) => boolean;
 }
@@ -47,10 +46,6 @@ export function buildModel(
     value: (hw, i) => {
       const us = latency(hw, i);
       return us ? metric.value(view.cases[i], us, hw) : null;
-    },
-    kernel: (hw, i) => {
-      const k = view.measurements[hw]?.kernel[i];
-      return k === null || k === undefined ? null : view.kernels[k];
     },
     better: (a, b) => (metric.better === 'higher' ? a > b : a < b),
   };
@@ -94,17 +89,6 @@ export function best(
 export function commonCases(model: ComparisonModel, indices?: number[]): number[] {
   const all = indices ?? model.view.cases.map((_, i) => i);
   return all.filter((i) => model.hardware.every((hw) => model.value(hw, i) !== null));
-}
-
-/**
- * Cases to compare the selected GPUs on: the ones they all ran, or every case when
- * they share none (then each GPU is summarized over its own cases).
- */
-export function fairCases(model: ComparisonModel): { indices: number[]; shared: boolean } {
-  const common = commonCases(model);
-  return common.length > 0
-    ? { indices: common, shared: true }
-    : { indices: model.view.cases.map((_, i) => i), shared: false };
 }
 
 /** Geomean advantage of `hardware` over `reference` across the cases both measured. */

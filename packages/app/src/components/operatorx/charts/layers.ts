@@ -5,11 +5,15 @@ import type { CustomLayerConfig } from '@/lib/d3-chart/D3Chart';
 type Linear = d3.ScaleContinuousNumeric<number, number>;
 type Band = d3.ScaleBand<string>;
 
-/** Horizontal bars on a band y-axis that grow from `origin` on a continuous x-axis. */
+/**
+ * Horizontal bars on a band y-axis that grow from `origin` on a continuous x-axis.
+ * With `sub`, each band splits into one thinner bar per `subDomain` entry.
+ */
 export function originBarsLayer<T>(opts: {
   key: string;
   data: T[];
   band: (d: T) => string;
+  sub?: { of: (d: T) => string; domain: string[] };
   value: (d: T) => number;
   color: (d: T) => string;
   label: (d: T) => string;
@@ -22,6 +26,10 @@ export function originBarsLayer<T>(opts: {
       const x = ctx.xScale as Linear;
       const y = ctx.yScale as Band;
       const x0 = x(opts.origin);
+      const n = opts.sub?.domain.length ?? 1;
+      const h = y.bandwidth() / n;
+      const top = (d: T) =>
+        (y(opts.band(d)) ?? 0) + (opts.sub ? opts.sub.domain.indexOf(opts.sub.of(d)) * h : 0);
       group
         .selectAll<SVGTextElement, T>('.bar-note')
         .data(opts.data)
@@ -30,7 +38,7 @@ export function originBarsLayer<T>(opts: {
         .attr('x', (d) =>
           opts.value(d) >= opts.origin ? x(opts.value(d)) + 6 : x(opts.value(d)) - 6,
         )
-        .attr('y', (d) => (y(opts.band(d)) ?? 0) + y.bandwidth() / 2)
+        .attr('y', (d) => top(d) + h / 2)
         .attr('dy', '0.35em')
         .attr('text-anchor', (d) => (opts.value(d) >= opts.origin ? 'start' : 'end'))
         .attr('font-size', '11px')
@@ -43,49 +51,11 @@ export function originBarsLayer<T>(opts: {
         .join('rect')
         .attr('class', 'bar')
         .attr('x', (d) => Math.min(x0, x(opts.value(d))))
-        .attr('y', (d) => y(opts.band(d)) ?? 0)
+        .attr('y', (d) => top(d) + (n > 1 ? 1 : 0))
         .attr('width', (d) => Math.max(1, Math.abs(x(opts.value(d)) - x0)))
-        .attr('height', y.bandwidth())
+        .attr('height', n > 1 ? Math.max(1, h - 2) : h)
         .attr('rx', 2)
         .attr('fill', opts.color)
-        .attr('cursor', 'pointer');
-    },
-  };
-}
-
-export interface GroupedDatum {
-  group: string;
-  series: string;
-  value: number;
-}
-
-/** Vertical bars: one cluster per x band, one bar per series, growing from `origin`. */
-export function groupedBarsLayer(opts: {
-  key: string;
-  data: GroupedDatum[];
-  series: string[];
-  colors: Record<string, string>;
-  origin: number;
-}): CustomLayerConfig {
-  return {
-    type: 'custom',
-    key: opts.key,
-    render: (group, ctx) => {
-      const x = ctx.xScale as Band;
-      const y = ctx.yScale as Linear;
-      const inner = x.bandwidth() / opts.series.length;
-      const base = y(opts.origin);
-      return group
-        .selectAll<SVGRectElement, GroupedDatum>('.bar')
-        .data(opts.data, (d) => `${d.group}|${d.series}`)
-        .join('rect')
-        .attr('class', 'bar')
-        .attr('x', (d) => (x(d.group) ?? 0) + opts.series.indexOf(d.series) * inner + 1)
-        .attr('width', Math.max(1, inner - 2))
-        .attr('y', (d) => Math.min(base, y(d.value)))
-        .attr('height', (d) => Math.max(1, Math.abs(y(d.value) - base)))
-        .attr('rx', 2)
-        .attr('fill', (d) => opts.colors[d.series])
         .attr('cursor', 'pointer');
     },
   };

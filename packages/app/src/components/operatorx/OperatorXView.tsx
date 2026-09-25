@@ -41,10 +41,6 @@ export default function OperatorXView() {
         <Heading as="h1" level="card">
           OperatorX
         </Heading>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Single-operator benchmarks: the same GEMM and MoE workloads timed on each GPU, grouped by
-          the model they come from.
-        </p>
         <TabsList className="mt-4">
           {CATEGORIES.map((c) => (
             <TabsTrigger key={c.value} value={c.value}>

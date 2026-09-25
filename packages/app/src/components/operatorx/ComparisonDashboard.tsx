@@ -5,7 +5,6 @@ import { useTheme } from 'next-themes';
 import { useMemo, useState } from 'react';
 
 import type { ComparisonOp } from '@semianalysisai/inferencex-db/operatorx/compare';
-import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { Heading } from '@/components/ui/heading';
 import { Label } from '@/components/ui/label';
@@ -17,6 +16,7 @@ import { useClientSearch } from '@/hooks/useClientSearch';
 import { replaceClientSearch } from '@/lib/client-navigation';
 import { generateVendorColors } from '@/lib/dynamic-colors';
 
+import { CoverageStrip } from './CoverageStrip';
 import { hardwareLabel, sortHardware } from './compare/hardware';
 import { METRICS, metricById } from './compare/metrics';
 import { buildModel, type ComparisonModel } from './compare/model';
@@ -52,17 +52,9 @@ function VizCard({ model, viz }: { model: ComparisonModel; viz: VizDefinition })
       data-testid={`operatorx-viz-${viz.id}`}
       className={`min-w-0 ${viz.wide ? 'lg:col-span-2' : ''}`}
     >
-      <div className="mb-4">
-        <div className="flex flex-wrap items-center gap-2">
-          <Heading as="h2" level="card">
-            {viz.title}
-          </Heading>
-          <Badge variant="outline" className="font-mono">
-            provisional · {viz.id}
-          </Badge>
-        </div>
-        <p className="mt-1 text-sm text-muted-foreground">{viz.description}</p>
-      </div>
+      <Heading as="h2" level="card" className="mb-4">
+        {viz.title}
+      </Heading>
       <viz.Component model={model} />
     </Card>
   );
@@ -131,14 +123,9 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
   return (
     <div className="flex flex-col gap-4">
       <Card className="relative z-10 py-4 md:py-5" data-testid="operatorx-controls">
-        <div className="mb-4">
-          <Heading as="h2" level="card">
-            Chart controls
-          </Heading>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Pick a workload source and a metric; every chart below compares the selected GPUs on it.
-          </p>
-        </div>
+        <Heading as="h2" level="card" className="mb-4">
+          Chart controls
+        </Heading>
         <div className="grid gap-x-5 gap-y-3 sm:grid-cols-2 lg:grid-cols-4">
           <ControlGroup label="Workload" htmlFor="operatorx-workload">
             <SearchableSelect
@@ -150,7 +137,7 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
                   label: '',
                   options: view.workloads.map((w) => ({
                     value: w.id,
-                    label: `${w.label} (${w.cases} cases, ${w.hardware.length} GPUs)`,
+                    label: w.label,
                   })),
                 },
               ]}
@@ -193,6 +180,9 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
               ]}
             />
           </ControlGroup>
+        </div>
+        <div className="mt-4 border-t border-border/60 pt-3">
+          <CoverageStrip model={model} />
         </div>
       </Card>
       <div className="grid gap-4 lg:grid-cols-2">

@@ -127,6 +127,12 @@ function timingShape(metrics: Obj): OperatorXTimingShape | null {
   };
 }
 
+/** The op's roles in its model (`name` is a list, e.g. ["o_proj", "q_proj"]), joined for display. */
+function caseRoles(name: unknown): string | null {
+  const roles = Array.isArray(name) ? name.filter((r) => typeof r === 'string' && r) : [];
+  return roles.length > 0 ? roles.join(', ') : null;
+}
+
 function caseSources(op: Obj): string[] {
   return Array.isArray(op.sources)
     ? op.sources.filter((s): s is string => typeof s === 'string')
@@ -183,7 +189,7 @@ export function normalizeBundle(bundle: OperatorXRawBundle): Normalized {
           {
             testlist,
             opType: type,
-            name: typeof op.name === 'string' ? op.name : null,
+            name: caseRoles(op.name),
             sources: caseSources(op),
             backend,
             shard: shard.id,
@@ -228,7 +234,7 @@ export function normalizeBundle(bundle: OperatorXRawBundle): Normalized {
           {
             testlist: String(c.testlist ?? ''),
             opType: type,
-            name: typeof shape.name === 'string' ? shape.name : null,
+            name: caseRoles(shape.name),
             sources: caseSources({ ...shape, ...c }),
             backend,
             shard: String(cell.id ?? ''),

@@ -1,11 +1,11 @@
 'use client';
 
-import { EmptyChart } from '../../charts/empty';
-import { OpxChart, tooltipHtml } from '../../charts/kit';
-import { originBarsLayer } from '../../charts/layers';
-import { hardwareLabel } from '../../compare/hardware';
-import { best, type ComparisonModel } from '../../compare/model';
-import type { VizDefinition } from '../types';
+import { EmptyChart } from '../charts/empty';
+import { OpxChart, tooltipHtml } from '../charts/kit';
+import { originBarsLayer } from '../charts/layers';
+import { hardwareLabel } from '../compare/hardware';
+import { best, type ComparisonModel } from '../compare/model';
+import type { VizDefinition } from './types';
 
 const pct = (v: number) => `${(v * 100).toFixed(0)}%`;
 
@@ -57,7 +57,7 @@ function WinShare({ model }: { model: ComparisonModel }) {
           band: (b) => b.hw,
           value: (b) => b.share,
           color: (b) => model.colors[b.hw],
-          label: (b) => `${pct(b.share)} (${b.wins})`,
+          label: (b) => pct(b.share),
           origin: 0,
         }),
       ]}
@@ -77,8 +77,6 @@ function WinShare({ model }: { model: ComparisonModel }) {
 export const winShare: VizDefinition = {
   id: 'win-share',
   title: 'Who wins',
-  description:
-    'Share of cases where each GPU has the best value on the selected metric, among cases two or more selected GPUs ran.',
   ops: ['gemm', 'moe'],
   Component: WinShare,
 };

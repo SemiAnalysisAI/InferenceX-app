@@ -5,12 +5,13 @@ import { useMemo, useState } from 'react';
 import type { ComputePrecision } from '@semianalysisai/inferencex-db/operatorx/compare';
 import { SegmentedToggle } from '@/components/ui/segmented-toggle';
 
-import { EmptyChart } from '../../charts/empty';
-import { OpxChart, esc, HardwareLegend, tooltipHtml } from '../../charts/kit';
-import { formatCompact } from '../../charts/scales';
-import { hardwareLabel, peakBandwidthTBs, peakTflops } from '../../compare/hardware';
-import type { ComparisonModel } from '../../compare/model';
-import type { VizDefinition } from '../types';
+import { EmptyChart } from '../charts/empty';
+import { OpxChart, esc, HardwareLegend, tooltipHtml } from '../charts/kit';
+import { formatCompact } from '../charts/scales';
+import { hardwareLabel, peakBandwidthTBs, peakTflops } from '../compare/hardware';
+import type { ComparisonModel } from '../compare/model';
+import { caseLabel } from '../compare/slices';
+import type { VizDefinition } from './types';
 
 const ORDER: ComputePrecision[] = ['fp4', 'fp8', 'bf16'];
 
@@ -74,7 +75,7 @@ function Roofline({ model }: { model: ComparisonModel }) {
         value={precision}
         onValueChange={setPicked}
         ariaLabel="Compute precision"
-        options={precisions.map((p) => ({ value: p, label: `${p} (${counts.get(p)})` }))}
+        options={precisions.map((p) => ({ value: p, label: p }))}
       />
       <OpxChart<Point>
         chartId="operatorx-roofline"
@@ -127,7 +128,7 @@ function Roofline({ model }: { model: ComparisonModel }) {
               title: hardwareLabel(p.hw),
               color: model.colors[p.hw],
               rows: [
-                esc(`${view.cases[p.i].shape} · ${view.cases[p.i].precision}`),
+                esc(`${caseLabel(view.cases[p.i])} · ${view.cases[p.i].precision}`),
                 `<strong>${p.y.toFixed(1)} TFLOPS</strong> at ${p.x.toFixed(0)} FLOP/B`,
               ],
             }),
@@ -141,8 +142,6 @@ function Roofline({ model }: { model: ComparisonModel }) {
 export const roofline: VizDefinition = {
   id: 'roofline',
   title: 'Roofline',
-  description:
-    'Achieved TFLOPS against arithmetic intensity (useful FLOPs per minimum bytes moved) for one compute precision, with each GPU’s dense-peak roofline dashed. Ignores the metric selector.',
   ops: ['gemm', 'moe'],
   wide: true,
   Component: Roofline,

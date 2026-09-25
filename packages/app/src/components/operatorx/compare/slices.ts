@@ -40,3 +40,8 @@ export function rankedSlices(op: ComparisonOp, cases: ComparisonCase[]): [string
     (a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0]),
   );
 }
+
+/** Tooltip name of a case: its role in the model, when known, and its shape. */
+export function caseLabel(c: ComparisonCase): string {
+  return c.role ? `${c.role} · ${c.shape}` : c.shape;
+}

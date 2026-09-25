@@ -1,15 +1,9 @@
-import { comparisonTable } from './provisional/comparison-table';
-import { coverage } from './provisional/coverage';
-import { distribution } from './provisional/distribution';
-import { kernelMatrix } from './provisional/kernel-matrix';
-import { metricVsSize } from './provisional/metric-vs-size';
-import { pairwiseScatter } from './provisional/pairwise-scatter';
-import { precisionAdvantage } from './provisional/precision-advantage';
-import { relativeHeatmap } from './provisional/relative-heatmap';
-import { roofline } from './provisional/roofline';
-import { sizeBuckets } from './provisional/size-buckets';
-import { speedupVsBaseline } from './provisional/speedup-vs-baseline';
-import { winShare } from './provisional/win-share';
+import { distribution } from './distribution';
+import { metricVsSize } from './metric-vs-size';
+import { pairwiseScatter } from './pairwise-scatter';
+import { roofline } from './roofline';
+import { speedupVsBaseline } from './speedup-vs-baseline';
+import { winShare } from './win-share';
 import type { VizDefinition } from './types';
 
 /** Dashboard visualizations, in display order. */
@@ -19,11 +13,5 @@ export const VISUALIZATIONS: VizDefinition[] = [
   metricVsSize,
   roofline,
   distribution,
-  sizeBuckets,
-  precisionAdvantage,
   pairwiseScatter,
-  relativeHeatmap,
-  kernelMatrix,
-  coverage,
-  comparisonTable,
 ];

@@ -6,13 +6,13 @@ import { useState } from 'react';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 
-import { EmptyChart } from '../../charts/empty';
-import { OpxChart, tooltipHtml } from '../../charts/kit';
-import { type BoxDatum, boxLayer } from '../../charts/layers';
-import { valueScale } from '../../charts/scales';
-import { hardwareLabel } from '../../compare/hardware';
-import { type ComparisonModel, commonCases } from '../../compare/model';
-import type { VizDefinition } from '../types';
+import { EmptyChart } from '../charts/empty';
+import { OpxChart, tooltipHtml } from '../charts/kit';
+import { type BoxDatum, boxLayer } from '../charts/layers';
+import { valueScale } from '../charts/scales';
+import { hardwareLabel } from '../compare/hardware';
+import { type ComparisonModel, commonCases } from '../compare/model';
+import type { VizDefinition } from './types';
 
 function Distribution({ model }: { model: ComparisonModel }) {
   const { metric } = model;
@@ -42,19 +42,14 @@ function Distribution({ model }: { model: ComparisonModel }) {
   });
   return (
     <div className="space-y-3">
-      <div className="flex items-center gap-2">
-        <Switch
-          id="opx-dist-common"
-          checked={common}
-          disabled={shared.length === 0}
-          onCheckedChange={setCommon}
-        />
-        <Label htmlFor="opx-dist-common" className="text-sm font-normal text-muted-foreground">
-          {shared.length > 0
-            ? `Only the ${shared.length} cases every selected GPU ran`
-            : 'No case is shared by every selected GPU; each box covers its GPU’s own cases'}
-        </Label>
-      </div>
+      {shared.length > 0 && (
+        <div className="flex items-center gap-2">
+          <Switch id="opx-dist-common" checked={common} onCheckedChange={setCommon} />
+          <Label htmlFor="opx-dist-common" className="text-sm font-normal text-muted-foreground">
+            Only the {shared.length} cases every selected GPU ran
+          </Label>
+        </div>
+      )}
       {boxes.length === 0 ? (
         <EmptyChart>No measured cases.</EmptyChart>
       ) : (
@@ -98,8 +93,6 @@ function Distribution({ model }: { model: ComparisonModel }) {
 export const distribution: VizDefinition = {
   id: 'distribution',
   title: 'Distribution per GPU',
-  description:
-    'Box plot of the selected metric over the workload’s cases: box p25–p75, bar at the median, whiskers p5–p95.',
   ops: ['gemm', 'moe'],
   Component: Distribution,
 };

@@ -5,12 +5,13 @@ import { useMemo, useState } from 'react';
 
 import { SearchableSelect } from '@/components/ui/searchable-select';
 
-import { EmptyChart } from '../../charts/empty';
-import { OpxChart, esc, HardwareLegend, tooltipHtml } from '../../charts/kit';
-import { valueScale } from '../../charts/scales';
-import { hardwareLabel } from '../../compare/hardware';
-import type { ComparisonModel } from '../../compare/model';
-import type { VizDefinition } from '../types';
+import { EmptyChart } from '../charts/empty';
+import { OpxChart, esc, HardwareLegend, tooltipHtml } from '../charts/kit';
+import { valueScale } from '../charts/scales';
+import { hardwareLabel } from '../compare/hardware';
+import type { ComparisonModel } from '../compare/model';
+import { caseLabel } from '../compare/slices';
+import type { VizDefinition } from './types';
 
 interface Pair {
   i: number;
@@ -139,7 +140,7 @@ function PairwiseScatter({ model }: { model: ComparisonModel }) {
             attachToLayer: 1,
             content: (p) =>
               tooltipHtml({
-                title: view.cases[p.i].shape,
+                title: caseLabel(view.cases[p.i]),
                 rows: [
                   esc(view.cases[p.i].precision),
                   `${hardwareLabel(a)} <strong>${metric.format(p.x)}</strong>`,
@@ -157,8 +158,6 @@ function PairwiseScatter({ model }: { model: ComparisonModel }) {
 export const pairwiseScatter: VizDefinition = {
   id: 'pairwise-scatter',
   title: 'Head to head',
-  description:
-    'Every case both GPUs ran, one GPU per axis on the selected metric. Points take the color of the GPU that wins that case; the dashed line is parity.',
   ops: ['gemm', 'moe'],
   Component: PairwiseScatter,
 };
