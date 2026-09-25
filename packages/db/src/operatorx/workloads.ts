@@ -25,18 +25,17 @@ const TESTLIST_LABELS: Record<string, string> = {
 };
 
 /**
- * Sources of one case: the model families of its checkpoint ids (`org/name`; one shape can
- * come from several models); cases without a model id fall back to their testlist.
+ * Sources of one case: the model families of its `sources` checkpoint ids (one shape can
+ * come from several models); cases without sources fall back to their testlist.
  */
 export function workloadSources(
   opType: string,
   testlist: string,
-  names: string[],
+  sources: string[],
 ): WorkloadSource[] {
   const suffix = opType === 'moe' ? 'MoE' : opType.toUpperCase();
-  const models = names.filter((n) => n.includes('/'));
-  if (models.length > 0) {
-    const families = [...new Set(models.map(modelFamily))];
+  if (sources.length > 0) {
+    const families = [...new Set(sources.map(modelFamily))];
     return families.map((f) => ({ id: `${opType}:${f}`, label: `${f} ${suffix}` }));
   }
   return [{ id: `${opType}:testlist:${testlist}`, label: TESTLIST_LABELS[testlist] ?? testlist }];

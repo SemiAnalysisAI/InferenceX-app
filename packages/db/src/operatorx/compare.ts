@@ -26,6 +26,8 @@ export interface ComparisonRow {
   hardware: string;
   testlist: string;
   workloads: string[];
+  /** Role of the op in its model (`q_proj`), when the testlist names it. */
+  role: string | null;
   shape: string;
   precision: string;
   computePrecision: ComputePrecision;
@@ -55,7 +57,7 @@ export interface Comparison {
 }
 
 export interface ComparisonInput {
-  /** Pool name as the sweep planned it (h200-dgxc, mi355x, ...). */
+  /** Runner label as the sweep planned it (h200-dgxc, mi300x-amd, ...). */
   runner: string;
   dataset: OperatorXDataset;
 }
@@ -144,6 +146,7 @@ export function buildComparison(op: ComparisonOp, inputs: ComparisonInput[]): Co
         hardware: hw,
         testlist: r.testlist,
         workloads: sources.map((s) => s.id),
+        role: r.name,
         ...opLabels(op, r.args),
         computePrecision: computePrecision(op, r.args),
         x: op === 'gemm' ? num(r.args.m) : num(r.args.tokens),
@@ -178,6 +181,7 @@ export function buildComparison(op: ComparisonOp, inputs: ComparisonInput[]): Co
 export interface ComparisonCase {
   key: string;
   testlist: string;
+  role: string | null;
   shape: string;
   precision: string;
   computePrecision: ComputePrecision;
@@ -223,6 +227,7 @@ export function comparisonView(comparison: Comparison, workloadId: string | null
     cases.push({
       key: r.caseKey,
       testlist: r.testlist,
+      role: r.role,
       shape: r.shape,
       precision: r.precision,
       computePrecision: r.computePrecision,

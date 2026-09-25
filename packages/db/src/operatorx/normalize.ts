@@ -25,8 +25,9 @@ export interface OperatorXResult {
   index: number;
   testlist: string;
   opType: string;
+  /** Role of the op in its model: `q_proj`, `experts`, ... */
   name: string | null;
-  /** Models or shape sets the case comes from (`op.sources`, else `op.name`). */
+  /** Checkpoint ids of the models the case comes from (`op.sources`). */
   sources: string[];
   backend: string;
   shard: string;
@@ -127,9 +128,9 @@ function timingShape(metrics: Obj): OperatorXTimingShape | null {
 }
 
 function caseSources(op: Obj): string[] {
-  if (Array.isArray(op.sources))
-    return op.sources.filter((s): s is string => typeof s === 'string');
-  return typeof op.name === 'string' ? [op.name] : [];
+  return Array.isArray(op.sources)
+    ? op.sources.filter((s): s is string => typeof s === 'string')
+    : [];
 }
 
 function toStatus(v: unknown): OperatorXStatus {

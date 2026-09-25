@@ -19,6 +19,12 @@ function ComparisonTable({ model }: { model: ComparisonModel }) {
       importance: 'key',
     },
     {
+      header: 'Role',
+      cell: (i) => view.cases[i].role ?? <span className="text-muted-foreground">–</span>,
+      sortValue: (i) => view.cases[i].role ?? '',
+      importance: 'key',
+    },
+    {
       header: 'Precision',
       cell: (i) => <span className="text-muted-foreground">{view.cases[i].precision}</span>,
       sortValue: (i) => view.cases[i].precision,
