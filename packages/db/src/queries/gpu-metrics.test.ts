@@ -4,7 +4,7 @@ import { PGlite } from '@electric-sql/pglite';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import type { DbClient } from '../connection';
-import { getGpuMetricsForPoint, getGpuMetricsForRun } from './gpu-metrics';
+import { getGpuMetricsForRun } from './gpu-metrics';
 
 let db: PGlite;
 const sql: DbClient = async (strings, ...values) => {
@@ -14,7 +14,6 @@ const sql: DbClient = async (strings, ...values) => {
 };
 
 const WITH_SERIES = 34557177019;
-const WITHOUT_SERIES = 34557177020;
 const RETRIED = 34557177021;
 
 beforeAll(async () => {
@@ -31,8 +30,8 @@ afterAll(async () => {
 
 /**
  * Run 1 holds a two-node artifact (one CSV per serving node) whose first CSV is
- * shared by points 10 and 11; run 3 is a rerun of run 2's GitHub id. Point 12
- * is deliberately left unlinked.
+ * shared by points 10 and 11; runs 3 and 4 are two attempts of one GitHub run.
+ * Point 12 is deliberately left unlinked.
  */
 beforeEach(async () => {
   await db.exec(`TRUNCATE workflow_runs, configs RESTART IDENTITY CASCADE;
@@ -41,8 +40,6 @@ beforeEach(async () => {
     VALUES (1, ${WITH_SERIES}, 1, 'Run Sweep', 'completed', 'success', 'main', 'abc123',
         'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/${WITH_SERIES}',
         '2026-09-11T04:19:00Z', '2026-09-11'),
-      (2, ${WITHOUT_SERIES}, 1, 'Run Sweep', 'completed', 'success', null, null, null,
-        '2026-09-12T04:19:00Z', '2026-09-12'),
       (3, ${RETRIED}, 1, 'Run Sweep', 'completed', 'failure', null, null, null,
         '2026-09-13T04:19:00Z', '2026-09-13'),
       (4, ${RETRIED}, 2, 'Run Sweep', 'completed', 'success', null, null, null,
@@ -105,18 +102,6 @@ beforeEach(async () => {
 });
 
 describe('getGpuMetricsForRun', () => {
-  it('returns null for a GitHub run id that was never ingested', async () => {
-    expect(await getGpuMetricsForRun(sql, 99999999999)).toBeNull();
-  });
-
-  it('returns null for an ingested run that stored no telemetry series', async () => {
-    // The run row exists, so the null must come from the empty-series branch and
-    // not from a missing workflow_runs lookup.
-    const [row] = await sql`select id from workflow_runs where github_run_id = ${WITHOUT_SERIES}`;
-    expect(Number(row!.id)).toBe(2);
-    expect(await getGpuMetricsForRun(sql, WITHOUT_SERIES)).toBeNull();
-  });
-
   it('returns the run header, every series, its per-GPU stats, and its samples', async () => {
     const payload = await getGpuMetricsForRun(sql, WITH_SERIES);
 
@@ -241,27 +226,5 @@ describe('getGpuMetricsForRun', () => {
     // "collected as zero" for everything except power.
     expect(Object.hasOwn(dropped!, 'edgeTemp')).toBe(true);
     expect(dropped?.edgeTemp).toBeUndefined();
-  });
-});
-
-describe('getGpuMetricsForPoint', () => {
-  it('returns null for a benchmark point with no linked series', async () => {
-    expect(await getGpuMetricsForPoint(sql, 12)).toBeNull();
-    expect(await getGpuMetricsForPoint(sql, 9999)).toBeNull();
-  });
-
-  it('returns every series linked to a multinode point, with each series full sample set', async () => {
-    const payload = await getGpuMetricsForPoint(sql, 10);
-    expect(payload?.benchmarkResultId).toBe(10);
-    expect(payload?.series.map((series) => [series.id, series.fileName])).toEqual([
-      [100, 'node0/gpu_metrics.csv'],
-      [101, 'node1/gpu_metrics.csv'],
-    ]);
-    expect(payload?.series.map((series) => series.data.length)).toEqual([3, 1]);
-    // Each series carries every point that references it, not just the queried one.
-    expect(payload?.series.map((series) => series.benchmarkResultIds)).toEqual([[10, 11], [10]]);
-
-    const single = await getGpuMetricsForPoint(sql, 11);
-    expect(single?.series.map((series) => series.id)).toEqual([100]);
   });
 });

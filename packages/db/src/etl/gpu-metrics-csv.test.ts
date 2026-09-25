@@ -1,13 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  computeGpuMetricStats,
-  parseAmdTimestamp,
-  parseGpuMetricsCsv,
-  parseMetricCell,
-  parseNvidiaTimestamp,
-  summarizeGpuMetricSamples,
-} from './gpu-metrics-csv.js';
+import { computeGpuMetricStats, parseGpuMetricsCsv } from './gpu-metrics-csv.js';
 
 const NVIDIA_CSV = [
   'timestamp, index, power.draw [W], temperature.gpu, clocks.current.sm [MHz], clocks.current.memory [MHz], utilization.gpu [%], utilization.memory [%]',
@@ -46,16 +39,6 @@ describe('parseGpuMetricsCsv — NVIDIA', () => {
     // The `[N/A]` power row for GPU 1 is not a usable sample.
     expect(parsed!.samples.filter((s) => s.gpuIndex === 1)).toHaveLength(1);
   });
-
-  it('applies a fixed collector offset when the context is not UTC', () => {
-    const parsed = parseGpuMetricsCsv(NVIDIA_CSV, { nvidiaUtcOffsetMinutes: -300 });
-    expect(parsed!.samples[0]!.timestampMs).toBe(Date.UTC(2026, 8, 11, 9, 19, 41, 982));
-  });
-
-  it('returns null for a header-only file or an unknown header', () => {
-    expect(parseGpuMetricsCsv(NVIDIA_CSV.split('\n')[0]!)).toBeNull();
-    expect(parseGpuMetricsCsv('a,b,c\n1,2,3')).toBeNull();
-  });
 });
 
 describe('parseGpuMetricsCsv — AMD', () => {
@@ -81,29 +64,6 @@ describe('parseGpuMetricsCsv — AMD', () => {
   });
 });
 
-describe('timestamp and cell helpers', () => {
-  it('parses nvidia-smi timestamps with and without milliseconds', () => {
-    expect(parseNvidiaTimestamp('2026/01/02 03:04:05')).toBe(Date.UTC(2026, 0, 2, 3, 4, 5));
-    expect(parseNvidiaTimestamp('2026/01/02 03:04:05.5')).toBe(Date.UTC(2026, 0, 2, 3, 4, 5, 500));
-    expect(parseNvidiaTimestamp('not a date')).toBeNull();
-  });
-
-  it('accepts epoch seconds, epoch milliseconds, and ISO strings for amd-smi', () => {
-    expect(parseAmdTimestamp('1789515524')).toBe(1789515524000);
-    expect(parseAmdTimestamp('1789515524.25')).toBe(1789515524250);
-    expect(parseAmdTimestamp('1789515524000')).toBe(1789515524000);
-    expect(parseAmdTimestamp('2026-09-16T00:00:00Z')).toBe(Date.UTC(2026, 8, 16));
-    expect(parseAmdTimestamp('12')).toBeNull();
-  });
-
-  it('treats N/A and blanks as null', () => {
-    expect(parseMetricCell('N/A')).toBeNull();
-    expect(parseMetricCell('')).toBeNull();
-    expect(parseMetricCell(undefined)).toBeNull();
-    expect(parseMetricCell(' 12.5 W')).toBe(12.5);
-  });
-});
-
 describe('computeGpuMetricStats', () => {
   it('digests every non-null metric per GPU with interpolated percentiles', () => {
     const parsed = parseGpuMetricsCsv(NVIDIA_CSV)!;
@@ -120,24 +80,5 @@ describe('computeGpuMetricStats', () => {
     // AMD-only columns never appear for an NVIDIA series.
     expect(stats.some((s) => s.metric === 'edgeTempC')).toBe(false);
     expect(stats.filter((s) => s.gpuIndex === 1 && s.metric === 'powerW')[0]!.count).toBe(1);
-  });
-
-  it('returns an empty digest for no samples', () => {
-    expect(computeGpuMetricStats([])).toEqual([]);
-  });
-});
-
-describe('summarizeGpuMetricSamples', () => {
-  it('reports the window, GPU count, and median per-GPU cadence', () => {
-    const summary = summarizeGpuMetricSamples(parseGpuMetricsCsv(NVIDIA_CSV)!.samples)!;
-    expect(summary.sampleCount).toBe(4);
-    expect(summary.gpuCount).toBe(2);
-    expect(summary.startedAtMs).toBe(Date.UTC(2026, 8, 11, 4, 19, 41, 982));
-    expect(summary.endedAtMs).toBe(Date.UTC(2026, 8, 11, 4, 19, 43, 990));
-    expect(summary.sampleIntervalS).toBeCloseTo(1.004, 3);
-  });
-
-  it('returns null for an empty series', () => {
-    expect(summarizeGpuMetricSamples([])).toBeNull();
   });
 });

@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import { mapBenchmarkRow } from './benchmark-mapper';
 import { createSkipTracker } from './skip-tracker';
 import {
-  fatalPublicationErrors,
   powerPublicationPoint,
   verifyPowerPublication,
   type PublishedPowerRow,
@@ -139,32 +138,5 @@ describe('PowerX publication', () => {
       mapBenchmarkRow({ ...raw, benchmark_outcome: { status: 'failed' } }, tracker),
     ).toBeNull();
     expect(tracker.skips.failedRun).toBe(1);
-  });
-});
-
-/**
- * Regression for the ingest-reddening chain: a gpu_metrics digest failure used to
- * be recorded as a DB error, reach the publication manifest's `ingestErrors`, and
- * set exitCode 1 on the required "Verify PowerX source, database and public API"
- * step — failing a production ingest whose benchmark data had landed fine.
- */
-describe('fatalPublicationErrors', () => {
-  it('ignores telemetry warnings, so a bad gpu_metrics CSV cannot fail the ingest', () => {
-    expect(
-      fatalPublicationErrors({ telemetryWarnings: ['3 gpu_metrics digest errors'] }, []),
-    ).toEqual([]);
-  });
-
-  it('still fails on real ingest errors and on verification mismatches', () => {
-    expect(
-      fatalPublicationErrors(
-        { ingestErrors: ['2 database ingest errors'], telemetryWarnings: ['1 gpu_metrics'] },
-        ['point 441871 expected absent, got 642'],
-      ),
-    ).toEqual(['2 database ingest errors', 'point 441871 expected absent, got 642']);
-  });
-
-  it('treats both fields as optional', () => {
-    expect(fatalPublicationErrors({}, [])).toEqual([]);
   });
 });

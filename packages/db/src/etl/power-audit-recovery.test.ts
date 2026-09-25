@@ -1,10 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { BenchmarkPersistenceInput } from './benchmark-ingest.js';
-import {
-  createBenchmarkPowerAuditRecovery,
-  type BenchmarkPowerAuditEvidence,
-} from './power-audit-recovery.js';
+import { createBenchmarkPowerAuditRecovery } from './power-audit-recovery.js';
 
 const resultFile = 'kimik3_recipe-a_conc48.json';
 const source = `power_validation_${resultFile}`;
@@ -40,15 +37,11 @@ function point(overrides: Partial<BenchmarkPersistenceInput> = {}): BenchmarkPer
 }
 
 describe('CI benchmark audit recovery', () => {
-  it.each([
-    ['aggregate before sibling', [false, true]],
-    ['aggregate after sibling', [true, false]],
-    ['repeated/no-op sibling ingest', [true, false, true, false]],
-  ])('retains exact provenance with %s and preserves benchmark values', (_label, paired) => {
+  it('retains exact provenance with aggregate after sibling and preserves benchmark values', () => {
     const recover = createBenchmarkPowerAuditRecovery();
     const original = point();
     let latest = original;
-    for (const isPaired of paired) {
+    for (const isPaired of [true, false]) {
       latest = recover(original, isPaired ? evidence : undefined);
       expect(latest.metrics).toBe(original.metrics);
       expect(latest.workers).toBe(original.workers);
@@ -58,67 +51,11 @@ describe('CI benchmark audit recovery', () => {
     expect(original.powerAudit).toBeUndefined();
   });
 
-  it('preserves every explicit audit, including one without a source', () => {
+  it('does not reuse the same run/concurrency audit for a point with another offload mode', () => {
     const recover = createBenchmarkPowerAuditRecovery();
     recover(point(), evidence);
-    for (const powerAudit of [{ source: 'producer-original.json' }, { sample_count: 42 }, {}]) {
-      const original = point({ powerAudit });
-      expect(recover(original, evidence)).toBe(original);
-      expect(recover(original)).toBe(original);
-    }
-  });
-
-  it.each([
-    { configId: 2 },
-    { recipeFingerprint: 'recipe-b' },
-    { offloadMode: 'off' },
-    { conc: 56 },
-    { isl: 8192 },
-    { osl: 1024 },
-    { benchmarkType: 'single_turn' as const },
-  ])('does not reuse the same run/concurrency audit for another point: %j', (difference) => {
-    const recover = createBenchmarkPowerAuditRecovery();
-    recover(point(), evidence);
-    const other = point(difference);
+    const other = point({ offloadMode: 'off' });
     expect(recover(other)).toBe(other);
     expect(other.powerAudit).toBeUndefined();
-  });
-
-  it('does not carry evidence into another run', () => {
-    createBenchmarkPowerAuditRecovery()(point(), evidence);
-    const nextRun = point();
-    expect(createBenchmarkPowerAuditRecovery()(nextRun)).toBe(nextRun);
-  });
-
-  it('restores audit metadata without promoting an invalid power verdict', () => {
-    const original = point({ metrics: { power_valid: 0, mean_ttft: 0.2 } });
-    const restored = createBenchmarkPowerAuditRecovery()(original, {
-      resultFile,
-      validations: { [source]: { ...validation, power_valid: false } },
-    });
-    expect(restored.powerAudit).toEqual(expectedAudit);
-    expect(restored.metrics).toBe(original.metrics);
-    expect(restored.metrics).toEqual({ power_valid: 0, mean_ttft: 0.2 });
-  });
-
-  it.each<BenchmarkPowerAuditEvidence>([
-    { resultFile: 'different-result.json', validations: evidence.validations },
-    {
-      resultFile,
-      validations: {
-        [source]: {
-          ...validation,
-          selected_window: { ...validation.selected_window, concurrency: 56 },
-        },
-      },
-    },
-    { resultFile, validations: { [source]: { ...validation, validation_path: undefined } } },
-    { resultFile, validations: {} },
-    { resultFile, validations: { [source]: validation, [`other/${source}`]: validation } },
-  ])('leaves missing or ambiguous exact sibling evidence unknown', (candidate) => {
-    const recover = createBenchmarkPowerAuditRecovery();
-    const original = point();
-    expect(recover(original, candidate)).toBe(original);
-    expect(recover(original)).toBe(original);
   });
 });

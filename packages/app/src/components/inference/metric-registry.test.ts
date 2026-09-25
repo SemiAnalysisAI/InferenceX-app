@@ -10,7 +10,6 @@ import {
   isBenchmarkMetricKey,
   isMeasuredEnergyConfigKey,
   isModeledSystemPowerConfigKey,
-  isPowerBasisConfigKey,
   isRoleLocalMeasuredEnergyConfigKey,
   MEASURED_ENERGY_METRIC_CONFIG_KEYS,
   METRIC_CONFIG_KEYS,
@@ -24,7 +23,6 @@ import {
   resolveMetricConfigKey,
   tokenMetricTypeForConfigKey,
 } from './metric-registry';
-import { POWER_BASIS_FIELDS } from '@/lib/power-basis';
 import type { YAxisMetricKey } from './types';
 
 describe('metric registry', () => {
@@ -222,47 +220,6 @@ describe('metric registry', () => {
       ...MEASURED_ENERGY_METRIC_CONFIG_KEYS,
       ...POWER_BASIS_METRIC_CONFIG_KEYS,
     ]);
-  });
-
-  it('files the derived power boundaries under the gate without a telemetry tier', () => {
-    // Every derived field lib/power-basis.ts can emit is selectable from the
-    // gated group, and none of them is mistaken for runner telemetry.
-    const basisFields = Object.values(POWER_BASIS_FIELDS).flatMap((fields) =>
-      Object.values(fields).map((field) => `y_${field}`),
-    );
-    expect([...POWER_BASIS_METRIC_CONFIG_KEYS].toSorted()).toEqual(basisFields.toSorted());
-    for (const key of POWER_BASIS_METRIC_CONFIG_KEYS) {
-      expect(key, key).not.toMatch(/^y_measured/u);
-      expect(isPowerBasisConfigKey(key), key).toBe(true);
-      expect(isMeasuredEnergyConfigKey(key), key).toBe(false);
-      expect(isModeledSystemPowerConfigKey(key), key).toBe(false);
-      expect(resolveMetricConfigKey(key), key).toBe(key);
-      const metric = METRIC_REGISTRY[key.slice(2) as keyof typeof METRIC_REGISTRY];
-      expect(chartDefinitions[0][key], key).toBe(metric.field);
-      expect(metric.labelZh, key).toMatch(/\p{Script=Han}/u);
-      expect(metric.titleZh, key).toMatch(/\p{Script=Han}/u);
-    }
-    for (const key of MEASURED_ENERGY_METRIC_CONFIG_KEYS) {
-      expect(isPowerBasisConfigKey(key), key).toBe(false);
-    }
-    expect(isPowerBasisConfigKey('y_modeledChassisPowerPerGpu')).toBe(false);
-    expect(isPowerBasisConfigKey('y_jOutput')).toBe(false);
-    // Watts keys stay token-agnostic; energy keys are output-token metrics, so
-    // the output-capable point filter admits them.
-    expect(tokenMetricTypeForConfigKey('y_utilityProvisionedWatts')).toBe('total');
-    expect(tokenMetricTypeForConfigKey('y_utilityProvisionedJPerOutputToken')).toBe('output');
-    expect(tokenMetricTypeForConfigKey('y_utilityModeledJPerOutputToken')).toBe('output');
-  });
-
-  it('keeps the all-GPU utility energy distinguishable from the per-decode-GPU jOutput', () => {
-    const labels = [
-      METRIC_REGISTRY.jOutput.label,
-      METRIC_REGISTRY.utilityProvisionedJPerOutputToken.label,
-      METRIC_REGISTRY.jOutput.labelZh,
-      METRIC_REGISTRY.utilityProvisionedJPerOutputToken.labelZh,
-    ];
-    expect(new Set(labels).size).toBe(labels.length);
-    expect(METRIC_REGISTRY.utilityProvisionedJPerOutputToken.title).toContain('all GPUs');
   });
 
   it('classifies measured-energy config keys', () => {

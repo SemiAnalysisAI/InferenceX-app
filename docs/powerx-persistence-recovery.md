@@ -213,18 +213,6 @@ bun run check:typography
 bun run --cwd packages/app test:unit src/app/api/v1/gpu-metrics-point/route.test.ts
 bun run --cwd packages/app test:unit src/app/api/v1/views/gpu-metrics/route.test.ts
 bun run --cwd packages/db test:unit src/queries/gpu-metrics-timeline.test.ts src/etl/telemetry-receipt.test.ts
-bun run --cwd packages/app test:e2e:component --spec cypress/component/gpu-stats-table.cy.tsx
-```
-
-The focused browser driver creates a disposable localhost PostgreSQL database, ingests
-NVIDIA/AMD/multinode artifacts, starts Next without a GitHub token, and enables the real
-Blob SDK against a local HTTP fixture. It writes logs, screenshots and receipts, then stops
-its owned processes. It uses ports 3137/3138 and requires PostgreSQL 17 tools. Run with a
-fresh output directory while no other dev server is using this checkout's `.next` directory:
-
-```sh
-cd packages/app
-POWERX_PG_BIN=/path/to/postgresql/bin bun scripts/powerx-db-acceptance.ts /absolute/fresh/output
 ```
 
 The ordinary fixture-backed smoke command remains `bun run test:e2e` with an

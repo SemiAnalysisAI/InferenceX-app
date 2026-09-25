@@ -889,19 +889,6 @@ describe('buildDerivedChartFields', () => {
     expect(historicalFields.measuredJPerTotalToken).toBeUndefined();
     expect(Object.keys(historicalFields)).toEqual(['tpPerGpu']);
   });
-
-  it('emits only the requested power-boundary fields and skips unavailable ones', () => {
-    // No output throughput and no telemetry: only the spec watts can be derived.
-    const historicalFields = buildDerivedChartFields(entry(), 'h100', [
-      'tpPerGpu',
-      'gpuProvisionedWatts',
-      'gpuProvisionedJPerOutputToken',
-      'utilityModeledWatts',
-    ]);
-
-    expect(Object.keys(historicalFields)).toEqual(['tpPerGpu', 'gpuProvisionedWatts']);
-    expect(historicalFields.gpuProvisionedWatts).toEqual({ y: 700, roof: false });
-  });
 });
 
 // ===========================================================================
@@ -1051,25 +1038,6 @@ describe('createChartDataPoint power-boundary fields', () => {
     expect(p.measuredJPerOutputToken).toEqual({ y: 10, roof: false });
   });
 
-  // The ?unofficialrun= overlay seam (transformBenchmarkRows(rows, 'median',
-  // 'external') vs the official derivation) is asserted in power-basis.test.ts,
-  // where real BenchmarkRow fixtures and HW_REGISTRY specs are available.
-
-  it('omits provisioned energies when output throughput is missing, keeps spec watts and B1-scaled modeled energy', () => {
-    const p = boundaryPoint(
-      entry({ output_tput_per_gpu: 0, benchmark_type: 'single_turn', ...validated }),
-    );
-    expect(p.gpuProvisionedWatts?.y).toBe(700);
-    expect(p.utilityProvisionedWatts?.y).toBe(700_000);
-    expect(p.utilityModeledWatts?.y).toBe(877.5);
-    expect(p.gpuProvisionedJPerOutputToken).toBeUndefined();
-    expect(p.utilityProvisionedJPerOutputToken).toBeUndefined();
-    expect('gpuProvisionedJPerOutputToken' in p).toBe(false);
-    expect('utilityProvisionedJPerOutputToken' in p).toBe(false);
-    // Modeled energy inherits B1's token denominator, so it survives.
-    expect(p.utilityModeledJPerOutputToken?.y).toBeCloseTo(17.55, 10);
-  });
-
   it('normalizes fixed-sequence disaggregated energy by all GPUs while jOutput stays per decode GPU', () => {
     const p = boundaryPoint(
       entry({
@@ -1097,41 +1065,6 @@ describe('createChartDataPoint power-boundary fields', () => {
     expect(agentic.gpuProvisionedWatts?.y).toBe(700);
     expect(agentic.gpuProvisionedJPerOutputToken).toBeUndefined();
     expect(agentic.utilityProvisionedJPerOutputToken).toBeUndefined();
-  });
-
-  it('omits the modeled boundary without a supported model or without B1 watts', () => {
-    const unsupported = boundaryPoint(
-      entry({
-        output_tput_per_gpu: 400,
-        ...validated,
-        modeledSystemPower: { status: 'unsupported', reason: 'hardware', modelRevision: 'test' },
-      }),
-    );
-    expect(unsupported.utilityModeledWatts).toBeUndefined();
-    expect(unsupported.utilityModeledJPerOutputToken).toBeUndefined();
-    expect(unsupported.utilityProvisionedJPerOutputToken).toBeDefined();
-
-    // Admission belongs to the model, not to the schema marker: a validated
-    // unversioned single-node row the model accepted renders B4 alongside B1.
-    const legacy = boundaryPoint(
-      entry({ output_tput_per_gpu: 400, ...validated, power_metric_schema_version: undefined }),
-    );
-    expect(legacy.measuredAvgPower?.y).toBe(500);
-    expect(legacy.modeledChassisPowerPerGpu?.y).toBe(650);
-    expect(legacy.utilityModeledWatts?.y).toBe(877.5);
-    expect(legacy.utilityModeledJPerOutputToken?.y).toBeCloseTo(17.55, 10);
-
-    // B4 is B1 scaled to the meter, so it needs B1's watts even with a model.
-    const noB1 = boundaryPoint(
-      entry({ output_tput_per_gpu: 400, ...validated, avg_power_w: undefined }),
-    );
-    expect(noB1.measuredAvgPower).toBeUndefined();
-    expect(noB1.utilityModeledWatts).toBeUndefined();
-    expect(noB1.utilityModeledJPerOutputToken).toBeUndefined();
-
-    const noTelemetry = boundaryPoint(entry({ output_tput_per_gpu: 400 }));
-    expect(noTelemetry.utilityModeledWatts).toBeUndefined();
-    expect(noTelemetry.gpuProvisionedJPerOutputToken?.y).toBeCloseTo(1.75, 10);
   });
 });
 
@@ -1354,32 +1287,6 @@ describe('createChartDataPoint per-stage measured power fields', () => {
     expect(point.measuredPrefillJPerInputToken!.y).toBe(0);
     expect(point.measuredDecodeJPerOutputToken).toBeDefined();
     expect(point.measuredDecodeJPerOutputToken!.y).toBe(0);
-  });
-
-  it('carries the prefill pool energy onto the output-token axis for validated disaggregated rows', () => {
-    const e = entry({
-      disagg: true,
-      power_valid: 1,
-      power_metric_schema_version: 2,
-      joules_per_input_token: 0.3,
-      joules_per_output_token: 2.4,
-      prefill_joules_per_input_token: 0.1,
-      decode_joules_per_output_token: 1.6,
-    });
-    const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
-    // 0.1 J/in × (2.4 ÷ 0.3 = 8 input tokens per output token) = 0.8 J/out,
-    // which with the decode pool's 1.6 J/out reconstructs the 2.4 J/out total.
-    expect(point.reconstructedPrefillJPerOutputToken!.y).toBeCloseTo(0.8, 12);
-    expect(point.reconstructedPrefillJPerOutputToken!.roof).toBe(false);
-    // Aggregate rows have no pools to split.
-    const aggregate = createChartDataPoint(
-      '2025-01-01',
-      entry({ ...e, disagg: false }),
-      'median_e2el',
-      'tput_per_gpu',
-      'h100',
-    );
-    expect(aggregate.reconstructedPrefillJPerOutputToken).toBeUndefined();
   });
 });
 

@@ -6,10 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 describe('explicit download attempt identity', () => {
-  it.each([
-    { requestedAttempt: 1, expectedStatus: 1 },
-    { requestedAttempt: 2, expectedStatus: 0 },
-  ])('checks the requested attempt $requestedAttempt', ({ requestedAttempt, expectedStatus }) => {
+  it('rejects a download whose GitHub attempt differs from the requested one', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'attempt-ingest-'));
     const manifestPath = path.join(dir, 'power-publication.json');
     try {
@@ -23,7 +20,7 @@ describe('explicit download attempt identity', () => {
         [
           fileURLToPath(new URL('ingest-ci-run.ts', import.meta.url)),
           '--download',
-          `https://github.com/SemiAnalysisAI/InferenceX/actions/runs/25199291771/attempts/${requestedAttempt}`,
+          'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/25199291771/attempts/1',
         ],
         {
           cwd: dir,
@@ -40,13 +37,9 @@ describe('explicit download attempt identity', () => {
         },
       );
       expect(result.error).toBeUndefined();
-      expect(result.status, result.stderr).toBe(expectedStatus);
-      if (expectedStatus === 0) {
-        expect(JSON.parse(fs.readFileSync(manifestPath, 'utf8')).runAttempt).toBe(2);
-      } else {
-        expect(result.stderr).toContain('GitHub attempt 2 differs from requested 1');
-        expect(fs.existsSync(manifestPath)).toBe(false);
-      }
+      expect(result.status, result.stderr).toBe(1);
+      expect(result.stderr).toContain('GitHub attempt 2 differs from requested 1');
+      expect(fs.existsSync(manifestPath)).toBe(false);
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }

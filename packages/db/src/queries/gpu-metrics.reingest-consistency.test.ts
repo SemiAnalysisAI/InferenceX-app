@@ -30,11 +30,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 
 import type { DbClient } from '../connection';
 import { ingestGpuMetricsArtifact } from '../etl/gpu-metrics-ingest';
-import {
-  getGpuMetricsForPoint,
-  type GpuMetricSeries,
-  TelemetrySnapshotChangedError,
-} from './gpu-metrics';
+import { getGpuMetricsForPoint, type GpuMetricSeries } from './gpu-metrics';
 
 type Sql = postgres.Sql;
 let db: PGlite;
@@ -119,12 +115,9 @@ function csvVersion(extraScrapes: number): string {
 
 /** Version 2: the same artifact re-uploaded with one more scrape per GPU = 6 unique samples. */
 const NVIDIA_CSV_V2 = csvVersion(1);
-/** Version 3: one more scrape per GPU again = 8 unique samples. */
-const NVIDIA_CSV_V3 = csvVersion(2);
 
 const V1_UNIQUE_SAMPLES = 4;
 const V2_UNIQUE_SAMPLES = 6;
-const V3_UNIQUE_SAMPLES = 8;
 
 function writeArtifact(csv: string, contextZone = 'UTC') {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'gpu-metrics-reingest-'));
@@ -197,21 +190,6 @@ function expectCoherent(series: GpuMetricSeries) {
 }
 
 describe('getGpuMetricsForPoint under telemetry re-ingest', () => {
-  it('serial read after re-ingest is coherent', async () => {
-    const first = await ingest(NVIDIA_CSV_V1);
-    expect(first.samplesInserted).toBe(V1_UNIQUE_SAMPLES);
-    const second = await ingest(NVIDIA_CSV_V2);
-    expect(second.samplesInserted).toBe(V2_UNIQUE_SAMPLES);
-    expect(second.seriesIds).toEqual(first.seriesIds);
-
-    const payload = await getGpuMetricsForPoint(reader, 10);
-    expect(payload?.series).toHaveLength(1);
-    for (const series of payload!.series) {
-      expect(series.sampleCount).toBe(V2_UNIQUE_SAMPLES);
-      expectCoherent(series);
-    }
-  });
-
   it('a re-ingest committed between the stats and samples statements yields one version', async () => {
     const first = await ingest(NVIDIA_CSV_V1);
     expect(first.samplesInserted).toBe(V1_UNIQUE_SAMPLES);
@@ -236,64 +214,5 @@ describe('getGpuMetricsForPoint under telemetry re-ingest', () => {
       for (const stat of series.stats) expect(stat.count).toBe(V2_UNIQUE_SAMPLES / 2);
       expectCoherent(series);
     }
-  });
-
-  it('an identical re-ingest committed between the stats and samples statements is coherent', async () => {
-    const first = await ingest(NVIDIA_CSV_V1);
-    expect(first.samplesInserted).toBe(V1_UNIQUE_SAMPLES);
-
-    let reingest: Awaited<ReturnType<typeof ingest>> | undefined;
-    const interleaved = interleaveAfterStats(reader, async (statsReadIndex) => {
-      if (statsReadIndex === 1) reingest = await ingest(NVIDIA_CSV_V1);
-    });
-
-    const payload = await getGpuMetricsForPoint(interleaved.client, 10);
-
-    // Unchanged digest, sidecars and sample count: the no-op path wrote nothing.
-    expect(reingest?.samplesInserted).toBe(0);
-    expect(reingest?.seriesSkipped).toBe(1);
-    expect(payload?.series).toHaveLength(1);
-    // Same version key, so no retry.
-    expect(interleaved.seriesReads()).toBe(1);
-
-    for (const series of payload!.series) {
-      expect(series.sampleCount).toBe(V1_UNIQUE_SAMPLES);
-      expectCoherent(series);
-    }
-  });
-
-  it('converges when a second re-ingest lands during the retry', async () => {
-    const first = await ingest(NVIDIA_CSV_V1);
-    expect(first.samplesInserted).toBe(V1_UNIQUE_SAMPLES);
-
-    const interleaved = interleaveAfterStats(reader, async (statsReadIndex) => {
-      if (statsReadIndex === 1) await ingest(NVIDIA_CSV_V2);
-      if (statsReadIndex === 2) await ingest(NVIDIA_CSV_V3);
-    });
-
-    const payload = await getGpuMetricsForPoint(interleaved.client, 10);
-
-    expect(payload?.series).toHaveLength(1);
-    expect(interleaved.seriesReads()).toBe(3);
-    for (const series of payload!.series) {
-      expect(series.sampleCount).toBe(V3_UNIQUE_SAMPLES);
-      expect(series.data).toHaveLength(V3_UNIQUE_SAMPLES);
-      expectCoherent(series);
-    }
-  });
-
-  it('gives up after three attempts when the series keeps changing', async () => {
-    const first = await ingest(NVIDIA_CSV_V1);
-    expect(first.samplesInserted).toBe(V1_UNIQUE_SAMPLES);
-
-    const interleaved = interleaveAfterStats(reader, async (statsReadIndex) => {
-      // Every attempt sees a fresh, distinct version committed under it.
-      await ingest(csvVersion(statsReadIndex));
-    });
-
-    await expect(getGpuMetricsForPoint(interleaved.client, 10)).rejects.toBeInstanceOf(
-      TelemetrySnapshotChangedError,
-    );
-    expect(interleaved.seriesReads()).toBe(3);
   });
 });

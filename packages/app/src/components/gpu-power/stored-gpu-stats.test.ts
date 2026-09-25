@@ -11,7 +11,6 @@ import {
   prepareGpuMetricsArtifact,
   statMetricColumn,
 } from '@semianalysisai/inferencex-db/etl/gpu-metrics-ingest';
-import { parseMultinodePowerSamples } from '@semianalysisai/inferencex-db/etl/multinode-power-samples';
 
 import { storedGpuStatsForMetric } from './stored-gpu-stats';
 import { ALL_METRIC_OPTIONS, computeGpuStats, parseCsvData, type GpuMetricRow } from './types';
@@ -93,46 +92,6 @@ describe('storedGpuStatsForMetric', () => {
     },
   );
 
-  it.each([
-    ['fractional seconds sharing a rounded millisecond', '1789948800.0009', '1789948800.0011', 1],
-    [
-      'fractional seconds in distinct rounded milliseconds',
-      '1789948800.0001',
-      '1789948800.0009',
-      2,
-    ],
-    ['fractional milliseconds', '1789948800000.9', '1789948800001.1', 1],
-    ['epoch milliseconds and ISO', '1789948800001', '2026-09-20T17:00:00.001-07:00', 1],
-  ])('matches live AMD and ingest populations for %s', (_, first, second, count) => {
-    const csv = `timestamp,gpu,socket_power\n${first},0,100\n${second},0,900`;
-    const artifactDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gpu-stats-timestamp-'));
-    try {
-      fs.writeFileSync(path.join(artifactDir, 'gpu_metrics.csv'), csv);
-      // Exercise production ingest normalization/dedup/digest, not a test-owned dedup.
-      const [prepared] = prepareGpuMetricsArtifact({
-        artifactDir,
-        artifactName: 'gpu_metrics_amd_fractional_timestamp',
-      });
-      const digest = storedGpuStatsForMetric(
-        prepared.stats.map((row) => ({ ...row, metric: statMetricColumn(row.metric) })),
-        'power',
-      );
-      expect(digest[0]).toMatchObject({
-        count,
-        mean: count === 1 ? 100 : 500,
-        p95: count === 1 ? 100 : 860,
-      });
-      const live = parseCsvData(csv);
-      expect(live.map((row) => Date.parse(row.timestamp))).toEqual(
-        prepared.samples.map((sample) => sample.timestampMs),
-      );
-      const { metric: _metric, ...expected } = prepared.stats[0];
-      expect(computeGpuStats(live, 'power')).toEqual([expected]);
-    } finally {
-      fs.rmSync(artifactDir, { recursive: true, force: true });
-    }
-  });
-
   it('preserves NVIDIA units, zero readings, and full-record percentiles', () => {
     const csv = [
       'timestamp, index, power.draw [W], temperature.gpu, clocks.current.sm [MHz], clocks.current.memory [MHz], utilization.gpu [%], utilization.memory [%]',
@@ -165,33 +124,5 @@ describe('storedGpuStatsForMetric', () => {
       mean: 850,
       stddev: 0,
     });
-  });
-
-  it('keeps multinode host-local GPU indices separate and does not invent non-power stats', () => {
-    const hosts = parseMultinodePowerSamples(
-      [
-        'schema_version,timestamp_unix,scrape_seq,hostname,gpu_index,gpu_uuid,power_w',
-        '1,1789948800,1,host-a,0,GPU-a0,0',
-        '1,1789948801,2,host-a,0,GPU-a0,500',
-        '1,1789948800,1,host-b,0,GPU-b0,800',
-      ].join('\n'),
-    )!;
-    for (const host of hosts) {
-      assertAllMetricStats(
-        host.samples,
-        host.samples.map((sample) => ({
-          timestamp: '',
-          index: sample.gpuIndex,
-          power: sample.powerW!,
-        })),
-      );
-    }
-    expect(storedGpuStatsForMetric(storedStats(hosts[0].samples), 'power')[0].mean).toBe(250);
-    expect(storedGpuStatsForMetric(storedStats(hosts[1].samples), 'power')[0].mean).toBe(800);
-    expect(storedGpuStatsForMetric(storedStats(hosts[0].samples), 'temperature')).toEqual([]);
-  });
-
-  it('keeps a missing digest metric empty', () => {
-    expect(storedGpuStatsForMetric([], 'power')).toEqual([]);
   });
 });

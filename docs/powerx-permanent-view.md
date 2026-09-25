@@ -19,8 +19,7 @@ The Measured Energy group is `gated: true` in `metric-registry.ts`. `ChartContro
 gated group while the gate is locked unless the selected `i_metric` belongs to it, so a
 shared link to any boundary renders for a reader who never unlocked the gate, while the
 group stays out of the selector otherwise. The boundary metrics are members of that group
-(`POWER_BASIS_METRIC_CONFIG_KEYS` is spread into it) so they inherit exactly this behaviour;
-Cypress `powerx-basis.cy.ts` covers the locked, unlocked and shared-link cases.
+(`POWER_BASIS_METRIC_CONFIG_KEYS` is spread into it) so they inherit exactly this behaviour.
 
 ## Boundaries
 
@@ -274,30 +273,14 @@ config is `display: 'timeline'`.
 
 ## Tests
 
-- `metric-registry.test.ts` — the six keys are in the gated group, resolve as themselves, are
-  bilingual, are not `measured*` keys, and map 1:1 onto `POWER_BASIS_FIELDS`.
-- `measured-metric-config.test.ts` — basis round-trips, snapping, return-to-measured, family
-  switch.
-- `measured-power-direction.test.ts` — watt keys share the measured corners and ascending
-  table sort, are power-curve metrics (upper envelope keeps the dominated peak) but not
-  measured-power-curve metrics; energy keys use the Pareto frontier and stay off the envelope.
-- `cypress/component/power-metric-availability.cy.tsx` — per-point explanations (en/zh)
-  including `noSpec`, `noNormalization`, `modelWorkload`, the overlay-aware count, and the
-  measured dictionary staying separate from the boundary dictionary.
-- `cypress/e2e/powerx-basis.cy.ts`, `measured-power-overlay.cy.ts` — control, URL, table,
-  `/zh`, overlay run.
-- `power-series.test.ts` — UTC timestamp parsing, one-second bucketing with `null` gaps, pool
-  sums.
-- `power-audit-bundle.test.ts` — cutting a DCGM bundle into per-validation series: window
-  clipping, device order and roles (validation file, manifest fallback), malformed entries.
-- `utils/powerTimeline.test.ts` — artifact-name and `source` joins, trace keys, per-run request
-  planning with the common prefix, missing rows, window phases, role pools, the focus store.
-- `api/gpu-metrics/route.test.ts` — `series=power` shape, `prefix=` narrowing the downloads
-  (both ways for bundles), the bundle size cap, the raw shape ignoring bundles, 400s for
-  malformed params.
-- `cypress/component/power-timeline.cy.tsx` — traces, emphasized window, TDP / all-in
-  references, per-GPU lines, pool lines with per-pool TDP, the focus chip, axis toggle,
-  overlay-run colour and filter, failed run, `/zh`.
-- `cypress/e2e/powerx-timeline.cy.ts` — Display → Timeline round trip through the share link,
-  shared-link entry, Table view on the alias, `?unofficialrun=` overlay traces, _View power
-  trace_ from a pinned tooltip (official and overlay), `/zh`.
+- `lib/power-basis.test.ts` and `lib/chart-utils.test.ts` — the six boundary values through
+  the real builder, and the same fields on `?unofficialrun=` overlay rows.
+- `gpu-power/power-series.test.ts`, `power-audit-bundle.test.ts` — one-second buckets with
+  `null` gaps, a partial pool is a gap rather than a lower sum, and bundle rows stay on their
+  host/device and role inside the padded window.
+- `utils/powerTimeline.test.ts` — overlay runs are fetched ahead of official runs.
+- `api/gpu-metrics/route*.test.ts` — the stored digest shape, DB-first serving, database
+  failure as 503, known missing hosts, and the retained-inventory recount before a CSV
+  fallback.
+- `cypress/component/power-timeline.cy.tsx`, `power-compare.cy.tsx` — overlay-run colour and
+  the overlay hardware filter.
