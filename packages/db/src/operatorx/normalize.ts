@@ -26,6 +26,8 @@ export interface OperatorXResult {
   testlist: string;
   opType: string;
   name: string | null;
+  /** Models or shape sets the case comes from (`op.sources`, else `op.name`). */
+  sources: string[];
   backend: string;
   shard: string;
   cluster: string | null;
@@ -124,6 +126,12 @@ function timingShape(metrics: Obj): OperatorXTimingShape | null {
   };
 }
 
+function caseSources(op: Obj): string[] {
+  if (Array.isArray(op.sources))
+    return op.sources.filter((s): s is string => typeof s === 'string');
+  return typeof op.name === 'string' ? [op.name] : [];
+}
+
 function toStatus(v: unknown): OperatorXStatus {
   return v === 'ok' || v === 'unsupported' ? v : 'error';
 }
@@ -175,6 +183,7 @@ export function normalizeBundle(bundle: OperatorXRawBundle): Normalized {
             testlist,
             opType: type,
             name: typeof op.name === 'string' ? op.name : null,
+            sources: caseSources(op),
             backend,
             shard: shard.id,
             cluster,
@@ -219,6 +228,7 @@ export function normalizeBundle(bundle: OperatorXRawBundle): Normalized {
             testlist: String(c.testlist ?? ''),
             opType: type,
             name: typeof shape.name === 'string' ? shape.name : null,
+            sources: caseSources({ ...shape, ...c }),
             backend,
             shard: String(cell.id ?? ''),
             cluster: typeof cell.cluster === 'string' ? cell.cluster : null,

@@ -167,17 +167,6 @@ export const VIEW_QUERY_PARAMS = {
     'xmetric',
     'xmode',
   ],
-  operatorx: [
-    'backend',
-    'cluster',
-    'metric',
-    'operator',
-    'page',
-    'precision',
-    'runId',
-    'shape',
-    'status',
-  ],
   options: ['format'],
   overview: ['compare', 'engine', 'format', 'hwrows', 'models', 'ref', 'rows', 'tier'],
   'profit-estimator': [
@@ -265,7 +254,10 @@ export const DASHBOARD_API_COVERAGE = {
   reliability: { view: 'reliability' },
   'gpu-specs': { view: 'gpu-specs' },
   submissions: { view: 'submissions' },
-  operatorx: { view: 'operatorx' },
+  operatorx: {
+    exclusion:
+      'Hidden OperatorX explorer is being redesigned; its read-only view returns with the new page.',
+  },
   collectivex: { view: 'collectivex' },
   'gpu-metrics': { view: 'gpu-metrics' },
   'current-inferencex-image': { view: 'current-inferencex-image' },

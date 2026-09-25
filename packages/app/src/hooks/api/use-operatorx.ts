@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 
 import type { OperatorXRunRef } from '@semianalysisai/inferencex-db/operatorx/bundle';
+import type { ComparisonOp, ComparisonView } from '@semianalysisai/inferencex-db/operatorx/compare';
 import type {
   OperatorXDataset,
   OperatorXResultDetail,
@@ -38,5 +39,17 @@ export function useOperatorXResult(runId: string | null, index: number | null) {
       get<OperatorXResultDetail>(`/api/v1/operatorx/runs/${runId}/results/${index}`, signal),
     enabled: Boolean(runId) && index !== null,
     staleTime: 5 * 60_000,
+  });
+}
+
+export function useOperatorXComparison(op: ComparisonOp | null, workload: string | null) {
+  const params = new URLSearchParams({ op: op ?? '' });
+  if (workload) params.set('workload', workload);
+  return useQuery({
+    queryKey: ['operatorx', 'compare', op, workload],
+    queryFn: ({ signal }) => get<ComparisonView>(`/api/v1/operatorx/compare?${params}`, signal),
+    enabled: op !== null,
+    staleTime: 5 * 60_000,
+    placeholderData: (previous) => (previous?.op === op ? previous : undefined),
   });
 }

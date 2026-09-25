@@ -103,3 +103,69 @@ export function usefulFlops(type: string, a: Args): number | null {
   }
   return null;
 }
+
+const ELEMENT_BYTES: Record<string, number> = {
+  fp32: 4,
+  bf16: 2,
+  fp16: 2,
+  e4m3: 1,
+  e5m2: 1,
+  int8: 1,
+  e2m1: 0.5,
+  int4: 0.5,
+};
+const SCALE_BYTES: Record<string, number> = { fp32: 4, bf16: 2, fp16: 2, e4m3: 1, ue8m0: 1 };
+
+/** Bytes of an operand descriptor over a rows×cols tensor: elements plus scales. */
+function operandBytes(d: Args | null, rows: number, cols: number, stored = true): number {
+  if (!d) return rows * cols * 2;
+  const dtype = str(stored ? d.dtype : (d.input ?? 'bf16')) ?? 'bf16';
+  let bytes = rows * cols * (ELEMENT_BYTES[dtype] ?? 2);
+  if (!stored) return bytes;
+  for (const key of ['scale', 'scale2']) {
+    const s = obj(d[key]);
+    const g = s && Array.isArray(s.group) ? (s.group as number[]) : null;
+    if (!s || !g) continue;
+    const r = g[0] === -1 ? rows : g[0];
+    const c = g[1] === -1 ? cols : g[1];
+    bytes += Math.ceil(rows / r) * Math.ceil(cols / c) * (SCALE_BYTES[str(s.dtype) ?? ''] ?? 4);
+  }
+  return bytes;
+}
+
+/**
+ * Minimum bytes one op call must move to/from memory: each input read once, output
+ * written once. GEMM reads A as it enters the op (bf16 unless pre-quantized) and B as
+ * stored. MoE reads the weights of the experts the tokens are expected to touch
+ * (E·(1-(1-k/E)^T) distinct experts under uniform routing), the shared experts and
+ * the router, plus the activations in and out.
+ */
+export function usefulBytes(type: string, a: Args): number | null {
+  if (type === 'gemm') {
+    const [m, n, k] = [num(a.m), num(a.n), num(a.k)];
+    if (!m || !n || !k) return null;
+    const out = ELEMENT_BYTES[str(a.out) ?? 'bf16'] ?? 2;
+    return operandBytes(obj(a.a), m, k, false) + operandBytes(obj(a.b), n, k) + m * n * out;
+  }
+  if (type === 'moe') {
+    const ex = obj(a.experts);
+    const [t, h] = [num(a.tokens), num(a.hidden)];
+    if (!ex || !t || !h) return null;
+    const [e, k, i] = [num(ex.num), num(ex.top_k), num(ex.inter)];
+    if (!e || !k || !i) return null;
+    const w = num(ex.latent) ?? h;
+    const q = obj(ex.quant) ?? {};
+    const touched = e * (1 - (1 - k / e) ** t);
+    let bytes = touched * (operandBytes(obj(q.w13), 2 * i, w) + operandBytes(obj(q.w2), w, i));
+    bytes += h * e * 2 + 2 * t * h * 2;
+    if (num(ex.latent)) bytes += 2 * h * w * 2;
+    const sh = obj(a.shared);
+    if (sh && num(sh.count) && num(sh.inter)) {
+      const sq = obj(sh.quant) ?? {};
+      const si = (sh.inter as number) * (sh.count as number);
+      bytes += operandBytes(obj(sq.w13), 2 * si, h) + operandBytes(obj(sq.w2), h, si);
+    }
+    return bytes;
+  }
+  return null;
+}

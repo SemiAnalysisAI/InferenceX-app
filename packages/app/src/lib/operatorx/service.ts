@@ -4,6 +4,12 @@
  */
 import type { OperatorXRunRef } from '@semianalysisai/inferencex-db/operatorx/bundle';
 import {
+  buildComparison,
+  type Comparison,
+  type ComparisonInput,
+  type ComparisonOp,
+} from '@semianalysisai/inferencex-db/operatorx/compare';
+import {
   normalizeBundle,
   type OperatorXDataset,
   type OperatorXResultDetail,
@@ -14,7 +20,8 @@ import { getOperatorXSource } from './sources';
 
 const LIST_TTL_MS = 60_000;
 const DATASET_TTL_MS = 10 * 60_000;
-const MAX_DATASETS = 8;
+const MAX_DATASETS = 32;
+const COMPARISON_TTL_MS = 5 * 60_000;
 
 type Normalized = ReturnType<typeof normalizeBundle>;
 
@@ -63,6 +70,45 @@ export async function getResultDetail(
   const result = results[index];
   if (!result) throw new OperatorXSourceError('Result not found', 404);
   return { result, metrics: metrics[index] ?? {} };
+}
+
+const OP_TESTLIST_PREFIX: Record<ComparisonOp, string> = { gemm: 'gemm', moe: 'moe' };
+const comparisons = new Map<ComparisonOp, { at: number; value: Promise<Comparison> }>();
+
+/**
+ * The newest timing run of each (pool, testlist) holding the op, combined into one
+ * cross-hardware comparison. Runs that fail to load are skipped.
+ */
+async function compareOp(op: ComparisonOp): Promise<Comparison> {
+  const prefix = OP_TESTLIST_PREFIX[op];
+  const covered = new Set<string>();
+  const picked: OperatorXRunRef[] = [];
+  for (const run of await listRuns()) {
+    const plan = run.plan;
+    if (!plan || run.unavailable || plan.mode !== 'timing') continue;
+    const fresh = plan.testlists.filter(
+      (t) => t.startsWith(prefix) && !covered.has(`${plan.pool}|${t}`),
+    );
+    if (fresh.length === 0) continue;
+    for (const t of fresh) covered.add(`${plan.pool}|${t}`);
+    picked.push(run);
+  }
+  const loaded = await Promise.allSettled(picked.map((run) => normalized(run.run_id)));
+  const inputs: ComparisonInput[] = [];
+  loaded.forEach((result, i) => {
+    if (result.status === 'fulfilled')
+      inputs.push({ pool: picked[i].plan!.pool, dataset: result.value });
+  });
+  return buildComparison(op, inputs);
+}
+
+export function getComparison(op: ComparisonOp): Promise<Comparison> {
+  const hit = comparisons.get(op);
+  if (hit && Date.now() - hit.at < COMPARISON_TTL_MS) return hit.value;
+  const value = compareOp(op);
+  comparisons.set(op, { at: Date.now(), value });
+  value.catch(() => comparisons.delete(op));
+  return value;
 }
 
 export function errorStatus(error: unknown): number {
