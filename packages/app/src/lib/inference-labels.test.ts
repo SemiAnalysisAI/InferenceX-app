@@ -67,6 +67,80 @@ describe('temporary DSpark UMBP run label', () => {
   });
 });
 
+describe('temporary UMBP linker gamma-6 run label', () => {
+  const linkerUrl = 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/35879254139';
+  const dsparkUrl = 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/35166686551';
+  const expiresAt = Date.parse('2026-10-16T02:00:00Z');
+
+  beforeEach(() => {
+    vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-09-25T02:00:00Z'));
+  });
+  afterEach(() => vi.restoreAllMocks());
+
+  it.each([linkerUrl, `${linkerUrl}/attempts/1`, `${linkerUrl}/attempts/3`])(
+    'labels the new run without changing identity: %s',
+    (url) => {
+      expect(inferenceFrameworkLabelOverride('mori-sglang', url)).toBe('MoRI UMBP SGLang');
+      expect(inferenceFrameworkLabelOverride('sglang-disagg', url)).toBe('MoRI UMBP SGLang');
+      expect(inferenceFrameworkLabelOverride('sglang', url)).toBeUndefined();
+      const config = getInferenceHardwareConfig(hwKey, undefined, [{ run_url: url }]);
+      expect(config.suffix).toBe('(MoRI UMBP SGLang)');
+      expect(config.name).toBe(getHardwareConfig(hwKey).name);
+      expect(getPointHardwareConfig({ hwKey, run_url: url }, config)).toEqual(config);
+      expect(
+        getInferenceRunLabel('✕ amd/agentx-v1.0-th-dspark-gamma6-lowcon', [
+          { framework: 'mori-sglang', run_url: url },
+        ]),
+      ).toBe('✕ amd/agentx-v1.0-th-dspark-gamma6-lowcon (MoRI UMBP SGLang)');
+    },
+  );
+
+  it('leaves neighboring run IDs and mixed historical points correctly labeled', () => {
+    for (const id of ['35879254138', '35879254140', '358792541390']) {
+      expect(
+        inferenceFrameworkLabelOverride('mori-sglang', linkerUrl.replace('35879254139', id)),
+      ).toBeUndefined();
+    }
+    expect(
+      getInferenceHardwareConfig(hwKey, undefined, [
+        { run_url: linkerUrl },
+        { run_url: historicalUrl },
+      ]).suffix,
+    ).toBe('(MoRI SGLang / MoRI UMBP SGLang)');
+  });
+
+  it('labels a curve mixing the new run with earlier UMBP runs as UMBP only', () => {
+    expect(
+      getInferenceHardwareConfig(hwKey, undefined, [
+        { run_url: linkerUrl },
+        { run_url: dsparkUrl },
+        { run_url: runUrl },
+      ]).suffix,
+    ).toBe('(MoRI UMBP SGLang)');
+  });
+
+  it('returns to the standard label at the exact cutoff in all shared display paths', () => {
+    vi.mocked(Date.now).mockReturnValue(expiresAt - 1);
+    expect(inferenceFrameworkLabelOverride('mori-sglang', linkerUrl)).toBe('MoRI UMBP SGLang');
+    for (const now of [expiresAt, expiresAt + 1, expiresAt + 86_400_000]) {
+      vi.mocked(Date.now).mockReturnValue(now);
+      expect(inferenceFrameworkLabelOverride('mori-sglang', linkerUrl)).toBeUndefined();
+      const point = { hwKey, framework: 'mori-sglang', run_url: linkerUrl };
+      const generic = getHardwareConfig(hwKey);
+      expect(getInferenceHardwareConfig(hwKey, undefined, [point])).toBe(generic);
+      expect(getPointHardwareConfig(point, generic)).toBe(generic);
+      expect(getInferenceRunLabel('✕ gamma6', [point])).toBe('✕ gamma6');
+      expect(inferenceFrameworkLabelOverride('mori-sglang', runUrl)).toBe('MoRI UMBP SGLang');
+    }
+  });
+
+  it('keeps the earlier DSpark window independent of the new cutoff', () => {
+    vi.mocked(Date.now).mockReturnValue(Date.parse('2026-10-09T01:32:00Z'));
+    expect(inferenceFrameworkLabelOverride('mori-sglang', dsparkUrl)).toBeUndefined();
+    expect(inferenceFrameworkLabelOverride('mori-sglang', linkerUrl)).toBe('MoRI UMBP SGLang');
+  });
+});
+
 describe('run-specific MoRI UMBP labels', () => {
   it('retains the unofficial marker and branch while labeling only the target overlay', () => {
     expect(
