@@ -309,7 +309,9 @@ source per exact run and recipe (`equalServiceSourceKey`), and colour overlay so
 - **Source labels** (`getEqualServiceSources`) read hardware and date, adding precision,
   topology, run, attempt, recipe, image or point only where two sources would otherwise look
   the same. The opaque key stays the exact identity.
-- Plots export PNG and CSV; the frontier table exports CSV only. The views API returns
+- Plots export PNG and CSV; the frontier table exports CSV only. Panel subtitles and the
+  baseline → comparator pair are export-only, so a PNG names its workload and sources while
+  the screen shows only the source selects. The views API returns
   `matchedConcurrency`, `rolePoints` and `powerFits`
   ([Dashboard read-only views](./dashboard-readonly-views.md#fixed-sequence-service-comparisons));
   it has no global-frontier parameter.

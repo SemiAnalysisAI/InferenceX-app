@@ -138,6 +138,9 @@ export default function MatchedConcurrencyTable({
       <Heading as="h3" level="card">
         {t.title}
       </Heading>
+      <p className="export-only hidden break-words text-sm" data-testid="matched-concurrency-pair">
+        {t.baseline}: {sourceLabel(baseline)} → {t.comparator}: {sourceLabel(comparator)}
+      </p>
       {table.reason ? (
         <p className="text-sm text-muted-foreground">{t.unavailable}</p>
       ) : table.rows.length === 0 ? (

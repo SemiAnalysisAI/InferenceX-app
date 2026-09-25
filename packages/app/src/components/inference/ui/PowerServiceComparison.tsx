@@ -340,6 +340,13 @@ export default function PowerServiceComparison({
                 {t.title}
               </Heading>
               <p className="export-only hidden text-sm text-muted-foreground">{contextLabel}</p>
+              {/* The source selects are no-export, so exported images name the pair here. */}
+              <p
+                className="export-only hidden break-words text-sm"
+                data-testid="equal-service-pair"
+              >
+                {t.baseline}: {sourceLabel(base)} → {t.comparator}: {sourceLabel(peer)}
+              </p>
               <div className="flex flex-wrap gap-x-5 gap-y-2 text-sm">
                 {METRICS.map((key, index) => (
                   <span key={key} className="inline-flex items-center gap-2">

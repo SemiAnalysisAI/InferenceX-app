@@ -101,6 +101,15 @@ describe('PowerServiceComparison', () => {
     cy.get('[data-testid="equal-service-comparator"]')
       .invoke('val')
       .should('contain', OVERLAY_RUN_URL);
+    // The selects are screen-only; exported images name the pair instead.
+    for (const pair of ['equal-service-pair', 'matched-concurrency-pair']) {
+      cy.get(`[data-testid="${pair}"]`)
+        .should('not.be.visible')
+        .and(
+          'have.text',
+          'Baseline: B200 (SGLang) · 2026-09-23 → Comparator: B300 (SGLang) · 2026-09-23',
+        );
+    }
     cy.get('[data-testid="matched-concurrency-row-8"]').should('exist');
   });
 });
