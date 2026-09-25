@@ -53,7 +53,7 @@ export default function OperatorXView() {
         <TabsContent key={c.value} value={c.value}>
           {c.value === 'attention' ? (
             <Card className="py-6 text-center">
-              <p className="text-sm text-muted-foreground">No attention results yet.</p>
+              <p className="text-sm text-muted-foreground">No results yet</p>
             </Card>
           ) : (
             category === c.value && <ComparisonDashboard op={c.value} />

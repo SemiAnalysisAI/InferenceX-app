@@ -116,7 +116,7 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
   if (view.workloads.length === 0)
     return (
       <Card className="py-6 text-center">
-        <p className="text-sm text-muted-foreground">No timing runs for this op yet.</p>
+        <p className="text-sm text-muted-foreground">No results yet</p>
       </Card>
     );
 
