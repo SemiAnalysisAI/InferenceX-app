@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 
-import OperatorXDisplay from '@/components/operatorx/OperatorXDisplay';
+import OperatorXDashboard from '@/components/operatorx/OperatorXDashboard';
 import { ZhTabIntro } from '@/components/zh/zh-tab-intro';
 import { tabMetadataZh } from '@/lib/tab-meta-zh';
 
@@ -10,7 +10,7 @@ export default function ZhOperatorXPage() {
   return (
     <>
       <ZhTabIntro tab="operatorx" />
-      <OperatorXDisplay />
+      <OperatorXDashboard />
     </>
   );
 }

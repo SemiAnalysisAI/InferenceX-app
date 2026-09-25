@@ -1,10 +1,10 @@
 import type { Metadata } from 'next';
 
-import OperatorXDisplay from '@/components/operatorx/OperatorXDisplay';
+import OperatorXDashboard from '@/components/operatorx/OperatorXDashboard';
 import { tabMetadata } from '@/lib/tab-meta';
 
 export const metadata: Metadata = tabMetadata('operatorx');
 
 export default function OperatorXPage() {
-  return <OperatorXDisplay />;
+  return <OperatorXDashboard />;
 }
