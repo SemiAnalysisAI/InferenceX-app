@@ -13,9 +13,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
 import { RetryableQueryError } from '@/components/ui/retryable-query-error';
-import { Switch } from '@/components/ui/switch';
 import { useOperatorXTimelines } from '@/hooks/api/use-operatorx';
 import { TABLEAU_10 } from '@/lib/constants';
 
@@ -238,7 +236,6 @@ function CaseTimelines({
     op,
     refs.map((r) => r.ref),
   );
-  const [shared, setShared] = useState(true);
   if (refs.length === 0)
     return <p className="text-sm text-muted-foreground">No selected GPU measured this case.</p>;
   if (error)
@@ -259,15 +256,9 @@ function CaseTimelines({
   const longest = Math.max(...refs.map((r) => data[r.ref]?.spanUs ?? 0), 0);
   return (
     <div className="space-y-3">
-      <div className="flex items-center gap-2">
-        <Switch id="opx-timeline-shared" checked={shared} onCheckedChange={setShared} />
-        <Label htmlFor="opx-timeline-shared" className="text-sm font-normal text-muted-foreground">
-          Same time scale for every GPU
-        </Label>
-      </div>
       {refs.map(({ hardware: hw, ref }) => {
         const timeline = data[ref] ?? null;
-        const scaleUs = (shared ? longest : timeline?.spanUs) || 1;
+        const scaleUs = longest || 1;
         return (
           <GpuTimeline
             key={hw}
