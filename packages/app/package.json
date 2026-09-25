@@ -24,7 +24,6 @@
     "test:e2e:full": "cypress run --component && cypress run",
     "test:e2e:component": "cypress run --component",
     "test:e2e:integration": "cypress run",
-    "test:e2e:powerx": "bun scripts/powerx-db-acceptance.ts",
     "test:unit": "bun --env-file=../../.env vitest run",
     "test:unit:coverage": "bun --env-file=../../.env vitest run --coverage",
     "clean": "rimraf .next out",

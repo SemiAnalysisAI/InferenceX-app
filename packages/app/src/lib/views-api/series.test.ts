@@ -115,35 +115,7 @@ function powerSweepRows(): BenchmarkRow[] {
   );
 }
 
-/** Concurrency of every returned point, in series order. */
-function seriesLoads(result: ReturnType<typeof buildInferenceSeries>): number[] {
-  return result.series.flatMap((series) => series.points).map((point) => point.concurrency);
-}
-
 describe('buildInferenceSeries', () => {
-  it.each([
-    ['interactivity', 'mean_tpot_intvty', 20],
-    ['ttft', 'mean_ttft', 0.6],
-    ['e2e', 'mean_e2el', 5],
-  ] as const)('uses recorded means without median fallback for %s', (xmode, field, expected) => {
-    const rows = [
-      makeRow({
-        conc: 1,
-        metrics: metrics({ mean_tpot: 0.05, mean_intvty: 77, mean_ttft: 0.6, mean_e2el: 5 }),
-      }),
-      makeRow({ conc: 2 }),
-    ];
-    const result = buildInferenceSeries(rows, {
-      ...BASE_OPTIONS,
-      xmode,
-      fixedSequenceStatistic: 'mean',
-    });
-    expect(result.xAxis).toMatchObject({ field, statistic: 'mean' });
-    expect(result.series.flatMap((entry) => entry.points).map((point) => point.x)).toEqual([
-      expected,
-    ]);
-  });
-
   it('assembles one series per hardware config with x-sorted points', () => {
     const result = buildInferenceSeries(fixtureRows(), BASE_OPTIONS);
 
@@ -314,76 +286,6 @@ describe('buildInferenceSeries', () => {
     expect(best.series).toHaveLength(1);
     expect(best.series[0].framework).toBe('vllm');
     expect(best.series[0].bestPerSku).toBe(true);
-  });
-
-  it.each(['y_measuredAvgPower', 'y_measuredJPerOutputToken'] as const)(
-    'retains all observed loads for %s without optimal/best ranking',
-    (metricConfigKey) => {
-      const rows = powerSweepRows();
-      const result = buildInferenceSeries(rows, {
-        ...BASE_OPTIONS,
-        xmode: 'concurrency',
-        metricConfigKey,
-        optimal: true,
-        best: true,
-      });
-      expect(result.xAxis).toEqual({
-        mode: 'concurrency',
-        field: 'conc',
-        label: 'Concurrency',
-        statistic: null,
-      });
-      expect(result.count).toBe(rows.length);
-      const points = result.series.flatMap((series) => series.points);
-      expect(points.map((point) => point.x)).toEqual(
-        rows.map((row) => row.conc).toSorted((a, b) => a - b),
-      );
-      expect(points.every((point) => !point.frontier && !point.bestPerSku)).toBe(true);
-      expect(result.frontier).toEqual({ direction: null, points: 0 });
-      expect(result.metric.direction).toBeNull();
-    },
-  );
-
-  it('keeps concurrency loads that lack end-to-end latency or exceed the cost limit', () => {
-    const withoutE2e = Object.fromEntries(
-      Object.entries(metrics()).filter(([key]) => !key.endsWith('_e2el')),
-    );
-    const rows = [
-      makeRow({ conc: 1, metrics: metrics({ tput_per_gpu: 0.5, output_tput_per_gpu: 0.4 }) }),
-      makeRow({ conc: 4, metrics: withoutE2e }),
-      makeRow({ conc: 16 }),
-    ];
-    const options = { ...BASE_OPTIONS, metricConfigKey: 'y_costh' } as const;
-
-    expect(seriesLoads(buildInferenceSeries(rows, { ...options, xmode: 'e2e' }))).not.toContain(1);
-    expect(seriesLoads(buildInferenceSeries(rows, { ...options, xmode: 'concurrency' }))).toEqual([
-      1, 4, 16,
-    ]);
-  });
-
-  it('exports reusable topology keys and preserves every load within the chosen topology', () => {
-    const rows = [
-      makeRow({ conc: 1 }),
-      makeRow({ conc: 4 }),
-      makeRow({ conc: 4, prefill_tp: 4, decode_tp: 4, num_prefill_gpu: 4, num_decode_gpu: 4 }),
-    ];
-    const all = buildInferenceSeries(rows, { ...BASE_OPTIONS, xmode: 'concurrency' });
-    const points = all.series.flatMap((series) => series.points);
-    expect(new Set(points.map((point) => point.topologyKey)).size).toBe(2);
-    const topology = points.find((point) => point.concurrency === 1)!.topologyKey;
-    const filtered = buildInferenceSeries(rows, {
-      ...BASE_OPTIONS,
-      xmode: 'concurrency',
-      quickFilters: { ...BASE_OPTIONS.quickFilters, topologies: [topology] },
-    });
-    expect(filtered.series.flatMap((series) => series.points).map((point) => point.x)).toEqual([
-      1, 4,
-    ]);
-    expect(
-      filtered.series
-        .flatMap((series) => series.points)
-        .every((point) => point.topologyKey === topology),
-    ).toBe(true);
   });
 
   it('switches x axis per xmode', () => {

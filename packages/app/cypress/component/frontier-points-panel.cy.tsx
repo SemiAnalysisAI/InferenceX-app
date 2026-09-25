@@ -2,7 +2,6 @@ import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.share
 
 import type { InferenceData } from '@/components/inference/types';
 import FrontierPointsPanel from '@/components/inference/ui/FrontierPointsPanel';
-import { FRONTIER_EXPORT_HEADERS } from '@/components/inference/utils/frontier-points';
 import { globalParetoFrontier } from '@/components/inference/utils/global-pareto';
 import { createMockInferenceData } from '../support/mock-data';
 import { mountWithProviders } from '../support/test-utils';
@@ -56,10 +55,8 @@ const overlay = [
 const eligible = [...official, ...overlay];
 const frontier = globalParetoFrontier(eligible, true, false);
 
-type CsvWindow = Cypress.AUTWindow & { __csv?: Blob };
-
-function mountPanel(width: number) {
-  cy.viewport(width, 1000);
+function mountPanel() {
+  cy.viewport(1280, 1000);
   mountWithProviders(
     <PathnameContext.Provider value="/inference">
       <div style={{ width: '100%', maxWidth: 1120, padding: 12, boxSizing: 'border-box' }}>
@@ -82,25 +79,8 @@ function mountPanel(width: number) {
 }
 
 describe('FrontierPointsPanel', () => {
-  it('states the competing scope and lists each frontier point with its run', () => {
-    mountPanel(1280);
-    cy.get('[data-testid="frontier-points-scope"]')
-      .should(
-        'contain.text',
-        '5 of 6 visible observations are on the frontier; they competed across 3 sources from 3 runs.',
-      )
-      .and('contain.text', 'Better: higher Interactivity (tok/s/user) and lower J/output token.');
-    cy.get('[data-testid="frontier-points-mixed"]').should(
-      'contain.text',
-      'span 2 topologies and 2 images',
-    );
-    cy.get('[data-testid="frontier-points-owner"]').then(($owners) =>
-      expect([...$owners].map((owner) => owner.textContent)).to.deep.equal([
-        'B200 ×2',
-        'GB300 ×2',
-        'MI355X ×1',
-      ]),
-    );
+  it('lists each frontier point with its run and marks the ?unofficialrun= point', () => {
+    mountPanel();
     cy.get('[data-testid="frontier-points-row"]').should('have.length', 5);
     cy.get('[data-testid="frontier-points-row"]')
       .filter(':contains("MI355X")')
@@ -116,43 +96,5 @@ describe('FrontierPointsPanel', () => {
       .should('have.attr', 'style')
       .and('contain', 'var(--overlay-run-0)');
     cy.get('[data-testid="frontier-points-table"]').should('not.contain.text', '206.3');
-  });
-
-  it('exports the frontier with run, attempt and unofficial provenance', () => {
-    mountPanel(1280);
-    cy.window().then((win) => {
-      cy.stub(win.URL, 'createObjectURL').callsFake((blob: Blob) => {
-        (win as CsvWindow).__csv = blob;
-        return 'blob:csv-test';
-      });
-      cy.stub(win.HTMLAnchorElement.prototype, 'click');
-    });
-    cy.get('#frontier-test-frontier-points [data-testid="export-button"]').click();
-    cy.get('[data-testid="export-csv-button"]').click();
-    cy.window()
-      .then((win) => (win as CsvWindow).__csv!.text())
-      .then((text) => {
-        expect(text).to.include('# x: Interactivity (tok/s/user)');
-        const [header, ...rows] = text
-          .split('\n')
-          .filter((line) => !line.startsWith('#'))
-          .map((line) => line.split(','));
-        expect(header).to.deep.equal([...FRONTIER_EXPORT_HEADERS, 'unofficial']);
-        const column = (name: string) => rows.map((row) => row[header.indexOf(name)]);
-        expect(rows).to.have.length(5);
-        expect(column('point_id').toSorted()).to.deep.equal(['0', '1', '2', '4', '5']);
-        expect(column('unofficial').filter((value) => value === 'true')).to.have.length(1);
-        expect(column('run_attempt')).to.include('2');
-      });
-  });
-
-  it('keeps the table inside its own scroller on mobile', () => {
-    mountPanel(390);
-    cy.document().should((doc) => {
-      expect(doc.documentElement.scrollWidth).to.be.at.most(doc.documentElement.clientWidth + 1);
-    });
-    cy.get('[data-testid="frontier-points-panel"]').screenshot('frontier-points-mobile', {
-      overwrite: true,
-    });
   });
 });

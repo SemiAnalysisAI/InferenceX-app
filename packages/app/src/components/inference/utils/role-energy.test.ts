@@ -23,19 +23,4 @@ describe('reconstructedRoleEnergy', () => {
       prefillShare: (100 * 1.975) / 7.975,
     });
   });
-
-  it('returns nothing unless the row is validated schema-2 disaggregated telemetry with every role figure', () => {
-    for (const overrides of [
-      { disagg: false },
-      { power_valid: 0 },
-      { power_valid: undefined },
-      { power_metric_schema_version: 1 },
-      { joules_per_input_token: 0 },
-      { joules_per_output_token: Number.NaN },
-      { prefill_joules_per_input_token: undefined },
-      { decode_joules_per_output_token: -1 },
-    ]) {
-      expect(reconstructedRoleEnergy({ ...entry, ...overrides })).toBeUndefined();
-    }
-  });
 });

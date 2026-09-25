@@ -164,7 +164,7 @@ export function openXAxisMenu(): void {
 
 /** Select an axis and verify that the single-select menu closes immediately. */
 export function selectXAxisMode(
-  mode: 'interactivity' | 'e2e' | 'ttft' | 'e2e-normalized-interactivity' | 'concurrency',
+  mode: 'interactivity' | 'e2e' | 'ttft' | 'e2e-normalized-interactivity',
   label?: string,
 ): void {
   openXAxisMenu();

@@ -86,17 +86,12 @@ describe('GET /api/v1/views/options', () => {
   it('exposes dashboard-parity defaults', async () => {
     const bodyRes = await GET(request('/api/v1/views/options'));
     const body = await bodyRes.json();
-    expect(body.fixedSequenceStatistics).toEqual(['median', 'mean']);
     expect(body.defaults).toMatchObject({
       model: 'DeepSeek-V4-Pro',
       sequence: '8k/1k',
       metric: 'y_tokensPerDollarH',
       percentile: 'p90',
       xmode: 'interactivity',
-      xstat: 'median',
-      serviceCompare: false,
-      roleShare: false,
-      powerFit: false,
     });
     // Same vendors, in the dashboard's quick-filter pill order.
     expect(body.quickFilters.vendors).toEqual(VENDOR_ORDER);

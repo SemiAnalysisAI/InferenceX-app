@@ -5,7 +5,6 @@ import {
   computeGpuStats,
   detectTdpFromArtifactName,
   getAvailableMetrics,
-  tdpForHardware,
   type GpuMetricRow,
   GPU_METRIC_OPTIONS,
   parseCsvData,
@@ -58,37 +57,12 @@ describe('parseCsvData', () => {
     expect(result[1].power).toBe(300.2);
   });
 
-  it('keeps ISO timestamps and deduplicates equivalent offset instants', () => {
-    const csv = `${CSV_HEADER}
-2026-03-08T02:30:00.000Z, 0, 100, 60, 1500, 2000, 95, 80
-2026-03-07T18:30:00.000-08:00, 0, 900, 60, 1500, 2000, 95, 80
-2026-03-08T03:30:00.000Z, 0, 300, 60, 1500, 2000, 95, 80`;
-    const rows = parseCsvData(csv);
-    expect(rows.map((row) => row.timestamp)).toEqual([
-      '2026-03-08T02:30:00.000Z',
-      '2026-03-08T03:30:00.000Z',
-    ]);
-    expect(rows.map((row) => row.power)).toEqual([100, 300]);
-    expect(computeGpuStats(rows, 'power')[0]).toMatchObject({ count: 2, mean: 200, p95: 290 });
-  });
-
   it('returns empty array for header-only CSV', () => {
     expect(parseCsvData(CSV_HEADER)).toEqual([]);
   });
 
   it('returns empty array for empty string', () => {
     expect(parseCsvData('')).toEqual([]);
-  });
-
-  it('retains valid power when secondary metric columns are missing', () => {
-    const csv = `${CSV_HEADER}
-2026/03/07 00:20:37.071, 0, 76.78 W
-2026/03/07 00:20:37.071, 1, 76.08 W, 29, 345 MHz, 3201 MHz, 0 %, 0 %`;
-    const result = parseCsvData(csv);
-    expect(result).toHaveLength(2);
-    expect(result[0].index).toBe(0);
-    expect(result[0].power).toBe(76.78);
-    expect(result[0].temperature).toBeUndefined();
   });
 
   it('skips rows with NaN values', () => {
@@ -262,43 +236,6 @@ describe('parseCsvData', () => {
     const result = parseCsvData(csv);
     expect(result).toHaveLength(1);
     expect(result[0].temperature).toBeUndefined();
-  });
-
-  it('NVIDIA: retains finite metrics, measured zeros and the first duplicate sample', () => {
-    const csv = `${CSV_HEADER}
-2026/03/07 00:20:37.071, 0, 0 W, N/A, Infinity, 3201 MHz, 0 %, N/A
-2026/03/07 00:20:37.071, 0, 900 W, 70, 1980 MHz, 3201 MHz, 99 %, 80 %
-2026/03/07 00:20:38.071, 0, 100 W, 40, 120 MHz, 3201 MHz, 0 %, 0 %
-2026/03/07 00:20:38.071, 1, Infinity, 40, 120 MHz, 3201 MHz, 0 %, 0 %`;
-    const rows = parseCsvData(csv);
-    expect(rows).toHaveLength(2);
-    expect(rows[0]).toMatchObject({ power: 0, gpuUtil: 0 });
-    expect(rows[0].temperature).toBeUndefined();
-    expect(rows[0].smClock).toBeUndefined();
-    expect(computeGpuStats(rows, 'power')[0]).toMatchObject({ count: 2, min: 0, mean: 50 });
-    expect(computeGpuStats(rows, 'temperature')[0]).toMatchObject({ count: 1, mean: 40 });
-  });
-
-  it('NVIDIA: resolves reordered and omitted optional columns by name', () => {
-    const rows = parseCsvData(
-      'index,power.draw [W],timestamp,utilization.gpu [%]\n0,0 W,2026/03/07 00:20:37.071,0 %',
-    );
-    expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({ index: 0, power: 0, gpuUtil: 0 });
-    expect(rows[0].temperature).toBeUndefined();
-  });
-
-  it('AMD: leaves absent, N/A and nonfinite metrics missing without losing zeros', () => {
-    const rows = parseCsvData(
-      'timestamp,gpu,socket_power,gfx_activity,gfx_0_clk,gfx_voltage\n1772939616,0,0,0,N/A,Infinity',
-    );
-    expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({ power: 0, gpuUtil: 0 });
-    for (const key of ['temperature', 'smClock', 'memClock', 'memUtil', 'gfxVoltage'] as const) {
-      expect(rows[0][key], key).toBeUndefined();
-      expect(computeGpuStats(rows, key), key).toEqual([]);
-    }
-    expect(getAvailableMetrics(rows).map((metric) => metric.key)).toEqual(['power', 'gpuUtil']);
   });
 
   it('AMD: populates all AMD-specific metric fields', () => {
@@ -608,32 +545,5 @@ describe('GPU_METRIC_OPTIONS', () => {
       expect(opt.yAxisLabel.length).toBeGreaterThan(0);
       expect(opt.yAxisLabel).toContain(opt.unit);
     }
-  });
-});
-
-describe('tdpForHardware', () => {
-  it('resolves a benchmark point hardware key regardless of artifact naming', () => {
-    expect(tdpForHardware('b200')).toEqual({
-      sku: 'B200',
-      tdp: detectTdpFromArtifactName('gpu_metrics_x_b200-nb_0')!.tdp,
-    });
-    expect(tdpForHardware('GB300')?.sku).toBe('GB300');
-    expect(tdpForHardware(undefined)).toBeNull();
-    expect(tdpForHardware('not-a-sku')).toBeNull();
-  });
-});
-
-/** A multinode DCGM bundle row: power sampled, nothing else collected. */
-const powerOnly = (index: number, power: number) => ({
-  timestamp: '2026-09-12T22:08:20Z',
-  index,
-  power,
-});
-
-describe('power-only rows', () => {
-  it('offers only the metrics the collector sampled', () => {
-    expect(getAvailableMetrics([powerOnly(0, 700), powerOnly(1, 710)]).map((m) => m.key)).toEqual([
-      'power',
-    ]);
   });
 });

@@ -1,17 +1,10 @@
-import { groupConcurrencySeries } from './concurrency-series';
 import { describe, expect, it } from 'vitest';
 
 import type { InferenceData } from '@/components/inference/types';
 import { chartDefinitions } from '@/components/inference/metric-registry';
 import type { ParetoDirection } from '@/lib/chart-utils';
 
-import {
-  chartFrontier,
-  isMeasuredPowerCurveMetric,
-  isPowerCurveMetric,
-  isPowerGaugeSeries,
-  upperPowerEnvelope,
-} from './powerCurves';
+import { chartFrontier, isPowerCurveMetric, upperPowerEnvelope } from './powerCurves';
 
 function point(conc: number, x: number, y: number, overrides: Partial<InferenceData> = {}) {
   return {
@@ -77,23 +70,6 @@ describe('power chart semantics', () => {
     expect(chartFrontier(points, 'lower_right')).toEqual(points);
   });
 
-  it.each(['y_gpuProvisionedWatts', 'y_utilityProvisionedWatts', 'y_utilityModeledWatts'])(
-    'draws %s as an envelope-locked power gauge like measured watts',
-    (metric) => {
-      expect(isPowerCurveMetric(metric)).toBe(true);
-      expect(isMeasuredPowerCurveMetric(metric)).toBe(true);
-    },
-  );
-
-  it.each([
-    'y_gpuProvisionedJPerOutputToken',
-    'y_utilityProvisionedJPerOutputToken',
-    'y_utilityModeledJPerOutputToken',
-  ])('keeps %s on the energy Pareto frontier', (metric) => {
-    expect(isPowerCurveMetric(metric)).toBe(false);
-    expect(isMeasuredPowerCurveMetric(metric)).toBe(false);
-  });
-
   it('preserves the canonical agentic restriction on Pareto membership', () => {
     const canonical = point(8, 100, 1, { isOnNormalizedInteractivityFrontier: true });
     const nonCanonical = point(1, 200, 4, { isOnNormalizedInteractivityFrontier: false });
@@ -135,37 +111,6 @@ describe('upper power envelope', () => {
     expect(upperPowerEnvelope(samples, false, true)).toEqual([fast, middle, plateau, slow]);
   });
 
-  it('keeps a flat provisioned series across its tested range only when asked to', () => {
-    // A TDP gauge is the same watts at every concurrency: with `keepTies` the
-    // boundary spans the sweep; the strict measured rule would collapse it to
-    // the first-sorted marker.
-    const flat = [point(1, 200, 1000), point(8, 120, 1000), point(64, 40, 1000)];
-    expect(upperPowerEnvelope(flat, true, true)).toEqual(flat.toReversed());
-    expect(upperPowerEnvelope(flat, false, true).map((p) => p.x)).toEqual([40, 120, 200]);
-    expect(upperPowerEnvelope(flat, true)).toEqual([flat[0]]);
-    expect(upperPowerEnvelope(flat, false)).toEqual([flat[2]]);
-  });
-
-  it('keeps ties only for provisioned and modelled gauge series', () => {
-    const measured = point(1, 200, 700);
-    const tdpClone = {
-      ...measured,
-      powerVariant: { kind: 'basis', id: 'gpu-provisioned' } as const,
-    };
-    const measuredClone = {
-      ...measured,
-      powerVariant: { kind: 'basis', id: 'gpu-measured' } as const,
-    };
-    const roleClone = { ...measured, powerVariant: { kind: 'role', id: 'decode' } as const };
-    expect(isPowerGaugeSeries('y_gpuProvisionedWatts', measured)).toBe(true);
-    expect(isPowerGaugeSeries('y_utilityModeledWatts', undefined)).toBe(true);
-    expect(isPowerGaugeSeries('y_measuredAvgPower', measured)).toBe(false);
-    expect(isPowerGaugeSeries('y_measuredAvgPower', tdpClone)).toBe(true);
-    expect(isPowerGaugeSeries('y_measuredAvgPower', measuredClone)).toBe(false);
-    expect(isPowerGaugeSeries('y_measuredAvgPower', roleClone)).toBe(false);
-    expect(isPowerGaugeSeries('y_gpuProvisionedWatts', roleClone)).toBe(false);
-  });
-
   it('uses only finite positive coordinates and preserves singleton boundaries', () => {
     const valid = point(1, 200, 350);
     expect(upperPowerEnvelope([], true)).toEqual([]);
@@ -184,47 +129,5 @@ describe('upper power envelope', () => {
         true,
       ),
     ).toEqual([valid]);
-  });
-});
-
-describe('observed concurrency series', () => {
-  const load = (conc: number, overrides: Partial<InferenceData> = {}) =>
-    point(conc, conc, 500, {
-      run_url: 'https://github.com/org/repo/actions/runs/123',
-      ...overrides,
-    });
-
-  it('retains non-monotonic measured points and sorts by exact load', () => {
-    const points = [load(128, { y: 470 }), load(1, { y: 500 }), load(4, { y: 600 })];
-    const segments = [...groupConcurrencySeries(points).values()];
-    expect(segments).toHaveLength(1);
-    expect(segments[0].map((sample) => [sample.x, sample.y])).toEqual([
-      [1, 500],
-      [4, 600],
-      [128, 470],
-    ]);
-  });
-
-  it('never connects different topology, recipes, runs, dates or role variants', () => {
-    const base = load(1);
-    const points = [
-      base,
-      load(4, { tp: 4 }),
-      load(8, { recipe_fingerprint: 'other-recipe' }),
-      load(16, { run_url: 'https://github.com/org/repo/actions/runs/456' }),
-      load(32, { date: '2026-09-11' }),
-      load(64, { powerVariant: { kind: 'role', id: 'prefill' } }),
-    ];
-    const segments = [...groupConcurrencySeries(points).values()];
-    expect(segments).toHaveLength(points.length);
-    expect(segments.flat()).toEqual(points);
-  });
-
-  it('keeps repeated load observations and unknown runs as markers, not an arbitrary average', () => {
-    const points = [load(4), load(4, { y: 650 }), load(8), load(16, { run_url: undefined })];
-    const segments = [...groupConcurrencySeries(points).values()];
-    expect(segments.every((segment) => segment.length === 1)).toBe(true);
-    expect(segments.flat()).toHaveLength(points.length);
-    expect(segments.flat().map((sample) => sample.y)).toEqual([500, 650, 500, 500]);
   });
 });

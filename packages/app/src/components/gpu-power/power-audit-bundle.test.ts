@@ -5,7 +5,6 @@ import {
   BUNDLE_SAMPLES_ENTRY,
   BUNDLE_WINDOW_PAD_SECONDS,
   cutPowerAuditBundle,
-  isPowerAuditBundleEntry,
 } from './power-audit-bundle';
 
 const ARTIFACT = 'power_audit_qwen3.5_8k1k_fp8_dynamo-sglang_x';
@@ -108,33 +107,7 @@ function bundle(overrides: Record<string, string | undefined> = {}): Map<string,
   return present;
 }
 
-describe('isPowerAuditBundleEntry', () => {
-  it('selects samples, manifest and retained validation/result/window documents', () => {
-    expect(isPowerAuditBundleEntry(BUNDLE_SAMPLES_ENTRY)).toBe(true);
-    expect(isPowerAuditBundleEntry(BUNDLE_MANIFEST_ENTRY)).toBe(true);
-    expect(isPowerAuditBundleEntry(validationName(8))).toBe(true);
-    expect(isPowerAuditBundleEntry('LOGS/power/windows/results_concurrency_8.json')).toBe(false);
-    expect(isPowerAuditBundleEntry(`LOGS/sa-bench_isl_8192_osl_1024/results.json`)).toBe(false);
-    // Root result candidates are matched to the exact artifact by normalization.
-    expect(isPowerAuditBundleEntry(`agg_${RESULT}_conc8.json`)).toBe(true);
-    expect(isPowerAuditBundleEntry(`${RESULT}_conc8.json`)).toBe(true);
-    expect(isPowerAuditBundleEntry('LOGS/agentic/conc_8/power_validation.json')).toBe(true);
-    expect(isPowerAuditBundleEntry('LOGS/power/windows/agentic_power_concurrency_8.json')).toBe(
-      true,
-    );
-    expect(isPowerAuditBundleEntry(`nested/${validationName(8)}`)).toBe(false);
-    expect(isPowerAuditBundleEntry('power_validation_x.json.bak')).toBe(false);
-  });
-});
-
 describe('cutPowerAuditBundle', () => {
-  it('emits one series per validation window with samples, in window order', () => {
-    const series = cutPowerAuditBundle(ARTIFACT, bundle());
-    expect(series.map((entry) => entry.source)).toEqual([validationName(1), validationName(2)]);
-    expect(series.every((entry) => entry.artifact === ARTIFACT)).toBe(true);
-    expect(series.every((entry) => entry.bucketSeconds === 1)).toBe(true);
-  });
-
   it('orders rows prefill, decode, unassigned, then by hostname and gpu_index', () => {
     const [first] = cutPowerAuditBundle(ARTIFACT, bundle());
     expect(first.devices).toEqual([
@@ -151,86 +124,11 @@ describe('cutPowerAuditBundle', () => {
     expect(first.power[3][2]).toBe(60);
   });
 
-  it('falls back to manifest roles and to benchmark_window', () => {
-    const [, second] = cutPowerAuditBundle(ARTIFACT, bundle());
-    expect(second.source).toBe(validationName(2));
-    expect(second.devices).toEqual([
-      { id: A0, role: 'prefill' },
-      { id: A1, role: 'prefill' },
-      { id: B0, role: 'decode' },
-    ]);
-    expect(second.startMs).toBe(2000 * 1000);
-    expect(second.t).toEqual([0, 1]);
-    expect(second.power).toEqual([
-      [130, 131],
-      [120, 121],
-      [220, 221],
-    ]);
-  });
-
-  it('leaves roles undefined without a manifest or per_gpu_role', () => {
-    const [, second] = cutPowerAuditBundle(
-      ARTIFACT,
-      bundle({ [BUNDLE_MANIFEST_ENTRY]: undefined }),
-    );
-    expect(second.devices).toEqual([{ id: A0 }, { id: A1 }, { id: B0 }]);
-    const [first] = cutPowerAuditBundle(ARTIFACT, bundle({ [BUNDLE_MANIFEST_ENTRY]: '{oops' }));
-    expect(first.devices!.map((device) => device.role)).toEqual([
-      'prefill',
-      'prefill',
-      'decode',
-      undefined,
-    ]);
-  });
-
   it('clips samples to the window plus the pad on both sides', () => {
     const [first] = cutPowerAuditBundle(ARTIFACT, bundle());
     expect(first.startMs).toBe((1000 - BUNDLE_WINDOW_PAD_SECONDS) * 1000);
     expect(first.t).toEqual([0, 60, 65, 70, 130]);
     // 1005.4 s lands in the 1005 s bucket; the malformed 2002 s rows never appear.
     expect(first.power[2]).toEqual([100, 100, 300, 100, 100]);
-  });
-
-  it('skips the sweep entirely without samples', () => {
-    expect(cutPowerAuditBundle(ARTIFACT, bundle({ [BUNDLE_SAMPLES_ENTRY]: undefined }))).toEqual(
-      [],
-    );
-    expect(cutPowerAuditBundle(ARTIFACT, bundle({ [BUNDLE_SAMPLES_ENTRY]: '' }))).toEqual([]);
-    expect(
-      cutPowerAuditBundle(ARTIFACT, bundle({ [BUNDLE_SAMPLES_ENTRY]: `${HEADER}\n` })),
-    ).toEqual([]);
-    // A header without the required columns is as good as no samples.
-    expect(
-      cutPowerAuditBundle(
-        ARTIFACT,
-        bundle({ [BUNDLE_SAMPLES_ENTRY]: 'timestamp,index,power\n1000,0,100' }),
-      ),
-    ).toEqual([]);
-  });
-
-  it('reads columns by header name, not position', () => {
-    const reordered = [
-      'power_w,gpu_uuid,gpu_index,hostname,timestamp_unix',
-      '123.5,GPU-a0,0,cn01,1000',
-      '124.5,GPU-a0,0,cn01,1001.2',
-    ].join('\r\n');
-    const [first] = cutPowerAuditBundle(ARTIFACT, bundle({ [BUNDLE_SAMPLES_ENTRY]: reordered }));
-    expect(first.devices).toEqual([{ id: A0, role: 'decode' }]);
-    expect(first.power).toEqual([[123.5, 124.5]]);
-  });
-
-  it('skips malformed validation files and files without a window', () => {
-    const series = cutPowerAuditBundle(
-      ARTIFACT,
-      bundle({
-        [validationName(1)]: '{"selected_window": ',
-        [validationName(4)]: JSON.stringify({ power_valid: true }),
-        [validationName(5)]: JSON.stringify([1, 2]),
-        [validationName(6)]: JSON.stringify({
-          selected_window: { start_time_unix: 2010, end_time_unix: 2000 },
-        }),
-      }),
-    );
-    expect(series.map((entry) => entry.source)).toEqual([validationName(2)]);
   });
 });

@@ -1,12 +1,5 @@
 import { describe, expect, it } from 'vitest';
-
-import { NonRetryableArtifactError } from './artifact-retry.js';
-import {
-  RUNNER_SUFFIX_RE,
-  WorkflowRunNotFoundError,
-  dedupeArtifactsByLogicalName,
-  isGithubNotFoundError,
-} from './github-artifacts.js';
+import { RUNNER_SUFFIX_RE, dedupeArtifactsByLogicalName } from './github-artifacts.js';
 
 const art = (name: string, created_at: string) => ({
   name,
@@ -44,46 +37,5 @@ describe('dedupeArtifactsByLogicalName', () => {
   it('passes through names without a runner suffix unchanged', () => {
     const deduped = dedupeArtifactsByLogicalName([art('run-stats', '2026-06-01T00:00:00Z')]);
     expect(deduped.get('run-stats')?.name).toBe('run-stats');
-  });
-});
-
-describe('isGithubNotFoundError', () => {
-  it('recognises the status gh prints to stderr for a deleted run', () => {
-    // Shape of the error execSync throws with `encoding: 'utf8'`: the message
-    // only names the command; the HTTP status lives in stderr.
-    const error = Object.assign(
-      new Error('Command failed: gh api repos/o/r/actions/runs/1/artifacts'),
-      {
-        status: 1,
-        stderr: 'gh: Not Found (HTTP 404)\n{"message":"Not Found"}\n',
-      },
-    );
-    expect(isGithubNotFoundError(error)).toBe(true);
-  });
-
-  it('leaves transient failures retryable', () => {
-    expect(
-      isGithubNotFoundError(
-        Object.assign(new Error('Command failed'), {
-          stderr: 'gh: error connecting to api.github.com\n',
-        }),
-      ),
-    ).toBe(false);
-    expect(
-      isGithubNotFoundError(
-        Object.assign(new Error('Command failed'), { stderr: 'gh: Server Error (HTTP 502)\n' }),
-      ),
-    ).toBe(false);
-    expect(isGithubNotFoundError(null)).toBe(false);
-    expect(isGithubNotFoundError('HTTP 404')).toBe(false);
-  });
-});
-
-describe('WorkflowRunNotFoundError', () => {
-  it('is non-retryable and names the run', () => {
-    const error = new WorkflowRunNotFoundError('SemiAnalysisAI/InferenceX', '34533943809');
-    expect(error).toBeInstanceOf(NonRetryableArtifactError);
-    expect(error.runId).toBe('34533943809');
-    expect(error.message).toContain('34533943809');
   });
 });

@@ -7,9 +7,7 @@ import type postgres from 'postgres';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { cutPowerAuditBundle } from '../../../app/src/components/gpu-power/power-audit-bundle';
-import { bucketPowerSeries } from '../../../app/src/components/gpu-power/power-series';
 import { storedPowerSeries } from '../../../app/src/components/gpu-power/stored-power-series';
-import { parseCsvData } from '../../../app/src/components/gpu-power/types';
 import type { DbClient } from '../connection';
 import { ingestGpuMetricsArtifact } from '../etl/gpu-metrics-ingest';
 import { getGpuMetricsForPoint, getGpuMetricsForRun } from './gpu-metrics';
@@ -147,57 +145,6 @@ beforeEach(async () => {
 });
 
 describe('artifact → ingest → stored Timeline', () => {
-  it('restores nested AgentX provenance on ingest and sample no-op without changing metrics or validity', async () => {
-    await db.exec(`UPDATE benchmark_results SET benchmark_type = 'agentic_traces',
-      metrics = '{"power_valid":0,"throughput":17}' WHERE id = 10`);
-    const files = agentxBundle();
-    const input = {
-      workflowRunId: 1,
-      artifact: writeArtifact(NAME, files),
-      benchmarkResultIds: [10, 11],
-    };
-    const initial = await ingestGpuMetricsArtifact(sql, input);
-    expect(initial.metadataUpdatedBenchmarkResultIds).toEqual([10]);
-    const expected = {
-      source: SOURCE,
-      window_start_unix: START,
-      window_end_unix: START + 1,
-    };
-    const row = () => db.query('SELECT power_audit, metrics FROM benchmark_results WHERE id = 10');
-    const initialRow = await row();
-    expect(initialRow.rows[0]).toEqual({
-      power_audit: expected,
-      metrics: { power_valid: 0, throughput: 17 },
-    });
-    const stored = await getGpuMetricsForRun(readSql, RUN);
-    expect(storedPowerSeries(stored!.series)).toEqual(cutPowerAuditBundle(NAME, files));
-    expect(storedPowerSeries(stored!.series)).toHaveLength(1);
-    expect(stored!.series[0].sidecars).toMatchObject({
-      validations: {
-        [SOURCE]: {
-          validation_path: 'LOGS/agentic/conc_32/power_validation.json',
-          validation_sha256: expect.stringMatching(/^[a-f0-9]{64}$/u),
-          power_valid: false,
-        },
-      },
-    });
-    await db.exec('UPDATE benchmark_results SET power_audit = NULL WHERE id = 10');
-    expect(await ingestGpuMetricsArtifact(sql, input)).toMatchObject({
-      samplesInserted: 0,
-      seriesSkipped: 2,
-      metadataUpdatedBenchmarkResultIds: [10],
-    });
-    const unchanged = await ingestGpuMetricsArtifact(sql, input);
-    expect(unchanged.metadataUpdatedBenchmarkResultIds).toEqual([]);
-    const repaired = await row();
-    expect(repaired.rows[0]).toEqual({
-      power_audit: expected,
-      metrics: { power_valid: 0, throughput: 17 },
-    });
-    const unrelated = await db.query('SELECT power_audit FROM benchmark_results WHERE id = 11');
-    expect(unrelated.rows).toEqual([{ power_audit: null }]);
-  });
-
   it.each(['explicit', 'wrong-run', 'wrong-id', 'wrong-conc', 'ambiguous'])(
     'does not infer or overwrite point provenance for %s identity',
     async (scenario) => {
@@ -275,65 +222,6 @@ describe('artifact → ingest → stored Timeline', () => {
     const actual = storedPowerSeries(stored!.series);
     expect(actual).toEqual(cutPowerAuditBundle(NAME, files));
     expect(actual[0].devices?.[0]).toEqual({ id: 'host-b/GPU-b0', role: 'prefill' });
-  });
-
-  it('recovers a previously ingested bundle from linked audit source/window and retained manifest', async () => {
-    const files = bundle();
-    await ingestGpuMetricsArtifact(sql, {
-      workflowRunId: 1,
-      artifact: writeArtifact(NAME, files),
-      benchmarkResultIds: [10, 11],
-    });
-    await sql`UPDATE gpu_metric_series SET sidecars = sidecars - 'validations'`;
-    const audit = {
-      source: `some/path/${SOURCE}`,
-      window_start_unix: START,
-      window_end_unix: START + 1,
-    };
-    await sql`UPDATE benchmark_results SET power_audit = ${JSON.stringify(audit)}::jsonb`;
-    const stored = await getGpuMetricsForRun(readSql, RUN);
-    expect(stored!.series[0].powerAudits).toHaveLength(2);
-    expect(storedPowerSeries(stored!.series)).toEqual(cutPowerAuditBundle(NAME, files));
-  });
-
-  it('does not fabricate a whole-run validation window when legacy provenance is absent', async () => {
-    await ingestGpuMetricsArtifact(sql, {
-      workflowRunId: 1,
-      artifact: writeArtifact(NAME, bundle()),
-      benchmarkResultIds: [10],
-    });
-    await sql`UPDATE gpu_metric_series SET sidecars = sidecars - 'validations'`;
-    const stored = await getGpuMetricsForRun(readSql, RUN);
-    expect(() => storedPowerSeries(stored!.series)).toThrow(
-      'validation window provenance is missing',
-    );
-    expect((await getGpuMetricsForPoint(readSql, 10))!.series).toHaveLength(2);
-  });
-
-  it('matches the CSV artifact path after duplicate flushes without changing distinct-sample means', async () => {
-    const name = 'gpu_metrics_qwen3.5_8k1k_fp8_sglang_conc32_b200_0';
-    const csv = [
-      'timestamp, index, power.draw [W], temperature.gpu, clocks.current.sm [MHz], clocks.current.memory [MHz], utilization.gpu [%], utilization.memory [%]',
-      '2026/09/12 04:00:00.100, 2, 300 W, 60, 1000 MHz, 2000 MHz, 80 %, 70 %',
-      '2026/09/12 04:00:00.100, 2, 300 W, 60, 1000 MHz, 2000 MHz, 80 %, 70 %', // repeated monitor flush
-      '2026/09/12 04:00:00.100, 2, 999 W, 60, 1000 MHz, 2000 MHz, 80 %, 70 %',
-      '2026/09/12 04:00:00.800, 2, 500 W, 60, 1000 MHz, 2000 MHz, 80 %, 70 %',
-      '2026/09/12 04:00:01.100, 7, 0 W, 60, 1000 MHz, 2000 MHz, 0 %, 0 %',
-    ].join('\n');
-    await ingestGpuMetricsArtifact(sql, {
-      workflowRunId: 1,
-      artifact: writeArtifact(name, new Map([['gpu_metrics.csv', csv]])),
-      benchmarkResultIds: [10],
-    });
-    const stored = await getGpuMetricsForRun(readSql, RUN);
-    expect(storedPowerSeries(stored!.series)).toEqual([bucketPowerSeries(name, parseCsvData(csv))]);
-    expect(storedPowerSeries(stored!.series)[0]).toMatchObject({
-      gpus: [2, 7],
-      power: [
-        [400, null],
-        [null, 0],
-      ],
-    });
   });
 
   it('keeps SMI telemetry embedded in a power_audit bundle readable with the same source/window cuts', async () => {

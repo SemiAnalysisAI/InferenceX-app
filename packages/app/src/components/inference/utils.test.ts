@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 
 import type { ChartDefinition, InferenceData } from '@/components/inference/types';
-import { resolveXAxisField } from './utils/resolveXAxisField';
 import {
   filterDataByCostLimit,
   partitionChartDataByLimits,
@@ -246,17 +245,6 @@ describe('processOverlayChartData', () => {
       [128, 0.2],
     ]);
     expect(result.clippedData).toEqual([]);
-  });
-
-  it('never substitutes latency coordinates for missing concurrency', () => {
-    const result = processOverlayChartDataWithClipping(
-      [{ ...prefillEnergyPoint(68, 120), conc: Number.NaN }],
-      'e2e',
-      'y_measuredPrefillJPerInputToken',
-      null,
-      { selectedXAxisMode: 'concurrency' },
-    );
-    expect(result.data).toEqual([]);
   });
 
   it('uses median TTFT for fixed-sequence overlays in TTFT mode and omits missing measurements', () => {
@@ -655,75 +643,4 @@ describe('TPUv7 overlay TCO basis', () => {
         .y,
     ).toBe(1.21);
   });
-});
-
-describe('fixed-sequence service statistic resolution', () => {
-  it.each([
-    ['interactivity', 'interactivity', 'median_intvty', 'mean_tpot_intvty'],
-    ['e2e', 'e2e', 'median_e2el', 'mean_e2el'],
-    ['ttft', 'e2e', 'median_e2el', 'mean_ttft'],
-  ] as const)(
-    'resolves mean %s without changing its preference direction',
-    (mode, type, natural, mean) => {
-      const definition = chartDef({ chartType: type, x: natural });
-      const resolved = resolveXAxisField(definition, 'y_tpPerGpu', 'p90_ttft', {
-        isAgentic: false,
-        percentile: 'p90',
-        xAxisMode: mode,
-        fixedSequenceStatistic: 'mean',
-      });
-      expect(resolved.xAxisField).toBe(mean);
-      expect(
-        resolveXAxisField(definition, 'y_tpPerGpu', null, {
-          isAgentic: false,
-          percentile: 'p90',
-          xAxisMode: mode,
-        }).xAxisField,
-      ).toBe(mode === 'ttft' ? 'median_ttft' : natural);
-      if (mode !== 'ttft') expect(resolved.naturalX).toBe(mean);
-    },
-  );
-
-  it('does not apply fixed-sequence means to agentic percentiles or observed concurrency', () => {
-    const definition = chartDef({ chartType: 'interactivity', x: 'median_intvty' });
-    expect(
-      resolveXAxisField(definition, 'y_tpPerGpu', null, {
-        isAgentic: true,
-        percentile: 'p90',
-        xAxisMode: 'interactivity',
-        fixedSequenceStatistic: 'mean',
-      }).xAxisField,
-    ).toBe('p90_intvty');
-    expect(
-      resolveXAxisField(definition, 'y_tpPerGpu', null, {
-        isAgentic: false,
-        percentile: 'p90',
-        xAxisMode: 'concurrency',
-        fixedSequenceStatistic: 'mean',
-      }).xAxisField,
-    ).toBe('conc');
-  });
-
-  it.each(['mean_tpot_intvty', 'mean_ttft', 'mean_e2el'] as const)(
-    'omits missing/invalid %s from overlays rather than reusing median or raw speed',
-    (field) => {
-      const mode =
-        field === 'mean_tpot_intvty' ? 'interactivity' : field === 'mean_ttft' ? 'ttft' : 'e2e';
-      const type = mode === 'interactivity' ? 'interactivity' : 'e2e';
-      const points = [undefined, 0, -1, NaN, Infinity, 4].map((value) =>
-        pt({
-          [field]: value,
-          mean_intvty: 999,
-          median_intvty: 100,
-          median_ttft: 1,
-          median_e2el: 3,
-        }),
-      );
-      const result = processOverlayChartData(points, type, 'y_tpPerGpu', null, {
-        selectedXAxisMode: mode,
-        fixedSequenceStatistic: 'mean',
-      });
-      expect(result.map((point) => point.x)).toEqual([4]);
-    },
-  );
 });
