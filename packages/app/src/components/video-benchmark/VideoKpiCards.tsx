@@ -1,0 +1,145 @@
+'use client';
+
+import { Card } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useLocale } from '@/lib/use-locale';
+import { leadCell } from './deployment';
+import { hardwareLabel, VIDEO_HARDWARE_ROSTER } from './hardware';
+import { formatMetric, metricValue, type MetricId, type VideoPoint } from './metrics';
+import { latestVideoCells } from './points';
+import { metricOptions, type VideoDashboardState } from './video-url-state';
+
+const CARD_METRICS = [
+  'p50Latency',
+  'videosPerGpuHour',
+  'dollarsPerVideo',
+  'kjPerVideo',
+] as const satisfies readonly MetricId[];
+const STRINGS = {
+  en: {
+    p50Latency: 'P50 time to video (s)',
+    videosPerGpuHour: 'Videos / GPU-hr',
+    dollarsPerVideo: 'TCO / video',
+    kjPerVideo: 'kJ / video',
+    p90: 'P90',
+    api: 'API list',
+    gpus: 'GPUs',
+    of: 'of',
+    unavailable: 'Not measured',
+    why: 'Failed run',
+  },
+  zh: {
+    p50Latency: 'P50 出片时间（s）',
+    videosPerGpuHour: '视频数 / GPU 小时',
+    dollarsPerVideo: 'TCO / 条视频',
+    kjPerVideo: 'kJ / 条视频',
+    p90: 'P90',
+    api: 'API 标价',
+    gpus: '张 GPU',
+    of: '/',
+    unavailable: '未测得',
+    why: '失败的运行',
+  },
+};
+
+/**
+ * One card per campaign hardware on its most efficient deployment: time to
+ * video, output per GPU-hour, TCO cost per video beside the API list price,
+ * and energy per video. Hardware without a valid run says so instead of vanishing.
+ */
+export default function VideoKpiCards({
+  points,
+  state,
+  colorFor,
+  loading = false,
+}: {
+  points: VideoPoint[];
+  state: VideoDashboardState;
+  colorFor: (hardwareKey: string) => string;
+  /** While the published history loads, show placeholders rather than a false "Not measured". */
+  loading?: boolean;
+}) {
+  const locale = useLocale();
+  const s = STRINGS[locale];
+  const options = metricOptions(state);
+  const cells = latestVideoCells(points);
+  const secondary = (point: VideoPoint, id: (typeof CARD_METRICS)[number]) => {
+    if (id === 'p50Latency')
+      return `${s.p90} ${formatMetric(metricValue(point, 'p90Latency', options), 'p90Latency')}`;
+    if (id === 'dollarsPerVideo') {
+      const api = metricValue(point, 'apiPricePerVideo', options);
+      return api === null ? null : `${s.api} ${formatMetric(api, 'apiPricePerVideo')}`;
+    }
+    return null;
+  };
+  return (
+    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" data-testid="video-kpi-cards">
+      {VIDEO_HARDWARE_ROSTER.map(({ key, unavailable }) => {
+        const point = leadCell(cells, key, options);
+        return (
+          <Card key={key} className="gap-2 p-4" data-testid="video-kpi-card" data-hardware={key}>
+            <div className="flex flex-wrap items-center gap-2">
+              <span
+                className="size-2.5 shrink-0 rounded-full"
+                style={{ backgroundColor: colorFor(key) }}
+              />
+              <span className="font-semibold">{hardwareLabel(key)}</span>
+              {point && (
+                <span className="text-2xs text-muted-foreground">
+                  {point.participating ?? '—'} {s.of} {point.allocated ?? '—'} {s.gpus}
+                  {point.server?.tp !== null &&
+                    point.server?.tp !== undefined &&
+                    point.server.ulysses !== null &&
+                    ` · TP${point.server.tp} × Ulysses ${point.server.ulysses}`}
+                </span>
+              )}
+            </div>
+            {!point && loading ? (
+              <div className="space-y-2" data-testid="video-kpi-skeleton" aria-busy="true">
+                {CARD_METRICS.map((id) => (
+                  <Skeleton key={id} className="h-3 w-full" />
+                ))}
+              </div>
+            ) : point ? (
+              <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
+                {CARD_METRICS.map((id) => {
+                  const note = secondary(point, id);
+                  return (
+                    <div key={id} className="contents">
+                      <dt className="text-muted-foreground">{s[id]}</dt>
+                      <dd className="text-right font-medium tabular-nums">
+                        {formatMetric(metricValue(point, id, options), id)}
+                        {note && (
+                          <span className="ml-1 text-2xs font-normal text-muted-foreground">
+                            {note}
+                          </span>
+                        )}
+                      </dd>
+                    </div>
+                  );
+                })}
+              </dl>
+            ) : (
+              <p className="text-xs text-muted-foreground" data-testid="video-kpi-unavailable">
+                <span className="font-medium text-foreground">{s.unavailable}.</span>{' '}
+                {unavailable && (
+                  <>
+                    {unavailable[locale]}{' '}
+                    <a
+                      className="underline underline-offset-2"
+                      href={unavailable.runUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      {s.why}
+                    </a>
+                  </>
+                )}
+              </p>
+            )}
+          </Card>
+        );
+      })}
+    </div>
+  );
+}

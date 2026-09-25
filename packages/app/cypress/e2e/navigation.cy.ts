@@ -1,6 +1,7 @@
 import { SUPPLEMENTAL_BENCHMARK_ROWS } from '../../src/lib/supplemental-benchmarks';
 import { OVERLAY_RUN_ID, OVERLAY_RUN_URL } from '../support/overlay-fixtures';
-import { servingArtifact, videoRun } from '../support/video-artifacts';
+import { videoHistoryEntry } from '../../src/components/video-benchmark/history';
+import { servingArtifact } from '../support/video-artifacts';
 
 const datum = (el: Element) => (el as Element & { __data__: { x: number; y: number } }).__data__;
 
@@ -372,91 +373,46 @@ describe('TPUv7 results', { testIsolation: true }, () => {
   });
 });
 
-describe('H3 video artifact viewer', () => {
+describe('H3 video performance history', () => {
   beforeEach(() => {
-    cy.intercept('GET', '/api/video-runs?page=*', { runs: [], nextPage: null });
-  });
-  it('shares a comparison built by opening two CI runs through the page', () => {
-    for (const saved of [
-      servingArtifact(123, 40, 'NVIDIA H200'),
-      servingArtifact(456, 41, 'NVIDIA B200'),
-    ]) {
-      cy.intercept('GET', `/api/video-runs?run=${saved.runId}`, {
-        run: videoRun(Number(saved.runId), 'success'),
-        artifacts: [saved.artifact],
-      });
-      cy.intercept(
-        'GET',
-        `/api/video-runs?run=${saved.runId}&artifact=${saved.artifact.id}&format=media`,
-        saved,
-      );
-    }
-    cy.intercept('GET', 'https://media.test/**', { statusCode: 204 });
-    cy.visit('/video?view=tradeoff&run=123&artifact=40');
-    cy.get('[data-testid="video-tradeoff"] tbody tr').should('have.length', 3);
-    cy.contains('summary', 'Run details and artifact selection').click();
-    cy.get('[data-testid="video-ci-runs"] form input').type('456');
-    cy.get('[data-testid="video-ci-runs"] form').submit();
-    cy.get('[data-testid="video-tradeoff"] tbody tr').should('have.length', 6);
-    cy.location().should((location) => {
-      const params = new URLSearchParams(location.search);
-      expect(params.get('run')).to.equal('456');
-      expect(params.get('compare')).to.equal('123.40,456.41');
+    cy.intercept('GET', '/api/video-runs?format=history&page=*', {
+      schemaVersion: 1,
+      entries: [],
+      nextPage: null,
     });
-    cy.reload();
-    cy.get('[data-testid="video-tradeoff"] tbody tr').should('have.length', 6);
-    cy.get('[data-testid="video-tradeoff"]')
-      .should('contain', 'NVIDIA H200')
-      .and('contain', 'NVIDIA B200');
   });
-  it('restores a cross-hardware comparison on reload and retains good results when one artifact fails', () => {
-    const h200 = servingArtifact(123, 40, 'NVIDIA H200');
-    const b200 = servingArtifact(456, 41, 'NVIDIA B200');
-    for (const saved of [h200, b200]) {
-      cy.intercept('GET', `/api/video-runs?run=${saved.runId}`, {
-        run: videoRun(Number(saved.runId), 'success'),
-        artifacts: [saved.artifact],
-      });
-      cy.intercept(
-        'GET',
-        `/api/video-runs?run=${saved.runId}&artifact=${saved.artifact.id}&format=media`,
-        saved,
-      );
-    }
-    cy.intercept('GET', '/api/video-runs?run=789&artifact=42&format=media', {
-      statusCode: 503,
-      body: { error: 'Synthetic unavailable artifact' },
-    });
-    cy.intercept('GET', 'https://media.test/**', { statusCode: 204 });
-    cy.visit('/video?view=tradeoff&run=123&artifact=40&source=123&compare=123.40,456.41,789.42');
-    cy.get('[data-testid="video-tradeoff"] tbody tr').should('have.length', 6);
-    cy.get('[data-testid="tradeoff-detail"]').should('contain', 'NVIDIA H200');
-    cy.get('[data-testid="video-tradeoff"]')
-      .should('contain', 'NVIDIA H200')
-      .and('contain', 'NVIDIA B200');
-    cy.get('[role="alert"]').should('contain', 'Some comparison results could not be loaded');
+  it('opens published history behind the dashboard and restores its filters after reload', () => {
+    const entry = videoHistoryEntry(servingArtifact(), '2026-09-09T00:00:00Z');
+    cy.intercept('GET', '/api/video-runs?format=history&page=1', {
+      schemaVersion: 1,
+      entries: [entry],
+      nextPage: null,
+    }).as('history');
+    cy.visit('/video');
+    cy.wait('@history');
+    cy.get('[data-testid="video-history"]').should('not.exist');
+    cy.get('[data-testid="video-history-section"] summary').click();
+    cy.get('[data-testid="video-history"] h1').should('contain', 'Performance history');
+    cy.get('[data-testid="video-history-observation"]').should('have.length', 3);
+    cy.get('[aria-label="Client concurrency"]').click();
+    cy.contains('[role="option"]', 'C2').click();
+    cy.get('[data-testid="video-history-observation"]')
+      .should('have.length', 1)
+      .and('contain', 'C2');
     cy.reload();
-    cy.get('[data-testid="video-tradeoff"] tbody tr').should('have.length', 6);
-    cy.get('[data-testid="tradeoff-detail"]').should('contain', 'NVIDIA H200');
-    cy.contains(
-      '[data-testid="video-tradeoff"] tbody button',
-      /NVIDIA B200.*Client concurrency 4/,
-    ).click();
-    cy.contains('button', 'Open videos and full result').click();
-    cy.get('[data-testid="serving-selected-metrics"]').should('contain', 'C4');
-    cy.location('search').should('include', 'run=456').and('include', 'compare=');
-    cy.get('[data-testid="serving-media"] video')
-      .should('have.attr', 'src')
-      .and('include', '/gpu/c4/');
+    cy.get('[data-testid="video-history-observation"]')
+      .should('have.length', 1)
+      .and('contain', 'C2')
+      .and('contain', '240 / —');
+    cy.location('search').should('contain', 'history-concurrency=2');
   });
-  it('uses the shared unlock for navigation and keeps an empty viewer free of sample results', () => {
+  it('keeps the hidden Video tab behind the shared unlock and noindex', () => {
     cy.viewport(1440, 1000);
     cy.visit('/video', {
       onBeforeLoad(win) {
         win.localStorage.removeItem('inferencex-feature-gate');
       },
     });
-    cy.get('[data-testid="video-ci-runs"]').should('contain', 'No H3 runs in this page');
     cy.get('video[data-role]').should('not.exist');
     cy.get('[data-testid="tab-trigger-hidden"]').should('not.exist');
     cy.get('body').type('{upArrow}{upArrow}{downArrow}{downArrow}');
@@ -464,16 +420,10 @@ describe('H3 video artifact viewer', () => {
     cy.contains('a', 'Video').should('have.attr', 'href', '/video');
     cy.get('head meta[name="robots"]').should('have.attr', 'content', 'noindex, nofollow');
   });
-  it('shows a recoverable load error and the Chinese empty state', () => {
-    cy.visit('/video');
-    cy.contains('summary', 'Local artifact tools').click();
-    cy.get('[data-testid="video-benchmark"]').contains('summary', 'Manifest URL').click();
-    cy.get('input[aria-label="Manifest URL"]').type('https://example.com/wrong.json');
-    cy.contains('button', 'Load manifest').click();
-    cy.get('[role="alert"]').should('contain', 'Could not load this bundle');
-    cy.get('video[data-role]').should('not.exist');
-    cy.visit('/zh/video');
-    cy.get('[data-testid="video-ci-runs"]').should('contain', '本页 GitHub 历史中没有 H3 运行');
+  it('renders the Chinese history section for a history deep link', () => {
+    cy.visit('/zh/video?history-hardware=H200');
+    cy.get('[data-testid="video-history-section"]').should('have.attr', 'open');
+    cy.get('[data-testid="video-history"] h1').should('contain', '性能历史');
     cy.get('head meta[name="robots"]').should('have.attr', 'content', 'noindex, nofollow');
   });
 });

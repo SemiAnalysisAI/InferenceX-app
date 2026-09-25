@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-08-20T08:25:30.857Z",
+  "generatedAt": "2026-09-20T03:49:19.738Z",
   "fixtures": {
     "agentic-catalog": {
       "bytes": 10027,
@@ -91,6 +91,13 @@
       "capturedAt": null,
       "sha256": "f28d2220e5246ad70113e38e49394bc7a0bfe9afba8cedf08b90e39042e53357",
       "source": null,
+      "topLevel": "object"
+    },
+    "video-history": {
+      "bytes": 18371,
+      "capturedAt": "2026-09-20T03:49:19.738Z",
+      "sha256": "16c1b9c97824fc68160454c14aeb79f2c3404595a5bd97b9bb8f286de42539f9",
+      "source": "Retained public H3 metadata replay from original runs via videoHistoryEntry (per-cell GPU counts, board power and server layout); publication time unavailable. No new benchmark or publication.",
       "topLevel": "object"
     }
   }
