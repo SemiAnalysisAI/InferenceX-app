@@ -75,8 +75,9 @@ export function topologyLabel(
       !peers.every((sibling) => sibling.split('|').includes(part))
     );
   });
+  // Numbers and unknowns join their name (TP4, DP?); word values need a space (offload off).
   return [
     modes[mode as keyof typeof modes] ?? mode,
-    ...visible.map((part) => part.replace('=', '')),
+    ...visible.map((part) => part.replace(/=(?=\p{L})/u, ' ').replace('=', '')),
   ].join(' · ');
 }
