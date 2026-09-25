@@ -7,10 +7,25 @@ interface RunProvenance {
   run_url?: string | null;
 }
 
-// Three-week recognition window, ending 2026-10-08 at 21:32 America/New_York.
-const UMBP_DSPARK_LABEL_EXPIRES_AT = Date.parse('2026-10-09T01:32:00Z');
-// Run 35879254139 is recognized through October 9, 2026 in America/New_York.
-const UMBP_GAMMA6_LABEL_EXPIRES_AT = Date.parse('2026-10-10T04:00:00Z');
+/** MoRI runs labeled UMBP indefinitely. */
+const UMBP_LABEL_RUNS = new Set(['34926284365']);
+
+/**
+ * Run-specific recognition labels and expiry (epoch ms).
+ * Once expired, the run falls back to the standard label.
+ */
+const TEMPORARY_UMBP_LABEL_RUNS: Record<string, { label: string; expiresAt: number }> = {
+  // DSpark on dsv4 AgentX disagg (InferenceX#3188): ends 2026-10-08 21:32 America/New_York.
+  '35166686551': {
+    label: 'MoRI UMBP SGLang',
+    expiresAt: Date.parse('2026-10-09T01:32:00Z'),
+  },
+  // UMBP linker + DSpark gamma 6 (InferenceX#3256): through October 9, 2026 America/New_York.
+  '35879254139': {
+    label: 'UMBP MoRI SGLang',
+    expiresAt: Date.parse('2026-10-10T04:00:00Z'),
+  },
+};
 
 /** Display-only: never change framework/hardware keys used by filters and history. */
 export function inferenceFrameworkLabelOverride(
@@ -19,13 +34,10 @@ export function inferenceFrameworkLabelOverride(
 ): string | undefined {
   if (resolveFrameworkAlias(framework) !== 'mori-sglang') return undefined;
   const runId = runIdFromRunUrl(runUrl);
-  if (runId === '35879254139' && Date.now() < UMBP_GAMMA6_LABEL_EXPIRES_AT) {
-    return 'UMBP MoRI SGLang';
-  }
-  const hasLabel =
-    runId === '34926284365' ||
-    (runId === '35166686551' && Date.now() < UMBP_DSPARK_LABEL_EXPIRES_AT);
-  return hasLabel ? 'MoRI UMBP SGLang' : undefined;
+  if (runId === null) return undefined;
+  if (UMBP_LABEL_RUNS.has(runId)) return 'MoRI UMBP SGLang';
+  const override = TEMPORARY_UMBP_LABEL_RUNS[runId];
+  return override && Date.now() < override.expiresAt ? override.label : undefined;
 }
 
 /** Keep unofficial-run identity/markers while making its special engine visible. */
