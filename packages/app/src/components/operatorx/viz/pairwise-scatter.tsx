@@ -27,11 +27,18 @@ function shared(model: ComparisonModel, a: string | undefined, b: string): numbe
     : 0;
 }
 
+function measured(model: ComparisonModel, hw: string): number {
+  return model.view.cases.filter((_, i) => model.value(hw, i) !== null).length;
+}
+
 function PairwiseScatter({ model }: { model: ComparisonModel }) {
   const { view, metric, hardware } = model;
   const [pickA, setA] = useState<string | null>(null);
   const [pickB, setB] = useState<string | null>(null);
-  const a = pickA && hardware.includes(pickA) ? pickA : (model.baseline ?? hardware[0]);
+  const a =
+    pickA && hardware.includes(pickA)
+      ? pickA
+      : (model.baseline ?? hardware.toSorted((p, q) => measured(model, q) - measured(model, p))[0]);
   const b =
     pickB && hardware.includes(pickB) && pickB !== a
       ? pickB
@@ -96,12 +103,12 @@ function PairwiseScatter({ model }: { model: ComparisonModel }) {
           xAxis={{
             label: `${hardwareLabel(a)} ${metric.label.toLowerCase()} (${metric.unit})`,
             tickCount: 5,
-            tickFormat: (v) => metric.format(Number(v)),
+            tickFormat: (v) => metric.tick(Number(v)),
           }}
           yAxis={{
             label: `${hardwareLabel(b)} (${metric.unit})`,
             tickCount: 5,
-            tickFormat: (v) => metric.format(Number(v)),
+            tickFormat: (v) => metric.tick(Number(v)),
           }}
           layers={[
             {

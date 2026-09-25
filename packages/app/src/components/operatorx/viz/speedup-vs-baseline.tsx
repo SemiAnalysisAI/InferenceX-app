@@ -39,7 +39,7 @@ function groupCases(model: ComparisonModel, grouping: Grouping): [string, number
 }
 
 function SpeedupVsBaseline({ model }: { model: ComparisonModel }) {
-  const { baseline, metric, view } = model;
+  const { baseline, view } = model;
   const [grouping, setGrouping] = useState<Grouping>('none');
   if (!baseline) return <EmptyChart>Pick a baseline GPU.</EmptyChart>;
   const grouped = grouping !== 'none';
@@ -83,7 +83,7 @@ function SpeedupVsBaseline({ model }: { model: ComparisonModel }) {
             padding: grouped ? 0.2 : 0.3,
           }}
           xAxis={{
-            label: `Advantage over ${hardwareLabel(baseline)}`,
+            label: `Geomean Advantage over ${hardwareLabel(baseline)}`,
             tickFormat: (v) => formatRatio(Number(v)),
           }}
           yAxis={{
@@ -109,8 +109,7 @@ function SpeedupVsBaseline({ model }: { model: ComparisonModel }) {
                 title: hardwareLabel(b.hw),
                 color: model.colors[b.hw],
                 rows: [
-                  `<strong>${formatRatio(b.value)}</strong> vs ${hardwareLabel(baseline)} (geomean)`,
-                  `${grouped ? `${grouping === 'size' ? `${sizeLabel} ` : ''}${b.group} · ` : ''}${b.cases} shared cases · ${metric.label.toLowerCase()}`,
+                  `${grouped ? `${grouping === 'size' ? `${sizeLabel} ` : ''}${b.group} · ` : ''}${b.cases} shared cases`,
                 ],
               }),
           }}
@@ -124,6 +123,7 @@ function SpeedupVsBaseline({ model }: { model: ComparisonModel }) {
 export const speedupVsBaseline: VizDefinition = {
   id: 'speedup-vs-baseline',
   title: 'Advantage over baseline',
+  needsBaseline: true,
   ops: ['gemm', 'moe'],
   Component: SpeedupVsBaseline,
 };

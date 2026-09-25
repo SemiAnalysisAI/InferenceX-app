@@ -83,7 +83,7 @@ function MetricVsSize({ model }: { model: ComparisonModel }) {
         yAxis={{
           label: `${metric.label} (${metric.unit})`,
           tickCount: 5,
-          tickFormat: (v) => metric.format(Number(v)),
+          tickFormat: (v) => metric.tick(Number(v)),
         }}
         layers={[
           {

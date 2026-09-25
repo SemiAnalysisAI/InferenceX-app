@@ -25,6 +25,24 @@ import { buildModel, caseRefs, type ComparisonModel } from './compare/model';
 import { VISUALIZATIONS } from './viz';
 import type { VizDefinition } from './viz/types';
 
+/** Baseline select value for "no baseline". */
+const NO_BASELINE = 'none';
+
+/** Visible cards with their width: a half card left alone in its row takes the whole row. */
+function layout(visible: VizDefinition[]): { viz: VizDefinition; wide: boolean }[] {
+  const out = visible.map((viz) => ({ viz, wide: Boolean(viz.wide) }));
+  let run: typeof out = [];
+  for (const card of [...out, null]) {
+    if (card && !card.wide) {
+      run.push(card);
+      continue;
+    }
+    if (run.length % 2 === 1) run.at(-1)!.wide = true;
+    run = [];
+  }
+  return out;
+}
+
 function setParam(key: string, value: string) {
   const params = new URLSearchParams(window.location.search);
   params.set(key, value);
@@ -48,11 +66,19 @@ function ControlGroup({
   );
 }
 
-function VizCard({ model, viz }: { model: ComparisonModel; viz: VizDefinition }) {
+function VizCard({
+  model,
+  viz,
+  wide,
+}: {
+  model: ComparisonModel;
+  viz: VizDefinition;
+  wide: boolean;
+}) {
   return (
     <Card
       data-testid={`operatorx-viz-${viz.id}`}
-      className={`min-w-0 ${viz.wide ? 'lg:col-span-2' : ''}`}
+      className={`min-w-0 ${wide ? 'lg:col-span-2' : ''}`}
     >
       <Heading as="h2" level="card" className="mb-4">
         {viz.title}
@@ -89,9 +115,11 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
     [picked, available],
   );
   const baseline =
-    pickedBaseline && hardware.includes(pickedBaseline)
-      ? pickedBaseline
-      : (hardware.find((h) => h === 'h200') ?? hardware[0] ?? null);
+    pickedBaseline === NO_BASELINE
+      ? null
+      : pickedBaseline && hardware.includes(pickedBaseline)
+        ? pickedBaseline
+        : (hardware.find((h) => h === 'h200') ?? hardware[0] ?? null);
   const model = useMemo(() => {
     if (!view) return null;
     const toggle = (hw: string) => {
@@ -136,9 +164,6 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
   return (
     <div className="flex flex-col gap-4">
       <Card className="relative z-10 py-4 md:py-5" data-testid="operatorx-controls">
-        <Heading as="h2" level="card" className="mb-4">
-          Chart controls
-        </Heading>
         <div className="grid gap-x-5 gap-y-3 sm:grid-cols-2 lg:grid-cols-4">
           <ControlGroup label="Workload" htmlFor="operatorx-workload">
             <SearchableSelect
@@ -182,13 +207,16 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
           <ControlGroup label="Baseline" htmlFor="operatorx-baseline">
             <SearchableSelect
               triggerId="operatorx-baseline"
-              value={baseline ?? ''}
+              value={baseline ?? NO_BASELINE}
               onValueChange={setBaseline}
               searchable={false}
               groups={[
                 {
                   label: '',
-                  options: hardware.map((h) => ({ value: h, label: hardwareLabel(h) })),
+                  options: [
+                    { value: NO_BASELINE, label: 'None' },
+                    ...hardware.map((h) => ({ value: h, label: hardwareLabel(h) })),
+                  ],
                 },
               ]}
             />
@@ -199,8 +227,10 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
         </div>
       </Card>
       <div className="grid gap-4 lg:grid-cols-2">
-        {VISUALIZATIONS.filter((v) => v.ops.includes(op)).map((viz) => (
-          <VizCard key={viz.id} model={model} viz={viz} />
+        {layout(
+          VISUALIZATIONS.filter((v) => v.ops.includes(op) && (baseline || !v.needsBaseline)),
+        ).map(({ viz, wide }) => (
+          <VizCard key={viz.id} model={model} viz={viz} wide={wide} />
         ))}
       </div>
       <CaseDetail

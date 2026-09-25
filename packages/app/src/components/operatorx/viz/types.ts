@@ -10,5 +10,7 @@ export interface VizDefinition {
   ops: ComparisonOp[];
   /** Spans the full row instead of half of it. */
   wide?: boolean;
+  /** Compares against the baseline GPU; hidden when none is picked. */
+  needsBaseline?: boolean;
   Component: (props: { model: ComparisonModel }) => React.ReactNode;
 }

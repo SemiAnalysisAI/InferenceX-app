@@ -2,10 +2,15 @@
 
 import { ticks } from 'd3';
 import { Loader2 } from 'lucide-react';
+import { useTheme } from 'next-themes';
 import { useMemo, useState } from 'react';
 
 import type { ComparisonOp, ComparisonView } from '@semianalysisai/inferencex-db/operatorx/compare';
-import type { OperatorXTimeline } from '@semianalysisai/inferencex-db/operatorx/timeline';
+import {
+  KERNEL_CATEGORIES,
+  type KernelCategory,
+  type OperatorXTimeline,
+} from '@semianalysisai/inferencex-db/operatorx/timeline';
 import {
   Dialog,
   DialogContent,
@@ -15,15 +20,47 @@ import {
 } from '@/components/ui/dialog';
 import { RetryableQueryError } from '@/components/ui/retryable-query-error';
 import { useOperatorXTimelines } from '@/hooks/api/use-operatorx';
-import { TABLEAU_10 } from '@/lib/constants';
 
 import { hardwareLabel } from './compare/hardware';
 import { caseRefs } from './compare/model';
 import { caseLabel } from './compare/slices';
 
-/** Kernels past the palette share one muted color. */
-const PALETTE = TABLEAU_10.slice(0, 9);
+type CategoryColors = Record<KernelCategory, string>;
+
 const OTHER = 'var(--muted-foreground)';
+
+/**
+ * One fixed color per kernel category, so a color means the same work on every GPU.
+ * Categorical slots 1-7 of the dataviz reference palette, stepped per theme and
+ * validated against the site's surfaces.
+ */
+const CATEGORY_COLORS: Record<'light' | 'dark', CategoryColors> = {
+  light: {
+    gemm: '#2a78d6',
+    'expert-gemm': '#eb6834',
+    quantize: '#1baf7a',
+    activation: '#eda100',
+    routing: '#e87ba4',
+    reduce: '#008300',
+    memory: '#4a3aa7',
+    other: OTHER,
+  },
+  dark: {
+    gemm: '#3987e5',
+    'expert-gemm': '#d95926',
+    quantize: '#199e70',
+    activation: '#c98500',
+    routing: '#d55181',
+    reduce: '#008300',
+    memory: '#9085e9',
+    other: OTHER,
+  },
+};
+
+const CATEGORY_LABEL = Object.fromEntries(KERNEL_CATEGORIES.map((c) => [c.id, c.label])) as Record<
+  KernelCategory,
+  string
+>;
 
 function formatUs(us: number): string {
   if (us >= 1000) return `${Number((us / 1000).toPrecision(3))} ms`;
@@ -64,24 +101,46 @@ function shortName(name: string): string {
   return out.trim() || name;
 }
 
-/** Color per kernel-name index: the GPU's longest kernels in palette order. */
-function kernelColors(t: OperatorXTimeline): (i: number) => string {
-  const ranked = new Map(t.kernels.slice(0, PALETTE.length).map((k, r) => [k.name, PALETTE[r]]));
-  return (i) => ranked.get(i) ?? OTHER;
+/** The categories present in the timelines, in legend order. */
+function CategoryLegend({
+  timelines,
+  palette,
+}: {
+  timelines: OperatorXTimeline[];
+  palette: CategoryColors;
+}) {
+  const present = new Set(timelines.flatMap((t) => t.categories));
+  return (
+    <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+      {KERNEL_CATEGORIES.filter((c) => present.has(c.id)).map((c) => (
+        <span key={c.id} className="flex items-center gap-1.5">
+          <span
+            className="inline-block size-2.5 rounded-sm"
+            style={{ background: palette[c.id] }}
+          />
+          {c.label}
+        </span>
+      ))}
+    </div>
+  );
 }
 
 function TimeAxis({ scaleUs }: { scaleUs: number }) {
+  const [unit, div] = scaleUs >= 2000 ? ['ms', 1000] : ['µs', 1];
   return (
-    <div className="relative ml-20 h-4 text-3xs text-muted-foreground tabular-nums">
-      {ticks(0, scaleUs, 5).map((t) => (
-        <span
-          key={t}
-          className="absolute -translate-x-1/2 border-l border-border/60 pl-0.5"
-          style={{ left: `${(t / scaleUs) * 100}%` }}
-        >
-          {formatUs(t)}
-        </span>
-      ))}
+    <div className="flex h-4 text-3xs text-muted-foreground tabular-nums">
+      <span className="w-20 shrink-0 pr-2">time ({unit})</span>
+      <div className="relative flex-1">
+        {ticks(0, scaleUs, 5).map((t) => (
+          <span
+            key={t}
+            className="absolute -translate-x-1/2 border-l border-border/60 pl-0.5"
+            style={{ left: `${(t / scaleUs) * 100}%` }}
+          >
+            {Number((t / div).toPrecision(3))}
+          </span>
+        ))}
+      </div>
     </div>
   );
 }
@@ -92,15 +151,17 @@ function GpuTimeline({
   latencyUs,
   timeline,
   scaleUs,
+  palette,
 }: {
   hardware: string;
   color: string;
   latencyUs: number | null;
   timeline: OperatorXTimeline | null;
   scaleUs: number;
+  palette: CategoryColors;
 }) {
   const [hovered, setHovered] = useState<number | null>(null);
-  const colorOf = useMemo(() => (timeline ? kernelColors(timeline) : () => OTHER), [timeline]);
+  const colorOf = (name: number) => (timeline ? palette[timeline.categories[name]] : OTHER);
   const event = timeline && hovered !== null ? timeline.events[hovered] : null;
   const total = timeline?.kernels.reduce((sum, k) => sum + k.usPerCall, 0) ?? 0;
   return (
@@ -113,13 +174,6 @@ function GpuTimeline({
         {latencyUs !== null && (
           <span className="tabular-nums">
             <span className="text-muted-foreground">latency</span> {formatUs(latencyUs)}
-          </span>
-        )}
-        {timeline && (
-          <span className="text-xs text-muted-foreground tabular-nums">
-            span {formatUs(timeline.spanUs)} · busy {formatUs(timeline.busyUs)} · idle{' '}
-            {formatUs(timeline.gapUs)}
-            {timeline.overlapUs > 0 && ` · overlap ${formatUs(timeline.overlapUs)}`}
           </span>
         )}
       </div>
@@ -154,6 +208,7 @@ function GpuTimeline({
           <p className="ml-20 min-h-4 truncate text-xs text-muted-foreground tabular-nums">
             {event ? (
               <>
+                {CATEGORY_LABEL[timeline.categories[event[0]]]} ·{' '}
                 <span className="font-mono text-foreground">
                   {shortName(timeline.names[event[0]])}
                 </span>{' '}
@@ -232,6 +287,7 @@ function CaseTimelines({
   caseIndex: number;
 }) {
   const refs = useMemo(() => caseRefs(view, hardware, caseIndex), [view, hardware, caseIndex]);
+  const palette = CATEGORY_COLORS[useTheme().resolvedTheme === 'dark' ? 'dark' : 'light'];
   const { data, error, isLoading, refetch } = useOperatorXTimelines(
     op,
     refs.map((r) => r.ref),
@@ -254,8 +310,10 @@ function CaseTimelines({
       </div>
     );
   const longest = Math.max(...refs.map((r) => data[r.ref]?.spanUs ?? 0), 0);
+  const timelines = refs.flatMap((r) => data[r.ref] ?? []);
   return (
     <div className="space-y-3">
+      <CategoryLegend timelines={timelines} palette={palette} />
       {refs.map(({ hardware: hw, ref }) => {
         const timeline = data[ref] ?? null;
         const scaleUs = longest || 1;
@@ -267,6 +325,7 @@ function CaseTimelines({
             latencyUs={view.measurements[hw]?.latencyUs[caseIndex] ?? null}
             timeline={timeline}
             scaleUs={scaleUs}
+            palette={palette}
           />
         );
       })}

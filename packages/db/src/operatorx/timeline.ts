@@ -11,6 +11,42 @@ const TIMELINE_NAME_MAX = 115;
 const isObj = (v: unknown): v is Obj => typeof v === 'object' && v !== null && !Array.isArray(v);
 const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
 
+/** What a kernel does, from its name; the drill-down colors by it. */
+export const KERNEL_CATEGORIES = [
+  { id: 'gemm', label: 'GEMM' },
+  { id: 'expert-gemm', label: 'Expert GEMM' },
+  { id: 'quantize', label: 'Quantize' },
+  { id: 'activation', label: 'Activation' },
+  { id: 'routing', label: 'Routing' },
+  { id: 'reduce', label: 'Reduce' },
+  { id: 'memory', label: 'Elementwise / memory' },
+  { id: 'other', label: 'Other' },
+] as const;
+
+export type KernelCategory = (typeof KERNEL_CATEGORIES)[number]['id'];
+
+/**
+ * First match wins, so the specific rules come first: a split-K reduce named `_gemm_…
+ * reduce_kernel` is a reduce, a `QuantGemm` is a GEMM, `router_gemm` is a GEMM.
+ * Mangled names are matched as-is; their identifiers survive mangling.
+ */
+const CATEGORY_RULES: [KernelCategory, RegExp][] = [
+  ['expert-gemm', /fused_moe|fmoe|moe_gemm|gemm_moe|marlin_moe|moe_wna16|^_matmul_/i],
+  ['reduce', /reduce|moe_sum|combine/i],
+  ['quantize', /quant(?!gemm)|cvt_fp\d+_to_fp\d|scale_1x128/i],
+  ['activation', /act_and_mul|silu|gelu|sigmoid|swiglu|situ_and_mul/i],
+  ['routing', /topk|gating|softmax|align_block|sort|expert_count|scatter|gather|index/i],
+  [
+    'gemm',
+    /gemm|nvjet|^cijk_|cutlass|marlin|matmul|cublas|wvsplitk|dotprod|hipblaslt|xdl|mfma|wmma/i,
+  ],
+  ['memory', /elementwise|copy|fill|memset|memcpy|rocclr|ragged_tensor|triton_poi/i],
+];
+
+export function kernelCategory(name: string): KernelCategory {
+  return CATEGORY_RULES.find(([, re]) => re.test(name))?.[0] ?? 'other';
+}
+
 /** Per-call totals of one kernel over the profiled replays. */
 export interface TimelineKernel {
   /** Index into `OperatorXTimeline.names`. */
@@ -33,6 +69,8 @@ export interface OperatorXTimeline {
   lanes: string[];
   /** Distinct kernel names; events and kernels refer to them by index. */
   names: string[];
+  /** Category of each name, parallel to `names`. */
+  categories: KernelCategory[];
   /** `[name, lane, startUs, durUs]`, op-relative, sorted by start. */
   events: [number, number, number, number][];
   /** Longest first. */
@@ -101,6 +139,7 @@ export function compactTimeline(metrics: Obj | null | undefined): OperatorXTimel
     overlapUs: num(p.overlap_us) ?? 0,
     lanes,
     names,
+    categories: names.map(kernelCategory),
     events,
     kernels,
     truncated: launched > events.length + 0.5,
