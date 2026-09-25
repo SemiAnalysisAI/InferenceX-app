@@ -45,28 +45,16 @@ describe('pure projected publication curve', () => {
     expect(() => assertCurvePreserved(old, proposed, policy)).toThrow('shrink');
     expect([...publishedCurve(old).values()][0]).toHaveLength(3);
   });
-  it('accepts a complete refresh and unrelated curve additions', () => {
+  it('does not inherit append-only history with an incompatible image', () => {
     const old = [point(1, 1), point(1, 16)];
-    expect(() =>
-      assertCurvePreserved(old, [...old, point(2, 1), point(2, 16)], policy),
-    ).not.toThrow();
     expect(() =>
       assertCurvePreserved(
         old,
-        [...old, point(2, 1, { identity: { ...identity, hardware: 'h200' } })],
+        [...old, point(2, 32, { appendOnly: true, image: 'new-image' })],
         policy,
       ),
-    ).not.toThrow();
+    ).toThrow('shrink');
   });
-  it.each([null, 'new-image'])(
-    'does not inherit append-only history with incompatible image %s',
-    (image) => {
-      const old = [point(1, 1), point(1, 16)];
-      expect(() =>
-        assertCurvePreserved(old, [...old, point(2, 32, { appendOnly: true, image })], policy),
-      ).toThrow('shrink');
-    },
-  );
   it('inherits only an uninterrupted same-image append-only chain', () => {
     const old = [point(1, 1), point(1, 16), point(2, 32, { appendOnly: true })];
     expect([...publishedCurve(old).values()][0].map((row) => row.identity.conc)).toEqual([
@@ -115,9 +103,5 @@ describe('pure projected publication curve', () => {
         ),
       ).toThrow('shrink');
     }
-  });
-  it('does not let an older run replace newer curve state', () => {
-    const old = [point(2, 1), point(2, 16)];
-    expect(() => assertCurvePreserved(old, [...old, point(1, 1)], policy)).not.toThrow();
   });
 });

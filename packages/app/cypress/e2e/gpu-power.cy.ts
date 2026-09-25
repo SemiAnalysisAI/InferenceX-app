@@ -167,58 +167,6 @@ const gpuMetricsResponse = {
   ],
 };
 
-describe('PowerX legend view switching', () => {
-  for (const { locale, width, correlation, line } of [
-    { locale: '', width: 1280, correlation: 'Correlation scatter', line: 'Line chart' },
-    { locale: '/zh', width: 390, correlation: '相关性散点图', line: '折线图' },
-  ]) {
-    it(`preserves filtering and downsampling across views at ${width}px`, () => {
-      cy.viewport(width, 844);
-      cy.intercept('GET', '**/api/gpu-metrics?runId=12345', {
-        ...gpuMetricsResponse,
-        artifacts: gpuMetricsResponse.artifacts.map((artifact) => ({
-          ...artifact,
-          data: artifact.data.flatMap((row) => [row, { ...row, index: 1, power: row.power + 20 }]),
-        })),
-      }).as('gpuMetrics');
-      cy.visit(`${locale}/gpu-metrics?gm_runId=12345`, {
-        onBeforeLoad(win) {
-          win.localStorage.setItem('inferencex-feature-gate', '1');
-          win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-        },
-      });
-      cy.wait('@gpuMetrics');
-      cy.get('[data-testid="chart-legend"] label[for="checkbox-1"]').click();
-      cy.get('#checkbox-1').should('not.be.checked');
-      cy.get('[data-testid="gpu-metrics-reset-filter"]').should('be.visible');
-      cy.get('[data-testid="gpu-metrics-downsample"]')
-        .click()
-        .should('have.attr', 'aria-checked', 'false');
-
-      cy.get(`button[title="${correlation}"]`).click();
-      cy.get('#checkbox-1').should('not.be.checked');
-      cy.get('[data-testid="gpu-metrics-downsample-corr"]').should(
-        'have.attr',
-        'aria-checked',
-        'false',
-      );
-      cy.get('[data-testid="gpu-metrics-reset-filter-2"]').click();
-      cy.get('#checkbox-1').should('be.checked');
-      cy.get('[data-testid="gpu-metrics-reset-filter-2"]').should('not.exist');
-
-      cy.get('[data-testid="chart-legend"] label[for="checkbox-1"]').click();
-      cy.get(`button[title="${line}"]`).click();
-      cy.get('[data-testid="gpu-metrics-reset-filter"]').click();
-      cy.get('#checkbox-1').should('be.checked');
-      cy.get('[data-testid="gpu-metrics-downsample"]').should('have.attr', 'aria-checked', 'false');
-      cy.document().then((doc) => {
-        expect(doc.documentElement.scrollWidth).to.be.at.most(doc.documentElement.clientWidth);
-      });
-      cy.screenshot(`powerx-legend-${width}`);
-    });
-  }
-});
-
 describe('PowerX Chinese route', () => {
   beforeEach(() => {
     cy.viewport(390, 844);

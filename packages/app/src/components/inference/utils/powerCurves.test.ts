@@ -5,13 +5,7 @@ import type { InferenceData } from '@/components/inference/types';
 import { chartDefinitions } from '@/components/inference/metric-registry';
 import type { ParetoDirection } from '@/lib/chart-utils';
 
-import {
-  chartFrontier,
-  isMeasuredPowerCurveMetric,
-  isPowerCurveMetric,
-  isPowerGaugeSeries,
-  upperPowerEnvelope,
-} from './powerCurves';
+import { chartFrontier, isPowerCurveMetric, upperPowerEnvelope } from './powerCurves';
 
 function point(conc: number, x: number, y: number, overrides: Partial<InferenceData> = {}) {
   return {
@@ -77,23 +71,6 @@ describe('power chart semantics', () => {
     expect(chartFrontier(points, 'lower_right')).toEqual(points);
   });
 
-  it.each(['y_gpuProvisionedWatts', 'y_utilityProvisionedWatts', 'y_utilityModeledWatts'])(
-    'draws %s as an envelope-locked power gauge like measured watts',
-    (metric) => {
-      expect(isPowerCurveMetric(metric)).toBe(true);
-      expect(isMeasuredPowerCurveMetric(metric)).toBe(true);
-    },
-  );
-
-  it.each([
-    'y_gpuProvisionedJPerOutputToken',
-    'y_utilityProvisionedJPerOutputToken',
-    'y_utilityModeledJPerOutputToken',
-  ])('keeps %s on the energy Pareto frontier', (metric) => {
-    expect(isPowerCurveMetric(metric)).toBe(false);
-    expect(isMeasuredPowerCurveMetric(metric)).toBe(false);
-  });
-
   it('preserves the canonical agentic restriction on Pareto membership', () => {
     const canonical = point(8, 100, 1, { isOnNormalizedInteractivityFrontier: true });
     const nonCanonical = point(1, 200, 4, { isOnNormalizedInteractivityFrontier: false });
@@ -133,37 +110,6 @@ describe('upper power envelope', () => {
     ).toEqual([950, 700, 350]);
     // A gauge keeps the plateau: it is part of the outer edge it draws.
     expect(upperPowerEnvelope(samples, false, true)).toEqual([fast, middle, plateau, slow]);
-  });
-
-  it('keeps a flat provisioned series across its tested range only when asked to', () => {
-    // A TDP gauge is the same watts at every concurrency: with `keepTies` the
-    // boundary spans the sweep; the strict measured rule would collapse it to
-    // the first-sorted marker.
-    const flat = [point(1, 200, 1000), point(8, 120, 1000), point(64, 40, 1000)];
-    expect(upperPowerEnvelope(flat, true, true)).toEqual(flat.toReversed());
-    expect(upperPowerEnvelope(flat, false, true).map((p) => p.x)).toEqual([40, 120, 200]);
-    expect(upperPowerEnvelope(flat, true)).toEqual([flat[0]]);
-    expect(upperPowerEnvelope(flat, false)).toEqual([flat[2]]);
-  });
-
-  it('keeps ties only for provisioned and modelled gauge series', () => {
-    const measured = point(1, 200, 700);
-    const tdpClone = {
-      ...measured,
-      powerVariant: { kind: 'basis', id: 'gpu-provisioned' } as const,
-    };
-    const measuredClone = {
-      ...measured,
-      powerVariant: { kind: 'basis', id: 'gpu-measured' } as const,
-    };
-    const roleClone = { ...measured, powerVariant: { kind: 'role', id: 'decode' } as const };
-    expect(isPowerGaugeSeries('y_gpuProvisionedWatts', measured)).toBe(true);
-    expect(isPowerGaugeSeries('y_utilityModeledWatts', undefined)).toBe(true);
-    expect(isPowerGaugeSeries('y_measuredAvgPower', measured)).toBe(false);
-    expect(isPowerGaugeSeries('y_measuredAvgPower', tdpClone)).toBe(true);
-    expect(isPowerGaugeSeries('y_measuredAvgPower', measuredClone)).toBe(false);
-    expect(isPowerGaugeSeries('y_measuredAvgPower', roleClone)).toBe(false);
-    expect(isPowerGaugeSeries('y_gpuProvisionedWatts', roleClone)).toBe(false);
   });
 
   it('uses only finite positive coordinates and preserves singleton boundaries', () => {

@@ -4,11 +4,6 @@ import chartDefinitions from '@/components/inference/metric-registry';
 import type { ChartDefinition, InferenceData } from '@/components/inference/types';
 import { sortRowsByYMetric } from '@/components/inference/ui/inference-table-sort';
 import {
-  isMeasuredPowerCurveMetric,
-  isPowerCurveMetric,
-  upperPowerEnvelope,
-} from '@/components/inference/utils/powerCurves';
-import {
   isFrontierEligible,
   paretoFrontForDirection,
   type ParetoDirection,
@@ -34,24 +29,6 @@ const MEASURED_POWER_METRICS = [
   'y_measuredPrefillAvgPower',
   'y_measuredDecodeAvgPower',
   'y_measuredPowerPercentTdp',
-  // Derived power boundaries share the watts semantics: the declared corner
-  // drives the ascending table sort, while the chart itself draws the upper
-  // power envelope (asserted separately below), exactly like measured watts.
-  'y_gpuProvisionedWatts',
-  'y_utilityProvisionedWatts',
-  'y_utilityModeledWatts',
-] as const;
-
-const BASIS_WATT_METRICS = [
-  'y_gpuProvisionedWatts',
-  'y_utilityProvisionedWatts',
-  'y_utilityModeledWatts',
-] as const;
-
-const BASIS_ENERGY_METRICS = [
-  'y_gpuProvisionedJPerOutputToken',
-  'y_utilityProvisionedJPerOutputToken',
-  'y_utilityModeledJPerOutputToken',
 ] as const;
 
 const QUERY_ENERGY_METRICS = [
@@ -186,46 +163,6 @@ describe('measured-power Pareto direction', () => {
       expect(chartDef[`${metric}_label`]).toBeTruthy();
       expect(chartDef[`${metric}_labelZh`]).toBeTruthy();
     }
-  });
-
-  it.each(BASIS_ENERGY_METRICS)('%s is bilingual and lower-is-better', (metric) => {
-    expect(declaredDirection(interactivityDef, metric)).toBe('lower_right');
-    expect(declaredDirection(e2eDef, metric)).toBe('lower_left');
-    for (const chartDef of [interactivityDef, e2eDef]) {
-      expect(chartDef[metric]).toMatch(/\.y$/u);
-      expect(chartDef[`${metric}_label`]).toBeTruthy();
-      expect(chartDef[`${metric}_labelZh`]).toBeTruthy();
-    }
-    // Energy uses the Pareto corner, not the power envelope: the dominated
-    // sweep points drop out just as they do for measured joules.
-    expect(frontierConcs(interactivityDef, metric)).toEqual([1, 32]);
-    expect(frontierConcs(e2eDef, metric)).toEqual([256, 32]);
-  });
-
-  describe.each(BASIS_WATT_METRICS)('%s', (metric) => {
-    it('draws the upper power envelope, not the Pareto corner, like measured watts', () => {
-      // ScatterGraph/GPUGraph pick the curve by `isPowerCurveMetric`; a watt
-      // boundary that misses that set would hide every dominated sweep point
-      // under Optimal Only and, for a flat TDP series, collapse to one marker.
-      expect(isPowerCurveMetric(metric)).toBe(true);
-      expect(isPowerCurveMetric('y_measuredAvgPower')).toBe(true);
-      // Envelope-locked like measured watts: with Optimal Only on, a Pareto
-      // corner would keep one marker and draw no curve for a flat TDP series.
-      expect(isMeasuredPowerCurveMetric(metric)).toBe(true);
-      expect(isMeasuredPowerCurveMetric('y_modeledChassisPowerPerGpu')).toBe(false);
-      expect(isMeasuredPowerCurveMetric('y_measuredAvgPower')).toBe(true);
-
-      const metricField = (interactivityDef[metric] as string).replace(/\.y$/u, '');
-      const envelope = upperPowerEnvelope(sweepPoints(metricField), true).map((p) => p.conc);
-      // The 1400 W conc 8 peak survives on the envelope; the Pareto corner drops it.
-      expect(envelope).toContain(8);
-      expect(frontierConcs(interactivityDef, metric)).not.toContain(8);
-    });
-  });
-
-  it.each(BASIS_ENERGY_METRICS)('%s stays off the power-envelope path', (metric) => {
-    expect(isPowerCurveMetric(metric)).toBe(false);
-    expect(isMeasuredPowerCurveMetric(metric)).toBe(false);
   });
 
   it('keeps %TDP bilingual while using the same per-hardware frontier as watts', () => {

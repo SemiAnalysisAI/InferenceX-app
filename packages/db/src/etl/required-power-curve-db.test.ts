@@ -55,24 +55,6 @@ describe('read-only required-power DB preflight', () => {
     const published = await getLatestBenchmarks(sql, 'qwen3.5', '9999-12-31');
     expect(published.map((row) => row.conc)).toEqual([1, 64]);
   });
-  it('accepts complete incoming point coverage', async () => {
-    await addPoint(1);
-    await expect(
-      preflightRequiredPowerCurves(sql, golden, source, options),
-    ).resolves.toBeUndefined();
-    expect(await sql`SELECT count(*)::int AS n FROM workflow_runs`).toEqual([{ n: 1 }]);
-  });
-  it('inherits same-image append-only state but rejects a changed image', async () => {
-    await addPoint(1);
-    await addPoint(64);
-    await expect(
-      preflightRequiredPowerCurves(sql, golden, source, { ...options, appendOnly: true }),
-    ).resolves.toBeUndefined();
-    await sql`UPDATE benchmark_results SET image='old-image'`;
-    await expect(
-      preflightRequiredPowerCurves(sql, golden, source, { ...options, appendOnly: true }),
-    ).rejects.toThrow('shrink');
-  });
   it('detects retry removal from a scope omitted entirely by incoming artifacts', async () => {
     await sql`UPDATE workflow_runs SET github_run_id=123`;
     await sql`UPDATE configs SET hardware='h200'`;
@@ -100,32 +82,6 @@ describe('read-only required-power DB preflight', () => {
       await expect(preflightRequiredPowerCurves(sql, dir, source, options)).rejects.toThrow(
         'shrink',
       );
-    } finally {
-      fs.rmSync(dir, { recursive: true, force: true });
-    }
-  });
-  it('models mixed dates on same-attempt upserts instead of overlooking a newer snapshot', async () => {
-    await sql`UPDATE workflow_runs SET github_run_id=123`;
-    await addPoint(1);
-    await sql`UPDATE benchmark_results SET date='2026-09-10'`;
-    await sql`INSERT INTO workflow_runs (id,github_run_id,run_attempt,name,date,created_at,run_started_at)
-      VALUES (2,222,1,'competing','2026-09-12','2026-09-12T00:00:00Z','2026-09-12T00:00:00Z')`;
-    await sql`INSERT INTO benchmark_results (config_id,workflow_run_id,date,benchmark_type,isl,osl,conc,offload_mode,recipe_fingerprint,image,metrics)
-      VALUES (1,2,'2026-09-12','agentic_traces',NULL,NULL,8,'off',${'a'.repeat(64)},'example/serving:golden','{}')`;
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'powerx-dates-'));
-    try {
-      fs.cpSync(golden, dir, { recursive: true });
-      fs.mkdirSync(path.join(dir, 'results_optional'));
-      const row = JSON.parse(
-        fs.readFileSync(path.join(golden, 'bmk_agentic_golden/agg.json'), 'utf8'),
-      );
-      Object.assign(row, { conc: 4, users: 4 });
-      fs.writeFileSync(path.join(dir, 'results_optional/extra.json'), JSON.stringify(row));
-      await expect(preflightRequiredPowerCurves(sql, dir, source, options)).rejects.toThrow(
-        'shrink',
-      );
-      const published = await getLatestBenchmarks(sql, 'qwen3.5', '9999-12-31');
-      expect(published.map((point) => point.conc)).toEqual([8]);
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }

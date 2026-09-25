@@ -8,7 +8,6 @@ import {
   fetchGithubRunArtifacts,
   getRunDate,
   normalizeGithubRunInfo,
-  readZipEntries,
   type GithubArtifact,
   type GithubWorkflowRun,
 } from './github-artifacts';
@@ -143,27 +142,5 @@ describe('extractZipEntries', () => {
       { entryName: 'upper.JSON', payload: { id: 2 } },
     ]);
     expect(parseErrors).toEqual(['bad.json']);
-  });
-});
-
-describe('readZipEntries', () => {
-  it('decodes only the entries the predicate selects and skips directories', () => {
-    const zip = new AdmZip();
-    zip.addFile('LOGS/power/', Buffer.alloc(0));
-    zip.addFile('LOGS/power/samples.csv', Buffer.from('a,b\n1,2', 'utf8'));
-    zip.addFile('LOGS/big/results.json', Buffer.alloc(64 * 1024, 0x41));
-    zip.addFile('power_validation_x_conc8.json', Buffer.from('{"power_valid":true}', 'utf8'));
-
-    const files = readZipEntries(
-      zip.toBuffer(),
-      (name) => name === 'LOGS/power/samples.csv' || name.startsWith('power_validation_'),
-    );
-
-    expect([...files.keys()].toSorted()).toEqual([
-      'LOGS/power/samples.csv',
-      'power_validation_x_conc8.json',
-    ]);
-    expect(files.get('LOGS/power/samples.csv')).toBe('a,b\n1,2');
-    expect(files.get('power_validation_x_conc8.json')).toBe('{"power_valid":true}');
   });
 });

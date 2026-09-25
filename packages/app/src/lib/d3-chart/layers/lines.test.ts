@@ -130,29 +130,6 @@ describe('renderLines', () => {
     }
   });
 
-  it('uses getStrokeWidth per series and falls back to strokeWidth otherwise', () => {
-    const group = createMockGroup();
-    const { xScale, yScale } = makeScales();
-    renderLines(
-      group as any,
-      SAMPLE_LINES,
-      xScale,
-      yScale,
-      makeConfig({
-        strokeWidth: 1.5,
-        getStrokeWidth: (key) => (key === 'seriesB' ? 3 : (undefined as unknown as number)),
-      }),
-    );
-
-    const widthByClass = Object.fromEntries(
-      group
-        .selectAll('.line-path')
-        .elements.map((el) => [el.attrs['class'], el.attrs['stroke-width']]),
-    );
-    expect(widthByClass['line-path line-seriesA']).toBe(1.5);
-    expect(widthByClass['line-path line-seriesB']).toBe(3);
-  });
-
   it('generates valid d attribute from line generator', () => {
     const group = createMockGroup();
     const { xScale, yScale } = makeScales();

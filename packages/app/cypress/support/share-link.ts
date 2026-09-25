@@ -1,15 +1,8 @@
 /**
  * The address bar is stripped clean after load (share-link state lives in the
- * in-memory store), so the Share popover is where a metric change must land.
- * Closes the popover again so the controls stay clickable.
- */
-export function assertShareLinkMetric(metric: string): void {
-  assertShareLinkParams({ i_metric: metric });
-}
-
-/**
- * Asserts several share-link parameters in one popover round trip. A `null`
- * expectation means the parameter must be absent (stripped as a default).
+ * in-memory store), so the Share popover is where share-link state must land.
+ * Asserts several parameters in one popover round trip; a `null` expectation
+ * means the parameter must be absent (stripped as a default).
  */
 export function assertShareLinkParams(expected: Record<string, string | null>): void {
   cy.get('[data-testid="share-button"]').first().click();

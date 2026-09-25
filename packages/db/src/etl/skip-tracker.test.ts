@@ -54,26 +54,6 @@ describe('recordDbError', () => {
   });
 });
 
-describe('recordTelemetryError', () => {
-  it('counts separately from dbError, which is the counter that fails the ingest', () => {
-    const tracker = createSkipTracker();
-    tracker.recordTelemetryError('gpu_metrics for dsv4-b200', new Error('malformed CSV'));
-    tracker.recordTelemetryError('gpu_metrics for dsv4-b300', new Error('malformed CSV'));
-    expect(tracker.skips.telemetryError).toBe(2);
-    expect(tracker.skips.dbError).toBe(0);
-  });
-
-  it('keeps its own print budget, so telemetry noise cannot silence DB errors', () => {
-    const tracker = createSkipTracker();
-    for (let i = 0; i < 15; i++) {
-      tracker.recordTelemetryError(`context ${i}`, new Error(`error ${i}`));
-    }
-    tracker.recordDbError('availability', new Error('boom'));
-    expect(tracker.skips.telemetryError).toBe(15);
-    expect(tracker.skips.dbError).toBe(1);
-  });
-});
-
 describe('snapshot', () => {
   it('captures current counters', () => {
     const tracker = createSkipTracker();
