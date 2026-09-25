@@ -7,8 +7,19 @@ interface RunProvenance {
   run_url?: string | null;
 }
 
-// Three-week recognition window, ending 2026-10-08 at 21:32 America/New_York.
-const UMBP_DSPARK_LABEL_EXPIRES_AT = Date.parse('2026-10-09T01:32:00Z');
+/** MoRI runs labeled UMBP indefinitely. */
+const UMBP_LABEL_RUNS = new Set(['34926284365']);
+
+/**
+ * MoRI runs labeled UMBP for a three-week recognition window, keyed by run id →
+ * expiry (epoch ms). Once expired, the run falls back to the standard label.
+ */
+const TEMPORARY_UMBP_LABEL_RUNS: Record<string, number> = {
+  // DSpark on dsv4 AgentX disagg (InferenceX#3188): ends 2026-10-08 21:32 America/New_York.
+  '35166686551': Date.parse('2026-10-09T01:32:00Z'),
+  // UMBP linker + DSpark gamma 6 (InferenceX#3256): ends 2026-10-15 22:00 America/New_York.
+  '35879254139': Date.parse('2026-10-16T02:00:00Z'),
+};
 
 /** Display-only: never change framework/hardware keys used by filters and history. */
 export function inferenceFrameworkLabelOverride(
@@ -17,9 +28,10 @@ export function inferenceFrameworkLabelOverride(
 ): string | undefined {
   if (resolveFrameworkAlias(framework) !== 'mori-sglang') return undefined;
   const runId = runIdFromRunUrl(runUrl);
+  if (runId === null) return undefined;
+  const expiresAt = TEMPORARY_UMBP_LABEL_RUNS[runId];
   const hasLabel =
-    runId === '34926284365' ||
-    (runId === '35166686551' && Date.now() < UMBP_DSPARK_LABEL_EXPIRES_AT);
+    UMBP_LABEL_RUNS.has(runId) || (expiresAt !== undefined && Date.now() < expiresAt);
   return hasLabel ? 'MoRI UMBP SGLang' : undefined;
 }
 
