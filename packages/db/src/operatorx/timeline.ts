@@ -11,6 +11,12 @@ const TIMELINE_NAME_MAX = 115;
 const isObj = (v: unknown): v is Obj => typeof v === 'object' && v !== null && !Array.isArray(v);
 const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
 
+/**
+ * Shape version of `OperatorXTimeline`. Timelines are cached as immutable, so clients put
+ * this in the request; bump it whenever the shape changes.
+ */
+export const TIMELINE_VERSION = 2;
+
 /** What a kernel does, from its name; the drill-down colors by it. */
 export const KERNEL_CATEGORIES = [
   { id: 'gemm', label: 'GEMM' },

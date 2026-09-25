@@ -6,7 +6,10 @@ import type {
   OperatorXDataset,
   OperatorXResultDetail,
 } from '@semianalysisai/inferencex-db/operatorx/normalize';
-import type { OperatorXTimeline } from '@semianalysisai/inferencex-db/operatorx/timeline';
+import {
+  type OperatorXTimeline,
+  TIMELINE_VERSION,
+} from '@semianalysisai/inferencex-db/operatorx/timeline';
 
 async function get<T>(url: string, signal: AbortSignal): Promise<T> {
   const response = await fetch(url, { signal });
@@ -60,10 +63,10 @@ export type OperatorXTimelines = Record<string, OperatorXTimeline | null>;
 /** Kernel timelines are immutable per `runId:index`, so one fetch per case lasts the session. */
 function timelinesQuery(op: ComparisonOp, refs: string[]) {
   return {
-    queryKey: ['operatorx', 'timelines', op, refs.join(',')],
+    queryKey: ['operatorx', 'timelines', TIMELINE_VERSION, op, refs.join(',')],
     queryFn: ({ signal }: { signal: AbortSignal }) =>
       get<OperatorXTimelines>(
-        `/api/v1/operatorx/timelines?${new URLSearchParams({ op, r: refs.join(',') })}`,
+        `/api/v1/operatorx/timelines?${new URLSearchParams({ op, r: refs.join(','), v: String(TIMELINE_VERSION) })}`,
         signal,
       ),
     staleTime: Infinity,
