@@ -9,6 +9,8 @@ interface RunProvenance {
 
 // Three-week recognition window, ending 2026-10-08 at 21:32 America/New_York.
 const UMBP_DSPARK_LABEL_EXPIRES_AT = Date.parse('2026-10-09T01:32:00Z');
+// Run 35879254139 is recognized through October 9, 2026 in America/New_York.
+const UMBP_GAMMA6_LABEL_EXPIRES_AT = Date.parse('2026-10-10T04:00:00Z');
 
 /** Display-only: never change framework/hardware keys used by filters and history. */
 export function inferenceFrameworkLabelOverride(
@@ -17,6 +19,9 @@ export function inferenceFrameworkLabelOverride(
 ): string | undefined {
   if (resolveFrameworkAlias(framework) !== 'mori-sglang') return undefined;
   const runId = runIdFromRunUrl(runUrl);
+  if (runId === '35879254139' && Date.now() < UMBP_GAMMA6_LABEL_EXPIRES_AT) {
+    return 'UMBP MoRI SGLang';
+  }
   const hasLabel =
     runId === '34926284365' ||
     (runId === '35166686551' && Date.now() < UMBP_DSPARK_LABEL_EXPIRES_AT);
@@ -28,9 +33,15 @@ export function getInferenceRunLabel(
   label: string,
   points: readonly (RunProvenance & { framework?: string })[],
 ): string {
-  const override = points
-    .map((point) => inferenceFrameworkLabelOverride(point.framework ?? '', point.run_url))
-    .find(Boolean);
+  const override = [
+    ...new Set(
+      points
+        .map((point) => inferenceFrameworkLabelOverride(point.framework ?? '', point.run_url))
+        .filter(Boolean),
+    ),
+  ]
+    .sort()
+    .join(' / ');
   return override ? `${label} (${override})` : label;
 }
 
@@ -50,7 +61,9 @@ export function getInferenceHardwareConfig(
     inferenceFrameworkLabelOverride(framework, point.run_url),
   );
   if (!overrides.some(Boolean)) return config;
-  const label = overrides.every(Boolean) ? 'MoRI UMBP SGLang' : 'MoRI SGLang / MoRI UMBP SGLang';
+  const label = [...new Set(overrides.map((override) => override ?? 'MoRI SGLang'))]
+    .sort()
+    .join(' / ');
   return {
     ...config,
     suffix: config.suffix.replace('MoRI SGLang', label),

@@ -100,6 +100,13 @@ private prompts, feedback, local uploads and administrative mutations are not
 public read projections. AgentX drilldowns use existing availability, aggregates,
 histograms, request timelines, logs and server metrics operations.
 
+Run-specific recognition labels do not rename API framework keys. Run
+`35879254139` displays `UMBP MoRI SGLang` through October 9, 2026 in
+America/New_York (`2026-10-10T04:00:00Z` exclusive); subsequent label resolution
+returns `MoRI SGLang`. An already-open memoized chart may need a refresh.
+Keep using `mori-sglang` for API selectors and raw CSV output throughout.
+This display-only exception changes no API data or OpenAPI contract.
+
 For every new or changed non-sensitive public-facing data view, implement or
 update its read-only API in the same PR. Reuse the UI's pure transforms, test
 selector effects and source semantics, and update OpenAPI, the route catalog,
