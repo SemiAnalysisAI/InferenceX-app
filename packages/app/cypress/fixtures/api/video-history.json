@@ -1,0 +1,361 @@
+{
+  "schemaVersion": 1,
+  "entries": [
+    {
+      "id": "34336635063.10103071687",
+      "runId": "34336635063",
+      "artifact": {
+        "id": 10103071687,
+        "name": "h3-video-34336635063-1",
+        "expired": false,
+        "size_in_bytes": 118562850,
+        "digest": "sha256:575c0016fa96f9fa080706285611509db6f2d72be5f8ffd0248cda3b91f2de42",
+        "stored": true
+      },
+      "publishedAt": null,
+      "sources": [
+        {
+          "id": "34336635063",
+          "sha256": "7df99e50c015669f4dd9ef62549317870f197cfe0fc5d163cf8bf0fb3b88dd5e",
+          "sourceSha": "25de33c57f5c2ac0189c3f3a8de396057266dfb9",
+          "hardware": "H100",
+          "execution": "complete",
+          "observedAt": "2026-09-09T09:47:33.704519+00:00",
+          "kind": "observation",
+          "observations": [
+            {
+              "id": "7df99e50c015669f4dd9ef62549317870f197cfe0fc5d163cf8bf0fb3b88dd5e:c1",
+              "cell": "c1",
+              "hardware": "NVIDIA H100 80GB HBM3",
+              "concurrency": 1,
+              "runtime": "71de97b264b04dcd514cf904003028aefe9775c8",
+              "workload": "1344 × 768 · 8 s · 24 fps · 50 steps · MiniMaxAI/MiniMax-H3 @ 42ed227ee7df · seed 11, 11, 29, 47, 29, 29, 29, 47, 83, 11, 47, 83, 47, 11, 11, 83, 83, 29, 83, 47 · A single continuous medium close-up of an adult presenter facing the camera in a",
+              "model": "MiniMaxAI/MiniMax-H3",
+              "status": "complete",
+              "valid": 20,
+              "completed": 20,
+              "scheduled": 20,
+              "failed": 0,
+              "samples": 20,
+              "p50": 167.33339739358053,
+              "p90": 168.11354550393298,
+              "clipsGpuHour": 5.3741390883412175,
+              "energyKj": 431.14963489170344
+            },
+            {
+              "id": "7df99e50c015669f4dd9ef62549317870f197cfe0fc5d163cf8bf0fb3b88dd5e:c2",
+              "cell": "c2",
+              "hardware": "NVIDIA H100 80GB HBM3",
+              "concurrency": 2,
+              "runtime": "71de97b264b04dcd514cf904003028aefe9775c8",
+              "workload": "1344 × 768 · 8 s · 24 fps · 50 steps · MiniMaxAI/MiniMax-H3 @ 42ed227ee7df · seed 11, 11, 29, 47, 29, 29, 29, 47, 83, 11, 47, 83, 47, 11, 11, 83, 83, 29, 83, 47 · A single continuous medium close-up of an adult presenter facing the camera in a",
+              "model": "MiniMaxAI/MiniMax-H3",
+              "status": "complete",
+              "valid": 20,
+              "completed": 20,
+              "scheduled": 20,
+              "failed": 0,
+              "samples": 20,
+              "p50": 334.78318604291417,
+              "p90": 336.9140758761205,
+              "clipsGpuHour": 5.368742995784034,
+              "energyKj": 431.32628015924786
+            }
+          ],
+          "fidelity": null,
+          "calibration": null,
+          "releaseQualified": false,
+          "error": null
+        }
+      ],
+      "error": null
+    },
+    {
+      "id": "34344378350.10106004321",
+      "runId": "34344378350",
+      "artifact": {
+        "id": 10106004321,
+        "name": "h3-video-34344378350-1",
+        "expired": false,
+        "size_in_bytes": 61499259,
+        "digest": "sha256:a0bd28cc430c443c1be086bb33f16636a04e51acb0d92f554228e1f1b7409329",
+        "stored": true
+      },
+      "publishedAt": null,
+      "sources": [
+        {
+          "id": "34344378350",
+          "sha256": "98206c73d05226c162cad14f456d7671640cbd1d090945f456f5427713fdde7f",
+          "sourceSha": "b04b09c505cfec39f71a7971b28c8af6c93882c9",
+          "hardware": "H100",
+          "execution": "complete",
+          "observedAt": "2026-09-09T12:11:43.125736+00:00",
+          "kind": "observation",
+          "observations": [
+            {
+              "id": "98206c73d05226c162cad14f456d7671640cbd1d090945f456f5427713fdde7f:c4",
+              "cell": "c4",
+              "hardware": "NVIDIA H100 80GB HBM3",
+              "concurrency": 4,
+              "runtime": "71de97b264b04dcd514cf904003028aefe9775c8",
+              "workload": "1344 × 768 · 8 s · 24 fps · 50 steps · MiniMaxAI/MiniMax-H3 @ 42ed227ee7df · seed 11, 11, 29, 47, 29, 29, 29, 47, 83, 11, 47, 83, 47, 11, 11, 83, 83, 29, 83, 47 · A single continuous medium close-up of an adult presenter facing the camera in a",
+              "model": "MiniMaxAI/MiniMax-H3",
+              "status": "complete",
+              "valid": 20,
+              "completed": 20,
+              "scheduled": 20,
+              "failed": 0,
+              "samples": 20,
+              "p50": 669.2438137787394,
+              "p90": 673.7058754772879,
+              "clipsGpuHour": 5.368345559881099,
+              "energyKj": 430.80324425396446
+            }
+          ],
+          "fidelity": null,
+          "calibration": null,
+          "releaseQualified": false,
+          "error": null
+        }
+      ],
+      "error": null
+    },
+    {
+      "id": "34342452354.10107476604",
+      "runId": "34342452354",
+      "artifact": {
+        "id": 10107476604,
+        "name": "h3-video-34342452354-1",
+        "expired": false,
+        "size_in_bytes": 175903798,
+        "digest": "sha256:ac85510c000f69098db37149ae56b48964563c7a1dc4b26a31f71317b8b3599a",
+        "stored": true
+      },
+      "publishedAt": null,
+      "sources": [
+        {
+          "id": "34342452354",
+          "sha256": "ad62f1b44954b9733cb513b7dd1d54c224759a20956d9a1f257b190ce8d4da35",
+          "sourceSha": "6ea0bf8750d97b2f89a913536dd0dc4aad5bf74e",
+          "hardware": "H200",
+          "execution": "complete",
+          "observedAt": "2026-09-09T10:52:07.062086+00:00",
+          "kind": "observation",
+          "observations": [
+            {
+              "id": "ad62f1b44954b9733cb513b7dd1d54c224759a20956d9a1f257b190ce8d4da35:c1",
+              "cell": "c1",
+              "hardware": "NVIDIA H200",
+              "concurrency": 1,
+              "runtime": "71de97b264b04dcd514cf904003028aefe9775c8",
+              "workload": "1344 × 768 · 8 s · 24 fps · 50 steps · MiniMaxAI/MiniMax-H3 @ 42ed227ee7df · seed 11, 11, 29, 47, 29, 29, 29, 47, 83, 11, 47, 83, 47, 11, 11, 83, 83, 29, 83, 47 · A single continuous medium close-up of an adult presenter facing the camera in a",
+              "model": "MiniMaxAI/MiniMax-H3",
+              "status": "complete",
+              "valid": 20,
+              "completed": 20,
+              "scheduled": 20,
+              "failed": 0,
+              "samples": 20,
+              "p50": 150.61379817902343,
+              "p90": 151.10486977093387,
+              "clipsGpuHour": 5.973235869122123,
+              "energyKj": 410.954300515549
+            },
+            {
+              "id": "ad62f1b44954b9733cb513b7dd1d54c224759a20956d9a1f257b190ce8d4da35:c2",
+              "cell": "c2",
+              "hardware": "NVIDIA H200",
+              "concurrency": 2,
+              "runtime": "71de97b264b04dcd514cf904003028aefe9775c8",
+              "workload": "1344 × 768 · 8 s · 24 fps · 50 steps · MiniMaxAI/MiniMax-H3 @ 42ed227ee7df · seed 11, 11, 29, 47, 29, 29, 29, 47, 83, 11, 47, 83, 47, 11, 11, 83, 83, 29, 83, 47 · A single continuous medium close-up of an adult presenter facing the camera in a",
+              "model": "MiniMaxAI/MiniMax-H3",
+              "status": "complete",
+              "valid": 20,
+              "completed": 20,
+              "scheduled": 20,
+              "failed": 0,
+              "samples": 20,
+              "p50": 300.09254947002046,
+              "p90": 300.1774324030848,
+              "clipsGpuHour": 5.997056099146397,
+              "energyKj": 409.91272507134966
+            },
+            {
+              "id": "ad62f1b44954b9733cb513b7dd1d54c224759a20956d9a1f257b190ce8d4da35:c4",
+              "cell": "c4",
+              "hardware": "NVIDIA H200",
+              "concurrency": 4,
+              "runtime": "71de97b264b04dcd514cf904003028aefe9775c8",
+              "workload": "1344 × 768 · 8 s · 24 fps · 50 steps · MiniMaxAI/MiniMax-H3 @ 42ed227ee7df · seed 11, 11, 29, 47, 29, 29, 29, 47, 83, 11, 47, 83, 47, 11, 11, 83, 83, 29, 83, 47 · A single continuous medium close-up of an adult presenter facing the camera in a",
+              "model": "MiniMaxAI/MiniMax-H3",
+              "status": "complete",
+              "valid": 20,
+              "completed": 20,
+              "scheduled": 20,
+              "failed": 0,
+              "samples": 20,
+              "p50": 601.2122122829896,
+              "p90": 601.8977232379839,
+              "clipsGpuHour": 5.986775861646954,
+              "energyKj": 413.58283766782114
+            }
+          ],
+          "fidelity": null,
+          "calibration": null,
+          "releaseQualified": false,
+          "error": null
+        }
+      ],
+      "error": null
+    },
+    {
+      "id": "34341996789.10104690935",
+      "runId": "34341996789",
+      "artifact": {
+        "id": 10104690935,
+        "name": "h3-video-34341996789-1",
+        "expired": false,
+        "size_in_bytes": 163563283,
+        "digest": "sha256:6b05cafd4c014e02c904f65c0e0d2f3d9a5b541ddc4f030372ed08d4a588c002",
+        "stored": true
+      },
+      "publishedAt": null,
+      "sources": [
+        {
+          "id": "34341996789",
+          "sha256": "ab90da9236114cd13de833a364159b8f84e69060de888f3e813635d5b7b26b82",
+          "sourceSha": "6ea0bf8750d97b2f89a913536dd0dc4aad5bf74e",
+          "hardware": "B200",
+          "execution": "complete",
+          "observedAt": "2026-09-09T10:47:03.922884+00:00",
+          "kind": "observation",
+          "observations": [
+            {
+              "id": "ab90da9236114cd13de833a364159b8f84e69060de888f3e813635d5b7b26b82:c1",
+              "cell": "c1",
+              "hardware": "NVIDIA B200",
+              "concurrency": 1,
+              "runtime": "71de97b264b04dcd514cf904003028aefe9775c8",
+              "workload": "1344 × 768 · 8 s · 24 fps · 50 steps · MiniMaxAI/MiniMax-H3 @ 42ed227ee7df · seed 11, 11, 29, 47, 29, 29, 29, 47, 83, 11, 47, 83, 47, 11, 11, 83, 83, 29, 83, 47 · A single continuous medium close-up of an adult presenter facing the camera in a",
+              "model": "MiniMaxAI/MiniMax-H3",
+              "status": "complete",
+              "valid": 20,
+              "completed": 20,
+              "scheduled": 20,
+              "failed": 0,
+              "samples": 20,
+              "p50": 77.94495720259147,
+              "p90": 78.31597462110221,
+              "clipsGpuHour": 11.52605424609145,
+              "energyKj": 301.08754501100987
+            },
+            {
+              "id": "ab90da9236114cd13de833a364159b8f84e69060de888f3e813635d5b7b26b82:c2",
+              "cell": "c2",
+              "hardware": "NVIDIA B200",
+              "concurrency": 2,
+              "runtime": "71de97b264b04dcd514cf904003028aefe9775c8",
+              "workload": "1344 × 768 · 8 s · 24 fps · 50 steps · MiniMaxAI/MiniMax-H3 @ 42ed227ee7df · seed 11, 11, 29, 47, 29, 29, 29, 47, 83, 11, 47, 83, 47, 11, 11, 83, 83, 29, 83, 47 · A single continuous medium close-up of an adult presenter facing the camera in a",
+              "model": "MiniMaxAI/MiniMax-H3",
+              "status": "complete",
+              "valid": 20,
+              "completed": 20,
+              "scheduled": 20,
+              "failed": 0,
+              "samples": 20,
+              "p50": 153.6016560649732,
+              "p90": 154.1683327689534,
+              "clipsGpuHour": 11.691563929313219,
+              "energyKj": 300.10551714629605
+            },
+            {
+              "id": "ab90da9236114cd13de833a364159b8f84e69060de888f3e813635d5b7b26b82:c4",
+              "cell": "c4",
+              "hardware": "NVIDIA B200",
+              "concurrency": 4,
+              "runtime": "71de97b264b04dcd514cf904003028aefe9775c8",
+              "workload": "1344 × 768 · 8 s · 24 fps · 50 steps · MiniMaxAI/MiniMax-H3 @ 42ed227ee7df · seed 11, 11, 29, 47, 29, 29, 29, 47, 83, 11, 47, 83, 47, 11, 11, 83, 83, 29, 83, 47 · A single continuous medium close-up of an adult presenter facing the camera in a",
+              "model": "MiniMaxAI/MiniMax-H3",
+              "status": "complete",
+              "valid": 20,
+              "completed": 20,
+              "scheduled": 20,
+              "failed": 0,
+              "samples": 20,
+              "p50": 307.28381997847464,
+              "p90": 308.79631440097,
+              "clipsGpuHour": 11.69172635792307,
+              "energyKj": 299.96858693604275
+            }
+          ],
+          "fidelity": null,
+          "calibration": null,
+          "releaseQualified": false,
+          "error": null
+        }
+      ],
+      "error": null
+    },
+    {
+      "id": "34410724145.10127189553",
+      "runId": "34410724145",
+      "artifact": {
+        "id": 10127189553,
+        "name": "h3-fidelity-34410724145-1",
+        "expired": false,
+        "size_in_bytes": 47838865,
+        "digest": "sha256:e8f364dae253274e954003fd06b177b17215381520bbc5924a10607839873479",
+        "stored": true
+      },
+      "publishedAt": null,
+      "sources": [
+        {
+          "id": "34410724145",
+          "sha256": "c40cc39acd26f046f84b307d7f771ed38f28d96ba21860d6679bba7ba3e7cf29",
+          "sourceSha": "df5e5cd434ef262cac029925d8782e4290ea6d16",
+          "hardware": "",
+          "execution": "",
+          "observedAt": null,
+          "kind": "fidelity",
+          "observations": [],
+          "fidelity": "fail",
+          "calibration": "uncalibrated",
+          "releaseQualified": false,
+          "error": null
+        }
+      ],
+      "error": null
+    },
+    {
+      "id": "34410729828.10127190894",
+      "runId": "34410729828",
+      "artifact": {
+        "id": 10127190894,
+        "name": "h3-fidelity-34410729828-1",
+        "expired": false,
+        "size_in_bytes": 47585397,
+        "digest": "sha256:bb701c77431bb999181d74cb99e4d957da13a6ff45ba927c3f89cf5add49ef69",
+        "stored": true
+      },
+      "publishedAt": null,
+      "sources": [
+        {
+          "id": "34410729828",
+          "sha256": "c2f6a036328e4b90fa1b364b16ca10353baa7eb2fef2d71571a1ab1465fc5382",
+          "sourceSha": "df5e5cd434ef262cac029925d8782e4290ea6d16",
+          "hardware": "",
+          "execution": "",
+          "observedAt": null,
+          "kind": "fidelity",
+          "observations": [],
+          "fidelity": "fail",
+          "calibration": "uncalibrated",
+          "releaseQualified": false,
+          "error": null
+        }
+      ],
+      "error": null
+    }
+  ],
+  "nextPage": null
+}
