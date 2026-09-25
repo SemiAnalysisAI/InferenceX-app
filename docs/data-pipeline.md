@@ -563,12 +563,13 @@ digests them at ingest time, in the same step that links server logs:
   zone-less `YYYY/MM/DD HH:MM:SS.mmm` is interpreted with the context sidecar's
   `timestamp_timezone` (the producer writes UTC).
 - `gpu_metric_gpu_stats` — per (series, GPU, metric) count/min/max/mean/median/
-  p95/p99/stddev computed once at ingest so readers never rescan samples.
+  p95/p99/stddev computed at ingest; matching algorithm versions avoid rescanning samples.
 - `benchmark_result_gpu_metrics` — links each benchmark point to the series that
   was recorded while it ran (several series per point for multinode artifacts).
 
 Ingest is idempotent: the same CSV hash, sidecars, and unique sample count refresh
-only the point links. A change replaces the samples and digest inside one
+only the point links when `stats_version` matches `GPU_STATS_VERSION`. An outdated
+digest is rebuilt without replacing samples or links. A source change replaces the samples and digest inside one
 transaction, including corrected timezone or identity sidecars. Repeated samples
 keep the first row per (GPU, timestamp) before computing counts and statistics,
 matching the sample table's primary key. Explicitly re-ingesting a run also
@@ -582,7 +583,7 @@ start-up and warm-up so both phases can be inspected.
 
 The point and run readers assemble a series from separate autocommit statements
 (series rows, statistics, samples). After loading, they re-read the series
-version key (`csv_sha256`, `sample_count`, `ingested_at`) and retry the whole
+version key (`csv_sha256`, `sample_count`, `ingested_at`, `stats_version`) and retry the whole
 read when a re-ingest committed in between, so one payload never mixes the
 statistics of one version with the samples of another.
 
@@ -628,8 +629,11 @@ is 404 and database failures remain errors. Cache-write failures log a warning a
 serve the fresh uncached result; the next request retries cache population.
 
 The public `/api/v1/views/gpu-metrics` projection and full-record UI table use the
-same stored per-GPU statistics digest for the selected file/host series. Empty or
-missing metric digests remain empty; only live artifacts calculate from samples.
+same per-GPU statistics digest for the selected file/host series. Current-version
+empty or missing metric digests remain empty. Unversioned or outdated digests
+are recomputed read-only from retained DB samples with the shared ingest algorithm.
+Incomplete retained samples leave statistics empty while preserving raw data for
+the existing source-gap recovery path; stats-only writes fail until the source is repaired.
 Statistics include startup and warmup, retain measured zero, and exclude missing
 readings per metric after first-wins timestamp/GPU deduplication. Mean is
 sample-weighted, percentiles interpolate at `p * (N - 1)`, and standard deviation
@@ -644,8 +648,56 @@ Serving-window power, J/token and selected-time-window calculations remain separ
 的完整性；普通 CSV 与 bundle、ingest 使用相同的 context 时区。
 点详情每次读取先核对数据库版本，修正 sidecar 或共享关联后
 无需手动清缓存；响应均为 no-store。全记录统计使用已存摘要，包含启动与 warmup；
-缺失读数不补零，已有摘要为空时不重新计算。它与 serving-window 功率、J/token 和
+缺失读数不补零；当前版本的摘要为空时保留为空，旧版本或无版本摘要从 DB 样本只读重算。它与 serving-window 功率、J/token 和
 用户所选时间窗口的统计分别处理。
+
+### Full-record statistics upgrades (migration 017)
+
+`GPU_STATS_VERSION` identifies the full-record digest algorithm, independently
+of source hashes and serving-window power schema versions. Bump it whenever
+metric populations, mappings, units or statistical definitions change. Migration
+017 marks existing series as version 0 (unknown); it does not certify old digests.
+Readers also treat a not-yet-migrated column as version 0, allowing app deployment
+before the writer migration. Read fallback does not write to the database.
+
+Point-cache revisions include both the deployed algorithm version and the stored
+version, so an algorithm deployment and subsequent digest repair each bypass old
+payloads for every linked point. Browser responses remain no-store; an already
+open tab receives the new result on its existing refetch/focus path.
+
+After applying migration 017 to the explicitly selected DB, use the existing
+backfill entry point (commands below are operator instructions, not automatic writes):
+
+```bash
+bun run admin:db:backfill-gpu-metrics --stats-only --all --dry-run
+bun run admin:db:backfill-gpu-metrics --stats-only --run <run-id> --attempt <attempt> --artifact <artifact-name> --dry-run
+bun run admin:db:backfill-gpu-metrics --stats-only --run <run-id> --attempt <attempt> --artifact <artifact-name> --yes
+```
+
+This mode uses DB samples only: no GitHub, artifact-retention cutoff, GPU work,
+benchmark publication, or cache purge. Unspecified attempts include all stored
+attempts; `--limit` counts series. Each series is locked and its digest/version
+replaced in one transaction. Current versions are no-ops, failures retain the old
+complete digest and print a scoped retry command with a nonzero exit status.
+Missing samples require source re-ingest. Successful retries skip completed series.
+DB `real` columns round to float32; comparisons with original CSV computations
+should allow float32 tolerance (e.g. 1e-5 relative), not require bit equality.
+
+Before production repair, retain a DB snapshot of affected series metadata and
+digests. Rollback stops the repair worker and restores the prior app/ingest build;
+leave the additive column in place. A prior version-aware build recomputes from
+samples when versions differ. To restore pre-versioned software and old stored
+results, restore the saved digest plus version together while writers are stopped,
+then invalidate the legacy cache. Raw samples and links are never changed by
+stats-only repair. Parser/timezone/identity fixes still require source re-ingest.
+
+中文：统计版本独立于数据 revision 和 serving-window schema。迁移先把旧摘要标记为
+未知版本；读取时可从 DB 样本重算，但不写库。`--stats-only` 支持按 run、attempt、artifact
+定向持久修复，也可覆盖全部保留历史，不依赖 GitHub 产物。每个 series 在事务内更新摘要与
+版本，失败保留旧结果并输出重试命令；成功后再次执行为 no-op。部署算法或修复摘要都会
+改变点详情缓存键，页面下次 refetch 时生效。生产修复前保留快照，回滚保留新增列；旧软件
+需要旧摘要时，停写后成对恢复摘要与版本，并清除旧缓存。此过程不修改 samples、关联或
+serving-window 指标。
 
 ### PowerX publication receipts
 

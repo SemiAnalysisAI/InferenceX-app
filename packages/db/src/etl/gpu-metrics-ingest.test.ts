@@ -6,7 +6,14 @@ import { PGlite } from '@electric-sql/pglite';
 import type postgres from 'postgres';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
-import { ingestGpuMetricsArtifact, prepareGpuMetricsArtifact } from './gpu-metrics-ingest';
+import {
+  ingestGpuMetricsArtifact,
+  prepareGpuMetricsArtifact,
+  refreshGpuMetricStats,
+} from './gpu-metrics-ingest';
+
+import { findOutdatedGpuMetricSeries } from '../lib/gpu-metrics-backfill';
+import { GPU_STATS_VERSION } from '../lib/gpu-metric-stats';
 
 type Sql = postgres.Sql;
 let db: PGlite;
@@ -39,7 +46,11 @@ async function storedSeries(seriesId: number) {
 
 beforeAll(async () => {
   db = await PGlite.create();
-  for (const name of ['001_initial_schema.sql', '016_gpu_metrics.sql']) {
+  for (const name of [
+    '001_initial_schema.sql',
+    '016_gpu_metrics.sql',
+    '017_gpu_metric_stats_version.sql',
+  ]) {
     await db.exec(fs.readFileSync(new URL(`../../migrations/${name}`, import.meta.url), 'utf8'));
   }
   sql = Object.assign(queryClient(db), {
@@ -313,5 +324,93 @@ describe('ingestGpuMetricsArtifact', () => {
       max_value: 950,
     });
     expect(after.links.map((row) => Number(row.benchmark_result_id))).toEqual([10, 11]);
+  });
+});
+
+describe('versioned full-record digests', () => {
+  it('upgrades unchanged input without rewriting samples or links, then becomes a no-op', async () => {
+    const input = {
+      workflowRunId: 1,
+      artifact: writeArtifact(NVIDIA_CSV),
+      benchmarkResultIds: [10, 11],
+    };
+    const first = await ingestGpuMetricsArtifact(sql, input);
+    const id = first.seriesIds[0]!;
+    const original = await storedSeries(id);
+    await sql`update gpu_metric_series set stats_version = 0 where id = ${id}`;
+    await sql`update gpu_metric_gpu_stats set mean_value = -1 where series_id = ${id}`;
+    const updated = await ingestGpuMetricsArtifact(sql, input);
+    expect(updated).toMatchObject({ samplesInserted: 0, seriesSkipped: 0 });
+    expect(await storedSeries(id)).toEqual(original);
+    expect(await ingestGpuMetricsArtifact(sql, input)).toMatchObject({
+      samplesInserted: 0,
+      seriesSkipped: 1,
+    });
+  });
+
+  it('backfills both retained hosts without artifacts; preserves null metrics, links and unrelated series', async () => {
+    const artifact = writePowerAuditArtifact();
+    const first = await ingestGpuMetricsArtifact(sql, {
+      workflowRunId: 1,
+      artifact,
+      benchmarkResultIds: [10, 11],
+    });
+    const unrelated = await ingestGpuMetricsArtifact(sql, {
+      workflowRunId: 1,
+      artifact: writeArtifact(NVIDIA_CSV),
+      benchmarkResultIds: [10],
+    });
+    const untouched = await storedSeries(unrelated.seriesIds[0]!);
+    const originals = await Promise.all(first.seriesIds.map(storedSeries));
+    await sql`update gpu_metric_series set stats_version = 0 where id = any(${sql.array(first.seriesIds)}::bigint[])`;
+    await sql`update gpu_metric_gpu_stats set mean_value = -1 where series_id = any(${sql.array(first.seriesIds)}::bigint[])`;
+    fs.rmSync(artifact.artifactDir, { recursive: true });
+    // No default retention cutoff: old runs remain repairable.
+    await sql`update workflow_runs set date = '2020-01-01' where id = 1`;
+    const targets = await findOutdatedGpuMetricSeries(
+      sql,
+      { run: null, attempt: null, artifact: null, fromRun: null, since: null },
+      null,
+    );
+    expect(targets.map((row) => Number(row.id))).toEqual(first.seriesIds);
+    expect(
+      await findOutdatedGpuMetricSeries(
+        sql,
+        { run: 34557177019, attempt: 2, artifact: null, fromRun: null, since: null },
+        null,
+      ),
+    ).toEqual([]);
+    for (const [index, id] of first.seriesIds.entries()) {
+      expect(await refreshGpuMetricStats(sql, id)).toBe(true);
+      expect(await storedSeries(id)).toEqual(originals[index]);
+      expect(await refreshGpuMetricStats(sql, id)).toBe(false);
+    }
+    expect(await storedSeries(unrelated.seriesIds[0]!)).toEqual(untouched);
+  });
+
+  it('rolls back a failed digest replacement and permits retry; refuses incomplete samples', async () => {
+    const first = await ingestGpuMetricsArtifact(sql, {
+      workflowRunId: 1,
+      artifact: writeArtifact(NVIDIA_CSV),
+      benchmarkResultIds: [10],
+    });
+    const id = first.seriesIds[0]!;
+    await sql`update gpu_metric_series set stats_version = 0 where id = ${id}`;
+    await sql`update gpu_metric_gpu_stats set mean_value = -1 where series_id = ${id}`;
+    const before = await storedSeries(id);
+    await db.exec(
+      'ALTER TABLE gpu_metric_gpu_stats ADD CONSTRAINT reject_stats CHECK (mean_value < 0)',
+    );
+    await expect(refreshGpuMetricStats(sql, id)).rejects.toMatchObject({ code: '23514' });
+    expect(await storedSeries(id)).toEqual(before);
+    await db.exec('ALTER TABLE gpu_metric_gpu_stats DROP CONSTRAINT reject_stats');
+    expect(await refreshGpuMetricStats(sql, id)).toBe(true);
+    const recovered = await storedSeries(id);
+    expect(recovered.metadata[0]?.stats_version).toBe(GPU_STATS_VERSION);
+    await sql`update gpu_metric_series set stats_version = 0 where id = ${id}`;
+    await sql`delete from gpu_metric_samples where series_id = ${id} and gpu_index = 0`;
+    const incomplete = await storedSeries(id);
+    await expect(refreshGpuMetricStats(sql, id)).rejects.toThrow('missing samples');
+    expect(await storedSeries(id)).toEqual(incomplete);
   });
 });

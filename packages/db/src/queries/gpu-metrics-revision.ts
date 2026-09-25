@@ -1,3 +1,5 @@
+import { GPU_STATS_VERSION } from '../lib/gpu-metric-stats';
+
 import type { DbClient } from '../connection';
 
 /** Re-ingest and shared-link changes must bypass older point payloads. */
@@ -8,6 +10,7 @@ export async function getGpuMetricsPointRevision(
   const [row] = await sql`
     select md5(jsonb_agg(jsonb_build_array(
       s.id, s.ingested_at, s.csv_sha256, s.sample_count, s.sidecars,
+      coalesce((to_jsonb(s)->>'stats_version')::integer, 0),
       (
         select jsonb_agg(jsonb_build_array(l.benchmark_result_id, b.power_audit)
           order by l.benchmark_result_id)
@@ -20,5 +23,5 @@ export async function getGpuMetricsPointRevision(
     join gpu_metric_series s on s.id = link.series_id
     where link.benchmark_result_id = ${benchmarkResultId}
   `;
-  return typeof row?.revision === 'string' ? row.revision : null;
+  return typeof row?.revision === 'string' ? `${GPU_STATS_VERSION}:${row.revision}` : null;
 }

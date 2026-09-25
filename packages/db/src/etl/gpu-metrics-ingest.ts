@@ -4,14 +4,23 @@
  *
  * Idempotency: a series is identified by (workflow run, artifact name, CSV
  * path). Re-ingesting an identical CSV, sidecars and sample count only refreshes
- * the point links; a change replaces the stored samples and digest inside one
- * transaction so readers never observe a half-written series.
+ * the point links when the statistics version is current; a source change
+ * replaces samples and digest atomically.
  */
 
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 
 import type postgres from 'postgres';
+
+import {
+  GPU_STATS_VERSION,
+  statMetricColumn,
+  computeStoredGpuMetricStats,
+  type StoredGpuMetricSample,
+} from '../lib/gpu-metric-stats.js';
+
+export { statMetricColumn } from '../lib/gpu-metric-stats.js';
 
 import type { Sql } from './db-utils.js';
 
@@ -175,28 +184,6 @@ export function prepareGpuMetricsArtifact(artifact: GpuMetricsArtifact): Prepare
   return series;
 }
 
-const STAT_METRIC_COLUMN: Record<GpuMetricStats['metric'], string> = {
-  powerW: 'power_w',
-  temperatureC: 'temperature_c',
-  smClockMhz: 'sm_clock_mhz',
-  memClockMhz: 'mem_clock_mhz',
-  gpuUtilPct: 'gpu_util_pct',
-  memUtilPct: 'mem_util_pct',
-  edgeTempC: 'edge_temp_c',
-  memTempC: 'mem_temp_c',
-  gfxVoltageMv: 'gfx_voltage_mv',
-  socVoltageMv: 'soc_voltage_mv',
-  memVoltageMv: 'mem_voltage_mv',
-  fclkMhz: 'fclk_mhz',
-  socclkMhz: 'socclk_mhz',
-  mmActivityPct: 'mm_activity_pct',
-};
-
-/** Stored metric names use the column spelling so SQL readers need no mapping. */
-export function statMetricColumn(metric: GpuMetricStats['metric']): string {
-  return STAT_METRIC_COLUMN[metric];
-}
-
 async function insertSampleBatch(
   tx: TxLike,
   seriesId: number,
@@ -277,16 +264,27 @@ export function upsertGpuMetricSeries(
     series: PreparedGpuMetricSeries;
     benchmarkResultIds: readonly number[];
   },
-): Promise<{ seriesId: number; samplesInserted: number; replaced: boolean }> {
+): Promise<{
+  seriesId: number;
+  samplesInserted: number;
+  replaced: boolean;
+  statsUpdated: boolean;
+}> {
   const { workflowRunId, artifactName, series, benchmarkResultIds } = input;
   const configKey = gpuMetricsArtifactSuffix(artifactName) ?? artifactName;
   const sidecarsJson = JSON.stringify(series.sidecars);
 
   return sql.begin(async (tx) => {
     const existing = await tx<
-      { id: number; csv_sha256: string; sample_count: number; sidecars_match: boolean }[]
+      {
+        id: number;
+        csv_sha256: string;
+        sample_count: number;
+        stats_version: number;
+        sidecars_match: boolean;
+      }[]
     >`
-      select id, csv_sha256, sample_count, sidecars = ${sidecarsJson}::jsonb as sidecars_match
+      select id, csv_sha256, sample_count, stats_version, sidecars = ${sidecarsJson}::jsonb as sidecars_match
       from gpu_metric_series
       where workflow_run_id = ${workflowRunId}
         and artifact_name = ${artifactName}
@@ -351,7 +349,12 @@ export function upsertGpuMetricSeries(
           series.samples.slice(offset, offset + SAMPLE_BATCH_SIZE),
         );
       }
+    }
+    const statsUpdated = needsSamples || existing[0]?.stats_version !== GPU_STATS_VERSION;
+    if (statsUpdated) {
+      if (!needsSamples) await tx`delete from gpu_metric_gpu_stats where series_id = ${seriesId}`;
       await insertStats(tx, seriesId, series.stats);
+      await tx`update gpu_metric_series set stats_version = ${GPU_STATS_VERSION} where id = ${seriesId}`;
     }
 
     if (benchmarkResultIds.length > 0) {
@@ -362,7 +365,30 @@ export function upsertGpuMetricSeries(
       `;
     }
 
-    return { seriesId, samplesInserted, replaced };
+    return { seriesId, samplesInserted, replaced, statsUpdated };
+  });
+}
+
+export function refreshGpuMetricStats(sql: Sql, seriesId: number): Promise<boolean> {
+  return sql.begin(async (tx) => {
+    const [series] = await tx<{ sample_count: number; stats_version: number }[]>`
+      select sample_count, stats_version from gpu_metric_series where id = ${seriesId} for update
+    `;
+    if (!series) throw new Error(`Unknown telemetry series ${seriesId}`);
+    if (series.stats_version === GPU_STATS_VERSION) return false;
+    const samples = await tx<StoredGpuMetricSample[]>`
+      select * from gpu_metric_samples where series_id = ${seriesId} order by sampled_at, gpu_index
+    `;
+    if (samples.length !== Number(series.sample_count)) {
+      throw new Error(
+        `Telemetry series ${seriesId} has missing samples; re-ingest its source artifact`,
+      );
+    }
+    const stats = computeStoredGpuMetricStats(samples);
+    await tx`delete from gpu_metric_gpu_stats where series_id = ${seriesId}`;
+    await insertStats(tx, seriesId, stats);
+    await tx`update gpu_metric_series set stats_version = ${GPU_STATS_VERSION} where id = ${seriesId}`;
+    return true;
   });
 }
 
@@ -391,7 +417,8 @@ export async function ingestGpuMetricsArtifact(
     });
     result.seriesIds.push(upserted.seriesId);
     result.samplesInserted += upserted.samplesInserted;
-    if (upserted.samplesInserted === 0 && !upserted.replaced) result.seriesSkipped++;
+    if (upserted.samplesInserted === 0 && !upserted.replaced && !upserted.statsUpdated)
+      result.seriesSkipped++;
   }
   // The caller has resolved this artifact's exact benchmark identities. Recover
   // only a unique AgentX point within that explicit set, after every host is

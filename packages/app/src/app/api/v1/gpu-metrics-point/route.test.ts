@@ -7,9 +7,21 @@ import { PGlite } from '@electric-sql/pglite';
 import { NextRequest } from 'next/server';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ingestGpuMetricsArtifact } from '@semianalysisai/inferencex-db/etl/gpu-metrics-ingest';
+import type * as GpuMetricStatsModule from '@semianalysisai/inferencex-db/lib/gpu-metric-stats';
 import type { GpuMetricSeries } from '@semianalysisai/inferencex-db/queries/gpu-metrics';
 import { getGpuMetricsPointRevision } from '@semianalysisai/inferencex-db/queries/gpu-metrics-revision';
 import { startPowerxBlobFixture } from '../../../../../scripts/powerx-blob-fixture';
+
+const algorithm = vi.hoisted(() => ({ version: 1 }));
+vi.mock('@semianalysisai/inferencex-db/lib/gpu-metric-stats', async (importOriginal) => {
+  const actual = await importOriginal<typeof GpuMetricStatsModule>();
+  return {
+    ...actual,
+    get GPU_STATS_VERSION() {
+      return algorithm.version;
+    },
+  };
+});
 
 const connection = vi.hoisted(() => ({ getDb: vi.fn() }));
 vi.mock('@semianalysisai/inferencex-db/connection', () => connection);
@@ -39,7 +51,11 @@ function client(database: Pick<PGlite, 'query'>) {
 
 beforeAll(async () => {
   db = await PGlite.create();
-  for (const name of ['001_initial_schema.sql', '016_gpu_metrics.sql']) {
+  for (const name of [
+    '001_initial_schema.sql',
+    '016_gpu_metrics.sql',
+    '017_gpu_metric_stats_version.sql',
+  ]) {
     await db.exec(
       fs.readFileSync(new URL(`../../../../../../db/migrations/${name}`, import.meta.url), 'utf8'),
     );
@@ -79,6 +95,7 @@ afterAll(async () => {
 });
 
 beforeEach(async () => {
+  algorithm.version = 1;
   await db.exec(
     'TRUNCATE gpu_metric_series RESTART IDENTITY CASCADE; UPDATE benchmark_results SET power_audit = null;',
   );
@@ -192,5 +209,56 @@ describe('artifact → local DB → real Blob cache → point API recovery', () 
     expect(blob.counts.writes).toBe(writes);
     const samples = await db.query('select count(*)::int as n from gpu_metric_samples');
     expect(samples.rows).toEqual([{ n: 24 }]);
+  });
+});
+
+const power = (body: { series: GpuMetricSeries[] }) =>
+  body.series[0]!.stats.find((s) => s.gpuIndex === 0 && s.metric === 'power_w')!;
+
+it('bypasses warmed shared-point caches on algorithm upgrade, then persists through unchanged re-ingest', async () => {
+  const input = { workflowRunId: 1, artifact: artifact(), benchmarkResultIds: [10, 11] };
+  const first = await ingestGpuMetricsArtifact(sql, input);
+  await sql`update gpu_metric_gpu_stats set mean_value = -1`;
+
+  for (const id of [10, 11]) {
+    const cached = await request(id);
+    expect(power(cached.body).mean).toBe(-1);
+  }
+  const oldRevision = await getGpuMetricsPointRevision(client(db), 10);
+  const originalSamples =
+    await sql`select * from gpu_metric_samples order by series_id, sampled_at, gpu_index`;
+  // Model a code deploy: no DB row, sample, sidecar or link has changed.
+  algorithm.version = 2;
+  expect(await getGpuMetricsPointRevision(client(db), 10)).not.toBe(oldRevision);
+  for (const id of [10, 11]) {
+    const refreshed = await request(id);
+    expect(power(refreshed.body).mean).toBeCloseTo(351.403333, 3);
+  }
+  expect(await sql`select stats_version from gpu_metric_series`).toEqual([{ stats_version: 1 }]);
+  expect(await sql`select distinct mean_value from gpu_metric_gpu_stats`).toEqual([
+    { mean_value: -1 },
+  ]);
+  const upgradedRevision = await getGpuMetricsPointRevision(client(db), 10);
+  const repaired = await ingestGpuMetricsArtifact(sql, input);
+  expect(repaired).toMatchObject({
+    seriesIds: first.seriesIds,
+    samplesInserted: 0,
+    seriesSkipped: 0,
+  });
+  expect(await getGpuMetricsPointRevision(client(db), 10)).not.toBe(upgradedRevision);
+  for (const id of [10, 11]) {
+    const refreshed = await request(id);
+    expect(power(refreshed.body).mean).toBeCloseTo(351.403333, 3);
+  }
+  expect(await sql`select stats_version from gpu_metric_series`).toEqual([{ stats_version: 2 }]);
+  expect(
+    await sql`select * from gpu_metric_samples order by series_id, sampled_at, gpu_index`,
+  ).toEqual(originalSamples);
+  const beforeHit = sampleReads;
+  await request(10);
+  expect(sampleReads).toBe(beforeHit);
+  expect(await ingestGpuMetricsArtifact(sql, input)).toMatchObject({
+    samplesInserted: 0,
+    seriesSkipped: 1,
   });
 });
