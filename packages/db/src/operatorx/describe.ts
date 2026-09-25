@@ -1,7 +1,6 @@
 /**
- * Human labels and useful-FLOP counts for OperatorX ops, across the args schemas the
- * sweep has emitted (operand descriptors and the earlier flat dtype strings). Pure
- * functions of an op's type and args; unknown ops fall back to generic labels.
+ * Human labels and useful-FLOP counts for OperatorX ops (gemm, moe_layer). Pure functions
+ * of an op's type and args; other op types fall back to generic labels.
  */
 
 type Args = Record<string, unknown>;
@@ -41,14 +40,10 @@ export interface OpLabels {
 }
 
 function gemmLabels(a: Args): OpLabels {
-  const shape = `${a.m}×${a.n}×${a.k}`;
-  if (obj(a.a) || obj(a.b)) {
-    return {
-      shape,
-      precision: `${describeOperand(a.a)} × ${describeOperand(a.b)} → ${a.out ?? 'bf16'}`,
-    };
-  }
-  return { shape, precision: `${a.dtype_a ?? '?'} × ${a.dtype_b ?? '?'} → ${a.dtype_out ?? '?'}` };
+  return {
+    shape: `${a.m}×${a.n}×${a.k}`,
+    precision: `${describeOperand(a.a)} × ${describeOperand(a.b)} → ${a.out ?? 'bf16'}`,
+  };
 }
 
 function moeLayerLabels(a: Args): OpLabels {
@@ -68,25 +63,6 @@ function moeLayerLabels(a: Args): OpLabels {
   return { shape, precision };
 }
 
-function moeGemmLabels(a: Args): OpLabels {
-  const ep = num(a.expert_parallel_size) ?? 1;
-  const tp = num(a.routed_tensor_parallel_size) ?? 1;
-  const par = ep > 1 || tp > 1 ? ` EP${ep} TP${tp}` : '';
-  return {
-    shape: `T=${a.num_tokens} H=${a.hidden} E=${a.num_experts}/top${a.top_k} I=${a.intermediate}${par}`,
-    precision: `${a.dtype_act ?? '?'} × ${a.dtype_weight ?? '?'}`,
-  };
-}
-
-function attentionLabels(a: Args): OpLabels {
-  const heads = `h${a.num_heads}${a.num_heads_kv && a.num_heads_kv !== a.num_heads ? `/${a.num_heads_kv}` : ''}`;
-  const dim = a.head_dim ?? `${a.head_dim_qk_nope}+${a.head_dim_qk_rope}/${a.head_dim_v}`;
-  return {
-    shape: `B=${a.batch_size} Sq=${a.seq_len_q} Skv=${a.seq_len_kv} ${heads} d${dim}${a.causal ? ' causal' : ''}`,
-    precision: `${a.dtype_q ?? '?'} → ${a.dtype_o ?? a.dtype_q ?? '?'}`,
-  };
-}
-
 export function opLabels(type: string, args: Args): OpLabels {
   switch (type) {
     case 'gemm': {
@@ -94,14 +70,6 @@ export function opLabels(type: string, args: Args): OpLabels {
     }
     case 'moe_layer': {
       return moeLayerLabels(args);
-    }
-    case 'moe_gemm':
-    case 'moe_forward': {
-      return moeGemmLabels(args);
-    }
-    case 'attention_mha':
-    case 'attention_mla': {
-      return attentionLabels(args);
     }
     default: {
       return { shape: JSON.stringify(args).slice(0, 80), precision: '' };
@@ -132,11 +100,6 @@ export function usefulFlops(type: string, a: Args): number | null {
     if (sh && num(sh.count) && num(sh.inter))
       flops += 6 * t * h * (sh.inter as number) * (sh.count as number);
     return flops;
-  }
-  if (type === 'moe_gemm') {
-    const [t, h, k, i] = [num(a.num_tokens), num(a.hidden), num(a.top_k), num(a.intermediate)];
-    const tp = num(a.routed_tensor_parallel_size) ?? 1;
-    return t && h && k && i ? (6 * t * h * k * i) / tp : null;
   }
   return null;
 }

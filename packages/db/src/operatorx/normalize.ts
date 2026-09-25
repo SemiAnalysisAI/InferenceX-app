@@ -2,9 +2,8 @@
  * Raw OperatorX bundle -> the dataset the dashboard renders. Pure and source-agnostic:
  * the GitHub, local-directory and database sources all hand this the same raw bundle.
  *
- * Tolerant by design: an unknown op type or args schema still produces rows (with
- * generic labels) instead of failing the run, so a new sweep schema never takes the
- * page down. Requested cases with no result row are reported as `missing`.
+ * An unknown op type still produces rows (with generic labels) instead of failing the
+ * run. Requested cases with no result row are reported as `missing`.
  */
 import { type OperatorXRawBundle, type OperatorXRunPlan, planFromManifest } from './bundle';
 import { opLabels, usefulFlops } from './describe';
