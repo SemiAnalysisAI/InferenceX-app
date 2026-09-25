@@ -1,5 +1,5 @@
 /**
- * Human labels and useful-FLOP counts for OperatorX ops (gemm, moe_layer). Pure functions
+ * Human labels and useful-FLOP counts for OperatorX ops (gemm, moe). Pure functions
  * of an op's type and args; other op types fall back to generic labels.
  */
 
@@ -46,7 +46,7 @@ function gemmLabels(a: Args): OpLabels {
   };
 }
 
-function moeLayerLabels(a: Args): OpLabels {
+function moeLabels(a: Args): OpLabels {
   const ex = obj(a.experts) ?? {};
   const q = obj(ex.quant) ?? {};
   const latent = num(ex.latent) ? ` L=${ex.latent}` : '';
@@ -68,8 +68,8 @@ export function opLabels(type: string, args: Args): OpLabels {
     case 'gemm': {
       return gemmLabels(args);
     }
-    case 'moe_layer': {
-      return moeLayerLabels(args);
+    case 'moe': {
+      return moeLabels(args);
     }
     default: {
       return { shape: JSON.stringify(args).slice(0, 80), precision: '' };
@@ -87,7 +87,7 @@ export function usefulFlops(type: string, a: Args): number | null {
     const [m, n, k] = [num(a.m), num(a.n), num(a.k)];
     return m && n && k ? 2 * m * n * k : null;
   }
-  if (type === 'moe_layer') {
+  if (type === 'moe') {
     const ex = obj(a.experts);
     const [t, h] = [num(a.tokens), num(a.hidden)];
     if (!ex || !t || !h) return null;
