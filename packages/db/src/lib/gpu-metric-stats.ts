@@ -2,7 +2,7 @@ import {
   computeGpuMetricStats,
   type GpuMetricSample,
   type GpuMetricStats,
-} from '../etl/gpu-metrics-csv.js';
+} from '../etl/gpu-metrics-csv';
 
 /** Bump whenever full-record digest definitions change. Independent of serving-window metrics. */
 export const GPU_STATS_VERSION = 1;

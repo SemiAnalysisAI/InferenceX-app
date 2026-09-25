@@ -12,7 +12,7 @@ import {
   computeStoredGpuMetricStats,
   statMetricColumn,
   type StoredGpuMetricSample,
-} from '../lib/gpu-metric-stats.js';
+} from '../lib/gpu-metric-stats';
 
 import type { DbClient } from '../connection.js';
 
