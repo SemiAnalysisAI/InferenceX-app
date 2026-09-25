@@ -9,6 +9,7 @@ import type {
 } from '@/components/inference/types';
 import { frameworkFamily } from '@/lib/framework-family';
 import type { PowerTier } from '@/lib/power-tier';
+import { pointTopologyKey } from './topology-filter';
 
 export type { AvailableQuickFilters, DeploymentMode, PowerTier, QuickFilters, SpecMode };
 
@@ -64,6 +65,7 @@ export function computeAvailableQuickFilters(
 ): AvailableQuickFilters {
   const vendors = new Set<string>();
   const frameworks = new Set<string>();
+  const topologies = new Set<string>();
   let hasSingleNode = false;
   let hasMultiNode = false;
   let hasDisagg = false;
@@ -72,6 +74,7 @@ export function computeAvailableQuickFilters(
   let hasCertified = false;
   let hasLegacy = false;
   for (const p of points) {
+    topologies.add(pointTopologyKey(p));
     const vendor = pointVendor(String(p.hwKey));
     if (vendor) vendors.add(vendor);
     const fam = frameworkFamily(p.framework);
@@ -98,6 +101,7 @@ export function computeAvailableQuickFilters(
     deployment,
     spec,
     power: POWER_TIER_ORDER.filter((tier) => (tier === 'certified' ? hasCertified : hasLegacy)),
+    topologies: [...topologies].toSorted(),
   };
 }
 
@@ -108,7 +112,8 @@ export function quickFiltersActive(f: QuickFilters): boolean {
     f.frameworks.length > 0 ||
     f.deployment.length > 0 ||
     f.spec.length > 0 ||
-    f.power.length > 0
+    f.power.length > 0 ||
+    (f.topologies?.length ?? 0) > 0
   );
 }
 
@@ -159,6 +164,7 @@ export function parsePowerTiers(values: readonly string[]): PowerTier[] {
 
 /** Whether a single data point satisfies every active quick-filter category. */
 export function matchesQuickFilters(point: InferenceData, f: QuickFilters): boolean {
+  if (f.topologies?.length && !f.topologies.includes(pointTopologyKey(point))) return false;
   if (f.vendors.length > 0) {
     const vendor = pointVendor(String(point.hwKey));
     if (!vendor || !f.vendors.includes(vendor)) return false;

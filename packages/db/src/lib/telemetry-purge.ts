@@ -28,8 +28,13 @@ export interface TelemetryPurgeCounts {
 
 export const NO_TELEMETRY: TelemetryPurgeCounts = { series: 0, samples: 0 };
 
+interface CountRow {
+  n: unknown;
+  samples: unknown;
+}
+
 /** `count`/`sum` come back as strings over the wire; `sum` is null on an empty set. */
-function toCounts(row: { n: unknown; samples: unknown } | undefined): TelemetryPurgeCounts {
+function toCounts(row: CountRow | undefined): TelemetryPurgeCounts {
   if (!row) return NO_TELEMETRY;
   return { series: Number(row.n ?? 0), samples: Number(row.samples ?? 0) };
 }
@@ -44,12 +49,12 @@ export async function countRunTelemetry(
   workflowRunIds: readonly number[],
 ): Promise<TelemetryPurgeCounts> {
   if (workflowRunIds.length === 0) return NO_TELEMETRY;
-  const [row] = await sql`
+  const [row] = await sql<CountRow[]>`
     SELECT count(*)::int AS n, coalesce(sum(sample_count), 0)::bigint AS samples
     FROM gpu_metric_series
     WHERE workflow_run_id = ANY(${[...workflowRunIds]})
   `;
-  return toCounts(row as { n: unknown; samples: unknown } | undefined);
+  return toCounts(row);
 }
 
 /**
@@ -62,7 +67,7 @@ export async function deleteRunTelemetry(
   workflowRunIds: readonly number[],
 ): Promise<TelemetryPurgeCounts> {
   if (workflowRunIds.length === 0) return NO_TELEMETRY;
-  const [row] = await sql`
+  const [row] = await sql<CountRow[]>`
     WITH deleted AS (
       DELETE FROM gpu_metric_series
       WHERE workflow_run_id = ANY(${[...workflowRunIds]})
@@ -70,7 +75,7 @@ export async function deleteRunTelemetry(
     )
     SELECT count(*)::int AS n, coalesce(sum(sample_count), 0)::bigint AS samples FROM deleted
   `;
-  return toCounts(row as { n: unknown; samples: unknown } | undefined);
+  return toCounts(row);
 }
 
 /**
@@ -83,7 +88,7 @@ export async function unlinkPointTelemetry(
   benchmarkResultIds: readonly number[],
 ): Promise<number> {
   if (benchmarkResultIds.length === 0) return 0;
-  const [row] = await sql`
+  const [row] = await sql<Pick<CountRow, 'n'>[]>`
     WITH deleted AS (
       DELETE FROM benchmark_result_gpu_metrics
       WHERE benchmark_result_id = ANY(${[...benchmarkResultIds]})
@@ -91,7 +96,7 @@ export async function unlinkPointTelemetry(
     )
     SELECT count(*)::int AS n FROM deleted
   `;
-  return Number((row as { n: unknown } | undefined)?.n ?? 0);
+  return Number(row?.n ?? 0);
 }
 
 /** One-line summary for preview and transcript output. */

@@ -139,7 +139,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-inference-view',
-    sourceSha256: 'de9192086b27e530ad6b1ece082b4989b3a9771a78195ae9f6d1c3899519588f',
+    sourceSha256: 'bafac08dbe6e6e4b75dd15987e79f84b514f3e93351149ad44b296f6dd2a9662',
   },
   {
     source: 'src/app/api/v1/views/operatorx/route.ts',
@@ -155,7 +155,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-view-options',
-    sourceSha256: '79571c3e6faf5af977c1afc9c29ebd6c1bfeb54ccf389711fa49668466fb58f4',
+    sourceSha256: 'ceba9504cfc50cb37748c9455f22dca9813789eb0148da740b24678bb540fb27',
   },
   {
     source: 'src/app/api/v1/views/overview/route.ts',
@@ -239,7 +239,7 @@ export const apiRouteCatalog = [
       en: 'UI-only PowerX raw/series=power read: DB-first with artifact fallback, separate host/GPU identities and adjacent CSV context timezone normalization. GET has no expected identities and reports sourceCoverage unknown. Healthy stored windows survive fallback; known-incomplete CSVs require retained file/sample inventory and known-incomplete bundles require re-ingest. DB failures return 503 DATABASE_UNAVAILABLE; unresolved stored gaps return 503 STORED_TELEMETRY_INCOMPLETE. Responses use no-store. This is not a stable public API.',
       zh: '仅供 PowerX 界面读取原始遥测或 series=power：优先 DB，缺失时回退产物，保留主机/GPU 身份，并按相邻 CSV context 规范化时区。GET 没有预期身份清单，sourceCoverage 为 unknown。回退保留健康存储窗口；已知不完整 CSV 须满足文件/样本清单，已知不完整 bundle 须重新 ingest。数据库故障返回 503 DATABASE_UNAVAILABLE，未恢复的存储缺口返回 503 STORED_TELEMETRY_INCOMPLETE。响应使用 no-store，不作为稳定公开 API。',
     },
-    sourceSha256: '48930ca8c5c7fb26ab193f872271e21aefadc306d760ad9a7365c7cba4e4029b',
+    sourceSha256: 'e5e542173400ab5012eeff665154e68d62a402f8279e0cb7fe6e3f4dfb548adf',
   },
   {
     source: 'src/app/api/gpu-metrics/route.ts',
@@ -250,7 +250,7 @@ export const apiRouteCatalog = [
       en: 'Read-only Timeline transport with runId, series=power and optional prefix in the query; JSON sources contains 1–1000 validation basenames with RESULT_FILENAME up to 200 ASCII letters/digits/dot/underscore/hyphen, matching prefix. Invalid input returns 400; bodies over 256 KiB return 413. Fully covered DB reads skip GitHub; missing identities fall back and merge by validation source, preserving stored sibling windows. Offline GitHub preserves healthy DB series with incomplete sourceCoverage. Coverage describes only requested identities, never whole-run/sample completeness. The GET no-store/error/inventory guarantees also apply. UI-owned, excluded from the stable public API.',
       zh: 'Timeline 只读传输：查询参数为 runId、series=power 和可选 prefix；JSON sources 含 1–1000 个验证文件 basename，RESULT_FILENAME 最长 200 个 ASCII 字母/数字/点/下划线/连字符，且须匹配 prefix。输入错误返回 400，正文超过 256 KiB 返回 413。DB 已覆盖请求时跳过 GitHub，否则按缺失身份回退，以 validation source 为键合并，并保留已存储的同 bundle 兄弟窗口。GitHub 离线仍返回健康 DB 序列，sourceCoverage 标记 incomplete。覆盖仅针对请求身份，不代表整次 run 或样本完整性。沿用 GET 的 no-store、错误和清单约束；属于界面接口，不纳入稳定公开 API。',
     },
-    sourceSha256: '48930ca8c5c7fb26ab193f872271e21aefadc306d760ad9a7365c7cba4e4029b',
+    sourceSha256: 'e5e542173400ab5012eeff665154e68d62a402f8279e0cb7fe6e3f4dfb548adf',
   },
   {
     source: 'src/app/api/openapi.json/route.ts',
@@ -805,6 +805,54 @@ export interface ApiContractSourceDigest {
  */
 export const apiContractSourceDigests = [
   {
+    source: 'src/components/inference/utils/resolveXAxisField.ts',
+    sourceSha256: '4783579c7b3c1a21b91968cb03e9c35a57a85251f4992cb5667a855ba7c77497',
+    reviewArea: {
+      en: 'Shared service-axis resolution: fixed-sequence mean/median, reciprocal mean TPOT, and AgentX percentile isolation.',
+      zh: '共用服务轴解析：固定长度工作负载 mean/median、mean TPOT 的倒数，以及 AgentX 独立的分位数选择。',
+    },
+  },
+  {
+    source: 'src/components/inference/utils/equal-service-comparison.ts',
+    sourceSha256: '9a7989e04f0228983f5f1069b8e35e221d85561bd95fdfd1ba9e4210f42bb0c1',
+    reviewArea: {
+      en: 'Source-scoped equal-service interpolation, comparator-relative changes, endpoint provenance, prefill share projection and role points.',
+      zh: '按完整来源限定的同等服务插值、相对基准变化、端点来源、prefill 占比视图以及各角色数据点。',
+    },
+  },
+  {
+    source: 'src/components/inference/utils/matched-concurrency.ts',
+    sourceSha256: 'db81deeff9e6ff64f607b71751d18acc59626f43fecbe037145e3a55c4fe959f',
+    reviewArea: {
+      en: 'Same-concurrency pairing of two exact sources: missing and conflicting observations, signed comparator-relative changes, no interpolation.',
+      zh: '两个完整来源在相同并发下的配对：缺失与冲突观测、相对基准的带符号变化，不做插值。',
+    },
+  },
+  {
+    source: 'src/components/inference/utils/power-fit.ts',
+    sourceSha256: 'a1e30d09648b74897e283b67a4e63e2591a485ed0f92e00acbe606b75967444a',
+    reviewArea: {
+      en: 'Per-source least-squares power fit on output per allocated GPU: intercept, marginal J/token, R², fitted range and registry TDP.',
+      zh: '按来源对每个已分配 GPU 的输出做最小二乘功耗拟合：截距、边际 J/token、R²、拟合范围与注册表 TDP。',
+    },
+  },
+  {
+    source: 'src/components/inference/utils/role-energy.ts',
+    sourceSha256: '36b1ceda97af99731482ed815167a660f1619ab94c2956afe11cf72d58fa5380',
+    reviewArea: {
+      en: 'Validated prefill/decode energy reconstruction and shares on a common output-token denominator.',
+      zh: '使用统一 output token 分母的已验证 prefill/decode 能耗重建与占比。',
+    },
+  },
+  {
+    source: 'src/lib/benchmark-transform.ts',
+    sourceSha256: '21f1fe4d63737c74efb2251a64f79eef1b5e9c565769be9b4fb500b1fa4ecc89',
+    reviewArea: {
+      en: 'Raw benchmark means and derived reciprocal mean-TPOT interactivity used by Dashboard and read-only views.',
+      zh: '仪表板和只读视图共用的原始 benchmark 均值与 mean TPOT 倒数形式的 interactivity。',
+    },
+  },
+  {
     source: '../db/src/etl/power-audit-validations.ts',
     sourceSha256: '44a607747b79d038bb8f4e53590efba689d376c143f50a5d750d3552faa0c442',
     reviewArea: {
@@ -814,7 +862,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/gpu-power/power-audit-bundle.ts',
-    sourceSha256: '35901a329822ae6522fe39522eb1da5509bcecee1afda93a2ce9c0d06b0f27de',
+    sourceSha256: '2f6e82d64380c936178e26795336bb8259a316fa4e547987688effc48e4b28eb',
     reviewArea: {
       en: 'Artifact Timeline validation windows, strict nested AgentX result identity, adjacent context selection, timezone normalization and device identity semantics.',
       zh: '产物 Timeline 验证窗口、严格匹配的嵌套 AgentX result 身份、相邻 context 选择、时区规范化及设备身份语义。',
@@ -830,7 +878,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/gpu-power/types.ts',
-    sourceSha256: 'e8c5460821f5d8228bcf8b7dd087abe14e29a8e220e1d8bcd75112fb5ead1baa',
+    sourceSha256: '207d56219a78a44603bff5d61ca9017caa37ab1a6973792793a2ce2122f5475c',
     reviewArea: {
       en: 'GPU telemetry units, missing values, timestamp deduplication, and full-record live statistics definitions.',
       zh: 'GPU 遥测单位、缺失值、时间戳去重，以及实时产物全记录统计的定义。',
@@ -901,7 +949,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/components/inference/hooks/chart-data-core.ts',
-    sourceSha256: '0c86987ed025557172a8d020144ca462be1ecac880d53b7d929f93a617086c33',
+    sourceSha256: '8601c33f6979541786362276697e4d4a21278de1d57b50d31f705391b5da041d',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -955,7 +1003,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/series.ts',
-    sourceSha256: 'b5ebddee9d9ea6b85a8fdab2cf8fcc50bbf05e0fa10564987698abd38a6d4488',
+    sourceSha256: '9974fe5166ac847f4b9284eda8a901ee0f9c8b432567ef184890453c715d2f4f',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -964,7 +1012,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/registry.ts',
-    sourceSha256: 'e7494504b118a7706742e542b3cc3b2543823d8463ac5b32b13ebdb971c84aed',
+    sourceSha256: '5770b2b60883003f4203b9db915aee24e39e14ca5dd787b67281520fd11f940c',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',

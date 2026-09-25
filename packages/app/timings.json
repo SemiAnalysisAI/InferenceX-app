@@ -237,6 +237,14 @@
       "duration": 2377
     },
     {
+      "spec": "cypress/e2e/powerx-timeline.cy.ts",
+      "duration": 4000
+    },
+    {
+      "spec": "cypress/e2e/powerx-compare.cy.ts",
+      "duration": 4000
+    },
+    {
       "spec": "cypress/e2e/profit-estimator.cy.ts",
       "duration": 39450
     },

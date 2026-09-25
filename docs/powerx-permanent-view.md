@@ -76,26 +76,15 @@ existing `inference_y_axis_metric_selected` fired by `ChartControls`.
 
 A point without a value for the selected boundary is omitted from that series only (the
 builders never emit `{ y: 0 }`, and both the official and overlay paths filter by
-`metricKey in point`). The PowerX availability panel explains the gap per point:
-
-| State              | Meaning                                                                                                                                                  |
-| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `noSpec`           | hardware has no `tdp` / `power` in `HW_REGISTRY`                                                                                                         |
-| `noThroughput`     | provisioned watts exist but the row has no output throughput                                                                                             |
-| `noNormalization`  | disaggregated row with throughput but no whole-deployment GPU count (`powerBasisNormalization`: not `single_turn`, or non-integer prefill/decode counts) |
-| `noTelemetry`      | modeled boundary needs validated GPU telemetry (B4 follows B1)                                                                                           |
-| `invalid`          | `power_valid === 0`                                                                                                                                      |
-| `modelWorkload`    | chassis model covers 8K / 1K only                                                                                                                        |
-| `modelHardware`    | hardware outside the chassis profiles (GB200 / GB300 NVL72)                                                                                              |
-| `modelUnsupported` | other `modelSystemPower` reasons (gpu-count, topology, role-power …)                                                                                     |
+`metricKey in point`).
 
 The chart caption (`data-testid="power-basis-assumptions"`) names the boundary, the formula in
 words, the PUE constant and the chassis-model revision so a screenshot records its method.
 The pinned tooltip's "Modeled system power" block (`tooltipUtils.ts` `modeledSystemPowerHTML`)
 renders only for `measured*` keys and `y_modeledChassisPowerPerGpu`, so on the boundary keys the
 caption is the only per-chart provenance; the caption does not promise more.
-The empty state for the utility-modeled boundary says why nothing rendered and points at the
-Boundary select.
+When no point in the selection reports the selected telemetry axis, the chart's empty state says
+the selection has no measured GPU power (`noMeasuredDataHint`) instead of the generic hint.
 
 ## Article figure → share link
 
@@ -143,9 +132,9 @@ role's availability rules carry through unchanged.
 Siblings exist only where the metric names the whole-deployment **average W/chip** or **J per
 output token** (the only quantities every boundary and role publishes on one axis); role
 energy additionally excludes the prefill J per input token scope. Elsewhere
-`powerCompareVariants` returns nothing, the Compare select disables the option, and — when a
-link arrives with an inapplicable mode — a hint (`measured-compare-hint`) says the comparison is
-paused. The parameter is kept, so switching back to an applicable setting resumes it.
+`powerCompareVariants` returns nothing and the Compare select disables the option. A link that
+arrives with an inapplicable mode keeps the parameter, so switching back to an applicable
+setting resumes it.
 
 Rendering (`ScatterGraph`): the series key is `scatterSeriesKey(point)` =
 `<hwKey>_<precision>[-v-<variant>]` (`utils/point-identity.ts`), so rooflines, frontiers,
@@ -165,8 +154,7 @@ line-swatch row per series present (base first); rows toggle chart-local visibil
 Tooltips add a "Series" line; on the energy axis a role clone also reports its share of the
 reconstructed request energy. Table adds a "Series" column and CSV a trailing "Power Series"
 column only while clones are present. Comparison clones are excluded from `bestSeriesPerSku`,
-the power-tier counts, the legend points table, the availability panel (which reads
-`selectionPoints`) and the date-comparison `GPUGraph`. Unofficial-run pills read `✕ <hardware>` (`getOverlayLineLabel`); the branch stays in the
+the legend points table and the date-comparison `GPUGraph`. Unofficial-run pills read `✕ <hardware>` (`getOverlayLineLabel`); the branch stays in the
 legend and a short run tag (` · main`, ` · …<date>-<sha>`) is appended only when several overlay
 runs draw the same hardware.
 
@@ -185,8 +173,8 @@ track `inference_power_compare_series_toggled { series, visible }`.
 
 `y_measuredPowerTimeline` is the third value of the Measured Power **Display** control
 (`watts` / `tdp` / `timeline`, `MeasuredPowerDisplay` in `measured-metric-config.ts`). Its
-registry field aliases `measuredAvgPower`, so the point set, the availability panel, the Table
-view and the share link are those of the measured average; only the chart body changes:
+registry field aliases `measuredAvgPower`, so the point set, the Table view and the share link
+are those of the measured average; only the chart body changes:
 `ChartDisplay` renders `ui/PowerTimeline.tsx` instead of `ScatterGraph` when the resolved
 config is `display: 'timeline'`.
 
@@ -204,14 +192,16 @@ config is `display: 'timeline'`.
     matches before falling back to the artifact name.
 
   Nothing is matched by hardware or concurrency. Rows whose telemetry is missing (expired
-  artifact, bundle over the download cap, another collector) are listed under the chart
-  (`data-testid="power-timeline-missing"`), never estimated. Trace keys are
+  artifact, bundle over the download cap, another collector) are not drawn, never
+  estimated. Trace keys are
   `<runId>:<name>` (`traceKeyForPoint`), unique per point in both collectors.
 
 - **Fetch.** One request per workflow run in the visible points
   (`planPowerTimelineRequests`, at most `POWER_TIMELINE_MAX_RUNS`; a deep-linked trace's run
-  goes first, then `?unofficialrun=` overlay runs, then official runs — `prioritizeRun` /
-  `prioritizeRuns` — so an overlay the user asked for is never the run that gets dropped),
+  goes first, then runs holding a point the legend shows (`?unofficialrun=` overlay runs before
+  official ones), then runs whose points are all hidden — `prioritizeRun` / `prioritizeRuns` — so
+  an overlay the user asked for, or a pair left visible for comparison, is never the run that gets
+  dropped),
   narrowed with
   `prefix=` to the common RESULT_FILENAME prefix so a nightly sweep's other models are not
   downloaded. `/api/gpu-metrics?series=power` first uses persisted telemetry and returns one-second per-GPU buckets
@@ -231,6 +221,17 @@ config is `display: 'timeline'`.
   (`setUnifiedOverlaySelection`, `computeToggle` solo semantics) exactly as `ScatterGraph`
   does; the context's `toggleHwType` alone would change nothing visible there.
 
+- **Date comparison.** With chip configs and comparison dates selected, `ChartDisplay` passes
+  `comparison`, and official traces become the compared (date, chip config) series of the
+  date-comparison `GPUGraph`. `useComparisonSeries` gives both displays the same series, run
+  numbers and colours. The legend lists one row per series with a trace candidate, grouped
+  under its hardware; a click calls `toggleActiveDate` with the same solo semantics, and a
+  soloed date hides the other dates' traces. Overlay runs stay in one _Unofficial run_ group
+  in their run colour and still follow `activeOverlayHwTypes`. The tooltip header, the focus
+  chip and the summary's hardware column add the date or run
+  (`B200 (SGLang) · 2026-09-23`); end labels lead with it only while more than one entry is
+  visible (`2026-09-23 c1`).
+
 - **Drawing.** One trace per config, mean of its GPUs (legend switch: one line per GPU),
   coloured by hardware for official rows and by `overlayRunColor(runIndex)` for
   `?unofficialrun=` rows; legend toggles follow `activeHwTypes` / `activeOverlayHwTypes`
@@ -239,7 +240,8 @@ config is `display: 'timeline'`.
   the all-in provisioned line is an opt-in legend switch because it halves the traces'
   vertical resolution. X axis: wall clock (UTC) when the visible traces come from one run,
   otherwise seconds since each trace's start; both are a toolbar toggle. `c<conc>` labels sit
-  at the end of the emphasized segment.
+  at the end of the emphasized segment; labels that would overprint stack one row apart
+  (`stackTraceLabels`).
 - **Pools (Figure 1).** The legend switch _Prefill / decode pools_ (shown when a visible
   trace carries worker roles) sums the board power of each role's GPUs
   (`tracePools` / `sumPowerAt`) and draws one line per pool — prefill dashed `7 3`, decode
@@ -259,17 +261,75 @@ config is `display: 'timeline'`.
   one-shot module store (`requestPowerTraceFocus`); the timeline consumes it on mount, dims
   every other trace, switches to pool mode when the trace has roles, and shows a _Focused on …_
   chip (`data-testid="power-timeline-focus"`) with _Show all_ to clear. The link's `href` is
-  the current page with `i_metric=y_measuredPowerTimeline`, so open-in-new-tab lands on the
-  timeline (unfocused: the focus is a gesture, not URL state).
-- **State.** Axis mode, line mode (mean / per GPU / pools), the all-in switch, the focused
-  trace and hover highlight are component state, not URL state: the share link is `i_metric=y_measuredPowerTimeline` plus the usual
-  scope, and a reader lands on the same defaults.
+  the current page with `i_metric=y_measuredPowerTimeline` only, so open-in-new-tab lands on
+  the unfocused timeline; once the focus is applied it is written to `i_ptfocus` like the other
+  timeline settings.
+- **Same load across platforms.** The toolbar _Concurrency_ select (`i_ptconc`, default all)
+  keeps the chart's rows at one load, so, for example, GB200 and GB300 prefill/decode pools draw
+  side by side; `i_ptaxis=serving` aligns them at each validated window's start. With two or
+  more hardware types visible, every line label leads with the hardware label. A deep link
+  resets the filter so the focused trace is never filtered out.
+- **Validated-window summary.** `ui/PowerTimelineSummary.tsx` lists each drawn trace's
+  hardware and config, run link, attempt, validation file, per-run telemetry source
+  (`database`, or `GitHub artifact fallback` when `/api/gpu-metrics` read any requested series
+  live) and window length. Per pool (all GPUs, prefill, decode) it shows the GPU count, the
+  row's validated average W/GPU as stored, the largest drawn 1-s pool sum inside the window
+  (`summarizeTraceWindow`) and pool TDP = GPUs × `HW_REGISTRY.tdp`. No average is recomputed.
+- **State.** Axis mode (`i_ptaxis`), line mode (`i_ptlines`: mean / `gpu` / `pool`), window-only
+  display (`i_ptwindow`), the focused trace (`i_ptfocus`), the all-in switch (`i_ptutility`) and
+  the concurrency filter (`i_ptconc`) are `PowerTimeline` component state mirrored into the URL by the component itself
+  (`parsePowerTimelineParams` on mount, `setUrlParams` on change); defaults serialize as `''`.
+  Hover highlight is never shared. See
+  [Dashboard read-only views](./dashboard-readonly-views.md) for the renderer-only status of
+  these fields against the raw `gpu-metrics` API.
 - **Analytics.** `inference_power_timeline_loaded { traces, missing, runs }`,
   `inference_power_timeline_axis_changed { mode }`,
   `inference_power_timeline_lines_changed { lines: 'mean' | 'gpu' | 'pool' }`,
   `inference_power_timeline_utility_toggled { enabled }`,
+  `inference_power_timeline_concurrency_changed { concurrency }`,
   `inference_power_trace_opened { hwKey, conc, overlay }` (scatter tooltip action),
   `inference_power_timeline_focus_cleared`.
+
+## Analysis panels (article figures 6–16)
+
+Figure numbers here follow the current article draft; the share-link table above predates its
+renumbering. Below the measured chart, `ui/PowerServiceComparison.tsx` offers three opt-in
+panels, and the scatter chart adds a fourth. All read the chart's scoped observed points
+(`observedPoints`: official and `?unofficialrun=` rows, comparison clones excluded), keep one
+source per exact run and recipe (`equalServiceSourceKey`), and colour overlay sources with
+`overlayRunColor`.
+
+| Figures      | Panel                                                                                                                                         | Switch (share param)                                                                                    | Helper                                                 |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| 6 / 7 / 9    | Same-concurrency table: baseline and comparator J/output token, W/GPU and streaming speed, with % change                                      | _Compare at the same speed / latency_ (`i_servicecompare=1`, sources `i_servicebase` / `i_servicepeer`) | `utils/matched-concurrency.ts`                         |
+| 12 / 13 / 14 | Role group: W/GPU by role, role-local J/input and J/output (not added), J/output token by role with the total, prefill share                  | _Prefill / decode roles_ (`i_roleshare=1`)                                                              | `getRolePoints` in `utils/equal-service-comparison.ts` |
+| 15           | Least-squares fit of mean W/GPU against output tok/s per allocated GPU: points, line, dashed extension to zero, P₀, P₀ ÷ TDP, m, R², n, range | _Power vs output-rate fit_ (`i_powerfit=1`)                                                             | `utils/power-fit.ts`                                   |
+| 16           | Frontier points: the drawn cross-platform frontier and each point's run and attempt                                                           | Legend _Pareto frontier_ (`i_frontier`) on a measured metric                                            | `utils/frontier-points.ts`                             |
+
+- **Same concurrency** pairs only observations; nothing is interpolated. A side missing at a
+  load reads _Not measured_. Disagreeing duplicates of one source read as ambiguous, with none
+  chosen. % change needs both sides. Same load usually means different speed, so the table
+  sits beside the equal-service comparison, not in place of it.
+- **Roles** use validated disaggregated rows. Each panel names its denominator. Missing role
+  telemetry is omitted, never drawn as zero, and share points stay unconnected.
+- **Fit** needs three distinct output rates per source. Output is whole-deployment tok/s over
+  all allocated GPUs, on the same basis as the mean W/GPU. P₀ is an extrapolated intercept,
+  not measured idle power, and R² describes only that line.
+- **Frontier** lists `globalParetoFrontier`'s own output, so the table is exactly what is
+  drawn. Ties keep the first point, official before overlay.
+- **Source labels** (`getEqualServiceSources`) read hardware and date, adding precision,
+  topology, run, attempt, recipe, image or point only where two sources would otherwise look
+  the same. The opaque key stays the exact identity.
+- Plots export PNG and CSV; the frontier table exports CSV only. Panel subtitles and the
+  baseline → comparator pair are export-only, so a PNG names its workload and sources while
+  the screen shows only the source selects. The views API returns
+  `matchedConcurrency`, `rolePoints` and `powerFits`
+  ([Dashboard read-only views](./dashboard-readonly-views.md#fixed-sequence-service-comparisons));
+  it has no global-frontier parameter.
+- Analytics: `inference_equal_service_toggled`, `inference_power_roles_toggled` and
+  `inference_power_fit_toggled` (`{ enabled }`), `inference_equal_service_source_changed
+{ role }`, and chart-button events under `matched_concurrency`, `power_roles`, `power_fit`
+  and `frontier_points`.
 
 ## Tests
 
@@ -283,4 +343,15 @@ config is `display: 'timeline'`.
   failure as 503, known missing hosts, and the retained-inventory recount before a CSV
   fallback.
 - `cypress/component/power-timeline.cy.tsx`, `power-compare.cy.tsx` — overlay-run colour and
-  the overlay hardware filter.
+  the overlay hardware filter; in date comparison, per-date trace colours, legend solo toggles
+  and date-prefixed end labels.
+- `cypress/component/gpu-graph.cy.tsx`, `cypress/e2e/inference-chart.cy.ts` and
+  `lib/d3-chart/layers/rooflines.test.ts` — `?unofficialrun=` runs stay on the date-comparison
+  `GPUGraph` in their run colour and dash on the interactivity and concurrency axes, per-curve
+  dashes survive display updates, and concurrency sweeps split per date, run and topology.
+- `utils/matched-concurrency.test.ts`, `utils/power-fit.test.ts`, `utils/powerTimeline.test.ts`
+  — signed same-concurrency deltas, the least-squares fit and R², disaggregated fits on output
+  per allocated GPU, and the peak pool power inside the validated window.
+- `cypress/component/power-service-comparison.cy.tsx`, `frontier-points-panel.cy.tsx`,
+  `power-timeline.cy.tsx` and `cypress/e2e/powerx-compare.cy.ts` — the article panels on
+  `?unofficialrun=` overlay rows.

@@ -2880,13 +2880,6 @@ describe('Power envelopes', () => {
       .should('have.length', 3)
       .each(($point) => cy.wrap($point).should('have.css', 'opacity', '1'));
     cy.get('#scatter-show-all-measurements').should('not.exist');
-    cy.get('[data-testid="measured-power-summary"]')
-      .should('contain.text', 'Showing 3 of 4 measured points')
-      .and('contain.text', '1/2 historical');
-    cy.get('#power-sweep .dot-group')
-      .filter((_, element) => element.style.opacity !== '0')
-      .find('.legacy-power-ring')
-      .should('have.length', 1);
     cy.get('#power-sweep .dot-group')
       .filter((_, element) => element.style.opacity === '0')
       .should('have.css', 'pointer-events', 'none');
@@ -2898,11 +2891,6 @@ describe('Power envelopes', () => {
           .should('have.length', 4)
           .each(($point) => cy.wrap($point).should('have.css', 'opacity', '1'));
         cy.get('#power-sweep .roofline-path').should('have.attr', 'd', boundary);
-        cy.get('[data-testid="measured-power-summary"]').should(
-          'contain.text',
-          'Showing 4 of 4 measured points',
-        );
-        cy.get('#power-sweep .legacy-power-ring').should('have.length', 2);
         cy.get('#scatter-show-all-measurements').should('not.exist');
         cy.get('#scatter-hide-non-optimal').click({ force: true });
         cy.get('#power-sweep .dot-group')
@@ -2925,7 +2913,6 @@ describe('Power envelopes', () => {
     cy.contains('button', 'Energy').click();
     cy.get('#scatter-hide-non-optimal').should('have.attr', 'data-state', 'checked');
     cy.get('#power-sweep .roofline-path[data-curve-kind="pareto"]').should('have.length', 1);
-    cy.get('[data-testid="power-curve-description"]').should('not.exist');
     cy.get('#scatter-show-all-measurements').should('not.exist');
   });
 

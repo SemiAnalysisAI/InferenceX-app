@@ -114,7 +114,7 @@ Axis and presentation state:
 
 - selected x-axis and y-axis metrics, percentile, and effective x-axis mode
 - the Measured controls (Boundary / Per / Scope / Statistic / Display / Unit) own no state: `measured-metric-config.ts` resolves each selection to the nearest registered metric key and writes it back to `selectedYAxisMetric`, so the power boundary rides on `i_metric` (there is deliberately no `i_pbasis`; see [PowerX Permanent View](./powerx-permanent-view.md))
-- the Measured Power Display value `timeline` (`y_measuredPowerTimeline`) swaps the chart body for `PowerTimeline`; its axis mode, per-GPU lines and all-in reference switch are component state and never enter the URL
+- the Measured Power Display value `timeline` (`y_measuredPowerTimeline`) swaps the chart body for `PowerTimeline`; its axis mode, line mode, window-only display, focused trace, all-in reference switch and concurrency filter are component state that `PowerTimeline` itself reads and writes through `useUrlState` as `i_ptaxis` / `i_ptlines` / `i_ptwindow` / `i_ptfocus` / `i_ptutility` / `i_ptconc`, so they never pass through the display domain
 - token-revenue price source (`i_revenue`): normalized uncached/cached/output pricing or the selected model's live OpenRouter catalog prices
 - scale, optimal-point, label, contrast, legend, and overlay controls
 
@@ -319,8 +319,8 @@ How the GPU-across-time comparison works in the inference tab:
 2. `useChartData` (in `InferenceProvider`) calls `buildComparisonDates()` to deduplicate and exclude the main `effectiveRunDate`.
 3. `useQueries` fires one `useBenchmarks(model, date)` request per comparison date in parallel, alongside the main date query.
 4. **Date stamping**: Each row from a comparison query is overwritten with `{ date: comparisonDates[i], actualDate: r.date }`. The `actualDate` field preserves the real DB date. Without this stamp, `activeDates` (keyed by user-selected date strings like `2025-01-15_h100-sxm`) would never match the rows' `date` field, so the toggle set would have no effect.
-5. `activeDates` is a `Set<string>` of `${date}_${gpuKey}` composite keys. It is initialised to all IDs whenever `allDateIds` changes (effect at line 473). Users toggle individual overlays on/off.
-6. Rows from all dates are merged into a single `rows` array and passed through `transformBenchmarkRows` — the chart renders all of them on the same axes, coloured by GPU + date.
+5. `activeDates` is a `Set<string>` of `${date}_${gpuKey}` composite keys. It is initialised to all IDs whenever `allDateIds` changes (effect at line 473). Users toggle individual overlays on/off: the `GPUGraph` legend and, on the Measured Power Timeline display, the `PowerTimeline` legend both call `toggleActiveDate` (`computeToggle` solo semantics). `ChartDisplay`'s `visibleDateComparisonRows` applies the same set to the table, CSV export and PowerX analysis panels. `?unofficialrun=` rows are not date series, so `activeDates` never hides them; they follow `activeOverlayHwTypes`.
+6. Rows from all dates are merged into a single `rows` array and passed through `transformBenchmarkRows` — the chart renders all of them on the same axes, coloured by GPU + date. `useComparisonSeries` owns the series order, run numbers and colours, so `GPUGraph` and `PowerTimeline` draw one (date, GPU) pair in the same colour.
 
 **When the latest date is selected as the main run date**: `useChartData` maps the selected date to `''` if it equals `latestAvailableDate`, reusing the no-date query key from the materialized view rather than firing a duplicate request.
 

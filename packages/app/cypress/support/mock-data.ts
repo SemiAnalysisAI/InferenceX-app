@@ -91,11 +91,13 @@ export function createMockHardwareConfig(): HardwareConfig {
 // ---------------------------------------------------------------------------
 
 export function createMockChartDefinition(overrides?: Partial<ChartDefinition>): ChartDefinition {
+  const chartType = overrides?.chartType ?? 'e2e';
+  const x = overrides?.x ?? (chartType === 'interactivity' ? 'median_intvty' : 'median_e2el');
   return {
-    chartType: 'e2e',
+    chartType,
     heading: 'End-to-End Latency vs Throughput',
-    x: 'conc' as keyof AggDataEntry,
-    x_label: 'Concurrency',
+    x,
+    x_label: chartType === 'interactivity' ? 'Interactivity' : 'End-to-end Latency (s)',
     y: 'mean_e2el' as keyof AggDataEntry,
     y_label: 'Mean E2E Latency (ms)',
     y_tpPerGpu: 'tput_per_gpu',
@@ -103,8 +105,9 @@ export function createMockChartDefinition(overrides?: Partial<ChartDefinition>):
     y_tpPerGpu_title: 'Throughput per Chip',
     y_tpPerGpu_roofline: 'upper_right',
     ...overrides,
-    x_scale_field: overrides?.x_scale_field ?? String(overrides?.x ?? 'conc'),
-    x_labelZh: overrides?.x_labelZh ?? '并发数',
+    x_scale_field: overrides?.x_scale_field ?? String(x),
+    x_labelZh:
+      overrides?.x_labelZh ?? (chartType === 'interactivity' ? '交互性' : '端到端延迟（s）'),
   };
 }
 
@@ -224,6 +227,8 @@ export function createMockInferenceContextValues(
     openRouterPricingError: null,
     setTokenRevenuePriceSource: namedStub('setTokenRevenuePriceSource'),
     selectedPercentile: 'p90',
+    fixedSequenceStatistic: 'median',
+    setFixedSequenceStatistic: namedStub('setFixedSequenceStatistic'),
     setSelectedPercentile: namedStub('setSelectedPercentile'),
     selectedXAxisMetric: null,
     setSelectedXAxisMetric: namedStub('setSelectedXAxisMetric'),
@@ -241,6 +246,7 @@ export function createMockInferenceContextValues(
     setQuickFilterDeployment: namedStub('setQuickFilterDeployment'),
     setQuickFilterSpec: namedStub('setQuickFilterSpec'),
     setQuickFilterPower: namedStub('setQuickFilterPower'),
+    setQuickFilterTopologies: namedStub('setQuickFilterTopologies'),
     isLegendExpanded: true,
     setIsLegendExpanded: namedStub('setIsLegendExpanded'),
     hideNonOptimal: false,

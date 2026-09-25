@@ -14,7 +14,12 @@
  * staging ("one CSV per node"). Pure module: no I/O.
  */
 
-import { splitCsvLine, type GpuMetricSample, type GpuMetricsVendor } from './gpu-metrics-csv.js';
+import {
+  emptySample,
+  splitCsvLine,
+  type GpuMetricSample,
+  type GpuMetricsVendor,
+} from './gpu-metrics-csv.js';
 
 export interface MultinodePowerHost {
   hostname: string;
@@ -30,27 +35,6 @@ const REQUIRED_COLUMNS = ['timestamp_unix', 'hostname', 'gpu_index', 'power_w'] 
 export function isMultinodePowerSamplesPath(relativePath: string): boolean {
   const posix = relativePath.split('\\').join('/');
   return /^LOGS\/(?:[^/]+\/)*samples\.csv$/u.test(posix);
-}
-
-function powerOnlySample(timestampMs: number, gpuIndex: number, powerW: number): GpuMetricSample {
-  return {
-    timestampMs,
-    gpuIndex,
-    powerW,
-    temperatureC: null,
-    smClockMhz: null,
-    memClockMhz: null,
-    gpuUtilPct: null,
-    memUtilPct: null,
-    edgeTempC: null,
-    memTempC: null,
-    gfxVoltageMv: null,
-    socVoltageMv: null,
-    memVoltageMv: null,
-    fclkMhz: null,
-    socclkMhz: null,
-    mmActivityPct: null,
-  };
 }
 
 /**
@@ -90,7 +74,7 @@ export function parseMultinodePowerSamples(csvText: string): MultinodePowerHost[
       host = { hostname, samples: [], gpuUuids: {} };
       hosts.set(hostname, host);
     }
-    host.samples.push(powerOnlySample(Math.round(seconds * 1000), gpuIndex, powerW));
+    host.samples.push({ ...emptySample(Math.round(seconds * 1000), gpuIndex), powerW });
     const uuid = at(cells, 'gpu_uuid');
     if (uuid && !(gpuIndex in host.gpuUuids)) host.gpuUuids[gpuIndex] = uuid;
   }

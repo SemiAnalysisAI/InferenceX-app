@@ -17,8 +17,11 @@ import { withPercentile } from '@/lib/benchmark-transform';
 import type { AggDataEntry, ChartDefinition } from '../types';
 import type { XAxisMode } from '../hooks/useChartData';
 
+export type FixedSequenceStatistic = 'mean' | 'median';
+
 /** Which rung of the branch ladder chose the x field (drives label choice). */
 export type XAxisBranch =
+  | 'concurrency'
   | 'natural'
   | 'user-input-override'
   | 'config-input-override'
@@ -35,14 +38,30 @@ export interface ResolvedXAxis {
 }
 
 /**
+ * A service-metric field at the selected statistic: the percentile for agentic
+ * rows, mean or median for fixed sequences. Fixed-sequence mean interactivity
+ * is reciprocal mean TPOT, never the raw arithmetic-mean interactivity field.
+ */
+export function resolveServiceField(
+  field: string,
+  opts: { isAgentic: boolean; percentile: string; fixedSequenceStatistic?: FixedSequenceStatistic },
+): keyof AggDataEntry {
+  const { isAgentic, percentile, fixedSequenceStatistic = 'median' } = opts;
+  const resolved = withPercentile(field, isAgentic ? percentile : fixedSequenceStatistic);
+  return (
+    !isAgentic && resolved === 'mean_intvty' ? 'mean_tpot_intvty' : resolved
+  ) as keyof AggDataEntry;
+}
+
+/**
  * Resolve the x-axis data field for a chart definition + metric selection.
  *
  * Rules, in order:
  * - The global x-axis mode takes precedence over legacy per-input-metric
- *   overrides. TTFT uses median for fixed-sequence runs.
+ *   overrides. Fixed-sequence service axes use the selected mean/median statistic.
  * - Natural x = the chart's latency metric at the selected percentile for
- *   agentic, forced to median for fixed-seq, where percentile-specific
- *   columns are not guaranteed to exist.
+ *   agentic, mean or median for fixed-sequence. Mean interactivity uses
+ *   reciprocal mean TPOT, never the raw arithmetic-mean interactivity field.
  * - Without a global mode, input metrics on the interactivity chart override x to a TTFT column:
  *   the user-picked metric for fixed-seq (the manual dropdown is hidden in
  *   agentic mode), else the config default.
@@ -58,13 +77,16 @@ export function resolveXAxisField(
   chartDef: ChartDefinition,
   selectedYAxisMetric: string,
   effectiveXMetric: string | null,
-  opts: { isAgentic: boolean; percentile: string; xAxisMode?: XAxisMode },
+  opts: {
+    isAgentic: boolean;
+    percentile: string;
+    xAxisMode?: XAxisMode;
+    fixedSequenceStatistic?: FixedSequenceStatistic;
+  },
 ): ResolvedXAxis {
   const { isAgentic, percentile, xAxisMode } = opts;
-  const naturalX = withPercentile(
-    chartDef.x,
-    isAgentic ? percentile : 'median',
-  ) as keyof AggDataEntry;
+  const serviceField = (field: string) => resolveServiceField(field, opts);
+  const naturalX = serviceField(chartDef.x);
 
   const metricTitle =
     (chartDef[`${selectedYAxisMetric}_title` as keyof ChartDefinition] as string) || '';
@@ -77,11 +99,11 @@ export function resolveXAxisField(
   let xAxisField: keyof AggDataEntry = naturalX;
   let branch: XAxisBranch = 'natural';
   if (xAxisMode !== undefined) {
-    if (xAxisMode === 'ttft' && chartDef.chartType === 'e2e') {
-      xAxisField = withPercentile(
-        'median_ttft',
-        isAgentic ? percentile : 'median',
-      ) as keyof AggDataEntry;
+    if (xAxisMode === 'concurrency') {
+      xAxisField = 'conc';
+      branch = 'concurrency';
+    } else if (xAxisMode === 'ttft' && chartDef.chartType === 'e2e') {
+      xAxisField = serviceField('median_ttft');
       branch = 'e2e-ttft-override';
     }
   } else if (
@@ -101,7 +123,7 @@ export function resolveXAxisField(
     branch = 'e2e-ttft-override';
   }
 
-  if (isAgentic) {
+  if (isAgentic && xAxisMode !== 'concurrency') {
     xAxisField = withPercentile(xAxisField, percentile) as keyof AggDataEntry;
   }
 

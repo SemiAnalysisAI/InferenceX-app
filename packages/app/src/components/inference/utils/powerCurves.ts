@@ -34,10 +34,7 @@ export function isPowerCurveMetric(metric: string): boolean {
  * Pareto behaviour.
  */
 export function isMeasuredPowerCurveMetric(metric: string): boolean {
-  return (
-    isPowerCurveMetric(metric) &&
-    (metric !== 'y_modeledChassisPowerPerGpu' || isPowerBasisConfigKey(metric))
-  );
+  return isPowerCurveMetric(metric) && metric !== 'y_modeledChassisPowerPerGpu';
 }
 
 /**

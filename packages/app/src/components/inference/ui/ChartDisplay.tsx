@@ -7,7 +7,6 @@ import { BarChart3, Table2 } from 'lucide-react';
 import chartDefinitions, {
   costTierLabel,
   costTierOptionLabel,
-  isMeasuredEnergyConfigKey,
   isModeledSystemPowerConfigKey,
   metricCostTier,
   tokenMetricTypeForConfigKey,
@@ -31,6 +30,7 @@ import {
 } from '@/components/inference/InferenceContext';
 import { useGlobalFilterSelection } from '@/components/GlobalFilterContext';
 import type {
+  AggDataEntry,
   ChartDefinition,
   HardwareConfig,
   InferenceData,
@@ -45,11 +45,13 @@ import {
   makeRunComparisonEntry,
 } from '@/components/inference/utils/comparisonEntry';
 import { dataRunsForDate } from '@/components/inference/utils/runEnumeration';
+import { resolveServiceField } from '@/components/inference/utils/resolveXAxisField';
 import { matchesQuickFilters } from '@/components/inference/utils/quickFilters';
 import { bestSeriesPerSku } from '@/components/inference/utils/best-series-per-sku';
 import InferenceTable from '@/components/inference/ui/InferenceTable';
 import ScatterGraph from '@/components/inference/ui/ScatterGraph';
 import PowerTimeline from '@/components/inference/ui/PowerTimeline';
+import PowerServiceComparison from '@/components/inference/ui/PowerServiceComparison';
 import { Card } from '@/components/ui/card';
 import { ChartButtons } from '@/components/ui/chart-buttons';
 import { ShareButton } from '@/components/ui/share-button';
@@ -98,7 +100,6 @@ import { ATOM_FOOTNOTE_MARKER, AtomEngineFootnote } from '@/components/ui/atom-e
 import { AgenticOptimizationNote } from '@/components/inference/ui/AgenticOptimizationNote';
 import { CacheReuseLink } from '@/components/inference/ui/CacheReuseLink';
 import { OffloadHaloLegendKey } from '@/components/inference/ui/OffloadHaloLegendKey';
-import { LegacyPowerLegendKey } from '@/components/inference/ui/LegacyPowerLegendKey';
 import { ActiveQuickFilters } from '@/components/inference/ui/ActiveQuickFilters';
 import { ResultContext } from '@/components/ui/result-context';
 import { ModelLogo } from '@/components/ui/model-logo';
@@ -213,7 +214,9 @@ function zhHeading(configured: string): string {
   const subjectZh = match?.groups && HEADING_SUBJECT_ZH[match.groups.subject];
   if (!subjectZh) return configured;
   const pctl = match.groups?.pctl;
-  return `vs. ${pctl ? `${pctl} ` : ''}${subjectZh}`;
+  const statisticZh =
+    pctl === 'Mean' ? '平均' : pctl === 'Median' ? '中位' : pctl ? `${pctl} ` : '';
+  return `vs. ${statisticZh}${subjectZh}`;
 }
 
 /** Presentation and data plumbing for trace-derived agentic x-axis modes. */
@@ -312,6 +315,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
     selectedXAxisMetric,
     selectedE2eXAxisMetric,
     selectedPercentile,
+    fixedSequenceStatistic,
     selectedXAxisMode,
     tokenRevenuePricing,
     showLineLabels,
@@ -319,13 +323,13 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
   } = useInferenceDisplay();
   const { setSelectedDates, setSelectedDatesFromRunExpansion, setIsLegendExpanded } =
     useInferenceActions();
+  const selectedMeasuredConfig = getMeasuredMetricConfig(selectedYAxisMetric);
   // The metric key carries the power boundary; the caption discloses it for
   // the derived boundaries (there is no separate URL param).
-  const selectedPowerBasis = getMeasuredMetricConfig(selectedYAxisMetric)?.basis;
+  const selectedPowerBasis = selectedMeasuredConfig?.basis;
   // The Measured Power "Timeline" display swaps the scatter body for the
   // per-second telemetry traces (PowerTimeline); table view and captions are
   // unchanged because the metric key aliases the measured average.
-  const selectedMeasuredConfig = getMeasuredMetricConfig(selectedYAxisMetric);
   const isPowerTimeline =
     selectedMeasuredConfig?.family === 'power' && selectedMeasuredConfig.display === 'timeline';
   const selectedBenchmarkType: 'single_turn' | 'agentic_traces' =
@@ -488,6 +492,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
         {
           isAgentic,
           selectedPercentile,
+          fixedSequenceStatistic,
           tcoBasis,
           selectedXAxisMode,
           powerCompare,
@@ -540,6 +545,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
     selectedXAxisMetric,
     selectedE2eXAxisMetric,
     selectedPercentile,
+    fixedSequenceStatistic,
     powerCompare,
     selectedXAxisMode,
     tokenRevenuePricing,
@@ -687,6 +693,25 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
     },
     [selectedPrecisions, quickFilters, selectedOfficialHwTypes, scopedActiveOverlayHwTypes],
   );
+  // Date comparison (GPUGraph, Timeline): official rows follow the per-date
+  // legend toggles instead of the scatter hardware selection, and unofficial
+  // runs keep the overlay hardware selection. Boundary / role siblings are a
+  // same-run comparison, so neither side draws them here.
+  const visibleDateComparisonRows = useCallback(
+    (officialRows: InferenceData[], overlay: OverlayData | null | undefined) => ({
+      officialRows: officialRows.filter(
+        (point) =>
+          !point.powerVariant &&
+          selectedPrecisions.includes(point.precision) &&
+          matchesQuickFilters(point, quickFilters) &&
+          activeDates.has(`${point.date}_${point.hwKey}`),
+      ),
+      overlayRows: visibleComparisonRows([], overlay).overlayRows.filter(
+        (point) => !point.powerVariant,
+      ),
+    }),
+    [selectedPrecisions, quickFilters, activeDates, visibleComparisonRows],
+  );
 
   if (!loading && error) {
     console.error(error);
@@ -730,6 +755,12 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
   }, [effectiveGraphs, selectedXAxisMode]);
 
   const isAgenticSequence = sequenceKind(selectedSequence) === 'agentic';
+  // Streaming speed at the selected statistic, read by the load-matched PowerX rows.
+  const serviceInteractivityField = resolveServiceField('median_intvty', {
+    isAgentic: isAgenticSequence,
+    percentile: selectedPercentile,
+    fixedSequenceStatistic,
+  });
   const residentPointIds = useMemo(() => {
     if (!isAgenticSequence) return [] as number[];
     const ids = new Set<number>();
@@ -783,7 +814,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
   const derivedSpec = useDerivedXAxis ? DERIVED_X_MODE_SPECS[selectedXAxisMode] : undefined;
 
   const renderableGraphs = useMemo(() => {
-    if (!isAgenticSequence) return visibleGraphs;
+    if (!isAgenticSequence || selectedXAxisMode === 'concurrency') return visibleGraphs;
     if (!derivedMetrics) {
       // Legacy AgentX axes can still render transient/non-persisted rows, which
       // have no ids to request.
@@ -833,6 +864,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
     isAgenticSequence,
     derivedSpec,
     derivedTargetIds.length,
+    selectedXAxisMode,
     visibleGraphs,
     derivedMetrics,
     selectedYAxisMetric,
@@ -872,38 +904,33 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
             const isTimelineMode = Boolean(
               selectedDateRange.startDate && selectedDateRange.endDate && selectedGPUs.length > 0,
             );
-            const replayAvailable = getViewMode(graphIndex) === 'chart' && !isTimelineMode;
+            const replayAvailable =
+              getViewMode(graphIndex) === 'chart' &&
+              !isTimelineMode &&
+              selectedXAxisMode !== 'concurrency';
             // Chart-level notices: the KV-offload halo
             // key, the agentic optimization note, and the ATOM engine
             // footnote. Detected from the same data the chart plots —
             // official points plus any loaded unofficial-run overlay for
             // this chart type — so they moved out of the legend without
             // changing when they appear.
-            // GPU/date comparison renders GPUGraph, which plots official
-            // points only — skip the unofficial overlay there so the footer
-            // can't advertise a halo or ATOM series that isn't on the chart.
+            // GPU/date comparison renders GPUGraph, which plots the loaded
+            // unofficial runs next to the compared dates on every x-axis.
             const isGpuComparison =
               selectedGPUs.length > 0 &&
               ((selectedDateRange.startDate && selectedDateRange.endDate) ||
                 selectedDates.length > 0);
-            const footerOverlay = isGpuComparison
-              ? undefined
-              : selectUnofficialOverlayForMode(
-                  selectedXAxisMode,
-                  graph.chartDefinition.chartType,
-                  overlayDataByChartType,
-                );
+            const footerOverlay = selectUnofficialOverlayForMode(
+              selectedXAxisMode,
+              graph.chartDefinition.chartType,
+              overlayDataByChartType,
+            );
             const footerPoints = [
               ...graph.data,
               ...(footerOverlay?.data ?? []),
               ...(footerOverlay?.clippedData ?? []).map((entry) => entry.point),
             ];
             const hasOffloadHalo = footerPoints.some((point) => point.offload_mode === 'on');
-            // Legacy-power rings render only on Measured Energy axes, so the
-            // key follows the same gate to never advertise an absent ring.
-            const hasLegacyPowerPoints =
-              isMeasuredEnergyConfigKey(selectedYAxisMetric) &&
-              footerPoints.some((point) => point.power_tier === 'legacy');
             const hasAtomSeries = footerPoints.some(
               (point) =>
                 point.framework !== undefined &&
@@ -913,14 +940,13 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
             // here as the footer's last block rather than in the chart subtitle,
             // keeping the result-context header compact.
             const footerNotices =
-              hasOffloadHalo || hasLegacyPowerPoints || isAgenticSequence || hasAtomSeries ? (
+              hasOffloadHalo || isAgenticSequence || hasAtomSeries ? (
                 <>
                   <div
                     data-testid="chart-status-notes"
                     className="flex flex-wrap items-center gap-x-5 gap-y-2"
                   >
                     {hasOffloadHalo && <OffloadHaloLegendKey />}
-                    {hasLegacyPowerPoints && <LegacyPowerLegendKey />}
                     {isAgenticSequence && <AgenticOptimizationNote />}
                     {isAgenticSequence && !minimalChrome && <CacheReuseLink />}
                     {hasAtomSeries && (
@@ -986,9 +1012,6 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                           : undefined
                       }
                       onExportCsv={() => {
-                        const candidateVisibleData = isTimelineMode
-                          ? graph.data.filter((d) => activeDates.has(`${d.date}_${d.hwKey}`))
-                          : graph.data;
                         const overlay = selectUnofficialOverlayForMode(
                           selectedXAxisMode,
                           graph.chartDefinition.chartType,
@@ -997,9 +1020,9 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                         const {
                           officialRows: visibleData,
                           overlayRows: visibleOverlayRowsForExport,
-                        } = isTimelineMode
-                          ? { officialRows: candidateVisibleData, overlayRows: [] }
-                          : visibleComparisonRows(candidateVisibleData, overlay);
+                        } = isGpuComparison
+                          ? visibleDateComparisonRows(graph.data, overlay)
+                          : visibleComparisonRows(graph.data, overlay);
                         const { headers, rows } = inferenceChartToCsv(
                           visibleData,
                           graph.model,
@@ -1053,6 +1076,12 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                               {(() => {
                                 // The timeline's x axis is time, not the scatter x metric.
                                 if (isPowerTimeline) return null;
+                                if (selectedXAxisMode === 'concurrency')
+                                  return locale === 'zh' ? '与并发数的关系' : 'vs. Concurrency';
+                                if (!isAgenticSequence) {
+                                  const heading = String(graph.chartDefinition.heading);
+                                  return locale === 'zh' ? zhHeading(heading) : heading;
+                                }
                                 const xField = graph.chartDefinition.x_scale_field;
                                 if (xField?.endsWith('_ttft')) {
                                   const percentile = xField.replace(/_ttft$/u, '');
@@ -1222,10 +1251,9 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                               ],
                             }
                           : overlay;
-                        const { officialRows, overlayRows } = visibleComparisonRows(
-                          tableOfficialData,
-                          tableOverlay,
-                        );
+                        const { officialRows, overlayRows } = isGpuComparison
+                          ? visibleDateComparisonRows(tableOfficialData, tableOverlay)
+                          : visibleComparisonRows(tableOfficialData, tableOverlay);
                         return (
                           <>
                             {chartCaption}
@@ -1262,6 +1290,8 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                                 locale,
                               )}
                               caption={chartCaption}
+                              comparison={Boolean(isGpuComparison)}
+                              runNumbering={runNumbering}
                             />
                           </div>
                         );
@@ -1278,6 +1308,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                           yLabel={metricLabel(graph.chartDefinition, selectedYAxisMetric, locale)}
                           chartDefinition={graph.chartDefinition}
                           caption={chartCaption}
+                          overlayData={footerOverlay ?? undefined}
                           runNumbering={runNumbering}
                         />
                       ) : (
@@ -1303,6 +1334,30 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                         </div>
                       );
                     })()}
+                    {selectedMeasuredConfig &&
+                      !isPowerTimeline &&
+                      getViewMode(graphIndex) !== 'table' &&
+                      (() => {
+                        const overlay = selectUnofficialOverlayForMode(
+                          selectedXAxisMode,
+                          graph.chartDefinition.chartType,
+                          overlayDataByChartType,
+                        );
+                        const { officialRows, overlayRows } = isGpuComparison
+                          ? visibleDateComparisonRows(graph.data, overlay)
+                          : visibleComparisonRows(graph.data, overlay);
+                        return (
+                          <PowerServiceComparison
+                            chartId={`chart-${graphIndex}`}
+                            contextLabel={`${getModelLabel(selectedModel)} · ${getSequenceLabel(selectedSequence)}`}
+                            data={[...officialRows, ...overlayRows]}
+                            overlayData={overlayRows}
+                            xField={graph.chartDefinition.x_scale_field as keyof AggDataEntry}
+                            xLabel={resolvedXLabel}
+                            interactivityField={serviceInteractivityField}
+                          />
+                        );
+                      })()}
                     <ChartNotices chartId={`chart-${graphIndex}`} notices={footerNotices} />
                     {replayAvailable && !minimalChrome && (
                       <ReplayLauncher

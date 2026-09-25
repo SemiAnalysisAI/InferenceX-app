@@ -13,10 +13,12 @@
  * Nothing is matched by hardware or concurrency; points whose telemetry is
  * missing (expired artifact, another collector) are reported, not guessed.
  */
-import type {
-  GpuPowerRole,
-  GpuPowerSeries,
-  GpuPowerSeriesResponse,
+import {
+  bucketTimeMs,
+  sumPowerAt,
+  type GpuPowerRole,
+  type GpuPowerSeries,
+  type GpuPowerSeriesResponse,
 } from '@/components/gpu-power/power-series';
 import type { InferenceData } from '@/components/inference/types';
 
@@ -54,6 +56,12 @@ export function traceKeyForPoint(point: AuditedPoint & { run_url?: string }): st
 /** Workflow run id from a GitHub Actions run URL. */
 export function runIdFromUrl(url: string | null | undefined): string | null {
   return url?.match(/\/runs\/(?<runId>\d+)/u)?.groups?.runId ?? null;
+}
+
+/** Attempt number from a `/runs/<id>/attempts/<n>` URL; null when the URL names none. */
+export function runAttemptFromUrl(url: string | null | undefined): number | null {
+  const attempt = url?.match(/\/runs\/\d+\/attempts\/(?<attempt>\d+)/u)?.groups?.attempt;
+  return attempt ? Number(attempt) : null;
 }
 
 export function longestCommonPrefix(values: readonly string[]): string {
@@ -154,6 +162,58 @@ export interface PowerTimelineTrace {
   windowEndMs: number | null;
 }
 
+export type PowerTimelineAxis = 'wall' | 'elapsed' | 'serving';
+export type PowerTimelineLines = 'mean' | 'gpu' | 'pool';
+
+/** URL input is optional: an omitted axis retains the existing per-run default. */
+export function parsePowerTimelineParams(params: {
+  i_ptaxis?: string;
+  i_ptlines?: string;
+  i_ptwindow?: string;
+  i_ptfocus?: string;
+  i_ptutility?: string;
+  i_ptconc?: string;
+}) {
+  return {
+    axis: (['wall', 'elapsed', 'serving'].includes(params.i_ptaxis ?? '')
+      ? params.i_ptaxis
+      : null) as PowerTimelineAxis | null,
+    lines: (params.i_ptlines === 'gpu' || params.i_ptlines === 'pool'
+      ? params.i_ptlines
+      : 'mean') as PowerTimelineLines,
+    windowOnly: params.i_ptwindow === 'window',
+    focus:
+      params.i_ptfocus && /^[1-9]\d*:[\w.-]+$/u.test(params.i_ptfocus) ? params.i_ptfocus : null,
+    utility: params.i_ptutility === '1',
+    concurrency: /^[1-9]\d{0,5}$/u.test(params.i_ptconc ?? '') ? Number(params.i_ptconc) : null,
+  };
+}
+
+export function hasPowerTimelineWindow(trace: PowerTimelineTrace): boolean {
+  return (
+    trace.windowStartMs !== null &&
+    trace.windowEndMs !== null &&
+    Number.isFinite(trace.windowStartMs) &&
+    Number.isFinite(trace.windowEndMs) &&
+    trace.windowEndMs > trace.windowStartMs
+  );
+}
+
+/** Filter and position retained buckets only; never infer a missing serving origin. */
+export function powerTimelineSampleX(
+  trace: PowerTimelineTrace,
+  column: number,
+  axis: PowerTimelineAxis,
+  windowOnly: boolean,
+): number | null {
+  const timeMs = bucketTimeMs(trace.series, column);
+  if ((axis === 'serving' || windowOnly) && !hasPowerTimelineWindow(trace)) return null;
+  if (windowOnly && windowPhase(trace, timeMs) !== 'window') return null;
+  if (axis === 'wall') return timeMs;
+  const origin = axis === 'serving' ? trace.windowStartMs! : bucketTimeMs(trace.series, 0);
+  return (timeMs - origin) / 1000;
+}
+
 /**
  * Why a validated point has no trace:
  * - `no-source`: the row predates `power_audit.source` (older schema), so no
@@ -233,9 +293,9 @@ function unixSecondsToMs(seconds: number | undefined): number | null {
 export type WindowPhase = 'before' | 'window' | 'after' | 'unknown';
 
 export function windowPhase(trace: PowerTimelineTrace, timeMs: number): WindowPhase {
-  if (trace.windowStartMs === null || trace.windowEndMs === null) return 'unknown';
-  if (timeMs < trace.windowStartMs) return 'before';
-  if (timeMs > trace.windowEndMs) return 'after';
+  if (!hasPowerTimelineWindow(trace)) return 'unknown';
+  if (timeMs < trace.windowStartMs!) return 'before';
+  if (timeMs > trace.windowEndMs!) return 'after';
   return 'window';
 }
 
@@ -247,8 +307,6 @@ export function traceConfigLabel(point: InferenceData): string {
   parts.push(`c${point.conc}`);
   return parts.join(' · ');
 }
-
-// ── Worker-role pools ────────────────────────────────────────────────────────
 
 export type PowerPoolRole = GpuPowerRole | 'all';
 
@@ -318,17 +376,97 @@ export function referenceLabelSlots(lines: readonly { watts: number }[]): number
   });
 }
 
+/**
+ * Rows for end-of-line trace labels in pixel space: a label whose box overlaps
+ * one already placed (both ranges intersect) moves one `rowHeight` below it,
+ * top anchors first, so pools ending at the same watts do not overprint.
+ * Returns each label's y in input order.
+ */
+export function stackTraceLabels(
+  labels: readonly { left: number; right: number; y: number }[],
+  rowHeight: number,
+): number[] {
+  const ys = labels.map((label) => label.y);
+  const placed: { left: number; right: number; y: number }[] = [];
+  const order = labels.map((_, index) => index).toSorted((a, b) => labels[a].y - labels[b].y);
+  for (const index of order) {
+    const { left, right } = labels[index];
+    let y = ys[index];
+    // Each move strictly lowers the label, so this ends within `placed.length` passes.
+    let moved = true;
+    while (moved) {
+      moved = false;
+      for (const other of placed) {
+        if (left < other.right && other.left < right && Math.abs(y - other.y) < rowHeight) {
+          y = other.y + rowHeight;
+          moved = true;
+        }
+      }
+    }
+    ys[index] = y;
+    placed.push({ left, right, y });
+  }
+  return ys;
+}
+
 /** Every GPU of the series as one pool. */
 export function allGpuPool(series: Pick<GpuPowerSeries, 'power'>): PowerPool {
   return { role: 'all', rows: series.power.map((_, row) => row) };
+}
+
+export interface TracePoolSummary {
+  role: PowerPoolRole;
+  gpuCount: number;
+  /** Highest drawn one-second pool sum inside the window; null when none was complete. */
+  peakWatts: number | null;
+}
+
+export interface TraceWindowSummary {
+  /** Recorded validated serving-window length, or null when bounds are missing. */
+  windowSeconds: number | null;
+  bucketSeconds: number;
+  pools: TracePoolSummary[];
+}
+
+/**
+ * What a Timeline reader needs next to the curves: the validated window's
+ * length and, per pool, its GPU count and the peak of the drawn pool line
+ * inside the window. A bucket missing a pool device is a gap in the line, so
+ * it is skipped. Averages are not recomputed: the benchmark row's validated
+ * figures stay the only means.
+ */
+export function summarizeTraceWindow(
+  trace: PowerTimelineTrace,
+  pools: readonly PowerPool[],
+): TraceWindowSummary {
+  const hasWindow = hasPowerTimelineWindow(trace);
+  const columns = hasWindow
+    ? trace.series.t
+        .map((_, column) => column)
+        .filter((column) => windowPhase(trace, bucketTimeMs(trace.series, column)) === 'window')
+    : [];
+  return {
+    windowSeconds: hasWindow ? (trace.windowEndMs! - trace.windowStartMs!) / 1000 : null,
+    bucketSeconds: trace.series.bucketSeconds,
+    pools: pools.map((pool) => {
+      const sums = columns
+        .map((column) => sumPowerAt(trace.series, pool.rows, column))
+        .filter((value): value is number => value !== null);
+      return {
+        role: pool.role,
+        gpuCount: pool.rows.length,
+        peakWatts: sums.length > 0 ? Math.max(...sums) : null,
+      };
+    }),
+  };
 }
 
 // ── Deep link from a pinned scatter tooltip ─────────────────────────────────
 //
 // "View power trace" on a pinned tooltip switches the metric to the Timeline
 // display; the timeline mounts afterwards and reads the requested trace here
-// so it can emphasise that config. Module state rather than URL state: the
-// focus is a one-shot gesture, and the share link stays `i_metric` alone.
+// so it can emphasise that config. The one-shot gesture takes precedence over
+// restored URL focus; the mounted timeline then persists it with its view state.
 
 let pendingFocus: string | null = null;
 

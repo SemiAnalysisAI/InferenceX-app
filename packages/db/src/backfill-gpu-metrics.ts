@@ -73,6 +73,7 @@ import { repositoryFromRunUrl } from './lib/runtime-metadata-artifacts.js';
 
 const DEFAULT_REPO = 'SemiAnalysisAI/InferenceX';
 const GITHUB_RETENTION_DAYS = 90;
+const GITHUB_RETENTION_MS = GITHUB_RETENTION_DAYS * 24 * 60 * 60 * 1000;
 const sql = createAdminSql({ noSsl: hasNoSslFlag(), max: 4, onnotice: () => {} });
 
 interface CandidateRun {
@@ -138,8 +139,7 @@ function parseFlags(): BackfillFlags {
 }
 
 function isWithinGithubRetention(date: string): boolean {
-  const ageMs = Date.now() - new Date(date).getTime();
-  return ageMs <= GITHUB_RETENTION_DAYS * 24 * 60 * 60 * 1000;
+  return Date.now() - new Date(date).getTime() <= GITHUB_RETENTION_MS;
 }
 
 async function loadCandidateRuns(
@@ -147,9 +147,7 @@ async function loadCandidateRuns(
   limit: number | null,
   force: boolean,
 ): Promise<CandidateRun[]> {
-  const cutoff = new Date(Date.now() - GITHUB_RETENTION_DAYS * 24 * 60 * 60 * 1000)
-    .toISOString()
-    .slice(0, 10);
+  const cutoff = new Date(Date.now() - GITHUB_RETENTION_MS).toISOString().slice(0, 10);
   const since = flags.since ?? cutoff;
   const rows = await sql<CandidateRun[]>`
     select wr.id, wr.github_run_id, wr.run_attempt, wr.html_url, wr.date::text as date,
@@ -223,13 +221,13 @@ async function processPair(
     const matchedIds: number[] = [];
     const mappedPoints: { ids: number[]; identity: Record<string, unknown> }[] = [];
     for (const row of mappedRows) {
+      const identity = benchmarkPublicationIdentity(row);
       const ids = await findBenchmarkResultIds(sql, run, [row], (id) =>
-        uniqueFallbacks.set(stablePowerPointIdentity(benchmarkPublicationIdentity(row)), id),
+        uniqueFallbacks.set(stablePowerPointIdentity(identity), id),
       );
       if (ids.length === 0) throw new Error(`${pair.gpuMetrics.name}: no matching benchmark rows`);
       matchedIds.push(...ids);
-      if (row.benchmarkType === 'agentic_traces')
-        mappedPoints.push({ ids, identity: benchmarkPublicationIdentity(row) });
+      if (row.benchmarkType === 'agentic_traces') mappedPoints.push({ ids, identity });
     }
     const resultIds = [...new Set(matchedIds)];
     if (resultIds.length === 0) {
@@ -282,16 +280,14 @@ async function processPair(
       metadataUpdatedBenchmarkResultIds: ingested.metadataUpdatedBenchmarkResultIds,
     };
   } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
     if (pointKeys.length === 0)
       expectationErrors.push({
         benchmarkArtifact: pair.benchmarks.name,
         artifactNames: [pair.gpuMetrics.name],
-        error: error instanceof Error ? error.message : String(error),
+        error: message,
       });
-    for (const key of pointKeys) {
-      const observation = observations.get(key)!;
-      observation.error = error instanceof Error ? error.message : String(error);
-    }
+    for (const key of pointKeys) observations.get(key)!.error = message;
     console.error(`  ✗ run ${run.github_run_id} artifact ${pair.gpuMetrics.name}:`, error);
     return { kind: 'failed' };
   } finally {

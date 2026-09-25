@@ -135,11 +135,7 @@ import {
   generateOverlayTooltipContent,
   generateTooltipContent,
 } from '@/components/inference/utils/tooltipUtils';
-import {
-  POWER_TIMELINE_METRIC_KEY,
-  requestPowerTraceFocus,
-  traceKeyForPoint,
-} from '@/components/inference/utils/powerTimeline';
+import { usePowerTraceAction } from '@/components/inference/hooks/usePowerTraceAction';
 import { QuickFiltersDialog } from '@/components/inference/ui/QuickFiltersDialog';
 import { ScatterEmptyState } from '@/components/inference/ui/ScatterEmptyState';
 import {
@@ -161,18 +157,15 @@ import {
   powerVariantLabel,
   powerVariantsInData,
 } from '@/components/inference/utils/power-compare';
+import FrontierPointsPanel from '@/components/inference/ui/FrontierPointsPanel';
 import LegendPointsDialog from '@/components/inference/ui/LegendPointsDialog';
 import { renderOffloadHalo } from '@/components/inference/utils/offload-halo';
-import { renderLegacyPowerRing } from '@/components/inference/utils/legacy-power-marker';
-import {
-  countPowerTiers,
-  MeasuredPowerSummary,
-} from '@/components/inference/ui/MeasuredPowerSummary';
 import {
   isMeasuredEnergyConfigKey,
   isRoleLocalMeasuredEnergyConfigKey,
 } from '@/components/inference/metric-registry';
 import { buildLegendPointsRows } from '@/components/inference/utils/legend-points-table';
+import { groupConcurrencySeries } from '@/components/inference/utils/concurrency-series';
 import { resolveScatterXAxisScale } from '@/components/inference/utils/x-axis-scale';
 import { pointLabelText } from './point-label';
 import {
@@ -441,6 +434,8 @@ const pointCountEn = (count: number) => `${count} ${count === 1 ? 'point' : 'poi
 
 const SCATTER_STRINGS = {
   en: {
+    concurrencyCurves:
+      'Dots are observed loads. Straight segments connect only matching topology, recipe and run; repeated loads remain separate markers. Concurrency is not a higher-is-better score.',
     logScale: 'Log Scale',
     optimalOnly: 'Optimal Only',
     paretoFrontier: 'Pareto Frontier',
@@ -450,10 +445,6 @@ const SCATTER_STRINGS = {
     optimalInfo: 'Optimal points form the Pareto frontier for the selected axes.',
     powerBoundaryInfo:
       'Show only points on the upper measured power boundary. Turn off to show all measurements; the boundary stays the same. This is a power-load boundary, not an energy-efficiency frontier.',
-    powerCurves:
-      'Smooth lines trace the upper power boundary across tested configurations. Dots are measured; lines are interpolated, not efficiency frontiers.',
-    powerOptimal:
-      'A power Pareto frontier can contain a single point. Turn off Optimal Only to show the upper power boundary.',
     labels: 'Labels',
     highContrast: 'High Contrast',
     parallelismLabels: 'Parallelism Labels',
@@ -473,12 +464,16 @@ const SCATTER_STRINGS = {
     noDataHint: 'Please change the model, sequence, precision, date range or chip selection.',
     noRoleEnergyDataHint:
       'This dataset does not report role-level prefill/decode energy. Choose a different model, scenario, precision, date, or measured-energy metric.',
+    noMeasuredDataHint:
+      'No measured GPU power is reported for this selection. Choose other chip configs, or a different model, scenario, precision or date.',
     unofficialTitle: (branch: string) => `UNOFFICIAL: ${branch}`,
     unofficialRun: 'UNOFFICIAL RUN',
     branch: 'Branch',
     viewWorkflow: 'View workflow run',
   },
   zh: {
+    concurrencyCurves:
+      '点表示实测负载；直线段仅连接相同拓扑、配方和运行的数据，重复负载保留为独立点。并发数不是越高越好的分数。',
     logScale: '对数缩放',
     optimalOnly: '仅最优',
     paretoFrontier: 'Pareto 前沿',
@@ -488,9 +483,6 @@ const SCATTER_STRINGS = {
     optimalInfo: '最优点构成当前所选坐标轴的 Pareto 前沿。',
     powerBoundaryInfo:
       '仅显示实测功率上边界上的点。关闭后显示全部测量点，边界曲线保持不变。这是功率负载边界，不是能效前沿。',
-    powerCurves:
-      '平滑曲线勾勒各测试配置的功耗上边界。数据点来自实测，曲线通过插值得到，不代表能效 Pareto 前沿。',
-    powerOptimal: '功耗的 Pareto 前沿可能只有一个点。关闭“仅最优”即可查看功耗上边界。',
     labels: '标签',
     highContrast: '高对比度',
     parallelismLabels: '并行配置标签',
@@ -510,6 +502,8 @@ const SCATTER_STRINGS = {
     noDataHint: '请调整模型、序列长度、精度、日期范围或芯片选项。',
     noRoleEnergyDataHint:
       '当前数据集未提供 Prefill/Decode 各角色的能耗数据。请选择其他模型、场景、精度、日期或实测能耗指标。',
+    noMeasuredDataHint:
+      '当前选择没有实测 GPU 功耗数据。请选择其他芯片配置，或更换模型、场景、精度或日期。',
     unofficialTitle: (branch: string) => `非官方：${branch}`,
     unofficialRun: '非官方运行',
     branch: '分支',
@@ -590,22 +584,26 @@ const ScatterGraph = React.memo(
       setQuickFilterDeployment,
       setQuickFilterSpec,
       setQuickFilterPower,
-      setSelectedYAxisMetric,
+      setQuickFilterTopologies,
     } = useInferenceActions();
-    const paretoDirection = chartDefinition[`${selectedYAxisMetric}_roofline`] as
-      | ParetoDirection
-      | undefined;
+    const isConcurrencyAxis = chartDefinition.x_scale_field === 'conc';
+    const paretoDirection = (
+      isConcurrencyAxis ? undefined : chartDefinition[`${selectedYAxisMetric}_roofline`]
+    ) as ParetoDirection | undefined;
     const hideNonOptimal = preferOptimalOnly && Boolean(paretoDirection);
     const isPowerAxis = isPowerCurveMetric(selectedYAxisMetric);
     const isMeasuredPowerAxis = isMeasuredPowerCurveMetric(selectedYAxisMetric);
     // Measured power describes the load sweep. Keep its boundary fixed while
     // Optimal Only changes marker visibility, as on the other scatter charts.
-    const showPowerEnvelope = isPowerAxis && (isMeasuredPowerAxis || !hideNonOptimal);
+    const showPowerEnvelope =
+      !isConcurrencyAxis && isPowerAxis && (isMeasuredPowerAxis || !hideNonOptimal);
     const showAllMeasurements = isMeasuredPowerAxis ? !hideNonOptimal : savedShowAllMeasurements;
-    const supportsGradientLabels = !showPowerEnvelope || isMeasuredPowerAxis;
+    const supportsGradientLabels =
+      !isConcurrencyAxis && (!showPowerEnvelope || isMeasuredPowerAxis);
     const showGradientLabels = preferGradientLabels && supportsGradientLabels;
     const groupDisplayedPoints = useCallback(
       (points: InferenceData[]) => {
+        if (isConcurrencyAxis) return groupConcurrencySeries(points);
         const groups = groupPointsByDate(points);
         if (showPowerEnvelope) {
           for (const [date, samples] of groups) {
@@ -621,7 +619,7 @@ const ScatterGraph = React.memo(
         }
         return groups;
       },
-      [showPowerEnvelope, chartDefinition.chartType, selectedYAxisMetric],
+      [isConcurrencyAxis, showPowerEnvelope, chartDefinition.chartType, selectedYAxisMetric],
     );
     const locale = useLocale();
     const featureGateUnlocked = useFeatureGate();
@@ -637,9 +635,6 @@ const ScatterGraph = React.memo(
     const ephemeralUrlState = useEphemeralUrlState();
     const costLimit = chartDefinition.y_cost_limit ?? 0;
     const latencyLimit = chartDefinition.y_latency_limit ?? 0;
-    // Legacy-power rings decorate points only while a Measured Energy y-axis
-    // is selected (see legacy-power-marker.ts).
-    const isMeasuredEnergyAxis = isMeasuredEnergyConfigKey(selectedYAxisMetric);
 
     const {
       isUnofficialRun,
@@ -908,7 +903,7 @@ const ScatterGraph = React.memo(
       return result;
     }, [groupedData, selectedYAxisMetric, chartDefinition]);
 
-    const displayedRooflines = showPowerEnvelope ? groupedData : rooflines;
+    const displayedRooflines = isConcurrencyAxis || showPowerEnvelope ? groupedData : rooflines;
 
     const powerEnvelopePointKeys = useMemo(() => {
       const keys = new Set<string>();
@@ -957,8 +952,13 @@ const ScatterGraph = React.memo(
       return false;
     }, [data]);
     const buildPointId = useCallback(
-      (point: InferenceData) => scatterPointJoinId(point, distinguishPointDates),
-      [distinguishPointDates],
+      (point: InferenceData) => {
+        const configId = scatterPointJoinId(point, distinguishPointDates);
+        return isConcurrencyAxis
+          ? `${configId}|observation-${point.id ?? data.indexOf(point)}|run-${point.run_url ?? ''}`
+          : configId;
+      },
+      [isConcurrencyAxis, data, distinguishPointDates],
     );
 
     // filteredData: visible points only (for scale domain calculation)
@@ -1206,7 +1206,7 @@ const ScatterGraph = React.memo(
       [overlayGroups, paretoDirection],
     );
     const displayedOverlayRooflines = useMemo(() => {
-      if (!showPowerEnvelope) return overlayRooflines;
+      if (!showPowerEnvelope && !isConcurrencyAxis) return overlayRooflines;
       return Object.fromEntries(
         Object.entries(overlayGroups).flatMap(([key, group]) =>
           [...groupDisplayedPoints(group.points)].map(([segment, points]) => [
@@ -1215,7 +1215,13 @@ const ScatterGraph = React.memo(
           ]),
         ),
       );
-    }, [showPowerEnvelope, overlayRooflines, overlayGroups, groupDisplayedPoints]);
+    }, [
+      isConcurrencyAxis,
+      showPowerEnvelope,
+      overlayRooflines,
+      overlayGroups,
+      groupDisplayedPoints,
+    ]);
 
     // Overlay counterpart of `optimalPointKeys`: the points on any overlay
     // run's drawn roofline (already e2e-restricted for agentic non-e2e modes).
@@ -1302,43 +1308,7 @@ const ScatterGraph = React.memo(
     const [fixedLogPointId, setFixedLogPointId] = useState<number | null>(null);
     const [powerTelemetryPoint, setPowerTelemetryPoint] = useState<InferenceData | null>(null);
 
-    // "View power trace" on a pinned tooltip (official or overlay point): the
-    // same-tab click stays in-page — remember which trace to emphasise, switch
-    // the metric to the Timeline display, and let the anchor's href keep
-    // serving open-in-new-tab. Listeners are attached per pin because the
-    // tooltip HTML is replaced on every pin.
-    const attachPowerTraceAction = useCallback(
-      (tooltipEl: HTMLElement, d: InferenceData, overlay: boolean) => {
-        const action = tooltipEl.querySelector('[data-action="view-power-trace"]');
-        const traceKey = traceKeyForPoint(d);
-        if (!action || !traceKey) return;
-        action.addEventListener('click', (actionEvent) => {
-          actionEvent.stopPropagation();
-          // Modifier / auxiliary clicks keep the anchor's own behaviour: the
-          // href opens this chart's timeline in a new tab or window.
-          const mouse = actionEvent as MouseEvent;
-          if (
-            mouse.button !== 0 ||
-            mouse.metaKey ||
-            mouse.ctrlKey ||
-            mouse.shiftKey ||
-            mouse.altKey
-          ) {
-            return;
-          }
-          actionEvent.preventDefault();
-          requestPowerTraceFocus(traceKey);
-          chartRef.current?.dismissTooltip();
-          setSelectedYAxisMetric(POWER_TIMELINE_METRIC_KEY);
-          track('inference_power_trace_opened', {
-            hwKey: String(d.hwKey),
-            conc: d.conc,
-            overlay,
-          });
-        });
-      },
-      [setSelectedYAxisMetric],
-    );
+    const attachPowerTraceAction = usePowerTraceAction(chartRef);
 
     // --- Legend points table (per-series drill-down opened from the legend) ---
     const [pointsTableTarget, setPointsTableTarget] = useState<LegendPointsTarget | null>(null);
@@ -1349,6 +1319,7 @@ const ScatterGraph = React.memo(
       (lockedFrameworks ? 0 : quickFilters.frameworks.length) +
       quickFilters.deployment.length +
       quickFilters.power.length +
+      (quickFilters.topologies?.length ?? 0) +
       (selectedSequence === Sequence.AgenticTraces ? 0 : quickFilters.spec.length);
     const clearQuickFilters = useCallback(() => {
       setQuickFilterVendors([]);
@@ -1356,12 +1327,14 @@ const ScatterGraph = React.memo(
       setQuickFilterDeployment([]);
       if (selectedSequence !== Sequence.AgenticTraces) setQuickFilterSpec([]);
       setQuickFilterPower([]);
+      setQuickFilterTopologies([]);
     }, [
       setQuickFilterVendors,
       setQuickFilterFrameworks,
       setQuickFilterDeployment,
       setQuickFilterSpec,
       setQuickFilterPower,
+      setQuickFilterTopologies,
       selectedSequence,
     ]);
 
@@ -1552,7 +1525,11 @@ const ScatterGraph = React.memo(
     const metricIdentity = useMemo(
       () =>
         [
-          showPowerEnvelope ? 'power-envelopes' : 'pareto-curves',
+          isConcurrencyAxis
+            ? 'observed-load'
+            : showPowerEnvelope
+              ? 'power-envelopes'
+              : 'pareto-curves',
           useAdvancedLabels ? 'advanced-labels' : 'basic-labels',
           showConcurrencyLabels ? 'conc-labels' : 'no-conc-labels',
           selectedYAxisMetric,
@@ -1570,6 +1547,7 @@ const ScatterGraph = React.memo(
           .toSorted()
           .join('|'),
       [
+        isConcurrencyAxis,
         showPowerEnvelope,
         selectedYAxisMetric,
         useAdvancedLabels,
@@ -1664,6 +1642,25 @@ const ScatterGraph = React.memo(
     const frontierHwKeys = useMemo(
       () => frontierHardwareKeys(globalParetoPoints, globalFrontier),
       [globalParetoPoints, globalFrontier],
+    );
+    // PowerX provenance of the drawn frontier: the same points, listed with their runs.
+    const showFrontierPoints =
+      showParetoFrontier &&
+      globalFrontier.length > 0 &&
+      !minimalChrome &&
+      getMeasuredMetricConfig(selectedYAxisMetric) !== undefined;
+    const frontierHardwareLabel = useCallback(
+      (point: InferenceData) => {
+        const config = processedOverlayData.includes(point)
+          ? overlayData?.hardwareConfig[point.hwKey]
+          : hardwareConfig[point.hwKey];
+        return config ? getDisplayLabel(config) : point.hwKey;
+      },
+      [processedOverlayData, overlayData, hardwareConfig],
+    );
+    const frontierHardwareColor = useCallback(
+      (point: InferenceData) => getCssColor(resolveColor(point.hwKey)),
+      [getCssColor, resolveColor],
     );
     const applyParetoFadeRef = useRef<(group: RenderContext['layout']['zoomGroup']) => void>(
       () => {},
@@ -1852,31 +1849,6 @@ const ScatterGraph = React.memo(
       hiddenPowerVariants,
     ]);
 
-    const powerTierCounts = useMemo(() => {
-      // Comparison clones re-plot the same measurements; count each once.
-      const officialTotal = pointsData.filter(
-        (point) => !point.powerVariant && selectedPrecisions.includes(point.precision),
-      );
-      const overlayTotal = processedOverlayData.filter(
-        (point) => !point.powerVariant && selectedPrecisions.includes(point.precision),
-      );
-      const officialVisible = officialTotal.filter(isPointVisible);
-      const overlayVisible = overlayTotal.filter(
-        (point) => activeOverlayHwTypes.has(String(point.hwKey)) && isOverlayPointVisible(point),
-      );
-      return {
-        total: countPowerTiers([...officialTotal, ...overlayTotal]),
-        visible: countPowerTiers([...officialVisible, ...overlayVisible]),
-      };
-    }, [
-      pointsData,
-      processedOverlayData,
-      selectedPrecisions,
-      isPointVisible,
-      activeOverlayHwTypes,
-      isOverlayPointVisible,
-    ]);
-
     // --- Legend hover highlight ---
     const isRooflineVisible = useCallback(
       (el: SVGElement) => {
@@ -1957,7 +1929,8 @@ const ScatterGraph = React.memo(
         persistedRulers !== undefined &&
         (persistedRulers.pending !== null || persistedRulers.state.rulers.length > 0),
     );
-    const perfRulerMode = preferPerfRulerMode && (!showPowerEnvelope || isMeasuredPowerAxis);
+    const perfRulerMode =
+      !isConcurrencyAxis && preferPerfRulerMode && (!showPowerEnvelope || isMeasuredPowerAxis);
     const [localPerfRulerState, setLocalPerfRulerState] =
       useState<PerfRulerState>(EMPTY_PERF_RULER_STATE);
     const perfRulerState = persistedRulers ? persistedRulers.state : localPerfRulerState;
@@ -2621,6 +2594,13 @@ const ScatterGraph = React.memo(
 
     // --- Layers ---
     const layers = useMemo((): LayerConfig<InferenceData>[] => {
+      // Observed-load segments join exact measurements; every other curve is smoothed.
+      const lineCurve = isConcurrencyAxis ? d3.curveLinear : d3.curveMonotoneX;
+      const curveKind = isConcurrencyAxis
+        ? 'observed-load'
+        : showPowerEnvelope
+          ? 'power-envelope'
+          : 'pareto';
       // Line-label identity of one drawn series under a power comparison
       // (`i_pcompare`): the base series keeps the hardware key, so pinned
       // anchors and hover hooks keep working; a sibling is `<hw>::<variant>`.
@@ -2664,7 +2644,7 @@ const ScatterGraph = React.memo(
             .line<InferenceData>()
             .x((d) => xScale(d.x))
             .y((d) => yScale(d.y))
-            .curve(d3.curveMonotoneX);
+            .curve(lineCurve);
 
           // Ensure rooflines layer exists before dot-groups
           let rooflinesLayer = zoomGroup.select<SVGGElement>('.rooflines-layer');
@@ -2767,7 +2747,7 @@ const ScatterGraph = React.memo(
             )
             .join('path')
             .attr('class', (d) => `roofline-path roofline-${d.key}`)
-            .attr('data-curve-kind', showPowerEnvelope ? 'power-envelope' : 'pareto')
+            .attr('data-curve-kind', curveKind)
             .attr('data-hw-key', (d) => d.hw)
             .attr('data-precision', (d) => d.precision)
             .attr('data-power-variant', (d) => d.variant || null)
@@ -2866,7 +2846,7 @@ const ScatterGraph = React.memo(
               (exit) => exit.remove(),
             )
             .attr('data-seg-key', (d) => d.segKey)
-            .attr('data-curve-kind', showPowerEnvelope ? 'power-envelope' : 'pareto')
+            .attr('data-curve-kind', curveKind)
             .attr('data-hw-key', (d) => d.hw)
             .attr('data-precision', (d) => d.precision)
             .attr('transform', (d) => `translate(${d.x},${d.y})`)
@@ -3159,7 +3139,7 @@ const ScatterGraph = React.memo(
             .line<InferenceData>()
             .x((d) => newXScale(d.x))
             .y((d) => newYScale(d.y))
-            .curve(d3.curveMonotoneX);
+            .curve(lineCurve);
 
           // Update roofline paths — must split per-date so the zoom redraw
           // matches the per-date sub-paths created in the initial render.
@@ -3390,7 +3370,7 @@ const ScatterGraph = React.memo(
                 .line<InferenceData>()
                 .x((d) => xScale(d.x))
                 .y((d) => yScale(d.y))
-                .curve(d3.curveMonotoneX);
+                .curve(lineCurve);
 
               interface OvEntry {
                 key: string;
@@ -3423,7 +3403,7 @@ const ScatterGraph = React.memo(
                 .data(ovEntries, (d) => d.key)
                 .join('path')
                 .attr('class', (d) => `overlay-roofline-path overlay-roofline-${d.key}`)
-                .attr('data-curve-kind', showPowerEnvelope ? 'power-envelope' : 'pareto')
+                .attr('data-curve-kind', curveKind)
                 .attr('fill', 'none')
                 .attr('stroke', (d) => d.stroke)
                 .attr('stroke-width', 2)
@@ -3486,15 +3466,14 @@ const ScatterGraph = React.memo(
                   overlayRunColor(overlayRunIndex(d.run_url ?? null, runIndexByUrl)),
                 );
 
-              // Match official points: KV offload and the measured-axis
-              // legacy-power ring are the only persistent point decorations.
-              // Decode method remains in the tooltip.
+              // Match official points: KV offload is the only persistent point
+              // decoration. Decode method remains in the tooltip.
               overlayPoints.each(function (d) {
-                const overlayStroke = overlayRunColor(
-                  overlayRunIndex(d.run_url ?? null, runIndexByUrl),
+                renderOffloadHalo(
+                  d3.select(this),
+                  d,
+                  overlayRunColor(overlayRunIndex(d.run_url ?? null, runIndexByUrl)),
                 );
-                renderOffloadHalo(d3.select(this), d, overlayStroke);
-                renderLegacyPowerRing(d3.select(this), d, isMeasuredEnergyAxis, overlayStroke);
               });
 
               updateOverlayLabels(zoomGroup);
@@ -3577,7 +3556,7 @@ const ScatterGraph = React.memo(
                 .line<InferenceData>()
                 .x((d) => newXScale(d.x))
                 .y((d) => newYScale(d.y))
-                .curve(d3.curveMonotoneX);
+                .curve(lineCurve);
 
               Object.entries(displayedOverlayRooflines).forEach(([key, group]) => {
                 if (group.points.length < 2) return;
@@ -3665,7 +3644,7 @@ const ScatterGraph = React.memo(
             .line<InferenceData>()
             .x((point) => xScale(point.x))
             .y((point) => yScale(point.y))
-            .curve(d3.curveMonotoneX);
+            .curve(lineCurve);
           const continuationPath = group
             .select<SVGPathElement>('.overflow-continuation-line')
             .attr('d', lineGenerator(entry.points) ?? '')
@@ -3806,6 +3785,7 @@ const ScatterGraph = React.memo(
       // existing DOM when it changes. Only data/structure changes recreate
       // the layers (and with them, the full chart render).
     }, [
+      isConcurrencyAxis,
       displayedRooflines,
       paretoHighlightLayer,
       groupDisplayedPoints,
@@ -3835,7 +3815,6 @@ const ScatterGraph = React.memo(
       yLabel,
       selectedYAxisMetric,
       powerCompareBaseId,
-      isMeasuredEnergyAxis,
       chartDefinition,
       locale,
       drawPerfRuler,
@@ -3859,10 +3838,8 @@ const ScatterGraph = React.memo(
         zoomGroup.selectAll('.dot-group').style('transition', 'opacity 150ms ease');
 
         // Offload halo: dashed ring on every point that used KV offload (Pareto or not).
-        // Legacy-power ring: dotted ring on unvalidated telemetry, measured axes only.
         zoomGroup.selectAll<SVGGElement, InferenceData>('.dot-group').each(function (d) {
           renderOffloadHalo(d3.select(this), d, 'var(--foreground)');
-          renderLegacyPowerRing(d3.select(this), d, isMeasuredEnergyAxis, 'var(--foreground)');
         });
 
         avoidPointLabelCollisions(zoomGroup);
@@ -3892,9 +3869,6 @@ const ScatterGraph = React.memo(
         optimalPointKeys,
         getCssColor,
         resolveColor,
-        // A metric-only change must re-run the decoration pass so legacy-power
-        // rings appear/disappear with the Measured Energy axis selection.
-        isMeasuredEnergyAxis,
       ],
     );
 
@@ -3930,9 +3904,8 @@ const ScatterGraph = React.memo(
           color,
         );
         // A precision toggle may replace and append the visible SVG shape.
-        // Keep the decorations above that shape after the swap.
+        // Keep the offload halo above that shape after the swap.
         point.selectAll('.offload-halo').raise();
-        point.selectAll('.legacy-power-ring').raise();
       });
 
       // Overlay points keep their X marker and run-derived color. Only their
@@ -4229,8 +4202,12 @@ const ScatterGraph = React.memo(
       <ScatterEmptyState
         reason={emptyReason}
         description={
-          emptyReason === 'selection' && isRoleLocalMeasuredEnergyConfigKey(selectedYAxisMetric)
-            ? legendT.noRoleEnergyDataHint
+          emptyReason === 'selection'
+            ? isRoleLocalMeasuredEnergyConfigKey(selectedYAxisMetric)
+              ? legendT.noRoleEnergyDataHint
+              : isMeasuredEnergyConfigKey(selectedYAxisMetric)
+                ? legendT.noMeasuredDataHint
+                : undefined
             : undefined
         }
         onShowChips={() => {
@@ -4257,7 +4234,11 @@ const ScatterGraph = React.memo(
           <QuickFiltersDialog
             open={quickFiltersOpen}
             onOpenChange={setQuickFiltersOpen}
-            bestPerSku={{ checked: bestPerSku, onCheckedChange: handleBestPerSkuChange }}
+            bestPerSku={
+              isConcurrencyAxis
+                ? undefined
+                : { checked: bestPerSku, onCheckedChange: handleBestPerSkuChange }
+            }
           />
         </div>
       );
@@ -4281,14 +4262,14 @@ const ScatterGraph = React.memo(
           testId="scatter-graph"
           grabCursor={true}
           caption={
-            isPowerAxis ? (
+            isConcurrencyAxis ? (
               <>
                 {caption}
                 <p
-                  data-testid="power-curve-description"
+                  data-testid="concurrency-curve-description"
                   className="mt-2 text-2xs text-muted-foreground"
                 >
-                  {showPowerEnvelope ? legendT.powerCurves : legendT.powerOptimal}
+                  {legendT.concurrencyCurves}
                 </p>
               </>
             ) : (
@@ -4563,7 +4544,7 @@ const ScatterGraph = React.memo(
                     track('latency_line_labels_toggled', { enabled: checked });
                   },
                 },
-                ...(showPowerEnvelope && !isMeasuredPowerAxis
+                ...(isConcurrencyAxis || (showPowerEnvelope && !isMeasuredPowerAxis)
                   ? []
                   : [
                       {
@@ -4649,18 +4630,14 @@ const ScatterGraph = React.memo(
             />
           }
         />
-        {isMeasuredEnergyAxis && (
-          <MeasuredPowerSummary
-            total={powerTierCounts.total}
-            visible={powerTierCounts.visible}
-            bestPerSku={bestPerSku}
-            optimalOnly={hideNonOptimal}
-          />
-        )}
         <QuickFiltersDialog
           open={quickFiltersOpen}
           onOpenChange={setQuickFiltersOpen}
-          bestPerSku={{ checked: bestPerSku, onCheckedChange: handleBestPerSkuChange }}
+          bestPerSku={
+            isConcurrencyAxis
+              ? undefined
+              : { checked: bestPerSku, onCheckedChange: handleBestPerSkuChange }
+          }
         />
         {pointsTable && (
           <LegendPointsDialog
@@ -4680,6 +4657,18 @@ const ScatterGraph = React.memo(
                 href: row.href ?? '',
               })
             }
+          />
+        )}
+        {showFrontierPoints && (
+          <FrontierPointsPanel
+            chartId={chartId}
+            eligible={globalParetoPoints}
+            frontier={globalFrontier}
+            xLabel={xLabel}
+            yLabel={yLabel}
+            overlayPoints={processedOverlayData}
+            hardwareLabel={frontierHardwareLabel}
+            hardwareColor={frontierHardwareColor}
           />
         )}
         {powerTelemetryPoint === null ? null : (

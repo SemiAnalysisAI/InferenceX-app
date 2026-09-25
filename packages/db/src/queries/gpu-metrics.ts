@@ -205,6 +205,20 @@ function toStatRow(raw: RawStatRow): GpuMetricStatRow {
   };
 }
 
+function groupBySeries<Raw extends { series_id: number | string }, Row>(
+  rows: readonly Raw[],
+  toRow: (raw: Raw) => Row,
+): Map<number, Row[]> {
+  const groups = new Map<number, Row[]>();
+  for (const raw of rows) {
+    const key = Number(raw.series_id);
+    const bucket = groups.get(key);
+    if (bucket) bucket.push(toRow(raw));
+    else groups.set(key, [toRow(raw)]);
+  }
+  return groups;
+}
+
 async function loadSeriesDetails(
   sql: DbClient,
   seriesRows: readonly RawSeriesRow[],
@@ -248,26 +262,16 @@ async function loadSeriesDetails(
     throw new TelemetrySnapshotChangedError(ids);
   }
 
-  const statsBySeries = new Map<number, GpuMetricStatRow[]>();
-  for (const raw of statRows) {
-    const key = Number(raw.series_id);
-    const bucket = statsBySeries.get(key);
-    if (bucket) bucket.push(toStatRow(raw));
-    else statsBySeries.set(key, [toStatRow(raw)]);
-  }
+  const statsBySeries = groupBySeries(statRows, toStatRow);
   const staleIds = new Set(
     seriesRows
       .filter((row) => row.stats_version !== GPU_STATS_VERSION)
       .map((row) => Number(row.id)),
   );
-  const staleSamples = new Map<number, RawSampleRow[]>();
-  for (const sample of sampleRows) {
-    const id = Number(sample.series_id);
-    if (!staleIds.has(id)) continue;
-    const rows = staleSamples.get(id) ?? [];
-    rows.push(sample);
-    staleSamples.set(id, rows);
-  }
+  const staleSamples = groupBySeries(
+    sampleRows.filter((sample) => staleIds.has(Number(sample.series_id))),
+    (sample) => sample,
+  );
   for (const row of seriesRows) {
     const id = Number(row.id);
     if (!staleIds.has(id)) continue;
@@ -286,13 +290,7 @@ async function loadSeriesDetails(
       })),
     );
   }
-  const samplesBySeries = new Map<number, GpuMetricSampleRow[]>();
-  for (const raw of sampleRows) {
-    const key = Number(raw.series_id);
-    const bucket = samplesBySeries.get(key);
-    if (bucket) bucket.push(toSampleRow(raw));
-    else samplesBySeries.set(key, [toSampleRow(raw)]);
-  }
+  const samplesBySeries = groupBySeries(sampleRows, toSampleRow);
 
   return seriesRows.map((row) => {
     const id = Number(row.id);
