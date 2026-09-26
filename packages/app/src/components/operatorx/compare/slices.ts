@@ -1,4 +1,10 @@
-import type { ComparisonCase, ComparisonOp } from '@semianalysisai/inferencex-db/operatorx/compare';
+import type {
+  ComparisonCase,
+  ComparisonOp,
+  ComparisonView,
+} from '@semianalysisai/inferencex-db/operatorx/compare';
+
+import { escapeHtml } from '@/lib/utils';
 
 /**
  * A slice is a set of cases that differ only in their size axis (GEMM M, MoE tokens):
@@ -41,7 +47,22 @@ export function rankedSlices(op: ComparisonOp, cases: ComparisonCase[]): [string
   );
 }
 
-/** Tooltip name of a case: its role in the model, when known, and its shape. */
-export function caseLabel(c: ComparisonCase): string {
-  return c.role ? `${c.role} · ${c.shape}` : c.shape;
+/** Where case `i` comes from: its layers in the model and the models, each when known. */
+export function caseOrigin(view: ComparisonView, i: number): { label: string; value: string }[] {
+  const c = view.cases[i];
+  const models = c.models.map((m) => view.models[m]);
+  return [
+    ...(c.role ? [{ label: c.role.includes(',') ? 'Layers' : 'Layer', value: c.role }] : []),
+    ...(models.length > 0
+      ? [{ label: models.length > 1 ? 'Models' : 'Model', value: models.join(', ') }]
+      : []),
+  ];
+}
+
+/** `caseOrigin` as tooltip rows. */
+export function originRows(view: ComparisonView, i: number): string[] {
+  return caseOrigin(view, i).map(
+    (o) =>
+      `<span class="text-muted-foreground">${escapeHtml(o.label)}</span> ${escapeHtml(o.value)}`,
+  );
 }

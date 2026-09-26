@@ -5,7 +5,7 @@
  */
 import { opLabels, usefulBytes, usefulFlops } from './describe';
 import { type OperatorXDataset, type OperatorXStatus, stableJson } from './normalize';
-import { type WorkloadSource, workloadSources } from './workloads';
+import { topLevelModel, type WorkloadSource, workloadSources } from './workloads';
 
 export type ComparisonOp = 'gemm' | 'moe';
 
@@ -28,6 +28,8 @@ export interface ComparisonRow {
   workloads: string[];
   /** Role of the op in its model (`q_proj`), when the testlist names it. */
   role: string | null;
+  /** Models the case comes from, as InferenceX names them (`GLM-5`, `Kimi-K2.5`). */
+  models: string[];
   shape: string;
   precision: string;
   computePrecision: ComputePrecision;
@@ -147,6 +149,7 @@ export function buildComparison(op: ComparisonOp, inputs: ComparisonInput[]): Co
         testlist: r.testlist,
         workloads: sources.map((s) => s.id),
         role: r.name,
+        models: [...new Set(r.sources.map(topLevelModel))],
         ...opLabels(op, r.args),
         computePrecision: computePrecision(op, r.args),
         x: op === 'gemm' ? num(r.args.m) : num(r.args.tokens),
@@ -182,6 +185,8 @@ export interface ComparisonCase {
   key: string;
   testlist: string;
   role: string | null;
+  /** Indexes into `ComparisonView.models`. */
+  models: number[];
   shape: string;
   precision: string;
   computePrecision: ComputePrecision;
@@ -209,6 +214,8 @@ export interface ComparisonView {
   workloads: ComparisonWorkload[];
   workload: string | null;
   cases: ComparisonCase[];
+  /** Models the cases come from. */
+  models: string[];
   kernels: string[];
   measurements: Record<string, ComparisonColumns>;
 }
@@ -221,13 +228,29 @@ export function comparisonView(comparison: Comparison, workloadId: string | null
   const rows = workload ? comparison.rows.filter((r) => r.workloads.includes(workload)) : [];
   const caseIndex = new Map<string, number>();
   const cases: ComparisonCase[] = [];
+  const models: string[] = [];
+  const modelIndex = new Map<string, number>();
+  const model = (name: string) => {
+    if (!modelIndex.has(name)) {
+      modelIndex.set(name, models.length);
+      models.push(name);
+    }
+    return modelIndex.get(name)!;
+  };
   for (const r of rows) {
-    if (caseIndex.has(r.caseKey)) continue;
+    const seen = caseIndex.get(r.caseKey);
+    // Runners can list different checkpoints for one case; the case names every model.
+    if (seen !== undefined) {
+      const ids = cases[seen].models;
+      for (const name of r.models) if (!ids.includes(model(name))) ids.push(model(name));
+      continue;
+    }
     caseIndex.set(r.caseKey, cases.length);
     cases.push({
       key: r.caseKey,
       testlist: r.testlist,
       role: r.role,
+      models: r.models.map(model),
       shape: r.shape,
       precision: r.precision,
       computePrecision: r.computePrecision,
@@ -274,6 +297,7 @@ export function comparisonView(comparison: Comparison, workloadId: string | null
     workloads: comparison.workloads,
     workload,
     cases,
+    models,
     kernels,
     measurements,
   };

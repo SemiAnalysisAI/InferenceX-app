@@ -13,7 +13,7 @@ import { OpxChart, esc, HardwareLegend, tooltipHtml } from '../charts/kit';
 import { formatCompact } from '../charts/scales';
 import { hardwareLabel, peakBandwidthTBs, peakTflops } from '../compare/hardware';
 import type { ComparisonModel } from '../compare/model';
-import { caseLabel } from '../compare/slices';
+import { originRows } from '../compare/slices';
 import type { VizDefinition } from './types';
 
 const ORDER: ComputePrecision[] = ['fp4', 'fp8', 'bf16'];
@@ -200,7 +200,8 @@ function Roofline({ model }: { model: ComparisonModel }) {
               title: hardwareLabel(p.hw),
               color: model.colors[p.hw],
               rows: [
-                esc(`${caseLabel(view.cases[p.i])} · ${view.cases[p.i].precision}`),
+                esc(`${view.cases[p.i].shape} · ${view.cases[p.i].precision}`),
+                ...originRows(view, p.i),
                 `<strong>${p.tflops.toFixed(1)} TFLOPS</strong>${share(p.tflops, peak, 'compute')}`,
                 `<strong>${tbs.toFixed(2)} TB/s</strong>${share(tbs, bw, 'bandwidth')}`,
                 `${p.ai.toFixed(0)} FLOP/byte`,

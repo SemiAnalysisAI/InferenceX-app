@@ -4,6 +4,10 @@
  * on the same workload.
  */
 
+import { DB_MODEL_TO_DISPLAY } from '@semianalysisai/inferencex-constants/models';
+
+import { MODEL_TO_KEY } from '../etl/normalizers';
+
 export interface WorkloadSource {
   id: string;
   label: string;
@@ -15,6 +19,27 @@ export function modelFamily(name: string): string {
   return repo
     .replaceAll(/-(?:fp8|nvfp4|mxfp4|mxfp8|attnfp8|fp4|preview)(?=-|$)/giu, '')
     .replace(/-v\d+$/iu, '');
+}
+
+/** Families the benchmark model map has no checkpoint of, by the DB key they report under. */
+const FAMILY_KEYS: Record<string, string> = {
+  'gpt-oss-120b-w-a': 'gptoss120b',
+  'DeepSeek-V4-Pro-0813': 'dsv4',
+};
+
+const familyKeys = new Map<string, string>([
+  ...Object.entries(MODEL_TO_KEY).map(([id, key]) => [modelFamily(id), key] as [string, string]),
+  ...Object.entries(FAMILY_KEYS),
+]);
+
+/**
+ * The model a checkpoint id belongs to, named as the rest of InferenceX names it
+ * (`nvidia/GLM-5.1-NVFP4` -> `GLM-5`): the benchmark model map's entry for the id, else
+ * for another checkpoint of the same family; the family itself when neither knows it.
+ */
+export function topLevelModel(id: string): string {
+  const key = MODEL_TO_KEY[id] ?? familyKeys.get(modelFamily(id));
+  return (key && DB_MODEL_TO_DISPLAY[key]) ?? modelFamily(id);
 }
 
 const TESTLIST_LABELS: Record<string, string> = {

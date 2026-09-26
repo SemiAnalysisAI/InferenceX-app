@@ -10,7 +10,7 @@ import { OpxChart, esc, HardwareLegend, tooltipHtml } from '../charts/kit';
 import { valueScale } from '../charts/scales';
 import { hardwareLabel } from '../compare/hardware';
 import type { ComparisonModel } from '../compare/model';
-import { caseLabel } from '../compare/slices';
+import { originRows } from '../compare/slices';
 import type { VizDefinition } from './types';
 
 interface Pair {
@@ -148,9 +148,10 @@ function PairwiseScatter({ model }: { model: ComparisonModel }) {
             attachToLayer: 1,
             content: (p) =>
               tooltipHtml({
-                title: caseLabel(view.cases[p.i]),
+                title: view.cases[p.i].shape,
                 rows: [
                   esc(view.cases[p.i].precision),
+                  ...originRows(view, p.i),
                   `${hardwareLabel(a)} <strong>${metric.format(p.x)}</strong>`,
                   `${hardwareLabel(b)} <strong>${metric.format(p.y)}</strong>`,
                 ],

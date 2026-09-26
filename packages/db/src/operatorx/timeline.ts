@@ -15,7 +15,7 @@ const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFi
  * Shape version of `OperatorXTimeline`. Timelines are cached as immutable, so clients put
  * this in the request; bump it whenever the shape changes.
  */
-export const TIMELINE_VERSION = 2;
+export const TIMELINE_VERSION = 3;
 
 /** What a kernel does, from its name; the drill-down colors by it. */
 export const KERNEL_CATEGORIES = [
@@ -33,15 +33,18 @@ export type KernelCategory = (typeof KERNEL_CATEGORIES)[number]['id'];
 
 /**
  * First match wins, so the specific rules come first: a split-K reduce named `_gemm_…
- * reduce_kernel` is a reduce, a `QuantGemm` is a GEMM, `router_gemm` is a GEMM.
+ * reduce_kernel` is a reduce, a `QuantGemm` is a GEMM, `router_gemm` is a GEMM. Helpers
+ * whose template arguments name `cutlass` types are caught by their own rule first.
  * Mangled names are matched as-is; their identifiers survive mangling.
  */
 const CATEGORY_RULES: [KernelCategory, RegExp][] = [
-  ['expert-gemm', /fused_moe|fmoe|moe_gemm|gemm_moe|marlin_moe|moe_wna16|^_matmul_/i],
-  ['reduce', /reduce|moe_sum|combine/i],
+  // TensorRT-LLM's batched GEMMs, some with a fused activation (`…swiGlu…`).
+  ['gemm', /^bmm_/],
+  ['expert-gemm', /fused_moe|fmoe|moe_gemm|gemm_moe|marlin_moe|moe_wna16|mfma_moe|^_matmul_/i],
+  ['reduce', /reduce|moe_sum|combine|finalize/i],
   ['quantize', /quant(?!gemm)|cvt_fp\d+_to_fp\d|scale_1x128/i],
-  ['activation', /act_and_mul|silu|gelu|sigmoid|swiglu|situ_and_mul/i],
-  ['routing', /topk|gating|softmax|align_block|sort|expert_count|scatter|gather|index/i],
+  ['activation', /act_and_mul|activation|silu|gelu|sigmoid|swiglu|situ_and_mul/i],
+  ['routing', /routing|topk|gating|softmax|align_block|sort|expert_count|scatter|gather|index/i],
   [
     'gemm',
     /gemm|nvjet|^cijk_|cutlass|marlin|matmul|cublas|wvsplitk|dotprod|hipblaslt|xdl|mfma|wmma/i,

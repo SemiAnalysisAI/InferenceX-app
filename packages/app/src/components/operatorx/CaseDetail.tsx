@@ -23,7 +23,7 @@ import { useOperatorXTimelines } from '@/hooks/api/use-operatorx';
 
 import { hardwareLabel } from './compare/hardware';
 import { caseRefs } from './compare/model';
-import { caseLabel } from './compare/slices';
+import { caseOrigin } from './compare/slices';
 
 type CategoryColors = Record<KernelCategory, string>;
 
@@ -333,6 +333,21 @@ function CaseTimelines({
   );
 }
 
+/** The case's layers and models, as label/value pairs. */
+function CaseOrigin({ origin }: { origin: { label: string; value: string }[] }) {
+  if (origin.length === 0) return null;
+  return (
+    <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
+      {origin.map((o) => (
+        <div key={o.label} className="contents">
+          <dt className="text-muted-foreground">{o.label}</dt>
+          <dd>{o.value}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
 /** Floating drill-down of one case: each selected GPU's kernel timeline and kernel table. */
 export function CaseDetail({
   op,
@@ -359,9 +374,10 @@ export function CaseDetail({
         {c && caseIndex !== null && (
           <>
             <DialogHeader>
-              <DialogTitle>{caseLabel(c)}</DialogTitle>
+              <DialogTitle>{c.shape}</DialogTitle>
               <DialogDescription className="font-mono text-xs">{c.precision}</DialogDescription>
             </DialogHeader>
+            <CaseOrigin origin={caseOrigin(view, caseIndex)} />
             <CaseTimelines
               op={op}
               view={view}

@@ -10,7 +10,7 @@ import { OpxChart, esc, HardwareLegend, tooltipHtml } from '../charts/kit';
 import { formatCompact, valueScale } from '../charts/scales';
 import { hardwareLabel } from '../compare/hardware';
 import type { ComparisonModel } from '../compare/model';
-import { caseLabel, rankedSlices } from '../compare/slices';
+import { originRows, rankedSlices } from '../compare/slices';
 import type { VizDefinition } from './types';
 
 interface Point {
@@ -117,7 +117,11 @@ function MetricVsSize({ model }: { model: ComparisonModel }) {
             tooltipHtml({
               title: hardwareLabel(p.hw),
               color: model.colors[p.hw],
-              rows: [esc(caseLabel(view.cases[p.i])), `<strong>${metric.format(p.y)}</strong>`],
+              rows: [
+                esc(view.cases[p.i].shape),
+                ...originRows(view, p.i),
+                `<strong>${metric.format(p.y)}</strong>`,
+              ],
               footer: 'Click for kernel timeline',
             }),
           getRulerX: (p, s) => (s as d3.ScaleLogarithmic<number, number>)(p.x),
