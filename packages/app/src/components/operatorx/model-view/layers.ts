@@ -69,6 +69,11 @@ export interface LayerBlock {
   /** Nodes fed by the block's input. */
   entries: string[];
   spans: SlotSpan[];
+  /**
+   * The block drawn from its most fused measured ops to its least: the fields above are
+   * the first. Blocks with one way to draw them have one.
+   */
+  views: Flow[];
 }
 
 /** A box of a hand-drawn graph, with the GEMM roles that run it. */
@@ -82,6 +87,8 @@ interface Def {
   title?: string;
   /** Drawn only when one of its roles was measured. */
   optional?: boolean;
+  /** One op that runs several others: folded blocks show it, open ones the others. */
+  variant?: 'fused' | 'unfused';
 }
 
 interface Graph {
@@ -161,21 +168,46 @@ function stages(nodes: Def[], late: boolean): Map<string, number> {
   return out;
 }
 
-type Flow = Pick<LayerBlock, 'cols' | 'tall' | 'nodes' | 'edges' | 'entries' | 'spans'>;
+export type Flow = Pick<LayerBlock, 'cols' | 'tall' | 'nodes' | 'edges' | 'entries' | 'spans'>;
+
+/** The graph without the boxes `drop` rejects, and the arrows into them. */
+function without(graph: Graph, drop: (d: Def) => boolean): Graph {
+  const kept = graph.nodes.filter((d) => !drop(d));
+  const ids = new Set(kept.map((d) => d.id));
+  return {
+    ...graph,
+    nodes: kept.map((d) => ({ ...d, after: d.after?.filter((a) => ids.has(a)) })),
+  };
+}
+
+/**
+ * Lays out a block with its measured fused ops, then with the ops they fuse. With no
+ * fused op measured, the unfused boxes are the only drawing.
+ */
+function flows(graph: Graph, present: Set<string>, prefix: string): Flow[] {
+  const kept = without(graph, (d) => Boolean(d.optional) && !d.roles?.some((r) => present.has(r)));
+  const has = (v: Def['variant']) => kept.nodes.some((d) => d.variant === v);
+  if (!has('fused') || !has('unfused')) return [layout(kept, present, prefix)];
+  return [
+    layout(
+      without(kept, (d) => d.variant === 'unfused'),
+      present,
+      prefix,
+    ),
+    layout(
+      without(kept, (d) => d.variant === 'fused'),
+      present,
+      prefix,
+    ),
+  ];
+}
 
 /**
  * Lays a graph out in rows and binds the measured roles to its boxes. Each stage puts its
  * unmeasured boxes on one row, then gives each GEMM a row for its bars. With `group`, one
  * op covers every box: its bars sit on the first row.
  */
-function layout(full: Graph, present: Set<string>, prefix: string, group?: OpSlot): Flow {
-  const kept = full.nodes.filter((d) => !d.optional || d.roles?.some((r) => present.has(r)));
-  const ids = new Set(kept.map((d) => d.id));
-  const graph = {
-    ...full,
-    cols: Math.max(full.cols, ...kept.map((d) => (d.col ?? 0) + (d.span ?? 1))),
-    nodes: kept.map((d) => ({ ...d, after: d.after?.filter((a) => ids.has(a)) })),
-  };
+function layout(graph: Graph, present: Set<string>, prefix: string, group?: OpSlot): Flow {
   const stage = stages(graph.nodes, Boolean(graph.late));
   const own = new Map(
     graph.nodes.map((d) => [d.id, (d.roles ?? []).filter((r) => present.has(r))]),
@@ -229,7 +261,7 @@ function layout(full: Graph, present: Set<string>, prefix: string, group?: OpSlo
     })),
   ];
   return {
-    cols: graph.cols,
+    cols: Math.max(graph.cols, ...graph.nodes.map((d) => (d.col ?? 0) + (d.span ?? 1))),
     tall,
     nodes,
     edges: graph.nodes.flatMap((d) =>
@@ -249,11 +281,14 @@ function gqaGraph(opts: { qkNorm: boolean; core: string; coreTitle?: string; gat
     nodes: [
       node('q', 'q_proj', 0, [], ['q_proj', 'self_attn.q_proj'], {
         title: opts.gated ? 'Emits the queries and a per-head output gate' : undefined,
+        variant: 'unfused',
       }),
-      node('k', 'k_proj', 1, [], ['k_proj', 'self_attn.k_proj']),
-      node('v', 'v_proj', 2, [], ['v_proj', 'self_attn.v_proj']),
-      node('qkv', 'qkv_proj', 3, [], ['qkv_proj'], {
+      node('k', 'k_proj', 1, [], ['k_proj', 'self_attn.k_proj'], { variant: 'unfused' }),
+      node('v', 'v_proj', 2, [], ['v_proj', 'self_attn.v_proj'], { variant: 'unfused' }),
+      node('qkv', 'qkv_proj', 0, [], ['qkv_proj'], {
+        span: 3,
         optional: true,
+        variant: 'fused',
         title: 'q, k and v as one fused GEMM, as some engines run them',
       }),
       node('q-rope', rope, 0, ['q', 'qkv']),
@@ -283,11 +318,15 @@ function mlaGraph(dsa: { topk: number } | null) {
   return {
     cols: dsa ? 4 : 3,
     nodes: [
-      node('q-a', 'q_a_proj', 0, [], ['q_a_proj', fused]),
-      node('kv-a', 'kv_a_proj_with_mqa', 1, [], ['kv_a_proj_with_mqa', fused], { span: 2 }),
-      node('q-norm', 'RMSNorm', 0, ['q-a']),
-      node('kv-norm', 'RMSNorm', 1, ['kv-a']),
-      node('k-rope', 'RoPE (k_pe)', 2, ['kv-a'], [], {
+      node('q-a', 'q_a_proj', 0, [], ['q_a_proj'], { variant: 'unfused' }),
+      node('kv-a', 'kv_a_proj_with_mqa', 1, [], ['kv_a_proj_with_mqa'], {
+        span: 2,
+        variant: 'unfused',
+      }),
+      node('qkv-a', fused, 0, [], [fused], { span: 3, optional: true, variant: 'fused' }),
+      node('q-norm', 'RMSNorm', 0, ['q-a', 'qkv-a']),
+      node('kv-norm', 'RMSNorm', 1, ['kv-a', 'qkv-a']),
+      node('k-rope', 'RoPE (k_pe)', 2, ['kv-a', 'qkv-a'], [], {
         title: 'The rotary key part, shared by every head',
       }),
       node('q-b', 'q_b_proj', 0, ['q-norm'], ['q_b_proj']),
@@ -337,8 +376,13 @@ function v4Graph(opts: { pool: string; topk: number }) {
       node('hc-pre', 'mHC pre-mix + RMSNorm', null, [], ['hc_attn'], {
         title: 'Hyper-connections reduce the residual streams to one',
       }),
-      node('q-a', 'wq_a', 0, ['hc-pre'], ['attn.wq_a', 'attn.wq_a+wkv']),
-      node('kv', 'wkv', 1, ['hc-pre'], ['attn.wkv', 'attn.wq_a+wkv']),
+      node('q-a', 'wq_a', 0, ['hc-pre'], ['attn.wq_a'], { variant: 'unfused' }),
+      node('kv', 'wkv', 1, ['hc-pre'], ['attn.wkv'], { variant: 'unfused' }),
+      node('q-a-kv', 'wq_a + wkv', 0, ['hc-pre'], ['attn.wq_a+wkv'], {
+        span: 2,
+        optional: true,
+        variant: 'fused',
+      }),
       node(
         'comp',
         'Compressor',
@@ -347,8 +391,8 @@ function v4Graph(opts: { pool: string; topk: number }) {
         ['attn.compressor.wkv+wgate', 'attn.compressor.wkv', 'attn.compressor.wgate'],
         { title: 'compressor.wkv + wgate' },
       ),
-      node('q-norm', 'RMSNorm', 0, ['q-a']),
-      node('kv-norm', 'Norm + RoPE', 1, ['kv']),
+      node('q-norm', 'RMSNorm', 0, ['q-a', 'q-a-kv']),
+      node('kv-norm', 'Norm + RoPE', 1, ['kv', 'q-a-kv']),
       node('pool', opts.pool, 2, ['comp']),
       node('q-b', 'wq_b', 0, ['q-norm'], ['attn.wq_b']),
       node('idx', 'Indexer wq_b', 3, ['q-norm'], ['attn.indexer.wq_b'], {
@@ -448,14 +492,17 @@ function moeGraph(moe: MoeSpec, act: string, hc: boolean): Graph {
   const span = shared ? 2 : 1;
   const sharedGateUp = moe.splitShared
     ? [
-        node('s-gate', 'w1 (gate)', 2, hc ? ['hc-pre'] : [], [
-          'ffn.shared_experts.w1',
-          'ffn.shared_experts.w1+w3',
-        ]),
-        node('s-up', 'w3 (up)', 3, hc ? ['hc-pre'] : [], [
-          'ffn.shared_experts.w3',
-          'ffn.shared_experts.w1+w3',
-        ]),
+        node('s-gate', 'w1 (gate)', 2, hc ? ['hc-pre'] : [], ['ffn.shared_experts.w1'], {
+          variant: 'unfused',
+        }),
+        node('s-up', 'w3 (up)', 3, hc ? ['hc-pre'] : [], ['ffn.shared_experts.w3'], {
+          variant: 'unfused',
+        }),
+        node('s-gate-up', 'w1 + w3', 2, hc ? ['hc-pre'] : [], ['ffn.shared_experts.w1+w3'], {
+          span: 2,
+          optional: true,
+          variant: 'fused',
+        }),
       ]
     : [
         node(
@@ -729,15 +776,28 @@ export function modelLayers(
     kind: BlockKind,
     repeat: number | null,
     graph: Graph,
-    extra: { alternative?: boolean; group?: OpSlot } = {},
-  ): LayerBlock => ({
-    id,
-    label,
-    kind,
-    repeat,
-    alternative: Boolean(extra.alternative),
-    ...layout(graph, present, `${id}:`, extra.group),
-  });
+    extra: { alternative?: boolean; fold?: { op: OpSlot; label: string; title: string } } = {},
+  ): LayerBlock => {
+    const prefix = `${id}:`;
+    const views = [
+      // One op timing the whole block, ahead of its GEMMs.
+      ...(extra.fold
+        ? [
+            layout(
+              {
+                cols: 1,
+                nodes: [node('fold', extra.fold.label, null, [], [], { title: extra.fold.title })],
+              },
+              present,
+              prefix,
+              extra.fold.op,
+            ),
+          ]
+        : []),
+      ...flows(graph, present, prefix),
+    ];
+    return { id, label, kind, repeat, alternative: Boolean(extra.alternative), ...views[0], views };
+  };
 
   const blocks: LayerBlock[] = [
     block('embed', 'Embedding', 'embedding', null, {
@@ -770,7 +830,11 @@ export function modelLayers(
         moeGraph(spec.moe, act, Boolean(spec.hc)),
         {
           alternative: spec.dense > 0,
-          group: { id: 'moe:moe', label: 'MoE', op: 'moe', roles: [] },
+          fold: {
+            op: { id: 'moe:moe', label: 'MoE', op: 'moe', roles: [] },
+            label: 'MoE forward',
+            title: 'Router, dispatch, experts and combine, timed as one op',
+          },
         },
       ),
     );
@@ -786,7 +850,9 @@ export function modelLayers(
     }),
   );
 
-  const bound = new Set(blocks.flatMap((b) => b.spans.flatMap((s) => s.slot.roles)));
+  const bound = new Set(
+    blocks.flatMap((b) => b.views.flatMap((v) => v.spans.flatMap((s) => s.slot.roles))),
+  );
   const other = [...present].filter((r) => !bound.has(r)).sort();
   // Roles the graph has no box for: listed, unconnected.
   if (other.length > 0) {
@@ -794,7 +860,8 @@ export function modelLayers(
       cols: 1,
       nodes: other.map((r) => node(r, r, null, [], [r])),
     });
-    blocks.push({ ...listed, edges: [], entries: [] });
+    const flat = { ...listed.views[0], edges: [], entries: [] };
+    blocks.push({ ...listed, ...flat, views: [flat] });
   }
   return blocks;
 }

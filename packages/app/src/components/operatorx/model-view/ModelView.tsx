@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowDown, Loader2 } from 'lucide-react';
+import { ArrowDown, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTheme } from 'next-themes';
 import { useMemo, useState } from 'react';
@@ -164,6 +164,8 @@ function SlotTooltip({ data, tokens }: { data: SlotData; tokens: number }) {
 }
 
 const HEADER_PX = 32;
+/** The strip along a block's bottom that unfolds its fused ops. */
+const FOLD_PX = 22;
 const COMPACT_PX = 34;
 const TALL_NODE_PX = 26;
 const COMPACT_NODE_PX = 20;
@@ -292,6 +294,8 @@ function BlockRows({
   lanes,
   isDark,
   onOpen,
+  level,
+  onStep,
 }: {
   block: LayerBlock;
   slots: SlotData[];
@@ -300,6 +304,9 @@ function BlockRows({
   lanes: number;
   isDark: boolean;
   onOpen: (data: SlotData) => void;
+  /** Which of `block.views` is drawn. */
+  level: number;
+  onStep: () => void;
 }) {
   const [hovered, setHovered] = useState<string | null>(null);
   const c = BLOCK_COLORS[block.kind];
@@ -307,7 +314,11 @@ function BlockRows({
   return (
     <div
       className={`grid ${ROW_GRID} gap-x-4`}
-      style={{ gridTemplateRows: [HEADER_PX, ...rows].map((h) => `${h}px`).join(' ') }}
+      style={{
+        gridTemplateRows: [HEADER_PX, ...rows, ...(block.views.length > 1 ? [FOLD_PX] : [])]
+          .map((h) => `${h}px`)
+          .join(' '),
+      }}
       data-testid={`operatorx-model-block-${block.id}`}
     >
       <div
@@ -404,6 +415,28 @@ function BlockRows({
           );
         })}
       </div>
+      {block.views.length > 1 && (
+        <button
+          type="button"
+          onClick={onStep}
+          className="relative z-[2] flex items-center justify-center gap-1 rounded-b-lg text-2xs text-muted-foreground hover:bg-muted/40 hover:text-foreground"
+          style={{ gridColumn: 1, gridRow: -2 }}
+          aria-expanded={level > 0}
+          data-testid={`operatorx-model-fold-${block.id}`}
+        >
+          {level < block.views.length - 1 ? (
+            <>
+              <ChevronDown className="size-3" />
+              {level === 0 ? 'Show the ops it fuses' : 'Unfuse further'}
+            </>
+          ) : (
+            <>
+              <ChevronUp className="size-3" />
+              Fold back to the fused op
+            </>
+          )}
+        </button>
+      )}
     </div>
   );
 }
@@ -534,6 +567,15 @@ export function ModelView() {
     () => modelLayers(arch, gemm.data, requested, (moe.data?.cases.length ?? 0) > 0),
     [arch, gemm.data, moe.data, requested],
   );
+  const [levels, setLevels] = useState<Record<string, number>>({});
+  const shown = useMemo(
+    () =>
+      blocks.map((block) => {
+        const level = Math.min(levels[block.id] ?? 0, block.views.length - 1);
+        return { block: { ...block, ...block.views[level] }, level };
+      }),
+    [blocks, levels],
+  );
   const models = useMemo(() => {
     const toggle = (hw: string) => {
       const next = hardware.includes(hw) ? hardware.filter((h) => h !== hw) : [...hardware, hw];
@@ -550,7 +592,7 @@ export function ModelView() {
   }, [gemm.data, moe.data, metric, hardware, available, colors]);
   const resolved = useMemo(
     () =>
-      blocks.map((block) => ({
+      shown.map(({ block }) => ({
         block,
         slots: block.spans.map(({ slot, first, last, bar }) => {
           const model = models[slot.op];
@@ -565,7 +607,7 @@ export function ModelView() {
           };
         }),
       })),
-    [blocks, models, requested, precision],
+    [shown, models, requested, precision],
   );
   const bins = useMemo(() => {
     const out = new Set<number>();
@@ -691,7 +733,7 @@ export function ModelView() {
             {bin === null ? <div /> : <TokenSlider bins={bins} bin={bin} onChange={setBin} />}
           </div>
           <div className="flex flex-col">
-            {blocks.map((block, b) => (
+            {shown.map(({ block, level }, b) => (
               <div key={block.id}>
                 {b > 0 && (
                   <div className={`grid ${ROW_GRID} gap-x-4`}>
@@ -709,6 +751,10 @@ export function ModelView() {
                   lanes={hardware.length}
                   isDark={isDark}
                   onOpen={setOpen}
+                  level={level}
+                  onStep={() =>
+                    setLevels((prev) => ({ ...prev, [block.id]: (level + 1) % block.views.length }))
+                  }
                 />
               </div>
             ))}
