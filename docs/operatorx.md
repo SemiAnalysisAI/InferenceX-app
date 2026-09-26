@@ -94,7 +94,8 @@ failed shards, it sends an `ingest-operatorx` repository dispatch with its run I
 the `Ingest OperatorX Results` workflow stores that run. GitHub delivers repository
 dispatches only to workflows on the default branch, so this starts working once
 `ingest-operatorx.yml` is on InferenceX-app's default branch. Run the workflow manually
-with a run ID to backfill or re-ingest a run.
+with a run ID to backfill or re-ingest a run. OperatorX API responses stay cached until
+the workflow, after storing a run, purges them with `/api/v1/invalidate?scope=operatorx`.
 
 1. `DATABASE_OPERATORX_WRITE_URL`: the owner connection (direct, non-pooled), for
    migrations and ingest only.

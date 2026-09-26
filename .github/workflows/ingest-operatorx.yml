@@ -70,6 +70,13 @@ jobs:
           RUN_ID: ${{ github.event.client_payload.run-id || inputs.run-id }}
         run: bun run --cwd packages/db src/ingest-operatorx.ts --download "$RUN_ID" SemiAnalysisAI/InferenceX
 
+      - name: Invalidate OperatorX cache
+        env:
+          VERCEL_INVALIDATE_SECRET: ${{ secrets.VERCEL_INVALIDATE_SECRET }}
+        run: |
+          curl -sSf -X POST "https://inferencex.semianalysis.com/api/v1/invalidate?scope=operatorx" \
+            -H "Authorization: Bearer $VERCEL_INVALIDATE_SECRET"
+
       - name: Notify Slack on failure
         if: failure()
         uses: slackapi/slack-github-action@dcb1066f776dd043e64d0e8ba94ca15cc7e1875d # v4.0.0

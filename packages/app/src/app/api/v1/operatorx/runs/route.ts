@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 
+import { cachedJson, operatorXCacheTag } from '@/lib/api-cache';
 import { errorMessage, errorStatus, listRuns, sourceName } from '@/lib/operatorx/service';
 
 export const dynamic = 'force-dynamic';
@@ -8,9 +9,9 @@ export const maxDuration = 300;
 
 export async function GET(_request?: Request) {
   try {
-    return NextResponse.json(
+    return cachedJson(
       { source: sourceName(), runs: await listRuns() },
-      { headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=60' } },
+      { tag: operatorXCacheTag() },
     );
   } catch (error) {
     console.error('OperatorX run list', error);

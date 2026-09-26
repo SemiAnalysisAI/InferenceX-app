@@ -23,42 +23,53 @@ import {
 import { OperatorXSourceError } from './source';
 import { getOperatorXSource } from './sources';
 
-const LIST_TTL_MS = 60_000;
-const DATASET_TTL_MS = 10 * 60_000;
+/*
+ * Responses are cached at the CDN until an ingest purges them. What the server keeps in
+ * memory is keyed by stored revision instead of by time, so the request after a purge
+ * reads the new data: the run list is read fresh (one small query), and a run's bundle or
+ * an op's comparison is reused only while the revisions it was built from are current.
+ */
 const MAX_DATASETS = 32;
-const COMPARISON_TTL_MS = 5 * 60_000;
 const COMPARISON_READ_BATCH = 4;
 
 type Normalized = ReturnType<typeof normalizeBundle>;
 
-let runsCache: { at: number; value: Promise<OperatorXRunRef[]> } | null = null;
-const datasets = new Map<string, { at: number; value: Promise<Normalized> }>();
+let runsInFlight: Promise<OperatorXRunRef[]> | null = null;
+/** Normalized bundles by `runId:revision`, least recently used first. */
+const datasets = new Map<string, Promise<Normalized>>();
 
 export function sourceName(): string {
   return getOperatorXSource().name;
 }
 
+/** The stored runs; concurrent callers share one read. */
 export function listRuns(): Promise<OperatorXRunRef[]> {
-  if (!runsCache || Date.now() - runsCache.at > LIST_TTL_MS) {
-    const value = getOperatorXSource().listRuns();
-    runsCache = { at: Date.now(), value };
-    value.catch(() => {
-      if (runsCache?.value === value) runsCache = null;
-    });
+  if (!runsInFlight) {
+    runsInFlight = getOperatorXSource().listRuns();
+    const clear = () => {
+      runsInFlight = null;
+    };
+    runsInFlight.then(clear, clear);
   }
-  return runsCache.value;
+  return runsInFlight;
 }
 
-function normalized(runId: string): Promise<Normalized> {
-  const hit = datasets.get(runId);
-  if (hit && Date.now() - hit.at < DATASET_TTL_MS) {
-    datasets.delete(runId); // refresh LRU position
-    datasets.set(runId, hit);
-    return hit.value;
+const revisionOf = (run: OperatorXRunRef) => run.revision ?? String(run.run_attempt);
+
+async function normalized(runId: string): Promise<Normalized> {
+  const runs = await listRuns();
+  const run = runs.find((r) => r.run_id === runId);
+  if (!run) throw new OperatorXSourceError('Run not found', 404);
+  const key = `${runId}:${revisionOf(run)}`;
+  const hit = datasets.get(key);
+  if (hit) {
+    datasets.delete(key); // refresh LRU position
+    datasets.set(key, hit);
+    return hit;
   }
   const value = getOperatorXSource().getBundle(runId).then(normalizeBundle);
-  datasets.set(runId, { at: Date.now(), value });
-  value.catch(() => datasets.delete(runId));
+  datasets.set(key, value);
+  value.catch(() => datasets.delete(key));
   while (datasets.size > MAX_DATASETS) datasets.delete(datasets.keys().next().value!);
   return value;
 }
@@ -80,7 +91,16 @@ export async function getResultDetail(
 
 const OP_TESTLIST_PREFIX: Record<ComparisonOp, string> = { gemm: 'gemm', moe: 'moe' };
 
-const compared = new Map<ComparisonOp, { at: number; value: Promise<Comparison> }>();
+/** Each op's comparison and the `runId:revision` list it was built from. */
+const compared = new Map<ComparisonOp, { revisions: string; value: Promise<Comparison> }>();
+
+function comparisonRuns(op: ComparisonOp, listed: OperatorXRunRef[]): OperatorXRunRef[] {
+  const prefix = OP_TESTLIST_PREFIX[op];
+  return listed.filter((run) => {
+    const plan = run.plan;
+    return plan?.mode === 'timing' && plan.testlists.some((t) => t.startsWith(prefix));
+  });
+}
 
 /**
  * Keep the newest actual result for each hardware/case/backend. A missing row only
@@ -88,13 +108,7 @@ const compared = new Map<ComparisonOp, { at: number; value: Promise<Comparison> 
  * real outcomes and remain newest-wins. Read a few bundles at a time and retain only
  * selected rows, not every historical profile.
  */
-async function compareOp(op: ComparisonOp): Promise<Comparison> {
-  const prefix = OP_TESTLIST_PREFIX[op];
-  const listed = await listRuns();
-  const runs = listed.filter((run) => {
-    const plan = run.plan;
-    return plan?.mode === 'timing' && plan.testlists.some((t) => t.startsWith(prefix));
-  });
+async function compareOp(op: ComparisonOp, runs: OperatorXRunRef[]): Promise<Comparison> {
   const selected = new Map<
     string,
     { runner: string; run: Normalized['run']; result: Normalized['results'][number] }
@@ -138,17 +152,18 @@ async function compareOp(op: ComparisonOp): Promise<Comparison> {
   return buildComparison(op, [...byRun.values()]);
 }
 
-function getCompared(op: ComparisonOp): Promise<Comparison> {
+/** An op's comparison, rebuilt when a run it reads is added, replaced or removed. */
+export async function getComparison(op: ComparisonOp): Promise<Comparison> {
+  const runs = comparisonRuns(op, await listRuns());
+  const revisions = runs.map((run) => `${run.run_id}:${revisionOf(run)}`).join(',');
   const hit = compared.get(op);
-  if (hit && Date.now() - hit.at < COMPARISON_TTL_MS) return hit.value;
-  const value = compareOp(op);
-  compared.set(op, { at: Date.now(), value });
-  value.catch(() => compared.delete(op));
+  if (hit?.revisions === revisions) return hit.value;
+  const value = compareOp(op, runs);
+  compared.set(op, { revisions, value });
+  value.catch(() => {
+    if (compared.get(op)?.value === value) compared.delete(op);
+  });
   return value;
-}
-
-export function getComparison(op: ComparisonOp): Promise<Comparison> {
-  return getCompared(op);
 }
 
 /**

@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from 'next/server';
 
+import { cachedJson, operatorXCacheTag } from '@/lib/api-cache';
 import { errorMessage, errorStatus, getComparison } from '@/lib/operatorx/service';
 import { comparisonView } from '@semianalysisai/inferencex-db/operatorx/compare';
 
@@ -16,9 +17,7 @@ export async function GET(request: NextRequest) {
   try {
     const comparison = await getComparison(op as 'gemm' | 'moe');
     const view = comparisonView(comparison, request.nextUrl.searchParams.get('workload'));
-    return NextResponse.json(view, {
-      headers: { 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=300' },
-    });
+    return cachedJson(view, { tag: operatorXCacheTag() });
   } catch (error) {
     console.error('OperatorX comparison', error);
     return NextResponse.json(

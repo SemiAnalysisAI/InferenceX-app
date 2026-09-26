@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from 'next/server';
 
+import { cachedJson, operatorXCacheTag } from '@/lib/api-cache';
 import { errorMessage, errorStatus, getTimelines } from '@/lib/operatorx/service';
 
 export const dynamic = 'force-dynamic';
@@ -27,11 +28,9 @@ export async function GET(request: NextRequest) {
     );
   try {
     const { timelines, known } = await getTimelines(op as 'gemm' | 'moe', refs);
-    return NextResponse.json(timelines, {
-      headers: {
-        'Cache-Control': known ? 'public, s-maxage=300, stale-while-revalidate=300' : 'no-store',
-      },
-    });
+    return known
+      ? cachedJson(timelines, { tag: operatorXCacheTag() })
+      : NextResponse.json(timelines, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) {
     console.error('OperatorX timelines', error);
     return NextResponse.json(

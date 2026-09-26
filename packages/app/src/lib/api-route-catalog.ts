@@ -214,7 +214,7 @@ export const apiRouteCatalog = [
       en: 'OperatorX page backend; its run, result and detail shapes follow the page while it is being redesigned.',
       zh: 'OperatorX 页面后端；页面重新设计期间，其运行、结果和详情结构随页面变化。',
     },
-    sourceSha256: '8feb5b4a9897a1bce20044f983d07baa7ec1695e0ec73e3182612611f80c938b',
+    sourceSha256: '067a81844de8360ea91d257805febd2ebbe981d6628fb0edb8202435d382b757',
   },
   {
     source: 'src/app/api/v1/operatorx/runs/[runId]/route.ts',
@@ -225,7 +225,7 @@ export const apiRouteCatalog = [
       en: 'OperatorX page backend; its run, result and detail shapes follow the page while it is being redesigned.',
       zh: 'OperatorX 页面后端；页面重新设计期间，其运行、结果和详情结构随页面变化。',
     },
-    sourceSha256: '5a405cbec0d7f546a0a6b7242f4d288afff321f7cc9eeb9fad0a34faf1ea660a',
+    sourceSha256: '0f68b7c9af8f3d5ec4093a4dba887fa324d1726f91e4f38a289d4b0b813a1e93',
   },
   {
     source: 'src/app/api/v1/operatorx/runs/[runId]/results/[index]/route.ts',
@@ -236,7 +236,7 @@ export const apiRouteCatalog = [
       en: 'OperatorX page backend; its run, result and detail shapes follow the page while it is being redesigned.',
       zh: 'OperatorX 页面后端；页面重新设计期间，其运行、结果和详情结构随页面变化。',
     },
-    sourceSha256: 'eae70063c6667f5fc788cadf078176a830f1d1b8177c1fc55895feaf843e25f9',
+    sourceSha256: 'b76aa2caf5998d0a3dc0c1d1b6853a1caa2cd4212744882f51c26b1cdd8c57e2',
   },
   {
     source: 'src/app/api/v1/operatorx/compare/route.ts',
@@ -247,7 +247,7 @@ export const apiRouteCatalog = [
       en: 'OperatorX page backend; its cross-hardware comparison shape follows the page while it is being redesigned.',
       zh: 'OperatorX 页面后端；页面重新设计期间，其跨硬件对比结构随页面变化。',
     },
-    sourceSha256: '9e140e706e4a8ac60fb4521512778b701a05e602d2f0ac72b3de1d5b2ac72b32',
+    sourceSha256: '4188dd7bbf1fb1a22f0b4287c9d3eb7231c003d6b1da935a9fddd7b4ea83eec3',
   },
   {
     source: 'src/app/api/v1/operatorx/timelines/route.ts',
@@ -258,7 +258,7 @@ export const apiRouteCatalog = [
       en: 'OperatorX page backend; serves the case drill-down kernel timelines in the page’s own compact shape.',
       zh: 'OperatorX 页面后端；以页面自身的紧凑结构提供用例详情的 kernel 时间线。',
     },
-    sourceSha256: '7aa2dde44ec470226839c2b9be07649a0e05c7043fbf9811862430d8ab73cc84',
+    sourceSha256: 'dbd2a0022410ac80203a1bd3c4b2290719b2691fe8813168d0d13c698cfd89e3',
   },
 
   {
@@ -489,7 +489,7 @@ export const apiRouteCatalog = [
       en: 'Secret-protected cache invalidation mutation for operators; it is not a public application contract.',
       zh: '供运维人员使用的密钥保护缓存失效写操作；它不是公开应用契约。',
     },
-    sourceSha256: 'eadfc008403b3a5321f9b857897ed5c9fce2de29dee34279fb559cf1b763c247',
+    sourceSha256: '8d9e6aed461c497d68f6947d95b40f97d8a75972c1c845b90cc7293fab1a1b2a',
   },
   {
     source: 'src/app/api/v1/latest-images/route.ts',
@@ -950,7 +950,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/api-cache.ts',
-    sourceSha256: 'b710c4ce4c2dd0a6eb3b662c9e426e301aee3afe3d64fba35745b9323be39ddd',
+    sourceSha256: 'cf710c1dca9cfae794cf3d14d3dad6a153bbd7151cedc9d9f0b27b792aeade24',
     reviewArea: {
       en: 'Public CDN tags, cache lifetimes, Blob key dimensions, and purge behavior.',
       zh: '公开 CDN 标签、缓存时长、Blob 键维度和清除行为。',
