@@ -334,14 +334,14 @@ function CaseTimelines({
 }
 
 /** The case's layers and models, as label/value pairs. */
-function CaseOrigin({ origin }: { origin: { label: string; value: string }[] }) {
+function CaseOrigin({ origin }: { origin: { model: string; roles: string }[] }) {
   if (origin.length === 0) return null;
   return (
     <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
       {origin.map((o) => (
-        <div key={o.label} className="contents">
-          <dt className="text-muted-foreground">{o.label}</dt>
-          <dd>{o.value}</dd>
+        <div key={o.model} className="contents">
+          <dt className="text-muted-foreground">{o.model}</dt>
+          <dd className="font-mono">{o.roles}</dd>
         </div>
       ))}
     </dl>

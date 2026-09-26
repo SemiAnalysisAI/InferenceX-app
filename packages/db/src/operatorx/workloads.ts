@@ -50,17 +50,17 @@ const TESTLIST_LABELS: Record<string, string> = {
 };
 
 /**
- * Sources of one case: the model families of its `sources` checkpoint ids (one shape can
+ * Sources of one case: the model families of the checkpoints it comes from (one shape can
  * come from several models); cases without sources fall back to their testlist.
  */
 export function workloadSources(
   opType: string,
   testlist: string,
-  sources: string[],
+  checkpoints: string[],
 ): WorkloadSource[] {
   const suffix = opType === 'moe' ? 'MoE' : opType.toUpperCase();
-  if (sources.length > 0) {
-    const families = [...new Set(sources.map(modelFamily))];
+  if (checkpoints.length > 0) {
+    const families = [...new Set(checkpoints.map(modelFamily))];
     return families.map((f) => ({ id: `${opType}:${f}`, label: `${f} ${suffix}` }));
   }
   return [{ id: `${opType}:testlist:${testlist}`, label: TESTLIST_LABELS[testlist] ?? testlist }];

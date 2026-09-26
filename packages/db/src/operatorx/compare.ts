@@ -4,7 +4,12 @@
  * picks which run supplies each runner's results (newest first wins per case).
  */
 import { opLabels, usefulBytes, usefulFlops } from './describe';
-import { type OperatorXDataset, type OperatorXStatus, stableJson } from './normalize';
+import {
+  type OperatorXDataset,
+  type OperatorXSource,
+  type OperatorXStatus,
+  stableJson,
+} from './normalize';
 import { topLevelModel, type WorkloadSource, workloadSources } from './workloads';
 
 export type ComparisonOp = 'gemm' | 'moe';
@@ -26,10 +31,8 @@ export interface ComparisonRow {
   hardware: string;
   testlist: string;
   workloads: string[];
-  /** Role of the op in its model (`q_proj`), when the testlist names it. */
-  role: string | null;
-  /** Models the case comes from, as InferenceX names them (`GLM-5`, `Kimi-K2.5`). */
-  models: string[];
+  /** Models the case comes from, as InferenceX names them, with its roles in each. */
+  sources: CaseSource<string>[];
   shape: string;
   precision: string;
   computePrecision: ComputePrecision;
@@ -44,6 +47,25 @@ export interface ComparisonRow {
   cudaGraph: boolean | null;
   runId: string;
   resultIndex: number;
+}
+
+/**
+ * A model a case comes from (a name, or an index into `ComparisonView.models`) and the
+ * layers that run the case in it (`attn.wq_b`, `mlp`).
+ */
+export interface CaseSource<M> {
+  model: M;
+  roles: string[];
+}
+
+/** Sources grouped by model: several checkpoints of one model merge. */
+function sourcesByModel(sources: OperatorXSource[]): CaseSource<string>[] {
+  const byModel = new Map<string, Set<string>>();
+  for (const s of sources) {
+    const model = topLevelModel(s.model);
+    byModel.set(model, (byModel.get(model) ?? new Set()).add(s.role));
+  }
+  return [...byModel].map(([model, roles]) => ({ model, roles: [...roles].sort() }));
 }
 
 export interface ComparisonWorkload extends WorkloadSource {
@@ -136,7 +158,7 @@ export function buildComparison(op: ComparisonOp, inputs: ComparisonInput[]): Co
       const key = `${hw}|${caseKey}`;
       if (rows.has(key)) continue;
       used = true;
-      const sources = workloadSources(op, r.testlist, r.sources);
+      const sources = workloadSources(op, r.testlist, [...new Set(r.sources.map((s) => s.model))]);
       for (const s of sources) {
         const w = workloads.get(s.id) ?? { source: s, cases: new Set(), hardware: new Set() };
         w.cases.add(caseKey);
@@ -148,8 +170,7 @@ export function buildComparison(op: ComparisonOp, inputs: ComparisonInput[]): Co
         hardware: hw,
         testlist: r.testlist,
         workloads: sources.map((s) => s.id),
-        role: r.name,
-        models: [...new Set(r.sources.map(topLevelModel))],
+        sources: sourcesByModel(r.sources),
         ...opLabels(op, r.args),
         computePrecision: computePrecision(op, r.args),
         x: op === 'gemm' ? num(r.args.m) : num(r.args.tokens),
@@ -184,9 +205,7 @@ export function buildComparison(op: ComparisonOp, inputs: ComparisonInput[]): Co
 export interface ComparisonCase {
   key: string;
   testlist: string;
-  role: string | null;
-  /** Indexes into `ComparisonView.models`. */
-  models: number[];
+  sources: CaseSource<number>[];
   shape: string;
   precision: string;
   computePrecision: ComputePrecision;
@@ -239,18 +258,22 @@ export function comparisonView(comparison: Comparison, workloadId: string | null
   };
   for (const r of rows) {
     const seen = caseIndex.get(r.caseKey);
-    // Runners can list different checkpoints for one case; the case names every model.
+    // Runners can list different layers for one case; the case names every one.
     if (seen !== undefined) {
-      const ids = cases[seen].models;
-      for (const name of r.models) if (!ids.includes(model(name))) ids.push(model(name));
+      const merged = cases[seen].sources;
+      for (const s of r.sources) {
+        const m = model(s.model);
+        const into = merged.find((x) => x.model === m);
+        if (into) {into.roles = [...new Set([...into.roles, ...s.roles])].sort();}
+        else {merged.push({ model: m, roles: [...s.roles] });}
+      }
       continue;
     }
     caseIndex.set(r.caseKey, cases.length);
     cases.push({
       key: r.caseKey,
       testlist: r.testlist,
-      role: r.role,
-      models: r.models.map(model),
+      sources: r.sources.map((s) => ({ model: model(s.model), roles: [...s.roles] })),
       shape: r.shape,
       precision: r.precision,
       computePrecision: r.computePrecision,

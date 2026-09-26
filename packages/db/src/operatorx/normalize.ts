@@ -19,16 +19,20 @@ export interface OperatorXTimingShape {
   streams: number;
 }
 
+/** A layer that runs a case: checkpoint id (`zai-org/GLM-5-FP8`) and module (`mlp`). */
+export interface OperatorXSource {
+  model: string;
+  role: string;
+}
+
 /** One requested (case, backend) and its outcome: the list-view row. Kept small. */
 export interface OperatorXResult {
   /** Stable index within the dataset; the key for fetching the full detail. */
   index: number;
   testlist: string;
   opType: string;
-  /** Role of the op in its model: `q_proj`, `experts`, ... */
-  name: string | null;
-  /** Checkpoint ids of the models the case comes from (`op.sources`). */
-  sources: string[];
+  /** Every layer that runs the case: its checkpoint and its role there. */
+  sources: OperatorXSource[];
   backend: string;
   shard: string;
   cluster: string | null;
@@ -127,16 +131,16 @@ function timingShape(metrics: Obj): OperatorXTimingShape | null {
   };
 }
 
-/** The op's roles in its model (`name` is a list, e.g. ["o_proj", "q_proj"]), joined for display. */
-function caseRoles(name: unknown): string | null {
-  const roles = Array.isArray(name) ? name.filter((r) => typeof r === 'string' && r) : [];
-  return roles.length > 0 ? roles.join(', ') : null;
-}
-
-function caseSources(op: Obj): string[] {
-  return Array.isArray(op.sources)
-    ? op.sources.filter((s): s is string => typeof s === 'string')
-    : [];
+/**
+ * `sources` entries are `<org>/<model>/<role>`; checkpoint ids are `org/model` and roles
+ * hold no `/`, so the role is what follows the last one.
+ */
+function caseSources(sources: unknown): OperatorXSource[] {
+  if (!Array.isArray(sources)) return [];
+  return sources.flatMap((s) => {
+    const cut = typeof s === 'string' ? s.lastIndexOf('/') : -1;
+    return cut > 0 ? [{ model: s.slice(0, cut), role: s.slice(cut + 1) }] : [];
+  });
 }
 
 function toStatus(v: unknown): OperatorXStatus {
@@ -189,8 +193,7 @@ export function normalizeBundle(bundle: OperatorXRawBundle): Normalized {
           {
             testlist,
             opType: type,
-            name: caseRoles(op.name),
-            sources: caseSources(op),
+            sources: caseSources(op.sources),
             backend,
             shard: shard.id,
             cluster,
@@ -234,8 +237,7 @@ export function normalizeBundle(bundle: OperatorXRawBundle): Normalized {
           {
             testlist: String(c.testlist ?? ''),
             opType: type,
-            name: caseRoles(shape.name),
-            sources: caseSources({ ...shape, ...c }),
+            sources: caseSources(c.sources ?? shape.sources),
             backend,
             shard: String(cell.id ?? ''),
             cluster: typeof cell.cluster === 'string' ? cell.cluster : null,

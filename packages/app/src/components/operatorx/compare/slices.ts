@@ -47,22 +47,18 @@ export function rankedSlices(op: ComparisonOp, cases: ComparisonCase[]): [string
   );
 }
 
-/** Where case `i` comes from: its layers in the model and the models, each when known. */
-export function caseOrigin(view: ComparisonView, i: number): { label: string; value: string }[] {
-  const c = view.cases[i];
-  const models = c.models.map((m) => view.models[m]);
-  return [
-    ...(c.role ? [{ label: c.role.includes(',') ? 'Layers' : 'Layer', value: c.role }] : []),
-    ...(models.length > 0
-      ? [{ label: models.length > 1 ? 'Models' : 'Model', value: models.join(', ') }]
-      : []),
-  ];
+/** Where case `i` comes from: each model and the layers that run the case in it. */
+export function caseOrigin(view: ComparisonView, i: number): { model: string; roles: string }[] {
+  return view.cases[i].sources.map((s) => ({
+    model: view.models[s.model],
+    roles: s.roles.join(', '),
+  }));
 }
 
 /** `caseOrigin` as tooltip rows. */
 export function originRows(view: ComparisonView, i: number): string[] {
   return caseOrigin(view, i).map(
     (o) =>
-      `<span class="text-muted-foreground">${escapeHtml(o.label)}</span> ${escapeHtml(o.value)}`,
+      `<span class="text-muted-foreground">${escapeHtml(o.model)}</span> ${escapeHtml(o.roles)}`,
   );
 }
