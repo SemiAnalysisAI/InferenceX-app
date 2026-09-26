@@ -33,7 +33,7 @@ combinations, not the full Cartesian product of all possible filter values.
 | `rankings`                      | `format`, `kind`, `model`, `scenario`                                                                                                                                                                                                                                                                    |
 | `reliability`                   | `asOf`, `format`, `gpus`, `range`                                                                                                                                                                                                                                                                        |
 | `submissions`                   | `direction`, `limit`, `lines`, `mode`, `offset`, `onChangeOnly`, `search`, `sort`                                                                                                                                                                                                                        |
-| `video`                         | `artifact`, `cell`, `compare`, `costs`, `gpuBasis`, `page`, `phase`, `run`, `selected`, `slot`, `source`, `view`, `workload`, `xAxis`, `yAxis`                                                                                                                                                           |
+| `video`                         | `artifact`, `cell`, `compare`, `costs`, `gpuBasis`, `page`, `phase`, `run`, `selected`, `slot`, `source`, `v_x`, `v_y`, `v_tier`, `v_view`, `v_optimal`, `v_api`, `v_hidden`, `v_base`, `v_cand`, `v_case`, `view`, `workload`, `xAxis`, `yAxis`                                                         |
 
 ## Source audit and shared computations
 
@@ -46,8 +46,56 @@ combinations, not the full Cartesian product of all possible filter values.
 - OperatorX/CollectiveX: selected operator sweep, EP/KV/swap chart and fit helpers.
 - Submissions/images: existing table, weekly/cumulative and image freshness helpers.
 - GPU metrics: shared line/correlation transforms and unsampled statistics.
-- Video: checksum-verified stored bundles, serving/fidelity selectors and tradeoffs.
+- Video: published history pages → videoPoints → dashboardCells → shared metrics,
+  deployment Pareto plot/table, lead-cell KPIs, Compare and measured evidence.
+  Legacy checksum-verified bundle serving/fidelity and tradeoff reads remain available.
 - Overview/rankings/compare: existing discovery-page assembly and scenario helpers.
+
+## VideoGenX dashboard contract
+
+`GET /api/v1/views/video` defaults to the current `/video` dashboard. The shared
+`VIDEO_HISTORY_MAX_PAGES` bounds both UI and API to the first five published
+history pages; responses report `coverage` with `pagesRead`, `maxPages`,
+`nextPage` and `truncated`. This is a publication-ordered window, not an execution
+date range or a promise to enumerate the entire catalog. Failures remain failures;
+missing fields remain null. Source run/artifact IDs, seals and distinct execution
+and publication times remain in `provenance`; raw documents, private asset URLs
+and credentials are excluded from the dashboard projection.
+
+| UI control or surface    | Public projection / scope                                                                                                                                                                                                                                                                                                                                                                                      |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| X/Y, cost tier, optimal  | `v_x`, `v_y`, `v_tier`, `v_optimal`; same metric registry, participating-GPU cost basis and per-hardware frontier helpers. Queueing cells never enter `plot`/`rows`.                                                                                                                                                                                                                                           |
+| Hardware visibility      | `v_hidden`, sorted/deduplicated known roster keys; affects plot/table only, matching UI. KPI, Compare and Evidence retain all selected-workload cells.                                                                                                                                                                                                                                                         |
+| API reference price      | `v_api`, positive USD/video-second rounded to four decimals; only `apiPricePerVideo`, never TCO or revenue. Invalid values use the UI reference.                                                                                                                                                                                                                                                               |
+| Chart/table              | `v_view`; echoed as `params.displayView`, no numerical difference. Color, zoom and playback remain presentation state.                                                                                                                                                                                                                                                                                         |
+| Workload/newest cell     | `videoPoints` → `dashboardCells`; same canonical identity, sample floor and publication precedence. Return `workload`, `otherWorkloads`, cells and source provenance.                                                                                                                                                                                                                                          |
+| KPI cards                | `kpis`: roster entries, shared lead cell and all metric values; missing hardware keeps null point/metrics.                                                                                                                                                                                                                                                                                                     |
+| Compare selectors/deltas | `v_base`, `v_cand`, `v_case`; shared selection defaults and `compareMetrics`. Default mode returns deltas without loading media.                                                                                                                                                                                                                                                                               |
+| Case media metadata      | `view=compare` adds at most two published-only `format=published` reads (deduplicated by run/artifact), `compareSide`/`pairCases`, bounded `resolvedCaseIndex`, matched/unmatched counts and selected records. Only bundle-relative media paths are exposed. Missing media, missing baseline/candidate and read errors have separate statuses; `ready` means readable artifacts and can still have zero pairs. |
+| Evidence                 | Shared power/plateau/scaling/facts functions. Descriptive measurements; no quality qualification or causal bottleneck inference.                                                                                                                                                                                                                                                                               |
+| Legacy run browser       | Explicit `view=discovery&page=…`; supplying `run`/`artifact` retains results and optional tradeoff selectors. Mixing legacy selectors and `v_*` returns 400.                                                                                                                                                                                                                                                   |
+
+Dashboard state values use the UI parser and its fallback defaults; unknown or
+repeated parameter names return 400. Legacy source status handling and 204 behavior
+remain unchanged. Chart history read failures preserve the sanitized upstream status;
+optional Compare media failure returns `comparison.cases.status=unavailable` without
+erasing independently available chart data. The route and generated OpenAPI remain
+no-store.
+
+Regression coverage exercises numerical API/UI parity across default and changed
+axes/tier/optimal/price/visibility, the shared five-page bound, legacy reads,
+case-index clamping, absent/failed media and private-URL exclusion. This does not
+claim live production API/UI equivalence or full-history completeness.
+
+### 中文说明
+
+视频公开接口默认复现当前仪表板：最多读取前五页已发布历史，复用相同的 workload、
+样本门槛、部署和数值计算，明确返回覆盖范围与截断状态。`v_hidden` 只隐藏图表和表格
+中的硬件，KPI、Compare 和 Evidence 保持原范围；`v_api` 只是视频秒参考价，不是
+TCO 或收益。默认不加载媒体；`view=compare` 才读取最多两份已发布媒体产物并返回
+匹配用例、实际索引和未配对数量，不暴露 asset URL 或原始数据包。`view=discovery`
+及原有 run/artifact 查询仍可使用；不能与 `v_*` 混用。未发布、无可比较双方和读取失败
+分别标记，不能解释为成功的空测量。该接口不承诺完整历史、质量验收或瓶颈因果结论。
 
 ## Other public surfaces
 

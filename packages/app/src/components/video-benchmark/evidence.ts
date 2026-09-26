@@ -1,12 +1,12 @@
 import { GPU_SPECS } from '@/lib/gpu-specs';
-import { deploymentKey, sharedLayoutCells } from './deployment';
+import { evidenceComparisonKey, sharedLayoutCells } from './deployment';
 import { hardwareSort } from './hardware';
 import { metricValue, type MetricOptions, type VideoPoint } from './metrics';
 import { latestVideoCells } from './points';
 
 /**
- * Compute-bound evidence read from the measured cells only: board power against
- * the recorded enforced limit, the client-concurrency plateau, and observed
+ * Descriptive evidence read from the measured cells only: board power against
+ * the recorded enforced limit, client-concurrency ratios, and observed
  * cross-hardware speedups against spec-sheet ratios. Every number is derived
  * from published observations or the GPU specs page; missing input reads as
  * null, never 0, so a panel can hide what the data does not support.
@@ -65,7 +65,11 @@ export interface PowerRange {
 export function powerRange(rows: PowerUtilizationRow[]): PowerRange | null {
   const values = rows.map((row) => row.percentOfCap).filter(finite);
   if (values.length === 0) return null;
-  return { measured: values.length, min: Math.min(...values), max: Math.max(...values) };
+  return {
+    measured: values.length,
+    min: Math.min(...values),
+    max: Math.max(...values),
+  };
 }
 
 /**
@@ -90,19 +94,19 @@ export interface ConcurrencyPlateauRow {
 }
 
 /**
- * Every measured cell against its hardware's C1 cell. On a batch-one server a
- * flat throughput ratio with latency scaling by C says client concurrency only
- * queues requests. Throughput is per participating GPU, as everywhere else.
+ * Every comparable measured cell against its hardware's C1 cell. These ratios
+ * describe the observation; they do not establish a batching or queueing mechanism.
+ * Throughput is per participating GPU, as everywhere else.
  */
 export function concurrencyPlateau(points: VideoPoint[]): ConcurrencyPlateauRow[] {
   const baseline = new Map(
     sharedLayoutCells(measuredCells(points)).map((p) => [p.hardwareKey, p] as const),
   );
-  // Only cells of the baseline's own layout are concurrency steps of that deployment;
-  // a hardware with no non-queued cell keeps its rows with null ratios.
+  // A step must match the baseline's known workload and deployment. A hardware
+  // with no C1 cell keeps its raw observations with null ratios.
   const cells = measuredCells(points).filter((p) => {
     const base = baseline.get(p.hardwareKey);
-    return base === undefined || deploymentKey(p) === deploymentKey(base);
+    return base === undefined || evidenceComparisonKey(p) === evidenceComparisonKey(base);
   });
   return cells.map((p) => {
     const base = baseline.get(p.hardwareKey);
@@ -122,7 +126,10 @@ export function concurrencyPlateau(points: VideoPoint[]): ConcurrencyPlateauRow[
   });
 }
 
-type QueuedRow = ConcurrencyPlateauRow & { throughputRatioVsC1: number; latencyRatioVsC1: number };
+type QueuedRow = ConcurrencyPlateauRow & {
+  throughputRatioVsC1: number;
+  latencyRatioVsC1: number;
+};
 const isQueued = (row: ConcurrencyPlateauRow): row is QueuedRow =>
   row.concurrency > 1 && finite(row.throughputRatioVsC1) && finite(row.latencyRatioVsC1);
 
@@ -195,7 +202,7 @@ export function specNumbers(hardwareKey: string): SpecNumbers {
 export interface ScalingVsSpecRow {
   fromKey: string;
   toKey: string;
-  /** C1 P50 of `from` over `to`: how many times faster `to` finished the same clip. */
+  /** C1 P50 of `from` over `to` for the same workload and layout. */
   observedSpeedup: number | null;
   memoryBandwidthRatio: number | null;
   bf16Ratio: number | null;
@@ -225,39 +232,6 @@ export function scalingVsSpec(points: VideoPoint[]): ScalingVsSpecRow[] {
   });
 }
 
-export interface SpeedupReading {
-  /** Spec ratio the observed speedup sits nearer to, measured in log space because ratios multiply. */
-  closest: 'bandwidth' | 'compute';
-  /** Where the observed speedup falls relative to the smallest and largest spec ratio. */
-  position: 'below' | 'between' | 'above';
-  /** False when the two log-distances are within 25 % of each other: the data does not separate them. */
-  decisive: boolean;
-}
-
-/** Ratio of near to far log-distance below which one spec ratio is called closer. */
-const DECISIVE_BELOW = 0.75;
-
-/** Null when the observed speedup or every spec ratio is missing. */
-export function readSpeedup(row: ScalingVsSpecRow): SpeedupReading | null {
-  const compute = [row.bf16Ratio, row.fp8Ratio].filter(positive);
-  if (!positive(row.observedSpeedup) || !positive(row.memoryBandwidthRatio) || compute.length === 0)
-    return null;
-  const observed = Math.log(row.observedSpeedup);
-  const toBandwidth = Math.abs(observed - Math.log(row.memoryBandwidthRatio));
-  const toCompute = Math.min(...compute.map((value) => Math.abs(observed - Math.log(value))));
-  const near = Math.min(toBandwidth, toCompute);
-  const far = Math.max(toBandwidth, toCompute);
-  const specs = [row.memoryBandwidthRatio, ...compute];
-  const lowest = Math.min(...specs);
-  const highest = Math.max(...specs);
-  return {
-    closest: toBandwidth <= toCompute ? 'bandwidth' : 'compute',
-    position:
-      row.observedSpeedup < lowest ? 'below' : row.observedSpeedup > highest ? 'above' : 'between',
-    decisive: far > 0 && near / far < DECISIVE_BELOW,
-  };
-}
-
 export interface EvidenceFacts {
   /** Participating GPUs per request when every measured cell agrees. */
   participating: number | null;
@@ -280,8 +254,10 @@ function uniform<T>(values: (T | null)[]): T | null {
 
 /** Caveat inputs read from the cells so the panel never states a number the data does not carry. */
 export function evidenceFacts(points: VideoPoint[]): EvidenceFacts {
-  const cells = measuredCells(points);
-  const shared = sharedLayoutCells(cells);
+  const measured = measuredCells(points);
+  const shared = sharedLayoutCells(measured);
+  const key = shared.length > 0 ? evidenceComparisonKey(shared[0]) : null;
+  const cells = key === null ? [] : measured.filter((p) => evidenceComparisonKey(p) === key);
   const samples = cells.map((p) => p.samples).filter(positive);
   const attention = shared.flatMap((p) =>
     p.server?.attention ? [{ hardwareKey: p.hardwareKey, attention: p.server.attention }] : [],

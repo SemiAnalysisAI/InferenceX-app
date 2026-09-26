@@ -8,6 +8,21 @@ describe('Video hardware dashboard (E2E fixtures)', () => {
     // The Compare panel fetches two published artifacts once in view; keep the spec offline.
     cy.intercept('GET', '/api/video-runs?run=*', { statusCode: 204 }).as('media');
   });
+  it('keeps hardware visibility after reload and on a shared Chinese URL', () => {
+    cy.visit('/video');
+    cy.get('[data-testid="video-hardware-chart"] circle.point').should('have.length', 3);
+    cy.contains('[data-testid="video-legend"] li', 'H100').click();
+    cy.location('search').should('contain', 'v_hidden=h100');
+    cy.get('[data-testid="video-hardware-chart"] circle.point').should('have.length', 2);
+    cy.reload();
+    cy.get('[data-testid="video-hardware-chart"] circle.point').should('have.length', 2);
+    cy.location('search').then((search) => cy.visit(`/zh/video${search}&v_view=table`));
+    cy.get('[data-testid="video-points-table"] tbody tr').should('have.length', 2);
+    cy.get('[data-testid="video-points-table"]').should('not.contain', 'H100');
+    cy.contains('[data-testid="video-legend"] li', 'H100').click();
+    cy.get('[data-testid="video-points-table"] tbody tr').should('have.length', 3);
+    cy.location('search').should('not.contain', 'v_hidden=');
+  });
   it('leads with the cross-hardware chart and restores v_ params from the URL', () => {
     cy.visit('/video?v_y=kjPerVideo&v_tier=r');
     // One measured deployment per hardware: three points, no frontier line, and the

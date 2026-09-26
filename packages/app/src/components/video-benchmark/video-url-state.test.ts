@@ -11,6 +11,17 @@ import {
 } from './video-url-state';
 
 describe('video dashboard URL state', () => {
+  it('restores hidden hardware from shared links and omits an empty selection', () => {
+    const state = readVideoDashboardState('?v_hidden=h100,b200,h100,unknown&v_tier=r');
+    expect(state.hidden).toEqual(['b200', 'h100']);
+    const shared = writeVideoDashboardState(new URL('https://x.test/video?unrelated=1'), state);
+    expect(shared.searchParams.get('v_hidden')).toBe('b200,h100');
+    expect(readVideoDashboardState(shared.search).hidden).toEqual(state.hidden);
+    expect(shared.searchParams.get('unrelated')).toBe('1');
+    expect(
+      writeVideoDashboardState(shared, { ...state, hidden: [] }).searchParams.has('v_hidden'),
+    ).toBe(false);
+  });
   it('falls back to defaults for missing or invalid params', () => {
     expect(readVideoDashboardState('')).toEqual(DEFAULT_VIDEO_DASHBOARD_STATE);
     expect(readVideoDashboardState('?v_x=bogus&v_y=nope&v_tier=z&v_view=pie&v_api=free')).toEqual(
@@ -41,6 +52,7 @@ describe('video dashboard URL state', () => {
       view: 'table',
       optimal: false,
       apiPrice: 0.047,
+      hidden: [],
     });
     expect([...X_METRICS]).toEqual(['p90Latency', 'p50Latency']);
     expect([...Y_METRICS]).toEqual([

@@ -4,6 +4,9 @@ import { storedBundle, storedFidelityBundle, type StoredArtifact } from './store
 import { servingCells } from './serving';
 import { efficiencyValue, latencyValue, tradeoffPoints } from './tradeoff';
 
+/** Shared bound for dashboard history reads in the browser and view API. */
+export const VIDEO_HISTORY_MAX_PAGES = 5;
+
 export interface VideoHistoryObservation {
   id: string;
   cell: string | null;
@@ -11,6 +14,8 @@ export interface VideoHistoryObservation {
   concurrency: number | null;
   runtime: string;
   workload: string;
+  /** Canonical plan and measurement semantics; absent/null on legacy or incomplete projections. */
+  workloadKey?: string | null;
   model: string;
   status: string;
   valid: number | null;
@@ -123,6 +128,7 @@ export function videoHistoryEntry(
             concurrency: point.concurrency,
             runtime: point.revision,
             workload: point.workloadLabel,
+            workloadKey: point.completeWorkload ? point.group : null,
             model: point.model,
             status: cell ? text(at(cell.cell, 'status')) : text(at(bundle.ci, 'phase')),
             valid: point.valid,

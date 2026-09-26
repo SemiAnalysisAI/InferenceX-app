@@ -211,7 +211,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-video-view',
-    sourceSha256: '566405f7db1eb5ea141b54384238e1b531bfe616c7fcd65b8653aed30d7ba007',
+    sourceSha256: '63a4ab1aebb979a3c4e449fa20bb24b052c3431f492ea140944a517293464248',
   },
   {
     source: 'src/app/api/v1/operatorx/runs/route.ts',
@@ -783,6 +783,87 @@ export interface ApiContractSourceDigest {
  */
 export const apiContractSourceDigests = [
   {
+    source: 'src/lib/views-api/video-dashboard.ts',
+    sourceSha256: '62bbf123e8fd9fb8ceff3724558fc99b52e842433f96266b1be4d3ed5f438036',
+    reviewArea: {
+      en: 'VideoGenX public dashboard selectors, source identity and shared numerical projection.',
+      zh: 'VideoGenX 公开仪表板的选择项、来源身份与共享数值投影。',
+    },
+  },
+  {
+    source: 'src/components/video-benchmark/history.ts',
+    sourceSha256: '4917bac6c0d272bda607697439322fd85e64683f4c63ad621e02101a8e923aae',
+    reviewArea: {
+      en: 'VideoGenX public dashboard selectors, source identity and shared numerical projection.',
+      zh: 'VideoGenX 公开仪表板的选择项、来源身份与共享数值投影。',
+    },
+  },
+  {
+    source: 'src/components/video-benchmark/metrics.ts',
+    sourceSha256: '9d5a4cd412ded8ebc3fb4a4c3b60b8fa9081e6393c901a8431a923b651f6590b',
+    reviewArea: {
+      en: 'VideoGenX public dashboard selectors, source identity and shared numerical projection.',
+      zh: 'VideoGenX 公开仪表板的选择项、来源身份与共享数值投影。',
+    },
+  },
+  {
+    source: 'src/components/video-benchmark/points.ts',
+    sourceSha256: 'a7c5313843b44a3fed1dea989024b1be689fd4952d8c0f8119f19c41e1afaab7',
+    reviewArea: {
+      en: 'VideoGenX public dashboard selectors, source identity and shared numerical projection.',
+      zh: 'VideoGenX 公开仪表板的选择项、来源身份与共享数值投影。',
+    },
+  },
+  {
+    source: 'src/components/video-benchmark/plot.ts',
+    sourceSha256: '50e15dd8ee90b9e96b8b1083294070270044abaf26f540be9cf17f594a3883e3',
+    reviewArea: {
+      en: 'VideoGenX public dashboard selectors, source identity and shared numerical projection.',
+      zh: 'VideoGenX 公开仪表板的选择项、来源身份与共享数值投影。',
+    },
+  },
+  {
+    source: 'src/components/video-benchmark/deployment.ts',
+    sourceSha256: 'f7416efa7fc30edabdefa3802775ba2bbbdcbe106b1651a200922d30cc41430d',
+    reviewArea: {
+      en: 'VideoGenX public dashboard selectors, source identity and shared numerical projection.',
+      zh: 'VideoGenX 公开仪表板的选择项、来源身份与共享数值投影。',
+    },
+  },
+  {
+    source: 'src/components/video-benchmark/evidence.ts',
+    sourceSha256: '4f57a3e2f6b3f55c4f30617db77b93d50dee79836bdc793c7299509ee1d71683',
+    reviewArea: {
+      en: 'VideoGenX public dashboard selectors, source identity and shared numerical projection.',
+      zh: 'VideoGenX 公开仪表板的选择项、来源身份与共享数值投影。',
+    },
+  },
+  {
+    source: 'src/components/video-benchmark/compare.ts',
+    sourceSha256: 'c95658b12f6d249ff13ad9b897a9e9f63983c1b210350437403da8c3b6245a38',
+    reviewArea: {
+      en: 'VideoGenX public dashboard selectors, source identity and shared numerical projection.',
+      zh: 'VideoGenX 公开仪表板的选择项、来源身份与共享数值投影。',
+    },
+  },
+  {
+    source: 'src/components/video-benchmark/compare-url-state.ts',
+    sourceSha256: '00ef527aee602e29cfec6d187d7643e2f7b7bab50e73ed67c073b4ec170e1c74',
+    reviewArea: {
+      en: 'VideoGenX public dashboard selectors, source identity and shared numerical projection.',
+      zh: 'VideoGenX 公开仪表板的选择项、来源身份与共享数值投影。',
+    },
+  },
+  {
+    source: 'src/components/video-benchmark/video-url-state.ts',
+    sourceSha256: 'deb6b936fdf5caf2562896ca8a96cb8a08fc5a61b3cde6dd38b866a9a3c27018',
+    reviewArea: {
+      en: 'VideoGenX public dashboard selectors, source identity and shared numerical projection.',
+      zh: 'VideoGenX 公开仪表板的选择项、来源身份与共享数值投影。',
+    },
+  },
+
+  {
     source: 'src/lib/views-api/upstream-error.ts',
     sourceSha256: 'c3f1b4c318e1ae771a67edd85f16d69b7316461334604fd8c892254eface715a',
     reviewArea: {
@@ -910,7 +991,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/registry.ts',
-    sourceSha256: 'e7494504b118a7706742e542b3cc3b2543823d8463ac5b32b13ebdb971c84aed',
+    sourceSha256: 'da75e54d3524ca9582443ab8c83dd301037f15cc627c314a3a9d0eed9e42bab8',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',

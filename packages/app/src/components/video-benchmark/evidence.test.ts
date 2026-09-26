@@ -8,7 +8,6 @@ import {
   plateauSummary,
   powerRange,
   powerUtilization,
-  readSpeedup,
   scalingVsSpec,
   specNumbers,
 } from './evidence';
@@ -127,12 +126,31 @@ describe('concurrencyPlateau', () => {
       queued: 6,
       throughputDeviationPct: expect.closeTo(1.437, 2),
       latency: [
-        { concurrency: 2, min: expect.closeTo(1.9706, 3), max: expect.closeTo(2.0007, 3) },
-        { concurrency: 4, min: expect.closeTo(3.9423, 3), max: expect.closeTo(3.9995, 3) },
+        {
+          concurrency: 2,
+          min: expect.closeTo(1.9706, 3),
+          max: expect.closeTo(2.0007, 3),
+        },
+        {
+          concurrency: 4,
+          min: expect.closeTo(3.9423, 3),
+          max: expect.closeTo(3.9995, 3),
+        },
       ],
     });
     expect(plateauSummary(concurrencyPlateau(c1))).toBeNull();
     expect(plateauSummary([])).toBeNull();
+  });
+  it('does not use a different or unknown workload as a concurrency step', () => {
+    const baseline = cell('h200', 1);
+    const step = cell('h200', 2);
+    for (const workloadKey of ['different-workload', null]) {
+      const rows = concurrencyPlateau([baseline, { ...step, workloadKey }]);
+      expect(rows.map((row) => row.concurrency)).toEqual([1]);
+      expect(plateauSummary(rows)).toBeNull();
+    }
+    const rows = concurrencyPlateau([baseline, { ...step, replicas: 2 }]);
+    expect(rows.map((row) => row.concurrency)).toEqual([1]);
   });
 });
 
@@ -184,27 +202,6 @@ describe('scalingVsSpec', () => {
     expect(rows[1].bf16Ratio).toBeCloseTo(2.275, 3);
     expect(rows[1].fp8Ratio).toBeCloseTo(2.2739, 3);
   });
-  it('reads which spec ratio the observed speedup sits closer to, and says when it cannot tell', () => {
-    const [h200, b200] = scalingVsSpec(points);
-    expect(readSpeedup(h200)).toEqual({ closest: 'compute', position: 'between', decisive: true });
-    expect(readSpeedup(b200)).toEqual({
-      closest: 'bandwidth',
-      position: 'between',
-      decisive: false,
-    });
-    expect(readSpeedup({ ...b200, memoryBandwidthRatio: null })).toBeNull();
-    expect(readSpeedup({ ...b200, bf16Ratio: null, fp8Ratio: null })).toBeNull();
-    expect(readSpeedup({ ...b200, observedSpeedup: 2.5 })).toEqual({
-      closest: 'compute',
-      position: 'above',
-      decisive: true,
-    });
-    expect(readSpeedup({ ...h200, observedSpeedup: 0.9 })).toEqual({
-      closest: 'compute',
-      position: 'below',
-      decisive: true,
-    });
-  });
   it('nulls every ratio for hardware missing from the specs page and needs two hardware', () => {
     const rows = scalingVsSpec([
       { ...cell('h100', 1), hardwareKey: 'gb200', id: 'gb200:c1' },
@@ -220,7 +217,6 @@ describe('scalingVsSpec', () => {
         fp8Ratio: null,
       },
     ]);
-    expect(readSpeedup(rows[0])).toBeNull();
     expect(scalingVsSpec([cell('h100', 1)])).toEqual([]);
     expect(scalingVsSpec([cell('h100', 1), { ...cell('h200', 1), p50: null }])).toEqual([]);
   });
@@ -237,7 +233,7 @@ describe('evidenceFacts', () => {
       attention: [],
     });
   });
-  it('drops a fact the cells disagree on and lists attention backends only when they differ', () => {
+  it('reads facts only from the shared workload and layout and records different attention backends', () => {
     const b200 = cell('b200', 1);
     const h200 = cell('h200', 1);
     const facts = evidenceFacts([
@@ -248,16 +244,19 @@ describe('evidenceFacts', () => {
         server: { tp: 4, ulysses: 2, attention: 'dynamic_cudnn_sdpa' },
       },
       { ...h200, server: { tp: 2, ulysses: 2, attention: 'fa' } },
-      { ...cell('h100', 1), server: null, workload: '' },
+      {
+        ...cell('h100', 1),
+        server: { tp: 2, ulysses: 2, attention: 'dynamic_cudnn_sdpa' },
+      },
     ]);
     expect(facts).toEqual({
-      participating: null,
-      tp: null,
+      participating: 4,
+      tp: 2,
       ulysses: 2,
-      samples: { min: 18, max: 20 },
+      samples: { min: 20, max: 20 },
       workload: '1344 × 768 · 8 s · 24 fps · 50 steps',
       attention: expect.arrayContaining([
-        { hardwareKey: 'b200', attention: 'dynamic_cudnn_sdpa' },
+        { hardwareKey: 'h100', attention: 'dynamic_cudnn_sdpa' },
         { hardwareKey: 'h200', attention: 'fa' },
       ]),
     });

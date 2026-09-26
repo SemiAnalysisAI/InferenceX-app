@@ -9,6 +9,7 @@ const observation: VideoHistoryObservation = {
   concurrency: 1,
   runtime: '71de97b2',
   workload: 'w',
+  workloadKey: 'formal-plan-and-semantics',
   model: 'MiniMaxAI/MiniMax-H3',
   status: 'complete',
   valid: 20,
@@ -97,6 +98,7 @@ describe('videoPoints', () => {
       artifactId: 10107476604,
       hardwareKey: 'h200',
       hardwareName: 'NVIDIA H200',
+      workloadKey: 'formal-plan-and-semantics',
       p50: 150.6,
       enforcedLimitW: 2800,
       server: { tp: 2, ulysses: 2, attention: 'auto' },
@@ -146,12 +148,14 @@ describe('videoPoints', () => {
       'avgPowerW',
       'enforcedLimitW',
       'server',
+      'workloadKey',
     ])
       delete obs[key];
     const [point] = videoPoints([legacy]);
     expect(point.participating).toBeNull();
     expect(point.wallSeconds).toBeNull();
     expect(point.server).toBeNull();
+    expect(point.workloadKey).toBeNull();
     expect(point.hardwareKey).toBe('h200');
   });
   it('keeps only the newest observation per hardware cell', () => {
@@ -231,7 +235,7 @@ describe('dashboardCells', () => {
     const pages = [
       pageOf('1', 'NVIDIA H200', [
         cell({}),
-        cell({ id: 'sha:short', cell: 'c1s', workload: SHORT }),
+        cell({ id: 'sha:short', cell: 'c1s', workload: SHORT, workloadKey: 'short-plan' }),
       ]),
       pageOf('2', 'NVIDIA B200', [cell({ id: 'sha:b1', hardware: 'NVIDIA B200' })]),
     ];
@@ -246,5 +250,36 @@ describe('dashboardCells', () => {
       videoPoints([pageOf('1', 'NVIDIA H200', [cell({ samples: 3 })])]),
     );
     expect(result).toEqual({ cells: [], workload: null, otherWorkloads: 1 });
+  });
+
+  it('does not replace the frozen workload with a newer cell whose cases differ', () => {
+    const result = dashboardCells(
+      videoPoints([
+        pageOf('3', 'NVIDIA H200', [
+          cell({ id: 'new:c1', workloadKey: 'different-prompt-and-seed' }),
+        ]),
+        pageOf('2', 'NVIDIA H200', [cell({ id: 'formal:c1' })]),
+        pageOf('1', 'NVIDIA B200', [cell({ id: 'b:c1', hardware: 'NVIDIA B200' })]),
+      ]),
+    );
+    expect(result.cells.map((p) => p.id)).toEqual(['b:c1', 'formal:c1']);
+    expect(result.otherWorkloads).toBe(1);
+    expect(result.workload).toBe(FORMAL.split(' · ').slice(0, 5).join(' · '));
+  });
+
+  it('keeps legacy cells together only inside their sealed source, never by label', () => {
+    const result = dashboardCells(
+      videoPoints([
+        pageOf('2', 'NVIDIA H200', [
+          cell({ id: 'source-a:c1', workloadKey: null }),
+          cell({ id: 'source-a:c2', cell: 'c2', concurrency: 2, workloadKey: null }),
+        ]),
+        pageOf('1', 'NVIDIA B200', [
+          cell({ id: 'source-b:c1', hardware: 'NVIDIA B200', workloadKey: undefined }),
+        ]),
+      ]),
+    );
+    expect(result.cells.map((p) => p.id)).toEqual(['source-a:c1', 'source-a:c2']);
+    expect(result.otherWorkloads).toBe(1);
   });
 });

@@ -49,6 +49,8 @@ function toPoint(
     runtime: o.runtime ?? '',
     model: o.model ?? '',
     workload: o.workload ?? '',
+    workloadKey:
+      typeof o.workloadKey === 'string' && o.workloadKey.length > 0 ? o.workloadKey : null,
     concurrency: num(o.concurrency),
     participating: num(o.participating),
     allocated: num(o.allocated),
@@ -100,9 +102,9 @@ export function latestVideoCells(points: VideoPoint[]): VideoPoint[] {
 /** Valid clips a cell needs before the dashboard counts it: the same floor as the P90 display. */
 export const DASHBOARD_SAMPLE_FLOOR = 10;
 
-/** Generation settings plus model: the first five label parts, before seeds and prompt text. */
-export function workloadGroup(point: Pick<VideoPoint, 'workload'>): string {
-  return point.workload.split(' · ').slice(0, 5).join(' · ');
+/** Unknown legacy workloads stay inside their sealed source, never merge by display label. */
+export function workloadGroup(point: Pick<VideoPoint, 'workloadKey' | 'id'>): string {
+  return point.workloadKey || `unknown:${point.id.split(':')[0]}`;
 }
 
 /**
@@ -132,27 +134,28 @@ export function dashboardCells(points: VideoPoint[]): {
       ),
     );
   }
-  let workload: string | null = null;
+  let workloadKey: string | null = null;
   for (const group of hardware.keys()) {
-    if (workload === null) {
-      workload = group;
+    if (workloadKey === null) {
+      workloadKey = group;
       continue;
     }
-    const byHardware = hardware.get(group)!.size - hardware.get(workload)!.size;
+    const byHardware = hardware.get(group)!.size - hardware.get(workloadKey)!.size;
     if (
       byHardware > 0 ||
-      (byHardware === 0 && cellKeys.get(group)!.size > cellKeys.get(workload)!.size)
+      (byHardware === 0 && cellKeys.get(group)!.size > cellKeys.get(workloadKey)!.size)
     )
-      workload = group;
+      workloadKey = group;
   }
   const others = new Set(points.map(workloadGroup));
-  if (workload !== null) others.delete(workload);
+  if (workloadKey !== null) others.delete(workloadKey);
+  const cells =
+    workloadKey === null
+      ? []
+      : latestVideoCells(qualified.filter((p) => workloadGroup(p) === workloadKey));
   return {
-    cells:
-      workload === null
-        ? []
-        : latestVideoCells(qualified.filter((p) => workloadGroup(p) === workload)),
-    workload,
+    cells,
+    workload: cells[0]?.workload.split(' · ').slice(0, 5).join(' · ') ?? null,
     otherWorkloads: others.size,
   };
 }
