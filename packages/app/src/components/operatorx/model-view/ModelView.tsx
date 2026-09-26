@@ -53,7 +53,7 @@ import { barsHeight, binTokens, gpuValues, inBin, OpBars, sizeBin } from './OpBa
 
 const DEFAULT_MODEL = 'DeepSeek-R1-0528';
 const PRECISIONS: ComputePrecision[] = ['fp4', 'fp8', 'bf16'];
-const ROW_GRID = 'grid-cols-[minmax(14rem,22rem)_minmax(0,1fr)]';
+const ROW_GRID = 'grid-cols-[minmax(16rem,28rem)_minmax(0,1fr)]';
 
 function setParam(key: string, value: string) {
   const params = new URLSearchParams(window.location.search);
@@ -81,9 +81,10 @@ function ControlGroup({
 /** A slot resolved against the data: its cases, and those at the selected size. */
 interface SlotData {
   slot: OpSlot;
-  /** Rows of its block it spans. */
+  /** Rows of its block it spans, and the row of its bars. */
   first: number;
   last: number;
+  bar: number;
   block: LayerBlock;
   model: ComparisonModel | null;
   indices: number[];
@@ -183,14 +184,13 @@ interface Box {
 function boxes(block: LayerBlock, tallPx: number): { rows: number[]; at: Map<string, Box> } {
   const rows = block.tall.map((t) => (t ? tallPx : COMPACT_PX));
   const tops = rows.map((_, r) => HEADER_PX + rows.slice(0, r).reduce((a, b) => a + b, 0));
-  const laneWidth =
-    block.lanes > 1 ? (100 - 2 * MARGIN - (block.lanes - 1) * LANE_GAP) / block.lanes : TRUNK_WIDTH;
+  const colWidth = (100 - 2 * MARGIN - (block.cols - 1) * LANE_GAP) / block.cols;
   const at = new Map<string, Box>();
   for (const n of block.nodes) {
-    const width = n.lane === null ? TRUNK_WIDTH : laneWidth;
-    const left = n.lane === null ? (100 - width) / 2 : MARGIN + n.lane * (laneWidth + LANE_GAP);
-    const h = block.tall[n.row] ? TALL_NODE_PX : COMPACT_NODE_PX;
-    const top = tops[n.row] + (rows[n.row] - h) / 2;
+    const width = n.col === null ? TRUNK_WIDTH : n.span * colWidth + (n.span - 1) * LANE_GAP;
+    const left = n.col === null ? (100 - width) / 2 : MARGIN + n.col * (colWidth + LANE_GAP);
+    const h = n.slots.length > 0 && block.tall[n.row] ? TALL_NODE_PX : COMPACT_NODE_PX;
+    const top = (tops[n.row] + tops[n.rowEnd] + rows[n.rowEnd] - h) / 2;
     at.set(n.id, { left, width, cx: left + width / 2, top, bottom: top + h });
   }
   return { rows, at };
@@ -200,21 +200,45 @@ const pct = (v: number) => `${v}%`;
 /** Grid rows of block rows `first..last`, after the title row. */
 const gridRow = (first: number, last: number) => `${first + 2} / ${last + 3}`;
 
+type Line = [number, number, number, number, boolean];
+
 /** Arrows between a block's boxes: straight down, or down, across and down. */
 function FlowEdges({ block, at }: { block: LayerBlock; at: Map<string, Box> }) {
   const marker = `operatorx-arrow-${block.id}`;
-  const lines: [number, number, number, number, boolean][] = [];
-  const route = (x0: number, y0: number, x1: number, y1: number) => {
-    if (Math.abs(x0 - x1) < 0.5) lines.push([x0, y0, x0, y1, true]);
-    else {
-      const bend = y1 - 7;
-      lines.push([x0, y0, x0, bend, false], [x0, bend, x1, bend, false], [x1, bend, x1, y1, true]);
+  const lines: Line[] = [];
+  const hits = (seg: Line, skip: Box[]) =>
+    [...at.values()].some((b) => {
+      if (skip.includes(b)) return false;
+      const [x1, y1, x2, y2] = seg;
+      return x1 === x2
+        ? x1 > b.left &&
+            x1 < b.left + b.width &&
+            Math.min(y1, y2) < b.bottom &&
+            Math.max(y1, y2) > b.top
+        : y1 > b.top &&
+            y1 < b.bottom &&
+            Math.min(x1, x2) < b.left + b.width &&
+            Math.max(x1, x2) > b.left;
+    });
+  // Down, then across just above the target; if that crosses a box, across just below the source.
+  const route = (a: Box, b: Box) => {
+    const [x0, y0, x1, y1] = [a.cx, a.bottom, b.cx, b.top];
+    if (Math.abs(x0 - x1) < 0.5) {
+      lines.push([x0, y0, x0, y1, true]);
+      return;
     }
+    const via = (bend: number): Line[] => [
+      [x0, y0, x0, bend, false],
+      [x0, bend, x1, bend, false],
+      [x1, bend, x1, y1, true],
+    ];
+    const near = via(y1 - 7);
+    lines.push(...(near.every((seg) => !hits(seg, [a, b])) ? near : via(y0 + 7)));
   };
   for (const [from, to] of block.edges) {
     const a = at.get(from);
     const b = at.get(to);
-    if (a && b) route(a.cx, a.bottom, b.cx, b.top);
+    if (a && b) route(a, b);
   }
   // The block's input splits along a bus under its title into each entry.
   const entries = block.entries.flatMap((id) => at.get(id) ?? []);
@@ -226,13 +250,7 @@ function FlowEdges({ block, at }: { block: LayerBlock; at: Map<string, Box> }) {
     lines.push(
       [50, HEADER_PX - 6, 50, bus, false],
       [Math.min(50, ...xs), bus, Math.max(50, ...xs), bus, false],
-      ...entries.map((e): [number, number, number, number, boolean] => [
-        e.cx,
-        bus,
-        e.cx,
-        e.top,
-        true,
-      ]),
+      ...entries.map((e): Line => [e.cx, bus, e.cx, e.top, true]),
     );
   }
   return (
@@ -339,7 +357,7 @@ function BlockRows({
             )}
             <div
               className="pointer-events-none relative z-[2] flex items-center"
-              style={{ gridColumn: 2, gridRow: gridRow(data.first, data.last) }}
+              style={{ gridColumn: 2, gridRow: gridRow(data.bar, data.bar) }}
             >
               {measured && data.model ? (
                 <div className="w-full">
@@ -365,18 +383,19 @@ function BlockRows({
         <FlowEdges block={block} at={at} />
         {block.nodes.map((n) => {
           const box = at.get(n.id)!;
-          const lit = n.slot !== null && hovered === n.slot.id;
+          const measured = n.slots.length > 0;
+          const lit = hovered !== null && n.slots.includes(hovered);
           return (
             <div
               key={n.id}
               title={n.title}
-              className={`absolute flex items-center justify-center overflow-hidden rounded border bg-card px-1.5 text-center leading-tight ${n.slot ? 'font-mono text-2xs text-foreground' : 'border-dashed text-2xs text-muted-foreground'} ${lit ? 'ring-2 ring-primary/60' : ''}`}
+              className={`absolute flex items-center justify-center overflow-hidden rounded border bg-card px-1.5 text-center leading-tight ${measured ? 'font-mono text-2xs text-foreground' : 'border-dashed text-2xs text-muted-foreground'} ${lit ? 'ring-2 ring-primary/60' : ''}`}
               style={{
                 left: pct(box.left),
                 width: pct(box.width),
                 top: box.top,
                 height: box.bottom - box.top,
-                borderColor: n.slot ? c.stroke : undefined,
+                borderColor: measured ? c.stroke : undefined,
               }}
               data-testid={`operatorx-model-node-${n.id}`}
             >
@@ -533,12 +552,13 @@ export function ModelView() {
     () =>
       blocks.map((block) => ({
         block,
-        slots: block.spans.map(({ slot, first, last }) => {
+        slots: block.spans.map(({ slot, first, last, bar }) => {
           const model = models[slot.op];
           return {
             slot,
             first,
             last,
+            bar,
             block,
             model,
             indices: slotCases(model?.view, slot, requested, precision),
@@ -675,7 +695,11 @@ export function ModelView() {
               <div key={block.id}>
                 {b > 0 && (
                   <div className={`grid ${ROW_GRID} gap-x-4`}>
-                    <ArrowDown className="mx-auto my-1 size-3.5 text-muted-foreground" />
+                    {block.alternative ? (
+                      <span className="my-0.5 text-center text-xs text-muted-foreground">or</span>
+                    ) : (
+                      <ArrowDown className="mx-auto my-1 size-3.5 text-muted-foreground" />
+                    )}
                   </div>
                 )}
                 <BlockRows

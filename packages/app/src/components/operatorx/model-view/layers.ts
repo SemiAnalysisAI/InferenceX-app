@@ -23,33 +23,34 @@ export interface OpSlot {
   roles: string[];
 }
 
-/** One box of a block's flow, on its own row. */
+/** One box of a block's graph. */
 export interface FlowNode {
   id: string;
   label: string;
-  /** Full role name, when the label shortens it. */
+  /** More about the box, shown on hover. */
   title?: string;
-  /** The measured op this box belongs to; null for a stage OperatorX does not measure. */
-  slot: OpSlot | null;
-  /** Parallel branch, left to right; null for the shared trunk. */
-  lane: number | null;
+  /** Ids of the measured ops that run this box: its own GEMMs, or the op covering its block. */
+  slots: string[];
+  /** Column of the block's grid, and how many it spans; null for a box across the middle. */
+  col: number | null;
+  span: number;
+  /** Rows it spans; a box with several GEMMs has a row of bars for each. */
   row: number;
+  rowEnd: number;
 }
 
-/**
- * Rows a measured op spans. A GEMM owns its row; the MoE op spans every box of its
- * block, since one measurement covers them all.
- */
+/** Rows a measured op spans, and the row holding its bars. */
 export interface SlotSpan {
   slot: OpSlot;
   first: number;
   last: number;
+  bar: number;
 }
 
 /**
  * A block drawn as the architecture explainer draws its drill-downs: boxes joined by
- * arrows, parallel branches side by side. Each box has a row of its own so the results
- * beside it line up; rows of a measured GEMM are tall enough for its bars.
+ * arrows, parallel paths side by side, stage by stage. A measured GEMM has a row of its
+ * own, tall enough for its bars.
  */
 export interface LayerBlock {
   id: string;
@@ -57,8 +58,10 @@ export interface LayerBlock {
   kind: BlockKind;
   /** How many layers repeat this block, when more than one. */
   repeat: number | null;
-  lanes: number;
-  /** Per row: whether it holds a measured GEMM's bars. */
+  /** Layers run this block or the one before it, never both. */
+  alternative: boolean;
+  cols: number;
+  /** Per row: whether it holds a row of bars. */
   tall: boolean[];
   nodes: FlowNode[];
   /** `[from, to]` node ids. */
@@ -68,59 +71,40 @@ export interface LayerBlock {
   spans: SlotSpan[];
 }
 
-type Flow = Pick<LayerBlock, 'lanes' | 'tall' | 'nodes' | 'edges' | 'entries' | 'spans'>;
-
-/**
- * Attention projections by branch and position in it: `q_a -> norm -> q_b`. Stage 1 is
- * left for the norm between a latent projection and its up-projection.
- */
-const ATTENTION_BRANCH: Record<string, [string, number]> = {
-  qkv_proj: ['qkv', 0],
-  q_proj: ['q', 0],
-  k_proj: ['k', 0],
-  v_proj: ['v', 0],
-  q_a_proj: ['q', 0],
-  q_b_proj: ['q', 2],
-  kv_a_proj_with_mqa: ['kv', 0],
-  kv_b_proj: ['kv', 2],
-  'attn.wq_a': ['q', 0],
-  'attn.wq_a+wkv': ['q', 0],
-  'attn.wq_b': ['q', 2],
-  'attn.wkv': ['kv', 0],
-  'attn.compressor.wkv+wgate': ['compressor', 0],
-  'attn.indexer.wq_b': ['indexer', 0],
-  'attn.indexer.weights_proj': ['indexer', 1],
-};
-const BRANCH_ORDER = ['qkv', 'q', 'k', 'v', 'kv', 'compressor', 'indexer'];
-const branchRank = (b: string) =>
-  BRANCH_ORDER.includes(b) ? BRANCH_ORDER.indexOf(b) : BRANCH_ORDER.length;
-/** Projections after the attention core, in order. */
-const ATTENTION_OUT = ['o_proj', 'attn.wo_a', 'attn.wo_b'];
-/** Branches whose rotary embedding the explainer draws after the projection. */
-const ROPE_BRANCHES = new Set(['qkv', 'q', 'k']);
-const FFN_ROLES = new Set(['gate_up_proj', 'down_proj', 'hc_ffn']);
-const HEAD_ROLES = ['head', 'lm_head'];
-
-type Place = 'attention' | 'ffn' | 'head' | 'other';
-
-/**
- * Where a GEMM role runs. The MoE op already covers the router, the routed experts and
- * the shared expert, so their GEMMs have no box of their own.
- */
-function place(role: string): Place | null {
-  if (role in ATTENTION_BRANCH || ATTENTION_OUT.includes(role)) return 'attention';
-  if (/^(?:attn|self_attn)\./.test(role) || role === 'hc_attn') return 'attention';
-  if (FFN_ROLES.has(role)) return 'ffn';
-  if (/^(?:experts|shared_experts?|ffn\.shared_experts|ffn\.gate$|mlp\.)/.test(role)) return null;
-  if (HEAD_ROLES.includes(role)) return 'head';
-  return 'other';
+/** A box of a hand-drawn graph, with the GEMM roles that run it. */
+interface Def {
+  id: string;
+  label: string;
+  col: number | null;
+  span?: number;
+  after?: string[];
+  roles?: string[];
+  title?: string;
+  /** Drawn only when one of its roles was measured. */
+  optional?: boolean;
 }
+
+interface Graph {
+  cols: number;
+  nodes: Def[];
+  /** Lay each box out as late as its outputs allow, so short paths end together. */
+  late?: boolean;
+}
+
+const node = (
+  id: string,
+  label: string,
+  col: number | null,
+  after: string[] = [],
+  roles: string[] = [],
+  extra: Partial<Def> = {},
+): Def => ({ id, label, col, after, roles, ...extra });
 
 /** An MTP module's layers repeat the main ones' shapes; they share the main role's box. */
 const baseRole = (role: string) => role.replace(/^mtp\./, '');
 
-const gemm = (role: string): OpSlot => ({
-  id: role,
+const gemm = (role: string, prefix: string): OpSlot => ({
+  id: `${prefix}${role}`,
   label: role,
   op: 'gemm',
   roles: [role, `mtp.${role}`],
@@ -151,157 +135,582 @@ export function slotCases(
   );
 }
 
-interface Box {
-  id: string;
-  label: string;
-  title?: string;
-  slot?: OpSlot | null;
+/** Stage of every box: its longest path from the block input, or with `late`, to the output. */
+function stages(nodes: Def[], late: boolean): Map<string, number> {
+  const early = new Map<string, number>();
+  const at = (d: Def): number => {
+    if (!early.has(d.id))
+      early.set(
+        d.id,
+        Math.max(-1, ...(d.after ?? []).map((a) => at(nodes.find((n) => n.id === a)!))) + 1,
+      );
+    return early.get(d.id)!;
+  };
+  for (const d of nodes) at(d);
+  if (!late) return early;
+  const depth = Math.max(...early.values());
+  const out = new Map<string, number>();
+  const back = (d: Def): number => {
+    if (!out.has(d.id)) {
+      const next = nodes.filter((n) => n.after?.includes(d.id));
+      out.set(d.id, next.length === 0 ? depth : Math.min(...next.map(back)) - 1);
+    }
+    return out.get(d.id)!;
+  };
+  for (const d of nodes) back(d);
+  return out;
 }
 
-/** A measured GEMM's box, labeled without the `attn.` its block already says. */
-const gemmBox = (role: string): Box => {
-  const label = role.replace(/^attn\./, '');
-  return { id: role, label, title: label === role ? undefined : role, slot: gemm(role) };
-};
+type Flow = Pick<LayerBlock, 'cols' | 'tall' | 'nodes' | 'edges' | 'entries' | 'spans'>;
 
 /**
- * Lays out parallel branches that converge into a trunk, stage by stage. A measured box
- * gets a row of its own, for its bars; a stage's unmeasured boxes share one row. With
- * `group`, one measured op covers every box, so each stage is a single row and a branch
- * shorter than the longest ends alongside it.
+ * Lays a graph out in rows and binds the measured roles to its boxes. Each stage puts its
+ * unmeasured boxes on one row, then gives each GEMM a row for its bars. With `group`, one
+ * op covers every box: its bars sit on the first row.
  */
-function flow(branches: Box[][], trunk: Box[], group: OpSlot | null = null): Flow {
-  const live = branches.filter((b) => b.length > 0);
-  const parallel = live.length > 1;
-  const nodes: FlowNode[] = [];
+function layout(full: Graph, present: Set<string>, prefix: string, group?: OpSlot): Flow {
+  const kept = full.nodes.filter((d) => !d.optional || d.roles?.some((r) => present.has(r)));
+  const ids = new Set(kept.map((d) => d.id));
+  const graph = {
+    ...full,
+    cols: Math.max(full.cols, ...kept.map((d) => (d.col ?? 0) + (d.span ?? 1))),
+    nodes: kept.map((d) => ({ ...d, after: d.after?.filter((a) => ids.has(a)) })),
+  };
+  const stage = stages(graph.nodes, Boolean(graph.late));
+  const own = new Map(
+    graph.nodes.map((d) => [d.id, (d.roles ?? []).filter((r) => present.has(r))]),
+  );
   const tall: boolean[] = [];
-  const add = (box: Box, lane: number | null, row: number) =>
-    nodes.push({
-      id: box.id,
-      label: box.label,
-      title: box.title,
-      slot: group ?? box.slot ?? null,
-      lane,
-      row,
-    });
-  const measured = (box: Box) => !group && Boolean(box.slot);
-  const depth = Math.max(0, ...live.map((b) => b.length));
-  for (let s = 0; s < depth; s++) {
-    const stage = live.flatMap((b, lane) => {
-      const box = b[group ? s - depth + b.length : s];
-      return box ? [{ box, lane: parallel ? lane : null }] : [];
-    });
-    const compact = stage.filter(({ box }) => !measured(box));
-    if (compact.length > 0) {
-      tall.push(false);
-      for (const { box, lane } of compact) add(box, lane, tall.length - 1);
+  const rows = new Map<string, number[]>();
+  const slotRow = new Map<string, number>();
+  const depth = Math.max(...stage.values());
+  for (let s = 0; s <= depth; s++) {
+    const here = graph.nodes.filter((d) => stage.get(d.id) === s);
+    const compact = here.filter((d) => own.get(d.id)!.length === 0);
+    if (compact.length > 0 || (group && s === 0)) {
+      tall.push(Boolean(group && s === 0));
+      for (const d of compact) rows.set(d.id, [tall.length - 1]);
     }
-    for (const { box, lane } of stage.filter((entry) => measured(entry.box))) {
+    const roles = [...new Set(here.flatMap((d) => own.get(d.id)!))];
+    const users = (r: string) => here.filter((d) => own.get(d.id)!.includes(r));
+    const leftmost = (r: string) => Math.min(...users(r).map((d) => d.col ?? 0));
+    roles.sort((a, b) => leftmost(a) - leftmost(b) || users(a).length - users(b).length);
+    for (const r of roles) {
       tall.push(true);
-      add(box, lane, tall.length - 1);
+      slotRow.set(r, tall.length - 1);
     }
+    for (const d of here)
+      if (own.get(d.id)!.length > 0)
+        rows.set(
+          d.id,
+          own.get(d.id)!.map((r) => slotRow.get(r)!),
+        );
   }
-  for (const box of trunk) {
-    tall.push(measured(box));
-    add(box, null, tall.length - 1);
-  }
-
-  const edges: [string, string][] = [];
-  for (const b of live) {
-    for (let i = 1; i < b.length; i++) edges.push([b[i - 1].id, b[i].id]);
-    if (trunk[0]) edges.push([b.at(-1)!.id, trunk[0].id]);
-  }
-  for (let i = 1; i < trunk.length; i++) edges.push([trunk[i - 1].id, trunk[i].id]);
-  const entries = live.length > 0 ? live.map((b) => b[0].id) : trunk.slice(0, 1).map((b) => b.id);
-  const spans: SlotSpan[] = group
-    ? [{ slot: group, first: 0, last: tall.length - 1 }]
-    : nodes.flatMap((n) => (n.slot ? [{ slot: n.slot, first: n.row, last: n.row }] : []));
-  return { lanes: parallel ? live.length : 1, tall, nodes, edges, entries, spans };
-}
-
-/** The flow with every id prefixed, for a second copy of a block. */
-function prefixed(f: Flow, prefix: string): Flow {
-  const id = (s: string) => `${prefix}${s}`;
-  const slot = (s: OpSlot) => ({ ...s, id: id(s.id) });
+  const nodes: FlowNode[] = graph.nodes.map((d) => {
+    const r = rows.get(d.id)!;
+    return {
+      id: `${prefix}${d.id}`,
+      label: d.label,
+      title: d.title,
+      slots: [...(group ? [group.id] : []), ...own.get(d.id)!.map((role) => `${prefix}${role}`)],
+      col: d.col,
+      span: d.span ?? 1,
+      row: Math.min(...r),
+      rowEnd: Math.max(...r),
+    };
+  });
+  const spans: SlotSpan[] = [
+    ...(group ? [{ slot: group, first: 0, last: tall.length - 1, bar: 0 }] : []),
+    ...[...slotRow].map(([role, row]) => ({
+      slot: gemm(role, prefix),
+      first: row,
+      last: row,
+      bar: row,
+    })),
+  ];
   return {
-    ...f,
-    nodes: f.nodes.map((n) => ({ ...n, id: id(n.id), slot: n.slot && slot(n.slot) })),
-    edges: f.edges.map(([a, b]) => [id(a), id(b)]),
-    entries: f.entries.map(id),
-    spans: f.spans.map((s) => ({ ...s, slot: slot(s.slot) })),
+    cols: graph.cols,
+    tall,
+    nodes,
+    edges: graph.nodes.flatMap((d) =>
+      (d.after ?? []).map((a): [string, string] => [`${prefix}${a}`, `${prefix}${d.id}`]),
+    ),
+    entries: graph.nodes.filter((d) => !d.after?.length).map((d) => `${prefix}${d.id}`),
+    spans,
   };
 }
 
-function attentionFlow(roles: string[]): Flow {
-  const branches = new Map<string, [number, Box][]>();
-  for (const role of roles) {
-    if (ATTENTION_OUT.includes(role)) continue;
-    const [branch, stage] = ATTENTION_BRANCH[role] ?? [role, 0];
-    branches.set(branch, [...(branches.get(branch) ?? []), [stage, gemmBox(role)]]);
-  }
-  const paths = [...branches]
-    .sort(([a], [b]) => branchRank(a) - branchRank(b) || a.localeCompare(b))
-    .map(([branch, boxes]) => {
-      const sorted = boxes.sort((a, b) => a[0] - b[0]);
-      const path: Box[] = [];
-      for (const [stage, box] of sorted) {
-        // A latent projection is normalized before its up-projection.
-        if (stage === 2 && path.length > 0) path.push({ id: `${branch}-norm`, label: 'RMSNorm' });
-        path.push(box);
-      }
-      if (ROPE_BRANCHES.has(branch) && sorted.every(([stage]) => stage === 0))
-        path.push({ id: `${branch}-rope`, label: 'RoPE' });
-      return path;
-    });
-  const out = ATTENTION_OUT.filter((r) => roles.includes(r)).map(gemmBox);
-  return flow(paths, [{ id: 'attention-core', label: 'Attention' }, ...out]);
-}
-
-/** Gate/up, activation, down; a projection is measured when the data has its role. */
-function ffnFlow(arch: ModelArchitecture | undefined, roles: string[]): Flow {
-  const box = (role: string, label: string): Box =>
-    roles.includes(role) ? gemmBox(role) : { id: role, label };
-  const act = arch ? ffnGateActivationLabel(arch) : 'SiLU';
-  return flow(
-    [],
-    [
-      box('gate_up_proj', 'Gate / up'),
-      { id: 'act', label: `${act} × up` },
-      box('down_proj', 'Down'),
-    ],
-  );
-}
-
-/** One MoE measurement runs the whole block, router through combine. */
-function moeFlow(arch: ModelArchitecture | undefined): Flow {
-  const shared = Boolean(arch?.hasSharedExpert);
-  const act = arch ? ffnGateActivationLabel(arch) : 'SiLU';
-  return flow(
-    [
-      [
-        { id: 'router', label: 'Router' },
-        { id: 'topk', label: arch?.activeExperts ? `Top-${arch.activeExperts}` : 'Top-k' },
-        { id: 'experts-gate-up', label: 'Expert gate / up' },
-        { id: 'experts-act', label: `${act} × up` },
-        { id: 'experts-down', label: 'Expert down' },
-      ],
-      shared
+/** Grouped-query (or multi-head) attention: q, k and v, each rotated, into the core. */
+function gqaGraph(opts: { qkNorm: boolean; core: string; coreTitle?: string; gated?: boolean }) {
+  const rope = opts.qkNorm ? 'Norm + RoPE' : 'RoPE';
+  const out = opts.gated ? 'gate' : 'core';
+  return {
+    cols: 3,
+    nodes: [
+      node('q', 'q_proj', 0, [], ['q_proj', 'self_attn.q_proj'], {
+        title: opts.gated ? 'Emits the queries and a per-head output gate' : undefined,
+      }),
+      node('k', 'k_proj', 1, [], ['k_proj', 'self_attn.k_proj']),
+      node('v', 'v_proj', 2, [], ['v_proj', 'self_attn.v_proj']),
+      node('qkv', 'qkv_proj', 3, [], ['qkv_proj'], {
+        optional: true,
+        title: 'q, k and v as one fused GEMM, as some engines run them',
+      }),
+      node('q-rope', rope, 0, ['q', 'qkv']),
+      node('k-rope', rope, 1, ['k', 'qkv']),
+      node('core', opts.core, null, ['q-rope', 'k-rope', 'v', 'qkv'], [], {
+        title: opts.coreTitle,
+      }),
+      ...(opts.gated
         ? [
-            { id: 'shared-gate-up', label: 'Shared gate / up' },
-            { id: 'shared-act', label: `${act} × up` },
-            { id: 'shared-down', label: 'Shared down' },
+            node('gate', '× σ(gate)', null, ['core'], [], {
+              title: 'Output gated by the sigmoid of the gate q_proj emits',
+            }),
           ]
-        : [],
+        : []),
+      node('o', 'o_proj', null, [out], ['o_proj', 'self_attn.o_proj']),
     ],
-    [{ id: 'combine', label: 'Combine' }],
-    { id: 'moe', label: 'MoE', op: 'moe', roles: [] },
-  );
+  } satisfies Graph;
 }
 
 /**
- * The model top down, as the architecture diagram draws it: embedding, the dense layers
- * (when an MoE model leads with some), the repeated layers, the final norm and head.
- * Measured GEMMs appear for the roles the data holds for this model.
+ * Multi-head latent attention: queries through a low-rank latent, keys and values from
+ * one compressed latent plus a shared rotary key. `dsa` adds DeepSeek sparse attention's
+ * lightning indexer, which scores tokens from the query latent.
+ */
+function mlaGraph(dsa: { topk: number } | null) {
+  const fused = 'fused_qkv_a_proj_with_mqa';
+  return {
+    cols: dsa ? 4 : 3,
+    nodes: [
+      node('q-a', 'q_a_proj', 0, [], ['q_a_proj', fused]),
+      node('kv-a', 'kv_a_proj_with_mqa', 1, [], ['kv_a_proj_with_mqa', fused], { span: 2 }),
+      node('q-norm', 'RMSNorm', 0, ['q-a']),
+      node('kv-norm', 'RMSNorm', 1, ['kv-a']),
+      node('k-rope', 'RoPE (k_pe)', 2, ['kv-a'], [], {
+        title: 'The rotary key part, shared by every head',
+      }),
+      node('q-b', 'q_b_proj', 0, ['q-norm'], ['q_b_proj']),
+      node('kv-b', 'kv_b_proj', 1, ['kv-norm'], ['kv_b_proj']),
+      ...(dsa
+        ? [
+            node(
+              'idx',
+              'Lightning indexer',
+              3,
+              ['q-norm'],
+              [
+                'indexer.wq_b',
+                'indexer.wk',
+                'indexer.weights_proj',
+                'self_attn.indexer.wq_b',
+                'self_attn.indexer.wk',
+              ],
+              { title: 'Scores past tokens from the query latent' },
+            ),
+            node('idx-top', `Top-${dsa.topk}`, 3, ['idx']),
+          ]
+        : []),
+      node('q-rope', 'RoPE', 0, ['q-b']),
+      node('core', dsa ? 'Sparse MLA attention' : 'MLA attention', null, [
+        'q-rope',
+        'kv-b',
+        'k-rope',
+        ...(dsa ? ['idx-top'] : []),
+      ]),
+      node('o', 'o_proj', null, ['core'], ['o_proj']),
+    ],
+  } satisfies Graph;
+}
+
+/**
+ * DeepSeek V4 attention: a low-rank query and one shared KV head over a 128-token window,
+ * plus KV compressed by a learned gated pool. Compressed-sparse (CSA) layers pool every
+ * 4 tokens and let an indexer pick which to attend; heavily compressed (HCA) layers pool
+ * every 128 and attend to them all. The output projection is grouped low rank, and
+ * hyper-connections mix the residual streams around the block.
+ */
+function v4Graph(opts: { pool: string; topk: number }) {
+  return {
+    cols: 4,
+    nodes: [
+      node('hc-pre', 'mHC pre-mix + RMSNorm', null, [], ['hc_attn'], {
+        title: 'Hyper-connections reduce the residual streams to one',
+      }),
+      node('q-a', 'wq_a', 0, ['hc-pre'], ['attn.wq_a', 'attn.wq_a+wkv']),
+      node('kv', 'wkv', 1, ['hc-pre'], ['attn.wkv', 'attn.wq_a+wkv']),
+      node(
+        'comp',
+        'Compressor',
+        2,
+        ['hc-pre'],
+        ['attn.compressor.wkv+wgate', 'attn.compressor.wkv', 'attn.compressor.wgate'],
+        { title: 'compressor.wkv + wgate' },
+      ),
+      node('q-norm', 'RMSNorm', 0, ['q-a']),
+      node('kv-norm', 'Norm + RoPE', 1, ['kv']),
+      node('pool', opts.pool, 2, ['comp']),
+      node('q-b', 'wq_b', 0, ['q-norm'], ['attn.wq_b']),
+      node('idx', 'Indexer wq_b', 3, ['q-norm'], ['attn.indexer.wq_b'], {
+        title: 'Compressed-sparse layers only: queries from the query latent',
+      }),
+      node('q-rope', 'Norm + RoPE', 0, ['q-b']),
+      node(
+        'idx-top',
+        `Top-${opts.topk}`,
+        3,
+        ['idx'],
+        [
+          'attn.indexer.weights_proj',
+          'attn.indexer.compressor.wkv+wgate',
+          'attn.indexer.compressor.wkv',
+          'attn.indexer.compressor.wgate',
+        ],
+        { title: 'The indexer’s own compressor and head weights score the pooled entries' },
+      ),
+      node('core', 'Sparse attention + sink', null, ['q-rope', 'kv-norm', 'pool', 'idx-top'], [], {
+        title: 'One shared KV head: the last 128 tokens plus the compressed entries',
+      }),
+      node('wo-a', 'wo_a', null, ['core'], ['attn.wo_a'], { title: 'Grouped low-rank output' }),
+      node('wo-b', 'wo_b', null, ['wo-a'], ['attn.wo_b']),
+      node('hc-post', 'mHC post-mix', null, ['wo-b']),
+    ],
+  } satisfies Graph;
+}
+
+/** Gated DeltaNet linear attention (Qwen3.5's three-in-four layers). */
+function deltaNetGraph() {
+  return {
+    cols: 3,
+    nodes: [
+      node(
+        'qkv',
+        'in_proj_qkv',
+        0,
+        [],
+        ['linear_attn.in_proj_qkv', 'in_proj_qkv', 'linear_attn.in_proj_qkvz', 'in_proj_qkvz'],
+      ),
+      node(
+        'ba',
+        'in_proj_b / a',
+        1,
+        [],
+        ['linear_attn.in_proj_b', 'linear_attn.in_proj_a', 'linear_attn.in_proj_ba', 'in_proj_ba'],
+        { title: 'Per-head decay and write strength' },
+      ),
+      node(
+        'z',
+        'in_proj_z',
+        2,
+        [],
+        ['linear_attn.in_proj_z', 'in_proj_z', 'linear_attn.in_proj_qkvz', 'in_proj_qkvz'],
+      ),
+      node('conv', 'Causal conv1d + SiLU', 0, ['qkv']),
+      node('delta', 'Gated delta rule', 0, ['conv', 'ba'], [], { span: 2 }),
+      node('norm', 'Gated RMSNorm', null, ['delta', 'z']),
+      node('out', 'out_proj', null, ['norm'], ['linear_attn.out_proj', 'out_proj']),
+    ],
+  } satisfies Graph;
+}
+
+const FFN_GATE_UP = ['gate_up_proj', 'gate_proj', 'up_proj', 'mlp.gate_up_proj'];
+const FFN_DOWN = ['down_proj', 'mlp.down_proj'];
+
+function ffnGraph(act: string) {
+  return {
+    cols: 1,
+    nodes: [
+      node('gate-up', 'gate_up_proj', null, [], FFN_GATE_UP),
+      node('act', `${act} × up`, null, ['gate-up']),
+      node('down', 'down_proj', null, ['act'], FFN_DOWN),
+    ],
+  } satisfies Graph;
+}
+
+interface MoeSpec {
+  routed: number;
+  topk: number;
+  shared: number;
+  /** Leading layers whose experts are picked by token id, not by the router. */
+  hash?: number;
+  /** Shared expert as separate w1 (gate) and w3 (up), as DeepSeek V4 writes it. */
+  splitShared?: boolean;
+}
+
+/**
+ * The MoE block: the router picks experts, the experts run, a shared expert runs beside
+ * them, and the results combine. One MoE measurement covers all of it; GEMMs measured on
+ * their own still get their rows.
+ */
+function moeGraph(moe: MoeSpec, act: string, hc: boolean): Graph {
+  const shared = moe.shared > 0;
+  const routedCol = shared ? 0 : null;
+  const span = shared ? 2 : 1;
+  const sharedGateUp = moe.splitShared
+    ? [
+        node('s-gate', 'w1 (gate)', 2, hc ? ['hc-pre'] : [], [
+          'ffn.shared_experts.w1',
+          'ffn.shared_experts.w1+w3',
+        ]),
+        node('s-up', 'w3 (up)', 3, hc ? ['hc-pre'] : [], [
+          'ffn.shared_experts.w3',
+          'ffn.shared_experts.w1+w3',
+        ]),
+      ]
+    : [
+        node(
+          's-gate',
+          'Shared gate / up',
+          2,
+          hc ? ['hc-pre'] : [],
+          [
+            'shared_expert.gate_up_proj',
+            'shared_experts.gate_up_proj',
+            'mlp.shared_expert.gate_up_proj',
+            'ffn.shared_experts.w1+w3',
+          ],
+          { span: 2 },
+        ),
+      ];
+  const routerLabel = 'Router';
+  return {
+    cols: shared ? 4 : 1,
+    late: true,
+    nodes: [
+      ...(hc
+        ? [
+            node('hc-pre', 'mHC pre-mix + RMSNorm', null, [], ['hc_ffn'], {
+              title: 'Hyper-connections reduce the residual streams to one',
+            }),
+          ]
+        : []),
+      node(
+        'router',
+        routerLabel,
+        routedCol,
+        hc ? ['hc-pre'] : [],
+        ['gate', 'ffn.gate', 'mlp.gate'],
+        {
+          span,
+          title: moe.hash
+            ? `The first ${moe.hash} layers pick experts by token id instead`
+            : undefined,
+        },
+      ),
+      node('topk', `Top-${moe.topk} of ${moe.routed}`, routedCol, ['router'], [], { span }),
+      node(
+        'e-gate-up',
+        'Experts gate / up',
+        routedCol,
+        ['topk'],
+        ['experts.gate_up_proj', 'experts.w13', 'experts.w1+w3'],
+        { span },
+      ),
+      node('e-act', `${act} × up`, routedCol, ['e-gate-up'], [], { span }),
+      node('e-down', 'Experts down', routedCol, ['e-act'], ['experts.down_proj', 'experts.w2'], {
+        span,
+      }),
+      ...(shared
+        ? [
+            ...sharedGateUp,
+            node(
+              's-act',
+              `${act} × up`,
+              2,
+              sharedGateUp.map((d) => d.id),
+              [],
+              { span: 2 },
+            ),
+            node(
+              's-down',
+              'Shared down',
+              2,
+              ['s-act'],
+              [
+                'shared_expert.down_proj',
+                'shared_experts.down_proj',
+                'mlp.shared_expert.down_proj',
+                'ffn.shared_experts.w2',
+              ],
+              { span: 2 },
+            ),
+          ]
+        : []),
+      node('combine', 'Weighted combine', null, ['e-down', ...(shared ? ['s-down'] : [])]),
+      ...(hc ? [node('hc-post', 'mHC post-mix', null, ['combine'])] : []),
+    ],
+  };
+}
+
+/** A layer's attention, and how many layers run it. */
+interface AttentionSpec {
+  label: string;
+  repeat: number;
+  graph: Graph;
+}
+
+/** What the view draws for a model, from its published config. */
+interface ModelSpec {
+  layers: number;
+  attention: AttentionSpec[];
+  /** Leading layers with a dense FFN in place of the MoE. */
+  dense: number;
+  moe: MoeSpec | null;
+  /** Manifold-constrained hyper-connections around every block. */
+  hc?: boolean;
+}
+
+const mla = (layers: number, dense: number, moe: MoeSpec, dsa: { topk: number } | null = null) => ({
+  layers,
+  dense,
+  moe,
+  attention: [
+    {
+      label: dsa ? 'MLA + DeepSeek sparse attention' : 'Multi-head latent attention',
+      repeat: layers,
+      graph: mlaGraph(dsa),
+    },
+  ],
+});
+
+/** Specs by model name, from each model's config.json on Hugging Face. */
+const MODEL_SPECS: [RegExp, ModelSpec][] = [
+  [/^DeepSeek-(?:R1|V3)/, mla(61, 3, { routed: 256, topk: 8, shared: 1 })],
+  [/^Kimi-K2/, mla(61, 1, { routed: 384, topk: 8, shared: 1 })],
+  [/^GLM-5/, mla(78, 3, { routed: 256, topk: 8, shared: 1 }, { topk: 2048 })],
+  [
+    /^DeepSeek-V4-Pro/,
+    {
+      layers: 61,
+      dense: 0,
+      hc: true,
+      moe: { routed: 384, topk: 6, shared: 1, hash: 3, splitShared: true },
+      attention: [
+        {
+          label: 'Hybrid attention (30 CSA + 31 HCA)',
+          repeat: 61,
+          graph: v4Graph({ pool: 'Pool ÷4 / ÷128', topk: 1024 }),
+        },
+      ],
+    },
+  ],
+  [
+    /^DeepSeek-V4/,
+    {
+      layers: 40,
+      dense: 0,
+      hc: true,
+      moe: { routed: 384, topk: 6, shared: 1, splitShared: true },
+      attention: [
+        {
+          label: 'Hybrid attention',
+          repeat: 40,
+          graph: v4Graph({ pool: 'Pool', topk: 512 }),
+        },
+      ],
+    },
+  ],
+  [
+    /^Qwen-?3\.5/,
+    {
+      layers: 60,
+      dense: 0,
+      moe: { routed: 512, topk: 10, shared: 1 },
+      attention: [
+        { label: 'Gated DeltaNet', repeat: 45, graph: deltaNetGraph() },
+        {
+          label: 'Gated attention',
+          repeat: 15,
+          graph: gqaGraph({ qkNorm: true, gated: true, core: 'Attention' }),
+        },
+      ],
+    },
+  ],
+  [
+    /^MiniMax-M2/,
+    {
+      layers: 62,
+      dense: 0,
+      moe: { routed: 256, topk: 8, shared: 0 },
+      attention: [
+        {
+          label: 'Grouped query attention',
+          repeat: 62,
+          graph: gqaGraph({ qkNorm: true, core: 'Attention' }),
+        },
+      ],
+    },
+  ],
+  [
+    /^MiniMax-M3/,
+    {
+      layers: 60,
+      dense: 3,
+      moe: { routed: 128, topk: 4, shared: 1 },
+      attention: [
+        {
+          label: 'MiniMax sparse attention',
+          repeat: 60,
+          graph: gqaGraph({
+            qkNorm: true,
+            core: 'Block-sparse attention',
+            coreTitle:
+              'Top 16 blocks of 128 tokens plus the local block; the first 3 layers attend fully',
+          }),
+        },
+      ],
+    },
+  ],
+  [
+    /^gpt-oss-120b/,
+    {
+      layers: 36,
+      dense: 0,
+      moe: { routed: 128, topk: 4, shared: 0 },
+      attention: [
+        {
+          label: 'Grouped query attention + sink',
+          repeat: 36,
+          graph: gqaGraph({
+            qkNorm: false,
+            core: 'Attention + sink',
+            coreTitle: 'Layers alternate a 128-token sliding window and full attention',
+          }),
+        },
+      ],
+    },
+  ],
+];
+
+/** A model the table does not know: drawn from the site's architecture entry. */
+function fallbackSpec(arch: ModelArchitecture | undefined, hasMoe: boolean): ModelSpec {
+  const layers = arch?.numLayers ?? 1;
+  const shared = arch?.hasSharedExpert ? (arch.sharedExperts ?? 1) : 0;
+  const moe = (arch ? arch.architectureType === 'moe' : hasMoe)
+    ? {
+        routed: (arch?.numExperts ?? 0) - shared,
+        topk: arch?.activeExperts ?? 0,
+        shared,
+      }
+    : null;
+  const dense = moe ? (arch?.denseFFNLayers ?? 0) : 0;
+  const graph =
+    arch?.attentionType === 'MLA' ? mlaGraph(null) : gqaGraph({ qkNorm: false, core: 'Attention' });
+  return {
+    layers,
+    dense,
+    moe,
+    attention: [
+      { label: arch ? `Attention (${arch.attentionType})` : 'Attention', repeat: layers, graph },
+    ],
+  };
+}
+
+/**
+ * The model top down, as the architecture diagram draws it: embedding, the layer's
+ * attention (and its variants, for hybrids), the dense FFN or MoE, the final norm and
+ * head. Every GEMM role the data holds for the model lands on the box that runs it; any
+ * the graph has no place for are listed at the end.
  */
 export function modelLayers(
   arch: ModelArchitecture | undefined,
@@ -312,89 +721,81 @@ export function modelLayers(
   const present = new Set(
     gemms ? gemms.cases.flatMap((_, i) => caseRoles(gemms, i, model).map(baseRole)) : [],
   );
-  const at = (where: Place) => [...present].filter((r) => place(r) === where).sort();
-  const attentionLabel = arch ? `Attention (${arch.attentionType})` : 'Attention';
-  const moe = arch ? arch.architectureType === 'moe' : hasMoe;
-  const layers = arch?.numLayers ?? null;
-  const dense = moe ? (arch?.denseFFNLayers ?? 0) : 0;
-  const main = layers === null ? null : layers - dense;
-  const attention = attentionFlow(at('attention'));
-  const ffn = ffnFlow(arch, at('ffn'));
+  const spec = MODEL_SPECS.find(([re]) => re.test(model))?.[1] ?? fallbackSpec(arch, hasMoe);
+  const act = arch ? ffnGateActivationLabel(arch) : 'SiLU';
+  const block = (
+    id: string,
+    label: string,
+    kind: BlockKind,
+    repeat: number | null,
+    graph: Graph,
+    extra: { alternative?: boolean; group?: OpSlot } = {},
+  ): LayerBlock => ({
+    id,
+    label,
+    kind,
+    repeat,
+    alternative: Boolean(extra.alternative),
+    ...layout(graph, present, `${id}:`, extra.group),
+  });
 
   const blocks: LayerBlock[] = [
-    {
-      id: 'embed',
-      label: 'Embedding',
-      kind: 'embedding',
-      repeat: null,
-      ...flow([], [{ id: 'embed', label: 'Token embedding' }]),
-    },
-  ];
-  if (dense > 0)
-    blocks.push(
-      {
-        id: 'dense-attention',
-        label: attentionLabel,
-        kind: 'attention',
-        repeat: dense,
-        ...prefixed(attention, 'dense-'),
-      },
-      {
-        id: 'dense-ffn',
-        label: 'Dense FFN',
-        kind: 'ffn',
-        repeat: dense,
-        ...prefixed(ffn, 'dense-'),
-      },
-    );
-  blocks.push({
-    id: 'attention',
-    label: attentionLabel,
-    kind: 'attention',
-    repeat: main,
-    ...attention,
-  });
-  if (moe) {
-    const shared = Boolean(arch?.hasSharedExpert);
-    const experts = arch?.numExperts
-      ? `${arch.numExperts} experts, top-${arch.activeExperts}${shared ? ' + shared' : ''}`
-      : null;
-    blocks.push({
-      id: 'moe',
-      label: experts ? `MoE (${experts})` : 'MoE',
-      kind: 'expert',
-      repeat: main,
-      ...moeFlow(arch),
-    });
-  } else {
-    blocks.push({ id: 'ffn', label: 'FFN', kind: 'ffn', repeat: main, ...ffn });
-  }
-  const head = at('head')[0];
-  blocks.push({
-    id: 'head',
-    label: 'Output',
-    kind: 'output',
-    repeat: null,
-    ...flow(
-      [],
-      [
-        { id: 'norm', label: 'Final norm' },
-        head ? { ...gemmBox(head), label: 'LM head' } : { id: 'lm-head', label: 'LM head' },
-      ],
+    block('embed', 'Embedding', 'embedding', null, {
+      cols: 1,
+      nodes: [node('embed', 'Token embedding', null)],
+    }),
+    ...spec.attention.map((a, i) =>
+      block(`attention-${i}`, a.label, 'attention', a.repeat, a.graph, { alternative: i > 0 }),
     ),
-  });
-  const other = at('other').map(gemmBox);
-  // Roles with no known place: listed, unconnected.
-  if (other.length > 0)
-    blocks.push({
-      id: 'other',
-      label: 'Other GEMMs',
-      kind: 'ffn',
-      repeat: null,
-      ...flow([], other),
-      edges: [],
-      entries: [],
+  ];
+  const moeLayers = spec.moe ? spec.layers - spec.dense : 0;
+  if (spec.dense > 0 || !spec.moe)
+    blocks.push(
+      block(
+        'ffn',
+        spec.moe ? 'Dense FFN' : 'FFN',
+        'ffn',
+        spec.moe ? spec.dense : spec.layers,
+        ffnGraph(act),
+      ),
+    );
+  if (spec.moe) {
+    const { routed, topk, shared } = spec.moe;
+    blocks.push(
+      block(
+        'moe',
+        routed > 0 ? `MoE (${routed} experts, top-${topk}${shared > 0 ? ' + shared' : ''})` : 'MoE',
+        'expert',
+        moeLayers,
+        moeGraph(spec.moe, act, Boolean(spec.hc)),
+        {
+          alternative: spec.dense > 0,
+          group: { id: 'moe:moe', label: 'MoE', op: 'moe', roles: [] },
+        },
+      ),
+    );
+  }
+  blocks.push(
+    block('head', 'Output', 'output', null, {
+      cols: 1,
+      nodes: [
+        ...(spec.hc ? [node('hc', 'mHC head mix', null)] : []),
+        node('norm', 'Final norm', null, spec.hc ? ['hc'] : []),
+        node('lm-head', 'lm_head', null, ['norm'], ['head', 'lm_head']),
+      ],
+    }),
+  );
+
+  const bound = new Set(blocks.flatMap((b) => b.spans.flatMap((s) => s.slot.roles)));
+  const other = [...present].filter((r) => !bound.has(r)).sort();
+  // Roles the graph has no box for: listed, unconnected.
+  if (other.length > 0) {
+    const listed = block('other', 'Other GEMMs', 'ffn', null, {
+      cols: 1,
+      nodes: other.map((r) => node(r, r, null, [], [r])),
     });
+    blocks.push({ ...listed, edges: [], entries: [] });
+  }
   return blocks;
 }
 
