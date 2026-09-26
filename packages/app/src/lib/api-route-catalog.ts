@@ -258,7 +258,7 @@ export const apiRouteCatalog = [
       en: 'OperatorX page backend; serves the case drill-down kernel timelines in the page’s own compact shape.',
       zh: 'OperatorX 页面后端；以页面自身的紧凑结构提供用例详情的 kernel 时间线。',
     },
-    sourceSha256: '2de3a5e96a2f0bf53246b0446219d1c04920e420015ce2a9cd568fb3f3af93b5',
+    sourceSha256: '141d2f1cf426f0916856c09d9c811347acdae2a30df224f17b2a183b5a171deb',
   },
 
   {

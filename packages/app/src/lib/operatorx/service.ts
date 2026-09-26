@@ -5,6 +5,7 @@
 import type { OperatorXRunRef } from '@semianalysisai/inferencex-db/operatorx/bundle';
 import {
   buildComparison,
+  comparisonCaseKey,
   type Comparison,
   type ComparisonInput,
   type ComparisonOp,
@@ -26,6 +27,7 @@ const LIST_TTL_MS = 60_000;
 const DATASET_TTL_MS = 10 * 60_000;
 const MAX_DATASETS = 32;
 const COMPARISON_TTL_MS = 5 * 60_000;
+const COMPARISON_READ_BATCH = 4;
 
 type Normalized = ReturnType<typeof normalizeBundle>;
 
@@ -78,52 +80,65 @@ export async function getResultDetail(
 
 const OP_TESTLIST_PREFIX: Record<ComparisonOp, string> = { gemm: 'gemm', moe: 'moe' };
 
-/** An op's comparison plus the kernel timeline of every result it holds, by `runId:index`. */
-interface Compared {
-  comparison: Comparison;
-  timelines: Map<string, OperatorXTimeline>;
-}
-
-const compared = new Map<ComparisonOp, { at: number; value: Promise<Compared> }>();
+const compared = new Map<ComparisonOp, { at: number; value: Promise<Comparison> }>();
 
 /**
- * The newest timing run of each (runner, testlist) holding the op, combined into one
- * cross-hardware comparison. Runs that fail to load are skipped. The timelines are
- * assembled here, once, so serving one is a lookup.
+ * Keep the newest actual result for each hardware/case/backend. A missing row only
+ * stands until an older run supplies a result; errors and unsupported results are
+ * real outcomes and remain newest-wins. Read a few bundles at a time and retain only
+ * selected rows, not every historical profile.
  */
-async function compareOp(op: ComparisonOp): Promise<Compared> {
+async function compareOp(op: ComparisonOp): Promise<Comparison> {
   const prefix = OP_TESTLIST_PREFIX[op];
-  const covered = new Set<string>();
-  const picked: OperatorXRunRef[] = [];
-  for (const run of await listRuns()) {
+  const listed = await listRuns();
+  const runs = listed.filter((run) => {
     const plan = run.plan;
-    if (!plan || plan.mode !== 'timing') continue;
-    const fresh = plan.testlists.filter(
-      (t) => t.startsWith(prefix) && !covered.has(`${plan.runner}|${t}`),
-    );
-    if (fresh.length === 0) continue;
-    for (const t of fresh) covered.add(`${plan.runner}|${t}`);
-    picked.push(run);
-  }
-  const loaded = await Promise.allSettled(picked.map((run) => normalized(run.run_id)));
-  const inputs: ComparisonInput[] = [];
-  const metrics = new Map<string, Normalized['metrics']>();
-  loaded.forEach((result, i) => {
-    if (result.status !== 'fulfilled') return;
-    inputs.push({ runner: picked[i].plan!.runner, dataset: result.value });
-    metrics.set(picked[i].run_id, result.value.metrics);
+    return plan?.mode === 'timing' && plan.testlists.some((t) => t.startsWith(prefix));
   });
-  const comparison = buildComparison(op, inputs);
-  const timelines = new Map<string, OperatorXTimeline>();
-  for (const row of comparison.rows) {
-    if (row.status !== 'ok') continue;
-    const timeline = compactTimeline(metrics.get(row.runId)?.[row.resultIndex]);
-    if (timeline) timelines.set(`${row.runId}:${row.resultIndex}`, timeline);
+  const selected = new Map<
+    string,
+    { runner: string; run: Normalized['run']; result: Normalized['results'][number] }
+  >();
+  let failedReads = 0;
+  const source = getOperatorXSource();
+  for (let i = 0; i < runs.length; i += COMPARISON_READ_BATCH) {
+    const batch = runs.slice(i, i + COMPARISON_READ_BATCH);
+    const loaded = await Promise.allSettled(
+      batch.map((run) => source.getBundle(run.run_id).then(normalizeBundle)),
+    );
+    for (const [j, outcome] of loaded.entries()) {
+      if (outcome.status === 'rejected') {
+        failedReads++;
+        continue;
+      }
+      const { run: summary, results } = outcome.value;
+      const runner = batch[j].plan!.runner;
+      for (const result of results) {
+        const key = comparisonCaseKey(op, runner, result);
+        if (key === null) continue;
+        const previous = selected.get(key);
+        if (!previous || (previous.result.status === 'missing' && result.status !== 'missing')) {
+          selected.set(key, { runner, run: summary, result });
+        }
+      }
+    }
   }
-  return { comparison, timelines };
+  if (selected.size === 0 && failedReads > 0)
+    throw new OperatorXSourceError('OperatorX run documents could not be read', 503);
+
+  const byRun = new Map<string, ComparisonInput>();
+  for (const { runner, run, result } of selected.values()) {
+    let input = byRun.get(run.runId);
+    if (!input) {
+      input = { runner, dataset: { run, results: [] } };
+      byRun.set(run.runId, input);
+    }
+    input.dataset.results.push(result);
+  }
+  return buildComparison(op, [...byRun.values()]);
 }
 
-function getCompared(op: ComparisonOp): Promise<Compared> {
+function getCompared(op: ComparisonOp): Promise<Comparison> {
   const hit = compared.get(op);
   if (hit && Date.now() - hit.at < COMPARISON_TTL_MS) return hit.value;
   const value = compareOp(op);
@@ -132,26 +147,37 @@ function getCompared(op: ComparisonOp): Promise<Compared> {
   return value;
 }
 
-export async function getComparison(op: ComparisonOp): Promise<Comparison> {
-  const { comparison } = await getCompared(op);
-  return comparison;
+export function getComparison(op: ComparisonOp): Promise<Comparison> {
+  return getCompared(op);
 }
 
 /**
- * Kernel timelines of the given `runId:index` results; null where none was profiled.
- * `known` is false when some ref is not a result of the current comparison (a stale or
- * re-ingested run), whose null must not be cached as "not profiled".
+ * Read timelines from their original stored runs. A newer comparison can replace a
+ * row without removing the older result that a client's open detail still names.
+ * `known` is false if a run or result no longer exists after re-ingest/deletion.
  */
 export async function getTimelines(
   op: ComparisonOp,
   refs: string[],
 ): Promise<{ timelines: Record<string, OperatorXTimeline | null>; known: boolean }> {
-  const { comparison, timelines } = await getCompared(op);
-  const results = new Set(comparison.rows.map((row) => `${row.runId}:${row.resultIndex}`));
-  return {
-    timelines: Object.fromEntries(refs.map((ref) => [ref, timelines.get(ref) ?? null])),
-    known: refs.every((ref) => results.has(ref)),
-  };
+  const timelines: Record<string, OperatorXTimeline | null> = {};
+  let known = true;
+  for (const ref of refs) {
+    const colon = ref.lastIndexOf(':');
+    const runId = ref.slice(0, colon);
+    const index = Number(ref.slice(colon + 1));
+    try {
+      const { results, metrics } = await normalized(runId);
+      const result = results[index];
+      if (!result || result.opType !== op) known = false;
+      timelines[ref] = result?.opType === op ? compactTimeline(metrics[index]) : null;
+    } catch (error) {
+      if (!(error instanceof OperatorXSourceError) || error.status !== 404) throw error;
+      timelines[ref] = null;
+      known = false;
+    }
+  }
+  return { timelines, known };
 }
 
 export function errorStatus(error: unknown): number {

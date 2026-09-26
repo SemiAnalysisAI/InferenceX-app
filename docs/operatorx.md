@@ -16,6 +16,11 @@ attention only; cache projection and RoPE are excluded. PyTorch expands grouped 
 before timing; AITER retains native grouped heads. Compare identical shapes,
 precisions, and backends. Other operators remain outside this view.
 
+Cross-run comparisons select the newest available result per GPU, case, and backend.
+An explicit error or unsupported result remains visible; a missing result can be
+filled by an older stored run. Kernel timelines are read from the result's stored
+run, so opening a profile still works after a newer comparison replaces that row.
+
 GEMM TFLOPS is `2*M*N*K/(latency_us*1e6)`, per GPU. An eight-GPU Slurm allocation does
 not multiply this number. The UI preserves A/B/output precision, latency, shape,
 backend, cluster, source commit, run identity, and diagnostic messages. The operator selector keeps GEMM and each attention family and routed MoE separate. Attention defaults

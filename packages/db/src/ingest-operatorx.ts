@@ -70,7 +70,7 @@ function selectShards(names: string[], runId: string, attempt: number) {
 }
 
 /** A sweep run's bundle from its artifacts in `dir`, downloading them first if asked. */
-function sweepBundle(repo: string, runId: string, dir: string, download: boolean) {
+export function sweepBundle(repo: string, runId: string, dir: string, download: boolean) {
   const run = fetchRunMeta(repo, runId);
   if (run.path !== SWEEP_WORKFLOW_PATH)
     throw new Error(`run ${runId} is not an OperatorX sweep (workflow: ${run.path})`);
@@ -179,7 +179,8 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch((error) => {
-  console.error('db:ingest:operatorx failed:', error);
-  process.exitCode = 1;
-});
+if (import.meta.main)
+  main().catch((error) => {
+    console.error('db:ingest:operatorx failed:', error);
+    process.exitCode = 1;
+  });

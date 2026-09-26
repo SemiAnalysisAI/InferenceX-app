@@ -11,9 +11,9 @@ const REF = /^[\w.-]{1,128}:\d+$/;
 const MAX_REFS = 32;
 
 /**
- * Kernel timelines of results named `runId:index` (comma-separated `r`). Re-ingest can
- * replace a run's results, so a response caches as long as the comparison it came from;
- * one naming a result the comparison does not hold is not cached at all.
+ * Kernel timelines of stored results named `runId:index` (comma-separated `r`). A
+ * replaced comparison row can still refer to its original run. A result removed by
+ * re-ingest is not cached by the HTTP response.
  */
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;

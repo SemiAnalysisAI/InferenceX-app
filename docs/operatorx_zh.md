@@ -17,6 +17,10 @@ Attention 显示 µs 延迟和有效矩阵乘法 TFLOPS，默认展示 TFLOPS，
 Attention 图表以 batch size 为横轴，保留 query/KV 长度、head 数、head dimension、
 KV rank、因果语义及 Q/K/V/输出精度。其他算子暂未纳入。
 
+跨运行比较会按 GPU、测试用例和后端选取最新的有效结果。明确报错或不支持的结果会保留；
+缺失的结果可由较早存储运行中的结果补齐。Kernel timeline 从结果所属的运行读取，
+因此新运行替换比较中的条目后，已打开的旧 profile 仍可查看。
+
 API 数据集版本 3 增加 `moe_gemm` 和可空的 `moe` 维度对象，并保留 `type`、原始 `args`
 及可空的 `attention`。不适用的算子字段为 null。现有原始数据无需迁移表结构即可读取；
 下次读取运行列表时，会根据已保存文档重建旧版读取器的摘要缓存，纳入此前未统计的 MoE。

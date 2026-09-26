@@ -141,6 +141,16 @@ function isCurrentSchema(op: ComparisonOp, a: Args): boolean {
   return op === 'gemm' ? isObj(a.a) && isObj(a.b) : isObj(a.experts);
 }
 
+/** The identity used to choose one result per GPU, case, and backend. */
+export function comparisonCaseKey(
+  op: ComparisonOp,
+  runner: string,
+  result: OperatorXDataset['results'][number],
+): string | null {
+  if (result.opType !== op || !isCurrentSchema(op, result.args)) return null;
+  return `${hardwareKey(runner)}|${stableJson(result.args)}|${result.backend}`;
+}
+
 /** Inputs newest first: the first runner's result for a case wins. */
 export function buildComparison(op: ComparisonOp, inputs: ComparisonInput[]): Comparison {
   const hardware = new Map<string, ComparisonHardware>();
@@ -153,9 +163,9 @@ export function buildComparison(op: ComparisonOp, inputs: ComparisonInput[]): Co
     const hw = hardwareKey(runner);
     let used = false;
     for (const r of dataset.results) {
-      if (r.opType !== op || !isCurrentSchema(op, r.args)) continue;
+      const key = comparisonCaseKey(op, runner, r);
+      if (key === null) continue;
       const caseKey = `${stableJson(r.args)}|${r.backend}`;
-      const key = `${hw}|${caseKey}`;
       if (rows.has(key)) continue;
       used = true;
       const sources = workloadSources(op, r.testlist, [...new Set(r.sources.map((s) => s.model))]);
