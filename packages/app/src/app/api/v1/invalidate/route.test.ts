@@ -7,8 +7,10 @@ const { mockPurgeAll, mockPurgeCollectiveX } = vi.hoisted(() => ({
 
 vi.mock('@/lib/api-cache', () => ({
   COLLECTIVEX_CACHE_SCOPE: 'collectivex',
+  OPERATORX_CACHE_SCOPE: 'operatorx',
   purgeAll: mockPurgeAll,
   purgeCollectiveX: mockPurgeCollectiveX,
+  purgeOperatorX: vi.fn(),
 }));
 
 import { POST } from './route';
