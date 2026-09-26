@@ -93,19 +93,6 @@ export function advantage(
   return model.metric.better === 'higher' ? v / r : r / v;
 }
 
-/** Best value among the selected hardware for a case, and who holds it. */
-export function best(
-  model: ComparisonModel,
-  i: number,
-): { hardware: string; value: number } | null {
-  let out: { hardware: string; value: number } | null = null;
-  for (const hw of model.hardware) {
-    const v = model.value(hw, i);
-    if (v !== null && (!out || model.better(v, out.value))) out = { hardware: hw, value: v };
-  }
-  return out;
-}
-
 /** Cases (all, or among `indices`) that every selected GPU measured OK. */
 export function commonCases(model: ComparisonModel, indices?: number[]): number[] {
   const all = indices ?? model.view.cases.map((_, i) => i);

@@ -10,6 +10,7 @@ import { Card } from '@/components/ui/card';
 import { Heading } from '@/components/ui/heading';
 import { Label } from '@/components/ui/label';
 import { MultiSelect } from '@/components/ui/multi-select';
+import { Pending } from '@/components/ui/pending';
 import { RetryableQueryError } from '@/components/ui/retryable-query-error';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { prefetchOperatorXTimelines, useOperatorXComparison } from '@/hooks/api/use-operatorx';
@@ -227,34 +228,19 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
             />
           </ControlGroup>
         </div>
-        <div
-          className={`mt-4 border-t border-border/60 pt-3 transition-opacity ${switching ? 'opacity-40' : ''}`}
-        >
+        <div className="mt-4 border-t border-border/60 pt-3">
           <CoverageStrip model={model} />
         </div>
       </Card>
-      {switching && (
-        <div
-          role="status"
-          data-testid="operatorx-switching"
-          className="sticky top-16 z-20 -mb-4 flex h-0 justify-center overflow-visible"
-        >
-          <span className="flex h-9 items-center gap-2 rounded-full border border-border bg-background px-4 text-sm text-muted-foreground shadow-md">
-            <Loader2 className="size-4 animate-spin" />
-            Loading {pending?.label ?? 'workload'}…
-          </span>
+      <Pending active={switching} label={`Loading ${pending?.label ?? 'workload'}…`}>
+        <div className="grid gap-4 lg:grid-cols-2">
+          {layout(
+            VISUALIZATIONS.filter((v) => v.ops.includes(op) && (baseline || !v.needsBaseline)),
+          ).map(({ viz, wide }) => (
+            <VizCard key={viz.id} model={model} viz={viz} wide={wide} />
+          ))}
         </div>
-      )}
-      <div
-        aria-busy={switching}
-        className={`grid gap-4 transition-opacity lg:grid-cols-2 ${switching ? 'pointer-events-none opacity-40' : ''}`}
-      >
-        {layout(
-          VISUALIZATIONS.filter((v) => v.ops.includes(op) && (baseline || !v.needsBaseline)),
-        ).map(({ viz, wide }) => (
-          <VizCard key={viz.id} model={model} viz={viz} wide={wide} />
-        ))}
-      </div>
+      </Pending>
       <CaseDetail
         op={op}
         view={view}
