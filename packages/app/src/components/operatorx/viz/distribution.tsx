@@ -46,7 +46,7 @@ function Distribution({ model }: { model: ComparisonModel }) {
         <div className="flex items-center gap-2">
           <Switch id="opx-dist-common" checked={common} onCheckedChange={setCommon} />
           <Label htmlFor="opx-dist-common" className="text-sm font-normal text-muted-foreground">
-            Only the {shared.length} cases every selected GPU ran
+            Matched only
           </Label>
         </div>
       )}
