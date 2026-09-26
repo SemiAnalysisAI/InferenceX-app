@@ -47,18 +47,20 @@ export function rankedSlices(op: ComparisonOp, cases: ComparisonCase[]): [string
   );
 }
 
-/** Where case `i` comes from: each model and the layers that run the case in it. */
-export function caseOrigin(view: ComparisonView, i: number): { model: string; roles: string }[] {
-  return view.cases[i].sources.map((s) => ({
-    model: view.models[s.model],
-    roles: s.roles.join(', '),
-  }));
+/**
+ * Where case `i` comes from: each model and the layers that run the case in it, or its
+ * testlist when no checkpoint has the shape.
+ */
+export function caseOrigin(view: ComparisonView, i: number): { label: string; value: string }[] {
+  const c = view.cases[i];
+  if (c.sources.length === 0) return [{ label: 'Testlist', value: c.testlist }];
+  return c.sources.map((s) => ({ label: view.models[s.model], value: s.roles.join(', ') }));
 }
 
 /** `caseOrigin` as tooltip rows. */
 export function originRows(view: ComparisonView, i: number): string[] {
   return caseOrigin(view, i).map(
     (o) =>
-      `<span class="text-muted-foreground">${escapeHtml(o.model)}</span> ${escapeHtml(o.roles)}`,
+      `<span class="text-muted-foreground">${escapeHtml(o.label)}</span> ${escapeHtml(o.value)}`,
   );
 }
