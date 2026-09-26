@@ -1,12 +1,9 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import type { VideoHistoryPage } from './history';
+import { VIDEO_HISTORY_MAX_PAGES, type VideoHistoryPage } from './history';
 import type { VideoPoint } from './metrics';
 import { videoPoints } from './points';
-
-/** Published pages are read newest first; the frozen campaign fits in far fewer. */
-const MAX_PAGES = 5;
 
 /** Load every published history page (bounded) and flatten it into chart points. */
 export function useVideoPoints() {
@@ -22,7 +19,7 @@ export function useVideoPoints() {
     (async () => {
       const pages: VideoHistoryPage[] = [];
       let replayed = false;
-      for (let page = 1; page <= MAX_PAGES; page++) {
+      for (let page = 1; page <= VIDEO_HISTORY_MAX_PAGES; page++) {
         const response = await fetch(`/api/video-runs?format=history&page=${page}`, {
           signal: controller.signal,
           cache: 'no-store',

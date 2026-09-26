@@ -1,5 +1,5 @@
 import { H3_API_REFERENCE } from './api-reference';
-import type { CostTier } from './hardware';
+import { VIDEO_HARDWARE_ROSTER, type CostTier } from './hardware';
 import {
   COST_TIERS,
   X_METRICS,
@@ -18,6 +18,8 @@ export interface VideoDashboardState {
   optimal: boolean;
   /** USD per video-second the API list price assumes; the dated reference unless the reader overrides it. */
   apiPrice: number;
+  /** Hardware hidden from the chart, table and CSV. */
+  hidden: string[];
 }
 
 export const DEFAULT_VIDEO_DASHBOARD_STATE: VideoDashboardState = {
@@ -27,9 +29,13 @@ export const DEFAULT_VIDEO_DASHBOARD_STATE: VideoDashboardState = {
   view: 'chart',
   optimal: true,
   apiPrice: H3_API_REFERENCE.pricePerVideoSecondUsd,
+  hidden: [],
 };
 
 const VIEWS: readonly VideoDashboardState['view'][] = ['chart', 'table'];
+
+const hiddenHardware = (keys: readonly string[]) =>
+  VIDEO_HARDWARE_ROSTER.filter(({ key }) => keys.includes(key)).map(({ key }) => key);
 
 const pick = <T extends string>(allowed: readonly T[], value: string | null, fallback: T): T =>
   allowed.includes(value as T) ? (value as T) : fallback;
@@ -65,6 +71,7 @@ export function readVideoDashboardState(search: string): VideoDashboardState {
     // Same shape as the inference tab's `i_optimal`: on unless the URL says `0`.
     optimal: p.get('v_optimal') !== '0',
     apiPrice: parseApiPrice(p.get('v_api')) ?? d.apiPrice,
+    hidden: hiddenHardware(p.get('v_hidden')?.split(',') ?? []),
   };
 }
 
@@ -81,5 +88,6 @@ export function writeVideoDashboardState(url: URL, state: VideoDashboardState): 
   set('v_optimal', state.optimal ? null : '0');
   const apiPrice = parseApiPrice(state.apiPrice);
   set('v_api', apiPrice === null || apiPrice === d.apiPrice ? null : String(apiPrice));
+  set('v_hidden', hiddenHardware(state.hidden).join(',') || null);
   return out;
 }

@@ -113,7 +113,7 @@ describe('Video hardware dashboard (retained fixture)', () => {
     cy.get('[data-testid="video-compare-toggle"]').should('have.attr', 'aria-expanded', 'false');
     cy.get('[data-testid="video-evidence-toggle"]').should('have.attr', 'aria-expanded', 'false');
     cy.contains('[data-testid="video-dashboard"] h2', 'Compare');
-    cy.contains('[data-testid="video-dashboard"] h2', 'Compute-bound evidence');
+    cy.contains('[data-testid="video-dashboard"] h2', 'Performance evidence');
     cy.get('[data-testid="video-legend"]').should('contain', 'H100').and('contain', 'MI355X');
     cy.get('[data-testid="video-legend"] [role="switch"]').should('have.length', 1);
     cy.get('[data-testid="video-optimal-only"]').should('have.attr', 'aria-checked', 'true');
@@ -193,6 +193,7 @@ describe('Video hardware dashboard (retained fixture)', () => {
     mount();
     cy.contains('[data-testid="video-legend"] li', 'H100').click();
     points().should('have.length', 2);
+    cy.location('search').should('contain', 'v_hidden=h100');
     cy.contains('button', 'Table').click();
     tableRows().should('have.length', 2);
     cy.get('[data-testid="video-points-table"]')
@@ -201,6 +202,14 @@ describe('Video hardware dashboard (retained fixture)', () => {
       .and('not.contain', 'H100');
     cy.location('search').should('contain', 'v_view=table');
     cy.get('[data-testid="video-history-section"]').should('not.have.attr', 'open');
+  });
+  it('restores hidden hardware from a shared table URL', () => {
+    mount('/video', '?v_hidden=h100&v_view=table');
+    tableRows().should('have.length', 2);
+    cy.get('[data-testid="video-points-table"]').should('not.contain', 'H100');
+    cy.contains('[data-testid="video-legend"] li', 'H100').click();
+    tableRows().should('have.length', 3);
+    cy.location('search').should('not.contain', 'v_hidden=');
   });
   it('restores v_ params from the URL and opens the history section for history deep links', () => {
     mount('/video', '?v_y=kjPerVideo&v_x=p50Latency&v_tier=r&history-hardware=H200');
@@ -267,7 +276,7 @@ describe('Video hardware dashboard (retained fixture)', () => {
     cy.get('[data-testid="video-compare-toggle"]').should('have.attr', 'aria-expanded', 'true');
     cy.get('[data-testid="video-evidence-toggle"]').click();
     cy.get('[data-testid="video-evidence-toggle"]').should('have.attr', 'aria-expanded', 'true');
-    cy.contains('h2', 'Compute-bound evidence').should('have.length', 1);
+    cy.contains('h2', 'Performance evidence').should('have.length', 1);
     mount('/video', '?v_cand=h200');
     cy.get('[data-testid="video-compare"]').should('exist');
     cy.get('[data-testid="video-compare-candidate"]').should('contain', 'H200');
@@ -323,7 +332,7 @@ describe('Video hardware dashboard (retained fixture)', () => {
     cy.get('[data-testid="video-cost-tier"]').should('contain', 'Hyperscaler 自有设备');
     cy.get('[data-testid="video-legend"]').should('contain', '仅最优');
     cy.contains('[data-testid="video-dashboard"] h2', '对比');
-    cy.contains('[data-testid="video-dashboard"] h2', '算力受限（compute-bound）的证据');
+    cy.contains('[data-testid="video-dashboard"] h2', '性能测量证据');
     cy.get('[data-testid="video-config-bar"]')
       .should('contain', 'X 轴指标')
       .and('contain', 'Y 轴指标')

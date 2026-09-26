@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { servingFixture } from './serving.fixture';
-import { at, entries } from './bundle';
+import { at, entries, type Json } from './bundle';
 import { videoHistoryEntry } from './history';
 import type { StoredArtifact } from './stored';
 
@@ -28,7 +28,54 @@ function saved(): StoredArtifact {
     ],
   };
 }
+
+function changePlans(artifact: StoredArtifact, change: (plan: Json) => void) {
+  for (const [path, document] of artifact.sources[0].documents) {
+    const plan = at(document, path === 'manifest.json' ? 'workload_plan' : 'plan');
+    if (plan !== null) change(plan);
+  }
+}
+
 describe('video history projection', () => {
+  it('preserves case and generation identity independently of the display label', () => {
+    const artifact = saved();
+    const prefix = 'A drummer taps a snare drum. '.repeat(4);
+    changePlans(artifact, (plan) => {
+      Object.assign(at(plan, 'cases', 0)!, { prompt: `${prefix}First ending.` });
+    });
+    const baseline = videoHistoryEntry(artifact, null).sources[0].observations[0];
+    expect(baseline.workloadKey).toEqual(expect.any(String));
+    for (const change of [
+      (plan: Json) => Object.assign(at(plan, 'cases', 0)!, { prompt: `${prefix}Other ending.` }),
+      (plan: Json) => Object.assign(at(plan, 'cases', 0)!, { seed: 999 }),
+      (plan: Json) => Object.assign(at(plan, 'generation')!, { flow_shift: 7 }),
+    ]) {
+      const changed = structuredClone(artifact);
+      changePlans(changed, change);
+      const source = videoHistoryEntry(changed, null).sources[0];
+      expect(source.error).toBeNull();
+      expect(source.observations[0].workloadKey).not.toBe(baseline.workloadKey);
+    }
+    const semantics = structuredClone(artifact);
+    for (const [path, document] of semantics.sources[0].documents)
+      if (path.endsWith('/spec.json'))
+        Object.assign(at(document, 'server')!, { performance_mode: 'quality' });
+    const changedSemantics = videoHistoryEntry(semantics, null).sources[0];
+    expect(changedSemantics.error).toBeNull();
+    expect(changedSemantics.observations[0].workload).toBe(baseline.workload);
+    expect(changedSemantics.observations[0].workloadKey).not.toBe(baseline.workloadKey);
+    // Repetition counts do not change the workload that was requested.
+    const repeated = structuredClone(artifact);
+    changePlans(repeated, (plan) => Object.assign(plan!, { repetitions: 8 }));
+    const repeats = videoHistoryEntry(repeated, null).sources[0];
+    expect(repeats.error).toBeNull();
+    expect(repeats.observations.map((p) => p.workloadKey)).toEqual([
+      baseline.workloadKey,
+      baseline.workloadKey,
+      baseline.workloadKey,
+    ]);
+  });
+
   it('groups concurrency cells under their original source without promoting smoke to qualification', () => {
     const entry = videoHistoryEntry(saved(), '2026-09-12T00:00:00Z');
     expect(entry.id).toBe('123.40');
@@ -90,6 +137,7 @@ describe('video history projection', () => {
       wallSeconds: null,
       avgPowerW: null,
       enforcedLimitW: null,
+      workloadKey: null,
     });
   });
   it('retains source provenance and failure when a new artifact contract is unsupported', () => {

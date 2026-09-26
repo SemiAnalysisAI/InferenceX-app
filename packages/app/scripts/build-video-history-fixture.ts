@@ -63,7 +63,7 @@ manifest.fixtures[FIXTURE_NAME] = {
   capturedAt,
   sha256: fixtureSha256(body),
   source:
-    'Retained public H3 metadata replay from original runs via videoHistoryEntry (per-cell GPU counts, board power and server layout); publication time unavailable. No new benchmark or publication.',
+    'Retained public H3 metadata replay from original runs via videoHistoryEntry (canonical workload identity, per-cell GPU counts, board power and server layout); publication time unavailable. No new benchmark or publication.',
   topLevel: fixtureTopLevel(page),
 };
 manifest.generatedAt = capturedAt;

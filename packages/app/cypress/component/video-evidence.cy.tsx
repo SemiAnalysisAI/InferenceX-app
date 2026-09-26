@@ -21,7 +21,40 @@ function mount(pathname = '/video', select = (points: VideoPoint[]) => points) {
 }
 const exhibit = (name: string) => cy.get(`[data-testid="video-evidence-${name}"]`);
 
-describe('Video compute-bound evidence (retained fixture)', () => {
+describe('Video performance evidence (retained fixture)', () => {
+  it('does not call low board power compute saturation', () => {
+    mount('/video', (points) =>
+      points
+        .filter((p) => p.hardwareKey === 'h200' && p.concurrency === 1)
+        .map((p) => ({ ...p, avgPowerW: 280 })),
+    );
+    exhibit('power-reading')
+      .should('contain', '10%')
+      .and('not.contain', 'near the cap')
+      .and('not.contain', 'compute-saturated');
+    cy.get('[data-testid="video-evidence"]').should('not.contain', 'Compute-bound evidence');
+  });
+  it('does not call higher throughput and lower latency a queueing plateau', () => {
+    mount('/video', (points) => {
+      const base = points.find((p) => p.hardwareKey === 'h200' && p.concurrency === 1)!;
+      return [
+        base,
+        {
+          ...base,
+          id: 'synthetic-c2',
+          concurrency: 2,
+          wallSeconds: base.wallSeconds! / 2,
+          p50: base.p50! / 2,
+        },
+      ];
+    });
+    exhibit('plateau-reading')
+      .should('contain', '100.0%')
+      .and('contain', '0.50× at C2')
+      .and('not.contain', 'rises')
+      .and('not.contain', 'queues requests');
+    exhibit('plateau').should('not.contain', 'Client concurrency plateau');
+  });
   it('reads board power against the recorded enforced limit per measured hardware', () => {
     mount();
     exhibit('power').find('[data-testid="video-evidence-power-row"]').should('have.length', 3);
@@ -66,7 +99,7 @@ describe('Video compute-bound evidence (retained fixture)', () => {
       .should('match', /width:\s*100%/u);
     exhibit('power-reading').should('contain', 'H200 ran at 102% of its enforced power limit');
   });
-  it('tabulates the concurrency plateau with ratios against each hardware C1 cell', () => {
+  it('tabulates concurrency measurements with ratios against each hardware C1 cell', () => {
     mount();
     exhibit('plateau').find('tbody tr').should('have.length', 9);
     exhibit('plateau').find('tbody th[scope="rowgroup"]').should('have.length', 3);
@@ -93,12 +126,12 @@ describe('Video compute-bound evidence (retained fixture)', () => {
       .should('contain', '5.97')
       .and('contain', '150.6');
     exhibit('plateau-reading')
-      .should('contain', 'Across 6 queued cells')
-      .and('contain', 'within 1.4% of C1')
+      .should('contain', 'Across 6 cells above C1')
+      .and('contain', 'largest deviation in throughput per GPU-hour from C1 is 1.4%')
       .and('contain', '1.97–2.00× at C2 and 3.94–4.00× at C4')
-      .and('contain', 'queues requests instead of batching them');
+      .and('contain', 'These ratios alone do not establish queueing or batching');
   });
-  it('compares observed speedups with spec-sheet ratios and hedges when they do not separate', () => {
+  it('compares observed speedups with spec-sheet ratios without attributing a bottleneck', () => {
     mount();
     exhibit('scaling').find('[data-testid="video-evidence-scaling-row"]').should('have.length', 2);
     exhibit('scaling')
@@ -107,50 +140,54 @@ describe('Video compute-bound evidence (retained fixture)', () => {
       .and('contain', 'H200')
       .and('contain', '1.11×')
       .and('contain', '1.43×')
-      .and('contain', '1.00×')
-      .and('contain', 'closer to the FLOPS ratio');
+      .and('contain', '1.00×');
     exhibit('scaling')
       .find('[data-pair="h200-b200"]')
       .should('contain', '1.93×')
       .and('contain', '1.67×')
       .and('contain', '2.28×')
-      .and('contain', '2.27×')
-      .and('contain', 'between the two, not clearly closer to either');
+      .and('contain', '2.27×');
     exhibit('scaling-reading')
       .should('contain', 'H100 → H200: 1.11× observed vs. 1.43× bandwidth and 1.00× FLOPS')
       .and(
         'contain',
         'H200 → B200: 1.93× observed vs. 1.67× bandwidth and 2.28× (BF16) / 2.27× (FP8) FLOPS',
       )
-      .and('contain', 'A bandwidth-bound workload would track the bandwidth ratio');
+      .and('contain', 'Spec-sheet ratios provide context, not bottleneck attribution');
     exhibit('caveats')
-      .should('contain', 'Batch-one, single-replica server')
+      .should('contain', 'Client concurrency is not observed batch size or replica count')
       .and('contain', '4 participating GPUs per video (TP2 × Ulysses 2)')
-      .and('contain', 'allocated boards beyond those sit idle')
+      .and('contain', 'the allocated GPU count may differ')
       .and('contain', 'not node, rack or facility power')
       .and('contain', 'n = 20 clips per cell')
-      .and('contain', 'Frozen workload 1344 × 768 · 8 s · 24 fps · 50 steps');
+      .and('contain', 'Matched workload: 1344 × 768 · 8 s · 24 fps · 50 steps');
   });
-  it('renders Chinese copy on /zh/video', () => {
+  it('renders Chinese copy on /zh/video at mobile width', () => {
+    cy.viewport(390, 844);
     mount('/zh/video');
     cy.get('[data-testid="video-evidence"]')
-      .should('contain', '算力受限（compute-bound）的证据')
+      .should('contain', '性能测量证据')
       .and('contain', '板卡功率 vs. 生效功率上限')
-      .and('contain', '客户端并发平台期')
+      .and('contain', '客户端并发测量')
       .and('contain', '实测加速比 vs. 规格表比值');
     exhibit('power-reading').should(
       'contain',
       '全部 3 种实测硬件生成期间均运行在生效功率上限的 92%–97%',
     );
     exhibit('plateau-reading')
-      .should('contain', '偏差不超过 1.4%')
+      .should('contain', '最大偏差为 1.4%')
       .and('contain', 'C2 时 1.97–2.00×、C4 时 3.94–4.00×');
-    exhibit('scaling')
-      .should('contain', '更接近 FLOPS 比值')
-      .and('contain', '介于两者之间，不明显偏向任一方');
+    exhibit('scaling-reading').should('contain', '规格表比值仅供参考，不能用于判定瓶颈');
+    cy.get('[data-testid="video-evidence"]')
+      .should('not.contain', '算力饱和')
+      .and('not.contain', '出片时间升至')
+      .should(($section) => {
+        expect($section[0].scrollWidth).to.be.at.most($section[0].clientWidth);
+      });
     exhibit('caveats')
       .should('contain', '每条视频由 4 张 GPU 参与计算（TP2 × Ulysses 2）')
       .and('contain', '每个 cell n = 20 条视频');
+    cy.screenshot('video-evidence-zh-mobile', { capture: 'viewport' });
   });
   it('hides the plateau and scaling exhibits when only one hardware at C1 is measured', () => {
     mount('/video', (points) =>

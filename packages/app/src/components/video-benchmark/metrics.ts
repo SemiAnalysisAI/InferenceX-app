@@ -12,6 +12,8 @@ export interface VideoPoint {
   model: string;
   /** Human-readable workload summary from the projection (resolution · duration · fps · steps · model @ rev · seeds · prompt). */
   workload: string;
+  /** Canonical plan and measurement semantics, independent of the display label. */
+  workloadKey?: string | null;
   concurrency: number | null;
   /** Boards that generated the clip: the denominator of every per-GPU metric. */
   participating: number | null;

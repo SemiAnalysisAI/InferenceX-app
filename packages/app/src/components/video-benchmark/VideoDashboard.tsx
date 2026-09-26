@@ -62,7 +62,7 @@ const STRINGS = {
   en: {
     title: 'VideoGenX · MiniMax-H3 across hardware',
     subtitle:
-      'One frozen workload, one model and runtime, measured on each GPU: time to video, useful output per GPU-hour and per TCO dollar, and metered GPU-board energy.',
+      'Measured GPU deployments on one workload: time to video, useful output per GPU-hour and per TCO dollar, and metered GPU-board energy. Runtime and layout details accompany each result.',
     chart: 'Chart',
     table: 'Table',
     viewToggle: 'Chart or table view',
@@ -70,9 +70,9 @@ const STRINGS = {
     optimalInfo:
       "Show only each hardware's Pareto-optimal deployments for the selected axes; turn off to see the dominated deployments faded.",
     compare: 'Compare',
-    evidence: 'Compute-bound evidence',
+    evidence: 'Performance evidence',
     toggleCompare: 'Show or hide the Compare section',
-    toggleEvidence: 'Show or hide the compute-bound evidence',
+    toggleEvidence: 'Show or hide performance evidence',
     tier: 'Cost tier',
     badges: 'TCO $/chip/hr',
     source: 'Source',
@@ -96,16 +96,16 @@ const STRINGS = {
   zh: {
     title: 'VideoGenX · MiniMax-H3 跨硬件对比',
     subtitle:
-      '固定的工作负载、模型与运行时，在每种 GPU 上实测：出片时间、每 GPU 小时和每美元 TCO 的有效产出，以及 GPU 板卡的实测能耗。',
+      '同一工作负载在不同 GPU 部署下的实测结果：出片时间、每 GPU 小时和每美元 TCO 的有效产出，以及 GPU 板卡能耗。各结果同时列出 runtime 与部署配置。',
     chart: '图表',
     table: '表格',
     viewToggle: '图表或表格视图',
     optimalOnly: '仅最优',
     optimalInfo: '只显示各硬件在当前坐标轴下的 Pareto 最优部署；关闭后以淡色显示被支配的部署。',
     compare: '对比',
-    evidence: '算力受限（compute-bound）的证据',
+    evidence: '性能测量证据',
     toggleCompare: '展开或收起“对比”区块',
-    toggleEvidence: '展开或收起算力受限证据',
+    toggleEvidence: '展开或收起性能测量证据',
     tier: '成本档位',
     badges: 'TCO $/chip/hr',
     source: '来源',
@@ -141,7 +141,7 @@ export default function VideoDashboard() {
   const s = STRINGS[locale];
   const { points, loading, error, replay, retry } = useVideoPoints();
   const { state, update } = useVideoDashboardState();
-  const [hidden, setHidden] = useState<ReadonlySet<string>>(() => new Set());
+  const hidden = useMemo(() => new Set(state.hidden), [state.hidden]);
   const [legendExpanded, setLegendExpanded] = useState(true);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [compareOpen, setCompareOpen] = useState(false);
@@ -217,12 +217,10 @@ export default function VideoDashboard() {
       title: unavailable?.[locale],
       onClick: (name: string) => {
         if (!measured.has(name)) return;
-        setHidden((old) => {
-          const next = new Set(old);
-          if (next.has(name)) next.delete(name);
-          else next.add(name);
-          return next;
-        });
+        const next = new Set(hidden);
+        if (next.has(name)) next.delete(name);
+        else next.add(name);
+        update({ hidden: [...next] });
         track('video_legend_toggled', { hardware: name });
       },
     };

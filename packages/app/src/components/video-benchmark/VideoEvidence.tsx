@@ -11,7 +11,6 @@ import {
   plateauSummary,
   powerRange,
   powerUtilization,
-  readSpeedup,
   scalingVsSpec,
   type ConcurrencyPlateauRow,
   type ScalingVsSpecRow,
@@ -21,23 +20,23 @@ import { formatMetric, type VideoPoint } from './metrics';
 
 const STRINGS = {
   en: {
-    title: 'Compute-bound evidence',
+    title: 'Performance evidence',
     subtitle:
-      'Three readings from the measured cells on why this workload behaves like a compute-bound diffusion model on the pinned runtime. Every number is computed from the published runs; the wording follows the numbers.',
+      'Measurements from published cells with a known shared workload and layout. These observations do not establish the performance bottleneck.',
     power: 'Board power vs. enforced limit',
     powerHint:
       'Mean GPU-board power of the participating boards while generating, against the power limit recorded around the run, not marketing TDP.',
     powerOne: (hardware: string, share: string) =>
-      `${hardware} ran at ${share} of its enforced power limit while generating: near the cap, as a compute-saturated workload would.`,
+      `${hardware} ran at ${share} of its enforced power limit while generating. Power share alone does not identify a bottleneck.`,
     powerAll: (n: number, share: string) =>
-      `All ${n} measured GPU types ran at ${share} of their enforced power limit while generating: near the cap, as a compute-saturated workload would.`,
+      `All ${n} measured GPU types ran at ${share} of their enforced power limit while generating. Power share alone does not identify a bottleneck.`,
     notRecorded: 'power or limit not recorded',
     meter: 'share of enforced power limit',
-    plateau: 'Client concurrency plateau',
+    plateau: 'Client concurrency measurements',
     plateauHint:
-      "Newest cell per hardware and client concurrency; ratios are against the same hardware's C1 cell.",
+      'Newest comparable cell per hardware and client concurrency; ratios use C1 on the same hardware, workload and layout.',
     plateauSentence: (queued: number, deviation: string, latency: string) =>
-      `Across ${queued} queued cells, throughput per GPU-hour stays within ${deviation} of C1 while P50 time to video rises to ${latency}: on the batch-one server, extra client concurrency queues requests instead of batching them.`,
+      `Across ${queued} cells above C1, the largest deviation in throughput per GPU-hour from C1 is ${deviation}; P50 time-to-video ratios are ${latency}. These ratios alone do not establish queueing or batching.`,
     at: (concurrency: number, range: string) => `${range} at C${concurrency}`,
     hardware: 'Hardware',
     c: 'C',
@@ -47,68 +46,52 @@ const STRINGS = {
     latency: '× C1 latency',
     scaling: 'Observed speedup vs. spec-sheet ratios',
     scalingHint:
-      'Consecutive hardware from slowest to fastest C1 P50. Observed = P50 ratio; spec ratios use per-GPU HBM bandwidth and dense tensor-core TFLOPS from the GPU specs page.',
+      'Consecutive hardware from slowest to fastest C1 P50 on the same workload and layout. Observed = P50 ratio; spec ratios use per-GPU HBM bandwidth and dense tensor-core TFLOPS from the GPU specs page.',
     pair: 'Pair',
     observed: 'Observed (P50 ratio)',
     bandwidth: 'Memory bandwidth',
     bf16: 'BF16 dense',
     fp8: 'FP8 dense',
-    reading: 'Reading',
-    readings: {
-      missing: 'spec missing',
-      compute: 'closer to the FLOPS ratio',
-      bandwidth: 'closer to the bandwidth ratio',
-      between: 'between the two, not clearly closer to either',
-      above: 'above both spec ratios, not clearly closer to either',
-      below: 'below both spec ratios, not clearly closer to either',
-    },
-    scalingStep: (
-      from: string,
-      to: string,
-      observed: string,
-      bandwidth: string,
-      flops: string,
-      reading: string,
-    ) =>
-      `${from} → ${to}: ${observed} observed vs. ${bandwidth} bandwidth and ${flops} FLOPS, ${reading}.`,
+    scalingStep: (from: string, to: string, observed: string, bandwidth: string, flops: string) =>
+      `${from} → ${to}: ${observed} observed vs. ${bandwidth} bandwidth and ${flops} FLOPS.`,
     scalingTail:
-      'A bandwidth-bound workload would track the bandwidth ratio; a compute-bound one the FLOPS ratio.',
+      'Spec-sheet ratios provide context, not bottleneck attribution. Identifying a compute or bandwidth bottleneck requires matched profiling or controlled experiments.',
     caveats: 'Read with these caveats',
     caveatServer:
-      'Batch-one, single-replica server: client concurrency queues requests rather than batching them.',
+      'Client concurrency is not observed batch size or replica count; these measurements alone do not qualify serving capacity.',
     caveatGpus: (n: number, recipe: string) =>
-      `${n} participating GPUs per video${recipe}; allocated boards beyond those sit idle.`,
+      `${n} participating GPUs per video${recipe}; the allocated GPU count may differ.`,
     caveatGpusUnknown: 'Participating GPUs per video differ between cells or were not recorded.',
     recipe: (tp: number, ulysses: number) => ` (TP${tp} × Ulysses ${ulysses})`,
     caveatPower:
       'GPU-board power against the recorded enforced limit; not node, rack or facility power.',
     caveatSamples: (n: string) =>
-      `n = ${n} clips per cell, one cohort per hardware: no error bars, and P90 is a display floor rather than a tail SLO.`,
+      `n = ${n} clips per cell; no uncertainty interval is shown. P90 requires enough samples for display and does not establish a tail SLO.`,
     caveatSamplesUnknown: 'Sample counts were not recorded.',
     caveatWorkload: (workload: string) =>
-      `Frozen workload ${workload}; every ratio compares the same clip across hardware.`,
-    caveatWorkloadUnknown:
-      'Cells do not share one workload label; cross-hardware ratios only hold for the same clip.',
+      `Matched workload: ${workload}. Matching uses recorded inputs and measurement semantics; runtime and hardware configuration can still differ.`,
+    caveatWorkloadUnknown: 'Ratios require a known matching workload and layout.',
     caveatAttention: (backends: string) =>
       `Attention backend differs by hardware (${backends}); each point is hardware plus its measured recipe.`,
   },
   zh: {
-    title: '算力受限（compute-bound）的证据',
+    title: '性能测量证据',
     subtitle:
-      '来自实测 cell 的三组读数，说明该工作负载在固定 runtime 上为何表现为算力受限的扩散模型。所有数字均由已发布运行计算得出，措辞以数字为准。',
+      '这些测量值来自已发布且工作负载、部署布局一致的 cell。仅凭这些读数，无法确定性能瓶颈。',
     power: '板卡功率 vs. 生效功率上限',
     powerHint:
       '生成期间各参与计算 GPU 板卡的平均功率，对照运行前后记录到的功率上限，而非标称 TDP。',
     powerOne: (hardware: string, share: string) =>
-      `${hardware} 生成期间运行在生效功率上限的 ${share}：接近上限，符合算力饱和型负载的表现。`,
+      `${hardware} 生成期间运行在生效功率上限的 ${share}。仅凭功率占比，无法判断性能瓶颈。`,
     powerAll: (n: number, share: string) =>
-      `全部 ${n} 种实测硬件生成期间均运行在生效功率上限的 ${share}：接近上限，符合算力饱和型负载的表现。`,
+      `全部 ${n} 种实测硬件生成期间均运行在生效功率上限的 ${share}。仅凭功率占比，无法判断性能瓶颈。`,
     notRecorded: '未记录功率或上限',
     meter: '占生效功率上限的比例',
-    plateau: '客户端并发平台期',
-    plateauHint: '每种硬件、每个客户端并发下最新的 cell；比值均相对同一硬件的 C1 cell。',
+    plateau: '客户端并发测量',
+    plateauHint:
+      '每种硬件、每个客户端并发下最新的可比 cell；基线为同一硬件、工作负载和部署布局下的 C1。',
     plateauSentence: (queued: number, deviation: string, latency: string) =>
-      `在 ${queued} 个排队 cell 中，每 GPU 小时吞吐量与 C1 的偏差不超过 ${deviation}，而 P50 出片时间升至 ${latency}：在 batch-one 服务器上，额外的客户端并发只是让请求排队，并没有形成 batching。`,
+      `在 ${queued} 个并发高于 C1 的 cell 中，每 GPU 小时吞吐量相对 C1 的最大偏差为 ${deviation}；P50 出片时间比值为 ${latency}。仅凭这些比值，无法确认排队或 batching 机制。`,
     at: (concurrency: number, range: string) => `C${concurrency} 时 ${range}`,
     hardware: '硬件',
     c: 'C',
@@ -118,51 +101,39 @@ const STRINGS = {
     latency: '延迟（相对 C1）',
     scaling: '实测加速比 vs. 规格表比值',
     scalingHint:
-      '按 C1 P50 从慢到快排列的相邻硬件。实测值为 P50 比值；规格比值取自 GPU 规格页的单卡 HBM 带宽与 dense tensor-core TFLOPS。',
+      '同一工作负载和部署布局下，按 C1 P50 从慢到快排列的相邻硬件。实测值为 P50 比值；规格比值取自 GPU 规格页的单卡 HBM 带宽与 dense tensor-core TFLOPS。',
     pair: '硬件对',
     observed: '实测（P50 比值）',
     bandwidth: '显存带宽',
     bf16: 'BF16 dense',
     fp8: 'FP8 dense',
-    reading: '判读',
-    readings: {
-      missing: '缺少规格',
-      compute: '更接近 FLOPS 比值',
-      bandwidth: '更接近带宽比值',
-      between: '介于两者之间，不明显偏向任一方',
-      above: '高于两个规格比值，不明显偏向任一方',
-      below: '低于两个规格比值，不明显偏向任一方',
-    },
-    scalingStep: (
-      from: string,
-      to: string,
-      observed: string,
-      bandwidth: string,
-      flops: string,
-      reading: string,
-    ) =>
-      `${from} → ${to}：实测 ${observed}，对比带宽比值 ${bandwidth}、FLOPS 比值 ${flops}，${reading}。`,
-    scalingTail: '带宽受限的负载会跟随带宽比值，算力受限的负载会跟随 FLOPS 比值。',
+    scalingStep: (from: string, to: string, observed: string, bandwidth: string, flops: string) =>
+      `${from} → ${to}：实测 ${observed}，对比带宽比值 ${bandwidth}、FLOPS 比值 ${flops}。`,
+    scalingTail:
+      '规格表比值仅供参考，不能用于判定瓶颈。确认算力或带宽瓶颈，需要在条件一致时进行 profiling 或对照实验。',
     caveats: '阅读时请注意',
-    caveatServer: 'batch-one 单副本服务器：客户端并发只会让请求排队，不会形成 batching。',
+    caveatServer: '客户端并发不等于实测 batch size 或副本数；这些测量值本身不足以验证服务容量。',
     caveatGpus: (n: number, recipe: string) =>
-      `每条视频由 ${n} 张 GPU 参与计算${recipe}；超出部分的已分配板卡处于空闲。`,
+      `每条视频由 ${n} 张 GPU 参与计算${recipe}；已分配的 GPU 数可能不同。`,
     caveatGpusUnknown: '各 cell 参与计算的 GPU 数不一致或未记录。',
     recipe: (tp: number, ulysses: number) => `（TP${tp} × Ulysses ${ulysses}）`,
     caveatPower: 'GPU 板卡级功率，对照记录到的生效上限；不是节点、机柜或设施功率。',
     caveatSamples: (n: string) =>
-      `每个 cell n = ${n} 条视频、每种硬件一个批次：没有误差棒；P90 仅在样本数达到显示门槛时展示，不能当作尾延迟 SLO。`,
+      `每个 cell n = ${n} 条视频；未展示不确定性区间。P90 仅在样本数达到显示门槛时展示，不能据此确认尾延迟 SLO。`,
     caveatSamplesUnknown: '未记录样本数。',
     caveatWorkload: (workload: string) =>
-      `冻结的工作负载 ${workload}；所有比值都是同一条视频在不同硬件上的对比。`,
-    caveatWorkloadUnknown: '各 cell 的工作负载标签不一致；跨硬件比值只在同一条视频下成立。',
+      `已匹配的工作负载：${workload}。匹配依据为记录的输入和测量口径；runtime 和硬件配置仍可能不同。`,
+    caveatWorkloadUnknown: '只有工作负载和部署布局已知且一致时，才计算比值。',
     caveatAttention: (backends: string) =>
       `各硬件的 attention 后端不同（${backends}）；每个数据点都是“硬件 + 实测配置”。`,
   },
 };
 
 const number = (value: number, digits: number) =>
-  value.toLocaleString('en-US', { minimumFractionDigits: digits, maximumFractionDigits: digits });
+  value.toLocaleString('en-US', {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  });
 const times = (value: number | null) => (value === null ? '—' : `${number(value, 2)}×`);
 /** "92–97" or "97" when both ends print alike. */
 function span(min: number, max: number, digits: number): string {
@@ -201,8 +172,8 @@ export interface VideoEvidenceProps {
 }
 
 /**
- * Compute-bound evidence panel: board power at the enforced limit, the
- * client-concurrency plateau and observed speedups against spec-sheet ratios.
+ * Descriptive evidence panel: measured board power, client-concurrency ratios
+ * and observed speedups against spec-sheet ratios.
  * Each exhibit renders only when the measured cells support it, and every
  * sentence is built from the computed numbers; the section disappears when
  * nothing is measured.
@@ -253,11 +224,6 @@ export default function VideoEvidence({ points, colorFor }: VideoEvidenceProps) 
     const fp8 = times(row.fp8Ratio);
     return bf16 === fp8 ? bf16 : `${bf16} (BF16) / ${fp8} (FP8)`;
   };
-  const readingText = (row: ScalingVsSpecRow) => {
-    const reading = readSpeedup(row);
-    if (reading === null) return s.readings.missing;
-    return reading.decisive ? s.readings[reading.closest] : s.readings[reading.position];
-  };
   const scalingSentence =
     scaling.length === 0
       ? null
@@ -269,7 +235,6 @@ export default function VideoEvidence({ points, colorFor }: VideoEvidenceProps) 
               times(row.observedSpeedup),
               times(row.memoryBandwidthRatio),
               flops(row),
-              readingText(row),
             ),
           )
           .join(' ')} ${s.scalingTail}`;
@@ -443,7 +408,6 @@ export default function VideoEvidence({ points, colorFor }: VideoEvidenceProps) 
                     <th className={`${HEAD} text-right`}>{s.bandwidth}</th>
                     <th className={`${HEAD} text-right`}>{s.bf16}</th>
                     <th className={`${HEAD} text-right`}>{s.fp8}</th>
-                    <th className={HEAD}>{s.reading}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -466,7 +430,6 @@ export default function VideoEvidence({ points, colorFor }: VideoEvidenceProps) 
                       <td className={`${CELL} text-right`}>{times(row.memoryBandwidthRatio)}</td>
                       <td className={`${CELL} text-right`}>{times(row.bf16Ratio)}</td>
                       <td className={`${CELL} text-right`}>{times(row.fp8Ratio)}</td>
-                      <td className={CELL}>{readingText(row)}</td>
                     </tr>
                   ))}
                 </tbody>

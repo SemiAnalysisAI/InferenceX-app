@@ -36,29 +36,40 @@ export function layoutLabel(p: Layout, locale: 'en' | 'zh'): string {
   return parts.length > 0 ? parts.join(' · ') : '—';
 }
 
+/** Known workload and layout required for a measured evidence comparison. */
+export function evidenceComparisonKey(p: VideoPoint): string | null {
+  const layout = [p.participating, p.server?.tp, p.server?.ulysses, p.replicas ?? 1];
+  if (!p.workloadKey || layout.some((n) => typeof n !== 'number' || !Number.isFinite(n) || n <= 0))
+    return null;
+  return JSON.stringify([p.workloadKey, ...layout]);
+}
+
 /**
- * One non-queued cell per hardware on the deployment layout that the most
- * hardware share (ties keep the first layout in cell order), so cross-hardware
- * evidence compares like with like. A hardware without that layout falls back
- * to its lead cell. Cells arrive in hardware order and stay in it.
+ * One C1 cell per hardware on the known workload and deployment layout that the
+ * most hardware share (ties keep the first in cell order). Hardware without
+ * that workload and layout is omitted.
+ * Cells arrive in hardware order and stay in it.
  */
 export function sharedLayoutCells<T extends VideoPoint>(cells: T[]): T[] {
-  const deployments = cells.filter((p) => p.hardwareKey !== null && !isQueueing(p));
+  const deployments = cells.filter(
+    (p) => p.hardwareKey !== null && p.concurrency === 1 && evidenceComparisonKey(p) !== null,
+  );
   const hardwareByLayout = new Map<string, Set<string>>();
   for (const p of deployments) {
-    const set = hardwareByLayout.get(deploymentKey(p)) ?? new Set<string>();
+    const key = evidenceComparisonKey(p)!;
+    const set = hardwareByLayout.get(key) ?? new Set<string>();
     set.add(p.hardwareKey!);
-    hardwareByLayout.set(deploymentKey(p), set);
+    hardwareByLayout.set(key, set);
   }
   let shared: string | null = null;
   for (const [key, set] of hardwareByLayout)
     if (shared === null || set.size > hardwareByLayout.get(shared)!.size) shared = key;
   const keys = [...new Set(deployments.map((p) => p.hardwareKey!))];
   return keys.flatMap((hardwareKey) => {
-    const cell =
-      deployments.find((p) => p.hardwareKey === hardwareKey && deploymentKey(p) === shared) ??
-      leadCell(deployments, hardwareKey, { tier: 'h' });
-    return cell ? [cell as T] : [];
+    const cell = deployments.find(
+      (p) => p.hardwareKey === hardwareKey && evidenceComparisonKey(p) === shared,
+    );
+    return cell ? [cell] : [];
   });
 }
 
