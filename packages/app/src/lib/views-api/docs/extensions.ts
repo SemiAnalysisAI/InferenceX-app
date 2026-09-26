@@ -365,16 +365,6 @@ const NEW_VIEWS = {
     '每吉瓦年利润',
     { pricing: object, data: object, overlays: object, comparisons: objects },
   ],
-  operatorx: [
-    'OperatorX selected sweep',
-    'OperatorX 所选测试',
-    {
-      run: { type: ['object', 'null'], additionalProperties: true },
-      rows: objects,
-      points: objects,
-      options: object,
-    },
-  ],
   collectivex: [
     'CollectiveX EP, KV and swap views',
     'CollectiveX EP、KV 与 swap 视图',
