@@ -49,11 +49,11 @@ import {
   slotCases,
   subView,
 } from './layers';
-import { binTokens, gpuValues, inBin, OpBars, sizeBin } from './OpBars';
+import { barsHeight, binTokens, gpuValues, inBin, OpBars, sizeBin } from './OpBars';
 
 const DEFAULT_MODEL = 'DeepSeek-R1-0528';
 const PRECISIONS: ComputePrecision[] = ['fp4', 'fp8', 'bf16'];
-const ROW_GRID = 'grid-cols-[minmax(11rem,18rem)_minmax(0,1fr)_4.5rem]';
+const ROW_GRID = 'grid-cols-[minmax(14rem,22rem)_minmax(0,1fr)_4.5rem]';
 
 function setParam(key: string, value: string) {
   const params = new URLSearchParams(window.location.search);
@@ -81,6 +81,9 @@ function ControlGroup({
 /** A slot resolved against the data: its cases, and those at the selected size. */
 interface SlotData {
   slot: OpSlot;
+  /** Rows of its block it spans. */
+  first: number;
+  last: number;
   block: LayerBlock;
   model: ComparisonModel | null;
   indices: number[];
@@ -159,86 +162,235 @@ function SlotTooltip({ data, tokens }: { data: SlotData; tokens: number }) {
   );
 }
 
+const HEADER_PX = 32;
+const COMPACT_PX = 34;
+const TALL_NODE_PX = 26;
+const COMPACT_NODE_PX = 20;
+/** Box geometry, in percent of the diagram column: margins, gap between branches. */
+const MARGIN = 4;
+const LANE_GAP = 4;
+const TRUNK_WIDTH = 72;
+
+interface Box {
+  left: number;
+  width: number;
+  cx: number;
+  top: number;
+  bottom: number;
+}
+
+/** Where every box of a block sits: x in percent of the column, y in pixels. */
+function boxes(block: LayerBlock, tallPx: number): { rows: number[]; at: Map<string, Box> } {
+  const rows = block.tall.map((t) => (t ? tallPx : COMPACT_PX));
+  const tops = rows.map((_, r) => HEADER_PX + rows.slice(0, r).reduce((a, b) => a + b, 0));
+  const laneWidth =
+    block.lanes > 1 ? (100 - 2 * MARGIN - (block.lanes - 1) * LANE_GAP) / block.lanes : TRUNK_WIDTH;
+  const at = new Map<string, Box>();
+  for (const n of block.nodes) {
+    const width = n.lane === null ? TRUNK_WIDTH : laneWidth;
+    const left = n.lane === null ? (100 - width) / 2 : MARGIN + n.lane * (laneWidth + LANE_GAP);
+    const h = block.tall[n.row] ? TALL_NODE_PX : COMPACT_NODE_PX;
+    const top = tops[n.row] + (rows[n.row] - h) / 2;
+    at.set(n.id, { left, width, cx: left + width / 2, top, bottom: top + h });
+  }
+  return { rows, at };
+}
+
+const pct = (v: number) => `${v}%`;
+/** Grid rows of block rows `first..last`, after the title row. */
+const gridRow = (first: number, last: number) => `${first + 2} / ${last + 3}`;
+
+/** Arrows between a block's boxes: straight down, or down, across and down. */
+function FlowEdges({ block, at }: { block: LayerBlock; at: Map<string, Box> }) {
+  const marker = `operatorx-arrow-${block.id}`;
+  const lines: [number, number, number, number, boolean][] = [];
+  const route = (x0: number, y0: number, x1: number, y1: number) => {
+    if (Math.abs(x0 - x1) < 0.5) lines.push([x0, y0, x0, y1, true]);
+    else {
+      const bend = y1 - 7;
+      lines.push([x0, y0, x0, bend, false], [x0, bend, x1, bend, false], [x1, bend, x1, y1, true]);
+    }
+  };
+  for (const [from, to] of block.edges) {
+    const a = at.get(from);
+    const b = at.get(to);
+    if (a && b) route(a.cx, a.bottom, b.cx, b.top);
+  }
+  // The block's input splits along a bus under its title into each entry.
+  const entries = block.entries.flatMap((id) => at.get(id) ?? []);
+  const bus = HEADER_PX + 1;
+  if (entries.length === 1 && Math.abs(entries[0].cx - 50) < 0.5)
+    lines.push([50, HEADER_PX - 6, 50, entries[0].top, true]);
+  else if (entries.length > 0) {
+    const xs = entries.map((e) => e.cx);
+    lines.push(
+      [50, HEADER_PX - 6, 50, bus, false],
+      [Math.min(50, ...xs), bus, Math.max(50, ...xs), bus, false],
+      ...entries.map((e): [number, number, number, number, boolean] => [
+        e.cx,
+        bus,
+        e.cx,
+        e.top,
+        true,
+      ]),
+    );
+  }
+  return (
+    <svg className="absolute inset-0 size-full overflow-visible text-muted-foreground" aria-hidden>
+      <defs>
+        <marker
+          id={marker}
+          viewBox="0 0 6 6"
+          refX="5"
+          refY="3"
+          markerWidth="6"
+          markerHeight="6"
+          orient="auto"
+        >
+          <path d="M0,0 L6,3 L0,6 z" fill="currentColor" />
+        </marker>
+      </defs>
+      {lines.map(([x1, y1, x2, y2, arrow], k) => (
+        <line
+          key={k}
+          x1={pct(x1)}
+          y1={y1}
+          x2={pct(x2)}
+          y2={y2}
+          stroke="currentColor"
+          strokeOpacity={0.7}
+          strokeWidth={1.25}
+          markerEnd={arrow ? `url(#${marker})` : undefined}
+        />
+      ))}
+    </svg>
+  );
+}
+
 function BlockRows({
   block,
   slots,
   tokens,
+  lanes,
   isDark,
   onOpen,
 }: {
   block: LayerBlock;
   slots: SlotData[];
   tokens: number;
+  /** GPUs shown, which sets the height of a row of bars. */
+  lanes: number;
   isDark: boolean;
   onOpen: (data: SlotData) => void;
 }) {
+  const [hovered, setHovered] = useState<string | null>(null);
   const c = BLOCK_COLORS[block.kind];
+  const { rows, at } = boxes(block, Math.max(barsHeight(lanes), 40));
   return (
-    <div className={`grid ${ROW_GRID} gap-x-4`} data-testid={`operatorx-model-block-${block.id}`}>
+    <div
+      className={`grid ${ROW_GRID} gap-x-4`}
+      style={{ gridTemplateRows: [HEADER_PX, ...rows].map((h) => `${h}px`).join(' ') }}
+      data-testid={`operatorx-model-block-${block.id}`}
+    >
       <div
         className="rounded-lg border"
         style={{
           gridColumn: 1,
-          gridRow: `1 / span ${slots.length + 1}`,
+          gridRow: '1 / -1',
           background: isDark ? c.dark : c.light,
           borderColor: c.stroke,
         }}
       />
-      <div
-        className="z-0 flex items-baseline gap-2 px-3 pt-2 pb-1"
-        style={{ gridColumn: 1, gridRow: 1 }}
-      >
+      <div className="flex items-baseline gap-2 px-3 pt-2" style={{ gridColumn: 1, gridRow: 1 }}>
         <span className="text-sm font-semibold">{block.label}</span>
         {block.repeat && block.repeat > 1 && (
           <span className="text-xs text-muted-foreground tabular-nums">×{block.repeat}</span>
         )}
       </div>
-      {slots.map((data, r) => {
-        const values = data.model ? gpuValues(data.model, data.atSize) : [];
+      {slots.map((data) => {
         const measured = data.indices.length > 0;
-        const row = (
+        const values = data.model ? gpuValues(data.model, data.atSize) : [];
+        const target = (
           <button
             type="button"
             disabled={!measured}
             onClick={() => onOpen(data)}
-            className={`z-0 col-span-3 grid grid-cols-subgrid items-center rounded-md text-left ${measured ? 'cursor-pointer hover:bg-muted/60' : 'cursor-default'}`}
-            style={{ gridColumn: '1 / -1', gridRow: r + 2 }}
+            onMouseEnter={() => setHovered(data.slot.id)}
+            onMouseLeave={() => setHovered(null)}
+            onFocus={() => setHovered(data.slot.id)}
+            onBlur={() => setHovered(null)}
+            className={`rounded-md ${measured ? 'cursor-pointer' : 'cursor-default'} ${hovered === data.slot.id && measured ? 'bg-muted/60' : ''}`}
+            style={{ gridColumn: '1 / -1', gridRow: gridRow(data.first, data.last) }}
+            aria-label={data.slot.label}
             data-testid={`operatorx-model-slot-${data.slot.id}`}
-          >
-            <span
-              className={`truncate px-3 py-1 font-mono text-xs ${measured ? '' : 'text-muted-foreground'}`}
-            >
-              {data.slot.label}
-            </span>
-            {values.length > 0 ? (
-              <OpBars model={data.model!} values={values} />
-            ) : (
-              <span className="text-xs text-muted-foreground">
-                {measured
-                  ? 'No shapes at this size'
-                  : data.slot.op
-                    ? 'No results yet'
-                    : 'Not measured'}
-              </span>
-            )}
-            <span className="text-right text-xs text-muted-foreground tabular-nums">
-              {data.atSize.length > 0 ? data.atSize.length.toLocaleString() : ''}
-            </span>
-          </button>
+          />
         );
-        return measured ? (
-          <TooltipRoot key={data.slot.id} delayDuration={150}>
-            <TooltipTrigger asChild>{row}</TooltipTrigger>
-            <TooltipContent side="top" align="center" className="w-80">
-              <SlotTooltip data={data} tokens={tokens} />
-            </TooltipContent>
-          </TooltipRoot>
-        ) : (
+        return (
           <div key={data.slot.id} className="contents">
-            {row}
+            {measured ? (
+              <TooltipRoot delayDuration={150}>
+                <TooltipTrigger asChild>{target}</TooltipTrigger>
+                <TooltipContent side="top" align="center" className="w-80">
+                  <SlotTooltip data={data} tokens={tokens} />
+                </TooltipContent>
+              </TooltipRoot>
+            ) : (
+              target
+            )}
+            <div
+              className="pointer-events-none relative z-[2] flex items-center"
+              style={{ gridColumn: 2, gridRow: gridRow(data.first, data.last) }}
+            >
+              {measured && data.model ? (
+                <div className="w-full">
+                  <OpBars
+                    model={data.model}
+                    values={values}
+                    empty={
+                      data.atSize.length > 0 ? 'No results at this size' : 'No shapes at this size'
+                    }
+                  />
+                </div>
+              ) : (
+                <span className="text-xs text-muted-foreground">No results yet</span>
+              )}
+            </div>
+            <div
+              className="pointer-events-none relative z-[2] flex items-center justify-end text-xs text-muted-foreground tabular-nums"
+              style={{ gridColumn: 3, gridRow: gridRow(data.first, data.last) }}
+            >
+              {data.atSize.length > 0 ? data.atSize.length.toLocaleString() : ''}
+            </div>
           </div>
         );
       })}
+      <div
+        className="pointer-events-none relative z-[1]"
+        style={{ gridColumn: 1, gridRow: '1 / -1' }}
+      >
+        <FlowEdges block={block} at={at} />
+        {block.nodes.map((n) => {
+          const box = at.get(n.id)!;
+          const lit = n.slot !== null && hovered === n.slot.id;
+          return (
+            <div
+              key={n.id}
+              title={n.title}
+              className={`absolute flex items-center justify-center overflow-hidden rounded border bg-card px-1.5 text-center leading-tight ${n.slot ? 'font-mono text-2xs text-foreground' : 'border-dashed text-2xs text-muted-foreground'} ${lit ? 'ring-2 ring-primary/60' : ''}`}
+              style={{
+                left: pct(box.left),
+                width: pct(box.width),
+                top: box.top,
+                height: box.bottom - box.top,
+                borderColor: n.slot ? c.stroke : undefined,
+              }}
+              data-testid={`operatorx-model-node-${n.id}`}
+            >
+              <span className="line-clamp-2 break-all">{n.label}</span>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -387,10 +539,12 @@ export function ModelView() {
     () =>
       blocks.map((block) => ({
         block,
-        slots: block.slots.map((slot) => {
-          const model = slot.op ? models[slot.op] : null;
+        slots: block.spans.map(({ slot, first, last }) => {
+          const model = models[slot.op];
           return {
             slot,
+            first,
+            last,
             block,
             model,
             indices: slotCases(model?.view, slot, requested, precision),
@@ -535,6 +689,7 @@ export function ModelView() {
                   block={block}
                   slots={slots.get(block.id) ?? []}
                   tokens={tokens}
+                  lanes={hardware.length}
                   isDark={isDark}
                   onOpen={setOpen}
                 />

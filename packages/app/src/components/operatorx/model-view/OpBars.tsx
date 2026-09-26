@@ -47,22 +47,58 @@ export function gpuValues(model: ComparisonModel, indices: number[]): GpuValue[]
   });
 }
 
-/** One bar per GPU, scaled to the row's largest value, each labeled. */
-export function OpBars({ model, values }: { model: ComparisonModel; values: GpuValue[] }) {
+const LANE_PX = 7;
+const GAP_PX = 3;
+const PAD_PX = 8;
+
+/** Height of the bars for this many GPUs. */
+export const barsHeight = (lanes: number) => lanes * LANE_PX + (lanes - 1) * GAP_PX + PAD_PX;
+
+/**
+ * One lane per selected GPU, scaled to the row's largest value, each labeled. The height
+ * depends only on the GPUs, never on which ones have data at this size, so rows keep
+ * their place as the size changes; a GPU without a value leaves its lane empty, and
+ * `empty` is shown when none has one.
+ */
+export function OpBars({
+  model,
+  values,
+  empty,
+}: {
+  model: ComparisonModel;
+  values: GpuValue[];
+  empty: string;
+}) {
+  const lanes = model.hardware.length;
+  const byHardware = new Map(values.map((v) => [v.hardware, v]));
   const max = Math.max(...values.map((v) => v.value));
   return (
-    <div className="flex h-16 flex-col justify-center gap-[3px] py-1">
-      {values.map((v) => (
-        <div key={v.hardware} className="flex h-[7px] items-center gap-2">
-          <div
-            className="h-full rounded-r-sm"
-            style={{ width: `${(v.value / max) * 85}%`, background: model.colors[v.hardware] }}
-          />
-          <span className="shrink-0 text-2xs leading-none text-muted-foreground tabular-nums">
-            {model.metric.format(v.value)}
-          </span>
-        </div>
-      ))}
+    <div
+      className="relative flex flex-col justify-center gap-[3px]"
+      style={{ height: barsHeight(lanes) }}
+    >
+      {values.length === 0 ? (
+        <span className="text-xs text-muted-foreground">{empty}</span>
+      ) : (
+        model.hardware.map((hw) => {
+          const v = byHardware.get(hw);
+          return (
+            <div key={hw} className="flex h-[7px] items-center gap-2">
+              {v && (
+                <>
+                  <div
+                    className="h-full rounded-r-sm"
+                    style={{ width: `${(v.value / max) * 85}%`, background: model.colors[hw] }}
+                  />
+                  <span className="shrink-0 text-2xs leading-none text-muted-foreground tabular-nums">
+                    {model.metric.format(v.value)}
+                  </span>
+                </>
+              )}
+            </div>
+          );
+        })
+      )}
     </div>
   );
 }
