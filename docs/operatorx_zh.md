@@ -3,8 +3,8 @@
 [English](operatorx.md) | **中文**
 
 OperatorX 与 CollectiveX 一同位于 **Hidden**，通过 ↑↑↓↓ 解锁。`/operatorx` 和
-`/zh/operatorx` 使用相同的读取器、图表、筛选和覆盖统计。`?run=<GitHub Actions run ID>`
-可查看指定运行，包括功能分支。
+`/zh/operatorx` 使用相同的读取器、图表、筛选和覆盖统计。`?run=<运行键>`
+可查看指定的已存储运行。
 
 支持 NVIDIA 和 AMD 的单卡 GEMM、MHA/GQA、物化 MLA、路由 MoE，以及 AMD AITER attention 后端。
 读取器按分片最新尝试匹配计划中的测试和后端，保留局部重跑未触及的分片，并校验来源。
@@ -16,6 +16,11 @@ Attention 显示 µs 延迟和有效矩阵乘法 TFLOPS，默认展示 TFLOPS，
 比较时需保持形状、精度和后端一致。算子选择器分别展示 GEMM、MHA/GQA、MLA 和路由 MoE。
 Attention 图表以 batch size 为横轴，保留 query/KV 长度、head 数、head dimension、
 KV rank、因果语义及 Q/K/V/输出精度。其他算子暂未纳入。
+
+跨运行比较会按 GPU、测试用例和后端选取最新的有效结果。明确报错或不支持的结果会保留；
+缺失的结果可由较早存储运行中的结果补齐。Kernel timeline 从结果所属的运行读取，
+因此新运行替换比较中的条目后，已打开的旧 profile 仍可查看。
+时间线引用包含存储版本。重新导入同一运行会生成新版本，新的比较结果不会误用旧缓存中的时间线。
 
 API 数据集版本 3 增加 `moe_gemm` 和可空的 `moe` 维度对象，并保留 `type`、原始 `args`
 及可空的 `attention`。不适用的算子字段为 null。现有原始数据无需迁移表结构即可读取；
@@ -61,22 +66,31 @@ K3 配置的 `n_shared=0`。分子不计激活和路由计算量，分母为实�
 
 ## 持久化与部署
 
-读取 API 时按需发现任意分支最近 44 天已完成的手动运行，每次最多导入四次运行。
-`discovery_complete=false` 表示客户端需继续获取。原始 JSON 在 GitHub 产物过期后仍保留。
+运行以原始文档形式保存在独立的 OperatorX 数据库（`opx_runs` 与 `opx_run_docs`）中：
+每次运行的清单及各分片的 operatorx 结果 JSON 原样保存。读取时由规范化器转换为仪表板
+数据；导入时也会执行一次，无法读取的运行不会被保存。运行通过推送导入：
 
-1. 配置具有 Actions 产物读取权限的 `GITHUB_TOKEN`。
-2. 将 `DATABASE_OPERATORX_WRITE_URL` 指向可写 PostgreSQL 主库，建议使用独立数据库。
+- `bun run admin:db:ingest:operatorx -- --download <运行 URL 或 ID>` 导入任意分支已完成的
+  `operatorx-sweep.yml` 运行，并下载其清单与分片产物。
+- CI 中 `admin:db:ingest:operatorx:ci` 从 `INGEST_ARTIFACTS_PATH` 读取 `INGEST_RUN_ID`
+  的预下载产物。
+- `bun run admin:db:ingest:operatorx -- --bundle <file.json> ...` 原样导入原始数据包，
+  用于非 sweep 采集的运行。
+
+重新导入会替换该运行。配置：
+
+InferenceX 的 `operatorx-sweep.yml` 手动触发的运行结束后（包括有分片失败的运行），
+会携带运行 ID 发送 `ingest-operatorx` repository dispatch，由 `Ingest OperatorX Results`
+工作流导入该运行。GitHub 只会把 repository dispatch 投递给默认分支上的工作流，
+因此需等 `ingest-operatorx.yml` 合入 InferenceX-app 默认分支后才会自动触发。
+回填或重新导入某次运行时，可手动输入运行 ID 运行该工作流。
+
+1. `DATABASE_OPERATORX_WRITE_URL`：所有者连接（直连、非连接池），仅用于迁移和导入。
+2. `DATABASE_OPERATORX_READONLY_URL`：连接池端点上的只读角色，应用仅使用此连接。
 3. 部署前运行 `bun run admin:db:migrate:operatorx -- --yes`。
 
-较旧的并发导入不会覆盖更新尝试。GitHub 不可用时仍可读取已存储数据；未保存且已过期的
-产物无法恢复。这里不触发跨仓库运行，也不会自动迁移生产数据库。公开 API 为
-`/api/v1/operatorx/runs` 和 `/api/v1/operatorx/runs/{runId}`，发现完成后缓存 60 秒，
-未完成的发现响应不缓存。
+## 本地验证
 
-## 使用真实产物本地验证
-
-将 `OPERATORX_LOCAL_ARTIFACT_DIR` 指向包含 `<runId>.json` 的目录，文件由
-`src/lib/operatorx-ingest.ts` 的 `downloadOperatorXBundle` 返回。此功能只在本机开发
-环境启用，生产环境忽略该设置。预览与持久化数据使用相同的读取器和 UI；不要用合成
-延迟替代实际测量进行人工验收。读取器、导入、PGlite 持久化和 Cypress 测试覆盖
-指标计算、覆盖统计、来源校验、重跑、隐藏导航、中英文及移动端行为。
+设置 `OPERATORX_SOURCE=local` 后，`OPERATORX_LOCAL_ARTIFACT_DIR` 指向包含 `<runKey>.json`
+原始数据包的目录。此功能只在开发环境启用，生产环境忽略该设置。不要用合成延迟替代实际
+测量进行人工验收。

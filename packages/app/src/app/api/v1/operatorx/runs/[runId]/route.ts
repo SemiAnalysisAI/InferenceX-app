@@ -1,19 +1,20 @@
 import { type NextRequest, NextResponse } from 'next/server';
-import { readOperatorXRun, OperatorXError } from '@/lib/operatorx-ingest';
+
+import { errorStatus, getDataset } from '@/lib/operatorx/service';
+
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 export const maxDuration = 300;
-export async function GET(request: NextRequest, context: { params: Promise<{ runId: string }> }) {
+
+export async function GET(_request: NextRequest, context: { params: Promise<{ runId: string }> }) {
   try {
     const { runId } = await context.params;
-    return NextResponse.json(await readOperatorXRun(runId, request.nextUrl.hostname), {
-      headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=60' },
+    return NextResponse.json(await getDataset(runId), {
+      headers: { 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=300' },
     });
   } catch (error) {
     console.error('OperatorX run read', error);
-    return NextResponse.json(
-      { error: 'OperatorX run unavailable' },
-      { status: error instanceof OperatorXError ? error.status : 503 },
-    );
+    const message = error instanceof Error ? error.message : 'OperatorX run unavailable';
+    return NextResponse.json({ error: message }, { status: errorStatus(error) });
   }
 }

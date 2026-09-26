@@ -35,7 +35,9 @@
     "db:verify": "bun --env-file=../../.env src/verify-db.ts",
     "test:unit": "vitest run",
     "test:unit:coverage": "vitest run --coverage",
-    "db:migrate:operatorx": "bun --env-file=../../.env src/migrate-operatorx.ts"
+    "db:migrate:operatorx": "bun --env-file=../../.env src/migrate-operatorx.ts",
+    "db:ingest:operatorx": "bun --env-file=../../.env src/ingest-operatorx.ts",
+    "db:ingest:operatorx:ci": "bun src/ingest-operatorx.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",

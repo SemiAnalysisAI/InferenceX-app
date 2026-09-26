@@ -56,7 +56,6 @@ which controls belong together.
 | `overview`                      | Models, model/hardware row limits, hardware tier, engine, comparison mode and reference. JSON or CSV.                                                                                                                                                     |
 | `rankings`                      | Ranking kind (model or chip), selected model/scenario and format. Use the exact values in OpenAPI.                                                                                                                                                        |
 | `compare`                       | GPU pairs, model/slug, scenario, tier selection and variant. JSON or CSV.                                                                                                                                                                                 |
-| `operatorx`                     | Exact/default measured run, operator, precision, shape, backend, cluster, status, throughput/latency and zero-based table page.                                                                                                                           |
 | `collectivex`                   | Ordered run selection and suite; EP size/phase/modes/precision/operation/percentile/axis/SKU/backend/series; KV page size/x/y/pull/push/overlap ISL/series; swap direction/layout/metric/percentile/series.                                               |
 | `submissions`                   | Search, table sort/direction/offset/limit, weekly/cumulative chart, on-change cutoff and NVIDIA/AMD/total lines. Table search does not filter the independent submission-volume chart.                                                                    |
 | `current-inferencex-image`      | Model, sequence, hardware, precision, speculation, node type, framework families and `asOf` for image age/release status.                                                                                                                                 |
@@ -64,6 +63,10 @@ which controls belong together.
 | `video`                         | CI run/artifact discovery; only already-published artifact reads; source, serving cell, media/fidelity slot, power phase and GPU denominator; same-workload comparisons, axes, deployment costs and selected tradeoff point. No-store.                    |
 
 ## Interpretation and maintenance
+
+OperatorX is feature-gated in navigation and has no published
+`/api/v1/views/operatorx` contract. Its `/api/v1/operatorx/*` routes belong to
+the page and are not part of this skill's read-only view API.
 
 Use positive safe run IDs written as plain digits (`1e3`, `0x10`, and `+5` are
 rejected); run lists such as `unofficialrun` and `runs` take up to eight unique IDs.

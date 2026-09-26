@@ -25,7 +25,6 @@ combinations, not the full Cartesian product of all possible filter values.
 | `gpu-specs`                     | `format`, `metric`                                                                                                                                                                                                                                                                                       |
 | `historical`                    | `deployment`, `end`, `extendToDate`, `format`, `frameworks`, `gpus`, `metric`, `model`, `precisions`, `priceSource`, `sequence`, `start`, `target`, `tcoBasis`, `vendors`                                                                                                                                |
 | `inference`                     | `allPoints`, `best`, `date`, `dates`, `deployment`, `end`, `format`, `frameworks`, `gpus`, `metric`, `model`, `optimal`, `percentile`, `power`, `precisions`, `priceSource`, `runId`, `sequence`, `spec`, `start`, `tcoBasis`, `unofficialrun`, `userCosts`, `userPowers`, `vendors`, `xmetric`, `xmode` |
-| `operatorx`                     | `backend`, `cluster`, `metric`, `operator`, `page`, `precision`, `runId`, `shape`, `status`                                                                                                                                                                                                              |
 | `options`                       | `format`                                                                                                                                                                                                                                                                                                 |
 | `overview`                      | `compare`, `engine`, `format`, `hwrows`, `models`, `ref`, `rows`, `tier`                                                                                                                                                                                                                                 |
 | `profit-estimator`              | `cachedInputPrice`, `costProvider`, `customCosts`, `date`, `dates`, `end`, `gpus`, `inputPrice`, `labCut`, `model`, `outputPrice`, `percentile`, `powerBasis`, `precisions`, `priceSource`, `runId`, `sequence`, `start`, `target`, `tcoBasis`, `unofficialrun`, `utilization`                           |
@@ -43,7 +42,7 @@ combinations, not the full Cartesian product of all possible filter values.
   cache-reuse, profit-estimator/profit-power, historical-best and fleet economics.
 - History: useInterpolatedTrendData, shared grouping and line extension.
 - Evaluation/reliability: chart-data, date resolution and rolling aggregation.
-- OperatorX/CollectiveX: selected operator sweep, EP/KV/swap chart and fit helpers.
+- CollectiveX: selected EP/KV/swap chart and fit helpers.
 - Submissions/images: existing table, weekly/cumulative and image freshness helpers.
 - GPU metrics: shared line/correlation transforms and unsampled statistics.
 - Video: checksum-verified stored bundles, serving/fidelity selectors and tradeoffs.
@@ -57,6 +56,9 @@ AgentX point drilldowns retain the existing public availability, derived metrics
 aggregates, histograms, request timeline, server metrics and log APIs.
 The AI-chart data source maps to inference; private provider keys, prompts and
 locally generated assets do not become public API data. Feedback is sensitive.
+OperatorX is feature-gated in navigation and uses page-owned
+`/api/v1/operatorx/*` routes; it has no published `/api/v1/views/operatorx`
+contract.
 Zoom, theme, axis scale, labels, media playback and report expansion are renderer
 state. GPU interactive downsampling does not alter returned raw data or statistics.
 
@@ -85,6 +87,8 @@ those properties.
 视图）均在覆盖表中登记；上表列出各只读接口接受的全部查询参数名。
 接口复用现有计算函数，公开运行与非官方叠加数据保留各自来源。
 私有上传、密钥、提示词、反馈及管理操作不作为公开读取接口。
+OperatorX 的入口受功能开关控制，页面使用专属的 `/api/v1/operatorx/*`
+接口；目前没有发布 `/api/v1/views/operatorx` 契约。
 
 测试覆盖契约同步及代表性的筛选行为，并未穷举所有参数组合。生产数据库上的
 完整 UI/API 对照仍需集成审查，不能仅凭单元测试宣称已完成。

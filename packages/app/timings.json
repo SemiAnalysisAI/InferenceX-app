@@ -210,7 +210,7 @@
     },
     {
       "spec": "cypress/e2e/operatorx.cy.ts",
-      "duration": 1541
+      "duration": 3342
     },
     {
       "spec": "cypress/e2e/overlay-legend-remove.cy.ts",

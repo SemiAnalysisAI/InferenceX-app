@@ -4,8 +4,8 @@
 
 OperatorX is a feature-gated dashboard alongside CollectiveX in **Hidden**. The
 existing ↑↑↓↓ unlock exposes both tabs. `/operatorx` and `/zh/operatorx` share the
-same reader, chart, filters, and coverage. `?run=<GitHub Actions run ID>` opens a
-specific run, including a feature-branch run.
+same reader, chart, filters, and coverage. `?run=<run key>` opens a
+specific stored run.
 
 The view covers single-GPU GEMM (`gemm`, `gemm_perf`), MHA/GQA materialized MLA (`attention`, `attention_perf`), and routed MoE (`moe_gemm`) on NVIDIA and AMD, including the AMD AITER backend. The
 reader matches every requested case/backend against its newest shard attempt,
@@ -15,6 +15,13 @@ GEMMs have no throughput value. Attention reports latency in µs and useful matm
 attention only; cache projection and RoPE are excluded. PyTorch expands grouped KV
 before timing; AITER retains native grouped heads. Compare identical shapes,
 precisions, and backends. Other operators remain outside this view.
+
+Cross-run comparisons select the newest available result per GPU, case, and backend.
+An explicit error or unsupported result remains visible; a missing result can be
+filled by an older stored run. Kernel timelines are read from the result's stored
+run, so opening a profile still works after a newer comparison replaces that row.
+Timeline references include the stored revision. Re-ingesting the same run replaces
+that revision, so a new comparison cannot open a cached timeline from the old data.
 
 GEMM TFLOPS is `2*M*N*K/(latency_us*1e6)`, per GPU. An eight-GPU Slurm allocation does
 not multiply this number. The UI preserves A/B/output precision, latency, shape,
@@ -68,35 +75,35 @@ unsupported, and empty cases have no TFLOPS value.
 
 ## Persistence and deployment
 
-Like CollectiveX, API reads lazily discover completed manual runs on any branch
-and preserve raw documents beyond GitHub's 14-day artifact retention. Discovery
-looks back 44 days to include reruns and imports at most four runs per request;
-the client follows `discovery_complete=false`. It checks the exact OperatorX
-workflow identity and downloads only manifest/result documents from bounded ZIPs.
+Runs live in a separate OperatorX database (`opx_runs` and `opx_run_docs`) as raw
+documents: each run's manifest and every shard's operatorx results JSON, verbatim.
+The normalizer turns them into the dashboard's dataset at read time; it also runs once
+at ingest, so a run that cannot be read is never stored. Runs arrive by push:
 
-1. Set `GITHUB_TOKEN` with Actions artifact read access.
-2. Set `DATABASE_OPERATORX_WRITE_URL` to a write-capable PostgreSQL primary. A
-   separate database is recommended; `opx_runs` is also namespaced if colocated.
+- `bun run admin:db:ingest:operatorx -- --download <run-url-or-id>` stores a completed
+  `operatorx-sweep.yml` run (any branch), downloading its manifest and shard artifacts.
+- In CI, `admin:db:ingest:operatorx:ci` reads pre-downloaded artifacts from
+  `INGEST_ARTIFACTS_PATH` for `INGEST_RUN_ID`.
+- `bun run admin:db:ingest:operatorx -- --bundle <file.json> ...` stores raw bundles
+  as they are, for runs collected outside a sweep.
+
+Re-ingesting a run replaces it. Setup:
+
+When a dispatched InferenceX `operatorx-sweep.yml` run finishes, including one with
+failed shards, it sends an `ingest-operatorx` repository dispatch with its run ID, and
+the `Ingest OperatorX Results` workflow stores that run. GitHub delivers repository
+dispatches only to workflows on the default branch, so this starts working once
+`ingest-operatorx.yml` is on InferenceX-app's default branch. Run the workflow manually
+with a run ID to backfill or re-ingest a run.
+
+1. `DATABASE_OPERATORX_WRITE_URL`: the owner connection (direct, non-pooled), for
+   migrations and ingest only.
+2. `DATABASE_OPERATORX_READONLY_URL`: a read-only role on the pooled endpoint; the
+   only connection the app uses.
 3. Run `bun run admin:db:migrate:operatorx -- --yes` before deployment.
 
-One row atomically stores the raw bundle and summary. An older concurrent ingest
-cannot replace a newer run attempt. Reads use the same primary. During GitHub
-outages, stored runs remain available. Unviewed artifacts that expire cannot be
-recovered. There is no cross-repository dispatch or automated production migration.
+## Local verification
 
-Public endpoints `/api/v1/operatorx/runs` and `/api/v1/operatorx/runs/{runId}` are
-documented in the bilingual API reference and OpenAPI registry. Completed discovery
-and run responses have a 60-second CDN TTL; incomplete discovery is uncached.
-
-## Local verification with actual artifacts
-
-Set `OPERATORX_LOCAL_ARTIFACT_DIR` to a directory containing `<runId>.json` bundles
-returned by `downloadOperatorXBundle` in `src/lib/operatorx-ingest.ts`. This explicitly
-opted-in preview works only in development on loopback URLs. Production ignores the
-setting. The preview uses the same validating reader and UI as persisted data; do
-not replace measured latencies with synthetic values for manual verification.
-
-The reader and ingest tests cover FLOP arithmetic, unsupported/missing cases, reruns,
-provenance, ZIP loading, and duplicate rejection. The persistence test executes the
-actual migration and queries in PGlite. The Cypress spec covers filters, hidden
-navigation, Chinese controls, and mobile rendering.
+With `OPERATORX_SOURCE=local`, `OPERATORX_LOCAL_ARTIFACT_DIR` points at a directory of
+`<runKey>.json` raw bundles. This works only in development; production ignores it.
+Do not replace measured latencies with synthetic values for manual verification.

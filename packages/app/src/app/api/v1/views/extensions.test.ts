@@ -7,7 +7,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { GET as cache } from './cache-reuse/route';
 import { GET as first } from './first-token/route';
 import { GET as gpu } from './gpu-metrics/route';
-import { GET as operator } from './operatorx/route';
 import { GET as gw } from './profit-estimator-per-gigawatt/route';
 import { GET as profit } from './profit-estimator/route';
 import { GET as submissions } from './submissions/route';
@@ -18,16 +17,12 @@ const mocks = vi.hoisted(() => ({
   video: vi.fn(),
   benchmarks: vi.fn(),
   unofficial: vi.fn(),
-  operatorRuns: vi.fn(),
-  operator: vi.fn(),
   submissions: vi.fn(),
 }));
 vi.mock('@/app/api/gpu-metrics/route', () => ({ GET: mocks.metrics }));
 vi.mock('@/app/api/video-runs/route', () => ({ GET: mocks.video }));
 vi.mock('@/app/api/v1/benchmarks/route', () => ({ GET: mocks.benchmarks }));
 vi.mock('@/app/api/unofficial-run/route', () => ({ GET: mocks.unofficial }));
-vi.mock('@/app/api/v1/operatorx/runs/route', () => ({ GET: mocks.operatorRuns }));
-vi.mock('@/app/api/v1/operatorx/runs/[runId]/route', () => ({ GET: mocks.operator }));
 vi.mock('@/app/api/v1/submissions/route', () => ({ GET: mocks.submissions }));
 vi.mock('@/lib/api-cache', () => ({ cachedJson: (data: unknown) => Response.json(data) }));
 const req = (view: string, query = '') =>
@@ -99,7 +94,6 @@ beforeEach(() => {
   );
   mocks.benchmarks.mockImplementation(() => Response.json([]));
   mocks.unofficial.mockImplementation(() => Response.json({ benchmarks: [], evaluations: [] }));
-  mocks.operatorRuns.mockImplementation(() => Response.json({ runs: [] }));
   mocks.submissions.mockImplementation(() => Response.json({ summary: [], volume: [] }));
 });
 describe('new dashboard projections', () => {
@@ -455,10 +449,7 @@ describe('new dashboard projections', () => {
     const body = await response.json();
     expect(body.params.caps).toEqual([0.5, 2, 5]);
   });
-  it('empty OperatorX discovery and submission history are successful empty views', async () => {
-    const opResponse = await operator(req('operatorx'));
-    const op = await opResponse.json();
-    expect(op).toMatchObject({ run: null, total: 0, rows: [], points: [] });
+  it('empty submission history is a successful empty view', async () => {
     const result = await submissions(
       req('submissions', 'search=notfound&lines=amd&mode=cumulative'),
     );
