@@ -116,12 +116,8 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
     () => (picked ? available.filter((h) => picked.includes(h)) : available),
     [picked, available],
   );
-  const baseline =
-    pickedBaseline === NO_BASELINE
-      ? null
-      : pickedBaseline && hardware.includes(pickedBaseline)
-        ? pickedBaseline
-        : (hardware.find((h) => h === 'h200') ?? hardware[0] ?? null);
+  // No baseline until one is picked.
+  const baseline = pickedBaseline && hardware.includes(pickedBaseline) ? pickedBaseline : null;
   const model = useMemo(() => {
     if (!view) return null;
     const toggle = (hw: string) => {
