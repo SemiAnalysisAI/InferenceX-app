@@ -109,7 +109,7 @@ export function localizeArchitectureDiagramText(value: string, locale: Locale): 
     .replaceAll('sparse top-', '稀疏 top-');
 }
 /** Block color definitions for light/dark themes */
-const BLOCK_COLORS = {
+export const BLOCK_COLORS = {
   embedding: { light: '#dbeafe', dark: '#1e3a5f', stroke: '#3b82f6' },
   attention: { light: '#fef3c7', dark: '#422006', stroke: '#d97706' },
   ffn: { light: '#d1fae5', dark: '#064e3b', stroke: '#059669' },

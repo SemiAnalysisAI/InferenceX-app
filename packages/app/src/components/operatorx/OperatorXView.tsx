@@ -7,11 +7,13 @@ import { useClientSearch } from '@/hooks/useClientSearch';
 import { replaceClientSearch } from '@/lib/client-navigation';
 
 import { ComparisonDashboard } from './ComparisonDashboard';
+import { ModelView } from './model-view/ModelView';
 
 const CATEGORIES = [
   { value: 'gemm', label: 'GEMM' },
   { value: 'moe', label: 'MoE' },
   { value: 'attention', label: 'Attention' },
+  { value: 'model', label: 'Model View' },
 ] as const;
 
 type Category = (typeof CATEGORIES)[number]['value'];
@@ -55,6 +57,8 @@ export default function OperatorXView() {
             <Card className="py-6 text-center">
               <p className="text-sm text-muted-foreground">No results yet</p>
             </Card>
+          ) : c.value === 'model' ? (
+            category === c.value && <ModelView />
           ) : (
             category === c.value && <ComparisonDashboard op={c.value} />
           )}

@@ -58,6 +58,17 @@ export function useOperatorXComparison(op: ComparisonOp | null, workload: string
   });
 }
 
+/** Every case one model contributes to an op, across hardware. */
+export function useOperatorXModel(op: ComparisonOp, model: string | null) {
+  const params = new URLSearchParams({ op });
+  if (model) params.set('model', model);
+  return useQuery({
+    queryKey: ['operatorx', 'model', op, model],
+    queryFn: ({ signal }) => get<ComparisonView>(`/api/v1/operatorx/compare?${params}`, signal),
+    staleTime: 5 * 60_000,
+  });
+}
+
 export type OperatorXTimelines = Record<string, OperatorXTimeline | null>;
 
 /** Kernel timelines of stored `runId:index:revision` results. */

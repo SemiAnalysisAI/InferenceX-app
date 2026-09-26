@@ -78,6 +78,8 @@ export interface Comparison {
   op: ComparisonOp;
   hardware: ComparisonHardware[];
   workloads: ComparisonWorkload[];
+  /** Models any case comes from, most cases first. */
+  models: string[];
   rows: ComparisonRow[];
 }
 
@@ -209,8 +211,18 @@ export function buildComparison(op: ComparisonOp, inputs: ComparisonInput[]): Co
     workloads: [...workloads.values()]
       .map((w) => ({ ...w.source, cases: w.cases.size, hardware: [...w.hardware].sort() }))
       .sort((a, b) => b.hardware.length - a.hardware.length || a.label.localeCompare(b.label)),
+    models: modelsByCases(rows.values()),
     rows: [...rows.values()],
   };
+}
+
+function modelsByCases(rows: Iterable<ComparisonRow>): string[] {
+  const cases = new Map<string, Set<string>>();
+  for (const r of rows)
+    for (const s of r.sources) cases.set(s.model, (cases.get(s.model) ?? new Set()).add(r.caseKey));
+  return [...cases]
+    .sort((a, b) => b[1].size - a[1].size || a[0].localeCompare(b[0]))
+    .map(([m]) => m);
 }
 
 /** A case as every runner measured it: described once. */
@@ -245,6 +257,10 @@ export interface ComparisonView {
   hardware: ComparisonHardware[];
   workloads: ComparisonWorkload[];
   workload: string | null;
+  /** Models with cases, for picking one; see `comparisonView`'s `model`. */
+  modelOptions: string[];
+  /** The model the cases were picked by, instead of a workload. */
+  model: string | null;
   cases: ComparisonCase[];
   /** Models the cases come from. */
   models: string[];
@@ -252,17 +268,30 @@ export interface ComparisonView {
   measurements: Record<string, ComparisonColumns>;
 }
 
-export function comparisonView(comparison: Comparison, workloadId: string | null): ComparisonView {
-  const workload =
-    comparison.workloads.find((w) => w.id === workloadId)?.id ??
-    comparison.workloads[0]?.id ??
-    null;
-  const rows = workload ? comparison.rows.filter((r) => r.workloads.includes(workload)) : [];
+/**
+ * The cases of one workload (default: the best-covered), or, given `model`, every case
+ * that model's checkpoints contribute.
+ */
+export function comparisonView(
+  comparison: Comparison,
+  workloadId: string | null,
+  model: string | null = null,
+): ComparisonView {
+  const workload = model
+    ? null
+    : (comparison.workloads.find((w) => w.id === workloadId)?.id ??
+      comparison.workloads[0]?.id ??
+      null);
+  const rows = model
+    ? comparison.rows.filter((r) => r.sources.some((s) => s.model === model))
+    : workload
+      ? comparison.rows.filter((r) => r.workloads.includes(workload))
+      : [];
   const caseIndex = new Map<string, number>();
   const cases: ComparisonCase[] = [];
   const models: string[] = [];
   const modelIndex = new Map<string, number>();
-  const model = (name: string) => {
+  const internModel = (name: string) => {
     if (!modelIndex.has(name)) {
       modelIndex.set(name, models.length);
       models.push(name);
@@ -275,7 +304,7 @@ export function comparisonView(comparison: Comparison, workloadId: string | null
     if (seen !== undefined) {
       const merged = cases[seen].sources;
       for (const s of r.sources) {
-        const m = model(s.model);
+        const m = internModel(s.model);
         const into = merged.find((x) => x.model === m);
         if (into) {
           into.roles = [...new Set([...into.roles, ...s.roles])].sort();
@@ -289,7 +318,7 @@ export function comparisonView(comparison: Comparison, workloadId: string | null
     cases.push({
       key: r.caseKey,
       testlist: r.testlist,
-      sources: r.sources.map((s) => ({ model: model(s.model), roles: [...s.roles] })),
+      sources: r.sources.map((s) => ({ model: internModel(s.model), roles: [...s.roles] })),
       shape: r.shape,
       precision: r.precision,
       computePrecision: r.computePrecision,
@@ -337,6 +366,8 @@ export function comparisonView(comparison: Comparison, workloadId: string | null
     hardware,
     workloads: comparison.workloads,
     workload,
+    modelOptions: comparison.models,
+    model,
     cases,
     models,
     kernels,
