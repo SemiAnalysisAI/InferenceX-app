@@ -65,6 +65,8 @@ export interface PointMeta {
   server_gpu_cache_hit_rate: number | null;
   /** Cumulative end-of-run CPU offload cache-hit. */
   server_cpu_cache_hit_rate: number | null;
+  /** External connector hits / queried tokens, when admission metrics exist. */
+  server_external_cache_hit_rate?: number | null;
 }
 
 export interface TraceServerMetrics {
@@ -90,6 +92,8 @@ export interface TraceServerMetrics {
    * exposes them; older rows retain their logical cache-hit buckets.
    */
   promptTokensBySource: Record<string, TimeSeriesPoint[]>;
+  /** Admission cache hits only; never part of the output prompt-token total. */
+  cacheHitsBySource?: Record<string, TimeSeriesPoint[]>;
   /** Prefill throughput: vllm:prompt_tokens rate (tokens/sec) per scrape. */
   prefillTps: TimeSeriesPoint[];
   /** Decode throughput: vllm:generation_tokens rate (tokens/sec) per scrape. */
@@ -158,6 +162,10 @@ function buildMeta(row: RawMetaRow): PointMeta {
       row.server_gpu_cache_hit_rate === null ? null : Number(row.server_gpu_cache_hit_rate),
     server_cpu_cache_hit_rate:
       row.server_cpu_cache_hit_rate === null ? null : Number(row.server_cpu_cache_hit_rate),
+    ...(row.server_external_cache_hit_rate === null ||
+    row.server_external_cache_hit_rate === undefined
+      ? {}
+      : { server_external_cache_hit_rate: Number(row.server_external_cache_hit_rate) }),
   };
 }
 
@@ -168,7 +176,14 @@ function merge(
   metricSources: MetricSourceDescriptor[],
 ): TraceServerMetrics {
   return {
-    meta,
+    meta: series.cacheLookupHitRates
+      ? {
+          ...meta,
+          server_gpu_cache_hit_rate: series.cacheLookupHitRates.local,
+          server_cpu_cache_hit_rate: null,
+          server_external_cache_hit_rate: series.cacheLookupHitRates.external,
+        }
+      : meta,
     kvCachePoolTokens,
     startNs: series.startNs,
     endNs: series.endNs,
@@ -178,6 +193,9 @@ function merge(
     prefixCacheHitRate: series.prefixCacheHitRate,
     queueDepth: series.queueDepth,
     promptTokensBySource: series.promptTokensBySource,
+    ...(series.cacheHitsBySource === undefined
+      ? {}
+      : { cacheHitsBySource: series.cacheHitsBySource }),
     prefillTps: series.prefillTps,
     decodeTps: series.decodeTps,
     // v2 chart_series rows pre-backfill don't have this field — default to []
@@ -328,6 +346,7 @@ export async function getTraceServerMetrics(
       nullif(br.metrics ->> 'router_version', '') as router_version,
       (br.metrics ->> 'server_gpu_cache_hit_rate')::numeric as server_gpu_cache_hit_rate,
       (br.metrics ->> 'server_cpu_cache_hit_rate')::numeric as server_cpu_cache_hit_rate,
+      (br.metrics ->> 'server_external_cache_hit_rate')::numeric as server_external_cache_hit_rate,
       (br.metrics ->> 'kv_cache_pool_tokens')::numeric as kv_cache_pool_tokens
     from benchmark_results br
     join configs c on c.id = br.config_id

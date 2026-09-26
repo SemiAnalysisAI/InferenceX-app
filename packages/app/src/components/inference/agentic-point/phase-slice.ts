@@ -35,6 +35,7 @@ export interface ServerSeriesLike {
   prefixCacheHitRate: TimeSeriesPoint[];
   queueDepth: QueueDepthPoint[];
   promptTokensBySource: Record<string, TimeSeriesPoint[]>;
+  cacheHitsBySource?: Record<string, TimeSeriesPoint[]>;
   prefillTps: TimeSeriesPoint[];
   decodeTps: TimeSeriesPoint[];
   prefixCacheHitsTps: TimeSeriesPoint[];
@@ -135,6 +136,9 @@ export function sliceServerSeriesByPhase<S extends ServerSeriesLike>(
     prefixCacheHitRate: sliceTs(series.prefixCacheHitRate),
     queueDepth: sliceQd(series.queueDepth),
     promptTokensBySource: sliceRecord(series.promptTokensBySource),
+    ...(series.cacheHitsBySource === undefined
+      ? {}
+      : { cacheHitsBySource: sliceRecord(series.cacheHitsBySource) }),
     prefillTps: sliceTs(series.prefillTps),
     decodeTps: sliceTs(series.decodeTps),
     prefixCacheHitsTps: sliceTs(series.prefixCacheHitsTps),

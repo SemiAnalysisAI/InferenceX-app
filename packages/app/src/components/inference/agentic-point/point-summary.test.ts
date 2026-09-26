@@ -41,6 +41,22 @@ function meta(overrides: Partial<PointMeta> = {}): PointMeta {
 }
 
 describe('PointSummary', () => {
+  it('shows the connector lookup rate instead of mislabeling it as CPU cache hits', () => {
+    const html = renderToStaticMarkup(
+      createElement(PointSummary, {
+        meta: meta({
+          offload_mode: 'on',
+          server_cpu_cache_hit_rate: 1.6,
+          server_external_cache_hit_rate: 0.8,
+        }),
+      }),
+    );
+    expect(html).toContain('External cache lookup hit');
+    expect(html).toContain('80.00%');
+    expect(html).not.toContain('CPU cache hit');
+    expect(html).not.toContain('160.00%');
+  });
+
   it('identifies multinode aggregate without calling it disaggregated', () => {
     const html = renderToStaticMarkup(
       createElement(PointSummary, {

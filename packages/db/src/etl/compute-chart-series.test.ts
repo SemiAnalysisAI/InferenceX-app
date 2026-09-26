@@ -2,7 +2,14 @@ import { gzipSync } from 'node:zlib';
 
 import { describe, expect, it } from 'vitest';
 
-import { CHART_SERIES_VERSION, computeChartSeries } from './compute-chart-series.js';
+import {
+  CHART_METRIC_KEYS,
+  CHART_SERIES_VERSION,
+  computeChartSeries,
+  computeChartSeriesFromMetricPhases,
+  type RawMetric,
+} from './compute-chart-series.js';
+import { collectMetricPhases } from './gzip-json-stream';
 
 /**
  * Build a minimal server_metrics_json blob covering the metrics the chart
@@ -286,6 +293,80 @@ describe('computeChartSeries', () => {
       expect(series?.promptTokensBySource).not.toHaveProperty('external_kv_transfer');
     },
   );
+
+  it.each([false, true])(
+    'separates admission hits from output counts (streaming=%s)',
+    async (streaming) => {
+      const metric = (source: string, rate: number) => ({
+        ...sourceRateSeries(source, rate),
+        labels: { source, engine: '0' },
+      });
+      const blob = gzipSync(
+        Buffer.from(
+          JSON.stringify({
+            metrics: {
+              'vllm:prompt_tokens': { series: [metric('', 100)] },
+              'vllm:prompt_tokens_by_source': {
+                series: [
+                  metric('local_compute', 20),
+                  metric('local_cache_hit', 30),
+                  metric('external_kv_transfer', 50),
+                ],
+              },
+              'vllm:prompt_tokens_cached_by_source': {
+                description: 'Cached prompt tokens by source. Counted at admission.',
+                series: [
+                  metric('device', 120),
+                  metric('host', 160),
+                  metric('disk', 30),
+                  metric('external_unspecified', 10),
+                ],
+              },
+              'vllm:prefix_cache_hits': { series: [metric('', 120)] },
+              'vllm:prefix_cache_queries': { series: [metric('', 400)] },
+              'vllm:external_prefix_cache_hits': { series: [metric('', 200)] },
+              'vllm:external_prefix_cache_queries': { series: [metric('', 250)] },
+            },
+            warmup_metrics: { 'vllm:prompt_tokens_cached_by_source': { series: [] } },
+          }),
+        ),
+      );
+      const phases = await collectMetricPhases<RawMetric>(
+        blob,
+        CHART_METRIC_KEYS,
+        streaming ? 1 : undefined,
+      );
+      const series = computeChartSeriesFromMetricPhases(phases.metrics, phases.warmupMetrics, {
+        framework: 'dynamo-vllm',
+        disagg: true,
+      });
+      expect(total(Object.values(series.promptTokensBySource).flat())).toBe(100);
+      expect(total(Object.values(series.cacheHitsBySource!).flat())).toBe(320);
+      expect(series.cacheHitsBySource?.['cache hit (external)']).toEqual([{ t: 0, value: 10 }]);
+      expect(series.cacheLookupHitRates).toEqual({ local: 0.3, external: 0.8 });
+      expect(series.metricSources?.[0].cacheHitsBySource).toEqual(series.cacheHitsBySource);
+      expect(series.metricSources?.[0].promptTokensBySource).toEqual(series.promptTokensBySource);
+    },
+  );
+
+  it('does not fabricate admission hit rates when lookup counters are missing', async () => {
+    const blob = gzipSync(
+      Buffer.from(
+        JSON.stringify({
+          metrics: {
+            'vllm:prompt_tokens': { series: [sourceRateSeries('', 100)] },
+            'vllm:prompt_tokens_cached_by_source': {
+              description: 'Counted at admission',
+              series: [sourceRateSeries('host', 160)],
+            },
+          },
+        }),
+      ),
+    );
+    const series = await computeChartSeries(blob);
+    expect(series?.cacheLookupHitRates).toEqual({ local: null, external: null });
+    expect(series?.cacheHitsBySource?.['cache hit (CPU offload)']).toEqual([{ t: 0, value: 160 }]);
+  });
 
   it('preserves connector-defined vLLM tiers and treats a missing label as external', async () => {
     const blob = gzipSync(

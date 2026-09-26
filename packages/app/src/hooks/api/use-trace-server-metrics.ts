@@ -37,6 +37,7 @@ export interface PointMeta {
   run_url: string | null;
   server_gpu_cache_hit_rate: number | null;
   server_cpu_cache_hit_rate: number | null;
+  server_external_cache_hit_rate?: number | null;
 }
 
 export type MetricSourceRole = 'router' | 'prefill' | 'decode' | 'combined' | 'unknown';
@@ -59,6 +60,7 @@ export interface MetricSourceSeries {
   queueDepth: QueueDepthPoint[];
   /** Fresh prefill plus physical cache tiers when available; logical fallback otherwise. */
   promptTokensBySource: Record<string, TimeSeriesPoint[]>;
+  cacheHitsBySource?: Record<string, TimeSeriesPoint[]>;
   promptTps: TimeSeriesPoint[];
   generationTps: TimeSeriesPoint[];
   prefixCacheHitsTps: TimeSeriesPoint[];
@@ -80,6 +82,7 @@ export interface TraceServerMetrics {
   prefixCacheHitRate: TimeSeriesPoint[];
   queueDepth: QueueDepthPoint[];
   promptTokensBySource: Record<string, TimeSeriesPoint[]>;
+  cacheHitsBySource?: Record<string, TimeSeriesPoint[]>;
   prefillTps: TimeSeriesPoint[];
   decodeTps: TimeSeriesPoint[];
   /** Tokens served from prefix cache per scrape (vllm:prefix_cache_hits rate). */

@@ -159,6 +159,21 @@ describe('sliceServerSeriesByPhase', () => {
     sliceServerSeriesByPhase(s, 'profiling', 1, 3);
     expect(s.kvCacheUsage.map((p) => p.t)).toEqual(before);
   });
+
+  it('slices admission sources separately from prompt sources', () => {
+    const s = {
+      ...makeSeries([0, 1, 2]),
+      cacheHitsBySource: {
+        host: [
+          { t: 1, value: 160 },
+          { t: 2, value: 80 },
+        ],
+      },
+    };
+    const out = sliceServerSeriesByPhase(s, 'profiling', 2, 3);
+    expect(out.series.cacheHitsBySource).toEqual({ host: [{ t: 0, value: 80 }] });
+    expect(s.cacheHitsBySource.host).toHaveLength(2);
+  });
 });
 
 describe('requestsForPhase', () => {

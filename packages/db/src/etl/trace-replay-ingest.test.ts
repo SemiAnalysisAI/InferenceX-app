@@ -10,6 +10,7 @@ import {
   TRACE_REPLAY_UPLOAD_CHUNK_BYTES,
   gzipTraceReplayInput,
   persistPreparedTraceReplay,
+  prepareTraceReplay,
   type PreparedTraceReplay,
   uploadTraceReplayPayloadChunks,
 } from './trace-replay-ingest';
@@ -131,7 +132,67 @@ describe('gzipTraceReplayInput', () => {
   }, 15_000);
 });
 
+const counter = (rate: number, source = '') => ({
+  labels: { source },
+  timeslices: [{ start_ns: 0, end_ns: 1e9, rate }],
+});
+
 describe('persistPreparedTraceReplay', () => {
+  it('does not divide admission hits by output prompt volume during preparation', async () => {
+    const prepared = await prepareTraceReplay(
+      null,
+      null,
+      Buffer.from(
+        JSON.stringify({
+          metrics: {
+            'vllm:prompt_tokens': { series: [counter(100)] },
+            'vllm:prompt_tokens_by_source': {
+              series: [
+                counter(20, 'local_compute'),
+                counter(30, 'local_cache_hit'),
+                counter(50, 'external_kv_transfer'),
+              ],
+            },
+            'vllm:prompt_tokens_cached_by_source': {
+              description: 'Counted at admission',
+              series: [counter(120, 'device'), counter(160, 'host'), counter(40, 'disk')],
+            },
+            'vllm:prefix_cache_hits': { series: [counter(120)] },
+            'vllm:prefix_cache_queries': { series: [counter(400)] },
+            'vllm:external_prefix_cache_hits': { series: [counter(200)] },
+            'vllm:external_prefix_cache_queries': { series: [counter(250)] },
+          },
+        }),
+      ),
+    );
+    expect(prepared.cacheHitRates).toEqual({ gpu: 0.3, cpu: null, external: 0.8 });
+    const { sql, calls } = mockSqlWithTransaction([{ id: 41 }]);
+    await persistPreparedTraceReplay(sql, [41], prepared);
+    const update = calls.find((call) =>
+      call.text.includes("metrics - 'server_cpu_cache_hit_rate'"),
+    );
+    expect(update?.values).toContainEqual({
+      server_gpu_cache_hit_rate: 0.3,
+      server_external_cache_hit_rate: 0.8,
+    });
+  });
+
+  it('persists lookup-family rates and removes the misleading old CPU ratio', async () => {
+    const { sql, calls } = mockSqlWithTransaction([{ id: 41 }]);
+    await persistPreparedTraceReplay(sql, [41], {
+      ...preparedFixture(),
+      cacheHitRates: { gpu: 0.3, cpu: null, external: 0.8 },
+    });
+    const update = calls.find((call) =>
+      call.text.includes("metrics - 'server_cpu_cache_hit_rate'"),
+    );
+    expect(update?.values).toContainEqual({
+      server_gpu_cache_hit_rate: 0.3,
+      server_external_cache_hit_rate: 0.8,
+    });
+    expect(calls.some((call) => call.text.includes('jsonb_set('))).toBe(false);
+  });
+
   it('rechecks links under a row lock and avoids creating an orphan after a concurrent ingest', async () => {
     const { sql, calls } = mockSqlWithTransaction([]);
 

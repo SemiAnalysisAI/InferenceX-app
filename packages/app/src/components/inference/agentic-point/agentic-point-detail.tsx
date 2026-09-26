@@ -190,6 +190,7 @@ export function AgenticPointDetail({ id }: Props) {
         prefixCacheHitRate: src.prefixCacheHitRate,
         queueDepth: src.queueDepth,
         promptTokensBySource: src.promptTokensBySource,
+        cacheHitsBySource: src.cacheHitsBySource,
         prefillTps: src.promptTps,
         decodeTps: src.generationTps,
         prefixCacheHitsTps: src.prefixCacheHitsTps,

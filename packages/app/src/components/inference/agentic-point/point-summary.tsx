@@ -24,6 +24,7 @@ const STRINGS = {
     concurrency: 'Concurrency',
     gpuCacheHit: 'Chip cache hit',
     cpuCacheHit: 'CPU cache hit',
+    externalCacheHit: 'External cache lookup hit',
     enabledLegacy: 'Enabled (legacy data)',
     disabledLegacy: 'Disabled (legacy data)',
     none: 'None',
@@ -40,6 +41,7 @@ const STRINGS = {
     concurrency: '并发数',
     gpuCacheHit: '芯片 Cache 命中率',
     cpuCacheHit: 'CPU Cache 命中率',
+    externalCacheHit: '外部 cache 查询命中率',
     enabledLegacy: '已启用（旧版数据）',
     disabledLegacy: '已禁用（旧版数据）',
     none: '无',
@@ -105,8 +107,15 @@ export function PointSummary({ meta }: { meta: PointMeta }) {
         {router && <MetaLine label={t.router} value={router} />}
         <MetaLine label={t.concurrency} value={meta.conc} />
         <MetaLine label={t.gpuCacheHit} value={fmtPct(meta.server_gpu_cache_hit_rate)} />
-        {showCpuCacheHit && (
-          <MetaLine label={t.cpuCacheHit} value={fmtPct(meta.server_cpu_cache_hit_rate)} />
+        {meta.server_external_cache_hit_rate === undefined ? (
+          showCpuCacheHit && (
+            <MetaLine label={t.cpuCacheHit} value={fmtPct(meta.server_cpu_cache_hit_rate)} />
+          )
+        ) : (
+          <MetaLine
+            label={t.externalCacheHit}
+            value={fmtPct(meta.server_external_cache_hit_rate)}
+          />
         )}
         {meta.isl !== null && <MetaLine label="ISL" value={meta.isl} />}
         {meta.osl !== null && <MetaLine label="OSL" value={meta.osl} />}

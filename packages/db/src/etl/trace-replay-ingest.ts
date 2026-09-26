@@ -61,7 +61,7 @@ export interface PreparedTraceReplay {
   timelineRequests: number;
   compressionMs: number;
   computeMs: number;
-  cacheHitRates: { gpu: number; cpu: number | null } | null;
+  cacheHitRates: { gpu: number | null; cpu: number | null; external?: number | null } | null;
   fullResponseMetrics: Record<string, number>;
 }
 
@@ -87,6 +87,13 @@ function jsonBuffer(value: unknown | null): Buffer | null {
 function cacheHitRatesFromChartSeries(
   chartSeries: Awaited<ReturnType<typeof computeTraceDerivedPayloads>>['chartSeries'],
 ): PreparedTraceReplay['cacheHitRates'] {
+  if (chartSeries?.cacheLookupHitRates) {
+    return {
+      gpu: chartSeries.cacheLookupHitRates.local,
+      cpu: null,
+      external: chartSeries.cacheLookupHitRates.external,
+    };
+  }
   if (!chartSeries || chartSeries.prefillTps.length === 0) return null;
   const sumPrompts = chartSeries.prefillTps.reduce((sum, point) => sum + point.value, 0);
   if (!(sumPrompts > 0)) return null;
@@ -353,7 +360,17 @@ export async function persistPreparedTraceReplay(
     `;
     log(`linked benchmark rows (${elapsed(updateStart)})`);
 
-    if (cacheHitRates) {
+    if (cacheHitRates && 'external' in cacheHitRates) {
+      await tx`
+        update benchmark_results
+        set metrics = (metrics - 'server_cpu_cache_hit_rate') || ${tx.json({
+          server_gpu_cache_hit_rate: cacheHitRates.gpu,
+          server_external_cache_hit_rate: cacheHitRates.external,
+        })}
+        where id = any(${tx.array(unlinked.map((row) => row.id))}::bigint[])
+      `;
+      log('updated cache-hit metrics from admission lookup counters');
+    } else if (cacheHitRates) {
       await tx`
         update benchmark_results
         set metrics = jsonb_set(

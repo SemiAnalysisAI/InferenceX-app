@@ -388,17 +388,25 @@ export function ThroughputCard({
 
 export function PromptTokenSourceCard({ sliced }: { sliced: SlicedServerSeries }) {
   const locale = useLocale();
+  const admission = sliced?.series.cacheHitsBySource !== undefined;
   return (
     <ExpandableChart
       title={
-        locale === 'zh' ? '累计 prompt token 来源构成' : 'Cumulative prompt token source breakdown'
+        admission
+          ? locale === 'zh'
+            ? '累计 cache 命中来源构成（调度接纳时统计）'
+            : 'Cumulative admitted cache-hit sources'
+          : locale === 'zh'
+            ? '累计 prompt token 来源构成'
+            : 'Cumulative prompt token source breakdown'
       }
       render={(expanded) => {
         const size = expanded ? CHART_SIZES.expanded : CHART_SIZES.inline;
         if (!sliced) return <ChartSkeleton />;
         return (
           <StackedAreaChart
-            sourceSeries={sliced.series.promptTokensBySource}
+            sourceSeries={sliced.series.cacheHitsBySource ?? sliced.series.promptTokensBySource}
+            accounting={admission ? 'admission' : 'prompt'}
             durationS={sliced.durationS}
             {...size}
           />

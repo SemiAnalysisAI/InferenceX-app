@@ -19,6 +19,21 @@ function mountChart(pathname: string) {
 }
 
 describe('Agentic prompt-token source chart', () => {
+  it('labels admission-only shares without calling them prompt-token shares', () => {
+    cy.mount(
+      <PathnameContext.Provider value="/inference/agentic/421">
+        <StackedAreaChart
+          sourceSeries={{ 'cache hit (CPU offload)': [{ t: 0, value: 160 }] }}
+          durationS={1}
+          accounting="admission"
+        />
+      </PathnameContext.Provider>,
+    );
+    cy.contains('% of admitted cache hits').should('be.visible');
+    cy.contains('% of prefill tokens').should('not.exist');
+    cy.contains('CPU Offload Cache Hit').should('be.visible');
+  });
+
   it('labels and colors each physical vLLM cache tier', () => {
     mountChart('/inference/agentic/421');
 

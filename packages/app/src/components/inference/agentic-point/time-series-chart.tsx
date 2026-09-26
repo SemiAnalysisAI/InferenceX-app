@@ -350,8 +350,12 @@ const SOURCE_LABELS = {
 } as const;
 
 const STACKED_AREA_STRINGS = {
-  en: { time: 'time', share: '% of prefill tokens' },
-  zh: { time: '时间', share: 'prefill token 占比' },
+  en: { time: 'time', share: '% of prefill tokens', admissionShare: '% of admitted cache hits' },
+  zh: {
+    time: '时间',
+    share: 'prefill token 占比',
+    admissionShare: '调度接纳时统计的 cache 命中占比',
+  },
 };
 
 function sourceLabel(source: string, locale: 'en' | 'zh'): string {
@@ -379,11 +383,13 @@ const FALLBACK_PALETTE = [
 export function StackedAreaChart({
   sourceSeries,
   durationS,
+  accounting = 'prompt',
   width = 720,
   height = 260,
 }: {
   sourceSeries: Record<string, TimeSeriesPoint[]>;
   durationS: number;
+  accounting?: 'prompt' | 'admission';
   width?: number;
   height?: number;
 }) {
@@ -573,7 +579,7 @@ export function StackedAreaChart({
         textAnchor="middle"
         transform={`rotate(-90 10 ${H / 2})`}
       >
-        {strings.share}
+        {accounting === 'admission' ? strings.admissionShare : strings.share}
       </text>
       {(() => {
         const chipY = H - 8;

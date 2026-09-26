@@ -128,8 +128,10 @@ import {
  * counting and makes the stacked breakdown sum to total prompt-token volume.
  *
  * v17: canonical vLLM `host` hits share the existing CPU/DRAM display bucket.
+ * v18: keep admission cache hits separate from output prompt tokens and use
+ * matching lookup counters for admission hit rates.
  */
-export const CHART_SERIES_VERSION = 17;
+export const CHART_SERIES_VERSION = 18;
 
 export interface TimeSeriesPoint {
   /** Seconds from benchmark start. */
@@ -158,6 +160,9 @@ export interface ChartSeries {
   prefixCacheHitRate: TimeSeriesPoint[];
   queueDepth: QueueDepthPoint[];
   promptTokensBySource: Record<string, TimeSeriesPoint[]>;
+  /** Present only when the producer explicitly counts cache hits at admission. */
+  cacheHitsBySource?: Record<string, TimeSeriesPoint[]>;
+  cacheLookupHitRates?: { local: number | null; external: number | null };
   prefillTps: TimeSeriesPoint[];
   decodeTps: TimeSeriesPoint[];
   /**
@@ -196,6 +201,7 @@ export interface MetricSourceSeries {
   prefixCacheHitRate: TimeSeriesPoint[];
   queueDepth: QueueDepthPoint[];
   promptTokensBySource: Record<string, TimeSeriesPoint[]>;
+  cacheHitsBySource?: Record<string, TimeSeriesPoint[]>;
   /** Raw prompt-token counter rate for this source. */
   promptTps: TimeSeriesPoint[];
   /** Raw generation-token counter rate for this source. */
@@ -221,6 +227,7 @@ interface RawSeries {
 }
 
 export interface RawMetric {
+  description?: string;
   series?: RawSeries[];
 }
 
@@ -236,6 +243,7 @@ const VLLM_CACHE_SOURCE_BUCKETS: Record<string, string> = {
   obj: 'cache hit (object store)',
   mixed: 'cache hit (mixed tiers)',
   external: 'cache hit (external)',
+  external_unspecified: 'cache hit (external)',
 };
 
 /** Canonical chart bucket for vLLM's physical cached-token source labels. */
@@ -254,6 +262,8 @@ export const CHART_METRIC_KEYS = new Set([
   'vllm:gpu_cache_usage_perc',
   'vllm:prefix_cache_hits',
   'vllm:prefix_cache_queries',
+  'vllm:external_prefix_cache_hits',
+  'vllm:external_prefix_cache_queries',
   'vllm:num_requests_running',
   'vllm:num_requests_waiting',
   'vllm:prompt_tokens',
@@ -285,6 +295,7 @@ function mergePhaseMetrics(profiling: MetricsMap, warmup: MetricsMap): MetricsMa
   const out: MetricsMap = {};
   for (const name of new Set([...Object.keys(profiling), ...Object.keys(warmup)])) {
     out[name] = {
+      description: profiling[name]?.description ?? warmup[name]?.description,
       series: [...(profiling[name]?.series ?? []), ...(warmup[name]?.series ?? [])],
     };
   }
@@ -1098,8 +1109,22 @@ function buildSeriesFromMetrics(
     else promptBySrc.set(label, [series]);
   };
   const logicalVllmSeries = metrics['vllm:prompt_tokens_by_source']?.series ?? [];
-  const physicalVllmSeries = metrics['vllm:prompt_tokens_cached_by_source']?.series ?? [];
-  if (physicalVllmSeries.length > 0) {
+  const physicalMetric = metrics['vllm:prompt_tokens_cached_by_source'];
+  const physicalVllmSeries = physicalMetric?.series ?? [];
+  // The name was reused when the producer changed accounting boundaries.
+  // AIPerf preserves its HELP text; source names or matching totals alone do
+  // not distinguish output-based cache attribution from admission counters.
+  const countsAtAdmission = /counted at admission/iu.test(physicalMetric?.description ?? '');
+  const admissionBySrc = new Map<string, RawSeries[]>();
+  if (countsAtAdmission) {
+    for (const series of physicalVllmSeries) {
+      const source = vllmCacheSourceBucket(series.labels?.['source'] || 'external');
+      const entries = admissionBySrc.get(source) ?? [];
+      entries.push(series);
+      admissionBySrc.set(source, entries);
+    }
+  }
+  if (physicalVllmSeries.length > 0 && !countsAtAdmission) {
     for (const series of logicalVllmSeries) {
       const labels = series.labels ?? {};
       const source = labels['source'] ?? labels['reason'] ?? labels['kind'] ?? '';
@@ -1159,6 +1184,30 @@ function buildSeriesFromMetrics(
     const arr = summedSeries(seriesForSource, tOf, 'rate', tickS).filter((p) => p.value > 0);
     if (arr.length > 0) promptTokensBySource[source] = arr;
   }
+  const cacheHitsBySource: Record<string, TimeSeriesPoint[]> = {};
+  for (const [source, seriesForSource] of admissionBySrc) {
+    const points = summedSeries(seriesForSource, tOf, 'rate', tickS).filter((p) => p.value > 0);
+    if (points.length > 0) cacheHitsBySource[source] = points;
+  }
+  const lookupRate = (hits: string, queries: string): number | null => {
+    const hitPoints = counterRate(hits);
+    const queryPoints = counterRate(queries);
+    if (hitPoints.length === 0 || queryPoints.length === 0) return null;
+    const denominator = queryPoints.reduce((sum, p) => sum + p.value, 0);
+    return denominator > 0 ? hitPoints.reduce((sum, p) => sum + p.value, 0) / denominator : null;
+  };
+  const admissionFields = countsAtAdmission
+    ? {
+        cacheHitsBySource,
+        cacheLookupHitRates: {
+          local: lookupRate('vllm:prefix_cache_hits', 'vllm:prefix_cache_queries'),
+          external: lookupRate(
+            'vllm:external_prefix_cache_hits',
+            'vllm:external_prefix_cache_queries',
+          ),
+        },
+      }
+    : {};
 
   const metricSources: MetricSourceSeries[] = [];
   const adapter = selectServerMetricsAdapter(context);
@@ -1172,7 +1221,10 @@ function buildSeriesFromMetrics(
           group = { source, metrics: {} };
           grouped.set(source.id, group);
         }
-        const groupedMetric = (group.metrics[metricName] ??= { series: [] });
+        const groupedMetric = (group.metrics[metricName] ??= {
+          description: metric.description,
+          series: [],
+        });
         groupedMetric.series!.push(series);
       }
     }
@@ -1189,6 +1241,9 @@ function buildSeriesFromMetrics(
         prefixCacheHitRate: sourceSeries.prefixCacheHitRate,
         queueDepth: sourceSeries.queueDepth,
         promptTokensBySource: sourceSeries.promptTokensBySource,
+        ...(sourceSeries.cacheHitsBySource === undefined
+          ? {}
+          : { cacheHitsBySource: sourceSeries.cacheHitsBySource }),
         promptTps: sourceSeries.prefillTps,
         generationTps: sourceSeries.decodeTps,
         prefixCacheHitsTps: sourceSeries.prefixCacheHitsTps,
@@ -1220,6 +1275,7 @@ function buildSeriesFromMetrics(
     prefixCacheHitRate,
     queueDepth,
     promptTokensBySource,
+    ...admissionFields,
     prefillTps,
     decodeTps,
     prefixCacheHitsTps,

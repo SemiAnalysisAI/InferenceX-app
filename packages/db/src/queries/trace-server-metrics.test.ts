@@ -75,6 +75,28 @@ function mockSql(queue: unknown[][]): { sql: DbClient; calls: string[] } {
 }
 
 describe('getTraceServerMetrics', () => {
+  it('returns admission sources and overrides stale output-denominator rates', async () => {
+    const sources = { 'cache hit (CPU offload)': [{ t: 0, value: 160 }] };
+    const { sql } = mockSql([
+      [
+        metaRow({
+          server_gpu_cache_hit_rate: 1.2,
+          server_cpu_cache_hit_rate: 1.6,
+          chart_series: {
+            ...currentSeries(),
+            cacheHitsBySource: sources,
+            cacheLookupHitRates: { local: 0.3, external: 0.8 },
+          },
+        }),
+      ],
+    ]);
+    const result = await getTraceServerMetrics(sql, 42);
+    expect(result?.cacheHitsBySource).toEqual(sources);
+    expect(result?.meta.server_gpu_cache_hit_rate).toBe(0.3);
+    expect(result?.meta.server_cpu_cache_hit_rate).toBeNull();
+    expect(result?.meta.server_external_cache_hit_rate).toBe(0.8);
+  });
+
   it('returns current precomputed series without selecting the raw blob', async () => {
     const { sql, calls } = mockSql([
       [
