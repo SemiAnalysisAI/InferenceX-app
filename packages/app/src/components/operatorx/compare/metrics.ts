@@ -82,6 +82,8 @@ export const METRICS: Metric[] = [
   },
 ];
 
+const DEFAULT_METRIC: MetricId = 'tflops';
+
 export function metricById(id: string | null): Metric {
-  return METRICS.find((m) => m.id === id) ?? METRICS[0];
+  return METRICS.find((m) => m.id === id) ?? METRICS.find((m) => m.id === DEFAULT_METRIC)!;
 }
