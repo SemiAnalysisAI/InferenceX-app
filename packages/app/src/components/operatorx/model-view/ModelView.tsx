@@ -419,21 +419,16 @@ function BlockRows({
         <button
           type="button"
           onClick={onStep}
-          className="relative z-[2] flex items-center justify-center gap-1 rounded-b-lg text-2xs text-muted-foreground hover:bg-muted/40 hover:text-foreground"
+          className="relative z-[2] flex items-center justify-center rounded-b-lg text-2xs text-muted-foreground hover:bg-muted/40 hover:text-foreground"
           style={{ gridColumn: 1, gridRow: -2 }}
           aria-expanded={level > 0}
+          aria-label={level < block.views.length - 1 ? 'Unfuse' : 'Fuse'}
           data-testid={`operatorx-model-fold-${block.id}`}
         >
           {level < block.views.length - 1 ? (
-            <>
-              <ChevronDown className="size-3" />
-              {level === 0 ? 'Show the ops it fuses' : 'Unfuse further'}
-            </>
+            <ChevronDown className="size-3.5" />
           ) : (
-            <>
-              <ChevronUp className="size-3" />
-              Fold back to the fused op
-            </>
+            <ChevronUp className="size-3.5" />
           )}
         </button>
       )}
