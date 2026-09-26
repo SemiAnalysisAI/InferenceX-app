@@ -74,11 +74,17 @@ export class GithubActionsSource implements OperatorXSource {
         'X-GitHub-Api-Version': '2022-11-28',
       },
     });
-    if (!response.ok)
+    if (!response.ok) {
+      // GitHub answers 403 both for missing permission and for an exhausted rate limit;
+      // its message and the remaining quota say which.
+      const body = (await response.json().catch(() => null)) as { message?: unknown } | null;
+      const detail = typeof body?.message === 'string' ? `: ${body.message.slice(0, 160)}` : '';
+      const remaining = response.headers.get('x-ratelimit-remaining');
       throw new OperatorXSourceError(
-        `GitHub request failed (${response.status})`,
+        `GitHub request failed (${response.status}${detail}${remaining === null ? '' : `, rate limit remaining ${remaining}`})`,
         response.status === 404 ? 404 : 502,
       );
+    }
     return response;
   }
 
