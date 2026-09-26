@@ -932,7 +932,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/registry.ts',
-    sourceSha256: '89ec22043b372feda7d87bc67a2b7503f5310d61948a401172ac6f0304287688',
+    sourceSha256: '2f787cabdb65a3549eb2fbd1ce7d3929dd5e5b18d7f34fce1fd7af26100b7954',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',

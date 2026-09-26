@@ -256,7 +256,7 @@ export const DASHBOARD_API_COVERAGE = {
   submissions: { view: 'submissions' },
   operatorx: {
     exclusion:
-      'Hidden OperatorX explorer is being redesigned; its read-only view returns with the new page.',
+      'Feature-gated OperatorX explorer uses page-owned routes; no stable public read-only view is published.',
   },
   collectivex: { view: 'collectivex' },
   'gpu-metrics': { view: 'gpu-metrics' },
