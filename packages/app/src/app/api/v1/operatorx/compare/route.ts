@@ -1,7 +1,12 @@
 import { type NextRequest, NextResponse } from 'next/server';
 
 import { cachedJson, operatorXCacheTag } from '@/lib/api-cache';
-import { errorMessage, errorStatus, getComparison } from '@/lib/operatorx/service';
+import {
+  errorMessage,
+  errorStatus,
+  getComparison,
+  isPartialComparison,
+} from '@/lib/operatorx/service';
 import { comparisonView } from '@semianalysisai/inferencex-db/operatorx/compare';
 
 export const dynamic = 'force-dynamic';
@@ -17,7 +22,10 @@ export async function GET(request: NextRequest) {
   try {
     const comparison = await getComparison(op as 'gemm' | 'moe');
     const view = comparisonView(comparison, request.nextUrl.searchParams.get('workload'));
-    return cachedJson(view, { tag: operatorXCacheTag() });
+    // A comparison missing an unreadable run is served but not cached.
+    return isPartialComparison(comparison)
+      ? NextResponse.json(view, { headers: { 'Cache-Control': 'no-store' } })
+      : cachedJson(view, { tag: operatorXCacheTag() });
   } catch (error) {
     console.error('OperatorX comparison', error);
     return NextResponse.json(

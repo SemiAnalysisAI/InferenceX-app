@@ -247,7 +247,7 @@ export const apiRouteCatalog = [
       en: 'OperatorX page backend; its cross-hardware comparison shape follows the page while it is being redesigned.',
       zh: 'OperatorX 页面后端；页面重新设计期间，其跨硬件对比结构随页面变化。',
     },
-    sourceSha256: '4188dd7bbf1fb1a22f0b4287c9d3eb7231c003d6b1da935a9fddd7b4ea83eec3',
+    sourceSha256: '2244b26cfeb258943e82e8d01e4c31019ad7e763038002acb627bb718d5143f9',
   },
   {
     source: 'src/app/api/v1/operatorx/timelines/route.ts',

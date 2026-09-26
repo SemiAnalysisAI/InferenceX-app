@@ -93,6 +93,12 @@ const OP_TESTLIST_PREFIX: Record<ComparisonOp, string> = { gemm: 'gemm', moe: 'm
 
 /** Each op's comparison and the `runId:revision` list it was built from. */
 const compared = new Map<ComparisonOp, { revisions: string; value: Promise<Comparison> }>();
+/** Comparisons built while some run could not be read: served, but never cached. */
+const partial = new WeakSet<Comparison>();
+
+export function isPartialComparison(comparison: Comparison): boolean {
+  return partial.has(comparison);
+}
 
 function comparisonRuns(op: ComparisonOp, listed: OperatorXRunRef[]): OperatorXRunRef[] {
   const prefix = OP_TESTLIST_PREFIX[op];
@@ -149,10 +155,15 @@ async function compareOp(op: ComparisonOp, runs: OperatorXRunRef[]): Promise<Com
     }
     input.dataset.results.push(result);
   }
-  return buildComparison(op, [...byRun.values()]);
+  const comparison = buildComparison(op, [...byRun.values()]);
+  if (failedReads > 0) partial.add(comparison);
+  return comparison;
 }
 
-/** An op's comparison, rebuilt when a run it reads is added, replaced or removed. */
+/**
+ * An op's comparison, rebuilt when a run it reads is added, replaced or removed. A
+ * partial one (some run failed to read) is not kept, so the next request tries again.
+ */
 export async function getComparison(op: ComparisonOp): Promise<Comparison> {
   const runs = comparisonRuns(op, await listRuns());
   const revisions = runs.map((run) => `${run.run_id}:${revisionOf(run)}`).join(',');
@@ -160,9 +171,10 @@ export async function getComparison(op: ComparisonOp): Promise<Comparison> {
   if (hit?.revisions === revisions) return hit.value;
   const value = compareOp(op, runs);
   compared.set(op, { revisions, value });
-  value.catch(() => {
+  const drop = () => {
     if (compared.get(op)?.value === value) compared.delete(op);
-  });
+  };
+  value.then((comparison) => partial.has(comparison) && drop(), drop);
   return value;
 }
 
