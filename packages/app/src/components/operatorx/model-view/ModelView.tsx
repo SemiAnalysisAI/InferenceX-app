@@ -444,7 +444,7 @@ function BlockRows({
           );
         })}
         {block.nodes.map((n) => {
-          if (!n.fold) return null;
+          if (!n.fold || n.fold.open) return null;
           const box = at.get(n.id)!;
           return (
             <FoldButton
@@ -455,6 +455,39 @@ function BlockRows({
               style={{ left: pct(box.left + box.width / 2), top: box.bottom - 7 }}
               testId={`operatorx-model-fold-${n.id}`}
             />
+          );
+        })}
+        {[
+          ...Map.groupBy(
+            block.nodes.filter((n) => n.fold?.open),
+            (n) => n.fold!.key,
+          ),
+        ].map(([key, group]) => {
+          // The ops one fused op unfolded into, outlined together with one chevron.
+          const outline = group.map((n) => at.get(n.id)!);
+          const left = Math.min(...outline.map((o) => o.left));
+          const right = Math.max(...outline.map((o) => o.left + o.width));
+          const top = Math.min(...outline.map((o) => o.top)) - 4;
+          const bottom = Math.max(...outline.map((o) => o.bottom)) + 4;
+          return (
+            <div key={`${key}:fold`} className="contents">
+              <div
+                className="absolute rounded-md border border-dashed border-muted-foreground/40"
+                style={{
+                  left: `calc(${pct(left)} - 4px)`,
+                  width: `calc(${pct(right - left)} + 8px)`,
+                  top,
+                  height: bottom - top,
+                }}
+              />
+              <FoldButton
+                fold={group[0].fold!}
+                onFold={onFold}
+                className="absolute -translate-x-1/2"
+                style={{ left: pct((left + right) / 2), top: bottom - 7 }}
+                testId={`operatorx-model-fold-${key}`}
+              />
+            </div>
           );
         })}
       </div>

@@ -1,7 +1,6 @@
 'use client';
 
 import { Card } from '@/components/ui/card';
-import { Heading } from '@/components/ui/heading';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useClientSearch } from '@/hooks/useClientSearch';
 import { replaceClientSearch } from '@/lib/client-navigation';
@@ -40,10 +39,8 @@ export default function OperatorXView() {
       data-testid="operatorx-page"
     >
       <Card>
-        <Heading as="h1" level="card">
-          OperatorX
-        </Heading>
-        <TabsList className="mt-4">
+        <h1 className="sr-only">OperatorX</h1>
+        <TabsList>
           {CATEGORIES.map((c) => (
             <TabsTrigger key={c.value} value={c.value}>
               {c.label}
