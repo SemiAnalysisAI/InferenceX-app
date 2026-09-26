@@ -96,6 +96,7 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
     data: view,
     error,
     isLoading,
+    isPlaceholderData: switching,
     refetch,
   } = useOperatorXComparison(op, search.get('workload'));
   const theme = useTheme().resolvedTheme === 'dark' ? 'dark' : 'light';
@@ -154,6 +155,10 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
         <p className="mt-3 text-sm text-muted-foreground">Loading results…</p>
       </Card>
     );
+  // While another workload loads, the previous one stays on screen, dimmed.
+  const pending = switching
+    ? view.workloads.find((w) => w.id === search.get('workload'))
+    : undefined;
   if (view.workloads.length === 0)
     return (
       <Card className="py-6 text-center">
@@ -168,7 +173,7 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
           <ControlGroup label="Workload" htmlFor="operatorx-workload">
             <SearchableSelect
               triggerId="operatorx-workload"
-              value={view.workload ?? ''}
+              value={pending?.id ?? view.workload ?? ''}
               onValueChange={(v) => setParam('workload', v)}
               groups={[
                 {
@@ -222,11 +227,28 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
             />
           </ControlGroup>
         </div>
-        <div className="mt-4 border-t border-border/60 pt-3">
+        <div
+          className={`mt-4 border-t border-border/60 pt-3 transition-opacity ${switching ? 'opacity-40' : ''}`}
+        >
           <CoverageStrip model={model} />
         </div>
       </Card>
-      <div className="grid gap-4 lg:grid-cols-2">
+      {switching && (
+        <div
+          role="status"
+          data-testid="operatorx-switching"
+          className="sticky top-16 z-20 -mb-4 flex h-0 justify-center overflow-visible"
+        >
+          <span className="flex h-9 items-center gap-2 rounded-full border border-border bg-background px-4 text-sm text-muted-foreground shadow-md">
+            <Loader2 className="size-4 animate-spin" />
+            Loading {pending?.label ?? 'workload'}…
+          </span>
+        </div>
+      )}
+      <div
+        aria-busy={switching}
+        className={`grid gap-4 transition-opacity lg:grid-cols-2 ${switching ? 'pointer-events-none opacity-40' : ''}`}
+      >
         {layout(
           VISUALIZATIONS.filter((v) => v.ops.includes(op) && (baseline || !v.needsBaseline)),
         ).map(({ viz, wide }) => (
