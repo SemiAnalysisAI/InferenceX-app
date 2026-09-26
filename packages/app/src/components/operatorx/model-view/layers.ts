@@ -37,6 +37,14 @@ export interface FlowNode {
   /** Rows it spans; a box with several GEMMs has a row of bars for each. */
   row: number;
   rowEnd: number;
+  /** A fused op that unfolds into the ops it runs, or one of those, which folds it back. */
+  fold?: Fold;
+}
+
+/** The key `open` holds while a fused op is unfolded, and whether it is. */
+export interface Fold {
+  key: string;
+  open: boolean;
 }
 
 /** Rows a measured op spans, and the row holding its bars. */
@@ -69,11 +77,8 @@ export interface LayerBlock {
   /** Nodes fed by the block's input. */
   entries: string[];
   spans: SlotSpan[];
-  /**
-   * The block drawn from its most fused measured ops to its least: the fields above are
-   * the first. Blocks with one way to draw them have one.
-   */
-  views: Flow[];
+  /** While the whole block is unfolded from its one fused op: what folds it back. */
+  fold: Fold | null;
 }
 
 /** A box of a hand-drawn graph, with the GEMM roles that run it. */
@@ -87,8 +92,9 @@ interface Def {
   title?: string;
   /** Drawn only when one of its roles was measured. */
   optional?: boolean;
-  /** One op that runs several others: folded blocks show it, open ones the others. */
-  variant?: 'fused' | 'unfused';
+  /** One op that runs these boxes: drawn in their place until it is unfolded. */
+  fuses?: string[];
+  fold?: Fold;
 }
 
 interface Graph {
@@ -181,25 +187,35 @@ function without(graph: Graph, drop: (d: Def) => boolean): Graph {
 }
 
 /**
- * Lays out a block with its measured fused ops, then with the ops they fuse. With no
- * fused op measured, the unfused boxes are the only drawing.
+ * Draws each measured fused op in place of the boxes it runs, unless `open` holds it.
+ * With no fused op measured, the unfused boxes are the only drawing.
  */
-function flows(graph: Graph, present: Set<string>, prefix: string): Flow[] {
+function unfold(
+  graph: Graph,
+  present: Set<string>,
+  prefix: string,
+  open: ReadonlySet<string>,
+): Flow {
   const kept = without(graph, (d) => Boolean(d.optional) && !d.roles?.some((r) => present.has(r)));
-  const has = (v: Def['variant']) => kept.nodes.some((d) => d.variant === v);
-  if (!has('fused') || !has('unfused')) return [layout(kept, present, prefix)];
-  return [
-    layout(
-      without(kept, (d) => d.variant === 'unfused'),
-      present,
-      prefix,
-    ),
-    layout(
-      without(kept, (d) => d.variant === 'fused'),
-      present,
-      prefix,
-    ),
-  ];
+  const hidden = new Set<string>();
+  const folds = new Map<string, Fold>();
+  for (const d of kept.nodes)
+    if (d.fuses) {
+      const fold = { key: `${prefix}${d.id}`, open: open.has(`${prefix}${d.id}`) };
+      if (fold.open) {
+        hidden.add(d.id);
+        for (const id of d.fuses) folds.set(id, fold);
+      } else {
+        folds.set(d.id, fold);
+        for (const id of d.fuses) hidden.add(id);
+      }
+    }
+  const shown = without(kept, (d) => hidden.has(d.id));
+  return layout(
+    { ...shown, nodes: shown.nodes.map((d) => ({ ...d, fold: folds.get(d.id) })) },
+    present,
+    prefix,
+  );
 }
 
 /**
@@ -249,6 +265,7 @@ function layout(graph: Graph, present: Set<string>, prefix: string, group?: OpSl
       span: d.span ?? 1,
       row: Math.min(...r),
       rowEnd: Math.max(...r),
+      fold: d.fold,
     };
   });
   const spans: SlotSpan[] = [
@@ -281,14 +298,13 @@ function gqaGraph(opts: { qkNorm: boolean; core: string; coreTitle?: string; gat
     nodes: [
       node('q', 'q_proj', 0, [], ['q_proj', 'self_attn.q_proj'], {
         title: opts.gated ? 'Emits the queries and a per-head output gate' : undefined,
-        variant: 'unfused',
       }),
-      node('k', 'k_proj', 1, [], ['k_proj', 'self_attn.k_proj'], { variant: 'unfused' }),
-      node('v', 'v_proj', 2, [], ['v_proj', 'self_attn.v_proj'], { variant: 'unfused' }),
+      node('k', 'k_proj', 1, [], ['k_proj', 'self_attn.k_proj']),
+      node('v', 'v_proj', 2, [], ['v_proj', 'self_attn.v_proj']),
       node('qkv', 'qkv_proj', 0, [], ['qkv_proj'], {
         span: 3,
         optional: true,
-        variant: 'fused',
+        fuses: ['q', 'k', 'v'],
         title: 'q, k and v as one fused GEMM, as some engines run them',
       }),
       node('q-rope', rope, 0, ['q', 'qkv']),
@@ -318,12 +334,11 @@ function mlaGraph(dsa: { topk: number } | null) {
   return {
     cols: dsa ? 4 : 3,
     nodes: [
-      node('q-a', 'q_a_proj', 0, [], ['q_a_proj'], { variant: 'unfused' }),
+      node('q-a', 'q_a_proj', 0, [], ['q_a_proj']),
       node('kv-a', 'kv_a_proj_with_mqa', 1, [], ['kv_a_proj_with_mqa'], {
         span: 2,
-        variant: 'unfused',
       }),
-      node('qkv-a', fused, 0, [], [fused], { span: 3, optional: true, variant: 'fused' }),
+      node('qkv-a', fused, 0, [], [fused], { span: 3, optional: true, fuses: ['q-a', 'kv-a'] }),
       node('q-norm', 'RMSNorm', 0, ['q-a', 'qkv-a']),
       node('kv-norm', 'RMSNorm', 1, ['kv-a', 'qkv-a']),
       node('k-rope', 'RoPE (k_pe)', 2, ['kv-a', 'qkv-a'], [], {
@@ -376,12 +391,12 @@ function v4Graph(opts: { pool: string; topk: number }) {
       node('hc-pre', 'mHC pre-mix + RMSNorm', null, [], ['hc_attn'], {
         title: 'Hyper-connections reduce the residual streams to one',
       }),
-      node('q-a', 'wq_a', 0, ['hc-pre'], ['attn.wq_a'], { variant: 'unfused' }),
-      node('kv', 'wkv', 1, ['hc-pre'], ['attn.wkv'], { variant: 'unfused' }),
+      node('q-a', 'wq_a', 0, ['hc-pre'], ['attn.wq_a']),
+      node('kv', 'wkv', 1, ['hc-pre'], ['attn.wkv']),
       node('q-a-kv', 'wq_a + wkv', 0, ['hc-pre'], ['attn.wq_a+wkv'], {
         span: 2,
         optional: true,
-        variant: 'fused',
+        fuses: ['q-a', 'kv'],
       }),
       node(
         'comp',
@@ -492,16 +507,12 @@ function moeGraph(moe: MoeSpec, act: string, hc: boolean): Graph {
   const span = shared ? 2 : 1;
   const sharedGateUp = moe.splitShared
     ? [
-        node('s-gate', 'w1 (gate)', 2, hc ? ['hc-pre'] : [], ['ffn.shared_experts.w1'], {
-          variant: 'unfused',
-        }),
-        node('s-up', 'w3 (up)', 3, hc ? ['hc-pre'] : [], ['ffn.shared_experts.w3'], {
-          variant: 'unfused',
-        }),
+        node('s-gate', 'w1 (gate)', 2, hc ? ['hc-pre'] : [], ['ffn.shared_experts.w1'], {}),
+        node('s-up', 'w3 (up)', 3, hc ? ['hc-pre'] : [], ['ffn.shared_experts.w3'], {}),
         node('s-gate-up', 'w1 + w3', 2, hc ? ['hc-pre'] : [], ['ffn.shared_experts.w1+w3'], {
           span: 2,
           optional: true,
-          variant: 'fused',
+          fuses: ['s-gate', 's-up'],
         }),
       ]
     : [
@@ -764,12 +775,15 @@ export function modelLayers(
   gemms: ComparisonView | undefined,
   model: string,
   hasMoe: boolean,
+  open: ReadonlySet<string>,
 ): LayerBlock[] {
   const present = new Set(
     gemms ? gemms.cases.flatMap((_, i) => caseRoles(gemms, i, model).map(baseRole)) : [],
   );
   const spec = MODEL_SPECS.find(([re]) => re.test(model))?.[1] ?? fallbackSpec(arch, hasMoe);
   const act = arch ? ffnGateActivationLabel(arch) : 'SiLU';
+  // Every role some box runs, folded or not.
+  const bound = new Set<string>();
   const block = (
     id: string,
     label: string,
@@ -779,24 +793,18 @@ export function modelLayers(
     extra: { alternative?: boolean; fold?: { op: OpSlot; label: string; title: string } } = {},
   ): LayerBlock => {
     const prefix = `${id}:`;
-    const views = [
-      // One op timing the whole block, ahead of its GEMMs.
-      ...(extra.fold
-        ? [
-            layout(
-              {
-                cols: 1,
-                nodes: [node('fold', extra.fold.label, null, [], [], { title: extra.fold.title })],
-              },
-              present,
-              prefix,
-              extra.fold.op,
-            ),
-          ]
-        : []),
-      ...flows(graph, present, prefix),
-    ];
-    return { id, label, kind, repeat, alternative: Boolean(extra.alternative), ...views[0], views };
+    for (const d of graph.nodes) for (const r of d.roles ?? []) bound.add(r);
+    const base = { id, label, kind, repeat, alternative: Boolean(extra.alternative) };
+    if (!extra.fold) return { ...base, ...unfold(graph, present, prefix, open), fold: null };
+    // One op timing the whole block, drawn until it is unfolded into the block's graph.
+    const fold = { key: `${prefix}fold`, open: open.has(`${prefix}fold`) };
+    if (fold.open) return { ...base, ...unfold(graph, present, prefix, open), fold };
+    const whole = node('fold', extra.fold.label, null, [], [], { title: extra.fold.title, fold });
+    return {
+      ...base,
+      ...layout({ cols: 1, nodes: [whole] }, present, prefix, extra.fold.op),
+      fold: null,
+    };
   };
 
   const blocks: LayerBlock[] = [
@@ -850,9 +858,6 @@ export function modelLayers(
     }),
   );
 
-  const bound = new Set(
-    blocks.flatMap((b) => b.views.flatMap((v) => v.spans.flatMap((s) => s.slot.roles))),
-  );
   const other = [...present].filter((r) => !bound.has(r)).sort();
   // Roles the graph has no box for: listed, unconnected.
   if (other.length > 0) {
@@ -860,8 +865,7 @@ export function modelLayers(
       cols: 1,
       nodes: other.map((r) => node(r, r, null, [], [r])),
     });
-    const flat = { ...listed.views[0], edges: [], entries: [] };
-    blocks.push({ ...listed, ...flat, views: [flat] });
+    blocks.push({ ...listed, edges: [], entries: [] });
   }
   return blocks;
 }

@@ -3,7 +3,7 @@
 import { ArrowDown, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTheme } from 'next-themes';
-import { useMemo, useState } from 'react';
+import { type CSSProperties, useMemo, useState } from 'react';
 
 import type {
   ComparisonOp,
@@ -43,6 +43,7 @@ import { metricVsSize } from '../viz/metric-vs-size';
 import { roofline } from '../viz/roofline';
 import {
   architecture,
+  type Fold,
   type LayerBlock,
   modelLayers,
   type OpSlot,
@@ -164,7 +165,7 @@ function SlotTooltip({ data, tokens }: { data: SlotData; tokens: number }) {
 }
 
 const HEADER_PX = 32;
-/** The strip along a block's bottom that unfolds its fused ops. */
+/** The strip along an unfolded block's bottom that folds it back. */
 const FOLD_PX = 22;
 const COMPACT_PX = 34;
 const TALL_NODE_PX = 26;
@@ -287,6 +288,36 @@ function FlowEdges({ block, at }: { block: LayerBlock; at: Map<string, Box> }) {
   );
 }
 
+/** A chevron that unfolds a fused op into the ops it runs, or folds them back. */
+function FoldButton({
+  fold,
+  onFold,
+  className,
+  style,
+  testId,
+}: {
+  fold: Fold;
+  onFold: (key: string) => void;
+  className: string;
+  style?: CSSProperties;
+  testId: string;
+}) {
+  const Icon = fold.open ? ChevronUp : ChevronDown;
+  return (
+    <button
+      type="button"
+      onClick={() => onFold(fold.key)}
+      className={`pointer-events-auto flex size-3.5 items-center justify-center rounded-full border bg-card text-muted-foreground hover:text-foreground ${className}`}
+      style={style}
+      aria-expanded={fold.open}
+      aria-label={fold.open ? 'Fold into the fused op' : 'Unfold into the ops it runs'}
+      data-testid={testId}
+    >
+      <Icon className="size-3" />
+    </button>
+  );
+}
+
 function BlockRows({
   block,
   slots,
@@ -294,8 +325,7 @@ function BlockRows({
   lanes,
   isDark,
   onOpen,
-  level,
-  onStep,
+  onFold,
 }: {
   block: LayerBlock;
   slots: SlotData[];
@@ -304,9 +334,8 @@ function BlockRows({
   lanes: number;
   isDark: boolean;
   onOpen: (data: SlotData) => void;
-  /** Which of `block.views` is drawn. */
-  level: number;
-  onStep: () => void;
+  /** Unfolds a fused op, or folds it back. */
+  onFold: (key: string) => void;
 }) {
   const [hovered, setHovered] = useState<string | null>(null);
   const c = BLOCK_COLORS[block.kind];
@@ -315,7 +344,7 @@ function BlockRows({
     <div
       className={`grid ${ROW_GRID} gap-x-4`}
       style={{
-        gridTemplateRows: [HEADER_PX, ...rows, ...(block.views.length > 1 ? [FOLD_PX] : [])]
+        gridTemplateRows: [HEADER_PX, ...rows, ...(block.fold ? [FOLD_PX] : [])]
           .map((h) => `${h}px`)
           .join(' '),
       }}
@@ -414,22 +443,32 @@ function BlockRows({
             </div>
           );
         })}
+        {block.nodes.map((n) => {
+          if (!n.fold) return null;
+          const box = at.get(n.id)!;
+          return (
+            <FoldButton
+              key={`${n.id}:fold`}
+              fold={n.fold}
+              onFold={onFold}
+              className="absolute -translate-x-1/2"
+              style={{ left: pct(box.left + box.width / 2), top: box.bottom - 7 }}
+              testId={`operatorx-model-fold-${n.id}`}
+            />
+          );
+        })}
       </div>
-      {block.views.length > 1 && (
+      {block.fold && (
         <button
           type="button"
-          onClick={onStep}
-          className="relative z-[2] flex items-center justify-center rounded-b-lg text-2xs text-muted-foreground hover:bg-muted/40 hover:text-foreground"
+          onClick={() => onFold(block.fold!.key)}
+          className="relative z-[2] flex items-center justify-center rounded-b-lg text-muted-foreground hover:bg-muted/40 hover:text-foreground"
           style={{ gridColumn: 1, gridRow: -2 }}
-          aria-expanded={level > 0}
-          aria-label={level < block.views.length - 1 ? 'Unfuse' : 'Fuse'}
+          aria-expanded
+          aria-label="Fold into the fused op"
           data-testid={`operatorx-model-fold-${block.id}`}
         >
-          {level < block.views.length - 1 ? (
-            <ChevronDown className="size-3.5" />
-          ) : (
-            <ChevronUp className="size-3.5" />
-          )}
+          <ChevronUp className="size-3.5" />
         </button>
       )}
     </div>
@@ -558,19 +597,13 @@ export function ModelView() {
         )[0] ?? null);
 
   const arch = architecture(requested);
+  // Fused ops the reader unfolded.
+  const [openFolds, setOpenFolds] = useState<ReadonlySet<string>>(new Set());
   const blocks = useMemo(
-    () => modelLayers(arch, gemm.data, requested, (moe.data?.cases.length ?? 0) > 0),
-    [arch, gemm.data, moe.data, requested],
+    () => modelLayers(arch, gemm.data, requested, (moe.data?.cases.length ?? 0) > 0, openFolds),
+    [arch, gemm.data, moe.data, requested, openFolds],
   );
-  const [levels, setLevels] = useState<Record<string, number>>({});
-  const shown = useMemo(
-    () =>
-      blocks.map((block) => {
-        const level = Math.min(levels[block.id] ?? 0, block.views.length - 1);
-        return { block: { ...block, ...block.views[level] }, level };
-      }),
-    [blocks, levels],
-  );
+
   const models = useMemo(() => {
     const toggle = (hw: string) => {
       const next = hardware.includes(hw) ? hardware.filter((h) => h !== hw) : [...hardware, hw];
@@ -587,7 +620,7 @@ export function ModelView() {
   }, [gemm.data, moe.data, metric, hardware, available, colors]);
   const resolved = useMemo(
     () =>
-      shown.map(({ block }) => ({
+      blocks.map((block) => ({
         block,
         slots: block.spans.map(({ slot, first, last, bar }) => {
           const model = models[slot.op];
@@ -602,7 +635,7 @@ export function ModelView() {
           };
         }),
       })),
-    [shown, models, requested, precision],
+    [blocks, models, requested, precision],
   );
   const bins = useMemo(() => {
     const out = new Set<number>();
@@ -728,7 +761,7 @@ export function ModelView() {
             {bin === null ? <div /> : <TokenSlider bins={bins} bin={bin} onChange={setBin} />}
           </div>
           <div className="flex flex-col">
-            {shown.map(({ block, level }, b) => (
+            {blocks.map((block, b) => (
               <div key={block.id}>
                 {b > 0 && (
                   <div className={`grid ${ROW_GRID} gap-x-4`}>
@@ -746,9 +779,12 @@ export function ModelView() {
                   lanes={hardware.length}
                   isDark={isDark}
                   onOpen={setOpen}
-                  level={level}
-                  onStep={() =>
-                    setLevels((prev) => ({ ...prev, [block.id]: (level + 1) % block.views.length }))
+                  onFold={(key) =>
+                    setOpenFolds((prev) => {
+                      const next = new Set(prev);
+                      if (!next.delete(key)) next.add(key);
+                      return next;
+                    })
                   }
                 />
               </div>
