@@ -31,6 +31,9 @@ interface Point {
 /** Key of the one roofline every device shares once normalized. */
 const SHARED = 'shared';
 const ratio = (v: number) => String(Number(v.toPrecision(2)));
+/** ` · 42% of peak compute`, or nothing when the device's peak is unknown. */
+const share = (v: number, of: number | null, what: string) =>
+  of ? ` · ${ratio((v / of) * 100)}% of peak ${what}` : '';
 
 function Roofline({ model }: { model: ComparisonModel }) {
   const { view } = model;
@@ -186,18 +189,22 @@ function Roofline({ model }: { model: ComparisonModel }) {
         tooltip={{
           rulerType: 'none',
           attachToLayer: 1,
-          content: (p) =>
-            tooltipHtml({
+          content: (p) => {
+            const peak = peakTflops(p.hw, precision);
+            const bw = peakBandwidthTBs(p.hw);
+            const tbs = p.tflops / p.ai;
+            return tooltipHtml({
               title: hardwareLabel(p.hw),
               color: model.colors[p.hw],
               rows: [
                 esc(`${caseLabel(view.cases[p.i])} · ${view.cases[p.i].precision}`),
-                normalized
-                  ? `<strong>${ratio(p.y * 100)}% of peak</strong> · ${p.tflops.toFixed(1)} TFLOPS at ${p.ai.toFixed(0)} FLOP/B`
-                  : `<strong>${p.tflops.toFixed(1)} TFLOPS</strong> at ${p.ai.toFixed(0)} FLOP/B`,
+                `<strong>${p.tflops.toFixed(1)} TFLOPS</strong>${share(p.tflops, peak, 'compute')}`,
+                `<strong>${tbs.toFixed(2)} TB/s</strong>${share(tbs, bw, 'bandwidth')}`,
+                `${p.ai.toFixed(0)} FLOP/byte`,
               ],
               footer: 'Click for kernel timeline',
-            }),
+            });
+          },
         }}
         legendElement={<HardwareLegend model={model} />}
       />
