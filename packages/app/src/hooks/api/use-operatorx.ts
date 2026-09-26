@@ -60,7 +60,7 @@ export function useOperatorXComparison(op: ComparisonOp | null, workload: string
 
 export type OperatorXTimelines = Record<string, OperatorXTimeline | null>;
 
-/** Kernel timelines are immutable per `runId:index`, so one fetch per case lasts the session. */
+/** Kernel timelines of `runId:index` results, fresh as long as the comparison naming them. */
 function timelinesQuery(op: ComparisonOp, refs: string[]) {
   return {
     queryKey: ['operatorx', 'timelines', TIMELINE_VERSION, op, refs.join(',')],
@@ -69,8 +69,7 @@ function timelinesQuery(op: ComparisonOp, refs: string[]) {
         `/api/v1/operatorx/timelines?${new URLSearchParams({ op, r: refs.join(','), v: String(TIMELINE_VERSION) })}`,
         signal,
       ),
-    staleTime: Infinity,
-    gcTime: 30 * 60_000,
+    staleTime: 5 * 60_000,
   };
 }
 

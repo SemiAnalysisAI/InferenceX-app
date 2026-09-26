@@ -11,8 +11,9 @@ const REF = /^[\w.-]{1,128}:\d+$/;
 const MAX_REFS = 32;
 
 /**
- * Kernel timelines of results named `runId:index` (comma-separated `r`). A run's
- * results never change, so a response is cacheable for good.
+ * Kernel timelines of results named `runId:index` (comma-separated `r`). Re-ingest can
+ * replace a run's results, so a response caches as long as the comparison it came from;
+ * one naming a result the comparison does not hold is not cached at all.
  */
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;
@@ -25,9 +26,11 @@ export async function GET(request: NextRequest) {
       { status: 400 },
     );
   try {
-    const timelines = await getTimelines(op as 'gemm' | 'moe', refs);
+    const { timelines, known } = await getTimelines(op as 'gemm' | 'moe', refs);
     return NextResponse.json(timelines, {
-      headers: { 'Cache-Control': 'public, max-age=86400, s-maxage=31536000, immutable' },
+      headers: {
+        'Cache-Control': known ? 'public, s-maxage=300, stale-while-revalidate=300' : 'no-store',
+      },
     });
   } catch (error) {
     console.error('OperatorX timelines', error);

@@ -137,13 +137,21 @@ export async function getComparison(op: ComparisonOp): Promise<Comparison> {
   return comparison;
 }
 
-/** Kernel timelines of the given `runId:index` results; null where none was profiled. */
+/**
+ * Kernel timelines of the given `runId:index` results; null where none was profiled.
+ * `known` is false when some ref is not a result of the current comparison (a stale or
+ * re-ingested run), whose null must not be cached as "not profiled".
+ */
 export async function getTimelines(
   op: ComparisonOp,
   refs: string[],
-): Promise<Record<string, OperatorXTimeline | null>> {
-  const { timelines } = await getCompared(op);
-  return Object.fromEntries(refs.map((ref) => [ref, timelines.get(ref) ?? null]));
+): Promise<{ timelines: Record<string, OperatorXTimeline | null>; known: boolean }> {
+  const { comparison, timelines } = await getCompared(op);
+  const results = new Set(comparison.rows.map((row) => `${row.runId}:${row.resultIndex}`));
+  return {
+    timelines: Object.fromEntries(refs.map((ref) => [ref, timelines.get(ref) ?? null])),
+    known: refs.every((ref) => results.has(ref)),
+  };
 }
 
 export function errorStatus(error: unknown): number {

@@ -80,7 +80,10 @@ function Roofline({ model }: { model: ComparisonModel }) {
       );
   const [a0, a1] =
     xs.length > 0
-      ? [Math.min(...xs, normalized ? 1 : Infinity) / 1.5, Math.max(...xs) * 1.5]
+      ? [
+          Math.min(...xs, normalized ? 1 : Infinity) / 1.5,
+          Math.max(...xs, normalized ? 1 : -Infinity) * 1.5,
+        ]
       : [0.1, 10];
   const rooflines: Record<string, { x: number; y: number }[]> = {};
   const roof = (peak: number, knee: number) => [
