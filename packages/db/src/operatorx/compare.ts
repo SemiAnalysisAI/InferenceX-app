@@ -264,8 +264,11 @@ export function comparisonView(comparison: Comparison, workloadId: string | null
       for (const s of r.sources) {
         const m = model(s.model);
         const into = merged.find((x) => x.model === m);
-        if (into) {into.roles = [...new Set([...into.roles, ...s.roles])].sort();}
-        else {merged.push({ model: m, roles: [...s.roles] });}
+        if (into) {
+          into.roles = [...new Set([...into.roles, ...s.roles])].sort();
+        } else {
+          merged.push({ model: m, roles: [...s.roles] });
+        }
       }
       continue;
     }
