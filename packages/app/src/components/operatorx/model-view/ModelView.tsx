@@ -53,7 +53,7 @@ import { barsHeight, binTokens, gpuValues, inBin, OpBars, sizeBin } from './OpBa
 
 const DEFAULT_MODEL = 'DeepSeek-R1-0528';
 const PRECISIONS: ComputePrecision[] = ['fp4', 'fp8', 'bf16'];
-const ROW_GRID = 'grid-cols-[minmax(14rem,22rem)_minmax(0,1fr)_4.5rem]';
+const ROW_GRID = 'grid-cols-[minmax(14rem,22rem)_minmax(0,1fr)]';
 
 function setParam(key: string, value: string) {
   const params = new URLSearchParams(window.location.search);
@@ -354,12 +354,6 @@ function BlockRows({
               ) : (
                 <span className="text-xs text-muted-foreground">No results yet</span>
               )}
-            </div>
-            <div
-              className="pointer-events-none relative z-[2] flex items-center justify-end text-xs text-muted-foreground tabular-nums"
-              style={{ gridColumn: 3, gridRow: gridRow(data.first, data.last) }}
-            >
-              {data.atSize.length > 0 ? data.atSize.length.toLocaleString() : ''}
             </div>
           </div>
         );
@@ -675,7 +669,6 @@ export function ModelView() {
               ))}
             </div>
             {bin === null ? <div /> : <TokenSlider bins={bins} bin={bin} onChange={setBin} />}
-            <div className="text-right text-xs text-muted-foreground">Shapes</div>
           </div>
           <div className="flex flex-col">
             {blocks.map((block, b) => (
