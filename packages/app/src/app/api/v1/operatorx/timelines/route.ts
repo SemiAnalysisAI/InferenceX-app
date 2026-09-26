@@ -7,7 +7,7 @@ export const runtime = 'nodejs';
 export const maxDuration = 300;
 
 const OPS = new Set(['gemm', 'moe']);
-const REF = /^\d+:\d+$/;
+const REF = /^[\w.-]{1,128}:\d+$/;
 const MAX_REFS = 32;
 
 /**

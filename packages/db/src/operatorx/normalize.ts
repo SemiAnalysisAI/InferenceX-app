@@ -1,6 +1,6 @@
 /**
  * Raw OperatorX bundle -> the dataset the dashboard renders. Pure and source-agnostic:
- * the GitHub, local-directory and database sources all hand this the same raw bundle.
+ * the database and local-directory sources both hand this the same raw bundle.
  *
  * An unknown op type still produces rows (with generic labels) instead of failing the
  * run. Requested cases with no result row are reported as `missing`.

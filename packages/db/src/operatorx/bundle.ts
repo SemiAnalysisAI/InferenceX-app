@@ -1,10 +1,10 @@
 /**
- * The raw OperatorX run bundle: one GitHub Actions run of operatorx-sweep.yml, as its
- * artifacts carry it. This is the storage contract between a data source (GitHub
- * artifacts, a local directory, the opx_runs table) and the normalizer, so every source
- * returns exactly this shape and nothing downstream knows where it came from.
+ * The raw OperatorX run bundle: one run's manifest and the operatorx results JSON of
+ * each of its shards. This is the storage contract between a data source (the OperatorX
+ * database, a local directory) and the normalizer, so every source returns exactly this
+ * shape and nothing downstream knows where it came from.
  *
- * `docs` are the shard artifact's JSON documents verbatim (the operatorx results JSON
+ * `docs` are the shard's JSON documents verbatim (the operatorx results JSON
  * files). Nothing is interpreted here; see normalize.ts.
  */
 
@@ -20,7 +20,7 @@ export interface OperatorXRunMeta {
 export interface OperatorXShardDocs {
   /** Manifest cell id (`<runner>-<hash>`). */
   id: string;
-  /** Actions attempt whose artifact supplied these documents. */
+  /** Run attempt that produced these documents. */
   attempt: number;
   docs: unknown[];
 }
@@ -32,12 +32,10 @@ export interface OperatorXRawBundle {
   shards: OperatorXShardDocs[];
 }
 
-/** A run as a source lists it, before its shard artifacts are read. */
+/** A run as a source lists it, before its documents are read. */
 export interface OperatorXRunRef extends OperatorXRunMeta {
   /** Planned coverage from the manifest, when the source has it cheaply. */
   plan?: OperatorXRunPlan;
-  /** The source can no longer produce the bundle (e.g. GitHub artifacts expired). */
-  unavailable?: string;
 }
 
 export interface OperatorXRunPlan {

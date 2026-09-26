@@ -97,7 +97,7 @@ async function compareOp(op: ComparisonOp): Promise<Compared> {
   const picked: OperatorXRunRef[] = [];
   for (const run of await listRuns()) {
     const plan = run.plan;
-    if (!plan || run.unavailable || plan.mode !== 'timing') continue;
+    if (!plan || plan.mode !== 'timing') continue;
     const fresh = plan.testlists.filter(
       (t) => t.startsWith(prefix) && !covered.has(`${plan.runner}|${t}`),
     );
