@@ -48,7 +48,6 @@ function gemmLabels(a: Args): OpLabels {
 
 function moeLabels(a: Args): OpLabels {
   const ex = obj(a.experts) ?? {};
-  const q = obj(ex.quant) ?? {};
   const latent = num(ex.latent) ? ` L=${ex.latent}` : '';
   const routing = obj(a.routing);
   const dist = routing?.distribution;
@@ -58,8 +57,8 @@ function moeLabels(a: Args): OpLabels {
       : '';
   const shape = `T=${a.tokens} H=${a.hidden} E=${ex.num}/top${ex.top_k} I=${ex.inter}${latent}${distLabel}`;
   const shared = obj(a.shared);
-  const sharedW = shared ? obj(shared.quant)?.w13 : null;
-  const precision = `x ${describeOperand(q.x)} · w ${describeOperand(q.w13)}${sharedW ? ` · shared w ${describeOperand(sharedW)}` : ''}`;
+  const sharedW = shared?.w1;
+  const precision = `a1 ${describeOperand(ex.a1)} · w ${describeOperand(ex.w1)}${sharedW ? ` · shared w ${describeOperand(sharedW)}` : ''}`;
   return { shape, precision };
 }
 
@@ -154,16 +153,14 @@ export function usefulBytes(type: string, a: Args): number | null {
     const [e, k, i] = [num(ex.num), num(ex.top_k), num(ex.inter)];
     if (!e || !k || !i) return null;
     const w = num(ex.latent) ?? h;
-    const q = obj(ex.quant) ?? {};
     const touched = e * (1 - (1 - k / e) ** t);
-    let bytes = touched * (operandBytes(obj(q.w13), 2 * i, w) + operandBytes(obj(q.w2), w, i));
+    let bytes = touched * (operandBytes(obj(ex.w1), 2 * i, w) + operandBytes(obj(ex.w2), w, i));
     bytes += h * e * 2 + 2 * t * h * 2;
     if (num(ex.latent)) bytes += 2 * h * w * 2;
     const sh = obj(a.shared);
     if (sh && num(sh.count) && num(sh.inter)) {
-      const sq = obj(sh.quant) ?? {};
       const si = (sh.inter as number) * (sh.count as number);
-      bytes += operandBytes(obj(sq.w13), 2 * si, h) + operandBytes(obj(sq.w2), h, si);
+      bytes += operandBytes(obj(sh.w1), 2 * si, h) + operandBytes(obj(sh.w2), h, si);
     }
     return bytes;
   }

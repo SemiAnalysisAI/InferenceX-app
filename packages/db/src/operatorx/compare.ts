@@ -79,8 +79,8 @@ function computePrecision(op: ComparisonOp, a: Args): ComputePrecision {
     op === 'gemm'
       ? [a.a, a.b]
       : (() => {
-          const q = ((a.experts ?? {}) as Args).quant as Args | undefined;
-          return q ? [q.x, q.w13] : [];
+          const ex = (a.experts ?? {}) as Args;
+          return ex.w1 ? [ex.a1, ex.w1] : [];
         })();
   const widest = quant.map(dtypeOf);
   if (widest.some((d) => d === 'bf16' || d === 'fp16')) return 'bf16';
