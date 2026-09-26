@@ -154,7 +154,8 @@ export function getComparison(op: ComparisonOp): Promise<Comparison> {
 /**
  * Read timelines from their original stored runs. A newer comparison can replace a
  * row without removing the older result that a client's open detail still names.
- * `known` is false if a run or result no longer exists after re-ingest/deletion.
+ * Read current bundles rather than the run-ID cache: a re-ingest replaces the stored
+ * revision while keeping the run ID and result indices.
  */
 export async function getTimelines(
   op: ComparisonOp,
@@ -162,15 +163,24 @@ export async function getTimelines(
 ): Promise<{ timelines: Record<string, OperatorXTimeline | null>; known: boolean }> {
   const timelines: Record<string, OperatorXTimeline | null> = {};
   let known = true;
+  const loaded = new Map<string, Promise<Normalized>>();
   for (const ref of refs) {
-    const colon = ref.lastIndexOf(':');
-    const runId = ref.slice(0, colon);
-    const index = Number(ref.slice(colon + 1));
+    const [runId, rawIndex, revision] = ref.split(':');
+    const index = Number(rawIndex);
     try {
-      const { results, metrics } = await normalized(runId);
+      let bundle = loaded.get(runId);
+      if (!bundle) {
+        bundle = getOperatorXSource().getBundle(runId).then(normalizeBundle);
+        loaded.set(runId, bundle);
+      }
+      const { run, results, metrics } = await bundle;
       const result = results[index];
-      if (!result || result.opType !== op) known = false;
-      timelines[ref] = result?.opType === op ? compactTimeline(metrics[index]) : null;
+      if (!revision || revision !== run.revision || !result || result.opType !== op) {
+        timelines[ref] = null;
+        known = false;
+      } else {
+        timelines[ref] = compactTimeline(metrics[index]);
+      }
     } catch (error) {
       if (!(error instanceof OperatorXSourceError) || error.status !== 404) throw error;
       timelines[ref] = null;

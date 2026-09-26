@@ -20,6 +20,7 @@ KV rank、因果语义及 Q/K/V/输出精度。其他算子暂未纳入。
 跨运行比较会按 GPU、测试用例和后端选取最新的有效结果。明确报错或不支持的结果会保留；
 缺失的结果可由较早存储运行中的结果补齐。Kernel timeline 从结果所属的运行读取，
 因此新运行替换比较中的条目后，已打开的旧 profile 仍可查看。
+时间线引用包含存储版本。重新导入同一运行会生成新版本，新的比较结果不会误用旧缓存中的时间线。
 
 API 数据集版本 3 增加 `moe_gemm` 和可空的 `moe` 维度对象，并保留 `type`、原始 `args`
 及可空的 `attention`。不适用的算子字段为 null。现有原始数据无需迁移表结构即可读取；
@@ -77,6 +78,10 @@ K3 配置的 `n_shared=0`。分子不计激活和路由计算量，分母为实�
   用于非 sweep 采集的运行。
 
 重新导入会替换该运行。配置：
+
+`Ingest OperatorX Results` 工作流支持手动输入运行 ID，也支持 `ingest-operatorx`
+repository dispatch。InferenceX 的 `operatorx-sweep.yml` 目前不会自动触发导入；
+sweep 完成后需单独运行导入工作流。
 
 1. `DATABASE_OPERATORX_WRITE_URL`：所有者连接（直连、非连接池），仅用于迁移和导入。
 2. `DATABASE_OPERATORX_READONLY_URL`：连接池端点上的只读角色，应用仅使用此连接。

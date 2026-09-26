@@ -54,6 +54,7 @@ export interface OperatorXResult {
 export interface OperatorXRunSummary {
   runId: string;
   runAttempt: number;
+  revision: string;
   sourceSha: string;
   sourceBranch: string | null;
   generatedAt: string;
@@ -268,6 +269,7 @@ export function normalizeBundle(bundle: OperatorXRawBundle): Normalized {
     run: {
       runId: bundle.run.run_id,
       runAttempt: bundle.run.run_attempt,
+      revision: bundle.run.revision ?? String(bundle.run.run_attempt),
       sourceSha: bundle.run.source_sha,
       sourceBranch: bundle.run.source_branch,
       generatedAt: bundle.run.generated_at,

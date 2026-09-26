@@ -20,6 +20,8 @@ Cross-run comparisons select the newest available result per GPU, case, and back
 An explicit error or unsupported result remains visible; a missing result can be
 filled by an older stored run. Kernel timelines are read from the result's stored
 run, so opening a profile still works after a newer comparison replaces that row.
+Timeline references include the stored revision. Re-ingesting the same run replaces
+that revision, so a new comparison cannot open a cached timeline from the old data.
 
 GEMM TFLOPS is `2*M*N*K/(latency_us*1e6)`, per GPU. An eight-GPU Slurm allocation does
 not multiply this number. The UI preserves A/B/output precision, latency, shape,
@@ -86,6 +88,10 @@ at ingest, so a run that cannot be read is never stored. Runs arrive by push:
   as they are, for runs collected outside a sweep.
 
 Re-ingesting a run replaces it. Setup:
+
+The `Ingest OperatorX Results` workflow accepts a manual run ID or an
+`ingest-operatorx` repository dispatch. The InferenceX `operatorx-sweep.yml` does not
+currently dispatch it automatically; run the ingest workflow for completed sweeps.
 
 1. `DATABASE_OPERATORX_WRITE_URL`: the owner connection (direct, non-pooled), for
    migrations and ingest only.

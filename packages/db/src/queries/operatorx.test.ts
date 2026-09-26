@@ -99,20 +99,29 @@ it('persists raw OperatorX documents and replaces a re-ingested run atomically',
         plan: { runner: 'h200-dgxc', requested: 1 },
       },
     ]);
-    expect(await getOperatorXBundle(sql, '123')).toMatchObject({
+    const storedOriginal = await getOperatorXBundle(sql, '123');
+    expect(storedOriginal).toMatchObject({
       run: { run_id: '123', conclusion: 'success' },
       shards: first.shards,
     });
+    const originalRevision = storedOriginal!.run.revision;
+    const originalRuns = await listOperatorXRuns(sql);
+    expect(originalRuns[0].revision).toBe(originalRevision);
 
     const retry = structuredClone(first);
     retry.run.run_attempt = 2;
     retry.run.conclusion = 'failure';
     retry.shards = [];
     expect(await saveOperatorXBundle(sql, retry)).toEqual({ docs: 0, results: 1 });
-    expect(await getOperatorXBundle(sql, '123')).toMatchObject({
+    const storedReplacement = await getOperatorXBundle(sql, '123');
+    expect(storedReplacement).toMatchObject({
       run: { run_attempt: 2, conclusion: 'failure' },
       shards: [],
     });
+    const replacementRevision = storedReplacement!.run.revision;
+    expect(replacementRevision).not.toBe(originalRevision);
+    const replacementRuns = await listOperatorXRuns(sql);
+    expect(replacementRuns[0].revision).toBe(replacementRevision);
     expect(await getOperatorXBundle(sql, '999')).toBeNull();
   } finally {
     await db.close();

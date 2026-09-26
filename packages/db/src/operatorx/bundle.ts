@@ -11,6 +11,8 @@
 export interface OperatorXRunMeta {
   run_id: string;
   run_attempt: number;
+  /** Storage revision; changes when a stored run is replaced. */
+  revision?: string;
   source_sha: string;
   source_branch: string | null;
   generated_at: string;

@@ -56,7 +56,7 @@ export function buildModel(
   };
 }
 
-/** `runId:index` of each selected GPU's OK result for a case, for the timeline fetch. */
+/** `runId:index:revision` of each selected GPU's OK result for the timeline fetch. */
 export function caseRefs(
   view: ComparisonView,
   hardware: string[],
@@ -66,8 +66,13 @@ export function caseRefs(
     const col = view.measurements[hw];
     const runId = col?.runId[caseIndex];
     const index = col?.resultIndex[caseIndex];
-    return col?.status[caseIndex] === 'ok' && runId && index !== null && index !== undefined
-      ? [{ hardware: hw, ref: `${runId}:${index}` }]
+    const revision = col?.revision[caseIndex];
+    return col?.status[caseIndex] === 'ok' &&
+      runId &&
+      index !== null &&
+      index !== undefined &&
+      revision
+      ? [{ hardware: hw, ref: `${runId}:${index}:${revision}` }]
       : [];
   });
 }

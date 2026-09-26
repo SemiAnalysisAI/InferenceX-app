@@ -19,8 +19,8 @@ export const RUN_KEY_RE = /^[\w.-]{1,128}$/u;
 
 /** Every run, newest first, from the precomputed summaries alone. */
 export async function listOperatorXRuns(sql: DbClient): Promise<OperatorXRunRef[]> {
-  const rows = await sql`SELECT summary FROM opx_runs ORDER BY generated_at DESC, id DESC`;
-  return rows.map((r) => r.summary as OperatorXRunRef);
+  const rows = await sql`SELECT id, summary FROM opx_runs ORDER BY generated_at DESC, id DESC`;
+  return rows.map((r) => ({ ...(r.summary as OperatorXRunRef), revision: String(r.id) }));
 }
 
 /**
@@ -33,7 +33,7 @@ export async function getOperatorXBundle(
   runKey: string,
 ): Promise<OperatorXRawBundle | null> {
   const rows = await sql`
-    SELECT r.run_key, r.run_attempt,
+    SELECT r.id, r.run_key, r.run_attempt,
       to_char(r.generated_at at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS generated_at,
       r.source_sha, r.source_branch, r.conclusion, r.manifest,
       COALESCE(d.shards, '[]'::jsonb) AS shards
@@ -56,6 +56,7 @@ export async function getOperatorXBundle(
     run: {
       run_id: String(r.run_key),
       run_attempt: Number(r.run_attempt),
+      revision: String(r.id),
       source_sha: String(r.source_sha),
       source_branch: (r.source_branch as string | null) ?? null,
       generated_at: String(r.generated_at),

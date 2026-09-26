@@ -4,26 +4,26 @@ import {
   planFromManifest,
   type OperatorXRawBundle,
 } from '@semianalysisai/inferencex-db/operatorx/bundle';
+import { comparisonView } from '@semianalysisai/inferencex-db/operatorx/compare';
+
+import { caseRefs } from '@/components/operatorx/compare/model';
 
 const sourceMock = vi.hoisted(() => vi.fn());
 vi.mock('./sources', () => ({ getOperatorXSource: sourceMock }));
 
 const args = { m: 1, n: 64, k: 128, a: { dtype: 'bf16' }, b: { dtype: 'bf16' } };
 const shape = { type: 'gemm', args, sources: ['openai/gpt-oss-120b/k_proj'] };
-const profile = {
-  timeline: [{ name: 'gemm_kernel', start_us: 0, dur_us: 10, stream: 0 }],
-  kernels: [{ name: 'gemm_kernel', us_per_call: 10, count_per_call: 1 }],
-};
-
 function bundle(
   id: string,
   backends: string[],
-  options: { noDocs?: boolean; status?: 'ok' | 'error' } = {},
+  options: { noDocs?: boolean; status?: 'ok' | 'error'; revision?: string; kernel?: string } = {},
 ): OperatorXRawBundle {
+  const kernel = options.kernel ?? 'gemm_kernel';
   return {
     run: {
       run_id: id,
       run_attempt: 1,
+      revision: options.revision ?? '1',
       source_sha: 'a'.repeat(40),
       source_branch: 'main',
       generated_at: '2026-09-26T00:00:00Z',
@@ -53,7 +53,13 @@ function bundle(
                   testlist: 'gemm',
                   op: { ...shape, backend },
                   status: options.status ?? 'ok',
-                  metrics: { latency_us: 10, profile },
+                  metrics: {
+                    latency_us: 10,
+                    profile: {
+                      timeline: [{ name: kernel, start_us: 0, dur_us: 10, stream: 0 }],
+                      kernels: [{ name: kernel, us_per_call: 10, count_per_call: 1 }],
+                    },
+                  },
                 })),
               },
             ],
@@ -143,12 +149,29 @@ it('reads a stored timeline after a newer comparison replaces its row', async ()
   source([old]);
   const { getComparison, getTimelines } = await import('./service');
   const comparison = await getComparison('gemm');
-  const [row] = comparison.rows;
-  const ref = `${row.runId}:${row.resultIndex}`;
+  const view = comparisonView(comparison, null);
+  const ref = caseRefs(view, ['h200'], 0)[0].ref;
+  expect(ref).toBe('1:0:1');
 
   source([recent, old]);
   const result = await getTimelines('gemm', [ref]);
 
   expect(result.known).toBe(true);
   expect(result.timelines[ref]).toMatchObject({ names: ['gemm_kernel'], spanUs: 10 });
+});
+
+it('uses the new stored revision after re-ingest instead of a cached old bundle', async () => {
+  source([bundle('1', ['vllm'], { revision: '101', kernel: 'old_kernel' })]);
+  const { getDataset, getTimelines } = await import('./service');
+  await getDataset('1');
+
+  source([bundle('1', ['vllm'], { revision: '102', kernel: 'new_kernel' })]);
+  const current = await getTimelines('gemm', ['1:0:102']);
+  const replaced = await getTimelines('gemm', ['1:0:101']);
+
+  expect(current).toMatchObject({
+    known: true,
+    timelines: { '1:0:102': { names: ['new_kernel'] } },
+  });
+  expect(replaced).toEqual({ known: false, timelines: { '1:0:101': null } });
 });

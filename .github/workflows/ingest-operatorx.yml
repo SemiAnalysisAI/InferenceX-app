@@ -23,7 +23,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      # The sweep dispatches this from its own last job, so it is still finishing.
+      # A repository_dispatch may arrive before the source sweep completes.
       - name: Wait for the sweep run to complete
         env:
           GH_TOKEN: ${{ secrets.INFX_MAIN_PAT }}

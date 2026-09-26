@@ -47,6 +47,7 @@ export interface ComparisonRow {
   cudaGraph: boolean | null;
   runId: string;
   resultIndex: number;
+  revision: string;
 }
 
 /**
@@ -193,6 +194,7 @@ export function buildComparison(op: ComparisonOp, inputs: ComparisonInput[]): Co
         cudaGraph: r.cudaGraph,
         runId: dataset.run.runId,
         resultIndex: r.index,
+        revision: dataset.run.revision,
       });
     }
     if (used) {
@@ -234,6 +236,7 @@ export interface ComparisonColumns {
   cudaGraph: (boolean | null)[];
   runId: (string | null)[];
   resultIndex: (number | null)[];
+  revision: (string | null)[];
 }
 
 /** One workload's cases across hardware, compact for transfer. */
@@ -309,6 +312,7 @@ export function comparisonView(comparison: Comparison, workloadId: string | null
       cudaGraph: empty(),
       runId: empty(),
       resultIndex: empty(),
+      revision: empty(),
     };
   }
   for (const r of rows) {
@@ -319,6 +323,7 @@ export function comparisonView(comparison: Comparison, workloadId: string | null
     col.cudaGraph[i] = r.cudaGraph;
     col.runId[i] = r.runId;
     col.resultIndex[i] = r.resultIndex;
+    col.revision[i] = r.revision;
     if (r.kernel) {
       if (!kernelIndex.has(r.kernel)) {
         kernelIndex.set(r.kernel, kernels.length);
