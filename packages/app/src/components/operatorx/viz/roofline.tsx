@@ -1,9 +1,12 @@
 'use client';
 
+import { curveLinear } from 'd3';
 import { useMemo, useState } from 'react';
 
 import type { ComputePrecision } from '@semianalysisai/inferencex-db/operatorx/compare';
+import { Label } from '@/components/ui/label';
 import { SegmentedToggle } from '@/components/ui/segmented-toggle';
+import { Switch } from '@/components/ui/switch';
 
 import { EmptyChart } from '../charts/empty';
 import { OpxChart, esc, HardwareLegend, tooltipHtml } from '../charts/kit';
@@ -20,7 +23,14 @@ interface Point {
   i: number;
   x: number;
   y: number;
+  /** FLOP/byte and TFLOPS, as measured; x/y are these or their normalized forms. */
+  ai: number;
+  tflops: number;
 }
+
+/** Key of the one roofline every device shares once normalized. */
+const SHARED = 'shared';
+const ratio = (v: number) => String(Number(v.toPrecision(2)));
 
 function Roofline({ model }: { model: ComparisonModel }) {
   const { view } = model;
@@ -32,51 +42,83 @@ function Roofline({ model }: { model: ComparisonModel }) {
   }, [view]);
   const precisions = ORDER.filter((p) => counts.has(p));
   const [picked, setPicked] = useState<ComputePrecision | null>(null);
+  const [normalized, setNormalized] = useState(true);
   const precision =
     picked && precisions.includes(picked)
       ? picked
       : precisions.toSorted((a, b) => (counts.get(b) ?? 0) - (counts.get(a) ?? 0))[0];
+  // Normalized, each device's intensity is divided by its ridge point (peak / bandwidth)
+  // and its throughput by its peak, so every roofline becomes min(1, x).
   const points = useMemo<Point[]>(
     () =>
-      model.hardware.flatMap((hw) =>
-        view.cases.flatMap((c, i) => {
+      model.hardware.flatMap((hw) => {
+        const peak = precision ? peakTflops(hw, precision) : null;
+        const bw = peakBandwidthTBs(hw);
+        if (normalized && (!peak || !bw)) return [];
+        return view.cases.flatMap((c, i) => {
           const us = model.latency(hw, i);
-          return c.computePrecision === precision && us && c.flops && c.bytes
-            ? [{ hw, i, x: c.flops / c.bytes, y: c.flops / (us * 1e6) }]
-            : [];
-        }),
-      ),
-    [model, view, precision],
+          if (c.computePrecision !== precision || !us || !c.flops || !c.bytes) return [];
+          const ai = c.flops / c.bytes;
+          const tflops = c.flops / (us * 1e6);
+          return [
+            normalized
+              ? { hw, i, ai, tflops, x: (ai * bw!) / peak!, y: tflops / peak! }
+              : { hw, i, ai, tflops, x: ai, y: tflops },
+          ];
+        });
+      }),
+    [model, view, precision, normalized],
   );
   if (!precision) return <EmptyChart>No case has FLOP and byte counts.</EmptyChart>;
-  const ais = view.cases.flatMap((c) =>
-    c.computePrecision === precision && c.flops && c.bytes ? [c.flops / c.bytes] : [],
-  );
-  const [a0, a1] = [Math.min(...ais) / 1.5, Math.max(...ais) * 1.5];
+  const xs = normalized
+    ? points.map((p) => p.x)
+    : view.cases.flatMap((c) =>
+        c.computePrecision === precision && c.flops && c.bytes ? [c.flops / c.bytes] : [],
+      );
+  const [a0, a1] =
+    xs.length > 0
+      ? [Math.min(...xs, normalized ? 1 : Infinity) / 1.5, Math.max(...xs) * 1.5]
+      : [0.1, 10];
   const rooflines: Record<string, { x: number; y: number }[]> = {};
-  for (const hw of model.hardware) {
-    const peak = peakTflops(hw, precision);
-    const bw = peakBandwidthTBs(hw);
-    if (!peak || !bw) continue;
-    const knee = peak / bw;
-    rooflines[hw] = [
-      { x: a0, y: Math.min(peak, bw * a0) },
-      ...(knee > a0 && knee < a1 ? [{ x: knee, y: peak }] : []),
-      { x: a1, y: Math.min(peak, bw * a1) },
-    ];
-  }
+  const roof = (peak: number, knee: number) => [
+    { x: a0, y: Math.min(peak, (peak / knee) * a0) },
+    ...(knee > a0 && knee < a1 ? [{ x: knee, y: peak }] : []),
+    { x: a1, y: Math.min(peak, (peak / knee) * a1) },
+  ];
+  if (normalized) rooflines[SHARED] = roof(1, 1);
+  else
+    for (const hw of model.hardware) {
+      const peak = peakTflops(hw, precision);
+      const bw = peakBandwidthTBs(hw);
+      if (peak && bw) rooflines[hw] = roof(peak, peak / bw);
+    }
   const ys = [
     ...points.map((p) => p.y),
     ...Object.values(rooflines).flatMap((r) => r.map((p) => p.y)),
   ];
   return (
     <div className="space-y-3">
-      <SegmentedToggle
-        value={precision}
-        onValueChange={setPicked}
-        ariaLabel="Compute precision"
-        options={precisions.map((p) => ({ value: p, label: p }))}
-      />
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+        <SegmentedToggle
+          value={precision}
+          onValueChange={setPicked}
+          ariaLabel="Compute precision"
+          options={precisions.map((p) => ({ value: p, label: p }))}
+        />
+        <div className="flex items-center gap-2">
+          <Switch
+            id="opx-roofline-normalized"
+            checked={normalized}
+            onCheckedChange={setNormalized}
+          />
+          <Label
+            htmlFor="opx-roofline-normalized"
+            className="text-sm font-normal text-muted-foreground"
+          >
+            Normalize to roofline
+          </Label>
+        </div>
+      </div>
       <OpxChart<Point>
         inspect={{ model, caseOf: (p) => p.i }}
         chartId="operatorx-roofline"
@@ -89,21 +131,41 @@ function Roofline({ model }: { model: ComparisonModel }) {
           domain: [Math.max(1e-3, Math.min(...ys) / 1.5), Math.max(...ys) * 1.3],
           nice: false,
         }}
-        xAxis={{
-          label: 'Arithmetic intensity (FLOP/byte)',
-          tickFormat: (v) => formatCompact(Number(v)),
-        }}
-        yAxis={{
-          label: 'Achieved TFLOPS',
-          tickCount: 6,
-          tickFormat: (v) => formatCompact(Number(v)),
-        }}
+        xAxis={
+          normalized
+            ? { label: 'Arithmetic intensity / ridge point', tickFormat: (v) => ratio(Number(v)) }
+            : {
+                label: 'Arithmetic intensity (FLOP/byte)',
+                tickFormat: (v) => formatCompact(Number(v)),
+              }
+        }
+        yAxis={
+          normalized
+            ? {
+                label: 'Share of peak compute (%)',
+                tickCount: 6,
+                tickFormat: (v) => ratio(Number(v) * 100),
+              }
+            : {
+                label: 'Achieved TFLOPS',
+                tickCount: 6,
+                tickFormat: (v) => formatCompact(Number(v)),
+              }
+        }
         layers={[
           {
             type: 'roofline',
             key: 'roofs',
             rooflines,
-            config: { getColor: (hw) => model.colors[hw], strokeWidth: 2, strokeDasharray: '6 4' },
+            config: {
+              getColor: (hw) =>
+                hw === SHARED
+                  ? 'var(--muted-foreground)'
+                  : (model.colors[hw] ?? 'var(--muted-foreground)'),
+              strokeWidth: 2,
+              strokeDasharray: '6 4',
+              curve: curveLinear,
+            },
           },
           {
             type: 'point',
@@ -130,7 +192,9 @@ function Roofline({ model }: { model: ComparisonModel }) {
               color: model.colors[p.hw],
               rows: [
                 esc(`${caseLabel(view.cases[p.i])} · ${view.cases[p.i].precision}`),
-                `<strong>${p.y.toFixed(1)} TFLOPS</strong> at ${p.x.toFixed(0)} FLOP/B`,
+                normalized
+                  ? `<strong>${ratio(p.y * 100)}% of peak</strong> · ${p.tflops.toFixed(1)} TFLOPS at ${p.ai.toFixed(0)} FLOP/B`
+                  : `<strong>${p.tflops.toFixed(1)} TFLOPS</strong> at ${p.ai.toFixed(0)} FLOP/B`,
               ],
               footer: 'Click for kernel timeline',
             }),
