@@ -79,9 +79,11 @@ K3 配置的 `n_shared=0`。分子不计激活和路由计算量，分母为实�
 
 重新导入会替换该运行。配置：
 
-`Ingest OperatorX Results` 工作流支持手动输入运行 ID，也支持 `ingest-operatorx`
-repository dispatch。InferenceX 的 `operatorx-sweep.yml` 目前不会自动触发导入；
-sweep 完成后需单独运行导入工作流。
+InferenceX 的 `operatorx-sweep.yml` 手动触发的运行结束后（包括有分片失败的运行），
+会携带运行 ID 发送 `ingest-operatorx` repository dispatch，由 `Ingest OperatorX Results`
+工作流导入该运行。GitHub 只会把 repository dispatch 投递给默认分支上的工作流，
+因此需等 `ingest-operatorx.yml` 合入 InferenceX-app 默认分支后才会自动触发。
+回填或重新导入某次运行时，可手动输入运行 ID 运行该工作流。
 
 1. `DATABASE_OPERATORX_WRITE_URL`：所有者连接（直连、非连接池），仅用于迁移和导入。
 2. `DATABASE_OPERATORX_READONLY_URL`：连接池端点上的只读角色，应用仅使用此连接。
