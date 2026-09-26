@@ -75,6 +75,21 @@ function mockSql(queue: unknown[][]): { sql: DbClient; calls: string[] } {
 }
 
 describe('getTraceServerMetrics', () => {
+  it('does not reinterpret a legacy external ratio as an admission lookup rate', async () => {
+    const { sql } = mockSql([
+      [
+        metaRow({
+          server_cpu_cache_hit_rate: 0.06945,
+          server_external_cache_hit_rate: 0.06945,
+        }),
+      ],
+    ]);
+    const result = await getTraceServerMetrics(sql, 42);
+    expect(result?.meta.server_cpu_cache_hit_rate).toBe(0.06945);
+    expect(result?.meta).not.toHaveProperty('server_external_cache_hit_rate');
+    expect(result).not.toHaveProperty('cacheHitsBySource');
+  });
+
   it('returns admission sources and overrides stale output-denominator rates', async () => {
     const sources = { 'cache hit (CPU offload)': [{ t: 0, value: 160 }] };
     const { sql } = mockSql([

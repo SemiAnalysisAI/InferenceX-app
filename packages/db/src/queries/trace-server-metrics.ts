@@ -31,7 +31,7 @@ export type {
 // The endpoint payload combines chart_series with separately queried point
 // metadata. Keep a composite response version so metadata-shape changes roll
 // the blob-cache namespace without forcing an expensive chart_series backfill.
-const POINT_META_VERSION = 4;
+const POINT_META_VERSION = 5;
 export const TRACE_SERVER_METRICS_VERSION = CHART_SERIES_VERSION * 100 + POINT_META_VERSION;
 
 export interface MetricSourceDescriptor {
@@ -162,10 +162,6 @@ function buildMeta(row: RawMetaRow): PointMeta {
       row.server_gpu_cache_hit_rate === null ? null : Number(row.server_gpu_cache_hit_rate),
     server_cpu_cache_hit_rate:
       row.server_cpu_cache_hit_rate === null ? null : Number(row.server_cpu_cache_hit_rate),
-    ...(row.server_external_cache_hit_rate === null ||
-    row.server_external_cache_hit_rate === undefined
-      ? {}
-      : { server_external_cache_hit_rate: Number(row.server_external_cache_hit_rate) }),
   };
 }
 
@@ -346,7 +342,6 @@ export async function getTraceServerMetrics(
       nullif(br.metrics ->> 'router_version', '') as router_version,
       (br.metrics ->> 'server_gpu_cache_hit_rate')::numeric as server_gpu_cache_hit_rate,
       (br.metrics ->> 'server_cpu_cache_hit_rate')::numeric as server_cpu_cache_hit_rate,
-      (br.metrics ->> 'server_external_cache_hit_rate')::numeric as server_external_cache_hit_rate,
       (br.metrics ->> 'kv_cache_pool_tokens')::numeric as kv_cache_pool_tokens
     from benchmark_results br
     join configs c on c.id = br.config_id
