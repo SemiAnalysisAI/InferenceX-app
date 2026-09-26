@@ -115,7 +115,7 @@ function Roofline({ model }: { model: ComparisonModel }) {
             htmlFor="opx-roofline-normalized"
             className="text-sm font-normal text-muted-foreground"
           >
-            Normalize to roofline
+            Normalized
           </Label>
         </div>
       </div>

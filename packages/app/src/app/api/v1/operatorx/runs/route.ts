@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-import { errorStatus, listRuns, sourceName } from '@/lib/operatorx/service';
+import { errorMessage, errorStatus, listRuns, sourceName } from '@/lib/operatorx/service';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -15,7 +15,7 @@ export async function GET(_request?: Request) {
   } catch (error) {
     console.error('OperatorX run list', error);
     return NextResponse.json(
-      { error: 'OperatorX runs unavailable' },
+      { error: errorMessage(error, 'OperatorX runs unavailable') },
       { status: errorStatus(error) },
     );
   }

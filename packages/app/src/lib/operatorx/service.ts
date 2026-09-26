@@ -149,3 +149,8 @@ export async function getTimelines(
 export function errorStatus(error: unknown): number {
   return error instanceof OperatorXSourceError ? error.status : 503;
 }
+
+/** Our own source errors say what failed; anything else stays generic. */
+export function errorMessage(error: unknown, fallback: string): string {
+  return error instanceof OperatorXSourceError ? `${fallback}: ${error.message}` : fallback;
+}

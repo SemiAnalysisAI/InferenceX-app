@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from 'next/server';
 
-import { errorStatus, getComparison } from '@/lib/operatorx/service';
+import { errorMessage, errorStatus, getComparison } from '@/lib/operatorx/service';
 import { comparisonView } from '@semianalysisai/inferencex-db/operatorx/compare';
 
 export const dynamic = 'force-dynamic';
@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('OperatorX comparison', error);
     return NextResponse.json(
-      { error: 'OperatorX comparison unavailable' },
+      { error: errorMessage(error, 'OperatorX comparison unavailable') },
       { status: errorStatus(error) },
     );
   }

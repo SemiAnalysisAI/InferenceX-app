@@ -214,7 +214,7 @@ export const apiRouteCatalog = [
       en: 'OperatorX page backend; its run, result and detail shapes follow the page while it is being redesigned.',
       zh: 'OperatorX 页面后端；页面重新设计期间，其运行、结果和详情结构随页面变化。',
     },
-    sourceSha256: '4d54e6c2b33db5d35a55dc6b9301e9eda8d549e4668e1716f7b80cb4eebe4734',
+    sourceSha256: '8feb5b4a9897a1bce20044f983d07baa7ec1695e0ec73e3182612611f80c938b',
   },
   {
     source: 'src/app/api/v1/operatorx/runs/[runId]/route.ts',
@@ -236,7 +236,7 @@ export const apiRouteCatalog = [
       en: 'OperatorX page backend; its run, result and detail shapes follow the page while it is being redesigned.',
       zh: 'OperatorX 页面后端；页面重新设计期间，其运行、结果和详情结构随页面变化。',
     },
-    sourceSha256: 'f62fc6071a4bb8c5f8bbb162974b5138703c7f8e310f58e7f80651c471825307',
+    sourceSha256: 'eae70063c6667f5fc788cadf078176a830f1d1b8177c1fc55895feaf843e25f9',
   },
   {
     source: 'src/app/api/v1/operatorx/compare/route.ts',
@@ -247,7 +247,7 @@ export const apiRouteCatalog = [
       en: 'OperatorX page backend; its cross-hardware comparison shape follows the page while it is being redesigned.',
       zh: 'OperatorX 页面后端；页面重新设计期间，其跨硬件对比结构随页面变化。',
     },
-    sourceSha256: '5a79db6d20ee154e20e1b4b14481430030aece1c3eef45d3fa7468b4f041a550',
+    sourceSha256: '9e140e706e4a8ac60fb4521512778b701a05e602d2f0ac72b3de1d5b2ac72b32',
   },
   {
     source: 'src/app/api/v1/operatorx/timelines/route.ts',
@@ -258,7 +258,7 @@ export const apiRouteCatalog = [
       en: 'OperatorX page backend; serves the case drill-down kernel timelines in the page’s own compact shape.',
       zh: 'OperatorX 页面后端；以页面自身的紧凑结构提供用例详情的 kernel 时间线。',
     },
-    sourceSha256: 'f3c607b5dda33249f674457261ef9421533ea33b347913015557a3c61fb2b3c8',
+    sourceSha256: 'd7fb7abfab576a71473303a3473e9b3d5fe4c30458428e7068c108c98898efdf',
   },
 
   {

@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from 'next/server';
 
-import { errorStatus, getResultDetail } from '@/lib/operatorx/service';
+import { errorMessage, errorStatus, getResultDetail } from '@/lib/operatorx/service';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -20,7 +20,7 @@ export async function GET(
   } catch (error) {
     console.error('OperatorX result read', error);
     return NextResponse.json(
-      { error: 'OperatorX result unavailable' },
+      { error: errorMessage(error, 'OperatorX result unavailable') },
       { status: errorStatus(error) },
     );
   }

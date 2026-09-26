@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from 'next/server';
 
-import { errorStatus, getTimelines } from '@/lib/operatorx/service';
+import { errorMessage, errorStatus, getTimelines } from '@/lib/operatorx/service';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('OperatorX timelines', error);
     return NextResponse.json(
-      { error: 'OperatorX timelines unavailable' },
+      { error: errorMessage(error, 'OperatorX timelines unavailable') },
       { status: errorStatus(error) },
     );
   }
