@@ -97,6 +97,34 @@ export const getShapeKeyForPrecision = (
 
 export const getShapeConfig = (shapeKey: ShapeKey) => SHAPE_CONFIG[shapeKey];
 
+/**
+ * The normal-state attributes of a shape, stringified exactly as `.attr()`
+ * would write them. Mirrors `applyNormalState` (a parity test pins the two together) for callers
+ * that write only changed attributes (`syncPointShape`).
+ */
+export const normalStateAttrs = (shapeKey: ShapeKey): [string, string][] => {
+  const config = getShapeConfig(shapeKey);
+  if (config.type === 'path') {
+    return [
+      ['d', config.normal.d],
+      ['stroke-width', String(config.normal.strokeWidth)],
+    ];
+  }
+  if (config.type === 'rect') {
+    return [
+      ['x', String(config.normal.x)],
+      ['y', String(config.normal.y)],
+      ['width', String(config.normal.width)],
+      ['height', String(config.normal.height)],
+      ['stroke-width', String(config.normal.strokeWidth)],
+    ];
+  }
+  return [
+    ['r', String(config.normal.r)],
+    ['stroke-width', String(config.normal.strokeWidth)],
+  ];
+};
+
 // Helper function to apply normal state attributes to a shape
 export const applyNormalState = (
   shape: d3.Selection<SVGCircleElement | SVGRectElement | SVGPathElement, unknown, null, undefined>,

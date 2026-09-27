@@ -8,7 +8,13 @@ import {
   invalidateTooltipGeometry,
 } from '../layers/scatter-points';
 import { setupChartStructure } from '../chart-setup';
-import { renderAxes, renderGrid, type AnyScale, type GridVisibility } from '../chart-update';
+import {
+  raiseInOrder,
+  renderAxes,
+  renderGrid,
+  type AnyScale,
+  type GridVisibility,
+} from '../chart-update';
 import type { ChartLayout, ContinuousScale } from '../types';
 
 import { buildScale, isBandScale, type BuiltScale } from './scale-builders';
@@ -124,6 +130,9 @@ export interface TransitionGeometry {
   paths: Map<SVGPathElement, string>;
 }
 
+/** Final z-order after every render: rooflines < points < line labels. */
+const RAISE_ORDER = ['.dot-group', '.point', '.line-label'] as const;
+const LINE_LABEL_RAISE = ['.line-label'] as const;
 const TRANSITION_POINT_SELECTOR = '.dot-group';
 const TRANSITION_ROOFLINE_SELECTOR = '.roofline-path';
 type GeometryVisibility = (element: SVGElement) => boolean;
@@ -449,15 +458,13 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
 
       // Ensure points render above lines/rooflines on re-renders
       // (D3 enter appends new elements at the end, so new lines can end up after existing dots)
-      renderGroup.selectAll('.dot-group').raise();
-      renderGroup.selectAll('.point').raise();
-
+      //
       // Line labels (built in the rooflines layer, which renders before the dots
       // so paths sit behind points) must sit above the points too. Raise them
       // after the dot raise so the final z-order is rooflines < points <
       // line-labels on every render. `.raise()` only reorders DOM, so per-label
       // de-overlap placement is untouched. No-op for charts without line labels.
-      renderGroup.selectAll('.line-label').raise();
+      raiseInOrder(renderGroup, RAISE_ORDER);
 
       // ── Tooltip ──
       if (tooltipConfig) {
@@ -729,7 +736,7 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
                     zoomContext,
                   );
                 }
-                zoomRenderGroup.selectAll('.line-label').raise();
+                raiseInOrder(zoomRenderGroup, LINE_LABEL_RAISE);
                 currentZoomConfig?.onZoom?.(event, zoomContext);
               });
             },
@@ -897,9 +904,7 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
     );
     customLayerDisplayIdentitiesRef.current = customLayerDisplayIdentities(layers);
     lastDisplayIdentityRef.current = displayIdentity;
-    renderGroup.selectAll('.dot-group').raise();
-    renderGroup.selectAll('.point').raise();
-    renderGroup.selectAll('.line-label').raise();
+    raiseInOrder(renderGroup, RAISE_ORDER);
 
     if (tooltipConfig && !tooltipConfig.proximityHover) {
       const attachIdx =
