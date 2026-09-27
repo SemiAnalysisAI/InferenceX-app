@@ -1,8 +1,11 @@
 // @vitest-environment jsdom
+import * as d3 from 'd3';
 import { act } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { InferenceData } from '@/components/inference/types';
+import { renderLegacyPowerRing } from '@/components/inference/utils/legacy-power-marker';
+import { renderOffloadHalo } from '@/components/inference/utils/offload-halo';
 
 import {
   POINTS,
@@ -446,5 +449,58 @@ describe('ScatterGraph toggle decoration', () => {
     expect(b200Roofline.getAttribute('d')).not.toBe(pathBefore);
     expect(b200Dot.getAttribute('transform')).not.toBe(transformBefore);
     unmount();
+  });
+});
+
+function pointGroup() {
+  const svg = d3.create('svg:svg');
+  return svg.append('g') as unknown as d3.Selection<SVGGElement, InferenceData, null, undefined>;
+}
+
+function recordCount(root: Node, run: () => void): number {
+  const observer = new MutationObserver(() => undefined);
+  observer.observe(root, { attributes: true, childList: true, subtree: true });
+  run();
+  const count = observer.takeRecords().length;
+  observer.disconnect();
+  return count;
+}
+
+const offloaded = { offload_mode: 'on', power_tier: 'legacy' } as InferenceData;
+
+describe('point decoration rings', () => {
+  it('draw the offload halo and legacy-power ring', () => {
+    const group = pointGroup();
+    renderOffloadHalo(group, offloaded, 'red');
+    renderLegacyPowerRing(group, offloaded, true, 'red');
+
+    expect(group.select('.offload-halo').attr('stroke')).toBe('red');
+    expect(group.select('.offload-halo').attr('stroke-dasharray')).toBe('3 2');
+    expect(group.select('.legacy-power-ring').attr('stroke-dasharray')).toBe('1 3');
+  });
+
+  it('write nothing when re-rendered with the same state', () => {
+    const group = pointGroup();
+    renderOffloadHalo(group, offloaded, 'red');
+    renderLegacyPowerRing(group, offloaded, true, 'red');
+
+    expect(
+      recordCount(group.node()!, () => {
+        renderOffloadHalo(group, offloaded, 'red');
+        renderLegacyPowerRing(group, offloaded, true, 'red');
+      }),
+    ).toBe(0);
+  });
+
+  it('restyle and remove on real changes', () => {
+    const group = pointGroup();
+    renderOffloadHalo(group, offloaded, 'red');
+    renderLegacyPowerRing(group, offloaded, true, 'red');
+
+    renderOffloadHalo(group, offloaded, 'blue');
+    renderLegacyPowerRing(group, offloaded, false, 'blue');
+
+    expect(group.select('.offload-halo').attr('stroke')).toBe('blue');
+    expect(group.select('.legacy-power-ring').empty()).toBe(true);
   });
 });
