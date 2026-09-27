@@ -33,6 +33,10 @@ export const DB_MODEL_TO_DISPLAY: Record<string, string> = {
   glm5: 'GLM-5',
   'glm5.1': 'GLM-5',
   'glm5.2': 'GLM-5.2',
+  // GLM-5.3 (zai-org/GLM-5.3) is a distinct checkpoint that InferenceX reports
+  // under its own `glm5.3` prefix (InferenceX#3330); it shares the GLM-5.2
+  // display bucket the same way glm5.1 folds into GLM-5.
+  'glm5.3': 'GLM-5.2',
   dsv4: 'DeepSeek-V4-Pro',
   // V4.1-Flash is a separate CED/CSA2 architecture (552B backbone, 8B prefill /
   // 16B decode active), not a V4-Pro point release, so it gets its own bucket.

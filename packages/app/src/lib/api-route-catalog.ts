@@ -142,14 +142,6 @@ export const apiRouteCatalog = [
     sourceSha256: 'de9192086b27e530ad6b1ece082b4989b3a9771a78195ae9f6d1c3899519588f',
   },
   {
-    source: 'src/app/api/v1/views/operatorx/route.ts',
-    path: '/api/v1/views/operatorx',
-    method: 'GET',
-    classification: 'published-read',
-    operationId: 'get-operatorx-view',
-    sourceSha256: 'a56b89364b11d4289f1b3684ee594df2b67e508ec8b0b5b83cde0f195caeb4a8',
-  },
-  {
     source: 'src/app/api/v1/views/options/route.ts',
     path: '/api/v1/views/options',
     method: 'GET',
@@ -217,17 +209,56 @@ export const apiRouteCatalog = [
     source: 'src/app/api/v1/operatorx/runs/route.ts',
     path: '/api/v1/operatorx/runs',
     method: 'GET',
-    classification: 'published-read',
-    operationId: 'list-operatorx-runs',
-    sourceSha256: 'f8e7049d1f3d16e3f4b6005b3c18eb9d1d427078b193e198d754a4e72fb516f7',
+    classification: 'page-bff',
+    exclusionReason: {
+      en: 'OperatorX page backend; its run, result and detail shapes follow the page while it is being redesigned.',
+      zh: 'OperatorX 页面后端；页面重新设计期间，其运行、结果和详情结构随页面变化。',
+    },
+    sourceSha256: '067a81844de8360ea91d257805febd2ebbe981d6628fb0edb8202435d382b757',
   },
   {
     source: 'src/app/api/v1/operatorx/runs/[runId]/route.ts',
     path: '/api/v1/operatorx/runs/{runId}',
     method: 'GET',
-    classification: 'published-read',
-    operationId: 'get-operatorx-run',
-    sourceSha256: '8337605725c6aefab2df6853f1a04446fdfcf6083c536fd8cce49c2abd771262',
+    classification: 'page-bff',
+    exclusionReason: {
+      en: 'OperatorX page backend; its run, result and detail shapes follow the page while it is being redesigned.',
+      zh: 'OperatorX 页面后端；页面重新设计期间，其运行、结果和详情结构随页面变化。',
+    },
+    sourceSha256: '0f68b7c9af8f3d5ec4093a4dba887fa324d1726f91e4f38a289d4b0b813a1e93',
+  },
+  {
+    source: 'src/app/api/v1/operatorx/runs/[runId]/results/[index]/route.ts',
+    path: '/api/v1/operatorx/runs/{runId}/results/{index}',
+    method: 'GET',
+    classification: 'page-bff',
+    exclusionReason: {
+      en: 'OperatorX page backend; its run, result and detail shapes follow the page while it is being redesigned.',
+      zh: 'OperatorX 页面后端；页面重新设计期间，其运行、结果和详情结构随页面变化。',
+    },
+    sourceSha256: 'b76aa2caf5998d0a3dc0c1d1b6853a1caa2cd4212744882f51c26b1cdd8c57e2',
+  },
+  {
+    source: 'src/app/api/v1/operatorx/compare/route.ts',
+    path: '/api/v1/operatorx/compare',
+    method: 'GET',
+    classification: 'page-bff',
+    exclusionReason: {
+      en: 'OperatorX page backend; its cross-hardware comparison shape follows the page while it is being redesigned.',
+      zh: 'OperatorX 页面后端；页面重新设计期间，其跨硬件对比结构随页面变化。',
+    },
+    sourceSha256: '2244b26cfeb258943e82e8d01e4c31019ad7e763038002acb627bb718d5143f9',
+  },
+  {
+    source: 'src/app/api/v1/operatorx/timelines/route.ts',
+    path: '/api/v1/operatorx/timelines',
+    method: 'GET',
+    classification: 'page-bff',
+    exclusionReason: {
+      en: 'OperatorX page backend; serves the case drill-down kernel timelines in the page’s own compact shape.',
+      zh: 'OperatorX 页面后端；以页面自身的紧凑结构提供用例详情的 kernel 时间线。',
+    },
+    sourceSha256: 'dbd2a0022410ac80203a1bd3c4b2290719b2691fe8813168d0d13c698cfd89e3',
   },
 
   {
@@ -458,7 +489,7 @@ export const apiRouteCatalog = [
       en: 'Secret-protected cache invalidation mutation for operators; it is not a public application contract.',
       zh: '供运维人员使用的密钥保护缓存失效写操作；它不是公开应用契约。',
     },
-    sourceSha256: 'eadfc008403b3a5321f9b857897ed5c9fce2de29dee34279fb559cf1b763c247',
+    sourceSha256: '8d9e6aed461c497d68f6947d95b40f97d8a75972c1c845b90cc7293fab1a1b2a',
   },
   {
     source: 'src/app/api/v1/latest-images/route.ts',
@@ -882,15 +913,6 @@ export const apiContractSourceDigests = [
   },
 
   {
-    source: 'src/components/operatorx/view-data.ts',
-    sourceSha256: 'b491ba1680785fd9e732279f05807d0d108674e3db899fdd1e30318f081a007d',
-    reviewArea: {
-      en: 'Dashboard read-only selector and calculation parity.',
-      zh: '仪表板只读接口的选择项与计算一致性。',
-    },
-  },
-
-  {
     source: 'src/components/gpu-power/chart-data.ts',
     sourceSha256: '34bdab18810a5e6688d150b71c4c1b22d383a63775672c0c915549b841c48475',
     reviewArea: {
@@ -991,7 +1013,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/registry.ts',
-    sourceSha256: 'da75e54d3524ca9582443ab8c83dd301037f15cc627c314a3a9d0eed9e42bab8',
+    sourceSha256: 'dc2c80873cb24d46d9ada5845ad159761b3b4a83314d9a698e14a0098d055457',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -1008,32 +1030,8 @@ export const apiContractSourceDigests = [
   },
 
   {
-    source: 'src/lib/operatorx-ingest.ts',
-    sourceSha256: 'bec2e115e006457816fc8e915b51128ea57b1c481b06b50fb4698ec37d94b425',
-    reviewArea: {
-      en: 'OperatorX provenance, run discovery, raw persistence, coverage, per-GPU GEMM, attention and routed MoE throughput, and latency.',
-      zh: 'OperatorX 来源校验、运行发现、原始数据持久化、覆盖情况、GEMM、attention 和路由 MoE 单卡吞吐量及延迟。',
-    },
-  },
-  {
-    source: '../db/src/operatorx/reader.ts',
-    sourceSha256: '4aa675bbf8e8f33ffe11d3ba322374c712cc721314b657478b25321bb3548d7b',
-    reviewArea: {
-      en: 'OperatorX provenance, run discovery, raw persistence, coverage, per-GPU GEMM, attention and routed MoE throughput, and latency.',
-      zh: 'OperatorX 来源校验、运行发现、原始数据持久化、覆盖情况、GEMM、attention 和路由 MoE 单卡吞吐量及延迟。',
-    },
-  },
-  {
-    source: '../db/src/queries/operatorx.ts',
-    sourceSha256: '104621edcb978e23a1a32a5a4c4bb57e2eafdc2058d67953aebc34c4b7c15e6f',
-    reviewArea: {
-      en: 'OperatorX provenance, run discovery, raw persistence, coverage, per-GPU GEMM, attention and routed MoE throughput, and latency.',
-      zh: 'OperatorX 来源校验、运行发现、原始数据持久化、覆盖情况、GEMM、attention 和路由 MoE 单卡吞吐量及延迟。',
-    },
-  },
-  {
     source: 'src/lib/api-cache.ts',
-    sourceSha256: 'b710c4ce4c2dd0a6eb3b662c9e426e301aee3afe3d64fba35745b9323be39ddd',
+    sourceSha256: 'cf710c1dca9cfae794cf3d14d3dad6a153bbd7151cedc9d9f0b27b792aeade24',
     reviewArea: {
       en: 'Public CDN tags, cache lifetimes, Blob key dimensions, and purge behavior.',
       zh: '公开 CDN 标签、缓存时长、Blob 键维度和清除行为。',
@@ -1138,7 +1136,10 @@ export const apiContractSourceDigests = [
     // Reviewed for the Qwen3.8-27B addition (InferenceX#3260): two new DB keys
     // and display names plus their release dates. No published parameter enum
     // or endpoint changes, so the docs stand.
-    sourceSha256: 'af1053b2ae94b50de51153153dd7a7e268e50bde3e5900310e44f2d8baa86f87',
+    // Reviewed for the GLM-5.3 DB key (InferenceX#3330): one new key, `glm5.3`,
+    // mapped to the existing GLM-5.2 display name (as glm5.1 -> GLM-5). No
+    // published parameter enum or endpoint changes, so the docs stand.
+    sourceSha256: 'bdc8e287f57107cdf0772c50ad4abc0278757b20db78844cc6cf02e88ea66717',
     reviewArea: {
       en: 'Published benchmark and TCO model names, aliases, and parameter enums.',
       zh: '已发布基准与 TCO 模型名称、别名和参数枚举。',

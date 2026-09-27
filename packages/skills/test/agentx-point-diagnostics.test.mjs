@@ -4,12 +4,13 @@ import { join } from 'node:path';
 import { before, test } from 'node:test';
 import { pathToFileURL } from 'node:url';
 
-import { packedSkillSuite } from './packed-skill.mjs';
+import { packageInfo, packedSkillSuite } from './packed-skill.mjs';
 
 const suite = packedSkillSuite();
 const { environment, temporaryRoot } = suite;
 const base = 'https://inferencex.semianalysis.com';
 const installed = new Map();
+const skillRoots = new Map();
 const preload = join(temporaryRoot, 'agentx-http-response.mjs');
 const operation = (parameter) => ({
   get: { parameters: [{ name: parameter, in: 'query', required: true }] },
@@ -29,6 +30,7 @@ const openapi = {
 before(() => {
   for (const target of ['codex', 'claude']) {
     const root = suite.install(target);
+    skillRoots.set(target, root);
     const cookbook = readFileSync(join(root, 'references/agentx.md'), 'utf8');
     const [snippet, ...extra] = cookbook.matchAll(
       /```bash\nnode --input-type=module <<'JS'\n(?<code>[\s\S]*?)\nJS\n```/gu,
@@ -46,6 +48,9 @@ import { appendFileSync, readFileSync } from 'node:fs';
 const fixtures = JSON.parse(readFileSync(process.env.INFERENCEX_AGENTX_FIXTURES, 'utf8'));
 globalThis.fetch = async (input, options) => {
   const url = String(input.url ?? input);
+  const headers = new Headers(options?.headers);
+  if ((headers.get('user-agent') ?? '') !== process.env.INFERENCEX_EXPECT_USER_AGENT) throw new Error('Unexpected attribution marker');
+  if (!process.env.INFERENCEX_EXPECT_USER_AGENT && headers.has('x-inferencex-traffic')) throw new Error('Opt-out retained traffic marker');
   appendFileSync(process.env.INFERENCEX_AGENTX_REQUESTS, JSON.stringify(url) + '\\n');
   if (options?.redirect !== 'error') throw new Error('AgentX requests must reject redirects');
   const response = fixtures[url];
@@ -176,7 +181,13 @@ const serverMetrics = {
 
 function run(
   responses,
-  { target = 'codex', openapiResponse = response(openapi), replacement } = {},
+  {
+    target = 'codex',
+    openapiResponse = response(openapi),
+    replacement,
+    telemetry = true,
+    standalone = false,
+  } = {},
 ) {
   const project = suite.project('agentx-request-');
   const fixtures = { [`${base}/api/openapi.json`]: openapiResponse };
@@ -190,6 +201,11 @@ function run(
     cwd: project,
     env: {
       ...environment,
+      INFERENCEX_SKILL_DIR: standalone ? '' : skillRoots.get(target),
+      INFERENCEX_TELEMETRY: telemetry ? '1' : '0',
+      DO_NOT_TRACK: '0',
+      INFERENCEX_EXPECT_USER_AGENT:
+        telemetry && !standalone ? `inferencex-skill/${packageInfo.version}` : '',
       INFERENCEX_AGENTX_FIXTURES: fixturesPath,
       INFERENCEX_AGENTX_REQUESTS: requestsPath,
     },
@@ -519,5 +535,13 @@ test('malformed light responses and missing live operations fail without heavy t
           !url.includes('trace-server-metrics'),
       ),
     );
+  }
+});
+
+test('installed AgentX recipe honors attribution opt-out', () => {
+  for (const options of [{ telemetry: false }, { standalone: true }]) {
+    const result = run(lightResponses, options);
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.requests.length, 3);
   }
 });

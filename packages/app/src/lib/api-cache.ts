@@ -33,6 +33,19 @@ export function collectiveXCacheTag(): string {
 export const COLLECTIVEX_CACHE_CONTROL =
   'public, max-age=0, s-maxage=60, stale-while-revalidate=300';
 
+/**
+ * OperatorX reads its own database and has its own scope, like CollectiveX: its
+ * responses carry this tag and stay cached until an OperatorX ingest purges it
+ * (`/api/v1/invalidate?scope=operatorx`).
+ */
+export const OPERATORX_CACHE_SCOPE = 'operatorx';
+
+/** CDN tag for OperatorX responses, namespaced like the other scopes. */
+export function operatorXCacheTag(): string {
+  const namespace = cacheNamespace();
+  return namespace ? `${OPERATORX_CACHE_SCOPE}:${namespace}` : OPERATORX_CACHE_SCOPE;
+}
+
 function cacheNamespace(): string {
   return process.env.CACHE_NAMESPACE?.trim() ?? '';
 }
@@ -187,6 +200,7 @@ export async function purgeAll(): Promise<number> {
   // a full purge must drop that tag explicitly — this line is the sole
   // mechanism that clears CollectiveX from the CDN.
   purgeCollectiveX();
+  purgeOperatorX();
   return deleted;
 }
 
@@ -248,4 +262,9 @@ export function cachedJson<T>(
       ...cdnHeaders(options?.tag, options?.cacheControl),
     },
   });
+}
+
+/** Purge only the OperatorX cache scope: its CDN tag. */
+export function purgeOperatorX(): void {
+  revalidateTag(operatorXCacheTag(), { expire: 0 });
 }

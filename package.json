@@ -47,7 +47,9 @@
     "admin:db:backfill-server-log-files": "bun run --cwd packages/db db:backfill-server-log-files",
     "admin:db:reset": "bun run --cwd packages/db db:reset",
     "admin:db:verify": "bun run --cwd packages/db db:verify",
-    "admin:db:migrate:operatorx": "bun run --cwd packages/db db:migrate:operatorx"
+    "admin:db:migrate:operatorx": "bun run --cwd packages/db db:migrate:operatorx",
+    "admin:db:ingest:operatorx": "bun run --cwd packages/db db:ingest:operatorx",
+    "admin:db:ingest:operatorx:ci": "bun run --cwd packages/db db:ingest:operatorx:ci"
   },
   "devDependencies": {
     "@babel/core": "^8.0.1",

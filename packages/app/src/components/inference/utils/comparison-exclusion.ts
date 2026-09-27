@@ -8,6 +8,20 @@ import {
 import { buildExclusion, type Exclusion, type ExclusionConflictPolicy } from '@/lib/exclusion';
 
 /**
+ * Whether the cross-engine comparability guard should be lifted for the current
+ * viewer. Unofficial previews are diagnostic and never guarded. The ↑↑↓↓ feature
+ * gate (`useFeatureGate`) lifts the guard for insiders too, so vLLM and SGLang
+ * configs can be overlaid on one graph while tuning configs. Callers pass the
+ * result as the `isUnofficialRun`-style "guard lifted" argument below.
+ */
+export function isEngineGuardLifted(
+  isUnofficialRun: boolean,
+  featureGateUnlocked: boolean,
+): boolean {
+  return isUnofficialRun || featureGateUnlocked;
+}
+
+/**
  * Preferred engine group when an official comparison first encounters multiple
  * valid groups and has no sticky user selection to preserve. Unofficial
  * previews impose no guard, so they have no default either.

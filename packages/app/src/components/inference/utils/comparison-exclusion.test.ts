@@ -7,7 +7,25 @@ import {
   comparisonDefaultGroup,
   comparisonExclusion,
   comparisonExclusionPolicy,
+  isEngineGuardLifted,
 } from './comparison-exclusion';
+
+describe('isEngineGuardLifted', () => {
+  it('keeps the guard for official views while the feature gate is locked', () => {
+    expect(isEngineGuardLifted(false, false)).toBe(false);
+  });
+
+  it('lifts the guard for unofficial previews regardless of the gate', () => {
+    expect(isEngineGuardLifted(true, false)).toBe(true);
+  });
+
+  it('lifts the guard when the ↑↑↓↓ feature gate is unlocked', () => {
+    expect(isEngineGuardLifted(false, true)).toBe(true);
+    // No exclusion means vLLM and SGLang configs may share one graph.
+    expect(comparisonExclusion(Model.DeepSeek_V4_Pro, Sequence.AgenticTraces, true)).toBeNull();
+    expect(comparisonDefaultGroup(Sequence.AgenticTraces, true)).toBeNull();
+  });
+});
 
 describe('comparisonExclusion', () => {
   it('defaults official DeepSeek V4 Pro Agentic charts to vLLM', () => {

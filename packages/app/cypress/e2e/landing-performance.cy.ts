@@ -43,6 +43,20 @@ function expectLowCls() {
 }
 
 describe('Landing page performance', () => {
+  it('links Anyscale to its localized quote without loading a landing-page logo', () => {
+    for (const prefix of ['', '/zh']) {
+      cy.visit(prefix || '/');
+      cy.get('[data-testid="intro-section"]').within(() => {
+        cy.contains('a', 'Anyscale').should('have.attr', 'href', `${prefix}/quotes#quote-anyscale`);
+        cy.get('img[alt="Anyscale"]').should('not.exist');
+        cy.contains('a', 'Anyscale').click();
+      });
+      cy.location('pathname').should('eq', `${prefix}/quotes`);
+      cy.location('hash').should('eq', '#quote-anyscale');
+      cy.get('#quote-anyscale').should('be.visible').and('contain.text', 'Seiji Eicher');
+    }
+  });
+
   it('does not shift when client JavaScript hydrates after first paint', () => {
     cy.viewport(412, 823);
     cy.request('/')

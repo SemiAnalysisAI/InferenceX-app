@@ -1,5 +1,13 @@
 # Public API worked examples
 
+For version-attributed Node recipes, set `INFERENCEX_SKILL_DIR` to the absolute installed
+`inferencex-api` directory containing this skill's `SKILL.md` (not the
+`inferencex` shortcut directory). This locates the shared request header helper. Standalone recipes still work
+without this optional helper and send no attribution.
+Set `INFERENCEX_TELEMETRY=0` to omit attribution; use
+`INFERENCEX_TRAFFIC=validation` for demos and acceptance checks. See
+[request usage](cli.md#request-usage) for the captured fields.
+
 These Node 24 recipes use public HTTPS and the current OpenAPI document. Run them
 from your project; no repository checkout, database credentials, or extra packages
 are needed. Each creates a fresh `api-evidence-*` directory and saves complete
@@ -10,9 +18,12 @@ with the answer. Repeating a recipe creates a new directory and preserves earlie
 attempts. A hash identifies saved bytes, not remote authenticity.
 
 The versioned CLI can list supported capabilities and public model scopes with
-`inferencex discover capabilities` and `inferencex discover models`. See the
-[CLI contract](cli.md). The recipes below remain useful for API operations that
-do not have a formal evidence-bundle command.
+`inferencex discover capabilities` and `inferencex discover models`, and it lists
+observed configurations for one model with `inferencex discover configs --model
+<display selector or DB model key>`. See the [CLI contract](cli.md). Prefer those
+commands for coverage questions (which hardware, frameworks, precisions or dates
+exist); use the recipes below when the answer needs metric values or an API
+operation that has no formal evidence-bundle command.
 
 ## Basic benchmark lookup
 
@@ -34,6 +45,12 @@ its coverage. Compute a separate summary for every alternative sample discussed.
 
 ```bash
 node --input-type=module <<'JS'
+import { pathToFileURL } from 'node:url';
+let requestHeaders = () => ({});
+if (process.env.INFERENCEX_SKILL_DIR) {
+  try { ({ requestHeaders } = await import(pathToFileURL(`${process.env.INFERENCEX_SKILL_DIR}/scripts/request-headers.mjs`).href)); }
+  catch { /* Optional attribution must not prevent a standalone query. */ }
+}
 import { createHash } from 'node:crypto';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 const base = 'https://inferencex.semianalysis.com';
@@ -44,7 +61,7 @@ async function read(path) {
   const stem = `${captureDir}/${requests.length + 1}`;
   let response, bytes;
   try {
-    response = await fetch(query_url, { signal: AbortSignal.timeout(30_000), redirect: 'error' });
+    response = await fetch(query_url, { headers: requestHeaders(query_url, { source: 'skill' }), signal: AbortSignal.timeout(30_000), redirect: 'error' });
     bytes = Buffer.from(await response.arrayBuffer());
   } catch (error) {
     writeFileSync(`${stem}.json`, JSON.stringify({ query_url, failed_at: new Date().toISOString(),
@@ -119,6 +136,12 @@ lists available values so an empty match does not require guessing another alias
 
 ```bash
 node --input-type=module <<'JS'
+import { pathToFileURL } from 'node:url';
+let requestHeaders = () => ({});
+if (process.env.INFERENCEX_SKILL_DIR) {
+  try { ({ requestHeaders } = await import(pathToFileURL(`${process.env.INFERENCEX_SKILL_DIR}/scripts/request-headers.mjs`).href)); }
+  catch { /* Optional attribution must not prevent a standalone query. */ }
+}
 import { createHash } from 'node:crypto';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 const base = 'https://inferencex.semianalysis.com';
@@ -131,7 +154,7 @@ async function read(path) {
   const stem = `${captureDir}/${requests.length + 1}`;
   let response, bytes;
   try {
-    response = await fetch(query_url, { signal: AbortSignal.timeout(30_000), redirect: 'error' });
+    response = await fetch(query_url, { headers: requestHeaders(query_url, { source: 'skill' }), signal: AbortSignal.timeout(30_000), redirect: 'error' });
     bytes = Buffer.from(await response.arrayBuffer());
   } catch (error) {
     writeFileSync(`${stem}.json`, JSON.stringify({ query_url, failed_at: new Date().toISOString(),
@@ -203,6 +226,12 @@ example choice, not a representative sample.
 
 ```bash
 node --input-type=module <<'JS'
+import { pathToFileURL } from 'node:url';
+let requestHeaders = () => ({});
+if (process.env.INFERENCEX_SKILL_DIR) {
+  try { ({ requestHeaders } = await import(pathToFileURL(`${process.env.INFERENCEX_SKILL_DIR}/scripts/request-headers.mjs`).href)); }
+  catch { /* Optional attribution must not prevent a standalone query. */ }
+}
 import { createHash } from 'node:crypto';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 const base = 'https://inferencex.semianalysis.com';
@@ -216,7 +245,7 @@ async function read(path) {
   const stem = `${captureDir}/${requests.length + 1}`;
   let response, bytes;
   try {
-    response = await fetch(query_url, { signal: AbortSignal.timeout(30_000), redirect: 'error' });
+    response = await fetch(query_url, { headers: requestHeaders(query_url, { source: 'skill' }), signal: AbortSignal.timeout(30_000), redirect: 'error' });
     bytes = Buffer.from(await response.arrayBuffer());
   } catch (error) {
     writeFileSync(`${stem}.json`, JSON.stringify({ query_url, failed_at: new Date().toISOString(),
@@ -315,6 +344,12 @@ Edit `scope` to match the user's request; discover raw hardware keys from the AP
 
 ```bash
 node --input-type=module <<'JS'
+import { pathToFileURL } from 'node:url';
+let requestHeaders = () => ({});
+if (process.env.INFERENCEX_SKILL_DIR) {
+  try { ({ requestHeaders } = await import(pathToFileURL(`${process.env.INFERENCEX_SKILL_DIR}/scripts/request-headers.mjs`).href)); }
+  catch { /* Optional attribution must not prevent a standalone query. */ }
+}
 import { createHash } from 'node:crypto';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 const base = 'https://inferencex.semianalysis.com';
@@ -334,7 +369,7 @@ async function read(path) {
   const stem = `${captureDir}/${requests.length + 1}`;
   let response, bytes;
   try {
-    response = await fetch(query_url, { signal: AbortSignal.timeout(30_000), redirect: 'error' });
+    response = await fetch(query_url, { headers: requestHeaders(query_url, { source: 'skill' }), signal: AbortSignal.timeout(30_000), redirect: 'error' });
     bytes = Buffer.from(await response.arrayBuffer());
   } catch (error) {
     writeFileSync(`${stem}.json`, JSON.stringify({ query_url, failed_at: new Date().toISOString(),

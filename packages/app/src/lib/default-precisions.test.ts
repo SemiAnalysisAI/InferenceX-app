@@ -201,3 +201,66 @@ describe('resolveEffectivePrecisions', () => {
     ).toEqual(['fp4']);
   });
 });
+
+describe('resolveEffectivePrecisions with a per-model default', () => {
+  it('uses the model default instead of the densest precision', () => {
+    expect(
+      resolveEffectivePrecisions({
+        selectedPrecisions: ['fp4'],
+        availablePrecisions: ['fp4', 'fp8'],
+        curveCounts: { fp4: 20, fp8: 12 },
+        explicit: false,
+        modelDefaultPrecisions: ['fp4', 'fp8'],
+      }),
+    ).toEqual(['fp4', 'fp8']);
+  });
+
+  it('drops model-default precisions the scenario lacks', () => {
+    expect(
+      resolveEffectivePrecisions({
+        selectedPrecisions: ['fp4'],
+        availablePrecisions: ['fp8'],
+        curveCounts: { fp8: 12 },
+        explicit: false,
+        modelDefaultPrecisions: ['fp4', 'fp8'],
+      }),
+    ).toEqual(['fp8']);
+  });
+
+  it('falls back to the auto default when none of the model default is available', () => {
+    expect(
+      resolveEffectivePrecisions({
+        selectedPrecisions: ['fp4'],
+        availablePrecisions: ['bf16'],
+        curveCounts: { bf16: 6 },
+        explicit: false,
+        modelDefaultPrecisions: ['fp4', 'fp8'],
+      }),
+    ).toEqual(['bf16']);
+  });
+
+  it('still honours an explicit selection', () => {
+    expect(
+      resolveEffectivePrecisions({
+        selectedPrecisions: ['fp8'],
+        availablePrecisions: ['fp4', 'fp8'],
+        curveCounts: { fp4: 20, fp8: 12 },
+        explicit: true,
+        modelDefaultPrecisions: ['fp4', 'fp8'],
+      }),
+    ).toEqual(['fp8']);
+  });
+
+  it('still unions unofficial-run precisions into the model default', () => {
+    expect(
+      resolveEffectivePrecisions({
+        selectedPrecisions: ['fp4'],
+        availablePrecisions: ['bf16', 'fp4', 'fp8'],
+        curveCounts: { bf16: 1, fp4: 20, fp8: 12 },
+        unofficialPrecisions: ['bf16'],
+        explicit: false,
+        modelDefaultPrecisions: ['fp4', 'fp8'],
+      }),
+    ).toEqual(['fp4', 'fp8', 'bf16']);
+  });
+});

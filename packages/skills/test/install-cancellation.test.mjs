@@ -88,12 +88,15 @@ if (${JSON.stringify(phase)} === 'staging') {
     if (from === ${JSON.stringify(source)}) pause();
     return result;
   };
-} else if (${JSON.stringify(phase)} === 'activated') {
+} else if (${JSON.stringify(phase)}.startsWith('activated')) {
   const rename = fs.renameSync;
   fs.renameSync = (from, to) => {
     const result = rename(from, to);
     if (from.endsWith('/transaction.next.json') &&
-        JSON.parse(fs.readFileSync(to, 'utf8')).phase === 'activated') pause();
+        JSON.parse(fs.readFileSync(to, 'utf8')).phase === 'activated' &&
+        (${JSON.stringify(phase)} === 'activated-runtime'
+          ? JSON.parse(fs.readFileSync(to, 'utf8')).skill === 'inferencex-api'
+          : JSON.parse(fs.readFileSync(to, 'utf8')).skill === 'inferencex-to-table')) pause();
     return result;
   };
 } else {
@@ -176,7 +179,12 @@ for (const signal of ['SIGINT', 'SIGTERM']) {
         writeFileSync(control.release, 'release');
         cancelled(control, await finish(control), signal);
         assert.deepEqual(snapshot(destination), previous);
-        assert.deepEqual(readdirSync(dirname(destination)), existing ? ['inferencex-api'] : []);
+        assert.deepEqual(
+          readdirSync(dirname(destination)),
+          existing
+            ? ['inferencex', 'inferencex-api', 'inferencex-to-chart', 'inferencex-to-table']
+            : [],
+        );
       } finally {
         await cleanup(control);
       }
@@ -227,7 +235,38 @@ test('SIGTERM after committed activation reports the completed installation', as
       JSON.parse(readFileSync(join(destination, '.inferencex-skills.json'), 'utf8')).version,
       packageInfo.version,
     );
-    assert.deepEqual(readdirSync(dirname(destination)), ['inferencex-api']);
+    assert.deepEqual(readdirSync(dirname(destination)), [
+      'inferencex',
+      'inferencex-api',
+      'inferencex-to-chart',
+      'inferencex-to-table',
+    ]);
+    assert.equal(JSON.parse(control.output.stdout).ready, true);
+  } finally {
+    await cleanup(control);
+  }
+});
+
+test('cancellation between runtime and entry commits remains observable and resumable', async () => {
+  const cwd = suite.project('cancel before entry-');
+  const control = spawnInstaller(cwd, join(cwd, 'gate'), 'activated-runtime');
+  try {
+    await waitForFile(control.ready, control.child);
+    control.child.kill('SIGTERM');
+    writeFileSync(control.release, 'release');
+    cancelled(control, await finish(control), 'SIGTERM');
+    const status = JSON.parse(
+      succeeded(suite.run(['status', '--dir', 'skills', '--json'], cwd)).stdout,
+    );
+    assert.equal(status.installation_state, 'installed');
+    assert.equal(status.entrypoint.installation_state, 'not_installed');
+    assert.equal(status.ready, false);
+    const resumed = JSON.parse(
+      succeeded(suite.run(['install', '--dir', 'skills', '--json'], cwd)).stdout,
+    );
+    assert.equal(resumed.outcome, 'skipped');
+    assert.equal(resumed.entrypoint.outcome, 'installed');
+    assert.equal(resumed.ready, true);
   } finally {
     await cleanup(control);
   }

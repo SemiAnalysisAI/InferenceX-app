@@ -109,7 +109,7 @@ function rethrowCancellation(error) {
   if (error?.code === 'CANCELLED') throw error;
 }
 
-function normalizeArgs(args) {
+function normalizeArgs(args, skillName) {
   try {
     const parsed = parseArgs({
       args,
@@ -141,7 +141,7 @@ function normalizeArgs(args) {
     const external = values.dir !== undefined || values.target !== undefined;
     const skillsRoot = values.dir ?? (values.target === undefined ? null : TARGETS[values.target]);
     return {
-      root: external ? resolve(skillsRoot, SKILL_NAME) : ROOT,
+      root: external ? resolve(skillsRoot, skillName) : ROOT,
       selection: external
         ? values.dir === undefined
           ? { mode: 'target', target: values.target }
@@ -156,8 +156,11 @@ function normalizeArgs(args) {
   }
 }
 
-export async function diagnose(args, { signal, fetchImpl = globalThis.fetch } = {}) {
-  const options = normalizeArgs(args);
+export async function diagnose(
+  args,
+  { signal, fetchImpl = globalThis.fetch, skillName = SKILL_NAME } = {},
+) {
+  const options = normalizeArgs(args, skillName);
   const failures = [];
   signal?.throwIfAborted();
   if (Number(process.versions.node.split('.')[0]) < 24) {
@@ -172,7 +175,7 @@ export async function diagnose(args, { signal, fetchImpl = globalThis.fetch } = 
   let transaction = { state: 'none', phase: null, had_destination: null, reason: null };
   if (options.external) {
     try {
-      transaction = await inspectInstallTransaction(options.root, PACKAGE_NAME, SKILL_NAME);
+      transaction = await inspectInstallTransaction(options.root, PACKAGE_NAME, skillName);
     } catch (error) {
       transaction = {
         state: 'blocked',

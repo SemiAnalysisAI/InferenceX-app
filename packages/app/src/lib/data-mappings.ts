@@ -549,15 +549,34 @@ export function getSequenceCategory(sequence: Sequence): CategoryTag {
  * DeepSeek V4 Pro: 2026-09-08 was the last day of its Single-turn 8k1k sweep
  * (InferenceX#2728, per MODELS.md "Deprecation Notice"); Agentic coding,
  * including the MTP and DSpark arms, stays active and the model is not retired.
+ *
+ * GLM-5.2 / GLM-5.3: Agentic coding only. The scenario dropdown also hides
+ * 8K/1K (MODEL_HIDDEN_SEQUENCES); listing it here keeps the other consumers of
+ * the category, such as the latest-images page, from treating it as live.
  */
 const MODEL_DEPRECATED_SEQUENCES: Partial<Record<Model, ReadonlySet<Sequence>>> = {
   [Model.MiniMax_M3]: new Set([Sequence.EightK_OneK]),
   [Model.DeepSeek_V4_Pro]: new Set([Sequence.EightK_OneK]),
+  [Model.GLM_5_2]: new Set([Sequence.EightK_OneK]),
 };
 
 /** Whether this model retired the scenario even though it is globally active. */
 export function isSequenceDeprecatedForModel(model: Model, sequence: Sequence): boolean {
   return MODEL_DEPRECATED_SEQUENCES[model]?.has(sequence) ?? false;
+}
+
+/**
+ * Scenarios removed from a model's scenario dropdown entirely. GLM-5.2 and
+ * GLM-5.3 share one bucket (see MODEL_CONFIG) and are benchmarked on Agentic
+ * coding only, so their 8K/1K rows are not offered.
+ */
+const MODEL_HIDDEN_SEQUENCES: Partial<Record<Model, ReadonlySet<Sequence>>> = {
+  [Model.GLM_5_2]: new Set([Sequence.EightK_OneK]),
+};
+
+/** Whether this model's scenario dropdown omits the scenario. */
+export function isSequenceHiddenForModel(model: Model, sequence: Sequence): boolean {
+  return MODEL_HIDDEN_SEQUENCES[model]?.has(sequence) ?? false;
 }
 
 /**
@@ -646,6 +665,29 @@ export const PRECISION_OPTIONS = Object.keys(PRECISION_CONFIG) as Precision[];
 
 export function getPrecisionLabel(precision: Precision): string {
   return PRECISION_CONFIG[precision]?.label ?? precision;
+}
+
+/**
+ * Model + scenario pairs whose dashboard opens on a fixed precision set instead
+ * of the densest-precision auto default. An explicit `i_prec`, a preset or a
+ * manual toggle still wins; precisions the scenario lacks are dropped.
+ *
+ * GLM-5.2 / GLM-5.3 Agentic coding: FP4 and FP8 both carry full fleets.
+ *
+ * Declared after `Precision`: TypeScript enums are initialised in module order.
+ */
+const MODEL_DEFAULT_PRECISIONS: Partial<
+  Record<Model, Partial<Record<Sequence, readonly Precision[]>>>
+> = {
+  [Model.GLM_5_2]: { [Sequence.AgenticTraces]: [Precision.FP4, Precision.FP8] },
+};
+
+/** The fixed default precision set for this model and scenario, if any. */
+export function getModelDefaultPrecisions(
+  model: Model,
+  sequence: Sequence,
+): readonly Precision[] | undefined {
+  return MODEL_DEFAULT_PRECISIONS[model]?.[sequence];
 }
 
 // ---------------------------------------------------------------------------

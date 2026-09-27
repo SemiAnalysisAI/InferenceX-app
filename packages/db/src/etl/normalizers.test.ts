@@ -119,6 +119,10 @@ describe('resolveModelKey', () => {
   it('resolves from infmax_model_prefix', () => {
     expect(resolveModelKey({ infmax_model_prefix: 'dsr1' })).toBe('dsr1');
     expect(resolveModelKey({ infmax_model_prefix: 'llama70b' })).toBe('llama70b');
+    // GLM-5.3 is its own DB key (InferenceX#3330 reports it as `glm5.3`), shown in
+    // the GLM-5.2 display bucket; both the prefix and the HF id must resolve.
+    expect(resolveModelKey({ infmax_model_prefix: 'glm5.3' })).toBe('glm5.3');
+    expect(resolveModelKey({ model: 'zai-org/GLM-5.3' })).toBe('glm5.3');
   });
 
   it('resolves from model_prefix (eval format)', () => {

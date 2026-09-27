@@ -56,7 +56,6 @@ which controls belong together.
 | `overview`                      | Models, model/hardware row limits, hardware tier, engine, comparison mode and reference. JSON or CSV.                                                                                                                                                                |
 | `rankings`                      | Ranking kind (model or chip), selected model/scenario and format. Use the exact values in OpenAPI.                                                                                                                                                                   |
 | `compare`                       | GPU pairs, model/slug, scenario, tier selection and variant. JSON or CSV.                                                                                                                                                                                            |
-| `operatorx`                     | Exact/default measured run, operator, precision, shape, backend, cluster, status, throughput/latency and zero-based table page.                                                                                                                                      |
 | `collectivex`                   | Ordered run selection and suite; EP size/phase/modes/precision/operation/percentile/axis/SKU/backend/series; KV page size/x/y/pull/push/overlap ISL/series; swap direction/layout/metric/percentile/series.                                                          |
 | `submissions`                   | Search, table sort/direction/offset/limit, weekly/cumulative chart, on-change cutoff and NVIDIA/AMD/total lines. Table search does not filter the independent submission-volume chart.                                                                               |
 | `current-inferencex-image`      | Model, sequence, hardware, precision, speculation, node type, framework families and `asOf` for image age/release status.                                                                                                                                            |
@@ -133,6 +132,10 @@ execution/publication times and coverage alongside exported values.
 
 ## Interpretation and maintenance
 
+OperatorX is feature-gated in navigation and has no published
+`/api/v1/views/operatorx` contract. Its `/api/v1/operatorx/*` routes belong to
+the page and are not part of this skill's read-only view API.
+
 Use positive safe run IDs written as plain digits (`1e3`, `0x10`, and `+5` are
 rejected); run lists such as `unofficialrun` and `runs` take up to eight unique IDs.
 Overlay run indices follow the input order after trimming whitespace and removing
@@ -167,6 +170,13 @@ buttons are presentation state, not new datasets. AI-chart provider keys and
 private prompts, feedback, local uploads and administrative mutations are not
 public read projections. AgentX drilldowns use existing availability, aggregates,
 histograms, request timelines, logs and server metrics operations.
+
+Run-specific recognition labels do not rename API framework keys. Run
+`35879254139` displays `UMBP MoRI SGLang` through October 9, 2026 in
+America/New_York (`2026-10-10T04:00:00Z` exclusive); subsequent label resolution
+returns `MoRI SGLang`. An already-open memoized chart may need a refresh.
+Keep using `mori-sglang` for API selectors and raw CSV output throughout.
+This display-only exception changes no API data or OpenAPI contract.
 
 For every new or changed non-sensitive public-facing data view, implement or
 update its read-only API in the same PR. Reuse the UI's pure transforms, test

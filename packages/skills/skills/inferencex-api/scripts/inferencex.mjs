@@ -28,6 +28,7 @@ const HELP = `inferencex — discover and verify existing InferenceX observation
 Usage:
   inferencex discover <models|dates|datasets|configs> [options]
   inferencex <domain> <export|inspect|compare> [options] --output-dir <new-directory>
+  inferencex charts <list|agentx-sources> [options]
   inferencex verify <directory> [policy options]
   inferencex describe [command]
   inferencex schema <name>
@@ -275,6 +276,12 @@ await runCli({
       return;
     }
 
+    if (parsed.command === 'charts') {
+      const { runCharts } = await import('./charts.mjs');
+      const document = await runCharts(parsed.args, parsed.outputDir, { signal });
+      await writeStdout(`${JSON.stringify(document, null, 2)}\n`, { signal });
+      return;
+    }
     if (parsed.command === 'verify') {
       await runVerification(parsed, signal);
       return;
