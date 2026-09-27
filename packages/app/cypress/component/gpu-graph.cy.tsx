@@ -17,6 +17,7 @@ import {
 import { Precision, Sequence } from '@/lib/data-mappings';
 import { overlayRooflineDasharray, overlayRunColor } from '@/lib/overlay-run-style';
 import { computeToggle } from '@/lib/toggle-set';
+import { POWER_TIMELINE_METRIC_KEY } from '@/components/inference/utils/powerTimeline';
 import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.shared-runtime';
 
 const defaultChartDef = createMockChartDefinition();
@@ -669,11 +670,13 @@ describe('GPU comparison with unofficial runs and load sweeps', () => {
     data,
     overlayPoints,
     unofficial,
+    context,
   }: {
     chartDefinition: ChartDefinition;
     data: InferenceData[];
     overlayPoints: InferenceData[];
     unofficial: UnofficialRunContextType;
+    context?: Parameters<typeof createMockInferenceContextValues>[0];
   }) {
     const [activeDates, setActiveDates] = useState(new Set(ALL_SERIES));
     const [overlayHw, setOverlayHw] = useState(new Set(['b200']));
@@ -687,6 +690,7 @@ describe('GPU comparison with unofficial runs and load sweeps', () => {
         setActiveDates((prev) => computeToggle(prev, id, ALL_SERIES)),
       selectedPrecisions: [Precision.FP4],
       showLineLabels: true,
+      ...context,
     });
     return (
       <UnofficialRunContext.Provider value={{ ...unofficial, activeOverlayHwTypes: overlayHw }}>
@@ -717,6 +721,7 @@ describe('GPU comparison with unofficial runs and load sweeps', () => {
     chartDefinition: ChartDefinition,
     data: InferenceData[],
     overlayPoints: InferenceData[],
+    context?: Parameters<typeof createMockInferenceContextValues>[0],
   ) => {
     const unofficial = createMockUnofficialRunContext({
       isUnofficialRun: true,
@@ -741,6 +746,7 @@ describe('GPU comparison with unofficial runs and load sweeps', () => {
         data={data}
         overlayPoints={overlayPoints}
         unofficial={unofficial}
+        context={context}
       />,
     );
   };
@@ -812,5 +818,25 @@ describe('GPU comparison with unofficial runs and load sweeps', () => {
     cy.get('#gpu-hide-non-optimal').should('not.exist');
     cy.get('[data-testid="legend-advanced-toggle"]').click();
     cy.get('#gpu-perf-ruler').should('not.exist');
+  });
+
+  it('opens the power trace from an official point on the concurrency comparison', () => {
+    const setSelectedYAxisMetric = cy.stub().as('setMetric');
+    const audited = (date: string, conc: number, y: number): InferenceData => ({
+      ...official(date, conc, y),
+      power_audit: {
+        source: `power_validation_h100_conc${conc}.json`,
+      } as InferenceData['power_audit'],
+    });
+    mountComparison(
+      createMockChartDefinition({ chartType: 'interactivity', x_scale_field: 'conc' }),
+      DATES.flatMap((date, d) => [audited(date, 8, 300 + d), audited(date, 16, 320 + d)]),
+      [],
+      { selectedYAxisMetric: 'y_measuredAvgPower', setSelectedYAxisMetric },
+    );
+
+    cy.get('#gpu-overlay .dot-group .visible-shape').first().click({ force: true });
+    cy.get('[data-chart-tooltip]:visible [data-action="view-power-trace"]').click();
+    cy.get('@setMetric').should('have.been.calledWith', POWER_TIMELINE_METRIC_KEY);
   });
 });

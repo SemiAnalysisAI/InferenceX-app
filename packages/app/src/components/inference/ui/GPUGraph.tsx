@@ -1671,6 +1671,7 @@ const GPUGraph = React.memo(
                 });
               });
             }
+            attachPowerTraceAction(tooltipEl, d, false);
             // Pinning updates D3Chart's React state. GPU comparison rebuilds
             // several inline layer configs on that render, whose cleanup can
             // briefly hide the otherwise-pinned portal tooltip. Restore its

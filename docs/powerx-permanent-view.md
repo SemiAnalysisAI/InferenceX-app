@@ -255,9 +255,9 @@ config is `display: 'timeline'`.
   all-in switch scales the same way. The tooltip names the pool, its summed watts against the
   pool TDP, and the mean / min / max per GPU inside it. Pool mode and per-GPU lines are
   mutually exclusive.
-- **Deep link.** A pinned scatter tooltip on any metric of the measured family offers _View
-  power trace_ (`data-action="view-power-trace"`, official and `?unofficialrun=` points
-  alike). It switches the Display to Timeline in place and records the point's trace key in a
+- **Deep link.** A pinned tooltip on any metric of the measured family, in the scatter chart or
+  the date-comparison `GPUGraph`, offers _View power trace_ (`data-action="view-power-trace"`,
+  official and `?unofficialrun=` points alike). It switches the Display to Timeline in place and records the point's trace key in a
   one-shot module store (`requestPowerTraceFocus`); the timeline consumes it on mount, dims
   every other trace, switches to pool mode when the trace has roles, and shows a _Focused on …_
   chip (`data-testid="power-timeline-focus"`) with _Show all_ to clear. The link's `href` is

@@ -134,7 +134,7 @@ Official and unofficial paths share this behavior. Date comparisons stay on `GPU
 
 ### Unofficial runs in date comparisons
 
-`GPUGraph` plots `?unofficialrun=` rows next to the compared dates as their own (run, hardware) series, `overlay-run<index>_<hwKey>`. They pass the same precision, quick-filter and overlay-hardware (`activeOverlayHwTypes`) gates as `ScatterGraph`, draw as X markers in `overlayRunColor(runIndex)`, and their curves take `overlayRooflineDasharray(runIndex)` through the roofline layer's per-curve `getDasharray`. They are not date series, so `activeDates` toggles leave them on; the legend lists them first, one `UNOFFICIAL: <branch>` group per run, and dismissing the run removes them. Pinned overlay tooltips offer **View power trace**, which opens the comparison Timeline focused on that trace; official points keep **View PowerX**.
+`GPUGraph` plots `?unofficialrun=` rows next to the compared dates as their own (run, hardware) series, `overlay-run<index>_<hwKey>`. They pass the same precision, quick-filter and overlay-hardware (`activeOverlayHwTypes`) gates as `ScatterGraph`, draw as X markers in `overlayRunColor(runIndex)`, and their curves take `overlayRooflineDasharray(runIndex)` through the roofline layer's per-curve `getDasharray`. They are not date series, so `activeDates` toggles leave them on; the legend lists them first, one `UNOFFICIAL: <branch>` group per run, and dismissing the run removes them. Pinned tooltips, official and overlay alike, offer **View power trace**, which opens the comparison Timeline focused on that trace; official points also keep **View PowerX**.
 
 ## Gradient Roofline Labels
 
