@@ -243,4 +243,22 @@ describe('point labels stay inside the plot bounding box', () => {
     expect(firstDy(first)).toBe(-8);
     expect(firstDy(second)).toBe(-8);
   });
+
+  it('writes nothing on a repeat pass when the layout is unchanged', () => {
+    // MutationObserver consumers (session replay, the coach mark) pay for every
+    // record, so a pass that moves no label must not rewrite any attribute.
+    const { zoomGroup } = renderChart();
+    addPoint(zoomGroup, { x: 200, y: 150 }); // default slot
+    addPoint(zoomGroup, { x: 395, y: 150, width: 40 }); // shifted inward
+    addPoint(zoomGroup, { x: 200, y: -40 }); // placement-hidden
+    avoidPointLabelCollisions(zoomGroup);
+
+    const observer = new MutationObserver(() => undefined);
+    observer.observe(zoomGroup.node()!, { attributes: true, subtree: true });
+    avoidPointLabelCollisions(zoomGroup);
+    const records = observer.takeRecords();
+    observer.disconnect();
+
+    expect(records.map((r) => `${(r.target as Element).tagName}.${r.attributeName}`)).toEqual([]);
+  });
 });

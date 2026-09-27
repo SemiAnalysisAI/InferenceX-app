@@ -1,6 +1,7 @@
 import type * as d3 from 'd3';
 
 import type { InferenceData } from '@/components/inference/types';
+import { setAttrIfChanged } from '@/lib/d3-chart/chart-update';
 import {
   LEGACY_POWER_RING_DASHARRAY,
   LEGACY_POWER_RING_RADIUS,
@@ -23,12 +24,15 @@ export function renderLegacyPowerRing(
     .selectAll<SVGCircleElement, boolean>('.legacy-power-ring')
     .data(isMeasuredAxis && point.power_tier === 'legacy' ? [true] : [])
     .join('circle')
-    .attr('class', 'legacy-power-ring')
-    .attr('r', LEGACY_POWER_RING_RADIUS)
-    .attr('fill', 'none')
-    .attr('stroke', stroke)
-    .attr('stroke-width', LEGACY_POWER_RING_STROKE_WIDTH)
-    .attr('stroke-dasharray', LEGACY_POWER_RING_DASHARRAY)
-    .attr('opacity', 0.9)
-    .attr('pointer-events', 'none');
+    // Every chart render re-syncs every point; skip unchanged writes.
+    .each(function () {
+      setAttrIfChanged(this, 'class', 'legacy-power-ring');
+      setAttrIfChanged(this, 'r', String(LEGACY_POWER_RING_RADIUS));
+      setAttrIfChanged(this, 'fill', 'none');
+      setAttrIfChanged(this, 'stroke', stroke);
+      setAttrIfChanged(this, 'stroke-width', String(LEGACY_POWER_RING_STROKE_WIDTH));
+      setAttrIfChanged(this, 'stroke-dasharray', LEGACY_POWER_RING_DASHARRAY);
+      setAttrIfChanged(this, 'opacity', '0.9');
+      setAttrIfChanged(this, 'pointer-events', 'none');
+    });
 }

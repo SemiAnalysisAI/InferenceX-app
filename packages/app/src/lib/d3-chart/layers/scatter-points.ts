@@ -6,9 +6,11 @@ import {
   getShapeConfig,
   getShapeKeyForPrecision,
   applyNormalState,
+  normalStateAttrs,
 } from '@/lib/chart-rendering';
 
 import type { ContinuousScale } from '../types';
+import { setAttrIfChanged, setStyleIfChanged, setTextIfChanged } from '../chart-update';
 import { CHART_TYPE, px } from '../typography';
 
 export interface ScatterPointConfig<T> {
@@ -72,9 +74,12 @@ export function syncPointShape(
     >;
     applyNormalState(shape, shapeKey);
   } else {
-    const shape = g.select<SVGElement>('.visible-shape');
-    shape.attr('fill', fill).attr('data-shape-key', shapeKey);
-    applyNormalState(shape as any, shapeKey);
+    // Display toggles re-sync every point; skip unchanged writes (`chart-update.ts` write-if-changed helpers).
+    setAttrIfChanged(existing, 'fill', fill);
+    setAttrIfChanged(existing, 'data-shape-key', shapeKey);
+    for (const [name, value] of normalStateAttrs(shapeKey)) {
+      setAttrIfChanged(existing, name, value);
+    }
   }
 }
 
@@ -141,37 +146,54 @@ export function renderScatterPoints<T extends { precision: string; x: number; y:
   // visibility, while data and metric phases may update their text.
   if (config.getLabelText && config.foreground) {
     const labelGetter = config.getLabelText;
+    const foreground = config.foreground;
     points.each(function (d) {
-      const lines = labelGetter(d).split('\n');
-      const text = d3
-        .select(this)
-        .selectAll<SVGTextElement, boolean>('.point-label')
-        .data([true])
-        .join('text')
-        .attr('class', 'point-label')
-        .attr('text-anchor', 'middle')
-        .attr('fill', config.foreground!)
-        .attr('font-size', px(CHART_TYPE.dataLabel))
-        .attr('font-weight', '700')
-        .attr('pointer-events', 'none');
-      const firstDy = -(0.8 + (lines.length - 1) * 1.1);
-      text
-        .selectAll<SVGTSpanElement, string>('tspan')
-        .data(lines)
-        .join('tspan')
-        .attr('x', 0)
-        .attr('dy', (_l, i) => (i === 0 ? `${firstDy}em` : '1.1em'))
-        .text((l) => l);
+      syncPointLabel(this, labelGetter(d), foreground, config.hideLabels);
     });
-    points
-      .selectAll('.point-label')
-      .style('display', config.hideLabels ? 'none' : '')
-      .style('opacity', config.hideLabels ? 0 : 1);
   } else {
     points.selectAll('.point-label').remove();
   }
 
   return points;
+}
+
+/**
+ * Join one point's `.point-label` and bring it to the canonical state for
+ * `text`, writing only what differs from the live DOM (see the write-if-changed helpers in `chart-update.ts`).
+ * Shared by the data and metric phases so both produce identical labels.
+ */
+export function syncPointLabel(
+  group: SVGGElement,
+  text: string,
+  foreground: string,
+  hideLabels: boolean | undefined,
+): void {
+  const lines = text.split('\n');
+  const firstDy = `${-(0.8 + (lines.length - 1) * 1.1)}em`;
+  const label = d3
+    .select(group)
+    .selectAll<SVGTextElement, boolean>('.point-label')
+    .data([true])
+    .join('text');
+  const element = label.node();
+  if (!element) return;
+  setAttrIfChanged(element, 'class', 'point-label');
+  setAttrIfChanged(element, 'text-anchor', 'middle');
+  setAttrIfChanged(element, 'fill', foreground);
+  setAttrIfChanged(element, 'font-size', px(CHART_TYPE.dataLabel));
+  setAttrIfChanged(element, 'font-weight', '700');
+  setAttrIfChanged(element, 'pointer-events', 'none');
+  setStyleIfChanged(element, 'display', hideLabels ? 'none' : '');
+  setStyleIfChanged(element, 'opacity', hideLabels ? '0' : '1');
+  label
+    .selectAll<SVGTSpanElement, string>('tspan')
+    .data(lines)
+    .join('tspan')
+    .each(function (line, index) {
+      setAttrIfChanged(this, 'x', '0');
+      setAttrIfChanged(this, 'dy', index === 0 ? firstDy : '1.1em');
+      setTextIfChanged(this, line);
+    });
 }
 
 /**
@@ -187,8 +209,10 @@ export function updateScatterPointsForDisplay<
   const points = zoomGroup.selectAll<SVGGElement, T>('.dot-group');
   points.each(function (d) {
     const point = d3.select(this);
-    if (config.getOpacity) point.style('opacity', config.getOpacity(d));
-    if (config.getPointerEvents) point.style('pointer-events', config.getPointerEvents(d));
+    if (config.getOpacity) setStyleIfChanged(this, 'opacity', String(config.getOpacity(d)));
+    if (config.getPointerEvents) {
+      setStyleIfChanged(this, 'pointer-events', config.getPointerEvents(d));
+    }
     const shapeKey = config.getShapeKey
       ? config.getShapeKey(d)
       : resolveShapeKey(d.precision, config.selectedPrecisions);
@@ -198,11 +222,12 @@ export function updateScatterPointsForDisplay<
       config.getColor(d),
     );
   });
-  points
-    .selectAll('.point-label')
-    .attr('fill', config.foreground ?? null)
-    .style('display', config.hideLabels ? 'none' : '')
-    .style('opacity', config.hideLabels ? 0 : 1);
+  points.selectAll<SVGTextElement, unknown>('.point-label').each(function () {
+    if (config.foreground) setAttrIfChanged(this, 'fill', config.foreground);
+    else this.removeAttribute('fill');
+    setStyleIfChanged(this, 'display', config.hideLabels ? 'none' : '');
+    setStyleIfChanged(this, 'opacity', config.hideLabels ? '0' : '1');
+  });
 }
 
 export interface TooltipContainerGeometry {
