@@ -99,15 +99,14 @@ export interface ConcurrencyPlateauRow {
  * Throughput is per participating GPU, as everywhere else.
  */
 export function concurrencyPlateau(points: VideoPoint[]): ConcurrencyPlateauRow[] {
-  const baseline = new Map(
-    sharedLayoutCells(measuredCells(points)).map((p) => [p.hardwareKey, p] as const),
-  );
-  // A step must match the baseline's known workload and deployment. A hardware
-  // with no C1 cell keeps its raw observations with null ratios.
-  const cells = measuredCells(points).filter((p) => {
-    const base = baseline.get(p.hardwareKey);
-    return base === undefined || evidenceComparisonKey(p) === evidenceComparisonKey(base);
-  });
+  const measured = measuredCells(points);
+  const shared = sharedLayoutCells(measured);
+  const key = shared.length > 0 ? evidenceComparisonKey(shared[0]) : null;
+  if (key === null) return [];
+  const baseline = new Map(shared.map((p) => [p.hardwareKey, p] as const));
+  // Every row belongs to the shared workload and layout. Within that cohort,
+  // hardware with no C1 cell keeps its raw observations with null ratios.
+  const cells = measured.filter((p) => evidenceComparisonKey(p) === key);
   return cells.map((p) => {
     const base = baseline.get(p.hardwareKey);
     const videosPerGpuHour = metricValue(p, 'videosPerGpuHour', options);
