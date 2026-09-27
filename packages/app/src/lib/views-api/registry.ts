@@ -175,17 +175,6 @@ export const VIEW_QUERY_PARAMS = {
     'roleShare',
     'powerFit',
   ],
-  operatorx: [
-    'backend',
-    'cluster',
-    'metric',
-    'operator',
-    'page',
-    'precision',
-    'runId',
-    'shape',
-    'status',
-  ],
   options: ['format'],
   overview: ['compare', 'engine', 'format', 'hwrows', 'models', 'ref', 'rows', 'tier'],
   'profit-estimator': [
@@ -273,7 +262,10 @@ export const DASHBOARD_API_COVERAGE = {
   reliability: { view: 'reliability' },
   'gpu-specs': { view: 'gpu-specs' },
   submissions: { view: 'submissions' },
-  operatorx: { view: 'operatorx' },
+  operatorx: {
+    exclusion:
+      'Feature-gated OperatorX explorer uses page-owned routes; no stable public read-only view is published.',
+  },
   collectivex: { view: 'collectivex' },
   'gpu-metrics': { view: 'gpu-metrics' },
   'current-inferencex-image': { view: 'current-inferencex-image' },
