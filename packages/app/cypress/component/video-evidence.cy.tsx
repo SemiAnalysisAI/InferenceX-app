@@ -22,6 +22,37 @@ function mount(pathname = '/video', select = (points: VideoPoint[]) => points) {
 const exhibit = (name: string) => cy.get(`[data-testid="video-evidence-${name}"]`);
 
 describe('Video performance evidence (retained fixture)', () => {
+  for (const { locale, width } of [
+    { locale: 'en', width: 1280 },
+    { locale: 'zh', width: 390 },
+  ]) {
+    it(`keeps the concurrency table within the stated shared layout (${locale}, ${width}px)`, () => {
+      cy.viewport(width, 844);
+      mount(locale === 'zh' ? '/zh/video' : '/video', (points) =>
+        points.map((p) =>
+          p.hardwareKey === 'b200'
+            ? { ...p, participating: 8, server: { tp: 4, ulysses: 2, attention: null } }
+            : p,
+        ),
+      );
+      exhibit('plateau').find('tbody tr').should('have.length', 6);
+      exhibit('plateau').find('tr[data-hardware="b200"]').should('not.exist');
+      exhibit('plateau')
+        .find('tr[data-hardware="h100"][data-concurrency="4"]')
+        .should('contain', '5.37')
+        .and('contain', '4.00×');
+      exhibit('caveats').should(
+        'contain',
+        locale === 'zh'
+          ? '每条视频由 4 张 GPU 参与计算（TP2 × Ulysses 2）'
+          : '4 participating GPUs per video (TP2 × Ulysses 2)',
+      );
+      cy.get('[data-testid="video-evidence"]').should(($section) => {
+        expect($section[0].scrollWidth).to.be.at.most($section[0].clientWidth);
+      });
+      exhibit('plateau').screenshot(`video-evidence-cohort-${locale}-${width}`);
+    });
+  }
   it('does not call low board power compute saturation', () => {
     mount('/video', (points) =>
       points

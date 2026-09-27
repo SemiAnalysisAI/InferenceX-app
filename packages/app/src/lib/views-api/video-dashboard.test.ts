@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import type { VideoHistoryPage } from '@/components/video-benchmark/history';
+import fixture from '../../../cypress/fixtures/api/video-history.json';
 import { videoDashboardProjection } from './video-dashboard';
 
 describe('VideoGenX public metadata projection', () => {
@@ -15,5 +17,23 @@ describe('VideoGenX public metadata projection', () => {
     expect(result.evidence.powerRange).toBeNull();
     expect(result.evidence.plateauSummary).toBeNull();
     expect(result.provenance).toEqual([]);
+  });
+  it('keeps a different deployment in chart selection but out of the shared evidence cohort', () => {
+    const page = structuredClone(fixture) as unknown as VideoHistoryPage;
+    for (const entry of page.entries)
+      for (const source of entry.sources)
+        for (const observation of source.observations) {
+          if (!observation.hardware.includes('B200')) continue;
+          observation.participating = 8;
+          observation.server = { tp: 4, ulysses: 2, attention: null };
+        }
+    const result = videoDashboardProjection([page], '');
+    expect(result.rows.some((row) => row.point.hardwareKey === 'b200')).toBe(true);
+    expect(result.evidence.plateau).toHaveLength(6);
+    expect(result.evidence.plateau.some((row) => row.hardwareKey === 'b200')).toBe(false);
+    expect(result.evidence.plateauSummary?.queued).toBe(4);
+    expect(result.evidence.facts.participating).toBe(4);
+    expect(result.evidence.power).toHaveLength(2);
+    expect(result.evidence.scaling).toHaveLength(1);
   });
 });

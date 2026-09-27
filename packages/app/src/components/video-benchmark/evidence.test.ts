@@ -152,6 +152,38 @@ describe('concurrencyPlateau', () => {
     const rows = concurrencyPlateau([baseline, { ...step, replicas: 2 }]);
     expect(rows.map((row) => row.concurrency)).toEqual([1]);
   });
+  it.each([
+    {
+      name: 'different layout',
+      patch: { participating: 8, server: { tp: 4, ulysses: 2, attention: null } },
+    },
+    { name: 'different workload', patch: { workloadKey: 'different-workload' } },
+    { name: 'unknown workload', patch: { workloadKey: null } },
+    { name: 'unknown layout', patch: { server: null } },
+  ])('omits hardware outside the shared cohort: $name', ({ patch }) => {
+    const mixed = points.map((p) => (p.hardwareKey === 'b200' ? { ...p, ...patch } : p));
+    const rows = concurrencyPlateau(mixed);
+    expect(rows).toHaveLength(6);
+    expect(rows.some((row) => row.hardwareKey === 'b200')).toBe(false);
+    expect(plateauSummary(rows)).toEqual({
+      queued: 4,
+      throughputDeviationPct: expect.closeTo(0.399, 2),
+      latency: [
+        { concurrency: 2, min: expect.closeTo(1.9925, 3), max: expect.closeTo(2.0007, 3) },
+        { concurrency: 4, min: expect.closeTo(3.9917, 3), max: expect.closeTo(3.9995, 3) },
+      ],
+    });
+  });
+  it('returns no concurrency evidence without a known C1 cohort', () => {
+    for (const cells of [
+      points.filter((p) => p.concurrency !== 1),
+      points.map((p) => ({ ...p, workloadKey: null })),
+    ]) {
+      const rows = concurrencyPlateau(cells);
+      expect(rows).toEqual([]);
+      expect(plateauSummary(rows)).toBeNull();
+    }
+  });
 });
 
 describe('scalingVsSpec', () => {

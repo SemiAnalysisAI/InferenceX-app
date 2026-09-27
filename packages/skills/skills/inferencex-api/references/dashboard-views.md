@@ -83,6 +83,9 @@ use the same defaults as the UI. Unknown/repeated query names still return 400.
   UI. `coverage.pagesRead`, `coverage.nextPage` and `coverage.truncated` describe
   the inspected window; this is not all-history or date-range coverage. It applies
   the UI's canonical workload selection, sample floor and newest-cell rules.
+- Evidence rows share one known workload and deployment layout. Hardware without
+  C1 keeps raw concurrency measurements only within that cohort, with null ratios.
+  Without any known C1 cohort, concurrency evidence is empty.
 - Default mode leaves `comparison.cases.status=not-requested`. `view=compare`
   reads at most two already-published media artifacts and returns the matched
   pair selected by `v_case` (zero-based), `resolvedCaseIndex`, pair count and
