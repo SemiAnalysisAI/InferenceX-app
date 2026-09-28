@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
@@ -6,12 +7,16 @@ import { packedSkillSuite, succeeded } from './packed-skill.mjs';
 import { tcoFeed, tcoPoint } from './tco-bundle-fixtures.mjs';
 
 const suite = packedSkillSuite();
+const CONCLUSION =
+  'The cheaper hardware is undetermined. Supply both USD/GPU-hour rates and the intended billing scope to determine modeled cost.';
+
 function run(rows, options = {}) {
   const project = suite.project();
   const skill = suite.install('codex', project);
   const input = join(project, 'feed.body');
   const report = join(project, 'report.md');
-  writeFileSync(input, JSON.stringify(tcoFeed(rows, options.feed)));
+  const body = JSON.stringify(tcoFeed(rows, options.feed));
+  writeFileSync(input, body);
   if (options.existing) writeFileSync(report, 'keep me');
   const result = suite.node(
     [
@@ -36,11 +41,11 @@ function run(rows, options = {}) {
     ],
     { cwd: project },
   );
-  return { result, input, report };
+  return { result, input, report, body };
 }
 
 test('installed missing-price summary binds the boundary to scope and a conditional conclusion', () => {
-  const { result, report } = run([
+  const { result, report, body } = run([
     tcoPoint('b200', { output_tput_per_gpu: 2508.931 }),
     tcoPoint('mi355x', { output_tput_per_gpu: 517.56 }),
   ]);
@@ -49,14 +54,21 @@ test('installed missing-price summary binds the boundary to scope and a conditio
   assert.equal(value.cost_winner, null);
   assert.equal(value.comparisons[0].price_a_over_b_at_equal_cost, 4.847613803230544);
   assert.equal(value.comparisons[0].workload, '1024x1024');
-  assert.equal(value.comparisons[0].a.point.hardware, 'b200');
   assert.equal(value.scope.interactivity_statistic, 'median');
   assert.equal(value.units.gpu_hourly_price, 'USD per GPU-hour');
-  assert.match(value.source.sha256, /^[a-f0-9]{64}$/u);
+  assert.equal(
+    value.source.sha256,
+    createHash('sha256').update(body).digest('hex'),
+    'source hash must identify the saved feed body',
+  );
+  assert.equal(value.conclusion, CONCLUSION);
   const markdown = readFileSync(report, 'utf8');
-  assert.ok(markdown.includes(value.conclusion));
-  assert.match(markdown, /4\.847613803230544/u);
-  assert.match(value.conclusion, /undetermined/u);
+  assert.ok(markdown.startsWith(`# Conditional TCO comparison\n\n${CONCLUSION}\n`));
+  assert.match(
+    markdown,
+    /1024x1024: equal modeled cost at price\(b200\) \/ price\(mi355x\) = 4\.847613803230544\. b200 is cheaper only below this ratio/u,
+  );
+  assert.doesNotMatch(markdown, /\b(?:cheaper hardware is|cost winner is)\s+b200\b/iu);
 });
 
 test('boundary stays unavailable for a missing, zero or clamped point', () => {

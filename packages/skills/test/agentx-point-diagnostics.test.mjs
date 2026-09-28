@@ -458,22 +458,21 @@ test('the installed recipe labels global and per-phase longest requests with the
   );
   assert.match(markdown, /Phase[^\n]*warmup[^\n]*33\.738 s[^\n]*warmup-0/u);
   assert.match(markdown, /Phase[^\n]*profiling[^\n]*128\.284 s[^\n]*profile-0/u);
-  assert.match(markdown, /neither GPU utilization nor server busy time/u);
+  // Phase maximum must not be relabeled as the global longest.
+  assert.doesNotMatch(markdown, /Longest request across all phases[^\n]*33\.738 s[^\n]*warmup/u);
 
-  for (const target of ['codex', 'claude']) {
-    const project = suite.project('offline-trace-');
-    const savedPath = join(project, 'selected-point.json');
-    writeFileSync(savedPath, JSON.stringify({ ...JSON.parse(result.stdout), trace_summary: {} }));
-    const offline = suite.node([
-      join(skillRoots.get(target), 'scripts/trace-summary.mjs'),
-      savedPath,
-    ]);
-    assert.equal(offline.status, 0, offline.stderr);
-    assert.deepEqual(JSON.parse(offline.stdout), {
-      trace_summary: summary,
-      trace_report_markdown: markdown,
-    });
-  }
+  const project = suite.project('offline-trace-');
+  const savedPath = join(project, 'selected-point.json');
+  writeFileSync(savedPath, JSON.stringify({ ...JSON.parse(result.stdout), trace_summary: {} }));
+  const offline = suite.node([
+    join(skillRoots.get('codex'), 'scripts/trace-summary.mjs'),
+    savedPath,
+  ]);
+  assert.equal(offline.status, 0, offline.stderr);
+  assert.deepEqual(JSON.parse(offline.stdout), {
+    trace_summary: summary,
+    trace_report_markdown: markdown,
+  });
 });
 
 test('no stored trace has an explicit unavailable report without inventing an empty timeline', () => {

@@ -17,7 +17,6 @@ import { createResponseBudget } from './response-budget.mjs';
 const API_ORIGIN = 'https://inferencex.semianalysis.com';
 
 // Raw recipes need failure bodies too; createHttpClient validates and parses before returning.
-// Attribution uses the sibling request-headers helper (same opt-out env vars as the CLI).
 export function createResponseCapture({
   timeoutMs = 30_000,
   responseBytes = 32 * 1024 * 1024,

@@ -7,17 +7,33 @@ import { setTimeout as wait } from 'node:timers/promises';
 import { before, test } from 'node:test';
 import { pathToFileURL } from 'node:url';
 
-import { packedSkillSuite } from './packed-skill.mjs';
+import { packageInfo, packedSkillSuite } from './packed-skill.mjs';
 
 const suite = packedSkillSuite();
-let helper;
-before(() => {
-  helper = join(suite.install('codex'), 'scripts/capture-response.mjs');
+const realFetch = globalThis.fetch;
+let createResponseCapture;
+before(async () => {
+  const helper = join(suite.install('codex'), 'scripts/capture-response.mjs');
+  assert.ok(existsSync(helper), 'the installed artifact must contain the capture helper');
+  ({ createResponseCapture } = await import(pathToFileURL(helper).href));
 });
 
-async function setup(t, fetchImpl, options) {
-  assert.ok(existsSync(helper), 'the installed artifact must contain the capture helper');
-  const { createResponseCapture } = await import(pathToFileURL(helper).href);
+function withEnv(t, env) {
+  const previous = {};
+  for (const [key, value] of Object.entries(env)) {
+    previous[key] = process.env[key];
+    if (value === undefined) delete process.env[key];
+    else process.env[key] = value;
+  }
+  t.after(() => {
+    for (const [key, value] of Object.entries(previous)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  });
+}
+
+function setup(t, fetchImpl, options) {
   const previous = process.cwd();
   process.chdir(suite.project('capture-'));
   t.after(() => process.chdir(previous));
@@ -48,6 +64,35 @@ test('installed capture saves complete decoded bytes and metadata before returni
   assertBody(capture, body, 200);
 });
 
+test('installed capture attributes skill traffic through request-headers', async (t) => {
+  withEnv(t, {
+    INFERENCEX_TELEMETRY: '1',
+    DO_NOT_TRACK: '0',
+    CI: '0',
+    INFERENCEX_TRAFFIC: undefined,
+  });
+  let headers;
+  const capture = await setup(t, (url, options) => {
+    headers = new Headers(options?.headers);
+    return new Response('{}');
+  });
+  await capture.read('/api/example');
+  assert.equal(headers.get('user-agent'), `inferencex-skill/${packageInfo.version}`);
+  assert.equal(headers.get('x-inferencex-traffic'), 'normal');
+});
+
+test('installed capture omits attribution headers when telemetry is opted out', async (t) => {
+  withEnv(t, { INFERENCEX_TELEMETRY: '0', DO_NOT_TRACK: '0' });
+  let headers;
+  const capture = await setup(t, (url, options) => {
+    headers = new Headers(options?.headers);
+    return new Response('{}');
+  });
+  await capture.read('/api/example');
+  assert.equal(headers.get('user-agent'), null);
+  assert.equal(headers.get('x-inferencex-traffic'), null);
+});
+
 test('malformed JSON, invalid UTF-8 and HTTP errors retain complete captures before rejection', async (t) => {
   const values = [
     { body: '{broken', status: 200, code: 'INVALID_RESPONSE' },
@@ -74,7 +119,6 @@ test('new captures and failed reads use unique paths without overwriting existin
   assert.equal(readFileSync(join(capture.captureDir, '2.json'), 'utf8'), 'keep record');
   assert.deepEqual(await capture.read('/api/example'), {});
   assertBody(capture, '{}', 200, 3);
-  const { createResponseCapture } = await import(pathToFileURL(helper).href);
   const second = createResponseCapture();
   assert.notEqual(second.captureDir, capture.captureDir);
 });
@@ -158,23 +202,19 @@ test('unsafe origins and invalid budgets fail before fetching', async (t) => {
   ]) {
     await assert.rejects(capture.read(path), { code: 'INVALID_ARGUMENT' });
   }
-  const { createResponseCapture } = await import(pathToFileURL(helper).href);
-  for (const options of [
-    { timeoutMs: 0 },
-    { timeoutMs: 30_001 },
-    { responseBytes: NaN },
-    { responseBytes: 32 * 1024 * 1024 + 1 },
-    { totalBytes: -1 },
-    { totalBytes: 128 * 1024 * 1024 + 1 },
-  ]) {
+  const rejectBudget = (options) =>
     assert.throws(() => createResponseCapture(options), { code: 'INVALID_ARGUMENT' });
-  }
+  rejectBudget({ timeoutMs: 0 });
+  rejectBudget({ timeoutMs: 30_001 });
+  rejectBudget({ responseBytes: NaN });
+  rejectBudget({ responseBytes: 32 * 1024 * 1024 + 1 });
+  rejectBudget({ totalBytes: -1 });
+  rejectBudget({ totalBytes: 128 * 1024 * 1024 + 1 });
   assert.equal(globalThis.fetch.mock.callCount(), 0);
   assert.deepEqual(readdirSync(capture.captureDir), []);
 });
 
 test('native fetch rejects redirects without contacting their destination', async (t) => {
-  const nativeFetch = globalThis.fetch;
   let destinationHits = 0;
   const server = createServer((request, response) => {
     if (request.url === '/api/example') {
@@ -194,7 +234,7 @@ test('native fetch rejects redirects without contacting their destination', asyn
     });
   });
   const capture = await setup(t, (url, options) =>
-    nativeFetch(`http://127.0.0.1:${server.address().port}${new URL(url).pathname}`, options),
+    realFetch(`http://127.0.0.1:${server.address().port}${new URL(url).pathname}`, options),
   );
   await assert.rejects(capture.read('/api/example'), { code: 'NETWORK_ERROR' });
   assert.equal(destinationHits, 0);
