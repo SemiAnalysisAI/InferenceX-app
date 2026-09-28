@@ -5,6 +5,60 @@ import PUBLISHED_SKILL from '../../src/lib/published-inferencex-skills.json';
 const SITE_URL = 'https://inferencex.semianalysis.com';
 
 describe('API documentation', () => {
+  it('exposes Pareto boundaries without promoting legacy fixtures or chart share params', () => {
+    const query =
+      '/api/v1/pareto?model=DeepSeek-R1-0528&rawModel=dsr1&sequence=1k%2F1k&xMetric=median_intvty&yMetric=output_tput_per_gpu&xDirection=max&yDirection=max';
+    // Local fixtures omit benchmark_type. The endpoint must keep that as an empty
+    // selection rather than inventing a single_turn workload for dominance math.
+    cy.request<BenchmarkRow[]>('/api/v1/benchmarks?model=DeepSeek-R1-0528').then(
+      ({ body: rows }) => {
+        expect(rows.length).to.be.greaterThan(0);
+        expect(
+          rows.some((row) => row.benchmark_type !== undefined && row.benchmark_type !== null),
+        ).to.equal(false);
+        cy.request(query).then(({ body, status }) => {
+          expect(status).to.equal(200);
+          expect(body.counts).to.deep.equal({
+            returned: rows.length,
+            selected: 0,
+            eligible: 0,
+            missing_or_nonfinite: 0,
+          });
+          expect(body.frontier).to.deep.equal([]);
+          expect(body.hinterland).to.deep.equal([]);
+        });
+      },
+    );
+    for (const suffix of ['&i_frontier=1', '&i_hinterland=2']) {
+      cy.request({ url: `${query}${suffix}`, failOnStatusCode: false })
+        .its('status')
+        .should('eq', 400);
+    }
+    cy.request(`${query}&hardware=not-a-hardware`).then(({ body }) => {
+      expect(body.frontier).to.deep.equal([]);
+      expect(body.hinterland).to.deep.equal([]);
+      expect(body.counts.selected).to.equal(0);
+    });
+    for (const locale of ['/api', '/zh/api']) {
+      cy.visit(locale);
+      cy.get('[data-testid="api-endpoint-get-pareto"] summary').click();
+      cy.get('[data-testid="api-endpoint-get-pareto"]').should('contain.text', '/api/v1/pareto');
+    }
+    cy.request('/api/openapi.json').then(({ body }) => {
+      const operation = body.paths['/api/v1/pareto'].get;
+      expect(operation.operationId).to.equal('get-pareto');
+      expect(operation.parameters.map((item: { name: string }) => item.name)).to.not.include(
+        'i_hinterland',
+      );
+      expect(body.components.schemas.ParetoBoundaries.properties).to.have.keys(
+        'source_url',
+        'selection',
+        'counts',
+        'frontier',
+        'hinterland',
+      );
+    });
+  });
   for (const locale of [
     {
       path: '/api',

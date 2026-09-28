@@ -8,6 +8,13 @@ constructing requests.
 
 ## Install
 
+For Pareto frontier and hinterland observations, use the
+[Pareto boundary API recipe](../packages/skills/skills/inferencex-api/references/pareto.md).
+It covers explicit metric directions, exact workload selection, tied observations,
+and optional chart frontier share-link parameters. Confirm that `/api/v1/pareto` is
+present in the deployed OpenAPI contract before querying; there is no new formal
+CLI command or automatic package release in this change.
+
 The commands below apply after 1.0.0 is published and publicly verified. During
 candidate review, use the [local archive instructions](../packages/skills/README.md#requirements-and-installation).
 

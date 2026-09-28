@@ -39,14 +39,16 @@ describe('Blog', () => {
 
   describe('Blog listing page', () => {
     before(() => {
-      // Listing content and links must not depend on remote thumbnail availability.
+      // Stub remote Substack thumbnails with a real 1×1 PNG. A 204 empty body
+      // can prevent Firefox from firing `window.load` while eager card images
+      // stay pending, which times out `cy.visit` in before-all.
       cy.intercept(
         {
           method: 'GET',
           pathname: '/_next/image',
           query: { url: /^https:\/\/substack-post-media\.s3\.amazonaws\.com\// },
         },
-        { statusCode: 204 },
+        { fixture: '1x1.png', headers: { 'content-type': 'image/png' } },
       );
       cy.visit('/blog');
     });
@@ -77,7 +79,8 @@ describe('Blog', () => {
   describe('Blog post page', () => {
     before(() => {
       cy.intercept('GET', 'https://substack-post-media.s3.amazonaws.com/**', {
-        statusCode: 204,
+        fixture: '1x1.png',
+        headers: { 'content-type': 'image/png' },
       });
       cy.visit('/blog/inferencemax-open-source-inference-benchmarking');
     });
