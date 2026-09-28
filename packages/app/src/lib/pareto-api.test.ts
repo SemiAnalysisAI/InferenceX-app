@@ -161,6 +161,7 @@ describe('Pareto API', () => {
   it.each([
     '&unknown=1',
     '&i_frontier=1',
+    '&i_hinterland=2',
     '&unofficialrun=123',
     '&hardware=',
     '&model=DeepSeek-R1-0528',
@@ -175,7 +176,7 @@ describe('Pareto API', () => {
     '&runId=123&exactRun=true&date=2026-01-01',
     '&powerValid=false',
   ])('rejects ambiguous or invalid query %s', (suffix) => {
-    expect(() => parse(suffix)).toThrow();
+    expect(() => parse(suffix)).toThrow(/Unknown|Empty|Invalid|requires|cannot|powerValid/u);
   });
   it.each(['model', 'rawModel', 'sequence', 'xMetric', 'yMetric', 'xDirection', 'yDirection'])(
     'requires %s',
