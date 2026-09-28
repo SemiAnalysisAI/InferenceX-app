@@ -1,8 +1,10 @@
 // @vitest-environment jsdom
+import * as d3 from 'd3';
 import { act } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { InferenceData } from '@/components/inference/types';
+import { renderOffloadHalo } from '@/components/inference/utils/offload-halo';
 
 import {
   POINTS,
@@ -411,5 +413,49 @@ describe('ScatterGraph toggle decoration', () => {
     expect(b200Roofline.getAttribute('d')).not.toBe(pathBefore);
     expect(b200Dot.getAttribute('transform')).not.toBe(transformBefore);
     unmount();
+  });
+});
+
+function pointGroup() {
+  const svg = d3.create('svg:svg');
+  return svg.append('g') as unknown as d3.Selection<SVGGElement, InferenceData, null, undefined>;
+}
+
+function recordCount(root: Node, run: () => void): number {
+  const observer = new MutationObserver(() => undefined);
+  observer.observe(root, { attributes: true, childList: true, subtree: true });
+  run();
+  const count = observer.takeRecords().length;
+  observer.disconnect();
+  return count;
+}
+
+const offloaded = { offload_mode: 'on' } as InferenceData;
+
+describe('offload halo decoration', () => {
+  it('draws the offload halo', () => {
+    const group = pointGroup();
+    renderOffloadHalo(group, offloaded, 'red');
+
+    expect(group.select('.offload-halo').attr('stroke')).toBe('red');
+    expect(group.select('.offload-halo').attr('stroke-dasharray')).toBe('3 2');
+  });
+
+  it('writes nothing when re-rendered with the same state', () => {
+    const group = pointGroup();
+    renderOffloadHalo(group, offloaded, 'red');
+
+    expect(recordCount(group.node()!, () => renderOffloadHalo(group, offloaded, 'red'))).toBe(0);
+  });
+
+  it('restyles and removes on real changes', () => {
+    const group = pointGroup();
+    renderOffloadHalo(group, offloaded, 'red');
+
+    renderOffloadHalo(group, offloaded, 'blue');
+    expect(group.select('.offload-halo').attr('stroke')).toBe('blue');
+
+    renderOffloadHalo(group, { offload_mode: 'off' } as InferenceData, 'blue');
+    expect(group.select('.offload-halo').empty()).toBe(true);
   });
 });
