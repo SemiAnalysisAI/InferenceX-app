@@ -84,7 +84,8 @@ refetching while recent GitHub history is still being ingested. The summary quer
 row cap and does not load artifact documents. Each table row has a visibility checkbox; checking a
 run fetches its cached dataset through `/api/v1/collectivex/runs/[runId]`. Checked datasets are
 combined client-side, and the EP, phase, kernel mode, precision, SKU, and backend controls filter
-their combined series.
+their combined series. Shift-clicking a checkbox applies its new state to every row between it and the
+previously clicked row, in the table's current (suite-filtered) order.
 
 Series ids are namespaced by GitHub Actions run id so the same matrix case from two runs remains
 independently toggleable. Configuration color stays consistent across runs; run identity is encoded
