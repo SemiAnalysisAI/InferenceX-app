@@ -10,6 +10,7 @@ import type {
   ComparisonView,
   ComputePrecision,
 } from '@semianalysisai/inferencex-db/operatorx/compare';
+import { compareSplits, parallelLabel } from '@semianalysisai/inferencex-db/operatorx/parallel';
 import { BLOCK_COLORS } from '@/components/inference/ui/model-architecture-diagram-renderer';
 import { Card } from '@/components/ui/card';
 import {
@@ -43,6 +44,7 @@ import { metricVsSize } from '../viz/metric-vs-size';
 import { roofline } from '../viz/roofline';
 import {
   architecture,
+  type FlowNode,
   type Fold,
   type LayerBlock,
   modelLayers,
@@ -59,6 +61,16 @@ const ROW_GRID = 'grid-cols-[minmax(16rem,28rem)_minmax(0,1fr)]';
 function setParam(key: string, value: string) {
   const params = new URLSearchParams(window.location.search);
   params.set(key, value);
+  replaceClientSearch(params);
+}
+
+/** The one-device option's select value (its split key is empty). */
+const ONE_DEVICE = '1';
+
+function setParallel(value: string) {
+  const params = new URLSearchParams(window.location.search);
+  if (value === ONE_DEVICE) params.delete('parallel');
+  else params.set('parallel', value);
   replaceClientSearch(params);
 }
 
@@ -288,6 +300,22 @@ function FlowEdges({ block, at }: { block: LayerBlock; at: Map<string, Box> }) {
   );
 }
 
+/**
+ * Each unfolded fused op of a block with the boxes it runs, and how many unfolded ops it
+ * holds inside (0 for the innermost).
+ */
+function outlines(nodes: FlowNode[]): { fold: Fold; members: FlowNode[]; depth: number }[] {
+  const out = new Map<string, { fold: Fold; members: FlowNode[]; depth: number }>();
+  for (const n of nodes)
+    (n.groups ?? []).forEach((fold, i) => {
+      const entry = out.get(fold.key) ?? { fold, members: [], depth: 0 };
+      entry.members.push(n);
+      entry.depth = Math.max(entry.depth, (n.groups ?? []).length - 1 - i);
+      out.set(fold.key, entry);
+    });
+  return [...out.values()];
+}
+
 /** A chevron that unfolds a fused op into the ops it runs, or folds them back. */
 function FoldButton({
   fold,
@@ -444,7 +472,7 @@ function BlockRows({
           );
         })}
         {block.nodes.map((n) => {
-          if (!n.fold || n.fold.open) return null;
+          if (!n.fold) return null;
           const box = at.get(n.id)!;
           return (
             <FoldButton
@@ -457,35 +485,32 @@ function BlockRows({
             />
           );
         })}
-        {[
-          ...Map.groupBy(
-            block.nodes.filter((n) => n.fold?.open),
-            (n) => n.fold!.key,
-          ),
-        ].map(([key, group]) => {
-          // The ops one fused op unfolded into, outlined together with one chevron.
-          const outline = group.map((n) => at.get(n.id)!);
-          const left = Math.min(...outline.map((o) => o.left));
-          const right = Math.max(...outline.map((o) => o.left + o.width));
-          const top = Math.min(...outline.map((o) => o.top)) - 4;
-          const bottom = Math.max(...outline.map((o) => o.bottom)) + 4;
+        {outlines(block.nodes).map(({ fold, members, depth }) => {
+          // The ops an unfolded fused op runs, outlined together with one chevron; an
+          // outer fold's outline sits a step outside the ones it holds.
+          const rects = members.map((n) => at.get(n.id)!);
+          const pad = 4 + 4 * depth;
+          const left = Math.min(...rects.map((o) => o.left));
+          const right = Math.max(...rects.map((o) => o.left + o.width));
+          const top = Math.min(...rects.map((o) => o.top)) - pad;
+          const bottom = Math.max(...rects.map((o) => o.bottom)) + pad;
           return (
-            <div key={`${key}:fold`} className="contents">
+            <div key={`${fold.key}:fold`} className="contents">
               <div
                 className="absolute rounded-md border border-dashed border-muted-foreground/40"
                 style={{
-                  left: `calc(${pct(left)} - 4px)`,
-                  width: `calc(${pct(right - left)} + 8px)`,
+                  left: `calc(${pct(left)} - ${pad}px)`,
+                  width: `calc(${pct(right - left)} + ${2 * pad}px)`,
                   top,
                   height: bottom - top,
                 }}
               />
               <FoldButton
-                fold={group[0].fold!}
+                fold={fold}
                 onFold={onFold}
                 className="absolute -translate-x-1/2"
                 style={{ left: pct((left + right) / 2), top: bottom - 7 }}
-                testId={`operatorx-model-fold-${key}`}
+                testId={`operatorx-model-fold-${fold.key}`}
               />
             </div>
           );
@@ -589,17 +614,34 @@ export function ModelView() {
   const search = new URLSearchParams(useClientSearch());
   const metric = metricById(search.get('metric'));
   const requested = search.get('model') ?? DEFAULT_MODEL;
-  const gemm = useOperatorXModel('gemm', requested);
-  const moe = useOperatorXModel('moe', requested);
+  const requestedSplit = search.get('parallel');
+  const gemm = useOperatorXModel('gemm', requested, requestedSplit);
+  const moe = useOperatorXModel('moe', requested, requestedSplit);
+  const attention = useOperatorXModel('attention', requested, requestedSplit);
   const isDark = useTheme().resolvedTheme === 'dark';
   const [picked, setPicked] = useState<string[] | null>(null);
   const [pickedPrecision, setPrecision] = useState<ComputePrecision | null>(null);
   const [open, setOpen] = useState<SlotData | null>(null);
   const [pickedBin, setBin] = useState<number | null>(null);
 
+  // Device splits any of the model's ops has cases at; one device by default.
+  const splits = useMemo(() => {
+    const cases = new Map<string, number>();
+    for (const v of [gemm.data, moe.data, attention.data])
+      for (const o of v?.parallelOptions ?? []) cases.set(o.key, (cases.get(o.key) ?? 0) + o.cases);
+    return [...cases]
+      .map(([key, n]) => ({ key, label: parallelLabel(key), cases: n }))
+      .sort((a, b) => compareSplits(a.key, b.key));
+  }, [gemm.data, moe.data, attention.data]);
+  const split = requestedSplit ?? splits[0]?.key ?? '';
+  // A view without cases at the split falls back to another; its cases are not this split's.
+  const atSplit = (v: ComparisonView | undefined) => (v?.parallel === split ? v : undefined);
+  const gemmView = atSplit(gemm.data);
+  const moeView = atSplit(moe.data);
+  const attentionView = atSplit(attention.data);
   const views = useMemo(
-    () => [gemm.data, moe.data].filter((v): v is ComparisonView => Boolean(v)),
-    [gemm.data, moe.data],
+    () => [gemm.data, moe.data, attention.data].filter((v): v is ComparisonView => Boolean(v)),
+    [gemm.data, moe.data, attention.data],
   );
   const modelOptions = useMemo(() => [...new Set(views.flatMap((v) => v.modelOptions))], [views]);
   const available = useMemo(
@@ -633,8 +675,16 @@ export function ModelView() {
   // Fused ops the reader unfolded.
   const [openFolds, setOpenFolds] = useState<ReadonlySet<string>>(new Set());
   const blocks = useMemo(
-    () => modelLayers(arch, gemm.data, requested, (moe.data?.cases.length ?? 0) > 0, openFolds),
-    [arch, gemm.data, moe.data, requested, openFolds],
+    () =>
+      modelLayers(
+        arch,
+        gemmView,
+        attentionView,
+        requested,
+        (moe.data?.cases.length ?? 0) > 0,
+        openFolds,
+      ),
+    [arch, gemmView, attentionView, moe.data, requested, openFolds],
   );
 
   const models = useMemo(() => {
@@ -649,8 +699,8 @@ export function ModelView() {
             preview: () => {},
           })
         : null;
-    return { gemm: build(gemm.data), moe: build(moe.data) };
-  }, [gemm.data, moe.data, metric, hardware, available, colors]);
+    return { gemm: build(gemmView), moe: build(moeView), attention: build(attentionView) };
+  }, [gemmView, moeView, attentionView, metric, hardware, available, colors]);
   const resolved = useMemo(
     () =>
       blocks.map((block) => ({
@@ -701,7 +751,7 @@ export function ModelView() {
   );
   const tokens = bin === null ? DEFAULT_TOKENS : binTokens(bin);
 
-  const error = gemm.error ?? moe.error;
+  const error = gemm.error ?? moe.error ?? attention.error;
   if (error)
     return (
       <RetryableQueryError
@@ -710,11 +760,12 @@ export function ModelView() {
         onRetry={() => {
           void gemm.refetch();
           void moe.refetch();
+          void attention.refetch();
         }}
         testId="operatorx-model-view-error"
       />
     );
-  if (gemm.isLoading || moe.isLoading)
+  if (gemm.isLoading || moe.isLoading || attention.isLoading)
     return (
       <Card data-testid="operatorx-loading" className="min-h-80 items-center justify-center">
         <Loader2 className="size-6 animate-spin text-muted-foreground" />
@@ -732,7 +783,9 @@ export function ModelView() {
     <TooltipProvider>
       <div className="flex flex-col gap-4" data-testid="operatorx-model-view">
         <Card className="relative z-10 py-4 md:py-5">
-          <div className="grid gap-x-5 gap-y-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div
+            className={`grid gap-x-5 gap-y-3 sm:grid-cols-2 ${splits.length > 1 ? 'lg:grid-cols-5' : 'lg:grid-cols-4'}`}
+          >
             <ControlGroup label="Model" htmlFor="operatorx-model">
               <SearchableSelect
                 triggerId="operatorx-model"
@@ -741,6 +794,25 @@ export function ModelView() {
                 groups={[{ label: '', options: modelOptions.map((m) => ({ value: m, label: m })) }]}
               />
             </ControlGroup>
+            {splits.length > 1 && (
+              <ControlGroup label="Devices" htmlFor="operatorx-model-parallel">
+                <SearchableSelect
+                  triggerId="operatorx-model-parallel"
+                  value={split || ONE_DEVICE}
+                  onValueChange={setParallel}
+                  searchable={false}
+                  groups={[
+                    {
+                      label: '',
+                      options: splits.map((o) => ({
+                        value: o.key || ONE_DEVICE,
+                        label: `${o.label} (${o.cases})`,
+                      })),
+                    },
+                  ]}
+                />
+              </ControlGroup>
+            )}
             <ControlGroup label="Metric" htmlFor="operatorx-metric">
               <SearchableSelect
                 triggerId="operatorx-metric"

@@ -247,7 +247,7 @@ export const apiRouteCatalog = [
       en: 'OperatorX page backend; its cross-hardware comparison shape follows the page while it is being redesigned.',
       zh: 'OperatorX 页面后端；页面重新设计期间，其跨硬件对比结构随页面变化。',
     },
-    sourceSha256: '582daf7b6e89a9046b8076f29a5f686421549196997bc474cc69bdc5ec841751',
+    sourceSha256: 'b7b6a875849cb0ae1ac980eb8c35c63a72415520cde58b924d2a5c9aa32661a8',
   },
   {
     source: 'src/app/api/v1/operatorx/timelines/route.ts',
@@ -258,7 +258,7 @@ export const apiRouteCatalog = [
       en: 'OperatorX page backend; serves the case drill-down kernel timelines in the page’s own compact shape.',
       zh: 'OperatorX 页面后端；以页面自身的紧凑结构提供用例详情的 kernel 时间线。',
     },
-    sourceSha256: 'dbd2a0022410ac80203a1bd3c4b2290719b2691fe8813168d0d13c698cfd89e3',
+    sourceSha256: 'c06a0c8272d7ee79baf7a6860e89f9f7fce6c33e9a89cf56c8c53519e2dd46d3',
   },
 
   {

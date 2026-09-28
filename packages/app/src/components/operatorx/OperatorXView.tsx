@@ -25,6 +25,7 @@ function selectCategory(value: string) {
   const params = new URLSearchParams(window.location.search);
   params.set('op', value);
   params.delete('workload');
+  params.delete('parallel');
   replaceClientSearch(params);
 }
 
@@ -50,15 +51,9 @@ export default function OperatorXView() {
       </Card>
       {CATEGORIES.map((c) => (
         <TabsContent key={c.value} value={c.value}>
-          {c.value === 'attention' ? (
-            <Card className="py-6 text-center">
-              <p className="text-sm text-muted-foreground">No results yet</p>
-            </Card>
-          ) : c.value === 'model' ? (
-            category === c.value && <ModelView />
-          ) : (
-            category === c.value && <ComparisonDashboard op={c.value} />
-          )}
+          {c.value === 'model'
+            ? category === c.value && <ModelView />
+            : category === c.value && <ComparisonDashboard op={c.value} />}
         </TabsContent>
       ))}
     </Tabs>

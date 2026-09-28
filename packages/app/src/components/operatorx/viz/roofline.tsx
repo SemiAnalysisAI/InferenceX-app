@@ -219,7 +219,7 @@ function Roofline({ model }: { model: ComparisonModel }) {
 export const roofline: VizDefinition = {
   id: 'roofline',
   title: 'Roofline',
-  ops: ['gemm', 'moe'],
+  ops: ['gemm', 'moe', 'attention'],
   wide: true,
   Component: Roofline,
 };

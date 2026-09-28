@@ -9,6 +9,7 @@ import {
   type Comparison,
   type ComparisonInput,
   type ComparisonOp,
+  opFamily,
 } from '@semianalysisai/inferencex-db/operatorx/compare';
 import {
   normalizeBundle,
@@ -89,7 +90,11 @@ export async function getResultDetail(
   return { result, metrics: metrics[index] ?? {} };
 }
 
-const OP_TESTLIST_PREFIX: Record<ComparisonOp, string> = { gemm: 'gemm', moe: 'moe' };
+const OP_TESTLIST_PREFIX: Record<ComparisonOp, string> = {
+  gemm: 'gemm',
+  moe: 'moe',
+  attention: 'attn',
+};
 
 /** Each op's comparison and the `runId:revision` list it was built from. */
 const compared = new Map<ComparisonOp, { revisions: string; value: Promise<Comparison> }>();
@@ -202,7 +207,7 @@ export async function getTimelines(
       }
       const { run, results, metrics } = await bundle;
       const result = results[index];
-      if (!revision || revision !== run.revision || !result || result.opType !== op) {
+      if (!revision || revision !== run.revision || !result || opFamily(result.opType) !== op) {
         timelines[ref] = null;
         known = false;
       } else {

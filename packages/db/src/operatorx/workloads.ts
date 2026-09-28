@@ -58,7 +58,7 @@ export function workloadSources(
   testlist: string,
   checkpoints: string[],
 ): WorkloadSource[] {
-  const suffix = opType === 'moe' ? 'MoE' : opType.toUpperCase();
+  const suffix = { moe: 'MoE', attention: 'attention' }[opType] ?? opType.toUpperCase();
   if (checkpoints.length > 0) {
     const families = [...new Set(checkpoints.map(modelFamily))];
     return families.map((f) => ({ id: `${opType}:${f}`, label: `${f} ${suffix}` }));

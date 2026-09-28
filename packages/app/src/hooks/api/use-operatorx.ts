@@ -46,11 +46,16 @@ export function useOperatorXResult(runId: string | null, index: number | null) {
   });
 }
 
-export function useOperatorXComparison(op: ComparisonOp | null, workload: string | null) {
+export function useOperatorXComparison(
+  op: ComparisonOp | null,
+  workload: string | null,
+  parallel: string | null,
+) {
   const params = new URLSearchParams({ op: op ?? '' });
   if (workload) params.set('workload', workload);
+  if (parallel !== null) params.set('parallel', parallel);
   return useQuery({
-    queryKey: ['operatorx', 'compare', op, workload],
+    queryKey: ['operatorx', 'compare', op, workload, parallel],
     queryFn: ({ signal }) => get<ComparisonView>(`/api/v1/operatorx/compare?${params}`, signal),
     enabled: op !== null,
     staleTime: 5 * 60_000,
@@ -58,12 +63,13 @@ export function useOperatorXComparison(op: ComparisonOp | null, workload: string
   });
 }
 
-/** Every case one model contributes to an op, across hardware. */
-export function useOperatorXModel(op: ComparisonOp, model: string | null) {
+/** Every case one model contributes to an op family at one device split, across hardware. */
+export function useOperatorXModel(op: ComparisonOp, model: string | null, parallel: string | null) {
   const params = new URLSearchParams({ op });
   if (model) params.set('model', model);
+  if (parallel !== null) params.set('parallel', parallel);
   return useQuery({
-    queryKey: ['operatorx', 'model', op, model],
+    queryKey: ['operatorx', 'model', op, model, parallel],
     queryFn: ({ signal }) => get<ComparisonView>(`/api/v1/operatorx/compare?${params}`, signal),
     staleTime: 5 * 60_000,
   });
