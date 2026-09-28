@@ -32,15 +32,8 @@ function hoverGpuPowerPointAndAssertTooltip(
   });
 }
 
-/** Send the ↑↑↓↓ unlock sequence to reveal the Hidden popover. */
-function unlockPowerX() {
-  cy.get('body').type('{uparrow}{uparrow}{downarrow}{downarrow}');
-}
-
-/** Open the Hidden popover (must be unlocked first) and click the PowerX link. */
 function openPowerX() {
-  cy.get('[data-testid="tab-trigger-hidden"]').click();
-  cy.get('[data-testid="tab-trigger-gpu-metrics"]').click();
+  cy.get('[data-testid="footer-link-powerx"]').scrollIntoView().click();
 }
 
 describe('PowerX', () => {
@@ -52,35 +45,21 @@ describe('PowerX', () => {
     });
   });
 
-  it('Hidden popover (and PowerX link inside it) is not present by default', () => {
+  it('lists PowerX in the footer without the feature gate, and not in the Hidden popover', () => {
     cy.get('[data-testid="tab-trigger-hidden"]').should('not.exist');
     cy.get('[data-testid="tab-trigger-gpu-metrics"]').should('not.exist');
+    cy.get('[data-testid="footer-link-powerx"]')
+      .scrollIntoView()
+      .should('be.visible')
+      .and('contain.text', 'PowerX');
   });
 
-  it('↑↑↓↓ key sequence reveals the Hidden popover containing PowerX', () => {
-    cy.get('[data-testid="tab-trigger-hidden"]').should('not.exist');
-    unlockPowerX();
-    cy.get('[data-testid="tab-trigger-hidden"]').should('be.visible');
-    cy.get('[data-testid="tab-trigger-hidden"]').click();
-    cy.get('[data-testid="tab-trigger-gpu-metrics"]').should('be.visible');
-    cy.get('[data-testid="tab-trigger-gpu-metrics"]').should('contain.text', 'PowerX');
-  });
-
-  it('unlock persists across page reloads via localStorage', () => {
-    unlockPowerX();
-    cy.get('[data-testid="tab-trigger-hidden"]').should('be.visible');
-    cy.reload();
-    cy.get('[data-testid="tab-trigger-hidden"]').should('be.visible');
-    cy.get('[data-testid="tab-trigger-hidden"]').click();
-    cy.get('[data-testid="tab-trigger-gpu-metrics"]').should('be.visible');
-  });
-
-  describe('(unlocked)', () => {
+  describe('from the footer', () => {
     beforeEach(() => {
       cy.visit('/inference', {
         onBeforeLoad(win) {
           win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-          win.localStorage.setItem('inferencex-feature-gate', '1');
+          win.localStorage.removeItem('inferencex-feature-gate');
         },
       });
     });
@@ -224,6 +203,10 @@ describe('PowerX Chinese route', () => {
     cy.get('link[rel="alternate"][hreflang="zh-CN"]')
       .invoke('attr', 'href')
       .should('include', '/zh/gpu-metrics');
+    cy.get('[data-testid="footer-link-powerx"]')
+      .scrollIntoView()
+      .should('be.visible')
+      .and('contain.text', 'PowerX 芯片功耗');
   });
 
   it('supports the correlation click path at 1440px', () => {

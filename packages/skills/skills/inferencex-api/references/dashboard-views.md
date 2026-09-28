@@ -152,6 +152,11 @@ rather than hard-coding them.
 Custom chip costs are USD/chip-hour, token prices USD/million tokens,
 interactivity tok/s/user, and video costs USD/deployment-hour. Preserve the
 response's resolved TCO, utilization, license share, topology and power basis.
+PowerX is available from the footer. Inference power metrics and the per-GW
+power selector no longer require the browser feature gate. Use the existing
+`gpu-metrics`, `inference` and `profit-estimator-per-gigawatt` views; UI visibility
+changes neither the API contract nor the validation requirements below.
+
 Modeled and provisioned power are distinct. Missing measured evidence is not zero.
 GPU chart projections omit missing metric readings; measured zero remains zero.
 The selected file/host series' full-record statistics include startup and warmup

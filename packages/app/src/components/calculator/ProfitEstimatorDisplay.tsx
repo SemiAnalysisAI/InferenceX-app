@@ -610,7 +610,7 @@ function ProfitEstimatorInner({
   );
   const [targetRaw, setTargetRaw] = useState<string>(() => String(targetValue));
   const featureGateUnlocked = useFeatureGate();
-  const powerControlsEnabled = basis === 'gw-year' && featureGateUnlocked;
+  const powerControlsEnabled = basis === 'gw-year';
   const [requestedPowerBasis, setPowerBasis] = useState<ProfitPowerBasis>('provisioned');
   const powerBasis = powerControlsEnabled ? requestedPowerBasis : 'provisioned';
   useEffect(() => {

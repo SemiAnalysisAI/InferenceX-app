@@ -178,7 +178,7 @@ describe('Profit estimator power option', { testIsolation: true }, () => {
     });
   }
 
-  it('ignores power URL overrides while locked and returns to provisioned estimates on relock', () => {
+  it('applies a shared power comparison without the feature gate', () => {
     stubOpenRouter();
     let rawRequests = 0;
     cy.intercept('GET', '/api/v1/benchmarks*', (req) => {
@@ -202,20 +202,10 @@ describe('Profit estimator power option', { testIsolation: true }, () => {
         win.localStorage.removeItem('inferencex-feature-gate');
       },
     });
-    chart().find('text.revenue-label').should('have.length', 4);
-    cy.get('#profit-power').should('not.exist');
-    cy.get('[data-testid="profit-power-note"]').should('not.exist');
-    cy.then(() => expect(rawRequests).to.equal(0));
-    cy.get('body').type('{uparrow}{uparrow}{downarrow}{downarrow}');
     cy.get('#profit-power').should('contain', 'Compare both');
+    cy.get('[data-testid="profit-power-note"]').should('exist');
     chart().find('text.revenue-label').should('have.length', 6);
-    cy.window().then((win) => {
-      win.localStorage.removeItem('inferencex-feature-gate');
-      win.dispatchEvent(new Event('inferencex:feature-gate:locked'));
-    });
-    cy.get('#profit-power').should('not.exist');
-    cy.get('[data-testid="profit-power-note"]').should('not.exist');
-    chart().find('text.revenue-label').should('have.length', 4);
+    cy.then(() => expect(rawRequests).to.be.greaterThan(0));
   });
 
   for (const currentValid of [true, false]) {

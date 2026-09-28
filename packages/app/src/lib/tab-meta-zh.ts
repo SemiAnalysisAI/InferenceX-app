@@ -168,7 +168,7 @@ export const TAB_LABELS_ZH: Record<DashboardRouteKey, string> = {
   'profit-estimator-per-gigawatt': '每吉瓦利润估算',
   reliability: '可靠性',
   'gpu-specs': '芯片规格',
-  'gpu-metrics': '芯片功耗',
+  'gpu-metrics': 'PowerX 芯片功耗',
   operatorx: 'OperatorX 算子',
   collectivex: 'CollectiveX 通信',
   submissions: '提交记录',

@@ -84,11 +84,9 @@ pins the producer checkout and retains each original audit artifact.
 ## Profit Estimator power basis
 
 The per-GW Profit Estimator offers provisioned power, measured + modeled power,
-and a paired comparison in Benchmark Config. Provisioned remains the default.
-The control uses the existing insider feature gate and is hidden while locked.
-Unlock with ↑↑↓↓ (`inferencex-feature-gate=1` in local storage). While locked,
-`c_power` cannot activate an alternative calculation or fetch full power rows;
-relocking restores provisioned estimates immediately.
+and a paired comparison in Benchmark Config, beside the other benchmark
+controls. Provisioned remains the default. `c_power=modeled` and
+`c_power=compare` select the alternative without an insider unlock.
 The alternative reuses the same hardware, P90 target, throughput frontier,
 token mix, prices, utilization, and per-GPU-hour costs. It changes only the
 facility kW/GPU used to calculate capacity per GW. Consequently, revenue,
@@ -126,9 +124,8 @@ from today's results and include the source date/run label.
 价格、利用率和每 GPU 小时成本，仅改变换算每 GW 容量时采用的设施功率。因此收入、
 计算成本、模型许可费和利润按相同比例变化，利润率不变；不会另行重新计算电费。
 
-该选项由现有内部功能开关控制，锁定时隐藏。按 ↑↑↓↓ 解锁（本地存储
-`inferencex-feature-gate=1`）。锁定时，`c_power` 不会启用其他估算方式或触发完整功耗
-数据请求；重新锁定后立即恢复预配功耗估算。
+该选项与其他基准测试配置控件放在一起，无需内部解锁。`c_power=modeled` 与
+`c_power=compare` 会直接选中对应的估算方式。
 
 AgentX 估算仅接纳通过验证的 schema-v2 功耗，且要求单节点机箱及适用模型。
 实测单卡、双卡或四卡配置可复用现有整机外推：假设在八卡服务器上部署多个完整实例，

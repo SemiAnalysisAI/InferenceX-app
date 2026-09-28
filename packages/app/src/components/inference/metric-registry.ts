@@ -694,7 +694,7 @@ export function isRoleLocalMeasuredEnergyConfigKey(configKey: string): boolean {
 
 /**
  * The derived power-boundary y-axes (GPU provisioned, utility provisioned,
- * utility modeled) that share the gated Measured Energy group and its
+ * utility modeled) that share the Measured Energy group and its
  * Boundary select. They are kept out of `MEASURED_ENERGY_METRIC_CONFIG_KEYS`
  * on purpose: spec constants and model output carry no telemetry tier, so the
  * tier tooltip line does not apply to them.
@@ -767,23 +767,15 @@ export const METRIC_CONTROL_GROUPS: readonly MetricControlGroup[] = [
     labelZh: '每 token 全电源配置能耗',
     metrics: ['y_jTotal', 'y_jOutput', 'y_jInput'],
   },
-  // Runner power telemetry and the chassis model built on it are still being
-  // validated, so both groups stay behind the ↑↑↓↓ feature gate until the
-  // measurements are stable enough to publish.
-  // The derived boundaries ride along so the same gate and the same
-  // shared-URL exception (a gated metric selected by `i_metric` still renders
-  // while locked) apply to them.
   {
     label: 'Measured Energy',
     labelZh: '实测能耗',
     metrics: [...MEASURED_ENERGY_METRIC_CONFIG_KEYS, ...POWER_BASIS_METRIC_CONFIG_KEYS],
-    gated: true,
   },
   {
     label: 'Modeled System Power',
     labelZh: '系统功耗估算',
     metrics: [MODELED_SYSTEM_POWER_METRIC_CONFIG_KEY],
-    gated: true,
   },
   {
     label: 'Custom User Values',

@@ -41,6 +41,7 @@ const STRINGS = {
     cacheReuse: 'Prefix Cache Reuse',
     gpuReliability: 'Chip Reliability',
     gpuSpecsDashboard: 'Chip Specs Dashboard',
+    powerx: 'PowerX',
     perfPerDollar: 'Performance per Dollar',
     modelArchitectures: 'Model Architectures',
     glossary: 'AI Inference Glossary',
@@ -78,6 +79,7 @@ const STRINGS = {
     cacheReuse: '前缀缓存复用',
     gpuReliability: '芯片可靠性',
     gpuSpecsDashboard: '芯片规格仪表板',
+    powerx: 'PowerX 芯片功耗',
     apiReference: 'API 文档',
     perfPerDollar: '每美元性能',
     modelArchitectures: '模型架构',
@@ -333,6 +335,14 @@ export const Footer = ({ starCount }: { starCount?: number | null }) => {
                   className="inline-flex min-h-11 items-center rounded-sm py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:outline-none md:min-h-8"
                 >
                   {t.gpuSpecsDashboard}
+                </Link>
+                <Link
+                  data-testid="footer-link-powerx"
+                  href={`${prefix}/gpu-metrics`}
+                  className="inline-flex min-h-11 items-center rounded-sm py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:outline-none md:min-h-8"
+                  onClick={() => track('footer_powerx_clicked')}
+                >
+                  {t.powerx}
                 </Link>
                 <Link
                   data-testid="footer-link-compare-per-dollar"
