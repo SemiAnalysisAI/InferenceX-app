@@ -4,7 +4,7 @@ import { argumentError, isMain, responseError } from './cli-contract.mjs';
 
 const KEY = /^[A-Za-z0-9][A-Za-z0-9_-]*$/u;
 const DECIMAL = /^(?:0|[1-9]\d*)(?:\.\d+)?$/u;
-const TCO_UNITS = Object.freeze({
+export const TCO_UNITS = Object.freeze({
   gpu_hourly_price: 'USD per GPU-hour',
   target_output_throughput: 'output tokens per second per user',
   gpu_output_throughput: 'output tokens per second per GPU',
@@ -77,6 +77,19 @@ function exactObject(value, keys) {
     Object.keys(value).length === keys.length &&
     keys.every((key) => Object.hasOwn(value, key))
   );
+}
+
+export function normalizeFeedArgs(values) {
+  const target = positiveDecimal(values.target, 'target');
+  if (target > 10_000) throw new Error('--target must be at most 10000');
+  const date = values.date ?? null;
+  if (date !== null && !validDate(date)) throw new Error('--date requires a real YYYY-MM-DD date');
+  return {
+    model: validateModel(values.model),
+    date,
+    workloads: workloadsFrom(values.workloads),
+    target_output_tokens_per_second_per_user: target,
+  };
 }
 
 function validateCanonical(values) {
@@ -163,16 +176,12 @@ export function normalizeArgs(args) {
       .filter((token) => token.kind === 'option')
       .map((token) => token.name);
     if (new Set(options).size !== options.length) throw new Error('Specify each option only once');
-    const target = positiveDecimal(parsed.values.target, 'target');
-    if (target > 10_000) throw new Error('--target must be at most 10000');
+    const scope = normalizeFeedArgs(parsed.values);
     const prices = priceEntriesFrom(parsed.values['gpu-hourly-prices']).toSorted(
       ([left], [right]) => left.localeCompare(right, 'en'),
     );
     return validateCanonical({
-      model: validateModel(parsed.values.model),
-      date: parsed.values.date ?? null,
-      workloads: workloadsFrom(parsed.values.workloads),
-      target_output_tokens_per_second_per_user: target,
+      ...scope,
       gpu_hourly_prices_usd: Object.fromEntries(prices),
       units: { ...TCO_UNITS },
     });
@@ -339,7 +348,7 @@ export async function collect(options, context) {
   };
 }
 
-function validateFeed(feed, values, workloads, target) {
+export function validateFeed(feed, values, workloads, target) {
   if (
     !object(feed) ||
     feed.model !== values.model ||

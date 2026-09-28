@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, truncateSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { before, test } from 'node:test';
 import { pathToFileURL } from 'node:url';
@@ -181,13 +181,7 @@ const serverMetrics = {
 
 function run(
   responses,
-  {
-    target = 'codex',
-    openapiResponse = response(openapi),
-    replacement,
-    telemetry = true,
-    standalone = false,
-  } = {},
+  { target = 'codex', openapiResponse = response(openapi), replacement, telemetry = true } = {},
 ) {
   const project = suite.project('agentx-request-');
   const fixtures = { [`${base}/api/openapi.json`]: openapiResponse };
@@ -196,16 +190,23 @@ function run(
   const requestsPath = join(project, 'requests.jsonl');
   writeFileSync(fixturesPath, JSON.stringify(fixtures));
   let code = installed.get(target);
+  code = code.replaceAll(
+    './.agents/skills/inferencex-api/scripts/trace-summary.mjs',
+    pathToFileURL(join(skillRoots.get(target), 'scripts/trace-summary.mjs')).href,
+  );
+  code = code.replaceAll(
+    './.agents/skills/inferencex-api/scripts/capture-response.mjs',
+    pathToFileURL(join(skillRoots.get(target), 'scripts/capture-response.mjs')).href,
+  );
   if (replacement) code = code.replace(...replacement);
   const result = suite.node(['--import', pathToFileURL(preload).href, '--input-type=module'], {
     cwd: project,
     env: {
       ...environment,
-      INFERENCEX_SKILL_DIR: standalone ? '' : skillRoots.get(target),
+      INFERENCEX_SKILL_DIR: skillRoots.get(target),
       INFERENCEX_TELEMETRY: telemetry ? '1' : '0',
       DO_NOT_TRACK: '0',
-      INFERENCEX_EXPECT_USER_AGENT:
-        telemetry && !standalone ? `inferencex-skill/${packageInfo.version}` : '',
+      INFERENCEX_EXPECT_USER_AGENT: telemetry ? `inferencex-skill/${packageInfo.version}` : '',
       INFERENCEX_AGENTX_FIXTURES: fixturesPath,
       INFERENCEX_AGENTX_REQUESTS: requestsPath,
     },
@@ -341,7 +342,7 @@ test('trace summaries keep each series denominator and distinguish cumulative fr
     }),
   });
   assert.equal(result.status, 0, result.stderr);
-  const summary = JSON.parse(result.stdout).trace_summary;
+  const { trace_summary: summary, trace_report_markdown: markdown } = JSON.parse(result.stdout);
   assert.ok(summary, 'recipe must compute the maintained trace summary');
   assert.equal(summary.request_count, 3);
   assert.equal(summary.cancelled_request_count, 1);
@@ -363,6 +364,18 @@ test('trace summaries keep each series denominator and distinguish cumulative fr
   assert.deepEqual(summary.server_metric_samples.kvCacheUsageByEngine, [
     { engineLabel: '0', ...counts(1, 1, 1, 0) },
   ]);
+  assert.match(
+    markdown,
+    /prefillTps.value[^\n]*3 samples, 2 finite; 1\/2 finite samples nonzero; 1 missing/u,
+  );
+  assert.match(
+    markdown,
+    /decodeTps.value[^\n]*4 samples, 3 finite; 2\/3 finite samples nonzero; 1 missing/u,
+  );
+  assert.match(
+    markdown,
+    /hostKvCacheUsage.value[^\n]*0 samples, 0 finite; nonzero fraction unavailable/u,
+  );
 });
 
 test('an empty timeline has zero requests and durations without inventing server samples', () => {
@@ -377,6 +390,171 @@ test('an empty timeline has zero requests and durations without inventing server
   assert.equal(summary.cancelled_request_count, 0);
   assert.equal(summary.cumulative_request_latency_s, 0);
   assert.equal(summary.request_inflight_union_s, 0);
+  assert.equal(summary.status, 'empty_timeline');
+  assert.equal(summary.longest_request, null);
+  assert.deepEqual(summary.phases, []);
+});
+
+test('the installed recipe labels global and per-phase longest requests with their identities', () => {
+  const records = [
+    request('warmup', { cid: 'warmup-0', end: 33_738_000_000, start: 0 }),
+    request('profiling', {
+      cid: 'profile-0',
+      ri: 8,
+      ti: 2,
+      start: 40_000_000_000,
+      end: 168_284_000_000,
+      cancelled: true,
+      ack: null,
+      osl: null,
+      srcTrace: 'source-4',
+      srcOuter: 2,
+      srcInner: 1,
+      srcKind: 'subagent',
+    }),
+    request('profiling', { cid: 'profile-1', start: 50e9, end: 60e9 }),
+  ];
+  const result = run({
+    ...heavyResponses,
+    '/api/v1/request-timeline?id=421': response({
+      ...timeline,
+      requests: records,
+      durationS: 170,
+      endNs: 171e9,
+    }),
+  });
+  assert.equal(result.status, 0, result.stderr);
+  const { trace_summary: summary, trace_report_markdown: markdown } = JSON.parse(result.stdout);
+  assert.equal(summary.status, 'available');
+  assert.equal(summary.selected_result_id, '421');
+  assert.equal(summary.scope, 'all_phases_including_cancelled');
+  assert.deepEqual(summary.longest_request, {
+    scope: 'all_phases',
+    selected_result_id: '421',
+    phase: 'profiling',
+    request_index: 1,
+    duration: { value: 128.284, unit: 's' },
+    request: records[1],
+  });
+  assert.deepEqual(
+    summary.phases.map((phase) => [
+      phase.phase,
+      phase.request_count,
+      phase.cancelled_request_count,
+    ]),
+    [
+      ['warmup', 1, 0],
+      ['profiling', 2, 1],
+    ],
+  );
+  assert.equal(summary.phases[0].longest_request.scope, 'phase');
+  assert.equal(summary.phases[0].longest_request.phase, 'warmup');
+  assert.equal(summary.phases[0].longest_request.duration.value, 33.738);
+  assert.equal(summary.phases[1].longest_request.duration.value, 128.284);
+  assert.match(markdown, /Across all phases[^\n]*3 requests[^\n]*1 cancelled/u);
+  assert.match(
+    markdown,
+    /Longest request across all phases[^\n]*128\.284 s[^\n]*profiling[^\n]*profile-0/u,
+  );
+  assert.match(markdown, /Phase[^\n]*warmup[^\n]*33\.738 s[^\n]*warmup-0/u);
+  assert.match(markdown, /Phase[^\n]*profiling[^\n]*128\.284 s[^\n]*profile-0/u);
+  // Phase maximum must not be relabeled as the global longest.
+  assert.doesNotMatch(markdown, /Longest request across all phases[^\n]*33\.738 s[^\n]*warmup/u);
+
+  const project = suite.project('offline-trace-');
+  const savedPath = join(project, 'selected-point.json');
+  writeFileSync(savedPath, JSON.stringify({ ...JSON.parse(result.stdout), trace_summary: {} }));
+  const offline = suite.node([
+    join(skillRoots.get('codex'), 'scripts/trace-summary.mjs'),
+    savedPath,
+  ]);
+  assert.equal(offline.status, 0, offline.stderr);
+  assert.deepEqual(JSON.parse(offline.stdout), {
+    trace_summary: summary,
+    trace_report_markdown: markdown,
+  });
+});
+
+test('no stored trace has an explicit unavailable report without inventing an empty timeline', () => {
+  const result = run(lightResponses);
+  assert.equal(result.status, 0, result.stderr);
+  const output = JSON.parse(result.stdout);
+  assert.equal(output.trace_summary?.status, 'trace_unavailable');
+  assert.equal(output.trace_summary.request_count, null);
+  assert.equal(output.trace_summary.longest_request, null);
+  assert.match(output.trace_report_markdown, /result 421[^\n]*no stored trace/iu);
+  assert.match(output.trace_report_markdown, /omitted the selected ID/u);
+});
+
+test('the installed offline helper rejects invalid scope and events without a no-trace report', () => {
+  const result = run(heavyResponses);
+  assert.equal(result.status, 0, result.stderr);
+  const saved = JSON.parse(result.stdout);
+  const project = suite.project('invalid-offline-trace-');
+  const inputPath = join(project, 'selected-point.json');
+  for (const [changed, expected] of [
+    [{ metadata: {} }, /scope/u],
+    [{ metadata: { selected_result_id: '0421' } }, /scope/u],
+    [{ selected_point: { id: 422 } }, /scope/u],
+    [
+      { trace_availability: { response: { 421: true }, key_present: false, available: false } },
+      /availability/u,
+    ],
+    [
+      { outcome: 'trace_unavailable', timeline: null, histograms: null, server_metrics: null },
+      /outcome/u,
+    ],
+    [
+      {
+        timeline: {
+          ...timeline,
+          requests: [request('warmup', { end: Number.MAX_SAFE_INTEGER + 1 })],
+        },
+      },
+      /timeline/u,
+    ],
+    [
+      { server_metrics: { ...serverMetrics, kvCacheUsageByEngine: [{ engineLabel: '0' }] } },
+      /server metrics/u,
+    ],
+  ]) {
+    writeFileSync(inputPath, JSON.stringify({ ...saved, ...changed }));
+    const offline = suite.node([
+      join(skillRoots.get('codex'), 'scripts/trace-summary.mjs'),
+      inputPath,
+    ]);
+    assert.notEqual(offline.status, 0);
+    assert.equal(offline.stdout, '');
+    assert.match(offline.stderr, expected);
+  }
+});
+
+test('the installed trace helper reports invalid input through the package CLI error contract', () => {
+  const script = join(skillRoots.get('codex'), 'scripts/trace-summary.mjs');
+  const usage = suite.node([script]);
+  assert.equal(usage.status, 2);
+  assert.equal(usage.stdout, '');
+  assert.equal(JSON.parse(usage.stderr).error.code, 'INVALID_ARGUMENT');
+  const invalidPath = join(suite.project('invalid-trace-json-'), 'selected-point.json');
+  writeFileSync(invalidPath, '{');
+  const malformed = suite.node([script, invalidPath]);
+  assert.equal(malformed.status, 1);
+  assert.equal(malformed.stdout, '');
+  assert.equal(JSON.parse(malformed.stderr).error.code, 'INVALID_RESPONSE');
+});
+
+test('the installed trace helper rejects an oversized saved file before parsing it', () => {
+  const oversizedPath = join(suite.project('oversized-trace-'), 'selected-point.json');
+  writeFileSync(oversizedPath, '');
+  truncateSync(oversizedPath, 64 * 1024 * 1024 + 1);
+  const result = suite.node([
+    join(skillRoots.get('codex'), 'scripts/trace-summary.mjs'),
+    oversizedPath,
+  ]);
+  assert.equal(result.status, 1);
+  assert.equal(result.stdout, '');
+  assert.match(result.stderr, /64 MiB/u);
+  assert.equal(JSON.parse(result.stderr).error.code, 'INVALID_RESPONSE');
 });
 
 test('requested queue windows count overlapping samples once for the exact selected requests', () => {
@@ -483,17 +661,22 @@ test('advertised traces fail as inconsistencies on HTTP and malformed heavy resp
         '/api/v1/request-timeline?id=421': response({ ...timeline, requests: [{}] }),
       },
     },
-    ...[{ start: 2, end: 1 }, { start: -1 }, { end: Number.MAX_SAFE_INTEGER + 1 }].map(
-      (overrides) => ({
-        responses: {
-          ...heavyResponses,
-          '/api/v1/request-timeline?id=421': response({
-            ...timeline,
-            requests: [request('main-agent', overrides)],
-          }),
-        },
-      }),
-    ),
+    ...[
+      { start: 2, end: 1 },
+      { start: -1 },
+      { end: Number.MAX_SAFE_INTEGER + 1 },
+      { credit: Number.MAX_SAFE_INTEGER + 1 },
+      { ack: Number.MAX_SAFE_INTEGER + 1 },
+      { ack: 0.5 },
+    ].map((overrides) => ({
+      responses: {
+        ...heavyResponses,
+        '/api/v1/request-timeline?id=421': response({
+          ...timeline,
+          requests: [request('main-agent', overrides)],
+        }),
+      },
+    })),
     {
       responses: { ...heavyResponses, '/api/v1/trace-histograms?ids=421': response({}) },
     },
@@ -539,9 +722,7 @@ test('malformed light responses and missing live operations fail without heavy t
 });
 
 test('installed AgentX recipe honors attribution opt-out', () => {
-  for (const options of [{ telemetry: false }, { standalone: true }]) {
-    const result = run(lightResponses, options);
-    assert.equal(result.status, 0, result.stderr);
-    assert.equal(result.requests.length, 3);
-  }
+  const result = run(lightResponses, { telemetry: false });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.requests.length, 3);
 });
