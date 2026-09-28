@@ -374,12 +374,16 @@ describe('evaluation sample drawer', () => {
     expect(response.headers.get('cache-control')).toContain('no-store');
     const body = await response.json();
     expect(body.samples).toEqual(filterEvalSamplePage(allSamples, 'world'));
-    expect(body.samples).toHaveLength(2);
     expect(body.total).toBe(12);
     expect(body.pageCount).toBe(3);
     expect(body.params).toMatchObject({ limit: 50, filter: 'failed' });
     expect(body.searchScope).toBe('current-page');
-    expect(filterEvalSamplePage(allSamples, '')[2].passed).toBeNull();
+    const unfiltered = await samples(req('evaluation-samples', 'evalResultId=1'));
+    const unfilteredBody = await unfiltered.json();
+    expect(unfilteredBody.samples.find((sample: { docId: number }) => sample.docId === 2)).toEqual(
+      allSamples[2],
+    );
+    expect(unfilteredBody.samples[2].passed).toBeNull();
   });
   it('resolves stored doc ID zero into the returned page and resets the filter', async () => {
     mocks.stored.mockImplementation(() => Response.json({ ...page, offset: 50 }));

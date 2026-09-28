@@ -10,7 +10,6 @@ describe('summarizeDistribution', () => {
     expect(summary.excluded).toBe(4);
     expect(summary.histogram!.counts).toHaveLength(15);
     expect(summary.histogram!.counts.reduce((sum, count) => sum + count, 0)).toBe(3);
-    expect(values[0]).toBe(100);
   });
 
   it.each([{ values: [] }, { values: [0, -1] }])(

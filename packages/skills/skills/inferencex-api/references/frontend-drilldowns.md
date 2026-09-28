@@ -22,10 +22,11 @@ strings with `URLSearchParams`, not interpolation of opaque IDs.
    Token/count distributions and `cachedFractionPerTurn` have different units;
    format the latter as a fraction or labeled percentage. A missing distribution
    is unavailable, not an empty histogram or a zero.
-3. Use `search` for conversation-ID substring search across the index, and `sort`
-   in `tokens`, `turns`, `subagents`, `id`. `tokens` orders total input descending.
-   `offset` is zero-based; use `pagination.hasMore`, not the presence of a full
-   page, to continue. Searching conversations does not filter dataset-wide charts.
+3. Use `search` for conversation-ID substring search across the index (at most
+   100 characters; longer values are a selector error), and `sort` in `tokens`,
+   `turns`, `subagents`, `id`. `tokens` orders total input descending. `offset`
+   is zero-based; use `pagination.hasMore`, not the presence of a full page, to
+   continue. Searching conversations does not filter dataset-wide charts.
 4. Select one returned `conv_id` with `convId`. Add `expanded=all` or comma-separated
    raw subagent node indices. The default is collapsed. `raw`/`inner` or
    `turn`/`sa` address deep-link targets; `raw` takes precedence, and the containing

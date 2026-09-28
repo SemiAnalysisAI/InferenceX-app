@@ -14,15 +14,16 @@ for (const agent of ['codex', 'claude']) {
       'utf8',
     ).replaceAll(/\s+/gu, ' ');
     assert.match(hub, /references\/frontend-drilldowns\.md/u);
-    for (const view of [
-      'dataset',
-      'agentx-catalog',
-      'agentx-point',
-      'evaluation-samples',
-      'gpu-specs',
-      'inference',
-    ]) {
-      assert.ok(recipe.includes(`/api/v1/views/${view}`), view);
-    }
+    assert.match(recipe, /\/api\/v1\/views\/dataset/u);
+    assert.match(recipe, /\/api\/v1\/views\/agentx-catalog/u);
+    assert.match(recipe, /\/api\/v1\/views\/agentx-point/u);
+    assert.match(recipe, /\/api\/v1\/views\/evaluation-samples/u);
+    assert.match(recipe, /\/api\/v1\/views\/gpu-specs/u);
+    assert.match(recipe, /\/api\/v1\/views\/inference/u);
+    assert.match(recipe, /cc-traces-weka-062126-256k/u);
+    assert.match(recipe, /at most 100 characters/u);
+    assert.match(recipe, /radar\.series/u);
+    assert.match(recipe, /currentConfig/u);
+    assert.doesNotMatch(recipe, /\/api\/v1\/views\/operatorx/u);
   });
 }
