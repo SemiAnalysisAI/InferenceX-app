@@ -783,9 +783,7 @@ export function ModelView() {
     <TooltipProvider>
       <div className="flex flex-col gap-4" data-testid="operatorx-model-view">
         <Card className="relative z-10 py-4 md:py-5">
-          <div
-            className={`grid gap-x-5 gap-y-3 sm:grid-cols-2 ${splits.length > 1 ? 'lg:grid-cols-5' : 'lg:grid-cols-4'}`}
-          >
+          <div className="grid gap-x-5 gap-y-3 sm:grid-cols-2 lg:grid-cols-5">
             <ControlGroup label="Model" htmlFor="operatorx-model">
               <SearchableSelect
                 triggerId="operatorx-model"
@@ -794,25 +792,23 @@ export function ModelView() {
                 groups={[{ label: '', options: modelOptions.map((m) => ({ value: m, label: m })) }]}
               />
             </ControlGroup>
-            {splits.length > 1 && (
-              <ControlGroup label="Devices" htmlFor="operatorx-model-parallel">
-                <SearchableSelect
-                  triggerId="operatorx-model-parallel"
-                  value={split || ONE_DEVICE}
-                  onValueChange={setParallel}
-                  searchable={false}
-                  groups={[
-                    {
-                      label: '',
-                      options: splits.map((o) => ({
-                        value: o.key || ONE_DEVICE,
-                        label: `${o.label} (${o.cases})`,
-                      })),
-                    },
-                  ]}
-                />
-              </ControlGroup>
-            )}
+            <ControlGroup label="Devices" htmlFor="operatorx-model-parallel">
+              <SearchableSelect
+                triggerId="operatorx-model-parallel"
+                value={split || ONE_DEVICE}
+                onValueChange={setParallel}
+                searchable={false}
+                groups={[
+                  {
+                    label: '',
+                    options: splits.map((o) => ({
+                      value: o.key || ONE_DEVICE,
+                      label: `${o.label} (${o.cases})`,
+                    })),
+                  },
+                ]}
+              />
+            </ControlGroup>
             <ControlGroup label="Metric" htmlFor="operatorx-metric">
               <SearchableSelect
                 triggerId="operatorx-metric"

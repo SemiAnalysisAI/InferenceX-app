@@ -31,3 +31,10 @@ export function peakBandwidthTBs(key: string): number | null {
   const m = spec(key)?.memoryBandwidth.match(/(?<tbs>[\d.]+)\s*TB\/s/u);
   return m ? Number(m.groups?.tbs) : null;
 }
+
+/** Per-GPU unidirectional scale-up (NVLink / Infinity Fabric) bandwidth in TB/s. */
+export function scaleUpTBs(key: string): number | null {
+  const m = spec(key)?.scaleUpBandwidth.match(/(?<v>[\d.]+)\s*(?<unit>[GT])B\/s/u);
+  if (!m?.groups) return null;
+  return Number(m.groups.v) / (m.groups.unit === 'G' ? 1000 : 1);
+}

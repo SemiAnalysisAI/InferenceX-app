@@ -12,6 +12,7 @@ import { EmptyChart } from '../charts/empty';
 import { OpxChart, esc, HardwareLegend, tooltipHtml } from '../charts/kit';
 import { formatCompact } from '../charts/scales';
 import { hardwareLabel, peakBandwidthTBs, peakTflops } from '../compare/hardware';
+import { type RooflineBound, rooflineBound } from '../compare/roofline-bound';
 import type { ComparisonModel } from '../compare/model';
 import { originRows } from '../compare/slices';
 import type { VizDefinition } from './types';
@@ -23,9 +24,11 @@ interface Point {
   i: number;
   x: number;
   y: number;
-  /** FLOP/byte and TFLOPS, as measured; x/y are these or their normalized forms. */
+  /** Effective FLOP/byte and measured TFLOPS; x/y are these or their normalized forms. */
   ai: number;
   tflops: number;
+  us: number;
+  bound: RooflineBound | null;
 }
 
 /** Key of the one roofline every device shares once normalized. */
@@ -34,6 +37,22 @@ const ratio = (v: number) => String(Number(v.toPrecision(2)));
 /** ` · 42% of peak compute`, or nothing when the device's peak is unknown. */
 const share = (v: number, of: number | null, what: string) =>
   of ? ` · ${ratio((v / of) * 100)}% of peak ${what}` : '';
+
+/** `Roofline 12 µs · 71% of it · bound by compute 60%, memory 35%, link 5%`. */
+function boundRow(b: RooflineBound, us: number): string {
+  const parts = (
+    [
+      ['compute', b.compute],
+      ['memory', b.memory],
+      ['link', b.link],
+    ] as const
+  ).filter(([, t]) => t > 0);
+  const split =
+    parts.length > 1
+      ? ` · ${parts.map(([name, t]) => `${name} ${ratio((t / b.us) * 100)}%`).join(', ')}`
+      : ` · ${parts[0]?.[0] ?? 'compute'}-bound`;
+  return `<strong>${ratio((b.us / us) * 100)}% of roofline</strong> (${ratio(b.us)} µs${split})`;
+}
 
 function Roofline({ model }: { model: ComparisonModel }) {
   const { view } = model;
@@ -50,8 +69,11 @@ function Roofline({ model }: { model: ComparisonModel }) {
     picked && precisions.includes(picked)
       ? picked
       : precisions.toSorted((a, b) => (counts.get(b) ?? 0) - (counts.get(a) ?? 0))[0];
-  // Normalized, each device's intensity is divided by its ridge point (peak / bandwidth)
-  // and its throughput by its peak, so every roofline becomes min(1, x).
+  // A case's stages each hit their own roof, so its intensity is effective: placed where
+  // the device's roofline min(peak, AI × bandwidth) reaches the case's own bound, F / t_roof.
+  // The gap under the roof is then measured time against that bound. For a single stage
+  // this is plain FLOP/byte. Normalized, intensity is divided by the ridge point
+  // (peak / bandwidth) and throughput by the peak, so every roofline becomes min(1, x).
   const points = useMemo<Point[]>(
     () =>
       model.hardware.flatMap((hw) => {
@@ -61,23 +83,27 @@ function Roofline({ model }: { model: ComparisonModel }) {
         return view.cases.flatMap((c, i) => {
           const us = model.latency(hw, i);
           if (c.computePrecision !== precision || !us || !c.flops || !c.bytes) return [];
-          const ai = c.flops / c.bytes;
+          const bound = rooflineBound(c, hw);
           const tflops = c.flops / (us * 1e6);
+          // ridge-normalized: the share of peak the bound allows on the slope, else past the ridge
+          const reach = peak && bw && bound ? c.flops / (peak * 1e6) / bound.us : null;
+          const ridged =
+            reach === null ? null : reach < 0.999 ? reach : ((c.flops / c.bytes) * bw!) / peak!;
+          const ai = ridged === null ? c.flops / c.bytes : (ridged * peak!) / bw!;
           return [
             normalized
-              ? { hw, i, ai, tflops, x: (ai * bw!) / peak!, y: tflops / peak! }
-              : { hw, i, ai, tflops, x: ai, y: tflops },
+              ? { hw, i, ai, tflops, us, bound, x: ridged!, y: tflops / peak! }
+              : { hw, i, ai, tflops, us, bound, x: ai, y: tflops },
           ];
         });
       }),
     [model, view, precision, normalized],
   );
   if (!precision) return <EmptyChart>No case has FLOP and byte counts.</EmptyChart>;
-  const xs = normalized
-    ? points.map((p) => p.x)
-    : view.cases.flatMap((c) =>
-        c.computePrecision === precision && c.flops && c.bytes ? [c.flops / c.bytes] : [],
-      );
+  const composite = view.cases.some(
+    (c) => (c.work?.parts.length ?? 0) > 1 || (c.work?.links.length ?? 0) > 0,
+  );
+  const xs = points.map((p) => p.x);
   const [a0, a1] =
     xs.length > 0
       ? [
@@ -139,9 +165,12 @@ function Roofline({ model }: { model: ComparisonModel }) {
         }}
         xAxis={
           normalized
-            ? { label: 'Arithmetic intensity / ridge point', tickFormat: (v) => ratio(Number(v)) }
+            ? {
+                label: `${composite ? 'Effective intensity' : 'Arithmetic intensity'} / ridge point`,
+                tickFormat: (v) => ratio(Number(v)),
+              }
             : {
-                label: 'Arithmetic intensity (FLOP/byte)',
+                label: `${composite ? 'Effective intensity' : 'Arithmetic intensity'} (FLOP/byte)`,
                 tickFormat: (v) => formatCompact(Number(v)),
               }
         }
@@ -195,7 +224,8 @@ function Roofline({ model }: { model: ComparisonModel }) {
           content: (p) => {
             const peak = peakTflops(p.hw, precision);
             const bw = peakBandwidthTBs(p.hw);
-            const tbs = p.tflops / p.ai;
+            const c = view.cases[p.i];
+            const tbs = c.bytes! / (p.us * 1e6);
             return tooltipHtml({
               title: hardwareLabel(p.hw),
               color: model.colors[p.hw],
@@ -204,7 +234,8 @@ function Roofline({ model }: { model: ComparisonModel }) {
                 ...originRows(view, p.i),
                 `<strong>${p.tflops.toFixed(1)} TFLOPS</strong>${share(p.tflops, peak, 'compute')}`,
                 `<strong>${tbs.toFixed(2)} TB/s</strong>${share(tbs, bw, 'bandwidth')}`,
-                `${p.ai.toFixed(0)} FLOP/byte`,
+                `${(c.flops! / c.bytes!).toFixed(0)} FLOP/byte${composite ? ` · ${p.ai.toFixed(0)} effective` : ''}`,
+                ...(p.bound ? [boundRow(p.bound, p.us)] : []),
               ],
               footer: 'Click for kernel timeline',
             });

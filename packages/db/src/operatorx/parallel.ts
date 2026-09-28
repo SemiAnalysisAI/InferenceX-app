@@ -42,9 +42,14 @@ export function parallelLabel(key: string): string {
   return key ? key.toUpperCase().replaceAll('·', ' · ') : '1 GPU';
 }
 
-/** Tensor-parallel ways: the split of each data-parallel group's work. */
-export function tensorParallel(args: Args): number {
-  return axis(args, 'tp');
+/** Ways along every axis, 1 where the case doesn't split. */
+export function parallelAxes(args: Args): Record<Axis, number> {
+  return {
+    tp: axis(args, 'tp'),
+    dp: axis(args, 'dp'),
+    ep: axis(args, 'ep'),
+    dcp: axis(args, 'dcp'),
+  };
 }
 
 /** Devices a split key runs on: tensor × data parallel ways. */

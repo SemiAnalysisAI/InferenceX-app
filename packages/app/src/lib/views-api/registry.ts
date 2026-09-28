@@ -167,6 +167,7 @@ export const VIEW_QUERY_PARAMS = {
     'xmetric',
     'xmode',
   ],
+  operatorx: ['format', 'hardware', 'model', 'op', 'page', 'parallel', 'status', 'workload'],
   options: ['format'],
   overview: ['compare', 'engine', 'format', 'hwrows', 'models', 'ref', 'rows', 'tier'],
   'profit-estimator': [
@@ -254,10 +255,7 @@ export const DASHBOARD_API_COVERAGE = {
   reliability: { view: 'reliability' },
   'gpu-specs': { view: 'gpu-specs' },
   submissions: { view: 'submissions' },
-  operatorx: {
-    exclusion:
-      'Feature-gated OperatorX explorer uses page-owned routes; no stable public read-only view is published.',
-  },
+  operatorx: { view: 'operatorx' },
   collectivex: { view: 'collectivex' },
   'gpu-metrics': { view: 'gpu-metrics' },
   'current-inferencex-image': { view: 'current-inferencex-image' },

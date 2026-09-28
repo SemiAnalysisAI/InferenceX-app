@@ -1,8 +1,15 @@
 import type { ComparisonCase } from '@semianalysisai/inferencex-db/operatorx/compare';
 
 import { peakBandwidthTBs, peakTflops } from './hardware';
+import { rooflineBound } from './roofline-bound';
 
-export type MetricId = 'latency' | 'tflops' | 'bandwidth' | 'computeUtil' | 'bandwidthUtil';
+export type MetricId =
+  | 'latency'
+  | 'tflops'
+  | 'bandwidth'
+  | 'computeUtil'
+  | 'bandwidthUtil'
+  | 'rooflineUtil';
 
 export interface Metric {
   id: MetricId;
@@ -76,6 +83,19 @@ export const METRICS: Metric[] = [
     value: (c, us, hw) => {
       const peak = peakBandwidthTBs(hw);
       return c.bytes && peak ? c.bytes / (us * 1e6) / peak : null;
+    },
+    format: pct,
+    tick: plainPct,
+  },
+  {
+    id: 'rooflineUtil',
+    label: 'Share of roofline',
+    unit: '%',
+    better: 'higher',
+    log: false,
+    value: (c, us, hw) => {
+      const bound = rooflineBound(c, hw);
+      return bound ? bound.us / us : null;
     },
     format: pct,
     tick: plainPct,

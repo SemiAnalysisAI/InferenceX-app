@@ -64,6 +64,33 @@ hidden size、latent 投影和共享专家，这些均不在本次测量范围�
 K3 配置的 `n_shared=0`。分子不计激活和路由计算量，分母为实测融合专家内核延迟。
 缺失、失败、不支持及空形状测试没有 TFLOPS 值。
 
+## Roofline
+
+MoE 与注意力算子包含多个阶段（投影、注意力核心或线性递归、路由、专家、共享专家），
+各阶段精度与算术强度不同，多卡切分还会引入集合通信。某用例在某 GPU 上的 roofline
+时间为各阶段中算力时间（按该阶段精度的峰值算力计算 FLOPs）与访存时间（按峰值带宽
+计算字节数）取较慢者之和，再加上各集合通信按 scale-up 带宽计算的时间：张量并行
+GEMM 的 all-reduce，MoE 的 all-reduce、all-gather/reduce-scatter 或专家并行的
+dispatch/combine，以及注意力的 dcp 合并。注意力自身的张量并行 all-reduce 不在算子
+内。Roofline 占比为该时间与实测延迟之比。Roofline 图按等效算术强度放置每个用例，
+即 GPU roofline 达到该用例上界的位置，因此点与屋顶之间的差距即为 roofline 占比；
+单阶段算子的等效强度就是普通的 FLOP/byte。
+
+## 数据 API
+
+`GET /api/v1/views/operatorx` 是公开的只读 OperatorX 数据接口，列于 API 参考与
+OpenAPI 文档中。每个用例与 GPU 返回一行，取该 GPU 最新存储的结果。每行包含用例键、
+算子类型、设备切分、testlist、用例所属的模型与层、形状与精度标签、维度、每 GPU
+有效 FLOPs 与字节数、状态、延迟、TFLOPS、TB/s、roofline 时间与占比（见下文）、kernel，以及存储的运行 ID 与结果索引。
+
+- `op`：`gemm`（默认）、`moe` 或 `attention`。
+- `workload`（取自 `options.workloads`）或 `model`（取自 `options.models`）。
+- `parallel`：`1` 表示单卡（tp=dp=ep=dcp=1），或 `tp8` 等切分。
+- `hardware`、`status`（默认 `ok`，或 `all`）、`page`（每页 100 行）、`format=csv`。
+
+未知或重复的参数，以及不在可选项中的取值，返回 400。在新结果入库前保持缓存；
+缺少无法读取的运行时不缓存。其余 `/api/v1/operatorx/*` 接口服务于页面，可能随页面变化。
+
 ## 持久化与部署
 
 运行以原始文档形式保存在独立的 OperatorX 数据库（`opx_runs` 与 `opx_run_docs`）中：

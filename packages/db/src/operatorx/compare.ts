@@ -3,7 +3,15 @@
  * case identity (op args + backend) and grouped into workload sources. Pure; the caller
  * picks which run supplies each runner's results (newest first wins per case).
  */
-import { ATTENTION_TYPES, attentionTokens, opLabels, usefulBytes, usefulFlops } from './describe';
+import {
+  ATTENTION_TYPES,
+  attentionTokens,
+  type ComputePrecision,
+  mathPrecision,
+  opLabels,
+  type OpWork,
+  opWork,
+} from './describe';
 import {
   type OperatorXDataset,
   type OperatorXSource,
@@ -30,8 +38,7 @@ export interface ComparisonHardware {
   runs: { runId: string; generatedAt: string }[];
 }
 
-/** Arithmetic precision the math runs at, for peak-throughput lookups. */
-export type ComputePrecision = 'fp4' | 'fp8' | 'bf16' | 'other';
+export type { ComputePrecision, OpWork, WorkPart, LinkTransfer } from './describe';
 
 export interface ComparisonRow {
   /** Case identity shared by the same case on every runner. */
@@ -55,6 +62,8 @@ export interface ComparisonRow {
   latencyUs: number | null;
   flops: number | null;
   bytes: number | null;
+  /** Per device, stage by stage, for the roofline. */
+  work: OpWork | null;
   kernel: string | null;
   cudaGraph: boolean | null;
   runId: string;
@@ -108,11 +117,6 @@ export function hardwareKey(runner: string): string {
 
 type Args = Record<string, unknown>;
 const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
-const dtypeOf = (v: unknown): string => {
-  const d = v && typeof v === 'object' ? (v as Args).dtype : null;
-  return typeof d === 'string' ? d : 'bf16';
-};
-
 /** The operands the math runs on: GEMM A and B, the experts, attention's projections. */
 function quantOperands(op: ComparisonOp, a: Args): unknown[] {
   if (op === 'gemm') return [a.a, a.b];
@@ -123,14 +127,6 @@ function quantOperands(op: ComparisonOp, a: Args): unknown[] {
   const proj = (a.proj ?? {}) as Record<string, Args>;
   const pairs = Object.values(proj).flatMap((p) => [p.a, p.b]);
   return pairs.length > 0 ? pairs : [{ dtype: 'bf16' }];
-}
-
-function computePrecision(op: ComparisonOp, a: Args): ComputePrecision {
-  const widest = quantOperands(op, a).map(dtypeOf);
-  if (widest.some((d) => d === 'bf16' || d === 'fp16')) return 'bf16';
-  if (widest.some((d) => d === 'e4m3' || d === 'e5m2' || d === 'int8')) return 'fp8';
-  if (widest.length > 0 && widest.every((d) => d === 'e2m1' || d === 'int4')) return 'fp4';
-  return 'other';
 }
 
 function dims(op: ComparisonOp, a: Args): Record<string, number> {
@@ -182,6 +178,12 @@ export function comparisonCaseKey(
   return `${hardwareKey(runner)}|${stableJson(result.args)}|${result.backend}`;
 }
 
+function totals(work: OpWork | null): Pick<ComparisonRow, 'flops' | 'bytes' | 'work'> {
+  if (!work) return { flops: null, bytes: null, work: null };
+  const sum = (key: 'flops' | 'bytes') => work.parts.reduce((t, p) => t + p[key], 0);
+  return { flops: sum('flops'), bytes: sum('bytes'), work };
+}
+
 /** Inputs newest first: the first runner's result for a case wins. */
 export function buildComparison(op: ComparisonOp, inputs: ComparisonInput[]): Comparison {
   const hardware = new Map<string, ComparisonHardware>();
@@ -215,13 +217,12 @@ export function buildComparison(op: ComparisonOp, inputs: ComparisonInput[]): Co
         workloads: sources.map((s) => s.id),
         sources: sourcesByModel(r.sources),
         ...opLabels(r.opType, r.args),
-        computePrecision: computePrecision(op, r.args),
+        computePrecision: mathPrecision(quantOperands(op, r.args)),
         x: sizeOf(op, r.args),
         dims: dims(op, r.args),
         status: r.status,
         latencyUs: r.latencyUs,
-        flops: usefulFlops(r.opType, r.args),
-        bytes: usefulBytes(r.opType, r.args),
+        ...totals(opWork(r.opType, r.args)),
         kernel: r.kernel,
         cudaGraph: r.cudaGraph,
         runId: dataset.run.runId,
@@ -266,8 +267,10 @@ export interface ComparisonCase {
   computePrecision: ComputePrecision;
   x: number | null;
   dims: Record<string, number>;
+  /** Useful FLOPs and minimum memory bytes per device: `work`'s totals. */
   flops: number | null;
   bytes: number | null;
+  work: OpWork | null;
 }
 
 /** Per-GPU measurements, column arrays indexed like `ComparisonView.cases`. */
@@ -383,6 +386,7 @@ export function comparisonView(
       dims: r.dims,
       flops: r.flops,
       bytes: r.bytes,
+      work: r.work,
     });
   }
   const kernels: string[] = [];

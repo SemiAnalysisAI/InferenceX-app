@@ -142,6 +142,14 @@ export const apiRouteCatalog = [
     sourceSha256: 'de9192086b27e530ad6b1ece082b4989b3a9771a78195ae9f6d1c3899519588f',
   },
   {
+    source: 'src/app/api/v1/views/operatorx/route.ts',
+    path: '/api/v1/views/operatorx',
+    method: 'GET',
+    classification: 'published-read',
+    operationId: 'get-operatorx-view',
+    sourceSha256: 'd67d048d0594ee9451d428b20003b637147e57dc17be0c7a9e00bc067a1ceb53',
+  },
+  {
     source: 'src/app/api/v1/views/options/route.ts',
     path: '/api/v1/views/options',
     method: 'GET',
@@ -932,7 +940,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/registry.ts',
-    sourceSha256: '2f787cabdb65a3549eb2fbd1ce7d3929dd5e5b18d7f34fce1fd7af26100b7954',
+    sourceSha256: 'afcbdd1fff5eac80c6c01709d2892594ea6a6aa2ec676f025f5adaa7f308f3e5',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -950,7 +958,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/api-cache.ts',
-    sourceSha256: 'cf710c1dca9cfae794cf3d14d3dad6a153bbd7151cedc9d9f0b27b792aeade24',
+    sourceSha256: 'b0f7e9de89f39f756a262fa2f4822b90ae5ac4b1606dd5fdf1148b5461b9dee7',
     reviewArea: {
       en: 'Public CDN tags, cache lifetimes, Blob key dimensions, and purge behavior.',
       zh: '公开 CDN 标签、缓存时长、Blob 键维度和清除行为。',

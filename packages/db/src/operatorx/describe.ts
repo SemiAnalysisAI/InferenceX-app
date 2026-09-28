@@ -1,10 +1,10 @@
 /**
- * Human labels and useful-FLOP counts for OperatorX ops (gemm, moe and the attention
- * modules). Pure functions of an op's type and args; other op types fall back to generic
- * labels. Counts are per device: a split case's work is shared by its devices.
+ * Human labels and work counts for OperatorX ops (gemm, moe and the attention modules).
+ * Pure functions of an op's type and args; other op types fall back to generic labels.
+ * Counts are per device: a split case's work is shared by its devices.
  */
 
-import { tensorParallel } from './parallel';
+import { parallelAxes } from './parallel';
 
 type Args = Record<string, unknown>;
 
@@ -128,6 +128,8 @@ interface AttentionWork {
   core: number;
   /** Cache or recurrent-state bytes read and written. */
   cache: number;
+  /** Width of each new token's attention output over all heads, merged across dcp ranks. */
+  merge: number;
 }
 
 const CACHE_BYTES = (dtype: unknown): number =>
@@ -159,6 +161,7 @@ function attentionWork(type: string, a: Args): AttentionWork | null {
           proj,
           core: 4 * qh * hd * sumGroups(gs, (g) => keys(g.ctx, g.q)),
           cache: cacheOf(2 * kvh * hd * kvBytes),
+          merge: qh * hd,
         };
       const [ih, id, compress, budget] = [
         n('index_heads'),
@@ -172,6 +175,7 @@ function attentionWork(type: string, a: Args): AttentionWork | null {
         proj,
         core: 4 * qh * hd * sumGroups(gs, (g) => keys(g.ctx, g.q, budget)) + 2 * ih * id * scored,
         cache: cacheOf(2 * kvh * hd * 2, (g) => Math.min(g.ctx, budget)),
+        merge: qh * hd,
       };
     }
     case 'mla':
@@ -198,6 +202,7 @@ function attentionWork(type: string, a: Args): AttentionWork | null {
           proj,
           core: perQuery * sumGroups(gs, (g) => keys(g.ctx, g.q)),
           cache: cacheOf((kvl + rope) * kvBytes),
+          merge: heads * v,
         };
       const [topk, ih, id] = [n('topk'), n('index_heads'), n('index_dim')];
       const own = (a.indexer ?? 'own') === 'own';
@@ -213,6 +218,7 @@ function attentionWork(type: string, a: Args): AttentionWork | null {
           perQuery * sumGroups(gs, (g) => keys(g.ctx, g.q, topk)) +
           (own ? 2 * ih * id * sumGroups(gs, (g) => keys(g.ctx, g.q)) : 0),
         cache: cacheOf((kvl + rope) * kvBytes, (g) => Math.min(g.ctx, topk)),
+        merge: heads * v,
       };
     }
     case 'dsv4_attn': {
@@ -256,6 +262,7 @@ function attentionWork(type: string, a: Args): AttentionWork | null {
         cache:
           cacheOf(hd * kvBytes, (g) => Math.min(g.ctx, window)) +
           (ratio > 0 ? (hd * kvBytes * sumGroups(gs, (g) => g.ctx)) / ratio : 0),
+        merge: heads * hd,
       };
     }
     case 'gdn':
@@ -283,7 +290,12 @@ function attentionWork(type: string, a: Args): AttentionWork | null {
             ];
       const state = vh * hd * hd * (a.state_dtype === 'bf16' ? 2 : 4);
       // each token updates and reads every head's k×v state
-      return { proj, core: 6 * vh * hd * hd * tokens, cache: 2 * state * sumGroups(gs, () => 1) };
+      return {
+        proj,
+        core: 6 * vh * hd * hd * tokens,
+        cache: 2 * state * sumGroups(gs, () => 1),
+        merge: 0,
+      };
     }
     default: {
       return null;
@@ -330,46 +342,6 @@ export function opLabels(type: string, args: Args): OpLabels {
   }
 }
 
-/**
- * Useful FLOPs of one op call on each of its devices (2 per multiply-add), or null when
- * the op has no defined count here. MoE counts router, routed experts at their active
- * top-k, latent projections and shared experts; it excludes activations, routing and
- * combine work. Attention counts its projections and the attention core (or the linear
- * recurrence), causal, with each query's keys capped where the module selects them.
- * A data-parallel group's work is split over its tensor-parallel devices.
- */
-export function usefulFlops(type: string, a: Args): number | null {
-  const flops = groupFlops(type, a);
-  return flops === null ? null : flops / tensorParallel(a);
-}
-
-function groupFlops(type: string, a: Args): number | null {
-  if (type === 'gemm') {
-    const [m, n, k] = [num(a.m), num(a.n), num(a.k)];
-    return m && n && k ? 2 * m * n * k : null;
-  }
-  if (type === 'moe') {
-    const ex = obj(a.experts);
-    const [t, h] = [num(a.tokens), num(a.hidden)];
-    if (!ex || !t || !h) return null;
-    const [e, k, i] = [num(ex.num), num(ex.top_k), num(ex.inter)];
-    if (!e || !k || !i) return null;
-    const w = num(ex.latent) ?? h;
-    let flops = 2 * t * h * e + 6 * t * w * i * k;
-    if (num(ex.latent)) flops += 2 * 2 * t * h * w;
-    const sh = obj(a.shared);
-    if (sh && num(sh.count) && num(sh.inter))
-      flops += 6 * t * h * (sh.inter as number) * (sh.count as number);
-    return flops;
-  }
-  const work = attentionWork(type, a);
-  if (work) {
-    const tokens = attentionTokens(a) ?? 0;
-    return work.proj.reduce((t, [, i, o]) => t + 2 * tokens * i * o, 0) + work.core;
-  }
-  return null;
-}
-
 const ELEMENT_BYTES: Record<string, number> = {
   fp32: 4,
   bf16: 2,
@@ -399,53 +371,191 @@ function operandBytes(d: Args | null, rows: number, cols: number, stored = true)
   return bytes;
 }
 
-/**
- * Minimum bytes one op call must move to/from memory: each input read once, output
- * written once. GEMM reads A as it enters the op (bf16 unless pre-quantized) and B as
- * stored. MoE reads the weights of the experts the tokens are expected to touch
- * (E·(1-(1-k/E)^T) distinct experts under uniform routing), the shared experts and
- * the router, plus the activations in and out. Attention reads its projection weights,
- * the cache (or recurrent state) it attends, and the activations in and out. Per
- * device, as `usefulFlops`.
- */
-export function usefulBytes(type: string, a: Args): number | null {
-  const bytes = groupBytes(type, a);
-  return bytes === null ? null : bytes / tensorParallel(a);
+/** Arithmetic precision the math runs at, for peak-throughput lookups. */
+export type ComputePrecision = 'fp4' | 'fp8' | 'bf16' | 'other';
+
+/** The precision math on these operands runs at: that of the widest. */
+export function mathPrecision(operands: unknown[]): ComputePrecision {
+  const dtypes = operands.map((o) => str(obj(o)?.dtype) ?? 'bf16');
+  if (dtypes.some((d) => d === 'bf16' || d === 'fp16')) return 'bf16';
+  if (dtypes.some((d) => d === 'e4m3' || d === 'e5m2' || d === 'int8')) return 'fp8';
+  if (dtypes.length > 0 && dtypes.every((d) => d === 'e2m1' || d === 'int4')) return 'fp4';
+  return 'other';
 }
 
-function groupBytes(type: string, a: Args): number | null {
-  if (type === 'gemm') {
-    const [m, n, k] = [num(a.m), num(a.n), num(a.k)];
-    if (!m || !n || !k) return null;
-    const out = ELEMENT_BYTES[str(a.out) ?? 'bf16'] ?? 2;
-    return operandBytes(obj(a.a), m, k, false) + operandBytes(obj(a.b), n, k) + m * n * out;
-  }
-  if (type === 'moe') {
-    const ex = obj(a.experts);
-    const [t, h] = [num(a.tokens), num(a.hidden)];
-    if (!ex || !t || !h) return null;
-    const [e, k, i] = [num(ex.num), num(ex.top_k), num(ex.inter)];
-    if (!e || !k || !i) return null;
-    const w = num(ex.latent) ?? h;
-    const touched = e * (1 - (1 - k / e) ** t);
-    let bytes = touched * (operandBytes(obj(ex.w1), 2 * i, w) + operandBytes(obj(ex.w2), w, i));
-    bytes += h * e * 2 + 2 * t * h * 2;
-    if (num(ex.latent)) bytes += 2 * h * w * 2;
-    const sh = obj(a.shared);
-    if (sh && num(sh.count) && num(sh.inter)) {
-      const si = (sh.inter as number) * (sh.count as number);
-      bytes += operandBytes(obj(sh.w1), 2 * si, h) + operandBytes(obj(sh.w2), h, si);
-    }
-    return bytes;
-  }
-  const work = attentionWork(type, a);
-  if (work) {
-    const [tokens, h] = [attentionTokens(a) ?? 0, num(a.hidden) ?? 0];
-    const weights = work.proj.reduce(
-      (t, [name, i, o]) => t + operandBytes(projOperands(a, name).b, o, i),
-      0,
+/** One stage of an op on one device: useful FLOPs, the bytes it must move, its math precision. */
+export interface WorkPart {
+  name: string;
+  flops: number;
+  bytes: number;
+  precision: ComputePrecision;
+}
+
+/** A collective inside the op: the bytes each device sends over its scale-up link. */
+export interface LinkTransfer {
+  name: string;
+  bytes: number;
+}
+
+/** What one call of an op does on each of its devices. */
+export interface OpWork {
+  parts: WorkPart[];
+  links: LinkTransfer[];
+}
+
+const BF16 = { dtype: 'bf16' };
+
+/** Ring all-reduce: each device sends 2(n-1)/n of the buffer. */
+const allReduce = (n: number, size: number) => (2 * (n - 1) * size) / n;
+/** All-gather, reduce-scatter or all-to-all: each device sends (n-1)/n of the whole. */
+const spread = (n: number, size: number) => ((n - 1) * size) / n;
+
+function gemmWork(a: Args): OpWork | null {
+  const [m, n, k] = [num(a.m), num(a.n), num(a.k)];
+  if (!m || !n || !k) return null;
+  const { tp } = parallelAxes(a);
+  const c = m * n * (ELEMENT_BYTES[str(a.out) ?? 'bf16'] ?? 2);
+  // B split over K: each device reads its slice of A and B and writes a full partial C
+  const inputs = operandBytes(obj(a.a), m, k, false) + operandBytes(obj(a.b), n, k);
+  return {
+    parts: [
+      {
+        name: 'GEMM',
+        flops: (2 * m * n * k) / tp,
+        bytes: inputs / tp + c,
+        precision: mathPrecision([a.a, a.b]),
+      },
+    ],
+    links: tp > 1 ? [{ name: 'all-reduce', bytes: allReduce(tp, c) }] : [],
+  };
+}
+
+function moeWork(a: Args): OpWork | null {
+  const ex = obj(a.experts);
+  const [t, h] = [num(a.tokens), num(a.hidden)];
+  if (!ex || !t || !h) return null;
+  const [e, k, i] = [num(ex.num), num(ex.top_k), num(ex.inter)];
+  if (!e || !k || !i) return null;
+  const { tp, dp, ep } = parallelAxes(a);
+  const w = num(ex.latent) ?? h;
+  // Routed experts serve every dp group's tokens, their weights split over all tp·dp devices
+  // (by expert under ep, else within each expert): the experts all the tokens are expected
+  // to touch under uniform routing, over dp here and tp below.
+  const touched = (e * (1 - (1 - k / e) ** (t * dp))) / dp;
+  const gate = obj(obj(a.router)?.gate);
+  const parts: WorkPart[] = [
+    {
+      name: 'router',
+      flops: 2 * t * h * e,
+      bytes: h * e * 2 + t * h * 2,
+      precision: mathPrecision([gate ?? BF16]),
+    },
+  ];
+  if (num(ex.latent))
+    parts.push(
+      { name: 'latent down', flops: 2 * t * h * w, bytes: h * w * 2, precision: 'bf16' },
+      { name: 'latent up', flops: 2 * t * h * w, bytes: h * w * 2, precision: 'bf16' },
     );
-    return weights + work.cache + 2 * tokens * h * 2;
-  }
-  return null;
+  parts.push(
+    {
+      name: 'experts gate/up',
+      flops: 4 * t * w * i * k,
+      bytes: touched * operandBytes(obj(ex.w1), 2 * i, w),
+      precision: mathPrecision([ex.a1, ex.w1]),
+    },
+    {
+      name: 'experts down',
+      flops: 2 * t * w * i * k,
+      bytes: touched * operandBytes(obj(ex.w2), w, i) + t * h * 2,
+      precision: mathPrecision([ex.a2 ?? ex.a1, ex.w2]),
+    },
+  );
+  const sh = obj(a.shared);
+  const si = sh ? (num(sh.inter) ?? 0) * (num(sh.count) ?? 0) : 0;
+  if (sh && si)
+    parts.push({
+      name: 'shared expert',
+      flops: 6 * t * h * si,
+      bytes: operandBytes(obj(sh.w1), 2 * si, h) + operandBytes(obj(sh.w2), h, si),
+      precision: mathPrecision([sh.a1, sh.w1]),
+    });
+  const world = tp * dp;
+  const x = t * h * 2;
+  let links: LinkTransfer[] = [];
+  if (ep > 1) {
+    // each of a group's tp devices dispatches its share of the group's token copies;
+    // the copies bound for experts on other devices leave over the link
+    links = [
+      { name: 'dispatch', bytes: spread(world, operandBytes(obj(ex.a1), t * k, h) / tp) },
+      { name: 'combine', bytes: spread(world, (t * k * h * 2) / tp) },
+    ];
+  } else if (dp > 1)
+    links = [
+      { name: 'all-gather', bytes: (dp - 1) * x },
+      { name: 'reduce-scatter', bytes: spread(world, dp * x) },
+    ];
+  else if (tp > 1) links = [{ name: 'all-reduce', bytes: allReduce(tp, x) }];
+  return { parts: parts.map((p) => ({ ...p, flops: p.flops / tp, bytes: p.bytes / tp })), links };
+}
+
+function attentionOpWork(type: string, a: Args): OpWork | null {
+  const work = attentionWork(type, a);
+  if (!work) return null;
+  const [tokens, h] = [attentionTokens(a) ?? 0, num(a.hidden) ?? 0];
+  const { tp, dcp } = parallelAxes(a);
+  const parts: WorkPart[] = work.proj.map(([name, i, o]) => {
+    const pair = projOperands(a, name);
+    return {
+      name,
+      flops: 2 * tokens * i * o,
+      bytes: operandBytes(pair.b, o, i),
+      precision: mathPrecision([pair.a ?? BF16, pair.b ?? BF16]),
+    };
+  });
+  parts.push({
+    name: type === 'gdn' || type === 'kda' ? 'recurrence' : 'attention core',
+    flops: work.core,
+    bytes: work.cache + 2 * tokens * h * 2,
+    precision: 'bf16',
+  });
+  // dcp: each rank holds 1/dcp of the cache for dcp× the heads; queries gathered, outputs merged
+  const merged = (tokens * work.merge * dcp * 2) / tp;
+  return {
+    parts: parts.map((p) => ({ ...p, flops: p.flops / tp, bytes: p.bytes / tp })),
+    links: dcp > 1 && merged > 0 ? [{ name: 'dcp merge', bytes: 2 * spread(dcp, merged) }] : [],
+  };
+}
+
+/**
+ * What one op call does on each of its devices, stage by stage, or null when the op has
+ * no defined count here. FLOPs are useful work (2 per multiply-add); bytes are the least
+ * each stage must move to or from memory, every input read once and output written once.
+ *
+ * GEMM reads A as it enters the op (bf16 unless pre-quantized) and B as stored. MoE counts
+ * the router, latent projections, the routed experts at their active top-k (reading the
+ * weights of the experts the tokens are expected to touch, E·(1-(1-k/E)^T) under uniform
+ * routing) and the shared experts; activations, routing and combine work are excluded.
+ * Attention counts each projection and the attention core (or linear recurrence), causal,
+ * each query's keys capped where the module selects them, reading the cache or state it
+ * attends. A data-parallel group's work is split over its tensor-parallel devices.
+ *
+ * Links are the collectives the split needs at the least: a tensor-parallel GEMM's
+ * all-reduce, an MoE's all-reduce, all-gather/reduce-scatter or expert-parallel
+ * dispatch/combine, attention's dcp merge. Attention's tensor-parallel all-reduce runs
+ * outside the op.
+ */
+export function opWork(type: string, a: Args): OpWork | null {
+  if (type === 'gemm') return gemmWork(a);
+  if (type === 'moe') return moeWork(a);
+  return ATTENTION_TYPES.includes(type) ? attentionOpWork(type, a) : null;
+}
+
+/** Useful FLOPs of one op call on each of its devices, or null when not counted here. */
+export function usefulFlops(type: string, a: Args): number | null {
+  return opWork(type, a)?.parts.reduce((t, p) => t + p.flops, 0) ?? null;
+}
+
+/** Minimum memory bytes of one op call on each of its devices, or null when not counted here. */
+export function usefulBytes(type: string, a: Args): number | null {
+  return opWork(type, a)?.parts.reduce((t, p) => t + p.bytes, 0) ?? null;
 }

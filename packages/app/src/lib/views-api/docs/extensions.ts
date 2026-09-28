@@ -204,28 +204,12 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
   swapLayout: ['contiguous (default) or random.', 'contiguous（默认）或 random。'],
   swapMetric: ['bandwidth (default) or latency.', 'bandwidth（默认）或 latency。'],
   swapPercentile: ['p50 (default), p95 or p99.', 'p50（默认）、p95 或 p99。'],
-  operator: [
-    'gemm, attention_mha, attention_mla or moe_gemm; default first available operator.',
-    'gemm、attention_mha、attention_mla 或 moe_gemm；默认首个可用算子。',
-  ],
-  shape: [
-    'Exact OperatorX shape key from response options.',
-    '响应 options 中的 OperatorX 形状键。',
-  ],
   backend: ['Backend filter; omit for all.', '后端筛选；省略时选择全部。'],
-  cluster: ['OperatorX cluster filter; omit for all.', 'OperatorX 集群筛选；省略时选择全部。'],
   sku: ['CollectiveX chip SKU filter; default all.', 'CollectiveX 芯片 SKU 筛选，默认 all。'],
-  status: [
-    'OperatorX status: ok (default), unsupported, error, missing or all.',
-    'OperatorX 状态：ok（默认）、unsupported、error、missing 或 all。',
-  ],
-  page: [
-    'OperatorX zero-based table page; video one-based CI discovery page.',
-    'OperatorX 表格页码从 0 开始；视频 CI 发现页码从 1 开始。',
-  ],
+  page: ['Video one-based CI discovery page.', '视频 CI 发现页码从 1 开始。'],
   metric: [
-    'View-specific metric key. OperatorX: tflops or latency; GPU metrics: power, temperature, clocks, utilization or available AMD metrics.',
-    '各视图对应的指标键。OperatorX 支持 tflops、latency；GPU 指标支持功耗、温度、时钟、利用率及可用 AMD 指标。',
+    'View-specific metric key. GPU metrics: power, temperature, clocks, utilization or available AMD metrics.',
+    '各视图对应的指标键。GPU 指标支持功耗、温度、时钟、利用率及可用 AMD 指标。',
   ],
   artifact: [
     'GPU metric artifact name, or video numeric artifact ID paired with run.',

@@ -28,6 +28,7 @@ import { operations as fleetViews } from './views-api/docs/fleet';
 import { operations as gpuSpecsViews } from './views-api/docs/gpu-specs';
 import { operations as historicalViews } from './views-api/docs/historical';
 import { operations as inferenceViews } from './views-api/docs/inference';
+import { operations as operatorXViews } from './views-api/docs/operatorx';
 import { operations as optionsViews } from './views-api/docs/options';
 import { operations as overviewViews } from './views-api/docs/overview';
 import { operations as rankingsViews } from './views-api/docs/rankings';
@@ -713,6 +714,7 @@ export const apiOperations: readonly ApiOperation[] = [
     ...overviewViews,
     ...rankingsViews,
     ...compareViews,
+    ...operatorXViews,
   ]),
   ...extensionViews,
 
