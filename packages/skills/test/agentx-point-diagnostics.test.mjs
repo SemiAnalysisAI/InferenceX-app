@@ -181,12 +181,7 @@ const serverMetrics = {
 
 function run(
   responses,
-  {
-    target = 'codex',
-    openapiResponse = response(openapi),
-    replacement,
-    telemetry = true,
-  } = {},
+  { target = 'codex', openapiResponse = response(openapi), replacement, telemetry = true } = {},
 ) {
   const project = suite.project('agentx-request-');
   const fixtures = { [`${base}/api/openapi.json`]: openapiResponse };
