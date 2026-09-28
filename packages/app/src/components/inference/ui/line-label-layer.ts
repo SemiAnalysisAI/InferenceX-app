@@ -1,6 +1,7 @@
 import * as d3 from 'd3';
 
 import { pointNearestX } from '@/components/inference/ui/line-label-anchor';
+import { setAttrIfChanged, setStyleIfChanged } from '@/lib/d3-chart/chart-update';
 import { plotClipSize } from '@/lib/d3-chart/plot-bounds';
 import { CHART_TYPE, px } from '@/lib/d3-chart/typography';
 
@@ -682,6 +683,7 @@ export function placePointLabels(
     width: number;
     lineCount: number;
     defaultFirstY: number;
+    placementHidden: boolean;
   }
   const pending: Omit<LabelInfo, 'width'>[] = [];
   const ascent = 9;
@@ -693,40 +695,46 @@ export function placePointLabels(
     const label = this.querySelector<SVGTextElement>('.point-label');
     if (!label) return;
     // A label this pass hid on an earlier frame (no slot fit, or its point had
-    // left the plot) is only provisionally hidden: give it back its opacity so
-    // it is reconsidered now that the layout may have changed. Labels hidden
-    // for any other reason (toggle off, legend hover, faded series) stay put.
-    if (label.hasAttribute(PLACEMENT_HIDDEN_ATTR)) {
+    // left the plot) is only provisionally hidden: it is reconsidered now that
+    // the layout may have changed. Labels hidden for any other reason (toggle
+    // off, legend hover, faded series) stay put. Its hidden state is released
+    // only if it is skipped below; placed labels settle it once at the end, so
+    // a label that stays hidden (or visible) writes nothing.
+    const placementHidden = label.hasAttribute(PLACEMENT_HIDDEN_ATTR);
+    const release = () => {
+      if (!placementHidden) return;
       label.removeAttribute(PLACEMENT_HIDDEN_ATTR);
       label.style.opacity = '1';
-    }
+    };
     if (
       label.style.display === 'none' ||
       label.style.visibility === 'hidden' ||
-      label.style.opacity === '0' ||
+      (!placementHidden && label.style.opacity === '0') ||
       this.style.opacity === '0'
     ) {
+      release();
       return;
     }
     const tspans = [...label.querySelectorAll<SVGTSpanElement>('tspan')];
-    if (tspans.length === 0) return;
     const transform = this.getAttribute('transform') ?? '';
     const match = transform.match(/translate\((?<tx>[^,]+),(?<ty>[^)]+)\)/u);
-    if (!match) return;
+    if (tspans.length === 0 || !match) {
+      release();
+      return;
+    }
     const lineCount = tspans.length;
-    const defaultFirstY = -(8 + (lineCount - 1) * lineHeight);
-    // Reset to the centred default before measuring so a shift applied on a
-    // previous pass does not leak into this one.
-    tspans[0].setAttribute('dy', `${defaultFirstY}px`);
-    for (const tspan of tspans) tspan.setAttribute('x', '0');
-    label.style.opacity = '1';
+    // No reset to the centred default before measuring: `getBBox().width`
+    // depends on neither the first tspan's `dy` nor the `x` shift, which every
+    // tspan shares. Resetting would emit two mutation records per label per
+    // pass even when nothing moves (see `@/lib/d3-chart/chart-update`).
     pending.push({
       element: label,
       tspans,
       centerX: Number.parseFloat(match[1]),
       centerY: Number.parseFloat(match[2]),
       lineCount,
-      defaultFirstY,
+      defaultFirstY: -(8 + (lineCount - 1) * lineHeight),
+      placementHidden,
     });
   });
 
@@ -781,16 +789,18 @@ export function placePointLabels(
         ? 0
         : null;
     if (index === null) {
-      label.element.style.opacity = '0';
-      label.element.setAttribute(PLACEMENT_HIDDEN_ATTR, '');
+      // Park the tspans at the centred default, as the pre-measure reset did.
+      setAttrIfChanged(label.tspans[0], 'dy', `${label.defaultFirstY}px`);
+      for (const tspan of label.tspans) setAttrIfChanged(tspan, 'x', '0');
+      setStyleIfChanged(label.element, 'opacity', '0');
+      if (!label.placementHidden) label.element.setAttribute(PLACEMENT_HIDDEN_ATTR, '');
       continue;
     }
     const chosen = candidates[index];
-    label.tspans[0].setAttribute('dy', `${chosen.firstY}px`);
-    if (chosen.dx !== 0) {
-      for (const tspan of label.tspans) tspan.setAttribute('x', String(chosen.dx));
-    }
-    label.element.style.opacity = '1';
+    setAttrIfChanged(label.tspans[0], 'dy', `${chosen.firstY}px`);
+    for (const tspan of label.tspans) setAttrIfChanged(tspan, 'x', String(chosen.dx));
+    if (label.placementHidden) label.element.removeAttribute(PLACEMENT_HIDDEN_ATTR);
+    setStyleIfChanged(label.element, 'opacity', '1');
     if (avoidCollisions) placed.push(chosen.box);
   }
 }

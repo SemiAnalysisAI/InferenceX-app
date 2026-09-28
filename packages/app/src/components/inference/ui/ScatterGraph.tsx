@@ -67,6 +67,7 @@ import type {
   ZoomContext,
 } from '@/lib/d3-chart/D3Chart/types';
 import type { ContinuousScale } from '@/lib/d3-chart/types';
+import { raiseInOrder, setAttrIfChanged } from '@/lib/d3-chart/chart-update';
 import { computeTooltipPosition, syncPointShape } from '@/lib/d3-chart/layers/scatter-points';
 import {
   EMPTY_PERF_RULER_STATE,
@@ -279,6 +280,16 @@ const VARIANT_DASH_BY_ID = new Map<string, string>(
     ] as const
   ).map(([kind, id]) => [id, powerVariantDash({ kind, id } as PowerVariant)]),
 );
+
+const LINE_LABEL_RAISE = ['.line-label'] as const;
+/** Decorations sit above the visible shape, which a precision toggle may replace. */
+const POINT_DECORATION_RAISE = ['.offload-halo'] as const;
+
+/** Rebuilds and zoom frames re-sync every gradient stop; skip unchanged writes. */
+function syncGradientStop(this: SVGStopElement, stop: { offset: number; color: string }): void {
+  setAttrIfChanged(this, 'offset', `${(stop.offset * 100).toFixed(2)}%`);
+  setAttrIfChanged(this, 'stop-color', stop.color);
+}
 
 function setsEqual<T>(a: Set<T>, b: Set<T>): boolean {
   if (a.size !== b.size) return false;
@@ -2708,11 +2719,10 @@ const ScatterGraph = React.memo(
                       .attr('x2', xScale(datePoints.at(-1)!.x))
                       .attr('y2', 0);
                     gradient
-                      .selectAll('stop')
+                      .selectAll<SVGStopElement, (typeof stops)[number]>('stop')
                       .data(stops)
                       .join('stop')
-                      .attr('offset', (s) => `${(s.offset * 100).toFixed(2)}%`)
-                      .attr('stop-color', (s) => s.color);
+                      .each(syncGradientStop);
                     stroke = `url(#${gid})`;
                   }
                 }
@@ -3127,7 +3137,7 @@ const ScatterGraph = React.memo(
             xScale: transform.rescaleX(ctx.xScale as ContinuousScale),
             yScale: transform.rescaleY(ctx.yScale as ContinuousScale),
           });
-          zoomGroup.selectAll('.line-label').raise();
+          raiseInOrder(zoomGroup, LINE_LABEL_RAISE);
         },
         onZoom: (zoomGroup, ctx) => {
           const ir = interactionRef.current;
@@ -3170,11 +3180,10 @@ const ScatterGraph = React.memo(
                     .attr('x1', newXScale(pointLabels[0].point.x))
                     .attr('x2', newXScale(pointLabels.at(-1)!.point.x));
                   gradientEl
-                    .selectAll('stop')
+                    .selectAll<SVGStopElement, (typeof newStops)[number]>('stop')
                     .data(newStops)
                     .join('stop')
-                    .attr('offset', (s) => `${(s.offset * 100).toFixed(2)}%`)
-                    .attr('stop-color', (s) => s.color);
+                    .each(syncGradientStop);
                 }
               }
 
@@ -3904,8 +3913,8 @@ const ScatterGraph = React.memo(
           color,
         );
         // A precision toggle may replace and append the visible SVG shape.
-        // Keep the offload halo above that shape after the swap.
-        point.selectAll('.offload-halo').raise();
+        // Keep the decorations above that shape after the swap.
+        raiseInOrder(point, POINT_DECORATION_RAISE);
       });
 
       // Overlay points keep their X marker and run-derived color. Only their
