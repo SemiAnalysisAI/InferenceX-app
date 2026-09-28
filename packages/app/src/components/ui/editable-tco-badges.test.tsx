@@ -85,6 +85,18 @@ describe('EditableTcoBadges', () => {
     expect(onCommit).toHaveBeenCalledWith('gb300', '2.31');
   });
 
+  it('ignores input events that only echo the controlled value', () => {
+    const { onChange } = render();
+    const input = container.querySelector<HTMLInputElement>('[data-testid="cost-input-gb300"]');
+    if (!input) throw new Error('missing input');
+    act(() => {
+      // Same shape as Firefox's spurious event after a parent rewrites `value`
+      // from a custom figure back to the published rate.
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
   it('sizes each input to the digits it holds', () => {
     render();
     const inputs = [...container.querySelectorAll<HTMLInputElement>('[data-testid="badge"] input')];

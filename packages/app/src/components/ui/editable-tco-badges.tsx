@@ -78,7 +78,15 @@ export function EditableTcoBadges({
               step={0.01}
               aria-label={inputLabel(chipLabel)}
               value={value}
-              onChange={(event) => onChange(base, event.target.value)}
+              // Firefox (and occasionally others) emit an `input` event when a
+              // controlled number field's value prop changes — e.g. leaving the
+              // custom $/GPU/hr tier rewrites the badge from a typed figure back
+              // to the published rate. Ignore those no-ops so the owner is not
+              // bounced straight back onto Custom.
+              onChange={(event) => {
+                if (event.target.value === value) return;
+                onChange(base, event.target.value);
+              }}
               onBlur={(event) => onCommit?.(base, event.target.value)}
               onWheel={(event) => event.currentTarget.blur()}
               // Sized to the digits typed, so the badge hugs the number the

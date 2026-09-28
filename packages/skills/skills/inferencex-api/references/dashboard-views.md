@@ -68,6 +68,24 @@ OperatorX is feature-gated in navigation and has no published
 `/api/v1/views/operatorx` contract. Its `/api/v1/operatorx/*` routes belong to
 the page and are not part of this skill's read-only view API.
 
+Additional page drilldowns are documented in
+[frontend drilldowns](frontend-drilldowns.md):
+
+| View                 | Selection and calculation                                                                                                                                                                 |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `dataset`            | Required slug; conversation-ID search/sort/pagination; optional single convId, expanded groups and deep-link coordinates; stored distributions and shared token-flamegraph rows/brackets. |
+| `agentx-catalog`     | No selectors; telemetry page's grouped representative configurations and stored-point counts.                                                                                             |
+| `agentx-point`       | One result id; warmup/profiling/all phase and exact server metric source; shared decoder/slicing and retained time origins.                                                               |
+| `evaluation-samples` | Stored evalResultId or complete public run/config identity; pass filter, offset/limit, stored docId and current-page text search.                                                         |
+
+The `agentx-point` projection additionally accepts `percentile`, `latencyMetric`
+and `throughput`; `charts` contains the shared rolling/cumulative and
+distribution/in-flight calculations with their units and windows.
+
+`gpu-specs` additionally accepts `chips` and returns JSON `radar` values normalized
+against all chips before visibility filtering. `inference` additionally accepts
+opaque `currentConfig`/`baselineConfig` keys from overview drilldown links.
+
 Use positive safe run IDs written as plain digits (`1e3`, `0x10`, and `+5` are
 rejected); run lists such as `unofficialrun` and `runs` take up to eight unique IDs.
 Overlay run indices follow the input order after trimming whitespace and removing
@@ -100,8 +118,9 @@ fallback; use unsampled `rows` to distinguish absent optional sensor values.
 Zoom, axis scale, theme, labels, report expansion, media playback and download
 buttons are presentation state, not new datasets. AI-chart provider keys and
 private prompts, feedback, local uploads and administrative mutations are not
-public read projections. AgentX drilldowns use existing availability, aggregates,
-histograms, request timelines, logs and server metrics operations.
+public read projections. AgentX raw availability, aggregates, histograms, request
+timelines, logs and server metrics remain available alongside the public point
+projection for phase/source controls.
 
 Run-specific recognition labels do not rename API framework keys. Run
 `35879254139` displays `UMBP MoRI SGLang` through October 9, 2026 in

@@ -5,6 +5,7 @@ import type { RequestRecord } from '@/hooks/api/use-request-timeline';
 import {
   averageSequenceLengthInFlight,
   buildThroughputChartSeries,
+  buildPrefixCacheHitRateSeries,
   cumulativeAverage,
   cumulativeCompletedRequests,
   cumulativeDifferenceMonotonic,
@@ -20,6 +21,30 @@ import {
   timeRollingAverage,
   toggleThroughputSeries,
 } from './time-series-math';
+
+describe('buildPrefixCacheHitRateSeries', () => {
+  it('uses weighted component rates and falls back for older traces without them', () => {
+    const prefixCacheHitRate = [
+      { t: 0, value: 0.5 },
+      { t: 1, value: 0.75 },
+    ];
+    const series = { prefixCacheHitRate, prefillTps: [], prefixCacheHitsTps: [] };
+    expect(buildPrefixCacheHitRateSeries(series)).toEqual([
+      { t: 0, value: 0.625 },
+      { t: 1, value: 0.625 },
+    ]);
+    const weighted = buildPrefixCacheHitRateSeries({
+      ...series,
+      prefixCacheHitsTps: [
+        { t: 0, value: 5 },
+        { t: 1, value: 75 },
+      ],
+    });
+    for (const point of weighted) expect(point.value).toBeCloseTo(80 / 110);
+    expect(weighted).toHaveLength(2);
+    expect(buildPrefixCacheHitRateSeries({ ...series, prefixCacheHitRate: [] })).toEqual([]);
+  });
+});
 
 describe('maxTimeSeriesValue', () => {
   it('finds the maximum across more samples than browsers accept as function arguments', () => {

@@ -91,19 +91,19 @@ describe('Agentic point coach mark', () => {
 
     // The callout must target an actual point, not empty plot area. The
     // highlight ring sits exactly on the anchor (the pointer line deliberately
-    // stops short so its arrowhead doesn't cover the dot).
+    // stops short so its arrowhead doesn't cover the dot). Retry through chart
+    // settle (same pattern/tolerance as the zoom case below).
     cy.get('[data-testid="agentic-point-coach-mark-pointer"]').should('exist');
-    cy.get('[data-testid="agentic-point-coach-mark-target"]').then(($ring) => {
+    cy.get('[data-testid="agentic-point-coach-mark-target"]').should(($ring) => {
       const tipX = Number($ring.attr('cx'));
       const tipY = Number($ring.attr('cy'));
-
-      cy.get(AGENTIC_MARKERS).then(($points) => {
-        const hit = [...$points].some((point) => {
-          const { x, y } = centreOf(point);
-          return Math.abs(x - tipX) < 1 && Math.abs(y - tipY) < 1;
-        });
-        expect(hit, 'pointer ends on an agentic point').to.eq(true);
+      // Query the AUT document — bare `document` here is the Cypress runner.
+      const markers = [...$ring[0].ownerDocument.querySelectorAll(AGENTIC_MARKERS)];
+      const hit = markers.some((point) => {
+        const { x, y } = centreOf(point);
+        return Math.abs(x - tipX) < 1.5 && Math.abs(y - tipY) < 1.5;
       });
+      expect(hit, 'pointer ends on an agentic point').to.eq(true);
     });
   });
 
@@ -247,20 +247,25 @@ describe('Agentic point coach mark', () => {
     );
 
     cy.get(COACH_MARK).should('be.visible');
-    cy.get('[data-testid="agentic-point-coach-mark-target"]').then(($ring) => {
+    cy.get('[data-testid="agentic-point-coach-mark-target"]').should(($ring) => {
       const tipX = Number($ring.attr('cx'));
       const tipY = Number($ring.attr('cy'));
       const onPoint = (element: Element) => {
         const { x, y } = centreOf(element);
-        return Math.abs(x - tipX) < 1 && Math.abs(y - tipY) < 1;
+        return Math.abs(x - tipX) < 1.5 && Math.abs(y - tipY) < 1.5;
       };
 
-      cy.get('[data-testid="scatter-graph"] .unofficial-overlay-pt').then(($overlay) => {
-        expect([...$overlay].some(onPoint), 'pointer avoids overlay markers').to.eq(false);
-      });
-      cy.get(AGENTIC_MARKERS).then(($official) => {
-        expect([...$official].some(onPoint), 'pointer lands on an official point').to.eq(true);
-      });
+      const doc = $ring[0].ownerDocument;
+      expect(
+        [...doc.querySelectorAll('[data-testid="scatter-graph"] .unofficial-overlay-pt')].some(
+          onPoint,
+        ),
+        'pointer avoids overlay markers',
+      ).to.eq(false);
+      expect(
+        [...doc.querySelectorAll(AGENTIC_MARKERS)].some(onPoint),
+        'pointer lands on an official point',
+      ).to.eq(true);
     });
   });
 
