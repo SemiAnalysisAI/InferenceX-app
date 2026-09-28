@@ -575,11 +575,13 @@ export default function CollectiveXDisplay() {
     const runId = deleteRun.isPending ? deleteRun.variables?.runId : undefined;
     return new Set(runId ? [runId] : []);
   }, [bulkDeletingRunIds, deleteRun.isPending, deleteRun.variables?.runId]);
-  const handleVisibleRunChange = useCallback((runId: string, visible: boolean) => {
+  const handleVisibleRunChange = useCallback((runIds: string[], visible: boolean) => {
     setVisibleRunIds((previous) => {
       const next = new Set(previous);
-      if (visible) next.add(runId);
-      else next.delete(runId);
+      for (const runId of runIds) {
+        if (visible) next.add(runId);
+        else next.delete(runId);
+      }
       return next;
     });
   }, []);
