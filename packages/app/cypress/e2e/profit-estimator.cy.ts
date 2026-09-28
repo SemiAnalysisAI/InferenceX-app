@@ -633,30 +633,33 @@ describe('Profit Estimator per GW', () => {
 
     cy.get('button#profit-cost').click();
     cy.get('[data-testid="cost-provider-costh"]').click();
+    cy.get('button#profit-cost').should('contain.text', 'Owning at Large Hyperscaler Volume');
     cy.get('[data-testid="profit-tco-badges"]').should('contain.text', 'GB300: 2.31');
     cy.get('[data-testid="profit-tco-source"]').should('contain.text', 'TCO Model');
-    cy.get('[data-testid="result-context-cost-tier"]').should(
-      'contain.text',
-      'Owning at Large Hyperscaler Volume',
-    );
   });
 
   it('switches to custom $/GPU/hr when a caption badge is edited', () => {
-    cy.get('[data-testid="result-context-cost-tier"]').should(
-      'contain.text',
-      'Owning at Large Hyperscaler Volume',
-    );
+    // This suite shares one visit (`testIsolation: false`). A prior attempt can
+    // leave Custom selected, so restore Owning before the entry assertion.
+    cy.get('button#profit-cost').then(($btn) => {
+      if (!$btn.text().includes('Owning at Large Hyperscaler Volume')) {
+        cy.wrap($btn).click();
+        cy.get('[data-testid="cost-provider-costh"]').click();
+      }
+    });
+    cy.get('button#profit-cost').should('contain.text', 'Owning at Large Hyperscaler Volume');
     cy.get('[data-testid="profit-tco-badges"]').should('contain.text', 'MI355X: 1.5');
     // Typing into a badge on a published tier moves the chart onto the
     // custom tier; the other chips keep the price they were showing.
     cy.get('[data-testid="profit-custom-cost-gb300"]').clear().type('4').blur();
-    cy.get('[data-testid="result-context-cost-tier"]').should('contain.text', 'Custom');
+    cy.get('button#profit-cost').should('contain.text', 'Custom $/GPU/hr');
     cy.get('[data-testid="profit-tco-badges"]')
       .should('contain.text', 'GB300: 4')
       .and('contain.text', 'MI355X: 1.5');
     cy.get('[data-testid="profit-tco-source"]').should('not.exist');
     cy.get('button#profit-cost').click();
     cy.get('[data-testid="cost-provider-costh"]').click();
+    cy.get('button#profit-cost').should('contain.text', 'Owning at Large Hyperscaler Volume');
     cy.get('[data-testid="profit-tco-badges"]').should('contain.text', 'GB300: 2.31');
   });
 
