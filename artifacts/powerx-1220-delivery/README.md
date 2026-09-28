@@ -4,11 +4,12 @@ Local reviewable packet for the three confirmed UX defects on InferenceX-app PR 
 
 ## SHAs
 
-| Ref                                                   | SHA                                                  |
-| ----------------------------------------------------- | ---------------------------------------------------- |
-| Local base (#1220 head / preferred parent merge base) | `b07e1c76d6d2285a27e75bdda65a2d6276a7d1a2`           |
-| Parent #1167 (`feat/powerx-db-ingest`)                | `2c160b2e2238f926adeb3299754c714a2de2ceac`           |
-| Fix branch                                            | `cursor/fix-powerx-1220-share-timeline-tooltip-7b02` |
+| Ref                                     | SHA                                                                                                |
+| --------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| Local base (#1220 head at branch point) | `b07e1c76d6d2285a27e75bdda65a2d6276a7d1a2`                                                         |
+| Parent #1167 (`feat/powerx-db-ingest`)  | `2c160b2e2238f926adeb3299754c714a2de2ceac`                                                         |
+| Fix branch head                         | `14b5bec620c643f233b560617ba576b9e57d6f3d` on `cursor/fix-powerx-1220-share-timeline-tooltip-7b02` |
+| Draft PR                                | https://github.com/SemiAnalysisAI/InferenceX-app/pull/1229 (base #1220)                            |
 
 Live API at start: #1220 `mergeable=true` / `mergeStateStatus=CLEAN` against #1167 — **no conflict work invented**.
 
