@@ -292,4 +292,80 @@ describe('PowerTimeline', () => {
       cy.get('text.power-trace-label').should('have.length', 1).and('have.text', 'c16');
     });
   });
+
+  it('follows dates-only range comparison (i_dstart/i_dend, no ~r runs)', () => {
+    // Range endpoints alone (empty selectedDates) must still drive per-date
+    // colours, legend toggles and end labels — the dates-only share/reload path.
+    const EARLIER_RUN_ID = '34600000002';
+    const EARLIER_RUN_URL = `https://github.com/SemiAnalysisAI/InferenceX/actions/runs/${EARLIER_RUN_ID}`;
+    const DATES = ['2026-09-01', '2026-09-09'] as const;
+    const ALL_SERIES = new Set(DATES.map((date) => `${date}_b200`));
+    cy.intercept('POST', `/api/gpu-metrics?runId=${EARLIER_RUN_ID}*`, {
+      body: {
+        runInfo: { ...response.runInfo, id: Number(EARLIER_RUN_ID), url: EARLIER_RUN_URL },
+        series: [series('b200', 16, 600)],
+      },
+    }).as('range-earlier');
+    cy.intercept('POST', `/api/gpu-metrics?runId=${RUN_ID}*`, { body: response }).as('range-later');
+
+    function DatesOnlyRange() {
+      const [activeDates, setActiveDates] = useState(new Set(ALL_SERIES));
+      const value = createMockInferenceContextValues({
+        selectedModel: Model.DeepSeek_V4_Pro,
+        selectedSequence: Sequence.EightK_OneK,
+        selectedYAxisMetric: 'y_measuredPowerTimeline',
+        hardwareConfig: hwConfig,
+        activeHwTypes: new Set(HW_TYPES),
+        hwTypesWithData: new Set(HW_TYPES),
+        selectedGPUs: ['b200'],
+        selectedDates: [],
+        selectedDateRange: { startDate: DATES[0], endDate: DATES[1] },
+        activeDates,
+        toggleActiveDate: (id: string) =>
+          setActiveDates((prev) => computeToggle(prev, id, ALL_SERIES)),
+      });
+      return (
+        <InferenceContextsProvider data={value} filters={value} display={value} actions={value}>
+          <div style={{ width: 1100, height: 700 }}>
+            <PowerTimeline
+              chartId="power-timeline-dates-only"
+              comparison
+              data={[
+                measuredPoint('b200', 16, 600, { date: DATES[0], run_url: EARLIER_RUN_URL }),
+                measuredPoint('b200', 16, 700, { date: DATES[1] }),
+              ]}
+              yLabel="Measured Average Power per Chip over Time (W)"
+            />
+          </div>
+        </InferenceContextsProvider>
+      );
+    }
+    mountWithProviders(
+      <PathnameContext.Provider value="/inference">
+        <DatesOnlyRange />
+      </PathnameContext.Provider>,
+      { unofficial: {} },
+    );
+    cy.wait(['@range-earlier', '@range-later']);
+
+    cy.get('[data-testid="chart-legend"] label').then(($labels) => {
+      const rows = $labels.toArray().map((label) => label.textContent?.trim());
+      expect(rows).to.include.members([...DATES]);
+      expect(rows.join(' ')).not.to.match(/#\d/u);
+    });
+    svg().within(() => {
+      cy.get('path.power-trace[data-segment="window"]').should('have.length', 2);
+      cy.get('text.power-trace-label').then(($labels) => {
+        expect($labels.toArray().map((label) => label.textContent)).to.have.members([
+          `${DATES[0]} c16`,
+          `${DATES[1]} c16`,
+        ]);
+      });
+    });
+    cy.get('[data-testid="chart-legend"] label').contains(DATES[0]).click();
+    svg().within(() => {
+      cy.get('path.power-trace[data-segment="window"]').should('have.length', 1);
+      cy.get('text.power-trace-label').should('have.text', 'c16');
+    });
+  });
 });

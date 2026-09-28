@@ -131,8 +131,9 @@ ruler commit would otherwise rerender every display consumer, and harnesses that
 interactivity. The store is scoped to one chart id on purpose. The replay chart
 (`replay-chart-0`) draws the same curve classes under the same provider, so a shared
 store would render every ruler twice and let the replay's prune pass delete rulers the
-main chart still shows; it and `GPUGraph` keep component-local state, which `ScatterGraph`
-also falls back to when no store is present.
+main chart still shows. `ScatterGraph` and the date-comparison `GPUGraph` both bind when
+their `chartId` is `chart-0` (ChartDisplay mounts exactly one of them as the primary
+chart); each falls back to component-local state when no matching store is present.
 
 `ScatterGraph` reads `state`/`setState` from the store, so the existing reducers, refs,
 and draw passes are unchanged. The one thing that moved is the axis reset:
