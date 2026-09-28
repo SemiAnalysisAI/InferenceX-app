@@ -97,7 +97,9 @@ describe('Agentic point coach mark', () => {
     cy.get('[data-testid="agentic-point-coach-mark-target"]').should(($ring) => {
       const tipX = Number($ring.attr('cx'));
       const tipY = Number($ring.attr('cy'));
-      const hit = [...document.querySelectorAll(AGENTIC_MARKERS)].some((point) => {
+      // Query the AUT document — bare `document` here is the Cypress runner.
+      const markers = [...$ring[0].ownerDocument.querySelectorAll(AGENTIC_MARKERS)];
+      const hit = markers.some((point) => {
         const { x, y } = centreOf(point);
         return Math.abs(x - tipX) < 1.5 && Math.abs(y - tipY) < 1.5;
       });
@@ -253,14 +255,15 @@ describe('Agentic point coach mark', () => {
         return Math.abs(x - tipX) < 1.5 && Math.abs(y - tipY) < 1.5;
       };
 
+      const doc = $ring[0].ownerDocument;
       expect(
-        [...document.querySelectorAll('[data-testid="scatter-graph"] .unofficial-overlay-pt')].some(
+        [...doc.querySelectorAll('[data-testid="scatter-graph"] .unofficial-overlay-pt')].some(
           onPoint,
         ),
         'pointer avoids overlay markers',
       ).to.eq(false);
       expect(
-        [...document.querySelectorAll(AGENTIC_MARKERS)].some(onPoint),
+        [...doc.querySelectorAll(AGENTIC_MARKERS)].some(onPoint),
         'pointer lands on an official point',
       ).to.eq(true);
     });
