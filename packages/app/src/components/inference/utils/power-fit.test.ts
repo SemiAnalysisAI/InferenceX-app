@@ -70,4 +70,23 @@ describe('buildPowerFits', () => {
     expect(fit.fit!.intercept).toBeCloseTo(307, 9);
     expect(fit.fit!.slope).toBeCloseTo(0.7, 9);
   });
+
+  it('fits a stitched append-only curve as one full ladder, not one fit per producing run', () => {
+    const snapshot = { curve_workflow_run_id: 35843506474, curve_date: '2026-09-18' };
+    const stitched = ladder([100, 200, 300, 400, 500], (x) => 300 + 0.5 * x, snapshot).map(
+      (entry, index) =>
+        index < 2
+          ? {
+              ...entry,
+              actualDate: '2026-09-23',
+              run_url:
+                'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/35905882425/attempts/1',
+            }
+          : entry,
+    );
+    const fits = buildPowerFits(stitched);
+    expect(fits.map((fit) => [fit.source.label, fit.fit?.n])).toEqual([
+      ['H200 (SGLang) · 2026-09-18', 5],
+    ]);
+  });
 });

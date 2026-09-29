@@ -143,9 +143,14 @@ beside the equal-service comparison rather than replacing it.
 The dashboard and API share `equal-service-comparison.ts`: both consume scoped
 observed points after chart coverage/limits, before frontier and best-per-SKU
 pruning, with power-comparison clones excluded. `allPoints=true` restores clipped
-observations. Source keys retain hardware, precision, exact run, actual source
-date, recipe, topology and workload identity; changing display dates does not
-create a new measured source. Comparisons never join different sources into one
+observations. Source keys retain hardware, precision, source run, source date,
+recipe, topology and workload identity; changing display dates does not create a
+new measured source. The source run is the logical curve snapshot
+(`curve_workflow_run_id` / `curve_date`, see
+[Append-Only Curve Extensions](./data-pipeline.md#append-only-curve-extensions)), so
+points an append-only run stitched onto an older curve stay one source; rows without a
+snapshot id, such as unofficial overlays, key by their own run URL and measured date, and
+an unknown run never joins distinct rows. Comparisons never join different sources into one
 interpolation bracket. All three metrics use bounded numerical linear
 interpolation of the underlying quantities, then compute
 `100 × (comparator / baseline − 1)`. No log-axis interpolation, extrapolation,

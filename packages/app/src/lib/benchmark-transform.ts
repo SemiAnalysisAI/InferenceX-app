@@ -315,6 +315,8 @@ export function rowToAggDataEntry(row: BenchmarkRow): AggDataEntry {
     date: row.date,
     actualDate: (row as any).actualDate ?? row.date,
     run_url: row.run_url ?? undefined,
+    curve_date: row.curve_date,
+    curve_workflow_run_id: row.curve_workflow_run_id,
     benchmark_type: row.benchmark_type,
     isl: row.isl,
     osl: row.osl,
