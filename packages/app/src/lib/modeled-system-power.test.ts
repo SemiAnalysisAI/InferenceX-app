@@ -222,6 +222,89 @@ describe('modeled system power admission and accounting', () => {
     expect(modelSystemPower(source)).toMatchObject({ reason: 'role-power' });
   });
 
+  it('models an aggregate multinode deployment without worker telemetry at the deployment mean', () => {
+    // Kimi K3 B200 dynamo-vLLM TP8/PP2 (prod rows, 2026-09-17): two eight-GPU hosts,
+    // aggregate producer, no per-worker array. The K3 H200 vLLM row below is
+    // TP16 × 2 DP replicas across four hosts.
+    const b200 = row({
+      is_multinode: true,
+      num_prefill_gpu: 16,
+      num_decode_gpu: 16,
+      decode_num_workers: 1,
+      metrics: {
+        power_valid: 1,
+        power_metric_schema_version: 2,
+        avg_power_w: 715.095,
+        avg_total_gpu_power_w: 11441.513,
+        decode_pp: 2,
+      },
+    });
+    const perChassis = estimateChassisPower('b200', 11441.513 / 2, 1.3)!;
+    const estimate = modelSystemPower(b200);
+    expect(estimate).toMatchObject({
+      status: 'supported',
+      topologyBasis: 'uniform-hosts',
+      chassisBasis: 'full',
+      gpuCount: 16,
+      chassisCount: 2,
+      modeledGpuCount: 16,
+    });
+    if (estimate.status !== 'supported') throw new Error('unreachable');
+    expect(estimate.chassisAcWatts).toBeCloseTo(perChassis.chassisAcWatts * 2, 6);
+    expect(estimate.deploymentFacilityWatts).toBe(estimate.facilityWatts);
+    expect(estimate.chassisAcWattsPerGpu).toBeCloseTo(perChassis.chassisAcWatts / 8, 6);
+
+    const h200 = row({
+      hardware: 'h200',
+      is_multinode: true,
+      prefill_tp: 16,
+      decode_tp: 16,
+      decode_ep: 32,
+      decode_dp_attention: true,
+      decode_num_workers: 2,
+      num_prefill_gpu: 32,
+      num_decode_gpu: 32,
+      metrics: {
+        power_valid: 1,
+        power_metric_schema_version: 2,
+        avg_power_w: 167.357,
+        avg_total_gpu_power_w: 5355.413,
+        decode_pp: 1,
+      },
+    });
+    expect(modelSystemPower(h200)).toMatchObject({
+      status: 'supported',
+      topologyBasis: 'uniform-hosts',
+      chassisCount: 4,
+      gpuCount: 32,
+    });
+
+    // A replica count that does not explain the telemetry width is not guessed around.
+    expect(modelSystemPower({ ...h200, decode_num_workers: 1 })).toMatchObject({
+      reason: 'gpu-count',
+    });
+    // Twelve GPUs cannot fill whole eight-GPU hosts; placement is unknown.
+    const twelve = row({ is_multinode: true, decode_tp: 12, prefill_tp: 12 });
+    twelve.metrics.avg_total_gpu_power_w = twelve.metrics.avg_power_w * 12;
+    expect(modelSystemPower(twelve)).toMatchObject({ reason: 'topology' });
+    // Per-worker telemetry, when present, keeps the more exact worker path.
+    const withWorkers = {
+      ...b200,
+      workers: ['host-a', 'host-b'].map((host, worker_idx) => ({
+        role: 'agg',
+        worker_idx,
+        hosts: [host],
+        num_gpus: 8,
+        avg_power_w: 715.095,
+      })),
+    };
+    expect(modelSystemPower(withWorkers)).toMatchObject({
+      status: 'supported',
+      topologyBasis: 'worker-hosts',
+      chassisCount: 2,
+    });
+  });
+
   it('preserves meaningful aggregate PP and PCP aliases before checking physical width', () => {
     for (const widths of [
       { decode_pp: 1, prefill_pp: 2 },

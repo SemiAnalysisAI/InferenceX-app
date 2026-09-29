@@ -11,6 +11,7 @@ import type {
   AggDataEntry,
   ChartDefinition,
   InferenceData,
+  PowerBasisFieldKey,
   YAxisMetricKey,
 } from '@/components/inference/types';
 import {
@@ -20,6 +21,8 @@ import {
 import { DEFAULT_TCO_BASIS, getGpuSpecs, isKnownGpu, type TcoBasis } from '@/lib/constants';
 import { getVendor, type Vendor } from '@/lib/dynamic-colors';
 import type { Locale } from '@/lib/i18n';
+import { buildPowerBasisChartFields, type PowerBasisChartFields } from '@/lib/power-basis';
+import { reconstructedRoleEnergy } from '@/components/inference/utils/role-energy';
 
 // ---------------------------------------------------------------------------
 // High-contrast color generation (iwanthue — k-means in CIELab)
@@ -289,7 +292,13 @@ export function buildAvailabilityHwKey(
   return hwKey;
 }
 
-export type DerivedMetricKey = BenchmarkMetricKey;
+// Power-boundary fields are derived here before the registry exposes them as
+// axes; the union collapses once METRIC_REGISTRY carries the same keys. The
+// reconstructed prefill energy is a comparison-only series (never an axis).
+export type DerivedMetricKey =
+  | BenchmarkMetricKey
+  | PowerBasisFieldKey
+  | 'reconstructedPrefillJPerOutputToken';
 export type DerivedChartFields = Pick<InferenceData, DerivedMetricKey>;
 
 const chartMetric = (y: number): { y: number; roof: boolean } => ({ y, roof: false });
@@ -411,6 +420,11 @@ export function buildDerivedChartFields(
       hardwarePower && tputPerGpu ? (hardwarePower * 1000) / tputPerGpu : 0,
     );
   }
+  // jOutput keeps the historical per-GPU normalization: for disaggregated rows
+  // output_tput_per_gpu is per decode GPU, so this is all-in W of one decode GPU
+  // per output token and ignores the prefill pool. The power-boundary field
+  // utilityProvisionedJPerOutputToken uses the same all-in W but counts every
+  // allocated GPU, so the two differ on disaggregated rows by (P + D) / D.
   if (hardwarePower > 0 && wants('jOutput') && outputTputPerGpu) {
     fields.jOutput = chartMetric(hardwarePower ? (hardwarePower * 1000) / outputTputPerGpu : 0);
   }
@@ -421,6 +435,14 @@ export function buildDerivedChartFields(
   const measured = buildMeasuredPowerChartFields(entry, specs.tdp);
   for (const [key, value] of Object.entries(measured) as [
     keyof MeasuredPowerChartFields,
+    { y: number; roof: boolean },
+  ][]) {
+    if (wants(key)) fields[key] = value;
+  }
+
+  const powerBasis = buildPowerBasisChartFields(entry, specs);
+  for (const [key, value] of Object.entries(powerBasis) as [
+    keyof PowerBasisChartFields,
     { y: number; roof: boolean },
   ][]) {
     if (wants(key)) fields[key] = value;
@@ -521,6 +543,8 @@ type MeasuredPowerChartFields = Partial<
     | 'measuredJPerSuccessfulQuery'
     | 'measuredWhPerSuccessfulQuery'
     | 'measuredPowerPercentTdp'
+    | 'measuredPowerTimeline'
+    | 'reconstructedPrefillJPerOutputToken'
   >
 >;
 
@@ -530,8 +554,13 @@ function buildMeasuredPowerChartFields(
   tdpWatts: number,
 ): MeasuredPowerChartFields {
   return {
+    // The timeline axis aliases the validated average: the point set (and
+    // its table row) is the same, only the chart body changes.
     ...(typeof entry.avg_power_w === 'number'
-      ? { measuredAvgPower: chartMetric(entry.avg_power_w) }
+      ? {
+          measuredAvgPower: chartMetric(entry.avg_power_w),
+          measuredPowerTimeline: chartMetric(entry.avg_power_w),
+        }
       : {}),
     ...(typeof entry.p75_power_w === 'number' && Number.isFinite(entry.p75_power_w)
       ? { measuredP75Power: chartMetric(entry.p75_power_w) }
@@ -562,6 +591,14 @@ function buildMeasuredPowerChartFields(
     ...(typeof entry.decode_joules_per_output_token === 'number'
       ? { measuredDecodeJPerOutputToken: chartMetric(entry.decode_joules_per_output_token) }
       : {}),
+    // Prefill energy on the output-token axis, so the roles comparison can
+    // stack it against the decode pool (PowerX Figure 7).
+    ...(() => {
+      const roleEnergy = reconstructedRoleEnergy(entry);
+      return roleEnergy
+        ? { reconstructedPrefillJPerOutputToken: chartMetric(roleEnergy.prefill) }
+        : {};
+    })(),
     ...(typeof entry.joules_per_successful_query === 'number'
       ? {
           measuredJPerSuccessfulQuery: chartMetric(entry.joules_per_successful_query),

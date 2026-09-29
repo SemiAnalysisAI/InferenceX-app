@@ -9,6 +9,7 @@
 
 import { METRIC_REGISTRY } from '@/components/inference/metric-registry';
 import type { InferenceData, TrendDataPoint } from '@/components/inference/types';
+import { inferPowerCompare, powerSeriesLabel } from '@/components/inference/utils/power-compare';
 import { chipCounts } from '@/lib/chip-counts';
 import type { SubmissionVolumeRow } from '@/lib/submissions-types';
 
@@ -57,6 +58,12 @@ export function inferenceChartToCsv(
   const islOsl = sequenceToIslOsl(sequence);
   const showModeledPower =
     displayedMetrics?.yPath === METRIC_REGISTRY.modeledChassisPowerPerGpu.field;
+  // A power comparison (`i_pcompare`) appends boundary / role clones of the
+  // plotted points; name each row's series so the export stays unambiguous.
+  const allPoints = [...data, ...overlayData];
+  const powerCompare = inferPowerCompare(allPoints);
+  const showPowerSeries = powerCompare !== 'none';
+  const plottedMetric = displayedMetrics ? `y_${displayedMetrics.yPath.split('.')[0]}` : '';
   const headers = [
     'Model',
     'ISL',
@@ -111,13 +118,15 @@ export function inferenceChartToCsv(
     'Physical Chips',
     'DP',
     ...(showModeledPower ? ['Configured Chip Count'] : []),
+    ...(showPowerSeries ? ['Power Series'] : []),
   ];
 
   const displayedColumns = displayedMetrics
     ? [
         {
           header: displayedMetrics.yHeader,
-          value: (point: InferenceData) => nestedMetric(point, displayedMetrics.yPath),
+          value: (point: InferenceData) =>
+            point.powerVariant ? point.y : nestedMetric(point, displayedMetrics.yPath),
         },
         { header: displayedMetrics.xHeader, value: (point: InferenceData) => point.x },
       ].filter(
@@ -128,7 +137,7 @@ export function inferenceChartToCsv(
     : [];
   headers.splice(10, 0, ...displayedColumns.map((column) => column.header));
 
-  const rows = [...data, ...overlayData]
+  const rows = allPoints
     .filter((d) => !d.hidden)
     .map((d) => {
       const chips = chipCounts(d, showModeledPower);
@@ -177,6 +186,7 @@ export function inferenceChartToCsv(
         chips.physical,
         d.dp ?? '',
         ...(showModeledPower ? [chips.configured] : []),
+        ...(showPowerSeries ? [powerSeriesLabel(d, plottedMetric, powerCompare, 'en')] : []),
       ];
       row.splice(10, 0, ...displayedColumns.map((column) => column.value(d)));
       return row;

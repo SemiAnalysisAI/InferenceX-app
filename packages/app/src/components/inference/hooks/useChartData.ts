@@ -27,12 +27,14 @@ import type {
   ChartDefinition,
   HardwareConfig,
   InferenceData,
+  PowerCompare,
   RenderableGraph,
   TokenRevenuePriceSource,
   TokenRevenuePricing,
   YAxisMetricKey,
 } from '@/components/inference/types';
 import { partitionChartDataByLimits } from '@/components/inference/utils';
+import { expandPowerCompareSeries } from '@/components/inference/utils/power-compare';
 import { parseComparisonEntry } from '@/components/inference/utils/comparisonEntry';
 import {
   computeAvailableQuickFilters,
@@ -116,6 +118,8 @@ export function useChartData(
   tcoBasis: TcoBasis = DEFAULT_TCO_BASIS,
   /** Opt-in from the inference page only; explicit date/run/history views opt out. */
   allowDefaultRunPreference = false,
+  /** Sibling boundary / role series appended to a gated power metric (`i_pcompare`). */
+  powerCompare: PowerCompare = 'none',
 ) {
   // When the selected date is the latest available, use '' (empty string) to match
   // the initial no-date query key, reusing the eagerly-fetched benchmarks from the
@@ -538,8 +542,14 @@ export function useChartData(
         );
         const hasMetric = metricData.length > 0;
         const isTtftX = typeof xAxisField === 'string' && xAxisField.endsWith('_ttft');
+        // Comparison clones are appended after the remap so they share the
+        // base point's x and differ only in y and `powerVariant`.
         const mappedData = hasMetric
-          ? metricData.map((d) => remapInferencePoint(d, metricKey, xAxisField))
+          ? expandPowerCompareSeries(
+              metricData.map((d) => remapInferencePoint(d, metricKey, xAxisField)),
+              selectedYAxisMetric,
+              powerCompare,
+            )
           : [];
 
         const isAgentic = selectedSequence === Sequence.AgenticTraces;
@@ -576,6 +586,7 @@ export function useChartData(
     compareGpuPair,
     selectedPercentile,
     quickFilters,
+    powerCompare,
   ]);
 
   // Points that pass every scope filter but NOT the y-metric coverage filter.

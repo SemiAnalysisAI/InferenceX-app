@@ -8,6 +8,7 @@ import {
   historicalTrendToCsv,
 } from './csv-export-helpers';
 import type { InferenceData } from '@/components/inference/types';
+import { expandPowerCompareSeries } from '@/components/inference/utils/power-compare';
 
 const makePoint = (overrides: Partial<InferenceData> = {}): InferenceData => ({
   x: 100,
@@ -750,5 +751,41 @@ describe('historicalTrendToCsv (mirrors HistoricalTrendsDisplay export)', () => 
     expect(rows[0][headers.indexOf('Cost per Million Tokens ($)')]).toBe(800);
     expect(rows[0][headers.indexOf('Target Interactivity (tok/s/user)')]).toBe(50);
     expect(rows[1][headers.indexOf('Date')]).toBe('2025-01-15');
+  });
+});
+
+describe('inferenceChartToCsv power comparison', () => {
+  it.each([false, true])('exports plotted role values with overlay=%s', (overlay) => {
+    const base = makePoint({
+      hwKey: 'gb300_dynamo-trt',
+      y: 708.1,
+      measuredAvgPower: { y: 708.1, roof: false },
+      measuredPrefillAvgPower: { y: 760.442, roof: false },
+      measuredDecodeAvgPower: { y: 690.652, roof: false },
+      run_url: 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/35532106109',
+    });
+    const points = expandPowerCompareSeries([base], 'y_measuredAvgPower', 'roles');
+    const { headers, rows } = inferenceChartToCsv(
+      overlay ? [] : points,
+      'Kimi-K3',
+      'agentic-traces',
+      overlay ? points : [],
+      {
+        yHeader: 'Measured Power per Chip (W)',
+        yPath: 'measuredAvgPower.y',
+        xHeader: 'Interactivity (tok/s/user)',
+      },
+    );
+    expect(
+      rows.map((row) => [
+        row[headers.indexOf('Power Series')],
+        row[headers.indexOf('Measured Power per Chip (W)')],
+      ]),
+    ).toEqual([
+      ['All GPUs', 708.1],
+      ['Prefill GPUs', 760.442],
+      ['Decode GPUs', 690.652],
+    ]);
+    expect(points.every((point) => point.measuredAvgPower?.y === 708.1)).toBe(true);
   });
 });
