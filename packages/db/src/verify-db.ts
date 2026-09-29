@@ -50,6 +50,9 @@ async function verify(): Promise<void> {
     TABLE_NAMES.evalResults,
     TABLE_NAMES.evalSamples,
     TABLE_NAMES.changelogEntries,
+    TABLE_NAMES.gpuMetricSeries,
+    TABLE_NAMES.gpuMetricSamples,
+    TABLE_NAMES.benchmarkResultGpuMetrics,
   ];
   for (const t of tables) {
     const [{ n }] = await sql`select count(*)::int as n from ${sql(t)}`;
