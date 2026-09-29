@@ -38,18 +38,13 @@ describe('Blog', () => {
   });
 
   describe('Blog listing page', () => {
-    before(() => {
-      // Stub remote Substack thumbnails with a real 1×1 PNG. A 204 empty body
-      // can prevent Firefox from firing `window.load` while eager card images
-      // stay pending, which times out `cy.visit` in before-all.
-      cy.intercept(
-        {
-          method: 'GET',
-          pathname: '/_next/image',
-          query: { url: /^https:\/\/substack-post-media\.s3\.amazonaws\.com\// },
-        },
-        { fixture: '1x1.png', headers: { 'content-type': 'image/png' } },
-      );
+    beforeEach(() => {
+      // The listing checks text and links, so stub every optimized thumbnail.
+      // Waiting on image optimization can keep Firefox from firing `window.load`.
+      cy.intercept('GET', '**/_next/image?*', {
+        fixture: '1x1.png',
+        headers: { 'content-type': 'image/png' },
+      });
       cy.visit('/blog');
     });
 
