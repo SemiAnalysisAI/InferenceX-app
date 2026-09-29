@@ -8,6 +8,8 @@ import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 
+import { NonRetryableArtifactError } from './artifact-retry.js';
+
 export interface ArtifactMeta {
   id?: number;
   name: string;
@@ -32,12 +34,46 @@ export interface ArtifactMeta {
  */
 export const RUNNER_SUFFIX_RE = /_[a-zA-Z][a-zA-Z0-9.-]*_\d+$/u;
 
-/** List a workflow run's artifacts via `gh api` (paginated). Malformed lines are skipped. */
+/**
+ * GitHub no longer has the run (deleted, or purged past retention), so its
+ * artifact listing 404s. Distinct from expired artifacts, which still list
+ * with `expired: true`.
+ */
+export class WorkflowRunNotFoundError extends NonRetryableArtifactError {
+  readonly repo: string;
+  readonly runId: string;
+
+  constructor(repo: string, runId: string) {
+    super(`GitHub has no run ${runId} in ${repo} (HTTP 404)`);
+    this.name = 'WorkflowRunNotFoundError';
+    this.repo = repo;
+    this.runId = runId;
+  }
+}
+
+/** `gh api` reports the HTTP status in its stderr (`gh: Not Found (HTTP 404)`). */
+export function isGithubNotFoundError(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null) return false;
+  const { stderr, message } = error as { stderr?: unknown; message?: unknown };
+  const text = [stderr, message].filter((part) => typeof part === 'string').join('\n');
+  return /\(HTTP 404\)/u.test(text);
+}
+
+/**
+ * List a workflow run's artifacts via `gh api` (paginated). Malformed lines
+ * are skipped; a 404 surfaces as `WorkflowRunNotFoundError`.
+ */
 export function listRunArtifacts(repo: string, runId: string): ArtifactMeta[] {
-  const json = execSync(
-    `gh api "repos/${repo}/actions/runs/${runId}/artifacts" --paginate --jq '.artifacts[]'`,
-    { encoding: 'utf8', maxBuffer: 50 * 1024 * 1024 },
-  );
+  let json: string;
+  try {
+    json = execSync(
+      `gh api "repos/${repo}/actions/runs/${runId}/artifacts" --paginate --jq '.artifacts[]'`,
+      { encoding: 'utf8', maxBuffer: 50 * 1024 * 1024 },
+    );
+  } catch (error) {
+    if (isGithubNotFoundError(error)) throw new WorkflowRunNotFoundError(repo, runId);
+    throw error;
+  }
   const out: ArtifactMeta[] = [];
   for (const line of json.trim().split('\n')) {
     if (!line) continue;

@@ -148,7 +148,7 @@ export interface PowerAudit {
   max_sample_gap_s?: number;
   producer_sha?: string | null;
   exporter_image_sha256?: string | null;
-  /** Relative path within the source run artifact bundle. */
+  /** Validation filename; nested AgentX documents use a canonical filename alias. */
   source?: string;
   /** Producer device identifiers; not necessarily physical UUIDs on older traces. */
   observed_gpu_ids?: string[];
