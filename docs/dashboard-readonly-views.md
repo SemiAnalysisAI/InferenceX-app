@@ -63,6 +63,11 @@ OperatorX is feature-gated in navigation and uses page-owned
 contract.
 Zoom, theme, axis scale, labels, media playback and report expansion are renderer
 state. GPU interactive downsampling does not alter returned raw data or statistics.
+Power boundary labels are GPU Level Measured, GPU Level Provisioned (TDP), All in
+Provisioned, and All in Measured. The last combines measured GPU power with modeled
+unmeasured components and PUE; it is not a wall-meter measurement. These labels and
+collapsed power-assumption/availability notes do not change metric IDs, API selectors,
+or calculations. Profit comparison `powerLabel` display text follows the same names.
 The GPU statistics table includes startup and warmup for all chips in the selected
 series, regardless of chip visibility. It is separate from serving-window power,
 J/token and selected-time-window calculations. Run telemetry is DB-first with an

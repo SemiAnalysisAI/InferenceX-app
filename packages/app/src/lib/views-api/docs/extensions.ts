@@ -122,8 +122,8 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
     '模型许可或收入分成百分比，范围 0 至 100，默认值随模型变化。',
   ],
   powerBasis: [
-    'provisioned (default), modeled or compare. Modeled power requires eligible measured source rows; estimates extrapolated from partial-GPU measurements to a full chassis are identified by powerLabel. Missing coverage is not zero.',
-    'provisioned（默认）、modeled 或 compare。建模功耗需要符合条件的实测数据行；由部分 GPU 的实测数据外推到整机的估算，会通过 powerLabel 标明。缺失数据不按零处理。',
+    'provisioned (default, All in Provisioned), modeled (All in Measured) or compare. All in Measured uses measured GPU power plus modeled unmeasured components and PUE; it is not measured wall power. Eligible measured source rows are required; powerLabel identifies paired estimates and full-chassis extrapolation. Missing coverage is not zero.',
+    'provisioned（默认，整体预配功耗）、modeled（整体实测功耗）或 compare。整体实测功耗采用 GPU 实测值，加上未实测组件的功耗估算和 PUE，并非墙上电表读数。该估算需要符合条件的实测数据行；powerLabel 标明对比方式和整机外推。缺失数据不按零处理。',
   ],
   power: [
     'Comma-separated certified and/or legacy power tiers. Omit for all tiers.',

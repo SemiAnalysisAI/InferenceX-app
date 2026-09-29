@@ -16,6 +16,28 @@ The pinned source currently identifies itself as **DRAFT / pending human
 verification**. Numerical parity establishes implementation equivalence, not
 empirical chassis calibration.
 
+## Updating the model for historical results
+
+Modeled power is derived from retained measurements when the browser or a shared
+views API transforms a benchmark row. Changing the model does not rewrite the
+original GPU measurements or require a per-run database backfill.
+
+1. Update `REVISION` in `packages/app/scripts/generate-system-power-reference.py`
+   to the intended clean Python model commit, and update the recorded assumptions
+   when required.
+2. Run that script with the path to the pinned model checkout to regenerate
+   `system-power-model.profiles.json` and `system-power-model.reference.json`.
+   If equations or load-dependent components changed, update the TypeScript
+   implementation too; regenerating constants alone is insufficient.
+3. Run the system-power model parity and admission tests, then deploy the app.
+   Existing browser sessions need the updated bundle. Derived API responses need
+   the normal authenticated cache invalidation or cache expiry; deployment alone
+   does not establish that every cached response uses the new revision.
+4. Regenerate frozen CSV/JSON exports separately. If the revised model needs
+   inputs that were never recorded, those rows stay unavailable until the input
+   gap is resolved. A new benchmark's power must not be attached to an older
+   benchmark's throughput.
+
 ## Boundary and assumptions
 
 The input is measured mean GPU power during a validated serving window. The
@@ -206,6 +228,13 @@ is unavailable, the corresponding mean remains unavailable rather than silently
 dropping that replicate.
 
 ## 中文说明
+
+模型结果在浏览器或共享 views API 转换 benchmark 数据时计算，不写回原始 GPU
+测量值。更新模型时，先修改生成脚本中的固定版本及相关假设，再生成 profiles 和
+reference JSON；如果公式或随负载变化的组件有改动，还需同步 TypeScript 实现。
+通过一致性及准入测试后部署，刷新浏览器，并使派生 API 缓存失效或等待其过期。
+冻结的 CSV/JSON 需另行导出。通常无需逐 run 回填数据库；若新模型需要历史记录中
+没有的输入，应保留不可用状态，也不能把新一轮测得的功耗配到旧吞吐结果上。
 
 PowerX 的系统功耗结果以实测 GPU 功率为输入，使用固定版本的功耗模型估算
 8-GPU 机箱的 AC 输入功率，再单独应用 PUE 得到设施功率估计。CPU 和 DRAM 利用率

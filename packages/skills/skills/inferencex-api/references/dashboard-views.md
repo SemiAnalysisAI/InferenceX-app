@@ -85,6 +85,13 @@ envelope. `frontier.direction` describes that boundary; `metric.direction` retai
 the optimization direction used by `best=true`. Interpret the envelope as a load
 boundary, not evidence that those points are more energy efficient.
 
+The dashboard names its four boundaries GPU Level Measured, GPU Level Provisioned
+(TDP), All in Provisioned, and All in Measured. All in Measured combines measured
+GPU power with modeled unmeasured components and PUE; do not describe it as measured
+wall power. Metric IDs and API selector values are unchanged. Profit `powerBasis`
+still accepts `provisioned`, `modeled`, or `compare`; `powerLabel` is display text.
+Expanding assumptions or unavailable-estimate details does not change returned data.
+
 Prefer equal-service comparisons for article-facing hardware analysis. Use
 `xstat=mean` only for fixed-sequence service axes when that statistic is intended:
 streaming speed then means **1 / mean TPOT**, not arithmetic mean request speed.

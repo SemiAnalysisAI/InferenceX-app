@@ -86,9 +86,9 @@ describe('InferenceTable sorting logic', () => {
               ['Prefill GPUs', '760'],
             ]
           : [
-              ['GPU measured', '708'],
-              ['GPU provisioned (TDP)', '1,400'],
-              ['Utility provisioned (all-in)', '1,920'],
+              ['GPU Level Measured', '708'],
+              ['GPU Level Provisioned (TDP)', '1,400'],
+              ['All in Provisioned', '1,920'],
             ],
       );
       expect(points.every((point) => point.measuredAvgPower?.y === 708.1)).toBe(true);

@@ -1015,7 +1015,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/calculator-extensions.ts',
-    sourceSha256: '0e2b050b483b505b9118336f6639594c8f82470e885c6356c4f2dc5790d39fec',
+    sourceSha256: '2bcd27b5f5fbea9dcd75b32f7ee88e1c92343bed3ff65a293fc9a8ff5ecf04c3',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',

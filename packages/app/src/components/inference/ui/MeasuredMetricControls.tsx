@@ -8,7 +8,12 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { track } from '@/lib/analytics';
-import { POWER_BASES, POWER_BASIS_LABELS, type PowerBasis } from '@/lib/power-basis';
+import {
+  ALL_IN_MEASURED_NOTE,
+  POWER_BASES,
+  POWER_BASIS_LABELS,
+  type PowerBasis,
+} from '@/lib/power-basis';
 import { useLocale } from '@/lib/use-locale';
 import {
   changeMeasuredMetricConfig,
@@ -22,7 +27,7 @@ const STRINGS = {
   en: {
     basis: 'Boundary',
     basisHelp:
-      'Where power is counted. GPU measured: runner telemetry from the GPU boards. GPU provisioned: rated TDP per GPU. Utility provisioned: all-in provisioned utility power per GPU. Utility modeled: measured GPU power carried through the modeled chassis to the utility meter with PUE. Points without a value for the chosen boundary are omitted, never replaced with an estimate.',
+      'Choose GPU-only or all-in power, including server overhead and PUE. Provisioned values use rated capacity; measured values start from GPU telemetry. Points without the selected value are omitted.',
     scope: 'Scope',
     scopeHelp:
       'All GPUs measures the whole deployment. Prefill and decode select only GPUs serving that role.',
@@ -49,7 +54,7 @@ const STRINGS = {
       'Energy is shown in joules. Energy per successful query can also be shown in watt-hours.',
     compare: 'Compare',
     compareHelp:
-      'Overlay sibling series on the same points, in the hardware colour with a dash per series. All boundaries: GPU measured, GPU provisioned, utility provisioned and utility modeled. Prefill vs decode: each worker pool next to the whole deployment; on the energy axis the prefill pool is carried onto the output-token axis by the served input:output ratio. Available for the whole-deployment average W/chip and J per output token.',
+      'Compare power boundaries or prefill and decode on the same benchmark points. Role energy uses a common output-token denominator. Available for average W/chip and J per output token.',
     compareNone: 'Off',
     compareBoundaries: 'All boundaries',
     compareRoles: 'Prefill vs decode',
@@ -57,7 +62,7 @@ const STRINGS = {
   zh: {
     basis: '功耗边界',
     basisHelp:
-      '选择功耗的计量边界。GPU 实测：来自 GPU 板卡的运行器遥测；GPU 额定：每 GPU 的额定 TDP；全电源配置：每 GPU 的全电源配置（all-in）市电功率；数据中心建模：将 GPU 实测功耗经机箱功耗模型推算至市电侧并计入 PUE。所选边界缺少数值的数据点将被省略，不会用估算值替代。',
+      '选择仅统计 GPU，或计入服务器其他组件及 PUE 的整体功耗。预配值按额定容量计算，实测值以 GPU 遥测为基础。缺少所选数值的数据点不绘制。',
     scope: '统计范围',
     scopeHelp: '全部 GPU 对应整个部署；预填充和解码仅统计承担相应任务的 GPU。',
     all: '全部 GPU',
@@ -82,7 +87,7 @@ const STRINGS = {
     unitHelp: '能耗以焦耳显示；每个成功请求的能耗也可显示为瓦时。',
     compare: '对比',
     compareHelp:
-      '在同一批数据点上叠加同源系列：颜色仍按硬件区分，每个系列用不同虚线表示。全部边界：GPU 实测、GPU 额定、全电源配置、数据中心建模；预填充 vs 解码：各 worker 池与整个部署并列，能耗轴上的预填充能耗按实际服务的输入/输出 token 比折算到每输出 token。仅适用于整个部署的平均 W/芯片和每输出 token 能耗。',
+      '在同一批基准测试数据点上对比不同功耗边界，或预填充与解码。各角色的能耗统一按输出 token 归一化。支持平均 W/芯片和每输出 token 能耗。',
     compareNone: '关闭',
     compareBoundaries: '全部边界',
     compareRoles: '预填充 vs 解码',
@@ -333,6 +338,14 @@ export function MeasuredMetricControls({
             </SelectContent>
           </Select>
         </div>
+      )}
+      {(config.basis === 'utility-modeled' || compare === 'boundaries') && (
+        <p
+          className="col-span-full text-xs text-muted-foreground"
+          data-testid="all-in-measured-note"
+        >
+          {ALL_IN_MEASURED_NOTE[locale]}
+        </p>
       )}
     </div>
   );
