@@ -3,8 +3,6 @@ import { describe, it, expect } from 'vitest';
 import type { ChartDefinition, InferenceData } from '@/components/inference/types';
 import { formatInferenceTableNumber } from '@/components/inference/ui/InferenceTable';
 
-// Test the pure logic used by InferenceTable — sorting and value resolution
-import { getNestedYValue } from '@/lib/chart-utils';
 import * as inferenceTableModule from './InferenceTable';
 import { chartDefinitions } from '../metric-registry';
 import { sortRowsByYMetric } from './inference-table-sort';
@@ -21,12 +19,6 @@ const CHART_DEF = {
   y_tpPerGpu_labelZh: '单 GPU token 吞吐量 (tok/s/gpu)',
   y_tpPerGpu_title: 'Token Throughput per GPU',
   y_tpPerGpu_roofline: 'upper_left',
-  y_costh: 'costh.y',
-  y_costh_label: 'Cost per Million Total Tokens ($)',
-  y_costh_roofline: 'lower_right',
-  y_tokensPerDollarH: 'tokensPerDollarH.y',
-  y_tokensPerDollarH_label: 'Total Tokens per $1 TCO (tok/$)',
-  y_tokensPerDollarH_roofline: 'upper_left',
 } as unknown as ChartDefinition;
 
 function makePoint(overrides: Partial<InferenceData>): InferenceData {
@@ -94,14 +86,10 @@ describe('InferenceTable sorting logic', () => {
       makePoint({ tpPerGpu: { y: 300, roof: false } }),
     ];
 
-    const yPath = CHART_DEF.y_tpPerGpu as string;
-    const sorted = [...points].toSorted(
-      (a, b) => getNestedYValue(b, yPath) - getNestedYValue(a, yPath),
-    );
+    const definition = chartDefinitions.find((chart) => chart.chartType === 'interactivity')!;
+    const sorted = sortRowsByYMetric(points, definition, 'y_tpPerGpu');
 
-    expect(getNestedYValue(sorted[0], yPath)).toBe(500);
-    expect(getNestedYValue(sorted[1], yPath)).toBe(300);
-    expect(getNestedYValue(sorted[2], yPath)).toBe(100);
+    expect(sorted.map((point) => point.tpPerGpu.y)).toEqual([500, 300, 100]);
   });
 
   it('sorts tokens-per-dollar purchasing power descending', () => {
@@ -111,36 +99,10 @@ describe('InferenceTable sorting logic', () => {
       makePoint({ tokensPerDollarH: { y: 1_500_000, roof: true } }),
     ];
 
-    const yPath = CHART_DEF.y_tokensPerDollarH as string;
-    const sorted = [...points].toSorted(
-      (a, b) => getNestedYValue(b, yPath) - getNestedYValue(a, yPath),
-    );
+    const definition = chartDefinitions.find((chart) => chart.chartType === 'interactivity')!;
+    const sorted = sortRowsByYMetric(points, definition, 'y_tokensPerDollarH');
 
-    expect(getNestedYValue(sorted[0], yPath)).toBe(1_500_000);
-    expect(getNestedYValue(sorted[1], yPath)).toBe(800_000);
-    expect(getNestedYValue(sorted[2], yPath)).toBe(200_000);
-  });
-});
-
-describe('getNestedYValue', () => {
-  it('resolves nested roofline metric path (tpPerGpu.y)', () => {
-    const point = makePoint({ tpPerGpu: { y: 42, roof: true } });
-    expect(getNestedYValue(point, 'tpPerGpu.y')).toBe(42);
-  });
-
-  it('resolves the existing cost-per-million path (costh.y)', () => {
-    const point = makePoint({ costh: { y: 1.23, roof: false } });
-    expect(getNestedYValue(point, 'costh.y')).toBe(1.23);
-  });
-
-  it('resolves the separate tokens-per-dollar path', () => {
-    const point = makePoint({ tokensPerDollarH: { y: 1_500_000, roof: false } });
-    expect(getNestedYValue(point, 'tokensPerDollarH.y')).toBe(1_500_000);
-  });
-
-  it('returns 0 for missing paths', () => {
-    const point = makePoint({});
-    expect(getNestedYValue(point, 'nonexistent.y')).toBe(0);
+    expect(sorted.map((point) => point.tokensPerDollarH?.y)).toEqual([1_500_000, 800_000, 200_000]);
   });
 });
 
