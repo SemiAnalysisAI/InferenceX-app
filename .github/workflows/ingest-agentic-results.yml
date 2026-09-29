@@ -31,6 +31,11 @@ on:
         description: InferenceX Actions run ID to ingest
         required: true
         type: string
+      require-power:
+        description: Require the versioned PowerX manifest and all declared evidence
+        required: false
+        default: false
+        type: boolean
       run-attempt:
         description: InferenceX Actions run attempt to ingest
         required: false
@@ -85,6 +90,11 @@ on:
         description: InferenceX Actions run ID to ingest
         required: true
         type: string
+      require-power:
+        description: Require the versioned PowerX manifest and all declared evidence
+        required: false
+        default: false
+        type: boolean
       run-attempt:
         description: InferenceX Actions run attempt to ingest
         required: false
@@ -276,6 +286,7 @@ jobs:
             github.event.client_payload.run-id || inputs.run-id }}
           ARTIFACTS_PATH: ${{ github.workspace }}/artifacts
           INGEST_REPO: SemiAnalysisAI/InferenceX
+          INGEST_REQUIRE_POWER: ${{ github.event.client_payload.require-power == true || inputs.require-power == true }}
         run: bun run admin:db:prepare:ci
 
       - name: Run migrations
@@ -288,6 +299,7 @@ jobs:
           INGEST_RUN_ATTEMPT: ${{ steps.artifacts.outputs.merge-run-attempt }}
           INGEST_ARTIFACTS_PATH: ${{ github.workspace }}/artifacts
           INGEST_REPO: SemiAnalysisAI/InferenceX
+          INGEST_REQUIRE_POWER: ${{ github.event.client_payload.require-power == true || inputs.require-power == true }}
           UNMAPPED_ENTITIES_OUTPUT: ${{ github.workspace }}/unmapped-entities.json
           POWER_PUBLICATION_MANIFEST: ${{ github.workspace }}/power-publication.json
         run: bun run admin:db:ingest:ci
