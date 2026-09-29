@@ -39,17 +39,12 @@ describe('Blog', () => {
 
   describe('Blog listing page', () => {
     beforeEach(() => {
-      // Stub remote Substack thumbnails with a real 1×1 PNG. A 204 empty body
-      // can prevent Firefox from firing `window.load` while eager card images
-      // stay pending. Per-test setup also lets Cypress retry a failed visit.
-      cy.intercept(
-        {
-          method: 'GET',
-          pathname: '/_next/image',
-          query: { url: /^https:\/\/substack-post-media\.s3\.amazonaws\.com\// },
-        },
-        { fixture: '1x1.png', headers: { 'content-type': 'image/png' } },
-      );
+      // The listing checks text and links, so stub every optimized thumbnail.
+      // Waiting on image optimization can keep Firefox from firing `window.load`.
+      cy.intercept('GET', '**/_next/image?*', {
+        fixture: '1x1.png',
+        headers: { 'content-type': 'image/png' },
+      });
       cy.visit('/blog');
     });
 
