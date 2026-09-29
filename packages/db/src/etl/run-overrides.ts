@@ -309,6 +309,42 @@ export const CHANGELOG_BACKFILLS: readonly ChangelogBackfill[] = [
       appendOnly: true,
     },
   },
+  {
+    id: 'run-35902709621-restore-append-only',
+    reason:
+      'PowerX Qwen3.5 FP8 B200 TP4 repeat 2 was dispatched as a c8-c128 run (35841100398) plus this c1-c4 recovery run on the same image, but the e2e dispatch wrote no append-only changelog, so the recovery run replaced the whole line with three points. Restore the flag so the Latest curve carries the c8-c128 points forward.',
+    githubRunId: 35902709621,
+    runAttempt: 1,
+    baseRef: 'unknown',
+    headRef: 'main',
+    set: {
+      appendOnly: true,
+    },
+  },
+  {
+    id: 'run-35905882425-restore-append-only',
+    reason:
+      'PowerX Qwen3.5 FP8 B200 TP4 repeat 3: c1-c4 recovery run for the c8-c128 run 35843506474 on the same image (nightly-dev-cu13-20260918-20518d85). Without the flag the B200 Latest curve shows only c1-c4.',
+    githubRunId: 35905882425,
+    runAttempt: 1,
+    baseRef: 'unknown',
+    headRef: 'main',
+    set: {
+      appendOnly: true,
+    },
+  },
+  {
+    id: 'run-35920473582-restore-append-only',
+    reason:
+      'PowerX Qwen3.5 FP8 H200 TP8/EP8 repeat 1 was dispatched as a c1 run (35903925568) plus this c2-c128 run on the same image (v0.5.14-cu130) without an append-only changelog. Latest is unaffected because repeat 3 (35931157736) is a complete snapshot; the flag keeps the repeat-1 ladder whole for as-of and history reads.',
+    githubRunId: 35920473582,
+    runAttempt: 1,
+    baseRef: 'unknown',
+    headRef: 'main',
+    set: {
+      appendOnly: true,
+    },
+  },
 ];
 
 export type JsonValue =
