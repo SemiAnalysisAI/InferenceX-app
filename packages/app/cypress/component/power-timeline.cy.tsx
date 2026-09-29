@@ -1,4 +1,5 @@
 import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.shared-runtime';
+import { useState } from 'react';
 
 import type { GpuPowerSeries, GpuPowerSeriesResponse } from '@/components/gpu-power/power-series';
 import PowerTimeline from '@/components/inference/ui/PowerTimeline';
@@ -21,6 +22,8 @@ const RUN_ID = '34716669498';
 const RUN_URL = `https://github.com/SemiAnalysisAI/InferenceX/actions/runs/${RUN_ID}`;
 const OVERLAY_RUN_ID = '31415926535';
 const OVERLAY_RUN_URL = `https://github.com/SemiAnalysisAI/InferenceX/actions/runs/${OVERLAY_RUN_ID}`;
+const SECOND_RUN_ID = '34716669499';
+const SECOND_RUN_URL = `https://github.com/SemiAnalysisAI/InferenceX/actions/runs/${SECOND_RUN_ID}`;
 const START_MS = Date.UTC(2026, 8, 12, 20, 20, 0);
 const hwConfig = createMockHardwareConfig();
 const HW_TYPES = new Set(['b200', 'h100']);
@@ -84,6 +87,24 @@ const response: GpuPowerSeriesResponse = {
   series: [series('b200', 16, 700), series('b200', 64, 900)],
 };
 
+const Y_LABEL = 'Measured Average Power per Chip over Time (W)';
+
+function providerOverrides(
+  unofficial: Parameters<typeof createMockUnofficialRunContext>[0] = {},
+): Parameters<typeof mountWithProviders>[1] {
+  return {
+    inference: {
+      selectedModel: Model.DeepSeek_V4_Pro,
+      selectedSequence: Sequence.EightK_OneK,
+      selectedYAxisMetric: 'y_measuredPowerTimeline',
+      hardwareConfig: hwConfig,
+      activeHwTypes: new Set(HW_TYPES),
+      hwTypesWithData: new Set(HW_TYPES),
+    },
+    unofficial,
+  };
+}
+
 function mountTimeline(
   data: InferenceData[],
   options: {
@@ -98,21 +119,32 @@ function mountTimeline(
           chartId="power-timeline-test"
           data={data}
           overlayData={options.overlay}
-          yLabel="Measured Average Power per Chip over Time (W)"
+          yLabel={Y_LABEL}
         />
       </div>
     </PathnameContext.Provider>,
-    {
-      inference: {
-        selectedModel: Model.DeepSeek_V4_Pro,
-        selectedSequence: Sequence.EightK_OneK,
-        selectedYAxisMetric: 'y_measuredPowerTimeline',
-        hardwareConfig: hwConfig,
-        activeHwTypes: new Set(HW_TYPES),
-        hwTypesWithData: new Set(HW_TYPES),
-      },
-      unofficial: options.unofficial ?? {},
-    },
+    providerOverrides(options.unofficial),
+  );
+}
+
+/** One measured run at mount; a button adds a second run to the same plot. */
+function GrowingTimeline() {
+  const [data, setData] = useState(() => [measuredPoint('b200', 16, 700)]);
+  return (
+    <PathnameContext.Provider value="/inference">
+      <button
+        type="button"
+        data-testid="add-run"
+        onClick={() =>
+          setData((prev) => [...prev, measuredPoint('h100', 16, 500, { run_url: SECOND_RUN_URL })])
+        }
+      >
+        add run
+      </button>
+      <div style={{ width: 1100, height: 700 }}>
+        <PowerTimeline chartId="power-timeline-test" data={data} yLabel={Y_LABEL} />
+      </div>
+    </PathnameContext.Provider>
   );
 }
 
@@ -180,5 +212,33 @@ describe('PowerTimeline', () => {
       cy.get('.power-reference[data-reference="tdp"]').should('have.length', 2);
     });
     cy.get('[data-testid="chart-legend"]').should('contain.text', '✕ powerx-timeline');
+  });
+
+  it('joins a run that arrives after mount without a hook-shape warning', () => {
+    const secondResponse: GpuPowerSeriesResponse = {
+      runInfo: { ...response.runInfo, id: Number(SECOND_RUN_ID), url: SECOND_RUN_URL },
+      series: [series('h100', 16, 500)],
+    };
+    cy.intercept('POST', `/api/gpu-metrics?runId=${RUN_ID}*`, { body: response }).as('first');
+    cy.intercept('POST', `/api/gpu-metrics?runId=${SECOND_RUN_ID}*`, {
+      body: secondResponse,
+    }).as('second');
+    cy.stub(console, 'error').as('consoleError');
+    mountWithProviders(<GrowingTimeline />, providerOverrides());
+    cy.wait('@first');
+    svg().find('path.power-trace[data-segment="window"]').should('have.length', 1);
+
+    cy.get('[data-testid="add-run"]').click();
+    cy.wait('@second');
+    svg().find('path.power-trace[data-segment="window"]').should('have.length', 2);
+    // React logs this when a memo's dependency array changes length between
+    // renders; one query per run used to be spread into that array.
+    cy.get('@consoleError').then((stub) => {
+      const calls = (stub as unknown as { args: unknown[][] }).args;
+      const shapeWarnings = calls.filter((args) =>
+        args.some((a) => typeof a === 'string' && a.includes('changed size between renders')),
+      );
+      expect(shapeWarnings, JSON.stringify(shapeWarnings)).to.have.length(0);
+    });
   });
 });
