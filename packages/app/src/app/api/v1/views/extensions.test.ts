@@ -19,7 +19,7 @@ const mocks = vi.hoisted(() => ({
   unofficial: vi.fn(),
   submissions: vi.fn(),
 }));
-vi.mock('@/app/api/gpu-metrics/route', () => ({ GET: mocks.metrics }));
+vi.mock('@/app/api/gpu-metrics/route', () => ({ readGpuMetricsForView: mocks.metrics }));
 vi.mock('@/app/api/video-runs/route', () => ({ GET: mocks.video }));
 vi.mock('@/app/api/v1/benchmarks/route', () => ({ GET: mocks.benchmarks }));
 vi.mock('@/app/api/unofficial-run/route', () => ({ GET: mocks.unofficial }));
