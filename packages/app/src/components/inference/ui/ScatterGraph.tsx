@@ -2396,14 +2396,16 @@ const ScatterGraph = React.memo(
         if (!svg) return;
         const root = d3.select(svg);
         // A comparison-series legend row highlights that boundary / role
-        // across every hardware instead of one hardware across series.
+        // across every hardware instead of one hardware across series. Base
+        // points and rooflines carry no variant (only siblings are cloned),
+        // so the empty id maps back to the base legend row's id.
         const variantId = hwKey.startsWith(POWER_VARIANT_LEGEND_PREFIX)
           ? hwKey.slice(POWER_VARIANT_LEGEND_PREFIX.length)
           : null;
         const matchesPoint = (d: InferenceData) =>
           variantId === null
             ? String(d.hwKey) === hwKey
-            : powerVariantId(d.powerVariant) === variantId;
+            : (powerVariantId(d.powerVariant) || powerCompareBaseId) === variantId;
         root
           .selectAll<SVGGElement, InferenceData>('.dot-group')
           .style('opacity', (d) =>
@@ -2416,7 +2418,7 @@ const ScatterGraph = React.memo(
             const matches =
               variantId === null
                 ? this.dataset.hwKey === hwKey
-                : (this.dataset.powerVariant ?? '') === variantId;
+                : (this.dataset.powerVariant || powerCompareBaseId) === variantId;
             return matches ? null : '0.15';
           });
         root
@@ -2425,7 +2427,7 @@ const ScatterGraph = React.memo(
             return labelOpacityForHover((this as SVGGElement).dataset, hwKey);
           });
       },
-      [isPointVisible, isRooflineVisible],
+      [isPointVisible, isRooflineVisible, powerCompareBaseId],
     );
 
     const handleLegendHoverEnd = useCallback(() => {
