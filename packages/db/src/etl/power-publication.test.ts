@@ -37,7 +37,7 @@ function expected(overrides = {}) {
     'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/123/attempts/2',
     { path: 'bmk_qwen3.5/results.json', sha256: 'abc' },
   );
-  if (!point) throw new Error('Fixture must be 8K/1K');
+  if (!point) throw new Error('Fixture must belong to a supported PowerX workload');
   return point;
 }
 function actual(point = expected()): PublishedPowerRow {
@@ -51,6 +51,12 @@ function actual(point = expected()): PublishedPowerRow {
 }
 
 describe('PowerX publication', () => {
+  it('keeps required 1K/1K measurements in the publication receipt', () => {
+    const point = expected({ isl: 1024, joules_per_output_token: 2.5 });
+    expect(point.identity).toMatchObject({ benchmark_type: 'single_turn', isl: 1024, osl: 1024 });
+    expect(verifyPowerPublication([point], [actual(point)], 'database')).toEqual([]);
+    expect(verifyPowerPublication([point], [], 'public API')[0]).toContain('found 0');
+  });
   it('verifies AgentX source identity, nullable sequences, energy and audit through DB/API', () => {
     const point = expected({
       scenario_type: 'agentic-coding',
