@@ -34,7 +34,7 @@ import {
 import { useGpuMetricsPoint, type GpuMetricSeries } from '@/hooks/api/use-gpu-metrics-point';
 import { useTraceServerMetrics } from '@/hooks/api/use-trace-server-metrics';
 
-import { availableOverlaySources, overlaySourceLabel } from './overlay-sources';
+import { availableOverlaySources } from './overlay-sources';
 import { track } from '@/lib/analytics';
 import { useLocale } from '@/lib/use-locale';
 
@@ -199,7 +199,7 @@ export function PowerTelemetryView({ id, enabled, hardware, serverMetricsEnabled
       ? serverMetrics.startNs / 1e6
       : new Date(selectedSeries.startedAt).getTime();
     return {
-      label: overlaySourceLabel(overlaySource, locale),
+      label: overlaySource.label[locale],
       unit: overlaySource.unit,
       color: overlaySource.color,
       points: toAbsoluteMs(overlaySource.points(serverMetrics), originMs),
@@ -367,7 +367,7 @@ export function PowerTelemetryView({ id, enabled, hardware, serverMetricsEnabled
                   <SelectItem value="none">{t.overlayNone}</SelectItem>
                   {overlaySources.map((source) => (
                     <SelectItem key={source.key} value={source.key}>
-                      {overlaySourceLabel(source, locale)} ({source.unit})
+                      {source.label[locale]} ({source.unit})
                     </SelectItem>
                   ))}
                 </SelectContent>

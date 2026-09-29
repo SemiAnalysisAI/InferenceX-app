@@ -140,12 +140,12 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
     interceptDerivedAgenticMetrics();
   });
 
-  it('defaults to Interactivity and offers all four full names in one axis dropdown', () => {
+  it('defaults to Interactivity and offers every full name in one axis dropdown', () => {
     cy.get('[data-testid="scenario-selector"]').should('contain.text', 'Agentic');
     cy.get('[data-testid="x-axis-mode-selector"]').should('contain.text', 'Interactivity');
     cy.get('[data-testid="x-axis-mode-buttons"]').should('not.exist');
     openXAxisMenu();
-    cy.get('[role="grid"] [data-select-option]').should('have.length', 4);
+    cy.get('[role="grid"] [data-select-option]').should('have.length', 5);
     cy.get('[data-testid="x-axis-mode-e2e-normalized-interactivity"]')
       .should('have.text', 'E2E Normalized Interactivity')
       .and('have.attr', 'aria-pressed', 'false');
@@ -479,11 +479,12 @@ describe('Label defaults for fixed-sequence scenarios', () => {
     cy.get('[data-testid="chart-figure"] h2').should('contain.text', 'Time To First Token');
   });
 
-  it('offers only the three supported axes for fixed sequences', () => {
+  it('offers only the four supported axes for fixed sequences', () => {
     interceptFixedSequenceData();
     cy.visit('/inference?i_seq=8k%2F1k');
     openXAxisMenu();
-    cy.get('[role="grid"] [data-select-option]').should('have.length', 3);
+    cy.get('[role="grid"] [data-select-option]').should('have.length', 4);
+    cy.get('[data-testid="x-axis-mode-concurrency"]').should('be.visible');
     cy.get('[data-testid="x-axis-mode-interactivity"]').should('be.visible');
     cy.get('[data-testid="x-axis-mode-e2e"]').should('be.visible');
     cy.get('[data-testid="x-axis-mode-ttft"]').should('be.visible');
@@ -586,8 +587,8 @@ const expectCoordinates = (selector: string, expected: number[]) => {
   });
 };
 const expectInteractivity = () => {
-  cy.get('#chart-0 .x-axis-label').should('have.text', 'Interactivity (tok/s/user)');
-  cy.get('[data-testid="chart-figure"] h2').should('contain.text', 'vs. Interactivity');
+  cy.get('#chart-0 .x-axis-label').should('have.text', 'Median Interactivity (tok/s/user)');
+  cy.get('[data-testid="chart-figure"] h2').should('contain.text', 'vs. Median Interactivity');
   expectCoordinates('.dot-group', [80, 40, 20]);
   expectCoordinates('.unofficial-overlay-pt', [60, 30]);
 };

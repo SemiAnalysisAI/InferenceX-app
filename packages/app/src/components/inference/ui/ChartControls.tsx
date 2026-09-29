@@ -58,7 +58,6 @@ import {
 import { useOpenDropdown } from '@/hooks/useOpenDropdown';
 import { ModelArchitectureInfoLink } from './ModelArchitectureInfoLink';
 import { MetricExplanation } from './MetricExplanation';
-import { PowerMetricAvailability } from './PowerMetricAvailability';
 import { MeasuredMetricControls } from './MeasuredMetricControls';
 import {
   changeMeasuredMetricConfig,
@@ -565,29 +564,15 @@ export default function ChartControls({
                   noResultsLabel={locale === 'zh' ? '无结果' : undefined}
                   clearSearchLabel={locale === 'zh' ? '清除搜索' : undefined}
                 />
-                {mounted && !getMeasuredMetricConfig(selectedYAxisMetric) && (
-                  <PowerMetricAvailability
-                    metric={selectedYAxisMetric}
-                    onSelect={handleYAxisMetricChange}
-                  />
-                )}
               </div>
 
               {mounted && getMeasuredMetricConfig(selectedYAxisMetric) && (
-                <>
-                  <MeasuredMetricControls
-                    metric={selectedYAxisMetric}
-                    onChange={handleYAxisMetricChange}
-                    compare={powerCompare}
-                    onCompareChange={setPowerCompare}
-                  />
-                  <div className="col-span-full">
-                    <PowerMetricAvailability
-                      metric={selectedYAxisMetric}
-                      onSelect={handleYAxisMetricChange}
-                    />
-                  </div>
-                </>
+                <MeasuredMetricControls
+                  metric={selectedYAxisMetric}
+                  onChange={handleYAxisMetricChange}
+                  compare={powerCompare}
+                  onCompareChange={setPowerCompare}
+                />
               )}
 
               {tcoVisible && (

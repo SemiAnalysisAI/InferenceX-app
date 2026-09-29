@@ -41,7 +41,10 @@ import {
   EMPTY_QUICK_FILTERS,
   type QuickFilters,
 } from '@/components/inference/utils/quickFilters';
-import { resolveXAxisField } from '@/components/inference/utils/resolveXAxisField';
+import {
+  resolveXAxisField,
+  type FixedSequenceStatistic,
+} from '@/components/inference/utils/resolveXAxisField';
 import { benchmarkQueryOptions, useBenchmarks } from '@/hooks/api/use-benchmarks';
 import type { BenchmarkRow } from '@/lib/api';
 import { benchmarkCurveDate, dedupeAgenticHistoryRuns } from '@/lib/benchmark-run-selection';
@@ -120,6 +123,7 @@ export function useChartData(
   allowDefaultRunPreference = false,
   /** Sibling boundary / role series appended to a gated power metric (`i_pcompare`). */
   powerCompare: PowerCompare = 'none',
+  fixedSequenceStatistic: FixedSequenceStatistic = 'median',
 ) {
   // When the selected date is the latest available, use '' (empty string) to match
   // the initial no-date query key, reusing the eagerly-fetched benchmarks from the
@@ -358,19 +362,24 @@ export function useChartData(
           isAgentic,
           percentile: selectedPercentile,
           xAxisMode: selectedXAxisMode,
+          fixedSequenceStatistic,
         });
         const naturalX = resolved.naturalX as keyof AggDataEntry;
         const xAxisField = resolved.xAxisField as keyof AggDataEntry;
         const { isTtftOverride } = resolved;
 
         const ttftPctl = isTtftOverride ? xAxisField.replace(/_ttft$/u, '') : 'p90';
-        const ttftPctlWord = ttftPctl === 'median' ? 'Median' : ttftPctl.toUpperCase();
+        const ttftPctlWord =
+          ttftPctl === 'median' ? 'Median' : ttftPctl === 'mean' ? 'Mean' : ttftPctl.toUpperCase();
         const ttftLabel = `${ttftPctlWord} Time To First Token (s)`;
         const ttftLabelZh = `${ttftPctlWord} 首 token 延迟 (s)`;
 
         let xAxisLabel = chartDef.x_label;
         let xAxisLabelZh = chartDef.x_labelZh;
-        if (resolved.branch === 'user-input-override') {
+        if (resolved.branch === 'concurrency') {
+          xAxisLabel = 'Concurrency';
+          xAxisLabelZh = '并发数';
+        } else if (resolved.branch === 'user-input-override') {
           const labelKey = `${selectedYAxisMetric}_x_label` as keyof ChartDefinition;
           const labelZhKey = `${selectedYAxisMetric}_x_labelZh` as keyof ChartDefinition;
           if (effectiveXMetric === chartDef[`${selectedYAxisMetric}_x` as keyof ChartDefinition]) {
@@ -402,13 +411,31 @@ export function useChartData(
           : selectedXAxisMode === undefined
             ? (chartDef[headingKey] as string) || chartDef.heading
             : chartDef.heading;
-        if (isAgentic) {
+        if (resolved.branch === 'concurrency') {
+          chartHeading = 'vs. Concurrency';
+        } else if (isAgentic) {
           const pctlWord = selectedPercentile.toUpperCase();
           xAxisLabel = applyAgenticPercentileToXLabel(xAxisLabel, pctlWord);
           xAxisLabelZh = applyAgenticPercentileToXLabel(xAxisLabelZh, pctlWord);
           chartHeading = chartHeading.replace(
             /^(?<vsPrefix>vs\.\s+)(?:(?:Median|Mean|P75|P90|P95|P99(?:\.9)?)\s+)?/iu,
             `$1${pctlWord} `,
+          );
+        } else {
+          const word = xAxisField.startsWith('mean_')
+            ? 'Mean'
+            : xAxisField.startsWith('median_')
+              ? 'Median'
+              : xAxisField.split('_')[0].toUpperCase();
+          const wordZh = word === 'Mean' ? '平均' : '中位';
+          xAxisLabel = applyAgenticPercentileToXLabel(xAxisLabel, word);
+          xAxisLabelZh = applyAgenticPercentileToXLabel(xAxisLabelZh, word).replace(
+            /^(?:Mean|Median)\s+/u,
+            wordZh,
+          );
+          chartHeading = chartHeading.replace(
+            /^(?<vsPrefix>vs\.\s+)(?:(?:Median|Mean|P75|P90|P95|P99(?:\.9)?)\s+)?/iu,
+            `$1${word} `,
           );
         }
 
@@ -422,11 +449,13 @@ export function useChartData(
           xAxisField !== naturalX && !(chartDef.chartType === 'e2e' && isTtftOverride);
 
         const rooflineOverrides: Partial<ChartDefinition> = {};
-        if (xAxisFlipped) {
+        if (xAxisFlipped || resolved.branch === 'concurrency') {
           for (const key of Object.keys(chartDef) as (keyof ChartDefinition)[]) {
             if (typeof key === 'string' && key.endsWith('_roofline')) {
               const dir = chartDef[key] as string | undefined;
-              if (dir && dir in FLIP_MAP) {
+              if (resolved.branch === 'concurrency') {
+                (rooflineOverrides as any)[key] = undefined;
+              } else if (dir && dir in FLIP_MAP) {
                 (rooflineOverrides as any)[key] = flipRooflineDirection(dir as RooflineDirection);
               }
             }
@@ -489,6 +518,7 @@ export function useChartData(
       selectedXAxisMetric,
       selectedE2eXAxisMetric,
       selectedPercentile,
+      fixedSequenceStatistic,
       selectedSequence,
       tokenRevenuePriceSource,
     ],

@@ -101,8 +101,7 @@ try {
     status:
       errors.length > 0 ? 'failed' : manifest.points.length > 0 ? 'matched' : 'no_power_points',
     errors,
-    // Kept out of `errors` on purpose: a telemetry digest failure costs one
-    // point's PowerX tab, not its benchmark data, so it must not fail the ingest.
+    // Non-fatal by design; see `fatalPublicationErrors`.
     telemetryWarnings: manifest.telemetryWarnings ?? [],
     ...(manifest.telemetry ? { telemetry: manifest.telemetry } : {}),
   };

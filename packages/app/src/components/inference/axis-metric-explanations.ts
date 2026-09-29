@@ -187,11 +187,11 @@ function provisionedJoules(tokenType: TokenType): MetricExplanation {
 /** Validation-status note appended to every Measured Energy explanation. */
 const MEASURED_TIER_NOTE_EN =
   ' Validated points passed the current PowerX telemetry checks. Historical points are real ' +
-  "older measurements but lack the information needed to confirm today's method; a dotted ring " +
-  'marks them. Filter either status under Quick Filters → Measured Power.';
+  "older measurements but lack the information needed to confirm today's method. Filter either " +
+  'status under Quick Filters → Measured Power.';
 const MEASURED_TIER_NOTE_ZH =
-  '已验证数据点通过了当前 PowerX 遥测检查。历史数据点来自真实的旧版测量，但缺少按当前方法完成验证所需的信息；' +
-  '图表以虚线圆环标记这类数据点。可在快捷筛选的“实测功耗”中按测量状态筛选。';
+  '已验证数据点通过了当前 PowerX 遥测检查。历史数据点来自真实的旧版测量，但缺少按当前方法完成验证所需的信息。' +
+  '可在快捷筛选的“实测功耗”中按测量状态筛选。';
 
 type MeasuredPhase = 'run' | 'prefill' | 'decode';
 
@@ -548,9 +548,15 @@ export const METRIC_EXPLANATIONS: Record<MetricKey, MetricExplanation> = {
  * the percentile prefix. Mirrors the branch logic in `resolveXAxisField` plus
  * the derived agentic x-axis mode handled in `ChartDisplay`.
  */
-export type XAxisKind = 'interactivity' | 'e2eLatency' | 'ttft' | 'e2eNormalizedInteractivity';
+export type XAxisKind =
+  | 'concurrency'
+  | 'interactivity'
+  | 'e2eLatency'
+  | 'ttft'
+  | 'e2eNormalizedInteractivity';
 
 export const X_AXIS_KINDS: readonly XAxisKind[] = [
+  'concurrency',
   'interactivity',
   'e2eLatency',
   'ttft',
@@ -567,11 +573,18 @@ export interface XAxisExplanation {
 }
 
 const zhPctl = (pctl: string | null): string =>
-  pctl === null ? '' : pctl === 'Median' ? '中位' : `${pctl} `;
+  pctl === null ? '' : pctl === 'Median' ? '中位' : pctl === 'Mean' ? '平均' : `${pctl} `;
 
 const enPctl = (pctl: string | null): string => (pctl === null ? '' : `${pctl} `);
 
 export const X_AXIS_EXPLANATIONS: Record<XAxisKind, XAxisExplanation> = {
+  concurrency: {
+    name: { en: () => 'Concurrency', zh: () => '并发数' },
+    description: {
+      en: 'The configured number of concurrent requests in each observed benchmark. This is a load setting, not a higher-is-better score. All observed load points are retained; lines only connect the same serving topology and run.',
+      zh: '每个实测基准配置的并发请求数。这是负载设置，不是越高越好的性能分数。保留全部实测负载点，连线仅连接同一服务拓扑、同一次运行的数据。',
+    },
+  },
   interactivity: {
     name: {
       en: (pctl) => `${enPctl(pctl)}Interactivity (tok/s/user)`,
@@ -581,7 +594,8 @@ export const X_AXIS_EXPLANATIONS: Record<XAxisKind, XAxisExplanation> = {
       en:
         'Interactivity is the rate at which a single user receives generated tokens while the ' +
         'model streams its answer — how quickly new words appear on screen. Higher values feel ' +
-        'snappier; operators trade it against batch throughput.',
+        'snappier; operators trade it against batch throughput. For fixed-sequence Mean, the rate ' +
+        'is 1 divided by mean TPOT in seconds, not the arithmetic mean of per-request rates.',
       zh:
         '交互性（interactivity）指模型流式输出回答时，单个用户接收生成 token 的速率——' +
         '即新内容出现在屏幕上的快慢。数值越高体验越流畅；运营方需要在交互性与批量吞吐量之间权衡。',
@@ -655,6 +669,7 @@ export function resolveXAxisKind(
     isDerivedNormalizedInteractivity: boolean;
   },
 ): XAxisKind {
+  if (opts.xAxisField === 'conc') return 'concurrency';
   if (opts.isDerivedNormalizedInteractivity) return 'e2eNormalizedInteractivity';
   if (opts.xAxisField.endsWith('ttft')) return 'ttft';
   return chartType === 'e2e' ? 'e2eLatency' : 'interactivity';
@@ -663,9 +678,11 @@ export function resolveXAxisKind(
 /**
  * Extract the percentile word from a resolved x-axis label (e.g.
  * "P90 Time To First Token (s)" → "P90"). The chart pipelines always render
- * the percentile prefix in this English form, including on /zh pages.
+ * percentiles in English; fixed-sequence statistics are localized on /zh.
  */
 export function xAxisPercentileFromLabel(xAxisLabel: string): string | null {
+  if (xAxisLabel.startsWith('平均')) return 'Mean';
+  if (xAxisLabel.startsWith('中位')) return 'Median';
   const match = /^(?<pctl>Median|Mean|P\d+(?:\.\d+)?)\s/iu.exec(xAxisLabel);
   if (!match?.groups?.pctl) return null;
   const pctl = match.groups.pctl;

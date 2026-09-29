@@ -51,6 +51,8 @@ export interface GpuPowerSeries {
 }
 
 export interface GpuPowerSeriesResponse {
+  /** Where the route read the series: the ingested digest or the run's GitHub artifacts. */
+  source?: 'database' | 'github';
   runInfo: GpuPowerRunInfo;
   series: GpuPowerSeries[];
   /** Coverage of requested validation identities only, never the full run/sweep. */

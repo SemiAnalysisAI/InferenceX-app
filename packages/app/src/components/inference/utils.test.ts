@@ -226,6 +226,27 @@ describe('processOverlayChartData', () => {
     expect(result.clippedData).toEqual([]);
   });
 
+  it('retains exact concurrency in unofficial overlays regardless of latency or optimization stamps', () => {
+    const points = [1, 4, 128].map((conc) => ({
+      ...prefillEnergyPoint(68, 120),
+      conc,
+      isOnNormalizedInteractivityFrontier: false,
+    }));
+    const result = processOverlayChartDataWithClipping(
+      points,
+      'e2e',
+      'y_measuredPrefillJPerInputToken',
+      'p90_ttft',
+      { isAgentic: false, selectedPercentile: 'p90', selectedXAxisMode: 'concurrency' },
+    );
+    expect(result.data.map((point) => [point.x, point.y])).toEqual([
+      [1, 0.2],
+      [4, 0.2],
+      [128, 0.2],
+    ]);
+    expect(result.clippedData).toEqual([]);
+  });
+
   it('uses median TTFT for fixed-sequence overlays in TTFT mode and omits missing measurements', () => {
     const result = processOverlayChartDataWithClipping(
       [prefillEnergyPoint(68, 1.5), prefillEnergyPoint(55)],

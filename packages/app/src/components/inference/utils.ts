@@ -6,7 +6,10 @@ import { getGpuSpecs, type TcoBasis } from '@/lib/constants';
  */
 
 import chartDefinitions from '@/components/inference/metric-registry';
-import { resolveXAxisField } from '@/components/inference/utils/resolveXAxisField';
+import {
+  resolveXAxisField,
+  type FixedSequenceStatistic,
+} from '@/components/inference/utils/resolveXAxisField';
 import { remapInferencePoint } from '@/lib/chart-utils';
 import { expandPowerCompareSeries } from '@/components/inference/utils/power-compare';
 
@@ -103,6 +106,9 @@ export function partitionChartDataByLimits(
   selectedYAxisMetric: string,
   options: { isTtftX: boolean; isAgentic: boolean },
 ): ProcessedChartData {
+  if (chartDefinition.x_scale_field === 'conc') {
+    return { data: data.filter((point) => Number.isFinite(point.x)), clippedData: [] };
+  }
   const costLimitApplies =
     selectedYAxisMetric.includes('cost') &&
     selectedYAxisMetric !== 'y_costUser' &&
@@ -150,6 +156,7 @@ export function processOverlayChartData(
     isAgentic?: boolean;
     selectedPercentile?: string;
     selectedXAxisMode?: XAxisMode;
+    fixedSequenceStatistic?: FixedSequenceStatistic;
     restrictToNormalizedFrontier?: boolean;
     tcoBasis?: TcoBasis;
     powerCompare?: PowerCompare;
@@ -177,6 +184,7 @@ export function processOverlayChartDataWithClipping(
     isAgentic?: boolean;
     selectedPercentile?: string;
     selectedXAxisMode?: XAxisMode;
+    fixedSequenceStatistic?: FixedSequenceStatistic;
     restrictToNormalizedFrontier?: boolean;
     tcoBasis?: TcoBasis;
     /** Sibling boundary / role series, mirroring the official path in useChartData. */
@@ -226,6 +234,7 @@ export function processOverlayChartDataWithClipping(
     isAgentic,
     percentile: selectedPercentile,
     xAxisMode: options?.selectedXAxisMode,
+    fixedSequenceStatistic: options?.fixedSequenceStatistic,
   });
 
   // The latency limit targets overload outliers on the TTFT axis only; skip it
@@ -251,8 +260,13 @@ export function processOverlayChartDataWithClipping(
     }
   }
 
-  return partitionChartDataByLimits(processedData, chartDef, selectedYAxisMetric, {
-    isTtftX,
-    isAgentic,
-  });
+  return partitionChartDataByLimits(
+    processedData,
+    { ...chartDef, x_scale_field: xAxisField },
+    selectedYAxisMetric,
+    {
+      isTtftX,
+      isAgentic,
+    },
+  );
 }

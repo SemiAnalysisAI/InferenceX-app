@@ -40,7 +40,6 @@ export function inferenceFrameworkLabelOverride(
   return override && Date.now() < override.expiresAt ? override.label : undefined;
 }
 
-/** Keep unofficial-run identity/markers while making its special engine visible. */
 /** Leads every unofficial-run label, in line labels and legend rows alike. */
 export const OVERLAY_LABEL_MARKER = '✕ ';
 const RUN_TAG_MAX = 20;
@@ -83,6 +82,7 @@ export function getOverlayLineLabel(
   return `${OVERLAY_LABEL_MARKER}${hardwareLabel}${sharesHardware ? overlayRunTag(run) : ''}`;
 }
 
+/** Keep unofficial-run identity/markers while making its special engine visible. */
 export function getInferenceRunLabel(
   label: string,
   points: readonly (RunProvenance & { framework?: string })[],

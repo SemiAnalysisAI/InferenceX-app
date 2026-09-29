@@ -19,16 +19,14 @@ export function createBenchmarkPowerAuditRecovery() {
     if (evidence) {
       const matches = Object.entries(evidence.validations).filter(([, validation]) => {
         const window = validation.selected_window;
-        if (
-          validation.result_file !== evidence.resultFile ||
-          !window ||
-          typeof window !== 'object' ||
-          Array.isArray(window) ||
-          !('concurrency' in window) ||
-          window.concurrency !== row.conc
-        )
-          return false;
-        return true;
+        return (
+          validation.result_file === evidence.resultFile &&
+          typeof window === 'object' &&
+          window !== null &&
+          !Array.isArray(window) &&
+          'concurrency' in window &&
+          window.concurrency === row.conc
+        );
       });
       // Ambiguous/missing evidence must not establish new provenance.
       if (matches.length !== 1) return row;

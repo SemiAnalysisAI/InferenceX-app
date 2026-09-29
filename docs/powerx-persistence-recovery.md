@@ -4,8 +4,7 @@ PowerX point detail, the run explorer and Power Timeline read migration-016 tele
 from the database. Timeline applies the same prefix selection, validation-window cuts,
 60-second padding and one-second per-device means as the artifact path. Stored samples
 retain UTC timestamps, original units and separate host-local GPU identities. GitHub
-remains the fallback for telemetry that has not been stored. Database failures return an
-error, not an empty result or an artifact fallback.
+remains the fallback for telemetry that has not been stored.
 
 Timeline sends a read-only `POST /api/gpu-metrics?runId=RUN_ID&series=power&prefix=PREFIX`
 with JSON `{ "sources": ["power_validation_RESULT_FILENAME.json"] }`. The planner sorts
@@ -134,7 +133,6 @@ the unknown denominator.
 This also applies on the first receipt: a selected expired benchmark sibling records
 an expectation error without attempting a download. Superseded retries and unrelated
 targets remain excluded by the existing logical-name and artifact filters.
-Known failed benchmark rows remain excluded, matching normal CI.
 
 Historical backfill retains the resolver's exact-first, unique-fallback offload matching.
 A proven fallback uses the persisted point's offload identity before receipt counting
@@ -182,9 +180,13 @@ receipt recovery error also blocks the complete count, even when older data rema
 ## Full-record statistics
 
 The point detail, run explorer and public `/api/v1/views/gpu-metrics` projection use the
-stored per-GPU digest for the existing full-record statistics, with name mappings only.
+current-version per-GPU digest for the existing full-record statistics, with name mappings
+only. Unversioned or outdated digests (`stats_version` ≠ `GPU_STATS_VERSION`) are recomputed
+read-only from retained DB samples with the shared ingest algorithm; incomplete retained
+samples leave statistics empty for the source-gap recovery path (see
+[statistics upgrades](./data-pipeline.md#full-record-statistics-upgrades-migration-017)).
 Units and percentile/stddev definitions are unchanged.
-Zero is a value; missing metrics or an empty digest remain missing. Live, un-ingested
+Zero is a value; missing metrics or an empty current-version digest remain missing. Live, un-ingested
 artifact data still computes statistics in the browser. These tables include startup and
 warmup. They are not serving-window power, energy, or user-selected-window statistics.
 
@@ -204,12 +206,6 @@ float32 tolerance rather than the tighter tolerance of the in-memory parser test
 From the repository root:
 
 ```sh
-bun install --frozen-lockfile --ignore-scripts
-bun run test:unit
-bun run typecheck
-bun run lint
-bun run fmt
-bun run check:typography
 bun run --cwd packages/app test:unit src/app/api/v1/gpu-metrics-point/route.test.ts
 bun run --cwd packages/app test:unit src/app/api/v1/views/gpu-metrics/route.test.ts
 bun run --cwd packages/db test:unit src/queries/gpu-metrics-timeline.test.ts src/etl/telemetry-receipt.test.ts

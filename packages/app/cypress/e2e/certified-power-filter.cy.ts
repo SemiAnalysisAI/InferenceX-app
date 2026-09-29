@@ -114,11 +114,8 @@ describe('Validated vs historical measured power', () => {
     });
   });
 
-  it('rings legacy points on a measured axis and filters them via Quick Filters', () => {
+  it('filters validated and historical measured points via Quick Filters', () => {
     visitCertifiedPowerChart();
-
-    cy.get('.legacy-power-ring').should('not.exist');
-    cy.get('[data-testid="legacy-power-key"]').should('not.exist');
 
     cy.get('[data-testid="yaxis-metric-selector"]').click('right');
     cy.contains('[data-slot="select-item"]', 'Measured Power')
@@ -127,16 +124,8 @@ describe('Validated vs historical measured power', () => {
       .click();
     cy.get('[data-slot="select-content"]').should('not.exist');
 
-    cy.get('[data-testid="measured-power-summary"]')
-      .should('contain.text', 'Showing 2 of 6 measured points')
-      .and('contain.text', '1/3 validated')
-      .and('contain.text', '1/3 historical')
-      .and('contain.text', 'Best per SKU and Optimal Only are enabled');
-
-    cy.get('.dot-group[data-hw-key^="b200"] .legacy-power-ring').should('exist');
-    cy.get('.dot-group[data-hw-key^="mi300x"] .legacy-power-ring').should('not.exist');
-    cy.get('[data-testid="legacy-power-key"]').should('be.visible');
-    cy.screenshot('legacy-power-rings', { capture: 'viewport' });
+    cy.get('.dot-group[data-hw-key^="b200"]').should('exist');
+    cy.get('.dot-group[data-hw-key^="mi300x"]').should('exist');
 
     cy.get('[data-testid="scatter-quick-filters"]').click();
     cy.get('[data-testid="quick-filters-dialog"]').should('be.visible');
@@ -152,8 +141,6 @@ describe('Validated vs historical measured power', () => {
     cy.get('[data-testid="quick-filters-selected-count"]').should('contain.text', '1 selected');
     cy.get('.dot-group[data-hw-key^="b200"]').should('not.exist');
     cy.get('.dot-group[data-hw-key^="mi300x"]').should('exist');
-    cy.get('.legacy-power-ring').should('not.exist');
-    cy.get('[data-testid="legacy-power-key"]').should('not.exist');
     cy.get('[data-testid="inference-chart-display"] svg').should('exist');
     cy.screenshot('certified-only-filter', { capture: 'viewport' });
 
@@ -165,8 +152,7 @@ describe('Validated vs historical measured power', () => {
       'false',
     );
     cy.get('[data-testid="quick-filters-dialog"]').contains('button', 'Done').click();
-    cy.get('.dot-group[data-hw-key^="b200"] .legacy-power-ring').should('exist');
-    cy.get('[data-testid="legacy-power-key"]').should('be.visible');
+    cy.get('.dot-group[data-hw-key^="b200"]').should('exist');
   });
 
   it('restores a shared i_power=certified link with the toggle pre-selected', () => {
@@ -177,7 +163,6 @@ describe('Validated vs historical measured power', () => {
 
     cy.get('.dot-group[data-hw-key^="mi300x"]').should('exist');
     cy.get('.dot-group[data-hw-key^="b200"]').should('not.exist');
-    cy.get('[data-testid="legacy-power-key"]').should('not.exist');
 
     cy.get('[data-testid="scatter-quick-filters"]').click();
     cy.get('[data-testid="quick-filter-power-certified"]').should(
@@ -202,10 +187,6 @@ describe('Validated vs historical measured power', () => {
     cy.get('#scatter-hide-non-optimal').should('have.attr', 'data-state', 'checked');
     cy.get('#scatter-show-all-measurements').should('not.exist');
     visiblePowerPoints().should('have.length', 4);
-    cy.get('[data-testid="measured-power-summary"]').should(
-      'contain.text',
-      'Showing 4 of 6 measured points',
-    );
 
     // Let the initial ResizeObserver update reach the SVG before saving geometry.
     cy.get<SVGSVGElement>('[data-testid="d3-chart-svg"]').should(($svg) => {
@@ -239,7 +220,6 @@ describe('Validated vs historical measured power', () => {
 
         cy.get('#scatter-hide-non-optimal').click();
         visiblePowerPoints().should('have.length', 4);
-        visiblePowerPoints().find('.legacy-power-ring').should('have.length', 2);
         cy.get<SVGPathElement>('.roofline-path').should(($current) => {
           expect(Array.from($current, (curve) => curve.getAttribute('d'))).to.deep.equal(geometry);
         });

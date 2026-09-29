@@ -654,8 +654,7 @@ export interface MetricControlGroup {
 /**
  * The runner-telemetry y-axes in the "Measured Energy" control group.
  * Exported (and referenced by the group below, so the two cannot drift) for
- * consumers that treat measured axes specially — the legacy-power point ring,
- * tooltip tier line, and footer legend key.
+ * consumers that treat measured axes specially, such as the tooltip tier line.
  */
 export const MEASURED_ENERGY_METRIC_CONFIG_KEYS = [
   'y_measuredPrefillAvgPower',
@@ -698,7 +697,7 @@ export function isRoleLocalMeasuredEnergyConfigKey(configKey: string): boolean {
  * utility modeled) that share the gated Measured Energy group and its
  * Boundary select. They are kept out of `MEASURED_ENERGY_METRIC_CONFIG_KEYS`
  * on purpose: spec constants and model output carry no telemetry tier, so the
- * legacy-power ring, tier tooltip line, and footer key do not apply to them.
+ * tier tooltip line does not apply to them.
  */
 export const POWER_BASIS_METRIC_CONFIG_KEYS = [
   'y_gpuProvisionedWatts',

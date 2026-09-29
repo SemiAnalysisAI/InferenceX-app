@@ -139,7 +139,7 @@ export function parseAmdTimestamp(raw: string): number | null {
   return Number.isFinite(iso) ? iso : null;
 }
 
-function emptySample(timestampMs: number, gpuIndex: number): GpuMetricSample {
+export function emptySample(timestampMs: number, gpuIndex: number): GpuMetricSample {
   return {
     timestampMs,
     gpuIndex,

@@ -49,11 +49,7 @@ export interface PowerPublicationManifest {
   points: PowerPublicationPoint[];
   /** Fatal: verify-power-publication exits non-zero when this is non-empty. */
   ingestErrors?: string[];
-  /**
-   * Non-fatal: PowerX telemetry digest failures. Surfaced in the verification
-   * receipt so they stay visible, but they never fail the ingest — the benchmark
-   * rows landed, and the artifact can be re-digested by the backfill.
-   */
+  /** Non-fatal PowerX telemetry digest failures; see `fatalPublicationErrors`. */
   telemetryWarnings?: string[];
   /** Attachment completeness, separate from benchmark/power publication validity. */
   telemetry?: TelemetryReceipt;
@@ -74,6 +70,7 @@ export interface PowerPublicationManifest {
     error?: string;
   };
 }
+
 /**
  * The errors that fail an ingest. `telemetryWarnings` is deliberately not among
  * them: a gpu_metrics digest failure costs one point's PowerX tab, while the

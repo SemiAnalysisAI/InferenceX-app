@@ -615,6 +615,8 @@ async function main(): Promise<void> {
       const parentDir = path.basename(path.dirname(file));
       const configKey = parentDir.replace(/^bmk_/u, '');
       const suffix = stripBmkAndAgenticPrefix(parentDir);
+      // Same pairing rule as server logs: `gpu_metrics_<key>` carries no
+      // `agentic_` prefix, so agentic points fall back to the bare suffix.
       const gpuMetricsArtifact =
         gpuMetricsArtifacts.get(configKey) ?? gpuMetricsArtifacts.get(suffix);
       let auditEvidence;
@@ -763,8 +765,6 @@ async function main(): Promise<void> {
                 tracker.recordDbError(`server_logs for ${configKey}`, error);
               }
             }
-            // Same pairing rule as server logs: `gpu_metrics_<key>` carries no
-            // `agentic_` prefix, so agentic points fall back to the bare suffix.
             if (gpuMetricsArtifact) {
               try {
                 const gpuMetricsStart = Date.now();
@@ -785,11 +785,9 @@ async function main(): Promise<void> {
                     `${ingested.seriesSkipped} unchanged (${elapsed(gpuMetricsStart)})`,
                 );
               } catch (error: any) {
-                // Non-fatal on purpose: this point's benchmark rows are already
-                // committed and only its telemetry tab is affected, and
-                // `admin:db:backfill-gpu-metrics --run <id>` can re-digest the
-                // artifact later. Recording it as a DB error instead would reach
-                // the publication manifest and fail the whole production ingest.
+                // Non-fatal on purpose (see `fatalPublicationErrors`): the rows are
+                // committed and `admin:db:backfill-gpu-metrics --run <id>` can
+                // re-digest the artifact. A DB error here would fail the ingest.
                 tracker.recordTelemetryError(`gpu_metrics for ${configKey}`, error);
                 for (const row of toInsert) {
                   const point = telemetryObservations.get(

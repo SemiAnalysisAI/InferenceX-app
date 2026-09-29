@@ -1,5 +1,4 @@
 import type { TraceServerMetrics } from '@/hooks/api/use-trace-server-metrics';
-import type { Locale } from '@/lib/i18n';
 
 /** One server-metric series that can be drawn over the chip telemetry chart. */
 export interface OverlaySource {
@@ -76,8 +75,4 @@ export function availableOverlaySources(
 ): OverlaySource[] {
   if (!metrics) return [];
   return OVERLAY_SOURCES.filter((source) => source.points(metrics).length > 0);
-}
-
-export function overlaySourceLabel(source: OverlaySource, locale: Locale): string {
-  return source.label[locale];
 }

@@ -1,3 +1,5 @@
+import { isPositive } from '@/lib/power-basis';
+
 /**
  * Reconstructs how a disaggregated deployment's request energy splits between
  * its prefill and decode pools (PowerX Figure 7).
@@ -36,9 +38,6 @@ export interface ReconstructedRoleEnergy {
   prefillShare: number;
 }
 
-const positive = (value: unknown): value is number =>
-  typeof value === 'number' && Number.isFinite(value) && value > 0;
-
 export function reconstructedRoleEnergy(
   entry: RoleEnergyInput,
 ): ReconstructedRoleEnergy | undefined {
@@ -49,12 +48,12 @@ export function reconstructedRoleEnergy(
   const output = entry.joules_per_output_token;
   const prefill = entry.prefill_joules_per_input_token;
   const decode = entry.decode_joules_per_output_token;
-  if (!positive(input) || !positive(output) || !positive(prefill) || !positive(decode)) {
+  if (!isPositive(input) || !isPositive(output) || !isPositive(prefill) || !isPositive(decode)) {
     return undefined;
   }
   const prefillPerOutputToken = prefill * (output / input);
   const total = prefillPerOutputToken + decode;
-  if (!positive(prefillPerOutputToken) || !positive(total)) return undefined;
+  if (!isPositive(prefillPerOutputToken) || !isPositive(total)) return undefined;
   return {
     prefill: prefillPerOutputToken,
     decode,

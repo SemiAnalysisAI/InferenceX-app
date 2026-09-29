@@ -962,6 +962,7 @@ export const generateGPUGraphTooltipContent = (config: TooltipConfig): string =>
         hasLogData: Boolean(hasLog),
         point: d,
         showPowerTelemetry: config.showPowerTelemetry,
+        powerTraceMetric: selectedYAxisMetric,
         locale,
       })}
     </div>
