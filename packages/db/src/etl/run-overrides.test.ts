@@ -188,6 +188,24 @@ describe('audited run backfills', () => {
     }
   });
 
+  it.each([35902709621, 35905882425, 35920473582])(
+    'restores append-only on the e2e-dispatched PowerX Qwen3.5 FP8 recovery run %i',
+    (githubRunId) => {
+      // e2e dispatch writes a synthetic changelog with placeholder refs and no marker.
+      const changelog = {
+        baseRef: 'unknown',
+        headRef: 'main',
+        entries: [{ configKeys: [], description: '', prLink: null, appendOnly: false }],
+      };
+      const applied = applyChangelogBackfills(githubRunId, 1, [changelog]);
+      expect(applied.backfillIds).toEqual([`run-${githubRunId}-restore-append-only`]);
+      expect(applied.changelogs[0].entries[0].appendOnly).toBe(true);
+      expect(applyChangelogBackfills(githubRunId, 2, [changelog]).backfillIds).toEqual([]);
+      // Every e2e run shares these refs; the complete H200 repeat-3 snapshot must stay untouched.
+      expect(applyChangelogBackfills(35931157736, 1, [changelog]).backfillIds).toEqual([]);
+    },
+  );
+
   it.each([
     [128, 4, 'd84f06bb4a4016f9f2fe917feb4f10b960f87ac5f48bfae1b0bca1d66d7c887b'],
     [256, 4, '1472857d464c0780b5eeb41184ff70290c5f6b9ad6a8c07b2524697e21dd0e07'],
