@@ -1,6 +1,7 @@
 import { isDeepStrictEqual } from 'node:util';
 import { MEASURED_POWER_METRIC_KEYS } from '@semianalysisai/inferencex-constants';
 import type { BenchmarkParams } from './benchmark-mapper';
+import type { TelemetryReceipt } from './telemetry-receipt';
 
 const CONFIG_FIELDS = {
   hardware: 'hardware',
@@ -46,26 +47,67 @@ export interface PowerPublicationManifest {
   runId: number;
   runAttempt: number;
   points: PowerPublicationPoint[];
+  /** Fatal: verify-power-publication exits non-zero when this is non-empty. */
   ingestErrors?: string[];
+  /**
+   * Non-fatal: PowerX telemetry digest failures. Surfaced in the verification
+   * receipt so they stay visible, but they never fail the ingest — the benchmark
+   * rows landed, and the artifact can be re-digested by the backfill.
+   */
+  telemetryWarnings?: string[];
+  /** Attachment completeness, separate from benchmark/power publication validity. */
+  telemetry?: TelemetryReceipt;
+  /** Durable refresh responsibility when telemetry recovery fills benchmark metadata. */
+  benchmarkRefresh?: {
+    status: 'pending' | 'complete' | 'failed';
+    benchmarkResultIds: number[];
+    /** Expected enrichment comes from retained validation, never a DB snapshot. */
+    auditUpdates?: {
+      benchmarkResultId: number;
+      identity: Record<string, unknown>;
+      /** Original mapped identity when the existing historical offload resolver used a fallback. */
+      sourceIdentity?: Record<string, unknown>;
+      powerAudit: { source: string; window_start_unix: number; window_end_unix: number };
+    }[];
+    endpoint?: string;
+    checkedAt?: string;
+    error?: string;
+  };
 }
+/**
+ * The errors that fail an ingest. `telemetryWarnings` is deliberately not among
+ * them: a gpu_metrics digest failure costs one point's PowerX tab, while the
+ * benchmark rows it accompanies are already committed and the artifact can be
+ * re-digested by `admin:db:backfill-gpu-metrics`. Folding it in would let one
+ * malformed CSV turn a whole production ingest red.
+ */
+export function fatalPublicationErrors(
+  manifest: Pick<PowerPublicationManifest, 'ingestErrors' | 'telemetryWarnings'>,
+  verificationErrors: readonly string[],
+): string[] {
+  return [...(manifest.ingestErrors ?? []), ...verificationErrors];
+}
+
 export interface PublishedPowerRow extends Record<string, unknown> {
   metrics: Record<string, number>;
+}
+
+export function stablePowerPointIdentity(row: Record<string, unknown>): string {
+  return JSON.stringify(
+    IDENTITY_FIELDS.filter((key) => key !== 'image' && key !== 'run_url').map(
+      (key) => row[key] ?? null,
+    ),
+  );
 }
 
 export function publicationIdentity(row: Record<string, unknown>): string {
   return JSON.stringify(IDENTITY_FIELDS.map((key) => row[key] ?? null));
 }
 
-export function powerPublicationPoint(
+export function benchmarkPublicationIdentity(
   row: BenchmarkParams,
-  runUrl: string,
-  artifact: PowerPublicationPoint['artifact'],
-): PowerPublicationPoint | null {
-  if (
-    row.benchmarkType !== 'agentic_traces' &&
-    (row.benchmarkType !== 'single_turn' || row.isl !== 8192 || row.osl !== 1024)
-  )
-    return null;
+  runUrl = '',
+): Record<string, unknown> {
   const identity: Record<string, unknown> = Object.fromEntries(
     Object.entries(CONFIG_FIELDS).map(([source, target]) => [
       target,
@@ -82,6 +124,22 @@ export function powerPublicationPoint(
     image: row.image,
     run_url: runUrl,
   });
+  return identity;
+}
+
+export function powerPublicationPoint(
+  row: BenchmarkParams,
+  runUrl: string,
+  artifact: PowerPublicationPoint['artifact'],
+): PowerPublicationPoint | null {
+  if (
+    row.benchmarkType !== 'agentic_traces' &&
+    (row.benchmarkType !== 'single_turn' ||
+      (row.isl !== 1024 && row.isl !== 8192) ||
+      row.osl !== 1024)
+  )
+    return null;
+  const identity = benchmarkPublicationIdentity(row, runUrl);
   return {
     identity,
     metrics: Object.fromEntries(
