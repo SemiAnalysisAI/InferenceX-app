@@ -95,15 +95,20 @@ facility kW/GPU used to calculate capacity per GW. Consequently, revenue,
 compute expense, license fee, and profit scale together; profit margin does not
 change. Electricity expense is not recomputed separately.
 
-This opt-in AgentX estimate requires validated schema-v2 telemetry and a
-single-node chassis supported by the pinned model. Validated 1/2/4-GPU allocations
-use the existing full-chassis extrapolation: fill an eight-GPU server with whole
-replicas at the measured per-GPU power and throughput, then divide modeled facility
-power by eight. This assumes replica co-location does not change performance or
-power; it is not a measurement of a partly idle server. The chart, tooltip, and CSV
-label every extrapolated estimate, including interpolation with one partial knot.
-Unsupported GB200/GB300 chassis, multi-node layouts, allocations that cannot tile
-eight GPUs, and missing/invalid measurements stay unavailable with distinct reasons.
+This opt-in AgentX estimate requires validated schema-v2 telemetry and chassis
+supported by the pinned model. Fully measured eight-GPU chassis are supported
+on a single node, per measured worker host, or across an aggregate multinode
+deployment without per-worker telemetry at the deployment-mean GPU power
+(`topologyBasis: 'uniform-hosts'`; symmetric TP/PP/DP shards load each host alike).
+Validated single-node 1/2/4-GPU allocations use full-chassis extrapolation: fill
+an eight-GPU server with whole replicas at the measured per-GPU power and
+throughput, then divide modeled facility power by eight. This assumes replica
+co-location does not change performance or power; it is not a measurement of a
+partly idle server. The chart, tooltip, and CSV label every extrapolated estimate,
+including interpolation with one partial knot. Unsupported GB200/GB300 chassis,
+partial multi-host allocations, disaggregated deployments without per-worker
+telemetry, allocations that cannot tile eight GPUs, and missing/invalid
+measurements stay unavailable with distinct reasons.
 The ordinary 8K/1K transformation keeps its existing admission policy.
 
 At an exact frontier point, use that point's modeled power. Between points,
