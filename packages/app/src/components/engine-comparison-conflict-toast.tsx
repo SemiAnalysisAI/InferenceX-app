@@ -41,6 +41,15 @@ export function describeEngineComparisonConflict(
   detail: EngineComparisonConflictDetail,
   locale: Locale,
 ): string {
+  if (
+    detail.kind === 'blocked' &&
+    ((detail.attempted === 'vllm' && detail.existing === 'sglang') ||
+      (detail.attempted === 'sglang' && detail.existing === 'vllm'))
+  ) {
+    return locale === 'zh'
+      ? 'vLLM 和 SGLang 采用不同的推理方式，因此无法直接比较。另外，我们也不想引发 vLLM 和 SGLang 之间的争论，笑死。'
+      : 'vLLM & SGLang take different approaches to inference and so they aren’t directly comparable. Also, we don’t want to start vLLM vs SGLang drama LMFAO';
+  }
   if (locale === 'zh') return describeZh(detail);
   if (detail.kind === 'blocked') {
     const attempted = familyLabel(detail.attempted);
@@ -92,8 +101,8 @@ function describeZh(detail: EngineComparisonConflictDetail): string {
 }
 
 const TITLES = {
-  en: "Configs from different engines can't share a graph",
-  zh: '不同引擎的配置无法共享同一图表',
+  en: 'vLLM & SGLang on same SKU can’t share a graph',
+  zh: '同一 SKU 上的 vLLM 和 SGLang 无法在同一图表中显示',
 } as const;
 
 interface Props {
