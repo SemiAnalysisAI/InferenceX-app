@@ -38,10 +38,10 @@ describe('Blog', () => {
   });
 
   describe('Blog listing page', () => {
-    before(() => {
+    beforeEach(() => {
       // Stub remote Substack thumbnails with a real 1×1 PNG. A 204 empty body
       // can prevent Firefox from firing `window.load` while eager card images
-      // stay pending, which times out `cy.visit` in before-all.
+      // stay pending. Per-test setup also lets Cypress retry a failed visit.
       cy.intercept(
         {
           method: 'GET',
