@@ -469,8 +469,10 @@ describe('Inference ChartControls grouped measured metrics', () => {
       cy.get(`input[aria-label="${searchLabel}"]`).type(group);
       cy.get('[data-select-option][data-value^="y_measured"]').should(($options) => {
         const values = [...$options].map((option) => option.dataset.value);
-        expect(values).to.have.length(13);
-        expect(new Set(values).size).to.equal(13);
+        // Thirteen measured axes plus the Timeline display of measured power.
+        expect(values).to.have.length(14);
+        expect(new Set(values).size).to.equal(14);
+        expect(values).to.include('y_measuredPowerTimeline');
       });
       cy.get(`input[aria-label="${searchLabel}"]`).clear().type(power);
       cy.get('[data-select-option]')
