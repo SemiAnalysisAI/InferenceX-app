@@ -23,17 +23,17 @@ group stays out of the selector otherwise. The boundary metrics are members of t
 
 ## Boundaries
 
-| Basis (`PowerBasis`)  | Selector label               | W / GPU metric                               | J / output token metric                           | Source                                                                  |
-| --------------------- | ---------------------------- | -------------------------------------------- | ------------------------------------------------- | ----------------------------------------------------------------------- |
-| `gpu-measured`        | GPU measured                 | `y_measuredAvgPower` (+P75/P90, roles, %TDP) | `y_measuredJPerOutputToken` (+ input/total/query) | runner telemetry; existing metrics, unchanged                           |
-| `gpu-provisioned`     | GPU provisioned (TDP)        | `y_gpuProvisionedWatts`                      | `y_gpuProvisionedJPerOutputToken`                 | `HW_REGISTRY.tdp`                                                       |
-| `utility-provisioned` | Utility provisioned (all-in) | `y_utilityProvisionedWatts`                  | `y_utilityProvisionedJPerOutputToken`             | `HW_REGISTRY.power` (all-in kW per GPU)                                 |
-| `utility-modeled`     | Utility modeled (PUE)        | `y_utilityModeledWatts`                      | `y_utilityModeledJPerOutputToken`                 | `modelSystemPower` chassis AC × PUE 1.3 (applied once), ÷ measured GPUs |
+| Basis (`PowerBasis`)  | Selector label              | W / GPU metric                               | J / output token metric                           | Source                                                                                    |
+| --------------------- | --------------------------- | -------------------------------------------- | ------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `gpu-measured`        | GPU Level Measured          | `y_measuredAvgPower` (+P75/P90, roles, %TDP) | `y_measuredJPerOutputToken` (+ input/total/query) | runner telemetry; existing metrics, unchanged                                             |
+| `gpu-provisioned`     | GPU Level Provisioned (TDP) | `y_gpuProvisionedWatts`                      | `y_gpuProvisionedJPerOutputToken`                 | `HW_REGISTRY.tdp`                                                                         |
+| `utility-provisioned` | All in Provisioned          | `y_utilityProvisionedWatts`                  | `y_utilityProvisionedJPerOutputToken`             | `HW_REGISTRY.power` (all-in kW per GPU)                                                   |
+| `utility-modeled`     | All in Measured             | `y_utilityModeledWatts`                      | `y_utilityModeledJPerOutputToken`                 | `modelSystemPower` deployment AC ÷ measured GPUs × PUE (1.3 air, 1.1 NVL72; applied once) |
 
 Formulas, the all-GPU normalization (`N_alloc` = prefill + decode GPUs for disaggregated
 rows) and the null rules are specified in
-[Data Transforms → Power boundaries](./data-transforms.md#power-boundaries); the chassis model
-itself in [PowerX System Power](./powerx-system-power.md). The ungated `jOutput` keeps its
+[Data Transforms → Power boundaries](./data-transforms.md#power-boundaries); the chassis and NVL72 rack models
+in [PowerX System Power](./powerx-system-power.md). The ungated `jOutput` keeps its
 per-decode-GPU normalization; its labels and the boundary metric's `all GPUs` label keep the
 two distinguishable in the selector, the availability list and CSV headers.
 

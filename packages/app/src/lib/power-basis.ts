@@ -40,8 +40,8 @@ export const ALL_IN_MEASURED_NOTE = {
 };
 
 export const ALL_IN_MEASURED_EMPTY = {
-  en: 'No values are available for All in Measured in this selection. This boundary needs 8K / 1K, validated GPU telemetry, and hardware covered by the chassis power model (not NVL72 systems). Choose another boundary to keep the points.',
-  zh: '当前选择没有可用的整体实测功耗数值。该边界需要 8K / 1K 场景、已验证的 GPU 遥测，且硬件在机箱功耗模型覆盖范围内（不含 NVL72 系统）。可切换到其他功耗边界以保留数据点。',
+  en: 'No values are available for All in Measured in this selection. This boundary needs 8K / 1K, validated GPU telemetry, and a supported chassis or rack power model. NVL72 also needs complete Grace or module telemetry from the same measurement window. Choose another boundary to keep the points.',
+  zh: '当前选择没有可用的整体实测功耗数值。该边界需要 8K / 1K 场景、已验证的 GPU 遥测，以及受支持的机箱或机架功耗模型。NVL72 还需要同一测量窗口内完整的 Grace 或 module 遥测。可切换到其他功耗边界以保留数据点。',
 };
 
 /** InferenceData keys per derived basis and quantity. B1 lives on the measured* fields. */
