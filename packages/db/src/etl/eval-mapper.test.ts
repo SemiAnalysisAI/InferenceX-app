@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { configCacheKey } from './config-cache';
+import { mapBenchmarkRow } from './benchmark-mapper';
 import { mapEvalRow, mapAggEvalRow } from './eval-mapper';
 import { createSkipTracker } from './skip-tracker';
 
@@ -596,5 +597,108 @@ describe('mapAggEvalRow', () => {
     const result = mapAggEvalRow(row, tracker);
 
     expect(result!.conc).toBeNull();
+  });
+});
+
+describe('evaluation and benchmark allocation identity', () => {
+  const base = {
+    infmax_model_prefix: 'qwen3.5',
+    hw: 'b300-dsxe',
+    framework: 'dynamo-sglang',
+    precision: 'fp8',
+    spec_decoding: 'mtp',
+    disagg: true,
+    is_multinode: true,
+    prefill_tp: 2,
+    prefill_ep: 2,
+    prefill_dp_attention: false,
+    prefill_num_workers: 1,
+    decode_tp: 2,
+    decode_ep: 2,
+    decode_dp_attention: false,
+    decode_num_workers: 1,
+    conc: 32,
+  };
+
+  it.each([
+    {
+      name: 'EP4 shares the TP4 prefill GPUs',
+      fields: { prefill_tp: 4, prefill_ep: 4, decode_tp: 4, decode_ep: 1 },
+      gpu: [4, 4],
+    },
+    { name: 'TP2 EP2 uses two GPUs per role', fields: {}, gpu: [2, 2] },
+    {
+      name: 'DP attention uses the same TP ranks',
+      fields: { prefill_dp_attention: 'true', decode_dp_attention: 'true' },
+      gpu: [2, 2],
+    },
+    {
+      name: 'two decode workers each use two GPUs',
+      fields: { decode_num_workers: 2 },
+      gpu: [2, 4],
+    },
+    {
+      name: 'PP and PCP multiply allocation but DCP does not',
+      fields: {
+        prefill_pp: 2,
+        prefill_pcp_size: 3,
+        prefill_dcp_size: 2,
+        decode_pp: 3,
+        decode_pcp_size: 2,
+        decode_dcp_size: 2,
+        decode_num_workers: 2,
+      },
+      gpu: [12, 24],
+    },
+    {
+      name: 'explicit role counts override inferred topology and deployment total',
+      fields: { num_prefill_gpu: 7, num_decode_gpu: 9, num_gpus: 32 },
+      gpu: [7, 9],
+    },
+    {
+      name: 'an explicit zero role count remains zero',
+      fields: { num_prefill_gpu: 0, num_decode_gpu: 2 },
+      gpu: [0, 2],
+    },
+  ])('$name', ({ fields, gpu }) => {
+    const source = { ...base, ...fields };
+    const tracker = createSkipTracker();
+    const benchmark = mapBenchmarkRow(
+      {
+        ...source,
+        isl: 1024,
+        osl: 8192,
+        num_prefill_gpu: gpu[0],
+        num_decode_gpu: gpu[1],
+        tput_per_gpu: 1000,
+      },
+      tracker,
+    )!;
+    const aggregate = mapAggEvalRow({ ...source, task: 'gsm8k', em_strict: 0.97 }, tracker)!;
+    const individual = mapEvalRow(source, makeResults(), tracker)[0];
+
+    expect(aggregate.config).toMatchObject({ numPrefillGpu: gpu[0], numDecodeGpu: gpu[1] });
+    expect(configCacheKey(aggregate.config)).toBe(configCacheKey(benchmark.config));
+    expect(configCacheKey(individual.config)).toBe(configCacheKey(benchmark.config));
+    expect(aggregate.config.prefillDpAttn).toBe(
+      source.prefill_dp_attention === 'true' || source.prefill_dp_attention === true,
+    );
+  });
+
+  it.each([
+    { fields: {}, expectedGpu: 4 },
+    { fields: { num_gpus: 2 }, expectedGpu: 2 },
+  ])('preserves legacy flat benchmark pairing with $fields', ({ fields, expectedGpu }) => {
+    const meta = makeMeta({ tp: 2, ep: 2, ...fields });
+    const tracker = createSkipTracker();
+    const benchmark = mapBenchmarkRow({ ...meta, tput_per_gpu: 1000 }, tracker)!;
+    const individual = mapEvalRow(meta, makeResults(), tracker)[0];
+    const aggregate = mapAggEvalRow({ ...meta, task: 'gsm8k', em_strict: 0.97 }, tracker)!;
+    expect(individual.config).toMatchObject({
+      numPrefillGpu: expectedGpu,
+      numDecodeGpu: expectedGpu,
+    });
+    expect(configCacheKey(individual.config)).toBe(configCacheKey(benchmark.config));
+    expect(configCacheKey(aggregate.config)).toBe(configCacheKey(benchmark.config));
   });
 });
