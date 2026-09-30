@@ -144,11 +144,10 @@ function visitChart(extraParams: string, officialRunUrl: string) {
   cy.get('[data-testid="chart-figure"]').should('have.length.at.least', 1);
 }
 
-// The article panels under a measured chart: load-matched rows, the role group,
-// the power-vs-output fit and the frontier's provenance, each for official rows
-// and a `?unofficialrun=` overlay together.
 describe('PowerX article panels', () => {
-  const PANELS = '&i_servicecompare=1&i_roleshare=1&i_powerfit=1&i_frontier=1';
+  const PANELS = '&i_roleshare=1&i_powerfit=1&i_frontier=1';
+  const RETIRED_COMPARE =
+    '&i_servicecompare=1&i_servicebase=old-baseline&i_servicepeer=old-comparator&i_servicetarget=40';
   const OFFICIAL_RUN_URL = 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/27182818284';
   const OVERLAY_COLOR = 'var(--overlay-run-0)';
 
@@ -160,22 +159,16 @@ describe('PowerX article panels', () => {
     });
   });
 
-  it('reproduces matched-load, role, fit and frontier panels for official and overlay rows', () => {
+  it('keeps role, fit and frontier panels while ignoring retired comparison share state', () => {
     interceptCheaperOverlayRows();
     visitChart(
-      `&unofficialrun=${OVERLAY_RUN_ID}&i_metric=y_measuredJPerOutputToken${PANELS}`,
+      `&unofficialrun=${OVERLAY_RUN_ID}&i_metric=y_measuredJPerOutputToken${PANELS}${RETIRED_COMPARE}`,
       OFFICIAL_RUN_URL,
     );
     cy.wait('@unofficialRun');
-    cy.get('[data-testid="equal-service-baseline"] option').should('have.length', 2);
-
-    // Official B200 against the overlay H200 at each observed concurrency.
-    for (const [conc] of CONFIGS) {
-      cy.get(`[data-testid="matched-concurrency-row-${conc}"]`).should(($row) => {
-        const text = $row.text().replaceAll('−', '-');
-        expect(text).to.include('-10.0%').and.include('W/GPU +0.0%');
-      });
-    }
+    cy.get('[data-testid="power-analysis-panels"]').should('be.visible');
+    cy.get('[data-testid^="equal-service-"]').should('not.exist');
+    cy.get('[data-testid^="matched-concurrency"]').should('not.exist');
 
     // Role power: prefill and decode W/GPU for both sources; the overlay in its run colour.
     cy.get('[data-testid="chart-0-role-power-plot"] circle.point').should(
@@ -213,7 +206,10 @@ describe('PowerX article panels', () => {
         expect($row.find('a').attr('href')).to.eq(OVERLAY_RUN_URL);
       });
     assertShareLinkParams({
-      i_servicecompare: '1',
+      i_servicecompare: null,
+      i_servicebase: null,
+      i_servicepeer: null,
+      i_servicetarget: null,
       i_roleshare: '1',
       i_powerfit: '1',
       i_frontier: '1',

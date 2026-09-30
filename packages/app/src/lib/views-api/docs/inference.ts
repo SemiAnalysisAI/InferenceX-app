@@ -221,8 +221,8 @@ const parameters: readonly ApiParameter[] = [
     required: false,
     type: 'boolean',
     description: text(
-      'Include source options, equal-service percentage curves, an optional target comparison and the same-concurrency diagnostic table (matchedConcurrency), using the same helpers as the dashboard. Uses scoped observed points before frontier/best pruning. JSON only.',
-      '返回来源选项、同等服务条件下的百分比对比曲线、可选目标值对比，以及相同并发下的诊断表（matchedConcurrency）；复用仪表板计算逻辑，使用筛选后、前沿和 best 筛选前的实测点。仅支持 JSON。',
+      'API-only analysis: include source options, equal-service percentage curves, an optional target comparison and the same-concurrency diagnostic table (matchedConcurrency). Uses scoped observed points before frontier/best pruning. No corresponding dashboard control or panel. JSON only.',
+      '仅通过 API 提供的分析：返回来源选项、同等服务条件下的百分比对比曲线、可选目标值对比，以及相同并发下的诊断表（matchedConcurrency）。使用筛选后、前沿和 best 筛选前的实测点。仪表板不提供对应控件或面板。仅支持 JSON。',
     ),
     schema: { type: 'boolean', default: false },
     example: 'true',
@@ -293,8 +293,8 @@ const parameters: readonly ApiParameter[] = [
     required: false,
     type: 'enum',
     description: text(
-      'Response encoding. csv returns one flat row per plotted point; serviceCompare, roleShare and powerFit panels require JSON and return 400 with CSV.',
-      '响应编码。csv 为每个图表点返回一行平面数据；serviceCompare、roleShare 和 powerFit 面板仅支持 JSON，与 CSV 同用时返回 400。',
+      'Response encoding. csv returns one flat row per plotted point; serviceCompare, roleShare and powerFit analytical results require JSON and return 400 with CSV.',
+      '响应编码。csv 为每个图表点返回一行平面数据；serviceCompare、roleShare 和 powerFit 分析结果仅支持 JSON，与 CSV 同用时返回 400。',
     ),
     schema: { type: 'string', enum: ['json', 'csv'], default: 'json' },
     example: 'csv',

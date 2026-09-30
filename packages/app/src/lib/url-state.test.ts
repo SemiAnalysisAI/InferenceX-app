@@ -99,6 +99,22 @@ describe('PARAM_DEFAULTS', () => {
     expect(PARAM_DEFAULTS.i_advlabel).toBe('');
   });
 
+  it('drops retired comparison controls from old share links while preserving analysis toggles', async () => {
+    setupWindow(
+      '?i_servicecompare=1&i_servicebase=baseline&i_servicepeer=comparator&i_servicetarget=8&i_roleshare=1&i_powerfit=1',
+    );
+    const { readUrlParams, buildShareUrl } = await import('@/lib/url-state');
+    const params = readUrlParams();
+    const shared = new URL(buildShareUrl()).searchParams;
+    expect(params).toMatchObject({ i_roleshare: '1', i_powerfit: '1' });
+    expect(shared.get('i_roleshare')).toBe('1');
+    expect(shared.get('i_powerfit')).toBe('1');
+    for (const key of ['i_servicecompare', 'i_servicebase', 'i_servicepeer', 'i_servicetarget']) {
+      expect(params).not.toHaveProperty(key);
+      expect(shared.has(key)).toBe(false);
+    }
+  });
+
   it('strips the normalized revenue source but preserves OpenRouter as explicit state', async () => {
     const { PARAM_DEFAULTS } = await import('@/lib/url-state');
     expect(PARAM_DEFAULTS.i_revenue).toBe('normalized');
