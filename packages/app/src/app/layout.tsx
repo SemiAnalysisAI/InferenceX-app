@@ -11,6 +11,7 @@ import { Footer } from '@/components/footer/footer';
 import { Header } from '@/components/header/header';
 import { RouteTransition } from '@/components/motion/route-transition';
 import { JsonLd } from '@/components/json-ld';
+import { Jumpscare } from '@/components/jumpscare/jumpscare';
 import { CircuitBackground } from '@/components/circuit-background';
 import { MinecraftBackgroundLazy } from '@/components/minecraft/minecraft-background-lazy';
 import { MinecraftDecorations } from '@/components/minecraft/minecraft-decorations';
@@ -230,6 +231,7 @@ export default async function RootLayout({
                 <RouteTransition>{children}</RouteTransition>
               </div>
               <Footer starCount={starCount} />
+              <Jumpscare />
             </ThemeProvider>
           </QueryProvider>
           {process.env.VERCEL && <Analytics />}

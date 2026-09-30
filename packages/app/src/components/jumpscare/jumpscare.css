@@ -1,0 +1,287 @@
+/* Jumpscare overlay — Halloween easter egg. Mounted only while firing (≈1.9 s),
+ * so none of this costs anything on a normal page. Deliberately breaks the
+ * "transform/opacity only" motion rule: it is supposed to feel wrong.
+ * Reduced-motion users never reach this code path (gated in jumpscare.ts). */
+
+.jumpscare-root {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483000;
+  overflow: hidden;
+  background: #000;
+  pointer-events: none;
+  animation: jumpscare-root 1.9s linear forwards;
+  contain: strict;
+}
+
+@keyframes jumpscare-root {
+  0%,
+  82% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.jumpscare-static {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0.32;
+  image-rendering: pixelated;
+  mix-blend-mode: screen;
+}
+
+.jumpscare-flash {
+  position: absolute;
+  inset: 0;
+  background: #fff;
+  animation: jumpscare-flash 1.9s steps(1, end) forwards;
+}
+
+@keyframes jumpscare-flash {
+  0% {
+    opacity: 1;
+    background: #fff;
+  }
+  4% {
+    opacity: 0;
+  }
+  9% {
+    opacity: 0.9;
+    background: #ff0a0a;
+  }
+  13% {
+    opacity: 0;
+  }
+  21% {
+    opacity: 0.7;
+    background: #fff;
+  }
+  24% {
+    opacity: 0;
+  }
+  46% {
+    opacity: 0.55;
+    background: #ff0a0a;
+  }
+  49% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.jumpscare-vignette {
+  position: absolute;
+  inset: -10%;
+  background: radial-gradient(ellipse at center, transparent 35%, rgba(0, 0, 0, 0.92) 78%);
+}
+
+.jumpscare-stage {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  animation: jumpscare-shake 0.09s steps(2, jump-none) infinite;
+}
+
+@keyframes jumpscare-shake {
+  0% {
+    transform: translate(-14px, 9px) rotate(-1.2deg);
+  }
+  25% {
+    transform: translate(11px, -13px) rotate(0.8deg);
+  }
+  50% {
+    transform: translate(-9px, -6px) rotate(1.4deg);
+  }
+  75% {
+    transform: translate(13px, 10px) rotate(-0.7deg);
+  }
+  100% {
+    transform: translate(-14px, 9px) rotate(-1.2deg);
+  }
+}
+
+.jumpscare-face-wrap {
+  position: relative;
+  width: min(78vmin, 640px);
+  aspect-ratio: 5 / 6;
+  animation: jumpscare-lunge 1.9s cubic-bezier(0.1, 1.4, 0.3, 1) forwards;
+  transform-origin: 50% 45%;
+  filter: drop-shadow(0 0 40px rgba(255, 0, 0, 0.55));
+}
+
+@keyframes jumpscare-lunge {
+  0% {
+    transform: translateY(45%) scale(0.08);
+    opacity: 0;
+  }
+  3% {
+    opacity: 1;
+  }
+  14% {
+    transform: translateY(0) scale(1.22);
+  }
+  30% {
+    transform: translateY(-2%) scale(1.1);
+  }
+  80% {
+    transform: translateY(-4%) scale(1.3);
+  }
+  100% {
+    transform: translateY(-12%) scale(1.7);
+  }
+}
+
+.jumpscare-face {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* Chromatic-aberration ghosts: same SVG, tinted, sliced and shoved sideways. */
+.jumpscare-face-ghost {
+  mix-blend-mode: screen;
+  opacity: 0.85;
+}
+
+.jumpscare-face-ghost[data-tint='red'] {
+  filter: sepia(1) saturate(12) hue-rotate(-40deg) brightness(0.9);
+  animation: jumpscare-glitch-red 0.35s steps(1, end) infinite;
+}
+
+.jumpscare-face-ghost[data-tint='cyan'] {
+  filter: sepia(1) saturate(10) hue-rotate(140deg) brightness(0.9);
+  animation: jumpscare-glitch-cyan 0.41s steps(1, end) infinite;
+}
+
+@keyframes jumpscare-glitch-red {
+  0% {
+    transform: translate(-12px, 0);
+    clip-path: inset(8% 0 62% 0);
+  }
+  20% {
+    transform: translate(9px, 3px);
+    clip-path: inset(44% 0 12% 0);
+  }
+  40% {
+    transform: translate(-6px, -4px);
+    clip-path: inset(0 0 78% 0);
+  }
+  60% {
+    transform: translate(14px, 2px);
+    clip-path: inset(66% 0 4% 0);
+  }
+  80% {
+    transform: translate(-10px, 5px);
+    clip-path: inset(22% 0 40% 0);
+  }
+  100% {
+    transform: translate(-12px, 0);
+    clip-path: inset(8% 0 62% 0);
+  }
+}
+
+@keyframes jumpscare-glitch-cyan {
+  0% {
+    transform: translate(11px, 2px);
+    clip-path: inset(50% 0 20% 0);
+  }
+  25% {
+    transform: translate(-8px, -3px);
+    clip-path: inset(10% 0 70% 0);
+  }
+  50% {
+    transform: translate(13px, 4px);
+    clip-path: inset(30% 0 45% 0);
+  }
+  75% {
+    transform: translate(-13px, 0);
+    clip-path: inset(72% 0 0 0);
+  }
+  100% {
+    transform: translate(11px, 2px);
+    clip-path: inset(50% 0 20% 0);
+  }
+}
+
+.jumpscare-eye-glow {
+  animation: jumpscare-eye 0.18s ease-in-out infinite alternate;
+}
+
+@keyframes jumpscare-eye {
+  from {
+    opacity: 0.55;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.jumpscare-scanlines {
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0) 0 2px,
+    rgba(0, 0, 0, 0.45) 2px 4px
+  );
+  animation: jumpscare-scan 0.3s linear infinite;
+}
+
+@keyframes jumpscare-scan {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(4px);
+  }
+}
+
+.jumpscare-text {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: clamp(24px, 8vh, 96px);
+  padding: 0 6vw;
+  text-align: center;
+  text-wrap: balance;
+  font-family:
+    ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', 'Noto Sans Mono CJK SC',
+    monospace;
+  font-weight: 700;
+  font-size: clamp(1rem, 2.6vw, 2.1rem);
+  line-height: 1.25;
+  letter-spacing: 0.08em;
+  color: #ff1a1a;
+  text-shadow:
+    0 0 12px #f00,
+    3px 0 0 rgba(0, 255, 255, 0.7),
+    -3px 0 0 rgba(255, 0, 0, 0.9);
+  animation: jumpscare-text 1.9s steps(1, end) forwards;
+}
+
+@keyframes jumpscare-text {
+  0%,
+  17% {
+    opacity: 0;
+  }
+  18%,
+  26% {
+    opacity: 1;
+  }
+  27%,
+  30% {
+    opacity: 0;
+  }
+  31%,
+  100% {
+    opacity: 1;
+  }
+}
