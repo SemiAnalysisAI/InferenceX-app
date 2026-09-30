@@ -21,9 +21,9 @@ import subprocess
 import sys
 
 sys.dont_write_bytecode = True
-# feat/gb200-nvl72-rack-model on top of ca4403aa (PR #10 merge); pending push to the upstream repo.
-REVISION = "963ead8b20a722595c34f7f4a0041259501cf019"
-REVISION_STATUS = "branch feat/gb200-nvl72-rack-model, child of ca4403aa527069857351ad8047dbb726844b3382; pending push upstream"
+# Local reference branch; upstream publication needs repository write access.
+REVISION = "6fcc086b77576d4cecb9d0c79637d6daf980308c"
+REVISION_STATUS = "local branch feat/gb200-nvl72-rack-model; unpublished pending repository write access; DRAFT / pending human verification"
 SOURCE = "https://github.com/SemiAnalysisAI/inferencex_power_model"
 MODELS = {
     "h100": ("hgx_h100_chassis/h100_chassis_power_model.py", "h100_chassis_power", "make_h100_config"),

@@ -1,6 +1,6 @@
 {
-  "modelRevision": "963ead8b20a722595c34f7f4a0041259501cf019",
-  "modelRevisionStatus": "branch feat/gb200-nvl72-rack-model, child of ca4403aa527069857351ad8047dbb726844b3382; pending push upstream",
+  "modelRevision": "6fcc086b77576d4cecb9d0c79637d6daf980308c",
+  "modelRevisionStatus": "local branch feat/gb200-nvl72-rack-model; unpublished pending repository write access; DRAFT / pending human verification",
   "source": "https://github.com/SemiAnalysisAI/inferencex_power_model",
   "status": "DRAFT / pending human verification",
   "cases": [

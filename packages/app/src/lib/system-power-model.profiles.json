@@ -1,9 +1,9 @@
 {
-  "modelRevision": "963ead8b20a722595c34f7f4a0041259501cf019",
-  "modelRevisionStatus": "branch feat/gb200-nvl72-rack-model, child of ca4403aa527069857351ad8047dbb726844b3382; pending push upstream",
+  "modelRevision": "6fcc086b77576d4cecb9d0c79637d6daf980308c",
+  "modelRevisionStatus": "local branch feat/gb200-nvl72-rack-model; unpublished pending repository write access; DRAFT / pending human verification",
   "source": "https://github.com/SemiAnalysisAI/inferencex_power_model",
   "status": "DRAFT / pending human verification",
-  "assumptionsSource": "https://github.com/SemiAnalysisAI/inferencex_power_model/blob/963ead8b20a722595c34f7f4a0041259501cf019/README.md#chassis-models",
+  "assumptionsSource": "https://github.com/SemiAnalysisAI/inferencex_power_model/blob/6fcc086b77576d4cecb9d0c79637d6daf980308c/README.md#chassis-models",
   "assumptions": {
     "u_pcie": 0.05,
     "u_cpu": 0.2,
@@ -11,7 +11,7 @@
     "u_nvme": 0.0,
     "pue": 1.2
   },
-  "rackAssumptionsSource": "https://github.com/SemiAnalysisAI/inferencex_power_model/blob/963ead8b20a722595c34f7f4a0041259501cf019/human_verified/gb200_nvl72_rack/gb200_nvl72_rack_power_model.py",
+  "rackAssumptionsSource": "https://github.com/SemiAnalysisAI/inferencex_power_model/blob/6fcc086b77576d4cecb9d0c79637d6daf980308c/human_verified/gb200_nvl72_rack/gb200_nvl72_rack_power_model.py",
   "rackAssumptions": {
     "u_nvlink": 0.5,
     "u_ib": 0.0,
@@ -39,9 +39,9 @@
     "human_verified/blackwell_nvswitch/blackwell_nvswitch_power_model.py": "857d276b552f6118842c0f026cb5e78dbcd70c9bdef2769fae8540842be61ec7",
     "human_verified/blackwell_nvswitch/plot_blackwell_nvswitch_power.py": "979abfc057320d29d251c100150440fdc10770794b1a05a89053631ffdff64db",
     "human_verified/chassis_plot_utils.py": "0f1c809a527788c8c25490420e29e737e6b7f83cb914dc022c3a4e3701b80643",
-    "human_verified/gb200_nvl72_rack/gb200_nvl72_rack_power_model.py": "f907916213a9176a4d82a05b905ed3c7b595035184150a352dc8049952ffd340",
+    "human_verified/gb200_nvl72_rack/gb200_nvl72_rack_power_model.py": "b4640f94c8f9e6be50eb18deff9728bb58559ba193b54577859cafabec4ccc33",
     "human_verified/gb200_nvl72_rack/plot_gb200_nvl72_rack_inference_gpu_sweep.py": "d0f6903df0348ccb2790e973b0dc10408c6f6022695ce039aad0b1e1fcd39519",
-    "human_verified/gb200_nvl72_rack/test_gb200_nvl72_rack_power_model.py": "4b33288998d4355d1f4812b9f2e014ab4cf2a588fb9fc94ac56fea9ae8922950",
+    "human_verified/gb200_nvl72_rack/test_gb200_nvl72_rack_power_model.py": "631bd7fd44b84260f16175a814d093795a4cdd0a91a0d19dd572a5ea6c088314",
     "human_verified/generic/connectx7/connectx7_power_model.py": "3510ab679846aefbc31d18d410a978533ddc331fc1562511751fedf093a6649f",
     "human_verified/generic/connectx7/plot_connectx7_power.py": "c9d554aeeeb5b74ff7398686c05d93f0db42b6ac98c902b063645597697de35c",
     "human_verified/generic/connectx8/connectx8_power_model.py": "7d638ea8524e181b0370601319c780600ff5a45b072589d58bdca58636bfa9cb",
