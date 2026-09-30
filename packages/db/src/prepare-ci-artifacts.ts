@@ -4,6 +4,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 
+import { writeArtifactManifest } from './etl/benchmark-artifact-order.js';
 import { buildArtifactPlan } from './lib/ci-artifact-preparation.js';
 import { downloadArtifact, listRunArtifacts, type ArtifactMeta } from './lib/github-artifacts.js';
 
@@ -148,6 +149,7 @@ function main(): void {
     console.log(`Downloading artifact: ${artifact.name}`);
     downloadWithRetries(artifact, artifactsPath);
   }
+  writeArtifactManifest(artifactsPath, plan.artifacts);
   if (plan.reused) {
     writeReuseMetadata(artifactsPath, sourceRunId, mergeRunId, sourceMetadata, mergeMetadata);
   }
