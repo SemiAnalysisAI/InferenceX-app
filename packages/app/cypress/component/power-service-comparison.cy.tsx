@@ -179,7 +179,9 @@ describe('PowerServiceComparison', () => {
       inference: {},
       unofficial: { runIndexByUrl: { [OVERLAY_RUN_URL]: 0 } },
     });
-    cy.get('[data-testid="equal-service-baseline"]').invoke('val').should('contain', OVERLAY_RUN_URL);
+    cy.get('[data-testid="equal-service-baseline"]')
+      .invoke('val')
+      .should('contain', OVERLAY_RUN_URL);
     cy.get('[data-testid="add-source"]').click();
     cy.get('[data-testid="equal-service-baseline"]').invoke('val').should('contain', 'b200_sglang');
     cy.get('[data-testid="equal-service-comparator"]')
