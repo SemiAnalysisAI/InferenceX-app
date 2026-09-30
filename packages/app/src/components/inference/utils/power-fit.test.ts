@@ -81,6 +81,7 @@ describe('buildPowerFits', () => {
               actualDate: '2026-09-23',
               run_url:
                 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/35905882425/attempts/1',
+              power_audit: { producer_sha: 'appended-producer', exporter_image_sha256: 'exporter' },
             }
           : entry,
     );

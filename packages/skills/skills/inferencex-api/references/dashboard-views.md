@@ -113,6 +113,11 @@ two sources; unknown explicit keys stay unavailable. Omitted target means no
 selected-target result. Targets are tok/s/user for streaming speed, seconds for
 TTFT/E2E. Concurrency is unsupported for equal-service interpolation.
 
+A source groups one logical curve snapshot and configuration. Stitched points retain
+their original producer provenance; differing telemetry producer/exporter hashes do not
+split the snapshot. Recipe, image and topology remain distinct. Rows without a snapshot
+retain their own run, measured date and telemetry producer/exporter hashes in the source key.
+
 The same dashboard helper uses scoped observed points before frontier/best
 pruning, with no power-comparison clones. It interpolates raw quantities
 linearly only inside each exact source range, then reports signed
@@ -120,7 +125,7 @@ linearly only inside each exact source range, then reports signed
 whole-deployment output tokens/s, and validated GPU J/output token. Negative energy
 change means lower comparator energy. Preserve bracket endpoint identities,
 `interpolated`, missing reasons and nulls. Never call interpolated points new
-measurements or bridge different runs, recipes, topologies or missing endpoints.
+measurements or bridge different sources, recipes, topologies or missing endpoints.
 
 `serviceCompare=true` also returns `matchedConcurrency`: the two selected sources
 paired at each concurrency either observed. Sides are `observed`, `missing`, or
