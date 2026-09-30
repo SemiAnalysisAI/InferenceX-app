@@ -170,8 +170,10 @@ recipe, topology and workload identity; changing display dates does not create a
 new measured source. The source run is the logical curve snapshot
 (`curve_workflow_run_id` / `curve_date`, see
 [Append-Only Curve Extensions](./data-pipeline.md#append-only-curve-extensions)), so
-points an append-only run stitched onto an older curve stay one source; rows without a
-snapshot id, such as unofficial overlays, key by their own run URL and measured date, and
+points an append-only run stitched onto an older curve stay one source even when their
+telemetry producer or exporter hashes differ. Recipe, image and topology remain separate
+configuration identities. Rows without a snapshot id, such as unofficial overlays, retain
+their own run URL, measured date and telemetry producer/exporter hashes, and
 an unknown run never joins distinct rows. Comparisons never join different sources into one
 interpolation bracket. All three metrics use bounded numerical linear
 interpolation of the underlying quantities, then compute
@@ -264,6 +266,10 @@ GPU 视图优先读取已存遥测，缺少存储数据时回退到产物。全�
 
 `serviceSources` 中各数据源的 `label` 仅供显示，由硬件和日期组成；只有两个数据源无法区分时，
 才补充精度、拓扑、运行等信息。选择数据源时应使用其 `key`。
+数据源的运行标识取自逻辑曲线快照（`curve_workflow_run_id` / `curve_date`）：append-only 运行
+拼接到旧曲线上的数据点仍视为同一数据源，即使其 telemetry producer 或 exporter hash 不同；
+测试配置指纹、镜像和拓扑仍用于区分不同配置。没有快照标识的行（例如非官方叠加数据）继续按各自的
+运行 URL、实测日期和 telemetry producer/exporter hash 区分数据源；运行未知的行不会与其他行合并为同一数据源。
 
 `serviceCompare=true` 还返回 `matchedConcurrency`：按并发数逐行配对两个所选数据源，任一方在
 该并发数下有观测即列出一行；每侧为 `observed`、`missing`，或同一负载下观测值不一致时的

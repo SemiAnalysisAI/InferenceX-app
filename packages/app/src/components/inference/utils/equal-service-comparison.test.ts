@@ -169,12 +169,19 @@ describe('equal-service comparison', () => {
     // B200 TP4: run 35905882425 appended c1–c4 onto run 35843506474's c8–c128.
     const snapshot = { curve_workflow_run_id: 35843506474, curve_date: '2026-09-20' };
     const stitched = [
-      point({ id: 1, conc: 8, actualDate: '2026-09-20', ...snapshot }),
+      point({
+        id: 1,
+        conc: 8,
+        actualDate: '2026-09-20',
+        power_audit: { producer_sha: 'producer-a', exporter_image_sha256: 'exporter-a' },
+        ...snapshot,
+      }),
       point({
         id: 2,
         conc: 1,
         actualDate: '2026-09-23',
         run_url: 'https://example.invalid/runs/35905882425/attempts/1',
+        power_audit: { producer_sha: 'producer-b', exporter_image_sha256: 'exporter-b' },
         ...snapshot,
       }),
     ];
@@ -198,6 +205,23 @@ describe('equal-service comparison', () => {
       'B300 (SGLang) · 2026-09-23 · Run #8',
     ]);
   });
+
+  it.each([
+    { image: 'another-image' },
+    { recipe_fingerprint: 'another-recipe' },
+    { decode_tp: 8, physicalChips: 8 },
+    { curve_workflow_run_id: 2 },
+  ])('keeps distinct snapshot configurations separate: %j', (variant) => {
+    const original = point({ curve_workflow_run_id: 1, curve_date: '2026-09-20' });
+    expect(getEqualServiceSources([original, { ...original, ...variant }])).toHaveLength(2);
+  });
+
+  it.each([{ producer_sha: 'another-producer' }, { exporter_image_sha256: 'another-exporter' }])(
+    'keeps producer distinctions when no snapshot authorizes stitching: %j',
+    (power_audit) => {
+      expect(getEqualServiceSources([point(), point({ power_audit })])).toHaveLength(2);
+    },
+  );
 
   it('plots role panels on the trace-derived P75/P90 axes from point.x without interpolating on them', () => {
     const role = (overrides: Partial<InferenceData>) =>
