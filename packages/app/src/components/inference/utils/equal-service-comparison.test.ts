@@ -162,4 +162,38 @@ describe('equal-service comparison', () => {
       'B300 (SGLang) · 2026-09-23',
     ]);
   });
+
+  it('keys a stitched append-only curve by its snapshot; rows without one keep their own run', () => {
+    // B200 TP4: run 35905882425 appended c1–c4 onto run 35843506474's c8–c128.
+    const snapshot = { curve_workflow_run_id: 35843506474, curve_date: '2026-09-20' };
+    const stitched = [
+      point({ id: 1, conc: 8, actualDate: '2026-09-20', ...snapshot }),
+      point({
+        id: 2,
+        conc: 1,
+        actualDate: '2026-09-23',
+        run_url: 'https://example.invalid/runs/35905882425/attempts/1',
+        ...snapshot,
+      }),
+    ];
+    const laterSnapshot = point({
+      id: 3,
+      actualDate: '2026-09-20',
+      curve_workflow_run_id: 35900000000,
+      curve_date: '2026-09-20',
+    });
+    const legacy = [
+      point({ id: 4, hwKey: 'b300_sglang', run_url: 'https://example.invalid/runs/7' }),
+      point({ id: 5, hwKey: 'b300_sglang', run_url: 'https://example.invalid/runs/8' }),
+    ];
+    expect(equalServiceSourceKey(stitched[0])).toBe(equalServiceSourceKey(stitched[1]));
+    expect(equalServiceSourceKey(legacy[0])).not.toBe(equalServiceSourceKey(legacy[1]));
+    const sources = getEqualServiceSources([...stitched, laterSnapshot, ...legacy]);
+    expect(sources.map((source) => source.label)).toEqual([
+      'B200 (SGLang) · 2026-09-20 · Run #35843506474',
+      'B200 (SGLang) · 2026-09-20 · Run #35900000000',
+      'B300 (SGLang) · 2026-09-23 · Run #7',
+      'B300 (SGLang) · 2026-09-23 · Run #8',
+    ]);
+  });
 });

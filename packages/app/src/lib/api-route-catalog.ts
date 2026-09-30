@@ -853,7 +853,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/inference/utils/equal-service-comparison.ts',
-    sourceSha256: '9a7989e04f0228983f5f1069b8e35e221d85561bd95fdfd1ba9e4210f42bb0c1',
+    sourceSha256: '8341fe0a94e5ddefebc70938514bd7f128aa16aeb22a7aef5863f02ef383ab25',
     reviewArea: {
       en: 'Source-scoped equal-service interpolation, comparator-relative changes, endpoint provenance, prefill share projection and role points.',
       zh: '按完整来源限定的同等服务插值、相对基准变化、端点来源、prefill 占比视图以及各角色数据点。',
@@ -885,7 +885,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/benchmark-transform.ts',
-    sourceSha256: '21f1fe4d63737c74efb2251a64f79eef1b5e9c565769be9b4fb500b1fa4ecc89',
+    sourceSha256: '53fb9102b1ddd0c597b3b2a414894564d2deda3da5ea2cf0059f997b2db852c8',
     reviewArea: {
       en: 'Raw benchmark means and derived reciprocal mean-TPOT interactivity used by Dashboard and read-only views.',
       zh: '仪表板和只读视图共用的原始 benchmark 均值与 mean TPOT 倒数形式的 interactivity。',
