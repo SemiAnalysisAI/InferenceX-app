@@ -90,15 +90,21 @@ const laterSource = point({
   run_url: 'https://example.invalid/runs/900000003',
   measuredAvgPower: metric(600),
 });
-function PinnedComparisonHarness() {
+function PinnedComparisonHarness({
+  initial,
+  added,
+}: {
+  initial: InferenceData[];
+  added: InferenceData[];
+}) {
   const [extra, setExtra] = useState<InferenceData[]>([]);
   return (
     <PathnameContext.Provider value="/inference">
-      <button type="button" data-testid="add-source" onClick={() => setExtra([laterSource])}>
+      <button type="button" data-testid="add-source" onClick={() => setExtra(added)}>
         add source
       </button>
       <PowerServiceComparison
-        data={[...fitLadder, ...comparator, ...extra]}
+        data={[...initial, ...extra]}
         overlayData={comparator}
         xField="mean_tpot_intvty"
         xLabel="Mean interactivity (output tok/s/user)"
@@ -114,6 +120,9 @@ describe('PowerServiceComparison', () => {
     cy.on('uncaught:exception', (error) => {
       if (error.message.includes('ResizeObserver loop')) return false;
     });
+    // The URL-state store is module-scoped and outlives the previous test's
+    // Compare selection, which would otherwise pre-pin the next mount.
+    writeUrlParams({ i_servicecompare: '0', i_servicebase: '', i_servicepeer: '' });
   });
 
   it('colours ?unofficialrun= sources with their run colour in every panel', () => {
@@ -142,13 +151,13 @@ describe('PowerServiceComparison', () => {
   });
 
   it('keeps the compared pair when a new source sorts ahead of the baseline', () => {
-    // The URL-state store is module-scoped and outlives the previous test's
-    // Compare selection, which would otherwise pre-pin this mount.
-    writeUrlParams({ i_servicecompare: '0', i_servicebase: '', i_servicepeer: '' });
-    mountWithProviders(<PinnedComparisonHarness />, {
-      inference: {},
-      unofficial: { runIndexByUrl: { [OVERLAY_RUN_URL]: 0 } },
-    });
+    mountWithProviders(
+      <PinnedComparisonHarness initial={[...fitLadder, ...comparator]} added={[laterSource]} />,
+      {
+        inference: {},
+        unofficial: { runIndexByUrl: { [OVERLAY_RUN_URL]: 0 } },
+      },
+    );
     cy.get('[data-testid="equal-service-toggle"]').check();
     cy.get('[data-testid="equal-service-baseline"]').invoke('val').should('contain', 'b200_sglang');
     cy.get('[data-testid="equal-service-comparator"]')
@@ -160,5 +169,22 @@ describe('PowerServiceComparison', () => {
     cy.get('[data-testid="equal-service-comparator"]')
       .invoke('val')
       .should('contain', OVERLAY_RUN_URL);
+  });
+
+  it('resolves a share link that pre-enables Compare as its rows arrive', () => {
+    // The overlay run can land before the official rows; pinning that first
+    // source would fix both sides on it.
+    writeUrlParams({ i_servicecompare: '1' });
+    mountWithProviders(<PinnedComparisonHarness initial={comparator} added={fitLadder} />, {
+      inference: {},
+      unofficial: { runIndexByUrl: { [OVERLAY_RUN_URL]: 0 } },
+    });
+    cy.get('[data-testid="equal-service-baseline"]').invoke('val').should('contain', OVERLAY_RUN_URL);
+    cy.get('[data-testid="add-source"]').click();
+    cy.get('[data-testid="equal-service-baseline"]').invoke('val').should('contain', 'b200_sglang');
+    cy.get('[data-testid="equal-service-comparator"]')
+      .invoke('val')
+      .should('contain', OVERLAY_RUN_URL);
+    cy.get('[data-testid="matched-concurrency-row-8"]').should('exist');
   });
 });
