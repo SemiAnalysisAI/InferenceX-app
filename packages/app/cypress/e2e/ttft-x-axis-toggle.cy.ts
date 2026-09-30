@@ -155,7 +155,7 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
     cy.get('[data-testid="chart-figure"] h2').should('contain.text', 'Interactivity');
     cy.get('[data-testid="chart-figure"] svg').should(
       'contain.text',
-      'P90 Interactivity (tok/s/user)',
+      'P75 Interactivity (tok/s/user)',
     );
   });
 
@@ -184,7 +184,7 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
     selectXAxisMode('e2e-normalized-interactivity');
     cy.get('[data-testid="chart-figure"] h2').should(
       'contain.text',
-      'P90 E2E Normalized Interactivity',
+      'P75 E2E Normalized Interactivity',
     );
     selectXAxisMode('interactivity', 'Interactivity');
     cy.get('[data-testid="chart-figure"] h2').should('contain.text', 'Interactivity');
@@ -212,13 +212,13 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
     cy.get('#chart-0 [data-testid="offload-halo-key"]').should('not.exist');
   });
 
-  it('shows the selected percentile in the Interactivity axis label', () => {
+  it('shows the fixed p75 percentile in the Interactivity axis label', () => {
     // Explicitly select the mode — do not rely on the agentic default mode.
     selectXAxisMode('interactivity', 'Interactivity');
-    // Agentic plots percentile fields (p90_intvty), so the axis label carries it.
+    // Agentic plots percentile fields (p75_intvty), so the axis label carries it.
     cy.get('[data-testid="chart-figure"] svg').should(
       'contain.text',
-      'P90 Interactivity (tok/s/user)',
+      'P75 Interactivity (tok/s/user)',
     );
   });
 
@@ -258,7 +258,7 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
   it('switches the x-axis to E2E Latency and updates the heading', () => {
     selectXAxisMode('e2e', 'E2E Latency');
     cy.get('[data-testid="chart-figure"] h2').should('contain.text', 'End-to-end Latency');
-    cy.get('[data-testid="chart-figure"] svg').should('contain.text', 'P90 End-to-end Latency (s)');
+    cy.get('[data-testid="chart-figure"] svg').should('contain.text', 'P75 End-to-end Latency (s)');
   });
 
   it('switches back to request-level E2E Normalized Interactivity', () => {
@@ -268,27 +268,11 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
     selectXAxisMode('e2e-normalized-interactivity');
     cy.get('[data-testid="chart-figure"] h2').should(
       'contain.text',
-      'P90 E2E Normalized Interactivity',
+      'P75 E2E Normalized Interactivity',
     );
     cy.get('[data-testid="chart-figure"] svg').should(
       'contain.text',
-      'P90 E2E Normalized Interactivity (tok/s/user)',
-    );
-
-    cy.get('[data-testid="percentile-selector"]').click();
-    cy.contains('[role="option"]', 'p75').click();
-    cy.get('[data-testid="chart-figure"] h2').should(
-      'contain.text',
-      'P75 E2E Normalized Interactivity',
-    );
-
-    // The percentile selector is shared page state for the whole suite —
-    // restore the p90 default so later tests assert against a known value.
-    cy.get('[data-testid="percentile-selector"]').click();
-    cy.contains('[role="option"]', 'p90').click();
-    cy.get('[data-testid="chart-figure"] h2').should(
-      'contain.text',
-      'P90 E2E Normalized Interactivity',
+      'P75 E2E Normalized Interactivity (tok/s/user)',
     );
   });
 
@@ -308,16 +292,13 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
     cy.get('[data-testid="chart-figure"] h2').should('contain.text', 'Interactivity');
     cy.get('[data-testid="chart-figure"] svg').should(
       'contain.text',
-      'P90 Interactivity (tok/s/user)',
+      'P75 Interactivity (tok/s/user)',
     );
   });
 
-  it('follows the percentile selector in the Interactivity axis label', () => {
-    // Select p75 here rather than inheriting it from another test — the axis
-    // label must track the selector on its own.
+  it('keeps the agentic Latency Percentile control removed and labels the fixed p75 basis', () => {
     selectXAxisMode('interactivity', 'Interactivity');
-    cy.get('[data-testid="percentile-selector"]').click();
-    cy.contains('[role="option"]', 'p75').click();
+    cy.get('[data-testid="percentile-selector"]').should('not.exist');
     cy.get('[data-testid="chart-figure"] svg').should(
       'contain.text',
       'P75 Interactivity (tok/s/user)',
@@ -352,21 +333,21 @@ describe('X-axis mode URL param', () => {
     cy.get('[data-testid="chart-figure"] h2').should('contain.text', 'Time To First Token');
   });
 
-  // AgentX publishes on P90, so the percentile control is insider-only. With
-  // the gate locked it must not render, and the chart must still plot P90.
-  it('hides the percentile selector behind the feature gate and defaults to P90', () => {
+  // Agentic inference charts fix the x-axis latency basis at P75. The old
+  // Latency Percentile dropdown is gone even when the feature gate is unlocked.
+  it('never shows the latency percentile selector and labels the fixed P75 basis', () => {
     interceptAgenticData();
     interceptDerivedAgenticMetrics();
     cy.visit('/inference?i_seq=agentic-traces', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-        win.localStorage.removeItem('inferencex-feature-gate');
+        unlockAgenticGate(win);
       },
     });
 
     cy.get('[data-testid="scenario-selector"]').should('contain.text', 'Agentic');
     cy.get('[data-testid="percentile-selector"]').should('not.exist');
-    cy.get('[data-testid="chart-figure"] h2').should('contain.text', 'P90');
+    cy.get('[data-testid="chart-figure"] h2').should('contain.text', 'P75');
   });
 });
 
@@ -418,7 +399,7 @@ describe('Default scenario', () => {
     // The explainer sits beside the trigger, linking out to the dataset page.
     cy.get('[data-testid="selected-option-help-agentic-traces"]').should('exist');
     cy.get('[data-testid="chart-figure"]').should('have.length.at.least', 1);
-    cy.get('[data-testid="chart-figure"] h2').should('contain.text', 'P90');
+    cy.get('[data-testid="chart-figure"] h2').should('contain.text', 'P75');
   });
 
   it('keeps 8K / 1K when the link asks for it explicitly', () => {
@@ -434,7 +415,7 @@ describe('Default scenario', () => {
     cy.get('[data-testid="chart-figure"]').should('have.length.at.least', 1);
     // Fixed-seq plots the mean field — no percentile prefix on the axis label.
     cy.get('[data-testid="chart-figure"] svg').should('contain.text', 'Interactivity (tok/s/user)');
-    cy.get('[data-testid="chart-figure"] svg').should('not.contain.text', 'P90 Interactivity');
+    cy.get('[data-testid="chart-figure"] svg').should('not.contain.text', 'P75 Interactivity');
   });
 
   it('opens the Agentic scenario for another model with corresponding data', () => {
@@ -728,7 +709,7 @@ describe('X-Axis Mode Toggle — overlay path (finding #8 regression guard)', ()
     // Overlay shares the chartDefinition label — the percentile prefix applies here too.
     cy.get('[data-testid="chart-figure"] svg').should(
       'contain.text',
-      'P90 Interactivity (tok/s/user)',
+      'P75 Interactivity (tok/s/user)',
     );
     cy.get('[data-testid="chart-notices-chart-0"] [data-testid="offload-halo-key"]')
       .should('be.visible')

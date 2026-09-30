@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({ locale: 'en' as 'en' | 'zh' }));
 vi.mock('@/lib/use-locale', () => ({ useLocale: () => mocks.locale }));
 vi.mock('../InferenceContext', () => ({
-  useInferenceDisplay: () => ({ selectedXAxisMode: 'interactivity', selectedPercentile: 'p90' }),
+  useInferenceDisplay: () => ({ selectedXAxisMode: 'interactivity', selectedPercentile: 'p75' }),
   useInferenceActions: () => ({ setSelectedXAxisMode: vi.fn() }),
   useInferenceFilters: () => ({ selectedSequence: 'agentic-traces' }),
 }));

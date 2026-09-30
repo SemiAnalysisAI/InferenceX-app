@@ -767,7 +767,6 @@ export interface InferenceActionsContextType {
   setSelectedPrecisions: (precisions: string[]) => void;
   setSelectedYAxisMetric: (metric: string) => void;
   setTokenRevenuePriceSource: (source: TokenRevenuePriceSource) => void;
-  setSelectedPercentile: (percentile: string) => void;
   setFixedSequenceStatistic: (statistic: FixedSequenceStatistic) => void;
   setSelectedXAxisMetric: (metric: string | null) => void;
   setSelectedXAxisMode: (mode: XAxisMode) => void;

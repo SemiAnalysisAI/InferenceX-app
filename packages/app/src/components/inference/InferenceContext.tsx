@@ -489,11 +489,8 @@ export function InferenceProvider({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Latency percentile applied to the chart x-axis for agentic scenarios.
-  // Values: 'p90' | 'p99'. Non-agentic charts ignore.
-  const [selectedPercentile, setSelectedPercentile] = useState<string>(
-    () => getUrlParam('i_pctl') || 'p90',
-  );
+  // Agentic x-axis latency basis is fixed at p75 (no Latency Percentile control).
+  const selectedPercentile = 'p75';
   const selectedE2eXAxisMetric = resolveE2eXAxisMetric(
     requestedE2eXAxisMetric,
     selectedXAxisMode,
@@ -1620,7 +1617,6 @@ export function InferenceProvider({
     {
       i_metric: selectedYAxisMetric,
       i_revenue: usesTokenSalePricing(selectedYAxisMetric) ? tokenRevenuePriceSource : 'normalized',
-      i_pctl: selectedPercentile,
       i_mstat: fixedSequenceStatistic,
       i_gpus: selectedGPUs.join(','),
       i_dates: selectedDates.join(','),
@@ -1965,7 +1961,6 @@ export function InferenceProvider({
     setSelectedPrecisions: setSelectedPrecisionsAndClear,
     setSelectedYAxisMetric: setSelectedYAxisMetricAndClear,
     setTokenRevenuePriceSource,
-    setSelectedPercentile,
     setFixedSequenceStatistic,
     setSelectedXAxisMetric,
     setSelectedXAxisMode: handleSetXAxisMode,
