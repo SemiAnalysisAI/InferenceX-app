@@ -37,7 +37,6 @@ describe('Power boundary labels', () => {
       cy.get('[role="option"]').should(($options) => {
         expect([...$options].map((option) => option.textContent?.trim())).to.deep.equal(labels);
       });
-      cy.screenshot(`power-boundary-options-${locale}`, { overwrite: true });
       cy.get('[role="option"][data-value="gpu-provisioned"]').click();
       cy.get('[data-testid="selected-metric"]').should('have.text', 'y_gpuProvisionedWatts');
       cy.get('[data-testid="measured-power-basis"]').click();
@@ -64,6 +63,10 @@ describe('Power boundary labels', () => {
       cy.get('[role="option"][data-value="gpu-measured"]').click();
       cy.get('[data-testid="selected-metric"]').should('have.text', 'y_measuredAvgPower');
       cy.get('[data-testid="all-in-measured-note"]').should('not.exist');
+      // Finish selection assertions before a screenshot can dismiss the open Radix menu.
+      cy.get('[data-testid="measured-power-basis"]').click();
+      cy.get('[role="option"]').should('be.visible');
+      cy.screenshot(`power-boundary-options-${locale}`, { overwrite: true });
     });
   }
 });
