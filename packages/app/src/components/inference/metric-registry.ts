@@ -716,6 +716,11 @@ export function isPowerBasisConfigKey(configKey: string): boolean {
   return POWER_BASIS_METRIC_CONFIG_KEY_SET.has(configKey);
 }
 
+/** The two All in Measured (utility-modeled) axes; they alone need the chassis power model. */
+export function isAllInMeasuredConfigKey(configKey: string): boolean {
+  return configKey === 'y_utilityModeledWatts' || configKey === 'y_utilityModeledJPerOutputToken';
+}
+
 export const MODELED_SYSTEM_POWER_METRIC_CONFIG_KEY = 'y_modeledChassisPowerPerGpu';
 
 /** Whether a y-axis config key plots the modeled chassis AC power metric. */
