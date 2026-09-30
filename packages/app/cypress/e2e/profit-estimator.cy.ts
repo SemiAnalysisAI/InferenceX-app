@@ -109,7 +109,7 @@ function assertDisclosureOpen(testId: string, open: boolean) {
 // Clear the preceding chart before each case changes the viewport.
 describe('Profit estimator power option', { testIsolation: true }, () => {
   for (const locale of ['en', 'zh'] as const) {
-    it(`prices DeepSeek Flash partial chassis with visible assumptions and CSV labels (${locale})`, () => {
+    it(`prices DeepSeek Flash partial chassis with a one-line power note and CSV labels (${locale})`, () => {
       stubOpenRouter();
       cy.viewport(locale === 'en' ? 1280 : 393, 900);
       cy.intercept('GET', '/api/v1/benchmarks*', {
@@ -164,19 +164,11 @@ describe('Profit estimator power option', { testIsolation: true }, () => {
       cy.get('[data-testid="profit-power-unavailable"] > summary').click();
       assertDisclosureOpen('profit-power-unavailable', true);
       cy.get('[data-testid="profit-power-unavailable"] > p').should('be.visible');
-      cy.get('[data-testid="profit-power-note"]').should(
-        'contain',
-        locale === 'en' ? 'unmeasured components are modeled' : '未实测的组件功耗由模型估算',
-      );
-      assertDisclosureOpen('profit-power-assumptions', false);
-      cy.get('[data-testid="profit-power-assumptions"] > summary').click();
-      assertDisclosureOpen('profit-power-assumptions', true);
-      cy.get('[data-testid="profit-power-assumptions"] > p')
-        .should('be.visible')
-        .and('contain', locale === 'en' ? 'partly idle server' : '部分 GPU 闲置');
-      cy.get('[data-testid="profit-power-assumptions"] > summary').click();
+      cy.get('[data-testid="profit-power-note"]')
+        .should('contain', locale === 'en' ? 'All in Measured' : '整体实测功耗')
+        .and('not.contain', locale === 'en' ? 'unmeasured components' : '未实测的组件');
+      cy.get('[data-testid="profit-power-assumptions"]').should('not.exist');
       cy.get('[data-testid="profit-power-unavailable"] > summary').click();
-      assertDisclosureOpen('profit-power-assumptions', false);
       assertDisclosureOpen('profit-power-unavailable', false);
       cy.get('[data-testid="profit-power-note"]').then(($note) => {
         const box = $note[0].getBoundingClientRect();

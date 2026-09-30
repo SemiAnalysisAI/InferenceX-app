@@ -465,6 +465,64 @@ describe('ScatterGraph', () => {
     );
   });
 
+  it('explains why All in Measured has no points', () => {
+    mountWithProviders(
+      <div style={{ width: 800, height: 600 }}>
+        <ScatterGraph
+          chartId="test-scatter-all-in-measured-empty"
+          modelLabel="Kimi K3"
+          data={[]}
+          xLabel="Interactivity"
+          yLabel="All in Measured Power per Chip"
+          chartDefinition={defaultChartDef}
+        />
+      </div>,
+      {
+        inference: {
+          hardwareConfig: hwConfig,
+          activeHwTypes: new Set(['b200_trt']),
+          hwTypesWithData: new Set(),
+          selectedYAxisMetric: 'y_utilityModeledWatts',
+        },
+        unofficial: {},
+      },
+    );
+
+    cy.contains('No values are available for All in Measured in this selection.').should(
+      'be.visible',
+    );
+    cy.contains('No measurements to plot for this selection.').should('not.exist');
+  });
+
+  it('localizes the All in Measured explanation', () => {
+    mountWithProviders(
+      <PathnameContext.Provider value="/zh/inference">
+        <div style={{ width: 375, height: 600 }}>
+          <ScatterGraph
+            chartId="test-scatter-all-in-measured-empty-zh"
+            modelLabel="Kimi K3"
+            data={[]}
+            xLabel="交互性"
+            yLabel="每芯片整体实测功耗"
+            chartDefinition={defaultChartDef}
+          />
+        </div>
+      </PathnameContext.Provider>,
+      {
+        inference: {
+          hardwareConfig: hwConfig,
+          activeHwTypes: new Set(['b200_trt']),
+          hwTypesWithData: new Set(),
+          selectedYAxisMetric: 'y_utilityModeledJPerOutputToken',
+        },
+        unofficial: {},
+      },
+    );
+
+    cy.contains('当前选择没有可用的整体实测功耗数值。').should('be.visible');
+    cy.contains('当前选择没有可绘制的测量数据。').should('not.exist');
+  });
+
   for (const selectedYAxisMetric of ['y_tpPerGpu', 'y_measuredPrefillJPerInputToken'] as const) {
     it(`offers targeted quick-filter recovery on ${selectedYAxisMetric} without changing model, precision or date`, () => {
       mountWithProviders(

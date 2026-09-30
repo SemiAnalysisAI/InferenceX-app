@@ -209,6 +209,13 @@ export interface AggDataEntry {
   actualDate?: string;
   /** URL to the GitHub Actions workflow run that produced this data point. */
   run_url?: string;
+  /**
+   * Logical curve snapshot this row belongs to. An append-only run stitches new
+   * points onto an older run's curve; both keep their own `run_url` but share
+   * this snapshot identity. Undefined on legacy and unofficial rows.
+   */
+  curve_date?: string;
+  curve_workflow_run_id?: number;
   /** Benchmark scenario: `single_turn` (fixed-seq isl/osl) or `agentic_traces`. */
   benchmark_type?: string;
   /** ISL in tokens — null for agentic_traces. */

@@ -69,6 +69,18 @@ function makeRow(overrides: Partial<BenchmarkRow> = {}): BenchmarkRow {
 }
 
 describe('rowToAggDataEntry', () => {
+  it('carries the curve snapshot identity of append-only rows and leaves legacy rows without one', () => {
+    const stitched = rowToAggDataEntry(
+      makeRow({ curve_date: '2026-09-20', curve_workflow_run_id: 35843506474 }),
+    );
+    expect([stitched.curve_date, stitched.curve_workflow_run_id]).toEqual([
+      '2026-09-20',
+      35843506474,
+    ]);
+    const legacy = rowToAggDataEntry(makeRow());
+    expect([legacy.curve_date, legacy.curve_workflow_run_id]).toEqual([undefined, undefined]);
+  });
+
   it.each([1, undefined])(
     'labels run 35879254139 in the official/overlay legend without changing data (DB id %s)',
     (id) => {

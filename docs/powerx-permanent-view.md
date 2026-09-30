@@ -296,8 +296,9 @@ Figure numbers here follow the current article draft; the share-link table above
 renumbering. Below the measured chart, `ui/PowerServiceComparison.tsx` offers three opt-in
 panels, and the scatter chart adds a fourth. All read the chart's scoped observed points
 (`observedPoints`: official and `?unofficialrun=` rows, comparison clones excluded), keep one
-source per exact run and recipe (`equalServiceSourceKey`), and colour overlay sources with
-`overlayRunColor`.
+source per curve snapshot and recipe (`equalServiceSourceKey`: a stitched append-only curve is
+one source keyed by `curve_workflow_run_id`; rows without a snapshot id key by their own run),
+and colour overlay sources with `overlayRunColor`.
 
 | Figures      | Panel                                                                                                                                         | Switch (share param)                                                                                    | Helper                                                 |
 | ------------ | --------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
@@ -317,9 +318,9 @@ source per exact run and recipe (`equalServiceSourceKey`), and colour overlay so
   not measured idle power, and R² describes only that line.
 - **Frontier** lists `globalParetoFrontier`'s own output, so the table is exactly what is
   drawn. Ties keep the first point, official before overlay.
-- **Source labels** (`getEqualServiceSources`) read hardware and date, adding precision,
-  topology, run, attempt, recipe, image or point only where two sources would otherwise look
-  the same. The opaque key stays the exact identity.
+- **Source labels** (`getEqualServiceSources`) read hardware and snapshot date, adding
+  precision, topology, snapshot run, attempt, recipe, image or point only where two sources
+  would otherwise look the same. The opaque key stays the exact identity.
 - Plots export PNG and CSV; the frontier table exports CSV only. Panel subtitles and the
   baseline → comparator pair are export-only, so a PNG names its workload and sources while
   the screen shows only the source selects. The views API returns

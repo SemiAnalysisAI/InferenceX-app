@@ -139,6 +139,7 @@ import {
 import { usePowerTraceAction } from '@/components/inference/hooks/usePowerTraceAction';
 import { QuickFiltersDialog } from '@/components/inference/ui/QuickFiltersDialog';
 import { ScatterEmptyState } from '@/components/inference/ui/ScatterEmptyState';
+import { ALL_IN_MEASURED_EMPTY } from '@/lib/power-basis';
 import {
   scatterPointConfigId,
   scatterPointJoinId,
@@ -162,6 +163,7 @@ import FrontierPointsPanel from '@/components/inference/ui/FrontierPointsPanel';
 import LegendPointsDialog from '@/components/inference/ui/LegendPointsDialog';
 import { renderOffloadHalo } from '@/components/inference/utils/offload-halo';
 import {
+  isAllInMeasuredConfigKey,
   isMeasuredEnergyConfigKey,
   isRoleLocalMeasuredEnergyConfigKey,
 } from '@/components/inference/metric-registry';
@@ -4216,9 +4218,11 @@ const ScatterGraph = React.memo(
           emptyReason === 'selection'
             ? isRoleLocalMeasuredEnergyConfigKey(selectedYAxisMetric)
               ? legendT.noRoleEnergyDataHint
-              : isMeasuredEnergyConfigKey(selectedYAxisMetric)
-                ? legendT.noMeasuredDataHint
-                : undefined
+              : isAllInMeasuredConfigKey(selectedYAxisMetric)
+                ? ALL_IN_MEASURED_EMPTY[locale]
+                : isMeasuredEnergyConfigKey(selectedYAxisMetric)
+                  ? legendT.noMeasuredDataHint
+                  : undefined
             : undefined
         }
         onShowChips={() => {

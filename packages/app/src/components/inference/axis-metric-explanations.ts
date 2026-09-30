@@ -488,12 +488,12 @@ export const METRIC_EXPLANATIONS: Record<MetricKey, MetricExplanation> = {
         'a data center reserves for one accelerator including host, networking, cooling and ' +
         'power-conversion overheads. It is a flat value independent of the run.',
       zh:
-        '取硬件注册表中的每芯片全电源配置功耗：数据中心为单张加速器预留的电源侧容量，' +
+        '取硬件注册表中的每芯片整体预配功耗（all-in）：数据中心为单张加速器预留的电源侧容量，' +
         '包含主机、网络、散热与电源转换开销。该值为恒定值，与运行无关。',
     },
     formula: {
       en: 'W/GPU = all-in provisioned power per GPU (kW) × 1000',
-      zh: 'W/GPU = 每 GPU 全电源配置功耗（kW）× 1000',
+      zh: 'W/GPU = 每 GPU 整体预配功耗（kW）× 1000',
     },
   },
   utilityProvisionedJPerOutputToken: {
@@ -503,12 +503,12 @@ export const METRIC_EXPLANATIONS: Record<MetricKey, MetricExplanation> = {
         'allocated accelerator. It differs from the public All-in Provisioned J per Output Token ' +
         'metric only for disaggregated runs, where that metric normalizes by decode GPUs alone.',
       zh:
-        '在全电源配置边界下的每输出 token 能耗，按全部已分配加速器归一。' +
+        '在整体预配功耗边界下的每输出 token 能耗，按全部已分配加速器归一。' +
         '仅在分离式运行中与公开的 All-in Provisioned J per Output Token 指标不同，后者只按 decode GPU 归一。',
     },
     formula: {
       en: 'J/tok = all-in provisioned power per GPU (W) × allocated GPUs ÷ total output tokens per second',
-      zh: 'J/tok = 每 GPU 全电源配置功耗（W）× 已分配 GPU 数 ÷ 总输出 token 吞吐（tok/s）',
+      zh: 'J/tok = 每 GPU 整体预配功耗（W）× 已分配 GPU 数 ÷ 总输出 token 吞吐（tok/s）',
     },
   },
   utilityModeledWatts: {
@@ -518,7 +518,7 @@ export const METRIC_EXPLANATIONS: Record<MetricKey, MetricExplanation> = {
         'AC by the system power model and then multiplied once by PUE. Only hardware with a known ' +
         'eight-GPU chassis profile on 8k1k runs is supported; NVL72 systems show no value.',
       zh:
-        '每已分配加速器的数据中心建模功耗：先由系统功耗模型将 GPU 实测功耗换算为机箱交流功耗，再乘以一次 PUE。' +
+        '每已分配加速器的整体实测功耗：先由系统功耗模型将 GPU 实测功耗换算为机箱交流功耗，再乘以一次 PUE。' +
         '仅支持在 8k1k 运行中具有已知八卡机箱模型的硬件；NVL72 系统不显示数值。',
     },
     formula: {
@@ -533,12 +533,12 @@ export const METRIC_EXPLANATIONS: Record<MetricKey, MetricExplanation> = {
         'measured GPU energy equals the ratio of modeled facility power to measured GPU power. ' +
         'Missing where the system power model or validated measured power is unavailable.',
       zh:
-        '将实测每输出 token 能耗按建模的数据中心边界缩放，其与 GPU 实测能耗之比等于数据中心建模功耗与 GPU 实测功耗之比。' +
+        '将实测每输出 token 能耗按整体实测功耗边界缩放，其与 GPU 实测能耗之比等于整体实测功耗与 GPU 实测功耗之比。' +
         '系统功耗模型或通过验证的实测功耗缺失时不显示。',
     },
     formula: {
       en: 'J/tok = measured J per output token × modeled facility W per GPU ÷ measured W per GPU',
-      zh: 'J/tok = 实测每输出 token 能耗 × 每 GPU 数据中心建模功耗（W）÷ 每 GPU 实测功耗（W）',
+      zh: 'J/tok = 实测每输出 token 能耗 × 每 GPU 整体实测功耗（W）÷ 每 GPU 实测功耗（W）',
     },
   },
 };

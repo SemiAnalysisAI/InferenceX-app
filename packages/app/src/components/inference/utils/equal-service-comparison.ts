@@ -57,8 +57,25 @@ export const positiveOrNull = (value: unknown): number | null => (isPositive(val
 export const observedPoints = (points: readonly InferenceData[]) =>
   points.filter((point) => !point.hidden && !point.powerVariant);
 
-/** Concurrency is excluded; unknown run identity must never join distinct rows. */
+/**
+ * The curve snapshot a row belongs to, or null when it carries none. An
+ * append-only run stitches new points onto an older run's curve; the chart
+ * draws them as one series, so the panels treat them as one source.
+ */
+const curveSnapshotId = (point: InferenceData): number | null =>
+  point.curve_workflow_run_id ?? null;
+/** Snapshot date of a stitched curve, else the row's own measured date. */
+const sourceDate = (point: InferenceData): string =>
+  (curveSnapshotId(point) === null ? undefined : point.curve_date) ??
+  point.actualDate ??
+  point.date;
+
+/**
+ * Concurrency is excluded; unknown run identity must never join distinct rows.
+ * Rows with a curve snapshot key by that snapshot instead of their own run.
+ */
 export function equalServiceSourceKey(point: InferenceData): string {
+  const snapshot = curveSnapshotId(point);
   const attempt = 'run_attempt' in point ? point.run_attempt : null;
   return JSON.stringify([
     point.hwKey,
@@ -68,9 +85,11 @@ export function equalServiceSourceKey(point: InferenceData): string {
     point.benchmark_type ?? null,
     point.isl ?? null,
     point.osl ?? null,
-    point.actualDate ?? point.date,
-    point.run_url || `unknown-run-point-${point.id ?? JSON.stringify(point)}`,
-    attempt,
+    sourceDate(point),
+    snapshot === null
+      ? point.run_url || `unknown-run-point-${point.id ?? JSON.stringify(point)}`
+      : `curve-${snapshot}`,
+    snapshot === null ? attempt : null,
     pointTopologyKey(point),
     point.recipe_fingerprint ?? null,
     point.image ?? null,
@@ -103,8 +122,9 @@ const SOURCE_LABEL_WORDS = {
 };
 
 /**
- * Hardware and date, plus only the details that tell otherwise identical
- * sources apart, in this order; the opaque key stays the exact identity.
+ * Hardware and snapshot date, plus only the details that tell otherwise
+ * identical sources apart, in this order; the opaque key stays the exact
+ * identity. A stitched curve is named by its snapshot run, not each row's run.
  */
 function sourceLabels(points: readonly InferenceData[], locale: 'en' | 'zh'): string[] {
   const words = SOURCE_LABEL_WORDS[locale];
@@ -112,10 +132,14 @@ function sourceLabels(points: readonly InferenceData[], locale: 'en' | 'zh'): st
     (point) => point.precision.toUpperCase(),
     (point, group) => topologyLabel(pointTopologyKey(point), locale, group.map(pointTopologyKey)),
     (point) => {
-      const runId = runIdFromUrl(point.run_url);
+      const snapshot = curveSnapshotId(point);
+      const runId = snapshot === null ? runIdFromUrl(point.run_url) : String(snapshot);
       return runId ? words.run(runId) : null;
     },
-    (point) => ('run_attempt' in point ? words.attempt(point.run_attempt) : null),
+    (point) =>
+      curveSnapshotId(point) === null && 'run_attempt' in point
+        ? words.attempt(point.run_attempt)
+        : null,
     (point) =>
       point.recipe_fingerprint ? `${words.recipe} ${point.recipe_fingerprint.slice(0, 8)}` : null,
     (point) => point.image ?? null,
@@ -125,7 +149,7 @@ function sourceLabels(points: readonly InferenceData[], locale: 'en' | 'zh'): st
     const hardware = getHardwareConfig(point.hwKey);
     return [
       hardware.name === 'unknown' ? point.hwKey : getDisplayLabel(hardware),
-      point.actualDate ?? point.date,
+      sourceDate(point),
     ].join(' · ');
   });
   for (const detail of details) {
