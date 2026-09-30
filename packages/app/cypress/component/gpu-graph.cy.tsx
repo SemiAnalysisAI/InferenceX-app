@@ -1,5 +1,11 @@
 import GPUGraph from '@/components/inference/ui/GPUGraph';
 import { InferenceContextsProvider } from '@/components/inference/InferenceContext';
+import {
+  PerfRulerStoreContext,
+  PERSISTED_PERF_RULER_CHART_ID,
+  usePerfRulerStore,
+  usePerfRulerStoreValue,
+} from '@/components/inference/perf-ruler-store';
 import type { ChartDefinition, InferenceData } from '@/components/inference/types';
 import {
   UnofficialRunContext,
@@ -18,6 +24,7 @@ import { Precision, Sequence } from '@/lib/data-mappings';
 import { overlayRooflineDasharray, overlayRunColor } from '@/lib/overlay-run-style';
 import { computeToggle } from '@/lib/toggle-set';
 import { POWER_TIMELINE_METRIC_KEY } from '@/components/inference/utils/powerTimeline';
+import { EMPTY_PERF_RULER_STATE, serializePerfRulers } from '@/lib/d3-chart/layers/perf-ruler';
 import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.shared-runtime';
 
 const defaultChartDef = createMockChartDefinition();
@@ -838,5 +845,82 @@ describe('GPU comparison with unofficial runs and load sweeps', () => {
     cy.get('#gpu-overlay .dot-group .visible-shape').first().click({ force: true });
     cy.get('[data-chart-tooltip]:visible [data-action="view-power-trace"]').click();
     cy.get('@setMetric').should('have.been.calledWith', POWER_TIMELINE_METRIC_KEY);
+  });
+});
+
+function SerializedPerfRulers() {
+  const store = usePerfRulerStore();
+  return (
+    <div data-testid="i-rulers-serialized">
+      {serializePerfRulers(store?.state ?? EMPTY_PERF_RULER_STATE)}
+    </div>
+  );
+}
+
+describe('GPUGraph run-specific Perf Ruler share links', () => {
+  const RUN_A = '2026-09-09~r27489075807';
+  const RUN_B = '2026-09-09~r27489075808';
+  const SERIES = new Set([`${RUN_A}_b200`, `${RUN_B}_b200`]);
+
+  function RunComparisonShare() {
+    const store = usePerfRulerStoreValue(PERSISTED_PERF_RULER_CHART_ID, undefined, null);
+    const rows = [RUN_A, RUN_B].flatMap((date, runIndex) =>
+      [8, 16, 32].map((conc, index) =>
+        createMockInferenceData({
+          hwKey: 'b200',
+          precision: Precision.FP8,
+          date,
+          conc,
+          x: 200 - index * 50,
+          y: 400 + runIndex * 100 + index * 20,
+          run_url: `https://github.com/SemiAnalysisAI/InferenceX/actions/runs/${date.split('~r')[1]}`,
+        }),
+      ),
+    );
+    const value = createMockInferenceContextValues({
+      selectedYAxisMetric: 'y_measuredAvgPower',
+      selectedGPUs: ['b200'],
+      selectedDates: [RUN_A, RUN_B],
+      selectedDateRange: { startDate: '', endDate: '' },
+      activeDates: SERIES,
+      selectedPrecisions: [Precision.FP8],
+      hardwareConfig: hwConfig,
+      showLineLabels: true,
+    });
+    return (
+      <PerfRulerStoreContext.Provider value={store}>
+        <InferenceContextsProvider data={value} filters={value} display={value} actions={value}>
+          <div style={{ width: 1000, height: 600 }}>
+            <GPUGraph
+              chartId={PERSISTED_PERF_RULER_CHART_ID}
+              modelLabel="DeepSeek V4"
+              data={rows}
+              xLabel="Interactivity"
+              yLabel="Power"
+              chartDefinition={createMockChartDefinition({
+                chartType: 'interactivity',
+                y_measuredAvgPower_roofline: 'lower_right',
+              })}
+            />
+          </div>
+          <SerializedPerfRulers />
+        </InferenceContextsProvider>
+      </PerfRulerStoreContext.Provider>
+    );
+  }
+
+  it('serializes run-qualified comparison rulers into i_rulers form', () => {
+    mountGpuGraph(<RunComparisonShare />);
+    cy.get('[data-testid="legend-advanced-toggle"]').click();
+    cy.get('#gpu-perf-ruler').click({ force: true });
+    cy.get(`#${PERSISTED_PERF_RULER_CHART_ID} .perf-ruler-hit`).should('have.length', 2);
+    cy.get(`#${PERSISTED_PERF_RULER_CHART_ID} .perf-ruler-hit`).eq(0).click({ force: true });
+    cy.get(`#${PERSISTED_PERF_RULER_CHART_ID} .perf-ruler-hit`).eq(1).click({ force: true });
+    cy.get(`#${PERSISTED_PERF_RULER_CHART_ID} .perf-ruler .pr-text-ratio`).should('exist');
+    cy.get('[data-testid="i-rulers-serialized"]')
+      .invoke('text')
+      .should('include', 'roofline-2026-09-09~r27489075807_b200_fp8')
+      .and('include', 'roofline-2026-09-09~r27489075808_b200_fp8')
+      .and('match', /^\d/);
   });
 });

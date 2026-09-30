@@ -115,6 +115,11 @@ toggles and colours. The inference view already returns `comparisons` (one proje
 The per-date toggles are renderer state, not query keys, so no API or OpenAPI contract
 change is required.
 
+Perf Ruler share state (`i_rulers`) also stays in the browser. Both the primary
+scatter chart and date/run comparison chart restore it; run-qualified curve IDs
+retain `~rRUN_ID`. Tooltip scrolling and viewport limits only keep existing actions
+reachable. Neither changes returned values or adds a views API parameter.
+
 ## Fixed-sequence service comparisons
 
 The inference view exposes the same mean/median selector as the dashboard through

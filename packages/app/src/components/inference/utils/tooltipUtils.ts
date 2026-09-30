@@ -562,6 +562,34 @@ const pointDetailActionLink = (action: TooltipAction, href: string, label: strin
   ">${label} &rarr;</a>`;
 
 /**
+ * Outer shell for pinned/hover chart tooltips. Caps width and height to the
+ * viewport so stacked action buttons (logs / PowerX / power trace) stay
+ * reachable on narrow mobile viewports — `computeTooltipPosition` can only
+ * clamp top/left, so a taller-than-viewport shell would still overflow.
+ */
+export const tooltipShellStyle = (opts: {
+  isPinned: boolean;
+  /** Hex/CSS color; omit for the default border token. */
+  border?: string;
+}): string => {
+  const border = opts.border ?? '1px solid var(--border)';
+  return [
+    'background: var(--popover)',
+    `border: ${border}`,
+    'border-radius: 8px',
+    'padding: 12px',
+    'box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1)',
+    `user-select: ${opts.isPinned ? 'text' : 'none'}`,
+    'max-width: min(320px, calc(100vw - 16px))',
+    'max-height: min(70vh, calc(100dvh - 16px))',
+    'overflow-x: hidden',
+    'overflow-y: auto',
+    'overscroll-behavior: contain',
+    'box-sizing: border-box',
+  ].join('; ');
+};
+
+/**
  * Whether a point on the measured-power / energy scatter can jump to its
  * per-second telemetry on the Timeline display. Overlay points qualify too:
  * the trace is keyed by run id and audit name, not by a persisted row id.
@@ -795,7 +823,7 @@ export const generateTooltipContent = (config: TooltipConfig): string => {
   const t = TOOLTIP_STRINGS[locale];
 
   return `
-    <div style="background: var(--popover); border: 1px solid var(--border); border-radius: 8px; padding: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); user-select: ${isPinned ? 'text' : 'none'};">
+    <div style="${tooltipShellStyle({ isPinned })}">
       ${isPinned ? `<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">${t.dismiss}</div>` : ''}
       <div style="color: var(--foreground); font-size: 12px; font-weight: 600; margin-bottom: 8px;">
         ${hardwareConfig[d.hwKey] ? getDisplayLabel(getPointHardwareConfig(d, hardwareConfig[d.hwKey])) : d.hwKey}
@@ -862,7 +890,7 @@ export const generateOverlayTooltipContent = (config: OverlayTooltipConfig): str
   const branch = perRow?.branch ?? overlayData.label;
 
   return `
-    <div style="background: var(--popover); border: 2px solid #dc2626; border-radius: 8px; padding: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); user-select: ${isPinned ? 'text' : 'none'};">
+    <div style="${tooltipShellStyle({ isPinned, border: '2px solid #dc2626' })}">
       ${isPinned ? `<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">${t.dismiss}</div>` : ''}
       <div style="color: #dc2626; font-size: 10px; font-weight: 700; margin-bottom: 4px; text-transform: uppercase;">
         ${t.unofficialRun}
@@ -920,7 +948,7 @@ export const generateGPUGraphTooltipContent = (config: TooltipConfig): string =>
   const t = TOOLTIP_STRINGS[locale];
 
   return `
-    <div style="background: var(--popover); border: 1px solid var(--border); border-radius: 8px; padding: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); user-select: ${isPinned ? 'text' : 'none'};">
+    <div style="${tooltipShellStyle({ isPinned })}">
       ${isPinned ? `<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">${t.dismiss}</div>` : ''}
       ${tooltipLine(t.date, `${formatTooltipDate(d.date, locale)}${d.actualDate && d.actualDate !== d.date ? ` <span style="opacity: 0.7">${t.dataFrom(formatTooltipDate(d.actualDate, locale))}</span>` : ''}`)}
       ${tooltipLine(t.chipConfig, `${hardwareConfig[d.hwKey] ? getDisplayLabel(getPointHardwareConfig(d, hardwareConfig[d.hwKey])) : d.hwKey}`)}

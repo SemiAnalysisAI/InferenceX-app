@@ -917,6 +917,19 @@ describe('serializePerfRulers / parsePerfRulers', () => {
     expect(parsed.draft).toBeNull();
     expect(parsed.nextId).toBe(3);
   });
+
+  it('round-trips run-specific date-comparison curve ids that contain ~', () => {
+    // GPUGraph series ids stamp the comparison entry onto point.date, so a
+    // run-qualified selection yields `roofline-<date>~r<runId>_<hw>_<prec>`.
+    const RUN_A = 'roofline-2026-09-09~r27489075807_b200_fp8';
+    const RUN_B = 'roofline-2026-09-09~r27489075808_b200_fp8';
+    const state = complete(EMPTY_PERF_RULER_STATE, RUN_A, RUN_B, 55.25);
+    const encoded = serializePerfRulers(state);
+    expect(encoded).toBe(`55.25|${RUN_A}|${RUN_B}`);
+    expect(parsePerfRulers(encoded).rulers).toEqual([
+      { id: 1, curveA: RUN_A, curveB: RUN_B, isoX: 55.25 },
+    ]);
+  });
 });
 
 // ── pathXExtent ─────────────────────────────────────────────

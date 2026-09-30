@@ -94,6 +94,7 @@ import {
   isMeasuredEnergyConfigKey,
   isRoleLocalMeasuredEnergyConfigKey,
 } from '@/components/inference/metric-registry';
+import { usePerfRulerStore } from '@/components/inference/perf-ruler-store';
 import {
   clampIsoX,
   clearPerfRulers,
@@ -111,6 +112,7 @@ import {
   renderPerfRulers,
   type PerfRulerEndInput,
   type PerfRulerGeometry,
+  type PerfRulerMeasurement,
   type PerfRulerRenderEntry,
   type PerfRulerState,
 } from '@/lib/d3-chart/layers/perf-ruler';
@@ -830,17 +832,32 @@ const GPUGraph = React.memo(
     // chip configs on the same date, an unofficial run, or a mix — which is
     // the point of this view: quantify the multiple between comparison series
     // at a glance. Load sweeps on the Concurrency axis have no ruler.
-    const [savedPerfRulerMode, setPerfRulerMode] = useState(false);
+    //
+    // When this instance is the primary chart (`chart-0`), rulers ride the
+    // shared PerfRulerStore so run-specific comparison measurements survive
+    // share links (`i_rulers`) and remounts — same contract as ScatterGraph.
+    const perfRulerStore = usePerfRulerStore();
+    const persistedRulers = perfRulerStore?.chartId === chartId ? perfRulerStore : undefined;
+    const [preferPerfRulerMode, setPerfRulerMode] = useState(
+      () =>
+        persistedRulers !== undefined &&
+        (persistedRulers.pending !== null || persistedRulers.state.rulers.length > 0),
+    );
     const perfRulerMode =
-      savedPerfRulerMode && !isConcurrencyAxis && (!powerEnvelopeMode || isMeasuredPowerAxis);
-    const [perfRulerState, setPerfRulerState] = useState<PerfRulerState>(EMPTY_PERF_RULER_STATE);
+      preferPerfRulerMode && !isConcurrencyAxis && (!powerEnvelopeMode || isMeasuredPowerAxis);
+    const [localPerfRulerState, setLocalPerfRulerState] =
+      useState<PerfRulerState>(EMPTY_PERF_RULER_STATE);
+    const perfRulerState = persistedRulers ? persistedRulers.state : localPerfRulerState;
+    const setPerfRulerState = persistedRulers ? persistedRulers.setState : setLocalPerfRulerState;
     // Changing the x- or y-axis metric clears every ruler: the curves are
     // redrawn in different units, so a ruler that persisted would measure a
     // ratio the user never placed. Runs before the draw pass so no stale
-    // ruler ever paints over the new curves.
+    // ruler ever paints over the new curves. Render-time adjustment is only
+    // legal for this component's own state; the store resets persisted rulers
+    // inside the provider (see usePerfRulerStoreValue).
     usePerfRulerAxisReset(
       perfRulerAxisMetricKey(chartDefinition.x_scale_field, selectedYAxisMetric),
-      setPerfRulerState,
+      setLocalPerfRulerState,
     );
     // Draw passes read mode/state through refs so toggling off clears the
     // rulers in the same pre-paint layout pass (no lingering frame).
@@ -944,12 +961,43 @@ const GPUGraph = React.memo(
     const perfRulerRef = useRef({ mode: perfRulerMode, onPointClick: handlePerfRulerPointClick });
     perfRulerRef.current = { mode: perfRulerMode, onPointClick: handlePerfRulerPointClick };
 
+    // Share-link rulers commit only once BOTH curve paths are in the DOM —
+    // same two-phase restore as ScatterGraph (see docs/state-ownership.md).
+    const persistedRulersRef = useRef(persistedRulers);
+    persistedRulersRef.current = persistedRulers;
+    const committedPendingRef = useRef<readonly PerfRulerMeasurement[] | null>(null);
+    const commitPendingPerfRulers = useCallback(
+      (zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>) => {
+        const store = persistedRulersRef.current;
+        const pending = store?.pending ?? null;
+        if (!store || !pending || !perfRulerModeRef.current) return;
+        if (committedPendingRef.current === pending) return;
+        const curveExists = (cls: string) => !zoomGroup.select(`.${CSS.escape(cls)}`).empty();
+        const resolved: PerfRulerMeasurement[] = [];
+        const remaining: PerfRulerMeasurement[] = [];
+        for (const ruler of pending) {
+          if (!curveExists(ruler.curveA) || !curveExists(ruler.curveB)) {
+            remaining.push(ruler);
+            continue;
+          }
+          const isoX = clampPerfRulerIsoXToOverlap(ruler.curveA, ruler.curveB, ruler.isoX);
+          if (isoX !== null) resolved.push({ ...ruler, isoX });
+        }
+        if (remaining.length === pending.length) return;
+        committedPendingRef.current = pending;
+        store.commitPending(resolved, remaining.length > 0 ? remaining : null);
+      },
+      [clampPerfRulerIsoXToOverlap],
+    );
+
     // Turning the toggle off clears ALL rulers and any in-progress selection
     // (the switch handler also clears synchronously; this covers programmatic
     // mode changes). `clearPerfRulers` bails out with the same reference
     // when there is nothing to clear.
     useEffect(() => {
-      if (!perfRulerMode) setPerfRulerState(clearPerfRulers);
+      if (perfRulerMode) return;
+      setPerfRulerState(clearPerfRulers);
+      persistedRulers?.discardPending();
     }, [perfRulerMode]);
 
     // Invisible widened hit strokes over every rendered roofline path make
@@ -1098,6 +1146,7 @@ const GPUGraph = React.memo(
       ) => {
         perfRulerDrawCtxRef.current = { zoomGroup, xScale, yScale, width, height };
         syncPerfRulerHitPaths(zoomGroup);
+        commitPendingPerfRulers(zoomGroup);
         const state = perfRulerStateRef.current;
         const entries: PerfRulerRenderEntry[] = [];
         if (perfRulerModeRef.current && state.rulers.length > 0) {
@@ -1148,7 +1197,7 @@ const GPUGraph = React.memo(
         );
         if (!dragHandles.empty()) dragHandles.call(perfRulerDrag);
       },
-      [syncPerfRulerHitPaths, perfRulerDrag],
+      [syncPerfRulerHitPaths, commitPendingPerfRulers, perfRulerDrag],
     );
     drawPerfRulerRef.current = drawPerfRuler;
 
@@ -1864,7 +1913,10 @@ const GPUGraph = React.memo(
                         // Clear synchronously with the mode flip so the rulers vanish
                         // in the same layout pass (the effect below also clears, for
                         // programmatic mode changes).
-                        if (!c) setPerfRulerState(clearPerfRulers);
+                        if (!c) {
+                          setPerfRulerState(clearPerfRulers);
+                          persistedRulers?.discardPending();
+                        }
                         track('gpu_timeseries_perf_ruler_toggled', { enabled: c });
                       },
                     },
@@ -1881,6 +1933,7 @@ const GPUGraph = React.memo(
                           count: perfRulerState.rulers.length,
                         });
                         setPerfRulerState(clearPerfRulers);
+                        persistedRulers?.discardPending();
                       },
                     },
                   ]
