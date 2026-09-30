@@ -11,6 +11,20 @@ import {
 import { selectRunOverrides } from './run-override-selection';
 
 describe('run override selection', () => {
+  it.each([
+    32403083041, 33219708211, 31927376673, 34413290524, 33716849615, 33219706372, 32346724519,
+  ])('selects only the whole-run purge for GB300 FP4 TensorRT-LLM AgentX run %s', (runId) => {
+    expect(selectRunOverrides(['--run-id', String(runId), '--yes'])).toEqual({
+      runId,
+      conclusions: new Map(),
+      changelogs: [],
+      benchmarks: [],
+      purgedRuns: new Set([runId]),
+      purgedAttempts: new Map(),
+      purgedPoints: [],
+    });
+  });
+
   it.each([35806602041, 34511705667])(
     'selects only the whole-run purge for MiniMax M3 GB200 TensorRT-LLM run %s',
     (runId) => {
@@ -105,20 +119,6 @@ describe('run override selection', () => {
       purgedAttempts: PURGED_RUN_ATTEMPTS,
       purgedPoints: PURGED_BENCHMARK_POINTS,
     });
-  });
-
-  it('isolates the six Qwen refresh patches from unrelated backfills and purges', () => {
-    const selected = selectRunOverrides(['--run-id', '33219708211', '-y', '--no-ssl']);
-    expect(selected.runId).toBe(33219708211);
-    expect(selected.benchmarks.map((entry) => entry.conc).toSorted((a, b) => a - b)).toEqual([
-      7, 44, 52, 96, 565, 704,
-    ]);
-    expect(selected.benchmarks.every((entry) => entry.githubRunId === 33219708211)).toBe(true);
-    expect(selected.conclusions.size).toBe(0);
-    expect(selected.changelogs).toEqual([]);
-    expect(selected.purgedRuns.size).toBe(0);
-    expect(selected.purgedAttempts.size).toBe(0);
-    expect(selected.purgedPoints).toEqual([]);
   });
 
   it('scopes every operation type to its selected run', () => {
