@@ -296,8 +296,9 @@ Figure numbers here follow the current article draft; the share-link table above
 renumbering. Below the measured chart, `ui/PowerServiceComparison.tsx` offers three opt-in
 panels, and the scatter chart adds a fourth. All read the chart's scoped observed points
 (`observedPoints`: official and `?unofficialrun=` rows, comparison clones excluded), keep one
-source per exact run and recipe (`equalServiceSourceKey`), and colour overlay sources with
-`overlayRunColor`.
+source per curve snapshot and recipe (`equalServiceSourceKey`: a stitched append-only curve is
+one source keyed by `curve_workflow_run_id`; rows without a snapshot id key by their own run),
+and colour overlay sources with `overlayRunColor`.
 
 | Figures      | Panel                                                                                                                                         | Switch (share param)                                                                                    | Helper                                                 |
 | ------------ | --------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
@@ -306,6 +307,9 @@ source per exact run and recipe (`equalServiceSourceKey`), and colour overlay so
 | 15           | Least-squares fit of mean W/GPU against output tok/s per allocated GPU: points, line, dashed extension to zero, P₀, P₀ ÷ TDP, m, R², n, range | _Power vs output-rate fit_ (`i_powerfit=1`)                                                             | `utils/power-fit.ts`                                   |
 | 16           | Frontier points: the drawn cross-platform frontier and each point's run and attempt                                                           | Legend _Pareto frontier_ (`i_frontier`) on a measured metric                                            | `utils/frontier-points.ts`                             |
 
+- **Role group** follows the chart's X axis, including the trace-derived P75/P90 E2E-normalized
+  interactivity axes (their values live on `point.x`); equal-service interpolation stays limited
+  to observed service fields and reports `unsupported-axis` there.
 - **Same concurrency** pairs only observations; nothing is interpolated. A side missing at a
   load reads _Not measured_. Disagreeing duplicates of one source read as ambiguous, with none
   chosen. % change needs both sides. Same load usually means different speed, so the table
@@ -317,9 +321,9 @@ source per exact run and recipe (`equalServiceSourceKey`), and colour overlay so
   not measured idle power, and R² describes only that line.
 - **Frontier** lists `globalParetoFrontier`'s own output, so the table is exactly what is
   drawn. Ties keep the first point, official before overlay.
-- **Source labels** (`getEqualServiceSources`) read hardware and date, adding precision,
-  topology, run, attempt, recipe, image or point only where two sources would otherwise look
-  the same. The opaque key stays the exact identity.
+- **Source labels** (`getEqualServiceSources`) read hardware and snapshot date, adding
+  precision, topology, snapshot run, attempt, recipe, image or point only where two sources
+  would otherwise look the same. The opaque key stays the exact identity.
 - Plots export PNG and CSV; the frontier table exports CSV only. Panel subtitles and the
   baseline → comparator pair are export-only, so a PNG names its workload and sources while
   the screen shows only the source selects. The views API returns

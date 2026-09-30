@@ -153,9 +153,14 @@ beside the equal-service comparison rather than replacing it.
 The dashboard and API share `equal-service-comparison.ts`: both consume scoped
 observed points after chart coverage/limits, before frontier and best-per-SKU
 pruning, with power-comparison clones excluded. `allPoints=true` restores clipped
-observations. Source keys retain hardware, precision, exact run, actual source
-date, recipe, topology and workload identity; changing display dates does not
-create a new measured source. Comparisons never join different sources into one
+observations. Source keys retain hardware, precision, source run, source date,
+recipe, topology and workload identity; changing display dates does not create a
+new measured source. The source run is the logical curve snapshot
+(`curve_workflow_run_id` / `curve_date`, see
+[Append-Only Curve Extensions](./data-pipeline.md#append-only-curve-extensions)), so
+points an append-only run stitched onto an older curve stay one source; rows without a
+snapshot id, such as unofficial overlays, key by their own run URL and measured date, and
+an unknown run never joins distinct rows. Comparisons never join different sources into one
 interpolation bracket. All three metrics use bounded numerical linear
 interpolation of the underlying quantities, then compute
 `100 × (comparator / baseline − 1)`. No log-axis interpolation, extrapolation,
@@ -172,7 +177,9 @@ visible.
 `roleShare=true` returns `roleEnergyShares` and `rolePoints` through the same shared
 role helper. Each role point carries prefill and decode mean W/GPU, role-local
 prefill J/input and decode J/output, and the output-token reconstruction below;
-any missing figure is null.
+any missing figure is null. Role points follow the response's `xAxis.field`, including
+the derived `p75_e2e_norm_intvty` / `p90_e2e_norm_intvty` axes; `equalServiceComparison`
+does not interpolate on those axes.
 Validated disaggregated prefill J/input is multiplied by same-window aggregate
 J/output ÷ J/input, then compared with decode J/output. The percentage denominator
 is reconstructed prefill + decode energy on one output-token basis. Missing or
@@ -250,7 +257,9 @@ GPU 视图优先读取已存遥测，缺少存储数据时回退到产物。全�
 该并发数下有观测即列出一行；每侧为 `observed`、`missing`，或同一负载下观测值不一致时的
 `ambiguous`（全部列出、不选其一）；仅当两侧都有观测时才计算变化百分比。同一并发下两者
 的服务速度通常不同，因此该表只作诊断，不替代同等服务对比。`roleShare=true` 另返回
-`rolePoints`（各角色 W/GPU、按本池 token 计的能耗及按输出 token 重建的能耗）。
+`rolePoints`（各角色 W/GPU、按本池 token 计的能耗及按输出 token 重建的能耗）。角色数据点沿用
+响应的 `xAxis.field`，包括派生的 `p75_e2e_norm_intvty` / `p90_e2e_norm_intvty` 横轴；
+`equalServiceComparison` 不在这些横轴上插值。
 `powerFit=true` 返回 `powerFits`：每个数据源以最小二乘法拟合平均 W/GPU 与每个已分配
 GPU 的输出 tok/s，给出 `P₀`、`m`（J/输出 token）、R²、点数、拟合范围和注册表 TDP；
 不同输出速率少于 3 个时不拟合。`P₀` 是外推截距，不是实测空载功耗。这些面板只支持

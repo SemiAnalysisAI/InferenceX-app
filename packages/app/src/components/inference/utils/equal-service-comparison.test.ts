@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import type { InferenceData } from '../types';
+import type { AggDataEntry, InferenceData } from '../types';
 import {
   buildEqualServiceComparison,
   equalServiceSourceKey,
   getEqualServiceSources,
+  getPrefillSharePoints,
+  getRolePoints,
 } from './equal-service-comparison';
 
 const metric = (y: number) => ({ y, roof: false });
@@ -161,5 +163,75 @@ describe('equal-service comparison', () => {
       'B200 (SGLang) · 2026-09-23 · Single-node · GPU4 · TP4 · EP? · Run #3',
       'B300 (SGLang) · 2026-09-23',
     ]);
+  });
+
+  it('keys a stitched append-only curve by its snapshot; rows without one keep their own run', () => {
+    // B200 TP4: run 35905882425 appended c1–c4 onto run 35843506474's c8–c128.
+    const snapshot = { curve_workflow_run_id: 35843506474, curve_date: '2026-09-20' };
+    const stitched = [
+      point({ id: 1, conc: 8, actualDate: '2026-09-20', ...snapshot }),
+      point({
+        id: 2,
+        conc: 1,
+        actualDate: '2026-09-23',
+        run_url: 'https://example.invalid/runs/35905882425/attempts/1',
+        ...snapshot,
+      }),
+    ];
+    const laterSnapshot = point({
+      id: 3,
+      actualDate: '2026-09-20',
+      curve_workflow_run_id: 35900000000,
+      curve_date: '2026-09-20',
+    });
+    const legacy = [
+      point({ id: 4, hwKey: 'b300_sglang', run_url: 'https://example.invalid/runs/7' }),
+      point({ id: 5, hwKey: 'b300_sglang', run_url: 'https://example.invalid/runs/8' }),
+    ];
+    expect(equalServiceSourceKey(stitched[0])).toBe(equalServiceSourceKey(stitched[1]));
+    expect(equalServiceSourceKey(legacy[0])).not.toBe(equalServiceSourceKey(legacy[1]));
+    const sources = getEqualServiceSources([...stitched, laterSnapshot, ...legacy]);
+    expect(sources.map((source) => source.label)).toEqual([
+      'B200 (SGLang) · 2026-09-20 · Run #35843506474',
+      'B200 (SGLang) · 2026-09-20 · Run #35900000000',
+      'B300 (SGLang) · 2026-09-23 · Run #7',
+      'B300 (SGLang) · 2026-09-23 · Run #8',
+    ]);
+  });
+
+  it('plots role panels on the trace-derived P75/P90 axes from point.x without interpolating on them', () => {
+    const role = (overrides: Partial<InferenceData>) =>
+      point({
+        disagg: true,
+        num_prefill_gpu: 4,
+        num_decode_gpu: 4,
+        power_valid: 1,
+        power_metric_schema_version: 2,
+        joules_per_input_token: 1,
+        joules_per_output_token: 8,
+        prefill_joules_per_input_token: 0.4,
+        decode_joules_per_output_token: 4.8,
+        measuredPrefillAvgPower: metric(300),
+        measuredDecodeAvgPower: metric(500),
+        ...overrides,
+      });
+    // The chart and the views API both store the derived value on `x` only.
+    const rows = [
+      role({ id: 1, x: 31.2 }),
+      role({ id: 2, x: 24.8, conc: 16 }),
+      role({ id: 3, x: 28, hwKey: 'b300_sglang', run_url: 'https://example.invalid/runs/2' }),
+    ];
+    const derived = 'p90_e2e_norm_intvty' as keyof AggDataEntry;
+    expect(getRolePoints(rows, derived).map((row) => row.x)).toEqual([24.8, 31.2, 28]);
+    expect(getPrefillSharePoints(rows, derived).map((row) => row.x)).toEqual([24.8, 31.2, 28]);
+    expect(getRolePoints(rows, 'p75_e2e_norm_intvty' as keyof AggDataEntry)).toHaveLength(3);
+    expect(
+      buildEqualServiceComparison(rows, {
+        baseline: equalServiceSourceKey(rows[0]),
+        comparator: equalServiceSourceKey(rows[2]),
+        target: 28,
+        xField: derived,
+      }).reason,
+    ).toBe('unsupported-axis');
   });
 });

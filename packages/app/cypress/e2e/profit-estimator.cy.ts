@@ -110,7 +110,7 @@ function assertDisclosureOpen(testId: string, open: boolean) {
 // Clear the preceding chart before each case changes the viewport.
 describe('Profit estimator power option', { testIsolation: true }, () => {
   for (const locale of ['en', 'zh'] as const) {
-    it(`prices DeepSeek Flash partial chassis with visible assumptions and CSV labels (${locale})`, () => {
+    it(`prices DeepSeek Flash partial chassis with a one-line power note and CSV labels (${locale})`, () => {
       stubOpenRouter();
       cy.viewport(locale === 'en' ? 1280 : 393, 900);
       cy.intercept('GET', '/api/v1/benchmarks*', {
@@ -165,19 +165,11 @@ describe('Profit estimator power option', { testIsolation: true }, () => {
       cy.get('[data-testid="profit-power-unavailable"] > summary').click();
       assertDisclosureOpen('profit-power-unavailable', true);
       cy.get('[data-testid="profit-power-unavailable"] > p').should('be.visible');
-      cy.get('[data-testid="profit-power-note"]').should(
-        'contain',
-        locale === 'en' ? 'unmeasured components are modeled' : '未实测的组件功耗由模型估算',
-      );
-      assertDisclosureOpen('profit-power-assumptions', false);
-      cy.get('[data-testid="profit-power-assumptions"] > summary').click();
-      assertDisclosureOpen('profit-power-assumptions', true);
-      cy.get('[data-testid="profit-power-assumptions"] > p')
-        .should('be.visible')
-        .and('contain', locale === 'en' ? 'partly idle server' : '部分 GPU 闲置');
-      cy.get('[data-testid="profit-power-assumptions"] > summary').click();
+      cy.get('[data-testid="profit-power-note"]')
+        .should('contain', locale === 'en' ? 'All in Measured' : '整体实测功耗')
+        .and('not.contain', locale === 'en' ? 'unmeasured components' : '未实测的组件');
+      cy.get('[data-testid="profit-power-assumptions"]').should('not.exist');
       cy.get('[data-testid="profit-power-unavailable"] > summary').click();
-      assertDisclosureOpen('profit-power-assumptions', false);
       assertDisclosureOpen('profit-power-unavailable', false);
       cy.get('[data-testid="profit-power-note"]').then(($note) => {
         const box = $note[0].getBoundingClientRect();
@@ -352,24 +344,28 @@ describe('Profit estimator power option', { testIsolation: true }, () => {
     });
     chart().find('text.revenue-label').should('have.length', 5);
     cy.get('#profit-power').should('not.exist');
-    cy.get('[data-testid="profit-power-basis"]').should('not.exist');
+    cy.get('[data-testid="profit-power-note"]').should('not.exist');
     cy.get('body').type('{uparrow}{uparrow}{downarrow}{downarrow}');
     cy.get('#profit-power').should('contain', 'Compare both');
     // Four supported SKUs get pairs; GB300 keeps its provisioned bar without CPU power.
     chart().find('text.revenue-label').should('have.length', 9);
     chart().should('contain', 'GB200').and('contain', 'All in Measured');
-    assertDisclosureOpen('profit-power-assumptions', false);
-    cy.get('[data-testid="profit-power-assumptions"] > summary').click();
-    assertDisclosureOpen('profit-power-assumptions', true);
-    cy.get('[data-testid="profit-power-basis"]')
-      .should('contain', 'GB200 NVL72')
+    // The header keeps its one line; the NVL72 basis and modeled components
+    // live in the Power Estimation help and the CSV caption.
+    cy.get('[data-testid="profit-power-note"]')
+      .should('contain', 'Compare both')
+      .and('not.contain', 'NVSwitch trays');
+    cy.get('[data-testid="profit-power-assumptions"]').should('not.exist');
+    cy.get('[data-testid="option-help-profit-power"]').click();
+    cy.get('[data-testid="option-help-content-profit-power"]')
+      .should('be.visible')
+      .and('contain', 'PUE 1.3 for air-cooled chassis or 1.1 for NVL72')
+      .and('contain', 'GB200 NVL72')
       .and('contain', 'measured module (GPU + HBM + Grace + LPDDR5X; module sensor)')
       .and('contain', 'NVSwitch trays')
-      .and('contain', 'DLC PUE 1.1')
-      .and('be.visible');
-    cy.get('[data-testid="profit-power-assumptions"] > p')
-      .first()
-      .should('contain', 'PUE 1.3 for air-cooled chassis or 1.1 for NVL72');
+      .and('contain', 'DLC PUE 1.1');
+    cy.get('body').type('{esc}');
+    cy.get('[data-testid="option-help-content-profit-power"]').should('not.exist');
     // Only GB300's measured estimate is unavailable; its provisioned estimate remains visible.
     cy.get('[data-testid="profit-power-unavailable"]')
       .should('contain', 'GB300')
@@ -377,7 +373,7 @@ describe('Profit estimator power option', { testIsolation: true }, () => {
     chart().scrollIntoView();
     cy.screenshot('profit-nvl72-compare-desktop', { capture: 'viewport', overwrite: true });
     cy.viewport(393, 900);
-    cy.get('[data-testid="profit-power-basis"]').then(($note) => {
+    cy.get('[data-testid="profit-power-note"]').then(($note) => {
       const bounds = $note[0].getBoundingClientRect();
       expect(bounds.left).to.be.at.least(0);
       expect(bounds.right).to.be.at.most(393);
@@ -392,13 +388,14 @@ describe('Profit estimator power option', { testIsolation: true }, () => {
       expect(bounds.right).to.be.at.most(393);
     });
     cy.screenshot('profit-nvl72-chart-mobile', { capture: 'viewport', overwrite: true });
-    cy.get('[data-testid="profit-power-assumptions"] > summary').click();
-    assertDisclosureOpen('profit-power-assumptions', false);
     cy.get('[data-testid="export-button"]').first().click();
     cy.get('[data-testid="export-csv-button"]').click();
     cy.then(() => csv!.text()).then((text) => {
       expect(text).to.contain('Power basis,Power sensor,System power profile');
       expect(text).to.contain('PUE 1.3 for air-cooled chassis or 1.1 for NVL72');
+      expect(text).to.contain('GB200 NVL72');
+      expect(text).to.contain('NVSwitch trays');
+      expect(text).to.contain('DLC PUE 1.1');
       const rows = text.split('\n').filter((line) => line.startsWith('GB200'));
       expect(rows).to.have.length(2);
       expect(rows.some((row) => row.includes('All in Provisioned'))).to.equal(true);

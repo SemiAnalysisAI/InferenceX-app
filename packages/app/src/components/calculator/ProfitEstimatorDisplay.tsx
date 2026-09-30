@@ -218,7 +218,6 @@ const STRINGS = {
       extrapolated: 'Full-chassis extrapolation',
     },
     powerPreview: `${ALL_IN_MEASURED_NOTE.en} AgentX system power is not yet qualified.`,
-    powerDetailsLabel: 'Power assumptions',
     powerDetails:
       'GPU power is interpolated between the same throughput points. Includes PUE 1.3 for air-cooled chassis or 1.1 for NVL72, and 10% headroom. Aggregate multinode hosts use the measured deployment mean. Full-chassis extrapolation fills an eight-GPU server with replicas of the measured 1/2/4-GPU workload at the same per-GPU power and throughput; it does not measure a partly idle server.',
     unavailableEstimates: (count: number) => `Unavailable estimates (${count})`,
@@ -349,7 +348,6 @@ const STRINGS = {
       extrapolated: '整机外推',
     },
     powerPreview: `${ALL_IN_MEASURED_NOTE.zh} AgentX 系统功耗模型尚未完成验证。`,
-    powerDetailsLabel: '功耗估算假设',
     powerDetails:
       'GPU 功耗在相同的吞吐量数据点间插值，风冷机箱 PUE 为 1.3，NVL72 为 1.1，另加 10% 功耗余量。聚合多节点按部署平均功耗估算各台服务器。整机外推假设八卡服务器部署多个相同的实测单卡、双卡或四卡实例，每卡功耗和吞吐量保持不变；它不代表部分 GPU 闲置时的整机实测功耗。',
     unavailableEstimates: (count: number) => `无法估算（${count} 项）`,
@@ -1425,28 +1423,9 @@ function ProfitEstimatorInner({
           )}
         </Heading>
         {powerControlsEnabled && (
-          <div className="mb-2 text-xs text-muted-foreground" data-testid="profit-power-note">
-            <p>
-              {t.powerLabel}: {t.powerOptions[powerBasis]}
-              {powerBasis !== 'provisioned' && <>. {t.powerPreview}</>}
-            </p>
-            {powerBasis !== 'provisioned' && (
-              <details className="mt-1" data-testid="profit-power-assumptions">
-                <summary
-                  className="cursor-pointer"
-                  onClick={() => track('profit_estimator_power_assumptions_toggled')}
-                >
-                  {t.powerDetailsLabel}
-                </summary>
-                <p className="mt-1">{t.powerDetails}</p>
-                {powerBasisNotes.length > 0 && (
-                  <p className="mt-1" data-testid="profit-power-basis">
-                    {powerBasisNotes.join(' ')}
-                  </p>
-                )}
-              </details>
-            )}
-          </div>
+          <p className="mb-2 text-xs text-muted-foreground" data-testid="profit-power-note">
+            {t.powerLabel}: {t.powerOptions[powerBasis]}
+          </p>
         )}
         {basis === 'gw-year' && powerBasis !== 'provisioned' && fullEstimate.skipped.length > 0 && (
           <details
@@ -1537,7 +1516,6 @@ function ProfitEstimatorInner({
   }, [
     pricing,
     powerBasis,
-    powerBasisNotes,
     powerControlsEnabled,
     powerUnavailable,
     fullEstimate.skipped,
@@ -1613,7 +1591,9 @@ function ProfitEstimatorInner({
       ...(powerControlsEnabled
         ? [
             `${t.powerLabel}: ${t.powerOptions[powerBasis]}`,
-            ...(powerBasis === 'provisioned' ? [] : [t.powerPreview, t.powerDetails]),
+            ...(powerBasis === 'provisioned'
+              ? []
+              : [t.powerPreview, t.powerDetails, ...powerBasisNotes]),
           ]
         : []),
     ]);
@@ -1627,6 +1607,7 @@ function ProfitEstimatorInner({
     basis,
     selectedRunDate,
     powerBasis,
+    powerBasisNotes,
     powerControlsEnabled,
   ]);
 
@@ -1700,7 +1681,12 @@ function ProfitEstimatorInner({
                       <LabelWithTooltip
                         htmlFor="profit-power"
                         label={t.powerLabel}
-                        tooltip={t.powerTooltip}
+                        tooltip={[
+                          t.powerTooltip,
+                          t.powerPreview,
+                          t.powerDetails,
+                          ...powerBasisNotes,
+                        ].join(' ')}
                       />
                       <div data-testid="profit-power-selector">
                         <MultiSelect

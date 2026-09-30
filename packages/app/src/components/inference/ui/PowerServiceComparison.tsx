@@ -159,6 +159,21 @@ export default function PowerServiceComparison({
   const sources = useMemo(() => getEqualServiceSources(data, locale), [data, locale]);
   const base = baseline || sources[0]?.key || '';
   const peer = comparator || sources[1]?.key || '';
+  // Turning Compare on pins the pair the user sees: otherwise an added overlay
+  // run or a filter change re-sorts `sources` and silently retargets the panels.
+  // A share link that pre-enables Compare keeps resolving dynamically, because
+  // its rows arrive in any order (an overlay can land before the official rows)
+  // and pinning mid-load would fix both sides on the same source. The URL sync
+  // below records the resolved keys, so a reload restores the pair explicitly.
+  const toggleCompare = useCallback(
+    (checked: boolean) => {
+      setEnabled(checked);
+      if (!checked) return;
+      if (!baseline && sources[0]) setBaseline(sources[0].key);
+      if (!comparator && sources[1]) setComparator(sources[1].key);
+    },
+    [baseline, comparator, sources],
+  );
   const previousAxis = useRef(xField);
   useEffect(() => {
     if (previousAxis.current !== xField) {
@@ -291,7 +306,7 @@ export default function PowerServiceComparison({
       <div className="no-export flex flex-wrap gap-4 text-sm">
         <PanelToggle
           checked={enabled}
-          onChange={setEnabled}
+          onChange={toggleCompare}
           label={t.compare}
           testId="equal-service-toggle"
           event="inference_equal_service_toggled"
