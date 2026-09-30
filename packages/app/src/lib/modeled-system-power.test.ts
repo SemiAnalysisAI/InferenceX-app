@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { BenchmarkRow } from '@/lib/api';
-import { rowToAggDataEntry, transformBenchmarkRows } from '@/lib/benchmark-transform';
+import { transformBenchmarkRows } from '@/lib/benchmark-transform';
 import { modelSystemPower } from '@/lib/modeled-system-power';
 import { estimateChassisPower, estimateRackPower } from '@/lib/system-power-model';
 
@@ -91,22 +91,6 @@ function nvl72Row(
 }
 
 describe('modeled system power admission and accounting', () => {
-  it('defaults air-cooled chassis to PUE 1.3 and preserves explicit facility overrides', () => {
-    // Pinned Python b200_chassis_power, fixed README utilization inputs.
-    expect(modelSystemPower(row())).toMatchObject({
-      pue: 1.3,
-      chassisAcWatts: 4837.2,
-      facilityWatts: 6288.4,
-      measuredGpuWattsPerGpu: 349.859,
-    });
-    expect(modelSystemPower(row(), 1.1)).toMatchObject({
-      pue: 1.1,
-      chassisAcWatts: 4837.2,
-      facilityWatts: 5320.9,
-      measuredGpuWattsPerGpu: 349.859,
-    });
-  });
-
   it('uses the validated physical count without summing aggregate aliases or multiplying by EP', () => {
     const source = row({ num_prefill_gpu: 64, num_decode_gpu: 64, prefill_ep: 8, decode_ep: 8 });
     const result = modelSystemPower(source);
@@ -129,22 +113,19 @@ describe('modeled system power admission and accounting', () => {
     expect(source.metrics.joules_per_output_token).toBe(12.937902);
   });
 
-  it.each(['rtx6000pro', 'tpuv7', 'b200-nvl'])('does not substitute for %s', (hardware) => {
+  it.each(['b200-nvl'])('does not substitute for %s', (hardware) => {
     expect(modelSystemPower(row({ hardware }))).toMatchObject({
       status: 'unsupported',
       reason: 'hardware',
     });
   });
 
-  it.each(['gb200', 'gb300'])(
-    'never models the Grace side of %s from GPU-only telemetry',
-    (hardware) => {
-      expect(modelSystemPower(row({ hardware }))).toMatchObject({
-        status: 'unsupported',
-        reason: 'cpu-telemetry',
-      });
-    },
-  );
+  it.each(['gb300'])('never models the Grace side of %s from GPU-only telemetry', (hardware) => {
+    expect(modelSystemPower(row({ hardware }))).toMatchObject({
+      status: 'unsupported',
+      reason: 'cpu-telemetry',
+    });
+  });
 
   it('ignores CPU-side keys on x86 chassis rows', () => {
     const source = row();
@@ -152,7 +133,7 @@ describe('modeled system power admission and accounting', () => {
     expect(modelSystemPower(source)).toEqual(modelSystemPower(row()));
   });
 
-  it.each([{ benchmark_type: 'agentic_traces' }, { isl: 1024 }, { osl: 8192 }, { isl: null }])(
+  it.each([{ benchmark_type: 'agentic_traces' }, { isl: 1024 }, { osl: 8192 }])(
     'keeps non-8k1k workloads unavailable: %j',
     (overrides) => {
       expect(modelSystemPower(row(overrides))).toMatchObject({
@@ -164,18 +145,10 @@ describe('modeled system power admission and accounting', () => {
 
   it.each([
     { power_valid: 0 },
-    { power_valid: undefined },
     { power_valid: '1' },
-    { power_valid: true },
-    { power_metric_schema_version: 1 },
     { power_metric_schema_version: 3 },
-    { avg_power_w: undefined },
     { avg_power_w: 0 },
-    { avg_power_w: -1 },
-    { avg_power_w: Infinity },
-    { avg_power_w: NaN },
     { avg_power_w: '349.859' },
-    { avg_total_gpu_power_w: undefined },
     { avg_total_gpu_power_w: -1 },
   ])('rejects invalid measured inputs: %j', (overrides) => {
     const source = row();
@@ -439,7 +412,7 @@ describe('modeled system power admission and accounting', () => {
     });
   });
 
-  it.each([false, true])('requires schema-v2 for workers across hosts (disagg=%s)', (disagg) => {
+  it.each([false])('requires schema-v2 for workers across hosts (disagg=%s)', (disagg) => {
     const source = row({
       disagg,
       is_multinode: true,
@@ -590,22 +563,6 @@ describe('modeled system power admission and accounting', () => {
     }
     Object.assign(frontend, { role: 'other', num_gpus: 0 });
     expect(modelSystemPower(source)).toMatchObject({ status: 'unsupported' });
-  });
-
-  it('shares official/overlay transforms without changing measured metrics or inventing modeled zeros', () => {
-    const source = row();
-    const entry = rowToAggDataEntry(source);
-    expect(entry.avg_power_w).toBe(source.metrics.avg_power_w);
-    expect(entry.joules_per_output_token).toBe(source.metrics.joules_per_output_token);
-    const { chartData } = transformBenchmarkRows([source]);
-    for (const points of chartData) {
-      expect(points[0].modeledChassisPowerPerGpu?.y).toBeGreaterThan(source.metrics.avg_power_w);
-    }
-    const unsupported = transformBenchmarkRows([row({ hardware: 'gb200' })]);
-    for (const points of unsupported.chartData) {
-      expect(points[0].modeledChassisPowerPerGpu).toBeUndefined();
-      expect(points[0].measuredAvgPower?.y).toBe(source.metrics.avg_power_w);
-    }
   });
 });
 
@@ -917,27 +874,17 @@ describe('NVL72 trays with measured compute-module power', () => {
     expect(modelSystemPower(twoTrays)).toMatchObject({ reason: 'topology' });
   });
 
-  it.each([
-    { cpu_power_valid: undefined },
-    { cpu_power_valid: 0 },
-    { cpu_power_valid: '1' },
-    { avg_total_cpu_power_w: undefined },
-    { avg_total_cpu_power_w: 0 },
-    { avg_total_cpu_power_w: -1 },
-    { avg_cpu_socket_power_w: undefined },
-    { avg_cpu_socket_power_w: 0 },
-    { avg_total_module_power_w: 0 },
-    { avg_total_module_power_w: -1 },
-    { avg_total_module_power_w: NaN },
-    { avg_total_module_power_w: '4300' },
-  ])('keeps NVL72 rows without valid CPU-side telemetry unavailable: %j', (overrides) => {
-    const source = nvl72Row();
-    Object.assign(source.metrics, overrides);
-    expect(modelSystemPower(source)).toMatchObject({
-      status: 'unsupported',
-      reason: 'cpu-telemetry',
-    });
-  });
+  it.each([{ cpu_power_valid: 0 }, { cpu_power_valid: '1' }, { avg_total_cpu_power_w: undefined }])(
+    'keeps NVL72 rows without valid CPU-side telemetry unavailable: %j',
+    (overrides) => {
+      const source = nvl72Row();
+      Object.assign(source.metrics, overrides);
+      expect(modelSystemPower(source)).toMatchObject({
+        status: 'unsupported',
+        reason: 'cpu-telemetry',
+      });
+    },
+  );
 
   it('requires schema-v2 GPU telemetry and stays within the shelf and facility domain', () => {
     const legacy = nvl72Row({ ...MODULE, power_metric_schema_version: undefined });

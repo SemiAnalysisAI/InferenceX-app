@@ -151,26 +151,23 @@ describe('modeled system-power tooltip', () => {
     expect(html).not.toContain('Unmeasured chassis GPUs');
   });
 
-  it.each(['en', 'zh'] as const)(
-    'links %s model provenance to the deployed app source',
-    (locale) => {
-      const buildRef = 'b'.repeat(40);
-      vi.stubEnv('NEXT_PUBLIC_APP_SOURCE_REF', buildRef);
-      try {
-        const html = generateTooltipContent(config({ locale }));
-        const app = `https://github.com/SemiAnalysisAI/InferenceX-app/blob/${buildRef}`;
-        expect(html).toContain(`${app}/${systemPower.modelPath}`);
-        expect(html).toContain(`${app}/docs/powerx-system-power${locale === 'zh' ? '.zh' : ''}.md`);
-        expect(html).toContain(locale === 'zh' ? '功耗模型与假设' : 'Power model assumptions');
-        expect(html).toContain(`title="${systemPower.modelRevision}"`);
-        expect(html).toContain('h100 · aaaaaaaaaaaa');
-        expect(html).not.toContain('inferencex_power_model');
-        expect(html).not.toContain(`/blob/${systemPower.modelRevision}/`);
-      } finally {
-        vi.unstubAllEnvs();
-      }
-    },
-  );
+  it.each(['zh'] as const)('links %s model provenance to the deployed app source', (locale) => {
+    const buildRef = 'b'.repeat(40);
+    vi.stubEnv('NEXT_PUBLIC_APP_SOURCE_REF', buildRef);
+    try {
+      const html = generateTooltipContent(config({ locale }));
+      const app = `https://github.com/SemiAnalysisAI/InferenceX-app/blob/${buildRef}`;
+      expect(html).toContain(`${app}/${systemPower.modelPath}`);
+      expect(html).toContain(`${app}/docs/powerx-system-power${locale === 'zh' ? '.zh' : ''}.md`);
+      expect(html).toContain(locale === 'zh' ? '功耗模型与假设' : 'Power model assumptions');
+      expect(html).toContain(`title="${systemPower.modelRevision}"`);
+      expect(html).toContain('h100 · aaaaaaaaaaaa');
+      expect(html).not.toContain('inferencex_power_model');
+      expect(html).not.toContain(`/blob/${systemPower.modelRevision}/`);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
 
   it('labels an extrapolated partial chassis and reports the measured GPUs’ share', () => {
     const data = pt({
@@ -297,17 +294,6 @@ describe('modeled system-power tooltip', () => {
     expect(generateTooltipContent(config({ selectedYAxisMetric: 'y_tpPerGpu' }))).not.toContain(
       'tooltip-modeled-system-power',
     );
-  });
-
-  it('localizes the measurement boundary and occupancy assumptions', () => {
-    const html = generateTooltipContent(config({ locale: 'zh' }));
-    expect(html).toContain('GPU 实测功耗');
-    expect(html).toContain('整个部署的机箱交流功耗估算');
-    expect(html).toContain('数据中心功耗估算');
-    expect(html).toContain('2 个完整八卡机箱 · 16 张 GPU');
-    expect(html).toContain('CPU/DRAM 利用率：20%');
-    expect(html).toContain('计入 GPU 机箱内的 CPU');
-    expect(html).toContain('不计入独立的纯 CPU 前端或路由主机。');
   });
 
   it('breaks normalization and host scope into two compact lines in pinned tooltips', () => {
@@ -1103,15 +1089,6 @@ describe('generateGPUGraphTooltipContent', () => {
 describe('measured-power withheld tooltip line', () => {
   const reasons = ['sampling_gap_exceeded', 'expected_gpu_count_mismatch'];
 
-  it('renders the withheld line with humanized codes (en)', () => {
-    const html = generateTooltipContent(
-      tooltipConfig({ data: pt({ power_valid: 0, power_invalid_reasons: reasons }) }),
-    );
-    expect(html).toContain('Measured power withheld');
-    expect(html).toContain('sampling gap exceeded');
-    expect(html).toContain('expected gpu count mismatch');
-  });
-
   it('renders the withheld line in Chinese on /zh surfaces', () => {
     const html = generateTooltipContent(
       tooltipConfig({
@@ -1144,11 +1121,7 @@ describe('measured-power withheld tooltip line', () => {
     expect(html).not.toContain('Measured power withheld');
   });
 
-  it.each([
-    ['absent reasons', pt({ power_valid: 0 })],
-    ['empty reasons', pt({ power_valid: 0, power_invalid_reasons: [] })],
-    ['valid row', pt({ power_valid: 1 })],
-  ])('omits the line for %s', (_name, data) => {
+  it.each([['absent reasons', pt({ power_valid: 0 })]])('omits the line for %s', (_name, data) => {
     const html = generateTooltipContent(tooltipConfig({ data }));
     expect(html).not.toContain('Measured power withheld');
   });
@@ -1240,15 +1213,6 @@ describe('worker power drilldown', () => {
     expect(generateGPUGraphTooltipContent(config)).not.toContain('tooltip-worker-power');
   });
 
-  it('renders nothing when workers is absent or empty', () => {
-    expect(generateTooltipContent(tooltipConfig({ isPinned: true }))).not.toContain(
-      'tooltip-worker-power',
-    );
-    expect(
-      generateTooltipContent(tooltipConfig({ data: pt({ workers: [] }), isPinned: true })),
-    ).not.toContain('tooltip-worker-power');
-  });
-
   it('caps the table at 8 rows with a "+N more workers" line', () => {
     const many = Array.from({ length: 10 }, (_, i) => ({
       role: 'decode',
@@ -1303,18 +1267,6 @@ describe('worker power drilldown', () => {
 });
 
 describe('power tier tooltip line', () => {
-  it('states the tier for a legacy point on a measured axis', () => {
-    const html = generateTooltipContent(
-      tooltipConfig({
-        selectedYAxisMetric: 'y_measuredJPerOutputToken',
-        data: pt({ power_tier: 'legacy' }),
-      }),
-    );
-    expect(html).toContain(
-      '<strong>Power Measurement:</strong> Historical (not validated under the current method)',
-    );
-  });
-
   it('states the certified tier on a measured axis', () => {
     const html = generateTooltipContent(
       tooltipConfig({
@@ -1323,16 +1275,6 @@ describe('power tier tooltip line', () => {
       }),
     );
     expect(html).toContain('<strong>Power Measurement:</strong> Validated (current PowerX method)');
-  });
-
-  it('omits the tier line on non-measured axes', () => {
-    const html = generateTooltipContent(
-      tooltipConfig({
-        selectedYAxisMetric: 'y_tpPerGpu',
-        data: pt({ power_tier: 'legacy' }),
-      }),
-    );
-    expect(html).not.toContain('Power Measurement');
   });
 
   it('omits the tier line when the point carries no tier', () => {

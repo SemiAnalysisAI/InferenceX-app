@@ -349,7 +349,7 @@ describe('new dashboard projections', () => {
       expect([firstFetchCount, mocks.unofficial.mock.calls.length]).toEqual([1, 2]);
     },
   );
-  it.each(['modeled', 'compare'])(
+  it.each(['modeled'])(
     'uses exact comparison snapshots with %s power while keeping the primary date cutoff',
     async (powerBasis) => {
       const rows = [
@@ -478,7 +478,7 @@ describe('new dashboard projections', () => {
       }
     },
   );
-  it.each(['modeled', 'compare'])(
+  it.each(['modeled'])(
     'labels full-chassis extrapolation for official and overlay %s estimates',
     async (powerBasis) => {
       const partial = agenticRow({

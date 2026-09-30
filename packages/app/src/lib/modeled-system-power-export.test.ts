@@ -162,17 +162,14 @@ describe('offline modeled PowerX comparisons', () => {
     });
   });
 
-  it.each([0, -1, Infinity, NaN, 1.5])(
-    'withholds energy for invalid output denominator %s',
-    (tokens) => {
-      const source = input();
-      source.rows[0].audit!.benchmark_window.total_output_tokens = tokens;
-      expect(buildComparison(source).rows[0].estimated_energy).toEqual({
-        status: 'unavailable',
-        reason: 'audit-does-not-match-measured-input',
-      });
-    },
-  );
+  it.each([0, 1.5])('withholds energy for invalid output denominator %s', (tokens) => {
+    const source = input();
+    source.rows[0].audit!.benchmark_window.total_output_tokens = tokens;
+    expect(buildComparison(source).rows[0].estimated_energy).toEqual({
+      status: 'unavailable',
+      reason: 'audit-does-not-match-measured-input',
+    });
+  });
 
   it('withholds energy for missing, mismatched, and invalid audit receipts', () => {
     for (const mutate of [

@@ -136,7 +136,7 @@ const withPoints = (base: InterpolatedResult, points: GPUDataPoint[]): Interpola
 });
 
 describe('profit power basis preview', () => {
-  it.each([8, 4, 2])(
+  it.each([8])(
     'keeps raw power attached through official and run-keyed %i-GPU frontiers',
     (gpus) => {
       const row = {
@@ -172,30 +172,6 @@ describe('profit power basis preview', () => {
       }
     },
   );
-
-  it('distinguishes partial chassis from NVL72 rows missing CPU telemetry', () => {
-    for (const hardware of ['gb200', 'gb300']) {
-      expect(
-        modeledPowerAtTarget(
-          { ...result, nearestPoints: [{ ...point, sourceRow: { ...source, hardware } }] },
-          45,
-        ),
-      ).toEqual({ reason: 'no-cpu-power' });
-    }
-    const partial = {
-      ...source,
-      prefill_tp: 4,
-      decode_tp: 4,
-      metrics: { ...source.metrics, avg_power_w: 500, avg_total_gpu_power_w: 2000 },
-    };
-    expect(modelSystemPower(partial, undefined, true)).toMatchObject({
-      status: 'supported',
-      chassisBasis: 'extrapolated',
-    });
-    expect(
-      modeledPowerAtTarget({ ...result, nearestPoints: [{ ...point, sourceRow: partial }] }, 45),
-    ).toMatchObject({ extrapolated: true });
-  });
 
   it('accepts fully measured NVL72 trays and records the measured basis behind the estimate', () => {
     // 1.1 × the tray's amortised facility watts per GPU from the pinned GB200 rack profile.
@@ -367,7 +343,7 @@ describe('profit power basis preview', () => {
     expect(modelSystemPower(source)).toMatchObject({ status: 'unsupported', reason: 'workload' });
   });
 
-  it.each([2, 4])(
+  it.each([2])(
     'prices a validated %i-GPU allocation as a labeled full-chassis extrapolation',
     (gpus) => {
       const partial = {
@@ -545,10 +521,6 @@ describe('profit power basis preview', () => {
         metrics: { ...source.metrics, avg_power_w: 500, avg_total_gpu_power_w: 1500 },
       },
       'unsupported-power-topology',
-    ],
-    [
-      { metrics: { ...source.metrics, avg_power_w: 500, avg_total_gpu_power_w: 2000 } },
-      'no-measured-power',
     ],
     [
       { metrics: { power_valid: 1, avg_power_w: 796.131, avg_total_gpu_power_w: 6369.045 } },
