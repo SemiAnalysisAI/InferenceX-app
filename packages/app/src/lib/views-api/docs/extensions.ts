@@ -122,8 +122,8 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
     '模型许可或收入分成百分比，范围 0 至 100，默认值随模型变化。',
   ],
   powerBasis: [
-    'provisioned (default, All in Provisioned), modeled (All in Measured) or compare. All in Measured uses measured GPU power plus modeled unmeasured components and PUE; it is not measured wall power. Eligible measured source rows are required; powerLabel identifies paired estimates and full-chassis extrapolation. Missing coverage is not zero.',
-    'provisioned（默认，整体预配功耗）、modeled（整体实测功耗）或 compare。整体实测功耗采用 GPU 实测值，加上未实测组件的功耗估算和 PUE，并非墙上电表读数。该估算需要符合条件的实测数据行；powerLabel 标明对比方式和整机外推。缺失数据不按零处理。',
+    'provisioned (default, All in Provisioned), modeled (All in Measured) or compare. All in Measured uses measured GPU power plus modeled unmeasured components and PUE; it is not measured wall power. Eligible measured source rows are required; powerLabel identifies paired estimates and full-chassis extrapolation. NVL72 requires validated GPU and Grace/module telemetry with complete socket coverage; CPU rail alone is insufficient. powerSource records topology, measured basis, sensor, PUE and the model revision, path and profile hash. compare retains provisioned estimates when measured estimates are unavailable; skipped reasons distinguish missing CPU power and incompatible sensor bases. Missing coverage is not zero.',
+    'provisioned（默认，整体预配功耗）、modeled（整体实测功耗）或 compare。整体实测功耗采用 GPU 实测值，加上未实测组件的功耗估算和 PUE，并非墙上电表读数。该估算需要符合条件的实测数据行；powerLabel 标明对比方式和整机外推。NVL72 需要通过验证的 GPU 与 Grace/模块遥测，并完整覆盖所有 socket；仅 CPU rail 读数不满足要求。powerSource 记录拓扑、实测口径、传感器、PUE 及模型版本、路径和 profile 哈希。compare 在实测估算不可用时保留预配估算；skipped 原因区分 CPU 功耗缺失与传感器口径不兼容。缺失数据不按零处理。',
   ],
   power: [
     'Comma-separated certified and/or legacy power tiers. Omit for all tiers.',

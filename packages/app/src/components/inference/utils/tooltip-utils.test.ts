@@ -185,6 +185,56 @@ describe('modeled system-power tooltip', () => {
     expect(zh).not.toContain('6000 W');
   });
 
+  it('names NVL72 compute trays and the measured basis instead of eight-GPU chassis', () => {
+    const trays = {
+      ...systemPower,
+      hardware: 'gb200',
+      modelPath: 'human_verified/gb200_nvl72_rack/gb200_nvl72_rack_power_model.py',
+      gpuCount: 8,
+      chassisCount: 2,
+      modeledGpuCount: 8,
+      pue: 1.1,
+      topologyBasis: 'nvl72-trays',
+      measuredBasis: 'module',
+      sensorKind: 'module',
+    } satisfies SystemPowerEstimate;
+    const html = generateTooltipContent(config({ data: pt({ modeledSystemPower: trays }) }));
+    expect(html).toContain('2 full NVL72 compute trays · 8 GPUs');
+    expect(html).toContain('Measured: module sensor (GPU + HBM + Grace + LPDDR5X)');
+    expect(html).toContain('Rack AC is divided by all 72 GPUs');
+    expect(html).toContain('Grace CPU and LPDDR5X are measured');
+    expect(html).toContain('PUE 1.1');
+    expect(html).not.toContain('eight-GPU chassis');
+    expect(html).not.toContain('CPU/DRAM utilization');
+    expect(html).not.toContain('Includes GPU chassis CPUs');
+
+    const partial = pt({
+      physicalChips: 3,
+      modeledSystemPower: {
+        ...trays,
+        gpuCount: 3,
+        chassisCount: 1,
+        modeledGpuCount: 4,
+        chassisBasis: 'extrapolated',
+        measuredBasis: 'gpu-plus-grace',
+        sensorKind: 'grace-socket',
+      },
+    });
+    const en = generateTooltipContent(config({ data: partial }));
+    expect(en).toContain('1 NVL72 compute tray · 3 of 4 GPUs measured, extrapolated to full tray');
+    expect(en).toContain('Unmeasured tray GPUs are assumed to run the same workload');
+    expect(en).toContain('Measured: GPU board + Grace socket. Modeled: regulator loss');
+    expect(en).not.toContain('Unmeasured chassis GPUs');
+
+    const zh = generateTooltipContent(config({ data: partial, locale: 'zh' }));
+    expect(zh).toContain('1 个 NVL72 计算 tray · 实测 3/4 张 GPU，按满 tray 外推');
+    expect(zh).toContain('假设 tray 内未实测的 GPU 运行相同负载');
+    expect(zh).toContain('实测：GPU 板卡 + Grace socket');
+    expect(zh).toContain('Grace CPU 与 LPDDR5X 为实测值');
+    expect(zh).not.toContain('八卡机箱');
+    expect(zh).not.toContain('CPU/DRAM 利用率');
+  });
+
   it('preserves the same model provenance in unofficial and date-comparison tooltips', () => {
     const official = config();
     const overlay = generateOverlayTooltipContent({

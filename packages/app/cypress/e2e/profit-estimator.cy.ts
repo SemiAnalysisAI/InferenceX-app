@@ -38,6 +38,7 @@ import { interceptVrPublicationData } from '../support/vr-publication-fixtures';
 import {
   interceptProfitData,
   profitBenchmarkRows,
+  profitNvl72Rows,
   PROFIT_CHANGELOG_NOTES,
   PROFIT_DATE,
   PROFIT_HISTORY_DATE,
@@ -146,10 +147,10 @@ describe('Profit estimator power option', { testIsolation: true }, () => {
         },
       );
       const label = locale === 'en' ? 'Full-chassis extrapolation' : '整机外推';
-      const hardwareReason =
+      const cpuReason =
         locale === 'en'
-          ? 'no system power model for this hardware'
-          : '该硬件暂无适用的系统功耗模型';
+          ? 'missing complete Grace or module power'
+          : '缺少完整的 Grace 或 module 功耗';
       cy.get('#profit-target').should('have.value', '125');
       chart().find('text.revenue-label').should('have.length', 3);
       chart()
@@ -159,7 +160,7 @@ describe('Profit estimator power option', { testIsolation: true }, () => {
         .and('contain', label);
       cy.get('[data-testid="profit-power-unavailable"]')
         .should('contain', 'GB300')
-        .and('contain', hardwareReason);
+        .and('contain', cpuReason);
       assertDisclosureOpen('profit-power-unavailable', false);
       cy.get('[data-testid="profit-power-unavailable"] > summary').click();
       assertDisclosureOpen('profit-power-unavailable', true);
@@ -234,7 +235,7 @@ describe('Profit estimator power option', { testIsolation: true }, () => {
     cy.then(() => expect(rawRequests).to.equal(0));
     cy.get('body').type('{uparrow}{uparrow}{downarrow}{downarrow}');
     cy.get('#profit-power').should('contain', 'Compare both');
-    chart().find('text.revenue-label').should('have.length', 6);
+    chart().find('text.revenue-label').should('have.length', 7);
     cy.window().then((win) => {
       win.localStorage.removeItem('inferencex-feature-gate');
       win.dispatchEvent(new Event('inferencex:feature-gate:locked'));
@@ -245,7 +246,7 @@ describe('Profit estimator power option', { testIsolation: true }, () => {
   });
 
   for (const currentValid of [true, false]) {
-    it(`dates historical power skips without current hardware metadata (${currentValid ? 'with current bars' : 'empty chart'})`, () => {
+    it(`dates historical power skips without current hardware metadata (${currentValid ? 'with current bars' : 'provisioned bars only'})`, () => {
       stubOpenRouter();
       cy.intercept('GET', '/api/v1/benchmarks*', (req) => {
         const historical = req.query['date'] === PROFIT_HISTORY_DATE;
@@ -278,8 +279,9 @@ describe('Profit estimator power option', { testIsolation: true }, () => {
         'contain',
         `B200 (SGLang) (FP4) • ${PROFIT_HISTORY_DATE}`,
       );
-      if (currentValid) chart().find('text.revenue-label').should('have.length', 2);
-      else cy.get('[data-testid="profit-estimator-chart"]').should('not.exist');
+      chart()
+        .find('text.revenue-label')
+        .should('have.length', currentValid ? 4 : 3);
     });
   }
 
@@ -309,10 +311,103 @@ describe('Profit estimator power option', { testIsolation: true }, () => {
     cy.wait('@power-rows').its('request.query').should('not.have.property', 'view');
     cy.get('#profit-power').should('contain', 'Compare both');
     cy.get('#profit-target').should('have.value', '45');
-    chart().find('text.revenue-label').should('have.length', 6);
+    chart().find('text.revenue-label').should('have.length', 7);
     chart().should('contain', 'B200').and('contain', 'B300').and('contain', 'MI355X');
     chart().should('contain', 'All in Measured').and('contain', 'All in Provisioned');
     cy.get('[data-testid="profit-power-unavailable"]').should('contain', 'GB300');
+  });
+
+  it('prices a GB200 NVL72 tray on its measured compute module and names the basis', () => {
+    stubOpenRouter();
+    cy.viewport(1280, 900);
+    cy.intercept('GET', '/api/v1/benchmarks*', (req) => {
+      req.reply({
+        body: [
+          ...profitBenchmarkRows().map((row) => ({
+            ...row,
+            metrics: {
+              ...row.metrics,
+              power_valid: 1,
+              power_metric_schema_version: 2,
+              avg_power_w: 500,
+              avg_total_gpu_power_w: 4000,
+            },
+          })),
+          ...profitNvl72Rows(),
+        ],
+      });
+    });
+    let csv: Blob | undefined;
+    // Locked: the control stays hidden and the tray prices on provisioned power like every SKU.
+    cy.visit('/profit-estimator-per-gigawatt?c_power=compare', {
+      onBeforeLoad: (win) => {
+        suppressNudges(win);
+        win.localStorage.removeItem('inferencex-feature-gate');
+        win.URL.createObjectURL = (blob) => {
+          if (blob instanceof win.Blob) csv = blob;
+          return 'blob:profit-nvl72-csv-test';
+        };
+        win.HTMLAnchorElement.prototype.click = () => {};
+      },
+    });
+    chart().find('text.revenue-label').should('have.length', 5);
+    cy.get('#profit-power').should('not.exist');
+    cy.get('[data-testid="profit-power-basis"]').should('not.exist');
+    cy.get('body').type('{uparrow}{uparrow}{downarrow}{downarrow}');
+    cy.get('#profit-power').should('contain', 'Compare both');
+    // Four supported SKUs get pairs; GB300 keeps its provisioned bar without CPU power.
+    chart().find('text.revenue-label').should('have.length', 9);
+    chart().should('contain', 'GB200').and('contain', 'All in Measured');
+    assertDisclosureOpen('profit-power-assumptions', false);
+    cy.get('[data-testid="profit-power-assumptions"] > summary').click();
+    assertDisclosureOpen('profit-power-assumptions', true);
+    cy.get('[data-testid="profit-power-basis"]')
+      .should('contain', 'GB200 NVL72')
+      .and('contain', 'measured module (GPU + HBM + Grace + LPDDR5X; module sensor)')
+      .and('contain', 'NVSwitch trays')
+      .and('contain', 'DLC PUE 1.1')
+      .and('be.visible');
+    cy.get('[data-testid="profit-power-assumptions"] > p')
+      .first()
+      .should('contain', 'PUE 1.3 for air-cooled chassis or 1.1 for NVL72');
+    // Only GB300's measured estimate is unavailable; its provisioned estimate remains visible.
+    cy.get('[data-testid="profit-power-unavailable"]')
+      .should('contain', 'GB300')
+      .and('not.contain', 'GB200');
+    chart().scrollIntoView();
+    cy.screenshot('profit-nvl72-compare-desktop', { capture: 'viewport', overwrite: true });
+    cy.viewport(393, 900);
+    cy.get('[data-testid="profit-power-basis"]').then(($note) => {
+      const bounds = $note[0].getBoundingClientRect();
+      expect(bounds.left).to.be.at.least(0);
+      expect(bounds.right).to.be.at.most(393);
+    });
+    chart().find('text.revenue-label').should('have.length', 9);
+    chart().scrollIntoView();
+    cy.screenshot('profit-nvl72-compare-mobile', { capture: 'viewport', overwrite: true });
+    chartSvg().scrollIntoView().should('be.visible');
+    chartSvg().then(($svg) => {
+      const bounds = $svg[0].getBoundingClientRect();
+      expect(bounds.left).to.be.at.least(0);
+      expect(bounds.right).to.be.at.most(393);
+    });
+    cy.screenshot('profit-nvl72-chart-mobile', { capture: 'viewport', overwrite: true });
+    cy.get('[data-testid="profit-power-assumptions"] > summary').click();
+    assertDisclosureOpen('profit-power-assumptions', false);
+    cy.get('[data-testid="export-button"]').first().click();
+    cy.get('[data-testid="export-csv-button"]').click();
+    cy.then(() => csv!.text()).then((text) => {
+      expect(text).to.contain('Power basis,Power sensor,System power profile');
+      expect(text).to.contain('PUE 1.3 for air-cooled chassis or 1.1 for NVL72');
+      const rows = text.split('\n').filter((line) => line.startsWith('GB200'));
+      expect(rows).to.have.length(2);
+      expect(rows.some((row) => row.includes('All in Provisioned'))).to.equal(true);
+      const measured = rows.find((row) => row.includes('measured module'));
+      expect(measured).to.contain('GPU + HBM + Grace + LPDDR5X; module sensor');
+      expect(measured).to.contain(',module,');
+      expect(measured).to.contain('gb200_nvl72_rack_power_model.py @ ');
+      expect(measured).to.contain(' sha256:');
+    });
   });
 
   it('keeps the benchmark settings and restores the original chart after unavailable power', () => {

@@ -93,8 +93,8 @@ import {
   type ProfitEstimatorRow,
   type ProfitEstimatorSkipReason,
 } from './profit-estimator';
-import { profitEstimatorChartStrings, rowLabel } from './ProfitEstimatorChart';
-import { estimateProfitByPower, type ProfitPowerBasis } from './profit-power';
+import { powerBasisLabel, profitEstimatorChartStrings, rowLabel } from './ProfitEstimatorChart';
+import { estimateProfitByPower, powerSourceKey, type ProfitPowerBasis } from './profit-power';
 import {
   buildProfitHistoryResults,
   historyFadeShare,
@@ -220,8 +220,11 @@ const STRINGS = {
     powerPreview: `${ALL_IN_MEASURED_NOTE.en} AgentX system power is not yet qualified.`,
     powerDetailsLabel: 'Power assumptions',
     powerDetails:
-      'GPU power is interpolated between the same throughput points. Includes PUE 1.3 and 10% headroom. Full-chassis extrapolation fills an eight-GPU server with replicas of the measured 1/2/4-GPU workload at the same per-GPU power and throughput; it does not measure a partly idle server.',
+      'GPU power is interpolated between the same throughput points. Includes PUE 1.3 for air-cooled chassis or 1.1 for NVL72, and 10% headroom. Aggregate multinode hosts use the measured deployment mean. Full-chassis extrapolation fills an eight-GPU server with replicas of the measured 1/2/4-GPU workload at the same per-GPU power and throughput; it does not measure a partly idle server.',
     unavailableEstimates: (count: number) => `Unavailable estimates (${count})`,
+    powerNvl72Note: (hardware: string, basis: string, pue: number) =>
+      `${hardware}: ${basis}. Modeled: NVSwitch trays, NICs/DPUs, NVMe, power shelves, DLC PUE ${pue}.`,
+    csvPowerHeaders: ['Power basis', 'Power sensor', 'System power profile'],
     pricingGroup: 'Pricing Config',
     costProviderLabel: 'Cost Provider',
     costProviderTooltip:
@@ -299,13 +302,16 @@ const STRINGS = {
       ],
     },
     skipped: (entries: string) => `Not priced: ${entries}.`,
+    modeledUnavailable: (entries: string) => `Measured + modeled unavailable: ${entries}.`,
     skipReason: {
       'outside-measured-range': 'no measured point at the target interactivity',
       'no-power': 'no all-in power figure',
       'no-measured-power': 'no usable measured power for these benchmark points',
+      'no-cpu-power': 'missing complete Grace or module power for these benchmark points',
+      'incompatible-power-basis': 'bounding points use different power measurement bases',
       'unsupported-power-hardware': 'no system power model for this hardware',
       'unsupported-power-topology':
-        'this topology cannot be modeled as whole replicas on one eight-GPU server',
+        'GPU counts, physical hosts or role power do not support this system model',
       'outside-power-model': 'these benchmark points are outside the supported power model',
       'no-cost': 'no TCO for this tier',
       'no-token-mix': 'no input/output token mix recorded',
@@ -345,8 +351,11 @@ const STRINGS = {
     powerPreview: `${ALL_IN_MEASURED_NOTE.zh} AgentX 系统功耗模型尚未完成验证。`,
     powerDetailsLabel: '功耗估算假设',
     powerDetails:
-      'GPU 功耗在相同的吞吐量数据点间插值，计入 PUE 1.3 和 10% 功耗余量。整机外推假设八卡服务器部署多个相同的实测单卡、双卡或四卡实例，每卡功耗和吞吐量保持不变；它不代表部分 GPU 闲置时的整机实测功耗。',
+      'GPU 功耗在相同的吞吐量数据点间插值，风冷机箱 PUE 为 1.3，NVL72 为 1.1，另加 10% 功耗余量。聚合多节点按部署平均功耗估算各台服务器。整机外推假设八卡服务器部署多个相同的实测单卡、双卡或四卡实例，每卡功耗和吞吐量保持不变；它不代表部分 GPU 闲置时的整机实测功耗。',
     unavailableEstimates: (count: number) => `无法估算（${count} 项）`,
+    powerNvl72Note: (hardware: string, basis: string, pue: number) =>
+      `${hardware}：${basis}。建模部分：NVSwitch tray、网卡/DPU、NVMe、电源架，液冷 PUE ${pue}。`,
+    csvPowerHeaders: ['功耗口径', '功耗传感器', '系统功耗 profile'],
     pricingGroup: '定价配置',
     costProviderLabel: '成本供应商',
     costProviderTooltip:
@@ -424,12 +433,15 @@ const STRINGS = {
       ],
     },
     skipped: (entries: string) => `未定价：${entries}。`,
+    modeledUnavailable: (entries: string) => `实测加建模估算不可用：${entries}。`,
     skipReason: {
       'outside-measured-range': '未在该交互性下实测',
       'no-power': '缺少全电源配置功率数据',
       'no-measured-power': '同一组基准测试数据点缺少有效功耗',
+      'no-cpu-power': '同一组基准测试数据点缺少完整的 Grace 或 module 功耗',
+      'incompatible-power-basis': '插值两端的功耗测量口径不同',
       'unsupported-power-hardware': '该硬件暂无适用的系统功耗模型',
-      'unsupported-power-topology': '该拓扑无法按完整实例部署在单台八卡服务器上建模',
+      'unsupported-power-topology': 'GPU 数量、物理主机或各角色功耗不满足系统模型要求',
       'outside-power-model': '这些基准测试数据点超出功耗模型的适用范围',
       'no-cost': '该层级无 TCO 数据',
       'no-token-mix': '未记录输入/输出 token 比例',
@@ -1363,7 +1375,7 @@ function ProfitEstimatorInner({
 
   const powerUnavailable = useMemo(
     () =>
-      t.skipped(
+      (powerBasis === 'compare' ? t.modeledUnavailable : t.skipped)(
         fullEstimate.skipped
           .map((row) => {
             const label = rowLabel(
@@ -1374,8 +1386,27 @@ function ProfitEstimatorInner({
           })
           .join('; '),
       ),
-    [fullEstimate.skipped, hardwareConfig, historyEntryLabel, t],
+    [fullEstimate.skipped, hardwareConfig, historyEntryLabel, powerBasis, t],
   );
+
+  const powerBasisNotes = useMemo(() => {
+    const notes = new Map<string, string>();
+    for (const row of estimate.rows) {
+      const source = row.powerSource;
+      if (source?.topology !== 'nvl72-trays') continue;
+      const key = `${row.hwKey}|${powerSourceKey(source)}`;
+      if (notes.has(key)) continue;
+      notes.set(
+        key,
+        t.powerNvl72Note(
+          rowLabel({ hwKey: row.hwKey }, hardwareConfig),
+          powerBasisLabel(source, locale),
+          source.pue,
+        ),
+      );
+    }
+    return [...notes.values()];
+  }, [estimate.rows, hardwareConfig, locale, t]);
 
   // Rendered as the chart's figcaption so it is part of the PNG export.
   const caption = useMemo(() => {
@@ -1408,6 +1439,11 @@ function ProfitEstimatorInner({
                   {t.powerDetailsLabel}
                 </summary>
                 <p className="mt-1">{t.powerDetails}</p>
+                {powerBasisNotes.length > 0 && (
+                  <p className="mt-1" data-testid="profit-power-basis">
+                    {powerBasisNotes.join(' ')}
+                  </p>
+                )}
               </details>
             )}
           </div>
@@ -1501,6 +1537,7 @@ function ProfitEstimatorInner({
   }, [
     pricing,
     powerBasis,
+    powerBasisNotes,
     powerControlsEnabled,
     powerUnavailable,
     fullEstimate.skipped,
@@ -1536,6 +1573,18 @@ function ProfitEstimatorInner({
   const handleExportCsv = useCallback(() => {
     // Whole dollars are plenty per GW-year; per chip-hour the cents are the figure.
     const usd = (value: number) => (basis === 'gw-year' ? Math.round(value) : value.toFixed(4));
+    // Measured + modeled rows name their basis, sensor, and pinned profile so a
+    // spreadsheet can tell a measured module from a modeled chassis per row.
+    const includeBasis = powerControlsEnabled && powerBasis !== 'provisioned';
+    const basisColumns = (row: ProfitEstimatorRow) => {
+      const source = row.powerSource;
+      if (!source) return [t.powerBarLabels.provisioned, '', ''];
+      return [
+        powerBasisLabel(source, locale),
+        source.topology === 'nvl72-trays' ? source.sensorKind : '',
+        `${source.modelPath} @ ${source.modelRevision}${source.profileSha256 ? ` sha256:${source.profileSha256}` : ''}`,
+      ];
+    };
     const rows = estimate.rows.map((row) => [
       rowLabel({ ...row, date: undefined }, hardwareConfig),
       row.precision?.toUpperCase() ?? '',
@@ -1549,9 +1598,17 @@ function ProfitEstimatorInner({
       row.revenuePerGpuHour.toFixed(4),
       // GPU-hours is 1 per chip-hour, so that basis has no column for it.
       ...(basis === 'gw-year' ? [Math.round(row.gpuHours)] : []),
+      ...(includeBasis ? basisColumns(row) : []),
     ]);
     const [sku, precision, ...rest] = t.csvHeaders[basis];
-    exportToCsv(exportFileName, [sku, precision, t.csvDateHeader, ...rest], rows, [
+    const headers = [
+      sku,
+      precision,
+      t.csvDateHeader,
+      ...rest,
+      ...(includeBasis ? t.csvPowerHeaders : []),
+    ];
+    exportToCsv(exportFileName, headers, rows, [
       t.captionFormula[basis](assumptions.utilizationPct, assumptions.labCutPct),
       ...(powerControlsEnabled
         ? [
@@ -1565,6 +1622,7 @@ function ProfitEstimatorInner({
     hardwareConfig,
     exportFileName,
     t,
+    locale,
     assumptions,
     basis,
     selectedRunDate,

@@ -60,6 +60,19 @@ function derive(source: BenchmarkRow) {
 }
 
 describe('power boundaries through the derived-field builder', () => {
+  it('keeps measured GPU boundaries when NVL72 CPU telemetry is unavailable', () => {
+    const { entry, fields } = derive(row({ hardware: 'gb200' }));
+    expect(entry.modeledSystemPower).toMatchObject({
+      status: 'unsupported',
+      reason: 'cpu-telemetry',
+    });
+    expect(fields.measuredAvgPower).toBeDefined();
+    expect(fields.gpuProvisionedWatts).toBeDefined();
+    expect(fields.utilityProvisionedWatts).toBeDefined();
+    expect(fields.utilityModeledWatts).toBeUndefined();
+    expect(fields.utilityModeledJPerOutputToken).toBeUndefined();
+  });
+
   it('serves the same fields to ?unofficialrun= overlays through transformBenchmarkRows', () => {
     const { chartData } = transformBenchmarkRows([row()], 'median', 'external');
     const point = chartData[0][0];

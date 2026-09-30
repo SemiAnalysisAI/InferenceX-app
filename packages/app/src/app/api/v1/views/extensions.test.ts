@@ -390,6 +390,94 @@ describe('new dashboard projections', () => {
       expect(body.comparisons[0].data.rows[0].revenuePerGpuHour).toBeCloseTo(5.8536, 4);
     },
   );
+  it('returns NVL72 measured basis and matching capacity for official and overlay estimates', async () => {
+    const tray = agenticRow({
+      hardware: 'gb200',
+      prefill_tp: 4,
+      decode_tp: 4,
+      num_prefill_gpu: 4,
+      num_decode_gpu: 4,
+      power_audit: {
+        cpu: { sensor_kind: 'module', expected_sockets: 2, observed_sockets: 2 },
+      },
+      metrics: {
+        ...agenticRow().metrics,
+        avg_power_w: 900.25,
+        avg_total_gpu_power_w: 3601,
+        cpu_power_valid: 1,
+        avg_total_module_power_w: 4300.75,
+      },
+    });
+    mocks.benchmarks.mockImplementation(() => Response.json([tray]));
+    mocks.unofficial.mockImplementation(() =>
+      Response.json({ benchmarks: [{ ...tray, id: 456 }], evaluations: [] }),
+    );
+    const response = await gw(
+      req(
+        'profit-estimator-per-gigawatt',
+        'model=DeepSeek-V4-Pro&target=45&priceSource=custom&powerBasis=compare&unofficialrun=456',
+      ),
+    );
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    for (const output of [body.data, body.overlays]) {
+      expect(output.skipped).toEqual([]);
+      expect(output.rows).toHaveLength(2);
+      const [provisioned, modeled] = output.rows;
+      expect(provisioned.powerLabel).toBe('All in Provisioned');
+      expect(provisioned.powerSource).toBeUndefined();
+      expect(modeled.powerLabel).toBe('All in Measured');
+      expect(modeled.powerSource).toMatchObject({
+        topology: 'nvl72-trays',
+        measuredBasis: 'module',
+        sensorKind: 'module',
+        pue: 1.1,
+        modelPath: 'human_verified/gb200_nvl72_rack/gb200_nvl72_rack_power_model.py',
+        modelRevision: expect.stringMatching(/^[0-9a-f]{40}$/u),
+        profileSha256: expect.stringMatching(/^[0-9a-f]{64}$/u),
+      });
+      // Pinned rack reference: 1.6077325 kW/GPU, including PUE and planning margin.
+      expect(modeled.gpuHours).toBeCloseTo((1_000_000 / 1.6077325) * 8760, 2);
+      expect(modeled.revenuePerGpuHour).toBe(provisioned.revenuePerGpuHour);
+    }
+  });
+  it.each([
+    [1, 'no-cpu-power'],
+    [0, 'no-measured-power'],
+  ] as const)(
+    'retains provisioned NVL72 estimates with GPU verdict %i and explains missing measured power',
+    async (powerValid, reason) => {
+      const missing = agenticRow({
+        hardware: 'gb300',
+        prefill_tp: 4,
+        decode_tp: 4,
+        num_prefill_gpu: 4,
+        num_decode_gpu: 4,
+        metrics: {
+          ...agenticRow().metrics,
+          avg_total_gpu_power_w: 2400,
+          power_valid: powerValid,
+        },
+      });
+      mocks.benchmarks.mockImplementation(() => Response.json([missing]));
+      for (const powerBasis of ['compare', 'modeled']) {
+        const response = await gw(
+          req(
+            'profit-estimator-per-gigawatt',
+            `model=DeepSeek-V4-Pro&target=45&priceSource=custom&powerBasis=${powerBasis}`,
+          ),
+        );
+        expect(response.status).toBe(200);
+        const body = await response.json();
+        expect(body.data.rows).toHaveLength(powerBasis === 'compare' ? 1 : 0);
+        if (powerBasis === 'compare') {
+          expect(body.data.rows[0].powerLabel).toBe('All in Provisioned');
+          expect(body.data.rows[0].powerSource).toBeUndefined();
+        }
+        expect(body.data.skipped).toMatchObject([{ reason }]);
+      }
+    },
+  );
   it.each(['modeled', 'compare'])(
     'labels full-chassis extrapolation for official and overlay %s estimates',
     async (powerBasis) => {
