@@ -88,7 +88,7 @@ export function useChartData(
   selectedRunDate?: string,
   enabled = true,
   latestAvailableDate?: string,
-  selectedPercentile = 'p75',
+  selectedPercentile = 'p90',
   /** When set, only series for these two registry GPU keys are shown (compare pages). */
   compareGpuPair?: readonly [string, string] | null,
   /**

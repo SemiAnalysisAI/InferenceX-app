@@ -489,8 +489,8 @@ export function InferenceProvider({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Agentic x-axis latency basis is fixed at p75 (no Latency Percentile control).
-  const selectedPercentile = 'p75';
+  // Agentic x-axis latency basis is fixed at p90 (no Latency Percentile control).
+  const selectedPercentile = 'p90';
   const selectedE2eXAxisMetric = resolveE2eXAxisMetric(
     requestedE2eXAxisMetric,
     selectedXAxisMode,

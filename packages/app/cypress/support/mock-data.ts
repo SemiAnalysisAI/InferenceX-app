@@ -226,7 +226,7 @@ export function createMockInferenceContextValues(
     openRouterPricingLoading: false,
     openRouterPricingError: null,
     setTokenRevenuePriceSource: namedStub('setTokenRevenuePriceSource'),
-    selectedPercentile: 'p75',
+    selectedPercentile: 'p90',
     fixedSequenceStatistic: 'median',
     setFixedSequenceStatistic: namedStub('setFixedSequenceStatistic'),
     selectedXAxisMetric: null,
