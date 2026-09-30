@@ -126,7 +126,7 @@ Dividing watts by one hardware's positive, constant TDP preserves its boundary m
 
 Upper boundaries use monotone interpolation between unique-X vertices, including after zoom. Curves are grouped by hardware, precision and date, and additionally by run for unofficial overlays; unrelated dates and runs never share a curve.
 
-**Perf Ruler** is available on all six measured-power axes in both chart views. It measures the ratio of the drawn upper-boundary values at the same X coordinate, using the rendered paths after zoom; clicking an off-boundary dot selects its series' boundary, clamped to the curves' shared X range. The ratio compares power or percentage of TDP, not energy efficiency. Optimal Only changes point visibility without moving the ruler. Hidden or removed curves cannot be measured, and changing either axis clears existing rulers. Modeled chassis power keeps its existing ruler restriction while showing an upper boundary; energy and other Pareto views retain their ruler behavior.
+**Perf Ruler** is available on all six measured-power axes in the single-run scatter chart (`ScatterGraph`) only; the date-comparison chart (`GPUGraph`) has no ruler. It measures the ratio of the drawn upper-boundary values at the same X coordinate, using the rendered paths after zoom; clicking an off-boundary dot selects its series' boundary, clamped to the curves' shared X range. The ratio compares power or percentage of TDP, not energy efficiency. Optimal Only changes point visibility without moving the ruler. Hidden or removed curves cannot be measured, and changing either axis clears existing rulers. Modeled chassis power keeps its existing ruler restriction while showing an upper boundary; energy and other Pareto views retain their ruler behavior.
 
 ### Observed concurrency sweeps
 
@@ -134,7 +134,7 @@ Upper boundaries use monotone interpolation between unique-X vertices, including
 
 `groupConcurrencySeries` groups straight-line segments by hardware, precision, topology (`pointTopologyKey`), recipe fingerprint, date, run and power-comparison variant. It never joins TP4 to TP8 or 4P/4D to 16P/16D. A group with repeated concurrency values, or points without run provenance, stays as markers instead of being reduced to an arbitrary average or envelope. Markers retain their original values and identities. These segments connect observations; they do not establish a hardware-controlled comparison or estimate untested loads.
 
-Official and unofficial paths share this behavior. Date comparisons stay on `GPUGraph` and split each compared (date, hardware) series and each unofficial run into the same segments, drawn with linear curves and without frontier, power envelope, Optimal Only or Perf Ruler; each series keeps one line label, on its longest segment. Exact topology quick filters retain that topology's entire load sweep. Share URLs, tables and CSV exports preserve the selected `conc` coordinates.
+Official and unofficial paths share this behavior. Date comparisons stay on `GPUGraph` and split each compared (date, hardware) series and each unofficial run into the same segments, drawn with linear curves and without frontier, power envelope or Optimal Only; each series keeps one line label, on its longest segment. Exact topology quick filters retain that topology's entire load sweep. Share URLs, tables and CSV exports preserve the selected `conc` coordinates.
 
 ### Unofficial runs in date comparisons
 
