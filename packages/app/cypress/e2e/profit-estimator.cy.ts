@@ -660,6 +660,9 @@ describe('Profit Estimator per GW', () => {
   });
 
   it('switches to custom $/GPU/hr when a caption badge is edited', () => {
+    // This case verifies the published default; the preceding case edits the
+    // same badge on the shared page, so start with a fresh estimator instance.
+    cy.visit('/profit-estimator-per-gigawatt', { onBeforeLoad: suppressNudges });
     cy.get('[data-testid="result-context-cost-tier"]').should(
       'contain.text',
       'Owning at Large Hyperscaler Volume',

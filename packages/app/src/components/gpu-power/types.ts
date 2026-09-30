@@ -203,9 +203,8 @@ export function getAvailableMetrics(data: GpuMetricRow[]): GpuMetricConfig[] {
 /** TDP for a known hardware key, e.g. the benchmark point's own `hardware`. */
 export function tdpForHardware(hardware: string | undefined): { sku: string; tdp: number } | null {
   const key = hardware?.toLowerCase();
-  if (!key) return null;
-  const entry = HW_REGISTRY[key];
-  return entry ? { sku: key.toUpperCase(), tdp: entry.tdp } : null;
+  const entry = key ? HW_REGISTRY[key] : undefined;
+  return entry ? { sku: key!.toUpperCase(), tdp: entry.tdp } : null;
 }
 
 /**
