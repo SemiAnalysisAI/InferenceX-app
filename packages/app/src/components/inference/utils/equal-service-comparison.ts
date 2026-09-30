@@ -82,6 +82,8 @@ const sourceDate = (point: InferenceData): string =>
 /**
  * Concurrency is excluded; unknown run identity must never join distinct rows.
  * Rows with a curve snapshot key by that snapshot instead of their own run.
+ * A snapshot can retain multiple telemetry producers; their hashes stay on the
+ * observations, while recipe, image and topology still distinguish configurations.
  */
 export function equalServiceSourceKey(point: InferenceData): string {
   const snapshot = curveSnapshotId(point);
@@ -110,8 +112,8 @@ export function equalServiceSourceKey(point: InferenceData): string {
     point.kv_p2p_transfer ?? null,
     point.router_name ?? null,
     point.router_version ?? null,
-    point.power_audit?.producer_sha ?? null,
-    point.power_audit?.exporter_image_sha256 ?? null,
+    snapshot === null ? (point.power_audit?.producer_sha ?? null) : null,
+    snapshot === null ? (point.power_audit?.exporter_image_sha256 ?? null) : null,
   ]);
 }
 

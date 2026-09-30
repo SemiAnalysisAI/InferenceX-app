@@ -245,8 +245,8 @@ const parameters: readonly ApiParameter[] = [
     required: false,
     type: 'string',
     description: text(
-      'Exact comparator key from serviceSources. Omitted selects the second deterministic source. Keys retain hardware, source run, recipe, topology and workload identity; never replace them with a hardware name.',
-      'serviceSources 中的完整对比来源键。省略时按确定性顺序选择第二项。来源键保留硬件、运行、配置配方、拓扑和工作负载标识，不能用硬件名称代替。',
+      'Exact comparator key from serviceSources. Omitted selects the second deterministic source. Keys retain hardware, curve snapshot, recipe, image, topology and workload identity. Stitched telemetry producer/exporter hashes do not split a snapshot; rows without one retain their own run, date and hashes. Never substitute a hardware name.',
+      'serviceSources 中的完整对比来源键。省略时按确定性顺序选择第二项。来源键保留硬件、曲线快照、测试配置指纹、镜像、拓扑和工作负载标识。同一快照内不同 telemetry producer/exporter 的 hash 不拆分来源；没有快照的行仍按原运行、日期和 hash 区分。不能用硬件名称代替。',
     ),
     schema: stringSchema,
     example: 'Exact key returned in serviceSources',

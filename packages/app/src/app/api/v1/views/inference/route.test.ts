@@ -102,12 +102,20 @@ beforeEach(() => {
 });
 
 describe('GET /api/v1/views/inference', () => {
-  it('calculates equal-service panels from observed points before frontier pruning with endpoint provenance', async () => {
+  it('compares stitched observations before frontier pruning and preserves each producer endpoint', async () => {
     const rows = ['h200', 'mi300x'].flatMap((hardware, index) =>
       [20, 60].map((x, position) =>
         makeRow({
           hardware,
           conc: position + 1,
+          curve_workflow_run_id: 900,
+          curve_date: '2026-03-02',
+          date: position === 0 ? '2026-03-01' : '2026-03-02',
+          run_url: `https://github.com/org/repo/actions/runs/${777 + position}`,
+          power_audit: {
+            producer_sha: `producer-${position}`,
+            exporter_image_sha256: `exporter-${position}`,
+          },
           metrics: {
             ...makeRow().metrics,
             median_intvty: x,
@@ -147,6 +155,7 @@ describe('GET /api/v1/views/inference', () => {
     );
     const body = await response.json();
     expect(response.status).toBe(200);
+    expect(body.serviceSources).toHaveLength(2);
     expect(body.serviceSources).toEqual(sources);
     expect(body.equalServiceComparison.metrics.meanWattsPerGpu.changePercent).toBeCloseTo(100 / 6);
     expect(body.equalServiceComparison.metrics.outputTokensPerSecond.changePercent).toBeCloseTo(
@@ -167,8 +176,14 @@ describe('GET /api/v1/views/inference', () => {
       ),
     ).toEqual(rows.slice(0, 2).map((row) => row.id));
     expect(
-      body.equalServiceComparison.metrics.meanWattsPerGpu.baseline.endpoints[0].point.runUrl,
-    ).toBe(rows[0].run_url);
+      body.equalServiceComparison.metrics.meanWattsPerGpu.baseline.endpoints.map(
+        (endpoint: { point: { runUrl: string } }) => endpoint.point.runUrl,
+      ),
+    ).toEqual(rows.slice(0, 2).map((row) => row.run_url));
+    expect(body.matchedConcurrency.rows).toMatchObject([
+      { concurrency: 1, baseline: { status: 'observed' }, comparator: { status: 'observed' } },
+      { concurrency: 2, baseline: { status: 'observed' }, comparator: { status: 'observed' } },
+    ]);
     expect(body).not.toHaveProperty('observedPoints');
     expect(body.equalServiceCurve).toHaveLength(2);
   });

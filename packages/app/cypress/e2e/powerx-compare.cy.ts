@@ -82,9 +82,17 @@ const availability = [
   },
 ];
 
-/** Official rows; their run URL makes them one source, as ingested runs do. */
 function interceptRows(officialRunUrl: string) {
-  const official = rows(null, 'b200').map((row) => ({ ...row, run_url: officialRunUrl }));
+  const official = rows(null, 'b200').map((row, index) => ({
+    ...row,
+    curve_workflow_run_id: 27182818284,
+    curve_date: DATE,
+    run_url: index === 0 ? officialRunUrl : `${officialRunUrl}0`,
+    power_audit: {
+      producer_sha: index === 0 ? 'producer-a' : 'producer-b',
+      exporter_image_sha256: index === 0 ? 'exporter-a' : 'exporter-b',
+    },
+  }));
   cy.intercept('GET', '/api/v1/availability', { body: availability }).as('availability');
   cy.intercept('GET', '/api/v1/benchmarks*', { body: official }).as('benchmarks');
   cy.intercept('GET', '/api/v1/workflow-info*', {
@@ -159,6 +167,7 @@ describe('PowerX article panels', () => {
       OFFICIAL_RUN_URL,
     );
     cy.wait('@unofficialRun');
+    cy.get('[data-testid="equal-service-baseline"] option').should('have.length', 2);
 
     // Official B200 against the overlay H200 at each observed concurrency.
     for (const [conc] of CONFIGS) {
