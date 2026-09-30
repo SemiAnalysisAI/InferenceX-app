@@ -408,56 +408,55 @@ export const METRIC_REGISTRY = {
   // telemetry, so the telemetry-only decorations must not treat them as such.
   gpuProvisionedWatts: {
     field: 'gpuProvisionedWatts.y',
-    label: 'GPU Provisioned Power per Chip (TDP, W)',
+    label: 'GPU Level Provisioned Power per Chip (TDP, W)',
     labelZh: '每芯片 GPU 额定功耗（TDP，W）',
-    title: 'GPU Provisioned Power per Chip (TDP)',
+    title: 'GPU Level Provisioned Power per Chip (TDP)',
     titleZh: '每芯片 GPU 额定功耗（TDP）',
     polarity: 'lower',
   },
   gpuProvisionedJPerOutputToken: {
     field: 'gpuProvisionedJPerOutputToken.y',
-    label: 'GPU Provisioned J per Output Token (TDP, J/tok)',
+    label: 'GPU Level Provisioned J per Output Token (TDP, J/tok)',
     labelZh: '每输出 token GPU 额定能耗（TDP，J/tok）',
-    title: 'GPU Provisioned Joules per Output Token (TDP)',
+    title: 'GPU Level Provisioned Joules per Output Token (TDP)',
     titleZh: '每输出 token GPU 额定焦耳能耗（TDP）',
     polarity: 'lower',
   },
   utilityProvisionedWatts: {
     field: 'utilityProvisionedWatts.y',
-    label: 'Utility Provisioned Power per Chip (all-in, W)',
-    labelZh: '每芯片全电源配置功耗（all-in，W）',
-    title: 'Utility Provisioned Power per Chip (all-in)',
-    titleZh: '每芯片全电源配置功耗（all-in）',
+    label: 'All in Provisioned Power per Chip (W)',
+    labelZh: '每芯片整体预配功耗（W）',
+    title: 'All in Provisioned Power per Chip',
+    titleZh: '每芯片整体预配功耗',
     polarity: 'lower',
   },
   // Unlike the ungated `jOutput`, which divides by output tokens per decode
   // GPU, this normalizes by every allocated GPU (prefill + decode).
   utilityProvisionedJPerOutputToken: {
     field: 'utilityProvisionedJPerOutputToken.y',
-    label: 'Utility Provisioned J per Output Token, all GPUs (all-in, J/tok)',
-    labelZh: '每输出 token 全电源配置能耗，按全部 GPU 归一（all-in，J/tok）',
-    title: 'Utility Provisioned Joules per Output Token, all GPUs (all-in)',
-    titleZh: '每输出 token 全电源配置焦耳能耗，按全部 GPU 归一（all-in）',
+    label: 'All in Provisioned J per Output Token, all GPUs (J/tok)',
+    labelZh: '每输出 token 整体预配能耗，按全部 GPU 归一（J/tok）',
+    title: 'All in Provisioned Joules per Output Token, all GPUs',
+    titleZh: '每输出 token 整体预配焦耳能耗，按全部 GPU 归一',
     polarity: 'lower',
   },
-  // zh vocabulary shared with the Boundary select, its help text and the chart
-  // caption: B3 “全电源配置” (as the ungated jOutput/jTotal already say for
-  // all-in), B4 “数据中心建模” (measured GPU power carried through the chassis
-  // model to the utility meter).
+  // Names follow POWER_BASIS_LABELS (lib/power-basis.ts) so the Table, export
+  // titles and API docs read the same as the Boundary select: All in Provisioned
+  // / 整体预配功耗 and All in Measured / 整体实测功耗.
   utilityModeledWatts: {
     field: 'utilityModeledWatts.y',
-    label: 'Utility Modeled Power per Chip (PUE, W)',
-    labelZh: '每芯片数据中心建模功耗（含 PUE，W）',
-    title: 'Utility Modeled Power per Chip (PUE)',
-    titleZh: '每芯片数据中心建模功耗（含 PUE）',
+    label: 'All in Measured Power per Chip (W)',
+    labelZh: '每芯片整体实测功耗（W）',
+    title: 'All in Measured Power per Chip',
+    titleZh: '每芯片整体实测功耗',
     polarity: 'lower',
   },
   utilityModeledJPerOutputToken: {
     field: 'utilityModeledJPerOutputToken.y',
-    label: 'Utility Modeled J per Output Token (PUE, J/tok)',
-    labelZh: '每输出 token 数据中心建模能耗（含 PUE，J/tok）',
-    title: 'Utility Modeled Joules per Output Token (PUE)',
-    titleZh: '每输出 token 数据中心建模焦耳能耗（含 PUE）',
+    label: 'All in Measured J per Output Token (J/tok)',
+    labelZh: '每输出 token 整体实测能耗（J/tok）',
+    title: 'All in Measured Joules per Output Token',
+    titleZh: '每输出 token 整体实测焦耳能耗',
     polarity: 'lower',
   },
 } as const satisfies Record<string, MetricDefinition>;
