@@ -8,7 +8,7 @@ Design rationale and non-obvious conventions. See [CLAUDE.md](../CLAUDE.md) for 
 - [Pareto Boundary API](./pareto-api.md): Query frontier and hinterland observations, preserve provenance, and distinguish API scope from chart highlights.
 
 - [API Skill Examples](./inferencex-api-examples.md) — Install the public skill, query benchmarks, export measured PowerX data, and explain empty results
-- [PowerX System Power](./powerx-system-power.md) — Pinned chassis model, measured-input guards, assumptions, and reproducible article exports
+- [PowerX System Power](./powerx-system-power.md) / [简体中文](./powerx-system-power.zh.md) — Smart provisioning walkthrough, Kimi K3 missing-row diagnosis, NVL72/chassis models, assumptions, and reproducible exports
 - [PowerX Permanent View](./powerx-permanent-view.md) — Power boundaries as gated Measured Energy metrics, `i_metric`/`i_rulers` share links, missing-value states
 - [PowerX Persistence and Recovery](./powerx-persistence-recovery.md) — Telemetry receipts, migration prerequisites, and targeted repair
 - [API Skill Releases](./inferencex-skills-release.md) — Prepare an immutable package, verify clean installations and agent exports, and publish through the package-specific workflow
