@@ -107,6 +107,10 @@ describe('Timeline requested-source coverage', () => {
     });
     vi.stubEnv('GITHUB_TOKEN', '');
     const response = await POST(request({ sources: [SOURCE_A, SOURCE_B] }));
+    expect(readRun).toHaveBeenCalledWith({}, Number(RUN_ID), {
+      prefix: 'dsr1_',
+      sourceResults: [NAME_A, NAME_B],
+    });
     expect(response.status).toBe(503);
     expect(await response.json()).toMatchObject({
       code: 'STORED_TELEMETRY_INCOMPLETE',

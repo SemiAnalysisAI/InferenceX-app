@@ -93,6 +93,7 @@ API routes (`packages/app/src/app/api/v1/`):
   `runs/[runId]` also handles admin DELETE. See [CollectiveX](./docs/collectivex.md).
 - `tco-feed?model=dsv4&workloads=1024x1024,8192x1024&tiers=30,50,75,100&format=csv` — per-hardware Pareto-frontier output-throughput reads at fixed interactivity tiers, for external spreadsheet TCO models (Excel Power Query); `view=scores` (optional `weights`, `workload_weights`, `alpha`) folds them into one tier-weighted, workload-blended, output-equivalent score per hardware
 - `overview?tier=50&engine=community&compare=30d&ref=b200` — a compact, cached page-data response used only by `/overview` selector navigation
+- `pareto` — beta derived frontier/hinterland observations with explicit raw model, workload, metrics and axis preferences; see [Pareto API](./docs/pareto-api.md). This is a documented exception to the raw-row rule, reusing the benchmark source and chart dominance algorithm without UI filtering.
 
 **Raw-data API routes return raw DB data**. Dashboard projections under
 `/api/v1/views/*` use shared pure UI transformations server-side and publish their
@@ -105,7 +106,9 @@ enter only as explicit query params with documented defaults, so a published she
 records its methodology; and `overview`, which assembles the same `OverviewPageData` used for the
 initial server render so selector changes can update the matrix without transferring every model's
 raw benchmark history or triggering a React Server Component (RSC) round trip. It is a page-owned
-backend-for-frontend (BFF), not a reusable public data API.
+backend-for-frontend (BFF), not a reusable public data API; and `pareto`, which returns
+frontier/hinterland coordinates over stored benchmark rows with explicit axis preferences (see
+[Pareto API](./docs/pareto-api.md)), reusing the chart dominance algorithm without UI filters.
 
 ### Read-only coverage for public views
 

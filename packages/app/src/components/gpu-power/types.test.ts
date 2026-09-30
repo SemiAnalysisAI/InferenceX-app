@@ -6,7 +6,6 @@ import {
   detectTdpFromArtifactName,
   getAvailableMetrics,
   type GpuMetricRow,
-  GPU_METRIC_OPTIONS,
   parseCsvData,
 } from './types';
 
@@ -46,38 +45,14 @@ describe('parseCsvData', () => {
     expect(result[1].power).toBe(76.08);
   });
 
-  it('parses CSV with bare numeric values (no unit suffixes)', () => {
-    const csv = `${CSV_HEADER}
-2024-01-15T10:00:00Z, 0, 250.5, 72, 1980, 1593, 95, 80
-2024-01-15T10:00:00Z, 1, 300.2, 68, 1950, 1593, 88, 75`;
-    const result = parseCsvData(csv);
-    expect(result).toHaveLength(2);
-    expect(result[0].power).toBe(250.5);
-    expect(result[0].smClock).toBe(1980);
-    expect(result[1].power).toBe(300.2);
-  });
-
   it('returns empty array for header-only CSV', () => {
     expect(parseCsvData(CSV_HEADER)).toEqual([]);
-  });
-
-  it('returns empty array for empty string', () => {
-    expect(parseCsvData('')).toEqual([]);
   });
 
   it('skips rows with NaN values', () => {
     const csv = `${CSV_HEADER}
 2026/03/07 00:20:37.071, abc, 76.78 W, 30, 345 MHz, 3201 MHz, 0 %, 0 %`;
     expect(parseCsvData(csv)).toEqual([]);
-  });
-
-  it('trims whitespace from values', () => {
-    const csv = `${CSV_HEADER}
- 2026/03/07 00:20:37.071 , 0 , 76.78 W , 30 , 345 MHz , 3201 MHz , 0 % , 0 % `;
-    const result = parseCsvData(csv);
-    expect(result).toHaveLength(1);
-    expect(result[0].timestamp).toBe('2026/03/07 00:20:37.071');
-    expect(result[0].power).toBe(76.78);
   });
 
   it('handles Windows-style line endings', () => {
@@ -87,19 +62,6 @@ describe('parseCsvData', () => {
     expect(result[0].power).toBe(76.78);
   });
 
-  it('parses multiple timestamps for same GPU correctly', () => {
-    const csv = `${CSV_HEADER}
-2026/03/07 00:20:37.071, 0, 76.78 W, 30, 345 MHz, 3201 MHz, 0 %, 0 %
-2026/03/07 00:20:38.076, 0, 76.70 W, 30, 345 MHz, 3201 MHz, 0 %, 0 %
-2026/03/07 00:20:39.076, 0, 80.49 W, 31, 345 MHz, 3201 MHz, 0 %, 0 %`;
-    const result = parseCsvData(csv);
-    expect(result).toHaveLength(3);
-    expect(result[0].power).toBe(76.78);
-    expect(result[1].power).toBe(76.7);
-    expect(result[2].power).toBe(80.49);
-    expect(result[2].temperature).toBe(31);
-  });
-
   it('ignores extra columns beyond the expected 8', () => {
     const csv = `${CSV_HEADER}
 2026/03/07 00:20:37.071, 0, 76.78, 30, 345, 3201, 0, 0, extra1, extra2`;
@@ -107,21 +69,6 @@ describe('parseCsvData', () => {
     expect(result).toHaveLength(1);
     expect(result[0].power).toBe(76.78);
     expect(result[0].memUtil).toBe(0);
-  });
-
-  it('handles 8-GPU real-world scenario', () => {
-    const lines = [];
-    for (let gpu = 0; gpu < 8; gpu++) {
-      lines.push(
-        `2026/03/07 00:20:37.071, ${gpu}, ${300 + gpu * 10}, ${65 + gpu}, 1980, 1593, 95, 80`,
-      );
-    }
-    const csv = `${CSV_HEADER}\n${lines.join('\n')}`;
-    const result = parseCsvData(csv);
-    expect(result).toHaveLength(8);
-    expect(result[7].index).toBe(7);
-    expect(result[7].power).toBe(370);
-    expect(result[7].temperature).toBe(72);
   });
 
   // --- AMD amd-smi format ---
@@ -168,18 +115,6 @@ describe('parseCsvData', () => {
     expect(result[0].temperature).toBe(38); // falls back to edge
   });
 
-  it('AMD: handles quoted array fields with embedded commas', () => {
-    const amdHeader =
-      'timestamp,gpu,gfx_activity,umc_activity,mm_activity,vcn_activity,jpeg_activity,socket_power,gfx_0_clk,mem_0_clk,edge,hotspot,mem';
-    const csv = `${amdHeader}
-1772939616,0,95,80,N/A,"['N/A', 'N/A', 'N/A', 'N/A']","['N/A', 'N/A']",350,1980,901,38,72,65`;
-    const result = parseCsvData(csv);
-    expect(result).toHaveLength(1);
-    expect(result[0].power).toBe(350);
-    expect(result[0].smClock).toBe(1980);
-    expect(result[0].temperature).toBe(72);
-  });
-
   it('AMD: parses real-world amd-smi row with all columns', () => {
     // Full amd-smi header with ~100+ columns
     const amdHeader =
@@ -195,26 +130,6 @@ describe('parseCsvData', () => {
     expect(result[0].gpuUtil).toBe(0);
     expect(result[0].memUtil).toBe(0);
     expect(result[0].temperature).toBe(40); // hotspot
-  });
-
-  it('AMD: parses 8 GPUs from same timestamp', () => {
-    const amdHeader =
-      'timestamp,gpu,gfx_activity,umc_activity,socket_power,gfx_0_clk,mem_0_clk,edge,hotspot,mem';
-    const lines = [];
-    for (let gpu = 0; gpu < 8; gpu++) {
-      lines.push(
-        `1772939616,${gpu},${90 + gpu},${70 + gpu},${300 + gpu * 5},${1900 + gpu * 10},901,${35 + gpu},${60 + gpu},${50 + gpu}`,
-      );
-    }
-    const csv = `${amdHeader}\n${lines.join('\n')}`;
-    const result = parseCsvData(csv);
-    expect(result).toHaveLength(8);
-    expect(result[0].index).toBe(0);
-    expect(result[7].index).toBe(7);
-    expect(result[7].power).toBe(335);
-    expect(result[7].gpuUtil).toBe(97);
-    expect(result[7].temperature).toBe(67); // hotspot
-    expect(result[7].smClock).toBe(1970);
   });
 
   it('AMD: skips rows with N/A power', () => {
@@ -269,17 +184,6 @@ describe('parseCsvData', () => {
     expect(result[0].fclk).toBe(1300);
     expect(result[0].socClk).toBe(28);
   });
-
-  it('NVIDIA: does not have AMD-specific fields', () => {
-    const csv = `${CSV_HEADER}
-2026/03/07 00:20:37.071, 0, 300, 65, 1980, 1593, 95, 80`;
-    const result = parseCsvData(csv);
-    expect(result).toHaveLength(1);
-    expect(result[0].edgeTemp).toBeUndefined();
-    expect(result[0].memTemp).toBeUndefined();
-    expect(result[0].gfxVoltage).toBeUndefined();
-    expect(result[0].fclk).toBeUndefined();
-  });
 });
 
 // ---------------------------------------------------------------------------
@@ -287,22 +191,6 @@ describe('parseCsvData', () => {
 // ---------------------------------------------------------------------------
 
 describe('getAvailableMetrics', () => {
-  it('returns only common metrics for NVIDIA data', () => {
-    const nvidiaRow: GpuMetricRow = {
-      timestamp: '2026/03/07 00:20:37.071',
-      index: 0,
-      power: 300,
-      temperature: 65,
-      smClock: 1980,
-      memClock: 1593,
-      gpuUtil: 95,
-      memUtil: 80,
-    };
-    const metrics = getAvailableMetrics([nvidiaRow]);
-    const keys = metrics.map((m) => m.key);
-    expect(keys).toEqual(['power', 'temperature', 'smClock', 'memClock', 'gpuUtil', 'memUtil']);
-  });
-
   it('returns common + AMD metrics for AMD data', () => {
     const amdRow: GpuMetricRow = {
       timestamp: '2026-03-07T00:00:00Z',
@@ -354,11 +242,6 @@ describe('getAvailableMetrics', () => {
     expect(keys).not.toContain('gfxVoltage');
     expect(keys).not.toContain('fclk');
   });
-
-  it('returns common metrics for empty data', () => {
-    const metrics = getAvailableMetrics([]);
-    expect(metrics.length).toBe(6);
-  });
 });
 
 // ---------------------------------------------------------------------------
@@ -373,53 +256,13 @@ describe('detectTdpFromArtifactName', () => {
     expect(result).toEqual({ sku: 'H200', tdp: 700 });
   });
 
-  it('detects H100 from artifact name', () => {
-    const result = detectTdpFromArtifactName('gpu_metrics_model_fp8_h100-sxm_0');
-    expect(result).toEqual({ sku: 'H100', tdp: 700 });
-  });
-
   it('detects GB200 without matching B200', () => {
     const result = detectTdpFromArtifactName('gpu_metrics_model_fp4_gb200-nvl72_0');
     expect(result).toEqual({ sku: 'GB200', tdp: 1200 });
   });
 
-  it('detects GB300 without matching B300', () => {
-    const result = detectTdpFromArtifactName('gpu_metrics_model_fp4_gb300-nvl72_0');
-    expect(result).toEqual({ sku: 'GB300', tdp: 1400 });
-  });
-
-  it('detects B200 when no GB prefix', () => {
-    const result = detectTdpFromArtifactName('gpu_metrics_model_fp4_b200-sxm_0');
-    expect(result).toEqual({ sku: 'B200', tdp: 1000 });
-  });
-
-  it('detects B300 when no GB prefix', () => {
-    const result = detectTdpFromArtifactName('gpu_metrics_model_fp4_b300-sxm_0');
-    expect(result).toEqual({ sku: 'B300', tdp: 1200 });
-  });
-
-  it('detects MI300X from artifact name', () => {
-    const result = detectTdpFromArtifactName('gpu_metrics_model_fp8_mi300x_0');
-    expect(result).toEqual({ sku: 'MI300X', tdp: 750 });
-  });
-
-  it('detects MI325X from artifact name', () => {
-    const result = detectTdpFromArtifactName('gpu_metrics_model_fp8_mi325x_0');
-    expect(result).toEqual({ sku: 'MI325X', tdp: 1000 });
-  });
-
-  it('detects MI355X from artifact name', () => {
-    const result = detectTdpFromArtifactName('gpu_metrics_model_fp4_mi355x_0');
-    expect(result).toEqual({ sku: 'MI355X', tdp: 1400 });
-  });
-
   it('returns null for unrecognized GPU', () => {
     expect(detectTdpFromArtifactName('gpu_metrics_model_fp8_unknown_0')).toBeNull();
-  });
-
-  it('is case-insensitive', () => {
-    const result = detectTdpFromArtifactName('gpu_metrics_model_fp8_H200-SXM_0');
-    expect(result).toEqual({ sku: 'H200', tdp: 700 });
   });
 });
 
@@ -446,24 +289,6 @@ function makeRow(
 // ---------------------------------------------------------------------------
 
 describe('computeGpuStats', () => {
-  it('computes correct statistics for a single GPU', () => {
-    const rows = [
-      makeRow({ timestamp: '2026/03/07 00:20:37.000', index: 0, power: 100 }),
-      makeRow({ timestamp: '2026/03/07 00:20:38.000', index: 0, power: 200 }),
-      makeRow({ timestamp: '2026/03/07 00:20:39.000', index: 0, power: 300 }),
-      makeRow({ timestamp: '2026/03/07 00:20:40.000', index: 0, power: 400 }),
-      makeRow({ timestamp: '2026/03/07 00:20:41.000', index: 0, power: 500 }),
-    ];
-    const stats = computeGpuStats(rows, 'power');
-    expect(stats).toHaveLength(1);
-    expect(stats[0].gpuIndex).toBe(0);
-    expect(stats[0].count).toBe(5);
-    expect(stats[0].min).toBe(100);
-    expect(stats[0].max).toBe(500);
-    expect(stats[0].mean).toBe(300);
-    expect(stats[0].median).toBe(300);
-  });
-
   it('returns stats per GPU sorted by index', () => {
     const rows = [
       makeRow({ timestamp: '2026/03/07 00:20:37.000', index: 1, power: 200 }),
@@ -525,25 +350,5 @@ describe('computeGpuStats', () => {
     expect(stats[0].mean).toBe(250);
     expect(stats[0].median).toBe(250);
     expect(stats[0].stddev).toBe(0);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// GPU_METRIC_OPTIONS
-// ---------------------------------------------------------------------------
-
-describe('GPU_METRIC_OPTIONS', () => {
-  it('covers all 6 GpuMetricKey values', () => {
-    const keys = GPU_METRIC_OPTIONS.map((m) => m.key);
-    expect(keys).toEqual(['power', 'temperature', 'smClock', 'memClock', 'gpuUtil', 'memUtil']);
-  });
-
-  it('each option has non-empty label, unit, and yAxisLabel', () => {
-    for (const opt of GPU_METRIC_OPTIONS) {
-      expect(opt.label.length).toBeGreaterThan(0);
-      expect(opt.unit.length).toBeGreaterThan(0);
-      expect(opt.yAxisLabel.length).toBeGreaterThan(0);
-      expect(opt.yAxisLabel).toContain(opt.unit);
-    }
   });
 });

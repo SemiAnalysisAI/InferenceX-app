@@ -60,6 +60,7 @@ import { captionControlTriggerClassName, ResultContext } from '@/components/ui/r
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { ALL_IN_MEASURED_NOTE, POWER_BASIS_LABELS } from '@/lib/power-basis';
 import { useComparisonChangelogs } from '@/hooks/api/use-comparison-changelogs';
 import { useOpenRouterPricing } from '@/hooks/api/use-openrouter-pricing';
 import { useOpenDropdown } from '@/hooks/useOpenDropdown';
@@ -207,17 +208,20 @@ const STRINGS = {
     powerTooltip:
       'Change only the power budget used to scale the same benchmark result to one GW. Pricing, throughput, utilization and unit costs stay the same.',
     powerOptions: {
-      provisioned: 'Provisioned power',
-      modeled: 'Measured + modeled power',
+      provisioned: POWER_BASIS_LABELS['utility-provisioned'].en,
+      modeled: POWER_BASIS_LABELS['utility-modeled'].en,
       compare: 'Compare both',
     },
     powerBarLabels: {
-      provisioned: 'Provisioned',
-      modeled: 'Measured + modeled',
+      provisioned: POWER_BASIS_LABELS['utility-provisioned'].en,
+      modeled: POWER_BASIS_LABELS['utility-modeled'].en,
       extrapolated: 'Full-chassis extrapolation',
     },
-    powerPreview:
-      'PowerX estimate · Same target, throughput, pricing and unit costs. GPU power comes from the same serving-frontier points; power between them is estimated linearly. Server overhead is modeled, with PUE 1.3 and 10% headroom. Full-chassis extrapolation fills an eight-GPU server with replicas of the measured 1/2/4-GPU workload at the same per-GPU power and throughput; it does not measure a partly idle server. AgentX system power is not yet qualified.',
+    powerPreview: `${ALL_IN_MEASURED_NOTE.en} AgentX system power is not yet qualified.`,
+    powerDetailsLabel: 'Power assumptions',
+    powerDetails:
+      'GPU power is interpolated between the same throughput points. Includes PUE 1.3 and 10% headroom. Full-chassis extrapolation fills an eight-GPU server with replicas of the measured 1/2/4-GPU workload at the same per-GPU power and throughput; it does not measure a partly idle server.',
+    unavailableEstimates: (count: number) => `Unavailable estimates (${count})`,
     pricingGroup: 'Pricing Config',
     costProviderLabel: 'Cost Provider',
     costProviderTooltip:
@@ -329,13 +333,20 @@ const STRINGS = {
     powerTooltip:
       '仅更改将同一基准测试结果换算为每 GW 收益时采用的功耗预算。价格、吞吐量、利用率和单位成本保持不变。',
     powerOptions: {
-      provisioned: '预配功耗',
-      modeled: '实测 GPU + 系统功耗估算',
+      provisioned: POWER_BASIS_LABELS['utility-provisioned'].zh,
+      modeled: POWER_BASIS_LABELS['utility-modeled'].zh,
       compare: '对比两种估算方式',
     },
-    powerBarLabels: { provisioned: '预配功耗', modeled: '实测 + 估算', extrapolated: '整机外推' },
-    powerPreview:
-      'PowerX 估算 · 两种方式采用相同的目标交互性、吞吐量、价格和单位成本。GPU 功耗取自同一组性能前沿数据点，点间功耗采用线性估算。服务器开销由模型估算，PUE 为 1.3，功耗余量为 10%。整机外推假设在八卡服务器上部署多个相同的实测单卡、双卡或四卡实例，每卡功耗和吞吐量保持不变；它不代表部分 GPU 闲置时的整机实测功耗。AgentX 系统功耗模型尚未完成验证。',
+    powerBarLabels: {
+      provisioned: POWER_BASIS_LABELS['utility-provisioned'].zh,
+      modeled: POWER_BASIS_LABELS['utility-modeled'].zh,
+      extrapolated: '整机外推',
+    },
+    powerPreview: `${ALL_IN_MEASURED_NOTE.zh} AgentX 系统功耗模型尚未完成验证。`,
+    powerDetailsLabel: '功耗估算假设',
+    powerDetails:
+      'GPU 功耗在相同的吞吐量数据点间插值，计入 PUE 1.3 和 10% 功耗余量。整机外推假设八卡服务器部署多个相同的实测单卡、双卡或四卡实例，每卡功耗和吞吐量保持不变；它不代表部分 GPU 闲置时的整机实测功耗。',
+    unavailableEstimates: (count: number) => `无法估算（${count} 项）`,
     pricingGroup: '定价配置',
     costProviderLabel: '成本供应商',
     costProviderTooltip:
@@ -1383,15 +1394,37 @@ function ProfitEstimatorInner({
           )}
         </Heading>
         {powerControlsEnabled && (
-          <p className="mb-2 text-xs text-muted-foreground" data-testid="profit-power-note">
-            {t.powerLabel}: {t.powerOptions[powerBasis]}
-            {powerBasis !== 'provisioned' && <>. {t.powerPreview}</>}
-          </p>
+          <div className="mb-2 text-xs text-muted-foreground" data-testid="profit-power-note">
+            <p>
+              {t.powerLabel}: {t.powerOptions[powerBasis]}
+              {powerBasis !== 'provisioned' && <>. {t.powerPreview}</>}
+            </p>
+            {powerBasis !== 'provisioned' && (
+              <details className="mt-1" data-testid="profit-power-assumptions">
+                <summary
+                  className="cursor-pointer"
+                  onClick={() => track('profit_estimator_power_assumptions_toggled')}
+                >
+                  {t.powerDetailsLabel}
+                </summary>
+                <p className="mt-1">{t.powerDetails}</p>
+              </details>
+            )}
+          </div>
         )}
         {basis === 'gw-year' && powerBasis !== 'provisioned' && fullEstimate.skipped.length > 0 && (
-          <p className="mb-2 text-xs text-muted-foreground" data-testid="profit-power-unavailable">
-            {powerUnavailable}
-          </p>
+          <details
+            className="mb-2 text-xs text-muted-foreground"
+            data-testid="profit-power-unavailable"
+          >
+            <summary
+              className="cursor-pointer"
+              onClick={() => track('profit_estimator_power_unavailable_toggled')}
+            >
+              {t.unavailableEstimates(fullEstimate.skipped.length)}
+            </summary>
+            <p className="mt-1">{powerUnavailable}</p>
+          </details>
         )}
         <ResultContext
           locale={locale}
@@ -1523,7 +1556,7 @@ function ProfitEstimatorInner({
       ...(powerControlsEnabled
         ? [
             `${t.powerLabel}: ${t.powerOptions[powerBasis]}`,
-            ...(powerBasis === 'provisioned' ? [] : [t.powerPreview]),
+            ...(powerBasis === 'provisioned' ? [] : [t.powerPreview, t.powerDetails]),
           ]
         : []),
     ]);

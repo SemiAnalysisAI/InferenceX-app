@@ -4,7 +4,7 @@ import { PGlite } from '@electric-sql/pglite';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import type { DbClient } from '../connection';
-import { getGpuMetricsForRun } from './gpu-metrics';
+import { getGpuMetricsForPoint, getGpuMetricsForRun, SAMPLE_PAGE_SIZE } from './gpu-metrics';
 
 let db: PGlite;
 const sql: DbClient = async (strings, ...values) => {
@@ -244,5 +244,78 @@ it('keeps healthy hosts readable when an unversioned sibling has incomplete samp
   expect(payload?.series[0]?.data).toHaveLength(3);
   expect(payload?.series[1]?.stats).toEqual(
     expect.arrayContaining([expect.objectContaining({ metric: 'power_w', mean: 500.5, count: 1 })]),
+  );
+});
+
+it('scopes prefix and source reads in SQL, including containing power-audit bundles', async () => {
+  await db.exec(`INSERT INTO gpu_metric_series
+    (id, workflow_run_id, artifact_name, config_key, file_name, vendor, csv_sha256,
+      sample_count, gpu_count, started_at, ended_at)
+    VALUES (110, 1, 'power_audit_dsr1_8k1k_fp4_sglang', 'bundle', 'samples.csv', 'nvidia', 'bundle',
+      0, 1, now(), now()),
+      (111, 1, 'gpu_metrics_dsr1X8k1k_fp4_sglang_conc32_b200-x_0', 'other', 'gpu_metrics.csv', 'nvidia', 'other',
+      0, 1, now(), now());`);
+  const sampleIds: unknown[] = [];
+  const observed: DbClient = (strings, ...values) => {
+    if (strings.join('').includes('from gpu_metric_samples')) sampleIds.push(values[0]);
+    return sql(strings, ...values);
+  };
+  const payload = await getGpuMetricsForRun(observed, WITH_SERIES, {
+    prefix: 'dsr1_8k1k_fp4_sglang_conc32',
+    sourceResults: ['dsr1_8k1k_fp4_sglang_conc32_b200-x_0'],
+  });
+  expect(payload?.series.map((series) => series.id)).toEqual([100, 101, 110]);
+  expect(sampleIds).toEqual([[100, 101, 110]]);
+  expect(await getGpuMetricsForRun(sql, WITH_SERIES, { sourceResults: ['missing'] })).toBeNull();
+});
+
+it('reads only the selected view host while retaining every exact explorer label', async () => {
+  const prefix = 'gpu_metrics_dsr1_8k1k_fp4_sglang_conc32_b200-x_0';
+  const names = [`${prefix}/node0/gpu_metrics.csv`, `${prefix}/node1/gpu_metrics.csv`];
+  const sampleIds: unknown[] = [];
+  const observed: DbClient = (strings, ...values) => {
+    if (strings.join('').includes('from gpu_metric_samples')) sampleIds.push(values[0]);
+    return sql(strings, ...values);
+  };
+  const selected = await getGpuMetricsForRun(observed, WITH_SERIES, { artifact: names[1] });
+  expect(selected?.artifactNames).toEqual(names);
+  expect(selected?.series.map((series) => series.id)).toEqual([101]);
+  expect(sampleIds).toEqual([[101]]);
+  const first = await getGpuMetricsForRun(sql, WITH_SERIES, { artifact: null });
+  expect(first?.series[0]?.id).toBe(100);
+  const missing = await getGpuMetricsForRun(observed, WITH_SERIES, { artifact: 'not-an-artifact' });
+  expect(missing).toMatchObject({ artifactNames: names, series: [] });
+  expect(sampleIds).toHaveLength(1);
+});
+
+it('pages a single large series without dropping microseconds and retries changes between pages', async () => {
+  await db.exec(`DELETE FROM gpu_metric_samples WHERE series_id = 100;
+    INSERT INTO gpu_metric_samples (series_id, gpu_index, sampled_at, power_w)
+    SELECT 100, 0, '2026-09-11T04:19:41Z'::timestamptz + n * interval '1 microsecond', n
+    FROM generate_series(1, ${SAMPLE_PAGE_SIZE + 2}) n;
+    UPDATE gpu_metric_series SET sample_count = ${SAMPLE_PAGE_SIZE + 2} WHERE id = 100;`);
+  let pages = 0;
+  const observed: DbClient = async (strings, ...values) => {
+    const rows = await sql(strings, ...values);
+    if (strings.join('').includes('from gpu_metric_samples')) {
+      // Model the bounded HTTP transport; the old whole-series query fails here.
+      expect(rows.length).toBeLessThanOrEqual(SAMPLE_PAGE_SIZE);
+      pages++;
+      if (pages === 1) {
+        await db.exec(`UPDATE gpu_metric_samples SET power_w = power_w + 20000 WHERE series_id = 100;
+          UPDATE gpu_metric_series SET ingested_at = ingested_at + interval '1 second' WHERE id = 100;`);
+      }
+    }
+    return rows;
+  };
+  const payload = await getGpuMetricsForPoint(observed, 11);
+  expect(pages).toBe(4);
+  const data = payload!.series[0]!.data;
+  expect(data).toHaveLength(SAMPLE_PAGE_SIZE + 2);
+  expect(data.map((row) => row.power)).toEqual(
+    Array.from({ length: SAMPLE_PAGE_SIZE + 2 }, (_, i) => i + 20001),
+  );
+  expect(payload!.series[0]!.stats.find((stat) => stat.metric === 'power_w')?.count).toBe(
+    SAMPLE_PAGE_SIZE + 2,
   );
 });

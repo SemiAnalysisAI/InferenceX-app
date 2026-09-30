@@ -97,6 +97,11 @@ when a duration is requested, compute and label elapsed or inclusive days.
 
 ## Choose the workflow
 
+- **Pareto frontier or hinterland observations, or inference frontier chart links:**
+  read [Pareto boundaries](references/pareto.md). Use the raw HTTP endpoint after
+  confirming `/api/v1/pareto` in the deployed OpenAPI; do not invent a formal CLI
+  command or pass chart toggles to the API. Resolve selectors with
+  `inferencex discover` when needed.
 - **AgentX charts, tables, or main-agent versus subagent comparison:** run
   `inferencex charts list`, then read [chart and table templates](references/chart-templates.md).
   Render the saved selected-point capture with `charts agentx-sources`, setting
@@ -104,14 +109,12 @@ when a duration is requested, compute and label elapsed or inclusive days.
   `--metric` (default `requests`); table mode produces `table.svg` (counts and all
   medians) with detailed files alongside. Preserve recorded
   source categories, phase scope and missing/cancelled sample counts.
-
 - **Dashboard views or filter parity:** read
   [dashboard read-only views](references/dashboard-views.md). Use the documented
   `/api/v1/views/*` GET endpoint and retain resolved parameters and source identity.
   These projections use raw capture, not a seventh formal evidence workflow.
   When changing a non-sensitive public view, update its read-only API, OpenAPI,
   selector tests, and this package in the same PR; do not create another package.
-
 - **PowerX measured power or energy:** read
   [PowerX](references/powerx.md), then use `inferencex powerx export`. Preserve
   strict-v2 rows with missing metrics, raw topology, observation dates, and source

@@ -6,7 +6,8 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 
 import { mapBenchmarkRow, type BenchmarkParams } from '../etl/benchmark-mapper';
 import { createSkipTracker } from '../etl/skip-tracker';
-import { findBenchmarkResultIds } from './benchmark-result-lookup';
+import { filterPurgedBenchmarkRows, findBenchmarkResultIds } from './benchmark-result-lookup';
+import { collectMissingTelemetryExpectations } from './gpu-metrics-backfill';
 
 type Sql = postgres.Sql;
 let db: PGlite;
@@ -108,4 +109,56 @@ describe('findBenchmarkResultIds', () => {
     expect(ids).toEqual([20]);
     expect(fallbacks).toEqual([]);
   });
+});
+
+it('excludes exact purges from mixed artifacts and missing-artifact expectations', async () => {
+  await db.exec(`UPDATE benchmark_results SET config_id = 1 WHERE id = 24;
+    UPDATE configs SET id = 744 WHERE id = 3;
+    UPDATE workflow_runs SET github_run_id = 30730541420, run_attempt = 1 WHERE id = 2;
+    UPDATE benchmark_results SET config_id = 744, conc = 1, offload_mode = 'on' WHERE id = 24;`);
+  const run = { github_run_id: 30730541420, run_attempt: 1 };
+  const point: BenchmarkParams = {
+    ...mapped(rawRow({ infmax_model_prefix: 'dsv4', framework: 'vllm', tp: 1 })),
+    benchmarkType: 'agentic_traces',
+    isl: null,
+    osl: null,
+    offloadMode: 'on',
+    recipeFingerprint: null,
+  };
+  const purged = { ...point, conc: 32 };
+  const surviving = { ...point, conc: 1 };
+  const rows = await filterPurgedBenchmarkRows(sql, run, [purged, surviving]);
+  expect(rows).toEqual([surviving]);
+  expect(await findBenchmarkResultIds(sql, run, rows)).toEqual([24]);
+  expect(await filterPurgedBenchmarkRows(sql, run, [purged])).toEqual([]);
+  expect(await filterPurgedBenchmarkRows(sql, { ...run, run_attempt: 2 }, [purged])).toEqual([
+    purged,
+  ]);
+  expect(
+    await filterPurgedBenchmarkRows(sql, run, [{ ...purged, recipeFingerprint: 'new' }]),
+  ).toHaveLength(1);
+  expect(
+    await filterPurgedBenchmarkRows(sql, run, [{ ...purged, offloadMode: 'off' }]),
+  ).toHaveLength(1);
+  expect(
+    await filterPurgedBenchmarkRows(sql, run, [
+      { ...purged, config: { ...point.config, decodeTp: 4 } },
+    ]),
+  ).toHaveLength(1);
+  const missing = await collectMissingTelemetryExpectations(
+    [
+      {
+        id: 1,
+        name: 'bmk_agentic_retained',
+        expired: false,
+        created_at: '2026-09-11T00:00:00Z',
+        archive_download_url: 'https://example.test/1',
+      },
+    ],
+    [],
+    null,
+    () => filterPurgedBenchmarkRows(sql, run, [purged, surviving]),
+  );
+  expect(missing.observations.map((entry) => entry.identity.conc)).toEqual([1]);
+  expect(missing.errors).toEqual([]);
 });

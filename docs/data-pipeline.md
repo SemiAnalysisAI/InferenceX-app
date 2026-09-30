@@ -584,6 +584,12 @@ job share one series across points. Windowing a series to the measured serving
 interval is a reader concern; the raw series deliberately includes server
 start-up and warm-up so both phases can be inspected.
 
+Run readers filter artifact prefixes and requested Timeline sources in SQL before
+loading samples. The public GPU metrics view loads only its selected file/host
+series while retaining the complete artifact-name inventory. Both point and run
+readers fetch samples in primary-key pages of at most 10,000 rows, preserving
+microsecond cursors and returning the complete selected series in time order.
+
 The point and run readers assemble a series from separate autocommit statements
 (series rows, statistics, samples). After loading, they re-read the series
 version key (`csv_sha256`, `sample_count`, `ingested_at`, `stats_version`) and retry the whole

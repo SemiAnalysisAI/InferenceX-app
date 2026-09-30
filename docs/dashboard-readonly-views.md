@@ -75,6 +75,11 @@ OperatorX is feature-gated in navigation and uses page-owned
 contract.
 Zoom, theme, axis scale, labels, media playback and report expansion are renderer
 state. GPU interactive downsampling does not alter returned raw data or statistics.
+Power boundary labels are GPU Level Measured, GPU Level Provisioned (TDP), All in
+Provisioned, and All in Measured. The last combines measured GPU power with modeled
+unmeasured components and PUE; it is not a wall-meter measurement. These labels and
+collapsed power-assumption/availability notes do not change metric IDs, API selectors,
+or calculations. Profit comparison `powerLabel` display text follows the same names.
 The GPU statistics table includes startup and warmup for all chips in the selected
 series, regardless of chip visibility. It is separate from serving-window power,
 J/token and selected-time-window calculations. Run telemetry is DB-first with an
@@ -121,6 +126,11 @@ toggles and colours. The inference view already returns `comparisons` (one proje
 `dates` or `start`/`end` entry) and `overlays` (one per unofficial run) for every `xmode`.
 The per-date toggles are renderer state, not query keys, so no API or OpenAPI contract
 change is required.
+
+Perf Ruler share state (`i_rulers`) also stays in the browser. Both the primary
+scatter chart and date/run comparison chart restore it; run-qualified curve IDs
+retain `~rRUN_ID`. Tooltip scrolling and viewport limits only keep existing actions
+reachable. Neither changes returned values or adds a views API parameter.
 
 ## Fixed-sequence service comparisons
 

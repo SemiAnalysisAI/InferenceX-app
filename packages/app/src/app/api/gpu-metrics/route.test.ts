@@ -73,7 +73,7 @@ vi.mock('adm-zip', () => {
   return { default: MockAdmZip };
 });
 
-import { databasePayloadToResponse, GET } from './route';
+import { databasePayloadToResponse, GET, readGpuMetricsForView } from './route';
 import { NextRequest } from 'next/server';
 
 const originalFetch = globalThis.fetch;
@@ -236,7 +236,45 @@ describe('GET /api/gpu-metrics — database first', () => {
     const body = await res.json();
     expect(body.source).toBe('database');
     expect(body.artifacts).toHaveLength(3);
-    expect(mockGetGpuMetricsForRun).toHaveBeenCalledWith({}, 34557177019);
+    expect(mockGetGpuMetricsForRun).toHaveBeenCalledWith({}, 34557177019, {
+      prefix: null,
+      sourceResults: null,
+    });
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+
+  it('passes selectors to the reader and preserves exact host labels for a scoped view', async () => {
+    process.env.DATABASE_READONLY_URL = 'postgresql://readonly.example.test/db';
+    const names = databasePayloadToResponse(storedRunPayload).artifacts.map((entry) => entry.name);
+    mockGetGpuMetricsForRun.mockResolvedValueOnce({
+      ...storedRunPayload,
+      artifactNames: names,
+      series: [storedRunPayload.series[2]],
+    });
+    globalThis.fetch = vi.fn();
+    const response = await readGpuMetricsForView(
+      req('/api/gpu-metrics?runId=34557177019'),
+      names[2]!,
+    );
+    expect(await response.json()).toMatchObject({
+      artifactNames: names,
+      artifacts: [{ name: names[2] }],
+    });
+    expect(mockGetGpuMetricsForRun).toHaveBeenCalledWith({}, 34557177019, {
+      prefix: null,
+      sourceResults: null,
+      artifact: names[2],
+    });
+    mockGetGpuMetricsForRun.mockResolvedValueOnce({
+      ...storedRunPayload,
+      artifactNames: names,
+      series: [],
+    });
+    const missing = await readGpuMetricsForView(
+      req('/api/gpu-metrics?runId=34557177019'),
+      'missing',
+    );
+    expect(await missing.json()).toMatchObject({ artifactNames: names, artifacts: [] });
     expect(globalThis.fetch).not.toHaveBeenCalled();
   });
 

@@ -87,7 +87,21 @@ export interface GpuMetricsRunPayload {
     createdAt: string | null;
   };
   series: GpuMetricSeries[];
+  /** Complete explorer labels when only one view artifact's samples were requested. */
+  artifactNames?: string[];
 }
+
+export interface GpuMetricsRunSelection {
+  prefix?: string | null;
+  sourceResults?: readonly string[] | null;
+  /** Undefined reads all matching artifacts; null selects the first explorer artifact. */
+  artifact?: string | null;
+}
+
+// One sample row serializes to roughly 0.5 KB over the Neon HTTP driver (17 numeric
+// columns plus keys and an ISO timestamp), so 50k rows stay near 25 MB, well below the
+// 64 MiB response cap, while a 1.25M-sample run needs ~25 sequential pages, not 125.
+export const SAMPLE_PAGE_SIZE = 50_000;
 
 interface RawSeriesRow {
   id: number | string;
@@ -234,16 +248,38 @@ async function loadSeriesDetails(
     order by series_id, gpu_index, metric
   `) as unknown as RawStatRow[];
 
-  const sampleRows = (await sql`
-    select series_id, gpu_index, sampled_at, power_w, temperature_c, sm_clock_mhz,
-      mem_clock_mhz, gpu_util_pct, mem_util_pct, edge_temp_c, mem_temp_c,
-      gfx_voltage_mv, soc_voltage_mv, mem_voltage_mv, fclk_mhz, socclk_mhz, mm_activity_pct
-    from gpu_metric_samples
-    where series_id = any(${ids}::bigint[])
-    order by series_id, sampled_at, gpu_index
-  `) as unknown as RawSampleRow[];
+  const sampleRows: RawSampleRow[] = [];
+  let cursor: RawSampleRow | undefined;
+  for (;;) {
+    const page = (await sql`
+      select series_id, gpu_index,
+        to_char(sampled_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') as sampled_at,
+        power_w, temperature_c, sm_clock_mhz, mem_clock_mhz, gpu_util_pct, mem_util_pct,
+        edge_temp_c, mem_temp_c, gfx_voltage_mv, soc_voltage_mv, mem_voltage_mv,
+        fclk_mhz, socclk_mhz, mm_activity_pct
+      from gpu_metric_samples
+      where series_id = any(${ids}::bigint[])
+        and (${cursor?.series_id ?? null}::bigint is null or
+          (series_id, gpu_index, sampled_at) >
+          (${cursor?.series_id ?? null}::bigint, ${cursor?.gpu_index ?? null}::smallint,
+            ${cursor?.sampled_at ?? null}::timestamptz))
+      order by series_id, gpu_index, gpu_metric_samples.sampled_at
+      limit ${SAMPLE_PAGE_SIZE}
+    `) as unknown as RawSampleRow[];
+    sampleRows.push(...page);
+    if (page.length < SAMPLE_PAGE_SIZE) break;
+    // Keep PostgreSQL's microseconds: a JS Date cursor would repeat or omit boundary rows.
+    cursor = page.at(-1)!;
+  }
+  // The primary-key pages group by GPU; retain the public time-then-GPU ordering.
+  sampleRows.sort(
+    (a, b) =>
+      Number(a.series_id) - Number(b.series_id) ||
+      String(a.sampled_at).localeCompare(String(b.sampled_at)) ||
+      Number(a.gpu_index) - Number(b.gpu_index),
+  );
 
-  // The three statements above run as separate autocommit queries (the DbClient
+  // The series, stats and sample pages use separate autocommit queries (the DbClient
   // has no transaction), so a re-ingest can commit between them. The writer
   // replaces samples, stats and the series row in one transaction and stamps
   // `ingested_at`; digest-only upgrades change `stats_version`. An unchanged
@@ -318,20 +354,23 @@ async function loadSeriesDetails(
 }
 
 /**
- * Every telemetry series stored for one GitHub Actions run (latest attempt).
+ * Stored telemetry for one GitHub Actions run (latest attempt), optionally scoped
+ * before reading samples. View selection also returns the full artifact-name inventory.
  * Returns null when the run is unknown or has no stored series, so callers can
  * fall back to the live GitHub artifacts for in-flight runs.
  */
 export function getGpuMetricsForRun(
   sql: DbClient,
   githubRunId: number,
+  selection: GpuMetricsRunSelection = {},
 ): Promise<GpuMetricsRunPayload | null> {
-  return withConsistentSnapshot(() => readGpuMetricsForRun(sql, githubRunId));
+  return withConsistentSnapshot(() => readGpuMetricsForRun(sql, githubRunId, selection));
 }
 
 async function readGpuMetricsForRun(
   sql: DbClient,
   githubRunId: number,
+  selection: GpuMetricsRunSelection,
 ): Promise<GpuMetricsRunPayload | null> {
   const runRows = (await sql`
     select id, github_run_id, run_attempt, name, date, html_url, head_branch, head_sha,
@@ -356,6 +395,27 @@ async function readGpuMetricsForRun(
   const run = runRows[0];
   if (!run) return null;
 
+  let artifactNames: string[] | undefined;
+  let selectedIds: number[] | null = null;
+  if (selection.artifact !== undefined) {
+    const inventory = (await sql`
+      select id,
+        case when count(*) over (partition by artifact_name) > 1
+          then artifact_name || '/' || file_name else artifact_name end as name
+      from gpu_metric_series
+      where workflow_run_id = ${Number(run.id)}
+      order by artifact_name, file_name
+    `) as { id: number | string; name: string }[];
+    if (inventory.length === 0) return null;
+    artifactNames = inventory.map((entry) => entry.name);
+    const selected = selection.artifact ?? artifactNames[0];
+    selectedIds = inventory
+      .filter((entry) => entry.name === selected)
+      .map((entry) => Number(entry.id));
+  }
+  const prefix = selection.prefix ?? null;
+  const sources = selection.sourceResults ?? null;
+
   const seriesRows = (await sql`
     select s.id, s.workflow_run_id, s.artifact_name, s.config_key, s.file_name, s.vendor,
       s.sample_interval_s, s.sample_count, s.gpu_count, s.started_at, s.ended_at, s.sidecars,
@@ -373,9 +433,21 @@ async function readGpuMetricsForRun(
       ) as power_audits
     from gpu_metric_series s
     where s.workflow_run_id = ${Number(run.id)}
+      and (${selectedIds}::bigint[] is null or s.id = any(${selectedIds}::bigint[]))
+      and (${prefix}::text is null or starts_with(s.artifact_name, 'gpu_metrics_' || ${prefix})
+        or (starts_with(s.artifact_name, 'power_audit_') and
+          (starts_with(s.artifact_name, 'power_audit_' || ${prefix})
+            or starts_with('power_audit_' || ${prefix}, s.artifact_name))))
+      and (${sources}::text[] is null or exists (
+        select 1 from unnest(${sources}::text[]) as requested(result)
+        where s.artifact_name = 'gpu_metrics_' || requested.result
+          or (starts_with(s.artifact_name, 'power_audit_') and
+            (starts_with(s.artifact_name, 'power_audit_' || requested.result)
+              or starts_with('power_audit_' || requested.result, s.artifact_name)))
+      ))
     order by s.artifact_name, s.file_name
   `) as unknown as RawSeriesRow[];
-  if (seriesRows.length === 0) return null;
+  if (seriesRows.length === 0 && artifactNames === undefined) return null;
 
   return {
     workflowRun: {
@@ -392,6 +464,7 @@ async function readGpuMetricsForRun(
       createdAt: run.created_at ? isoString(run.created_at) : null,
     },
     series: await loadSeriesDetails(sql, seriesRows),
+    ...(artifactNames === undefined ? {} : { artifactNames }),
   };
 }
 

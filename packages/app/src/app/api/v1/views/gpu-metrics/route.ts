@@ -1,11 +1,13 @@
-import { GET as metrics } from '@/app/api/gpu-metrics/route';
+import {
+  readGpuMetricsForView as metrics,
+  type GpuMetricsRouteResponse,
+} from '@/app/api/gpu-metrics/route';
 import { buildCorrelationData, buildGroupedData } from '@/components/gpu-power/chart-data';
 import { storedGpuStatsForMetric } from '@/components/gpu-power/stored-gpu-stats';
 import {
   ALL_METRIC_OPTIONS,
   computeGpuStats,
   getAvailableMetrics,
-  type GpuPowerApiResponse,
 } from '@/components/gpu-power/types';
 import { runViewsRoute, ViewsApiParamError } from '@/lib/views-api/errors';
 import {
@@ -29,17 +31,17 @@ export function GET(request: NextRequest) {
     const s = request.nextUrl.searchParams;
     if (!s.get('runId')) throw new ViewsApiParamError('runId', 'runId is required');
     const runId = parseNumberParam(s.get('runId'), 'runId', 0, { min: 1, integer: true });
-    const data = await readResponse<GpuPowerApiResponse>(
-      await metrics(sourceRequest(request, '/api/gpu-metrics', { runId: String(runId) })),
+    const data = await readResponse<GpuMetricsRouteResponse>(
+      await metrics(
+        sourceRequest(request, '/api/gpu-metrics', { runId: String(runId) }),
+        s.get('artifact'),
+      ),
     );
+    const artifactNames = data.artifactNames ?? data.artifacts.map((a) => a.name);
     const artifact = s.get('artifact') ?? data.artifacts[0]?.name;
     const selected = data.artifacts.find((a) => a.name === artifact);
     if (artifact && !selected)
-      throw new ViewsApiParamError(
-        'artifact',
-        'Unknown artifact',
-        data.artifacts.map((a) => a.name),
-      );
+      throw new ViewsApiParamError('artifact', 'Unknown artifact', artifactNames);
     const rows = selected?.data ?? [];
     const availableMetrics = getAvailableMetrics(rows);
     const keys = ALL_METRIC_OPTIONS.map((m) => m.key);
@@ -93,7 +95,7 @@ export function GET(request: NextRequest) {
           direction,
         },
         runInfo: data.runInfo,
-        artifacts: data.artifacts.map((a) => a.name),
+        artifacts: artifactNames,
         availableMetrics,
         gpuIndices: indices,
         rows: rows.filter((r) => gpus.includes(r.index)),

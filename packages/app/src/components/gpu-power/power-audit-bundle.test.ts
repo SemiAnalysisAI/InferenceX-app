@@ -5,6 +5,7 @@ import {
   BUNDLE_SAMPLES_ENTRY,
   BUNDLE_WINDOW_PAD_SECONDS,
   cutPowerAuditBundle,
+  parsePowerCsvData,
 } from './power-audit-bundle';
 
 const ARTIFACT = 'power_audit_qwen3.5_8k1k_fp8_dynamo-sglang_x';
@@ -130,5 +131,34 @@ describe('cutPowerAuditBundle', () => {
     expect(first.t).toEqual([0, 60, 65, 70, 130]);
     // 1005.4 s lands in the 1005 s bucket; the malformed 2002 s rows never appear.
     expect(first.power[2]).toEqual([100, 100, 300, 100, 100]);
+  });
+});
+
+describe('parsePowerCsvData', () => {
+  const NVIDIA_CSV = [
+    'timestamp, index, power.draw [W], temperature.gpu, clocks.current.sm [MHz], clocks.current.memory [MHz], utilization.gpu [%], utilization.memory [%]',
+    '2026/09/11 04:19:41.123, 0, 350.5 W, 60, 1980 MHz, 2619 MHz, 90 %, 50 %',
+  ].join('\n');
+
+  it('normalizes UTC and missing collector context to ISO UTC like the stored path', () => {
+    // A zone-less stamp left as-is would be parsed as browser-local by `new Date`.
+    for (const context of [null, { timestamp_timezone: 'UTC' }, { timestamp_timezone: '+00:00' }]) {
+      expect(parsePowerCsvData(NVIDIA_CSV, context).map((row) => row.timestamp)).toEqual([
+        '2026-09-11T04:19:41.123Z',
+      ]);
+    }
+  });
+
+  it('applies a non-zero collector offset', () => {
+    expect(
+      parsePowerCsvData(NVIDIA_CSV, { timestamp_timezone: '+08:00' }).map((row) => row.timestamp),
+    ).toEqual(['2026-09-10T20:19:41.123Z']);
+  });
+
+  it('leaves ISO timestamps untouched', () => {
+    const iso = NVIDIA_CSV.replace('2026/09/11 04:19:41.123', '2026-09-11T04:19:41.123Z');
+    expect(parsePowerCsvData(iso, { timestamp_timezone: 'UTC' })[0]?.timestamp).toBe(
+      '2026-09-11T04:19:41.123Z',
+    );
   });
 });

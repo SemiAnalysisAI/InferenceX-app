@@ -122,8 +122,8 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
     '模型许可或收入分成百分比，范围 0 至 100，默认值随模型变化。',
   ],
   powerBasis: [
-    'provisioned (default), modeled or compare. Modeled power requires eligible measured source rows; estimates extrapolated from partial-GPU measurements to a full chassis are identified by powerLabel. Missing coverage is not zero.',
-    'provisioned（默认）、modeled 或 compare。建模功耗需要符合条件的实测数据行；由部分 GPU 的实测数据外推到整机的估算，会通过 powerLabel 标明。缺失数据不按零处理。',
+    'provisioned (default, All in Provisioned), modeled (All in Measured) or compare. All in Measured uses measured GPU power plus modeled unmeasured components and PUE; it is not measured wall power. Eligible measured source rows are required; powerLabel identifies paired estimates and full-chassis extrapolation. Missing coverage is not zero.',
+    'provisioned（默认，整体预配功耗）、modeled（整体实测功耗）或 compare。整体实测功耗采用 GPU 实测值，加上未实测组件的功耗估算和 PUE，并非墙上电表读数。该估算需要符合条件的实测数据行；powerLabel 标明对比方式和整机外推。缺失数据不按零处理。',
   ],
   power: [
     'Comma-separated certified and/or legacy power tiers. Omit for all tiers.',
@@ -394,7 +394,7 @@ const NEW_VIEWS = {
       stats: {
         ...objects,
         description:
-          'Per-GPU statistics for the selected file/host series, including startup and warmup. Current-version stored digests are authoritative, including an empty or missing metric digest. Outdated or unversioned digests are recomputed read-only from retained DB samples using the current full-record algorithm. Count is the finite-reading count after first-wins timestamp/GPU deduplication. Mean is sample-weighted, P50/P95/P99 use linear interpolation at p*(N-1), and standard deviation divides by N. Values use the selected metric unit. GPU visibility and chart downsampling do not change this population. These are not serving-window power or J/token.',
+          'Per-GPU statistics for the selected file/host series, including startup and warmup. Current-version stored digests are authoritative, including an empty or missing metric digest. Outdated or unversioned digests are recomputed read-only from retained DB samples using the current full-record algorithm. Count is the finite-reading count after first-wins timestamp/GPU deduplication. Mean is sample-weighted, P50/P95/P99 use linear interpolation at p*(N-1), and standard deviation divides by N. Values use the selected metric unit; the storage-only metric column is omitted. GPU visibility and chart downsampling do not change this population. These are not serving-window power or J/token.',
       },
       rendering: object,
     },
@@ -426,14 +426,14 @@ export const operations: ApiOperation[] = Object.entries(NEW_VIEWS).map(
           view === 'video'
             ? ' Only already published artifacts are read. Cell, phase, slot and GPU-basis choices select result evidence and normalized serving rates; x/y/cost/workload filters produce computed tradeoff points. Local bundles and arbitrary URLs are excluded. Responses are no-store.'
             : view === 'gpu-metrics'
-              ? ' Telemetry reads stored DB series first and falls back to GitHub artifacts when storage is absent. Responses use private, no-store; an upstream database failure remains HTTP 503 rather than an empty dataset. File/host series retain separate identities. Full-record statistics include startup and warmup and use current-version stored per-GPU digests; a current empty or missing metric digest stays empty. Outdated or unversioned digests are recomputed read-only from retained DB samples. Statistics cover every chip in the selected series, while raw rows and charts respect selected GPU indices. Chart downsampling does not alter statistics. These sample-weighted statistics are separate from serving-window power, J/token and selected-time-window calculations. Line time remains relative to the first sample across all chips; missing metric readings are omitted rather than zero-filled. Correlations require both readings. This endpoint projects the raw GPU-metrics explorer, not the inference Power Timeline. Timeline role/window evidence comes from its existing series=power read plus benchmark power_audit. Timeline i_ptaxis, i_ptlines, i_ptwindow, i_ptfocus and i_ptutility share fields control client rendering only and are not accepted here; they do not change raw telemetry or full-record statistics.'
+              ? ' Telemetry reads stored DB series first and falls back to GitHub artifacts when storage is absent. Responses use private, no-store; an upstream database failure remains HTTP 503 rather than an empty dataset. File/host series retain separate identities. Full-record statistics include startup and warmup and use current-version stored per-GPU digests; a current empty or missing metric digest stays empty. Outdated or unversioned digests are recomputed read-only from retained DB samples. Statistics cover every chip in the selected series, while raw rows and charts respect selected GPU indices. Chart downsampling does not alter statistics. Statistics expose the selected metric values without the storage-only metric column. These sample-weighted statistics are separate from serving-window power, J/token and selected-time-window calculations. Line time remains relative to the first sample across all chips; missing metric readings are omitted rather than zero-filled. Correlations require both readings. This endpoint projects the raw GPU-metrics explorer, not the inference Power Timeline. Timeline role/window evidence comes from its existing series=power read plus benchmark power_audit. Timeline i_ptaxis, i_ptlines, i_ptwindow, i_ptfocus and i_ptutility share fields control client rendering only and are not accepted here; they do not change raw telemetry or full-record statistics.'
               : ''
         }`,
         `只读${zh}，使用仪表板的数据读取和计算函数。未知或重复查询键返回 400；响应包含解析后的参数，保留缺失数据。仅影响样式的控件不作为 API 参数。${
           view === 'video'
             ? ' 仅读取已发布产物。cell、阶段、slot 和 GPU 口径选择对应结果证据，并计算 serving 归一化速率；x/y、成本及工作负载筛选生成权衡图数据点。不读取本地数据包或任意 URL。响应不缓存。'
             : view === 'gpu-metrics'
-              ? ' 遥测优先读取数据库中已存储的序列；缺少存储数据时回退到 GitHub 产物。响应使用 private, no-store；上游数据库故障保留 HTTP 503，不作为空数据返回。各文件、主机的序列身份独立保留。全记录统计包含服务启动与 warmup，已有数据使用当前算法版本的每 GPU 统计摘要；当前摘要为空或缺少所选指标时仍返回空统计数组。旧版本或无版本摘要从保留的 DB 样本只读重算。统计覆盖所选序列的全部芯片，原始数据行和图表则按芯片索引筛选；图表降采样不改变统计。这里按样本计算的统计与 serving-window 功率、J/token 及用户所选时间窗口的计算分别处理。折线时间以所有芯片的首个采样为起点；缺失指标读数会被跳过，不补零。相关性图要求两个指标均有读数。 本接口投影原始 GPU-metrics 浏览器，不是推理页的 Power Timeline。时间线通过现有 series=power 读取和基准测试 power_audit 获取角色与窗口证据；i_ptaxis、i_ptlines、i_ptwindow、i_ptfocus 和 i_ptutility 分享字段仅控制客户端显示，本接口不接受这些参数。它们不改变原始遥测或全记录统计。'
+              ? ' 遥测优先读取数据库中已存储的序列；缺少存储数据时回退到 GitHub 产物。响应使用 private, no-store；上游数据库故障保留 HTTP 503，不作为空数据返回。各文件、主机的序列身份独立保留。全记录统计包含服务启动与 warmup，已有数据使用当前算法版本的每 GPU 统计摘要；当前摘要为空或缺少所选指标时仍返回空统计数组。旧版本或无版本摘要从保留的 DB 样本只读重算。统计覆盖所选序列的全部芯片，原始数据行和图表则按芯片索引筛选；图表降采样不改变统计。统计项只包含所选指标的数值，不返回数据库内部的 metric 字段。这里按样本计算的统计与 serving-window 功率、J/token 及用户所选时间窗口的计算分别处理。折线时间以所有芯片的首个采样为起点；缺失指标读数会被跳过，不补零。相关性图要求两个指标均有读数。 本接口投影原始 GPU-metrics 浏览器，不是推理页的 Power Timeline。时间线通过现有 series=power 读取和基准测试 power_audit 获取角色与窗口证据；i_ptaxis、i_ptlines、i_ptwindow、i_ptfocus 和 i_ptutility 分享字段仅控制客户端显示，本接口不接受这些参数。它们不改变原始遥测或全记录统计。'
               : ''
         }`,
       ),

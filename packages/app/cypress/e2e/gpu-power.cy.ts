@@ -52,6 +52,11 @@ describe('PowerX', () => {
       .scrollIntoView()
       .should('be.visible')
       .and('contain.text', 'PowerX');
+    cy.get('[data-testid="footer-link-gpu-specs"]').focus();
+    cy.press(Cypress.Keyboard.Keys.TAB);
+    cy.get('[data-testid="footer-link-powerx"]')
+      .should('be.focused')
+      .and('have.css', 'text-decoration-line', 'underline');
   });
 
   describe('from the footer', () => {

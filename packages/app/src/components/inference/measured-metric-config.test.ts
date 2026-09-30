@@ -12,15 +12,17 @@ import {
 } from './measured-metric-config';
 
 describe('measured metric configuration', () => {
-  it.each(MEASURED_ENERGY_METRIC_CONFIG_KEYS)(
-    'round-trips the existing share-link metric %s',
-    (key) => {
-      const config = getMeasuredMetricConfig(key);
-      expect(config).toBeDefined();
-      expect(changeMeasuredMetricConfig(key, {})).toBe(key);
-      expect(changeMeasuredMetricConfig('y_tpPerGpu', config!)).toBe(key);
-    },
-  );
+  it.each([
+    'y_measuredAvgPower',
+    'y_measuredPowerTimeline',
+    'y_measuredJPerOutputToken',
+    'y_measuredWhPerSuccessfulQuery',
+  ] as const)('round-trips the existing share-link metric %s', (key) => {
+    const config = getMeasuredMetricConfig(key);
+    expect(config).toBeDefined();
+    expect(changeMeasuredMetricConfig(key, {})).toBe(key);
+    expect(changeMeasuredMetricConfig('y_tpPerGpu', config!)).toBe(key);
+  });
 
   it('does not group unrelated metrics or unknown persisted values', () => {
     const grouped = METRIC_CONFIG_KEYS.filter((key) => getMeasuredMetricConfig(key));

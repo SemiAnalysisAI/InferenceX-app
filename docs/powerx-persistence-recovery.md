@@ -22,12 +22,12 @@ or download keeps healthy requested DB series readable with incomplete coverage;
 hide known-incomplete stored telemetry or database failures. Unrelated stored artifacts
 outside the requested identities do not block that read.
 
-Live ordinary CSVs and bundle CSVs normalize NVIDIA wall-clock timestamps with adjacent
-collector context using the ingest parser. Context must be in the same ZIP directory as
+Live ordinary CSVs and bundle CSVs normalize NVIDIA wall-clock timestamps to ISO UTC with
+the ingest parser, so live and stored reads agree. Adjacent collector context supplies the
+offset; missing or UTC context means zero. Context must be in the same ZIP directory as
 the CSV; host directories never share offsets. When multiple context candidates exist, both
 ingest and live reads select the first valid object in code-unit filename order, independent
-of archive or filesystem listing order. ISO/AMD timestamps and missing context
-retain their existing behavior.
+of archive or filesystem listing order. ISO/AMD timestamps pass through unchanged.
 
 Both paths keep the first row for a device/timestamp, matching the existing ingest
 deduplication, before averaging distinct samples within a bucket. A discovered unreadable
@@ -216,10 +216,11 @@ The ordinary fixture-backed smoke command remains `bun run test:e2e` with an
 
 ## Deployment and targeted data repair (operator review required)
 
-1. Deploy the reviewed application and ingest/backfill code together. Verify migrations
-   `015_power_provenance.sql` and `016_gpu_metrics.sql` already exist on the target. This
-   change adds no migration. Do not run migrations or backfill against production merely
-   to inspect a receipt.
+1. Deploy the reviewed application and ingest/backfill code together. Check the target's
+   migration ledger and apply pending migrations with `bun run admin:db:migrate --yes`
+   before running ingest or backfill. This branch adds `016_gpu_metrics.sql` and
+   `017_gpu_metric_stats_version.sql`; writers require the `stats_version` column from 017. CI ingest workflows migrate automatically, but manual backfill does not.
+   Do not run migrations or backfill against production merely to inspect a receipt.
 2. Retain the original publication receipt, exact artifact bytes, sidecars, source run and
    attempt. Snapshot the target run's telemetry series, samples, digests and point links
    before correction. Check that the app reads the same database that ingest writes.

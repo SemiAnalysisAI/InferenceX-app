@@ -26,7 +26,7 @@
  * here focused on one config (`requestPowerTraceFocus`).
  */
 import * as d3 from 'd3';
-import { useQueries } from '@tanstack/react-query';
+import { useQueries, type UseQueryResult } from '@tanstack/react-query';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { HW_REGISTRY } from '@semianalysisai/inferencex-constants';
 
@@ -811,7 +811,25 @@ export default function PowerTimeline({
     [requests, overlayRunIds, shownRunIds, focusRun],
   );
   const droppedRuns = requests.length - fetchedRequests.length;
-  const queries = useQueries({
+  // React Query structurally shares the combined result, so `resolved` keeps
+  // its identity until a run's data actually changes. That gives the response
+  // map a fixed-shape memo input; a per-query spread would change the deps
+  // array length whenever runs enter or leave the plot, which React rejects.
+  const combineQueries = useCallback(
+    (results: UseQueryResult<GpuPowerSeriesResponse, Error>[]) => ({
+      loadingRuns: results.filter((query) => query.isPending).length,
+      errors: fetchedRequests.flatMap((request, index) => {
+        const error = results[index]?.error;
+        return error instanceof Error ? [{ request, error }] : [];
+      }),
+      resolved: fetchedRequests.flatMap((request, index) => {
+        const response = results[index]?.data;
+        return response ? [[request.runId, response] as const] : [];
+      }),
+    }),
+    [fetchedRequests],
+  );
+  const { loadingRuns, errors, resolved } = useQueries({
     queries: fetchedRequests.map((request) => ({
       queryKey: ['power-timeline', request.runId, request.prefix, request.sources] as const,
       queryFn: ({ signal }: { signal: AbortSignal }) => fetchPowerSeries(request, signal),
@@ -819,24 +837,9 @@ export default function PowerTimeline({
       refetchOnWindowFocus: true,
       retry: 1,
     })),
+    combine: combineQueries,
   });
-  const loadingRuns = queries.filter((query) => query.isPending).length;
-  const errors = fetchedRequests
-    .map((request, index) => ({ request, error: queries[index].error }))
-    .filter(
-      (entry): entry is { request: PowerTimelineRequest; error: Error } =>
-        entry.error instanceof Error,
-    );
-  const responses = useMemo(() => {
-    const map = new Map<string, GpuPowerSeriesResponse>();
-    fetchedRequests.forEach((request, index) => {
-      const response = queries[index].data;
-      if (response) map.set(request.runId, response);
-    });
-    return map;
-    // Query data objects are stable per fetch; deriving from them keeps the map memoised.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fetchedRequests, ...queries.map((query) => query.data)]);
+  const responses = useMemo(() => new Map<string, GpuPowerSeriesResponse>(resolved), [resolved]);
 
   const { traces, missing } = useMemo(
     () => joinPowerTimeline(allPoints, responses),

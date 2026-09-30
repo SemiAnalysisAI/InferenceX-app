@@ -26,6 +26,8 @@ const RUN_ID = '34716669498';
 const RUN_URL = `https://github.com/SemiAnalysisAI/InferenceX/actions/runs/${RUN_ID}`;
 const OVERLAY_RUN_ID = '31415926535';
 const OVERLAY_RUN_URL = `https://github.com/SemiAnalysisAI/InferenceX/actions/runs/${OVERLAY_RUN_ID}`;
+const SECOND_RUN_ID = '34716669499';
+const SECOND_RUN_URL = `https://github.com/SemiAnalysisAI/InferenceX/actions/runs/${SECOND_RUN_ID}`;
 const START_MS = Date.UTC(2026, 8, 12, 20, 20, 0);
 const hwConfig = createMockHardwareConfig();
 const HW_TYPES = new Set(['b200', 'h100']);
@@ -89,6 +91,25 @@ const response: GpuPowerSeriesResponse = {
   series: [series('b200', 16, 700), series('b200', 64, 900)],
 };
 
+const Y_LABEL = 'Measured Average Power per Chip over Time (W)';
+
+function providerOverrides(
+  unofficial: Parameters<typeof createMockUnofficialRunContext>[0] = {},
+  activeHwTypes?: readonly string[],
+): Parameters<typeof mountWithProviders>[1] {
+  return {
+    inference: {
+      selectedModel: Model.DeepSeek_V4_Pro,
+      selectedSequence: Sequence.EightK_OneK,
+      selectedYAxisMetric: 'y_measuredPowerTimeline',
+      hardwareConfig: hwConfig,
+      activeHwTypes: new Set(activeHwTypes ?? HW_TYPES),
+      hwTypesWithData: new Set(HW_TYPES),
+    },
+    unofficial,
+  };
+}
+
 function mountTimeline(
   data: InferenceData[],
   options: {
@@ -104,26 +125,41 @@ function mountTimeline(
           chartId="power-timeline-test"
           data={data}
           overlayData={options.overlay}
-          yLabel="Measured Average Power per Chip over Time (W)"
+          yLabel={Y_LABEL}
         />
       </div>
     </PathnameContext.Provider>,
-    {
-      inference: {
-        selectedModel: Model.DeepSeek_V4_Pro,
-        selectedSequence: Sequence.EightK_OneK,
-        selectedYAxisMetric: 'y_measuredPowerTimeline',
-        hardwareConfig: hwConfig,
-        activeHwTypes: new Set(options.activeHwTypes ?? HW_TYPES),
-        hwTypesWithData: new Set(HW_TYPES),
-      },
-      unofficial: options.unofficial ?? {},
-    },
+    providerOverrides(options.unofficial, options.activeHwTypes),
+  );
+}
+
+/** One measured run at mount; a button adds a second run to the same plot. */
+function GrowingTimeline() {
+  const [data, setData] = useState(() => [measuredPoint('b200', 16, 700)]);
+  return (
+    <PathnameContext.Provider value="/inference">
+      <button
+        type="button"
+        data-testid="add-run"
+        onClick={() =>
+          setData((prev) => [...prev, measuredPoint('h100', 16, 500, { run_url: SECOND_RUN_URL })])
+        }
+      >
+        add run
+      </button>
+      <div style={{ width: 1100, height: 700 }}>
+        <PowerTimeline chartId="power-timeline-test" data={data} yLabel={Y_LABEL} />
+      </div>
+    </PathnameContext.Provider>
   );
 }
 
 const overlayResponse = (traces: GpuPowerSeries[]): GpuPowerSeriesResponse => ({
-  runInfo: { ...response.runInfo, id: Number(OVERLAY_RUN_ID), url: OVERLAY_RUN_URL },
+  runInfo: {
+    ...response.runInfo,
+    id: Number(OVERLAY_RUN_ID),
+    url: OVERLAY_RUN_URL,
+  },
   series: traces,
 });
 
@@ -166,8 +202,12 @@ describe('PowerTimeline', () => {
   });
 
   it('colours overlay-run traces by run and honours the overlay hardware filter', () => {
-    const overlayPoint = measuredPoint('h200', 16, 500, { run_url: OVERLAY_RUN_URL });
-    cy.intercept('POST', `/api/gpu-metrics?runId=${RUN_ID}*`, { body: response }).as('official');
+    const overlayPoint = measuredPoint('h200', 16, 500, {
+      run_url: OVERLAY_RUN_URL,
+    });
+    cy.intercept('POST', `/api/gpu-metrics?runId=${RUN_ID}*`, {
+      body: response,
+    }).as('official');
     cy.intercept('POST', `/api/gpu-metrics?runId=${OVERLAY_RUN_ID}*`, {
       body: overlayResponse([series('h200', 16, 500)]),
     }).as('overlay');
@@ -190,9 +230,47 @@ describe('PowerTimeline', () => {
     cy.get('[data-testid="chart-legend"]').should('contain.text', '✕ powerx-timeline');
   });
 
+  it('joins a run that arrives after mount without a hook-shape warning', () => {
+    const secondResponse: GpuPowerSeriesResponse = {
+      runInfo: {
+        ...response.runInfo,
+        id: Number(SECOND_RUN_ID),
+        url: SECOND_RUN_URL,
+      },
+      series: [series('h100', 16, 500)],
+    };
+    cy.intercept('POST', `/api/gpu-metrics?runId=${RUN_ID}*`, {
+      body: response,
+    }).as('first');
+    cy.intercept('POST', `/api/gpu-metrics?runId=${SECOND_RUN_ID}*`, {
+      body: secondResponse,
+    }).as('second');
+    cy.stub(console, 'error').as('consoleError');
+    mountWithProviders(<GrowingTimeline />, providerOverrides());
+    cy.wait('@first');
+    svg().find('path.power-trace[data-segment="window"]').should('have.length', 1);
+
+    cy.get('[data-testid="add-run"]').click();
+    cy.wait('@second');
+    svg().find('path.power-trace[data-segment="window"]').should('have.length', 2);
+    // React logs this when a memo's dependency array changes length between
+    // renders; one query per run used to be spread into that array.
+    cy.get('@consoleError').then((stub) => {
+      const calls = (stub as unknown as { args: unknown[][] }).args;
+      const shapeWarnings = calls.filter((args) =>
+        args.some((a) => typeof a === 'string' && a.includes('changed size between renders')),
+      );
+      expect(shapeWarnings, JSON.stringify(shapeWarnings)).to.have.length(0);
+    });
+  });
+
   it('marks overlay traces in the same-load summary with their run colour', () => {
-    const overlayPoint = measuredPoint('h200', 16, 500, { run_url: OVERLAY_RUN_URL });
-    cy.intercept('POST', `/api/gpu-metrics?runId=${RUN_ID}*`, { body: response }).as('official');
+    const overlayPoint = measuredPoint('h200', 16, 500, {
+      run_url: OVERLAY_RUN_URL,
+    });
+    cy.intercept('POST', `/api/gpu-metrics?runId=${RUN_ID}*`, {
+      body: response,
+    }).as('official');
     cy.intercept('POST', `/api/gpu-metrics?runId=${OVERLAY_RUN_ID}*`, {
       body: overlayResponse([series('h200', 16, 500)]),
     }).as('overlay');
@@ -218,11 +296,17 @@ describe('PowerTimeline', () => {
     const ALL_SERIES = new Set(DATES.map((date) => `${date}_b200`));
     cy.intercept('POST', `/api/gpu-metrics?runId=${EARLIER_RUN_ID}*`, {
       body: {
-        runInfo: { ...response.runInfo, id: Number(EARLIER_RUN_ID), url: EARLIER_RUN_URL },
+        runInfo: {
+          ...response.runInfo,
+          id: Number(EARLIER_RUN_ID),
+          url: EARLIER_RUN_URL,
+        },
         series: [series('b200', 16, 600)],
       },
     }).as('earlier');
-    cy.intercept('POST', `/api/gpu-metrics?runId=${RUN_ID}*`, { body: response }).as('later');
+    cy.intercept('POST', `/api/gpu-metrics?runId=${RUN_ID}*`, {
+      body: response,
+    }).as('later');
 
     function DateComparison() {
       const [activeDates, setActiveDates] = useState(new Set(ALL_SERIES));
@@ -247,7 +331,10 @@ describe('PowerTimeline', () => {
               chartId="power-timeline-test"
               comparison
               data={[
-                measuredPoint('b200', 16, 600, { date: DATES[0], run_url: EARLIER_RUN_URL }),
+                measuredPoint('b200', 16, 600, {
+                  date: DATES[0],
+                  run_url: EARLIER_RUN_URL,
+                }),
                 measuredPoint('b200', 16, 700, { date: DATES[1] }),
               ]}
               yLabel="Measured Average Power per Chip over Time (W)"
@@ -290,6 +377,82 @@ describe('PowerTimeline', () => {
         .should('have.length', 1)
         .and('have.attr', 'data-trace-key', `${RUN_ID}:${resultName('b200', 16)}`);
       cy.get('text.power-trace-label').should('have.length', 1).and('have.text', 'c16');
+    });
+  });
+
+  it('follows dates-only range comparison (i_dstart/i_dend, no ~r runs)', () => {
+    // Range endpoints alone (empty selectedDates) must still drive per-date
+    // colours, legend toggles and end labels — the dates-only share/reload path.
+    const EARLIER_RUN_ID = '34600000002';
+    const EARLIER_RUN_URL = `https://github.com/SemiAnalysisAI/InferenceX/actions/runs/${EARLIER_RUN_ID}`;
+    const DATES = ['2026-09-01', '2026-09-09'] as const;
+    const ALL_SERIES = new Set(DATES.map((date) => `${date}_b200`));
+    cy.intercept('POST', `/api/gpu-metrics?runId=${EARLIER_RUN_ID}*`, {
+      body: {
+        runInfo: { ...response.runInfo, id: Number(EARLIER_RUN_ID), url: EARLIER_RUN_URL },
+        series: [series('b200', 16, 600)],
+      },
+    }).as('range-earlier');
+    cy.intercept('POST', `/api/gpu-metrics?runId=${RUN_ID}*`, { body: response }).as('range-later');
+
+    function DatesOnlyRange() {
+      const [activeDates, setActiveDates] = useState(new Set(ALL_SERIES));
+      const value = createMockInferenceContextValues({
+        selectedModel: Model.DeepSeek_V4_Pro,
+        selectedSequence: Sequence.EightK_OneK,
+        selectedYAxisMetric: 'y_measuredPowerTimeline',
+        hardwareConfig: hwConfig,
+        activeHwTypes: new Set(HW_TYPES),
+        hwTypesWithData: new Set(HW_TYPES),
+        selectedGPUs: ['b200'],
+        selectedDates: [],
+        selectedDateRange: { startDate: DATES[0], endDate: DATES[1] },
+        activeDates,
+        toggleActiveDate: (id: string) =>
+          setActiveDates((prev) => computeToggle(prev, id, ALL_SERIES)),
+      });
+      return (
+        <InferenceContextsProvider data={value} filters={value} display={value} actions={value}>
+          <div style={{ width: 1100, height: 700 }}>
+            <PowerTimeline
+              chartId="power-timeline-dates-only"
+              comparison
+              data={[
+                measuredPoint('b200', 16, 600, { date: DATES[0], run_url: EARLIER_RUN_URL }),
+                measuredPoint('b200', 16, 700, { date: DATES[1] }),
+              ]}
+              yLabel="Measured Average Power per Chip over Time (W)"
+            />
+          </div>
+        </InferenceContextsProvider>
+      );
+    }
+    mountWithProviders(
+      <PathnameContext.Provider value="/inference">
+        <DatesOnlyRange />
+      </PathnameContext.Provider>,
+      { unofficial: {} },
+    );
+    cy.wait(['@range-earlier', '@range-later']);
+
+    cy.get('[data-testid="chart-legend"] label').then(($labels) => {
+      const rows = $labels.toArray().map((label) => label.textContent?.trim());
+      expect(rows).to.include.members([...DATES]);
+      expect(rows.join(' ')).not.to.match(/#\d/u);
+    });
+    svg().within(() => {
+      cy.get('path.power-trace[data-segment="window"]').should('have.length', 2);
+      cy.get('text.power-trace-label').then(($labels) => {
+        expect($labels.toArray().map((label) => label.textContent)).to.have.members([
+          `${DATES[0]} c16`,
+          `${DATES[1]} c16`,
+        ]);
+      });
+    });
+    cy.get('[data-testid="chart-legend"] label').contains(DATES[0]).click();
+    svg().within(() => {
+      cy.get('path.power-trace[data-segment="window"]').should('have.length', 1);
+      cy.get('text.power-trace-label').should('have.text', 'c16');
     });
   });
 });

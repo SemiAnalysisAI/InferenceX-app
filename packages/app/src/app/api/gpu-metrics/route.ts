@@ -42,6 +42,7 @@ import { getDb } from '@semianalysisai/inferencex-db/connection';
 import {
   getGpuMetricsForRun,
   type GpuMetricsRunPayload,
+  type GpuMetricsRunSelection,
 } from '@semianalysisai/inferencex-db/queries/gpu-metrics';
 
 import type {
@@ -94,6 +95,7 @@ export type GpuMetricsSource = 'database' | 'github';
 
 export interface GpuMetricsRouteResponse extends GpuPowerApiResponse {
   source: GpuMetricsSource;
+  artifactNames?: string[];
 }
 
 /** Shape the stored digest like the GitHub payload so the explorer is source-agnostic. */
@@ -105,6 +107,7 @@ export function databasePayloadToResponse(payload: GpuMetricsRunPayload): GpuMet
   }
   return {
     source: 'database',
+    ...(payload.artifactNames ? { artifactNames: payload.artifactNames } : {}),
     runInfo: {
       id: run.githubRunId,
       name: run.name,
@@ -120,7 +123,8 @@ export function databasePayloadToResponse(payload: GpuMetricsRunPayload): GpuMet
     artifacts: payload.series.map(({ data, ...series }) => ({
       // Multinode uploads carry one CSV per node; keep them distinguishable.
       name:
-        (filesPerArtifact.get(series.artifactName) ?? 1) > 1
+        (filesPerArtifact.get(series.artifactName) ?? 1) > 1 ||
+        payload.artifactNames?.includes(`${series.artifactName}/${series.fileName}`)
           ? `${series.artifactName}/${series.fileName}`
           : series.artifactName,
       data,
@@ -376,14 +380,22 @@ async function fetchGpuMetricsFromGithub(
   };
 }
 
-async function fetchGpuMetricsFromDatabase(runId: string): Promise<GpuMetricsRouteResponse | null> {
+async function fetchGpuMetricsFromDatabase(
+  runId: string,
+  selection: GpuMetricsRunSelection,
+): Promise<GpuMetricsRouteResponse | null> {
   if (!process.env.DATABASE_READONLY_URL) return null;
-  const payload = await getGpuMetricsForRun(getDb(), Number(runId));
+  const payload = await getGpuMetricsForRun(getDb(), Number(runId), selection);
   return payload ? databasePayloadToResponse(payload) : null;
 }
 
 export function GET(request: NextRequest) {
   return readGpuMetrics(request, null);
+}
+
+/** Selecting a host must not discard the explorer's sibling artifact choices. */
+export function readGpuMetricsForView(request: NextRequest, artifact: string | null) {
+  return readGpuMetrics(request, null, artifact);
 }
 
 /** Read-only Timeline transport; the body avoids URL limits for a run's point identities. */
@@ -440,7 +452,11 @@ export async function POST(request: NextRequest) {
   }
 }
 
-async function readGpuMetrics(request: NextRequest, sources: string[] | null) {
+async function readGpuMetrics(
+  request: NextRequest,
+  sources: string[] | null,
+  selectedArtifact?: string | null,
+) {
   const params = request.nextUrl.searchParams;
   const runId = params.get('runId');
 
@@ -461,7 +477,12 @@ async function readGpuMetrics(request: NextRequest, sources: string[] | null) {
 
   let stored: GpuMetricsRouteResponse | null;
   try {
-    stored = await fetchGpuMetricsFromDatabase(runId);
+    stored = await fetchGpuMetricsFromDatabase(runId, {
+      prefix,
+      sourceResults:
+        sources?.map((source) => source.slice('power_validation_'.length, -'.json'.length)) ?? null,
+      ...(selectedArtifact === undefined ? {} : { artifact: selectedArtifact }),
+    });
   } catch (error) {
     // Missing data may use live artifacts; a failed read cannot establish absence.
     console.error(`gpu-metrics: database lookup failed for run ${runId}:`, error);
@@ -512,7 +533,7 @@ async function readGpuMetrics(request: NextRequest, sources: string[] | null) {
         ) {
           return powerSeriesResponse('database', stored.runInfo, databaseSeries, sources);
         }
-      } else if (artifacts.length > 0) {
+      } else if (artifacts.length > 0 || stored.artifactNames) {
         return NextResponse.json(
           { ...stored, artifacts },
           { headers: { 'Cache-Control': 'no-store' } },

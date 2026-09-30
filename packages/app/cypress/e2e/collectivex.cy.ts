@@ -87,6 +87,10 @@ function installRun(body: CollectiveXDataset = dataset, alias = 'run') {
   cy.intercept('GET', `/api/v1/collectivex/runs/${body.run.run_id}*`, { body }).as(alias);
 }
 
+function runCheckbox(body: CollectiveXDataset) {
+  return cy.get(`[data-testid="collectivex-run-visible-${body.run.run_id}"]`);
+}
+
 function openCollectiveX() {
   cy.visit('/collectivex');
   cy.wait('@runs');
@@ -401,6 +405,44 @@ describe('CollectiveX neutral run view', () => {
         expect($lines.eq(0)).to.have.attr('stroke-dasharray', 'none');
         expect($lines.eq(1)).to.have.attr('stroke-dasharray', '9 4');
       });
+  });
+
+  it('shift-click applies one visibility state to every run between two clicked rows', () => {
+    const middleDataset = buildDataset({
+      shards: [makeRawShard()],
+      meta: { run_id: '158', generated_at: '2026-07-06T12:20:00Z', source_sha: 'a'.repeat(40) },
+    });
+    const ordered = [dataset, middleDataset, comparisonDataset];
+    installRuns(ordered);
+    installRun();
+    installRun(middleDataset, 'middleRun');
+    installRun(comparisonDataset, 'comparisonRun');
+    cy.reload();
+    cy.wait('@runs');
+    cy.wait('@run');
+
+    // Clear the default selection so the range check starts from nothing.
+    runCheckbox(dataset).uncheck();
+    for (const body of ordered) runCheckbox(body).should('not.be.checked');
+
+    runCheckbox(dataset).click();
+    runCheckbox(comparisonDataset).click({ shiftKey: true });
+    for (const body of ordered) runCheckbox(body).should('be.checked');
+    cy.wait(['@middleRun', '@comparisonRun']);
+    for (const body of ordered) {
+      cy.get(`[data-testid="collectivex-run-line-style-${body.run.run_id}"]`).should('exist');
+    }
+
+    // Shift-unchecking from the last anchor clears the range back to the clicked row.
+    runCheckbox(middleDataset).click({ shiftKey: true });
+    runCheckbox(dataset).should('be.checked');
+    runCheckbox(middleDataset).should('not.be.checked');
+    runCheckbox(comparisonDataset).should('not.be.checked');
+
+    // A plain click only toggles its own row.
+    runCheckbox(comparisonDataset).click();
+    runCheckbox(middleDataset).should('not.be.checked');
+    runCheckbox(comparisonDataset).should('be.checked');
   });
 
   it('defaults to the newest measured run when a newer incomplete run has no series', () => {

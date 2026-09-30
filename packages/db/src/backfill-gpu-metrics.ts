@@ -61,7 +61,11 @@ import {
   parseLimitForceFlags,
   runBackfillMain,
 } from './lib/backfill-runner.js';
-import { findBenchmarkResultIds, readMappedBenchmarkRows } from './lib/benchmark-result-lookup.js';
+import {
+  filterPurgedBenchmarkRows,
+  findBenchmarkResultIds,
+  readMappedBenchmarkRows,
+} from './lib/benchmark-result-lookup.js';
 import { downloadArtifact, fetchRunMeta } from './lib/github-artifacts.js';
 import {
   pairGpuMetricsArtifacts,
@@ -204,14 +208,18 @@ async function processPair(
     benchmarkDir = await retryArtifactOperation(`downloading ${pair.benchmarks.name}`, () =>
       downloadArtifact(pair.benchmarks, tempDir),
     );
-    const mappedRows = readMappedBenchmarkRows(benchmarkDir, (error) => {
-      expectationsUnknown = true;
-      expectationErrors.push({
-        benchmarkArtifact: pair.benchmarks.name,
-        artifactNames: [pair.gpuMetrics.name],
-        error,
-      });
-    });
+    const mappedRows = await filterPurgedBenchmarkRows(
+      sql,
+      run,
+      readMappedBenchmarkRows(benchmarkDir, (error) => {
+        expectationsUnknown = true;
+        expectationErrors.push({
+          benchmarkArtifact: pair.benchmarks.name,
+          artifactNames: [pair.gpuMetrics.name],
+          error,
+        });
+      }),
+    );
     for (const row of mappedRows) {
       const identity = benchmarkPublicationIdentity(row);
       const key = stablePowerPointIdentity(identity);
@@ -522,7 +530,11 @@ async function main(): Promise<void> {
             directory = await retryArtifactOperation(`downloading ${artifact.name}`, () =>
               downloadArtifact(artifact, tempDir),
             );
-            const rows = readMappedBenchmarkRows(directory, onUnmapped);
+            const rows = await filterPurgedBenchmarkRows(
+              sql,
+              run,
+              readMappedBenchmarkRows(directory, onUnmapped),
+            );
             for (const row of rows)
               await findBenchmarkResultIds(sql, run, [row], (id) =>
                 uniqueFallbacks.set(

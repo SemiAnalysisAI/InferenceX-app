@@ -28,10 +28,15 @@ export type PowerBasis = (typeof POWER_BASES)[number];
 export type PowerQuantity = 'watts' | 'energy';
 
 export const POWER_BASIS_LABELS: Record<PowerBasis, { en: string; zh: string }> = {
-  'gpu-measured': { en: 'GPU measured', zh: 'GPU 实测' },
-  'gpu-provisioned': { en: 'GPU provisioned (TDP)', zh: 'GPU 额定（TDP）' },
-  'utility-provisioned': { en: 'Utility provisioned (all-in)', zh: '全电源配置（all-in）' },
-  'utility-modeled': { en: 'Utility modeled (PUE)', zh: '数据中心建模（含 PUE）' },
+  'gpu-measured': { en: 'GPU Level Measured', zh: 'GPU 实测功耗' },
+  'gpu-provisioned': { en: 'GPU Level Provisioned (TDP)', zh: 'GPU 额定功耗（TDP）' },
+  'utility-provisioned': { en: 'All in Provisioned', zh: '整体预配功耗' },
+  'utility-modeled': { en: 'All in Measured', zh: '整体实测功耗' },
+};
+
+export const ALL_IN_MEASURED_NOTE = {
+  en: 'GPU power is measured; unmeasured components are modeled, with PUE included.',
+  zh: 'GPU 功耗来自实测；未实测的组件功耗由模型估算，并计入数据中心 PUE。',
 };
 
 /** InferenceData keys per derived basis and quantity. B1 lives on the measured* fields. */

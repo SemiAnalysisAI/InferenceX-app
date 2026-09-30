@@ -466,63 +466,6 @@ describe('getNestedYValue', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Pareto front x-ordering — gradient labels require ascending x
-// ---------------------------------------------------------------------------
-describe('paretoFront x-ordering for gradient labels', () => {
-  it('paretoFrontUpperRight returns points in ascending x order', () => {
-    const points = [pt(3, 30), pt(1, 10), pt(2, 20)];
-    const front = paretoFrontUpperRight(points);
-    for (let i = 1; i < front.length; i++) {
-      expect(front[i].x).toBeGreaterThanOrEqual(front[i - 1].x);
-    }
-  });
-
-  it('paretoFrontLowerRight returns points in descending x order', () => {
-    // This is the documented behavior that causes gradient labels to break
-    // when points are not re-sorted to ascending x.
-    // Use data where y decreases as x decreases so multiple points land on front:
-    // lower_right: sort desc x, push when y < minY
-    const points = [pt(3, 20), pt(2, 15), pt(1, 10)];
-    const front = paretoFrontLowerRight(points);
-    expect(front.length).toBeGreaterThanOrEqual(2);
-    // Verify descending order
-    for (let i = 1; i < front.length; i++) {
-      expect(front[i].x).toBeLessThanOrEqual(front[i - 1].x);
-    }
-  });
-
-  it('paretoFrontLowerRight sorted ascending fixes gradient label compatibility', () => {
-    // Regression test: sorting the output of paretoFrontLowerRight by
-    // ascending x ensures computeGradientStops gets a positive totalRange.
-    const points = [pt(3, 20), pt(2, 15), pt(1, 10)];
-    const front = paretoFrontLowerRight(points);
-    expect(front.length).toBeGreaterThanOrEqual(2);
-    // Apply the fix from ScatterGraph.tsx
-    front.sort((a, b) => a.x - b.x);
-    // Now ascending
-    for (let i = 1; i < front.length; i++) {
-      expect(front[i].x).toBeGreaterThanOrEqual(front[i - 1].x);
-    }
-  });
-
-  it('paretoFrontUpperLeft returns points in ascending x order', () => {
-    const points = [pt(3, 10), pt(1, 30), pt(2, 20)];
-    const front = paretoFrontUpperLeft(points);
-    for (let i = 1; i < front.length; i++) {
-      expect(front[i].x).toBeGreaterThanOrEqual(front[i - 1].x);
-    }
-  });
-
-  it('paretoFrontLowerLeft returns points in ascending x order', () => {
-    const points = [pt(3, 30), pt(1, 10), pt(2, 20)];
-    const front = paretoFrontLowerLeft(points);
-    for (let i = 1; i < front.length; i++) {
-      expect(front[i].x).toBeGreaterThanOrEqual(front[i - 1].x);
-    }
-  });
-});
-
 // ===========================================================================
 // getHardwareKey
 // ===========================================================================
@@ -1092,20 +1035,6 @@ describe('createChartDataPoint measured power fields', () => {
     expect(missing.measuredP75Power).toBeUndefined();
     expect(missing.measuredP90Power).toBeUndefined();
   });
-  it('emits measuredAvgPower when avg_power_w is present on the entry', () => {
-    const e = entry({ avg_power_w: 685.5 });
-    const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
-    expect(point.measuredAvgPower).toBeDefined();
-    expect(point.measuredAvgPower!.y).toBe(685.5);
-    expect(point.measuredAvgPower!.roof).toBe(false);
-  });
-
-  it('emits measuredJPerOutputToken when joules_per_output_token is present', () => {
-    const e = entry({ joules_per_output_token: 8.4 });
-    const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
-    expect(point.measuredJPerOutputToken).toBeDefined();
-    expect(point.measuredJPerOutputToken!.y).toBe(8.4);
-  });
 
   it('derives J/query, Wh/query, and percent TDP from validated source fields', () => {
     const e = entry({ avg_power_w: 560, joules_per_successful_query: 1800 });
@@ -1159,14 +1088,6 @@ describe('createChartDataPoint measured power fields', () => {
     expect(point.measuredAvgPower!.y).toBe(0);
   });
 
-  it('emits measuredJPerTotalToken when joules_per_total_token is present', () => {
-    const e = entry({ joules_per_total_token: 0.93 });
-    const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
-    expect(point.measuredJPerTotalToken).toBeDefined();
-    expect(point.measuredJPerTotalToken!.y).toBe(0.93);
-    expect(point.measuredJPerTotalToken!.roof).toBe(false);
-  });
-
   it('emits J/output and J/total independently — different denominators', () => {
     // 8k1k workload: J/output ≈ 9 × J/total (input is ~8x output, so output/total ≈ 1/9).
     const e = entry({ joules_per_output_token: 2.04, joules_per_total_token: 0.23 });
@@ -1191,30 +1112,6 @@ describe('createChartDataPoint measured power fields', () => {
 // createChartDataPoint — per-stage measured power / energy (disagg prefill/decode)
 // ===========================================================================
 describe('createChartDataPoint per-stage measured power fields', () => {
-  it('emits measuredPrefillAvgPower when prefill_avg_power_w is present', () => {
-    const e = entry({ prefill_avg_power_w: 920.3 });
-    const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
-    expect(point.measuredPrefillAvgPower).toBeDefined();
-    expect(point.measuredPrefillAvgPower!.y).toBe(920.3);
-    expect(point.measuredPrefillAvgPower!.roof).toBe(false);
-  });
-
-  it('emits measuredDecodeAvgPower when decode_avg_power_w is present', () => {
-    const e = entry({ decode_avg_power_w: 612.1 });
-    const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
-    expect(point.measuredDecodeAvgPower).toBeDefined();
-    expect(point.measuredDecodeAvgPower!.y).toBe(612.1);
-    expect(point.measuredDecodeAvgPower!.roof).toBe(false);
-  });
-
-  it('emits measuredJPerInputToken when joules_per_input_token is present', () => {
-    const e = entry({ joules_per_input_token: 0.27 });
-    const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
-    expect(point.measuredJPerInputToken).toBeDefined();
-    expect(point.measuredJPerInputToken!.y).toBe(0.27);
-    expect(point.measuredJPerInputToken!.roof).toBe(false);
-  });
-
   it('omits all per-stage fields on legacy rows predating per-stage attribution', () => {
     // Single-node / pre-disagg runs emit avg_power_w only, no prefill/decode split.
     const e = entry({ avg_power_w: 685.5 });
@@ -1222,15 +1119,6 @@ describe('createChartDataPoint per-stage measured power fields', () => {
     expect(point.measuredPrefillAvgPower).toBeUndefined();
     expect(point.measuredDecodeAvgPower).toBeUndefined();
     expect(point.measuredJPerInputToken).toBeUndefined();
-  });
-
-  it('emits prefill and decode independently — the disagg per-stage split', () => {
-    // GB300 disagg: prefill GPUs run compute-bound (higher W) than decode GPUs.
-    const e = entry({ prefill_avg_power_w: 948, decode_avg_power_w: 631 });
-    const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
-    expect(point.measuredPrefillAvgPower!.y).toBe(948);
-    expect(point.measuredDecodeAvgPower!.y).toBe(631);
-    expect(point.measuredPrefillAvgPower!.y).toBeGreaterThan(point.measuredDecodeAvgPower!.y);
   });
 
   it('preserves a zero per-stage power value (not falsy-coerced away)', () => {

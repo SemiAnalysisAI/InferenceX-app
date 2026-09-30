@@ -339,7 +339,7 @@ export const Footer = ({ starCount }: { starCount?: number | null }) => {
                 <Link
                   data-testid="footer-link-powerx"
                   href={`${prefix}/gpu-metrics`}
-                  className="inline-flex min-h-11 items-center rounded-sm py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:outline-none md:min-h-8"
+                  className="inline-flex min-h-11 items-center rounded-sm py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:underline focus-visible:underline-offset-4 focus-visible:outline-none md:min-h-8"
                   onClick={() => track('footer_powerx_clicked')}
                 >
                   {t.powerx}

@@ -115,7 +115,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-gpu-metrics-view',
-    sourceSha256: '2ad6ff9f64b397ed4fea5a0456b2b0f328b46f9e171753fa90af458c1f70f23a',
+    sourceSha256: '9513c85ee406f390f73c15757ea30ad9d902b2ec0e39dde25a0e305def2ff7a2',
   },
   {
     source: 'src/app/api/v1/views/gpu-specs/route.ts',
@@ -262,6 +262,14 @@ export const apiRouteCatalog = [
   },
 
   {
+    source: 'src/app/api/v1/pareto/route.ts',
+    path: '/api/v1/pareto',
+    method: 'GET',
+    classification: 'published-read',
+    operationId: 'get-pareto',
+    sourceSha256: '40f350f1b947d223597132effb351960658494549ec35201aa13491d21d9f94d',
+  },
+  {
     source: 'src/app/api/gpu-metrics/route.ts',
     path: '/api/gpu-metrics',
     method: 'GET',
@@ -270,7 +278,7 @@ export const apiRouteCatalog = [
       en: 'UI-only PowerX raw/series=power read: DB-first with artifact fallback, separate host/GPU identities and adjacent CSV context timezone normalization. GET has no expected identities and reports sourceCoverage unknown. Healthy stored windows survive fallback; known-incomplete CSVs require retained file/sample inventory and known-incomplete bundles require re-ingest. DB failures return 503 DATABASE_UNAVAILABLE; unresolved stored gaps return 503 STORED_TELEMETRY_INCOMPLETE. Responses use no-store. This is not a stable public API.',
       zh: '仅供 PowerX 界面读取原始遥测或 series=power：优先 DB，缺失时回退产物，保留主机/GPU 身份，并按相邻 CSV context 规范化时区。GET 没有预期身份清单，sourceCoverage 为 unknown。回退保留健康存储窗口；已知不完整 CSV 须满足文件/样本清单，已知不完整 bundle 须重新 ingest。数据库故障返回 503 DATABASE_UNAVAILABLE，未恢复的存储缺口返回 503 STORED_TELEMETRY_INCOMPLETE。响应使用 no-store，不作为稳定公开 API。',
     },
-    sourceSha256: 'e5e542173400ab5012eeff665154e68d62a402f8279e0cb7fe6e3f4dfb548adf',
+    sourceSha256: 'c1e279231b7ecee8e8cbff89dd9104c5b5f5bfd9e73528308e8f8f7ed2324e50',
   },
   {
     source: 'src/app/api/gpu-metrics/route.ts',
@@ -281,7 +289,7 @@ export const apiRouteCatalog = [
       en: 'Read-only Timeline transport with runId, series=power and optional prefix in the query; JSON sources contains 1–1000 validation basenames with RESULT_FILENAME up to 200 ASCII letters/digits/dot/underscore/hyphen, matching prefix. Invalid input returns 400; bodies over 256 KiB return 413. Fully covered DB reads skip GitHub; missing identities fall back and merge by validation source, preserving stored sibling windows. Offline GitHub preserves healthy DB series with incomplete sourceCoverage. Coverage describes only requested identities, never whole-run/sample completeness. The GET no-store/error/inventory guarantees also apply. UI-owned, excluded from the stable public API.',
       zh: 'Timeline 只读传输：查询参数为 runId、series=power 和可选 prefix；JSON sources 含 1–1000 个验证文件 basename，RESULT_FILENAME 最长 200 个 ASCII 字母/数字/点/下划线/连字符，且须匹配 prefix。输入错误返回 400，正文超过 256 KiB 返回 413。DB 已覆盖请求时跳过 GitHub，否则按缺失身份回退，以 validation source 为键合并，并保留已存储的同 bundle 兄弟窗口。GitHub 离线仍返回健康 DB 序列，sourceCoverage 标记 incomplete。覆盖仅针对请求身份，不代表整次 run 或样本完整性。沿用 GET 的 no-store、错误和清单约束；属于界面接口，不纳入稳定公开 API。',
     },
-    sourceSha256: 'e5e542173400ab5012eeff665154e68d62a402f8279e0cb7fe6e3f4dfb548adf',
+    sourceSha256: 'c1e279231b7ecee8e8cbff89dd9104c5b5f5bfd9e73528308e8f8f7ed2324e50',
   },
   {
     source: 'src/app/api/openapi.json/route.ts',
@@ -893,7 +901,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/gpu-power/power-audit-bundle.ts',
-    sourceSha256: '2f6e82d64380c936178e26795336bb8259a316fa4e547987688effc48e4b28eb',
+    sourceSha256: '21607a0bc3795c545d7f84bb7af2558624a8d1e054e7c92b9203ae94825d1804',
     reviewArea: {
       en: 'Artifact Timeline validation windows, strict nested AgentX result identity, adjacent context selection, timezone normalization and device identity semantics.',
       zh: '产物 Timeline 验证窗口、严格匹配的嵌套 AgentX result 身份、相邻 context 选择、时区规范化及设备身份语义。',
@@ -901,7 +909,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/gpu-power/stored-gpu-stats.ts',
-    sourceSha256: '90adde200c37694c2e37e427458a8c6a9bdb70873033699e343e8c94a291544a',
+    sourceSha256: '77e9f6ad6eef5f3c30899a9a24d04b0d85b64b0293bea9c38964a9680a55e289',
     reviewArea: {
       en: 'Stored full-record GPU metric mappings, authoritative missing digests, and UI/API statistics parity.',
       zh: '已存全记录 GPU 指标映射、缺失摘要语义，以及界面和 API 的统计一致性。',
@@ -1007,7 +1015,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/calculator-extensions.ts',
-    sourceSha256: '0e2b050b483b505b9118336f6639594c8f82470e885c6356c4f2dc5790d39fec',
+    sourceSha256: '2bcd27b5f5fbea9dcd75b32f7ee88e1c92343bed3ff65a293fc9a8ff5ecf04c3',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -1050,6 +1058,22 @@ export const apiContractSourceDigests = [
     },
   },
 
+  {
+    source: 'src/lib/pareto-api.ts',
+    sourceSha256: '6854dc8b0d883503bdcdd6edf3022386c4a3b0e54f4b6b100e921d534d228c72',
+    reviewArea: {
+      en: 'Pareto selectors, validation, source scope, missing-axis counts and boundary observations.',
+      zh: 'Pareto 选择条件、验证、来源范围、缺失坐标计数和边界观测值。',
+    },
+  },
+  {
+    source: 'src/lib/pareto-frontier.ts',
+    sourceSha256: '03a09b631f9dd933d21189e684ea729259e9a228274d55b1da65d2af102a9a4a',
+    reviewArea: {
+      en: 'Shared chart/API dominance directions, tie handling and boundary ordering.',
+      zh: '图表与 API 共用的支配方向、同坐标处理和边界排序。',
+    },
+  },
   {
     source: 'src/lib/api-cache.ts',
     sourceSha256: 'cf710c1dca9cfae794cf3d14d3dad6a153bbd7151cedc9d9f0b27b792aeade24',

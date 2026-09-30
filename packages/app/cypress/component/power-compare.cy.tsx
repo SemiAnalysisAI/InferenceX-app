@@ -151,4 +151,33 @@ describe('ScatterGraph power comparison series', () => {
       expect(hidden).to.have.length(3);
     });
   });
+
+  it('keeps the base series lit when its legend row is hovered', () => {
+    const official = expandPowerCompareSeries(measuredCurve('b200'), 'y_measuredAvgPower', 'roles');
+    const overlay = expandPowerCompareSeries(
+      measuredCurve('h100', OVERLAY_RUN_URL),
+      'y_measuredAvgPower',
+      'roles',
+    );
+    mountCompare(official, overlay);
+
+    cy.get(`${svg} .roofline-path[data-power-variant="prefill"]`).should('exist');
+    // Base points and rooflines carry no variant id (only role siblings are
+    // cloned), so the base row has to map back onto them.
+    cy.get(legend).contains('label', 'All GPUs').trigger('mouseover');
+    // Wait for the siblings to settle first: opacity transitions over 150 ms,
+    // so a base check taken at once would still read the pre-hover value.
+    cy.get(`${svg} .roofline-path[data-power-variant="prefill"]`).should(
+      'have.css',
+      'opacity',
+      '0.15',
+    );
+    cy.get(`${svg} .roofline-path:not([data-power-variant])`).should('have.css', 'opacity', '1');
+    cy.get(legend).contains('label', 'All GPUs').trigger('mouseout');
+    cy.get(`${svg} .roofline-path[data-power-variant="prefill"]`).should(
+      'have.css',
+      'opacity',
+      '1',
+    );
+  });
 });

@@ -224,7 +224,12 @@ function basename(entryName: string): string {
   return entryName.slice(entryName.lastIndexOf('/') + 1);
 }
 
-/** Apply the adjacent collector context only to NVIDIA's unzoned wall-clock timestamps. */
+/**
+ * Normalize NVIDIA's unzoned wall-clock timestamps to ISO UTC, matching the ingest
+ * parser: the adjacent collector context supplies the offset and missing or UTC
+ * context means zero. Live and stored reads then agree, so a run does not shift by
+ * the browser timezone before ingest. ISO and AMD timestamps pass through unchanged.
+ */
 export function parsePowerCsvData(
   text: string,
   context: Record<string, unknown> | null,
@@ -238,7 +243,6 @@ export function parsePowerCsvData(
     ? (offset.sign === '-' ? -1 : 1) * (Number(offset.h) * 60 + Number(offset.m))
     : 0;
   return parseCsvData(text).map((row) => {
-    if (!offsetMinutes) return row;
     const timestamp = parseNvidiaTimestamp(row.timestamp, offsetMinutes);
     return timestamp === null ? row : { ...row, timestamp: new Date(timestamp).toISOString() };
   });

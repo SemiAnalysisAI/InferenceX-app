@@ -24,5 +24,7 @@ export function storedGpuStatsForMetric(
   stats: readonly GpuMetricStatRow[],
   metricKey: GpuMetricKey,
 ): GpuStats[] {
-  return stats.filter((row) => row.metric === STORED_METRIC[metricKey]);
+  return stats
+    .filter((row) => row.metric === STORED_METRIC[metricKey])
+    .map(({ metric: _metric, ...row }) => row);
 }

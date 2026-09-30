@@ -225,7 +225,7 @@ export function PowerTelemetryView({ id, enabled, hardware, serverMetricsEnabled
       </div>
     );
   }
-  if (query.isError) {
+  if (query.isError && !query.data) {
     return (
       <RetryableQueryError
         message={t.error}

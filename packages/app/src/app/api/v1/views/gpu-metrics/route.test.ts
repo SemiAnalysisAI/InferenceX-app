@@ -4,7 +4,10 @@ import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { metrics } = vi.hoisted(() => ({ metrics: vi.fn() }));
-vi.mock('@/app/api/gpu-metrics/route', () => ({ GET: metrics }));
+vi.mock('@/app/api/gpu-metrics/route', () => ({
+  GET: metrics,
+  readGpuMetricsForView: metrics,
+}));
 // These source handlers are imported by the shared source module, but this view never calls them.
 vi.mock('@/app/api/v1/benchmarks/route', () => ({ GET: vi.fn() }));
 vi.mock('@/app/api/unofficial-run/route', () => ({ GET: vi.fn() }));
@@ -91,7 +94,7 @@ describe('GET /api/v1/views/gpu-metrics full-record statistics', () => {
     expect(response.status).toBe(200);
     expect(response.headers.get('cache-control')).toBe('private, no-store');
     const body = await response.json();
-    expect(body.stats).toEqual(digest);
+    expect(body.stats).toEqual(digest.map(({ metric: _metric, ...stats }) => stats));
     expect(body.rows).toEqual(rows);
     expect(metrics.mock.calls[0][0].nextUrl.searchParams.get('runId')).toBe(String(runInfo.id));
   });

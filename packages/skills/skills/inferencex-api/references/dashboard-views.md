@@ -80,10 +80,21 @@ day. Date-only comparisons select that day's exact logical snapshot; the primary
 source observations inclusively.
 Public unofficial overlays must not be relabeled as official results.
 
+`i_rulers` belongs to browser share links, including run-specific comparison
+curves. It is not a views API parameter. Tooltip scrolling and viewport limits
+only affect access to existing actions; neither changes API data or calculations.
+
 For measured-power gauges, `optimal=true` keeps the chart's higher-power outer
 envelope. `frontier.direction` describes that boundary; `metric.direction` retains
 the optimization direction used by `best=true`. Interpret the envelope as a load
 boundary, not evidence that those points are more energy efficient.
+
+The dashboard names its four boundaries GPU Level Measured, GPU Level Provisioned
+(TDP), All in Provisioned, and All in Measured. All in Measured combines measured
+GPU power with modeled unmeasured components and PUE; do not describe it as measured
+wall power. Metric IDs and API selector values are unchanged. Profit `powerBasis`
+still accepts `provisioned`, `modeled`, or `compare`; `powerLabel` is display text.
+Expanding assumptions or unavailable-estimate details does not change returned data.
 
 Prefer equal-service comparisons for article-facing hardware analysis. Use
 `xstat=mean` only for fixed-sequence service axes when that statistic is intended:
@@ -160,7 +171,8 @@ changes neither the API contract nor the validation requirements below.
 Modeled and provisioned power are distinct. Missing measured evidence is not zero.
 GPU chart projections omit missing metric readings; measured zero remains zero.
 The selected file/host series' full-record statistics include startup and warmup
-and cover all chips regardless of visibility or chart downsampling. Current-version stored digests
+and cover all chips regardless of visibility or chart downsampling. Stats rows omit
+the storage-only `metric` column; `params.metric` identifies the selected metric. Current-version stored digests
 are authoritative, including empty or absent metric digests. Outdated or
 unversioned digests are recomputed read-only from retained DB samples. Keep these sample-weighted statistics separate from
 serving-window power, J/token and selected-time-window calculations. The view reads

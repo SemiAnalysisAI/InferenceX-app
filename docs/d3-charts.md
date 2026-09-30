@@ -77,6 +77,10 @@ The metric registry declares whether higher or lower values are preferable. Char
 
 ### Global Pareto highlights
 
+For machine-readable frontier and hinterland observations, see the
+[Pareto boundary API](./pareto-api.md). The server and chart share
+`src/lib/pareto-frontier.ts`; their input-selection pipelines differ.
+
 Inference scatter charts with a performance-preference X axis expose a **Pareto Frontier** switch under
 **Advanced**, off by default.
 Collapsing Advanced does not turn off an enabled highlight.
