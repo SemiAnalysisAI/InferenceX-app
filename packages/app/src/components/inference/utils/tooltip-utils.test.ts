@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 
 import type { HardwareConfig, InferenceData } from '@/components/inference/types';
 import type { SystemPowerEstimate } from '@/lib/modeled-system-power';
@@ -72,8 +72,8 @@ function tooltipConfig(overrides: Partial<TooltipConfig> = {}): TooltipConfig {
 const systemPower = {
   status: 'supported',
   hardware: 'h100',
-  modelRevision: 'ca4403aa527069857351ad8047dbb726844b3382',
-  modelPath: 'chassis/H100.py',
+  modelRevision: `app-sha256:${'a'.repeat(64)}`,
+  modelPath: 'packages/app/src/lib/system-power-model.ts',
   gpuCount: 16,
   chassisCount: 2,
   chassisAcWatts: 12000,
@@ -146,10 +146,31 @@ describe('modeled system-power tooltip', () => {
     expect(html).toContain(
       'Includes GPU chassis CPUs; excludes separate CPU-only frontend/router hosts.',
     );
-    expect(html).toContain(`/blob/${systemPower.modelRevision}/${systemPower.modelPath}`);
+    expect(html).toContain(`/blob/master/${systemPower.modelPath}`);
     expect(html).not.toContain('12,000 W/GPU');
     expect(html).not.toContain('Unmeasured chassis GPUs');
   });
+
+  it.each(['en', 'zh'] as const)(
+    'links %s model provenance to the deployed app source',
+    (locale) => {
+      const buildRef = 'b'.repeat(40);
+      vi.stubEnv('NEXT_PUBLIC_APP_SOURCE_REF', buildRef);
+      try {
+        const html = generateTooltipContent(config({ locale }));
+        const app = `https://github.com/SemiAnalysisAI/InferenceX-app/blob/${buildRef}`;
+        expect(html).toContain(`${app}/${systemPower.modelPath}`);
+        expect(html).toContain(`${app}/docs/powerx-system-power${locale === 'zh' ? '.zh' : ''}.md`);
+        expect(html).toContain(locale === 'zh' ? '功耗模型与假设' : 'Power model assumptions');
+        expect(html).toContain(`title="${systemPower.modelRevision}"`);
+        expect(html).toContain('h100 · aaaaaaaaaaaa');
+        expect(html).not.toContain('inferencex_power_model');
+        expect(html).not.toContain(`/blob/${systemPower.modelRevision}/`);
+      } finally {
+        vi.unstubAllEnvs();
+      }
+    },
+  );
 
   it('labels an extrapolated partial chassis and reports the measured GPUs’ share', () => {
     const data = pt({
@@ -189,7 +210,7 @@ describe('modeled system-power tooltip', () => {
     const trays = {
       ...systemPower,
       hardware: 'gb200',
-      modelPath: 'human_verified/gb200_nvl72_rack/gb200_nvl72_rack_power_model.py',
+      modelPath: 'packages/app/src/lib/system-power-model.ts',
       gpuCount: 8,
       chassisCount: 2,
       modeledGpuCount: 8,

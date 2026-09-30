@@ -10,7 +10,7 @@ import {
   type SystemPowerRackHardware,
 } from '@/lib/system-power-model';
 
-// Application policy for the air-cooled chassis profiles; the pinned Python default stays 1.2.
+// Application policy for air-cooled chassis; the app profile default stays 1.2.
 export const AIR_COOLED_SYSTEM_PUE = 1.3;
 // Application policy for the direct-liquid-cooled NVL72 rack profiles (docs/powerx-system-power.md).
 export const DLC_SYSTEM_PUE = 1.1;

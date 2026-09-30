@@ -21,16 +21,19 @@ then [the worked calculation](#a-worked-nvl72-calculation). The
 [code map](#where-each-part-lives) connect the explanation to implementation.
 The later sections retain the full admission, topology and export contracts.
 
-`system-power-model.profiles.json` records the pinned power model revision,
-component source hashes, hardware mapping, complete platform configuration, and
-fixed inference assumptions. Its profiles come from executing the original
-Python components. `system-power-model.ts` preserves their nonlinear fan curve,
-PSU efficiency interpolation, intermediate rounding, and PUE ordering. The
-Python-generated reference cases test this implementation against the source.
+The model belongs to InferenceX-app. `system-power-model.ts` owns the equations,
+including nonlinear fan curves, PSU efficiency interpolation, intermediate
+rounding, and PUE ordering. `system-power-model.profiles.json` owns the editable
+component parameters, hardware mapping, platform configuration, and metadata
+describing the fixed inference scenario. These checked-in files are the source of truth for the frontend,
+shared views API, and offline exporter. `system-power-model.provenance.json`
+records their app model revision and source hashes.
 
-The pinned source currently identifies itself as **DRAFT / pending human
-verification**. Numerical parity establishes implementation equivalence, not
-empirical chassis calibration.
+The checked-in reference cases retain the historical Python baseline for
+regression comparison; Python and its former private repository are not required
+to develop, build, or deploy the app model. The model remains **DRAFT / pending
+human verification**. Matching a numerical baseline establishes implementation
+consistency, not empirical chassis calibration.
 
 ## What is measured, modeled, and provisioned?
 
@@ -138,7 +141,8 @@ must separately pass the GPU and CPU/module audit checks described below.
 4. **Apply planning headroom separately.** Multiply facility kW/GPU by 1.10.
    PUE 1.1 and the 10% reserve are different factors with different purposes.
 
-The committed Python reference fixture contains these intermediate values:
+The checked-in reference fixture, originally captured from the Python baseline,
+contains these intermediate values:
 
 | Stage                                          |    Watts |
 | ---------------------------------------------- | -------: |
@@ -150,9 +154,9 @@ The committed Python reference fixture contains these intermediate values:
 | Rack AC, after load-dependent shelf efficiency | 74,904.6 |
 | Facility power after PUE 1.1                   | 82,395.1 |
 
-Displayed intermediate values are rounded. The calculation retains the source's
+Displayed intermediate values are rounded. The calculation retains the model's
 summation and rounding order, so adding displayed values can differ by 0.1 W.
-The source's raw profile defaults include PUE 1.2; the dashboard wrapper supplies
+The profile's baseline defaults include PUE 1.2; the dashboard wrapper supplies
 **1.1 for NVL72** and **1.3 for the supported air-cooled chassis**.
 
     Planning kW/GPU = 82,395.1 / 72 / 1,000 × 1.10 ≈ 1.258814
@@ -192,7 +196,7 @@ the committed reference JSON. No new hardware measurements were taken for it.
 | Responsibility                                                                      | Implementation                                                                                                                                                                                                                                                                                                |
 | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Preserve CPU/GPU metrics and audit provenance during ingest                         | [benchmark-mapper.ts](../packages/db/src/etl/benchmark-mapper.ts), [power-publication.ts](../packages/db/src/etl/power-publication.ts)                                                                                                                                                                        |
-| Pin Python model revision, assumptions and component hashes                         | [generate-system-power-reference.py](../packages/app/scripts/generate-system-power-reference.py), [profiles](../packages/app/src/lib/system-power-model.profiles.json)                                                                                                                                        |
+| Edit component parameters; refresh app model revision and source hashes             | [profiles](../packages/app/src/lib/system-power-model.profiles.json), [provenance](../packages/app/src/lib/system-power-model.provenance.json), [update-system-power-provenance.ts](../packages/app/scripts/update-system-power-provenance.ts)                                                                |
 | Apply workload, validity, sensor and topology admission; allocate deployment shares | [modelSystemPower](../packages/app/src/lib/modeled-system-power.ts)                                                                                                                                                                                                                                           |
 | Calculate nonlinear chassis/rack power, losses and PUE                              | [system-power-model.ts](../packages/app/src/lib/system-power-model.ts)                                                                                                                                                                                                                                        |
 | Match power to the original frontier and retain provisioned comparisons             | [modeledPowerAtTarget / estimateProfitByPower](../packages/app/src/components/calculator/profit-power.ts)                                                                                                                                                                                                     |
@@ -202,17 +206,13 @@ the committed reference JSON. No new hardware measurements were taken for it.
 | Export modeled benchmark rows offline                                               | [export-modeled-system-power.ts](../packages/app/scripts/export-modeled-system-power.ts)                                                                                                                                                                                                                      |
 | Check calculation parity and admission behavior                                     | [reference fixtures](../packages/app/src/lib/system-power-model.reference.json), [model tests](../packages/app/src/lib/system-power-model.test.ts), [admission tests](../packages/app/src/lib/modeled-system-power.test.ts), [planning tests](../packages/app/src/components/calculator/profit-power.test.ts) |
 
-Publishing #1190 publishes its TypeScript implementation and bundled profiles;
-the runtime does not fetch Python from GitHub. The Python source pin is local commit
-`6fcc086b77576d4cecb9d0c79637d6daf980308c`, intended for the private
-[SemiAnalysisAI/inferencex_power_model](https://github.com/SemiAnalysisAI/inferencex_power_model)
-repository. That commit is **unpublished pending repository write access**;
-reviewers cannot yet retrieve it from that remote. Publishing the app bundle
-does not publish the Python source. Source publication, when completed, will not
-change its DRAFT status or establish empirical calibration. The source
-revision and file hashes belong in the review/export record, alongside which
-components remain uncalibrated. See the update procedure below for historical
-results and frozen exports.
+The equations and editable parameters are reviewed and released together in
+InferenceX-app. Publishing an app change publishes the model it uses; there is
+no separate Python-source publication step or private-repository access gate.
+The reference fixtures record the earlier Python implementation as historical
+lineage only. App model versions and file hashes identify subsequent changes;
+neither moving ownership nor passing regression checks establishes calibration.
+See the update procedure below for historical results and frozen exports.
 
 ## NVL72 architecture walkthrough
 
@@ -238,7 +238,7 @@ flowchart TB
     BASIS -->|"Grace socket sensor"| SUM["Measured GPU-board + Grace watts<br/>Profile regulator allowance on GPU share"]
     MODULE --> RACK
     SUM --> RACK
-    PROFILE["Pinned GB200 / GB300 rack profiles<br/>Static loads and conversion assumptions"] -.-> RACK
+    PROFILE["App-owned GB200 / GB300 rack profiles<br/>Static loads and conversion assumptions"] -.-> RACK
     RACK["Mean tray load scaled to an 18-tray rack<br/>Modeled rack residual + power-shelf losses"]
     RACK --> AC["Rack AC power"]
     AC --> FAC["Apply PUE once<br/>NVL72 default: 1.1"]
@@ -269,7 +269,7 @@ flowchart TB
     ECON --> UI["All in Provisioned / All in Measured / Compare both<br/>Chart, tooltips, details and CSV"]
     SKIP --> KEEP["Compare retains valid provisioned bars<br/>Measured-only mode does not substitute"]
     KEEP --> UI
-    META["Sensor basis, PUE, 10% reserve<br/>Profile revision and source hash"] -.-> UI
+    META["Sensor basis, PUE, 10% reserve<br/>App model revision and source hash"] -.-> UI
 ```
 
 Solid arrows show data flow; dashed arrows supply assumptions or provenance.
@@ -284,20 +284,42 @@ Modeled power is derived from retained measurements when the browser or a shared
 views API transforms a benchmark row. Changing the model does not rewrite the
 original GPU measurements or require a per-run database backfill.
 
-1. Commit and publish the intended Python model revision so another reviewer can
-   obtain the exact source. Update `REVISION` in
-   `packages/app/scripts/generate-system-power-reference.py` to that clean commit,
-   update `REVISION_STATUS`, and update the recorded assumptions when required.
-   Publishing Python alone does not update the dashboard's bundled profiles.
-2. Run that script with the path to the pinned model checkout to regenerate
-   `system-power-model.profiles.json` and `system-power-model.reference.json`.
-   If equations or load-dependent components changed, update the TypeScript
-   implementation too; regenerating constants alone is insufficient.
-3. Run the system-power model parity and admission tests, then deploy the app.
-   Existing browser sessions need the updated bundle. Derived API responses need
-   the normal authenticated cache invalidation or cache expiry; deployment alone
-   does not establish that every cached response uses the new revision.
-4. Regenerate frozen CSV/JSON exports separately. If the revised model needs
+1. Edit equations in `packages/app/src/lib/system-power-model.ts` and active
+   parameters in `system-power-model.profiles.json`: `fixedComponentsDcWatts`,
+   `fan`, `psu`, and the coefficients in `rackProfiles`. The per-profile
+   `assumptions` describe the scenario used to derive those coefficients;
+   changing `u_cpu`, `u_ram` or similar metadata alone does not recalculate watts.
+   A new utilization scenario needs justified coefficients or new equations,
+   matching assumption metadata, and regression acceptance. The workload,
+   validity, topology and PUE policy live in `modeled-system-power.ts`; update
+   that adapter when the intended behavior changes there. All three files are
+   reviewed in InferenceX-app, without a separate model-repository change.
+2. Refresh the committed provenance manifest with the command below. Its
+   `modelRevision` is `app-sha256:<64 hex>`, derived from the actual SHA-256 hashes
+   of those three files. `modelPath` identifies
+   `packages/app/src/lib/system-power-model.ts`. Commit the refreshed manifest
+   with the model changes; `--check` reports drift without writing files. The
+   digest is a model identity, not a Git commit. Source links use the deployment's
+   `VERCEL_GIT_COMMIT_SHA` or `GITHUB_SHA`, falling back to `master`.
+
+   ```sh
+   bun packages/app/scripts/update-system-power-provenance.ts
+   bun packages/app/scripts/update-system-power-provenance.ts --check
+   ```
+
+3. Review the numerical changes and run the relevant model, admission, planning,
+   views API and export regression checks. Keep the 496 historical reference
+   cases as a frozen baseline. An intentional model change needs independently
+   justified expected values and explicit regression acceptance; the provenance
+   command never regenerates expected numbers to match the current code.
+   Regression acceptance does not establish empirical calibration.
+4. Deploy the app with the accepted model and profiles. Historical rows with
+   sufficient, matched raw telemetry are recalculated when they pass through the
+   updated model; no model-only database backfill is required. Existing browser
+   sessions need the updated bundle. Derived API responses need the normal
+   authenticated cache invalidation or cache expiry; deployment alone does not
+   establish that every cached response uses the new revision.
+5. Regenerate frozen CSV/JSON exports separately. If the revised model needs
    inputs that were never recorded, those rows stay unavailable until the input
    gap is resolved. A new benchmark's power must not be attached to an older
    benchmark's throughput.
@@ -305,12 +327,13 @@ original GPU measurements or require a per-run database backfill.
 ## Boundary and assumptions
 
 The input is measured mean GPU power during a validated serving window. The
-modeled chassis AC output adds the source model's CPU, DRAM, networking, storage,
+modeled chassis AC output adds the app profile's CPU, DRAM, networking, storage,
 board, fans, and PSU conversion losses. Facility power is a separate estimate:
-PUE is applied after chassis AC, including the source's rounding order.
+PUE is applied after chassis AC, preserving the model's rounding order.
 
-The fixed README inference sweep uses `u_cpu=0.20`, `u_ram=0.20`, `u_pcie=0.05`,
-and `u_nvme=0.0`. The pinned Python model defaults to PUE `1.2`; PowerX uses
+The app profiles retain the fixed inference assumptions `u_cpu=0.20`,
+`u_ram=0.20`, `u_pcie=0.05`, and `u_nvme=0.0`. The profile baseline includes PUE
+`1.2`; PowerX uses
 `1.3` for its supported air-cooled chassis profiles. Utility power = critical IT
 power × PUE (`1.3` air, `1.1` DLC).
 The factor applies after chassis AC; measured GPU power and chassis AC do not change.
@@ -320,32 +343,45 @@ override and does not convert an air-cooled chassis model into a DLC model. The
 NVL72 rack profiles below are direct-liquid-cooled and default to `1.1`.
 Platform-specific network assumptions,
 fan control, component counts, and chassis defaults are preserved in the
-generated profile; every JSON export includes that profile and every CSV row
-includes its applicable assumptions and profile hash. These are model inputs,
-not measured CPU/DRAM utilization.
+editable app profile; every JSON export includes that profile and every CSV row
+includes its applicable assumptions, model revision and source hash. Utilization
+assumptions such as `u_cpu`, `u_ram` and `u_ib` record the scenario from which the
+active coefficients were derived; they are not live utilization controls or
+measured CPU/DRAM utilization. Editing these labels alone does not change the
+fixed watts or curves.
 
-| Hardware identity | Source chassis implementation                                 |
-| ----------------- | ------------------------------------------------------------- |
-| `h100`            | `human_verified/hgx_h100_chassis/h100_chassis_power_model.py` |
-| `h200`            | `human_verified/hgx_h200_chassis/h200_chassis_power_model.py` |
-| `b200`            | `human_verified/hgx_b200_chassis/b200_chassis_power_model.py` |
-| `b300`            | `human_verified/hgx_b300_chassis/b300_chassis_power_model.py` |
-| `mi300x`          | `human_verified/mi300x_chassis/mi300x_chassis_power_model.py` |
-| `mi325x`          | `human_verified/mi325x_chassis/mi325x_chassis_power_model.py` |
-| `mi355x`          | `human_verified/mi355x_chassis/mi355x_chassis_power_model.py` |
+These are the active keys in
+[system-power-model.profiles.json](../packages/app/src/lib/system-power-model.profiles.json).
+Their equations are implemented by the named functions in
+[system-power-model.ts](../packages/app/src/lib/system-power-model.ts).
+
+| Hardware identity | Editable app profile | TypeScript estimator   |
+| ----------------- | -------------------- | ---------------------- |
+| `h100`            | `profiles.h100`      | `estimateChassisPower` |
+| `h200`            | `profiles.h200`      | `estimateChassisPower` |
+| `b200`            | `profiles.b200`      | `estimateChassisPower` |
+| `b300`            | `profiles.b300`      | `estimateChassisPower` |
+| `mi300x`          | `profiles.mi300x`    | `estimateChassisPower` |
+| `mi325x`          | `profiles.mi325x`    | `estimateChassisPower` |
+| `mi355x`          | `profiles.mi355x`    | `estimateChassisPower` |
 
 All listed profiles describe a complete eight-GPU chassis. Their topology is not
 substituted onto GB200 or GB300, which use the NVL72 rack profiles instead:
 
-| Hardware identity | Source rack implementation                                        |
-| ----------------- | ----------------------------------------------------------------- |
-| `gb200`           | `human_verified/gb200_nvl72_rack/gb200_nvl72_rack_power_model.py` |
-| `gb300`           | same module, `gb300_nvl72_rack_config`                            |
+| Hardware identity | Editable app profile | TypeScript estimator |
+| ----------------- | -------------------- | -------------------- |
+| `gb200`           | `rackProfiles.gb200` | `estimateRackPower`  |
+| `gb300`           | `rackProfiles.gb300` | `estimateRackPower`  |
+
+The [reference fixture](../packages/app/src/lib/system-power-model.reference.json)
+retains historical source/revision metadata, component hashes, and
+`pythonConfigurations` for baseline lineage only. Those records are not active
+app parameters or an ongoing Python dependency.
 
 The rack profiles (`rackProfiles`) take **measured** compute-module watts per tray
 as their input: the module sensor total (`avg_total_module_power_w`) when the
 producer publishes it, otherwise GPU-board watts plus the Grace-socket total
-(`avg_total_cpu_power_w`) with the source's regulator-loss allowance on the GPU
+(`avg_total_cpu_power_w`) with the app profile's regulator-loss allowance on the GPU
 share. The Grace CPU and LPDDR5X are never modelled; rows without
 `cpu_power_valid=1` and complete module or Grace provenance stay unavailable (`cpu-telemetry`).
 Each measured worker host is one compute tray (four GPUs, two Grace sockets); an
@@ -354,22 +390,20 @@ deployment mean, cross-checked against the Grace-socket count and the CPU leg's
 `power_audit.cpu.observed_sockets`. The
 measured trays are folded into one rack of 18 trays matching their mean
 compute-module input, the power-shelf efficiency curve is evaluated once at that
-rack's DC load (as the source `gb200_nvl72_rack_power` does with its single
-per-tray input), and every tray takes the same 1/18 share, so NVSwitch trays,
+rack's DC load, using one mean per-tray input. Every tray takes the same 1/18
+share, so NVSwitch trays,
 power shelves, and management switches are amortised over 72 GPUs. Chassis, by
 contrast, own their fans and PSUs and are each evaluated at their own load. The
 result carries `topologyBasis: 'nvl72-trays'`, `measuredBasis`, and `sensorKind`.
 A partially allocated tray extrapolates only the GPU-board share (a module reading
-already covers the whole tray) and is labeled `extrapolated`. The source is pinned to revision
-`6fcc086b77576d4cecb9d0c79637d6daf980308c`, a local commit intended for the private
-model repository linked above. It remains unpublished pending repository write
-access, and the model remains DRAFT / pending human verification. The NVL72 section below
-lists the measured input, the modeled residual and the Profit Estimator gate rules.
+already covers the whole tray) and is labeled `extrapolated`. The app-owned
+model remains DRAFT / pending human verification. The NVL72 section below lists
+the measured input, the modeled residual and the Profit Estimator gate rules.
 
 A partially allocated chassis (one to seven measured GPUs on one host) is
-modeled at measured per-GPU power × 8. That is the same `n_gpu × W/GPU` input
-the source sweep scripts feed each chassis model, and it assumes the unmeasured
-GPUs run the same workload. The estimate is labeled `chassisBasis:
+modeled at measured per-GPU power × 8. This `n_gpu × W/GPU` input is retained
+from the historical baseline and assumes the unmeasured GPUs run the same
+workload. The estimate is labeled `chassisBasis:
 'extrapolated'`: per-GPU values divide by the modeled chassis GPU count
 (`modeledGpuCount`), while `deploymentAcWatts` / `deploymentFacilityWatts` keep
 only the measured GPUs' share of each chassis. This is not a proportional share
@@ -387,7 +421,8 @@ worker, distinct worker hosts, and consistent total/role watts. A role average
 alone cannot establish physical placement or evaluate each host's nonlinear
 model. CPU-only frontend workers are excluded from GPU-chassis counting. Separate CPU-only
 frontend/router hosts are outside this estimate; CPU power within GPU chassis
-still uses the source's fixed 20% utilization assumption.
+still uses fixed coefficients derived for the app profile's 20% utilization
+scenario.
 
 The default measured contract is numeric `power_valid=1` and metric schema 2.
 The original validated single-node producer predates the schema marker but
@@ -413,11 +448,11 @@ Grace watts and total/mean watts consistent with the audited socket count.
 CPU-rail-only and missing or unknown sensor provenance stay unavailable. Basis selection: `module` when `avg_total_module_power_w` is present (the
 reading already contains the GPU boards, so it is never scaled), otherwise
 `gpu-plus-grace` (GPU-board watts × 4 plus the Grace-socket total per tray, with the
-source's regulator-loss allowance `regulatorLossFracOfTdp / (1 − frac)` on the GPU
+profile's regulator-loss allowance `regulatorLossFracOfTdp / (1 − frac)` on the GPU
 share only). A present-but-invalid module key makes the row unavailable
 (`cpu-telemetry`); it never falls back to the Grace socket silently.
 
-**Modeled residual.** Everything outside the compute modules comes from the pinned
+**Modeled residual.** Everything outside the compute modules comes from the app
 profile (`rackProfiles`), evaluated once for a rack of 18 trays at the measured
 trays' mean input (the shelf curve sees the whole rack's DC load, never one tray's)
 and amortised over 72 GPUs; the parameters marked UNVERIFIED carry a documented
@@ -439,9 +474,10 @@ range in `unverifiedParameters` and no published rail:
 | Facility PUE                           | 1.1 (direct liquid cooling)                                                          | same                                                                     | PowerX policy, applied once to rack AC   |
 
 Rack DC above the installed shelf capacity (264 kW) overflows the efficiency curve
-and the row is unavailable (`model-domain`). Rounding follows the source: rack AC is rounded
-to 0.1 W before PUE. Python-generated `rackCases` prove parity with the pinned
-implementation for both variants, both bases, every shelf knot and PUE 1.0–1.2.
+and the row is unavailable (`model-domain`). The model rounds rack AC to 0.1 W
+before PUE. Checked-in `rackCases` retain the historical Python baseline for
+both variants, both bases, every shelf knot and PUE 1.0–1.2. They are regression
+references, not calibration evidence or a dependency on the former repository.
 
 **Gate rules (Profit Estimator).** Planning kW/GPU = deployment facility watts ÷
 measured GPUs ÷ 1000 × 1.1. It accepts fully measured eight-GPU chassis
@@ -458,7 +494,10 @@ knot beside a Grace-socket knot stays unavailable rather than blending sensors. 
 bar tooltip, the collapsed Power assumptions disclosure and the CSV columns `Power
 basis`, `Power sensor`, `System power profile` name the basis (measured module, or
 measured GPU board + Grace socket with regulator loss modeled), the sensor kind, and
-the pinned profile (`modelPath @ modelRevision sha256:<source file hash>`) per row.
+the app profile (`modelPath @ modelRevision sha256:<source file hash>`) per row.
+The path and revision identify the app-owned model; the source hash identifies
+the TypeScript equation file, and the revision also covers the editable profile
+and admission/PUE adapter.
 The `?unofficialrun=` overlay rule does not apply to the Profit Estimator basis
 control: the estimator prices official frontier points only.
 

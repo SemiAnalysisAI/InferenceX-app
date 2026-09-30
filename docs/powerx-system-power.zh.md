@@ -16,13 +16,15 @@ AgentX 估算，包括 Kimi K3；这不代表模型已经过 AgentX 校准。应
 [代码位置](#各部分代码在哪里) 将说明与实现对应起来。后面的章节完整记录了数据接纳、
 拓扑和导出约定。
 
-`system-power-model.profiles.json` 记录固定的功耗模型版本、组件源码哈希、硬件映射、
-完整平台配置和固定推理假设。各 profile 由原始 Python 组件执行生成。
-`system-power-model.ts` 保留原模型的非线性风扇曲线、PSU 效率插值、中间值舍入和 PUE
-应用顺序。由 Python 生成的参考用例用于核对 TypeScript 实现与源模型是否一致。
+模型由 InferenceX-app 维护。`system-power-model.ts` 定义公式，包括非线性风扇曲线、
+PSU 效率插值、中间值舍入和 PUE 应用顺序。`system-power-model.profiles.json` 保存可
+直接编辑的组件参数、硬件映射、平台配置，以及说明固定推理场景的元数据。前端、
+共享 views API 和离线导出器均以这些仓库内文件中的模型定义为准。`system-power-model.provenance.json`
+记录应用模型版本和源码哈希。
 
-固定版本的源码仍标记为 **DRAFT / pending human verification（草稿，待人工核验）**。
-数值一致性只能证明实现等价，不能证明已经过实机机箱校准。
+已提交的参考用例保留历史 Python 基线，用于回归对照；开发、构建和部署应用模型
+都不需要 Python 或原私有仓库。模型仍为 **DRAFT / pending human verification
+（草稿，待人工核验）**。与数值基线一致只能证明实现的一致性，不能证明已经过实机机箱校准。
 
 ## 实测、建模和预配分别指什么？
 
@@ -109,7 +111,7 @@ PUE 为 1.1。真实基准测试还必须分别通过后文列出的 GPU 和 CPU
 4. **单独计入规划余量。**将设施 kW/GPU 乘以 1.10。PUE 1.1 与 10% 规划余量是不同
    的系数，作用也不同。
 
-已提交的 Python 参考测试数据包含以下中间值：
+已提交的参考测试数据最初取自 Python 基线，包含以下中间值：
 
 | 阶段                                       | 功率（W） |
 | ------------------------------------------ | --------: |
@@ -121,8 +123,8 @@ PUE 为 1.1。真实基准测试还必须分别通过后文列出的 GPU 和 CPU
 | 计入随负载变化的电源架效率后的机架交流功率 |  74,904.6 |
 | 乘以 PUE 1.1 后的设施功率                  |  82,395.1 |
 
-表中中间值已舍入。计算保留源模型的求和与舍入顺序，因此直接相加表中数值可能差
-0.1 W。源模型原始 profile 的默认 PUE 为 1.2；仪表板封装层对 **NVL72 使用 1.1**，
+表中中间值已舍入。计算保留模型的求和与舍入顺序，因此直接相加表中数值可能差
+0.1 W。profile 的基线默认 PUE 为 1.2；仪表板封装层对 **NVL72 使用 1.1**，
 对**当前支持的风冷机箱使用 1.3**。
 
     规划 kW/GPU = 82,395.1 / 72 / 1,000 × 1.10 ≈ 1.258814
@@ -156,7 +158,7 @@ PUE 为 1.1。真实基准测试还必须分别通过后文列出的 GPU 和 CPU
 | 职责                                             | 实现                                                                                                                                                                                                                                                                                        |
 | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 入库时保留 CPU/GPU 指标和审计来源                | [benchmark-mapper.ts](../packages/db/src/etl/benchmark-mapper.ts)、[power-publication.ts](../packages/db/src/etl/power-publication.ts)                                                                                                                                                      |
-| 固定 Python 模型版本、假设和组件哈希             | [generate-system-power-reference.py](../packages/app/scripts/generate-system-power-reference.py)、[profiles](../packages/app/src/lib/system-power-model.profiles.json)                                                                                                                      |
+| 编辑组件参数；更新应用模型版本和源码哈希         | [profiles](../packages/app/src/lib/system-power-model.profiles.json)、[来源清单](../packages/app/src/lib/system-power-model.provenance.json)、[update-system-power-provenance.ts](../packages/app/scripts/update-system-power-provenance.ts)                                                |
 | 检查负载、有效性、传感器和拓扑条件；分摊部署功耗 | [modelSystemPower](../packages/app/src/lib/modeled-system-power.ts)                                                                                                                                                                                                                         |
 | 计算非线性机箱/机架功耗、损耗和 PUE              | [system-power-model.ts](../packages/app/src/lib/system-power-model.ts)                                                                                                                                                                                                                      |
 | 将功耗匹配到原前沿，并保留预配对比结果           | [modeledPowerAtTarget / estimateProfitByPower](../packages/app/src/components/calculator/profit-power.ts)                                                                                                                                                                                   |
@@ -166,14 +168,11 @@ PUE 为 1.1。真实基准测试还必须分别通过后文列出的 GPU 和 CPU
 | 离线导出建模后的基准测试记录                     | [export-modeled-system-power.ts](../packages/app/scripts/export-modeled-system-power.ts)                                                                                                                                                                                                    |
 | 验证计算一致性和接纳行为                         | [参考测试数据](../packages/app/src/lib/system-power-model.reference.json)、[模型测试](../packages/app/src/lib/system-power-model.test.ts)、[接纳规则测试](../packages/app/src/lib/modeled-system-power.test.ts)、[规划测试](../packages/app/src/components/calculator/profit-power.test.ts) |
 
-发布 #1190 会发布 TypeScript 实现及随应用打包的 profiles，运行时不会从 GitHub 下载
-Python。Python 源码固定在本地提交 `6fcc086b77576d4cecb9d0c79637d6daf980308c`，
-计划发布至私有仓库
-[SemiAnalysisAI/inferencex_power_model](https://github.com/SemiAnalysisAI/inferencex_power_model)。
-该提交**尚未发布，正在等待仓库写入权限**；审阅者目前无法从该远端取得这个提交。
-发布应用 bundle 不等于发布 Python 源码。日后完成源码发布，也不会改变其 DRAFT 状态，
-更不代表完成了实测校准。审阅和导出记录应保留源码版本、文件哈希，以及哪些组件仍
-未经校准。历史结果和冻结导出的更新方式见后文。
+公式和可编辑参数在 InferenceX-app 中一同审阅、一同发布。发布应用变更就会发布该
+版本采用的模型，不需要单独发布 Python 源码，也不以私有仓库权限作为前提。
+参考测试数据只将早期 Python 实现记作历史来源。后续变化由应用模型版本和文件哈希
+标识；维护归属的改变或回归检查通过，都不代表完成了实测校准。历史结果和冻结导出
+的更新方式见后文。
 
 ## NVL72 架构导览
 
@@ -199,7 +198,7 @@ flowchart TB
     BASIS -->|"Grace socket 传感器"| SUM["实测 GPU 板卡 + Grace 功耗<br/>按 profile 对 GPU 份额计入稳压损耗余量"]
     MODULE --> RACK
     SUM --> RACK
-    PROFILE["固定版本的 GB200 / GB300 机架 profile<br/>静态负载与转换假设"] -.-> RACK
+    PROFILE["应用维护的 GB200 / GB300 机架 profile<br/>静态负载与转换假设"] -.-> RACK
     RACK["按 tray 平均负载扩展至 18 tray 机架<br/>加入机架其余组件和电源架损耗模型"]
     RACK --> AC["机架交流功率"]
     AC --> FAC["只应用一次 PUE<br/>NVL72 默认值：1.1"]
@@ -229,7 +228,7 @@ flowchart TB
     ECON --> UI["All in Provisioned / All in Measured / Compare both<br/>图表、提示框、详情和 CSV"]
     SKIP --> KEEP["对比模式保留有效预配柱子<br/>仅实测模式不以预配值替代"]
     KEEP --> UI
-    META["传感器口径、PUE、10% 余量<br/>profile 版本和源码哈希"] -.-> UI
+    META["传感器口径、PUE、10% 余量<br/>应用模型版本和源码哈希"] -.-> UI
 ```
 
 实线表示数据流，虚线提供假设或来源信息。规划采用正式性能前沿点，不采用
@@ -241,58 +240,85 @@ flowchart TB
 浏览器或共享 views API 转换基准测试记录时，会根据保留的测量值推导建模功耗。
 修改模型不会改写原始 GPU 测量值，也不需要逐 run 回填数据库。
 
-1. 提交并发布要使用的 Python 模型版本，让其他审阅者能够取得完全相同的源码。
-   将 `packages/app/scripts/generate-system-power-reference.py` 的 `REVISION` 更新为
-   该干净提交，并更新 `REVISION_STATUS`；必要时同步记录的假设。仅发布 Python 不会
-   更新仪表板打包的 profiles。
-2. 运行该脚本，传入固定版本模型 checkout 的路径，重新生成
-   `system-power-model.profiles.json` 和 `system-power-model.reference.json`。
-   如果公式或随负载变化的组件有改动，还必须修改 TypeScript 实现；只重新生成常量不够。
-3. 运行系统功耗模型的一致性测试和接纳规则测试，再部署应用。已有浏览器会话需要
-   加载新 bundle；派生 API 响应需要走正常的认证缓存失效流程，或等待缓存过期。
-   仅完成部署，不能证明所有缓存响应都已采用新版本。
-4. 冻结的 CSV/JSON 导出需单独重新生成。若新模型需要从未记录的输入，相应记录应
+1. 在 `packages/app/src/lib/system-power-model.ts` 中修改公式，在
+   `system-power-model.profiles.json` 中修改参与计算的参数：`fixedComponentsDcWatts`、
+   `fan`、`psu` 及 `rackProfiles` 中的系数。每个 profile 的 `assumptions` 记录推导这些
+   系数时采用的场景；只改 `u_cpu`、`u_ram` 等元数据，不会重新计算功率。要支持新的
+   利用率场景，需要有依据的新系数或新公式、与之对应的假设记录，并通过回归验收。
+   负载、有效性、拓扑和 PUE 策略位于 `modeled-system-power.ts`；若这些行为需要改变，
+   应同步修改该适配层。三个文件都在 InferenceX-app 中审阅，无需另改一个模型仓库。
+2. 用以下命令更新已提交的来源清单。`modelRevision` 的格式为 `app-sha256:<64 hex>`，
+   根据上述三个文件实际内容的 SHA-256 哈希生成。`modelPath` 指向
+   `packages/app/src/lib/system-power-model.ts`。更新后的清单应与模型修改一起提交；
+   `--check` 只检查清单是否与当前文件一致，不写文件。这个哈希摘要是模型标识，
+   不是 Git 提交。源码链接使用部署的 `VERCEL_GIT_COMMIT_SHA` 或 `GITHUB_SHA`，
+   两者均缺失时使用 `master`。
+
+   ```sh
+   bun packages/app/scripts/update-system-power-provenance.ts
+   bun packages/app/scripts/update-system-power-provenance.ts --check
+   ```
+
+3. 审阅数值变化，运行相关模型、接纳规则、规划、views API 和导出回归检查。
+   保留 496 个历史参考用例作为冻结基线。有意改变模型时，需要提供独立论证的预期值，
+   并明确验收回归结果；来源清单命令不会根据当前代码重新生成预期数字。
+   回归验收通过不代表完成了实测校准。
+4. 部署已验收的模型和 profiles。历史记录只要具有充分、匹配的原始遥测，就会在经过
+   新模型时重新计算；单纯修改模型无需回填数据库。已有浏览器会话需要加载新 bundle；
+   派生 API 响应需要走正常的认证缓存失效流程，或等待缓存过期。仅完成部署，不能证明
+   所有缓存响应都已采用新版本。
+5. 冻结的 CSV/JSON 导出需单独重新生成。若新模型需要从未记录的输入，相应记录应
    保持不可用，直至输入缺口解决。不能把新基准测试的功耗附到旧基准测试的吞吐量上。
 
 ## 计算边界与假设
 
 输入是已验证服务窗口内的平均 GPU 实测功率。机箱交流功耗模型在此基础上，加入
-源模型中的 CPU、DRAM、网络、存储、主板、风扇和 PSU 转换损耗。设施功率另行估算：
-先算机箱交流功率，再应用 PUE，并保留源模型的舍入顺序。
+应用 profile 中的 CPU、DRAM、网络、存储、主板、风扇和 PSU 转换损耗。设施功率另行
+估算：先算机箱交流功率，再应用 PUE，并保留模型的舍入顺序。
 
-README 中固定的推理 sweep 使用 `u_cpu=0.20`、`u_ram=0.20`、`u_pcie=0.05` 和
-`u_nvme=0.0`。固定版本的 Python 模型默认 PUE 为 `1.2`；PowerX 对当前支持的风冷
+应用 profiles 保留固定推理假设：`u_cpu=0.20`、`u_ram=0.20`、`u_pcie=0.05` 和
+`u_nvme=0.0`。profile 基线包含默认 PUE `1.2`；PowerX 对当前支持的风冷
 机箱 profile 使用 `1.3`。市电侧功率 = IT 负载功率 × PUE（风冷 `1.3`，直接液冷 DLC
 `1.1`）。该系数作用于机箱交流功率之后，不改变 GPU 实测功率或机箱交流功率。
 这里的冷却方式指模型中的机箱，并非已经核实的基准测试站点冷却配置。机箱 profile
 不支持 DLC；`--pue` 只是显式覆盖设施功率系数，不会把风冷机箱模型转成液冷模型。
 下文的 NVL72 机架 profile 为直接液冷，默认使用 `1.1`。
 
-生成的 profile 保留各平台的网络假设、风扇控制、组件数量和机箱默认值。每份 JSON
-导出包含完整 profile，每行 CSV 包含适用假设及 profile 哈希。这些是模型输入，
-不是实测 CPU/DRAM 利用率。
+应用内可编辑的 profile 保留各平台的网络假设、风扇控制、组件数量和机箱默认值。每份 JSON
+导出包含完整 profile，每行 CSV 包含适用假设、模型版本和源码哈希。`u_cpu`、
+`u_ram`、`u_ib` 等利用率假设记录的是推导当前参与计算的系数时采用的场景，不是实时利用率
+控件，也不是 CPU/DRAM 利用率实测值。只修改这些标签，不会改变固定功率或曲线。
 
-| 硬件标识 | 机箱模型源码                                                  |
-| -------- | ------------------------------------------------------------- |
-| `h100`   | `human_verified/hgx_h100_chassis/h100_chassis_power_model.py` |
-| `h200`   | `human_verified/hgx_h200_chassis/h200_chassis_power_model.py` |
-| `b200`   | `human_verified/hgx_b200_chassis/b200_chassis_power_model.py` |
-| `b300`   | `human_verified/hgx_b300_chassis/b300_chassis_power_model.py` |
-| `mi300x` | `human_verified/mi300x_chassis/mi300x_chassis_power_model.py` |
-| `mi325x` | `human_verified/mi325x_chassis/mi325x_chassis_power_model.py` |
-| `mi355x` | `human_verified/mi355x_chassis/mi355x_chassis_power_model.py` |
+下表列出
+[system-power-model.profiles.json](../packages/app/src/lib/system-power-model.profiles.json)
+中参与计算的配置项，对应公式由
+[system-power-model.ts](../packages/app/src/lib/system-power-model.ts) 中的函数实现。
+
+| 硬件标识 | 应用内可编辑的 profile | TypeScript 计算函数    |
+| -------- | ---------------------- | ---------------------- |
+| `h100`   | `profiles.h100`        | `estimateChassisPower` |
+| `h200`   | `profiles.h200`        | `estimateChassisPower` |
+| `b200`   | `profiles.b200`        | `estimateChassisPower` |
+| `b300`   | `profiles.b300`        | `estimateChassisPower` |
+| `mi300x` | `profiles.mi300x`      | `estimateChassisPower` |
+| `mi325x` | `profiles.mi325x`      | `estimateChassisPower` |
+| `mi355x` | `profiles.mi355x`      | `estimateChassisPower` |
 
 上述 profile 均描述完整八卡机箱。GB200 和 GB300 使用独立的 NVL72 机架 profile，
 不套用这些机箱拓扑：
 
-| 硬件标识 | 机架模型源码                                                      |
-| -------- | ----------------------------------------------------------------- |
-| `gb200`  | `human_verified/gb200_nvl72_rack/gb200_nvl72_rack_power_model.py` |
-| `gb300`  | 同一模块中的 `gb300_nvl72_rack_config`                            |
+| 硬件标识 | 应用内可编辑的 profile | TypeScript 计算函数 |
+| -------- | ---------------------- | ------------------- |
+| `gb200`  | `rackProfiles.gb200`   | `estimateRackPower` |
+| `gb300`  | `rackProfiles.gb300`   | `estimateRackPower` |
+
+[参考测试数据](../packages/app/src/lib/system-power-model.reference.json) 保留历史源码及
+版本信息、组件哈希和 `pythonConfigurations`，仅用于追溯基线来源。这些记录不是应用
+当前使用的参数，也不意味着应用仍依赖 Python。
 
 机架 profile（`rackProfiles`）的输入是每个 tray 的**实测**计算模块功耗：生产端发布
 `avg_total_module_power_w` 时使用 module 传感器总值；否则使用 GPU 板卡功耗加
-Grace socket 总功耗（`avg_total_cpu_power_w`），并按源模型对 GPU 份额计入稳压损耗
+Grace socket 总功耗（`avg_total_cpu_power_w`），并按应用 profile 对 GPU 份额计入稳压损耗
 余量。Grace CPU 和 LPDDR5X 从不由模型补算。缺少 `cpu_power_valid=1` 或完整 module /
 Grace 来源记录的行保持不可用（`cpu-telemetry`）。
 
@@ -300,21 +326,17 @@ Grace 来源记录的行保持不可用（`cpu-telemetry`）。
 数组的聚合多节点记录，按 `gpuCount / 4` 推算 tray 数，各 tray 采用部署平均值，并与
 Grace socket 数及 CPU 采集记录中的 `power_audit.cpu.observed_sockets` 交叉校验。
 按实测 tray 的平均计算模块输入，构造一个包含 18 个同等负载 tray 的机架；电源架效率
-曲线只在整机架直流负载处求值一次。这与源模型 `gb200_nvl72_rack_power` 接受单一
-per-tray 输入的方式一致。每个 tray 分摊 1/18，因此 NVSwitch tray、电源架和管理
+曲线只在整机架直流负载处求值一次，使用单一的 tray 平均输入。每个 tray 分摊 1/18，
+因此 NVSwitch tray、电源架和管理
 交换机按 72 张 GPU 分摊。机箱则各自拥有风扇和 PSU，按各自的负载单独求值。
 结果包含 `topologyBasis: 'nvl72-trays'`、`measuredBasis` 和 `sensorKind`。
 
 部分分配的 tray 只外推 GPU 板卡份额，因为 module 读数本身已覆盖整个 tray；结果标记
-为 `extrapolated`。源码固定在本地提交
-`6fcc086b77576d4cecb9d0c79637d6daf980308c`，计划发布至上文的私有模型仓库，
-目前仍因等待仓库写入权限而未发布。模型仍为 DRAFT / pending human verification。
-下文列出 NVL72 的实测输入、其余组件
-模型，以及利润估算器的接纳规则。
+为 `extrapolated`。应用维护的模型仍为 DRAFT / pending human verification。
+下文列出 NVL72 的实测输入、其余组件模型，以及利润估算器的接纳规则。
 
 部分分配的机箱，即单台主机上实测一至七张 GPU，按“实测每 GPU 功率 × 8”建模。
-这与源模型 sweep 脚本使用的 `n_gpu × W/GPU` 输入一致，并假设未实测的 GPU 运行相同
-负载。估算标记为 `chassisBasis: 'extrapolated'`：每 GPU 数值按建模机箱 GPU 数
+这一 `n_gpu × W/GPU` 输入沿用历史基线，并假设未实测的 GPU 运行相同负载。估算标记为 `chassisBasis: 'extrapolated'`：每 GPU 数值按建模机箱 GPU 数
 （`modeledGpuCount`）分摊；`deploymentAcWatts` / `deploymentFacilityWatts` 只保留
 各机箱中实测 GPU 的份额。这不是先在部分负载处计算机箱，再按比例分摊；固定组件、
 风扇曲线和 PSU 效率都在满机箱负载处求值。缺失或无效遥测、数量不一致、缺少主机
@@ -326,7 +348,7 @@ per-tray 输入的方式一致。每个 tray 分摊 1/18，因此 NVSwitch tray�
 对应一个机箱（一至八张 GPU）、worker 位于不同主机，并且总功率与角色功率一致。
 只有角色平均值，无法证明物理放置方式，也无法计算各主机的非线性模型。
 纯 CPU frontend worker 不计入 GPU 机箱数量。独立的纯 CPU frontend/router 主机
-不在估算范围内；GPU 机箱内的 CPU 功耗仍采用源模型固定的 20% 利用率假设。
+不在估算范围内；GPU 机箱内的 CPU 功耗仍采用固定系数，这些系数按应用 profile 中 20% 利用率场景推导得出。
 
 默认实测约定要求数值型 `power_valid=1` 和指标 schema 2。原有通过验证的单节点生产端
 早于 schema 标记，但两个 watts 字段的定义已与 schema 2 相同。这条路径保留 schema 缺失的
@@ -350,11 +372,11 @@ per-tray 输入的方式一致。每个 tray 分摊 1/18，因此 NVSwitch tray�
 
 口径选择：存在 `avg_total_module_power_w` 时采用 `module`，因为读数已包含 GPU
 板卡，所以不会再缩放；否则采用 `gpu-plus-grace`，即每 tray 的每 GPU 板卡功率 × 4
-加 Grace socket 总功率，并且只对 GPU 份额应用源模型的稳压损耗余量
+加 Grace socket 总功率，并且只对 GPU 份额应用 profile 的稳压损耗余量
 `regulatorLossFracOfTdp / (1 − frac)`。module 字段存在但无效时，该行不可用
 （`cpu-telemetry`），不会悄然回退到 Grace socket。
 
-**其余组件的模型估算。**计算模块以外的部分均来自固定版本 profile（`rackProfiles`）。
+**其余组件的模型估算。**计算模块以外的部分均来自应用 profile（`rackProfiles`）。
 按实测 tray 的平均输入构造 18 tray 机架，整体求值一次，再按 72 张 GPU 分摊。
 电源架曲线使用整机架的直流负载，不能只使用单个 tray 的负载。标为 UNVERIFIED 的
 参数在 `unverifiedParameters` 中记录了范围，但没有已发布的供电轨测量：
@@ -375,9 +397,9 @@ per-tray 输入的方式一致。每个 tray 分摊 1/18，因此 NVSwitch tray�
 | 设施 PUE                         | 1.1（直接液冷）                                                                 | 相同                                                                | PowerX 策略，仅对机架交流功率应用一次    |
 
 机架直流功率超过电源架装机容量（264 kW）时，超出效率曲线适用范围，该行不可用
-（`model-domain`）。舍入顺序与源模型一致：先将机架交流功率舍入到 0.1 W，再应用 PUE。
-Python 生成的 `rackCases` 验证了两种变体、两种口径、全部电源架曲线节点和 PUE 1.0–1.2
-下与固定实现的数值一致性。
+（`model-domain`）。模型先将机架交流功率舍入到 0.1 W，再应用 PUE。已提交的
+`rackCases` 保留历史 Python 基线，涵盖两种变体、两种口径、全部电源架曲线节点和
+PUE 1.0–1.2。它们用于回归对照，不是校准证据，也不构成对原仓库的依赖。
 
 **利润估算器的接纳规则。**规划 kW/GPU = 部署设施功率 ÷ 实测 GPU 数 ÷ 1000 × 1.1。
 接受完整实测的八卡机箱（`single-node`、`worker-hosts` 或 `uniform-hosts` 拓扑下的
@@ -390,9 +412,10 @@ worker 数组的聚合多节点记录则按 `gpuCount / 4` 推算 tray 数，各
 两个前沿点必须采用相同实测口径和传感器类型；若一端是 module、另一端是 Grace
 socket，结果不可用，不混合两种传感器。柱形提示框、默认折叠的 Power assumptions
 详情，以及 CSV 中的 `Power basis`、`Power sensor`、`System power profile` 列，会逐行
-列明口径、传感器类型和固定 profile。口径为实测 module，或实测 GPU 板卡 + Grace
+列明口径、传感器类型和应用 profile。口径为实测 module，或实测 GPU 板卡 + Grace
 socket 并由模型估算稳压损耗；profile 表示为
-`modelPath @ modelRevision sha256:<source file hash>`。
+`modelPath @ modelRevision sha256:<source file hash>`。路径和版本标识应用维护的模型；
+源码哈希标识 TypeScript 公式文件，模型版本还涵盖可编辑 profile 和接纳/PUE 适配层。
 `?unofficialrun=` 叠加层规则不适用于利润估算器的功耗口径控件；估算器只对正式前沿点计价。
 
 ## 利润估算器的功耗口径

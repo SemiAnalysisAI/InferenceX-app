@@ -53,10 +53,14 @@ function measuredCurve(hwKey: string, run_url?: string): InferenceData[] {
   );
 }
 
-function mountCompare(data: InferenceData[], overlay: InferenceData[]) {
+function mountCompare(
+  data: InferenceData[],
+  overlay: InferenceData[],
+  { locale = 'en', width = 1000 }: { locale?: 'en' | 'zh'; width?: number } = {},
+) {
   mountWithProviders(
-    <PathnameContext.Provider value="/inference">
-      <div style={{ width: 1000, height: 640 }}>
+    <PathnameContext.Provider value={locale === 'zh' ? '/zh/inference' : '/inference'}>
+      <div style={{ width, height: 640 }}>
         <ScatterGraph
           chartId="power-compare-test"
           modelLabel="DeepSeek V4 Pro"
@@ -180,4 +184,80 @@ describe('ScatterGraph power comparison series', () => {
       '1',
     );
   });
+});
+
+describe('Modeled power source links', () => {
+  for (const locale of ['en', 'zh'] as const) {
+    for (const width of [1280, 390]) {
+      const overlay = width === 390;
+      it(`links to app-owned source and ${locale} assumptions from a ${overlay ? 'mobile overlay' : 'desktop official'} tooltip`, () => {
+        cy.viewport(width, 720);
+        const modeledCurve = (hwKey: string, runUrl?: string) =>
+          measuredCurve(hwKey, runUrl).map((point) =>
+            createMockInferenceData({
+              ...point,
+              disagg: false,
+              modeledSystemPower: {
+                status: 'supported',
+                hardware: hwKey,
+                modelRevision: 'model-content-digest-for-tooltip-fixture',
+                modelPath: 'packages/app/src/lib/system-power-model.ts',
+                gpuCount: 8,
+                chassisCount: 1,
+                modeledGpuCount: 8,
+                measuredGpuWattsPerGpu: 600,
+                chassisAcWatts: 6400,
+                chassisAcWattsPerGpu: 800,
+                facilityWatts: 8320,
+                deploymentAcWatts: 6400,
+                deploymentFacilityWatts: 8320,
+                pue: 1.3,
+                topologyBasis: 'single-node',
+                chassisBasis: 'full',
+                telemetryBasis: 'validated-v2',
+              },
+            }),
+          );
+        mountCompare(modeledCurve('b200'), modeledCurve('h100', OVERLAY_RUN_URL), {
+          locale,
+          width: Math.min(1000, width - 32),
+        });
+        cy.get(`${svg} ${overlay ? '.unofficial-overlay-pt' : '.dot-group'}`)
+          .eq(1)
+          .click({ force: true });
+        cy.get('[data-chart-tooltip]:visible').within(() => {
+          if (overlay) cy.contains('powerx-compare').should('exist');
+          cy.get('[data-testid="tooltip-modeled-system-power"]').within(() => {
+            const base = `https://github.com/SemiAnalysisAI/InferenceX-app/blob/${process.env.NEXT_PUBLIC_APP_SOURCE_REF ?? 'master'}`;
+            cy.get(`a[href="${base}/packages/app/src/lib/system-power-model.ts"]`)
+              .should('have.attr', 'title', 'model-content-digest-for-tooltip-fixture')
+              .and('have.attr', 'target', '_blank')
+              .and('have.attr', 'rel', 'noopener noreferrer')
+              .scrollIntoView()
+              .should('be.visible');
+            cy.contains('a', locale === 'zh' ? '功耗模型与假设' : 'Power model assumptions')
+              .should(
+                'have.attr',
+                'href',
+                `${base}/docs/powerx-system-power${locale === 'zh' ? '.zh' : ''}.md`,
+              )
+              .and('have.attr', 'target', '_blank')
+              .and('have.attr', 'rel', 'noopener noreferrer')
+              .then(($link) => $link[0].scrollIntoView({ block: 'center' }))
+              .should('be.visible')
+              .then(($link) => {
+                const bounds = $link[0].getBoundingClientRect();
+                expect(bounds.left).to.be.at.least(0);
+                expect(bounds.right).to.be.at.most(width);
+                const shell = $link.closest('[data-chart-tooltip]')[0].firstElementChild!;
+                const frame = shell.getBoundingClientRect();
+                expect(bounds.top).to.be.at.least(frame.top);
+                expect(bounds.bottom).to.be.at.most(frame.bottom);
+              });
+          });
+        });
+        cy.screenshot(`power-model-links-${locale}-${width}`, { capture: 'viewport' });
+      });
+    }
+  }
 });

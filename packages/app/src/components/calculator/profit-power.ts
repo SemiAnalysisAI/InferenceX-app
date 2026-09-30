@@ -20,7 +20,7 @@ interface ProfitPowerProfile {
   pue: number;
   modelPath: string;
   modelRevision: string;
-  /** SHA-256 of the pinned source file behind `modelPath`; null if the profile lacks one. */
+  /** Equation-file hash; modelRevision also covers parameters and admission/PUE policy. */
   profileSha256: string | null;
 }
 

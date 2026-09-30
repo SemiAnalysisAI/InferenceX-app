@@ -12,7 +12,7 @@ import {
   defaultSystemPue,
   modelSystemPower,
 } from '../src/lib/modeled-system-power';
-import profileData from '../src/lib/system-power-model.profiles.json';
+import { SYSTEM_POWER_MODEL_METADATA as profileData } from '../src/lib/system-power-model';
 
 interface PowerAudit {
   power_valid: boolean;
@@ -403,6 +403,7 @@ async function main() {
     'packages/app/src/lib/modeled-system-power.ts',
     'packages/app/src/lib/system-power-model.ts',
     'packages/app/src/lib/system-power-model.profiles.json',
+    'packages/app/src/lib/system-power-model.provenance.json',
   ];
   const hashes: Record<string, string> = {};
   for (const path of codePaths)

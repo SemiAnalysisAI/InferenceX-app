@@ -86,6 +86,10 @@ describe('offline modeled PowerX comparisons', () => {
     const source = input();
     const before = structuredClone(source);
     const result = buildComparison(source);
+    expect(result.metadata.model.source).toBe('https://github.com/SemiAnalysisAI/InferenceX-app');
+    expect(result.metadata.model.modelRevision).toMatch(/^app-sha256:[0-9a-f]{64}$/u);
+    expect(result.rows[0].model_path).toBe('packages/app/src/lib/system-power-model.ts');
+    expect(result.rows[0].modeled.modelRevision).toBe(result.metadata.model.modelRevision);
     expect(result.metadata.pue_override).toBeNull();
     expect(result.metadata.pue_defaults).toEqual({ air_cooled_chassis: 1.3, dlc_nvl72_rack: 1.1 });
     expect(result.metadata.model.assumptions.pue).toBe(1.2);
@@ -258,7 +262,7 @@ describe('offline modeled PowerX comparisons', () => {
       pue: 1.1,
       measured_basis: 'module',
       sensor_kind: 'module',
-      model_path: 'human_verified/gb200_nvl72_rack/gb200_nvl72_rack_power_model.py',
+      model_path: 'packages/app/src/lib/system-power-model.ts',
       assumptions: { u_nvlink: 0.5, pue: 1.1 },
       measured_inputs: {
         avg_gpu_w: 900.25,
@@ -307,7 +311,7 @@ describe('offline modeled PowerX comparisons', () => {
     source.rows[0].benchmark.hardware = 'H200';
     expect(buildComparison(source).rows[0]).toMatchObject({
       assumptions: { u_cpu: 0.2 },
-      model_path: 'human_verified/hgx_h200_chassis/h200_chassis_power_model.py',
+      model_path: 'packages/app/src/lib/system-power-model.ts',
     });
     // NVL72 rows need the schema-v2 contract; the unversioned exception is x86 single-node only.
     source.rows[0].benchmark.hardware = 'gb200';

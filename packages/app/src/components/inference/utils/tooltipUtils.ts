@@ -266,7 +266,7 @@ const SYSTEM_POWER_STRINGS = {
     facility: 'Modeled facility power',
     assumptions: 'CPU/DRAM utilization: 20%; PCIe: 5%; NVMe: 0%; fans: auto.',
     platformAssumptions: 'NVIDIA NVLink: 50%, IB: 0%; AMD Ethernet: 0%.',
-    sweep: 'Fixed README inference sweep',
+    guide: 'Power model assumptions',
     topology: (chassis: number, measured: number, modeled: number) =>
       measured === modeled
         ? `${chassis} full eight-GPU chassis · ${measured} GPUs`
@@ -317,7 +317,7 @@ const SYSTEM_POWER_STRINGS = {
     facility: '数据中心功耗估算',
     assumptions: 'CPU/DRAM 利用率：20%；PCIe：5%；NVMe：0%；风扇：自动。',
     platformAssumptions: 'NVIDIA NVLink：50%，IB：0%；AMD Ethernet：0%。',
-    sweep: 'README 中的固定推理参数扫描',
+    guide: '功耗模型与假设',
     topology: (chassis: number, measured: number, modeled: number) =>
       measured === modeled
         ? `${chassis} 个完整八卡机箱 · ${measured} 张 GPU`
@@ -376,8 +376,10 @@ const modeledSystemPowerHTML = (
     if (!isPinned || estimate.reason === 'workload') return '';
     return tooltipLine(t.unavailable, t.reasons[estimate.reason]);
   }
-  const sourceUrl = `https://github.com/SemiAnalysisAI/inferencex_power_model/blob/${estimate.modelRevision}/${estimate.modelPath}`;
-  const readmeUrl = `https://github.com/SemiAnalysisAI/inferencex_power_model/blob/${estimate.modelRevision}/README.md`;
+  const sourceRef = encodeURIComponent(process.env.NEXT_PUBLIC_APP_SOURCE_REF || 'master');
+  const appSource = `https://github.com/SemiAnalysisAI/InferenceX-app/blob/${sourceRef}`;
+  const sourceUrl = `${appSource}/${estimate.modelPath}`;
+  const guideUrl = `${appSource}/docs/powerx-system-power${locale === 'zh' ? '.zh' : ''}.md`;
   // Tray estimates measure the compute module; chassis estimates model the CPU/DRAM.
   const tray = estimate.topologyBasis === 'nvl72-trays' ? estimate : null;
   const topology = tray
@@ -406,8 +408,8 @@ const modeledSystemPowerHTML = (
       ${tooltipLine(t.deploymentAc, `${fmt(estimate.deploymentAcWatts)} W`)}
       ${tooltipLine(`${t.facility} (PUE ${fmt(estimate.pue)})`, `${fmt(estimate.deploymentFacilityWatts)} W`)}
       <div style="color: var(--muted-foreground); margin-bottom: 4px;">${topology}${extrapolation}${uniformHosts}<br/>${notes.join('<br/>')}</div>
-      ${tooltipLine(t.model, `<a href="${escapeHtml(sourceUrl)}" target="_blank" rel="noopener noreferrer" style="text-decoration: underline;">${escapeHtml(estimate.hardware)} · ${escapeHtml(estimate.modelRevision.slice(0, 12))}</a>`)}
-      <a href="${escapeHtml(readmeUrl)}" target="_blank" rel="noopener noreferrer" style="text-decoration: underline;">${t.sweep}</a>
+      ${tooltipLine(t.model, `<a href="${escapeHtml(sourceUrl)}" title="${escapeHtml(estimate.modelRevision)}" target="_blank" rel="noopener noreferrer" style="text-decoration: underline;">${escapeHtml(estimate.hardware)} · ${escapeHtml(estimate.modelRevision.replace(/^app-sha256:/u, '').slice(0, 12))}</a>`)}
+      <a href="${escapeHtml(guideUrl)}" target="_blank" rel="noopener noreferrer" style="text-decoration: underline;">${t.guide}</a>
     `
         : ''
     }

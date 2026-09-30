@@ -222,7 +222,7 @@ describe('profit power basis preview', () => {
       measuredBasis: 'module',
       sensorKind: 'module',
       pue: 1.1,
-      modelPath: 'human_verified/gb200_nvl72_rack/gb200_nvl72_rack_power_model.py',
+      modelPath: 'packages/app/src/lib/system-power-model.ts',
       modelRevision: rack.modelRevision,
       profileSha256: expect.stringMatching(/^[0-9a-f]{64}$/u),
     } satisfies ProfitPowerSource);
@@ -447,7 +447,7 @@ describe('profit power basis preview', () => {
     expect(modeled.powerSource).toMatchObject({
       topology: 'chassis',
       pue: 1.3,
-      modelPath: 'human_verified/mi355x_chassis/mi355x_chassis_power_model.py',
+      modelPath: 'packages/app/src/lib/system-power-model.ts',
     });
     expect(modeled.revenuePerGpuHour).toBe(baseline.revenuePerGpuHour);
     const ratio = 2.09 / 1.5976675;

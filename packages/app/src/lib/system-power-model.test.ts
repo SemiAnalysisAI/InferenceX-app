@@ -1,6 +1,11 @@
 import { GPU_KEYS } from '@semianalysisai/inferencex-constants';
+import { createHash } from 'node:crypto';
+import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { dirname, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
+import { buildSystemPowerProvenance } from '../../scripts/update-system-power-provenance';
 import {
   estimateChassisPower,
   estimateRackPower,
@@ -8,6 +13,8 @@ import {
   SUPPORTED_SYSTEM_POWER_HARDWARE,
   SUPPORTED_SYSTEM_POWER_RACK_HARDWARE,
   SYSTEM_POWER_MODEL_REVISION,
+  SYSTEM_POWER_MODEL_METADATA,
+  systemPowerSourceSha256,
 } from './system-power-model';
 import reference from './system-power-model.reference.json';
 
@@ -21,8 +28,7 @@ const rackInput = (row: (typeof reference.rackCases)[number]): RackMeasuredInput
     : { basis: 'module', moduleWattsPerTray: row.moduleWattsPerTray };
 
 describe('fixed 8k1k chassis model', () => {
-  it('matches the pinned Python implementation across platforms, fan/PSU boundaries, and PUE', () => {
-    expect(reference.modelRevision).toBe(SYSTEM_POWER_MODEL_REVISION);
+  it('matches the historical Python baseline across platforms, fan/PSU boundaries, and PUE', () => {
     expect(new Set(reference.cases.map((row) => row.hardware))).toEqual(
       new Set(SUPPORTED_SYSTEM_POWER_HARDWARE),
     );
@@ -73,7 +79,7 @@ describe('fixed 8k1k chassis model', () => {
 });
 
 describe('NVL72 rack model with measured compute-module input', () => {
-  it('matches the pinned Python rack model across variants, bases, shelf knots, and PUE', () => {
+  it('matches the historical Python baseline across variants, bases, shelf knots, and PUE', () => {
     expect(new Set(reference.rackCases.map((row) => row.hardware))).toEqual(
       new Set(SUPPORTED_SYSTEM_POWER_RACK_HARDWARE),
     );
@@ -165,5 +171,75 @@ describe('NVL72 rack model with measured compute-module input', () => {
     // The electrical equivalent module reading reproduces the split-basis rack.
     expect(module.rackAcWatts).toBeCloseTo(split.rackAcWatts, 0);
     expect(module.facilityWatts).toBeCloseTo(split.facilityWatts, 0);
+  });
+});
+
+describe('app-owned model provenance', () => {
+  it('identifies the actual app equations, parameters and admission/PUE policy', async () => {
+    const root = resolve(import.meta.dirname, '../../../..');
+    const metadata = SYSTEM_POWER_MODEL_METADATA;
+    expect(metadata).toMatchObject(await buildSystemPowerProvenance(root));
+    expect(metadata.source).toBe('https://github.com/SemiAnalysisAI/InferenceX-app');
+    expect(metadata.status).toBe('DRAFT / pending human verification');
+    expect(SYSTEM_POWER_MODEL_REVISION).toMatch(/^app-sha256:[0-9a-f]{64}$/u);
+    expect(Object.keys(metadata.sourceSha256)).toEqual([
+      'packages/app/src/lib/modeled-system-power.ts',
+      'packages/app/src/lib/system-power-model.profiles.json',
+      'packages/app/src/lib/system-power-model.ts',
+    ]);
+    for (const [path, expectedHash] of Object.entries(metadata.sourceSha256)) {
+      const bytes = await readFile(resolve(root, path));
+      expect(expectedHash, path).toBe(createHash('sha256').update(bytes).digest('hex'));
+    }
+    for (const profile of Object.values({ ...metadata.profiles, ...metadata.rackProfiles })) {
+      expect(profile.modelPath).toBe('packages/app/src/lib/system-power-model.ts');
+      expect(profile).not.toHaveProperty('defaultConfig');
+      expect(profile).not.toHaveProperty('functionName');
+      expect(profile).not.toHaveProperty('configFactory');
+      expect(systemPowerSourceSha256(profile.modelPath)).toBe(
+        metadata.sourceSha256['packages/app/src/lib/system-power-model.ts'],
+      );
+    }
+    expect(systemPowerSourceSha256('toString')).toBeNull();
+    expect(systemPowerSourceSha256(reference.modelPaths.gb200)).toBeNull();
+  });
+
+  it('changes the version when profile parameters or admission/PUE policy change', async () => {
+    const root = resolve(import.meta.dirname, '../../../..');
+    const copy = await mkdtemp(resolve(tmpdir(), 'system-power-provenance-'));
+    try {
+      for (const path of Object.keys(SYSTEM_POWER_MODEL_METADATA.sourceSha256)) {
+        await mkdir(dirname(resolve(copy, path)), { recursive: true });
+        await writeFile(resolve(copy, path), await readFile(resolve(root, path)));
+      }
+      const baseline = await buildSystemPowerProvenance(copy);
+      expect(baseline.modelRevision).toBe(SYSTEM_POWER_MODEL_REVISION);
+      const profilePath = resolve(copy, 'packages/app/src/lib/system-power-model.profiles.json');
+      const profiles = JSON.parse(await readFile(profilePath, 'utf8'));
+      profiles.rackProfiles.gb200.computeTrayStaticDcWatts.compute_tray_fans_unverified += 1;
+      await writeFile(profilePath, JSON.stringify(profiles));
+      const parametersChanged = await buildSystemPowerProvenance(copy);
+      expect(parametersChanged.modelRevision).not.toBe(baseline.modelRevision);
+      const adapterPath = resolve(copy, 'packages/app/src/lib/modeled-system-power.ts');
+      const adapter = await readFile(adapterPath, 'utf8');
+      await writeFile(adapterPath, adapter.replace('DLC_SYSTEM_PUE = 1.1', 'DLC_SYSTEM_PUE = 1.2'));
+      const policyChanged = await buildSystemPowerProvenance(copy);
+      expect(policyChanged.modelRevision).not.toBe(parametersChanged.modelRevision);
+    } finally {
+      await rm(copy, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps all independent historical expected values and their original lineage', () => {
+    expect(reference.modelRevision).toBe('6fcc086b77576d4cecb9d0c79637d6daf980308c');
+    expect(reference.source).toBe('https://github.com/SemiAnalysisAI/inferencex_power_model');
+    expect(reference.fixtureRole).toContain('Frozen historical Python migration baseline');
+    expect(reference.pythonConfigurations.gb200.defaultConfig.pue).toBe(1.2);
+    expect(reference.cases.length + reference.rackCases.length).toBe(496);
+    expect(
+      createHash('sha256')
+        .update(JSON.stringify([reference.cases, reference.rackCases]))
+        .digest('hex'),
+    ).toBe('98cb77c182c510b0e73fefaea1242f20b732e8623cc2cfcc8b6f367d9412d268');
   });
 });

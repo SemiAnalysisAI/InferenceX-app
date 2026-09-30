@@ -100,7 +100,10 @@ NVL72 estimates require valid GPU power plus validated Grace-socket or compute-m
 power with complete socket coverage. CPU-rail-only readings do not establish the
 Grace/LPDDR boundary. A module reading already includes GPU power; do not add GPU
 watts again. Read `powerSource` for topology, measured basis, sensor, PUE, model
-revision/path and profile hash. `compare` preserves provisioned rows when a measured
+content revision, app TypeScript source path and source hash. Equations and parameters
+are maintained in InferenceX-app; the revision is a content digest, not a private-repository
+Git commit. Model-only updates recalculate retained valid measurements after deployment;
+they do not require telemetry backfill. `compare` preserves provisioned rows when a measured
 estimate is unavailable; `skipped.reason` distinguishes `no-cpu-power` from
 `incompatible-power-basis`. Modeled-only estimates never substitute provisioned
 watts, and neither mode selects a different serving frontier to fill missing power.

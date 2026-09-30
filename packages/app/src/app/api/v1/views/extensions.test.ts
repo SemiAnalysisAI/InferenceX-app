@@ -432,8 +432,8 @@ describe('new dashboard projections', () => {
         measuredBasis: 'module',
         sensorKind: 'module',
         pue: 1.1,
-        modelPath: 'human_verified/gb200_nvl72_rack/gb200_nvl72_rack_power_model.py',
-        modelRevision: expect.stringMatching(/^[0-9a-f]{40}$/u),
+        modelPath: 'packages/app/src/lib/system-power-model.ts',
+        modelRevision: expect.stringMatching(/^app-sha256:[0-9a-f]{64}$/u),
         profileSha256: expect.stringMatching(/^[0-9a-f]{64}$/u),
       });
       // Pinned rack reference: 1.6077325 kW/GPU, including PUE and planning margin.
