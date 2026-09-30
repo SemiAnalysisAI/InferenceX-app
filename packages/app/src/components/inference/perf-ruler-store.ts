@@ -26,10 +26,10 @@ import {
  * @file perf-ruler-store.ts
  * @description Provider-owned Perf Ruler state for the primary inference
  * chart, so completed rulers persist in share links (`i_rulers`). Lives
- * beside `InferenceContext` rather than inside it so `ScatterGraph` /
- * date-comparison `GPUGraph` can consume the store without importing the
- * (heavily mocked) provider module. ChartDisplay mounts exactly one of
- * those as `chart-0`; the replay chart keeps local state on purpose.
+ * beside `InferenceContext` rather than inside it so `ScatterGraph` can
+ * consume the store without importing the (heavily mocked) provider module.
+ * ChartDisplay mounts it as `chart-0`; the date-comparison `GPUGraph` draws
+ * no rulers, and the replay chart keeps local state on purpose.
  */
 
 /**

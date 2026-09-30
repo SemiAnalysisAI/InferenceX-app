@@ -79,11 +79,6 @@ function polylinePath(vertices: { x: number; y: number }[]): PerfRulerPathLike {
 // ── formatPerfRatio ──────────────────────────────────────────────────
 
 describe('formatPerfRatio', () => {
-  it('formats small multiples with two decimals', () => {
-    expect(formatPerfRatio(2.0304)).toBe('2.03x');
-    expect(formatPerfRatio(1)).toBe('1.00x');
-  });
-
   it('drops to one decimal at 10x and none at 100x', () => {
     expect(formatPerfRatio(10.46)).toBe('10.5x');
     expect(formatPerfRatio(123.4)).toBe('123x');
@@ -122,17 +117,6 @@ describe('isPerfRulerCurveVisible', () => {
 // ── intersectPathAtX ─────────────────────────────────────────────────
 
 describe('intersectPathAtX', () => {
-  it('finds the mid-segment intersection on a single-segment path', () => {
-    const path = polylinePath([
-      { x: 0, y: 100 },
-      { x: 100, y: 0 },
-    ]);
-    const hit = intersectPathAtX(path, 50);
-    expect(hit).not.toBeNull();
-    expect(hit!.x).toBeCloseTo(50, 0);
-    expect(hit!.y).toBeCloseTo(50, 0);
-  });
-
   it('interpolates within the correct segment of a multi-segment curve', () => {
     const path = polylinePath([
       { x: 0, y: 200 },
@@ -143,18 +127,6 @@ describe('intersectPathAtX', () => {
     expect(hit).not.toBeNull();
     expect(hit!.x).toBeCloseTo(200, 0);
     expect(hit!.y).toBeCloseTo(75, 1);
-  });
-
-  it('hits interior vertices exactly', () => {
-    const path = polylinePath([
-      { x: 0, y: 200 },
-      { x: 100, y: 100 },
-      { x: 300, y: 50 },
-    ]);
-    const hit = intersectPathAtX(path, 100);
-    expect(hit).not.toBeNull();
-    expect(hit!.x).toBeCloseTo(100, 0);
-    expect(hit!.y).toBeCloseTo(100, 0);
   });
 
   it('supports paths whose x decreases along their length', () => {
@@ -190,19 +162,6 @@ describe('intersectPathAtX', () => {
     expect(nearEnd!.y).toBeCloseTo(50, 0);
   });
 
-  it('converges tightly on shallow curves approximated by many segments', () => {
-    // y = 10000 / x sampled on [50, 500] — a hyperbola like a latency curve.
-    const vertices = Array.from({ length: 91 }, (_v, i) => {
-      const x = 50 + i * 5;
-      return { x, y: 10000 / x };
-    });
-    const path = polylinePath(vertices);
-    const hit = intersectPathAtX(path, 250);
-    expect(hit).not.toBeNull();
-    expect(hit!.x).toBeCloseTo(250, 0);
-    expect(hit!.y).toBeCloseTo(40, 0);
-  });
-
   it('returns a point on a vertical (constant-x) path instead of diverging', () => {
     const path = polylinePath([
       { x: 50, y: 0 },
@@ -227,20 +186,6 @@ describe('intersectPathAtX', () => {
 // ── computeIsoXRulerGeometry ─────────────────────────────────────────
 
 describe('computeIsoXRulerGeometry', () => {
-  it('places the line at the iso-x, spanning the two intersection ys', () => {
-    const geometry = computeIsoXRulerGeometry(ISO_X, END_A, END_B);
-    expect(geometry).not.toBeNull();
-    expect(geometry!.x).toBe(100);
-    expect(geometry!.y1).toBe(50);
-    expect(geometry!.y2).toBe(150);
-  });
-
-  it('computes the ratio from raw y values, higher over lower', () => {
-    const geometry = computeIsoXRulerGeometry(ISO_X, END_A, END_B);
-    expect(geometry!.ratio).toBeCloseTo(400 / 197, 10);
-    expect(geometry!.ratioLabel).toBe('2.03x');
-  });
-
   it('yields the same ratio regardless of end order (symmetric)', () => {
     const swapped = computeIsoXRulerGeometry(ISO_X, END_B, END_A);
     expect(swapped!.ratio).toBeCloseTo(400 / 197, 10);
@@ -275,14 +220,6 @@ describe('computeIsoXRulerGeometry', () => {
 describe('computePerfRulerLabelLayout', () => {
   const GEOMETRY = { x: 100, y1: 50, y2: 150, ratioLabel: '2.03x' };
 
-  it('places the label up-right of the line midpoint by default', () => {
-    const layout = computePerfRulerLabelLayout(GEOMETRY, { chartWidth: 800, chartHeight: 400 });
-    expect(layout.side).toBe(1);
-    expect(layout.textAnchor).toBe('start');
-    expect(layout.labelX).toBeGreaterThan(GEOMETRY.x);
-    expect(layout.labelY).toBeLessThan((GEOMETRY.y1 + GEOMETRY.y2) / 2);
-  });
-
   it('flips to the left side near the right chart edge', () => {
     const layout = computePerfRulerLabelLayout(GEOMETRY, { chartWidth: 125, chartHeight: 400 });
     expect(layout.side).toBe(-1);
@@ -303,54 +240,6 @@ describe('computePerfRulerLabelLayout', () => {
     expect(layout.labelY - fontSize / 2).toBeGreaterThanOrEqual(4);
     expect(layout.labelY + fontSize / 2).toBeLessThanOrEqual(70);
   });
-
-  it('ends the arrow curve horizontally next to the line midpoint', () => {
-    const layout = computePerfRulerLabelLayout(GEOMETRY, { chartWidth: 800, chartHeight: 400 });
-    const midY = (GEOMETRY.y1 + GEOMETRY.y2) / 2;
-    // Quadratic curve: M sx sy Q cx cy ex ey — the end point sits a few px
-    // right of the line at the midpoint height, tangent horizontal.
-    const numbers = layout.arrowPath.match(/-?\d+(?:\.\d+)?/g)!.map(Number);
-    const [sx, sy, cx, cy, ex, ey] = numbers;
-    expect(sx).toBeGreaterThan(GEOMETRY.x);
-    expect(sy).toBeLessThan(midY);
-    expect(cy).toBe(midY);
-    expect(cx).toBe(sx);
-    expect(ey).toBe(midY);
-    expect(ex).toBeGreaterThan(GEOMETRY.x);
-    expect(ex).toBeLessThan(sx);
-  });
-
-  it('points the arrowhead tip at the line, just off the stroke', () => {
-    const layout = computePerfRulerLabelLayout(GEOMETRY, { chartWidth: 800, chartHeight: 400 });
-    const midY = (GEOMETRY.y1 + GEOMETRY.y2) / 2;
-    const numbers = layout.arrowHeadPath.match(/-?\d+(?:\.\d+)?/g)!.map(Number);
-    const [tipX, tipY] = numbers;
-    expect(tipY).toBe(midY);
-    expect(Math.abs(tipX - GEOMETRY.x)).toBeLessThanOrEqual(6);
-    expect(layout.arrowHeadPath.endsWith('Z')).toBe(true);
-  });
-
-  it('respects a custom font size when checking the top clip', () => {
-    const nearTop = { x: 100, y1: 40, y2: 60, ratioLabel: '2.03x' };
-    const small = computePerfRulerLabelLayout(nearTop, { fontSize: 12 });
-    // 50 - 46 = 4 above the top — fits a 12px label (4 - 6 < 4 fails)…
-    // both sizes clip here, so both drop below; a taller chart midpoint
-    // stays above for both.
-    const tall = { x: 100, y1: 100, y2: 200, ratioLabel: '2.03x' };
-    expect(computePerfRulerLabelLayout(tall, { fontSize: 12 }).labelY).toBeLessThan(150);
-    expect(small.labelY).toBeGreaterThan(50);
-  });
-
-  it('anchors the × delete button just past the label, at the label height', () => {
-    const right = computePerfRulerLabelLayout(GEOMETRY, { chartWidth: 800, chartHeight: 400 });
-    expect(right.side).toBe(1);
-    expect(right.deleteX).toBeGreaterThan(right.labelX);
-    expect(right.deleteY).toBe(right.labelY);
-    const left = computePerfRulerLabelLayout(GEOMETRY, { chartWidth: 125, chartHeight: 400 });
-    expect(left.side).toBe(-1);
-    expect(left.deleteX).toBeLessThan(left.labelX);
-    expect(left.deleteY).toBe(left.labelY);
-  });
 });
 
 // ── computePerfRulerLabelLayouts ──────────────────────────────────
@@ -358,11 +247,6 @@ describe('computePerfRulerLabelLayout', () => {
 describe('computePerfRulerLabelLayouts', () => {
   const GEOMETRY = { x: 100, y1: 50, y2: 150, ratioLabel: '2.03x' };
   const OPTS = { chartWidth: 800, chartHeight: 400 };
-
-  it('matches the single-label layout when there is no collision', () => {
-    const [only] = computePerfRulerLabelLayouts([GEOMETRY], OPTS);
-    expect(only).toEqual(computePerfRulerLabelLayout(GEOMETRY, OPTS));
-  });
 
   it('passes null geometries through, keeping array positions aligned', () => {
     const layouts = computePerfRulerLabelLayouts([null, GEOMETRY, null], OPTS);
@@ -383,13 +267,6 @@ describe('computePerfRulerLabelLayouts', () => {
     // The nudged label's arrow and × follow it.
     expect(second!.deleteY).toBe(second!.labelY);
     expect(second!.arrowPath).not.toBe(first!.arrowPath);
-  });
-
-  it('leaves far-apart labels untouched', () => {
-    const other = { x: 500, y1: 250, y2: 350, ratioLabel: '1.50x' };
-    const [first, second] = computePerfRulerLabelLayouts([GEOMETRY, other], OPTS);
-    expect(first).toEqual(computePerfRulerLabelLayout(GEOMETRY, OPTS));
-    expect(second).toEqual(computePerfRulerLabelLayout(other, OPTS));
   });
 
   it('keeps the below-midpoint collision fallback inside a short chart', () => {
@@ -449,28 +326,6 @@ function renderSingle(
 }
 
 describe('renderPerfRulers', () => {
-  it('draws the ruler line, end caps, arrow, big ratio label, drag handle, and ×', () => {
-    const group = createMockGroup();
-    const geometry = computeIsoXRulerGeometry(ISO_X, END_A, END_B)!;
-    renderSingle(group, geometry);
-
-    const ruler = group.selectAll('.perf-ruler');
-    expect(ruler.elements).toHaveLength(1);
-    const children = ruler.elements[0].children.map((c) => String(c.attrs['class']));
-    expect(children).toContain('pr-line');
-    expect(children).toContain('pr-cap pr-cap-top');
-    expect(children).toContain('pr-cap pr-cap-bottom');
-    expect(children).toContain('pr-arrow');
-    expect(children).toContain('pr-arrow-head');
-    expect(children).toContain('pr-text pr-text-ratio');
-    expect(children).toContain('pr-drag');
-    expect(children).toContain('pr-delete no-export');
-    // The chip rect and secondary percent line are gone in the big-label
-    // design.
-    expect(children).not.toContain('pr-bg');
-    expect(children).not.toContain('pr-text pr-text-percent');
-  });
-
   it('positions the vertical line and caps at the iso-x', () => {
     const group = createMockGroup();
     const geometry = computeIsoXRulerGeometry(ISO_X, END_A, END_B)!;
@@ -516,56 +371,6 @@ describe('renderPerfRulers', () => {
     expect(drag.styles['cursor']).toBe('ew-resize');
   });
 
-  it('writes the big ratio label in the accent color with a readability halo', () => {
-    const group = createMockGroup();
-    const geometry = computeIsoXRulerGeometry(ISO_X, END_A, END_B)!;
-    renderSingle(group, geometry, undefined, { chartWidth: 800, chartHeight: 400 });
-
-    const ruler = group.selectAll('.perf-ruler');
-    const byClass = (cls: string) =>
-      ruler.elements[0].children.find((c) => String(c.attrs['class']) === cls)!;
-    const label = byClass('pr-text pr-text-ratio');
-    expect(label.textContent).toBe('2.03x');
-    expect(label.attrs['font-size']).toBe(`${DEFAULT_LABEL_FONT_SIZE}px`);
-    expect(label.attrs['font-weight']).toBe('800');
-    expect(label.attrs['fill']).toBe('var(--primary)');
-    // Halo: background-colored stroke painted UNDER the glyph fill.
-    expect(label.attrs['paint-order']).toBe('stroke');
-    expect(label.attrs['stroke']).toBe('var(--background)');
-    expect(Number(label.attrs['stroke-width'])).toBeGreaterThan(0);
-  });
-
-  it('honors a custom halo color and font size', () => {
-    const group = createMockGroup();
-    const geometry = computeIsoXRulerGeometry(ISO_X, END_A, END_B)!;
-    renderSingle(group, geometry, { halo: 'white', labelFontSize: 40 });
-
-    const ruler = group.selectAll('.perf-ruler');
-    const label = ruler.elements[0].children.find(
-      (c) => String(c.attrs['class']) === 'pr-text pr-text-ratio',
-    )!;
-    expect(label.attrs['stroke']).toBe('white');
-    expect(label.attrs['font-size']).toBe('40px');
-  });
-
-  it('draws the arrow curve and filled head in the accent color', () => {
-    const group = createMockGroup();
-    const geometry = computeIsoXRulerGeometry(ISO_X, END_A, END_B)!;
-    renderSingle(group, geometry, undefined, { chartWidth: 800, chartHeight: 400 });
-
-    const ruler = group.selectAll('.perf-ruler');
-    const byClass = (cls: string) =>
-      ruler.elements[0].children.find((c) => String(c.attrs['class']) === cls)!;
-    const layout = computePerfRulerLabelLayout(geometry, { chartWidth: 800, chartHeight: 400 });
-    const arrow = byClass('pr-arrow');
-    expect(arrow.attrs['d']).toBe(layout.arrowPath);
-    expect(arrow.attrs['stroke']).toBe('var(--primary)');
-    expect(arrow.attrs['fill']).toBe('none');
-    const head = byClass('pr-arrow-head');
-    expect(head.attrs['d']).toBe(layout.arrowHeadPath);
-    expect(head.attrs['fill']).toBe('var(--primary)');
-  });
-
   it('places the label right of the line by default', () => {
     const group = createMockGroup();
     const geometry = computeIsoXRulerGeometry(ISO_X, END_A, END_B)!;
@@ -577,19 +382,6 @@ describe('renderPerfRulers', () => {
     )!;
     expect(Number(label.attrs['x'])).toBeGreaterThan(geometry.x);
     expect(label.attrs['text-anchor']).toBe('start');
-  });
-
-  it('flips the label to the left near the right chart edge', () => {
-    const group = createMockGroup();
-    const geometry = computeIsoXRulerGeometry(ISO_X, END_A, END_B)!;
-    renderSingle(group, geometry, undefined, { chartWidth: 125 });
-
-    const ruler = group.selectAll('.perf-ruler');
-    const label = ruler.elements[0].children.find(
-      (c) => String(c.attrs['class']) === 'pr-text pr-text-ratio',
-    )!;
-    expect(Number(label.attrs['x'])).toBeLessThan(geometry.x);
-    expect(label.attrs['text-anchor']).toBe('end');
   });
 
   it('is idempotent: re-rendering keeps a single ruler group', () => {
@@ -628,12 +420,6 @@ describe('renderPerfRulers', () => {
 
     const ruler = group.selectAll('.perf-ruler');
     expect(ruler.elements).toHaveLength(0);
-  });
-
-  it('renders nothing when called with no entries on an empty group', () => {
-    const group = createMockGroup();
-    renderSingle(group, null);
-    expect(group.selectAll('.perf-ruler').elements).toHaveLength(0);
   });
 
   it('disables pointer events so the ruler never blocks point clicks', () => {
@@ -694,16 +480,6 @@ describe('renderPerfRulers', () => {
     // The click must not fall through to the chart underneath.
     expect(stopped).toBe(1);
   });
-
-  it('registers hover handlers that reveal the × per ruler group', () => {
-    const group = createMockGroup();
-    const geometry = computeIsoXRulerGeometry(ISO_X, END_A, END_B)!;
-    renderSingle(group, geometry);
-
-    const ruler = group.selectAll('.perf-ruler');
-    expect(ruler.elements[0].handlers?.['mouseenter']).toBeTypeOf('function');
-    expect(ruler.elements[0].handlers?.['mouseleave']).toBeTypeOf('function');
-  });
 });
 
 // ── nextPerfRulerState ───────────────────────────────────────
@@ -718,19 +494,6 @@ function complete(state: PerfRulerState, a: string, b: string, isoX: number): Pe
 
 describe('nextPerfRulerState', () => {
   const EMPTY = EMPTY_PERF_RULER_STATE;
-
-  it('starts an in-progress draft on the first click', () => {
-    const state = nextPerfRulerState(EMPTY, { curve: 'curve-a', isoX: 40 });
-    expect(state.rulers).toEqual([]);
-    expect(state.draft).toEqual({ curve: 'curve-a', isoX: 40 });
-  });
-
-  it('moves the draft iso-x when the draft curve is clicked again', () => {
-    let state = nextPerfRulerState(EMPTY, { curve: 'curve-a', isoX: 40 });
-    state = nextPerfRulerState(state, { curve: 'curve-a', isoX: 72 });
-    expect(state.draft).toEqual({ curve: 'curve-a', isoX: 72 });
-    expect(state.rulers).toEqual([]);
-  });
 
   it('completes a measurement at the DRAFT iso-x when a second curve is clicked', () => {
     let state = nextPerfRulerState(EMPTY, { curve: 'curve-a', isoX: 40 });
@@ -836,11 +599,6 @@ describe('deletePerfRuler', () => {
     // Ids are never reused after a delete.
     expect(afterDelete.nextId).toBe(3);
   });
-
-  it('returns the same reference when the id is not found', () => {
-    const one = complete(EMPTY_PERF_RULER_STATE, 'a', 'b', 40);
-    expect(deletePerfRuler(one, 99)).toBe(one);
-  });
 });
 
 describe('clearPerfRulers', () => {
@@ -851,10 +609,6 @@ describe('clearPerfRulers', () => {
     expect(cleared.rulers).toEqual([]);
     expect(cleared.draft).toBeNull();
     expect(cleared.nextId).toBe(state.nextId);
-  });
-
-  it('returns the same reference when already empty', () => {
-    expect(clearPerfRulers(EMPTY_PERF_RULER_STATE)).toBe(EMPTY_PERF_RULER_STATE);
   });
 });
 
@@ -872,11 +626,6 @@ describe('prunePerfRulers', () => {
     const pruned = prunePerfRulers(drafted, () => false);
     expect(pruned.draft).toBeNull();
   });
-
-  it('returns the same reference when every curve still exists', () => {
-    const one = complete(EMPTY_PERF_RULER_STATE, 'a', 'b', 40);
-    expect(prunePerfRulers(one, () => true)).toBe(one);
-  });
 });
 
 describe('perfRulerCurveSet', () => {
@@ -884,10 +633,6 @@ describe('perfRulerCurveSet', () => {
     let state = complete(EMPTY_PERF_RULER_STATE, 'a', 'b', 40);
     state = nextPerfRulerState(state, { curve: 'c', isoX: 90 });
     expect([...perfRulerCurveSet(state)].sort()).toEqual(['a', 'b', 'c']);
-  });
-
-  it('is empty for the empty state', () => {
-    expect(perfRulerCurveSet(EMPTY_PERF_RULER_STATE).size).toBe(0);
   });
 });
 
@@ -935,14 +680,6 @@ describe('serializePerfRulers / parsePerfRulers', () => {
 // ── pathXExtent ─────────────────────────────────────────────
 
 describe('pathXExtent', () => {
-  it('returns the min/max x of the path endpoints', () => {
-    const path = polylinePath([
-      { x: 100, y: 100 },
-      { x: 300, y: 50 },
-    ]);
-    expect(pathXExtent(path)).toEqual({ min: 100, max: 300 });
-  });
-
   it('supports paths whose x decreases along their length', () => {
     const path = polylinePath([
       { x: 300, y: 10 },

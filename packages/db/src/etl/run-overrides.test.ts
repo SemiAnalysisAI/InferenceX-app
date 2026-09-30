@@ -188,62 +188,6 @@ describe('audited run backfills', () => {
     }
   });
 
-  it('corrects only the six Qwen metrics-refresh recipes without changing measurements', () => {
-    const backfills = BENCHMARK_POINT_BACKFILLS.filter((b) => b.githubRunId === 33219708211);
-    expect(backfills.map((b) => [b.productionConfigId, b.conc, b.recipeFingerprint])).toEqual([
-      [2360, 7, '18f2c2292689243d0b87de83c376830284db0d86fb04a729376a8e310e01856d'],
-      [2361, 96, '097590578e9c8f65a51537c359a0bc0d0b4fcc5dbb557ee77a0939dbe0baeb3f'],
-      [2362, 704, 'c798a4b016d861f821f34fbc9cffdfdcd74e1b608304f01f4fa944388ddd5ed0'],
-      [2363, 52, '8b163e70d15e09358a90ea0e109a7d60bb822b71155285479822854747fa51bc'],
-      [2364, 565, '3f73af0d7e9b46406415309565b5c912a78e3a7f0661e497a028af7323845fc4'],
-      [2365, 44, '22c7807daf12e816829cdb3d8c8fe08f28d5a8e20b3eb7d33f0090e92dafe866'],
-    ]);
-    for (const backfill of backfills) {
-      const point = {
-        configId: backfill.productionConfigId!,
-        config: backfill.config,
-        benchmarkType: 'agentic_traces',
-        isl: null,
-        osl: null,
-        conc: backfill.conc,
-        offloadMode: 'off',
-        recipeFingerprint: backfill.recipeFingerprint,
-        metrics: {
-          median_itl: 0.1,
-          output_tput_per_gpu: 123,
-          server_gpu_cache_hit_rate: 0.5284,
-          kv_p2p_transfer: 'nixl',
-          allocated_cpu_dram_gb: 0,
-          kv_offloading: 'none',
-        },
-      };
-      const applied = applyBenchmarkPointBackfill(33219708211, 1, point);
-      expect(applied.point).toEqual({
-        ...point,
-        offloadMode: 'on',
-        metrics: {
-          median_itl: 0.1,
-          output_tput_per_gpu: 123,
-          server_gpu_cache_hit_rate: 0.5284,
-          kv_p2p_transfer: 'nixl',
-          offload_mode: 'on',
-          kv_offloading: 'dram',
-          kv_offload_backend: 'native',
-          kv_offload_backend_version: '1.3.0rc24',
-        },
-      });
-      expect(applyBenchmarkPointBackfill(33219708211, 2, point).backfillId).toBeNull();
-      expect(applyBenchmarkPointBackfill(31927376673, 1, point).backfillId).toBeNull();
-      expect(
-        applyBenchmarkPointBackfill(33219708211, 1, { ...point, recipeFingerprint: null })
-          .backfillId,
-      ).toBeNull();
-      expect(applyBenchmarkPointBackfill(33219708211, 1, applied.point).point).toEqual(
-        applied.point,
-      );
-    }
-  });
-
   it.each([
     [128, 4, 'd84f06bb4a4016f9f2fe917feb4f10b960f87ac5f48bfae1b0bca1d66d7c887b'],
     [256, 4, '1472857d464c0780b5eeb41184ff70290c5f6b9ad6a8c07b2524697e21dd0e07'],
@@ -622,6 +566,36 @@ describe('PURGED_BENCHMARK_POINTS', () => {
 });
 
 describe('isRunAttemptPurged', () => {
+  it.each([
+    32403083041, 33219708211, 31927376673, 34413290524, 33716849615, 33219706372, 32346724519,
+  ])(
+    'purges every attempt of GB300 FP4 TensorRT-LLM AgentX run %s with disabled server metrics',
+    (runId) => {
+      expect(PURGED_RUNS.has(runId)).toBe(true);
+      for (const attempt of [undefined, 1, 2, 3, 4, 99]) {
+        expect(isRunAttemptPurged(runId, attempt)).toBe(true);
+      }
+      expect(isRunAttemptPurged(runId - 1, 1)).toBe(false);
+      expect(isRunAttemptPurged(runId + 1, 1)).toBe(false);
+      expect(BENCHMARK_POINT_BACKFILLS.filter((entry) => entry.githubRunId === runId)).toEqual([]);
+      expect(() =>
+        validateRunBackfills([], [examplePointBackfill({ githubRunId: runId })]),
+      ).toThrow(/already in PURGED_RUNS/u);
+    },
+  );
+
+  it.each([35806602041, 34511705667])(
+    'purges every attempt of MiniMax M3 GB200 TensorRT-LLM run %s with disabled server metrics',
+    (runId) => {
+      expect(PURGED_RUNS.has(runId)).toBe(true);
+      for (const attempt of [undefined, 1, 2, 99]) {
+        expect(isRunAttemptPurged(runId, attempt)).toBe(true);
+      }
+      expect(isRunAttemptPurged(runId - 1, 1)).toBe(false);
+      expect(isRunAttemptPurged(runId + 1, 1)).toBe(false);
+    },
+  );
+
   it('purges every attempt of the H200 Kimi-K3 simple-power run 34819961093 while keeping the 2026-09-13 H200 runs', () => {
     expect(PURGED_RUNS.has(34819961093)).toBe(true);
     for (const attempt of [undefined, 1, 2, 99]) {
