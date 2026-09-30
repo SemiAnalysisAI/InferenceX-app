@@ -391,7 +391,7 @@ still uses the source's fixed 20% utilization assumption.
 
 The default measured contract is numeric `power_valid=1` and metric schema 2.
 The original validated single-node producer predates the schema marker but
-already defines both watts fields identically. This path retains the absent
+already uses the schema-2 definitions for both watts fields. This path retains the absent
 schema and reports `validated-unversioned-single-node`; it does not upgrade the
 source or admit unversioned disaggregated power. The article receipt additionally
 pins the producer checkout and retains each original audit artifact.

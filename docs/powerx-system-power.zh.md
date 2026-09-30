@@ -50,7 +50,7 @@ GPU 功耗图回答的是“测到了多少 GPU 功耗”；利润计算回答�
 数据点，对应多少整机功耗”。图上有 GPU 实测值，只能说明其中一项输入存在。
 
 2026 年 9 月 29 日的复现使用了保存的 93 条公开 Kimi K3 基准测试记录，设置为 AgentX
-P90、**45 tok/s/user**、自动选择 FP4。它复现了截图中两个可计价配置：B200 Dynamo-vLLM
+P90、**45 tok/s/user**、自动选择 FP4。它复现了截图中两个有价格结果的配置：B200 Dynamo-vLLM
 和 MI355X ATOM。这是对当时截图的历史复现，不代表今天的在线数据库仍有相同的数据覆盖。
 按 #1190 的
 [cc86afd6](https://github.com/SemiAnalysisAI/InferenceX-app/commit/cc86afd6b179cceeb550cbf579ff60df46a47ac3)
@@ -64,8 +64,8 @@ P90、**45 tok/s/user**、自动选择 FP4。它复现了截图中两个可计�
 | B300        | 所选记录 439941/439935 没有实测功耗。                                                                                    | 为估算器使用的服务性能曲线补充通过验证的测量。                                                             |
 | H200        | 现有服务性能曲线达不到所要求的 45 tok/s/user。                                                                           | 将目标设在曲线支持的范围内，或取得覆盖该目标且通过验证的新曲线。                                           |
 
-两张截图选择的引擎也不同：功耗图隐藏了 ATOM，显示 MI355X vLLM；有价格结果的 AMD
-配置则是 ATOM。比较结果数量前，应先对齐模型、负载、日期/运行、引擎、精度、分位数
+这些截图选择的引擎也不同：功耗图隐藏了 ATOM，显示 MI355X vLLM；有价格结果的 AMD
+配置则是 ATOM。比较记录数量前，应先对齐模型、负载、日期/运行、引擎、精度、分位数
 和目标值。
 
 AMD 的例子更具体：45 tok/s/user 的性能插值使用 **14.832 和 47.596 tok/s/user** 两个点，
@@ -329,7 +329,7 @@ per-tray 输入的方式一致。每个 tray 分摊 1/18，因此 NVSwitch tray�
 不在估算范围内；GPU 机箱内的 CPU 功耗仍采用源模型固定的 20% 利用率假设。
 
 默认实测约定要求数值型 `power_valid=1` 和指标 schema 2。原有通过验证的单节点生产端
-早于 schema 标记，但其两个 watts 字段的定义已经相同。这条路径保留 schema 缺失的
+早于 schema 标记，但两个 watts 字段的定义已与 schema 2 相同。这条路径保留 schema 缺失的
 原状，并报告 `validated-unversioned-single-node`；不会升级源数据版本，也不会接纳
 无版本的分离式功耗。文章的验证回执还会固定生产端 checkout，并保留各原始审计产物。
 
@@ -337,10 +337,10 @@ per-tray 输入的方式一致。每个 tray 分摊 1/18，因此 NVSwitch tray�
 
 **实测输入。**每个计算 tray 都使用实测计算模块功耗，Grace CPU 和 LPDDR5X 不由模型
 估算。生产端的 CPU 功耗采集（srt-slurm，ACPI hwmon）在与 GPU 能耗相同的正式窗口内
-输出 `avg_cpu_socket_power_w`、`avg_total_cpu_power_w`、`total_cpu_energy_j`。
-若每个 socket 都有 `Module Power Socket` 传感器，还会输出
-`avg_total_module_power_w` 和 `total_module_energy_j`，并附带独立验证结论
-`cpu_power_valid` 及 `power_audit.cpu`（传感器类型、采集器、socket 覆盖情况、原因码）。
+输出 `avg_cpu_socket_power_w`、`avg_total_cpu_power_w` 和 `total_cpu_energy_j`，并附带
+独立验证结论 `cpu_power_valid` 及 `power_audit.cpu`（传感器类型、采集器、socket 覆盖情况、
+原因码）。若每个 socket 都有 `Module Power Socket` 传感器，还会输出
+`avg_total_module_power_w` 和 `total_module_energy_j`。
 
 接纳条件为 `power_valid=1`、schema 2、`cpu_power_valid=1`，且 `power_audit.cpu` 中
 预期和实测 socket 数一致，每 tray 两个。module 读数要求 `sensor_kind: module`，
@@ -350,7 +350,7 @@ per-tray 输入的方式一致。每个 tray 分摊 1/18，因此 NVSwitch tray�
 
 口径选择：存在 `avg_total_module_power_w` 时采用 `module`，因为读数已包含 GPU
 板卡，所以不会再缩放；否则采用 `gpu-plus-grace`，即每 tray 的每 GPU 板卡功率 × 4
-加 Grace socket 总功率，并且只对 GPU 份额应用源模型的稳压损耗系数
+加 Grace socket 总功率，并且只对 GPU 份额应用源模型的稳压损耗余量
 `regulatorLossFracOfTdp / (1 − frac)`。module 字段存在但无效时，该行不可用
 （`cpu-telemetry`），不会悄然回退到 Grace socket。
 
@@ -412,8 +412,8 @@ socket 并由模型估算稳压损耗；profile 表示为
 计算。分离式记录要求逐主机、逐角色功耗。NVL72 要求完整四卡 tray，并具有上文所述
 CPU 来源证据。
 
-通过验证的单节点 1/2/4 卡配置保留整机箱外推：假设八卡服务器放置若干完整实例，每 GPU
-功耗和吞吐量保持实测值，再将建模设施功耗除以八。该假设认为实例同机部署不影响性能
+通过验证的单节点 1/2/4 卡配置保留整机箱外推：按实测的每 GPU 功耗和吞吐量，用完整实例
+填满一台八卡服务器，再将建模设施功耗除以八。该假设认为实例同机部署不影响性能
 或功耗，不代表测量了部分 GPU 闲置的服务器。图表、提示框和 CSV 对所有外推估算
 作出标注，包括仅一端为部分分配点的插值。其他部分分配方式以及缺失、无效测量仍不可用，
 并给出不同原因。常规 8K/1K 转换路径保留原有接纳策略。
