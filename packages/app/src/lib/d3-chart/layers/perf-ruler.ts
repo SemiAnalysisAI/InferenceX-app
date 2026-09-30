@@ -331,15 +331,20 @@ const PERF_RULER_URL_FIELD_SEPARATOR = '|';
  * `roofline-path` / `overlay-roofline-path` marker classes or any other node
  * inside the zoom group — those match many paths, so a hand-edited link
  * would draw a ruler between whichever two come first in DOM order.
+ *
+ * Date-comparison curves include the comparison entry in the series id
+ * (`roofline-<date~r<runId>>_<hwKey>_<precision>`), so `~` is part of the
+ * allowed alphabet alongside the encoded-date `__<percent-encoded>` suffix.
  */
-const PERF_RULER_CURVE_ID = /^(?:overlay-)?roofline-(?!path$)[\w%.-]+$/u;
+const PERF_RULER_CURVE_ID = /^(?:overlay-)?roofline-(?!path$)[\w%.~-]+$/u;
 
 /**
  * Share-link encoding of the COMPLETED rulers (`i_rulers`). One ruler per
  * `;`, fields joined by `|`: `isoX|curveA|curveB`. Curve ids are the rendered
  * roofline path identity classes (`roofline-<hwKey>_<precision>`,
- * `overlay-roofline-<hwKey>_<precision>_run<N>`, optionally `__<encoded
- * date>`), whose alphabet is `[A-Za-z0-9_%.-]`, so neither separator can
+ * `overlay-roofline-<hwKey>_<precision>_run<N>`, date-comparison
+ * `roofline-<date[~r<runId>]>_<hwKey>_<precision>`, optionally `__<encoded
+ * date>`), whose alphabet is `[A-Za-z0-9_%.~-]`, so neither separator can
  * appear inside one; `URLSearchParams` percent-encodes both on the wire.
  * The iso-x is rounded to four significant digits to keep links short — a
  * 0.05% shift on the x metric is far below the ruler's visual resolution.

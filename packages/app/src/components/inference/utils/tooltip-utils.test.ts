@@ -580,6 +580,28 @@ describe('generateTooltipContent', () => {
     expect(html).toContain('Click elsewhere to dismiss');
   });
 
+  it('caps pinned tooltip height so stacked actions stay inside the mobile viewport', () => {
+    const html = generateTooltipContent(
+      tooltipConfig({
+        isPinned: true,
+        hasTrace: true,
+        hasLog: true,
+        showPowerTelemetry: true,
+        selectedYAxisMetric: 'y_measuredAvgPower',
+        data: pt({
+          id: 42,
+          benchmark_type: 'agentic_traces',
+          power_audit: { source: 'power_validation_h100_conc8.json' },
+          run_url: 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/1',
+        }),
+      }),
+    );
+    expect(html).toContain('max-height: min(70vh, calc(100dvh - 16px))');
+    expect(html).toContain('overflow-y: auto');
+    expect(html).toContain('max-width: min(320px, calc(100vw - 16px))');
+    expect(html).toContain('data-action="view-power-trace"');
+  });
+
   it('does not show dismiss text when isPinned is false', () => {
     const html = generateTooltipContent(tooltipConfig({ isPinned: false }));
     expect(html).not.toContain('Click elsewhere to dismiss');
