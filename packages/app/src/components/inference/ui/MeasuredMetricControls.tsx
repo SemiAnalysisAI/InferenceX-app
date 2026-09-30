@@ -34,7 +34,7 @@ const STRINGS = {
     all: 'All GPUs',
     prefill: 'Prefill GPUs',
     decode: 'Decode GPUs',
-    statistic: 'Statistic',
+    statistic: 'Power statistic',
     statisticHelp:
       'P75 and P90 are time-weighted percentiles of synchronized fleet power, divided by chip count. They are available for all GPUs only.',
     average: 'Average',
@@ -68,7 +68,7 @@ const STRINGS = {
     all: '全部 GPU',
     prefill: '预填充 GPU',
     decode: '解码 GPU',
-    statistic: '统计量',
+    statistic: '功耗统计量',
     statisticHelp:
       'P75 和 P90 是同步采样的集群总功率按时间加权得到的分位数，再除以芯片数。仅支持全部 GPU。',
     average: '平均值',
