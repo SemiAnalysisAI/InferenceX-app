@@ -16,7 +16,7 @@ import { metricRowLabel } from '@/components/inference/axis-metric-explanations'
 import { getMeasuredMetricConfig } from '@/components/inference/measured-metric-config';
 import { AIR_COOLED_SYSTEM_PUE } from '@/lib/modeled-system-power';
 import { SYSTEM_POWER_MODEL_REVISION } from '@/lib/system-power-model';
-import { ALL_IN_MEASURED_NOTE } from '@/lib/power-basis';
+import { ALL_IN_MEASURED_EMPTY, ALL_IN_MEASURED_NOTE } from '@/lib/power-basis';
 import {
   applyTokenRevenuePricing,
   cachedInputPricePerMillion,
@@ -146,8 +146,6 @@ const STRINGS = {
       'No benchmark data matches the current model, scenario, and filter selection. Adjust the filters above to see results.',
     noSystemPowerData:
       'No system-power estimates are available for this selection. Choose 8K / 1K with validated GPU telemetry, supported hardware, and known eight-GPU chassis placement. Measured GPU power remains available separately where telemetry exists.',
-    noUtilityModeledData:
-      'No values are available for All in Measured in this selection. This boundary needs 8K / 1K, validated GPU telemetry, and hardware covered by the chassis power model (not NVL72 systems). Choose another boundary to keep the points.',
     // Boundary disclosures for the derived power axes (lib/power-basis.ts).
     // Formulas in words; constants named so a screenshot records its method.
     powerBasisAssumptions: {
@@ -183,8 +181,6 @@ const STRINGS = {
     noChartData: '当前模型、场景与筛选条件下没有匹配的基准测试数据。请调整上方筛选条件查看结果。',
     noSystemPowerData:
       '当前选择没有可用的系统功耗估算。请选择 8K / 1K 场景；估算仅覆盖 GPU 遥测已验证、硬件受支持、八卡机箱位置已知的运行。存在遥测数据时，仍可单独查看 GPU 实测功耗。',
-    noUtilityModeledData:
-      '当前选择没有可用的整体实测功耗数值。该边界需要 8K / 1K 场景、已验证的 GPU 遥测，且硬件在机箱功耗模型覆盖范围内（不含 NVL72 系统）。可切换到其他功耗边界以保留数据点。',
     powerBasisAssumptions: {
       'gpu-provisioned':
         'GPU 额定功耗（TDP）· 功率取硬件注册表中每 GPU 的额定 TDP，因此每种硬件的功率曲线为水平线。每输出 token 能耗 = TDP × 分配的 GPU 数 ÷ 整个部署的输出 tok/s；分离式配置将 prefill 与 decode GPU 一并计入。未公布 TDP 的硬件不绘制。',
@@ -895,7 +891,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                 {isModeledSystemPowerConfigKey(selectedYAxisMetric)
                   ? t.noSystemPowerData
                   : selectedPowerBasis === 'utility-modeled'
-                    ? t.noUtilityModeledData
+                    ? ALL_IN_MEASURED_EMPTY[locale]
                     : t.noChartData}
               </p>
             </Card>,
