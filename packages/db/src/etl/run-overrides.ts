@@ -41,6 +41,8 @@ export const CONCLUSION_OVERRIDES: ReadonlyMap<number, string> = new Map([
 ]);
 
 export const PURGED_RUNS: ReadonlySet<number> = new Set([
+  35806602041, // 2026-09-30 | Reason: MiniMax M3 GB200 TensorRT-LLM accidentally set publish_events_and_metrics: false; missing server metrics make the published P&L estimates unreliable
+  34511705667, // 2026-09-30 | Reason: MiniMax M3 GB200 TensorRT-LLM accidentally set publish_events_and_metrics: false; missing server metrics make the published P&L estimates unreliable
   20286769842, // very long ago | Reason: broken run
   20789830797, // very long ago | Reason: broken run
   21427451958, // 2026-01-28 | Reason: for initial gsm8k evals baseline data collection, performance data ignored for this run

@@ -11,6 +11,21 @@ import {
 import { selectRunOverrides } from './run-override-selection';
 
 describe('run override selection', () => {
+  it.each([35806602041, 34511705667])(
+    'selects only the whole-run purge for MiniMax M3 GB200 TensorRT-LLM run %s',
+    (runId) => {
+      expect(selectRunOverrides(['--run-id', String(runId), '--yes'])).toEqual({
+        runId,
+        conclusions: new Map(),
+        changelogs: [],
+        benchmarks: [],
+        purgedRuns: new Set([runId]),
+        purgedAttempts: new Map(),
+        purgedPoints: [],
+      });
+    },
+  );
+
   it('selects only the whole-run purge for the H200 Kimi-K3 simple-power run 34819961093', () => {
     expect(selectRunOverrides(['--run-id', '34819961093', '--yes'])).toEqual({
       runId: 34819961093,
