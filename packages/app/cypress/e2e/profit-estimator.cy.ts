@@ -405,7 +405,7 @@ describe('Profit estimator power option', { testIsolation: true }, () => {
       const measured = rows.find((row) => row.includes('measured module'));
       expect(measured).to.contain('GPU + HBM + Grace + LPDDR5X; module sensor');
       expect(measured).to.contain(',module,');
-      expect(measured).to.contain('gb200_nvl72_rack_power_model.py @ ');
+      expect(measured).to.contain('system-power-model.ts @ app-sha256:');
       expect(measured).to.contain(' sha256:');
     });
   });
