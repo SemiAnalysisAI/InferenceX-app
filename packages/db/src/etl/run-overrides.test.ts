@@ -622,6 +622,18 @@ describe('PURGED_BENCHMARK_POINTS', () => {
 });
 
 describe('isRunAttemptPurged', () => {
+  it.each([35806602041, 34511705667])(
+    'purges every attempt of MiniMax M3 GB200 TensorRT-LLM run %s with disabled server metrics',
+    (runId) => {
+      expect(PURGED_RUNS.has(runId)).toBe(true);
+      for (const attempt of [undefined, 1, 2, 99]) {
+        expect(isRunAttemptPurged(runId, attempt)).toBe(true);
+      }
+      expect(isRunAttemptPurged(runId - 1, 1)).toBe(false);
+      expect(isRunAttemptPurged(runId + 1, 1)).toBe(false);
+    },
+  );
+
   it('purges every attempt of the H200 Kimi-K3 simple-power run 34819961093 while keeping the 2026-09-13 H200 runs', () => {
     expect(PURGED_RUNS.has(34819961093)).toBe(true);
     for (const attempt of [undefined, 1, 2, 99]) {
