@@ -159,6 +159,14 @@ export default function PowerServiceComparison({
   const sources = useMemo(() => getEqualServiceSources(data, locale), [data, locale]);
   const base = baseline || sources[0]?.key || '';
   const peer = comparator || sources[1]?.key || '';
+  // Compare pins the resolved pair in state: otherwise an added overlay run or
+  // a filter change re-sorts `sources` and silently retargets the panels,
+  // while reloading the share URL would keep the original pair.
+  useEffect(() => {
+    if (!enabled) return;
+    if (!baseline && sources[0]) setBaseline(sources[0].key);
+    if (!comparator && sources[1]) setComparator(sources[1].key);
+  }, [enabled, baseline, comparator, sources]);
   const previousAxis = useRef(xField);
   useEffect(() => {
     if (previousAxis.current !== xField) {

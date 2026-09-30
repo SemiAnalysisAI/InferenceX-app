@@ -470,11 +470,14 @@ describe('Inference ChartControls grouped measured metrics', () => {
         expect(values).to.include('y_measuredPowerTimeline');
       });
       cy.get(`input[aria-label="${searchLabel}"]`).clear().type(power);
-      cy.get('[data-select-option]')
-        .should('have.length', 1)
-        .and('have.text', power)
-        .and('have.attr', 'data-value', 'y_measuredP75Power')
-        .and('have.attr', 'aria-pressed', 'true');
+      // 'All in Measured Power per Chip' also contains the family name; only
+      // the family option may display exactly that name.
+      cy.get('[data-select-option]').should(($options) => {
+        const exact = [...$options].filter((option) => option.textContent?.trim() === power);
+        expect(exact).to.have.length(1);
+        expect(exact[0].dataset.value).to.equal('y_measuredP75Power');
+        expect(exact[0].getAttribute('aria-pressed')).to.equal('true');
+      });
       cy.get('[data-testid="option-help-y_measuredP75Power"]').should('exist');
       cy.get(`input[aria-label="${searchLabel}"]`).clear().type(energy);
       cy.get('[data-select-option]')

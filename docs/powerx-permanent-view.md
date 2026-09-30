@@ -307,6 +307,9 @@ and colour overlay sources with `overlayRunColor`.
 | 15           | Least-squares fit of mean W/GPU against output tok/s per allocated GPU: points, line, dashed extension to zero, P₀, P₀ ÷ TDP, m, R², n, range | _Power vs output-rate fit_ (`i_powerfit=1`)                                                             | `utils/power-fit.ts`                                   |
 | 16           | Frontier points: the drawn cross-platform frontier and each point's run and attempt                                                           | Legend _Pareto frontier_ (`i_frontier`) on a measured metric                                            | `utils/frontier-points.ts`                             |
 
+- **Role group** follows the chart's X axis, including the trace-derived P75/P90 E2E-normalized
+  interactivity axes (their values live on `point.x`); equal-service interpolation stays limited
+  to observed service fields and reports `unsupported-axis` there.
 - **Same concurrency** pairs only observations; nothing is interpolated. A side missing at a
   load reads _Not measured_. Disagreeing duplicates of one source read as ambiguous, with none
   chosen. % change needs both sides. Same load usually means different speed, so the table

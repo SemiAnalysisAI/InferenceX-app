@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import type { InferenceData } from '../types';
+import type { AggDataEntry, InferenceData } from '../types';
 import {
   buildEqualServiceComparison,
   equalServiceSourceKey,
   getEqualServiceSources,
+  getPrefillSharePoints,
+  getRolePoints,
 } from './equal-service-comparison';
 
 const metric = (y: number) => ({ y, roof: false });
@@ -195,5 +197,41 @@ describe('equal-service comparison', () => {
       'B300 (SGLang) · 2026-09-23 · Run #7',
       'B300 (SGLang) · 2026-09-23 · Run #8',
     ]);
+  });
+
+  it('plots role panels on the trace-derived P75/P90 axes from point.x without interpolating on them', () => {
+    const role = (overrides: Partial<InferenceData>) =>
+      point({
+        disagg: true,
+        num_prefill_gpu: 4,
+        num_decode_gpu: 4,
+        power_valid: 1,
+        power_metric_schema_version: 2,
+        joules_per_input_token: 1,
+        joules_per_output_token: 8,
+        prefill_joules_per_input_token: 0.4,
+        decode_joules_per_output_token: 4.8,
+        measuredPrefillAvgPower: metric(300),
+        measuredDecodeAvgPower: metric(500),
+        ...overrides,
+      });
+    // The chart and the views API both store the derived value on `x` only.
+    const rows = [
+      role({ id: 1, x: 31.2 }),
+      role({ id: 2, x: 24.8, conc: 16 }),
+      role({ id: 3, x: 28, hwKey: 'b300_sglang', run_url: 'https://example.invalid/runs/2' }),
+    ];
+    const derived = 'p90_e2e_norm_intvty' as keyof AggDataEntry;
+    expect(getRolePoints(rows, derived).map((row) => row.x)).toEqual([24.8, 31.2, 28]);
+    expect(getPrefillSharePoints(rows, derived).map((row) => row.x)).toEqual([24.8, 31.2, 28]);
+    expect(getRolePoints(rows, 'p75_e2e_norm_intvty' as keyof AggDataEntry)).toHaveLength(3);
+    expect(
+      buildEqualServiceComparison(rows, {
+        baseline: equalServiceSourceKey(rows[0]),
+        comparator: equalServiceSourceKey(rows[2]),
+        target: 28,
+        xField: derived,
+      }).reason,
+    ).toBe('unsupported-axis');
   });
 });

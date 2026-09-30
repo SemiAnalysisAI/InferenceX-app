@@ -51,6 +51,15 @@ export interface EqualServiceComparison {
 const serviceAxis = (field: string) =>
   field === 'mean_tpot_intvty' ||
   /^(?:mean|median|p\d+(?:\.\d+)?)_(?:intvty|tpot|ttft|e2el|itl)$/u.test(field);
+/**
+ * Trace-derived agentic axes (`p75_e2e_norm_intvty`, `p90_e2e_norm_intvty`)
+ * live only on `point.x`; no row field carries that name. The role panels
+ * plot observations, so they accept them; equal-service interpolation keeps
+ * its observed-field policy and reports `unsupported-axis`.
+ */
+const derivedAxis = (field: string) => /^p\d+_e2e_norm_intvty$/u.test(field);
+const roleAxisValue = (point: InferenceData, xField: keyof AggDataEntry) =>
+  derivedAxis(xField) ? point.x : point[xField];
 /** A positive finite reading, or null: a missing value is never zero. */
 export const positiveOrNull = (value: unknown): number | null => (isPositive(value) ? value : null);
 /** Measured rows only: hidden rows and power-comparison clones are never sources. */
@@ -318,10 +327,10 @@ export function getPrefillSharePoints(
   points: readonly InferenceData[],
   xField: keyof AggDataEntry,
 ) {
-  if (!serviceAxis(xField) && xField !== 'conc') return [];
+  if (!serviceAxis(xField) && xField !== 'conc' && !derivedAxis(xField)) return [];
   return observedPoints(points)
     .flatMap((point) => {
-      const x = point[xField];
+      const x = roleAxisValue(point, xField);
       const energy = reconstructedRoleEnergy(point);
       return isPositive(x) && energy
         ? [{ x, sourceKey: equalServiceSourceKey(point), point, ...energy }]
@@ -353,10 +362,10 @@ export function getRolePoints(
   points: readonly InferenceData[],
   xField: keyof AggDataEntry,
 ): RolePoint[] {
-  if (!serviceAxis(xField) && xField !== 'conc') return [];
+  if (!serviceAxis(xField) && xField !== 'conc' && !derivedAxis(xField)) return [];
   return observedPoints(points)
     .flatMap((point): RolePoint[] => {
-      const x = point[xField];
+      const x = roleAxisValue(point, xField);
       if (!point.disagg || !isPositive(x)) return [];
       const role: RolePoint = {
         x,
