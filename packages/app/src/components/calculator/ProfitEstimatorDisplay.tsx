@@ -205,7 +205,7 @@ const STRINGS = {
     benchmarkGroup: 'Benchmark Config',
     powerLabel: 'Power Estimation',
     powerTooltip:
-      'Change only the power budget used to scale the same benchmark result to one GW. Pricing, throughput, utilization and unit costs stay the same.',
+      'All in Measured uses the best power-valid curve at the selected target. Compare both uses that same curve for both bars when available. Pricing, utilization and unit costs stay the same.',
     powerOptions: {
       provisioned: POWER_BASIS_LABELS['utility-provisioned'].en,
       modeled: POWER_BASIS_LABELS['utility-modeled'].en,
@@ -319,7 +319,7 @@ const STRINGS = {
     benchmarkGroup: '基准测试配置',
     powerLabel: '功耗估算方式',
     powerTooltip:
-      '仅更改将同一基准测试结果换算为每 GW 收益时采用的功耗预算。价格、吞吐量、利用率和单位成本保持不变。',
+      '整体实测功耗在选定目标下采用功耗有效的最优曲线。对比两种估算方式时，若实测估算可用，两根柱子采用同一条曲线。价格、利用率和单位成本保持不变。',
     powerOptions: {
       provisioned: POWER_BASIS_LABELS['utility-provisioned'].zh,
       modeled: POWER_BASIS_LABELS['utility-modeled'].zh,
@@ -983,7 +983,15 @@ function ProfitEstimatorInner({
   // from that date's run with the same target, prices, and TCO tier.
   const fullEstimate = useMemo(() => {
     if (!hasData || !pricing) return { rows: [], skipped: [] };
-    const current = getResults(targetValue, mode, interpolationCostProvider);
+    const curvePowerBasis = basis === 'gw-year' ? powerBasis : 'provisioned';
+    const current = getResults(
+      targetValue,
+      mode,
+      interpolationCostProvider,
+      undefined,
+      false,
+      curvePowerBasis,
+    );
     const results = historyActive
       ? [
           ...current.filter((r) => selectedGPUs.includes(r.hwKey)),
@@ -994,6 +1002,7 @@ function ProfitEstimatorInner({
             targetValue,
             mode,
             costProvider: interpolationCostProvider,
+            powerBasis: curvePowerBasis,
             currentRunIds: historyCurrentRunIds,
           }),
         ]
@@ -1021,6 +1030,7 @@ function ProfitEstimatorInner({
     hasData,
     pricing,
     getResults,
+    basis,
     powerBasis,
     t.powerBarLabels,
     targetValue,

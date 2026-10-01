@@ -52,9 +52,9 @@ experimental power controls with ↑↑↓↓ if they are hidden.
 the selected scope, including B200/H200 multi-node deployments. It shows measured
 GPU power even when an all-in estimate is unavailable; the estimate displays
 `—` with a reason and stays blank in CSV. The graph plots numeric estimates only.
-The Profit Estimator adds target-range and financial requirements and uses only
-official frontier points. Inference charts and tables also support unofficial-run
-overlays.
+The Profit Estimator adds target-range and financial requirements. All in
+Measured builds its performance frontier from power-valid measurements in the
+selected scope. Inference charts and tables also support unofficial-run overlays.
 
 ## Hardware and telemetry requirements
 
@@ -148,11 +148,14 @@ total, not the fixture's rounded per-GPU display value.
   above the 264 kW installed shelf capacity is outside the model domain.
 - **Planning reserve:** facility kW/GPU × 1.10 is a separate capacity buffer.
   Average power plus this reserve is not a validated electrical peak limit.
-- **Matched comparison:** profit modes keep the same original performance
-  frontier, target, token prices, utilization, license share and per-GPU-hour
-  costs. Between frontier points, planning power is interpolated only between
-  those original points, with compatible model revision, PUE, topology and sensor
-  basis. No extrapolation or replacement by another power-valid point occurs.
+- **Measured curves:** All in Measured selects power-valid points before building
+  the performance frontier. Throughput and power use that curve at the requested
+  target; the curve uses a compatible model, PUE, topology and sensor basis.
+  No target extrapolation or borrowing from unselected history occurs.
+- **Matched comparison:** Compare both uses the same power-valid curve, target
+  and financial inputs for its paired bars. If no measured estimate is available,
+  the ordinary provisioned result remains. All in Provisioned keeps the ordinary
+  performance frontier.
 
 Lower planning power increases GPU capacity per GW. Revenue, compute cost and
 license fees scale with that capacity under the fixed per-GPU assumptions; profit
@@ -170,7 +173,7 @@ Chart/table rows and target-based profit estimates answer different questions.
 | B200/H200 multi-node system estimate is unavailable (`topology`, `role-power`, `gpu-count`) | Inspect physical GPU count, host placement and total/role watts. Use the original producer topology; do not infer chassis placement from a display label or sum TP/EP aliases.             |
 | NVL72 reports `cpu-telemetry` / `no-cpu-power`                                              | Inspect the same-window CPU audit, sensor kind and complete socket coverage. GPU validity remains independent.                                                                             |
 | `telemetry` / `no-measured-power`                                                           | Check the original validation audit and raw samples. Reprocess only when the retained evidence supports the original window; otherwise collect replacement performance and power together. |
-| `outside-measured-range` or power-invalid target bracket                                    | Choose a target supported by the selected serving curve. Both original bounding points need valid power; another valid point elsewhere on the curve cannot fill the gap.                   |
+| `outside-measured-range` or power-invalid target bracket                                    | Choose a target within the selected power-valid curve. Both bounding points need compatible valid power; points outside the selected scope cannot fill the gap.                            |
 | `incompatible-power-basis`                                                                  | Do not interpolate between module and GPU-plus-Grace readings, or different model/PUE bases.                                                                                               |
 | No cost, token mix or provisioned power                                                     | Inspect the financial inputs. This can prevent both profit estimates even when power is valid.                                                                                             |
 | `workload`, `hardware`, `model-domain`                                                      | Use a supported workload/profile and in-domain input; do not replace the missing estimate with zero or TDP.                                                                                |

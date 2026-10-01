@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { AvailabilityRow, BenchmarkRow, RunConfigRow } from '@/lib/api';
 import { Percentile } from '@/lib/data-mappings';
+import { modeledPowerAtTarget } from './profit-power';
 
 import {
   buildProfitHistoryResults,
@@ -174,6 +175,51 @@ describe('buildProfitHistoryResults', () => {
     mode: 'interactivity_to_throughput' as const,
     costProvider: 'costh' as const,
   };
+
+  it('selects valid knots within each historical run without borrowing from older runs', () => {
+    const row = (x: number, throughput: number, valid: boolean, run = 200) => {
+      const point = agenticRow('2026-06-14', 'b200', x, throughput, {
+        workflow_run_id: run,
+        run_started_at: `2026-06-14T${run === 200 ? '12' : '06'}:00:00Z`,
+      });
+      return {
+        ...point,
+        metrics: {
+          ...point.metrics,
+          power_valid: Number(valid),
+          power_metric_schema_version: 2,
+          avg_power_w: 500,
+          avg_total_gpu_power_w: 4000,
+        },
+      };
+    };
+    const rows = [row(20, 8000, true), row(40, 9000, false), row(80, 3000, true)];
+    const selected = buildProfitHistoryResults([{ date: '2026-06-14', rows }], {
+      ...options,
+      powerBasis: 'modeled',
+    });
+    expect(selected).toHaveLength(1);
+    expect(selected[0].nearestPoints.map((p) => p.interactivity)).toEqual([20, 80]);
+    expect(modeledPowerAtTarget(selected[0], 60)).toHaveProperty('kwPerGpu');
+    const noLatestPower = buildProfitHistoryResults(
+      [
+        {
+          date: '2026-06-14',
+          rows: [
+            row(20, 8000, true, 100),
+            row(80, 3000, true, 100),
+            row(20, 8000, false),
+            row(80, 3000, false),
+          ],
+        },
+      ],
+      { ...options, powerBasis: 'compare' },
+    );
+    expect(noLatestPower[0].nearestPoints.every((p) => p.sourceRow?.workflow_run_id === 200)).toBe(
+      true,
+    );
+    expect(modeledPowerAtTarget(noLatestPower[0], 60)).toEqual({ reason: 'no-measured-power' });
+  });
 
   it('interpolates the selected chip at the target on each date and stamps the date', () => {
     const rowsByDate = [

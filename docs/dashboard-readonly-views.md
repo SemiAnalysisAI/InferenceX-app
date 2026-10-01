@@ -81,6 +81,13 @@ Missing system estimates use `y: null`, `status: "unavailable"`, and
 with blank missing values. Numeric `series` and `count` are unchanged. Each date
 comparison and unofficial overlay has its own `tableRows`; latest does not pool history.
 
+For GW-year profit, `modeled` selects valid system-power points before building the
+curve at the same target, without extrapolation or another snapshot. `compare` uses
+the same valid-curve throughput for both power budgets, retaining the original
+provisioned estimate when no valid curve covers the target. Provisioned-only keeps
+the original performance curve. Official, comparison and unofficial scopes remain
+independent; CPU/module telemetry and compatible sensor-basis requirements still apply.
+
 Dense profit charts reserve readable space per bar and scroll within the plot on narrow
 screens; captions and controls stay fixed. This is presentation-only: API selectors,
 calculations, source identities and CSV rows are unchanged. PNG export includes the full
@@ -256,6 +263,12 @@ those properties.
 `unavailableReason` 给出原因；`measuredGpuWatts` 保留实测 GPU 功耗。CSV 导出同一组行，缺失值留空。
 `series` 和 `count` 保持不变，仍只包含可绘制的数值点；各日期对比和非官方叠加分别返回自己的 `tableRows`，
 Latest 不会合并历史数据。
+
+按 GW 年估算利润时，modeled 先筛选满足系统功耗要求的数据点，再在原目标值上构建曲线，
+不外推，也不借用其他快照。compare 的两种功耗方案使用同一条有效曲线的吞吐量；
+没有有效曲线覆盖目标时，保留原曲线的预配估算。provisioned 单独使用时沿用原性能曲线。
+官方数据、日期对比和非官方叠加各自独立计算；CPU/模块遥测要求和传感器口径兼容性要求同样不变。
+
 私有上传、密钥、提示词、反馈及管理操作不作为公开读取接口。
 OperatorX 的入口受功能开关控制，页面使用专属的 `/api/v1/operatorx/*`
 接口；目前没有发布 `/api/v1/views/operatorx` 契约。

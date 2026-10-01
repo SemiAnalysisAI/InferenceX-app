@@ -844,6 +844,14 @@ export interface ApiContractSourceDigest {
  */
 export const apiContractSourceDigests = [
   {
+    source: 'src/components/calculator/profit-power.ts',
+    sourceSha256: 'ff92b0a954afb78769ab8a29ca6ca7bdc52f83bb49379e2f2f274ef4c179330a',
+    reviewArea: {
+      en: 'Power-valid curve selection at fixed targets, compatible power bases, paired throughput and provisioned fallback shared by Profit UI and API.',
+      zh: '利润界面与 API 共用的有效功耗曲线选择、固定目标值、功耗口径兼容性、配对吞吐量与预配估算回退。',
+    },
+  },
+  {
     source: 'src/components/inference/utils/inference-table-data.ts',
     sourceSha256: '816eb0dbc416f6c322fd3955af13fc03f8c6988704d82f36a9bfd8ec9abc9669',
     reviewArea: {
@@ -1023,7 +1031,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/calculator-extensions.ts',
-    sourceSha256: '2bcd27b5f5fbea9dcd75b32f7ee88e1c92343bed3ff65a293fc9a8ff5ecf04c3',
+    sourceSha256: '0c571acc23940e65290a5421c0872eb63f2531b289699c520209910b50dee784',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',

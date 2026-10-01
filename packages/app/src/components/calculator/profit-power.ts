@@ -11,7 +11,8 @@ import {
   type ProfitEstimatorSkipReason,
   type ProfitEstimatorSpecs,
 } from './profit-estimator';
-import type { GPUDataPoint, InterpolatedResult } from './types';
+import { interpolateForGPU } from './interpolation';
+import type { CalculatorMode, CostProvider, GPUDataPoint, InterpolatedResult } from './types';
 
 export type ProfitPowerBasis = 'provisioned' | 'modeled' | 'compare';
 
@@ -110,7 +111,37 @@ function planningPower(point: GPUDataPoint): PlanningPower {
   };
 }
 
-/** Reusing the original frontier prevents the power choice from changing throughput. */
+/** Select a compatible power-valid frontier within the caller's selected curve. */
+export function interpolateProfitForGPU(
+  points: GPUDataPoint[],
+  target: number,
+  mode: CalculatorMode,
+  costProvider: CostProvider,
+  powerBasis: ProfitPowerBasis,
+): InterpolatedResult | null {
+  const original = interpolateForGPU(points, target, mode, costProvider);
+  if (powerBasis === 'provisioned' || mode !== 'interactivity_to_throughput') return original;
+  const cohorts = new Map<string, GPUDataPoint[]>();
+  for (const point of points) {
+    const power = planningPower(point);
+    if ('reason' in power) continue;
+    const key = powerSourceKey(power.source);
+    const cohort = cohorts.get(key) ?? [];
+    cohort.push(point);
+    cohorts.set(key, cohort);
+  }
+  let best: InterpolatedResult | null = null;
+  // Source ordering makes equal-throughput selection independent of input order.
+  for (const key of [...cohorts.keys()].toSorted()) {
+    const candidate = interpolateForGPU(cohorts.get(key)!, target, mode, costProvider);
+    if (!candidate || 'reason' in modeledPowerAtTarget(candidate, target)) continue;
+    if (!best || candidate.value > best.value) best = candidate;
+  }
+  // Preserve provisioned-only fallback and the existing unavailability reason.
+  return best ?? original;
+}
+
+/** Read power from the same selected knots as throughput, without extrapolation. */
 export function modeledPowerAtTarget(result: InterpolatedResult, target: number): PlanningPower {
   if (result.clamped) return { reason: 'outside-measured-range' };
   const exact = result.nearestPoints.find((p) => Math.abs(p.interactivity - target) < 1e-9);

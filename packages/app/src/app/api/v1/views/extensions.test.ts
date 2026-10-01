@@ -390,6 +390,76 @@ describe('new dashboard projections', () => {
       expect(body.comparisons[0].data.rows[0].revenuePerGpuHour).toBeCloseTo(5.8536, 4);
     },
   );
+  it.each(['modeled', 'compare'])(
+    'uses valid power curves at the same target in official, historical and overlay %s estimates',
+    async (powerBasis) => {
+      const curve = (scale: number, date: string) =>
+        [
+          [20, 9000, 1],
+          [40, 8000, 0],
+          [60, 3000, 1],
+        ].map(([interactivity, throughput, powerValid], index) =>
+          agenticRow({
+            id: scale * 100 + index,
+            conc: 3 - index,
+            // The exact logical snapshot includes a retained endpoint from an
+            // older producer run; power selection must not split that curve.
+            date: scale === 2 && index === 0 ? '2026-09-08' : date,
+            run_url:
+              scale === 2 && index === 0
+                ? 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/122'
+                : agenticRow().run_url,
+            curve_workflow_run_id: scale * 1000,
+            curve_date: date,
+            metrics: {
+              ...agenticRow().metrics,
+              p90_itl: 1 / interactivity,
+              tput_per_gpu: throughput * scale,
+              input_tput_per_gpu: throughput * scale * 0.9,
+              output_tput_per_gpu: throughput * scale * 0.1,
+              power_valid: powerValid,
+            },
+          }),
+        );
+      mocks.benchmarks.mockImplementation((request: NextRequest) =>
+        Response.json(
+          request.nextUrl.searchParams.get('exact') === 'true'
+            ? curve(2, '2026-09-09')
+            : curve(1, '2026-09-10'),
+        ),
+      );
+      mocks.unofficial.mockImplementation(() =>
+        Response.json({ benchmarks: curve(3, '2026-09-10'), evaluations: [] }),
+      );
+      const query = `model=DeepSeek-V4-Pro&precisions=fp4&target=45&priceSource=custom&inputPrice=1&cachedInputPrice=1&outputPrice=1&powerBasis=${powerBasis}&dates=2026-09-09&unofficialrun=456`;
+      const response = await gw(req('profit-estimator-per-gigawatt', query));
+      expect(response.status).toBe(200);
+      const body = await response.json();
+      for (const [output, scale] of [
+        [body.data, 1],
+        [body.comparisons[0].data, 2],
+        [body.overlays, 3],
+      ]) {
+        expect(output.skipped).toEqual([]);
+        expect(output.rows).toHaveLength(powerBasis === 'compare' ? 2 : 1);
+        // The existing Steffen curve over valid endpoints at 20/60 yields
+        // 4766.6015625 tok/s/GPU at 45.
+        // Both power budgets use that throughput, even though the full performance
+        // frontier includes the faster, power-invalid knot at 40.
+        for (const row of output.rows)
+          expect(row.revenuePerGpuHour).toBeCloseTo(17.159765625 * scale);
+      }
+      const provisioned = await gw(
+        req(
+          'profit-estimator-per-gigawatt',
+          query.replace(`powerBasis=${powerBasis}`, 'powerBasis=provisioned'),
+        ),
+      );
+      const baseline = await provisioned.json();
+      expect(baseline.data.rows).toHaveLength(1);
+      expect(baseline.data.rows[0].revenuePerGpuHour).toBeGreaterThan(17.159765625);
+    },
+  );
   it('returns NVL72 measured basis and matching capacity for official and overlay estimates', async () => {
     const tray = agenticRow({
       hardware: 'gb200',

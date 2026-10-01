@@ -116,10 +116,14 @@ watts again. Read `powerSource` for topology, measured basis, sensor, PUE, model
 content revision, app TypeScript source path and source hash. Equations and parameters
 are maintained in InferenceX-app; the revision is a content digest, not a private-repository
 Git commit. Model-only updates recalculate retained valid measurements after deployment;
-they do not require telemetry backfill. `compare` preserves provisioned rows when a measured
-estimate is unavailable; `skipped.reason` distinguishes `no-cpu-power` from
-`incompatible-power-basis`. Modeled-only estimates never substitute provisioned
-watts, and neither mode selects a different serving frontier to fill missing power.
+they do not require telemetry backfill. For GW-year estimates, `modeled` first selects
+points with valid system-power inputs, then builds the curve at the requested target.
+It does not extrapolate or substitute historical snapshots. `compare` uses the same
+valid-curve throughput for both budgets; if no valid curve covers the target, it keeps
+the original provisioned estimate. `provisioned` alone retains the original performance
+curve. Official, comparison and unofficial scopes are evaluated independently.
+`skipped.reason` distinguishes missing CPU power and incompatible sensor bases;
+modeled estimates never substitute provisioned watts.
 
 Prefer equal-service comparisons for article-facing hardware analysis. Use
 `xstat=mean` only for fixed-sequence service axes when that statistic is intended:
