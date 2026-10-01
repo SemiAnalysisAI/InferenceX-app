@@ -243,7 +243,9 @@ describe('Modeled power source links', () => {
               )
               .and('have.attr', 'target', '_blank')
               .and('have.attr', 'rel', 'noopener noreferrer')
-              .then(($link) => $link[0].scrollIntoView({ block: 'center' }))
+              .then(($link) => {
+                $link[0].scrollIntoView({ block: 'center' });
+              })
               .should('be.visible')
               .then(($link) => {
                 const bounds = $link[0].getBoundingClientRect();

@@ -212,7 +212,7 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
     cy.get('#chart-0 [data-testid="offload-halo-key"]').should('not.exist');
   });
 
-  it('shows the selected percentile in the Interactivity axis label', () => {
+  it('shows the fixed p90 percentile in the Interactivity axis label', () => {
     // Explicitly select the mode — do not rely on the agentic default mode.
     selectXAxisMode('interactivity', 'Interactivity');
     // Agentic plots percentile fields (p90_intvty), so the axis label carries it.
@@ -274,22 +274,6 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
       'contain.text',
       'P90 E2E Normalized Interactivity (tok/s/user)',
     );
-
-    cy.get('[data-testid="percentile-selector"]').click();
-    cy.contains('[role="option"]', 'p75').click();
-    cy.get('[data-testid="chart-figure"] h2').should(
-      'contain.text',
-      'P75 E2E Normalized Interactivity',
-    );
-
-    // The percentile selector is shared page state for the whole suite —
-    // restore the p90 default so later tests assert against a known value.
-    cy.get('[data-testid="percentile-selector"]').click();
-    cy.contains('[role="option"]', 'p90').click();
-    cy.get('[data-testid="chart-figure"] h2').should(
-      'contain.text',
-      'P90 E2E Normalized Interactivity',
-    );
   });
 
   it('does not change the chart while browsing options, and Escape cancels', () => {
@@ -312,15 +296,12 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
     );
   });
 
-  it('follows the percentile selector in the Interactivity axis label', () => {
-    // Select p75 here rather than inheriting it from another test — the axis
-    // label must track the selector on its own.
+  it('keeps the agentic Latency Percentile control removed and labels the fixed p90 basis', () => {
     selectXAxisMode('interactivity', 'Interactivity');
-    cy.get('[data-testid="percentile-selector"]').click();
-    cy.contains('[role="option"]', 'p75').click();
+    cy.get('[data-testid="percentile-selector"]').should('not.exist');
     cy.get('[data-testid="chart-figure"] svg').should(
       'contain.text',
-      'P75 Interactivity (tok/s/user)',
+      'P90 Interactivity (tok/s/user)',
     );
   });
 });
@@ -352,15 +333,15 @@ describe('X-axis mode URL param', () => {
     cy.get('[data-testid="chart-figure"] h2').should('contain.text', 'Time To First Token');
   });
 
-  // AgentX publishes on P90, so the percentile control is insider-only. With
-  // the gate locked it must not render, and the chart must still plot P90.
-  it('hides the percentile selector behind the feature gate and defaults to P90', () => {
+  // Agentic inference charts fix the x-axis latency basis at P90. The old
+  // Latency Percentile dropdown is gone even when the feature gate is unlocked.
+  it('never shows the latency percentile selector and labels the fixed P90 basis', () => {
     interceptAgenticData();
     interceptDerivedAgenticMetrics();
     cy.visit('/inference?i_seq=agentic-traces', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-        win.localStorage.removeItem('inferencex-feature-gate');
+        unlockAgenticGate(win);
       },
     });
 

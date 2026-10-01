@@ -290,30 +290,24 @@ config is `display: 'timeline'`.
   `inference_power_trace_opened { hwKey, conc, overlay }` (scatter tooltip action),
   `inference_power_timeline_focus_cleared`.
 
-## Analysis panels (article figures 6–16)
+## Analysis panels
 
-Figure numbers here follow the current article draft; the share-link table above predates its
-renumbering. Below the measured chart, `ui/PowerServiceComparison.tsx` offers three opt-in
-panels, and the scatter chart adds a fourth. All read the chart's scoped observed points
+Below the measured chart, `ui/PowerAnalysisPanels.tsx` offers the opt-in role and power-fit panels, and the scatter chart
+offers the frontier-points table. They read the chart's scoped observed points
 (`observedPoints`: official and `?unofficialrun=` rows, comparison clones excluded), keep one
 source per curve snapshot and recipe (`equalServiceSourceKey`: a stitched append-only curve is
 one source keyed by `curve_workflow_run_id`; rows without a snapshot id key by their own run),
 and colour overlay sources with `overlayRunColor`.
 
-| Figures      | Panel                                                                                                                                         | Switch (share param)                                                                                    | Helper                                                 |
-| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
-| 6 / 7 / 9    | Same-concurrency table: baseline and comparator J/output token, W/GPU and streaming speed, with % change                                      | _Compare at the same speed / latency_ (`i_servicecompare=1`, sources `i_servicebase` / `i_servicepeer`) | `utils/matched-concurrency.ts`                         |
-| 12 / 13 / 14 | Role group: W/GPU by role, role-local J/input and J/output (not added), J/output token by role with the total, prefill share                  | _Prefill / decode roles_ (`i_roleshare=1`)                                                              | `getRolePoints` in `utils/equal-service-comparison.ts` |
-| 15           | Least-squares fit of mean W/GPU against output tok/s per allocated GPU: points, line, dashed extension to zero, P₀, P₀ ÷ TDP, m, R², n, range | _Power vs output-rate fit_ (`i_powerfit=1`)                                                             | `utils/power-fit.ts`                                   |
-| 16           | Frontier points: the drawn cross-platform frontier and each point's run and attempt                                                           | Legend _Pareto frontier_ (`i_frontier`) on a measured metric                                            | `utils/frontier-points.ts`                             |
+| Figures      | Panel                                                                                                                                         | Switch (share param)                                         | Helper                                                 |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------ |
+| 12 / 13 / 14 | Role group: W/GPU by role, role-local J/input and J/output (not added), J/output token by role with the total, prefill share                  | _Prefill / decode roles_ (`i_roleshare=1`)                   | `getRolePoints` in `utils/equal-service-comparison.ts` |
+| 15           | Least-squares fit of mean W/GPU against output tok/s per allocated GPU: points, line, dashed extension to zero, P₀, P₀ ÷ TDP, m, R², n, range | _Power vs output-rate fit_ (`i_powerfit=1`)                  | `utils/power-fit.ts`                                   |
+| 16           | Frontier points: the drawn cross-platform frontier and each point's run and attempt                                                           | Legend _Pareto frontier_ (`i_frontier`) on a measured metric | `utils/frontier-points.ts`                             |
 
 - **Role group** follows the chart's X axis, including the trace-derived P75/P90 E2E-normalized
   interactivity axes (their values live on `point.x`); equal-service interpolation stays limited
   to observed service fields and reports `unsupported-axis` there.
-- **Same concurrency** pairs only observations; nothing is interpolated. A side missing at a
-  load reads _Not measured_. Disagreeing duplicates of one source read as ambiguous, with none
-  chosen. % change needs both sides. Same load usually means different speed, so the table
-  sits beside the equal-service comparison, not in place of it.
 - **Roles** use validated disaggregated rows. Each panel names its denominator. Missing role
   telemetry is omitted, never drawn as zero, and share points stay unconnected.
 - **Fit** needs three distinct output rates per source. Output is whole-deployment tok/s over
@@ -324,16 +318,23 @@ and colour overlay sources with `overlayRunColor`.
 - **Source labels** (`getEqualServiceSources`) read hardware and snapshot date, adding
   precision, topology, snapshot run, attempt, recipe, image or point only where two sources
   would otherwise look the same. The opaque key stays the exact identity.
-- Plots export PNG and CSV; the frontier table exports CSV only. Panel subtitles and the
-  baseline → comparator pair are export-only, so a PNG names its workload and sources while
-  the screen shows only the source selects. The views API returns
-  `matchedConcurrency`, `rolePoints` and `powerFits`
+- Role and fit plots export PNG and CSV; the frontier table exports CSV only. Export subtitles
+  name the workload and sources. The views API returns `rolePoints` and `powerFits`
   ([Dashboard read-only views](./dashboard-readonly-views.md#fixed-sequence-service-comparisons));
   it has no global-frontier parameter.
-- Analytics: `inference_equal_service_toggled`, `inference_power_roles_toggled` and
-  `inference_power_fit_toggled` (`{ enabled }`), `inference_equal_service_source_changed
-{ role }`, and chart-button events under `matched_concurrency`, `power_roles`, `power_fit`
-  and `frontier_points`.
+- Analytics: `inference_power_roles_toggled` and `inference_power_fit_toggled` (`{ enabled }`),
+  and chart-button events under `power_roles`, `power_fit` and `frontier_points`.
+
+Equal-service comparisons and the matched-concurrency diagnostic remain available through the
+read-only inference API with `serviceCompare`, `serviceBaseline`, `serviceComparator` and
+`serviceTarget`. They have no dashboard control, panel, table or share parameter. The API retains
+source identity, bounded interpolation, missing-data reasons and same-load pairing semantics;
+see [Dashboard read-only views](./dashboard-readonly-views.md#fixed-sequence-service-comparisons).
+
+同等服务条件下的对比和相同并发下的诊断继续通过只读 inference API 提供，查询参数为
+`serviceCompare`、`serviceBaseline`、`serviceComparator` 和 `serviceTarget`。仪表板不提供
+对应的控件、面板、表格或分享参数；角色分析、功耗拟合和前沿点表继续保留。API 的来源标识、
+有界插值、缺失原因和同并发配对规则保持不变，详见[仪表板只读视图](./dashboard-readonly-views.md#fixed-sequence-service-comparisons)。
 
 ## Tests
 
@@ -356,6 +357,6 @@ and colour overlay sources with `overlayRunColor`.
 - `utils/matched-concurrency.test.ts`, `utils/power-fit.test.ts`, `utils/powerTimeline.test.ts`
   — signed same-concurrency deltas, the least-squares fit and R², disaggregated fits on output
   per allocated GPU, and the peak pool power inside the validated window.
-- `cypress/component/power-service-comparison.cy.tsx`, `frontier-points-panel.cy.tsx`,
+- `cypress/component/power-analysis-panels.cy.tsx`, `frontier-points-panel.cy.tsx`,
   `power-timeline.cy.tsx` and `cypress/e2e/powerx-compare.cy.ts` — the article panels on
   `?unofficialrun=` overlay rows.

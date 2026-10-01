@@ -46,13 +46,12 @@ import {
   makeRunComparisonEntry,
 } from '@/components/inference/utils/comparisonEntry';
 import { dataRunsForDate } from '@/components/inference/utils/runEnumeration';
-import { resolveServiceField } from '@/components/inference/utils/resolveXAxisField';
 import { matchesQuickFilters } from '@/components/inference/utils/quickFilters';
 import { bestSeriesPerSku } from '@/components/inference/utils/best-series-per-sku';
 import InferenceTable from '@/components/inference/ui/InferenceTable';
 import ScatterGraph from '@/components/inference/ui/ScatterGraph';
 import PowerTimeline from '@/components/inference/ui/PowerTimeline';
-import PowerServiceComparison from '@/components/inference/ui/PowerServiceComparison';
+import PowerAnalysisPanels from '@/components/inference/ui/PowerAnalysisPanels';
 import { Card } from '@/components/ui/card';
 import { ChartButtons } from '@/components/ui/chart-buttons';
 import { ShareButton } from '@/components/ui/share-button';
@@ -754,12 +753,6 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
   }, [effectiveGraphs, selectedXAxisMode]);
 
   const isAgenticSequence = sequenceKind(selectedSequence) === 'agentic';
-  // Streaming speed at the selected statistic, read by the load-matched PowerX rows.
-  const serviceInteractivityField = resolveServiceField('median_intvty', {
-    isAgentic: isAgenticSequence,
-    percentile: selectedPercentile,
-    fixedSequenceStatistic,
-  });
   const residentPointIds = useMemo(() => {
     if (!isAgenticSequence) return [] as number[];
     const ids = new Set<number>();
@@ -1356,14 +1349,13 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                           ? visibleDateComparisonRows(graph.data, overlay)
                           : visibleComparisonRows(graph.data, overlay);
                         return (
-                          <PowerServiceComparison
+                          <PowerAnalysisPanels
                             chartId={`chart-${graphIndex}`}
                             contextLabel={`${getModelLabel(selectedModel)} · ${getSequenceLabel(selectedSequence)}`}
                             data={[...officialRows, ...overlayRows]}
                             overlayData={overlayRows}
                             xField={graph.chartDefinition.x_scale_field as keyof AggDataEntry}
                             xLabel={resolvedXLabel}
-                            interactivityField={serviceInteractivityField}
                           />
                         );
                       })()}
