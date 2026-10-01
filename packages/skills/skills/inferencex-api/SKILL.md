@@ -52,6 +52,14 @@ a matching label is insufficient. Missing values remain missing, never zero.
 
 ## Deliver the requested result
 
+The inference view defaults to `best=true`, including Qwen3.5 on 8K/1K and
+Agentic. It ranks candidate frameworks per SKU with the dashboard's existing
+shared-range scoring for the selected axes; this is not a universal engine ranking.
+Use `best=false` to retrieve both vLLM and SGLang series on the same SKU.
+The dashboard requires an explicit no-drama acknowledgement before displaying
+both in guarded official views. That acknowledgement is local UI state, not an
+API parameter, authorization check, or a value carried by shared URLs.
+
 Use the formal result and its metadata for values already computed by the CLI.
 Calculate only the additional quantities needed for the user's question. Preserve
 the user's selectors and acceptance criteria throughout classification and costing.

@@ -209,6 +209,67 @@ describe('GPU comparison agentic point detail', () => {
   const CONFLICTING_GPU_URL =
     '/inference?g_model=DeepSeek-V4-Pro&i_seq=agentic-traces&i_prec=fp4&i_gpus=b200_sglang,b200_vllm&i_dates=2026-06-12&i_dstart=2026-06-12&i_dend=2026-06-12';
 
+  it('defaults to the scored winner and requires consent before showing both engines', () => {
+    cy.intercept('GET', '/api/v1/availability', { body: agenticAvailability });
+    cy.intercept('GET', '/api/v1/benchmarks*', { body: agenticBenchmarks });
+    interceptDerivedAgenticMetrics();
+    cy.visit('/inference?g_model=DeepSeek-V4-Pro&i_seq=agentic-traces&i_prec=fp4', {
+      onBeforeLoad(win) {
+        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+        win.localStorage.removeItem('inferencex-feature-gate');
+      },
+    });
+    // Equal curves tie by key: SGLang wins, not the old vLLM guard default.
+    const checked = '[data-testid="chart-legend"] ul input[type="checkbox"]:checked';
+    cy.get(checked).should(($inputs) => {
+      const ids = [...$inputs].map((input) => input.id).join(',');
+      expect(ids).to.contain('b200_sglang');
+      expect(ids).not.to.contain('b200_vllm');
+    });
+    cy.get('[data-testid="scatter-quick-filters"]').click();
+    cy.get('[data-testid="quick-filter-best-per-sku"]')
+      .should('have.attr', 'data-state', 'checked')
+      .click();
+    cy.get('[data-testid="engine-comparison-confirmation"]').should('be.visible');
+    cy.get('[data-testid="engine-comparison-confirmation"]').contains('button', 'Cancel').click();
+    cy.get('[data-testid="quick-filter-best-per-sku"]')
+      .should('have.attr', 'data-state', 'checked')
+      .click();
+    cy.get('[data-testid="engine-comparison-confirmation"]')
+      .contains('button', 'I agree, show both')
+      .click();
+    cy.get('[data-testid="quick-filter-best-per-sku"]').should(
+      'have.attr',
+      'data-state',
+      'unchecked',
+    );
+    cy.contains('button', 'Done').click();
+    cy.get(checked).should(($inputs) => {
+      const ids = [...$inputs].map((input) => input.id).join(',');
+      expect(ids).to.contain('b200_sglang');
+      expect(ids).to.contain('b200_vllm');
+    });
+    // A shared/reloaded URL is not consent for another reader.
+    cy.reload();
+    cy.get(checked).should(($inputs) => {
+      const ids = [...$inputs].map((input) => input.id).join(',');
+      expect(ids.includes('b200_sglang') && ids.includes('b200_vllm')).to.equal(false);
+    });
+    cy.get('[data-testid="chart-legend"] input[id^="checkbox-b200_"]:not(:checked)')
+      .first()
+      .invoke('attr', 'id')
+      .then((id) => cy.get(`[data-testid="chart-legend"] label[for="${id}"]`).click());
+    cy.get('[data-testid="engine-comparison-confirmation"]')
+      .contains('button', 'I agree, show both')
+      .click();
+    cy.get(checked).should(($inputs) => {
+      const ids = [...$inputs].map((input) => input.id).join(',');
+      expect(ids).to.contain('b200_sglang');
+      expect(ids).to.contain('b200_vllm');
+      expect(ids).to.contain('b300_vllm');
+    });
+  });
+
   it('surfaces automatic resolution of conflicting GPU URL state', () => {
     cy.intercept('GET', '/api/v1/availability', { body: agenticAvailability }).as(
       'agenticAvailability',
@@ -222,6 +283,7 @@ describe('GPU comparison agentic point detail', () => {
     cy.visit(CONFLICTING_GPU_URL, {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+        win.localStorage.setItem('inferencex-filter-hint-nudge-dismissed', 'true');
         win.localStorage.removeItem('inferencex-feature-gate');
       },
     });
@@ -236,6 +298,13 @@ describe('GPU comparison agentic point detail', () => {
       .should('contain.text', 'vLLM')
       .and('not.contain.text', 'SGLang');
     cy.contains('button', 'Jun 12, 2026').should('be.visible');
+    cy.contains('button', 'Review comparison warning').click();
+    cy.get('[data-testid="engine-comparison-confirmation"]')
+      .contains('button', 'I agree, show both')
+      .click();
+    cy.get('[data-testid="gpu-multiselect"] [data-slot="select-trigger"]')
+      .should('contain.text', 'vLLM')
+      .and('contain.text', 'SGLang');
   });
 
   it('lets vLLM and SGLang share the graph when the feature gate is unlocked', () => {

@@ -96,6 +96,42 @@ beforeEach(() => {
 });
 
 describe('GET /api/v1/views/inference', () => {
+  it('defaults Qwen to the cross-framework winner while best=false keeps both engines', async () => {
+    const rows = ['vllm', 'sglang'].flatMap((framework) =>
+      [16, 64].map((conc) =>
+        makeRow({
+          model: 'qwen3.5',
+          framework,
+          hardware: 'b200',
+          conc,
+          metrics: {
+            ...makeRow().metrics,
+            median_intvty: conc === 16 ? 40 : 20,
+            tput_per_gpu: (framework === 'sglang' ? 400 : 200) + conc,
+          },
+        }),
+      ),
+    );
+    mockGetLatestBenchmarks.mockResolvedValue(rows);
+    const url = '/api/v1/views/inference?model=Qwen-3.5-397B-A17B&metric=tpPerGpu';
+    const bestResponse = await GET(request(url));
+    expect(bestResponse.status).toBe(200);
+    const best = await bestResponse.json();
+    expect(best.params.best).toBe(true);
+    expect(best.series.map((series: { framework: string }) => series.framework)).toEqual([
+      'sglang',
+    ]);
+    const allResponse = await GET(request(`${url}&best=false`));
+    expect(allResponse.status).toBe(200);
+    const all = await allResponse.json();
+    expect(all.series.map((series: { framework: string }) => series.framework).sort()).toEqual([
+      'sglang',
+      'vllm',
+    ]);
+    expect(
+      all.series.find((series: { framework: string }) => series.framework === 'sglang'),
+    ).toEqual(best.series[0]);
+  });
   it('returns chart-ready series with resolved params for the default selection', async () => {
     const res = await GET(
       request('/api/v1/views/inference?model=DeepSeek-R1-0528&metric=tpPerGpu'),

@@ -108,9 +108,10 @@ const TITLES = {
 interface Props {
   detail: EngineComparisonConflictDetail | null;
   onDismiss?: () => void;
+  onCompare?: () => void;
 }
 
-export function EngineComparisonConflictToast({ detail, onDismiss }: Props) {
+export function EngineComparisonConflictToast({ detail, onDismiss, onCompare }: Props) {
   const locale = useLocale();
   const [seq, setSeq] = useState(0);
 
@@ -134,9 +135,23 @@ export function EngineComparisonConflictToast({ detail, onDismiss }: Props) {
       key={seq}
       testId="engine-comparison-conflict-toast"
       icon={<AlertTriangle className="text-amber-500" />}
-      title={TITLES[locale]}
+      title={
+        onCompare
+          ? locale === 'zh'
+            ? '同时显示前需确认'
+            : 'Confirm before showing both engines'
+          : TITLES[locale]
+      }
       description={describeEngineComparisonConflict(detail, locale)}
       onDismiss={onDismiss}
+      action={
+        onCompare
+          ? {
+              label: locale === 'zh' ? '查看对比提示' : 'Review comparison warning',
+              onClick: onCompare,
+            }
+          : undefined
+      }
     />
   );
 }

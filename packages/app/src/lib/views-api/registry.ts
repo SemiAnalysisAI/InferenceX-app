@@ -242,7 +242,11 @@ export type ReadonlyView = keyof typeof VIEW_QUERY_PARAMS;
 
 /** Every dashboard route, including hidden/public routes, has an explicit disposition. */
 export const DASHBOARD_API_COVERAGE = {
-  inference: { view: 'inference' },
+  inference: {
+    view: 'inference',
+    exclusion:
+      'The same-SKU vLLM/SGLang confirmation dialog is a local presentation acknowledgement, not an API access restriction. best=true ranks across frameworks; best=false returns both without interactive consent state.',
+  },
   'profit-estimator-per-gigawatt': { view: 'profit-estimator-per-gigawatt' },
   'profit-estimator': { view: 'profit-estimator' },
   evaluation: { view: 'evaluation' },
