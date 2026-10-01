@@ -1,29 +1,51 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useId, useMemo, useState } from 'react';
 
-import type { AggDataEntry, ChartDefinition, InferenceData } from '@/components/inference/types';
+import type { ChartDefinition, InferenceData } from '@/components/inference/types';
 import { type DataTableColumn, DataTable } from '@/components/ui/data-table';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { track } from '@/lib/analytics';
 import { chipCounts } from '@/lib/chip-counts';
 import { getNestedYValue, metricLabel, xAxisLabel } from '@/lib/chart-utils';
 import { isModeledSystemPowerConfigKey } from '@/components/inference/metric-registry';
 import { inferPowerCompare, powerSeriesLabel } from '@/components/inference/utils/power-compare';
 import { sortRowsByYMetric } from '@/components/inference/ui/inference-table-sort';
+import { getEqualServiceSources } from '@/components/inference/utils/equal-service-comparison';
+import {
+  powerBaselineDeltas,
+  powerBaselineMetric,
+} from '@/components/inference/utils/power-baseline';
 import { type Precision, getPrecisionLabel } from '@/lib/data-mappings';
 import { getDisplayLabel } from '@/lib/utils';
 import { getInferenceHardwareConfig } from '@/lib/inference-labels';
 import type { Locale } from '@/lib/i18n';
 import { useLocale } from '@/lib/use-locale';
-import { SegmentedToggle } from '@/components/ui/segmented-toggle';
-import { track } from '@/lib/analytics';
-import PowerComparisonTable from './PowerComparisonTable';
 
 interface InferenceTableProps {
   data: InferenceData[];
   chartDefinition: ChartDefinition;
   selectedYAxisMetric: string;
-  interactivityField?: keyof AggDataEntry;
 }
+
+const STRINGS = {
+  en: {
+    baseline: 'Baseline',
+    baselineNote: 'Δ at the same concurrency, relative to the baseline.',
+    baselineRow: 'baseline',
+  },
+  zh: {
+    baseline: '基准配置',
+    baselineNote: '差值按相同并发数计算，相对基准配置。',
+    baselineRow: '基准',
+  },
+};
 
 /** Format a number for table display — picks sensible precision and groups thousands. */
 export function formatInferenceTableNumber(value: number, decimals?: number): string {
@@ -35,6 +57,12 @@ export function formatInferenceTableNumber(value: number, decimals?: number): st
     maximumFractionDigits: fixedDecimals,
   }).format(value);
 }
+
+/** A difference with its sign; an exact zero reads `0`, not `0.0000`. */
+export const signedTableNumber = (value: number, decimals?: number) =>
+  value === 0
+    ? formatInferenceTableNumber(0, decimals ?? 0)
+    : `${value > 0 ? '+' : ''}${formatInferenceTableNumber(value, decimals)}`;
 
 export function inferenceTableHeaderLabels(
   chartDefinition: ChartDefinition,
@@ -51,6 +79,7 @@ export function inferenceTableHeaderLabels(
     series: locale === 'zh' ? '系列' : 'Series',
     yMetric: metricLabel(chartDefinition, selectedYAxisMetric, locale),
     xMetric: xAxisLabel(chartDefinition, locale),
+    baselineDelta: locale === 'zh' ? '相对基准差值' : 'Δ vs baseline',
     throughput: locale === 'zh' ? '单芯片吞吐量 (tok/s)' : 'Throughput/Chip (tok/s)',
   };
 }
@@ -59,13 +88,10 @@ export default function InferenceTable({
   data,
   chartDefinition,
   selectedYAxisMetric,
-  interactivityField = 'median_intvty',
 }: InferenceTableProps) {
   const locale = useLocale();
-  const [mode, setMode] = useState('measurements');
-  const canComparePower =
-    selectedYAxisMetric === 'y_measuredAvgPower' ||
-    selectedYAxisMetric === 'y_measuredJPerOutputToken';
+  const t = STRINGS[locale];
+  const baselineId = useId();
   const yPath = chartDefinition[selectedYAxisMetric as keyof ChartDefinition] as string | undefined;
   const showModeledPower = isModeledSystemPowerConfigKey(selectedYAxisMetric);
   const headers = useMemo(
@@ -80,6 +106,23 @@ export default function InferenceTable({
   // Boundary / role clones (`i_pcompare`) share every config column with their
   // base row; the series column is what tells them apart.
   const powerCompare = useMemo(() => inferPowerCompare(data), [data]);
+  // A baseline the legend has hidden falls back to the first visible source and
+  // returns with its series, so no effect needs to reset the choice.
+  const baselineMetric = powerBaselineMetric(selectedYAxisMetric);
+  const sources = useMemo(
+    () => (baselineMetric ? getEqualServiceSources(data, locale) : []),
+    [data, locale, baselineMetric],
+  );
+  const [chosenBaseline, setChosenBaseline] = useState<string | null>(null);
+  const baseline =
+    sources.find((source) => source.key === chosenBaseline)?.key ?? sources[0]?.key ?? null;
+  const deltas = useMemo(
+    () =>
+      baselineMetric && baseline !== null
+        ? powerBaselineDeltas(data, baseline, baselineMetric)
+        : null,
+    [data, baseline, baselineMetric],
+  );
 
   const columns = useMemo<DataTableColumn<InferenceData>[]>(
     () => [
@@ -165,6 +208,31 @@ export default function InferenceTable({
         className: 'tabular-nums',
         importance: 'key',
       },
+      ...(deltas
+        ? [
+            {
+              header: headers.baselineDelta,
+              align: 'right' as const,
+              cell: (row: InferenceData) => {
+                const delta = deltas.get(row);
+                if (delta?.status === 'observed') {
+                  return `${signedTableNumber(delta.value)} (${signedTableNumber(delta.percent, 1)}%)`;
+                }
+                if (delta?.status === 'baseline') {
+                  return <span className="text-muted-foreground">{t.baselineRow}</span>;
+                }
+                return '—';
+              },
+              sortValue: (row: InferenceData) => {
+                const delta = deltas.get(row);
+                if (delta?.status === 'observed') return delta.percent;
+                return delta?.status === 'baseline' ? 0 : null;
+              },
+              className: 'tabular-nums',
+              importance: 'key' as const,
+            },
+          ]
+        : []),
       {
         header: headers.xMetric,
         align: 'right',
@@ -182,45 +250,50 @@ export default function InferenceTable({
         importance: 'key',
       },
     ],
-    [yPath, headers, showModeledPower, powerCompare, selectedYAxisMetric, locale],
+    [yPath, headers, showModeledPower, powerCompare, selectedYAxisMetric, locale, deltas, t],
   );
 
   return (
     <div className="min-w-0 space-y-3">
-      {canComparePower && (
-        <SegmentedToggle
-          value={mode}
-          options={[
-            { value: 'measurements', label: locale === 'zh' ? '实测数据' : 'Measurements' },
-            {
-              value: 'comparison',
-              label: locale === 'zh' ? '功耗与能耗对比' : 'Compare power & energy',
-            },
-          ]}
-          ariaLabel={locale === 'zh' ? '表格内容' : 'Table content'}
-          role="group"
-          testId="inference-table-content"
-          onValueChange={(value) => {
-            setMode(value);
-            track('inference_table_content_changed', { mode: value });
-          }}
-        />
+      {deltas && (
+        <div
+          className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-3"
+          data-testid="inference-table-baseline"
+        >
+          <label htmlFor={baselineId} className="text-sm font-medium whitespace-nowrap">
+            {t.baseline}
+          </label>
+          <Select
+            value={baseline ?? undefined}
+            onValueChange={(value) => {
+              setChosenBaseline(value);
+              track('inference_table_baseline_changed');
+            }}
+          >
+            <SelectTrigger
+              id={baselineId}
+              data-testid="inference-table-baseline-trigger"
+              className="w-full sm:w-auto sm:max-w-md"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {sources.map((source) => (
+                <SelectItem key={source.key} value={source.key}>
+                  {source.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">{t.baselineNote}</p>
+        </div>
       )}
-      {canComparePower && mode === 'comparison' ? (
-        <PowerComparisonTable
-          data={data}
-          xField={chartDefinition.x_scale_field as keyof AggDataEntry}
-          xLabel={headers.xMetric}
-          interactivityField={interactivityField}
-        />
-      ) : (
-        <DataTable
-          data={sorted}
-          columns={columns}
-          testId="inference-results-table"
-          analyticsPrefix="inference_table"
-        />
-      )}
+      <DataTable
+        data={sorted}
+        columns={columns}
+        testId="inference-results-table"
+        analyticsPrefix="inference_table"
+      />
     </div>
   );
 }

@@ -3,8 +3,6 @@ import type { AggDataEntry, InferenceData } from '../types';
 import {
   buildEqualServiceComparison,
   equalServiceSourceKey,
-  getEqualServiceComparisonCurve,
-  getEqualServiceRange,
   getEqualServiceSources,
   getPrefillSharePoints,
   getRolePoints,
@@ -225,147 +223,7 @@ describe('equal-service comparison', () => {
     },
   );
 
-  it.each(['p75_e2e_norm_intvty', 'p90_e2e_norm_intvty'] as const)(
-    'compares the derived %s axis from point.x at observed and interpolated targets',
-    (xField) => {
-      const rows = [...a, ...b].map((entry) => ({
-        ...entry,
-        benchmark_type: 'agentic_traces',
-        x: entry.mean_intvty!,
-        mean_intvty: 999,
-      }));
-      const derivedOptions = {
-        baseline: equalServiceSourceKey(rows[0]),
-        comparator: equalServiceSourceKey(rows[2]),
-        xField: xField as keyof AggDataEntry,
-      };
-      const result = buildEqualServiceComparison(rows, { ...derivedOptions, target: 40 });
-      expect(result.reason).toBeUndefined();
-      expect(result.metrics.meanWattsPerGpu).toMatchObject({
-        baseline: { value: 600, interpolated: true },
-        comparator: { value: 900, interpolated: true },
-        changePercent: 50,
-      });
-      expect(result.metrics.joulesPerOutputToken.changePercent).toBe(-40);
-      expect(
-        result.metrics.meanWattsPerGpu.baseline?.endpoints.map(({ x, point: endpoint }) => [
-          x,
-          endpoint.id,
-        ]),
-      ).toEqual([
-        [20, 1],
-        [60, 2],
-      ]);
-      expect(getEqualServiceRange(rows, derivedOptions)).toEqual({ min: 20, max: 60 });
-      expect(
-        getEqualServiceComparisonCurve(rows, derivedOptions).map(({ target }) => target),
-      ).toEqual([20, 60]);
-
-      const exact = buildEqualServiceComparison(rows, { ...derivedOptions, target: 20 });
-      expect(exact.metrics.meanWattsPerGpu).toMatchObject({
-        baseline: { value: 400, interpolated: false },
-        comparator: { value: 800, interpolated: false },
-        changePercent: 100,
-      });
-      expect(
-        exact.metrics.meanWattsPerGpu.baseline?.endpoints.map(({ point: endpoint }) => endpoint.id),
-      ).toEqual([1]);
-      for (const target of [19, 61]) {
-        expect(
-          buildEqualServiceComparison(rows, { ...derivedOptions, target }).metrics.meanWattsPerGpu,
-        ).toMatchObject({
-          baseline: null,
-          comparator: null,
-          changePercent: null,
-          reason: 'out-of-range',
-        });
-      }
-    },
-  );
-
-  it('returns only the common service range and retains a shared exact endpoint', () => {
-    const rows = [...a, ...b.map((entry) => ({ ...entry, mean_intvty: entry.mean_intvty! + 40 }))];
-    expect(getEqualServiceRange(rows, options)).toEqual({ min: 60, max: 60 });
-    expect(getEqualServiceComparisonCurve(rows, options).map(({ target }) => target)).toEqual([60]);
-    expect(
-      buildEqualServiceComparison(rows, { ...options, target: 60 }).metrics.meanWattsPerGpu,
-    ).toMatchObject({
-      baseline: { value: 800, interpolated: false },
-      comparator: { value: 800, interpolated: false },
-      changePercent: 0,
-    });
-    const disjoint = [
-      ...a,
-      ...b.map((entry) => ({ ...entry, mean_intvty: entry.mean_intvty! + 41 })),
-    ];
-    expect(getEqualServiceRange(disjoint, options)).toBeNull();
-    expect(getEqualServiceComparisonCurve(disjoint, options)).toEqual([]);
-    expect(
-      getEqualServiceRange([...a, ...b], { ...options, comparator: options.baseline }),
-    ).toBeNull();
-    expect(
-      getEqualServiceRange([...a, ...b], { ...options, comparator: 'unknown-source' }),
-    ).toBeNull();
-  });
-
-  it('keeps missing and conflicting derived observations inside the range without skipping them', () => {
-    const rows = [...a, ...b].map((entry) => ({ ...entry, x: entry.mean_intvty! }));
-    const derivedOptions = { ...options, xField: 'p90_e2e_norm_intvty' as keyof AggDataEntry };
-    const missing = { ...rows[0], id: 5, x: 40, measuredAvgPower: undefined };
-    expect(getEqualServiceRange([...rows, missing], derivedOptions)).toEqual({ min: 20, max: 60 });
-    expect(
-      buildEqualServiceComparison([...rows, missing], { ...derivedOptions, target: 50 }).metrics
-        .meanWattsPerGpu,
-    ).toMatchObject({ baseline: null, changePercent: null, reason: 'missing-metric' });
-    const conflicting = { ...rows[0], id: 6, measuredAvgPower: metric(401) };
-    expect(
-      buildEqualServiceComparison([...rows, conflicting], { ...derivedOptions, target: 20 }).metrics
-        .meanWattsPerGpu,
-    ).toMatchObject({ baseline: null, changePercent: null, reason: 'ambiguous-x' });
-    expect(
-      buildEqualServiceComparison([...rows, conflicting], { ...derivedOptions, target: 20 }).metrics
-        .joulesPerOutputToken.changePercent,
-    ).toBeCloseTo(-20);
-  });
-
-  it('excludes invalid, hidden and cloned derived coordinates from the overlap', () => {
-    const rows = [...a, ...b].map((entry) => ({ ...entry, x: entry.mean_intvty! }));
-    const derivedOptions = { ...options, xField: 'p90_e2e_norm_intvty' as keyof AggDataEntry };
-    const extras = [
-      ...[0, -1, NaN, Infinity].map((x) => ({ ...a[0], x })),
-      { ...a[0], x: 1, hidden: true },
-      { ...b[0], x: 100, powerVariant: { kind: 'basis', id: 'gpu-provisioned' } as const },
-    ];
-    expect(getEqualServiceRange([...rows, ...extras], derivedOptions)).toEqual({
-      min: 20,
-      max: 60,
-    });
-    expect(
-      getEqualServiceComparisonCurve([...rows, ...extras], derivedOptions).map(
-        ({ target }) => target,
-      ),
-    ).toEqual([20, 60]);
-    expect(getEqualServiceRange([...extras, ...rows.slice(2)], derivedOptions)).toBeNull();
-    for (const target of [0, -1, NaN, Infinity]) {
-      expect(buildEqualServiceComparison(rows, { ...derivedOptions, target }).reason).toBe(
-        'invalid-target',
-      );
-    }
-  });
-
-  it.each(['conc', 'x', 'output_tput_per_gpu', 'p99_e2e_norm_intvty'] as const)(
-    'does not interpret %s as an available service axis',
-    (xField) => {
-      const unsupported = { ...options, xField: xField as keyof AggDataEntry };
-      expect(buildEqualServiceComparison([...a, ...b], unsupported).reason).toBe(
-        'unsupported-axis',
-      );
-      expect(getEqualServiceRange([...a, ...b], unsupported)).toBeNull();
-      expect(getEqualServiceComparisonCurve([...a, ...b], unsupported)).toEqual([]);
-    },
-  );
-
-  it('plots role panels on the trace-derived P75/P90 axes from point.x', () => {
+  it('plots role panels on the trace-derived P75/P90 axes from point.x without interpolating on them', () => {
     const role = (overrides: Partial<InferenceData>) =>
       point({
         disagg: true,
@@ -391,5 +249,13 @@ describe('equal-service comparison', () => {
     expect(getRolePoints(rows, derived).map((row) => row.x)).toEqual([24.8, 31.2, 28]);
     expect(getPrefillSharePoints(rows, derived).map((row) => row.x)).toEqual([24.8, 31.2, 28]);
     expect(getRolePoints(rows, 'p75_e2e_norm_intvty' as keyof AggDataEntry)).toHaveLength(3);
+    expect(
+      buildEqualServiceComparison(rows, {
+        baseline: equalServiceSourceKey(rows[0]),
+        comparator: equalServiceSourceKey(rows[2]),
+        target: 28,
+        xField: derived,
+      }).reason,
+    ).toBe('unsupported-axis');
   });
 });

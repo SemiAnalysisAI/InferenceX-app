@@ -42,7 +42,7 @@ which API selectors belong together.
 | View                            | Selection and calculation                                                                                                                                                                                                                                                                                                              |
 | ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `options`                       | Static registries and defaults, JSON only. Data-dependent run/config choices come from their own views.                                                                                                                                                                                                                                |
-| `inference`                     | Model, sequence, precisions, date/exact run, GPU/vendor/framework/deployment/spec/power filters; metric, xmode, xstat, xmetric, percentile, optimal/best/allPoints; Table power-comparison sources/target; roleShare and powerFit panels; TCO, custom costs/powers, pricing, unofficial runs, comparison dates/endpoints. JSON or CSV. |
+| `inference`                     | Model, sequence, precisions, date/exact run, GPU/vendor/framework/deployment/spec/power filters; metric, xmode, xstat, xmetric, percentile, optimal/best/allPoints; API-only equal-service sources/target; roleShare and powerFit panels; TCO, custom costs/powers, pricing, unofficial runs, comparison dates/endpoints. JSON or CSV. |
 | `historical`                    | Model, sequence, target, metric, precisions, GPUs/vendors/frameworks/deployment, start/end, TCO and pricing. `extendToDate` labels synthetic extension, defaults to current UTC date. JSON or CSV.                                                                                                                                     |
 | `calculator`                    | Model/sequence/run/date, precisions/GPUs, percentile, target/mode, token type, owning/renting cost, TCO, power budget, cost cap, hide-above-limit and public unofficial runs. JSON or CSV.                                                                                                                                             |
 | `first-token`                   | Benchmark selection plus 1–8 positive TTFT caps in seconds, minimum interactivity, cost provider and token type. Shared dashboard winner selection.                                                                                                                                                                                    |
@@ -103,11 +103,11 @@ TTFT/E2E use recorded means. Default is median; absent means are not replaced.
 AgentX still uses `percentile`; concurrency uses no statistic. Check resolved
 `params.xstat` and `xAxis.statistic`, not the requested parameter alone.
 
-Table → Compare power & energy selects two visible sources for mean measured GPU W/GPU or GPU
-J/output token, at the same concurrency (default) or a target speed/latency. Modeled and all-in
-metrics do not enable it. Use `serviceCompare`, `serviceBaseline`, `serviceComparator` and
-`serviceTarget` with the same filters and `allPoints=true` to match Table rows. Table mode,
-source selections and target are local state, with no share-parameter equivalents.
+Equal-service analysis is API-only: the dashboard has no target input or comparison curve. Its
+Table view does show same-concurrency differences from one baseline source (a `Δ vs baseline`
+column on measured GPU W/GPU and J/output token; table-local, no share parameter), and the API
+equivalent is `matchedConcurrency`. Use `serviceCompare`, `serviceBaseline`, `serviceComparator`
+and `serviceTarget` as API query parameters; they have no dashboard share-parameter equivalents.
 
 `serviceCompare=true` returns exact opaque `serviceSources` keys, an
 `equalServiceCurve`, and an optional `equalServiceComparison` at `serviceTarget`.
@@ -117,8 +117,7 @@ Use returned keys verbatim for `serviceBaseline` and `serviceComparator` via
 otherwise look alike); select and join by `key`, never by label. Omitted keys select the first
 two sources; unknown explicit keys stay unavailable. Omitted target means no
 selected-target result. Targets are tok/s/user for streaming speed, seconds for
-TTFT/E2E. Derived P75/P90 E2E-normalized interactivity uses projected `point.x`; follow
-`xAxis.label` for the target's meaning. Concurrency is unsupported for equal-service interpolation.
+TTFT/E2E. Concurrency is unsupported for equal-service interpolation.
 
 A source groups one logical curve snapshot and configuration. Stitched points retain
 their original producer provenance; differing telemetry producer/exporter hashes do not
@@ -130,8 +129,7 @@ pruning, with no power-comparison clones. It interpolates raw quantities
 linearly only inside each exact source range, then reports signed
 `100 × (comparator / baseline − 1)`. Metrics are measured GPU W/GPU,
 whole-deployment output tokens/s, and validated GPU J/output token. Negative energy
-change means lower comparator energy. Compute signed differences as comparator minus baseline
-from the returned values; no separate difference field is returned. Preserve bracket endpoint identities,
+change means lower comparator energy. Preserve bracket endpoint identities,
 `interpolated`, missing reasons and nulls. Never call interpolated points new
 measurements or bridge different sources, recipes, topologies or missing endpoints.
 
@@ -157,12 +155,10 @@ intercept, not idle power, and do not read the line outside its x-range.
 These analytical results require JSON; enabling any with CSV returns 400. Existing CSV remains
 a plotted-point export.
 
-表格中的“功耗与能耗对比”仅适用于 GPU 实测平均 W/GPU 或 GPU J/output token：从当前可见数据中选择两个来源，
-默认按相同并发对比，也可指定目标速度或延迟；不适用于建模功耗或整机功耗。使用 `serviceCompare`、`serviceBaseline`、
-`serviceComparator`、`serviceTarget`，配合相同筛选和 `allPoints=true` 可复现表格计算。
-模式、来源和目标值是本地表格状态，没有分享参数。P75/P90 E2E 归一化交互速度使用投影后的
-`point.x` 做有界插值，不外推；目标值含义以 `xAxis.label` 为准。差值直接用返回的对比值减基准值计算，
-响应中没有单独的差值字段；来源标识和缺失原因保留。
+同等服务对比与同并发诊断仅通过 API 提供，查询参数为 `serviceCompare`、`serviceBaseline`、
+`serviceComparator` 和 `serviceTarget`；仪表板没有对应的服务对比控件、来源选择、目标值输入、
+同并发表格或分享参数。角色分析和功耗拟合面板仍在仪表板中提供，分别对应 `roleShare` 和
+`powerFit`。来源标识、插值规则、缺失原因和仅 JSON 的响应约束以上文说明为准。
 
 For exact-load comparisons, use `xmode=concurrency`. The response resolves
 `optimal=false` and `best=false`, retains every eligible observed load, and sets

@@ -306,8 +306,8 @@ and colour overlay sources with `overlayRunColor`.
 | 16           | Frontier points: the drawn cross-platform frontier and each point's run and attempt                                                           | Legend _Pareto frontier_ (`i_frontier`) on a measured metric | `utils/frontier-points.ts`                             |
 
 - **Role group** follows the chart's X axis, including the trace-derived P75/P90 E2E-normalized
-  interactivity axes (their values live on `point.x`). Table comparisons use those same
-  projected values for bounded equal-service interpolation.
+  interactivity axes (their values live on `point.x`); equal-service interpolation stays limited
+  to observed service fields and reports `unsupported-axis` there.
 - **Roles** use validated disaggregated rows. Each panel names its denominator. Missing role
   telemetry is omitted, never drawn as zero, and share points stay unconnected.
 - **Fit** needs three distinct output rates per source. Output is whole-deployment tok/s over
@@ -325,29 +325,26 @@ and colour overlay sources with `overlayRunColor`.
 - Analytics: `inference_power_roles_toggled` and `inference_power_fit_toggled` (`{ enabled }`),
   and chart-button events under `power_roles`, `power_fit` and `frontier_points`.
 
-### Table power comparisons
-
-Table → Compare power & energy is available for mean measured GPU W/GPU and GPU J/output token.
-Select a baseline and comparator from current visible data, then use the same concurrency
-(default) or enter a target speed/latency. Values retain the GPU measurement boundary;
-modeled and all-in metrics do not enable this mode. Differences are `comparator − baseline`,
-with percentage changes relative to the baseline. Missing or ambiguous observations stay unavailable.
-Equal-service estimates use bounded interpolation, including projected P75/P90 E2E-normalized
-interactivity; they never extrapolate or bridge missing endpoints.
-
-The table's mode, source pair and target are local state, like the existing Table view.
-The read-only API covers the calculations through `serviceCompare`, `serviceBaseline`,
-`serviceComparator` and `serviceTarget`; use matching filters and `allPoints=true` for Table rows.
-No share parameter or response field is added. See
+Equal-service comparisons remain API-only (`serviceCompare`, `serviceBaseline`,
+`serviceComparator`, `serviceTarget`); the chart's Perf Ruler is the dashboard's same-speed
+comparison. Same-concurrency differences surface in the Table view. On measured GPU W/GPU and
+J/output token, a **Baseline** select (default: the first visible source) adds a `Δ vs baseline`
+column to the Measurements rows: `row − baseline` at the same concurrency, with the percentage
+relative to the baseline, in the metric column's own units. Baseline rows read "baseline"; a load
+the baseline never ran, a conflicting baseline reading, or a boundary / role clone shows `—`.
+Nothing is interpolated. The baseline is table-local state like the view mode, with no share
+parameter; analytics `inference_table_baseline_changed`. The API retains source identity, bounded
+interpolation, missing-data reasons and same-load pairing semantics (`matchedConcurrency`); see
 [Dashboard read-only views](./dashboard-readonly-views.md#fixed-sequence-service-comparisons).
 
-表格中的“功耗与能耗对比”仅在 GPU 实测平均 W/GPU 和 GPU J/output token 指标下提供。从当前可见数据中
-选择基准来源和对比来源，默认按相同并发对比，也可输入目标速度或延迟。对比值保持 GPU 测量边界；
-建模功耗和整机功耗不启用该模式。差值为对比值减基准值，变化百分比以基准值为分母；缺失或冲突的观测值保持不可用。
-同等服务对比支持 P75/P90 E2E 归一化交互速度，使用投影值做有界插值，不外推，也不跨越缺失端点。
-与现有表格视图一样，模式、来源和目标值只保存在本地表格状态中。API 仍使用 `serviceCompare`、`serviceBaseline`、
-`serviceComparator` 和 `serviceTarget`，配合相同筛选和 `allPoints=true` 即可得到与表格一致的数据行，
-不新增分享参数或响应字段。详见[仪表板只读视图](./dashboard-readonly-views.md#fixed-sequence-service-comparisons)。
+同等服务条件下的对比仍只通过只读 inference API 提供（`serviceCompare`、`serviceBaseline`、
+`serviceComparator`、`serviceTarget`），图表上的 Perf Ruler 是仪表板上相同速度下的对比工具。
+相同并发下的差异由表格视图呈现：在 GPU 实测 W/GPU 和 J/output token 指标下，“基准配置”选择框
+（默认取第一个可见配置）会在实测数据行中新增“相对基准差值”列，显示该行减去基准配置在相同并发数下
+的读数，以及相对基准的百分比，单位与指标列一致。基准配置自身的行显示“基准”；基准未测过的并发数、
+基准读数冲突或边界/角色克隆行显示 `—`，全程不做插值。基准配置与视图切换一样只是表格本地状态，
+没有分享参数；埋点事件为 `inference_table_baseline_changed`。API 的来源标识、有界插值、缺失原因和
+同并发配对规则（`matchedConcurrency`）保持不变，详见[仪表板只读视图](./dashboard-readonly-views.md#fixed-sequence-service-comparisons)。
 
 ## Tests
 

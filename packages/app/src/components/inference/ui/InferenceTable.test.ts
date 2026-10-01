@@ -5,6 +5,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import type { ChartDefinition, InferenceData } from '@/components/inference/types';
 import InferenceTable, {
   formatInferenceTableNumber,
+  signedTableNumber,
 } from '@/components/inference/ui/InferenceTable';
 import { expandPowerCompareSeries } from '../utils/power-compare';
 
@@ -173,5 +174,12 @@ describe('formatInferenceTableNumber', () => {
     expect(formatInferenceTableNumber(12.34)).toBe('12.3');
     expect(formatInferenceTableNumber(0.1234)).toBe('0.123');
     expect(formatInferenceTableNumber(0.00123)).toBe('0.0012');
+  });
+
+  it('signs baseline differences and keeps an exact zero short', () => {
+    expect(signedTableNumber(-160.8)).toBe('-161');
+    expect(signedTableNumber(0.24)).toBe('+0.240');
+    expect(signedTableNumber(0, 1)).toBe('0.0');
+    expect(signedTableNumber(0)).toBe('0');
   });
 });

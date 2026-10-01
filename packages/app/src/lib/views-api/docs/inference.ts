@@ -221,8 +221,8 @@ const parameters: readonly ApiParameter[] = [
     required: false,
     type: 'boolean',
     description: text(
-      'Include source options, equal-service percentage curves, an optional target comparison and matchedConcurrency. Covers Table power comparisons for measured GPU mean W/GPU and J/output token; use matching filters and allPoints=true for Table rows. The table source pair, mode and target are local state without share parameters. JSON only.',
-      '返回来源选项、同等服务条件下的百分比对比曲线、可选目标值对比和 matchedConcurrency，覆盖表格中 GPU 实测平均 W/GPU 与 J/output token 的功耗与能耗对比。使用相同筛选和 allPoints=true 即可得到与表格一致的数据行。表格中的来源、模式和目标值是本地状态，没有分享参数。仅支持 JSON。',
+      'API-only analysis: include source options, equal-service percentage curves, an optional target comparison and the same-concurrency diagnostic table (matchedConcurrency). Uses scoped observed points before frontier/best pruning. The dashboard Table view shows only same-concurrency differences from one baseline; equal-service targets have no dashboard control. JSON only.',
+      '仅通过 API 提供的分析：返回来源选项、同等服务条件下的百分比对比曲线、可选目标值对比，以及相同并发下的诊断表（matchedConcurrency）。使用筛选后、前沿和 best 筛选前的实测点。仪表板的表格视图只呈现相对单个基准配置的同并发差异，同等服务目标值没有对应控件。仅支持 JSON。',
     ),
     schema: { type: 'boolean', default: false },
     example: 'true',
@@ -257,8 +257,8 @@ const parameters: readonly ApiParameter[] = [
     required: false,
     type: 'number',
     description: text(
-      'Positive finite service-axis target: tok/s/user for streaming speed, seconds for TTFT/E2E. Derived P75/P90 E2E-normalized interactivity uses projected point.x and the meaning in xAxis.label. Omitted returns the curve and null target comparison. Linear interpolation stays within each exact source; no extrapolation or bridging missing endpoints. Concurrency is unsupported.',
-      '有限正数服务轴目标：streaming speed 单位为 tok/s/user，TTFT/E2E 单位为秒。派生的 P75/P90 E2E 归一化交互速度使用投影后的 point.x，目标值含义以 xAxis.label 为准。省略时返回曲线，目标值对比为 null。仅在每个来源自身的数据范围内做线性插值，不外推、不跨越缺失端点。并发轴不适用。',
+      'Positive finite service-axis target: tok/s/user for streaming speed, seconds for TTFT/E2E. Omitted returns the curve and null target comparison. Numerical linear interpolation is bounded by each exact source; no extrapolation or interpolation across missing metric endpoints. Concurrency is unsupported.',
+      '有限正数服务轴目标：streaming speed 单位为 tok/s/user，TTFT/E2E 单位为秒。省略时返回曲线，目标值对比为 null。仅在各完整来源的实测范围内做数值线性插值，不外推、不跨越缺失指标端点。并发轴不适用。',
     ),
     schema: { type: 'number', minimum: Number.MIN_VALUE },
     example: 40,

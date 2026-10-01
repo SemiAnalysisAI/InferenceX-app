@@ -853,7 +853,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/inference/utils/equal-service-comparison.ts',
-    sourceSha256: '8a46de8da9941d530525380d4be23666b8c4275c3151f373b45bc830fc1c016b',
+    sourceSha256: 'ff06f0eb908b6912706bb8dc67d931698d9cbd356546f20850ea8221fedc9354',
     reviewArea: {
       en: 'Source-scoped equal-service interpolation, comparator-relative changes, endpoint provenance, prefill share projection and role points.',
       zh: '按完整来源限定的同等服务插值、相对基准变化、端点来源、prefill 占比视图以及各角色数据点。',
