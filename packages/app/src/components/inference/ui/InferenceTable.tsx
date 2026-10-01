@@ -42,7 +42,7 @@ const STRINGS = {
   },
   zh: {
     baseline: '基准配置',
-    baselineNote: '差值按相同并发数计算，相对基准配置。',
+    baselineNote: '差值为相同并发数下相对基准配置的变化。',
     baselineRow: '基准',
   },
 };
