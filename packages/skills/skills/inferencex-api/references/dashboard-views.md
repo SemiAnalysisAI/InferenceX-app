@@ -96,6 +96,12 @@ wall power. Metric IDs and API selector values are unchanged. Profit `powerBasis
 still accepts `provisioned`, `modeled`, or `compare`; `powerLabel` is display text.
 Expanding assumptions or unavailable-estimate details does not change returned data.
 
+All in Measured watts and energy accept validated 8K/1K and AgentX rows through the
+shared chart/API transform, including historical and unofficial rows. AgentX reuses
+the chassis or rack model without independent workload calibration. Telemetry and
+topology gates still apply; NVL72 needs complete Grace or module power. The standalone
+Modeled Chassis AC metric and 8K/1K offline export retain their 8K/1K scope.
+
 NVL72 estimates require valid GPU power plus validated Grace-socket or compute-module
 power with complete socket coverage. CPU-rail-only readings do not establish the
 Grace/LPDDR boundary. A module reading already includes GPU power; do not add GPU

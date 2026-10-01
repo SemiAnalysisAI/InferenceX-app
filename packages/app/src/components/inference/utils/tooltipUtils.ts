@@ -8,6 +8,7 @@ import type { Locale } from '@/lib/i18n';
 import { isKvOffloadEnabled } from '@/lib/kv-offload';
 import { chartStateHref } from '@/lib/url-state';
 import { chipCounts } from '@/lib/chip-counts';
+import { ALL_IN_MEASURED_AGENTIC_NOTE } from '@/lib/power-basis';
 import type {
   SystemPowerSensorKind,
   SystemPowerUnsupportedReason,
@@ -15,6 +16,7 @@ import type {
 
 import type { HardwareConfig, InferenceData, OverlayData } from '@/components/inference/types';
 import {
+  isAllInMeasuredConfigKey,
   isMeasuredEnergyConfigKey,
   isModeledSystemPowerConfigKey,
 } from '@/components/inference/metric-registry';
@@ -260,6 +262,7 @@ const escapeHtml = (s: string): string =>
 const SYSTEM_POWER_STRINGS = {
   en: {
     heading: 'Draft System-Power Model · 8k1k',
+    agenticHeading: 'Draft System-Power Model · AgentX',
     measuredGpu: 'Measured GPU power',
     normalizedAc: 'Modeled chassis AC per GPU',
     deploymentAc: 'Modeled deployment chassis AC',
@@ -311,6 +314,7 @@ const SYSTEM_POWER_STRINGS = {
   },
   zh: {
     heading: '系统功耗模型（草案）· 8k1k',
+    agenticHeading: '系统功耗模型（草案）· AgentX',
     measuredGpu: 'GPU 实测功耗',
     normalizedAc: '每 GPU 分摊的机箱交流功耗估算',
     deploymentAc: '整个部署的机箱交流功耗估算',
@@ -367,7 +371,8 @@ const modeledSystemPowerHTML = (
   if (
     !estimate ||
     (!isMeasuredEnergyConfigKey(selectedYAxisMetric) &&
-      !isModeledSystemPowerConfigKey(selectedYAxisMetric))
+      !isModeledSystemPowerConfigKey(selectedYAxisMetric) &&
+      !isAllInMeasuredConfigKey(selectedYAxisMetric))
   ) {
     return '';
   }
@@ -399,7 +404,8 @@ const modeledSystemPowerHTML = (
       ]
     : [t.assumptions, t.platformAssumptions, t.normalization, t.boundary];
   return `<div data-testid="tooltip-modeled-system-power" style="margin-top: 8px; border-top: 1px solid var(--border); padding-top: 6px;">
-    <strong>${t.heading}</strong>
+    <strong>${d.benchmark_type === 'agentic_traces' ? t.agenticHeading : t.heading}</strong>
+    ${d.benchmark_type === 'agentic_traces' ? `<div>${ALL_IN_MEASURED_AGENTIC_NOTE[locale]}</div>` : ''}
     ${tooltipLine(t.measuredGpu, `${fmt(estimate.measuredGpuWattsPerGpu)} W/GPU`)}
     ${tooltipLine(t.normalizedAc, `${fmt(estimate.chassisAcWattsPerGpu)} W/GPU`)}
     ${

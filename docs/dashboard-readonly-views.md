@@ -68,6 +68,12 @@ Provisioned, and All in Measured. The last combines measured GPU power with mode
 unmeasured components and PUE; it is not a wall-meter measurement. These labels and
 collapsed power-assumption/availability notes do not change metric IDs, API selectors,
 or calculations. Profit comparison `powerLabel` display text follows the same names.
+All in Measured watts and energy accept validated 8K/1K and AgentX rows through the
+shared chart/API transform, including historical and unofficial rows. AgentX reuses
+the chassis or rack model without independent workload calibration. Telemetry and
+topology gates still apply; NVL72 needs complete Grace or module power. The standalone
+Modeled Chassis AC metric and 8K/1K offline export retain their 8K/1K scope.
+
 Dense profit charts reserve readable space per bar and scroll within the plot on narrow
 screens; captions and controls stay fixed. This is presentation-only: API selectors,
 calculations, source identities and CSV rows are unchanged. PNG export includes the full

@@ -16,7 +16,11 @@ import { metricRowLabel } from '@/components/inference/axis-metric-explanations'
 import { getMeasuredMetricConfig } from '@/components/inference/measured-metric-config';
 import { AIR_COOLED_SYSTEM_PUE, DLC_SYSTEM_PUE } from '@/lib/modeled-system-power';
 import { SYSTEM_POWER_MODEL_REVISION } from '@/lib/system-power-model';
-import { ALL_IN_MEASURED_EMPTY, ALL_IN_MEASURED_NOTE } from '@/lib/power-basis';
+import {
+  ALL_IN_MEASURED_AGENTIC_NOTE,
+  ALL_IN_MEASURED_EMPTY,
+  ALL_IN_MEASURED_NOTE,
+} from '@/lib/power-basis';
 import {
   applyTokenRevenuePricing,
   cachedInputPricePerMillion,
@@ -154,7 +158,7 @@ const STRINGS = {
         'GPU Level Provisioned (TDP) · Watts are the rated TDP per GPU from the hardware registry, so the power curve is flat per hardware. Joules per output token = TDP × allocated GPUs ÷ whole-deployment output tok/s; disaggregated configurations count prefill and decode GPUs together. Hardware without a published TDP is omitted.',
       'utility-provisioned':
         'All in Provisioned · Watts are the all-in provisioned utility power per GPU from the hardware registry (SemiAnalysis Datacenter Industry Model), so the power curve is flat per hardware. Joules per output token = all-in W × allocated GPUs ÷ whole-deployment output tok/s; disaggregated configurations count prefill and decode GPUs together, unlike the ungated All-in Provisioned J per Output Token, which divides per decode GPU.',
-      'utility-modeled': `All in Measured · Validated GPU telemetry with unmeasured components modeled. NVL72 additionally requires complete measured Grace or module power; rack overhead is modeled. Facility watts per GPU = modeled IT watts per GPU × PUE ${AIR_COOLED_SYSTEM_PUE} (air-cooled) or PUE ${DLC_SYSTEM_PUE} (NVL72), applied once. Measured GPU energy per output token scales by facility W/GPU divided by measured GPU W/GPU. Model revision ${modelRevisionLabel}. Available for 8K / 1K on supported hardware; incomplete inputs are omitted.`,
+      'utility-modeled': `All in Measured · Validated GPU telemetry with unmeasured components modeled. NVL72 additionally requires complete measured Grace or module power; rack overhead is modeled. Facility watts per GPU = modeled IT watts per GPU × PUE ${AIR_COOLED_SYSTEM_PUE} (air-cooled) or PUE ${DLC_SYSTEM_PUE} (NVL72), applied once. Measured GPU energy per output token scales by facility W/GPU divided by measured GPU W/GPU. Model revision ${modelRevisionLabel}. Available for 8K / 1K and AgentX on supported hardware; incomplete inputs are omitted.`,
     },
     vsTtft: (word: string) => `vs. ${word} Time To First Token`,
     vsE2eLatency: (pctl?: string) =>
@@ -187,7 +191,7 @@ const STRINGS = {
         'GPU 额定功耗（TDP）· 功率取硬件注册表中每 GPU 的额定 TDP，因此每种硬件的功率曲线为水平线。每输出 token 能耗 = TDP × 分配的 GPU 数 ÷ 整个部署的输出 tok/s；分离式配置将 prefill 与 decode GPU 一并计入。未公布 TDP 的硬件不绘制。',
       'utility-provisioned':
         '整体预配功耗 · 功率取硬件注册表中每 GPU 的全电源配置（all-in）市电功率（来源：SemiAnalysis Datacenter Industry Model），因此每种硬件的功率曲线为水平线。每输出 token 能耗 = all-in 功率 × 分配的 GPU 数 ÷ 整个部署的输出 tok/s；分离式配置将 prefill 与 decode GPU 一并计入，这与未加门控的“每输出 token 全电源配置能耗”按 decode GPU 计算不同。',
-      'utility-modeled': `整体实测功耗 · GPU 遥测已验证，未实测组件由模型估算。NVL72 还需完整的 Grace 或 module 实测功耗，机架开销由模型估算。每 GPU 分摊的数据中心功耗 = 每 GPU 分摊的 IT 功耗估算 × PUE ${AIR_COOLED_SYSTEM_PUE}（风冷）或 PUE ${DLC_SYSTEM_PUE}（NVL72）；PUE 只应用一次。每输出 token 的实测 GPU 能耗按“每卡数据中心功耗 ÷ 每卡实测 GPU 功耗”的比例换算。模型版本 ${modelRevisionLabel}。仅适用于受支持硬件的 8K / 1K 场景，输入不完整的数据点不绘制。`,
+      'utility-modeled': `整体实测功耗 · GPU 遥测已验证，未实测组件由模型估算。NVL72 还需完整的 Grace 或 module 实测功耗，机架开销由模型估算。每 GPU 分摊的数据中心功耗 = 每 GPU 分摊的 IT 功耗估算 × PUE ${AIR_COOLED_SYSTEM_PUE}（风冷）或 PUE ${DLC_SYSTEM_PUE}（NVL72）；PUE 只应用一次。每输出 token 的实测 GPU 能耗按“每卡数据中心功耗 ÷ 每卡实测 GPU 功耗”的比例换算。模型版本 ${modelRevisionLabel}。适用于受支持硬件的 8K / 1K 和 AgentX 场景，输入不完整的数据点不绘制。`,
     },
     vsTtft: (word: string) => `vs. ${word === 'Median' ? '中位' : word} 首 token 延迟（TTFT）`,
     vsE2eLatency: (pctl?: string) => (pctl ? `vs. ${pctl} 端到端延迟` : 'vs. 端到端延迟'),
@@ -1218,6 +1222,17 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                                 data-testid="power-compare-model-note"
                               >
                                 {ALL_IN_MEASURED_NOTE[locale]}
+                              </p>
+                            )}
+                          {isAgenticSequence &&
+                            selectedPowerBasis &&
+                            (selectedPowerBasis === 'utility-modeled' ||
+                              powerCompare === 'boundaries') && (
+                              <p
+                                className="mb-2 text-xs text-muted-foreground"
+                                data-testid="power-agentic-model-note"
+                              >
+                                {ALL_IN_MEASURED_AGENTIC_NOTE[locale]}
                               </p>
                             )}
                           {isUnofficialRun &&

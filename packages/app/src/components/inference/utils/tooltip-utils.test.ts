@@ -134,6 +134,26 @@ describe('modeled system-power tooltip', () => {
       ...overrides,
     });
 
+  it.each(['en', 'zh'] as const)(
+    'discloses the AgentX estimate in the %s All in Measured tooltip',
+    (locale) => {
+      const html = generateTooltipContent(
+        config({
+          locale,
+          selectedYAxisMetric: 'y_utilityModeledWatts',
+          data: pt({ modeledSystemPower: systemPower, benchmark_type: 'agentic_traces' }),
+        }),
+      );
+      expect(html).toContain('AgentX');
+      expect(html).toContain(
+        locale === 'en'
+          ? 'not been independently calibrated'
+          : '尚未针对 AgentX 工作负载进行独立校准',
+      );
+      expect(html).not.toContain('8k1k');
+    },
+  );
+
   it('separates measured input, normalized chassis AC, and whole-deployment facility power', () => {
     const html = generateTooltipContent(config());
     expect(html).toContain('500 W/GPU');
