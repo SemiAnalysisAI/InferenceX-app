@@ -41,26 +41,33 @@
   content: none;
 }
 
-/* September theme for the InferenceX wordmark — Childhood Cancer Awareness Month
-   ("Go Gold"). The gold awareness ribbon's palette painted onto the brand text
-   via a clipped gradient, running from deep goldenrod through bright gold and
-   back. The darker anchors keep the clipped wordmark legible on the light
-   header, the same treatment the earlier flag themes used. Fixed colors,
-   independent of the theme tokens, so it renders the same in light, dark, and
-   minecraft modes. */
-.pride-wordmark {
-  background-image: linear-gradient(
-    90deg,
-    #9a6a00 0%,
-    #d4a017 30%,
-    #ffd700 50%,
-    #d4a017 70%,
-    #9a6a00 100%
-  );
-  background-clip: text;
-  -webkit-background-clip: text;
-  color: transparent;
-  -webkit-text-fill-color: transparent;
+/* October header treatment; keep chart and export branding unchanged. */
+.halloween-wordmark {
+  color: #b54708;
+}
+
+.halloween-wordmark-x {
+  color: #7e22ce;
+}
+
+:is(.dark, .minecraft) .halloween-wordmark {
+  color: #fb923c;
+}
+
+:is(.dark, .minecraft) .halloween-wordmark-x {
+  color: #c084fc;
+}
+
+.halloween-wordmark-pumpkin {
+  font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif;
+  transform: rotate(12deg);
+}
+
+@media (forced-colors: active) {
+  .halloween-wordmark,
+  .halloween-wordmark-x {
+    color: LinkText;
+  }
 }
 
 /* Benchmark log viewer gutter. Line numbers come from a CSS counter rather than
