@@ -82,12 +82,16 @@ const availability = [
   },
 ];
 
-function interceptRows(officialRunUrl: string) {
+function interceptRows(officialRunUrl: string, clippedLatency = false) {
   const official = rows(null, 'b200').map((row, index) => ({
     ...row,
     curve_workflow_run_id: 27182818284,
     curve_date: DATE,
     run_url: index === 0 ? officialRunUrl : `${officialRunUrl}0`,
+    metrics: {
+      ...row.metrics,
+      median_ttft: clippedLatency ? [0.5, 2, 90][index] : row.metrics.median_ttft,
+    },
     power_audit: {
       producer_sha: index === 0 ? 'producer-a' : 'producer-b',
       exporter_image_sha256: index === 0 ? 'exporter-a' : 'exporter-b',
@@ -101,11 +105,12 @@ function interceptRows(officialRunUrl: string) {
 }
 
 /** Overlay rows 10% cheaper per token than the official rows, so they own the frontier. */
-function interceptCheaperOverlayRows() {
-  const cheaper = rows(OVERLAY_RUN_URL, 'h200').map((row) => ({
+function interceptCheaperOverlayRows(clippedLatency = false) {
+  const cheaper = rows(OVERLAY_RUN_URL, 'h200').map((row, index) => ({
     ...row,
     metrics: {
       ...row.metrics,
+      median_ttft: clippedLatency ? [0.5, 2, 90][index] : row.metrics.median_ttft,
       joules_per_output_token: row.metrics.joules_per_output_token * 0.9,
       joules_per_input_token: row.metrics.joules_per_input_token * 0.9,
     },
@@ -131,17 +136,66 @@ function interceptCheaperOverlayRows() {
   }).as('unofficialRun');
 }
 
-function visitChart(extraParams: string, officialRunUrl: string) {
-  interceptRows(officialRunUrl);
-  cy.visit(`/inference?g_model=DeepSeek-V4-Pro&i_seq=8k/1k&i_prec=fp4${extraParams}`, {
-    onBeforeLoad(win) {
-      win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-      win.localStorage.setItem('inferencex-feature-gate', '1');
+function visitChart(
+  extraParams: string,
+  officialRunUrl: string,
+  {
+    locale = 'en',
+    clippedLatency = false,
+  }: { locale?: 'en' | 'zh'; clippedLatency?: boolean } = {},
+) {
+  interceptRows(officialRunUrl, clippedLatency);
+  cy.visit(
+    `${locale === 'zh' ? '/zh' : ''}/inference?g_model=DeepSeek-V4-Pro&i_seq=8k/1k&i_prec=fp4${extraParams}`,
+    {
+      onBeforeLoad(win) {
+        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+        win.localStorage.setItem('inferencex-feature-gate', '1');
+        win.sessionStorage.setItem('inferencex-reproducibility-nudge-shown', '1');
+      },
     },
-  });
+  );
   cy.wait(['@availability', '@benchmarks']);
   cy.get('[data-testid="inference-chart-display"]').should('exist');
   cy.get('[data-testid="chart-figure"]').should('have.length.at.least', 1);
+}
+
+function selectPowerSource(testId: string, label: string) {
+  cy.get(`[data-testid="${testId}"]`)
+    .find('option')
+    .contains(label)
+    .invoke('val')
+    .then((value) => {
+      expect(value).to.be.a('string');
+      cy.get(`[data-testid="${testId}"]`).select(String(value));
+    });
+}
+
+function assertReadableDifference(tableId: string, text: string) {
+  cy.contains(`[data-testid="${tableId}"] td`, text).should(($cell) => {
+    const cell = $cell[0];
+    const container = cell.closest('table')!.parentElement!;
+    const range = cell.ownerDocument.createRange();
+    range.selectNodeContents(cell);
+    const bounds = range.getBoundingClientRect();
+    const containerBounds = container.getBoundingClientRect();
+    const firstCell = cell.parentElement!.querySelector('td')!;
+    const leftEdge =
+      getComputedStyle(firstCell).position === 'sticky'
+        ? firstCell.getBoundingClientRect().right
+        : containerBounds.left;
+    expect(bounds.left, 'difference starts beyond any pinned column').to.be.at.least(leftEdge);
+    expect(bounds.right, 'complete difference fits in the scroll viewport').to.be.at.most(
+      containerBounds.right + 1,
+    );
+  });
+}
+
+function capturePowerTable(name: string) {
+  cy.get('[data-testid="power-comparison-table"]').scrollIntoView({
+    offset: { top: -90, left: 0 },
+  });
+  cy.screenshot(name, { capture: 'viewport' });
 }
 
 describe('PowerX article panels', () => {
@@ -214,5 +268,97 @@ describe('PowerX article panels', () => {
       i_powerfit: '1',
       i_frontier: '1',
     });
+  });
+
+  for (const locale of ['en', 'zh'] as const) {
+    it(`compares official and overlay energy inside the existing Table view (${locale})`, () => {
+      cy.viewport(1440, 1000);
+      interceptCheaperOverlayRows(true);
+      visitChart(
+        `&unofficialrun=${OVERLAY_RUN_ID}&i_metric=y_measuredJPerOutputToken&i_xmode=ttft&i_mstat=median&i_optimal=0&i_best=0`,
+        OFFICIAL_RUN_URL,
+        { locale, clippedLatency: true },
+      );
+      cy.wait('@unofficialRun');
+      // The 90-second observations lie beyond the TTFT chart's 60-second limit.
+      cy.get('[data-testid="chart-figure"]').last().find('svg .dot-group').should('have.length', 2);
+      cy.get('[data-testid="chart-figure"]')
+        .last()
+        .find('svg .unofficial-overlay-pt')
+        .should('have.length', 2);
+      cy.get('[data-testid="inference-table-view-btn"]').last().click();
+      cy.get('[data-testid="inference-results-table"] tbody tr').should('have.length', 6);
+      cy.contains(
+        '[data-testid="inference-table-content"] button',
+        locale === 'zh' ? '功耗与能耗对比' : 'Compare power & energy',
+      ).click();
+      cy.get('[data-testid="inference-results-table"]').should('not.exist');
+      selectPowerSource('power-table-baseline', 'B200');
+      selectPowerSource('power-table-comparator', 'H200');
+      cy.get('[data-testid="power-concurrency-results"] tbody tr').should('have.length', 3);
+      for (const [concurrency, energyDifference] of [
+        [16, '-0.24'],
+        [64, '-0.16'],
+        [256, '-0.1'],
+      ] as const) {
+        cy.get('[data-testid="power-concurrency-results"] tbody')
+          .contains('td', new RegExp(`^${concurrency}$`, 'u'))
+          .parent('tr')
+          .should('contain.text', `${energyDifference} J/output token (-10%)`)
+          .and('contain.text', '0 W/GPU (0%)');
+      }
+      capturePowerTable(`power-table-${locale}-desktop`);
+
+      cy.get('[data-testid="power-table-match"]').select('service');
+      cy.get('[data-testid="power-table-target"]').clear().type('46');
+      cy.get('[data-testid="power-service-results"] tbody')
+        .contains('tr', locale === 'zh' ? 'GPU 能耗' : 'GPU energy')
+        .should('contain.text', '1.3')
+        .and('contain.text', '1.17')
+        .and('contain.text', '-0.13 J/output token (-10%)')
+        .and('contain.text', locale === 'zh' ? '插值估算' : 'Interpolated');
+      cy.get('[data-testid="power-concurrency-results"]').should('not.exist');
+
+      cy.get('[data-testid="power-table-match"]').select('concurrency');
+      cy.viewport(390, 844);
+      cy.get('[data-testid="power-table-baseline"], [data-testid="power-table-comparator"]')
+        .should('be.visible')
+        .each(($control) => {
+          const bounds = $control[0].getBoundingClientRect();
+          expect(bounds.left).to.be.at.least(0);
+          expect(bounds.right).to.be.at.most(390);
+        });
+      cy.get('[data-testid="power-concurrency-results"] table').parent().scrollTo('right');
+      cy.contains(
+        '[data-testid="power-concurrency-results"] td',
+        '-0.24 J/output token (-10%)',
+      ).should('be.visible');
+      assertReadableDifference('power-concurrency-results', '-0.24 J/output token (-10%)');
+      capturePowerTable(`power-table-${locale}-mobile`);
+      cy.get('[data-testid="power-table-match"]').select('service');
+      cy.get('[data-testid="power-table-target"]').should(($target) => {
+        expect($target[0].getBoundingClientRect().width).to.be.greaterThan(250);
+      });
+      cy.get('[data-testid="power-service-results"] table')
+        .parent()
+        .scrollTo('right', { ensureScrollable: false });
+      assertReadableDifference('power-service-results', '-0.13 J/output token (-10%)');
+      capturePowerTable(`power-table-${locale}-mobile-service`);
+      cy.contains(
+        '[data-testid="inference-table-content"] button',
+        locale === 'zh' ? '实测数据' : 'Measurements',
+      ).click();
+      cy.get('[data-testid="power-comparison-table"]').should('not.exist');
+      cy.get('[data-testid="inference-results-table"] tbody tr').should('have.length', 6);
+    });
+  }
+
+  it('keeps power comparisons out of the throughput Table view', () => {
+    cy.viewport(1440, 1000);
+    visitChart('&i_metric=y_tpPerGpu', OFFICIAL_RUN_URL);
+    cy.get('[data-testid="inference-table-view-btn"]').first().click();
+    cy.get('[data-testid="inference-results-table"] tbody tr').should('have.length', 3);
+    cy.get('[data-testid="inference-table-content"]').should('not.exist');
+    cy.get('[data-testid="power-comparison-table"]').should('not.exist');
   });
 });

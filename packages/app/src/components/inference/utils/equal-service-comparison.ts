@@ -48,17 +48,18 @@ export interface EqualServiceComparison {
     EqualServiceMetric
   >;
 }
-const serviceAxis = (field: string) =>
-  field === 'mean_tpot_intvty' ||
-  /^(?:mean|median|p\d+(?:\.\d+)?)_(?:intvty|tpot|ttft|e2el|itl)$/u.test(field);
 /**
  * Trace-derived agentic axes (`p75_e2e_norm_intvty`, `p90_e2e_norm_intvty`)
- * live only on `point.x`; no row field carries that name. The role panels
- * plot observations, so they accept them; equal-service interpolation keeps
- * its observed-field policy and reports `unsupported-axis`.
+ * live only on `point.x`; no row field carries that name. Callers must supply
+ * rows projected for the requested axis, as the chart and views API do.
  */
-const derivedAxis = (field: string) => /^p\d+_e2e_norm_intvty$/u.test(field);
-const roleAxisValue = (point: InferenceData, xField: keyof AggDataEntry) =>
+const derivedAxis = (field: string) =>
+  field === 'p75_e2e_norm_intvty' || field === 'p90_e2e_norm_intvty';
+const serviceAxis = (field: string) =>
+  derivedAxis(field) ||
+  field === 'mean_tpot_intvty' ||
+  /^(?:mean|median|p\d+(?:\.\d+)?)_(?:intvty|tpot|ttft|e2el|itl)$/u.test(field);
+const serviceAxisValue = (point: InferenceData, xField: keyof AggDataEntry) =>
   derivedAxis(xField) ? point.x : point[xField];
 /** A positive finite reading, or null: a missing value is never zero. */
 export const positiveOrNull = (value: unknown): number | null => (isPositive(value) ? value : null);
@@ -227,7 +228,7 @@ function estimate(
 ): { estimate: EqualServiceEstimate | null; reason?: EqualServiceReason } {
   const rows = points
     .flatMap((point) => {
-      const x = point[field];
+      const x = serviceAxisValue(point, field);
       return isPositive(x) ? [{ point, x, value: quantity(point) }] : [];
     })
     .sort((a, b) => a.x - b.x || (a.point.id ?? 0) - (b.point.id ?? 0));
@@ -303,24 +304,42 @@ export function buildEqualServiceComparison(
   };
 }
 
+function sourceAxisValues(
+  points: readonly InferenceData[],
+  key: string,
+  xField: keyof AggDataEntry,
+): number[] {
+  return observedPoints(points)
+    .filter((point) => equalServiceSourceKey(point) === key)
+    .map((point) => serviceAxisValue(point, xField))
+    .filter(isPositive);
+}
+
+/** Common observed X domain; individual metrics can still be missing or ambiguous inside it. */
+export function getEqualServiceRange(
+  points: readonly InferenceData[],
+  { baseline, comparator, xField }: Omit<EqualServiceOptions, 'target'>,
+): { min: number; max: number } | null {
+  if (!serviceAxis(xField) || baseline === comparator) return null;
+  const a = sourceAxisValues(points, baseline, xField);
+  const b = sourceAxisValues(points, comparator, xField);
+  if (a.length === 0 || b.length === 0) return null;
+  const min = Math.max(Math.min(...a), Math.min(...b));
+  const max = Math.min(Math.max(...a), Math.max(...b));
+  return min <= max ? { min, max } : null;
+}
+
 /** Knots are observed X values within both source ranges, not a fitted hardware model. */
 export function getEqualServiceComparisonCurve(
   points: readonly InferenceData[],
   options: Omit<EqualServiceOptions, 'target'>,
 ): EqualServiceComparison[] {
-  if (!serviceAxis(options.xField) || options.baseline === options.comparator) return [];
-  const xs = (key: string) =>
-    observedPoints(points)
-      .filter((point) => equalServiceSourceKey(point) === key)
-      .map((point) => point[options.xField])
-      .filter(isPositive);
-  const a = xs(options.baseline),
-    b = xs(options.comparator);
-  if (a.length === 0 || b.length === 0) return [];
-  const lower = Math.max(Math.min(...a), Math.min(...b));
-  const upper = Math.min(Math.max(...a), Math.max(...b));
+  const range = getEqualServiceRange(points, options);
+  if (!range) return [];
+  const a = sourceAxisValues(points, options.baseline, options.xField);
+  const b = sourceAxisValues(points, options.comparator, options.xField);
   return [...new Set([...a, ...b])]
-    .filter((x) => x >= lower && x <= upper)
+    .filter((x) => x >= range.min && x <= range.max)
     .sort((x, y) => x - y)
     .map((target) => buildEqualServiceComparison(points, { ...options, target }));
 }
@@ -329,10 +348,10 @@ export function getPrefillSharePoints(
   points: readonly InferenceData[],
   xField: keyof AggDataEntry,
 ) {
-  if (!serviceAxis(xField) && xField !== 'conc' && !derivedAxis(xField)) return [];
+  if (!serviceAxis(xField) && xField !== 'conc') return [];
   return observedPoints(points)
     .flatMap((point) => {
-      const x = roleAxisValue(point, xField);
+      const x = serviceAxisValue(point, xField);
       const energy = reconstructedRoleEnergy(point);
       return isPositive(x) && energy
         ? [{ x, sourceKey: equalServiceSourceKey(point), point, ...energy }]
@@ -364,10 +383,10 @@ export function getRolePoints(
   points: readonly InferenceData[],
   xField: keyof AggDataEntry,
 ): RolePoint[] {
-  if (!serviceAxis(xField) && xField !== 'conc' && !derivedAxis(xField)) return [];
+  if (!serviceAxis(xField) && xField !== 'conc') return [];
   return observedPoints(points)
     .flatMap((point): RolePoint[] => {
-      const x = roleAxisValue(point, xField);
+      const x = serviceAxisValue(point, xField);
       if (!point.disagg || !isPositive(x)) return [];
       const role: RolePoint = {
         x,

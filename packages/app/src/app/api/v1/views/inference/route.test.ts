@@ -8,16 +8,25 @@ import {
 import { buildInferenceSeries } from '@/lib/views-api/series';
 import { Sequence } from '@/lib/data-mappings';
 import type { BenchmarkRow } from '@/lib/api';
+import type { AggDataEntry } from '@/components/inference/types';
+import type { DerivedAgenticMetricMap } from '@/hooks/api/use-derived-agentic-metrics';
 
-const { mockGetLatestBenchmarks, mockGetBenchmarksForRun, mockUnofficialRun, mockGetDb } =
-  vi.hoisted(() => ({
-    mockGetLatestBenchmarks: vi.fn(),
-    mockGetBenchmarksForRun: vi.fn(),
-    mockUnofficialRun: vi.fn(),
-    mockGetDb: vi.fn(() => 'mock-sql'),
-  }));
+const {
+  mockGetLatestBenchmarks,
+  mockGetBenchmarksForRun,
+  mockUnofficialRun,
+  mockDerivedAgenticMetrics,
+  mockGetDb,
+} = vi.hoisted(() => ({
+  mockGetLatestBenchmarks: vi.fn(),
+  mockGetBenchmarksForRun: vi.fn(),
+  mockUnofficialRun: vi.fn(),
+  mockDerivedAgenticMetrics: vi.fn(),
+  mockGetDb: vi.fn(() => 'mock-sql'),
+}));
 
 vi.mock('@/app/api/unofficial-run/route', () => ({ GET: mockUnofficialRun }));
+vi.mock('@/app/api/v1/derived-agentic-metrics/route', () => ({ GET: mockDerivedAgenticMetrics }));
 
 vi.mock('@semianalysisai/inferencex-db/connection', () => ({
   getDb: mockGetDb,
@@ -99,9 +108,122 @@ beforeEach(() => {
   mockGetLatestBenchmarks.mockResolvedValue(ROWS);
   mockGetBenchmarksForRun.mockResolvedValue(ROWS);
   mockUnofficialRun.mockImplementation(() => Response.json({ benchmarks: [], evaluations: [] }));
+  mockDerivedAgenticMetrics.mockImplementation(() => Response.json({}));
 });
 
 describe('GET /api/v1/views/inference', () => {
+  it.each(['p75', 'p90'] as const)(
+    'compares AgentX power and energy at a derived %s service target using the chart projection',
+    async (percentile) => {
+      const rows = ['h200', 'mi300x'].flatMap((hardware, index) =>
+        [0, 1].map((position) =>
+          makeRow({
+            hardware,
+            benchmark_type: 'agentic_traces',
+            conc: position + 1,
+            metrics: {
+              ...makeRow().metrics,
+              p75_itl: 0.04,
+              p90_itl: 0.05,
+              p75_ttlt: 2,
+              p90_ttlt: 3,
+              avg_power_w: 200 + 200 * position + 50 * index,
+              joules_per_output_token: 4 - 2 * position - index,
+              power_valid: 1,
+              power_metric_schema_version: 2,
+            },
+          }),
+        ),
+      );
+      const derivedMetrics: DerivedAgenticMetricMap = Object.fromEntries(
+        rows.map((row, index) => [
+          row.id,
+          {
+            id: row.id,
+            p75_e2e_norm_intvty: index % 2 === 0 ? 30 : 90,
+            p90_e2e_norm_intvty: index % 2 === 0 ? 20 : 60,
+          },
+        ]),
+      );
+      mockGetLatestBenchmarks.mockResolvedValue(rows);
+      mockDerivedAgenticMetrics.mockImplementation(() => Response.json(derivedMetrics));
+      const target = percentile === 'p75' ? 60 : 40;
+      const projected = buildInferenceSeries(rows, {
+        sequence: Sequence.AgenticTraces,
+        percentile,
+        precisions: ['fp8'],
+        metricConfigKey: 'y_measuredAvgPower',
+        xmode: 'e2e-normalized-interactivity',
+        xmetric: 'p90_ttft',
+        gpus: [],
+        quickFilters: { vendors: [], frameworks: [], deployment: [], spec: [], power: [] },
+        optimal: true,
+        best: true,
+        allPoints: true,
+        derivedMetrics,
+      });
+      const sources = getEqualServiceSources(projected.observedPoints);
+      const expected = buildEqualServiceComparison(projected.observedPoints, {
+        baseline: sources[0].key,
+        comparator: sources[1].key,
+        target,
+        xField: `${percentile}_e2e_norm_intvty` as keyof AggDataEntry,
+      });
+      const response = await GET(
+        request(
+          `/api/v1/views/inference?model=DeepSeek-R1-0528&sequence=agentic-traces&metric=measuredAvgPower&xmode=e2e-normalized-interactivity&percentile=${percentile}&serviceCompare=true&serviceTarget=${target}&allPoints=true`,
+        ),
+      );
+      const body = await response.json();
+      expect(response.status).toBe(200);
+      expect(mockDerivedAgenticMetrics).toHaveBeenCalledTimes(1);
+      const derivedRequest = mockDerivedAgenticMetrics.mock.calls[0][0] as NextRequest;
+      expect(derivedRequest.nextUrl.pathname).toBe('/api/v1/derived-agentic-metrics');
+      expect(derivedRequest.nextUrl.searchParams.get('ids')).toBe(
+        rows.map((row) => row.id).join(','),
+      );
+      expect(body.xAxis).toMatchObject({
+        field: `${percentile}_e2e_norm_intvty`,
+        statistic: percentile,
+      });
+      expect(body.serviceSources).toEqual(sources);
+      expect(body.equalServiceComparison.reason).toBeUndefined();
+      expect(body.equalServiceComparison.metrics.meanWattsPerGpu).toMatchObject({
+        baseline: { value: 300, interpolated: true },
+        comparator: { value: 350, interpolated: true },
+      });
+      expect(body.equalServiceComparison.metrics.meanWattsPerGpu.changePercent).toBeCloseTo(
+        100 / 6,
+      );
+      expect(body.equalServiceComparison.metrics.joulesPerOutputToken.changePercent).toBeCloseTo(
+        -100 / 3,
+      );
+      for (const key of ['meanWattsPerGpu', 'joulesPerOutputToken'] as const) {
+        expect(body.equalServiceComparison.metrics[key].changePercent).toBe(
+          expected.metrics[key].changePercent,
+        );
+        expect(
+          body.equalServiceComparison.metrics[key].baseline.endpoints.map(
+            (endpoint: { x: number; point: { id: number; runUrl: string } }) => [
+              endpoint.x,
+              endpoint.point.id,
+              endpoint.point.runUrl,
+            ],
+          ),
+        ).toEqual(
+          expected.metrics[key].baseline!.endpoints.map(({ x, point }) => [
+            x,
+            point.id,
+            point.run_url,
+          ]),
+        );
+      }
+      expect(body.equalServiceCurve.map((entry: { target: number }) => entry.target)).toEqual(
+        percentile === 'p75' ? [30, 90] : [20, 60],
+      );
+    },
+  );
+
   it('compares stitched observations before frontier pruning and preserves each producer endpoint', async () => {
     const rows = ['h200', 'mi300x'].flatMap((hardware, index) =>
       [20, 60].map((x, position) =>

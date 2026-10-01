@@ -52,6 +52,7 @@ import InferenceTable from '@/components/inference/ui/InferenceTable';
 import ScatterGraph from '@/components/inference/ui/ScatterGraph';
 import PowerTimeline from '@/components/inference/ui/PowerTimeline';
 import PowerAnalysisPanels from '@/components/inference/ui/PowerAnalysisPanels';
+import { resolveServiceField } from '@/components/inference/utils/resolveXAxisField';
 import { Card } from '@/components/ui/card';
 import { ChartButtons } from '@/components/ui/chart-buttons';
 import { ShareButton } from '@/components/ui/share-button';
@@ -1261,6 +1262,11 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                               data={[...officialRows, ...overlayRows]}
                               chartDefinition={graph.chartDefinition}
                               selectedYAxisMetric={selectedYAxisMetric}
+                              interactivityField={resolveServiceField('median_intvty', {
+                                isAgentic: isAgenticSequence,
+                                percentile: selectedPercentile,
+                                fixedSequenceStatistic,
+                              })}
                             />
                           </>
                         );

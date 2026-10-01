@@ -1,8 +1,8 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 
-import type { ChartDefinition, InferenceData } from '@/components/inference/types';
+import type { AggDataEntry, ChartDefinition, InferenceData } from '@/components/inference/types';
 import { type DataTableColumn, DataTable } from '@/components/ui/data-table';
 import { chipCounts } from '@/lib/chip-counts';
 import { getNestedYValue, metricLabel, xAxisLabel } from '@/lib/chart-utils';
@@ -14,11 +14,15 @@ import { getDisplayLabel } from '@/lib/utils';
 import { getInferenceHardwareConfig } from '@/lib/inference-labels';
 import type { Locale } from '@/lib/i18n';
 import { useLocale } from '@/lib/use-locale';
+import { SegmentedToggle } from '@/components/ui/segmented-toggle';
+import { track } from '@/lib/analytics';
+import PowerComparisonTable from './PowerComparisonTable';
 
 interface InferenceTableProps {
   data: InferenceData[];
   chartDefinition: ChartDefinition;
   selectedYAxisMetric: string;
+  interactivityField?: keyof AggDataEntry;
 }
 
 /** Format a number for table display — picks sensible precision and groups thousands. */
@@ -55,8 +59,13 @@ export default function InferenceTable({
   data,
   chartDefinition,
   selectedYAxisMetric,
+  interactivityField = 'median_intvty',
 }: InferenceTableProps) {
   const locale = useLocale();
+  const [mode, setMode] = useState('measurements');
+  const canComparePower =
+    selectedYAxisMetric === 'y_measuredAvgPower' ||
+    selectedYAxisMetric === 'y_measuredJPerOutputToken';
   const yPath = chartDefinition[selectedYAxisMetric as keyof ChartDefinition] as string | undefined;
   const showModeledPower = isModeledSystemPowerConfigKey(selectedYAxisMetric);
   const headers = useMemo(
@@ -177,11 +186,41 @@ export default function InferenceTable({
   );
 
   return (
-    <DataTable
-      data={sorted}
-      columns={columns}
-      testId="inference-results-table"
-      analyticsPrefix="inference_table"
-    />
+    <div className="min-w-0 space-y-3">
+      {canComparePower && (
+        <SegmentedToggle
+          value={mode}
+          options={[
+            { value: 'measurements', label: locale === 'zh' ? '实测数据' : 'Measurements' },
+            {
+              value: 'comparison',
+              label: locale === 'zh' ? '功耗与能耗对比' : 'Compare power & energy',
+            },
+          ]}
+          ariaLabel={locale === 'zh' ? '表格内容' : 'Table content'}
+          role="group"
+          testId="inference-table-content"
+          onValueChange={(value) => {
+            setMode(value);
+            track('inference_table_content_changed', { mode: value });
+          }}
+        />
+      )}
+      {canComparePower && mode === 'comparison' ? (
+        <PowerComparisonTable
+          data={data}
+          xField={chartDefinition.x_scale_field as keyof AggDataEntry}
+          xLabel={headers.xMetric}
+          interactivityField={interactivityField}
+        />
+      ) : (
+        <DataTable
+          data={sorted}
+          columns={columns}
+          testId="inference-results-table"
+          analyticsPrefix="inference_table"
+        />
+      )}
+    </div>
   );
 }

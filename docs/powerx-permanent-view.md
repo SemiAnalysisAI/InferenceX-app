@@ -306,8 +306,8 @@ and colour overlay sources with `overlayRunColor`.
 | 16           | Frontier points: the drawn cross-platform frontier and each point's run and attempt                                                           | Legend _Pareto frontier_ (`i_frontier`) on a measured metric | `utils/frontier-points.ts`                             |
 
 - **Role group** follows the chart's X axis, including the trace-derived P75/P90 E2E-normalized
-  interactivity axes (their values live on `point.x`); equal-service interpolation stays limited
-  to observed service fields and reports `unsupported-axis` there.
+  interactivity axes (their values live on `point.x`). Table comparisons use those same
+  projected values for bounded equal-service interpolation.
 - **Roles** use validated disaggregated rows. Each panel names its denominator. Missing role
   telemetry is omitted, never drawn as zero, and share points stay unconnected.
 - **Fit** needs three distinct output rates per source. Output is whole-deployment tok/s over
@@ -325,16 +325,29 @@ and colour overlay sources with `overlayRunColor`.
 - Analytics: `inference_power_roles_toggled` and `inference_power_fit_toggled` (`{ enabled }`),
   and chart-button events under `power_roles`, `power_fit` and `frontier_points`.
 
-Equal-service comparisons and the matched-concurrency diagnostic remain available through the
-read-only inference API with `serviceCompare`, `serviceBaseline`, `serviceComparator` and
-`serviceTarget`. They have no dashboard control, panel, table or share parameter. The API retains
-source identity, bounded interpolation, missing-data reasons and same-load pairing semantics;
-see [Dashboard read-only views](./dashboard-readonly-views.md#fixed-sequence-service-comparisons).
+### Table power comparisons
 
-同等服务条件下的对比和相同并发下的诊断继续通过只读 inference API 提供，查询参数为
-`serviceCompare`、`serviceBaseline`、`serviceComparator` 和 `serviceTarget`。仪表板不提供
-对应的控件、面板、表格或分享参数；角色分析、功耗拟合和前沿点表继续保留。API 的来源标识、
-有界插值、缺失原因和同并发配对规则保持不变，详见[仪表板只读视图](./dashboard-readonly-views.md#fixed-sequence-service-comparisons)。
+Table → Compare power & energy is available for mean measured GPU W/GPU and GPU J/output token.
+Select a baseline and comparator from current visible data, then use the same concurrency
+(default) or enter a target speed/latency. Values retain the GPU measurement boundary;
+modeled and all-in metrics do not enable this mode. Differences are `comparator − baseline`,
+with percentage changes relative to the baseline. Missing or ambiguous observations stay unavailable.
+Equal-service estimates use bounded interpolation, including projected P75/P90 E2E-normalized
+interactivity; they never extrapolate or bridge missing endpoints.
+
+The table's mode, source pair and target are local state, like the existing Table view.
+The read-only API covers the calculations through `serviceCompare`, `serviceBaseline`,
+`serviceComparator` and `serviceTarget`; use matching filters and `allPoints=true` for Table rows.
+No share parameter or response field is added. See
+[Dashboard read-only views](./dashboard-readonly-views.md#fixed-sequence-service-comparisons).
+
+表格中的“功耗与能耗对比”仅在 GPU 实测平均 W/GPU 和 GPU J/output token 指标下提供。从当前可见数据中
+选择基准来源和对比来源，默认按相同并发对比，也可输入目标速度或延迟。对比值保持 GPU 测量边界；
+建模功耗和整机功耗不启用该模式。差值为对比值减基准值，变化百分比以基准值为分母；缺失或冲突的观测值保持不可用。
+同等服务对比支持 P75/P90 E2E 归一化交互速度，使用投影值做有界插值，不外推，也不跨越缺失端点。
+与现有表格视图一样，模式、来源和目标值只保存在本地表格状态中。API 仍使用 `serviceCompare`、`serviceBaseline`、
+`serviceComparator` 和 `serviceTarget`，配合相同筛选和 `allPoints=true` 即可得到与表格一致的数据行，
+不新增分享参数或响应字段。详见[仪表板只读视图](./dashboard-readonly-views.md#fixed-sequence-service-comparisons)。
 
 ## Tests
 
