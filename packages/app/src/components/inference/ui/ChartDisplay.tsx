@@ -158,7 +158,7 @@ const STRINGS = {
         'GPU Level Provisioned (TDP) · Watts are the rated TDP per GPU from the hardware registry, so the power curve is flat per hardware. Joules per output token = TDP × allocated GPUs ÷ whole-deployment output tok/s; disaggregated configurations count prefill and decode GPUs together. Hardware without a published TDP is omitted.',
       'utility-provisioned':
         'All in Provisioned · Watts are the all-in provisioned utility power per GPU from the hardware registry (SemiAnalysis Datacenter Industry Model), so the power curve is flat per hardware. Joules per output token = all-in W × allocated GPUs ÷ whole-deployment output tok/s; disaggregated configurations count prefill and decode GPUs together, unlike the ungated All-in Provisioned J per Output Token, which divides per decode GPU.',
-      'utility-modeled': `All in Measured · Validated GPU telemetry with unmeasured components modeled. NVL72 additionally requires complete measured Grace or module power; rack overhead is modeled. Facility watts per GPU = modeled IT watts per GPU × PUE ${AIR_COOLED_SYSTEM_PUE} (air-cooled) or PUE ${DLC_SYSTEM_PUE} (NVL72), applied once. Measured GPU energy per output token scales by facility W/GPU divided by measured GPU W/GPU. Model revision ${modelRevisionLabel}. Available for 8K / 1K and AgentX on supported hardware; incomplete inputs are omitted.`,
+      'utility-modeled': `All in Measured · Validated GPU telemetry with unmeasured components modeled. NVL72 additionally requires complete measured Grace or module power; rack overhead is modeled. Facility watts per GPU = modeled IT watts per GPU × PUE ${AIR_COOLED_SYSTEM_PUE} (air-cooled) or PUE ${DLC_SYSTEM_PUE} (NVL72), applied once. Measured GPU energy per output token scales by facility W/GPU divided by measured GPU W/GPU. Model revision ${modelRevisionLabel}. Available for 8K / 1K and AgentX on supported hardware; unavailable estimates stay in the table with their measured GPU power and reason.`,
     },
     vsTtft: (word: string) => `vs. ${word} Time To First Token`,
     vsE2eLatency: (pctl?: string) =>
@@ -191,7 +191,7 @@ const STRINGS = {
         'GPU 额定功耗（TDP）· 功率取硬件注册表中每 GPU 的额定 TDP，因此每种硬件的功率曲线为水平线。每输出 token 能耗 = TDP × 分配的 GPU 数 ÷ 整个部署的输出 tok/s；分离式配置将 prefill 与 decode GPU 一并计入。未公布 TDP 的硬件不绘制。',
       'utility-provisioned':
         '整体预配功耗 · 功率取硬件注册表中每 GPU 的全电源配置（all-in）市电功率（来源：SemiAnalysis Datacenter Industry Model），因此每种硬件的功率曲线为水平线。每输出 token 能耗 = all-in 功率 × 分配的 GPU 数 ÷ 整个部署的输出 tok/s；分离式配置将 prefill 与 decode GPU 一并计入，这与未加门控的“每输出 token 全电源配置能耗”按 decode GPU 计算不同。',
-      'utility-modeled': `整体实测功耗 · GPU 遥测已验证，未实测组件由模型估算。NVL72 还需完整的 Grace 或 module 实测功耗，机架开销由模型估算。每 GPU 分摊的数据中心功耗 = 每 GPU 分摊的 IT 功耗估算 × PUE ${AIR_COOLED_SYSTEM_PUE}（风冷）或 PUE ${DLC_SYSTEM_PUE}（NVL72）；PUE 只应用一次。每输出 token 的实测 GPU 能耗按“每卡数据中心功耗 ÷ 每卡实测 GPU 功耗”的比例换算。模型版本 ${modelRevisionLabel}。适用于受支持硬件的 8K / 1K 和 AgentX 场景，输入不完整的数据点不绘制。`,
+      'utility-modeled': `整体实测功耗 · GPU 遥测已验证，未实测组件由模型估算。NVL72 还需完整的 Grace 或 module 实测功耗，机架开销由模型估算。每 GPU 分摊的数据中心功耗 = 每 GPU 分摊的 IT 功耗估算 × PUE ${AIR_COOLED_SYSTEM_PUE}（风冷）或 PUE ${DLC_SYSTEM_PUE}（NVL72）；PUE 只应用一次。每输出 token 的实测 GPU 能耗按“每卡数据中心功耗 ÷ 每卡实测 GPU 功耗”的比例换算。模型版本 ${modelRevisionLabel}。适用于受支持硬件的 8K / 1K 和 AgentX 场景。估算不可用的数据点仍保留在表格中，并显示实测 GPU 功耗和不可用原因。`,
     },
     vsTtft: (word: string) => `vs. ${word === 'Median' ? '中位' : word} 首 token 延迟（TTFT）`,
     vsE2eLatency: (pctl?: string) => (pctl ? `vs. ${pctl} 端到端延迟` : 'vs. 端到端延迟'),
@@ -503,7 +503,11 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
 
       let overlayPoints = processed.data;
       let clippedOverlayPoints = processed.clippedData;
+      let tableOverlayPoints = processed.tableData;
       if (compareGpuPair?.length === 2) {
+        tableOverlayPoints = tableOverlayPoints?.filter((p) =>
+          hardwareKeyMatchesAnyBase(String(p.hwKey), compareGpuPair),
+        );
         overlayPoints = overlayPoints.filter((p) =>
           hardwareKeyMatchesAnyBase(String(p.hwKey), compareGpuPair),
         );
@@ -512,10 +516,15 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
         );
       }
 
-      if (overlayPoints.length === 0 && clippedOverlayPoints.length === 0) return null;
+      if (
+        overlayPoints.length === 0 &&
+        clippedOverlayPoints.length === 0 &&
+        !tableOverlayPoints?.length
+      )
+        return null;
 
       const keySet = new Set([
-        ...overlayPoints.map((p) => String(p.hwKey)),
+        ...(tableOverlayPoints ?? overlayPoints).map((p) => String(p.hwKey)),
         ...clippedOverlayPoints.map(({ point }) => String(point.hwKey)),
       ]);
       const hardwareConfigFiltered = Object.fromEntries(
@@ -525,6 +534,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
       return {
         data: overlayPoints,
         clippedData: clippedOverlayPoints,
+        tableData: tableOverlayPoints,
         hardwareConfig: hardwareConfigFiltered,
         label: unofficialRunInfo.branch,
         runUrl: unofficialRunInfo.url,
@@ -559,7 +569,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
     const eligibleKeys = new Set<string>();
     for (const overlay of [overlayDataByChartType.e2e, overlayDataByChartType.interactivity]) {
       const points = [
-        ...(overlay?.data ?? []),
+        ...(overlay?.tableData ?? overlay?.data ?? []),
         ...(overlay?.clippedData ?? []).map((entry) => entry.point),
       ];
       for (const point of points) {
@@ -577,7 +587,10 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
   const officialScope = useMemo(() => {
     const eligibleKeys = new Set<string>();
     for (const graph of graphs) {
-      const points = [...graph.data, ...(graph.clippedData ?? []).map((entry) => entry.point)];
+      const points = graph.tableData ?? [
+        ...graph.data,
+        ...(graph.clippedData ?? []).map((entry) => entry.point),
+      ];
       for (const point of points) {
         if (
           selectedPrecisions.includes(point.precision) &&
@@ -736,6 +749,8 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
   const effectiveGraphs = useMemo(() => {
     if (graphs.length > 0) return graphs;
     const hasOverlay =
+      (overlayDataByChartType.e2e?.tableData?.length ?? 0) > 0 ||
+      (overlayDataByChartType.interactivity?.tableData?.length ?? 0) > 0 ||
       (overlayDataByChartType.e2e?.data.length ?? 0) > 0 ||
       (overlayDataByChartType.e2e?.clippedData?.length ?? 0) > 0 ||
       (overlayDataByChartType.interactivity?.data.length ?? 0) > 0 ||
@@ -747,6 +762,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
       chartDefinition,
       data: [] as InferenceData[],
       clippedData: [],
+      tableData: undefined,
     }));
   }, [graphs, overlayDataByChartType, selectedModel, selectedSequence]);
 
@@ -761,7 +777,10 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
     if (!isAgenticSequence) return [] as number[];
     const ids = new Set<number>();
     for (const graph of visibleGraphs) {
-      const points = [...graph.data, ...(graph.clippedData ?? []).map((entry) => entry.point)];
+      const points = graph.tableData ?? [
+        ...graph.data,
+        ...(graph.clippedData ?? []).map((entry) => entry.point),
+      ];
       for (const point of points) {
         if (
           selectedPrecisions.includes(point.precision) &&
@@ -791,7 +810,10 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
     if (!useDerivedXAxis) return [] as number[];
     const ids = new Set<number>();
     for (const graph of visibleGraphs) {
-      const points = [...graph.data, ...(graph.clippedData ?? []).map((entry) => entry.point)];
+      const points = graph.tableData ?? [
+        ...graph.data,
+        ...(graph.clippedData ?? []).map((entry) => entry.point),
+      ];
       for (const point of points) {
         if (point.benchmark_type === 'agentic_traces' && isPersistedBenchmarkId(point.id)) {
           ids.add(point.id);
@@ -815,7 +837,12 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
       // Legacy AgentX axes can still render transient/non-persisted rows, which
       // have no ids to request.
       if (!derivedSpec && derivedTargetIds.length === 0) return visibleGraphs;
-      return visibleGraphs.map((graph) => ({ ...graph, data: [], clippedData: [] }));
+      return visibleGraphs.map((graph) => ({
+        ...graph,
+        data: [],
+        clippedData: [],
+        tableData: graph.tableData ? [] : undefined,
+      }));
     }
     return visibleGraphs.map((graph) => {
       const rooflineKey = `${selectedYAxisMetric}_roofline` as keyof typeof graph.chartDefinition;
@@ -844,7 +871,10 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
         })
         .filter((entry): entry is NonNullable<typeof entry> => entry !== null);
 
-      if (!derivedSpec) return { ...graph, data, clippedData };
+      const tableData = graph.tableData?.map(
+        (point) => preparePoint(point) ?? { ...point, x: NaN },
+      );
+      if (!derivedSpec) return { ...graph, data, clippedData, tableData };
 
       const chartDefinition = {
         ...graph.chartDefinition,
@@ -854,7 +884,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
         y_latency_limit: undefined,
         ...(derivedCorner ? { [rooflineKey]: derivedCorner } : {}),
       };
-      return { ...graph, chartDefinition, data, clippedData };
+      return { ...graph, chartDefinition, data, clippedData, tableData };
     });
   }, [
     isAgenticSequence,
@@ -1013,12 +1043,29 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                           graph.chartDefinition.chartType,
                           overlayDataByChartType,
                         );
+                        const tableMode = getViewMode(graphIndex) === 'table';
+                        const exportData = tableMode
+                          ? (graph.tableData ?? [
+                              ...graph.data,
+                              ...(graph.clippedData ?? []).map((entry) => entry.point),
+                            ])
+                          : graph.data;
+                        const exportOverlay =
+                          tableMode && overlay
+                            ? {
+                                ...overlay,
+                                data: overlay.tableData ?? [
+                                  ...overlay.data,
+                                  ...(overlay.clippedData ?? []).map((entry) => entry.point),
+                                ],
+                              }
+                            : overlay;
                         const {
                           officialRows: visibleData,
                           overlayRows: visibleOverlayRowsForExport,
                         } = isGpuComparison
-                          ? visibleDateComparisonRows(graph.data, overlay)
-                          : visibleComparisonRows(graph.data, overlay);
+                          ? visibleDateComparisonRows(exportData, exportOverlay)
+                          : visibleComparisonRows(exportData, exportOverlay);
                         const { headers, rows } = inferenceChartToCsv(
                           visibleData,
                           graph.model,
@@ -1255,14 +1302,14 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                         // must not silently remove measured rows from the table.
                         // Restore both official and unofficial clipped points before
                         // applying the shared precision, quick-filter, and legend gates.
-                        const tableOfficialData = [
+                        const tableOfficialData = graph.tableData ?? [
                           ...graph.data,
                           ...(graph.clippedData ?? []).map((entry) => entry.point),
                         ];
                         const tableOverlay = overlay
                           ? {
                               ...overlay,
-                              data: [
+                              data: overlay.tableData ?? [
                                 ...overlay.data,
                                 ...(overlay.clippedData ?? []).map((entry) => entry.point),
                               ],

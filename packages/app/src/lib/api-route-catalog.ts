@@ -139,7 +139,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-inference-view',
-    sourceSha256: 'bafac08dbe6e6e4b75dd15987e79f84b514f3e93351149ad44b296f6dd2a9662',
+    sourceSha256: '428fab797ad0d304ee7ee193fd2e115219e986e87294d4f561953ab64e0fd5ef',
   },
   {
     source: 'src/app/api/v1/views/options/route.ts',
@@ -844,6 +844,14 @@ export interface ApiContractSourceDigest {
  */
 export const apiContractSourceDigests = [
   {
+    source: 'src/components/inference/utils/inference-table-data.ts',
+    sourceSha256: '816eb0dbc416f6c322fd3955af13fc03f8c6988704d82f36a9bfd8ec9abc9669',
+    reviewArea: {
+      en: 'All in Measured table eligibility, nullable values and unavailable reasons shared by UI, CSV and public views.',
+      zh: '界面、CSV 和公开视图共用的整体实测表格行筛选、可空数值与不可用原因。',
+    },
+  },
+  {
     source: 'src/components/inference/utils/resolveXAxisField.ts',
     sourceSha256: '4783579c7b3c1a21b91968cb03e9c35a57a85251f4992cb5667a855ba7c77497',
     reviewArea: {
@@ -1033,7 +1041,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/series.ts',
-    sourceSha256: '9974fe5166ac847f4b9284eda8a901ee0f9c8b432567ef184890453c715d2f4f',
+    sourceSha256: '9bf521e64e111965b597cb0f55d2f2b4b765b09f8168e8399e9c4316921cc643',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',

@@ -1,5 +1,5 @@
 import type { ChartDefinition, InferenceData } from '@/components/inference/types';
-import { getNestedYValue } from '@/lib/chart-utils';
+import { inferenceTableYValue } from '@/components/inference/utils/inference-table-data';
 
 /**
  * Default row order for the inference table.
@@ -25,8 +25,10 @@ export function sortRowsByYMetric(
   const yAscending = rooflineDir?.startsWith('lower');
 
   return [...data].toSorted((a, b) => {
-    const ay = a.powerVariant ? a.y : getNestedYValue(a, yPath);
-    const by = b.powerVariant ? b.y : getNestedYValue(b, yPath);
+    const ay = inferenceTableYValue(a, yPath);
+    const by = inferenceTableYValue(b, yPath);
+    if (ay === null) return by === null ? 0 : 1;
+    if (by === null) return -1;
     return yAscending ? ay - by : by - ay;
   });
 }

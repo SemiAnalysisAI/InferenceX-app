@@ -116,6 +116,127 @@ function powerSweepRows(): BenchmarkRow[] {
 }
 
 describe('buildInferenceSeries', () => {
+  it('retains GPU-valid all-in table rows without adding unavailable estimates to chart series', () => {
+    const measured = metrics({
+      avg_power_w: 500,
+      avg_total_gpu_power_w: 4000,
+      pp: 1,
+      pcp_size: 1,
+      power_valid: 1,
+      power_metric_schema_version: 2,
+      joules_per_output_token: 2,
+    });
+    const supported = makeRow({ metrics: measured });
+    const noCpu = makeRow({ hardware: 'gb200', metrics: measured });
+    const invalid = makeRow({ hardware: 'b200', metrics: { ...measured, power_valid: 0 } });
+    const otherPrecision = makeRow({ hardware: 'gb300', precision: 'fp4', metrics: measured });
+    const result = buildInferenceSeries([supported, noCpu, invalid, otherPrecision], {
+      ...BASE_OPTIONS,
+      metricConfigKey: 'y_utilityModeledWatts',
+      optimal: true,
+    });
+
+    expect(result.count).toBe(1);
+    expect(result.series.flatMap((series) => series.points.map((point) => point.id))).toEqual([
+      supported.id,
+    ]);
+    expect(result.tableRows).toHaveLength(2);
+    expect(result.tableRows?.find((point) => point.id === supported.id)).toMatchObject({
+      y: result.series[0].points[0].y,
+      measuredGpuWatts: 500,
+      status: 'available',
+      unavailableReason: null,
+    });
+    expect(result.tableRows?.find((point) => point.id === noCpu.id)).toMatchObject({
+      hwKey: 'gb200_trt',
+      y: null,
+      measuredGpuWatts: 500,
+      status: 'unavailable',
+      unavailableReason: 'cpu-telemetry',
+      frontier: false,
+    });
+  });
+
+  it('keeps all-in energy missing, honors selected hardware, and leaves ordinary views unchanged', () => {
+    const row = makeRow({
+      metrics: metrics({
+        avg_power_w: 500,
+        avg_total_gpu_power_w: 4000,
+        pp: 1,
+        pcp_size: 1,
+        power_valid: 1,
+        power_metric_schema_version: 2,
+      }),
+    });
+    const result = buildInferenceSeries([row], {
+      ...BASE_OPTIONS,
+      metricConfigKey: 'y_utilityModeledJPerOutputToken',
+    });
+    expect(result.series).toEqual([]);
+    expect(result.tableRows).toMatchObject([
+      { id: row.id, y: null, status: 'unavailable', unavailableReason: 'energy' },
+    ]);
+    expect(
+      buildInferenceSeries([row], {
+        ...BASE_OPTIONS,
+        metricConfigKey: 'y_utilityModeledWatts',
+        gpus: ['gb200'],
+      }).tableRows,
+    ).toEqual([]);
+    expect(buildInferenceSeries([row], BASE_OPTIONS)).not.toHaveProperty('tableRows');
+  });
+
+  it('keeps non-frontier transient rows in the table without assigning them frontier flags', () => {
+    const rows = [
+      [1, 10, 400],
+      [2, 20, 500],
+    ].map(([conc, x, watts]) => {
+      const row = makeRow({
+        conc,
+        metrics: metrics({
+          median_intvty: x,
+          avg_power_w: watts,
+          avg_total_gpu_power_w: watts * 8,
+          power_valid: 1,
+          power_metric_schema_version: 2,
+          pp: 1,
+          pcp_size: 1,
+        }),
+      });
+      Reflect.deleteProperty(row, 'id');
+      return row;
+    });
+    const result = buildInferenceSeries(rows, {
+      ...BASE_OPTIONS,
+      metricConfigKey: 'y_utilityModeledWatts',
+      optimal: true,
+    });
+    expect(result.count).toBe(1);
+    expect(result.tableRows).toHaveLength(2);
+    expect(result.tableRows?.map((point) => [point.concurrency, point.frontier])).toEqual([
+      [1, false],
+      [2, true],
+    ]);
+  });
+
+  it('returns null for missing or invalid normalized axes without dropping table rows', () => {
+    const row = makeRow({
+      benchmark_type: 'agentic_traces',
+      metrics: metrics({ avg_power_w: 500, power_valid: 1, power_metric_schema_version: 2 }),
+    });
+    const result = buildInferenceSeries([row], {
+      ...BASE_OPTIONS,
+      sequence: Sequence.AgenticTraces,
+      metricConfigKey: 'y_utilityModeledWatts',
+      xmode: 'e2e-normalized-interactivity',
+      derivedMetrics: {
+        [row.id]: { id: row.id, p75_e2e_norm_intvty: null, p90_e2e_norm_intvty: 0 },
+      },
+    });
+    expect(result.series).toEqual([]);
+    expect(result.tableRows).toMatchObject([{ id: row.id, x: null, y: null }]);
+  });
+
   it('assembles one series per hardware config with x-sorted points', () => {
     const result = buildInferenceSeries(fixtureRows(), BASE_OPTIONS);
 

@@ -197,7 +197,14 @@ function buildView(
   return { resolvedPrecisions, result };
 }
 
-function csvRows(data: { result: Pick<InferenceSeriesResult, 'series'> }) {
+function csvRows(data: { result: Pick<InferenceSeriesResult, 'series' | 'tableRows'> }) {
+  if (data.result.tableRows)
+    return data.result.tableRows.map(({ metrics, ...row }) => ({
+      ...row,
+      ...Object.fromEntries(
+        Object.entries(metrics).map(([key, value]) => [`metric_${key}`, value]),
+      ),
+    }));
   return data.result.series.flatMap((entry) =>
     entry.points.map((point) => ({
       hwKey: entry.hwKey,
@@ -583,6 +590,7 @@ export function GET(request: NextRequest) {
       frontier: data.result.frontier,
       hardware: data.result.hardware,
       series: data.result.series,
+      ...(data.result.tableRows === undefined ? {} : { tableRows: data.result.tableRows }),
       count: data.result.count,
       comparisons,
       overlays,

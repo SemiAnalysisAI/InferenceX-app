@@ -270,25 +270,28 @@ describe('AgentX All in Measured chart and table', () => {
       cy.intercept('GET', '/api/v1/trace-availability*', { body: {} });
       cy.intercept('GET', '/api/v1/log-availability*', { body: {} });
       cy.intercept('GET', '/api/v1/resident-sequence-lengths*', { body: {} });
-      cy.intercept('GET', '/api/unofficial-run*', {
-        body: {
-          runInfos: [
-            {
-              id: OVERLAY_RUN_ID,
-              name: 'agentic-power',
-              branch: 'agentic-power',
-              sha: 'abc000',
-              createdAt: `${DATE}T00:00:00Z`,
-              url: OVERLAY_RUN_URL,
-              conclusion: 'success',
-              status: 'completed',
-              isNonMainBranch: true,
-            },
-          ],
-          benchmarks: [{ ...agenticRows[1], id: 0, run_url: OVERLAY_RUN_URL }],
-          evaluations: [],
-        },
-      }).as('agenticOverlay');
+      const overlayBody = {
+        runInfos: [
+          {
+            id: OVERLAY_RUN_ID,
+            name: 'agentic-power',
+            branch: 'agentic-power',
+            sha: 'abc000',
+            createdAt: `${DATE}T00:00:00Z`,
+            url: OVERLAY_RUN_URL,
+            conclusion: 'success',
+            status: 'completed',
+            isNonMainBranch: true,
+          },
+        ],
+        benchmarks: [agenticRows[1], agenticRows[2]].map((row) => ({
+          ...row,
+          id: 0,
+          run_url: OVERLAY_RUN_URL,
+        })),
+        evaluations: [],
+      };
+      cy.intercept('GET', '/api/unofficial-run*', { body: overlayBody }).as('agenticOverlay');
       let csvBlob: Blob | undefined;
       cy.visit(
         `${locale === 'zh' ? '/zh' : ''}/inference?g_model=Kimi-K3&i_seq=agentic-traces&i_prec=fp4&i_pctl=p90&i_metric=y_utilityModeledWatts&i_optimal=0&i_best=0&unofficialrun=${OVERLAY_RUN_ID}`,
@@ -326,14 +329,43 @@ describe('AgentX All in Measured chart and table', () => {
       cy.get('[data-testid="chart-figure"]')
         .first()
         .find('tbody tr')
-        .should('have.length', 3)
+        .should('have.length', 5)
         .then(($rows) => {
           expect($rows.text()).to.contain('B200').and.contain('H200');
-          expect($rows.text()).not.to.contain('GB200').and.not.to.contain('B300');
+          expect($rows.text()).to.contain('GB200').and.not.to.contain('B300');
+          const missing = [...$rows].filter((row) => row.textContent!.includes('GB200'));
+          expect(missing).to.have.length(2);
+          for (const row of missing) {
+            expect(row.textContent).to.contain('450').and.contain('—');
+            expect(row.textContent).to.contain(
+              locale === 'en'
+                ? 'Grace or module telemetry missing or invalid'
+                : 'Grace 或 module 遥测缺失或无效',
+            );
+          }
         });
       cy.get('[data-testid="chart-figure"]')
         .first()
         .screenshot(`agentic-all-in-${locale}-table`, { overwrite: true });
+      if (locale === 'zh') {
+        cy.get('[data-testid="inference-results-table"]')
+          .first()
+          .contains('th', '整体估算状态')
+          .then(($status) => {
+            const scroll = $status[0].closest('table')!.parentElement!;
+            const pinnedWidth =
+              $status[0].parentElement!.firstElementChild!.getBoundingClientRect().width;
+            cy.wrap(scroll).scrollTo($status[0].offsetLeft - pinnedWidth, 0);
+            cy.wrap($status).should(($cell) => {
+              expect($cell[0].getBoundingClientRect().right).to.be.at.most(
+                scroll.getBoundingClientRect().right + 1,
+              );
+            });
+          });
+        cy.get('[data-testid="chart-figure"]')
+          .first()
+          .screenshot('agentic-all-in-zh-table-status', { overwrite: true });
+      }
       cy.get('header').invoke('css', 'visibility', '');
       cy.get('[data-testid="export-button"]').first().click();
       cy.get('[data-testid="export-csv-button"]').click();
@@ -343,14 +375,48 @@ describe('AgentX All in Measured chart and table', () => {
         const values = data.map((line) => line.split(','));
         expect(values.map((row) => row[columns.indexOf('Hardware')]).sort()).to.deep.equal([
           'b200',
+          'gb200',
+          'gb200',
           'h200',
           'h200',
         ]);
         expect(
           values.map((row) => Number(row[columns.indexOf('Physical Chips')])).sort((a, b) => a - b),
-        ).to.deep.equal([16, 32, 32]);
+        ).to.deep.equal([4, 4, 16, 32, 32]);
+        const missing = values.filter((row) => row[columns.indexOf('Hardware')] === 'gb200');
+        for (const row of missing) {
+          expect(row[10]).to.equal('');
+          expect(row[columns.indexOf('Measured GPU Power (W/chip)')]).to.equal('450');
+          expect(row[columns.indexOf('All-in Estimate Status')]).to.equal(
+            'Grace or module telemetry missing or invalid',
+          );
+        }
       });
       cy.document().then((doc) => expect(doc.documentElement.scrollWidth).to.be.at.most(width));
+      // A selection containing only GPU measurements must still have a usable table.
+      cy.intercept('GET', '/api/v1/benchmarks*', { body: [agenticRows[2]] }).as('missingOnly');
+      cy.intercept('GET', '/api/unofficial-run*', {
+        body: {
+          ...overlayBody,
+          benchmarks: [{ ...agenticRows[2], id: 0, run_url: OVERLAY_RUN_URL }],
+        },
+      }).as('missingOverlay');
+      cy.reload();
+      cy.wait(['@missingOnly', '@missingOverlay']);
+      cy.get('[data-testid="inference-table-view-btn"]').first().click();
+      cy.get('[data-testid="chart-figure"]')
+        .first()
+        .find('tbody tr')
+        .should('have.length', 2)
+        .and('contain.text', 'GB200');
+      cy.location('href').then((href) => {
+        const url = new URL(href);
+        url.searchParams.set('i_best', '1');
+        url.searchParams.set('i_xmode', 'concurrency');
+        cy.visit(url.toString());
+      });
+      cy.get('[data-testid="inference-table-view-btn"]').first().click();
+      cy.get('[data-testid="chart-figure"]').first().find('tbody tr').should('have.length', 2);
     });
   }
 });

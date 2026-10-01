@@ -48,12 +48,13 @@ experimental power controls with ↑↑↓↓ if they are hidden.
    inference selection. Expand **Unavailable estimates** for missing results;
    hover or select a bar for its power basis and read the formula notes below.
 
-**Expected result:** the inference table includes rows with a valid selected
-metric, including supported B200/H200 multi-node deployments. Selecting All in
-Measured does not include every valid GPU measurement: it also requires the
-inputs below. The Profit Estimator adds target-range and financial requirements
-and uses only official frontier points. Inference charts and tables also
-support unofficial-run overlays.
+**Expected result:** the All in Measured table keeps every GPU-valid record in
+the selected scope, including B200/H200 multi-node deployments. It shows measured
+GPU power even when an all-in estimate is unavailable; the estimate displays
+`—` with a reason and stays blank in CSV. The graph plots numeric estimates only.
+The Profit Estimator adds target-range and financial requirements and uses only
+official frontier points. Inference charts and tables also support unofficial-run
+overlays.
 
 ## Hardware and telemetry requirements
 

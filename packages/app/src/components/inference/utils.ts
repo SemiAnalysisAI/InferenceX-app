@@ -5,7 +5,8 @@ import { getGpuSpecs, type TcoBasis } from '@/lib/constants';
  * For Pareto front calculations, see @/lib/chart-utils
  */
 
-import chartDefinitions from '@/components/inference/metric-registry';
+import chartDefinitions, { isAllInMeasuredConfigKey } from '@/components/inference/metric-registry';
+import { allInMeasuredTableData } from '@/components/inference/utils/inference-table-data';
 import {
   resolveXAxisField,
   type FixedSequenceStatistic,
@@ -40,6 +41,7 @@ export function selectUnofficialOverlayForMode<T>(
 export interface ProcessedChartData {
   data: InferenceData[];
   clippedData: ClippedInferenceData[];
+  tableData?: InferenceData[];
 }
 
 /**
@@ -260,7 +262,7 @@ export function processOverlayChartDataWithClipping(
     }
   }
 
-  return partitionChartDataByLimits(
+  const partition = partitionChartDataByLimits(
     processedData,
     { ...chartDef, x_scale_field: xAxisField },
     selectedYAxisMetric,
@@ -269,4 +271,16 @@ export function processOverlayChartDataWithClipping(
       isAgentic,
     },
   );
+  return {
+    ...partition,
+    ...(isAllInMeasuredConfigKey(selectedYAxisMetric)
+      ? {
+          tableData: expandPowerCompareSeries(
+            allInMeasuredTableData(sourceData, metricKey, xAxisField),
+            selectedYAxisMetric,
+            options?.powerCompare ?? 'none',
+          ),
+        }
+      : {}),
+  };
 }

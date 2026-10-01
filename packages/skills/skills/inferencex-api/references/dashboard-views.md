@@ -102,6 +102,13 @@ the chassis or rack model without independent workload calibration. Telemetry an
 topology gates still apply; NVL72 needs complete Grace or module power. The standalone
 Modeled Chassis AC metric and 8K/1K offline export retain their 8K/1K scope.
 
+For All in Measured, `tableRows` retains every GPU-valid observation in the selected
+scope and best-series selection, including axis-clipped and non-frontier points.
+Missing system estimates use `y: null`, `status: "unavailable"`, and
+`unavailableReason`; `measuredGpuWatts` remains available. CSV exports these rows
+with blank missing values. Numeric `series` and `count` are unchanged. Each date
+comparison and unofficial overlay has its own `tableRows`; latest does not pool history.
+
 NVL72 estimates require valid GPU power plus validated Grace-socket or compute-module
 power with complete socket coverage. CPU-rail-only readings do not establish the
 Grace/LPDDR boundary. A module reading already includes GPU power; do not add GPU
@@ -169,8 +176,7 @@ n, x-range, registry `tdpWatts` and point identities. Fewer than three distinct
 rates return `fit: null`, `reason: "too-few-points"`. Call `P₀` an extrapolated
 intercept, not idle power, and do not read the line outside its x-range.
 
-These analytical results require JSON; enabling any with CSV returns 400. Existing CSV remains
-a plotted-point export.
+These analytical results require JSON; enabling any with CSV returns 400. CSV exports plotted points except for All in Measured, which exports `tableRows`.
 
 同等服务对比与同并发诊断仅通过 API 提供，查询参数为 `serviceCompare`、`serviceBaseline`、
 `serviceComparator` 和 `serviceTarget`；仪表板没有对应的服务对比控件、来源选择、目标值输入、

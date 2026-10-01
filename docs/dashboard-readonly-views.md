@@ -74,6 +74,13 @@ the chassis or rack model without independent workload calibration. Telemetry an
 topology gates still apply; NVL72 needs complete Grace or module power. The standalone
 Modeled Chassis AC metric and 8K/1K offline export retain their 8K/1K scope.
 
+For All in Measured, `tableRows` retains every GPU-valid observation in the selected
+scope and best-series selection, including axis-clipped and non-frontier points.
+Missing system estimates use `y: null`, `status: "unavailable"`, and
+`unavailableReason`; `measuredGpuWatts` remains available. CSV exports these rows
+with blank missing values. Numeric `series` and `count` are unchanged. Each date
+comparison and unofficial overlay has its own `tableRows`; latest does not pool history.
+
 Dense profit charts reserve readable space per bar and scroll within the plot on narrow
 screens; captions and controls stay fixed. This is presentation-only: API selectors,
 calculations, source identities and CSV rows are unchanged. PNG export includes the full
@@ -214,8 +221,7 @@ point identity. Fewer than three distinct output rates return `fit: null` with
 power, and R² is null when power did not vary.
 
 These analytical results are JSON-only: `format=csv` with any analysis enabled returns
-400, rather than silently exporting only the primary chart. Ordinary CSV retains
-its existing plotted-point contract.
+400, rather than silently exporting only the primary chart. CSV exports plotted points except for All in Measured, which exports `tableRows`.
 
 | Surface                                        | Dashboard control / share parameter               | Read-only API coverage                                                    |
 | ---------------------------------------------- | ------------------------------------------------- | ------------------------------------------------------------------------- |
@@ -246,6 +252,11 @@ those properties.
 @semianalysisai/inferencex-skills 包。所有仪表板路由（含隐藏和功能开关控制的
 视图）均在覆盖表中登记；上表列出各只读接口接受的全部查询参数名。
 接口复用现有计算函数，公开运行与非官方叠加数据保留各自来源。
+整体实测指标的 `tableRows` 保留当前筛选范围和最优曲线选择内所有 GPU 遥测有效的观测点，
+不按前沿或坐标轴显示范围裁剪。估算不可用时 `y` 为 null，`status` 为 `unavailable`，
+`unavailableReason` 给出原因；`measuredGpuWatts` 保留实测 GPU 功耗。CSV 导出同一组行，缺失值留空。
+`series` 和 `count` 保持不变，仍只包含可绘制的数值点；各日期对比和非官方叠加分别返回自己的 `tableRows`，
+Latest 不会合并历史数据。
 私有上传、密钥、提示词、反馈及管理操作不作为公开读取接口。
 OperatorX 的入口受功能开关控制，页面使用专属的 `/api/v1/operatorx/*`
 接口；目前没有发布 `/api/v1/views/operatorx` 契约。
