@@ -2,7 +2,7 @@ export function InferenceXWordmark() {
   return (
     <span
       data-testid="inferencex-wordmark"
-      className="halloween-wordmark relative inline-block pr-2 text-lg font-bold tracking-tight"
+      className="halloween-wordmark relative inline-block pr-1.5 text-lg font-bold tracking-tight"
     >
       Inference<span className="halloween-wordmark-x">X</span>
       <span

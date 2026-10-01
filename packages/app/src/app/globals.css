@@ -44,6 +44,10 @@
 /* October header treatment; keep chart and export branding unchanged. */
 .halloween-wordmark {
   color: #b54708;
+  /* Hinted glyph advances at 18px left DM Sans visibly uneven ("Inf e r");
+     unhinted advances plus explicit kerning keep the letters evenly set. */
+  text-rendering: geometricPrecision;
+  font-kerning: normal;
 }
 
 .halloween-wordmark-x {
@@ -68,6 +72,89 @@
   .halloween-wordmark-x {
     color: LinkText;
   }
+}
+
+/* October decoration: leaves falling down the left edge (autumn-leaves.tsx).
+   Sits under the sticky header (z-50) and never takes pointer input. */
+.autumn-leaves {
+  position: fixed;
+  inset: 0 auto 0 0;
+  z-index: 40;
+  /* The left page gutter beside the 1280px container, never narrower than 56px. */
+  width: clamp(56px, calc((100vw - 1280px) / 2 + 2rem), 160px);
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.autumn-leaf {
+  position: absolute;
+  top: 0;
+  left: var(--leaf-left);
+  width: var(--leaf-size);
+  height: var(--leaf-size);
+  opacity: 0.85;
+  animation: autumn-leaf-fall var(--leaf-duration) linear var(--leaf-delay) infinite;
+  will-change: transform;
+}
+
+.autumn-leaf-sway {
+  display: block;
+  width: 100%;
+  height: 100%;
+  animation: autumn-leaf-sway calc(var(--leaf-duration) / 4) ease-in-out var(--leaf-delay) infinite
+    alternate;
+}
+
+/* Phones have only the page padding as a gutter, so the strip and leaves
+   shrink to stay clear of content. */
+@media (max-width: 639px) {
+  .autumn-leaves {
+    width: 30px;
+  }
+  .autumn-leaf {
+    left: calc(var(--leaf-left) * 0.4);
+    width: calc(var(--leaf-size) * 0.6);
+    height: calc(var(--leaf-size) * 0.6);
+  }
+}
+
+@keyframes autumn-leaf-fall {
+  from {
+    transform: translateY(-10vh);
+  }
+  to {
+    transform: translateY(110vh);
+  }
+}
+
+@keyframes autumn-leaf-sway {
+  from {
+    transform: translateX(calc(var(--leaf-sway) * -1)) rotate(-35deg);
+  }
+  to {
+    transform: translateX(var(--leaf-sway)) rotate(40deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .autumn-leaf,
+  .autumn-leaf-sway {
+    animation: none;
+  }
+  .autumn-leaf {
+    top: var(--leaf-rest);
+    transform: rotate(-20deg);
+  }
+}
+
+@media (forced-colors: active) {
+  .autumn-leaves {
+    display: none;
+  }
+}
+
+html[data-inferencex-embed] .autumn-leaves {
+  display: none;
 }
 
 /* Benchmark log viewer gutter. Line numbers come from a CSS counter rather than
