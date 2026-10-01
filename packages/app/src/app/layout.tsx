@@ -12,6 +12,7 @@ import { Header } from '@/components/header/header';
 import { RouteTransition } from '@/components/motion/route-transition';
 import { JsonLd } from '@/components/json-ld';
 import { CircuitBackground } from '@/components/circuit-background';
+import { AutumnLeaves } from '@/components/autumn-leaves';
 import { MinecraftBackgroundLazy } from '@/components/minecraft/minecraft-background-lazy';
 import { MinecraftDecorations } from '@/components/minecraft/minecraft-decorations';
 import { ThemeProvider } from '@/components/ui/theme-provider';
@@ -211,6 +212,7 @@ export default async function RootLayout({
           dangerouslySetInnerHTML={{ __html: landingBannerPrepaintScript }}
         />
         <CircuitBackground />
+        <AutumnLeaves />
         <MinecraftBackgroundLazy />
         <MinecraftDecorations />
         <PostHogProvider>

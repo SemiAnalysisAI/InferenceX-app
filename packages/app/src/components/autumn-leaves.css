@@ -1,0 +1,91 @@
+/* Keep decoration inside the page gutter, below the sticky header. */
+.autumn-leaves {
+  position: fixed;
+  inset: 4.25rem auto 0 0;
+  width: clamp(14px, calc((100vw - 1280px) / 2), 100px);
+  overflow: hidden;
+  pointer-events: none;
+  user-select: none;
+  z-index: 10;
+}
+
+.autumn-leaf {
+  position: absolute;
+  width: clamp(8px, 1.6vw, 24px);
+  height: clamp(13px, 2.4vw, 36px);
+  border-radius: 4% 85% 8% 85%;
+  background: linear-gradient(125deg, #e6b75c 0%, var(--leaf-color) 45%, #71351d 100%);
+  opacity: 0.65;
+  transform: rotate(var(--leaf-turn));
+}
+
+.autumn-leaf::before {
+  content: '';
+  position: absolute;
+  top: 14%;
+  left: 48%;
+  width: 1px;
+  height: 100%;
+  background: #623b25;
+  transform: rotate(-24deg);
+  transform-origin: top;
+}
+
+.autumn-leaf::after {
+  content: '';
+  position: absolute;
+  inset: 25% 28% 30% 25%;
+  border-top: 1px solid #f4d49380;
+  border-bottom: 1px solid #f4d49380;
+  transform: rotate(24deg);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .autumn-leaf {
+    /* One short fall, then a static border: no perpetual motion beside charts. */
+    animation: autumn-leaf-fall var(--leaf-duration) ease-out both;
+  }
+}
+
+@keyframes autumn-leaf-fall {
+  0% {
+    opacity: 0;
+    transform: translate(-8px, -180px) rotate(calc(var(--leaf-turn) - 100deg));
+  }
+  25% {
+    opacity: 0.65;
+    transform: translate(6px, -105px) rotate(calc(var(--leaf-turn) - 55deg));
+  }
+  65% {
+    transform: translate(-4px, -38px) rotate(calc(var(--leaf-turn) + 16deg));
+  }
+  100% {
+    opacity: 0.65;
+    transform: translate(0, 0) rotate(var(--leaf-turn));
+  }
+}
+
+@media (max-width: 1359px) {
+  .autumn-leaf {
+    left: 2px !important;
+    width: 8px;
+    height: 13px;
+  }
+}
+
+@media (max-width: 639px) {
+  .autumn-leaf:nth-child(even) {
+    display: none;
+  }
+}
+
+.minecraft .autumn-leaves,
+html[data-inferencex-embed] .autumn-leaves {
+  display: none;
+}
+
+@media print, (forced-colors: active) {
+  .autumn-leaves {
+    display: none;
+  }
+}

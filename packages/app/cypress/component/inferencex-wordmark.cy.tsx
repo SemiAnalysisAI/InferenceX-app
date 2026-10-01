@@ -34,6 +34,10 @@ describe('Halloween wordmark', () => {
           'color',
           theme === 'light' ? 'rgb(181, 71, 8)' : 'rgb(251, 146, 60)',
         );
+        cy.get('[data-testid="inferencex-wordmark"]').should(($wordmark) => {
+          const spacing = getComputedStyle($wordmark[0]).letterSpacing;
+          expect(spacing === 'normal' ? 0 : parseFloat(spacing)).to.eq(0);
+        });
         cy.get('a').should('contain.text', 'InferenceX').click();
         cy.location('hash').should('eq', '#home');
       });
