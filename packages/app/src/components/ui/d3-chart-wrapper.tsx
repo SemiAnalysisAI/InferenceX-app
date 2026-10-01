@@ -65,6 +65,7 @@ export interface D3ChartWrapperProps {
   instructions?: string;
   testId?: string;
   grabCursor?: boolean;
+  scrollablePlot?: { minWidth: number; label: string; enabled: boolean };
 }
 
 export function D3ChartWrapper({
@@ -83,83 +84,117 @@ export function D3ChartWrapper({
   instructions,
   testId,
   grabCursor = true,
+  scrollablePlot,
 }: D3ChartWrapperProps) {
   const locale = useLocale();
   const resolvedInstructions = instructions ?? DEFAULT_CHART_INSTRUCTIONS[locale];
 
-  return (
-    <div id={chartId} data-testid={testId}>
-      {caption && <figcaption>{caption}</figcaption>}
-      <div className="flex flex-col lg:flex-row w-full">
-        <div ref={setContainerRef} className="relative flex-1 min-w-0">
-          <div className="relative">
-            {/* Stable hook for tests. `[data-testid="scatter-graph"] svg` also
+  const plot = (
+    <div
+      className="flex flex-col lg:flex-row w-full"
+      style={scrollablePlot ? { minWidth: scrollablePlot.minWidth } : undefined}
+    >
+      <div ref={setContainerRef} className="relative flex-1 min-w-0">
+        <div className="relative">
+          {/* Stable hook for tests. `[data-testid="scatter-graph"] svg` also
                 matches every Lucide icon inside the card — dozens of them —
                 so picking "the first svg" silently grabs an icon whenever the
                 selected metric renders one above the chart. */}
-            <svg
-              ref={svgRef}
-              data-testid="d3-chart-svg"
-              width="100%"
-              height={dimensions.height}
-              style={{ cursor: grabCursor ? 'grab' : undefined }}
-              onMouseDown={
-                grabCursor
-                  ? (e) => {
-                      (e.currentTarget as SVGSVGElement).style.cursor = 'grabbing';
-                    }
-                  : undefined
+          <svg
+            ref={svgRef}
+            data-testid="d3-chart-svg"
+            width="100%"
+            height={dimensions.height}
+            style={{ cursor: grabCursor ? 'grab' : undefined }}
+            onMouseDown={
+              grabCursor
+                ? (e) => {
+                    (e.currentTarget as SVGSVGElement).style.cursor = 'grabbing';
+                  }
+                : undefined
+            }
+            onMouseUp={
+              grabCursor
+                ? (e) => {
+                    (e.currentTarget as SVGSVGElement).style.cursor = 'grab';
+                  }
+                : undefined
+            }
+            onClick={() => {
+              if (isPinned()) {
+                dismissTooltip();
+                hideTooltipElements(tooltipRef, svgRef);
               }
-              onMouseUp={
-                grabCursor
-                  ? (e) => {
-                      (e.currentTarget as SVGSVGElement).style.cursor = 'grab';
-                    }
-                  : undefined
-              }
-              onClick={() => {
-                if (isPinned()) {
-                  dismissTooltip();
-                  hideTooltipElements(tooltipRef, svgRef);
-                }
-              }}
-            />
-            {/* Tooltip is portalled to <body> with position:fixed so it can
+            }}
+          />
+          {/* Tooltip is portalled to <body> with position:fixed so it can
                 rise above sibling chart cards' stacking contexts. The d3 layer
                 writes viewport-coords into style.left/top — see
                 computeTooltipPosition. */}
-            <PortalTooltip
-              chartId={chartId}
-              tooltipRef={tooltipRef}
-              pinned={Boolean(pinnedPoint)}
-            />
-            {noDataOverlay}
-          </div>
-          {resolvedInstructions && (
-            <p className="no-export text-xs text-muted-foreground text-center mt-2">
-              {resolvedInstructions}
-            </p>
-          )}
-          <div className="overflow-hidden max-h-0">
-            <div id={`${chartId}-export`} className="p-4"></div>
-          </div>
+          <PortalTooltip chartId={chartId} tooltipRef={tooltipRef} pinned={Boolean(pinnedPoint)} />
+          {noDataOverlay}
         </div>
-        {legendElement && (
-          /* Sizes to the legend content: when the sidebar legend panel is open
+        {resolvedInstructions && (
+          <p className="no-export text-xs text-muted-foreground text-center mt-2">
+            {resolvedInstructions}
+          </p>
+        )}
+        <div className="overflow-hidden max-h-0">
+          <div id={`${chartId}-export`} className="p-4"></div>
+        </div>
+      </div>
+      {legendElement && (
+        /* Sizes to the legend content: when the sidebar legend panel is open
              (.sidebar-legend present) the column grows to fit the widest
              legend label (capped) so full names display without truncation,
              while still sitting next to the plot without overlapping it; when
              closed the legend renders only a small reopen button and the
              chart reclaims the width. Height belongs to the legend itself:
              short lists should not reserve an empty chart-height column. */
+        <div
+          data-slot="chart-legend-wrapper"
+          className="w-full lg:w-auto lg:shrink-0 lg:self-start relative mt-3 lg:mt-0 lg:has-[.sidebar-legend]:w-fit lg:has-[.sidebar-legend]:min-w-48 lg:has-[.sidebar-legend]:max-w-96"
+        >
+          {legendElement}
+        </div>
+      )}
+    </div>
+  );
+
+  return (
+    <div id={chartId} data-testid={testId}>
+      {caption && <figcaption>{caption}</figcaption>}
+      {scrollablePlot ? (
+        <>
+          {scrollablePlot.enabled && (
+            <p className="no-export text-xs text-muted-foreground mb-2">{scrollablePlot.label}</p>
+          )}
           <div
-            data-slot="chart-legend-wrapper"
-            className="w-full lg:w-auto lg:shrink-0 lg:self-start relative mt-3 lg:mt-0 lg:has-[.sidebar-legend]:w-fit lg:has-[.sidebar-legend]:min-w-48 lg:has-[.sidebar-legend]:max-w-96"
+            data-chart-scroll
+            className={
+              scrollablePlot.enabled
+                ? 'overflow-x-auto rounded-sm focus-visible:outline-2 focus-visible:outline-ring'
+                : undefined
+            }
+            tabIndex={scrollablePlot.enabled ? 0 : undefined}
+            role={scrollablePlot.enabled ? 'region' : undefined}
+            aria-label={scrollablePlot.enabled ? scrollablePlot.label : undefined}
+            onKeyDown={(event) => {
+              if (!scrollablePlot.enabled) return;
+              if (event.target !== event.currentTarget) return;
+              if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+              event.preventDefault();
+              event.currentTarget.scrollBy({
+                left: (event.key === 'ArrowRight' ? 1 : -1) * event.currentTarget.clientWidth * 0.8,
+              });
+            }}
           >
-            {legendElement}
+            {plot}
           </div>
-        )}
-      </div>
+        </>
+      ) : (
+        plot
+      )}
     </div>
   );
 }

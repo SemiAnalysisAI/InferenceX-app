@@ -381,12 +381,14 @@ describe('Profit estimator power option', { testIsolation: true }, () => {
     chart().find('text.revenue-label').should('have.length', 9);
     chart().scrollIntoView();
     cy.screenshot('profit-nvl72-compare-mobile', { capture: 'viewport', overwrite: true });
-    chartSvg().scrollIntoView().should('be.visible');
-    chartSvg().then(($svg) => {
-      const bounds = $svg[0].getBoundingClientRect();
-      expect(bounds.left).to.be.at.least(0);
-      expect(bounds.right).to.be.at.most(393);
-    });
+    chart().find('[data-chart-scroll]').scrollIntoView().scrollTo('left').should('be.visible');
+    chart()
+      .find('[data-chart-scroll]')
+      .then(($scroll) => {
+        const bounds = $scroll[0].getBoundingClientRect();
+        expect(bounds.left).to.be.at.least(0);
+        expect(bounds.right).to.be.at.most(393);
+      });
     cy.screenshot('profit-nvl72-chart-mobile', { capture: 'viewport', overwrite: true });
     cy.get('[data-testid="export-button"]').first().click();
     cy.get('[data-testid="export-csv-button"]').click();
@@ -406,6 +408,143 @@ describe('Profit estimator power option', { testIsolation: true }, () => {
       expect(measured).to.contain(' sha256:');
     });
   });
+
+  for (const locale of ['en', 'zh'] as const) {
+    it(`keeps all nine power comparison bars readable and reachable on mobile (${locale})`, () => {
+      stubOpenRouter();
+      cy.viewport(390, 900);
+      cy.intercept('GET', '/api/v1/benchmarks*', {
+        body: [
+          ...profitBenchmarkRows().map((row) => ({
+            ...row,
+            metrics: {
+              ...row.metrics,
+              power_valid: 1,
+              power_metric_schema_version: 2,
+              avg_power_w: 500,
+              avg_total_gpu_power_w: 4000,
+            },
+          })),
+          ...profitNvl72Rows(),
+        ],
+      });
+      cy.visit(`${locale === 'zh' ? '/zh' : ''}/profit-estimator-per-gigawatt?c_power=compare`, {
+        onBeforeLoad: unlockPowerGate,
+      });
+      chart()
+        .find('text.revenue-label')
+        .should('have.length', 9)
+        .should(($labels) => {
+          const boxes = [...$labels].map((label) => label.getBoundingClientRect());
+          for (let i = 1; i < boxes.length; i++) {
+            expect(
+              boxes[i].left - boxes[i - 1].right,
+              'space between revenue and margin labels',
+            ).to.be.at.least(4);
+          }
+        });
+      chart()
+        .find('image.bar-vendor-mark')
+        .should(($marks) => {
+          const boxes = [...$marks].map((mark) => mark.getBoundingClientRect());
+          for (let i = 1; i < boxes.length; i++) {
+            expect(boxes[i].left - boxes[i - 1].right, 'space between vendor marks').to.be.at.least(
+              4,
+            );
+          }
+        });
+      const scroller = () => chart().find('[data-chart-scroll]');
+      scroller().should('have.attr', 'tabindex', '0').and('have.attr', 'role', 'region');
+      scroller()
+        .scrollIntoView({ offset: { top: -70, left: 0 } })
+        .focus()
+        .should('have.focus');
+      scroller().then(($scroll) => {
+        const el = $scroll[0];
+        const event = new el.ownerDocument.defaultView!.KeyboardEvent('keydown', {
+          key: 'ArrowRight',
+          bubbles: true,
+          cancelable: true,
+        });
+        el.dispatchEvent(event);
+        expect(
+          event.defaultPrevented,
+          `handled key on ${el.clientWidth}/${el.scrollWidth}`,
+        ).to.equal(true);
+        expect(el.scrollLeft, 'synchronous scroll').to.be.greaterThan(0);
+      });
+      scroller().should(($scroll) => expect($scroll[0].scrollLeft).to.be.greaterThan(0));
+      scroller().scrollTo('right');
+      chart().find('rect.bar-profit').last().should('be.visible');
+      chart().find('rect.bar-profit').last().click({ scrollBehavior: false });
+      cy.get('[data-chart-tooltip="profit-estimator-chart"]')
+        .should('be.visible')
+        .and('contain', 'MI355X');
+      // Clear the pinned tooltip for screenshots; the SVG center is outside the scroll viewport.
+      chartSvg().trigger('click', { force: true, scrollBehavior: false });
+      cy.get('[data-chart-tooltip="profit-estimator-chart"]').should('not.be.visible');
+      cy.document().should((doc) => {
+        expect(doc.documentElement.scrollWidth).to.be.at.most(390);
+      });
+      cy.get('[data-testid="profit-caption"]').should(($caption) => {
+        const bounds = $caption[0].getBoundingClientRect();
+        expect(bounds.left).to.be.at.least(0);
+        expect(bounds.right).to.be.at.most(390);
+      });
+      scroller()
+        .scrollIntoView({ offset: { top: -70, left: 0 } })
+        .scrollTo('left');
+      chart().find('rect.bar-tco').first().should('be.visible');
+      cy.screenshot(`profit-dense-${locale}-mobile-left`, { capture: 'viewport', overwrite: true });
+      scroller().scrollTo('right');
+      cy.screenshot(`profit-dense-${locale}-mobile-right`, {
+        capture: 'viewport',
+        overwrite: true,
+      });
+      let exportedPng = '';
+      let exportedLabels: string[] = [];
+      cy.window().then((win) => {
+        win.HTMLAnchorElement.prototype.click = function () {
+          if (this.download.endsWith('.png')) {
+            exportedPng = this.href;
+            exportedLabels = [
+              ...win.document.querySelectorAll('#profit-estimator-chart-export text.revenue-label'),
+            ].map((label) => label.textContent ?? '');
+          }
+        };
+      });
+      cy.get('[data-testid="export-button"]').first().click();
+      cy.get('[data-testid="export-png-button"]').click();
+      cy.window()
+        .should(() => expect(exportedPng).to.match(/^data:image\/png;base64,/u))
+        .then((win) => {
+          expect(exportedLabels).to.have.length(9);
+          cy.writeFile(
+            `cypress/downloads/profit-dense-${locale}.png`,
+            exportedPng.split(',')[1],
+            'base64',
+          );
+          return new Cypress.Promise<void>((resolve, reject) => {
+            const png = new win.Image();
+            png.addEventListener('load', () => {
+              expect(png.naturalWidth).to.be.greaterThan(1500);
+              resolve();
+            });
+            png.addEventListener('error', () => reject(new Error('Profit PNG did not decode')));
+            png.src = exportedPng;
+          });
+        });
+      scroller().should(($scroll) => expect($scroll[0].scrollLeft).to.be.greaterThan(0));
+      cy.viewport(1280, 900);
+      scroller().should('not.have.attr', 'tabindex');
+      scroller().should(($scroll) => {
+        expect($scroll[0].scrollWidth).to.equal($scroll[0].clientWidth);
+      });
+      chart().find('text.revenue-label').should('have.length', 9);
+      chartSvg().scrollIntoView({ offset: { top: -70, left: 0 } });
+      cy.screenshot(`profit-dense-${locale}-desktop`, { capture: 'viewport', overwrite: true });
+    });
+  }
 
   it('keeps the benchmark settings and restores the original chart after unavailable power', () => {
     stubOpenRouter();

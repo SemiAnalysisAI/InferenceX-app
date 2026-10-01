@@ -97,6 +97,8 @@ const GLYPH_WIDTH_EM = 0.55;
 const LABEL_SIDE_PAD_PX = 4;
 /** The labels above a bar may borrow this much of the gap to each neighbour, in px. */
 const X_GAP_ALLOWANCE = 12;
+/** Keep comparison labels and vendor marks readable when bars outgrow the viewport. */
+const MIN_BAR_STEP_PX = 96;
 
 /**
  * Horizontal room the labels above a bar may use, in px. A label may overhang
@@ -274,6 +276,7 @@ const STRINGS = {
         'measured GPU board + Grace socket (Grace socket sensor), regulator loss modeled',
     },
     noData: 'No SKU can be priced for the current selection.',
+    scrollHint: 'Scroll horizontally to view the full chart.',
   },
   zh: {
     yAxisModeled: '每吉瓦设施总功耗对应的年收入（美元）',
@@ -307,6 +310,7 @@ const STRINGS = {
         '实测 GPU 板卡 + Grace socket 功耗（Grace socket 传感器），稳压损耗由模型估算',
     },
     noData: '当前选择下没有可定价的 SKU。',
+    scrollHint: '横向滚动查看完整图表。',
   },
 } as const;
 
@@ -1032,12 +1036,22 @@ export default function ProfitEstimatorChart({
   );
 
   const baseMargin = compact ? CHART_MARGIN_COMPACT : CHART_MARGIN;
+  const minimumMargin = slantedMargins(
+    [...labelMap.values()],
+    MIN_BAR_STEP_PX,
+    CHART_TYPE.axisLabelSub,
+    baseMargin,
+  );
+  const chartWidth = Math.max(
+    dimensions.width,
+    rows.length * MIN_BAR_STEP_PX + minimumMargin.left + minimumMargin.right,
+  );
   // Upright two-line labels when each SKU has room for them; slanted otherwise.
   const labelLayout = useMemo<XLabelLayout>(() => {
-    const plotWidth = dimensions.width - baseMargin.left - baseMargin.right;
+    const plotWidth = chartWidth - baseMargin.left - baseMargin.right;
     const slot = rows.length > 0 ? plotWidth / rows.length : 0;
     return xLabelLayout([...labelMap.values()], slot, CHART_TYPE.axisLabelSub);
-  }, [dimensions.width, baseMargin, rows.length, labelMap]);
+  }, [chartWidth, baseMargin, rows.length, labelMap]);
   const margin = useMemo(() => {
     if (labelLayout === 'stacked') {
       const dated = [...labelMap.values()].some((label) => splitHistoryLabel(label)[1] !== '');
@@ -1046,15 +1060,15 @@ export default function ProfitEstimatorChart({
         bottom: X_LABEL_STACKED_BOTTOM + (dated ? X_LABEL_HISTORY_LINE_PX : 0),
       };
     }
-    const plotWidth = dimensions.width - baseMargin.left - baseMargin.right;
+    const plotWidth = chartWidth - baseMargin.left - baseMargin.right;
     const slot = rows.length > 0 ? plotWidth / rows.length : 0;
     return slantedMargins([...labelMap.values()], slot, CHART_TYPE.axisLabelSub, baseMargin);
-  }, [baseMargin, labelLayout, dimensions.width, rows.length, labelMap]);
+  }, [baseMargin, labelLayout, chartWidth, rows.length, labelMap]);
   const plotHeight = chartHeight - margin.top - margin.bottom;
   // The vendor mark grows with the bar, so the headroom above the tallest stack
   // has to be sized from the same band width the renderer will see.
   const bandwidth = useMemo(() => {
-    const plotWidth = dimensions.width - margin.left - margin.right;
+    const plotWidth = chartWidth - margin.left - margin.right;
     if (plotWidth <= 0 || rows.length === 0) return 0;
     return d3
       .scaleBand<string>()
@@ -1062,7 +1076,7 @@ export default function ProfitEstimatorChart({
       .range([0, plotWidth])
       .padding(BAND_PADDING)
       .bandwidth();
-  }, [dimensions.width, margin, rows]);
+  }, [chartWidth, margin, rows]);
   const yDomain = useMemo(
     () => profitYDomain(rows, plotHeight, stackHeadroomPx(barMarkHeight(bandwidth))),
     [rows, plotHeight, bandwidth],
@@ -1189,6 +1203,11 @@ export default function ProfitEstimatorChart({
         instructions=""
         legendElement={legendElement}
         caption={caption}
+        scrollablePlot={{
+          minWidth: chartWidth,
+          label: t.scrollHint,
+          enabled: chartWidth > dimensions.width,
+        }}
       />
     </div>
   );

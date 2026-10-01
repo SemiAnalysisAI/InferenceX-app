@@ -356,7 +356,13 @@ export function useChartExport({
       // Layout: force side-by-side flex row for export
       applyStyles(exportElement, { width: 'fit-content', overflow: 'visible', padding: '16px' });
 
-      const flexContainer = clone.querySelector(':scope > .flex') as HTMLElement | null;
+      for (const scroller of clone.querySelectorAll<HTMLElement>('[data-chart-scroll]')) {
+        applyStyles(scroller, { width: 'fit-content', overflow: 'visible' });
+        scroller.scrollLeft = 0;
+      }
+      const flexContainer = clone.querySelector(
+        ':scope > .flex, [data-chart-scroll] > .flex',
+      ) as HTMLElement | null;
       applyStyles(flexContainer, {
         flexDirection: 'row',
         width: 'fit-content',

@@ -58,7 +58,7 @@ function colorForRow(row: ProfitEstimatorRow): string {
 
 function mountChart(widthPx: number, rows: ProfitEstimatorRow[] = ROWS) {
   cy.mount(
-    <div style={{ width: widthPx, padding: 16 }}>
+    <div data-testid="profit-chart-container" style={{ width: widthPx, padding: 16 }}>
       <ProfitEstimatorChart
         rows={rows}
         hardwareConfig={{} as HardwareConfig}
@@ -86,10 +86,10 @@ function barColumns(): Cypress.Chainable<{ left: number; right: number }[]> {
   });
 }
 
-/** Left-to-right boxes of every revenue figure and margin line above the bars. */
+/** Combined revenue and margin bounds for each bar, in left-to-right order. */
 function labelBoxes(): Cypress.Chainable<DOMRect[]> {
   return cy
-    .get('[data-testid="profit-estimator-chart"] .revenue-label tspan')
+    .get('[data-testid="profit-estimator-chart"] .revenue-label')
     .then(($tspans) =>
       [...$tspans]
         .filter((el) => (el.textContent ?? '') !== '')
@@ -102,8 +102,31 @@ function overlaps(a: DOMRect, b: DOMRect): boolean {
 }
 
 describe('ProfitEstimatorChart revenue labels', () => {
+  it('preserves the rendered SVG at the exact scrolling threshold', () => {
+    cy.viewport(1280, 900);
+    mountChart(390, ROWS.slice(0, 3));
+    cy.get('[data-testid="d3-chart-svg"]').then(($svg) => {
+      const svg = $svg[0];
+      const width = svg.getBoundingClientRect().width;
+      cy.get('[data-testid="profit-chart-container"]').invoke('css', 'width', `${width + 32}px`);
+      cy.get('[data-chart-scroll][tabindex]').should('not.exist');
+      cy.get('[data-testid="d3-chart-svg"]').should(($current) => {
+        expect($current[0], 'same SVG at the threshold').to.equal(svg);
+        expect($current[0].getBoundingClientRect().width).to.equal(width);
+        expect($current.find('.revenue-label')).to.have.length(3);
+      });
+      cy.get('[data-chart-scroll]').should('not.have.attr', 'tabindex');
+      cy.get('[data-testid="profit-chart-container"]').invoke('css', 'width', `${width + 31}px`);
+      cy.get('[data-chart-scroll]').should('have.attr', 'tabindex', '0');
+      cy.get('[data-testid="d3-chart-svg"]').should(($current) => {
+        expect($current[0], 'same SVG below the threshold').to.equal(svg);
+        expect($current.find('.revenue-label')).to.have.length(3);
+      });
+    });
+  });
+
   it('never lets neighbouring revenue figures overlap on a phone', () => {
-    // iPhone 15/16 CSS viewport; the card padding leaves the chart ~361px.
+    // iPhone 15/16 viewport: the 361px card viewport scrolls across the wider plot.
     cy.viewport(393, 852);
     mountChart(393);
     cy.screenshot('profit-estimator-chart-phone', { overwrite: true });
@@ -125,9 +148,12 @@ describe('ProfitEstimatorChart revenue labels', () => {
     mountChart(393, LOSING_ROWS);
     cy.get('[data-testid="profit-estimator-chart"] .loss-label').should('have.length', 2);
     cy.screenshot('profit-estimator-chart-phone-loss', { overwrite: true });
-    // The wide figure loses the word and its decimal; the narrow one keeps its decimal.
+    // The scrollable plot has room to retain the loss label as well as the signed amount.
     cy.get('[data-testid="profit-estimator-chart"] .loss-label').then(($labels) => {
-      expect([...$labels].map((el) => el.textContent)).to.deep.equal(['-$561M', '-$4.9B']);
+      expect([...$labels].map((el) => el.textContent)).to.deep.equal([
+        'Loss -$561M',
+        'Loss -$4.9B',
+      ]);
     });
     cy.get('[data-testid="profit-estimator-chart"] rect.bar')
       .first()

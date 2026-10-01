@@ -68,6 +68,10 @@ Provisioned, and All in Measured. The last combines measured GPU power with mode
 unmeasured components and PUE; it is not a wall-meter measurement. These labels and
 collapsed power-assumption/availability notes do not change metric IDs, API selectors,
 or calculations. Profit comparison `powerLabel` display text follows the same names.
+Dense profit charts reserve readable space per bar and scroll within the plot on narrow
+screens; captions and controls stay fixed. This is presentation-only: API selectors,
+calculations, source identities and CSV rows are unchanged. PNG export includes the full
+plot regardless of its current scroll position, so no API or skills contract change is needed.
 The GPU statistics table includes startup and warmup for all chips in the selected
 series, regardless of chip visibility. It is separate from serving-window power,
 J/token and selected-time-window calculations. Run telemetry is DB-first with an
