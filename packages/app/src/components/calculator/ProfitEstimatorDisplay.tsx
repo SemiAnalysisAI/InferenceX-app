@@ -91,7 +91,6 @@ import {
   profitModelDefaults,
   type ProfitBasis,
   type ProfitEstimatorRow,
-  type ProfitEstimatorSkipReason,
 } from './profit-estimator';
 import { powerBasisLabel, profitEstimatorChartStrings, rowLabel } from './ProfitEstimatorChart';
 import { estimateProfitByPower, powerSourceKey, type ProfitPowerBasis } from './profit-power';
@@ -220,7 +219,6 @@ const STRINGS = {
     powerPreview: `${ALL_IN_MEASURED_NOTE.en} AgentX system power is not yet qualified.`,
     powerDetails:
       'GPU power is interpolated between the same throughput points. Includes PUE 1.3 for air-cooled chassis or 1.1 for NVL72, and 10% headroom. Aggregate multinode hosts use the measured deployment mean. Full-chassis extrapolation fills an eight-GPU server with replicas of the measured 1/2/4-GPU workload at the same per-GPU power and throughput; it does not measure a partly idle server.',
-    unavailableEstimates: (count: number) => `Unavailable estimates (${count})`,
     powerNvl72Note: (hardware: string, basis: string, pue: number) =>
       `${hardware}: ${basis}. Modeled: NVSwitch trays, NICs/DPUs, NVMe, power shelves, DLC PUE ${pue}.`,
     csvPowerHeaders: ['Power basis', 'Power sensor', 'System power profile'],
@@ -300,21 +298,6 @@ const STRINGS = {
         'Revenue ($/GPU/hr, 100% util)',
       ],
     },
-    skipped: (entries: string) => `Not priced: ${entries}.`,
-    modeledUnavailable: (entries: string) => `Measured + modeled unavailable: ${entries}.`,
-    skipReason: {
-      'outside-measured-range': 'no measured point at the target interactivity',
-      'no-power': 'no all-in power figure',
-      'no-measured-power': 'no usable measured power for these benchmark points',
-      'no-cpu-power': 'missing complete Grace or module power for these benchmark points',
-      'incompatible-power-basis': 'bounding points use different power measurement bases',
-      'unsupported-power-hardware': 'no system power model for this hardware',
-      'unsupported-power-topology':
-        'GPU counts, physical hosts or role power do not support this system model',
-      'outside-power-model': 'these benchmark points are outside the supported power model',
-      'no-cost': 'no TCO for this tier',
-      'no-token-mix': 'no input/output token mix recorded',
-    } satisfies Record<ProfitEstimatorSkipReason, string>,
     compareHistory: 'Compare history',
     gpuConfig: 'Chip Config',
     gpuConfigTooltip: `Select up to ${PROFIT_HISTORY_MAX_GPUS} chip configurations to compare how their estimated revenue and profit have moved over time. Each config is priced again on every compared date (the ends of the date range, plus any date or run added from the Config Changelog below) using the run measured then, so software updates show up as a change in the bar.`,
@@ -350,7 +333,6 @@ const STRINGS = {
     powerPreview: `${ALL_IN_MEASURED_NOTE.zh} AgentX 系统功耗模型尚未完成验证。`,
     powerDetails:
       'GPU 功耗在相同的吞吐量数据点间插值，风冷机箱 PUE 为 1.3，NVL72 为 1.1，另加 10% 功耗余量。聚合多节点按部署平均功耗估算各台服务器。整机外推假设八卡服务器部署多个相同的实测单卡、双卡或四卡实例，每卡功耗和吞吐量保持不变；它不代表部分 GPU 闲置时的整机实测功耗。',
-    unavailableEstimates: (count: number) => `无法估算（${count} 项）`,
     powerNvl72Note: (hardware: string, basis: string, pue: number) =>
       `${hardware}：${basis}。建模部分：NVSwitch tray、网卡/DPU、NVMe、电源架，液冷 PUE ${pue}。`,
     csvPowerHeaders: ['功耗口径', '功耗传感器', '系统功耗 profile'],
@@ -430,20 +412,6 @@ const STRINGS = {
         '收入（$/GPU/hr，100% 利用率）',
       ],
     },
-    skipped: (entries: string) => `未定价：${entries}。`,
-    modeledUnavailable: (entries: string) => `实测加建模估算不可用：${entries}。`,
-    skipReason: {
-      'outside-measured-range': '未在该交互性下实测',
-      'no-power': '缺少全电源配置功率数据',
-      'no-measured-power': '同一组基准测试数据点缺少有效功耗',
-      'no-cpu-power': '同一组基准测试数据点缺少完整的 Grace 或 module 功耗',
-      'incompatible-power-basis': '插值两端的功耗测量口径不同',
-      'unsupported-power-hardware': '该硬件暂无适用的系统功耗模型',
-      'unsupported-power-topology': 'GPU 数量、物理主机或各角色功耗不满足系统模型要求',
-      'outside-power-model': '这些基准测试数据点超出功耗模型的适用范围',
-      'no-cost': '该层级无 TCO 数据',
-      'no-token-mix': '未记录输入/输出 token 比例',
-    } satisfies Record<ProfitEstimatorSkipReason, string>,
     compareHistory: '对比历史趋势',
     gpuConfig: '芯片配置',
     gpuConfigTooltip: `最多选择 ${PROFIT_HISTORY_MAX_GPUS} 个芯片配置，对比其收入与利润估算随时间的变化。每个配置都会用当日实测的运行结果，在每个对比日期（日期范围的起止两端，以及从下方配置变更日志中添加的日期或运行）重新估价，软件更新带来的差异会直接体现在柱形上。`,
@@ -1371,29 +1339,6 @@ function ProfitEstimatorInner({
     historyCurrentRunIds,
   ]);
 
-  const powerUnavailable = useMemo(() => {
-    const unpriced: string[] = [];
-    const measuredUnavailable: string[] = [];
-    for (const row of fullEstimate.skipped) {
-      const label = rowLabel(
-        { ...row, dateLabel: row.date ? historyEntryLabel(row.date) : undefined },
-        hardwareConfig,
-      );
-      const entries =
-        powerBasis === 'compare' &&
-        fullEstimate.rows.some((priced) => priced.resultKey === `${row.resultKey}__provisioned`)
-          ? measuredUnavailable
-          : unpriced;
-      entries.push(`${label}: ${t.skipReason[row.reason]}`);
-    }
-    return [
-      unpriced.length > 0 ? t.skipped(unpriced.join('; ')) : '',
-      measuredUnavailable.length > 0 ? t.modeledUnavailable(measuredUnavailable.join('; ')) : '',
-    ]
-      .filter(Boolean)
-      .join(' ');
-  }, [fullEstimate, hardwareConfig, historyEntryLabel, powerBasis, t]);
-
   const powerBasisNotes = useMemo(() => {
     const notes = new Map<string, string>();
     for (const row of estimate.rows) {
@@ -1433,20 +1378,6 @@ function ProfitEstimatorInner({
           <p className="mb-2 text-xs text-muted-foreground" data-testid="profit-power-note">
             {t.powerLabel}: {t.powerOptions[powerBasis]}
           </p>
-        )}
-        {basis === 'gw-year' && powerBasis !== 'provisioned' && fullEstimate.skipped.length > 0 && (
-          <details
-            className="mb-2 text-xs text-muted-foreground"
-            data-testid="profit-power-unavailable"
-          >
-            <summary
-              className="cursor-pointer"
-              onClick={() => track('profit_estimator_power_unavailable_toggled')}
-            >
-              {t.unavailableEstimates(fullEstimate.skipped.length)}
-            </summary>
-            <p className="mt-1">{powerUnavailable}</p>
-          </details>
         )}
         <ResultContext
           locale={locale}
@@ -1524,8 +1455,6 @@ function ProfitEstimatorInner({
     pricing,
     powerBasis,
     powerControlsEnabled,
-    powerUnavailable,
-    fullEstimate.skipped,
     hardwareConfig,
     effectivePriceSource,
     listPricing,
@@ -1971,16 +1900,6 @@ function ProfitEstimatorInner({
           )}
           {pricing ? (
             <figure data-testid="profit-figure" className="relative rounded-lg">
-              {basis === 'gw-year' &&
-                estimate.rows.length === 0 &&
-                powerBasis !== 'provisioned' && (
-                  <p
-                    className="mb-3 text-xs text-muted-foreground"
-                    data-testid="profit-power-unavailable"
-                  >
-                    {t.powerPreview} {powerUnavailable}
-                  </p>
-                )}
               <ChartButtons
                 chartId="profit-estimator-chart"
                 analyticsPrefix="profit_estimator"
