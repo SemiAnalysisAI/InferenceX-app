@@ -1371,21 +1371,28 @@ function ProfitEstimatorInner({
     historyCurrentRunIds,
   ]);
 
-  const powerUnavailable = useMemo(
-    () =>
-      (powerBasis === 'compare' ? t.modeledUnavailable : t.skipped)(
-        fullEstimate.skipped
-          .map((row) => {
-            const label = rowLabel(
-              { ...row, dateLabel: row.date ? historyEntryLabel(row.date) : undefined },
-              hardwareConfig,
-            );
-            return `${label}: ${t.skipReason[row.reason]}`;
-          })
-          .join('; '),
-      ),
-    [fullEstimate.skipped, hardwareConfig, historyEntryLabel, powerBasis, t],
-  );
+  const powerUnavailable = useMemo(() => {
+    const unpriced: string[] = [];
+    const measuredUnavailable: string[] = [];
+    for (const row of fullEstimate.skipped) {
+      const label = rowLabel(
+        { ...row, dateLabel: row.date ? historyEntryLabel(row.date) : undefined },
+        hardwareConfig,
+      );
+      const entries =
+        powerBasis === 'compare' &&
+        fullEstimate.rows.some((priced) => priced.resultKey === `${row.resultKey}__provisioned`)
+          ? measuredUnavailable
+          : unpriced;
+      entries.push(`${label}: ${t.skipReason[row.reason]}`);
+    }
+    return [
+      unpriced.length > 0 ? t.skipped(unpriced.join('; ')) : '',
+      measuredUnavailable.length > 0 ? t.modeledUnavailable(measuredUnavailable.join('; ')) : '',
+    ]
+      .filter(Boolean)
+      .join(' ');
+  }, [fullEstimate, hardwareConfig, historyEntryLabel, powerBasis, t]);
 
   const powerBasisNotes = useMemo(() => {
     const notes = new Map<string, string>();

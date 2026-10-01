@@ -110,6 +110,61 @@ function assertDisclosureOpen(testId: string, open: boolean) {
 // Clear the preceding chart before each case changes the viewport.
 describe('Profit estimator power option', { testIsolation: true }, () => {
   for (const locale of ['en', 'zh'] as const) {
+    it(`distinguishes unpriced SKUs from missing measured-power estimates (${locale})`, () => {
+      stubOpenRouter();
+      const width = locale === 'en' ? 1280 : 390;
+      cy.viewport(width, 900);
+      cy.intercept('GET', '/api/v1/benchmarks*', {
+        body: profitBenchmarkRows().map((row) => ({
+          ...row,
+          metrics: {
+            ...row.metrics,
+            power_valid: row.hardware === 'b300' ? 0 : 1,
+            power_metric_schema_version: 2,
+            avg_power_w: 500,
+            avg_total_gpu_power_w: 4000,
+          },
+        })),
+      });
+      cy.visit(`${locale === 'zh' ? '/zh' : ''}/profit-estimator-per-gigawatt?c_power=compare`, {
+        onBeforeLoad: unlockPowerGate,
+      });
+      chart().find('text.revenue-label').should('have.length', 6);
+      chart()
+        .find('.x-axis')
+        .should('not.contain', 'H200')
+        .and('contain', 'B300')
+        .and('contain', 'GB300');
+      const unpriced = locale === 'en' ? 'Not priced:' : '未定价：';
+      const measured =
+        locale === 'en' ? 'Measured + modeled unavailable:' : '实测加建模估算不可用：';
+      cy.get('[data-testid="profit-power-unavailable"] > summary').click();
+      cy.get('[data-testid="profit-power-unavailable"] > p')
+        .should('be.visible')
+        .should(($notice) => {
+          const [baseline, measurement] = $notice.text().split(measured);
+          expect(baseline).to.contain(unpriced).and.to.contain('H200');
+          expect(baseline).not.to.contain('B300');
+          expect(measurement).to.contain('B300').and.to.contain('GB300');
+          expect(measurement).not.to.contain('H200');
+          expect(measurement).to.contain(
+            locale === 'en' ? 'no usable measured power' : '同一组基准测试数据点缺少有效功耗',
+          );
+          expect(measurement).to.contain(
+            locale === 'en'
+              ? 'missing complete Grace or module power'
+              : '缺少完整的 Grace 或 module 功耗',
+          );
+          const bounds = $notice[0].getBoundingClientRect();
+          expect(bounds.left).to.be.at.least(0);
+          expect(bounds.right).to.be.at.most(width);
+        });
+      cy.get('[data-testid="profit-power-unavailable"]').scrollIntoView({
+        offset: { top: -70, left: 0 },
+      });
+      cy.screenshot(`profit-unavailable-basis-${locale}`, { capture: 'viewport', overwrite: true });
+    });
+
     it(`prices DeepSeek Flash partial chassis with a one-line power note and CSV labels (${locale})`, () => {
       stubOpenRouter();
       cy.viewport(locale === 'en' ? 1280 : 393, 900);

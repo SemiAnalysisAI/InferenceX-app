@@ -72,6 +72,9 @@ Dense profit charts reserve readable space per bar and scroll within the plot on
 screens; captions and controls stay fixed. This is presentation-only: API selectors,
 calculations, source identities and CSV rows are unchanged. PNG export includes the full
 plot regardless of its current scroll position, so no API or skills contract change is needed.
+Unavailable-estimate notices distinguish unpriced SKUs from missing measured-plus-modeled
+estimates using the retained provisioned result identity. This explanatory grouping preserves
+the API's existing rows, skip reasons, selectors and calculations.
 The GPU statistics table includes startup and warmup for all chips in the selected
 series, regardless of chip visibility. It is separate from serving-window power,
 J/token and selected-time-window calculations. Run telemetry is DB-first with an
