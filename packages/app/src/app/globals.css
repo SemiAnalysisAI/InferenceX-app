@@ -80,8 +80,9 @@
   position: fixed;
   inset: 0 auto 0 0;
   z-index: 40;
-  /* The left page gutter beside the 1280px container, never narrower than 56px. */
-  width: clamp(56px, calc((100vw - 1280px) / 2 + 2rem), 160px);
+  /* At container breakpoints only the page padding remains available. */
+  width: clamp(14px, calc((100vw - 1280px) / 2), 96px);
+  --leaf-sway-scale: 1;
   overflow: hidden;
   pointer-events: none;
 }
@@ -105,16 +106,15 @@
     alternate;
 }
 
-/* Phones have only the page padding as a gutter, so the strip and leaves
-   shrink to stay clear of content. */
-@media (max-width: 639px) {
+/* Tablet and laptop breakpoints need the same protection as phones. */
+@media (max-width: 1359px) {
   .autumn-leaves {
-    width: 30px;
+    --leaf-sway-scale: 0.1;
   }
   .autumn-leaf {
     left: calc(var(--leaf-left) * 0.4);
-    width: calc(var(--leaf-size) * 0.6);
-    height: calc(var(--leaf-size) * 0.6);
+    width: calc(var(--leaf-size) * 0.25);
+    height: calc(var(--leaf-size) * 0.25);
   }
 }
 
@@ -129,10 +129,10 @@
 
 @keyframes autumn-leaf-sway {
   from {
-    transform: translateX(calc(var(--leaf-sway) * -1)) rotate(-35deg);
+    transform: translateX(calc(var(--leaf-sway) * var(--leaf-sway-scale) * -1)) rotate(-35deg);
   }
   to {
-    transform: translateX(var(--leaf-sway)) rotate(40deg);
+    transform: translateX(calc(var(--leaf-sway) * var(--leaf-sway-scale))) rotate(40deg);
   }
 }
 
