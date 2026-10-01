@@ -45,8 +45,8 @@ experimental power controls with ↑↑↓↓ if they are hidden.
 4. For a capacity comparison, open `/profit-estimator-per-gigawatt`, choose the
    model and a supported interactivity target, then select **Compare both** in
    Benchmark Config. Match each result's workload, engine and precision to the
-   inference selection. Expand **Unavailable estimates** for missing results;
-   hover or select a bar for its power basis and read the formula notes below.
+   inference selection. Hover or select a bar for its power basis and read the
+   formula notes below.
 
 **Expected result:** the inference table includes rows with a valid selected
 metric, including supported B200/H200 multi-node deployments. Selecting All in
@@ -175,10 +175,9 @@ Chart/table rows and target-based profit estimates answer different questions.
 | `workload`, `hardware`, `model-domain`                                     | Use a supported workload/profile and in-domain input; do not replace the missing estimate with zero or TDP.                                                                                |
 
 In **Compare both**, a valid provisioned result remains when its measured estimate
-is unavailable. Configurations that cannot be priced at all are listed separately
-from missing measured estimates. Measured-only mode never substitutes provisioned
-watts. See [persistence and recovery](./powerx-persistence-recovery.md) for retained
-telemetry and targeted repair; new power readings cannot be attached to old
+is unavailable. Measured-only mode never substitutes provisioned watts. See
+[persistence and recovery](./powerx-persistence-recovery.md) for retained telemetry
+and targeted repair; new power readings cannot be attached to old
 throughput results.
 
 ## Provenance and reproducible exports

@@ -95,22 +95,10 @@ const chart = () => cy.get('[data-testid="profit-estimator-chart"]');
 const chartSvg = () => chart().find('svg').filter(':has(.chart-root)').first();
 const bars = () => chart().find('rect.bar');
 
-function assertDisclosureOpen(testId: string, open: boolean) {
-  cy.get<HTMLDetailsElement>(`[data-testid="${testId}"]`).should(($details) => {
-    expect($details[0].open, `${testId} native disclosure state`).to.equal(open);
-    const content = $details[0].querySelector('p');
-    expect(content, `${testId} content`).not.to.equal(null);
-    // Cypress visibility omits native closed-details rendering in some browsers.
-    if (content && typeof content.checkVisibility === 'function') {
-      expect(content.checkVisibility(), `${testId} browser visibility`).to.equal(open);
-    }
-  });
-}
-
 // Clear the preceding chart before each case changes the viewport.
 describe('Profit estimator power option', { testIsolation: true }, () => {
   for (const locale of ['en', 'zh'] as const) {
-    it(`distinguishes unpriced SKUs from missing measured-power estimates (${locale})`, () => {
+    it(`keeps available estimates without a per-configuration warning list (${locale})`, () => {
       stubOpenRouter();
       const width = locale === 'en' ? 1280 : 390;
       cy.viewport(width, 900);
@@ -135,34 +123,12 @@ describe('Profit estimator power option', { testIsolation: true }, () => {
         .should('not.contain', 'H200')
         .and('contain', 'B300')
         .and('contain', 'GB300');
-      const unpriced = locale === 'en' ? 'Not priced:' : '未定价：';
-      const measured =
-        locale === 'en' ? 'Measured + modeled unavailable:' : '实测加建模估算不可用：';
-      cy.get('[data-testid="profit-power-unavailable"] > summary').click();
-      cy.get('[data-testid="profit-power-unavailable"] > p')
-        .should('be.visible')
-        .should(($notice) => {
-          const [baseline, measurement] = $notice.text().split(measured);
-          expect(baseline).to.contain(unpriced).and.to.contain('H200');
-          expect(baseline).not.to.contain('B300');
-          expect(measurement).to.contain('B300').and.to.contain('GB300');
-          expect(measurement).not.to.contain('H200');
-          expect(measurement).to.contain(
-            locale === 'en' ? 'no usable measured power' : '同一组基准测试数据点缺少有效功耗',
-          );
-          expect(measurement).to.contain(
-            locale === 'en'
-              ? 'missing complete Grace or module power'
-              : '缺少完整的 Grace 或 module 功耗',
-          );
-          const bounds = $notice[0].getBoundingClientRect();
-          expect(bounds.left).to.be.at.least(0);
-          expect(bounds.right).to.be.at.most(width);
-        });
-      cy.get('[data-testid="profit-power-unavailable"]').scrollIntoView({
-        offset: { top: -70, left: 0 },
+      cy.get('[data-testid="profit-power-unavailable"]').should('not.exist');
+      chart().scrollIntoView();
+      cy.screenshot(`profit-no-unavailable-list-${locale}`, {
+        capture: 'viewport',
+        overwrite: true,
       });
-      cy.screenshot(`profit-unavailable-basis-${locale}`, { capture: 'viewport', overwrite: true });
     });
 
     it(`prices DeepSeek Flash partial chassis with a one-line power note and CSV labels (${locale})`, () => {
@@ -202,10 +168,6 @@ describe('Profit estimator power option', { testIsolation: true }, () => {
         },
       );
       const label = locale === 'en' ? 'Full-chassis extrapolation' : '整机外推';
-      const cpuReason =
-        locale === 'en'
-          ? 'missing complete Grace or module power'
-          : '缺少完整的 Grace 或 module 功耗';
       cy.get('#profit-target').should('have.value', '125');
       chart().find('text.revenue-label').should('have.length', 3);
       chart()
@@ -213,19 +175,11 @@ describe('Profit estimator power option', { testIsolation: true }, () => {
         .and('contain', 'B300')
         .and('contain', 'MI355X')
         .and('contain', label);
-      cy.get('[data-testid="profit-power-unavailable"]')
-        .should('contain', 'GB300')
-        .and('contain', cpuReason);
-      assertDisclosureOpen('profit-power-unavailable', false);
-      cy.get('[data-testid="profit-power-unavailable"] > summary').click();
-      assertDisclosureOpen('profit-power-unavailable', true);
-      cy.get('[data-testid="profit-power-unavailable"] > p').should('be.visible');
+      cy.get('[data-testid="profit-power-unavailable"]').should('not.exist');
       cy.get('[data-testid="profit-power-note"]')
         .should('contain', locale === 'en' ? 'All in Measured' : '整体实测功耗')
         .and('not.contain', locale === 'en' ? 'unmeasured components' : '未实测的组件');
       cy.get('[data-testid="profit-power-assumptions"]').should('not.exist');
-      cy.get('[data-testid="profit-power-unavailable"] > summary').click();
-      assertDisclosureOpen('profit-power-unavailable', false);
       cy.get('[data-testid="profit-power-note"]').then(($note) => {
         const box = $note[0].getBoundingClientRect();
         expect(box.left).to.be.at.least(0);
@@ -293,7 +247,7 @@ describe('Profit estimator power option', { testIsolation: true }, () => {
   });
 
   for (const currentValid of [true, false]) {
-    it(`dates historical power skips without current hardware metadata (${currentValid ? 'with current bars' : 'provisioned bars only'})`, () => {
+    it(`keeps historical provisioned bars when measured power is unavailable (${currentValid ? 'with current bars' : 'provisioned bars only'})`, () => {
       stubOpenRouter();
       cy.intercept('GET', '/api/v1/benchmarks*', (req) => {
         const historical = req.query['date'] === PROFIT_HISTORY_DATE;
@@ -317,14 +271,6 @@ describe('Profit estimator power option', { testIsolation: true }, () => {
       cy.visit(
         `/profit-estimator-per-gigawatt?c_power=compare&i_gpus=b200_sglang,b300_vllm&i_dstart=${PROFIT_HISTORY_DATE}&i_dend=${PROFIT_HISTORY_DATE}`,
         { onBeforeLoad: unlockPowerGate },
-      );
-      cy.get('[data-testid="profit-power-unavailable"]').should(
-        'contain',
-        `B300 (vLLM) (FP4) • ${PROFIT_HISTORY_DATE}`,
-      );
-      cy.get('[data-testid="profit-power-unavailable"]').should(
-        'contain',
-        `B200 (SGLang) (FP4) • ${PROFIT_HISTORY_DATE}`,
       );
       chart()
         .find('text.revenue-label')
@@ -361,7 +307,7 @@ describe('Profit estimator power option', { testIsolation: true }, () => {
     chart().find('text.revenue-label').should('have.length', 7);
     chart().should('contain', 'B200').and('contain', 'B300').and('contain', 'MI355X');
     chart().should('contain', 'All in Measured').and('contain', 'All in Provisioned');
-    cy.get('[data-testid="profit-power-unavailable"]').should('contain', 'GB300');
+    cy.get('[data-testid="profit-power-unavailable"]').should('not.exist');
   });
 
   it('prices a GB200 NVL72 tray on its measured compute module and names the basis', () => {
@@ -421,10 +367,7 @@ describe('Profit estimator power option', { testIsolation: true }, () => {
       .and('contain', 'DLC PUE 1.1');
     cy.get('body').type('{esc}');
     cy.get('[data-testid="option-help-content-profit-power"]').should('not.exist');
-    // Only GB300's measured estimate is unavailable; its provisioned estimate remains visible.
-    cy.get('[data-testid="profit-power-unavailable"]')
-      .should('contain', 'GB300')
-      .and('not.contain', 'GB200');
+    cy.get('[data-testid="profit-power-unavailable"]').should('not.exist');
     chart().scrollIntoView();
     cy.screenshot('profit-nvl72-compare-desktop', { capture: 'viewport', overwrite: true });
     cy.viewport(393, 900);
@@ -611,10 +554,8 @@ describe('Profit estimator power option', { testIsolation: true }, () => {
         cy.get('#profit-power').click();
         cy.get('[role="option"]').contains('All in Measured').click();
         // These existing fixtures intentionally have throughput but no validated power.
-        cy.get('[data-testid="profit-power-unavailable"]').should(
-          'contain',
-          'no usable measured power',
-        );
+        cy.get('[data-testid="profit-power-unavailable"]').should('not.exist');
+        cy.contains('No SKU can be priced for the current selection.').should('be.visible');
         cy.get('#profit-target').should('have.value', '45');
         cy.get('[data-testid="profit-model-selector"]').should('contain', 'Kimi K3');
         cy.get('[data-testid="profit-price-source-selector"]').should('contain', 'Moonshot');

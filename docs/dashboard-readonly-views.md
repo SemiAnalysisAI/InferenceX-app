@@ -66,7 +66,7 @@ state. GPU interactive downsampling does not alter returned raw data or statisti
 Power boundary labels are GPU Level Measured, GPU Level Provisioned (TDP), All in
 Provisioned, and All in Measured. The last combines measured GPU power with modeled
 unmeasured components and PUE; it is not a wall-meter measurement. These labels and
-collapsed power-assumption/availability notes do not change metric IDs, API selectors,
+power-assumption notes do not change metric IDs, API selectors,
 or calculations. Profit comparison `powerLabel` display text follows the same names.
 All in Measured watts and energy accept validated 8K/1K and AgentX rows through the
 shared chart/API transform, including historical and unofficial rows. AgentX reuses
@@ -78,9 +78,8 @@ Dense profit charts reserve readable space per bar and scroll within the plot on
 screens; captions and controls stay fixed. This is presentation-only: API selectors,
 calculations, source identities and CSV rows are unchanged. PNG export includes the full
 plot regardless of its current scroll position, so no API or skills contract change is needed.
-Unavailable-estimate notices distinguish unpriced SKUs from missing measured-plus-modeled
-estimates using the retained provisioned result identity. This explanatory grouping preserves
-the API's existing rows, skip reasons, selectors and calculations.
+Profit charts omit the per-configuration unavailable-estimate list. This is presentation-only;
+the API retains skipped rows and reasons, and calculations and CSV exports are unchanged.
 The GPU statistics table includes startup and warmup for all chips in the selected
 series, regardless of chip visibility. It is separate from serving-window power,
 J/token and selected-time-window calculations. Run telemetry is DB-first with an
