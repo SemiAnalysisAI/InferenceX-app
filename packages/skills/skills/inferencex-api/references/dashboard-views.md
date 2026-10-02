@@ -5,6 +5,19 @@ Use `/api/v1/views/*` for dashboard-calculated values. Read the deployed
 these routes become available only after the corresponding app change deploys.
 Do not assume an installed skill proves server availability.
 
+## Historical editorial articles
+
+The GLM-5.3 article at
+`/blog/sparse-savings-persistent-demand-inside-glm53` (Chinese:
+`/zh/blog/sparse-savings-persistent-demand-inside-glm53`) preserves the newsletter's
+September 28, 2026 snapshot, original figures, and framework/TTFT qualifications.
+Discover public article text through `/llms.txt` and `/llms-full.txt`; the
+subscriber-only continuation is linked, not exposed by those feeds.
+This is static editorial content, not a new view API. For fresh measurements use
+the existing `inference`, `first-token`, and `cache-reuse` contracts below, with
+explicit selectors. Do not replace the article's historical costs with current
+results or treat its interpolated values as separately measured operating points.
+
 ## Capture and select
 
 1. Resolve the view and missing selectors from the table below. Read `options`
