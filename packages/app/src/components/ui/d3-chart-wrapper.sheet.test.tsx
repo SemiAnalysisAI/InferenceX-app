@@ -4,7 +4,7 @@ import React, { act, createRef } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { MOBILE_VIEWPORT_QUERY } from '@/hooks/useMediaQuery';
+import { COARSE_POINTER_QUERY, MOBILE_VIEWPORT_QUERY } from '@/hooks/useMediaQuery';
 import { stubMatchMedia } from '@/test/match-media-stub';
 
 vi.mock('@/lib/use-locale', () => ({ useLocale: () => 'en' }));
@@ -59,7 +59,7 @@ const backdrop = () => document.querySelector<HTMLElement>('[data-testid="chart-
 
 describe('D3ChartWrapper mobile detail sheet', () => {
   it('presents a pinned tooltip as a dismissible bottom sheet on phones', () => {
-    stubMatchMedia({ [MOBILE_VIEWPORT_QUERY]: true });
+    stubMatchMedia({ [MOBILE_VIEWPORT_QUERY]: true, [COARSE_POINTER_QUERY]: true });
     const { dismissTooltip, hideTooltipElements } = renderWrapper(true);
 
     expect(tooltip()?.dataset.sheet).toBe('true');
@@ -72,7 +72,7 @@ describe('D3ChartWrapper mobile detail sheet', () => {
   });
 
   it('closes the sheet on Escape', () => {
-    stubMatchMedia({ [MOBILE_VIEWPORT_QUERY]: true });
+    stubMatchMedia({ [MOBILE_VIEWPORT_QUERY]: true, [COARSE_POINTER_QUERY]: true });
     const { dismissTooltip } = renderWrapper(true);
     act(() => {
       window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
@@ -88,8 +88,15 @@ describe('D3ChartWrapper mobile detail sheet', () => {
     expect(backdrop()).toBeNull();
   });
 
+  it('keeps the floating tooltip in a narrow window driven by a mouse', () => {
+    stubMatchMedia({ [MOBILE_VIEWPORT_QUERY]: true, [COARSE_POINTER_QUERY]: false });
+    renderWrapper(true);
+    expect(tooltip()?.dataset.sheet).toBeUndefined();
+    expect(backdrop()).toBeNull();
+  });
+
   it('never shows a sheet for an unpinned hover tooltip', () => {
-    stubMatchMedia({ [MOBILE_VIEWPORT_QUERY]: true });
+    stubMatchMedia({ [MOBILE_VIEWPORT_QUERY]: true, [COARSE_POINTER_QUERY]: true });
     renderWrapper(false);
     expect(tooltip()?.dataset.sheet).toBeUndefined();
     expect(backdrop()).toBeNull();

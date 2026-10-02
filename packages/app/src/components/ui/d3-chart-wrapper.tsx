@@ -3,7 +3,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
-import { useIsMobileViewport } from '@/hooks/useMediaQuery';
+import { useIsCoarsePointer, useIsMobileViewport } from '@/hooks/useMediaQuery';
 import { useLocale } from '@/lib/use-locale';
 
 const DEFAULT_CHART_INSTRUCTIONS = {
@@ -45,8 +45,11 @@ function PortalTooltip({
   const locale = useLocale();
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
+  // Bottom sheet only on touch phones. A narrow desktop window driven by a
+  // mouse keeps the floating tooltip so pin-then-hover comparisons still work.
   const isMobile = useIsMobileViewport();
-  const sheet = pinned && isMobile;
+  const isTouch = useIsCoarsePointer();
+  const sheet = pinned && isMobile && isTouch;
 
   const onSheetDismissRef = useRef(onSheetDismiss);
   onSheetDismissRef.current = onSheetDismiss;

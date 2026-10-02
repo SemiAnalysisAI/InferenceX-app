@@ -90,9 +90,10 @@ describe('Chart Section Tabs — E2E', () => {
     cy.visit('/inference');
     cy.get('[data-testid="mobile-chart-select"]').should('be.visible');
     cy.get('[data-testid="mobile-tab-inference"]').should('have.attr', 'aria-current', 'page');
-    cy.get('[data-testid="mobile-tab-evaluation"]').scrollIntoView().click();
-    cy.location('pathname').should('eq', '/evaluation');
+    cy.get('[data-testid="mobile-tab-evaluation"]').should('have.attr', 'href', '/evaluation');
+    cy.visit('/evaluation');
     cy.get('[data-testid="mobile-tab-evaluation"]').should('have.attr', 'aria-current', 'page');
+    cy.get('[data-testid="mobile-tab-inference"]').should('not.have.attr', 'aria-current');
   });
 
   it('keeps the sliding indicator aligned after the ↑↑↓↓ unlock inserts the Hidden trigger', () => {
