@@ -140,3 +140,47 @@ describe('PowerX publication', () => {
     expect(tracker.skips.failedRun).toBe(1);
   });
 });
+
+describe('NVL72 CPU publication', () => {
+  it('retains CPU watts and socket provenance and rejects their loss in DB/API readback', () => {
+    const point = expected({
+      cpu_power_valid: 1,
+      avg_total_cpu_power_w: 501,
+      power_audit: {
+        ...raw.power_audit,
+        cpu: {
+          sensor_kind: 'grace_socket',
+          source: 'acpi',
+          expected_sockets: 2,
+          observed_sockets: 2,
+          reason_codes: [],
+        },
+      },
+    });
+    expect(point.metrics).toMatchObject({ cpu_power_valid: 1, avg_total_cpu_power_w: 501 });
+    expect(point.power_audit).toMatchObject({
+      cpu: { sensor_kind: 'grace_socket', observed_sockets: 2 },
+    });
+    expect(verifyPowerPublication([point], [actual(point)], 'database')).toEqual([]);
+    const missingCpu = actual(point);
+    delete missingCpu.metrics.cpu_power_valid;
+    delete missingCpu.metrics.avg_total_cpu_power_w;
+    expect(verifyPowerPublication([point], [missingCpu], 'API')).toContainEqual(
+      expect.stringContaining('cpu_power_valid expected 1'),
+    );
+    expect(
+      verifyPowerPublication([point], [{ ...actual(point), power_audit: raw.power_audit }], 'API'),
+    ).toContainEqual(expect.stringContaining('power_audit differs'));
+  });
+
+  it('preserves valid GPU watts and rejects leaked invalid CPU watts', () => {
+    const point = expected({ cpu_power_valid: 0, avg_total_cpu_power_w: 501 });
+    expect(point.metrics).toMatchObject({ cpu_power_valid: 0, avg_power_w: 642 });
+    expect(point.metrics).not.toHaveProperty('avg_total_cpu_power_w');
+    const leaked = actual(point);
+    leaked.metrics.avg_total_cpu_power_w = 501;
+    expect(verifyPowerPublication([point], [leaked], 'API')).toContainEqual(
+      expect.stringContaining('avg_total_cpu_power_w expected absent, got 501'),
+    );
+  });
+});

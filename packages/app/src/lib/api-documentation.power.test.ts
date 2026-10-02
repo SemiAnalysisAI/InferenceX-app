@@ -43,9 +43,29 @@ describe('measured-power API documentation', () => {
         'max_sample_gap_s',
         'producer_sha',
         'exporter_image_sha256',
+        'cpu',
       ].toSorted(),
     );
     expect(audit?.required).toBeUndefined();
+
+    // NVL72 CPU-side leg provenance: the enum matches the consumer's sensor kinds.
+    const cpu = audit?.properties?.cpu;
+    expect(cpu?.properties?.sensor_kind).toEqual({
+      type: 'string',
+      enum: ['module', 'grace_socket', 'dcgm_cpu_rail'],
+    });
+    expect(cpu?.properties?.reason_codes).toEqual({ type: 'array', items: { type: 'string' } });
+    expect(Object.keys(cpu?.properties ?? {}).toSorted()).toEqual(
+      [
+        'sensor_kind',
+        'source',
+        'expected_sockets',
+        'observed_sockets',
+        'sample_row_count',
+        'reason_codes',
+      ].toSorted(),
+    );
+    expect(cpu?.required).toBeUndefined();
 
     expect(benchmarkRowSchema?.required).not.toContain('power_invalid_reasons');
     expect(benchmarkRowSchema?.required).not.toContain('power_audit');
@@ -83,6 +103,9 @@ describe('measured-power API documentation', () => {
       expect(note?.description).toContain('powerValid=strictV2');
       expect(note?.description).toContain('power_valid == 1');
       expect(note?.description).toContain('power_metric_schema_version == 2');
+      expect(note?.description).toContain('cpu_power_valid');
+      expect(note?.description).toContain('power_audit.cpu');
+      expect(note?.example).toMatchObject({ cpu_power_valid: 1, avg_total_cpu_power_w: 501 });
     }
     const zhNote = getApiDocumentation('zh').schemaNotes.find(
       (candidate) => candidate.id === 'measured-power',
