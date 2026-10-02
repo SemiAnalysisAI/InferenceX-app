@@ -5,12 +5,19 @@ import { describe, expect, it } from 'vitest';
 
 import { GET as fullText } from '@/app/llms-full.txt/route';
 import { getAllPosts, getPostBySlug } from './blog';
+import { getGlossaryEntry } from './glossary';
+import { getZhGlossaryEntry } from './glossary-zh';
 
 const slug = 'sparse-savings-persistent-demand-inside-glm53';
 const source = `https://newsletter.semianalysis.com/p/${slug}`;
 const publicDir = path.resolve(import.meta.dirname, '../../public');
 
 describe('GLM-5.3 newsletter port', () => {
+  it('links the article from the sparse-attention glossary in both languages', () => {
+    expect(getGlossaryEntry('sparse-attention')?.articleSlugs).toContain(slug);
+    expect(getZhGlossaryEntry('sparse-attention')?.articleSlugs).toContain(slug);
+  });
+
   it.each(['en', 'zh'] as const)(
     'publishes compilable %s content and all 21 original figures',
     async (locale) => {
