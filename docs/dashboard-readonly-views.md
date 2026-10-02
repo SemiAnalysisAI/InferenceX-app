@@ -5,6 +5,17 @@ The implementation reuses the existing @semianalysisai/inferencex-skills package
 Every registered dashboard route is checked against DASHBOARD_API_COVERAGE by
 registry.test.ts, including hidden and feature-gated routes.
 
+## Static editorial content
+
+`/blog/sparse-savings-persistent-demand-inside-glm53` and its `/zh/blog/` sibling
+reproduce the public GLM-5.3 newsletter article, with the September 28, 2026
+benchmark snapshot and original figures. They add no data selectors, calculations,
+or API contracts. Existing `/llms.txt`, `/llms-full.txt`, `/feed.xml`, and sitemap
+handlers discover the post through the shared blog registry. The subscriber-only
+continuation stays on the newsletter and is not included in these feeds.
+Use the existing inference, first-token, and cache-reuse view contracts for live
+data; do not interpret the historical article figures as current API results.
+
 ## Exact query-key inventory
 
 All endpoints are GET under /api/v1/views. Unsupported and repeated keys return 400.
