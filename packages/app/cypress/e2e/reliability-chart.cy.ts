@@ -17,10 +17,6 @@ describe('Reliability Chart', () => {
     cy.contains('h2', 'Chip Reliability').should('be.visible');
   });
 
-  it('shows the date range selector', () => {
-    cy.get('[data-testid="reliability-date-range"]').should('be.visible');
-  });
-
   it('keeps the date filter scoped and discoverable above the chart', () => {
     cy.get('[data-testid="reliability-chart-display"]')
       .contains('h3', 'Chart filters')
@@ -37,21 +33,6 @@ describe('Reliability Chart', () => {
     cy.get('body').type('{esc}');
   });
 
-  it('changing date range updates the displayed selection', () => {
-    cy.get('[data-testid="reliability-date-range"]').click();
-    cy.contains('[role="option"]', 'Last 7 days').click();
-    cy.get('[data-testid="reliability-date-range"]').should('contain', 'Last 7 days');
-  });
-
-  it('shows a chart with SVG', () => {
-    cy.get('#reliability-chart').find('svg').should('exist');
-  });
-
-  it('does not show "No data available" text', () => {
-    cy.get('[data-testid="reliability-chart-display"]').should('exist');
-    cy.contains('No data available').should('not.exist');
-  });
-
   it('shows Source attribution in chart caption', () => {
     cy.get('#reliability-chart')
       .closest('section')
@@ -66,6 +47,8 @@ describe('Reliability Chart — Content & Interactions', () => {
     cy.window().then((win) => {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
     });
+    // Keep this fresh load: Cypress restores cy.clock between tests, so the
+    // earlier group's selector interactions can reaggregate under the real date.
     visitReliability('/reliability');
     cy.get('[data-testid="reliability-chart-display"]').should('be.visible');
   });
@@ -80,8 +63,9 @@ describe('Reliability Chart — Content & Interactions', () => {
     cy.get('#reliability-chart svg rect.bar')
       .its('length')
       .then((initialCount) => {
-        cy.get('[data-testid="reliability-date-range"]').click();
+        cy.get('[data-testid="reliability-date-range"]').should('be.visible').click();
         cy.contains('[role="option"]', 'Last 7 days').click();
+        cy.get('[data-testid="reliability-date-range"]').should('contain', 'Last 7 days');
 
         cy.get('#reliability-chart svg rect.bar').should('have.length.lessThan', initialCount);
 
