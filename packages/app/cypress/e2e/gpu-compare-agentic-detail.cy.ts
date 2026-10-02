@@ -100,6 +100,11 @@ const agenticBenchmarks = AGENTIC_HARDWARE.flatMap((g) =>
 // "View charts" link only when trace-availability returns true for the id.
 const agenticIds = new Set(agenticBenchmarks.map((b) => b.id));
 
+function expectCompatibleSelection($inputs: JQuery<HTMLElement>) {
+  const ids = [...$inputs].map((input) => input.id).sort();
+  expect(ids).to.deep.equal(['checkbox-b200_sglang', 'checkbox-b300_vllm']);
+}
+
 describe('GPU comparison agentic point detail', () => {
   it('exposes the per-point charts as a normal browser link', () => {
     // Shadow the fixture-server availability + benchmarks responses with
@@ -208,6 +213,25 @@ describe('GPU comparison agentic point detail', () => {
 
   const CONFLICTING_GPU_URL =
     '/inference?g_model=DeepSeek-V4-Pro&i_seq=agentic-traces&i_prec=fp4&i_gpus=b200_sglang,b200_vllm&i_dates=2026-06-12&i_dstart=2026-06-12&i_dend=2026-06-12';
+
+  it('restores a soloed compatible selection without requesting engine consent', () => {
+    cy.intercept('GET', '/api/v1/availability', { body: agenticAvailability });
+    cy.intercept('GET', '/api/v1/benchmarks*', { body: agenticBenchmarks });
+    interceptDerivedAgenticMetrics();
+    cy.visit('/inference?g_model=DeepSeek-V4-Pro&i_seq=agentic-traces&i_prec=fp4', {
+      onBeforeLoad(win) {
+        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+        win.localStorage.removeItem('inferencex-feature-gate');
+      },
+    });
+    const checked = '[data-testid="chart-legend"] ul input[type="checkbox"]:checked';
+    cy.get(checked).should(expectCompatibleSelection);
+    cy.get('[data-testid="chart-legend"] label[for="checkbox-b200_sglang"]').click();
+    cy.get(checked).should('have.length', 1).and('have.attr', 'id', 'checkbox-b200_sglang');
+    cy.get('[data-testid="chart-legend"] label[for="checkbox-b200_sglang"]').click();
+    cy.get('[data-testid="engine-comparison-confirmation"]').should('not.exist');
+    cy.get(checked).should(expectCompatibleSelection);
+  });
 
   it('defaults to the scored winner and requires consent before showing both engines', () => {
     cy.intercept('GET', '/api/v1/availability', { body: agenticAvailability });

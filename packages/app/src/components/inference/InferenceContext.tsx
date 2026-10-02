@@ -1288,6 +1288,8 @@ export function InferenceProvider({
     (hw: string) => {
       const proposed = computeToggle(activeHwTypes, hw, selectableHwTypes);
       if (
+        // Solo/restore clicks retain the exclusion-aware selection below.
+        !activeHwTypes.has(hw) &&
         requestEngineComparison(proposed, () => {
           setActiveHwTypes(proposed);
           setBestPerSku(false);
