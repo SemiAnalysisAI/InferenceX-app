@@ -31,8 +31,12 @@ export interface DataTableColumn<T> {
   align?: 'left' | 'right' | 'center';
   /** Extract and format the cell value from a row. */
   cell: (row: T, index: number) => React.ReactNode;
-  /** Extract a sortable/searchable value from a row. Omit to disable sorting and search for this column. */
-  sortValue?: (row: T) => number | string;
+  /**
+   * Extract a sortable/searchable value from a row. Omit to disable sorting and
+   * search for this column; return null for a cell with nothing to compare, which
+   * sorts last in either direction and never matches a search.
+   */
+  sortValue?: (row: T) => number | string | null;
   /** Additional className for header and body cells. */
   className?: string;
   /** Opt-in visibility preset membership; columns without this remain in All data only. */
@@ -178,8 +182,8 @@ export function DataTable<T>({
     const q = search.trim().toLowerCase();
     return data.filter((row) =>
       columns.some((col) => {
-        if (!col.sortValue) return false;
-        return String(col.sortValue(row)).toLowerCase().includes(q);
+        const value = col.sortValue?.(row);
+        return value !== null && value !== undefined && String(value).toLowerCase().includes(q);
       }),
     );
   }, [data, search, columns, searchable]);

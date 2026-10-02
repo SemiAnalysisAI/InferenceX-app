@@ -325,16 +325,26 @@ and colour overlay sources with `overlayRunColor`.
 - Analytics: `inference_power_roles_toggled` and `inference_power_fit_toggled` (`{ enabled }`),
   and chart-button events under `power_roles`, `power_fit` and `frontier_points`.
 
-Equal-service comparisons and the matched-concurrency diagnostic remain available through the
-read-only inference API with `serviceCompare`, `serviceBaseline`, `serviceComparator` and
-`serviceTarget`. They have no dashboard control, panel, table or share parameter. The API retains
-source identity, bounded interpolation, missing-data reasons and same-load pairing semantics;
-see [Dashboard read-only views](./dashboard-readonly-views.md#fixed-sequence-service-comparisons).
+Equal-service comparisons remain API-only (`serviceCompare`, `serviceBaseline`,
+`serviceComparator`, `serviceTarget`); the chart's Perf Ruler is the dashboard's same-speed
+comparison. Same-concurrency differences surface in the Table view. On measured GPU W/GPU and
+J/output token, a **Baseline** select (default: the first visible source) adds a `Δ vs baseline`
+column to the Measurements rows: `row − baseline` at the same concurrency, with the percentage
+relative to the baseline, in the metric column's own units. Baseline rows read "baseline"; a load
+the baseline never ran, a conflicting baseline reading, or a boundary / role clone shows `—`.
+Nothing is interpolated. The baseline is table-local state like the view mode, with no share
+parameter; analytics `inference_table_baseline_changed`. The API retains source identity, bounded
+interpolation, missing-data reasons and same-load pairing semantics (`matchedConcurrency`); see
+[Dashboard read-only views](./dashboard-readonly-views.md#fixed-sequence-service-comparisons).
 
-同等服务条件下的对比和相同并发下的诊断继续通过只读 inference API 提供，查询参数为
-`serviceCompare`、`serviceBaseline`、`serviceComparator` 和 `serviceTarget`。仪表板不提供
-对应的控件、面板、表格或分享参数；角色分析、功耗拟合和前沿点表继续保留。API 的来源标识、
-有界插值、缺失原因和同并发配对规则保持不变，详见[仪表板只读视图](./dashboard-readonly-views.md#fixed-sequence-service-comparisons)。
+同等服务条件下的对比仍只通过只读 inference API 提供（`serviceCompare`、`serviceBaseline`、
+`serviceComparator`、`serviceTarget`），图表上的 Perf Ruler 是仪表板上相同速度下的对比工具。
+相同并发下的差异由表格视图呈现：在 GPU 实测 W/GPU 和 J/output token 指标下，“基准配置”选择框
+（默认取第一个可见配置）会在实测数据行中新增“相对基准差值”列，显示该行减去基准配置在相同并发数下
+的读数，以及相对基准的百分比，单位与指标列一致。基准配置自身的行显示“基准”；基准未测过的并发数、
+基准读数冲突或边界/角色克隆行显示 `—`，全程不做插值。基准配置与视图切换一样只是表格本地状态，
+没有分享参数；埋点事件为 `inference_table_baseline_changed`。API 的来源标识、有界插值、缺失原因和
+同并发配对规则（`matchedConcurrency`）保持不变，详见[仪表板只读视图](./dashboard-readonly-views.md#fixed-sequence-service-comparisons)。
 
 ## Tests
 

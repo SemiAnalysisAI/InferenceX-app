@@ -130,9 +130,13 @@ median. AgentX keeps its selected `percentile`, and concurrency has no statistic
 `params.xstat` resolves to null in both cases, while `xAxis.statistic` records the
 effective percentile or null.
 
-Equal-service comparisons and the same-concurrency diagnostic are API-only analysis.
-The dashboard has no source-pair selector, target input, comparison curve or matched-concurrency
-table. Its role and power-fit panels remain available.
+Equal-service comparisons are API-only analysis: the dashboard has no target input or
+comparison curve, and the chart's Perf Ruler remains its same-speed comparison. The Table view
+shows same-concurrency differences instead. On measured GPU W/GPU and J/output token it adds a
+`Δ vs baseline` column that differences every other visible row from one baseline source
+(default: the first visible) at the same concurrency, without interpolation. The baseline is
+table-local state like the chart/table view mode itself, with no share parameter. Role and
+power-fit panels remain available.
 
 `serviceCompare=true` adds `serviceSources`, `equalServiceCurve`, and (when
 `serviceTarget` is present) `equalServiceComparison`. Select exact opaque
@@ -204,12 +208,13 @@ These analytical results are JSON-only: `format=csv` with any analysis enabled r
 400, rather than silently exporting only the primary chart. Ordinary CSV retains
 its existing plotted-point contract.
 
-| Surface                                        | Dashboard control / share parameter               | Read-only API coverage                                                    |
-| ---------------------------------------------- | ------------------------------------------------- | ------------------------------------------------------------------------- |
-| Fixed-sequence statistic                       | `i_mstat`                                         | `xstat`                                                                   |
-| Equal-service and matched-concurrency analysis | API-only; no dashboard control or share parameter | `serviceCompare`, `serviceBaseline`, `serviceComparator`, `serviceTarget` |
-| Prefill / decode roles                         | `i_roleshare`                                     | `roleShare`                                                               |
-| Power vs output-rate fit                       | `i_powerfit`                                      | `powerFit`                                                                |
+| Surface                      | Dashboard control / share parameter                                | Read-only API coverage                                                    |
+| ---------------------------- | ------------------------------------------------------------------ | ------------------------------------------------------------------------- |
+| Fixed-sequence statistic     | `i_mstat`                                                          | `xstat`                                                                   |
+| Equal-service analysis       | API-only; no dashboard control or share parameter                  | `serviceCompare`, `serviceBaseline`, `serviceComparator`, `serviceTarget` |
+| Same-concurrency differences | Table view `Δ vs baseline` column; table-local, no share parameter | `matchedConcurrency` via `serviceCompare`                                 |
+| Prefill / decode roles       | `i_roleshare`                                                      | `roleShare`                                                               |
+| Power vs output-rate fit     | `i_powerfit`                                                       | `powerFit`                                                                |
 
 The scatter chart's Frontier points table (shown with `i_frontier` on a measured
 power metric) lists the drawn cross-platform frontier with each point's run and
@@ -260,10 +265,12 @@ GPU 视图优先读取已存遥测，缺少存储数据时回退到产物。全�
 条目一份投影）和 `overlays`（每个非官方运行一份）。按日期显隐属于渲染状态，不是查询参数，
 因此无需修改 API 或 OpenAPI 契约。
 
-同等服务条件下的对比和相同并发下的诊断仅通过 API 提供。仪表板不提供这两项分析的来源选择、
-目标值输入、对比曲线或同并发表格；prefill/decode 角色分析和功耗拟合面板继续保留。
-`serviceCompare`、`serviceBaseline`、`serviceComparator`、`serviceTarget` 仍为 API 查询参数，
-不对应仪表板控件或分享参数。固定长度工作负载的统计量、角色分析和功耗拟合的分享参数与 API
+同等服务条件下的对比仅通过 API 提供：仪表板没有目标值输入和对比曲线，图表上的 Perf Ruler 仍是
+相同速度下的对比工具。相同并发下的差异改由表格视图呈现：在 GPU 实测 W/GPU 和 J/output token
+指标下新增“相对基准差值”列，以一个基准配置（默认取第一个可见配置）为参照，对其余可见行在相同
+并发数下求差，不做插值。基准配置与图表/表格视图切换一样只是表格本地状态，没有分享参数；
+prefill/decode 角色分析和功耗拟合面板继续保留。`serviceCompare`、`serviceBaseline`、
+`serviceComparator`、`serviceTarget` 仍为 API 查询参数，不对应仪表板控件或分享参数。固定长度工作负载的统计量、角色分析和功耗拟合的分享参数与 API
 参数仍一一对应：`i_mstat` → `xstat`、`i_roleshare` → `roleShare`、`i_powerfit` → `powerFit`。
 
 `serviceSources` 中各数据源的 `label` 仅供显示，由硬件和日期组成；只有两个数据源无法区分时，
