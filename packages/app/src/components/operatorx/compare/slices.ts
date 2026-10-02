@@ -7,12 +7,14 @@ import type {
 import { escapeHtml } from '@/lib/utils';
 
 /**
- * A slice is a set of cases that differ only in their size axis (GEMM M, MoE tokens):
- * same N×K and precision for GEMM, same layer for MoE. Size sweeps and per-shape
- * aggregates group by it.
+ * A slice is a set of cases that differ only in their size axis (GEMM M, MoE tokens,
+ * attention requests): same N×K and precision for GEMM, same layer for MoE, same module,
+ * query length and context for attention. Size sweeps and per-shape aggregates group by it.
  */
 export function sliceKey(op: ComparisonOp, c: ComparisonCase): string {
   if (op === 'gemm') return `N=${c.dims.n} K=${c.dims.k} · ${c.precision}`;
+  if (op === 'attention')
+    return `${c.shape.replaceAll(/(?<lead>^|· |\+ )\d+×/gu, '$<lead>')} · ${c.precision}`;
   return `${c.shape.replace(/^T=\d+ /u, '')} · ${c.precision}`;
 }
 

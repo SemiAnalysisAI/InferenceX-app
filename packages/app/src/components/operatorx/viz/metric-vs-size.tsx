@@ -137,6 +137,6 @@ export const metricVsSize: VizDefinition = {
   id: 'metric-vs-size',
   title: 'Metric vs size',
   wide: true,
-  ops: ['gemm', 'moe'],
+  ops: ['gemm', 'moe', 'attention'],
   Component: MetricVsSize,
 };

@@ -230,11 +230,15 @@ function cdnHeaders(tag: string = cacheTag(), cacheControl?: string): Record<str
  * CDN-cached plain-text response (e.g. CSV) with the same cache headers and
  * purge tag as cachedJson. Uncompressed — use only for small payloads.
  */
-export function cachedText(data: string, contentType: string): Response {
+export function cachedText(
+  data: string,
+  contentType: string,
+  options?: { tag?: string; cacheControl?: string },
+): Response {
   return new Response(data, {
     headers: {
       'Content-Type': contentType,
-      ...cdnHeaders(),
+      ...cdnHeaders(options?.tag, options?.cacheControl),
     },
   });
 }

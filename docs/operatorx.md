@@ -73,6 +73,41 @@ The K3 profile has `n_shared=0`. The numerator excludes activation and routing w
 the denominator is the measured fused expert kernel latency. Missing, failed,
 unsupported, and empty cases have no TFLOPS value.
 
+## Roofline
+
+MoE and attention ops run several stages (projections, the attention core or
+recurrence, router, experts, shared experts), each at its own precision and
+intensity, and split cases add collectives. A case's roofline time on a GPU is
+the sum over its stages of the slower of compute (FLOPs at that GPU's peak for
+the stage's precision) and memory (bytes at peak bandwidth), plus each
+collective's bytes at the GPU's scale-up bandwidth: a tensor-parallel GEMM's
+all-reduce, an MoE's all-reduce, all-gather/reduce-scatter or expert-parallel
+dispatch/combine, and attention's dcp merge. Attention's own tensor-parallel
+all-reduce runs outside the op. Share of roofline is that time over measured
+latency. The roofline chart plots each case at its effective intensity: where
+the GPU's roofline reaches the case's bound, so the gap under the roof is the
+case's share of roofline. For a single-stage op this is plain FLOP/byte.
+
+## Data API
+
+`GET /api/v1/views/operatorx` is the public, read-only OperatorX feed, listed in
+the API reference and OpenAPI document. It returns one row per case and GPU,
+from that GPU's newest stored result. Each row has the case key, op type,
+device split, testlist, the models and layers the case comes from, shape and
+precision labels, dimensions, per-GPU useful FLOPs and bytes, status, latency,
+TFLOPS, TB/s, roofline time and share (see below), kernel, and the stored run ID
+and result index.
+
+- `op`: `gemm` (default), `moe` or `attention`.
+- `workload` (from `options.workloads`) or `model` (from `options.models`).
+- `parallel`: `1` for one device (tp=dp=ep=dcp=1), or a split such as `tp8`.
+- `hardware`, `status` (`ok` by default, or `all`), `page` (100 rows), `format=csv`.
+
+Unknown or repeated parameters and values outside the listed options return 400.
+Responses are cached until new results are ingested. A response built without an
+unreadable run is not cached. The other `/api/v1/operatorx/*` routes serve the
+page and may change with it.
+
 ## Persistence and deployment
 
 Runs live in a separate OperatorX database (`opx_runs` and `opx_run_docs`) as raw

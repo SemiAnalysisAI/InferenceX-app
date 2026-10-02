@@ -10,6 +10,7 @@ import {
   KERNEL_CATEGORIES,
   type KernelCategory,
   type OperatorXTimeline,
+  type TimelineRanks,
 } from '@semianalysisai/inferencex-db/operatorx/timeline';
 import {
   Dialog,
@@ -145,6 +146,27 @@ function TimeAxis({ scaleUs }: { scaleUs: number }) {
   );
 }
 
+/** A split case's GPU count, its fastest rank's latency and the rank skew. */
+function RankSummary({ ranks }: { ranks: TimelineRanks }) {
+  return (
+    <>
+      <span className="tabular-nums">
+        <span className="text-muted-foreground">GPUs</span> {ranks.world}
+      </span>
+      {ranks.latencyUsMin !== null && (
+        <span className="tabular-nums">
+          <span className="text-muted-foreground">fastest rank</span> {formatUs(ranks.latencyUsMin)}
+        </span>
+      )}
+      {ranks.skewUs !== null && (
+        <span className="tabular-nums">
+          <span className="text-muted-foreground">skew</span> {formatUs(ranks.skewUs)}
+        </span>
+      )}
+    </>
+  );
+}
+
 function GpuTimeline({
   hardware,
   color,
@@ -176,7 +198,20 @@ function GpuTimeline({
             <span className="text-muted-foreground">latency</span> {formatUs(latencyUs)}
           </span>
         )}
+        {timeline?.ranks && <RankSummary ranks={timeline.ranks} />}
       </div>
+      {timeline?.ranks && (
+        <p
+          className="text-xs text-muted-foreground tabular-nums"
+          data-testid="operatorx-rank-latencies"
+        >
+          Each rank:{' '}
+          {timeline.ranks.latencyUs
+            .map((us, rank) => `${rank} ${us === null ? '—' : formatUs(us)}`)
+            .join(' · ')}
+          . The timeline below is rank 0’s.
+        </p>
+      )}
       {timeline ? (
         <>
           <div className="space-y-1" onMouseLeave={() => setHovered(null)}>

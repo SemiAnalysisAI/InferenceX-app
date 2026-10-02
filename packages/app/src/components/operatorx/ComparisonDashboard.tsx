@@ -50,6 +50,16 @@ function setParam(key: string, value: string) {
   replaceClientSearch(params);
 }
 
+/** The one-device option's select value (its split key is empty). */
+const ONE_DEVICE = '1';
+
+function setParallel(value: string) {
+  const params = new URLSearchParams(window.location.search);
+  if (value === ONE_DEVICE) params.delete('parallel');
+  else params.set('parallel', value);
+  replaceClientSearch(params);
+}
+
 function ControlGroup({
   label,
   htmlFor,
@@ -99,7 +109,7 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
     isLoading,
     isPlaceholderData: switching,
     refetch,
-  } = useOperatorXComparison(op, search.get('workload'));
+  } = useOperatorXComparison(op, search.get('workload'), search.get('parallel'));
   const theme = useTheme().resolvedTheme === 'dark' ? 'dark' : 'light';
   const [picked, setPicked] = useState<string[] | null>(null);
   const [pickedBaseline, setBaseline] = useState<string | null>(null);
@@ -166,7 +176,7 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
   return (
     <div className="flex flex-col gap-4">
       <Card className="relative z-10 py-4 md:py-5" data-testid="operatorx-controls">
-        <div className="grid gap-x-5 gap-y-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-x-5 gap-y-3 sm:grid-cols-2 lg:grid-cols-5">
           <ControlGroup label="Workload" htmlFor="operatorx-workload">
             <SearchableSelect
               triggerId="operatorx-workload"
@@ -178,6 +188,23 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
                   options: view.workloads.map((w) => ({
                     value: w.id,
                     label: w.label,
+                  })),
+                },
+              ]}
+            />
+          </ControlGroup>
+          <ControlGroup label="Devices" htmlFor="operatorx-parallel">
+            <SearchableSelect
+              triggerId="operatorx-parallel"
+              value={view.parallel || ONE_DEVICE}
+              onValueChange={setParallel}
+              searchable={false}
+              groups={[
+                {
+                  label: '',
+                  options: view.parallelOptions.map((o) => ({
+                    value: o.key || ONE_DEVICE,
+                    label: `${o.label} (${o.cases})`,
                   })),
                 },
               ]}

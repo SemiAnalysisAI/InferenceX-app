@@ -2,12 +2,13 @@ import { type NextRequest, NextResponse } from 'next/server';
 
 import { cachedJson, operatorXCacheTag } from '@/lib/api-cache';
 import { errorMessage, errorStatus, getTimelines } from '@/lib/operatorx/service';
+import type { ComparisonOp } from '@semianalysisai/inferencex-db/operatorx/compare';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 export const maxDuration = 300;
 
-const OPS = new Set(['gemm', 'moe']);
+const OPS = new Set(['gemm', 'moe', 'attention']);
 const REF = /^[\w.-]{1,128}:\d+:[\w.-]{1,128}$/;
 const MAX_REFS = 32;
 
@@ -19,7 +20,8 @@ const MAX_REFS = 32;
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;
   const op = params.get('op') ?? '';
-  if (!OPS.has(op)) return NextResponse.json({ error: 'op must be gemm or moe' }, { status: 400 });
+  if (!OPS.has(op))
+    return NextResponse.json({ error: 'op must be gemm, moe or attention' }, { status: 400 });
   const refs = (params.get('r') ?? '').split(',').filter(Boolean);
   if (refs.length === 0 || refs.length > MAX_REFS || !refs.every((r) => REF.test(r)))
     return NextResponse.json(
@@ -27,7 +29,7 @@ export async function GET(request: NextRequest) {
       { status: 400 },
     );
   try {
-    const { timelines, known } = await getTimelines(op as 'gemm' | 'moe', refs);
+    const { timelines, known } = await getTimelines(op as ComparisonOp, refs);
     return known
       ? cachedJson(timelines, { tag: operatorXCacheTag() })
       : NextResponse.json(timelines, { headers: { 'Cache-Control': 'no-store' } });

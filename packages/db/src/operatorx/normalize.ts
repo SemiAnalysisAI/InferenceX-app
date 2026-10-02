@@ -7,6 +7,7 @@
  */
 import { type OperatorXRawBundle, type OperatorXRunPlan, planFromManifest } from './bundle';
 import { opLabels, usefulFlops } from './describe';
+import { canonicalArgs } from './parallel';
 
 export type OperatorXStatus = 'ok' | 'unsupported' | 'error' | 'missing';
 
@@ -144,6 +145,20 @@ function caseSources(sources: unknown): OperatorXSource[] {
   });
 }
 
+/**
+ * Whether telemetry saw clock/power capping in the timed window: on a split case, on any
+ * of its ranks (rank 0's own telemetry is `metrics.telemetry`; every rank's is under
+ * `metrics.ranks.per_rank`).
+ */
+function cappedOnAnyRank(metrics: Obj): boolean | null {
+  const ranks =
+    isObj(metrics.ranks) && Array.isArray(metrics.ranks.per_rank) ? metrics.ranks.per_rank : [];
+  const flags = [metrics.telemetry, ...ranks.map((r) => (isObj(r) ? r.telemetry : null))].flatMap(
+    (t) => (isObj(t) && typeof t.capped === 'boolean' ? [t.capped] : []),
+  );
+  return flags.length > 0 ? flags.some(Boolean) : null;
+}
+
 function toStatus(v: unknown): OperatorXStatus {
   return v === 'ok' || v === 'unsupported' ? v : 'error';
 }
@@ -181,14 +196,14 @@ export function normalizeBundle(bundle: OperatorXRawBundle): Normalized {
         if (!isObj(row) || !isObj(row.op)) continue;
         const op = row.op;
         const type = String(op.type ?? 'unknown');
-        const args = isObj(op.args) ? op.args : {};
+        const args = canonicalArgs(isObj(op.args) ? op.args : {});
         const backend = String(op.backend ?? 'unknown');
         const testlist = String(row.testlist ?? '');
         const m = isObj(row.metrics) ? row.metrics : {};
         const status = toStatus(row.status);
         const latencyUs = status === 'ok' ? num(m.latency_us) : null;
         const flops = usefulFlops(type, args);
-        const telemetry = isObj(m.telemetry) ? m.telemetry : null;
+        const capped = cappedOnAnyRank(m);
         seen.add(`${testlist}|${type}|${stableJson(args)}|${backend}`);
         push(
           {
@@ -212,7 +227,7 @@ export function normalizeBundle(bundle: OperatorXRawBundle): Normalized {
             cudaGraph: typeof m.cuda_graph === 'boolean' ? m.cuda_graph : null,
             kernel: status === 'ok' ? chosenKernel(m) : null,
             timing: timingShape(m),
-            capped: telemetry && typeof telemetry.capped === 'boolean' ? telemetry.capped : null,
+            capped,
           },
           m,
         );
@@ -229,7 +244,7 @@ export function normalizeBundle(bundle: OperatorXRawBundle): Normalized {
     for (const c of Array.isArray(cell.cases) ? cell.cases.filter(isObj) : []) {
       const shape = isObj(c.shape) ? c.shape : {};
       const type = String(shape.type ?? 'unknown');
-      const args = isObj(shape.args) ? shape.args : {};
+      const args = canonicalArgs(isObj(shape.args) ? shape.args : {});
       for (const backend of backends) {
         const key = `${String(c.testlist ?? '')}|${type}|${stableJson(args)}|${backend}`;
         if (seen.has(key)) continue;
