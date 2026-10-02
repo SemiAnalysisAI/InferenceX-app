@@ -8,6 +8,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
 import { useLocale } from '@/lib/use-locale';
 import VideoBenchmark from './VideoBenchmark';
+import VideoHistory from './VideoHistory';
+import type { VideoHistoryPage } from './history';
 import FidelityResults from './FidelityResults';
 import VideoSelect from './VideoSelect';
 import { servingCells } from './serving';
@@ -23,11 +25,16 @@ const STRINGS = {
     title: 'H3 video benchmark',
     results: 'Videos & result',
     tradeoffs: 'Hardware tradeoffs',
+    history: 'Performance history',
     view: 'Benchmark view',
     preparing: 'Loading results and preparing media. The first publication of a run takes longer.',
     downloading: 'Downloading CI archive',
     advanced: 'Run details and artifact selection',
-    error: 'Could not load CI results',
+    error: 'Could not load results',
+    publishedLoading: 'Loading the newest published result…',
+    publishedEmpty:
+      'No readable result in the newest published page. Open Performance history for more published results, or browse CI runs.',
+    publishedError: 'Could not load published results. Retry or browse CI runs.',
     details: 'Technical details',
     select: 'CI run',
     refresh: 'Refresh',
@@ -53,11 +60,16 @@ const STRINGS = {
     title: 'H3 视频基准测试',
     results: '视频与结果',
     tradeoffs: '硬件延迟与效率权衡',
+    history: '性能历史',
     view: '基准测试视图',
     preparing: '正在加载结果并准备媒体。首次发布该运行的产物需要更多时间。',
     downloading: '正在下载 CI 产物',
     advanced: '运行详情与产物选择',
-    error: '无法加载 CI 结果',
+    error: '无法加载结果',
+    publishedLoading: '正在加载最新的已发布结果…',
+    publishedEmpty:
+      '最新发布页面中没有可读取的结果。可在性能历史中查看其他已发布结果，或浏览 CI 运行。',
+    publishedError: '无法加载已发布结果。请重试，或浏览 CI 运行。',
     details: '技术详情',
     select: 'CI 运行',
     refresh: '刷新',
@@ -92,9 +104,12 @@ function share(runId: number, artifactId?: number, source?: string, cell?: strin
   const url = new URL(location.href);
   const view = url.searchParams.get('view');
   const comparison = url.searchParams.get('compare');
+  const historyFilters = [...url.searchParams].filter(([key]) => key.startsWith('history-'));
   url.search = '';
-  if (view === 'tradeoff') url.searchParams.set('view', view);
+  if (view === 'tradeoff' || view === 'history' || view === 'results')
+    url.searchParams.set('view', view);
   if (comparison) url.searchParams.set('compare', comparison);
+  for (const [key, value] of historyFilters) url.searchParams.set(key, value);
   url.searchParams.set('run', String(runId));
   if (artifactId) url.searchParams.set('artifact', String(artifactId));
   if (source) url.searchParams.set('source', source);
@@ -124,16 +139,22 @@ export default function VideoCIRuns() {
   const [direct, setDirect] = useState('');
   const [manual, setManual] = useState(false);
   const [cellId, setCellId] = useState('');
-  const [view, setView] = useState('results');
+  const [view, setView] = useState('');
+  const [browsing, setBrowsing] = useState(false);
   const [compared, setCompared] = useState<TradeoffRun[]>([]);
   const [comparisonLoading, setComparisonLoading] = useState(false);
   const [comparisonError, setComparisonError] = useState(false);
   const comparisonDownload = useRef<AbortController | null>(null);
   const changeView = (value: string) => {
+    if (value === 'history') {
+      request.current++;
+      download.current?.abort();
+      setLoading(false);
+      setProgress('');
+    }
     setView(value);
     const url = new URL(location.href);
-    if (value === 'tradeoff') url.searchParams.set('view', 'tradeoff');
-    else url.searchParams.delete('view');
+    url.searchParams.set('view', value);
     history.replaceState(null, '', url);
   };
   const collect = useCallback((bundle: Bundle, exportRun: string, artifactId: string) => {
@@ -305,6 +326,7 @@ export default function VideoCIRuns() {
     setError('');
     setRun(null);
     setCellId(selectedCell ?? '');
+    setSourceId(source ?? '');
     setSources([]);
     setArtifact(null);
     setArtifacts([]);
@@ -352,15 +374,68 @@ export default function VideoCIRuns() {
       if (current === request.current) setLoading(false);
     }
   }
+  async function openPublished() {
+    const current = ++request.current;
+    download.current?.abort();
+    const controller = new AbortController();
+    download.current = controller;
+    setBrowsing(false);
+    setNextPage(1);
+    setRun(null);
+    setRuns([]);
+    setArtifact(null);
+    setArtifacts([]);
+    setSources([]);
+    setLoading(true);
+    setProgress(s.publishedLoading);
+    setError('');
+    try {
+      const data: VideoHistoryPage = await json(
+        '/api/video-runs?format=history&page=1',
+        controller.signal,
+      );
+      if (current !== request.current) return;
+      if (data.schemaVersion !== 1 || !Array.isArray(data.entries))
+        throw new Error('Invalid published history');
+      const entry = data.entries.find(
+        (item) => !item.error && item.sources.some((source) => !source.error),
+      );
+      const source = entry?.sources.find((item) => !item.error);
+      if (entry && source)
+        await selectRun(
+          entry.runId,
+          String(entry.artifact.id),
+          source.id,
+          source.observations[0]?.cell,
+        );
+    } catch {
+      if (current === request.current) setError(s.publishedError);
+    } finally {
+      if (current === request.current) setLoading(false);
+    }
+  }
+  function openResults() {
+    if (run)
+      return selectRun(String(run.id), artifact ? String(artifact.id) : null, sourceId, cellId);
+    const params = new URLSearchParams(location.search);
+    const selected = params.get('run');
+    return selected
+      ? selectRun(selected, params.get('artifact'), params.get('source'), params.get('cell'))
+      : openPublished();
+  }
   async function list(page: number, auto = false) {
     const current = ++request.current;
     download.current?.abort();
+    const controller = new AbortController();
+    download.current = controller;
     setLoading(true);
     setProgress('');
     setError('');
+    setBrowsing(true);
     try {
       const data: { runs: CIRun[]; nextPage: number | null } = await json(
         `/api/video-runs?page=${page}`,
+        controller.signal,
       );
       if (current !== request.current) return;
       setRuns((old) =>
@@ -399,12 +474,14 @@ export default function VideoCIRuns() {
   }
   useEffect(() => {
     const params = new URLSearchParams(location.search);
-    if (params.get('view') === 'tradeoff') setView('tradeoff');
+    const initialView = params.get('view') ?? (params.has('run') ? 'results' : 'history');
+    setView(['history', 'tradeoff'].includes(initialView) ? initialView : 'results');
     if (params.has('compare')) void restoreComparison();
     const directRun = params.get('run');
     if (directRun)
       void selectRun(directRun, params.get('artifact'), params.get('source'), params.get('cell'));
-    else void list(1, true);
+    else if (initialView === 'results') void openPublished();
+
     return () => {
       request.current++;
       download.current?.abort();
@@ -415,7 +492,7 @@ export default function VideoCIRuns() {
   const selectedSource = sources.find((item) => item.id === sourceId);
   return (
     <div className="mx-auto min-w-0 w-full max-w-7xl space-y-4 py-2" data-testid="video-ci-runs">
-      <Card className="min-w-0 gap-3 p-4 md:p-4">
+      <Card hidden={view === 'history'} className="min-w-0 gap-3 p-4 md:p-4">
         <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
           <Heading as="h1" level="section">
             {s.title}
@@ -425,7 +502,7 @@ export default function VideoCIRuns() {
               className="min-w-0 flex-1 sm:flex-none"
               variant="outline"
               disabled={loading}
-              onClick={() => void list(1, true)}
+              onClick={() => void openResults()}
             >
               {s.refresh}
             </Button>
@@ -434,7 +511,7 @@ export default function VideoCIRuns() {
                 className="min-w-0 flex-1 sm:flex-none"
                 variant="outline"
                 disabled={loading}
-                onClick={() => void list(nextPage)}
+                onClick={() => void list(nextPage, !run)}
               >
                 {nextPage === 1 ? s.browse : s.older}
               </Button>
@@ -473,7 +550,9 @@ export default function VideoCIRuns() {
             {run.name}
           </p>
         )}
-        {runs.length === 0 && !loading && <p>{s.empty}</p>}
+        {runs.length === 0 && !loading && !loadError && (
+          <p>{browsing ? s.empty : s.publishedEmpty}</p>
+        )}
         <details className="border-t border-border/40 pt-3 [&[open]>form]:mb-3 [&[open]>a]:mb-3 [&[open]>a]:block">
           <summary className="cursor-pointer text-xs text-muted-foreground">{s.advanced}</summary>
           <p className="my-3 text-xs text-muted-foreground">{s.note}</p>
@@ -535,14 +614,7 @@ export default function VideoCIRuns() {
               <summary className="cursor-pointer text-sm">{s.details}</summary>
               <pre className="mt-2 whitespace-pre-wrap break-all text-xs">{loadError}</pre>
             </details>
-            <Button
-              variant="outline"
-              onClick={() =>
-                run
-                  ? void selectRun(String(run.id), artifact ? String(artifact.id) : null)
-                  : void list(1, true)
-              }
-            >
+            <Button variant="outline" onClick={() => void openResults()}>
               {s.retry}
             </Button>
           </div>
@@ -560,9 +632,19 @@ export default function VideoCIRuns() {
         <Button
           variant={view === 'results' ? 'default' : 'outline'}
           aria-pressed={view === 'results'}
-          onClick={() => changeView('results')}
+          onClick={() => {
+            changeView('results');
+            if (!run || sources.length === 0) void openResults();
+          }}
         >
           {s.results}
+        </Button>
+        <Button
+          variant={view === 'history' ? 'default' : 'outline'}
+          aria-pressed={view === 'history'}
+          onClick={() => changeView('history')}
+        >
+          {s.history}
         </Button>
         <Button
           variant={view === 'tradeoff' ? 'default' : 'outline'}
@@ -572,6 +654,14 @@ export default function VideoCIRuns() {
           {s.tradeoffs}
         </Button>
       </div>
+      {view === 'history' && (
+        <VideoHistory
+          onOpen={(runId, artifactId, source, cell) => {
+            changeView('results');
+            void selectRun(runId, artifactId, source, cell);
+          }}
+        />
+      )}
       <div hidden={view !== 'tradeoff'}>
         {comparisonLoading && (
           <p role="status" className="mb-3 text-sm text-muted-foreground">
@@ -623,7 +713,10 @@ export default function VideoCIRuns() {
                 if (run && artifact) share(run.id, artifact.id, sourceId, id);
               }}
               onLoaded={collectLoaded}
-              onError={() => changeView('results')}
+              onError={() => {
+                if (new URLSearchParams(location.search).get('view') !== 'history')
+                  changeView('results');
+              }}
             />
           )}
         </div>
