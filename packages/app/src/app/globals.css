@@ -153,7 +153,8 @@
   }
 }
 
-html[data-inferencex-embed] .autumn-leaves {
+html[data-inferencex-embed] .autumn-leaves,
+html[data-autumn-leaves-off] .autumn-leaves {
   display: none;
 }
 
