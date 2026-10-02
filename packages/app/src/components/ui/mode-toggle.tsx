@@ -1,15 +1,13 @@
 'use client';
 
 import { track } from '@/lib/analytics';
-import { Pickaxe, Sun } from 'lucide-react';
+import { Crosshair, Pickaxe, Sun } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import * as React from 'react';
 
 import { cn } from '@/lib/utils';
+import { nextTheme } from '@/lib/themes';
 import { HEADER_ACTION_STYLE } from './control-styles';
-
-type Theme = 'light' | 'dark' | 'minecraft';
-const THEME_CYCLE: Theme[] = ['light', 'dark', 'minecraft'];
 
 export function ModeToggle() {
   const { setTheme, theme } = useTheme();
@@ -21,8 +19,7 @@ export function ModeToggle() {
   }, []);
 
   const toggleTheme = () => {
-    const idx = THEME_CYCLE.indexOf(theme as Theme);
-    const next = THEME_CYCLE[(idx + 1) % THEME_CYCLE.length];
+    const next = nextTheme(theme);
     setTheme(next);
     track('theme_toggled', { theme: next });
   };
@@ -55,7 +52,9 @@ export function ModeToggle() {
       aria-label={displayAriaLabel}
       onClick={toggleTheme}
     >
-      {theme === 'minecraft' ? (
+      {theme === 'csgo' ? (
+        <Crosshair size={20} aria-hidden="true" />
+      ) : theme === 'minecraft' ? (
         <Pickaxe size={20} aria-hidden="true" />
       ) : theme === 'dark' ? (
         <Sun size={20} aria-hidden="true" />
