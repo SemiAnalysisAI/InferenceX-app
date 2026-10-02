@@ -442,7 +442,13 @@ export function buildDerivedChartFields(
     if (wants(key)) fields[key] = value;
   }
 
-  if (wants('modeledChassisPowerPerGpu') && entry.modeledSystemPower?.status === 'supported') {
+  if (
+    wants('modeledChassisPowerPerGpu') &&
+    entry.benchmark_type === 'single_turn' &&
+    entry.isl === 8192 &&
+    entry.osl === 1024 &&
+    entry.modeledSystemPower?.status === 'supported'
+  ) {
     fields.modeledChassisPowerPerGpu = chartMetric(entry.modeledSystemPower.chassisAcWattsPerGpu);
   }
 

@@ -12,6 +12,11 @@ const nextConfig: NextConfig = {
   // distDir, so distinct dirs let the two coexist.
   distDir: process.env.NEXT_DIST_DIR || '.next',
   allowedDevOrigins: allowedDevOriginsFromEnv(),
+  env: {
+    // Preview source links must follow the deployed commit, not the model content digest.
+    NEXT_PUBLIC_APP_SOURCE_REF:
+      process.env.VERCEL_GIT_COMMIT_SHA || process.env.GITHUB_SHA || 'master',
+  },
   transpilePackages: ['@semianalysisai/inferencex-constants'],
   serverExternalPackages: ['shiki'],
   redirects() {

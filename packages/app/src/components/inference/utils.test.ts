@@ -25,6 +25,38 @@ describe('selectUnofficialOverlayForMode', () => {
     );
   });
 });
+
+describe('All in Measured table coverage', () => {
+  it('retains GPU-valid overlay rows with missing all-in power without plotting a fallback', () => {
+    const result = processOverlayChartDataWithClipping(
+      [
+        pt({
+          id: 1,
+          measuredAvgPower: { y: 450, roof: false },
+          utilityModeledWatts: { y: 700, roof: false },
+        }),
+        pt({
+          id: 2,
+          measuredAvgPower: { y: 500, roof: false },
+          modeledSystemPower: {
+            status: 'unsupported',
+            reason: 'cpu-telemetry',
+            modelRevision: 'test',
+          },
+        }),
+        pt({ id: 3 }),
+      ],
+      'interactivity',
+      'y_utilityModeledWatts',
+      null,
+    );
+    expect(result.data.map((point) => [point.id, point.y])).toEqual([[1, 700]]);
+    expect(result.tableData?.map((point) => [point.id, point.y])).toEqual([
+      [1, 700],
+      [2, NaN],
+    ]);
+  });
+});
 // ---------------------------------------------------------------------------
 // fixture factories
 // ---------------------------------------------------------------------------

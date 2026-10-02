@@ -96,6 +96,35 @@ wall power. Metric IDs and API selector values are unchanged. Profit `powerBasis
 still accepts `provisioned`, `modeled`, or `compare`; `powerLabel` is display text.
 Expanding assumptions or unavailable-estimate details does not change returned data.
 
+All in Measured watts and energy accept validated 8K/1K and AgentX rows through the
+shared chart/API transform, including historical and unofficial rows. AgentX reuses
+the chassis or rack model without independent workload calibration. Telemetry and
+topology gates still apply; NVL72 needs complete Grace or module power. The standalone
+Modeled Chassis AC metric and 8K/1K offline export retain their 8K/1K scope.
+
+For All in Measured, `tableRows` retains every GPU-valid observation in the selected
+scope and best-series selection, including axis-clipped and non-frontier points.
+Missing system estimates use `y: null`, `status: "unavailable"`, and
+`unavailableReason`; `measuredGpuWatts` remains available. CSV exports these rows
+with blank missing values. Numeric `series` and `count` are unchanged. Each date
+comparison and unofficial overlay has its own `tableRows`; latest does not pool history.
+
+NVL72 estimates require valid GPU power plus validated Grace-socket or compute-module
+power with complete socket coverage. CPU-rail-only readings do not establish the
+Grace/LPDDR boundary. A module reading already includes GPU power; do not add GPU
+watts again. Read `powerSource` for topology, measured basis, sensor, PUE, model
+content revision, app TypeScript source path and source hash. Equations and parameters
+are maintained in InferenceX-app; the revision is a content digest, not a private-repository
+Git commit. Model-only updates recalculate retained valid measurements after deployment;
+they do not require telemetry backfill. For GW-year estimates, `modeled` first selects
+points with valid system-power inputs, then builds the curve at the requested target.
+It does not extrapolate or substitute historical snapshots. `compare` uses the same
+valid-curve throughput for both budgets; if no valid curve covers the target, it keeps
+the original provisioned estimate. `provisioned` alone retains the original performance
+curve. Official, comparison and unofficial scopes are evaluated independently.
+`skipped.reason` distinguishes missing CPU power and incompatible sensor bases;
+modeled estimates never substitute provisioned watts.
+
 Prefer equal-service comparisons for article-facing hardware analysis. Use
 `xstat=mean` only for fixed-sequence service axes when that statistic is intended:
 streaming speed then means **1 / mean TPOT**, not arithmetic mean request speed.
@@ -151,8 +180,7 @@ n, x-range, registry `tdpWatts` and point identities. Fewer than three distinct
 rates return `fit: null`, `reason: "too-few-points"`. Call `P₀` an extrapolated
 intercept, not idle power, and do not read the line outside its x-range.
 
-These analytical results require JSON; enabling any with CSV returns 400. Existing CSV remains
-a plotted-point export.
+These analytical results require JSON; enabling any with CSV returns 400. CSV exports plotted points except for All in Measured, which exports `tableRows`.
 
 同等服务对比与同并发诊断仅通过 API 提供，查询参数为 `serviceCompare`、`serviceBaseline`、
 `serviceComparator` 和 `serviceTarget`；仪表板没有对应的服务对比控件、来源选择、目标值输入、

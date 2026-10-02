@@ -14,9 +14,13 @@ import chartDefinitions, {
 } from '@/components/inference/metric-registry';
 import { metricRowLabel } from '@/components/inference/axis-metric-explanations';
 import { getMeasuredMetricConfig } from '@/components/inference/measured-metric-config';
-import { AIR_COOLED_SYSTEM_PUE } from '@/lib/modeled-system-power';
+import { AIR_COOLED_SYSTEM_PUE, DLC_SYSTEM_PUE } from '@/lib/modeled-system-power';
 import { SYSTEM_POWER_MODEL_REVISION } from '@/lib/system-power-model';
-import { ALL_IN_MEASURED_EMPTY, ALL_IN_MEASURED_NOTE } from '@/lib/power-basis';
+import {
+  ALL_IN_MEASURED_AGENTIC_NOTE,
+  ALL_IN_MEASURED_EMPTY,
+  ALL_IN_MEASURED_NOTE,
+} from '@/lib/power-basis';
 import {
   applyTokenRevenuePricing,
   cachedInputPricePerMillion,
@@ -120,6 +124,8 @@ import WorkflowInfoDisplay from './WorkflowInfoDisplay';
 
 type InferenceViewMode = 'chart' | 'table';
 
+const modelRevisionLabel = SYSTEM_POWER_MODEL_REVISION.replace(/^app-sha256:/u, '').slice(0, 12);
+
 const STRINGS = {
   en: {
     inferencePerformance: 'Inference Performance',
@@ -137,14 +143,14 @@ const STRINGS = {
     e2eNormIntvtyDisclaimer:
       'E2E Normalized Interactivity requires persisted per-request traces, so unofficial-run overlays are unavailable for this experimental view.',
     systemPowerAssumptions:
-      '8k1k estimate from validated GPU telemetry · CPU/DRAM utilization 20% · Eight-GPU chassis models; a partially allocated chassis is extrapolated to a full chassis at the measured per-GPU power. Chassis AC includes platform overheads; PUE is applied separately for facility power. Click a point for measured GPU power, topology, and power model provenance. Unsupported inputs are omitted.',
+      '8K / 1K estimates from validated telemetry. Eight-GPU chassis assume 20% CPU/DRAM utilization; partial allocations are extrapolated to a full chassis at the measured per-GPU power. NVL72 uses measured Grace or module power plus modeled rack overhead. Facility power applies PUE once: 1.3 for air-cooled chassis, 1.1 for NVL72. Click a point for measurement and model provenance. Unsupported inputs are omitted.',
     completedSequenceLengths: (count: string) =>
       `Completed requests across all resident points (n=${count})`,
     viewMode: 'View mode',
     noChartData:
       'No benchmark data matches the current model, scenario, and filter selection. Adjust the filters above to see results.',
     noSystemPowerData:
-      'No system-power estimates are available for this selection. Choose 8K / 1K with validated GPU telemetry, supported hardware, and known eight-GPU chassis placement. Measured GPU power remains available separately where telemetry exists.',
+      'No system-power estimates are available for this selection. Choose 8K / 1K with validated GPU telemetry and a supported chassis or rack power model. NVL72 also needs complete Grace or module telemetry from the same measurement window. Measured GPU power remains available separately where telemetry exists.',
     // Boundary disclosures for the derived power axes (lib/power-basis.ts).
     // Formulas in words; constants named so a screenshot records its method.
     powerBasisAssumptions: {
@@ -152,7 +158,7 @@ const STRINGS = {
         'GPU Level Provisioned (TDP) · Watts are the rated TDP per GPU from the hardware registry, so the power curve is flat per hardware. Joules per output token = TDP × allocated GPUs ÷ whole-deployment output tok/s; disaggregated configurations count prefill and decode GPUs together. Hardware without a published TDP is omitted.',
       'utility-provisioned':
         'All in Provisioned · Watts are the all-in provisioned utility power per GPU from the hardware registry (SemiAnalysis Datacenter Industry Model), so the power curve is flat per hardware. Joules per output token = all-in W × allocated GPUs ÷ whole-deployment output tok/s; disaggregated configurations count prefill and decode GPUs together, unlike the ungated All-in Provisioned J per Output Token, which divides per decode GPU.',
-      'utility-modeled': `All in Measured · Measured GPU power carried through the modeled chassis (CPU, DRAM, platform, PSU losses) to the utility meter: modeled chassis AC × PUE ${AIR_COOLED_SYSTEM_PUE} (air-cooled, applied once), divided by the measured GPUs; joules per output token scale measured joules by the same ratio. Chassis power model revision ${SYSTEM_POWER_MODEL_REVISION.slice(0, 7)}. Available for 8K / 1K with validated telemetry on supported hardware only; NVL72 systems (GB200, GB300) and points without values are omitted.`,
+      'utility-modeled': `All in Measured · Validated GPU telemetry with unmeasured components modeled. NVL72 additionally requires complete measured Grace or module power; rack overhead is modeled. Facility watts per GPU = modeled IT watts per GPU × PUE ${AIR_COOLED_SYSTEM_PUE} (air-cooled) or PUE ${DLC_SYSTEM_PUE} (NVL72), applied once. Measured GPU energy per output token scales by facility W/GPU divided by measured GPU W/GPU. Model revision ${modelRevisionLabel}. Available for 8K / 1K and AgentX on supported hardware; unavailable estimates stay in the table with their measured GPU power and reason.`,
     },
     vsTtft: (word: string) => `vs. ${word} Time To First Token`,
     vsE2eLatency: (pctl?: string) =>
@@ -174,18 +180,18 @@ const STRINGS = {
     e2eNormIntvtyDisclaimer:
       '端到端归一化交互性需要持久化的逐请求 trace 数据，因此该实验性视图不支持非官方运行覆盖。',
     systemPowerAssumptions:
-      '基于已验证 GPU 遥测的 8k1k 估算 · CPU/DRAM 利用率 20% · 采用八卡机箱模型；仅使用部分 GPU 的机箱按实测每卡功耗外推至满机箱。机箱交流功耗包含平台开销；数据中心功耗另行应用 PUE。点击数据点可查看 GPU 实测功耗、拓扑和功耗模型来源。不支持的输入不绘制。',
+      '基于已验证遥测的 8K / 1K 估算。八卡机箱假设 CPU/DRAM 利用率为 20%；仅使用部分 GPU 时，按实测每卡功耗外推至满机箱。NVL72 使用实测 Grace 或 module 功耗，加上模型估算的机架开销。数据中心功耗只应用一次 PUE：风冷机箱为 1.3，NVL72 为 1.1。点击数据点可查看测量与模型来源。不支持的输入不绘制。',
     completedSequenceLengths: (count: string) => `当前所有数据点的已完成请求（n=${count}）`,
     viewMode: '视图模式',
     noChartData: '当前模型、场景与筛选条件下没有匹配的基准测试数据。请调整上方筛选条件查看结果。',
     noSystemPowerData:
-      '当前选择没有可用的系统功耗估算。请选择 8K / 1K 场景；估算仅覆盖 GPU 遥测已验证、硬件受支持、八卡机箱位置已知的运行。存在遥测数据时，仍可单独查看 GPU 实测功耗。',
+      '当前选择没有可用的系统功耗估算。请选择 8K / 1K 场景，并确保 GPU 遥测已验证、机箱或机架功耗模型受支持。NVL72 还需要同一测量窗口内完整的 Grace 或 module 遥测。存在遥测数据时，仍可单独查看 GPU 实测功耗。',
     powerBasisAssumptions: {
       'gpu-provisioned':
         'GPU 额定功耗（TDP）· 功率取硬件注册表中每 GPU 的额定 TDP，因此每种硬件的功率曲线为水平线。每输出 token 能耗 = TDP × 分配的 GPU 数 ÷ 整个部署的输出 tok/s；分离式配置将 prefill 与 decode GPU 一并计入。未公布 TDP 的硬件不绘制。',
       'utility-provisioned':
         '整体预配功耗 · 功率取硬件注册表中每 GPU 的全电源配置（all-in）市电功率（来源：SemiAnalysis Datacenter Industry Model），因此每种硬件的功率曲线为水平线。每输出 token 能耗 = all-in 功率 × 分配的 GPU 数 ÷ 整个部署的输出 tok/s；分离式配置将 prefill 与 decode GPU 一并计入，这与未加门控的“每输出 token 全电源配置能耗”按 decode GPU 计算不同。',
-      'utility-modeled': `整体实测功耗 · 将 GPU 实测功耗经机箱功耗模型（CPU、DRAM、平台开销、PSU 损耗）推算至市电侧：机箱交流功耗估算 × PUE ${AIR_COOLED_SYSTEM_PUE}（风冷，仅应用一次），再除以实测 GPU 数；每输出 token 能耗按同一比例放大实测能耗。机箱功耗模型版本 ${SYSTEM_POWER_MODEL_REVISION.slice(0, 7)}。仅适用于 8K / 1K、遥测已验证且硬件受支持的运行；NVL72 系统（GB200、GB300）及缺少数值的数据点不绘制。`,
+      'utility-modeled': `整体实测功耗 · GPU 遥测已验证，未实测组件由模型估算。NVL72 还需完整的 Grace 或 module 实测功耗，机架开销由模型估算。每 GPU 分摊的数据中心功耗 = 每 GPU 分摊的 IT 功耗估算 × PUE ${AIR_COOLED_SYSTEM_PUE}（风冷）或 PUE ${DLC_SYSTEM_PUE}（NVL72）；PUE 只应用一次。每输出 token 的实测 GPU 能耗按“每卡数据中心功耗 ÷ 每卡实测 GPU 功耗”的比例换算。模型版本 ${modelRevisionLabel}。适用于受支持硬件的 8K / 1K 和 AgentX 场景。估算不可用的数据点仍保留在表格中，并显示实测 GPU 功耗和不可用原因。`,
     },
     vsTtft: (word: string) => `vs. ${word === 'Median' ? '中位' : word} 首 token 延迟（TTFT）`,
     vsE2eLatency: (pctl?: string) => (pctl ? `vs. ${pctl} 端到端延迟` : 'vs. 端到端延迟'),
@@ -497,7 +503,11 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
 
       let overlayPoints = processed.data;
       let clippedOverlayPoints = processed.clippedData;
+      let tableOverlayPoints = processed.tableData;
       if (compareGpuPair?.length === 2) {
+        tableOverlayPoints = tableOverlayPoints?.filter((p) =>
+          hardwareKeyMatchesAnyBase(String(p.hwKey), compareGpuPair),
+        );
         overlayPoints = overlayPoints.filter((p) =>
           hardwareKeyMatchesAnyBase(String(p.hwKey), compareGpuPair),
         );
@@ -506,10 +516,15 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
         );
       }
 
-      if (overlayPoints.length === 0 && clippedOverlayPoints.length === 0) return null;
+      if (
+        overlayPoints.length === 0 &&
+        clippedOverlayPoints.length === 0 &&
+        !tableOverlayPoints?.length
+      )
+        return null;
 
       const keySet = new Set([
-        ...overlayPoints.map((p) => String(p.hwKey)),
+        ...(tableOverlayPoints ?? overlayPoints).map((p) => String(p.hwKey)),
         ...clippedOverlayPoints.map(({ point }) => String(point.hwKey)),
       ]);
       const hardwareConfigFiltered = Object.fromEntries(
@@ -519,6 +534,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
       return {
         data: overlayPoints,
         clippedData: clippedOverlayPoints,
+        tableData: tableOverlayPoints,
         hardwareConfig: hardwareConfigFiltered,
         label: unofficialRunInfo.branch,
         runUrl: unofficialRunInfo.url,
@@ -553,7 +569,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
     const eligibleKeys = new Set<string>();
     for (const overlay of [overlayDataByChartType.e2e, overlayDataByChartType.interactivity]) {
       const points = [
-        ...(overlay?.data ?? []),
+        ...(overlay?.tableData ?? overlay?.data ?? []),
         ...(overlay?.clippedData ?? []).map((entry) => entry.point),
       ];
       for (const point of points) {
@@ -571,7 +587,10 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
   const officialScope = useMemo(() => {
     const eligibleKeys = new Set<string>();
     for (const graph of graphs) {
-      const points = [...graph.data, ...(graph.clippedData ?? []).map((entry) => entry.point)];
+      const points = graph.tableData ?? [
+        ...graph.data,
+        ...(graph.clippedData ?? []).map((entry) => entry.point),
+      ];
       for (const point of points) {
         if (
           selectedPrecisions.includes(point.precision) &&
@@ -730,6 +749,8 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
   const effectiveGraphs = useMemo(() => {
     if (graphs.length > 0) return graphs;
     const hasOverlay =
+      (overlayDataByChartType.e2e?.tableData?.length ?? 0) > 0 ||
+      (overlayDataByChartType.interactivity?.tableData?.length ?? 0) > 0 ||
       (overlayDataByChartType.e2e?.data.length ?? 0) > 0 ||
       (overlayDataByChartType.e2e?.clippedData?.length ?? 0) > 0 ||
       (overlayDataByChartType.interactivity?.data.length ?? 0) > 0 ||
@@ -741,6 +762,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
       chartDefinition,
       data: [] as InferenceData[],
       clippedData: [],
+      tableData: undefined,
     }));
   }, [graphs, overlayDataByChartType, selectedModel, selectedSequence]);
 
@@ -755,7 +777,10 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
     if (!isAgenticSequence) return [] as number[];
     const ids = new Set<number>();
     for (const graph of visibleGraphs) {
-      const points = [...graph.data, ...(graph.clippedData ?? []).map((entry) => entry.point)];
+      const points = graph.tableData ?? [
+        ...graph.data,
+        ...(graph.clippedData ?? []).map((entry) => entry.point),
+      ];
       for (const point of points) {
         if (
           selectedPrecisions.includes(point.precision) &&
@@ -785,7 +810,10 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
     if (!useDerivedXAxis) return [] as number[];
     const ids = new Set<number>();
     for (const graph of visibleGraphs) {
-      const points = [...graph.data, ...(graph.clippedData ?? []).map((entry) => entry.point)];
+      const points = graph.tableData ?? [
+        ...graph.data,
+        ...(graph.clippedData ?? []).map((entry) => entry.point),
+      ];
       for (const point of points) {
         if (point.benchmark_type === 'agentic_traces' && isPersistedBenchmarkId(point.id)) {
           ids.add(point.id);
@@ -809,7 +837,12 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
       // Legacy AgentX axes can still render transient/non-persisted rows, which
       // have no ids to request.
       if (!derivedSpec && derivedTargetIds.length === 0) return visibleGraphs;
-      return visibleGraphs.map((graph) => ({ ...graph, data: [], clippedData: [] }));
+      return visibleGraphs.map((graph) => ({
+        ...graph,
+        data: [],
+        clippedData: [],
+        tableData: graph.tableData ? [] : undefined,
+      }));
     }
     return visibleGraphs.map((graph) => {
       const rooflineKey = `${selectedYAxisMetric}_roofline` as keyof typeof graph.chartDefinition;
@@ -838,7 +871,10 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
         })
         .filter((entry): entry is NonNullable<typeof entry> => entry !== null);
 
-      if (!derivedSpec) return { ...graph, data, clippedData };
+      const tableData = graph.tableData?.map(
+        (point) => preparePoint(point) ?? { ...point, x: NaN },
+      );
+      if (!derivedSpec) return { ...graph, data, clippedData, tableData };
 
       const chartDefinition = {
         ...graph.chartDefinition,
@@ -848,7 +884,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
         y_latency_limit: undefined,
         ...(derivedCorner ? { [rooflineKey]: derivedCorner } : {}),
       };
-      return { ...graph, chartDefinition, data, clippedData };
+      return { ...graph, chartDefinition, data, clippedData, tableData };
     });
   }, [
     isAgenticSequence,
@@ -1007,12 +1043,29 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                           graph.chartDefinition.chartType,
                           overlayDataByChartType,
                         );
+                        const tableMode = getViewMode(graphIndex) === 'table';
+                        const exportData = tableMode
+                          ? (graph.tableData ?? [
+                              ...graph.data,
+                              ...(graph.clippedData ?? []).map((entry) => entry.point),
+                            ])
+                          : graph.data;
+                        const exportOverlay =
+                          tableMode && overlay
+                            ? {
+                                ...overlay,
+                                data: overlay.tableData ?? [
+                                  ...overlay.data,
+                                  ...(overlay.clippedData ?? []).map((entry) => entry.point),
+                                ],
+                              }
+                            : overlay;
                         const {
                           officialRows: visibleData,
                           overlayRows: visibleOverlayRowsForExport,
                         } = isGpuComparison
-                          ? visibleDateComparisonRows(graph.data, overlay)
-                          : visibleComparisonRows(graph.data, overlay);
+                          ? visibleDateComparisonRows(exportData, exportOverlay)
+                          : visibleComparisonRows(exportData, exportOverlay);
                         const { headers, rows } = inferenceChartToCsv(
                           visibleData,
                           graph.model,
@@ -1218,6 +1271,17 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                                 {ALL_IN_MEASURED_NOTE[locale]}
                               </p>
                             )}
+                          {isAgenticSequence &&
+                            selectedPowerBasis &&
+                            (selectedPowerBasis === 'utility-modeled' ||
+                              powerCompare === 'boundaries') && (
+                              <p
+                                className="mb-2 text-xs text-muted-foreground"
+                                data-testid="power-agentic-model-note"
+                              >
+                                {ALL_IN_MEASURED_AGENTIC_NOTE[locale]}
+                              </p>
+                            )}
                           {isUnofficialRun &&
                             selectedXAxisMode === 'e2e-normalized-interactivity' && (
                               <p className="mb-2 text-xs text-muted-foreground">
@@ -1238,14 +1302,14 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                         // must not silently remove measured rows from the table.
                         // Restore both official and unofficial clipped points before
                         // applying the shared precision, quick-filter, and legend gates.
-                        const tableOfficialData = [
+                        const tableOfficialData = graph.tableData ?? [
                           ...graph.data,
                           ...(graph.clippedData ?? []).map((entry) => entry.point),
                         ];
                         const tableOverlay = overlay
                           ? {
                               ...overlay,
-                              data: [
+                              data: overlay.tableData ?? [
                                 ...overlay.data,
                                 ...(overlay.clippedData ?? []).map((entry) => entry.point),
                               ],

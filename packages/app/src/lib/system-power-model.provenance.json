@@ -1,0 +1,13 @@
+{
+  "modelRevision": "app-sha256:99b252a0422c01934973760dbf5779c10aa87cc76e89807d1643258ef586e58e",
+  "modelRevisionStatus": "App-owned TypeScript equations, parameters and admission/PUE policy",
+  "source": "https://github.com/SemiAnalysisAI/InferenceX-app",
+  "status": "DRAFT / pending human verification",
+  "assumptionsSource": "packages/app/src/lib/system-power-model.profiles.json#/assumptions",
+  "rackAssumptionsSource": "packages/app/src/lib/system-power-model.profiles.json#/rackAssumptions",
+  "sourceSha256": {
+    "packages/app/src/lib/modeled-system-power.ts": "96c6016a5afabb860e01420038944422e3418befe347dc08d3602107878147fe",
+    "packages/app/src/lib/system-power-model.profiles.json": "9aaf0b8dc6365a86f099504e2fe7bbd612c3aef5606752059cd6062173aa4e20",
+    "packages/app/src/lib/system-power-model.ts": "9f0ff5dd1d1e85a6a09e1e20e9d9f682ece5f4f8eae7e5fe813e799329e966c4"
+  }
+}

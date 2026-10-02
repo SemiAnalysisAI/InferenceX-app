@@ -1135,7 +1135,7 @@ and the two can be collapsed into one once both are on master.
   input / $0.06 cached / $1.20 output per M tok, the permanent 50%-off rate on its
   pay-as-you-go page); the OpenRouter aggregate also sits below it. At 83
   tok/s/user the B200, B300, GB200, and MI355X agentic curves are priced, and the
-  H100, H200, MI300X, and MI325X curves top out below it and list as not priced.
+  H100, H200, MI300X, and MI325X curves top out below it and are omitted at that target.
   GLM 5.2/5.3 opens on a 10% model license fee and MiniMax M3 on 20%; Kimi K3
   opens on the 30% `DEFAULT_LAB_CUT_PCT`. DeepSeek V4 Pro opens on 24 tok/s/user,
   the speed DeepSeek's own API serves at, DeepSeek's peak-hour list price for
@@ -1144,14 +1144,14 @@ and the two can be collapsed into one once both are on master.
   and a 0% model license fee, since the weights ship under the MIT license. At 24
   tok/s/user the B200, B300, and MI355X agentic curves are priced; the
   GB200, GB300, and H200 curves bottom out above it (their lowest measured
-  points sit at roughly 40, 30, and 27 tok/s/user) and list as not priced until
+  points sit at roughly 40, 30, and 27 tok/s/user) and are omitted until
   a lower-interactivity run lands. DeepSeek V4.1 Flash opens on 125 tok/s/user,
   the speed DeepSeek's own API serves the Flash tier at, DeepSeek's peak-hour
   list price for `deepseek-flash` ($0.30 input / $0.006 cached / $1.20 output
   per M tok; off-peak is half that), and a 0% model license fee, since the
   weights ship under the MIT license. It entered the fleet on AgentX only (InferenceX#2961), so the page is
   wired ahead of the first published rows; SKUs whose agentic curves stop short
-  of 125 tok/s/user list as not priced rather than extrapolated. A
+  of 125 tok/s/user are omitted rather than extrapolated. A
   model with a list price gets a third Token Price option, `<vendor> list
 price`, next to OpenRouter and Custom; the caption names the source in force and
   links the lab's pricing page when the list price is used. Switching to Custom

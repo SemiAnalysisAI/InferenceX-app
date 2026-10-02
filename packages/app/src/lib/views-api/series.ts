@@ -9,6 +9,7 @@ import {
   type RooflineDirection,
 } from '@/components/inference/hooks/chart-data-core';
 import chartDefinitions, {
+  isAllInMeasuredConfigKey,
   METRIC_REGISTRY,
   tokenMetricTypeForConfigKey,
   type MetricConfigKey,
@@ -25,6 +26,10 @@ import type {
 } from '@/components/inference/types';
 import { partitionChartDataByLimits } from '@/components/inference/utils';
 import { bestSeriesPerSku } from '@/components/inference/utils/best-series-per-sku';
+import {
+  allInMeasuredTableData,
+  allInMeasuredUnavailableReason,
+} from '@/components/inference/utils/inference-table-data';
 import {
   isMeasuredPowerCurveMetric,
   upperPowerEnvelope,
@@ -127,6 +132,22 @@ export interface InferenceSeriesEntry {
   readonly points: readonly InferenceSeriesPoint[];
 }
 
+export interface InferenceTableRow extends Omit<InferenceSeriesPoint, 'x' | 'y'> {
+  readonly hwKey: string;
+  readonly gpu: string;
+  readonly framework: string;
+  readonly specMethod: string;
+  readonly label: string;
+  readonly vendor?: string;
+  readonly deployment: string;
+  readonly kvOffload: boolean;
+  readonly x: number | null;
+  readonly y: number | null;
+  readonly measuredGpuWatts: number;
+  readonly status: 'available' | 'unavailable';
+  readonly unavailableReason: ReturnType<typeof allInMeasuredUnavailableReason>;
+}
+
 export interface InferenceSeriesMetricMeta {
   readonly key: MetricKey;
   readonly configKey: MetricConfigKey;
@@ -139,6 +160,8 @@ export interface InferenceSeriesMetricMeta {
 
 export interface InferenceSeriesResult {
   readonly series: readonly InferenceSeriesEntry[];
+  /** All in Measured table population, including unavailable system estimates. */
+  readonly tableRows?: readonly InferenceTableRow[];
   readonly hardware: readonly { key: string; label: string; vendor?: string }[];
   readonly frontier: { direction: ParetoDirection | null; points: number };
   readonly metric: InferenceSeriesMetricMeta;
@@ -408,9 +431,58 @@ export function buildInferenceSeries(
   }
 
   const count = series.reduce((total, entry) => total + entry.points.length, 0);
+  // Remapping retains nested metric objects, including for transient rows without IDs.
+  const frontierMetrics = new Set([...frontierPoints].map((point) => point[metricKey]));
+  const tableRows = isAllInMeasuredConfigKey(metricConfigKey)
+    ? allInMeasuredTableData(scoped, metricKey, resolved.xAxisField)
+        .filter((point) => !best || bestHwKeys.size === 0 || bestHwKeys.has(point.hwKey))
+        .map((point): InferenceTableRow => {
+          const derived = point.id === undefined ? undefined : options.derivedMetrics?.[point.id];
+          const x =
+            xmode === 'e2e-normalized-interactivity'
+              ? percentile === 'p75'
+                ? derived?.p75_e2e_norm_intvty
+                : derived?.p90_e2e_norm_intvty
+              : point.x;
+          const unavailableReason = allInMeasuredUnavailableReason(point, metricKey);
+          return {
+            id: point.id ?? null,
+            precision: point.precision,
+            hwKey: point.hwKey,
+            gpu: point.hwKey.split('_')[0],
+            framework: point.framework ?? '',
+            specMethod: point.spec_decoding ?? 'none',
+            label: hardwareLegendLabel(point.hwKey, point.model),
+            vendor: GPU_VENDORS[point.hwKey.split('_')[0]],
+            deployment: pointDeploymentMode(point),
+            kvOffload: isKvOffloadEnabled(point),
+            x:
+              typeof x === 'number' &&
+              Number.isFinite(x) &&
+              (xmode !== 'e2e-normalized-interactivity' || x > 0)
+                ? x
+                : null,
+            y: Number.isFinite(point.y) ? point.y : null,
+            concurrency: point.conc ?? 0,
+            topologyKey: pointTopologyKey(point),
+            tp: point.tp ?? 0,
+            date: point.date ?? '',
+            ...(runIdFromUrl(point.run_url) === undefined
+              ? {}
+              : { runId: runIdFromUrl(point.run_url) }),
+            frontier: unavailableReason === null && frontierMetrics.has(point[metricKey]),
+            bestPerSku: bestHwKeys.has(point.hwKey),
+            metrics: pointMetrics(point, metricKey),
+            measuredGpuWatts: point.measuredAvgPower!.y,
+            status: unavailableReason === null ? 'available' : 'unavailable',
+            unavailableReason,
+          };
+        })
+    : undefined;
 
   return {
     series,
+    ...(tableRows === undefined ? {} : { tableRows }),
     hardware: series.map((entry) => ({
       key: entry.hwKey,
       label: entry.label,

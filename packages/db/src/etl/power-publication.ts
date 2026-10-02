@@ -33,6 +33,7 @@ const IDENTITY_FIELDS = [
   'image',
   'run_url',
 ] as const;
+// The CPU-side keys are withheld on cpu_power_valid, so the manifest carries that verdict too.
 const POWER_FIELDS = [
   ...MEASURED_POWER_METRIC_KEYS,
   'power_valid',

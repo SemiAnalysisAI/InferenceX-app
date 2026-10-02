@@ -236,7 +236,7 @@ export function rowToAggDataEntry(row: BenchmarkRow): AggDataEntry {
         ? row.power_invalid_reasons
         : undefined,
     power_metric_schema_version: m.power_metric_schema_version,
-    modeledSystemPower: modelSystemPower(row),
+    modeledSystemPower: modelSystemPower(row, undefined, true),
     power_tier: resolvePowerTier({
       powerValid: m.power_valid,
       wholeDeploymentSemantics: hasWholeDeploymentEnergySemantics,

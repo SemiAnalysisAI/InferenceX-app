@@ -122,8 +122,8 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
     '模型许可或收入分成百分比，范围 0 至 100，默认值随模型变化。',
   ],
   powerBasis: [
-    'provisioned (default, All in Provisioned), modeled (All in Measured) or compare. All in Measured uses measured GPU power plus modeled unmeasured components and PUE; it is not measured wall power. Eligible measured source rows are required; powerLabel identifies paired estimates and full-chassis extrapolation. Missing coverage is not zero.',
-    'provisioned（默认，整体预配功耗）、modeled（整体实测功耗）或 compare。整体实测功耗采用 GPU 实测值，加上未实测组件的功耗估算和 PUE，并非墙上电表读数。该估算需要符合条件的实测数据行；powerLabel 标明对比方式和整机外推。缺失数据不按零处理。',
+    'provisioned (default, All in Provisioned), modeled (All in Measured) or compare. For GW-year estimates, modeled filters source points to valid system-power inputs before building the curve at the same target, without extrapolation or historical substitution. compare uses identical valid-curve throughput for paired budgets; when no valid curve reaches the target, it retains the original provisioned estimate. provisioned-only keeps the original performance curve. All in Measured adds modeled components and PUE to measured inputs; it is not measured wall power. NVL72 requires complete validated GPU and Grace/module telemetry; CPU rail alone is insufficient, and sensor bases must be compatible. powerSource records topology, measured basis, sensor, PUE, model revision and source hash. powerLabel marks paired estimates and full-chassis extrapolation; skipped reasons preserve missing coverage.',
+    'provisioned（默认，整体预配功耗）、modeled（整体实测功耗）或 compare。按 GW 年估算时，modeled 先筛选满足系统功耗要求的数据点，再在同一目标值上构建曲线，不外推，也不借用历史数据。compare 的两种功耗方案使用同一条有效曲线的吞吐量；没有有效曲线覆盖目标时，保留原曲线的预配估算。provisioned 单独使用时仍沿用原性能曲线。整体实测功耗在实测输入上叠加组件估算和 PUE，并非墙上电表读数。NVL72 需要完整且通过验证的 GPU 与 Grace/模块遥测，仅 CPU rail 读数不足，传感器口径也必须兼容。powerSource 记录拓扑、实测口径、传感器、PUE、模型版本和源码哈希；powerLabel 标明配对估算和整机外推，skipped 保留覆盖缺失原因。',
   ],
   power: [
     'Comma-separated certified and/or legacy power tiers. Omit for all tiers.',

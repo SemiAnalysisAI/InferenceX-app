@@ -1245,6 +1245,14 @@ export function InferenceProvider({
     const wantedType = selectedXAxisMode === 'interactivity' ? 'interactivity' : 'e2e';
     const graph = graphs.find((candidate) => candidate.chartDefinition.chartType === wantedType);
     if (!graph) return hwTypesWithData;
+    // All in Measured can have GPU-valid table rows without a numeric estimate to rank.
+    const unrankedHwTypes = graph.tableData
+      ? new Set(
+          graph.tableData
+            .filter((point) => effectivePrecisions.includes(point.precision))
+            .map(extractHwKey),
+        )
+      : hwTypesWithData;
     const direction =
       graph.chartDefinition[
         `${selectedYAxisMetric}_roofline` as keyof typeof graph.chartDefinition
@@ -1255,11 +1263,19 @@ export function InferenceProvider({
       direction !== 'lower_left' &&
       direction !== 'lower_right'
     ) {
-      return hwTypesWithData;
+      return unrankedHwTypes;
     }
     const best = bestSeriesPerSku(graph.data, direction);
-    return best.size > 0 ? best : hwTypesWithData;
-  }, [graphs, hwTypesWithData, selectedXAxisMode, selectedYAxisMetric]);
+    if (best.size > 0) return best;
+    return unrankedHwTypes;
+  }, [
+    graphs,
+    hwTypesWithData,
+    selectedXAxisMode,
+    selectedYAxisMetric,
+    effectivePrecisions,
+    extractHwKey,
+  ]);
 
   const setBestPerSkuAndApply = useCallback(
     (enabled: boolean, options?: { applySelection?: boolean }) => {

@@ -1,280 +1,245 @@
-# Modeled system power in PowerX
+# PowerX system power and smart provisioning
 
-PowerX can compare measured GPU-board watts with estimated chassis AC watts for
-the non-agentic 8192-input/1024-output workload. The existing app transformation
-and the offline article exporter both call `modelSystemPower`; the API and
-benchmark producer continue returning their original measurements.
+[English](./powerx-system-power.md) | [简体中文](./powerx-system-power.zh.md)
 
-`system-power-model.profiles.json` records the pinned power model revision,
-component source hashes, hardware mapping, complete platform configuration, and
-fixed inference assumptions. Its profiles come from executing the original
-Python components. `system-power-model.ts` preserves their nonlinear fan curve,
-PSU efficiency interpolation, intermediate rounding, and PUE ordering. The
-Python-generated reference cases test this implementation against the source.
+Use this guide to inspect measured curves, estimate system power, and compare
+capacity under a fixed facility power budget. Start with [the dashboard steps](#inspect-a-measured-curve),
+then use [the hardware requirements](#hardware-and-telemetry-requirements) or
+[troubleshooting](#when-a-curve-or-estimate-is-missing) when a result is unavailable.
 
-The pinned source currently identifies itself as **DRAFT / pending human
-verification**. Numerical parity establishes implementation equivalence, not
-empirical chassis calibration.
+The system model is **DRAFT / pending human verification**. Its regression
+fixtures establish numerical consistency, not empirical calibration. AgentX
+estimates, including Kimi K3, are planning previews; they do not establish AgentX
+calibration or safe peak-load provisioning.
 
-## Updating the model for historical results
+## Choose the power boundary
 
-Modeled power is derived from retained measurements when the browser or a shared
-views API transforms a benchmark row. Changing the model does not rewrite the
-original GPU measurements or require a per-run database backfill.
+| Dashboard boundary          | What the value represents                                                                            |
+| --------------------------- | ---------------------------------------------------------------------------------------------------- |
+| GPU Level Measured          | Validated GPU-board power during the benchmark window.                                               |
+| GPU Level Provisioned (TDP) | Hardware TDP; a reference, not a reading from this run.                                              |
+| All in Provisioned          | The hardware registry's fixed facility kW/GPU allowance.                                             |
+| All in Measured             | Measured inputs plus modeled system components and facility overhead. It is not measured wall power. |
 
-1. Update `REVISION` in `packages/app/scripts/generate-system-power-reference.py`
-   to the intended clean Python model commit, and update the recorded assumptions
-   when required.
-2. Run that script with the path to the pinned model checkout to regenerate
-   `system-power-model.profiles.json` and `system-power-model.reference.json`.
-   If equations or load-dependent components changed, update the TypeScript
-   implementation too; regenerating constants alone is insufficient.
-3. Run the system-power model parity and admission tests, then deploy the app.
-   Existing browser sessions need the updated bundle. Derived API responses need
-   the normal authenticated cache invalidation or cache expiry; deployment alone
-   does not establish that every cached response uses the new revision.
-4. Regenerate frozen CSV/JSON exports separately. If the revised model needs
-   inputs that were never recorded, those rows stay unavailable until the input
-   gap is resolved. A new benchmark's power must not be attached to an older
-   benchmark's throughput.
+The examples below use W per GPU and J per output token. GPU measurements remain
+available independently of whether the system model can accept the row. Measured
+P75/P90 values are time-weighted percentiles of synchronized fleet GPU power,
+divided by GPU count; neither the average nor individual-device percentiles
+substitute for them.
 
-## Boundary and assumptions
+## Inspect a measured curve
 
-The input is measured mean GPU power during a validated serving window. The
-modeled chassis AC output adds the source model's CPU, DRAM, networking, storage,
-board, fans, and PSU conversion losses. Facility power is a separate estimate:
-PUE is applied after chassis AC, including the source's rounding order.
+**Prerequisites:** a benchmark selection with retained power data. Unlock the
+experimental power controls with ↑↑↓↓ if they are hidden.
 
-The fixed README inference sweep uses `u_cpu=0.20`, `u_ram=0.20`, `u_pcie=0.05`,
-and `u_nvme=0.0`. The pinned Python model defaults to PUE `1.2`; PowerX uses
-`1.3` for its supported air-cooled chassis profiles. Utility power = critical IT
-power × PUE (`1.3` air, `1.1` DLC).
-The factor applies after chassis AC; measured GPU power and chassis AC do not change.
-Cooling describes the modeled chassis, not verified benchmark-site cooling.
-The current profiles do not model DLC; `--pue` remains an explicit facility-factor
-override and does not convert an air-cooled chassis model into a DLC model.
-Platform-specific network assumptions,
-fan control, component counts, and chassis defaults are preserved in the
-generated profile; every JSON export includes that profile and every CSV row
-includes its applicable assumptions and profile hash. These are model inputs,
-not measured CPU/DRAM utilization.
+1. Open `/inference`, select the model (for example, Kimi K3), workload, date/run,
+   engine, precision, and hardware. Keep those selections fixed when comparing
+   boundaries; different engines or historical runs are different curves.
+2. Choose a measured-power metric and **GPU Level Measured**. Use **Table** to
+   inspect numeric rows and select a chart point to inspect its measurement
+   provenance. Start with average W/GPU: energy also requires a valid token
+   denominator, and P75/P90 require retained percentile measurements.
+3. Switch to **All in Measured** to inspect facility estimates. This boundary
+   supports 8K/1K single-turn results and AgentX previews. The separate
+   **Modeled Chassis AC** metric remains limited to 8K/1K single-turn results.
+4. For a capacity comparison, open `/profit-estimator-per-gigawatt`, choose the
+   model and a supported interactivity target, then select **Compare both** in
+   Benchmark Config. Match each result's workload, engine and precision to the
+   inference selection. Hover or select a bar for its power basis and read the
+   formula notes below.
 
-| Hardware identity | Source chassis implementation                                 |
-| ----------------- | ------------------------------------------------------------- |
-| `h100`            | `human_verified/hgx_h100_chassis/h100_chassis_power_model.py` |
-| `h200`            | `human_verified/hgx_h200_chassis/h200_chassis_power_model.py` |
-| `b200`            | `human_verified/hgx_b200_chassis/b200_chassis_power_model.py` |
-| `b300`            | `human_verified/hgx_b300_chassis/b300_chassis_power_model.py` |
-| `mi300x`          | `human_verified/mi300x_chassis/mi300x_chassis_power_model.py` |
-| `mi325x`          | `human_verified/mi325x_chassis/mi325x_chassis_power_model.py` |
-| `mi355x`          | `human_verified/mi355x_chassis/mi355x_chassis_power_model.py` |
+**Expected result:** the All in Measured table keeps every GPU-valid record in
+the selected scope, including B200/H200 multi-node deployments. It shows measured
+GPU power even when an all-in estimate is unavailable; the estimate displays
+`—` with a reason and stays blank in CSV. The graph plots numeric estimates only.
+The Profit Estimator adds target-range and financial requirements. All in
+Measured builds its performance frontier from power-valid measurements in the
+selected scope. Inference charts and tables also support unofficial-run overlays.
 
-All listed profiles describe a complete eight-GPU chassis. GB200 and GB300 have
-no matching model and are unsupported. Their rack topology is not substituted
-with B200 or B300.
+## Hardware and telemetry requirements
 
-A partially allocated chassis (one to seven measured GPUs on one host) is
-modeled at measured per-GPU power × 8. That is the same `n_gpu × W/GPU` input
-the source sweep scripts feed each chassis model, and it assumes the unmeasured
-GPUs run the same workload. The estimate is labeled `chassisBasis:
-'extrapolated'`: per-GPU values divide by the modeled chassis GPU count
-(`modeledGpuCount`), while `deploymentAcWatts` / `deploymentFacilityWatts` keep
-only the measured GPUs' share of each chassis. This is not a proportional share
-of a chassis evaluated at partial load; fixed components, the fan curve, and PSU
-efficiency are all evaluated at full-chassis load. Missing or invalid telemetry,
-inconsistent counts, missing host placement, more than one chassis per host, and
-model-domain overflow remain unavailable.
+| Hardware / deployment                                       | System estimate requires                                                                                                                                                                                                  |
+| ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| H100, H200, B200, B300, MI300X, MI325X, MI355X              | Valid GPU-board telemetry; an eight-GPU chassis profile models CPU, DRAM, networking, storage, board, fans and PSU losses.                                                                                                |
+| B200/H200 and other supported chassis across multiple hosts | Consistent GPU counts and watts. Per-worker data must identify one chassis per distinct host. Aggregate non-disaggregated rows without workers may use complete eight-GPU hosts at the deployment mean (`uniform-hosts`). |
+| Prefill/decode disaggregation                               | Per-worker host placement and role power consistent with deployment totals. A role average alone cannot establish each host's load. Separate CPU-only frontend/router hosts are outside the estimate.                     |
+| GB200 / GB300 NVL72                                         | Valid GPU telemetry **and** complete, independently valid compute-module or Grace-socket telemetry from the same window: four GPUs and two sockets per compute tray.                                                      |
 
-For a single-node deployment, the producer's physical width is `TP * PP * PCP`.
-EP partitions that width. Some existing API configuration aliases contain
-`TP * EP`; the model cross-checks the physical width against measured total and
-per-GPU watts instead of trusting or summing those aliases. Multi-node and
-disaggregated inputs require one chassis (one to eight GPUs) per measured
-worker, distinct worker hosts, and consistent total/role watts. A role average
-alone cannot establish physical placement or evaluate each host's nonlinear
-model. CPU-only frontend workers are excluded from GPU-chassis counting. Separate CPU-only
-frontend/router hosts are outside this estimate; CPU power within GPU chassis
-still uses the source's fixed 20% utilization assumption.
+The normal contract is numeric `power_valid=1`,
+`power_metric_schema_version=2`, positive `avg_power_w` (W/GPU) and
+`avg_total_gpu_power_w` (deployment W), and a consistent physical GPU count.
+The model retains a legacy validated single-node exception with no schema
+marker as `validated-unversioned-single-node`; this does not admit unversioned
+multi-node, disaggregated or NVL72 rows. Profit planning always requires schema 2.
 
-The default measured contract is numeric `power_valid=1` and metric schema 2.
-The original validated single-node producer predates the schema marker but
-already defines both watts fields identically. This path retains the absent
-schema and reports `validated-unversioned-single-node`; it does not upgrade the
-source or admit unversioned disaggregated power. The article receipt additionally
-pins the producer checkout and retains each original audit artifact.
+**NVL72 sensor boundary:** `cpu_power_valid=1` and `power_audit.cpu` must record
+matching expected/observed socket counts, two per tray. Either:
 
-## Profit Estimator power basis
+- `avg_total_module_power_w` with `sensor_kind: module` covers GPU, HBM, Grace
+  and LPDDR5X together. Do not add GPU or Grace watts again.
+- `avg_total_cpu_power_w` and `avg_cpu_socket_power_w` with
+  `sensor_kind: grace_socket` must agree with the socket count. The model adds
+  GPU-board power and a regulator allowance of GPU W × 0.15 / 0.85.
 
-The per-GW Profit Estimator offers provisioned power, measured + modeled power,
-and a paired comparison in Benchmark Config. Provisioned remains the default.
-The control uses the existing insider feature gate and is hidden while locked.
-Unlock with ↑↑↓↓ (`inferencex-feature-gate=1` in local storage). While locked,
-`c_power` cannot activate an alternative calculation or fetch full power rows;
-relocking restores provisioned estimates immediately.
-The alternative reuses the same hardware, P90 target, throughput frontier,
-token mix, prices, utilization, and per-GPU-hour costs. It changes only the
-facility kW/GPU used to calculate capacity per GW. Consequently, revenue,
-compute expense, license fee, and profit scale together; profit margin does not
-change. Electricity expense is not recomputed separately.
+CPU-rail-only, missing or unknown sensor provenance is insufficient. A present
+but invalid module measurement remains unavailable; it does not silently fall
+back to Grace readings. Model support does not imply that every producer version
+collects these fields.
 
-This opt-in AgentX estimate requires validated schema-v2 telemetry and chassis
-supported by the pinned model. Fully measured eight-GPU chassis are supported
-on a single node, per measured worker host, or across an aggregate multinode
-deployment without per-worker telemetry at the deployment-mean GPU power
-(`topologyBasis: 'uniform-hosts'`; symmetric TP/PP/DP shards load each host alike).
-Validated single-node 1/2/4-GPU allocations use full-chassis extrapolation: fill
-an eight-GPU server with whole replicas at the measured per-GPU power and
-throughput, then divide modeled facility power by eight. This assumes replica
-co-location does not change performance or power; it is not a measurement of a
-partly idle server. The chart, tooltip, and CSV label every extrapolated estimate,
-including interpolation with one partial knot. Unsupported GB200/GB300 chassis,
-partial multi-host allocations, disaggregated deployments without per-worker
-telemetry, allocations that cannot tile eight GPUs, and missing/invalid
-measurements stay unavailable with distinct reasons.
-The ordinary 8K/1K transformation keeps its existing admission policy.
+**Partial allocations:** a one-to-seven-GPU chassis is modeled as eight GPUs at
+the measured per-GPU load and labeled `extrapolated`. Deployment totals retain
+only the measured GPUs' share. Profit planning accepts single-node 1/2/4-GPU
+chassis allocations as whole-replica extrapolations, assuming co-location leaves
+performance and power unchanged. Other partial layouts, including partial NVL72
+trays, are not accepted for profit planning. A module sensor already covers its
+whole tray, so that reading is never scaled to fill unmeasured GPUs.
 
-At an exact frontier point, use that point's modeled power. Between points,
-estimate power linearly using the same two knots as the existing throughput
-interpolation; never select a different point to fill a power gap. The estimate
-uses PUE 1.3 and an additional 10% planning margin. These assumptions, including
-the fixed CPU/DRAM utilization above, are not validated peak-load provisioning or
-AgentX system calibration. The UI and CSV label the estimate and its assumptions.
-`c_power=modeled` and `c_power=compare` preserve the selection in share URLs.
-Unavailable historical estimates use the hardware registry when a chip is absent
-from today's results and include the source date/run label.
+## One worked NVL72 example
 
-每 GW 利润估算器在基准测试配置中提供预配功耗、实测加建模功耗，以及两种方式的同口径
-对比；默认仍采用预配功耗。两种方式使用同一硬件、P90 目标、吞吐量前沿、token 比例、
-价格、利用率和每 GPU 小时成本，仅改变换算每 GW 容量时采用的设施功率。因此收入、
-计算成本、模型许可费和利润按相同比例变化，利润率不变；不会另行重新计算电费。
+**Input:** the [GB300 reference fixture](../packages/app/src/lib/system-power-model.reference.json)
+with **3,000.75 W of module power per complete tray** and PUE 1.1.
+This is a numerical fixture, not a measured Kimi K3 result. An actual benchmark
+must separately satisfy both GPU and CPU/module validation.
 
-该选项由现有内部功能开关控制，锁定时隐藏。按 ↑↑↓↓ 解锁（本地存储
-`inferencex-feature-gate=1`）。锁定时，`c_power` 不会启用其他估算方式或触发完整功耗
-数据请求；重新锁定后立即恢复预配功耗估算。
+1. Scale the measured mean module input to 18 compute trays. Add modeled tray
+   components, nine NVSwitch trays, conversion losses and management switches.
+2. Evaluate the power-shelf efficiency once at the combined rack load. Every
+   measured tray receives the same 1/18 rack share; this assumes the remaining
+   trays run at that mean load, rather than measuring actual rack occupancy.
+3. Apply PUE once to rack AC power, then divide by 72 GPUs.
+4. Apply the separate 10% planning reserve for the Profit Estimator.
 
-AgentX 估算仅接纳通过验证的 schema-v2 功耗，且要求单节点机箱及适用模型。
-实测单卡、双卡或四卡配置可复用现有整机外推：假设在八卡服务器上部署多个完整实例，
-每卡功耗和吞吐量保持不变，再将建模设施功耗除以八。这要求实例共置不改变性能或功耗，
-不代表部分 GPU 闲置时的整机实测功耗。图表、提示框和 CSV 均标注整机外推；若插值
-使用的任一数据点采用外推，也保留该标注。GB200/GB300 等无匹配模型的机箱、多节点
-配置、无法整除八卡的实例，以及缺失或无效功耗仍不可用，并分别说明原因。原有
-8K/1K 转换路径的接纳规则不变。精确前沿点使用自身的功耗；点间采用原吞吐量插值的
-同一对数据点线性估算功耗，不换用其他点填补缺失。PUE 取 1.3，另加 10% 功耗余量；
-这些假设和上述固定 CPU/DRAM 利用率尚未通过 AgentX 系统校准，也不构成峰值供电容量
-验证。界面与 CSV 会注明估算及其假设，分享链接通过 `c_power` 保留所选方式。
-历史估算不可用时，若当天结果不含该芯片，则从硬件注册表获取名称；提示会附上来源
-日期或运行标签，避免与当前结果混淆。
+| Stage                                           |    Watts |
+| ----------------------------------------------- | -------: |
+| Module input × 18 trays                         | 54,013.5 |
+| Modeled compute-tray components                 | 11,466.0 |
+| Modeled NVSwitch trays                          |  4,107.6 |
+| Tray conversion losses                          |  1,967.8 |
+| Rack DC, including 200 W of management switches | 71,754.9 |
+| Rack AC, after shelf losses                     | 74,904.6 |
+| Facility power after PUE 1.1                    | 82,395.1 |
 
-## Offline comparison export
+```text
+Planning kW/GPU = 82,395.1 / 72 / 1,000 × 1.10 ≈ 1.258814
+GPU capacity per GW = 1,000,000 / 1.258814 ≈ 794,399
+GPU-hours per GW-year = GPU capacity × 8,760
+```
 
-The exporter reads a local cohort envelope and writes a **new** output directory:
+An eight-GPU benchmark on two complete trays receives
+82,395.1 × 8 / 72 ≈ 9,155.0 W of facility power, giving the same per-GPU result.
+It has not measured all 72 GPUs. Intermediate values are rounded; summing the
+displayed components can differ by 0.1 W. Planning uses the retained facility
+total, not the fixture's rounded per-GPU display value.
+
+## Assumptions behind the estimate
+
+- **PUE:** the dashboard applies 1.3 to air-cooled chassis and 1.1 to NVL72,
+  after AC conversion losses. The historical profile default of 1.2 is not the
+  dashboard default. Cooling describes the model, not verified site cooling.
+  Changing PUE does not convert an air-cooled chassis model into a DLC model.
+- **Chassis overhead:** coefficients reflect fixed assumptions of 20% CPU/DRAM
+  utilization, 5% PCIe utilization and idle NVMe. These are not live utilization
+  readings. Each host's nonlinear fan/PSU model is evaluated at its own load;
+  `uniform-hosts` explicitly substitutes the deployment mean for every host.
+- **NVL72 overhead:** Grace and LPDDR5X are measured. Rack networking, switches,
+  fans, board residuals, conversion losses and power shelves are modeled.
+  [Profiles](../packages/app/src/lib/system-power-model.profiles.json) retain
+  component values, source status and ranges for unverified parameters. Rack DC
+  above the 264 kW installed shelf capacity is outside the model domain.
+- **Planning reserve:** facility kW/GPU × 1.10 is a separate capacity buffer.
+  Average power plus this reserve is not a validated electrical peak limit.
+- **Measured curves:** All in Measured selects power-valid points before building
+  the performance frontier. Throughput and power use that curve at the requested
+  target; the curve uses a compatible model, PUE, topology and sensor basis.
+  No target extrapolation or borrowing from unselected history occurs.
+- **Matched comparison:** Compare both uses the same power-valid curve, target
+  and financial inputs for its paired bars. If no measured estimate is available,
+  the ordinary provisioned result remains. All in Provisioned keeps the ordinary
+  performance frontier.
+
+Lower planning power increases GPU capacity per GW. Revenue, compute cost and
+license fees scale with that capacity under the fixed per-GPU assumptions; profit
+margin and per-chip-hour economics do not improve. Electricity expense is not
+recomputed separately.
+
+## When a curve or estimate is missing
+
+Compare the same model, workload, date/run, engine, precision and metric first.
+Chart/table rows and target-based profit estimates answer different questions.
+
+| Symptom / reason                                                                            | Check and next action                                                                                                                                                                      |
+| ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| GPU curve exists, All in Measured is absent                                                 | Check supported workload/hardware and the row's system-model status. Valid GPU power alone does not establish a system estimate.                                                           |
+| B200/H200 multi-node system estimate is unavailable (`topology`, `role-power`, `gpu-count`) | Inspect physical GPU count, host placement and total/role watts. Use the original producer topology; do not infer chassis placement from a display label or sum TP/EP aliases.             |
+| NVL72 reports `cpu-telemetry` / `no-cpu-power`                                              | Inspect the same-window CPU audit, sensor kind and complete socket coverage. GPU validity remains independent.                                                                             |
+| `telemetry` / `no-measured-power`                                                           | Check the original validation audit and raw samples. Reprocess only when the retained evidence supports the original window; otherwise collect replacement performance and power together. |
+| `outside-measured-range` or power-invalid target bracket                                    | Choose a target within the selected power-valid curve. Both bounding points need compatible valid power; points outside the selected scope cannot fill the gap.                            |
+| `incompatible-power-basis`                                                                  | Do not interpolate between module and GPU-plus-Grace readings, or different model/PUE bases.                                                                                               |
+| No cost, token mix or provisioned power                                                     | Inspect the financial inputs. This can prevent both profit estimates even when power is valid.                                                                                             |
+| `workload`, `hardware`, `model-domain`                                                      | Use a supported workload/profile and in-domain input; do not replace the missing estimate with zero or TDP.                                                                                |
+
+In **Compare both**, a valid provisioned result remains when its measured estimate
+is unavailable. Measured-only mode never substitutes provisioned watts. See
+[persistence and recovery](./powerx-persistence-recovery.md) for retained telemetry
+and targeted repair; new power readings cannot be attached to old
+throughput results.
+
+## Provenance and reproducible exports
+
+Inspect the point's measurement source and the estimate's model revision, PUE,
+sensor basis and topology. Profit tooltips identify the power basis; formula
+notes and CSV columns `Power basis`, `Power sensor` and `System power profile`
+provide the assumptions and source details.
+The model revision is an `app-sha256:` digest, not a benchmark run ID or Git commit.
+
+The [offline exporter](../packages/app/scripts/export-modeled-system-power.ts)
+accepts a local `ComparisonInput` envelope with original `BenchmarkRow` entries,
+metadata, and optional original artifacts/audits. Use the script's type for the
+complete shape; preserve run, attempt, producer revision, capture time and hashes.
+The exporter follows the ordinary 8K/1K model policy, not the AgentX preview opt-in.
+Run from the repository root with installed dependencies and a new output path:
 
 ```sh
 bun packages/app/scripts/export-modeled-system-power.ts \
-  --input /path/to/original-qwen-article.input.json \
-  --output /path/to/new-original-qwen-comparison
-
-bun packages/app/scripts/export-modeled-system-power.ts \
-  --input /path/to/qwen35-current.input.json \
-  --output /path/to/new-current-qwen-comparison --pue 1.3
+  --input /path/to/cohort.input.json \
+  --output /path/to/new-comparison
 ```
 
-The maintained input shape is `ComparisonInput` in the script:
+Outputs are `comparison.json`, `comparison.csv` and optional `cells.csv`. JSON
+retains original rows, audits, validity, model outputs and provenance; unavailable
+CSV values stay blank. Optional `--pue 1.3` overrides the facility factor for
+**every** row and is recorded in metadata. Without it, per-hardware defaults apply.
+See [API examples](./inferencex-api-examples.md) for measured-data extraction.
 
-```ts
-{
-  cohort: string,
-  metadata: { /* source URLs, capture times, hashes and cohort selection */ },
-  rows: [{
-    id: string,               // stable observation identity
-    cell?: string,            // optional group of original replicates
-    benchmark: BenchmarkRow, // original API row or existing ETL output
-    rawInput?: unknown,      // original artifact before ETL normalization
-    source?: object,         // run, attempt, producer revision and artifact receipt
-    audit?: object           // matching original power-validation sidecar
-  }]
-}
+Modeled energy requires a matching audit with exact telemetry duration, physical
+GPU count and successful request/token denominators. It is modeled deployment
+power × duration, not integrated measured wall energy. No kernel-level
+prefill/decode energy is inferred. Each replicate is modeled before aggregation;
+a cell mean remains unavailable if any scoped replicate is unavailable.
+
+## Maintain the model
+
+| Responsibility                                      | Source                                                                          |
+| --------------------------------------------------- | ------------------------------------------------------------------------------- |
+| Equations, nonlinear curves and rounding            | [system-power-model.ts](../packages/app/src/lib/system-power-model.ts)          |
+| Component parameters, assumptions and source status | [profiles](../packages/app/src/lib/system-power-model.profiles.json)            |
+| Workload, telemetry, topology and PUE admission     | [modelSystemPower](../packages/app/src/lib/modeled-system-power.ts)             |
+| Matched frontier and planning reserve               | [profit-power.ts](../packages/app/src/components/calculator/profit-power.ts)    |
+| Frozen numerical baseline                           | [reference fixtures](../packages/app/src/lib/system-power-model.reference.json) |
+| Model identity and source hashes                    | [provenance](../packages/app/src/lib/system-power-model.provenance.json)        |
+
+Edit equations or active coefficients together with justified expected values and
+assumption metadata. Changing labels such as `u_cpu` alone does not change watts.
+Refresh and check the manifest:
+
+```sh
+bun packages/app/scripts/update-system-power-provenance.ts
+bun packages/app/scripts/update-system-power-provenance.ts --check
 ```
 
-Use the existing `normalizeArtifactRows` / `mapBenchmarkRow` for raw producer
-aggregates. Keep the original aggregate as `rawInput`, retain original schema
-markers, and check that its measured metrics survive normalization unchanged.
-Use complete raw API responses for current snapshots, then select the exact
-`single_turn`, `isl=8192`, `osl=1024` workload locally. Retain every scoped row,
-including unsupported hardware and missing/invalid power; never mix a current
-snapshot into the frozen article campaign.
-
-Outputs are `comparison.json`, `comparison.csv`, and optional `cells.csv`.
-The JSON includes original input rows, measured validity, modeled outputs,
-assumptions, audit windows, and source provenance. CSV includes separate measured
-and modeled columns; unavailable numbers are blank. Invalid/unverified raw
-values remain in the raw-input record and are not labeled valid measurements.
-Metadata records input and implementation SHA-256 hashes, model and application
-revisions, worktree state, generation time, and full profile provenance. Generate
-the final release export from the intended application commit; file hashes also
-identify any local changes during development.
-
-Modeled energy is available only when a matching valid audit sidecar supplies an
-exact telemetry duration, physical GPU count, and successful request/token
-denominators. It is modeled deployment power (the measured GPUs' share of each
-chassis) multiplied by that duration, not a time integral of measured wall power. Actual output-token counts are used;
-nominal `1024` tokens per query never replace recorded counts. No kernel-level
-prefill/decode energy is inferred. API snapshots without these sidecars receive
-power estimates only.
-
-Each replicate is modeled before aggregation. A cell mean averages its modeled
-replicate outputs; it does not evaluate the model at mean watts. If any replicate
-is unavailable, the corresponding mean remains unavailable rather than silently
-dropping that replicate.
-
-## 中文说明
-
-模型结果在浏览器或共享 views API 转换 benchmark 数据时计算，不写回原始 GPU
-测量值。更新模型时，先修改生成脚本中的固定版本及相关假设，再生成 profiles 和
-reference JSON；如果公式或随负载变化的组件有改动，还需同步 TypeScript 实现。
-通过一致性及准入测试后部署，刷新浏览器，并使派生 API 缓存失效或等待其过期。
-冻结的 CSV/JSON 需另行导出。通常无需逐 run 回填数据库；若新模型需要历史记录中
-没有的输入，应保留不可用状态，也不能把新一轮测得的功耗配到旧吞吐结果上。
-
-PowerX 的系统功耗结果以实测 GPU 功率为输入，使用固定版本的功耗模型估算
-8-GPU 机箱的 AC 输入功率，再单独应用 PUE 得到设施功率估计。CPU 和 DRAM 利用率
-均假设为 20%；这些是模型参数，不是实测利用率。完整平台配置、源码版本和校验和
-随导出结果保留。模型源码仍标记为待人工核验，数值一致性不代表完成了实机校准。
-
-固定版本的 Python 模型默认 PUE 为 1.2；PowerX 对当前风冷机箱模型
-采用 1.3。市电侧功率 = IT 负载功率 × PUE，风冷取 1.3，直接液冷（DLC）
-取 1.1。PUE 仅作用于机箱交流功率，不改变 GPU 实测功率或机箱交流功率。这里的
-冷却方式指建模机箱，并非已核实的测试站点配置。当前模型不支持 DLC；`--pue` 仅
-覆盖设施功率系数，不会把风冷机箱模型转换为液冷模型。
-
-仅使用部分 GPU 的机箱（单台主机上实测 1–7 张 GPU）按实测每卡功率 × 8 建模，
-与模型源码 sweep 脚本喂给各机箱模型的 `n_gpu × W/GPU` 输入一致，并假设未实测的
-GPU 运行相同负载。结果标记为 `chassisBasis: 'extrapolated'`：每卡数值按建模机箱
-的 GPU 总数分摊，`deploymentAcWatts` 只保留实测 GPU 在各机箱中的份额。这不是把
-部分分配的机箱按比例分摊：固定组件、风扇曲线和 PSU 效率都在满机箱负载点求值。
-GB200、GB300 没有匹配模型，也不能套用 B200、B300 模型。缺失、无效和不支持的
-情况保持不可用。纯 CPU frontend worker 不计入 GPU 机箱数；独立的纯 CPU
-frontend/router 主机不在估算范围内，GPU 机箱内的 CPU 功率仍按 20% 利用率计算。
-
-导出时每次测量先独立计算，再对同一 cell 的重复测量取平均。能耗使用审计记录中的
-实际窗口和成功 token 数，按实测 GPU 的份额计算，明确标记为估计值，不改写原有
-GPU 实测指标。当前 API 快照与原文章冻结数据分别导出，避免混用不同时间和配置的
-结果。
-
-## Measured P75 and P90 GPU power
-
-`y_measuredP75Power` and `y_measuredP90Power` show the time-weighted P75 and P90 of
-synchronized fleet GPU-board power over the validated load window, divided by GPU
-count. They share the regular measured-power chart path for official points and
-unofficial overlays. Missing or unvalidated percentile data remains unavailable;
-average power is never used as a substitute. These metrics are separate from modeled
-chassis AC power and individual-device percentiles.
-
-P75 and P90 backfills use the same 34 original validated traces and exact windows
-recorded in `docs/data/power-p90-backfill.json`.
-
-`y_measuredP75Power` 和 `y_measuredP90Power` 分别显示已验证负载窗口内整组 GPU
-功耗按时间加权的 P75 和 P90，再按参与测量的 GPU 数量均摊。正式数据与非正式
-运行叠加层使用同一计算和绘图路径。缺少测量值或未通过验证时保持不可用，
-不会用平均功耗替代。该指标与机箱交流功耗估算、单个设备的功耗分位数不同。
-两个分位数均由审计记录中的同一批 34 份原始遥测及其测量窗口重新计算。
+Run affected model, admission, planning, views API and export checks. Keep the
+496 historical reference cases frozen; baseline parity does not establish
+calibration. The app owns the model and parameters; no private Python repository
+is required. Historical measurements are modeled on read, so a model-only change
+needs an updated app bundle and API cache refresh/expiry, not a raw-data backfill.
+Regenerate frozen exports separately; missing source measurements remain missing.
