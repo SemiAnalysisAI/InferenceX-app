@@ -94,14 +94,17 @@ export function BottomToast({
         if (!start || !touch) return;
         setDrag({ dx: touch.clientX - start.x, dy: touch.clientY - start.y });
       }}
-      onTouchEnd={() => {
-        const current = drag;
+      onTouchEnd={(event) => {
+        // Measure from the gesture's own end point: the `drag` state can lag
+        // the last touchmove, and a quick flick may never set it at all.
+        const start = touchStartRef.current;
+        const touch = event.changedTouches[0];
         touchStartRef.current = null;
         setDrag(null);
-        if (
-          current &&
-          (Math.abs(current.dx) > SWIPE_DISMISS_PX || current.dy > SWIPE_DISMISS_PX / 2)
-        ) {
+        if (!start || !touch) return;
+        const dx = touch.clientX - start.x;
+        const dy = touch.clientY - start.y;
+        if (Math.abs(dx) > SWIPE_DISMISS_PX || dy > SWIPE_DISMISS_PX / 2) {
           dismiss();
         }
       }}

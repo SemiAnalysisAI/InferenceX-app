@@ -362,7 +362,7 @@ function MobileTabStrip({
         data-ph-capture-attribute-tab={route.key}
         onClick={() => onSelect(route.key)}
         className={cn(
-          'inline-flex min-h-10 shrink-0 snap-start items-center rounded-full border px-4 text-sm font-medium whitespace-nowrap',
+          'inline-flex min-h-10 shrink-0 items-center rounded-full border px-4 text-sm font-medium whitespace-nowrap',
           'transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
           active
             ? 'border-secondary bg-secondary text-secondary-foreground dark:border-primary dark:bg-primary dark:text-primary-foreground'
@@ -382,7 +382,7 @@ function MobileTabStrip({
         aria-label={ariaLabel}
         data-testid="mobile-chart-select"
         onScroll={updateEdges}
-        className="no-scrollbar flex snap-x snap-mandatory scroll-px-3 gap-2 overflow-x-auto overscroll-x-contain p-3"
+        className="no-scrollbar flex gap-2 overflow-x-auto overscroll-x-contain p-3"
       >
         {routes.map(renderPill)}
         {gatedRoutes.length > 0 && (
