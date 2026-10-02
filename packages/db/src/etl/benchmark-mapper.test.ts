@@ -1820,3 +1820,81 @@ describe('mapBenchmarkRow — v3 agentic nested agg schema', () => {
     expect(result!.offloadMode).toBe('on');
   });
 });
+
+describe('NVL72 CPU ingestion', () => {
+  it.each([
+    { gpu: 1, cpu: 1, cpuValid: 1, watts: 501 },
+    { gpu: 0, cpu: '1', cpuValid: 1, watts: 501 },
+    { gpu: 1, cpu: 0, cpuValid: 0, watts: undefined },
+    { gpu: 1, cpu: 'invalid', cpuValid: 0, watts: undefined },
+    { gpu: 1, cpu: undefined, cpuValid: undefined, watts: undefined },
+  ])(
+    'keeps CPU and GPU verdicts independent: GPU=$gpu CPU=$cpu',
+    ({ gpu, cpu, cpuValid, watts }) => {
+      const result = mapBenchmarkRow(
+        makeV2Row({
+          power_valid: gpu,
+          ...(cpu === undefined ? {} : { cpu_power_valid: cpu }),
+          avg_power_w: 600,
+          avg_cpu_socket_power_w: 250.5,
+          avg_total_cpu_power_w: 501,
+          total_cpu_energy_j: 10020,
+          avg_total_module_power_w: 2901,
+          total_module_energy_j: 58020,
+        }),
+        createSkipTracker(),
+      );
+      expect(result!.metrics.cpu_power_valid).toBe(cpuValid);
+      expect(result!.metrics.avg_total_cpu_power_w).toBe(watts);
+      expect(result!.metrics.avg_cpu_socket_power_w).toBe(watts === undefined ? undefined : 250.5);
+      expect(result!.metrics.total_cpu_energy_j).toBe(watts === undefined ? undefined : 10020);
+      expect(result!.metrics.avg_total_module_power_w).toBe(watts === undefined ? undefined : 2901);
+      expect(result!.metrics.total_module_energy_j).toBe(watts === undefined ? undefined : 58020);
+      expect(result!.metrics.avg_power_w).toBe(gpu === 1 ? 600 : undefined);
+    },
+  );
+
+  it('preserves Grace socket evidence while bounding malformed CPU audit fields', () => {
+    const cpu = {
+      sensor_kind: 'grace_socket',
+      source: 'acpi',
+      expected_sockets: 4,
+      observed_sockets: 4,
+      sample_row_count: 6268,
+      reason_codes: [],
+    };
+    const result = mapBenchmarkRow(makeV2Row({ power_audit: { cpu } }), createSkipTracker());
+    expect(result!.powerAudit).toMatchObject({ cpu });
+    expect(
+      extractPowerAudit({
+        sample_count: 1,
+        cpu: {
+          sensor_kind: 'unknown',
+          source: 'x'.repeat(33),
+          expected_sockets: -1,
+          observed_sockets: Number.NaN,
+          sample_row_count: '12',
+          reason_codes: ['cpu_socket_count_mismatch', 'cpu_socket_count_mismatch', '<img>', 7],
+        },
+      }),
+    ).toEqual({
+      sample_count: 1,
+      producer_sha: null,
+      exporter_image_sha256: null,
+      cpu: { sample_row_count: 12, reason_codes: ['cpu_socket_count_mismatch'] },
+    });
+    expect(extractPowerAudit({ sample_count: 1, cpu: 'acpi' })).not.toHaveProperty('cpu');
+  });
+
+  it('scrubs supplemental CPU measurements after normalizing their verdict', () => {
+    const metrics = {
+      cpu_power_valid: 2,
+      power_valid: 1,
+      avg_total_cpu_power_w: 501,
+      avg_power_w: 600,
+    };
+    normalizePowerContractMetrics(metrics, metrics);
+    expect(scrubWithheldPowerMetrics(metrics)).toBe(false);
+    expect(metrics).toEqual({ cpu_power_valid: 0, power_valid: 1, avg_power_w: 600 });
+  });
+});
