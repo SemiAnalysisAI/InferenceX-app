@@ -16,14 +16,21 @@ import { cn } from '@/lib/utils';
 export function AutumnLeavesToggle({ isZh = false }: { isZh?: boolean }) {
   const [enabled, setEnabled] = useState(true);
 
+  // The header can mount two instances (desktop and mobile menu), so every
+  // instance follows the `<html>` attribute instead of owning the state.
   useEffect(() => {
-    setEnabled(!document.documentElement.hasAttribute(AUTUMN_LEAVES_OFF_ATTRIBUTE));
+    const root = document.documentElement;
+    const sync = () => setEnabled(!root.hasAttribute(AUTUMN_LEAVES_OFF_ATTRIBUTE));
+    sync();
+    const observer = new MutationObserver(sync);
+    observer.observe(root, { attributes: true, attributeFilter: [AUTUMN_LEAVES_OFF_ATTRIBUTE] });
+    return () => observer.disconnect();
   }, []);
 
   const toggle = () => {
-    const next = !enabled;
-    setEnabled(next);
     const root = document.documentElement;
+    const next = root.hasAttribute(AUTUMN_LEAVES_OFF_ATTRIBUTE);
+    setEnabled(next);
     if (next) root.removeAttribute(AUTUMN_LEAVES_OFF_ATTRIBUTE);
     else root.setAttribute(AUTUMN_LEAVES_OFF_ATTRIBUTE, '');
     try {

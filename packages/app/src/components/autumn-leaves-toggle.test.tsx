@@ -49,6 +49,32 @@ describe('AutumnLeavesToggle', () => {
     expect(localStorage.getItem(AUTUMN_LEAVES_STORAGE_KEY)).toBeNull();
   });
 
+  it('keeps every mounted instance in sync', async () => {
+    act(() =>
+      root.render(
+        <>
+          <AutumnLeavesToggle />
+          <AutumnLeavesToggle />
+        </>,
+      ),
+    );
+    const [first, second] = container.querySelectorAll<HTMLButtonElement>(
+      '[data-testid="autumn-leaves-toggle"]',
+    );
+    act(() => first.click());
+    // MutationObserver callbacks run as microtasks.
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(second.getAttribute('aria-pressed')).toBe('false');
+    act(() => second.click());
+    expect(document.documentElement.hasAttribute(AUTUMN_LEAVES_OFF_ATTRIBUTE)).toBe(false);
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(first.getAttribute('aria-pressed')).toBe('true');
+  });
+
   it('prepaint script keys off the saved opt-out', () => {
     expect(autumnLeavesPrepaintScript).toContain(JSON.stringify(AUTUMN_LEAVES_STORAGE_KEY));
     expect(autumnLeavesPrepaintScript).toContain(JSON.stringify(AUTUMN_LEAVES_OFF_ATTRIBUTE));
