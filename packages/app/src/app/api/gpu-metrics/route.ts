@@ -21,7 +21,7 @@
  * Two response shapes:
  * - default: every `gpu_metrics_*` artifact's parsed rows (the `/gpu-metrics`
  *   page), from the stored digest when the run is ingested, else from GitHub;
- *   bundles are ignored on the GitHub path;
+ *   native bundle samples provide per-host temperature when no CSV sibling exists;
  * - `series=power`: compact per-GPU watt series bucketed to one second
  *   (`components/gpu-power/power-series.ts`) for the PowerX timeline, from
  *   CSV artifacts and from bundles cut per validation window. The timeline
@@ -37,6 +37,11 @@
  * `sourceCoverage` describes those requested identities, not full-run completeness.
  */
 import { type NextRequest, NextResponse } from 'next/server';
+
+import {
+  isMultinodePowerSamplesPath,
+  parseMultinodePowerSamples,
+} from '@semianalysisai/inferencex-db/etl/multinode-power-samples';
 
 import { getDb } from '@semianalysisai/inferencex-db/connection';
 import {
@@ -148,7 +153,7 @@ interface GithubGpuMetricsResponse extends Omit<GpuMetricsRouteResponse, 'artifa
 }
 
 type TelemetryJob =
-  | { kind: 'csv'; artifact: GithubArtifact }
+  | { kind: 'csv' | 'native'; artifact: GithubArtifact }
   | { kind: 'bundle'; artifact: GithubArtifact };
 
 type TelemetryResult =
@@ -211,6 +216,27 @@ async function downloadArtifact(
   return files.length > 0 ? { name: artifact.name, files } : null;
 }
 
+async function downloadNativeSamples(
+  artifact: GithubArtifact,
+  githubToken: string,
+): Promise<GithubArtifactPayload | null> {
+  const buffer = await downloadZip(artifact, githubToken, MAX_BUNDLE_BYTES);
+  if (!buffer) return null;
+  const files = extractZipEntries(buffer, '.csv', (name, contents) => {
+    if (!isMultinodePowerSamplesPath(name)) return [];
+    return (parseMultinodePowerSamples(contents) ?? []).map((host) => ({
+      name: `${name}#${host.hostname}`,
+      data: host.samples.map((sample) => ({
+        timestamp: new Date(sample.timestampMs).toISOString(),
+        index: sample.gpuIndex,
+        power: sample.powerW!,
+        ...(sample.temperatureC === null ? {} : { temperature: sample.temperatureC }),
+      })),
+    }));
+  });
+  return files.length > 0 ? { name: artifact.name, files } : null;
+}
+
 async function downloadBundle(
   artifact: GithubArtifact,
   githubToken: string,
@@ -232,8 +258,11 @@ async function downloadBundle(
  */
 async function runJob(job: TelemetryJob, githubToken: string): Promise<TelemetryResult | null> {
   try {
-    if (job.kind === 'csv') {
-      const parsed = await downloadArtifact(job.artifact, githubToken);
+    if (job.kind === 'csv' || job.kind === 'native') {
+      const parsed = await (job.kind === 'native' ? downloadNativeSamples : downloadArtifact)(
+        job.artifact,
+        githubToken,
+      );
       return parsed ? { kind: 'csv', parsed } : null;
     }
     const series = await downloadBundle(job.artifact, githubToken);
@@ -350,18 +379,19 @@ async function fetchGpuMetricsFromGithub(
   const jobs: TelemetryJob[] = artifacts
     .filter((a) => a.name.startsWith(wanted) && isRequestedArtifact(a.name, sources))
     .map((artifact) => ({ kind: 'csv', artifact }));
-  if (includeBundles) {
-    for (const artifact of artifacts) {
-      if (isWantedBundle(artifact.name, prefix) && isRequestedArtifact(artifact.name, sources))
-        jobs.push({ kind: 'bundle', artifact });
-    }
+  const csvNames = new Set(jobs.map((job) => job.artifact.name));
+  for (const artifact of artifacts) {
+    if (!isWantedBundle(artifact.name, prefix) || !isRequestedArtifact(artifact.name, sources))
+      continue;
+    if (
+      !includeBundles &&
+      csvNames.has(`${ARTIFACT_PREFIX}${artifact.name.slice(BUNDLE_PREFIX.length)}`)
+    )
+      continue;
+    jobs.push({ kind: includeBundles ? 'bundle' : 'native', artifact });
   }
   if (jobs.length === 0) {
-    throw new Error(
-      includeBundles
-        ? 'No telemetry artifacts (gpu_metrics or power_audit) found for this run'
-        : 'No gpu_metrics artifacts found for this run',
-    );
+    throw new Error('No telemetry artifacts (gpu_metrics or power_audit) found for this run');
   }
 
   const results = await downloadTelemetry(jobs, githubToken);

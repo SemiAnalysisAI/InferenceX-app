@@ -68,6 +68,16 @@ readings combine CPU and LPDDR5X power; a module reading already includes GPU
 power. Missing measurements stay unavailable. These fields do not add CPU
 samples to the GPU timeline or change the CLI export format.
 
+## GPU temperature telemetry
+
+The PowerX run explorer can display per-GPU Celsius readings from native SRT
+samples v3, preserving host-local GPU identities. Missing temperature stays
+unavailable; older v1/v2 power files do not gain inferred temperatures. These
+samples are exposed by the UI-owned `/api/gpu-metrics` raw-artifact reader and
+its stored digest, not the stable measured-energy export above. Do not infer
+temperature coverage from `power_valid`, or compare prefill/decode temperatures
+without matching role and time-window evidence.
+
 ## Selection and coverage
 
 The request uses `/api/v1/benchmarks` with `model`, optional `date`, and
