@@ -750,7 +750,8 @@ html[data-inferencex-skin='vllm'] [data-slot='card'] {
 
 /* Dark backgrounds need no outline — this is the original title-screen look. */
 .dark .splash-text,
-.minecraft .splash-text {
+.minecraft .splash-text,
+.csgo .splash-text {
   color: #ffff00;
   text-shadow: 2px 2px 0px #3f3f00;
 }
