@@ -6,7 +6,6 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { track } from '@/lib/analytics';
 
-import { AutumnLeavesToggle } from '@/components/autumn-leaves-toggle';
 import { ModeToggle } from '@/components/ui/mode-toggle';
 import { HEADER_ACTION_STYLE } from '@/components/ui/control-styles';
 import { NewBadge } from '@/components/ui/new-badge';
@@ -269,9 +268,6 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
             <span className="hidden items-center gap-2 sm:flex">
               <MinecraftToggles />
             </span>
-            <span className="hidden sm:flex">
-              <AutumnLeavesToggle isZh={isZh} />
-            </span>
             <ModeToggle />
 
             {/* Mobile hamburger */}
@@ -339,7 +335,6 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
                     </Link>
                   ))}
                   <span className="flex items-center gap-2 px-3 sm:hidden">
-                    <AutumnLeavesToggle isZh={isZh} />
                     <MinecraftToggles />
                   </span>
                 </div>
