@@ -560,6 +560,7 @@ describe('Agentic point request metric time series', () => {
     let searchAttemptsBeforeRetry = 0;
     cy.intercept({ method: 'GET', pathname: '/api/v1/server-log-files' }, (request) => {
       fileAttempts += 1;
+      if (!failFile) request.alias = 'serverLogFilesRetry';
       request.reply(
         failFile
           ? { statusCode: 500, body: {} }
@@ -609,8 +610,8 @@ describe('Agentic point request metric time series', () => {
       failFile = false;
     });
     cy.get('[data-testid="server-log-files-query-error"]').contains('button', '重试').click();
-    // Wait for the refetch to land before counting attempts — asserting right
-    // after the click races the request.
+    // The error disappears as soon as loading starts, before the request arrives.
+    cy.wait('@serverLogFilesRetry').its('response.statusCode').should('equal', 200);
     cy.get('[data-testid="server-log-files-query-error"]').should('not.exist');
     cy.then(() => expect(fileAttempts).to.be.greaterThan(fileAttemptsBeforeRetry));
 

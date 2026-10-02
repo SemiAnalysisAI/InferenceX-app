@@ -83,11 +83,18 @@ const powerBenchmarks = powerConfigs.flatMap((config) =>
 function visitCertifiedPowerChart(extraParams = '', benchmarks = powerBenchmarks) {
   cy.intercept('GET', '/api/v1/availability', { body: powerAvailability }).as('availability');
   cy.intercept('GET', '/api/v1/benchmarks*', { body: benchmarks }).as('benchmarks');
+  // Keep this intercepted power scenario independent of the server database.
+  cy.intercept('GET', '/api/v1/workflow-info*', {
+    body: { runs: [], changelogs: [], configs: [], runConfigs: [] },
+  });
+  cy.intercept('GET', '/api/v1/log-availability*', (request) => {
+    const ids = new URL(request.url).searchParams.get('ids')?.split(',') ?? [];
+    request.reply({ body: Object.fromEntries(ids.map((id) => [id, false])) });
+  });
   cy.visit(`/inference?g_model=DeepSeek-V4-Pro&i_seq=8k/1k&i_prec=fp4${extraParams}`, {
     onBeforeLoad(win) {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-      // Measured Energy sits behind the ↑↑↓↓ gate while power telemetry is WIP.
-      win.localStorage.setItem('inferencex-feature-gate', '1');
+      win.localStorage.removeItem('inferencex-feature-gate');
     },
   });
   cy.wait(['@availability', '@benchmarks']);
@@ -123,6 +130,7 @@ describe('Validated vs historical measured power', () => {
       .should('be.visible')
       .click();
     cy.get('[data-slot="select-content"]').should('not.exist');
+    cy.get('[data-testid="yaxis-metric-selector"]').should('contain.text', 'Measured Power');
 
     cy.get('.dot-group[data-hw-key^="b200"]').should('exist');
     cy.get('.dot-group[data-hw-key^="mi300x"]').should('exist');

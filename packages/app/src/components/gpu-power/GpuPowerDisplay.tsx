@@ -3,8 +3,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { track } from '@/lib/analytics';
 import * as d3 from 'd3';
-import { BarChart3, Check, Link as LinkIcon, Lock, Loader2, ScatterChart } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { BarChart3, Check, Link as LinkIcon, Loader2, ScatterChart } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -25,8 +24,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 
-import { localePath, type Locale } from '@/lib/i18n';
-import { relockFeatureGate } from '@/lib/use-feature-gate';
+import { type Locale } from '@/lib/i18n';
 import { useLocale } from '@/lib/use-locale';
 import { useClientSearchParams } from '@/hooks/useClientSearch';
 
@@ -50,7 +48,6 @@ const STRINGS = {
     heading: 'PowerX',
     descPre: 'Enter a GitHub Actions run ID to visualize chip metrics over time from',
     descPost: 'artifacts.',
-    relockButton: 'Re-lock feature gate',
     runIdLabel: 'Run ID',
     runIdPlaceholder: 'e.g. 22806827144',
     loadButton: 'Load',
@@ -89,7 +86,6 @@ const STRINGS = {
     heading: 'PowerX',
     descPre: '输入 GitHub Actions 运行 ID，可视化',
     descPost: '产物中芯片指标的时间变化趋势。',
-    relockButton: '重新锁定功能入口',
     runIdLabel: '运行 ID',
     runIdPlaceholder: '例如 22806827144',
     loadButton: '加载',
@@ -157,7 +153,6 @@ async function fetchGpuPowerRun(runId: string, signal: AbortSignal): Promise<Gpu
 }
 
 export default function GpuMetricsDisplay() {
-  const router = useRouter();
   const locale = useLocale();
   const t = STRINGS[locale];
   const searchParams = useClientSearchParams();
@@ -431,25 +426,7 @@ export default function GpuMetricsDisplay() {
                 {t.descPost}
               </>
             }
-            actions={
-              <div className="flex flex-wrap items-center gap-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="gap-1.5 text-xs text-muted-foreground"
-                  onClick={() => {
-                    relockFeatureGate();
-                    track('powerx_relocked');
-                    router.push(localePath('/inference', locale));
-                  }}
-                  title={t.relockButton}
-                >
-                  <Lock className="size-3" />
-                  {t.relockButton}
-                </Button>
-                <ChartShareActions />
-              </div>
-            }
+            actions={<ChartShareActions />}
           />
           <div className="flex flex-wrap items-end gap-3">
             <div className="flex-1 max-w-sm space-y-1">

@@ -34,6 +34,18 @@ combinations, not the full Cartesian product of all possible filter values.
 | `submissions`                   | `direction`, `limit`, `lines`, `mode`, `offset`, `onChangeOnly`, `search`, `sort`                                                                                                                                                                                                                                                                                                                                                   |
 | `video`                         | `artifact`, `cell`, `compare`, `costs`, `gpuBasis`, `page`, `phase`, `run`, `selected`, `slot`, `source`, `view`, `workload`, `xAxis`, `yAxis`                                                                                                                                                                                                                                                                                      |
 
+PowerX navigation and power-control visibility are presentation-only: `/gpu-metrics`
+is linked from the footer, inference power metrics are selectable without unlocking,
+and per-GW `c_power=modeled|compare` works while locked. The existing read-only
+`gpu-metrics`, `inference` and `profit-estimator-per-gigawatt` projections already
+expose those data and `powerBasis` choices; selectors, calculations and response
+contracts are unchanged.
+
+PowerX 入口和功耗控件的显示仅属于展示层改动：页脚提供 `/gpu-metrics` 链接，推理页的
+功耗指标无需解锁即可选择，每 GW 页的 `c_power=modeled|compare` 在锁定状态下同样可用。
+现有只读视图 `gpu-metrics`、`inference` 和 `profit-estimator-per-gigawatt` 已覆盖这些
+数据和 `powerBasis` 选项，查询参数、计算逻辑和响应格式均不变。
+
 ## Source audit and shared computations
 
 - Inference: global/date/quick-filter contexts, metric registry, useChartData,

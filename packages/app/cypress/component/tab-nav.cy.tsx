@@ -218,7 +218,7 @@ describe('TabNav — Hidden popover for gated tabs', () => {
     cy.get('[data-testid="tab-hidden-popover"]').should('be.visible');
     cy.get('[data-testid="tab-trigger-collectivex"]').should('have.attr', 'href', '/collectivex');
     cy.get('[data-testid="tab-trigger-ai-chart"]').should('have.attr', 'href', '/ai-chart');
-    cy.get('[data-testid="tab-trigger-gpu-metrics"]').should('have.attr', 'href', '/gpu-metrics');
+    cy.get('[data-testid="tab-trigger-gpu-metrics"]').should('not.exist');
     cy.get('[data-testid="tab-hidden-popover"]')
       .find('[data-testid="tab-trigger-submissions"]')
       .should('not.exist');

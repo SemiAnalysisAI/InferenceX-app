@@ -249,7 +249,7 @@ export const DASHBOARD_ROUTES = [
     key: 'gpu-metrics',
     path: '/gpu-metrics',
     canonicalPath: '/gpu-metrics',
-    navGroup: 'feature-gated',
+    navGroup: 'footer-only',
     indexable: true,
     localeMirrored: true,
     providers: STANDALONE_DASHBOARD_PROVIDERS,
