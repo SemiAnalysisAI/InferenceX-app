@@ -12,6 +12,7 @@ import { Header } from '@/components/header/header';
 import { RouteTransition } from '@/components/motion/route-transition';
 import { JsonLd } from '@/components/json-ld';
 import { AutumnLeaves } from '@/components/autumn-leaves';
+import { autumnLeavesPrepaintScript } from '@/lib/autumn-leaves';
 import { CircuitBackground } from '@/components/circuit-background';
 import { MinecraftBackgroundLazy } from '@/components/minecraft/minecraft-background-lazy';
 import { MinecraftDecorations } from '@/components/minecraft/minecraft-decorations';
@@ -210,6 +211,11 @@ export default async function RootLayout({
           id="landing-banner-prepaint"
           suppressHydrationWarning
           dangerouslySetInnerHTML={{ __html: landingBannerPrepaintScript }}
+        />
+        <script
+          id="autumn-leaves-prepaint"
+          suppressHydrationWarning
+          dangerouslySetInnerHTML={{ __html: autumnLeavesPrepaintScript }}
         />
         <CircuitBackground />
         <MinecraftBackgroundLazy />
