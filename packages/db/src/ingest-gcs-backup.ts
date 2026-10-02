@@ -104,8 +104,12 @@ interface WorkflowMapResult {
   changelogs: { baseRef: string; headRef: string; entries: ChangelogEntry[] }[];
   /** True when the changelog declares evals-only — benchmark/stats data is dropped. */
   evalsOnly: boolean;
-  /** Skip counts from mapping phase (dbError is tracked separately in phase 2). */
-  localSkips: Omit<Skips, 'dbError'>;
+  /**
+   * Skip counts from the mapping phase. `dbError` is tracked separately in phase 2,
+   * and `telemetryError` never applies here: the GCS backup path ingests no
+   * `gpu_metrics_*` artifacts.
+   */
+  localSkips: Omit<Skips, 'dbError' | 'telemetryError'>;
   localUnmappedModels: Set<string>;
   localUnmappedHws: Set<string>;
   /** Pre-formatted [WARN] lines to print at the start of phase 2 for this dir. */
@@ -121,7 +125,7 @@ interface WriteResult {
   evalSamples: number;
   changelogs: number;
   warnings: string[];
-  localSkips: Omit<Skips, 'dbError'>;
+  localSkips: Omit<Skips, 'dbError' | 'telemetryError'>;
   localUnmappedModels: string[];
   localUnmappedHws: string[];
 }

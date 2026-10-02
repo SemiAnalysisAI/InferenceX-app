@@ -211,9 +211,9 @@ describe('PowerX Chinese route', () => {
       .should('contain.text', '秒')
       .and('contain.text', '功耗 (W)');
     cy.get('[data-testid="gpu-metrics-chart-svg"]').should('contain.text', '点击数据点固定提示框');
-    cy.get('[data-testid="gpu-metrics-chart-svg"] svg .point')
-      .first()
-      .trigger('mouseenter', { force: true });
+    cy.get('[data-testid="gpu-metrics-chart-svg"] svg .point').first().scrollIntoView();
+    // Exercise the supported mobile interaction, not a forced off-screen hover.
+    cy.get('[data-testid="gpu-metrics-chart-svg"] svg .point').first().click();
     cy.get('[data-chart-tooltip]:visible')
       .should('contain.text', '芯片 0')
       .and('contain.text', '功耗：');

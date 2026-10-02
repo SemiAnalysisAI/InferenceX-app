@@ -5,6 +5,47 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
+describe('explicit download attempt identity', () => {
+  it('rejects a download whose GitHub attempt differs from the requested one', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'attempt-ingest-'));
+    const manifestPath = path.join(dir, 'power-publication.json');
+    try {
+      fs.writeFileSync(
+        path.join(dir, 'gh'),
+        '#!/bin/sh\ncase "$*" in\n*--paginate*) exit 0 ;;\n*--jq*) printf "2\\n" ;;\n*) exit 3 ;;\nesac\n',
+        { mode: 0o755 },
+      );
+      const result = spawnSync(
+        'bun',
+        [
+          fileURLToPath(new URL('ingest-ci-run.ts', import.meta.url)),
+          '--download',
+          'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/25199291771/attempts/1',
+        ],
+        {
+          cwd: dir,
+          env: {
+            PATH: `${dir}${path.delimiter}${process.env.PATH}`,
+            TMPDIR: dir,
+            NODE_ENV: 'test',
+            DATABASE_WRITE_URL: 'postgres://unused:unused@127.0.0.1:1/unused',
+            GITHUB_TOKEN: 'unused',
+            POWER_PUBLICATION_MANIFEST: manifestPath,
+          },
+          encoding: 'utf8',
+          timeout: 10_000,
+        },
+      );
+      expect(result.error).toBeUndefined();
+      expect(result.status, result.stderr).toBe(1);
+      expect(result.stderr).toContain('GitHub attempt 2 differs from requested 1');
+      expect(fs.existsSync(manifestPath)).toBe(false);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
 describe('purged CI ingestion', () => {
   it.each([
     { runId: 20286769842, runAttempt: 1, reused: false },
@@ -53,6 +94,7 @@ describe('purged CI ingestion', () => {
           runAttempt,
           points: [],
           ingestErrors: [],
+          telemetryWarnings: [],
         });
       } finally {
         fs.rmSync(dir, { recursive: true, force: true });

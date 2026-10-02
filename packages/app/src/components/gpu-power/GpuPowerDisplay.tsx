@@ -33,6 +33,8 @@ import { useClientSearchParams } from '@/hooks/useClientSearch';
 import GpuCorrelationChart from './GpuCorrelationChart';
 import GpuMetricsChart from './GpuPowerChart';
 import GpuStatsTable from './GpuStatsTable';
+import { DEFAULT_TELEMETRY_DISPLAY, type TelemetryDisplayState } from './telemetry-smoothing';
+import { TelemetryDisplayControls } from './TelemetryDisplayControls';
 import {
   type GpuMetricKey,
   type GpuPowerApiResponse,
@@ -81,6 +83,7 @@ const STRINGS = {
     chip: 'Chip',
     chartToolbar: 'Chart controls',
     correlationAxes: 'Correlation axes',
+    displayControls: 'Line options',
   },
   zh: {
     heading: 'PowerX',
@@ -119,6 +122,7 @@ const STRINGS = {
     chip: '芯片',
     chartToolbar: '图表控制',
     correlationAxes: '相关性坐标轴',
+    displayControls: '曲线选项',
   },
 } as const;
 
@@ -175,6 +179,7 @@ export default function GpuMetricsDisplay() {
     gcTime: 0,
     retry: false,
     refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
   });
   const artifacts = query.data?.artifacts ?? [];
   const runInfo = query.data?.runInfo ?? null;
@@ -200,10 +205,8 @@ export default function GpuMetricsDisplay() {
     artifacts.some((artifact) => artifact.name === selectedArtifactCandidate)
       ? selectedArtifactCandidate
       : (artifacts[0]?.name ?? '');
-  const currentData = useMemo(
-    () => artifacts.find((artifact) => artifact.name === selectedArtifact)?.data ?? [],
-    [artifacts, selectedArtifact],
-  );
+  const currentArtifact = artifacts.find((artifact) => artifact.name === selectedArtifact);
+  const currentData = useMemo(() => currentArtifact?.data ?? [], [currentArtifact]);
   const availableMetrics = useMemo(() => getAvailableMetrics(currentData), [currentData]);
   const urlMetric = searchParams.get('gm_metric');
   const selectedMetricCandidate = selectionApplies ? selection.metric : urlMetric;
@@ -237,6 +240,16 @@ export default function GpuMetricsDisplay() {
   const [chartView, setChartView] = useState<GpuMetricsView>('chart');
   const [corrXMetric, setCorrXMetric] = useState<GpuMetricKey>('power');
   const [corrYMetric, setCorrYMetric] = useState<GpuMetricKey>('temperature');
+  // A power-only series (multinode DCGM bundle) has no temperature axis to
+  // default to; use the first other collected metric instead of an empty plot.
+  const effectiveCorrYMetric = useMemo<GpuMetricKey>(
+    () =>
+      availableMetrics.some((m) => m.key === corrYMetric)
+        ? corrYMetric
+        : (availableMetrics.find((m) => m.key !== corrXMetric)?.key ?? corrXMetric),
+    [availableMetrics, corrXMetric, corrYMetric],
+  );
+  const [display, setDisplay] = useState<TelemetryDisplayState>(DEFAULT_TELEMETRY_DISPLAY);
   const viewOptions = useMemo<SegmentedToggleOption<GpuMetricsView>[]>(
     () => [
       {
@@ -358,6 +371,52 @@ export default function GpuMetricsDisplay() {
     if (axis === 'x') setCorrXMetric(value as GpuMetricKey);
     else setCorrYMetric(value as GpuMetricKey);
   }, []);
+
+  const legendElement = (
+    <ChartLegend
+      variant="sidebar"
+      onItemRemove={removeGpu}
+      legendItems={allGpuIndices.map((gpuIndex) => ({
+        name: `${t.chip} ${gpuIndex}`,
+        hw: String(gpuIndex),
+        label: `${t.chip} ${gpuIndex}`,
+        color: GPU_COLORS[gpuIndex % GPU_COLORS.length],
+        isActive: visibleGpus.has(gpuIndex),
+        onClick: () => toggleGpu(gpuIndex),
+      }))}
+      isLegendExpanded={isLegendExpanded}
+      onExpandedChange={(expanded) => {
+        setIsLegendExpanded(expanded);
+        track('gpu_metrics_legend_expanded', { expanded });
+      }}
+      actions={
+        allGpusSelected
+          ? []
+          : [
+              {
+                id:
+                  chartView === 'correlation'
+                    ? 'gpu-metrics-reset-filter-2'
+                    : 'gpu-metrics-reset-filter',
+                label: t.resetFilter,
+                onClick: selectAllGpus,
+              },
+            ]
+      }
+      switches={[
+        {
+          id:
+            chartView === 'correlation' ? 'gpu-metrics-downsample-corr' : 'gpu-metrics-downsample',
+          label: t.downsample,
+          checked: downsample,
+          onCheckedChange: (c) => {
+            setDownsample(c);
+            track('gpu_metrics_downsample_toggled', { enabled: c });
+          },
+        },
+      ]}
+    />
+  );
 
   return (
     <section data-testid="gpu-metrics-display">
@@ -608,7 +667,7 @@ export default function GpuMetricsDisplay() {
                   <div className="space-y-1 min-w-0">
                     <Label htmlFor="gpu-metrics-correlation-y">{t.yAxis}</Label>
                     <Select
-                      value={corrYMetric}
+                      value={effectiveCorrYMetric}
                       onValueChange={(v) => handleCorrelationMetricChange('y', v)}
                     >
                       <SelectTrigger id="gpu-metrics-correlation-y" className="w-full">
@@ -628,12 +687,24 @@ export default function GpuMetricsDisplay() {
             )}
 
             {chartView === 'chart' && (
+              <ControlPanel legend={t.displayControls} className="mb-3 no-export">
+                <TelemetryDisplayControls
+                  value={display}
+                  onChange={setDisplay}
+                  analyticsPrefix="gpu_metrics"
+                  idPrefix="gpu-metrics-display"
+                />
+              </ControlPanel>
+            )}
+
+            {chartView === 'chart' && (
               <GpuMetricsChart
                 data={currentData}
                 visibleGpus={visibleGpus}
                 metricKey={selectedMetric}
                 artifactName={selectedArtifact}
                 maxPoints={downsample ? 2000 : Infinity}
+                display={display}
                 caption={
                   <>
                     <h2 className="text-lg font-semibold">
@@ -643,47 +714,7 @@ export default function GpuMetricsDisplay() {
                     <UnofficialDomainNotice />
                   </>
                 }
-                legendElement={
-                  <ChartLegend
-                    variant="sidebar"
-                    onItemRemove={removeGpu}
-                    legendItems={allGpuIndices.map((gpuIndex) => ({
-                      name: `${t.chip} ${gpuIndex}`,
-                      hw: String(gpuIndex),
-                      label: `${t.chip} ${gpuIndex}`,
-                      color: GPU_COLORS[gpuIndex % GPU_COLORS.length],
-                      isActive: visibleGpus.has(gpuIndex),
-                      onClick: () => toggleGpu(gpuIndex),
-                    }))}
-                    isLegendExpanded={isLegendExpanded}
-                    onExpandedChange={(expanded) => {
-                      setIsLegendExpanded(expanded);
-                      track('gpu_metrics_legend_expanded', { expanded });
-                    }}
-                    actions={
-                      allGpusSelected
-                        ? []
-                        : [
-                            {
-                              id: 'gpu-metrics-reset-filter',
-                              label: t.resetFilter,
-                              onClick: selectAllGpus,
-                            },
-                          ]
-                    }
-                    switches={[
-                      {
-                        id: 'gpu-metrics-downsample',
-                        label: t.downsample,
-                        checked: downsample,
-                        onCheckedChange: (c) => {
-                          setDownsample(c);
-                          track('gpu_metrics_downsample_toggled', { enabled: c });
-                        },
-                      },
-                    ]}
-                  />
-                }
+                legendElement={legendElement}
               />
             )}
             {chartView === 'correlation' && (
@@ -691,7 +722,7 @@ export default function GpuMetricsDisplay() {
                 data={currentData}
                 visibleGpus={visibleGpus}
                 xMetric={corrXMetric}
-                yMetric={corrYMetric}
+                yMetric={effectiveCorrYMetric}
                 maxPoints={downsample ? 2000 : Infinity}
                 caption={
                   <>
@@ -699,47 +730,7 @@ export default function GpuMetricsDisplay() {
                     <UnofficialDomainNotice />
                   </>
                 }
-                legendElement={
-                  <ChartLegend
-                    variant="sidebar"
-                    onItemRemove={removeGpu}
-                    legendItems={allGpuIndices.map((gpuIndex) => ({
-                      name: `${t.chip} ${gpuIndex}`,
-                      hw: String(gpuIndex),
-                      label: `${t.chip} ${gpuIndex}`,
-                      color: GPU_COLORS[gpuIndex % GPU_COLORS.length],
-                      isActive: visibleGpus.has(gpuIndex),
-                      onClick: () => toggleGpu(gpuIndex),
-                    }))}
-                    isLegendExpanded={isLegendExpanded}
-                    onExpandedChange={(expanded) => {
-                      setIsLegendExpanded(expanded);
-                      track('gpu_metrics_legend_expanded', { expanded });
-                    }}
-                    actions={
-                      allGpusSelected
-                        ? []
-                        : [
-                            {
-                              id: 'gpu-metrics-reset-filter-2',
-                              label: t.resetFilter,
-                              onClick: selectAllGpus,
-                            },
-                          ]
-                    }
-                    switches={[
-                      {
-                        id: 'gpu-metrics-downsample-corr',
-                        label: t.downsample,
-                        checked: downsample,
-                        onCheckedChange: (c) => {
-                          setDownsample(c);
-                          track('gpu_metrics_downsample_toggled', { enabled: c });
-                        },
-                      },
-                    ]}
-                  />
-                }
+                legendElement={legendElement}
               />
             )}
           </Card>
@@ -749,7 +740,11 @@ export default function GpuMetricsDisplay() {
             <h3 className="text-sm font-semibold mb-2">
               {t.perGpuStats} ({getGpuMetricLabel(metricConfig, locale)})
             </h3>
-            <GpuStatsTable data={currentData} metricKey={selectedMetric} />
+            <GpuStatsTable
+              data={currentData}
+              metricKey={selectedMetric}
+              storedStats={currentArtifact?.series?.stats}
+            />
           </Card>
         </>
       )}

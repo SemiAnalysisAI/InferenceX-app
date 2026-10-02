@@ -1,24 +1,16 @@
 import { HW_REGISTRY } from '@semianalysisai/inferencex-constants';
+import {
+  parseAmdTimestamp,
+  parseNvidiaTimestamp,
+  splitCsvLine,
+} from '@semianalysisai/inferencex-db/etl/gpu-metrics-csv';
+import type {
+  GpuMetricSampleRow,
+  GpuMetricSeries,
+  GpuMetricStatRow,
+} from '@semianalysisai/inferencex-db/queries/gpu-metrics';
 
-export interface GpuMetricRow {
-  timestamp: string;
-  index: number;
-  power: number;
-  temperature: number;
-  smClock: number;
-  memClock: number;
-  gpuUtil: number;
-  memUtil: number;
-  // AMD-specific optional fields
-  edgeTemp?: number;
-  memTemp?: number;
-  gfxVoltage?: number;
-  socVoltage?: number;
-  memVoltage?: number;
-  fclk?: number;
-  socClk?: number;
-  mmActivity?: number;
-}
+export type GpuMetricRow = GpuMetricSampleRow;
 
 export interface GpuPowerRunInfo {
   id: number;
@@ -34,6 +26,8 @@ export interface GpuPowerRunInfo {
 export interface GpuMetricsArtifact {
   name: string;
   data: GpuMetricRow[];
+  /** Only database-backed artifacts carry the full-record digest. */
+  series?: Omit<GpuMetricSeries, 'data'>;
 }
 
 export interface GpuPowerApiResponse {
@@ -199,17 +193,24 @@ export const ALL_METRIC_OPTIONS: GpuMetricConfig[] = [...GPU_METRIC_OPTIONS, ...
 
 /**
  * Returns the metric options that have data in the given dataset.
- * AMD-specific metrics are only shown when at least one row has a non-undefined value.
+ * A metric is shown only when at least one row has a finite reading.
  */
 export function getAvailableMetrics(data: GpuMetricRow[]): GpuMetricConfig[] {
   if (data.length === 0) return GPU_METRIC_OPTIONS;
-  return ALL_METRIC_OPTIONS.filter((m) => data.some((row) => row[m.key] !== undefined));
+  return ALL_METRIC_OPTIONS.filter((m) => data.some((row) => Number.isFinite(row[m.key])));
 }
 
 /**
  * Detect GPU SKU from an artifact name and return its TDP in watts.
  * Artifact names look like: gpu_metrics_dsr1_1k8k_fp8_sglang_tp8_..._h200-nb_0
  */
+/** TDP for a known hardware key, e.g. the benchmark point's own `hardware`. */
+export function tdpForHardware(hardware: string | undefined): { sku: string; tdp: number } | null {
+  const key = hardware?.toLowerCase();
+  const entry = key ? HW_REGISTRY[key] : undefined;
+  return entry ? { sku: key!.toUpperCase(), tdp: entry.tdp } : null;
+}
+
 export function detectTdpFromArtifactName(
   artifactName: string,
 ): { sku: string; tdp: number } | null {
@@ -224,179 +225,12 @@ export function detectTdpFromArtifactName(
   return null;
 }
 
-export interface Anomaly {
-  type: 'statistical' | 'thermal' | 'near_tdp' | 'clock_drop' | 'util_drop';
-  label: string;
-  gpuIndex: number;
-  seconds: number;
-  value: number;
-  message: string;
-}
-
-function median(values: number[]): number {
-  const sorted = [...values].toSorted((a, b) => a - b);
-  const mid = Math.floor(sorted.length / 2);
-  return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
-}
-
 function parseTimestampToMs(raw: string): number | null {
   const d = new Date(raw);
   if (!isNaN(d.getTime())) return d.getTime();
   const n = parseFloat(raw);
   if (!isNaN(n)) return n < 1e12 ? n * 1000 : n;
   return null;
-}
-
-/**
- * Detect anomalies in GPU metrics data using MAD-based Modified Z-score
- * (per NIST/Iglewicz & Hoaglin, threshold 3.5) plus domain-specific GPU thresholds.
- */
-export function detectAnomalies(
-  data: GpuMetricRow[],
-  metricKey: GpuMetricKey,
-  artifactName?: string,
-): Anomaly[] {
-  if (data.length === 0) return [];
-
-  const anomalies: Anomaly[] = [];
-  const tdpInfo = artifactName ? detectTdpFromArtifactName(artifactName) : null;
-
-  // Find earliest timestamp for seconds calculation
-  let minTime = Infinity;
-  for (const row of data) {
-    const ms = parseTimestampToMs(row.timestamp);
-    if (ms !== null && ms < minTime) minTime = ms;
-  }
-
-  // Group by GPU index
-  const gpuGroups = new Map<number, GpuMetricRow[]>();
-  for (const row of data) {
-    if (!gpuGroups.has(row.index)) gpuGroups.set(row.index, []);
-    gpuGroups.get(row.index)!.push(row);
-  }
-
-  for (const [gpuIndex, rows] of gpuGroups) {
-    const rawValues = rows.map((r) => r[metricKey]);
-    // Skip if any values are undefined (metric not available for this vendor)
-    if (rawValues.some((v) => v === undefined)) continue;
-    const values = rawValues as number[];
-    if (values.length < 3) continue;
-
-    // MAD-based Modified Z-score detection
-    const med = median(values);
-    const absDeviations = values.map((v) => Math.abs(v - med));
-    const mad = median(absDeviations);
-
-    // Pre-compute SM clock median for clock_drop detection (avoid O(n^2))
-    const smMedian =
-      metricKey === 'smClock' || metricKey === 'power' ? median(rows.map((r) => r.smClock)) : 0;
-
-    for (let i = 0; i < rows.length; i++) {
-      const row = rows[i];
-      const ms = parseTimestampToMs(row.timestamp);
-      const seconds = ms === null ? i : (ms - minTime) / 1000;
-
-      // Statistical outlier (MAD)
-      if (mad > 0) {
-        const modifiedZ = (0.6745 * (values[i] - med)) / mad;
-        if (Math.abs(modifiedZ) > 3.5) {
-          anomalies.push({
-            type: 'statistical',
-            label: 'Statistical Outlier',
-            gpuIndex,
-            seconds,
-            value: values[i],
-            message: `Chip ${gpuIndex} at ${seconds.toFixed(0)}s: ${metricKey} = ${values[i].toFixed(1)} (Modified Z = ${modifiedZ.toFixed(1)}, median = ${med.toFixed(1)})`,
-          });
-        }
-      }
-
-      // Domain-specific: thermal throttle (temperature > 83°C)
-      if (row.temperature > 83) {
-        anomalies.push({
-          type: 'thermal',
-          label: 'Thermal Throttle',
-          gpuIndex,
-          seconds,
-          value: row.temperature,
-          message: `Chip ${gpuIndex} at ${seconds.toFixed(0)}s: temperature ${row.temperature}°C exceeds throttle threshold (83°C)`,
-        });
-      }
-
-      // Domain-specific: near TDP (power > 90% of TDP)
-      if (tdpInfo && row.power > tdpInfo.tdp * 0.9) {
-        anomalies.push({
-          type: 'near_tdp',
-          label: 'Near TDP',
-          gpuIndex,
-          seconds,
-          value: row.power,
-          message: `Chip ${gpuIndex} at ${seconds.toFixed(0)}s: power ${row.power.toFixed(1)}W is ${((row.power / tdpInfo.tdp) * 100).toFixed(0)}% of TDP (${tdpInfo.tdp}W)`,
-        });
-      }
-
-      // Domain-specific: clock drop (SM clock > 30% below median)
-      if (
-        (metricKey === 'smClock' || metricKey === 'power') &&
-        smMedian > 0 &&
-        row.smClock < smMedian * 0.7
-      ) {
-        anomalies.push({
-          type: 'clock_drop',
-          label: 'Clock Drop',
-          gpuIndex,
-          seconds,
-          value: row.smClock,
-          message: `Chip ${gpuIndex} at ${seconds.toFixed(0)}s: SM clock ${row.smClock} MHz dropped ${((1 - row.smClock / smMedian) * 100).toFixed(0)}% below median (${smMedian.toFixed(0)} MHz)`,
-        });
-      }
-
-      // Domain-specific: utilization drop (GPU util = 0 after being > 50%)
-      if (row.gpuUtil === 0 && i > 0 && rows[i - 1].gpuUtil > 50) {
-        anomalies.push({
-          type: 'util_drop',
-          label: 'Utilization Drop',
-          gpuIndex,
-          seconds,
-          value: 0,
-          message: `Chip ${gpuIndex} at ${seconds.toFixed(0)}s: utilization dropped to 0% (was ${rows[i - 1].gpuUtil}%)`,
-        });
-      }
-    }
-  }
-
-  // Deduplicate: keep only one anomaly per (type, gpuIndex, second)
-  const seen = new Set<string>();
-  const deduped = anomalies.filter((a) => {
-    const key = `${a.type}_${a.gpuIndex}_${Math.round(a.seconds)}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
-
-  return deduped.toSorted((a, b) => a.seconds - b.seconds);
-}
-
-/**
- * Split a CSV line respecting double-quoted fields (which may contain commas).
- * Required for AMD amd-smi CSV where array fields like "['N/A', 'N/A']" are quoted.
- */
-function splitCsvLine(line: string): string[] {
-  const result: string[] = [];
-  let current = '';
-  let inQuotes = false;
-  for (const char of line) {
-    if (char === '"') {
-      inQuotes = !inQuotes;
-    } else if (char === ',' && !inQuotes) {
-      result.push(current.trim());
-      current = '';
-    } else {
-      current += char;
-    }
-  }
-  result.push(current.trim());
-  return result;
 }
 
 /**
@@ -407,7 +241,7 @@ function buildColumnMap(headerLine: string): Map<string, number> {
   const headers = splitCsvLine(headerLine);
   const map = new Map<string, number>();
   for (let i = 0; i < headers.length; i++) {
-    map.set(headers[i].toLowerCase(), i);
+    map.set(headers[i].toLowerCase().replace(/\s*\[.*\]$/u, ''), i);
   }
   return map;
 }
@@ -418,40 +252,39 @@ function buildColumnMap(headerLine: string): Map<string, number> {
  * clocks.current.sm [MHz], clocks.current.memory [MHz], utilization.gpu [%], utilization.memory [%]
  */
 function parseNvidiaCsv(lines: string[]): GpuMetricRow[] {
+  const columns = buildColumnMap(lines[0]);
+  const col = (name: string) => columns.get(name) ?? -1;
+  const iTimestamp = col('timestamp');
+  const iIndex = col('index');
+  const iPower = col('power.draw');
+  if (iTimestamp < 0 || iIndex < 0 || iPower < 0) return [];
   const results: GpuMetricRow[] = [];
   for (let i = 1; i < lines.length; i++) {
     const cols = lines[i].split(',').map((c) => c.trim());
-    if (cols.length < 8) continue;
-
-    const index = parseInt(cols[1], 10);
-    const power = parseFloat(cols[2]);
-    const temperature = parseFloat(cols[3]);
-    const smClock = parseFloat(cols[4]);
-    const memClock = parseFloat(cols[5]);
-    const gpuUtil = parseFloat(cols[6]);
-    const memUtil = parseFloat(cols[7]);
-
-    if ([index, power, temperature, smClock, memClock, gpuUtil, memUtil].some(isNaN)) continue;
+    if (cols.length <= Math.max(iTimestamp, iIndex, iPower)) continue;
+    const index = parseInt(cols[iIndex], 10);
+    const power = safeFloat(cols[iPower]);
+    if (!Number.isInteger(index) || index < 0 || power === undefined) continue;
 
     results.push({
-      timestamp: cols[0],
+      timestamp: cols[iTimestamp],
       index,
       power,
-      temperature,
-      smClock,
-      memClock,
-      gpuUtil,
-      memUtil,
+      temperature: safeFloat(cols[col('temperature.gpu')]),
+      smClock: safeFloat(cols[col('clocks.current.sm')]),
+      memClock: safeFloat(cols[col('clocks.current.memory')]),
+      gpuUtil: safeFloat(cols[col('utilization.gpu')]),
+      memUtil: safeFloat(cols[col('utilization.memory')]),
     });
   }
   return results;
 }
 
-/** Safely parse a float, returning undefined for N/A or unparseable values. */
+/** Missing, unparseable and nonfinite readings stay absent; measured zero is valid. */
 function safeFloat(val: string | undefined): number | undefined {
   if (val === undefined || val === 'N/A' || val === '') return undefined;
   const n = parseFloat(val);
-  return isNaN(n) ? undefined : n;
+  return Number.isFinite(n) ? n : undefined;
 }
 
 /**
@@ -484,28 +317,25 @@ function parseAmdCsv(lines: string[], colMap: Map<string, number>): GpuMetricRow
   const results: GpuMetricRow[] = [];
   for (let i = 1; i < lines.length; i++) {
     const cols = splitCsvLine(lines[i]);
-    if (cols.length < 3) continue;
+    if (cols.length <= Math.max(iTimestamp, iGpu, iPower)) continue;
 
     const index = parseInt(cols[iGpu], 10);
-    const power = parseFloat(cols[iPower]);
+    const power = safeFloat(cols[iPower]);
     // Prefer hotspot temp, fall back to edge
-    let temperature = iHotspot >= 0 ? parseFloat(cols[iHotspot]) : NaN;
-    if (isNaN(temperature) && iEdge >= 0) temperature = parseFloat(cols[iEdge]);
-    const smClock = iGfxClk >= 0 ? parseFloat(cols[iGfxClk]) : 0;
-    const memClock = iMemClk >= 0 ? parseFloat(cols[iMemClk]) : 0;
-    const gpuUtil = iGfxActivity >= 0 ? parseFloat(cols[iGfxActivity]) : 0;
-    const memUtil = iUmcActivity >= 0 ? parseFloat(cols[iUmcActivity]) : 0;
+    const temperature = safeFloat(cols[iHotspot]) ?? safeFloat(cols[iEdge]);
+    const smClock = safeFloat(cols[iGfxClk]);
+    const memClock = safeFloat(cols[iMemClk]);
+    const gpuUtil = safeFloat(cols[iGfxActivity]);
+    const memUtil = safeFloat(cols[iUmcActivity]);
 
-    if (isNaN(index) || isNaN(power)) continue;
-    if (isNaN(temperature)) temperature = 0;
+    if (!Number.isInteger(index) || index < 0 || power === undefined) continue;
 
-    // AMD timestamps are Unix epoch seconds — convert to ms-based string for consistency
-    const rawTimestamp = cols[iTimestamp];
-    const epochSec = parseFloat(rawTimestamp);
-    const timestamp =
-      !isNaN(epochSec) && epochSec > 1e9 && epochSec < 1e11
-        ? new Date(epochSec * 1000).toISOString()
-        : rawTimestamp;
+    // Round epoch fractions exactly as ingest does before constructing the dedup key.
+    const timestampMs = parseAmdTimestamp(cols[iTimestamp]);
+    if (timestampMs === null) continue;
+    const date = new Date(timestampMs);
+    if (!Number.isFinite(date.getTime())) continue;
+    const timestamp = date.toISOString();
 
     // AMD-specific metrics
     const edgeTemp = iEdge >= 0 ? safeFloat(cols[iEdge]) : undefined;
@@ -552,28 +382,27 @@ export function parseCsvData(csvText: string): GpuMetricRow[] {
 
   const headerLower = lines[0].toLowerCase();
 
-  // Detect AMD format by checking for amd-smi specific columns
-  if (headerLower.includes('socket_power') || headerLower.includes('gfx_activity')) {
-    const colMap = buildColumnMap(lines[0]);
-    return parseAmdCsv(lines, colMap);
-  }
-
-  return parseNvidiaCsv(lines);
+  const rows =
+    headerLower.includes('socket_power') || headerLower.includes('gfx_activity')
+      ? parseAmdCsv(lines, buildColumnMap(lines[0]))
+      : parseNvidiaCsv(lines);
+  // Normalize one CSV at a time: host-local indices may repeat in other files.
+  // Keep the first device/timestamp sample, matching the persisted digest.
+  const seen = new Set<string>();
+  return rows.filter((row) => {
+    // NVIDIA's naive collector clock must not use the reader's local DST rules.
+    const ms = parseNvidiaTimestamp(row.timestamp) ?? parseTimestampToMs(row.timestamp);
+    if (ms === null || !Number.isFinite(ms)) return false;
+    const key = `${row.index}:${ms}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 // --- Statistics ---
 
-export interface GpuStats {
-  gpuIndex: number;
-  count: number;
-  min: number;
-  max: number;
-  mean: number;
-  median: number;
-  p95: number;
-  p99: number;
-  stddev: number;
-}
+export type GpuStats = Omit<GpuMetricStatRow, 'metric'>;
 
 function percentile(sorted: number[], p: number): number {
   const idx = (p / 100) * (sorted.length - 1);
@@ -587,7 +416,7 @@ export function computeGpuStats(data: GpuMetricRow[], metricKey: GpuMetricKey): 
   const groups = new Map<number, number[]>();
   for (const row of data) {
     const val = row[metricKey];
-    if (val === undefined) continue;
+    if (val === undefined || !Number.isFinite(val)) continue;
     if (!groups.has(row.index)) groups.set(row.index, []);
     groups.get(row.index)!.push(val);
   }

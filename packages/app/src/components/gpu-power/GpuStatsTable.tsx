@@ -1,9 +1,11 @@
 'use client';
 
 import React, { useMemo, useState } from 'react';
+import type { GpuMetricStatRow } from '@semianalysisai/inferencex-db/queries/gpu-metrics';
 
 import { track } from '@/lib/analytics';
 import { useLocale } from '@/lib/use-locale';
+import { storedGpuStatsForMetric } from './stored-gpu-stats';
 
 import {
   type GpuMetricKey,
@@ -16,18 +18,26 @@ import {
 interface GpuStatsTableProps {
   data: GpuMetricRow[];
   metricKey: GpuMetricKey;
+  /** Full-record digest; omit only for live artifacts without stored statistics. */
+  storedStats?: readonly GpuMetricStatRow[];
 }
 
 type SortCol = keyof GpuStats;
 
 const fmtStat = (v: number) => (v >= 1000 ? v.toFixed(0) : v.toFixed(1));
 
-const GpuStatsTable = React.memo(({ data, metricKey }: GpuStatsTableProps) => {
+const GpuStatsTable = React.memo(({ data, metricKey, storedStats }: GpuStatsTableProps) => {
   const locale = useLocale();
   const [sortCol, setSortCol] = useState<SortCol>('gpuIndex');
   const [sortAsc, setSortAsc] = useState(true);
 
-  const stats = useMemo(() => computeGpuStats(data, metricKey), [data, metricKey]);
+  const stats = useMemo(
+    () =>
+      storedStats === undefined
+        ? computeGpuStats(data, metricKey)
+        : storedGpuStatsForMetric(storedStats, metricKey),
+    [data, metricKey, storedStats],
+  );
   const metricConfig = ALL_METRIC_OPTIONS.find((m) => m.key === metricKey)!;
 
   const sorted = useMemo(
@@ -66,47 +76,54 @@ const GpuStatsTable = React.memo(({ data, metricKey }: GpuStatsTableProps) => {
   ];
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-xs">
-        <thead>
-          <tr className="border-b">
-            {cols.map((c) => (
-              <th
-                key={c.key}
-                className="px-2 py-1.5 text-left font-medium text-muted-foreground"
-                aria-sort={sortCol === c.key ? (sortAsc ? 'ascending' : 'descending') : 'none'}
-              >
-                <button
-                  type="button"
-                  className="cursor-pointer select-none hover:text-foreground"
-                  onClick={() => handleSort(c.key)}
+    <div>
+      <p className="mb-2 text-xs text-muted-foreground" data-testid="gpu-stats-scope">
+        {locale === 'zh'
+          ? '全记录统计，包含服务启动与 warmup；不随图表所选时间窗口变化。'
+          : 'Full-record statistics include startup and warmup; the selected chart window does not change this table.'}
+      </p>
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="border-b">
+              {cols.map((c) => (
+                <th
+                  key={c.key}
+                  className="px-2 py-1.5 text-left font-medium text-muted-foreground"
+                  aria-sort={sortCol === c.key ? (sortAsc ? 'ascending' : 'descending') : 'none'}
                 >
-                  {c.label}
-                  {c.key !== 'gpuIndex' && c.key !== 'count' ? ` (${metricConfig.unit})` : ''}
-                  {sortCol === c.key && (sortAsc ? ' \u2191' : ' \u2193')}
-                </button>
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {sorted.map((s) => (
-            <tr key={s.gpuIndex} className="border-b border-border/50 hover:bg-muted/50">
-              <td className="px-2 py-1 font-medium">{s.gpuIndex}</td>
-              <td className="px-2 py-1">
-                {locale === 'zh' ? s.count.toLocaleString('zh-CN') : s.count.toLocaleString()}
-              </td>
-              <td className="px-2 py-1">{fmtStat(s.min)}</td>
-              <td className="px-2 py-1">{fmtStat(s.max)}</td>
-              <td className="px-2 py-1">{fmtStat(s.mean)}</td>
-              <td className="px-2 py-1">{fmtStat(s.median)}</td>
-              <td className="px-2 py-1">{fmtStat(s.p95)}</td>
-              <td className="px-2 py-1">{fmtStat(s.p99)}</td>
-              <td className="px-2 py-1">{fmtStat(s.stddev)}</td>
+                  <button
+                    type="button"
+                    className="cursor-pointer select-none hover:text-foreground"
+                    onClick={() => handleSort(c.key)}
+                  >
+                    {c.label}
+                    {c.key !== 'gpuIndex' && c.key !== 'count' ? ` (${metricConfig.unit})` : ''}
+                    {sortCol === c.key && (sortAsc ? ' \u2191' : ' \u2193')}
+                  </button>
+                </th>
+              ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {sorted.map((s) => (
+              <tr key={s.gpuIndex} className="border-b border-border/50 hover:bg-muted/50">
+                <td className="px-2 py-1 font-medium">{s.gpuIndex}</td>
+                <td className="px-2 py-1">
+                  {locale === 'zh' ? s.count.toLocaleString('zh-CN') : s.count.toLocaleString()}
+                </td>
+                <td className="px-2 py-1">{fmtStat(s.min)}</td>
+                <td className="px-2 py-1">{fmtStat(s.max)}</td>
+                <td className="px-2 py-1">{fmtStat(s.mean)}</td>
+                <td className="px-2 py-1">{fmtStat(s.median)}</td>
+                <td className="px-2 py-1">{fmtStat(s.p95)}</td>
+                <td className="px-2 py-1">{fmtStat(s.p99)}</td>
+                <td className="px-2 py-1">{fmtStat(s.stddev)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 });

@@ -10,6 +10,15 @@ export interface Skips {
   noIslOsl: number;
   failedRun: number;
   dbError: number;
+  /**
+   * PowerX telemetry digest failures, counted apart from `dbError` because they
+   * are not fatal. The benchmark rows land either way; only the per-point
+   * telemetry tab is affected, and the artifact can be re-digested later by
+   * `admin:db:backfill-gpu-metrics`. Folding these into `dbError` would let one
+   * malformed `gpu_metrics_*` CSV turn the whole production ingest red, through
+   * the publication manifest that verify-power-publication treats as fatal.
+   */
+  telemetryError: number;
   /** Agentic point whose sibling `agentic_<suffix>` artifact had no trace_replay files. */
   traceReplayMissing: number;
 }
@@ -35,6 +44,15 @@ export interface SkipTracker {
    * @param err - The caught error.
    */
   recordDbError: (context: string, err: Error) => void;
+  /**
+   * Record a non-fatal PowerX telemetry digest failure. Same printing and
+   * suppression as `recordDbError`, but increments `skips.telemetryError` so the
+   * ingest is not failed by it.
+   *
+   * @param context - Human-readable label for where the error occurred.
+   * @param err - The caught error.
+   */
+  recordTelemetryError: (context: string, err: Error) => void;
   /**
    * Capture a point-in-time snapshot of the current skip counters and
    * unmapped-name sets. Used together with `diff()` to report per-artifact drops.
@@ -76,12 +94,14 @@ export function createSkipTracker(): SkipTracker {
     noIslOsl: 0,
     failedRun: 0,
     dbError: 0,
+    telemetryError: 0,
     traceReplayMissing: 0,
   };
   const unmappedModels = new Set<string>();
   const unmappedHws = new Set<string>();
   const unmappedPrecisions = new Set<string>();
   let dbErrorsPrinted = 0;
+  let telemetryErrorsPrinted = 0;
 
   return {
     skips,
@@ -96,6 +116,19 @@ export function createSkipTracker(): SkipTracker {
         dbErrorsPrinted++;
         if (dbErrorsPrinted === MAX_DB_ERRORS) {
           console.error('  [DB ERROR] further DB errors suppressed; count included in summary');
+        }
+      }
+    },
+
+    recordTelemetryError(context: string, err: Error): void {
+      skips.telemetryError++;
+      if (telemetryErrorsPrinted < MAX_DB_ERRORS) {
+        console.error(`  [TELEMETRY] ${context}: ${err.message}`);
+        telemetryErrorsPrinted++;
+        if (telemetryErrorsPrinted === MAX_DB_ERRORS) {
+          console.error(
+            '  [TELEMETRY] further telemetry errors suppressed; count included in summary',
+          );
         }
       }
     },

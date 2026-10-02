@@ -37,7 +37,7 @@ function expected(overrides = {}) {
     'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/123/attempts/2',
     { path: 'bmk_qwen3.5/results.json', sha256: 'abc' },
   );
-  if (!point) throw new Error('Fixture must be 8K/1K');
+  if (!point) throw new Error('Fixture must belong to a supported PowerX workload');
   return point;
 }
 function actual(point = expected()): PublishedPowerRow {
@@ -51,6 +51,12 @@ function actual(point = expected()): PublishedPowerRow {
 }
 
 describe('PowerX publication', () => {
+  it('keeps required 1K/1K measurements in the publication receipt', () => {
+    const point = expected({ isl: 1024, joules_per_output_token: 2.5 });
+    expect(point.identity).toMatchObject({ benchmark_type: 'single_turn', isl: 1024, osl: 1024 });
+    expect(verifyPowerPublication([point], [actual(point)], 'database')).toEqual([]);
+    expect(verifyPowerPublication([point], [], 'public API')[0]).toContain('found 0');
+  });
   it('verifies AgentX source identity, nullable sequences, energy and audit through DB/API', () => {
     const point = expected({
       scenario_type: 'agentic-coding',
@@ -132,5 +138,49 @@ describe('PowerX publication', () => {
       mapBenchmarkRow({ ...raw, benchmark_outcome: { status: 'failed' } }, tracker),
     ).toBeNull();
     expect(tracker.skips.failedRun).toBe(1);
+  });
+});
+
+describe('NVL72 CPU publication', () => {
+  it('retains CPU watts and socket provenance and rejects their loss in DB/API readback', () => {
+    const point = expected({
+      cpu_power_valid: 1,
+      avg_total_cpu_power_w: 501,
+      power_audit: {
+        ...raw.power_audit,
+        cpu: {
+          sensor_kind: 'grace_socket',
+          source: 'acpi',
+          expected_sockets: 2,
+          observed_sockets: 2,
+          reason_codes: [],
+        },
+      },
+    });
+    expect(point.metrics).toMatchObject({ cpu_power_valid: 1, avg_total_cpu_power_w: 501 });
+    expect(point.power_audit).toMatchObject({
+      cpu: { sensor_kind: 'grace_socket', observed_sockets: 2 },
+    });
+    expect(verifyPowerPublication([point], [actual(point)], 'database')).toEqual([]);
+    const missingCpu = actual(point);
+    delete missingCpu.metrics.cpu_power_valid;
+    delete missingCpu.metrics.avg_total_cpu_power_w;
+    expect(verifyPowerPublication([point], [missingCpu], 'API')).toContainEqual(
+      expect.stringContaining('cpu_power_valid expected 1'),
+    );
+    expect(
+      verifyPowerPublication([point], [{ ...actual(point), power_audit: raw.power_audit }], 'API'),
+    ).toContainEqual(expect.stringContaining('power_audit differs'));
+  });
+
+  it('preserves valid GPU watts and rejects leaked invalid CPU watts', () => {
+    const point = expected({ cpu_power_valid: 0, avg_total_cpu_power_w: 501 });
+    expect(point.metrics).toMatchObject({ cpu_power_valid: 0, avg_power_w: 642 });
+    expect(point.metrics).not.toHaveProperty('avg_total_cpu_power_w');
+    const leaked = actual(point);
+    leaked.metrics.avg_total_cpu_power_w = 501;
+    expect(verifyPowerPublication([point], [leaked], 'API')).toContainEqual(
+      expect.stringContaining('avg_total_cpu_power_w expected absent, got 501'),
+    );
   });
 });
