@@ -1,5 +1,5 @@
 export type DashboardNavGroup = 'primary' | 'feature-gated' | 'footer-only';
-export type DashboardShareParamScope = 'g_' | 'i_' | 'e_' | 'r_' | 'c_';
+export type DashboardShareParamScope = 'g_' | 'i_' | 'e_' | 'r_' | 'c_' | 'v_';
 
 export interface DashboardProviderCapabilities {
   readonly globalFilters: boolean;
@@ -86,7 +86,7 @@ export const DASHBOARD_ROUTES = [
     indexable: false,
     localeMirrored: true,
     providers: STANDALONE_DASHBOARD_PROVIDERS,
-    shareParamScopes: [],
+    shareParamScopes: ['v_'],
   },
   {
     key: 'inference',

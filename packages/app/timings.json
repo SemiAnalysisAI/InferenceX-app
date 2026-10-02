@@ -277,6 +277,10 @@
       "duration": 27250
     },
     {
+      "spec": "cypress/e2e/video-dashboard.cy.ts",
+      "duration": 8000
+    },
+    {
       "spec": "cypress/e2e/yaxis-metrics-render.cy.ts",
       "duration": 7006
     },

@@ -1,4 +1,9 @@
 import { GET as videoRuns } from '@/app/api/video-runs/route';
+import { compareSide, pairCases } from '@/components/video-benchmark/compare';
+import {
+  VIDEO_HISTORY_MAX_PAGES,
+  type VideoHistoryPage,
+} from '@/components/video-benchmark/history';
 import { servingCells } from '@/components/video-benchmark/serving';
 import { storedBundle, type StoredArtifact } from '@/components/video-benchmark/stored';
 import {
@@ -18,11 +23,102 @@ import {
 } from '@/lib/views-api/params';
 import { VIEW_QUERY_PARAMS } from '@/lib/views-api/registry';
 import { readResponse, sourceRequest } from '@/lib/views-api/source';
+import { videoDashboardProjection } from '@/lib/views-api/video-dashboard';
 import { type NextRequest, NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
 const headers = { 'Cache-Control': 'private, no-store' };
+
+async function dashboardResponse(request: NextRequest, view: 'dashboard' | 'compare') {
+  const pages: VideoHistoryPage[] = [];
+  let nextPage: number | null = 1;
+  for (let page = 1; page <= VIDEO_HISTORY_MAX_PAGES; page++) {
+    const payload = await readResponse<VideoHistoryPage>(
+      await videoRuns(
+        sourceRequest(request, '/api/video-runs', { format: 'history', page: String(page) }),
+      ),
+    );
+    if (payload.schemaVersion !== 1 || !Array.isArray(payload.entries))
+      throw new Error('Unsupported published history projection');
+    pages.push(payload);
+    nextPage = payload.nextPage;
+    if (nextPage === null) break;
+  }
+  const projection = videoDashboardProjection(pages, request.nextUrl.search);
+  const { baseline, candidate } = projection.comparison;
+  let cases: {
+    status: 'not-requested' | 'no-pair' | 'not-published' | 'ready' | 'unavailable';
+    resolvedCaseIndex: number;
+    count: number;
+    selected: ReturnType<typeof pairCases>['pairs'][number] | null;
+    unmatched: ReturnType<typeof pairCases>['unmatched'] | null;
+  } = { status: 'not-requested', resolvedCaseIndex: 0, count: 0, selected: null, unmatched: null };
+  if (view === 'compare') {
+    cases.status = 'no-pair';
+    if (baseline && candidate) {
+      // Same artifact can contain both points. Read it once, through the published-only media path.
+      const artifacts = new Map<string, StoredArtifact | null>();
+      try {
+        for (const point of [baseline, candidate]) {
+          const key = `${point.runId}:${point.artifactId}`;
+          if (artifacts.has(key)) continue;
+          const response = await videoRuns(
+            sourceRequest(request, '/api/video-runs', {
+              run: point.runId,
+              artifact: String(point.artifactId),
+              format: 'published',
+            }),
+          );
+          artifacts.set(
+            key,
+            response.status === 204 ? null : await readResponse<StoredArtifact>(response),
+          );
+        }
+        const b = artifacts.get(`${baseline.runId}:${baseline.artifactId}`);
+        const c = artifacts.get(`${candidate.runId}:${candidate.artifactId}`);
+        cases.status = 'not-published';
+        if (b && c) {
+          const matched = pairCases(
+            compareSide(b, baseline).records,
+            compareSide(c, candidate).records,
+          );
+          const index = Math.min(
+            projection.params.caseIndex,
+            Math.max(matched.pairs.length - 1, 0),
+          );
+          cases = {
+            status: 'ready',
+            resolvedCaseIndex: index,
+            count: matched.pairs.length,
+            selected: matched.pairs[index] ?? null,
+            unmatched: matched.unmatched,
+          };
+        }
+      } catch {
+        // Like the collapsed UI panel, a media error does not erase published chart metrics.
+        cases.status = 'unavailable';
+      }
+    }
+  }
+  return NextResponse.json(
+    {
+      view: 'video',
+      apiVersion: 'v1',
+      ...projection,
+      params: { ...projection.params, view, displayView: projection.params.view },
+      coverage: {
+        pagesRead: pages.length,
+        maxPages: VIDEO_HISTORY_MAX_PAGES,
+        nextPage,
+        truncated: nextPage !== null,
+      },
+      comparison: { ...projection.comparison, cases },
+    },
+    { headers },
+  );
+}
+
 function serializePoint({
   run: evidenceRun,
   ...point
@@ -42,6 +138,24 @@ export function GET(request: NextRequest) {
   return runViewsRoute('video', async () => {
     validateViewParams(request.nextUrl.searchParams, VIEW_QUERY_PARAMS['video']);
     const s = request.nextUrl.searchParams;
+    const mode = parseEnumParam(
+      s.get('view'),
+      'view',
+      ['dashboard', 'compare', 'discovery', 'results', 'tradeoff'],
+      s.has('run') || s.has('artifact') ? 'results' : 'dashboard',
+    );
+    if (mode === 'dashboard' || mode === 'compare') {
+      for (const key of s.keys())
+        if (key !== 'view' && !key.startsWith('v_'))
+          throw new ViewsApiParamError(key, 'Use a legacy view for run/artifact selectors');
+      return dashboardResponse(request, mode);
+    }
+    for (const key of s.keys())
+      if (key.startsWith('v_'))
+        throw new ViewsApiParamError(
+          key,
+          'Dashboard selectors require view=dashboard or view=compare',
+        );
     // GitHub run id and artifact id share the positive-digits rule.
     const run = parseRunIdParam(s.get('run'), 'run');
     const artifact = parseRunIdParam(s.get('artifact'), 'artifact');
@@ -176,7 +290,7 @@ export function GET(request: NextRequest) {
       ['participating', 'allocated'],
       'participating',
     );
-    const view = parseEnumParam(s.get('view'), 'view', ['results', 'tradeoff'], 'results');
+    const view = mode;
     const cell = s.get('cell'),
       slot = s.get('slot');
     const evidence = selectedSource
