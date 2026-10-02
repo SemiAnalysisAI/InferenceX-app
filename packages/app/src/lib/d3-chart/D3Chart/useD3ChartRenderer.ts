@@ -18,6 +18,7 @@ import {
 import type { ChartLayout, ContinuousScale } from '../types';
 
 import { buildScale, isBandScale, type BuiltScale } from './scale-builders';
+import { isTouchCompatMouseEvent } from '../touch-input';
 import {
   renderLayer,
   updateLayerDecorationOnZoom,
@@ -495,6 +496,8 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
             .attr('pointer-events', 'all')
             .on('mousemove', (event: MouseEvent) => {
               if (isPinned()) return;
+              // Let taps reach the pinning click handler (see touch-input.ts).
+              if (isTouchCompatMouseEvent(event)) return;
               const [mx] = d3.pointer(event);
 
               // Get current (possibly zoomed) x scale
