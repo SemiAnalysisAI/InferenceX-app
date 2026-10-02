@@ -65,10 +65,13 @@ describe('Prefix Cache Reuse', () => {
     it('labels the configuration control and shows the plotted config', () => {
       cy.get('label[for="cache-reuse-config"]').should('contain.text', 'Configuration');
       cy.get('[data-testid="cache-reuse-config-selector"]').should('contain.text', 'B300');
-      cy.get('[data-testid="cache-reuse-figure"] figcaption').should(
-        'contain.text',
-        `${REAL_CONFIGS.length} of ${REAL_CONFIGS.length} measured rows report cache tiers`,
-      );
+      cy.get('[data-testid="cache-reuse-config-selector"]')
+        .invoke('text')
+        .then((config) => {
+          cy.get('[data-testid="cache-reuse-figure"] figcaption')
+            .should('contain.text', config.trim())
+            .and('contain.text', 'Source: SemiAnalysis InferenceX');
+        });
     });
   });
 
