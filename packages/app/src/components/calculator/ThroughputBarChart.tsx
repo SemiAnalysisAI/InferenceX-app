@@ -17,6 +17,7 @@ import type {
   RenderContext,
 } from '@/lib/d3-chart/D3Chart/types';
 import { computeLeftMargin, measureTextWidth } from '@/lib/d3-chart/dynamic-margins';
+import { useIsMobileViewport } from '@/hooks/useMediaQuery';
 import type { ContinuousScale } from '@/lib/d3-chart/types';
 import { getChartWatermark } from '@/lib/data-mappings';
 import type { Locale } from '@/lib/i18n';
@@ -436,13 +437,32 @@ function positionLabelPairs(
       const barEnd = xScale(getMetricValue(d, barMetric, costType));
       const maxW = maxWidths.get(d.resultKey) ?? 0;
       const fitsInside = barEnd > maxW + 24;
+      // On narrow (phone) plots the longest bars can leave too little room to
+      // their right. Pull the label left so it ends at the plot edge instead
+      // of clipping, and give it a background halo where it overlaps the bar.
+      const outsideX = Math.min(barEnd + 6, Math.max(0, chartWidth - maxW - 2));
+      const clamped = !fitsInside && outsideX < barEnd + 6;
       const fill = fitsInside ? contrastColors(getBarColor(d)) : 'var(--foreground)';
-      d3.select(this)
-        .attr('x', fitsInside ? barEnd - 10 : barEnd + 6)
+      const label = d3
+        .select(this)
+        .attr('x', fitsInside ? barEnd - 10 : outsideX)
         .attr('text-anchor', fitsInside ? 'end' : 'start')
         .style('fill', fill)
         .attr('stroke', null)
         .attr('visibility', barEnd < 0 || barEnd > chartWidth ? 'hidden' : 'visible');
+      if (clamped) {
+        label
+          .style('stroke', 'var(--background)')
+          .style('stroke-width', '3px')
+          .style('stroke-linejoin', 'round')
+          .style('paint-order', 'stroke');
+      } else {
+        label
+          .style('stroke', null)
+          .style('stroke-width', null)
+          .style('stroke-linejoin', null)
+          .style('paint-order', null);
+      }
     });
   };
 
@@ -729,7 +749,15 @@ export default function ThroughputBarChart({
     };
   }, [sortedResults, hardwareConfig]);
 
-  const xAxisConfig = useMemo(() => ({ tickCount: 6 }), []);
+  // Phones: fewer, SI-compact ticks ("100k") so tick labels never collide.
+  const isMobileViewport = useIsMobileViewport();
+  const xAxisConfig = useMemo(
+    () =>
+      isMobileViewport
+        ? { tickCount: 4, tickFormat: (d: d3.AxisDomain) => d3.format('~s')(Number(d)) }
+        : { tickCount: 6 },
+    [isMobileViewport],
+  );
 
   // ── onRender: x-axis label + initial selection opacities ──
 

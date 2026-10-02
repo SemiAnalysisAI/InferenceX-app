@@ -18,6 +18,7 @@ import { NUDGE_REGISTRY } from '@/lib/nudges/registry';
 import type { NudgeDefinition, NudgeScope, NudgeTrigger } from '@/lib/nudges/types';
 import { LANDING_BANNER_DISMISSED_ATTRIBUTE } from '@/lib/nudges/landing-banner';
 import { BottomToast } from '@/components/ui/bottom-toast';
+import { useIsMobileViewport } from '@/hooks/useMediaQuery';
 import { CoachMark } from '@/components/ui/coach-mark';
 import { Button } from '@/components/ui/button';
 import { NewBadge } from '@/components/ui/new-badge';
@@ -93,6 +94,8 @@ export function NudgeEngine({ scope }: NudgeEngineProps) {
   const triggerCountsRef = useRef<Record<string, number>>({});
   const eventDetailRef = useRef<Record<string, unknown> | null>(null);
   const sessionDismissedRef = useRef<Set<string>>(new Set());
+
+  const isMobileViewport = useIsMobileViewport();
 
   const activeBanner = activeBannerId ? scopeNudges.find((n) => n.id === activeBannerId) : null;
   const activeOverlay = activeOverlayId ? scopeNudges.find((n) => n.id === activeOverlayId) : null;
@@ -304,6 +307,11 @@ export function NudgeEngine({ scope }: NudgeEngineProps) {
   // Render — banner and overlay can coexist
   // -------------------------------------------------------------------------
 
+  // A phone has room for one floating card. While a coach mark is teaching an
+  // on-chart interaction, hold the bottom toast back (it is not dismissed) so
+  // the two never stack over the plot; it returns once the coach mark closes.
+  const deferToastForCoachMark = isMobileViewport && Boolean(activeCoachMark?.content.anchor);
+
   return (
     <>
       {activeBanner && (
@@ -313,7 +321,7 @@ export function NudgeEngine({ scope }: NudgeEngineProps) {
           onAction={handleBannerAction}
         />
       )}
-      {activeOverlay?.type === 'toast' && (
+      {activeOverlay?.type === 'toast' && !deferToastForCoachMark && (
         <ToastRenderer
           def={activeOverlay}
           onDismiss={dismissOverlay}
