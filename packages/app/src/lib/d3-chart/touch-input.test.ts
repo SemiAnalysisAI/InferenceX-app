@@ -5,14 +5,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { attachOverlayXMarkerHandlers } from './overlay-x-marker';
 import {
+  TOUCH_ONLY_QUERY,
   installTouchInputTracking,
   isTouchCompatMouseEvent,
   resetTouchInputTrackingForTests,
 } from './touch-input';
 
-const setHoverNone = (hoverNone: boolean) => {
-  window.matchMedia = vi.fn().mockImplementation((query: string) => ({
-    matches: query === '(hover: none)' ? hoverNone : false,
+const setHoverNone = (hoverNone: boolean, query = TOUCH_ONLY_QUERY) => {
+  window.matchMedia = vi.fn().mockImplementation((q: string) => ({
+    matches: q === query ? hoverNone : false,
     media: query,
     addEventListener: () => {},
     removeEventListener: () => {},
@@ -58,9 +59,14 @@ describe('isTouchCompatMouseEvent', () => {
     expect(isTouchCompatMouseEvent(event)).toBe(true);
   });
 
-  it('treats devices without hover as touch', () => {
+  it('treats touch-only devices as touch', () => {
     setHoverNone(true);
     expect(isTouchCompatMouseEvent(new MouseEvent('mouseenter'))).toBe(true);
+  });
+
+  it('keeps mouse hover in pointer-less environments that only report hover: none', () => {
+    setHoverNone(true, '(hover: none)');
+    expect(isTouchCompatMouseEvent(new MouseEvent('mouseenter'))).toBe(false);
   });
 });
 

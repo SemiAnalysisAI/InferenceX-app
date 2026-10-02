@@ -17,6 +17,9 @@
 /** How long after a touch the following compatibility mouse events count as touch. */
 const TOUCH_COMPAT_WINDOW_MS = 1000;
 
+/** A device whose primary pointer is a finger and cannot hover (phones, tablets). */
+export const TOUCH_ONLY_QUERY = '(hover: none) and (pointer: coarse)';
+
 let lastTouchAt = Number.NEGATIVE_INFINITY;
 let installed = false;
 
@@ -54,7 +57,7 @@ interface SourceCapabilitiesLike {
 
 /**
  * True when a mouse event is a compatibility event synthesized from a touch,
- * or the device has no hover-capable pointer at all.
+ * or the device is touch-only (no hover and a coarse primary pointer).
  */
 export function isTouchCompatMouseEvent(event?: Event | null): boolean {
   installTouchInputTracking();
@@ -63,7 +66,10 @@ export function isTouchCompatMouseEvent(event?: Event | null): boolean {
   if (capabilities?.firesTouchEvents) return true;
   if (now() - lastTouchAt < TOUCH_COMPAT_WINDOW_MS) return true;
   if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
-    return window.matchMedia('(hover: none)').matches;
+    // Require a coarse pointer too: headless and pointer-less environments
+    // (CI browsers, kiosks) report `hover: none` with `pointer: none`, and
+    // they still need ordinary mouse hover to work.
+    return window.matchMedia(TOUCH_ONLY_QUERY).matches;
   }
   return false;
 }
