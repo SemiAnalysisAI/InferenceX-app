@@ -475,7 +475,7 @@ function verifyPointEvidence(
         artifact.validation_state !== 'valid' ||
         typeof artifact.sha256 !== 'string' ||
         !/^[a-f0-9]{64}$/u.test(artifact.sha256) ||
-        createHash('sha256').update(file.contents).digest('hex') !== artifact.sha256
+        digest(file) !== artifact.sha256
       )
         throw new Error(`Required power: invalid artifact validation or hash ${relative}`);
       evidence.set(relative, file);

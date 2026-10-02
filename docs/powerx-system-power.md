@@ -16,6 +16,28 @@ The pinned source currently identifies itself as **DRAFT / pending human
 verification**. Numerical parity establishes implementation equivalence, not
 empirical chassis calibration.
 
+## Updating the model for historical results
+
+Modeled power is derived from retained measurements when the browser or a shared
+views API transforms a benchmark row. Changing the model does not rewrite the
+original GPU measurements or require a per-run database backfill.
+
+1. Update `REVISION` in `packages/app/scripts/generate-system-power-reference.py`
+   to the intended clean Python model commit, and update the recorded assumptions
+   when required.
+2. Run that script with the path to the pinned model checkout to regenerate
+   `system-power-model.profiles.json` and `system-power-model.reference.json`.
+   If equations or load-dependent components changed, update the TypeScript
+   implementation too; regenerating constants alone is insufficient.
+3. Run the system-power model parity and admission tests, then deploy the app.
+   Existing browser sessions need the updated bundle. Derived API responses need
+   the normal authenticated cache invalidation or cache expiry; deployment alone
+   does not establish that every cached response uses the new revision.
+4. Regenerate frozen CSV/JSON exports separately. If the revised model needs
+   inputs that were never recorded, those rows stay unavailable until the input
+   gap is resolved. A new benchmark's power must not be attached to an older
+   benchmark's throughput.
+
 ## Boundary and assumptions
 
 The input is measured mean GPU power during a validated serving window. The
@@ -95,15 +117,20 @@ facility kW/GPU used to calculate capacity per GW. Consequently, revenue,
 compute expense, license fee, and profit scale together; profit margin does not
 change. Electricity expense is not recomputed separately.
 
-This opt-in AgentX estimate requires validated schema-v2 telemetry and a
-single-node chassis supported by the pinned model. Validated 1/2/4-GPU allocations
-use the existing full-chassis extrapolation: fill an eight-GPU server with whole
-replicas at the measured per-GPU power and throughput, then divide modeled facility
-power by eight. This assumes replica co-location does not change performance or
-power; it is not a measurement of a partly idle server. The chart, tooltip, and CSV
-label every extrapolated estimate, including interpolation with one partial knot.
-Unsupported GB200/GB300 chassis, multi-node layouts, allocations that cannot tile
-eight GPUs, and missing/invalid measurements stay unavailable with distinct reasons.
+This opt-in AgentX estimate requires validated schema-v2 telemetry and chassis
+supported by the pinned model. Fully measured eight-GPU chassis are supported
+on a single node, per measured worker host, or across an aggregate multinode
+deployment without per-worker telemetry at the deployment-mean GPU power
+(`topologyBasis: 'uniform-hosts'`; symmetric TP/PP/DP shards load each host alike).
+Validated single-node 1/2/4-GPU allocations use full-chassis extrapolation: fill
+an eight-GPU server with whole replicas at the measured per-GPU power and
+throughput, then divide modeled facility power by eight. This assumes replica
+co-location does not change performance or power; it is not a measurement of a
+partly idle server. The chart, tooltip, and CSV label every extrapolated estimate,
+including interpolation with one partial knot. Unsupported GB200/GB300 chassis,
+partial multi-host allocations, disaggregated deployments without per-worker
+telemetry, allocations that cannot tile eight GPUs, and missing/invalid
+measurements stay unavailable with distinct reasons.
 The ordinary 8K/1K transformation keeps its existing admission policy.
 
 At an exact frontier point, use that point's modeled power. Between points,
@@ -201,6 +228,13 @@ is unavailable, the corresponding mean remains unavailable rather than silently
 dropping that replicate.
 
 ## 中文说明
+
+模型结果在浏览器或共享 views API 转换 benchmark 数据时计算，不写回原始 GPU
+测量值。更新模型时，先修改生成脚本中的固定版本及相关假设，再生成 profiles 和
+reference JSON；如果公式或随负载变化的组件有改动，还需同步 TypeScript 实现。
+通过一致性及准入测试后部署，刷新浏览器，并使派生 API 缓存失效或等待其过期。
+冻结的 CSV/JSON 需另行导出。通常无需逐 run 回填数据库；若新模型需要历史记录中
+没有的输入，应保留不可用状态，也不能把新一轮测得的功耗配到旧吞吐结果上。
 
 PowerX 的系统功耗结果以实测 GPU 功率为输入，使用固定版本的功耗模型估算
 8-GPU 机箱的 AC 输入功率，再单独应用 PUE 得到设施功率估计。CPU 和 DRAM 利用率

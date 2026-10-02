@@ -94,10 +94,22 @@ const chart = () => cy.get('[data-testid="profit-estimator-chart"]');
 const chartSvg = () => chart().find('svg').filter(':has(.chart-root)').first();
 const bars = () => chart().find('rect.bar');
 
+function assertDisclosureOpen(testId: string, open: boolean) {
+  cy.get<HTMLDetailsElement>(`[data-testid="${testId}"]`).should(($details) => {
+    expect($details[0].open, `${testId} native disclosure state`).to.equal(open);
+    const content = $details[0].querySelector('p');
+    expect(content, `${testId} content`).not.to.equal(null);
+    // Cypress visibility omits native closed-details rendering in some browsers.
+    if (content && typeof content.checkVisibility === 'function') {
+      expect(content.checkVisibility(), `${testId} browser visibility`).to.equal(open);
+    }
+  });
+}
+
 // Clear the preceding chart before each case changes the viewport.
 describe('Profit estimator power option', { testIsolation: true }, () => {
   for (const locale of ['en', 'zh'] as const) {
-    it(`prices DeepSeek Flash partial chassis with visible assumptions and CSV labels (${locale})`, () => {
+    it(`prices DeepSeek Flash partial chassis with a one-line power note and CSV labels (${locale})`, () => {
       stubOpenRouter();
       cy.viewport(locale === 'en' ? 1280 : 393, 900);
       cy.intercept('GET', '/api/v1/benchmarks*', {
@@ -148,10 +160,16 @@ describe('Profit estimator power option', { testIsolation: true }, () => {
       cy.get('[data-testid="profit-power-unavailable"]')
         .should('contain', 'GB300')
         .and('contain', hardwareReason);
-      cy.get('[data-testid="profit-power-note"]').should(
-        'contain',
-        locale === 'en' ? 'partly idle server' : '部分 GPU 闲置',
-      );
+      assertDisclosureOpen('profit-power-unavailable', false);
+      cy.get('[data-testid="profit-power-unavailable"] > summary').click();
+      assertDisclosureOpen('profit-power-unavailable', true);
+      cy.get('[data-testid="profit-power-unavailable"] > p').should('be.visible');
+      cy.get('[data-testid="profit-power-note"]')
+        .should('contain', locale === 'en' ? 'All in Measured' : '整体实测功耗')
+        .and('not.contain', locale === 'en' ? 'unmeasured components' : '未实测的组件');
+      cy.get('[data-testid="profit-power-assumptions"]').should('not.exist');
+      cy.get('[data-testid="profit-power-unavailable"] > summary').click();
+      assertDisclosureOpen('profit-power-unavailable', false);
       cy.get('[data-testid="profit-power-note"]').then(($note) => {
         const box = $note[0].getBoundingClientRect();
         expect(box.left).to.be.at.least(0);
@@ -285,7 +303,7 @@ describe('Profit estimator power option', { testIsolation: true }, () => {
     cy.get('#profit-target').should('have.value', '45');
     chart().find('text.revenue-label').should('have.length', 6);
     chart().should('contain', 'B200').and('contain', 'B300').and('contain', 'MI355X');
-    chart().should('contain', 'Measured + modeled').and('contain', 'Provisioned');
+    chart().should('contain', 'All in Measured').and('contain', 'All in Provisioned');
     cy.get('[data-testid="profit-power-unavailable"]').should('contain', 'GB300');
   });
 
@@ -297,7 +315,7 @@ describe('Profit estimator power option', { testIsolation: true }, () => {
       .invoke('text')
       .then((original) => {
         cy.get('#profit-power').click();
-        cy.get('[role="option"]').contains('Measured + modeled power').click();
+        cy.get('[role="option"]').contains('All in Measured').click();
         // These existing fixtures intentionally have throughput but no validated power.
         cy.get('[data-testid="profit-power-unavailable"]').should(
           'contain',
@@ -308,7 +326,7 @@ describe('Profit estimator power option', { testIsolation: true }, () => {
         cy.get('[data-testid="profit-price-source-selector"]').should('contain', 'Moonshot');
         cy.get('[data-testid="profit-estimator-chart"]').should('not.exist');
         cy.get('#profit-power').click();
-        cy.get('[role="option"]').contains('Provisioned power').click();
+        cy.get('[role="option"]').contains('All in Provisioned').click();
         bars().its('length').should('be.greaterThan', 0);
         chart().should('have.text', original);
       });

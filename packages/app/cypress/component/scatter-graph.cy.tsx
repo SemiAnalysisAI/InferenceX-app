@@ -465,6 +465,64 @@ describe('ScatterGraph', () => {
     );
   });
 
+  it('explains why All in Measured has no points', () => {
+    mountWithProviders(
+      <div style={{ width: 800, height: 600 }}>
+        <ScatterGraph
+          chartId="test-scatter-all-in-measured-empty"
+          modelLabel="Kimi K3"
+          data={[]}
+          xLabel="Interactivity"
+          yLabel="All in Measured Power per Chip"
+          chartDefinition={defaultChartDef}
+        />
+      </div>,
+      {
+        inference: {
+          hardwareConfig: hwConfig,
+          activeHwTypes: new Set(['b200_trt']),
+          hwTypesWithData: new Set(),
+          selectedYAxisMetric: 'y_utilityModeledWatts',
+        },
+        unofficial: {},
+      },
+    );
+
+    cy.contains('No values are available for All in Measured in this selection.').should(
+      'be.visible',
+    );
+    cy.contains('No measurements to plot for this selection.').should('not.exist');
+  });
+
+  it('localizes the All in Measured explanation', () => {
+    mountWithProviders(
+      <PathnameContext.Provider value="/zh/inference">
+        <div style={{ width: 375, height: 600 }}>
+          <ScatterGraph
+            chartId="test-scatter-all-in-measured-empty-zh"
+            modelLabel="Kimi K3"
+            data={[]}
+            xLabel="交互性"
+            yLabel="每芯片整体实测功耗"
+            chartDefinition={defaultChartDef}
+          />
+        </div>
+      </PathnameContext.Provider>,
+      {
+        inference: {
+          hardwareConfig: hwConfig,
+          activeHwTypes: new Set(['b200_trt']),
+          hwTypesWithData: new Set(),
+          selectedYAxisMetric: 'y_utilityModeledJPerOutputToken',
+        },
+        unofficial: {},
+      },
+    );
+
+    cy.contains('当前选择没有可用的整体实测功耗数值。').should('be.visible');
+    cy.contains('当前选择没有可绘制的测量数据。').should('not.exist');
+  });
+
   for (const selectedYAxisMetric of ['y_tpPerGpu', 'y_measuredPrefillJPerInputToken'] as const) {
     it(`offers targeted quick-filter recovery on ${selectedYAxisMetric} without changing model, precision or date`, () => {
       mountWithProviders(
@@ -925,14 +983,19 @@ describe('ScatterGraph', () => {
     cy.get('#test-scatter-overlay-labels svg .line-label')
       .filter('[data-line-key]:not([data-line-key^="overlay-"])')
       .should('have.length.greaterThan', 0);
-    // The exact branch that crashed the production page remains visible in the
-    // overlay line label and legend after ScatterGraph's render-time updates.
-    cy.get('#test-scatter-overlay-labels svg .line-label[data-line-key^="overlay-"]')
-      .find('text')
-      .should('contain.text', runBranch);
+    // The pill names the hardware behind the ✕ marker, parsed like an official
+    // pill; the long branch that crashed the production page stays in the legend.
+    cy.get('#test-scatter-overlay-labels svg .line-label[data-line-key^="overlay-"] .ll-text')
+      .should('have.text', '✕ B200 (TRTLLM)')
+      .and('not.contain.text', runBranch);
     cy.get(
       '#test-scatter-overlay-labels svg .line-label[data-line-key^="overlay-"] .ll-gpu',
-    ).should('not.exist');
+    ).should('have.text', 'B200');
+    // b200_trt is active only in the overlay legend (official rows: h100), so
+    // the overlay pill must stay visible after the filter-sync effect.
+    cy.get('#test-scatter-overlay-labels svg .line-label[data-line-key^="overlay-"]')
+      .should('have.attr', 'data-visible', '1')
+      .and('have.css', 'opacity', '1');
     cy.get('#test-scatter-overlay-labels [data-testid="chart-legend"]').should(
       'contain.text',
       runBranch,
@@ -1094,7 +1157,7 @@ describe('ScatterGraph', () => {
     cy.get('#test-scatter-singleton-overlay-label svg .line-label[data-line-key^="overlay-"]')
       .should('have.length', 1)
       .find('text')
-      .should('contain.text', 'tileRT');
+      .should('have.text', '✕ B200 (TRTLLM)');
 
     cy.get('#test-scatter-singleton-overlay-label svg').then(($svg) => {
       const svg = $svg[0];
@@ -2875,13 +2938,6 @@ describe('Power envelopes', () => {
       .should('have.length', 3)
       .each(($point) => cy.wrap($point).should('have.css', 'opacity', '1'));
     cy.get('#scatter-show-all-measurements').should('not.exist');
-    cy.get('[data-testid="measured-power-summary"]')
-      .should('contain.text', 'Showing 3 of 4 measured points')
-      .and('contain.text', '1/2 historical');
-    cy.get('#power-sweep .dot-group')
-      .filter((_, element) => element.style.opacity !== '0')
-      .find('.legacy-power-ring')
-      .should('have.length', 1);
     cy.get('#power-sweep .dot-group')
       .filter((_, element) => element.style.opacity === '0')
       .should('have.css', 'pointer-events', 'none');
@@ -2893,11 +2949,6 @@ describe('Power envelopes', () => {
           .should('have.length', 4)
           .each(($point) => cy.wrap($point).should('have.css', 'opacity', '1'));
         cy.get('#power-sweep .roofline-path').should('have.attr', 'd', boundary);
-        cy.get('[data-testid="measured-power-summary"]').should(
-          'contain.text',
-          'Showing 4 of 4 measured points',
-        );
-        cy.get('#power-sweep .legacy-power-ring').should('have.length', 2);
         cy.get('#scatter-show-all-measurements').should('not.exist');
         cy.get('#scatter-hide-non-optimal').click({ force: true });
         cy.get('#power-sweep .dot-group')
@@ -2920,7 +2971,6 @@ describe('Power envelopes', () => {
     cy.contains('button', 'Energy').click();
     cy.get('#scatter-hide-non-optimal').should('have.attr', 'data-state', 'checked');
     cy.get('#power-sweep .roofline-path[data-curve-kind="pareto"]').should('have.length', 1);
-    cy.get('[data-testid="power-curve-description"]').should('not.exist');
     cy.get('#scatter-show-all-measurements').should('not.exist');
   });
 

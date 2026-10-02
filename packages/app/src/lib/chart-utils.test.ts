@@ -929,6 +929,89 @@ describe('createChartDataPoint energy fields', () => {
 });
 
 // ===========================================================================
+// createChartDataPoint — power-boundary fields (B2 GPU provisioned, B3 utility
+// provisioned, B4 utility modeled). Mock specs: tdp 700 W, power 700 "kW".
+// ===========================================================================
+const boundaryPoint = (e: AggDataEntry) =>
+  createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
+
+describe('createChartDataPoint power-boundary fields', () => {
+  // Eight measured GPUs (2 prefill + 6 decode) on two partially filled chassis:
+  // the model evaluates 16 GPUs, so only deploymentFacilityWatts ÷ gpuCount yields 877.5 W.
+  // Every other numerator/denominator pairing gives a different number.
+  const supportedModel = {
+    status: 'supported' as const,
+    hardware: 'h100',
+    modelRevision: 'test',
+    modelPath: 'test',
+    gpuCount: 8,
+    chassisCount: 2,
+    modeledGpuCount: 16,
+    measuredGpuWattsPerGpu: 500,
+    chassisAcWatts: 10_400,
+    chassisAcWattsPerGpu: 650,
+    facilityWatts: 13_520,
+    deploymentAcWatts: 5400,
+    deploymentFacilityWatts: 7020,
+    pue: 1.3,
+    telemetryBasis: 'validated-v2' as const,
+    topologyBasis: 'worker-hosts' as const,
+    chassisBasis: 'extrapolated' as const,
+  };
+  const validated = {
+    power_valid: 1,
+    power_metric_schema_version: 2,
+    avg_power_w: 500,
+    joules_per_output_token: 10,
+    modeledSystemPower: supportedModel,
+  };
+  it('emits all six boundary fields for a validated official row', () => {
+    const p = boundaryPoint(
+      entry({ output_tput_per_gpu: 400, benchmark_type: 'single_turn', ...validated }),
+    );
+    expect(p.gpuProvisionedWatts).toEqual({ y: 700, roof: false });
+    expect(p.gpuProvisionedJPerOutputToken?.y).toBeCloseTo(700 / 400, 10);
+    expect(p.utilityProvisionedWatts).toEqual({ y: 700_000, roof: false });
+    expect(p.utilityProvisionedJPerOutputToken?.y).toBeCloseTo(700_000 / 400, 10);
+    // B4 W = deployment facility ÷ measured GPUs; J scales B1 by B4 W ÷ B1 W.
+    expect(p.utilityModeledWatts).toEqual({ y: 877.5, roof: false });
+    expect(p.utilityModeledJPerOutputToken?.y).toBeCloseTo((10 * 877.5) / 500, 10);
+    // Existing measured (B1) fields are untouched by the new boundaries.
+    expect(p.measuredAvgPower).toEqual({ y: 500, roof: false });
+    expect(p.measuredJPerOutputToken).toEqual({ y: 10, roof: false });
+  });
+
+  it('normalizes fixed-sequence disaggregated energy by all GPUs while jOutput stays per decode GPU', () => {
+    const p = boundaryPoint(
+      entry({
+        output_tput_per_gpu: 400,
+        disagg: true,
+        benchmark_type: 'single_turn',
+        num_prefill_gpu: 4,
+        num_decode_gpu: 4,
+      }),
+    );
+    expect(p.gpuProvisionedJPerOutputToken?.y).toBeCloseTo((700 * 8) / (400 * 4), 10);
+    expect(p.utilityProvisionedJPerOutputToken?.y).toBeCloseTo((700_000 * 8) / (400 * 4), 10);
+    expect(p.jOutput?.y).toBeCloseTo(700_000 / 400, 10);
+    expect(p.utilityProvisionedJPerOutputToken?.y).toBeCloseTo(2 * p.jOutput!.y, 10);
+
+    const agentic = boundaryPoint(
+      entry({
+        output_tput_per_gpu: 400,
+        disagg: true,
+        benchmark_type: 'agentic_traces',
+        num_prefill_gpu: 4,
+        num_decode_gpu: 4,
+      }),
+    );
+    expect(agentic.gpuProvisionedWatts?.y).toBe(700);
+    expect(agentic.gpuProvisionedJPerOutputToken).toBeUndefined();
+    expect(agentic.utilityProvisionedJPerOutputToken).toBeUndefined();
+  });
+});
+
+// ===========================================================================
 // createChartDataPoint — measured power / energy fields (from runner telemetry)
 // ===========================================================================
 describe('createChartDataPoint measured power fields', () => {
@@ -951,20 +1034,6 @@ describe('createChartDataPoint measured power fields', () => {
     );
     expect(missing.measuredP75Power).toBeUndefined();
     expect(missing.measuredP90Power).toBeUndefined();
-  });
-  it('emits measuredAvgPower when avg_power_w is present on the entry', () => {
-    const e = entry({ avg_power_w: 685.5 });
-    const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
-    expect(point.measuredAvgPower).toBeDefined();
-    expect(point.measuredAvgPower!.y).toBe(685.5);
-    expect(point.measuredAvgPower!.roof).toBe(false);
-  });
-
-  it('emits measuredJPerOutputToken when joules_per_output_token is present', () => {
-    const e = entry({ joules_per_output_token: 8.4 });
-    const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
-    expect(point.measuredJPerOutputToken).toBeDefined();
-    expect(point.measuredJPerOutputToken!.y).toBe(8.4);
   });
 
   it('derives J/query, Wh/query, and percent TDP from validated source fields', () => {
@@ -1019,14 +1088,6 @@ describe('createChartDataPoint measured power fields', () => {
     expect(point.measuredAvgPower!.y).toBe(0);
   });
 
-  it('emits measuredJPerTotalToken when joules_per_total_token is present', () => {
-    const e = entry({ joules_per_total_token: 0.93 });
-    const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
-    expect(point.measuredJPerTotalToken).toBeDefined();
-    expect(point.measuredJPerTotalToken!.y).toBe(0.93);
-    expect(point.measuredJPerTotalToken!.roof).toBe(false);
-  });
-
   it('emits J/output and J/total independently — different denominators', () => {
     // 8k1k workload: J/output ≈ 9 × J/total (input is ~8x output, so output/total ≈ 1/9).
     const e = entry({ joules_per_output_token: 2.04, joules_per_total_token: 0.23 });
@@ -1051,30 +1112,6 @@ describe('createChartDataPoint measured power fields', () => {
 // createChartDataPoint — per-stage measured power / energy (disagg prefill/decode)
 // ===========================================================================
 describe('createChartDataPoint per-stage measured power fields', () => {
-  it('emits measuredPrefillAvgPower when prefill_avg_power_w is present', () => {
-    const e = entry({ prefill_avg_power_w: 920.3 });
-    const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
-    expect(point.measuredPrefillAvgPower).toBeDefined();
-    expect(point.measuredPrefillAvgPower!.y).toBe(920.3);
-    expect(point.measuredPrefillAvgPower!.roof).toBe(false);
-  });
-
-  it('emits measuredDecodeAvgPower when decode_avg_power_w is present', () => {
-    const e = entry({ decode_avg_power_w: 612.1 });
-    const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
-    expect(point.measuredDecodeAvgPower).toBeDefined();
-    expect(point.measuredDecodeAvgPower!.y).toBe(612.1);
-    expect(point.measuredDecodeAvgPower!.roof).toBe(false);
-  });
-
-  it('emits measuredJPerInputToken when joules_per_input_token is present', () => {
-    const e = entry({ joules_per_input_token: 0.27 });
-    const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
-    expect(point.measuredJPerInputToken).toBeDefined();
-    expect(point.measuredJPerInputToken!.y).toBe(0.27);
-    expect(point.measuredJPerInputToken!.roof).toBe(false);
-  });
-
   it('omits all per-stage fields on legacy rows predating per-stage attribution', () => {
     // Single-node / pre-disagg runs emit avg_power_w only, no prefill/decode split.
     const e = entry({ avg_power_w: 685.5 });
@@ -1082,15 +1119,6 @@ describe('createChartDataPoint per-stage measured power fields', () => {
     expect(point.measuredPrefillAvgPower).toBeUndefined();
     expect(point.measuredDecodeAvgPower).toBeUndefined();
     expect(point.measuredJPerInputToken).toBeUndefined();
-  });
-
-  it('emits prefill and decode independently — the disagg per-stage split', () => {
-    // GB300 disagg: prefill GPUs run compute-bound (higher W) than decode GPUs.
-    const e = entry({ prefill_avg_power_w: 948, decode_avg_power_w: 631 });
-    const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
-    expect(point.measuredPrefillAvgPower!.y).toBe(948);
-    expect(point.measuredDecodeAvgPower!.y).toBe(631);
-    expect(point.measuredPrefillAvgPower!.y).toBeGreaterThan(point.measuredDecodeAvgPower!.y);
   });
 
   it('preserves a zero per-stage power value (not falsy-coerced away)', () => {

@@ -6,6 +6,9 @@ import type { Model, Sequence } from '@/lib/data-mappings';
 import type { PowerTier } from '@/lib/power-tier';
 import type { SystemPowerEstimate } from '@/lib/modeled-system-power';
 import type { MetricKey } from './metric-registry';
+import type { FixedSequenceStatistic } from './utils/resolveXAxisField';
+import type { XAxisMode } from './hooks/chart-data-core';
+import type { PowerBasis } from '@/lib/power-basis';
 
 export type { WorkerPower };
 
@@ -87,6 +90,8 @@ export interface AggDataEntry {
   'p99.9_ttft': number;
   mean_tpot: number;
   mean_intvty: number;
+  /** Reciprocal of finite positive mean TPOT (seconds), not raw mean_intvty. */
+  mean_tpot_intvty?: number;
   median_tpot: number;
   median_intvty: number;
   std_tpot: number;
@@ -204,6 +209,13 @@ export interface AggDataEntry {
   actualDate?: string;
   /** URL to the GitHub Actions workflow run that produced this data point. */
   run_url?: string;
+  /**
+   * Logical curve snapshot this row belongs to. An append-only run stitches new
+   * points onto an older run's curve; both keep their own `run_url` but share
+   * this snapshot identity. Undefined on legacy and unofficial rows.
+   */
+  curve_date?: string;
+  curve_workflow_run_id?: number;
   /** Benchmark scenario: `single_turn` (fixed-seq isl/osl) or `agentic_traces`. */
   benchmark_type?: string;
   /** ISL in tokens — null for agentic_traces. */
@@ -347,7 +359,66 @@ export interface InferenceData extends Partial<Omit<AggDataEntry, AggDataConflic
   measuredJPerSuccessfulQuery?: { y: number; roof: boolean };
   measuredWhPerSuccessfulQuery?: { y: number; roof: boolean };
   measuredPowerPercentTdp?: { y: number; roof: boolean };
+  /** Alias of `measuredAvgPower` selecting the per-second telemetry timeline view. */
+  measuredPowerTimeline?: { y: number; roof: boolean };
+  /**
+   * Prefill pool energy per OUTPUT token for disaggregated rows:
+   * `prefill_joules_per_input_token` × (J/out ÷ J/in), i.e. carried onto the
+   * output-token axis by the served input:output ratio so it adds to
+   * `measuredDecodeJPerOutputToken` (utils/role-energy.ts, PowerX Figure 7).
+   */
+  reconstructedPrefillJPerOutputToken?: { y: number; roof: boolean };
+  /**
+   * Set on the clones a power comparison (`i_pcompare`) appends to the chart:
+   * which boundary or worker role this point's `y` came from. Base points of
+   * the selected metric never carry it (utils/power-compare.ts).
+   */
+  powerVariant?: PowerVariant;
+
+  // Power boundaries beyond the GPU-measured telemetry above (B1). Each pair is
+  // W per allocated GPU plus J per successful output token, normalized by every
+  // allocated GPU (prefill + decode for disaggregation). Emitted only when the
+  // value is finite and positive; see lib/power-basis.ts and
+  // docs/data-transforms.md "Power boundaries".
+  /** B2 W/GPU: HW_REGISTRY tdp. */
+  gpuProvisionedWatts?: { y: number; roof: boolean };
+  /** B2 J/out: tdp × N_alloc ÷ total output tok/s. */
+  gpuProvisionedJPerOutputToken?: { y: number; roof: boolean };
+  /** B3 W/GPU: HW_REGISTRY all-in power (kW × 1000). */
+  utilityProvisionedWatts?: { y: number; roof: boolean };
+  /**
+   * B3 J/out: all-in W × N_alloc ÷ total output tok/s. Unlike `jOutput`, which
+   * divides one decode GPU's all-in W by that GPU's output, this counts every
+   * allocated GPU, so it is (P + D) / D × `jOutput` on disaggregated rows.
+   */
+  utilityProvisionedJPerOutputToken?: { y: number; roof: boolean };
+  /** B4 W/GPU: modeled deployment facility watts (chassis AC × PUE, applied once) ÷ measured GPUs. */
+  utilityModeledWatts?: { y: number; roof: boolean };
+  /** B4 J/out: B1 `joules_per_output_token` × (B4 W ÷ B1 W); inherits B1's token denominator. */
+  utilityModeledJPerOutputToken?: { y: number; roof: boolean };
 }
+
+/**
+ * Sibling series the gated power charts can overlay on the selected metric:
+ * every boundary (PowerX Figures 2/3) or every worker role (Figures 6/7).
+ * Rides on the `i_pcompare` URL parameter; `none` draws the metric alone.
+ */
+export type PowerCompare = 'none' | 'boundaries' | 'roles';
+/** Worker-pool scope of a measured figure. */
+export type PowerRole = 'all' | 'prefill' | 'decode';
+/** Identity of one comparison series: a boundary or a role. */
+export type PowerVariant = { kind: 'basis'; id: PowerBasis } | { kind: 'role'; id: PowerRole };
+
+/** InferenceData keys carrying the B2–B4 power-boundary readings. */
+export type PowerBasisFieldKey =
+  | 'gpuProvisionedWatts'
+  | 'gpuProvisionedJPerOutputToken'
+  | 'utilityProvisionedWatts'
+  | 'utilityProvisionedJPerOutputToken'
+  | 'utilityModeledWatts'
+  | 'utilityModeledJPerOutputToken';
+
+export type { PowerBasis } from '@/lib/power-basis';
 
 /** Why a chart-ready point was intentionally excluded from the visible plot. */
 export type ChartClipReason = 'cost' | 'latency';
@@ -581,6 +652,8 @@ export interface QuickFilters {
   spec: SpecMode[];
   /** Measured-power certification tiers (see `@/lib/power-tier`). */
   power: PowerTier[];
+  /** Exact allocation and parallelism identities; absent means no constraint. */
+  topologies?: string[];
 }
 
 /**
@@ -650,10 +723,13 @@ export interface InferenceDisplayContextType {
   openRouterPricingLoading: boolean;
   openRouterPricingError: string | null;
   selectedPercentile: string;
+  fixedSequenceStatistic: FixedSequenceStatistic;
   selectedXAxisMetric: string | null;
   selectedE2eXAxisMetric: string | null;
-  selectedXAxisMode: 'ttft' | 'e2e' | 'interactivity' | 'e2e-normalized-interactivity';
+  selectedXAxisMode: XAxisMode;
   scaleType: 'auto' | 'linear' | 'log';
+  /** Comparison series overlaid on a gated power metric (`i_pcompare`). */
+  powerCompare: PowerCompare;
   isLegendExpanded: boolean;
   hideNonOptimal: boolean;
   showAllMeasurements: boolean;
@@ -691,17 +767,17 @@ export interface InferenceActionsContextType {
   setSelectedPrecisions: (precisions: string[]) => void;
   setSelectedYAxisMetric: (metric: string) => void;
   setTokenRevenuePriceSource: (source: TokenRevenuePriceSource) => void;
-  setSelectedPercentile: (percentile: string) => void;
+  setFixedSequenceStatistic: (statistic: FixedSequenceStatistic) => void;
   setSelectedXAxisMetric: (metric: string | null) => void;
-  setSelectedXAxisMode: (
-    mode: 'ttft' | 'e2e' | 'interactivity' | 'e2e-normalized-interactivity',
-  ) => void;
+  setSelectedXAxisMode: (mode: XAxisMode) => void;
   setScaleType: (type: 'auto' | 'linear' | 'log') => void;
+  setPowerCompare: (mode: PowerCompare) => void;
   setQuickFilterVendors: (vendors: string[]) => void;
   setQuickFilterFrameworks: (frameworks: string[]) => void;
   setQuickFilterDeployment: (modes: DeploymentMode[]) => void;
   setQuickFilterSpec: (modes: SpecMode[]) => void;
   setQuickFilterPower: (tiers: PowerTier[]) => void;
+  setQuickFilterTopologies: (topologies: string[]) => void;
   setIsLegendExpanded: (expanded: boolean) => void;
   setHideNonOptimal: (hide: boolean) => void;
   setShowAllMeasurements: (show: boolean) => void;

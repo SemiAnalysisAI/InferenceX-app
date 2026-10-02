@@ -469,15 +469,20 @@ describe('Inference ChartControls grouped measured metrics', () => {
       cy.get(`input[aria-label="${searchLabel}"]`).type(group);
       cy.get('[data-select-option][data-value^="y_measured"]').should(($options) => {
         const values = [...$options].map((option) => option.dataset.value);
-        expect(values).to.have.length(13);
-        expect(new Set(values).size).to.equal(13);
+        // Thirteen measured axes plus the Timeline display of measured power.
+        expect(values).to.have.length(14);
+        expect(new Set(values).size).to.equal(14);
+        expect(values).to.include('y_measuredPowerTimeline');
       });
       cy.get(`input[aria-label="${searchLabel}"]`).clear().type(power);
-      cy.get('[data-select-option]')
-        .should('have.length', 1)
-        .and('have.text', power)
-        .and('have.attr', 'data-value', 'y_measuredP75Power')
-        .and('have.attr', 'aria-pressed', 'true');
+      // 'All in Measured Power per Chip' also contains the family name; only
+      // the family option may display exactly that name.
+      cy.get('[data-select-option]').should(($options) => {
+        const exact = [...$options].filter((option) => option.textContent?.trim() === power);
+        expect(exact).to.have.length(1);
+        expect(exact[0].dataset.value).to.equal('y_measuredP75Power');
+        expect(exact[0].getAttribute('aria-pressed')).to.equal('true');
+      });
       cy.get('[data-testid="option-help-y_measuredP75Power"]').should('exist');
       cy.get(`input[aria-label="${searchLabel}"]`).clear().type(energy);
       cy.get('[data-select-option]')
@@ -861,7 +866,8 @@ describe('Inference axis selector — Chinese Agentic controls', () => {
     );
     cy.get('[data-testid="inference-secondary-controls"] > button').click();
     cy.get('[data-testid="x-axis-mode-selector"]').should('contain.text', '交互性').click();
-    cy.get('[role="grid"] [data-select-option]').should('have.length', 4);
+    cy.get('[role="grid"] [data-select-option]').should('have.length', 5);
+    cy.get('[data-testid="x-axis-mode-concurrency"]').should('have.text', '并发数');
     cy.get('[data-testid="x-axis-mode-e2e-normalized-interactivity"]').should(
       'have.text',
       '端到端归一化交互性',

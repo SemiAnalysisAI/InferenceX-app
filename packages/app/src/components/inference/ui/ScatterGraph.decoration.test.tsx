@@ -4,7 +4,6 @@ import { act } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { InferenceData } from '@/components/inference/types';
-import { renderLegacyPowerRing } from '@/components/inference/utils/legacy-power-marker';
 import { renderOffloadHalo } from '@/components/inference/utils/offload-halo';
 
 import {
@@ -128,41 +127,6 @@ describe('ScatterGraph toggle decoration', () => {
     expect(container.querySelector('[data-testid="offload-halo-key"]')).toBeNull();
     expect(container.querySelector('[data-testid="agentic-optimization-note"]')).toBeNull();
     unmount();
-  });
-
-  it('rings legacy-power points only on Measured Energy axes', () => {
-    const legacy = {
-      ...point('h100', 'fp8', 10, 100, 1),
-      power_tier: 'legacy',
-    } as InferenceData;
-    const certified = {
-      ...point('h100', 'fp8', 20, 200, 2),
-      power_tier: 'certified',
-    } as InferenceData;
-    const tierless = point('h100', 'fp8', 40, 400, 4);
-
-    inferenceState.current = {
-      ...baseInferenceState(),
-      selectedYAxisMetric: 'y_measuredAvgPower',
-    };
-    const measured = mountChart({ data: [legacy, certified, tierless] });
-    const groups = dotGroups(measured.container);
-
-    expect(groups[0].querySelector('.legacy-power-ring')).not.toBeNull();
-    expect(groups[1].querySelector('.legacy-power-ring')).toBeNull();
-    expect(groups[2].querySelector('.legacy-power-ring')).toBeNull();
-    // The legend key lives in ChartDisplay's axis-metric footer, not the chart.
-    expect(measured.container.querySelector('[data-testid="legacy-power-key"]')).toBeNull();
-    measured.unmount();
-
-    // Non-measured axis: the same legacy point renders without a ring.
-    inferenceState.current = {
-      ...baseInferenceState(),
-      selectedYAxisMetric: 'y',
-    };
-    const throughput = mountChart({ data: [legacy, certified, tierless] });
-    expect(throughput.container.querySelectorAll('.legacy-power-ring')).toHaveLength(0);
-    throughput.unmount();
   });
 
   it('reads current trace availability without changing metric identity', () => {
@@ -466,41 +430,32 @@ function recordCount(root: Node, run: () => void): number {
   return count;
 }
 
-const offloaded = { offload_mode: 'on', power_tier: 'legacy' } as InferenceData;
+const offloaded = { offload_mode: 'on' } as InferenceData;
 
-describe('point decoration rings', () => {
-  it('draw the offload halo and legacy-power ring', () => {
+describe('offload halo decoration', () => {
+  it('draws the offload halo', () => {
     const group = pointGroup();
     renderOffloadHalo(group, offloaded, 'red');
-    renderLegacyPowerRing(group, offloaded, true, 'red');
 
     expect(group.select('.offload-halo').attr('stroke')).toBe('red');
     expect(group.select('.offload-halo').attr('stroke-dasharray')).toBe('3 2');
-    expect(group.select('.legacy-power-ring').attr('stroke-dasharray')).toBe('1 3');
   });
 
-  it('write nothing when re-rendered with the same state', () => {
+  it('writes nothing when re-rendered with the same state', () => {
     const group = pointGroup();
     renderOffloadHalo(group, offloaded, 'red');
-    renderLegacyPowerRing(group, offloaded, true, 'red');
 
-    expect(
-      recordCount(group.node()!, () => {
-        renderOffloadHalo(group, offloaded, 'red');
-        renderLegacyPowerRing(group, offloaded, true, 'red');
-      }),
-    ).toBe(0);
+    expect(recordCount(group.node()!, () => renderOffloadHalo(group, offloaded, 'red'))).toBe(0);
   });
 
-  it('restyle and remove on real changes', () => {
+  it('restyles and removes on real changes', () => {
     const group = pointGroup();
     renderOffloadHalo(group, offloaded, 'red');
-    renderLegacyPowerRing(group, offloaded, true, 'red');
 
     renderOffloadHalo(group, offloaded, 'blue');
-    renderLegacyPowerRing(group, offloaded, false, 'blue');
-
     expect(group.select('.offload-halo').attr('stroke')).toBe('blue');
-    expect(group.select('.legacy-power-ring').empty()).toBe(true);
+
+    renderOffloadHalo(group, { offload_mode: 'off' } as InferenceData, 'blue');
+    expect(group.select('.offload-halo').empty()).toBe(true);
   });
 });

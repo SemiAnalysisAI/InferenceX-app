@@ -200,10 +200,6 @@ export function getAvailableMetrics(data: GpuMetricRow[]): GpuMetricConfig[] {
   return ALL_METRIC_OPTIONS.filter((m) => data.some((row) => Number.isFinite(row[m.key])));
 }
 
-/**
- * Detect GPU SKU from an artifact name and return its TDP in watts.
- * Artifact names look like: gpu_metrics_dsr1_1k8k_fp8_sglang_tp8_..._h200-nb_0
- */
 /** TDP for a known hardware key, e.g. the benchmark point's own `hardware`. */
 export function tdpForHardware(hardware: string | undefined): { sku: string; tdp: number } | null {
   const key = hardware?.toLowerCase();
@@ -211,6 +207,10 @@ export function tdpForHardware(hardware: string | undefined): { sku: string; tdp
   return entry ? { sku: key!.toUpperCase(), tdp: entry.tdp } : null;
 }
 
+/**
+ * Detect GPU SKU from an artifact name and return its TDP in watts.
+ * Artifact names look like: gpu_metrics_dsr1_1k8k_fp8_sglang_tp8_..._h200-nb_0
+ */
 export function detectTdpFromArtifactName(
   artifactName: string,
 ): { sku: string; tdp: number } | null {

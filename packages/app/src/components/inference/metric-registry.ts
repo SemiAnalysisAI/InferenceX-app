@@ -386,6 +386,79 @@ export const METRIC_REGISTRY = {
     titleZh: '实测平均功耗占 TDP 百分比',
     polarity: 'lower',
   },
+  // The per-second telemetry behind `measuredAvgPower`. The field aliases the
+  // same average so the table view, availability panel, and share links keep
+  // working; ChartDisplay swaps the scatter chart for `PowerTimeline`, which
+  // fetches each point's `gpu_metrics_*` artifact and draws the trace. The
+  // label leads with "Measured Average Power", like the %TDP display, so a
+  // "Measured Power" search still finds only the family option.
+  measuredPowerTimeline: {
+    field: 'measuredPowerTimeline.y',
+    label: 'Measured Average Power per Chip over Time (W)',
+    labelZh: '每芯片实测平均功耗时间线（W）',
+    title: 'Measured Average Power per Chip over Time',
+    titleZh: '每芯片实测平均功耗时间线',
+    polarity: 'lower',
+  },
+  // Power boundaries beyond GPU-measured telemetry (`lib/power-basis.ts`).
+  // Each boundary publishes W per allocated GPU and J per output token; the
+  // Boundary select in the Measured controls resolves to these keys, so the
+  // metric key alone carries the boundary in share links. Keys deliberately
+  // lack the `measured` prefix: they are spec constants or model output, not
+  // telemetry, so the telemetry-only decorations must not treat them as such.
+  gpuProvisionedWatts: {
+    field: 'gpuProvisionedWatts.y',
+    label: 'GPU Level Provisioned Power per Chip (TDP, W)',
+    labelZh: '每芯片 GPU 额定功耗（TDP，W）',
+    title: 'GPU Level Provisioned Power per Chip (TDP)',
+    titleZh: '每芯片 GPU 额定功耗（TDP）',
+    polarity: 'lower',
+  },
+  gpuProvisionedJPerOutputToken: {
+    field: 'gpuProvisionedJPerOutputToken.y',
+    label: 'GPU Level Provisioned J per Output Token (TDP, J/tok)',
+    labelZh: '每输出 token GPU 额定能耗（TDP，J/tok）',
+    title: 'GPU Level Provisioned Joules per Output Token (TDP)',
+    titleZh: '每输出 token GPU 额定焦耳能耗（TDP）',
+    polarity: 'lower',
+  },
+  utilityProvisionedWatts: {
+    field: 'utilityProvisionedWatts.y',
+    label: 'All in Provisioned Power per Chip (W)',
+    labelZh: '每芯片整体预配功耗（W）',
+    title: 'All in Provisioned Power per Chip',
+    titleZh: '每芯片整体预配功耗',
+    polarity: 'lower',
+  },
+  // Unlike the ungated `jOutput`, which divides by output tokens per decode
+  // GPU, this normalizes by every allocated GPU (prefill + decode).
+  utilityProvisionedJPerOutputToken: {
+    field: 'utilityProvisionedJPerOutputToken.y',
+    label: 'All in Provisioned J per Output Token, all GPUs (J/tok)',
+    labelZh: '每输出 token 整体预配能耗，按全部 GPU 归一（J/tok）',
+    title: 'All in Provisioned Joules per Output Token, all GPUs',
+    titleZh: '每输出 token 整体预配焦耳能耗，按全部 GPU 归一',
+    polarity: 'lower',
+  },
+  // Names follow POWER_BASIS_LABELS (lib/power-basis.ts) so the Table, export
+  // titles and API docs read the same as the Boundary select: All in Provisioned
+  // / 整体预配功耗 and All in Measured / 整体实测功耗.
+  utilityModeledWatts: {
+    field: 'utilityModeledWatts.y',
+    label: 'All in Measured Power per Chip (W)',
+    labelZh: '每芯片整体实测功耗（W）',
+    title: 'All in Measured Power per Chip',
+    titleZh: '每芯片整体实测功耗',
+    polarity: 'lower',
+  },
+  utilityModeledJPerOutputToken: {
+    field: 'utilityModeledJPerOutputToken.y',
+    label: 'All in Measured J per Output Token (J/tok)',
+    labelZh: '每输出 token 整体实测能耗（J/tok）',
+    title: 'All in Measured Joules per Output Token',
+    titleZh: '每输出 token 整体实测焦耳能耗',
+    polarity: 'lower',
+  },
 } as const satisfies Record<string, MetricDefinition>;
 
 export type MetricKey = keyof typeof METRIC_REGISTRY;
@@ -580,8 +653,7 @@ export interface MetricControlGroup {
 /**
  * The runner-telemetry y-axes in the "Measured Energy" control group.
  * Exported (and referenced by the group below, so the two cannot drift) for
- * consumers that treat measured axes specially — the legacy-power point ring,
- * tooltip tier line, and footer legend key.
+ * consumers that treat measured axes specially, such as the tooltip tier line.
  */
 export const MEASURED_ENERGY_METRIC_CONFIG_KEYS = [
   'y_measuredPrefillAvgPower',
@@ -597,6 +669,7 @@ export const MEASURED_ENERGY_METRIC_CONFIG_KEYS = [
   'y_measuredJPerSuccessfulQuery',
   'y_measuredWhPerSuccessfulQuery',
   'y_measuredPowerPercentTdp',
+  'y_measuredPowerTimeline',
 ] as const satisfies readonly MetricConfigKey[];
 
 const MEASURED_ENERGY_METRIC_CONFIG_KEY_SET: ReadonlySet<string> = new Set(
@@ -616,6 +689,36 @@ export function isMeasuredEnergyConfigKey(configKey: string): boolean {
 /** Whether a y-axis requires the explicit prefill/decode energy breakdown. */
 export function isRoleLocalMeasuredEnergyConfigKey(configKey: string): boolean {
   return ROLE_LOCAL_MEASURED_ENERGY_METRIC_CONFIG_KEY_SET.has(configKey);
+}
+
+/**
+ * The derived power-boundary y-axes (GPU provisioned, utility provisioned,
+ * utility modeled) that share the gated Measured Energy group and its
+ * Boundary select. They are kept out of `MEASURED_ENERGY_METRIC_CONFIG_KEYS`
+ * on purpose: spec constants and model output carry no telemetry tier, so the
+ * tier tooltip line does not apply to them.
+ */
+export const POWER_BASIS_METRIC_CONFIG_KEYS = [
+  'y_gpuProvisionedWatts',
+  'y_gpuProvisionedJPerOutputToken',
+  'y_utilityProvisionedWatts',
+  'y_utilityProvisionedJPerOutputToken',
+  'y_utilityModeledWatts',
+  'y_utilityModeledJPerOutputToken',
+] as const satisfies readonly MetricConfigKey[];
+
+const POWER_BASIS_METRIC_CONFIG_KEY_SET: ReadonlySet<string> = new Set(
+  POWER_BASIS_METRIC_CONFIG_KEYS,
+);
+
+/** Whether a y-axis config key plots a derived power boundary (B2–B4). */
+export function isPowerBasisConfigKey(configKey: string): boolean {
+  return POWER_BASIS_METRIC_CONFIG_KEY_SET.has(configKey);
+}
+
+/** The two All in Measured (utility-modeled) axes; they alone need the chassis power model. */
+export function isAllInMeasuredConfigKey(configKey: string): boolean {
+  return configKey === 'y_utilityModeledWatts' || configKey === 'y_utilityModeledJPerOutputToken';
 }
 
 export const MODELED_SYSTEM_POWER_METRIC_CONFIG_KEY = 'y_modeledChassisPowerPerGpu';
@@ -671,10 +774,13 @@ export const METRIC_CONTROL_GROUPS: readonly MetricControlGroup[] = [
   // Runner power telemetry and the chassis model built on it are still being
   // validated, so both groups stay behind the ↑↑↓↓ feature gate until the
   // measurements are stable enough to publish.
+  // The derived boundaries ride along so the same gate and the same
+  // shared-URL exception (a gated metric selected by `i_metric` still renders
+  // while locked) apply to them.
   {
     label: 'Measured Energy',
     labelZh: '实测能耗',
-    metrics: MEASURED_ENERGY_METRIC_CONFIG_KEYS,
+    metrics: [...MEASURED_ENERGY_METRIC_CONFIG_KEYS, ...POWER_BASIS_METRIC_CONFIG_KEYS],
     gated: true,
   },
   {

@@ -20,7 +20,6 @@ import {
 import {
   ModelSelector,
   ScenarioSelector,
-  PercentileSelector,
   PrecisionSelector,
 } from '@/components/ui/chart-selectors';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
@@ -58,15 +57,15 @@ import {
 import { useOpenDropdown } from '@/hooks/useOpenDropdown';
 import { ModelArchitectureInfoLink } from './ModelArchitectureInfoLink';
 import { MetricExplanation } from './MetricExplanation';
-import { PowerMetricAvailability } from './PowerMetricAvailability';
 import { MeasuredMetricControls } from './MeasuredMetricControls';
 import {
+  changeMeasuredMetricConfig,
   getMeasuredMetricConfig,
   MEASURED_METRIC_DEFAULTS,
   type MeasuredMetricFamily,
 } from '../measured-metric-config';
 import { XAxisModeSelector } from './XAxisModeSelector';
-import { showsTcoBasisSelector, Sequence, type Model, type Percentile } from '@/lib/data-mappings';
+import { showsTcoBasisSelector, Sequence, type Model } from '@/lib/data-mappings';
 import { useLocale } from '@/lib/use-locale';
 import { DEFAULT_Y_AXIS_METRIC } from '@/lib/url-state';
 
@@ -226,10 +225,10 @@ export default function ChartControls({
     openRouterModelId,
     openRouterPricingLoading,
     openRouterPricingError,
-    selectedPercentile,
     selectedXAxisMetric,
     selectedXAxisMode,
     scaleType,
+    powerCompare,
   } = useInferenceDisplay();
   const {
     setSelectedModel,
@@ -237,11 +236,11 @@ export default function ChartControls({
     setSelectedPrecisions,
     setSelectedYAxisMetric,
     setTokenRevenuePriceSource,
-    setSelectedPercentile,
     setSelectedGPUs,
     setSelectedDateRange,
     setSelectedXAxisMetric,
     setScaleType,
+    setPowerCompare,
   } = useInferenceActions();
 
   // Y-axis options come from the canonical registry and need no API data.
@@ -335,10 +334,14 @@ export default function ChartControls({
         if (!config) return [option];
         if (seen.has(config.family)) return [];
         seen.add(config.family);
+        // Keep the selected boundary (and other dimensions) when hopping between
+        // the power and energy families; fall back to the family default otherwise.
         const value =
           selectedConfig?.family === config.family
             ? selectedYAxisMetric
-            : MEASURED_METRIC_DEFAULTS[config.family];
+            : selectedConfig
+              ? changeMeasuredMetricConfig(selectedYAxisMetric, { family: config.family })
+              : MEASURED_METRIC_DEFAULTS[config.family];
         return [
           {
             value,
@@ -457,8 +460,6 @@ export default function ChartControls({
     showTcoBasis &&
     isCostMetric(selectedYAxisMetric) &&
     showsTcoBasisSelector(selectedModel, selectedSequence);
-  const showPercentile =
-    mounted && selectedSequence === Sequence.AgenticTraces && featureGateUnlocked;
 
   return (
     <TooltipProvider delayDuration={0}>
@@ -467,9 +468,7 @@ export default function ChartControls({
           legend={t.benchmarkControls}
           className={hideGpuComparison ? 'lg:col-span-2' : 'lg:col-span-3'}
         >
-          <div
-            className={`grid min-w-0 grid-cols-2 items-start gap-3 ${showPercentile ? 'md:grid-cols-5' : 'md:grid-cols-4'}`}
-          >
+          <div className="grid min-w-0 grid-cols-2 items-start gap-3 md:grid-cols-4">
             <div className="min-w-0 col-span-2">
               <ModelSelector
                 value={selectedModel}
@@ -499,16 +498,6 @@ export default function ChartControls({
               availablePrecisions={availablePrecisions}
               data-testid="precision-multiselect"
             />
-            {/* AgentX publishes on P90, so the percentile control is an insider
-              affordance rather than a normal chart filter: it stays behind the
-              ↑↑↓↓ feature gate and the chart defaults to P90 without it. */}
-            {showPercentile && (
-              <PercentileSelector
-                value={selectedPercentile}
-                onChange={(p: Percentile) => setSelectedPercentile(p)}
-                data-testid="percentile-selector"
-              />
-            )}
           </div>
         </ControlPanel>
 
@@ -558,27 +547,15 @@ export default function ChartControls({
                   noResultsLabel={locale === 'zh' ? '无结果' : undefined}
                   clearSearchLabel={locale === 'zh' ? '清除搜索' : undefined}
                 />
-                {mounted && !getMeasuredMetricConfig(selectedYAxisMetric) && (
-                  <PowerMetricAvailability
-                    metric={selectedYAxisMetric}
-                    onSelect={handleYAxisMetricChange}
-                  />
-                )}
               </div>
 
               {mounted && getMeasuredMetricConfig(selectedYAxisMetric) && (
-                <>
-                  <MeasuredMetricControls
-                    metric={selectedYAxisMetric}
-                    onChange={handleYAxisMetricChange}
-                  />
-                  <div className="col-span-full">
-                    <PowerMetricAvailability
-                      metric={selectedYAxisMetric}
-                      onSelect={handleYAxisMetricChange}
-                    />
-                  </div>
-                </>
+                <MeasuredMetricControls
+                  metric={selectedYAxisMetric}
+                  onChange={handleYAxisMetricChange}
+                  compare={powerCompare}
+                  onCompareChange={setPowerCompare}
+                />
               )}
 
               {tcoVisible && (

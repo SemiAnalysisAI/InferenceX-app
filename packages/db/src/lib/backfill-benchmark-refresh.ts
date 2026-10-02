@@ -121,8 +121,7 @@ export async function refreshBackfillBenchmarks(
     `;
     if (rows.length !== ids.length)
       throw new Error('Refresh receipt IDs do not belong to its run/attempt');
-    const changed = rows;
-    for (const row of changed) {
+    for (const row of rows) {
       const audit = row.power_audit;
       if (audit === null)
         throw new Error(
@@ -159,7 +158,7 @@ export async function refreshBackfillBenchmarks(
         points[0]!.power_audit = update.powerAudit;
     }
     save();
-    if (changed.length > 0) {
+    if (rows.length > 0) {
       phase = 'refresh latest_benchmarks';
       await refreshLatestBenchmarks(sql);
       phase = 'invalidate cache';
@@ -178,7 +177,7 @@ export async function refreshBackfillBenchmarks(
       )
         throw new Error('Invalid cache invalidation response');
       phase = 'verify benchmark API';
-      for (const model of new Set(changed.map((row) => row.model))) {
+      for (const model of new Set(rows.map((row) => row.model))) {
         const displayModel = DB_MODEL_TO_DISPLAY[model];
         if (!displayModel) throw new Error(`Unmapped public model: ${model}`);
         const url = new URL('/api/v1/benchmarks', endpoint);
@@ -197,7 +196,7 @@ export async function refreshBackfillBenchmarks(
         if (!api.ok) throw new Error(`HTTP ${api.status}`);
         const body: unknown = await api.json();
         if (!Array.isArray(body)) throw new Error('Invalid benchmark API response');
-        for (const row of changed.filter((entry) => entry.model === model)) {
+        for (const row of rows.filter((entry) => entry.model === model)) {
           const matches = body.filter((candidate) => {
             const raw = candidate?.id;
             const id =

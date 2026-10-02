@@ -25,8 +25,8 @@ export function sortRowsByYMetric(
   const yAscending = rooflineDir?.startsWith('lower');
 
   return [...data].toSorted((a, b) => {
-    const ay = getNestedYValue(a, yPath);
-    const by = getNestedYValue(b, yPath);
+    const ay = a.powerVariant ? a.y : getNestedYValue(a, yPath);
+    const by = b.powerVariant ? b.y : getNestedYValue(b, yPath);
     return yAscending ? ay - by : by - ay;
   });
 }

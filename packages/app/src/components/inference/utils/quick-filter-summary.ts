@@ -1,5 +1,6 @@
 import type { QuickFilters } from '../types';
 import { FRAMEWORK_FAMILIES } from './quickFilters';
+import { topologyLabel } from './topology-filter';
 
 const LABELS = {
   en: {
@@ -8,6 +9,7 @@ const LABELS = {
     deployment: 'Deployment',
     spec: 'Spec Decoding',
     power: 'Measured Power',
+    topologies: 'Topology',
     'single-node': 'Single-node',
     'multi-node': 'Multi-node',
     disagg: 'Disaggregated',
@@ -22,6 +24,7 @@ const LABELS = {
     deployment: '部署模式',
     spec: '投机解码',
     power: '实测功耗',
+    topologies: '拓扑',
     'single-node': '单节点',
     'multi-node': '多节点聚合',
     disagg: '分离式',
@@ -37,14 +40,16 @@ export function quickFilterSummary(filters: QuickFilters, locale: 'en' | 'zh', a
   const labels = LABELS[locale];
   return (Object.keys(filters) as (keyof QuickFilters)[]).flatMap((category) => {
     if (agentic && category === 'spec') return [];
-    return filters[category].map((value) => ({
+    return (filters[category] ?? []).map((value) => ({
       category,
       value,
       categoryLabel: labels[category],
       label:
-        category === 'frameworks'
-          ? (FRAMEWORK_FAMILIES.find((family) => family.key === value)?.label ?? value)
-          : (labels[value as keyof typeof labels] ?? value),
+        category === 'topologies'
+          ? topologyLabel(value, locale)
+          : category === 'frameworks'
+            ? (FRAMEWORK_FAMILIES.find((family) => family.key === value)?.label ?? value)
+            : (labels[value as keyof typeof labels] ?? value),
     }));
   });
 }

@@ -19,6 +19,7 @@ import {
   metricCostTier,
   metricForCostTier,
   metricOptionTitle,
+  POWER_BASIS_METRIC_CONFIG_KEYS,
   resolveMetricConfigKey,
   tokenMetricTypeForConfigKey,
 } from './metric-registry';
@@ -39,6 +40,10 @@ describe('metric registry', () => {
     expect(e2e.y_costh_roofline).toBe('lower_left');
     expect(interactivity.y_measuredPowerPercentTdp_roofline).toBe('lower_right');
     expect(e2e.y_measuredPowerPercentTdp_roofline).toBe('lower_left');
+    for (const key of POWER_BASIS_METRIC_CONFIG_KEYS) {
+      expect(interactivity[`${key}_roofline`], key).toBe('lower_right');
+      expect(e2e[`${key}_roofline`], key).toBe('lower_left');
+    }
   });
 
   it('preserves metric-specific x overrides and bilingual labels', () => {
@@ -210,7 +215,11 @@ describe('metric registry', () => {
     );
 
     const measuredGroup = METRIC_CONTROL_GROUPS.find((group) => group.label === 'Measured Energy');
-    expect(measuredGroup?.metrics).toBe(MEASURED_ENERGY_METRIC_CONFIG_KEYS);
+    expect(measuredGroup?.gated).toBe(true);
+    expect(measuredGroup?.metrics).toEqual([
+      ...MEASURED_ENERGY_METRIC_CONFIG_KEYS,
+      ...POWER_BASIS_METRIC_CONFIG_KEYS,
+    ]);
   });
 
   it('classifies measured-energy config keys', () => {

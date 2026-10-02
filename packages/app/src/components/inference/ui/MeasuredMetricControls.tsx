@@ -7,29 +7,41 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { track } from '@/lib/analytics';
+import {
+  ALL_IN_MEASURED_NOTE,
+  POWER_BASES,
+  POWER_BASIS_LABELS,
+  type PowerBasis,
+} from '@/lib/power-basis';
 import { useLocale } from '@/lib/use-locale';
 import {
   changeMeasuredMetricConfig,
   getMeasuredMetricConfig,
   type MeasuredMetricConfigChange,
 } from '../measured-metric-config';
+import type { PowerCompare } from '../types';
+import { POWER_COMPARE_MODES, powerCompareAvailable } from '../utils/power-compare';
 
 const STRINGS = {
   en: {
+    basis: 'Boundary',
+    basisHelp:
+      'Choose GPU-only or all-in power, including server overhead and PUE. Provisioned values use rated capacity; measured values start from GPU telemetry. Points without the selected value are omitted.',
     scope: 'Scope',
     scopeHelp:
       'All GPUs measures the whole deployment. Prefill and decode select only GPUs serving that role.',
     all: 'All GPUs',
     prefill: 'Prefill GPUs',
     decode: 'Decode GPUs',
-    statistic: 'Statistic',
+    statistic: 'Power statistic',
     statisticHelp:
       'P75 and P90 are time-weighted percentiles of synchronized fleet power, divided by chip count. They are available for all GPUs only.',
     average: 'Average',
-    roleHint: 'Prefill and decode power support Average only.',
     display: 'Display',
     displayHelp:
-      'Power per chip in watts, or average power as a percentage of chip TDP. Percent of TDP is available for the all-GPU average only.',
+      'Power per chip in watts, average power as a percentage of chip TDP, or the per-second telemetry timeline behind the average. Percent of TDP and Timeline are available for the all-GPU average only.',
+    timeline: 'Timeline',
     denominator: 'Per',
     denominatorHelp:
       'Choose the energy denominator. All-GPU energy per input or output token includes the whole deployment; role energy is selected separately under Scope.',
@@ -40,21 +52,30 @@ const STRINGS = {
     unit: 'Unit',
     unitHelp:
       'Energy is shown in joules. Energy per successful query can also be shown in watt-hours.',
+    compare: 'Compare',
+    compareHelp:
+      'Compare power boundaries or prefill and decode on the same benchmark points. Role energy uses a common output-token denominator. Available for average W/chip and J per output token.',
+    compareNone: 'Off',
+    compareBoundaries: 'All boundaries',
+    compareRoles: 'Prefill vs decode',
   },
   zh: {
+    basis: '功耗边界',
+    basisHelp:
+      '选择仅统计 GPU，或计入服务器其他组件及 PUE 的整体功耗。预配值按额定容量计算，实测值以 GPU 遥测为基础。缺少所选数值的数据点不绘制。',
     scope: '统计范围',
     scopeHelp: '全部 GPU 对应整个部署；预填充和解码仅统计承担相应任务的 GPU。',
     all: '全部 GPU',
     prefill: '预填充 GPU',
     decode: '解码 GPU',
-    statistic: '统计量',
+    statistic: '功耗统计量',
     statisticHelp:
       'P75 和 P90 是同步采样的集群总功率按时间加权得到的分位数，再除以芯片数。仅支持全部 GPU。',
     average: '平均值',
-    roleHint: '预填充和解码功率仅支持平均值。',
     display: '显示方式',
     displayHelp:
-      '显示单芯片功率（瓦），或平均功率占芯片 TDP 的百分比。TDP 百分比仅支持全部 GPU 的平均功率。',
+      '显示单芯片功率（瓦）、平均功率占芯片 TDP 的百分比，或平均值背后的逐秒遥测时间线。TDP 百分比和时间线仅支持全部 GPU 的平均功率。',
+    timeline: '时间线',
     denominator: '能耗分母',
     denominatorHelp:
       '选择能耗的分母。按输入或输出 token 归一化的全部 GPU 能耗仍包含整个部署；预填充或解码能耗需在统计范围中单独选择。',
@@ -64,21 +85,39 @@ const STRINGS = {
     query: '成功请求',
     unit: '单位',
     unitHelp: '能耗以焦耳显示；每个成功请求的能耗也可显示为瓦时。',
+    compare: '对比',
+    compareHelp:
+      '在同一批基准测试数据点上对比不同功耗边界，或预填充与解码。各角色的能耗统一按输出 token 归一化。支持平均 W/芯片和每输出 token 能耗。',
+    compareNone: '关闭',
+    compareBoundaries: '全部边界',
+    compareRoles: '预填充 vs 解码',
   },
 } as const;
 
 export function MeasuredMetricControls({
   metric,
   onChange,
+  compare = 'none',
+  onCompareChange,
 }: {
   metric: string;
   onChange: (metric: string) => void;
+  /** Comparison series overlaid on the metric (`i_pcompare`). */
+  compare?: PowerCompare;
+  onCompareChange?: (mode: PowerCompare) => void;
 }) {
-  const t = STRINGS[useLocale()];
+  const locale = useLocale();
+  const t = STRINGS[locale];
   const config = getMeasuredMetricConfig(metric);
   if (!config) return null;
+  const compareLabels: Record<PowerCompare, string> = {
+    none: t.compareNone,
+    boundaries: t.compareBoundaries,
+    roles: t.compareRoles,
+  };
   const change = (next: MeasuredMetricConfigChange) =>
     onChange(changeMeasuredMetricConfig(metric, next));
+  const basisId = `measured-${config.family}-basis`;
   const scopeId = `measured-${config.family}-scope`;
   const roleScope =
     config.family === 'energy'
@@ -91,9 +130,31 @@ export function MeasuredMetricControls({
 
   return (
     <div
-      className="col-span-full grid min-w-0 gap-3 sm:grid-cols-3"
+      className="col-span-full grid min-w-0 grid-cols-[repeat(auto-fit,minmax(min(100%,12rem),1fr))] gap-3"
       data-testid="measured-metric-controls"
     >
+      <div className="flex min-w-0 flex-col gap-1.5">
+        <LabelWithTooltip htmlFor={basisId} label={t.basis} tooltip={t.basisHelp} />
+        <Select
+          value={config.basis}
+          onValueChange={(value) => {
+            const basis = value as PowerBasis;
+            track('inference_power_basis_changed', { basis, family: config.family });
+            change({ basis });
+          }}
+        >
+          <SelectTrigger id={basisId} data-testid={basisId} className="w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent portalled={false}>
+            {POWER_BASES.map((basis) => (
+              <SelectItem key={basis} value={basis} data-value={basis}>
+                {POWER_BASIS_LABELS[basis][locale]}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
       {config.family === 'energy' && (
         <div className="flex min-w-0 flex-col gap-1.5">
           <LabelWithTooltip
@@ -159,7 +220,7 @@ export function MeasuredMetricControls({
               role="group"
               size="default"
               className="w-full"
-              buttonClassName="flex-1 justify-center"
+              buttonClassName="min-w-max flex-auto justify-center"
               ariaLabel={t.statistic}
               value={config.statistic}
               onValueChange={(statistic) => change({ statistic })}
@@ -204,12 +265,16 @@ export function MeasuredMetricControls({
                 >
                   % TDP
                 </SelectItem>
+                <SelectItem
+                  value="timeline"
+                  data-value="timeline"
+                  disabled={config.scope !== 'all' || config.statistic !== 'average'}
+                >
+                  {t.timeline}
+                </SelectItem>
               </SelectContent>
             </Select>
           </div>
-          {config.scope !== 'all' && (
-            <p className="col-span-full text-xs text-muted-foreground">{t.roleHint}</p>
-          )}
         </>
       ) : (
         <div className="flex min-w-0 flex-col gap-1.5">
@@ -236,6 +301,51 @@ export function MeasuredMetricControls({
             </SelectContent>
           </Select>
         </div>
+      )}
+      {onCompareChange && (
+        <div className="flex min-w-0 flex-col gap-1.5">
+          <LabelWithTooltip
+            htmlFor="measured-power-compare"
+            label={t.compare}
+            tooltip={t.compareHelp}
+          />
+          <Select
+            value={compare}
+            onValueChange={(value) => {
+              const mode = value as PowerCompare;
+              track('inference_power_compare_changed', { mode, family: config.family });
+              onCompareChange(mode);
+            }}
+          >
+            <SelectTrigger
+              id="measured-power-compare"
+              data-testid="measured-power-compare"
+              className="w-full"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent portalled={false}>
+              {POWER_COMPARE_MODES.map((mode) => (
+                <SelectItem
+                  key={mode}
+                  value={mode}
+                  data-value={mode}
+                  disabled={!powerCompareAvailable(metric, mode)}
+                >
+                  {compareLabels[mode]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+      {(config.basis === 'utility-modeled' || compare === 'boundaries') && (
+        <p
+          className="col-span-full text-xs text-muted-foreground"
+          data-testid="all-in-measured-note"
+        >
+          {ALL_IN_MEASURED_NOTE[locale]}
+        </p>
       )}
     </div>
   );

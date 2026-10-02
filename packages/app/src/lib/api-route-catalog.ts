@@ -139,7 +139,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-inference-view',
-    sourceSha256: 'de9192086b27e530ad6b1ece082b4989b3a9771a78195ae9f6d1c3899519588f',
+    sourceSha256: 'bafac08dbe6e6e4b75dd15987e79f84b514f3e93351149ad44b296f6dd2a9662',
   },
   {
     source: 'src/app/api/v1/views/options/route.ts',
@@ -147,7 +147,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-view-options',
-    sourceSha256: '79571c3e6faf5af977c1afc9c29ebd6c1bfeb54ccf389711fa49668466fb58f4',
+    sourceSha256: 'ceba9504cfc50cb37748c9455f22dca9813789eb0148da740b24678bb540fb27',
   },
   {
     source: 'src/app/api/v1/views/overview/route.ts',
@@ -844,6 +844,54 @@ export interface ApiContractSourceDigest {
  */
 export const apiContractSourceDigests = [
   {
+    source: 'src/components/inference/utils/resolveXAxisField.ts',
+    sourceSha256: '4783579c7b3c1a21b91968cb03e9c35a57a85251f4992cb5667a855ba7c77497',
+    reviewArea: {
+      en: 'Shared service-axis resolution: fixed-sequence mean/median, reciprocal mean TPOT, and AgentX percentile isolation.',
+      zh: '共用服务轴解析：固定长度工作负载 mean/median、mean TPOT 的倒数，以及 AgentX 独立的分位数选择。',
+    },
+  },
+  {
+    source: 'src/components/inference/utils/equal-service-comparison.ts',
+    sourceSha256: 'ff06f0eb908b6912706bb8dc67d931698d9cbd356546f20850ea8221fedc9354',
+    reviewArea: {
+      en: 'Source-scoped equal-service interpolation, comparator-relative changes, endpoint provenance, prefill share projection and role points.',
+      zh: '按完整来源限定的同等服务插值、相对基准变化、端点来源、prefill 占比视图以及各角色数据点。',
+    },
+  },
+  {
+    source: 'src/components/inference/utils/matched-concurrency.ts',
+    sourceSha256: 'db81deeff9e6ff64f607b71751d18acc59626f43fecbe037145e3a55c4fe959f',
+    reviewArea: {
+      en: 'Same-concurrency pairing of two exact sources: missing and conflicting observations, signed comparator-relative changes, no interpolation.',
+      zh: '两个完整来源在相同并发下的配对：缺失与冲突观测、相对基准的带符号变化，不做插值。',
+    },
+  },
+  {
+    source: 'src/components/inference/utils/power-fit.ts',
+    sourceSha256: 'a1e30d09648b74897e283b67a4e63e2591a485ed0f92e00acbe606b75967444a',
+    reviewArea: {
+      en: 'Per-source least-squares power fit on output per allocated GPU: intercept, marginal J/token, R², fitted range and registry TDP.',
+      zh: '按来源对每个已分配 GPU 的输出做最小二乘功耗拟合：截距、边际 J/token、R²、拟合范围与注册表 TDP。',
+    },
+  },
+  {
+    source: 'src/components/inference/utils/role-energy.ts',
+    sourceSha256: '36b1ceda97af99731482ed815167a660f1619ab94c2956afe11cf72d58fa5380',
+    reviewArea: {
+      en: 'Validated prefill/decode energy reconstruction and shares on a common output-token denominator.',
+      zh: '使用统一 output token 分母的已验证 prefill/decode 能耗重建与占比。',
+    },
+  },
+  {
+    source: 'src/lib/benchmark-transform.ts',
+    sourceSha256: '53fb9102b1ddd0c597b3b2a414894564d2deda3da5ea2cf0059f997b2db852c8',
+    reviewArea: {
+      en: 'Raw benchmark means and derived reciprocal mean-TPOT interactivity used by Dashboard and read-only views.',
+      zh: '仪表板和只读视图共用的原始 benchmark 均值与 mean TPOT 倒数形式的 interactivity。',
+    },
+  },
+  {
     source: '../db/src/etl/power-audit-validations.ts',
     sourceSha256: '44a607747b79d038bb8f4e53590efba689d376c143f50a5d750d3552faa0c442',
     reviewArea: {
@@ -853,7 +901,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/gpu-power/power-audit-bundle.ts',
-    sourceSha256: '96aa2ed60692116d5b5219b90b562fdc8143b63359bd917bbc91812ffaf274a8',
+    sourceSha256: '21607a0bc3795c545d7f84bb7af2558624a8d1e054e7c92b9203ae94825d1804',
     reviewArea: {
       en: 'Artifact Timeline validation windows, strict nested AgentX result identity, adjacent context selection, timezone normalization and device identity semantics.',
       zh: '产物 Timeline 验证窗口、严格匹配的嵌套 AgentX result 身份、相邻 context 选择、时区规范化及设备身份语义。',
@@ -869,7 +917,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/gpu-power/types.ts',
-    sourceSha256: 'e8c5460821f5d8228bcf8b7dd087abe14e29a8e220e1d8bcd75112fb5ead1baa',
+    sourceSha256: '9f4e90196e912af9e02ade8521321f35d804c25c02eca847a1b5717581740a42',
     reviewArea: {
       en: 'GPU telemetry units, missing values, timestamp deduplication, and full-record live statistics definitions.',
       zh: 'GPU 遥测单位、缺失值、时间戳去重，以及实时产物全记录统计的定义。',
@@ -931,7 +979,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/components/inference/hooks/chart-data-core.ts',
-    sourceSha256: '0c86987ed025557172a8d020144ca462be1ecac880d53b7d929f93a617086c33',
+    sourceSha256: '8601c33f6979541786362276697e4d4a21278de1d57b50d31f705391b5da041d',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -967,7 +1015,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/calculator-extensions.ts',
-    sourceSha256: '0e2b050b483b505b9118336f6639594c8f82470e885c6356c4f2dc5790d39fec',
+    sourceSha256: '2bcd27b5f5fbea9dcd75b32f7ee88e1c92343bed3ff65a293fc9a8ff5ecf04c3',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -985,7 +1033,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/series.ts',
-    sourceSha256: 'b5ebddee9d9ea6b85a8fdab2cf8fcc50bbf05e0fa10564987698abd38a6d4488',
+    sourceSha256: '9974fe5166ac847f4b9284eda8a901ee0f9c8b432567ef184890453c715d2f4f',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -994,7 +1042,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/registry.ts',
-    sourceSha256: '2f787cabdb65a3549eb2fbd1ce7d3929dd5e5b18d7f34fce1fd7af26100b7954',
+    sourceSha256: '9f07c3bae5ec76f47b562143d52632dd186f132cd0e117848a0fa1d7d018f3ea',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',

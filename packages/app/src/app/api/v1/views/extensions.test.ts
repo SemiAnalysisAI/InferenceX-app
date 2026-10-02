@@ -416,7 +416,7 @@ describe('new dashboard projections', () => {
         expect(output.skipped).toEqual([]);
         expect(output.rows.map((row: { powerLabel: string }) => row.powerLabel)).toEqual(
           powerBasis === 'compare'
-            ? ['Provisioned', 'Measured + modeled · Full-chassis extrapolation']
+            ? ['All in Provisioned', 'All in Measured · Full-chassis extrapolation']
             : ['Full-chassis extrapolation'],
         );
       }

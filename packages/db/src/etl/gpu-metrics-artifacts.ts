@@ -77,28 +77,11 @@ function isGpuMetricsCsvName(fileName: string): boolean {
   return !lower.includes('_identity') && !lower.includes('_energy_');
 }
 
-/** Recursively list every telemetry CSV under an extracted artifact root. */
-export function listGpuMetricsCsvFiles(root: string): GpuMetricsCsvFile[] {
-  if (!fs.existsSync(root) || !fs.statSync(root).isDirectory()) return [];
-  const files: GpuMetricsCsvFile[] = [];
-  const visit = (directory: string): void => {
-    for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
-      const pathname = path.join(directory, entry.name);
-      if (entry.isDirectory()) visit(pathname);
-      else if (entry.isFile() && isGpuMetricsCsvName(entry.name)) {
-        files.push({
-          fileName: path.relative(root, pathname).split(path.sep).join('/'),
-          path: pathname,
-        });
-      }
-    }
-  };
-  visit(root);
-  return files.toSorted((a, b) => a.fileName.localeCompare(b.fileName));
-}
-
-/** Every multinode power CSV under an extracted `power_audit_` root. */
-export function listMultinodePowerSampleFiles(root: string): GpuMetricsCsvFile[] {
+/** Recursively list the files under `root` whose POSIX-relative name passes `matches`. */
+function listFiles(
+  root: string,
+  matches: (fileName: string, baseName: string) => boolean,
+): GpuMetricsCsvFile[] {
   if (!fs.existsSync(root) || !fs.statSync(root).isDirectory()) return [];
   const files: GpuMetricsCsvFile[] = [];
   const visit = (directory: string): void => {
@@ -107,7 +90,7 @@ export function listMultinodePowerSampleFiles(root: string): GpuMetricsCsvFile[]
       if (entry.isDirectory()) visit(pathname);
       else if (entry.isFile()) {
         const fileName = path.relative(root, pathname).split(path.sep).join('/');
-        if (isMultinodePowerSamplesPath(fileName)) files.push({ fileName, path: pathname });
+        if (matches(fileName, entry.name)) files.push({ fileName, path: pathname });
       }
     }
   };
@@ -115,12 +98,19 @@ export function listMultinodePowerSampleFiles(root: string): GpuMetricsCsvFile[]
   return files.toSorted((a, b) => a.fileName.localeCompare(b.fileName));
 }
 
+/** Recursively list every telemetry CSV under an extracted artifact root. */
+export function listGpuMetricsCsvFiles(root: string): GpuMetricsCsvFile[] {
+  return listFiles(root, (_fileName, baseName) => isGpuMetricsCsvName(baseName));
+}
+
+/** Every multinode power CSV under an extracted `power_audit_` root. */
+export function listMultinodePowerSampleFiles(root: string): GpuMetricsCsvFile[] {
+  return listFiles(root, isMultinodePowerSamplesPath);
+}
+
 /** The producer manifest next to `samples.csv`; null when absent or malformed. */
 export function readMultinodePowerManifest(samplesPath: string): Record<string, unknown> | null {
-  const parsed = readJsonIfPresent(path.join(path.dirname(samplesPath), 'manifest.json'));
-  return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
-    ? (parsed as Record<string, unknown>)
-    : null;
+  return readJsonObjectIfPresent(path.join(path.dirname(samplesPath), 'manifest.json'));
 }
 
 /** Preserve window boundaries and role overrides before GitHub artifact expiry. */
@@ -165,6 +155,14 @@ function readJsonIfPresent(pathname: string): unknown | null {
   } catch {
     return null;
   }
+}
+
+/** Like `readJsonIfPresent`, but only a plain JSON object counts as present. */
+function readJsonObjectIfPresent(pathname: string): Record<string, unknown> | null {
+  const parsed = readJsonIfPresent(pathname);
+  return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+    ? (parsed as Record<string, unknown>)
+    : null;
 }
 
 /** `gpu,total_energy_consumption` two-column CSV → { "<gpu>": joules }. */
@@ -217,11 +215,8 @@ export function readGpuMetricsSidecars(csvPath: string): GpuMetricsSidecars {
     )
     .sort();
   for (const entry of contextFiles) {
-    const parsed = readJsonIfPresent(path.join(dir, entry));
-    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-      context = parsed as Record<string, unknown>;
-      break;
-    }
+    context = readJsonObjectIfPresent(path.join(dir, entry));
+    if (context) break;
   }
   const energyStartPath = path.join(dir, 'gpu_metrics_energy_start.csv');
   const energyEndPath = path.join(dir, 'gpu_metrics_energy_end.csv');
