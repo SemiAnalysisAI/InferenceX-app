@@ -1,5 +1,6 @@
 import * as d3 from 'd3';
 import { invalidateTooltipGeometry } from '@/lib/d3-chart/layers/scatter-points';
+import { installTouchInputTracking, isTouchCompatMouseEvent } from '@/lib/d3-chart/touch-input';
 
 export interface OverlayTooltipHandle<T> {
   isPinned: () => boolean;
@@ -50,9 +51,13 @@ export function attachOverlayXMarkerHandlers<T>(
     options.tooltip.style('left', `${position.left}px`).style('top', `${position.top}px`);
   };
 
+  installTouchInputTracking();
+
   points
-    .on('mouseenter', function (_event, data) {
+    .on('mouseenter', function (event, data) {
       if (options.handle?.isPinned()) return;
+      // Let taps reach the pinning click handler (see touch-input.ts).
+      if (isTouchCompatMouseEvent(event)) return;
       d3.select(this)
         .select(options.markerSelector)
         .attr('d', options.hoverPath)
@@ -67,6 +72,7 @@ export function attachOverlayXMarkerHandlers<T>(
     })
     .on('mousemove', (event) => {
       if (options.handle?.isPinned()) return;
+      if (isTouchCompatMouseEvent(event)) return;
       positionTooltip(event);
     })
     .on('mouseleave', function () {
