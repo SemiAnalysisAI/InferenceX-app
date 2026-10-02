@@ -258,7 +258,7 @@ describe('component CSS harness', () => {
   });
 
   for (const width of [390, 1280]) {
-    for (const theme of ['light', 'dark', 'minecraft']) {
+    for (const theme of ['light', 'dark', 'minecraft', 'csgo']) {
       it(`keeps selected segments concentric with their outlines at ${width}px in ${theme} mode`, () => {
         cy.viewport(width, 720);
         cy.mount(

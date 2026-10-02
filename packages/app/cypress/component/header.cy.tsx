@@ -37,7 +37,7 @@ describe('Header', () => {
             <ThemeProvider
               attribute="class"
               defaultTheme="light"
-              themes={['light', 'dark', 'minecraft']}
+              themes={['light', 'dark', 'minecraft', 'csgo']}
               disableTransitionOnChange
             >
               <Header />
@@ -248,7 +248,7 @@ describe('Header', () => {
 
   it('uses the same resting icon color and shape for all three header utilities in each theme', () => {
     cy.viewport(390, 844);
-    for (const theme of ['light', 'dark', 'minecraft']) {
+    for (const theme of ['light', 'dark', 'minecraft', 'csgo']) {
       cy.get('[data-testid="theme-toggle"]').should(
         'have.attr',
         'aria-label',

@@ -3,7 +3,7 @@
 @import './motion.css';
 @plugin '@tailwindcss/typography';
 
-@custom-variant dark (&:is(.dark *, .minecraft *));
+@custom-variant dark (&:is(.dark *, .minecraft *, .csgo *));
 @custom-variant minecraft (&:is(.minecraft *));
 
 /* Allow hash navigation to clear the fixed navbar */
@@ -54,11 +54,11 @@
   color: #7e22ce;
 }
 
-:is(.dark, .minecraft) .halloween-wordmark {
+:is(.dark, .minecraft, .csgo) .halloween-wordmark {
   color: #fb923c;
 }
 
-:is(.dark, .minecraft) .halloween-wordmark-x {
+:is(.dark, .minecraft, .csgo) .halloween-wordmark-x {
   color: #c084fc;
 }
 
@@ -299,7 +299,8 @@ html[data-inferencex-embed] .autumn-leaves {
   --overlay-run-7: oklch(0.6 0.17 60); /* amber-orange */
 }
 
-.dark {
+.dark,
+.csgo {
   /* Base Theme Colors */
   --background: #131416;
   --foreground: #eaebec;
@@ -342,6 +343,112 @@ html[data-inferencex-embed] .autumn-leaves {
   --overlay-run-5: oklch(0.7 0.22 330);
   --overlay-run-6: oklch(0.72 0.2 230);
   --overlay-run-7: oklch(0.78 0.18 60);
+}
+
+/* CS:GO keeps dark chart/vendor palettes; gold belongs to interface chrome. */
+.csgo {
+  color-scheme: dark;
+  --background: #101820;
+  --foreground: #f0eee7;
+  --card: #18232d;
+  --card-foreground: #f0eee7;
+  --popover: #1b2732;
+  --popover-foreground: #f0eee7;
+  --primary: #e6bd68;
+  --primary-foreground: #101820;
+  --secondary: #8eb7d4;
+  --secondary-foreground: #101820;
+  --muted: #293744;
+  --muted-foreground: #b9c3ca;
+  --accent: #303e49;
+  --accent-foreground: #f0eee7;
+  --border: #60707c;
+  --border-alt: #35444e;
+  --input: #60707c;
+  --ring: #e6bd68;
+  --sidebar: #18232d;
+  --sidebar-foreground: #f0eee7;
+  --sidebar-primary: #e6bd68;
+  --sidebar-primary-foreground: #101820;
+  --sidebar-accent: #303e49;
+  --sidebar-accent-foreground: #f0eee7;
+  --sidebar-border: #60707c;
+  --sidebar-ring: #e6bd68;
+  --radius: 0.125rem;
+}
+
+.csgo-scene {
+  position: fixed;
+  inset: 0;
+  z-index: -10;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.csgo-scene-image,
+.csgo-scene-shade {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  inset: 0;
+}
+
+.csgo-scene-image {
+  object-fit: cover;
+  object-position: center top;
+}
+
+.csgo-scene-shade {
+  background: linear-gradient(180deg, #10182088, #101820d9 65%, #101820f5);
+}
+
+.csgo-theme-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-block: 1rem;
+  padding: 0.5rem 1rem;
+  border-left: 3px solid var(--primary);
+  background: linear-gradient(90deg, #18232deb, #18232d66);
+}
+
+.csgo-theme-banner img {
+  width: clamp(10rem, 22vw, 15rem);
+  height: auto;
+}
+
+.csgo-theme-banner span {
+  flex-shrink: 0;
+}
+
+.csgo header {
+  background: #101820ed;
+  border-bottom: 2px solid var(--primary);
+}
+
+.csgo :is(button, [role='button'], [role='combobox'], input, textarea):focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 3px;
+}
+
+.csgo :is([data-slot='card'], [data-slot='select-trigger'], [data-slot='tabs-list']) {
+  border-radius: var(--radius);
+}
+
+.csgo [data-slot='card'] {
+  background-color: #18232df5;
+  border-top-color: var(--primary);
+}
+
+.csgo .circuit-bg,
+.csgo .autumn-leaves,
+html[data-inferencex-embed] .csgo-scene {
+  display: none;
+}
+
+html[data-inferencex-embed] [data-testid='csgo-theme-banner'] {
+  display: none;
 }
 
 /* ── Minecraft Theme ── */
@@ -465,7 +572,9 @@ html[data-inferencex-embed] .autumn-leaves {
 
 /* Shiki code blocks: reuse dark theme in minecraft mode */
 .minecraft .shiki,
-.minecraft .shiki span {
+.minecraft .shiki span,
+.csgo .shiki,
+.csgo .shiki span {
   color: var(--shiki-dark);
   background-color: var(--shiki-dark-bg);
 }
