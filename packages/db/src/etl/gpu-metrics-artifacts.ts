@@ -65,7 +65,7 @@ export function gpuMetricsArtifactSuffix(artifactName: string): string | null {
   return null;
 }
 
-/** The nvidia-smi/amd-smi CSV carries clocks, utilization and temperature; the power bundle only power. */
+/** Native bundles supplement power with optional fields supplied by their producer generation. */
 export function isPowerAuditArtifact(artifactName: string): boolean {
   return artifactName.startsWith(POWER_AUDIT_ARTIFACT_PREFIX);
 }

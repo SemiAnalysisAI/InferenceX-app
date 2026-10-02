@@ -301,3 +301,57 @@ describe('PowerX Chinese route', () => {
     });
   });
 });
+
+const nativeTemperatureResponse = {
+  ...gpuMetricsResponse,
+  artifacts: [
+    {
+      name: 'power_audit_native/LOGS/power/samples.csv#node-a',
+      data: [
+        { timestamp: '2026-08-23T10:00:00Z', index: 0, power: 400, temperature: 65.5 },
+        { timestamp: '2026-08-23T10:00:01Z', index: 0, power: 410 },
+        { timestamp: '2026-08-23T10:00:02Z', index: 0, power: 420, temperature: 0 },
+      ],
+    },
+    {
+      name: 'power_audit_native/LOGS/power/samples.csv#node-b',
+      data: [{ timestamp: '2026-08-23T10:00:00Z', index: 0, power: 300 }],
+    },
+  ],
+};
+
+describe('Native GPU temperature', () => {
+  for (const [locale, width, label] of [
+    ['en', 1440, 'Temperature'],
+    ['zh', 390, '温度'],
+  ] as const) {
+    it(`shows measured Celsius and keeps missing host temperatures unavailable (${locale})`, () => {
+      cy.viewport(width, 900);
+      cy.intercept('GET', '**/api/gpu-metrics?runId=12345', nativeTemperatureResponse).as(
+        'nativeMetrics',
+      );
+      cy.visit(`${locale === 'zh' ? '/zh' : ''}/gpu-metrics?gm_runId=12345&gm_metric=temperature`, {
+        onBeforeLoad(win) {
+          win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+          win.localStorage.setItem('inferencex-feature-gate', '1');
+        },
+      });
+      cy.wait('@nativeMetrics');
+      cy.get('[data-testid="gpu-metrics-metric-select"]').should('contain.text', `${label} (°C)`);
+      cy.get('[data-testid="gpu-metrics-chart-svg"] svg').should('contain.text', `${label} (°C)`);
+      cy.get('[data-testid="gpu-metrics-chart-svg"] svg .point').should('have.length', 2);
+      cy.get('[data-testid="gpu-metrics-display"] table').should('contain.text', '65.5');
+      cy.get('[data-testid="gpu-metrics-display-mode-points"]').click();
+      cy.get('[data-testid="gpu-metrics-chart-svg"]').scrollIntoView();
+      cy.screenshot(`native-temperature-${locale}-${width}`, { capture: 'viewport' });
+      cy.document().then((doc) => {
+        expect(doc.documentElement.scrollWidth).to.be.at.most(doc.documentElement.clientWidth);
+      });
+      cy.get('[data-testid="gpu-metrics-artifact-select"]').click();
+      cy.get('[role="option"]').contains('node-b').click();
+      cy.get('[data-testid="gpu-metrics-metric-select"]').should('not.contain.text', label).click();
+      cy.get('[role="option"]').should('not.contain.text', label);
+      cy.get('body').type('{esc}');
+    });
+  }
+});

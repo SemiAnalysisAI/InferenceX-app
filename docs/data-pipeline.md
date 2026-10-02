@@ -548,10 +548,11 @@ still paired by the bare suffix). The multinode template uploads no `gpu_metrics
 artifact; its telemetry travels inside `power_audit_<suffix>` as
 `LOGS/power/samples.csv`, one deployment-wide CSV written by srt-slurm's
 `dcgm-power` collector (`timestamp_unix, hostname, gpu_index, gpu_uuid, power_w`,
-power only). `etl/multinode-power-samples.ts` regroups it per host and the ingest
+with optional `temperature_c` in samples schema v3). `etl/multinode-power-samples.ts` regroups it per host and the ingest
 stores one series per host (`file_name` = `LOGS/power/samples.csv#<hostname>`),
-so multinode and disaggregated points get per-GPU power curves with null clocks,
-temperature and utilization. Single-node jobs upload a `power_audit_` bundle too,
+so multinode and disaggregated points get per-GPU power and available temperature
+curves, with null clocks and utilization. Missing/invalid temperature stays null;
+zero Celsius remains a real reading. Historical v1/v2 files remain readable. Single-node jobs upload a `power_audit_` bundle too,
 so discovery and backfill pairing use it only for a suffix with no `gpu_metrics_`
 upload. The PowerX explorer used to download and parse the artifacts from GitHub
 on every request and lost them after GitHub's 90-day retention. CI ingest now
@@ -618,7 +619,10 @@ missing siblings, including other windows in the same bundle, use source-level D
 merging. Unavailable artifacts leave healthy DB traces readable with explicit missing
 sources. `sourceCoverage` describes only the requested identities; legacy GET reports
 coverage unknown. Plain CSV fallback applies the adjacent context timezone just like
-ingest and bundle reads. Raw multi-file artifacts retain separate file/host series.
+ingest and bundle reads. Raw multi-file artifacts retain separate file/host series. Raw GitHub fallback also
+reads native `power_audit_` sample bundles when no legacy CSV sibling exists,
+exposing optional GPU temperature through the existing Temperature selector and
+Celsius statistics. The producer must emit samples v3 before new runs gain this field.
 Successful reads and storage errors use no-store.
 
 AgentX nested validation documents are matched to the exact root result and retained

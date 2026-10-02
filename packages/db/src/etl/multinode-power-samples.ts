@@ -8,13 +8,13 @@
  *
  *   schema_version,timestamp_unix,scrape_seq,hostname,gpu_index,gpu_uuid,power_w
  *
- * Only power is scraped, so every other `GpuMetricSample` field stays null and
- * the digest carries `powerW` alone. Rows are regrouped per host so each host
+ * Version 3 adds optional GPU temperature in Celsius. Missing temperature
+ * stays null, including in historical power-only files. Rows are regrouped per host; each host
  * becomes its own series, the shape the reader already uses for multinode
  * staging ("one CSV per node"). Pure module: no I/O.
  */
 
-import { splitCsvLine, type GpuMetricSample, type GpuMetricsVendor } from './gpu-metrics-csv.js';
+import { splitCsvLine, type GpuMetricSample, type GpuMetricsVendor } from './gpu-metrics-csv';
 
 export interface MultinodePowerHost {
   hostname: string;
@@ -32,7 +32,7 @@ export function isMultinodePowerSamplesPath(relativePath: string): boolean {
   return /^LOGS\/(?:[^/]+\/)*samples\.csv$/u.test(posix);
 }
 
-function powerOnlySample(timestampMs: number, gpuIndex: number, powerW: number): GpuMetricSample {
+function powerSample(timestampMs: number, gpuIndex: number, powerW: number): GpuMetricSample {
   return {
     timestampMs,
     gpuIndex,
@@ -90,7 +90,14 @@ export function parseMultinodePowerSamples(csvText: string): MultinodePowerHost[
       host = { hostname, samples: [], gpuUuids: {} };
       hosts.set(hostname, host);
     }
-    host.samples.push(powerOnlySample(Math.round(seconds * 1000), gpuIndex, powerW));
+    const sample = powerSample(Math.round(seconds * 1000), gpuIndex, powerW);
+    const temperatureText = at(cells, 'temperature_c');
+    const temperature = temperatureText ? Number(temperatureText) : Number.NaN;
+    // DCGM reserves INT32_BLANK and larger values for unavailable readings.
+    if (Number.isFinite(temperature) && temperature >= -273.15 && temperature < 2147483632) {
+      sample.temperatureC = temperature;
+    }
+    host.samples.push(sample);
     const uuid = at(cells, 'gpu_uuid');
     if (uuid && !(gpuIndex in host.gpuUuids)) host.gpuUuids[gpuIndex] = uuid;
   }
