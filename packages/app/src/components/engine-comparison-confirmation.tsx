@@ -15,16 +15,14 @@ const STRINGS = {
   en: {
     title: 'Compare vLLM and SGLang on the same SKU?',
     description:
-      'These results use different inference implementations. The winner can change with the workload, metric, and operating range. Showing both is not a claim that either engine is universally better.',
-    agreement: 'By continuing, I agree not to use this comparison to start vLLM vs SGLang drama.',
+      'By continuing to display vLLM & SGLang on the same hardware SKU, I agree not to use this comparison to start vLLM vs SGLang drama on twitter or XHS or other forums',
     cancel: 'Cancel',
     confirm: 'I agree, show both',
   },
   zh: {
     title: '同时显示同一 SKU 上的 vLLM 和 SGLang？',
     description:
-      '这些结果使用不同的推理实现。性能优劣会随工作负载、指标和运行区间而变化。同时显示两者，并不代表某个引擎在所有情况下都更好。',
-    agreement: '继续即表示我同意，不利用这组对比挑起 vLLM 与 SGLang 之间的争论。',
+      '继续显示同一硬件 SKU 上的 vLLM 和 SGLang，即表示我同意不利用这组对比在 Twitter、小红书或其他论坛上挑起 vLLM 与 SGLang 之间的争论。',
     cancel: '取消',
     confirm: '我同意，同时显示',
   },
@@ -54,9 +52,7 @@ export function EngineComparisonConfirmation({
       >
         <DialogHeader>
           <DialogTitle>{t.title}</DialogTitle>
-          <DialogDescription>
-            {t.description} {t.agreement}
-          </DialogDescription>
+          <DialogDescription>{t.description}</DialogDescription>
         </DialogHeader>
         <DialogFooter>
           <Button variant="outline" onClick={onCancel} autoFocus>

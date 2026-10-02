@@ -23,7 +23,10 @@ describe('Engine comparison confirmation', () => {
   it('requires an affirmative agreement and focuses Cancel first', () => {
     cy.mount(<Harness confirm={cy.stub().as('confirm')} cancel={cy.stub().as('cancel')} />);
     cy.focused().should('have.text', 'Cancel');
-    cy.get('[role="dialog"]').should('contain.text', 'agree not to use this comparison');
+    cy.get('[role="dialog"] p').should(
+      'have.text',
+      'By continuing to display vLLM & SGLang on the same hardware SKU, I agree not to use this comparison to start vLLM vs SGLang drama on twitter or XHS or other forums',
+    );
     cy.get('@confirm').should('not.have.been.called');
     cy.contains('button', 'I agree, show both').click();
     cy.get('@confirm').should('have.been.calledOnce');
@@ -42,7 +45,10 @@ describe('Engine comparison confirmation', () => {
         <Harness confirm={cy.stub().as('confirm')} cancel={cy.stub().as('cancel')} />
       </PathnameContext.Provider>,
     );
-    cy.get('[role="dialog"]').should('contain.text', '不利用这组对比挑起');
+    cy.get('[role="dialog"] p').should(
+      'have.text',
+      '继续显示同一硬件 SKU 上的 vLLM 和 SGLang，即表示我同意不利用这组对比在 Twitter、小红书或其他论坛上挑起 vLLM 与 SGLang 之间的争论。',
+    );
     cy.contains('button', '我同意，同时显示').click();
     cy.get('@confirm').should('have.been.calledOnce');
   });
