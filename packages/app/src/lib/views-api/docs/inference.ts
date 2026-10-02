@@ -191,10 +191,10 @@ const parameters: readonly ApiParameter[] = [
     required: false,
     type: 'boolean',
     description: text(
-      'Return only the best series per GPU SKU. Default depends on model and sequence, matching the dashboard.',
-      '仅返回每个 GPU SKU 的最优曲线（对应仪表盘 “Best per SKU” 开关）。',
+      'Defaults to true: rank all candidate frameworks per SKU using the current axes and shared measured range. best=false returns all selected series, including vLLM and SGLang on the same SKU. The dashboard asks for a no-drama acknowledgement before showing both; the read-only API has no interactive consent state. This ranking is not a universal engine winner.',
+      '默认为 true：按当前坐标轴和共同实测区间，对每个 SKU 的所有候选框架进行排名。best=false 返回所有选定曲线，包括同一 SKU 上的 vLLM 和 SGLang。仪表板在同时显示两者前要求确认不挑起争论；只读 API 不保存交互确认状态。此排名不代表某个引擎在所有情况下都更好。',
     ),
-    schema: { type: 'boolean' },
+    schema: { type: 'boolean', default: true },
     example: 'true',
   },
   {
