@@ -51,7 +51,7 @@ export function EngineComparisonConfirmation({
         overlayClassName="z-60"
       >
         <DialogHeader>
-          <DialogTitle>{t.title}</DialogTitle>
+          <DialogTitle className="pr-6">{t.title}</DialogTitle>
           <DialogDescription>{t.description}</DialogDescription>
         </DialogHeader>
         <DialogFooter>
