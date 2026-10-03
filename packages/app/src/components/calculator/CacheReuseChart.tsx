@@ -4,6 +4,7 @@ import * as d3 from 'd3';
 import React, { useMemo, useRef } from 'react';
 
 import type { HardwareConfig } from '@/components/inference/types';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { getHardwareConfig } from '@/lib/constants';
 import { CHART_TYPE, px } from '@/lib/d3-chart/typography';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
@@ -21,6 +22,14 @@ import {
   type CacheReuseResult,
   type CacheTier,
 } from './cache-reuse';
+import {
+  HORIZONTAL_LAYOUT_QUERY,
+  HORIZONTAL_MARGIN,
+  horizontalChartHeight,
+  labelFits,
+  verticalLabelMode,
+  type CacheReuseOrientation,
+} from './cache-reuse-layout';
 
 export const CACHE_REUSE_STRINGS = {
   en: {
@@ -186,8 +195,15 @@ const MARGIN = { top: 16, right: 20, bottom: 64, left: 64 };
 const HEIGHT = 480;
 /** Inner gap between the official and run bars of one concurrency. */
 const SERIES_PADDING = 0.12;
-/** Segments shorter than this draw no percentage; the tooltip still has it. */
-const MIN_LABEL_HEIGHT = 14;
+const LABEL_FONT_SIZE = CHART_TYPE.annotation;
+
+const labelText = (s: Segment) => formatShare(s.y1 - s.y0);
+
+/** Where one bar sits: its slot on the band axis and its thickness. */
+interface BarSlot {
+  start: number;
+  thickness: number;
+}
 
 const CacheReuseChart = React.memo(
   ({
@@ -201,47 +217,69 @@ const CacheReuseChart = React.memo(
     const locale = useLocale();
     const t = CACHE_REUSE_STRINGS[locale];
     const chartRef = useRef<D3ChartHandle | null>(null);
+    const orientation: CacheReuseOrientation = useMediaQuery(HORIZONTAL_LAYOUT_QUERY)
+      ? 'horizontal'
+      : 'vertical';
+    const horizontal = orientation === 'horizontal';
 
     const seriesKeys = useMemo(() => result.series.map((s) => s.key), [result.series]);
     const segments = useMemo(() => segmentsOf(result.bars), [result.bars]);
 
-    const xScale = useMemo(
+    const bandScale = useMemo(
       () => ({
         type: 'band' as const,
-        domain: result.concurrencies.map(String),
-        padding: seriesKeys.length > 1 ? 0.22 : 0.35,
+        // The y range runs bottom-up, so a reversed domain puts the lowest
+        // concurrency on the top row and the sweep reads downward.
+        domain: horizontal
+          ? result.concurrencies.map(String).toReversed()
+          : result.concurrencies.map(String),
+        padding: horizontal ? 0.18 : seriesKeys.length > 1 ? 0.22 : 0.35,
       }),
-      [result.concurrencies, seriesKeys.length],
+      [result.concurrencies, seriesKeys.length, horizontal],
     );
-    const yScale = useMemo(
+    const shareScale = useMemo(
       () => ({ type: 'linear' as const, domain: [0, 1] as [number, number], nice: false }),
       [],
     );
-    const xAxis = useMemo(() => ({ grid: false, label: t.xTitle }), [t]);
-    const yAxis = useMemo(
+    const bandAxis = useMemo(() => ({ grid: false, label: t.xTitle }), [t]);
+    const shareAxis = useMemo(
       () => ({
         label: t.yTitle,
         tickFormat: (d: d3.AxisDomain) => d3.format('.0%')(Number(d)),
-        tickCount: 5,
+        tickCount: horizontal ? 4 : 5,
       }),
-      [t],
+      [t, horizontal],
     );
+    const height = horizontal
+      ? horizontalChartHeight(result.concurrencies.length, seriesKeys.length)
+      : HEIGHT;
 
     const layers = useMemo<CustomLayerConfig[]>(() => {
       const render = (
         group: d3.Selection<SVGGElement, unknown, null, undefined>,
         ctx: RenderContext,
       ) => {
-        const x0 = ctx.xScale as d3.ScaleBand<string>;
-        const y = ctx.yScale as d3.ScaleLinear<number, number>;
-        const x1 = d3
+        const band = (horizontal ? ctx.yScale : ctx.xScale) as d3.ScaleBand<string>;
+        const share = (horizontal ? ctx.xScale : ctx.yScale) as d3.ScaleLinear<number, number>;
+        const inner = d3
           .scaleBand<string>()
           .domain(seriesKeys)
-          .range([0, x0.bandwidth()])
+          .range([0, band.bandwidth()])
           .padding(seriesKeys.length > 1 ? SERIES_PADDING : 0);
-        const slotX = (concurrency: number, seriesKey: string) =>
-          (x0(String(concurrency)) ?? 0) + (x1(seriesKey) ?? 0);
-        const width = x1.bandwidth();
+        const thickness = inner.bandwidth();
+        const slot = (concurrency: number, seriesKey: string): BarSlot => ({
+          start: (band(String(concurrency)) ?? 0) + (inner(seriesKey) ?? 0),
+          thickness,
+        });
+        /** Pixel extent of a share interval along the value axis. */
+        const extent = (from: number, to: number) => Math.abs(share(to) - share(from));
+        const center = (s: Segment) => {
+          const { start } = slot(s.bar.concurrency, s.bar.seriesKey);
+          const mid = (share(s.y0) + share(s.y1)) / 2;
+          return horizontal
+            ? { x: mid, y: start + thickness / 2 }
+            : { x: start + thickness / 2, y: mid };
+        };
 
         group
           .selectAll<SVGRectElement, Segment>('.cr-segment')
@@ -251,32 +289,63 @@ const CacheReuseChart = React.memo(
           .attr('data-tier', (s) => s.tier)
           .attr('data-series', (s) => s.bar.seriesKey)
           .attr('data-conc', (s) => s.bar.concurrency)
-          .attr('x', (s) => slotX(s.bar.concurrency, s.bar.seriesKey))
-          .attr('width', width)
-          .attr('y', (s) => y(s.y1))
-          .attr('height', (s) => Math.max(0, y(s.y0) - y(s.y1)))
+          .each(function (s) {
+            const { start } = slot(s.bar.concurrency, s.bar.seriesKey);
+            const length = Math.max(0, extent(s.y0, s.y1));
+            const rect = d3.select(this);
+            if (horizontal) {
+              rect
+                .attr('x', share(s.y0))
+                .attr('width', length)
+                .attr('y', start)
+                .attr('height', thickness);
+            } else {
+              rect
+                .attr('x', start)
+                .attr('width', thickness)
+                .attr('y', share(s.y1))
+                .attr('height', length);
+            }
+          })
           .attr('fill', (s) => CACHE_TIER_COLORS[s.tier])
           .style('pointer-events', 'none');
 
+        // Horizontal rows read every label upright along the bar. Vertical
+        // columns switch the whole chart to sideways text once the widest
+        // label no longer fits across a column, so no percentage spills over
+        // its neighbour. A segment too short for its label draws none.
+        const rotated =
+          !horizontal &&
+          verticalLabelMode(thickness, segments.map(labelText), LABEL_FONT_SIZE) === 'rotated';
+        const fits = (s: Segment) => {
+          const length = extent(s.y0, s.y1);
+          return horizontal || rotated
+            ? labelFits(labelText(s), LABEL_FONT_SIZE, length, thickness)
+            : labelFits(labelText(s), LABEL_FONT_SIZE, thickness, length);
+        };
+
         group
           .selectAll<SVGTextElement, Segment>('.cr-value')
-          .data(
-            segments.filter((s) => y(s.y0) - y(s.y1) >= MIN_LABEL_HEIGHT),
-            (s) => `${s.bar.key}|${s.tier}`,
-          )
+          .data(segments.filter(fits), (s) => `${s.bar.key}|${s.tier}`)
           .join('text')
           .attr('class', 'cr-value')
-          .attr('x', (s) => slotX(s.bar.concurrency, s.bar.seriesKey) + width / 2)
-          .attr('y', (s) => (y(s.y0) + y(s.y1)) / 2)
+          .attr('data-orientation', rotated ? 'rotated' : 'upright')
+          .attr('x', (s) => center(s).x)
+          .attr('y', (s) => center(s).y)
+          .attr('transform', (s) => {
+            if (!rotated) return null;
+            const { x, y } = center(s);
+            return `rotate(-90 ${x} ${y})`;
+          })
           .attr('dy', '0.35em')
           .attr('text-anchor', 'middle')
-          .attr('font-size', px(CHART_TYPE.annotation))
+          .attr('font-size', px(LABEL_FONT_SIZE))
           .attr('font-weight', '600')
           // Dark ink on the pale tiers, light on the slate one: contrast holds in
           // both themes because the tier colors are fixed, not themed.
           .style('fill', (s) => (s.tier === 'unreused' ? '#f5f5f5' : '#0b0f14'))
           .style('pointer-events', 'none')
-          .text((s) => formatShare(s.y1 - s.y0));
+          .text(labelText);
 
         group
           .selectAll<SVGLineElement, CacheReuseBar>('.cr-ceiling')
@@ -286,10 +355,24 @@ const CacheReuseChart = React.memo(
           )
           .join('line')
           .attr('class', 'cr-ceiling')
-          .attr('x1', (b) => slotX(b.concurrency, b.seriesKey) - 3)
-          .attr('x2', (b) => slotX(b.concurrency, b.seriesKey) + width + 3)
-          .attr('y1', (b) => y(b.share.theoretical!))
-          .attr('y2', (b) => y(b.share.theoretical!))
+          .each(function (b) {
+            const { start } = slot(b.concurrency, b.seriesKey);
+            const at = share(b.share.theoretical!);
+            const line = d3.select(this);
+            if (horizontal) {
+              line
+                .attr('x1', at)
+                .attr('x2', at)
+                .attr('y1', start - 3)
+                .attr('y2', start + thickness + 3);
+            } else {
+              line
+                .attr('x1', start - 3)
+                .attr('x2', start + thickness + 3)
+                .attr('y1', at)
+                .attr('y2', at);
+            }
+          })
           .attr('stroke', 'var(--foreground)')
           .attr('stroke-width', 1.5)
           .attr('stroke-dasharray', '4 3')
@@ -304,9 +387,14 @@ const CacheReuseChart = React.memo(
           .data(result.unmeasured, (u) => `${u.concurrency}|${u.seriesKey}`)
           .join('text')
           .attr('class', 'cr-empty')
-          .attr('x', (u) => slotX(u.concurrency, u.seriesKey) + width / 2)
-          .attr('y', ctx.height - 8)
-          .attr('text-anchor', 'middle')
+          .attr('x', (u) =>
+            horizontal ? 8 : slot(u.concurrency, u.seriesKey).start + thickness / 2,
+          )
+          .attr('y', (u) =>
+            horizontal ? slot(u.concurrency, u.seriesKey).start + thickness / 2 : ctx.height - 8,
+          )
+          .attr('dy', horizontal ? '0.35em' : null)
+          .attr('text-anchor', horizontal ? 'start' : 'middle')
           .attr('font-size', px(CHART_TYPE.dataLabel))
           .style('fill', 'var(--muted-foreground)')
           .style('pointer-events', 'none')
@@ -314,7 +402,7 @@ const CacheReuseChart = React.memo(
           .append('title')
           .text(t.noTiers);
 
-        // One full-height hit target per bar carries the tooltip and, for a run,
+        // One full-length hit target per bar carries the tooltip and, for a run,
         // the palette-colored outline that tells it apart from the official bar.
         return group
           .selectAll<SVGRectElement, CacheReuseBar>('.cr-bar')
@@ -323,17 +411,31 @@ const CacheReuseChart = React.memo(
           .attr('class', 'cr-bar bar')
           .attr('data-series', (b) => b.seriesKey)
           .attr('data-conc', (b) => b.concurrency)
-          .attr('x', (b) => slotX(b.concurrency, b.seriesKey))
-          .attr('width', width)
-          .attr('y', y(1))
-          .attr('height', Math.max(0, ctx.height - y(1)))
+          .each(function (b) {
+            const { start } = slot(b.concurrency, b.seriesKey);
+            const length = Math.max(0, extent(0, 1));
+            const rect = d3.select(this);
+            if (horizontal) {
+              rect
+                .attr('x', share(0))
+                .attr('width', length)
+                .attr('y', start)
+                .attr('height', thickness);
+            } else {
+              rect
+                .attr('x', start)
+                .attr('width', thickness)
+                .attr('y', share(1))
+                .attr('height', length);
+            }
+          })
           .attr('fill', 'transparent')
           .attr('stroke', (b) => (b.runIndex === undefined ? 'none' : overlayRunColor(b.runIndex)))
           .attr('stroke-width', 2)
           .attr('cursor', 'pointer');
       };
       return [{ type: 'custom', key: 'cache-reuse-bars', render }];
-    }, [segments, seriesKeys, result.bars, result.unmeasured, showCeiling, t]);
+    }, [segments, seriesKeys, result.bars, result.unmeasured, showCeiling, t, horizontal]);
 
     const tooltipStateRef = useRef({ hardwareConfig, runInfoByIndex, locale });
     tooltipStateRef.current = { hardwareConfig, runInfoByIndex, locale };
@@ -370,15 +472,15 @@ const CacheReuseChart = React.memo(
         ref={chartRef}
         chartId="cache-reuse"
         data={result.bars}
-        height={HEIGHT}
-        margin={MARGIN}
+        height={height}
+        margin={horizontal ? HORIZONTAL_MARGIN : MARGIN}
         watermark={getChartWatermark()}
         testId="cache-reuse-chart"
         clipContent={false}
-        xScale={xScale}
-        yScale={yScale}
-        xAxis={xAxis}
-        yAxis={yAxis}
+        xScale={horizontal ? shareScale : bandScale}
+        yScale={horizontal ? bandScale : shareScale}
+        xAxis={horizontal ? shareAxis : bandAxis}
+        yAxis={horizontal ? bandAxis : shareAxis}
         layers={layers}
         zoom={zoom}
         instructions={t.instructions}
