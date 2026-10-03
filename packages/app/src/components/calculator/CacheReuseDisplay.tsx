@@ -1,6 +1,5 @@
 'use client';
 
-import { ChevronRightIcon } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 
 import type { CalculatorUrlSeed } from '@/components/calculator/url-seed';
@@ -66,8 +65,6 @@ import { useThroughputData, type GroupMeta } from './useThroughputData';
 const STRINGS = {
   en: {
     title: 'Prefix Cache Reuse',
-    description:
-      'Where prompt tokens come from at each concurrency: HBM cache, host cache, or recomputed.',
     benchmarkGroup: 'Benchmark Config',
     chartGroup: 'Chart Config',
     configLabel: 'Configuration',
@@ -84,13 +81,6 @@ const STRINGS = {
       'None of the measured rows for this configuration reported a prefix-cache tier. Try another configuration or run date.',
     captionSource: 'Source: SemiAnalysis InferenceX',
     unofficialRun: 'Unofficial run',
-    notesSummary: 'How to read this chart',
-    notes: [
-      'Shares come from the runtime’s own prefix-cache counters over all prompt tokens, so HBM, host, and not reused add up to 100%.',
-      'Host is the CPU-offload hit rate. The router’s external-cache rate is used only when no CPU figure is reported; the two are never added.',
-      'TensorRT-LLM with offload reports HBM and host as one figure, drawn as one segment.',
-      'The dashed tick is the trace’s infinite-cache ceiling.',
-    ],
     colSeries: 'Series',
     colConcurrency: 'Concurrency',
     colHbm: 'HBM',
@@ -104,7 +94,6 @@ const STRINGS = {
   },
   zh: {
     title: '前缀缓存复用',
-    description: '各并发数下 prompt token 的来源：HBM 缓存、主机缓存或重新计算。',
     benchmarkGroup: '基准测试配置',
     chartGroup: '图表配置',
     configLabel: '配置',
@@ -118,13 +107,6 @@ const STRINGS = {
     noTiers: '该配置的实测数据行均未上报前缀缓存层级。请尝试其他配置或运行日期。',
     captionSource: '来源：SemiAnalysis InferenceX',
     unofficialRun: '非官方运行',
-    notesSummary: '如何阅读本图',
-    notes: [
-      '占比取自运行时自身的前缀缓存计数，分母为全部 prompt token，因此 HBM、主机与未复用之和为 100%。',
-      '主机层为 CPU offload 命中率；仅当未上报 CPU 数值时才改用 router 外部缓存命中率，两者不相加。',
-      'TensorRT-LLM 开启 offload 时将 HBM 与主机合并上报，绘制为单个段。',
-      '虚线刻度为该 trace 的无限缓存理论上限。',
-    ],
     colSeries: '系列',
     colConcurrency: '并发数',
     colHbm: 'HBM',
@@ -527,11 +509,7 @@ function CacheReuseInner() {
       <section data-testid="cache-reuse-controls">
         <Card className="relative z-30">
           <div className="flex flex-col gap-4">
-            <DashboardSectionHeader
-              title={t.title}
-              description={t.description}
-              actions={<ChartShareActions />}
-            />
+            <DashboardSectionHeader title={t.title} actions={<ChartShareActions />} />
 
             <TooltipProvider delayDuration={0}>
               <ControlPanel
@@ -659,25 +637,6 @@ function CacheReuseInner() {
               </>
             )}
           </figure>
-
-          <details
-            className="group mt-4 text-xs text-muted-foreground"
-            data-testid="cache-reuse-notes"
-            onToggle={(e) => track('cache_reuse_notes_toggled', { open: e.currentTarget.open })}
-          >
-            <summary className="flex w-fit cursor-pointer list-none items-center gap-1 rounded-sm font-medium hover:text-foreground [&::-webkit-details-marker]:hidden">
-              <ChevronRightIcon
-                aria-hidden
-                className="size-3.5 transition-transform duration-200 group-open:rotate-90"
-              />
-              {t.notesSummary}
-            </summary>
-            <ul className="mt-2 list-disc space-y-1 pl-5">
-              {t.notes.map((note) => (
-                <li key={note}>{note}</li>
-              ))}
-            </ul>
-          </details>
 
           {tableRows.length > 0 && (
             <div className="mt-4">

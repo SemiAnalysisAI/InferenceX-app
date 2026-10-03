@@ -67,9 +67,13 @@ describe('Prefix Cache Reuse', () => {
     it('labels the configuration control and shows the plotted config', () => {
       cy.get('label[for="cache-reuse-config"]').should('contain.text', 'Configuration');
       cy.get('[data-testid="cache-reuse-config-selector"]').should('contain.text', 'B300');
-      cy.get('[data-testid="cache-reuse-figure"] figcaption')
-        .should('contain.text', 'B300')
-        .and('not.contain.text', 'measured rows');
+      cy.get('[data-testid="cache-reuse-config-selector"]')
+        .invoke('text')
+        .then((config) => {
+          cy.get('[data-testid="cache-reuse-figure"] figcaption')
+            .should('contain.text', config.trim())
+            .and('contain.text', 'Source: SemiAnalysis InferenceX');
+        });
     });
   });
 
@@ -167,22 +171,6 @@ describe('Prefix Cache Reuse', () => {
           expect(box.height, 'column bar is taller than wide').to.be.greaterThan(box.width);
         });
       labelsInsideSegments();
-    });
-
-    it('folds the reading notes away until asked', () => {
-      interceptOverlayRun();
-      cy.visit('/cache-reuse', { onBeforeLoad: dismissNudges });
-      cy.wait('@benchmarks');
-      cy.get('[data-testid="cache-reuse-notes"]').should('not.have.attr', 'open');
-      cy.get('[data-testid="cache-reuse-notes"]').should(($details) => {
-        expect(($details[0] as HTMLDetailsElement).open, 'notes start folded').to.equal(false);
-      });
-      cy.get('[data-testid="cache-reuse-notes"] summary').click();
-      cy.get('[data-testid="cache-reuse-notes"]').should('have.attr', 'open');
-      cy.get('[data-testid="cache-reuse-notes"] li')
-        .should('have.length.greaterThan', 1)
-        .first()
-        .should('be.visible');
     });
   });
 
