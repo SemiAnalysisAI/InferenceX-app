@@ -86,8 +86,8 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
     'configurations 中的缓存复用配置键。省略时采用仪表板默认配置。',
   ],
   recipe: [
-    'Exact key from data.recipes (dashboard c_recipe). Missing or unknown keys select the recipe with the most tiered rows, then most rows, then label; overlays supply choices only without official rows. params.recipe reports the resolved key.',
-    'data.recipes 中的方案键，对应仪表板 c_recipe。省略或未知键按缓存层级数据行数、总行数和标签依次选择默认方案；仅在没有官方数据时使用叠加运行的方案。params.recipe 返回实际选择的键。',
+    'Exact key from data.recipes (dashboard c_recipe). Omitted keys select the recipe with the most tiered rows, then most rows, then label. Unknown keys return 400 with allowed keys. Identity includes PP/DCP/PCP widths, including legacy metrics. Overlays supply choices only without official rows. params.recipe reports the resolved key.',
+    'data.recipes 中的方案键，对应仪表板 c_recipe。省略时按缓存层级数据行数、总行数和标签依次选择默认方案；未知键返回 400，并列出可用键。方案区分包含 PP/DCP/PCP 参数，也适用于旧数据。仅在没有官方数据时使用叠加运行的方案。params.recipe 返回实际选择的键。',
   ],
   customCosts: [
     'JSON object from base hardware keys to finite nonnegative USD/chip-hour values, at most 100 entries.',

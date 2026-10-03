@@ -91,6 +91,7 @@ describe('getTraceServerMetrics', () => {
     const { sql, calls } = mockSql([
       [
         metaRow({
+          metrics: { prefill_pp: 2, decode_dcp_size: 8, prefill_pcp_size: 4 },
           kv_offloading: 'dram',
           kv_offload_backend: 'lmcache',
           kv_offload_backend_version: '0.5.1',
@@ -124,6 +125,7 @@ describe('getTraceServerMetrics', () => {
       num_prefill_gpu: 8,
       num_decode_gpu: 64,
       recipe_fingerprint: 'exact-fingerprint',
+      metrics: { prefill_pp: 2, decode_dcp_size: 8, prefill_pcp_size: 4 },
     });
     expect(calls).toHaveLength(1);
     expect(calls[0]).not.toContain('server_metrics_json_gz as blob');

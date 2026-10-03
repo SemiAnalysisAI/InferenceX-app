@@ -65,6 +65,7 @@ export function useThroughputData(
   selectedTokenType: CostType = 'total',
   tcoBasis: TcoBasis = DEFAULT_TCO_BASIS,
   includePower = false,
+  runId?: string,
 ) {
   const initialCacheScope = useMemo(
     () =>
@@ -80,11 +81,11 @@ export function useThroughputData(
     error: queryError,
   } = useBenchmarks(
     selectedModel,
-    selectedRunDate,
+    runId ? '' : selectedRunDate,
     enabled,
-    undefined,
-    undefined,
-    includePower
+    runId,
+    runId ? true : undefined,
+    includePower || runId
       ? undefined
       : {
           type: 'calculator',
@@ -92,7 +93,7 @@ export function useThroughputData(
           ...(initialCacheScope ? { cacheScope: initialCacheScope } : {}),
         },
     // A calculator projection cannot seed the raw-power query cache.
-    includePower ? undefined : initialRows,
+    includePower || runId ? undefined : initialRows,
   );
 
   const loading = queryLoading || !allRows;

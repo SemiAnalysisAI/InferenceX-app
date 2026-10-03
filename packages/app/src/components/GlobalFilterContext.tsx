@@ -86,6 +86,8 @@ export interface GlobalFilterRunContextType {
   selectedRunDate: string;
   selectedRunDateRev: number;
   selectedRunId: string;
+  /** Explicit selection, retained even when absent from the date's run picker. */
+  requestedRunId: string;
   effectiveRunDate: string;
 }
 
@@ -612,6 +614,7 @@ export function GlobalFilterProvider({
   const setSelectedRunDateManual = useCallback((date: string) => {
     requestedRunDateExplicitRef.current = true;
     setRequestedRunDate(date);
+    setRequestedRunId('');
     setSelectedRunDateRev((revision) => revision + 1);
   }, []);
 
@@ -727,9 +730,10 @@ export function GlobalFilterProvider({
       selectedRunDate: effectiveRunDate,
       selectedRunDateRev,
       selectedRunId: effectiveRunId,
+      requestedRunId,
       effectiveRunDate,
     }),
-    [effectiveRunDate, selectedRunDateRev, effectiveRunId],
+    [effectiveRunDate, selectedRunDateRev, effectiveRunId, requestedRunId],
   );
 
   const availabilityValue = useMemo<GlobalFilterAvailabilityContextType>(

@@ -356,7 +356,7 @@ describe('recipe identity', () => {
     expect(result.bars.every((b) => b.share.host > 0)).toBe(true);
   });
 
-  it('plots the requested recipe and falls back when it is unknown', () => {
+  it('plots the requested recipe and leaves an unknown recipe empty', () => {
     const offKey = recipeKeyOf(off(8, 0));
     const picked = buildCacheReuse({ official, config, recipe: offKey });
     expect(picked.recipe).toBe(offKey);
@@ -365,9 +365,53 @@ describe('recipe identity', () => {
       [8, 0.54],
       [10, 0.53],
     ]);
-    expect(buildCacheReuse({ official, config, recipe: 'nope' }).recipe).toBe(
-      recipeKeyOf(on(8, 0, 0)),
+    const missing = buildCacheReuse({ official, config, recipe: 'nope' });
+    expect(missing.recipe).toBeNull();
+    expect(missing.bars).toEqual([]);
+    expect(missing.recipes).toHaveLength(3);
+  });
+
+  it.each([
+    'prefill_pp',
+    'decode_pp',
+    'prefill_dcp_size',
+    'decode_dcp_size',
+    'prefill_pcp_size',
+    'decode_pcp_size',
+  ])('keeps legacy recipes differing only in %s selectable', (field) => {
+    const plain = makePoint(
+      { server_gpu_cache_hit_rate: 0.9 },
+      { ...dep8, recipe_fingerprint: null },
     );
+    const parallel = makePoint(
+      { server_gpu_cache_hit_rate: 0.6, [field]: 2 },
+      { ...dep8, recipe_fingerprint: null },
+    );
+    const points = [plain, parallel];
+    expect(cacheReuseRecipes(points)).toHaveLength(2);
+    expect(
+      buildCacheReuse({ official: points, config, recipe: recipeKeyOf(parallel) }).bars.map(
+        (b) => b.share.hbm,
+      ),
+    ).toEqual([0.6]);
+    expect(
+      cacheReuseRecipes(points)
+        .map((r) => r.label)
+        .some((label) =>
+          label.includes(field.endsWith('_pp') ? 'PP2' : field.includes('dcp') ? 'DCP2' : 'PCP2'),
+        ),
+    ).toBe(true);
+  });
+
+  it('preserves existing fingerprinted links when parallel widths exceed one', () => {
+    const point = makePoint(
+      { server_gpu_cache_hit_rate: 0.6, prefill_pp: 2, decode_pp: 2 },
+      { ...dep8, recipe_fingerprint: 'fp123' },
+    );
+    const recipe = 'agg|mn|p4x8/32/dpa|d4x8/32/dpa|g32+32|spec-mtp|offload-on|fp-fp123';
+    expect(
+      buildCacheReuse({ official: [point], config, recipe }).bars.map((bar) => bar.share.hbm),
+    ).toEqual([0.6]);
   });
 
   it('lists each recipe once with a readable label and its row counts', () => {

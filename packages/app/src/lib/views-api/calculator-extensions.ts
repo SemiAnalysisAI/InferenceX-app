@@ -105,6 +105,13 @@ export function calculatorExtension(view: CalculatorExtension, request: NextRequ
             recipe: search.get('recipe') ?? undefined,
           })
         : null;
+      if (search.get('recipe') && !data?.recipe) {
+        throw new ViewsApiParamError(
+          'recipe',
+          'Recipe is unavailable in this snapshot',
+          data?.recipes.map((recipe) => recipe.key) ?? [],
+        );
+      }
       return cachedJson({
         ...envelope,
         params: { ...envelope.params, config, recipe: data?.recipe ?? null },

@@ -360,3 +360,5 @@ Dashboard scope membership is declared by `shareParamScopes` in
 `packages/app/src/lib/dashboard-routes.ts`. Tests enforce completeness and route-specific
 share behavior, so this document deliberately does not duplicate a manually maintained
 parameter table.
+
+Cache reuse uses the global run context’s `requestedRunId` for exact historical snapshots; `selectedRunId` is the picker’s resolved/default choice. An unavailable explicit run must not turn into a newer run. A manual date selection clears the previous run pin.

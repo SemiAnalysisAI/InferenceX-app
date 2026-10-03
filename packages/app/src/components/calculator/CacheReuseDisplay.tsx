@@ -84,6 +84,8 @@ const STRINGS = {
       'Fixed-sequence runs record no prefix-cache tiers, so there is nothing to stack here. Switch the scenario to AgentX.',
     noTiers:
       'None of the measured rows for this configuration reported a prefix-cache tier. Try another configuration or run date.',
+    missingRecipe:
+      'The linked recipe is unavailable in this snapshot. Select an available recipe to continue.',
     captionSource: 'Source: SemiAnalysis InferenceX',
     unofficialRun: 'Unofficial run',
     colSeries: 'Series',
@@ -114,6 +116,7 @@ const STRINGS = {
     noData: '当前选择没有实测数据。请尝试其他模型、工作负载或精度。',
     noTiersFixed: '固定序列的运行不记录前缀缓存层级，此处没有可堆叠的数据。请将场景切换为 AgentX。',
     noTiers: '该配置的实测数据行均未上报前缀缓存层级。请尝试其他配置或运行日期。',
+    missingRecipe: '当前快照中没有链接指定的配置方案。请选择其他可用方案。',
     captionSource: '来源：SemiAnalysis InferenceX',
     unofficialRun: '非官方运行',
     colSeries: '系列',
@@ -176,7 +179,7 @@ function CacheReuseInner() {
     effectivePrecisions: selectedPrecisions,
   } = useGlobalFilterSelection();
   const { setSelectedModel, setSelectedSequence, setSelectedPrecisions } = useGlobalFilterActions();
-  const { selectedRunDate } = useGlobalFilterRun();
+  const { selectedRunDate, requestedRunId } = useGlobalFilterRun();
   const { availablePrecisions, availableSequences, availableModels } =
     useGlobalFilterAvailability();
 
@@ -220,6 +223,8 @@ function CacheReuseInner() {
     true,
     'total',
     tcoBasis,
+    false,
+    requestedRunId || undefined,
   );
 
   const isAgenticSequence = selectedSequence === Sequence.AgenticTraces;
@@ -255,6 +260,8 @@ function CacheReuseInner() {
   const selectedConfig = useMemo<ConfigOption | null>(() => {
     const requested = configOptions.find((o) => o.key === configInput);
     if (requested) return requested;
+    // A point link must not substitute another chip with the same recipe key.
+    if (configInput && recipeInput) return null;
     const fallback = defaultCacheReuseGroup(gpuDataByGroupKey, gpuGroupMeta);
     return (
       configOptions.find((o) => o.key === fallback) ??
@@ -262,7 +269,7 @@ function CacheReuseInner() {
       configOptions[0] ??
       null
     );
-  }, [configOptions, configInput, gpuDataByGroupKey, gpuGroupMeta]);
+  }, [configOptions, configInput, recipeInput, gpuDataByGroupKey, gpuGroupMeta]);
 
   const runInfoByIndex = useMemo(() => {
     const map: Record<number, { branch: string; url: string }> = {};
@@ -306,10 +313,13 @@ function CacheReuseInner() {
       ? (result.recipes.find((r) => r.key === result.recipe)?.label ?? '')
       : '';
   const hasBars = result.bars.length > 0;
+  const missingRecipe = !loading && Boolean(recipeInput) && result.recipe === null;
 
   const handleModelChange = useCallback(
     (value: string) => {
       setSelectedModel(value as Model);
+      setRecipeInput('');
+      writeUrlParams({ c_recipe: '' });
       track('cache_reuse_model_selected', { model: value });
     },
     [setSelectedModel],
@@ -317,6 +327,8 @@ function CacheReuseInner() {
   const handleSequenceChange = useCallback(
     (value: string) => {
       setSelectedSequence(value as Sequence);
+      setRecipeInput('');
+      writeUrlParams({ c_recipe: '' });
       track('cache_reuse_sequence_selected', { sequence: value });
     },
     [setSelectedSequence],
@@ -324,6 +336,8 @@ function CacheReuseInner() {
   const handlePrecisionChange = useCallback(
     (value: string[]) => {
       setSelectedPrecisions(value);
+      setRecipeInput('');
+      writeUrlParams({ c_recipe: '' });
       track('cache_reuse_precision_selected', { precision: value.join(',') });
     },
     [setSelectedPrecisions],
@@ -613,7 +627,7 @@ function CacheReuseInner() {
                     />
                   </div>
                 </div>
-                {result.recipes.length > 1 && (
+                {(result.recipes.length > 1 || missingRecipe) && (
                   <div className="flex min-w-0 flex-col space-y-1.5">
                     <LabelWithTooltip
                       htmlFor="cache-reuse-recipe"
@@ -696,7 +710,7 @@ function CacheReuseInner() {
                   className="flex items-center justify-center h-48 text-muted-foreground text-center px-6"
                   data-testid="cache-reuse-no-tiers"
                 >
-                  {isAgenticSequence ? t.noTiers : t.noTiersFixed}
+                  {missingRecipe ? t.missingRecipe : isAgenticSequence ? t.noTiers : t.noTiersFixed}
                 </div>
               </>
             )}
