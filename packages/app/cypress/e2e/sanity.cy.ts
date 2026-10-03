@@ -131,6 +131,41 @@ describe('Splash text', () => {
 });
 
 describe('Theme Toggle', () => {
+  it('loads CS:GO on demand, persists it, and removes decorations on exit', () => {
+    cy.visit('/', {
+      onBeforeLoad(win) {
+        win.localStorage.setItem('theme', 'light');
+        win.localStorage.setItem('minecraft-music', 'false');
+        win.localStorage.setItem('minecraft-sound', 'false');
+      },
+    });
+    cy.get('[data-testid="csgo-scene"]').should('not.exist');
+    cy.window().then((win) => {
+      expect(
+        win.performance
+          .getEntriesByType('resource')
+          .some((r) => r.name.includes('/decorative/csgo/')),
+      ).to.eq(false);
+    });
+    for (const theme of ['dark', 'minecraft', 'csgo']) {
+      cy.get('[data-testid="theme-toggle"]').click();
+      cy.get('html').should('have.class', theme);
+    }
+    cy.get('[data-testid="csgo-theme-banner"]').should('be.visible');
+    cy.get('[data-testid="csgo-scene"]')
+      .should('have.attr', 'aria-hidden', 'true')
+      .and('have.css', 'pointer-events', 'none');
+    cy.reload();
+    cy.get('html').should('have.class', 'csgo');
+    cy.get('[data-testid="csgo-scene"] img').should(($img) => {
+      expect(($img[0] as HTMLImageElement).naturalWidth).to.be.greaterThan(0);
+    });
+    cy.get('[data-testid="theme-toggle"]').click();
+    cy.get('html').should('have.class', 'light');
+    cy.get('[data-testid="csgo-scene"]').should('not.exist');
+    cy.get('[data-testid="csgo-theme-banner"]').should('not.exist');
+  });
+
   it('theme persists across page reload (localStorage)', () => {
     cy.window().then((win) => {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
