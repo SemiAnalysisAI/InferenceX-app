@@ -65,10 +65,9 @@ describe('Prefix Cache Reuse', () => {
     it('labels the configuration control and shows the plotted config', () => {
       cy.get('label[for="cache-reuse-config"]').should('contain.text', 'Configuration');
       cy.get('[data-testid="cache-reuse-config-selector"]').should('contain.text', 'B300');
-      cy.get('[data-testid="cache-reuse-figure"] figcaption').should(
-        'contain.text',
-        `${REAL_CONFIGS.length} of ${REAL_CONFIGS.length} measured rows report cache tiers`,
-      );
+      cy.get('[data-testid="cache-reuse-figure"] figcaption')
+        .should('contain.text', 'B300')
+        .and('not.contain.text', 'measured rows');
     });
   });
 
@@ -116,6 +115,71 @@ describe('Prefix Cache Reuse', () => {
       cy.wait('@benchmarks');
       cy.get('[data-testid="cache-reuse-no-tiers"]').should('contain.text', 'Fixed-sequence');
       cy.get(BARS).should('not.exist');
+    });
+  });
+
+  describe('layout', () => {
+    const boxOf = (el: Element) => el.getBoundingClientRect();
+    const labelsInsideSegments = () =>
+      cy.get(SEGMENTS).then(($segments) => {
+        const segments = [...$segments].map(boxOf);
+        cy.get('[data-testid="cache-reuse-chart"] svg .cr-value').each(($label) => {
+          const label = boxOf($label[0]);
+          const inside = segments.some(
+            (s) =>
+              label.left >= s.left - 0.5 &&
+              label.right <= s.right + 0.5 &&
+              label.top >= s.top - 0.5 &&
+              label.bottom <= s.bottom + 0.5,
+          );
+          expect(inside, `"${$label.text()}" sits inside a segment`).to.equal(true);
+        });
+      });
+
+    it('draws phone-width bars as rows, lowest concurrency first, labels inside', () => {
+      cy.viewport(393, 852);
+      interceptOverlayRun();
+      cy.visit('/cache-reuse', { onBeforeLoad: dismissNudges });
+      cy.wait('@benchmarks');
+      cy.get(BARS).should('have.length', REAL_CONFIGS.length);
+      cy.get(BARS).each(($bar) => {
+        const box = boxOf($bar[0]);
+        expect(box.width, 'row bar is wider than tall').to.be.greaterThan(box.height);
+      });
+      cy.get(`${BARS}[data-conc="1"]`).then(($first) => {
+        cy.get(`${BARS}[data-conc="48"]`).then(($last) => {
+          expect(boxOf($first[0]).top).to.be.lessThan(boxOf($last[0]).top);
+        });
+      });
+      labelsInsideSegments();
+    });
+
+    it('keeps desktop columns and their labels inside each segment', () => {
+      cy.viewport(1280, 900);
+      interceptOverlayRun();
+      cy.visit('/cache-reuse', { onBeforeLoad: dismissNudges });
+      cy.wait('@benchmarks');
+      cy.get(BARS)
+        .first()
+        .then(($bar) => {
+          const box = boxOf($bar[0]);
+          expect(box.height, 'column bar is taller than wide').to.be.greaterThan(box.width);
+        });
+      labelsInsideSegments();
+    });
+
+    it('folds the reading notes away until asked', () => {
+      interceptOverlayRun();
+      cy.visit('/cache-reuse', { onBeforeLoad: dismissNudges });
+      cy.wait('@benchmarks');
+      cy.get('[data-testid="cache-reuse-notes"]').should('not.have.attr', 'open');
+      cy.get('[data-testid="cache-reuse-notes"] li').should('not.be.visible');
+      cy.get('[data-testid="cache-reuse-notes"] summary').click();
+      cy.get('[data-testid="cache-reuse-notes"]').should('have.attr', 'open');
+      cy.get('[data-testid="cache-reuse-notes"] li')
+        .should('have.length.greaterThan', 1)
+        .first()
+        .should('be.visible');
     });
   });
 
