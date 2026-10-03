@@ -100,11 +100,6 @@ const agenticBenchmarks = AGENTIC_HARDWARE.flatMap((g) =>
 // "View charts" link only when trace-availability returns true for the id.
 const agenticIds = new Set(agenticBenchmarks.map((b) => b.id));
 
-function expectCompatibleSelection($inputs: JQuery<HTMLElement>) {
-  const ids = [...$inputs].map((input) => input.id).sort();
-  expect(ids).to.deep.equal(['checkbox-b200_sglang', 'checkbox-b300_vllm']);
-}
-
 describe('GPU comparison agentic point detail', () => {
   it('exposes the per-point charts as a normal browser link', () => {
     // Shadow the fixture-server availability + benchmarks responses with
@@ -214,7 +209,7 @@ describe('GPU comparison agentic point detail', () => {
   const CONFLICTING_GPU_URL =
     '/inference?g_model=DeepSeek-V4-Pro&i_seq=agentic-traces&i_prec=fp4&i_gpus=b200_sglang,b200_vllm&i_dates=2026-06-12&i_dstart=2026-06-12&i_dend=2026-06-12';
 
-  it('restores a soloed compatible selection without requesting engine consent', () => {
+  it('restores a soloed selection without a confirmation dialog', () => {
     cy.intercept('GET', '/api/v1/availability', { body: agenticAvailability });
     cy.intercept('GET', '/api/v1/benchmarks*', { body: agenticBenchmarks });
     interceptDerivedAgenticMetrics();
@@ -225,15 +220,19 @@ describe('GPU comparison agentic point detail', () => {
       },
     });
     const checked = '[data-testid="chart-legend"] ul input[type="checkbox"]:checked';
-    cy.get(checked).should(expectCompatibleSelection);
+    cy.get('#checkbox-b200_sglang').should('be.checked');
     cy.get('[data-testid="chart-legend"] label[for="checkbox-b200_sglang"]').click();
     cy.get(checked).should('have.length', 1).and('have.attr', 'id', 'checkbox-b200_sglang');
     cy.get('[data-testid="chart-legend"] label[for="checkbox-b200_sglang"]').click();
     cy.get('[data-testid="engine-comparison-confirmation"]').should('not.exist');
-    cy.get(checked).should(expectCompatibleSelection);
+    cy.get(checked).should(($inputs) => {
+      const ids = [...$inputs].map((input) => input.id).sort();
+      expect(ids).to.include('checkbox-b200_sglang');
+      expect(ids.length).to.be.greaterThan(1);
+    });
   });
 
-  it('defaults to the scored winner and requires consent before showing both engines', () => {
+  it('shows both engines immediately when Best per SKU is turned off', () => {
     cy.intercept('GET', '/api/v1/availability', { body: agenticAvailability });
     cy.intercept('GET', '/api/v1/benchmarks*', { body: agenticBenchmarks });
     interceptDerivedAgenticMetrics();
@@ -243,7 +242,7 @@ describe('GPU comparison agentic point detail', () => {
         win.localStorage.removeItem('inferencex-feature-gate');
       },
     });
-    // Equal curves tie by key: SGLang wins, not the old vLLM guard default.
+    // Equal curves tie by key: SGLang wins.
     const checked = '[data-testid="chart-legend"] ul input[type="checkbox"]:checked';
     cy.get(checked).should(($inputs) => {
       const ids = [...$inputs].map((input) => input.id).join(',');
@@ -254,14 +253,7 @@ describe('GPU comparison agentic point detail', () => {
     cy.get('[data-testid="quick-filter-best-per-sku"]')
       .should('have.attr', 'data-state', 'checked')
       .click();
-    cy.get('[data-testid="engine-comparison-confirmation"]').should('be.visible');
-    cy.get('[data-testid="engine-comparison-confirmation"]').contains('button', 'Cancel').click();
-    cy.get('[data-testid="quick-filter-best-per-sku"]')
-      .should('have.attr', 'data-state', 'checked')
-      .click();
-    cy.get('[data-testid="engine-comparison-confirmation"]')
-      .contains('button', 'I agree, show both')
-      .click();
+    cy.get('[data-testid="engine-comparison-confirmation"]').should('not.exist');
     cy.get('[data-testid="quick-filter-best-per-sku"]').should(
       'have.attr',
       'data-state',
@@ -273,19 +265,6 @@ describe('GPU comparison agentic point detail', () => {
       expect(ids).to.contain('b200_sglang');
       expect(ids).to.contain('b200_vllm');
     });
-    // A shared/reloaded URL is not consent for another reader.
-    cy.reload();
-    cy.get(checked).should(($inputs) => {
-      const ids = [...$inputs].map((input) => input.id).join(',');
-      expect(ids.includes('b200_sglang') && ids.includes('b200_vllm')).to.equal(false);
-    });
-    cy.get('[data-testid="chart-legend"] input[id^="checkbox-b200_"]:not(:checked)')
-      .first()
-      .invoke('attr', 'id')
-      .then((id) => cy.get(`[data-testid="chart-legend"] label[for="${id}"]`).click());
-    cy.get('[data-testid="engine-comparison-confirmation"]')
-      .contains('button', 'I agree, show both')
-      .click();
     cy.get(checked).should(($inputs) => {
       const ids = [...$inputs].map((input) => input.id).join(',');
       expect(ids).to.contain('b200_sglang');
@@ -294,16 +273,14 @@ describe('GPU comparison agentic point detail', () => {
     });
   });
 
-  it('surfaces automatic resolution of conflicting GPU URL state', () => {
+  it('restores both engine families from a GPU URL', () => {
     cy.intercept('GET', '/api/v1/availability', { body: agenticAvailability }).as(
       'agenticAvailability',
     );
     cy.intercept('GET', '/api/v1/benchmarks*', { body: agenticBenchmarks }).as('agenticBenchmarks');
     interceptDerivedAgenticMetrics();
 
-    // Agentic surfaces are public, so this test must run with the ↑↑↓↓ feature
-    // gate LOCKED: an unlocked gate lifts the cross-engine guard (see the next
-    // test). testIsolation is off, so clear the flag an earlier test seeded.
+    // Test with the feature gate locked to cover the ordinary public view.
     cy.visit(CONFLICTING_GPU_URL, {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
@@ -312,23 +289,12 @@ describe('GPU comparison agentic point detail', () => {
       },
     });
 
-    // Official DeepSeek-V4-Pro agentic charts prefer vLLM when they first resolve
-    // a cross-engine conflict with no sticky selection (comparisonDefaultGroup,
-    // PR #632). Before that the winner was the alphabetically-first group, SGLang.
-    cy.get('[data-testid="engine-comparison-conflict-toast"]')
-      .should('be.visible')
-      .and('contain.text', 'Kept vLLM and removed SGLang configs');
-    cy.get('[data-testid="gpu-multiselect"] [data-slot="select-trigger"]')
-      .should('contain.text', 'vLLM')
-      .and('not.contain.text', 'SGLang');
-    cy.contains('button', 'Jun 12, 2026').should('be.visible');
-    cy.contains('button', 'Review comparison warning').click();
-    cy.get('[data-testid="engine-comparison-confirmation"]')
-      .contains('button', 'I agree, show both')
-      .click();
     cy.get('[data-testid="gpu-multiselect"] [data-slot="select-trigger"]')
       .should('contain.text', 'vLLM')
       .and('contain.text', 'SGLang');
+    cy.contains('button', 'Jun 12, 2026').should('be.visible');
+    cy.get('[data-testid="engine-comparison-conflict-toast"]').should('not.exist');
+    cy.get('[data-testid="engine-comparison-confirmation"]').should('not.exist');
   });
 
   it('lets vLLM and SGLang share the graph when the feature gate is unlocked', () => {
