@@ -21,6 +21,8 @@ const BARS = '[data-testid="cache-reuse-chart"] svg .cr-bar';
 const SEGMENTS = '[data-testid="cache-reuse-chart"] svg .cr-segment';
 const X_TICKS = '[data-testid="cache-reuse-chart"] svg .x-axis .tick text';
 
+const boxOf = (el: Element) => el.getBoundingClientRect();
+
 const dismissNudges = (win: Cypress.AUTWindow) => {
   win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
   win.sessionStorage.setItem('inferencex-reproducibility-nudge-shown', '1');
@@ -119,7 +121,6 @@ describe('Prefix Cache Reuse', () => {
   });
 
   describe('layout', () => {
-    const boxOf = (el: Element) => el.getBoundingClientRect();
     const labelsInsideSegments = () =>
       cy.get(SEGMENTS).then(($segments) => {
         const segments = [...$segments].map(boxOf);
@@ -173,7 +174,9 @@ describe('Prefix Cache Reuse', () => {
       cy.visit('/cache-reuse', { onBeforeLoad: dismissNudges });
       cy.wait('@benchmarks');
       cy.get('[data-testid="cache-reuse-notes"]').should('not.have.attr', 'open');
-      cy.get('[data-testid="cache-reuse-notes"] li').should('not.be.visible');
+      cy.get('[data-testid="cache-reuse-notes"]').should(($details) => {
+        expect(($details[0] as HTMLDetailsElement).open, 'notes start folded').to.equal(false);
+      });
       cy.get('[data-testid="cache-reuse-notes"] summary').click();
       cy.get('[data-testid="cache-reuse-notes"]').should('have.attr', 'open');
       cy.get('[data-testid="cache-reuse-notes"] li')
