@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as d3 from 'd3';
 
 import { useChartZoom, type UseChartZoomResult } from './useChartZoom';
@@ -130,6 +130,68 @@ describe('setupZoom transform replay', () => {
     // transform applied — only the no-op identity replay is skipped.
     expect(onZoom).toHaveBeenCalledTimes(1);
     expect(onZoom.mock.calls[0][0].transform.k).toBe(1.5);
+    cleanup();
+  });
+});
+
+function fakeTouchStart(fingers: number, target: SVGSVGElement) {
+  const event = new Event('touchstart', { bubbles: true, cancelable: true });
+  const touches = Array.from({ length: fingers }, (_, i) => ({
+    identifier: i,
+    clientX: 100 + i * 50,
+    clientY: 100 + i * 50,
+    pageX: 100 + i * 50,
+    pageY: 100 + i * 50,
+    target,
+  }));
+  Object.defineProperty(event, 'touches', { value: touches });
+  Object.defineProperty(event, 'changedTouches', { value: touches });
+  return event;
+}
+
+const zooming = (el: SVGSVGElement) => (el as unknown as { __zooming?: unknown }).__zooming;
+
+describe('setupZoom touch behaviour', () => {
+  // d3-zoom only attaches its touch handlers when `defaultTouchable()` sees a
+  // touch-capable environment; jsdom reports none, so advertise one.
+  beforeEach(() => {
+    Object.defineProperty(navigator, 'maxTouchPoints', { value: 5, configurable: true });
+  });
+  afterEach(() => {
+    Object.defineProperty(navigator, 'maxTouchPoints', { value: 0, configurable: true });
+  });
+
+  it('allows native single-finger panning but disables native pinch-zoom on the SVG', () => {
+    const { svgEl, svgSelection, hook, cleanup } = setup();
+
+    hook.current.setupZoom(svgSelection, 800, 600);
+
+    // `pan-x pan-y` keeps one-finger page scroll native while reserving the
+    // two-finger pinch for d3-zoom (see zoomEventFilter).
+    expect(svgEl.style.touchAction).toBe('pan-x pan-y');
+    cleanup();
+  });
+
+  it('does not start a zoom gesture from a single-finger touchstart', () => {
+    const { svgEl, svgSelection, hook, cleanup } = setup();
+    hook.current.setupZoom(svgSelection, 800, 600);
+
+    svgEl.dispatchEvent(fakeTouchStart(1, svgEl));
+
+    // d3-zoom sets `__zooming` on the node for the lifetime of a gesture; a
+    // rejected touchstart must leave it unset so touchmove is never
+    // preventDefault'ed and the page keeps scrolling.
+    expect(zooming(svgEl)).toBeUndefined();
+    cleanup();
+  });
+
+  it('starts a zoom gesture once a second finger lands', () => {
+    const { svgEl, svgSelection, hook, cleanup } = setup();
+    hook.current.setupZoom(svgSelection, 800, 600);
+
+    svgEl.dispatchEvent(fakeTouchStart(2, svgEl));
+
+    expect(zooming(svgEl)).toBeDefined();
     cleanup();
   });
 });

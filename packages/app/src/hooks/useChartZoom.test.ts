@@ -1,13 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-/**
- * Extracted logic from useChartZoom's .filter() and .wheelDelta() for unit testing.
- * Mirrors the inline functions in useChartZoom.ts.
- */
-function wheelFilter(event: { type: string; shiftKey: boolean; ctrlKey: boolean; button: number }) {
-  if (event.type === 'wheel') return event.shiftKey && !event.ctrlKey;
-  return !event.ctrlKey && !event.button;
-}
+import { MIN_TOUCH_POINTS, zoomEventFilter } from './useChartZoom';
+
+// The filter is the real export; wheelDelta mirrors the inline function in
+// useChartZoom.ts.
+const wheelFilter = zoomEventFilter;
 
 function wheelDelta(event: { deltaY: number; deltaX: number; deltaMode: number }) {
   const delta = event.deltaY || event.deltaX;
@@ -47,6 +44,30 @@ describe('useChartZoom wheel filter', () => {
     expect(wheelFilter({ type: 'mousedown', shiftKey: false, ctrlKey: true, button: 0 })).toBe(
       false,
     );
+  });
+});
+
+const touchstart = (fingers: number) => ({ type: 'touchstart', touches: { length: fingers } });
+
+describe('useChartZoom touch filter', () => {
+  it('rejects a single-finger touchstart so the page keeps scrolling', () => {
+    expect(zoomEventFilter(touchstart(1))).toBe(false);
+  });
+
+  it('accepts a two-finger touchstart (pinch-zoom / two-finger pan)', () => {
+    expect(zoomEventFilter(touchstart(2))).toBe(true);
+  });
+
+  it('accepts more than two fingers', () => {
+    expect(zoomEventFilter(touchstart(3))).toBe(true);
+  });
+
+  it('rejects a touchstart with no touch list', () => {
+    expect(zoomEventFilter({ type: 'touchstart' })).toBe(false);
+  });
+
+  it('requires exactly two fingers as the minimum', () => {
+    expect(MIN_TOUCH_POINTS).toBe(2);
   });
 });
 

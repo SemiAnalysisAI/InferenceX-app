@@ -46,6 +46,44 @@ export interface SetupZoomOptions {
 }
 
 /**
+ * Minimal shape of the events d3-zoom passes to `.filter()`.
+ */
+export interface ZoomFilterEvent {
+  type: string;
+  shiftKey?: boolean;
+  ctrlKey?: boolean;
+  button?: number;
+  touches?: { length: number };
+}
+
+/**
+ * Minimum number of fingers required before a touch gesture is allowed to
+ * zoom/pan a chart. A single finger must always scroll the page.
+ */
+export const MIN_TOUCH_POINTS = 2;
+
+/**
+ * Decide whether a d3-zoom source event may start a gesture.
+ *
+ * - Wheel: require Shift so bare scroll doesn't hijack the page. Reject
+ *   ctrlKey+wheel — browsers synthesize trackpad pinch as ctrl+wheel, and
+ *   those should fall through to native browser zoom, not chart zoom.
+ * - Touch: require two fingers. d3-zoom's touchmove handler calls
+ *   `preventDefault()` for the lifetime of a gesture, which is what blocks
+ *   page scroll on mobile when one finger lands on a chart. Rejecting the
+ *   first finger here means no gesture starts and the browser keeps native
+ *   scrolling; when a second finger lands, `touchstarted` reads
+ *   `event.touches` (all active fingers, not just the new one), so both are
+ *   registered and the gesture becomes a pinch-zoom / two-finger pan.
+ * - Mouse: reject ctrl-click (macOS context menu) and non-primary buttons.
+ */
+export function zoomEventFilter(event: ZoomFilterEvent): boolean {
+  if (event.type === 'wheel') return Boolean(event.shiftKey) && !event.ctrlKey;
+  if (event.type === 'touchstart') return (event.touches?.length ?? 0) >= MIN_TOUCH_POINTS;
+  return !event.ctrlKey && !event.button;
+}
+
+/**
  * Return value from useChartZoom hook
  */
 export interface UseChartZoomResult {
@@ -141,13 +179,7 @@ export function useChartZoom(options: UseChartZoomOptions): UseChartZoomResult {
       // create zoom behavior
       const zoom = d3
         .zoom<SVGSVGElement, unknown>()
-        .filter((event) => {
-          // Require Shift for wheel zoom so bare scroll doesn't hijack the page.
-          // Reject ctrlKey+wheel — browsers synthesize trackpad pinch as ctrl+wheel,
-          // and those should fall through to native browser zoom, not chart zoom.
-          if (event.type === 'wheel') return event.shiftKey && !event.ctrlKey;
-          return !event.ctrlKey && !event.button;
-        })
+        .filter(zoomEventFilter)
         // macOS swaps deltaY→deltaX when Shift is held (Chrome/Safari OS-level behavior).
         // Fall back to deltaX so D3 doesn't get delta=0 and compute pow(2,0)=1 (no zoom).
         .wheelDelta((event: WheelEvent) => {
@@ -177,6 +209,13 @@ export function useChartZoom(options: UseChartZoomOptions): UseChartZoomResult {
 
       // apply zoom to SVG
       svg.call(zoom as any);
+
+      // Let the browser own single-finger scrolling over the chart, but keep
+      // two-finger gestures for the chart: `pan-x pan-y` permits native
+      // scrolling while opting out of native pinch-zoom, so d3-zoom's
+      // two-finger gesture (see zoomEventFilter) isn't racing the browser's
+      // viewport zoom.
+      svg.style('touch-action', 'pan-x pan-y');
 
       // store zoom behavior in ref
       zoomRef.current = zoom;

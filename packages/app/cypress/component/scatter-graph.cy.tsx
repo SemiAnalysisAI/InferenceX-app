@@ -26,6 +26,51 @@ const defaultChartDef = createMockChartDefinition();
 const hwConfig = createMockHardwareConfig();
 
 describe('ScatterGraph', () => {
+  it('shows touch guidance with an unofficial overlay loaded', () => {
+    cy.viewport(390, 844);
+    cy.window().then((win) => {
+      const original = win.matchMedia.bind(win);
+      cy.stub(win, 'matchMedia').callsFake((query: string) => {
+        const result = original(query);
+        if (query === '(pointer: coarse)') {
+          Object.defineProperty(result, 'matches', { value: true });
+        }
+        return result;
+      });
+    });
+    const inference = createMockInferenceContextValues();
+    mountWithProviders(
+      <InferenceContextsProvider
+        data={inference}
+        filters={inference}
+        display={inference}
+        actions={inference}
+      >
+        <ScatterGraph
+          chartId="touch-overlay-test"
+          modelLabel="DeepSeek R1"
+          data={[createMockInferenceData({ x: 20, y: 80 })]}
+          overlayData={{
+            data: [createMockInferenceData({ x: 30, y: 90 })],
+            hardwareConfig: hwConfig,
+            label: 'test overlay',
+          }}
+          xLabel="Interactivity"
+          yLabel="Throughput"
+          chartDefinition={defaultChartDef}
+          transitionDuration={0}
+        />
+      </InferenceContextsProvider>,
+      { unofficial: {} },
+    );
+    cy.get('#touch-overlay-test .no-export')
+      .should('contain.text', 'Use one finger to scroll the page')
+      .and('contain.text', 'Pinch with two fingers to zoom')
+      .and('contain.text', 'Drag with two fingers to pan')
+      .and('not.contain.text', 'Shift+Scroll')
+      .and('not.contain.text', 'Double-click');
+  });
+
   it('keeps the frontier modes and overlay winners without exposing the retired hinterland', () => {
     const official = [
       createMockInferenceData({ hwKey: 'h100', precision: Precision.FP8, x: 20, y: 80 }),
