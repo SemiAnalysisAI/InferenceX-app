@@ -57,7 +57,6 @@ import {
   CACHE_TIER_COLORS,
   defaultCacheReuseGroup,
   formatShare,
-  tieredRowCount,
   type CacheReuseBar,
 } from './cache-reuse';
 import CacheReuseChart, { CACHE_REUSE_STRINGS, configLabel, tierLabel } from './CacheReuseChart';
@@ -315,8 +314,15 @@ function CacheReuseInner() {
     ],
   );
   const hasAnyData = hasData || hasOverlayData;
+  // Caption counts describe the plotted recipe, not every row of the group.
+  const tieredRows = result.bars.filter((b) => b.seriesKey === 'official').length;
+  const measuredRows =
+    tieredRows + result.unmeasured.filter((u) => u.seriesKey === 'official').length;
+  const plottedRecipeLabel =
+    result.recipes.length > 1
+      ? (result.recipes.find((r) => r.key === result.recipe)?.label ?? '')
+      : '';
   const hasBars = result.bars.length > 0;
-  const tieredRows = useMemo(() => tieredRowCount(officialPoints), [officialPoints]);
 
   const handleModelChange = useCallback(
     (value: string) => {
@@ -488,9 +494,10 @@ function CacheReuseInner() {
     exportToCsv(`InferenceX_cache_reuse_${selectedModel}.csv`, headers, body, [
       `${getModelLabel(selectedModel)} • ${getSequenceLabel(selectedSequence, locale)}`,
       selectedConfig?.label ?? '',
+      plottedRecipeLabel,
     ]);
     track('cache_reuse_csv_exported', { model: selectedModel });
-  }, [t, tableRows, selectedModel, selectedSequence, locale, selectedConfig]);
+  }, [t, tableRows, selectedModel, selectedSequence, locale, selectedConfig, plottedRecipeLabel]);
 
   const legendHwKeys = useMemo(
     () => [...new Set([...availableHwKeys, ...(isUnofficialRun ? overlayAvailableHwKeys : [])])],
@@ -508,7 +515,8 @@ function CacheReuseInner() {
       <p className="text-sm text-muted-foreground mb-2">
         {getModelLabel(selectedModel)} • {getSequenceLabel(selectedSequence, locale)}
         {selectedConfig ? ` • ${selectedConfig.label}` : ''} •{' '}
-        {t.captionRows(tieredRows, officialPoints.length)} • {t.captionSource}
+        {plottedRecipeLabel ? `${plottedRecipeLabel} • ` : ''}
+        {t.captionRows(tieredRows, measuredRows)} • {t.captionSource}
       </p>
     </>
   );
