@@ -57,6 +57,7 @@ import {
   CACHE_TIER_COLORS,
   defaultCacheReuseGroup,
   formatShare,
+  recipeLabelOf,
   type CacheReuseBar,
 } from './cache-reuse';
 import CacheReuseChart, { CACHE_REUSE_STRINGS, configLabel, tierLabel } from './CacheReuseChart';
@@ -71,6 +72,10 @@ const STRINGS = {
     configTooltip:
       'The chip and serving framework whose sweep is plotted. Configurations that reported no cache tier for this selection are listed but draw no bars.',
     configPlaceholder: 'Configuration',
+    recipeLabel: 'Recipe',
+    recipeTooltip:
+      'Parallelism, speculative decoding, and KV offload of the plotted rows. A configuration can run several recipes at the same concurrency; each is plotted on its own so one sweep never mixes them.',
+    recipeOption: (label: string, rows: number) => `${label} (${rows} rows)`,
     ceiling: 'Theoretical ceiling',
     errorLoading: 'Error loading data. Please try a different selection.',
     noData:
@@ -87,7 +92,7 @@ const STRINGS = {
     colHost: 'Host',
     colUnreused: 'Not reused',
     colCeiling: 'Ceiling',
-    colTp: 'TP',
+    colRecipe: 'Recipe',
     colRun: 'Run',
     viewRun: 'View',
     official: 'Official',
@@ -100,6 +105,10 @@ const STRINGS = {
     configTooltip:
       '要绘制的芯片与推理框架组合。当前选择下未上报任何缓存层级的配置仍会列出，但不绘制柱形。',
     configPlaceholder: '配置',
+    recipeLabel: '方案',
+    recipeTooltip:
+      '所绘数据行的并行方式、投机解码与 KV offload 设置。同一配置在相同并发数下可能有多个方案，每次只绘制一个，避免在同一条扫描中混用。',
+    recipeOption: (label: string, rows: number) => `${label}（${rows} 行）`,
     ceiling: '理论上限',
     errorLoading: '加载数据出错，请尝试其他选择。',
     noData: '当前选择没有实测数据。请尝试其他模型、工作负载或精度。',
@@ -113,7 +122,7 @@ const STRINGS = {
     colHost: '主机',
     colUnreused: '未复用',
     colCeiling: '理论上限',
-    colTp: 'TP',
+    colRecipe: '方案',
     colRun: '运行记录',
     viewRun: '查看',
     official: '官方',
@@ -128,7 +137,7 @@ interface CacheReuseRow {
   host: number | null;
   unreused: number;
   ceiling: number | null;
-  tp: number;
+  recipe: string;
   runUrl: string | null;
 }
 
@@ -175,6 +184,9 @@ function CacheReuseInner() {
   // "the configuration with the most tiered rows", which is why the default
   // is never written back.
   const [configInput, setConfigInput] = useState<string>(() => readUrlParams().c_cfg ?? '');
+  // Empty means the recipe with the most tiered rows; like `c_cfg`, the
+  // default is never written back.
+  const [recipeInput, setRecipeInput] = useState<string>(() => readUrlParams().c_recipe ?? '');
   const [showCeiling, setShowCeiling] = useState(false);
   const [isLegendExpanded, setIsLegendExpanded] = useState(true);
 
@@ -277,10 +289,22 @@ function CacheReuseInner() {
         overlayMeta: overlayGroupMeta,
         overlayLabels,
         config: selectedConfig?.meta ?? { hwKey: '' },
+        recipe: recipeInput || undefined,
       }),
-    [officialPoints, overlayGpuDataByGroupKey, overlayGroupMeta, overlayLabels, selectedConfig],
+    [
+      officialPoints,
+      overlayGpuDataByGroupKey,
+      overlayGroupMeta,
+      overlayLabels,
+      selectedConfig,
+      recipeInput,
+    ],
   );
   const hasAnyData = hasData || hasOverlayData;
+  const plottedRecipeLabel =
+    result.recipes.length > 1
+      ? (result.recipes.find((r) => r.key === result.recipe)?.label ?? '')
+      : '';
   const hasBars = result.bars.length > 0;
 
   const handleModelChange = useCallback(
@@ -304,9 +328,16 @@ function CacheReuseInner() {
     },
     [setSelectedPrecisions],
   );
+  const handleRecipeChange = useCallback((key: string) => {
+    setRecipeInput(key);
+    writeUrlParams({ c_recipe: key });
+    track('cache_reuse_recipe_selected', { recipe: key });
+  }, []);
   const handleConfigChange = useCallback((key: string) => {
     setConfigInput(key);
-    writeUrlParams({ c_cfg: key });
+    // Recipe keys belong to one configuration; carry none across a switch.
+    setRecipeInput('');
+    writeUrlParams({ c_cfg: key, c_recipe: '' });
     track('cache_reuse_config_selected', { config: key });
   }, []);
 
@@ -357,7 +388,7 @@ function CacheReuseInner() {
         host: bar.share.combined ? null : bar.share.host,
         unreused: bar.share.unreused,
         ceiling: bar.share.theoretical,
-        tp: bar.point.tp,
+        recipe: recipeLabelOf(bar.point),
         runUrl:
           bar.runIndex === undefined
             ? (bar.point.sourceRow?.run_url ?? null)
@@ -399,7 +430,7 @@ function CacheReuseInner() {
         sortValue: (r) => r.ceiling ?? -1,
         align: 'right',
       },
-      { header: t.colTp, cell: (r) => r.tp, sortValue: (r) => r.tp, align: 'right' },
+      { header: t.colRecipe, cell: (r) => r.recipe, sortValue: (r) => r.recipe },
       {
         header: t.colRun,
         cell: (r) =>
@@ -430,7 +461,7 @@ function CacheReuseInner() {
       t.colHost,
       t.colUnreused,
       t.colCeiling,
-      t.colTp,
+      t.colRecipe,
       t.colRun,
     ];
     const body = tableRows.map((r) => [
@@ -440,15 +471,16 @@ function CacheReuseInner() {
       r.host ?? '',
       r.unreused,
       r.ceiling ?? '',
-      r.tp,
+      r.recipe,
       r.runUrl ?? '',
     ]);
     exportToCsv(`InferenceX_cache_reuse_${selectedModel}.csv`, headers, body, [
       `${getModelLabel(selectedModel)} • ${getSequenceLabel(selectedSequence, locale)}`,
       selectedConfig?.label ?? '',
+      plottedRecipeLabel,
     ]);
     track('cache_reuse_csv_exported', { model: selectedModel });
-  }, [t, tableRows, selectedModel, selectedSequence, locale, selectedConfig]);
+  }, [t, tableRows, selectedModel, selectedSequence, locale, selectedConfig, plottedRecipeLabel]);
 
   const legendHwKeys = useMemo(
     () => [...new Set([...availableHwKeys, ...(isUnofficialRun ? overlayAvailableHwKeys : [])])],
@@ -465,7 +497,8 @@ function CacheReuseInner() {
       </Heading>
       <p className="text-sm text-muted-foreground mb-2">
         {getModelLabel(selectedModel)} • {getSequenceLabel(selectedSequence, locale)}
-        {selectedConfig ? ` • ${selectedConfig.label}` : ''} • {t.captionSource}
+        {selectedConfig ? ` • ${selectedConfig.label}` : ''}
+        {plottedRecipeLabel ? ` • ${plottedRecipeLabel}` : ''} • {t.captionSource}
       </p>
     </>
   );
@@ -580,6 +613,37 @@ function CacheReuseInner() {
                     />
                   </div>
                 </div>
+                {result.recipes.length > 1 && (
+                  <div className="flex min-w-0 flex-col space-y-1.5">
+                    <LabelWithTooltip
+                      htmlFor="cache-reuse-recipe"
+                      label={t.recipeLabel}
+                      tooltip={t.recipeTooltip}
+                    />
+                    <div data-testid="cache-reuse-recipe-selector">
+                      <MultiSelect
+                        triggerId="cache-reuse-recipe"
+                        options={result.recipes.map((r) => ({
+                          value: r.key,
+                          label: t.recipeOption(r.label, r.tiered),
+                        }))}
+                        value={result.recipe ? [result.recipe] : []}
+                        onChange={(values) => {
+                          const next = values[0];
+                          if (next) handleRecipeChange(next);
+                        }}
+                        open={openDropdown === 'recipe'}
+                        onOpenChange={handleDropdownOpenChange('recipe')}
+                        placeholder={t.recipeLabel}
+                        minSelections={1}
+                        maxSelections={1}
+                        showClearAll={false}
+                        plainSelectedText
+                        showSelectionSummary={false}
+                      />
+                    </div>
+                  </div>
+                )}
               </ControlPanel>
             </TooltipProvider>
           </div>

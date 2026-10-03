@@ -10,6 +10,7 @@ export const VIEW_QUERY_PARAMS = {
     'model',
     'percentile',
     'precisions',
+    'recipe',
     'runId',
     'sequence',
     'tcoBasis',

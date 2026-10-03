@@ -10,6 +10,7 @@
  */
 import { interceptDerivedAgenticMetrics, unlockAgenticGate } from '../support/e2e';
 import {
+  b300Rows,
   interceptCalculatorOverlayRun,
   interceptOverlayRun,
   OVERLAY_RUN_BRANCH,
@@ -85,6 +86,54 @@ describe('Prefix Cache Reuse', () => {
       cy.get(BARS).should('have.length', REAL_CONFIGS.length);
       cy.get('[data-testid="cache-reuse-config-selector"]').should('contain.text', 'B300');
     });
+  });
+
+  describe('serving recipes', () => {
+    for (const width of [393, 1280]) {
+      it(`switches recipes without mixing bars at ${width}px`, () => {
+        cy.viewport(width, 900);
+        interceptOverlayRun();
+        const rows = b300Rows(null).map((row) => ({
+          ...row,
+          prefill_ep: 1,
+          decode_ep: 1,
+          prefill_dp_attention: false,
+          decode_dp_attention: false,
+          prefill_num_workers: 1,
+          decode_num_workers: 1,
+        }));
+        const other = rows.slice(0, 2).map((row) => ({
+          ...row,
+          id: row.id + 100,
+          decode_tp: 16,
+          num_decode_gpu: 16,
+          metrics: { ...row.metrics, server_gpu_cache_hit_rate: 0.6 },
+        }));
+        cy.intercept('GET', '/api/v1/benchmarks*', { body: [...rows, ...other] }).as('recipes');
+        const recipe = 'agg|sn|p1x8/1/-|d1x16/1/-|g8+16|spec-none|offload-on|';
+        cy.visit(`/cache-reuse?c_recipe=${encodeURIComponent(recipe)}`, {
+          onBeforeLoad: dismissNudges,
+        });
+        cy.wait('@recipes');
+        cy.get(BARS).should('have.length', 2);
+        firstRowCell('HBM').should('have.text', '60.0%');
+        firstRowCell('Recipe').should('contain.text', 'TP16');
+        cy.get('[data-testid="cache-reuse-recipe-selector"]').should('contain.text', 'TP16');
+        cy.get('[data-testid="cache-reuse-figure"] figcaption').should(
+          'not.contain.text',
+          'measured rows',
+        );
+        cy.get('#cache-reuse-recipe').click();
+        cy.contains('[role="option"]', 'TP8').click();
+        cy.get(BARS).should('have.length', REAL_CONFIGS.length);
+        firstRowCell('HBM').should('have.text', '80.0%');
+        firstRowCell('Recipe').should('contain.text', 'TP8');
+        cy.get('[data-testid="cache-reuse-controls"]').screenshot(
+          `cache-recipes-controls-${width}`,
+        );
+        cy.get('[data-testid="cache-reuse-figure"]').screenshot(`cache-recipes-chart-${width}`);
+      });
+    }
   });
 
   describe('unofficial-run overlay', () => {

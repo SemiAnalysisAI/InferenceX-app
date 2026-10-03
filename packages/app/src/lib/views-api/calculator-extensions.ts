@@ -97,17 +97,19 @@ export function calculatorExtension(view: CalculatorExtension, request: NextRequ
           'Unknown configuration',
           Object.keys(configurations),
         );
+      const data = config
+        ? buildCacheReuse({
+            ...options,
+            official: groups.official.grouped[config] ?? [],
+            config: configurations[config],
+            recipe: search.get('recipe') ?? undefined,
+          })
+        : null;
       return cachedJson({
         ...envelope,
-        params: { ...envelope.params, config },
+        params: { ...envelope.params, config, recipe: data?.recipe ?? null },
         configurations,
-        data: config
-          ? buildCacheReuse({
-              ...options,
-              official: groups.official.grouped[config] ?? [],
-              config: configurations[config],
-            })
-          : null,
+        data,
       });
     }
     const defaults = profitModelDefaults(params.model as Model);
