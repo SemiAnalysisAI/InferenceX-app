@@ -15,6 +15,12 @@ import {
 import { DISPLAY_MODEL_TO_DB, rowToSequence } from '@semianalysisai/inferencex-constants';
 import type { BenchmarkRow } from '@/lib/api';
 import { track } from '@/lib/analytics';
+import { EngineComparisonConfirmation } from '@/components/engine-comparison-confirmation';
+import {
+  needsEngineComparisonConsent,
+  supportsEngineComparisonConsent,
+  useEngineComparisonConsent,
+} from './hooks/use-engine-comparison-consent';
 import {
   FAVORITE_PRESETS,
   type FavoritePreset,
@@ -294,14 +300,15 @@ export function InferenceProvider({
   } = useGlobalFilterAvailability();
   const { availableRuns, workflowError } = useGlobalFilterWorkflow();
   const { isUnofficialRun } = useUnofficialRun();
-  // The public 8K/1K and Agentic views allow direct cross-engine comparisons.
-  // Unofficial runs and the insiders' gate also lift the guard elsewhere.
+  // ↑↑↓↓ insiders' gate: when unlocked, the cross-engine comparability guard is
+  // lifted so vLLM and SGLang configs can share one graph while tuning configs.
   const featureGateUnlocked = useFeatureGate();
   const engineGuardLifted = isEngineGuardLifted(isUnofficialRun, featureGateUnlocked);
-  const comparisonGuardLifted =
-    engineGuardLifted ||
-    effectiveSequence === Sequence.EightK_OneK ||
-    effectiveSequence === Sequence.AgenticTraces;
+  const engineConsent = useEngineComparisonConsent(
+    `${selectedModel}|${effectiveSequence}|${effectivePrecisions.join(',')}`,
+  );
+  const consentSupported = supportsEngineComparisonConsent(effectiveSequence);
+  const comparisonGuardLifted = engineGuardLifted || (consentSupported && engineConsent.accepted);
 
   const { getUrlParam, setUrlParams } = useUrlState();
   const [hasExplicitRunSelection, setHasExplicitRunSelection] = useState(() =>
@@ -337,9 +344,18 @@ export function InferenceProvider({
       ),
     [selectedModel, effectiveSequence, comparisonGuardLifted, overviewHistoryPair],
   );
+  const requestEngineComparison = useCallback(
+    (keys: Iterable<string>, apply: () => void): boolean => {
+      if (!consentSupported || !needsEngineComparisonConsent(keys, exclusion)) return false;
+      engineConsent.request(apply);
+      track('inference_engine_comparison_confirmation_opened');
+      return true;
+    },
+    [consentSupported, exclusion, engineConsent.request],
+  );
   const defaultExclusionGroup = useMemo(
-    () => comparisonDefaultGroup(effectiveSequence, comparisonGuardLifted),
-    [effectiveSequence, comparisonGuardLifted],
+    () => comparisonDefaultGroup(effectiveSequence, engineGuardLifted),
+    [effectiveSequence, engineGuardLifted],
   );
   const exclusionPolicy: ExclusionConflictPolicy = comparisonExclusionPolicy(effectiveSequence);
 
@@ -948,6 +964,13 @@ export function InferenceProvider({
   );
   const setSelectedGPUsAndClear = useCallback(
     (next: string[]) => {
+      if (
+        requestEngineComparison(next, () => {
+          setSelectedGpuState(next);
+          clearScopedSelectionOnChange();
+        })
+      )
+        return;
       if (!exclusion) {
         setSelectedGpuState(next);
         clearScopedSelectionOnChange();
@@ -1007,6 +1030,7 @@ export function InferenceProvider({
       exclusionPolicy,
       clearPresetOnChange,
       clearScopedSelectionOnChange,
+      requestEngineComparison,
     ],
   );
   const setSelectedDatesAndClear = useCallback(
@@ -1221,6 +1245,17 @@ export function InferenceProvider({
 
   const setBestPerSkuAndApply = useCallback(
     (enabled: boolean, options?: { applySelection?: boolean }) => {
+      if (
+        !enabled &&
+        options?.applySelection !== false &&
+        requestEngineComparison(selectableHwTypes, () => {
+          setBestPerSku(false);
+          setActiveHwTypes(selectableHwTypes);
+          setActivePresetId(null);
+          presetHwFilterRef.current = null;
+        })
+      )
+        return;
       setBestPerSku(enabled);
       // Overlay-mode legend edits own a temporary unified selection. They can
       // disable the automatic mode without replacing the context selection
@@ -1231,7 +1266,7 @@ export function InferenceProvider({
       setActivePresetId(null);
       presetHwFilterRef.current = null;
     },
-    [bestHwTypes, selectableHwTypes, resolveHwSelection, setActiveHwTypes],
+    [bestHwTypes, selectableHwTypes, resolveHwSelection, setActiveHwTypes, requestEngineComparison],
   );
 
   // Direct fallback: apply pendingHwFilter when selectableHwTypes is already populated
@@ -1251,6 +1286,18 @@ export function InferenceProvider({
 
   const toggleHwType = useCallback(
     (hw: string) => {
+      const proposed = computeToggle(activeHwTypes, hw, selectableHwTypes);
+      if (
+        // Solo/restore clicks retain the exclusion-aware selection below.
+        !activeHwTypes.has(hw) &&
+        requestEngineComparison(proposed, () => {
+          setActiveHwTypes(proposed);
+          setBestPerSku(false);
+          setActivePresetId(null);
+          presetHwFilterRef.current = null;
+        })
+      )
+        return;
       // Toggle against the selection universe, not the metric-filtered legend:
       // computeToggle's "everything is on, so solo this one" branch compares
       // set sizes, and activeHwTypes is sized against selectableHwTypes.
@@ -1261,7 +1308,13 @@ export function InferenceProvider({
       setActivePresetId(null);
       presetHwFilterRef.current = null;
     },
-    [activeHwTypes, selectableHwTypes, setActiveHwTypes, toggleComparisonSelection],
+    [
+      activeHwTypes,
+      selectableHwTypes,
+      setActiveHwTypes,
+      toggleComparisonSelection,
+      requestEngineComparison,
+    ],
   );
 
   const removeHwType = useCallback(
@@ -1289,6 +1342,13 @@ export function InferenceProvider({
   );
   const removeActiveDate = useCallback((id: string) => removeDateRaw(id), [removeDateRaw]);
   const selectAllHwTypes = useCallback(() => {
+    if (
+      requestEngineComparison(selectableHwTypes, () => {
+        setBestPerSku(false);
+        setActiveHwTypes(selectableHwTypes);
+      })
+    )
+      return;
     setBestPerSku(false);
     if (exclusion) {
       const { result, droppedGroups } = resolveHwSelection(selectableHwTypes, activeHwTypes);
@@ -1309,6 +1369,7 @@ export function InferenceProvider({
     exclusion,
     resolveHwSelection,
     setActiveHwTypes,
+    requestEngineComparison,
   ]);
   const selectAllActiveDates = useCallback(
     () => selectAllDatesRaw(allDateIds),
@@ -1326,10 +1387,11 @@ export function InferenceProvider({
   // reset commits as soon as data for the new model arrives — without this, switching models
   // bails on the empty-data tick and never re-fires, leaving the legend at the prior intersection.
   const precisionsKey = effectivePrecisions.join(',');
-  // Keyed on the resolved guard state: the feature gate hydrates from
-  // localStorage after mount, so selection must be revisited when it changes.
+  // Keyed on the resolved guard state rather than isUnofficialRun alone: the
+  // feature gate hydrates from localStorage after mount, so the first-paint
+  // official resolution must be revisited once the gate unlocks (or re-locks).
   const hwResetKey = `${selectedModel}|${effectiveSequence}|${precisionsKey}|${
-    comparisonGuardLifted ? 'unrestricted' : 'guarded'
+    engineGuardLifted ? 'preview' : 'official'
   }`;
   const lastHwResetKeyRef = useRef('');
 
@@ -1952,6 +2014,29 @@ export function InferenceProvider({
       <EngineComparisonConflictToast
         detail={comparisonGuardLifted ? null : engineConflict}
         onDismiss={dismissEngineConflict}
+        onCompare={
+          consentSupported
+            ? () => {
+                const keys = selectedGpuState.length > 0 ? selectedGpuState : selectableHwTypes;
+                requestEngineComparison(keys, () => {
+                  setBestPerSku(false);
+                  setActiveHwTypes(new Set(keys));
+                  setEngineConflict(null);
+                });
+              }
+            : undefined
+        }
+      />
+      <EngineComparisonConfirmation
+        open={engineConsent.open}
+        onCancel={() => {
+          engineConsent.cancel();
+          track('inference_engine_comparison_confirmation_cancelled');
+        }}
+        onConfirm={() => {
+          engineConsent.confirm();
+          track('inference_engine_comparison_confirmation_accepted');
+        }}
       />
       <Dialog open={showDateRangeDialog} onOpenChange={setShowDateRangeDialog}>
         <DialogContent>
