@@ -65,8 +65,6 @@ import { useThroughputData, type GroupMeta } from './useThroughputData';
 const STRINGS = {
   en: {
     title: 'Prefix Cache Reuse',
-    description:
-      'Where a configuration finds its prompt tokens as concurrency rises: served from the chip’s HBM cache, from the host tier behind it, or recomputed. Each stacked bar is one measured row, read from the runtime’s own cache counters.',
     benchmarkGroup: 'Benchmark Config',
     chartGroup: 'Chart Config',
     configLabel: 'Configuration',
@@ -85,13 +83,8 @@ const STRINGS = {
       'Fixed-sequence runs record no prefix-cache tiers, so there is nothing to stack here. Switch the scenario to AgentX.',
     noTiers:
       'None of the measured rows for this configuration reported a prefix-cache tier. Try another configuration or run date.',
-    captionRows: (tiered: number, measured: number) =>
-      `${tiered} of ${measured} measured rows report cache tiers`,
     captionSource: 'Source: SemiAnalysis InferenceX',
     unofficialRun: 'Unofficial run',
-    note: 'Note:',
-    methodology:
-      ' Shares are the runtime’s own prefix-cache hit counters over all prompt tokens of the run, so HBM, host, and not-reused sum to 100%. The host tier is the CPU-offload rate (HiCache and similar host-memory caches) and falls back to the router’s external cache rate only when a row reports no CPU figure; the two are never added together. TensorRT-LLM with offload enabled reports both tiers as one figure, drawn as a single reused segment. The dashed tick is the trace’s infinite-cache ceiling.',
     colSeries: 'Series',
     colConcurrency: 'Concurrency',
     colHbm: 'HBM',
@@ -105,8 +98,6 @@ const STRINGS = {
   },
   zh: {
     title: '前缀缓存复用',
-    description:
-      '随并发数上升，一个配置的 prompt token 从哪里来：命中芯片 HBM 缓存、命中其后的主机层缓存，还是重新计算。每个堆叠柱形对应一行实测数据，数值取自运行时自身的缓存计数。',
     benchmarkGroup: '基准测试配置',
     chartGroup: '图表配置',
     configLabel: '配置',
@@ -122,13 +113,8 @@ const STRINGS = {
     noData: '当前选择没有实测数据。请尝试其他模型、工作负载或精度。',
     noTiersFixed: '固定序列的运行不记录前缀缓存层级，此处没有可堆叠的数据。请将场景切换为 AgentX。',
     noTiers: '该配置的实测数据行均未上报前缀缓存层级。请尝试其他配置或运行日期。',
-    captionRows: (tiered: number, measured: number) =>
-      `${measured} 行实测数据中有 ${tiered} 行上报缓存层级`,
     captionSource: '来源：SemiAnalysis InferenceX',
     unofficialRun: '非官方运行',
-    note: '注：',
-    methodology:
-      ' 占比取自运行时自身的前缀缓存命中计数，分母为本次运行的全部 prompt token，因此 HBM、主机与未复用三者之和为 100%。主机层取 CPU offload 命中率（HiCache 等主机内存缓存），仅当数据行未上报 CPU 数值时才改用 router 的外部缓存命中率，两者不会相加。TensorRT-LLM 开启 offload 时将两层合并上报，图中绘制为单个复用段。虚线刻度为该 trace 的无限缓存理论上限。',
     colSeries: '系列',
     colConcurrency: '并发数',
     colHbm: 'HBM',
@@ -314,10 +300,6 @@ function CacheReuseInner() {
     ],
   );
   const hasAnyData = hasData || hasOverlayData;
-  // Caption counts describe the plotted recipe, not every row of the group.
-  const tieredRows = result.bars.filter((b) => b.seriesKey === 'official').length;
-  const measuredRows =
-    tieredRows + result.unmeasured.filter((u) => u.seriesKey === 'official').length;
   const plottedRecipeLabel =
     result.recipes.length > 1
       ? (result.recipes.find((r) => r.key === result.recipe)?.label ?? '')
@@ -514,9 +496,8 @@ function CacheReuseInner() {
       </Heading>
       <p className="text-sm text-muted-foreground mb-2">
         {getModelLabel(selectedModel)} • {getSequenceLabel(selectedSequence, locale)}
-        {selectedConfig ? ` • ${selectedConfig.label}` : ''} •{' '}
-        {plottedRecipeLabel ? `${plottedRecipeLabel} • ` : ''}
-        {t.captionRows(tieredRows, measuredRows)} • {t.captionSource}
+        {selectedConfig ? ` • ${selectedConfig.label}` : ''}
+        {plottedRecipeLabel ? ` • ${plottedRecipeLabel}` : ''} • {t.captionSource}
       </p>
     </>
   );
@@ -560,11 +541,7 @@ function CacheReuseInner() {
       <section data-testid="cache-reuse-controls">
         <Card className="relative z-30">
           <div className="flex flex-col gap-4">
-            <DashboardSectionHeader
-              title={t.title}
-              description={t.description}
-              actions={<ChartShareActions />}
-            />
+            <DashboardSectionHeader title={t.title} actions={<ChartShareActions />} />
 
             <TooltipProvider delayDuration={0}>
               <ControlPanel
@@ -723,11 +700,6 @@ function CacheReuseInner() {
               </>
             )}
           </figure>
-
-          <p className="mt-4 text-xs text-muted-foreground">
-            <strong>{t.note}</strong>
-            {t.methodology}
-          </p>
 
           {tableRows.length > 0 && (
             <div className="mt-4">
