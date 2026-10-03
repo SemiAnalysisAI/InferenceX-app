@@ -1,3 +1,4 @@
+import { parallelismLabel } from '@/components/inference/utils/parallelism-label';
 import { frameworkFamily } from '@/lib/framework-family';
 import { isKvOffloadEnabled } from '@/lib/kv-offload';
 
@@ -116,6 +117,10 @@ export interface CacheReuseResult {
   /** Rows of the chosen configuration that reported no cache tier, per series. */
   unmeasured: { seriesKey: string; concurrency: number; point: GPUDataPoint }[];
   anyCombined: boolean;
+  /** Official recipes of the configuration, for the recipe selector. */
+  recipes: CacheReuseRecipe[];
+  /** The recipe the official series plots; null when there are no official rows. */
+  recipe: string | null;
 }
 
 export interface CacheReuseInput {
@@ -126,6 +131,101 @@ export interface CacheReuseInput {
   overlayLabels?: Record<number, string>;
   /** The chosen configuration, matched against overlay group metadata. */
   config: GroupMeta;
+  /**
+   * The serving recipe plotted, a `recipeKeyOf` value. Absent or unknown means
+   * the official recipe with the most tiered rows.
+   */
+  recipe?: string;
+}
+
+/**
+ * One serving recipe inside a configuration group. A group is hardware +
+ * framework (+ precision) only, so the same concurrency can carry several
+ * recipes — 4×DEP8 with KV offload off and on, 2×TP16 — each with its own cache
+ * behaviour. Bars from different recipes are not comparable along one sweep.
+ */
+export interface CacheReuseRecipe {
+  key: string;
+  label: string;
+  rows: number;
+  tiered: number;
+}
+
+/**
+ * Everything that makes two rows of one group different deployments at the same
+ * concurrency: parallelism, worker layout, disaggregation, speculative decoding,
+ * KV offload, and the recipe fingerprint when the producer stamps one.
+ */
+export function recipeKeyOf(point: GPUDataPoint): string {
+  const row = point.sourceRow;
+  if (!row) return `tp${point.tp}`;
+  return [
+    row.disagg ? 'disagg' : 'agg',
+    row.is_multinode ? 'mn' : 'sn',
+    `p${row.prefill_num_workers}x${row.prefill_tp}/${row.prefill_ep}/${row.prefill_dp_attention ? 'dpa' : '-'}`,
+    `d${row.decode_num_workers}x${row.decode_tp}/${row.decode_ep}/${row.decode_dp_attention ? 'dpa' : '-'}`,
+    `g${row.num_prefill_gpu}+${row.num_decode_gpu}`,
+    `spec-${row.spec_method || 'none'}`,
+    `offload-${row.offload_mode || 'off'}`,
+    row.recipe_fingerprint ? `fp-${row.recipe_fingerprint}` : '',
+  ].join('|');
+}
+
+export function recipeLabelOf(point: GPUDataPoint): string {
+  const row = point.sourceRow;
+  if (!row) return `TP${point.tp}`;
+  const decodeOnly = !row.disagg && row.decode_tp > 0;
+  const parallel = parallelismLabel({
+    tp: decodeOnly ? row.decode_tp : row.prefill_tp,
+    ep: decodeOnly ? row.decode_ep : row.prefill_ep,
+    dpAttention: decodeOnly ? row.decode_dp_attention : row.prefill_dp_attention,
+    disagg: row.disagg,
+    isMultinode: row.is_multinode,
+    prefillTp: row.prefill_tp,
+    prefillEp: row.prefill_ep,
+    prefillDpAttention: row.prefill_dp_attention,
+    prefillNumWorkers: row.prefill_num_workers,
+    decodeTp: row.decode_tp,
+    decodeEp: row.decode_ep,
+    decodeDpAttention: row.decode_dp_attention,
+    decodeNumWorkers: row.decode_num_workers,
+  });
+  const workers = !row.disagg && row.decode_num_workers > 1 ? `${row.decode_num_workers}×` : '';
+  const bareTp = [...parallel].every((c) => c >= '0' && c <= '9');
+  const parts = [`${workers}${bareTp ? `TP${parallel}` : parallel}`];
+  if (row.spec_method && row.spec_method !== 'none') parts.push(row.spec_method.toUpperCase());
+  const offloadOn = isKvOffloadEnabled({
+    kv_offloading: typeof row.metrics.kv_offloading === 'string' ? row.metrics.kv_offloading : null,
+    offload_mode: row.offload_mode,
+  });
+  parts.push(offloadOn ? 'KV offload' : 'no offload');
+  if (row.recipe_fingerprint) parts.push(row.recipe_fingerprint.slice(0, 7));
+  return parts.join(' · ');
+}
+
+/** Recipes in a group, most tiered rows first, then most rows, then label. */
+export function cacheReuseRecipes(points: readonly GPUDataPoint[]): CacheReuseRecipe[] {
+  const byKey = new Map<string, CacheReuseRecipe>();
+  for (const point of points) {
+    const key = recipeKeyOf(point);
+    const entry = byKey.get(key) ?? { key, label: recipeLabelOf(point), rows: 0, tiered: 0 };
+    entry.rows += 1;
+    if (cacheShareOf(point)) entry.tiered += 1;
+    byKey.set(key, entry);
+  }
+  return [...byKey.values()].toSorted(
+    (a, b) => b.tiered - a.tiered || b.rows - a.rows || a.label.localeCompare(b.label),
+  );
+}
+
+/** The requested recipe when the points carry it, else the best-covered one. */
+export function resolveRecipe(
+  points: readonly GPUDataPoint[],
+  requested: string | undefined,
+): string | null {
+  const recipes = cacheReuseRecipes(points);
+  if (requested && recipes.some((r) => r.key === requested)) return requested;
+  return recipes[0]?.key ?? null;
 }
 
 /**
@@ -136,9 +236,21 @@ export interface CacheReuseInput {
 export function buildCacheReuse(input: CacheReuseInput): CacheReuseResult {
   // A configuration that exists only in a loaded run has no official slot;
   // listing one anyway would halve every run bar beside an empty column.
+  const recipes = cacheReuseRecipes(input.official);
+  const recipe = resolveRecipe(input.official, input.recipe);
+  // One recipe per series. A run keeps the plotted recipe when it measured it,
+  // and otherwise its own best-covered recipe, so a branch that tries a new
+  // layout still draws without mixing layouts within its bars.
+  const ofRecipe = (points: readonly GPUDataPoint[], wanted: string | null) => {
+    const key = points.some((p) => recipeKeyOf(p) === wanted)
+      ? wanted
+      : resolveRecipe(points, undefined);
+    return points.filter((p) => recipeKeyOf(p) === key);
+  };
+  const official = ofRecipe(input.official, recipe);
   const series: CacheReuseSeries[] =
-    input.official.length > 0 ? [{ key: 'official', label: 'official' }] : [];
-  const perSeries = new Map<string, readonly GPUDataPoint[]>([['official', input.official]]);
+    official.length > 0 ? [{ key: 'official', label: 'official' }] : [];
+  const perSeries = new Map<string, readonly GPUDataPoint[]>([['official', official]]);
 
   const runIndexes = new Set<number>();
   for (const [groupKey, meta] of Object.entries(input.overlayMeta ?? {})) {
@@ -149,6 +261,10 @@ export function buildCacheReuse(input: CacheReuseInput): CacheReuseResult {
     runIndexes.add(meta.runIndex);
     const key = `run:${meta.runIndex}`;
     perSeries.set(key, [...(perSeries.get(key) ?? []), ...points]);
+  }
+  for (const runIndex of runIndexes) {
+    const key = `run:${runIndex}`;
+    perSeries.set(key, ofRecipe(perSeries.get(key) ?? [], recipe));
   }
   for (const runIndex of [...runIndexes].toSorted((a, b) => a - b)) {
     series.push({
@@ -162,8 +278,8 @@ export function buildCacheReuse(input: CacheReuseInput): CacheReuseResult {
   const unmeasured: CacheReuseResult['unmeasured'] = [];
   const concurrencies = new Set<number>();
   for (const entry of series) {
-    // One bar per concurrency: the latest official row is already unique per
-    // (config, concurrency); a run that repeats one keeps its first row.
+    // One bar per concurrency: within one recipe the latest official row is
+    // unique per concurrency; a run that repeats one keeps its first row.
     const seen = new Set<number>();
     for (const point of perSeries.get(entry.key) ?? []) {
       if (seen.has(point.concurrency)) continue;
@@ -191,6 +307,8 @@ export function buildCacheReuse(input: CacheReuseInput): CacheReuseResult {
     bars,
     unmeasured,
     anyCombined: bars.some((b) => b.share.combined),
+    recipes,
+    recipe,
   };
 }
 
