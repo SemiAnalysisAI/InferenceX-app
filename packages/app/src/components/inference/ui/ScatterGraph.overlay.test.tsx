@@ -82,7 +82,7 @@ describe('ScatterGraph unofficial overlays', () => {
         dash: curve.getAttribute('stroke-dasharray'),
       }));
     const initialCurves = curves();
-    expect(initialCurves).toHaveLength(2);
+    expect(initialCurves).toHaveLength(1);
     expect(initialCurves.every((curve) => curve.path)).toBe(true);
     expect(visibleLabels()).toHaveLength(0);
 
@@ -90,7 +90,7 @@ describe('ScatterGraph unofficial overlays', () => {
       inferenceState.current = { ...inferenceState.current, showGradientLabels };
       rerender();
       const labels = visibleLabels();
-      expect(labels).toHaveLength(showGradientLabels ? 4 : 0);
+      expect(labels).toHaveLength(showGradientLabels ? 2 : 0);
       for (const [index, run] of runInfos.entries()) {
         const runLabels = labels.filter((label) => {
           const group = label.closest('.unofficial-overlay-pt') as SVGGElement & {
@@ -100,13 +100,17 @@ describe('ScatterGraph unofficial overlays', () => {
           expect(group.__data__.tp).not.toBe(8);
           return group.__data__.run_url === run.url;
         });
-        expect(runLabels.map((label) => label.textContent).sort()).toEqual(
-          showGradientLabels ? ['TP1', 'TP4'] : [],
-        );
+        if (index === 1) {
+          expect(runLabels.map((label) => label.textContent).sort()).toEqual(
+            showGradientLabels ? ['TP1', 'TP4'] : [],
+          );
+        } else {
+          expect(runLabels).toHaveLength(0);
+        }
         const legendItem = legendState.current!.legendItems.find(
           (item: { hw: string }) => item.hw === `overlay-run-${run.id}`,
         );
-        expect(legendItem.color).toBe(initialCurves[index].color);
+        if (index === 0) expect(legendItem.color).toBe(initialCurves[0].color);
         for (const label of runLabels) expect(label.style.fill).toBe(legendItem.color);
       }
       expect(curves()).toEqual(initialCurves);
@@ -128,7 +132,7 @@ describe('ScatterGraph unofficial overlays', () => {
 
     overlayState.current = initialOverlayState;
     rerender();
-    expect(visibleLabels()).toHaveLength(4);
+    expect(visibleLabels()).toHaveLength(2);
     expect(curves()).toEqual(initialCurves);
 
     props.overlayData = {
@@ -203,7 +207,7 @@ describe('ScatterGraph unofficial overlays', () => {
     const axisGeometry = axes.map((axis) => axis.innerHTML);
     const positions = groups.map((group) => group.getAttribute('transform'));
     expect(groups).toHaveLength(9);
-    expect(curves).toHaveLength(3);
+    expect(curves).toHaveLength(2);
     expect(paths.every(Boolean)).toBe(true);
 
     for (const showAllMeasurements of [false, true, false]) {
@@ -211,7 +215,7 @@ describe('ScatterGraph unofficial overlays', () => {
       rerender();
       for (const group of groups) {
         const datum = (group as SVGGElement & { __data__: InferenceData }).__data__;
-        const visible = showAllMeasurements || datum.x !== 20;
+        const visible = showAllMeasurements || (datum.x !== 20 && datum.run_url !== runUrls[0]);
         expect(group.style.opacity).toBe(visible ? '1' : '0');
         expect(group.style.pointerEvents).toBe(visible ? 'auto' : 'none');
         expect(Boolean(group.querySelector('.legacy-power-ring'))).toBe(
@@ -223,7 +227,7 @@ describe('ScatterGraph unofficial overlays', () => {
       ).toContain(
         showAllMeasurements
           ? 'Showing 9 of 9 measured points: 3/3 validated · 6/6 historical.'
-          : 'Showing 6 of 9 measured points: 3/3 validated · 3/6 historical.',
+          : 'Showing 4 of 9 measured points: 2/3 validated · 2/6 historical.',
       );
       expect(curves.map((curve) => curve.getAttribute('d'))).toEqual(paths);
       expect(axes.map((axis) => axis.innerHTML)).toEqual(axisGeometry);
