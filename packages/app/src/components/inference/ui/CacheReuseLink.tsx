@@ -1,7 +1,9 @@
 'use client';
 
 import Link from 'next/link';
+import { useContext } from 'react';
 
+import { GlobalFilterRunContext } from '@/components/GlobalFilterContext';
 import type { PointMeta } from '@/hooks/api/use-trace-server-metrics';
 import { track } from '@/lib/analytics';
 import { cacheReuseHref } from '@/lib/cache-reuse-link';
@@ -16,9 +18,16 @@ const STRINGS = {
 export function CacheReuseLink({ point, className }: { point?: PointMeta; className?: string }) {
   const locale = useLocale();
   const t = STRINGS[locale];
+  // A point can render outside the chart provider. Chart links subscribe to
+  // current run intent instead of depending on the debounced URL-state store.
+  const run = useContext(GlobalFilterRunContext);
   return (
     <Link
-      href={cacheReuseHref(locale, point)}
+      href={cacheReuseHref(
+        locale,
+        point,
+        run ? { date: run.selectedRunDate, id: run.requestedRunId } : undefined,
+      )}
       data-testid="cache-reuse-link"
       className={
         className ?? 'text-xs leading-5 text-muted-foreground underline hover:text-foreground'

@@ -131,4 +131,4 @@ flags do not make public data sensitive.
 
 ### Cache-reuse recipe selection
 
-Pass a returned `data.recipes[].key` as `recipe`; `params.recipe` identifies the resolved selection. Missing or stale keys use the dashboard default. Each run uses the selected recipe if available, otherwise its own best-covered recipe. Inspect each bar's source row for its recipe identity. Without official rows, choices come from matching overlay runs.
+Pass a returned `data.recipes[].key` as `recipe`; `params.recipe` identifies the resolved selection. Omitted keys use the dashboard default. Unknown keys return 400 with allowed keys; do not silently substitute another recipe. Recipe identity includes PP/DCP/PCP widths even without a fingerprint. Preserve the source `runId` for a historical point; a date alone may resolve another same-day run. Each run uses the selected recipe if available, otherwise its own best-covered recipe. Inspect each bar's source row for its recipe identity. Without official rows, choices come from matching overlay runs.

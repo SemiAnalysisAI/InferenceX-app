@@ -507,17 +507,50 @@ describe('cache-reuse recipe selection', () => {
     expect(body.data.bars).toHaveLength(1);
     expect(body.data.bars[0]).toMatchObject({ seriesKey: 'run:0', share: { hbm: 0.6, host: 0.2 } });
   });
-  it.each(['', '&recipe=unknown'])(
-    'uses the dashboard default for missing or stale recipe keys (%s)',
-    async (suffix) => {
-      mocks.benchmarks.mockImplementation(() => Response.json(rows));
-      const response = await cache(req('cache-reuse', query + suffix));
-      expect(response.status).toBe(200);
-      const body = await response.json();
-      expect(body.params.recipe).toBe(original);
-      expect(
-        body.data.bars.map((bar: { point: { sourceRow: BenchmarkRow } }) => bar.point.sourceRow.id),
-      ).toEqual([1, 2]);
-    },
-  );
+  it('uses the dashboard default only when the recipe is omitted', async () => {
+    mocks.benchmarks.mockImplementation(() => Response.json(rows));
+    const response = await cache(req('cache-reuse', query));
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.params.recipe).toBe(original);
+    expect(
+      body.data.bars.map((bar: { point: { sourceRow: BenchmarkRow } }) => bar.point.sourceRow.id),
+    ).toEqual([1, 2]);
+  });
+});
+
+describe('unavailable cache-reuse recipes', () => {
+  it('returns an actionable error instead of another recipe', async () => {
+    mocks.benchmarks.mockImplementation(() => Response.json([agenticRow()]));
+    const response = await cache(req('cache-reuse', 'model=DeepSeek-V4-Pro&recipe=missing'));
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({
+      param: 'recipe',
+      error: 'Recipe is unavailable in this snapshot',
+      allowed: ['agg|sn|p1x8/1/-|d1x8/1/-|g8+8|spec-none|offload-off|'],
+    });
+  });
+  it('keeps context-parallel recipes separately selectable', async () => {
+    const rows = [
+      agenticRow({ id: 1 }),
+      agenticRow({
+        id: 2,
+        metrics: { ...agenticRow().metrics, decode_dcp_size: 8, server_gpu_cache_hit_rate: 0.6 },
+      }),
+    ];
+    mocks.benchmarks.mockImplementation(() => Response.json(rows));
+    const recipe = 'agg|sn|p1x8/1/-|d1x8/1/-|g8+8|spec-none|offload-off||parallel-1/1/1/8/1/1';
+    const response = await cache(
+      req('cache-reuse', `model=DeepSeek-V4-Pro&recipe=${encodeURIComponent(recipe)}`),
+    );
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.data.recipes).toHaveLength(2);
+    expect(
+      body.data.bars.map((bar: { point: { sourceRow: BenchmarkRow }; share: { hbm: number } }) => [
+        bar.point.sourceRow.id,
+        bar.share.hbm,
+      ]),
+    ).toEqual([[2, 0.6]]);
+  });
 });

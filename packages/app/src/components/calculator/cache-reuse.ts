@@ -133,8 +133,9 @@ export interface CacheReuseInput {
   /** The chosen configuration, matched against overlay group metadata. */
   config: GroupMeta;
   /**
-   * The serving recipe plotted, a `recipeKeyOf` value. Absent or unknown means
+   * The serving recipe plotted, a `recipeKeyOf` value. Absent means
    * the recipe with the most tiered rows, using overlays only without official rows.
+   * An unknown explicit key returns no bars.
    */
   recipe?: string;
 }
@@ -180,8 +181,17 @@ export function cacheReuseRecipeKey(
     | 'num_decode_gpu'
     | 'recipe_fingerprint'
     | 'spec_method'
-  > & { offload_mode: string | null },
+  > & { offload_mode: string | null; metrics?: BenchmarkRow['metrics'] },
 ): string {
+  const m = row.metrics ?? {};
+  const parallelism = [
+    m.prefill_pp ?? 1,
+    m.decode_pp ?? 1,
+    m.prefill_dcp_size ?? m.dcp_size ?? 1,
+    m.decode_dcp_size ?? m.dcp_size ?? 1,
+    m.prefill_pcp_size ?? m.pcp_size ?? 1,
+    m.decode_pcp_size ?? m.pcp_size ?? 1,
+  ];
   return [
     row.disagg ? 'disagg' : 'agg',
     row.is_multinode ? 'mn' : 'sn',
@@ -191,6 +201,10 @@ export function cacheReuseRecipeKey(
     `spec-${row.spec_method || 'none'}`,
     `offload-${row.offload_mode || 'off'}`,
     row.recipe_fingerprint ? `fp-${row.recipe_fingerprint}` : '',
+    // Fingerprints already distinguish complete recipes; keep their existing links stable.
+    ...(!row.recipe_fingerprint && parallelism.some((size) => size > 1)
+      ? [`parallel-${parallelism.join('/')}`]
+      : []),
   ].join('|');
 }
 
@@ -198,6 +212,11 @@ export function recipeLabelOf(point: GPUDataPoint): string {
   const row = point.sourceRow;
   if (!row) return `TP${point.tp}`;
   const decodeOnly = !row.disagg && row.decode_tp > 0;
+  const m = row.metrics;
+  const prefillDcp = m.prefill_dcp_size ?? m.dcp_size;
+  const decodeDcp = m.decode_dcp_size ?? m.dcp_size;
+  const prefillPcp = m.prefill_pcp_size ?? m.pcp_size;
+  const decodePcp = m.decode_pcp_size ?? m.pcp_size;
   const parallel = parallelismLabel({
     tp: decodeOnly ? row.decode_tp : row.prefill_tp,
     ep: decodeOnly ? row.decode_ep : row.prefill_ep,
@@ -212,6 +231,15 @@ export function recipeLabelOf(point: GPUDataPoint): string {
     decodeEp: row.decode_ep,
     decodeDpAttention: row.decode_dp_attention,
     decodeNumWorkers: row.decode_num_workers,
+    pp: Math.max(m.prefill_pp ?? 1, m.decode_pp ?? 1),
+    dcp: Math.max(prefillDcp ?? 1, decodeDcp ?? 1),
+    pcp: Math.max(prefillPcp ?? 1, decodePcp ?? 1),
+    prefillPp: m.prefill_pp,
+    decodePp: m.decode_pp,
+    prefillDcp,
+    decodeDcp,
+    prefillPcp,
+    decodePcp,
   });
   const workers = !row.disagg && row.decode_num_workers > 1 ? `${row.decode_num_workers}×` : '';
   const bareTp = [...parallel].every((c) => c >= '0' && c <= '9');
@@ -241,13 +269,13 @@ export function cacheReuseRecipes(points: readonly GPUDataPoint[]): CacheReuseRe
   );
 }
 
-/** The requested recipe when the points carry it, else the best-covered one. */
+/** Explicit recipes must exist; only an omitted selection uses the default. */
 export function resolveRecipe(
   points: readonly GPUDataPoint[],
   requested: string | undefined,
 ): string | null {
   const recipes = cacheReuseRecipes(points);
-  if (requested && recipes.some((r) => r.key === requested)) return requested;
+  if (requested) return recipes.some((r) => r.key === requested) ? requested : null;
   return recipes[0]?.key ?? null;
 }
 
@@ -272,6 +300,17 @@ export function buildCacheReuse(input: CacheReuseInput): CacheReuseResult {
   const recipePoints = input.official.length > 0 ? input.official : [...perSeries.values()].flat();
   const recipes = cacheReuseRecipes(recipePoints);
   const recipe = resolveRecipe(recipePoints, input.recipe);
+  if (input.recipe && recipe === null) {
+    return {
+      series: [],
+      concurrencies: [],
+      bars: [],
+      unmeasured: [],
+      anyCombined: false,
+      recipes,
+      recipe,
+    };
+  }
   // One recipe per series. A run keeps the plotted recipe when it measured it,
   // and otherwise its own best-covered recipe, so a branch that tries a new
   // layout still draws without mixing layouts within its bars.

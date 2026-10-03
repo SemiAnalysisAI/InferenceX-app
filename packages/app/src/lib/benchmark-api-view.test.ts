@@ -132,3 +132,39 @@ describe('toCalculatorBenchmarkRows', () => {
     ]);
   });
 });
+
+describe('cache-reuse recipe projection', () => {
+  it('preserves role-specific and legacy context-parallel widths', () => {
+    const [row] = toCalculatorBenchmarkRows(
+      [
+        {
+          benchmark_type: 'agentic_traces',
+          isl: null,
+          osl: null,
+          metrics: {
+            prefill_pp: 2,
+            decode_pp: 4,
+            prefill_dcp_size: 2,
+            decode_dcp_size: 8,
+            prefill_pcp_size: 4,
+            decode_pcp_size: 2,
+            dcp_size: 8,
+            pcp_size: 4,
+            debug: 999,
+          },
+        },
+      ],
+      'agentic-traces',
+    );
+    expect(row.metrics).toEqual({
+      prefill_pp: 2,
+      decode_pp: 4,
+      prefill_dcp_size: 2,
+      decode_dcp_size: 8,
+      prefill_pcp_size: 4,
+      decode_pcp_size: 2,
+      dcp_size: 8,
+      pcp_size: 4,
+    });
+  });
+});

@@ -69,6 +69,18 @@ describe('cacheReuseHref', () => {
     expect(url.searchParams.has('i_prec')).toBe(false);
     expect(url.searchParams.get('c_cfg')).toBe('b200_sglang');
   });
+
+  it('pins historical links to the source run even when its URL includes an attempt', () => {
+    const url = new URL(
+      cacheReuseHref('en', {
+        ...point,
+        run_url: 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/111/attempts/2',
+      }),
+      'https://inferencex.test',
+    );
+    expect(url.searchParams.get('g_runid')).toBe('111');
+    expect(url.searchParams.get('g_rundate')).toBe('2026-09-17');
+  });
 });
 
 describe('pointHardwareKey', () => {
@@ -80,5 +92,21 @@ describe('pointHardwareKey', () => {
 
   it('never folds the speculative method into an agentic key', () => {
     expect(pointHardwareKey({ ...point, spec_method: 'mtp' })).toBe('b200_sglang');
+  });
+});
+
+describe('point recipe metrics', () => {
+  it('matches the full legacy parallelism key', () => {
+    const url = new URL(
+      cacheReuseHref('en', {
+        ...point,
+        recipe_fingerprint: null,
+        metrics: { prefill_pp: 2, decode_dcp_size: 8, prefill_pcp_size: 4 },
+      }),
+      'https://inferencex.test',
+    );
+    expect(url.searchParams.get('c_recipe')).toBe(
+      'agg|sn|p1x8/1/-|d4x8/8/dpa|g8+32|spec-none|offload-on||parallel-2/1/1/8/4/1',
+    );
   });
 });
