@@ -39,7 +39,7 @@ const STRINGS = {
     bestPerSku: 'Best per SKU',
     bestPerSkuHint: 'Show the best configuration per chip; turn off to select more',
     bestPerSkuHelp:
-      'Selects the best configuration line for each chip SKU across candidate frameworks using the current chart metrics. Where curves overlap, performance is compared across their shared measured range rather than one peak point. Turning this off asks for confirmation before showing vLLM and SGLang on the same SKU in guarded official views. Official and unofficial runs are evaluated separately; eligible TileRT configurations remain visible.',
+      'Selects the best configuration line for each chip SKU across candidate frameworks using the current chart metrics. Where curves overlap, performance is compared across their shared measured range rather than one peak point. Turning this off shows all eligible configurations, including vLLM and SGLang on the same SKU. Official and unofficial runs are evaluated separately; eligible TileRT configurations remain visible.',
     vendor: 'Vendor',
     vendorHelp:
       'Filter by the company that makes the chip, such as NVIDIA, AMD, or Google (TPU). Select one or more vendors; leave the group empty to include all.',
@@ -80,7 +80,7 @@ const STRINGS = {
     bestPerSku: '每个 SKU 仅显示最佳配置',
     bestPerSkuHint: '每款芯片显示最佳配置；关闭后可选择更多配置',
     bestPerSkuHelp:
-      '按当前图表指标，从所有候选框架中为每款芯片选择表现最佳的配置曲线。曲线范围重叠时，会比较共同实测范围内的整体表现，而不是只看单个峰值点。关闭后，受比较规则限制的官方视图会先要求确认，再同时显示同一 SKU 上的 vLLM 和 SGLang。官方与非官方运行分别评估；符合条件的 TileRT 配置仍会保留。',
+      '按当前图表指标，从所有候选框架中为每款芯片选择表现最佳的配置曲线。曲线范围重叠时，会比较共同实测范围内的整体表现，而不是只看单个峰值点。关闭后会显示所有符合条件的配置，包括同一 SKU 上的 vLLM 和 SGLang。官方与非官方运行分别评估；符合条件的 TileRT 配置仍会保留。',
     vendor: '厂商',
     vendorHelp:
       '按芯片制造商筛选，例如 NVIDIA、AMD 或 Google（TPU）。可选择一个或多个厂商；不选则显示全部。',
