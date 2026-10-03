@@ -18,6 +18,7 @@ import { escapeHtml, getDisplayLabel } from '@/lib/utils';
 import {
   CACHE_TIER_COLORS,
   formatShare,
+  recipeLabelOf,
   type CacheReuseBar,
   type CacheReuseResult,
   type CacheTier,
@@ -52,7 +53,7 @@ export const CACHE_REUSE_STRINGS = {
     reportedTotal: 'Reported total:',
     overReported: 'above 100%, clamped',
     precision: 'Precision:',
-    tp: 'TP:',
+    recipe: 'Recipe:',
     viewRun: 'View workflow run',
     viewOfficial: 'View raw result on GitHub',
   },
@@ -76,7 +77,7 @@ export const CACHE_REUSE_STRINGS = {
     reportedTotal: '上报合计：',
     overReported: '超过 100%，已截断',
     precision: '精度：',
-    tp: 'TP：',
+    recipe: '方案：',
     viewRun: '查看工作流运行',
     viewOfficial: '在 GitHub 查看原始结果',
   },
@@ -176,7 +177,7 @@ export function generateCacheReuseTooltipHTML(
       ${ceiling}
       ${overReported}
       ${row(`<strong>${t.precision}</strong> ${escapeHtml(point.precision.toUpperCase())}`)}
-      ${row(`<strong>${t.tp}</strong> ${point.tp}`)}
+      ${row(`<strong>${t.recipe}</strong> ${escapeHtml(recipeLabelOf(point))}`)}
       ${runLink}
     </div>
   `;

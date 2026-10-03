@@ -382,6 +382,23 @@ describe('recipe identity', () => {
     expect(new Set(recipes.map((r) => r.label)).size).toBe(3);
   });
 
+  it('selects recipes in an overlay-only configuration', () => {
+    const result = buildCacheReuse({
+      official: [],
+      config,
+      recipe: recipeKeyOf(off(8, 0)),
+      overlay: { h200_vllm__run0: official },
+      overlayMeta: { h200_vllm__run0: { hwKey: 'h200_vllm', runIndex: 0 } },
+    });
+    expect(result.recipes).toHaveLength(3);
+    expect(result.recipe).toBe(recipeKeyOf(off(8, 0)));
+    expect(result.bars.map((bar) => [bar.concurrency, bar.share.hbm])).toEqual([
+      [4, 0.6],
+      [8, 0.54],
+      [10, 0.53],
+    ]);
+  });
+
   it('keeps a run on its own recipe when it did not measure the plotted one', () => {
     const run = [wide(8, 0.7), wide(16, 0.6)];
     const result = buildCacheReuse({

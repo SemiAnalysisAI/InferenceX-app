@@ -57,6 +57,7 @@ import {
   CACHE_TIER_COLORS,
   defaultCacheReuseGroup,
   formatShare,
+  recipeLabelOf,
   type CacheReuseBar,
 } from './cache-reuse';
 import CacheReuseChart, { CACHE_REUSE_STRINGS, configLabel, tierLabel } from './CacheReuseChart';
@@ -91,7 +92,7 @@ const STRINGS = {
     colHost: 'Host',
     colUnreused: 'Not reused',
     colCeiling: 'Ceiling',
-    colTp: 'TP',
+    colRecipe: 'Recipe',
     colRun: 'Run',
     viewRun: 'View',
     official: 'Official',
@@ -121,7 +122,7 @@ const STRINGS = {
     colHost: '主机',
     colUnreused: '未复用',
     colCeiling: '理论上限',
-    colTp: 'TP',
+    colRecipe: '方案',
     colRun: '运行记录',
     viewRun: '查看',
     official: '官方',
@@ -136,7 +137,7 @@ interface CacheReuseRow {
   host: number | null;
   unreused: number;
   ceiling: number | null;
-  tp: number;
+  recipe: string;
   runUrl: string | null;
 }
 
@@ -387,7 +388,7 @@ function CacheReuseInner() {
         host: bar.share.combined ? null : bar.share.host,
         unreused: bar.share.unreused,
         ceiling: bar.share.theoretical,
-        tp: bar.point.tp,
+        recipe: recipeLabelOf(bar.point),
         runUrl:
           bar.runIndex === undefined
             ? (bar.point.sourceRow?.run_url ?? null)
@@ -429,7 +430,7 @@ function CacheReuseInner() {
         sortValue: (r) => r.ceiling ?? -1,
         align: 'right',
       },
-      { header: t.colTp, cell: (r) => r.tp, sortValue: (r) => r.tp, align: 'right' },
+      { header: t.colRecipe, cell: (r) => r.recipe, sortValue: (r) => r.recipe },
       {
         header: t.colRun,
         cell: (r) =>
@@ -460,7 +461,7 @@ function CacheReuseInner() {
       t.colHost,
       t.colUnreused,
       t.colCeiling,
-      t.colTp,
+      t.colRecipe,
       t.colRun,
     ];
     const body = tableRows.map((r) => [
@@ -470,7 +471,7 @@ function CacheReuseInner() {
       r.host ?? '',
       r.unreused,
       r.ceiling ?? '',
-      r.tp,
+      r.recipe,
       r.runUrl ?? '',
     ]);
     exportToCsv(`InferenceX_cache_reuse_${selectedModel}.csv`, headers, body, [

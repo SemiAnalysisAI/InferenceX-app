@@ -1,4 +1,5 @@
 import { parallelismLabel } from '@/components/inference/utils/parallelism-label';
+import type { BenchmarkRow } from '@/lib/api';
 import { frameworkFamily } from '@/lib/framework-family';
 import { isKvOffloadEnabled } from '@/lib/kv-offload';
 
@@ -117,9 +118,9 @@ export interface CacheReuseResult {
   /** Rows of the chosen configuration that reported no cache tier, per series. */
   unmeasured: { seriesKey: string; concurrency: number; point: GPUDataPoint }[];
   anyCombined: boolean;
-  /** Official recipes of the configuration, for the recipe selector. */
+  /** Official recipes, or matching overlay recipes when no official rows exist. */
   recipes: CacheReuseRecipe[];
-  /** The recipe the official series plots; null when there are no official rows. */
+  /** The selected recipe; null when the configuration has no rows. */
   recipe: string | null;
 }
 
@@ -133,7 +134,7 @@ export interface CacheReuseInput {
   config: GroupMeta;
   /**
    * The serving recipe plotted, a `recipeKeyOf` value. Absent or unknown means
-   * the official recipe with the most tiered rows.
+   * the recipe with the most tiered rows, using overlays only without official rows.
    */
   recipe?: string;
 }
@@ -159,6 +160,28 @@ export interface CacheReuseRecipe {
 export function recipeKeyOf(point: GPUDataPoint): string {
   const row = point.sourceRow;
   if (!row) return `tp${point.tp}`;
+  return cacheReuseRecipeKey(row);
+}
+
+export function cacheReuseRecipeKey(
+  row: Pick<
+    BenchmarkRow,
+    | 'disagg'
+    | 'is_multinode'
+    | 'prefill_tp'
+    | 'prefill_ep'
+    | 'prefill_dp_attention'
+    | 'prefill_num_workers'
+    | 'decode_tp'
+    | 'decode_ep'
+    | 'decode_dp_attention'
+    | 'decode_num_workers'
+    | 'num_prefill_gpu'
+    | 'num_decode_gpu'
+    | 'recipe_fingerprint'
+    | 'spec_method'
+  > & { offload_mode: string | null },
+): string {
   return [
     row.disagg ? 'disagg' : 'agg',
     row.is_multinode ? 'mn' : 'sn',
@@ -234,10 +257,21 @@ export function resolveRecipe(
  * can be read against the published curve concurrency by concurrency.
  */
 export function buildCacheReuse(input: CacheReuseInput): CacheReuseResult {
-  // A configuration that exists only in a loaded run has no official slot;
-  // listing one anyway would halve every run bar beside an empty column.
-  const recipes = cacheReuseRecipes(input.official);
-  const recipe = resolveRecipe(input.official, input.recipe);
+  const perSeries = new Map<string, readonly GPUDataPoint[]>();
+
+  const runIndexes = new Set<number>();
+  for (const [groupKey, meta] of Object.entries(input.overlayMeta ?? {})) {
+    if (meta.hwKey !== input.config.hwKey) continue;
+    if (input.config.precision !== undefined && meta.precision !== input.config.precision) continue;
+    const points = input.overlay?.[groupKey];
+    if (!points || points.length === 0) continue;
+    runIndexes.add(meta.runIndex);
+    const key = `run:${meta.runIndex}`;
+    perSeries.set(key, [...(perSeries.get(key) ?? []), ...points]);
+  }
+  const recipePoints = input.official.length > 0 ? input.official : [...perSeries.values()].flat();
+  const recipes = cacheReuseRecipes(recipePoints);
+  const recipe = resolveRecipe(recipePoints, input.recipe);
   // One recipe per series. A run keeps the plotted recipe when it measured it,
   // and otherwise its own best-covered recipe, so a branch that tries a new
   // layout still draws without mixing layouts within its bars.
@@ -250,18 +284,7 @@ export function buildCacheReuse(input: CacheReuseInput): CacheReuseResult {
   const official = ofRecipe(input.official, recipe);
   const series: CacheReuseSeries[] =
     official.length > 0 ? [{ key: 'official', label: 'official' }] : [];
-  const perSeries = new Map<string, readonly GPUDataPoint[]>([['official', official]]);
-
-  const runIndexes = new Set<number>();
-  for (const [groupKey, meta] of Object.entries(input.overlayMeta ?? {})) {
-    if (meta.hwKey !== input.config.hwKey) continue;
-    if (input.config.precision !== undefined && meta.precision !== input.config.precision) continue;
-    const points = input.overlay?.[groupKey];
-    if (!points || points.length === 0) continue;
-    runIndexes.add(meta.runIndex);
-    const key = `run:${meta.runIndex}`;
-    perSeries.set(key, [...(perSeries.get(key) ?? []), ...points]);
-  }
+  perSeries.set('official', official);
   for (const runIndex of runIndexes) {
     const key = `run:${runIndex}`;
     perSeries.set(key, ofRecipe(perSeries.get(key) ?? [], recipe));
