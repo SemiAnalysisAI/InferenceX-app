@@ -44,7 +44,6 @@ import {
 } from './etl/power-publication.js';
 import {
   readTelemetryReceipt,
-  summarizeTelemetryReceipt,
   telemetryArtifactsForAttempt,
   type TelemetryObservation,
   type TelemetryReceipt,
@@ -627,30 +626,15 @@ async function main(): Promise<void> {
         sql,
         { runId, runAttempt: run.run_attempt },
         [...observations.values()],
-        { previous: manifest.telemetry, targeted: Boolean(flags.artifact), uniqueFallbacks },
+        {
+          previous: manifest.telemetry,
+          targeted: Boolean(flags.artifact),
+          uniqueFallbacks,
+          recoveryError,
+          recoveryArtifactName: flags.artifact,
+          expectationErrors,
+        },
       );
-      if (recoveryError) {
-        const priorError = manifest.telemetry.recoveryError;
-        const priorScope = manifest.telemetry.recoveryArtifactNames;
-        manifest.telemetry.recoveryError = [
-          ...new Set([priorError, recoveryError].filter(Boolean).join('\n').split('\n')),
-        ].join('\n');
-        if (flags.artifact && (!priorError || priorScope))
-          manifest.telemetry.recoveryArtifactNames = [
-            ...new Set([...(priorScope ?? []), flags.artifact]),
-          ];
-        else delete manifest.telemetry.recoveryArtifactNames;
-      }
-      if (expectationErrors) {
-        const failedBenchmarks = new Set(expectationErrors.map((error) => error.benchmarkArtifact));
-        manifest.telemetry.expectationErrors = [
-          ...(manifest.telemetry.expectationErrors ?? []).filter(
-            (error) => !failedBenchmarks.has(error.benchmarkArtifact),
-          ),
-          ...expectationErrors,
-        ];
-      }
-      summarizeTelemetryReceipt(manifest.telemetry);
       saveReceipt();
       if (manifest.benchmarkRefresh && manifest.benchmarkRefresh.status !== 'complete')
         await refresh();
