@@ -115,7 +115,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-gpu-metrics-view',
-    sourceSha256: '9513c85ee406f390f73c15757ea30ad9d902b2ec0e39dde25a0e305def2ff7a2',
+    sourceSha256: '8997284dc31762bebce867547d002cc0cbbc9c9a423d56d39cf40690dfef9190',
   },
   {
     source: 'src/app/api/v1/views/gpu-specs/route.ts',
@@ -895,7 +895,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/components/gpu-power/chart-data.ts',
-    sourceSha256: '3e4bed7d693f146c97ac52cc0bb64d854a9dee2a1fa8d5dbf534ac4e1e78fa3f',
+    sourceSha256: '9e057519b83ac6f4644db577be075c6aa24734a99614a29453c5f152b2f26d38',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
