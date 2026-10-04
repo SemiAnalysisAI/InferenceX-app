@@ -845,7 +845,7 @@ export interface ApiContractSourceDigest {
 export const apiContractSourceDigests = [
   {
     source: '../db/src/etl/power-audit-validations.ts',
-    sourceSha256: '44a607747b79d038bb8f4e53590efba689d376c143f50a5d750d3552faa0c442',
+    sourceSha256: 'fbaa1bcfa14a560a11bb08e1b6a0827f08cbcadb9513eba0305fd4cee4dcff7b',
     reviewArea: {
       en: 'Shared legacy and nested AgentX validation identity normalization for artifact and stored Timeline windows.',
       zh: '产物与数据库 Timeline 窗口共用的 legacy 和嵌套 AgentX validation 身份规范化。',

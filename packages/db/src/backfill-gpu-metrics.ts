@@ -36,7 +36,7 @@ import { AsyncSemaphore } from './etl/async-semaphore.js';
 import { createAdminSql } from './etl/db-utils.js';
 import { ingestGpuMetricsArtifact, refreshGpuMetricStats } from './etl/gpu-metrics-ingest.js';
 import { readPowerAuditValidations } from './etl/gpu-metrics-artifacts.js';
-import { recoveredPowerAudit } from './etl/power-audit-validations.js';
+import { recoveredPowerAuditForPoint } from './etl/power-audit-validations.js';
 import {
   benchmarkPublicationIdentity,
   stablePowerPointIdentity,
@@ -229,7 +229,7 @@ async function processPair(
       observations.set(key, { identity, artifactNames: [pair.gpuMetrics.name], produced: true });
     }
     const matchedIds: number[] = [];
-    const mappedPoints: { ids: number[]; identity: Record<string, unknown> }[] = [];
+    const mappedPoints: { ids: number[]; conc: number; identity: Record<string, unknown> }[] = [];
     for (const row of mappedRows) {
       const ids = await findBenchmarkResultIds(sql, run, [row], (id) =>
         uniqueFallbacks.set(stablePowerPointIdentity(benchmarkPublicationIdentity(row)), id),
@@ -237,7 +237,7 @@ async function processPair(
       if (ids.length === 0) throw new Error(`${pair.gpuMetrics.name}: no matching benchmark rows`);
       matchedIds.push(...ids);
       if (row.benchmarkType === 'agentic_traces')
-        mappedPoints.push({ ids, identity: benchmarkPublicationIdentity(row) });
+        mappedPoints.push({ ids, conc: row.conc, identity: benchmarkPublicationIdentity(row) });
     }
     const resultIds = [...new Set(matchedIds)];
     if (resultIds.length === 0) {
@@ -248,21 +248,10 @@ async function processPair(
     gpuMetricsDir = await retryArtifactOperation(`downloading ${pair.gpuMetrics.name}`, () =>
       downloadArtifact(pair.gpuMetrics, tempDir),
     );
-    const validations = Object.entries(
-      readPowerAuditValidations(gpuMetricsDir, pair.gpuMetrics.name),
-    )
-      .map(([source, validation]) => ({
-        powerAudit: recoveredPowerAudit(source, validation),
-        conc: (validation.selected_window as Record<string, unknown> | undefined)?.concurrency,
-      }))
-      .filter((validation) => validation.powerAudit !== null);
+    const validations = readPowerAuditValidations(gpuMetricsDir, pair.gpuMetrics.name);
     const auditUpdates: BenchmarkAuditUpdate[] = [];
     for (const point of mappedPoints) {
-      const candidates = validations.filter(
-        (validation) => validation.conc === point.identity.conc,
-      );
-      if (candidates.length !== 1) continue;
-      const powerAudit = candidates[0]!.powerAudit;
+      const powerAudit = recoveredPowerAuditForPoint(validations, { conc: point.conc });
       if (powerAudit)
         auditUpdates.push(
           ...point.ids.map((benchmarkResultId) => ({

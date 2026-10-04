@@ -177,6 +177,23 @@ describe('artifact → ingest → stored Timeline', () => {
     },
   );
 
+  it('fills a missing agentic power_audit from the unique retained window and reports the row', async () => {
+    await db.exec("UPDATE benchmark_results SET benchmark_type = 'agentic_traces'");
+    const result = await ingestGpuMetricsArtifact(sql, {
+      workflowRunId: 1,
+      artifact: writeArtifact(NAME, agentxBundle()),
+      benchmarkResultIds: [10, 11],
+    });
+    expect(result.metadataUpdatedBenchmarkResultIds).toEqual([10]);
+    const rows = await db.query<{ id: number; power_audit: unknown }>(
+      'SELECT id, power_audit FROM benchmark_results ORDER BY id',
+    );
+    expect(rows.rows.map((row) => [Number(row.id), row.power_audit])).toEqual([
+      [10, { source: SOURCE, window_start_unix: START, window_end_unix: START + 1 }],
+      [11, null],
+    ]);
+  });
+
   it('matches artifact windows, host/GPU identity, deduplicated mean watts and gaps for a multinode bundle', async () => {
     const files = bundle();
     const artifact = writeArtifact(NAME, files);

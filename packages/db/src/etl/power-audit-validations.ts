@@ -123,3 +123,26 @@ export function recoveredPowerAudit(
     window_end_unix: selected.end_time_unix,
   };
 }
+
+/**
+ * The retained window that belongs to one AgentX point: exactly one recoverable
+ * validation names the point's concurrency and, when the caller knows it, the
+ * point's result file. With a result file (CI pre-insert) at most one document
+ * can match, because a recovered source is derived from that file. Without one
+ * (stored repair, backfill checkpoint) a normalized map still holds at most one
+ * nested alias per concurrency, so two matches mean conflicting documents;
+ * ambiguous or missing evidence must not establish provenance.
+ */
+export function recoveredPowerAuditForPoint(
+  validations: Readonly<Record<string, Record<string, unknown>>>,
+  point: { conc: number; resultFile?: string },
+): ReturnType<typeof recoveredPowerAudit> {
+  const audits = Object.entries(validations).flatMap(([source, validation]) => {
+    const window = validation.selected_window;
+    if (!isRecord(window) || window.concurrency !== point.conc) return [];
+    if (point.resultFile !== undefined && validation.result_file !== point.resultFile) return [];
+    const audit = recoveredPowerAudit(source, validation);
+    return audit ? [audit] : [];
+  });
+  return audits.length === 1 ? audits[0]! : null;
+}
