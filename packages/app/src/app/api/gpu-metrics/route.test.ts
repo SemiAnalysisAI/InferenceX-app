@@ -289,75 +289,97 @@ describe('GET /api/gpu-metrics — database first', () => {
     expect(globalThis.fetch).not.toHaveBeenCalled();
   });
 
-  it('checks retained file/sample coverage before using a truncated host CSV fallback', async () => {
-    process.env.DATABASE_READONLY_URL = 'postgresql://readonly.example.test/db';
-    const { parseCsvData } = await vi.importActual<typeof GpuPowerTypes>(
-      '@/components/gpu-power/types',
-    );
-    const header =
-      'timestamp, index, power.draw [W], temperature.gpu, clocks.current.sm [MHz], clocks.current.memory [MHz], utilization.gpu [%], utilization.memory [%]';
-    const hostA = [header, nvidiaRow(0, 300), nvidiaRow(0, 999), nvidiaRow(1, 310)].join('\n');
-    // host-b lost its GPU 1 row: one of the two retained samples.
-    const hostB = [header, nvidiaRow(0, 500)].join('\n');
-    zipArchives.byKey.set('coverage', [
-      { entryName: 'host-a/gpu_metrics.csv', data: hostA },
-      { entryName: 'host-b/gpu_metrics.csv', data: hostB },
-    ]);
-    mockParseCsvData.mockImplementationOnce(parseCsvData).mockImplementationOnce(parseCsvData);
-    mockGetGpuMetricsForRun.mockResolvedValueOnce({
-      ...storedRunPayload,
-      series: [
-        {
-          ...storedRunPayload.series[0],
-          artifactName: 'gpu_metrics_live',
-          fileName: 'host-a/gpu_metrics.csv',
-          sidecars: {
-            seriesInventory: [
-              { fileName: 'host-a/gpu_metrics.csv', sampleCount: 2 },
-              { fileName: 'host-b/gpu_metrics.csv', sampleCount: 2 },
-            ],
+  it.each([
+    { recovered: false, status: 503 },
+    { recovered: true, status: 200 },
+  ])(
+    'checks retained file/sample coverage with recovered=$recovered',
+    async ({ recovered, status }) => {
+      process.env.DATABASE_READONLY_URL = 'postgresql://readonly.example.test/db';
+      const { parseCsvData } = await vi.importActual<typeof GpuPowerTypes>(
+        '@/components/gpu-power/types',
+      );
+      const header =
+        'timestamp, index, power.draw [W], temperature.gpu, clocks.current.sm [MHz], clocks.current.memory [MHz], utilization.gpu [%], utilization.memory [%]';
+      const hostA = [header, nvidiaRow(0, 300), nvidiaRow(0, 999), nvidiaRow(1, 310)].join('\n');
+      // A matching filename only recovers the stored gap when both samples survived.
+      const hostB = [header, nvidiaRow(0, 500), ...(recovered ? [nvidiaRow(1, 510)] : [])].join(
+        '\n',
+      );
+      zipArchives.byKey.set('coverage', [
+        { entryName: 'host-a/gpu_metrics.csv', data: hostA },
+        { entryName: 'host-b/gpu_metrics.csv', data: hostB },
+      ]);
+      mockParseCsvData.mockImplementationOnce(parseCsvData).mockImplementationOnce(parseCsvData);
+      mockGetGpuMetricsForRun.mockResolvedValueOnce({
+        ...storedRunPayload,
+        series: [
+          {
+            ...storedRunPayload.series[0],
+            artifactName: 'gpu_metrics_live',
+            fileName: 'host-a/gpu_metrics.csv',
+            sidecars: {
+              seriesInventory: [
+                { fileName: 'host-a/gpu_metrics.csv', sampleCount: 2 },
+                { fileName: 'host-b/gpu_metrics.csv', sampleCount: 2 },
+              ],
+            },
           },
-        },
-      ],
-    });
-    globalThis.fetch = vi
-      .fn()
-      .mockResolvedValueOnce({
-        ok: true,
-        json: () =>
-          Promise.resolve({
-            id: 34557177019,
-            name: 'Sweep',
-            head_branch: 'main',
-            head_sha: 'abc',
-            created_at: '2026-03-01T00:00:00Z',
-            html_url: 'https://example.test/run',
-            status: 'completed',
-            conclusion: 'success',
-          }),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: () =>
-          Promise.resolve({
-            artifacts: [
-              { id: 1, name: 'gpu_metrics_live', archive_download_url: 'https://example.test/zip' },
-            ],
-          }),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        headers: new Headers(),
-        arrayBuffer: () => Promise.resolve(new TextEncoder().encode('coverage').buffer),
+        ],
       });
-    const res = await GET(req('/api/gpu-metrics?runId=34557177019&series=power'));
-    expect(res.status).toBe(503);
-    expect(await res.json()).toMatchObject({
-      code: 'STORED_TELEMETRY_INCOMPLETE',
-      artifact: 'gpu_metrics_live',
-    });
-    expect(globalThis.fetch).toHaveBeenCalledTimes(3);
-  });
+      globalThis.fetch = vi
+        .fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              id: 34557177019,
+              name: 'Sweep',
+              head_branch: 'main',
+              head_sha: 'abc',
+              created_at: '2026-03-01T00:00:00Z',
+              html_url: 'https://example.test/run',
+              status: 'completed',
+              conclusion: 'success',
+            }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              artifacts: [
+                {
+                  id: 1,
+                  name: 'gpu_metrics_live',
+                  archive_download_url: 'https://example.test/zip',
+                },
+              ],
+            }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          headers: new Headers(),
+          arrayBuffer: () => Promise.resolve(new TextEncoder().encode('coverage').buffer),
+        });
+      const res = await GET(req('/api/gpu-metrics?runId=34557177019&series=power'));
+      expect(res.status).toBe(status);
+      const payload = await res.json();
+      if (recovered) {
+        expect(payload).toMatchObject({ source: 'github' });
+        expect(payload.series).toHaveLength(1);
+        expect(payload.series[0].power).toEqual([
+          [300, 310],
+          [500, 510],
+        ]);
+      } else {
+        expect(payload).toMatchObject({
+          code: 'STORED_TELEMETRY_INCOMPLETE',
+          artifact: 'gpu_metrics_live',
+        });
+      }
+      expect(globalThis.fetch).toHaveBeenCalledTimes(3);
+    },
+  );
 });
 
 describe('GET /api/gpu-metrics', () => {
