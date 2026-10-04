@@ -83,6 +83,7 @@ import { discoverTraceReplayArtifacts } from './etl/trace-artifact-discovery';
 import { discoverServerLogArtifacts, readServerLogArtifact } from './etl/server-log-artifacts';
 import {
   discoverGpuMetricsArtifacts,
+  expectedTelemetryArtifactNames,
   readPowerAuditValidations,
 } from './etl/gpu-metrics-artifacts';
 import { createBenchmarkPowerAuditRecovery } from './etl/power-audit-recovery';
@@ -697,7 +698,7 @@ async function main(): Promise<void> {
             artifactNames: gpuMetricsArtifact
               ? [gpuMetricsArtifact.artifactName]
               : parentDir.startsWith('bmk_')
-                ? [`gpu_metrics_${suffix}`, `power_audit_${suffix}`]
+                ? expectedTelemetryArtifactNames(suffix)
                 : [],
             produced: parentDir.startsWith('bmk_') ? Boolean(gpuMetricsArtifact) : null,
           });
