@@ -31,7 +31,7 @@ export type {
 // The endpoint payload combines chart_series with separately queried point
 // metadata. Keep a composite response version so metadata-shape changes roll
 // the blob-cache namespace without forcing an expensive chart_series backfill.
-const POINT_META_VERSION = 5;
+const POINT_META_VERSION = 6;
 export const TRACE_SERVER_METRICS_VERSION = CHART_SERIES_VERSION * 100 + POINT_META_VERSION;
 
 export interface MetricSourceDescriptor {
@@ -47,6 +47,17 @@ export interface PointMeta {
   spec_method: string;
   disagg: boolean;
   is_multinode: boolean;
+  prefill_tp: number;
+  prefill_ep: number;
+  prefill_dp_attention: boolean;
+  prefill_num_workers: number;
+  decode_tp: number;
+  decode_ep: number;
+  decode_dp_attention: boolean;
+  decode_num_workers: number;
+  num_prefill_gpu: number;
+  num_decode_gpu: number;
+  recipe_fingerprint: string | null;
   conc: number;
   offload_mode: string | null;
   kv_offloading: string | null;
@@ -141,6 +152,17 @@ function buildMeta(row: RawMetaRow): PointMeta {
     spec_method: row.spec_method,
     disagg: row.disagg,
     is_multinode: row.is_multinode,
+    prefill_tp: row.prefill_tp,
+    prefill_ep: row.prefill_ep,
+    prefill_dp_attention: row.prefill_dp_attention,
+    prefill_num_workers: row.prefill_num_workers,
+    decode_tp: row.decode_tp,
+    decode_ep: row.decode_ep,
+    decode_dp_attention: row.decode_dp_attention,
+    decode_num_workers: row.decode_num_workers,
+    num_prefill_gpu: row.num_prefill_gpu,
+    num_decode_gpu: row.num_decode_gpu,
+    recipe_fingerprint: row.recipe_fingerprint,
     conc: row.conc,
     offload_mode: row.offload_mode,
     kv_offloading: row.kv_offloading,
@@ -317,6 +339,10 @@ export async function getTraceServerMetrics(
       ), '[]'::jsonb) as metric_sources,
       br.id, c.hardware, c.framework, c.model, c.precision, c.spec_method,
       c.disagg, c.is_multinode,
+      c.prefill_tp, c.prefill_ep, c.prefill_dp_attention, c.prefill_num_workers,
+      c.decode_tp, c.decode_ep, c.decode_dp_attention, c.decode_num_workers,
+      c.num_prefill_gpu, c.num_decode_gpu,
+      br.recipe_fingerprint,
       br.conc, br.offload_mode, br.isl, br.osl, br.benchmark_type,
       br.date::text,
       case when wr.html_url is not null then wr.html_url || '/attempts/' || wr.run_attempt else null end as run_url,

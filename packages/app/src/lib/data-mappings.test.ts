@@ -281,9 +281,9 @@ describe('isSequenceDeprecatedForModel / getSequenceCategoryForModel', () => {
 // per-model Best per SKU default
 // ===========================================================================
 describe('isBestPerSkuDefaultOff', () => {
-  it('opens Qwen3.5 8K/1K and agentic charts with every configuration', () => {
-    expect(isBestPerSkuDefaultOff(Model.Qwen3_5, Sequence.EightK_OneK)).toBe(true);
-    expect(isBestPerSkuDefaultOff(Model.Qwen3_5, Sequence.AgenticTraces)).toBe(true);
+  it('opens Qwen3.5 8K/1K and agentic charts with Best per SKU enabled', () => {
+    expect(isBestPerSkuDefaultOff(Model.Qwen3_5, Sequence.EightK_OneK)).toBe(false);
+    expect(isBestPerSkuDefaultOff(Model.Qwen3_5, Sequence.AgenticTraces)).toBe(false);
   });
 
   it('keeps Best per SKU on for other Qwen3.5 scenarios and other models', () => {

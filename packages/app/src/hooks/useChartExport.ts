@@ -3,6 +3,7 @@ import { useCallback, useState } from 'react';
 import { CHART_FONT_MINECRAFT, CHART_FONT_SANS } from '@/lib/d3-chart/typography';
 import { getExportFooterText } from '@/lib/export-footer';
 import { useLocale } from '@/lib/use-locale';
+import { hasDarkTheme } from '@/lib/themes';
 
 const STRINGS = {
   en: { exportFailed: 'Failed to export image. Please try again.' },
@@ -225,10 +226,7 @@ async function addWatermark(chartDataUrl: string, bgColor: string): Promise<stri
   const img = await loadImage(chartDataUrl);
   if (!img) return chartDataUrl;
 
-  const isDark =
-    document.documentElement.classList.contains('dark') ||
-    document.documentElement.classList.contains('minecraft') ||
-    bgColor.includes('0 0%');
+  const isDark = hasDarkTheme(document.documentElement) || bgColor.includes('0 0%');
 
   const WATERMARK_HEIGHT = 120;
   const canvas = document.createElement('canvas');
