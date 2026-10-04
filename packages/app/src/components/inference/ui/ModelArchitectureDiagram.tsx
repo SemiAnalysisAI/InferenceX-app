@@ -5,6 +5,7 @@ import { ChevronDown, ChevronUp, ExternalLink } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTheme } from 'next-themes';
+import { isDarkTheme } from '@/lib/themes';
 import type { Locale } from '@/lib/i18n';
 import { useLocale } from '@/lib/use-locale';
 
@@ -105,7 +106,7 @@ function ArchitectureContent({ model, arch, isExpanded, locale }: ArchitectureCo
     // Match the renderer's effective width so ResizeObserver notifications that
     // cannot change the SVG (including its initial callback) stay no-ops.
     const width = Math.min(container.clientWidth || 600, 640);
-    const isDark = resolvedTheme === 'dark' || resolvedTheme === 'minecraft';
+    const isDark = isDarkTheme(resolvedTheme);
     const previous = lastRenderRef.current;
     if (
       previous?.width === width &&

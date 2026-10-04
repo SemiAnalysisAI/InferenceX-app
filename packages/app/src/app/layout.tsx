@@ -11,7 +11,10 @@ import { Footer } from '@/components/footer/footer';
 import { Header } from '@/components/header/header';
 import { RouteTransition } from '@/components/motion/route-transition';
 import { JsonLd } from '@/components/json-ld';
+import { AutumnLeaves } from '@/components/autumn-leaves';
 import { CircuitBackground } from '@/components/circuit-background';
+import { CsgoDecorations, CsgoThemeBanner } from '@/components/csgo/csgo-decorations';
+import { APP_THEMES } from '@/lib/themes';
 import { MinecraftBackgroundLazy } from '@/components/minecraft/minecraft-background-lazy';
 import { MinecraftDecorations } from '@/components/minecraft/minecraft-decorations';
 import { ThemeProvider } from '@/components/ui/theme-provider';
@@ -213,19 +216,22 @@ export default async function RootLayout({
         <CircuitBackground />
         <MinecraftBackgroundLazy />
         <MinecraftDecorations />
+        <CsgoDecorations />
+        <AutumnLeaves />
         <PostHogProvider>
           <JsonLd data={jsonLd} />
           <QueryProvider>
             <ThemeProvider
               attribute="class"
               defaultTheme="dark"
-              themes={['light', 'dark', 'minecraft']}
+              themes={APP_THEMES}
               enableSystem
               disableTransitionOnChange
             >
               <PostHogPageView />
               <VisitTracker />
               <Header starCount={starCount} />
+              <CsgoThemeBanner />
               <div className="grow flex flex-col">
                 <RouteTransition>{children}</RouteTransition>
               </div>

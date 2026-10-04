@@ -12,6 +12,7 @@ import {
 } from '@semianalysisai/inferencex-constants';
 import { Info, Plus, X } from 'lucide-react';
 import { useTheme } from 'next-themes';
+import { isDarkTheme } from '@/lib/themes';
 import Link from 'next/link';
 
 import ProfitEstimatorChart from '@/components/calculator/ProfitEstimatorChart';
@@ -1078,7 +1079,7 @@ function ProfitEstimatorInner({
     (row: ProfitEstimatorRow) => {
       const base = resolveColor(row.hwKey);
       if (!row.date) return base;
-      const theme = resolvedTheme === 'dark' ? 'dark' : 'light';
+      const theme = isDarkTheme(resolvedTheme) ? 'dark' : 'light';
       return shadeHistoryColor(
         base,
         historyFadeShare(historyRanks.rank(row.date), historyRanks.count),

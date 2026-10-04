@@ -2,6 +2,7 @@
 
 import { useSyncExternalStore } from 'react';
 import { useTheme } from 'next-themes';
+import { isDarkTheme } from '@/lib/themes';
 
 const THEMED_FIGURE_BOOTSTRAP = `(()=>{const s=document.currentScript,i=s&&s.previousElementSibling;if(!(i instanceof HTMLImageElement))return;const l=document.documentElement.classList.contains('light'),v=l?i.dataset.srcLight:i.dataset.srcDark;if(v)i.setAttribute('src',v)})()`;
 
@@ -35,11 +36,7 @@ export function ThemedFigureImage({
   const clientTheme =
     resolvedTheme ??
     (isClient && document.documentElement.classList.contains('light') ? 'light' : 'dark');
-  const src = isClient
-    ? clientTheme === 'dark' || clientTheme === 'minecraft'
-      ? srcDark
-      : srcLight
-    : undefined;
+  const src = isClient ? (isDarkTheme(clientTheme) ? srcDark : srcLight) : undefined;
 
   return (
     <>

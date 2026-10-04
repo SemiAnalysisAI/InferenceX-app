@@ -8,6 +8,7 @@ import * as d3 from 'd3';
 import dynamic from 'next/dynamic';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTheme } from 'next-themes';
+import { isDarkTheme } from '@/lib/themes';
 
 import {
   useInferenceActions,
@@ -310,7 +311,7 @@ const GPUGraph = React.memo(
     const gpuDateColorMap = useMemo(() => {
       const { dates, sortedGPUs } = gpuDatePairs;
       if (sortedGPUs.length === 0 || dates.length === 0) return {};
-      const theme = resolvedTheme === 'dark' || resolvedTheme === 'minecraft' ? 'dark' : 'light';
+      const theme = isDarkTheme(resolvedTheme) ? 'dark' : 'light';
       return generateGpuDateColors(sortedGPUs, dates.length, theme);
     }, [gpuDatePairs, resolvedTheme]);
 
@@ -320,7 +321,7 @@ const GPUGraph = React.memo(
     const hcGpuDateColorMap = useMemo(() => {
       const { dates, sortedGPUs } = gpuDatePairs;
       if (!highContrast || sortedGPUs.length === 0 || dates.length === 0) return {};
-      const theme = resolvedTheme === 'dark' || resolvedTheme === 'minecraft' ? 'dark' : 'light';
+      const theme = isDarkTheme(resolvedTheme) ? 'dark' : 'light';
       const baseColors: Record<string, string> = {};
       for (const gpu of sortedGPUs) baseColors[gpu] = getCssColor(resolveColor(gpu));
       return generateHighContrastGpuDateColors(baseColors, dates.length, theme);
