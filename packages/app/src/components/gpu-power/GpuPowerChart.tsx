@@ -246,7 +246,9 @@ const GpuMetricsChart = React.memo(
 
     const allPoints = useMemo(() => {
       const pts: ParsedPoint[] = [];
-      for (const points of groupedData.values()) pts.push(...points);
+      for (const points of groupedData.values()) {
+        pts.push(...points.filter((point) => Number.isFinite(point.value)));
+      }
       return pts;
     }, [groupedData]);
 
@@ -409,6 +411,7 @@ const GpuMetricsChart = React.memo(
               getColor: (key) => (key === MEAN_KEY ? MEAN_COLOR : colorFor(parseInt(key, 10))),
               getStrokeWidth: (key) => (key === MEAN_KEY ? 2.5 : rolling ? 1.75 : 1.5),
               curve: d3.curveMonotoneX,
+              isDefined: (point) => Number.isFinite(point.y),
             },
           },
           // GPU data points

@@ -63,6 +63,10 @@ OperatorX is feature-gated in navigation and uses page-owned
 contract.
 Zoom, theme, axis scale, labels, media playback and report expansion are renderer
 state. GPU interactive downsampling does not alter returned raw data or statistics.
+GPU telemetry lines retain gaps at explicitly missing metric readings, including
+rolling averages and chip means with no contributors. Gap markers are internal
+renderer state: the API still returns measured chart points only, while `rows`
+preserves timestamps with unavailable fields. Statistics and raw data are unchanged.
 The GPU statistics table includes startup and warmup for all chips in the selected
 series, regardless of chip visibility. It is separate from serving-window power,
 J/token and selected-time-window calculations. Run telemetry is DB-first with an

@@ -320,6 +320,18 @@ const nativeTemperatureResponse = {
   ],
 };
 
+function assertTemperatureGap(selector: string) {
+  cy.get(`[data-testid="gpu-metrics-chart-svg"] ${selector}`).should(($paths) => {
+    expect($paths).to.have.length(1);
+    const path = $paths.attr('d')!;
+    expect(path.match(/M/g), 'separate paths on both sides of missing temperature').to.have.length(
+      2,
+    );
+    expect(path, 'no connecting line or curve across the missing sample').not.to.match(/[LC]/);
+    expect(path).not.to.include('NaN');
+  });
+}
+
 describe('Native GPU temperature', () => {
   for (const [locale, width, label] of [
     ['en', 1440, 'Temperature'],
@@ -341,12 +353,39 @@ describe('Native GPU temperature', () => {
       cy.get('[data-testid="gpu-metrics-chart-svg"] svg').should('contain.text', `${label} (°C)`);
       cy.get('[data-testid="gpu-metrics-chart-svg"] svg .point').should('have.length', 2);
       cy.get('[data-testid="gpu-metrics-display"] table').should('contain.text', '65.5');
+      // The default rolling view must preserve the same missing timestamp.
+      assertTemperatureGap('.line-0');
+      cy.get('[data-testid="gpu-metrics-display-series-mean"]').click();
+      assertTemperatureGap('.line-mean');
       cy.get('[data-testid="gpu-metrics-display-mode-points"]').click();
+      assertTemperatureGap('.line-mean');
+      cy.get('[data-testid="gpu-metrics-display-series-chips"]').click();
+      assertTemperatureGap('.line-0');
+      cy.get('[data-testid="gpu-metrics-chart-svg"] svg .point').last().scrollIntoView().click();
+      cy.get('[data-chart-tooltip]:visible').should('contain.text', '0.0 °C');
+      cy.get('[data-testid="gpu-metrics-chart-svg"] svg')
+        .first()
+        .trigger('dblclick', { force: true });
+      assertTemperatureGap('.line-0');
       cy.get('[data-testid="gpu-metrics-chart-svg"]').scrollIntoView();
       cy.screenshot(`native-temperature-${locale}-${width}`, { capture: 'viewport' });
       cy.document().then((doc) => {
         expect(doc.documentElement.scrollWidth).to.be.at.most(doc.documentElement.clientWidth);
       });
+      cy.get('[data-testid="gpu-metrics-metric-select"]').click();
+      cy.get('[role="option"]')
+        .contains(locale === 'zh' ? '功耗 (W)' : 'Power Draw (W)')
+        .click();
+      cy.get('[data-testid="gpu-metrics-chart-svg"] .line-0').should(($path) => {
+        expect(
+          $path.attr('d')!.match(/M/g),
+          'complete power readings stay connected',
+        ).to.have.length(1);
+      });
+      cy.get('[data-testid="gpu-metrics-chart-svg"] svg .point').should('have.length', 3);
+      cy.get('[data-testid="gpu-metrics-metric-select"]').click();
+      cy.get('[role="option"]').contains(`${label} (°C)`).click();
+      assertTemperatureGap('.line-0');
       cy.get('[data-testid="gpu-metrics-artifact-select"]').click();
       cy.get('[role="option"]').contains('node-b').click();
       cy.get('[data-testid="gpu-metrics-metric-select"]').should('not.contain.text', label).click();

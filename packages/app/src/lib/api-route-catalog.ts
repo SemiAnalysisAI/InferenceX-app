@@ -895,7 +895,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/components/gpu-power/chart-data.ts',
-    sourceSha256: '3e4bed7d693f146c97ac52cc0bb64d854a9dee2a1fa8d5dbf534ac4e1e78fa3f',
+    sourceSha256: '438cb43b5a57169275a3ea1012fa5a25ed8d3195432790d1ecf6774c3cfa12cd',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
