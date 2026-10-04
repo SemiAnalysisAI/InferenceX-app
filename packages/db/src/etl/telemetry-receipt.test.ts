@@ -233,6 +233,119 @@ describe('persisted telemetry receipts', () => {
     },
   );
 
+  it('clears only successfully repaired scopes from an earlier recovery failure', async () => {
+    await inventory(completeInventory);
+    const previous = await readTelemetryReceipt(sql, run, []);
+    previous.recoveryError = 'shared failed\nother failed';
+    previous.recoveryArtifactNames = [artifactName, 'gpu_metrics_other'];
+    const repaired = await readTelemetryReceipt(
+      sql,
+      run,
+      [{ identity: previous.points[0]!.identity, artifactNames: [artifactName], produced: true }],
+      { previous, targeted: true },
+    );
+    expect(repaired.recoveryError).toBe('shared failed\nother failed');
+    expect(repaired.recoveryArtifactNames).toEqual(['gpu_metrics_other']);
+  });
+
+  it.each([false, true])(
+    'clears an unscoped old failure only after successful full-run recovery (targeted=%s)',
+    async (targeted) => {
+      await inventory(completeInventory);
+      const previous = await readTelemetryReceipt(sql, run, []);
+      previous.recoveryError = 'earlier run failed';
+      const observations = previous.points.map(({ identity, artifactNames }) => ({
+        identity,
+        artifactNames,
+        produced: true,
+      }));
+      const repaired = await readTelemetryReceipt(sql, run, observations, { previous, targeted });
+      expect(repaired.recoveryError).toBe(targeted ? 'earlier run failed' : undefined);
+      expect(repaired).not.toHaveProperty('recoveryArtifactNames');
+    },
+  );
+
+  it('merges current scoped failures in order and summarizes the resulting receipt', async () => {
+    await inventory(completeInventory);
+    const previous = await readTelemetryReceipt(sql, run, []);
+    for (const point of previous.points) point.api = { status: 'readable' };
+    previous.recoveryError = 'old\nshared';
+    previous.recoveryArtifactNames = ['gpu_metrics_other', artifactName];
+    const result = await readTelemetryReceipt(sql, run, [], {
+      previous,
+      targeted: true,
+      recoveryError: 'shared\nnew\nold',
+      recoveryArtifactName: 'gpu_metrics_new',
+    });
+    expect(result.recoveryError).toBe('old\nshared\nnew');
+    expect(result.recoveryArtifactNames).toEqual([
+      'gpu_metrics_other',
+      artifactName,
+      'gpu_metrics_new',
+    ]);
+    expect(result.counts.apiReadablePoints).toBe(2);
+    expect(result.counts.apiCompletePoints).toBe(0);
+  });
+
+  it('does not count previously readable points as complete after a first recovery failure', async () => {
+    await inventory(completeInventory);
+    const previous = await readTelemetryReceipt(sql, run, []);
+    for (const point of previous.points) point.api = { status: 'readable' };
+    const result = await readTelemetryReceipt(sql, run, [], {
+      previous,
+      targeted: true,
+      recoveryError: 'correction failed',
+      recoveryArtifactName: artifactName,
+    });
+    expect(result.recoveryError).toBe('correction failed');
+    expect(result.recoveryArtifactNames).toEqual([artifactName]);
+    expect(result.counts.apiReadablePoints).toBe(2);
+    expect(result.counts.apiCompletePoints).toBe(0);
+  });
+
+  it.each([
+    ['new run-wide failure', ['gpu_metrics_other'], null],
+    ['previous run-wide failure', undefined, artifactName],
+  ] as const)('keeps recovery scope unbounded for a %s', async (_name, priorScope, scope) => {
+    const previous = await readTelemetryReceipt(sql, run, []);
+    previous.recoveryError = 'old';
+    if (priorScope) previous.recoveryArtifactNames = [...priorScope];
+    const result = await readTelemetryReceipt(sql, run, [], {
+      previous,
+      targeted: true,
+      recoveryError: 'new',
+      recoveryArtifactName: scope,
+    });
+    expect(result.recoveryError).toBe('old\nnew');
+    expect(result).not.toHaveProperty('recoveryArtifactNames');
+  });
+
+  it('replaces expectation errors only for benchmark artifacts checked by this recovery', async () => {
+    const previous = await readTelemetryReceipt(sql, run, []);
+    const oldA = { benchmarkArtifact: 'bmk_a', artifactNames: ['gpu_metrics_a'], error: 'old a' };
+    const oldB = { benchmarkArtifact: 'bmk_b', artifactNames: ['gpu_metrics_b'], error: 'old b' };
+    const newA = { ...oldA, error: 'new a' };
+    const newC = { benchmarkArtifact: 'bmk_c', artifactNames: ['gpu_metrics_c'], error: 'new c' };
+    previous.expectationErrors = [oldA, oldB];
+    const result = await readTelemetryReceipt(sql, run, [], {
+      previous,
+      targeted: true,
+      expectationErrors: [newA, newC],
+    });
+    expect(result.expectationErrors).toEqual([oldB, newA, newC]);
+    expect(result.counts.expectedPoints).toBeNull();
+  });
+
+  it.each([undefined, []])(
+    'preserves the distinction between omitted and empty current expectation errors (%j)',
+    async (expectationErrors) => {
+      const result = await readTelemetryReceipt(sql, run, [], { expectationErrors });
+      expect(Object.hasOwn(result, 'expectationErrors')).toBe(expectationErrors !== undefined);
+      expect(result.expectationErrors).toEqual(expectationErrors);
+      expect(result.counts.expectedPoints).toBe(2);
+    },
+  );
+
   it('keeps missing inventory unknown and missing host storage incomplete', async () => {
     await inventory('{invalid json');
     const unknown = await readTelemetryReceipt(sql, run, []);
