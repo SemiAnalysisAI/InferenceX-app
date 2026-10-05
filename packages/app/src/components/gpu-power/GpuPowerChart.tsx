@@ -89,12 +89,12 @@ interface GpuMetricsChartProps {
   overlay?: TelemetryOverlaySeries | null;
 }
 
-/** Mean across the visible chips, aligned by nearest sample within one poll interval. */
+/** Mean across the visible chips, aligned within half a poll interval to preserve gaps. */
 function buildMeanSeries(groups: Map<number, ParsedPoint[]>, t0Ms: number): ParsedPoint[] {
   const arrays = [...groups.values()];
   if (arrays.length === 0) return [];
   const longest = arrays.reduce((a, b) => (b.length > a.length ? b : a));
-  const mean = meanAcrossSeries(arrays, estimateSampleIntervalMs(longest));
+  const mean = meanAcrossSeries(arrays, estimateSampleIntervalMs(longest) / 2);
   return mean.map((p) => ({
     seconds: (p.ms - t0Ms) / 1000,
     ms: p.ms,

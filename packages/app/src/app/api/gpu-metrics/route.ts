@@ -378,15 +378,15 @@ async function readGpuMetrics(
       // Keep healthy stored windows even when their GitHub copies expired,
       // and never replace or duplicate them with a live copy. source='github'
       // records that this response required fallback, not that every row is live.
-      const databaseSources = new Set(databaseSeries.map(seriesSource));
-      const combined = [
-        ...databaseSeries,
-        ...[...powerSeries, ...bundleSeries].filter(
-          (entry) =>
-            !databaseSources.has(seriesSource(entry)) &&
-            (sources === null || sources.includes(seriesSource(entry) ?? '')),
-        ),
-      ];
+      const seenSources = new Set(databaseSeries.map(seriesSource));
+      const combined = [...databaseSeries];
+      for (const entry of [...powerSeries, ...bundleSeries]) {
+        const source = seriesSource(entry);
+        if (sources !== null && !sources.includes(source ?? '')) continue;
+        if (source !== null && seenSources.has(source)) continue;
+        combined.push(entry);
+        if (source !== null) seenSources.add(source);
+      }
       assertStoredArtifactsRecovered(stored, artifacts, incomplete);
       return powerSeriesResponse('github', runInfo, combined, sources);
     }
