@@ -1,24 +1,26 @@
 import { describe, expect, it } from 'vitest';
 
 import type { BenchmarkPersistenceInput } from './benchmark-ingest.js';
-import { createBenchmarkPowerAuditRecovery } from './power-audit-recovery.js';
+import { agentxWindowPlan, attachAgentxAudits } from './power-audit-recovery.js';
 
-const resultFile = 'kimik3_recipe-a_conc48.json';
-const source = `power_validation_${resultFile}`;
-const validation = {
-  power_valid: true,
-  validation_path: 'LOGS/agentic/conc_48/power_validation.json',
-  result_file: resultFile,
-  selected_window: {
-    concurrency: 48,
-    start_time_unix: 1000,
-    end_time_unix: 1100,
-    result_path: 'agentic/conc_48/agentic_power_concurrency_48.json',
-    window_file: 'windows/agentic_power_concurrency_48.json',
-  },
-};
-const evidence = { resultFile, validations: { [source]: validation } };
-const expectedAudit = { source, window_start_unix: 1000, window_end_unix: 1100 };
+function nested(conc: number, resultFile: string, start = 1000) {
+  return {
+    power_valid: true,
+    validation_path: `LOGS/agentic/conc_${conc}/power_validation.json`,
+    result_file: resultFile,
+    selected_window: {
+      concurrency: conc,
+      start_time_unix: start,
+      end_time_unix: start + 100,
+      result_path: `agentic/conc_${conc}/agentic_power_concurrency_${conc}.json`,
+      window_file: `windows/agentic_power_concurrency_${conc}.json`,
+    },
+  };
+}
+
+const RESULT_48 = 'kimik3_recipe-a_conc48.json';
+const SOURCE_48 = `power_validation_${RESULT_48.slice(0, -5)}.json`;
+const AUDIT_48 = { source: SOURCE_48, window_start_unix: 1000, window_end_unix: 1100 };
 
 function point(overrides: Partial<BenchmarkPersistenceInput> = {}): BenchmarkPersistenceInput {
   return {
@@ -31,31 +33,84 @@ function point(overrides: Partial<BenchmarkPersistenceInput> = {}): BenchmarkPer
     image: 'image',
     recipeFingerprint: 'recipe-a',
     metrics: { power_valid: 1, avg_power_w: 234.5, mean_ttft: 0.2 },
-    workers: [{ role: 'agg', worker_idx: 0, num_gpus: 8, avg_power_w: 234.5 }],
     ...overrides,
   };
 }
 
-describe('CI benchmark audit recovery', () => {
-  it('retains exact provenance with aggregate after sibling and preserves benchmark values', () => {
-    const recover = createBenchmarkPowerAuditRecovery();
-    const original = point();
-    let latest = original;
-    for (const isPaired of [true, false]) {
-      latest = recover(original, isPaired ? evidence : undefined);
-      expect(latest.metrics).toBe(original.metrics);
-      expect(latest.workers).toBe(original.workers);
-      expect({ ...latest, powerAudit: undefined }).toEqual({ ...original, powerAudit: undefined });
-    }
-    expect(latest.powerAudit).toEqual(expectedAudit);
-    expect(original.powerAudit).toBeUndefined();
+describe('agentxWindowPlan', () => {
+  it('maps each concurrency to its one recoverable window', () => {
+    const plan = agentxWindowPlan({
+      [SOURCE_48]: nested(48, RESULT_48),
+      'power_validation_kimik3_recipe-a_conc96.json': nested(
+        96,
+        'kimik3_recipe-a_conc96.json',
+        5000,
+      ),
+    });
+    expect([...plan]).toEqual([
+      [48, AUDIT_48],
+      [
+        96,
+        {
+          source: 'power_validation_kimik3_recipe-a_conc96.json',
+          window_start_unix: 5000,
+          window_end_unix: 5100,
+        },
+      ],
+    ]);
   });
 
-  it('does not reuse the same run/concurrency audit for a point with another offload mode', () => {
-    const recover = createBenchmarkPowerAuditRecovery();
-    recover(point(), evidence);
-    const other = point({ offloadMode: 'off' });
-    expect(recover(other)).toBe(other);
-    expect(other.powerAudit).toBeUndefined();
+  it('withholds a concurrency named by two recoverable windows and ignores legacy documents', () => {
+    const twin = nested(48, 'other_conc48.json', 2000);
+    expect(
+      agentxWindowPlan({
+        [SOURCE_48]: nested(48, RESULT_48),
+        'power_validation_other_conc48.json': twin,
+      }).size,
+    ).toBe(0);
+    // A top-level document names the concurrency but carries no retained alias.
+    const legacy = { power_valid: true, selected_window: nested(48, RESULT_48).selected_window };
+    expect([
+      ...agentxWindowPlan({
+        'power_validation_legacy.json': legacy,
+        [SOURCE_48]: nested(48, RESULT_48),
+      }),
+    ]).toEqual([[48, AUDIT_48]]);
+  });
+});
+
+const describePoint = (p: BenchmarkPersistenceInput) => `${p.conc}/${p.offloadMode}`;
+
+describe('attachAgentxAudits', () => {
+  const plan = agentxWindowPlan({ [SOURCE_48]: nested(48, RESULT_48) });
+
+  it('attaches the window to the single agentic point at its concurrency and leaves the rest untouched', () => {
+    const agentic = point();
+    const other = point({ conc: 32 });
+    const singleTurn = point({ benchmarkType: 'single_turn', isl: 1024, osl: 1024 });
+    const result = attachAgentxAudits(plan, [singleTurn, agentic, other], describePoint);
+    expect(result.points.map((p) => p.powerAudit)).toEqual([undefined, AUDIT_48, undefined]);
+    expect(result.points[0]).toBe(singleTurn);
+    expect(result.points[2]).toBe(other);
+    expect(result.points[1]!.metrics).toBe(agentic.metrics);
+    expect(agentic.powerAudit).toBeUndefined();
+    expect(result).toMatchObject({ attached: 1, refused: [] });
+  });
+
+  it('keeps provenance a point already carries', () => {
+    const existing = { source: 'producer.json' };
+    const result = attachAgentxAudits(plan, [point({ powerAudit: existing })], describePoint);
+    expect(result.points[0]!.powerAudit).toBe(existing);
+    expect(result.attached).toBe(0);
+  });
+
+  it('refuses, by name, a concurrency shared by two points instead of guessing', () => {
+    const result = attachAgentxAudits(
+      plan,
+      [point({ offloadMode: 'on' }), point({ offloadMode: 'off' })],
+      describePoint,
+    );
+    expect(result.points.map((p) => p.powerAudit)).toEqual([undefined, undefined]);
+    expect(result.refused).toEqual([{ concurrency: 48, points: ['48/on', '48/off'] }]);
   });
 });

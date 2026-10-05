@@ -73,6 +73,16 @@ describe('getModelAndSequence', () => {
     expect(result).toEqual({ model: Model.GLM_5_2, sequence: Sequence.OneK_OneK });
   });
 
+  it.each(['glm5.2', 'glm5.3'])('recognizes the %s alias in unofficial artifacts', (prefix) => {
+    expect(getModelAndSequence(`results_${prefix}_1k1k`)).toEqual({
+      model: Model.GLM_5_2,
+      sequence: Sequence.OneK_OneK,
+    });
+    expect(
+      getModelAndSequenceFromArtifact({ infmax_model_prefix: prefix, isl: 1024, osl: 1024 }),
+    ).toEqual({ model: Model.GLM_5_2, sequence: Sequence.OneK_OneK });
+  });
+
   it('returns undefined for unrecognized model prefix', () => {
     expect(getModelAndSequence('results_unknown_1k1k')).toBeUndefined();
   });
@@ -281,9 +291,9 @@ describe('isSequenceDeprecatedForModel / getSequenceCategoryForModel', () => {
 // per-model Best per SKU default
 // ===========================================================================
 describe('isBestPerSkuDefaultOff', () => {
-  it('opens Qwen3.5 8K/1K and agentic charts with every configuration', () => {
-    expect(isBestPerSkuDefaultOff(Model.Qwen3_5, Sequence.EightK_OneK)).toBe(true);
-    expect(isBestPerSkuDefaultOff(Model.Qwen3_5, Sequence.AgenticTraces)).toBe(true);
+  it('opens Qwen3.5 8K/1K and agentic charts with Best per SKU enabled', () => {
+    expect(isBestPerSkuDefaultOff(Model.Qwen3_5, Sequence.EightK_OneK)).toBe(false);
+    expect(isBestPerSkuDefaultOff(Model.Qwen3_5, Sequence.AgenticTraces)).toBe(false);
   });
 
   it('keeps Best per SKU on for other Qwen3.5 scenarios and other models', () => {

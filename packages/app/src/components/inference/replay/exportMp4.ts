@@ -1,6 +1,7 @@
 import type { ArrayBufferTarget as ArrayBufferTargetType, Muxer as MuxerType } from 'mp4-muxer';
 
 import { getExportFooterText } from '@/lib/export-footer';
+import { hasDarkTheme } from '@/lib/themes';
 
 export type Mp4ExportStage = 'init' | 'render' | 'encode' | 'flush' | 'mux';
 
@@ -231,9 +232,7 @@ export async function exportReplayMp4(opts: ExportOptions): Promise<void> {
 
   const bgColor =
     getComputedStyle(document.documentElement).getPropertyValue('--background').trim() || '#fff';
-  const isDark =
-    document.documentElement.classList.contains('dark') ||
-    document.documentElement.classList.contains('minecraft');
+  const isDark = hasDarkTheme(document.documentElement);
 
   let outWidth = 0;
   let outHeight = 0;

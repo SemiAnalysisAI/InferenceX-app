@@ -98,4 +98,19 @@ describe('GET /api/v1/views/gpu-metrics full-record statistics', () => {
     expect(body.rows).toEqual(rows);
     expect(metrics.mock.calls[0][0].nextUrl.searchParams.get('runId')).toBe(String(runInfo.id));
   });
+
+  it('falls back to another collected metric when the default correlation y-axis was not sampled', async () => {
+    const powerOnly = [
+      { timestamp: '2026-09-08T00:00:00Z', index: 0, power: 100, smClock: 1500 },
+      { timestamp: '2026-09-08T00:00:01Z', index: 0, power: 300, smClock: 1900 },
+    ];
+    source([{ ...artifact(), data: powerOnly }]);
+    const response = await GET(request('&chartView=correlation'));
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.chart).toEqual([
+      { x: 100, y: 1500, gpuIndex: 0, raw: powerOnly[0] },
+      { x: 300, y: 1900, gpuIndex: 0, raw: powerOnly[1] },
+    ]);
+  });
 });

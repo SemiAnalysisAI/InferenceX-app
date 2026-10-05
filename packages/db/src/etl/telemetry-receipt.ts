@@ -246,6 +246,10 @@ export async function readTelemetryReceipt(
     targeted?: boolean;
     /** Mapped identity -> persisted ID, only from the historical resolver's unique fallback. */
     uniqueFallbacks?: ReadonlyMap<string, number>;
+    recoveryError?: string;
+    /** Omitted/null means the current failure covers the whole run. */
+    recoveryArtifactName?: string | null;
+    expectationErrors?: TelemetryReceipt['expectationErrors'];
   } = {},
 ): Promise<TelemetryReceipt> {
   const previous = options.previous;
@@ -411,6 +415,30 @@ export async function readTelemetryReceipt(
     });
   }
   receipt.points.sort((a, b) => a.key.localeCompare(b.key));
+  // Merge current failures after resolving prior ones, before counts can claim completeness.
+  if (options.recoveryError) {
+    const priorError = receipt.recoveryError;
+    const priorScope = receipt.recoveryArtifactNames;
+    receipt.recoveryError = [
+      ...new Set([priorError, options.recoveryError].filter(Boolean).join('\n').split('\n')),
+    ].join('\n');
+    if (options.recoveryArtifactName && (!priorError || priorScope))
+      receipt.recoveryArtifactNames = [
+        ...new Set([...(priorScope ?? []), options.recoveryArtifactName]),
+      ];
+    else delete receipt.recoveryArtifactNames;
+  }
+  if (options.expectationErrors) {
+    const failedBenchmarks = new Set(
+      options.expectationErrors.map((error) => error.benchmarkArtifact),
+    );
+    receipt.expectationErrors = [
+      ...(receipt.expectationErrors ?? []).filter(
+        (error) => !failedBenchmarks.has(error.benchmarkArtifact),
+      ),
+      ...options.expectationErrors,
+    ];
+  }
   return summarizeTelemetryReceipt(receipt);
 }
 

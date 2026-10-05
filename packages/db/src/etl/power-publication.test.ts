@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { mapBenchmarkRow } from './benchmark-mapper';
 import { createSkipTracker } from './skip-tracker';
 import {
+  POWER_WORKLOADS,
   powerPublicationPoint,
+  powerWorkloadForScenario,
   verifyPowerPublication,
   type PublishedPowerRow,
 } from './power-publication';
@@ -51,6 +53,27 @@ function actual(point = expected()): PublishedPowerRow {
 }
 
 describe('PowerX publication', () => {
+  it('admits exactly the workloads of POWER_WORKLOADS to the receipt', () => {
+    const point = (overrides: Record<string, unknown>) =>
+      powerPublicationPoint(mapBenchmarkRow({ ...raw, ...overrides }, createSkipTracker())!, '', {
+        path: '',
+        sha256: '',
+      });
+    expect(point({ isl: 4096, osl: 1024 })).toBeNull();
+    for (const workload of POWER_WORKLOADS) {
+      const row =
+        workload.benchmarkType === 'agentic_traces'
+          ? { isl: undefined, osl: undefined, scenario_type: 'agentic-coding', users: 32 }
+          : { isl: workload.isl, osl: workload.osl };
+      expect(point(row)?.identity).toMatchObject({
+        benchmark_type: workload.benchmarkType,
+        isl: workload.isl,
+        osl: workload.osl,
+      });
+    }
+    expect(powerWorkloadForScenario('8k1k')).toMatchObject({ isl: 8192, osl: 1024 });
+    expect(powerWorkloadForScenario('4k1k')).toBeUndefined();
+  });
   it('keeps required 1K/1K measurements in the publication receipt', () => {
     const point = expected({ isl: 1024, joules_per_output_token: 2.5 });
     expect(point.identity).toMatchObject({ benchmark_type: 'single_turn', isl: 1024, osl: 1024 });
@@ -138,5 +161,49 @@ describe('PowerX publication', () => {
       mapBenchmarkRow({ ...raw, benchmark_outcome: { status: 'failed' } }, tracker),
     ).toBeNull();
     expect(tracker.skips.failedRun).toBe(1);
+  });
+});
+
+describe('NVL72 CPU publication', () => {
+  it('retains CPU watts and socket provenance and rejects their loss in DB/API readback', () => {
+    const point = expected({
+      cpu_power_valid: 1,
+      avg_total_cpu_power_w: 501,
+      power_audit: {
+        ...raw.power_audit,
+        cpu: {
+          sensor_kind: 'grace_socket',
+          source: 'acpi',
+          expected_sockets: 2,
+          observed_sockets: 2,
+          reason_codes: [],
+        },
+      },
+    });
+    expect(point.metrics).toMatchObject({ cpu_power_valid: 1, avg_total_cpu_power_w: 501 });
+    expect(point.power_audit).toMatchObject({
+      cpu: { sensor_kind: 'grace_socket', observed_sockets: 2 },
+    });
+    expect(verifyPowerPublication([point], [actual(point)], 'database')).toEqual([]);
+    const missingCpu = actual(point);
+    delete missingCpu.metrics.cpu_power_valid;
+    delete missingCpu.metrics.avg_total_cpu_power_w;
+    expect(verifyPowerPublication([point], [missingCpu], 'API')).toContainEqual(
+      expect.stringContaining('cpu_power_valid expected 1'),
+    );
+    expect(
+      verifyPowerPublication([point], [{ ...actual(point), power_audit: raw.power_audit }], 'API'),
+    ).toContainEqual(expect.stringContaining('power_audit differs'));
+  });
+
+  it('preserves valid GPU watts and rejects leaked invalid CPU watts', () => {
+    const point = expected({ cpu_power_valid: 0, avg_total_cpu_power_w: 501 });
+    expect(point.metrics).toMatchObject({ cpu_power_valid: 0, avg_power_w: 642 });
+    expect(point.metrics).not.toHaveProperty('avg_total_cpu_power_w');
+    const leaked = actual(point);
+    leaked.metrics.avg_total_cpu_power_w = 501;
+    expect(verifyPowerPublication([point], [leaked], 'API')).toContainEqual(
+      expect.stringContaining('avg_total_cpu_power_w expected absent, got 501'),
+    );
   });
 });

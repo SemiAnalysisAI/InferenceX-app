@@ -122,6 +122,12 @@ const URL_STATE_KEYS = [
   // Cache reuse: the configuration group plotted. Empty means the group with
   // the most rows reporting cache tiers.
   'c_cfg',
+  // Cache reuse: the serving recipe within that group. Empty means the recipe
+  // with the most rows reporting cache tiers.
+  'c_recipe',
+  // Profit estimator: which cache hit rate to use — actual (server-measured,
+  // default) or theoretical (infinite-cache rate from the trace).
+  'c_chmode',
 ] as const;
 
 export type UrlStateKey = (typeof URL_STATE_KEYS)[number];
@@ -232,6 +238,8 @@ export const PARAM_DEFAULTS: Record<UrlStateKey, string> = {
   c_ivmin: '',
   c_ttft: '',
   c_cfg: '',
+  c_recipe: '',
+  c_chmode: '',
   // Empty means the default y metric (margin).
   c_ly: '',
   c_ramp: DEFAULT_LIFECYCLE_RAMP_MONTHS,

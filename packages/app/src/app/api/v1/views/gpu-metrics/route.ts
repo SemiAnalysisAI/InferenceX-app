@@ -2,7 +2,11 @@ import {
   readGpuMetricsForView as metrics,
   type GpuMetricsRouteResponse,
 } from '@/app/api/gpu-metrics/route';
-import { buildCorrelationData, buildGroupedData } from '@/components/gpu-power/chart-data';
+import {
+  buildCorrelationData,
+  buildGroupedData,
+  correlationYMetric,
+} from '@/components/gpu-power/chart-data';
 import { storedGpuStatsForMetric } from '@/components/gpu-power/stored-gpu-stats';
 import {
   ALL_METRIC_OPTIONS,
@@ -103,7 +107,12 @@ export function GET(request: NextRequest) {
         chart:
           chartView === 'chart'
             ? Object.fromEntries(buildGroupedData(rows, new Set(gpus), metric))
-            : buildCorrelationData(rows, new Set(gpus), corrXMetric, corrYMetric),
+            : buildCorrelationData(
+                rows,
+                new Set(gpus),
+                corrXMetric,
+                correlationYMetric(availableMetrics, corrXMetric, corrYMetric),
+              ),
         rendering: { maxInteractivePoints: downsample ? 2000 : null, rawRowsUnsampled: true },
       },
       { headers: { 'Cache-Control': 'private, no-store' } },

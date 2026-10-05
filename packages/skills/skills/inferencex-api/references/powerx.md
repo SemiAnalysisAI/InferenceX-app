@@ -57,6 +57,17 @@ Existing output directories are refused.
 Use `inferencex verify <directory>` to reconstruct the result from the saved
 responses. A later API request is separate evidence and may return different data.
 
+## NVL72 CPU measurements
+
+Raw benchmark responses may include `cpu_power_valid`, `avg_cpu_socket_power_w`,
+`avg_total_cpu_power_w`, `total_cpu_energy_j`, and optional module power/energy.
+CPU measurements require `cpu_power_valid === 1`, independently of GPU validity.
+`powerValid=strictV2` filters GPU measurements only. Read `power_audit.cpu` for
+sensor type, collector, socket coverage, and validation reasons. Grace socket
+readings combine CPU and LPDDR5X power; a module reading already includes GPU
+power. Missing measurements stay unavailable. These fields do not add CPU
+samples to the GPU timeline or change the CLI export format.
+
 ## Selection and coverage
 
 The request uses `/api/v1/benchmarks` with `model`, optional `date`, and

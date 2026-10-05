@@ -45,6 +45,13 @@ export interface GPUDataPoint {
    */
   cacheHitRate?: number;
   /**
+   * Infinite-cache theoretical hit rate (0..1) computed from the trace itself,
+   * representing the maximum reuse potential of the workload with unbounded
+   * cache capacity. See `theoretical_cache_hit_rate` on the source row.
+   * Undefined for fixed sequences or rows that did not report a theoretical rate.
+   */
+  theoreticalCacheHitRate?: number;
+  /**
    * Fraction of the tokens this config serves that are input tokens.
    *
    * Not simply `inputThroughput / (inputThroughput + outputThroughput)`: on a
@@ -93,6 +100,12 @@ export interface InterpolatedResult {
    * fixed-sequence frontier). See {@link GPUDataPoint.cacheHitRate}.
    */
   cacheHitRate?: number;
+  /**
+   * Infinite-cache theoretical hit rate at that operating point, or undefined
+   * when the frontier did not carry a theoretical rate on every point.
+   * See {@link GPUDataPoint.theoreticalCacheHitRate}.
+   */
+  theoreticalCacheHitRate?: number;
   /**
    * Fraction of the tokens this config serves that are input tokens.
    *

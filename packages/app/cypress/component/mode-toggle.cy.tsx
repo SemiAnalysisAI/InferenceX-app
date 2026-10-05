@@ -1,5 +1,19 @@
 import { ModeToggle } from '@/components/ui/mode-toggle';
 import { ThemeProvider } from '@/components/ui/theme-provider';
+import { APP_THEMES } from '@/lib/themes';
+
+const ICONS: Record<string, string> = {
+  light: 'lucide-sun',
+  dark: 'lucide-moon',
+  minecraft: 'lucide-pickaxe',
+  csgo: 'lucide-crosshair',
+  gta: 'lucide-car',
+};
+
+function pick(theme: string) {
+  cy.get('[data-testid="theme-toggle"]').click();
+  cy.get(`[data-testid="theme-option-${theme}"]`).click();
+}
 
 describe('ModeToggle', () => {
   beforeEach(() => {
@@ -7,7 +21,7 @@ describe('ModeToggle', () => {
       <ThemeProvider
         attribute="class"
         defaultTheme="light"
-        themes={['light', 'dark', 'minecraft']}
+        themes={APP_THEMES}
         disableTransitionOnChange
       >
         <ModeToggle />
@@ -15,26 +29,53 @@ describe('ModeToggle', () => {
     );
   });
 
-  it('clicking toggle cycles light → dark', () => {
-    cy.get('html').should('not.have.class', 'dark');
-    cy.get('[data-testid="theme-toggle"]').click();
-    cy.get('html').should('have.class', 'dark');
+  it('expands an icon-only menu with one option per theme', () => {
+    cy.get('[data-testid="theme-menu"]').should('not.exist');
+    cy.get('[data-testid="theme-toggle"]')
+      .should('have.attr', 'aria-expanded', 'false')
+      .click()
+      .should('have.attr', 'aria-expanded', 'true');
+    cy.get('[data-testid="theme-menu"] [role="radio"]').should('have.length', APP_THEMES.length);
+    for (const theme of APP_THEMES) {
+      cy.get(`[data-testid="theme-option-${theme}"]`)
+        .should('have.attr', 'aria-label')
+        .and('not.be.empty');
+      // Icons only: no visible text inside an option.
+      cy.get(`[data-testid="theme-option-${theme}"]`).should('have.text', '');
+      cy.get(`[data-testid="theme-option-${theme}"] svg`).should('have.class', ICONS[theme]);
+    }
+    cy.get('[data-testid="theme-option-light"]')
+      .should('have.attr', 'aria-checked', 'true')
+      .and('have.focus');
   });
 
-  it('clicking toggle twice cycles light → dark → minecraft', () => {
-    cy.get('[data-testid="theme-toggle"]').click();
-    cy.get('html').should('have.class', 'dark');
-    cy.get('[data-testid="theme-toggle"]').click();
-    cy.get('html').should('have.class', 'minecraft');
+  it('selects any theme directly and closes the menu', () => {
+    for (const theme of ['gta', 'minecraft', 'dark', 'csgo', 'light']) {
+      pick(theme);
+      cy.get('html').should('have.class', theme);
+      cy.get('[data-testid="theme-menu"]').should('not.exist');
+      cy.get('[data-testid="theme-toggle"]')
+        .should('have.attr', 'aria-label', `Switch theme (currently ${theme} mode)`)
+        .find('svg')
+        .should('have.class', ICONS[theme]);
+    }
+    cy.get('html').should('not.have.class', 'gta');
   });
 
-  it('clicking toggle three times returns to light mode', () => {
+  it('supports arrow-key navigation and Escape', () => {
     cy.get('[data-testid="theme-toggle"]').click();
-    cy.get('html').should('have.class', 'dark');
+    cy.focused().should('have.attr', 'data-testid', 'theme-option-light');
+    cy.focused().type('{downArrow}');
+    cy.focused().should('have.attr', 'data-testid', 'theme-option-dark');
+    cy.focused().type('{upArrow}{upArrow}');
+    cy.focused().should('have.attr', 'data-testid', 'theme-option-gta');
+    cy.focused().click();
+    cy.get('html').should('have.class', 'gta');
+    cy.get('[data-testid="theme-menu"]').should('not.exist');
     cy.get('[data-testid="theme-toggle"]').click();
-    cy.get('html').should('have.class', 'minecraft');
-    cy.get('[data-testid="theme-toggle"]').click();
-    cy.get('html').should('not.have.class', 'dark');
-    cy.get('html').should('not.have.class', 'minecraft');
+    cy.focused().should('have.attr', 'data-testid', 'theme-option-gta');
+    cy.focused().type('{esc}');
+    cy.get('[data-testid="theme-menu"]').should('not.exist');
+    cy.get('html').should('have.class', 'gta');
   });
 });

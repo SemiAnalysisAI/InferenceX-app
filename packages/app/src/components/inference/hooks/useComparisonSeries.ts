@@ -12,6 +12,7 @@ import {
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { getModelSortIndex } from '@/lib/constants';
 import { generateGpuDateColors, generateHighContrastGpuDateColors } from '@/lib/dynamic-colors';
+import { isDarkTheme } from '@/lib/themes';
 
 /** One (comparison entry, chip config) series of the date comparison view. */
 export interface ComparisonSeries {
@@ -78,7 +79,7 @@ export function useComparisonSeries(providedRunNumbering?: Map<string, number>) 
   const gpuDateColorMap = useMemo(() => {
     const { dates, sortedGPUs } = gpuDatePairs;
     if (sortedGPUs.length === 0 || dates.length === 0) return {};
-    const theme = resolvedTheme === 'dark' || resolvedTheme === 'minecraft' ? 'dark' : 'light';
+    const theme = isDarkTheme(resolvedTheme) ? 'dark' : 'light';
     return generateGpuDateColors(sortedGPUs, dates.length, theme);
   }, [gpuDatePairs, resolvedTheme]);
 
@@ -88,7 +89,7 @@ export function useComparisonSeries(providedRunNumbering?: Map<string, number>) 
   const hcGpuDateColorMap = useMemo(() => {
     const { dates, sortedGPUs } = gpuDatePairs;
     if (!highContrast || sortedGPUs.length === 0 || dates.length === 0) return {};
-    const theme = resolvedTheme === 'dark' || resolvedTheme === 'minecraft' ? 'dark' : 'light';
+    const theme = isDarkTheme(resolvedTheme) ? 'dark' : 'light';
     const baseColors: Record<string, string> = {};
     for (const gpu of sortedGPUs) baseColors[gpu] = getCssColor(resolveColor(gpu));
     return generateHighContrastGpuDateColors(baseColors, dates.length, theme);
