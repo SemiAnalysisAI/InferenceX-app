@@ -16,8 +16,8 @@ identifies these as officially released artwork.
 | `trio-mobile.webp`     | Same original                                                                       | Right-aligned 1080 × 1190 crop, resized to 720 × 793, quality 82 |
 | `vinewood.webp`        | https://thegtaplace.com/images/gtav/artwork/michael_with_vinewood_sign_extended.jpg | Resized to 1600 pixels wide, WebP quality 84                     |
 | `vinewood-mobile.webp` | Same original                                                                       | Resized to 800 pixels wide, WebP quality 82                      |
-| `gtav-logo.webp`       | https://thegtaplace.com/images/gtav/artwork/gtav_logo_transparent.png               | Resized to 360 × 318, WebP quality 90; design unchanged          |
 
 The images are served locally, without third-party hotlinks or tracking.
 Responsive sources keep mobile downloads smaller. They load only when the
-GTA theme mounts. Font provenance is in `src/app/fonts/GTA-FONTS.md`.
+GTA theme mounts. Font provenance is in `src/app/fonts/GTA-FONTS.md`. The banner wordmark is
+live Pricedown text ("Grand Theft InferenceX"), not the GTA V logo.

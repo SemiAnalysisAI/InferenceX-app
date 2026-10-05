@@ -544,28 +544,22 @@ html[data-inferencex-embed] [data-testid='csgo-theme-banner'] {
   background: linear-gradient(90deg, #080a08 0%, #080a08eb 20%, #080a0840 47%, #080a0800 70%);
 }
 
-.gta-banner-identity {
+/* Stacked "Grand Theft InferenceX" wordmark in Pricedown. */
+.gta-wordmark {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.gta-logo {
-  width: 10rem;
-  height: auto;
-}
-
-/* InferenceX remains distinct from the unmodified GTA V logo. */
-.gta-wordmark {
   font-family: var(--gta-display);
   font-weight: 700;
-  line-height: 1;
+  line-height: 0.82;
   color: #fff;
-  font-size: clamp(1.5rem, 3vw, 2rem);
+  font-size: clamp(1.6rem, 3.2vw, 2.4rem);
   -webkit-text-stroke: 4px #000;
   paint-order: stroke fill;
   text-shadow: 0 3px 0 #000;
+}
+
+.gta-wordmark-big {
+  font-size: 1.55em;
 }
 
 .gta-wanted {
@@ -624,8 +618,8 @@ html[data-inferencex-embed] [data-testid='csgo-theme-banner'] {
     background: linear-gradient(90deg, #080a08e6, #080a0840 55%, #080a0800);
   }
 
-  .gta-logo {
-    width: 7rem;
+  .gta-wordmark {
+    font-size: 1.4rem;
   }
 
   .gta-wanted {

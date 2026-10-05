@@ -64,8 +64,9 @@ The chrome follows the GTA V pause menu: near-opaque black panels over Rockstar'
 Michael/Franklin/Trevor artwork, a black header with a cash-green rule, uppercase Chalet
 Comprime menu tabs with the current page as a solid white tab
 (`aria-current="page"`), Chalet Comprime headings, and DM Sans body copy.
-`GtaThemeBanner` pairs the unmodified GTA V logo with Michael's Vinewood
-artwork, an InferenceX Pricedown wordmark, and a five-star wanted level.
+`GtaThemeBanner` pairs Michael's Vinewood artwork with a stacked Pricedown
+"Grand Theft InferenceX" wordmark (live text, not the GTA V logo) and a
+five-star wanted level.
 The splash uses Pricedown in mission gold. `GtaDecorations` follows the root
 class and renders local responsive WebP images (`aria-hidden`,
 `pointer-events: none`), only while GTA is active. Embed routes suppress both;
@@ -106,7 +107,7 @@ the overlay CSS variables inherit the existing dark palette.
 - No CS:GO image requests on a cold light/dark landing; images load only
   after selection, with a smaller mobile crop.
 - No GTA artwork requests on a cold light/dark landing; responsive artwork
-  and logo load on selection, persist after reload, and unmount on exit.
+  loads on selection, the Pricedown wordmark renders, persist after reload, and unmount on exit.
 - CS:GO uses dark figure sources and chart colors, including high-contrast.
   PNG/MP4 footer contrast uses the same shared dark-theme classifier.
 - Desktop and narrow mobile landing/chart views, keyboard focus, Chinese

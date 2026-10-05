@@ -17,5 +17,5 @@ code license does not relicense these fonts, and the upstream copyright holders
 are Typodermic and House Industries. Do not reuse these files outside the GTA
 theme without confirming the agreement covers that use.
 
-Artwork and logo provenance is documented separately in
+Artwork provenance is documented separately in
 `public/decorative/gta/README.md`.
