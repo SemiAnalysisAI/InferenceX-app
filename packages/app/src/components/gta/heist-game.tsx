@@ -288,6 +288,7 @@ export function HeistGame({ locale = 'en' }: { locale?: 'en' | 'zh' }) {
     engine.current.target = id;
     sync();
     if (overview) toggleMap();
+    else focusCanvas();
   };
   const pedal = (control: keyof Controls, label: string, content: string) => (
     <button

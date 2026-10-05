@@ -67,6 +67,27 @@ describe('GTA heist controls', () => {
     cy.get('[data-testid="heist-map"]').should('have.text', '路线地图');
   });
 
+  it('keeps keyboard driving active after choosing a sidebar destination', () => {
+    cy.mount(
+      <div style={{ height: 750 }}>
+        <HeistGame />
+      </div>,
+    );
+    cy.get('[data-testid="heist-start"]').click();
+    cy.get('[data-testid="heist-stop-nvidia"]').click();
+    cy.get('.heist-gps').should('contain.text', 'NVIDIA');
+    cy.get('[data-testid="heist-canvas"]')
+      .should('have.focus')
+      .trigger('keydown', { code: 'ArrowUp' });
+    cy.window().then((win) => {
+      const game = win as unknown as GameWindow;
+      const before = JSON.parse(game.render_game_to_text()).car.y;
+      game.advanceTime(1000);
+      expect(JSON.parse(game.render_game_to_text()).car.y).to.be.lessThan(before - 70);
+    });
+    cy.get('[data-testid="heist-canvas"]').trigger('keyup', { code: 'ArrowUp' });
+  });
+
   it('rounds the countdown consistently and supports mobile destination selection', () => {
     cy.viewport(390, 844);
     cy.mount(
