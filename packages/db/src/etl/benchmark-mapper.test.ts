@@ -618,39 +618,42 @@ describe('mapBenchmarkRow', () => {
       expect(result!.config.disagg).toBe(true);
     });
 
-    it('preserves explicit disagg=false for a multi-node Dynamo server', () => {
-      const tracker = createSkipTracker();
-      const result = mapBenchmarkRow(
-        makeV2Row({
-          framework: 'dynamo-vllm',
-          disagg: false,
-          is_multinode: true,
-          prefill_tp: 8,
-          prefill_ep: 1,
-          prefill_num_workers: 1,
-          num_prefill_gpu: 16,
-          prefill_pp: 2,
-          decode_tp: 0,
-          decode_ep: 0,
-          decode_num_workers: 0,
-          num_decode_gpu: 0,
-          decode_pp: 1,
-        }),
-        tracker,
-      );
+    it.each(['dynamo-vllm', 'mori-sglang'])(
+      'preserves explicit aggregate topology for %s',
+      (framework) => {
+        const tracker = createSkipTracker();
+        const result = mapBenchmarkRow(
+          makeV2Row({
+            framework,
+            disagg: false,
+            is_multinode: true,
+            prefill_tp: 8,
+            prefill_ep: 1,
+            prefill_num_workers: 1,
+            num_prefill_gpu: 16,
+            prefill_pp: 2,
+            decode_tp: 0,
+            decode_ep: 0,
+            decode_num_workers: 0,
+            num_decode_gpu: 0,
+            decode_pp: 1,
+          }),
+          tracker,
+        );
 
-      expect(result!.config.framework).toBe('dynamo-vllm');
-      expect(result!.config.disagg).toBe(false);
-      expect(result!.config.isMultinode).toBe(true);
-      expect(result!.config.prefillTp).toBe(8);
-      expect(result!.config.decodeTp).toBe(8);
-      expect(result!.config.prefillEp).toBe(1);
-      expect(result!.config.decodeEp).toBe(1);
-      expect(result!.config.numPrefillGpu).toBe(16);
-      expect(result!.config.numDecodeGpu).toBe(16);
-      expect(result!.metrics.prefill_pp).toBe(2);
-      expect(result!.metrics.decode_pp).toBe(2);
-    });
+        expect(result!.config.framework).toBe(framework);
+        expect(result!.config.disagg).toBe(false);
+        expect(result!.config.isMultinode).toBe(true);
+        expect(result!.config.prefillTp).toBe(8);
+        expect(result!.config.decodeTp).toBe(8);
+        expect(result!.config.prefillEp).toBe(1);
+        expect(result!.config.decodeEp).toBe(1);
+        expect(result!.config.numPrefillGpu).toBe(16);
+        expect(result!.config.numDecodeGpu).toBe(16);
+        expect(result!.metrics.prefill_pp).toBe(2);
+        expect(result!.metrics.decode_pp).toBe(2);
+      },
+    );
 
     it('keeps legacy disagg=false Dynamo artifacts disaggregated when decode workers exist', () => {
       const tracker = createSkipTracker();
@@ -1448,7 +1451,7 @@ describe('mapBenchmarkRow — v3 agentic nested agg schema', () => {
     [{ num_gpus: true }, 16],
     [{ is_multinode: undefined }, 16],
     [{ disagg: true }, 16],
-    [{ framework: 'mori-sglang' }, 16],
+    [{ framework: 'mori-sglang' }, 4],
     [{ pp: true }, 16],
     [{ pp: null }, 16],
     [{ request_metrics: undefined }, 16],
