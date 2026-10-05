@@ -452,85 +452,47 @@ html[data-inferencex-embed] [data-testid='csgo-theme-banner'] {
   display: none;
 }
 
-/* ── GTA Theme ── Los Santos sunset chrome over the dark chart palettes. */
+/* ── GTA Theme ── GTA V pause-menu chrome over the dark chart palettes. */
 .gta {
   color-scheme: dark;
-  --background: #0c0b10;
-  --foreground: #f4f2ee;
-  --card: #141319;
-  --card-foreground: #f4f2ee;
-  --popover: #18171e;
-  --popover-foreground: #f4f2ee;
-  --primary: #7bd36e;
-  --primary-foreground: #0c0b10;
-  --secondary: #5aa6e6;
-  --secondary-foreground: #0c0b10;
-  --muted: #26242d;
-  --muted-foreground: #bdb9c4;
-  --accent: #2f2c38;
-  --accent-foreground: #f4f2ee;
-  --border: #5b5766;
-  --border-alt: #34313c;
-  --input: #5b5766;
-  --ring: #7bd36e;
-  --sidebar: #141319;
-  --sidebar-foreground: #f4f2ee;
-  --sidebar-primary: #7bd36e;
-  --sidebar-primary-foreground: #0c0b10;
-  --sidebar-accent: #2f2c38;
-  --sidebar-accent-foreground: #f4f2ee;
-  --sidebar-border: #5b5766;
-  --sidebar-ring: #7bd36e;
+  --background: #0a0a0b;
+  --foreground: #f5f5f5;
+  --card: #111113;
+  --card-foreground: #f5f5f5;
+  --popover: #0d0d0f;
+  --popover-foreground: #f5f5f5;
+  --primary: #72cc72;
+  --primary-foreground: #0a0a0b;
+  --secondary: #5d9bd5;
+  --secondary-foreground: #0a0a0b;
+  --muted: #232326;
+  --muted-foreground: #b8b8bd;
+  --accent: #2c2c30;
+  --accent-foreground: #f5f5f5;
+  --border: #3a3a3f;
+  --border-alt: #26262a;
+  --input: #4a4a50;
+  --ring: #ffffff;
+  --sidebar: #111113;
+  --sidebar-foreground: #f5f5f5;
+  --sidebar-primary: #72cc72;
+  --sidebar-primary-foreground: #0a0a0b;
+  --sidebar-accent: #2c2c30;
+  --sidebar-accent-foreground: #f5f5f5;
+  --sidebar-border: #3a3a3f;
+  --sidebar-ring: #ffffff;
   --radius: 0.125rem;
+  --gta-display: var(--font-pricedown), 'Pricedown', Impact, sans-serif;
+  --gta-menu: var(--font-chalet-comprime), 'ChaletComprime', 'Arial Narrow', sans-serif;
 }
 
+/* Pause-menu backdrop: dark, slightly warm, with a soft vignette. */
 .gta-scene {
   position: fixed;
   inset: 0;
   z-index: -10;
   pointer-events: none;
-  overflow: hidden;
-}
-
-.gta-scene-sky,
-.gta-scene-shade {
-  position: absolute;
-  inset: 0;
-}
-
-.gta-scene-sky {
-  background: linear-gradient(
-    180deg,
-    #140b2a 0%,
-    #3a1650 28%,
-    #8a2d63 52%,
-    #e0614a 72%,
-    #f4a64a 86%,
-    #f9d27a 100%
-  );
-}
-
-.gta-scene-sun {
-  position: absolute;
-  left: 50%;
-  bottom: 12vh;
-  width: min(46vw, 34rem);
-  aspect-ratio: 1;
-  transform: translate(-50%, 50%);
-  border-radius: 50%;
-  background: radial-gradient(circle, #ffe6a0 0%, #ffb35c 45%, #ff7a4d00 70%);
-}
-
-.gta-scene-skyline {
-  position: absolute;
-  left: 0;
-  bottom: 0;
-  width: 100%;
-  height: 34vh;
-}
-
-.gta-scene-shade {
-  background: linear-gradient(180deg, #0c0b10b8 0%, #0c0b1080 40%, #0c0b1033 70%, #0c0b1066 100%);
+  background: radial-gradient(120% 80% at 50% 0%, #1d1f24 0%, #0d0d0f 55%, #050506 100%), #0a0a0b;
 }
 
 .gta-theme-banner {
@@ -539,47 +501,64 @@ html[data-inferencex-embed] [data-testid='csgo-theme-banner'] {
   justify-content: space-between;
   gap: 1rem;
   margin-block: 1rem;
-  padding: 0.5rem 1rem;
-  border-left: 3px solid var(--primary);
-  background: linear-gradient(90deg, #000000d9, #00000059);
+  padding: 0.75rem 1.25rem;
+  background: #000000c2;
 }
 
-.gta-title {
+/* Stacked GTA V-style wordmark. */
+.gta-wordmark {
   display: flex;
   flex-direction: column;
-  line-height: 0.95;
-  font-weight: 900;
-  font-style: italic;
-  letter-spacing: -0.01em;
+  font-family: var(--gta-display);
+  font-weight: 700;
+  line-height: 0.82;
   color: #fff;
-  -webkit-text-stroke: 1.5px #000;
+  font-size: clamp(1.2rem, 3vw, 2.1rem);
+  -webkit-text-stroke: 4px #000;
   paint-order: stroke fill;
-  text-shadow: 3px 3px 0 #000;
+  text-shadow: 0 3px 0 #000;
 }
 
-.gta-title-small {
-  font-size: clamp(0.75rem, 1.6vw, 1rem);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-}
-
-.gta-title-large {
-  font-size: clamp(1.5rem, 4vw, 2.5rem);
+.gta-wordmark-big {
+  font-size: 1.55em;
 }
 
 .gta-wanted {
   display: flex;
   flex-shrink: 0;
-  gap: 0.125rem;
-  color: #f4f2ee;
+  gap: 0.15rem;
+  color: #f5f5f5;
 }
 
+/* Header and headings use the GTA V menu face; body copy stays DM Sans. */
 .gta header {
-  background: #000000e6;
-  border-bottom: 2px solid var(--primary);
+  background: #000000eb;
+  border-bottom: 3px solid var(--primary);
 }
 
-.gta :is(button, [role='button'], [role='combobox'], input, textarea):focus-visible {
+.gta :is(h1, h2, h3, [data-slot='card-title']) {
+  font-family: var(--gta-menu);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.gta header nav a,
+.gta [data-testid='mobile-menu'] a {
+  font-family: var(--gta-menu);
+  font-size: 1rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-radius: 0;
+}
+
+/* Selected menu tab: solid white with black text, like the GTA V pause menu. */
+.gta header nav a[aria-current='page'] {
+  background: #f5f5f5;
+  color: #000;
+}
+
+.gta :is(button, [role='button'], [role='combobox'], input, textarea, a):focus-visible {
   outline: 2px solid var(--ring);
   outline-offset: 3px;
 }
@@ -588,9 +567,25 @@ html[data-inferencex-embed] [data-testid='csgo-theme-banner'] {
   border-radius: var(--radius);
 }
 
+/* Menu panels: translucent black with no visible frame. */
 .gta [data-slot='card'] {
-  background-color: #141319f2;
-  border-top-color: var(--primary);
+  background-color: #000000b8;
+  border-color: #ffffff14;
+}
+
+.gta [data-slot='popover-content'] {
+  background-color: #000000eb;
+  border-color: #ffffff1f;
+}
+
+.gta .splash-text {
+  font-family: var(--gta-display) !important;
+  font-size: 1.15rem;
+  color: #f0c850;
+  -webkit-text-stroke: 3px #000;
+  paint-order: stroke fill;
+  text-shadow: 0 2px 0 #000;
+  -webkit-font-smoothing: antialiased;
 }
 
 .gta .circuit-bg,
@@ -902,8 +897,7 @@ html[data-inferencex-skin='vllm'] [data-slot='card'] {
 /* Dark backgrounds need no outline — this is the original title-screen look. */
 .dark .splash-text,
 .minecraft .splash-text,
-.csgo .splash-text,
-.gta .splash-text {
+.csgo .splash-text {
   color: #ffff00;
   text-shadow: 2px 2px 0px #3f3f00;
 }

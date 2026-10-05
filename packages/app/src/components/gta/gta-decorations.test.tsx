@@ -41,7 +41,6 @@ describe('GtaDecorations', () => {
     await setTheme('gta');
     const scene = container.querySelector('[data-testid="gta-scene"]');
     expect(scene?.getAttribute('aria-hidden')).toBe('true');
-    expect(scene?.querySelector('svg.gta-scene-skyline')).not.toBeNull();
     expect(
       container.querySelectorAll('img, image, button, a, audio, video, iframe, canvas'),
     ).toHaveLength(0);

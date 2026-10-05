@@ -51,6 +51,26 @@ const monocraft = localFont({
   preload: false,
 });
 
+// GTA theme fonts. preload:false + selectors scoped to `.gta` mean browsers
+// fetch them only after the GTA theme is selected. See src/app/fonts/GTA-FONTS.md.
+const pricedown = localFont({
+  src: './fonts/Pricedown.woff2',
+  variable: '--font-pricedown',
+  weight: '700',
+  display: 'swap',
+  preload: false,
+});
+
+const chaletComprime = localFont({
+  src: [
+    { path: './fonts/ChaletComprime-Regular.woff2', weight: '400' },
+    { path: './fonts/ChaletComprime-Bold.woff2', weight: '700' },
+  ],
+  variable: '--font-chalet-comprime',
+  display: 'swap',
+  preload: false,
+});
+
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
@@ -194,7 +214,11 @@ export default async function RootLayout({
 }>) {
   const starCount = await fetchStarCount();
   return (
-    <html lang="en" className={monocraft.variable} suppressHydrationWarning>
+    <html
+      lang="en"
+      className={`${monocraft.variable} ${pricedown.variable} ${chaletComprime.variable}`}
+      suppressHydrationWarning
+    >
       <head>
         <link
           rel="preload"

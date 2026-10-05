@@ -58,19 +58,22 @@ Asset provenance and the maintainer-reported permission are recorded in
 
 GTA follows the CS:GO pattern: it is dark-classified everywhere
 (`isDarkTheme`), aliases onto the dark chart seed (`chartPaletteTheme`), and
-keeps the dark vendor, high-contrast, and overlay palettes. Interface chrome
-uses a HUD cash green primary, armor blue secondary, square corners, and a
-black header with a green rule.
+keeps the dark vendor, high-contrast, and overlay palettes.
 
-`GtaDecorations` follows the root class and renders a fixed, decorative Los
-Santos sunset: CSS gradients plus an inline SVG skyline and palms, behind a
-shade that keeps cards legible. It has `pointer-events: none`, `aria-hidden`,
-and makes no network requests. `GtaThemeBanner` shows a "Grand Theft
-Inference" title and a five-star wanted level. Embed routes suppress both.
+The chrome follows the GTA V pause menu: translucent black panels over a dark
+vignette backdrop, a black header with a cash-green rule, uppercase Chalet
+Comprime menu tabs with the current page as a solid white tab
+(`aria-current="page"`), Chalet Comprime headings, and DM Sans body copy.
+`GtaThemeBanner` renders a stacked Pricedown "Grand Theft Inference"
+wordmark and a five-star wanted level; the splash uses Pricedown in mission
+gold. `GtaDecorations` follows the root class and renders the CSS-only
+backdrop (`aria-hidden`, `pointer-events: none`). Embed routes suppress both.
 
-No Rockstar artwork, logos, or fonts are bundled. Pricedown's free Typodermic
-desktop license does not cover webfont embedding, so the banner uses DM Sans
-black italic with an outline instead.
+Fonts are loaded with `next/font/local` and `preload: false`, and are only
+referenced under `.gta`, so other themes never request them. Provenance and
+the maintainer-reported Rockstar font agreement are recorded in
+`packages/app/src/app/fonts/GTA-FONTS.md`. No Rockstar artwork or logos are
+bundled.
 
 ## Picker accessibility
 
