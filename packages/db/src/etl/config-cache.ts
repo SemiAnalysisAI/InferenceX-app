@@ -83,7 +83,10 @@ export function configKeyFromRow(row: Record<string, unknown>): string {
   });
 }
 
-/** Every stored config id by cache key: one read shared by the preload and read-only lookups. */
+/**
+ * Every stored config id by cache key, read from the table on each call; the
+ * preload and the read-only preflight each take their own snapshot.
+ */
 export async function loadConfigIds(sql: Sql | DbClient): Promise<Map<string, number>> {
   const rows = await sql`
     select id, hardware, framework, model, precision, spec_method,

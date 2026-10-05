@@ -1207,7 +1207,9 @@ main()
             ],
             // Reported but not fatal — see Skips.telemetryError.
             telemetryWarnings: tracker.skips.telemetryError
-              ? [`${tracker.skips.telemetryError} gpu_metrics digest errors`]
+              ? [
+                  `${tracker.skips.telemetryError} telemetry errors (gpu_metrics digest or AgentX window)`,
+                ]
               : [],
             ...(telemetry ? { telemetry } : {}),
           },

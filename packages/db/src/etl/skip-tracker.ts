@@ -11,12 +11,14 @@ export interface Skips {
   failedRun: number;
   dbError: number;
   /**
-   * PowerX telemetry digest failures, counted apart from `dbError` because they
-   * are not fatal. The benchmark rows land either way; only the per-point
-   * telemetry tab is affected, and the artifact can be re-digested later by
-   * `admin:db:backfill-gpu-metrics`. Folding these into `dbError` would let one
-   * malformed `gpu_metrics_*` CSV turn the whole production ingest red, through
-   * the publication manifest that verify-power-publication treats as fatal.
+   * PowerX telemetry failures: a `gpu_metrics_*` digest that could not be
+   * stored, or an AgentX window plan that could not be read or attached.
+   * Counted apart from `dbError` because they are not fatal: the benchmark
+   * rows land either way, only the per-point telemetry tab or provenance is
+   * affected, and `admin:db:backfill-gpu-metrics` can repeat the step later.
+   * Folding these into `dbError` would let one malformed CSV turn the whole
+   * production ingest red, through the publication manifest that
+   * verify-power-publication treats as fatal.
    */
   telemetryError: number;
   /** Agentic point whose sibling `agentic_<suffix>` artifact had no trace_replay files. */

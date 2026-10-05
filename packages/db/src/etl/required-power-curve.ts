@@ -190,7 +190,9 @@ export async function loadStoredCurvePoints(
  * Read-only preflight; no config/workflow upsert, migration, or materialized-view
  * refresh. `readFiles` lends the ingest's one benchmark-artifact read, shared
  * here by the verifier and the incoming-point plan; without it the preflight
- * reads once for itself.
+ * reads once for itself when a manifest exists. It still verifies a second time
+ * and re-parses the manifest for the publication policy; a typed required-power
+ * scope returned by the verifier would remove both.
  */
 export async function preflightRequiredPowerCurves(
   sql: DbClient | Sql,

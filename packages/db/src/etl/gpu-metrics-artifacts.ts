@@ -263,7 +263,10 @@ export function contextUtcOffsetMinutes(context: Record<string, unknown> | null)
 /**
  * Index every extracted telemetry artifact by its shared suffix. A
  * `gpu_metrics_` upload wins over the `power_audit_` bundle for the same
- * suffix; the bundle only fills in for multinode jobs that have no other.
+ * suffix. Single-node jobs upload both, with legacy top-level validations
+ * only; multinode jobs upload the bundle alone, and it is the one carrier of
+ * nested AgentX windows (`normalizePowerAuditValidations`). A single-node
+ * bundle that started carrying nested windows would be shadowed here.
  */
 export function discoverGpuMetricsArtifacts(artifactsDir: string): Map<string, GpuMetricsArtifact> {
   const discovered = new Map<string, GpuMetricsArtifact>();

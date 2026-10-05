@@ -19,9 +19,9 @@ export interface RequiredPowerSource {
   headSha: string | null;
 }
 /**
- * One file the manifest may bind, hashed once when read. Benchmark files keep
- * their parsed rows; sidecars are re-read when parsed, because the extracted
- * bundle does not change for the lifetime of this process.
+ * One file the manifest may bind. Benchmark files arrive hashed with their
+ * parsed rows; sidecars are hashed and re-read per verification, because the
+ * extracted bundle does not change for the lifetime of this process.
  */
 interface Evidence {
   path: string;
@@ -60,7 +60,10 @@ function mappedIdentity(row: BenchmarkParams): string {
  * success. `before_write` runs over the planned points before the first
  * irreversible write and prevents publication; `after_insert` runs over the rows
  * actually handed to the benchmark insert and is what fails the ingest step when
- * a row was dropped on the way (a config error, a failed bulk insert).
+ * a row was dropped on the way (a config error, a failed bulk insert). The
+ * required side is the verifier's pre-correction mapped point and both retained
+ * sides are post-correction, so a backfill that changes a required point's
+ * identity reports it as missing.
  */
 export function assertRequiredPowerPointsRetained(
   required: readonly BenchmarkParams[],
@@ -223,8 +226,9 @@ function verifyRequiredPowerBundle(
 
 /**
  * Run before any database upsert, including workflow/config metadata writes.
- * `readFiles` lends the ingest's one benchmark-artifact read; it is called only
- * once a manifest exists, so an ordinary run reads nothing here.
+ * `readFiles` lends the ingest's one benchmark-artifact read; the standalone
+ * commands fall back to their own read with a throwaway tracker. It is called
+ * only once a manifest exists, so an ordinary run reads nothing here.
  */
 export function verifyRequiredPowerArtifacts(
   root: string,
