@@ -23,7 +23,6 @@
  */
 
 import fs from 'fs';
-import { createHash } from 'node:crypto';
 import {
   powerPublicationPoint,
   publicationIdentity,
@@ -61,7 +60,8 @@ import {
   flattenReusedIngestArtifactBundle,
   readReusedIngestMetadata,
 } from './etl/reused-ingest-metadata';
-import { mapBenchmarkRow, type BenchmarkParams } from './etl/benchmark-mapper';
+import type { BenchmarkParams } from './etl/benchmark-mapper';
+import { readBenchmarkArtifacts, type BenchmarkArtifactFile } from './etl/benchmark-artifacts';
 import { preflightRequiredPowerCurves } from './etl/required-power-curve';
 import {
   assertRequiredPowerPointsRetained,
@@ -268,7 +268,6 @@ const sql = createAdminSql({
 
 /** Key aggregate artifacts produced by the benchmark CI. */
 const ARTIFACT_NAMES = {
-  benchmarks: 'results_bmk',
   runStats: 'run-stats',
   evals: 'eval_results_all',
   changelog: 'changelog-metadata',
@@ -358,6 +357,11 @@ async function main(): Promise<void> {
       console.log(`  PR #${pr.number}:      ${pr.htmlUrl}`);
     }
   }
+
+  // One read of the run's benchmark JSON for verification and the ingest loop.
+  let benchmarkFilesRead: BenchmarkArtifactFile[] | undefined;
+  const benchmarkFiles = () =>
+    (benchmarkFilesRead ??= readBenchmarkArtifacts(artifactsDir, { runId: runIdStr, tracker }));
 
   const requiredPowerPoints = verifyRequiredPowerArtifacts(
     artifactsDir,
@@ -513,22 +517,6 @@ async function main(): Promise<void> {
   if (evalsOnly) {
     console.log('  Skipped (evals-only run)');
   } else {
-    const bmkDir = path.join(artifactsDir, ARTIFACT_NAMES.benchmarks);
-    const bmkFiles = findJsonFiles(bmkDir);
-
-    // Per-job `bmk_*` artifacts and any other `results_*` aggregate; the
-    // `results_bmk` aggregate is already listed once above.
-    const allBmkDirs = fs.existsSync(artifactsDir)
-      ? fs
-          .readdirSync(artifactsDir)
-          .filter(
-            (d) =>
-              d !== ARTIFACT_NAMES.benchmarks && (d.startsWith('bmk_') || d.startsWith('results_')),
-          )
-          .map((d) => path.join(artifactsDir, d))
-          .filter((d) => fs.statSync(d).isDirectory())
-      : [];
-
     const serverLogArtifacts = discoverServerLogArtifacts(artifactsDir);
     if (serverLogArtifacts.size > 0) {
       console.log(`  Found ${serverLogArtifacts.size} server log artifact(s)`);
@@ -563,55 +551,41 @@ async function main(): Promise<void> {
       );
     }
 
-    const allBmkFiles = [...bmkFiles, ...allBmkDirs.flatMap((d) => findJsonFiles(d))];
+    const files = benchmarkFiles();
     const seenPointIdentities = new Map<string, string>();
-    console.log(`  Found ${allBmkFiles.length} benchmark JSON file(s)`);
+    console.log(`  Found ${files.length} benchmark JSON file(s)`);
 
-    for (const [fileIndex, file] of allBmkFiles.entries()) {
+    for (const [fileIndex, file] of files.entries()) {
       const fileStart = Date.now();
-      const relativeFile = path.relative(artifactsDir, file);
-      const artifactSha256 = createHash('sha256').update(fs.readFileSync(file)).digest('hex');
+      const relativeFile = file.path;
       console.log(
-        `  [${fileIndex + 1}/${allBmkFiles.length}] ${relativeFile} (${formatBytes(fileSize(file))})`,
+        `  [${fileIndex + 1}/${files.length}] ${relativeFile} (${formatBytes(file.bytes)})`,
       );
-      const data = readJson(file);
-      if (!data) {
+      if (file.unreadable !== undefined) {
+        console.warn(`  [WARN] Failed to parse ${relativeFile}: ${file.unreadable}`);
         telemetryExpectationsUnknown = true;
         powerPublicationErrors.push(`Unreadable benchmark JSON: ${relativeFile}`);
         console.log(`    skipped unreadable JSON (${elapsed(fileStart)})`);
+        console.log(`    raw rows: ${file.rows.length + file.nonObjectRows}`);
         continue;
       }
+      console.log(`    raw rows: ${file.rows.length + file.nonObjectRows}`);
 
-      const rawRows: Record<string, any>[] = Array.isArray(data)
-        ? data
-        : [data as Record<string, any>];
-      console.log(`    raw rows: ${rawRows.length}`);
-
-      for (const rawRow of rawRows) {
-        if (!rawRow || typeof rawRow !== 'object') continue;
-        const datasetSlug = datasetSlugFromBenchmarkRow(rawRow);
+      for (const { raw } of file.rows) {
+        const datasetSlug = datasetSlugFromBenchmarkRow(raw);
         if (datasetSlug) datasetSlugs.add(datasetSlug);
       }
 
-      let fileExpectationsUnknown = false;
-      const rows = rawRows
-        .filter((r) => {
-          const isRow = typeof r === 'object' && r !== null;
-          if (!isRow) fileExpectationsUnknown = true;
-          return isRow;
-        })
-        .map((r) => {
-          const failedRuns = tracker.skips.failedRun;
-          const mapped = mapBenchmarkRow(r, tracker, undefined, runIdStr);
-          // Known failed benchmarks are intentionally excluded; unmappable rows
-          // leave an unknown number of successful attachment expectations.
-          if (!mapped && tracker.skips.failedRun === failedRuns) fileExpectationsUnknown = true;
-          if (!mapped && Number(r.isl) === 8192 && Number(r.osl) === 1024) {
-            powerPublicationErrors.push(`Unmapped or failed 8K/1K result: ${relativeFile}`);
-          }
-          return mapped;
-        })
-        .filter((r): r is NonNullable<typeof r> => r !== null);
+      // Known failed benchmarks are intentionally excluded; non-object entries
+      // and unmappable rows leave an unknown number of attachment expectations.
+      let fileExpectationsUnknown = file.nonObjectRows > 0;
+      const rows = file.rows.flatMap(({ raw, mapped, failed }) => {
+        if (!mapped && !failed) fileExpectationsUnknown = true;
+        if (!mapped && Number(raw.isl) === 8192 && Number(raw.osl) === 1024) {
+          powerPublicationErrors.push(`Unmapped or failed 8K/1K result: ${relativeFile}`);
+        }
+        return mapped ? [mapped] : [];
+      });
       if (fileExpectationsUnknown) telemetryExpectationsUnknown = true;
 
       console.log(`    mapped rows: ${rows.length}`);
@@ -620,7 +594,7 @@ async function main(): Promise<void> {
         continue;
       }
 
-      const parentDir = path.basename(path.dirname(file));
+      const parentDir = path.posix.basename(path.posix.dirname(file.path));
       const configKey = parentDir.replace(/^bmk_/u, '');
       const suffix = stripBmkAndAgenticPrefix(parentDir);
       const gpuMetricsArtifact =
@@ -650,7 +624,7 @@ async function main(): Promise<void> {
           configId = await getOrCreateConfig(row.config);
         } catch (error: any) {
           telemetryExpectationsUnknown = true;
-          tracker.recordDbError(`config for ${path.basename(file)}`, error);
+          tracker.recordDbError(`config for ${path.posix.basename(file.path)}`, error);
           continue;
         }
         if (
@@ -711,7 +685,7 @@ async function main(): Promise<void> {
         const publication = powerPublicationPoint(
           point,
           `https://github.com/${REPO}/actions/runs/${runIdNum}/attempts/${runAttemptNum}`,
-          { path: relativeFile, sha256: artifactSha256 },
+          { path: relativeFile, sha256: file.sha256 },
         );
         const identity = benchmarkPublicationIdentity(point);
         const key = stablePowerPointIdentity(identity);
@@ -838,7 +812,7 @@ async function main(): Promise<void> {
           // harness emits `agentic_<suffix>/trace_replay/...` next to the
           // `bmk_agentic_<suffix>` artifact we just ingested.
           if (parentDir.startsWith('bmk_agentic_') && insertedIds.length > 0) {
-            const concMatch = path.basename(file).match(/_conc(?<conc>\d+)\.json$/u);
+            const concMatch = path.posix.basename(file.path).match(/_conc(?<conc>\d+)\.json$/u);
             const trace =
               (concMatch?.groups?.conc
                 ? traceReplayPaths.get(`${suffix}|${concMatch.groups.conc}`)
@@ -917,7 +891,7 @@ async function main(): Promise<void> {
             }
           }
         } catch (error: any) {
-          tracker.recordDbError(path.basename(file), error);
+          tracker.recordDbError(path.posix.basename(file.path), error);
         }
       }
       console.log(`    finished ${relativeFile} (${elapsed(fileStart)})`);
