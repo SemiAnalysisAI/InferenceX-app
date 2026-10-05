@@ -2,6 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import { useTheme } from 'next-themes';
+import dynamic from 'next/dynamic';
+import { useLocale } from '@/lib/use-locale';
+import { track } from '@/lib/analytics';
+
+const GtaHeistDialog = dynamic(() => import('./gta-heist-dialog'), { ssr: false });
 
 function Star() {
   return (
@@ -20,7 +25,12 @@ function Star() {
 export function GtaThemeBanner() {
   const { resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
+  const [heistOpen, setHeistOpen] = useState(false);
+  const locale = useLocale();
   useEffect(() => setMounted(true), []);
+  useEffect(() => {
+    if (resolvedTheme !== 'gta') setHeistOpen(false);
+  }, [resolvedTheme]);
   if (!mounted || resolvedTheme !== 'gta') return null;
 
   return (
@@ -55,7 +65,28 @@ export function GtaThemeBanner() {
             <Star key={i} />
           ))}
         </div>
+        <div className="gta-heist-launcher">
+          <span>{locale === 'zh' ? '湾区劫案' : 'BAY AREA HEIST'}</span>
+          <button
+            type="button"
+            data-testid="gta-heist-launch"
+            onClick={() => {
+              setHeistOpen(true);
+              track('gta_heist_opened');
+            }}
+          >
+            {locale === 'zh' ? '开始驾驶 →' : 'Start heist →'}
+          </button>
+        </div>
       </div>
+      {heistOpen && (
+        <GtaHeistDialog
+          onClose={() => {
+            setHeistOpen(false);
+            track('gta_heist_closed');
+          }}
+        />
+      )}
     </div>
   );
 }
