@@ -82,6 +82,9 @@ by the repository's code license.
 
 ## Picker accessibility
 
+The GTA banner also launches the optional [Bay Area heist game](./gta-heist.md).
+The game loads on demand and does not alter benchmark controls or data.
+
 The trigger keeps `data-testid="theme-toggle"` and its
 `Switch theme (currently <theme> mode)` label. Options are `role="radio"` in a
 labelled `radiogroup` (`data-testid="theme-option-<theme>"`), with localized

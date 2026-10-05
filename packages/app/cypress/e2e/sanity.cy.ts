@@ -208,6 +208,12 @@ describe('Theme Toggle', () => {
     cy.get('[data-testid="gta-scene"] img').should(($img) => {
       expect(($img[0] as HTMLImageElement).naturalWidth).to.be.greaterThan(0);
     });
+    cy.get('[data-testid="gta-heist-launch"]').click();
+    cy.get('[data-testid="heist-game"]').should('have.attr', 'data-phase', 'ready');
+    cy.get('[data-testid="heist-start"]').click();
+    cy.get('[data-testid="heist-canvas"]').should('have.focus').type('{esc}');
+    cy.get('[data-testid="heist-game"]').should('not.exist');
+    cy.get('[data-testid="gta-heist-launch"]').should('have.focus');
     pickTheme('light');
     cy.get('html').should('have.class', 'light');
     cy.get('[data-testid="gta-scene"]').should('not.exist');
