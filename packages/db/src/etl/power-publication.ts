@@ -1,6 +1,7 @@
 import { isDeepStrictEqual } from 'node:util';
 import { MEASURED_POWER_METRIC_KEYS } from '@semianalysisai/inferencex-constants';
 import type { BenchmarkParams } from './benchmark-mapper';
+import type { ConfigParams } from './config-cache';
 import type { TelemetryReceipt } from './telemetry-receipt';
 
 const CONFIG_FIELDS = {
@@ -21,7 +22,7 @@ const CONFIG_FIELDS = {
   decodeNumWorkers: 'decode_num_workers',
   numPrefillGpu: 'num_prefill_gpu',
   numDecodeGpu: 'num_decode_gpu',
-} as const;
+} as const satisfies Record<keyof ConfigParams, string>;
 const IDENTITY_FIELDS = [
   ...Object.values(CONFIG_FIELDS),
   'benchmark_type',
@@ -39,6 +40,36 @@ const POWER_FIELDS = [
   'power_metric_schema_version',
   'cpu_power_valid',
 ];
+/**
+ * The workloads PowerX publishes. The receipt predicate, the required-power
+ * matrix scenarios and the ingest diagnostics derive from this one table.
+ */
+export const POWER_WORKLOADS = [
+  { scenario: 'agentic', benchmarkType: 'agentic_traces', isl: null, osl: null },
+  { scenario: '1k1k', benchmarkType: 'single_turn', isl: 1024, osl: 1024 },
+  { scenario: '8k1k', benchmarkType: 'single_turn', isl: 8192, osl: 1024 },
+] as const;
+export type PowerWorkload = (typeof POWER_WORKLOADS)[number];
+
+/** Mapped agentic rows carry null sequence lengths, so equality is the whole rule. */
+export function powerWorkloadOf(row: {
+  benchmarkType: string;
+  isl: number | null;
+  osl: number | null;
+}): PowerWorkload | null {
+  return (
+    POWER_WORKLOADS.find(
+      (workload) =>
+        workload.benchmarkType === row.benchmarkType &&
+        workload.isl === row.isl &&
+        workload.osl === row.osl,
+    ) ?? null
+  );
+}
+
+export function powerWorkloadForScenario(scenario: string): PowerWorkload | undefined {
+  return POWER_WORKLOADS.find((workload) => workload.scenario === scenario);
+}
 export interface PowerPublicationPoint {
   identity: Record<string, unknown>;
   metrics: Record<string, number>;
@@ -134,13 +165,7 @@ export function powerPublicationPoint(
   runUrl: string,
   artifact: PowerPublicationPoint['artifact'],
 ): PowerPublicationPoint | null {
-  if (
-    row.benchmarkType !== 'agentic_traces' &&
-    (row.benchmarkType !== 'single_turn' ||
-      (row.isl !== 1024 && row.isl !== 8192) ||
-      row.osl !== 1024)
-  )
-    return null;
+  if (!powerWorkloadOf(row)) return null;
   const identity = benchmarkPublicationIdentity(row, runUrl);
   return {
     identity,

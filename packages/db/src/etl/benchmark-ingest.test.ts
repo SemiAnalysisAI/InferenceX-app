@@ -110,7 +110,7 @@ describe('bulkIngestBenchmarkRows — power audit provenance lanes', () => {
     expect(text).toContain('metrics, workers, power_invalid_reasons, power_audit )');
     expect(text.match(/::jsonb\[\]/gu)).toHaveLength(4);
     expect(text).toContain('power_invalid_reasons = excluded.power_invalid_reasons');
-    expect(text).toContain('power_audit = excluded.power_audit');
+    expect(text).toContain('coalesce(excluded.power_audit, benchmark_results.power_audit)');
   });
 
   it('serializes present fields and contributes null lanes for absent ones', async () => {

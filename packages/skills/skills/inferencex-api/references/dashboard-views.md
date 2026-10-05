@@ -5,6 +5,19 @@ Use `/api/v1/views/*` for dashboard-calculated values. Read the deployed
 these routes become available only after the corresponding app change deploys.
 Do not assume an installed skill proves server availability.
 
+## Historical editorial articles
+
+The GLM-5.3 article at
+`/blog/sparse-savings-persistent-demand-inside-glm53` (Chinese:
+`/zh/blog/sparse-savings-persistent-demand-inside-glm53`) preserves the newsletter's
+September 28, 2026 snapshot, original figures, and framework/TTFT qualifications.
+Discover public article text through `/llms.txt` and `/llms-full.txt`; the
+subscriber-only continuation is linked, not exposed by those feeds.
+This is static editorial content, not a new view API. For fresh measurements use
+the existing `inference`, `first-token`, and `cache-reuse` contracts below, with
+explicit selectors. Do not replace the article's historical costs with current
+results or treat its interpolated values as separately measured operating points.
+
 ## Capture and select
 
 1. Resolve the view and missing selectors from the table below. Read `options`
@@ -46,8 +59,8 @@ which API selectors belong together.
 | `historical`                    | Model, sequence, target, metric, precisions, GPUs/vendors/frameworks/deployment, start/end, TCO and pricing. `extendToDate` labels synthetic extension, defaults to current UTC date. JSON or CSV.                                                                                                                                     |
 | `calculator`                    | Model/sequence/run/date, precisions/GPUs, percentile, target/mode, token type, owning/renting cost, TCO, power budget, cost cap, hide-above-limit and public unofficial runs. JSON or CSV.                                                                                                                                             |
 | `first-token`                   | Benchmark selection plus 1–8 positive TTFT caps in seconds, minimum interactivity, cost provider and token type. Shared dashboard winner selection.                                                                                                                                                                                    |
-| `cache-reuse`                   | AgentX selection plus exact `config` from returned configurations. Cache-reuse curves retain official versus unofficial evidence.                                                                                                                                                                                                      |
-| `profit-estimator`              | AgentX selection, comparison dates/runs, target, utilization, lab revenue share, list/OpenRouter/custom token prices, own/rent/custom chip costs, TCO and provisioned/modeled/compare power. USD/chip-hour.                                                                                                                            |
+| `cache-reuse`                   | AgentX selection plus exact `config` from returned configurations and `recipe` from data.recipes. Cache-reuse curves retain official versus unofficial evidence.                                                                                                                                                                       |
+| `profit-estimator`              | AgentX selection, comparison dates/runs, target, utilization, lab revenue share, list/OpenRouter/custom token prices, own/rent/custom chip costs, TCO, actual/theoretical cache-hit mode and provisioned/modeled/compare power. USD/chip-hour.                                                                                         |
 | `profit-estimator-per-gigawatt` | Same selectors; USD/GW-year basis and owning-cost default.                                                                                                                                                                                                                                                                             |
 | `fleet`                         | Model/sequence/precision/GPUs, target/percentile, TCO/token type/cost provider, MW, input/output prices, ramp, cache discount, MTBI, recovery, horizon and metric. JSON or CSV.                                                                                                                                                        |
 | `evaluation`                    | Model, task, date, precision and GPU selection; public unofficial runs remain separately labeled and independent of the official date cutoff. JSON or CSV.                                                                                                                                                                             |
@@ -207,3 +220,7 @@ update its read-only API in the same PR. Reuse the UI's pure transforms, test
 selector effects and source semantics, and update OpenAPI, the route catalog,
 coverage inventory and this existing npm package. Hidden navigation and feature
 flags do not make public data sensitive.
+
+### Cache-reuse recipe selection
+
+Pass a returned `data.recipes[].key` as `recipe`; `params.recipe` identifies the resolved selection. Missing or stale keys use the dashboard default. Each run uses the selected recipe if available, otherwise its own best-covered recipe. Inspect each bar's source row for its recipe identity. Without official rows, choices come from matching overlay runs.

@@ -11,7 +11,11 @@ import { Footer } from '@/components/footer/footer';
 import { Header } from '@/components/header/header';
 import { RouteTransition } from '@/components/motion/route-transition';
 import { JsonLd } from '@/components/json-ld';
+import { AutumnLeaves } from '@/components/autumn-leaves';
 import { CircuitBackground } from '@/components/circuit-background';
+import { CsgoDecorations, CsgoThemeBanner } from '@/components/csgo/csgo-decorations';
+import { GtaDecorations, GtaThemeBanner } from '@/components/gta/gta-decorations';
+import { APP_THEMES } from '@/lib/themes';
 import { MinecraftBackgroundLazy } from '@/components/minecraft/minecraft-background-lazy';
 import { MinecraftDecorations } from '@/components/minecraft/minecraft-decorations';
 import { ThemeProvider } from '@/components/ui/theme-provider';
@@ -43,6 +47,26 @@ const dm_sans = DM_Sans({
 const monocraft = localFont({
   src: './fonts/Monocraft.woff2',
   variable: '--font-minecraft',
+  display: 'swap',
+  preload: false,
+});
+
+// GTA theme fonts. preload:false + selectors scoped to `.gta` mean browsers
+// fetch them only after the GTA theme is selected. See src/app/fonts/GTA-FONTS.md.
+const pricedown = localFont({
+  src: './fonts/Pricedown.woff2',
+  variable: '--font-pricedown',
+  weight: '700',
+  display: 'swap',
+  preload: false,
+});
+
+const chaletComprime = localFont({
+  src: [
+    { path: './fonts/ChaletComprime-Regular.woff2', weight: '400' },
+    { path: './fonts/ChaletComprime-Bold.woff2', weight: '700' },
+  ],
+  variable: '--font-chalet-comprime',
   display: 'swap',
   preload: false,
 });
@@ -190,7 +214,11 @@ export default async function RootLayout({
 }>) {
   const starCount = await fetchStarCount();
   return (
-    <html lang="en" className={monocraft.variable} suppressHydrationWarning>
+    <html
+      lang="en"
+      className={`${monocraft.variable} ${pricedown.variable} ${chaletComprime.variable}`}
+      suppressHydrationWarning
+    >
       <head>
         <link
           rel="preload"
@@ -213,19 +241,24 @@ export default async function RootLayout({
         <CircuitBackground />
         <MinecraftBackgroundLazy />
         <MinecraftDecorations />
+        <CsgoDecorations />
+        <GtaDecorations />
+        <AutumnLeaves />
         <PostHogProvider>
           <JsonLd data={jsonLd} />
           <QueryProvider>
             <ThemeProvider
               attribute="class"
               defaultTheme="dark"
-              themes={['light', 'dark', 'minecraft']}
+              themes={APP_THEMES}
               enableSystem
               disableTransitionOnChange
             >
               <PostHogPageView />
               <VisitTracker />
               <Header starCount={starCount} />
+              <CsgoThemeBanner />
+              <GtaThemeBanner />
               <div className="grow flex flex-col">
                 <RouteTransition>{children}</RouteTransition>
               </div>

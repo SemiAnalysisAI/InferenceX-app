@@ -3,7 +3,11 @@ import { GPU_STATS_VERSION } from './gpu-metric-stats.js';
 
 /** Pairing rules for the historical gpu_metrics backfill. */
 
-import { gpuMetricsArtifactSuffix, isPowerAuditArtifact } from '../etl/gpu-metrics-artifacts.js';
+import {
+  expectedTelemetryArtifactNames,
+  gpuMetricsArtifactSuffix,
+  isPowerAuditArtifact,
+} from '../etl/gpu-metrics-artifacts.js';
 import type { BenchmarkParams } from '../etl/benchmark-mapper.js';
 import { benchmarkPublicationIdentity } from '../etl/power-publication.js';
 import type { TelemetryObservation, TelemetryReceipt } from '../etl/telemetry-receipt.js';
@@ -84,7 +88,7 @@ export async function collectMissingTelemetryExpectations(
   for (const artifact of dedupeArtifactsByLogicalName(artifacts).values()) {
     if (!artifact.name.startsWith('bmk_') || paired.has(artifact.name)) continue;
     const suffix = artifact.name.replace(/^bmk_(?:agentic_)?/u, '');
-    const artifactNames = [`gpu_metrics_${suffix}`, `power_audit_${suffix}`];
+    const artifactNames = expectedTelemetryArtifactNames(suffix);
     if (selectedArtifact && !artifactNames.includes(selectedArtifact)) continue;
     const recordError = (error: string) => {
       errors.push({ benchmarkArtifact: artifact.name, artifactNames, error });

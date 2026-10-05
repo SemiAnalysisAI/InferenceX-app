@@ -41,10 +41,10 @@ describe('Blog', () => {
     beforeEach(() => {
       // The listing checks text and links, so stub every optimized thumbnail.
       // Waiting on image optimization can keep Firefox from firing `window.load`.
-      cy.intercept('GET', '**/_next/image?*', {
-        fixture: '1x1.png',
-        headers: { 'content-type': 'image/png' },
-      });
+      cy.intercept(
+        { method: 'GET', pathname: '/_next/image' },
+        { fixture: '1x1.png', headers: { 'content-type': 'image/png' } },
+      );
       cy.visit('/blog');
     });
 
@@ -68,6 +68,20 @@ describe('Blog', () => {
 
     it('post cards link to individual posts', () => {
       cy.get('a[href^="/blog/"]').should('have.length.gte', 1);
+    });
+
+    it('serves local card thumbnails through the image optimizer', () => {
+      // The browser never fetches these (stubbed above), so check the real
+      // optimizer response directly for the first local thumbnail on the page.
+      cy.get('[data-testid="blog-post-grid"] img[src^="/_next/image?url=%2Fimages%2F"]')
+        .first()
+        .invoke('attr', 'src')
+        .then((src) => {
+          cy.request({ url: String(src), encoding: 'binary' }).then((response) => {
+            expect(response.status).to.eq(200);
+            expect(response.headers['content-type']).to.match(/^image\//u);
+          });
+        });
     });
   });
 

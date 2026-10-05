@@ -20,6 +20,7 @@ import { NAV_LABELS_ZH, type HeaderNavHref } from '@/lib/tab-meta-zh';
 import { cn } from '@/lib/utils';
 
 import { GitHubStars } from './GithubStars';
+import { InferenceXWordmark } from './inferencex-wordmark';
 
 const DASHBOARD_TABS = DASHBOARD_ROUTES.map((route) => route.path);
 
@@ -206,7 +207,7 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
             data-testid="header-brand"
             className="flex items-center min-h-11 gap-2 shrink-0"
           >
-            <span className="pride-wordmark text-lg font-bold tracking-tight">InferenceX</span>
+            <InferenceXWordmark />
             <span className="hidden sm:flex items-center gap-1.5 text-xs text-muted-foreground">
               by
               <Image
@@ -227,6 +228,7 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
                 data-testid={testId}
                 href={displayHref}
                 prefetch={isActive(pathname, href) ? false : undefined}
+                aria-current={isActive(pathname, href) ? 'page' : undefined}
                 className={cn(
                   'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors',
                   isActive(pathname, href)
@@ -304,6 +306,7 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
                       key={href}
                       href={displayHref}
                       prefetch={isActive(pathname, href) ? false : undefined}
+                      aria-current={isActive(pathname, href) ? 'page' : undefined}
                       className={cn(
                         'flex items-center min-h-11 px-3 rounded-md text-sm font-medium transition-colors',
                         isActive(pathname, href)

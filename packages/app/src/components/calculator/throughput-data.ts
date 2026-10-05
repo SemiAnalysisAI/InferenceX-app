@@ -213,6 +213,11 @@ export function buildGpuGroups<M extends GroupMeta>(
     const outputTput = m.output_tput_per_gpu ?? tput;
     const inputTput = m.input_tput_per_gpu ?? 0;
     const cacheHitRate = pricingCacheHitRate({ ...m, hw: row.hardware });
+    const theoreticalRate =
+      typeof m.theoretical_cache_hit_rate === 'number' &&
+      Number.isFinite(m.theoretical_cache_hit_rate)
+        ? Math.max(0, Math.min(1, m.theoretical_cache_hit_rate))
+        : null;
     const tokenShare = inputTokenShare(row, inputTput, outputTput);
     const specs = getGpuSpecs(hwKey, tcoBasis);
     const power = specs.power;
@@ -240,6 +245,7 @@ export function buildGpuGroups<M extends GroupMeta>(
       outputThroughput: outputTput,
       inputThroughput: inputTput,
       ...(cacheHitRate === null ? {} : { cacheHitRate }),
+      ...(theoreticalRate === null ? {} : { theoreticalCacheHitRate: theoreticalRate }),
       ...(tokenShare === null ? {} : { inputTokenShare: tokenShare }),
       concurrency: row.conc,
       tp: row.decode_tp,

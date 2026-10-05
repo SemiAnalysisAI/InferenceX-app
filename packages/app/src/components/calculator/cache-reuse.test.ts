@@ -4,7 +4,9 @@ import type { BenchmarkRow } from '@/lib/api';
 
 import {
   buildCacheReuse,
+  cacheReuseRecipes,
   cacheShareOf,
+  recipeKeyOf,
   defaultCacheReuseGroup,
   formatShare,
   tieredRowCount,
@@ -284,5 +286,128 @@ describe('defaultCacheReuseGroup', () => {
     expect(defaultCacheReuseGroup(groups, meta)).toBe('b200_sglang');
     expect(tieredRowCount(groups.h100_sglang)).toBe(0);
     expect(defaultCacheReuseGroup({ h100_sglang: groups.h100_sglang }, meta)).toBeNull();
+  });
+});
+
+describe('recipe identity', () => {
+  // Kimi K3 / H200 vLLM, 2026-09: three recipes share concurrency 8 and 10 —
+  // 4×DEP8 with offload off and on, and 2×TP16. Keyed on concurrency alone the
+  // chart kept whichever row came first and mixed recipes along one sweep.
+  const dep8 = {
+    is_multinode: true,
+    prefill_tp: 8,
+    prefill_ep: 32,
+    prefill_dp_attention: true,
+    prefill_num_workers: 4,
+    decode_tp: 8,
+    decode_ep: 32,
+    decode_dp_attention: true,
+    decode_num_workers: 4,
+    num_prefill_gpu: 32,
+    num_decode_gpu: 32,
+    spec_method: 'mtp',
+  };
+  const tp16 = {
+    ...dep8,
+    prefill_tp: 16,
+    decode_tp: 16,
+    prefill_num_workers: 2,
+    decode_num_workers: 2,
+  };
+  const off = (conc: number, gpu: number) =>
+    makePoint({ server_gpu_cache_hit_rate: gpu }, { ...dep8, conc, offload_mode: 'off' });
+  const on = (conc: number, gpu: number, cpu: number) =>
+    makePoint(
+      { server_gpu_cache_hit_rate: gpu, server_cpu_cache_hit_rate: cpu },
+      { ...dep8, conc, offload_mode: 'on' },
+    );
+  const wide = (conc: number, gpu: number) =>
+    makePoint({ server_gpu_cache_hit_rate: gpu }, { ...tp16, conc, offload_mode: 'off' });
+  // Interleaved the way the API returns them: offload-on first at conc 8.
+  const official = [
+    off(4, 0.6),
+    wide(4, 0.62),
+    on(8, 0.55, 0.11),
+    off(8, 0.54),
+    wide(8, 0.5),
+    off(10, 0.53),
+    on(10, 0.52, 0.12),
+    on(16, 0.38, 0.16),
+    on(24, 0.33, 0.22),
+  ];
+  const config = { hwKey: 'h200_vllm' };
+
+  it('tells recipes apart by layout and offload, not by concurrency', () => {
+    expect(recipeKeyOf(off(8, 0.5))).toBe(recipeKeyOf(off(16, 0.4)));
+    expect(recipeKeyOf(off(8, 0.5))).not.toBe(recipeKeyOf(on(8, 0.5, 0.1)));
+    expect(recipeKeyOf(off(8, 0.5))).not.toBe(recipeKeyOf(wide(8, 0.5)));
+  });
+
+  it('never mixes recipes along one sweep', () => {
+    const result = buildCacheReuse({ official, config });
+    const plotted = new Set(result.bars.map((b) => recipeKeyOf(b.point)));
+    expect(plotted.size).toBe(1);
+  });
+
+  it('defaults to the recipe with the most tiered rows and keeps all of its rows', () => {
+    const result = buildCacheReuse({ official, config });
+    expect(result.recipe).toBe(recipeKeyOf(on(8, 0, 0)));
+    expect(result.bars.map((b) => b.concurrency)).toEqual([8, 10, 16, 24]);
+    expect(result.bars.every((b) => b.share.host > 0)).toBe(true);
+  });
+
+  it('plots the requested recipe and falls back when it is unknown', () => {
+    const offKey = recipeKeyOf(off(8, 0));
+    const picked = buildCacheReuse({ official, config, recipe: offKey });
+    expect(picked.recipe).toBe(offKey);
+    expect(picked.bars.map((b) => [b.concurrency, b.share.hbm])).toEqual([
+      [4, 0.6],
+      [8, 0.54],
+      [10, 0.53],
+    ]);
+    expect(buildCacheReuse({ official, config, recipe: 'nope' }).recipe).toBe(
+      recipeKeyOf(on(8, 0, 0)),
+    );
+  });
+
+  it('lists each recipe once with a readable label and its row counts', () => {
+    const recipes = cacheReuseRecipes(official);
+    expect(recipes.map((r) => [r.rows, r.tiered])).toEqual([
+      [4, 4],
+      [3, 3],
+      [2, 2],
+    ]);
+    expect(recipes[0]!.label).toContain('KV offload');
+    expect(recipes[1]!.label).toContain('no offload');
+    expect(new Set(recipes.map((r) => r.label)).size).toBe(3);
+  });
+
+  it('selects recipes in an overlay-only configuration', () => {
+    const result = buildCacheReuse({
+      official: [],
+      config,
+      recipe: recipeKeyOf(off(8, 0)),
+      overlay: { h200_vllm__run0: official },
+      overlayMeta: { h200_vllm__run0: { hwKey: 'h200_vllm', runIndex: 0 } },
+    });
+    expect(result.recipes).toHaveLength(3);
+    expect(result.recipe).toBe(recipeKeyOf(off(8, 0)));
+    expect(result.bars.map((bar) => [bar.concurrency, bar.share.hbm])).toEqual([
+      [4, 0.6],
+      [8, 0.54],
+      [10, 0.53],
+    ]);
+  });
+
+  it('keeps a run on its own recipe when it did not measure the plotted one', () => {
+    const run = [wide(8, 0.7), wide(16, 0.6)];
+    const result = buildCacheReuse({
+      official,
+      config,
+      overlay: { h200_vllm__run0: run },
+      overlayMeta: { h200_vllm__run0: { hwKey: 'h200_vllm', runIndex: 0 } as never },
+    });
+    const runBars = result.bars.filter((b) => b.seriesKey === 'run:0');
+    expect(runBars.map((b) => b.concurrency)).toEqual([8, 16]);
   });
 });
