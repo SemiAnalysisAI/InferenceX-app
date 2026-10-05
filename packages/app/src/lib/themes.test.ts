@@ -5,7 +5,7 @@ import { generateHighContrastColors } from './chart-utils';
 
 describe('presentation themes', () => {
   it('lists every picker theme in display order', () => {
-    expect(APP_THEMES).toEqual(['light', 'dark', 'minecraft', 'csgo', 'gta']);
+    expect(APP_THEMES).toEqual(['light', 'dark', 'minecraft', 'csgo', 'gta', 'kart']);
   });
 
   it('aliases decorative dark themes onto the dark chart seed only', () => {
@@ -13,6 +13,7 @@ describe('presentation themes', () => {
       'light',
       'dark',
       'minecraft',
+      'dark',
       'dark',
       'dark',
     ]);
@@ -24,6 +25,7 @@ describe('presentation themes', () => {
     ['minecraft', true],
     ['csgo', true],
     ['gta', true],
+    ['kart', true],
     ['system', false],
     [undefined, false],
   ])('classifies %s for chart and figure contrast', (theme, expected) => {
@@ -43,6 +45,13 @@ describe('presentation themes', () => {
   it('preserves the dark high-contrast palette in GTA for official and overlay keys', () => {
     const keys = ['b200_vllm', 'b300_vllm', 'mi355x_sglang', 'overlay-1', 'overlay-2'];
     expect(generateHighContrastColors(keys, 'gta')).toEqual(
+      generateHighContrastColors(keys, 'dark'),
+    );
+  });
+
+  it('preserves the dark high-contrast palette in Mario Kart for official and overlay keys', () => {
+    const keys = ['b200_vllm', 'b300_vllm', 'mi355x_sglang', 'overlay-1', 'overlay-2'];
+    expect(generateHighContrastColors(keys, 'kart')).toEqual(
       generateHighContrastColors(keys, 'dark'),
     );
   });
