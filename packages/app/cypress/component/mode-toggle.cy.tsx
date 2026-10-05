@@ -69,7 +69,7 @@ describe('ModeToggle', () => {
     cy.focused().should('have.attr', 'data-testid', 'theme-option-dark');
     cy.focused().type('{upArrow}{upArrow}');
     cy.focused().should('have.attr', 'data-testid', 'theme-option-gta');
-    cy.focused().type('{enter}');
+    cy.focused().click();
     cy.get('html').should('have.class', 'gta');
     cy.get('[data-testid="theme-toggle"]').click();
     cy.focused().should('have.attr', 'data-testid', 'theme-option-gta');

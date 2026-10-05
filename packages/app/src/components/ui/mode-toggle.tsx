@@ -58,23 +58,12 @@ export function ModeToggle() {
 
   const buttonClasses = cn(HEADER_ACTION_STYLE, 'size-11');
 
-  if (!mounted) {
-    return (
-      <button
-        type="button"
-        data-testid="theme-toggle"
-        className={buttonClasses}
-        aria-label="Switch theme"
-        aria-haspopup="dialog"
-        aria-expanded={false}
-      >
-        <PendingIcon />
-      </button>
-    );
-  }
-
-  const activeIndex = Math.max(0, APP_THEMES.indexOf(theme ?? ''));
-  const ActiveIcon = THEME_ICONS[theme ?? ''];
+  // The trigger and menu render identically before and after mount so a click
+  // that lands right after hydration still opens the menu. Only the icon and
+  // label wait for the saved theme, which is unknown during SSR.
+  const current = mounted ? theme : undefined;
+  const activeIndex = Math.max(0, APP_THEMES.indexOf(current ?? ''));
+  const ActiveIcon = THEME_ICONS[current ?? ''];
 
   const choose = (next: string) => {
     setOpen(false);
@@ -111,7 +100,7 @@ export function ModeToggle() {
           type="button"
           data-testid="theme-toggle"
           className={cn(buttonClasses, open && 'bg-muted text-foreground')}
-          aria-label={`Switch theme (currently ${theme} mode)`}
+          aria-label={mounted ? `Switch theme (currently ${theme} mode)` : 'Switch theme'}
         >
           {ActiveIcon ? <ActiveIcon size={20} aria-hidden="true" /> : <PendingIcon />}
         </button>
@@ -131,7 +120,7 @@ export function ModeToggle() {
           {APP_THEMES.map((id, index) => {
             const Icon = THEME_ICONS[id];
             const label = t.labels[id as ThemeLabel] ?? id;
-            const selected = id === theme;
+            const selected = id === current;
             return (
               <button
                 key={id}
