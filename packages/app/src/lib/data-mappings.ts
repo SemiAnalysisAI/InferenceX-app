@@ -1,3 +1,5 @@
+import { DISPLAY_MODEL_TO_DB } from '@semianalysisai/inferencex-constants/models';
+
 import type { ExclusionConflictPolicy, ExclusionSpec } from './exclusion';
 
 export enum Model {
@@ -363,7 +365,10 @@ export function getChartWatermark(isUnofficialRun = false): 'logo' | 'unofficial
 export const MODEL_PREFIX_MAPPING: Record<string, Model> = Object.fromEntries(
   (Object.entries(MODEL_CONFIG) as [Model, (typeof MODEL_CONFIG)[Model]][])
     .filter(([, c]) => c.prefix)
-    .map(([m, c]) => [c.prefix, m]),
+    // Include every DB point-release alias, while retaining legacy artifact prefixes.
+    .flatMap(([m, c]) =>
+      [...new Set([c.prefix, ...(DISPLAY_MODEL_TO_DB[m] ?? [])])].map((prefix) => [prefix, m]),
+    ),
 );
 
 // Specific point-release prefixes must win over family prefixes such as
