@@ -55,6 +55,11 @@ describe('read-only required-power DB preflight', () => {
     const published = await getLatestBenchmarks(sql, 'qwen3.5', '9999-12-31');
     expect(published.map((row) => row.conc)).toEqual([1, 64]);
   });
+  it('verifies and plans from the lent artifact read', async () => {
+    await expect(
+      preflightRequiredPowerCurves(sql, golden, source, options, () => []),
+    ).rejects.toThrow('missing benchmark point');
+  });
   it('detects retry removal from a scope omitted entirely by incoming artifacts', async () => {
     await sql`UPDATE workflow_runs SET github_run_id=123`;
     await sql`UPDATE configs SET hardware='h200'`;

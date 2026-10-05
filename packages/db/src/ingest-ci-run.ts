@@ -356,7 +356,8 @@ async function main(): Promise<void> {
     }
   }
 
-  // One read of the run's benchmark JSON for verification and the ingest loop.
+  // One read of the run's benchmark JSON: lent to the required-power verifier
+  // and the curve preflight, consumed by the ingest loop.
   let benchmarkFilesRead: BenchmarkArtifactFile[] | undefined;
   const benchmarkFiles = () =>
     (benchmarkFilesRead ??= readBenchmarkArtifacts(artifactsDir, { runId: runIdStr, tracker }));
@@ -369,6 +370,7 @@ async function main(): Promise<void> {
       headSha: ghInfo?.headSha ?? null,
     },
     process.env.INGEST_REQUIRE_POWER === 'true',
+    benchmarkFiles,
   );
   if (requiredPowerPoints.length > 0)
     console.log(`  Required power: ${requiredPowerPoints.length} source benchmark points verified`);
@@ -451,6 +453,7 @@ async function main(): Promise<void> {
         headSha: ghInfo?.headSha ?? null,
       },
       { date, runStartedAt: workflowGhInfo?.runStartedAt ?? null, appendOnly },
+      benchmarkFiles,
     );
 
   const workflowRunId = await getOrCreateWorkflowRun({

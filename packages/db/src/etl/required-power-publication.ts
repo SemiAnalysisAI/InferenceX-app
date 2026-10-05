@@ -221,11 +221,17 @@ function verifyRequiredPowerBundle(
   return [...seen.values()].map(({ point }) => point);
 }
 
-/** Run before any database upsert, including workflow/config metadata writes. */
+/**
+ * Run before any database upsert, including workflow/config metadata writes.
+ * `readFiles` lends the ingest's one benchmark-artifact read; it is called only
+ * once a manifest exists, so an ordinary run reads nothing here.
+ */
 export function verifyRequiredPowerArtifacts(
   root: string,
   source: RequiredPowerSource,
   required = false,
+  readFiles: () => readonly BenchmarkArtifactFile[] = () =>
+    readBenchmarkArtifacts(root, { runId: source.runId, tracker: createSkipTracker() }),
 ): BenchmarkParams[] {
   const manifestDir = path.join(root, REQUIRED_POWER_MANIFEST);
   if (!fs.existsSync(manifestDir)) {
@@ -243,7 +249,7 @@ export function verifyRequiredPowerArtifacts(
   const manifest = JSON.parse(
     fs.readFileSync(path.join(manifestDir, 'sweep_manifest.json'), 'utf8'),
   );
-  const files = readBenchmarkArtifacts(root, { runId: source.runId, tracker: createSkipTracker() });
+  const files = readFiles();
   for (const file of files)
     if (file.unreadable)
       throw new Error(

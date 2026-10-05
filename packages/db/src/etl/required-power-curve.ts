@@ -7,7 +7,8 @@ import {
 import type { DbClient } from '../connection';
 import type { Sql } from './db-utils';
 import { REQUIRED_POWER_MANIFEST } from '../lib/ci-artifact-preparation';
-import { mapBenchmarkRow, type BenchmarkParams } from './benchmark-mapper';
+import { readBenchmarkArtifacts, type BenchmarkArtifactFile } from './benchmark-artifacts';
+import type { BenchmarkParams } from './benchmark-mapper';
 import { configCacheKey, loadConfigIds } from './config-cache';
 import { benchmarkPublicationIdentity, stablePowerPointIdentity } from './power-publication';
 import {
@@ -185,14 +186,25 @@ export async function loadStoredCurvePoints(
   }));
 }
 
-/** Read-only preflight; no config/workflow upsert, migration, or materialized-view refresh. */
+/**
+ * Read-only preflight; no config/workflow upsert, migration, or materialized-view
+ * refresh. `readFiles` lends the ingest's one benchmark-artifact read, shared
+ * here by the verifier and the incoming-point plan; without it the preflight
+ * reads once for itself.
+ */
 export async function preflightRequiredPowerCurves(
   sql: DbClient | Sql,
   root: string,
   source: RequiredPowerSource,
   options: { date: string; runStartedAt: string | null; appendOnly: boolean },
+  readFiles?: () => readonly BenchmarkArtifactFile[],
 ): Promise<void> {
-  const required = verifyRequiredPowerArtifacts(root, source);
+  let filesRead: readonly BenchmarkArtifactFile[] | undefined;
+  const files = () =>
+    (filesRead ??=
+      readFiles?.() ??
+      readBenchmarkArtifacts(root, { runId: source.runId, tracker: createSkipTracker() }));
+  const required = verifyRequiredPowerArtifacts(root, source, false, files);
   if (required.length === 0) return;
   const manifest = JSON.parse(
     fs.readFileSync(path.join(root, REQUIRED_POWER_MANIFEST, 'sweep_manifest.json'), 'utf8'),
@@ -200,34 +212,19 @@ export async function preflightRequiredPowerCurves(
   const configIds = await loadConfigIds(sql);
   const incoming = new Map<string, BenchmarkParams>();
   const backfilled = new Map<string, string>();
-  for (const name of fs.readdirSync(root)) {
-    if (
-      (!name.startsWith('bmk_') && !name.startsWith('results_')) ||
-      !fs.statSync(path.join(root, name)).isDirectory()
-    )
-      continue;
-    for (const file of fs
-      .readdirSync(path.join(root, name))
-      .filter((candidateName) => candidateName.endsWith('.json'))) {
-      const data = JSON.parse(fs.readFileSync(path.join(root, name, file), 'utf8'));
-      for (const raw of Array.isArray(data) ? data : [data]) {
-        if (!raw || typeof raw !== 'object' || Array.isArray(raw)) continue;
-        const mapped = mapBenchmarkRow(raw, createSkipTracker(), undefined, source.runId);
-        if (!mapped) continue;
-        // A config not present yet cannot match an id-keyed purge; backfills
-        // match by config dimensions and still apply.
-        const point = { ...mapped, configId: configIds.get(configCacheKey(mapped.config)) ?? -1 };
-        const plan = planBenchmarkPoint(
-          { githubRunId: source.runId, runAttempt: source.runAttempt },
-          point,
-          backfilled,
-        );
-        if (plan.kind === 'purged') continue;
-        incoming.set(
-          stablePowerPointIdentity(benchmarkPublicationIdentity(plan.point)),
-          plan.point,
-        );
-      }
+  for (const file of files()) {
+    for (const { mapped } of file.rows) {
+      if (!mapped) continue;
+      // A config not present yet cannot match an id-keyed purge; backfills
+      // match by config dimensions and still apply.
+      const point = { ...mapped, configId: configIds.get(configCacheKey(mapped.config)) ?? -1 };
+      const plan = planBenchmarkPoint(
+        { githubRunId: source.runId, runAttempt: source.runAttempt },
+        point,
+        backfilled,
+      );
+      if (plan.kind === 'purged') continue;
+      incoming.set(stablePowerPointIdentity(benchmarkPublicationIdentity(plan.point)), plan.point);
     }
   }
   assertRequiredPowerPointsRetained(required, [...incoming.values()], 'before_write');

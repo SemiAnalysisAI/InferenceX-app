@@ -3,10 +3,12 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
+import { readBenchmarkArtifacts } from './benchmark-artifacts';
 import {
   assertRequiredPowerPointsRetained,
   verifyRequiredPowerArtifacts,
 } from './required-power-publication';
+import { createSkipTracker } from './skip-tracker';
 
 const golden = path.resolve(
   import.meta.dirname,
@@ -282,6 +284,17 @@ describe('required power publication contract', () => {
       manifest.points[0].devices[0].energy_j = 2;
     });
     expect(() => verifyRequiredPowerArtifacts(other, source)).toThrow('differs from audit');
+  });
+  it('verifies a lent artifact read instead of reading again', () => {
+    const files = readBenchmarkArtifacts(golden, {
+      runId: source.runId,
+      tracker: createSkipTracker(),
+    });
+    expect(verifyRequiredPowerArtifacts(golden, source, false, () => files)).toHaveLength(1);
+    const tampered = files.map((file) => ({ ...file, sha256: '0'.repeat(64) }));
+    expect(() => verifyRequiredPowerArtifacts(golden, source, false, () => tampered)).toThrow(
+      'hash',
+    );
   });
   it('accepts identical aggregate copies but rejects conflicting duplicate rows', () => {
     const dir = fixture();
