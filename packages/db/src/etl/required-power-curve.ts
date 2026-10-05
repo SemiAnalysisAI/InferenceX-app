@@ -15,11 +15,7 @@ import {
   verifyRequiredPowerArtifacts,
   type RequiredPowerSource,
 } from './required-power-publication';
-import {
-  applyBenchmarkPointBackfill,
-  isBenchmarkPointPurged,
-  recordBackfilledPointIdentity,
-} from './run-overrides';
+import { planBenchmarkPoint } from './run-overrides';
 import { createSkipTracker } from './skip-tracker';
 
 export interface CurvePoint {
@@ -209,14 +205,18 @@ export async function preflightRequiredPowerCurves(
         if (!raw || typeof raw !== 'object' || Array.isArray(raw)) continue;
         const mapped = mapBenchmarkRow(raw, createSkipTracker(), undefined, source.runId);
         if (!mapped) continue;
-        // A config not present yet cannot match a config-id-scoped purge/backfill.
+        // A config not present yet cannot match an id-keyed purge; backfills
+        // match by config dimensions and still apply.
         const point = { ...mapped, configId: configIds.get(configCacheKey(mapped.config)) ?? -1 };
-        if (isBenchmarkPointPurged(source.runId, source.runAttempt, point)) continue;
-        const applied = applyBenchmarkPointBackfill(source.runId, source.runAttempt, point);
-        recordBackfilledPointIdentity(backfilled, applied.sourceIdentity, applied.desiredIdentity);
+        const plan = planBenchmarkPoint(
+          { githubRunId: source.runId, runAttempt: source.runAttempt },
+          point,
+          backfilled,
+        );
+        if (plan.kind === 'purged') continue;
         incoming.set(
-          stablePowerPointIdentity(benchmarkPublicationIdentity(applied.point)),
-          applied.point,
+          stablePowerPointIdentity(benchmarkPublicationIdentity(plan.point)),
+          plan.point,
         );
       }
     }

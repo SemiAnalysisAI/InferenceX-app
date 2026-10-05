@@ -45,11 +45,9 @@ import {
 import { pairServerLogArtifacts } from './lib/server-log-backfill';
 import { createAdminSql, refreshLatestBenchmarks } from './etl/db-utils';
 import {
-  applyBenchmarkPointBackfill,
   applyChangelogBackfills,
-  isBenchmarkPointPurged,
   isRunAttemptPurged,
-  recordBackfilledPointIdentity,
+  planBenchmarkPoint,
   validateRunBackfills,
 } from './etl/run-overrides';
 import { createSkipTracker } from './etl/skip-tracker';
@@ -627,17 +625,12 @@ async function main(): Promise<void> {
           tracker.recordDbError(`config for ${path.posix.basename(file.path)}`, error);
           continue;
         }
-        if (
-          isBenchmarkPointPurged(runIdNum, runAttemptNum, {
-            configId,
-            benchmarkType: row.benchmarkType,
-            isl: row.isl,
-            osl: row.osl,
-            conc: row.conc,
-            offloadMode: row.offloadMode,
-            recipeFingerprint: row.recipeFingerprint,
-          })
-        ) {
+        const plan = planBenchmarkPoint(
+          { githubRunId: runIdNum, runAttempt: runAttemptNum },
+          { ...row, configId },
+          seenPointIdentities,
+        );
+        if (plan.kind === 'purged') {
           console.log(
             `    skipped purged benchmark point: config ${configId}, ${row.benchmarkType}, ` +
               `isl ${row.isl}, osl ${row.osl}, conc ${row.conc}, offload ${row.offloadMode}, ` +
@@ -645,22 +638,13 @@ async function main(): Promise<void> {
           );
           continue;
         }
-        const applied = applyBenchmarkPointBackfill(runIdNum, runAttemptNum, {
-          ...row,
-          configId,
-        });
-        recordBackfilledPointIdentity(
-          seenPointIdentities,
-          applied.sourceIdentity,
-          applied.desiredIdentity,
-        );
-        if (applied.backfillId) {
+        if (plan.backfillId) {
           console.log(
-            `    applied benchmark point backfill ${applied.backfillId}: ` +
+            `    applied benchmark point backfill ${plan.backfillId}: ` +
               `config ${configId}, conc ${row.conc}`,
           );
         }
-        resolved.push(applied.point);
+        resolved.push(plan.point);
       }
       // Attach exact retained provenance before both the receipt and the upsert,
       // over the file's resolved points; the upsert keeps it across aggregate
