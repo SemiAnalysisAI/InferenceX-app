@@ -181,15 +181,33 @@ describe('Theme Toggle', () => {
       },
     });
     cy.get('[data-testid="gta-scene"]').should('not.exist');
+    cy.window().then((win) => {
+      expect(
+        win.performance
+          .getEntriesByType('resource')
+          .some((r) => r.name.includes('/decorative/gta/')),
+      ).to.eq(false);
+    });
     pickTheme('gta');
     cy.get('html').should('have.class', 'gta');
     cy.get('[data-testid="gta-theme-banner"]').should('be.visible');
+    cy.get('[data-testid="gta-theme-banner"] .gta-logo')
+      .should('have.attr', 'alt', 'Grand Theft Auto V')
+      .and(($img) => {
+        expect(($img[0] as HTMLImageElement).naturalWidth).to.be.greaterThan(0);
+      });
+    cy.get('[data-testid="gta-theme-banner"] .gta-banner-art img').should(($img) => {
+      expect(($img[0] as HTMLImageElement).naturalWidth).to.be.greaterThan(0);
+    });
     cy.get('[data-testid="gta-scene"]')
       .should('have.attr', 'aria-hidden', 'true')
       .and('have.css', 'pointer-events', 'none');
     cy.reload();
     cy.get('html').should('have.class', 'gta');
     cy.get('[data-testid="gta-scene"]').should('exist');
+    cy.get('[data-testid="gta-scene"] img').should(($img) => {
+      expect(($img[0] as HTMLImageElement).naturalWidth).to.be.greaterThan(0);
+    });
     pickTheme('light');
     cy.get('html').should('have.class', 'light');
     cy.get('[data-testid="gta-scene"]').should('not.exist');

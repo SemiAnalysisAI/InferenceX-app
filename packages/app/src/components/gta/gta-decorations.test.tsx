@@ -18,6 +18,7 @@ afterEach(() => {
   act(() => root.unmount());
   container.remove();
   document.documentElement.className = '';
+  delete document.documentElement.dataset.inferencexEmbed;
 });
 
 async function setTheme(theme: string) {
@@ -36,18 +37,40 @@ describe('GtaDecorations', () => {
     }
   });
 
-  it('mounts on activation, stays decorative and request-free, and unmounts on exit', async () => {
+  it('loads local responsive artwork only on activation and removes it on exit', async () => {
     act(() => root.render(<GtaDecorations />));
     await setTheme('gta');
     const scene = container.querySelector('[data-testid="gta-scene"]');
     expect(scene?.getAttribute('aria-hidden')).toBe('true');
-    expect(
-      container.querySelectorAll('img, image, button, a, audio, video, iframe, canvas'),
-    ).toHaveLength(0);
+    const image = scene?.querySelector('img');
+    expect(image?.getAttribute('src')).toBe('/decorative/gta/trio.webp');
+    expect(image?.getAttribute('alt')).toBe('');
+    expect(image?.getAttribute('draggable')).toBe('false');
+    expect(scene?.querySelector('source')?.getAttribute('srcset')).toBe(
+      '/decorative/gta/trio-mobile.webp',
+    );
+    expect(container.querySelectorAll('button, a, audio, video, iframe, canvas')).toHaveLength(0);
     await setTheme('light');
     expect(container.childElementCount).toBe(0);
     await setTheme('gta');
     expect(container.querySelectorAll('[data-testid="gta-scene"]')).toHaveLength(1);
+  });
+
+  it('does not mount artwork in embeds, including after an embed attribute change', async () => {
+    document.documentElement.className = 'gta';
+    document.documentElement.dataset.inferencexEmbed = '';
+    act(() => root.render(<GtaDecorations />));
+    expect(container.querySelector('img')).toBeNull();
+    await act(async () => {
+      delete document.documentElement.dataset.inferencexEmbed;
+      await Promise.resolve();
+    });
+    expect(container.querySelector('img')).not.toBeNull();
+    await act(async () => {
+      document.documentElement.dataset.inferencexEmbed = '';
+      await Promise.resolve();
+    });
+    expect(container.querySelector('img')).toBeNull();
   });
 
   it('honors a saved GTA theme on mount', () => {

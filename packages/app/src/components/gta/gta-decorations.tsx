@@ -26,13 +26,30 @@ export function GtaThemeBanner() {
   return (
     <div className="container mx-auto px-4 lg:px-8" data-testid="gta-theme-banner">
       <div className="gta-theme-banner">
-        <p className="gta-wordmark" aria-label="Grand Theft Inference">
-          <span aria-hidden="true">Grand</span>
-          <span aria-hidden="true">Theft</span>
-          <span aria-hidden="true" className="gta-wordmark-big">
-            Inference
-          </span>
-        </p>
+        <picture className="gta-banner-art" aria-hidden="true">
+          <source media="(max-width: 640px)" srcSet="/decorative/gta/vinewood-mobile.webp" />
+          <img
+            src="/decorative/gta/vinewood.webp"
+            alt=""
+            width={1600}
+            height={996}
+            decoding="async"
+            draggable={false}
+          />
+        </picture>
+        <div className="gta-banner-shade" aria-hidden="true" />
+        <div className="gta-banner-identity">
+          <img
+            className="gta-logo"
+            src="/decorative/gta/gtav-logo.webp"
+            alt="Grand Theft Auto V"
+            width={360}
+            height={318}
+            decoding="async"
+            draggable={false}
+          />
+          <p className="gta-wordmark">InferenceX</p>
+        </div>
         <div className="gta-wanted" role="img" aria-label="Wanted level: five stars">
           {[0, 1, 2, 3, 4].map((i) => (
             <Star key={i} />
@@ -45,20 +62,43 @@ export function GtaThemeBanner() {
 
 /**
  * Follow the root class, like the CS:GO and Minecraft decorations, because
- * this mounts outside ThemeProvider. Pure CSS backdrop: no network requests.
+ * this mounts outside ThemeProvider. Artwork loads only while GTA is active.
  */
 export function GtaDecorations() {
   const [active, setActive] = useState(false);
 
   useEffect(() => {
-    const check = () => setActive(document.documentElement.classList.contains('gta'));
+    const check = () =>
+      setActive(
+        document.documentElement.classList.contains('gta') &&
+          !Object.hasOwn(document.documentElement.dataset, 'inferencexEmbed'),
+      );
     check();
     const observer = new MutationObserver(check);
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class', 'data-inferencex-embed'],
+    });
     return () => observer.disconnect();
   }, []);
 
   if (!active) return null;
 
-  return <div className="gta-scene" data-testid="gta-scene" aria-hidden="true" />;
+  return (
+    <div className="gta-scene" data-testid="gta-scene" aria-hidden="true">
+      <picture>
+        <source media="(max-width: 640px)" srcSet="/decorative/gta/trio-mobile.webp" />
+        <img
+          className="gta-scene-image"
+          src="/decorative/gta/trio.webp"
+          alt=""
+          width={1920}
+          height={1190}
+          decoding="async"
+          draggable={false}
+        />
+      </picture>
+      <div className="gta-scene-shade" />
+    </div>
+  );
 }

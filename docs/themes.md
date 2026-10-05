@@ -60,20 +60,25 @@ GTA follows the CS:GO pattern: it is dark-classified everywhere
 (`isDarkTheme`), aliases onto the dark chart seed (`chartPaletteTheme`), and
 keeps the dark vendor, high-contrast, and overlay palettes.
 
-The chrome follows the GTA V pause menu: translucent black panels over a dark
-vignette backdrop, a black header with a cash-green rule, uppercase Chalet
+The chrome follows the GTA V pause menu: near-opaque black panels over Rockstar's
+Michael/Franklin/Trevor artwork, a black header with a cash-green rule, uppercase Chalet
 Comprime menu tabs with the current page as a solid white tab
 (`aria-current="page"`), Chalet Comprime headings, and DM Sans body copy.
-`GtaThemeBanner` renders a stacked Pricedown "Grand Theft Inference"
-wordmark and a five-star wanted level; the splash uses Pricedown in mission
-gold. `GtaDecorations` follows the root class and renders the CSS-only
-backdrop (`aria-hidden`, `pointer-events: none`). Embed routes suppress both.
+`GtaThemeBanner` pairs the unmodified GTA V logo with Michael's Vinewood
+artwork, an InferenceX Pricedown wordmark, and a five-star wanted level.
+The splash uses Pricedown in mission gold. `GtaDecorations` follows the root
+class and renders local responsive WebP images (`aria-hidden`,
+`pointer-events: none`), only while GTA is active. Embed routes suppress both;
+the scene also observes the embed attribute and never mounts its images there.
+Dashboard navigation uses white selected tabs with black text.
 
 Fonts are loaded with `next/font/local` and `preload: false`, and are only
 referenced under `.gta`, so other themes never request them. Provenance and
 the maintainer-reported Rockstar font agreement are recorded in
-`packages/app/src/app/fonts/GTA-FONTS.md`. No Rockstar artwork or logos are
-bundled.
+`packages/app/src/app/fonts/GTA-FONTS.md`. Artwork sources, transformations,
+and the separately reported permission are recorded in
+`packages/app/public/decorative/gta/README.md`. These assets are not covered
+by the repository's code license.
 
 ## Picker accessibility
 
@@ -97,6 +102,8 @@ the overlay CSS variables inherit the existing dark palette.
   persistence after reload, and cleanup on exit.
 - No CS:GO image requests on a cold light/dark landing; images load only
   after selection, with a smaller mobile crop.
+- No GTA artwork requests on a cold light/dark landing; responsive artwork
+  and logo load on selection, persist after reload, and unmount on exit.
 - CS:GO uses dark figure sources and chart colors, including high-contrast.
   PNG/MP4 footer contrast uses the same shared dark-theme classifier.
 - Desktop and narrow mobile landing/chart views, keyboard focus, Chinese

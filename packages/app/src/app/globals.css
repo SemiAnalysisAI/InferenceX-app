@@ -486,48 +486,130 @@ html[data-inferencex-embed] [data-testid='csgo-theme-banner'] {
   --gta-menu: var(--font-chalet-comprime), 'ChaletComprime', 'Arial Narrow', sans-serif;
 }
 
-/* Pause-menu backdrop: dark, slightly warm, with a soft vignette. */
+/* Local Rockstar artwork, mounted only while the GTA theme is active. */
 .gta-scene {
   position: fixed;
   inset: 0;
   z-index: -10;
   pointer-events: none;
-  background: radial-gradient(120% 80% at 50% 0%, #1d1f24 0%, #0d0d0f 55%, #050506 100%), #0a0a0b;
+  overflow: hidden;
+  background: #0a0a0b;
+}
+
+.gta-scene-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 65% center;
+}
+
+.gta-scene-shade {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, #05070999, #050709c9 65%, #050709eb);
 }
 
 .gta-theme-banner {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  margin-block: 1rem;
-  padding: 0.75rem 1.25rem;
-  background: #000000c2;
+  min-height: 17rem;
+  margin-block: 0.5rem 1.5rem;
+  padding: 1.5rem 2rem;
+  border-bottom: 4px solid var(--primary);
+  background: #10110f;
 }
 
-/* Stacked GTA V-style wordmark. */
-.gta-wordmark {
+.gta-banner-art {
+  position: absolute;
+  inset: 0 0 0 25%;
+  z-index: -2;
+}
+
+.gta-banner-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center top;
+}
+
+.gta-banner-shade {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(90deg, #080a08 0%, #080a08eb 20%, #080a0840 47%, #080a0800 70%);
+}
+
+.gta-banner-identity {
   display: flex;
   flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.gta-logo {
+  width: 10rem;
+  height: auto;
+}
+
+/* InferenceX remains distinct from the unmodified GTA V logo. */
+.gta-wordmark {
   font-family: var(--gta-display);
   font-weight: 700;
-  line-height: 0.82;
+  line-height: 1;
   color: #fff;
-  font-size: clamp(1.2rem, 3vw, 2.1rem);
+  font-size: clamp(1.5rem, 3vw, 2rem);
   -webkit-text-stroke: 4px #000;
   paint-order: stroke fill;
   text-shadow: 0 3px 0 #000;
 }
 
-.gta-wordmark-big {
-  font-size: 1.55em;
-}
-
 .gta-wanted {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
   display: flex;
   flex-shrink: 0;
   gap: 0.15rem;
   color: #f5f5f5;
+  filter: drop-shadow(0 2px 2px #000);
+}
+
+@media (max-width: 640px) {
+  .gta-theme-banner {
+    min-height: 14rem;
+    padding: 1rem;
+  }
+
+  .gta-banner-art {
+    left: 0;
+  }
+
+  .gta-banner-art img {
+    object-position: 65% top;
+  }
+
+  .gta-banner-shade {
+    background: linear-gradient(90deg, #080a08e6, #080a0840 55%, #080a0800);
+  }
+
+  .gta-logo {
+    width: 7rem;
+  }
+
+  .gta-wanted {
+    top: 0.5rem;
+    right: 0.5rem;
+  }
+
+  .gta-wanted svg {
+    width: 18px;
+    height: 18px;
+  }
 }
 
 /* Header and headings use the GTA V menu face; body copy stays DM Sans. */
@@ -570,8 +652,27 @@ html[data-inferencex-embed] [data-testid='csgo-theme-banner'] {
 
 /* Menu panels: translucent black with no visible frame. */
 .gta [data-slot='card'] {
-  background-color: #000000b8;
+  background-color: #080a0aeb;
   border-color: #ffffff14;
+}
+
+.gta [data-slot='dashboard-navigation'] {
+  border-radius: 0;
+  background: #000000d9;
+}
+
+.gta [data-slot='dashboard-navigation'] nav :is(a, button) {
+  font-family: var(--gta-menu);
+  font-size: 1.25rem;
+  font-weight: 700;
+  padding: 0.5rem 0.75rem;
+  text-transform: uppercase;
+  color: #fff;
+}
+
+.gta [data-slot='dashboard-navigation'] nav [data-tab-active='true'] {
+  background: #f5f5f5;
+  color: #000;
 }
 
 .gta [data-slot='popover-content'] {
