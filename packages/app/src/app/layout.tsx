@@ -14,6 +14,7 @@ import { JsonLd } from '@/components/json-ld';
 import { AutumnLeaves } from '@/components/autumn-leaves';
 import { CircuitBackground } from '@/components/circuit-background';
 import { CsgoDecorations, CsgoThemeBanner } from '@/components/csgo/csgo-decorations';
+import { GtaDecorations, GtaThemeBanner } from '@/components/gta/gta-decorations';
 import { APP_THEMES } from '@/lib/themes';
 import { MinecraftBackgroundLazy } from '@/components/minecraft/minecraft-background-lazy';
 import { MinecraftDecorations } from '@/components/minecraft/minecraft-decorations';
@@ -217,6 +218,7 @@ export default async function RootLayout({
         <MinecraftBackgroundLazy />
         <MinecraftDecorations />
         <CsgoDecorations />
+        <GtaDecorations />
         <AutumnLeaves />
         <PostHogProvider>
           <JsonLd data={jsonLd} />
@@ -232,6 +234,7 @@ export default async function RootLayout({
               <VisitTracker />
               <Header starCount={starCount} />
               <CsgoThemeBanner />
+              <GtaThemeBanner />
               <div className="grow flex flex-col">
                 <RouteTransition>{children}</RouteTransition>
               </div>

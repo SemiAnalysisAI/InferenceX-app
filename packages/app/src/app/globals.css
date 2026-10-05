@@ -3,7 +3,7 @@
 @import './motion.css';
 @plugin '@tailwindcss/typography';
 
-@custom-variant dark (&:is(.dark *, .minecraft *, .csgo *));
+@custom-variant dark (&:is(.dark *, .minecraft *, .csgo *, .gta *));
 @custom-variant minecraft (&:is(.minecraft *));
 
 /* Allow hash navigation to clear the fixed navbar */
@@ -54,11 +54,11 @@
   color: #7e22ce;
 }
 
-:is(.dark, .minecraft, .csgo) .halloween-wordmark {
+:is(.dark, .minecraft, .csgo, .gta) .halloween-wordmark {
   color: #fb923c;
 }
 
-:is(.dark, .minecraft, .csgo) .halloween-wordmark-x {
+:is(.dark, .minecraft, .csgo, .gta) .halloween-wordmark-x {
   color: #c084fc;
 }
 
@@ -300,7 +300,8 @@ html[data-inferencex-embed] .autumn-leaves {
 }
 
 .dark,
-.csgo {
+.csgo,
+.gta {
   /* Base Theme Colors */
   --background: #131416;
   --foreground: #eaebec;
@@ -451,6 +452,154 @@ html[data-inferencex-embed] [data-testid='csgo-theme-banner'] {
   display: none;
 }
 
+/* ── GTA Theme ── Los Santos sunset chrome over the dark chart palettes. */
+.gta {
+  color-scheme: dark;
+  --background: #0c0b10;
+  --foreground: #f4f2ee;
+  --card: #141319;
+  --card-foreground: #f4f2ee;
+  --popover: #18171e;
+  --popover-foreground: #f4f2ee;
+  --primary: #7bd36e;
+  --primary-foreground: #0c0b10;
+  --secondary: #5aa6e6;
+  --secondary-foreground: #0c0b10;
+  --muted: #26242d;
+  --muted-foreground: #bdb9c4;
+  --accent: #2f2c38;
+  --accent-foreground: #f4f2ee;
+  --border: #5b5766;
+  --border-alt: #34313c;
+  --input: #5b5766;
+  --ring: #7bd36e;
+  --sidebar: #141319;
+  --sidebar-foreground: #f4f2ee;
+  --sidebar-primary: #7bd36e;
+  --sidebar-primary-foreground: #0c0b10;
+  --sidebar-accent: #2f2c38;
+  --sidebar-accent-foreground: #f4f2ee;
+  --sidebar-border: #5b5766;
+  --sidebar-ring: #7bd36e;
+  --radius: 0.125rem;
+}
+
+.gta-scene {
+  position: fixed;
+  inset: 0;
+  z-index: -10;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.gta-scene-sky,
+.gta-scene-shade {
+  position: absolute;
+  inset: 0;
+}
+
+.gta-scene-sky {
+  background: linear-gradient(
+    180deg,
+    #140b2a 0%,
+    #3a1650 28%,
+    #8a2d63 52%,
+    #e0614a 72%,
+    #f4a64a 86%,
+    #f9d27a 100%
+  );
+}
+
+.gta-scene-sun {
+  position: absolute;
+  left: 50%;
+  bottom: 12vh;
+  width: min(46vw, 34rem);
+  aspect-ratio: 1;
+  transform: translate(-50%, 50%);
+  border-radius: 50%;
+  background: radial-gradient(circle, #ffe6a0 0%, #ffb35c 45%, #ff7a4d00 70%);
+}
+
+.gta-scene-skyline {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  height: 34vh;
+}
+
+.gta-scene-shade {
+  background: linear-gradient(180deg, #0c0b10e0, #0c0b10c7 45%, #0c0b10a6 75%, #0c0b10d0);
+}
+
+.gta-theme-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-block: 1rem;
+  padding: 0.5rem 1rem;
+  border-left: 3px solid var(--primary);
+  background: linear-gradient(90deg, #000000d9, #00000059);
+}
+
+.gta-title {
+  display: flex;
+  flex-direction: column;
+  line-height: 0.95;
+  font-weight: 900;
+  font-style: italic;
+  letter-spacing: -0.01em;
+  color: #fff;
+  -webkit-text-stroke: 1.5px #000;
+  paint-order: stroke fill;
+  text-shadow: 3px 3px 0 #000;
+}
+
+.gta-title-small {
+  font-size: clamp(0.75rem, 1.6vw, 1rem);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.gta-title-large {
+  font-size: clamp(1.5rem, 4vw, 2.5rem);
+}
+
+.gta-wanted {
+  display: flex;
+  flex-shrink: 0;
+  gap: 0.125rem;
+  color: #f4f2ee;
+}
+
+.gta header {
+  background: #000000e6;
+  border-bottom: 2px solid var(--primary);
+}
+
+.gta :is(button, [role='button'], [role='combobox'], input, textarea):focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 3px;
+}
+
+.gta :is([data-slot='card'], [data-slot='select-trigger'], [data-slot='tabs-list']) {
+  border-radius: var(--radius);
+}
+
+.gta [data-slot='card'] {
+  background-color: #141319f2;
+  border-top-color: var(--primary);
+}
+
+.gta .circuit-bg,
+.gta .autumn-leaves,
+html[data-inferencex-embed] .gta-scene,
+html[data-inferencex-embed] [data-testid='gta-theme-banner'] {
+  display: none;
+}
+
 /* ── Minecraft Theme ── */
 .minecraft {
   --background: #1e1e1e;
@@ -574,7 +723,9 @@ html[data-inferencex-embed] [data-testid='csgo-theme-banner'] {
 .minecraft .shiki,
 .minecraft .shiki span,
 .csgo .shiki,
-.csgo .shiki span {
+.csgo .shiki span,
+.gta .shiki,
+.gta .shiki span {
   color: var(--shiki-dark);
   background-color: var(--shiki-dark-bg);
 }
@@ -751,7 +902,8 @@ html[data-inferencex-skin='vllm'] [data-slot='card'] {
 /* Dark backgrounds need no outline — this is the original title-screen look. */
 .dark .splash-text,
 .minecraft .splash-text,
-.csgo .splash-text {
+.csgo .splash-text,
+.gta .splash-text {
   color: #ffff00;
   text-shadow: 2px 2px 0px #3f3f00;
 }

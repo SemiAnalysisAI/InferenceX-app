@@ -125,6 +125,7 @@ describe('Splash text', () => {
 
     // Same splash after switching themes — it is no longer minecraft-only.
     cy.get('[data-testid="theme-toggle"]').click();
+    cy.get('[data-testid="theme-option-dark"]').click();
     cy.get('html').should('have.class', 'dark');
     cy.get('[data-testid="splash-text"]').should('be.visible').and('have.text', 'AgentX is here!!');
   });
@@ -147,10 +148,9 @@ describe('Theme Toggle', () => {
           .some((r) => r.name.includes('/decorative/csgo/')),
       ).to.eq(false);
     });
-    for (const theme of ['dark', 'minecraft', 'csgo']) {
-      cy.get('[data-testid="theme-toggle"]').click();
-      cy.get('html').should('have.class', theme);
-    }
+    cy.get('[data-testid="theme-toggle"]').click();
+    cy.get('[data-testid="theme-option-csgo"]').click();
+    cy.get('html').should('have.class', 'csgo');
     cy.get('[data-testid="csgo-theme-banner"]').should('be.visible');
     cy.get('[data-testid="csgo-scene"]')
       .should('have.attr', 'aria-hidden', 'true')
@@ -161,9 +161,34 @@ describe('Theme Toggle', () => {
       expect(($img[0] as HTMLImageElement).naturalWidth).to.be.greaterThan(0);
     });
     cy.get('[data-testid="theme-toggle"]').click();
+    cy.get('[data-testid="theme-option-light"]').click();
     cy.get('html').should('have.class', 'light');
     cy.get('[data-testid="csgo-scene"]').should('not.exist');
     cy.get('[data-testid="csgo-theme-banner"]').should('not.exist');
+  });
+
+  it('applies GTA from the picker, persists it, and removes decorations on exit', () => {
+    cy.visit('/', {
+      onBeforeLoad(win) {
+        win.localStorage.setItem('theme', 'light');
+      },
+    });
+    cy.get('[data-testid="gta-scene"]').should('not.exist');
+    cy.get('[data-testid="theme-toggle"]').click();
+    cy.get('[data-testid="theme-option-gta"]').click();
+    cy.get('html').should('have.class', 'gta');
+    cy.get('[data-testid="gta-theme-banner"]').should('be.visible');
+    cy.get('[data-testid="gta-scene"]')
+      .should('have.attr', 'aria-hidden', 'true')
+      .and('have.css', 'pointer-events', 'none');
+    cy.reload();
+    cy.get('html').should('have.class', 'gta');
+    cy.get('[data-testid="gta-scene"]').should('exist');
+    cy.get('[data-testid="theme-toggle"]').click();
+    cy.get('[data-testid="theme-option-light"]').click();
+    cy.get('html').should('have.class', 'light');
+    cy.get('[data-testid="gta-scene"]').should('not.exist');
+    cy.get('[data-testid="gta-theme-banner"]').should('not.exist');
   });
 
   it('theme persists across page reload (localStorage)', () => {
@@ -173,6 +198,7 @@ describe('Theme Toggle', () => {
     });
     cy.visit('/');
     cy.get('[data-testid="theme-toggle"]').click();
+    cy.get('[data-testid="theme-option-dark"]').click();
     cy.get('html').should('have.class', 'dark');
     cy.reload();
     cy.get('html').should('have.class', 'dark');

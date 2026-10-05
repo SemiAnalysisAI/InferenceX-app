@@ -6,7 +6,7 @@
 
 import { GOOGLE_BLUE, resolveFrameworkAlias } from '@semianalysisai/inferencex-constants';
 import iwanthue from 'iwanthue';
-import { isDarkTheme } from '@/lib/themes';
+import { chartPaletteTheme, isDarkTheme } from '@/lib/themes';
 
 import type {
   AggDataEntry,
@@ -94,8 +94,8 @@ export const generateHighContrastColors = (
   vendorKeyFor?: (key: string) => string,
 ): Record<string, string> => {
   if (keys.length === 0) return {};
-  // Reuse the dark seed as well as its lightness bounds for CS:GO.
-  if (theme === 'csgo') theme = 'dark';
+  // Reuse the dark seed as well as its lightness bounds for CS:GO and GTA.
+  theme = chartPaletteTheme(theme);
 
   const colors: Record<string, string> = {};
   const [lmin, lmax] = isDarkTheme(theme) ? [50, 100] : [30, 65];

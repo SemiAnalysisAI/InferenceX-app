@@ -4,7 +4,10 @@
 
 The root `ThemeProvider` in `packages/app/src/app/layout.tsx` uses `next-themes`
 to persist a theme and apply its class to `<html>` before hydration. The
-header's `ModeToggle` cycles explicit themes and emits `theme_toggled`.
+header's `ModeToggle` is an icon-only picker: the trigger shows the active
+theme's icon and expands a compact column with one icon button per theme in
+`APP_THEMES` order, so any theme is one tap away. Selecting a theme emits
+`theme_toggled`.
 The existing default remains dark; the system setting remains supported.
 
 Minecraft has several independent paths:
@@ -30,8 +33,9 @@ contrast branch.
 
 ## CS:GO implementation
 
-The cycle is `light → dark → minecraft → csgo → light`. `src/lib/themes.ts`
-centralizes theme order and dark-background classification. CS:GO retains the
+`src/lib/themes.ts` centralizes picker order
+(`light, dark, minecraft, csgo, gta`), dark-background classification, and the
+chart-palette alias used by CS:GO and GTA. CS:GO retains the
 existing sans-serif font for chart legibility and preserves the dark theme's
 vendor, high-contrast, and overlay palettes. It does not recolor hardware
 series into team colors.
@@ -50,6 +54,32 @@ The visual references are Valve's
 Asset provenance and the maintainer-reported permission are recorded in
 `packages/app/public/decorative/csgo/README.md`. Permission is not extended to audio.
 
+## GTA implementation
+
+GTA follows the CS:GO pattern: it is dark-classified everywhere
+(`isDarkTheme`), aliases onto the dark chart seed (`chartPaletteTheme`), and
+keeps the dark vendor, high-contrast, and overlay palettes. Interface chrome
+uses a HUD cash green primary, armor blue secondary, square corners, and a
+black header with a green rule.
+
+`GtaDecorations` follows the root class and renders a fixed, decorative Los
+Santos sunset: CSS gradients plus an inline SVG skyline and palms, behind a
+shade that keeps cards legible. It has `pointer-events: none`, `aria-hidden`,
+and makes no network requests. `GtaThemeBanner` shows a "Grand Theft
+Inference" title and a five-star wanted level. Embed routes suppress both.
+
+No Rockstar artwork, logos, or fonts are bundled. Pricedown's free Typodermic
+desktop license does not cover webfont embedding, so the banner uses DM Sans
+black italic with an outline instead.
+
+## Picker accessibility
+
+The trigger keeps `data-testid="theme-toggle"` and its
+`Switch theme (currently <theme> mode)` label. Options are `role="radio"` in a
+labelled `radiogroup` (`data-testid="theme-option-<theme>"`), with localized
+`aria-label`/`title` text, roving tab index, arrow/Home/End navigation, and
+Escape to close. Options stay 44px on phones and 36px from `md`.
+
 ## Data/API coverage
 
 This is a presentation-only control: no filter, metric, calculation, route,
@@ -60,8 +90,8 @@ the overlay CSS variables inherit the existing dark palette.
 
 ## Verification inventory
 
-- Full theme cycle, unknown/system fallback, persistence after reload, and
-  cleanup on exit.
+- Direct selection of every theme from the picker, keyboard navigation,
+  persistence after reload, and cleanup on exit.
 - No CS:GO image requests on a cold light/dark landing; images load only
   after selection, with a smaller mobile crop.
 - CS:GO uses dark figure sources and chart colors, including high-contrast.
