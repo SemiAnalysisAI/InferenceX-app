@@ -65,15 +65,25 @@ not an invented top-level file. Stored validation sidecars retain `validation_pa
 `result_file` and the SHA-256 of the original validation bytes. Legacy top-level
 validation documents take precedence, and power-validity and role values stay unchanged.
 
-Normal CI derives missing AgentX benchmark source/window metadata before publication
-and benchmark upsert, retaining it across aggregate copies of the same full point
-identity. Targeted telemetry re-ingest also fills SQL-NULL `power_audit` after all hosts
-are stored and linked, including sample no-ops. It requires one unambiguous AgentX point
-within the caller's explicit run/result IDs with matching concurrency; it neither
-overwrites non-null provenance nor changes metrics, workers or validity. The ingest
-result reports actual `metadataUpdatedBenchmarkResultIds`. Ordinary benchmark reads
-also require the existing `latest_benchmarks` refresh and benchmark cache invalidation;
-point/Timeline revision changes alone do not refresh the UI's benchmark source list.
+The telemetry bundle owns AgentX window provenance. `agentxWindowPlan` maps each
+concurrency to the one recoverable window of one artifact; a concurrency named by two
+windows is conflicting evidence and stays absent. `attachAgentxAudits` attaches a window
+to the single agentic point at that concurrency within the covered set (CI: one result
+file; backfill: one artifact pair), keeps provenance a point already carries, and refuses
+a concurrency shared by two points by name. Normal CI attaches before publication and
+benchmark upsert and records each refusal as a telemetry warning; the aggregate
+`results_bmk` copy is ingested once, so it cannot overwrite what the job directories
+derived. The benchmark upsert keeps an existing agentic `power_audit` when the incoming
+row carries none, so aggregate copies and re-ingests cannot erase derived provenance; a
+row carrying its own audit still wins, and single-turn rows keep replacing theirs.
+`ingestGpuMetricsArtifact` writes series, samples and links only. The backfill CLI plans
+the same windows per artifact pair, checkpoints the planned writes in its receipt, stores
+and links every host, then writes provenance with one guarded statement
+(`applyAgentxAudits`: same run, agentic row, SQL-NULL audit) and reports the ids actually
+written. Nothing on this path overwrites non-null provenance or changes metrics, workers
+or validity. Ordinary benchmark reads also require the existing `latest_benchmarks`
+refresh and benchmark cache invalidation; point/Timeline revision changes alone do not
+refresh the UI's benchmark source list.
 
 ## Cache and browser recovery
 
@@ -272,8 +282,9 @@ The ordinary fixture-backed smoke command remains `bun run test:e2e` with an
 
    The receipt's run/attempt, point IDs and endpoint must still match. A checkpoint
    interrupted before its metadata UPDATE leaves NULL candidates. They retain a
-   failed refresh responsibility and require targeted artifact re-ingest; a later
-   upsert clearing an already-written audit cannot erase that responsibility.
+   failed refresh responsibility and require targeted artifact re-ingest; the benchmark
+   upsert keeps an already-written agentic audit, so a later re-ingest cannot regress it
+   or erase that responsibility.
    Invalid/string-encoded audits fail explicitly. HTTP calls have a 30-second
    timeout; retries use the saved receipt rather than an unrecorded manual purge.
    Dry runs never refresh. `complete` covers the recorded IDs and API metadata,

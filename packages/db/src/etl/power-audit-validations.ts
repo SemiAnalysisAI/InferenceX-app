@@ -98,10 +98,17 @@ export function normalizePowerAuditValidations(
 }
 
 /** Recover source/window metadata only from a normalized nested validation. */
+/** The `PowerAudit` subset a retained AgentX window recovers; `source` is always the alias. */
+export interface RecoveredPowerAudit {
+  source: string;
+  window_start_unix: number;
+  window_end_unix: number;
+}
+
 export function recoveredPowerAudit(
   source: string,
   validation: Record<string, unknown>,
-): { source: string; window_start_unix: number; window_end_unix: number } | null {
+): RecoveredPowerAudit | null {
   const path = validation.validation_path;
   const result = validation.result_file;
   if (typeof path !== 'string' || typeof result !== 'string') return null;

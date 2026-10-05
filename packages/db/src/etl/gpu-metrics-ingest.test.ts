@@ -305,7 +305,6 @@ describe('ingestGpuMetricsArtifact', () => {
       benchmarkResultIds: [11],
     });
     expect(recovered).toEqual({
-      metadataUpdatedBenchmarkResultIds: [],
       seriesIds: [seriesId],
       samplesInserted: 5,
       seriesSkipped: 0,

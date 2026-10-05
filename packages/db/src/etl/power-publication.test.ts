@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { mapBenchmarkRow } from './benchmark-mapper';
 import { createSkipTracker } from './skip-tracker';
 import {
+  POWER_WORKLOADS,
   powerPublicationPoint,
+  powerWorkloadForScenario,
   verifyPowerPublication,
   type PublishedPowerRow,
 } from './power-publication';
@@ -51,6 +53,27 @@ function actual(point = expected()): PublishedPowerRow {
 }
 
 describe('PowerX publication', () => {
+  it('admits exactly the workloads of POWER_WORKLOADS to the receipt', () => {
+    const point = (overrides: Record<string, unknown>) =>
+      powerPublicationPoint(mapBenchmarkRow({ ...raw, ...overrides }, createSkipTracker())!, '', {
+        path: '',
+        sha256: '',
+      });
+    expect(point({ isl: 4096, osl: 1024 })).toBeNull();
+    for (const workload of POWER_WORKLOADS) {
+      const row =
+        workload.benchmarkType === 'agentic_traces'
+          ? { isl: undefined, osl: undefined, scenario_type: 'agentic-coding', users: 32 }
+          : { isl: workload.isl, osl: workload.osl };
+      expect(point(row)?.identity).toMatchObject({
+        benchmark_type: workload.benchmarkType,
+        isl: workload.isl,
+        osl: workload.osl,
+      });
+    }
+    expect(powerWorkloadForScenario('8k1k')).toMatchObject({ isl: 8192, osl: 1024 });
+    expect(powerWorkloadForScenario('4k1k')).toBeUndefined();
+  });
   it('keeps required 1K/1K measurements in the publication receipt', () => {
     const point = expected({ isl: 1024, joules_per_output_token: 2.5 });
     expect(point.identity).toMatchObject({ benchmark_type: 'single_turn', isl: 1024, osl: 1024 });

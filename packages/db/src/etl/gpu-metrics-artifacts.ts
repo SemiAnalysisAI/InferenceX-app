@@ -70,6 +70,14 @@ export function isPowerAuditArtifact(artifactName: string): boolean {
   return artifactName.startsWith(POWER_AUDIT_ARTIFACT_PREFIX);
 }
 
+/**
+ * The two uploads that may carry one point's telemetry, preferred first. When a
+ * point's own sibling was not seen, receipts expect either of them, not both.
+ */
+export function expectedTelemetryArtifactNames(suffix: string): string[] {
+  return [`${GPU_METRICS_ARTIFACT_PREFIX}${suffix}`, `${POWER_AUDIT_ARTIFACT_PREFIX}${suffix}`];
+}
+
 function isGpuMetricsCsvName(fileName: string): boolean {
   const lower = fileName.toLowerCase();
   if (!lower.startsWith('gpu_metrics') || !lower.endsWith('.csv')) return false;

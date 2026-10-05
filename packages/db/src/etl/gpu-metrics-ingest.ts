@@ -46,7 +46,6 @@ import {
   type GpuMetricsSidecars,
 } from './gpu-metrics-artifacts.js';
 import { multinodePowerVendor, parseMultinodePowerSamples } from './multinode-power-samples.js';
-import { recoveredPowerAudit } from './power-audit-validations.js';
 
 /** Samples are streamed to Postgres in unnest batches of this many rows. */
 const SAMPLE_BATCH_SIZE = 5000;
@@ -79,7 +78,6 @@ export interface GpuMetricsIngestResult {
   seriesIds: number[];
   samplesInserted: number;
   seriesSkipped: number;
-  metadataUpdatedBenchmarkResultIds: number[];
 }
 
 /**
@@ -136,13 +134,23 @@ function prepareMultinodePowerSeries(artifact: GpuMetricsArtifact): PreparedGpuM
 export function prepareGpuMetricsArtifact(artifact: GpuMetricsArtifact): PreparedGpuMetricSeries[] {
   const prepared: PreparedGpuMetricSeries[] = [];
   const unreadable: string[] = [];
+  // Bundle-level sidecars depend only on the artifact, so read them once and
+  // share them across every CSV of the bundle.
+  const bundle = artifact.artifactName.startsWith('power_audit_')
+    ? {
+        validations: readPowerAuditValidations(artifact.artifactDir, artifact.artifactName),
+        powerManifest: (() => {
+          const bundleFile = listMultinodePowerSampleFiles(artifact.artifactDir)[0];
+          return bundleFile ? readMultinodePowerManifest(bundleFile.path) : null;
+        })(),
+      }
+    : null;
   for (const file of listGpuMetricsCsvFiles(artifact.artifactDir)) {
     const csvText = fs.readFileSync(file.path, 'utf8');
     const sidecars = readGpuMetricsSidecars(file.path);
-    if (artifact.artifactName.startsWith('power_audit_')) {
-      sidecars.validations = readPowerAuditValidations(artifact.artifactDir, artifact.artifactName);
-      const bundleFile = listMultinodePowerSampleFiles(artifact.artifactDir)[0];
-      sidecars.powerManifest = bundleFile ? readMultinodePowerManifest(bundleFile.path) : null;
+    if (bundle) {
+      sidecars.validations = bundle.validations;
+      sidecars.powerManifest = bundle.powerManifest;
     }
     const parsed = parseGpuMetricsCsv(csvText, {
       nvidiaUtcOffsetMinutes: contextUtcOffsetMinutes(sidecars.context),
@@ -392,7 +400,12 @@ export function refreshGpuMetricStats(sql: Sql, seriesId: number): Promise<boole
   });
 }
 
-/** Read, digest, and persist every CSV of one artifact for one set of points. */
+/**
+ * Read, digest, and persist every CSV of one artifact for one set of points.
+ * Writes telemetry tables and point links only; benchmark-row provenance is
+ * attached by the caller that owns the point set (CI before insert, the
+ * backfill through its receipt-checkpointed plan).
+ */
 export async function ingestGpuMetricsArtifact(
   sql: Sql,
   input: {
@@ -402,12 +415,7 @@ export async function ingestGpuMetricsArtifact(
   },
 ): Promise<GpuMetricsIngestResult> {
   const prepared = prepareGpuMetricsArtifact(input.artifact);
-  const result: GpuMetricsIngestResult = {
-    seriesIds: [],
-    samplesInserted: 0,
-    seriesSkipped: 0,
-    metadataUpdatedBenchmarkResultIds: [],
-  };
+  const result: GpuMetricsIngestResult = { seriesIds: [], samplesInserted: 0, seriesSkipped: 0 };
   for (const series of prepared) {
     const upserted = await upsertGpuMetricSeries(sql, {
       workflowRunId: input.workflowRunId,
@@ -419,33 +427,6 @@ export async function ingestGpuMetricsArtifact(
     result.samplesInserted += upserted.samplesInserted;
     if (upserted.samplesInserted === 0 && !upserted.replaced && !upserted.statsUpdated)
       result.seriesSkipped++;
-  }
-  // The caller has resolved this artifact's exact benchmark identities. Recover
-  // only a unique AgentX point within that explicit set, after every host is
-  // stored/linked. This also repairs metadata when all samples were a no-op.
-  const validations = prepared[0]?.sidecars.validations ?? {};
-  const audits = Object.entries(validations)
-    .map(([source, validation]) => ({
-      audit: recoveredPowerAudit(source, validation),
-      conc: (validation.selected_window as Record<string, unknown> | undefined)?.concurrency,
-    }))
-    .filter((entry) => entry.audit !== null);
-  for (const { audit, conc } of audits) {
-    if (typeof conc !== 'number' || !Number.isSafeInteger(conc) || conc <= 0) continue;
-    if (audits.filter((entry) => entry.conc === conc).length !== 1) continue;
-    const updated = await sql<{ id: number }[]>`
-      with candidates as (
-        select id from benchmark_results
-        where workflow_run_id = ${input.workflowRunId}
-          and id = any(${sql.array([...new Set(input.benchmarkResultIds)])}::bigint[])
-          and benchmark_type = 'agentic_traces' and conc = ${conc}
-      )
-      update benchmark_results set power_audit = ${sql.json(audit)}::jsonb
-      where id in (select id from candidates)
-        and (select count(*) from candidates) = 1 and power_audit is null
-      returning id
-    `;
-    result.metadataUpdatedBenchmarkResultIds.push(...updated.map((row) => Number(row.id)));
   }
   return result;
 }

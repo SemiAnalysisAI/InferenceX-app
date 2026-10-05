@@ -36,7 +36,12 @@ import { AsyncSemaphore } from './etl/async-semaphore.js';
 import { createAdminSql } from './etl/db-utils.js';
 import { ingestGpuMetricsArtifact, refreshGpuMetricStats } from './etl/gpu-metrics-ingest.js';
 import { readPowerAuditValidations } from './etl/gpu-metrics-artifacts.js';
-import { recoveredPowerAudit } from './etl/power-audit-validations.js';
+import type { RecoveredPowerAudit } from './etl/power-audit-validations.js';
+import {
+  agentxWindowPlan,
+  applyAgentxAudits,
+  attachAgentxAudits,
+} from './etl/power-audit-recovery.js';
 import {
   benchmarkPublicationIdentity,
   stablePowerPointIdentity,
@@ -186,7 +191,7 @@ type PairOutcome =
       samplesInserted: number;
       pointsLinked: number;
       expectationsUnknown: boolean;
-      metadataUpdatedBenchmarkResultIds: number[];
+      auditsWritten: number;
     }
   | { kind: 'unmatched' }
   | { kind: 'failed' };
@@ -228,15 +233,24 @@ async function processPair(
       observations.set(key, { identity, artifactNames: [pair.gpuMetrics.name], produced: true });
     }
     const matchedIds: number[] = [];
-    const mappedPoints: { ids: number[]; identity: Record<string, unknown> }[] = [];
+    const agenticPoints: {
+      id: number;
+      benchmarkType: string;
+      conc: number;
+      identity: Record<string, unknown>;
+      powerAudit?: RecoveredPowerAudit;
+    }[] = [];
     for (const row of mappedRows) {
       const ids = await findBenchmarkResultIds(sql, run, [row], (id) =>
         uniqueFallbacks.set(stablePowerPointIdentity(benchmarkPublicationIdentity(row)), id),
       );
       if (ids.length === 0) throw new Error(`${pair.gpuMetrics.name}: no matching benchmark rows`);
       matchedIds.push(...ids);
-      if (row.benchmarkType === 'agentic_traces')
-        mappedPoints.push({ ids, identity: benchmarkPublicationIdentity(row) });
+      if (row.benchmarkType === 'agentic_traces') {
+        const identity = benchmarkPublicationIdentity(row);
+        for (const id of ids)
+          agenticPoints.push({ id, benchmarkType: row.benchmarkType, conc: row.conc, identity });
+      }
     }
     const resultIds = [...new Set(matchedIds)];
     if (resultIds.length === 0) {
@@ -247,30 +261,22 @@ async function processPair(
     gpuMetricsDir = await retryArtifactOperation(`downloading ${pair.gpuMetrics.name}`, () =>
       downloadArtifact(pair.gpuMetrics, tempDir),
     );
-    const validations = Object.entries(
-      readPowerAuditValidations(gpuMetricsDir, pair.gpuMetrics.name),
-    )
-      .map(([source, validation]) => ({
-        powerAudit: recoveredPowerAudit(source, validation),
-        conc: (validation.selected_window as Record<string, unknown> | undefined)?.concurrency,
-      }))
-      .filter((validation) => validation.powerAudit !== null);
-    const auditUpdates: BenchmarkAuditUpdate[] = [];
-    for (const point of mappedPoints) {
-      const candidates = validations.filter(
-        (validation) => validation.conc === point.identity.conc,
+    // One plan per pair: the bundle's retained windows attached to the single
+    // stored point at each concurrency. The receipt checkpoints exactly these
+    // writes before the series ingest, and the apply statement writes exactly them.
+    const plan = agentxWindowPlan(readPowerAuditValidations(gpuMetricsDir, pair.gpuMetrics.name));
+    const attached = attachAgentxAudits(plan, agenticPoints, (point) => `benchmark ${point.id}`);
+    for (const refusal of attached.refused) {
+      console.warn(
+        `  [WARN] ${pair.gpuMetrics.name}: retained window at concurrency ${refusal.concurrency} ` +
+          `covers ${refusal.points.join(', ')}; provenance withheld`,
       );
-      if (candidates.length !== 1) continue;
-      const powerAudit = candidates[0]!.powerAudit;
-      if (powerAudit)
-        auditUpdates.push(
-          ...point.ids.map((benchmarkResultId) => ({
-            benchmarkResultId,
-            identity: point.identity,
-            powerAudit,
-          })),
-        );
     }
+    const auditUpdates: BenchmarkAuditUpdate[] = attached.points.flatMap((point) =>
+      point.powerAudit
+        ? [{ benchmarkResultId: point.id, identity: point.identity, powerAudit: point.powerAudit }]
+        : [],
+    );
     await checkpointMetadata(auditUpdates);
     const ingested = await ingestGpuMetricsArtifact(sql, {
       workflowRunId: run.id,
@@ -280,13 +286,21 @@ async function processPair(
     if (ingested.seriesIds.length === 0) {
       throw new Error(`${pair.gpuMetrics.name}: no parseable gpu_metrics CSV`);
     }
+    // Provenance is written only after every host series is stored and linked.
+    const written = await applyAgentxAudits(sql, {
+      workflowRunId: run.id,
+      writes: auditUpdates.map(({ benchmarkResultId, powerAudit }) => ({
+        benchmarkResultId,
+        powerAudit,
+      })),
+    });
     return {
       kind: 'ingested',
       seriesCount: ingested.seriesIds.length,
       samplesInserted: ingested.samplesInserted,
       pointsLinked: resultIds.length,
       expectationsUnknown,
-      metadataUpdatedBenchmarkResultIds: ingested.metadataUpdatedBenchmarkResultIds,
+      auditsWritten: written.length,
     };
   } catch (error) {
     if (pointKeys.length === 0)
@@ -429,6 +443,7 @@ async function main(): Promise<void> {
   let seriesStored = 0;
   let samplesStored = 0;
   let pointsLinked = 0;
+  let auditsWritten = 0;
   let unmatchedArtifacts = 0;
   let artifactFailures = 0;
   let runFailures = 0;
@@ -593,11 +608,7 @@ async function main(): Promise<void> {
             runSeries += outcome.seriesCount;
             runSamples += outcome.samplesInserted;
             pointsLinked += outcome.pointsLinked;
-            checkpointBenchmarkRefresh(
-              manifest,
-              outcome.metadataUpdatedBenchmarkResultIds,
-              saveReceipt,
-            );
+            auditsWritten += outcome.auditsWritten;
             break;
           }
           case 'unmatched': {
@@ -646,7 +657,7 @@ async function main(): Promise<void> {
   console.log(
     `\n=== backfill complete: ${artifactsProcessed} artifact(s), ${seriesStored} series, ` +
       `${samplesStored} sample(s), ${pointsLinked} point link(s), ` +
-      `${unmatchedArtifacts} unmatched artifact(s), ` +
+      `${auditsWritten} AgentX audit(s) written, ${unmatchedArtifacts} unmatched artifact(s), ` +
       `${missingRuns} run(s) without pairs, ${goneRuns} run(s) gone from GitHub, ` +
       `${artifactFailures} failed artifact(s), ${runFailures} failed run(s) ===`,
   );

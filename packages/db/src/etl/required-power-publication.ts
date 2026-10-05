@@ -1,10 +1,15 @@
 import fs from 'node:fs';
-import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
-import { mapBenchmarkRow, type BenchmarkParams } from './benchmark-mapper';
+import {
+  readBenchmarkArtifacts,
+  sha256Hex,
+  type BenchmarkArtifactFile,
+} from './benchmark-artifacts';
+import type { BenchmarkParams } from './benchmark-mapper';
 import { createSkipTracker } from './skip-tracker';
 import { configCacheKey } from './config-cache';
+import { powerWorkloadForScenario } from './power-publication';
 import { CHANGELOG_ARTIFACT_NAME, REQUIRED_POWER_MANIFEST } from '../lib/ci-artifact-preparation';
 
 type JsonRow = Record<string, unknown>;
@@ -13,10 +18,17 @@ export interface RequiredPowerSource {
   runAttempt: number;
   headSha: string | null;
 }
-export interface BenchmarkArtifactRows {
+/**
+ * One file the manifest may bind, hashed once when read. Benchmark files keep
+ * their parsed rows; sidecars are re-read when parsed, because the extracted
+ * bundle does not change for the lifetime of this process.
+ */
+interface Evidence {
   path: string;
-  rows: unknown[];
-  contents?: Buffer | string;
+  sha256: string;
+  bytes: number;
+  rows: readonly JsonRow[];
+  text: () => string;
 }
 
 function object(value: unknown, label: string): JsonRow {
@@ -43,10 +55,17 @@ function mappedIdentity(row: BenchmarkParams): string {
   return JSON.stringify([row.recipeFingerprint, row.conc, row.benchmarkType, row.isl, row.osl]);
 }
 
-/** A purge or later ingest filter must not turn an incomplete required scope into success. */
+/**
+ * A purge or later ingest filter must not turn an incomplete required scope into
+ * success. `before_write` runs over the planned points before the first
+ * irreversible write and prevents publication; `after_insert` runs over the rows
+ * actually handed to the benchmark insert and is what fails the ingest step when
+ * a row was dropped on the way (a config error, a failed bulk insert).
+ */
 export function assertRequiredPowerPointsRetained(
   required: readonly BenchmarkParams[],
   retained: readonly BenchmarkParams[],
+  stage: 'before_write' | 'after_insert',
 ): void {
   const retainedIdentity = (row: BenchmarkParams) =>
     JSON.stringify([configCacheKey(row.config), row.offloadMode, mappedIdentity(row)]);
@@ -54,7 +73,7 @@ export function assertRequiredPowerPointsRetained(
   for (const row of required) {
     const key = retainedIdentity(row);
     if (!present.has(key))
-      throw new Error(`Required power: missing benchmark point after ingest ${key}`);
+      throw new Error(`Required power (${stage}): missing benchmark point ${key}`);
     const actual = present.get(key)!;
     for (const field of [
       'power_valid',
@@ -65,14 +84,17 @@ export function assertRequiredPowerPointsRetained(
       'joules_per_output_token',
     ])
       if (actual.metrics[field] !== row.metrics[field])
-        throw new Error(`Required power: ${field} changed before ingest for ${key}`);
+        throw new Error(
+          `Required power (${stage}): ${field} differs from the verified artifact for ${key}`,
+        );
   }
 }
 
 /** Validate only the producer-declared required scope; legacy optional points remain unchanged. */
-export function verifyRequiredPowerPublication(
+function verifyRequiredPowerBundle(
   manifestValue: unknown,
-  artifacts: readonly BenchmarkArtifactRows[],
+  files: readonly BenchmarkArtifactFile[],
+  bundle: ReadonlyMap<string, Evidence>,
   source: RequiredPowerSource,
 ): BenchmarkParams[] {
   const manifest = object(manifestValue, 'sweep manifest');
@@ -129,23 +151,17 @@ export function verifyRequiredPowerPublication(
       for (const value of entries) {
         const row = object(value, 'matrix row');
         if (row['require-power'] !== true || row['eval-only'] === true) continue;
-        if (!['1k1k', '8k1k', 'agentic'].includes(scenario))
-          throw new Error(`Required power: unsupported scenario ${scenario}`);
-        const agentic = scenario === 'agentic';
+        const workload = powerWorkloadForScenario(scenario);
+        if (!workload) throw new Error(`Required power: unsupported scenario ${scenario}`);
+        const agentic = workload.benchmarkType === 'agentic_traces';
         const isl = agentic ? null : row.isl;
         const osl = agentic ? null : row.osl;
-        if (!agentic && (isl !== (scenario === '8k1k' ? 8192 : 1024) || osl !== 1024))
+        if (!agentic && (isl !== workload.isl || osl !== workload.osl))
           throw new Error(`Required power: inconsistent sequence lengths for ${scenario}`);
         const concurrencies = Array.isArray(row.conc) ? row.conc : [row.conc];
         if (concurrencies.length === 0) throw new Error('Required power: empty concurrency list');
         for (const conc of concurrencies) {
-          const key = identity(
-            row['recipe-fingerprint'],
-            conc,
-            agentic ? 'agentic_traces' : 'single_turn',
-            isl,
-            osl,
-          );
+          const key = identity(row['recipe-fingerprint'], conc, workload.benchmarkType, isl, osl);
           if (expected.has(key)) throw new Error(`Required power: duplicate matrix point ${key}`);
           expected.set(key, { ...row, matrixTopology: topology });
         }
@@ -156,12 +172,9 @@ export function verifyRequiredPowerPublication(
     throw new Error('Required power: manifest has no required benchmark points');
 
   const seen = new Map<string, { row: JsonRow; path: string; point: BenchmarkParams }>();
-  for (const artifact of artifacts) {
+  for (const file of files) {
     const inFile = new Set<string>();
-    for (const value of artifact.rows) {
-      if (!value || typeof value !== 'object' || Array.isArray(value)) continue;
-      const raw = value as JsonRow;
-      const mapped = mapBenchmarkRow(raw, createSkipTracker());
+    for (const { raw, mapped } of file.rows) {
       if (!mapped) continue;
       const fingerprint = mapped.recipeFingerprint;
       // A missing fingerprint cannot match a required point; the missing-point check fails below.
@@ -169,15 +182,13 @@ export function verifyRequiredPowerPublication(
       const key = mappedIdentity(mapped);
       if (!expected.has(key)) continue;
       if (inFile.has(key))
-        throw new Error(`Required power: duplicate point ${key} in ${artifact.path}`);
+        throw new Error(`Required power: duplicate point ${key} in ${file.path}`);
       inFile.add(key);
       const prior = seen.get(key);
       if (prior) {
         // collect-results uploads exact copies of per-job rows in results_bmk.
-        if (prior.path === artifact.path || !isDeepStrictEqual(prior.row, raw))
-          throw new Error(
-            `Required power: conflicting or duplicate point ${key} in ${artifact.path}`,
-          );
+        if (prior.path === file.path || !isDeepStrictEqual(prior.row, raw))
+          throw new Error(`Required power: conflicting or duplicate point ${key} in ${file.path}`);
         continue;
       }
       if (raw.power_valid !== 1 || raw.power_metric_schema_version !== 2)
@@ -200,13 +211,13 @@ export function verifyRequiredPowerPublication(
         if (typeof metric !== 'number' || !Number.isFinite(metric) || metric <= 0)
           throw new Error(`Required power: ${field} must be finite and positive for ${key}`);
       }
-      seen.set(key, { row: raw, path: artifact.path, point: mapped });
+      seen.set(key, { row: raw, path: file.path, point: mapped });
     }
   }
   for (const key of expected.keys()) {
     if (!seen.has(key)) throw new Error(`Required power: missing benchmark point ${key}`);
   }
-  verifyPointEvidence(manifest, expected, seen, artifacts);
+  verifyPointEvidence(manifest, expected, seen, bundle);
   return [...seen.values()].map(({ point }) => point);
 }
 
@@ -232,22 +243,24 @@ export function verifyRequiredPowerArtifacts(
   const manifest = JSON.parse(
     fs.readFileSync(path.join(manifestDir, 'sweep_manifest.json'), 'utf8'),
   );
-  const artifacts: BenchmarkArtifactRows[] = [];
-  for (const name of fs.readdirSync(root)) {
-    if (!name.startsWith('bmk_') && !name.startsWith('results_')) continue;
-    const dir = path.join(root, name);
-    if (!fs.statSync(dir).isDirectory()) continue;
-    for (const file of fs.readdirSync(dir)) {
-      if (!file.endsWith('.json')) continue;
-      const contents = fs.readFileSync(path.join(dir, file));
-      const data = JSON.parse(contents.toString('utf8'));
-      artifacts.push({
-        path: path.join(name, file),
-        rows: Array.isArray(data) ? data : [data],
-        contents,
-      });
-    }
-  }
+  const files = readBenchmarkArtifacts(root, { runId: source.runId, tracker: createSkipTracker() });
+  for (const file of files)
+    if (file.unreadable)
+      throw new Error(
+        `Required power: unreadable benchmark artifact ${file.path}: ${file.unreadable}`,
+      );
+  const bundle = new Map<string, Evidence>(
+    files.map((file) => [
+      file.path,
+      {
+        path: file.path,
+        sha256: file.sha256,
+        bytes: file.bytes,
+        rows: file.rows.map((row) => row.raw),
+        text: () => fs.readFileSync(path.join(root, file.path), 'utf8'),
+      },
+    ]),
+  );
   for (const pointValue of Array.isArray(manifest.points) ? manifest.points : []) {
     const point = object(pointValue, 'point');
     if (!Array.isArray(point.artifacts)) throw new Error('Required power: missing point artifacts');
@@ -259,20 +272,23 @@ export function verifyRequiredPowerArtifacts(
         throw new Error(`Required power: missing required artifact ${relative}`);
       if (!fs.realpathSync(file).startsWith(`${fs.realpathSync(root)}${path.sep}`))
         throw new Error(`Required power: artifact escapes bundle ${relative}`);
-      if (!artifacts.some((item) => item.path === relative))
-        artifacts.push({ path: relative, rows: [], contents: fs.readFileSync(file) });
+      if (bundle.has(relative)) continue;
+      const contents = fs.readFileSync(file);
+      bundle.set(relative, {
+        path: relative,
+        sha256: sha256Hex(contents),
+        bytes: contents.length,
+        rows: [],
+        text: () => fs.readFileSync(file, 'utf8'),
+      });
     }
   }
-  const points = verifyRequiredPowerPublication(manifest, artifacts, source);
+  const points = verifyRequiredPowerBundle(manifest, files, bundle, source);
   // Rerun-failed-jobs keeps successful points and metadata from earlier attempts of this head.
   console.log(
     `  Required power scope: run ${source.runId}, declared attempt ${manifest['run-attempt']}, ingest attempt ${source.runAttempt}`,
   );
   return points;
-}
-
-function digest(artifact: BenchmarkArtifactRows): string {
-  return createHash('sha256').update(artifact.contents!).digest('hex');
 }
 
 function safeArtifactPath(value: unknown): string {
@@ -303,12 +319,11 @@ function verifyPointEvidence(
   manifest: JsonRow,
   expected: Map<string, JsonRow>,
   seen: Map<string, { row: JsonRow; path: string; point: BenchmarkParams }>,
-  artifacts: readonly BenchmarkArtifactRows[],
+  bundle: ReadonlyMap<string, Evidence>,
 ): void {
   if (!Array.isArray(manifest.points) || manifest.points.length !== expected.size)
     throw new Error('Required power: point manifest does not cover the exact required matrix');
   const verified = new Set<string>();
-  const files = new Map(artifacts.map((artifact) => [artifact.path, artifact]));
   for (const declaredValue of manifest.points) {
     const declared = object(declaredValue, 'point');
     const id = object(declared.identity, 'point identity');
@@ -462,20 +477,20 @@ function verifyPointEvidence(
     if (end <= start) throw new Error('Required power: invalid measurement window boundaries');
     if (!Array.isArray(declared.artifacts) || declared.artifacts.length === 0)
       throw new Error('Required power: missing required artifacts');
-    const evidence = new Map<string, BenchmarkArtifactRows>();
+    const evidence = new Map<string, Evidence>();
     for (const value of declared.artifacts) {
       const artifact = object(value, 'required artifact');
       const relative = safeArtifactPath(artifact.path);
       if (evidence.has(relative))
         throw new Error(`Required power: duplicate required artifact ${relative}`);
-      const file = files.get(relative);
-      if (!file || file.contents === undefined || file.contents.length === 0)
+      const file = bundle.get(relative);
+      if (!file || file.bytes === 0)
         throw new Error(`Required power: missing required artifact ${relative}`);
       if (
         artifact.validation_state !== 'valid' ||
         typeof artifact.sha256 !== 'string' ||
         !/^[a-f0-9]{64}$/u.test(artifact.sha256) ||
-        createHash('sha256').update(file.contents).digest('hex') !== artifact.sha256
+        file.sha256 !== artifact.sha256
       )
         throw new Error(`Required power: invalid artifact validation or hash ${relative}`);
       evidence.set(relative, file);
@@ -486,7 +501,7 @@ function verifyPointEvidence(
       )
     )
       throw new Error(`Required power: benchmark artifact is not hash-bound for ${key}`);
-    const byName = (name: string): BenchmarkArtifactRows => {
+    const byName = (name: string): Evidence => {
       const matches = [...evidence.values()].filter(
         (file) => path.posix.basename(file.path) === name,
       );
@@ -499,7 +514,7 @@ function verifyPointEvidence(
     );
     if (sidecars.length !== 1)
       throw new Error('Required power: expected one required power validation artifact');
-    const audit = object(JSON.parse(sidecars[0].contents!.toString()), 'power validation');
+    const audit = object(JSON.parse(sidecars[0].text()), 'power validation');
     const auditWindow = object(audit.benchmark_window, 'audit benchmark window');
     if (
       audit.power_valid !== true ||
@@ -523,23 +538,20 @@ function verifyPointEvidence(
         const directory = path.posix.dirname(file.path);
         const manifestFile = evidence.get(`${directory}/manifest.json`);
         if (!manifestFile) throw new Error('Required power: missing native node manifest');
-        const nodeManifest = object(
-          JSON.parse(manifestFile.contents!.toString()),
-          'native node manifest',
-        );
+        const nodeManifest = object(JSON.parse(manifestFile.text()), 'native node manifest');
         if (nodeManifest.lifecycle !== 'complete' || nodeManifest.collector_exit_code !== 0)
           throw new Error('Required power: invalid native node collection');
         const receipt = (audit.nodes as JsonRow[]).find((node) => node.node === nodeManifest.node);
         if (
           !receipt ||
-          receipt.manifest_sha256 !== digest(manifestFile) ||
-          receipt.telemetry_sha256 !== digest(file)
+          receipt.manifest_sha256 !== manifestFile.sha256 ||
+          receipt.telemetry_sha256 !== file.sha256
         )
           throw new Error('Required power: native node receipt differs from evidence');
         for (const hash of [receipt.identity_sha256, receipt.identity_end_sha256])
           if (
             ![...evidence.values()].some(
-              (item) => path.posix.dirname(item.path) === directory && digest(item) === hash,
+              (item) => path.posix.dirname(item.path) === directory && item.sha256 === hash,
             )
           )
             throw new Error('Required power: missing native physical identity evidence');
@@ -560,7 +572,7 @@ function verifyPointEvidence(
       );
       if (nodeFiles.length !== 1)
         throw new Error('Required power: expected one node identity artifact');
-      const node = nodeFiles[0].contents!.toString().trim();
+      const node = nodeFiles[0].text().trim();
       const identityFiles = [...evidence.values()].filter((file) =>
         /^(?:gpu_metrics_identity\.csv|gpu_metrics_devices\.json)$/u.test(
           path.posix.basename(file.path),
@@ -570,7 +582,7 @@ function verifyPointEvidence(
         throw new Error('Required power: expected one physical GPU identity artifact');
       const uuidRows: [string, string][] = [];
       if (identityFiles[0].path.endsWith('.csv')) {
-        const lines = identityFiles[0].contents!.toString().trim().split(/\r?\n/u);
+        const lines = identityFiles[0].text().trim().split(/\r?\n/u);
         const columns = lines
           .shift()!
           .split(',')
@@ -595,7 +607,7 @@ function verifyPointEvidence(
             else Object.values(value).forEach(visit);
           }
         };
-        visit(JSON.parse(identityFiles[0].contents!.toString()));
+        visit(JSON.parse(identityFiles[0].text()));
       }
       if (
         uuidRows.length === 0 ||
