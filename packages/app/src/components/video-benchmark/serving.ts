@@ -1,4 +1,5 @@
 import { at, number, rows, safePath, text, type Bundle, type Json } from './bundle';
+import { canonicalVideoModelId, VIDEO_MODELS } from './models';
 
 export interface ServingCell {
   id: string;
@@ -15,7 +16,7 @@ export interface ServingCell {
 }
 
 function requireValue(condition: unknown, message: string): asserts condition {
-  if (!condition) throw new Error(`Invalid H3 serving matrix: ${message}`);
+  if (!condition) throw new Error(`Invalid video serving matrix: ${message}`);
 }
 
 function canonical(value: Json): string {
@@ -28,17 +29,21 @@ function canonical(value: Json): string {
   return JSON.stringify(value);
 }
 
-/** Read the backend's single-runtime matrix without manufacturing paired results. */
-export function servingCells(
+/** Read sealed planned cells even when execution evidence is absent or incomplete. */
+export function plannedServingCells(
   bundle: Pick<Bundle, 'documents' | 'checksums' | 'manifest' | 'ci'>,
-): ServingCell[] {
+): Pick<ServingCell, 'id' | 'concurrency' | 'cell'>[] {
   const { documents, checksums, manifest, ci } = bundle;
   if (!documents.has('serving-smoke.json')) return [];
   const matrix = documents.get('serving-smoke.json') ?? null;
   const cells = at(matrix, 'cells');
+  const wan =
+    canonicalVideoModelId(text(at(manifest, 'workload_plan', 'model_id'))) ===
+    VIDEO_MODELS.wan22.modelId;
   requireValue(
     at(matrix, 'schema_version') === '1.0.0' &&
-      at(matrix, 'bundle_type') === 'h3_serving_smoke_matrix' &&
+      at(matrix, 'bundle_type') ===
+        (wan ? 'video_serving_smoke_matrix' : 'h3_serving_smoke_matrix') &&
       ['running', 'failed', 'complete'].includes(text(at(matrix, 'status'))) &&
       Array.isArray(cells) &&
       cells.length > 0 &&
@@ -59,17 +64,12 @@ export function servingCells(
     'summary is not bound to the manifest',
   );
   const plan = at(matrix, 'plan');
-  const devices = rows(at(matrix, 'gpu_uuids'));
   requireValue(
-    plan !== null &&
-      canonical(plan) === canonical(at(manifest, 'workload_plan')) &&
-      devices.length > 0 &&
-      new Set(devices).size === devices.length &&
-      devices.every((device) => typeof device === 'string' && device.startsWith('GPU-')),
-    'workload or GPU identity is missing or inconsistent',
+    plan !== null && canonical(plan) === canonical(at(manifest, 'workload_plan')),
+    'workload identity is missing or inconsistent',
   );
   const seen = new Set<number>();
-  return cells.map((cell): ServingCell => {
+  return cells.map((cell): Pick<ServingCell, 'id' | 'concurrency' | 'cell'> => {
     const concurrency = at(cell, 'concurrency');
     requireValue(
       typeof concurrency === 'number' && [1, 2, 4].includes(concurrency) && !seen.has(concurrency),
@@ -77,6 +77,33 @@ export function servingCells(
     );
     seen.add(concurrency);
     const id = `c${concurrency}`;
+    requireValue(
+      ['not_started', 'running', 'failed', 'complete'].includes(text(at(cell, 'status'))) &&
+        typeof at(cell, 'verified') === 'boolean',
+      `${id} has an invalid execution status`,
+    );
+    return { id, concurrency, cell };
+  });
+}
+
+/** Read execution evidence with the full existing workload/hardware/media checks. */
+export function servingCells(
+  bundle: Pick<Bundle, 'documents' | 'checksums' | 'manifest' | 'ci'>,
+): ServingCell[] {
+  const planned = plannedServingCells(bundle);
+  const { documents, checksums, manifest } = bundle;
+  const matrix = documents.get('serving-smoke.json') ?? null;
+  const plan = at(matrix, 'plan');
+  const wan = canonicalVideoModelId(text(at(plan, 'model_id'))) === VIDEO_MODELS.wan22.modelId;
+  const devices = rows(at(matrix, 'gpu_uuids'));
+  if (planned.length > 0)
+    requireValue(
+      devices.length > 0 &&
+        new Set(devices).size === devices.length &&
+        devices.every((device) => typeof device === 'string' && device.startsWith('GPU-')),
+      'GPU identity is missing or inconsistent',
+    );
+  return planned.map(({ id, concurrency, cell }): ServingCell => {
     const root = `gpu/${id}`;
     const runPath = `${root}/baseline/run.json`;
     const jobPath = `${root}/gpu-job.json`;
@@ -98,11 +125,6 @@ export function servingCells(
     const job = linked('receipt', jobPath);
     const power = linked('power', powerPath);
     const spec = documents.get(specPath) ?? null;
-    requireValue(
-      ['not_started', 'running', 'failed', 'complete'].includes(text(at(cell, 'status'))) &&
-        typeof at(cell, 'verified') === 'boolean',
-      `${id} has an invalid execution status`,
-    );
     if (at(cell, 'verified') === true)
       requireValue(
         run && job && spec && at(cell, 'status') === 'complete',
@@ -129,7 +151,7 @@ export function servingCells(
           at(job, 'measurement_verified') === true &&
             at(job, 'status') === 'complete' &&
             at(job, 'cleanup_status') === 'clean' &&
-            at(job, 'evidence_kind') === 'controlled_h3_gpu',
+            at(job, 'evidence_kind') === (wan ? 'controlled_video_gpu' : 'controlled_h3_gpu'),
           `${id} does not contain verified, complete GPU execution`,
         );
     }
@@ -140,7 +162,9 @@ export function servingCells(
           at(job, 'roles', 'baseline', 'run_sha256') === checksums.get(runPath) &&
           at(run, 'bundle_type') === 'mvp_run' &&
           at(run, 'bundle_version') === '0.1.0' &&
-          ['operator_endpoint', 'live_h3'].includes(text(at(run, 'evidence_kind'))) &&
+          ['operator_endpoint', wan ? 'live_video' : 'live_h3'].includes(
+            text(at(run, 'evidence_kind')),
+          ) &&
           canonical(at(run, 'plan')) === canonical(plan) &&
           at(run, 'plan_sha256') === at(job, 'plan_sha256') &&
           at(run, 'configuration', 'runtime_revision') === at(matrix, 'runtime', 'revision') &&

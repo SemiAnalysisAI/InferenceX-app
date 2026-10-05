@@ -100,8 +100,8 @@ export const TAB_META_ZH: Record<DashboardRouteKey, { title: string; description
       '各模型、芯片 SKU 和配置的当前 InferenceX Docker 镜像标签。对比已部署镜像与最新 vLLM 和 SGLang 发布版本，标记过期标签。',
   },
   video: {
-    title: 'H3 视频基准测试',
-    description: '查看 H3 原始视频、音频、测量结果与 CI 来源记录。',
+    title: 'VideoGenX 视频基准测试',
+    description: '按模型、硬件和工作负载查看视频生成测量、原始证据与来源记录。',
   },
   feedback: {
     title: '用户反馈',

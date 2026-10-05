@@ -37,9 +37,10 @@ export async function storedArtifacts(runId: string): Promise<CIArtifact[]> {
   do {
     const page = await list({ prefix: runPrefix(runId), cursor });
     for (const blob of page.blobs) {
-      const match = /\/(?<name>h3-(?:results|video|fidelity)-\d+-\d+)_(?<id>\d+)\.json$/u.exec(
-        blob.pathname,
-      );
+      const match =
+        /\/(?<name>(?:h3-(?:results|video|fidelity)|video-serving)-\d+-\d+)_(?<id>\d+)\.json$/u.exec(
+          blob.pathname,
+        );
       if (match?.groups)
         result.push({
           id: Number(match.groups.id),
@@ -259,7 +260,7 @@ export async function publishedVideoHistory(page: number): Promise<VideoHistoryP
     const batch = await list({ prefix: `${PREFIX}/runs/`, cursor });
     for (const blob of batch.blobs) {
       const match =
-        /^h3-video-media\/v1\/runs\/(?<run>[1-9]\d*)\/(?<name>h3-(?:results|video|fidelity)-(?<producer>[1-9]\d*)-[1-9]\d*)_(?<artifact>[1-9]\d*)\.json$/u.exec(
+        /^h3-video-media\/v1\/runs\/(?<run>[1-9]\d*)\/(?<name>(?:h3-(?:results|video|fidelity)|video-serving)-(?<producer>[1-9]\d*)-[1-9]\d*)_(?<artifact>[1-9]\d*)\.json$/u.exec(
           blob.pathname,
         )?.groups;
       if (!match || match.run !== match.producer) continue;

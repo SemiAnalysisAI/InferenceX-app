@@ -7,6 +7,7 @@ import {
 } from '@semianalysisai/inferencex-constants';
 import { getGithubToken } from '@/lib/github-artifacts';
 import { loadFixture } from '@/lib/test-fixtures';
+import { readVideoReplay } from '@/lib/video-replay';
 import type { VideoHistoryPage } from '@/components/video-benchmark/history';
 import {
   publishedVideoHistory,
@@ -22,7 +23,8 @@ const ROOT = `${GITHUB_API_BASE}/repos/${GITHUB_OWNER}/${GITHUB_REPO}`;
 const MAX_BYTES = 256 * 1024 ** 2;
 const headers = { 'Cache-Control': 'private, no-store' };
 const id = (value: string) => /^[1-9]\d{0,19}$/u.test(value);
-const artifactName = /^h3-(?:results|video|fidelity)-(?<runId>\d+)-(?<attempt>\d+)$/u;
+const artifactName =
+  /^(?:h3-(?:results|video|fidelity)|video-serving)-(?<runId>\d+)-(?<attempt>\d+)$/u;
 
 function github(path: string, signal = AbortSignal.timeout(30000)) {
   const token = getGithubToken();
@@ -63,6 +65,8 @@ export async function GET(request: NextRequest) {
   }
   const deadline = AbortSignal.timeout(270000);
   try {
+    const replay = await readVideoReplay(query);
+    if (replay) return replay;
     if (
       process.env.NODE_ENV === 'development' &&
       !videoStorageEnabled() &&

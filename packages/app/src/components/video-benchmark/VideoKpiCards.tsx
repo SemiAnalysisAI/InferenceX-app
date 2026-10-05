@@ -4,8 +4,9 @@ import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useLocale } from '@/lib/use-locale';
 import { leadCell } from './deployment';
-import { hardwareLabel, VIDEO_HARDWARE_ROSTER } from './hardware';
+import { hardwareLabel } from './hardware';
 import { formatMetric, metricValue, type MetricId, type VideoPoint } from './metrics';
+import { videoModelHardware } from './models';
 import { latestVideoCells } from './points';
 import { metricOptions, type VideoDashboardState } from './video-url-state';
 
@@ -74,7 +75,7 @@ export default function VideoKpiCards({
   };
   return (
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" data-testid="video-kpi-cards">
-      {VIDEO_HARDWARE_ROSTER.map(({ key, unavailable }) => {
+      {videoModelHardware(state.model, points).map(({ key, unavailable }) => {
         const point = leadCell(cells, key, options);
         return (
           <Card key={key} className="gap-2 p-4" data-testid="video-kpi-card" data-hardware={key}>

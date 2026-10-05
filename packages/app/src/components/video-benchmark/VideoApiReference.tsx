@@ -5,14 +5,17 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { track } from '@/lib/analytics';
 import { useLocale } from '@/lib/use-locale';
-import { formatApiPrice, H3_API_REFERENCE } from './api-reference';
+import { formatApiPrice } from './api-reference';
+import { VIDEO_MODELS, type VideoModel } from './models';
 import { parseApiPrice } from './video-url-state';
 
 const STRINGS = {
   en: {
+    missing:
+      'No verified API price for this model. Enter your own assumption to calculate API economics.',
     label: 'API price reference ($/video-second)',
     reset: 'Reset',
-    resetTitle: 'Reset to the dated reference price',
+    resetTitle: 'Reset to the model reference, or clear if unavailable',
     reference: 'Reference',
     range: 'listed range',
     captured: 'captured',
@@ -21,9 +24,10 @@ const STRINGS = {
       'List price, not realized revenue; self-hosted TCO excludes utilization, CPU, storage and network.',
   },
   zh: {
+    missing: '此模型暂无已验证 API 参考价。输入自定义假设后可计算 API 经济指标。',
     label: 'API 参考价（$/video-s）',
     reset: '重置',
-    resetTitle: '恢复为标注采集日期的参考价',
+    resetTitle: '恢复模型参考价；无参考价时清空',
     reference: '参考值',
     range: '标价区间',
     captured: '采集于',
@@ -43,24 +47,27 @@ const STRINGS = {
  */
 export default function VideoApiReference({
   value,
+  model = 'h3',
   onChange,
 }: {
-  value: number;
-  onChange: (value: number) => void;
+  value: number | null;
+  model?: VideoModel;
+  onChange: (value: number | null) => void;
 }) {
   const locale = useLocale();
   const s = STRINGS[locale];
   const id = useId();
-  const { pricePerVideoSecondUsd: reference, rangeUsd, capturedOn, label } = H3_API_REFERENCE;
-  const [raw, setRaw] = useState(() => String(value));
+  const referenceInfo = VIDEO_MODELS[model].apiReference;
+  const reference = referenceInfo?.pricePerVideoSecondUsd ?? null;
+  const [raw, setRaw] = useState(() => (value === null ? '' : String(value)));
   const [synced, setSynced] = useState(value);
   // Adopt a value set elsewhere (URL restore, reset) without clobbering text mid-edit.
   if (value !== synced) {
     setSynced(value);
-    if (parseApiPrice(raw) !== value) setRaw(String(value));
+    if (parseApiPrice(raw) !== value) setRaw(value === null ? '' : String(value));
   }
   const valueAtFocus = useRef(value);
-  const commit = (next: number, reset = false) => {
+  const commit = (next: number | null, reset = false) => {
     if (next === value) return;
     onChange(next);
     if (reset) track('video_api_price_changed', { value: String(next), reset: true });
@@ -91,9 +98,9 @@ export default function VideoApiReference({
               if (next !== null) commit(next);
             }}
             onBlur={() => {
-              if (parseApiPrice(raw) === null) setRaw(String(value));
+              if (parseApiPrice(raw) === null) setRaw(value === null ? '' : String(value));
               if (value !== valueAtFocus.current) {
-                track('video_api_price_changed', { value: String(value) });
+                track('video_api_price_changed', { value: value === null ? '' : String(value) });
               }
             }}
             onWheel={(event) => event.currentTarget.blur()}
@@ -105,7 +112,7 @@ export default function VideoApiReference({
             data-testid="video-api-price-reset"
             className="shrink-0"
             onClick={() => {
-              setRaw(String(reference));
+              setRaw(reference === null ? '' : String(reference));
               commit(reference, true);
             }}
           >
@@ -118,10 +125,17 @@ export default function VideoApiReference({
         data-testid="video-api-reference-caption"
       >
         <p>
-          {s.reference} {formatApiPrice(reference)}/video-s · {s.range}{' '}
-          {formatApiPrice(rangeUsd[0])}–{formatApiPrice(rangeUsd[1])} · {s.captured} {capturedOn} ·{' '}
-          {s.source}
-          {label[locale]}
+          {referenceInfo ? (
+            <>
+              {s.reference} {formatApiPrice(referenceInfo.pricePerVideoSecondUsd)}/video-s ·{' '}
+              {s.range} {formatApiPrice(referenceInfo.rangeUsd[0])}–
+              {formatApiPrice(referenceInfo.rangeUsd[1])} · {s.captured} {referenceInfo.capturedOn}{' '}
+              · {s.source}
+              {referenceInfo.label[locale]}
+            </>
+          ) : (
+            s.missing
+          )}
         </p>
         <p>{s.disclaimer}</p>
       </div>

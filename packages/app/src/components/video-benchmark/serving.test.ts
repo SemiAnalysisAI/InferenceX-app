@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { at, loadBundle, type Json } from './bundle';
-import { servingFixture as fixture } from './serving.fixture';
+import { servingFixture as fixture, wanServingFixture } from './serving.fixture';
 import { participatingGpuCount, perGpuHour, selectServingRecord, servingCells } from './serving';
 
 function set(value: Json, key: string, replacement: Json) {
@@ -78,7 +78,7 @@ describe('H3 serving matrix', () => {
     if (defect === 'fixture') set(run, 'evidence_kind', 'fixture');
     if (defect === 'metrics') set(at(cell, 'completion'), 'valid', 3);
     if (defect === 'p50') set(at(cell, 'metrics'), 'client_ready_p50_seconds', 1);
-    expect(() => servingCells(b)).toThrow('Invalid H3 serving matrix:');
+    expect(() => servingCells(b)).toThrow('Invalid video serving matrix:');
   });
   it.each(['reference', 'missing', 'spec', 'media', 'traversal', 'power'])(
     'rejects broken %s bindings',
@@ -147,3 +147,44 @@ it.skipIf(!process.env.H3_SERVING_ARTIFACT_DIR)(
     expect(at(cells[2].cell, 'metrics', 'client_ready_p50_seconds')).toBeCloseTo(297.686668);
   },
 );
+
+it('accepts the generic video-only serving producer without requiring an audio track', () => {
+  const cells = servingCells(wanServingFixture());
+  expect(cells).toHaveLength(3);
+  expect(at(cells[0].run, 'plan', 'model_id')).toBe('Wan-AI/Wan2.2-T2V-A14B-Diffusers');
+  expect(at(cells[0].run, 'plan', 'generation', 'duration_seconds')).toBeNull();
+  expect(at(cells[0].run, 'summary', 'valid')).toBe(20);
+  expect(at(cells[0].run, 'records', 1, 'media', 'audio')).toBeNull();
+});
+
+it.each(['wan-matrix', 'wan-job', 'wan-run', 'h3-matrix', 'h3-job', 'h3-run'])(
+  'rejects contradictory model/evidence family: %s',
+  (change) => {
+    const bundle = change.startsWith('wan-') ? wanServingFixture() : fixture();
+    if (change.endsWith('matrix'))
+      set(
+        bundle.documents.get('serving-smoke.json')!,
+        'bundle_type',
+        change.startsWith('wan-') ? 'h3_serving_smoke_matrix' : 'video_serving_smoke_matrix',
+      );
+    if (change.endsWith('job'))
+      set(
+        bundle.documents.get('gpu/c1/gpu-job.json')!,
+        'evidence_kind',
+        change.startsWith('wan-') ? 'controlled_h3_gpu' : 'controlled_video_gpu',
+      );
+    if (change.endsWith('run'))
+      set(
+        bundle.documents.get('gpu/c1/baseline/run.json')!,
+        'evidence_kind',
+        change.startsWith('wan-') ? 'live_h3' : 'live_video',
+      );
+    expect(() => servingCells(bundle)).toThrow('Invalid video serving matrix');
+  },
+);
+
+it('keeps operator_endpoint request evidence valid under a verified Wan supervisor', () => {
+  const bundle = wanServingFixture();
+  set(bundle.documents.get('gpu/c1/baseline/run.json')!, 'evidence_kind', 'operator_endpoint');
+  expect(servingCells(bundle)).toHaveLength(3);
+});

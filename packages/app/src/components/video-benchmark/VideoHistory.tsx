@@ -8,13 +8,14 @@ import { Input } from '@/components/ui/input';
 import { useLocale } from '@/lib/use-locale';
 import { track } from '@/lib/analytics';
 import VideoSelect from './VideoSelect';
+import { videoModelHistory, type VideoModel } from './models';
 import type { VideoHistoryEntry, VideoHistoryPage } from './history';
 
 const STRINGS = {
   en: {
     title: 'Performance history',
     intro:
-      'Published H3 results, including older runs. Each entry keeps its original execution and artifact identity.',
+      'Published results for the selected model, including older runs. Each entry keeps its original execution and artifact identity.',
     note: 'Recorded observations only; no matched version baseline has been selected. Media validity does not establish perceptual quality or serving capacity.',
     order:
       'Newest publication first. Execution time is shown separately; re-exporting a result does not make it a new measurement.',
@@ -49,6 +50,7 @@ const STRINGS = {
     throughput: 'Valid clips / GPU-hour',
     energy: 'GPU-board kJ / valid clip',
     status: 'Execution',
+    healthExcluded: 'Excluded from performance ranking: hardware-health failure.',
     missing:
       '— means unavailable, invalid or insufficient samples. P90 requires at least 10 valid samples per cell.',
     metricNote:
@@ -58,7 +60,7 @@ const STRINGS = {
   },
   zh: {
     title: '性能历史',
-    intro: '查看已发布的 H3 结果，包括较早运行；每条记录保留原始执行与产物标识。',
+    intro: '查看所选模型已发布的结果，包括较早运行；每条记录保留原始执行与产物标识。',
     note: '当前仅展示观测值，尚未选择匹配的版本基线。媒体有效性不代表感知质量或服务容量已通过验收。',
     order: '按发布时间从新到旧排列。执行时间单独列出；重新导出不代表重新测量。',
     loading: '正在加载已发布结果…',
@@ -92,6 +94,7 @@ const STRINGS = {
     throughput: '有效视频数 / GPU 小时',
     energy: '每有效视频 GPU 板卡能耗（kJ）',
     status: '执行状态',
+    healthExcluded: '硬件健康检查失败，已从性能排名中排除。',
     missing: '— 表示无数据、数据无效或样本不足。每个配置至少有 10 个有效样本才显示 P90。',
     metricNote:
       '延迟与吞吐量涵盖提交到媒体下载完成。能耗使用记录的生成时间窗口，按参与计算的 GPU 板卡统计，越低越好；失败尝试的耗时仍计入对应测量窗口。',
@@ -126,12 +129,12 @@ const filter = (key: string, value: string, setter: (value: string) => void) => 
   track('video_history_filter_changed', { filter: key });
 };
 
-export default function VideoHistory() {
+export default function VideoHistory({ model = 'h3' }: { model?: VideoModel }) {
   const locale = useLocale();
   const s = STRINGS[locale];
   const status = (value: string | null) =>
     value ? (STATUS[value]?.[locale] ?? value) : s.unavailable;
-  const [entries, setEntries] = useState<VideoHistoryEntry[]>([]);
+  const [allEntries, setEntries] = useState<VideoHistoryEntry[]>([]);
   const [nextPage, setNextPage] = useState<number | null>(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
@@ -157,7 +160,7 @@ export default function VideoHistory() {
           : [...old, ...data.entries.filter((entry) => !old.some((item) => item.id === entry.id))],
       );
       setNextPage(data.nextPage);
-      setReplay(response.headers.get('x-videogenx-replay') === '1');
+      setReplay(response.headers.has('x-videogenx-replay'));
     } catch {
       if (!signal?.aborted) setError(true);
     } finally {
@@ -173,6 +176,8 @@ export default function VideoHistory() {
     void load(1, controller.signal);
     return () => controller.abort();
   }, []);
+  const entries = videoModelHistory([{ schemaVersion: 1, entries: allEntries, nextPage }], model)[0]
+    .entries;
   const observations = entries.flatMap((entry) =>
     entry.sources.flatMap((source) => source.observations),
   );
@@ -328,7 +333,14 @@ export default function VideoHistory() {
                               {s.failed}: {fmt(point.failed)}
                             </p>
                           </td>
-                          <td className="p-2">{status(point.status)}</td>
+                          <td className="p-2">
+                            {status(point.status)}
+                            {point.hardwareHealth?.status === 'fail' && (
+                              <p className="text-xs text-destructive">
+                                {s.healthExcluded} {point.hardwareHealth.reason}
+                              </p>
+                            )}
+                          </td>
                           <td className="p-2">
                             {fmt(point.p50)} / {fmt(point.p90)}
                             <p className="text-xs text-muted-foreground">n={point.samples}</p>

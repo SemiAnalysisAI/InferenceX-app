@@ -185,3 +185,32 @@ it.skipIf(!process.env.H3_ARTIFACT_DIR)(
     }
   },
 );
+
+it('rejects a sealed optional result that contradicts its manifest model', async () => {
+  const manifest = {
+    schema_version: 1,
+    run_id: '123',
+    run_attempt: '1',
+    ci: { repository: 'SemiAnalysisAI/InferenceX' },
+    git_commit: 'a'.repeat(40),
+    workload_plan: { model_id: 'Wan-AI/Wan2.2-T2V-A14B-Diffusers' },
+    evidence: {},
+  };
+  const result = {
+    schema_version: '1.0.0',
+    bundle_type: 'h3_benchmark_result',
+    execution: { ci: { run_id: '123' } },
+    workload: { plan: { model_id: 'MiniMaxAI/MiniMax-H3' } },
+  };
+  const files = await fixture({
+    'manifest.json': JSON.stringify(manifest),
+    'result.json': JSON.stringify(result),
+  });
+  await expect(loadBundle(files.read)).rejects.toThrow('different video models');
+  result.workload.plan.model_id = 'Wan-AI/Wan2.2-T2V-A14B';
+  const alias = await fixture({
+    'manifest.json': JSON.stringify(manifest),
+    'result.json': JSON.stringify(result),
+  });
+  await expect(loadBundle(alias.read)).resolves.toMatchObject({ manifest });
+});

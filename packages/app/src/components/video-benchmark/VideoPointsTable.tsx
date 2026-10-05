@@ -1,6 +1,7 @@
 'use client';
 
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
+import { Button } from '@/components/ui/button';
 import { useLocale } from '@/lib/use-locale';
 import { layoutLabel } from './deployment';
 import { hardwareLabel } from './hardware';
@@ -15,6 +16,7 @@ const STRINGS = {
     counts: 'Valid / scheduled',
     power: 'Board power (W)',
     run: 'CI run',
+    details: 'Details',
   },
   zh: {
     hardware: '硬件',
@@ -22,6 +24,7 @@ const STRINGS = {
     counts: '有效 / 计划',
     power: '板卡功率（W）',
     run: 'CI 运行',
+    details: '详情',
   },
 };
 const METRIC_COLUMNS: readonly MetricId[] = [
@@ -33,6 +36,7 @@ const METRIC_COLUMNS: readonly MetricId[] = [
   'apiPricePerVideo',
   'kjPerVideo',
   'powerPctCap',
+  'quality',
 ];
 
 /** Rows for the plotted cells, plus provenance. Queued cells stay in the evidence panel. */
@@ -48,10 +52,12 @@ export default function VideoPointsTable({
   points,
   state,
   hidden,
+  onSelect,
 }: {
   points: VideoPoint[];
   state: VideoDashboardState;
   hidden: ReadonlySet<string>;
+  onSelect?: (point: VideoPoint) => void;
 }) {
   const locale = useLocale();
   const s = STRINGS[locale];
@@ -81,7 +87,7 @@ export default function VideoPointsTable({
       align: 'right',
       cell: (p) => formatMetric(metricValue(p, id, options), id),
       sortValue: (p) => metricValue(p, id, options) ?? Number.NEGATIVE_INFINITY,
-      importance: id === 'p50Latency' || id === 'videosPerDollar' ? 'key' : 'secondary',
+      importance: id === state.x || id === state.y ? 'key' : 'secondary',
     })),
     {
       header: s.power,
@@ -107,6 +113,19 @@ export default function VideoPointsTable({
       ),
       importance: 'secondary',
     },
+    ...(onSelect
+      ? [
+          {
+            header: s.details,
+            cell: (p: VideoPoint) => (
+              <Button size="sm" variant="ghost" onClick={() => onSelect(p)}>
+                {s.details}
+              </Button>
+            ),
+            importance: 'key' as const,
+          },
+        ]
+      : []),
   ];
   return (
     <DataTable

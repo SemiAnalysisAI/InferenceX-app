@@ -3,7 +3,12 @@ import { strToU8, zipSync } from 'fflate';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { head, put, list } from '@vercel/blob';
 import type * as BlobSdk from '@vercel/blob';
-import { publishedVideoHistory, readStoredArtifact, storeVideoArtifact } from './video-storage';
+import {
+  publishedVideoHistory,
+  readStoredArtifact,
+  storedArtifacts,
+  storeVideoArtifact,
+} from './video-storage';
 import { storedBundle, storedFidelityBundle } from '@/components/video-benchmark/stored';
 import { fidelityFixture } from '@/components/video-benchmark/fidelity.fixture';
 
@@ -301,4 +306,26 @@ describe('published video history catalog', () => {
     expect(list).toHaveBeenLastCalledWith({ prefix: 'h3-video-media/v1/runs/', cursor: 'next' });
     expect(put).not.toHaveBeenCalled();
   });
+});
+
+it('discovers generic serving artifacts through the same immutable catalog without writes', async () => {
+  vi.stubEnv('BLOB_READ_WRITE_TOKEN', 'synthetic-test-token');
+  const published = {
+    ...blob(10),
+    pathname: 'h3-video-media/v1/runs/10/video-serving-10-1_20.json',
+  };
+  vi.mocked(list).mockResolvedValue({ blobs: [published], hasMore: false, cursor: undefined });
+  vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+    Response.json({
+      storageVersion: 1,
+      runId: '10',
+      artifact: { ...artifact, name: 'video-serving-10-1' },
+      sources: [],
+    }),
+  );
+  const artifacts = await storedArtifacts('10');
+  const page = await publishedVideoHistory(1);
+  expect(artifacts.map((a) => a.name)).toEqual(['video-serving-10-1']);
+  expect(page.entries.map((e) => e.artifact.name)).toEqual(['video-serving-10-1']);
+  expect(put).not.toHaveBeenCalled();
 });

@@ -6,7 +6,9 @@ import { useLocale } from '@/lib/use-locale';
 import { metricLabel, X_METRICS, Y_METRICS, type XMetricId, type YMetricId } from './metrics';
 import VideoApiReference from './VideoApiReference';
 import VideoSelect from './VideoSelect';
+import { VIDEO_MODELS, type VideoModel } from './models';
 import { metricOptions, type VideoDashboardState } from './video-url-state';
+import { QUALITY_METRICS, QUALITY_METRIC_IDS, type QualityMetricId } from './quality';
 
 const STRINGS = {
   en: {
@@ -17,6 +19,9 @@ const STRINGS = {
     deployment: 'Deployment',
     x: 'X-axis metric',
     y: 'Y-axis metric',
+    quality: 'Quality dimension',
+    threshold: 'Quality threshold (minimum)',
+    off: 'Off — descriptive performance',
   },
   zh: {
     benchmark: '基准测试配置',
@@ -26,6 +31,9 @@ const STRINGS = {
     deployment: '部署',
     x: 'X 轴指标',
     y: 'Y 轴指标',
+    quality: '质量维度',
+    threshold: '质量阈值（最低评分）',
+    off: '关闭 — 仅描述性能',
   },
 };
 
@@ -41,20 +49,17 @@ function Fact({ label, value }: { label: string; value: string }) {
 
 /**
  * Two control panels mirroring the inference tab: what is being compared
- * (frozen for this campaign, so model, workload and deployment are stated,
- * not selectable, beside the one editable input, the API list price) and
+ * (model selection, observed workload and deployment, plus API price) and
  * how it is plotted (the axes; the cost tier sits in the chart caption).
  */
 export default function VideoConfigBar({
   state,
   onChange,
-  modelLabel,
   workloadLabel,
   deploymentLabel,
 }: {
   state: VideoDashboardState;
   onChange: (patch: Partial<VideoDashboardState>) => void;
-  modelLabel: string;
   workloadLabel: string;
   /** Measured server layouts (GPUs per video and model split). */
   deploymentLabel: string;
@@ -69,10 +74,22 @@ export default function VideoConfigBar({
   return (
     <div className="grid gap-3 lg:grid-cols-2" data-testid="video-config-bar">
       <ControlPanel legend={s.benchmark} className="sm:grid-cols-2 xl:grid-cols-4">
-        <Fact label={s.model} value={modelLabel} />
+        <VideoSelect
+          label={s.model}
+          value={state.model}
+          onValueChange={(value) => change('model', value as VideoModel)}
+          options={Object.entries(VIDEO_MODELS).map(([value, model]) => ({
+            value,
+            label: model.label,
+          }))}
+        />
         <Fact label={s.workload} value={workloadLabel} />
         <Fact label={s.deployment} value={deploymentLabel} />
-        <VideoApiReference value={state.apiPrice} onChange={(apiPrice) => onChange({ apiPrice })} />
+        <VideoApiReference
+          model={state.model}
+          value={state.apiPrice}
+          onChange={(apiPrice) => onChange({ apiPrice })}
+        />
       </ControlPanel>
       <ControlPanel legend={s.chart} className="sm:grid-cols-2">
         <VideoSelect
@@ -85,8 +102,46 @@ export default function VideoConfigBar({
           label={s.y}
           value={state.y}
           onValueChange={(value) => change('y', value as YMetricId)}
-          options={Y_METRICS.map((id) => ({ value: id, label: metricLabel(id, locale, options) }))}
+          options={Y_METRICS.filter((id) => state.model === 'h3' || id !== 'quality').map((id) => ({
+            value: id,
+            label: metricLabel(id, locale, options),
+          }))}
         />
+        {state.model === 'h3' && (
+          <>
+            <VideoSelect
+              label={s.quality}
+              value={state.qualityMetric}
+              onValueChange={(value) => change('qualityMetric', value as QualityMetricId)}
+              options={QUALITY_METRIC_IDS.map((id) => ({
+                value: id,
+                label: locale === 'zh' ? QUALITY_METRICS[id].labelZh : QUALITY_METRICS[id].label,
+              }))}
+            />
+            <VideoSelect
+              label={s.threshold}
+              value={state.qualityThreshold === null ? 'off' : String(state.qualityThreshold)}
+              onValueChange={(value) =>
+                change('qualityThreshold', value === 'off' ? null : Number(value))
+              }
+              options={[
+                { value: 'off', label: s.off },
+                ...[
+                  ...new Set([
+                    0,
+                    1,
+                    2,
+                    3,
+                    4,
+                    ...(state.qualityThreshold === null ? [] : [state.qualityThreshold]),
+                  ]),
+                ]
+                  .sort((a, b) => a - b)
+                  .map((value) => ({ value: String(value), label: `≥ ${value} / 4` })),
+              ]}
+            />
+          </>
+        )}
       </ControlPanel>
     </div>
   );

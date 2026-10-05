@@ -1,10 +1,55 @@
-import { deploymentKey } from './deployment';
+import { comparisonCohortKey, deploymentKey } from './deployment';
+import type { VideoDeploymentRecord, VideoHardwareHealth } from './deployment-contract';
 import { hardwareKey, hardwareSort } from './hardware';
 import type { VideoHistoryObservation, VideoHistoryPage } from './history';
 import type { VideoPoint } from './metrics';
 
 const num = (value: unknown): number | null =>
   typeof value === 'number' && Number.isFinite(value) ? value : null;
+
+const textOrNull = (value: unknown): string | null =>
+  typeof value === 'string' && value.length > 0 ? value : null;
+const boolOrNull = (value: unknown): boolean | null => (typeof value === 'boolean' ? value : null);
+
+function deploymentRecord(
+  d: VideoDeploymentRecord | null | undefined,
+): VideoDeploymentRecord | null {
+  if (!d || typeof d !== 'object') return null;
+  return {
+    gpusPerReplica: num(d.gpusPerReplica),
+    ring: num(d.ring),
+    cfg: num(d.cfg),
+    offload:
+      d.offload && typeof d.offload === 'object'
+        ? {
+            ditCpu: boolOrNull(d.offload.ditCpu),
+            ditLayerwise: boolOrNull(d.offload.ditLayerwise),
+            textEncoderCpu: boolOrNull(d.offload.textEncoderCpu),
+            imageEncoderCpu: boolOrNull(d.offload.imageEncoderCpu),
+            vaeCpu: boolOrNull(d.offload.vaeCpu),
+          }
+        : null,
+    encoderParallel: textOrNull(d.encoderParallel),
+    batchSize: num(d.batchSize),
+    maxBatchSize: num(d.maxBatchSize),
+    batchDelayMs: num(d.batchDelayMs),
+    scheduling: textOrNull(d.scheduling),
+    engine: textOrNull(d.engine),
+    precision: textOrNull(d.precision),
+    acceleration: textOrNull(d.acceleration),
+    generationKey: textOrNull(d.generationKey),
+    configEvidence: textOrNull(d.configEvidence),
+  };
+}
+
+function hardwareHealth(h: VideoHardwareHealth | null | undefined): VideoHardwareHealth | null {
+  if (!h || typeof h !== 'object') return null;
+  return {
+    status: h.status === 'pass' || h.status === 'fail' ? h.status : 'unknown',
+    reason: textOrNull(h.reason),
+    evidence: textOrNull(h.evidence),
+  };
+}
 
 /**
  * Flatten published history pages (newest publication first) into chartable
@@ -21,7 +66,18 @@ export function videoPoints(pages: VideoHistoryPage[]): VideoPoint[] {
         for (const observation of source.observations) {
           if (seen.has(observation.id)) continue;
           seen.add(observation.id);
-          points.push(toPoint(observation, entry.runId, entry.artifact.id, source.observedAt));
+          points.push({
+            ...toPoint(observation, entry.runId, entry.artifact.id, source.observedAt),
+            provenance: {
+              sourceId: source.id,
+              manifestSha256: source.sha256,
+              sourceSha: source.sourceSha,
+              artifactDigest: entry.artifact.digest ?? null,
+              fidelity: source.fidelity,
+              calibration: source.calibration,
+              releaseQualified: source.releaseQualified,
+            },
+          });
         }
       }
   return points.toSorted(
@@ -76,6 +132,9 @@ function toPoint(
             attention: typeof server.attention === 'string' ? server.attention : null,
           }
         : null,
+    deployment: deploymentRecord(o.deployment),
+    hardwareHealth: hardwareHealth(o.hardwareHealth),
+    quality: o.quality ?? null,
     status: o.status ?? '',
     observedAt,
   };
@@ -92,7 +151,13 @@ export function latestVideoCells(points: VideoPoint[]): VideoPoint[] {
   const seen = new Set<string>();
   return points.filter((point) => {
     if (point.hardwareKey === null) return true;
-    const key = `${point.hardwareKey}:${deploymentKey(point)}:${point.concurrency ?? 'na'}`;
+    const key = JSON.stringify([
+      point.hardwareKey,
+      comparisonCohortKey(point) ?? workloadGroup(point),
+      deploymentKey(point),
+      point.runtime,
+      point.concurrency,
+    ]);
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
@@ -120,7 +185,9 @@ export function dashboardCells(points: VideoPoint[]): {
   workload: string | null;
   otherWorkloads: number;
 } {
-  const qualified = points.filter((p) => p.samples >= DASHBOARD_SAMPLE_FLOOR);
+  const qualified = points.filter(
+    (p) => p.samples >= DASHBOARD_SAMPLE_FLOOR && p.hardwareHealth?.status !== 'fail',
+  );
   const hardware = new Map<string, Set<string>>();
   const cellKeys = new Map<string, Set<string>>();
   for (const p of qualified) {

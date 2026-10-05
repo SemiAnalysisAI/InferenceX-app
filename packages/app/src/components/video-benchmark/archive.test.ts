@@ -11,23 +11,26 @@ function archive(files: Record<string, string>) {
   ]);
 }
 describe('CI ZIP import', () => {
-  it('verifies and opens a legacy CI artifact', async () => {
-    const manifest = JSON.stringify({
-      schema_version: 1,
-      run_id: '10',
-      run_attempt: '1',
-      git_commit: 'a'.repeat(40),
-      ci: { repository: 'SemiAnalysisAI/InferenceX' },
-    });
-    const blob = archive({
-      'manifest.json': manifest,
-      SHA256SUMS: `${hash(manifest)}  manifest.json\n`,
-    });
-    const [source] = await archiveSources(blob, artifact);
-    expect(source.id).toBe('10');
-    const bundle = await loadBundle(source.read);
-    expect(bundle.manifestSha256).toBe(hash(manifest));
-  });
+  it.each(['h3-video-10-1', 'video-serving-10-1'])(
+    'verifies and opens CI artifact %s',
+    async (name) => {
+      const manifest = JSON.stringify({
+        schema_version: 1,
+        run_id: '10',
+        run_attempt: '1',
+        git_commit: 'a'.repeat(40),
+        ci: { repository: 'SemiAnalysisAI/InferenceX' },
+      });
+      const blob = archive({
+        'manifest.json': manifest,
+        SHA256SUMS: `${hash(manifest)}  manifest.json\n`,
+      });
+      const [source] = await archiveSources(blob, { ...artifact, name });
+      expect(source.id).toBe('10');
+      const bundle = await loadBundle(source.read);
+      expect(bundle.manifestSha256).toBe(hash(manifest));
+    },
+  );
   it('preserves original execution identities in an exported archive', async () => {
     const index = JSON.stringify({
       schema_version: '1.0.0',

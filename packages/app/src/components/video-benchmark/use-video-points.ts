@@ -1,13 +1,17 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { VIDEO_HISTORY_MAX_PAGES, type VideoHistoryPage } from './history';
-import type { VideoPoint } from './metrics';
+import { videoModelHistory, type VideoModel } from './models';
 import { videoPoints } from './points';
+import { videoServingEvidence } from './serving-evidence';
 
 /** Load every published history page (bounded) and flatten it into chart points. */
-export function useVideoPoints() {
-  const [points, setPoints] = useState<VideoPoint[]>([]);
+export function useVideoPoints(model: VideoModel = 'h3') {
+  const [history, setHistory] = useState<VideoHistoryPage[]>([]);
+  const selected = useMemo(() => videoModelHistory(history, model), [history, model]);
+  const points = useMemo(() => videoPoints(selected), [selected]);
+  const servingEvidence = useMemo(() => videoServingEvidence(selected), [selected]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [replay, setReplay] = useState(false);
@@ -25,7 +29,7 @@ export function useVideoPoints() {
           cache: 'no-store',
         });
         if (!response.ok) throw new Error(`Published history HTTP ${response.status}`);
-        replayed ||= response.headers.get('x-videogenx-replay') === '1';
+        replayed ||= response.headers.has('x-videogenx-replay');
         const data = (await response.json()) as VideoHistoryPage;
         if (data.schemaVersion !== 1 || !Array.isArray(data.entries))
           throw new Error('Unsupported published history projection');
@@ -33,7 +37,7 @@ export function useVideoPoints() {
         if (data.nextPage === null) break;
       }
       if (controller.signal.aborted) return;
-      setPoints(videoPoints(pages));
+      setHistory(pages);
       setReplay(replayed);
     })()
       .catch((error: unknown) => {
@@ -46,5 +50,5 @@ export function useVideoPoints() {
     return () => controller.abort();
   }, [attempt]);
   const retry = useCallback(() => setAttempt((n) => n + 1), []);
-  return { points, loading, error: loadError, replay, retry };
+  return { points, servingEvidence, loading, error: loadError, replay, retry };
 }

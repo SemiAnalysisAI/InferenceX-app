@@ -105,6 +105,41 @@ describe('videoPoints', () => {
       observedAt: '2026-09-09T10:00:00Z',
     });
   });
+  it('retains configuration, health and source provenance while preserving unknown values', () => {
+    const enriched = structuredClone(page);
+    enriched.entries[0].sources[0].observations[0] = {
+      ...observation,
+      deployment: { ring: 1, maxBatchSize: 1, batchSize: null, offload: { ditCpu: false } },
+      hardwareHealth: {
+        status: 'unknown',
+        reason: 'No clock evidence',
+        evidence: 'gpu-before.json',
+      },
+      quality: null,
+    };
+    const [point] = videoPoints([enriched]);
+    expect(point.deployment).toMatchObject({
+      ring: 1,
+      maxBatchSize: 1,
+      batchSize: null,
+      offload: { ditCpu: false },
+    });
+    expect(point.hardwareHealth).toEqual({
+      status: 'unknown',
+      reason: 'No clock evidence',
+      evidence: 'gpu-before.json',
+    });
+    expect(point.quality).toBeNull();
+    expect(point.provenance).toEqual({
+      sourceId: source.id,
+      manifestSha256: 'a',
+      sourceSha: 'b',
+      artifactDigest: null,
+      fidelity: null,
+      calibration: null,
+      releaseQualified: false,
+    });
+  });
   it('sorts by HW_REGISTRY order, then concurrency', () => {
     const b200 = {
       ...page.entries[0],
@@ -281,5 +316,31 @@ describe('dashboardCells', () => {
     );
     expect(result.cells.map((p) => p.id)).toEqual(['source-a:c1', 'source-a:c2']);
     expect(result.otherWorkloads).toBe(1);
+  });
+});
+
+describe('deployment observation identity', () => {
+  it('keeps distinct workloads, runtime revisions and recorded configurations', () => {
+    const [base] = videoPoints([page]);
+    const variants = [
+      base,
+      { ...base, id: 'workload:c1', workloadKey: 'other-plan' },
+      { ...base, id: 'runtime:c1', runtime: 'new-runtime' },
+      { ...base, id: 'replica:c1', replicas: 2 },
+      { ...base, id: 'batch:c1', deployment: { batchSize: 2 } },
+      { ...base, id: 'generation:c1', deployment: { generationKey: '25-steps' } },
+    ];
+    expect(latestVideoCells(variants).map((p) => p.id)).toEqual(variants.map((p) => p.id));
+  });
+  it('does not count failed hardware toward the selected workload', () => {
+    const [base] = videoPoints([page]);
+    const failed = {
+      ...base,
+      id: 'failed:c1',
+      workloadKey: 'other-plan',
+      hardwareKey: 'b200',
+      hardwareHealth: { status: 'fail' as const, reason: 'fault', evidence: 'health.json' },
+    };
+    expect(dashboardCells([failed, base]).cells.map((p) => p.id)).toEqual([base.id]);
   });
 });

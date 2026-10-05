@@ -1,26 +1,88 @@
 import { metricValue, type MetricOptions, type VideoPoint } from './metrics';
 
-type Layout = Pick<VideoPoint, 'participating' | 'server' | 'replicas'>;
+type Layout = Pick<VideoPoint, 'participating' | 'server' | 'replicas' | 'deployment'> &
+  Partial<Pick<VideoPoint, 'runtime'>>;
+type QueueingInput = Pick<VideoPoint, 'concurrency' | 'replicas' | 'deployment'>;
 
-/**
- * A deployment is the server layout that produced a cell: how many GPU boards
- * served one request and how they split the model (tensor parallel × Ulysses
- * sequence parallel). Cells that differ only in client concurrency belong to
- * the same deployment, so they share this key.
- */
-export function deploymentKey(p: Pick<VideoPoint, 'participating' | 'server'>): string {
-  return `${p.participating ?? 'na'}g:tp${p.server?.tp ?? 'na'}:u${p.server?.ulysses ?? 'na'}`;
+const positiveInteger = (n: number | null | undefined): n is number =>
+  typeof n === 'number' && Number.isInteger(n) && n > 0;
+
+/** A measured server configuration, independent of client concurrency. */
+export function deploymentKey(p: Layout): string {
+  const d = p.deployment;
+  return JSON.stringify([
+    p.runtime ?? null,
+    p.participating,
+    p.server?.tp ?? null,
+    p.server?.ulysses ?? null,
+    p.replicas ?? null,
+    p.server?.attention ?? null,
+    d?.gpusPerReplica ?? null,
+    d?.ring ?? null,
+    d?.cfg ?? null,
+    d?.offload?.ditCpu ?? null,
+    d?.offload?.ditLayerwise ?? null,
+    d?.offload?.textEncoderCpu ?? null,
+    d?.offload?.imageEncoderCpu ?? null,
+    d?.offload?.vaeCpu ?? null,
+    d?.encoderParallel ?? null,
+    d?.batchSize ?? null,
+    d?.maxBatchSize ?? null,
+    d?.batchDelayMs ?? null,
+    d?.scheduling ?? null,
+    d?.engine ?? null,
+    d?.precision ?? null,
+    d?.acceleration ?? null,
+    d?.generationKey ?? null,
+  ]);
 }
 
 /**
- * On a batch-one server every request beyond one per replica waits in a queue:
- * latency grows with concurrency while throughput stays flat. Such a cell is
- * evidence about the same deployment, never a new point on its frontier.
- * Bundles that predate the deployment record ran one supervised endpoint, so
- * an unknown replica count reads as one.
+ * Known canonical workloads include prompts, seeds and generation settings.
+ * Additional generation/precision/acceleration changes remain separate until a
+ * quality protocol explicitly establishes comparability. Runtime is a disclosed
+ * comparison variable, not a claim of equivalent perceptual quality.
  */
-export function isQueueing(p: Pick<VideoPoint, 'concurrency' | 'replicas'>): boolean {
-  return (p.concurrency ?? 1) > (p.replicas ?? 1);
+export function comparisonCohortKey(p: VideoPoint): string | null {
+  if (!p.workloadKey) return null;
+  return JSON.stringify([
+    p.workloadKey,
+    p.model,
+    p.deployment?.generationKey ?? null,
+    p.deployment?.precision ?? null,
+    p.deployment?.acceleration ?? null,
+  ]);
+}
+
+/**
+ * Legacy retained bundles ran a supervised batch-one endpoint. Only those
+ * records keep the historical one-replica fallback. A modern scheduling record
+ * requires recorded capacity: a configured dynamic maximum above one is not
+ * evidence that the server actually batched those requests.
+ */
+export function queueingStatus(p: QueueingInput): 'queueing' | 'unqueued' | 'unknown' {
+  if (p.deployment === null || p.deployment === undefined)
+    return (p.concurrency ?? 1) > (p.replicas ?? 1) ? 'queueing' : 'unqueued';
+  if (!positiveInteger(p.concurrency)) return 'unknown';
+  if (p.concurrency === 1) return 'unqueued';
+  if (!positiveInteger(p.replicas)) return 'unknown';
+  if (p.concurrency <= p.replicas) return 'unqueued';
+  const d = p.deployment;
+  let batch: number | null = null;
+  if (d.scheduling === 'fixed_batch' && positiveInteger(d.batchSize)) batch = d.batchSize;
+  if (d.scheduling === 'dynamic' && d.maxBatchSize === 1) batch = 1;
+  if (d.scheduling === 'batch_one') batch = 1;
+  if (batch === null) return 'unknown';
+  return p.concurrency > p.replicas * batch ? 'queueing' : 'unqueued';
+}
+
+export function isQueueing(p: QueueingInput): boolean {
+  return queueingStatus(p) === 'queueing';
+}
+
+/** A hardware failure or unknown request capacity cannot enter performance rankings. */
+export function deploymentEligible(p: VideoPoint): boolean {
+  return p.hardwareHealth?.status !== 'fail' && queueingStatus(p) === 'unqueued';
 }
 
 /** "4 GPU · TP2 × Ulysses 2", plus the replica count when more than one. */
@@ -41,7 +103,16 @@ export function evidenceComparisonKey(p: VideoPoint): string | null {
   const layout = [p.participating, p.server?.tp, p.server?.ulysses, p.replicas ?? 1];
   if (!p.workloadKey || layout.some((n) => typeof n !== 'number' || !Number.isFinite(n) || n <= 0))
     return null;
-  return JSON.stringify([p.workloadKey, ...layout]);
+  // Attention backend remains an explicitly disclosed comparison variable in
+  // the existing cross-hardware evidence panel; it still identifies chart deployments.
+  return JSON.stringify([
+    comparisonCohortKey(p),
+    deploymentKey({
+      ...p,
+      runtime: '',
+      server: p.server ? { ...p.server, attention: null } : null,
+    }),
+  ]);
 }
 
 /**
@@ -52,7 +123,11 @@ export function evidenceComparisonKey(p: VideoPoint): string | null {
  */
 export function sharedLayoutCells<T extends VideoPoint>(cells: T[]): T[] {
   const deployments = cells.filter(
-    (p) => p.hardwareKey !== null && p.concurrency === 1 && evidenceComparisonKey(p) !== null,
+    (p) =>
+      p.hardwareKey !== null &&
+      p.concurrency === 1 &&
+      deploymentEligible(p) &&
+      evidenceComparisonKey(p) !== null,
   );
   const hardwareByLayout = new Map<string, Set<string>>();
   for (const p of deployments) {
@@ -87,7 +162,7 @@ export function leadCell(
   let best: VideoPoint | undefined;
   let bestRate = Number.NEGATIVE_INFINITY;
   for (const p of cells) {
-    if (p.hardwareKey !== hardwareKey || isQueueing(p)) continue;
+    if (p.hardwareKey !== hardwareKey || !deploymentEligible(p)) continue;
     const rate = metricValue(p, 'videosPerGpuHour', options) ?? Number.NEGATIVE_INFINITY;
     const faster = rate === bestRate && (p.p50 ?? Infinity) < (best?.p50 ?? Infinity);
     if (best === undefined || rate > bestRate || faster) {

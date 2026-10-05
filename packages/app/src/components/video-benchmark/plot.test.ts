@@ -4,6 +4,7 @@ import type { VideoHistoryPage } from './history';
 import { X_METRICS, Y_METRICS, type VideoPoint } from './metrics';
 import { listedVideoCells, plotVideoPoints } from './plot';
 import { videoPoints } from './points';
+import type { VideoQualityAssessment, VideoQualityMetricResult } from './quality';
 import { DEFAULT_VIDEO_DASHBOARD_STATE, type VideoDashboardState } from './video-url-state';
 
 const base: VideoPoint = {
@@ -16,6 +17,7 @@ const base: VideoPoint = {
   runtime: 'r',
   model: 'm',
   workload: 'w',
+  workloadKey: 'matched-workload',
   concurrency: 1,
   participating: 4,
   allocated: 8,
@@ -117,7 +119,7 @@ describe('plotVideoPoints', () => {
     expect(ids(out.frontiers.h200)).toEqual(['h200-8g', 'h200-4g-c1', 'h200-2g']);
     // No axis pair or cost tier re-admits it.
     for (const x of X_METRICS) {
-      for (const y of Y_METRICS) {
+      for (const y of Y_METRICS.filter((id) => id !== 'quality')) {
         expect(ids(plot([base, queued], { ...state, x, y, tier: 'r' }).plotted)).toEqual([
           'h200-4g-c1',
         ]);
@@ -210,5 +212,163 @@ describe('Optimal Only', () => {
     expect(
       ids(listedVideoCells([base, unmetered], { ...energy, optimal: false }, new Set())),
     ).toEqual(['h200-4g-c1', 'h200-4g-nopower']);
+  });
+});
+
+describe('comparison eligibility', () => {
+  it('does not dominate or connect a different workload, generation setting, or unknown identity', () => {
+    const points = [
+      base,
+      cell({
+        id: 'different-plan',
+        workloadKey: 'other-plan',
+        participating: 2,
+        p90: 10,
+        wallSeconds: 200,
+      }),
+      cell({ id: 'different-steps', deployment: { generationKey: 'steps:25' }, participating: 8 }),
+      cell({ id: 'unknown-one', workloadKey: null, participating: 2 }),
+      cell({ id: 'unknown-two', workloadKey: null, participating: 8 }),
+    ];
+    const result = plot(points);
+    expect(ids(result.plotted)).toEqual(ids(points));
+    expect(Object.values(result.frontiers).every((group) => group.length === 1)).toBe(true);
+    expect(result.multiLayout).toBe(false);
+  });
+  it('keeps multiple nonqueued observations of one deployment as unconnected points', () => {
+    const first = cell({ replicas: 2 });
+    const second = cell({
+      id: 'same-layout-c2',
+      replicas: 2,
+      concurrency: 2,
+      p90: 160,
+      wallSeconds: 2500,
+    });
+    const result = plot([first, second]);
+    expect(ids(result.plotted)).toEqual([first.id, second.id]);
+    expect(Object.values(result.frontiers).every((group) => group.length === 1)).toBe(true);
+    expect(result.multiLayout).toBe(false);
+  });
+  it('excludes failed hardware from the chart and table with either Optimal Only setting', () => {
+    const failed = cell({
+      id: 'failed',
+      participating: 2,
+      p90: 10,
+      wallSeconds: 200,
+      hardwareHealth: { status: 'fail', reason: 'throttling', evidence: 'health.json' },
+    });
+    for (const optimal of [true, false]) {
+      expect(ids(plot([failed, base], { ...state, optimal }).plotted)).toEqual([base.id]);
+      expect(ids(listedVideoCells([failed, base], { ...state, optimal }, new Set()))).toEqual([
+        base.id,
+      ]);
+    }
+  });
+  it('does not rank unrecorded capacity as a deployment improvement', () => {
+    const unknown = cell({
+      id: 'scheduler',
+      concurrency: 4,
+      replicas: 1,
+      deployment: { batchSize: 4, scheduling: 'unknown' },
+    });
+    expect(ids(plot([unknown], { ...state, optimal: false }).plotted)).toEqual([]);
+    expect(listedVideoCells([unknown], { ...state, optimal: false }, new Set())).toEqual([]);
+  });
+});
+
+// Synthetic calibrated scores test eligibility only; retained measurements are unjudged.
+function quality(overrides: Partial<VideoQualityMetricResult> = {}): VideoQualityAssessment {
+  const metric: VideoQualityMetricResult = {
+    value: 4,
+    status: 'pass',
+    direction: 'higher',
+    evaluatorId: 'fixture-human',
+    evaluatorVersion: 'fixture-v1',
+    evaluatorSha256: 'b'.repeat(64),
+    samples: 20,
+    total: 20,
+    calibration: {
+      status: 'calibrated',
+      cohortId: 'fixture-calibration',
+      threshold: 3,
+      provenance: 'fixture://preregistered',
+      frozenAt: '2026-09-01T00:00:00Z',
+    },
+  };
+  return {
+    scale: 'ordinal_0_to_4',
+    contractId: 'fixture-protocol',
+    contractSha256: 'a'.repeat(64),
+    rubricVersion: 'fixture-v1',
+    rubricSha256: 'c'.repeat(64),
+    metrics: {
+      prompt_adherence: { ...metric, ...overrides },
+      visual_fidelity: { ...metric },
+      temporal_consistency: { ...metric },
+      motion_plausibility: { ...metric },
+      audio_quality: { ...metric },
+      audio_content: { ...metric },
+      av_sync: { ...metric },
+    },
+  };
+}
+
+describe('quality-qualified frontier', () => {
+  it('retains a declared calibrated zero and excludes a faster point failing another dimension', () => {
+    const zero = quality({
+      value: 0,
+      calibration: { ...quality().metrics.prompt_adherence!.calibration!, threshold: 0 },
+    });
+    const failed = quality();
+    failed.metrics.audio_content = { ...failed.metrics.audio_content!, status: 'fail' };
+    const points = [
+      cell({ quality: zero }),
+      cell({ id: 'faster-audio-failure', participating: 2, p90: 10, quality: failed }),
+    ];
+    for (const optimal of [true, false]) {
+      const selected = { ...state, optimal, y: 'quality' as const, qualityThreshold: 0 };
+      expect(plot(points, selected).plotted.map((p) => [p.id, p.y])).toEqual([[base.id, 0]]);
+      expect(ids(listedVideoCells(points, selected, new Set()))).toEqual([base.id]);
+    }
+  });
+  it('filters before dominance and applies the same eligibility with Optimal Only off', () => {
+    const accepted = cell({ quality: quality() });
+    const below = cell({
+      id: 'fast-low-quality',
+      participating: 2,
+      p90: 10,
+      wallSeconds: 200,
+      quality: quality({ value: 3 }),
+    });
+    const unjudged = cell({ id: 'fast-unjudged', participating: 8, p90: 20, wallSeconds: 200 });
+    for (const optimal of [true, false]) {
+      const selected = { ...state, optimal, qualityThreshold: 4 };
+      expect(ids(plot([below, unjudged, accepted], selected).plotted)).toEqual([base.id]);
+      expect(ids(listedVideoCells([below, unjudged, accepted], selected, new Set()))).toEqual([
+        base.id,
+      ]);
+    }
+  });
+  it('keeps evaluator and calibration cohorts separate even when each score is eligible', () => {
+    const first = cell({ quality: quality() });
+    const other = cell({
+      id: 'other-evaluator',
+      participating: 2,
+      p90: 10,
+      wallSeconds: 200,
+      quality: quality({ evaluatorVersion: 'fixture-v2' }),
+    });
+    const result = plot([first, other], { ...state, y: 'quality' });
+    expect(ids(result.plotted)).toEqual([base.id, 'other-evaluator']);
+    expect(result.plotted.map((p) => p.y)).toEqual([4, 4]);
+    expect(Object.values(result.frontiers).every((group) => group.length === 1)).toBe(true);
+    expect(result.multiLayout).toBe(false);
+  });
+  it('returns no quality table or chart rows for uncalibrated retained measurements', () => {
+    for (const optimal of [true, false]) {
+      const selected = { ...state, optimal, y: 'quality' as const };
+      expect(plot(h200, selected).plotted).toEqual([]);
+      expect(listedVideoCells(h200, selected, new Set())).toEqual([]);
+    }
   });
 });
