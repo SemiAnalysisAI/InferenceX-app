@@ -4,7 +4,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { benchmarkCurveScope } from '@semianalysisai/inferencex-constants';
 import type { DbClient } from '../connection';
 import { stablePowerPointIdentity } from '../etl/power-publication';
-import { type CurvePoint, publishedCurve } from '../etl/required-power-curve';
+import { loadStoredCurvePoints, publishedCurve } from '../etl/required-power-curve';
 import { applyBenchmarkPointBackfill } from '../etl/run-overrides';
 import { getAllBenchmarksForHistory, getBenchmarksForRun, getLatestBenchmarks } from './benchmarks';
 
@@ -87,28 +87,8 @@ interface CurveEntry {
 }
 const byEntry = (a: CurveEntry, b: CurveEntry) =>
   a.scope.localeCompare(b.scope) || a.point.localeCompare(b.point) || a.run - b.run;
-/** The stored-point query of preflightRequiredPowerCurves, restricted to one model. */
-async function loadCurvePoints(): Promise<CurvePoint[]> {
-  const rows = await sql`
-    SELECT c.*, br.benchmark_type, br.isl, br.osl, br.conc, br.offload_mode,
-      br.recipe_fingerprint, br.image, br.date::text AS point_date,
-      wr.id AS workflow_run_id, wr.github_run_id, wr.run_attempt,
-      wr.run_started_at::text, wr.append_only
-    FROM benchmark_results br
-    JOIN configs c ON c.id = br.config_id
-    JOIN latest_workflow_runs wr ON wr.id = br.workflow_run_id
-    WHERE br.error IS NULL AND c.model = ${CURVE_MODEL}`;
-  return rows.map((row): CurvePoint => ({
-    identity: row,
-    image: row.image as string | null,
-    workflowRunId: Number(row.workflow_run_id),
-    githubRunId: Number(row.github_run_id),
-    runAttempt: Number(row.run_attempt),
-    date: String(row.point_date),
-    runStartedAt: row.run_started_at as string | null,
-    appendOnly: Boolean(row.append_only),
-  }));
-}
+/** The preflight's own stored-point loader, restricted to one model; no run has GitHub id 0. */
+const loadCurvePoints = () => loadStoredCurvePoints(sql, [CURVE_MODEL], 0);
 /**
  * publishedCurve has no SQL execution of its own, so this is the only place the TypeScript
  * projection and both PostgreSQL read paths are held to one answer. The TypeScript snapshot

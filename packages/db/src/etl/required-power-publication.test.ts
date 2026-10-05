@@ -306,7 +306,7 @@ describe('required power publication contract', () => {
     write(dir, 'results_bmk/agg.json', rows);
     expect(() => verifyRequiredPowerArtifacts(dir, source)).toThrow('conflicting');
   });
-  it('retains every required identity after local purges and backfills, naming the stage', () => {
+  it('names the stage when a required identity is missing or a power field differs', () => {
     const required = verifyRequiredPowerArtifacts(golden, source);
     const dropped = [{ ...required[0], conc: 2 }];
     expect(() => assertRequiredPowerPointsRetained(required, dropped, 'before_write')).toThrow(

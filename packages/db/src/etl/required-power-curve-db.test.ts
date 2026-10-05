@@ -55,7 +55,7 @@ describe('read-only required-power DB preflight', () => {
     const published = await getLatestBenchmarks(sql, 'qwen3.5', '9999-12-31');
     expect(published.map((row) => row.conc)).toEqual([1, 64]);
   });
-  it('verifies and plans from the lent artifact read', async () => {
+  it('verifies from the lent artifact read instead of the root', async () => {
     await expect(
       preflightRequiredPowerCurves(sql, golden, source, options, () => []),
     ).rejects.toThrow('missing benchmark point');
