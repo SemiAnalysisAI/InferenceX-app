@@ -636,7 +636,7 @@ function ProfitEstimatorInner({
   }, [getUrlParam]);
   const [cacheHitMode, setCacheHitMode] = useState<CacheHitMode>('actual');
   useEffect(() => {
-    const value = getUrlParam('c_cache');
+    const value = getUrlParam('c_chmode');
     setCacheHitMode(value === 'theoretical' ? 'theoretical' : 'actual');
   }, [getUrlParam]);
   const utilization = usePercentField(DEFAULT_UTILIZATION_PCT, 'profit_utilization_set');
@@ -1648,7 +1648,7 @@ function ProfitEstimatorInner({
                           const next = values[0];
                           if (next !== 'actual' && next !== 'theoretical') return;
                           setCacheHitMode(next);
-                          setUrlParam('c_cache', next === 'actual' ? '' : next);
+                          setUrlParam('c_chmode', next === 'actual' ? '' : next);
                           track('profit_cache_hit_mode_changed', { mode: next });
                         }}
                         open={openDropdown === 'cacheHit'}
