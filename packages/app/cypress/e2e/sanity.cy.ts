@@ -191,11 +191,11 @@ describe('Theme Toggle', () => {
     pickTheme('gta');
     cy.get('html').should('have.class', 'gta');
     cy.get('[data-testid="gta-theme-banner"]').should('be.visible');
-    cy.get('[data-testid="gta-theme-banner"] .gta-logo')
-      .should('have.attr', 'alt', 'Grand Theft Auto V')
-      .and(($img) => {
-        expect(($img[0] as HTMLImageElement).naturalWidth).to.be.greaterThan(0);
-      });
+    cy.get('[data-testid="gta-theme-banner"] .gta-wordmark')
+      .should('have.attr', 'aria-label', 'Grand Theft InferenceX')
+      .and('have.text', 'GrandTheftInferenceX')
+      .and('have.css', 'font-family')
+      .and('match', /Pricedown/i);
     cy.get('[data-testid="gta-theme-banner"] .gta-banner-art img').should(($img) => {
       expect(($img[0] as HTMLImageElement).naturalWidth).to.be.greaterThan(0);
     });

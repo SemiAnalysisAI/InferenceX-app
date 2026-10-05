@@ -38,18 +38,13 @@ export function GtaThemeBanner() {
           />
         </picture>
         <div className="gta-banner-shade" aria-hidden="true" />
-        <div className="gta-banner-identity">
-          <img
-            className="gta-logo"
-            src="/decorative/gta/gtav-logo.webp"
-            alt="Grand Theft Auto V"
-            width={360}
-            height={318}
-            decoding="async"
-            draggable={false}
-          />
-          <p className="gta-wordmark">InferenceX</p>
-        </div>
+        <p className="gta-wordmark" aria-label="Grand Theft InferenceX">
+          <span aria-hidden="true">Grand</span>
+          <span aria-hidden="true">Theft</span>
+          <span aria-hidden="true" className="gta-wordmark-big">
+            InferenceX
+          </span>
+        </p>
         <div className="gta-wanted" role="img" aria-label="Wanted level: five stars">
           {[0, 1, 2, 3, 4].map((i) => (
             <Star key={i} />
