@@ -83,12 +83,14 @@ import { useLocale } from '@/lib/use-locale';
 import { getDisplayLabel } from '@/lib/utils';
 
 import {
+  applyCacheHitMode,
   clampPercent,
   DEFAULT_UTILIZATION_PCT,
   listPricingToTokenRevenuePricing,
   modelsWithAgenticData,
   parseTokenPriceInput,
   profitModelDefaults,
+  type CacheHitMode,
   type ProfitBasis,
   type ProfitEstimatorRow,
   type ProfitEstimatorSkipReason,
@@ -235,6 +237,13 @@ const STRINGS = {
     targetAgenticLabel: (percentile: string) => `Target ${percentile} Interactivity (tok/s/user)`,
     targetAgenticTooltip: (percentile: string) =>
       `The ${percentile} interactivity operating point used for agentic workload interpolation.`,
+    cacheHitLabel: 'Cache Hit Rates',
+    cacheHitTooltip:
+      'Which cache hit rate to use for cached-input pricing. Actual uses the server-measured rate from the benchmark run. Theoretical uses the infinite-cache rate computed from the trace, representing the maximum reuse potential with unbounded cache capacity — an upper-bound revenue estimate.',
+    cacheHitOptions: {
+      actual: 'Actual',
+      theoretical: 'Theoretical',
+    } satisfies Record<CacheHitMode, string>,
     utilizationLabel: 'Utilization (%)',
     utilizationTooltip:
       'Utilization % factors in the swings & dips of token traffic throughout day & night in addition to efficiency losses of scaling out large scale deployments.',
@@ -353,6 +362,13 @@ const STRINGS = {
     targetAgenticLabel: (percentile: string) => `目标 ${percentile} 交互性 (tok/s/user)`,
     targetAgenticTooltip: (percentile: string) =>
       `用于智能体工作负载插值的 ${percentile} 交互性操作点。`,
+    cacheHitLabel: 'Cache 命中率',
+    cacheHitTooltip:
+      '缓存输入定价使用的 cache 命中率。Actual 使用基准测试运行中服务端实测的命中率。Theoretical 使用 trace 计算的无限缓存理论命中率，代表缓存容量无限时的最大复用潜力——一种收入上限估算。',
+    cacheHitOptions: {
+      actual: 'Actual',
+      theoretical: 'Theoretical',
+    } satisfies Record<CacheHitMode, string>,
     utilizationLabel: '利用率 (%)',
     utilizationTooltip:
       '利用率 % 考虑了 token 流量在昼夜间的起伏波动，以及大规模部署横向扩展时的效率损失。',
@@ -617,6 +633,11 @@ function ProfitEstimatorInner({
   useEffect(() => {
     const value = getUrlParam('c_power');
     setPowerBasis(value === 'modeled' || value === 'compare' ? value : 'provisioned');
+  }, [getUrlParam]);
+  const [cacheHitMode, setCacheHitMode] = useState<CacheHitMode>('actual');
+  useEffect(() => {
+    const value = getUrlParam('c_chmode');
+    setCacheHitMode(value === 'theoretical' ? 'theoretical' : 'actual');
   }, [getUrlParam]);
   const utilization = usePercentField(DEFAULT_UTILIZATION_PCT, 'profit_utilization_set');
   const labCut = usePercentField(
@@ -1010,8 +1031,9 @@ function ProfitEstimatorInner({
           }),
         ]
       : current;
+    const pricedResults = applyCacheHitMode(results, cacheHitMode);
     const estimated = estimateProfitByPower(
-      results,
+      pricedResults,
       (hwKey) => ({
         powerKwPerGpu: getGpuSpecs(hwKey).power,
         costPerGpuHour: costPerGpuHourFor(hwKey),
@@ -1033,6 +1055,7 @@ function ProfitEstimatorInner({
     hasData,
     pricing,
     getResults,
+    cacheHitMode,
     powerBasis,
     t.powerBarLabels,
     targetValue,
@@ -1521,6 +1544,7 @@ function ProfitEstimatorInner({
     const [sku, precision, ...rest] = t.csvHeaders[basis];
     exportToCsv(exportFileName, [sku, precision, t.csvDateHeader, ...rest], rows, [
       t.captionFormula[basis](assumptions.utilizationPct, assumptions.labCutPct),
+      `${t.cacheHitLabel}: ${t.cacheHitOptions[cacheHitMode]}`,
       ...(powerControlsEnabled
         ? [
             `${t.powerLabel}: ${t.powerOptions[powerBasis]}`,
@@ -1536,6 +1560,7 @@ function ProfitEstimatorInner({
     assumptions,
     basis,
     selectedRunDate,
+    cacheHitMode,
     powerBasis,
     powerControlsEnabled,
   ]);
@@ -1604,6 +1629,38 @@ function ProfitEstimatorInner({
                       onChange={handleTargetChange}
                       onBlur={handleTargetBlur}
                     />
+                  </div>
+                  <div className="flex min-w-0 flex-col space-y-1.5 md:col-span-2">
+                    <LabelWithTooltip
+                      htmlFor="profit-cache-hit"
+                      label={t.cacheHitLabel}
+                      tooltip={t.cacheHitTooltip}
+                    />
+                    <div data-testid="profit-cache-hit-selector">
+                      <MultiSelect
+                        triggerId="profit-cache-hit"
+                        options={Object.entries(t.cacheHitOptions).map(([value, label]) => ({
+                          value,
+                          label,
+                        }))}
+                        value={[cacheHitMode]}
+                        onChange={(values) => {
+                          const next = values[0];
+                          if (next !== 'actual' && next !== 'theoretical') return;
+                          setCacheHitMode(next);
+                          setUrlParam('c_chmode', next === 'actual' ? '' : next);
+                          track('profit_cache_hit_mode_changed', { mode: next });
+                        }}
+                        open={openDropdown === 'cacheHit'}
+                        onOpenChange={handleDropdownOpenChange('cacheHit')}
+                        minSelections={1}
+                        maxSelections={1}
+                        showClearAll={false}
+                        searchable={false}
+                        plainSelectedText
+                        showSelectionSummary={false}
+                      />
+                    </div>
                   </div>
                   {powerControlsEnabled && (
                     <div className="flex min-w-0 flex-col space-y-1.5 md:col-span-2">
