@@ -13,6 +13,17 @@ const point: PointMeta = {
   spec_method: 'none',
   disagg: false,
   is_multinode: false,
+  prefill_tp: 8,
+  prefill_ep: 1,
+  prefill_dp_attention: false,
+  prefill_num_workers: 1,
+  decode_tp: 8,
+  decode_ep: 8,
+  decode_dp_attention: true,
+  decode_num_workers: 4,
+  num_prefill_gpu: 8,
+  num_decode_gpu: 32,
+  recipe_fingerprint: 'measured-recipe',
   conc: 8,
   offload_mode: 'on',
   kv_offloading: 'dram',
@@ -43,6 +54,10 @@ describe('cacheReuseHref', () => {
     expect(url.searchParams.get('i_seq')).toBe('agentic-traces');
     expect(url.searchParams.get('i_prec')).toBe('fp4');
     expect(url.searchParams.get('c_cfg')).toBe('b200_sglang');
+    expect(url.searchParams.get('c_recipe')).toBe(
+      'agg|sn|p1x8/1/-|d4x8/8/dpa|g8+32|spec-none|offload-on|fp-measured-recipe',
+    );
+    expect(url.searchParams.get('g_rundate')).toBe('2026-09-17');
   });
 
   it('leaves unknown model buckets and precisions to the store', () => {

@@ -1,5 +1,6 @@
 import { DB_MODEL_TO_DISPLAY } from '@semianalysisai/inferencex-constants';
 
+import { cacheReuseRecipeKey } from '@/components/calculator/cache-reuse';
 import type { PointMeta } from '@/hooks/api/use-trace-server-metrics';
 import type { AggDataEntry } from '@/components/inference/types';
 import { getHardwareKey } from '@/lib/chart-utils';
@@ -30,6 +31,9 @@ export function cacheReuseHref(locale: Locale, point?: PointMeta): string {
     params.set('i_prec', point.precision);
   }
   params.set('c_cfg', pointHardwareKey(point));
+  params.set('c_recipe', cacheReuseRecipeKey(point));
+  params.set('g_rundate', point.date);
+  params.delete('g_runid');
   return `${path}?${params.toString()}`;
 }
 

@@ -1,3 +1,5 @@
+import { DISPLAY_MODEL_TO_DB } from '@semianalysisai/inferencex-constants/models';
+
 import type { ExclusionConflictPolicy, ExclusionSpec } from './exclusion';
 
 export enum Model {
@@ -363,7 +365,10 @@ export function getChartWatermark(isUnofficialRun = false): 'logo' | 'unofficial
 export const MODEL_PREFIX_MAPPING: Record<string, Model> = Object.fromEntries(
   (Object.entries(MODEL_CONFIG) as [Model, (typeof MODEL_CONFIG)[Model]][])
     .filter(([, c]) => c.prefix)
-    .map(([m, c]) => [c.prefix, m]),
+    // Include every DB point-release alias, while retaining legacy artifact prefixes.
+    .flatMap(([m, c]) =>
+      [...new Set([c.prefix, ...(DISPLAY_MODEL_TO_DB[m] ?? [])])].map((prefix) => [prefix, m]),
+    ),
 );
 
 // Specific point-release prefixes must win over family prefixes such as
@@ -596,11 +601,9 @@ export function getSequenceCategoryForModel(sequence: Sequence, model?: Model | 
  * only the default for readers who have not chosen changes, so these charts
  * open with every configuration visible.
  *
- * Qwen3.5 397B: both the 8K/1K sweep and Agentic coding open with all configs.
+ * Keep defaults aligned with the read-only inference view API.
  */
-const MODEL_BEST_PER_SKU_DEFAULT_OFF: Partial<Record<Model, ReadonlySet<Sequence>>> = {
-  [Model.Qwen3_5]: new Set([Sequence.EightK_OneK, Sequence.AgenticTraces]),
-};
+const MODEL_BEST_PER_SKU_DEFAULT_OFF: Partial<Record<Model, ReadonlySet<Sequence>>> = {};
 
 /** Whether Best per SKU defaults to off for this model and scenario. */
 export function isBestPerSkuDefaultOff(

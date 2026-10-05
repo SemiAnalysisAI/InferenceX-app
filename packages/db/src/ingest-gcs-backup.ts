@@ -34,11 +34,9 @@ import path from 'path';
 import { confirm, hasNoSslFlag, hasYesFlag } from './cli-utils';
 import { createAdminSql, refreshLatestBenchmarks } from './etl/db-utils';
 import {
-  applyBenchmarkPointBackfill,
   applyChangelogBackfills,
-  isBenchmarkPointPurged,
+  planBenchmarkPoint,
   PURGED_RUNS,
-  recordBackfilledPointIdentity,
   validateRunBackfills,
 } from './etl/run-overrides';
 import { createSkipTracker, type Skips } from './etl/skip-tracker';
@@ -648,17 +646,12 @@ async function main(): Promise<void> {
           tracker.recordDbError(`config for ${zipFile}`, error);
           continue;
         }
-        if (
-          isBenchmarkPointPurged(result.githubRunId, result.ghInfo?.runAttempt, {
-            configId,
-            benchmarkType: row.benchmarkType,
-            isl: row.isl,
-            osl: row.osl,
-            conc: row.conc,
-            offloadMode: row.offloadMode,
-            recipeFingerprint: row.recipeFingerprint,
-          })
-        ) {
+        const plan = planBenchmarkPoint(
+          { githubRunId: result.githubRunId, runAttempt: result.ghInfo?.runAttempt },
+          { ...row, configId },
+          seenPointIdentities,
+        );
+        if (plan.kind === 'purged') {
           console.log(
             `  [${result.dateDir}] skipped purged benchmark point: config ${configId}, ` +
               `${row.benchmarkType}, isl ${row.isl}, osl ${row.osl}, conc ${row.conc}, ` +
@@ -666,22 +659,13 @@ async function main(): Promise<void> {
           );
           continue;
         }
-        const applied = applyBenchmarkPointBackfill(result.githubRunId, result.ghInfo?.runAttempt, {
-          ...row,
-          configId,
-        });
-        recordBackfilledPointIdentity(
-          seenPointIdentities,
-          applied.sourceIdentity,
-          applied.desiredIdentity,
-        );
-        if (applied.backfillId) {
+        if (plan.backfillId) {
           console.log(
             `  [${result.dateDir}] applied benchmark point backfill ` +
-              `${applied.backfillId}: config ${configId}, conc ${row.conc}`,
+              `${plan.backfillId}: config ${configId}, conc ${row.conc}`,
           );
         }
-        toInsert.push(applied.point);
+        toInsert.push(plan.point);
       }
       if (toInsert.length > 0) {
         try {

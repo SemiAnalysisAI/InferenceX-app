@@ -395,8 +395,9 @@ describe('Profit Estimator per GW', () => {
     chart().should('contain.text', 'Model License Fee').and('contain.text', 'Profit');
     cy.get('[data-testid="profit-caption"] h2').should(
       'contain.text',
-      'Revenue & Profit Estimates per GigaWatt Per Year at P90 45 tok/s/user Interactivity',
+      'Revenue & Profit Estimates per GigaWatt Per Year at P90 45 tok/s/user Interactivity (Beta)',
     );
+    cy.contains('Revenue & Profit Estimator per GigaWatt (Beta)').should('be.visible');
     cy.get('[data-testid="result-context-cost-tier"]').should(
       'contain.text',
       'Owning at Large Hyperscaler Volume',
@@ -1387,7 +1388,10 @@ describe('Profit Estimator per GW — Chinese mirror', () => {
     chart().should('contain.text', '模型许可费').and('contain.text', '利润');
     cy.get('[data-testid="profit-benchmark-panel"] legend').should('have.text', '基准测试配置');
     cy.get('[data-testid="profit-pricing-panel"] legend').should('have.text', '定价配置');
-    cy.get('[data-testid="profit-caption"] h2').should('contain.text', '每吉瓦每年收入与利润估算');
+    cy.get('[data-testid="profit-caption"] h2')
+      .should('contain.text', '每吉瓦每年收入与利润估算')
+      .and('contain.text', '（Beta）');
+    cy.contains('每吉瓦收入与利润估算器（Beta）').should('be.visible');
     openFormulaNotes();
     cy.get('[data-testid="profit-formula-notes"]').should('contain.text', '利用率');
   });
@@ -1415,7 +1419,7 @@ describe('Profit Estimator (per chip-hour)', () => {
     cy.get('[data-testid="profit-lab-cut-input"]').should('have.value', '30');
     cy.get('[data-testid="profit-caption"] h2').should(
       'contain.text',
-      'Kimi K3 2.8T Agentic Revenue & Profit Estimates per Chip per Hour at P90 45 tok/s/user Interactivity',
+      'Kimi K3 2.8T Agentic Revenue & Profit Estimates per Chip per Hour at P90 45 tok/s/user Interactivity (Beta)',
     );
     // The chip-hour basis reads like a renter's P&L, so it opens on the
     // 3-year-commit rental tier rather than the owning tier the GW-year page uses.

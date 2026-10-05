@@ -28,6 +28,7 @@ import { type Locale } from '@/lib/i18n';
 import { useLocale } from '@/lib/use-locale';
 import { useClientSearchParams } from '@/hooks/useClientSearch';
 
+import { correlationYMetric } from './chart-data';
 import GpuCorrelationChart from './GpuCorrelationChart';
 import GpuMetricsChart from './GpuPowerChart';
 import GpuStatsTable from './GpuStatsTable';
@@ -235,13 +236,8 @@ export default function GpuMetricsDisplay() {
   const [chartView, setChartView] = useState<GpuMetricsView>('chart');
   const [corrXMetric, setCorrXMetric] = useState<GpuMetricKey>('power');
   const [corrYMetric, setCorrYMetric] = useState<GpuMetricKey>('temperature');
-  // A power-only series (multinode DCGM bundle) has no temperature axis to
-  // default to; use the first other collected metric instead of an empty plot.
-  const effectiveCorrYMetric = useMemo<GpuMetricKey>(
-    () =>
-      availableMetrics.some((m) => m.key === corrYMetric)
-        ? corrYMetric
-        : (availableMetrics.find((m) => m.key !== corrXMetric)?.key ?? corrXMetric),
+  const effectiveCorrYMetric = useMemo(
+    () => correlationYMetric(availableMetrics, corrXMetric, corrYMetric),
     [availableMetrics, corrXMetric, corrYMetric],
   );
   const [display, setDisplay] = useState<TelemetryDisplayState>(DEFAULT_TELEMETRY_DISPLAY);

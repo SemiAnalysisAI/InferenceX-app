@@ -23,7 +23,6 @@
  */
 
 import fs from 'fs';
-import { createHash } from 'node:crypto';
 import {
   powerPublicationPoint,
   publicationIdentity,
@@ -46,11 +45,9 @@ import {
 import { pairServerLogArtifacts } from './lib/server-log-backfill';
 import { createAdminSql, refreshLatestBenchmarks } from './etl/db-utils';
 import {
-  applyBenchmarkPointBackfill,
   applyChangelogBackfills,
-  isBenchmarkPointPurged,
   isRunAttemptPurged,
-  recordBackfilledPointIdentity,
+  planBenchmarkPoint,
   validateRunBackfills,
 } from './etl/run-overrides';
 import { createSkipTracker } from './etl/skip-tracker';
@@ -61,7 +58,8 @@ import {
   flattenReusedIngestArtifactBundle,
   readReusedIngestMetadata,
 } from './etl/reused-ingest-metadata';
-import { mapBenchmarkRow, type BenchmarkParams } from './etl/benchmark-mapper';
+import type { BenchmarkParams } from './etl/benchmark-mapper';
+import { readBenchmarkArtifacts, type BenchmarkArtifactFile } from './etl/benchmark-artifacts';
 import { preflightRequiredPowerCurves } from './etl/required-power-curve';
 import {
   assertRequiredPowerPointsRetained,
@@ -83,9 +81,14 @@ import { discoverTraceReplayArtifacts } from './etl/trace-artifact-discovery';
 import { discoverServerLogArtifacts, readServerLogArtifact } from './etl/server-log-artifacts';
 import {
   discoverGpuMetricsArtifacts,
+  expectedTelemetryArtifactNames,
   readPowerAuditValidations,
 } from './etl/gpu-metrics-artifacts';
-import { createBenchmarkPowerAuditRecovery } from './etl/power-audit-recovery';
+import {
+  agentxWindowPlan,
+  attachAgentxAudits,
+  type AgentxWindowPlan,
+} from './etl/power-audit-recovery';
 import { ingestGpuMetricsArtifact } from './etl/gpu-metrics-ingest';
 import { readTelemetryReceipt, type TelemetryObservation } from './etl/telemetry-receipt';
 import { datasetSlugFromBenchmarkRow } from './etl/dataset-provenance';
@@ -263,7 +266,6 @@ const sql = createAdminSql({
 
 /** Key aggregate artifacts produced by the benchmark CI. */
 const ARTIFACT_NAMES = {
-  benchmarks: 'results_bmk',
   runStats: 'run-stats',
   evals: 'eval_results_all',
   changelog: 'changelog-metadata',
@@ -353,6 +355,11 @@ async function main(): Promise<void> {
       console.log(`  PR #${pr.number}:      ${pr.htmlUrl}`);
     }
   }
+
+  // One read of the run's benchmark JSON for verification and the ingest loop.
+  let benchmarkFilesRead: BenchmarkArtifactFile[] | undefined;
+  const benchmarkFiles = () =>
+    (benchmarkFilesRead ??= readBenchmarkArtifacts(artifactsDir, { runId: runIdStr, tracker }));
 
   const requiredPowerPoints = verifyRequiredPowerArtifacts(
     artifactsDir,
@@ -508,17 +515,6 @@ async function main(): Promise<void> {
   if (evalsOnly) {
     console.log('  Skipped (evals-only run)');
   } else {
-    const bmkDir = path.join(artifactsDir, ARTIFACT_NAMES.benchmarks);
-    const bmkFiles = findJsonFiles(bmkDir);
-
-    const allBmkDirs = fs.existsSync(artifactsDir)
-      ? fs
-          .readdirSync(artifactsDir)
-          .filter((d) => d.startsWith('bmk_') || d.startsWith('results_'))
-          .map((d) => path.join(artifactsDir, d))
-          .filter((d) => fs.statSync(d).isDirectory())
-      : [];
-
     const serverLogArtifacts = discoverServerLogArtifacts(artifactsDir);
     if (serverLogArtifacts.size > 0) {
       console.log(`  Found ${serverLogArtifacts.size} server log artifact(s)`);
@@ -553,56 +549,41 @@ async function main(): Promise<void> {
       );
     }
 
-    const allBmkFiles = [...bmkFiles, ...allBmkDirs.flatMap((d) => findJsonFiles(d))];
+    const files = benchmarkFiles();
     const seenPointIdentities = new Map<string, string>();
-    const recoverPowerAudit = createBenchmarkPowerAuditRecovery();
-    console.log(`  Found ${allBmkFiles.length} benchmark JSON file(s)`);
+    console.log(`  Found ${files.length} benchmark JSON file(s)`);
 
-    for (const [fileIndex, file] of allBmkFiles.entries()) {
+    for (const [fileIndex, file] of files.entries()) {
       const fileStart = Date.now();
-      const relativeFile = path.relative(artifactsDir, file);
-      const artifactSha256 = createHash('sha256').update(fs.readFileSync(file)).digest('hex');
+      const relativeFile = file.path;
       console.log(
-        `  [${fileIndex + 1}/${allBmkFiles.length}] ${relativeFile} (${formatBytes(fileSize(file))})`,
+        `  [${fileIndex + 1}/${files.length}] ${relativeFile} (${formatBytes(file.bytes)})`,
       );
-      const data = readJson(file);
-      if (!data) {
+      if (file.unreadable !== undefined) {
+        console.warn(`  [WARN] Failed to parse ${relativeFile}: ${file.unreadable}`);
         telemetryExpectationsUnknown = true;
         powerPublicationErrors.push(`Unreadable benchmark JSON: ${relativeFile}`);
         console.log(`    skipped unreadable JSON (${elapsed(fileStart)})`);
+        console.log(`    raw rows: ${file.rows.length + file.nonObjectRows}`);
         continue;
       }
+      console.log(`    raw rows: ${file.rows.length + file.nonObjectRows}`);
 
-      const rawRows: Record<string, any>[] = Array.isArray(data)
-        ? data
-        : [data as Record<string, any>];
-      console.log(`    raw rows: ${rawRows.length}`);
-
-      for (const rawRow of rawRows) {
-        if (!rawRow || typeof rawRow !== 'object') continue;
-        const datasetSlug = datasetSlugFromBenchmarkRow(rawRow);
+      for (const { raw } of file.rows) {
+        const datasetSlug = datasetSlugFromBenchmarkRow(raw);
         if (datasetSlug) datasetSlugs.add(datasetSlug);
       }
 
-      let fileExpectationsUnknown = false;
-      const rows = rawRows
-        .filter((r) => {
-          const isRow = typeof r === 'object' && r !== null;
-          if (!isRow) fileExpectationsUnknown = true;
-          return isRow;
-        })
-        .map((r) => {
-          const failedRuns = tracker.skips.failedRun;
-          const mapped = mapBenchmarkRow(r, tracker, undefined, runIdStr);
-          // Known failed benchmarks are intentionally excluded; unmappable rows
-          // leave an unknown number of successful attachment expectations.
-          if (!mapped && tracker.skips.failedRun === failedRuns) fileExpectationsUnknown = true;
-          if (!mapped && Number(r.isl) === 8192 && Number(r.osl) === 1024) {
-            powerPublicationErrors.push(`Unmapped or failed 8K/1K result: ${relativeFile}`);
-          }
-          return mapped;
-        })
-        .filter((r): r is NonNullable<typeof r> => r !== null);
+      // Known failed benchmarks are intentionally excluded; non-object entries
+      // and unmappable rows leave an unknown number of attachment expectations.
+      let fileExpectationsUnknown = file.nonObjectRows > 0;
+      const rows = file.rows.flatMap(({ raw, mapped, failed }) => {
+        if (!mapped && !failed) fileExpectationsUnknown = true;
+        if (!mapped && Number(raw.isl) === 8192 && Number(raw.osl) === 1024) {
+          powerPublicationErrors.push(`Unmapped or failed 8K/1K result: ${relativeFile}`);
+        }
+        return mapped ? [mapped] : [];
+      });
       if (fileExpectationsUnknown) telemetryExpectationsUnknown = true;
 
       console.log(`    mapped rows: ${rows.length}`);
@@ -611,22 +592,22 @@ async function main(): Promise<void> {
         continue;
       }
 
-      const toInsert = [];
-      const parentDir = path.basename(path.dirname(file));
+      const parentDir = path.posix.basename(path.posix.dirname(file.path));
       const configKey = parentDir.replace(/^bmk_/u, '');
       const suffix = stripBmkAndAgenticPrefix(parentDir);
       const gpuMetricsArtifact =
         gpuMetricsArtifacts.get(configKey) ?? gpuMetricsArtifacts.get(suffix);
-      let auditEvidence;
+      // The telemetry bundle paired with a per-job agentic artifact owns the
+      // retained windows its points may carry.
+      let windows: AgentxWindowPlan = new Map();
       if (parentDir.startsWith('bmk_agentic_') && gpuMetricsArtifact) {
         try {
-          auditEvidence = {
-            resultFile: path.basename(file),
-            validations: readPowerAuditValidations(
+          windows = agentxWindowPlan(
+            readPowerAuditValidations(
               gpuMetricsArtifact.artifactDir,
               gpuMetricsArtifact.artifactName,
             ),
-          };
+          );
         } catch (error) {
           tracker.recordTelemetryError(
             `power audit for ${configKey}`,
@@ -634,26 +615,22 @@ async function main(): Promise<void> {
           );
         }
       }
+      const resolved: (BenchmarkParams & { configId: number })[] = [];
       for (const row of rows) {
         let configId: number;
         try {
           configId = await getOrCreateConfig(row.config);
         } catch (error: any) {
           telemetryExpectationsUnknown = true;
-          tracker.recordDbError(`config for ${path.basename(file)}`, error);
+          tracker.recordDbError(`config for ${path.posix.basename(file.path)}`, error);
           continue;
         }
-        if (
-          isBenchmarkPointPurged(runIdNum, runAttemptNum, {
-            configId,
-            benchmarkType: row.benchmarkType,
-            isl: row.isl,
-            osl: row.osl,
-            conc: row.conc,
-            offloadMode: row.offloadMode,
-            recipeFingerprint: row.recipeFingerprint,
-          })
-        ) {
+        const plan = planBenchmarkPoint(
+          { githubRunId: runIdNum, runAttempt: runAttemptNum },
+          { ...row, configId },
+          seenPointIdentities,
+        );
+        if (plan.kind === 'purged') {
           console.log(
             `    skipped purged benchmark point: config ${configId}, ${row.benchmarkType}, ` +
               `isl ${row.isl}, osl ${row.osl}, conc ${row.conc}, offload ${row.offloadMode}, ` +
@@ -661,43 +638,57 @@ async function main(): Promise<void> {
           );
           continue;
         }
-        const applied = applyBenchmarkPointBackfill(runIdNum, runAttemptNum, {
-          ...row,
-          configId,
-        });
-        recordBackfilledPointIdentity(
-          seenPointIdentities,
-          applied.sourceIdentity,
-          applied.desiredIdentity,
-        );
-        if (applied.backfillId) {
+        if (plan.backfillId) {
           console.log(
-            `    applied benchmark point backfill ${applied.backfillId}: ` +
+            `    applied benchmark point backfill ${plan.backfillId}: ` +
               `config ${configId}, conc ${row.conc}`,
           );
         }
-        // Attach exact retained validation metadata before both the receipt and
-        // the upsert. A later aggregate copy must not null this run's recovery.
-        const point = recoverPowerAudit(applied.point, auditEvidence);
+        resolved.push(plan.point);
+      }
+      // Attach exact retained provenance before both the receipt and the upsert,
+      // over the file's resolved points; the upsert keeps it across aggregate
+      // copies of the same point.
+      const attached = attachAgentxAudits(
+        windows,
+        resolved,
+        (point) =>
+          `conc ${point.conc}, offload ${point.offloadMode}, recipe ${point.recipeFingerprint ?? 'legacy'}`,
+      );
+      for (const refusal of attached.refused) {
+        tracker.recordTelemetryError(
+          `power audit for ${configKey}`,
+          new Error(
+            `retained window at concurrency ${refusal.concurrency} covers ` +
+              `${refusal.points.length} points (${refusal.points.join('; ')}); provenance withheld`,
+          ),
+        );
+      }
+      const toInsert = attached.points;
+      for (const point of toInsert) {
         const publication = powerPublicationPoint(
           point,
           `https://github.com/${REPO}/actions/runs/${runIdNum}/attempts/${runAttemptNum}`,
-          { path: relativeFile, sha256: artifactSha256 },
+          { path: relativeFile, sha256: file.sha256 },
         );
-        if (publication)
-          powerPublicationPoints.set(publicationIdentity(publication.identity), publication);
-        toInsert.push(point);
         const identity = benchmarkPublicationIdentity(point);
         const key = stablePowerPointIdentity(identity);
         // Aggregate copies may arrive before/after their per-job sibling. Only
-        // the latter establishes whether that exact telemetry artifact exists.
-        if (parentDir.startsWith('bmk_') || !telemetryObservations.has(key)) {
+        // the latter names the exact source artifact and carries attached
+        // provenance, so it wins the receipt in either order.
+        const sibling = parentDir.startsWith('bmk_');
+        if (publication) {
+          const id = publicationIdentity(publication.identity);
+          if (sibling || !powerPublicationPoints.has(id))
+            powerPublicationPoints.set(id, publication);
+        }
+        if (sibling || !telemetryObservations.has(key)) {
           telemetryObservations.set(key, {
             identity,
             artifactNames: gpuMetricsArtifact
               ? [gpuMetricsArtifact.artifactName]
               : parentDir.startsWith('bmk_')
-                ? [`gpu_metrics_${suffix}`, `power_audit_${suffix}`]
+                ? expectedTelemetryArtifactNames(suffix)
                 : [],
             produced: parentDir.startsWith('bmk_') ? Boolean(gpuMetricsArtifact) : null,
           });
@@ -805,7 +796,7 @@ async function main(): Promise<void> {
           // harness emits `agentic_<suffix>/trace_replay/...` next to the
           // `bmk_agentic_<suffix>` artifact we just ingested.
           if (parentDir.startsWith('bmk_agentic_') && insertedIds.length > 0) {
-            const concMatch = path.basename(file).match(/_conc(?<conc>\d+)\.json$/u);
+            const concMatch = path.posix.basename(file.path).match(/_conc(?<conc>\d+)\.json$/u);
             const trace =
               (concMatch?.groups?.conc
                 ? traceReplayPaths.get(`${suffix}|${concMatch.groups.conc}`)
@@ -884,7 +875,7 @@ async function main(): Promise<void> {
             }
           }
         } catch (error: any) {
-          tracker.recordDbError(path.basename(file), error);
+          tracker.recordDbError(path.posix.basename(file.path), error);
         }
       }
       console.log(`    finished ${relativeFile} (${elapsed(fileStart)})`);
@@ -894,7 +885,7 @@ async function main(): Promise<void> {
       await Promise.all(traceTasks);
     }
     await traceWorkerPool.close();
-    assertRequiredPowerPointsRetained(requiredPowerPoints, retainedPowerPoints);
+    assertRequiredPowerPointsRetained(requiredPowerPoints, retainedPowerPoints, 'after_insert');
     console.log(`  Benchmarks: +${totalNewBmk} new, ${totalDupBmk} dup`);
     if (totalTraceReplayLinked > 0 || tracker.skips.traceReplayMissing > 0) {
       console.log(
