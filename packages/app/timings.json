@@ -233,10 +233,6 @@
       "duration": 1325
     },
     {
-      "spec": "cypress/e2e/performance.cy.ts",
-      "duration": 2377
-    },
-    {
       "spec": "cypress/e2e/profit-estimator.cy.ts",
       "duration": 39450
     },

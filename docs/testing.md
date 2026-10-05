@@ -61,3 +61,22 @@ Server-cache performance regressions must assert source-reader call counts for r
 6. **No shallow Cypress tests** — assert content/behavior, not just visibility
 7. **Regression tests must reproduce the bug** with exact triggering input
 8. **No inline Cypress timeout overrides** — use the global `defaultCommandTimeout` in `cypress.config.ts`. Never pass `{ timeout: N }` to individual commands.
+
+## Removing redundant tests
+
+Before deleting a test, identify the behavior it actually exercises and the retained
+test that covers it. Tests of handwritten copies of production logic do not provide
+regression coverage. Call the production implementation instead; a production-code
+mutation should make the retained test fail.
+
+Keep page-level checks for routing, history, hydration, API wiring, and interactions
+between components. A component test alone does not replace those checks. Within a
+page suite, prefer asserting loaded data and the result of an interaction over
+separate tests that only find the surrounding wrapper or an SVG.
+
+Do not delete a failing or flaky regression merely to make CI green. Record any
+intentional coverage loss, and leave numerical, provenance, authentication, and
+localization guards in place unless their replacement covers the same failure.
+
+See [the September 2026 cleanup audit](./test-cleanup-audit.md) for the removal
+decisions and retained coverage in this cleanup.

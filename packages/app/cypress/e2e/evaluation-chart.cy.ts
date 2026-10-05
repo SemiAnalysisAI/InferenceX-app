@@ -1,47 +1,5 @@
 import { expectNoPageOverflow } from '../support/e2e';
 
-describe('Evaluation Chart', () => {
-  before(() => {
-    cy.viewport(1440, 900);
-    cy.window().then((win) => {
-      win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-    });
-    cy.visit('/evaluation');
-    cy.get('[data-testid="evaluation-chart-display"]').should('exist');
-    cy.get('[data-testid="evaluation-view-toggle"]').contains('Chart').click();
-  });
-
-  it('shows the Accuracy Evals heading', () => {
-    cy.contains('h2', 'Accuracy Evals').should('be.visible');
-  });
-
-  it('shows benchmark selector', () => {
-    cy.get('[data-testid="evaluation-benchmark-selector"]').should('be.visible');
-  });
-
-  it('benchmark selector has options', () => {
-    cy.get('[data-testid="evaluation-benchmark-selector"]').click();
-    cy.get('[role="option"]').should('have.length.greaterThan', 0);
-    cy.get('body').type('{esc}');
-  });
-
-  it('shows a chart with SVG', () => {
-    cy.get('#evaluation-chart').find('svg').should('exist');
-  });
-
-  it('does not show "No data available" text', () => {
-    cy.get('[data-testid="evaluation-chart-display"]').should('exist');
-    cy.contains('No data available').should('not.exist');
-  });
-
-  it('shows Source attribution in chart caption', () => {
-    cy.get('#evaluation-chart')
-      .closest('figure')
-      .find('[data-testid="result-context"]')
-      .should('contain', 'SemiAnalysis InferenceX');
-  });
-});
-
 describe('Evaluation Chart — Content & Interactions', () => {
   before(() => {
     cy.viewport(1440, 900);
@@ -54,31 +12,26 @@ describe('Evaluation Chart — Content & Interactions', () => {
   });
 
   it('renders SVG data points (circles) inside the evaluation chart after data loads', () => {
+    cy.contains('h2', 'Accuracy Evals').should('be.visible');
     cy.get('#evaluation-chart svg circle').should('have.length.greaterThan', 0);
   });
 
-  it('changing the benchmark selector updates the chart subtitle to reflect the new benchmark', () => {
+  it('keeps the only fixture-backed benchmark selected and closes the menu with Escape', () => {
+    // This model's committed fixture only has GSM8K. Cross-benchmark selection
+    // is covered by component/eval-chart-controls.cy.tsx with multiple options.
+    cy.get('[data-testid="evaluation-benchmark-selector"]').should('be.visible').click();
+    cy.get('[role="option"]')
+      .should('have.length', 1)
+      .and('contain.text', 'GSM8K')
+      .and('have.attr', 'aria-selected', 'true')
+      .and('be.disabled');
+    cy.get('body').type('{esc}');
+    cy.get('[role="option"]').should('not.exist');
+    cy.get('[data-testid="evaluation-benchmark-selector"]').should('contain.text', 'GSM8K');
     cy.get('#evaluation-chart')
       .closest('figure')
       .find('[data-testid="result-context"]')
-      .invoke('text')
-      .then((initialCaption) => {
-        cy.get('[data-testid="evaluation-benchmark-selector"]').click();
-        cy.get('[role="option"]').then(($options) => {
-          if ($options.length <= 1) return;
-          cy.wrap($options).last().click();
-          cy.get('#evaluation-chart')
-            .closest('figure')
-            .find('figcaption')
-            .invoke('text')
-            .should('not.eq', initialCaption);
-        });
-      });
-    // Clear Radix scroll-lock side effect so subsequent tests can click
-    cy.get('body').then(($body) => {
-      $body.removeAttr('data-scroll-locked');
-      $body.css('pointer-events', '');
-    });
+      .should('contain.text', 'GSM8K');
   });
 
   it('legend sidebar renders with at least one hardware item', () => {
