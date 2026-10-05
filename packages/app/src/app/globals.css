@@ -3,7 +3,7 @@
 @import './motion.css';
 @plugin '@tailwindcss/typography';
 
-@custom-variant dark (&:is(.dark *, .minecraft *, .csgo *));
+@custom-variant dark (&:is(.dark *, .minecraft *, .csgo *, .gta *));
 @custom-variant minecraft (&:is(.minecraft *));
 
 /* Allow hash navigation to clear the fixed navbar */
@@ -54,11 +54,11 @@
   color: #7e22ce;
 }
 
-:is(.dark, .minecraft, .csgo) .halloween-wordmark {
+:is(.dark, .minecraft, .csgo, .gta) .halloween-wordmark {
   color: #fb923c;
 }
 
-:is(.dark, .minecraft, .csgo) .halloween-wordmark-x {
+:is(.dark, .minecraft, .csgo, .gta) .halloween-wordmark-x {
   color: #c084fc;
 }
 
@@ -300,7 +300,8 @@ html[data-inferencex-embed] .autumn-leaves {
 }
 
 .dark,
-.csgo {
+.csgo,
+.gta {
   /* Base Theme Colors */
   --background: #131416;
   --foreground: #eaebec;
@@ -451,6 +452,281 @@ html[data-inferencex-embed] [data-testid='csgo-theme-banner'] {
   display: none;
 }
 
+/* ── GTA Theme ── GTA V pause-menu chrome over the dark chart palettes. */
+.gta {
+  color-scheme: dark;
+  --background: #0a0a0b;
+  --foreground: #f5f5f5;
+  --card: #111113;
+  --card-foreground: #f5f5f5;
+  --popover: #0d0d0f;
+  --popover-foreground: #f5f5f5;
+  --primary: #72cc72;
+  --primary-foreground: #0a0a0b;
+  --secondary: #5d9bd5;
+  --secondary-foreground: #0a0a0b;
+  --muted: #232326;
+  --muted-foreground: #b8b8bd;
+  --accent: #2c2c30;
+  --accent-foreground: #f5f5f5;
+  --border: #3a3a3f;
+  --border-alt: #26262a;
+  --input: #4a4a50;
+  --ring: #ffffff;
+  --sidebar: #111113;
+  --sidebar-foreground: #f5f5f5;
+  --sidebar-primary: #72cc72;
+  --sidebar-primary-foreground: #0a0a0b;
+  --sidebar-accent: #2c2c30;
+  --sidebar-accent-foreground: #f5f5f5;
+  --sidebar-border: #3a3a3f;
+  --sidebar-ring: #ffffff;
+  --radius: 0.125rem;
+  --gta-display: var(--font-pricedown), 'Pricedown', Impact, sans-serif;
+  --gta-menu: var(--font-chalet-comprime), 'ChaletComprime', 'Arial Narrow', sans-serif;
+}
+
+/* Local Rockstar artwork, mounted only while the GTA theme is active. */
+.gta-scene {
+  position: fixed;
+  inset: 0;
+  z-index: -10;
+  pointer-events: none;
+  overflow: hidden;
+  background: #0a0a0b;
+}
+
+.gta-scene-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 65% center;
+}
+
+.gta-scene-shade {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, #05070999, #050709c9 65%, #050709eb);
+}
+
+.gta-theme-banner {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  min-height: 17rem;
+  margin-block: 0.5rem 1.5rem;
+  padding: 1.5rem 2rem;
+  border-bottom: 4px solid var(--primary);
+  background: #10110f;
+}
+
+.gta-banner-art {
+  position: absolute;
+  inset: 0 0 0 25%;
+  z-index: -2;
+}
+
+.gta-banner-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center top;
+}
+
+.gta-banner-shade {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(90deg, #080a08 0%, #080a08eb 20%, #080a0840 47%, #080a0800 70%);
+}
+
+/* Stacked "Grand Theft InferenceX" wordmark in Pricedown. */
+.gta-wordmark {
+  display: flex;
+  flex-direction: column;
+  font-family: var(--gta-display);
+  font-weight: 700;
+  line-height: 0.82;
+  color: #fff;
+  font-size: clamp(1.6rem, 3.2vw, 2.4rem);
+  -webkit-text-stroke: 4px #000;
+  paint-order: stroke fill;
+  text-shadow: 0 3px 0 #000;
+}
+
+.gta-wordmark-big {
+  font-size: 1.55em;
+}
+
+.gta-wanted {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  display: flex;
+  flex-shrink: 0;
+  gap: 0.15rem;
+  color: #f5f5f5;
+  filter: drop-shadow(0 2px 2px #000);
+}
+
+.gta-heist-launcher {
+  position: absolute;
+  right: 1.25rem;
+  bottom: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.5rem;
+}
+
+.gta-heist-launcher span {
+  font-family: var(--gta-display);
+  color: #fff;
+  text-shadow: 2px 2px 2px #000;
+  font-size: 1.5rem;
+}
+
+.gta-heist-launcher button {
+  min-height: 44px;
+  padding: 0.5rem 1rem;
+  border: 1px solid #c9e69d;
+  background: #b6db84;
+  color: #14200d;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+@media (max-width: 640px) {
+  .gta-theme-banner {
+    min-height: 14rem;
+    padding: 1rem;
+  }
+
+  .gta-banner-art {
+    left: 0;
+  }
+
+  .gta-banner-art img {
+    object-position: 65% top;
+  }
+
+  .gta-banner-shade {
+    background: linear-gradient(90deg, #080a08e6, #080a0840 55%, #080a0800);
+  }
+
+  .gta-wordmark {
+    font-size: 1.4rem;
+  }
+
+  .gta-wanted {
+    top: 0.5rem;
+    right: 0.5rem;
+  }
+
+  .gta-wanted svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .gta-heist-launcher {
+    right: 0.75rem;
+    bottom: 0.75rem;
+  }
+
+  .gta-heist-launcher span {
+    font-size: 1rem;
+  }
+}
+
+/* Header and headings use the GTA V menu face; body copy stays DM Sans. */
+.gta header {
+  background: #000000eb;
+  border-bottom: 3px solid var(--primary);
+}
+
+.gta :is(h1, h2, h3, [data-slot='card-title']) {
+  font-family: var(--gta-menu);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.gta header nav a,
+.gta [data-testid='mobile-menu'] a {
+  font-family: var(--gta-menu);
+  font-size: 1rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-radius: 0;
+}
+
+/* Selected menu tab: solid white with black text, like the GTA V pause menu. */
+.gta header nav a[aria-current='page'],
+.gta [data-testid='mobile-menu'] a[aria-current='page'] {
+  background: #f5f5f5;
+  color: #000;
+}
+
+.gta :is(button, [role='button'], [role='combobox'], input, textarea, a):focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 3px;
+}
+
+.gta :is([data-slot='card'], [data-slot='select-trigger'], [data-slot='tabs-list']) {
+  border-radius: var(--radius);
+}
+
+/* Menu panels: translucent black with no visible frame. */
+.gta [data-slot='card'] {
+  background-color: #080a0aeb;
+  border-color: #ffffff14;
+}
+
+.gta [data-slot='dashboard-navigation'] {
+  border-radius: 0;
+  background: #000000d9;
+}
+
+.gta [data-slot='dashboard-navigation'] nav :is(a, button) {
+  font-family: var(--gta-menu);
+  font-size: 1.25rem;
+  font-weight: 700;
+  padding: 0.5rem 0.75rem;
+  text-transform: uppercase;
+  color: #fff;
+}
+
+.gta [data-slot='dashboard-navigation'] nav [data-tab-active='true'] {
+  background: #f5f5f5;
+  color: #000;
+}
+
+.gta [data-slot='popover-content'] {
+  background-color: #000000eb;
+  border-color: #ffffff1f;
+}
+
+.gta .splash-text {
+  font-family: var(--gta-display) !important;
+  font-size: 1.15rem;
+  color: #f0c850;
+  -webkit-text-stroke: 3px #000;
+  paint-order: stroke fill;
+  text-shadow: 0 2px 0 #000;
+  -webkit-font-smoothing: antialiased;
+}
+
+.gta .circuit-bg,
+.gta .autumn-leaves,
+html[data-inferencex-embed] .gta-scene,
+html[data-inferencex-embed] [data-testid='gta-theme-banner'] {
+  display: none;
+}
+
 /* ── Minecraft Theme ── */
 .minecraft {
   --background: #1e1e1e;
@@ -574,7 +850,9 @@ html[data-inferencex-embed] [data-testid='csgo-theme-banner'] {
 .minecraft .shiki,
 .minecraft .shiki span,
 .csgo .shiki,
-.csgo .shiki span {
+.csgo .shiki span,
+.gta .shiki,
+.gta .shiki span {
   color: var(--shiki-dark);
   background-color: var(--shiki-dark-bg);
 }

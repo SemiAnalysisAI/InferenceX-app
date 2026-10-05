@@ -55,6 +55,7 @@ describe('ThemedFigureImage', () => {
     ['dark', '/chart-dark.png'],
     ['minecraft', '/chart-dark.png'],
     ['csgo', '/chart-dark.png'],
+    ['gta', '/chart-dark.png'],
   ])('gives an eager cold %s render exactly one active source', (theme, expectedSrc) => {
     document.documentElement.className = theme;
     renderUi(

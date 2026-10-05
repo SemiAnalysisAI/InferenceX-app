@@ -49,6 +49,12 @@ Cache reuse returns `data.recipes` and the resolved `params.recipe`. Pass a retu
 
 ## Source audit and shared computations
 
+The inference run selector uses the same `DISPLAY_MODEL_TO_DB` aliases as benchmark
+queries. For example, the `GLM-5.2` display/API model includes raw `glm5.2` and
+`glm5.3` rows. `/api/v1/workflow-info` remains date-scoped across models; the UI
+filters its changelog keys by those aliases and the selected precision. This
+alignment changes no API parameters, response schemas, or stored model identities.
+
 - Inference: global/date/quick-filter contexts, metric registry, useChartData,
   Pareto selection, compare-date parsing and trace-derived normalized metrics.
 - Calculator family: useThroughputData, interpolation, first-token-limits,
