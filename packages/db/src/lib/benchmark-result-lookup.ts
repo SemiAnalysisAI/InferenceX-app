@@ -127,10 +127,14 @@ function findJsonFiles(root: string): string[] {
   return files.toSorted();
 }
 
-/** Map known successful rows; report unidentifiable rows separately from known failures. */
+/**
+ * Map known successful rows with the source run id, so run-scoped repairs apply
+ * as in CI ingest; report unidentifiable rows separately from known failures.
+ */
 export function readMappedBenchmarkRows(
   root: string,
   onUnmapped: (error: string) => void = () => {},
+  runId: number | string | null = null,
 ): BenchmarkParams[] {
   const tracker = createSkipTracker();
   const rows: BenchmarkParams[] = [];
@@ -144,7 +148,7 @@ export function readMappedBenchmarkRows(
         continue;
       }
       const failedRuns = tracker.skips.failedRun;
-      const mapped = mapBenchmarkRow(raw as Record<string, unknown>, tracker);
+      const mapped = mapBenchmarkRow(raw as Record<string, unknown>, tracker, undefined, runId);
       if (mapped) rows.push(mapped);
       else if (tracker.skips.failedRun === failedRuns) onUnmapped(error);
     }

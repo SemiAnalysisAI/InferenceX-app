@@ -217,14 +217,18 @@ async function processPair(
     const mappedRows = await filterPurgedBenchmarkRows(
       sql,
       run,
-      readMappedBenchmarkRows(benchmarkDir, (error) => {
-        expectationsUnknown = true;
-        expectationErrors.push({
-          benchmarkArtifact: pair.benchmarks.name,
-          artifactNames: [pair.gpuMetrics.name],
-          error,
-        });
-      }),
+      readMappedBenchmarkRows(
+        benchmarkDir,
+        (error) => {
+          expectationsUnknown = true;
+          expectationErrors.push({
+            benchmarkArtifact: pair.benchmarks.name,
+            artifactNames: [pair.gpuMetrics.name],
+            error,
+          });
+        },
+        run.github_run_id,
+      ),
     );
     for (const row of mappedRows) {
       const identity = benchmarkPublicationIdentity(row);
@@ -551,7 +555,7 @@ async function main(): Promise<void> {
             const rows = await filterPurgedBenchmarkRows(
               sql,
               run,
-              readMappedBenchmarkRows(directory, onUnmapped),
+              readMappedBenchmarkRows(directory, onUnmapped, run.github_run_id),
             );
             for (const row of rows)
               await findBenchmarkResultIds(sql, run, [row], (id) =>
