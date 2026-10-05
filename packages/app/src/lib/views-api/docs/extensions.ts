@@ -244,8 +244,8 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
     '相关性图 x 轴 GPU 指标，默认 power。',
   ],
   corrYMetric: [
-    'Correlation y-axis GPU metric, default temperature.',
-    '相关性图 y 轴 GPU 指标，默认 temperature。',
+    'Correlation y-axis GPU metric, default temperature; when the artifact did not sample it, the first other collected metric is used.',
+    '相关性图 y 轴 GPU 指标，默认 temperature；若该产物未采集此指标，则改用其他已采集指标中的第一个。',
   ],
   downsample: [
     'Boolean, default true; declares the UI 2000-interactive-point rendering cap. Returned raw rows and statistics are never sampled.',

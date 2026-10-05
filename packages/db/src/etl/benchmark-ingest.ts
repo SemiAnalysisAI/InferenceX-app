@@ -111,8 +111,8 @@ export async function bulkIngestBenchmarkRows(
       unnest(${sql.array(isls)}::int[]),
       unnest(${sql.array(osls)}::int[]),
       unnest(${sql.array(concs)}::int[]),
-      unnest(${sql.array(images)}),
-      unnest(${sql.array(recipeFingerprints)}),
+      unnest(${sql.array(images)}::text[]),
+      unnest(${sql.array(recipeFingerprints)}::text[]),
       unnest(${sql.array(metricsJsons)}::jsonb[]),
       unnest(${sql.array(workersJsons)}::jsonb[]),
       unnest(${sql.array(powerInvalidReasonsJsons)}::jsonb[]),
@@ -134,7 +134,15 @@ export async function bulkIngestBenchmarkRows(
       -- Like workers, the fresh artifact is authoritative for provenance: a
       -- re-ingest from an artifact without the fields deliberately nulls them.
       power_invalid_reasons = excluded.power_invalid_reasons,
-      power_audit = excluded.power_audit
+      -- Except AgentX provenance, which no result row carries: it is derived
+      -- from the telemetry bundle and attached to the per-job sibling before
+      -- insert, so an aggregate copy or a re-ingest without it must not clear it.
+      -- A row that does carry one (a future producer) still wins.
+      power_audit = case
+        when excluded.benchmark_type = 'agentic_traces'
+          then coalesce(excluded.power_audit, benchmark_results.power_audit)
+        else excluded.power_audit
+      end
     returning (xmax = 0) as inserted, id
   `;
 
