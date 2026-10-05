@@ -37,6 +37,8 @@ test('VideoGenX skill example uses documented selectors and preserves partial co
     view: 'compare',
     v_x: 'p50Latency',
     v_y: 'videosPerGpuHour',
+    v_quality: 'prompt_adherence',
+    v_qmin: '4',
     v_tier: 'r',
     v_optimal: '0',
     v_api: '0.08',
@@ -46,6 +48,32 @@ test('VideoGenX skill example uses documented selectors and preserves partial co
     v_case: '3',
   });
   assert.deepEqual(output, [data]);
+});
+
+test('VideoGenX quality example preserves an empty unqualified frontier and its missing measurements', async () => {
+  const output = [];
+  const data = {
+    params: { qualityMetric: 'prompt_adherence', qualityThreshold: 4 },
+    coverage: { pagesRead: 1, maxPages: 5, nextPage: null, truncated: false },
+    quality: {
+      metric: 'prompt_adherence',
+      direction: 'higher',
+      readerThreshold: 4,
+      thresholdProvenance: 'reader-selected URL; frozen evaluator rule still required',
+      active: true,
+      eligible: 0,
+      exclusions: [{ id: 'source:c1', reasons: ['unjudged'] }],
+    },
+    rows: [],
+    comparison: { cases: { status: 'not-published', selected: null } },
+    provenance: [{ runId: '123', artifactId: 456, publishedAt: null }],
+  };
+  await example(() => Promise.resolve(Response.json(data)), {
+    log: (text) => output.push(JSON.parse(text)),
+  });
+  assert.deepEqual(output, [data]);
+  assert.equal(output[0].rows.length, 0);
+  assert.equal(output[0].provenance[0].publishedAt, null);
 });
 
 test('VideoGenX skill example fails on an HTTP error instead of printing empty successful evidence', async () => {

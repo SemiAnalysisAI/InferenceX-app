@@ -82,6 +82,7 @@ describe('video metrics', () => {
       'dollarsPerVideo',
       'videosPerGpuHour',
       'kjPerVideo',
+      'quality',
     ]);
     expect(Object.keys(VIDEO_METRICS).toSorted()).toEqual(
       [...X_METRICS, ...Y_METRICS, 'powerPctCap', 'apiPricePerVideo'].toSorted(),
@@ -128,6 +129,12 @@ describe('video metrics', () => {
     expect(metricValue(h200, 'kjPerVideo', opts)).toBeCloseTo(410.954, 2);
     expect(metricValue(h200, 'powerPctCap', opts)).toBeCloseTo(97.41, 1);
     expect(metricValue(b200, 'powerPctCap', opts)).toBeCloseTo(96.4, 1);
+  });
+  it('names the canonical selected quality dimension and its unchanged zero-to-four scale', () => {
+    const qualityOptions = { ...opts, qualityMetric: 'audio_content' as const };
+    expect(metricLabel('quality', 'en', qualityOptions)).toBe('Audio content (0–4)');
+    expect(metricLabel('quality', 'zh', qualityOptions)).toBe('音频内容 (0–4)');
+    expect(formatMetric(0, 'quality')).toBe('0');
   });
   it('prices the clip at the API list price, independent of hardware and tier', () => {
     // 0.034 $/video-s × 8 s clip.

@@ -5,7 +5,7 @@ import { registerAnalyticsClient } from '@/lib/analytics';
 
 /** Owns the price like VideoDashboard does and exposes it, plus an external setter. */
 function Harness({ initial, pathname = '/video' }: { initial: number; pathname?: string }) {
-  const [value, setValue] = useState(initial);
+  const [value, setValue] = useState<number | null>(initial);
   return (
     <PathnameContext.Provider value={pathname}>
       <div className="grid gap-4 p-4 sm:grid-cols-2">

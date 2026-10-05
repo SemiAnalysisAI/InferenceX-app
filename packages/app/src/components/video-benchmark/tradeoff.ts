@@ -1,5 +1,6 @@
 import { at, entries, number, ROLES, rows, text, type Bundle, type Json } from './bundle';
 import { servingCells } from './serving';
+import { canonicalVideoModelId, VIDEO_MODELS } from './models';
 import { allocatedGpus } from './allocation';
 import { powerLimitComparison } from './power-limit';
 import { serverTimingSummary } from './server-timing';
@@ -38,6 +39,16 @@ const positive = (value: Json) => {
   return n !== null && n > 0 ? n : null;
 };
 
+/** Wan requests frame count and FPS; H3 retains its explicitly requested duration. */
+export function workloadDurationSeconds(plan: Json): number | null {
+  const generation = at(plan, 'generation');
+  if (canonicalVideoModelId(text(at(plan, 'model_id'))) !== VIDEO_MODELS.wan22.modelId)
+    return positive(at(generation, 'duration_seconds'));
+  const frames = positive(at(generation, 'frame_count'));
+  const fps = positive(at(generation, 'fps'));
+  return frames !== null && Number.isInteger(frames) && fps !== null ? frames / fps : null;
+}
+
 function workloadInfo(plan: Json, identity: string, semantics: Json) {
   const workload = Object.fromEntries(
     entries(plan).filter(([key]) => !['plan_id', 'repetitions', 'warmup_runs'].includes(key)),
@@ -47,7 +58,8 @@ function workloadInfo(plan: Json, identity: string, semantics: Json) {
   const completeWorkload =
     text(at(plan, 'model_id')) &&
     text(at(plan, 'model_revision')) &&
-    ['width', 'height', 'duration_seconds', 'fps', 'num_inference_steps'].every(
+    workloadDurationSeconds(plan) !== null &&
+    ['width', 'height', 'fps', 'num_inference_steps'].every(
       (key) => positive(at(generation, key)) !== null,
     ) &&
     cases.length > 0 &&
@@ -55,7 +67,7 @@ function workloadInfo(plan: Json, identity: string, semantics: Json) {
   const group = completeWorkload ? canonical({ plan: workload, semantics }) : `unknown:${identity}`;
   const workloadLabel = [
     `${number(at(generation, 'width')) ?? '?'} × ${number(at(generation, 'height')) ?? '?'}`,
-    `${number(at(generation, 'duration_seconds')) ?? '?'} s`,
+    `${workloadDurationSeconds(plan) ?? '?'} s`,
     `${number(at(generation, 'fps')) ?? '?'} fps`,
     `${number(at(generation, 'num_inference_steps')) ?? '?'} steps`,
     `${text(at(plan, 'model_id'))} @ ${text(at(plan, 'model_revision')).slice(0, 12)}`,

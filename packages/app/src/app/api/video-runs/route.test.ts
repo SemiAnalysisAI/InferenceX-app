@@ -82,33 +82,37 @@ describe('H3 CI artifact access', () => {
     const result3 = await GET(request('?run=10&artifact=20'));
     expect(result3.status).toBe(410);
   });
-  it('streams the verified run artifact with a deadline longer than metadata requests', async () => {
-    vi.stubEnv('NODE_ENV', 'development');
-    const deadline = new AbortController().signal;
-    const timeout = vi
-      .spyOn(AbortSignal, 'timeout')
-      .mockImplementation((ms) => (ms === 270000 ? deadline : new AbortController().signal));
-    fetchMock
-      .mockResolvedValueOnce(response({ private: false }))
-      .mockResolvedValueOnce(
-        response({
-          name: 'h3-results-10-1',
-          workflow_run: { id: 10 },
-          size_in_bytes: 4,
-          archive_download_url: 'https://evil.example',
-        }),
-      )
-      .mockResolvedValueOnce(new Response(new Uint8Array([80, 75, 3, 4])));
-    const result = await GET(request('?run=10&artifact=20'));
-    expect(timeout).toHaveBeenCalledWith(270000);
-    expect(fetchMock.mock.calls[2][1]?.signal).toBe(deadline);
-    expect(fetchMock.mock.calls[0][1]?.signal).not.toBe(deadline);
-    expect(result.headers.get('content-type')).toBe('application/zip');
-    expect([...new Uint8Array(await result.arrayBuffer())]).toEqual([80, 75, 3, 4]);
-    expect(String(fetchMock.mock.calls[2][0])).toBe(
-      'https://api.github.com/repos/SemiAnalysisAI/InferenceX/actions/artifacts/20/zip',
-    );
-  });
+  it.each(['h3-results-10-1', 'video-serving-10-1'])(
+    'streams %s with a deadline longer than metadata requests',
+    async (name) => {
+      vi.stubEnv('NODE_ENV', 'development');
+      const deadline = new AbortController().signal;
+      const timeout = vi
+        .spyOn(AbortSignal, 'timeout')
+        .mockImplementation((ms) => (ms === 270000 ? deadline : new AbortController().signal));
+      fetchMock
+        .mockResolvedValueOnce(response({ private: false }))
+        .mockResolvedValueOnce(
+          response({
+            name,
+            workflow_run: { id: 10 },
+            size_in_bytes: 4,
+            archive_download_url: 'https://evil.example',
+          }),
+        )
+        .mockResolvedValueOnce(new Response(new Uint8Array([80, 75, 3, 4])));
+      const result = await GET(request('?run=10&artifact=20'));
+      expect(result.status).toBe(200);
+      expect(timeout).toHaveBeenCalledWith(270000);
+      expect(fetchMock.mock.calls[2][1]?.signal).toBe(deadline);
+      expect(fetchMock.mock.calls[0][1]?.signal).not.toBe(deadline);
+      expect(result.headers.get('content-type')).toBe('application/zip');
+      expect([...new Uint8Array(await result.arrayBuffer())]).toEqual([80, 75, 3, 4]);
+      expect(String(fetchMock.mock.calls[2][0])).toBe(
+        'https://api.github.com/repos/SemiAnalysisAI/InferenceX/actions/artifacts/20/zip',
+      );
+    },
+  );
   it('rejects oversized artifacts before downloading', async () => {
     fetchMock.mockResolvedValueOnce(response({ private: false })).mockResolvedValueOnce(
       response({

@@ -16,9 +16,16 @@ export function paretoFrontier<T extends { x: number; y: number }>(
 ): T[] {
   const sx = xBetter === 'higher' ? 1 : -1;
   const sy = yBetter === 'higher' ? 1 : -1;
-  return paretoFrontUpperLeft(
-    points,
+  const measured = points.filter((p) => Number.isFinite(p.x) && Number.isFinite(p.y));
+  const frontier = paretoFrontUpperLeft(
+    measured,
     (p) => sx * p.x,
     (p) => sy * p.y,
-  ).toSorted((a, b) => a.x - b.x);
+  );
+  // The shared calculator keeps one point per coordinate. Distinct measured
+  // deployments at that same nondominated coordinate must retain their identities.
+  const coordinates = new Set(frontier.map((p) => JSON.stringify([p.x, p.y])));
+  return measured
+    .filter((p) => coordinates.has(JSON.stringify([p.x, p.y])))
+    .toSorted((a, b) => a.x - b.x);
 }

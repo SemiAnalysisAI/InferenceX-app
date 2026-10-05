@@ -66,9 +66,10 @@ export async function archiveSources(blob: Blob, artifact: CIArtifact) {
   )
     throw new Error('Missing verified archive entry point');
   const index: Json = files['index.json'] ? JSON.parse(await read('index.json').text()) : null;
-  const identity = /^h3-(?:video|results|fidelity)-(?<run>\d+)-(?<attempt>\d+)$/u.exec(
-    artifact.name,
-  )?.groups;
+  const identity =
+    /^(?:h3-(?:video|results|fidelity)|video-serving)-(?<run>\d+)-(?<attempt>\d+)$/u.exec(
+      artifact.name,
+    )?.groups;
   if (!identity) throw new Error('Invalid H3 artifact identity');
   if (fidelity) {
     const comparison: Json = JSON.parse(await read('comparison.json').text());

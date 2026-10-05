@@ -17,6 +17,34 @@ describe('public view contract coverage', () => {
     expect(operation.responses['204']).not.toHaveProperty('content');
     expect(operation.responses).toHaveProperty('503');
   });
+  it('exposes quality filter parameters and nullable per-dimension evidence in OpenAPI', () => {
+    const operation = apiOperations.find((op) => op.path === '/api/v1/views/video')!;
+    expect(operation.parameters.map((parameter) => parameter.name)).toEqual(
+      expect.arrayContaining(['v_quality', 'v_qmin']),
+    );
+    const schema = operation.responses.find((response) => response.status === '200')!.schema;
+    expect(schema.properties?.quality?.properties?.readerThreshold).toMatchObject({
+      type: ['number', 'null'],
+      minimum: 0,
+      maximum: 4,
+    });
+    expect(schema.properties?.cells?.items?.properties?.quality).toMatchObject({
+      type: ['object', 'null'],
+      properties: {
+        scale: { type: 'string', enum: ['ordinal_0_to_4'] },
+        metrics: {
+          properties: {
+            audio_quality: {
+              properties: {
+                value: { type: ['number', 'null'] },
+                evaluatorSha256: { type: ['string', 'null'] },
+              },
+            },
+          },
+        },
+      },
+    });
+  });
   it('accounts for every visible, hidden and feature-gated dashboard route', () => {
     expect(Object.keys(DASHBOARD_API_COVERAGE).sort()).toEqual([...DASHBOARD_ROUTE_KEYS].sort());
     for (const coverage of Object.values(DASHBOARD_API_COVERAGE)) {

@@ -1,13 +1,17 @@
-import { at, number, text } from './bundle';
+import { at, bundleModel, number, text } from './bundle';
 import type { CIArtifact } from './archive';
 import { storedBundle, storedFidelityBundle, type StoredArtifact } from './stored';
-import { servingCells } from './serving';
-import { efficiencyValue, latencyValue, tradeoffPoints } from './tradeoff';
+import { plannedServingCells, servingCells } from './serving';
+import { efficiencyValue, latencyValue, tradeoffPoints, workloadDurationSeconds } from './tradeoff';
+import type { VideoDeploymentFields } from './deployment-contract';
+import type { VideoQualityAssessment } from './quality';
+import { sourceObservationFields } from './observation-projection';
+import { servingCellEvidence, type ServingCellEvidence } from './serving-evidence';
 
 /** Shared bound for dashboard history reads in the browser and view API. */
 export const VIDEO_HISTORY_MAX_PAGES = 5;
 
-export interface VideoHistoryObservation {
+export interface VideoHistoryObservation extends VideoDeploymentFields {
   id: string;
   cell: string | null;
   hardware: string;
@@ -41,9 +45,12 @@ export interface VideoHistoryObservation {
   /** Summed recorded enforced limits of the same boards; null when a limit was not recorded. */
   enforcedLimitW: number | null;
   server: { tp: number | null; ulysses: number | null; attention: string | null } | null;
+  quality?: VideoQualityAssessment | null;
 }
 export interface VideoHistorySource {
   id: string;
+  /** Model identity survives zero-observation and failed generation. Absent on legacy H3 projections. */
+  model?: string | null;
   sha256: string | null;
   sourceSha: string;
   hardware: string;
@@ -51,6 +58,8 @@ export interface VideoHistorySource {
   observedAt: string | null;
   kind: 'observation' | 'fidelity';
   observations: VideoHistoryObservation[];
+  /** Planned serving cells, including zero-sample and failed execution. Absent on old projections. */
+  serving?: ServingCellEvidence[];
   fidelity: string | null;
   calibration: string | null;
   releaseQualified: boolean | null;
@@ -102,6 +111,9 @@ export function videoHistoryEntry(
         result.releaseQualified = typeof qualified === 'boolean' ? qualified : null;
       } else {
         const bundle = storedBundle(source);
+        // Keep the sealed producer identity visible even if an optional result contradicts it.
+        result.model = bundleModel(bundle.manifest, null);
+        result.model = bundleModel(bundle.manifest, bundle.result);
         result.sha256 = bundle.manifestSha256;
         result.sourceSha = text(at(bundle.manifest, 'git_commit'));
         result.observedAt = text(at(bundle.ci, 'started_at')) || null;
@@ -114,7 +126,19 @@ export function videoHistoryEntry(
           null;
         const qualified = at(bundle.ci, 'release_qualified');
         result.releaseQualified = typeof qualified === 'boolean' ? qualified : null;
+        const qualityAbsent =
+          !bundle.documents.has('dashboard-observations.json') &&
+          at(bundle.manifest, 'evidence', 'dashboard-observations.json') === null;
+        result.serving = plannedServingCells(bundle).map((cell) =>
+          servingCellEvidence({ ...cell, run: null, spec: null }, qualityAbsent),
+        );
         const cells = servingCells(bundle);
+        // Preserve execution accounting even when an optional observation sidecar is rejected.
+        result.serving = cells.map((cell) => servingCellEvidence(cell));
+        const observationFields = sourceObservationFields(bundle, cells);
+        result.serving = cells.map((cell) =>
+          servingCellEvidence(cell, !observationFields.get(cell.id)?.quality),
+        );
         result.observations = tradeoffPoints({
           bundle,
           exportRun: saved.runId,
@@ -123,6 +147,11 @@ export function videoHistoryEntry(
           const cell = cells.find((item) => item.id === point.cellId);
           return {
             id: point.id,
+            ...(observationFields.get(point.cellId ?? '') ?? {
+              deployment: null,
+              hardwareHealth: null,
+              quality: null,
+            }),
             cell: point.cellId ?? null,
             hardware: point.hardware || text(at(bundle.ci, 'site', 'gpu_model')),
             concurrency: point.concurrency,
@@ -144,7 +173,7 @@ export function videoHistoryEntry(
             allocated: point.allocated,
             replicas: point.replicas,
             wallSeconds: point.wall,
-            durationSeconds: number(at(point.workload, 'generation', 'duration_seconds')),
+            durationSeconds: workloadDurationSeconds(point.workload),
             frameCount: number(at(point.workload, 'generation', 'frame_count')),
             avgPowerW: point.power,
             enforcedLimitW: point.powerLimit?.watts ?? null,
@@ -158,6 +187,9 @@ export function videoHistoryEntry(
                 : null,
           };
         });
+        for (const cell of result.serving)
+          cell.workloadKey =
+            result.observations.find((o) => o.cell === cell.cell)?.workloadKey ?? null;
       }
     } catch (error) {
       result.error = error instanceof Error ? error.message : String(error);

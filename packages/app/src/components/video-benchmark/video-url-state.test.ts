@@ -11,6 +11,36 @@ import {
 } from './video-url-state';
 
 describe('video dashboard URL state', () => {
+  it('round-trips one quality dimension and a reader threshold without changing other filters', () => {
+    const state = readVideoDashboardState(
+      '?v_y=quality&v_quality=audio_quality&v_qmin=3.5&v_hidden=h100',
+    );
+    expect(state).toMatchObject({
+      y: 'quality',
+      qualityMetric: 'audio_quality',
+      qualityThreshold: 3.5,
+      hidden: ['h100'],
+    });
+    const url = writeVideoDashboardState(
+      new URL('https://example.test/video?history-query=retained'),
+      state,
+    );
+    expect(readVideoDashboardState(url.search)).toEqual(state);
+    expect(url.searchParams.get('history-query')).toBe('retained');
+    for (const threshold of ['', 'NaN', '-1', '4.1', '5'])
+      expect(readVideoDashboardState(`?v_qmin=${threshold}`).qualityThreshold).toBeNull();
+    expect(readVideoDashboardState('?v_quality=psnr').qualityMetric).toBe('prompt_adherence');
+  });
+  it('round-trips a zero threshold and the canonical audio-content dimension', () => {
+    const state = readVideoDashboardState('?v_quality=audio_content&v_qmin=0');
+    expect(state).toMatchObject({ qualityMetric: 'audio_content', qualityThreshold: 0 });
+    const url = writeVideoDashboardState(new URL('https://example.test/video'), state);
+    expect(url.searchParams.get('v_qmin')).toBe('0');
+    expect(readVideoDashboardState(url.search)).toEqual(state);
+    expect(readVideoDashboardState('?v_quality=subject_consistency').qualityMetric).toBe(
+      'prompt_adherence',
+    );
+  });
   it('restores hidden hardware from shared links and omits an empty selection', () => {
     const state = readVideoDashboardState('?v_hidden=h100,b200,h100,unknown&v_tier=r');
     expect(state.hidden).toEqual(['b200', 'h100']);
@@ -46,6 +76,7 @@ describe('video dashboard URL state', () => {
         '?v_x=p50Latency&v_y=kjPerVideo&v_tier=r&v_view=table&v_optimal=0&v_api=0.047',
       ),
     ).toEqual({
+      model: 'h3',
       x: 'p50Latency',
       y: 'kjPerVideo',
       tier: 'r',
@@ -53,6 +84,8 @@ describe('video dashboard URL state', () => {
       optimal: false,
       apiPrice: 0.047,
       hidden: [],
+      qualityMetric: 'prompt_adherence',
+      qualityThreshold: null,
     });
     expect([...X_METRICS]).toEqual(['p90Latency', 'p50Latency']);
     expect([...Y_METRICS]).toEqual([
@@ -60,6 +93,7 @@ describe('video dashboard URL state', () => {
       'dollarsPerVideo',
       'videosPerGpuHour',
       'kjPerVideo',
+      'quality',
     ]);
     for (const x of X_METRICS) expect(readVideoDashboardState(`?v_x=${x}`).x).toBe(x);
     for (const y of Y_METRICS) expect(readVideoDashboardState(`?v_y=${y}`).y).toBe(y);
@@ -145,17 +179,37 @@ describe('video dashboard URL state', () => {
       }).searchParams.has('v_api'),
     ).toBe(false);
   });
-  it('maps state to metric options: the cost tier and the API price, nothing else', () => {
+  it('maps state to metric options including the selected quality dimension', () => {
     expect(metricOptions(DEFAULT_VIDEO_DASHBOARD_STATE)).toEqual({
       tier: 'h',
       apiPricePerVideoSecond: 0.08,
+      qualityMetric: 'prompt_adherence',
     });
     expect(metricOptions({ ...DEFAULT_VIDEO_DASHBOARD_STATE, tier: 'r', apiPrice: 0.05 })).toEqual({
       tier: 'r',
       apiPricePerVideoSecond: 0.05,
+      qualityMetric: 'prompt_adherence',
     });
     expect(
       metricOptions({ ...DEFAULT_VIDEO_DASHBOARD_STATE, apiPrice: -1 }).apiPricePerVideoSecond,
     ).toBeNull();
   });
+});
+
+it('keeps model selection and model-specific price defaults in shared URLs', () => {
+  const wan = readVideoDashboardState('?v_model=wan22&v_api=invalid');
+  expect(wan).toMatchObject({ model: 'wan22', apiPrice: null });
+  const url = writeVideoDashboardState(new URL('https://example.test/video'), wan);
+  expect(url.search).toBe('?v_model=wan22');
+  expect(readVideoDashboardState(url.search)).toEqual(wan);
+  const custom = writeVideoDashboardState(url, { ...wan, apiPrice: 0.08 });
+  expect(custom.searchParams.get('v_api')).toBe('0.08');
+  expect(readVideoDashboardState(custom.search).apiPrice).toBe(0.08);
+  expect(readVideoDashboardState('?v_model=unknown')).toEqual(DEFAULT_VIDEO_DASHBOARD_STATE);
+});
+
+it('keeps H3 audio quality filters out of the Wan view', () => {
+  const state = readVideoDashboardState('?v_model=wan22&v_y=quality&v_qmin=3');
+  expect(state.y).toBe('videosPerDollar');
+  expect(state.qualityThreshold).toBeNull();
 });

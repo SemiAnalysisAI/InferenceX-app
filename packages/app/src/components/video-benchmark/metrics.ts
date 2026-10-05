@@ -1,7 +1,14 @@
 import { costPerGpuHour, type CostTier } from './hardware';
+import type { VideoDeploymentFields } from './deployment-contract';
+import {
+  QUALITY_METRICS,
+  qualityValue,
+  type QualityMetricId,
+  type VideoQualityAssessment,
+} from './quality';
 
 /** One published serving cell (hardware × client concurrency) flattened for the dashboard. */
-export interface VideoPoint {
+export interface VideoPoint extends VideoDeploymentFields {
   id: string;
   runId: string;
   artifactId: number;
@@ -40,15 +47,31 @@ export interface VideoPoint {
   server: { tp: number | null; ulysses: number | null; attention: string | null } | null;
   status: string;
   observedAt: string | null;
+  quality?: VideoQualityAssessment | null;
+  provenance?: {
+    sourceId: string;
+    manifestSha256: string | null;
+    sourceSha: string;
+    artifactDigest: string | null;
+    fidelity: string | null;
+    calibration: string | null;
+    releaseQualified: boolean | null;
+  } | null;
 }
 
 export type XMetricId = 'p90Latency' | 'p50Latency';
-export type YMetricId = 'videosPerDollar' | 'dollarsPerVideo' | 'videosPerGpuHour' | 'kjPerVideo';
+export type YMetricId =
+  | 'videosPerDollar'
+  | 'dollarsPerVideo'
+  | 'videosPerGpuHour'
+  | 'kjPerVideo'
+  | 'quality';
 /** Axis metrics plus the two the cards and evidence read but the chart does not plot. */
 export type MetricId = XMetricId | YMetricId | 'powerPctCap' | 'apiPricePerVideo';
 
 export interface MetricOptions {
   tier: CostTier;
+  qualityMetric?: QualityMetricId;
   /**
    * USD an API bills per video-second of the same clip (`H3_API_REFERENCE` or
    * the reader's override). Missing or non-positive → the API list price is null.
@@ -74,6 +97,7 @@ export const Y_METRICS: readonly YMetricId[] = [
   'dollarsPerVideo',
   'videosPerGpuHour',
   'kjPerVideo',
+  'quality',
 ];
 export const COST_TIERS: readonly CostTier[] = ['h', 'r'];
 
@@ -84,6 +108,13 @@ export const TIER_LABELS: Record<CostTier, { en: string; zh: string }> = {
 };
 
 export const VIDEO_METRICS: Record<MetricId, MetricDefinition> = {
+  quality: {
+    label: 'Quality rating (selected dimension)',
+    labelZh: '质量评分（所选维度）',
+    unit: 'ordinal 0–4',
+    polarity: 'higher',
+    digits: 2,
+  },
   p90Latency: {
     label: 'P90 time to video (s)',
     labelZh: 'P90 出片时间（s）',
@@ -181,6 +212,10 @@ export function metricValue(
 ): number | null {
   let value: number | null = null;
   switch (id) {
+    case 'quality': {
+      value = qualityValue(point, options.qualityMetric ?? 'prompt_adherence');
+      break;
+    }
     case 'p90Latency': {
       // Same display floor as the run views: P90 needs at least ten valid samples.
       value = point.samples >= 10 ? point.p90 : null;
@@ -226,6 +261,10 @@ export function metricValue(
 }
 
 export function metricLabel(id: MetricId, locale: 'en' | 'zh', options: MetricOptions): string {
+  if (id === 'quality') {
+    const dimension = QUALITY_METRICS[options.qualityMetric ?? 'prompt_adherence'];
+    return `${locale === 'zh' ? dimension.labelZh : dimension.label} (0–4)`;
+  }
   const def = VIDEO_METRICS[id];
   const base = locale === 'zh' ? def.labelZh : def.label;
   if (!def.tiered) return base;

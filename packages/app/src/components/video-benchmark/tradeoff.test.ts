@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   tradeoffPoints,
+  workloadDurationSeconds,
   tradeoffCurves,
   latencyValue,
   efficiencyValue,
@@ -373,3 +374,16 @@ it.skipIf(!process.env.H3_SERVING_ARTIFACT_DIR)(
     expect(efficiencyValue(points[0], 'clipsGpu')).toBeCloseTo(15.0621776301);
   },
 );
+
+it('derives Wan frame duration without changing H3 requested duration or filling missing evidence', () => {
+  const plan = {
+    model_id: 'Wan-AI/Wan2.2-T2V-A14B-Diffusers',
+    generation: { frame_count: 81, fps: 16, duration_seconds: 4 },
+  };
+  expect(workloadDurationSeconds(plan)).toBe(81 / 16);
+  expect(workloadDurationSeconds({ ...plan, model_id: 'MiniMaxAI/MiniMax-H3' })).toBe(4);
+  expect(
+    workloadDurationSeconds({ ...plan, generation: { fps: 16, duration_seconds: 4 } }),
+  ).toBeNull();
+  expect(workloadDurationSeconds({ ...plan, generation: { frame_count: 81, fps: 0 } })).toBeNull();
+});

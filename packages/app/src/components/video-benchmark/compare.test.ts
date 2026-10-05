@@ -315,14 +315,14 @@ describe('compareSide', () => {
     set(document(inconsistent.sources[0], 'manifest.json'), 'mode', 'fidelity');
     expect(() => compareSide(misbundled, h100)).toThrow('Stored result identity mismatch');
     expect(() => compareSide(inconsistent, h100)).toThrow(
-      'Invalid H3 serving matrix: CI identity does not match the manifest',
+      'Invalid video serving matrix: CI identity does not match the manifest',
     );
     expect(() =>
       compareSide(
         { ...inconsistent, sources: [...inconsistent.sources, ...misbundled.sources] },
         h100,
       ),
-    ).toThrow('Invalid H3 serving matrix: CI identity does not match the manifest');
+    ).toThrow('Invalid video serving matrix: CI identity does not match the manifest');
     // A readable source without the cell does not prove the unreadable one lacked it.
     const readable = stored(h100.runId, h100.artifactId, hardware);
     expect(() =>

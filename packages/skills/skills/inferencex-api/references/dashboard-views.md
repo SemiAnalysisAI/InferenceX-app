@@ -66,13 +66,30 @@ which controls belong together.
 
 With no `run`/`artifact`, `/api/v1/views/video` returns the current dashboard's
 published-history projection, not CI discovery. Copy its URL selectors directly:
-`v_x`, `v_y`, `v_tier`, `v_optimal`, `v_api`, `v_hidden`, `v_base`, `v_cand`, `v_case`.
+`v_x`, `v_y`, `v_quality`, `v_qmin`, `v_tier`, `v_optimal`, `v_api`, `v_hidden`, `v_base`, `v_cand`, `v_case`.
 `v_view=chart|table` is presentation only. Read resolved `params`; malformed values
 use the same defaults as the UI. Unknown/repeated query names still return 400.
 
 - Defaults: P90 seconds vs videos/USD TCO, owning tier `h`, optimal deployments
   only; `r` selects renting. `v_optimal=0` includes dominated deployments. Queued
   client-concurrency cells stay in evidence, outside chart/table.
+- Serving outcomes: inspect `serving` even when `rows` is empty. It retains every planned cell in the loaded pages before chart/workload/hardware/quality filters, including zero-attempt failures. `failed` counts attempted failures; `timedOut` is a subset, `notStarted` is separate, and `legacyFailedSlots` preserves the older aggregate. Unknown counts remain null. `unjudged` requires sufficient clip/request evidence; `qualitySloGoodput` is null without per-request quality and deadline joins.
+- Quality: `v_y=quality` plots one `v_quality` dimension against latency;
+  `v_qmin=4` adds a reader threshold before frontier selection on any Y axis.
+  The seven dimension IDs are `prompt_adherence` (default), `visual_fidelity`,
+  `temporal_consistency`, `motion_plausibility`, `audio_quality`, `audio_content`, `av_sync`.
+  They preserve separate higher-is-better human 0–4 ratings; never combine them
+  into one score. Require `quality.scale=ordinal_0_to_4` and all seven critical
+  dimensions to pass their own frozen calibrated rules. Legacy 1–5 or missing
+  scale declarations are not converted. These IDs retain the original rubric,
+  using registry `human.absolute_dimension_rating` version `0.2.0-draft`.
+  Read each point's nullable `quality` contract/rubric/evaluator identities,
+  per-dimension raw value/status, assessed/total sample coverage, calibration
+  cohort and frozen threshold provenance. Only complete-coverage calibrated
+  passes qualify. A reader threshold cannot relax the frozen rule; a raw
+  `judged_unqualified` score remains visible evidence but cannot enter a frontier.
+  Chart, table, CSV and API select the same eligible observations. Existing
+  unjudged data produces an empty quality view, not zero scores.
 - `v_hidden` is a comma-separated roster-key list (for example `h100,mi355x`),
   default empty. It filters chart/table only; KPI/Compare/Evidence keep their
   original scope. Unknown keys are ignored, remaining keys are sorted/deduplicated.
@@ -99,7 +116,7 @@ use the same defaults as the UI. Unknown/repeated query names still return 400.
   Legacy selectors and `v_*` selectors cannot be mixed. Legacy missing artifacts
   return 204; dashboard mode returns its empty/partial projection and coverage.
 
-Example (check deployed OpenAPI availability first; no authentication or write):
+Example: apply a reader quality threshold to measured per-GPU throughput. Check deployed OpenAPI availability first; unjudged retained data returns empty rows. No authentication or write:
 
 ```js
 const url = new URL('https://inferencex.semianalysis.com/api/v1/views/video');
@@ -107,6 +124,8 @@ url.search = new URLSearchParams({
   view: 'compare',
   v_x: 'p50Latency',
   v_y: 'videosPerGpuHour',
+  v_quality: 'prompt_adherence',
+  v_qmin: '4',
   v_tier: 'r',
   v_optimal: '0',
   v_api: '0.08',
@@ -122,12 +141,15 @@ console.log(
   JSON.stringify({
     params: data.params,
     coverage: data.coverage,
+    quality: data.quality,
     rows: data.rows,
     comparison: data.comparison,
     provenance: data.provenance,
   }),
 );
 ```
+
+Compare deployment frontiers only within the returned workload/generation and quality-evaluator cohorts. Keep single measurements as points; connecting measured frontier points is not interpolation. Hardware-health failures and unknown batching capacity are excluded from normal rankings.
 
 Measured ratios and uncalibrated media similarity do not qualify visual quality,
 energy claims or a causal compute/memory bottleneck. Preserve source IDs, seals,
@@ -186,3 +208,31 @@ update its read-only API in the same PR. Reuse the UI's pure transforms, test
 selector effects and source semantics, and update OpenAPI, the route catalog,
 coverage inventory and this existing npm package. Hidden navigation and feature
 flags do not make public data sensitive.
+
+### Local multi-model foundation
+
+`/video?v_model=wan22` and `/api/v1/views/video?v_model=wan22` select Wan2.2-T2V-A14B;
+`h3` is the default. Model filtering precedes workload selection and applies to charts,
+tables, exports, serving evidence and history provenance. Switching models resets custom
+pricing, hidden hardware and comparison/history selections. H3 retains its dated $0.08/video-second
+reference; Wan's API price is null unless the reader supplies `v_api`. Missing results remain
+empty. The serving reader accepts `video-serving-<run>-<attempt>` artifacts with
+`video_serving_smoke_matrix`, `controlled_video_gpu` and `live_video` evidence while preserving
+legacy H3 contracts. Evidence tags must agree with the selected model; `operator_endpoint` request records remain valid under either model's verified supervisor. Wan request duration is `frame_count / fps`; H3 keeps its explicitly requested duration. Wan's canonical model ID is `Wan-AI/Wan2.2-T2V-A14B-Diffusers`;
+the previous `Wan-AI/Wan2.2-T2V-A14B` remains a selection alias, not permission to pool unequal workload keys.
+`manifest.workload_plan.model_id` supplies source-level identity even before generation;
+a contradictory optional result is rejected. API provenance returns nullable source `model`.
+A sealed initial serving summary supplies planned/not-started counts; a manifest alone cannot infer them.
+This reader does not itself establish GPU measurements, quality qualification or Trainium support.
+Only legacy `h3-*` artifacts without model identity use the H3 fallback; unidentified generic artifacts do not enter either model projection.
+Ambiguous mixed-model sources are excluded. H3's seven-dimension quality policy is unchanged;
+Wan quality and quality/SLO goodput stay null until a separate video-only quality contract is supported.
+
+Wan serving 接入沿用既有目录和校验流程，接受 `video-serving-<run>-<attempt>`、
+`video_serving_smoke_matrix`、`controlled_video_gpu` 和 `live_video`，同时兼容 H3。执行证据类型须与模型一致；经对应模型 supervisor 验证的请求记录仍可使用 `operator_endpoint`。Wan 的请求时长按 `frame_count / fps` 计算，H3 保留显式请求时长。
+规范模型 ID 为 `Wan-AI/Wan2.2-T2V-A14B-Diffusers`，旧的 `Wan-AI/Wan2.2-T2V-A14B`
+仅作为模型选择的别名，不会合并不同的工作负载。来源身份取自已封存的
+`manifest.workload_plan.model_id`；可选结果中的模型与之冲突时会拒绝该结果。
+公开 API 的 provenance 保留可为空的来源 `model`。只有旧 `h3-*` 产物可在模型身份缺失时归入 H3；未知模型的通用产物不会进入任一模型投影。预检失败的计划数与未启动数
+必须由初始 serving summary 明确记录，不能只凭 manifest 推导。接入成功不代表
+已有 GPU 测量、通过质量验收或支持 Trainium；Wan 的质量与质量/SLO goodput 仍为 null。
