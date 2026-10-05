@@ -200,8 +200,8 @@ function priceSourceOptions(
 const STRINGS = {
   en: {
     title: {
-      'gw-year': 'Revenue & Profit Estimator per GigaWatt',
-      'chip-hour': 'Revenue & Profit Estimator',
+      'gw-year': 'Revenue & Profit Estimator per GigaWatt (Beta)',
+      'chip-hour': 'Revenue & Profit Estimator (Beta)',
     },
     benchmarkGroup: 'Benchmark Config',
     powerLabel: 'Power Estimation',
@@ -250,9 +250,9 @@ const STRINGS = {
         : 'This model has no OpenRouter listing. Switch Token Price to Custom to enter a price.',
     chartTitle: {
       'gw-year': (model: string, workload: string, percentile: string, target: number) =>
-        `${model} ${workload} Revenue & Profit Estimates per GigaWatt Per Year at ${percentile} ${target} tok/s/user Interactivity`,
+        `${model} ${workload} Revenue & Profit Estimates per GigaWatt Per Year at ${percentile} ${target} tok/s/user Interactivity (Beta)`,
       'chip-hour': (model: string, workload: string, percentile: string, target: number) =>
-        `${model} ${workload} Revenue & Profit Estimates per Chip per Hour at ${percentile} ${target} tok/s/user Interactivity`,
+        `${model} ${workload} Revenue & Profit Estimates per Chip per Hour at ${percentile} ${target} tok/s/user Interactivity (Beta)`,
     },
     sellingPriceLabel: 'Selling Price per Million Tokens',
     sellingPrices: (input: string, cached: string, output: string, source: string) =>
@@ -322,8 +322,8 @@ const STRINGS = {
   },
   zh: {
     title: {
-      'gw-year': '每吉瓦收入与利润估算器',
-      'chip-hour': '收入与利润估算器',
+      'gw-year': '每吉瓦收入与利润估算器（Beta）',
+      'chip-hour': '收入与利润估算器（Beta）',
     },
     benchmarkGroup: '基准测试配置',
     powerLabel: '功耗估算方式',
@@ -368,9 +368,9 @@ const STRINGS = {
         : '该模型没有 OpenRouter 条目。请将 Token 售价切换为自定义并输入价格。',
     chartTitle: {
       'gw-year': (model: string, workload: string, percentile: string, target: number) =>
-        `${model} ${workload} 每吉瓦每年收入与利润估算（${percentile} 交互性 ${target} tok/s/user）`,
+        `${model} ${workload} 每吉瓦每年收入与利润估算（${percentile} 交互性 ${target} tok/s/user）（Beta）`,
       'chip-hour': (model: string, workload: string, percentile: string, target: number) =>
-        `${model} ${workload} 每芯片每小时收入与利润估算（${percentile} 交互性 ${target} tok/s/user）`,
+        `${model} ${workload} 每芯片每小时收入与利润估算（${percentile} 交互性 ${target} tok/s/user）（Beta）`,
     },
     sellingPriceLabel: '每百万 token 售价',
     sellingPrices: (input: string, cached: string, output: string, source: string) =>
