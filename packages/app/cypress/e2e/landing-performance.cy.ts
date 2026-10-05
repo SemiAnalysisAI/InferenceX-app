@@ -1,3 +1,13 @@
+/** Open the header theme picker after the client mount and choose `theme`. */
+function pickTheme(theme: string) {
+  // The trigger label names the saved theme only once the client has mounted.
+  cy.get('[data-testid="theme-toggle"]')
+    .should('have.attr', 'aria-label')
+    .and('contain', 'currently');
+  cy.get('[data-testid="theme-toggle"]').click();
+  cy.get(`[data-testid="theme-option-${theme}"]`).click();
+}
+
 type LayoutShiftEntry = PerformanceEntry & {
   hadRecentInput: boolean;
   value: number;
@@ -187,8 +197,7 @@ describe('Landing page performance', () => {
       },
     });
 
-    cy.get('[data-testid="theme-toggle"]').click();
-    cy.get('[data-testid="theme-option-minecraft"]').click();
+    pickTheme('minecraft');
     cy.get('html').should('have.class', 'minecraft');
     cy.window().should((win) => {
       const resourceNames = win.performance.getEntriesByType('resource').map((entry) => entry.name);

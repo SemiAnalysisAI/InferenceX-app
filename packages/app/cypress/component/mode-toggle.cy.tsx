@@ -71,6 +71,7 @@ describe('ModeToggle', () => {
     cy.focused().should('have.attr', 'data-testid', 'theme-option-gta');
     cy.focused().click();
     cy.get('html').should('have.class', 'gta');
+    cy.get('[data-testid="theme-menu"]').should('not.exist');
     cy.get('[data-testid="theme-toggle"]').click();
     cy.focused().should('have.attr', 'data-testid', 'theme-option-gta');
     cy.focused().type('{esc}');

@@ -1,6 +1,16 @@
 // Merged from basic.cy.ts, navigation.cy.ts, theme-toggle.cy.ts, and land-acknowledgement.cy.ts
 // to reduce per-file Cypress startup overhead (~500ms per file)
 
+/** Open the header theme picker after the client mount and choose `theme`. */
+function pickTheme(theme: string) {
+  // The trigger label names the saved theme only once the client has mounted.
+  cy.get('[data-testid="theme-toggle"]')
+    .should('have.attr', 'aria-label')
+    .and('contain', 'currently');
+  cy.get('[data-testid="theme-toggle"]').click();
+  cy.get(`[data-testid="theme-option-${theme}"]`).click();
+}
+
 describe('Page Load & Navigation', () => {
   before(() => {
     cy.visit('/');
@@ -124,8 +134,7 @@ describe('Splash text', () => {
     cy.get('[data-testid="splash-text"]').should('be.visible').and('have.text', 'AgentX is here!!');
 
     // Same splash after switching themes — it is no longer minecraft-only.
-    cy.get('[data-testid="theme-toggle"]').click();
-    cy.get('[data-testid="theme-option-dark"]').click();
+    pickTheme('dark');
     cy.get('html').should('have.class', 'dark');
     cy.get('[data-testid="splash-text"]').should('be.visible').and('have.text', 'AgentX is here!!');
   });
@@ -148,8 +157,7 @@ describe('Theme Toggle', () => {
           .some((r) => r.name.includes('/decorative/csgo/')),
       ).to.eq(false);
     });
-    cy.get('[data-testid="theme-toggle"]').click();
-    cy.get('[data-testid="theme-option-csgo"]').click();
+    pickTheme('csgo');
     cy.get('html').should('have.class', 'csgo');
     cy.get('[data-testid="csgo-theme-banner"]').should('be.visible');
     cy.get('[data-testid="csgo-scene"]')
@@ -160,8 +168,7 @@ describe('Theme Toggle', () => {
     cy.get('[data-testid="csgo-scene"] img').should(($img) => {
       expect(($img[0] as HTMLImageElement).naturalWidth).to.be.greaterThan(0);
     });
-    cy.get('[data-testid="theme-toggle"]').click();
-    cy.get('[data-testid="theme-option-light"]').click();
+    pickTheme('light');
     cy.get('html').should('have.class', 'light');
     cy.get('[data-testid="csgo-scene"]').should('not.exist');
     cy.get('[data-testid="csgo-theme-banner"]').should('not.exist');
@@ -174,8 +181,7 @@ describe('Theme Toggle', () => {
       },
     });
     cy.get('[data-testid="gta-scene"]').should('not.exist');
-    cy.get('[data-testid="theme-toggle"]').click();
-    cy.get('[data-testid="theme-option-gta"]').click();
+    pickTheme('gta');
     cy.get('html').should('have.class', 'gta');
     cy.get('[data-testid="gta-theme-banner"]').should('be.visible');
     cy.get('[data-testid="gta-scene"]')
@@ -184,8 +190,7 @@ describe('Theme Toggle', () => {
     cy.reload();
     cy.get('html').should('have.class', 'gta');
     cy.get('[data-testid="gta-scene"]').should('exist');
-    cy.get('[data-testid="theme-toggle"]').click();
-    cy.get('[data-testid="theme-option-light"]').click();
+    pickTheme('light');
     cy.get('html').should('have.class', 'light');
     cy.get('[data-testid="gta-scene"]').should('not.exist');
     cy.get('[data-testid="gta-theme-banner"]').should('not.exist');
@@ -197,8 +202,7 @@ describe('Theme Toggle', () => {
       win.localStorage.setItem('theme', 'light');
     });
     cy.visit('/');
-    cy.get('[data-testid="theme-toggle"]').click();
-    cy.get('[data-testid="theme-option-dark"]').click();
+    pickTheme('dark');
     cy.get('html').should('have.class', 'dark');
     cy.reload();
     cy.get('html').should('have.class', 'dark');

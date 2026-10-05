@@ -65,6 +65,15 @@ export function ModeToggle() {
   const activeIndex = Math.max(0, APP_THEMES.indexOf(current ?? ''));
   const ActiveIcon = THEME_ICONS[current ?? ''];
 
+  // Land on the active theme whenever the menu opens, including a reopen that
+  // interrupts the close animation (Radix skips onOpenAutoFocus then).
+  React.useEffect(() => {
+    if (!open) return;
+    const frame = requestAnimationFrame(() => focusOption(activeIndex));
+    return () => cancelAnimationFrame(frame);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- focus only on open
+  }, [open]);
+
   const choose = (next: string) => {
     setOpen(false);
     if (next === theme) return;
@@ -110,11 +119,7 @@ export function ModeToggle() {
         sideOffset={6}
         data-testid="theme-menu"
         className="w-auto p-1"
-        onOpenAutoFocus={(event) => {
-          // Land on the active theme so arrow keys start from the current choice.
-          event.preventDefault();
-          focusOption(activeIndex);
-        }}
+        onOpenAutoFocus={(event) => event.preventDefault()}
       >
         <div role="radiogroup" aria-label={t.menu} className="flex flex-col gap-0.5">
           {APP_THEMES.map((id, index) => {
