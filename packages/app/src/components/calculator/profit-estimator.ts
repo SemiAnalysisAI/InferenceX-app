@@ -169,6 +169,18 @@ export function listPricingToTokenRevenuePricing(list: ProfitListPricing): Token
   };
 }
 
+/**
+ * Whether the profit estimator uses the observed (server-measured) cache hit
+ * rate or the infinite-cache theoretical rate from the trace.
+ *
+ * - **actual**: the cache hit rate measured by the serving runtime during the
+ *   benchmark, reflecting real cache capacity and eviction behaviour.
+ * - **theoretical**: the infinite-cache theoretical rate computed from the
+ *   trace, representing the maximum reuse potential if cache capacity were
+ *   unbounded. Useful as an upper-bound revenue estimate.
+ */
+export type CacheHitMode = 'actual' | 'theoretical';
+
 /** Fraction of benchmarked throughput that is actually sold. */
 export const DEFAULT_UTILIZATION_PCT = 60;
 
@@ -408,6 +420,22 @@ export function modelsWithAgenticData<M extends string>(
     rows.filter((row) => row.benchmark_type === 'agentic_traces').map((row) => row.model),
   );
   return models.filter((model) => dbKeysFor(model).some((key) => agenticDbModels.has(key)));
+}
+
+/**
+ * Remap interpolated results to use the theoretical cache hit rate in place of
+ * the measured one. When the theoretical rate is unavailable, the measured rate
+ * is kept — the intent is an upper-bound estimate, not a dropout.
+ */
+export function applyCacheHitMode<
+  T extends { cacheHitRate?: number; theoreticalCacheHitRate?: number },
+>(results: readonly T[], mode: CacheHitMode): T[] {
+  if (mode === 'actual') return results as T[];
+  return results.map((r) =>
+    typeof r.theoreticalCacheHitRate === 'number'
+      ? { ...r, cacheHitRate: r.theoreticalCacheHitRate }
+      : r,
+  );
 }
 
 /**

@@ -12,6 +12,7 @@ import {
 } from '@semianalysisai/inferencex-constants';
 import { Info, Plus, X } from 'lucide-react';
 import { useTheme } from 'next-themes';
+import { isDarkTheme } from '@/lib/themes';
 import Link from 'next/link';
 
 import ProfitEstimatorChart from '@/components/calculator/ProfitEstimatorChart';
@@ -83,12 +84,14 @@ import { useLocale } from '@/lib/use-locale';
 import { getDisplayLabel } from '@/lib/utils';
 
 import {
+  applyCacheHitMode,
   clampPercent,
   DEFAULT_UTILIZATION_PCT,
   listPricingToTokenRevenuePricing,
   modelsWithAgenticData,
   parseTokenPriceInput,
   profitModelDefaults,
+  type CacheHitMode,
   type ProfitBasis,
   type ProfitEstimatorRow,
 } from './profit-estimator';
@@ -199,8 +202,8 @@ function priceSourceOptions(
 const STRINGS = {
   en: {
     title: {
-      'gw-year': 'Revenue & Profit Estimator per GigaWatt',
-      'chip-hour': 'Revenue & Profit Estimator',
+      'gw-year': 'Revenue & Profit Estimator per GigaWatt (Beta)',
+      'chip-hour': 'Revenue & Profit Estimator (Beta)',
     },
     benchmarkGroup: 'Benchmark Config',
     powerLabel: 'Power Estimation',
@@ -238,6 +241,13 @@ const STRINGS = {
     targetAgenticLabel: (percentile: string) => `Target ${percentile} Interactivity (tok/s/user)`,
     targetAgenticTooltip: (percentile: string) =>
       `The ${percentile} interactivity operating point used for agentic workload interpolation.`,
+    cacheHitLabel: 'Cache Hit Rates',
+    cacheHitTooltip:
+      'Which cache hit rate to use for cached-input pricing. Actual uses the server-measured rate from the benchmark run. Theoretical uses the infinite-cache rate computed from the trace, representing the maximum reuse potential with unbounded cache capacity — an upper-bound revenue estimate.',
+    cacheHitOptions: {
+      actual: 'Actual',
+      theoretical: 'Theoretical',
+    } satisfies Record<CacheHitMode, string>,
     utilizationLabel: 'Utilization (%)',
     utilizationTooltip:
       'Utilization % factors in the swings & dips of token traffic throughout day & night in addition to efficiency losses of scaling out large scale deployments.',
@@ -253,9 +263,9 @@ const STRINGS = {
         : 'This model has no OpenRouter listing. Switch Token Price to Custom to enter a price.',
     chartTitle: {
       'gw-year': (model: string, workload: string, percentile: string, target: number) =>
-        `${model} ${workload} Revenue & Profit Estimates per GigaWatt Per Year at ${percentile} ${target} tok/s/user Interactivity`,
+        `${model} ${workload} Revenue & Profit Estimates per GigaWatt Per Year at ${percentile} ${target} tok/s/user Interactivity (Beta)`,
       'chip-hour': (model: string, workload: string, percentile: string, target: number) =>
-        `${model} ${workload} Revenue & Profit Estimates per Chip per Hour at ${percentile} ${target} tok/s/user Interactivity`,
+        `${model} ${workload} Revenue & Profit Estimates per Chip per Hour at ${percentile} ${target} tok/s/user Interactivity (Beta)`,
     },
     sellingPriceLabel: 'Selling Price per Million Tokens',
     sellingPrices: (input: string, cached: string, output: string, source: string) =>
@@ -313,8 +323,8 @@ const STRINGS = {
   },
   zh: {
     title: {
-      'gw-year': '每吉瓦收入与利润估算器',
-      'chip-hour': '收入与利润估算器',
+      'gw-year': '每吉瓦收入与利润估算器（Beta）',
+      'chip-hour': '收入与利润估算器（Beta）',
     },
     benchmarkGroup: '基准测试配置',
     powerLabel: '功耗估算方式',
@@ -352,6 +362,13 @@ const STRINGS = {
     targetAgenticLabel: (percentile: string) => `目标 ${percentile} 交互性 (tok/s/user)`,
     targetAgenticTooltip: (percentile: string) =>
       `用于智能体工作负载插值的 ${percentile} 交互性操作点。`,
+    cacheHitLabel: 'Cache 命中率',
+    cacheHitTooltip:
+      '缓存输入定价使用的 cache 命中率。Actual 使用基准测试运行中服务端实测的命中率。Theoretical 使用 trace 计算的无限缓存理论命中率，代表缓存容量无限时的最大复用潜力——一种收入上限估算。',
+    cacheHitOptions: {
+      actual: 'Actual',
+      theoretical: 'Theoretical',
+    } satisfies Record<CacheHitMode, string>,
     utilizationLabel: '利用率 (%)',
     utilizationTooltip:
       '利用率 % 考虑了 token 流量在昼夜间的起伏波动，以及大规模部署横向扩展时的效率损失。',
@@ -367,9 +384,9 @@ const STRINGS = {
         : '该模型没有 OpenRouter 条目。请将 Token 售价切换为自定义并输入价格。',
     chartTitle: {
       'gw-year': (model: string, workload: string, percentile: string, target: number) =>
-        `${model} ${workload} 每吉瓦每年收入与利润估算（${percentile} 交互性 ${target} tok/s/user）`,
+        `${model} ${workload} 每吉瓦每年收入与利润估算（${percentile} 交互性 ${target} tok/s/user）（Beta）`,
       'chip-hour': (model: string, workload: string, percentile: string, target: number) =>
-        `${model} ${workload} 每芯片每小时收入与利润估算（${percentile} 交互性 ${target} tok/s/user）`,
+        `${model} ${workload} 每芯片每小时收入与利润估算（${percentile} 交互性 ${target} tok/s/user）（Beta）`,
     },
     sellingPriceLabel: '每百万 token 售价',
     sellingPrices: (input: string, cached: string, output: string, source: string) =>
@@ -605,6 +622,11 @@ function ProfitEstimatorInner({
   useEffect(() => {
     const value = getUrlParam('c_power');
     setPowerBasis(value === 'modeled' || value === 'compare' ? value : 'provisioned');
+  }, [getUrlParam]);
+  const [cacheHitMode, setCacheHitMode] = useState<CacheHitMode>('actual');
+  useEffect(() => {
+    const value = getUrlParam('c_chmode');
+    setCacheHitMode(value === 'theoretical' ? 'theoretical' : 'actual');
   }, [getUrlParam]);
   const utilization = usePercentField(DEFAULT_UTILIZATION_PCT, 'profit_utilization_set');
   const labCut = usePercentField(
@@ -1007,8 +1029,9 @@ function ProfitEstimatorInner({
           }),
         ]
       : current;
+    const pricedResults = applyCacheHitMode(results, cacheHitMode);
     const estimated = estimateProfitByPower(
-      results,
+      pricedResults,
       (hwKey) => ({
         powerKwPerGpu: getGpuSpecs(hwKey).power,
         costPerGpuHour: costPerGpuHourFor(hwKey),
@@ -1031,6 +1054,7 @@ function ProfitEstimatorInner({
     pricing,
     getResults,
     basis,
+    cacheHitMode,
     powerBasis,
     t.powerBarLabels,
     targetValue,
@@ -1077,7 +1101,7 @@ function ProfitEstimatorInner({
     (row: ProfitEstimatorRow) => {
       const base = resolveColor(row.hwKey);
       if (!row.date) return base;
-      const theme = resolvedTheme === 'dark' ? 'dark' : 'light';
+      const theme = isDarkTheme(resolvedTheme) ? 'dark' : 'light';
       return shadeHistoryColor(
         base,
         historyFadeShare(historyRanks.rank(row.date), historyRanks.count),
@@ -1534,6 +1558,7 @@ function ProfitEstimatorInner({
     ];
     exportToCsv(exportFileName, headers, rows, [
       t.captionFormula[basis](assumptions.utilizationPct, assumptions.labCutPct),
+      `${t.cacheHitLabel}: ${t.cacheHitOptions[cacheHitMode]}`,
       ...(powerControlsEnabled
         ? [
             `${t.powerLabel}: ${t.powerOptions[powerBasis]}`,
@@ -1552,6 +1577,7 @@ function ProfitEstimatorInner({
     assumptions,
     basis,
     selectedRunDate,
+    cacheHitMode,
     powerBasis,
     powerBasisNotes,
     powerControlsEnabled,
@@ -1621,6 +1647,38 @@ function ProfitEstimatorInner({
                       onChange={handleTargetChange}
                       onBlur={handleTargetBlur}
                     />
+                  </div>
+                  <div className="flex min-w-0 flex-col space-y-1.5 md:col-span-2">
+                    <LabelWithTooltip
+                      htmlFor="profit-cache-hit"
+                      label={t.cacheHitLabel}
+                      tooltip={t.cacheHitTooltip}
+                    />
+                    <div data-testid="profit-cache-hit-selector">
+                      <MultiSelect
+                        triggerId="profit-cache-hit"
+                        options={Object.entries(t.cacheHitOptions).map(([value, label]) => ({
+                          value,
+                          label,
+                        }))}
+                        value={[cacheHitMode]}
+                        onChange={(values) => {
+                          const next = values[0];
+                          if (next !== 'actual' && next !== 'theoretical') return;
+                          setCacheHitMode(next);
+                          setUrlParam('c_chmode', next === 'actual' ? '' : next);
+                          track('profit_cache_hit_mode_changed', { mode: next });
+                        }}
+                        open={openDropdown === 'cacheHit'}
+                        onOpenChange={handleDropdownOpenChange('cacheHit')}
+                        minSelections={1}
+                        maxSelections={1}
+                        showClearAll={false}
+                        searchable={false}
+                        plainSelectedText
+                        showSelectionSummary={false}
+                      />
+                    </div>
                   </div>
                   {powerControlsEnabled && (
                     <div className="flex min-w-0 flex-col space-y-1.5 md:col-span-2">

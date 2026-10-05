@@ -115,7 +115,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-gpu-metrics-view',
-    sourceSha256: '9513c85ee406f390f73c15757ea30ad9d902b2ec0e39dde25a0e305def2ff7a2',
+    sourceSha256: '8997284dc31762bebce867547d002cc0cbbc9c9a423d56d39cf40690dfef9190',
   },
   {
     source: 'src/app/api/v1/views/gpu-specs/route.ts',
@@ -278,7 +278,7 @@ export const apiRouteCatalog = [
       en: 'UI-only PowerX raw/series=power read: DB-first with artifact fallback, separate host/GPU identities and adjacent CSV context timezone normalization. GET has no expected identities and reports sourceCoverage unknown. Healthy stored windows survive fallback; known-incomplete CSVs require retained file/sample inventory and known-incomplete bundles require re-ingest. DB failures return 503 DATABASE_UNAVAILABLE; unresolved stored gaps return 503 STORED_TELEMETRY_INCOMPLETE. Responses use no-store. This is not a stable public API.',
       zh: '仅供 PowerX 界面读取原始遥测或 series=power：优先 DB，缺失时回退产物，保留主机/GPU 身份，并按相邻 CSV context 规范化时区。GET 没有预期身份清单，sourceCoverage 为 unknown。回退保留健康存储窗口；已知不完整 CSV 须满足文件/样本清单，已知不完整 bundle 须重新 ingest。数据库故障返回 503 DATABASE_UNAVAILABLE，未恢复的存储缺口返回 503 STORED_TELEMETRY_INCOMPLETE。响应使用 no-store，不作为稳定公开 API。',
     },
-    sourceSha256: '80fd8ea1d462b2d47d42411d8361db72802943a94c7ffb91879244c69ef2c693',
+    sourceSha256: 'b155dd8f95c573b134b5ac96ef06938259d782915d1131712bdb7cef33857603',
   },
   {
     source: 'src/app/api/gpu-metrics/route.ts',
@@ -289,7 +289,7 @@ export const apiRouteCatalog = [
       en: 'Read-only Timeline transport with runId, series=power and optional prefix in the query; JSON sources contains 1–1000 validation basenames with RESULT_FILENAME up to 200 ASCII letters/digits/dot/underscore/hyphen, matching prefix. Invalid input returns 400; bodies over 256 KiB return 413. Fully covered DB reads skip GitHub; missing identities fall back and merge by validation source, preserving stored sibling windows. Offline GitHub preserves healthy DB series with incomplete sourceCoverage. Coverage describes only requested identities, never whole-run/sample completeness. The GET no-store/error/inventory guarantees also apply. UI-owned, excluded from the stable public API.',
       zh: 'Timeline 只读传输：查询参数为 runId、series=power 和可选 prefix；JSON sources 含 1–1000 个验证文件 basename，RESULT_FILENAME 最长 200 个 ASCII 字母/数字/点/下划线/连字符，且须匹配 prefix。输入错误返回 400，正文超过 256 KiB 返回 413。DB 已覆盖请求时跳过 GitHub，否则按缺失身份回退，以 validation source 为键合并，并保留已存储的同 bundle 兄弟窗口。GitHub 离线仍返回健康 DB 序列，sourceCoverage 标记 incomplete。覆盖仅针对请求身份，不代表整次 run 或样本完整性。沿用 GET 的 no-store、错误和清单约束；属于界面接口，不纳入稳定公开 API。',
     },
-    sourceSha256: '80fd8ea1d462b2d47d42411d8361db72802943a94c7ffb91879244c69ef2c693',
+    sourceSha256: 'b155dd8f95c573b134b5ac96ef06938259d782915d1131712bdb7cef33857603',
   },
   {
     source: 'src/app/api/openapi.json/route.ts',
@@ -844,6 +844,22 @@ export interface ApiContractSourceDigest {
  */
 export const apiContractSourceDigests = [
   {
+    source: 'src/app/api/gpu-metrics/artifact-selection.ts',
+    sourceSha256: 'ab1efa13ee06e467a73b3a89946a8e58968c9f3dee1eea533b33fe4770aff08e',
+    reviewArea: {
+      en: 'Shared stored/live telemetry artifact prefix and requested-source selection.',
+      zh: '数据库与实时遥测共用的产物前缀及请求 source 选择规则。',
+    },
+  },
+  {
+    source: 'src/app/api/gpu-metrics/github-telemetry.ts',
+    sourceSha256: '5af589a48ae7ea461d767ad34affabb43598a95d414f34bcf4a901845313116f',
+    reviewArea: {
+      en: 'Live PowerX artifact selection, download bounds, per-artifact failure isolation, CSV context normalization and bundle decoding.',
+      zh: 'PowerX 实时产物选择、下载限制、单产物故障隔离、CSV context 规范化及 bundle 解码。',
+    },
+  },
+  {
     source: 'src/components/calculator/profit-power.ts',
     sourceSha256: 'ff92b0a954afb78769ab8a29ca6ca7bdc52f83bb49379e2f2f274ef4c179330a',
     reviewArea: {
@@ -909,7 +925,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/etl/power-audit-validations.ts',
-    sourceSha256: '44a607747b79d038bb8f4e53590efba689d376c143f50a5d750d3552faa0c442',
+    sourceSha256: '54f37f2bc06835b6cfbbe306d77acd3d5677e10997a9764a340f448f59e953a2',
     reviewArea: {
       en: 'Shared legacy and nested AgentX validation identity normalization for artifact and stored Timeline windows.',
       zh: '产物与数据库 Timeline 窗口共用的 legacy 和嵌套 AgentX validation 身份规范化。',
@@ -959,7 +975,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/components/gpu-power/chart-data.ts',
-    sourceSha256: '3e4bed7d693f146c97ac52cc0bb64d854a9dee2a1fa8d5dbf534ac4e1e78fa3f',
+    sourceSha256: '9e057519b83ac6f4644db577be075c6aa24734a99614a29453c5f152b2f26d38',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -1013,7 +1029,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/components/calculator/throughput-data.ts',
-    sourceSha256: '4d12f2f267c939def090843b2f221a9ae5d92956b8307c4866ef6c09065096aa',
+    sourceSha256: '4ff72d6273e20036a4e05c886c0441cdf55d0d6d7ef4b6632c4c0b53fd1d3beb',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -1031,7 +1047,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/calculator-extensions.ts',
-    sourceSha256: '0c571acc23940e65290a5421c0872eb63f2531b289699c520209910b50dee784',
+    sourceSha256: '33e3f193205c0a62a284ea2279d27f04233a1c64e3bd37b8f0468e326d680ad8',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -1058,7 +1074,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/registry.ts',
-    sourceSha256: '9f07c3bae5ec76f47b562143d52632dd186f132cd0e117848a0fa1d7d018f3ea',
+    sourceSha256: '5836360c07ce714b78ca3a93b541f704cffce63567f645cf2ad8199687e48c16',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -1328,7 +1344,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/trace-server-metrics.ts',
-    sourceSha256: '4f70c310675c36ce062fe78861925f0a9e99b05396a6d2b5d0afc9221a89edd7',
+    sourceSha256: '5e5409267997e2ca5df90e6ffa74042090a332ac5bd29e3a52055b8674725bdb',
     reviewArea: {
       en: 'Trace server metric metadata, time-series groups, source labels, and units.',
       zh: '跟踪服务器指标元数据、时间序列分组、来源标签和单位。',

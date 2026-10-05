@@ -3,6 +3,7 @@ import { Y_AXIS_METRICS } from '@/lib/chart-utils';
 import { toSequence } from '@/lib/compare-enum-coerce';
 import { sequenceForScenarioSegment } from '@/lib/compare-scenario-route';
 import type { Sequence } from '@/lib/data-mappings';
+import { APP_THEMES } from '@/lib/themes';
 
 export {
   EMBED_PATH_PREFIX,
@@ -152,7 +153,7 @@ export function embedBootScript(theme: EmbedTheme, skin: EmbedSkin | undefined):
   return (
     `(function(){var h=document.documentElement;h.dataset.inferencexEmbed='';` +
     `var s=${skinJs};if(s){h.dataset.inferencexSkin=s;}` +
-    `h.classList.remove('light','dark','minecraft');h.classList.add(${JSON.stringify(theme)});` +
+    `h.classList.remove(...${JSON.stringify(APP_THEMES)});h.classList.add(${JSON.stringify(theme)});` +
     `h.style.colorScheme=${JSON.stringify(theme)};})();`
   );
 }

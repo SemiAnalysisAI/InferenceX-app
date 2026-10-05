@@ -4,6 +4,7 @@ import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.share
 
 import { Header } from '@/components/header/header';
 import { ThemeProvider } from '@/components/ui/theme-provider';
+import { APP_THEMES } from '@/lib/themes';
 import { createMockRouter } from '../support/mock-router';
 
 // Mounted outside the Next app shell; next-style-loader inserts the global
@@ -37,7 +38,7 @@ describe('Header', () => {
             <ThemeProvider
               attribute="class"
               defaultTheme="light"
-              themes={['light', 'dark', 'minecraft']}
+              themes={APP_THEMES}
               disableTransitionOnChange
             >
               <Header />
@@ -208,6 +209,21 @@ describe('Header', () => {
     cy.get('[data-testid="theme-toggle"]').should('be.visible');
   });
 
+  for (const pathname of ['/', '/zh']) {
+    it(`omits the leaves toggle from desktop and mobile headers on ${pathname}`, () => {
+      cy.viewport(1440, 900);
+      mountHeader(pathname);
+      cy.get('[data-testid="autumn-leaves-toggle"]').should('not.exist');
+      cy.get('[data-testid="language-toggle"]').should('be.visible');
+      cy.get('[data-testid="theme-toggle"]').should('be.visible');
+
+      cy.viewport(375, 812);
+      cy.get('[data-testid="mobile-menu-toggle"]').click();
+      cy.get('[data-testid="mobile-menu"]').should('be.visible');
+      cy.get('[data-testid="autumn-leaves-toggle"]').should('not.exist');
+    });
+  }
+
   it('shows mobile hamburger menu on small viewports', () => {
     cy.viewport(375, 812);
     cy.get('[data-testid="nav-link-dashboard"]').should('not.be.visible');
@@ -233,7 +249,7 @@ describe('Header', () => {
 
   it('uses the same resting icon color and shape for all three header utilities in each theme', () => {
     cy.viewport(390, 844);
-    for (const theme of ['light', 'dark', 'minecraft']) {
+    for (const [index, theme] of APP_THEMES.entries()) {
       cy.get('[data-testid="theme-toggle"]').should(
         'have.attr',
         'aria-label',
@@ -251,7 +267,11 @@ describe('Header', () => {
           });
         }
       });
-      cy.get('[data-testid="theme-toggle"]').click();
+      const next = APP_THEMES[index + 1];
+      if (next) {
+        cy.get('[data-testid="theme-toggle"]').click();
+        cy.get(`[data-testid="theme-option-${next}"]`).click();
+      }
     }
   });
 
@@ -371,7 +391,7 @@ describe('Header', () => {
 
     it('exposes the minecraft audio toggles in the mobile menu without overflowing', () => {
       cy.get('[data-testid="theme-toggle"]').click();
-      cy.get('[data-testid="theme-toggle"]').click();
+      cy.get('[data-testid="theme-option-minecraft"]').click();
       cy.get('html').should('have.class', 'minecraft');
       cy.get('[data-testid="mobile-menu-toggle"]').click();
       cy.get('[data-testid="mobile-menu"]').within(() => {

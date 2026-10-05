@@ -3,6 +3,7 @@
 import { Loader2 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTheme } from 'next-themes';
+import { isDarkTheme } from '@/lib/themes';
 import { useMemo, useState } from 'react';
 
 import type { ComparisonOp } from '@semianalysisai/inferencex-db/operatorx/compare';
@@ -100,7 +101,7 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
     isPlaceholderData: switching,
     refetch,
   } = useOperatorXComparison(op, search.get('workload'));
-  const theme = useTheme().resolvedTheme === 'dark' ? 'dark' : 'light';
+  const theme = isDarkTheme(useTheme().resolvedTheme) ? 'dark' : 'light';
   const [picked, setPicked] = useState<string[] | null>(null);
   const [pickedBaseline, setBaseline] = useState<string | null>(null);
   const [inspected, setInspected] = useState<number | null>(null);

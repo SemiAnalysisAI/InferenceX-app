@@ -46,16 +46,10 @@ import {
 } from '@semianalysisai/inferencex-db/queries/gpu-metrics';
 
 import type {
-  GpuMetricRow,
   GpuPowerRunInfo,
   GpuMetricsArtifact,
   GpuPowerApiResponse,
 } from '@/components/gpu-power/types';
-import {
-  cutPowerAuditBundle,
-  isPowerAuditBundleEntry,
-  parsePowerCsvData,
-} from '@/components/gpu-power/power-audit-bundle';
 import {
   bucketPowerFiles,
   parseTelemetryTimestampUtc,
@@ -65,27 +59,11 @@ import {
   storedPowerSeries,
   StoredTelemetryIncompleteError,
 } from '@/components/gpu-power/stored-power-series';
-import {
-  downloadGithubArtifact,
-  extractZipEntries,
-  fetchGithubRunArtifacts,
-  fetchGithubWorkflowRun,
-  getGithubToken,
-  normalizeGithubRunInfo,
-  readZipEntries,
-  type GithubArtifact,
-  type GithubWorkflowRun,
-} from '@/lib/github-artifacts';
+import { ARTIFACT_PREFIX, isWantedBundle, isRequestedArtifact } from './artifact-selection';
+import { fetchGpuMetricsFromGithub, type GithubArtifactPayload } from './github-telemetry';
 
-const MAX_ARTIFACT_BYTES = 50 * 1024 * 1024;
-/** Bundles carry a whole sweep (215 MB seen for nw8); only the power entries are decoded. */
-const MAX_BUNDLE_BYTES = 256 * 1024 * 1024;
 /** Bundle downloads are latency-bound; match the other artifact routes' budget. */
 export const maxDuration = 300;
-/** Parallel artifact downloads; GitHub's zip redirects are latency-bound, not CPU-bound. */
-const DOWNLOAD_CONCURRENCY = 4;
-const ARTIFACT_PREFIX = 'gpu_metrics_';
-const BUNDLE_PREFIX = 'power_audit_';
 /** RESULT_FILENAME characters: model, workload, precision, framework, parallelism, host, hash. */
 const PREFIX_PATTERN = /^[A-Za-z0-9._-]{1,200}$/u;
 const SOURCE_PATTERN = /^power_validation_[A-Za-z0-9._-]{1,200}\.json$/u;
@@ -135,144 +113,6 @@ export function databasePayloadToResponse(payload: GpuMetricsRunPayload): GpuMet
   };
 }
 
-/** The GitHub path also carries the bundle series the timeline draws. */
-interface GithubArtifactPayload {
-  name: string;
-  files: { name: string; data: GpuMetricRow[] }[];
-}
-
-interface GithubGpuMetricsResponse extends Omit<GpuMetricsRouteResponse, 'artifacts'> {
-  artifacts: GithubArtifactPayload[];
-  source: 'github';
-  bundleSeries: GpuPowerSeries[];
-}
-
-type TelemetryJob =
-  | { kind: 'csv'; artifact: GithubArtifact }
-  | { kind: 'bundle'; artifact: GithubArtifact };
-
-type TelemetryResult =
-  | { kind: 'csv'; parsed: GithubArtifactPayload }
-  | { kind: 'bundle'; series: GpuPowerSeries[] };
-
-/** Fetches one artifact zip, or `null` (with a warning) when it fails or exceeds `maxBytes`. */
-async function downloadZip(
-  artifact: GithubArtifact,
-  githubToken: string,
-  maxBytes: number,
-): Promise<Buffer | null> {
-  const dlResp = await downloadGithubArtifact(artifact.archive_download_url, githubToken);
-  if (!dlResp.ok) {
-    console.warn(`Failed to download artifact ${artifact.name}: ${dlResp.statusText}`);
-    return null;
-  }
-
-  const contentLength = dlResp.headers.get('Content-Length');
-  if (contentLength && parseInt(contentLength, 10) > maxBytes) {
-    console.warn(`Artifact ${artifact.name} exceeds ${maxBytes / (1024 * 1024)} MB, skipping`);
-    return null;
-  }
-  return Buffer.from(await dlResp.arrayBuffer());
-}
-
-async function downloadArtifact(
-  artifact: GithubArtifact,
-  githubToken: string,
-): Promise<GithubArtifactPayload | null> {
-  const buffer = await downloadZip(artifact, githubToken, MAX_ARTIFACT_BYTES);
-  if (!buffer) return null;
-  const contexts = new Map<string, Record<string, unknown>>();
-  const contextFiles = extractZipEntries(buffer, '.json', (name, contents) => {
-    const base = name.slice(name.lastIndexOf('/') + 1);
-    if (!base.includes('gpu_metrics') || !base.toLowerCase().endsWith('_context.json')) return [];
-    const context: unknown = JSON.parse(contents);
-    return context && typeof context === 'object' && !Array.isArray(context)
-      ? [{ name, context: context as Record<string, unknown> }]
-      : [];
-  });
-  // Ingest uses code-unit filename order, not archive order or the host locale.
-  contextFiles.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
-  for (const { name, context } of contextFiles) {
-    const directory = name.slice(0, name.lastIndexOf('/') + 1);
-    if (!contexts.has(directory)) contexts.set(directory, context);
-  }
-  const files = extractZipEntries(
-    buffer,
-    '.csv',
-    (entryName, contents) => {
-      const directory = entryName.slice(0, entryName.lastIndexOf('/') + 1);
-      const data = parsePowerCsvData(contents, contexts.get(directory) ?? null);
-      return data.length > 0 ? [{ name: entryName, data }] : [];
-    },
-    (entryName, error) => {
-      console.warn(`Failed to parse CSV ${entryName} from ${artifact.name}:`, error);
-    },
-  );
-  return files.length > 0 ? { name: artifact.name, files } : null;
-}
-
-async function downloadBundle(
-  artifact: GithubArtifact,
-  githubToken: string,
-): Promise<GpuPowerSeries[] | null> {
-  const buffer = await downloadZip(artifact, githubToken, MAX_BUNDLE_BYTES);
-  if (!buffer) return null;
-  const series = cutPowerAuditBundle(
-    artifact.name,
-    readZipEntries(buffer, isPowerAuditBundleEntry),
-  );
-  return series.length > 0 ? series : null;
-}
-
-/**
- * One artifact download and parse. A corrupt or truncated archive is that
- * artifact's failure alone: it is logged and skipped so the other series of
- * the run still reach the chart (the client would otherwise retry the whole
- * multi-hundred-megabyte request).
- */
-async function runJob(job: TelemetryJob, githubToken: string): Promise<TelemetryResult | null> {
-  try {
-    if (job.kind === 'csv') {
-      const parsed = await downloadArtifact(job.artifact, githubToken);
-      return parsed ? { kind: 'csv', parsed } : null;
-    }
-    const series = await downloadBundle(job.artifact, githubToken);
-    return series ? { kind: 'bundle', series } : null;
-  } catch (error) {
-    console.warn(`Failed to read artifact ${job.artifact.name}:`, error);
-    return null;
-  }
-}
-
-/** Downloads in listing order with a bounded number of requests in flight. */
-async function downloadTelemetry(
-  jobs: TelemetryJob[],
-  githubToken: string,
-): Promise<TelemetryResult[]> {
-  const results: (TelemetryResult | null)[] = Array.from({ length: jobs.length }, () => null);
-  let next = 0;
-  const worker = async () => {
-    while (next < jobs.length) {
-      const index = next++;
-      results[index] = await runJob(jobs[index], githubToken);
-    }
-  };
-  await Promise.all(Array.from({ length: Math.min(DOWNLOAD_CONCURRENCY, jobs.length) }, worker));
-  return results.filter((result): result is TelemetryResult => result !== null);
-}
-
-/**
- * A bundle names a whole sweep, while the client's prefix (the longest common
- * prefix of its points' validation names) may run into the `_sa-bench_…_conc<c>`
- * suffix; either side being a prefix of the other selects the bundle.
- */
-function isWantedBundle(name: string, prefix: string | null): boolean {
-  if (!name.startsWith(BUNDLE_PREFIX)) return false;
-  if (prefix === null) return true;
-  const wanted = `${BUNDLE_PREFIX}${prefix}`;
-  return name.startsWith(wanted) || wanted.startsWith(name);
-}
-
 /** Validation basenames identify individual windows, including siblings in one bundle. */
 function seriesSource(series: GpuPowerSeries): string | null {
   return (
@@ -280,16 +120,6 @@ function seriesSource(series: GpuPowerSeries): string | null {
     (series.artifact.startsWith(ARTIFACT_PREFIX)
       ? `power_validation_${series.artifact.slice(ARTIFACT_PREFIX.length)}.json`
       : null)
-  );
-}
-
-function isRequestedArtifact(name: string, sources: string[] | null): boolean {
-  return (
-    sources === null ||
-    sources.some((source) => {
-      const result = source.slice('power_validation_'.length, -'.json'.length);
-      return name === `${ARTIFACT_PREFIX}${result}` || isWantedBundle(name, result);
-    })
   );
 }
 
@@ -330,55 +160,47 @@ function filterArtifactsByPrefix(
   });
 }
 
-async function fetchGpuMetricsFromGithub(
-  runId: string,
-  prefix: string | null,
-  includeBundles: boolean,
-  sources: string[] | null = null,
-): Promise<GithubGpuMetricsResponse> {
-  const githubToken = getGithubToken();
-  if (!githubToken) throw new Error('GitHub token not configured');
-
-  const runResp = await fetchGithubWorkflowRun(runId, githubToken);
-  if (!runResp.ok) throw new Error(`Failed to fetch workflow run: ${runResp.status}`);
-  const run = (await runResp.json()) as GithubWorkflowRun;
-
-  const artifacts = await fetchGithubRunArtifacts(runId, githubToken);
-
-  // `eval_gpu_metrics_*` artifacts are excluded by the bare `gpu_metrics` test.
-  const wanted = prefix ? `${ARTIFACT_PREFIX}${prefix}` : 'gpu_metrics';
-  const jobs: TelemetryJob[] = artifacts
-    .filter((a) => a.name.startsWith(wanted) && isRequestedArtifact(a.name, sources))
-    .map((artifact) => ({ kind: 'csv', artifact }));
-  if (includeBundles) {
-    for (const artifact of artifacts) {
-      if (isWantedBundle(artifact.name, prefix) && isRequestedArtifact(artifact.name, sources))
-        jobs.push({ kind: 'bundle', artifact });
-    }
-  }
-  if (jobs.length === 0) {
-    throw new Error(
-      includeBundles
-        ? 'No telemetry artifacts (gpu_metrics or power_audit) found for this run'
-        : 'No gpu_metrics artifacts found for this run',
+/** A live artifact repairs a stored gap only when its retained file/sample inventory matches. */
+function assertStoredArtifactsRecovered(
+  stored: GpuMetricsRouteResponse | null,
+  artifacts: GithubArtifactPayload[],
+  incomplete: StoredTelemetryIncompleteError[],
+): void {
+  for (const missing of incomplete) {
+    const incompleteArtifact = missing.artifact;
+    const live = artifacts.find((artifact) => artifact.name === incompleteArtifact);
+    const inventory = stored?.artifacts.find(
+      (artifact) => artifact.series?.artifactName === incompleteArtifact,
+    )?.series?.sidecars.seriesInventory;
+    // A matching name alone cannot prove that missing hosts/samples recovered.
+    // Bundle cuts do not retain the raw inventory, so known-incomplete bundles
+    // require re-ingest; ordinary un-ingested bundle fallback stays available.
+    if (!live || !Array.isArray(inventory) || inventory.length === 0) throw missing;
+    const counts = new Map(
+      live.files.map((file) => [
+        file.name,
+        new Set(
+          file.data.flatMap((row) => {
+            const time = parseTelemetryTimestampUtc(row.timestamp);
+            return time === null || !Number.isInteger(row.index) || !Number.isFinite(row.power)
+              ? []
+              : [`${row.index}:${time}`];
+          }),
+        ).size,
+      ]),
     );
+    if (
+      !inventory.every(
+        (expected) =>
+          expected !== null &&
+          typeof expected === 'object' &&
+          typeof expected.fileName === 'string' &&
+          typeof expected.sampleCount === 'number' &&
+          counts.get(expected.fileName) === expected.sampleCount,
+      )
+    )
+      throw missing;
   }
-
-  const results = await downloadTelemetry(jobs, githubToken);
-  if (results.length === 0) throw new Error('No Chip metrics data found in artifacts');
-
-  const parsedArtifacts: GithubArtifactPayload[] = [];
-  const bundleSeries: GpuPowerSeries[] = [];
-  for (const result of results) {
-    if (result.kind === 'csv') parsedArtifacts.push(result.parsed);
-    else bundleSeries.push(...result.series);
-  }
-  return {
-    source: 'github',
-    runInfo: normalizeGithubRunInfo(run) as GpuPowerRunInfo,
-    artifacts: parsedArtifacts,
-    bundleSeries,
-  };
 }
 
 async function fetchGpuMetricsFromDatabase(
@@ -565,41 +387,7 @@ async function readGpuMetrics(
             (sources === null || sources.includes(seriesSource(entry) ?? '')),
         ),
       ];
-      for (const missing of incomplete) {
-        const incompleteArtifact = missing.artifact;
-        const live = artifacts.find((artifact) => artifact.name === incompleteArtifact);
-        const inventory = stored?.artifacts.find(
-          (artifact) => artifact.series?.artifactName === incompleteArtifact,
-        )?.series?.sidecars.seriesInventory;
-        // A matching name alone cannot prove that missing hosts/samples recovered.
-        // Bundle cuts do not retain the raw inventory, so known-incomplete bundles
-        // require re-ingest; ordinary un-ingested bundle fallback stays available.
-        if (!live || !Array.isArray(inventory) || inventory.length === 0) throw missing;
-        const counts = new Map(
-          live.files.map((file) => [
-            file.name,
-            new Set(
-              file.data.flatMap((row) => {
-                const time = parseTelemetryTimestampUtc(row.timestamp);
-                return time === null || !Number.isInteger(row.index) || !Number.isFinite(row.power)
-                  ? []
-                  : [`${row.index}:${time}`];
-              }),
-            ).size,
-          ]),
-        );
-        if (
-          !inventory.every(
-            (expected) =>
-              expected !== null &&
-              typeof expected === 'object' &&
-              typeof expected.fileName === 'string' &&
-              typeof expected.sampleCount === 'number' &&
-              counts.get(expected.fileName) === expected.sampleCount,
-          )
-        )
-          throw missing;
-      }
+      assertStoredArtifactsRecovered(stored, artifacts, incomplete);
       return powerSeriesResponse('github', runInfo, combined, sources);
     }
     const live = await fetchGpuMetricsFromGithub(runId, prefix, false);

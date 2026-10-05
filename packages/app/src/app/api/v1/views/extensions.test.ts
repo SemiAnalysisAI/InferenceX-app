@@ -476,6 +476,7 @@ describe('new dashboard projections', () => {
         avg_total_gpu_power_w: 3601,
         cpu_power_valid: 1,
         avg_total_module_power_w: 4300.75,
+        theoretical_cache_hit_rate: 0.99,
       },
     });
     mocks.benchmarks.mockImplementation(() => Response.json([tray]));
@@ -509,6 +510,24 @@ describe('new dashboard projections', () => {
       // Pinned rack reference: 1.6077325 kW/GPU, including PUE and planning margin.
       expect(modeled.gpuHours).toBeCloseTo((1_000_000 / 1.6077325) * 8760, 2);
       expect(modeled.revenuePerGpuHour).toBe(provisioned.revenuePerGpuHour);
+    }
+    const theoreticalResponse = await gw(
+      req(
+        'profit-estimator-per-gigawatt',
+        'model=DeepSeek-V4-Pro&target=45&priceSource=custom&powerBasis=compare&cacheHitMode=theoretical&unofficialrun=456',
+      ),
+    );
+    expect(theoreticalResponse.status).toBe(200);
+    const theoretical = await theoreticalResponse.json();
+    expect(theoretical.params.cacheHitMode).toBe('theoretical');
+    for (const [actual, projected] of [
+      [body.data, theoretical.data],
+      [body.overlays, theoretical.overlays],
+    ]) {
+      expect(projected.rows).toHaveLength(2);
+      expect(projected.rows[1].powerSource).toEqual(actual.rows[1].powerSource);
+      expect(projected.rows[1].gpuHours).toBe(actual.rows[1].gpuHours);
+      expect(projected.rows[1].revenuePerGpuHour).toBeLessThan(actual.rows[1].revenuePerGpuHour);
     }
   });
   it.each([
@@ -616,4 +635,66 @@ describe('new dashboard projections', () => {
     expect(body.rows).toEqual([]);
     expect(body.series).toEqual([{ key: 'amd', points: [] }]);
   });
+});
+
+describe('cache-reuse recipe selection', () => {
+  const query = 'model=DeepSeek-V4-Pro&sequence=agentic-traces&precisions=fp4';
+  const original = 'agg|sn|p1x8/1/-|d1x8/1/-|g8+8|spec-none|offload-off|';
+  const selected = 'agg|sn|p1x8/1/-|d1x16/1/-|g8+16|spec-none|offload-on|';
+  const rows = [
+    agenticRow({ id: 1, conc: 8 }),
+    agenticRow({ id: 2, conc: 16 }),
+    agenticRow({
+      id: 3,
+      conc: 16,
+      decode_tp: 16,
+      num_decode_gpu: 16,
+      offload_mode: 'on',
+      metrics: {
+        ...agenticRow().metrics,
+        server_gpu_cache_hit_rate: 0.6,
+        server_cpu_cache_hit_rate: 0.2,
+      },
+    }),
+  ];
+  it('returns the selected recipe without mixing another recipe at the same concurrency', async () => {
+    mocks.benchmarks.mockImplementation(() => Response.json(rows));
+    const response = await cache(
+      req('cache-reuse', `${query}&recipe=${encodeURIComponent(selected)}`),
+    );
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.params.recipe).toBe(selected);
+    expect(body.data.recipes).toHaveLength(2);
+    expect(body.data.recipe).toBe(selected);
+    expect(body.data.bars).toHaveLength(1);
+    expect(body.data.bars[0]).toMatchObject({ concurrency: 16, share: { hbm: 0.6, host: 0.2 } });
+    expect(body.data.bars[0].point.sourceRow.id).toBe(3);
+  });
+  it('offers recipe selection for overlay-only configurations', async () => {
+    mocks.unofficial.mockImplementation(() => Response.json({ benchmarks: rows, evaluations: [] }));
+    const response = await cache(
+      req('cache-reuse', `${query}&unofficialrun=123&recipe=${encodeURIComponent(selected)}`),
+    );
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.params.recipe).toBe(selected);
+    expect(body.data.recipes).toHaveLength(2);
+    expect(body.data.series).toHaveLength(1);
+    expect(body.data.bars).toHaveLength(1);
+    expect(body.data.bars[0]).toMatchObject({ seriesKey: 'run:0', share: { hbm: 0.6, host: 0.2 } });
+  });
+  it.each(['', '&recipe=unknown'])(
+    'uses the dashboard default for missing or stale recipe keys (%s)',
+    async (suffix) => {
+      mocks.benchmarks.mockImplementation(() => Response.json(rows));
+      const response = await cache(req('cache-reuse', query + suffix));
+      expect(response.status).toBe(200);
+      const body = await response.json();
+      expect(body.params.recipe).toBe(original);
+      expect(
+        body.data.bars.map((bar: { point: { sourceRow: BenchmarkRow } }) => bar.point.sourceRow.id),
+      ).toEqual([1, 2]);
+    },
+  );
 });

@@ -3,7 +3,7 @@
 @import './motion.css';
 @plugin '@tailwindcss/typography';
 
-@custom-variant dark (&:is(.dark *, .minecraft *));
+@custom-variant dark (&:is(.dark *, .minecraft *, .csgo *, .gta *));
 @custom-variant minecraft (&:is(.minecraft *));
 
 /* Allow hash navigation to clear the fixed navbar */
@@ -41,26 +41,120 @@
   content: none;
 }
 
-/* September theme for the InferenceX wordmark — Childhood Cancer Awareness Month
-   ("Go Gold"). The gold awareness ribbon's palette painted onto the brand text
-   via a clipped gradient, running from deep goldenrod through bright gold and
-   back. The darker anchors keep the clipped wordmark legible on the light
-   header, the same treatment the earlier flag themes used. Fixed colors,
-   independent of the theme tokens, so it renders the same in light, dark, and
-   minecraft modes. */
-.pride-wordmark {
-  background-image: linear-gradient(
-    90deg,
-    #9a6a00 0%,
-    #d4a017 30%,
-    #ffd700 50%,
-    #d4a017 70%,
-    #9a6a00 100%
-  );
-  background-clip: text;
-  -webkit-background-clip: text;
-  color: transparent;
-  -webkit-text-fill-color: transparent;
+/* October header treatment; keep chart and export branding unchanged. */
+.halloween-wordmark {
+  color: #b54708;
+  /* Hinted glyph advances at 18px left DM Sans visibly uneven ("Inf e r");
+     unhinted advances plus explicit kerning keep the letters evenly set. */
+  text-rendering: geometricPrecision;
+  font-kerning: normal;
+}
+
+.halloween-wordmark-x {
+  color: #7e22ce;
+}
+
+:is(.dark, .minecraft, .csgo, .gta) .halloween-wordmark {
+  color: #fb923c;
+}
+
+:is(.dark, .minecraft, .csgo, .gta) .halloween-wordmark-x {
+  color: #c084fc;
+}
+
+.halloween-wordmark-pumpkin {
+  font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif;
+  transform: rotate(12deg);
+}
+
+@media (forced-colors: active) {
+  .halloween-wordmark,
+  .halloween-wordmark-x {
+    color: LinkText;
+  }
+}
+
+/* October decoration: leaves falling down the left edge (autumn-leaves.tsx).
+   Sits under the sticky header (z-50) and never takes pointer input. */
+.autumn-leaves {
+  position: fixed;
+  inset: 0 auto 0 0;
+  z-index: 40;
+  /* At container breakpoints only the page padding remains available. */
+  width: clamp(14px, calc((100vw - 1280px) / 2), 96px);
+  --leaf-sway-scale: 1;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.autumn-leaf {
+  position: absolute;
+  top: 0;
+  left: var(--leaf-left);
+  width: var(--leaf-size);
+  height: var(--leaf-size);
+  opacity: 0.85;
+  animation: autumn-leaf-fall var(--leaf-duration) linear var(--leaf-delay) infinite;
+  will-change: transform;
+}
+
+.autumn-leaf-sway {
+  display: block;
+  width: 100%;
+  height: 100%;
+  animation: autumn-leaf-sway calc(var(--leaf-duration) / 4) ease-in-out var(--leaf-delay) infinite
+    alternate;
+}
+
+/* Tablet and laptop breakpoints need the same protection as phones. */
+@media (max-width: 1359px) {
+  .autumn-leaves {
+    --leaf-sway-scale: 0.1;
+  }
+  .autumn-leaf {
+    left: calc(var(--leaf-left) * 0.4);
+    width: calc(var(--leaf-size) * 0.25);
+    height: calc(var(--leaf-size) * 0.25);
+  }
+}
+
+@keyframes autumn-leaf-fall {
+  from {
+    transform: translateY(-10vh);
+  }
+  to {
+    transform: translateY(110vh);
+  }
+}
+
+@keyframes autumn-leaf-sway {
+  from {
+    transform: translateX(calc(var(--leaf-sway) * var(--leaf-sway-scale) * -1)) rotate(-35deg);
+  }
+  to {
+    transform: translateX(calc(var(--leaf-sway) * var(--leaf-sway-scale))) rotate(40deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .autumn-leaf,
+  .autumn-leaf-sway {
+    animation: none;
+  }
+  .autumn-leaf {
+    top: var(--leaf-rest);
+    transform: rotate(-20deg);
+  }
+}
+
+@media (forced-colors: active) {
+  .autumn-leaves {
+    display: none;
+  }
+}
+
+html[data-inferencex-embed] .autumn-leaves {
+  display: none;
 }
 
 /* Benchmark log viewer gutter. Line numbers come from a CSS counter rather than
@@ -205,7 +299,9 @@
   --overlay-run-7: oklch(0.6 0.17 60); /* amber-orange */
 }
 
-.dark {
+.dark,
+.csgo,
+.gta {
   /* Base Theme Colors */
   --background: #131416;
   --foreground: #eaebec;
@@ -248,6 +344,387 @@
   --overlay-run-5: oklch(0.7 0.22 330);
   --overlay-run-6: oklch(0.72 0.2 230);
   --overlay-run-7: oklch(0.78 0.18 60);
+}
+
+/* CS:GO keeps dark chart/vendor palettes; gold belongs to interface chrome. */
+.csgo {
+  color-scheme: dark;
+  --background: #101820;
+  --foreground: #f0eee7;
+  --card: #18232d;
+  --card-foreground: #f0eee7;
+  --popover: #1b2732;
+  --popover-foreground: #f0eee7;
+  --primary: #e6bd68;
+  --primary-foreground: #101820;
+  --secondary: #8eb7d4;
+  --secondary-foreground: #101820;
+  --muted: #293744;
+  --muted-foreground: #b9c3ca;
+  --accent: #303e49;
+  --accent-foreground: #f0eee7;
+  --border: #60707c;
+  --border-alt: #35444e;
+  --input: #60707c;
+  --ring: #e6bd68;
+  --sidebar: #18232d;
+  --sidebar-foreground: #f0eee7;
+  --sidebar-primary: #e6bd68;
+  --sidebar-primary-foreground: #101820;
+  --sidebar-accent: #303e49;
+  --sidebar-accent-foreground: #f0eee7;
+  --sidebar-border: #60707c;
+  --sidebar-ring: #e6bd68;
+  --radius: 0.125rem;
+}
+
+.csgo-scene {
+  position: fixed;
+  inset: 0;
+  z-index: -10;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.csgo-scene-image,
+.csgo-scene-shade {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  inset: 0;
+}
+
+.csgo-scene-image {
+  object-fit: cover;
+  object-position: center top;
+}
+
+.csgo-scene-shade {
+  background: linear-gradient(180deg, #10182088, #101820d9 65%, #101820f5);
+}
+
+.csgo-theme-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-block: 1rem;
+  padding: 0.5rem 1rem;
+  border-left: 3px solid var(--primary);
+  background: linear-gradient(90deg, #18232deb, #18232d66);
+}
+
+.csgo-theme-banner img {
+  width: clamp(10rem, 22vw, 15rem);
+  height: auto;
+}
+
+.csgo-theme-banner span {
+  flex-shrink: 0;
+}
+
+.csgo header {
+  background: #101820ed;
+  border-bottom: 2px solid var(--primary);
+}
+
+.csgo :is(button, [role='button'], [role='combobox'], input, textarea):focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 3px;
+}
+
+.csgo :is([data-slot='card'], [data-slot='select-trigger'], [data-slot='tabs-list']) {
+  border-radius: var(--radius);
+}
+
+.csgo [data-slot='card'] {
+  background-color: #18232df5;
+  border-top-color: var(--primary);
+}
+
+.csgo .circuit-bg,
+.csgo .autumn-leaves,
+html[data-inferencex-embed] .csgo-scene {
+  display: none;
+}
+
+html[data-inferencex-embed] [data-testid='csgo-theme-banner'] {
+  display: none;
+}
+
+/* ── GTA Theme ── GTA V pause-menu chrome over the dark chart palettes. */
+.gta {
+  color-scheme: dark;
+  --background: #0a0a0b;
+  --foreground: #f5f5f5;
+  --card: #111113;
+  --card-foreground: #f5f5f5;
+  --popover: #0d0d0f;
+  --popover-foreground: #f5f5f5;
+  --primary: #72cc72;
+  --primary-foreground: #0a0a0b;
+  --secondary: #5d9bd5;
+  --secondary-foreground: #0a0a0b;
+  --muted: #232326;
+  --muted-foreground: #b8b8bd;
+  --accent: #2c2c30;
+  --accent-foreground: #f5f5f5;
+  --border: #3a3a3f;
+  --border-alt: #26262a;
+  --input: #4a4a50;
+  --ring: #ffffff;
+  --sidebar: #111113;
+  --sidebar-foreground: #f5f5f5;
+  --sidebar-primary: #72cc72;
+  --sidebar-primary-foreground: #0a0a0b;
+  --sidebar-accent: #2c2c30;
+  --sidebar-accent-foreground: #f5f5f5;
+  --sidebar-border: #3a3a3f;
+  --sidebar-ring: #ffffff;
+  --radius: 0.125rem;
+  --gta-display: var(--font-pricedown), 'Pricedown', Impact, sans-serif;
+  --gta-menu: var(--font-chalet-comprime), 'ChaletComprime', 'Arial Narrow', sans-serif;
+}
+
+/* Local Rockstar artwork, mounted only while the GTA theme is active. */
+.gta-scene {
+  position: fixed;
+  inset: 0;
+  z-index: -10;
+  pointer-events: none;
+  overflow: hidden;
+  background: #0a0a0b;
+}
+
+.gta-scene-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 65% center;
+}
+
+.gta-scene-shade {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, #05070999, #050709c9 65%, #050709eb);
+}
+
+.gta-theme-banner {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  min-height: 17rem;
+  margin-block: 0.5rem 1.5rem;
+  padding: 1.5rem 2rem;
+  border-bottom: 4px solid var(--primary);
+  background: #10110f;
+}
+
+.gta-banner-art {
+  position: absolute;
+  inset: 0 0 0 25%;
+  z-index: -2;
+}
+
+.gta-banner-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center top;
+}
+
+.gta-banner-shade {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(90deg, #080a08 0%, #080a08eb 20%, #080a0840 47%, #080a0800 70%);
+}
+
+/* Stacked "Grand Theft InferenceX" wordmark in Pricedown. */
+.gta-wordmark {
+  display: flex;
+  flex-direction: column;
+  font-family: var(--gta-display);
+  font-weight: 700;
+  line-height: 0.82;
+  color: #fff;
+  font-size: clamp(1.6rem, 3.2vw, 2.4rem);
+  -webkit-text-stroke: 4px #000;
+  paint-order: stroke fill;
+  text-shadow: 0 3px 0 #000;
+}
+
+.gta-wordmark-big {
+  font-size: 1.55em;
+}
+
+.gta-wanted {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  display: flex;
+  flex-shrink: 0;
+  gap: 0.15rem;
+  color: #f5f5f5;
+  filter: drop-shadow(0 2px 2px #000);
+}
+
+.gta-heist-launcher {
+  position: absolute;
+  right: 1.25rem;
+  bottom: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.5rem;
+}
+
+.gta-heist-launcher span {
+  font-family: var(--gta-display);
+  color: #fff;
+  text-shadow: 2px 2px 2px #000;
+  font-size: 1.5rem;
+}
+
+.gta-heist-launcher button {
+  min-height: 44px;
+  padding: 0.5rem 1rem;
+  border: 1px solid #c9e69d;
+  background: #b6db84;
+  color: #14200d;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+@media (max-width: 640px) {
+  .gta-theme-banner {
+    min-height: 14rem;
+    padding: 1rem;
+  }
+
+  .gta-banner-art {
+    left: 0;
+  }
+
+  .gta-banner-art img {
+    object-position: 65% top;
+  }
+
+  .gta-banner-shade {
+    background: linear-gradient(90deg, #080a08e6, #080a0840 55%, #080a0800);
+  }
+
+  .gta-wordmark {
+    font-size: 1.4rem;
+  }
+
+  .gta-wanted {
+    top: 0.5rem;
+    right: 0.5rem;
+  }
+
+  .gta-wanted svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .gta-heist-launcher {
+    right: 0.75rem;
+    bottom: 0.75rem;
+  }
+
+  .gta-heist-launcher span {
+    font-size: 1rem;
+  }
+}
+
+/* Header and headings use the GTA V menu face; body copy stays DM Sans. */
+.gta header {
+  background: #000000eb;
+  border-bottom: 3px solid var(--primary);
+}
+
+.gta :is(h1, h2, h3, [data-slot='card-title']) {
+  font-family: var(--gta-menu);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.gta header nav a,
+.gta [data-testid='mobile-menu'] a {
+  font-family: var(--gta-menu);
+  font-size: 1rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-radius: 0;
+}
+
+/* Selected menu tab: solid white with black text, like the GTA V pause menu. */
+.gta header nav a[aria-current='page'],
+.gta [data-testid='mobile-menu'] a[aria-current='page'] {
+  background: #f5f5f5;
+  color: #000;
+}
+
+.gta :is(button, [role='button'], [role='combobox'], input, textarea, a):focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 3px;
+}
+
+.gta :is([data-slot='card'], [data-slot='select-trigger'], [data-slot='tabs-list']) {
+  border-radius: var(--radius);
+}
+
+/* Menu panels: translucent black with no visible frame. */
+.gta [data-slot='card'] {
+  background-color: #080a0aeb;
+  border-color: #ffffff14;
+}
+
+.gta [data-slot='dashboard-navigation'] {
+  border-radius: 0;
+  background: #000000d9;
+}
+
+.gta [data-slot='dashboard-navigation'] nav :is(a, button) {
+  font-family: var(--gta-menu);
+  font-size: 1.25rem;
+  font-weight: 700;
+  padding: 0.5rem 0.75rem;
+  text-transform: uppercase;
+  color: #fff;
+}
+
+.gta [data-slot='dashboard-navigation'] nav [data-tab-active='true'] {
+  background: #f5f5f5;
+  color: #000;
+}
+
+.gta [data-slot='popover-content'] {
+  background-color: #000000eb;
+  border-color: #ffffff1f;
+}
+
+.gta .splash-text {
+  font-family: var(--gta-display) !important;
+  font-size: 1.15rem;
+  color: #f0c850;
+  -webkit-text-stroke: 3px #000;
+  paint-order: stroke fill;
+  text-shadow: 0 2px 0 #000;
+  -webkit-font-smoothing: antialiased;
+}
+
+.gta .circuit-bg,
+.gta .autumn-leaves,
+html[data-inferencex-embed] .gta-scene,
+html[data-inferencex-embed] [data-testid='gta-theme-banner'] {
+  display: none;
 }
 
 /* ── Minecraft Theme ── */
@@ -371,7 +848,11 @@
 
 /* Shiki code blocks: reuse dark theme in minecraft mode */
 .minecraft .shiki,
-.minecraft .shiki span {
+.minecraft .shiki span,
+.csgo .shiki,
+.csgo .shiki span,
+.gta .shiki,
+.gta .shiki span {
   color: var(--shiki-dark);
   background-color: var(--shiki-dark-bg);
 }
@@ -547,7 +1028,8 @@ html[data-inferencex-skin='vllm'] [data-slot='card'] {
 
 /* Dark backgrounds need no outline — this is the original title-screen look. */
 .dark .splash-text,
-.minecraft .splash-text {
+.minecraft .splash-text,
+.csgo .splash-text {
   color: #ffff00;
   text-shadow: 2px 2px 0px #3f3f00;
 }

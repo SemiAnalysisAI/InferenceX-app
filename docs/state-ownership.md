@@ -184,6 +184,11 @@ availability to the effective model and precisions. `effectiveSelectedRunId` is
 validated within that set but is not written back through the global run action, so a
 precision-specific fallback cannot replace the user's global run intent.
 
+`MODEL_PREFIX_MAPPING` includes the display model's full `DISPLAY_MODEL_TO_DB`
+alias set as well as its legacy artifact prefix. Run/changelog filtering therefore
+recognizes `glm5.3` under the GLM-5.2/5.3 display option, matching the benchmark API's
+model grouping without changing the stored checkpoint identities.
+
 ### Default VR snapshot
 
 `InferenceProvider` opts the default inference page into the preference in
