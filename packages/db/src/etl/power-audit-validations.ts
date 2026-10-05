@@ -98,10 +98,17 @@ export function normalizePowerAuditValidations(
 }
 
 /** Recover source/window metadata only from a normalized nested validation. */
+/** The `PowerAudit` subset a retained AgentX window recovers; `source` is always the alias. */
+export interface RecoveredPowerAudit {
+  source: string;
+  window_start_unix: number;
+  window_end_unix: number;
+}
+
 export function recoveredPowerAudit(
   source: string,
   validation: Record<string, unknown>,
-): { source: string; window_start_unix: number; window_end_unix: number } | null {
+): RecoveredPowerAudit | null {
   const path = validation.validation_path;
   const result = validation.result_file;
   if (typeof path !== 'string' || typeof result !== 'string') return null;
@@ -122,27 +129,4 @@ export function recoveredPowerAudit(
     window_start_unix: selected.start_time_unix,
     window_end_unix: selected.end_time_unix,
   };
-}
-
-/**
- * The retained window that belongs to one AgentX point: exactly one recoverable
- * validation names the point's concurrency and, when the caller knows it, the
- * point's result file. With a result file (CI pre-insert) at most one document
- * can match, because a recovered source is derived from that file. Without one
- * (stored repair, backfill checkpoint) a normalized map still holds at most one
- * nested alias per concurrency, so two matches mean conflicting documents;
- * ambiguous or missing evidence must not establish provenance.
- */
-export function recoveredPowerAuditForPoint(
-  validations: Readonly<Record<string, Record<string, unknown>>>,
-  point: { conc: number; resultFile?: string },
-): ReturnType<typeof recoveredPowerAudit> {
-  const audits = Object.entries(validations).flatMap(([source, validation]) => {
-    const window = validation.selected_window;
-    if (!isRecord(window) || window.concurrency !== point.conc) return [];
-    if (point.resultFile !== undefined && validation.result_file !== point.resultFile) return [];
-    const audit = recoveredPowerAudit(source, validation);
-    return audit ? [audit] : [];
-  });
-  return audits.length === 1 ? audits[0]! : null;
 }

@@ -86,7 +86,11 @@ import {
   expectedTelemetryArtifactNames,
   readPowerAuditValidations,
 } from './etl/gpu-metrics-artifacts';
-import { createBenchmarkPowerAuditRecovery } from './etl/power-audit-recovery';
+import {
+  agentxWindowPlan,
+  attachAgentxAudits,
+  type AgentxWindowPlan,
+} from './etl/power-audit-recovery';
 import { ingestGpuMetricsArtifact } from './etl/gpu-metrics-ingest';
 import { readTelemetryReceipt, type TelemetryObservation } from './etl/telemetry-receipt';
 import { datasetSlugFromBenchmarkRow } from './etl/dataset-provenance';
@@ -512,10 +516,15 @@ async function main(): Promise<void> {
     const bmkDir = path.join(artifactsDir, ARTIFACT_NAMES.benchmarks);
     const bmkFiles = findJsonFiles(bmkDir);
 
+    // Per-job `bmk_*` artifacts and any other `results_*` aggregate; the
+    // `results_bmk` aggregate is already listed once above.
     const allBmkDirs = fs.existsSync(artifactsDir)
       ? fs
           .readdirSync(artifactsDir)
-          .filter((d) => d.startsWith('bmk_') || d.startsWith('results_'))
+          .filter(
+            (d) =>
+              d !== ARTIFACT_NAMES.benchmarks && (d.startsWith('bmk_') || d.startsWith('results_')),
+          )
           .map((d) => path.join(artifactsDir, d))
           .filter((d) => fs.statSync(d).isDirectory())
       : [];
@@ -556,7 +565,6 @@ async function main(): Promise<void> {
 
     const allBmkFiles = [...bmkFiles, ...allBmkDirs.flatMap((d) => findJsonFiles(d))];
     const seenPointIdentities = new Map<string, string>();
-    const recoverPowerAudit = createBenchmarkPowerAuditRecovery();
     console.log(`  Found ${allBmkFiles.length} benchmark JSON file(s)`);
 
     for (const [fileIndex, file] of allBmkFiles.entries()) {
@@ -612,22 +620,22 @@ async function main(): Promise<void> {
         continue;
       }
 
-      const toInsert = [];
       const parentDir = path.basename(path.dirname(file));
       const configKey = parentDir.replace(/^bmk_/u, '');
       const suffix = stripBmkAndAgenticPrefix(parentDir);
       const gpuMetricsArtifact =
         gpuMetricsArtifacts.get(configKey) ?? gpuMetricsArtifacts.get(suffix);
-      let auditEvidence;
+      // The telemetry bundle paired with a per-job agentic artifact owns the
+      // retained windows its points may carry.
+      let windows: AgentxWindowPlan = new Map();
       if (parentDir.startsWith('bmk_agentic_') && gpuMetricsArtifact) {
         try {
-          auditEvidence = {
-            resultFile: path.basename(file),
-            validations: readPowerAuditValidations(
+          windows = agentxWindowPlan(
+            readPowerAuditValidations(
               gpuMetricsArtifact.artifactDir,
               gpuMetricsArtifact.artifactName,
             ),
-          };
+          );
         } catch (error) {
           tracker.recordTelemetryError(
             `power audit for ${configKey}`,
@@ -635,6 +643,7 @@ async function main(): Promise<void> {
           );
         }
       }
+      const resolved: (BenchmarkParams & { configId: number })[] = [];
       for (const row of rows) {
         let configId: number;
         try {
@@ -677,22 +686,45 @@ async function main(): Promise<void> {
               `config ${configId}, conc ${row.conc}`,
           );
         }
-        // Attach exact retained validation metadata before both the receipt and
-        // the upsert. A later aggregate copy must not null this run's recovery.
-        const point = recoverPowerAudit(applied.point, auditEvidence);
+        resolved.push(applied.point);
+      }
+      // Attach exact retained provenance before both the receipt and the upsert,
+      // over the file's resolved points; the upsert keeps it across aggregate
+      // copies of the same point.
+      const attached = attachAgentxAudits(
+        windows,
+        resolved,
+        (point) =>
+          `conc ${point.conc}, offload ${point.offloadMode}, recipe ${point.recipeFingerprint ?? 'legacy'}`,
+      );
+      for (const refusal of attached.refused) {
+        tracker.recordTelemetryError(
+          `power audit for ${configKey}`,
+          new Error(
+            `retained window at concurrency ${refusal.concurrency} covers ` +
+              `${refusal.points.length} points (${refusal.points.join('; ')}); provenance withheld`,
+          ),
+        );
+      }
+      const toInsert = attached.points;
+      for (const point of toInsert) {
         const publication = powerPublicationPoint(
           point,
           `https://github.com/${REPO}/actions/runs/${runIdNum}/attempts/${runAttemptNum}`,
           { path: relativeFile, sha256: artifactSha256 },
         );
-        if (publication)
-          powerPublicationPoints.set(publicationIdentity(publication.identity), publication);
-        toInsert.push(point);
         const identity = benchmarkPublicationIdentity(point);
         const key = stablePowerPointIdentity(identity);
         // Aggregate copies may arrive before/after their per-job sibling. Only
-        // the latter establishes whether that exact telemetry artifact exists.
-        if (parentDir.startsWith('bmk_') || !telemetryObservations.has(key)) {
+        // the latter names the exact source artifact and carries attached
+        // provenance, so it wins the receipt in either order.
+        const sibling = parentDir.startsWith('bmk_');
+        if (publication) {
+          const id = publicationIdentity(publication.identity);
+          if (sibling || !powerPublicationPoints.has(id))
+            powerPublicationPoints.set(id, publication);
+        }
+        if (sibling || !telemetryObservations.has(key)) {
           telemetryObservations.set(key, {
             identity,
             artifactNames: gpuMetricsArtifact

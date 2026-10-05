@@ -1,9 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  normalizePowerAuditValidations,
-  recoveredPowerAuditForPoint,
-} from './power-audit-validations.js';
+import { normalizePowerAuditValidations } from './power-audit-validations.js';
 
 const ARTIFACT = 'power_audit_kimik3_agentx_fp4';
 const RESULT = 'kimik3_agentx_fp4_conc48.json';
@@ -66,44 +63,5 @@ describe('normalizePowerAuditValidations', () => {
     const input = fixture();
     input.window.benchmark_start_time_unix = START + 1;
     expect(normalizePowerAuditValidations(ARTIFACT, input.files()).size).toBe(0);
-  });
-});
-
-describe('recoveredPowerAuditForPoint', () => {
-  const audit = { source: SOURCE, window_start_unix: START, window_end_unix: END };
-  const normalized = () =>
-    Object.fromEntries(normalizePowerAuditValidations(ARTIFACT, fixture().files()));
-
-  it('returns the one window naming the concurrency, with or without the result file', () => {
-    expect(recoveredPowerAuditForPoint(normalized(), { conc: 48 })).toEqual(audit);
-    expect(recoveredPowerAuditForPoint(normalized(), { conc: 48, resultFile: RESULT })).toEqual(
-      audit,
-    );
-  });
-
-  it('refuses another concurrency or another result file', () => {
-    expect(recoveredPowerAuditForPoint(normalized(), { conc: 32 })).toBeNull();
-    expect(
-      recoveredPowerAuditForPoint(normalized(), { conc: 48, resultFile: 'other_conc48.json' }),
-    ).toBeNull();
-  });
-
-  it('ignores a legacy document naming the same concurrency but refuses two recoverable windows', () => {
-    const validations = normalized();
-    const nested = validations[SOURCE]!;
-    const legacy = { ...fixture().validation, selected_window: { ...fixture().selected } };
-    const withLegacy = { 'power_validation_legacy.json': legacy, ...validations };
-    expect(recoveredPowerAuditForPoint(withLegacy, { conc: 48 })).toEqual(audit);
-    const twin = {
-      ...nested,
-      result_file: 'other_conc48.json',
-      selected_window: { ...fixture().selected },
-    };
-    expect(
-      recoveredPowerAuditForPoint(
-        { ...validations, 'power_validation_other_conc48.json': twin },
-        { conc: 48 },
-      ),
-    ).toBeNull();
   });
 });
