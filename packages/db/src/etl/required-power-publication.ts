@@ -9,6 +9,7 @@ import {
 import type { BenchmarkParams } from './benchmark-mapper';
 import { createSkipTracker } from './skip-tracker';
 import { configCacheKey } from './config-cache';
+import { powerWorkloadForScenario } from './power-publication';
 import { CHANGELOG_ARTIFACT_NAME, REQUIRED_POWER_MANIFEST } from '../lib/ci-artifact-preparation';
 
 type JsonRow = Record<string, unknown>;
@@ -141,23 +142,17 @@ function verifyRequiredPowerBundle(
       for (const value of entries) {
         const row = object(value, 'matrix row');
         if (row['require-power'] !== true || row['eval-only'] === true) continue;
-        if (!['1k1k', '8k1k', 'agentic'].includes(scenario))
-          throw new Error(`Required power: unsupported scenario ${scenario}`);
-        const agentic = scenario === 'agentic';
+        const workload = powerWorkloadForScenario(scenario);
+        if (!workload) throw new Error(`Required power: unsupported scenario ${scenario}`);
+        const agentic = workload.benchmarkType === 'agentic_traces';
         const isl = agentic ? null : row.isl;
         const osl = agentic ? null : row.osl;
-        if (!agentic && (isl !== (scenario === '8k1k' ? 8192 : 1024) || osl !== 1024))
+        if (!agentic && (isl !== workload.isl || osl !== workload.osl))
           throw new Error(`Required power: inconsistent sequence lengths for ${scenario}`);
         const concurrencies = Array.isArray(row.conc) ? row.conc : [row.conc];
         if (concurrencies.length === 0) throw new Error('Required power: empty concurrency list');
         for (const conc of concurrencies) {
-          const key = identity(
-            row['recipe-fingerprint'],
-            conc,
-            agentic ? 'agentic_traces' : 'single_turn',
-            isl,
-            osl,
-          );
+          const key = identity(row['recipe-fingerprint'], conc, workload.benchmarkType, isl, osl);
           if (expected.has(key)) throw new Error(`Required power: duplicate matrix point ${key}`);
           expected.set(key, { ...row, matrixTopology: topology });
         }

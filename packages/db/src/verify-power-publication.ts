@@ -34,8 +34,6 @@ try {
     from benchmark_results br join configs c on c.id = br.config_id
     join workflow_runs wr on wr.id = br.workflow_run_id
     where wr.github_run_id = ${manifest.runId} and wr.run_attempt = ${manifest.runAttempt}
-      and (br.benchmark_type = 'agentic_traces' or
-        (br.benchmark_type = 'single_turn' and br.isl in (1024, 8192) and br.osl = 1024))
   `;
   const errors = fatalPublicationErrors(
     manifest,
