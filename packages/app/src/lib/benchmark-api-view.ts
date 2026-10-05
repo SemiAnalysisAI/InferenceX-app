@@ -6,6 +6,12 @@ const CALCULATOR_METRIC_KEYS = new Set([
   'output_tput_per_gpu',
   'prefill_pp',
   'decode_pp',
+  'prefill_dcp_size',
+  'decode_dcp_size',
+  'dcp_size',
+  'prefill_pcp_size',
+  'decode_pcp_size',
+  'pcp_size',
   // Cached-input billing in the Fleet Lifecycle section reads these. Only
   // agentic rows carry them, but the trim runs on every calculator response, so
   // omitting them here would strip the metric before interpolation ever sees it.

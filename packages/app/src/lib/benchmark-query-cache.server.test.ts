@@ -30,7 +30,7 @@ describe('benchmark-query-cache.server', () => {
       'benchmark-history',
       'benchmark-history-agentic-curve-scope-v2',
       'benchmarks-agentic-curve-scope-v2',
-      'benchmarks-calculator-agentic-curve-scope-v2',
+      'benchmarks-calculator-agentic-curve-scope-v3',
       'benchmarks-run-agentic-curve-scope-v2',
     ]);
     expect(new Set(keys).size).toBe(keys.length);

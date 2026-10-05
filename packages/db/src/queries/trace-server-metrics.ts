@@ -31,7 +31,7 @@ export type {
 // The endpoint payload combines chart_series with separately queried point
 // metadata. Keep a composite response version so metadata-shape changes roll
 // the blob-cache namespace without forcing an expensive chart_series backfill.
-const POINT_META_VERSION = 6;
+const POINT_META_VERSION = 7;
 export const TRACE_SERVER_METRICS_VERSION = CHART_SERIES_VERSION * 100 + POINT_META_VERSION;
 
 export interface MetricSourceDescriptor {
@@ -58,6 +58,8 @@ export interface PointMeta {
   num_prefill_gpu: number;
   num_decode_gpu: number;
   recipe_fingerprint: string | null;
+  /** PP/DCP/PCP metrics needed to identify legacy recipes without fingerprints. */
+  metrics?: Record<string, number>;
   conc: number;
   offload_mode: string | null;
   kv_offloading: string | null;
@@ -163,6 +165,7 @@ function buildMeta(row: RawMetaRow): PointMeta {
     num_prefill_gpu: row.num_prefill_gpu,
     num_decode_gpu: row.num_decode_gpu,
     recipe_fingerprint: row.recipe_fingerprint,
+    metrics: row.metrics ?? {},
     conc: row.conc,
     offload_mode: row.offload_mode,
     kv_offloading: row.kv_offloading,
@@ -343,6 +346,16 @@ export async function getTraceServerMetrics(
       c.decode_tp, c.decode_ep, c.decode_dp_attention, c.decode_num_workers,
       c.num_prefill_gpu, c.num_decode_gpu,
       br.recipe_fingerprint,
+      jsonb_strip_nulls(jsonb_build_object(
+        'prefill_pp', br.metrics -> 'prefill_pp',
+        'decode_pp', br.metrics -> 'decode_pp',
+        'prefill_dcp_size', br.metrics -> 'prefill_dcp_size',
+        'decode_dcp_size', br.metrics -> 'decode_dcp_size',
+        'dcp_size', br.metrics -> 'dcp_size',
+        'prefill_pcp_size', br.metrics -> 'prefill_pcp_size',
+        'decode_pcp_size', br.metrics -> 'decode_pcp_size',
+        'pcp_size', br.metrics -> 'pcp_size'
+      )) as metrics,
       br.conc, br.offload_mode, br.isl, br.osl, br.benchmark_type,
       br.date::text,
       case when wr.html_url is not null then wr.html_url || '/attempts/' || wr.run_attempt else null end as run_url,

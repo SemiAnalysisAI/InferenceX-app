@@ -33,6 +33,8 @@ export interface PointMeta {
   num_prefill_gpu: number;
   num_decode_gpu: number;
   recipe_fingerprint: string | null;
+  /** PP/DCP/PCP metrics needed to identify legacy recipes without fingerprints. */
+  metrics?: Record<string, number>;
   conc: number;
   offload_mode: string | null;
   kv_offloading: string | null;
