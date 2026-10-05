@@ -711,17 +711,18 @@ serving-window 指标。
 ### PowerX publication receipts
 
 The normal CI importer writes `POWER_PUBLICATION_MANIFEST` when configured. Each
-8K/1K point records the mapped, override-adjusted metric contract, all configuration
-dimensions, original source run/attempt, structured audit, and input file SHA-256.
-Reused sweeps keep their original source identity. Failed or unmapped explicit 8K/1K
-results and database errors remain in the manifest; they cannot pass verification.
+point at a PowerX workload (`POWER_WORKLOADS`: 8K/1K, 1K/1K, AgentX) records the
+mapped, override-adjusted metric contract, all configuration dimensions, original
+source run/attempt, structured audit, and input file SHA-256. Reused sweeps keep
+their original source identity. Failed or unmapped results at those workloads and
+database errors remain in the manifest; they cannot pass verification.
 
 After ingestion and cache invalidation, `bun packages/db/src/verify-power-publication.ts
 power-publication.json` compares every expected point against the exact database
 run attempt and public `runId=…&exactRun=true` response. It checks missing values and
 withheld telemetry as well as numbers; legacy missing measurements remain missing.
 A `matched` receipt establishes transport fidelity, not collection coverage. An
-empty receipt says `no_8k1k_points`, never that power coverage was validated.
+empty receipt says `no_power_points`, never that power coverage was validated.
 The workflow retains both the input manifest and verification receipt. Cache
 invalidation errors fail the workflow instead of being swallowed. Imported P75/P90
 ledger edits trigger the existing reviewed override workflow.

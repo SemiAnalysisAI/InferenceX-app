@@ -1,6 +1,6 @@
 import { isDeepStrictEqual } from 'node:util';
 import { MEASURED_POWER_METRIC_KEYS } from '@semianalysisai/inferencex-constants';
-import type { BenchmarkParams } from './benchmark-mapper';
+import { isAgenticRow, type BenchmarkParams } from './benchmark-mapper';
 import type { ConfigParams } from './config-cache';
 import type { TelemetryReceipt } from './telemetry-receipt';
 
@@ -42,7 +42,8 @@ const POWER_FIELDS = [
 ];
 /**
  * The workloads PowerX publishes. The receipt predicate, the required-power
- * matrix scenarios and the ingest diagnostics derive from this one table.
+ * matrix scenarios and the ingest's unmapped-row diagnostic derive from this
+ * one table.
  */
 export const POWER_WORKLOADS = [
   { scenario: 'agentic', benchmarkType: 'agentic_traces', isl: null, osl: null },
@@ -64,6 +65,15 @@ export function powerWorkloadOf(row: {
         workload.isl === row.isl &&
         workload.osl === row.osl,
     ) ?? null
+  );
+}
+
+/** The workload of a raw artifact row the mapper rejected, by the mapper's own type rule. */
+export function rawPowerWorkloadOf(raw: Record<string, unknown>): PowerWorkload | null {
+  return powerWorkloadOf(
+    isAgenticRow(raw)
+      ? { benchmarkType: 'agentic_traces', isl: null, osl: null }
+      : { benchmarkType: 'single_turn', isl: Number(raw.isl), osl: Number(raw.osl) },
   );
 }
 

@@ -199,6 +199,11 @@ export interface BenchmarkParams {
   powerAudit?: PowerAudit;
 }
 
+/** Agentic-trace rows emit `scenario_type: 'agentic-coding'` (and variants). */
+export function isAgenticRow(row: Record<string, unknown>): boolean {
+  return String(row.scenario_type ?? '').startsWith('agentic');
+}
+
 /**
  * Map a raw benchmark result dict to typed `BenchmarkParams`.
  *
@@ -249,9 +254,9 @@ export function mapBenchmarkRow(
     return null;
   }
 
-  // Agentic-trace runs emit `scenario_type: 'agentic-coding'` (and variants),
-  // no isl/osl, and `users` instead of `conc`. Everything else stays as-is.
-  const isAgentic = String(row.scenario_type ?? '').startsWith('agentic');
+  // Agentic-trace runs carry no isl/osl and `users` instead of `conc`.
+  // Everything else stays as-is.
+  const isAgentic = isAgenticRow(row);
   const benchmarkType: BenchmarkType = isAgentic ? 'agentic_traces' : 'single_turn';
 
   const isl = isAgentic ? null : (parseInt2(row.isl) ?? islOslFallback?.isl ?? null);
@@ -499,7 +504,7 @@ function resolveParallelism(row: Record<string, any>, frameworkDisagg: boolean):
   if (
     row.num_gpus === undefined &&
     !frameworkDisagg &&
-    String(row.scenario_type ?? '').startsWith('agentic') &&
+    isAgenticRow(row) &&
     row.request_metrics &&
     typeof row.request_metrics === 'object' &&
     !Array.isArray(row.request_metrics) &&

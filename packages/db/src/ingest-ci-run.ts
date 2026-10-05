@@ -25,6 +25,7 @@
 import fs from 'fs';
 import {
   powerPublicationPoint,
+  rawPowerWorkloadOf,
   publicationIdentity,
   benchmarkPublicationIdentity,
   stablePowerPointIdentity,
@@ -581,11 +582,16 @@ async function main(): Promise<void> {
       // and unmappable rows leave an unknown number of attachment expectations.
       let fileExpectationsUnknown = file.nonObjectRows > 0;
       const rows = file.rows.flatMap(({ raw, mapped, failed }) => {
-        if (!mapped && !failed) fileExpectationsUnknown = true;
-        if (!mapped && Number(raw.isl) === 8192 && Number(raw.osl) === 1024) {
-          powerPublicationErrors.push(`Unmapped or failed 8K/1K result: ${relativeFile}`);
-        }
-        return mapped ? [mapped] : [];
+        if (mapped) return [mapped];
+        if (!failed) fileExpectationsUnknown = true;
+        // A PowerX-workload row that did not map is a hole in the published
+        // curve, so it fails the receipt; every POWER_WORKLOADS scenario counts.
+        const workload = rawPowerWorkloadOf(raw);
+        if (workload)
+          powerPublicationErrors.push(
+            `Unmapped or failed ${workload.scenario} result: ${relativeFile}`,
+          );
+        return [];
       });
       if (fileExpectationsUnknown) telemetryExpectationsUnknown = true;
 

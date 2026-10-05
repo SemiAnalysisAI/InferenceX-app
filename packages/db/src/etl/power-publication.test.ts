@@ -5,6 +5,7 @@ import {
   POWER_WORKLOADS,
   powerPublicationPoint,
   powerWorkloadForScenario,
+  rawPowerWorkloadOf,
   verifyPowerPublication,
   type PublishedPowerRow,
 } from './power-publication';
@@ -53,13 +54,14 @@ function actual(point = expected()): PublishedPowerRow {
 }
 
 describe('PowerX publication', () => {
-  it('admits exactly the workloads of POWER_WORKLOADS to the receipt', () => {
+  it('derives the receipt predicate and the raw-row diagnostic from POWER_WORKLOADS', () => {
     const point = (overrides: Record<string, unknown>) =>
       powerPublicationPoint(mapBenchmarkRow({ ...raw, ...overrides }, createSkipTracker())!, '', {
         path: '',
         sha256: '',
       });
     expect(point({ isl: 4096, osl: 1024 })).toBeNull();
+    expect(rawPowerWorkloadOf({ ...raw, isl: 4096, osl: 1024 })).toBeNull();
     for (const workload of POWER_WORKLOADS) {
       const row =
         workload.benchmarkType === 'agentic_traces'
@@ -70,6 +72,7 @@ describe('PowerX publication', () => {
         isl: workload.isl,
         osl: workload.osl,
       });
+      expect(rawPowerWorkloadOf({ ...raw, ...row })).toBe(workload);
     }
     expect(powerWorkloadForScenario('8k1k')).toMatchObject({ isl: 8192, osl: 1024 });
     expect(powerWorkloadForScenario('4k1k')).toBeUndefined();
