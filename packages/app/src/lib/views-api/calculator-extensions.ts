@@ -6,9 +6,11 @@ import {
 } from '@/components/calculator/first-token-limits';
 import { interpolateForGPU } from '@/components/calculator/interpolation';
 import {
+  applyCacheHitMode,
   DEFAULT_UTILIZATION_PCT,
   listPricingToTokenRevenuePricing,
   profitModelDefaults,
+  type CacheHitMode,
 } from '@/components/calculator/profit-estimator';
 import { estimateProfitByPower } from '@/components/calculator/profit-power';
 import type { TokenRevenuePricing } from '@/components/inference/types';
@@ -140,6 +142,12 @@ export function calculatorExtension(view: CalculatorExtension, request: NextRequ
       ['provisioned', 'modeled', 'compare'],
       'provisioned',
     );
+    const cacheHitMode = parseEnumParam<CacheHitMode>(
+      search.get('cacheHitMode'),
+      'cacheHitMode',
+      ['actual', 'theoretical'],
+      'actual',
+    );
     const priceSource = parseEnumParam(
       search.get('priceSource'),
       'priceSource',
@@ -183,7 +191,7 @@ export function calculatorExtension(view: CalculatorExtension, request: NextRequ
       powerBasis,
     } as const;
     function estimate(group: typeof groups.official) {
-      const results = Object.entries(group.grouped).flatMap(([key, points]) => {
+      const raw = Object.entries(group.grouped).flatMap(([key, points]) => {
         const result = interpolateForGPU(
           points,
           target,
@@ -194,6 +202,7 @@ export function calculatorExtension(view: CalculatorExtension, request: NextRequ
           ? [{ ...result, ...group.groupMeta[key], resultKey: key }]
           : [];
       });
+      const results = applyCacheHitMode(raw, cacheHitMode);
       return estimateProfitByPower(
         results,
         (hwKey) => ({
@@ -235,6 +244,7 @@ export function calculatorExtension(view: CalculatorExtension, request: NextRequ
         priceSource,
         utilization,
         labCut,
+        cacheHitMode,
         powerBasis,
         basis,
         dates: selections.map((s) => s.entry),
