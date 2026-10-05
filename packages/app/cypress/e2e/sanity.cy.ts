@@ -1,6 +1,16 @@
 // Merged from basic.cy.ts, navigation.cy.ts, theme-toggle.cy.ts, and land-acknowledgement.cy.ts
 // to reduce per-file Cypress startup overhead (~500ms per file)
 
+/** Open the header theme picker after the client mount and choose `theme`. */
+function pickTheme(theme: string) {
+  // The trigger label names the saved theme only once the client has mounted.
+  cy.get('[data-testid="theme-toggle"]')
+    .should('have.attr', 'aria-label')
+    .and('contain', 'currently');
+  cy.get('[data-testid="theme-toggle"]').click();
+  cy.get(`[data-testid="theme-option-${theme}"]`).click();
+}
+
 describe('Page Load & Navigation', () => {
   before(() => {
     cy.visit('/');
@@ -124,7 +134,7 @@ describe('Splash text', () => {
     cy.get('[data-testid="splash-text"]').should('be.visible').and('have.text', 'AgentX is here!!');
 
     // Same splash after switching themes — it is no longer minecraft-only.
-    cy.get('[data-testid="theme-toggle"]').click();
+    pickTheme('dark');
     cy.get('html').should('have.class', 'dark');
     cy.get('[data-testid="splash-text"]').should('be.visible').and('have.text', 'AgentX is here!!');
   });
@@ -147,10 +157,8 @@ describe('Theme Toggle', () => {
           .some((r) => r.name.includes('/decorative/csgo/')),
       ).to.eq(false);
     });
-    for (const theme of ['dark', 'minecraft', 'csgo']) {
-      cy.get('[data-testid="theme-toggle"]').click();
-      cy.get('html').should('have.class', theme);
-    }
+    pickTheme('csgo');
+    cy.get('html').should('have.class', 'csgo');
     cy.get('[data-testid="csgo-theme-banner"]').should('be.visible');
     cy.get('[data-testid="csgo-scene"]')
       .should('have.attr', 'aria-hidden', 'true')
@@ -160,10 +168,50 @@ describe('Theme Toggle', () => {
     cy.get('[data-testid="csgo-scene"] img').should(($img) => {
       expect(($img[0] as HTMLImageElement).naturalWidth).to.be.greaterThan(0);
     });
-    cy.get('[data-testid="theme-toggle"]').click();
+    pickTheme('light');
     cy.get('html').should('have.class', 'light');
     cy.get('[data-testid="csgo-scene"]').should('not.exist');
     cy.get('[data-testid="csgo-theme-banner"]').should('not.exist');
+  });
+
+  it('applies GTA from the picker, persists it, and removes decorations on exit', () => {
+    cy.visit('/', {
+      onBeforeLoad(win) {
+        win.localStorage.setItem('theme', 'light');
+      },
+    });
+    cy.get('[data-testid="gta-scene"]').should('not.exist');
+    cy.window().then((win) => {
+      expect(
+        win.performance
+          .getEntriesByType('resource')
+          .some((r) => r.name.includes('/decorative/gta/')),
+      ).to.eq(false);
+    });
+    pickTheme('gta');
+    cy.get('html').should('have.class', 'gta');
+    cy.get('[data-testid="gta-theme-banner"]').should('be.visible');
+    cy.get('[data-testid="gta-theme-banner"] .gta-logo')
+      .should('have.attr', 'alt', 'Grand Theft Auto V')
+      .and(($img) => {
+        expect(($img[0] as HTMLImageElement).naturalWidth).to.be.greaterThan(0);
+      });
+    cy.get('[data-testid="gta-theme-banner"] .gta-banner-art img').should(($img) => {
+      expect(($img[0] as HTMLImageElement).naturalWidth).to.be.greaterThan(0);
+    });
+    cy.get('[data-testid="gta-scene"]')
+      .should('have.attr', 'aria-hidden', 'true')
+      .and('have.css', 'pointer-events', 'none');
+    cy.reload();
+    cy.get('html').should('have.class', 'gta');
+    cy.get('[data-testid="gta-scene"]').should('exist');
+    cy.get('[data-testid="gta-scene"] img').should(($img) => {
+      expect(($img[0] as HTMLImageElement).naturalWidth).to.be.greaterThan(0);
+    });
+    pickTheme('light');
+    cy.get('html').should('have.class', 'light');
+    cy.get('[data-testid="gta-scene"]').should('not.exist');
+    cy.get('[data-testid="gta-theme-banner"]').should('not.exist');
   });
 
   it('theme persists across page reload (localStorage)', () => {
@@ -172,7 +220,7 @@ describe('Theme Toggle', () => {
       win.localStorage.setItem('theme', 'light');
     });
     cy.visit('/');
-    cy.get('[data-testid="theme-toggle"]').click();
+    pickTheme('dark');
     cy.get('html').should('have.class', 'dark');
     cy.reload();
     cy.get('html').should('have.class', 'dark');

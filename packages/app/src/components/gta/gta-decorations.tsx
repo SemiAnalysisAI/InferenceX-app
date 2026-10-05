@@ -1,0 +1,104 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { useTheme } from 'next-themes';
+
+function Star() {
+  return (
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+      <path
+        d="M12 2.5l2.9 6.1 6.6.8-4.9 4.6 1.3 6.6L12 17.3l-5.9 3.3 1.3-6.6-4.9-4.6 6.6-.8z"
+        fill="currentColor"
+        stroke="#000"
+        strokeWidth="1.8"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+export function GtaThemeBanner() {
+  const { resolvedTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  if (!mounted || resolvedTheme !== 'gta') return null;
+
+  return (
+    <div className="container mx-auto px-4 lg:px-8" data-testid="gta-theme-banner">
+      <div className="gta-theme-banner">
+        <picture className="gta-banner-art" aria-hidden="true">
+          <source media="(max-width: 640px)" srcSet="/decorative/gta/vinewood-mobile.webp" />
+          <img
+            src="/decorative/gta/vinewood.webp"
+            alt=""
+            width={1600}
+            height={996}
+            decoding="async"
+            draggable={false}
+          />
+        </picture>
+        <div className="gta-banner-shade" aria-hidden="true" />
+        <div className="gta-banner-identity">
+          <img
+            className="gta-logo"
+            src="/decorative/gta/gtav-logo.webp"
+            alt="Grand Theft Auto V"
+            width={360}
+            height={318}
+            decoding="async"
+            draggable={false}
+          />
+          <p className="gta-wordmark">InferenceX</p>
+        </div>
+        <div className="gta-wanted" role="img" aria-label="Wanted level: five stars">
+          {[0, 1, 2, 3, 4].map((i) => (
+            <Star key={i} />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Follow the root class, like the CS:GO and Minecraft decorations, because
+ * this mounts outside ThemeProvider. Artwork loads only while GTA is active.
+ */
+export function GtaDecorations() {
+  const [active, setActive] = useState(false);
+
+  useEffect(() => {
+    const check = () =>
+      setActive(
+        document.documentElement.classList.contains('gta') &&
+          !Object.hasOwn(document.documentElement.dataset, 'inferencexEmbed'),
+      );
+    check();
+    const observer = new MutationObserver(check);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class', 'data-inferencex-embed'],
+    });
+    return () => observer.disconnect();
+  }, []);
+
+  if (!active) return null;
+
+  return (
+    <div className="gta-scene" data-testid="gta-scene" aria-hidden="true">
+      <picture>
+        <source media="(max-width: 640px)" srcSet="/decorative/gta/trio-mobile.webp" />
+        <img
+          className="gta-scene-image"
+          src="/decorative/gta/trio.webp"
+          alt=""
+          width={1920}
+          height={1190}
+          decoding="async"
+          draggable={false}
+        />
+      </picture>
+      <div className="gta-scene-shade" />
+    </div>
+  );
+}

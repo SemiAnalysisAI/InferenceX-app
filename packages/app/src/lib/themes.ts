@@ -1,12 +1,19 @@
 /** Presentation themes; benchmark data and share URLs do not depend on these. */
-export const APP_THEMES = ['light', 'dark', 'minecraft', 'csgo'];
+export const APP_THEMES = ['light', 'dark', 'minecraft', 'csgo', 'gta'];
+
+/** Themes that draw on the dark palette (charts, figures, exports). */
+const DARK_THEMES = new Set(['dark', 'minecraft', 'csgo', 'gta']);
+
+/** Themes that reuse the plain dark chart seed instead of their own palette. */
+const DARK_CHART_ALIASES = new Set(['csgo', 'gta']);
 
 export function isDarkTheme(theme: string | undefined): boolean {
-  return theme === 'dark' || theme === 'minecraft' || theme === 'csgo';
+  return theme !== undefined && DARK_THEMES.has(theme);
 }
 
-export function nextTheme(theme: string | undefined): string {
-  return APP_THEMES[(APP_THEMES.indexOf(theme ?? '') + 1) % APP_THEMES.length];
+/** Map decorative dark themes onto the dark chart palette seed. */
+export function chartPaletteTheme(theme: string): string {
+  return DARK_CHART_ALIASES.has(theme) ? 'dark' : theme;
 }
 
 export function hasDarkTheme(element: Element): boolean {
