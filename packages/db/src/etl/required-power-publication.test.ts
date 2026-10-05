@@ -26,6 +26,11 @@ function json(dir: string, file: string): any {
 function write(dir: string, file: string, value: unknown) {
   fs.writeFileSync(path.join(dir, file), JSON.stringify(value));
 }
+function sha256(dir: string, file: string) {
+  return createHash('sha256')
+    .update(fs.readFileSync(path.join(dir, file)))
+    .digest('hex');
+}
 const manifestPath = 'required-power-sweep-manifest/sweep_manifest.json';
 const benchmarkPath = 'bmk_agentic_golden/agg.json';
 const auditPath = 'agentic_golden/power_validation.json';
@@ -41,10 +46,7 @@ function changeArtifact(dir: string, file: string, edit: (value: any) => void) {
   changeManifest(dir, (manifest) => {
     for (const point of manifest.points)
       for (const artifact of point.artifacts)
-        if (artifact.path === file)
-          artifact.sha256 = createHash('sha256')
-            .update(fs.readFileSync(path.join(dir, file)))
-            .digest('hex');
+        if (artifact.path === file) artifact.sha256 = sha256(dir, file);
   });
 }
 function multinodeFixture() {
@@ -103,13 +105,68 @@ function multinodeFixture() {
       { node: 'decode', gpu_uuid: 'GPU-d', role: 'decode', energy_j: 600 },
     ];
     for (const file of Object.keys(extras))
-      point.artifacts.push({
-        path: file,
-        sha256: createHash('sha256')
-          .update(fs.readFileSync(path.join(dir, file)))
-          .digest('hex'),
-        validation_state: 'valid',
-      });
+      point.artifacts.push({ path: file, sha256: sha256(dir, file), validation_state: 'valid' });
+  });
+  return dir;
+}
+const nativeNodes = { 'node-a': 'GPU-a', 'node-b': 'GPU-b' };
+/** Non-disagg two-node bundle whose telemetry is per-node nvidia-smi with signed receipts. */
+function nativeFixture() {
+  const dir = fixture();
+  changeArtifact(dir, benchmarkPath, (row) =>
+    Object.assign(row, { is_multinode: true, disagg: false, num_gpus: 2 }),
+  );
+  const files: string[] = [];
+  const receipts = Object.entries(nativeNodes).map(([node, uuid]) => {
+    const directory = `power_audit_golden/${node}`;
+    fs.mkdirSync(path.join(dir, directory), { recursive: true });
+    const contents: Record<string, string> = {
+      'gpu_metrics.csv': `timestamp, index, power.draw [W]\n2023/11/14 22:13:20.000, 0, 500\n`,
+      'manifest.json': JSON.stringify({ lifecycle: 'complete', collector_exit_code: 0, node }),
+      'gpu_metrics_identity.csv': `index, uuid\n0, ${uuid}\n`,
+      'gpu_metrics_identity_end.csv': `index, uuid\n0, ${uuid}\n# end\n`,
+    };
+    for (const [name, text] of Object.entries(contents)) {
+      fs.writeFileSync(path.join(dir, directory, name), text);
+      files.push(`${directory}/${name}`);
+    }
+    return {
+      node,
+      manifest_sha256: sha256(dir, `${directory}/manifest.json`),
+      telemetry_sha256: sha256(dir, `${directory}/gpu_metrics.csv`),
+      identity_sha256: sha256(dir, `${directory}/gpu_metrics_identity.csv`),
+      identity_end_sha256: sha256(dir, `${directory}/gpu_metrics_identity_end.csv`),
+      physical_gpu_ids: { '0': uuid },
+    };
+  });
+  changeArtifact(dir, auditPath, (audit) =>
+    Object.assign(audit, {
+      telemetry_kind: 'native_multinode_smi',
+      expected_gpu_count: 2,
+      observed_gpu_count: 2,
+      nodes: receipts,
+      per_gpu_energy_j: { 'GPU-a': 500, 'GPU-b': 500 },
+      per_gpu_role: { 'GPU-a': 'agg', 'GPU-b': 'agg' },
+    }),
+  );
+  changeManifest(dir, (manifest) => {
+    const entry = manifest.matrix.single_node.agentic[0];
+    Object.assign(entry, { 'num-gpus': 2, 'node-count': 2 });
+    manifest.matrix = { single_node: {}, multi_node: { agentic: [entry] } };
+    const point = manifest.points[0];
+    Object.assign(point.topology, { is_multinode: true, num_gpus: 2 });
+    point.devices = Object.entries(nativeNodes).map(([node, gpu_uuid]) => ({
+      node,
+      gpu_uuid,
+      role: 'aggregate',
+      energy_j: 500,
+    }));
+    // The single-node gpu_metrics.csv must not stay declared: traces are counted per node.
+    point.artifacts = [auditPath, benchmarkPath, ...files].map((file) => ({
+      path: file,
+      sha256: sha256(dir, file),
+      validation_state: 'valid',
+    }));
   });
   return dir;
 }
@@ -167,6 +224,52 @@ describe('required power publication contract', () => {
     expect(() => verifyRequiredPowerArtifacts(mismatched, source)).toThrow(
       'prefill energy differs',
     );
+  });
+  it('accepts a native multinode bundle with per-node receipts', () => {
+    expect(verifyRequiredPowerArtifacts(nativeFixture(), source)).toHaveLength(1);
+  });
+  it('rejects a native receipt whose telemetry hash differs', () => {
+    const dir = nativeFixture();
+    changeArtifact(dir, auditPath, (audit) => {
+      audit.nodes[0].telemetry_sha256 = 'f'.repeat(64);
+    });
+    expect(() => verifyRequiredPowerArtifacts(dir, source)).toThrow('native node receipt differs');
+  });
+  it('rejects an incomplete native node collection', () => {
+    const dir = nativeFixture();
+    const nodeManifest = 'power_audit_golden/node-a/manifest.json';
+    changeArtifact(dir, nodeManifest, (value) => {
+      value.lifecycle = 'partial';
+    });
+    // Re-sign the receipt so only the lifecycle check can fire.
+    changeArtifact(dir, auditPath, (audit) => {
+      audit.nodes[0].manifest_sha256 = sha256(dir, nodeManifest);
+    });
+    expect(() => verifyRequiredPowerArtifacts(dir, source)).toThrow(
+      'invalid native node collection',
+    );
+  });
+  it('rejects duplicate native GPU identities across nodes', () => {
+    const dir = nativeFixture();
+    changeArtifact(dir, auditPath, (audit) => {
+      audit.nodes[1].physical_gpu_ids = { '0': 'GPU-a' };
+    });
+    expect(() => verifyRequiredPowerArtifacts(dir, source)).toThrow(
+      'duplicate native GPU identity',
+    );
+  });
+  it('accepts a JSON physical GPU identity file', () => {
+    const dir = fixture();
+    const csv = 'agentic_golden/gpu_metrics_identity.csv';
+    const devices = 'agentic_golden/gpu_metrics_devices.json';
+    fs.rmSync(path.join(dir, csv));
+    write(dir, devices, [{ gpu: 0, uuid: 'GPU-golden' }]);
+    changeManifest(dir, (manifest) => {
+      for (const artifact of manifest.points[0].artifacts)
+        if (artifact.path === csv)
+          Object.assign(artifact, { path: devices, sha256: sha256(dir, devices) });
+    });
+    expect(verifyRequiredPowerArtifacts(dir, source)).toHaveLength(1);
   });
   it('rejects invalid sidecar verdict and device energy disagreement despite valid hashes', () => {
     const dir = fixture();
