@@ -171,6 +171,7 @@ export const VIEW_QUERY_PARAMS = {
   options: ['format'],
   overview: ['compare', 'engine', 'format', 'hwrows', 'models', 'ref', 'rows', 'tier'],
   'profit-estimator': [
+    'cacheHitMode',
     'cachedInputPrice',
     'costProvider',
     'customCosts',
@@ -195,6 +196,7 @@ export const VIEW_QUERY_PARAMS = {
     'utilization',
   ],
   'profit-estimator-per-gigawatt': [
+    'cacheHitMode',
     'cachedInputPrice',
     'costProvider',
     'customCosts',

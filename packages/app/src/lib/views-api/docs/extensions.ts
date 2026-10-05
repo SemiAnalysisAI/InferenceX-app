@@ -89,6 +89,10 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
     'Exact key from data.recipes (dashboard c_recipe). Missing or unknown keys select the recipe with the most tiered rows, then most rows, then label; overlays supply choices only without official rows. params.recipe reports the resolved key.',
     'data.recipes 中的方案键，对应仪表板 c_recipe。省略或未知键按缓存层级数据行数、总行数和标签依次选择默认方案；仅在没有官方数据时使用叠加运行的方案。params.recipe 返回实际选择的键。',
   ],
+  cacheHitMode: [
+    'actual (default) or theoretical. Actual uses the server-measured cache hit rate from the benchmark; theoretical uses the infinite-cache rate computed from the trace.',
+    'actual（默认）或 theoretical。Actual 使用基准测试中服务端实测的 cache 命中率；Theoretical 使用 trace 计算的无限缓存理论命中率。',
+  ],
   customCosts: [
     'JSON object from base hardware keys to finite nonnegative USD/chip-hour values, at most 100 entries.',
     'JSON 对象，将基础硬件键映射为有限非负美元/芯片小时，最多 100 项。',
