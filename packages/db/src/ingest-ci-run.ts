@@ -885,7 +885,7 @@ async function main(): Promise<void> {
       await Promise.all(traceTasks);
     }
     await traceWorkerPool.close();
-    assertRequiredPowerPointsRetained(requiredPowerPoints, retainedPowerPoints);
+    assertRequiredPowerPointsRetained(requiredPowerPoints, retainedPowerPoints, 'after_insert');
     console.log(`  Benchmarks: +${totalNewBmk} new, ${totalDupBmk} dup`);
     if (totalTraceReplayLinked > 0 || tracker.skips.traceReplayMissing > 0) {
       console.log(

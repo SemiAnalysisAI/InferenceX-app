@@ -55,10 +55,17 @@ function mappedIdentity(row: BenchmarkParams): string {
   return JSON.stringify([row.recipeFingerprint, row.conc, row.benchmarkType, row.isl, row.osl]);
 }
 
-/** A purge or later ingest filter must not turn an incomplete required scope into success. */
+/**
+ * A purge or later ingest filter must not turn an incomplete required scope into
+ * success. `before_write` runs over the planned points before the first
+ * irreversible write and prevents publication; `after_insert` runs over the rows
+ * actually handed to the benchmark insert and is what fails the ingest step when
+ * a row was dropped on the way (a config error, a failed bulk insert).
+ */
 export function assertRequiredPowerPointsRetained(
   required: readonly BenchmarkParams[],
   retained: readonly BenchmarkParams[],
+  stage: 'before_write' | 'after_insert',
 ): void {
   const retainedIdentity = (row: BenchmarkParams) =>
     JSON.stringify([configCacheKey(row.config), row.offloadMode, mappedIdentity(row)]);
@@ -66,7 +73,7 @@ export function assertRequiredPowerPointsRetained(
   for (const row of required) {
     const key = retainedIdentity(row);
     if (!present.has(key))
-      throw new Error(`Required power: missing benchmark point after ingest ${key}`);
+      throw new Error(`Required power (${stage}): missing benchmark point ${key}`);
     const actual = present.get(key)!;
     for (const field of [
       'power_valid',
@@ -77,7 +84,9 @@ export function assertRequiredPowerPointsRetained(
       'joules_per_output_token',
     ])
       if (actual.metrics[field] !== row.metrics[field])
-        throw new Error(`Required power: ${field} changed before ingest for ${key}`);
+        throw new Error(
+          `Required power (${stage}): ${field} differs from the verified artifact for ${key}`,
+        );
   }
 }
 

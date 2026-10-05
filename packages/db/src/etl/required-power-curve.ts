@@ -221,7 +221,7 @@ export async function preflightRequiredPowerCurves(
       }
     }
   }
-  assertRequiredPowerPointsRetained(required, [...incoming.values()]);
+  assertRequiredPowerPointsRetained(required, [...incoming.values()], 'before_write');
   const models = [...new Set([...incoming.values()].map((point) => point.config.model))];
   const rows = await sql`
     SELECT c.*, br.benchmark_type, br.isl, br.osl, br.conc, br.offload_mode,

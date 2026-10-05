@@ -293,11 +293,21 @@ describe('required power publication contract', () => {
     write(dir, 'results_bmk/agg.json', rows);
     expect(() => verifyRequiredPowerArtifacts(dir, source)).toThrow('conflicting');
   });
-  it('retains every required identity after local purges and backfills', () => {
+  it('retains every required identity after local purges and backfills, naming the stage', () => {
     const required = verifyRequiredPowerArtifacts(golden, source);
+    const dropped = [{ ...required[0], conc: 2 }];
+    expect(() => assertRequiredPowerPointsRetained(required, dropped, 'before_write')).toThrow(
+      'Required power (before_write): missing benchmark point',
+    );
+    expect(() => assertRequiredPowerPointsRetained(required, dropped, 'after_insert')).toThrow(
+      '(after_insert)',
+    );
+    const altered = [{ ...required[0], metrics: { ...required[0].metrics, avg_power_w: 1 } }];
+    expect(() => assertRequiredPowerPointsRetained(required, altered, 'after_insert')).toThrow(
+      'avg_power_w differs from the verified artifact',
+    );
     expect(() =>
-      assertRequiredPowerPointsRetained(required, [{ ...required[0], conc: 2 }]),
-    ).toThrow('missing benchmark point');
-    expect(() => assertRequiredPowerPointsRetained(required, required)).not.toThrow();
+      assertRequiredPowerPointsRetained(required, required, 'before_write'),
+    ).not.toThrow();
   });
 });
