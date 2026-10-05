@@ -38,12 +38,10 @@ export function GtaThemeBanner() {
           />
         </picture>
         <div className="gta-banner-shade" aria-hidden="true" />
-        <p className="gta-wordmark" aria-label="Grand Theft InferenceX">
-          <span aria-hidden="true">Grand</span>
-          <span aria-hidden="true">Theft</span>
-          <span aria-hidden="true" className="gta-wordmark-big">
-            InferenceX
-          </span>
+        {/* Real text so assistive tech reads "Grand Theft InferenceX"; the
+            spaces collapse visually because the lines are flex items. */}
+        <p className="gta-wordmark">
+          <span>Grand</span> <span>Theft</span> <span className="gta-wordmark-big">InferenceX</span>
         </p>
         <div className="gta-wanted" role="img" aria-label="Wanted level: five stars">
           {[0, 1, 2, 3, 4].map((i) => (

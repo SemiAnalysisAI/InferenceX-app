@@ -192,8 +192,7 @@ describe('Theme Toggle', () => {
     cy.get('html').should('have.class', 'gta');
     cy.get('[data-testid="gta-theme-banner"]').should('be.visible');
     cy.get('[data-testid="gta-theme-banner"] .gta-wordmark')
-      .should('have.attr', 'aria-label', 'Grand Theft InferenceX')
-      .and('have.text', 'GrandTheftInferenceX')
+      .should('have.text', 'Grand Theft InferenceX')
       .and('have.css', 'font-family')
       .and('match', /Pricedown/i);
     cy.get('[data-testid="gta-theme-banner"] .gta-banner-art img').should(($img) => {
