@@ -272,8 +272,9 @@ The ordinary fixture-backed smoke command remains `bun run test:e2e` with an
 
    The receipt's run/attempt, point IDs and endpoint must still match. A checkpoint
    interrupted before its metadata UPDATE leaves NULL candidates. They retain a
-   failed refresh responsibility and require targeted artifact re-ingest; a later
-   upsert clearing an already-written audit cannot erase that responsibility.
+   failed refresh responsibility and require targeted artifact re-ingest; the benchmark
+   upsert keeps an already-written agentic audit, so a later re-ingest cannot regress it
+   or erase that responsibility.
    Invalid/string-encoded audits fail explicitly. HTTP calls have a 30-second
    timeout; retries use the saved receipt rather than an unrecorded manual purge.
    Dry runs never refresh. `complete` covers the recorded IDs and API metadata,
