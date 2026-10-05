@@ -32,7 +32,9 @@ describe('Mario Kart mode', () => {
     cy.get('[data-testid="kart-game"]').should('not.exist');
     cy.window().then((win) =>
       expect(
-        win.performance.getEntriesByType('resource').filter((r) => r.name.endsWith('.gltf')),
+        win.performance
+          .getEntriesByType('resource')
+          .filter((r) => /\.(?:gltf|glb|bin)$/.test(r.name)),
       ).to.have.length(0),
     );
     cy.get('[data-testid="kart-launch"]').click();
@@ -41,7 +43,13 @@ describe('Mario Kart mode', () => {
       'data-status',
       'ready',
     );
+    cy.get('[data-testid="kart-pick-luigi"]').click().should('have.attr', 'aria-pressed', 'true');
     cy.get('[data-testid="kart-start"]').click();
+    cy.get('[data-testid="kart-game"]').should('have.attr', 'data-phase', 'countdown');
+    cy.window().then((win) => {
+      const text = (win as unknown as { render_game_to_text?: () => string }).render_game_to_text;
+      if (text) expect(JSON.parse(text()).player.character).to.equal('luigi');
+    });
     cy.get('[data-testid="kart-canvas"]').should('have.focus').type('{esc}');
     cy.get('[data-testid="kart-game"]').should('not.exist');
     cy.get('[data-testid="kart-launch"]').should('have.focus');

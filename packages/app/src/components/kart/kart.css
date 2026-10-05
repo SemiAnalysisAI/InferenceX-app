@@ -19,34 +19,78 @@
 }
 .kart-hud {
   position: absolute;
-  inset: 24px 64px auto 28px;
-  display: flex;
-  justify-content: space-between;
-  gap: 24px;
+  inset: 18px 70px auto 22px;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: start;
+  gap: 18px;
   pointer-events: none;
   text-shadow: 0 2px 4px #0009;
 }
-.kart-title {
+.kart-place {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.kart-title span {
-  font-size: var(--text-sm);
-  font-weight: 900;
+  align-items: baseline;
   font-style: italic;
-  letter-spacing: 0.08em;
+  font-weight: 900;
+  line-height: 1;
+  color: #fff;
+  -webkit-text-stroke: 2px #1a1030;
+  text-shadow:
+    0 4px 0 #1a1030,
+    0 8px 16px #0007;
 }
-.kart-title strong {
-  font-size: var(--text-2xl);
+.kart-place strong {
+  font-size: clamp(3.25rem, 7vw, 5.5rem);
+}
+.kart-place span {
+  font-size: var(--text-3xl);
+  margin-left: 2px;
+}
+.kart-place-1 {
+  color: #ffd640;
+}
+.kart-place-2 {
+  color: #dfe7f2;
+}
+.kart-place-3 {
+  color: #f0a35e;
+}
+.kart-item-slot {
+  position: relative;
+  width: 92px;
+  height: 92px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 40%, #ffffffee, #c9dbef 70%);
+  border: 5px solid #ffffff;
+  box-shadow:
+    0 0 0 4px #1a2a46,
+    0 8px 22px #0007;
+}
+.kart-item-slot img {
+  width: 76px;
+  height: 76px;
+  object-fit: contain;
+}
+.kart-item-slot small {
+  position: absolute;
+  right: -6px;
+  bottom: -4px;
+  font-size: var(--text-lg);
+  font-weight: 900;
+  color: #fff;
+  text-shadow: 0 2px 3px #000;
 }
 .kart-metrics {
+  justify-self: end;
   display: flex;
-  gap: 24px;
+  gap: 22px;
 }
 .kart-metrics div {
   display: flex;
   flex-direction: column;
+  align-items: flex-end;
 }
 .kart-metrics span {
   text-transform: uppercase;
@@ -55,15 +99,61 @@
 }
 .kart-metrics strong {
   font-size: var(--text-2xl);
+  font-style: italic;
+  font-weight: 900;
   font-variant-numeric: tabular-nums;
 }
 .kart-metrics small {
   font-size: var(--text-base);
 }
+.kart-standings {
+  position: absolute;
+  left: 18px;
+  top: 128px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  pointer-events: none;
+}
+.kart-standings li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 132px;
+  padding: 2px 8px 2px 4px;
+  border-radius: 6px;
+  background: #0b1830a8;
+  font-size: var(--text-xs);
+  font-weight: 800;
+}
+.kart-standings li span {
+  width: 14px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.kart-standings li em {
+  font-style: normal;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.kart-standings img {
+  width: 26px;
+  height: 26px;
+  object-fit: contain;
+}
+.kart-standings .kart-me,
+.kart-results .kart-me {
+  background: #ffd640;
+  color: #1a1030;
+}
 .kart-actions {
   position: absolute;
-  top: 108px;
-  right: 28px;
+  top: 116px;
+  right: 22px;
   display: flex;
   gap: 8px;
 }
@@ -93,50 +183,95 @@
 }
 .kart-map {
   position: absolute;
-  right: 24px;
-  bottom: 110px;
-  width: 145px;
-  height: 145px;
-  background: #101b3080;
-  border-radius: 16px;
+  right: 18px;
+  bottom: 100px;
+  width: 190px;
+  height: 190px;
   pointer-events: none;
+  filter: drop-shadow(0 4px 8px #0008);
 }
 .kart-speed {
   position: absolute;
-  left: 28px;
-  bottom: 152px;
+  right: 220px;
+  bottom: 108px;
   display: flex;
   align-items: baseline;
   gap: 6px;
+  font-style: italic;
   text-shadow: 0 3px 6px #0009;
   pointer-events: none;
 }
 .kart-speed strong {
   font-size: var(--text-5xl);
-  font-style: italic;
+  font-weight: 900;
   font-variant-numeric: tabular-nums;
 }
 .kart-speed span {
   font-size: var(--text-sm);
   font-weight: 800;
 }
-.kart-boost {
+.kart-speed-boost strong {
+  color: #ffb347;
+}
+.kart-spark {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  margin-left: 6px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 0 10px #fff;
+}
+.kart-spark-1 {
+  background: #5fc8ff;
+  box-shadow: 0 0 14px #5fc8ff;
+}
+.kart-spark-2 {
+  background: #ff9a1f;
+  box-shadow: 0 0 16px #ff9a1f;
+}
+.kart-banner {
   position: absolute;
-  left: 28px;
-  bottom: 118px;
-  width: 190px;
-  display: flex;
-  flex-direction: column;
-  font-size: var(--text-xs);
-  font-weight: 800;
-  text-shadow: 0 1px 3px #000;
+  inset: 30% 0 auto;
+  text-align: center;
+  font-size: clamp(2.5rem, 7vw, 5rem);
+  font-weight: 900;
+  font-style: italic;
+  color: #ffd640;
+  -webkit-text-stroke: 2px #8d2638;
+  text-shadow:
+    0 5px 0 #8d2638,
+    0 8px 18px #0006;
+  pointer-events: none;
+  animation: kart-pop 0.35s ease-out;
 }
-.kart-boost meter {
-  width: 100%;
-  height: 14px;
+.kart-banner-small {
+  inset: 42% 0 auto;
+  font-size: clamp(1.75rem, 4vw, 3rem);
+  color: #ffffff;
 }
-.kart-boost-active {
-  color: var(--kart-yellow);
+.kart-wrong {
+  color: #ff3b30;
+  -webkit-text-stroke: 2px #fff;
+  text-shadow: 0 5px 0 #5a0d18;
+  animation: kart-blink 0.6s steps(2) infinite;
+}
+@keyframes kart-pop {
+  from {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+}
+@keyframes kart-blink {
+  50% {
+    opacity: 0.25;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .kart-banner,
+  .kart-wrong {
+    animation: none;
+  }
 }
 .kart-touch {
   position: absolute;
@@ -152,8 +287,14 @@
   background: #101b30bd;
   user-select: none;
 }
-.kart-touch button:last-child {
+.kart-game .kart-touch .kart-touch-throttle {
   background: var(--kart-red);
+}
+.kart-game .kart-touch .kart-touch-item {
+  background: #b8860b;
+}
+.kart-game .kart-touch .kart-touch-drift {
+  background: #1f5fae;
 }
 .kart-overlay {
   position: absolute;
@@ -207,13 +348,90 @@
   font-size: var(--text-sm);
   padding: 8px 12px;
 }
+.kart-card-wide {
+  max-width: 760px;
+}
+.kart-picker {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin: 0 0 16px;
+  padding: 0;
+  border: 0;
+}
+.kart-picker legend {
+  width: 100%;
+  margin-bottom: 8px;
+  font-size: var(--text-xs);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #abbed5;
+}
+.kart-card .kart-pick {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 78px;
+  padding: 6px 8px;
+  background: #1a2a46;
+  border: 2px solid #ffffff40;
+  font-size: var(--text-xs);
+}
+.kart-card .kart-pick img {
+  width: 56px;
+  height: 56px;
+  object-fit: contain;
+}
+.kart-card .kart-pick[aria-pressed='true'] {
+  background: #ffd640;
+  color: #1a1030;
+  border-color: #ffffff;
+}
+.kart-cc .kart-pick {
+  min-width: 90px;
+  font-size: var(--text-sm);
+  padding: 10px 12px;
+}
+.kart-progress {
+  width: 100%;
+  height: 14px;
+  margin-bottom: 12px;
+}
+.kart-results {
+  margin: 0 auto 12px;
+  padding: 0;
+  list-style: none;
+  max-width: 420px;
+  text-align: left;
+}
+.kart-results li {
+  display: grid;
+  grid-template-columns: 24px 36px 1fr auto;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 10px;
+  border-radius: 6px;
+  font-weight: 700;
+}
+.kart-results li:nth-child(odd):not(.kart-me) {
+  background: #ffffff10;
+}
+.kart-results em {
+  font-style: normal;
+}
+.kart-results time {
+  font-variant-numeric: tabular-nums;
+}
+.kart-card .kart-laps {
+  font-size: var(--text-sm);
+  margin-bottom: 14px;
+}
 .kart-card .kart-controls {
   font-size: var(--text-xs);
   margin: 20px 0 6px;
-}
-.kart-assist {
-  font-size: var(--text-xs);
-  color: #abbed5;
 }
 .kart-countdown {
   position: absolute;
@@ -269,64 +487,113 @@
     min-height: 360px;
   }
   .kart-hud {
-    inset: 16px 58px auto 16px;
-    flex-direction: column;
-    gap: 14px;
-  }
-  .kart-title strong {
-    font-size: var(--text-lg);
-  }
-  .kart-title span {
-    font-size: var(--text-xs);
-  }
-  .kart-metrics {
-    gap: 22px;
-  }
-  .kart-metrics strong {
-    font-size: var(--text-xl);
-  }
-  .kart-actions {
-    top: 140px;
-    right: 16px;
-  }
-  .kart-actions button {
-    padding: 8px 10px;
-  }
-  .kart-map {
-    right: 12px;
-    bottom: 142px;
-    width: 105px;
-    height: 105px;
-  }
-  .kart-speed {
-    left: 16px;
-    bottom: 175px;
-  }
-  .kart-speed strong {
-    font-size: var(--text-4xl);
-  }
-  .kart-boost {
-    left: 16px;
-    bottom: 148px;
-    width: 140px;
-  }
-  .kart-touch {
-    left: 12px;
-    right: 12px;
-    bottom: 32px;
-    flex-wrap: wrap;
+    inset: 12px 58px auto 12px;
     gap: 8px;
   }
+  .kart-place strong {
+    font-size: var(--text-5xl);
+  }
+  .kart-place span {
+    font-size: var(--text-xl);
+  }
+  .kart-item-slot {
+    width: 66px;
+    height: 66px;
+    border-width: 4px;
+  }
+  .kart-item-slot img {
+    width: 52px;
+    height: 52px;
+  }
+  .kart-metrics {
+    flex-direction: column;
+    gap: 2px;
+  }
+  .kart-metrics strong {
+    font-size: var(--text-lg);
+  }
+  .kart-standings {
+    top: 92px;
+    left: 10px;
+  }
+  .kart-standings li {
+    width: auto;
+    padding: 1px 4px;
+  }
+  .kart-standings li em {
+    display: none;
+  }
+  .kart-standings img {
+    width: 20px;
+    height: 20px;
+  }
+  .kart-actions {
+    top: 96px;
+    right: 8px;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .kart-actions button {
+    min-height: 36px;
+    padding: 6px 8px;
+    font-size: var(--text-xs);
+  }
+  .kart-map {
+    right: 8px;
+    bottom: 150px;
+    width: 120px;
+    height: 120px;
+  }
+  .kart-speed {
+    left: 12px;
+    right: auto;
+    bottom: 150px;
+  }
+  .kart-speed strong {
+    font-size: var(--text-3xl);
+  }
+  .kart-touch {
+    left: 8px;
+    right: 8px;
+    bottom: 16px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+  }
   .kart-touch button {
-    flex: 1 1 25%;
-    min-width: 65px;
-    padding: 10px 8px;
+    min-width: 0;
+    min-height: 56px;
+    padding: 8px 6px;
   }
   .kart-card {
-    padding: 22px;
+    padding: 20px;
   }
   .kart-card h2 {
     font-size: var(--text-2xl);
+  }
+  .kart-picker:not(.kart-cc) {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+  }
+  .kart-card .kart-pick {
+    min-width: 0;
+    padding: 4px;
+  }
+  .kart-card .kart-pick span {
+    overflow: hidden;
+    max-width: 100%;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .kart-card p {
+    font-size: var(--text-sm);
+    line-height: 1.45;
+    margin-bottom: 12px;
+  }
+  .kart-card .kart-pick img {
+    width: 44px;
+    height: 44px;
   }
 }
 @media (max-height: 540px) and (min-width: 641px) {
@@ -346,6 +613,87 @@
   .kart-card p {
     margin-bottom: 8px;
     font-size: var(--text-sm);
+  }
+  .kart-card-wide {
+    max-width: 760px;
+  }
+  .kart-picker {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+    margin: 0 0 16px;
+    padding: 0;
+    border: 0;
+  }
+  .kart-picker legend {
+    width: 100%;
+    margin-bottom: 8px;
+    font-size: var(--text-xs);
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #abbed5;
+  }
+  .kart-card .kart-pick {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    min-width: 78px;
+    padding: 6px 8px;
+    background: #1a2a46;
+    border: 2px solid #ffffff40;
+    font-size: var(--text-xs);
+  }
+  .kart-card .kart-pick img {
+    width: 56px;
+    height: 56px;
+    object-fit: contain;
+  }
+  .kart-card .kart-pick[aria-pressed='true'] {
+    background: #ffd640;
+    color: #1a1030;
+    border-color: #ffffff;
+  }
+  .kart-cc .kart-pick {
+    min-width: 90px;
+    font-size: var(--text-sm);
+    padding: 10px 12px;
+  }
+  .kart-progress {
+    width: 100%;
+    height: 14px;
+    margin-bottom: 12px;
+  }
+  .kart-results {
+    margin: 0 auto 12px;
+    padding: 0;
+    list-style: none;
+    max-width: 420px;
+    text-align: left;
+  }
+  .kart-results li {
+    display: grid;
+    grid-template-columns: 24px 36px 1fr auto;
+    align-items: center;
+    gap: 8px;
+    padding: 3px 10px;
+    border-radius: 6px;
+    font-weight: 700;
+  }
+  .kart-results li:nth-child(odd):not(.kart-me) {
+    background: #ffffff10;
+  }
+  .kart-results em {
+    font-style: normal;
+  }
+  .kart-results time {
+    font-variant-numeric: tabular-nums;
+  }
+  .kart-card .kart-laps {
+    font-size: var(--text-sm);
+    margin-bottom: 14px;
   }
   .kart-card .kart-controls {
     margin-top: 8px;
