@@ -553,7 +553,8 @@ html[data-inferencex-embed] [data-testid='csgo-theme-banner'] {
 }
 
 /* Selected menu tab: solid white with black text, like the GTA V pause menu. */
-.gta header nav a[aria-current='page'] {
+.gta header nav a[aria-current='page'],
+.gta [data-testid='mobile-menu'] a[aria-current='page'] {
   background: #f5f5f5;
   color: #000;
 }

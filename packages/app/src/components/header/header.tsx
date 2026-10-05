@@ -306,6 +306,7 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
                       key={href}
                       href={displayHref}
                       prefetch={isActive(pathname, href) ? false : undefined}
+                      aria-current={isActive(pathname, href) ? 'page' : undefined}
                       className={cn(
                         'flex items-center min-h-11 px-3 rounded-md text-sm font-medium transition-colors',
                         isActive(pathname, href)
