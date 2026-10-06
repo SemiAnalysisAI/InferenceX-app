@@ -108,6 +108,11 @@ export interface DatabasePowerRow {
   runAttempt: number;
   headSha: string;
   hardware: string;
+  model: string;
+  framework: string;
+  isMultinode: boolean;
+  benchmarkType: string;
+  runName: string;
   metrics: Record<string, unknown>;
   hasWorkers: boolean;
   linkedSeries: { id: string; vendor: string; artifactName: string; csvSha256: string }[];
@@ -117,6 +122,7 @@ export function summarizeDatabaseInventory(
   rows: readonly DatabasePowerRow[],
   sources: readonly SourceEvidence[],
   telemetryTablesPresent: boolean,
+  amdRowsRead = rows.length,
 ) {
   const inventory = rows.map((row) => ({
     resultId: row.resultId,
@@ -124,6 +130,11 @@ export function summarizeDatabaseInventory(
     runAttempt: row.runAttempt,
     headSha: row.headSha,
     hardware: row.hardware,
+    model: row.model,
+    framework: row.framework,
+    isMultinode: row.isMultinode,
+    benchmarkType: row.benchmarkType,
+    runName: row.runName,
     hasWorkers: row.hasWorkers,
     linkedSeries: row.linkedSeries,
     ...classifyDatabaseRow(row, sources),
@@ -133,7 +144,7 @@ export function summarizeDatabaseInventory(
   );
   return {
     databaseChecked: true,
-    amdRowsRead: rows.length,
+    amdRowsRead,
     powerOrTelemetryRows: relevant.length,
     telemetryInventory: telemetryTablesPresent ? 'available' : 'unknown_pre_gpu_metrics_migration',
     verifiedRetirementCandidates: relevant.filter(
@@ -149,22 +160,31 @@ export function summarizeDatabaseInventory(
 export function classifyDatabaseRow(row: DatabasePowerRow, sources: readonly SourceEvidence[]) {
   const source = sources.find((entry) => entry.resultId === row.resultId);
   const powerKeys = LEGACY_GPU_POWER_KEYS.filter((key) => row.metrics[key] !== undefined);
-  if (!source) return { status: 'source_unknown' as const, powerKeys };
+  const finitePowerKeys = powerKeys.filter(
+    (key) =>
+      typeof row.metrics[key] === 'number' &&
+      Number.isFinite(row.metrics[key]) &&
+      row.metrics[key] >= 0,
+  );
+  const powerVerdict =
+    row.metrics.power_valid === 1 ? 'valid' : row.metrics.power_valid === 0 ? 'invalid' : 'unknown';
+  const measurement = { powerKeys, finitePowerKeys, powerVerdict };
+  if (!source) return { status: 'source_unknown' as const, ...measurement };
   if (
     row.githubRunId !== source.githubRunId ||
     row.runAttempt !== source.runAttempt ||
     row.headSha !== source.sourceSha ||
     row.hardware !== source.hardware
   ) {
-    return { status: 'identity_mismatch' as const, powerKeys };
+    return { status: 'identity_mismatch' as const, ...measurement };
   }
   const linked = row.linkedSeries.filter((series) => series.csvSha256 === source.csvSha256);
   if (row.linkedSeries.length > 0 && linked.length === 0) {
-    return { status: 'series_sha_mismatch' as const, powerKeys };
+    return { status: 'series_sha_mismatch' as const, ...measurement };
   }
   return {
     status: 'verified_legacy_amd_smi' as const,
-    powerKeys,
+    ...measurement,
     linkedSeriesIds: linked.map((series) => series.id),
     seriesCoverage: row.linkedSeries.length === 0 ? ('unknown' as const) : ('matched' as const),
     source,

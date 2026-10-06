@@ -191,6 +191,13 @@ describe('parseCsvData', () => {
 // ---------------------------------------------------------------------------
 
 describe('getAvailableMetrics', () => {
+  it('does not offer retired watts when nonpower readings remain', () => {
+    const metrics = getAvailableMetrics([
+      { timestamp: '2026-03-07T00:00:00Z', index: 0, temperature: 65, gpuUtil: 92 },
+    ]);
+    expect(metrics.map((metric) => metric.key)).toEqual(['temperature', 'gpuUtil']);
+  });
+
   it('returns common + AMD metrics for AMD data', () => {
     const amdRow: GpuMetricRow = {
       timestamp: '2026-03-07T00:00:00Z',

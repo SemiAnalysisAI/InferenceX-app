@@ -4,6 +4,7 @@ import { PGlite } from '@electric-sql/pglite';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import type { DbClient } from '../connection';
+import rawPoints from '../lib/legacy-amd-smi-raw-points.json';
 import { getGpuMetricsForPoint, getGpuMetricsForRun, SAMPLE_PAGE_SIZE } from './gpu-metrics';
 
 let db: PGlite;
@@ -102,6 +103,32 @@ beforeEach(async () => {
 });
 
 describe('getGpuMetricsForRun', () => {
+  it('retains raw-verified AMD temperature and utilization without serving its watts', async () => {
+    const raw = rawPoints.entries[0]!;
+    await db.exec(`
+      INSERT INTO workflow_runs (id, github_run_id, run_attempt, name, status, conclusion,
+        head_sha, created_at, date)
+      VALUES (5, ${raw.githubRunId}, ${raw.runAttempt}, 'Raw source', 'completed', 'success',
+        '${raw.headSha}', '2026-09-11', '2026-09-11');
+      INSERT INTO gpu_metric_series (id, workflow_run_id, artifact_name, config_key, file_name,
+        vendor, csv_sha256, sample_count, gpu_count, started_at, ended_at, sidecars)
+      VALUES (105, 5, 'gpu_metrics_raw', 'raw', 'gpu_metrics.csv', 'amd',
+        '${raw.csvSha256}', 1, 1, '2026-09-11', '2026-09-11', '{}');
+      INSERT INTO gpu_metric_samples (series_id, gpu_index, sampled_at, power_w,
+        temperature_c, gpu_util_pct)
+      VALUES (105, 0, '2026-09-11', 535, 65, 92);
+      INSERT INTO gpu_metric_gpu_stats (series_id, gpu_index, metric, sample_count,
+        min_value, max_value, mean_value, median_value, p95_value, p99_value, stddev_value)
+      VALUES (105, 0, 'power_w', 1, 535, 535, 535, 535, 535, 535, 0),
+        (105, 0, 'temperature_c', 1, 65, 65, 65, 65, 65, 65, 0);
+    `);
+    const payload = await getGpuMetricsForRun(sql, raw.githubRunId);
+    expect(payload?.series[0]?.data[0]).toMatchObject({ temperature: 65, gpuUtil: 92 });
+    expect(payload?.series[0]?.data[0]).not.toHaveProperty('power');
+    expect(payload?.series[0]?.stats.map((stat) => stat.metric)).toContain('temperature_c');
+    expect(payload?.series[0]?.stats.map((stat) => stat.metric)).not.toContain('power_w');
+  });
+
   it('returns the run header, every series, its per-GPU stats, and its samples', async () => {
     const payload = await getGpuMetricsForRun(sql, WITH_SERIES);
 

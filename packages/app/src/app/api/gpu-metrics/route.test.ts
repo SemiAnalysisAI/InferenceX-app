@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import type * as GpuPowerTypes from '@/components/gpu-power/types';
+import type * as InferenceXConstants from '@semianalysisai/inferencex-constants';
 
 const { mockParseCsvData, zipArchives } = vi.hoisted(() => {
   interface ZipEntry {
@@ -33,7 +34,8 @@ const { mockParseCsvData, zipArchives } = vi.hoisted(() => {
   };
 });
 
-vi.mock('@semianalysisai/inferencex-constants', () => ({
+vi.mock('@semianalysisai/inferencex-constants', async (importOriginal) => ({
+  ...(await importOriginal<typeof InferenceXConstants>()),
   GITHUB_API_BASE: 'https://api.github.com',
   GITHUB_OWNER: 'TestOwner',
   GITHUB_REPO: 'TestRepo',

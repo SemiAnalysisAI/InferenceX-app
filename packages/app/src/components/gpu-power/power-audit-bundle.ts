@@ -311,7 +311,8 @@ export function cutPowerAuditCsvs(
       const id = populated.length === 1 ? String(row.index) : `${file.name}/${row.index}`;
       devices.set(id, { id, hostname: file.name, gpuIndex: row.index });
       const time = parseTelemetryTimestampUtc(row.timestamp);
-      if (time !== null) samples.push({ deviceId: id, time: time / 1000, power: row.power });
+      if (time !== null && typeof row.power === 'number')
+        samples.push({ deviceId: id, time: time / 1000, power: row.power });
     }
   }
   return cutPowerAuditSamples(artifact, samples, devices, validations, manifest);

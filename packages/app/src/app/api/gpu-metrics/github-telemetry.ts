@@ -1,6 +1,8 @@
 /** Live PowerX artifact acquisition; the route owns DB fallback and HTTP responses. */
 import type { GpuMetricRow, GpuPowerRunInfo } from '@/components/gpu-power/types';
+import { isRetiredLiveCsv } from '@semianalysisai/inferencex-db/lib/legacy-amd-smi-policy';
 import {
+  BUNDLE_SAMPLES_ENTRY,
   cutPowerAuditBundle,
   isPowerAuditBundleEntry,
   parsePowerCsvData,
@@ -70,6 +72,7 @@ async function downloadZip(
 async function downloadArtifact(
   artifact: GithubArtifact,
   githubToken: string,
+  run: Pick<GithubWorkflowRun, 'id' | 'head_sha'>,
 ): Promise<GithubArtifactPayload | null> {
   const buffer = await downloadZip(artifact, githubToken, MAX_ARTIFACT_BYTES);
   if (!buffer) return null;
@@ -91,9 +94,12 @@ async function downloadArtifact(
   const files = extractZipEntries(
     buffer,
     '.csv',
-    (entryName, contents) => {
+    (entryName, contents, raw) => {
       const directory = entryName.slice(0, entryName.lastIndexOf('/') + 1);
-      const data = parsePowerCsvData(contents, contexts.get(directory) ?? null);
+      const parsed = parsePowerCsvData(contents, contexts.get(directory) ?? null);
+      const data = isRetiredLiveCsv(run.id, run.head_sha, raw)
+        ? parsed.map(({ power: _power, ...nonpower }) => nonpower)
+        : parsed;
       return data.length > 0 ? [{ name: entryName, data }] : [];
     },
     (entryName, error) => {
@@ -106,13 +112,20 @@ async function downloadArtifact(
 async function downloadBundle(
   artifact: GithubArtifact,
   githubToken: string,
+  run: Pick<GithubWorkflowRun, 'id' | 'head_sha'>,
 ): Promise<GpuPowerSeries[] | null> {
   const buffer = await downloadZip(artifact, githubToken, MAX_BUNDLE_BYTES);
   if (!buffer) return null;
-  const series = cutPowerAuditBundle(
-    artifact.name,
-    readZipEntries(buffer, isPowerAuditBundleEntry),
-  );
+  let retiredCsvFound = false;
+  const entries = readZipEntries(buffer, isPowerAuditBundleEntry, (name, raw) => {
+    if (!name.toLowerCase().endsWith('.csv') || !isRetiredLiveCsv(run.id, run.head_sha, raw))
+      return false;
+    retiredCsvFound = true;
+    return true;
+  });
+  // The fallback samples file may be derived from the same retired SMI CSV.
+  if (retiredCsvFound) entries.delete(BUNDLE_SAMPLES_ENTRY);
+  const series = cutPowerAuditBundle(artifact.name, entries);
   return series.length > 0 ? series : null;
 }
 
@@ -122,13 +135,17 @@ async function downloadBundle(
  * the run still reach the chart (the client would otherwise retry the whole
  * multi-hundred-megabyte request).
  */
-async function runJob(job: TelemetryJob, githubToken: string): Promise<TelemetryResult | null> {
+async function runJob(
+  job: TelemetryJob,
+  githubToken: string,
+  run: Pick<GithubWorkflowRun, 'id' | 'head_sha'>,
+): Promise<TelemetryResult | null> {
   try {
     if (job.kind === 'csv') {
-      const parsed = await downloadArtifact(job.artifact, githubToken);
+      const parsed = await downloadArtifact(job.artifact, githubToken, run);
       return parsed ? { kind: 'csv', parsed } : null;
     }
-    const series = await downloadBundle(job.artifact, githubToken);
+    const series = await downloadBundle(job.artifact, githubToken, run);
     return series ? { kind: 'bundle', series } : null;
   } catch (error) {
     console.warn(`Failed to read artifact ${job.artifact.name}:`, error);
@@ -140,13 +157,14 @@ async function runJob(job: TelemetryJob, githubToken: string): Promise<Telemetry
 async function downloadTelemetry(
   jobs: TelemetryJob[],
   githubToken: string,
+  run: Pick<GithubWorkflowRun, 'id' | 'head_sha'>,
 ): Promise<TelemetryResult[]> {
   const results: (TelemetryResult | null)[] = Array.from({ length: jobs.length }, () => null);
   let next = 0;
   const worker = async () => {
     while (next < jobs.length) {
       const index = next++;
-      results[index] = await runJob(jobs[index], githubToken);
+      results[index] = await runJob(jobs[index], githubToken, run);
     }
   };
   await Promise.all(Array.from({ length: Math.min(DOWNLOAD_CONCURRENCY, jobs.length) }, worker));
@@ -192,8 +210,10 @@ export async function fetchGpuMetricsFromGithub(
     );
   }
 
-  const results = await downloadTelemetry(jobs, githubToken);
-  if (results.length === 0) throw new Error('No Chip metrics data found in artifacts');
+  const results = await downloadTelemetry(jobs, githubToken, run);
+  if (results.length === 0) {
+    throw new Error('No Chip metrics data found in artifacts');
+  }
 
   const parsedArtifacts: GithubArtifactPayload[] = [];
   const bundleSeries: GpuPowerSeries[] = [];

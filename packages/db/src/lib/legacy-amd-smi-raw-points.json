@@ -1,0 +1,72 @@
+{
+  "entries": [
+    {
+      "resultId": "431819",
+      "githubRunId": 28646817197,
+      "runAttempt": 1,
+      "headSha": "6506d10f48c5a583a981805c4d470c14783df33f",
+      "hardware": "mi355x",
+      "config": {
+        "model": "minimaxm3",
+        "disagg": false,
+        "hardware": "mi355x",
+        "decodeEp": 1,
+        "decodeTp": 4,
+        "framework": "atom",
+        "precision": "fp4",
+        "prefillEp": 1,
+        "prefillTp": 4,
+        "specMethod": "none",
+        "isMultinode": false,
+        "numDecodeGpu": 4,
+        "numPrefillGpu": 4,
+        "decodeNumWorkers": 0,
+        "decodeDpAttn": false,
+        "prefillNumWorkers": 0,
+        "prefillDpAttn": false
+      },
+      "benchmarkType": "single_turn",
+      "isl": 8192,
+      "osl": 1024,
+      "conc": 128,
+      "offloadMode": "off",
+      "recipeFingerprint": null,
+      "csvSha256": "00fceaa25771a8971840047a2dbfdfaa793d67baff2e4a5ff0942814c04638fd",
+      "csvPath": "28646817197/8065212521/gpu_metrics.csv"
+    },
+    {
+      "resultId": "443533",
+      "githubRunId": 36507377618,
+      "runAttempt": 1,
+      "headSha": "b9489aead453ae3765bf5882db84031326bf1ff7",
+      "hardware": "mi355x",
+      "config": {
+        "model": "qwen3.5",
+        "disagg": false,
+        "hardware": "mi355x",
+        "decodeEp": 1,
+        "decodeTp": 4,
+        "framework": "sglang",
+        "precision": "fp4",
+        "prefillEp": 1,
+        "prefillTp": 4,
+        "specMethod": "none",
+        "isMultinode": false,
+        "numDecodeGpu": 4,
+        "numPrefillGpu": 4,
+        "decodeNumWorkers": 0,
+        "decodeDpAttn": false,
+        "prefillNumWorkers": 0,
+        "prefillDpAttn": false
+      },
+      "benchmarkType": "single_turn",
+      "isl": 8192,
+      "osl": 1024,
+      "conc": 4,
+      "offloadMode": "off",
+      "recipeFingerprint": "170b36a5df21331385e177fc6e625f2846cbecd536476e9c9cd2ab88a56117d4",
+      "csvSha256": "39e5513048c262624dfc5d91deaf0d1ab45b5f0ba5a77958f1a1012749afd508",
+      "csvPath": "36507377618/11018065123/gpu_metrics.csv"
+    }
+  ]
+}

@@ -54,6 +54,11 @@ it('selects only an exact direct AMD-SMI source and leaves benchmark metrics unt
     runAttempt: 1,
     headSha: source.sourceSha,
     hardware: 'mi355x',
+    model: 'qwen3.5',
+    framework: 'sglang',
+    isMultinode: false,
+    benchmarkType: 'single_turn',
+    runName: 'benchmark',
     metrics: {
       avg_power_w: 535,
       total_gpu_energy_j: 1200,
@@ -72,6 +77,7 @@ it('selects only an exact direct AMD-SMI source and leaves benchmark metrics unt
   const metricsBefore = { ...row.metrics };
   expect(classifyDatabaseRow(row, [source])).toMatchObject({
     status: 'verified_legacy_amd_smi',
+    powerVerdict: 'valid',
     powerKeys: [
       'avg_power_w',
       'total_gpu_energy_j',
@@ -81,6 +87,14 @@ it('selects only an exact direct AMD-SMI source and leaves benchmark metrics unt
     linkedSeriesIds: ['42'],
   });
   expect(row.metrics).toEqual(metricsBefore);
+  expect(
+    classifyDatabaseRow({ ...row, metrics: { avg_power_w: null, power_valid: 0 } }, [])
+      .finitePowerKeys,
+  ).toEqual([]);
+  expect(
+    classifyDatabaseRow({ ...row, metrics: { avg_power_w: null, power_valid: 0 } }, [])
+      .powerVerdict,
+  ).toBe('invalid');
   expect(classifyDatabaseRow(row, [source]).powerKeys).not.toContain('avg_cpu_socket_power_w');
   expect(classifyDatabaseRow(row, [source]).powerKeys).not.toContain('power_valid');
   expect(classifyDatabaseRow(row, [source]).powerKeys).not.toContain('power_metric_schema_version');
@@ -113,6 +127,11 @@ it('inventories legacy power before telemetry tables exist without claiming comp
       runAttempt: source.runAttempt,
       headSha: source.sourceSha,
       hardware: source.hardware,
+      model: 'qwen3.5',
+      framework: 'sglang',
+      isMultinode: false,
+      benchmarkType: 'single_turn',
+      runName: 'benchmark',
       metrics: { avg_power_w: 535, median_ttft: 0.2 },
       hasWorkers: false,
       linkedSeries: [],
