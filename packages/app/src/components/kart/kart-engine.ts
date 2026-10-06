@@ -132,6 +132,7 @@ export interface Kart {
   driftStage: 0 | 1 | 2;
   boost: number;
   boostPower: number;
+  boostPanelContact: boolean;
   draft: number;
   spin: number;
   tumble: number;
@@ -317,6 +318,7 @@ export function newRace(options: RaceOptions = {}): Race {
       driftStage: 0,
       boost: 0,
       boostPower: 1,
+      boostPanelContact: false,
       draft: 0,
       spin: 0,
       tumble: 0,
@@ -404,18 +406,26 @@ export const isStunned = (k: Kart) => k.spin > 0 || k.tumble > 0 || k.respawn > 
 // ---------------------------------------------------------------------------
 // Simulation
 // ---------------------------------------------------------------------------
-const blocked = (race: Race, k: { y: number }, x: number, z: number) => {
+const blocked = (race: Race, k: { x: number; y: number; z: number }, x: number, z: number) => {
   const s = surfaceAt(race.surface, x, z);
   if (s === SURFACE.wall || s === SURFACE.none) return true;
   // Barrier rails and building ledges register as floors that are too tall to climb.
-  return heightAt(race.surface, x, z) - k.y > 1.6;
+  const allowance =
+    s === SURFACE.bank || s === SURFACE.boost ? 1.6 + Math.hypot(x - k.x, z - k.z) * 1.15 : 1.6;
+  return heightAt(race.surface, x, z) - k.y > allowance;
 };
 const RING = Array.from({ length: 10 }, (_, i) => [
   Math.cos((i / 10) * Math.PI * 2),
   Math.sin((i / 10) * Math.PI * 2),
 ]);
 /** Returns an outward wall normal if a circle at (x, z) overlaps blocked terrain. */
-function wallNormal(race: Race, k: { y: number }, x: number, z: number, r: number) {
+function wallNormal(
+  race: Race,
+  k: { x: number; y: number; z: number },
+  x: number,
+  z: number,
+  r: number,
+) {
   let nx = 0;
   let nz = 0;
   let hit = false;
@@ -877,15 +887,21 @@ function stepKart(race: Race, k: Kart, input: Controls, dt: number) {
     k.driftArmed = true;
   }
   if (!driftHeld) k.driftArmed = false;
-  if (k.hop > 0) {
-    k.hop -= dt;
-    if (driftHeld && Math.abs(k.steer) > 0.3 && k.driftDir === 0 && k.speed > 22)
-      k.driftDir = k.steer > 0 ? 1 : -1;
-  }
+  if (k.hop > 0) k.hop -= dt;
+  // A hop started below drift speed stays armed while held. Otherwise the player
+  // can accelerate through the threshold but never start drifting until re-pressing.
+  if (
+    driftHeld &&
+    (k.hop > 0 || (k.driftArmed && k.grounded)) &&
+    Math.abs(k.steer) > 0.3 &&
+    k.driftDir === 0 &&
+    k.speed > 22
+  )
+    k.driftDir = k.steer > 0 ? 1 : -1;
   if (k.driftDir !== 0) {
     if (!driftHeld || k.speed < 18 || stunned || surf === SURFACE.water) {
       // Release: mini-turbo.
-      if (!stunned && driftHeld === false && k.driftStage > 0) {
+      if (!stunned && !driftHeld && k.driftStage > 0 && k.speed >= 18 && surf !== SURFACE.water) {
         const stage = k.driftStage;
         giveBoost(k, stage === 2 ? 1.25 : 0.7, stage === 2 ? 1.3 : 1.22);
         race.events.push({ type: 'mini-turbo', kart: k.index, value: stage });
@@ -907,7 +923,8 @@ function stepKart(race: Race, k: Kart, input: Controls, dt: number) {
   let yaw =
     k.driftDir === 0
       ? k.steer * s.handling * speedFactor * Math.sign(k.speed || 1) * (k.grounded ? 1 : 0.6)
-      : k.driftDir * s.handling * (0.72 + 0.48 * k.steer * k.driftDir) * Math.min(1, k.speed / 24);
+      : // Keep the same speed-dependent steering envelope as normal driving.
+        k.driftDir * s.handling * (0.55 + 0.45 * k.steer * k.driftDir) * speedFactor;
   if (k.spin > 0) yaw = 0;
   if (k.tumble > 0) yaw *= 0.2;
   yaw *= grip;
@@ -1004,7 +1021,14 @@ function stepKart(race: Race, k: Kart, input: Controls, dt: number) {
         k.driftDir = k.steer > 0 ? 1 : -1;
     }
   }
-  if (surfaceAt(race.surface, k.x, k.z) === SURFACE.water && k.grounded) {
+  const landedSurface = surfaceAt(race.surface, k.x, k.z);
+  const onPanel = landedSurface === SURFACE.boost && k.grounded;
+  if (onPanel && !k.boostPanelContact && !stunned && !finished) {
+    giveBoost(k, 1, 1.35);
+    race.events.push({ type: 'boost', kart: k.index });
+  }
+  k.boostPanelContact = onPanel;
+  if (landedSurface === SURFACE.water && k.grounded) {
     k.respawn = 1.8;
     k.trailing = false;
     k.driftDir = 0;

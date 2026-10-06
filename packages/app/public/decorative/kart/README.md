@@ -56,6 +56,11 @@ All archives were downloaded on 2026-10-05 from The Models Resource.
   boundary) plus ground height. Format: `KSRF` magic, then little-endian
   `x0, z0, res` (f32), `pad, width, height` (u32), `width*height` surface bytes,
   and `width*height` int16 heights in 1/32 units.
+- The bank and all nine boost strips are restored from the shipped course's
+  baked `polygon8` (MainRoad), `polygon1` (curb), and `polygon0`
+  (`ef_dushBoard`) triangles by `bun scripts/repair-kart-surface.ts` in
+  `packages/app`. Surface codes 7 and 8 identify drivable banking and boost
+  panels; steep vertical faces and higher structures remain blocked.
 - `circuit.webp` and `circuit-mobile.webp`: screenshots of the converted course
   in this app's renderer, without HUD.
 

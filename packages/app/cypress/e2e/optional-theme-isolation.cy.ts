@@ -77,6 +77,10 @@ describe('optional themes stay off the default page', () => {
         win.localStorage.setItem('minecraft-sound', 'false');
       },
     });
+    // The server-rendered trigger is visible before its click handler hydrates.
+    cy.get('[data-testid="theme-toggle"]')
+      .should('have.attr', 'aria-label')
+      .and('contain', 'currently');
     cy.document().then((doc) => {
       const baseline = seo(doc);
       for (const theme of ['csgo', 'gta', 'minecraft', 'kart']) {

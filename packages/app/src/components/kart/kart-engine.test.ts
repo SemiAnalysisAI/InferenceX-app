@@ -18,7 +18,7 @@ import {
   type Race,
 } from './kart-engine';
 import { heightAt, parseSurface, SURFACE, surfaceAt } from './kart-surface';
-import { pointAt as trackPoint, wrapAngle } from './kart-track';
+import { nearest, pointAt as trackPoint, wrapAngle } from './kart-track';
 
 const bin = readFileSync(
   path.resolve(import.meta.dirname, '../../../public/decorative/kart/luigi-circuit-surface.bin'),
@@ -153,23 +153,117 @@ describe('kart engine', () => {
     expect(race.player.speed).toBeLessThan(0);
   });
 
-  it('drifting charges blue then orange sparks and releases a mini-turbo', () => {
+  it.each([
+    [200, 'right', 1, 1],
+    [200, 'right', 2, 1.7],
+    [400, 'left', 1, 1],
+  ] as const)(
+    'drifts from %s to the %s and naturally earns stage %s',
+    (distance, direction, stage, seconds) => {
+      const race = solo(distance);
+      race.karts = [race.player];
+      race.player.speed = 60;
+      for (let i = 0; i < Math.round(seconds / STEP); i++) {
+        stepRace(race, { ...EMPTY_CONTROLS, throttle: true, drift: true, [direction]: true }, STEP);
+        expect(race.events.some((e) => e.type === 'wall')).toBe(false);
+        race.events.length = 0;
+      }
+      expect(race.player.driftStage).toBe(stage);
+      const speed = race.player.speed;
+      stepRace(race, { ...EMPTY_CONTROLS, throttle: true }, STEP);
+      expect(race.events).toContainEqual({
+        type: 'mini-turbo',
+        kart: race.player.index,
+        value: stage,
+      });
+      expect(race.player.driftDir).toBe(0);
+      expect(race.player.driftCharge).toBe(0);
+      expect(race.player.boost).toBeCloseTo(stage === 2 ? 1.25 : 0.7);
+      run(race, { throttle: true }, 0.1);
+      expect(race.player.speed).toBeGreaterThan(speed + 2);
+    },
+  );
+
+  it('starts a held drift after accelerating out of a low-speed hop', () => {
+    const race = solo(190);
+    race.karts = [race.player];
+    race.player.speed = 11;
+    run(race, { drift: true }, 0.5);
+    expect(race.player.grounded).toBe(true);
+    expect(race.player.driftDir).toBe(0);
+    run(race, { throttle: true, drift: true, right: true }, 0.7);
+    expect(race.player.driftDir).toBe(-1);
+    expect(race.player.driftCharge).toBeGreaterThan(0);
+  });
+
+  it('does not reward an uncharged drift or a spin-out with a mini-turbo', () => {
+    for (const spin of [false, true]) {
+      const race = solo(200);
+      race.karts = [race.player];
+      race.player.speed = 60;
+      run(race, { throttle: true, drift: true, right: true }, spin ? 1 : 0.3);
+      expect(race.player.driftStage).toBe(spin ? 1 : 0);
+      if (spin) race.player.spin = 1;
+      stepRace(race, { ...EMPTY_CONTROLS, throttle: true }, STEP);
+      expect(race.player.boost).toBe(0);
+      expect(race.events.some((e) => e.type === 'mini-turbo')).toBe(false);
+    }
+  });
+
+  it('does not activate a boost strip while flying above it', () => {
     const race = solo();
-    run(race, { throttle: true }, 1.5);
-    run(race, { throttle: true, drift: true, left: true }, 0.3);
-    expect(race.player.driftDir).toBe(1);
-    run(race, { throttle: true, drift: true, left: true }, 0.5);
-    expect(race.player.driftStage).toBe(0);
-    expect(race.player.driftCharge).toBeGreaterThan(0.5);
-    // Skip ahead in the charge rather than circling into the wall on a straight.
-    race.player.driftCharge = 1.1;
-    run(race, { throttle: true, drift: true, left: true }, 0.1);
-    expect(race.player.driftStage).toBe(1);
-    race.player.driftCharge = 2.05;
-    run(race, { throttle: true, drift: true, left: true }, 0.15);
-    expect(race.player.driftStage).toBe(2);
-    run(race, { throttle: true }, STEP);
-    expect(race.player.boost).toBeGreaterThan(0);
+    race.karts = [race.player];
+    Object.assign(race.player, {
+      x: -125.13,
+      z: 511.65,
+      y: 30,
+      speed: 60,
+      grounded: false,
+    });
+    stepRace(race, { ...EMPTY_CONTROLS, throttle: true }, STEP);
+    expect(race.player.boost).toBe(0);
+    expect(race.player.boostPanelContact).toBe(false);
+  });
+
+  // Centers of all nine ef_dushBoard strips in the shipped course mesh.
+  it.each([
+    [-157.58, 505.58],
+    [-185.15, 488.04],
+    [-203.74, 462.55],
+    [-125.13, 511.65],
+    [-92.65, 505.64],
+    [-65.04, 488.15],
+    [-39.95, 439.66],
+    [-46.41, 462.68],
+    [-210.19, 439.41],
+  ])('drives through boost strip at (%s, %s) without a wall impact', (x, z) => {
+    const race = solo();
+    race.karts = [race.player];
+    expect(surfaceAt(surface, x, z)).toBe(SURFACE.boost);
+    const n = nearest(x, z);
+    Object.assign(race.player, {
+      x: x - n.tx * 9,
+      z: z - n.tz * 9,
+      heading: Math.atan2(n.tx, n.tz),
+      speed: 60,
+    });
+    race.player.y = heightAt(surface, race.player.x, race.player.z);
+    let boosts = 0;
+    for (let i = 0; i < 15; i++) {
+      stepRace(race, { ...EMPTY_CONTROLS, throttle: true }, STEP);
+      expect(race.events.some((e) => e.type === 'wall')).toBe(false);
+      boosts += race.events.filter((e) => e.type === 'boost').length;
+      race.events.length = 0;
+    }
+    expect(boosts).toBe(1);
+    expect(race.player.speed).toBeGreaterThan(70);
+    expect((race.player.x - x) * n.tx + (race.player.z - z) * n.tz).toBeGreaterThan(5);
+    // Moving to ordinary road must let the boost expire, not refresh it forever.
+    const p = pointAt(10);
+    Object.assign(race.player, { x: p.x, z: p.z, y: p.y, heading: p.heading });
+    run(race, { throttle: true }, 1.2);
+    expect(race.player.boost).toBe(0);
+    expect(race.player.boostPanelContact).toBe(false);
   });
 
   it('rocket start rewards timing and burns out when early', () => {
