@@ -39,7 +39,9 @@ describe('kart minimap', () => {
       expect(x).toBeGreaterThanOrEqual(8);
       expect(x).toBeLessThan(size - 8);
       const pixel = (Math.floor(y) * size + Math.floor(x)) * 4;
-      expect(image.data.slice(pixel, pixel + 4)).toEqual([245, 246, 250, 235]);
+      expect(image.data.slice(pixel, pixel + 4)).toEqual(
+        Uint8ClampedArray.from([245, 246, 250, 235]),
+      );
     }
     expect(image.data[3]).toBe(0);
   });
