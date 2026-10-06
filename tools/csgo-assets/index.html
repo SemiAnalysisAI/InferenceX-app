@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex,nofollow" />
+    <title>CS:GO asset inspection</title>
+    <link rel="stylesheet" href="./style.css" />
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js",
+          "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <header>
+      <div class="brand">
+        <svg viewBox="0 0 32 32" width="28" height="28" aria-label="Asset inspection" role="img">
+          <path
+            d="M4 11 16 4l12 7v12l-12 7-12-7V11Zm0 0 12 7 12-7M16 18v12"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          /></svg
+        ><span>INFERENCEX <span class="muted">/ CS:GO</span></span>
+      </div>
+      <div>
+        <span class="status" data-en="ASSET INTAKE · NOT GAMEPLAY" data-zh="素材检查 · 非游戏画面"
+          >ASSET INTAKE · NOT GAMEPLAY</span
+        ><button id="language" type="button">中文</button
+        ><button id="theme" type="button" data-en="Light / dark" data-zh="浅色 / 深色">
+          Light / dark
+        </button>
+      </div>
+    </header>
+    <main>
+      <section class="stage" aria-label="Weapon geometry inspection">
+        <div class="stage-heading">
+          <p class="eyebrow" data-en="VALVE WORKSHOP GEOMETRY" data-zh="VALVE WORKSHOP 原始模型">
+            VALVE WORKSHOP GEOMETRY
+          </p>
+          <h1 id="weapon-name">AK-47</h1>
+          <p
+            class="muted"
+            data-en="Original mesh. Neutral inspection material."
+            data-zh="原始网格，使用中性材质检查。"
+          >
+            Original mesh. Neutral inspection material.
+          </p>
+        </div>
+        <canvas id="viewport" aria-label="Interactive 3D weapon model"></canvas>
+        <p id="message" role="status" aria-live="polite">Loading geometry…</p>
+        <div class="stage-bottom">
+          <span data-en="Drag to orbit · Scroll to zoom" data-zh="拖动旋转 · 滚轮缩放"
+            >Drag to orbit · Scroll to zoom</span
+          ><span id="stats"></span>
+        </div>
+      </section>
+      <aside>
+        <p class="eyebrow" data-en="SOURCE FILES" data-zh="源文件">SOURCE FILES</p>
+        <label for="weapon" data-en="Weapon mesh" data-zh="武器模型">Weapon mesh</label
+        ><select id="weapon"></select>
+        <dl>
+          <dt data-en="Geometry" data-zh="几何体">Geometry</dt>
+          <dd data-en="34 original OBJ files" data-zh="34 个原始 OBJ 文件">
+            34 original OBJ files
+          </dd>
+          <dt data-en="Materials" data-zh="材质">Materials</dt>
+          <dd data-en="Not included; neutral preview" data-zh="未包含，当前为中性预览材质">
+            Not included; neutral preview
+          </dd>
+          <dt data-en="Animation" data-zh="动画">Animation</dt>
+          <dd data-en="Not included in this archive" data-zh="此压缩包未包含">
+            Not included in this archive
+          </dd>
+        </dl>
+        <div class="divider"></div>
+        <label for="sound" data-en="Original audio sample" data-zh="原始音频样本"
+          >Original audio sample</label
+        ><select id="sound"></select>
+        <div class="audio-actions">
+          <button class="primary" id="play" data-en="Play sample" data-zh="播放样本">
+            Play sample</button
+          ><button id="stop" data-en="Stop" data-zh="停止">Stop</button>
+        </div>
+        <label class="check"
+          ><input type="checkbox" id="wireframe" /><span
+            data-en="Wireframe inspection"
+            data-zh="线框检查"
+            >Wireframe inspection</span
+          ></label
+        >
+        <button id="reset" data-en="Reset camera" data-zh="重置视角">Reset camera</button>
+        <div class="divider"></div>
+        <p class="eyebrow" data-en="MERGE GATE" data-zh="合并条件">MERGE GATE</p>
+        <p class="gate" data-en="BLOCKED" data-zh="未满足">BLOCKED</p>
+        <p
+          class="muted"
+          data-en="No Dust II map or 5v5 implementation is loaded here. Asset availability is not gameplay parity."
+          data-zh="此页面未加载 Dust II 地图，也未实现 5v5 对战。获得素材不代表玩法已达到一致。"
+        >
+          No Dust II map or 5v5 implementation is loaded here. Asset availability is not gameplay
+          parity.
+        </p>
+        <a
+          href="https://www.counter-strike.net/workshop/workshopresources"
+          target="_blank"
+          rel="noopener noreferrer"
+          data-en="Valve Workshop source ↗"
+          data-zh="Valve Workshop 来源 ↗"
+          >Valve Workshop source ↗</a
+        >
+        <a
+          href="https://github.com/sourcesounds/csgo/tree/08f1bd6835d4f510d2ccaedeab6bb9f637b388ab"
+          target="_blank"
+          rel="noopener noreferrer"
+          data-en="Pinned audio mirror ↗"
+          data-zh="固定版本音频镜像 ↗"
+          >Pinned audio mirror ↗</a
+        >
+      </aside>
+    </main>
+    <footer>
+      <span
+        data-en="DEVELOPMENT INSPECTION · DO NOT PRESENT AS THE FINISHED GAME"
+        data-zh="开发素材检查 · 请勿作为成品游戏演示"
+        >DEVELOPMENT INSPECTION · DO NOT PRESENT AS THE FINISHED GAME</span
+      ><span>CS:GO · Source 1</span>
+    </footer>
+    <script type="module" src="./viewer.mjs"></script>
+  </body>
+</html>

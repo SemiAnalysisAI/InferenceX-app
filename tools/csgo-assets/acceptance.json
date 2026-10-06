@@ -1,0 +1,170 @@
+{
+  "schemaVersion": 1,
+  "state": "proposed-not-approved",
+  "referenceBuild": null,
+  "referenceMapSha256": null,
+  "approvedBy": null,
+  "requiredPercent": 95,
+  "checks": [
+    {
+      "id": "map-layout",
+      "requirement": "Complete Dust II layout, scale, spawns, A/B sites, tunnels, mid, catwalk, long and pit against the pinned CS:GO map",
+      "weight": 5,
+      "required": true,
+      "status": "not-run",
+      "evidence": []
+    },
+    {
+      "id": "map-visuals",
+      "requirement": "Original map materials, props, lighting and sky compared at fixed reference camera positions",
+      "weight": 5,
+      "required": true,
+      "status": "not-run",
+      "evidence": []
+    },
+    {
+      "id": "map-collision",
+      "requirement": "Collision, stairs, slopes, clipping and visibility tested across all map routes",
+      "weight": 5,
+      "required": true,
+      "status": "not-run",
+      "evidence": []
+    },
+    {
+      "id": "movement",
+      "requirement": "Walking, running, crouching, jumping, acceleration, air movement and landing match measured reference behavior",
+      "weight": 5,
+      "required": true,
+      "status": "not-run",
+      "evidence": []
+    },
+    {
+      "id": "weapon-roster",
+      "requirement": "Every weapon and equipment item in the agreed competitive loadout is usable, with correct team restrictions",
+      "weight": 5,
+      "required": true,
+      "status": "not-run",
+      "evidence": []
+    },
+    {
+      "id": "weapon-presentation",
+      "requirement": "Original weapon materials, hands, draw, reload, firing and inspection animations are bound correctly",
+      "weight": 5,
+      "required": true,
+      "status": "not-run",
+      "evidence": []
+    },
+    {
+      "id": "ballistics",
+      "requirement": "Damage, armor, hitgroups, range falloff and penetration match reference test fixtures",
+      "weight": 5,
+      "required": true,
+      "status": "not-run",
+      "evidence": []
+    },
+    {
+      "id": "weapon-handling",
+      "requirement": "Recoil, spread, movement inaccuracy, fire modes, scopes, magazines and reload timings match reference fixtures",
+      "weight": 5,
+      "required": true,
+      "status": "not-run",
+      "evidence": []
+    },
+    {
+      "id": "grenades",
+      "requirement": "HE, flash, smoke, decoy, Molotov and incendiary physics, effects and interactions match the agreed build",
+      "weight": 5,
+      "required": true,
+      "status": "not-run",
+      "evidence": []
+    },
+    {
+      "id": "bomb",
+      "requirement": "Carry, drop, pickup, plant, cancellation, defuse, kit timing, explosion and post-plant win conditions",
+      "weight": 5,
+      "required": true,
+      "status": "not-run",
+      "evidence": []
+    },
+    {
+      "id": "rounds",
+      "requirement": "5v5 team assignment, freeze time, round clock, round wins, halftime, match end and agreed overtime rules",
+      "weight": 5,
+      "required": true,
+      "status": "not-run",
+      "evidence": []
+    },
+    {
+      "id": "economy",
+      "requirement": "Buy zones, buy time, money caps, prices, rewards, loss bonus, saving, drops and pickups match reference rules",
+      "weight": 5,
+      "required": true,
+      "status": "not-run",
+      "evidence": []
+    },
+    {
+      "id": "bots",
+      "requirement": "Bots navigate the full map, perceive only valid information, use equipment, plant, defuse and complete matches",
+      "weight": 5,
+      "required": true,
+      "status": "not-run",
+      "evidence": []
+    },
+    {
+      "id": "audio",
+      "requirement": "Original weapon, reload, surface-dependent footstep, grenade, bomb, radio and round audio mapped with positional attenuation",
+      "weight": 5,
+      "required": true,
+      "status": "not-run",
+      "evidence": []
+    },
+    {
+      "id": "hud",
+      "requirement": "Radar, team state, health, armor, ammunition, inventory, timer, scoreboard and kill feed update correctly",
+      "weight": 5,
+      "required": true,
+      "status": "not-run",
+      "evidence": []
+    },
+    {
+      "id": "spectator",
+      "requirement": "Death, spectator switching, round restart and match restart work without stale state",
+      "weight": 5,
+      "required": true,
+      "status": "not-run",
+      "evidence": []
+    },
+    {
+      "id": "multiplayer",
+      "requirement": "Agreed ten-human networking scope, authority, synchronization, reconnect and latency behavior are implemented and tested",
+      "weight": 5,
+      "required": true,
+      "status": "not-run",
+      "evidence": []
+    },
+    {
+      "id": "stability",
+      "requirement": "Full-match soak test, loading failures, focus changes and performance budgets pass on the presentation hardware",
+      "weight": 5,
+      "required": true,
+      "status": "not-run",
+      "evidence": []
+    },
+    {
+      "id": "app-isolation",
+      "requirement": "No game assets, engine or audio on default light/dark/embed paths; EN/ZH UI, cleanup and SEO remain intact",
+      "weight": 5,
+      "required": true,
+      "status": "not-run",
+      "evidence": []
+    },
+    {
+      "id": "cosmetic-extras",
+      "requirement": "Optional cosmetic and menu details identified in the approved reference checklist",
+      "weight": 5,
+      "required": false,
+      "status": "not-run",
+      "evidence": []
+    }
+  ]
+}
