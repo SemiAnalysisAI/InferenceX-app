@@ -157,6 +157,10 @@
       "duration": 10395
     },
     {
+      "spec": "cypress/e2e/optional-theme-isolation.cy.ts",
+      "duration": 30000
+    },
+    {
       "spec": "cypress/e2e/kart-mode.cy.ts",
       "duration": 22000
     },

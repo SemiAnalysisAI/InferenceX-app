@@ -16,13 +16,6 @@ const INTERACTIVE =
  * Once true, stays true for the session — browsers remember the gesture.
  */
 let userHasInteracted = false;
-if (typeof document !== 'undefined') {
-  const markInteracted = () => {
-    userHasInteracted = true;
-  };
-  document.addEventListener('pointerdown', markInteracted, { capture: true, once: true });
-  document.addEventListener('keydown', markInteracted, { capture: true, once: true });
-}
 
 /** Song start timestamps (in seconds) within the Minecraft OST compilation video. */
 const MINECRAFT_OST_VIDEO_ID = 'bIOiV4d1SVI';
@@ -66,6 +59,19 @@ export function MinecraftBackground() {
   const [isMinecraft, setIsMinecraft] = useState(false);
 
   useEffect(() => {
+    userHasInteracted ||= navigator.userActivation?.hasBeenActive ?? false;
+    const markInteracted = () => {
+      userHasInteracted = true;
+    };
+    document.addEventListener('pointerdown', markInteracted, { capture: true, once: true });
+    document.addEventListener('keydown', markInteracted, { capture: true, once: true });
+    return () => {
+      document.removeEventListener('pointerdown', markInteracted, true);
+      document.removeEventListener('keydown', markInteracted, true);
+    };
+  }, []);
+
+  useEffect(() => {
     function check() {
       setIsMinecraft(document.documentElement.classList.contains('minecraft'));
     }
@@ -96,9 +102,11 @@ export function MinecraftBackground() {
   // Preload the click sound into an AudioBuffer for instant playback
   useEffect(() => {
     let cancelled = false;
+    if (typeof AudioContext === 'undefined') return;
+    const controller = new AbortController();
     const ctx = new AudioContext();
     audioCtxRef.current = ctx;
-    fetch('/minecraft-click.mp3')
+    fetch('/minecraft-click.mp3', { signal: controller.signal })
       .then((r) => r.arrayBuffer())
       .then((buf) => ctx.decodeAudioData(buf))
       .then((decoded) => {
@@ -107,7 +115,8 @@ export function MinecraftBackground() {
       .catch(() => {});
     return () => {
       cancelled = true;
-      ctx.close();
+      controller.abort();
+      void ctx.close().catch(() => {});
       audioCtxRef.current = null;
       bufferRef.current = null;
     };
@@ -209,8 +218,10 @@ export function MinecraftBackground() {
       return;
     }
 
+    let disposed = false;
+    let retry: ReturnType<typeof setInterval> | undefined;
     function createPlayer() {
-      if (playerRef.current || !wrapperRef.current) return;
+      if (disposed || playerRef.current || !wrapperRef.current) return;
       const el = document.createElement('div');
       wrapperRef.current.append(el);
 
@@ -218,7 +229,7 @@ export function MinecraftBackground() {
       const startSeconds = getInitialMusicStart();
 
       function nudge() {
-        if (started) return;
+        if (disposed || started) return;
         playerRef.current?.playVideo();
       }
       nudgeRef.current = nudge;
@@ -245,6 +256,7 @@ export function MinecraftBackground() {
           },
           events: {
             onReady: (e: YT.PlayerEvent) => {
+              if (disposed) return;
               e.target.setVolume(30);
               e.target.playVideo();
               // Browsers block autoplay without a prior user gesture.
@@ -257,8 +269,8 @@ export function MinecraftBackground() {
               // so music starts as soon as the browser allows it.
               if (userHasInteracted) {
                 let retries = 0;
-                const retry = setInterval(() => {
-                  if (started || retries++ > 10) {
+                retry = setInterval(() => {
+                  if (disposed || started || retries++ > 10) {
                     clearInterval(retry);
                     return;
                   }
@@ -267,6 +279,7 @@ export function MinecraftBackground() {
               }
             },
             onStateChange: (e: YT.PlayerEvent & { data: number }) => {
+              if (disposed) return;
               // YT.PlayerState.PLAYING === 1
               if (e.data === 1 && !started) onStarted();
               // YT.PlayerState.ENDED === 0 — loop the single allowed video
@@ -294,6 +307,8 @@ export function MinecraftBackground() {
     }
 
     return () => {
+      disposed = true;
+      clearInterval(retry);
       // Restore global callback to prevent stale closure chain growth
       if (installedCallback) {
         window.onYouTubeIframeAPIReady = undefined;
