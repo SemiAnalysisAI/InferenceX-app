@@ -1,5 +1,5 @@
 const featureCode =
-  /THREE\.WebGLRenderer|BAY AREA HEIST|minecraft-click\.mp3|ender-dragon\.mp3|Loading Luigi Circuit|\.csgo-scene|\.gta-scene|\.mc-dragon-flyacross|\.kart-scene|font-family:\s*["']?(?:Monocraft|Pricedown|ChaletComprime)/i;
+  /THREE\.WebGLRenderer|LOS SANTOS 3D|minecraft-click\.mp3|ender-dragon\.mp3|Loading Luigi Circuit|\.csgo-scene|\.gta-scene|\.mc-dragon-flyacross|\.kart-scene|font-family:\s*["']?(?:Monocraft|Pricedown|ChaletComprime)/i;
 const featureAsset =
   /\/decorative\/(?:minecraft|csgo|gta|kart)\/|minecraft-click\.mp3|youtube\.com|ytimg\.com/;
 const seo = (doc: Document) => [

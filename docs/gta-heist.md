@@ -1,64 +1,69 @@
-# GTA V Bay Area heist mode
+# GTA V 3D presentation game
 
-An optional arcade game inside the GTA presentation theme. Select GTA in
-the theme picker, then choose **Start heist** in its banner. Escape closes
-the dialog and restores focus to the launcher. Other themes and embeds do
-not expose the launcher; the game bundle is dynamically imported on demand.
+Select the GTA theme, then **Start heist**. The previous 2D Bay Area game
+has been removed. Its replacement is a browser-scale custom city sandbox,
+not the complete GTA V product or campaign.
 
-## Gameplay
+## Playable city
 
-Collect fictional compute crates from any three of seven office stops, then
-deliver them to the safehouse before five minutes expire. Stop inside a
-pickup ring and press E or use the Collect button. Crates raise a wanted
-meter and add arcade pursuers. Collisions damage the car; reaching zero
-health or time ends the run. There are no weapons or real company actions.
+The custom district has a connected street grid, buildings, a waterfront,
+park, decorative amusement pier, and street furniture. Four selectable GTA V
+cars (Adder, Buffalo, Blista, Taxi) share the roads with 18 traffic vehicles.
+The Michael model represents the player on foot and background pedestrians.
+The police model represents pursuers. Geometry and available textures are
+reused; missing shared texture dictionaries receive explicit material tints.
+The character export has no walking animation, so on-foot movement does not
+claim animation parity with GTA V.
 
-- WASD or arrow keys: accelerate, brake/reverse and steer.
-- Space: handbrake; E: collect/deliver; P: pause; M: route map.
-- Pointer controls support simultaneous steering and pedals on touch devices.
-- The map pauses driving; click an office marker or its sidebar entry to
-  choose a GPS destination. A purple route follows the schematic road graph.
-- Pause/hidden-tab/window blur stops the simulation. New run clears all
-  progress. Closing or leaving GTA removes the game and its listeners.
+Pick up four packages in order, then deliver at the garage. Stop within the
+gold ring and press E. Pickups and vehicle collisions raise a wanted level;
+stay at least 110 m from every pursuer for 15 seconds to escape. The garage
+repairs a stationary vehicle. A run ends on delivery, zero health, or eight
+minutes elapsed. Cash and progress are in-memory and reset on closing.
 
-Progress exists only in the mounted game. There is no storage, network
-request, leaderboard, analytics of routes, or connection to benchmark data.
-Only opening and closing the game emit the existing UI analytics events.
+- WASD/arrows: drive or walk.
+- Space: brake; Shift: sprint on foot.
+- F: exit a stationary car or reenter within five metres.
+- E: collect/deliver; C: chase/close camera; P: pause; M: map.
+- Buttons: change a stationary car, day/night, sound, restart.
+- Touch: hold steering and pedals simultaneously; use the action buttons.
+- Blur, hidden tab and map opening pause the simulation. Escape closes the
+  dialog and restores launcher focus.
 
-## Geography and assets
+## San Andreas flight
 
-The map is a deliberately compressed Bay Area layout, not a street map or
-routing service. Locations are city-level references, not exact office
-entrances, campus plans, or instructions for entering a real site.
+The flight button separately loads a low-detail San Andreas model containing
+the source terrain/building meshes and a Frogger helicopter model. This is an aerial explorer:
+W/S moves, A/D turns, Shift climbs and Space descends. Height is clamped above
+the terrain. It has no aircraft physics, on-ground missions, traffic, or
+interiors. Returning restores the paused custom-city run.
 
-- NVIDIA, Google, Apple and Meta city references use the
-  [Built In Bay Area company guide](https://www.builtinsf.com/articles/silicon-valley-ai-companies).
-- AMD's Santa Clara location is listed on
-  [AMD's corporate locations page](https://www.amd.com/en/corporate/locations.html).
-- OpenAI and Anthropic's San Francisco office clusters are described by
-  [The San Francisco Standard](https://sfstandard.com/2026/04/07/i-leaderboard-san-francisco-office/).
+The source model is not a substitute for GTA V's full streamed world.
+The city sandbox's street layout, buildings, mission system and physics are
+custom work and are not extracted GTA V gameplay.
 
-The playable map, cars, buildings and pursuit markers are deterministic
-Canvas drawings, not AI-generated background images. The existing GTA
-banner, artwork, logo and locally hosted fonts retain the provenance and
-reported-permission notes in the theme's asset READMEs. No GTA audio or
-additional extracted game assets are added.
+## Resource and SEO boundaries
 
-## Implementation and verification
+The existing optional-theme lazy boundary is retained. The dialog, Three.js,
+game CSS and models are requested only after launch. Selecting GTA alone
+does not download the game models. The map is another on-demand download.
+Closing aborts fetches, removes input and resize handlers, disposes geometry,
+materials/textures and the WebGL context, and closes synthesized engine audio.
+No external requests, persistence, or telemetry of player movement is added.
 
-- `heist-world.ts`: map geometry, water/building collision and road routing.
-- `heist-engine.ts`: deterministic fixed-step vehicle and mission simulation.
-- `heist-renderer.ts`: cached static map, moving cars, route and minimap.
-- `heist-game.tsx`: bilingual HUD, focused keyboard input, pointer controls,
-  animation lifecycle and development-only text/time test hooks.
-- `gta-heist-dialog.tsx`: accessible dialog and focus restoration.
+No indexable page, metadata, canonical, hreflang, structured data, benchmark
+filter, numerical transformation, or API is changed. This is the documented
+presentation-only exclusion from API and `inferencex-skills` coverage.
 
-Engine tests cover movement, collection rules, mission completion, failure,
-pause, damage cooldowns, water/bridge boundaries and route connectivity.
-Cypress component tests cover driving/pause/reset and map selection.
-The existing GTA sanity integration test covers launch/close/focus return.
+## Implementation
 
-This is a presentation-only game, not a new benchmark view. It changes no
-model, workload, filters, calculations, share parameters or returned data.
-It therefore uses the documented presentation-control exclusion from
-API and `inferencex-skills` coverage.
+- `gta-world.ts`: city geometry and street/traffic paths.
+- `gta-engine.ts`: deterministic simulation, missions and state transitions.
+- `gta-renderer.ts`: asset loading, instanced scenery and disposal.
+- `gta-game.tsx`: bilingual controls, accessibility and lifecycle.
+- `gta-engine.test.ts`: driving, collision, missions, pause, flight and reset-state tests.
+- `cypress/component/gta-heist.cy.tsx`: integrated controls and Chinese UI.
+- Existing optional-theme isolation and sanity specs remain the integration guards.
+
+Asset provenance, processing and permission limitations are recorded in
+`packages/app/public/decorative/gta/models/README.md`.

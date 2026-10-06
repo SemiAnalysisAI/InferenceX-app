@@ -1,0 +1,146 @@
+[
+  {
+    "file": "adder.glb",
+    "bytes": 1826120,
+    "sha256": "8ff3832227e86447c2093eef58bb53179d41cd04cba1716c300536762d7cd964",
+    "originalBytes": 5632232,
+    "originalSha256": "3b494c9f8a0f671abd255665d64b1b636c8ffdc1e305b0b56e0aa19a7b42f914",
+    "meshes": 15,
+    "images": 10
+  },
+  {
+    "file": "bench.glb",
+    "bytes": 139200,
+    "sha256": "1d3c0aeff22f33527504f23b9d7c4e7f315bf94c5181d81f282fd9c2dcdedbf5",
+    "originalBytes": 162308,
+    "originalSha256": "e37eb617150458d7f40ed2a9185018d3d38a2e9b1ad5977b4b6bd5156886ad87",
+    "meshes": 1,
+    "images": 1
+  },
+  {
+    "file": "bin.glb",
+    "bytes": 108716,
+    "sha256": "d6ee79b87884d1ef37c76aa6b0107c7553acb751f5475f791ec79ce6ac08802b",
+    "originalBytes": 139232,
+    "originalSha256": "23b4c8becfbf352d88a07d5d18937a0878032bfb57f3c7d14019306d4a7242a8",
+    "meshes": 4,
+    "images": 2
+  },
+  {
+    "file": "blista.glb",
+    "bytes": 1953236,
+    "sha256": "83d21e14b6ca9149a0ba4a5262e86326356163f16bf3eb86e64666b6047e770d",
+    "originalBytes": 5893100,
+    "originalSha256": "94451b807de69e70fff8ba81d8bf2b48cb5f1fb7f5e35daf7799119f3d77d9ff",
+    "meshes": 15,
+    "images": 10
+  },
+  {
+    "file": "buffalo.glb",
+    "bytes": 2043924,
+    "sha256": "247c7a0e4a9ce7fadbd05ff31ca659cb50ed78c3ebc09cf993333ec4796fbf16",
+    "originalBytes": 5981936,
+    "originalSha256": "e4aafd8fe57d3b90041fc48bffd4b4f7eb6bcbdadbf0b4c8a9aaa06f3e6585a7",
+    "meshes": 14,
+    "images": 9
+  },
+  {
+    "file": "cone.glb",
+    "bytes": 10236,
+    "sha256": "db023049a9f79c8598f5914eadd02cee17bae4b7eeb6f01bded7be1269f0cee6",
+    "originalBytes": 10220,
+    "originalSha256": "cdfbc1030fa5964aff2d72acbc80d1bbed2f0ab01babe7cbf195d416f6e96065",
+    "meshes": 1,
+    "images": 0
+  },
+  {
+    "file": "dumpster.glb",
+    "bytes": 266940,
+    "sha256": "80f2a08ebaa77e399cb2e6bb6333660b8af63e7d4d8cc37ea51a81b0b97bc311",
+    "originalBytes": 322656,
+    "originalSha256": "aea48a3912ac1e1d594c9a2af6f5384a3a1dbcffdad8999e3215f321a8a3e73c",
+    "meshes": 2,
+    "images": 2
+  },
+  {
+    "file": "frogger.glb",
+    "bytes": 1112888,
+    "sha256": "588521420b0136b859bed980e9bf5dfac97ef0c970258171c8c39f755b53724b",
+    "originalBytes": 3944520,
+    "originalSha256": "a0fd61a446e6a197f7699ebd722a9398ff65b6969a44b5f7154f549a52659e31",
+    "meshes": 11,
+    "images": 5
+  },
+  {
+    "file": "hydrant.glb",
+    "bytes": 130996,
+    "sha256": "dd9ab040e7f2defc18881b35be018a2c104ab7ca328311f950b406a4e62bc176",
+    "originalBytes": 145860,
+    "originalSha256": "98125dfbbfdb43a9f94e005a510dd70c59608148a72222d7fc2248c2b173483b",
+    "meshes": 3,
+    "images": 1
+  },
+  {
+    "file": "lamp.glb",
+    "bytes": 225736,
+    "sha256": "631e1f8011e44f2ef51f27193795acc3cac9db32920ca558fcb1f8b686f630ff",
+    "originalBytes": 341384,
+    "originalSha256": "bb4a12321de2e53778c45bdd15df00132eb9a1ccc88f43b3c5b063479381c03b",
+    "meshes": 7,
+    "images": 4
+  },
+  {
+    "file": "los-santos.glb",
+    "bytes": 8875728,
+    "sha256": "8c5fa66b2fae00a3ae59799249e79f38c0f43ccef590a021f8f5760bd1a7e367",
+    "originalBytes": 8875728,
+    "originalSha256": "8c5fa66b2fae00a3ae59799249e79f38c0f43ccef590a021f8f5760bd1a7e367",
+    "meshes": 46,
+    "images": 44
+  },
+  {
+    "file": "michael.glb",
+    "bytes": 3001752,
+    "sha256": "bf17b639e82bc5890f2c431eea99309526adde99911a7002a16c8cb8f3488e6e",
+    "originalBytes": 4942600,
+    "originalSha256": "ec09369fd31f74d36299e3fbc1c57b71e86ec9ba9721a447faa2fca0d503f560",
+    "meshes": 20,
+    "images": 12
+  },
+  {
+    "file": "palm.glb",
+    "bytes": 157096,
+    "sha256": "56de5d1c9258af70de6e626138a44859bb11bf4eaa9bc9e40727cf882aed50cf",
+    "originalBytes": 157080,
+    "originalSha256": "addae6414cd74e89d450ca4c2c910567deacfdbe6ea74b4d5495d0d31b45f0f8",
+    "meshes": 7,
+    "images": 0
+  },
+  {
+    "file": "police.glb",
+    "bytes": 2316024,
+    "sha256": "bba72bec2aade85e8a79c8813c411ff211ef9d4ee30a5f9b6ec9818b0ab0244a",
+    "originalBytes": 6286120,
+    "originalSha256": "07c9592507107f33aabf99d49233094201020e03724d2c9742013f90b7741ed7",
+    "meshes": 18,
+    "images": 11
+  },
+  {
+    "file": "signal.glb",
+    "bytes": 114400,
+    "sha256": "2888e9efc6da71938f0364bcf392417dd4376e6643e997ae1049dd59e8ebc68c",
+    "originalBytes": 114388,
+    "originalSha256": "233c2170fc05543117201c5c3b3fd6c14cd338131bd8f9fbad828f5f4e9a43c3",
+    "meshes": 13,
+    "images": 0
+  },
+  {
+    "file": "taxi.glb",
+    "bytes": 2256788,
+    "sha256": "6854f1163190eb5534c6c42a22435074f0840048979c31289dc75f990b361df1",
+    "originalBytes": 6240984,
+    "originalSha256": "291331618776e74d3d712bc99519371378698b4c90d645c3d03244d0bc72c5cb",
+    "meshes": 18,
+    "images": 12
+  }
+]
