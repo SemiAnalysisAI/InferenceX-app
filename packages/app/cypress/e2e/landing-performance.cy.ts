@@ -51,7 +51,7 @@ function monocraftFontStates(win: Cypress.AUTWindow) {
     win
       .getComputedStyle(win.document.documentElement)
       .getPropertyValue('--font-minecraft')
-      .split(',')[0],
+      .split(',')[0] || 'Monocraft',
   );
   return [...win.document.fonts]
     .filter((font) => normalizeFontFamily(font.family) === family)
@@ -129,6 +129,7 @@ describe('Landing page performance', () => {
     cy.visit('/');
 
     cy.get('.circuit-bg').should('have.css', 'display', 'none');
+    cy.get('[data-testid="splash-text"]').should('not.exist');
     cy.window().then((win) => {
       const resourceNames = win.performance.getEntriesByType('resource').map((entry) => entry.name);
       expect(resourceNames.some((name) => name.includes('/brand/left-pattern-full.svg'))).to.eq(
@@ -137,7 +138,11 @@ describe('Landing page performance', () => {
       expect(resourceNames.some((name) => name.includes('/minecraft-click.mp3'))).to.eq(false);
       // Chrome can replay a cached font timing from an earlier desktop page
       // without using that font here. Check the current document's font state.
-      expect(monocraftFontStates(win), 'mobile Monocraft state').to.deep.eq(['unloaded']);
+      // A lazy theme stylesheet may not have registered the font at all.
+      expect(
+        monocraftFontStates(win).filter((status) => status !== 'unloaded'),
+        'active mobile Monocraft fonts',
+      ).to.deep.eq([]);
       // The landing AgentX ledger has five lazy model marks. A mobile viewport may
       // fetch any visible subset, but the text-only supporter strip must not pull
       // in its former logo set.
