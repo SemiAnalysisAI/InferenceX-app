@@ -347,6 +347,21 @@ html[data-inferencex-embed] .autumn-leaves {
   --overlay-run-7: oklch(0.78 0.18 60);
 }
 
+/* Tiny pre-paint shell for persisted Kart selections. No assets, fonts or
+ * animations here; artwork and gameplay styles remain in the lazy bundle. */
+.kart {
+  --primary: #ffd640;
+  --primary-foreground: #162237;
+  --ring: #ffd640;
+  --background: #111b2b;
+  --card: #152237;
+  --popover: #152237;
+}
+.kart .circuit-bg,
+.kart .autumn-leaves {
+  display: none;
+}
+
 /* CS:GO keeps dark chart/vendor palettes; gold belongs to interface chrome. */
 .csgo {
   color-scheme: dark;

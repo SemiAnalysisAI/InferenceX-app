@@ -1,18 +1,6 @@
-.kart {
-  --primary: #ffd640;
-  --primary-foreground: #162237;
-  --ring: #ffd640;
-  --background: #111b2b;
-  --card: #152237;
-  --popover: #152237;
-}
 .kart header {
   border-bottom: 3px solid #e82d40;
   background: #111b2bf5;
-}
-.kart .circuit-bg,
-.kart .autumn-leaves {
-  display: none;
 }
 .kart [data-slot='card'] {
   background: #152237f5;
