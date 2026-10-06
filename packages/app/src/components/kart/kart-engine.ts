@@ -8,7 +8,14 @@ import {
   TRACK_LENGTH,
   wrapAngle,
 } from './kart-track';
-import { heightAt, SURFACE, surfaceAt, syntheticSurface, type SurfaceMap } from './kart-surface';
+import {
+  heightAt,
+  isCourseSurface,
+  SURFACE,
+  surfaceAt,
+  syntheticSurface,
+  type SurfaceMap,
+} from './kart-surface';
 
 export { TRACK, TRACK_LENGTH } from './kart-track';
 export const LAPS = 3;
@@ -168,6 +175,9 @@ export interface Kart {
     band: number;
     stuck: number;
     reverse: number;
+    /** Furthest progress so far and seconds without improving it. */
+    best: number;
+    stall: number;
   };
   hits: number;
   wheelTurn: number;
@@ -346,13 +356,15 @@ export function newRace(options: RaceOptions = {}): Race {
       startCharge: null,
       ai: {
         lane: (slot % 3) * 3 - 3,
-        skill: 0.955 + (slot / 7) * 0.04,
+        skill: 0.99 + (slot / 7) * 0.04,
         itemTimer: 0,
         avoid: 0,
         noise: slot * 1.7,
         band: 1,
         stuck: 0,
         reverse: 0,
+        best: distance,
+        stall: 0,
       },
       hits: 0,
       wheelTurn: 0,
@@ -646,69 +658,158 @@ function respawnKart(race: Race, k: Kart) {
   k.trackIndex = nearest(p.x, p.z).index;
   k.grounded = true;
   k.invulnerable = 1.5;
+  k.ai.best = k.progress;
+  k.ai.stall = 0;
   race.events.push({ type: 'respawn', kart: k.index });
 }
 
-// AI driver: chooses a racing line and presses the same controls a person would.
+const LINE_LANES = [-12, -10, -8, -6, -4, -2, 0, 2, 4, 6, 8, 10, 12];
+/** Surface under a point `lane` units left of the centerline at `distance`. */
+function laneSurface(race: Race, distance: number, lane: number) {
+  const p = pointAt(distance, lane);
+  return surfaceAt(race.surface, p.x, p.z);
+}
+const laneClear = (race: Race, distance: number, lane: number) =>
+  isCourseSurface(laneSurface(race, distance, lane));
+/** Ahead/side offsets of a world point in the kart's frame (+side is left). */
+function relative(k: Kart, x: number, z: number) {
+  const dx = x - k.x;
+  const dz = z - k.z;
+  return {
+    ahead: dx * Math.sin(k.heading) + dz * Math.cos(k.heading),
+    side: dx * Math.cos(k.heading) - dz * Math.sin(k.heading),
+  };
+}
+
+/**
+ * AI driver: plans a racing line over the real course surface, brakes for
+ * bends it cannot hold, chains drift mini-turbos, takes boost strips, dodges
+ * hazards, and plays items against the racers around it, all through the same
+ * controls a person presses.
+ */
 export function aiControls(race: Race, k: Kart): Controls {
   const c: Controls = { ...EMPTY_CONTROLS };
   const s = stats(k, race);
   const player = race.player;
-  // Gentle rubber-banding, like the game's CPU racers.
-  const gap = player.progress - k.progress;
-  k.ai.band = gap > 90 ? 1.07 : gap > 40 ? 1.03 : gap < -140 ? 0.94 : gap < -70 ? 0.97 : 1;
-  const look = 14 + Math.max(0, k.speed) * 0.42;
+  // Rubber-banding toward the human, strongest when the human leads.
+  if (!k.human) {
+    const gap = player.progress - k.progress;
+    k.ai.band =
+      gap > 120
+        ? 1.14
+        : gap > 60
+          ? 1.09
+          : gap > 25
+            ? 1.05
+            : gap > 0
+              ? 1.02
+              : gap < -220
+                ? 0.96
+                : gap < -120
+                  ? 0.99
+                  : 1;
+  }
+  const speed = Math.max(0, k.speed);
+  const look = 12 + speed * 0.36;
   const curve = curvatureAt(k.progress + look);
   const curveFar = curvatureAt(k.progress + look * 2);
-  // Hug the inside of bends; spread out on straights.
-  const wave = Math.sin(race.elapsed * 0.35 + k.ai.noise) * 2;
-  let lane = Math.max(-10, Math.min(10, curve * 520 + k.ai.lane + wave));
-  // Dodge bananas and shells on the ground ahead.
-  for (const p of race.projectiles) {
-    if (p.kind !== 'banana' && p.kind !== 'bobomb') continue;
-    const dx = p.x - k.x;
-    const dz = p.z - k.z;
-    const ahead = dx * Math.sin(k.heading) + dz * Math.cos(k.heading);
-    const side = dx * Math.cos(k.heading) - dz * Math.sin(k.heading);
-    if (ahead > 0 && ahead < 30 && Math.abs(side) < 5) lane += side > 0 ? -6 : 6;
+  let sharpest = 0;
+  for (let d = 10; d <= 20 + speed * 0.9; d += 8) {
+    const v = curvatureAt(k.progress + d);
+    if (Math.abs(v) > Math.abs(sharpest)) sharpest = v;
   }
-  // Grab item boxes when empty-handed.
+  const here = nearest(k.x, k.z, k.trackIndex).lateral;
+
+  // Racing line: aim for the inside of the coming bend, then pick the nearest
+  // lane that stays on drivable surface both midway and at the aim point.
+  const ideal = Math.max(
+    -10,
+    Math.min(10, (curve * 0.6 + curveFar * 0.4) * 640 + k.ai.lane * 0.35),
+  );
+  let lane = ideal;
+  let bestCost = Infinity;
+  for (const l of LINE_LANES) {
+    if (!laneClear(race, k.progress + look, l) || !laneClear(race, k.progress + look * 0.5, l))
+      continue;
+    let cost = Math.abs(l - ideal) + Math.abs(l - here) * 0.15;
+    // Boost strips are worth a detour.
+    if (
+      laneSurface(race, k.progress + look, l) === SURFACE.boost ||
+      laneSurface(race, k.progress + look * 0.5, l) === SURFACE.boost
+    )
+      cost -= 9;
+    if (cost < bestCost) {
+      bestCost = cost;
+      lane = l;
+    }
+  }
+
+  // Dodge bananas, Bob-ombs, and oncoming green shells; pass slower karts.
+  let threat = false;
+  for (const p of race.projectiles) {
+    if (p.owner === k.index && p.age < 0.6) continue;
+    const r = relative(k, p.x, p.z);
+    if (p.kind === 'banana' || p.kind === 'bobomb') {
+      if (r.ahead > 0 && r.ahead < 34 && Math.abs(r.side) < 5.5) lane += r.side > 0 ? -6.5 : 6.5;
+    } else if (r.ahead > -40 && r.ahead < 40 && Math.hypot(r.ahead, r.side) < 40) {
+      const closing = p.vx * (k.x - p.x) + p.vz * (k.z - p.z) > 0;
+      if (closing) {
+        threat = true;
+        if (Math.abs(r.side) < 6 && p.kind.includes('green')) lane += r.side > 0 ? -7 : 7;
+      }
+    }
+  }
+  for (const o of race.karts) {
+    if (o === k || o.respawn > 0) continue;
+    const r = relative(k, o.x, o.z);
+    if (r.ahead > 2 && r.ahead < 16 && Math.abs(r.side) < 4 && o.speed < k.speed - 2)
+      lane += r.side > 0 ? -4.5 : 4.5;
+  }
+  // Grab item boxes when empty-handed and the box is close to the line.
   if (!k.item && k.roulette <= 0) {
     let best = Infinity;
     for (const b of race.boxes) {
       if (b.respawn > 0) continue;
-      const dx = b.x - k.x;
-      const dz = b.z - k.z;
-      const ahead = dx * Math.sin(k.heading) + dz * Math.cos(k.heading);
-      if (ahead < 6 || ahead > 45) continue;
+      const r = relative(k, b.x, b.z);
+      if (r.ahead < 6 || r.ahead > 45) continue;
       const nb = nearest(b.x, b.z, k.trackIndex);
-      if (ahead < best) {
-        best = ahead;
+      if (Math.abs(nb.lateral - lane) > 9) continue;
+      if (r.ahead < best) {
+        best = r.ahead;
         lane = nb.lateral;
       }
     }
   }
+  lane = Math.max(-13, Math.min(13, lane));
+
   const target = pointAt(k.progress + look, lane);
   const desired = Math.atan2(target.x - k.x, target.z - k.z);
   const err = wrapAngle(desired - k.heading);
-  const steer = Math.max(-1, Math.min(1, err * 2.6));
-  if (steer > 0.12) c.left = true;
-  if (steer < -0.12) c.right = true;
-  // Analog-ish steering through press modulation.
-  if (Math.abs(steer) < 0.5 && Math.floor(race.elapsed * 20 + k.index) % 2 === 0) {
+  const steer = Math.max(-1, Math.min(1, err * 3.2));
+  if (steer > 0.08) c.left = true;
+  if (steer < -0.08) c.right = true;
+  // Analog-ish steering through press modulation on gentle corrections.
+  if (Math.abs(steer) < 0.35 && Math.floor(race.elapsed * 30 + k.index) % 3 === 0) {
     c.left = false;
     c.right = false;
   }
   c.throttle = true;
-  // Unstick: back out of walls, then let Lakitu help if that fails.
+
+  // Unstick: back out of walls; if progress stalls anyway, let Lakitu help.
+  if (k.progress > k.ai.best + 6) {
+    k.ai.best = k.progress;
+    k.ai.stall = 0;
+  } else if (!isStunned(k) && k.burnout <= 0) k.ai.stall += STEP;
   if (Math.abs(k.speed) < 4 && !isStunned(k) && k.burnout <= 0) k.ai.stuck += STEP;
   else k.ai.stuck = Math.max(0, k.ai.stuck - STEP * 2);
-  if (k.ai.stuck > 1.2 && k.ai.reverse <= 0) {
-    k.ai.reverse = 0.9;
-    k.ai.stuck = k.ai.stuck > 5 ? k.ai.stuck : k.ai.stuck * 0.5 + 1.2;
-  }
-  if (k.ai.stuck > 5.5) {
+  if (k.ai.stuck > 0.8 && k.ai.reverse <= 0) {
+    k.ai.reverse = 0.8;
     k.ai.stuck = 0;
+  }
+  if (k.ai.stall > 3.5) {
+    k.ai.stall = 0;
+    k.ai.stuck = 0;
+    k.ai.reverse = 0;
     k.respawn = 1.4;
     return c;
   }
@@ -716,68 +817,118 @@ export function aiControls(race: Race, k: Kart): Controls {
     k.ai.reverse -= STEP;
     return { ...EMPTY_CONTROLS, brake: true, left: err < 0, right: err > 0 };
   }
-  if (Math.abs(err) > 0.85 && k.speed > s.top * 0.6) c.throttle = false;
-  if (Math.abs(err) > 1.6) c.brake = k.speed > 15;
-  // Drift through long bends for mini-turbos.
+
+  // Corner speed: lift or brake when the bend ahead is tighter than the kart
+  // can hold, or when the current heading would carry it off the course.
+  const limit =
+    Math.sqrt(150 / Math.max(0.0035, Math.abs(sharpest))) * (k.driftDir === 0 ? 1 : 1.12);
+  const projected = pointAt(k.progress + look * 0.6, here + Math.sin(-err) * look * 0.6);
+  const headingOff = !isCourseSurface(surfaceAt(race.surface, projected.x, projected.z));
+  if (k.boost <= 0 && k.star <= 0) {
+    if (speed > limit * 1.18 || (headingOff && Math.abs(err) > 0.45 && speed > 30)) {
+      c.throttle = false;
+      c.brake = speed > limit * 1.3;
+    } else if (speed > limit) c.throttle = false;
+  }
+  if (Math.abs(err) > 1.6) {
+    c.throttle = false;
+    c.brake = k.speed > 15;
+  }
+
+  // Drift into bends in the bend's direction for mini-turbos; release once
+  // the orange spark is ready on the exit or if the drift is carrying it wide.
   const bend = Math.abs(curve) + Math.abs(curveFar);
+  const bendDir = Math.sign(curve + curveFar);
+  const wide = !laneClear(race, k.progress + 8, here - k.driftDir * 4);
   c.drift =
     k.driftDir === 0
-      ? bend > 0.014 && k.speed > s.top * 0.7 && k.grounded && Math.abs(steer) > 0.3
-      : bend > 0.006 && !(k.driftStage === 2 && Math.abs(curve) < 0.008);
+      ? bend > 0.011 &&
+        speed > s.top * 0.6 &&
+        k.grounded &&
+        Math.sign(steer) === bendDir &&
+        Math.abs(steer) > 0.25 &&
+        !headingOff
+      : k.driftDir === bendDir &&
+        !wide &&
+        bend > 0.005 &&
+        !(k.driftStage === 2 && Math.abs(curve) < 0.007);
+
   // Items.
   if (k.item && k.roulette <= 0 && k.itemCooldown <= 0) {
     k.ai.itemTimer -= STEP;
-    const ahead = race.karts.find(
-      (o) =>
-        o !== k &&
-        o.progress > k.progress &&
-        o.progress - k.progress < 55 &&
-        Math.abs(wrapAngle(Math.atan2(o.x - k.x, o.z - k.z) - k.heading)) < 0.12,
-    );
-    const behind = race.karts.find(
-      (o) => o !== k && o.progress < k.progress && k.progress - o.progress < 18,
-    );
+    const inSights = (o: Kart, range: number, cone: number) => {
+      const r = relative(k, o.x, o.z);
+      return r.ahead > 3 && r.ahead < range && Math.abs(Math.atan2(r.side, r.ahead)) < cone;
+    };
+    const rivals = race.karts.filter((o) => o !== k && o.respawn <= 0 && o.finishedAt === null);
+    const ahead =
+      (inSights(player, 60, 0.14) && player !== k ? player : undefined) ??
+      rivals.find((o) => inSights(o, 50, 0.1));
+    const behind = rivals.find((o) => o.progress < k.progress && k.progress - o.progress < 22);
+    const playerBehind =
+      player !== k && player.progress < k.progress && k.progress - player.progress < 30;
+    const playerAhead =
+      player !== k && player.progress > k.progress && player.progress - k.progress < 140;
     const straight = Math.abs(curve) < 0.004 && Math.abs(curveFar) < 0.004;
+    const offroadAhead = !laneClear(race, k.progress + 25, here);
     let use = false;
     let hold = false;
     switch (k.item) {
       case 'mushroom':
       case 'triple-mushroom':
       case 'golden-mushroom': {
-        use = (straight || k.surface === SURFACE.offroad) && k.ai.itemTimer <= 0;
+        hold = k.item === 'triple-mushroom' && threat;
+        use =
+          (k.ai.itemTimer <= 0 &&
+            (straight || offroadAhead || playerAhead || (k.boost <= 0 && k.speed < s.top * 0.7))) ||
+          k.ai.itemTimer < -4;
         break;
       }
       case 'banana':
       case 'triple-banana': {
+        // Trail it as a shield, drop it in the human's path.
         hold = true;
-        use = (Boolean(behind) && k.ai.itemTimer <= 0) || k.ai.itemTimer < -6;
+        use =
+          (playerBehind && k.ai.itemTimer <= 0) ||
+          (Boolean(behind) && k.ai.itemTimer < -2) ||
+          k.ai.itemTimer < -12;
         break;
       }
       case 'green-shell':
       case 'triple-green-shell': {
         hold = true;
-        use = Boolean(ahead) || (Boolean(behind) && k.ai.itemTimer < -3) || k.ai.itemTimer < -9;
+        use = Boolean(ahead) || (playerBehind && k.ai.itemTimer < -1) || k.ai.itemTimer < -14;
         break;
       }
       case 'red-shell': {
-        use = k.ai.itemTimer <= 0 && k.place > 1;
+        // Fire when the human is the next kart up the road; otherwise keep it trailing as a shield.
+        const nextUp = rivals
+          .filter((o) => o.progress > k.progress)
+          .sort((a, b) => a.progress - b.progress)[0];
+        use =
+          k.ai.itemTimer <= 0 &&
+          k.place > 1 &&
+          (nextUp === player || playerAhead || k.ai.itemTimer < -6);
         hold = !use;
         break;
       }
       case 'bobomb': {
-        use = Boolean(ahead) || k.ai.itemTimer < -5;
+        use = Boolean(ahead) || (playerBehind && k.ai.itemTimer < -1) || k.ai.itemTimer < -6;
         break;
       }
-      case 'star':
+      case 'star': {
+        use = threat || k.ai.itemTimer <= 0;
+        break;
+      }
       case 'lightning': {
-        use = k.ai.itemTimer <= 0;
+        use = k.ai.itemTimer <= 0 && (k.place > 2 || playerAhead);
         break;
       }
     }
     // Hold to trail, release to use; triple items fire one per press.
     if (TRAILABLE.includes(k.item)) c.item = use ? !k.trailing : hold;
     else c.item = use && !k.itemHeld;
-    if (use && behind && !ahead && k.item.includes('green')) c.brake = true;
+    if (use && !ahead && (playerBehind || behind) && k.item.includes('green')) c.brake = true;
   }
   return c;
 }

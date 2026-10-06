@@ -114,6 +114,48 @@ describe('kart engine', () => {
     for (const k of cpu) for (const t of k.lapTimes) expect(t).toBeGreaterThan(15);
   });
 
+  it('CPU racers are fast, consistent, and finish as a tight pack', () => {
+    for (const seed of [9, 21]) {
+      const race = go(seed);
+      run(race, {}, 120);
+      const times = race.karts
+        .filter((k) => !k.human)
+        .map((k) => k.finishedAt ?? Infinity)
+        .sort((a, b) => a - b);
+      // Three laps in roughly 65-70 s at 150cc, the whole field within ~12 s.
+      expect(times[0]).toBeLessThan(74);
+      expect(times.at(-1)).toBeLessThan(times[0] + 14);
+    }
+  });
+
+  it('CPU drivers recover from a wall instead of stalling forever', () => {
+    const race = go(4);
+    const cpu = race.karts.find((k) => !k.human)!;
+    // Park the kart facing a wall, off the racing line.
+    const p = pointAt(380, -25);
+    Object.assign(cpu, {
+      x: p.x,
+      z: p.z,
+      heading: p.heading + Math.PI / 2,
+      speed: 0,
+      progress: 380,
+    });
+    const start = cpu.progress;
+    run(race, {}, 12);
+    expect(cpu.progress).toBeGreaterThan(start + 150);
+  });
+
+  it('rubber-bands CPUs toward a human who leads', () => {
+    const race = go();
+    const cpu = race.karts.find((k) => !k.human)!;
+    race.player.progress = cpu.progress + 200;
+    aiControls(race, cpu);
+    expect(cpu.ai.band).toBeGreaterThan(1.1);
+    race.player.progress = cpu.progress - 300;
+    aiControls(race, cpu);
+    expect(cpu.ai.band).toBeLessThan(1);
+  });
+
   it('steering turns the kart', () => {
     const left = solo();
     const right = solo();
