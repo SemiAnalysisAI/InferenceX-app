@@ -257,6 +257,7 @@ export function createKartAudio() {
   };
   let finalLap = false;
   let finished = false;
+  let gridPlayed = false;
   const resumeFinalTheme = () => {
     if (!finished) playMusic('music-race-final', true);
   };
@@ -415,13 +416,19 @@ export function createKartAudio() {
         if (race.phase === 'ready') {
           finalLap = false;
           finished = false;
+          gridPlayed = false;
           stopMusic();
         }
         lastPhase = race.phase;
       }
       if (ready) {
         updateEngines(race, on, throttle);
-        // Late load: pick the race theme up mid-race.
+        // Late load: the first race starts before the samples finish decoding,
+        // so pick the starting-grid or race theme up wherever the race is.
+        if (race.phase === 'countdown' && !gridPlayed && !musicName && race.countdown > 0.8) {
+          gridPlayed = true;
+          playMusic('music-start', false);
+        }
         if (race.phase === 'racing' && !finished && !musicName) playMusic(raceTheme(), true);
       } else {
         const base = 55 + speed * 2.1 + (k.boost > 0 ? 40 : 0);
@@ -477,7 +484,10 @@ export function createKartAudio() {
         };
         switch (e.type) {
           case 'countdown': {
-            if (e.value === 3 && !musicName) playMusic('music-start', false);
+            if (e.value === 3 && !musicName && buffers.has('music-start')) {
+              gridPlayed = true;
+              playMusic('music-start', false);
+            }
             if (!play('countdown', 0.7)) tone(440, 0.25, 'square', 0.18);
             break;
           }
@@ -558,7 +568,22 @@ export function createKartAudio() {
             break;
           }
           case 'explosion': {
-            const n = mine ? { vol: 0.9, pan: 0 } : (near() ?? { vol: 0.35, pan: 0 });
+            // The event names the Bob-omb's owner; position the cue at the blast itself.
+            const blast = race.explosions.reduce<(typeof race.explosions)[number] | null>(
+              (a, b) => (!a || b.age < a.age ? b : a),
+              null,
+            );
+            let n = { vol: 0.5, pan: 0 };
+            if (blast) {
+              const dx = blast.x - k.x;
+              const dz = blast.z - k.z;
+              const dist = Math.hypot(dx, dz) || 1;
+              const side = (dx * Math.cos(k.heading) - dz * Math.sin(k.heading)) / dist;
+              n = {
+                vol: Math.max(0.12, Math.min(0.95, 14 / (dist + 12))),
+                pan: Math.max(-0.9, Math.min(0.9, -side)),
+              };
+            }
             if (!play('explosion', n.vol, 1, n.pan)) burst(0.9, 1200, 0.4);
             break;
           }
@@ -587,6 +612,8 @@ export function createKartAudio() {
             finished = true;
             if (play('goal', 0.75)) {
               stopMusic();
+              // Mario Kart Wii plays the 2nd-6th fanfare for the top half of a
+              // 12-racer field; with 8 racers that is 2nd-4th.
               const place = k.place;
               schedule(
                 () =>
