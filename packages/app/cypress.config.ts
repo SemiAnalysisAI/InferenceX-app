@@ -47,6 +47,16 @@ export default defineConfig({
     },
   },
   component: {
+    setupNodeEvents(on, config) {
+      on('before:browser:launch', (browser, launchOptions) => {
+        if (browser.family === 'chromium' && browser.name !== 'electron') {
+          // Component games need the same GPU-less WebGL setup as e2e.
+          launchOptions.args.push('--use-angle=swiftshader', '--enable-unsafe-swiftshader');
+        }
+        return launchOptions;
+      });
+      return config;
+    },
     devServer: {
       framework: 'next',
       bundler: 'webpack',
