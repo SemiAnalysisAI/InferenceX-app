@@ -15,6 +15,7 @@ const sql: DbClient = async (strings, ...values) => {
 
 const WITH_SERIES = 34557177019;
 const RETRIED = 34557177021;
+const NO_SERIES = 34557177023;
 
 beforeAll(async () => {
   db = await PGlite.create();
@@ -266,7 +267,16 @@ it('scopes prefix and source reads in SQL, including containing power-audit bund
   });
   expect(payload?.series.map((series) => series.id)).toEqual([100, 101, 110]);
   expect(sampleIds).toEqual([[100, 101, 110]]);
-  expect(await getGpuMetricsForRun(sql, WITH_SERIES, { sourceResults: ['missing'] })).toBeNull();
+});
+
+it('returns null only when the run has no stored series', async () => {
+  await db.exec(`INSERT INTO workflow_runs (id, github_run_id, run_attempt, name, created_at, date)
+    VALUES (5, ${NO_SERIES}, 1, 'Run Sweep', '2026-09-14T04:19:00Z', '2026-09-14')`);
+  expect(await getGpuMetricsForRun(sql, WITH_SERIES, { sourceResults: ['missing'] })).toMatchObject(
+    { workflowRun: { githubRunId: WITH_SERIES }, series: [] },
+  );
+  expect(await getGpuMetricsForRun(sql, NO_SERIES)).toBeNull();
+  expect(await getGpuMetricsForRun(sql, NO_SERIES, { sourceResults: ['missing'] })).toBeNull();
 });
 
 it('reads only the selected view host while retaining every exact explorer label', async () => {

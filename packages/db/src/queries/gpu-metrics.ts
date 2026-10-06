@@ -376,7 +376,9 @@ async function readGpuMetricsForRun(
 ): Promise<GpuMetricsRunPayload | null> {
   const runRows = (await sql`
     select id, github_run_id, run_attempt, name, date, html_url, head_branch, head_sha,
-      conclusion, status, created_at
+      conclusion, status, created_at,
+      exists (select 1 from gpu_metric_series s where s.workflow_run_id = workflow_runs.id)
+        as has_series
     from workflow_runs
     where github_run_id = ${githubRunId}
     order by run_attempt desc
@@ -393,9 +395,10 @@ async function readGpuMetricsForRun(
     conclusion: string | null;
     status: string | null;
     created_at: string | Date | null;
+    has_series: boolean;
   }[];
   const run = runRows[0];
-  if (!run) return null;
+  if (!run?.has_series) return null;
 
   let artifactNames: string[] | undefined;
   let selectedIds: number[] | null = null;
@@ -449,7 +452,6 @@ async function readGpuMetricsForRun(
       ))
     order by s.artifact_name, s.file_name
   `) as unknown as RawSeriesRow[];
-  if (seriesRows.length === 0 && artifactNames === undefined) return null;
 
   return {
     workflowRun: {
