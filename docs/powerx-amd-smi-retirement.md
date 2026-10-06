@@ -1,19 +1,10 @@
-# Preview legacy AMD-SMI power retirement
+# Legacy AMD-SMI GPU power retirement
 
-The PowerX source policy retires direct AMD-SMI `socket_power` values, even when their numerical validation passed. The benchmark result and its throughput, latency, configuration, run, and raw audit evidence remain. This preview makes no database changes. It does not mark a retired source as a measurement failure.
+The source policy retires GPU W/J from two raw-verified direct AMD-SMI `socket_power` points, results `431819` and `443533`. This is a provenance decision, not a failed numerical validation. Benchmark performance, CPU metrics, validation/audit metadata, nonpower telemetry, and original artifacts remain. The exact source and portable point identities are in `packages/db/src/lib/legacy-amd-smi-raw-points.json`; the [operator runbook](../packages/db/README-legacy-amd-smi-retirement.md) gives the dry-run, apply, and cache order. No production apply or cache invalidation is established by this repository change.
 
-Run the preview against retained source evidence before connecting to a database:
+## Read-only source inventory
 
-```sh
-bun packages/db/src/preview-amd-smi-retirement.ts \
-  --evidence /path/to/source-findings.json \
-  --artifact-root /path/to/retained-artifacts \
-  > /path/to/amd-smi-preview.json
-```
-
-The evidence file contains `source_identified_points`, with each result's run ID, attempt, source commit, artifact CSV path, CSV SHA256, collector command, metric, hardware, and API run URL. The preview reads the original CSV and requires its SHA256 and `timestamp,gpu,socket_power` columns to match. It rejects a DME `LOGS/power/samples.csv` even if someone labels that record AMD-SMI. The saved September 29 evidence currently verifies two exact results, 443533 and 431819. Those are examples, not complete historical coverage.
-
-To compare the evidence with every retained AMD benchmark row, provide `DATABASE_READONLY_URL` and add `--db`. The script calls only `getDb()`, the repository's read-only client, and emits one JSON preview. Save that output securely because it contains internal run and result identities. `verifiedRetirementCandidates` match result ID, GitHub run ID, attempt, source commit, hardware, and any stored telemetry CSV SHA. `unresolvedRows` need original-source recovery or a documented exclusion from this policy before a production change. An absent telemetry series leaves series coverage unknown; it does not prove that the benchmark power has a different source. The script lists the existing W/J fields and worker presence, but does not remove either.
+The evidence file supplies `source_identified_points`. The preview independently checks each source record's run ID, attempt, commit, collector command, hardware, original CSV path, SHA-256, and `timestamp,gpu,socket_power` header. With `--db`, it uses `DATABASE_READONLY_URL` to compare those records with retained AMD benchmark rows; it does not mutate data. Code-only manifests remain dispatch-unverified and are rejected as retirement evidence.
 
 ```sh
 bun packages/db/src/preview-amd-smi-retirement.ts \
@@ -22,6 +13,4 @@ bun packages/db/src/preview-amd-smi-retirement.ts \
   --db > /path/to/amd-smi-db-preview.json
 ```
 
-Before applying the policy, complete the original-source inventory across retained DB history. Review the exact benchmark IDs and shared series links. Capture original `metrics`, `workers`, `power_audit`, validation documents, telemetry series, samples, statistics, links, and file hashes. The later writer must remove only retired GPU W/J fields and worker power from published benchmark rows; preserve performance and audit data. It also needs a durable source identity that makes CI ingest, backfill, retained-row reuse, run and point reads, Timeline, views, and live GitHub fallback honor the same retirement after retries. `power_valid=0` would falsely describe a policy retirement as failed measurement validation. Do not use run or point purge helpers, which delete benchmark evidence.
-
-The current checkout has no durable source-retirement rule, and the saved API snapshot does not enumerate all historical DB rows or collector identities. This preview is a source inventory and a proposed target list. It is not a production cleanup command.
+The October 5, 2026 production read-only preview found 2 verified rows among 3,172 AMD power-key/telemetry rows. The other **3,170 rows remain unresolved and outside the executable policy**; they are not presumed to use AMD-SMI. Production did not yet have GPU telemetry tables, so historical series coverage was unknown. The writer rechecks the two exact identities under lock and removes only their GPU W/J; replay and read paths apply the same source guard. An unresolved row must not be retired merely because its hardware, date, or metric resembles the two verified sources.

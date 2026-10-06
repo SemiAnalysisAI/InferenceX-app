@@ -93,7 +93,10 @@ the latter does not establish an exact release for every row.
 Inspect `metric_coverage` for the requested measurement fields. Each field reports
 `available_rows` and `unavailable_rows`; strict row eligibility does not guarantee
 metric availability. A missing or null field does not establish whether measurement
-occurred or why the value is absent. Report it as unavailable, not as "not measured."
+occurred or why the value is absent. Source-policy retirement can remove legacy
+AMD-SMI GPU W/J while retaining performance, CPU power, nonpower telemetry, audit
+evidence and a prior `power_valid` verdict; it does not imply a failed numerical
+validation. Report missing GPU W/J as unavailable, not zero or "not measured."
 Keep absent JSON keys absent and explicit nulls null; CSV uses blank cells for
 unavailable values. Keep eligible rows, state which requested measurements are
 unavailable, and avoid zero filling or energy-advantage

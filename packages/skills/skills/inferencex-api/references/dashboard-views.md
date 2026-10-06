@@ -116,6 +116,10 @@ unversioned digests are recomputed read-only from retained DB samples. Keep thes
 serving-window power, J/token and selected-time-window calculations. The view reads
 stored telemetry first, falls back to artifacts for missing storage, and preserves
 upstream 503 failures. Treat an error as unavailable evidence, not an empty dataset.
+For source-retired GPU power, `rows` omit `power` while temperature and other
+collected readings remain. An omitted `metric` selects the first available metric;
+an explicit `metric=power` cannot recreate retired watts. Do not interpret an
+absent power series or statistic as zero, and keep original artifact provenance.
 
 Zoom, axis scale, theme, labels, report expansion, media playback and download
 buttons are presentation state, not new datasets. AI-chart provider keys and
