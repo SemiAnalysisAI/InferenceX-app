@@ -5,10 +5,13 @@ import {
   JOBS,
   lanePoint,
   START,
+  START_ANGLE,
   VEHICLES,
   type Point,
   type Vehicle,
 } from './gta-world';
+import { streetRoute } from './gta-geography';
+const pursuitRoutes = new WeakMap<Actor, { points: Point[]; next: number; until: number }>();
 export interface Controls {
   forward: boolean;
   reverse: boolean;
@@ -51,8 +54,8 @@ export interface CityState {
 export function newCity(): CityState {
   return {
     phase: 'ready',
-    player: { ...START, angle: Math.PI, speed: 0 },
-    car: { ...START, angle: Math.PI, speed: 0 },
+    player: { ...START, angle: START_ANGLE, speed: 0 },
+    car: { ...START, angle: START_ANGLE, speed: 0 },
     onFoot: false,
     vehicle: 'adder',
     health: 100,
@@ -209,22 +212,16 @@ export function stepCity(s: CityState, c: Controls, seconds: number) {
     }
   }
   for (const cop of s.police) {
-    const dx = s.player.x - cop.x,
-      dz = s.player.z - cop.z;
-    // Axis-aligned route choices keep pursuit on connected city streets.
-    const alignedX = Math.abs(dx) < 8,
-      alignedZ = Math.abs(dz) < 8;
-    let desired =
-      Math.abs(dx) > Math.abs(dz) ? (Math.sign(dx) * Math.PI) / 2 : dz > 0 ? 0 : Math.PI;
-    if (!alignedX && !alignedZ) {
-      const vertical = Math.abs(Math.sin(cop.angle)) < 0.5;
-      const atCross =
-        Math.abs((vertical ? cop.z : cop.x) - Math.round((vertical ? cop.z : cop.x) / 100) * 100) <
-        4;
-      if (!atCross) desired = cop.angle;
+    let route = pursuitRoutes.get(cop);
+    if (!route || route.until < s.elapsed) {
+      route = { points: streetRoute(cop, s.player), next: 0, until: s.elapsed + 3 };
+      pursuitRoutes.set(cop, route);
     }
-    cop.angle = desired;
-    cop.speed = 18 + s.heat * 2;
+    while (route.next < route.points.length && distance(cop, route.points[route.next]) < 3)
+      route.next++;
+    const goal = distance(cop, s.player) < 35 ? s.player : route.points[route.next];
+    cop.angle = goal ? Math.atan2(goal.x - cop.x, goal.z - cop.z) : cop.angle;
+    cop.speed = goal ? 18 + s.heat * 2 : 0;
     move(cop, dt, 1.3);
     if (distance(cop, s.player) < 3 && !s.immunity) {
       s.health = Math.max(0, s.health - 12);
@@ -241,7 +238,7 @@ export function stepCity(s: CityState, c: Controls, seconds: number) {
       s.message = 'escape';
     }
   }
-  if (distance(s.player, GARAGE) < 10 && Math.abs(s.player.speed) < 1) {
+  if (s.health > 0 && !s.heat && distance(s.player, GARAGE) < 10 && Math.abs(s.player.speed) < 1) {
     s.health = Math.min(100, s.health + dt * 10);
   }
   if (s.time === 0 || s.health === 0) {

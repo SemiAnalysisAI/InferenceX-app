@@ -1,66 +1,95 @@
+import {
+  BAY_LANDMARKS,
+  FOOTPRINTS,
+  inside,
+  nearestRoadPoint,
+  roadHeading,
+  segmentDistance,
+  STREETS_SF,
+  streetRoute,
+} from './gta-geography';
 export interface Point {
   x: number;
   z: number;
 }
 export const STREETS = [-100, 0, 100, 200, 300, 400, 500];
-export const START = { x: 0, z: 28 };
-export const GARAGE = { x: -100, z: 100 };
+export const START = nearestRoadPoint(BAY_LANDMARKS[2], '03RD ST');
+export const START_ANGLE = roadHeading(START);
+export const GARAGE = { ...START };
 export const ROAD_HALF = 13;
 export const VEHICLES = ['adder', 'buffalo', 'blista', 'taxi'] as const;
 export type Vehicle = (typeof VEHICLES)[number];
 export const DISTRICTS = [
-  { x: 0, z: 0, en: 'Vespucci Run', zh: 'Vespucci 街区' },
-  { x: 100, z: 300, en: 'Downtown', zh: '市中心' },
-  { x: 400, z: 300, en: 'Vinewood Heights', zh: 'Vinewood 高地' },
+  { x: 0, z: 0, en: 'San Paloma', zh: 'San Paloma' },
+  { x: 0, z: 2000, en: 'Santa Clara', zh: 'Santa Clara' },
+  { x: 500, z: 2700, en: 'San Jose', zh: 'San Jose' },
 ];
 export const JOBS = [
-  { x: 0, z: 100, en: 'Beach pickup', zh: '海滩取货' },
-  { x: 300, z: 100, en: 'Downtown exchange', zh: '市中心交接' },
-  { x: 400, z: 400, en: 'Vinewood delivery', zh: 'Vinewood 送货' },
-  { x: -100, z: 400, en: 'Pier rendezvous', zh: '码头会合' },
+  { ...START, en: "Oren's Hummus pickup", zh: "Oren's Hummus 取货" },
+  { ...nearestRoadPoint(BAY_LANDMARKS[1]), en: 'Ferry Building exchange', zh: '渡轮大厦交接' },
+  { x: 0, z: 1900, en: 'NVIDIA campus delivery', zh: 'NVIDIA 园区送货' },
+  { x: 300, z: 2200, en: 'AMD campus delivery', zh: 'AMD 园区送货' },
   { ...GARAGE, en: 'Return to the garage', zh: '返回车库' },
 ];
 export const distance = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.z - b.z);
 export const road = (p: Point, margin = ROAD_HALF) =>
-  STREETS.some((v) => Math.abs(p.x - v) < margin || Math.abs(p.z - v) < margin);
-export const BUILDINGS: (Point & { w: number; d: number; h: number; style: number })[] = [];
-for (let x = 0; x < 500; x += 100)
-  for (let z = -100; z < 500; z += 100) {
-    if (x === 0 && z === 100) continue; // Public park.
-    const style = (x / 100 + z / 100 + 7) % 4;
-    for (let i = 0; i < 2; i++)
-      for (let k = 0; k < 2; k++) {
-        BUILDINGS.push({
-          x: x + 31 + i * 38,
-          z: z + 31 + k * 38,
-          w: 29,
-          d: 29,
-          h: x >= 200 && z >= 100 ? 28 + ((x + z + i * 47 + k * 83) % 110) : 8 + style * 5 + i * 3,
-          style,
-        });
-      }
-  }
-export function blocked(p: Point, radius = 1.2) {
-  const onPier = p.x >= -273 + radius && p.x <= -120 && Math.abs(p.z - 300) < 11 - radius;
-  if (
-    (!onPier && p.x < -230 + radius) ||
-    p.x > 529 - radius ||
-    p.z < -129 + radius ||
-    p.z > 529 - radius
-  )
-    return true;
-  return BUILDINGS.some(
-    (b) => Math.abs(p.x - b.x) < b.w / 2 + radius && Math.abs(p.z - b.z) < b.d / 2 + radius,
+  STREETS_SF.some((s) =>
+    s.points.slice(1).some((q, i) => segmentDistance(p, s.points[i], q) < margin),
   );
+export const BUILDINGS = FOOTPRINTS;
+const cells = new Map<string, typeof BUILDINGS>();
+for (const b of BUILDINGS)
+  for (let x = Math.floor((b.x - b.w / 2) / 50); x <= Math.floor((b.x + b.w / 2) / 50); x++)
+    for (let z = Math.floor((b.z - b.d / 2) / 50); z <= Math.floor((b.z + b.d / 2) / 50); z++) {
+      const key = `${x},${z}`;
+      if (!cells.has(key)) cells.set(key, []);
+      cells.get(key)!.push(b);
+    }
+export function blocked(p: Point, radius = 1.2) {
+  if (p.x < -860 + radius || p.x > 950 - radius || p.z < -760 + radius || p.z > 2980 - radius)
+    return true;
+  for (let x = Math.floor((p.x - radius) / 50); x <= Math.floor((p.x + radius) / 50); x++)
+    for (let z = Math.floor((p.z - radius) / 50); z <= Math.floor((p.z + radius) / 50); z++)
+      for (const b of cells.get(`${x},${z}`) ?? [])
+        if (
+          inside(p, b.ring) ||
+          b.ring.some((q, i) => segmentDistance(p, q, b.ring[(i + 1) % b.ring.length]) < radius)
+        )
+          return true;
+  return false;
 }
+const circuits = [
+  [START, nearestRoadPoint(BAY_LANDMARKS[0]), nearestRoadPoint(BAY_LANDMARKS[1]), START],
+  [
+    nearestRoadPoint({ x: -600, z: 300 }),
+    nearestRoadPoint({ x: -600, z: -500 }),
+    nearestRoadPoint({ x: 0, z: -500 }),
+    START,
+    nearestRoadPoint({ x: -600, z: 300 }),
+  ],
+  [
+    nearestRoadPoint({ x: 0, z: 500 }),
+    nearestRoadPoint({ x: 600, z: 500 }),
+    nearestRoadPoint({ x: 600, z: -200 }),
+    nearestRoadPoint({ x: 0, z: 500 }),
+  ],
+].map((points) => {
+  const route = points.slice(1).flatMap((p, i) => streetRoute(points[i], p));
+  const lengths = route.slice(1).map((p, i) => distance(p, route[i]));
+  return { points: route, lengths, total: lengths.reduce((a, b) => a + b, 0) };
+});
 export function lanePoint(progress: number, lane: number): Point & { angle: number } {
-  const min = -100 + lane * 100,
-    max = 500 - lane * 100,
-    length = max - min;
-  const t = ((progress % (length * 4)) + length * 4) % (length * 4);
-  const off = 5;
-  if (t < length) return { x: min + t, z: min + off, angle: Math.PI / 2 };
-  if (t < length * 2) return { x: max - off, z: min + t - length, angle: 0 };
-  if (t < length * 3) return { x: max - (t - length * 2), z: max - off, angle: -Math.PI / 2 };
-  return { x: min + off, z: max - (t - length * 3), angle: Math.PI };
+  const { points, lengths, total } = circuits[lane % circuits.length];
+  let t = ((progress % total) + total) % total;
+  for (let i = 0; i < lengths.length; i++) {
+    if (t <= lengths[i] && lengths[i] > 0) {
+      const a = points[i],
+        b = points[i + 1],
+        f = t / lengths[i],
+        angle = Math.atan2(b.x - a.x, b.z - a.z);
+      return { x: a.x + (b.x - a.x) * f, z: a.z + (b.z - a.z) * f, angle };
+    }
+    t -= lengths[i];
+  }
+  return { ...START, angle: Math.PI };
 }

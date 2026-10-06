@@ -22,7 +22,7 @@ export default function GtaHeistDialog({ onClose }: { onClose: () => void }) {
         }}
       >
         <DialogTitle className="sr-only">
-          {locale === 'zh' ? 'Los Santos 夜行' : 'Los Santos After Hours'}
+          {locale === 'zh' ? 'San Paloma 夜行' : 'San Paloma After Hours'}
         </DialogTitle>
         <DialogDescription className="sr-only">
           {locale === 'zh'

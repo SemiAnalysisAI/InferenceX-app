@@ -1,4 +1,5 @@
 import { GtaGame } from '@/components/gta/gta-game';
+import { START } from '@/components/gta/gta-world';
 
 type GameWindow = Window & {
   advanceTime: (ms: number) => void;
@@ -23,7 +24,7 @@ describe('GTA 3D city', () => {
       const game = win as unknown as GameWindow;
       game.advanceTime(1000);
       const state = JSON.parse(game.render_game_to_text());
-      expect(state.car.z).to.be.lessThan(25);
+      expect(state.car.z).to.be.lessThan(START.z - 4);
       expect(state.car.speed).to.be.greaterThan(10);
     });
     cy.get('[data-testid="heist-canvas"]').trigger('keyup', { code: 'KeyW' });

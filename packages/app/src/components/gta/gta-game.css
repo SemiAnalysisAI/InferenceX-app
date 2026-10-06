@@ -408,3 +408,12 @@
     grid-template-columns: repeat(2, auto);
   }
 }
+.gta-performance {
+  position: absolute;
+  top: 5.1rem;
+  left: 1.5rem;
+  color: #d5dcd8;
+  font: 10px/1.4 monospace;
+  pointer-events: none;
+  z-index: 2;
+}
