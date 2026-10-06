@@ -46,7 +46,9 @@ Streetlight/traffic-signal fragments are reattached with custom transforms
 because the exported meshes omit the attachment transforms.
 Some preview exports lack GTA V's shared textures. Runtime material colors
 fill those gaps. Vehicle paint and lighting are custom. The character export
-does not include locomotion animation. The district buildings, roads,
+does not include a skeleton or locomotion clips. A custom runtime skeleton and
+skin weights add original procedural walking and running; the shipped GLB is
+unchanged. The district buildings, roads,
 crosswalks, signs, pier, lighting, mission markers and game logic are original
 procedural work; they must not be represented as original GTA V assets.
 

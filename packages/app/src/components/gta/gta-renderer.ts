@@ -3,6 +3,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { BUILDINGS, GARAGE, JOBS, STREETS, type Point } from './gta-world';
 import type { CityState } from './gta-engine';
+import { clonePedestrian, createPedestrianAnimation, rigPedestrian } from './gta-pedestrian';
 
 export const MODEL_NAMES = [
   'adder',
@@ -29,8 +30,10 @@ export function disposeScene(scene: T.Object3D) {
   const geometries = new Set<T.BufferGeometry>(),
     materials = new Set<T.Material>(),
     textures = new Set<T.Texture>();
+  const skeletons = new Set<T.Skeleton>();
   scene.traverse((n) => {
     const m = n as T.Mesh;
+    if ((m as T.SkinnedMesh).isSkinnedMesh) skeletons.add((m as T.SkinnedMesh).skeleton);
     if (m.geometry) geometries.add(m.geometry);
     if (m.material)
       for (const material of Array.isArray(m.material) ? m.material : [m.material]) {
@@ -46,6 +49,7 @@ export function disposeScene(scene: T.Object3D) {
   });
   materials.forEach((m) => m.dispose());
   geometries.forEach((g) => g.dispose());
+  skeletons.forEach((s) => s.dispose());
 }
 export async function createCityRenderer(
   canvas: HTMLCanvasElement,
@@ -386,18 +390,23 @@ export async function createCityRenderer(
   let carName = '';
   const traffic: T.Group[] = [],
     police: T.Group[] = [];
-  const person = models.michael.clone(true);
+  rigPedestrian(models.michael);
+  const person = clonePedestrian(models.michael);
+  const personAnimation = createPedestrianAnimation(person);
   city.add(person);
   const headlights = new T.SpotLight('#fff1c7', 0, 70, 0.42, 0.8, 1);
   const headTarget = new T.Object3D();
   scene.add(headlights, headTarget);
   headlights.target = headTarget;
   const peds = Array.from({ length: 14 }, (_, i) => {
-    const p = models.michael.clone(true);
+    const p = clonePedestrian(models.michael);
     p.scale.setScalar(0.97 + (i % 3) * 0.03);
     city.add(p);
     return p;
   });
+  const pedAnimations = peds.map(createPedestrianAnimation);
+  let previousTime = 0;
+  let previousPosition: Point | null = null;
   const tmp = new T.Vector3();
   let snap = true;
   function render(s: CityState, overview = false) {
@@ -429,11 +438,18 @@ export async function createCityRenderer(
     carGroup.position.set(s.car.x, 0.3, s.car.z);
     carGroup.rotation.y = s.car.angle + Math.PI;
     person.visible = s.onFoot;
-    person.position.set(
-      s.player.x,
-      0.3 + (s.onFoot ? Math.abs(Math.sin(s.elapsed * 10)) * 0.06 : 0),
-      s.player.z,
+    const dt = Math.max(0, Math.min(s.elapsed - previousTime, 0.1));
+    const travelled = previousPosition
+      ? Math.hypot(s.player.x - previousPosition.x, s.player.z - previousPosition.z)
+      : 0;
+    personAnimation.update(
+      s.onFoot && travelled < 12 * dt ? travelled * Math.sign(s.player.speed) : 0,
+      dt,
+      s.player.speed,
     );
+    previousTime = s.elapsed;
+    previousPosition = { x: s.player.x, z: s.player.z };
+    person.position.set(s.player.x, 0.3, s.player.z);
     person.rotation.y = s.player.angle;
     s.traffic.forEach((t, i) => {
       if (!traffic[i]) {
@@ -464,6 +480,7 @@ export async function createCityRenderer(
     peds.forEach((p, i) => {
       p.position.set(17 + (i % 5) * 100, 0.3, ((i * 63 + s.elapsed * 1.2) % 520) - 100);
       p.rotation.y = 0;
+      pedAnimations[i].update(1.2 * dt, dt, 1.2);
     });
     markers.forEach((m, i) => {
       m.visible = i === Math.min(s.job, 4);

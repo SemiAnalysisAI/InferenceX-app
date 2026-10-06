@@ -250,7 +250,7 @@ export function GtaGame({ locale = 'en' }: { locale?: 'en' | 'zh' }) {
           accumulator -= 1 / 60;
         }
       }
-      if (state.current.phase === 'driving' || dirty.current) {
+      if ((!manual.current && state.current.phase === 'driving') || dirty.current) {
         handle?.render(state.current, map.current);
         dirty.current = false;
       }

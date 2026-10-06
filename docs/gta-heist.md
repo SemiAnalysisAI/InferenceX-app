@@ -12,8 +12,11 @@ cars (Adder, Buffalo, Blista, Taxi) share the roads with 18 traffic vehicles.
 The Michael model represents the player on foot and background pedestrians.
 The police model represents pursuers. Geometry and available textures are
 reused; missing shared texture dictionaries receive explicit material tints.
-The character export has no walking animation, so on-foot movement does not
-claim animation parity with GTA V.
+The character export has no skeleton or animation clips. A custom runtime
+skin rig adds distance-driven walking and sprinting, knee bends and opposing
+arm swings. It settles when stopped, freezes when paused and gives background
+pedestrians independent strides. These are original procedural animations,
+not GTA V's animation clips.
 
 Pick up four packages in order, then deliver at the garage. Stop within the
 gold ring and press E. Pickups and vehicle collisions raise a wanted level;
