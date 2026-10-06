@@ -87,6 +87,7 @@ export async function createCityRenderer(
     near: 1,
     far: 900,
   });
+  sun.shadow.camera.updateProjectionMatrix();
   sun.shadow.bias = -0.001;
   scene.add(sun.target);
   const models = {} as Record<ModelName, T.Group>;

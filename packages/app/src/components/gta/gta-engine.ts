@@ -42,7 +42,7 @@ export interface CityState {
   immunity: number;
   police: Actor[];
   traffic: (Actor & { progress: number; lane: number; model: Vehicle })[];
-  message: 'drive' | 'pickup' | 'escape' | 'repair' | 'vehicle' | 'far' | 'fast';
+  message: 'drive' | 'pickup' | 'escape' | 'repair' | 'vehicle' | 'far' | 'fast' | 'blocked';
   night: boolean;
   camera: number;
   explorer: boolean;
@@ -97,12 +97,22 @@ export function enterExit(s: CityState) {
       s.message = 'fast';
       return false;
     }
-    const p = { x: s.car.x + Math.cos(s.car.angle) * 3, z: s.car.z - Math.sin(s.car.angle) * 3 };
-    if (blocked(p, 0.4)) return false;
+    // Try both doors, then behind/in front of the car when parked beside walls.
+    const p = [Math.PI / 2, -Math.PI / 2, Math.PI, 0]
+      .map((offset) => ({
+        x: s.car.x + Math.sin(s.car.angle + offset) * 3,
+        z: s.car.z + Math.cos(s.car.angle + offset) * 3,
+      }))
+      .find((point) => !blocked(point, 0.4));
+    if (!p) {
+      s.message = 'blocked';
+      return false;
+    }
     s.player = { ...p, angle: s.car.angle, speed: 0 };
     s.car.speed = 0;
     s.onFoot = true;
   }
+  s.message = 'drive';
   return true;
 }
 export function interact(s: CityState) {

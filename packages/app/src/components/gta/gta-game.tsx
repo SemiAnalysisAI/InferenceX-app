@@ -63,6 +63,7 @@ const COPY = {
     onFoot: 'ON FOOT',
     repair: 'GARAGE: stop here to repair',
     aim: 'Stop at the gold marker',
+    blockedExit: 'No room to exit. Move the car away from the obstacle.',
     escape: 'Stay clear of police to lose your wanted level',
     sound: 'Sound',
     soundOff: 'Mute',
@@ -114,6 +115,7 @@ const COPY = {
     onFoot: '步行',
     repair: '车库：停车维修',
     aim: '在金色标记处停车',
+    blockedExit: '没有下车空间，请将车辆驶离障碍物。',
     escape: '远离警察以消除通缉等级',
     sound: '声音',
     soundOff: '静音',
@@ -520,7 +522,13 @@ export function GtaGame({ locale = 'en' }: { locale?: 'en' | 'zh' }) {
         <small>{view.explorer ? t.atlas : `${Math.min(view.job + 1, 5)} / 5`}</small>
         <strong>{view.explorer ? t.atlasHelp : locale === 'zh' ? job.zh : job.en}</strong>
         <span>
-          {view.explorer ? `${Math.round(view.altitude)} m` : view.heat ? t.escape : t.aim}
+          {view.explorer
+            ? `${Math.round(view.altitude)} m`
+            : view.message === 'blocked'
+              ? t.blockedExit
+              : view.heat
+                ? t.escape
+                : t.aim}
         </span>
       </div>
       <aside className="gta-bottom-hud">

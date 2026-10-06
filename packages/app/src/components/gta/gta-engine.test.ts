@@ -75,6 +75,24 @@ describe('GTA 3D simulation', () => {
     s.player = { ...s.car };
     expect(enterExit(s)).toBe(true);
   });
+  it('exits through the opposite door when parked beside a building', () => {
+    const s = driving();
+    s.car = { x: 14, z: 31, angle: 0, speed: 0 };
+    expect(blocked(s.car)).toBe(false);
+    expect(blocked({ x: 17, z: 31 }, 0.4)).toBe(true);
+    expect(enterExit(s)).toBe(true);
+    expect(s.player.x).toBe(11);
+    expect(blocked(s.player, 0.4)).toBe(false);
+  });
+  it('reports an obstructed exit without moving the player', () => {
+    const s = driving();
+    s.car = { ...BUILDINGS[0], angle: 0, speed: 0 };
+    const before = { ...s.player };
+    expect(enterExit(s)).toBe(false);
+    expect(s.message).toBe('blocked');
+    expect(s.onFoot).toBe(false);
+    expect(s.player).toEqual(before);
+  });
   it('changes parked cars but not moving vehicles or on foot', () => {
     const s = driving();
     expect(changeVehicle(s)).toBe(true);
