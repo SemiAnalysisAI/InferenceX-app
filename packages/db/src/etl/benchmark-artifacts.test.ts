@@ -7,10 +7,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { readBenchmarkArtifacts, sha256Hex } from './benchmark-artifacts';
 import { createSkipTracker } from './skip-tracker';
 
-const golden = path.resolve(
-  import.meta.dirname,
-  '../../../../docs/fixtures/powerx-manifest-v2/artifacts',
-);
+const golden = path.resolve(import.meta.dirname, 'fixtures/powerx-manifest-v2');
 const dirs: string[] = [];
 function bundle(): string {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'benchmark-artifacts-'));

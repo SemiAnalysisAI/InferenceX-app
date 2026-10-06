@@ -10,10 +10,7 @@ import {
 } from './required-power-publication';
 import { createSkipTracker } from './skip-tracker';
 
-const golden = path.resolve(
-  import.meta.dirname,
-  '../../../../docs/fixtures/powerx-manifest-v2/artifacts',
-);
+const golden = path.resolve(import.meta.dirname, 'fixtures/powerx-manifest-v2');
 const source = { runId: 123, runAttempt: 1, headSha: 'b'.repeat(40) };
 const dirs: string[] = [];
 function fixture() {

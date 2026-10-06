@@ -85,12 +85,12 @@ must use the append-only contract below.
 ### Required Power Publication
 
 Required ordinary sweeps upload a versioned
-`required-power-sweep-manifest/sweep_manifest.json`. The [shared v2 fixture and
-contract](./fixtures/powerx-manifest-v2/README.md) bind the complete required
-matrix to source run/head/attempt, point identities, topology, exact measurement
-windows, physical node/GPU roles and hashed evidence. Both repositories test the
-same bytes. Unversioned required manifests fail closed; optional legacy bundles
-retain their existing behavior.
+`required-power-sweep-manifest/sweep_manifest.json`. The manifest binds the
+complete required matrix to source run/head/attempt, point identities, topology,
+exact measurement windows, physical node/GPU roles and hashed evidence. Tests use
+the synthetic bundle in `packages/db/src/etl/fixtures/powerx-manifest-v2/`.
+Unversioned required manifests fail closed; optional legacy bundles retain their
+existing behavior.
 
 Artifact preparation validates required evidence before workflow migrations.
 Required intent also travels in the dispatch payload, so losing both the manifest

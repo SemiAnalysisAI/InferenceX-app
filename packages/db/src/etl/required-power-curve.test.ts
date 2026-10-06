@@ -9,10 +9,7 @@ import {
 import { powerPublicationPoint, stablePowerPointIdentity } from './power-publication';
 import { verifyRequiredPowerArtifacts } from './required-power-publication';
 import path from 'node:path';
-const golden = path.resolve(
-  import.meta.dirname,
-  '../../../../docs/fixtures/powerx-manifest-v2/artifacts',
-);
+const golden = path.resolve(import.meta.dirname, 'fixtures/powerx-manifest-v2');
 const benchmark = verifyRequiredPowerArtifacts(golden, {
   runId: 123,
   runAttempt: 1,

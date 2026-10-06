@@ -77,9 +77,9 @@ beforeAll(async () => {
   blob = await startPowerxBlobFixture();
   for (const [key, value] of Object.entries(blob.env)) vi.stubEnv(key, value);
   root = fs.mkdtempSync(path.join(os.tmpdir(), 'powerx-cache-recovery-'));
-  // Retained run 34175132645, attempt 1; source and excerpt hashes live beside the fixture.
+  // Unchanged lines 1 and 2898-2921 of gpu_metrics.csv from run 34175132645, attempt 1.
   const csv = fs.readFileSync(
-    new URL('../../../../../../../docs/fixtures/powerx-reingest/nvidia.csv', import.meta.url),
+    new URL('../../../../lib/fixtures/powerx-reingest-nvidia.csv', import.meta.url),
   );
   expect(createHash('sha256').update(csv).digest('hex')).toBe(
     '833cf864da4618579deeeda89b3ddde6dbf8b7b32b7877fda643f18411ee3481',

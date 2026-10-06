@@ -12,10 +12,7 @@ const sql: DbClient = async (strings, ...values) => {
   const result = await db.query<Record<string, unknown>>(query, values);
   return result.rows;
 };
-const golden = path.resolve(
-  import.meta.dirname,
-  '../../../../docs/fixtures/powerx-manifest-v2/artifacts',
-);
+const golden = path.resolve(import.meta.dirname, 'fixtures/powerx-manifest-v2');
 const source = { runId: 123, runAttempt: 1, headSha: 'b'.repeat(40) };
 const options = { date: '2026-09-16', runStartedAt: '2026-09-16T00:00:00Z', appendOnly: false };
 beforeAll(async () => {
