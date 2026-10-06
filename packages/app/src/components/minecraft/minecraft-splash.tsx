@@ -1,42 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { lazy, Suspense, useState, useEffect } from 'react';
 
 import { useLocale } from '@/lib/use-locale';
-
-export const SPLASHES = [
-  'AgentX is here!!',
-  'Now with more tokens!',
-  'Chip go brrr!',
-  'Also try SGLang!',
-  'Tensor cores activated!',
-  'FP8 is the new FP16!',
-  '100% open source!',
-  'Benchmarked on real hardware!',
-  'Not just vibes!',
-  'Tokens per second!',
-  'Time to first token!',
-  'May contain NaN!',
-  'Works on my Chip!',
-  'DeepSeek approved!',
-  'Lower latency!',
-  'Higher throughput!',
-  'Runs on a single node!',
-  'NVLink go brrr!',
-  'Attention is all you need!',
-  'Powered by CUDA!',
-  'Batch size = 1!',
-  'No synthetic benchmarks!',
-  'Real-world workloads!',
-  'Out of VRAM!',
-  'KV cache optimized!',
-  'Prefill gang!',
-  'Disagg or no disagg?',
-  'GB200 NVL72!',
-  'More flops!',
-  'PCIe bottleneck!',
-  'Roofline analysis!',
-];
+import { useEasterEggTheme } from '@/lib/use-easter-egg-theme';
+const RandomSplash = lazy(() => import('./minecraft-splash-text'));
 
 /**
  * Splash shown outside the minecraft theme. Light and dark mode get a single
@@ -59,15 +27,8 @@ const ANNOUNCEMENT = {
  */
 export function MinecraftSplash() {
   const locale = useLocale();
-  const [randomSplash, setRandomSplash] = useState('');
-  const [isMinecraft, setIsMinecraft] = useState(false);
+  const theme = useEasterEggTheme();
   const [wideEnough, setWideEnough] = useState(false);
-
-  // Picked client-side only: a server-rendered random pick would mismatch on
-  // hydration. Minecraft mode is the only consumer, and it starts `false`.
-  useEffect(() => {
-    setRandomSplash(SPLASHES[Math.floor(Math.random() * SPLASHES.length)]);
-  }, []);
 
   // `.splash-wrapper` is `display: none` below 1024px, but hiding it in CSS is
   // not enough: the browser still fetches the Monocraft webfont the splash
@@ -82,22 +43,19 @@ export function MinecraftSplash() {
     return () => query.removeEventListener('change', sync);
   }, []);
 
-  useEffect(() => {
-    function check() {
-      setIsMinecraft(document.documentElement.classList.contains('minecraft'));
-    }
-    check();
-    const observer = new MutationObserver(check);
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-    return () => observer.disconnect();
-  }, []);
-
-  const splash = isMinecraft ? randomSplash : ANNOUNCEMENT[locale];
-  if (!splash || !wideEnough) return null;
+  if (!wideEnough) return null;
 
   return (
     <div className="splash-wrapper" data-testid="splash-text">
-      <span className="splash-text">{splash}</span>
+      <span className="splash-text">
+        {theme === 'minecraft' ? (
+          <Suspense fallback={ANNOUNCEMENT[locale]}>
+            <RandomSplash />
+          </Suspense>
+        ) : (
+          ANNOUNCEMENT[locale]
+        )}
+      </span>
     </div>
   );
 }

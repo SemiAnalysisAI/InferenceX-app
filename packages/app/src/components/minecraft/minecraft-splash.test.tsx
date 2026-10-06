@@ -9,7 +9,8 @@ vi.mock('next/navigation', () => ({
   usePathname: () => pathnameStub.value,
 }));
 
-import { MinecraftSplash, SPLASHES } from './minecraft-splash';
+import { MinecraftSplash } from './minecraft-splash';
+import { SPLASHES } from './minecraft-splash-text';
 
 let container: HTMLDivElement;
 let root: Root;
@@ -21,7 +22,7 @@ function render() {
 /** MutationObserver callbacks land on the microtask queue. */
 async function flush() {
   await act(async () => {
-    await Promise.resolve();
+    await import('./minecraft-splash-text');
   });
 }
 

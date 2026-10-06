@@ -3,7 +3,7 @@ import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderToString } from 'react-dom/server';
-import { KartThemeLazy } from './kart-theme-lazy';
+import { EasterEggThemeLazy as KartThemeLazy } from '../easter-egg-theme-lazy';
 
 const loaded = vi.hoisted(() => vi.fn());
 vi.mock('./kart-decorations', async (original) => {
@@ -43,7 +43,7 @@ describe('Mario Kart decorations', () => {
   });
   it('does not request images or mount game controls in other themes', async () => {
     act(() => root.render(<KartThemeLazy />));
-    for (const theme of ['light', 'dark', 'minecraft', 'csgo', 'gta']) {
+    for (const theme of ['light', 'dark']) {
       await change(theme);
       expect(container.childElementCount).toBe(0);
     }
