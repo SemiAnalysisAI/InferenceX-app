@@ -15,7 +15,7 @@ export const AMD_HARDWARE = Object.entries(HW_REGISTRY)
 export const LEGACY_GPU_POWER_KEYS = [...MEASURED_POWER_METRIC_KEYS].filter(
   (key) =>
     !CPU_SIDE_POWER_METRIC_KEYS.has(key) &&
-    (key.endsWith('_power_w') || key.endsWith('_energy_j') || key.startsWith('joules_per_')),
+    (key.endsWith('_power_w') || key.endsWith('_energy_j') || key.includes('joules_per_')),
 );
 
 export interface SourceEvidence {
@@ -111,6 +111,38 @@ export interface DatabasePowerRow {
   metrics: Record<string, unknown>;
   hasWorkers: boolean;
   linkedSeries: { id: string; vendor: string; artifactName: string; csvSha256: string }[];
+}
+
+export function summarizeDatabaseInventory(
+  rows: readonly DatabasePowerRow[],
+  sources: readonly SourceEvidence[],
+  telemetryTablesPresent: boolean,
+) {
+  const inventory = rows.map((row) => ({
+    resultId: row.resultId,
+    githubRunId: row.githubRunId,
+    runAttempt: row.runAttempt,
+    headSha: row.headSha,
+    hardware: row.hardware,
+    hasWorkers: row.hasWorkers,
+    linkedSeries: row.linkedSeries,
+    ...classifyDatabaseRow(row, sources),
+  }));
+  const relevant = inventory.filter(
+    (row) => row.powerKeys.length > 0 || row.linkedSeries.length > 0,
+  );
+  return {
+    databaseChecked: true,
+    amdRowsRead: rows.length,
+    powerOrTelemetryRows: relevant.length,
+    telemetryInventory: telemetryTablesPresent ? 'available' : 'unknown_pre_gpu_metrics_migration',
+    verifiedRetirementCandidates: relevant.filter(
+      (row) => row.status === 'verified_legacy_amd_smi',
+    ),
+    unresolvedRows: relevant.filter((row) => row.status !== 'verified_legacy_amd_smi'),
+    completeSourceCoverage:
+      telemetryTablesPresent && relevant.every((row) => row.status === 'verified_legacy_amd_smi'),
+  };
 }
 
 /** An exact result/run/attempt/source match is required; missing source stays unknown. */

@@ -2,8 +2,8 @@
 import { getDb } from './connection.js';
 import {
   AMD_HARDWARE,
-  classifyDatabaseRow,
   readSourceEvidence,
+  summarizeDatabaseInventory,
   type DatabasePowerRow,
 } from './lib/amd-smi-retirement-inventory.js';
 
@@ -75,8 +75,17 @@ async function main() {
       throw new Error('--db requires DATABASE_READONLY_URL; no write URL is used');
     }
     const sql = getDb();
-    const rows = await sql`
-      select br.id::text as result_id, wr.github_run_id, wr.run_attempt, wr.head_sha,
+    const [schema] = await sql`
+      select to_regclass('gpu_metric_series') is not null as has_series,
+        to_regclass('benchmark_result_gpu_metrics') is not null as has_links
+    `;
+    const telemetryTablesPresent = schema?.has_series === true && schema.has_links === true;
+    const rows: Record<string, unknown>[] = [];
+    let cursor = '0';
+    for (;;) {
+      const page = telemetryTablesPresent
+        ? await sql`
+          select br.id::text as result_id, wr.github_run_id, wr.run_attempt, wr.head_sha,
         c.hardware, br.metrics, br.workers,
         coalesce((
           select jsonb_agg(jsonb_build_object(
@@ -87,33 +96,33 @@ async function main() {
           join gpu_metric_series s on s.id = l.series_id
           where l.benchmark_result_id = br.id
         ), '[]'::jsonb) as linked_series
-      from benchmark_results br
-      join configs c on c.id = br.config_id
-      join workflow_runs wr on wr.id = br.workflow_run_id
-      where c.hardware = any(${AMD_HARDWARE}::text[])
-      order by br.id
-    `;
-    const inventory = rows.map(databasePowerRow).map((row) => ({
-      resultId: row.resultId,
-      githubRunId: row.githubRunId,
-      runAttempt: row.runAttempt,
-      headSha: row.headSha,
-      hardware: row.hardware,
-      hasWorkers: row.hasWorkers,
-      linkedSeries: row.linkedSeries,
-      ...classifyDatabaseRow(row, sources),
-    }));
-    const relevant = inventory.filter(
-      (row) => row.powerKeys.length > 0 || row.linkedSeries.length > 0,
+          from benchmark_results br
+          join configs c on c.id = br.config_id
+          join workflow_runs wr on wr.id = br.workflow_run_id
+          where br.id > ${cursor}::bigint and c.hardware = any(${AMD_HARDWARE}::text[])
+          order by br.id
+          limit 250
+        `
+        : await sql`
+      select br.id::text as result_id, wr.github_run_id, wr.run_attempt, wr.head_sha,
+        c.hardware, br.metrics, br.workers, null::jsonb as linked_series
+          from benchmark_results br
+          join configs c on c.id = br.config_id
+          join workflow_runs wr on wr.id = br.workflow_run_id
+          where br.id > ${cursor}::bigint and c.hardware = any(${AMD_HARDWARE}::text[])
+          order by br.id
+          limit 250
+        `;
+      rows.push(...page);
+      if (page.length < 250) break;
+      cursor = String(page.at(-1)?.result_id);
+      if (rows.length % 2500 === 0)
+        process.stderr.write(`Read ${rows.length} AMD benchmark rows\n`);
+    }
+    Object.assign(
+      report,
+      summarizeDatabaseInventory(rows.map(databasePowerRow), sources, telemetryTablesPresent),
     );
-    report.databaseChecked = true;
-    report.amdRowsRead = rows.length;
-    report.powerOrTelemetryRows = relevant.length;
-    const candidates = relevant.filter((row) => row.status === 'verified_legacy_amd_smi');
-    const unresolved = relevant.filter((row) => row.status !== 'verified_legacy_amd_smi');
-    report.verifiedRetirementCandidates = candidates;
-    report.unresolvedRows = unresolved;
-    report.completeSourceCoverage = unresolved.length === 0;
   }
   process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
 }

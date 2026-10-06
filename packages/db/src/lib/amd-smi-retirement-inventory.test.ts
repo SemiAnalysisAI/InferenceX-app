@@ -7,6 +7,7 @@ import { afterEach, expect, it } from 'vitest';
 
 import {
   classifyDatabaseRow,
+  summarizeDatabaseInventory,
   verifySourceEvidence,
   type DatabasePowerRow,
 } from './amd-smi-retirement-inventory';
@@ -53,7 +54,16 @@ it('selects only an exact direct AMD-SMI source and leaves benchmark metrics unt
     runAttempt: 1,
     headSha: source.sourceSha,
     hardware: 'mi355x',
-    metrics: { avg_power_w: 535, total_gpu_energy_j: 1200, mean_ttft: 0.2 },
+    metrics: {
+      avg_power_w: 535,
+      total_gpu_energy_j: 1200,
+      prefill_joules_per_input_token: 1.5,
+      decode_joules_per_output_token: 2.5,
+      avg_cpu_socket_power_w: 250,
+      power_valid: 1,
+      power_metric_schema_version: 2,
+      mean_ttft: 0.2,
+    },
     hasWorkers: false,
     linkedSeries: [
       { id: '42', vendor: 'amd', artifactName: 'gpu_metrics_config', csvSha256: source.csvSha256 },
@@ -62,10 +72,19 @@ it('selects only an exact direct AMD-SMI source and leaves benchmark metrics unt
   const metricsBefore = { ...row.metrics };
   expect(classifyDatabaseRow(row, [source])).toMatchObject({
     status: 'verified_legacy_amd_smi',
-    powerKeys: ['avg_power_w', 'total_gpu_energy_j'],
+    powerKeys: [
+      'avg_power_w',
+      'total_gpu_energy_j',
+      'prefill_joules_per_input_token',
+      'decode_joules_per_output_token',
+    ],
     linkedSeriesIds: ['42'],
   });
   expect(row.metrics).toEqual(metricsBefore);
+  expect(classifyDatabaseRow(row, [source]).powerKeys).not.toContain('avg_cpu_socket_power_w');
+  expect(classifyDatabaseRow(row, [source]).powerKeys).not.toContain('power_valid');
+  expect(classifyDatabaseRow(row, [source]).powerKeys).not.toContain('power_metric_schema_version');
+  expect(classifyDatabaseRow(row, [source]).powerKeys).not.toContain('mean_ttft');
   expect(classifyDatabaseRow({ ...row, runAttempt: 2 }, [source]).status).toBe('identity_mismatch');
   expect(
     classifyDatabaseRow(
@@ -82,4 +101,32 @@ it('rejects a DME CSV and a changed source hash even with an AMD-SMI label', () 
   expect(() => verifySourceEvidence(point, root)).toThrow('not direct AMD-SMI');
   fs.writeFileSync(path.join(root, point.csv_relative_path), 'timestamp,gpu,socket_power\n1,0,1\n');
   expect(() => verifySourceEvidence(point, root)).toThrow('CSV SHA mismatch');
+});
+
+it('inventories legacy power before telemetry tables exist without claiming complete coverage', () => {
+  const { root, point } = evidence('timestamp,gpu,socket_power\n1,0,535\n');
+  const source = verifySourceEvidence(point, root);
+  const rows: DatabasePowerRow[] = [
+    {
+      resultId: source.resultId,
+      githubRunId: source.githubRunId,
+      runAttempt: source.runAttempt,
+      headSha: source.sourceSha,
+      hardware: source.hardware,
+      metrics: { avg_power_w: 535, median_ttft: 0.2 },
+      hasWorkers: false,
+      linkedSeries: [],
+    },
+  ];
+  const inventory = summarizeDatabaseInventory(rows, [source], false);
+  expect(inventory).toMatchObject({
+    amdRowsRead: 1,
+    powerOrTelemetryRows: 1,
+    telemetryInventory: 'unknown_pre_gpu_metrics_migration',
+    completeSourceCoverage: false,
+    verifiedRetirementCandidates: [
+      { resultId: source.resultId, powerKeys: ['avg_power_w'], seriesCoverage: 'unknown' },
+    ],
+  });
+  expect(rows[0]?.metrics).toEqual({ avg_power_w: 535, median_ttft: 0.2 });
 });
