@@ -1,3 +1,4 @@
+import AdmZip from 'adm-zip';
 import { NextRequest } from 'next/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -43,6 +44,16 @@ function csv(power: number): string {
     `2026/03/01 00:00:00.000, 0, ${power} W, 65, 1500 MHz, 2000 MHz, 95 %, 80 %`,
     `2026/03/01 00:00:01.000, 0, ${power + 10} W, 65, 1500 MHz, 2000 MHz, 95 %, 80 %`,
   ].join('\n');
+}
+
+function powerValidation(start: number): string {
+  return JSON.stringify({ selected_window: { start_time_unix: start, end_time_unix: start + 10 } });
+}
+
+function archive(files: Record<string, string>): Uint8Array<ArrayBuffer> {
+  const zip = new AdmZip();
+  for (const [name, text] of Object.entries(files)) zip.addFile(name, Buffer.from(text));
+  return new Uint8Array(zip.toBuffer());
 }
 
 function stored(name: string, power = 100): GpuMetricSeries {
@@ -95,6 +106,79 @@ afterEach(() => {
 });
 
 describe('Timeline requested-source coverage', () => {
+  it('answers an ingested run from stored windows only, listing unstored requests as missing', async () => {
+    const response = await POST(request({ sources: [SOURCE_A, SOURCE_B] }));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      source: 'database',
+      series: [{ artifact: csvName(NAME_A) }],
+      sourceCoverage: { status: 'incomplete', missingSources: [SOURCE_B] },
+    });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('answers an unstored run from GitHub only, one series per requested window, preferring CSV over bundle', async () => {
+    readRun.mockResolvedValue(null);
+    const sweep = 'dsr1_fp4_b200_dynamo-trt';
+    const sweepSource = (conc: number) => source(`${sweep}_sa-bench_conc${conc}`);
+    // A single-node job uploads its window as gpu_metrics_<RESULT_FILENAME> and again inside
+    // power_audit_<RESULT_FILENAME>. A multinode sweep uploads only the bundle.
+    const archives = new Map([
+      [csvName(NAME_A), archive({ 'gpu_metrics.csv': csv(100) })],
+      [
+        `power_audit_${NAME_A}`,
+        archive({ 'gpu_metrics.csv': csv(100), [SOURCE_A]: powerValidation(START) }),
+      ],
+      [
+        `power_audit_${sweep}`,
+        archive({
+          [sweepSource(32)]: powerValidation(START + 600),
+          [sweepSource(64)]: powerValidation(START + 1200),
+          'LOGS/power/samples.csv': [
+            'schema_version,timestamp_unix,scrape_seq,hostname,gpu_index,gpu_uuid,power_w',
+            `1,${START + 600},1,cn01,0,GPU-a0,500`,
+            `1,${START + 1200},2,cn01,0,GPU-a0,700`,
+          ].join('\n'),
+        }),
+      ],
+    ]);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: unknown) => {
+        const url = String(input);
+        if (url.endsWith(`/actions/runs/${RUN_ID}`)) {
+          return Promise.resolve(Response.json({ id: Number(RUN_ID), html_url: RUN_URL }));
+        }
+        if (url.includes(`/actions/runs/${RUN_ID}/artifacts?`)) {
+          const artifacts = [...archives.keys()].map((name, id) => ({
+            id,
+            name,
+            archive_download_url: `https://example.test/${name}`,
+          }));
+          return Promise.resolve(Response.json({ artifacts }));
+        }
+        const bytes = archives.get(url.slice('https://example.test/'.length));
+        if (bytes) return Promise.resolve(new Response(bytes));
+        throw new Error(`Unexpected network request: ${url}`);
+      }),
+    );
+
+    const response = await POST(request({ sources: [SOURCE_A, sweepSource(64)] }));
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body).toMatchObject({
+      source: 'github',
+      sourceCoverage: { status: 'complete', missingSources: [] },
+    });
+    expect(body.series).toHaveLength(2);
+    expect(body.series).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ artifact: csvName(NAME_A) }),
+        expect.objectContaining({ artifact: `power_audit_${sweep}`, source: sweepSource(64) }),
+      ]),
+    );
+  });
+
   it('keeps known missing hosts as 503 even when another requested series is healthy', async () => {
     const partial = stored(NAME_B, 300);
     partial.sidecars.seriesInventory = [
@@ -105,7 +189,6 @@ describe('Timeline requested-source coverage', () => {
       workflowRun,
       series: [stored(NAME_A), partial],
     });
-    vi.stubEnv('GITHUB_TOKEN', '');
     const response = await POST(request({ sources: [SOURCE_A, SOURCE_B] }));
     expect(readRun).toHaveBeenCalledWith({}, Number(RUN_ID), {
       prefix: 'dsr1_',
@@ -116,5 +199,6 @@ describe('Timeline requested-source coverage', () => {
       code: 'STORED_TELEMETRY_INCOMPLETE',
       artifact: csvName(NAME_B),
     });
+    expect(fetch).not.toHaveBeenCalled();
   });
 });

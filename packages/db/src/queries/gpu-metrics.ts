@@ -309,8 +309,7 @@ async function loadSeriesDetails(
     if (!staleIds.has(id)) continue;
     const samples = staleSamples.get(id) ?? [];
     if (samples.length !== Number(row.sample_count)) {
-      // Keep samples available to the existing source-gap recovery path, but
-      // never present a partial-population digest as full-record statistics.
+      // Never present a partial-population digest as full-record statistics.
       statsBySeries.set(id, []);
       continue;
     }

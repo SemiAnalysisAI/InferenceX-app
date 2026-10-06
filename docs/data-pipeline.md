@@ -605,18 +605,16 @@ run — are never copied. Our own GCS reader (`lib/gcs-artifacts.ts`) additional
 ignores everything but `bmk_`/`server_logs_` objects, so widening the mirror's run
 filter would also need a reader change before backfill could use it.
 
-Readers: `/api/gpu-metrics?runId=` serves stored telemetry first, including
-`series=power` Timeline buckets reconstructed with retained windows and device
-identities. Missing storage falls back to GitHub artifacts. Known-incomplete CSV
-fallback must match retained filenames and sample counts; known-incomplete bundles
-need exact-source re-ingest. Healthy DB series remain in mixed fallback responses.
-Database failures return `503 DATABASE_UNAVAILABLE`; incomplete storage without
-usable fallback returns `503 STORED_TELEMETRY_INCOMPLETE` with re-ingest guidance.
+Readers: `/api/gpu-metrics?runId=` answers each run from one source. A run with
+stored telemetry is read from the database only, including `series=power` Timeline
+buckets reconstructed with retained windows and device identities; a run without it
+is read from its GitHub artifacts only. The two are never mixed in one response.
+Database failures return `503 DATABASE_UNAVAILABLE`; known-incomplete storage returns
+`503 STORED_TELEMETRY_INCOMPLETE` with re-ingest guidance and never tries GitHub.
 Timeline requests use read-only POST with sorted validation basenames in a `sources`
-JSON body. Stored coverage of those identities permits an artifact-independent response;
-missing siblings, including other windows in the same bundle, use source-level DB-first
-merging. Unavailable artifacts leave healthy DB traces readable with explicit missing
-sources. `sourceCoverage` describes only the requested identities; legacy GET reports
+JSON body. A requested window missing from an ingested run is not fetched from GitHub;
+the response lists it in `sourceCoverage.missingSources` with status `incomplete`.
+`sourceCoverage` describes only the requested identities; legacy GET reports
 coverage unknown. Plain CSV fallback applies the adjacent context timezone just like
 ingest and bundle reads. Raw multi-file artifacts retain separate file/host series.
 Successful reads and storage errors use no-store.
@@ -641,18 +639,19 @@ The public `/api/v1/views/gpu-metrics` projection and full-record UI table use t
 same per-GPU statistics digest for the selected file/host series. Current-version
 empty or missing metric digests remain empty. Unversioned or outdated digests
 are recomputed read-only from retained DB samples with the shared ingest algorithm.
-Incomplete retained samples leave statistics empty while preserving raw data for
-the existing source-gap recovery path; stats-only writes fail until the source is repaired.
+Incomplete retained samples leave statistics empty while preserving the raw data;
+stats-only writes fail until the source is repaired.
 Statistics include startup and warmup, retain measured zero, and exclude missing
 readings per metric after first-wins timestamp/GPU deduplication. Mean is
 sample-weighted, percentiles interpolate at `p * (N - 1)`, and standard deviation
 divides by `N`. GPU visibility and chart downsampling do not alter this population.
 Serving-window power, J/token and selected-time-window calculations remain separate.
 
-中文：历史遥测和 Timeline 优先读取数据库；缺少存储数据时回退到 GitHub 产物，
-文件、主机与 GPU 的身份保持独立。数据库故障返回 503；已知存储不完整且无法恢复时，
-返回带定向重新入库提示的 503。Timeline 通过只读 POST 传入所需来源标识；缺失的兄弟曲线
-按来源补齐，GitHub 不可用时仍返回健康的 DB 曲线，并显式标出缺失来源。旧的 GET
+中文：历史遥测和 Timeline 对每个 run 只使用一个数据来源：遥测已入库的 run 只读数据库，
+其余 run 只读 GitHub 产物，同一响应不会混用两者；文件、主机与 GPU 的身份保持独立。
+数据库故障返回 503；已知存储不完整时，直接返回带定向重新入库提示的 503，不会转而读取
+GitHub。Timeline 通过只读 POST 传入所需来源标识；已入库 run 缺少的请求窗口不会从 GitHub
+补齐，而是在 sourceCoverage 中标为 incomplete 并列出缺失来源。旧的 GET
 没有预期清单，覆盖状态为 unknown。sourceCoverage 仅描述本次请求，不代表整个 run
 的完整性；普通 CSV 与 bundle、ingest 使用相同的 context 时区。
 点详情每次读取先核对数据库版本，修正 sidecar 或共享关联后
