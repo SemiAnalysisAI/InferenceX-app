@@ -18,6 +18,15 @@ export const SURFACE = {
 } as const;
 export type SurfaceType = (typeof SURFACE)[keyof typeof SURFACE];
 
+export function isCourseSurface(type: number) {
+  return (
+    type === SURFACE.road ||
+    type === SURFACE.curb ||
+    type === SURFACE.bank ||
+    type === SURFACE.boost
+  );
+}
+
 export interface SurfaceMap {
   x0: number;
   z0: number;
