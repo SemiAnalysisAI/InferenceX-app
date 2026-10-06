@@ -14,6 +14,7 @@ import {
 
 import { findOutdatedGpuMetricSeries } from '../lib/gpu-metrics-backfill';
 import { GPU_STATS_VERSION } from '../lib/gpu-metric-stats';
+import { getGpuMetricsPointRevision } from '../queries/gpu-metrics-revision';
 
 type Sql = postgres.Sql;
 let db: PGlite;
@@ -23,7 +24,7 @@ const roots: string[] = [];
 function queryClient(database: Pick<PGlite, 'query'>) {
   const client = async (strings: TemplateStringsArray, ...values: unknown[]) => {
     const query = strings.reduce((text, part, i) => text + (i ? `$${i}` : '') + part, '');
-    const result = await database.query(query, values);
+    const result = await database.query<Record<string, unknown>>(query, values);
     return result.rows;
   };
   return Object.assign(client, {
@@ -53,6 +54,7 @@ beforeAll(async () => {
   ]) {
     await db.exec(fs.readFileSync(new URL(`../../migrations/${name}`, import.meta.url), 'utf8'));
   }
+  await db.exec('ALTER TABLE benchmark_results ADD COLUMN power_audit jsonb');
   sql = Object.assign(queryClient(db), {
     begin: (fn: (tx: Sql) => Promise<unknown>) =>
       db.transaction((tx) => fn(queryClient(tx) as unknown as Sql)),
@@ -141,7 +143,41 @@ function writePowerAuditArtifact() {
   return { artifactName, artifactDir };
 }
 
+function writeAmdPowerAuditArtifact(profile: 'legacy' | 'native' = 'native') {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'gpu-metrics-ingest-'));
+  roots.push(root);
+  const artifactName = 'power_audit_kimik3_conc8_fp8_vllm_mi355x_0';
+  const artifactDir = path.join(root, artifactName);
+  const powerDir = path.join(artifactDir, 'LOGS', 'power');
+  fs.cpSync(new URL('fixtures/amd-device-metrics', import.meta.url), powerDir, {
+    recursive: true,
+  });
+  if (profile === 'native') {
+    const manifestPath = path.join(powerDir, 'manifest.json');
+    const manifest: Record<string, unknown> = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+    delete manifest.power_profile;
+    fs.writeFileSync(manifestPath, JSON.stringify(manifest));
+  }
+  return { artifactName, artifactDir };
+}
+
 describe('prepareGpuMetricsArtifact', () => {
+  it('does not classify an unrecognized power scope as AMD', () => {
+    const artifact = writePowerAuditArtifact();
+    fs.writeFileSync(
+      path.join(artifact.artifactDir, 'LOGS', 'power', 'manifest.json'),
+      JSON.stringify({
+        ...MULTINODE_MANIFEST,
+        source_metric: 'gpu_power_usage',
+        power_scope: 'other_power_boundary',
+      }),
+    );
+    expect(prepareGpuMetricsArtifact(artifact).map((series) => series.vendor)).toEqual([
+      'nvidia',
+      'nvidia',
+    ]);
+  });
+
   it('falls back to the multinode power bundle, one power-only series per host', () => {
     const prepared = prepareGpuMetricsArtifact(writePowerAuditArtifact());
     expect(prepared.map((series) => series.fileName)).toEqual([
@@ -170,6 +206,69 @@ describe('prepareGpuMetricsArtifact', () => {
 });
 
 describe('ingestGpuMetricsArtifact', () => {
+  it.each(['legacy', 'native'] as const)(
+    'stores %s AMD DME telemetry as AMD despite the historical DCGM producer name',
+    async (profile) => {
+      const result = await ingestGpuMetricsArtifact(sql, {
+        workflowRunId: 1,
+        artifact: writeAmdPowerAuditArtifact(profile),
+        benchmarkResultIds: [10],
+      });
+      const stored = await storedSeries(result.seriesIds[0]!);
+      expect(stored.metadata).toMatchObject([
+        {
+          vendor: 'amd',
+          sidecars: {
+            context: {
+              producer: 'srt-slurm.dcgm-power',
+              source_metric: 'gpu_power_usage',
+              power_scope: 'gpu_device_power_as_reported_by_amd_device_metrics_exporter',
+            },
+          },
+        },
+      ]);
+    },
+  );
+
+  it('repairs an unchanged AMD vendor without replacing telemetry, then becomes a no-op', async () => {
+    const readSql = queryClient(db);
+    const input = {
+      workflowRunId: 1,
+      artifact: writeAmdPowerAuditArtifact(),
+      benchmarkResultIds: [10, 11],
+    };
+    const first = await ingestGpuMetricsArtifact(sql, input);
+    const id = first.seriesIds[0]!;
+    await sql`update gpu_metric_series set vendor = 'nvidia', ingested_at = '2026-09-01' where id = ${id}`;
+    const before = await storedSeries(id);
+    const originalRevision = await getGpuMetricsPointRevision(readSql, 10);
+
+    const repaired = await ingestGpuMetricsArtifact(sql, input);
+    const after = await storedSeries(id);
+    expect(after.metadata[0]!.vendor).toBe('amd');
+    expect(repaired).toMatchObject({
+      seriesIds: first.seriesIds,
+      samplesInserted: 0,
+      seriesSkipped: 0,
+    });
+    expect(after).toEqual({
+      ...before,
+      metadata: [
+        { ...before.metadata[0], vendor: 'amd', ingested_at: after.metadata[0]!.ingested_at },
+      ],
+    });
+    const repairedRevision = await getGpuMetricsPointRevision(readSql, 10);
+    expect(repairedRevision).not.toBe(originalRevision);
+
+    expect(await ingestGpuMetricsArtifact(sql, input)).toMatchObject({
+      seriesIds: first.seriesIds,
+      samplesInserted: 0,
+      seriesSkipped: 1,
+    });
+    expect(await storedSeries(id)).toEqual(after);
+    expect(await getGpuMetricsPointRevision(readSql, 10)).toBe(repairedRevision);
+  });
+
   it('refuses a partial artifact when a discovered host CSV has only a header', async () => {
     const artifact = writeArtifact(NVIDIA_CSV);
     const missingHostFile = path.join(artifact.artifactDir, 'host-b', 'gpu_metrics.csv');

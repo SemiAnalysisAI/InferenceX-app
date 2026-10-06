@@ -41,6 +41,11 @@ bun run admin:db:backfill-gpu-metrics --run RUN_ID --attempt ATTEMPT \
 ```
 
 Unchanged inputs are no-ops. GitHub backfill accepts only the current source attempt.
+An unchanged AMD DME artifact can correct a stored NVIDIA vendor label without
+replacing its samples, statistics or point links. The series revision then refreshes
+point reads once. Current DME bundles identify AMD by `gpu_power_usage` and its
+`gpu_device_power_as_reported_by_amd_device_metrics_exporter` scope; older bundles
+use `power_profile: amd-device-metrics`. Both retain their original manifest bytes.
 Older or expired artifacts require retained original bytes; never substitute another
 attempt's artifacts. For local recovery, set `INGEST_RUN_ID`, `INGEST_RUN_ATTEMPT`,
 `INGEST_REPO=SemiAnalysisAI/InferenceX`, `INGEST_ARTIFACTS_PATH` and

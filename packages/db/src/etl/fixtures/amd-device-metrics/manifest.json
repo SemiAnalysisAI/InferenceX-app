@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "producer": "srt-slurm.dcgm-power",
+  "producer_version": "2.23.2.post0+g8dace5f95.d20260925",
+  "producer_git_commit": "8dace5f9596907a5075bf056251563b2e9563e7d",
+  "power_profile": "amd-device-metrics",
+  "source_metric": "gpu_power_usage",
+  "unit": "W",
+  "power_scope": "gpu_device_power_as_reported_by_amd_device_metrics_exporter",
+  "samples_schema_version": 2,
+  "utilization_metrics": [
+    {
+      "column": "gpu_util_pct",
+      "source_metric": "gpu_gfx_activity",
+      "unit": "percent"
+    }
+  ],
+  "timestamp_source": "head_node_unix_clock",
+  "sample_interval_seconds": 1,
+  "status": "complete",
+  "publication_valid": true,
+  "dcgm_exporter": {
+    "container_image_resolved": "docker://rocm/device-metrics-exporter:v1.5.2",
+    "container_image_sha256": null
+  },
+  "expected_devices": [
+    {
+      "hostname": "amd-a",
+      "gpu_index": 0,
+      "assignments": [{ "worker_role": "agg" }]
+    }
+  ]
+}

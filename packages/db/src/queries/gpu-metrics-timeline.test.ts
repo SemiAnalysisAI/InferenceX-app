@@ -150,6 +150,61 @@ beforeEach(async () => {
 });
 
 describe('artifact → ingest → stored Timeline', () => {
+  it('reads native AMD DME power and provenance after the source artifact is removed', async () => {
+    const fixture = new URL('../etl/fixtures/amd-device-metrics/', import.meta.url);
+    const manifest = JSON.parse(fs.readFileSync(new URL('manifest.json', fixture), 'utf8'));
+    delete manifest.power_profile;
+    manifest.expected_devices.push({
+      hostname: 'amd-b',
+      gpu_index: 0,
+      assignments: [{ worker_role: 'agg' }],
+    });
+    const name = 'power_audit_qwen3.5_8k1k_fp8_sglang_mi355x_0';
+    const source = 'power_validation_qwen3.5_8k1k_fp8_sglang_mi355x_0_conc32.json';
+    const validation = {
+      power_valid: false,
+      selected_window: { start_time_unix: 1790360712, end_time_unix: 1790360715 },
+    };
+    const csv = [
+      fs.readFileSync(new URL('samples.csv', fixture), 'utf8').trimEnd(),
+      '2,1790360712.2282302,22,amd-b,0,a00000000002,450,0,',
+      '2,1790360713.22827,23,amd-b,0,a00000000002,500,0,',
+      '2,1790360714.2282336,24,amd-b,0,a00000000002,550,0,',
+    ].join('\n');
+    const files = new Map([
+      ['LOGS/power/samples.csv', csv],
+      ['LOGS/power/manifest.json', JSON.stringify(manifest)],
+      [source, JSON.stringify(validation)],
+    ]);
+    await db.exec("UPDATE configs SET hardware = 'mi355x'");
+    const artifact = writeArtifact(name, files);
+    await ingestGpuMetricsArtifact(sql, { workflowRunId: 1, artifact, benchmarkResultIds: [10] });
+    fs.rmSync(artifact.artifactDir, { recursive: true });
+
+    const stored = await getGpuMetricsForRun(readSql, RUN);
+    expect(stored!.series.map((series) => series.vendor)).toEqual(['amd', 'amd']);
+    for (const series of stored!.series) {
+      expect(series.sidecars.context).toEqual(manifest);
+      expect(series.sidecars.validations).toEqual({ [source]: validation });
+    }
+    const actual = storedPowerSeries(stored!.series);
+    expect(actual).toEqual(cutPowerAuditBundle(name, files));
+    expect(actual).toMatchObject([
+      {
+        source,
+        t: [0, 1, 2],
+        power: [
+          [241, 241, 241],
+          [450, 500, 550],
+        ],
+        devices: [{ id: 'amd-a/100000000001' }, { id: 'amd-b/a00000000002' }],
+      },
+    ]);
+    const point = await getGpuMetricsForPoint(readSql, 10);
+    expect(point!.series).toEqual(stored!.series);
+    expect(storedPowerSeries(point!.series)).toEqual(actual);
+  });
+
   it('persists series and links without touching point provenance', async () => {
     await db.exec("UPDATE benchmark_results SET benchmark_type = 'agentic_traces'");
     const before = await db.query('SELECT id, power_audit FROM benchmark_results ORDER BY id');

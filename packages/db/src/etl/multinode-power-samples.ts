@@ -99,11 +99,16 @@ export function parseMultinodePowerSamples(csvText: string): MultinodePowerHost[
 }
 
 /**
- * The producer manifest names its source metric; DCGM means NVIDIA. Anything
- * naming AMD tooling maps to 'amd', and an absent manifest defaults to NVIDIA
- * because only the DCGM producer writes this layout today.
+ * Native AMD DME records its metric and power scope; older bundles name the
+ * AMD profile explicitly. Both retain the historical DCGM producer name.
  */
 export function multinodePowerVendor(manifest: Record<string, unknown> | null): GpuMetricsVendor {
+  if (
+    manifest?.power_profile === 'amd-device-metrics' ||
+    (manifest?.source_metric === 'gpu_power_usage' &&
+      manifest?.power_scope === 'gpu_device_power_as_reported_by_amd_device_metrics_exporter')
+  )
+    return 'amd';
   const source = [manifest?.source_metric, manifest?.producer]
     .filter((value): value is string => typeof value === 'string')
     .join(' ')

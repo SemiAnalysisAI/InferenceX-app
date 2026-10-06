@@ -3,8 +3,8 @@
  * the per-GPU statistics digest, and links to the benchmark points it covers.
  *
  * Idempotency: a series is identified by (workflow run, artifact name, CSV
- * path). Re-ingesting an identical CSV, sidecars and sample count only refreshes
- * the point links when the statistics version is current; a source change
+ * path). Re-ingesting an identical CSV, sidecars and sample count refreshes
+ * point links and corrects vendor metadata when needed; a source change
  * replaces samples and digest atomically.
  */
 
@@ -277,6 +277,7 @@ export function upsertGpuMetricSeries(
   samplesInserted: number;
   replaced: boolean;
   statsUpdated: boolean;
+  vendorUpdated: boolean;
 }> {
   const { workflowRunId, artifactName, series, benchmarkResultIds } = input;
   const configKey = gpuMetricsArtifactSuffix(artifactName) ?? artifactName;
@@ -286,13 +287,14 @@ export function upsertGpuMetricSeries(
     const existing = await tx<
       {
         id: number;
+        vendor: GpuMetricsVendor;
         csv_sha256: string;
         sample_count: number;
         stats_version: number;
         sidecars_match: boolean;
       }[]
     >`
-      select id, csv_sha256, sample_count, stats_version, sidecars = ${sidecarsJson}::jsonb as sidecars_match
+      select id, vendor, csv_sha256, sample_count, stats_version, sidecars = ${sidecarsJson}::jsonb as sidecars_match
       from gpu_metric_series
       where workflow_run_id = ${workflowRunId}
         and artifact_name = ${artifactName}
@@ -303,6 +305,7 @@ export function upsertGpuMetricSeries(
     let seriesId: number;
     let needsSamples = true;
     let replaced = false;
+    let vendorUpdated = false;
     if (existing.length > 0) {
       seriesId = Number(existing[0]!.id);
       // Count also detects legacy digests computed before duplicate removal.
@@ -312,6 +315,11 @@ export function upsertGpuMetricSeries(
         existing[0]!.sample_count === series.samples.length
       ) {
         needsSamples = false;
+        if (existing[0]!.vendor !== series.vendor) {
+          await tx`update gpu_metric_series set vendor = ${series.vendor}, ingested_at = now()
+            where id = ${seriesId}`;
+          vendorUpdated = true;
+        }
       } else {
         replaced = true;
         await tx`delete from gpu_metric_samples where series_id = ${seriesId}`;
@@ -373,7 +381,7 @@ export function upsertGpuMetricSeries(
       `;
     }
 
-    return { seriesId, samplesInserted, replaced, statsUpdated };
+    return { seriesId, samplesInserted, replaced, statsUpdated, vendorUpdated };
   });
 }
 
@@ -425,7 +433,12 @@ export async function ingestGpuMetricsArtifact(
     });
     result.seriesIds.push(upserted.seriesId);
     result.samplesInserted += upserted.samplesInserted;
-    if (upserted.samplesInserted === 0 && !upserted.replaced && !upserted.statsUpdated)
+    if (
+      upserted.samplesInserted === 0 &&
+      !upserted.replaced &&
+      !upserted.statsUpdated &&
+      !upserted.vendorUpdated
+    )
       result.seriesSkipped++;
   }
   return result;
