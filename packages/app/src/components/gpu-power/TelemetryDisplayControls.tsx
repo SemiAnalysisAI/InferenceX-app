@@ -56,9 +56,9 @@ interface Props {
 }
 
 /**
- * Display-mode controls shared by the PowerX explorer and the per-point PowerX
- * tab: raw samples vs. a time-window rolling average, and per-chip lines vs.
- * the mean across the visible chips.
+ * Display-mode controls for the per-point PowerX tab: raw samples vs. a
+ * time-window rolling average, and per-chip lines vs. the mean across the
+ * visible chips.
  */
 export function TelemetryDisplayControls({
   value,

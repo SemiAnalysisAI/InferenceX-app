@@ -278,7 +278,7 @@ export const apiRouteCatalog = [
       en: 'UI-only PowerX raw/series=power read: one source per run (the DB when the run has stored telemetry, otherwise its GitHub artifacts, never combined), separate host/GPU identities and adjacent CSV context timezone normalization. GET has no expected identities and reports sourceCoverage unknown. Live windows are unique by validation source, preferring CSV over bundle. DB failures return 503 DATABASE_UNAVAILABLE; known-incomplete stored telemetry returns 503 STORED_TELEMETRY_INCOMPLETE without trying GitHub. Responses use no-store. This is not a stable public API.',
       zh: '仅供 PowerX 界面读取原始遥测或 series=power：每个 run 只使用一个数据来源（遥测已入库时只读 DB，否则只读该 run 的 GitHub 产物，两者不混用），保留主机/GPU 身份，并按相邻 CSV context 规范化时区。GET 没有预期身份清单，sourceCoverage 为 unknown。实时窗口按 validation source 去重，优先 CSV，再用 bundle。数据库故障返回 503 DATABASE_UNAVAILABLE；若已入库的遥测已知不完整，则返回 503 STORED_TELEMETRY_INCOMPLETE，不会转而读取 GitHub。响应使用 no-store，不作为稳定公开 API。',
     },
-    sourceSha256: '44be9da2157f3e811e43c25fc353dfd847801033b994c3998b3182b4190dd5dc',
+    sourceSha256: 'cd230b069be257ce8ac7d393992999920a4aedfa565ee2e8950ff0eac98f2cb2',
   },
   {
     source: 'src/app/api/gpu-metrics/route.ts',
@@ -289,7 +289,7 @@ export const apiRouteCatalog = [
       en: 'Read-only Timeline transport with runId, series=power and optional prefix in the query; JSON sources contains 1–1000 validation basenames with RESULT_FILENAME up to 200 ASCII letters/digits/dot/underscore/hyphen, matching prefix. Invalid input returns 400; bodies over 256 KiB return 413. A requested window missing from an ingested run is not fetched from GitHub; the DB response lists it in missingSources with sourceCoverage incomplete. Coverage describes only requested identities, never whole-run/sample completeness. The GET source-selection, no-store and error guarantees also apply. UI-owned, excluded from the stable public API.',
       zh: 'Timeline 只读传输：查询参数为 runId、series=power 和可选 prefix；JSON sources 含 1–1000 个验证文件 basename，RESULT_FILENAME 最长 200 个 ASCII 字母/数字/点/下划线/连字符，且须匹配 prefix。输入错误返回 400，正文超过 256 KiB 返回 413。已入库 run 缺少的请求窗口不会从 GitHub 补齐，DB 响应会将其列入 missingSources，并把 sourceCoverage 标记为 incomplete。覆盖仅针对请求身份，不代表整次 run 或样本完整性。沿用 GET 的单一来源选择、no-store 和错误约束；属于界面接口，不纳入稳定公开 API。',
     },
-    sourceSha256: '44be9da2157f3e811e43c25fc353dfd847801033b994c3998b3182b4190dd5dc',
+    sourceSha256: 'cd230b069be257ce8ac7d393992999920a4aedfa565ee2e8950ff0eac98f2cb2',
   },
   {
     source: 'src/app/api/openapi.json/route.ts',
@@ -911,7 +911,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/components/gpu-power/chart-data.ts',
-    sourceSha256: '9e057519b83ac6f4644db577be075c6aa24734a99614a29453c5f152b2f26d38',
+    sourceSha256: '6312a051ba7dd105a0afb4e06704302547e57239249ecde0f6e33a73afd31f1e',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -1010,7 +1010,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/registry.ts',
-    sourceSha256: '1958ff6a851aa32a167c4acafbdaf69c7ef18bac9ca59851d2153300dbf88a59',
+    sourceSha256: '6a228cb8083c1a7e95c2ab24b7ea1450015d89f0748c401a4049282bae91d58b',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
