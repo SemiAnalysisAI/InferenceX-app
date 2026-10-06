@@ -13,6 +13,8 @@ export const SURFACE = {
   water: 4,
   wall: 5,
   curb: 6,
+  bank: 7,
+  boost: 8,
 } as const;
 export type SurfaceType = (typeof SURFACE)[keyof typeof SURFACE];
 

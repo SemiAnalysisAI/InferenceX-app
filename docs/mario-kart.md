@@ -33,6 +33,11 @@ mini-turbo. Pressing accelerate just after the 2 in the countdown gives a rocket
 start; pressing too early burns out. Following close behind another racer
 builds a slipstream.
 
+The nine boost panels on the final banked bend give a one-second boost on
+contact. Banking is drivable terrain, not a vertical barrier. Drift steering
+uses speed-dependent handling so ordinary bends allow natural blue/orange
+charge; a low-speed hop held through acceleration can also enter a drift.
+
 Item boxes sit in three rows around the course. The roulette lands on an item
 weighted by position, as in the original: front runners mostly see bananas and
 green shells, back markers see stars, triple mushrooms, Golden Mushrooms, and
