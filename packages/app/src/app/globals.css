@@ -3,7 +3,7 @@
 @import './motion.css';
 @plugin '@tailwindcss/typography';
 
-@custom-variant dark (&:is(.dark *, .minecraft *, .csgo *, .gta *));
+@custom-variant dark (&:is(.dark *, .minecraft *, .csgo *, .gta *, .kart *));
 @custom-variant minecraft (&:is(.minecraft *));
 
 /* Allow hash navigation to clear the fixed navbar */
@@ -54,11 +54,11 @@
   color: #7e22ce;
 }
 
-:is(.dark, .minecraft, .csgo, .gta) .halloween-wordmark {
+:is(.dark, .minecraft, .csgo, .gta, .kart) .halloween-wordmark {
   color: #fb923c;
 }
 
-:is(.dark, .minecraft, .csgo, .gta) .halloween-wordmark-x {
+:is(.dark, .minecraft, .csgo, .gta, .kart) .halloween-wordmark-x {
   color: #c084fc;
 }
 
@@ -301,7 +301,8 @@ html[data-inferencex-embed] .autumn-leaves {
 
 .dark,
 .csgo,
-.gta {
+.gta,
+.kart {
   /* Base Theme Colors */
   --background: #131416;
   --foreground: #eaebec;
@@ -344,6 +345,21 @@ html[data-inferencex-embed] .autumn-leaves {
   --overlay-run-5: oklch(0.7 0.22 330);
   --overlay-run-6: oklch(0.72 0.2 230);
   --overlay-run-7: oklch(0.78 0.18 60);
+}
+
+/* Tiny pre-paint shell for persisted Kart selections. No assets, fonts or
+ * animations here; artwork and gameplay styles remain in the lazy bundle. */
+.kart {
+  --primary: #ffd640;
+  --primary-foreground: #162237;
+  --ring: #ffd640;
+  --background: #111b2b;
+  --card: #152237;
+  --popover: #152237;
+}
+.kart .circuit-bg,
+.kart .autumn-leaves {
+  display: none;
 }
 
 /* CS:GO keeps dark chart/vendor palettes; gold belongs to interface chrome. */
@@ -852,7 +868,9 @@ html[data-inferencex-embed] [data-testid='gta-theme-banner'] {
 .csgo .shiki,
 .csgo .shiki span,
 .gta .shiki,
-.gta .shiki span {
+.gta .shiki span,
+.kart .shiki,
+.kart .shiki span {
   color: var(--shiki-dark);
   background-color: var(--shiki-dark-bg);
 }
@@ -1018,9 +1036,13 @@ html[data-inferencex-skin='vllm'] [data-slot='card'] {
   /* The keyframes re-declare this; keeping it on the element means the splash
      still sits where it belongs when the animation is off (reduced motion). */
   transform: translate(2rem, 2.25rem) rotate(10deg);
-  animation: splash-bounce 1.5s ease-in-out infinite;
   transform-origin: center;
-  /* Always use Minecraft font & style regardless of active theme */
+  font-family: inherit;
+}
+
+/* The standard announcement must not fetch a game font or animate. */
+.minecraft .splash-text {
+  animation: splash-bounce 1.5s ease-in-out infinite;
   font-family: var(--font-minecraft, 'Monocraft', monospace) !important;
   -webkit-font-smoothing: none;
   -moz-osx-font-smoothing: unset;
@@ -1035,7 +1057,8 @@ html[data-inferencex-skin='vllm'] [data-slot='card'] {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .splash-text {
+  .splash-text,
+  .minecraft .splash-text {
     animation: none;
   }
 }

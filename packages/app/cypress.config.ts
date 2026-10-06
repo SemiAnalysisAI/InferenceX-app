@@ -25,7 +25,13 @@ export default defineConfig({
       // Force reduced motion so e2e clicks always land on settled elements.
       on('before:browser:launch', (browser, launchOptions) => {
         if (browser.family === 'chromium' && browser.name !== 'electron') {
-          launchOptions.args.push('--force-prefers-reduced-motion');
+          // CI has no physical GPU. Exercise the real WebGL game with ANGLE's
+          // software renderer instead of accepting its unsupported-WebGL fallback.
+          launchOptions.args.push(
+            '--force-prefers-reduced-motion',
+            '--use-angle=swiftshader',
+            '--enable-unsafe-swiftshader',
+          );
         }
         return launchOptions;
       });

@@ -15,6 +15,7 @@ import { AutumnLeaves } from '@/components/autumn-leaves';
 import { CircuitBackground } from '@/components/circuit-background';
 import { CsgoDecorations, CsgoThemeBanner } from '@/components/csgo/csgo-decorations';
 import { GtaDecorations, GtaThemeBanner } from '@/components/gta/gta-decorations';
+import { KartThemeLazy } from '@/components/kart/kart-theme-lazy';
 import { APP_THEMES } from '@/lib/themes';
 import { MinecraftBackgroundLazy } from '@/components/minecraft/minecraft-background-lazy';
 import { MinecraftDecorations } from '@/components/minecraft/minecraft-decorations';
@@ -259,6 +260,7 @@ export default async function RootLayout({
               <Header starCount={starCount} />
               <CsgoThemeBanner />
               <GtaThemeBanner />
+              <KartThemeLazy />
               <div className="grow flex flex-col">
                 <RouteTransition>{children}</RouteTransition>
               </div>
