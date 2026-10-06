@@ -57,6 +57,15 @@ export function createKartAudio() {
   squeal.connect(master);
   noise.start();
   let muted = false;
+  let disposed = false;
+  const timers = new Set<ReturnType<typeof setTimeout>>();
+  const schedule = (callback: () => void, delay: number) => {
+    const timer = setTimeout(() => {
+      timers.delete(timer);
+      if (!disposed) callback();
+    }, delay);
+    timers.add(timer);
+  };
 
   const tone = (
     freq: number,
@@ -65,7 +74,7 @@ export function createKartAudio() {
     vol = 0.25,
     slide = 0,
   ) => {
-    if (muted) return;
+    if (muted || disposed) return;
     const t = ctx.currentTime;
     const o = ctx.createOscillator();
     const g = ctx.createGain();
@@ -80,7 +89,7 @@ export function createKartAudio() {
     o.stop(t + dur + 0.02);
   };
   const burst = (dur: number, freq: number, vol = 0.3) => {
-    if (muted) return;
+    if (muted || disposed) return;
     const t = ctx.currentTime;
     const src = ctx.createBufferSource();
     src.buffer = noiseBuffer;
@@ -101,13 +110,15 @@ export function createKartAudio() {
 
   return {
     resume() {
-      void ctx.resume();
+      if (!disposed) void ctx.resume().catch(() => {});
     },
     setMuted(value: boolean) {
+      if (disposed) return;
       muted = value;
       master.gain.setTargetAtTime(value ? 0 : 0.32, ctx.currentTime, 0.05);
     },
     update(race: Race, dt: number, active: boolean) {
+      if (disposed) return;
       const k = race.player;
       const t = ctx.currentTime;
       const speed = Math.max(0, Math.abs(k.speed));
@@ -198,14 +209,14 @@ export function createKartAudio() {
           case 'final-lap': {
             if (mine) {
               tone(660, 0.15, 'square', 0.18);
-              setTimeout(() => tone(880, 0.3, 'square', 0.18), 160);
+              schedule(() => tone(880, 0.3, 'square', 0.18), 160);
             }
             break;
           }
           case 'finish': {
             if (mine)
               [523, 659, 784, 1046].forEach((f, i) =>
-                setTimeout(() => tone(f, 0.35, 'square', 0.16), i * 150),
+                schedule(() => tone(f, 0.35, 'square', 0.16), i * 150),
               );
             break;
           }
@@ -217,6 +228,10 @@ export function createKartAudio() {
       }
     },
     dispose() {
+      if (disposed) return;
+      disposed = true;
+      timers.forEach(clearTimeout);
+      timers.clear();
       try {
         oscA.stop();
         oscB.stop();
@@ -224,7 +239,7 @@ export function createKartAudio() {
       } catch {
         // already stopped
       }
-      void ctx.close();
+      void ctx.close().catch(() => {});
     },
   };
 }

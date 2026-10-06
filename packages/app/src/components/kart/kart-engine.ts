@@ -462,7 +462,7 @@ function hitKart(race: Race, k: Kart, kind: 'spin' | 'tumble', source = -1) {
 }
 function dropTrailing(k: Kart) {
   k.trailing = false;
-  if (k.item && (k.item === 'banana' || k.item === 'green-shell' || k.item === 'red-shell')) {
+  if (k.item && TRAILABLE.includes(k.item)) {
     k.itemCount = Math.max(0, k.itemCount - 1);
     if (k.itemCount === 0) k.item = null;
   }

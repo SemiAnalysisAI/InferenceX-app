@@ -251,6 +251,43 @@ describe('kart engine', () => {
     expect(victim.hits).toBeGreaterThan(0);
   });
 
+  it.each(['triple-banana', 'triple-green-shell'] as const)(
+    '%s loses one item each time its rear shield takes a hit',
+    (item) => {
+      const race = solo();
+      const k = race.player;
+      k.item = item;
+      k.itemCount = 3;
+      for (const remaining of [2, 1, 0]) {
+        k.trailing = true;
+        race.projectiles.push({
+          id: ++race.nextId,
+          kind: 'banana',
+          owner: -1,
+          target: -1,
+          x: k.x - Math.sin(k.heading),
+          z: k.z - Math.cos(k.heading),
+          y: k.y,
+          vx: 0,
+          vy: 0,
+          vz: 0,
+          age: 1,
+          life: 10,
+          bounces: 0,
+          fuse: 0,
+          progress: k.progress,
+          trackIndex: k.trackIndex,
+          grounded: true,
+        });
+        run(race, { item: true }, STEP);
+        expect(k.trailing).toBe(false);
+        expect(k.itemCount).toBe(remaining);
+        expect(k.item).toBe(remaining ? item : null);
+        expect(k.spin).toBe(0);
+      }
+    },
+  );
+
   it('red shells home in on the racer ahead', () => {
     const race = solo();
     const k = race.player;

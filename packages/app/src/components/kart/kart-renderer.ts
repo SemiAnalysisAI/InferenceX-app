@@ -186,6 +186,7 @@ export function createKartRenderer(
   const views: RacerView[] = [];
   const templates: Partial<Record<string, THREE.Object3D>> = {};
   const boxes: THREE.Group[] = [];
+  const boxMaterials: THREE.Material[] = [];
   const projectiles = new Map<number, THREE.Object3D>();
   const explosions = new Map<number, THREE.Mesh>();
   let sky: THREE.Object3D | null = null;
@@ -297,6 +298,10 @@ export function createKartRenderer(
         }),
       ),
       new THREE.TextureLoader().loadAsync(`${assetBase}/items/item-box-question.png`).then((t) => {
+        if (disposed) {
+          t.dispose();
+          return;
+        }
         t.colorSpace = THREE.SRGBColorSpace;
         t.magFilter = THREE.NearestFilter;
         question = t;
@@ -399,14 +404,17 @@ export function createKartRenderer(
     race = r;
     for (const v of views) {
       scene.remove(v.root, v.shadow);
-      disposeObject(v.trail);
-      disposeObject(v.orbit);
+      // Item clones borrow their geometry, materials and textures from templates.
+      v.trail.clear();
+      v.orbit.clear();
       v.materials.forEach((m) => m.dispose());
     }
     views.length = 0;
     for (const k of r.karts) views.push(buildRacer(k.character));
     for (const b of boxes) scene.remove(b);
     boxes.length = 0;
+    boxMaterials.forEach((m) => m.dispose());
+    boxMaterials.length = 0;
     const tpl = templates['item-box'];
     for (const b of r.boxes) {
       const g = new THREE.Group();
@@ -418,6 +426,7 @@ export function createKartRenderer(
           if (mesh.name.includes('question')) mesh.visible = false;
           else {
             const m = (mesh.material as THREE.MeshStandardMaterial).clone();
+            boxMaterials.push(m);
             m.transparent = true;
             m.opacity = 0.5;
             m.depthWrite = false;
@@ -429,9 +438,13 @@ export function createKartRenderer(
         g.add(shell);
       }
       if (question) {
-        const s = new THREE.Sprite(
-          new THREE.SpriteMaterial({ map: question, transparent: true, depthWrite: false }),
-        );
+        const material = new THREE.SpriteMaterial({
+          map: question,
+          transparent: true,
+          depthWrite: false,
+        });
+        boxMaterials.push(material);
+        const s = new THREE.Sprite(material);
         s.scale.set(2.1, 2.1, 1);
         s.renderOrder = 4;
         g.add(s);
@@ -442,7 +455,10 @@ export function createKartRenderer(
     }
     for (const o of projectiles.values()) scene.remove(o);
     projectiles.clear();
-    for (const e of explosions.values()) scene.remove(e);
+    for (const e of explosions.values()) {
+      scene.remove(e);
+      disposeObject(e);
+    }
     explosions.clear();
     particles.clear();
     camSet = false;
@@ -914,9 +930,11 @@ export function createKartRenderer(
     },
     stats: () => ({ calls: renderer.info.render.calls, triangles: renderer.info.render.triangles }),
     dispose() {
+      if (disposed) return;
       disposed = true;
       controller.abort();
       for (const v of views) v.materials.forEach((m) => m.dispose());
+      boxMaterials.forEach((m) => m.dispose());
       disposeObject(scene);
       Object.values(templates).forEach((t) => t && disposeObject(t));
       shadowTexture.dispose();
