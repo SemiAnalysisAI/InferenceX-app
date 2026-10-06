@@ -3,7 +3,7 @@
 @import './motion.css';
 @plugin '@tailwindcss/typography';
 
-@custom-variant dark (&:is(.dark *, .minecraft *, .csgo *, .gta *));
+@custom-variant dark (&:is(.dark *, .minecraft *, .csgo *, .gta *, .kart *));
 @custom-variant minecraft (&:is(.minecraft *));
 
 /* Allow hash navigation to clear the fixed navbar */
@@ -54,11 +54,11 @@
   color: #7e22ce;
 }
 
-:is(.dark, .minecraft, .csgo, .gta) .halloween-wordmark {
+:is(.dark, .minecraft, .csgo, .gta, .kart) .halloween-wordmark {
   color: #fb923c;
 }
 
-:is(.dark, .minecraft, .csgo, .gta) .halloween-wordmark-x {
+:is(.dark, .minecraft, .csgo, .gta, .kart) .halloween-wordmark-x {
   color: #c084fc;
 }
 
@@ -301,7 +301,8 @@ html[data-inferencex-embed] .autumn-leaves {
 
 .dark,
 .csgo,
-.gta {
+.gta,
+.kart {
   /* Base Theme Colors */
   --background: #131416;
   --foreground: #eaebec;
@@ -346,7 +347,22 @@ html[data-inferencex-embed] .autumn-leaves {
   --overlay-run-7: oklch(0.78 0.18 60);
 }
 
-/* CS:GO keeps dark chart/vendor palettes; gold belongs to interface chrome. */
+/* Tiny pre-paint shell for persisted Kart selections. No assets, fonts or
+ * animations here; artwork and gameplay styles remain in the lazy bundle. */
+.kart {
+  --primary: #ffd640;
+  --primary-foreground: #162237;
+  --ring: #ffd640;
+  --background: #111b2b;
+  --card: #152237;
+  --popover: #152237;
+}
+.kart .circuit-bg,
+.kart .autumn-leaves {
+  display: none;
+}
+
+/* Scoped pre-paint palettes for persisted themes. No assets or animation. */
 .csgo {
   color-scheme: dark;
   --background: #101820;
@@ -377,83 +393,9 @@ html[data-inferencex-embed] .autumn-leaves {
   --sidebar-ring: #e6bd68;
   --radius: 0.125rem;
 }
-
-.csgo-scene {
-  position: fixed;
-  inset: 0;
-  z-index: -10;
-  pointer-events: none;
-  overflow: hidden;
-}
-
-.csgo-scene-image,
-.csgo-scene-shade {
-  position: absolute;
-  width: 100%;
-  height: 100%;
-  inset: 0;
-}
-
-.csgo-scene-image {
-  object-fit: cover;
-  object-position: center top;
-}
-
-.csgo-scene-shade {
-  background: linear-gradient(180deg, #10182088, #101820d9 65%, #101820f5);
-}
-
-.csgo-theme-banner {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  margin-block: 1rem;
-  padding: 0.5rem 1rem;
-  border-left: 3px solid var(--primary);
-  background: linear-gradient(90deg, #18232deb, #18232d66);
-}
-
-.csgo-theme-banner img {
-  width: clamp(10rem, 22vw, 15rem);
-  height: auto;
-}
-
-.csgo-theme-banner span {
-  flex-shrink: 0;
-}
-
-.csgo header {
-  background: #101820ed;
-  border-bottom: 2px solid var(--primary);
-}
-
-.csgo :is(button, [role='button'], [role='combobox'], input, textarea):focus-visible {
-  outline: 2px solid var(--ring);
-  outline-offset: 3px;
-}
-
-.csgo :is([data-slot='card'], [data-slot='select-trigger'], [data-slot='tabs-list']) {
-  border-radius: var(--radius);
-}
-
-.csgo [data-slot='card'] {
-  background-color: #18232df5;
-  border-top-color: var(--primary);
-}
-
-.csgo .circuit-bg,
-.csgo .autumn-leaves,
-html[data-inferencex-embed] .csgo-scene {
-  display: none;
-}
-
-html[data-inferencex-embed] [data-testid='csgo-theme-banner'] {
-  display: none;
-}
-
-/* ── GTA Theme ── GTA V pause-menu chrome over the dark chart palettes. */
 .gta {
+  --font-pricedown: 'Pricedown';
+  --font-chalet-comprime: 'ChaletComprime';
   color-scheme: dark;
   --background: #0a0a0b;
   --foreground: #f5f5f5;
@@ -485,250 +427,8 @@ html[data-inferencex-embed] [data-testid='csgo-theme-banner'] {
   --gta-display: var(--font-pricedown), 'Pricedown', Impact, sans-serif;
   --gta-menu: var(--font-chalet-comprime), 'ChaletComprime', 'Arial Narrow', sans-serif;
 }
-
-/* Local Rockstar artwork, mounted only while the GTA theme is active. */
-.gta-scene {
-  position: fixed;
-  inset: 0;
-  z-index: -10;
-  pointer-events: none;
-  overflow: hidden;
-  background: #0a0a0b;
-}
-
-.gta-scene-image {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  object-position: 65% center;
-}
-
-.gta-scene-shade {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(180deg, #05070999, #050709c9 65%, #050709eb);
-}
-
-.gta-theme-banner {
-  position: relative;
-  isolation: isolate;
-  overflow: hidden;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  min-height: 17rem;
-  margin-block: 0.5rem 1.5rem;
-  padding: 1.5rem 2rem;
-  border-bottom: 4px solid var(--primary);
-  background: #10110f;
-}
-
-.gta-banner-art {
-  position: absolute;
-  inset: 0 0 0 25%;
-  z-index: -2;
-}
-
-.gta-banner-art img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  object-position: center top;
-}
-
-.gta-banner-shade {
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  background: linear-gradient(90deg, #080a08 0%, #080a08eb 20%, #080a0840 47%, #080a0800 70%);
-}
-
-/* Stacked "Grand Theft InferenceX" wordmark in Pricedown. */
-.gta-wordmark {
-  display: flex;
-  flex-direction: column;
-  font-family: var(--gta-display);
-  font-weight: 700;
-  line-height: 0.82;
-  color: #fff;
-  font-size: clamp(1.6rem, 3.2vw, 2.4rem);
-  -webkit-text-stroke: 4px #000;
-  paint-order: stroke fill;
-  text-shadow: 0 3px 0 #000;
-}
-
-.gta-wordmark-big {
-  font-size: 1.55em;
-}
-
-.gta-wanted {
-  position: absolute;
-  top: 1rem;
-  right: 1rem;
-  display: flex;
-  flex-shrink: 0;
-  gap: 0.15rem;
-  color: #f5f5f5;
-  filter: drop-shadow(0 2px 2px #000);
-}
-
-.gta-heist-launcher {
-  position: absolute;
-  right: 1.25rem;
-  bottom: 1.25rem;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 0.5rem;
-}
-
-.gta-heist-launcher span {
-  font-family: var(--gta-display);
-  color: #fff;
-  text-shadow: 2px 2px 2px #000;
-  font-size: 1.5rem;
-}
-
-.gta-heist-launcher button {
-  min-height: 44px;
-  padding: 0.5rem 1rem;
-  border: 1px solid #c9e69d;
-  background: #b6db84;
-  color: #14200d;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-@media (max-width: 640px) {
-  .gta-theme-banner {
-    min-height: 14rem;
-    padding: 1rem;
-  }
-
-  .gta-banner-art {
-    left: 0;
-  }
-
-  .gta-banner-art img {
-    object-position: 65% top;
-  }
-
-  .gta-banner-shade {
-    background: linear-gradient(90deg, #080a08e6, #080a0840 55%, #080a0800);
-  }
-
-  .gta-wordmark {
-    font-size: 1.4rem;
-  }
-
-  .gta-wanted {
-    top: 0.5rem;
-    right: 0.5rem;
-  }
-
-  .gta-wanted svg {
-    width: 18px;
-    height: 18px;
-  }
-
-  .gta-heist-launcher {
-    right: 0.75rem;
-    bottom: 0.75rem;
-  }
-
-  .gta-heist-launcher span {
-    font-size: 1rem;
-  }
-}
-
-/* Header and headings use the GTA V menu face; body copy stays DM Sans. */
-.gta header {
-  background: #000000eb;
-  border-bottom: 3px solid var(--primary);
-}
-
-.gta :is(h1, h2, h3, [data-slot='card-title']) {
-  font-family: var(--gta-menu);
-  font-weight: 700;
-  letter-spacing: 0.01em;
-}
-
-.gta header nav a,
-.gta [data-testid='mobile-menu'] a {
-  font-family: var(--gta-menu);
-  font-size: 1rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  border-radius: 0;
-}
-
-/* Selected menu tab: solid white with black text, like the GTA V pause menu. */
-.gta header nav a[aria-current='page'],
-.gta [data-testid='mobile-menu'] a[aria-current='page'] {
-  background: #f5f5f5;
-  color: #000;
-}
-
-.gta :is(button, [role='button'], [role='combobox'], input, textarea, a):focus-visible {
-  outline: 2px solid var(--ring);
-  outline-offset: 3px;
-}
-
-.gta :is([data-slot='card'], [data-slot='select-trigger'], [data-slot='tabs-list']) {
-  border-radius: var(--radius);
-}
-
-/* Menu panels: translucent black with no visible frame. */
-.gta [data-slot='card'] {
-  background-color: #080a0aeb;
-  border-color: #ffffff14;
-}
-
-.gta [data-slot='dashboard-navigation'] {
-  border-radius: 0;
-  background: #000000d9;
-}
-
-.gta [data-slot='dashboard-navigation'] nav :is(a, button) {
-  font-family: var(--gta-menu);
-  font-size: 1.25rem;
-  font-weight: 700;
-  padding: 0.5rem 0.75rem;
-  text-transform: uppercase;
-  color: #fff;
-}
-
-.gta [data-slot='dashboard-navigation'] nav [data-tab-active='true'] {
-  background: #f5f5f5;
-  color: #000;
-}
-
-.gta [data-slot='popover-content'] {
-  background-color: #000000eb;
-  border-color: #ffffff1f;
-}
-
-.gta .splash-text {
-  font-family: var(--gta-display) !important;
-  font-size: 1.15rem;
-  color: #f0c850;
-  -webkit-text-stroke: 3px #000;
-  paint-order: stroke fill;
-  text-shadow: 0 2px 0 #000;
-  -webkit-font-smoothing: antialiased;
-}
-
-.gta .circuit-bg,
-.gta .autumn-leaves,
-html[data-inferencex-embed] .gta-scene,
-html[data-inferencex-embed] [data-testid='gta-theme-banner'] {
-  display: none;
-}
-
-/* ── Minecraft Theme ── */
 .minecraft {
+  --font-minecraft: 'Monocraft';
   --background: #1e1e1e;
   --foreground: #ffffff;
   --card: #1e1e1e;
@@ -778,72 +478,12 @@ html[data-inferencex-embed] [data-testid='gta-theme-banner'] {
   --overlay-run-6: oklch(0.72 0.2 230);
   --overlay-run-7: oklch(0.78 0.18 60);
 }
-
-/* Force pixel font on everything in minecraft mode */
-.minecraft,
-.minecraft * {
-  font-family: var(--font-minecraft, 'Monocraft', monospace) !important;
-}
-
-/* Minecraft text shadow on all text */
-.minecraft * {
-  text-shadow: 1.5px 1.5px 0px rgba(0, 0, 0, 0.4);
-}
-
-/* Disable font smoothing for crisp pixel font */
-.minecraft {
-  -webkit-font-smoothing: none;
-  -moz-osx-font-smoothing: unset;
-}
-
-/* Minecraft-style beveled buttons — raised 3D effect */
-.minecraft button,
-.minecraft [role='button'],
-.minecraft a[class*='rounded'] {
-  border: 2px solid !important;
-  border-color: #ffffff80 #37373780 #37373780 #ffffff80 !important;
-  border-radius: 0 !important;
-}
-.minecraft button:hover,
-.minecraft [role='button']:hover {
-  background-color: rgba(170, 170, 221, 0.15) !important;
-  border-color: #ffffffe0 #6666aa80 #6666aa80 #ffffffe0 !important;
-}
-.minecraft button:active,
-.minecraft [role='button']:active {
-  border-color: #37373780 #ffffff80 #ffffff80 #37373780 !important;
-}
-
-/* Force square corners on everything */
-.minecraft [class*='rounded'] {
-  border-radius: 0 !important;
-}
-
-/* Pixelated rendering for images */
-.minecraft img {
-  image-rendering: pixelated;
-}
-
-/* Minecraft header grass-block top accent */
-.minecraft header {
-  border-bottom: 3px solid transparent !important;
-  border-image: linear-gradient(to right, #7fb238, #5d9b47, #7fb238, #526935, #7fb238) 1 !important;
-}
-
-/* Sunken slot effect on cards */
-.minecraft .border-border {
-  border: 2px solid;
-  border-color: #373737 #ffffff40 #ffffff40 #373737;
-}
-
-/* Input fields — sunken slot style */
-.minecraft input,
-.minecraft select,
-.minecraft textarea {
-  border: 2px solid !important;
-  border-color: #373737 #c6c6c680 #c6c6c680 #373737 !important;
-  border-radius: 0 !important;
-  background-color: rgba(0, 0, 0, 0.3) !important;
+.minecraft .circuit-bg,
+.csgo .circuit-bg,
+.csgo .autumn-leaves,
+.gta .circuit-bg,
+.gta .autumn-leaves {
+  display: none;
 }
 
 /* Shiki code blocks: reuse dark theme in minecraft mode */
@@ -852,14 +492,11 @@ html[data-inferencex-embed] [data-testid='gta-theme-banner'] {
 .csgo .shiki,
 .csgo .shiki span,
 .gta .shiki,
-.gta .shiki span {
+.gta .shiki span,
+.kart .shiki,
+.kart .shiki span {
   color: var(--shiki-dark);
   background-color: var(--shiki-dark-bg);
-}
-
-/* Hide circuit background in minecraft mode */
-.minecraft .circuit-bg {
-  display: none;
 }
 
 /* Embed routes (/embed/model/[slug]) render one chart inside a third-party
@@ -939,58 +576,6 @@ html[data-inferencex-skin='vllm'] [data-slot='card'] {
   backdrop-filter: none;
 }
 
-/* Ender-dragon fly-across — one-shot animation on minecraft theme activation,
- * triggered from minecraft-decorations.tsx. Plays once (iteration-count: 1)
- * and lands the dragon off-screen left so the GIF stops being rendered. The
- * dragon hovers in the center between 35% and 60% (4.2s–7.2s of the 12s
- * total) so the canonical 3s growl SFX from minecraft-decorations.tsx lines
- * up with a deliberate mid-screen pause rather than a moving target. */
-@keyframes mc-dragon-flyacross {
-  0% {
-    transform: translate(110vw, 0) scale(1);
-    opacity: 0;
-  }
-  8% {
-    opacity: 0.95;
-  }
-  35% {
-    transform: translate(40vw, -2vh) scale(1.05);
-  }
-  60% {
-    transform: translate(40vw, -2vh) scale(1.05);
-  }
-  92% {
-    opacity: 0.95;
-  }
-  100% {
-    transform: translate(-130vw, 1vh) scale(1);
-    opacity: 0;
-  }
-}
-
-.mc-dragon-flyacross {
-  animation: mc-dragon-flyacross 12s cubic-bezier(0.4, 0, 0.6, 1) 1 forwards;
-  will-change: transform, opacity;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .mc-dragon-flyacross {
-    animation: none;
-    display: none;
-  }
-}
-
-/* Splash text — yellow bouncing rotated text (Minecraft title screen style) */
-@keyframes splash-bounce {
-  0%,
-  100% {
-    transform: translate(2rem, 2.25rem) rotate(10deg) scale(1);
-  }
-  50% {
-    transform: translate(2rem, 2.25rem) rotate(10deg) scale(1.1);
-  }
-}
-
 .splash-wrapper {
   display: none;
   position: absolute;
@@ -1018,12 +603,8 @@ html[data-inferencex-skin='vllm'] [data-slot='card'] {
   /* The keyframes re-declare this; keeping it on the element means the splash
      still sits where it belongs when the animation is off (reduced motion). */
   transform: translate(2rem, 2.25rem) rotate(10deg);
-  animation: splash-bounce 1.5s ease-in-out infinite;
   transform-origin: center;
-  /* Always use Minecraft font & style regardless of active theme */
-  font-family: var(--font-minecraft, 'Monocraft', monospace) !important;
-  -webkit-font-smoothing: none;
-  -moz-osx-font-smoothing: unset;
+  font-family: inherit;
 }
 
 /* Dark backgrounds need no outline — this is the original title-screen look. */
@@ -1035,7 +616,8 @@ html[data-inferencex-skin='vllm'] [data-slot='card'] {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .splash-text {
+  .splash-text,
+  .minecraft .splash-text {
     animation: none;
   }
 }

@@ -34,7 +34,7 @@ contrast branch.
 ## CS:GO implementation
 
 `src/lib/themes.ts` centralizes picker order
-(`light, dark, minecraft, csgo, gta`), dark-background classification, and the
+(`light, dark, minecraft, csgo, gta, kart`), dark-background classification, and the
 chart-palette alias used by CS:GO and GTA. CS:GO retains the
 existing sans-serif font for chart legibility and preserves the dark theme's
 vendor, high-contrast, and overlay palettes. It does not recolor hardware
@@ -80,6 +80,16 @@ the maintainer-reported Rockstar font agreement are recorded in
 and the separately reported permission are recorded in
 `packages/app/public/decorative/gta/README.md`. These assets are not covered
 by the repository's code license.
+
+## Mario Kart implementation
+
+Mario Kart adds a flag option to the same picker, dark chart-palette aliasing,
+local responsive Luigi Circuit artwork, and an opt-in 3D race dialog. The
+track and kart bundle loads only after the launcher is pressed. See
+[Mario Kart theme and race](./mario-kart.md) for controls, lifecycle, verification,
+and the presentation-only API exclusion. Asset provenance and the
+maintainer-reported Nintendo permission are recorded in
+`packages/app/public/decorative/kart/README.md`.
 
 ## Picker accessibility
 
