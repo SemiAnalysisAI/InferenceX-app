@@ -477,7 +477,7 @@ const GpuMetricsChart = React.memo(
               ${rolling ? `<div class="text-muted-foreground">${t.rollingSuffix(display.windowS)}</div>` : ''}
               ${
                 d.raw
-                  ? `<div class="text-muted-foreground">${t.power}${sep} ${d.raw.power.toFixed(1)} W</div>${
+                  ? `${d.raw.power === undefined ? '' : `<div class="text-muted-foreground">${t.power}${sep} ${d.raw.power.toFixed(1)} W</div>`}${
                       d.raw.temperature === undefined
                         ? ''
                         : `<div class="text-muted-foreground">${t.temp}${sep} ${d.raw.temperature}\u00B0C</div>`

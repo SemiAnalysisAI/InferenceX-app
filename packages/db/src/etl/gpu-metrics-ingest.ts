@@ -19,6 +19,7 @@ import {
   computeStoredGpuMetricStats,
   type StoredGpuMetricSample,
 } from '../lib/gpu-metric-stats.js';
+import { isRetiredStoredSeries } from '../lib/legacy-amd-smi-policy.js';
 
 export { statMetricColumn } from '../lib/gpu-metric-stats.js';
 
@@ -415,8 +416,27 @@ export async function ingestGpuMetricsArtifact(
   },
 ): Promise<GpuMetricsIngestResult> {
   const prepared = prepareGpuMetricsArtifact(input.artifact);
+  const [sourceRun] = await sql<
+    { github_run_id: number | string; run_attempt: number; head_sha: string | null }[]
+  >`
+    select github_run_id, run_attempt, head_sha from workflow_runs where id = ${input.workflowRunId}
+  `;
+  if (!sourceRun) throw new Error(`Unknown workflow run ${input.workflowRunId}`);
+  const source = {
+    githubRunId: Number(sourceRun.github_run_id),
+    runAttempt: sourceRun.run_attempt,
+    headSha: sourceRun.head_sha,
+  };
   const result: GpuMetricsIngestResult = { seriesIds: [], samplesInserted: 0, seriesSkipped: 0 };
-  for (const series of prepared) {
+  for (const parsed of prepared) {
+    const series = isRetiredStoredSeries(source, parsed.vendor, parsed.csvSha256)
+      ? {
+          ...parsed,
+          samples: parsed.samples.map((sample) => ({ ...sample, powerW: null })),
+          stats: parsed.stats.filter((stat) => stat.metric !== 'powerW'),
+          sidecars: { ...parsed.sidecars, legacyAmdSmiPowerRetired: true },
+        }
+      : parsed;
     const upserted = await upsertGpuMetricSeries(sql, {
       workflowRunId: input.workflowRunId,
       artifactName: input.artifact.artifactName,

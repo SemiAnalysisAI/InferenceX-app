@@ -257,7 +257,7 @@ const benchmarkMetricsSchema: ApiSchema = {
   type: 'object',
   additionalProperties: numberSchema,
   description:
-    'Scalar metric map. Time metrics, including p99_itl and p99_tpot, are in seconds. p99_itl measures inter-token latency; p99_tpot measures per-request time per output token. Use the actual p99_itl field for an inter-token latency requirement, not the reciprocal of p99_intvty. Throughput metrics use tokens per second per GPU unless their name states otherwise; output_tput_per_gpu counts output tokens. Keys evolve independently; measured power / energy / GPU-telemetry keys are typed below.',
+    'Scalar metric map. Time metrics, including p99_itl and p99_tpot, are in seconds. p99_itl measures inter-token latency; p99_tpot measures per-request time per output token. Use the actual p99_itl field for an inter-token latency requirement, not the reciprocal of p99_intvty. Throughput metrics use tokens per second per GPU unless their name states otherwise; output_tput_per_gpu counts output tokens. Keys evolve independently; measured power / energy / GPU-telemetry keys are typed below. A source-policy retirement can omit GPU W/J while preserving performance, nonpower telemetry, audit fields, and a prior power_valid verdict; missing GPU W/J is not zero.',
   properties: Object.fromEntries(
     POWER_METRIC_KEYS.map((key): [string, ApiSchema] => [
       key,
@@ -312,7 +312,7 @@ const workerPowerSchema = objectSchemaWithOptional(
     avg_util_pct: numberSchema,
     avg_mem_used_mb: numberSchema,
   },
-  ['hosts', 'avg_temp_c', 'peak_temp_c', 'avg_util_pct', 'avg_mem_used_mb'],
+  ['hosts', 'avg_power_w', 'avg_temp_c', 'peak_temp_c', 'avg_util_pct', 'avg_mem_used_mb'],
 );
 
 const benchmarkRowSchema = objectSchemaWithOptional(
@@ -1089,8 +1089,8 @@ export const apiOperations: readonly ApiOperation[] = [
         'query',
         false,
         'enum',
-        'Only strictV2 is accepted. It keeps rows whose metrics.power_valid is the number 1 and metrics.power_metric_schema_version is the number 2 (whole-deployment energy semantics). Omit this parameter to apply no power filter, preserving throughput and latency results even when power is missing or invalid. Other values, including an empty value, yield 400 Unknown powerValid filter. Cannot be combined with view=calculator.',
-        '仅接受 strictV2：保留 metrics.power_valid 为数字 1、且 metrics.power_metric_schema_version 为数字 2 的数据行，其能耗指标采用整个部署的统计口径。省略此参数则不按功率筛选，即使功率缺失或无效，也会保留吞吐量和延迟结果。其他取值（包括空值）返回 400 Unknown powerValid filter。不能与 view=calculator 组合使用。',
+        'Only strictV2 is accepted. It keeps rows whose metrics.power_valid is the number 1 and metrics.power_metric_schema_version is the number 2 (whole-deployment energy semantics). A validated verdict does not guarantee GPU W/J after source-policy retirement; inspect finite fields before counting measurements. Omit this parameter to apply no power filter, preserving throughput and latency results even when power is missing or invalid. Other values, including an empty value, yield 400 Unknown powerValid filter. Cannot be combined with view=calculator.',
+        '仅接受 strictV2：保留 metrics.power_valid 为数字 1、且 metrics.power_metric_schema_version 为数字 2 的数据行，其能耗指标采用整个部署的统计口径。来源策略清理 GPU 功率和能耗后，即使验证结论通过，也不保证仍有 GPU W/J；统计实测值前须检查字段是否为有限数值。省略此参数则不按功率筛选，即使功率缺失或无效，也会保留吞吐量和延迟结果。其他取值（包括空值）返回 400 Unknown powerValid filter。不能与 view=calculator 组合使用。',
         { type: 'string', enum: POWER_VALIDITY_FILTERS },
         'strictV2',
       ),

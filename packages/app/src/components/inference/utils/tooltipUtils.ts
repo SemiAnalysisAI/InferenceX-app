@@ -338,8 +338,8 @@ const generateWorkerPowerHTML = (d: InferenceData, isPinned: boolean, locale: Lo
     const parts = [
       `<strong>${escapeHtml(w.role)}[${w.worker_idx}]</strong>`,
       `${w.num_gpus} ${t.chips}`,
-      `${fmt(w.avg_power_w)} W`,
     ];
+    if (typeof w.avg_power_w === 'number') parts.push(`${fmt(w.avg_power_w)} W`);
     if (typeof w.avg_temp_c === 'number') {
       parts.push(
         typeof w.peak_temp_c === 'number'

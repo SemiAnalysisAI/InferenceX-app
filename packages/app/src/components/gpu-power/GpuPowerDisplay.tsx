@@ -216,7 +216,7 @@ export default function GpuMetricsDisplay() {
     ALL_METRIC_OPTIONS.some((metric) => metric.key === selectedMetricCandidate) &&
     availableMetrics.some((metric) => metric.key === selectedMetricCandidate)
       ? (selectedMetricCandidate as GpuMetricKey)
-      : 'power';
+      : (availableMetrics[0]?.key ?? 'power');
 
   const [gpuSelection, setGpuSelection] = useState<{
     scopeKey: string;
@@ -284,7 +284,9 @@ export default function GpuMetricsDisplay() {
         searchKey,
         runId: requestedRunId ?? '',
         artifact: name,
-        metric: metrics.some((metric) => metric.key === selectedMetric) ? selectedMetric : 'power',
+        metric: metrics.some((metric) => metric.key === selectedMetric)
+          ? selectedMetric
+          : (metrics[0]?.key ?? 'power'),
       });
     },
     [artifacts, requestedRunId, searchKey, selectedMetric],

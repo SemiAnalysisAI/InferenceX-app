@@ -182,9 +182,7 @@ function assertStoredArtifactsRecovered(
         new Set(
           file.data.flatMap((row) => {
             const time = parseTelemetryTimestampUtc(row.timestamp);
-            return time === null || !Number.isInteger(row.index) || !Number.isFinite(row.power)
-              ? []
-              : [`${row.index}:${time}`];
+            return time === null || !Number.isInteger(row.index) ? [] : [`${row.index}:${time}`];
           }),
         ).size,
       ]),

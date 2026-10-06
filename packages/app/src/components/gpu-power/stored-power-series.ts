@@ -116,7 +116,8 @@ function storedBundle(artifact: string, series: readonly GpuMetricSeries[]): Gpu
           artifact,
           `device identity is missing for ${entry.fileName} GPU ${row.index}`,
         );
-      samples.push({ deviceId, time: Date.parse(row.timestamp) / 1000, power: row.power });
+      if (typeof row.power === 'number')
+        samples.push({ deviceId, time: Date.parse(row.timestamp) / 1000, power: row.power });
     }
   }
   const manifest = series.find((entry) => isRecord(entry.sidecars.context))?.sidecars.context;

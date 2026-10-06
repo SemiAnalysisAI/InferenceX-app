@@ -626,7 +626,7 @@ async function main(): Promise<void> {
           continue;
         }
         const plan = planBenchmarkPoint(
-          { githubRunId: runIdNum, runAttempt: runAttemptNum },
+          { githubRunId: runIdNum, runAttempt: runAttemptNum, headSha: workflowGhInfo?.headSha },
           { ...row, configId },
           seenPointIdentities,
         );

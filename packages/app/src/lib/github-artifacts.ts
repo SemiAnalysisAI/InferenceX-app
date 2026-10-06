@@ -128,12 +128,15 @@ export function downloadGithubArtifact(url: string, token: string): Promise<Resp
 export function readZipEntries(
   buffer: Buffer,
   predicate: (entryName: string) => boolean,
+  excludeEntry?: (entryName: string, raw: Buffer) => boolean,
 ): Map<string, string> {
   const zip = new AdmZip(buffer);
   const files = new Map<string, string>();
   for (const entry of zip.getEntries()) {
     if (entry.isDirectory || !predicate(entry.entryName)) continue;
-    files.set(entry.entryName, entry.getData().toString('utf8'));
+    const raw = entry.getData();
+    if (excludeEntry?.(entry.entryName, raw)) continue;
+    files.set(entry.entryName, raw.toString('utf8'));
   }
   return files;
 }
@@ -141,7 +144,7 @@ export function readZipEntries(
 export function extractZipEntries<T>(
   buffer: Buffer,
   extension: string,
-  parseEntry: (entryName: string, contents: string) => T[],
+  parseEntry: (entryName: string, contents: string, raw: Buffer) => T[],
   onParseError?: (entryName: string, error: unknown) => void,
 ): T[] {
   // Preserve partial-success behavior: malformed matching files are skipped after optional reporting.
@@ -154,7 +157,8 @@ export function extractZipEntries<T>(
     }
 
     try {
-      rows.push(...parseEntry(entry.entryName, entry.getData().toString('utf8')));
+      const raw = entry.getData();
+      rows.push(...parseEntry(entry.entryName, raw.toString('utf8'), raw));
     } catch (error) {
       onParseError?.(entry.entryName, error);
     }

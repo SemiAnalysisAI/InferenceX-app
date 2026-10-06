@@ -622,12 +622,17 @@ async function main(): Promise<void> {
       localUnmappedHws: [...result.localUnmappedHws],
     };
 
+    const sourceHeadSha =
+      result.headSha && result.ghInfo?.headSha && result.headSha !== result.ghInfo.headSha
+        ? undefined
+        : (result.headSha ?? result.ghInfo?.headSha);
+
     const workflowRunId = await getOrCreateWorkflowRun({
       githubRunId: result.githubRunId,
       name: result.runName,
       date: result.dateDir,
       headBranch: result.headBranch,
-      headSha: result.headSha,
+      headSha: sourceHeadSha,
       createdAt: result.createdAt,
       appendOnly: hasAppendOnlyFlag(result.changelogs),
       ghInfo: result.ghInfo,
@@ -647,7 +652,11 @@ async function main(): Promise<void> {
           continue;
         }
         const plan = planBenchmarkPoint(
-          { githubRunId: result.githubRunId, runAttempt: result.ghInfo?.runAttempt },
+          {
+            githubRunId: result.githubRunId,
+            runAttempt: result.ghInfo?.runAttempt,
+            headSha: sourceHeadSha,
+          },
           { ...row, configId },
           seenPointIdentities,
         );

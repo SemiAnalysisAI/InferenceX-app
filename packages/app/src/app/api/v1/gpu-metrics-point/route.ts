@@ -12,7 +12,7 @@ import { idQueryRoute } from '../id-routes';
 
 export const dynamic = 'force-dynamic';
 
-export const CACHE_KEY_PREFIX = 'gpu-metrics-point-v2';
+export const CACHE_KEY_PREFIX = 'gpu-metrics-point-v3';
 
 const getCachedGpuMetricsForPoint = cachedQuery(
   (id: number, _revision: string): Promise<GpuMetricsPointPayload | null> =>

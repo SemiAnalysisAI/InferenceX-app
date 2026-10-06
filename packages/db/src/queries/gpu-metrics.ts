@@ -15,11 +15,12 @@ import {
 } from '../lib/gpu-metric-stats';
 
 import type { DbClient } from '../connection.js';
+import { isRetiredStoredSeries } from '../lib/legacy-amd-smi-policy';
 
 export interface GpuMetricSampleRow {
   timestamp: string;
   index: number;
-  power: number;
+  power?: number;
   /**
    * Absent when the collector did not sample the metric (the multinode DCGM
    * power bundle scrapes power only), so readers can tell "not collected"
@@ -59,6 +60,7 @@ export interface GpuMetricSeries {
   configKey: string;
   fileName: string;
   vendor: string;
+  csvSha256?: string;
   sampleIntervalS: number | null;
   sampleCount: number;
   gpuCount: number;
@@ -121,6 +123,10 @@ interface RawSeriesRow {
   csv_sha256: string;
   ingested_at: string | Date;
   stats_version: number;
+  source_run_id?: number | string;
+  source_attempt?: number;
+  source_head_sha?: string | null;
+  retire_power?: boolean;
 }
 
 /** The columns `upsertGpuMetricSeries` rewrites whenever it replaces a series. */
@@ -225,6 +231,9 @@ async function loadSeriesDetails(
 ): Promise<GpuMetricSeries[]> {
   if (seriesRows.length === 0) return [];
   const ids = seriesRows.map((row) => Number(row.id));
+  const retiredPowerIds = new Set(
+    seriesRows.filter((row) => row.retire_power).map((row) => Number(row.id)),
+  );
 
   const statRows = (await sql`
     select series_id, gpu_index, metric, sample_count, min_value, max_value, mean_value,
@@ -288,6 +297,7 @@ async function loadSeriesDetails(
   for (const raw of statRows) {
     const key = Number(raw.series_id);
     const bucket = statsBySeries.get(key);
+    if (retiredPowerIds.has(key) && raw.metric === 'power_w') continue;
     if (bucket) bucket.push(toStatRow(raw));
     else statsBySeries.set(key, [toStatRow(raw)]);
   }
@@ -316,18 +326,22 @@ async function loadSeriesDetails(
     }
     statsBySeries.set(
       id,
-      computeStoredGpuMetricStats(samples).map((stat) => ({
-        ...stat,
-        metric: statMetricColumn(stat.metric),
-      })),
+      computeStoredGpuMetricStats(samples)
+        .filter((stat) => !(row.retire_power && stat.metric === 'powerW'))
+        .map((stat) => ({
+          ...stat,
+          metric: statMetricColumn(stat.metric),
+        })),
     );
   }
   const samplesBySeries = new Map<number, GpuMetricSampleRow[]>();
   for (const raw of sampleRows) {
     const key = Number(raw.series_id);
     const bucket = samplesBySeries.get(key);
-    if (bucket) bucket.push(toSampleRow(raw));
-    else samplesBySeries.set(key, [toSampleRow(raw)]);
+    const sample = toSampleRow(raw);
+    if (retiredPowerIds.has(key)) delete sample.power;
+    if (bucket) bucket.push(sample);
+    else samplesBySeries.set(key, [sample]);
   }
 
   return seriesRows.map((row) => {
@@ -338,6 +352,7 @@ async function loadSeriesDetails(
       configKey: row.config_key,
       fileName: row.file_name,
       vendor: row.vendor,
+      csvSha256: row.csv_sha256,
       sampleIntervalS: row.sample_interval_s,
       sampleCount: Number(row.sample_count),
       gpuCount: Number(row.gpu_count),
@@ -451,6 +466,19 @@ async function readGpuMetricsForRun(
   `) as unknown as RawSeriesRow[];
   if (seriesRows.length === 0 && artifactNames === undefined) return null;
 
+  const selectedSeriesRows = seriesRows.map((row) => ({
+    ...row,
+    retire_power: isRetiredStoredSeries(
+      {
+        githubRunId: Number(run.github_run_id),
+        runAttempt: Number(run.run_attempt),
+        headSha: run.head_sha,
+      },
+      row.vendor,
+      row.csv_sha256,
+    ),
+  }));
+
   return {
     workflowRun: {
       id: Number(run.id),
@@ -465,7 +493,7 @@ async function readGpuMetricsForRun(
       status: run.status,
       createdAt: run.created_at ? isoString(run.created_at) : null,
     },
-    series: await loadSeriesDetails(sql, seriesRows),
+    series: await loadSeriesDetails(sql, selectedSeriesRows),
     ...(artifactNames === undefined ? {} : { artifactNames }),
   };
 }
@@ -490,7 +518,8 @@ async function readGpuMetricsForPoint(
   const seriesRows = (await sql`
     select s.id, s.workflow_run_id, s.artifact_name, s.config_key, s.file_name, s.vendor,
       s.sample_interval_s, s.sample_count, s.gpu_count, s.started_at, s.ended_at, s.sidecars,
-      s.csv_sha256, s.ingested_at,
+      s.csv_sha256, s.ingested_at, wr.github_run_id as source_run_id,
+      wr.run_attempt as source_attempt, wr.head_sha as source_head_sha,
       coalesce((to_jsonb(s)->>'stats_version')::integer, 0) as stats_version,
       (
         select array_agg(l.benchmark_result_id order by l.benchmark_result_id)
@@ -504,12 +533,25 @@ async function readGpuMetricsForPoint(
       ) as power_audits
     from benchmark_result_gpu_metrics link
     join gpu_metric_series s on s.id = link.series_id
+    join workflow_runs wr on wr.id = s.workflow_run_id
     where link.benchmark_result_id = ${benchmarkResultId}
     order by s.artifact_name, s.file_name
   `) as unknown as RawSeriesRow[];
-  if (seriesRows.length === 0) return null;
+  const selectedSeriesRows = seriesRows.map((row) => ({
+    ...row,
+    retire_power: isRetiredStoredSeries(
+      {
+        githubRunId: Number(row.source_run_id),
+        runAttempt: row.source_attempt,
+        headSha: row.source_head_sha,
+      },
+      row.vendor,
+      row.csv_sha256,
+    ),
+  }));
+  if (selectedSeriesRows.length === 0) return null;
   return {
     benchmarkResultId,
-    series: await loadSeriesDetails(sql, seriesRows),
+    series: await loadSeriesDetails(sql, selectedSeriesRows),
   };
 }

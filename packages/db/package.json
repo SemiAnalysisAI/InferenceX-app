@@ -23,6 +23,7 @@
     "db:migrate": "bun --env-file=../../.env src/migrate.ts",
     "db:migrate:collectivex": "bun --env-file=../../.env src/migrate-collectivex.ts",
     "db:apply-overrides": "bun --env-file=../../.env src/apply-overrides.ts",
+    "db:retire-legacy-amd-smi-power": "bun src/retire-legacy-amd-smi-power.ts",
     "db:backfill-aggregate-stats": "bun --env-file=../../.env src/backfill-aggregate-stats.ts",
     "db:backfill-atom-kv-capacity": "bun --env-file=../../.env src/backfill-atom-kv-capacity.ts",
     "db:backfill-chart-series": "bun --env-file=../../.env src/backfill-chart-series.ts",

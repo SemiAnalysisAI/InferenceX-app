@@ -34,6 +34,7 @@
 import { type ConfigParams, configCacheKey } from './config-cache';
 import { QWEN35_P90_POWER_BACKFILLS } from './power-p90-backfills';
 import { matchesExpectedBackfillMetrics } from '../lib/benchmark-point-backfill';
+import { withoutRetiredGpuPower } from '../lib/legacy-amd-smi-policy';
 
 export const CONCLUSION_OVERRIDES: ReadonlyMap<number, string> = new Map([
   [22806827144, 'success'], // 2026-03-07 | dsr1 fp8 h200 SGLang 0.5.7→0.5.9 bump | Reason: database upload step failed
@@ -1318,14 +1319,18 @@ export type BenchmarkPointPlan<T extends BackfillablePoint> =
  * Callers log and persist; this owner only decides.
  */
 export function planBenchmarkPoint<T extends BackfillablePoint>(
-  run: { githubRunId: number; runAttempt: number | null | undefined },
+  run: { githubRunId: number; runAttempt: number | null | undefined; headSha?: string | null },
   point: T,
   seen: Map<string, string>,
 ): BenchmarkPointPlan<T> {
   if (isBenchmarkPointPurged(run.githubRunId, run.runAttempt, point)) return { kind: 'purged' };
   const applied = applyBenchmarkPointBackfill(run.githubRunId, run.runAttempt, point);
   recordBackfilledPointIdentity(seen, applied.sourceIdentity, applied.desiredIdentity);
-  return { kind: 'planned', point: applied.point, backfillId: applied.backfillId };
+  return {
+    kind: 'planned',
+    point: withoutRetiredGpuPower(run, applied.point, true),
+    backfillId: applied.backfillId,
+  };
 }
 
 /**

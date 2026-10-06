@@ -367,6 +367,17 @@ describe('published API documentation invariants', () => {
     expect(runSummary?.kv_cases).toMatchObject({ type: 'object' });
   });
 
+  it('allows source-retired worker watts while retaining worker telemetry', () => {
+    const benchmarks = apiOperations.find((operation) => operation.id === 'list-benchmarks');
+    const workers = benchmarks?.responses.find((response) => response.status === '200')?.schema
+      .items?.properties?.workers?.items;
+    expect(workers?.properties).toMatchObject({
+      avg_power_w: { type: 'number' },
+      avg_temp_c: { type: 'number' },
+    });
+    expect(workers?.required).not.toContain('avg_power_w');
+  });
+
   it('uses canonical shared-route error examples', () => {
     const bulkIds = [
       'get-agentic-aggregates',

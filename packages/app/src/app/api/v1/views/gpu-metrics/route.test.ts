@@ -89,6 +89,26 @@ beforeEach(() => {
 });
 
 describe('GET /api/v1/views/gpu-metrics full-record statistics', () => {
+  it('keeps nonpower readings and defaults to an available metric after source retirement', async () => {
+    const retained = rows.map(({ power: _power, ...row }) => row);
+    source([{ ...artifact([]), data: retained }]);
+
+    const response = await GET(request());
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.params.metric).toBe('temperature');
+    expect(body.availableMetrics.map((metric: { key: string }) => metric.key)).toEqual([
+      'temperature',
+    ]);
+    expect(body.rows).toEqual(retained);
+
+    const explicitPower = await GET(request('&metric=power'));
+    expect(explicitPower.status).toBe(200);
+    const powerBody = await explicitPower.json();
+    expect(powerBody.stats).toEqual([]);
+    expect(powerBody.rows).toEqual(retained);
+  });
+
   it('returns the stored digest even when raw rows would produce different statistics', async () => {
     const response = await GET(request());
     expect(response.status).toBe(200);

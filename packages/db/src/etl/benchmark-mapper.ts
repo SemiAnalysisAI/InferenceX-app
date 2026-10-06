@@ -129,7 +129,8 @@ export interface WorkerPower {
   worker_idx: number;
   hosts?: string[];
   num_gpus: number;
-  avg_power_w: number;
+  /** Absent when a source-policy retirement keeps this worker's nonpower telemetry. */
+  avg_power_w?: number;
   avg_temp_c?: number;
   peak_temp_c?: number;
   avg_util_pct?: number;
