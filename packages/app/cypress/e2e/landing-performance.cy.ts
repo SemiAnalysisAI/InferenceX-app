@@ -119,7 +119,13 @@ describe('Landing page performance', () => {
         false,
       );
       expect(resourceNames.some((name) => name.includes('/minecraft-click.mp3'))).to.eq(false);
-      expect(resourceNames.some((name) => name.includes('/Monocraft-'))).to.eq(false);
+      // Chrome can replay a cached font timing from an earlier desktop page
+      // without using that font here. Check the current document's font state.
+      const monocraft = [...win.document.fonts].filter((font) => font.family === 'monocraft');
+      expect(
+        monocraft.map((font) => font.status),
+        'mobile Monocraft state',
+      ).to.deep.eq(['unloaded']);
       // The landing AgentX ledger has five lazy model marks. A mobile viewport may
       // fetch any visible subset, but the text-only supporter strip must not pull
       // in its former logo set.
@@ -197,6 +203,11 @@ describe('Landing page performance', () => {
     cy.window().should((win) => {
       const resourceNames = win.performance.getEntriesByType('resource').map((entry) => entry.name);
       expect(resourceNames.some((name) => name.includes('/minecraft-click.mp3'))).to.eq(true);
+      const monocraft = [...win.document.fonts].filter((font) => font.family === 'monocraft');
+      expect(
+        monocraft.map((font) => font.status),
+        'active Minecraft font state',
+      ).to.deep.eq(['loaded']);
     });
   });
 });
