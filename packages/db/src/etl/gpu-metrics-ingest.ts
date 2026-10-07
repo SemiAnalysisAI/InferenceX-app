@@ -4,7 +4,7 @@
  *
  * Idempotency: a series is identified by (workflow run, artifact name, CSV
  * path). Re-ingesting an identical CSV, sidecars and sample count only refreshes
- * the point links; a source change replaces the samples atomically.
+ * the point links; a source change, or `replace`, replaces the samples atomically.
  */
 
 import fs from 'node:fs';
@@ -217,7 +217,7 @@ async function insertSampleBatch(
 /**
  * Upsert one prepared series and link it to `benchmarkResultIds`. Returns the
  * series id and how many sample rows were written (0 when the CSV, sidecars,
- * and unique sample count are unchanged).
+ * and unique sample count are unchanged and `replace` is not set).
  */
 export function upsertGpuMetricSeries(
   sql: Sql,
@@ -226,15 +226,17 @@ export function upsertGpuMetricSeries(
     artifactName: string;
     series: PreparedGpuMetricSeries;
     benchmarkResultIds: readonly number[];
+    /** Rewrite unchanged series too: a parser fix alters values, not the source. */
+    replace?: boolean;
   },
 ): Promise<{
   seriesId: number;
   samplesInserted: number;
   replaced: boolean;
 }> {
-  const { workflowRunId, artifactName, series, benchmarkResultIds } = input;
+  const { workflowRunId, artifactName, series, benchmarkResultIds, replace = false } = input;
   const configKey = gpuMetricsArtifactSuffix(artifactName) ?? artifactName;
-  const sidecarsJson = JSON.stringify(series.sidecars);
+  const sidecars = sql.json(series.sidecars as unknown as postgres.JSONValue);
 
   return sql.begin(async (tx) => {
     const existing = await tx<
@@ -245,7 +247,7 @@ export function upsertGpuMetricSeries(
         sidecars_match: boolean;
       }[]
     >`
-      select id, csv_sha256, sample_count, sidecars = ${sidecarsJson}::jsonb as sidecars_match
+      select id, csv_sha256, sample_count, sidecars = ${sidecars} as sidecars_match
       from gpu_metric_series
       where workflow_run_id = ${workflowRunId}
         and artifact_name = ${artifactName}
@@ -260,6 +262,7 @@ export function upsertGpuMetricSeries(
       seriesId = Number(existing[0]!.id);
       // A parser or deduplication change can alter the count of an unchanged CSV.
       if (
+        !replace &&
         existing[0]!.csv_sha256 === series.csvSha256 &&
         existing[0]!.sidecars_match &&
         existing[0]!.sample_count === series.samples.length
@@ -277,7 +280,7 @@ export function upsertGpuMetricSeries(
             gpu_count = ${series.gpuCount},
             started_at = to_timestamp(${series.startedAtMs / 1000}::double precision),
             ended_at = to_timestamp(${series.endedAtMs / 1000}::double precision),
-            sidecars = ${sidecarsJson}::jsonb,
+            sidecars = ${sidecars},
             ingested_at = now()
           where id = ${seriesId}
         `;
@@ -293,7 +296,7 @@ export function upsertGpuMetricSeries(
           ${series.samples.length}, ${series.gpuCount},
           to_timestamp(${series.startedAtMs / 1000}::double precision),
           to_timestamp(${series.endedAtMs / 1000}::double precision),
-          ${sidecarsJson}::jsonb
+          ${sidecars}
         )
         returning id
       `;
@@ -334,6 +337,7 @@ export async function ingestGpuMetricsArtifact(
     workflowRunId: number;
     artifact: GpuMetricsArtifact;
     benchmarkResultIds: readonly number[];
+    replace?: boolean;
   },
 ): Promise<GpuMetricsIngestResult> {
   const prepared = prepareGpuMetricsArtifact(input.artifact);
@@ -344,6 +348,7 @@ export async function ingestGpuMetricsArtifact(
       artifactName: input.artifact.artifactName,
       series,
       benchmarkResultIds: input.benchmarkResultIds,
+      replace: input.replace,
     });
     result.seriesIds.push(upserted.seriesId);
     result.samplesInserted += upserted.samplesInserted;

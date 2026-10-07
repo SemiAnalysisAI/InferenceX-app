@@ -35,16 +35,21 @@ bun run admin:db:backfill-gpu-metrics --run RUN_ID --attempt ATTEMPT \
   --artifact EXACT_ARTIFACT_NAME --receipt /path/power-publication.json --yes
 ```
 
-When the repair fills a missing AgentX `power_audit`, the merged receipt's point
-expects the recovered value. After an interruption, rerun the same command.
+The backfill writes a receipt only with `--receipt`, which requires `--run`; a missing
+file starts a new receipt. Root scripts run in `packages/db`, so give receipt paths as
+absolute paths. When the repair fills a missing AgentX `power_audit`, the merged
+receipt's point expects the recovered value. After an interruption, rerun the same
+command.
 
-Unchanged inputs are no-ops. GitHub backfill accepts only the current source attempt.
+Unchanged inputs are no-ops; after a parser fix, add `--force` to replace the stored
+samples. GitHub backfill accepts only the current source attempt.
 Older or expired artifacts require retained original bytes; never substitute another
 attempt's artifacts. For local recovery, set `INGEST_RUN_ID`, `INGEST_RUN_ATTEMPT`,
 `INGEST_REPO=SemiAnalysisAI/InferenceX`, `INGEST_ARTIFACTS_PATH` and
-`POWER_PUBLICATION_MANIFEST`, then run `bun run admin:db:ingest:ci` with the same
-credentials. Inspect `reused-ingest-metadata/reuse_source_run.json` first if present;
-it overrides the run/attempt identity. Apply sidecar corrections to the retained tree.
+`POWER_PUBLICATION_MANIFEST` (the receipt path; without it no receipt is written), then
+run `bun run admin:db:ingest:ci` with the same credentials. Inspect
+`reused-ingest-metadata/reuse_source_run.json` first if present; it overrides the
+run/attempt identity. Apply sidecar corrections to the retained tree.
 
 Both commands refresh `latest_benchmarks`. Then refresh the API cache of the app that
 reads the repaired database, with that app's `INVALIDATE_SECRET` set:

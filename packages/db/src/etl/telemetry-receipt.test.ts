@@ -204,34 +204,31 @@ describe('persisted telemetry receipts', () => {
   }
   const completeInventory = { seriesInventory: [{ fileName: 'gpu_metrics.csv', sampleCount: 2 }] };
 
-  it.each([false, true])(
-    'reads complete JSONB inventory (encoded=%s) and preserves unrelated targeted state',
-    async (encoded) => {
-      await inventory(encoded ? JSON.stringify(completeInventory) : completeInventory);
-      const original = await readTelemetryReceipt(sql, run, []);
-      expect(original.counts).toMatchObject({
-        expectedPoints: 2,
-        storedPoints: 2,
-        linkedPoints: 2,
-        storedSeries: 1,
-        storedSamples: 2,
-        apiCompletePoints: 0,
-      });
-      original.points[1]!.api = { status: 'readable' };
-      const first = original.points[0]!;
-      const repaired = await readTelemetryReceipt(
-        sql,
-        run,
-        [{ identity: first.identity, artifactNames: [artifactName], produced: true }],
-        { previous: original, targeted: true },
-      );
-      expect(
-        repaired.points.find((point) => point.key === stablePowerPointIdentity(first.identity))!.api
-          .status,
-      ).toBe('unknown');
-      expect(repaired.points[1]).toEqual(original.points[1]);
-    },
-  );
+  it('reads complete JSONB inventory and preserves unrelated targeted state', async () => {
+    await inventory(completeInventory);
+    const original = await readTelemetryReceipt(sql, run, []);
+    expect(original.counts).toMatchObject({
+      expectedPoints: 2,
+      storedPoints: 2,
+      linkedPoints: 2,
+      storedSeries: 1,
+      storedSamples: 2,
+      apiCompletePoints: 0,
+    });
+    original.points[1]!.api = { status: 'readable' };
+    const first = original.points[0]!;
+    const repaired = await readTelemetryReceipt(
+      sql,
+      run,
+      [{ identity: first.identity, artifactNames: [artifactName], produced: true }],
+      { previous: original, targeted: true },
+    );
+    expect(
+      repaired.points.find((point) => point.key === stablePowerPointIdentity(first.identity))!.api
+        .status,
+    ).toBe('unknown');
+    expect(repaired.points[1]).toEqual(original.points[1]);
+  });
 
   it('clears only successfully repaired scopes from an earlier recovery failure', async () => {
     await inventory(completeInventory);

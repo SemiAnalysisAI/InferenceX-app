@@ -1161,9 +1161,7 @@ main()
     process.exitCode = 1;
   })
   .finally(async () => {
-    const publicationPath =
-      process.env.POWER_PUBLICATION_MANIFEST ??
-      `power-publication-${runIdNum}-attempt-${runAttemptNum}.json`;
+    const publicationPath = process.env.POWER_PUBLICATION_MANIFEST;
     if (publicationPath) {
       const telemetry = checkTelemetry
         ? await readTelemetryReceipt(

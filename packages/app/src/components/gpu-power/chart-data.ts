@@ -1,19 +1,4 @@
-import type { GpuMetricConfig, GpuMetricKey, GpuMetricRow } from './types';
-
-/**
- * The correlation y-axis to draw. A power-only series (multinode DCGM bundle)
- * has no temperature axis to default to; use the first other collected metric
- * instead of an empty plot.
- */
-export function correlationYMetric(
-  availableMetrics: readonly Pick<GpuMetricConfig, 'key'>[],
-  xMetric: GpuMetricKey,
-  yMetric: GpuMetricKey,
-): GpuMetricKey {
-  return availableMetrics.some((m) => m.key === yMetric)
-    ? yMetric
-    : (availableMetrics.find((m) => m.key !== xMetric)?.key ?? xMetric);
-}
+import type { GpuMetricKey, GpuMetricRow } from './types';
 export interface ParsedPoint {
   seconds: number;
   value: number;

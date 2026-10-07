@@ -115,7 +115,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-gpu-metrics-view',
-    sourceSha256: '8997284dc31762bebce867547d002cc0cbbc9c9a423d56d39cf40690dfef9190',
+    sourceSha256: '07981a86ac72ea968e8f4453049d67f6b48da4d37c816a6d23cf24759373e95a',
   },
   {
     source: 'src/app/api/v1/views/gpu-specs/route.ts',
@@ -834,7 +834,7 @@ export interface ApiContractSourceDigest {
 export const apiContractSourceDigests = [
   {
     source: '../db/src/queries/gpu-metrics.ts',
-    sourceSha256: '80d42a0596c309d6e300e5b45defd98cd415767559634fa9938753aca0ea8b9e',
+    sourceSha256: '8c648b6aa213edb19ef112bed948994eb81ef84d595f561f3d4ae1e2d3c6a76a',
     reviewArea: {
       en: 'Stored PowerX telemetry reads: latest attempt, GPU metrics view artifact selection, point lookups and per-GPU statistics computed from complete stored samples.',
       zh: '数据库 PowerX 遥测读取：最新 attempt、GPU 指标视图的产物选择、单点查询，以及基于完整已存样本计算的每 GPU 统计。',
@@ -884,7 +884,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/components/gpu-power/chart-data.ts',
-    sourceSha256: 'd09474b1973cd38936235815101debea0a533da22104ad325e444c9d7a7556c6',
+    sourceSha256: 'b606a832b21546d78cb7cce2db756f7ac288f4886da3e1c90ea68ff50e5cddeb',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',

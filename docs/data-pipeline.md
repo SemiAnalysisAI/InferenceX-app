@@ -600,7 +600,9 @@ read when a re-ingest committed in between, so one payload never mixes the
 statistics of one version with the samples of another.
 
 `bun run admin:db:backfill-gpu-metrics --all --yes` attaches telemetry for runs
-ingested before this migration. The reachable history is bounded by GitHub's
+ingested before this migration. `--force` also replaces the samples of unchanged series,
+which is how a parser fix reaches stored telemetry; the database keeps only the
+parsed samples, not the CSV. The reachable history is bounded by GitHub's
 90-day artifact retention (the upload step sets no `retention-days`) because the
 GCS backup, which keeps every artifact name, only mirrors `schedule` and `push`
 runs on `main`; PR sweeps and manual dispatches — nearly every telemetry-bearing

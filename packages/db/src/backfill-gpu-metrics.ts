@@ -16,13 +16,15 @@
  *   bun run --cwd packages/db db:backfill-gpu-metrics --all --dry-run
  *   bun run --cwd packages/db db:backfill-gpu-metrics --all --force --limit 20 --yes
  *
- * Runs that already have at least one stored series are skipped unless
- * --force is passed.
+ * --all skips runs that already have a stored series unless --force is passed;
+ * --run selects its run either way. --force also replaces the stored samples of
+ * unchanged series, so a parser fix reaches runs whose artifacts GitHub retains.
  */
 
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { parseArgs } from 'node:util';
 
 import { hasNoSslFlag } from './cli-utils.js';
 import { AsyncSemaphore } from './etl/async-semaphore.js';
@@ -51,7 +53,6 @@ import { retryArtifactOperation } from './lib/artifact-retry.js';
 import {
   confirmProceed,
   listBackfillRunArtifacts,
-  parseLimitForceFlags,
   runBackfillMain,
 } from './lib/backfill-runner.js';
 import {
@@ -84,46 +85,61 @@ interface CandidateRun {
 interface BackfillFlags {
   all: boolean;
   dryRun: boolean;
+  force: boolean;
+  limit: number | null;
   run: number | null;
   attempt: number | null;
   artifact: string | null;
   receipt: string | null;
 }
 
-function positiveIntFlag(flag: string): number | null {
-  const index = process.argv.indexOf(flag);
-  if (index === -1) return null;
-  const raw = process.argv[index + 1];
-  if (!raw || !/^\d+$/u.test(raw) || Number(raw) <= 0) {
+function positiveInt(flag: string, value: string | undefined): number | null {
+  if (value === undefined) return null;
+  if (!/^\d+$/u.test(value) || Number(value) <= 0) {
     throw new Error(`${flag} requires a positive integer`);
   }
-  return Number(raw);
+  return Number(value);
 }
 
-function stringFlag(flag: string): string | null {
-  const index = process.argv.indexOf(flag);
-  if (index === -1) return null;
-  const value = process.argv[index + 1];
-  if (!value || value.startsWith('--')) throw new Error(`${flag} requires a value`);
-  return value;
+function nonEmpty(flag: string, value: string | undefined): string | null {
+  if (value === '') throw new Error(`${flag} requires a value`);
+  return value ?? null;
 }
 
-function parseFlags(): BackfillFlags {
+/**
+ * Strict, so an unknown flag stops the run before any database work instead of
+ * being ignored. `--yes` and `--no-ssl` are read by the shared CLI helpers; they
+ * are declared here only so strict parsing accepts them.
+ */
+function parseFlags(args: string[]): BackfillFlags {
+  const { values } = parseArgs({
+    args,
+    options: {
+      all: { type: 'boolean' },
+      'dry-run': { type: 'boolean' },
+      force: { type: 'boolean' },
+      limit: { type: 'string' },
+      run: { type: 'string' },
+      attempt: { type: 'string' },
+      artifact: { type: 'string' },
+      receipt: { type: 'string' },
+      yes: { type: 'boolean', short: 'y' },
+      'no-ssl': { type: 'boolean' },
+    },
+  });
   return {
-    all: process.argv.includes('--all'),
-    dryRun: process.argv.includes('--dry-run'),
-    run: positiveIntFlag('--run'),
-    attempt: positiveIntFlag('--attempt'),
-    artifact: stringFlag('--artifact'),
-    receipt: stringFlag('--receipt'),
+    all: values.all ?? false,
+    dryRun: values['dry-run'] ?? false,
+    force: values.force ?? false,
+    limit: positiveInt('--limit', values.limit),
+    run: positiveInt('--run', values.run),
+    attempt: positiveInt('--attempt', values.attempt),
+    artifact: nonEmpty('--artifact', values.artifact),
+    receipt: nonEmpty('--receipt', values.receipt),
   };
 }
 
-async function loadCandidateRuns(
-  flags: BackfillFlags,
-  limit: number | null,
-  force: boolean,
-): Promise<CandidateRun[]> {
+async function loadCandidateRuns(flags: BackfillFlags): Promise<CandidateRun[]> {
   const cutoff = new Date(Date.now() - GITHUB_RETENTION_DAYS * 24 * 60 * 60 * 1000)
     .toISOString()
     .slice(0, 10);
@@ -147,8 +163,32 @@ async function loadCandidateRuns(
       github_run_id: Number(row.github_run_id),
       series_count: Number(row.series_count),
     }))
-    .filter((row) => force || flags.run !== null || row.series_count === 0);
-  return limit === null ? candidates : candidates.slice(0, limit);
+    .filter((row) => flags.force || flags.run !== null || row.series_count === 0);
+  return flags.limit === null ? candidates : candidates.slice(0, flags.limit);
+}
+
+function readReceipt(receiptPath: string, run: CandidateRun): PowerPublicationManifest {
+  const runId = run.github_run_id;
+  const manifest: PowerPublicationManifest = fs.existsSync(receiptPath)
+    ? JSON.parse(fs.readFileSync(receiptPath, 'utf8'))
+    : { version: 1, runId, runAttempt: run.run_attempt, points: [] };
+  if (
+    manifest.version !== 1 ||
+    manifest.runId !== runId ||
+    manifest.runAttempt !== run.run_attempt ||
+    !Array.isArray(manifest.points) ||
+    (manifest.telemetry &&
+      (manifest.telemetry.runId !== runId || manifest.telemetry.runAttempt !== run.run_attempt))
+  )
+    throw new Error('Publication receipt run/attempt does not match the recovery target');
+  return manifest;
+}
+
+function writeReceipt(receiptPath: string, manifest: PowerPublicationManifest): void {
+  fs.mkdirSync(path.dirname(path.resolve(receiptPath)), { recursive: true });
+  const temporary = `${receiptPath}.tmp`;
+  fs.writeFileSync(temporary, `${JSON.stringify(manifest, null, 2)}\n`, { flush: true });
+  fs.renameSync(temporary, receiptPath);
 }
 
 /**
@@ -201,6 +241,7 @@ async function processPair(
   observations: Map<string, TelemetryObservation>,
   expectationErrors: NonNullable<TelemetryReceipt['expectationErrors']>,
   uniqueFallbacks: Map<string, number>,
+  replace: boolean,
 ): Promise<PairOutcome> {
   let benchmarkDir: string | null = null;
   let gpuMetricsDir: string | null = null;
@@ -276,6 +317,7 @@ async function processPair(
       workflowRunId: run.id,
       artifact: { artifactName: pair.gpuMetrics.name, artifactDir: gpuMetricsDir },
       benchmarkResultIds: resultIds,
+      replace,
     });
     if (ingested.seriesIds.length === 0) {
       throw new Error(`${pair.gpuMetrics.name}: no parseable gpu_metrics CSV`);
@@ -311,8 +353,7 @@ async function processPair(
 }
 
 async function main(): Promise<void> {
-  const flags = parseFlags();
-  const { limit, force } = parseLimitForceFlags();
+  const flags = parseFlags(process.argv.slice(2));
   if (!flags.all && flags.run === null) {
     throw new Error('Pass --run <github run id> or --all');
   }
@@ -320,7 +361,7 @@ async function main(): Promise<void> {
     throw new Error('--attempt, --artifact and --receipt require --run');
 
   console.log('=== backfill-gpu-metrics ===');
-  const runs = await loadCandidateRuns(flags, limit, force);
+  const runs = await loadCandidateRuns(flags);
   console.log(`  ${runs.length} candidate run(s)`);
   if (runs.length === 0) {
     if (flags.attempt !== null || flags.artifact || flags.receipt)
@@ -390,26 +431,7 @@ async function main(): Promise<void> {
     const runId = run.github_run_id;
     const repository = repositoryFromRunUrl(run.html_url) ?? DEFAULT_REPO;
     const runStart = Date.now();
-    const receiptPath =
-      flags.receipt ?? `power-publication-${runId}-attempt-${run.run_attempt}.json`;
-    const manifest: PowerPublicationManifest = fs.existsSync(receiptPath)
-      ? JSON.parse(fs.readFileSync(receiptPath, 'utf8'))
-      : { version: 1, runId, runAttempt: run.run_attempt, points: [] };
-    if (
-      manifest.version !== 1 ||
-      manifest.runId !== runId ||
-      manifest.runAttempt !== run.run_attempt ||
-      !Array.isArray(manifest.points) ||
-      (manifest.telemetry &&
-        (manifest.telemetry.runId !== runId || manifest.telemetry.runAttempt !== run.run_attempt))
-    )
-      throw new Error('Publication receipt run/attempt does not match the recovery target');
-    const saveReceipt = () => {
-      fs.mkdirSync(path.dirname(path.resolve(receiptPath)), { recursive: true });
-      const temporary = `${receiptPath}.tmp`;
-      fs.writeFileSync(temporary, `${JSON.stringify(manifest, null, 2)}\n`, { flush: true });
-      fs.renameSync(temporary, receiptPath);
-    };
+    const manifest = flags.receipt === null ? null : readReceipt(flags.receipt, run);
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), `gpu-metrics-backfill-${runId}-`));
     const observations = new Map<string, TelemetryObservation>();
     const uniqueFallbacks = new Map<string, number>();
@@ -436,36 +458,39 @@ async function main(): Promise<void> {
       const pairs = allPairs.filter(
         (pair) => !flags.artifact || pair.gpuMetrics.name === flags.artifact,
       );
-      // Expectations come from benchmark siblings even when no telemetry was
-      // uploaded. Counting only the successful pairs would hide missing points.
-      const missing = await collectMissingTelemetryExpectations(
-        artifacts,
-        allPairs,
-        flags.artifact,
-        async (artifact, onUnmapped) => {
-          let directory: string | null = null;
-          try {
-            directory = await retryArtifactOperation(`downloading ${artifact.name}`, () =>
-              downloadArtifact(artifact, tempDir),
+      // Receipt expectations come from benchmark siblings even when no telemetry
+      // was uploaded. Counting only the successful pairs would hide missing points.
+      const missing =
+        flags.receipt === null
+          ? { observations: [], errors: [] }
+          : await collectMissingTelemetryExpectations(
+              artifacts,
+              allPairs,
+              flags.artifact,
+              async (artifact, onUnmapped) => {
+                let directory: string | null = null;
+                try {
+                  directory = await retryArtifactOperation(`downloading ${artifact.name}`, () =>
+                    downloadArtifact(artifact, tempDir),
+                  );
+                  const rows = await filterPurgedBenchmarkRows(
+                    sql,
+                    run,
+                    readMappedBenchmarkRows(directory, onUnmapped, run.github_run_id),
+                  );
+                  for (const row of rows)
+                    await findBenchmarkResultIds(sql, run, [row], (id) =>
+                      uniqueFallbacks.set(
+                        stablePowerPointIdentity(benchmarkPublicationIdentity(row)),
+                        id,
+                      ),
+                    );
+                  return rows;
+                } finally {
+                  if (directory) fs.rmSync(directory, { recursive: true, force: true });
+                }
+              },
             );
-            const rows = await filterPurgedBenchmarkRows(
-              sql,
-              run,
-              readMappedBenchmarkRows(directory, onUnmapped, run.github_run_id),
-            );
-            for (const row of rows)
-              await findBenchmarkResultIds(sql, run, [row], (id) =>
-                uniqueFallbacks.set(
-                  stablePowerPointIdentity(benchmarkPublicationIdentity(row)),
-                  id,
-                ),
-              );
-            return rows;
-          } finally {
-            if (directory) fs.rmSync(directory, { recursive: true, force: true });
-          }
-        },
-      );
       for (const observation of missing.observations)
         observations.set(stablePowerPointIdentity(observation.identity), observation);
       expectationErrors = missing.errors;
@@ -486,7 +511,15 @@ async function main(): Promise<void> {
       const outcomes = await Promise.all(
         pairs.map((pair) =>
           limiter.run(() =>
-            processPair(run, pair, tempDir, observations, missing.errors, uniqueFallbacks),
+            processPair(
+              run,
+              pair,
+              tempDir,
+              observations,
+              missing.errors,
+              uniqueFallbacks,
+              flags.force,
+            ),
           ),
         ),
       );
@@ -526,22 +559,24 @@ async function main(): Promise<void> {
       recoveryError = error instanceof Error ? error.message : String(error);
       console.error(`  ✗ run ${runId}:`, error);
     } finally {
-      await expectRecoveredAudits(manifest, audits);
-      manifest.telemetry = await readTelemetryReceipt(
-        sql,
-        { runId, runAttempt: run.run_attempt },
-        [...observations.values()],
-        {
-          previous: manifest.telemetry,
-          targeted: Boolean(flags.artifact),
-          uniqueFallbacks,
-          recoveryError,
-          recoveryArtifactName: flags.artifact,
-          expectationErrors,
-        },
-      );
-      saveReceipt();
-      console.log(`  PowerX ingest receipt: ${receiptPath}`);
+      if (flags.receipt !== null && manifest !== null) {
+        await expectRecoveredAudits(manifest, audits);
+        manifest.telemetry = await readTelemetryReceipt(
+          sql,
+          { runId, runAttempt: run.run_attempt },
+          [...observations.values()],
+          {
+            previous: manifest.telemetry,
+            targeted: Boolean(flags.artifact),
+            uniqueFallbacks,
+            recoveryError,
+            recoveryArtifactName: flags.artifact,
+            expectationErrors,
+          },
+        );
+        writeReceipt(flags.receipt, manifest);
+        console.log(`  PowerX ingest receipt: ${flags.receipt}`);
+      }
       fs.rmSync(tempDir, { recursive: true, force: true });
     }
   }

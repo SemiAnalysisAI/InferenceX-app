@@ -108,7 +108,7 @@ interface RawSeriesRow {
   gpu_count: number;
   started_at: string | Date;
   ended_at: string | Date;
-  sidecars: Record<string, unknown> | string;
+  sidecars: Record<string, unknown>;
   power_audits: Record<string, unknown>[] | null;
   csv_sha256: string;
   ingested_at: string | Date;
@@ -285,10 +285,7 @@ async function loadSeriesDetails(
       gpuCount: Number(row.gpu_count),
       startedAt: isoString(row.started_at),
       endedAt: isoString(row.ended_at),
-      sidecars:
-        typeof row.sidecars === 'string'
-          ? (JSON.parse(row.sidecars) as Record<string, unknown>)
-          : row.sidecars,
+      sidecars: row.sidecars,
       powerAudits: row.power_audits ?? [],
       // Never present a partial population as full-record statistics.
       stats:

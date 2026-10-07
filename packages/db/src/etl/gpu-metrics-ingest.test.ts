@@ -259,6 +259,22 @@ describe('ingestGpuMetricsArtifact', () => {
     expect(count!.n).toBe(4);
   });
 
+  it('replaces unchanged series when forced, so a parser fix reaches stored samples', async () => {
+    const artifact = writeArtifact(NVIDIA_CSV);
+    const input = { workflowRunId: 1, artifact, benchmarkResultIds: [10] };
+    const first = await ingestGpuMetricsArtifact(sql, input);
+    // Values an earlier parser stored from the same CSV, sidecars and count.
+    await sql`update gpu_metric_samples set power_w = 7`;
+    expect(await ingestGpuMetricsArtifact(sql, { ...input, replace: true })).toEqual({
+      seriesIds: first.seriesIds,
+      samplesInserted: 4,
+      seriesSkipped: 0,
+    });
+    const samples = await sql<{ power_w: number }[]>`
+      select power_w from gpu_metric_samples order by sampled_at, gpu_index`;
+    expect(samples.map((s) => s.power_w)).toEqual([187.8, 190.96, 912.1, 905.3]);
+  });
+
   it('rolls back a replacement when point linking fails and retries without losing existing links', async () => {
     const artifact = writeArtifact(NVIDIA_CSV);
     const first = await ingestGpuMetricsArtifact(sql, {

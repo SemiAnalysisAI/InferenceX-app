@@ -97,18 +97,22 @@ describe('GET /api/v1/views/gpu-metrics full-record statistics', () => {
     expect(metrics.mock.calls[0][0].nextUrl.searchParams.get('runId')).toBe(String(runInfo.id));
   });
 
-  it('falls back to another collected metric when the default correlation y-axis was not sampled', async () => {
-    const powerOnly = [
+  it('reports the correlation y-axis it draws when the series has no temperature', async () => {
+    const noTemperature = [
       { timestamp: '2026-09-08T00:00:00Z', index: 0, power: 100, smClock: 1500 },
       { timestamp: '2026-09-08T00:00:01Z', index: 0, power: 300, smClock: 1900 },
     ];
-    source([{ ...artifact(), data: powerOnly }]);
-    const response = await GET(request('&chartView=correlation'));
-    expect(response.status).toBe(200);
-    const body = await response.json();
+    source([{ ...artifact(), data: noTemperature }]);
+    const defaulted = await GET(request('&chartView=correlation'));
+    const body = await defaulted.json();
+    expect(body.params.corrYMetric).toBe('smClock');
     expect(body.chart).toEqual([
-      { x: 100, y: 1500, gpuIndex: 0, raw: powerOnly[0] },
-      { x: 300, y: 1900, gpuIndex: 0, raw: powerOnly[1] },
+      { x: 100, y: 1500, gpuIndex: 0, raw: noTemperature[0] },
+      { x: 300, y: 1900, gpuIndex: 0, raw: noTemperature[1] },
     ]);
+    const requested = await GET(request('&chartView=correlation&corrYMetric=temperature'));
+    const explicit = await requested.json();
+    expect(explicit.params.corrYMetric).toBe('temperature');
+    expect(explicit.chart).toEqual([]);
   });
 });

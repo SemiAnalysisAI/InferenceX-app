@@ -248,8 +248,8 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
     '相关性图 x 轴 GPU 指标，默认 power。',
   ],
   corrYMetric: [
-    'Correlation y-axis GPU metric, default temperature; when the artifact did not sample it, the first other collected metric is used.',
-    '相关性图 y 轴 GPU 指标，默认 temperature；若该产物未采集此指标，则改用其他已采集指标中的第一个。',
+    'Correlation y-axis GPU metric. Defaults to temperature when the artifact sampled it, otherwise to the first collected metric other than corrXMetric; without one the correlation is empty. An explicit metric is used even when unsampled, giving an empty correlation.',
+    '相关性图 y 轴 GPU 指标。默认 temperature；若该产物未采集温度，则改用 corrXMetric 以外第一个已采集的指标，没有此类指标时相关性数据为空。显式指定的指标即使未采集也照常使用，此时相关性数据为空。',
   ],
   downsample: [
     'Boolean, default true; declares the UI 2000-interactive-point rendering cap. Returned raw rows and statistics are never sampled.',
@@ -452,14 +452,14 @@ export const operations: ApiOperation[] = Object.entries(NEW_VIEWS).map(
           view === 'video'
             ? ' Only already published artifacts are read. Cell, phase, slot and GPU-basis choices select result evidence and normalized serving rates; x/y/cost/workload filters produce computed tradeoff points. Local bundles and arbitrary URLs are excluded. Responses are no-store.'
             : view === 'gpu-metrics'
-              ? ' Telemetry reads stored DB series first and falls back to GitHub artifacts when storage is absent. Responses use private, no-store; an upstream database failure remains HTTP 503 rather than an empty dataset. File/host series retain separate identities. Full-record statistics include startup and warmup and use current-version stored per-GPU digests; a current empty or missing metric digest stays empty. Outdated or unversioned digests are recomputed read-only from retained DB samples. Statistics cover every chip in the selected series, while raw rows and charts respect selected GPU indices. Chart downsampling does not alter statistics. Statistics expose the selected metric values without the storage-only metric column. These sample-weighted statistics are separate from serving-window power, J/token and selected-time-window calculations. Line time remains relative to the first sample across all chips; missing metric readings are omitted rather than zero-filled. Correlations require both readings.'
+              ? ' Telemetry comes from one source per run: its stored DB series once the run is ingested, otherwise its GitHub artifacts. Responses use private, no-store; an upstream database failure remains HTTP 503 rather than an empty dataset. File/host series retain separate identities. Raw rows and charts respect selected GPU indices. Line time remains relative to the first sample across all chips; missing metric readings are omitted rather than zero-filled. Correlations require both readings.'
               : ''
         }`,
         `只读${zh}，使用仪表板的数据读取和计算函数。未知或重复查询键返回 400；响应包含解析后的参数，保留缺失数据。仅影响样式的控件不作为 API 参数。${
           view === 'video'
             ? ' 仅读取已发布产物。cell、阶段、slot 和 GPU 口径选择对应结果证据，并计算 serving 归一化速率；x/y、成本及工作负载筛选生成权衡图数据点。不读取本地数据包或任意 URL。响应不缓存。'
             : view === 'gpu-metrics'
-              ? ' 遥测优先读取数据库中已存储的序列；缺少存储数据时回退到 GitHub 产物。响应使用 private, no-store；上游数据库故障保留 HTTP 503，不作为空数据返回。各文件、主机的序列身份独立保留。全记录统计包含服务启动与 warmup，已有数据使用当前算法版本的每 GPU 统计摘要；当前摘要为空或缺少所选指标时仍返回空统计数组。旧版本或无版本摘要从保留的 DB 样本只读重算。统计覆盖所选序列的全部芯片，原始数据行和图表则按芯片索引筛选；图表降采样不改变统计。统计项只包含所选指标的数值，不返回数据库内部的 metric 字段。这里按样本计算的统计与 serving-window 功率、J/token 及用户所选时间窗口的计算分别处理。折线时间以所有芯片的首个采样为起点；缺失指标读数会被跳过，不补零。相关性图要求两个指标均有读数。'
+              ? ' 每个 run 只从一个来源读取遥测：已入库的 run 读取数据库中存储的序列，其余 run 读取 GitHub 产物。响应使用 private, no-store；上游数据库故障保留 HTTP 503，不作为空数据返回。各文件、主机的序列身份独立保留。原始数据行和图表按所选芯片索引筛选。折线时间以所有芯片的首个采样为起点；缺失指标读数会被跳过，不补零。相关性图要求两个指标均有读数。'
               : ''
         }`,
       ),
