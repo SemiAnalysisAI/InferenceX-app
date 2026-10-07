@@ -79,7 +79,7 @@ export interface AgentxAuditWrite {
  * Write planned provenance into stored AgentX rows that still lack it, in one
  * statement. The plan already decided which row a window belongs to; the
  * statement only guards the row's run, type and NULL audit, and returns the ids
- * actually written so a backfill receipt can confirm them.
+ * it wrote.
  */
 export async function applyAgentxAudits(
   sql: Sql,

@@ -12,14 +12,14 @@ Check the target migration ledger and apply pending migrations before running wr
 bun run admin:db:migrate --yes
 ```
 
-PowerX requires `016_gpu_metrics.sql` and `017_gpu_metric_stats_version.sql` in order.
-Writers depend on the `stats_version` column from 017. CI ingest workflows migrate
-automatically; manual backfill does not. Deploy compatible application and writer code.
+PowerX requires `016_gpu_metrics.sql`. CI ingest workflows migrate
+automatically; manual backfill does not. Migrate before deploying an app build that
+reads these tables; until 016 exists, its telemetry reads fail.
 
 ## Repair a run
 
 Retain the original receipt, artifact bytes and sidecars with their exact source run
-and attempt. Before correction, snapshot the affected series, samples, digests, point
+and attempt. Before correction, snapshot the affected series, samples, point
 links and any benchmark audits the repair may update. Set `DATABASE_WRITE_URL` and
 `GITHUB_TOKEN` for the intended target, then preview the named artifact:
 
@@ -64,16 +64,17 @@ the way `.github/workflows/ingest-results.yml` does.
 
 ## Verify the repair
 
-Run the HTTP verifier against the app connected to the repaired database:
+Run the HTTP verifier against the app connected to the repaired database. For a
+protected preview, set `CACHE_PROTECTION_BYPASS_SECRET`:
 
 ```sh
 bun packages/db/src/verify-power-publication.ts /path/power-publication.json https://TARGET_ORIGIN
 ```
 
-Inspect per-point receipt gaps, point and Timeline API responses, then reload or
-refocus the browser. Check the expected hosts, GPU IDs, timestamps and digest values.
-Telemetry revisions refresh point caches automatically; no manual PowerX cache purge
-is needed. Benchmark audit changes require the refresh step above.
+Inspect per-point receipt gaps and point API responses. Check the expected hosts, GPU
+IDs, timestamps and statistics. Telemetry revisions refresh point caches
+automatically; no manual PowerX cache purge is needed. Benchmark audit changes require
+the cache refresh above.
 
 - `artifact_missing` or `expectationErrors`: recover the exact named telemetry or
   benchmark sibling. An unreadable benchmark sibling leaves the expected count unknown.
@@ -93,5 +94,4 @@ Restore only the snapshotted rows in a reviewed transaction, or re-ingest the or
 bytes and sidecars with the same run/attempt/point identities. Verify counts, links and
 API responses again. Do not delete a shared series to repair one point.
 
-Revert application code only if needed, then use the existing cache invalidation
-procedure because the previous code restores its old cache behavior.
+After reverting application code, refresh the API cache as above.

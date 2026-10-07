@@ -513,7 +513,7 @@ async function main(): Promise<void> {
     }
     // PowerX telemetry: `gpu_metrics_<key>` is uploaded next to `bmk_<key>` by
     // every single-node job; multinode jobs carry it inside `power_audit_<key>`
-    // instead (see migration 016). Digested here so the dashboard never
+    // instead (see migration 016). Stored here so the dashboard never
     // re-downloads GitHub artifacts and keeps the series past retention.
     const gpuMetricsArtifacts = discoverGpuMetricsArtifacts(artifactsDir);
     if (gpuMetricsArtifacts.size > 0) {

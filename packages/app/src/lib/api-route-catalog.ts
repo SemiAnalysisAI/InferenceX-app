@@ -278,7 +278,7 @@ export const apiRouteCatalog = [
       en: 'Raw PowerX telemetry read behind the public GPU metrics view, which calls it in-process: one source per run (the DB when the run has stored telemetry, otherwise its GitHub artifacts, never combined), separate host/GPU identities and adjacent CSV context timezone normalization. DB failures return 503 DATABASE_UNAVAILABLE. Responses use no-store. This is not a stable public API.',
       zh: '原始 PowerX 遥测读取接口，由公开的 GPU 指标视图在进程内调用：每个 run 只使用一个数据来源（遥测已入库时只读 DB，否则只读该 run 的 GitHub 产物，两者不混用），保留主机/GPU 身份，并按相邻 CSV context 规范化时区。数据库故障返回 503 DATABASE_UNAVAILABLE。响应使用 no-store，不作为稳定公开 API。',
     },
-    sourceSha256: 'c17122661ce4b384bff054de695a075d0ac20ed619142bafa75d19605bdad7ee',
+    sourceSha256: 'ae36e0dfa4586f9f66c35c39aa3cfa67bdb76e54718d0e1c719cb227ff31fd2d',
   },
   {
     source: 'src/app/api/openapi.json/route.ts',
@@ -834,7 +834,7 @@ export interface ApiContractSourceDigest {
 export const apiContractSourceDigests = [
   {
     source: '../db/src/queries/gpu-metrics.ts',
-    sourceSha256: '8c648b6aa213edb19ef112bed948994eb81ef84d595f561f3d4ae1e2d3c6a76a',
+    sourceSha256: '2cd183ed871d0f8d0290dd8b029f96b1ff97cd1a4fd2eed34d24c69ff6e7a85b',
     reviewArea: {
       en: 'Stored PowerX telemetry reads: latest attempt, GPU metrics view artifact selection, point lookups and per-GPU statistics computed from complete stored samples.',
       zh: '数据库 PowerX 遥测读取：最新 attempt、GPU 指标视图的产物选择、单点查询，以及基于完整已存样本计算的每 GPU 统计。',

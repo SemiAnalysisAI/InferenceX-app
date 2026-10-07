@@ -28,7 +28,7 @@ export interface GpuMetricsRouteResponse extends GpuPowerApiResponse {
   artifactNames?: string[];
 }
 
-/** Shape the stored digest like the GitHub payload so readers are source-agnostic. */
+/** Shape stored series like the GitHub payload so readers are source-agnostic. */
 export function databasePayloadToResponse(payload: GpuMetricsRunPayload): GpuMetricsRouteResponse {
   const run = payload.workflowRun;
   const filesPerArtifact = new Map<string, number>();

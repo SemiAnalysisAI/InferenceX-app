@@ -1,7 +1,7 @@
 /**
- * Backfill PowerX telemetry (`gpu_metrics_<suffix>` artifacts) into the
- * migration-016 tables for runs that were ingested before the CI path
- * digested them.
+ * Backfill or repair PowerX telemetry (`gpu_metrics_<suffix>` artifacts, or the
+ * `power_audit_<suffix>` bundle of a suffix without one) in the migration-016
+ * tables from a run's GitHub artifacts.
  *
  * GitHub keeps run artifacts for 90 days and the GCS mirror only covers
  * scheduled/push runs on main, so the reachable history is bounded by GitHub

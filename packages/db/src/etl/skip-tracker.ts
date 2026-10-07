@@ -11,8 +11,9 @@ export interface Skips {
   failedRun: number;
   dbError: number;
   /**
-   * PowerX telemetry failures: a `gpu_metrics_*` digest that could not be
-   * stored, or an AgentX window plan that could not be read or attached.
+   * PowerX telemetry failures: a `gpu_metrics_*` or `power_audit_*` artifact
+   * whose series could not be stored, or an AgentX window plan that could not
+   * be read or attached.
    * Counted apart from `dbError` because they are not fatal: the benchmark
    * rows land either way, only the point's telemetry or provenance is
    * affected, and `admin:db:backfill-gpu-metrics` can repeat the step later.

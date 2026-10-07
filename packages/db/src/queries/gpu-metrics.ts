@@ -63,7 +63,7 @@ export interface GpuMetricSeries {
   startedAt: string;
   endedAt: string;
   sidecars: Record<string, unknown>;
-  /** Existing benchmark provenance can recover windows from older ingests. */
+  /** Measurement-window audits (`power_audit`) of the linked benchmark points. */
   powerAudits?: Record<string, unknown>[];
   stats: GpuMetricStatRow[];
   data: GpuMetricSampleRow[];

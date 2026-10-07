@@ -225,7 +225,7 @@ it('pages a single large series without dropping microseconds and retries change
   const observed: DbClient = async (strings, ...values) => {
     const rows = await sql(strings, ...values);
     if (strings.join('').includes('from gpu_metric_samples')) {
-      // Model the bounded HTTP transport; the old whole-series query fails here.
+      // Model the bounded HTTP transport, which a whole-series query would exceed.
       expect(rows.length).toBeLessThanOrEqual(SAMPLE_PAGE_SIZE);
       pages++;
       if (pages === 1) {

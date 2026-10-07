@@ -329,7 +329,7 @@ export function upsertGpuMetricSeries(
  * Read and persist every CSV of one artifact for one set of points.
  * Writes telemetry tables and point links only; benchmark-row provenance is
  * attached by the caller that owns the point set (CI before insert, the
- * backfill through its receipt-checkpointed plan).
+ * backfill after this call stores and links every series).
  */
 export async function ingestGpuMetricsArtifact(
   sql: Sql,
