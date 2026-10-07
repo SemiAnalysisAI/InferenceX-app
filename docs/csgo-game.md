@@ -12,7 +12,9 @@ mouse are required; native pointer capture is available on the standalone page.
 scripts run it. Next rewrites `/games/csgo` to the generated static `index.html`.
 This page does not mount the benchmark app, its providers or a game iframe.
 The default dashboard does not import game modules, load game styles, or prefetch
-the game. Full-page navigation tears down the game document when returning.
+the game. Returning leaves the game document; no engine is mounted in the
+destination dashboard. Explicit GPU disposal and back/forward-cache behavior
+remain part of the runtime-lifecycle acceptance work.
 
 The game HTML and route headers specify `noindex, nofollow`. The game is absent
 from the sitemap; landing-page metadata, canonical links, language alternatives

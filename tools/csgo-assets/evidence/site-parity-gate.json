@@ -1,0 +1,28 @@
+{
+  "eligible": false,
+  "checklistPercent": 0,
+  "reasons": [
+    "Acceptance baseline is not approved",
+    "Reference CS:GO build and map digest are not pinned",
+    "Required check not passed: map-layout",
+    "Required check not passed: map-visuals",
+    "Required check not passed: map-collision",
+    "Required check not passed: movement",
+    "Required check not passed: weapon-roster",
+    "Required check not passed: weapon-presentation",
+    "Required check not passed: ballistics",
+    "Required check not passed: weapon-handling",
+    "Required check not passed: grenades",
+    "Required check not passed: bomb",
+    "Required check not passed: rounds",
+    "Required check not passed: economy",
+    "Required check not passed: bots",
+    "Required check not passed: audio",
+    "Required check not passed: hud",
+    "Required check not passed: spectator",
+    "Required check not passed: offline-5v5",
+    "Required check not passed: stability",
+    "Required check not passed: app-isolation",
+    "Evidence-backed checklist coverage is 0%, below 95%"
+  ]
+}

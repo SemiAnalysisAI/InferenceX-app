@@ -105,7 +105,18 @@ try {
       false,
     );
     const assets = requests.filter((url) => /\/games\/csgo\/(?:assets|lighting)\//.test(url));
-    assert.ok(assets.length > 10);
+    for (const file of [
+      '/assets/map/dust2.glb',
+      '/assets/map/navigation.json',
+      '/lighting/world.json',
+      '/lighting/world.bin.gz',
+      '/lighting/atlas.rgbe.gz',
+    ]) {
+      assert.ok(
+        assets.some((url) => new URL(url).pathname.endsWith(file)),
+        file,
+      );
+    }
     assert.ok(assets.every((url) => new URL(url).origin === origin));
     await page.locator('#return-site').click();
     console.log('RETURN', locale);

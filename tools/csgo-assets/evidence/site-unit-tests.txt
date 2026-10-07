@@ -1,0 +1,245 @@
+TAP version 13
+# Subtest: asset paths reject traversal, absolute paths, backslashes and empty components
+ok 1 - asset paths reject traversal, absolute paths, backslashes and empty components
+  ---
+  duration_ms: 1.425467
+  ...
+# Subtest: checks byte size, pinned SHA-256 and optional Git blob identity
+ok 2 - checks byte size, pinned SHA-256 and optional Git blob identity
+  ---
+  duration_ms: 0.932142
+  ...
+# Subtest: format guards reject HTML disguised as a model or audio file
+ok 3 - format guards reject HTML disguised as a model or audio file
+  ---
+  duration_ms: 0.48106
+  ...
+# Subtest: atomic writes preserve verified files and refuse symlink targets
+ok 4 - atomic writes preserve verified files and refuse symlink targets
+  ---
+  duration_ms: 11.711786
+  ...
+# Subtest: downloads reject unapproved hosts, failures and oversized payloads
+ok 5 - downloads reject unapproved hosts, failures and oversized payloads
+  ---
+  duration_ms: 20.219852
+  ...
+# Subtest: every firearm and knife resolves to an exact imported firing audio file
+ok 6 - every firearm and knife resolves to an exact imported firing audio file
+  ---
+  duration_ms: 9.761312
+  ...
+# Subtest: all 34 firearms use the pinned numeric schema with valid inherited attributes
+ok 7 - all 34 firearms use the pinned numeric schema with valid inherited attributes
+  ---
+  duration_ms: 1.954512
+  ...
+# Subtest: KeyValues preserves repeated object sections, quoted URLs and prefab overrides
+ok 8 - KeyValues preserves repeated object sections, quoted URLs and prefab overrides
+  ---
+  duration_ms: 1.241071
+  ...
+# Subtest: AK headshots penetrate helmets, AWP body shots kill, M4A1-S helmet shots do not
+ok 9 - AK headshots penetrate helmets, AWP body shots kill, M4A1-S helmet shots do not
+  ---
+  duration_ms: 0.225347
+  ...
+# Subtest: range decay uses Source units, stomach has its own multiplier, legs ignore armor
+ok 10 - range decay uses Source units, stomach has its own multiplier, legs ignore armor
+  ---
+  duration_ms: 0.150136
+  ...
+# Subtest: insufficient armor is consumed without over-absorbing damage
+ok 11 - insufficient armor is consumed without over-absorbing damage
+  ---
+  duration_ms: 0.187116
+  ...
+# Subtest: moving, jumping and sustained fire reduce accuracy, recovery restores it
+ok 12 - moving, jumping and sustained fire reduce accuracy, recovery restores it
+  ---
+  duration_ms: 0.307313
+  ...
+# Subtest: weapon weight, scope, walk and crouch set distinct movement caps
+ok 13 - weapon weight, scope, walk and crouch set distinct movement caps
+  ---
+  duration_ms: 0.156701
+  ...
+# Subtest: recoil is repeatable and spread emits distinct bounded pellet offsets
+ok 14 - recoil is repeatable and spread emits distinct bounded pellet offsets
+  ---
+  duration_ms: 0.423447
+  ...
+# Subtest: match applies bullet armor once, awards weapon-specific rewards and resets fire state
+ok 15 - match applies bullet armor once, awards weapon-specific rewards and resets fire state
+  ---
+  duration_ms: 1.69757
+  ...
+# Subtest: both original character ports have textured skinning and retargeted locomotion
+ok 16 - both original character ports have textured skinning and retargeted locomotion
+  ---
+  duration_ms: 7.969977
+  ...
+# Subtest: all 34 world weapons have original materials and hand attachment bones
+ok 17 - all 34 world weapons have original materials and hand attachment bones
+  ---
+  duration_ms: 461.585056
+  ...
+# Subtest: every source spawn reaches both bombsites in the baked navigation graph
+ok 18 - every source spawn reaches both bombsites in the baked navigation graph
+  ---
+  duration_ms: 967.518081
+  ...
+# Subtest: RGBExp light samples preserve signed exponents and linear channel ratios
+ok 19 - RGBExp light samples preserve signed exponents and linear channel ratios
+  ---
+  duration_ms: 1.995873
+  ...
+# Subtest: baked world geometry and light samples match their checked-in hashes
+ok 20 - baked world geometry and light samples match their checked-in hashes
+  ---
+  duration_ms: 22.258991
+  ...
+# Subtest: baked geometry groups cover finite triangles and valid lightmap UVs
+ok 21 - baked geometry groups cover finite triangles and valid lightmap UVs
+  ---
+  duration_ms: 14.232589
+  ...
+# Subtest: manifest pins every model and audio file with a unique safe path and SHA-256
+ok 22 - manifest pins every model and audio file with a unique safe path and SHA-256
+  ---
+  duration_ms: 11.667363
+  ...
+# Subtest: one human and nine bots are split into two teams
+ok 23 - one human and nine bots are split into two teams
+  ---
+  duration_ms: 1.900502
+  ...
+# Subtest: 34 weapon meshes have playable definitions plus knife
+ok 24 - 34 weapon meshes have playable definitions plus knife
+  ---
+  duration_ms: 0.209837
+  ...
+# Subtest: team restrictions, budget and buy zone are enforced
+ok 25 - team restrictions, budget and buy zone are enforced
+  ---
+  duration_ms: 0.437411
+  ...
+# Subtest: ammo is spent only when live and rate limits apply
+ok 26 - ammo is spent only when live and rate limits apply
+  ---
+  duration_ms: 0.701285
+  ...
+# Subtest: switching weapons cancels reload without creating ammunition
+ok 27 - switching weapons cancels reload without creating ammunition
+  ---
+  duration_ms: 0.405095
+  ...
+# Subtest: weapon pickup preserves ammo and respects slots, distance, height and cooldown
+ok 28 - weapon pickup preserves ammo and respects slots, distance, height and cooldown
+  ---
+  duration_ms: 0.646297
+  ...
+# Subtest: plant requires a live carrier inside a site and cancels when released
+ok 29 - plant requires a live carrier inside a site and cancels when released
+  ---
+  duration_ms: 0.349297
+  ...
+# Subtest: a planted bomb prevents a CT elimination win and can be defused
+ok 30 - a planted bomb prevents a CT elimination win and can be defused
+  ---
+  duration_ms: 1.124508
+  ...
+# Subtest: carrier death drops the bomb and another T can pick it up
+ok 31 - carrier death drops the bomb and another T can pick it up
+  ---
+  duration_ms: 0.460812
+  ...
+# Subtest: timeout, explosion and rewards are resolved once
+ok 32 - timeout, explosion and rewards are resolved once
+  ---
+  duration_ms: 0.460716
+  ...
+# Subtest: layered navigation avoids walls and rejects unreachable paths
+ok 33 - layered navigation avoids walls and rejects unreachable paths
+  ---
+  duration_ms: 1.389309
+  ...
+# Subtest: cloned materials and skeletons are released once without destroying cached geometry/textures
+ok 34 - cloned materials and skeletons are released once without destroying cached geometry/textures
+  ---
+  duration_ms: 1.645274
+  ...
+# Subtest: procedural models can additionally release their owned geometry
+ok 35 - procedural models can additionally release their owned geometry
+  ---
+  duration_ms: 0.196988
+  ...
+# Subtest: menu release cancels a capture that the browser grants later
+ok 36 - menu release cancels a capture that the browser grants later
+  ---
+  duration_ms: 1.220955
+  ...
+# Subtest: cancelled capture failures do not restart fallback input
+ok 37 - cancelled capture failures do not restart fallback input
+  ---
+  duration_ms: 0.251804
+  ...
+# Subtest: current proposal is explicitly not merge eligible
+ok 38 - current proposal is explicitly not merge eligible
+  ---
+  duration_ms: 1.192456
+  ...
+# Subtest: ninety-five percent can pass only when every required check passes
+ok 39 - ninety-five percent can pass only when every required check passes
+  ---
+  duration_ms: 0.51443
+  ...
+# Subtest: high coverage cannot conceal a missing critical feature or evidence
+ok 40 - high coverage cannot conceal a missing critical feature or evidence
+  ---
+  duration_ms: 0.23732
+  ...
+# Subtest: baseline, map fingerprint, weights and threshold cannot be omitted
+ok 41 - baseline, map fingerprint, weights and threshold cannot be omitted
+  ---
+  duration_ms: 0.558914
+  ...
+# Subtest: asset archive rejects traversal, unknown members, missing files and links
+ok 42 - asset archive rejects traversal, unknown members, missing files and links
+  ---
+  duration_ms: 1.718284
+  ...
+# Subtest: archive download checks each part and the assembled digest
+ok 43 - archive download checks each part and the assembled digest
+  ---
+  duration_ms: 49.752571
+  ...
+# Subtest: local game assets must all match the locked bytes
+ok 44 - local game assets must all match the locked bytes
+  ---
+  duration_ms: 3.801064
+  ...
+# Subtest: team arm selection does not treat ct_arms as a Terrorist-arm match
+ok 45 - team arm selection does not treat ct_arms as a Terrorist-arm match
+  ---
+  duration_ms: 1.191898
+  ...
+# Subtest: animation binding handles shoot/fire and inspect/lookat aliases
+ok 46 - animation binding handles shoot/fire and inspect/lookat aliases
+  ---
+  duration_ms: 1.147851
+  ...
+# Subtest: all 34 animated viewmodels contain real textures, geometry and animation clips
+ok 47 - all 34 animated viewmodels contain real textures, geometry and animation clips
+  ---
+  duration_ms: 2433.588859
+  ...
+1..47
+# tests 47
+# suites 0
+# pass 47
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 5431.474512

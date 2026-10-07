@@ -1,0 +1,26 @@
+[
+  {
+    "locale": "en",
+    "width": 1280,
+    "sameOrigin": true,
+    "assetRequests": 14,
+    "returned": true,
+    "lighting": {
+      "surfaces": 2773,
+      "materialGroups": 42
+    },
+    "pageErrors": []
+  },
+  {
+    "locale": "zh",
+    "width": 390,
+    "sameOrigin": true,
+    "assetRequests": 8,
+    "returned": true,
+    "lighting": {
+      "surfaces": 2773,
+      "materialGroups": 42
+    },
+    "pageErrors": []
+  }
+]

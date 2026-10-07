@@ -1,5 +1,4 @@
 """Fill textureless GLB materials from their original VMT base-texture entries."""
-import bpy
 import os
 import sys
 import json

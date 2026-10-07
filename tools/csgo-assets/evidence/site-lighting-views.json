@@ -1,0 +1,100 @@
+{
+  "purpose": "Staged visual inspection of both sites and a B-route point, not reference parity",
+  "lighting": {
+    "surfaces": 2773,
+    "materialGroups": 42
+  },
+  "views": [
+    {
+      "file": "view-0-0.png",
+      "position": {
+        "x": 21.25,
+        "y": 1.8176502675341268,
+        "z": -47.6
+      },
+      "stats": {
+        "frame": 6,
+        "calls": 189,
+        "triangles": 2294738,
+        "points": 0,
+        "lines": 0
+      }
+    },
+    {
+      "file": "view-0-1.png",
+      "position": {
+        "x": 21.25,
+        "y": 1.8176502675341268,
+        "z": -47.6
+      },
+      "stats": {
+        "frame": 11,
+        "calls": 264,
+        "triangles": 2475932,
+        "points": 0,
+        "lines": 0
+      }
+    },
+    {
+      "file": "view-1-0.png",
+      "position": {
+        "x": -28.9,
+        "y": 0.12376753157430187,
+        "z": -51
+      },
+      "stats": {
+        "frame": 17,
+        "calls": 237,
+        "triangles": 2364953,
+        "points": 0,
+        "lines": 0
+      }
+    },
+    {
+      "file": "view-1-1.png",
+      "position": {
+        "x": -28.9,
+        "y": 0.12376753157430187,
+        "z": -51
+      },
+      "stats": {
+        "frame": 23,
+        "calls": 267,
+        "triangles": 2465957,
+        "points": 0,
+        "lines": 0
+      }
+    },
+    {
+      "file": "view-2-0.png",
+      "position": {
+        "x": -32.3,
+        "y": 0.5883063924589678,
+        "z": -16.15
+      },
+      "stats": {
+        "frame": 30,
+        "calls": 252,
+        "triangles": 2428239,
+        "points": 0,
+        "lines": 0
+      }
+    },
+    {
+      "file": "view-2-1.png",
+      "position": {
+        "x": -32.3,
+        "y": 0.5883063924589678,
+        "z": -16.15
+      },
+      "stats": {
+        "frame": 35,
+        "calls": 192,
+        "triangles": 2295051,
+        "points": 0,
+        "lines": 0
+      }
+    }
+  ],
+  "pageErrors": []
+}

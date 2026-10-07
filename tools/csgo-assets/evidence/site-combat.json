@@ -1,0 +1,107 @@
+{
+  "fixture": "Controlled target and test funding; not a competitive bot qualification",
+  "scenarios": [
+    {
+      "name": "nova-nine-pellets-and-semi-auto",
+      "ammo": 7,
+      "trace": {
+        "weapon": "nova",
+        "pellets": [
+          {
+            "victim": 5,
+            "hitGroup": "head",
+            "distance": 3.896451730676145
+          },
+          {
+            "victim": 5,
+            "hitGroup": "head",
+            "distance": 3.8690656105637458
+          },
+          {
+            "victim": 5,
+            "hitGroup": "head",
+            "distance": 3.876797774106071
+          },
+          {
+            "victim": 5,
+            "hitGroup": "head",
+            "distance": 3.878345484651662
+          },
+          {
+            "victim": 5,
+            "hitGroup": "head",
+            "distance": 3.8884671679273826
+          },
+          {
+            "victim": 5,
+            "hitGroup": "head",
+            "distance": 3.9039237428465996
+          },
+          {
+            "victim": 5,
+            "hitGroup": "head",
+            "distance": 3.8318331510205783
+          },
+          {
+            "victim": 5,
+            "hitGroup": "head",
+            "distance": 3.835977276163984
+          },
+          {
+            "victim": 5,
+            "hitGroup": "head",
+            "distance": 3.8742808831813638
+          }
+        ],
+        "accuracy": {
+          "spread": 0.04,
+          "inaccuracy": 0.007
+        },
+        "time": 1.2833009999999982
+      },
+      "targetHealth": 390.3561208066749
+    },
+    {
+      "name": "automatic-recoil-and-recovery",
+      "before": {
+        "gap": 5.1538,
+        "ammo": 30
+      },
+      "spray": {
+        "ammo": 22,
+        "penalty": 0.0038686114238546563,
+        "punch": 0.008094207073784061,
+        "gap": 5.850150056293838
+      },
+      "recovered": {
+        "penalty": 8.577904303937342e-11,
+        "punch": 2.2137266751218312e-11
+      }
+    },
+    {
+      "name": "awp-two-stage-scope-and-movement",
+      "firstZoom": 30.5369432627651,
+      "secondZoom": 7.50833333548052,
+      "motion": {
+        "distance": 1.9050380999999763,
+        "speed": 0
+      }
+    },
+    {
+      "name": "viewmodel-switch-resource-stability",
+      "warmedMemory": {
+        "geometries": 307,
+        "textures": 318
+      },
+      "finalMemory": {
+        "geometries": 307,
+        "textures": 318
+      }
+    },
+    {
+      "name": "death-clears-sniper-scope",
+      "passed": true
+    }
+  ],
+  "pageErrors": []
+}

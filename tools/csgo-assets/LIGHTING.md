@@ -31,6 +31,8 @@ has replicated one-luxel borders to prevent neighboring faces bleeding during
 bilinear filtering. The original collision mesh is unchanged.
 
 The restored geometry replaces only matching `world_geometry` material groups.
+Four world faces without baked samples retain neutral lighting rather than being
+discarded with their replaced material groups.
 Materials without a matching restored group retain their old rendering.
 `__test.lighting` reports the loaded surface count and replaced material groups.
 The raw data and extraction tests are implementation evidence, not visual

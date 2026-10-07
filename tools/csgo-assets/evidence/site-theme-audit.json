@@ -1,0 +1,146 @@
+{
+  "cold": [
+    {
+      "theme": "light",
+      "route": "/",
+      "width": 1440,
+      "optionalRequests": 0,
+      "optionalCodeChunks": 0,
+      "checkedChunks": 18,
+      "optionalFonts": 0,
+      "encodedResourceBytes": 354247
+    },
+    {
+      "theme": "dark",
+      "route": "/",
+      "width": 390,
+      "optionalRequests": 0,
+      "optionalCodeChunks": 0,
+      "checkedChunks": 38,
+      "optionalFonts": 0,
+      "encodedResourceBytes": 666100
+    },
+    {
+      "theme": "light",
+      "route": "/zh",
+      "width": 390,
+      "optionalRequests": 0,
+      "optionalCodeChunks": 0,
+      "checkedChunks": 38,
+      "optionalFonts": 0,
+      "encodedResourceBytes": 673229
+    },
+    {
+      "theme": "dark",
+      "route": "/zh",
+      "width": 1440,
+      "optionalRequests": 0,
+      "optionalCodeChunks": 0,
+      "checkedChunks": 43,
+      "optionalFonts": 0,
+      "encodedResourceBytes": 790014
+    },
+    {
+      "theme": "system",
+      "route": "/",
+      "width": 1440,
+      "optionalRequests": 0,
+      "optionalCodeChunks": 0,
+      "checkedChunks": 43,
+      "optionalFonts": 0,
+      "encodedResourceBytes": 779969
+    },
+    {
+      "theme": "fresh",
+      "route": "/zh",
+      "width": 390,
+      "optionalRequests": 0,
+      "optionalCodeChunks": 0,
+      "checkedChunks": 38,
+      "optionalFonts": 0,
+      "encodedResourceBytes": 673227
+    }
+  ],
+  "embeds": [
+    {
+      "savedTheme": "minecraft",
+      "optionalRequests": 0
+    },
+    {
+      "savedTheme": "csgo",
+      "optionalRequests": 0
+    },
+    {
+      "savedTheme": "gta",
+      "optionalRequests": 0
+    },
+    {
+      "savedTheme": "kart",
+      "optionalRequests": 0
+    }
+  ],
+  "launchers": [
+    {
+      "route": "/",
+      "width": 1440,
+      "hoverGameRequests": 0,
+      "sameOriginNavigation": true,
+      "seoUnchanged": true,
+      "noHorizontalOverflow": true,
+      "destination": "/games/csgo?lang=en"
+    },
+    {
+      "route": "/zh",
+      "width": 390,
+      "hoverGameRequests": 0,
+      "sameOriginNavigation": true,
+      "seoUnchanged": true,
+      "noHorizontalOverflow": true,
+      "destination": "/games/csgo?lang=zh"
+    }
+  ],
+  "switching": [
+    {
+      "theme": "csgo",
+      "unmounted": true,
+      "seoUnchanged": true
+    },
+    {
+      "theme": "gta",
+      "unmounted": true,
+      "seoUnchanged": true
+    },
+    {
+      "theme": "minecraft",
+      "unmounted": true,
+      "seoUnchanged": true
+    },
+    {
+      "theme": "kart",
+      "unmounted": true,
+      "seoUnchanged": true
+    }
+  ],
+  "crawlers": [
+    {
+      "route": "/",
+      "title": true,
+      "description": true,
+      "canonical": true,
+      "hreflang": true,
+      "jsonld": true,
+      "headings": true,
+      "noGame": true
+    },
+    {
+      "route": "/zh",
+      "title": true,
+      "description": true,
+      "canonical": true,
+      "hreflang": true,
+      "jsonld": true,
+      "headings": true,
+      "noGame": true
+    }
+  ]
+}

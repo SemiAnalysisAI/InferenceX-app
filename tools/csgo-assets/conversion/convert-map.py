@@ -1,6 +1,5 @@
 import bpy
 import sys
-import json
 import os
 sys.path.insert(0, os.environ.get("SOURCEIO_PARENT", os.getcwd()))
 import SourceIO

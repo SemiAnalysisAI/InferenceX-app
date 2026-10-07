@@ -44,7 +44,13 @@ try {
     advanceTime(20);
   });
   const ammo = await page.evaluate(() => __test.match.players[0].weapon.ammo);
-  await page.mouse.move(640, 400);
+  // With native capture, absolute pointer repositioning changes the shot direction.
+  // Keep the initial aim used by the staged target and fire without a mouse move.
+  const aim = await page.evaluate(() => ({
+    yaw: __test.camera.rotation.y,
+    pitch: __test.camera.rotation.x,
+  }));
+  assert.ok(Math.abs(aim.yaw) < 0.001 && Math.abs(aim.pitch) < 0.001, JSON.stringify(aim));
   await page.mouse.down();
   await page.evaluate(() => advanceTime(1000));
   await page.mouse.up();

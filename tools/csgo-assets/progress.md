@@ -61,11 +61,22 @@ In-site hosting and world-lighting iteration, October 6–7, 2026:
   files. Browsers load those assets from the website, not GitHub or Perplexity.
 - Restored the map port's baked light samples for 2,773 world surfaces in 42
   material groups. This does not restore displacement, prop or character lighting.
-- All 45 game-tool tests pass, with no skips. The production dashboard fixture
+- All 47 game-tool tests pass, with no skips. The production dashboard fixture
   build and full workspace unit suites pass; the app has 6,210 passing tests and
   four skips.
 - Repeated the default-theme/embed/SEO audit after native-route integration.
   No optional resources were requested in the tested default or embed states.
+- English desktop and Chinese narrow-screen same-site enter/return flows pass
+  without page errors. The native game regression passes all 60 routes and a
+  25-round match ending CT 16–T 9 with 111 kills; the human was idle during
+  the match simulation.
+- Fixed pending mouse-capture cancellation when opening menus and preserved
+  four world faces that have no baked light samples.
+- Native combat, scope, pause/resume and weapon-switch tests pass. Ten warmed
+  switch cycles keep 307 geometries and 318 textures. The standard input client
+  completes two hosted-adapter exploration passes without an error report.
+- Six staged bombsite/B-route views render without page errors; inspected
+  samples show no obvious missing walls. This is not original-renderer parity.
 - Browser-flow and full-game regression evidence is recorded separately in
   `evidence/site-integration.md`; no 95% fidelity claim or merge authorization
   follows from these implementation tests.

@@ -41,10 +41,11 @@ export function extractLighting(bsp) {
     const name = names.toString('utf8', nameAt, names.indexOf(0, nameAt));
     if (/tools|trigger|clip|skybox|nodraw|hint|areaportal/i.test(name)) continue;
     const lightAt = faces.readInt32LE(f + 20),
-      width = faces.readInt32LE(f + 36) + 1,
-      height = faces.readInt32LE(f + 40) + 1;
-    if (lightAt < 0 || width < 1 || height < 1 || width > 1024 || height > 1024) continue;
-    if (lightAt + width * height * 4 > lighting.length)
+      width = lightAt < 0 ? 1 : faces.readInt32LE(f + 36) + 1,
+      height = lightAt < 0 ? 1 : faces.readInt32LE(f + 40) + 1;
+    if (width < 1 || height < 1 || width > 1024 || height > 1024)
+      throw new Error('Invalid world-face lightmap dimensions');
+    if (lightAt >= 0 && lightAt + width * height * 4 > lighting.length)
       throw new Error('Lightmap samples exceed lump');
     const vectors = Array.from({ length: 4 }, (_, row) =>
       Array.from({ length: 4 }, (_value, col) => texInfo.readFloatLE(ti + row * 16 + col * 4)),
@@ -102,7 +103,10 @@ export function extractLighting(bsp) {
             Math.min(face.width - 1, Math.max(0, u))) *
             4;
         const dest = ((face.y + v) * atlasWidth + face.x + u) * 4;
-        lighting.copy(atlas, dest, src, src + 4);
+        if (face.lightAt < 0) {
+          // Retain unlit faces in replaced material groups with a neutral multiplier.
+          atlas.set([255, 255, 255, 0], dest);
+        } else lighting.copy(atlas, dest, src, src + 4);
       }
     if (!grouped.has(face.material)) grouped.set(face.material, []);
     const data = grouped.get(face.material);
@@ -117,8 +121,8 @@ export function extractLighting(bsp) {
           -p[1] * 0.01905,
           mapped[0] / face.textureWidth,
           1 - mapped[1] / face.textureHeight,
-          (face.x + mapped[2] - face.minU + 0.5) / atlasWidth,
-          (face.y + mapped[3] - face.minV + 0.5) / atlasHeight,
+          (face.x + (face.lightAt < 0 ? 0 : mapped[2] - face.minU) + 0.5) / atlasWidth,
+          (face.y + (face.lightAt < 0 ? 0 : mapped[3] - face.minV) + 0.5) / atlasHeight,
         );
       }
   }
@@ -138,7 +142,8 @@ export function extractLighting(bsp) {
     metadata: {
       version: 1,
       sourceSha256: sha(bsp),
-      surfaces: surfaces.length,
+      surfaces: surfaces.filter((face) => face.lightAt >= 0).length,
+      unlitSurfaces: surfaces.filter((face) => face.lightAt < 0).length,
       atlasWidth,
       atlasHeight,
       groups,

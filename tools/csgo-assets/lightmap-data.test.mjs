@@ -27,6 +27,7 @@ test('baked world geometry and light samples match their checked-in hashes', asy
     '0f91e0a20297ab32eb2bad31e9cd77d585de1ec82cadd6961e9373e7f16962a6',
   );
   assert.equal(metadata.surfaces, 2773);
+  assert.equal(metadata.unlitSurfaces, 4);
   for (const path of ['world.bin.gz', 'atlas.rgbe.gz']) {
     const bytes = await readFile(new URL(path, root));
     verify(bytes, { path, ...metadata[path] });
