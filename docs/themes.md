@@ -179,6 +179,17 @@ establish zero shared theme-selector overhead, guarantee search rankings, or
 replace production Core Web Vitals measurements. The shared pre-paint colors
 remain intentional to avoid a flash when an opted-in theme is restored.
 
+The isolation suites derive optional themes from `APP_THEMES`, so registering
+a new theme adds its embed and activation/teardown cases automatically.
+Halo is also included in the inactive-path asset and saved-preference guards.
+Keep artwork, font declarations, layout CSS and music behind the selection
+boundary. Do not add theme asset preload hints to shared layouts.
+The default-page checks seed saved music/sound opt-ins for every guarded theme;
+these preferences must not start media on light/dark pages or embeds.
+Crawler and theme-switch comparisons also cover robots, Open Graph and Twitter
+metadata. Run these tests on the implementation's final commit before merge;
+passing an earlier commit does not verify later changes.
+
 - Direct selection of every theme from the picker, keyboard navigation,
   persistence after reload, and cleanup on exit.
 - No CS:GO image requests on a cold light/dark landing; images load only

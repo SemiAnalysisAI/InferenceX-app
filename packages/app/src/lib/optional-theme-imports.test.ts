@@ -2,9 +2,11 @@ import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
+import { APP_THEMES } from './themes';
 
 const src = path.resolve(import.meta.dirname, '..');
-const optionalDirectory = /^components\/(?:minecraft|csgo|gta|kart|halo)\//;
+const optionalThemes = APP_THEMES.filter((theme) => !['light', 'dark', 'system'].includes(theme));
+const optionalDirectory = new RegExp(`^components/(?:${optionalThemes.join('|')})/`);
 // These wrappers contain only activation gates and dynamic imports.
 const wrappers = new Set([
   'components/minecraft/minecraft-splash.tsx',
@@ -12,8 +14,10 @@ const wrappers = new Set([
   'components/halo/halo-toggles-lazy.tsx',
 ]);
 const engine = /^(?:three|@react-three\/[^/]+|@dimforge\/rapier[^/]*)(?:\/|$)/;
-const optionalAsset =
-  /(?:\/decorative\/(?:minecraft|csgo|gta|kart|halo)\/|minecraft-click\.mp3|Monocraft-|Pricedown|ChaletComprime|Industry-)/i;
+const optionalAsset = new RegExp(
+  `(?:/decorative/(?:${optionalThemes.join('|')})/|minecraft-click\\.mp3|Monocraft-|Pricedown|ChaletComprime|Industry-|halo[^/]*\\.(?:woff2?|ttf|otf|mp3|ogg|wav))`,
+  'i',
+);
 
 /** Static runtime imports, including re-exports. Dynamic imports stay behind their gate. */
 function imports(text: string): string[] {
