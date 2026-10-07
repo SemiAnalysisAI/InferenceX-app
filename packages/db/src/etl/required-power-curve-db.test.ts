@@ -1,20 +1,16 @@
-import { PGlite } from '@electric-sql/pglite';
+import type { PGlite } from '@electric-sql/pglite';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { beforeAll, beforeEach, afterAll, describe, it, expect } from 'vitest';
-import type { DbClient } from '../connection';
+import { migratedPglite, pgliteSql, type PgliteSql } from '../lib/test-pglite';
 import { readBenchmarkArtifacts } from './benchmark-artifacts';
 import { preflightRequiredPowerCurves } from './required-power-curve';
 import { verifyRequiredPowerArtifacts } from './required-power-publication';
 import { createSkipTracker } from './skip-tracker';
 import { getLatestBenchmarks } from '../queries/benchmarks';
 let db: PGlite;
-const sql: DbClient = async (strings, ...values) => {
-  const query = strings.reduce((text, part, index) => text + (index ? `$${index}` : '') + part, '');
-  const result = await db.query<Record<string, unknown>>(query, values);
-  return result.rows;
-};
+let sql: PgliteSql;
 const golden = path.resolve(import.meta.dirname, 'fixtures/powerx-manifest-v2');
 const source = { runId: 123, runAttempt: 1, headSha: 'b'.repeat(40) };
 const options = { date: '2026-09-16', runStartedAt: '2026-09-16T00:00:00Z', appendOnly: false };
@@ -27,13 +23,8 @@ function preflight(root: string, runSource = source) {
   return preflightRequiredPowerCurves(sql, required, files, runSource, options);
 }
 beforeAll(async () => {
-  db = await PGlite.create();
-  const dir = new URL('../../migrations/', import.meta.url);
-  for (const file of fs
-    .readdirSync(dir)
-    .filter((name) => name.endsWith('.sql'))
-    .sort())
-    await db.exec(fs.readFileSync(new URL(file, dir), 'utf8'));
+  db = await migratedPglite();
+  sql = pgliteSql(db);
 }, 20000);
 afterAll(async () => {
   await db?.close();

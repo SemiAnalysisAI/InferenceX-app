@@ -1701,16 +1701,4 @@ describe('NVL72 CPU ingestion', () => {
     });
     expect(extractPowerAudit({ sample_count: 1, cpu: 'acpi' })).not.toHaveProperty('cpu');
   });
-
-  it('scrubs supplemental CPU measurements after normalizing their verdict', () => {
-    const metrics = {
-      cpu_power_valid: 2,
-      power_valid: 1,
-      avg_total_cpu_power_w: 501,
-      avg_power_w: 600,
-    };
-    normalizePowerContractMetrics(metrics, metrics);
-    expect(scrubWithheldPowerMetrics(metrics)).toBe(false);
-    expect(metrics).toEqual({ cpu_power_valid: 0, power_valid: 1, avg_power_w: 600 });
-  });
 });

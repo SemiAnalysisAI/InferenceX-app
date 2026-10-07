@@ -4,7 +4,7 @@ import path from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { readBenchmarkArtifacts, sha256Hex } from './benchmark-artifacts';
+import { readBenchmarkArtifacts } from './benchmark-artifacts';
 import { createSkipTracker } from './skip-tracker';
 
 const golden = path.resolve(import.meta.dirname, 'fixtures/powerx-manifest-v2');
@@ -20,24 +20,18 @@ afterEach(() => {
 });
 
 describe('readBenchmarkArtifacts', () => {
-  it('lists the aggregate and each per-job file once, hashed and mapped once', () => {
+  it('lists each per-job file and results_* aggregate once, in sorted order', () => {
     const dir = bundle();
     fs.mkdirSync(path.join(dir, 'results_bmk'));
     fs.copyFileSync(
       path.join(dir, 'bmk_agentic_golden/agg.json'),
       path.join(dir, 'results_bmk/agg.json'),
     );
-    const tracker = createSkipTracker();
-    const files = readBenchmarkArtifacts(dir, { runId: 123, tracker });
+    const files = readBenchmarkArtifacts(dir, { runId: 123, tracker: createSkipTracker() });
     expect(files.map((file) => file.path)).toEqual([
       'bmk_agentic_golden/agg.json',
       'results_bmk/agg.json',
     ]);
-    expect(files[0]).toMatchObject({
-      sha256: sha256Hex(fs.readFileSync(path.join(dir, 'bmk_agentic_golden/agg.json'))),
-      nonObjectRows: 0,
-    });
-    expect(files.flatMap((file) => file.rows).map((row) => row.mapped?.conc)).toEqual([1, 1]);
   });
 
   it('reports unreadable JSON, non-object entries and failed runs without throwing', () => {

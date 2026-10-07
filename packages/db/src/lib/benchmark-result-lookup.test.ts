@@ -2,8 +2,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import { PGlite } from '@electric-sql/pglite';
-import type postgres from 'postgres';
+import type { PGlite } from '@electric-sql/pglite';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { mapBenchmarkRow, type BenchmarkParams } from '../etl/benchmark-mapper';
@@ -14,20 +13,11 @@ import {
   readMappedBenchmarkRows,
 } from './benchmark-result-lookup';
 import { collectMissingTelemetryExpectations } from './gpu-metrics-backfill';
+import { migratedPglite, pgliteSql, type PgliteSql } from './test-pglite';
 
-type Sql = postgres.Sql;
 let db: PGlite;
-let sql: Sql;
+let sql: PgliteSql;
 const roots: string[] = [];
-
-function queryClient(database: Pick<PGlite, 'query'>) {
-  const client = async (strings: TemplateStringsArray, ...values: unknown[]) => {
-    const query = strings.reduce((text, part, i) => text + (i ? `$${i}` : '') + part, '');
-    const result = await database.query(query, values);
-    return result.rows;
-  };
-  return Object.assign(client, { json: JSON.stringify, array: (value: unknown) => value });
-}
 
 const GITHUB_RUN_ID = 34557177019;
 const RUN = { github_run_id: GITHUB_RUN_ID, run_attempt: 2 };
@@ -57,12 +47,8 @@ function mapped(raw: Record<string, unknown>): BenchmarkParams {
 }
 
 beforeAll(async () => {
-  db = await PGlite.create();
-  const dir = new URL('../../migrations/', import.meta.url);
-  for (const name of fs.readdirSync(dir).toSorted()) {
-    if (name.endsWith('.sql')) await db.exec(fs.readFileSync(new URL(name, dir), 'utf8'));
-  }
-  sql = queryClient(db) as unknown as Sql;
+  db = await migratedPglite();
+  sql = pgliteSql(db);
 }, 30_000);
 
 afterEach(() => {

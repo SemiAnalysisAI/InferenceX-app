@@ -1,28 +1,20 @@
-import fs from 'node:fs';
-
-import { PGlite } from '@electric-sql/pglite';
+import type { PGlite } from '@electric-sql/pglite';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import type { DbClient } from '../connection';
+import { migratedPglite, pgliteSql, type PgliteSql } from '../lib/test-pglite';
 import { getGpuMetricsForPoint, getGpuMetricsForRun, SAMPLE_PAGE_SIZE } from './gpu-metrics';
 
 let db: PGlite;
-const sql: DbClient = async (strings, ...values) => {
-  const query = strings.reduce((text, part, i) => text + (i ? `$${i}` : '') + part, '');
-  const result = await db.query<Record<string, unknown>>(query, values);
-  return result.rows;
-};
+let sql: PgliteSql;
 
 const WITH_SERIES = 34557177019;
 const RETRIED = 34557177021;
 const NO_SERIES = 34557177023;
 
 beforeAll(async () => {
-  db = await PGlite.create();
-  for (const name of ['001_initial_schema.sql', '016_gpu_metrics.sql']) {
-    await db.exec(fs.readFileSync(new URL(`../../migrations/${name}`, import.meta.url), 'utf8'));
-  }
-  await db.exec('ALTER TABLE benchmark_results ADD COLUMN power_audit jsonb');
+  db = await migratedPglite();
+  sql = pgliteSql(db);
 }, 20_000);
 
 afterAll(async () => {
@@ -79,7 +71,7 @@ beforeEach(async () => {
     INSERT INTO gpu_metric_samples (series_id, gpu_index, sampled_at, power_w, temperature_c,
       sm_clock_mhz, mem_clock_mhz, gpu_util_pct, mem_util_pct, edge_temp_c, mem_temp_c,
       gfx_voltage_mv, soc_voltage_mv, mem_voltage_mv, fclk_mhz, socclk_mhz, mm_activity_pct)
-    VALUES (100, 0, '2026-09-11T04:19:41Z', 187.5, 33, 120, 3996, 0, 0,
+    VALUES (100, 0, '2026-09-11T04:19:41Z', 187.5, 33, 120, 3996, 0, 5,
               35.5, 40.5, 750, 800, 1350, 1940, 1100, 12.5),
            (100, 1, '2026-09-11T04:19:41Z', 190.5, 39, 120, 3996, 0, 0,
               null, null, null, null, null, null, null, null),
@@ -130,44 +122,30 @@ describe('getGpuMetricsForRun', () => {
       sidecars: { context: { timestamp_timezone: 'UTC' } },
     });
     // Statistics come from the stored samples; a missing reading is not zero.
-    expect(node0?.stats.filter((stat) => stat.metric === 'power_w')).toEqual([
-      {
-        gpuIndex: 0,
-        metric: 'power_w',
-        count: 1,
-        min: 187.5,
-        max: 187.5,
-        mean: 187.5,
-        median: 187.5,
-        p95: 187.5,
-        p99: 187.5,
-        stddev: 0,
-      },
-      {
-        gpuIndex: 1,
-        metric: 'power_w',
-        count: 1,
-        min: 190.5,
-        max: 190.5,
-        mean: 190.5,
-        median: 190.5,
-        p95: 190.5,
-        p99: 190.5,
-        stddev: 0,
-      },
-    ]);
-    expect(node0?.stats).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ gpuIndex: 0, metric: 'edge_temp_c', mean: 35.5, count: 1 }),
-        expect.objectContaining({ gpuIndex: 0, metric: 'gpu_util_pct', mean: 0, count: 1 }),
-        expect.objectContaining({ gpuIndex: 0, metric: 'mem_voltage_mv', mean: 1350, count: 1 }),
-      ]),
-    );
+    const gpu0 = node0!.stats.filter((stat) => stat.gpuIndex === 0);
+    expect(Object.fromEntries(gpu0.map((stat) => [stat.metric, [stat.count, stat.mean]]))).toEqual({
+      power_w: [1, 187.5],
+      temperature_c: [1, 33],
+      sm_clock_mhz: [1, 120],
+      mem_clock_mhz: [1, 3996],
+      gpu_util_pct: [1, 0],
+      mem_util_pct: [1, 5],
+      edge_temp_c: [1, 35.5],
+      mem_temp_c: [1, 40.5],
+      gfx_voltage_mv: [1, 750],
+      soc_voltage_mv: [1, 800],
+      mem_voltage_mv: [1, 1350],
+      fclk_mhz: [1, 1940],
+      socclk_mhz: [1, 1100],
+      mm_activity_pct: [1, 12.5],
+    });
     expect(node0?.data.map((sample) => [sample.timestamp, sample.index, sample.power])).toEqual([
       ['2026-09-11T04:19:41.000Z', 0, 187.5],
       ['2026-09-11T04:19:41.000Z', 1, 190.5],
       ['2026-09-11T04:19:42.000Z', 0, 0],
     ]);
+    // Collector dropout: power reads 0 W, every other metric stays absent rather than 0.
+    expect(node0?.data[2]).toEqual({ timestamp: '2026-09-11T04:19:42.000Z', index: 0, power: 0 });
     expect(node0?.data[0]).toEqual({
       timestamp: '2026-09-11T04:19:41.000Z',
       index: 0,
@@ -176,7 +154,7 @@ describe('getGpuMetricsForRun', () => {
       smClock: 120,
       memClock: 3996,
       gpuUtil: 0,
-      memUtil: 0,
+      memUtil: 5,
       edgeTemp: 35.5,
       memTemp: 40.5,
       gfxVoltage: 750,
@@ -194,36 +172,6 @@ describe('getGpuMetricsForRun', () => {
     expect(payload?.series.map((series) => ({ id: series.id, vendor: series.vendor }))).toEqual([
       { id: 102, vendor: 'amd' },
     ]);
-  });
-
-  it('reports a dropped sample as zero power with every other metric absent', async () => {
-    const payload = await getGpuMetricsForRun(sql, WITH_SERIES);
-    const dropped = payload?.series[0]?.data.at(-1);
-    // Power keeps the `?? 0` default (a null power reading is indistinguishable
-    // from a genuine 0 W reading once it reaches the chart); the other metrics
-    // stay absent so a power-only collector never shows up as 0 °C / 0 MHz / 0 %.
-    expect(dropped).toEqual({
-      timestamp: '2026-09-11T04:19:42.000Z',
-      index: 0,
-      power: 0,
-      temperature: undefined,
-      smClock: undefined,
-      memClock: undefined,
-      gpuUtil: undefined,
-      memUtil: undefined,
-      edgeTemp: undefined,
-      memTemp: undefined,
-      gfxVoltage: undefined,
-      socVoltage: undefined,
-      memVoltage: undefined,
-      fclk: undefined,
-      socClk: undefined,
-      mmActivity: undefined,
-    });
-    // Absent rather than zeroed, so consumers can tell "not collected" from
-    // "collected as zero" for everything except power.
-    expect(Object.hasOwn(dropped!, 'edgeTemp')).toBe(true);
-    expect(dropped?.edgeTemp).toBeUndefined();
   });
 });
 

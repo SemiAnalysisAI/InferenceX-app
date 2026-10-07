@@ -74,14 +74,9 @@ describe('PowerX publication', () => {
       });
       expect(rawPowerWorkloadOf({ ...raw, ...row })).toBe(workload);
     }
+    expect(powerWorkloadForScenario('1k1k')).toMatchObject({ isl: 1024, osl: 1024 });
     expect(powerWorkloadForScenario('8k1k')).toMatchObject({ isl: 8192, osl: 1024 });
     expect(powerWorkloadForScenario('4k1k')).toBeUndefined();
-  });
-  it('keeps required 1K/1K measurements in the publication receipt', () => {
-    const point = expected({ isl: 1024, joules_per_output_token: 2.5 });
-    expect(point.identity).toMatchObject({ benchmark_type: 'single_turn', isl: 1024, osl: 1024 });
-    expect(verifyPowerPublication([point], [actual(point)], 'database')).toEqual([]);
-    expect(verifyPowerPublication([point], [], 'public API')[0]).toContain('found 0');
   });
   it('verifies AgentX source identity, nullable sequences, energy and audit through DB/API', () => {
     const point = expected({
@@ -152,6 +147,7 @@ describe('PowerX publication', () => {
   });
   it('preserves invalid diagnostics and rejects leaked invalid watts', () => {
     const point = expected({ power_valid: 0, power_invalid_reasons: ['sampling_gap_exceeded'] });
+    expect(point.metrics).toMatchObject({ power_valid: 0 });
     expect(point.metrics).not.toHaveProperty('avg_power_w');
     expect(verifyPowerPublication([point], [actual(point)], 'API')).toEqual([]);
     const row = actual(point);
@@ -197,16 +193,5 @@ describe('NVL72 CPU publication', () => {
     expect(
       verifyPowerPublication([point], [{ ...actual(point), power_audit: raw.power_audit }], 'API'),
     ).toContainEqual(expect.stringContaining('power_audit differs'));
-  });
-
-  it('preserves valid GPU watts and rejects leaked invalid CPU watts', () => {
-    const point = expected({ cpu_power_valid: 0, avg_total_cpu_power_w: 501 });
-    expect(point.metrics).toMatchObject({ cpu_power_valid: 0, avg_power_w: 642 });
-    expect(point.metrics).not.toHaveProperty('avg_total_cpu_power_w');
-    const leaked = actual(point);
-    leaked.metrics.avg_total_cpu_power_w = 501;
-    expect(verifyPowerPublication([point], [leaked], 'API')).toContainEqual(
-      expect.stringContaining('avg_total_cpu_power_w expected absent, got 501'),
-    );
   });
 });

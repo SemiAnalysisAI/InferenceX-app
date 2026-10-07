@@ -2,8 +2,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import { PGlite } from '@electric-sql/pglite';
-import type postgres from 'postgres';
+import type { PGlite } from '@electric-sql/pglite';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { computeGpuMetricStats } from './gpu-metrics-csv';
@@ -14,24 +13,12 @@ import {
 } from './gpu-metrics-ingest';
 
 import type { DbClient } from '../connection';
+import { migratedPglite, pgliteSql, type PgliteSql } from '../lib/test-pglite';
 import { getGpuMetricsForPoint } from '../queries/gpu-metrics';
 
-type Sql = postgres.Sql;
 let db: PGlite;
-let sql: Sql;
+let sql: PgliteSql;
 const roots: string[] = [];
-
-function queryClient(database: Pick<PGlite, 'query'>) {
-  const client = async (strings: TemplateStringsArray, ...values: unknown[]) => {
-    const query = strings.reduce((text, part, i) => text + (i ? `$${i}` : '') + part, '');
-    const result = await database.query<Record<string, unknown>>(query, values);
-    return result.rows;
-  };
-  return Object.assign(client, {
-    json: JSON.stringify,
-    array: (value: unknown) => value,
-  });
-}
 
 async function storedSeries(seriesId: number) {
   return {
@@ -44,16 +31,8 @@ async function storedSeries(seriesId: number) {
 }
 
 beforeAll(async () => {
-  db = await PGlite.create();
-  for (const name of ['001_initial_schema.sql', '016_gpu_metrics.sql']) {
-    await db.exec(fs.readFileSync(new URL(`../../migrations/${name}`, import.meta.url), 'utf8'));
-  }
-  // The point reader aggregates benchmark_results.power_audit (migration 015).
-  await db.exec('ALTER TABLE benchmark_results ADD COLUMN power_audit jsonb');
-  sql = Object.assign(queryClient(db), {
-    begin: (fn: (tx: Sql) => Promise<unknown>) =>
-      db.transaction((tx) => fn(queryClient(tx) as unknown as Sql)),
-  }) as unknown as Sql;
+  db = await migratedPglite();
+  sql = pgliteSql(db);
 }, 20_000);
 
 beforeEach(async () => {
@@ -165,6 +144,14 @@ describe('prepareGpuMetricsArtifact', () => {
     ]);
     expect(hostA!.sidecars.energyStart).toBeNull();
   });
+
+  it('prefers an SMI CSV in the bundle over its per-host power samples', () => {
+    const artifact = writePowerAuditArtifact();
+    fs.writeFileSync(path.join(artifact.artifactDir, 'gpu_metrics.csv'), NVIDIA_CSV);
+    expect(prepareGpuMetricsArtifact(artifact).map((series) => series.fileName)).toEqual([
+      'gpu_metrics.csv',
+    ]);
+  });
 });
 
 describe('ingestGpuMetricsArtifact', () => {
@@ -257,6 +244,11 @@ describe('ingestGpuMetricsArtifact', () => {
     expect(relinked.map((l) => Number(l.benchmark_result_id))).toEqual([10, 11]);
     const [count] = await sql<{ n: number }[]>`select count(*)::int as n from gpu_metric_samples`;
     expect(count!.n).toBe(4);
+    // Models a parser change: the stored count no longer matches the unchanged CSV.
+    await sql`update gpu_metric_series set sample_count = 5`;
+    expect(
+      await ingestGpuMetricsArtifact(sql, { workflowRunId: 1, artifact, benchmarkResultIds: [] }),
+    ).toMatchObject({ samplesInserted: 4, seriesSkipped: 0 });
   });
 
   it('replaces unchanged series when forced, so a parser fix reaches stored samples', async () => {
@@ -335,18 +327,12 @@ describe('getGpuMetricsForPoint under telemetry re-ingest', () => {
     // PGlite has one connection: committing the re-ingest before the series rows
     // reach the reader models a concurrent writer between two autocommit reads.
     const reader: DbClient = async (strings, ...values) => {
-      const rows = await queryClient(db)(strings, ...values);
+      const rows = await sql(strings, ...values);
       if (!reingest && strings.join('').includes('from benchmark_result_gpu_metrics link')) {
-        // One more scrape per GPU changes the CSV hash and the sample count.
+        // Same CSV and count, new timezone: only ingested_at marks the new version.
         reingest = await ingestGpuMetricsArtifact(sql, {
           workflowRunId: 1,
-          artifact: writeArtifact(
-            [
-              NVIDIA_CSV,
-              '2026/09/11 04:19:43.990, 0, 700.00 W, 60, 1900 MHz, 3996 MHz, 90 %, 70 %',
-              '2026/09/11 04:19:43.994, 1, 702.50 W, 61, 1900 MHz, 3996 MHz, 91 %, 71 %',
-            ].join('\n'),
-          ),
+          artifact: writeArtifact(NVIDIA_CSV, '+02:00'),
           benchmarkResultIds: [10],
         });
       }
@@ -355,12 +341,10 @@ describe('getGpuMetricsForPoint under telemetry re-ingest', () => {
 
     const payload = await getGpuMetricsForPoint(reader, 10);
 
-    expect(reingest).toMatchObject({ seriesIds: first.seriesIds, samplesInserted: 6 });
+    expect(reingest).toMatchObject({ seriesIds: first.seriesIds, samplesInserted: 4 });
     const [series] = payload!.series;
-    expect(series!.sampleCount).toBe(6);
-    expect(series!.data).toHaveLength(6);
-    expect(
-      series!.stats.filter((stat) => stat.metric === 'power_w').map((stat) => stat.count),
-    ).toEqual([3, 3]);
+    expect(series!.sidecars).toMatchObject({ context: { timestamp_timezone: '+02:00' } });
+    expect(series!.startedAt).toBe('2026-09-11T02:19:41.982Z');
+    expect(series!.data[0]!.timestamp).toBe(series!.startedAt);
   });
 });

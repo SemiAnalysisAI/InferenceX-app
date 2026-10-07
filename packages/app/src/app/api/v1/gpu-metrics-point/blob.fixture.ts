@@ -2,10 +2,9 @@ import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 
 /** Local HTTP transport for the real Blob SDK; never contacts a Blob store. */
-export async function startPowerxBlobFixture(port = 0) {
+export async function startPowerxBlobFixture() {
   const objects = new Map<string, string>();
-  const counts = { reads: 0, writes: 0, failedWrites: 0 };
-  let rejectWrites = false;
+  const counts = { reads: 0, writes: 0 };
   const server = createServer(async (request, response) => {
     const url = new URL(request.url!, 'http://localhost');
     const pathname = url.searchParams.get('pathname') ?? url.searchParams.get('url');
@@ -24,11 +23,6 @@ export async function startPowerxBlobFixture(port = 0) {
     if (!pathname) return fail(400, 'bad_request');
     if (request.method === 'PUT') {
       counts.writes++;
-      if (rejectWrites) {
-        counts.failedWrites++;
-        request.resume();
-        return fail(403, 'forbidden');
-      }
       const chunks: Buffer[] = [];
       for await (const chunk of request) chunks.push(Buffer.from(chunk));
       objects.set(pathname, Buffer.concat(chunks).toString());
@@ -49,20 +43,17 @@ export async function startPowerxBlobFixture(port = 0) {
     );
   });
   await new Promise<void>((resolve) => {
-    server.listen(port, '127.0.0.1', resolve);
+    server.listen(0, '127.0.0.1', resolve);
   });
   const address = server.address() as AddressInfo;
   return {
     env: {
       VERCEL_BLOB_API_URL: `http://127.0.0.1:${address.port}`,
       BLOB_READ_WRITE_TOKEN: 'vercel_blob_rw_local_fixture',
-      BLOB_CACHE_PREFIX: 'powerx-local-acceptance',
+      BLOB_CACHE_PREFIX: 'test-cache',
     },
     objects,
     counts,
-    rejectWrites: (value: boolean) => {
-      rejectWrites = value;
-    },
     close: () =>
       new Promise<void>((resolve, reject) => {
         server.closeAllConnections();

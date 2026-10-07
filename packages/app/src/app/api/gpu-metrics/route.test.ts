@@ -91,6 +91,19 @@ afterEach(() => {
   }
 });
 
+const multinodeSeries = {
+  artifactName: 'gpu_metrics_multinode_b200-x_0',
+  fileName: 'results/gpu_metrics_rank0.csv',
+  vendor: 'nvidia',
+  sampleIntervalS: 1,
+  sampleCount: 0,
+  gpuCount: 0,
+  startedAt: '2026-09-11T04:19:41.982Z',
+  endedAt: '2026-09-11T04:19:41.982Z',
+  sidecars: {},
+  stats: [],
+  data: [],
+};
 const storedRunPayload = {
   workflowRun: {
     id: 7,
@@ -107,68 +120,20 @@ const storedRunPayload = {
   },
   series: [
     {
+      ...multinodeSeries,
       id: 1,
       artifactName: 'gpu_metrics_dsr1_conc32_b200-x_0',
       fileName: 'gpu_metrics.csv',
-      vendor: 'nvidia',
-      sampleIntervalS: 1,
       sampleCount: 2,
       gpuCount: 1,
-      startedAt: '2026-09-11T04:19:41.982Z',
       endedAt: '2026-09-11T04:19:42.990Z',
-      sidecars: {},
-      stats: [],
       data: [
-        {
-          timestamp: '2026-09-11T04:19:41.982Z',
-          index: 0,
-          power: 187.8,
-          temperature: 33,
-          smClock: 120,
-          memClock: 3996,
-          gpuUtil: 0,
-          memUtil: 0,
-        },
-        {
-          timestamp: '2026-09-11T04:19:42.990Z',
-          index: 0,
-          power: 912.1,
-          temperature: 61,
-          smClock: 1965,
-          memClock: 3996,
-          gpuUtil: 98,
-          memUtil: 74,
-        },
+        { timestamp: '2026-09-11T04:19:41.982Z', index: 0, power: 187.8 },
+        { timestamp: '2026-09-11T04:19:42.990Z', index: 0, power: 912.1 },
       ],
     },
-    {
-      id: 2,
-      artifactName: 'gpu_metrics_multinode_b200-x_0',
-      fileName: 'results/gpu_metrics_rank0.csv',
-      vendor: 'nvidia',
-      sampleIntervalS: 1,
-      sampleCount: 0,
-      gpuCount: 0,
-      startedAt: '2026-09-11T04:19:41.982Z',
-      endedAt: '2026-09-11T04:19:41.982Z',
-      sidecars: {},
-      stats: [],
-      data: [],
-    },
-    {
-      id: 3,
-      artifactName: 'gpu_metrics_multinode_b200-x_0',
-      fileName: 'results/gpu_metrics_rank1.csv',
-      vendor: 'nvidia',
-      sampleIntervalS: 1,
-      sampleCount: 0,
-      gpuCount: 0,
-      startedAt: '2026-09-11T04:19:41.982Z',
-      endedAt: '2026-09-11T04:19:41.982Z',
-      sidecars: {},
-      stats: [],
-      data: [],
-    },
+    { ...multinodeSeries, id: 2 },
+    { ...multinodeSeries, id: 3, fileName: 'results/gpu_metrics_rank1.csv' },
   ],
 };
 
@@ -198,29 +163,23 @@ describe('databasePayloadToResponse', () => {
 });
 
 describe('GET /api/gpu-metrics — database first', () => {
-  it('serves the stored digest without touching GitHub when the run is ingested', async () => {
+  it('answers stored runs without GitHub, reading every artifact for GET and one host for a view', async () => {
     process.env.DATABASE_READONLY_URL = 'postgresql://readonly.example.test/db';
-    mockGetGpuMetricsForRun.mockResolvedValueOnce(storedRunPayload);
     globalThis.fetch = vi.fn();
-
-    const res = await GET(req('/api/gpu-metrics?runId=34557177019'));
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body.source).toBe('database');
-    expect(body.artifacts).toHaveLength(3);
-    expect(mockGetGpuMetricsForRun).toHaveBeenCalledWith({}, 34557177019, {});
-    expect(globalThis.fetch).not.toHaveBeenCalled();
-  });
-
-  it('passes selectors to the reader and preserves exact host labels for a scoped view', async () => {
-    process.env.DATABASE_READONLY_URL = 'postgresql://readonly.example.test/db';
     const names = databasePayloadToResponse(storedRunPayload).artifacts.map((entry) => entry.name);
+    mockGetGpuMetricsForRun.mockResolvedValueOnce(storedRunPayload);
+    const all = await GET(req('/api/gpu-metrics?runId=34557177019'));
+    expect(await all.json()).toMatchObject({
+      source: 'database',
+      artifacts: names.map((name) => ({ name })),
+    });
+    // An absent selection reads every artifact; `artifact: null` narrows to the first.
+    expect(mockGetGpuMetricsForRun).toHaveBeenCalledWith({}, 34557177019, {});
     mockGetGpuMetricsForRun.mockResolvedValueOnce({
       ...storedRunPayload,
       artifactNames: names,
       series: [storedRunPayload.series[2]],
     });
-    globalThis.fetch = vi.fn();
     const response = await readGpuMetricsForView(
       req('/api/gpu-metrics?runId=34557177019'),
       names[2]!,

@@ -38,6 +38,7 @@ function changeManifest(dir: string, edit: (manifest: any) => void) {
   edit(manifest);
   write(dir, manifestPath, manifest);
 }
+const agentic = (manifest: any) => manifest.matrix.single_node.agentic;
 function changeArtifact(dir: string, file: string, edit: (value: any) => void) {
   const value = json(dir, file);
   edit(value);
@@ -182,6 +183,31 @@ describe('required power publication contract', () => {
     expect(() => verifyRequiredPowerArtifacts(dir, source, true)).toThrow('sweep manifest missing');
     expect(verifyRequiredPowerArtifacts(dir, source)).toBeNull();
   });
+  it.each<[string, (manifest: any) => void, string]>([
+    ['another run', (m) => Object.assign(m, { 'run-id': 124 }), 'source run, attempt or head'],
+    ['a later attempt', (m) => Object.assign(m, { 'run-attempt': 2 }), 'source run, attempt'],
+    ['another head', (m) => Object.assign(m, { head: 'c'.repeat(40) }), 'source run, attempt'],
+    ['schema-version 1', (m) => Object.assign(m, { 'schema-version': 1 }), 'schema-version'],
+    ['a duplicate row', (m) => agentic(m).push(agentic(m)[0]), 'duplicate matrix point'],
+    ['optional rows only', (m) => (agentic(m)[0]['require-power'] = false), 'no required'],
+    ['conc [1, 2]', (m) => (agentic(m)[0].conc = [1, 2]), 'missing benchmark point'],
+  ])('rejects a manifest with %s', (_, edit, message) => {
+    const dir = fixture();
+    changeManifest(dir, edit);
+    expect(() => verifyRequiredPowerArtifacts(dir, source)).toThrow(message);
+  });
+  it.each([{ power_valid: 0 }, { power_metric_schema_version: 1 }])(
+    'rejects a required row with %j',
+    (change) => {
+      const dir = fixture();
+      changeArtifact(dir, benchmarkPath, (value) => Object.assign(value, change));
+      expect(() => verifyRequiredPowerArtifacts(dir, source)).toThrow('invalid power verdict');
+    },
+  );
+  it('accepts the declared scope of an earlier attempt of the same run and head', () => {
+    const scope = verifyRequiredPowerArtifacts(golden, { ...source, runAttempt: 2 });
+    expect(scope?.points).toHaveLength(1);
+  });
   it('rejects hash mismatches and explicit invalid evidence', () => {
     const dir = fixture();
     fs.appendFileSync(path.join(dir, 'agentic_golden/gpu_metrics.csv'), '\n');
@@ -231,11 +257,9 @@ describe('required power publication contract', () => {
     });
     expect(() => verifyRequiredPowerArtifacts(dir, source)).toThrow('unsupported telemetry_kind');
   });
-  it('accepts a native multinode bundle with per-node receipts', () => {
-    expect(verifyRequiredPowerArtifacts(nativeFixture(), source)?.points).toHaveLength(1);
-  });
-  it('rejects a native receipt whose telemetry hash differs', () => {
+  it('accepts a native multinode bundle and rejects a receipt whose telemetry hash differs', () => {
     const dir = nativeFixture();
+    expect(verifyRequiredPowerArtifacts(dir, source)?.points).toHaveLength(1);
     changeArtifact(dir, auditPath, (audit) => {
       audit.nodes[0].telemetry_sha256 = 'f'.repeat(64);
     });

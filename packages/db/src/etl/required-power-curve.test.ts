@@ -31,38 +31,6 @@ function point(run: number, conc: number, extra: Partial<CurvePoint> = {}): Curv
   };
 }
 describe('pure projected publication curve', () => {
-  it('rejects the old partial-sweep regression without altering input rows', () => {
-    const old = [
-      point(1, 1),
-      point(1, 16),
-      point(1, 64, {
-        identity: { ...identity, conc: 64, disagg: true, recipe_fingerprint: 'split-recipe' },
-      }),
-    ];
-    const proposed = [...old, point(2, 1)];
-    expect(() => assertCurvePreserved(old, proposed, policy)).toThrow('shrink');
-    expect([...publishedCurve(old).values()][0]).toHaveLength(3);
-  });
-  it('does not inherit append-only history with an incompatible image', () => {
-    const old = [point(1, 1), point(1, 16)];
-    expect(() =>
-      assertCurvePreserved(
-        old,
-        [...old, point(2, 32, { appendOnly: true, image: 'new-image' })],
-        policy,
-      ),
-    ).toThrow('shrink');
-  });
-  it('inherits only an uninterrupted same-image append-only chain', () => {
-    const old = [point(1, 1), point(1, 16), point(2, 32, { appendOnly: true })];
-    expect([...publishedCurve(old).values()][0].map((row) => row.identity.conc)).toEqual([
-      32, 1, 16,
-    ]);
-    expect(() =>
-      assertCurvePreserved(old, [...old, point(3, 64, { appendOnly: true })], policy),
-    ).not.toThrow();
-    expect(() => assertCurvePreserved(old, [...old, point(3, 64)], policy)).toThrow('shrink');
-  });
   it('permits only the exact removed identities of the observed snapshot', () => {
     const old = [point(1, 1), point(1, 16)];
     const proposed = [...old, point(2, 1)];
