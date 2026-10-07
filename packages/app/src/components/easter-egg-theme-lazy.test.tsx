@@ -27,6 +27,7 @@ vi.mock('./kart/kart-decorations', () => {
 let container: HTMLDivElement;
 let root: Root;
 beforeEach(() => {
+  window.history.replaceState(null, '', '/');
   document.documentElement.className = 'dark';
   delete document.documentElement.dataset.inferencexEmbed;
   container = document.createElement('div');
@@ -51,6 +52,19 @@ function Probe() {
 }
 
 describe('optional theme boundary', () => {
+  it.each(['/embed/model/deepseek-v4', '/zh/embed/model/deepseek-v4'])(
+    'does not import a saved theme before the embed boot attribute exists at %s',
+    async (path) => {
+      window.history.replaceState(null, '', path);
+      act(() => root.render(<EasterEggThemeLazy />));
+      for (const theme of ['minecraft', 'csgo', 'gta', 'kart']) {
+        await change(theme);
+        expect(container.innerHTML).toBe('');
+        expect(loaded).not.toHaveBeenCalled();
+      }
+    },
+  );
+
   it('never renders or imports themes on the server or a cold default page', async () => {
     document.documentElement.className = 'kart';
     expect(renderToString(<EasterEggThemeLazy />)).toBe('');

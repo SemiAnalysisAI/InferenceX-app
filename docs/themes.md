@@ -10,13 +10,19 @@ theme's icon and expands a compact column with one icon button per theme in
 `theme_toggled`.
 The existing default remains dark; the system setting remains supported.
 
+The root `EasterEggThemeLazy` boundary imports only the selected optional theme.
+Light/dark pages, first-time visits, system-theme visits and embeds do not render
+that boundary's content. The shared activation hook checks both the embed
+pathname and the pre-paint attribute so a saved optional theme cannot start
+loading while a streamed embed is waiting for its boot markup.
+
 Minecraft has several independent paths:
 
-- `globals.css`: semantic tokens, global Monocraft typography, square corners,
-  beveled controls, pixelated images, and the grass-colored header rule.
-  Tailwind's `dark` variant also applies to Minecraft.
-- `MinecraftBackgroundLazy`: observes the root class before importing the
-  background. That background dynamically imports a React Three Fiber scene
+- `globals.css`: the small pre-paint palette and hiding rules. Theme layout CSS
+  and font declarations live in the lazy theme module. Tailwind's `dark` variant
+  also applies to Minecraft.
+- `EasterEggThemeLazy`: observes the root class before importing the selected
+  theme. The Minecraft background dynamically imports a React Three Fiber scene
   with 60 floating blocks; it also owns click audio and the YouTube music player.
 - `MinecraftDecorations`: separately observes the class, renders corner
   images, and triggers the dragon entrance/growl. Its effect cleans up on exit;
@@ -118,6 +124,31 @@ is required. The shared palette paths apply to official and unofficial data;
 the overlay CSS variables inherit the existing dark palette.
 
 ## Verification inventory
+
+`optional-theme-imports.test.ts` follows static runtime imports and re-exports
+from all page/layout entry points, including their shared components and CSS.
+It rejects eager optional-theme implementations, Three.js/React Three Fiber
+and Rapier, and theme asset/font loads in shared CSS. Only the small splash and
+toggle wrappers are permitted across that boundary; their transitive imports
+are still checked. Dynamic imports are verified separately by browser tests.
+
+`optional-theme-isolation.cy.ts` runs in the existing production-build Chrome
+and Firefox CI matrix. It covers:
+
+- English/Chinese desktop/mobile light/dark landings, no saved preference and
+  system preference, including opening the picker and scrolling.
+- Network requests from navigation onward (including requests still in flight),
+  loaded JS/CSS fingerprints for the optional engines and Minecraft game,
+  font registration, and absence of optional theme/game DOM.
+- English/Chinese embeds with each optional theme saved, before and after
+  hydration. Saved music/sound opt-ins must not activate outside Minecraft.
+- Raw-HTML metadata and headings for normal and Googlebot requests, preload
+  hints, and unchanged SEO metadata when selecting and leaving optional themes.
+
+These checks guard resource isolation and indexable content. They do not
+establish zero shared theme-selector overhead, guarantee search rankings, or
+replace production Core Web Vitals measurements. The shared pre-paint colors
+remain intentional to avoid a flash when an opted-in theme is restored.
 
 - Direct selection of every theme from the picker, keyboard navigation,
   persistence after reload, and cleanup on exit.
