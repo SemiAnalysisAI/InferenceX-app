@@ -3,6 +3,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { BAY_LANDMARKS, inside, STREETS_SF } from './gta-geography';
 import { blocked, BUILDINGS, GARAGE } from './gta-world';
 import type { loadArchitecture } from './gta-architecture';
+import { addBayLandmarks } from './gta-landmarks';
 
 const material = (color: string, roughness = 0.85) =>
   new T.MeshStandardMaterial({ color, roughness });
@@ -56,6 +57,7 @@ export function buildCityscape(
   };
   box(0, -0.25, 200, 1800, 0.5, 2000, curb);
   box(0, -0.4, 1900, 1800, 0.5, 2200, material('#727b60'));
+  box(-400, -0.3, -950, 950, 0.5, 400, material('#727b60'));
   const roadGeometries: T.BufferGeometry[] = [],
     shoulderGeometries: T.BufferGeometry[] = [];
   const props: { x: number; z: number; angle: number; model: string }[] = [];
@@ -66,10 +68,33 @@ export function buildCityscape(
         length = Math.hypot(b.x - a.x, b.z - a.z);
       if (length < 0.1) continue;
       roadGeometries.push(strip(a, b, street.width, 0.06));
-      shoulderGeometries.push(strip(a, b, street.width + 4, 0.04));
       const nx = (b.z - a.z) / length,
         nz = -(b.x - a.x) / length,
         angle = -Math.atan2(b.z - a.z, b.x - a.x);
+      if (length > 22)
+        for (const side of [-1, 1]) {
+          const offset = side * (street.width / 2 + 1.25),
+            trim = 8 / length;
+          const start = {
+            x: a.x + (b.x - a.x) * trim + nx * offset,
+            z: a.z + (b.z - a.z) * trim + nz * offset,
+          };
+          const end = {
+            x: b.x - (b.x - a.x) * trim + nx * offset,
+            z: b.z - (b.z - a.z) * trim + nz * offset,
+          };
+          shoulderGeometries.push(strip(start, end, 2.5, 0.18));
+          box(
+            (start.x + end.x) / 2,
+            0.1,
+            (start.z + end.z) / 2,
+            Math.max(1, length - 16),
+            0.2,
+            2.5,
+            curb,
+            angle,
+          );
+        }
       if (street.width >= 17)
         for (let distance = 12; distance < length - 10; distance += 14) {
           const t = distance / length;
@@ -130,6 +155,8 @@ export function buildCityscape(
   // Only two landmarks replace surveyed masses. All other footprints keep their measured outline.
   for (const b of BUILDINGS) {
     if (BAY_LANDMARKS.slice(0, 2).some((p) => inside(p, b.ring))) continue;
+    if (b.id.startsWith('nvidia-') || b.id === 'coit-tower' || inside({ x: 290, z: 256 }, b.ring))
+      continue;
     architecture.building(b);
   }
   function label(
@@ -270,19 +297,7 @@ export function buildCityscape(
     a,
   );
   awning.rotation.x = 0.08;
-  // Original interpretations of the campuses, not imported corporate building models.
-  label('NVIDIA', -115, 20, 1901, 70, 0, '#24342b');
-  const triangle = new T.Shape([
-    new T.Vector2(-180, -1800),
-    new T.Vector2(-50, -1800),
-    new T.Vector2(-115, -1895),
-  ]);
-  const roofGeo = new T.ExtrudeGeometry(triangle, { depth: 3, bevelEnabled: false });
-  roofGeo.rotateX(-Math.PI / 2);
-  roofGeo.translate(0, 25, 0);
-  const campusRoof = new T.Mesh(roofGeo, white);
-  campusRoof.castShadow = true;
-  city.add(campusRoof);
+  addBayLandmarks(city, label, architecture.foliage);
   label('AMD', 260, 22, 2173, 60, 0, '#353b41');
   label('SAN JOSE', 500, 7, 2570, 22);
   label('SANTA CLARA', 0, 7, 1600, 24);

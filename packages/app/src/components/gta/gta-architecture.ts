@@ -10,7 +10,7 @@ interface Part {
   material: T.Material | T.Material[];
   matrix: T.Matrix4;
 }
-export const ARCHITECTURE_ASSET_COUNT = 10;
+export const ARCHITECTURE_ASSET_COUNT = 11;
 export async function loadArchitecture(
   root: T.Group,
   base: string,
@@ -50,8 +50,9 @@ export async function loadArchitecture(
       'facade-apartment',
       'facade-factory',
       'facade-glass',
+      'jacaranda-canopy.webp',
     ]) {
-      const r = await fetch(`${base}${name}.jpg`, { signal });
+      const r = await fetch(`${base}${name.includes('.') ? name : `${name}.jpg`}`, { signal });
       if (!r.ok) throw new Error(`Road texture: ${r.status}`);
       const bitmap = await createImageBitmap(await r.blob(), { imageOrientation: 'flipY' });
       const texture = new T.Texture(bitmap);
@@ -72,10 +73,13 @@ export async function loadArchitecture(
     throw error;
   }
   textures[0].colorSpace = T.SRGBColorSpace;
-  textures.slice(3).forEach((t) => {
+  textures.slice(3, 6).forEach((t) => {
     t.colorSpace = T.SRGBColorSpace;
     t.repeat.set(1 / 3.1, 1 / 3.4);
   });
+  textures[6].colorSpace = T.SRGBColorSpace;
+  textures[6].wrapS = T.ClampToEdgeWrapping;
+  textures[6].wrapT = T.ClampToEdgeWrapping;
   const asphalt = new T.MeshStandardMaterial({
     map: textures[0],
     normalMap: textures[1],
@@ -293,6 +297,7 @@ export async function loadArchitecture(
   return {
     environment,
     asphalt,
+    foliage: textures[6],
     building(b: Building) {
       const shape = new T.Shape(b.ring.map((p) => new T.Vector2(p.x, -p.z)));
       const geometry = new T.ExtrudeGeometry(shape, { depth: b.h, bevelEnabled: false, steps: 1 });

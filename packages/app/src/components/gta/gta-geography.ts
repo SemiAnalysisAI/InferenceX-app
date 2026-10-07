@@ -34,6 +34,36 @@ southNodes.slice(1).forEach((node, i) =>
     points: [southNodes[i].point, node.point],
   }),
 );
+const northGate = STREETS_SF.flatMap((s) => [
+  { id: s.a, point: s.points[0] },
+  { id: s.b, point: s.points.at(-1)! },
+]).find((node) => node.id === '24800000.0')!;
+STREETS_SF.push(
+  {
+    id: 'telegraph-approach',
+    name: 'TELEGRAPH HILL SCENIC ROAD',
+    a: northGate.id,
+    b: 'coit-stop',
+    width: 12,
+    points: [
+      northGate.point,
+      { x: northGate.point.x, z: -920 },
+      { x: -650, z: -920 },
+      { x: -650, z: -1030 },
+    ],
+  },
+  {
+    id: 'bridge-vista',
+    name: 'GOLDEN GATE VISTA',
+    a: 'coit-stop',
+    b: 'bridge-stop',
+    width: 12,
+    points: [
+      { x: -650, z: -1030 },
+      { x: -800, z: -1030 },
+    ],
+  },
+);
 export const FOOTPRINTS = data.buildings.map((b, i) => {
   const ring = b.ring.map(geoPoint);
   const minX = Math.min(...ring.map((p) => p.x)),
@@ -51,7 +81,6 @@ export const FOOTPRINTS = data.buildings.map((b, i) => {
   };
 });
 for (const [i, x, z, w, d, h] of [
-  [0, -115, 1850, 140, 100, 24],
   [1, 260, 2130, 170, 85, 28],
   [2, 640, 2730, 80, 70, 82],
   [3, 390, 2670, 70, 90, 45],
@@ -74,6 +103,71 @@ for (const [i, x, z, w, d, h] of [
     ],
   });
 }
+// Condensed campus geometry. The same outlines drive rendering and collision.
+export const NVIDIA_BUILDINGS = [
+  {
+    id: 'nvidia-endeavor',
+    x: -125,
+    z: 1850,
+    h: 16,
+    ring: [
+      { x: -205, z: 1890 },
+      { x: -45, z: 1890 },
+      { x: -125, z: 1760 },
+    ],
+  },
+  {
+    id: 'nvidia-voyager',
+    x: -235,
+    z: 1650,
+    h: 21,
+    ring: [
+      { x: -320, z: 1665 },
+      { x: -275, z: 1730 },
+      { x: -195, z: 1730 },
+      { x: -150, z: 1665 },
+      { x: -195, z: 1595 },
+      { x: -275, z: 1595 },
+    ],
+  },
+];
+for (const b of NVIDIA_BUILDINGS) {
+  const xs = b.ring.map((p) => p.x),
+    zs = b.ring.map((p) => p.z);
+  FOOTPRINTS.push({
+    ...b,
+    x: (Math.max(...xs) + Math.min(...xs)) / 2,
+    z: (Math.max(...zs) + Math.min(...zs)) / 2,
+    w: Math.max(...xs) - Math.min(...xs),
+    d: Math.max(...zs) - Math.min(...zs),
+    style: 2,
+  });
+}
+const roundFootprint = (x: number, z: number, r: number) =>
+  Array.from({ length: 24 }, (_, i) => ({
+    x: x + Math.cos((i * Math.PI) / 12) * r,
+    z: z + Math.sin((i * Math.PI) / 12) * r,
+  }));
+const salesforce = FOOTPRINTS.find((b) => inside({ x: 290, z: 256 }, b.ring));
+if (salesforce)
+  Object.assign(salesforce, {
+    x: 290,
+    z: 256,
+    w: 44,
+    d: 44,
+    h: 250,
+    ring: roundFootprint(290, 256, 22),
+  });
+FOOTPRINTS.push({
+  id: 'coit-tower',
+  x: -600,
+  z: -1060,
+  w: 20,
+  d: 20,
+  h: 52,
+  style: 0,
+  ring: roundFootprint(-600, -1060, 10),
+});
 export function segmentDistance(p: GeoPoint, a: GeoPoint, b: GeoPoint) {
   const dx = b.x - a.x,
     dz = b.z - a.z;

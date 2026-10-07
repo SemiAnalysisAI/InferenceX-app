@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   changeVehicle,
+  beginTour,
   cityText,
   EMPTY_CONTROLS,
   enterExit,
@@ -9,12 +10,45 @@ import {
   stepCity,
   target,
 } from './gta-engine';
-import { blocked, BUILDINGS, GARAGE, JOBS, lanePoint, START, START_ANGLE } from './gta-world';
+import {
+  blocked,
+  BUILDINGS,
+  DESTINATIONS,
+  GARAGE,
+  JOBS,
+  lanePoint,
+  START,
+  START_ANGLE,
+} from './gta-world';
 const driving = (): ReturnType<typeof newCity> => ({ ...newCity(), phase: 'driving' });
 const advance = (s: ReturnType<typeof newCity>, c = EMPTY_CONTROLS, seconds = 1) => {
   for (let i = 0; i < Math.round(seconds * 60); i++) stepCity(s, c, 1 / 60);
 };
 describe('GTA 3D simulation', () => {
+  it('offers a driveable, untimed NVIDIA tour without silently teleporting', () => {
+    const s = driving();
+    const before = { ...s.player };
+    expect(beginTour(s, 6)).toBe(true);
+    expect(s.player).toEqual(before);
+    s.time = 0.01;
+    advance(s);
+    expect(s.time).toBe(0.01);
+    expect(s.phase).toBe('driving');
+    expect(target(s).en).toContain('NVIDIA');
+  });
+  it('fast travels explicitly to safe destinations without advancing missions', () => {
+    for (let i = 0; i < DESTINATIONS.length; i++) {
+      const s = driving();
+      expect(beginTour(s, i, true)).toBe(true);
+      expect(blocked(s.player, 1.3)).toBe(false);
+      expect(s.car.x).toBe(DESTINATIONS[i].x);
+      expect(interact(s)).toBe(true);
+      expect(s.job).toBe(0);
+      expect(s.cash).toBe(0);
+    }
+    const s = driving();
+    expect(beginTour(s, -1, true)).toBe(false);
+  });
   it('starts independently at a clear spawn', () => {
     const a = newCity(),
       b = newCity();
@@ -76,11 +110,11 @@ describe('GTA 3D simulation', () => {
   });
   it('exits through the opposite door when parked beside a building', () => {
     const s = driving();
-    s.car = { x: -42, z: 1850, angle: Math.PI, speed: 0 };
+    s.car = { x: 348, z: 2130, angle: Math.PI, speed: 0 };
     expect(blocked(s.car)).toBe(false);
-    expect(blocked({ x: -45, z: 1850 }, 0.4)).toBe(true);
+    expect(blocked({ x: 345, z: 2130 }, 0.4)).toBe(true);
     expect(enterExit(s)).toBe(true);
-    expect(s.player.x).toBeCloseTo(-39);
+    expect(s.player.x).toBeCloseTo(351);
     expect(blocked(s.player, 0.4)).toBe(false);
   });
   it('reports an obstructed exit without moving the player', () => {

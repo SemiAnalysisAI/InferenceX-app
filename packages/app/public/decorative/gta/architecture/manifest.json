@@ -77,5 +77,14 @@
     "derivation": "Orthographic facade bake; glass is original geometry lit by the CC0 HDR environment",
     "bytes": 22470,
     "sha256": "af09b7fb55f6ccd26cbfffafecec48835e532bf60a59130dea933ed15a7c8339"
+  },
+  {
+    "file": "jacaranda-canopy.webp",
+    "source": "https://polyhaven.com/a/jacaranda_tree",
+    "license": "CC0",
+    "author": "Rob Tuytel, Rico Cilliers",
+    "derivation": "Transparent orthographic bake of the 1K Jacaranda Tree model. Crossed cards replace the full mesh for runtime performance.",
+    "bytes": 172854,
+    "sha256": "e8fde17ce7f5c96999b8357349c560d69f6fd44ee84b436990dff6e87d5396e9"
   }
 ]

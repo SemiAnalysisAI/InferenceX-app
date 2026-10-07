@@ -7,7 +7,7 @@ import {
   STREETS_SF,
   streetRoute,
 } from './gta-geography';
-import { blocked, JOBS, START } from './gta-world';
+import { blocked, DESTINATIONS, JOBS, START } from './gta-world';
 
 describe('San Paloma geography', () => {
   it('uses the SF survey instead of an invented rectangular grid', () => {
@@ -23,7 +23,7 @@ describe('San Paloma geography', () => {
     expect(project(-122.399, 37.793).z).toBeCloseTo(-111.32);
   });
   it('keeps every mission reachable through connected, unobstructed streets', () => {
-    for (const destination of JOBS) {
+    for (const destination of [...JOBS, ...DESTINATIONS]) {
       expect(blocked(destination)).toBe(false);
       const route = streetRoute(START, destination);
       expect(route.length).toBeGreaterThan(0);
@@ -53,7 +53,8 @@ describe('San Paloma geography', () => {
   });
   it('marks the compressed South Bay connection separately from surveyed streets', () => {
     expect(STREETS_SF.filter((s) => s.id.startsWith('connector-'))).toHaveLength(5);
-    expect(FOOTPRINTS.filter((b) => b.id.startsWith('south-'))).toHaveLength(6);
+    expect(FOOTPRINTS.filter((b) => b.id.startsWith('south-'))).toHaveLength(5);
+    expect(FOOTPRINTS.filter((b) => b.id.startsWith('nvidia-'))).toHaveLength(2);
     expect(JOBS[2].en).toContain('NVIDIA');
     expect(JOBS[3].en).toContain('AMD');
   });

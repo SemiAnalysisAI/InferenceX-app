@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   changeVehicle,
+  beginTour,
   cityText,
   EMPTY_CONTROLS,
   enterExit,
@@ -14,13 +15,19 @@ import {
   type CityState,
 } from './gta-engine';
 import { createCityRenderer, CITY_ASSET_COUNT, type CityRenderer } from './gta-renderer';
-import { BUILDINGS, JOBS, distance } from './gta-world';
-import { STREETS_SF } from './gta-geography';
+import { BUILDINGS, DESTINATIONS, distance } from './gta-world';
+import { STREETS_SF, streetRoute } from './gta-geography';
 import './gta-game.css';
 
 const COPY = {
   en: {
     title: 'San Paloma After Hours',
+    explore: 'Explore Bay Area',
+    destination: 'Destination',
+    drive: 'Set GPS and drive',
+    visit: 'Fast travel',
+    free: 'Free roam · no time limit',
+    arrived: 'Destination reached. Stop and explore on foot.',
     subtitle: 'SF street geometry · Bay Area sandbox',
     brief:
       'Collect four packages across the city, then return to the garage. Stop in a gold ring and press E. Police respond to pickups and collisions. Stay more than 110 m away for 15 seconds to lose them.',
@@ -74,6 +81,12 @@ const COPY = {
   },
   zh: {
     title: 'San Paloma 夜行',
+    explore: '探索湾区',
+    destination: '目的地',
+    drive: '设置导航并驾车前往',
+    visit: '快速旅行',
+    free: '自由探索 · 无时间限制',
+    arrived: '已到达目的地，可停车下车探索。',
     subtitle: '旧金山街道数据 · 湾区沙盒',
     brief:
       '在城内收集四个包裹，再返回车库。在金色圆圈内停车并按 E。取货或碰撞会引来警察；保持 110 米以上距离 15 秒即可摆脱追捕。',
@@ -144,6 +157,7 @@ const KEYS: Record<string, keyof Controls> = {
   ShiftRight: 'sprint',
 };
 
+let cachedRoute = { key: '', points: [] as { x: number; z: number }[] };
 function paintMap(canvas: HTMLCanvasElement, s: CityState) {
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
@@ -176,6 +190,10 @@ function paintMap(canvas: HTMLCanvasElement, s: CityState) {
   ctx.lineWidth = 2;
   ctx.beginPath();
   ctx.moveTo(90, 90);
+  const routeKey = `${Math.floor(s.player.x / 25)},${Math.floor(s.player.z / 25)},${t.x},${t.z}`;
+  if (routeKey !== cachedRoute.key)
+    cachedRoute = { key: routeKey, points: streetRoute(s.player, t) };
+  for (const p of cachedRoute.points) ctx.lineTo(cx(p.x), cz(p.z));
   ctx.lineTo(cx(t.x), cz(t.z));
   ctx.stroke();
   ctx.fillStyle = '#ffe17e';
@@ -204,6 +222,7 @@ function paintMap(canvas: HTMLCanvasElement, s: CityState) {
   ctx.restore();
 }
 export function GtaGame({ locale = 'en' }: { locale?: 'en' | 'zh' }) {
+  const [destination, setDestination] = useState(6);
   const t = COPY[locale],
     state = useRef(newCity()),
     input = useRef<Controls>({ ...EMPTY_CONTROLS });
@@ -458,6 +477,16 @@ export function GtaGame({ locale = 'en' }: { locale?: 'en' | 'zh' }) {
     else void audio.current.ctx.suspend();
     focus();
   };
+  const explore = (fast: boolean) => {
+    clear();
+    if (!beginTour(state.current, destination, fast)) return;
+    map.current = false;
+    setOverview(false);
+    manual.current = false;
+    graphics.current?.resetCamera();
+    sync();
+    focus();
+  };
   const action = (key: string) => {
     if (key === 'KeyP') {
       if (state.current.phase === 'driving') pause();
@@ -544,16 +573,26 @@ export function GtaGame({ locale = 'en' }: { locale?: 'en' | 'zh' }) {
         aria-label={locale === 'zh' ? '渲染性能' : 'Rendering performance'}
       />
       <div className="gta-objective">
-        <small>{view.explorer ? t.atlas : `${Math.min(view.job + 1, 5)} / 5`}</small>
+        <small>
+          {view.explorer
+            ? t.atlas
+            : view.tour === null
+              ? `${Math.min(view.job + 1, 5)} / 5`
+              : t.free}
+        </small>
         <strong>{view.explorer ? t.atlasHelp : locale === 'zh' ? job.zh : job.en}</strong>
         <span>
           {view.explorer
             ? `${Math.round(view.altitude)} m`
-            : view.message === 'blocked'
-              ? t.blockedExit
-              : view.heat
-                ? t.escape
-                : t.aim}
+            : view.tour === null
+              ? view.message === 'blocked'
+                ? t.blockedExit
+                : view.heat
+                  ? t.escape
+                  : t.aim
+              : distance(view.player, job) < 18
+                ? t.arrived
+                : `${Math.round(distance(view.player, job))} m · GPS`}
         </span>
       </div>
       <aside className="gta-bottom-hud">
@@ -580,7 +619,9 @@ export function GtaGame({ locale = 'en' }: { locale?: 'en' | 'zh' }) {
           <span>
             {t.health} {Math.ceil(view.health)}% ·{' '}
             <b data-testid="heist-timer">
-              {Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, '0')}
+              {view.tour === null
+                ? `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`
+                : '∞'}
             </b>
           </span>
         </div>
@@ -649,11 +690,25 @@ export function GtaGame({ locale = 'en' }: { locale?: 'en' | 'zh' }) {
       {overview && (
         <div className="gta-map-panel">
           <h3>{t.map}</h3>
-          {JOBS.map((p, i) => (
-            <p key={p.en}>
-              {i + 1}. {locale === 'zh' ? p.zh : p.en} {i < view.job ? '✓' : ''}
-            </p>
-          ))}
+          <p>{t.free}</p>
+          <label htmlFor="gta-destination">{t.destination}</label>
+          <select
+            id="gta-destination"
+            value={destination}
+            onChange={(e) => setDestination(Number(e.target.value))}
+          >
+            {DESTINATIONS.map((p, i) => (
+              <option value={i} key={p.en}>
+                {locale === 'zh' ? p.zh : p.en}
+              </option>
+            ))}
+          </select>
+          <button type="button" data-testid="tour-drive" onClick={() => explore(false)}>
+            {t.drive}
+          </button>
+          <button type="button" data-testid="tour-visit" onClick={() => explore(true)}>
+            {t.visit}
+          </button>
           <button type="button" onClick={() => start()}>
             {t.resume}
           </button>
@@ -701,6 +756,11 @@ export function GtaGame({ locale = 'en' }: { locale?: 'en' | 'zh' }) {
               )
             )}
             <p className="gta-desktop-help">{t.controls}</p>
+            {ready && !atlasLoading && !view.explorer && (
+              <button type="button" onClick={toggleMap}>
+                {t.explore}
+              </button>
+            )}
             <p className="gta-mobile-help">{t.mobile}</p>
             <small>{t.disclaimer}</small>
           </div>

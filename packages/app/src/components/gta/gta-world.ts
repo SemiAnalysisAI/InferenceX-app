@@ -46,7 +46,7 @@ for (const b of BUILDINGS)
       cells.get(key)!.push(b);
     }
 export function blocked(p: Point, radius = 1.2) {
-  if (p.x < -860 + radius || p.x > 950 - radius || p.z < -760 + radius || p.z > 2980 - radius)
+  if (p.x < -860 + radius || p.x > 950 - radius || p.z < -1150 + radius || p.z > 2980 - radius)
     return true;
   for (let x = Math.floor((p.x - radius) / 50); x <= Math.floor((p.x + radius) / 50); x++)
     for (let z = Math.floor((p.z - radius) / 50); z <= Math.floor((p.z + radius) / 50); z++)
@@ -58,6 +58,17 @@ export function blocked(p: Point, radius = 1.2) {
           return true;
   return false;
 }
+export const DESTINATIONS = [
+  { ...START, en: "Oren's Hummus", zh: "Oren's Hummus" },
+  { ...nearestRoadPoint(BAY_LANDMARKS[1]), en: 'Ferry Building', zh: '渡轮大厦' },
+  { ...nearestRoadPoint(BAY_LANDMARKS[0]), en: 'Transamerica Pyramid', zh: '泛美金字塔' },
+  { ...nearestRoadPoint({ x: 290, z: 256 }), en: 'Salesforce Tower', zh: 'Salesforce Tower' },
+  { x: -650, z: -1030, en: 'Coit Tower · condensed hill', zh: '科伊特塔 · 缩比例山丘' },
+  { x: -800, z: -1030, en: 'Golden Gate viewpoint', zh: '金门大桥观景点' },
+  { x: 0, z: 1850, en: 'NVIDIA HQ · Santa Clara', zh: 'NVIDIA 总部 · Santa Clara' },
+  { x: 300, z: 2200, en: 'AMD HQ · Santa Clara', zh: 'AMD 总部 · Santa Clara' },
+  { x: 500, z: 2740, en: 'Downtown San Jose', zh: 'San Jose 市中心' },
+];
 const circuits = [
   [START, nearestRoadPoint(BAY_LANDMARKS[0]), nearestRoadPoint(BAY_LANDMARKS[1]), START],
   [

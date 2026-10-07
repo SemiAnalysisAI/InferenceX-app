@@ -16,7 +16,9 @@ Poly Haven's asset license is documented at https://polyhaven.com/license. The H
 
 The models are the 1K glTF exports, repacked into self-contained GLBs. Unused modules were removed, textures recompressed, and geometry simplified with meshoptimizer (target ratio 0.18, error 0.002). The wall/window/door/cornice modules and fire escape components are preserved. `manifest.json` records the shipped byte sizes and SHA-256 hashes.
 
-The apartment and factory façade JPEGs are orthographic texture bakes of those CC0 modules. The glass façade JPEG is an original pane-and-frame material bake. Distant buildings use these repeated atlases; nearby buildings use modeled modules. These are not photographic scans of individual SF buildings. The ten architecture files total 9,837,462 bytes.
+The apartment and factory façade JPEGs are orthographic texture bakes of those CC0 modules. The glass façade JPEG is an original pane-and-frame material bake. Distant buildings use these repeated atlases; nearby buildings use modeled modules. These are not photographic scans of individual SF buildings. The eleven architecture files total 10,010,316 bytes.
+
+The Jacaranda foliage texture is a transparent orthographic bake of the CC0 model by Rob Tuytel and Rico Cilliers, https://polyhaven.com/a/jacaranda_tree. Crossed texture cards replace the full 312k-polygon tree at runtime. This adds leaf and branch detail without replicating the source geometry across the city.
 
 ## Geographic data
 
@@ -40,3 +42,9 @@ The Oren's Hummus stop refers to the restaurant at 71 3rd Street, listed at http
 The compressed southern corridor, Santa Clara campuses and San Jose blocks are original game geometry. NVIDIA and AMD are placed in Santa Clara, consistent with their headquarters listings at https://www.nvidia.com/en-us/contact/ and https://www.amd.com/en/corporate/locations.html. They are not measured campus replicas. The South Bay connection is deliberately much shorter than the real journey.
 
 This is a browser sandbox, not the full GTA V game or GTA V-quality photogrammetry. Existing Rockstar-derived character/vehicle assets and their separately reported permission are documented in `../models/README.md`; those permissions do not establish rights to unrelated third-party assets.
+
+## Landmark expansion
+
+Endeavor and Voyager now use separate collision-matched triangular and hexagonal volumes, folded roofs, glass walls and a solar trellis interpretation. Architectural references: https://enclos.com/project/nvidia-voyager/ and https://metropolismag.com/projects/nvidia-new-tech-campus/. Dimensions and site arrangement remain condensed, not a measured campus reconstruction.
+
+Additional original models include Salesforce Tower, Coit Tower, a Golden Gate Bridge panorama and San Jose's civic rotunda. References: https://dac.dk/en/magazine/places/salesforce-tower-655, https://sfrecpark.org/facilities/facility/details/Coit-Tower-290, https://www.goldengate.org/exhibits/engineering-the-design/, and https://www.sanjoseca.gov/your-government/departments-offices/event-services/facilities-and-fees/rotunda. Coit Tower and the bridge viewpoint use a deliberately compressed northern extension; the bridge is scenery beyond the playable boundary.

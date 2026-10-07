@@ -6,6 +6,36 @@ type GameWindow = Window & {
   render_game_to_text: () => string;
 };
 describe('GTA 3D city', () => {
+  it('offers untimed landmark navigation and explicit South Bay fast travel', () => {
+    cy.mount(
+      <div style={{ height: 750 }}>
+        <GtaGame />
+      </div>,
+    );
+    cy.get('[data-testid="heist-start"]', { timeout: 60000 }).should('be.visible');
+    cy.contains('button', 'Explore Bay Area').click();
+    cy.get('#gta-destination').select('6');
+    cy.get('[data-testid="tour-drive"]').click();
+    cy.window().then((win) => {
+      const game = win as unknown as GameWindow;
+      game.advanceTime(0);
+      const state = JSON.parse(game.render_game_to_text());
+      expect(state.tour).to.equal(6);
+      expect(state.car.x).to.equal(START.x);
+    });
+    cy.get('[data-testid="heist-timer"]').should('contain', '∞');
+    cy.get('[data-testid="heist-map"]').click();
+    cy.get('#gta-destination').select('8');
+    cy.get('[data-testid="tour-visit"]').click();
+    cy.window().then((win) => {
+      const game = win as unknown as GameWindow;
+      game.advanceTime(0);
+      const state = JSON.parse(game.render_game_to_text());
+      expect(state.target.en).to.equal('Downtown San Jose');
+      expect(state.car.x).to.equal(500);
+      expect(state.car.z).to.equal(2740);
+    });
+  });
   it('loads, drives, pauses, resumes and resets', () => {
     cy.mount(
       <div style={{ height: 750 }}>

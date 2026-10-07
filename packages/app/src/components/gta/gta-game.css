@@ -417,3 +417,21 @@
   pointer-events: none;
   z-index: 2;
 }
+.gta-map-panel select {
+  display: block;
+  width: 100%;
+  min-height: 42px;
+  padding: 8px;
+  margin: 8px 0 16px;
+  color: #f1f0df;
+  background: #172725;
+  border: 1px solid #92a58f;
+  font: inherit;
+}
+.gta-map-panel {
+  max-height: calc(100% - 180px);
+  overflow-y: auto;
+}
+.gta-map-panel button {
+  margin: 4px;
+}

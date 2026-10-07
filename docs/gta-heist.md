@@ -29,6 +29,15 @@ stay at least 110 m from every pursuer for 15 seconds to escape. The garage
 repairs a stationary vehicle. A run ends on delivery, zero health, or eight
 minutes elapsed. Cash and progress are in-memory and reset on closing.
 
+For sightseeing, choose **Explore Bay Area** or open **City map**. Select one
+of nine destinations and choose **Set GPS and drive** to retain the current
+position, or **Fast travel** to move explicitly to its road stop. Free roam
+has no countdown, and visiting a destination does not advance heist rewards.
+The minimap follows the street graph. Stops include the Ferry Building,
+Transamerica Pyramid, Salesforce Tower, Coit Tower, Golden Gate viewpoint,
+NVIDIA and AMD in Santa Clara, and downtown San Jose. The northern scenic
+extension and South Bay distances are deliberately condensed.
+
 - WASD/arrows: drive or walk.
 - Space: brake; Shift: sprint on foot.
 - F: exit a stationary car or reenter within five metres.

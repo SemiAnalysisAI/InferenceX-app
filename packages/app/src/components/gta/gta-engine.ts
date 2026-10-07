@@ -3,6 +3,7 @@ import {
   distance,
   GARAGE,
   JOBS,
+  DESTINATIONS,
   lanePoint,
   START,
   START_ANGLE,
@@ -10,7 +11,7 @@ import {
   type Point,
   type Vehicle,
 } from './gta-world';
-import { streetRoute } from './gta-geography';
+import { roadHeading, streetRoute } from './gta-geography';
 const pursuitRoutes = new WeakMap<Actor, { points: Point[]; next: number; until: number }>();
 export interface Controls {
   forward: boolean;
@@ -50,6 +51,7 @@ export interface CityState {
   camera: number;
   explorer: boolean;
   altitude: number;
+  tour: number | null;
 }
 export function newCity(): CityState {
   return {
@@ -83,9 +85,37 @@ export function newCity(): CityState {
     camera: 0,
     explorer: false,
     altitude: 800,
+    tour: null,
   };
 }
-export const target = (s: CityState) => JOBS[Math.min(s.job, JOBS.length - 1)];
+export const target = (s: CityState) =>
+  s.tour === null ? JOBS[Math.min(s.job, JOBS.length - 1)] : DESTINATIONS[s.tour];
+export function beginTour(s: CityState, index: number, fastTravel = false) {
+  if (!Number.isInteger(index) || !DESTINATIONS[index] || s.explorer) return false;
+  s.tour = index;
+  s.phase = 'driving';
+  s.health = 100;
+  s.heat = 0;
+  s.police = [];
+  s.message = 'drive';
+  if (fastTravel) {
+    const p = DESTINATIONS[index];
+    const viewAngle =
+      index === 6
+        ? -Math.PI / 2
+        : index === 4
+          ? Math.atan2(50, -30)
+          : index === 5
+            ? -2.3
+            : index === 8
+              ? Math.atan2(70, -60)
+              : roadHeading(p);
+    s.car = { x: p.x, z: p.z, angle: viewAngle, speed: 0 };
+    s.player = { ...s.car };
+    s.onFoot = false;
+  }
+  return true;
+}
 export function enterExit(s: CityState) {
   if (s.phase !== 'driving' || s.explorer) return false;
   if (s.onFoot) {
@@ -121,6 +151,10 @@ export function enterExit(s: CityState) {
 export function interact(s: CityState) {
   if (s.phase !== 'driving' || s.explorer) return false;
   if (distance(s.player, target(s)) > 13 || Math.abs(s.player.speed) > 3) return false;
+  if (s.tour !== null) {
+    s.message = 'repair';
+    return true;
+  }
   s.cash += 1000;
   s.job++;
   s.message = 'pickup';
@@ -167,7 +201,7 @@ export function stepCity(s: CityState, c: Controls, seconds: number) {
     );
     return;
   }
-  s.time = Math.max(0, s.time - dt);
+  if (s.tour === null) s.time = Math.max(0, s.time - dt);
   s.immunity = Math.max(0, s.immunity - dt);
   const throttle = Number(c.forward) - Number(c.reverse),
     turn = Number(c.right) - Number(c.left);
@@ -257,7 +291,7 @@ export function stepCity(s: CityState, c: Controls, seconds: number) {
   if (s.health > 0 && !s.heat && distance(s.player, GARAGE) < 10 && Math.abs(s.player.speed) < 1) {
     s.health = Math.min(100, s.health + dt * 10);
   }
-  if (s.time === 0 || s.health === 0) {
+  if ((s.tour === null && s.time === 0) || s.health === 0) {
     s.phase = 'busted';
     s.car.speed = 0;
     s.player.speed = 0;

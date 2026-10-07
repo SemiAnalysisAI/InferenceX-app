@@ -1,9 +1,8 @@
 import * as T from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
-import { Sky } from 'three/addons/objects/Sky.js';
 import { JOBS, lanePoint, type Point } from './gta-world';
-import type { CityState } from './gta-engine';
+import { target, type CityState } from './gta-engine';
 import { clonePedestrian, createPedestrianAnimation, rigPedestrian } from './gta-pedestrian';
 import { ARCHITECTURE_ASSET_COUNT, loadArchitecture } from './gta-architecture';
 import { buildCityscape } from './gta-cityscape';
@@ -78,11 +77,26 @@ export async function createCityRenderer(
   const camera = new T.PerspectiveCamera(62, 1, 0.2, 18000);
   const sky = new T.Color('#b5d7e4');
   scene.background = sky;
-  const skyDome = new Sky();
-  skyDome.scale.setScalar(10000);
-  skyDome.material.uniforms.turbidity.value = 4;
-  skyDome.material.uniforms.rayleigh.value = 1.8;
-  skyDome.material.uniforms.sunPosition.value.set(-120, 220, 140);
+  const skyDome = new T.Mesh(
+    new T.SphereGeometry(9000, 24, 12),
+    new T.ShaderMaterial({
+      side: T.BackSide,
+      depthWrite: false,
+      vertexShader:
+        'varying vec3 skyDirection; void main(){skyDirection=position;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',
+      fragmentShader: `varying vec3 skyDirection;
+      void main(){
+        vec3 d=normalize(skyDirection);
+        float h=pow(max(d.y,0.0),0.45);
+        vec3 skyColor=mix(vec3(0.68,0.78,0.84),vec3(0.15,0.38,0.65),h);
+        float glow=pow(max(dot(d,normalize(vec3(-120.,220.,140.))),0.),128.);
+        skyColor+=vec3(1.,0.82,0.6)*glow*0.45;
+        gl_FragColor=vec4(skyColor,1.);
+        #include <tonemapping_fragment>
+        #include <colorspace_fragment>
+      }`,
+    }),
+  );
   city.add(skyDome);
   scene.fog = new T.Fog('#b5d7e4', 250, 1100);
   const ambient = new T.HemisphereLight('#d9e9ff', '#c2b1a0', 2.5);
@@ -305,7 +319,10 @@ export async function createCityRenderer(
       pedAnimations[i].update(1.2 * dt, dt, 1.2);
     });
     markers.forEach((m, i) => {
-      m.visible = i === Math.min(s.job, 4);
+      m.visible = i === (s.tour === null ? Math.min(s.job, 4) : 0);
+      const p = s.tour === null ? JOBS[i] : target(s);
+      m.position.x = p.x;
+      m.position.z = p.z;
       m.position.y = 0.5 + Math.sin(s.elapsed * 2) * 0.2;
     });
     const a = s.player.angle;
