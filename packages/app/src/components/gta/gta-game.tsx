@@ -373,10 +373,12 @@ export function GtaGame({
       (state.current.tour ? TOUR_STOPS.map((stop) => stop.id) : JOB_IDS).map((id) =>
         markerFor(w, id),
       ),
-      state.current.tour ? 0 : state.current.job,
+      state.current.tour
+        ? TOUR_STOPS.findIndex((stop) => stop.id === state.current!.tour)
+        : state.current.job,
       state.current.player,
     );
-  }, [overview, view?.job]);
+  }, [overview, view?.job, view?.tour]);
   const start = (reset = false) => {
     if (!ready || atlasLoading || !state.current) return;
     if (reset) {
@@ -767,12 +769,18 @@ export function GtaGame({
               {t.visit}
             </button>
           </div>
-          {JOB_IDS.map((id, i) => (
-            <p key={id}>
-              {i + 1}. {locale === 'zh' ? JOB_COPY[id].zh : JOB_COPY[id].en}{' '}
-              {i < view.job ? '✓' : ''}
-            </p>
-          ))}
+          {view.tour
+            ? TOUR_STOPS.map((stop, i) => (
+                <p key={stop.id} data-testid="tour-map-stop">
+                  {i + 1}. {locale === 'zh' ? stop.zh : stop.en}
+                </p>
+              ))
+            : JOB_IDS.map((id, i) => (
+                <p key={id}>
+                  {i + 1}. {locale === 'zh' ? JOB_COPY[id].zh : JOB_COPY[id].en}{' '}
+                  {i < view.job ? '✓' : ''}
+                </p>
+              ))}
           <button type="button" onClick={() => start()}>
             {t.resume}
           </button>

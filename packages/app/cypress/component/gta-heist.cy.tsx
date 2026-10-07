@@ -30,6 +30,8 @@ describe('GTA 3D city', () => {
     });
     cy.get('[data-testid="heist-timer"]').should('have.text', '∞');
     cy.get('[data-testid="heist-map"]').click();
+    cy.get('[data-testid="tour-map-stop"]').should('have.length', 9);
+    cy.get('[data-testid="tour-map-stop"]').eq(6).should('contain.text', 'NVIDIA HQ');
     cy.get('#gta-destination').select('sjdt');
     cy.get('[data-testid="tour-visit"]').click();
     cy.window().then((win) => {
