@@ -1,0 +1,493 @@
+{
+  "schemaVersion": 1,
+  "capturedAt": "2026-10-06",
+  "state": "converted-development-assets-not-parity-approved",
+  "converter": {
+    "blender": "5.0.1",
+    "sourceioCommit": "472e81542a6750cf3c282daac41af96a2f5d4fd3",
+    "maxMapTextureSize": 512
+  },
+  "characterMotion": {
+    "url": "https://github.com/robotboy655/gmod-animations",
+    "commit": "9a588af0cb1a2d53de35496ba1737305a877e50c",
+    "attribution": "Maxime Lebled, Facepunch Studios LTD / Valve Software",
+    "status": "Retargeted GMod locomotion, not original CS:GO character animation"
+  },
+  "sources": [
+    {
+      "workshopId": "3068466810",
+      "purpose": "Dust II community port",
+      "url": "https://steamcommunity.com/sharedfiles/filedetails/?id=3068466810",
+      "archives": [
+        {
+          "name": "de_dust2new.gma",
+          "bytes": 308216678,
+          "sha256": "b710344719e5e6e916179a59fbabd144240f0e65452877bb0b4c33f5fca449b7"
+        }
+      ]
+    },
+    {
+      "workshopId": "1239501421",
+      "purpose": "Assault rifle models",
+      "url": "https://steamcommunity.com/sharedfiles/filedetails/?id=1239501421",
+      "archives": [
+        {
+          "name": "907905263567830244_legacy.bin",
+          "bytes": 43903739,
+          "sha256": "7f1aecc364f355acadca7953b60a4160cec96580231167068d460d88ecfcd791"
+        }
+      ]
+    },
+    {
+      "workshopId": "1236324520",
+      "purpose": "Pistol models",
+      "url": "https://steamcommunity.com/sharedfiles/filedetails/?id=1236324520",
+      "archives": [
+        {
+          "name": "907905263567821942_legacy.bin",
+          "bytes": 45903566,
+          "sha256": "63fa74661ead6732e811a52f1e9c199e9edfad49e53b6cde0fbe7faa68f2000f"
+        }
+      ]
+    },
+    {
+      "workshopId": "1233135884",
+      "purpose": "Machine gun models",
+      "url": "https://steamcommunity.com/sharedfiles/filedetails/?id=1233135884",
+      "archives": [
+        {
+          "name": "907905263567814355_legacy.bin",
+          "bytes": 13973155,
+          "sha256": "d56aade9ebdc2d3a140ba871fb861398c66d804711345200a3c2516a0a78a2a7"
+        }
+      ]
+    },
+    {
+      "workshopId": "1241988706",
+      "purpose": "Shotgun models",
+      "url": "https://steamcommunity.com/sharedfiles/filedetails/?id=1241988706",
+      "archives": [
+        {
+          "name": "907905263567835157_legacy.bin",
+          "bytes": 20861674,
+          "sha256": "861b91fe5b7baf033ee67f167f613607da39ad0f268edf72d4d6f31db79bf33a"
+        }
+      ]
+    },
+    {
+      "workshopId": "1212279803",
+      "purpose": "SMG models",
+      "url": "https://steamcommunity.com/sharedfiles/filedetails/?id=1212279803",
+      "archives": [
+        {
+          "name": "947332735410356084_legacy.bin",
+          "bytes": 35818503,
+          "sha256": "97ddf8ec0ddf93c7f1f2c8f55356a5d040c4814f2208f7acf07351d54c552319"
+        }
+      ]
+    },
+    {
+      "workshopId": "1244760503",
+      "purpose": "Sniper rifle models",
+      "url": "https://steamcommunity.com/sharedfiles/filedetails/?id=1244760503",
+      "archives": [
+        {
+          "name": "907905263567844749_legacy.bin",
+          "bytes": 22883230,
+          "sha256": "2fcaff7d67c9275c963a9478d44b26a07ed884e5e6a5bfb76d81defefbb8fbf5"
+        }
+      ]
+    },
+    {
+      "workshopId": "481358078",
+      "purpose": "Counter-Terrorist character port",
+      "url": "https://steamcommunity.com/sharedfiles/filedetails/?id=481358078",
+      "archives": [
+        {
+          "name": "693902535308567444_legacy.bin",
+          "bytes": 37373604,
+          "sha256": "bab08e5e7e0c4f50db74e80ac5cad9f8e9b793901ffee57855957fd0898aa350"
+        }
+      ]
+    },
+    {
+      "workshopId": "481607813",
+      "purpose": "Terrorist character port",
+      "url": "https://steamcommunity.com/sharedfiles/filedetails/?id=481607813",
+      "archives": [
+        {
+          "name": "693902535309954192_legacy.bin",
+          "bytes": 66175372,
+          "sha256": "d2f422ddc4dc812ec75eedb5157f55bc5163199ccd50f015dce32d28dcabbf6b"
+        }
+      ]
+    }
+  ],
+  "files": [
+    {
+      "path": "map/dust2.glb",
+      "bytes": 82759176,
+      "sha256": "6603b3d9665c061eb2b9c2ce9a8f3dd39fc11c6d313b14cb183b0e376d311529"
+    },
+    {
+      "path": "map/entities.json",
+      "bytes": 23984,
+      "sha256": "9235ed664fb84c4cc02887f966c27044d49a3bd4ea339259932de336970f5e45"
+    },
+    {
+      "path": "map/navigation.json",
+      "bytes": 515276,
+      "sha256": "7a6a84d49e55ce1ef392be11c7f20ca4bdd65588d20b5e2e055132ebde9512e5"
+    },
+    {
+      "path": "characters/t.glb",
+      "bytes": 1483480,
+      "sha256": "d4ffb09604f2d6cc57e524c0201ada1f8039bb83958058bf2072d4043c29e48a"
+    },
+    {
+      "path": "characters/ct.glb",
+      "bytes": 2024268,
+      "sha256": "67e4c5bf1d21ccb3408d7483139cfdd20b3967f0c3f5efb80807938e7751fd5e"
+    },
+    {
+      "path": "viewmodels/glock-18.glb",
+      "bytes": 5389196,
+      "sha256": "d1e432e81787e36bca0a7e706c39751a8431886ca105b40c9a54ac7b9089781f"
+    },
+    {
+      "path": "worldmodels/glock-18.glb",
+      "bytes": 1630128,
+      "sha256": "d824ff4efe5a49e1a209cce93fe52b4d989b895a713db5b01d52345675c81d78"
+    },
+    {
+      "path": "viewmodels/p2000.glb",
+      "bytes": 7461120,
+      "sha256": "543bdc9ebabe56887cdc76ca6c5546cccdbc5201779e84aab7893cfd2d7f0a24"
+    },
+    {
+      "path": "worldmodels/p2000.glb",
+      "bytes": 1383572,
+      "sha256": "76330bc78e91e15cb93d2b62feecf51c8bfac779f009d8c88b65590679d03544"
+    },
+    {
+      "path": "viewmodels/usp-s.glb",
+      "bytes": 8029732,
+      "sha256": "7a81c47d393abad5dd2561fe51a4e04388b15216bccf69c558ab042ed4647819"
+    },
+    {
+      "path": "worldmodels/usp-s.glb",
+      "bytes": 1971264,
+      "sha256": "1b6aa2bcb191514199cba2cfd066fe2fc13a1c10d38b665dd4263ec49cc477a6"
+    },
+    {
+      "path": "viewmodels/dual_berettas.glb",
+      "bytes": 6365324,
+      "sha256": "54f9061309db241604a40e599440188431273cd9c80411e9db3ff639ad41268c"
+    },
+    {
+      "path": "worldmodels/dual_berettas.glb",
+      "bytes": 2095636,
+      "sha256": "aa60ee2ac88e9b4df142d6f14336e4c7688c7a8283ac34982aa78a887573e5dd"
+    },
+    {
+      "path": "viewmodels/p250.glb",
+      "bytes": 7091824,
+      "sha256": "1adfa1b0675f3a845545814d41910531a3bf1c245349adcc04dc6bb0ec25bbc8"
+    },
+    {
+      "path": "worldmodels/p250.glb",
+      "bytes": 1251988,
+      "sha256": "0627a334c65439aa9baebbbe27403fc1552dba94e87c01fe8a7bc70471ffe21b"
+    },
+    {
+      "path": "viewmodels/five-seven.glb",
+      "bytes": 7540932,
+      "sha256": "e512d09b1864e1a473daae115dab1f20acdb76d3107c88aa98ae462795126d51"
+    },
+    {
+      "path": "worldmodels/five-seven.glb",
+      "bytes": 1740336,
+      "sha256": "99f795925bd3ea5ec1382f82347865906dee49e0367a4648804c2315e6d4e548"
+    },
+    {
+      "path": "viewmodels/tec-9.glb",
+      "bytes": 6919832,
+      "sha256": "90f93df990f7135714b569b6b058e42e3383d34f6356545e7f6097e8732a3bc5"
+    },
+    {
+      "path": "worldmodels/tec-9.glb",
+      "bytes": 1366204,
+      "sha256": "047b13be19831b41af0b32f998a7f4fb2e0dde4bde5d1ed8d037030335b9c255"
+    },
+    {
+      "path": "viewmodels/cz_75.glb",
+      "bytes": 7967680,
+      "sha256": "298f3df8cc663bcb7aaff63eacf79716ac05c2d9d769f201ae8e28d3261eaa1a"
+    },
+    {
+      "path": "worldmodels/cz_75.glb",
+      "bytes": 1679368,
+      "sha256": "136452ddde0628bc89f6e9c66dea4c8a49fbc9bf17ff6a44405882429bc296c4"
+    },
+    {
+      "path": "viewmodels/desert_eagle.glb",
+      "bytes": 7450676,
+      "sha256": "443b15e0f0ac3ba0ab30023a71935fa4c74f79e978259bbea53e965b074104f9"
+    },
+    {
+      "path": "worldmodels/desert_eagle.glb",
+      "bytes": 1660884,
+      "sha256": "75dc154885c8988d684948106f30aebe7a52e2cd423304e15f48ce6bf2ecfaec"
+    },
+    {
+      "path": "viewmodels/revolver.glb",
+      "bytes": 8454176,
+      "sha256": "31ada727141879d8ce0373a62ac0eb9628bf2c15dccf7666ed7ed58ee64d127d"
+    },
+    {
+      "path": "worldmodels/revolver.glb",
+      "bytes": 1988360,
+      "sha256": "dd014313909e90c348258d7ff7b1487f7f57b465f87628b200eceb7a23286071"
+    },
+    {
+      "path": "viewmodels/mac-10.glb",
+      "bytes": 7216280,
+      "sha256": "058296317235c43772a36c78e9d8657c21292d1cabc85dbd7e7be89a96349369"
+    },
+    {
+      "path": "worldmodels/mac-10.glb",
+      "bytes": 1520092,
+      "sha256": "73234415ba4ea020a7939023b0af4d8a05fcbb6477d0df5010d1f5184e59227c"
+    },
+    {
+      "path": "viewmodels/mp9.glb",
+      "bytes": 6120716,
+      "sha256": "c364333fa8ffec6954627461d47b2d861fbf0477256177f790976a915d9932bd"
+    },
+    {
+      "path": "worldmodels/mp9.glb",
+      "bytes": 1579556,
+      "sha256": "248a1369220d0213da65da67cfbfcf71fae4c796600a949a2c508fa8b0d190e0"
+    },
+    {
+      "path": "viewmodels/mp7.glb",
+      "bytes": 5970812,
+      "sha256": "6cb26685c757c5ea144bddb9589e93f7ecdd17090d90f735de7dbf253dfda1d0"
+    },
+    {
+      "path": "worldmodels/mp7.glb",
+      "bytes": 1420932,
+      "sha256": "6b44cf230c26ae79d51ebe0d90d3497dec2d486828474266e91d09dbdeb388d8"
+    },
+    {
+      "path": "viewmodels/mp5sd.glb",
+      "bytes": 6767748,
+      "sha256": "75ec546f662096f3f0b0bf7516f1b31d25f129c0e0c251775daeb46678fba41b"
+    },
+    {
+      "path": "worldmodels/mp5sd.glb",
+      "bytes": 2255220,
+      "sha256": "7a84e29118a8b6b13bf22339d42b887ea2fcebf46518f360552e860c21bb108e"
+    },
+    {
+      "path": "viewmodels/ump-45.glb",
+      "bytes": 7482052,
+      "sha256": "04184e7d960cd46a56f6f96df49781143ac55ae3071e1c6848e501c86d46b92c"
+    },
+    {
+      "path": "worldmodels/ump-45.glb",
+      "bytes": 1502900,
+      "sha256": "4976543473998c4e91b20b265cbc71696132eb0ad1d994bd344c626ce4e7a9ed"
+    },
+    {
+      "path": "viewmodels/p90.glb",
+      "bytes": 7666200,
+      "sha256": "0e68fca487bc6eff8e701cf18b856df909bb652b85866b4550a0e585aaf10806"
+    },
+    {
+      "path": "worldmodels/p90.glb",
+      "bytes": 1860612,
+      "sha256": "581be6fdc942109cb4cd50707f230379961280e0034b67759f8776309bd606f0"
+    },
+    {
+      "path": "viewmodels/bizon.glb",
+      "bytes": 7513524,
+      "sha256": "f2bb97b88fbed94374d814277c8b3c6b3664ae3fd2e3503c4959c728e2890f67"
+    },
+    {
+      "path": "worldmodels/bizon.glb",
+      "bytes": 1599128,
+      "sha256": "59b29c166d8f98293892c98efd1a148fa4d5f798bec7037a741bb82f61bed3c3"
+    },
+    {
+      "path": "viewmodels/nova.glb",
+      "bytes": 6127024,
+      "sha256": "37588b46a2d5acd31641f1ddfacfff419fa1a9e4f6a3ca035b91a5516d85543f"
+    },
+    {
+      "path": "worldmodels/nova.glb",
+      "bytes": 1365268,
+      "sha256": "f20c14fa2fda96085d764d6acc5f2bd397348d91d0e74b7a971eeab59a3738c0"
+    },
+    {
+      "path": "viewmodels/xm1014.glb",
+      "bytes": 6444676,
+      "sha256": "d80aa9f80eb4cc92eac624a2ecd76da4fd504ba10fa4228d1285ab5a3cbe08f0"
+    },
+    {
+      "path": "worldmodels/xm1014.glb",
+      "bytes": 1630580,
+      "sha256": "ca7837b0972733c8ae407ecf5109f8a003a0506f50df6a3ae550b9345991288f"
+    },
+    {
+      "path": "viewmodels/mag-7.glb",
+      "bytes": 5569784,
+      "sha256": "36a85080ffca8fb51cb77ce2c2cb924383c42409e37eba69ca196e24fb9233b3"
+    },
+    {
+      "path": "worldmodels/mag-7.glb",
+      "bytes": 1508524,
+      "sha256": "61e82dd9eb1b3233fe4c0ef30392da4067f38ce363474c205516f22dfee3e56e"
+    },
+    {
+      "path": "viewmodels/sawed-off.glb",
+      "bytes": 5762232,
+      "sha256": "25b939cb6df7dea620fd315a0f64f3b5764dbc9af5dfbc4ec9547f0658b329ad"
+    },
+    {
+      "path": "worldmodels/sawed-off.glb",
+      "bytes": 1748700,
+      "sha256": "1d8287152207ce92b0f0cfacc0758c4cc1fdd7401e5f9e8a96a87a6d0f907543"
+    },
+    {
+      "path": "viewmodels/galil_ar.glb",
+      "bytes": 3491828,
+      "sha256": "37769f7987f338ae068e57844dfd9595578009e1553fccb950471efc13c232c0"
+    },
+    {
+      "path": "worldmodels/galil_ar.glb",
+      "bytes": 1292904,
+      "sha256": "b7ced67e3bab7421576ff1046a671dc9e9e6a8c3bddaaefa3b34e63ab23f0faa"
+    },
+    {
+      "path": "viewmodels/famas.glb",
+      "bytes": 4386684,
+      "sha256": "ef26f272d4dbddf33539e659b3d007762f2eec4e00ccc336bb0205edeedf4e0c"
+    },
+    {
+      "path": "worldmodels/famas.glb",
+      "bytes": 2089576,
+      "sha256": "339f235fc9a3737c8e4f62c0a910529dc49fde2e29435c2464d2b1a517173e47"
+    },
+    {
+      "path": "viewmodels/ak-47.glb",
+      "bytes": 4469172,
+      "sha256": "0f7f2783399f69befd7f6bdf61e3ba47d39d2b5dc6630b2558ec320d22b71d2e"
+    },
+    {
+      "path": "worldmodels/ak-47.glb",
+      "bytes": 2141712,
+      "sha256": "a76e82ccf9bf037276684f0203d0c06c7e90e07788981e3ebc2cccd31807fc5c"
+    },
+    {
+      "path": "viewmodels/m4a4.glb",
+      "bytes": 6141588,
+      "sha256": "da2f3f48598df1082d55921ce8e873dffb23c52e5d788c03fa4d7fb315674c8b"
+    },
+    {
+      "path": "worldmodels/m4a4.glb",
+      "bytes": 1754972,
+      "sha256": "3882e30c5a5cbaeb6b25e883990a3c20c00edf27d4831f3affb567e666a0cddc"
+    },
+    {
+      "path": "viewmodels/m4a1_s.glb",
+      "bytes": 6787908,
+      "sha256": "2e1dbfc3cd08deba42a438f306d00ca604d2cb2eba6edbbed16ca7a58309fd36"
+    },
+    {
+      "path": "worldmodels/m4a1_s.glb",
+      "bytes": 1946940,
+      "sha256": "cf52a40c3bc988373aa9cb574e78b63f2a4b5f3980fd6e2c93b6c0394dc64ef5"
+    },
+    {
+      "path": "viewmodels/sg_553.glb",
+      "bytes": 4208884,
+      "sha256": "c7f1b888ebd3d4872d62a6300c288e2c3c73f432a2b5bee06c24cdcf532ec5b3"
+    },
+    {
+      "path": "worldmodels/sg_553.glb",
+      "bytes": 1761140,
+      "sha256": "8fd90e7033c7e16dafdb5d95d4e536592350e22219a122c94006b04a14039462"
+    },
+    {
+      "path": "viewmodels/aug.glb",
+      "bytes": 4342024,
+      "sha256": "7cdff3a3fb87a5d26627eb60e8cbc3ddf5d3dc93806245b50982018843bf0dda"
+    },
+    {
+      "path": "worldmodels/aug.glb",
+      "bytes": 1704480,
+      "sha256": "5d8ec30c1da213382ffbcd29a77b8713c6683207472084c20bee7cd5d04a9815"
+    },
+    {
+      "path": "viewmodels/ssg_08.glb",
+      "bytes": 8771940,
+      "sha256": "cd7f5e509be6f05d9dec7d8ab427bf6d850e8f82bedbbe3169fe34675ac141a4"
+    },
+    {
+      "path": "worldmodels/ssg_08.glb",
+      "bytes": 1454652,
+      "sha256": "6bddaf3d2fa989db5bc10ed23a1156deb2452034a8f7b39bd6e376792f61b3dc"
+    },
+    {
+      "path": "viewmodels/awp.glb",
+      "bytes": 6291728,
+      "sha256": "e39d01294e4cbdfd703859d959f04c22ce93b11cb2dc899d4843a7ed62d3b7f5"
+    },
+    {
+      "path": "worldmodels/awp.glb",
+      "bytes": 1579940,
+      "sha256": "d2a0464bb5b3be1546c5ad9070e7b92394710da17543db0b28b5e3d0cc5a9197"
+    },
+    {
+      "path": "viewmodels/g3sg1.glb",
+      "bytes": 6328156,
+      "sha256": "1030b8791629eab3eb4d52e2078a0fc0977ea877845ce2b6c023c3f5c891159c"
+    },
+    {
+      "path": "worldmodels/g3sg1.glb",
+      "bytes": 1625592,
+      "sha256": "72f80bf5b00f683483bde626f8af279a95792134b52628cba764f4007e106a8f"
+    },
+    {
+      "path": "viewmodels/scar-20.glb",
+      "bytes": 6063560,
+      "sha256": "2bdef11f60c97323f5700a3dc73200a3553bf25c127a202f8c27502c2367a405"
+    },
+    {
+      "path": "worldmodels/scar-20.glb",
+      "bytes": 1473268,
+      "sha256": "e235324011bc071169b42f4ce40b9c3a72e236e4cc814a7a47a9f2163dd94d97"
+    },
+    {
+      "path": "viewmodels/m249.glb",
+      "bytes": 9171552,
+      "sha256": "5d674697ce1a6b4019b7cb9f03fb3916ab8da059373d8a0f87d8b88db60c1e5a"
+    },
+    {
+      "path": "worldmodels/m249.glb",
+      "bytes": 1654996,
+      "sha256": "bd2eb92f523e8d608174201e4e4b446e514490104126f3e4d3a6c9a68f7cb3bb"
+    },
+    {
+      "path": "viewmodels/negev.glb",
+      "bytes": 10553136,
+      "sha256": "dbeb3f8fa320588083e81d522bcd8a6f3d04719dae9e5dae6ba8a7bf2226c3d8"
+    },
+    {
+      "path": "worldmodels/negev.glb",
+      "bytes": 1939752,
+      "sha256": "35abc3bcab812aa00d46961192bec55e200704e63924c8daf2dedb9467c8d97d"
+    }
+  ]
+}

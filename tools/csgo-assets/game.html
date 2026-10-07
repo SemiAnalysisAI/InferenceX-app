@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="robots" content="noindex,nofollow" />
+    <title>Dust II | Offline 5v5 development build</title>
+    <link rel="stylesheet" href="game.css" />
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js",
+          "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/",
+          "three-mesh-bvh": "https://cdn.jsdelivr.net/npm/three-mesh-bvh@0.9.2/build/index.module.js"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <canvas id="world" aria-label="Dust II 3D game"></canvas>
+    <header>
+      <span class="wordmark"
+        ><svg viewBox="0 0 32 32" width="25" height="25" aria-hidden="true">
+          <path
+            d="M4 5h14l10 11-10 11H4l10-11Z"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="3"
+          /></svg
+        >DUST II <small>OFFLINE 5v5</small></span
+      ><span id="build">DEVELOPMENT BUILD · PARITY UNVERIFIED</span
+      ><button id="language">中文</button><button id="sound" aria-pressed="true">Sound on</button>
+    </header>
+    <div id="round">
+      <span id="ct-score">0</span>
+      <div><small id="phase">LOADING</small><strong id="clock">0:00</strong></div>
+      <span id="t-score">0</span>
+    </div>
+    <canvas id="radar" width="220" height="220" aria-label="Team radar"></canvas>
+    <div id="feed" aria-live="polite"></div>
+    <div id="scope" hidden aria-hidden="true"></div>
+    <div id="crosshair">+</div>
+    <div id="hitmarker">×</div>
+    <div id="damage"></div>
+    <div id="flash"></div>
+    <div id="objective"></div>
+    <div id="action"><span></span></div>
+    <footer>
+      <div class="vital"><strong id="health">100</strong><small>HEALTH</small></div>
+      <div class="vital"><strong id="armor">0</strong><small>ARMOR</small></div>
+      <div class="money" id="money">$800</div>
+      <div id="weapon">
+        <small>GLOCK-18</small><strong>20 <em>/ 120</em></strong>
+      </div>
+    </footer>
+    <div id="hint">
+      WASD move · Mouse aim · Click fire · R reload · B buy · E plant / defuse · 1/2 weapons · 3
+      knife · 4 grenade · Tab score · Esc pause
+    </div>
+    <div id="performance"></div>
+    <section id="menu" class="overlay">
+      <div class="panel">
+        <p class="eyebrow">COUNTER-STRIKE MAP EXPERIMENT</p>
+        <h1>DUST II</h1>
+        <p id="intro">One human. Nine bots. Original map and weapon assets.</p>
+        <p class="warning" id="disclaimer">
+          Development build, not 95% parity. Workshop map port, simplified lighting, retargeted
+          character animations and unqualified bot tactics. Do not use as a finished CS:GO
+          presentation.
+        </p>
+        <div class="progress"><span id="loadbar"></span></div>
+        <p id="loading" role="status">Loading map geometry and materials…</p>
+        <div class="actions">
+          <button id="start-t" disabled>Play Terrorists</button
+          ><button id="start-ct" disabled>Play Counter-Terrorists</button
+          ><button id="tour" disabled>Explore map</button><button id="resume" hidden>Resume</button>
+        </div>
+        <p class="controls">
+          Desktop keyboard and mouse required. Audio starts after your first click.
+        </p>
+        <a href="index.html">Weapon asset inspector</a>
+      </div>
+    </section>
+    <section id="buy" class="overlay" hidden>
+      <div class="panel buy-panel">
+        <div class="buy-title">
+          <h2>BUY EQUIPMENT</h2>
+          <button id="close-buy">Close · B</button>
+        </div>
+        <p id="buy-status"></p>
+        <div id="buy-items"></div>
+      </div>
+    </section>
+    <section id="scoreboard" class="overlay" hidden>
+      <div class="panel">
+        <h2>SCOREBOARD</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Player</th>
+              <th>Team</th>
+              <th>State</th>
+              <th>K</th>
+              <th>D</th>
+              <th>$</th>
+            </tr>
+          </thead>
+          <tbody id="scores"></tbody>
+        </table>
+        <p>Click after death to change the observed teammate.</p>
+        <button id="restart">Restart match</button>
+      </div>
+    </section>
+    <script type="module" src="game.mjs"></script>
+  </body>
+</html>

@@ -1,8 +1,12 @@
-# CS:GO asset intake
+# CS:GO asset intake and offline Dust II prototype
 
-This is development tooling for the requested Dust II game. It is not the game,
-not integrated into the dashboard, and not ready for the proposed presentation.
+This directory contains asset tooling and an offline Dust II game prototype.
+It is not integrated into the dashboard or ready for the proposed presentation.
 No claim of 95% feature parity is made. The PR must remain a draft.
+
+Open `game.html` for the one-human/nine-bot prototype after restoring the converted
+assets. See [GAME.md](GAME.md) for its systems, conversion recipe and remaining
+acceptance gaps. `index.html` remains the original OBJ/audio inspection tool.
 
 ## Verified inputs
 
@@ -57,8 +61,10 @@ asset atomically after verification. An interrupted run can be retried.
 
 The [Valve Developer Community map inventory](https://developer.valvesoftware.com/wiki/Counter-Strike:_Global_Offensive/Maps)
 describes official Workshop compatibility versions. A reference CS:GO build and
-corresponding map, materials, props, collision and navigation data still need to
-be obtained and pinned. A screenshot is not map geometry.
+unmodified map fingerprint still need approval. The current prototype uses the
+textured [de_dust2new community port](https://steamcommunity.com/sharedfiles/filedetails/?id=3068466810),
+whose author documents visual downgrades. Its converted output and source archive
+are hashed separately in `game-assets-lock.json`; that does not establish reference parity.
 
 The search also found:
 
@@ -77,7 +83,7 @@ The search also found:
 
 `acceptance.json` is a proposed coverage checklist, not an approved definition of
 “95% of CS:GO.” It includes full-map visuals and collision, weapons, movement,
-grenades, bomb logic, rounds, economy, bots, audio, HUD, spectators, networking,
+grenades, bomb logic, rounds, economy, bots, audio, HUD, spectators, offline 5v5,
 stability and dashboard isolation. Each row must be expanded into reproducible
 reference test cases before signoff. No gameplay category is implemented by this
 asset tooling.
@@ -124,9 +130,12 @@ development-only presentation surface.
 - 请求者表示已获得 Steam 的游戏素材使用许可。此处仅记录该陈述，不代表已独立核实协议，
   也不将许可扩大到第三方游戏代码、改制内容或皮肤。
 - `acceptance.json` 只是待确认的验收清单。具体 CS:GO 版本、地图哈希、部署目标、
-  真人联机范围、演示设备及日期尚待确认，所有玩法检查均未通过验收。
+  演示设备及日期尚待确认，所有玩法检查均未通过验收。模式已确认为 1 名真人与 9 名机器人。
 - 检查脚本当前应返回非零状态。它验证验收报告是否完整，不自动证明测试结果真实，
   也不等同于 GitHub 分支保护规则。
 
 工具页面可切换中英文，支持模型旋转、缩放、线框检查和手动播放音频。
 本次改动不新增仪表板路由或生产环境导入，不修改数据、API 或公开技能包。
+
+`game.html` 现已提供离线 Dust II 开发版本，包含地图移植、武器、机器人和回合流程。
+它尚未达到 95% 还原度，也不适合正式演示。具体实现范围和未完成项见 `GAME.md`。

@@ -135,8 +135,8 @@
       "evidence": []
     },
     {
-      "id": "multiplayer",
-      "requirement": "Agreed ten-human networking scope, authority, synchronization, reconnect and latency behavior are implemented and tested",
+      "id": "offline-5v5",
+      "requirement": "One human and nine bots complete an offline 5v5 match, including side selection, deaths, spectating, halftime and restart; ten-human networking is outside the user-confirmed scope",
       "weight": 5,
       "required": true,
       "status": "not-run",

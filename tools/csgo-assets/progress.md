@@ -2,6 +2,24 @@ Original prompt: Open a PR for a realistic CS:GO Dust II 5v5 3D game using real 
 
 ## Current work
 
+- User confirmed one human with nine bots; ten-human networking is out of scope.
+- Added `game.html` with a converted textured Dust II Workshop port, static props,
+  collision probes and a precomputed 4,327-node connected navigation graph.
+- Added offline match state, buying, 34 firearms, ammunition, reloading, basic
+  damage/armor, grenades, C4, round transitions, halftime and spectator controls.
+- Converted 34 animated weapon viewmodels with hands and textures; repaired
+  SourceIO's missing first-texture references and textureless materials directly
+  from the supplied VTF/VMT files. The tests now reject textureless opaque materials.
+- Added 34 textured world-weapon models, CT/T character models and hand attachments.
+  Character motion is attributed, retargeted GMod motion, not original CS:GO animation.
+- Restored 20 map alpha materials, including foliage and chain-link fencing.
+- Added ammunition-preserving weapon pickup, reload cancellation on switching,
+  exact firing-audio mappings for all firearms, stereo audio and simple wall occlusion.
+- Added an engine-bundled preview build. Fonts still have a network fallback.
+- SourceIO's hidden master-instance collection initially produced overlapping
+  unplaced geometry. Visible-only export fixed that conversion error.
+- Original asset-intake work remains below; `GAME.md` describes current limitations.
+
 - Located and downloaded Valve's legacy Workshop weapon archive.
 - Restored 34 original OBJ weapon meshes and 1,021 WAV weapon/footstep files.
 - Added size, SHA-256, Git blob, file-format and path-safety validation.
@@ -23,15 +41,30 @@ Original prompt: Open a PR for a realistic CS:GO Dust II 5v5 3D game using real 
 
 ## Not completed
 
-- No game loop, full Dust II map, collision, weapons gameplay, animations, bots,
-  multiplayer, economy, grenades or bomb mode.
+- Exact movement, ballistics, recoil, grenade physics and original-renderer parity.
+- Original CS:GO character locomotion, per-weapon pose qualification and complete radio mapping.
+- High-skill bot behavior qualification, full-match reliability and presentation-hardware performance.
 - No approved parity baseline or measured 95% completion.
 - No dashboard integration.
-- No original map asset pinned. Sources found are documented in README.md.
+- The pinned map is a community CS:GO port, not an independently verified original game build.
 - Independent Chinese copy review and maintainer signoff remain pending.
 - Keep the PR draft and do not enable auto-merge.
 
 ## Verification results
+
+Current game work:
+
+- 26 local Node tests pass, including all 34 viewmodels, 34 world models, both
+  characters, firing audio mappings, inventory behavior and map graph connectivity.
+- 73 generated map/model/navigation files have SHA-256 entries. Binary asset
+  tests skip in CI when those ignored assets are absent; local results are separate.
+- The earlier browser run physically traversed all 60 spawn-to-site routes,
+  exercised movement, firing, reloading, buying and two round transitions with
+  no page errors. The updated character/audio build is undergoing another run.
+- Full-match, reference fidelity and presentation-hardware approval are not inferred
+  from these local tests. The parity gate remains unsatisfied.
+
+Original asset-inspector work:
 
 - All 1,055 files passed byte-size, SHA-256 and format checks; a second check reused
   all files with no downloads.
