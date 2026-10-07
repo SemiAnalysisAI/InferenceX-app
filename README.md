@@ -1,0 +1,3 @@
+Versioned assets for the in-site Dust II development build. Contains the documented Workshop map/character/weapon ports and mirrored audio, not a verified original game build. The requester states Valve/Steam permission; community-port distribution rights still require maintainer review. This asset release does not certify 95% fidelity or authorize merging the game PR. Provenance and hashes are in tools/csgo-assets/GAME.md, assets-lock.json and game-assets-lock.json at commit 7d550eb9c452b9683a1612f8bf1508396f68a3f8.
+
+用于站内 Dust II 开发版本的固定素材包，包含已记录来源的 Workshop 地图、角色、武器移植和音频镜像，并非已验证的原版游戏。请求者表示已获 Valve/Steam 许可；社区移植内容的分发权限仍需维护者审核。本素材发布不证明达到 95% 还原度，也不授权合并游戏 PR。来源与哈希见上述提交中的素材文档。
