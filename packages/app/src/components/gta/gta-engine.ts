@@ -11,7 +11,17 @@ import {
   type Point,
   type Vehicle,
 } from './gta-world';
-import { roadHeading, streetRoute } from './gta-geography';
+import { BAY_LANDMARKS, roadHeading, streetRoute } from './gta-geography';
+const TOUR_LOOK_AT: Record<number, Point> = {
+  1: BAY_LANDMARKS[1],
+  2: BAY_LANDMARKS[0],
+  3: { x: 290, z: 256 },
+  4: { x: -600, z: -1060 },
+  5: { x: -1150, z: -1350 },
+  6: { x: -125, z: 1850 },
+  7: { x: 260, z: 2130 },
+  8: { x: 570, z: 2680 },
+};
 const pursuitRoutes = new WeakMap<Actor, { points: Point[]; next: number; until: number }>();
 export interface Controls {
   forward: boolean;
@@ -100,16 +110,8 @@ export function beginTour(s: CityState, index: number, fastTravel = false) {
   s.message = 'drive';
   if (fastTravel) {
     const p = DESTINATIONS[index];
-    const viewAngle =
-      index === 6
-        ? -Math.PI / 2
-        : index === 4
-          ? Math.atan2(50, -30)
-          : index === 5
-            ? -2.3
-            : index === 8
-              ? Math.atan2(70, -60)
-              : roadHeading(p);
+    const lookAt = TOUR_LOOK_AT[index];
+    const viewAngle = lookAt ? Math.atan2(lookAt.x - p.x, lookAt.z - p.z) : roadHeading(p);
     s.car = { x: p.x, z: p.z, angle: viewAngle, speed: 0 };
     s.player = { ...s.car };
     s.onFoot = false;

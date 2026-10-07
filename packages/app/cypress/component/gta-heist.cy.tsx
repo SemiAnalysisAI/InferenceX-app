@@ -35,6 +35,13 @@ describe('GTA 3D city', () => {
       expect(state.car.x).to.equal(500);
       expect(state.car.z).to.equal(2740);
     });
+    cy.get('[data-testid="heist-canvas"]').trigger('keydown', { code: 'KeyC' });
+    cy.get('[data-testid="heist-canvas"]').trigger('keydown', { code: 'KeyC' });
+    cy.window().then((win) => {
+      const game = win as unknown as GameWindow;
+      game.advanceTime(0);
+      expect(JSON.parse(game.render_game_to_text()).camera).to.equal(2);
+    });
   });
   it('loads, drives, pauses, resumes and resets', () => {
     cy.mount(

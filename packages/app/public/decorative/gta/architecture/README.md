@@ -18,7 +18,7 @@ The models are the 1K glTF exports, repacked into self-contained GLBs. Unused mo
 
 The apartment and factory façade JPEGs are orthographic texture bakes of those CC0 modules. The glass façade JPEG is an original pane-and-frame material bake. Distant buildings use these repeated atlases; nearby buildings use modeled modules. These are not photographic scans of individual SF buildings. The eleven architecture files total 10,010,316 bytes.
 
-The Jacaranda foliage texture is a transparent orthographic bake of the CC0 model by Rob Tuytel and Rico Cilliers, https://polyhaven.com/a/jacaranda_tree. Crossed texture cards replace the full 312k-polygon tree at runtime. This adds leaf and branch detail without replicating the source geometry across the city.
+The Jacaranda foliage texture is a transparent orthographic bake of the CC0 model by Rob Tuytel and Rico Cilliers, https://polyhaven.com/a/jacaranda_tree. Crossed texture cards replace the full tree geometry at runtime. This adds leaf and branch detail without replicating the source geometry across the city.
 
 ## Geographic data
 

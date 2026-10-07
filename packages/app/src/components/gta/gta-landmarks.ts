@@ -66,7 +66,7 @@ export function addBayLandmarks(city: T.Group, label: Label, foliage: T.Texture)
   };
   const tree = (x: number, z: number, size = 1) => {
     for (let i = 0; i < 3; i++) {
-      const plane = add(leafPlane, leaves, x, 5.5 * size, z);
+      const plane = add(leafPlane, leaves, x, 5 * size, z);
       plane.scale.setScalar(size);
       plane.rotation.y = (i * Math.PI) / 3;
     }
@@ -152,7 +152,7 @@ export function addBayLandmarks(city: T.Group, label: Label, foliage: T.Texture)
     box(-25, 0.2, z, 5, 0.4, 5, white);
   }
   for (let x = -320; x < -60; x += 26) tree(x, 1940, 1.2);
-  label('NVIDIA HQ', -22, 3, 1860, 18, Math.PI / 2, '#314629');
+  label('NVIDIA HQ', -22, 2, 1860, 7, Math.PI / 2, '#314629');
   label('VISITOR PLAZA', -36, 2, 1790, 12, Math.PI / 2);
 
   // Salesforce's rounded taper and illuminated crown.
@@ -220,7 +220,7 @@ export function addBayLandmarks(city: T.Group, label: Label, foliage: T.Texture)
       previous = p;
     }
   }
-  label('GOLDEN GATE VISTA', -800, 3, -1043, 20, Math.PI);
+  label('GOLDEN GATE VISTA', -820, 2, -1050, 8, 0);
   // San Jose: recognizable civic rotunda, tower and palms around a plaza.
   box(590, 40, 2680, 42, 80, 26, glass);
   for (let y = 4; y < 80; y += 4) box(590, y, 2693.5, 43, 0.3, 0.4, white);

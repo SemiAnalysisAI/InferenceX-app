@@ -495,7 +495,10 @@ export function GtaGame({ locale = 'en' }: { locale?: 'en' | 'zh' }) {
     if (key === 'KeyM') toggleMap();
     if (key === 'KeyF') enterExit(state.current);
     if (key === 'KeyE') interact(state.current);
-    if (key === 'KeyC') state.current.camera = (state.current.camera + 1) % 2;
+    if (key === 'KeyC') {
+      state.current.camera = (state.current.camera + 1) % 3;
+      graphics.current?.resetCamera();
+    }
     sync();
     focus();
   };

@@ -338,14 +338,28 @@ export async function createCityRenderer(
       camera.position.set(s.player.x, 1000, s.player.z + 1);
       camera.lookAt(s.player.x, 0, s.player.z);
     } else {
-      const dist = s.onFoot ? 5 : s.camera === 1 ? 0.2 : 10 + Math.abs(s.car.speed) * 0.05;
-      const height = s.onFoot ? 3.1 : s.camera === 1 ? 1.6 : 5.2;
+      const landmarkHeight = s.tour === 3 ? 250 : s.tour === 4 ? 52 : 30;
+      const scenic = s.camera === 2;
+      const dist = scenic
+        ? Math.max(55, landmarkHeight * 0.75)
+        : s.onFoot
+          ? 5
+          : s.camera === 1
+            ? 0.2
+            : 10 + Math.abs(s.car.speed) * 0.05;
+      const height = scenic
+        ? 15 + landmarkHeight * 0.2
+        : s.onFoot
+          ? 3.1
+          : s.camera === 1
+            ? 1.6
+            : 5.2;
       tmp.set(s.player.x - Math.sin(a) * dist, height, s.player.z - Math.cos(a) * dist);
       if (snap) camera.position.copy(tmp);
       else camera.position.lerp(tmp, 0.14);
       camera.lookAt(
         s.player.x + Math.sin(a) * 9,
-        s.onFoot ? 1.3 : 1.5,
+        scenic ? landmarkHeight * 0.4 : s.onFoot ? 1.3 : 1.5,
         s.player.z + Math.cos(a) * 9,
       );
     }

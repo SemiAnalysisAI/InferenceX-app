@@ -41,7 +41,7 @@ extension and South Bay distances are deliberately condensed.
 - WASD/arrows: drive or walk.
 - Space: brake; Shift: sprint on foot.
 - F: exit a stationary car or reenter within five metres.
-- E: collect/deliver; C: chase/close camera; P: pause; M: map.
+- E: collect/deliver; C: chase/close/scenic camera; P: pause; M: map.
 - Buttons: change a stationary car, day/night, sound, restart.
 - Touch: hold steering and pedals simultaneously; use the action buttons.
 - Blur, hidden tab and map opening pause the simulation. Escape closes the
