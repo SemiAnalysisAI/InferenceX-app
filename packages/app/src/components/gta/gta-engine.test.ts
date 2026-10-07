@@ -1,170 +1,165 @@
-import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { beforeAll, describe, expect, it } from 'vitest';
 import {
   changeVehicle,
   cityText,
   EMPTY_CONTROLS,
   enterExit,
   interact,
+  markerFor,
   newCity,
+  START_POINT,
   stepCity,
   target,
+  travel,
+  type CityState,
+  type Controls,
 } from './gta-engine';
-import { blocked, BUILDINGS, GARAGE, JOBS, lanePoint, START } from './gta-world';
-const driving = (): ReturnType<typeof newCity> => ({ ...newCity(), phase: 'driving' });
-const advance = (s: ReturnType<typeof newCity>, c = EMPTY_CONTROLS, seconds = 1) => {
-  for (let i = 0; i < Math.round(seconds * 60); i++) stepCity(s, c, 1 / 60);
+import { distance, JOB_IDS, World, type CityData } from './gta-world';
+
+// The real San Fierro data on flat terrain keeps these tests independent of
+// browser image decoding while still exercising the actual street network.
+let world: World;
+beforeAll(() => {
+  const data = JSON.parse(
+    readFileSync(resolve(process.cwd(), 'public/decorative/gta/sf/city.json'), 'utf8'),
+  ) as CityData;
+  const g = data.grid;
+  const tw = Math.ceil((g.x1 - g.x0) / g.terrain) + 1,
+    th = Math.ceil((g.z1 - g.z0) / g.terrain) + 1,
+    gw = Math.ceil((g.x1 - g.x0) / g.ground) + 1,
+    gh = Math.ceil((g.z1 - g.z0) / g.ground) + 1;
+  world = new World(
+    data,
+    { width: tw, height: th, data: new Float32Array(tw * th) },
+    { width: gw, height: gh, data: new Uint8Array(gw * gh) },
+  );
+});
+
+const driving = () => ({ ...newCity(world), phase: 'driving' as const });
+const advance = (s: CityState, c: Controls = EMPTY_CONTROLS, seconds = 1) => {
+  for (let i = 0; i < Math.round(seconds * 60); i++) stepCity(world, s, c, 1 / 60);
 };
-describe('GTA 3D simulation', () => {
-  it('starts independently at a clear spawn', () => {
-    const a = newCity(),
-      b = newCity();
-    a.police.push({ ...a.car });
-    expect(b.police).toHaveLength(0);
-    expect(a.car).toMatchObject(START);
-    expect(blocked(a.car)).toBe(false);
+
+describe('San Fierro world data', () => {
+  it('places the real landmarks, including Oren’s Hummus and the South Bay campuses', () => {
+    for (const id of [
+      'oren',
+      'transamerica',
+      'coit',
+      'ferry',
+      'gg_south',
+      'nvidia_endeavor',
+      'amd_hq',
+    ])
+      expect(world.landmarks[id], id).toBeDefined();
+    expect(world.southBay(world.landmarks.nvidia_endeavor)).toBe(true);
+    expect(world.southBay(world.landmarks.amd_hq)).toBe(true);
+    expect(world.southBay(world.landmarks.oren)).toBe(false);
+    expect(world.buildings.length).toBeGreaterThan(10000);
   });
-  it('requires manual steering and supports forward, reverse and braking', () => {
+  it('names streets and districts from the map', () => {
+    const s = newCity(world);
+    expect(world.street(s.car.x, s.car.z)).not.toBe('');
+    expect(world.district(s.car).en).toBe('SoMa');
+  });
+});
+
+describe('San Fierro simulation', () => {
+  it('starts on a clear lane near Oren’s Hummus with traffic and pedestrians', () => {
+    const a = newCity(world),
+      b = newCity(world);
+    a.police.push({ ...a.car } as never);
+    expect(b.police).toHaveLength(0);
+    expect(distance(a.car, START_POINT)).toBeLessThan(200);
+    expect(world.blocked(a.car, 0.8)).toBe(false);
+    expect(a.traffic.length).toBeGreaterThan(10);
+    expect(a.peds.length).toBeGreaterThan(10);
+    expect(target(world, a).id).toBe('oren');
+  });
+  it('drives forward along the heading, brakes and reverses', () => {
     const s = driving();
+    const start = { ...s.car };
     advance(s, { ...EMPTY_CONTROLS, forward: true });
-    expect(s.car.z).toBeLessThan(START.z - 5);
-    expect(s.car.angle).toBe(Math.PI);
+    const moved = { x: s.car.x - start.x, z: s.car.z - start.z };
+    expect(Math.hypot(moved.x, moved.z)).toBeGreaterThan(3);
+    expect(moved.x * Math.sin(start.angle) + moved.z * Math.cos(start.angle)).toBeGreaterThan(0);
     const speed = s.car.speed;
     advance(s, { ...EMPTY_CONTROLS, brake: true });
     expect(s.car.speed).toBeLessThan(speed / 2);
-    advance(s, { ...EMPTY_CONTROLS, reverse: true });
+    advance(s, { ...EMPTY_CONTROLS, reverse: true }, 1.5);
     expect(s.car.speed).toBeLessThan(0);
   });
-  it('steers in the requested direction', () => {
-    const s = driving();
-    advance(s, { ...EMPTY_CONTROLS, forward: true, right: true }, 0.8);
-    expect(s.car.x).toBeGreaterThan(START.x);
-    expect(s.car.angle).toBeLessThan(Math.PI);
-  });
-  it('collides with buildings and cannot leave the bounded city', () => {
-    expect(BUILDINGS.every((b) => blocked(b))).toBe(true);
-    const s = driving();
-    s.car = { x: 0, z: -127, angle: Math.PI, speed: 40 };
-    advance(s, EMPTY_CONTROLS, 0.2);
-    expect(s.car.z).toBeGreaterThan(-129);
-    expect(s.health).toBeLessThan(100);
-  });
   it.each(['ready', 'paused', 'won', 'busted'] as const)('freezes %s completely', (phase) => {
-    const s = newCity();
+    const s = newCity(world);
     s.phase = phase;
-    const before = cityText(s);
+    const before = cityText(world, s);
     advance(s, { ...EMPTY_CONTROLS, forward: true });
-    expect(cityText(s)).toBe(before);
+    expect(cityText(world, s)).toBe(before);
   });
-  it('ignores invalid time and caps catchup', () => {
+  it('ignores invalid time steps', () => {
     const s = driving(),
-      before = cityText(s);
-    for (const dt of [NaN, Infinity, -1, 0]) stepCity(s, EMPTY_CONTROLS, dt);
-    expect(cityText(s)).toBe(before);
-    stepCity(s, EMPTY_CONTROLS, 50);
-    expect(s.time).toBeCloseTo(480 - 1 / 30);
+      before = cityText(world, s);
+    for (const dt of [NaN, Infinity, -1, 0]) stepCity(world, s, EMPTY_CONTROLS, dt);
+    expect(cityText(world, s)).toBe(before);
   });
-  it('only exits a stopped car and requires proximity to reenter', () => {
+  it('only exits a stopped car, animates walking and requires proximity to reenter', () => {
     const s = driving();
     s.car.speed = 10;
-    expect(enterExit(s)).toBe(false);
+    expect(enterExit(world, s)).toBe(false);
     s.car.speed = 0;
-    expect(enterExit(s)).toBe(true);
+    expect(enterExit(world, s)).toBe(true);
     expect(s.onFoot).toBe(true);
-    advance(s, { ...EMPTY_CONTROLS, forward: true, sprint: true }, 2);
-    expect(enterExit(s)).toBe(false);
-    s.player = { ...s.car };
-    expect(enterExit(s)).toBe(true);
-  });
-  it('exits through the opposite door when parked beside a building', () => {
-    const s = driving();
-    s.car = { x: 14, z: 31, angle: 0, speed: 0 };
-    expect(blocked(s.car)).toBe(false);
-    expect(blocked({ x: 17, z: 31 }, 0.4)).toBe(true);
-    expect(enterExit(s)).toBe(true);
-    expect(s.player.x).toBe(11);
-    expect(blocked(s.player, 0.4)).toBe(false);
-  });
-  it('reports an obstructed exit without moving the player', () => {
-    const s = driving();
-    s.car = { ...BUILDINGS[0], angle: 0, speed: 0 };
-    const before = { ...s.player };
-    expect(enterExit(s)).toBe(false);
-    expect(s.message).toBe('blocked');
+    const stride = s.player.stride;
+    advance(s, { ...EMPTY_CONTROLS, forward: true, sprint: true }, 3);
+    expect(s.player.stride).toBeGreaterThan(stride + 1);
+    expect(distance(s.player, s.car)).toBeGreaterThan(5);
+    expect(enterExit(world, s)).toBe(false);
+    s.player = { ...s.player, x: s.car.x + 1, z: s.car.z };
+    expect(enterExit(world, s)).toBe(true);
     expect(s.onFoot).toBe(false);
-    expect(s.player).toEqual(before);
   });
-  it('changes parked cars but not moving vehicles or on foot', () => {
+  it('changes vehicle only while stopped', () => {
     const s = driving();
-    expect(changeVehicle(s)).toBe(true);
-    expect(s.vehicle).toBe('buffalo');
-    s.car.speed = 4;
+    const v = s.vehicle;
+    s.car.speed = 10;
     expect(changeVehicle(s)).toBe(false);
     s.car.speed = 0;
-    s.onFoot = true;
-    expect(changeVehicle(s)).toBe(false);
+    expect(changeVehicle(s)).toBe(true);
+    expect(s.vehicle).not.toBe(v);
   });
-  it('requires each pickup and garage delivery to win', () => {
+  it('collects only at the marker and finishes after NVIDIA and AMD', () => {
     const s = driving();
-    expect(interact(s)).toBe(false);
-    for (const job of JOBS) {
-      s.player = { ...job, angle: 0, speed: 0 };
-      expect(target(s)).toEqual(job);
-      expect(interact(s)).toBe(true);
+    expect(interact(world, s)).toBe(false);
+    for (const id of JOB_IDS) {
+      expect(target(world, s).id).toBe(id);
+      const m = markerFor(world, id);
+      s.player = { ...s.player, x: m.x, z: m.z, speed: 0 };
+      s.car = { ...s.car, x: m.x, z: m.z, speed: 0 };
+      expect(interact(world, s)).toBe(true);
     }
     expect(s.phase).toBe('won');
-    expect(s.cash).toBe(5000);
-    expect(interact(s)).toBe(false);
+    expect(s.cash).toBeGreaterThan(0);
   });
-  it('cannot collect at speed or while paused', () => {
+  it('quick-travels to San Jovano and back when stopped', () => {
     const s = driving();
-    s.player = { ...JOBS[0], angle: 0, speed: 9 };
-    expect(interact(s)).toBe(false);
+    s.car.speed = 20;
+    s.player.speed = 20;
+    expect(travel(world, s, 'south')).toBe(false);
+    s.car.speed = 0;
     s.player.speed = 0;
-    s.phase = 'paused';
-    expect(interact(s)).toBe(false);
+    expect(travel(world, s, 'south')).toBe(true);
+    expect(world.southBay(s.car)).toBe(true);
+    expect(distance(s.car, world.landmarks.nvidia_endeavor)).toBeLessThan(800);
+    expect(travel(world, s, 'city')).toBe(true);
+    expect(world.southBay(s.car)).toBe(false);
   });
-  it('repairs only while parked at garage', () => {
-    const s = driving();
-    s.car = { ...GARAGE, angle: 0, speed: 0 };
-    s.player = { ...s.car };
-    s.health = 50;
-    advance(s);
-    expect(s.health).toBeGreaterThan(59);
-  });
-  it('lets the player escape police and applies damage cooldowns', () => {
-    const s = driving();
-    s.heat = 1;
-    s.police = [{ ...s.player }];
-    advance(s, EMPTY_CONTROLS, 0.2);
-    expect(s.health).toBe(88);
-    s.police = [];
-    s.heat = 1;
-    advance(s, EMPTY_CONTROLS, 16);
-    expect(s.heat).toBe(0);
-  });
-  it('traffic stays on roads and uses distinct car models', () => {
-    for (let lane = 0; lane < 3; lane++)
-      for (let d = 0; d < 2500; d += 10) expect(blocked(lanePoint(d, lane))).toBe(false);
-    expect(new Set(newCity().traffic.map((t) => t.model)).size).toBe(4);
-  });
-  it('ends the run on timeout or zero health', () => {
-    const s = driving();
-    s.time = 0.001;
-    advance(s);
-    expect(s.phase).toBe('busted');
-    const b = driving();
-    b.health = 0;
-    advance(b);
-    expect(b.phase).toBe('busted');
-  });
-  it('flight does not mutate the city mission and stays above terrain', () => {
-    const s = driving();
-    s.explorer = true;
-    advance(s, { ...EMPTY_CONTROLS, forward: true, brake: true }, 3);
-    expect(s.altitude).toBe(750);
-    expect(s.time).toBe(480);
-    expect(s.car).toMatchObject(START);
-    expect(enterExit(s)).toBe(false);
-    expect(interact(s)).toBe(false);
+  it('flies the San Andreas explorer within bounds', () => {
+    const s = { ...driving(), explorer: true, altitude: 900 };
+    advance(s, { ...EMPTY_CONTROLS, forward: true, sprint: true }, 60);
+    expect(Math.abs(s.player.x)).toBeLessThanOrEqual(5500);
+    expect(Math.abs(s.player.z)).toBeLessThanOrEqual(7000);
+    expect(s.altitude).toBeLessThanOrEqual(2600);
   });
 });

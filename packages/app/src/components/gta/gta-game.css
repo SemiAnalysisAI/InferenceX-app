@@ -408,3 +408,25 @@
     grid-template-columns: repeat(2, auto);
   }
 }
+.gta-location {
+  display: block;
+  font-size: 0.8rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-shadow: 0 1px 2px #000;
+}
+.gta-location b {
+  color: #ffe08a;
+}
+.gta-game .gta-tools button[aria-pressed='true'] {
+  background: #4b6542;
+  border-color: #c8e29f;
+}
+.gta-map-panel canvas {
+  display: block;
+  width: 100%;
+  max-width: 360px;
+  height: auto;
+  margin: 0.5rem 0;
+  border: 1px solid #77877c;
+}
