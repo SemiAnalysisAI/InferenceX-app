@@ -1,0 +1,4 @@
+schema_version,timestamp_unix,scrape_seq,hostname,gpu_index,gpu_uuid,power_w,gpu_util_pct,sm_active
+2,1790360712.2282302,22,amd-a,0,100000000001,241,0,
+2,1790360713.22827,23,amd-a,0,100000000001,241,0,
+2,1790360714.2282336,24,amd-a,0,100000000001,241,0,
