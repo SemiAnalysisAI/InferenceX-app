@@ -14,6 +14,16 @@ for (const entry of ['game', 'viewer']) {
     format: 'esm',
     minify: true,
     legalComments: 'linked',
+    plugins: [
+      {
+        name: 'hosted-preview-input',
+        setup(builder) {
+          builder.onResolve({ filter: /^\.\/mouse-capture\.mjs$/ }, () => ({
+            path: join(root, 'mouse-preview.mjs'),
+          }));
+        },
+      },
+    ],
   });
   const file = entry === 'game' ? 'game.html' : 'index.html';
   const source = await readFile(join(root, file), 'utf8');

@@ -8,6 +8,7 @@ import { Match, RULES, distance } from './match.mjs';
 import { WEAPONS, EQUIPMENT } from './weapons.mjs';
 import { Navigation } from './navigation.mjs';
 import { SOUND_NAMES, fireSound, resolveSound } from './audio-map.mjs';
+import { acquireMouse, releaseMouse, isMouseCaptured } from './mouse-capture.mjs';
 THREE.Mesh.prototype.raycast = acceleratedRaycast;
 const $ = (id) => document.querySelector(`#${id}`);
 const renderer = new THREE.WebGLRenderer({
@@ -97,16 +98,10 @@ function loadMessage(text, percent) {
   $('loadbar').style.width = `${percent}%`;
 }
 function captureMouse() {
-  try {
-    const result = renderer.domElement.requestPointerLock?.();
-    result?.catch(() => {
-      $('hint').textContent =
-        'Mouse capture unavailable. Hold left mouse button and drag to aim, or use arrow keys.';
-    });
-  } catch {
+  acquireMouse(renderer.domElement, () => {
     $('hint').textContent =
-      'Mouse capture unavailable. Hold left mouse button and drag to aim, or use arrow keys.';
-  }
+      'Hosted preview: hold left mouse button and drag to aim/fire, or use arrow keys to aim. WASD moves.';
+  });
 }
 function vec(p, h = 0) {
   return new THREE.Vector3(p.x, p.y + h, p.z);
@@ -1118,7 +1113,7 @@ function buyMenu() {
     if (!paused) captureMouse();
     return;
   }
-  document.exitPointerLock?.();
+  releaseMouse();
   $('buy-status').textContent =
     `${p.team} · $${p.money} · ${match.canBuy(p) ? 'Buy zone active' : 'Outside buy zone / buy time'}`;
   $('buy-items').replaceChildren();
@@ -1142,7 +1137,7 @@ function pause() {
   input.fire = false;
   $('menu').hidden = false;
   $('resume').hidden = !match;
-  document.exitPointerLock?.();
+  releaseMouse();
 }
 $('start-t').addEventListener('click', () => start('T'));
 $('start-ct').addEventListener('click', () => start('CT'));
@@ -1219,7 +1214,7 @@ document.addEventListener('keyup', (e) => {
   if (e.code === 'Tab') $('scoreboard').hidden = true;
 });
 document.addEventListener('mousemove', (e) => {
-  if (paused || (document.pointerLockElement !== renderer.domElement && !(e.buttons & 1))) return;
+  if (paused || (!isMouseCaptured(renderer.domElement) && !(e.buttons & 1))) return;
   yaw -= e.movementX * (scoped ? 0.001 : 0.002);
   pitch = Math.max(-1.45, Math.min(1.45, pitch - e.movementY * (scoped ? 0.001 : 0.002)));
 });

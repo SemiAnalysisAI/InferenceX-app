@@ -67,6 +67,8 @@ WASD moves; mouse aims; left click fires; right click scopes supported weapons; 
 
 `?quality=low` reduces render resolution for software-rendered testing. It does not change gameplay. `render_game_to_text()`, `advanceTime(ms)` and `__test` are development-only QA hooks.
 
+Run `npm ci` and `npm run build -- /ABSOLUTE/PREVIEW/DIRECTORY` to create the bundled hosted preview. It bundles Three.js and the collision library locally. The hosted iframe does not allow cursor capture; its explicit preview input adapter uses left-button drag to aim/fire and arrow keys to aim. The standalone source page retains native mouse capture. Neither mode supplies mobile touch controls.
+
 ## Still blocking completion
 
 - Reference build, exact weapon/economy values, movement, penetration, recoil and grenade physics are not validated against CS:GO.
