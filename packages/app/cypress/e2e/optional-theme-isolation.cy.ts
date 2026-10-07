@@ -1,10 +1,24 @@
+import { APP_THEMES } from '../../src/lib/themes';
+
+const optionalThemes = APP_THEMES.filter((theme) => !['light', 'dark', 'system'].includes(theme));
+// Guard saved Halo preferences before the theme ships, too.
+const guardedThemes = [...new Set([...optionalThemes, 'halo'])];
 const featureCode =
-  /THREE\.WebGLRenderer|WebGLRenderer:|LOS SANTOS 3D|minecraft-click\.mp3|ender-dragon\.mp3|Loading Luigi Circuit|inferencex-minecraft-worlds|mc-panorama-cube|\.mc-hotbar-wrap|\.csgo-scene|\.gta-scene|\.mc-dragon-flyacross|\.kart-scene|font-family:\s*["']?(?:Monocraft|Pricedown|ChaletComprime)/i;
-const featureAsset =
-  /\/decorative\/(?:minecraft|csgo|gta|kart)\/|minecraft-click\.mp3|Monocraft-|Pricedown|ChaletComprime|youtube(?:-nocookie)?\.com|ytimg\.com/i;
+  /THREE\.WebGLRenderer|WebGLRenderer:|LOS SANTOS 3D|minecraft-click\.mp3|ender-dragon\.mp3|Loading Luigi Circuit|inferencex-minecraft-worlds|mc-panorama-cube|\.mc-hotbar-wrap|\.csgo-scene|\.gta-scene|\.mc-dragon-flyacross|\.kart-scene|\.halo-scene|halo-theme\.css|font-family:\s*["']?(?:Monocraft|Pricedown|ChaletComprime|Halo)/i;
+const featureAsset = new RegExp(
+  `/decorative/(?:${guardedThemes.join('|')})/|minecraft-click\\.mp3|Monocraft-|Pricedown|ChaletComprime|halo[^/]*\\.(?:woff2?|ttf|otf|mp3|ogg|wav)|youtube(?:-nocookie)?\\.com|ytimg\\.com`,
+  'i',
+);
 const featureElements =
   '[data-testid="minecraft-game"], [data-testid="minecraft-play-banner"], [data-testid="kart-game"], [data-testid$="-theme-banner"], .mc-dragon-flyacross';
 const isFeatureAsset = (url: string) => featureAsset.test(decodeURIComponent(url));
+
+function saveMediaOptIns(win: Window, enabled: boolean) {
+  for (const theme of guardedThemes) {
+    win.localStorage.setItem(`${theme}-music`, String(enabled));
+    win.localStorage.setItem(`${theme}-sound`, String(enabled));
+  }
+}
 
 function expectNoOptionalResources(requests: string[]) {
   cy.window().then((win) => {
@@ -13,17 +27,23 @@ function expectNoOptionalResources(requests: string[]) {
     const resources = win.performance.getEntriesByType('resource');
     expect(resources.filter((entry) => isFeatureAsset(entry.name))).to.have.length(0);
     expect(
-      [...win.document.fonts].filter((font) => /monocraft|pricedown|chalet/i.test(font.family)),
+      [...win.document.fonts].filter((font) =>
+        /monocraft|pricedown|chalet|halo/i.test(font.family),
+      ),
     ).to.have.length(0);
     for (const resource of resources.filter((entry) => /\.(?:js|css)(?:\?|$)/.test(entry.name)))
       cy.request(resource.name).its('body').should('not.match', featureCode);
   });
   cy.get(featureElements).should('not.exist');
+  cy.get('audio, video, iframe[src*="youtube"]').should('not.exist');
 }
 const seo = (doc: Document) => [
   doc.title,
   doc.querySelector('meta[name="description"]')?.getAttribute('content'),
   doc.querySelector('link[rel="canonical"]')?.getAttribute('href'),
+  ...[
+    ...doc.querySelectorAll('meta[name="robots"], meta[property^="og:"], meta[name^="twitter:"]'),
+  ].map((node) => node.outerHTML),
   ...[...doc.querySelectorAll('link[hreflang], script[type="application/ld+json"]')].map(
     (node) => node.outerHTML,
   ),
@@ -50,8 +70,7 @@ describe('optional themes stay off the default page', () => {
           if (theme === 'default') win.localStorage.removeItem('theme');
           else win.localStorage.setItem('theme', theme);
           // Stored opt-ins must not start media outside the selected theme.
-          win.localStorage.setItem('minecraft-music', 'true');
-          win.localStorage.setItem('minecraft-sound', 'true');
+          saveMediaOptIns(win, true);
         },
       });
       if (theme === 'light' || theme === 'dark') cy.get('html').should('have.class', theme);
@@ -71,7 +90,7 @@ describe('optional themes stay off the default page', () => {
     });
   }
 
-  for (const theme of ['minecraft', 'csgo', 'gta', 'kart']) {
+  for (const theme of guardedThemes) {
     for (const prefix of ['', '/zh']) {
       it(`${prefix || 'English'} embed ignores saved ${theme} before and after hydration`, () => {
         const requests: string[] = [];
@@ -81,8 +100,7 @@ describe('optional themes stay off the default page', () => {
         cy.visit(`${prefix}/embed/model/deepseek-v4?theme=light`, {
           onBeforeLoad(win) {
             win.localStorage.setItem('theme', theme);
-            win.localStorage.setItem('minecraft-music', 'true');
-            win.localStorage.setItem('minecraft-sound', 'true');
+            saveMediaOptIns(win, true);
           },
         });
         cy.get('html').should('have.class', 'light').and('have.attr', 'data-inferencex-embed');
@@ -115,11 +133,7 @@ describe('optional themes stay off the default page', () => {
             (link) => isFeatureAsset(link.getAttribute('href') ?? ''),
           ),
         ).to.have.length(0);
-        expect(
-          doc.querySelector(
-            '[data-testid="kart-game"], [data-testid="gta-theme-banner"], [data-testid="csgo-theme-banner"]',
-          ),
-        ).to.equal(null);
+        expect(doc.querySelector(featureElements)).to.equal(null);
         // Metadata and indexable headings are in raw HTML, without running JavaScript.
         cy.request(route).then((normal) => {
           const normalDoc = new DOMParser().parseFromString(normal.body, 'text/html');
@@ -134,8 +148,7 @@ describe('optional themes stay off the default page', () => {
     cy.visit('/about', {
       onBeforeLoad(win) {
         win.localStorage.setItem('theme', 'light');
-        win.localStorage.setItem('minecraft-music', 'false');
-        win.localStorage.setItem('minecraft-sound', 'false');
+        saveMediaOptIns(win, false);
       },
     });
     // The server-rendered trigger is visible before its click handler hydrates.
@@ -144,7 +157,7 @@ describe('optional themes stay off the default page', () => {
       .and('contain', 'currently');
     cy.document().then((doc) => {
       const baseline = seo(doc);
-      for (const theme of ['csgo', 'gta', 'minecraft', 'kart']) {
+      for (const theme of optionalThemes) {
         cy.get('[data-testid="theme-toggle"]').click();
         cy.get(`[data-testid="theme-option-${theme}"]`).click();
         if (theme === 'minecraft') cy.get('canvas').should('exist');
