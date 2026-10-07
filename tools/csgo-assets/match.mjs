@@ -1,4 +1,5 @@
 import { WEAPONS, EQUIPMENT, weaponState } from './weapons.mjs';
+import { bulletDamage, recoverWeapon } from './ballistics.mjs';
 const weaponSlot = (w) => (WEAPONS[w.id].category === 'pistol' ? 'secondary' : 'primary');
 export const RULES = {
   freeze: 10,
@@ -147,6 +148,14 @@ export class Match {
       p.navAt = 0;
       p.stuck = 0;
       p.fireHeld = false;
+      p.speed = 0;
+      p.scoped = false;
+      p.punchPitch = 0;
+      p.punchYaw = 0;
+      p.burstShots = 0;
+      p.burstWait = 0;
+      p.lastMoveSpeed = 0;
+      p.lastShotTrace = null;
       if (first || dead) {
         p.inventory = [];
         p.armor = 0;
@@ -162,6 +171,9 @@ export class Match {
         w.reserve = WEAPONS[w.id].reserve;
         w.reloading = 0;
         w.nextFire = 0;
+        w.accuracyPenalty = 0;
+        w.recoilIndex = 0;
+        w.lastShot = -Infinity;
       }
       if (!p.human) this.botBuy(p);
     }
@@ -246,12 +258,36 @@ export class Match {
     w.nextFire = this.time + 60 / d.rpm;
     p.lastShotAt = this.time;
     w.shots++;
+    w.lastShot = this.time;
+    w.recoilIndex++;
+    const accuracy = p.scoped ? d.scopedAccuracy : d.accuracy;
+    w.accuracyPenalty = Math.min(1, w.accuracyPenalty + (accuracy?.fire || 0));
     this.emit('fire', { player: p.id, weapon: w.id });
     return true;
   }
-  damage(victim, amount, attacker, head = false) {
+  bulletHit(victim, attacker, meters, hitGroup) {
     if (!victim.alive || this.phase !== 'live') return;
-    if (victim.armor > 0 && (!head || victim.helmet)) {
+    const result = bulletDamage(
+      WEAPONS[attacker.weapon.id],
+      meters,
+      hitGroup,
+      victim.armor,
+      victim.helmet,
+    );
+    victim.armor = Math.max(0, victim.armor - result.armor);
+    this.damage(
+      victim,
+      result.health,
+      attacker,
+      hitGroup === 'head',
+      true,
+      WEAPONS[attacker.weapon.id].killAward,
+    );
+    return result;
+  }
+  damage(victim, amount, attacker, head = false, armorApplied = false, killAward = 300) {
+    if (!victim.alive || this.phase !== 'live') return;
+    if (!armorApplied && victim.armor > 0 && (!head || victim.helmet)) {
       const absorbed = Math.min(victim.armor, amount * 0.45);
       victim.armor -= absorbed;
       amount -= absorbed;
@@ -263,7 +299,7 @@ export class Match {
     victim.deaths++;
     if (attacker && attacker.team !== victim.team) {
       attacker.kills++;
-      attacker.money = Math.min(16000, attacker.money + 300);
+      attacker.money = Math.min(16000, attacker.money + killAward);
     }
     this.drops.push({ position: { ...victim.position }, weapon: { ...victim.weapon } });
     if (this.bomb.carrier === victim.id) {
@@ -340,6 +376,7 @@ export class Match {
   }
   tick(dt) {
     this.time += dt;
+    this.recoverWeapons(dt);
     for (const p of this.players)
       for (const w of p.inventory)
         if (w.reloading > 0) {
@@ -394,6 +431,13 @@ export class Match {
     if (!ct) this.endRound('T', 'Counter-Terrorists eliminated');
     else if (!t && this.bomb.state !== 'planted') this.endRound('CT', 'Terrorists eliminated');
     else if (this.timer <= 0 && this.bomb.state !== 'planted') this.endRound('CT', 'Time expired');
+  }
+  recoverWeapons(dt) {
+    for (const p of this.players) {
+      for (const w of p.inventory) recoverWeapon(w, WEAPONS[w.id], dt, this.time, p.crouch);
+      p.punchPitch *= Math.exp(-7 * dt);
+      p.punchYaw *= Math.exp(-7 * dt);
+    }
   }
 }
 export function distance(a, b) {

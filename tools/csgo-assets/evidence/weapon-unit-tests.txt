@@ -1,0 +1,47 @@
+✔ asset paths reject traversal, absolute paths, backslashes and empty components (1.24248ms)
+✔ checks byte size, pinned SHA-256 and optional Git blob identity (1.223177ms)
+✔ format guards reject HTML disguised as a model or audio file (0.408064ms)
+✔ atomic writes preserve verified files and refuse symlink targets (15.201784ms)
+✔ downloads reject unapproved hosts, failures and oversized payloads (24.685458ms)
+✔ every firearm and knife resolves to an exact imported firing audio file (25.755172ms)
+✔ all 34 firearms use the pinned numeric schema with valid inherited attributes (2.104683ms)
+✔ KeyValues preserves repeated object sections, quoted URLs and prefab overrides (1.463462ms)
+✔ AK headshots penetrate helmets, AWP body shots kill, M4A1-S helmet shots do not (0.262401ms)
+✔ range decay uses Source units, stomach has its own multiplier, legs ignore armor (0.189386ms)
+✔ insufficient armor is consumed without over-absorbing damage (0.241103ms)
+✔ moving, jumping and sustained fire reduce accuracy, recovery restores it (0.314354ms)
+✔ weapon weight, scope, walk and crouch set distinct movement caps (0.249144ms)
+✔ recoil is repeatable and spread emits distinct bounded pellet offsets (0.495099ms)
+✔ match applies bullet armor once, awards weapon-specific rewards and resets fire state (2.381446ms)
+✔ both original character ports have textured skinning and retargeted locomotion (73.729533ms)
+✔ all 34 world weapons have original materials and hand attachment bones (1727.101362ms)
+✔ every source spawn reaches both bombsites in the baked navigation graph (903.80672ms)
+✔ manifest pins every model and audio file with a unique safe path and SHA-256 (11.718687ms)
+✔ one human and nine bots are split into two teams (1.875047ms)
+✔ 34 weapon meshes have playable definitions plus knife (0.232636ms)
+✔ team restrictions, budget and buy zone are enforced (0.326732ms)
+✔ ammo is spent only when live and rate limits apply (0.818274ms)
+✔ switching weapons cancels reload without creating ammunition (0.364429ms)
+✔ weapon pickup preserves ammo and respects slots, distance, height and cooldown (0.617043ms)
+✔ plant requires a live carrier inside a site and cancels when released (0.375353ms)
+✔ a planted bomb prevents a CT elimination win and can be defused (0.343994ms)
+✔ carrier death drops the bomb and another T can pick it up (0.576205ms)
+✔ timeout, explosion and rewards are resolved once (0.553328ms)
+✔ layered navigation avoids walls and rejects unreachable paths (1.568302ms)
+✔ cloned materials and skeletons are released once without destroying cached geometry/textures (12.916622ms)
+✔ procedural models can additionally release their owned geometry (0.247963ms)
+✔ current proposal is explicitly not merge eligible (1.022163ms)
+✔ ninety-five percent can pass only when every required check passes (0.486393ms)
+✔ high coverage cannot conceal a missing critical feature or evidence (1.482121ms)
+✔ baseline, map fingerprint, weights and threshold cannot be omitted (0.982432ms)
+✔ team arm selection does not treat ct_arms as a Terrorist-arm match (0.802311ms)
+✔ animation binding handles shoot/fire and inspect/lookat aliases (0.801088ms)
+✔ all 34 animated viewmodels contain real textures, geometry and animation clips (4640.249111ms)
+ℹ tests 39
+ℹ suites 0
+ℹ pass 39
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 8252.558215

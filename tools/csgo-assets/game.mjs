@@ -11,6 +11,15 @@ import { SOUND_NAMES, fireSound, resolveSound } from './audio-map.mjs';
 import { acquireMouse, releaseMouse, isMouseCaptured } from './mouse-capture.mjs';
 import { shouldHideArms } from './viewmodel-visibility.mjs';
 import { actionClip } from './weapon-animation.mjs';
+import { disposeModelInstance } from './model-lifecycle.mjs';
+import {
+  SOURCE_UNIT,
+  maxMoveSpeed,
+  shotAccuracy,
+  recoilKick,
+  spreadOffset,
+  verticalFov,
+} from './ballistics.mjs';
 THREE.Mesh.prototype.raycast = acceleratedRaycast;
 const $ = (id) => document.querySelector(`#${id}`);
 const renderer = new THREE.WebGLRenderer({
@@ -45,6 +54,7 @@ let collision = null,
   yaw = 0,
   pitch = 0,
   scoped = false,
+  zoomLevel = 0,
   muted = false,
   lang = 'en',
   ready = false,
@@ -286,10 +296,7 @@ function createAvatar(id) {
 function setAvatarTeam(avatar, team) {
   if (avatar.userData.team === team) return;
   avatar.userData.mixer?.stopAllAction();
-  avatar.traverse((o) => {
-    if (o.isMesh)
-      for (const m of Array.isArray(o.material) ? o.material : [o.material]) m.dispose();
-  });
+  disposeModelInstance(avatar);
   avatar.clear();
   const template = characterTemplates.get(team);
   const model = cloneSkeleton(template.scene);
@@ -344,10 +351,7 @@ async function showAvatarWeapon(avatar, id) {
   data.weaponId = id;
   if (data.weaponModel) {
     data.weaponModel.removeFromParent();
-    data.weaponModel.traverse((o) => {
-      if (o.isMesh)
-        for (const m of Array.isArray(o.material) ? o.material : [o.material]) m.dispose();
-    });
+    disposeModelInstance(data.weaponModel);
     data.weaponModel = null;
   }
   if (id === 'knife') return;
@@ -377,10 +381,7 @@ function updateDrops() {
     droppedMeshes.delete(drop);
     if (mesh) {
       scene.remove(mesh);
-      mesh.traverse((o) => {
-        if (o.isMesh)
-          for (const m of Array.isArray(o.material) ? o.material : [o.material]) m.dispose();
-      });
+      disposeModelInstance(mesh);
     }
   }
   for (const drop of match.drops) {
@@ -407,6 +408,10 @@ function updateDrops() {
 }
 async function showWeapon(id) {
   if (id === modelId) return;
+  scoped = false;
+  zoomLevel = 0;
+  weaponMixer?.stopAllAction();
+  disposeModelInstance(weaponRoot, { geometry: modelId === 'knife' });
   modelId = id;
   const ticket = ++modelTicket;
   weaponRoot.clear();
@@ -487,6 +492,7 @@ function start(team, tour = false) {
   mode = tour ? 'tour' : 'match';
   paused = false;
   scoped = false;
+  zoomLevel = 0;
   spectate = 0;
   yaw = 0;
   pitch = 0;
@@ -527,6 +533,8 @@ function move(p, dx, dz, dt, jump = false) {
   const ground = floor(p.position, p.position.y + 0.48);
   if (ground !== null && ground > p.position.y + 0.42) {
     p.position = from;
+    p.speed = 0;
+    p.lastMoveSpeed = 0;
     return;
   }
   if (jump && p.grounded) {
@@ -553,78 +561,92 @@ function move(p, dx, dz, dt, jump = false) {
     p.position = { ...spawns[p.team][0] };
     p.vy = 0;
   }
+  p.speed = dt > 0 ? Math.hypot(p.position.x - from.x, p.position.z - from.z) / dt : 0;
+  p.lastMoveSpeed = p.speed;
 }
 function shoot(p, target = null) {
-  if (!match.fire(p)) return;
   const w = WEAPONS[p.weapon.id],
-    origin = vec(p.position, p.crouch ? 0.85 : 1.18);
-  let direction;
+    origin = vec(p.position, p.crouch ? 0.82 : 1.22);
+  p.scoped = p.human
+    ? scoped
+    : Boolean(w.scoped && target && distance(p.position, target.position) > 12);
+  const accuracy = shotAccuracy(w, p.weapon, p);
+  const kick = recoilKick(w, p.weapon.recoilIndex);
+  if (!match.fire(p)) return false;
+  let aim;
   if (p.human) {
-    direction = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
-    const moving =
-      input.keys.has('KeyW') ||
-      input.keys.has('KeyA') ||
-      input.keys.has('KeyS') ||
-      input.keys.has('KeyD');
-    const spread =
-      (scoped ? 0.001 : 0.004) + (moving ? 0.025 : 0) + Math.min(p.weapon.shots, 0.02) / 100;
-    direction.x += (match.random() - 0.5) * spread;
-    direction.y += (match.random() - 0.5) * spread;
-    direction.z += (match.random() - 0.5) * spread;
-    direction.normalize();
-    pitch = Math.max(-1.4, pitch - 0.009);
+    aim = new THREE.Vector3(0, 0, -1).applyEuler(
+      new THREE.Euler(pitch + p.punchPitch, yaw + p.punchYaw, 0, 'YXZ'),
+    );
+    p.punchPitch = Math.min(0.3, p.punchPitch + kick.pitch);
+    p.punchYaw += kick.yaw;
   } else {
-    direction = vec(target.position, 0.9 + match.random() * 0.3)
+    aim = vec(target.position, target.crouch ? 0.65 : 1)
       .sub(origin)
       .normalize();
-    direction.x += (match.random() - 0.5) * 0.025;
-    direction.y += (match.random() - 0.5) * 0.025;
-    direction.normalize();
   }
-  const range = w.category === 'knife' ? 1.8 : 150;
-  const wall = hit(origin, origin.clone().addScaledVector(direction, range));
-  let max = wall ? wall.distance : range;
-  let victim = null,
-    head = false;
-  for (const enemy of match.players) {
-    if (!enemy.alive || enemy.team === p.team) continue;
-    for (const [height, r, isHead] of [
-      [enemy.crouch ? 0.8 : 1.18, 0.18, true],
-      [enemy.crouch ? 0.52 : 0.75, 0.29, false],
-      [0.3, 0.23, false],
-    ]) {
-      const point = new THREE.Ray(origin, direction).intersectSphere(
-        new THREE.Sphere(vec(enemy.position, height), r),
-        new THREE.Vector3(),
-      );
-      const d = point ? origin.distanceTo(point) : Infinity;
-      if (d < max) {
-        max = d;
-        victim = enemy;
-        head = isHead;
+  const right = new THREE.Vector3().crossVectors(aim, new THREE.Vector3(0, 1, 0)).normalize();
+  const up = new THREE.Vector3().crossVectors(right, aim).normalize();
+  const range = w.category === 'knife' ? 1.8 : w.range * SOURCE_UNIT;
+  const impacts = [];
+  const random = () => match.random();
+  for (let pellet = 0; pellet < (w.pellets || 1); pellet++) {
+    const offset = spreadOffset(accuracy, random);
+    const direction = aim
+      .clone()
+      .addScaledVector(right, offset.x)
+      .addScaledVector(up, offset.y)
+      .normalize();
+    const wall = hit(origin, origin.clone().addScaledVector(direction, range));
+    let max = wall ? wall.distance : range;
+    let victim = null,
+      hitGroup = 'chest';
+    for (const enemy of match.players) {
+      if (!enemy.alive || enemy.team === p.team) continue;
+      for (const [height, radius, group] of [
+        [enemy.crouch ? 0.8 : 1.18, 0.17, 'head'],
+        [enemy.crouch ? 0.54 : 0.86, 0.24, 'chest'],
+        [enemy.crouch ? 0.36 : 0.58, 0.22, 'stomach'],
+        [0.2, 0.19, 'leg'],
+      ]) {
+        const point = new THREE.Ray(origin, direction).intersectSphere(
+          new THREE.Sphere(vec(enemy.position, height), radius),
+          new THREE.Vector3(),
+        );
+        const d = point ? origin.distanceTo(point) : Infinity;
+        if (d < max) {
+          max = d;
+          victim = enemy;
+          hitGroup = group;
+        }
       }
     }
+    if (victim) {
+      if (w.category === 'knife') match.damage(victim, w.damage, p, false, false, 1500);
+      else match.bulletHit(victim, p, max, hitGroup);
+      if (p.human) hitUntil = performance.now() + 130;
+    }
+    const end = origin.clone().addScaledVector(direction, Math.min(max, 60));
+    impacts.push({ victim: victim?.id ?? null, hitGroup: victim ? hitGroup : null, distance: max });
+    const line = new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints([origin, end]),
+      new THREE.LineBasicMaterial({ color: '#f8d588', transparent: true, opacity: 0.6 }),
+    );
+    scene.add(line);
+    effects.push({ type: 'tracer', mesh: line, life: 0.06 });
   }
-  if (victim) {
-    const pellet = w.category === 'shotgun' ? 4 : 1;
-    match.damage(victim, w.damage * (head ? 4 : 1) * pellet * 0.98 ** (max / 10), p, head);
-    if (p.human) hitUntil = performance.now() + 130;
-  }
-  const end = origin.clone().addScaledVector(direction, Math.min(max, 60));
-  const line = new THREE.Line(
-    new THREE.BufferGeometry().setFromPoints([origin, end]),
-    new THREE.LineBasicMaterial({ color: '#f8d588', transparent: true, opacity: 0.6 }),
-  );
-  scene.add(line);
-  effects.push({ type: 'tracer', mesh: line, life: 0.06 });
+  p.lastShotTrace = { weapon: w.id, pellets: impacts, accuracy, time: match.time };
   if (p.human) {
     weaponRoot.position.z = 0.025;
     weaponRoot.rotation.x = 0.02;
     animateWeapon('fire');
   }
+  return true;
 }
 function botThink(p, dt) {
   if (!p.alive || match.phase !== 'live') return;
+  p.speed = p.lastMoveSpeed || 0;
+  p.lastMoveSpeed = 0;
   if (p.blindedUntil > match.time) {
     match.interact(p, dt, false);
     return;
@@ -674,7 +696,14 @@ function botThink(p, dt) {
         p.utilityAt = match.time + 12;
       }
     }
-    if (match.time > p.reaction) shoot(p, enemy);
+    if (match.time > p.reaction && match.time >= p.burstWait && shoot(p, enemy)) {
+      p.burstShots++;
+      const burstSize = distance(p.position, enemy.position) > 22 ? 2 : 5;
+      if (p.burstShots >= burstSize) {
+        p.burstWait = match.time + Math.max(0.15, WEAPONS[p.weapon.id].recovery || 0.3);
+        p.burstShots = 0;
+      }
+    }
     if (p.health < 35 || p.weapon.reloading) {
       const away = vec(p.position).sub(vec(enemy.position)).normalize();
       move(p, away.x * dt * 2, away.z * dt * 2, dt);
@@ -729,7 +758,7 @@ function botThink(p, dt) {
   }
   const dx = (node.x - p.position.x) / d,
     dz = (node.z - p.position.z) / d;
-  const speed = 3.7;
+  const speed = maxMoveSpeed(WEAPONS[p.weapon.id], { crouch: p.crouch });
   const before = { ...p.position };
   const step = Math.min(speed * dt, d);
   move(p, dx * step, dz * step, dt, node.y - p.position.y > 0.25 && d < 1.2);
@@ -921,10 +950,13 @@ function update(dt) {
   const human = match.players[0];
   if (mode === 'tour') {
     match.time += dt;
+    match.recoverWeapons(dt);
   } else {
     match.tick(dt);
   }
   if (human.alive) {
+    // Synchronize selection before processing fire/scope input, not after it.
+    showWeapon(human.weapon.id);
     yaw +=
       ((input.keys.has('ArrowLeft') ? 1 : 0) - (input.keys.has('ArrowRight') ? 1 : 0)) * dt * 1.5;
     pitch = Math.max(
@@ -940,7 +972,11 @@ function update(dt) {
       const forward = (input.keys.has('KeyW') ? 1 : 0) - (input.keys.has('KeyS') ? 1 : 0),
         side = (input.keys.has('KeyD') ? 1 : 0) - (input.keys.has('KeyA') ? 1 : 0);
       const length = Math.hypot(forward, side) || 1,
-        speed = human.crouch ? 1.7 : input.keys.has('ShiftLeft') ? 2.4 : 4.6;
+        speed = maxMoveSpeed(WEAPONS[human.weapon.id], {
+          crouch: human.crouch,
+          scoped,
+          walking: input.keys.has('ShiftLeft'),
+        });
       move(
         human,
         ((-Math.sin(yaw) * forward + Math.cos(yaw) * side) / length) * speed * dt,
@@ -965,10 +1001,11 @@ function update(dt) {
     }
     if (mode !== 'tour') for (const p of match.players) if (!p.human) botThink(p, dt);
     camera.position.copy(vec(human.position, human.crouch ? 0.82 : 1.22));
-    camera.rotation.set(pitch, yaw, 0);
+    camera.rotation.set(pitch + human.punchPitch, yaw + human.punchYaw, 0);
     weaponRoot.visible = true;
-    showWeapon(human.weapon.id);
   } else {
+    scoped = false;
+    zoomLevel = 0;
     for (const p of match.players) if (!p.human && mode !== 'tour') botThink(p, dt);
     const alive = match.players.filter((p) => p.alive && p.team === human.team);
     const viewed = alive[spectate % Math.max(1, alive.length)];
@@ -979,9 +1016,17 @@ function update(dt) {
     weaponRoot.visible = false;
   }
   const sniperScope = scoped && WEAPONS[human.weapon.id].category === 'sniper';
-  camera.fov = scoped ? (sniperScope ? 18 : 40) : 78;
+  camera.fov = verticalFov(scoped ? WEAPONS[human.weapon.id].zoomFov[zoomLevel - 1] || 40 : 90);
   $('scope').hidden = !sniperScope;
-  $('crosshair').hidden = sniperScope;
+  $('crosshair').hidden = WEAPONS[human.weapon.id].category === 'sniper';
+  const crosshairAccuracy = shotAccuracy(WEAPONS[human.weapon.id], human.weapon, {
+    ...human,
+    scoped,
+  });
+  $('crosshair').style.setProperty(
+    '--gap',
+    `${Math.min(32, 4 + crosshairAccuracy.inaccuracy * 180)}px`,
+  );
   if (sniperScope) weaponRoot.visible = false;
   camera.updateProjectionMatrix();
   weaponRoot.position.z *= 0.8;
@@ -1187,7 +1232,10 @@ document.addEventListener('keydown', (e) => {
   if (e.repeat || !match || paused) return;
   const p = match.players[0];
   if (e.code === 'KeyB') buyMenu();
-  if (e.code === 'KeyR') match.reload(p);
+  if (e.code === 'KeyR' && match.reload(p)) {
+    scoped = false;
+    zoomLevel = 0;
+  }
   if (e.code === 'KeyF') animateWeapon('lookat');
   if (e.code === 'Tab') $('scoreboard').hidden = false;
   if (e.code === 'Digit1') {
@@ -1228,7 +1276,11 @@ renderer.domElement.addEventListener('mousedown', (e) => {
     return;
   }
   if (e.button === 0) input.fire = true;
-  if (e.button === 2 && WEAPONS[match.players[0].weapon.id].scoped) scoped = !scoped;
+  if (e.button === 2 && WEAPONS[match.players[0].weapon.id].scoped) {
+    showWeapon(match.players[0].weapon.id);
+    zoomLevel = (zoomLevel + 1) % (WEAPONS[match.players[0].weapon.id].zoomLevels + 1);
+    scoped = zoomLevel > 0;
+  }
 });
 document.addEventListener('mouseup', () => (input.fire = false));
 document.addEventListener('contextmenu', (e) => e.preventDefault());
@@ -1261,13 +1313,20 @@ window.__test = {
   get renderStats() {
     return { ...renderer.info.render };
   },
+  get rendererMemory() {
+    return { ...renderer.info.memory };
+  },
   get audioStats() {
     return { ...audioStats };
+  },
+  get weaponModel() {
+    return { id: modelId, ready: weaponRoot.children.length > 0 };
   },
   start,
   move,
   hit,
   floor,
+  shoot,
 };
 window.render_game_to_text = () =>
   JSON.stringify({
@@ -1286,6 +1345,10 @@ window.render_game_to_text = () =>
       ammo: p.weapon.ammo,
       path: p.path.length,
       alive: p.alive,
+      speed: p.speed,
+      accuracyPenalty: p.weapon.accuracyPenalty,
+      recoilIndex: p.weapon.recoilIndex,
+      lastShotTrace: p.lastShotTrace,
     })),
     map: window.__mapInfo,
     coordinates: 'meters; Y up; Source X => X, Source Y => -Z',

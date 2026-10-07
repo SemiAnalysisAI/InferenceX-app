@@ -45,14 +45,35 @@ Original prompt: Open a PR for a realistic CS:GO Dust II 5v5 3D game using real 
 - Original CS:GO character locomotion, per-weapon pose qualification and complete radio mapping.
 - High-skill bot behavior qualification, full-match reliability and presentation-hardware performance.
 - No approved parity baseline or measured 95% completion.
-- No dashboard integration.
+- Draft CS:GO landing theme links to the private preview; game assets/engine remain isolated.
 - The pinned map is a community CS:GO port, not an independently verified original game build.
 - Independent Chinese copy review and maintainer signoff remain pending.
 - Keep the PR draft and do not enable auto-merge.
 
 ## Verification results
 
-Current game work:
+Weapon iteration, October 6, 2026:
+
+- Imported all 34 firearm attribute records from a hash-locked February 2023
+  Valve item-schema mirror, with repeated-section and prefab-inheritance tests.
+- Replaced universal armor reduction and shotgun damage multiplication with
+  per-weapon armor/falloff/hitgroup calculations and individual pellet traces.
+- Added movement-aware accuracy, recovery, deterministic approximate view recoil,
+  weapon/scope movement limits, zoom cycling and bot burst pauses.
+- Fixed the scope/viewmodel selection ordering exposed by browser testing.
+- Fixed the scope mask's HUD layering and reset zoom on death and reloading.
+- Repeated viewmodel replacement disposes cloned materials and skeleton resources
+  while preserving shared cached geometry and textures.
+- All 39 local game-tool Node tests pass without failures or skips.
+- The controlled combat browser fixture passed pellet, trigger, recoil/recovery,
+  reload, zoom, movement, repeated-switch resource and death-scope checks.
+- The final full-match retest completed all 60 physical routes, then a 27-round match
+  ending CT 16, T 11 with 131 kills and no page errors. The human slot was idle
+  during the match simulation; this is not competitive bot qualification.
+- Reference details and remaining approximations are in `WEAPON-FIDELITY.md`.
+- No approved baseline or 95% parity claim; keep the PR draft and unmerged.
+
+Earlier gameplay iteration:
 
 - 28 local Node tests pass, including all 34 viewmodels, 34 world models, both
   characters, firing audio mappings, inventory behavior and map graph connectivity.

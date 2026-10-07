@@ -2,7 +2,11 @@
 
 Captured on 2026-10-06 US Eastern / 2026-10-07 UTC. These are implementation tests, not approved CS:GO reference comparisons.
 
-## Browser run
+The later weapon-data and handling iteration has separate results in
+[weapon-fidelity.md](./weapon-fidelity.md). The runs below preserve the earlier
+gameplay and landing-integration evidence rather than replacing it.
+
+## Earlier browser run
 
 `browser-smoke.json` records the Playwright run against the converted, textured build in software-rendered low-resolution mode.
 

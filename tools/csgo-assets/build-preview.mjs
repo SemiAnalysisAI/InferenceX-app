@@ -38,6 +38,7 @@ for (const file of [
   'assets-lock.json',
   'game-assets-lock.json',
   'GAME.md',
+  'WEAPON-FIDELITY.md',
   'README.md',
   'favicon.svg',
 ])

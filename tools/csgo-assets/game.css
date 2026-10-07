@@ -46,8 +46,32 @@ button[hidden],
   height: 100%;
   display: block;
 }
-header {
+#scope {
+  z-index: 1;
+}
+#round,
+#radar,
+#feed,
+footer,
+#objective,
+#action,
+#hint,
+#performance {
+  z-index: 2;
+}
+#crosshair,
+#hitmarker {
   z-index: 3;
+}
+#damage,
+#flash {
+  z-index: 4;
+}
+.overlay {
+  z-index: 5;
+}
+header {
+  z-index: 6;
   position: fixed;
   left: 25px;
   right: 25px;
@@ -146,14 +170,43 @@ header button {
   border-left: 2px solid #bfaa77;
 }
 #crosshair {
+  --gap: 4px;
   position: fixed;
   left: 50%;
   top: 50%;
   transform: translate(-50%, -50%);
-  font: 24px monospace;
-  color: #d7eeaf;
-  text-shadow: 0 1px 3px #000;
+  width: 0;
+  height: 0;
   pointer-events: none;
+}
+#crosshair i {
+  position: absolute;
+  background: #a9e46a;
+  box-shadow: 0 0 1px 1px #16220e;
+}
+#crosshair i:nth-child(1) {
+  width: 8px;
+  height: 2px;
+  right: var(--gap);
+  top: -1px;
+}
+#crosshair i:nth-child(2) {
+  width: 8px;
+  height: 2px;
+  left: var(--gap);
+  top: -1px;
+}
+#crosshair i:nth-child(3) {
+  width: 2px;
+  height: 8px;
+  left: -1px;
+  bottom: var(--gap);
+}
+#crosshair i:nth-child(4) {
+  width: 2px;
+  height: 8px;
+  left: -1px;
+  top: var(--gap);
 }
 #hitmarker {
   display: none;
