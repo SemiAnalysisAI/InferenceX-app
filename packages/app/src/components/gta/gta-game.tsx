@@ -570,11 +570,13 @@ export function GtaGame({ locale = 'en' }: { locale?: 'en' | 'zh' }) {
           </span>
         </div>
       </header>
-      <output
-        ref={performanceHud}
-        className="gta-performance"
-        aria-label={locale === 'zh' ? '渲染性能' : 'Rendering performance'}
-      />
+      {process.env.NODE_ENV !== 'production' && (
+        <output
+          ref={performanceHud}
+          className="gta-performance"
+          aria-label={locale === 'zh' ? '渲染性能' : 'Rendering performance'}
+        />
+      )}
       <div className="gta-objective">
         <small>
           {view.explorer

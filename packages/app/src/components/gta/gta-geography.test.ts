@@ -7,9 +7,14 @@ import {
   STREETS_SF,
   streetRoute,
 } from './gta-geography';
-import { blocked, DESTINATIONS, JOBS, START } from './gta-world';
+import { blocked, cameraClearanceHeight, DESTINATIONS, JOBS, START } from './gta-world';
 
 describe('San Paloma geography', () => {
+  it('keeps scenic cameras above rooftops without lifting cameras over clear roads', () => {
+    expect(cameraClearanceHeight({ x: -125, z: 1850 }, 20)).toBe(31);
+    expect(cameraClearanceHeight({ x: -125, z: 1850 }, 500)).toBe(500);
+    expect(cameraClearanceHeight({ x: 0, z: 1850 }, 20)).toBe(20);
+  });
   it('uses the SF survey instead of an invented rectangular grid', () => {
     expect(FOOTPRINTS.length).toBeGreaterThan(1800);
     expect(STREETS_SF.length).toBeGreaterThan(600);

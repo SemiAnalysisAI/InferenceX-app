@@ -435,3 +435,10 @@
 .gta-map-panel button {
   margin: 4px;
 }
+@media (max-width: 700px) {
+  .gta-performance {
+    top: 3.7rem;
+    left: 0.7rem;
+    font-size: 9px;
+  }
+}

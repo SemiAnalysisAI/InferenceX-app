@@ -58,6 +58,13 @@ export function blocked(p: Point, radius = 1.2) {
           return true;
   return false;
 }
+export function cameraClearanceHeight(p: Point, minimumHeight: number) {
+  let height = minimumHeight;
+  for (const b of cells.get(`${Math.floor(p.x / 50)},${Math.floor(p.z / 50)}`) ?? []) {
+    if (b.h + 15 > height && inside(p, b.ring)) height = b.h + 15;
+  }
+  return height;
+}
 export const DESTINATIONS = [
   { ...START, en: "Oren's Hummus", zh: "Oren's Hummus" },
   { ...nearestRoadPoint(BAY_LANDMARKS[1]), en: 'Ferry Building', zh: '渡轮大厦' },

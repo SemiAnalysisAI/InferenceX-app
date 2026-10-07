@@ -1,7 +1,7 @@
 import * as T from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
-import { JOBS, lanePoint, type Point } from './gta-world';
+import { cameraClearanceHeight, JOBS, lanePoint, type Point } from './gta-world';
 import { target, type CityState } from './gta-engine';
 import { clonePedestrian, createPedestrianAnimation, rigPedestrian } from './gta-pedestrian';
 import { ARCHITECTURE_ASSET_COUNT, loadArchitecture } from './gta-architecture';
@@ -348,13 +348,16 @@ export async function createCityRenderer(
             ? 0.2
             : 10 + Math.abs(s.car.speed) * 0.05;
       const height = scenic
-        ? 15 + landmarkHeight * 0.2
+        ? landmarkHeight > 100
+          ? landmarkHeight + 60
+          : 15 + landmarkHeight * 0.2
         : s.onFoot
           ? 3.1
           : s.camera === 1
             ? 1.6
             : 5.2;
       tmp.set(s.player.x - Math.sin(a) * dist, height, s.player.z - Math.cos(a) * dist);
+      if (scenic) tmp.y = cameraClearanceHeight({ x: tmp.x, z: tmp.z }, tmp.y);
       if (snap) camera.position.copy(tmp);
       else camera.position.lerp(tmp, 0.14);
       camera.lookAt(
