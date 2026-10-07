@@ -647,6 +647,28 @@ export async function createCityRenderer(
       camPos.set(o.x + 520, 140, o.z + 380);
       camLook.set(o.x - 520, 40, o.z + 120);
       snap = true;
+    } else if (s.camera === 2) {
+      const destination = target(world, s);
+      const center = world.landmarks[destination.id];
+      const groundHeight = world.surface(center.x, center.z);
+      const index = world.buildingAt(center.x, center.z);
+      const height = Math.max(
+        destination.id === 'salesforce' ? 326 : destination.id === 'coit' ? 64 : 30,
+        index >= 0 ? world.buildings[index].height : 0,
+      );
+      const dist = Math.max(70, height * 1.2);
+      camPos.set(
+        center.x - Math.sin(a) * dist,
+        groundHeight + height + 45,
+        center.z - Math.cos(a) * dist,
+      );
+      const under = world.buildingAt(camPos.x, camPos.z, 2);
+      if (under >= 0)
+        camPos.y = Math.max(
+          camPos.y,
+          world.buildings[under].base + world.buildings[under].height + 15,
+        );
+      camLook.set(center.x, groundHeight + height * 0.45, center.z);
     } else if (s.onFoot) {
       look.set(focus.x, fy + 1.55, focus.z);
       tmp.set(

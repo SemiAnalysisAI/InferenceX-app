@@ -119,6 +119,18 @@ export const CITY_NAME = { en: 'San Fierro', zh: '圣菲耶罗' };
 export const SOUTH_BAY_NAME = { en: 'San Jovano', zh: '圣霍瓦诺' };
 
 export const JOB_IDS = ['oren', 'transamerica', 'coit', 'nvidia_endeavor', 'amd_hq'] as const;
+export const TOUR_STOPS = [
+  { id: 'oren', en: "Oren's Hummus", zh: "Oren's Hummus" },
+  { id: 'ferry', en: 'Ferry Building', zh: '渡轮大厦' },
+  { id: 'transamerica', en: 'Transamerica Pyramid', zh: 'Transamerica 金字塔' },
+  { id: 'salesforce', en: 'Salesforce Tower', zh: 'Salesforce Tower' },
+  { id: 'coit', en: 'Coit Tower', zh: 'Coit Tower' },
+  { id: 'gg_south', en: 'Golden Gate viewpoint', zh: '金门大桥观景点' },
+  { id: 'nvidia_endeavor', en: 'NVIDIA HQ · Santa Clara', zh: 'NVIDIA 总部 · 圣克拉拉' },
+  { id: 'amd_hq', en: 'AMD HQ · Santa Clara', zh: 'AMD 总部 · 圣克拉拉' },
+  { id: 'sjdt', en: 'Downtown San Jovano (San Jose)', zh: '圣霍瓦诺市中心（圣何塞）' },
+] as const;
+export type TourId = (typeof TOUR_STOPS)[number]['id'];
 export const JOB_COPY: Record<(typeof JOB_IDS)[number], { en: string; zh: string }> = {
   oren: {
     en: "Pick up the order at Oren's Hummus, 71 3rd St",
@@ -275,6 +287,30 @@ export class World {
         length,
       });
       i += 5 + n * 3;
+    }
+    // Fictional connector across the gap introduced by compressing the South Bay.
+    // Both ends meet existing road geometry; the corridor avoids building footprints.
+    for (const [name, points] of [
+      ['San Jovano Connector', [203.1, 6190, 605.1, 6174.9]],
+      ['Santa Clara Connector', [211.1, 4735.2, 211.1, 4660, -473.1, 4660, -473.1, 4679.9]],
+    ] as const) {
+      const pts = new Float32Array(points);
+      const dy = new Float32Array(pts.length / 2);
+      let length = 0;
+      for (let i = 0; i < pts.length; i += 2) {
+        dy[i / 2] = this.height(pts[i], pts[i + 1]);
+        if (i) length += Math.hypot(pts[i] - pts[i - 2], pts[i + 1] - pts[i - 1]);
+      }
+      this.roads.push({
+        cls: ROAD.primary,
+        width: 10,
+        oneway: false,
+        bridge: false,
+        name,
+        pts,
+        dy,
+        length,
+      });
     }
     this.splitLanes();
     for (const lane of this.lanes) {

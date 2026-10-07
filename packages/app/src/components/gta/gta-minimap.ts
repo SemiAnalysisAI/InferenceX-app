@@ -80,6 +80,7 @@ export interface RadarMarks {
   player: Point & { angle: number };
   target: Point;
   police: Point[];
+  route?: Point[];
 }
 
 /** Rotating GTA-style radar: north follows the player's heading. */
@@ -104,6 +105,18 @@ export function paintRadar(
   ctx.translate(-(m.player.x - world.x0) / MAP_SCALE, -(m.player.z - world.z0) / MAP_SCALE);
   ctx.imageSmoothingEnabled = true;
   ctx.drawImage(map, 0, 0);
+  if (m.route?.length) {
+    ctx.strokeStyle = '#a94cff';
+    ctx.lineWidth = 3 / (k * MAP_SCALE);
+    ctx.beginPath();
+    m.route.forEach((p, i) => {
+      const x = (p.x - world.x0) / MAP_SCALE;
+      const y = (p.z - world.z0) / MAP_SCALE;
+      if (i) ctx.lineTo(x, y);
+      else ctx.moveTo(x, y);
+    });
+    ctx.stroke();
+  }
   ctx.restore();
   // Target blip (clamped to the edge) and police.
   const toRadar = (p: Point) => {

@@ -102,3 +102,24 @@ README in that directory records each source and license.
 Asset provenance, processing and permission limitations are recorded in
 `packages/app/public/decorative/gta/models/README.md` and
 `packages/app/public/decorative/gta/sf/README.md`.
+
+# Integration with PR #1285 / 与 PR #1285 集成
+
+The San Fierro world retains the San Paloma branch's nine-stop sightseeing mode,
+explicit fast travel, untimed exploration, road-following GPS, scenic camera and
+gameplay-warning priority. It replaces the earlier small city geometry rather than
+loading two competing world engines.
+
+The San Jovano Connector and Santa Clara Connector are original fictional roads
+across gaps introduced by compressing the South Bay. They are rendered as paved
+roads, included in the navigation graph and tested for building clearance; they
+are not claimed to be real surveyed streets. GPS also joins overlapping sections
+of the fictional freeway where they lack shared OSM vertices.
+
+圣菲耶罗保留 San Paloma 分支的九站观光、明确标注的快速旅行、无时间限制的探索、
+沿道路显示的导航、观景镜头和游戏警告优先级。较大的新地图替换旧的小型地图，
+不同时加载两套城市引擎。
+
+San Jovano Connector 和 Santa Clara Connector 是为连接缩比例南湾区域而设计的
+原创虚构道路，实际渲染为铺装道路，纳入导航图并测试建筑净空；它们不是实测街道。
+虚构高速路与其他道路重叠但缺少共同 OSM 顶点的位置也纳入导航连接。

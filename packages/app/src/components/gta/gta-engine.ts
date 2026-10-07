@@ -3,12 +3,14 @@ import {
   JOB_IDS,
   ROAD,
   TRAFFIC_MODELS,
+  TOUR_STOPS,
   VEHICLES,
   type Point,
   type Road,
   type TrafficModel,
   type Vehicle,
   type World,
+  type TourId,
 } from './gta-world';
 
 export interface Controls {
@@ -105,6 +107,7 @@ export interface CityState {
   altitude: number;
   /** Deterministic RNG state. */
   seed: number;
+  tour: TourId | null;
 }
 
 export const SPECS: Record<
@@ -136,14 +139,14 @@ export function markerFor(world: World, id: string): Point {
   let point = cache.get(id);
   if (!point) {
     const p = world.landmarks[id];
-    const lane = nearestLane(world, p, 160);
+    const lane = nearestLane(world, p, 400);
     point = lane ? { x: lane.point.x, z: lane.point.z } : p;
     cache.set(id, point);
   }
   return point;
 }
 
-function nearestLane(world: World, p: Point, radius: number) {
+export function nearestLane(world: World, p: Point, radius: number) {
   let best: { lane: number; s: number; point: Point & { angle: number }; d: number } | null = null;
   for (const lane of world.lanesNear(p.x, p.z, radius + 400)) {
     const r = world.roads[lane];
@@ -197,15 +200,41 @@ export function newCity(world: World, seed = 1): CityState {
     explorer: false,
     altitude: 800,
     seed,
+    tour: null,
   };
   populate(world, s, true);
   return s;
 }
 
 export const target = (world: World, s: CityState) => {
-  const id = JOB_IDS[Math.min(s.job, JOB_IDS.length - 1)];
+  const id = s.tour ?? JOB_IDS[Math.min(s.job, JOB_IDS.length - 1)];
   return { id, ...markerFor(world, id) };
 };
+
+export function beginTour(world: World, s: CityState, id: string, fastTravel = false) {
+  const stop = TOUR_STOPS.find((entry) => entry.id === id);
+  if (!stop || s.explorer || !['ready', 'paused', 'driving'].includes(s.phase)) return false;
+  if (fastTravel && Math.abs(s.player.speed) > 2) return false;
+  const p = markerFor(world, stop.id);
+  if (fastTravel && world.blocked(p, 1.15)) return false;
+  s.tour = stop.id;
+  s.phase = 'driving';
+  s.message = 'drive';
+  if (fastTravel) {
+    const face = world.landmarks[id];
+    const angle = Math.atan2(face.x - p.x, face.z - p.z);
+    const y = world.surface(p.x, p.z);
+    s.car = { ...s.car, ...p, y, vy: 0, angle, speed: 0, slip: 0, airborne: false };
+    s.player = { ...s.player, ...p, y, angle, speed: 0, stride: 0 };
+    s.onFoot = false;
+    s.traffic = [];
+    s.peds = [];
+    s.police = [];
+    s.heat = 0;
+    populate(world, s, true);
+  }
+  return true;
+}
 
 export function enterExit(world: World, s: CityState) {
   if (s.phase !== 'driving' || s.explorer) return false;
@@ -251,6 +280,11 @@ export function interact(world: World, s: CityState) {
   if (s.phase !== 'driving' || s.explorer) return false;
   const t = target(world, s);
   if (distance(s.player, t) > 14 || Math.abs(s.player.speed) > 3) return false;
+  if (s.tour !== null) {
+    s.health = 100;
+    s.message = 'repair';
+    return true;
+  }
   s.cash += 1500 + s.job * 500;
   s.job++;
   s.message = 'pickup';
@@ -706,7 +740,10 @@ export function stepCity(world: World, s: CityState, c: Controls, seconds: numbe
     );
     return;
   }
-  s.time = Math.max(0, s.time - dt);
+  if (s.tour === null) s.time = Math.max(0, s.time - dt);
+  if (s.message === 'blocked' && (c.forward || c.reverse || Math.abs(s.car.speed) > 0.5)) {
+    s.message = 'drive';
+  }
   s.clock = (s.clock + dt / 120) % 24;
   s.immunity = Math.max(0, s.immunity - dt);
   if (s.onFoot) stepFoot(world, s, c, dt);
@@ -728,7 +765,7 @@ export function stepCity(world: World, s: CityState, c: Controls, seconds: numbe
       if (s.police.length === before) break;
     }
   }
-  if (s.time === 0 || s.health === 0) {
+  if ((s.tour === null && s.time === 0) || s.health === 0) {
     s.phase = 'busted';
     s.car.speed = 0;
     s.player.speed = 0;
@@ -747,6 +784,8 @@ export function cityText(world: World, s: CityState) {
     time: s.time,
     clock: s.clock,
     job: s.job,
+    tour: s.tour,
+    camera: s.camera,
     cash: s.cash,
     heat: s.heat,
     target: t,

@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import { beforeAll, describe, expect, it } from 'vitest';
 import {
   changeVehicle,
+  beginTour,
   cityText,
   EMPTY_CONTROLS,
   enterExit,
@@ -16,7 +17,9 @@ import {
   type CityState,
   type Controls,
 } from './gta-engine';
-import { distance, JOB_IDS, World, type CityData } from './gta-world';
+import { distance, JOB_IDS, TOUR_STOPS, World, type CityData } from './gta-world';
+import { streetRoute } from './gta-navigation';
+import { objectiveStatus } from './gta-hud';
 
 // The real San Fierro data on flat terrain keeps these tests independent of
 // browser image decoding while still exercising the actual street network.
@@ -43,6 +46,17 @@ const advance = (s: CityState, c: Controls = EMPTY_CONTROLS, seconds = 1) => {
 };
 
 describe('San Fierro world data', () => {
+  it('keeps both compressed-region access roads clear of buildings', () => {
+    const connectors = world.roads.filter(
+      (road) => road.name.endsWith('Connector') && road.cls < 100,
+    );
+    expect(connectors).toHaveLength(2);
+    for (const road of connectors) {
+      for (let s = 0; s <= road.length; s += 4) {
+        expect(world.blocked(world.lanePoint(road, s, 0), 4), road.name).toBe(false);
+      }
+    }
+  });
   it('places the real landmarks, including Oren’s Hummus and the South Bay campuses', () => {
     for (const id of [
       'oren',
@@ -67,6 +81,50 @@ describe('San Fierro world data', () => {
 });
 
 describe('San Fierro simulation', () => {
+  it.each(TOUR_STOPS)('keeps sightseeing stop $id reachable and safe', ({ id }) => {
+    const s = driving();
+    expect(beginTour(world, s, id, true)).toBe(true);
+    expect(world.blocked(s.car, 1.15)).toBe(false);
+    expect(target(world, s).id).toBe(id);
+    expect(streetRoute(world, newCity(world).car, s.car).length).toBeGreaterThan(1);
+    expect(interact(world, s)).toBe(true);
+    expect(s.cash).toBe(0);
+    expect(s.job).toBe(0);
+  });
+  it('sets GPS without teleporting and removes only the tour time limit', () => {
+    const s = driving();
+    const before = { ...s.car };
+    expect(beginTour(world, s, 'nvidia_endeavor')).toBe(true);
+    expect(s.car).toEqual(before);
+    s.time = 0;
+    advance(s, EMPTY_CONTROLS, 0.2);
+    expect(s.phase).toBe('driving');
+    s.health = 0;
+    advance(s, EMPTY_CONTROLS, 0.2);
+    expect(s.phase).toBe('busted');
+  });
+  it('rejects invalid or moving fast travel without mutating state', () => {
+    const s = driving();
+    const before = cityText(world, s);
+    expect(beginTour(world, s, 'missing', true)).toBe(false);
+    expect(cityText(world, s)).toBe(before);
+    s.player.speed = 10;
+    s.car.speed = 10;
+    expect(beginTour(world, s, 'coit', true)).toBe(false);
+    expect(s.tour).toBe(null);
+  });
+  it('keeps warnings above tour guidance and clears blocked exit when driving resumes', () => {
+    const s = driving();
+    beginTour(world, s, 'coit');
+    const copy = { blockedExit: 'blocked', escape: 'wanted', aim: 'drive', arrived: 'arrived' };
+    s.message = 'blocked';
+    s.heat = 1;
+    expect(objectiveStatus(world, s, copy)).toEqual({ text: 'blocked', warning: true });
+    advance(s, { ...EMPTY_CONTROLS, forward: true }, 0.1);
+    expect(objectiveStatus(world, s, copy)).toEqual({ text: 'wanted', warning: true });
+    s.heat = 0;
+    expect(objectiveStatus(world, s, copy).text).toContain('GPS');
+  });
   it('starts on a clear lane near Oren’s Hummus with traffic and pedestrians', () => {
     const a = newCity(world),
       b = newCity(world);

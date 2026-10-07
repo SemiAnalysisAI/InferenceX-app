@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   changeVehicle,
+  beginTour,
   cityText,
   EMPTY_CONTROLS,
   enterExit,
@@ -16,12 +17,29 @@ import {
   type CityState,
 } from './gta-engine';
 import { drawCityMap, paintOverview, paintRadar } from './gta-minimap';
+import { streetRoute } from './gta-navigation';
+import { objectiveStatus } from './gta-hud';
 import { createCityRenderer, LOAD_STEPS, type CityRenderer } from './gta-renderer';
-import { CITY_NAME, JOB_COPY, JOB_IDS, SOUTH_BAY_NAME, distance, type World } from './gta-world';
+import {
+  CITY_NAME,
+  JOB_COPY,
+  JOB_IDS,
+  TOUR_STOPS,
+  SOUTH_BAY_NAME,
+  distance,
+  type Point,
+  type World,
+} from './gta-world';
 import './gta-game.css';
 
 const COPY = {
   en: {
+    explore: 'Explore Bay Area',
+    destination: 'Destination',
+    drive: 'Set GPS and drive',
+    visit: 'Fast travel',
+    free: 'Free roam · no time limit',
+    arrived: 'Destination reached. Stop and explore on foot.',
     title: `${CITY_NAME.en} After Hours`,
     subtitle: 'GTA V assets · real San Francisco map data',
     brief:
@@ -78,6 +96,12 @@ const COPY = {
     failedAtlas: 'The full map failed to load. You can keep playing the city or try flight again.',
   },
   zh: {
+    explore: '自由探索湾区',
+    destination: '目的地',
+    drive: '设置导航并驾驶',
+    visit: '快速前往',
+    free: '自由探索 · 无时间限制',
+    arrived: '已到达目的地。停车后可下车探索。',
     title: `${CITY_NAME.zh} 夜行`,
     subtitle: 'GTA V 资源 · 真实旧金山地图数据',
     brief:
@@ -181,6 +205,7 @@ export function GtaGame({
     [atlasLoading, setAtlasLoading] = useState(false),
     [atlasError, setAtlasError] = useState(false),
     [overview, setOverview] = useState(false);
+  const [destination, setDestination] = useState<string>('nvidia_endeavor');
   const [sound, setSound] = useState(false),
     audio = useRef<{ ctx: AudioContext; osc: OscillatorNode; gain: GainNode } | null>(null);
   const ready = view !== null;
@@ -207,6 +232,8 @@ export function GtaGame({
       last = 0,
       hud = 0,
       accumulator = 0;
+    let routeKey = '';
+    let route: Point[] = [];
     setView(null);
     setError(false);
     setLoaded(0);
@@ -230,11 +257,18 @@ export function GtaGame({
       if (now - hud > 100) {
         hud = now;
         setView({ ...s });
+        const goal = target(w, s);
+        const key = `${goal.id}:${Math.round(s.player.x / 50)}:${Math.round(s.player.z / 50)}`;
+        if (!s.explorer && key !== routeKey) {
+          routeKey = key;
+          route = streetRoute(w, s.player, goal);
+        }
         if (minimap.current && cityMap.current && !s.explorer)
           paintRadar(minimap.current, cityMap.current, w, {
             player: s.player,
-            target: target(w, s),
+            target: goal,
             police: s.police,
+            route,
           });
       }
       const a = audio.current;
@@ -336,8 +370,10 @@ export function GtaGame({
       bigMap.current,
       cityMap.current,
       w,
-      JOB_IDS.map((id) => markerFor(w, id)),
-      state.current.job,
+      (state.current.tour ? TOUR_STOPS.map((stop) => stop.id) : JOB_IDS).map((id) =>
+        markerFor(w, id),
+      ),
+      state.current.tour ? 0 : state.current.job,
       state.current.player,
     );
   }, [overview, view?.job]);
@@ -374,6 +410,16 @@ export function GtaGame({
   const go = (to: 'city' | 'south') => {
     if (!state.current || !world.current) return;
     if (travel(world.current, state.current, to)) graphics.current?.resetCamera();
+    sync();
+    focus();
+  };
+  const tour = (fastTravel: boolean) => {
+    if (!state.current || !world.current) return;
+    if (!beginTour(world.current, state.current, destination, fastTravel)) return;
+    map.current = false;
+    setOverview(false);
+    clear();
+    graphics.current?.resetCamera();
     sync();
     focus();
   };
@@ -481,7 +527,10 @@ export function GtaGame({
   const seconds = Math.ceil(view?.time ?? 0),
     job = view && w ? target(w, view) : null,
     active = view?.phase === 'driving',
-    jobCopy = job ? JOB_COPY[job.id] : null,
+    jobCopy = view?.tour
+      ? TOUR_STOPS.find((stop) => stop.id === view.tour)
+      : JOB_COPY[JOB_IDS[Math.min(view?.job ?? 0, JOB_IDS.length - 1)]],
+    objective = view && w ? objectiveStatus(w, view, t) : null,
     street = view && w && !view.explorer ? w.street(view.player.x, view.player.z) : '',
     district = view && w && !view.explorer ? w.district(view.player) : null,
     still = !view || Math.abs(view.player.speed) <= 2;
@@ -530,7 +579,9 @@ export function GtaGame({
           <small>
             {view.explorer
               ? t.atlas
-              : `${Math.min(view.job + 1, JOB_IDS.length)} / ${JOB_IDS.length}`}
+              : view.tour
+                ? t.free
+                : `${Math.min(view.job + 1, JOB_IDS.length)} / ${JOB_IDS.length}`}
           </small>
           <strong>
             {view.explorer
@@ -541,14 +592,11 @@ export function GtaGame({
                   : jobCopy.en
                 : ''}
           </strong>
-          <span>
-            {view.explorer
-              ? `${Math.round(view.altitude)} m`
-              : view.message === 'blocked'
-                ? t.blockedExit
-                : view.heat
-                  ? t.escape
-                  : `${t.aim} · ${job ? Math.round(distance(view.player, job)) : 0} m`}
+          <span
+            className={objective?.warning ? 'gta-warning' : undefined}
+            aria-live={objective?.warning ? 'polite' : 'off'}
+          >
+            {objective?.text}
           </span>
         </div>
       )}
@@ -583,7 +631,9 @@ export function GtaGame({
             <span>
               {t.health} {Math.ceil(view.health)}% ·{' '}
               <b data-testid="heist-timer">
-                {Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, '0')}
+                {view.tour
+                  ? '∞'
+                  : `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`}
               </b>
             </span>
           </div>
@@ -691,6 +741,32 @@ export function GtaGame({
         <div className="gta-map-panel">
           <h3>{t.map}</h3>
           <canvas ref={bigMap} width={360} height={400} aria-label={t.map} />
+          <label htmlFor="gta-destination">{t.destination}</label>
+          <select
+            id="gta-destination"
+            value={destination}
+            onChange={(event) => setDestination(event.target.value)}
+          >
+            {TOUR_STOPS.map((stop) => (
+              <option key={stop.id} value={stop.id}>
+                {locale === 'zh' ? stop.zh : stop.en}
+              </option>
+            ))}
+          </select>
+          <div className="gta-tour-actions">
+            <button type="button" data-testid="tour-drive" onClick={() => tour(false)}>
+              {t.drive}
+            </button>
+            <button
+              type="button"
+              data-testid="tour-visit"
+              title={t.travelHelp}
+              disabled={!still}
+              onClick={() => tour(true)}
+            >
+              {t.visit}
+            </button>
+          </div>
           {JOB_IDS.map((id, i) => (
             <p key={id}>
               {i + 1}. {locale === 'zh' ? JOB_COPY[id].zh : JOB_COPY[id].en}{' '}
@@ -742,6 +818,11 @@ export function GtaGame({
                       : t.restart}
                 </button>
               )
+            )}
+            {ready && !atlasLoading && view.phase === 'ready' && (
+              <button type="button" onClick={toggleMap}>
+                {t.explore}
+              </button>
             )}
             <p className="gta-desktop-help">{t.controls}</p>
             <p className="gta-mobile-help">{t.mobile}</p>
