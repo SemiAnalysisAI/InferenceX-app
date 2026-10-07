@@ -1,6 +1,7 @@
 'use client';
 
 import { useSyncExternalStore } from 'react';
+import { isEmbedPathname } from './embed-route';
 
 export type EasterEggTheme = 'minecraft' | 'csgo' | 'gta' | 'kart';
 const themes: EasterEggTheme[] = ['minecraft', 'csgo', 'gta', 'kart'];
@@ -9,7 +10,9 @@ let observer: MutationObserver | undefined;
 
 function snapshot(): EasterEggTheme | null {
   const root = document.documentElement;
-  if (Object.hasOwn(root.dataset, 'inferencexEmbed')) return null;
+  // The saved theme can be applied before a streamed embed stamps its boot attribute.
+  if (isEmbedPathname(window.location.pathname) || Object.hasOwn(root.dataset, 'inferencexEmbed'))
+    return null;
   return themes.find((theme) => root.classList.contains(theme)) ?? null;
 }
 

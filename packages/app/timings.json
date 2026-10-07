@@ -162,7 +162,7 @@
     },
     {
       "spec": "cypress/e2e/optional-theme-isolation.cy.ts",
-      "duration": 30000
+      "duration": 216000
     },
     {
       "spec": "cypress/e2e/kart-mode.cy.ts",
