@@ -1,13 +1,13 @@
 /**
- * Read side of the PowerX telemetry digest (migration 016).
+ * Read side of the stored PowerX telemetry (migration 016).
  *
  * Two entry points: everything recorded during one GitHub Actions run (keyed by
  * run ID), and the series linked to one benchmark point. Samples are returned
  * as flat rows with ISO timestamps, the shape the live artifact parser produces.
+ * Per-GPU statistics are computed from the stored samples on every read.
  */
 
 import {
-  GPU_STATS_VERSION,
   computeStoredGpuMetricStats,
   statMetricColumn,
   type StoredGpuMetricSample,
@@ -55,7 +55,6 @@ export interface GpuMetricStatRow {
 export interface GpuMetricSeries {
   id: number;
   artifactName: string;
-  configKey: string;
   fileName: string;
   vendor: string;
   sampleIntervalS: number | null;
@@ -64,7 +63,6 @@ export interface GpuMetricSeries {
   startedAt: string;
   endedAt: string;
   sidecars: Record<string, unknown>;
-  benchmarkResultIds: number[];
   /** Existing benchmark provenance can recover windows from older ingests. */
   powerAudits?: Record<string, unknown>[];
   stats: GpuMetricStatRow[];
@@ -102,9 +100,7 @@ export const SAMPLE_PAGE_SIZE = 50_000;
 
 interface RawSeriesRow {
   id: number | string;
-  workflow_run_id: number | string;
   artifact_name: string;
-  config_key: string;
   file_name: string;
   vendor: string;
   sample_interval_s: number | null;
@@ -113,11 +109,9 @@ interface RawSeriesRow {
   started_at: string | Date;
   ended_at: string | Date;
   sidecars: Record<string, unknown> | string;
-  benchmark_result_ids: (number | string)[] | null;
   power_audits: Record<string, unknown>[] | null;
   csv_sha256: string;
   ingested_at: string | Date;
-  stats_version: number;
 }
 
 /** The columns `upsertGpuMetricSeries` rewrites whenever it replaces a series. */
@@ -126,21 +120,6 @@ interface RawSeriesVersionRow {
   csv_sha256: string;
   sample_count: number;
   ingested_at: string | Date;
-  stats_version: number;
-}
-
-interface RawStatRow {
-  series_id: number | string;
-  gpu_index: number;
-  metric: string;
-  sample_count: number;
-  min_value: number;
-  max_value: number;
-  mean_value: number;
-  median_value: number;
-  p95_value: number;
-  p99_value: number;
-  stddev_value: number;
 }
 
 interface RawSampleRow extends StoredGpuMetricSample {
@@ -166,7 +145,7 @@ export class TelemetrySnapshotChangedError extends Error {
 const MAX_SNAPSHOT_ATTEMPTS = 3;
 
 const seriesVersionKey = (row: RawSeriesVersionRow): string =>
-  `${Number(row.id)}:${row.csv_sha256}:${Number(row.sample_count)}:${isoString(row.ingested_at)}:${row.stats_version}`;
+  `${Number(row.id)}:${row.csv_sha256}:${Number(row.sample_count)}:${isoString(row.ingested_at)}`;
 
 async function withConsistentSnapshot<T>(read: () => Promise<T>): Promise<T> {
   for (let attempt = 1; ; attempt += 1) {
@@ -201,19 +180,33 @@ function toSampleRow(raw: RawSampleRow): GpuMetricSampleRow {
   };
 }
 
-function toStatRow(raw: RawStatRow): GpuMetricStatRow {
-  return {
-    gpuIndex: Number(raw.gpu_index),
-    metric: raw.metric,
-    count: Number(raw.sample_count),
-    min: raw.min_value,
-    max: raw.max_value,
-    mean: raw.mean_value,
-    median: raw.median_value,
-    p95: raw.p95_value,
-    p99: raw.p99_value,
-    stddev: raw.stddev_value,
-  };
+/** Series rows of one run (optionally only `seriesIds`) or linked to one benchmark point. */
+async function readSeriesRows(
+  sql: DbClient,
+  scope: { workflowRunId: number; seriesIds: number[] | null } | { benchmarkResultId: number },
+): Promise<RawSeriesRow[]> {
+  const runId = 'workflowRunId' in scope ? scope.workflowRunId : null;
+  const seriesIds = 'workflowRunId' in scope ? scope.seriesIds : null;
+  const pointId = 'benchmarkResultId' in scope ? scope.benchmarkResultId : null;
+  // Under the null guard, `in (select ...)` would scan every series; an array
+  // keeps the point lookup on the link and series primary keys.
+  return (await sql`
+    select s.id, s.artifact_name, s.file_name, s.vendor, s.sample_interval_s, s.sample_count,
+      s.gpu_count, s.started_at, s.ended_at, s.sidecars, s.csv_sha256, s.ingested_at,
+      (
+        select jsonb_agg(br.power_audit order by br.id)
+        from benchmark_result_gpu_metrics l
+        join benchmark_results br on br.id = l.benchmark_result_id
+        where l.series_id = s.id and br.power_audit is not null
+      ) as power_audits
+    from gpu_metric_series s
+    where (${runId}::bigint is null or s.workflow_run_id = ${runId})
+      and (${seriesIds}::bigint[] is null or s.id = any(${seriesIds}::bigint[]))
+      and (${pointId}::bigint is null or s.id = any(array(
+        select link.series_id from benchmark_result_gpu_metrics link
+        where link.benchmark_result_id = ${pointId})))
+    order by s.artifact_name, s.file_name
+  `) as unknown as RawSeriesRow[];
 }
 
 async function loadSeriesDetails(
@@ -222,14 +215,6 @@ async function loadSeriesDetails(
 ): Promise<GpuMetricSeries[]> {
   if (seriesRows.length === 0) return [];
   const ids = seriesRows.map((row) => Number(row.id));
-
-  const statRows = (await sql`
-    select series_id, gpu_index, metric, sample_count, min_value, max_value, mean_value,
-      median_value, p95_value, p99_value, stddev_value
-    from gpu_metric_gpu_stats
-    where series_id = any(${ids}::bigint[])
-    order by series_id, gpu_index, metric
-  `) as unknown as RawStatRow[];
 
   const sampleRows: RawSampleRow[] = [];
   let cursor: RawSampleRow | undefined;
@@ -262,15 +247,13 @@ async function loadSeriesDetails(
       Number(a.gpu_index) - Number(b.gpu_index),
   );
 
-  // The series, stats and sample pages use separate autocommit queries (the DbClient
-  // has no transaction), so a re-ingest can commit between them. The writer
-  // replaces samples, stats and the series row in one transaction and stamps
-  // `ingested_at`; digest-only upgrades change `stats_version`. An unchanged
-  // key after the sample read proves both belong to the same series version.
+  // The series and sample pages use separate autocommit queries (the DbClient has
+  // no transaction), so a re-ingest can commit between them. The writer replaces
+  // samples and the series row in one transaction and stamps `ingested_at`. An
+  // unchanged key after the sample read proves both belong to the same series version.
   const versionRows = (await sql`
-    select id, csv_sha256, sample_count, ingested_at,
-      coalesce((to_jsonb(s)->>'stats_version')::integer, 0) as stats_version
-    from gpu_metric_series s
+    select id, csv_sha256, sample_count, ingested_at
+    from gpu_metric_series
     where id = any(${ids}::bigint[])
   `) as unknown as RawSeriesVersionRow[];
   const versionKeys = new Set(versionRows.map(seriesVersionKey));
@@ -281,57 +264,20 @@ async function loadSeriesDetails(
     throw new TelemetrySnapshotChangedError(ids);
   }
 
-  const statsBySeries = new Map<number, GpuMetricStatRow[]>();
-  for (const raw of statRows) {
-    const key = Number(raw.series_id);
-    const bucket = statsBySeries.get(key);
-    if (bucket) bucket.push(toStatRow(raw));
-    else statsBySeries.set(key, [toStatRow(raw)]);
-  }
-  const staleIds = new Set(
-    seriesRows
-      .filter((row) => row.stats_version !== GPU_STATS_VERSION)
-      .map((row) => Number(row.id)),
-  );
-  const staleSamples = new Map<number, RawSampleRow[]>();
+  const samplesBySeries = new Map<number, RawSampleRow[]>();
   for (const sample of sampleRows) {
     const id = Number(sample.series_id);
-    if (!staleIds.has(id)) continue;
-    const rows = staleSamples.get(id) ?? [];
-    rows.push(sample);
-    staleSamples.set(id, rows);
-  }
-  for (const row of seriesRows) {
-    const id = Number(row.id);
-    if (!staleIds.has(id)) continue;
-    const samples = staleSamples.get(id) ?? [];
-    if (samples.length !== Number(row.sample_count)) {
-      // Never present a partial-population digest as full-record statistics.
-      statsBySeries.set(id, []);
-      continue;
-    }
-    statsBySeries.set(
-      id,
-      computeStoredGpuMetricStats(samples).map((stat) => ({
-        ...stat,
-        metric: statMetricColumn(stat.metric),
-      })),
-    );
-  }
-  const samplesBySeries = new Map<number, GpuMetricSampleRow[]>();
-  for (const raw of sampleRows) {
-    const key = Number(raw.series_id);
-    const bucket = samplesBySeries.get(key);
-    if (bucket) bucket.push(toSampleRow(raw));
-    else samplesBySeries.set(key, [toSampleRow(raw)]);
+    const bucket = samplesBySeries.get(id);
+    if (bucket) bucket.push(sample);
+    else samplesBySeries.set(id, [sample]);
   }
 
   return seriesRows.map((row) => {
     const id = Number(row.id);
+    const samples = samplesBySeries.get(id) ?? [];
     return {
       id,
       artifactName: row.artifact_name,
-      configKey: row.config_key,
       fileName: row.file_name,
       vendor: row.vendor,
       sampleIntervalS: row.sample_interval_s,
@@ -343,10 +289,16 @@ async function loadSeriesDetails(
         typeof row.sidecars === 'string'
           ? (JSON.parse(row.sidecars) as Record<string, unknown>)
           : row.sidecars,
-      benchmarkResultIds: (row.benchmark_result_ids ?? []).map(Number),
       powerAudits: row.power_audits ?? [],
-      stats: statsBySeries.get(id) ?? [],
-      data: samplesBySeries.get(id) ?? [],
+      // Never present a partial population as full-record statistics.
+      stats:
+        samples.length === Number(row.sample_count)
+          ? computeStoredGpuMetricStats(samples).map((stat) => ({
+              ...stat,
+              metric: statMetricColumn(stat.metric),
+            }))
+          : [],
+      data: samples.map(toSampleRow),
     };
   });
 }
@@ -415,26 +367,10 @@ async function readGpuMetricsForRun(
       .map((entry) => Number(entry.id));
   }
 
-  const seriesRows = (await sql`
-    select s.id, s.workflow_run_id, s.artifact_name, s.config_key, s.file_name, s.vendor,
-      s.sample_interval_s, s.sample_count, s.gpu_count, s.started_at, s.ended_at, s.sidecars,
-      s.csv_sha256, s.ingested_at,
-      coalesce((to_jsonb(s)->>'stats_version')::integer, 0) as stats_version,
-      (
-        select array_agg(l.benchmark_result_id order by l.benchmark_result_id)
-        from benchmark_result_gpu_metrics l where l.series_id = s.id
-      ) as benchmark_result_ids,
-      (
-        select jsonb_agg(br.power_audit order by br.id)
-        from benchmark_result_gpu_metrics l
-        join benchmark_results br on br.id = l.benchmark_result_id
-        where l.series_id = s.id and br.power_audit is not null
-      ) as power_audits
-    from gpu_metric_series s
-    where s.workflow_run_id = ${Number(run.id)}
-      and (${selectedIds}::bigint[] is null or s.id = any(${selectedIds}::bigint[]))
-    order by s.artifact_name, s.file_name
-  `) as unknown as RawSeriesRow[];
+  const seriesRows = await readSeriesRows(sql, {
+    workflowRunId: Number(run.id),
+    seriesIds: selectedIds,
+  });
 
   return {
     workflowRun: {
@@ -472,26 +408,7 @@ async function readGpuMetricsForPoint(
   sql: DbClient,
   benchmarkResultId: number,
 ): Promise<GpuMetricsPointPayload | null> {
-  const seriesRows = (await sql`
-    select s.id, s.workflow_run_id, s.artifact_name, s.config_key, s.file_name, s.vendor,
-      s.sample_interval_s, s.sample_count, s.gpu_count, s.started_at, s.ended_at, s.sidecars,
-      s.csv_sha256, s.ingested_at,
-      coalesce((to_jsonb(s)->>'stats_version')::integer, 0) as stats_version,
-      (
-        select array_agg(l.benchmark_result_id order by l.benchmark_result_id)
-        from benchmark_result_gpu_metrics l where l.series_id = s.id
-      ) as benchmark_result_ids,
-      (
-        select jsonb_agg(br.power_audit order by br.id)
-        from benchmark_result_gpu_metrics l
-        join benchmark_results br on br.id = l.benchmark_result_id
-        where l.series_id = s.id and br.power_audit is not null
-      ) as power_audits
-    from benchmark_result_gpu_metrics link
-    join gpu_metric_series s on s.id = link.series_id
-    where link.benchmark_result_id = ${benchmarkResultId}
-    order by s.artifact_name, s.file_name
-  `) as unknown as RawSeriesRow[];
+  const seriesRows = await readSeriesRows(sql, { benchmarkResultId });
   if (seriesRows.length === 0) return null;
   return {
     benchmarkResultId,

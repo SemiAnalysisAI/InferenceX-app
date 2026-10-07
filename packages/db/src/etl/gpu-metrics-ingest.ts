@@ -1,25 +1,15 @@
 /**
  * Persist one gpu_metrics artifact: series metadata, full-resolution samples,
- * the per-GPU statistics digest, and links to the benchmark points it covers.
+ * and links to the benchmark points it covers.
  *
  * Idempotency: a series is identified by (workflow run, artifact name, CSV
  * path). Re-ingesting an identical CSV, sidecars and sample count only refreshes
- * the point links when the statistics version is current; a source change
- * replaces samples and digest atomically.
+ * the point links; a source change replaces the samples atomically.
  */
 
 import fs from 'node:fs';
 
 import type postgres from 'postgres';
-
-import {
-  GPU_STATS_VERSION,
-  statMetricColumn,
-  computeStoredGpuMetricStats,
-  type StoredGpuMetricSample,
-} from '../lib/gpu-metric-stats.js';
-
-export { statMetricColumn } from '../lib/gpu-metric-stats.js';
 
 import { sha256Hex } from './benchmark-artifacts.js';
 import type { Sql } from './db-utils.js';
@@ -27,11 +17,9 @@ import type { Sql } from './db-utils.js';
 /** Either a pooled client or the transaction handle passed to `sql.begin` callbacks. */
 type TxLike = Sql | postgres.TransactionSql;
 import {
-  computeGpuMetricStats,
   parseGpuMetricsCsv,
   summarizeGpuMetricSamples,
   type GpuMetricSample,
-  type GpuMetricStats,
   type GpuMetricsVendor,
 } from './gpu-metrics-csv.js';
 import {
@@ -70,7 +58,6 @@ export interface PreparedGpuMetricSeries {
   vendor: GpuMetricsVendor;
   csvSha256: string;
   samples: GpuMetricSample[];
-  stats: GpuMetricStats[];
   sampleIntervalS: number | null;
   gpuCount: number;
   startedAtMs: number;
@@ -109,7 +96,6 @@ function prepareMultinodePowerSeries(artifact: GpuMetricsArtifact): PreparedGpuM
         vendor,
         csvSha256,
         samples,
-        stats: computeGpuMetricStats(samples),
         sampleIntervalS: summary.sampleIntervalS,
         gpuCount: summary.gpuCount,
         startedAtMs: summary.startedAtMs,
@@ -174,7 +160,6 @@ export function prepareGpuMetricsArtifact(artifact: GpuMetricsArtifact): Prepare
       vendor: parsed.vendor,
       csvSha256: sha256Hex(csvText),
       samples,
-      stats: computeGpuMetricStats(samples),
       sampleIntervalS: summary.sampleIntervalS,
       gpuCount: summary.gpuCount,
       startedAtMs: summary.startedAtMs,
@@ -229,32 +214,6 @@ async function insertSampleBatch(
   `;
 }
 
-async function insertStats(
-  tx: TxLike,
-  seriesId: number,
-  stats: readonly GpuMetricStats[],
-): Promise<void> {
-  if (stats.length === 0) return;
-  await tx`
-    insert into gpu_metric_gpu_stats (
-      series_id, gpu_index, metric, sample_count,
-      min_value, max_value, mean_value, median_value, p95_value, p99_value, stddev_value
-    )
-    select
-      ${seriesId},
-      unnest(${tx.array(stats.map((s) => s.gpuIndex))}::smallint[]),
-      unnest(${tx.array(stats.map((s) => statMetricColumn(s.metric)))}::text[]),
-      unnest(${tx.array(stats.map((s) => s.count))}::int[]),
-      unnest(${tx.array(stats.map((s) => s.min))}::real[]),
-      unnest(${tx.array(stats.map((s) => s.max))}::real[]),
-      unnest(${tx.array(stats.map((s) => s.mean))}::real[]),
-      unnest(${tx.array(stats.map((s) => s.median))}::real[]),
-      unnest(${tx.array(stats.map((s) => s.p95))}::real[]),
-      unnest(${tx.array(stats.map((s) => s.p99))}::real[]),
-      unnest(${tx.array(stats.map((s) => s.stddev))}::real[])
-  `;
-}
-
 /**
  * Upsert one prepared series and link it to `benchmarkResultIds`. Returns the
  * series id and how many sample rows were written (0 when the CSV, sidecars,
@@ -272,7 +231,6 @@ export function upsertGpuMetricSeries(
   seriesId: number;
   samplesInserted: number;
   replaced: boolean;
-  statsUpdated: boolean;
 }> {
   const { workflowRunId, artifactName, series, benchmarkResultIds } = input;
   const configKey = gpuMetricsArtifactSuffix(artifactName) ?? artifactName;
@@ -284,11 +242,10 @@ export function upsertGpuMetricSeries(
         id: number;
         csv_sha256: string;
         sample_count: number;
-        stats_version: number;
         sidecars_match: boolean;
       }[]
     >`
-      select id, csv_sha256, sample_count, stats_version, sidecars = ${sidecarsJson}::jsonb as sidecars_match
+      select id, csv_sha256, sample_count, sidecars = ${sidecarsJson}::jsonb as sidecars_match
       from gpu_metric_series
       where workflow_run_id = ${workflowRunId}
         and artifact_name = ${artifactName}
@@ -301,7 +258,7 @@ export function upsertGpuMetricSeries(
     let replaced = false;
     if (existing.length > 0) {
       seriesId = Number(existing[0]!.id);
-      // Count also detects legacy digests computed before duplicate removal.
+      // A parser or deduplication change can alter the count of an unchanged CSV.
       if (
         existing[0]!.csv_sha256 === series.csvSha256 &&
         existing[0]!.sidecars_match &&
@@ -311,7 +268,6 @@ export function upsertGpuMetricSeries(
       } else {
         replaced = true;
         await tx`delete from gpu_metric_samples where series_id = ${seriesId}`;
-        await tx`delete from gpu_metric_gpu_stats where series_id = ${seriesId}`;
         await tx`
           update gpu_metric_series set
             vendor = ${series.vendor},
@@ -353,12 +309,6 @@ export function upsertGpuMetricSeries(
         );
       }
     }
-    const statsUpdated = needsSamples || existing[0]?.stats_version !== GPU_STATS_VERSION;
-    if (statsUpdated) {
-      if (!needsSamples) await tx`delete from gpu_metric_gpu_stats where series_id = ${seriesId}`;
-      await insertStats(tx, seriesId, series.stats);
-      await tx`update gpu_metric_series set stats_version = ${GPU_STATS_VERSION} where id = ${seriesId}`;
-    }
 
     if (benchmarkResultIds.length > 0) {
       await tx`
@@ -368,40 +318,12 @@ export function upsertGpuMetricSeries(
       `;
     }
 
-    return {
-      seriesId,
-      samplesInserted: needsSamples ? series.samples.length : 0,
-      replaced,
-      statsUpdated,
-    };
-  });
-}
-
-export function refreshGpuMetricStats(sql: Sql, seriesId: number): Promise<boolean> {
-  return sql.begin(async (tx) => {
-    const [series] = await tx<{ sample_count: number; stats_version: number }[]>`
-      select sample_count, stats_version from gpu_metric_series where id = ${seriesId} for update
-    `;
-    if (!series) throw new Error(`Unknown telemetry series ${seriesId}`);
-    if (series.stats_version === GPU_STATS_VERSION) return false;
-    const samples = await tx<StoredGpuMetricSample[]>`
-      select * from gpu_metric_samples where series_id = ${seriesId} order by sampled_at, gpu_index
-    `;
-    if (samples.length !== Number(series.sample_count)) {
-      throw new Error(
-        `Telemetry series ${seriesId} has missing samples; re-ingest its source artifact`,
-      );
-    }
-    const stats = computeStoredGpuMetricStats(samples);
-    await tx`delete from gpu_metric_gpu_stats where series_id = ${seriesId}`;
-    await insertStats(tx, seriesId, stats);
-    await tx`update gpu_metric_series set stats_version = ${GPU_STATS_VERSION} where id = ${seriesId}`;
-    return true;
+    return { seriesId, samplesInserted: needsSamples ? series.samples.length : 0, replaced };
   });
 }
 
 /**
- * Read, digest, and persist every CSV of one artifact for one set of points.
+ * Read and persist every CSV of one artifact for one set of points.
  * Writes telemetry tables and point links only; benchmark-row provenance is
  * attached by the caller that owns the point set (CI before insert, the
  * backfill through its receipt-checkpointed plan).
@@ -425,8 +347,7 @@ export async function ingestGpuMetricsArtifact(
     });
     result.seriesIds.push(upserted.seriesId);
     result.samplesInserted += upserted.samplesInserted;
-    if (upserted.samplesInserted === 0 && !upserted.replaced && !upserted.statsUpdated)
-      result.seriesSkipped++;
+    if (upserted.samplesInserted === 0 && !upserted.replaced) result.seriesSkipped++;
   }
   return result;
 }

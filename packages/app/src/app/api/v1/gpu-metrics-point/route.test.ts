@@ -12,6 +12,7 @@ import type { GpuMetricSeries } from '@semianalysisai/inferencex-db/queries/gpu-
 import { getGpuMetricsPointRevision } from '@semianalysisai/inferencex-db/queries/gpu-metrics-revision';
 import { startPowerxBlobFixture } from '../../../../../scripts/powerx-blob-fixture';
 
+// Version 2 stands in for a deployed change to the statistics calculator.
 const algorithm = vi.hoisted(() => ({ version: 1 }));
 vi.mock('@semianalysisai/inferencex-db/lib/gpu-metric-stats', async (importOriginal) => {
   const actual = await importOriginal<typeof GpuMetricStatsModule>();
@@ -20,6 +21,10 @@ vi.mock('@semianalysisai/inferencex-db/lib/gpu-metric-stats', async (importOrigi
     get GPU_STATS_VERSION() {
       return algorithm.version;
     },
+    computeStoredGpuMetricStats: (...args: Parameters<typeof actual.computeStoredGpuMetricStats>) =>
+      actual
+        .computeStoredGpuMetricStats(...args)
+        .map((stat) => (algorithm.version === 1 ? stat : { ...stat, mean: -1 })),
   };
 });
 
@@ -51,11 +56,7 @@ function client(database: Pick<PGlite, 'query'>) {
 
 beforeAll(async () => {
   db = await PGlite.create();
-  for (const name of [
-    '001_initial_schema.sql',
-    '016_gpu_metrics.sql',
-    '017_gpu_metric_stats_version.sql',
-  ]) {
+  for (const name of ['001_initial_schema.sql', '016_gpu_metrics.sql']) {
     await db.exec(
       fs.readFileSync(new URL(`../../../../../../db/migrations/${name}`, import.meta.url), 'utf8'),
     );
@@ -166,6 +167,9 @@ describe('artifact → local DB → real Blob cache → point API recovery', () 
 
     const unlinked = await request(11);
     expect(unlinked.response.status).toBe(404);
+    await db.exec(
+      `UPDATE benchmark_results SET power_audit = '{"source":"audit-11"}' WHERE id = 11`,
+    );
     await ingestGpuMetricsArtifact(sql, {
       workflowRunId: 1,
       artifact: artifact(),
@@ -173,7 +177,7 @@ describe('artifact → local DB → real Blob cache → point API recovery', () 
     });
     for (const id of [10, 11]) {
       const linked = await request(id);
-      expect(linked.body.series[0].benchmarkResultIds).toEqual([10, 11]);
+      expect(linked.body.series[0].powerAudits).toEqual([{ source: 'audit-11' }]);
     }
     const oldRevision = await getGpuMetricsPointRevision(client(db), 10);
     fs.writeFileSync(
@@ -215,50 +219,20 @@ describe('artifact → local DB → real Blob cache → point API recovery', () 
 const power = (body: { series: GpuMetricSeries[] }) =>
   body.series[0]!.stats.find((s) => s.gpuIndex === 0 && s.metric === 'power_w')!;
 
-it('bypasses warmed shared-point caches on algorithm upgrade, then persists through unchanged re-ingest', async () => {
-  const input = { workflowRunId: 1, artifact: artifact(), benchmarkResultIds: [10, 11] };
-  const first = await ingestGpuMetricsArtifact(sql, input);
-  await sql`update gpu_metric_gpu_stats set mean_value = -1`;
-
+it('refreshes shared cached points when the statistics calculator version changes', async () => {
+  await ingestGpuMetricsArtifact(sql, {
+    workflowRunId: 1,
+    artifact: artifact(),
+    benchmarkResultIds: [10, 11],
+  });
   for (const id of [10, 11]) {
     const cached = await request(id);
-    expect(power(cached.body).mean).toBe(-1);
+    expect(power(cached.body).mean).toBeCloseTo(351.403333, 3);
   }
-  const oldRevision = await getGpuMetricsPointRevision(client(db), 10);
-  const originalSamples =
-    await sql`select * from gpu_metric_samples order by series_id, sampled_at, gpu_index`;
   // Model a code deploy: no DB row, sample, sidecar or link has changed.
   algorithm.version = 2;
-  expect(await getGpuMetricsPointRevision(client(db), 10)).not.toBe(oldRevision);
   for (const id of [10, 11]) {
     const refreshed = await request(id);
-    expect(power(refreshed.body).mean).toBeCloseTo(351.403333, 3);
+    expect(power(refreshed.body).mean).toBe(-1);
   }
-  expect(await sql`select stats_version from gpu_metric_series`).toEqual([{ stats_version: 1 }]);
-  expect(await sql`select distinct mean_value from gpu_metric_gpu_stats`).toEqual([
-    { mean_value: -1 },
-  ]);
-  const upgradedRevision = await getGpuMetricsPointRevision(client(db), 10);
-  const repaired = await ingestGpuMetricsArtifact(sql, input);
-  expect(repaired).toMatchObject({
-    seriesIds: first.seriesIds,
-    samplesInserted: 0,
-    seriesSkipped: 0,
-  });
-  expect(await getGpuMetricsPointRevision(client(db), 10)).not.toBe(upgradedRevision);
-  for (const id of [10, 11]) {
-    const refreshed = await request(id);
-    expect(power(refreshed.body).mean).toBeCloseTo(351.403333, 3);
-  }
-  expect(await sql`select stats_version from gpu_metric_series`).toEqual([{ stats_version: 2 }]);
-  expect(
-    await sql`select * from gpu_metric_samples order by series_id, sampled_at, gpu_index`,
-  ).toEqual(originalSamples);
-  const beforeHit = sampleReads;
-  await request(10);
-  expect(sampleReads).toBe(beforeHit);
-  expect(await ingestGpuMetricsArtifact(sql, input)).toMatchObject({
-    samplesInserted: 0,
-    seriesSkipped: 1,
-  });
 });

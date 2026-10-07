@@ -19,7 +19,7 @@ const rows = [
   { timestamp: '2026-09-08T00:00:01Z', index: 0, power: 300, temperature: 42 },
   { timestamp: '2026-09-08T00:00:01Z', index: 1, power: 50, temperature: 38 },
 ];
-const digest: GpuMetricStatRow[] = [
+const readerStats: GpuMetricStatRow[] = [
   {
     gpuIndex: 0,
     metric: 'power_w',
@@ -45,14 +45,13 @@ const digest: GpuMetricStatRow[] = [
     stddev: 80,
   },
 ];
-function artifact(stats: GpuMetricStatRow[] = digest): GpuMetricsArtifact {
+function artifact(stats: GpuMetricStatRow[] = readerStats): GpuMetricsArtifact {
   return {
     name: 'gpu_metrics_retained/host-a/gpu_metrics.csv',
     data: rows,
     series: {
       id: 1,
       artifactName: 'gpu_metrics_retained',
-      configKey: 'retained',
       fileName: 'host-a/gpu_metrics.csv',
       vendor: 'nvidia',
       sampleIntervalS: 1,
@@ -61,7 +60,6 @@ function artifact(stats: GpuMetricStatRow[] = digest): GpuMetricsArtifact {
       startedAt: '2026-09-08T00:00:00Z',
       endedAt: '2026-09-08T00:00:10Z',
       sidecars: {},
-      benchmarkResultIds: [10, 11],
       stats,
     },
   };
@@ -89,13 +87,13 @@ beforeEach(() => {
 });
 
 describe('GET /api/v1/views/gpu-metrics full-record statistics', () => {
-  it('returns the stored digest even when raw rows would produce different statistics', async () => {
-    const response = await GET(request());
+  it("returns the reader's all-chip statistics instead of recomputing them from GPU-filtered rows", async () => {
+    const response = await GET(request('&gpus=0'));
     expect(response.status).toBe(200);
     expect(response.headers.get('cache-control')).toBe('private, no-store');
     const body = await response.json();
-    expect(body.stats).toEqual(digest.map(({ metric: _metric, ...stats }) => stats));
-    expect(body.rows).toEqual(rows);
+    expect(body.stats).toEqual(readerStats.map(({ metric: _metric, ...stats }) => stats));
+    expect(body.rows).toEqual(rows.filter((row) => row.index === 0));
     expect(metrics.mock.calls[0][0].nextUrl.searchParams.get('runId')).toBe(String(runInfo.id));
   });
 

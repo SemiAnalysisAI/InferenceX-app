@@ -109,7 +109,6 @@ const storedRunPayload = {
     {
       id: 1,
       artifactName: 'gpu_metrics_dsr1_conc32_b200-x_0',
-      configKey: 'dsr1_conc32_b200-x_0',
       fileName: 'gpu_metrics.csv',
       vendor: 'nvidia',
       sampleIntervalS: 1,
@@ -118,7 +117,6 @@ const storedRunPayload = {
       startedAt: '2026-09-11T04:19:41.982Z',
       endedAt: '2026-09-11T04:19:42.990Z',
       sidecars: {},
-      benchmarkResultIds: [10],
       stats: [],
       data: [
         {
@@ -146,7 +144,6 @@ const storedRunPayload = {
     {
       id: 2,
       artifactName: 'gpu_metrics_multinode_b200-x_0',
-      configKey: 'multinode_b200-x_0',
       fileName: 'results/gpu_metrics_rank0.csv',
       vendor: 'nvidia',
       sampleIntervalS: 1,
@@ -155,14 +152,12 @@ const storedRunPayload = {
       startedAt: '2026-09-11T04:19:41.982Z',
       endedAt: '2026-09-11T04:19:41.982Z',
       sidecars: {},
-      benchmarkResultIds: [11],
       stats: [],
       data: [],
     },
     {
       id: 3,
       artifactName: 'gpu_metrics_multinode_b200-x_0',
-      configKey: 'multinode_b200-x_0',
       fileName: 'results/gpu_metrics_rank1.csv',
       vendor: 'nvidia',
       sampleIntervalS: 1,
@@ -171,7 +166,6 @@ const storedRunPayload = {
       startedAt: '2026-09-11T04:19:41.982Z',
       endedAt: '2026-09-11T04:19:41.982Z',
       sidecars: {},
-      benchmarkResultIds: [11],
       stats: [],
       data: [],
     },
@@ -198,7 +192,7 @@ describe('databasePayloadToResponse', () => {
       'gpu_metrics_multinode_b200-x_0/results/gpu_metrics_rank1.csv',
     ]);
     expect(response.artifacts[0]!.data).toHaveLength(2);
-    expect(response.artifacts[0]!.series?.benchmarkResultIds).toEqual([10]);
+    expect(response.artifacts[0]!.series?.id).toBe(1);
     expect(response.artifacts[0]!.series).not.toHaveProperty('data');
   });
 });

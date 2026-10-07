@@ -76,14 +76,6 @@ beforeEach(async () => {
     INSERT INTO benchmark_result_gpu_metrics (benchmark_result_id, series_id)
     VALUES (10, 100), (11, 100), (10, 101);
 
-    INSERT INTO gpu_metric_gpu_stats (series_id, gpu_index, metric, sample_count,
-      min_value, max_value, mean_value, median_value, p95_value, p99_value, stddev_value)
-    VALUES (100, 0, 'powerW', 2, 187.5, 912.25, 549.875, 549.875, 912.25, 912.25, 362.375),
-           (100, 1, 'powerW', 1, 190.5, 190.5, 190.5, 190.5, 190.5, 190.5, 0),
-           (101, 0, 'powerW', 1, 500.5, 500.5, 500.5, 500.5, 500.5, 500.5, 0),
-           (102, 0, 'powerW', 1, 700.5, 700.5, 700.5, 700.5, 700.5, 700.5, 0),
-           (103, 0, 'powerW', 1, 100.5, 100.5, 100.5, 100.5, 100.5, 100.5, 0);
-
     INSERT INTO gpu_metric_samples (series_id, gpu_index, sampled_at, power_w, temperature_c,
       sm_clock_mhz, mem_clock_mhz, gpu_util_pct, mem_util_pct, edge_temp_c, mem_temp_c,
       gfx_voltage_mv, soc_voltage_mv, mem_voltage_mv, fclk_mhz, socclk_mhz, mm_activity_pct)
@@ -125,11 +117,10 @@ describe('getGpuMetricsForRun', () => {
       'node1/gpu_metrics.csv',
     ]);
 
-    const [node0, node1] = payload!.series;
+    const [node0] = payload!.series;
     expect(node0).toMatchObject({
       id: 100,
       artifactName: 'gpu_metrics_dsr1_8k1k_fp4_sglang_conc32_b200-x_0',
-      configKey: 'dsr1_8k1k_fp4_sglang_conc32_b200-x_0',
       vendor: 'nvidia',
       sampleIntervalS: 1,
       sampleCount: 3,
@@ -137,9 +128,8 @@ describe('getGpuMetricsForRun', () => {
       startedAt: '2026-09-11T04:19:41.000Z',
       endedAt: '2026-09-11T04:19:43.000Z',
       sidecars: { context: { timestamp_timezone: 'UTC' } },
-      benchmarkResultIds: [10, 11],
     });
-    // Pre-migration (unversioned) digests are recomputed read-only; null is not zero.
+    // Statistics come from the stored samples; a missing reading is not zero.
     expect(node0?.stats.filter((stat) => stat.metric === 'power_w')).toEqual([
       {
         gpuIndex: 0,
@@ -196,7 +186,6 @@ describe('getGpuMetricsForRun', () => {
       socClk: 1100,
       mmActivity: 12.5,
     });
-    expect(node1?.benchmarkResultIds).toEqual([10]);
   });
 
   it('reads the latest attempt of a rerun GitHub run id, not the first', async () => {
@@ -238,7 +227,7 @@ describe('getGpuMetricsForRun', () => {
   });
 });
 
-it('keeps healthy hosts readable when an unversioned sibling has incomplete samples', async () => {
+it('withholds statistics for a series with incomplete samples, keeping sibling hosts readable', async () => {
   await sql`update gpu_metric_series set sample_count = 4 where id = 100`;
   const payload = await getGpuMetricsForRun(sql, WITH_SERIES);
   expect(payload?.series[0]?.stats).toEqual([]);

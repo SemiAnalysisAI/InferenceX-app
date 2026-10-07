@@ -4,7 +4,11 @@ import {
   type GpuMetricStats,
 } from '../etl/gpu-metrics-csv';
 
-/** Bump whenever full-record digest definitions change. Independent of serving-window metrics. */
+/**
+ * Point-cache revisions include this version: bump it whenever full-record metric
+ * populations, mappings, units or statistical definitions change. Serving-window
+ * metrics do not depend on it.
+ */
 export const GPU_STATS_VERSION = 1;
 
 export const STAT_METRIC_COLUMN = {
@@ -24,7 +28,6 @@ export const STAT_METRIC_COLUMN = {
   mmActivityPct: 'mm_activity_pct',
 } as const satisfies Record<GpuMetricStats['metric'], string>;
 
-/** Stored metric names use the column spelling so SQL readers need no mapping. */
 export function statMetricColumn(metric: GpuMetricStats['metric']): string {
   return STAT_METRIC_COLUMN[metric];
 }
@@ -34,7 +37,7 @@ export type StoredGpuMetricSample = {
   sampled_at: string | Date;
 } & Record<(typeof STAT_METRIC_COLUMN)[keyof typeof STAT_METRIC_COLUMN], number | null>;
 
-/** Preserve nulls: chart adapters intentionally zero-fill power, digest inputs must not. */
+/** Preserve nulls: chart adapters intentionally zero-fill power, statistics inputs must not. */
 export function computeStoredGpuMetricStats(
   rows: readonly StoredGpuMetricSample[],
 ): GpuMetricStats[] {

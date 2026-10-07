@@ -7,10 +7,8 @@ import {
   parseGpuMetricsCsv,
   type GpuMetricSample,
 } from '@semianalysisai/inferencex-db/etl/gpu-metrics-csv';
-import {
-  prepareGpuMetricsArtifact,
-  statMetricColumn,
-} from '@semianalysisai/inferencex-db/etl/gpu-metrics-ingest';
+import { prepareGpuMetricsArtifact } from '@semianalysisai/inferencex-db/etl/gpu-metrics-ingest';
+import { statMetricColumn } from '@semianalysisai/inferencex-db/lib/gpu-metric-stats';
 
 import { storedGpuStatsForMetric } from './stored-gpu-stats';
 import { ALL_METRIC_OPTIONS, computeGpuStats, parseCsvData, type GpuMetricRow } from './types';
@@ -82,7 +80,7 @@ describe('storedGpuStatsForMetric', () => {
             stddev: 100,
           },
         ]);
-        const { metric: _metric, ...expected } = prepared.stats[0];
+        const { metric: _metric, ...expected } = computeGpuMetricStats(prepared.samples)[0];
         expect(actual).toEqual([expected]);
       } finally {
         if (originalTimezone === undefined) delete process.env.TZ;

@@ -420,7 +420,7 @@ const NEW_VIEWS = {
       stats: {
         ...objects,
         description:
-          'Per-GPU statistics for the selected file/host series, including startup and warmup. Current-version stored digests are authoritative, including an empty or missing metric digest. Outdated or unversioned digests are recomputed read-only from retained DB samples using the current full-record algorithm. Count is the finite-reading count after first-wins timestamp/GPU deduplication. Mean is sample-weighted, P50/P95/P99 use linear interpolation at p*(N-1), and standard deviation divides by N. Values use the selected metric unit; the storage-only metric column is omitted. GPU visibility and chart downsampling do not change this population. These are not serving-window power or J/token.',
+          'Per-GPU statistics for the selected file/host series, including startup and warmup. For stored runs they are computed on each read from the stored samples: a missing reading stays missing, and a series whose stored samples do not match its recorded sample count returns no statistics. Count is the finite-reading count after first-wins timestamp/GPU deduplication. Mean is sample-weighted, P50/P95/P99 use linear interpolation at p*(N-1), and standard deviation divides by N. Values use the selected metric unit; the storage-only metric column is omitted. GPU visibility and chart downsampling do not change this population. These are not serving-window power or J/token.',
       },
       rendering: object,
     },
