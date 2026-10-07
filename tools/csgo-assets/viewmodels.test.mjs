@@ -24,6 +24,8 @@ test(
       const json = JSON.parse(bytes.subarray(20, 20 + bytes.readUInt32LE(12)).toString());
       assert.ok(json.meshes.length > 0, id);
       assert.ok(json.animations.length > 0, id);
+      for (const action of ['idle', 'fire', 'reload', 'lookat'])
+        assert.ok(actionClip(json.animations, action), `${id}: ${action} animation binding`);
       assert.ok(json.images.length > 0, id);
       assert.ok(
         json.images.every((image) => !image.name?.startsWith('missing_')),

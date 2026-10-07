@@ -14,6 +14,10 @@ Captured on 2026-10-06 US Eastern / 2026-10-07 UTC. These are implementation tes
 
 The match simulation used the native-input development bundle. The hosted bundle uses the same match, physics, map and bot code with a separate drag-to-aim input adapter because its iframe cannot capture the cursor.
 
+The standard browser-game action client was then run against the hosted adapter. It exercised CT-side strafing and firing, left the game live with 11 rounds in the USP-S, and recorded no console/page errors after the final fixes. `hosted-state.json` and `hosted-ct.png` preserve that run. The CT screenshot confirms that the corrected team filter keeps CT hands visible.
+
+All 136 expected idle, firing, reload and inspection clip bindings resolve across the 34 viewmodels. This is a binding check, not an animation-timing comparison.
+
 ## Images
 
 `gameplay.png` is the actual buying/firing/reloading test capture. `character-render.png` is a staged close-range character/material/weapon-attachment check, not a combat result. `mobile-menu.png` records the narrow-screen menu.
