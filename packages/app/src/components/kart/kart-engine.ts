@@ -1241,7 +1241,11 @@ function stepProjectiles(race: Race, dt: number) {
         const sp = Math.hypot(p.vx, p.vz);
         const want = Math.atan2(aim.x - p.x, aim.z - p.z);
         const cur = Math.atan2(p.vx, p.vz);
-        const turn = Math.max(-5 * dt, Math.min(5 * dt, wrapAngle(want - cur)));
+        // A fixed turn radius makes close lateral targets impossible to hit.
+        // Once locked on, aim directly; retain bounded steering along the course.
+        const turn = close
+          ? wrapAngle(want - cur)
+          : Math.max(-5 * dt, Math.min(5 * dt, wrapAngle(want - cur)));
         p.vx = Math.sin(cur + turn) * sp;
         p.vz = Math.cos(cur + turn) * sp;
         if (t.finishedAt !== null || t.respawn > 0) p.target = -1;
