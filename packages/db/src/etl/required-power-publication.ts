@@ -18,6 +18,22 @@ export interface RequiredPowerSource {
   runAttempt: number;
   headSha: string | null;
 }
+export interface CurveReplacement {
+  curve_scope: string;
+  previous_snapshot_workflow_run_id: number;
+  removed_point_identities: string[];
+}
+/** The manifest's authorization to shrink a published curve: none, or exact observed losses. */
+export interface CurvePublication {
+  mode: 'incremental' | 'replacement';
+  replacement_scope: CurveReplacement[];
+}
+/** What a verified v2 manifest requires this ingest to publish. */
+export interface RequiredPowerScope {
+  /** Every producer-required benchmark point, mapped before run overrides. */
+  points: BenchmarkParams[];
+  publication: CurvePublication;
+}
 /**
  * One file the manifest may bind. Benchmark files arrive hashed with their
  * parsed rows; sidecars are hashed and re-read per verification, because the
@@ -93,41 +109,57 @@ export function assertRequiredPowerPointsRetained(
   }
 }
 
+/** The one validation of the policy; the curve check trusts this type. */
+function parsePublicationPolicy(value: unknown): CurvePublication {
+  const publication = object(value, 'publication policy');
+  const mode = publication.mode;
+  const scopes = publication.replacement_scope;
+  if (
+    (mode !== 'incremental' && mode !== 'replacement') ||
+    !Array.isArray(scopes) ||
+    (mode === 'incremental' && scopes.length > 0)
+  )
+    throw new Error('Required power: invalid publication policy');
+  const curveScopes = new Set<string>();
+  const replacementScope = scopes.map((scopeValue): CurveReplacement => {
+    const replacement = object(scopeValue, 'exact replacement scope');
+    const curveScope = replacement.curve_scope;
+    const snapshot = replacement.previous_snapshot_workflow_run_id;
+    const removed = replacement.removed_point_identities;
+    if (
+      typeof curveScope !== 'string' ||
+      !curveScope ||
+      curveScopes.has(curveScope) ||
+      typeof snapshot !== 'number' ||
+      !Number.isSafeInteger(snapshot) ||
+      snapshot <= 0 ||
+      !Array.isArray(removed) ||
+      removed.length === 0 ||
+      removed.some((id) => typeof id !== 'string' || !id) ||
+      new Set(removed).size !== removed.length
+    )
+      throw new Error('Required power: invalid exact replacement scope');
+    curveScopes.add(curveScope);
+    return {
+      curve_scope: curveScope,
+      previous_snapshot_workflow_run_id: snapshot,
+      removed_point_identities: removed as string[],
+    };
+  });
+  return { mode, replacement_scope: replacementScope };
+}
+
 /** Validate only the producer-declared required scope; legacy optional points remain unchanged. */
 function verifyRequiredPowerBundle(
   manifestValue: unknown,
   files: readonly BenchmarkArtifactFile[],
   bundle: ReadonlyMap<string, Evidence>,
   source: RequiredPowerSource,
-): BenchmarkParams[] {
+): RequiredPowerScope {
   const manifest = object(manifestValue, 'sweep manifest');
   if (manifest['schema-version'] !== 2)
     throw new Error('Required power: incompatible manifest schema-version (expected 2)');
-  const publication = object(manifest.publication, 'publication policy');
-  if (
-    !['incremental', 'replacement'].includes(String(publication.mode)) ||
-    !Array.isArray(publication.replacement_scope) ||
-    (publication.mode === 'incremental' && publication.replacement_scope.length > 0)
-  )
-    throw new Error('Required power: invalid publication policy');
-  const replacementScopes = new Set<string>();
-  for (const value of publication.replacement_scope) {
-    const replacement = object(value, 'exact replacement scope');
-    if (
-      typeof replacement.curve_scope !== 'string' ||
-      !replacement.curve_scope ||
-      replacementScopes.has(replacement.curve_scope) ||
-      !Number.isSafeInteger(replacement.previous_snapshot_workflow_run_id) ||
-      Number(replacement.previous_snapshot_workflow_run_id) <= 0 ||
-      !Array.isArray(replacement.removed_point_identities) ||
-      replacement.removed_point_identities.length === 0 ||
-      replacement.removed_point_identities.some((id) => typeof id !== 'string' || !id) ||
-      new Set(replacement.removed_point_identities).size !==
-        replacement.removed_point_identities.length
-    )
-      throw new Error('Required power: invalid exact replacement scope');
-    replacementScopes.add(replacement.curve_scope);
-  }
+  const publication = parsePublicationPolicy(manifest.publication);
   const declaredAttempt = manifest['run-attempt'];
   if (
     manifest['run-id'] !== source.runId ||
@@ -221,14 +253,15 @@ function verifyRequiredPowerBundle(
     if (!seen.has(key)) throw new Error(`Required power: missing benchmark point ${key}`);
   }
   verifyPointEvidence(manifest, expected, seen, bundle);
-  return [...seen.values()].map(({ point }) => point);
+  return { points: [...seen.values()].map(({ point }) => point), publication };
 }
 
 /**
  * Run before any database upsert, including workflow/config metadata writes.
- * `readFiles` lends the ingest's one benchmark-artifact read; the standalone
- * commands fall back to their own read with a throwaway tracker. It is called
- * only once a manifest exists, so an ordinary run reads nothing here.
+ * Null means the run declares no required scope (no v2 manifest). `readFiles`
+ * lends the ingest's one benchmark-artifact read; the standalone commands fall
+ * back to their own read with a throwaway tracker. It is called only once a
+ * manifest exists, so an ordinary run reads nothing here.
  */
 export function verifyRequiredPowerArtifacts(
   root: string,
@@ -236,7 +269,7 @@ export function verifyRequiredPowerArtifacts(
   required = false,
   readFiles: () => readonly BenchmarkArtifactFile[] = () =>
     readBenchmarkArtifacts(root, { runId: source.runId, tracker: createSkipTracker() }),
-): BenchmarkParams[] {
+): RequiredPowerScope | null {
   const manifestDir = path.join(root, REQUIRED_POWER_MANIFEST);
   if (!fs.existsSync(manifestDir)) {
     if (required) throw new Error('Required power: sweep manifest missing for required dispatch');
@@ -248,7 +281,7 @@ export function verifyRequiredPowerArtifacts(
           throw new Error('Required power: sweep manifest missing for required changelog scope');
       }
     }
-    return [];
+    return null;
   }
   const manifest = JSON.parse(
     fs.readFileSync(path.join(manifestDir, 'sweep_manifest.json'), 'utf8'),
@@ -293,12 +326,12 @@ export function verifyRequiredPowerArtifacts(
       });
     }
   }
-  const points = verifyRequiredPowerBundle(manifest, files, bundle, source);
+  const scope = verifyRequiredPowerBundle(manifest, files, bundle, source);
   // Rerun-failed-jobs keeps successful points and metadata from earlier attempts of this head.
   console.log(
     `  Required power scope: run ${source.runId}, declared attempt ${manifest['run-attempt']}, ingest attempt ${source.runAttempt}`,
   );
-  return points;
+  return scope;
 }
 
 function safeArtifactPath(value: unknown): string {

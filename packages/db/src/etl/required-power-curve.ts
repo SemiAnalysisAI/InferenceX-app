@@ -1,23 +1,21 @@
-import fs from 'node:fs';
-import path from 'node:path';
 import {
   benchmarkCurveScope,
   type BenchmarkCurveInput,
 } from '@semianalysisai/inferencex-constants';
 import type { DbClient } from '../connection';
 import type { Sql } from './db-utils';
-import { REQUIRED_POWER_MANIFEST } from '../lib/ci-artifact-preparation';
-import { readBenchmarkArtifacts, type BenchmarkArtifactFile } from './benchmark-artifacts';
+import type { BenchmarkArtifactFile } from './benchmark-artifacts';
 import type { BenchmarkParams } from './benchmark-mapper';
 import { configCacheKey, loadConfigIds } from './config-cache';
 import { benchmarkPublicationIdentity, stablePowerPointIdentity } from './power-publication';
 import {
   assertRequiredPowerPointsRetained,
-  verifyRequiredPowerArtifacts,
+  type CurvePublication,
+  type CurveReplacement,
+  type RequiredPowerScope,
   type RequiredPowerSource,
 } from './required-power-publication';
 import { planBenchmarkPoint } from './run-overrides';
-import { createSkipTracker } from './skip-tracker';
 
 export interface CurvePoint {
   identity: Record<string, unknown>;
@@ -28,15 +26,6 @@ export interface CurvePoint {
   date: string;
   runStartedAt: string | null;
   appendOnly: boolean;
-}
-export interface CurveReplacement {
-  curve_scope: string;
-  previous_snapshot_workflow_run_id: number;
-  removed_point_identities: string[];
-}
-export interface CurvePublication {
-  mode: 'incremental' | 'replacement';
-  replacement_scope: CurveReplacement[];
 }
 
 function scope(point: CurvePoint): string {
@@ -97,19 +86,13 @@ export function publishedCurve(points: readonly CurvePoint[]): Map<string, Curve
   return result;
 }
 
-function canonical(entries: CurveReplacement[]): string {
+function canonical(entries: readonly CurveReplacement[]): string {
   return JSON.stringify(
     entries
-      .map((entry) => {
-        if (
-          typeof entry.curve_scope !== 'string' ||
-          !Number.isSafeInteger(entry.previous_snapshot_workflow_run_id) ||
-          !Array.isArray(entry.removed_point_identities) ||
-          entry.removed_point_identities.some((id) => typeof id !== 'string')
-        )
-          throw new Error('Required power: invalid exact replacement scope');
-        return { ...entry, removed_point_identities: [...entry.removed_point_identities].sort() };
-      })
+      .map((entry) => ({
+        ...entry,
+        removed_point_identities: [...entry.removed_point_identities].sort(),
+      }))
       .sort((a, b) => a.curve_scope.localeCompare(b.curve_scope)),
   );
 }
@@ -120,12 +103,6 @@ export function assertCurvePreserved(
   proposed: readonly CurvePoint[],
   publication: CurvePublication,
 ): void {
-  if (
-    !publication ||
-    !['incremental', 'replacement'].includes(publication.mode) ||
-    !Array.isArray(publication.replacement_scope)
-  )
-    throw new Error('Required power: invalid curve publication policy');
   const before = publishedCurve(existing);
   const after = publishedCurve(proposed);
   const losses: CurveReplacement[] = [];
@@ -144,8 +121,6 @@ export function assertCurvePreserved(
         removed_point_identities: removed,
       });
   }
-  if (publication.mode === 'incremental' && publication.replacement_scope.length > 0)
-    throw new Error('Required power: incremental publication cannot authorize replacement');
   if (
     (losses.length > 0 && publication.mode !== 'replacement') ||
     canonical(losses) !== canonical(publication.replacement_scope)
@@ -188,33 +163,20 @@ export async function loadStoredCurvePoints(
 
 /**
  * Read-only preflight; no config/workflow upsert, migration, or materialized-view
- * refresh. `readFiles` lends the ingest's one benchmark-artifact read, shared
- * here by the verifier and the incoming-point plan; without it the preflight
- * reads once for itself when a manifest exists. It still verifies a second time
- * and re-parses the manifest for the publication policy; a typed required-power
- * scope returned by the verifier would remove both.
+ * refresh. `files` is the ingest's one benchmark-artifact read, the same rows the
+ * verifier bound to `required`.
  */
 export async function preflightRequiredPowerCurves(
   sql: DbClient | Sql,
-  root: string,
+  required: RequiredPowerScope,
+  files: readonly BenchmarkArtifactFile[],
   source: RequiredPowerSource,
   options: { date: string; runStartedAt: string | null; appendOnly: boolean },
-  readFiles?: () => readonly BenchmarkArtifactFile[],
 ): Promise<void> {
-  let filesRead: readonly BenchmarkArtifactFile[] | undefined;
-  const files = () =>
-    (filesRead ??=
-      readFiles?.() ??
-      readBenchmarkArtifacts(root, { runId: source.runId, tracker: createSkipTracker() }));
-  const required = verifyRequiredPowerArtifacts(root, source, false, files);
-  if (required.length === 0) return;
-  const manifest = JSON.parse(
-    fs.readFileSync(path.join(root, REQUIRED_POWER_MANIFEST, 'sweep_manifest.json'), 'utf8'),
-  );
   const configIds = await loadConfigIds(sql);
   const incoming = new Map<string, BenchmarkParams>();
   const backfilled = new Map<string, string>();
-  for (const file of files()) {
+  for (const file of files) {
     for (const { mapped } of file.rows) {
       if (!mapped) continue;
       // A config not present yet cannot match an id-keyed purge; backfills
@@ -229,7 +191,7 @@ export async function preflightRequiredPowerCurves(
       incoming.set(stablePowerPointIdentity(benchmarkPublicationIdentity(plan.point)), plan.point);
     }
   }
-  assertRequiredPowerPointsRetained(required, [...incoming.values()], 'before_write');
+  assertRequiredPowerPointsRetained(required.points, [...incoming.values()], 'before_write');
   const models = [...new Set([...incoming.values()].map((point) => point.config.model))];
   const stored = await loadStoredCurvePoints(sql, models, source.runId);
   const attemptRows =
@@ -248,7 +210,7 @@ export async function preflightRequiredPowerCurves(
     source,
     ...options,
   });
-  assertCurvePreserved(existing, proposed, manifest.publication);
+  assertCurvePreserved(existing, proposed, required.publication);
 }
 
 export interface CurveProjectionInput {

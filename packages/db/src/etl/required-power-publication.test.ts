@@ -180,7 +180,7 @@ describe('required power publication contract', () => {
     expect(() => verifyRequiredPowerArtifacts(dir, source)).toThrow('sweep manifest missing');
     fs.rmSync(path.join(dir, 'changelog-metadata'), { recursive: true });
     expect(() => verifyRequiredPowerArtifacts(dir, source, true)).toThrow('sweep manifest missing');
-    expect(verifyRequiredPowerArtifacts(dir, source)).toEqual([]);
+    expect(verifyRequiredPowerArtifacts(dir, source)).toBeNull();
   });
   it('rejects hash mismatches and explicit invalid evidence', () => {
     const dir = fixture();
@@ -211,7 +211,7 @@ describe('required power publication contract', () => {
   });
   it('requires both prefill and decode physical evidence and matching role energy', () => {
     const dir = multinodeFixture();
-    expect(verifyRequiredPowerArtifacts(dir, source)).toHaveLength(1);
+    expect(verifyRequiredPowerArtifacts(dir, source)?.points).toHaveLength(1);
     changeManifest(dir, (manifest) => {
       manifest.points[0].devices.pop();
     });
@@ -225,7 +225,7 @@ describe('required power publication contract', () => {
     );
   });
   it('accepts a native multinode bundle with per-node receipts', () => {
-    expect(verifyRequiredPowerArtifacts(nativeFixture(), source)).toHaveLength(1);
+    expect(verifyRequiredPowerArtifacts(nativeFixture(), source)?.points).toHaveLength(1);
   });
   it('rejects a native receipt whose telemetry hash differs', () => {
     const dir = nativeFixture();
@@ -268,7 +268,7 @@ describe('required power publication contract', () => {
         if (artifact.path === csv)
           Object.assign(artifact, { path: devices, sha256: sha256(dir, devices) });
     });
-    expect(verifyRequiredPowerArtifacts(dir, source)).toHaveLength(1);
+    expect(verifyRequiredPowerArtifacts(dir, source)?.points).toHaveLength(1);
   });
   it('rejects invalid sidecar verdict and device energy disagreement despite valid hashes', () => {
     const dir = fixture();
@@ -287,7 +287,9 @@ describe('required power publication contract', () => {
       runId: source.runId,
       tracker: createSkipTracker(),
     });
-    expect(verifyRequiredPowerArtifacts(golden, source, false, () => files)).toHaveLength(1);
+    expect(verifyRequiredPowerArtifacts(golden, source, false, () => files)?.points).toHaveLength(
+      1,
+    );
     const tampered = files.map((file) => ({ ...file, sha256: '0'.repeat(64) }));
     expect(() => verifyRequiredPowerArtifacts(golden, source, false, () => tampered)).toThrow(
       'hash',
@@ -297,14 +299,14 @@ describe('required power publication contract', () => {
     const dir = fixture();
     fs.mkdirSync(path.join(dir, 'results_bmk'));
     fs.copyFileSync(path.join(dir, benchmarkPath), path.join(dir, 'results_bmk/agg.json'));
-    expect(verifyRequiredPowerArtifacts(dir, source)).toHaveLength(1);
+    expect(verifyRequiredPowerArtifacts(dir, source)?.points).toHaveLength(1);
     const rows = json(dir, benchmarkPath);
     rows.avg_power_w = 501;
     write(dir, 'results_bmk/agg.json', rows);
     expect(() => verifyRequiredPowerArtifacts(dir, source)).toThrow('conflicting');
   });
   it('names the stage when a required identity is missing or a power field differs', () => {
-    const required = verifyRequiredPowerArtifacts(golden, source);
+    const required = verifyRequiredPowerArtifacts(golden, source)!.points;
     const dropped = [{ ...required[0], conc: 2 }];
     expect(() => assertRequiredPowerPointsRetained(required, dropped, 'before_write')).toThrow(
       'Required power (before_write): missing benchmark point',

@@ -363,18 +363,17 @@ async function main(): Promise<void> {
   const benchmarkFiles = () =>
     (benchmarkFilesRead ??= readBenchmarkArtifacts(artifactsDir, { runId: runIdStr, tracker }));
 
-  const requiredPowerPoints = verifyRequiredPowerArtifacts(
+  const powerSource = { runId, runAttempt: runAttemptNum, headSha: ghInfo?.headSha ?? null };
+  const requiredPower = verifyRequiredPowerArtifacts(
     artifactsDir,
-    {
-      runId,
-      runAttempt: runAttemptNum,
-      headSha: ghInfo?.headSha ?? null,
-    },
+    powerSource,
     process.env.INGEST_REQUIRE_POWER === 'true',
     benchmarkFiles,
   );
-  if (requiredPowerPoints.length > 0)
-    console.log(`  Required power: ${requiredPowerPoints.length} source benchmark points verified`);
+  if (requiredPower)
+    console.log(
+      `  Required power: ${requiredPower.points.length} source benchmark points verified`,
+    );
 
   await preloadConfigs();
   console.log(`  ${configCache.size} configs preloaded`);
@@ -441,21 +440,15 @@ async function main(): Promise<void> {
   }
   const appendOnly = hasAppendOnlyFlag(changelogs);
   const evalsOnly = hasEvalsOnlyFlag(changelogs);
-  if (evalsOnly && requiredPowerPoints.length > 0)
+  if (evalsOnly && requiredPower)
     throw new Error('Required power: benchmark scope cannot be published as an evals-only run');
 
-  if (requiredPowerPoints.length > 0)
-    await preflightRequiredPowerCurves(
-      sql,
-      artifactsDir,
-      {
-        runId,
-        runAttempt: runAttemptNum,
-        headSha: ghInfo?.headSha ?? null,
-      },
-      { date, runStartedAt: workflowGhInfo?.runStartedAt ?? null, appendOnly },
-      benchmarkFiles,
-    );
+  if (requiredPower)
+    await preflightRequiredPowerCurves(sql, requiredPower, benchmarkFiles(), powerSource, {
+      date,
+      runStartedAt: workflowGhInfo?.runStartedAt ?? null,
+      appendOnly,
+    });
 
   const workflowRunId = await getOrCreateWorkflowRun({
     githubRunId: runId,
@@ -720,7 +713,7 @@ async function main(): Promise<void> {
           );
           totalNewBmk += newCount;
           totalDupBmk += dupCount;
-          if (requiredPowerPoints.length > 0) retainedPowerPoints.push(...toInsert);
+          if (requiredPower) retainedPowerPoints.push(...toInsert);
 
           // Build availability only after successful insert
           for (const r of toInsert) {
@@ -894,7 +887,8 @@ async function main(): Promise<void> {
       await Promise.all(traceTasks);
     }
     await traceWorkerPool.close();
-    assertRequiredPowerPointsRetained(requiredPowerPoints, retainedPowerPoints, 'after_insert');
+    if (requiredPower)
+      assertRequiredPowerPointsRetained(requiredPower.points, retainedPowerPoints, 'after_insert');
     console.log(`  Benchmarks: +${totalNewBmk} new, ${totalDupBmk} dup`);
     if (totalTraceReplayLinked > 0 || tracker.skips.traceReplayMissing > 0) {
       console.log(

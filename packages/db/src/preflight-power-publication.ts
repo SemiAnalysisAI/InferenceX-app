@@ -21,7 +21,7 @@ if (
     'Usage: preflight-power-publication.ts <artifacts-dir> <source-run-id> <attempt> <head-sha> [--optional-power]',
   );
 
-const points = verifyRequiredPowerArtifacts(
+const required = verifyRequiredPowerArtifacts(
   root,
   { runId: Number(runId), runAttempt: Number(runAttempt), headSha },
   option !== '--optional-power',
@@ -29,7 +29,7 @@ const points = verifyRequiredPowerArtifacts(
 console.log(
   JSON.stringify({
     status: 'validated_artifacts',
-    requiredPoints: points.length,
+    requiredPoints: required?.points.length ?? 0,
     databaseWrites: 0,
     curvePreservation: 'not_checked_requires_published_state',
   }),

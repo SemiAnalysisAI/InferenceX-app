@@ -4,17 +4,16 @@ import {
   projectProposedCurve,
   publishedCurve,
   type CurvePoint,
-  type CurvePublication,
 } from './required-power-curve';
 import { powerPublicationPoint, stablePowerPointIdentity } from './power-publication';
-import { verifyRequiredPowerArtifacts } from './required-power-publication';
+import { verifyRequiredPowerArtifacts, type CurvePublication } from './required-power-publication';
 import path from 'node:path';
 const golden = path.resolve(import.meta.dirname, 'fixtures/powerx-manifest-v2');
 const benchmark = verifyRequiredPowerArtifacts(golden, {
   runId: 123,
   runAttempt: 1,
   headSha: 'b'.repeat(40),
-})[0];
+})!.points[0];
 const identity = powerPublicationPoint(benchmark, '', { path: '', sha256: '' })!.identity;
 const policy: CurvePublication = { mode: 'incremental', replacement_scope: [] };
 const concs = (points: CurvePoint[]) => points.map((p) => [p.identity.conc, p.workflowRunId]);
