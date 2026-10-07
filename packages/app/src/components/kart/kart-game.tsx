@@ -403,7 +403,7 @@ export function KartGame({
           while (accumulator >= STEP) {
             stepRace(race.current, input.current, STEP);
             renderer.events(race.current);
-            audio.current?.update(race.current, STEP, true);
+            audio.current?.update(race.current, STEP, true, input.current);
             if (race.current.events.length > 0) {
               viewRef.current = snapshot(race.current, viewRef.current);
               race.current.events.length = 0;
@@ -412,7 +412,7 @@ export function KartGame({
           }
         }
         if (race.current.phase === 'paused' || race.current.phase === 'ready')
-          audio.current?.update(race.current, dt, false);
+          audio.current?.update(race.current, dt, false, input.current);
         paint(dt);
         elapsed += dt;
         hudElapsed += dt;

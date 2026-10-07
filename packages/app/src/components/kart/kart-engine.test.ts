@@ -15,6 +15,7 @@ import {
   stepRace,
   TRACK_LENGTH,
   type Controls,
+  type EngineClass,
   type Race,
 } from './kart-engine';
 import { heightAt, parseSurface, SURFACE, surfaceAt } from './kart-surface';
@@ -67,6 +68,34 @@ const solo = (distance = 40) => {
   return race;
 };
 
+const shellRace = (distance = 40, gap = 12, lane = 12, engineClass: EngineClass = 150) => {
+  const race = newRace({ surface, seed: 3, engineClass });
+  race.phase = 'racing';
+  race.boxes = [];
+  for (const k of race.karts) {
+    k.human = true;
+    k.respawn = 999;
+    k.progress = -1000;
+  }
+  const victim = race.karts.find((k) => k !== race.player)!;
+  for (const [k, progress, offset] of [
+    [race.player, distance, 0],
+    [victim, distance + gap, lane],
+  ] as const) {
+    const p = pointAt(progress, offset);
+    Object.assign(k, {
+      ...p,
+      progress,
+      trackIndex: nearest(p.x, p.z).index,
+      speed: 0,
+      respawn: 0,
+    });
+  }
+  race.player.item = 'red-shell';
+  race.player.itemCount = 1;
+  return { race, victim };
+};
+
 describe('kart engine', () => {
   it('loads the real Luigi Circuit surface map', () => {
     const start = pointAt(0);
@@ -112,6 +141,48 @@ describe('kart engine', () => {
     const cpu = race.karts.filter((k) => !k.human);
     expect(cpu.every((k) => k.finishedAt !== null)).toBe(true);
     for (const k of cpu) for (const t of k.lapTimes) expect(t).toBeGreaterThan(15);
+  });
+
+  it('CPU racers are fast, consistent, and finish as a tight pack', () => {
+    for (const seed of [9, 21]) {
+      const race = go(seed);
+      run(race, {}, 120);
+      const times = race.karts
+        .filter((k) => !k.human)
+        .map((k) => k.finishedAt ?? Infinity)
+        .sort((a, b) => a - b);
+      // Three laps in roughly 65-70 s at 150cc, the whole field within ~12 s.
+      expect(times[0]).toBeLessThan(74);
+      expect(times.at(-1)).toBeLessThan(times[0] + 14);
+    }
+  });
+
+  it('CPU drivers recover from a wall instead of stalling forever', () => {
+    const race = go(4);
+    const cpu = race.karts.find((k) => !k.human)!;
+    // Park the kart facing a wall, off the racing line.
+    const p = pointAt(380, -25);
+    Object.assign(cpu, {
+      x: p.x,
+      z: p.z,
+      heading: p.heading + Math.PI / 2,
+      speed: 0,
+      progress: 380,
+    });
+    const start = cpu.progress;
+    run(race, {}, 12);
+    expect(cpu.progress).toBeGreaterThan(start + 150);
+  });
+
+  it('rubber-bands CPUs toward a human who leads', () => {
+    const race = go();
+    const cpu = race.karts.find((k) => !k.human)!;
+    race.player.progress = cpu.progress + 200;
+    aiControls(race, cpu);
+    expect(cpu.ai.band).toBeGreaterThan(1.1);
+    race.player.progress = cpu.progress - 300;
+    aiControls(race, cpu);
+    expect(cpu.ai.band).toBeLessThan(1);
   });
 
   it('steering turns the kart', () => {
@@ -403,6 +474,89 @@ describe('kart engine', () => {
     run(race, { item: true }, 0.1);
     run(race, {}, 3);
     expect(victim.hits).toBeGreaterThan(0);
+  });
+
+  it.each(
+    ([50, 100, 150] as const).flatMap((cc) =>
+      [-12, 12].flatMap((lane) => [STEP, 1 / 30].map((dt) => ({ cc, lane, dt }))),
+    ),
+  )('red shells hit close lateral targets at $cc cc, lane $lane, dt $dt', ({ cc, lane, dt }) => {
+    const { race, victim } = shellRace(40, 12, lane, cc);
+    stepRace(race, { ...EMPTY_CONTROLS, item: true }, dt);
+    stepRace(race, EMPTY_CONTROLS, dt);
+    expect(race.projectiles[0].target).toBe(victim.index);
+    for (let i = 0; i < 2 / dt && victim.hits === 0; i++) stepRace(race, EMPTY_CONTROLS, dt);
+    expect(victim.hits).toBe(1);
+    expect(victim.tumble).toBeGreaterThan(0);
+    expect(race.projectiles).toHaveLength(0);
+    expect(race.player.hits).toBe(0);
+  });
+
+  it.each([
+    { distance: 180, gap: 120, lane: 12 },
+    { distance: 550, gap: 120, lane: -12 },
+    { distance: TRACK_LENGTH - 35, gap: 60, lane: 12 },
+  ])('red shells follow bends and lap boundaries: $distance', ({ distance, gap, lane }) => {
+    const { race, victim } = shellRace(distance, gap, lane);
+    run(race, { item: true }, STEP);
+    run(race, {}, STEP);
+    for (let i = 0; i < 600 && victim.hits === 0; i++) stepRace(race, EMPTY_CONTROLS, STEP);
+    expect(victim.hits).toBe(1);
+    expect(race.projectiles).toHaveLength(0);
+  });
+
+  it('green shells do not steer toward an off-axis racer', () => {
+    const { race, victim } = shellRace();
+    race.player.item = 'green-shell';
+    run(race, { item: true }, STEP);
+    run(race, {}, STEP);
+    const shell = race.projectiles[0];
+    const { vx, vz } = shell;
+    expect(shell.target).toBe(-1);
+    run(race, {}, 0.3);
+    expect(shell.vx).toBe(vx);
+    expect(shell.vz).toBe(vz);
+    expect(victim.hits).toBe(0);
+  });
+
+  it('red shells keep tracking a moving target after launch', () => {
+    const { race, victim } = shellRace(40, 25, -12);
+    victim.speed = 50;
+    run(race, { item: true, throttle: true }, STEP);
+    run(race, { throttle: true }, STEP);
+    for (let i = 0; i < 120 && victim.hits === 0; i++)
+      stepRace(race, { ...EMPTY_CONTROLS, throttle: true, right: true }, STEP);
+    expect(victim.hits).toBe(1);
+    expect(race.projectiles).toHaveLength(0);
+  });
+
+  it.each(['banana', 'star'] as const)('red shells still respect %s protection', (protection) => {
+    const { race, victim } = shellRace(40, 25, 0);
+    run(race, { item: true }, STEP);
+    run(race, {}, STEP);
+    if (protection === 'banana') {
+      victim.item = 'banana';
+      victim.itemCount = 1;
+      victim.trailing = true;
+    } else victim.star = 5;
+    // Keep the victim's defensive item held while the shell approaches.
+    for (let i = 0; i < 60; i++) stepRace(race, { ...EMPTY_CONTROLS, item: true }, STEP);
+    expect(victim.hits).toBe(0);
+    expect(race.projectiles).toHaveLength(0);
+    if (protection === 'banana') expect(victim.item).toBeNull();
+  });
+
+  it('backward red shells remain untargeted', () => {
+    const { race, victim } = shellRace();
+    run(race, { item: true }, STEP);
+    run(race, { brake: true }, STEP);
+    const shell = race.projectiles[0];
+    const { vx, vz } = shell;
+    expect(shell.target).toBe(-1);
+    run(race, {}, 0.3);
+    expect(shell.vx).toBe(vx);
+    expect(shell.vz).toBe(vz);
+    expect(victim.hits).toBe(0);
   });
 
   it('a star makes the kart invincible and faster', () => {

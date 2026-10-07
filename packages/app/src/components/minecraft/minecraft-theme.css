@@ -138,3 +138,81 @@
     transform: translate(2rem, 2.25rem) rotate(10deg) scale(1.1);
   }
 }
+
+/* Playable Minecraft launcher banner (the game itself loads on click). */
+.mc-play-banner {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  margin-block: 16px;
+  padding: 18px 24px;
+  color: #fff;
+  border: 3px solid #000;
+  box-shadow:
+    inset 3px 3px 0 #ffffff40,
+    inset -3px -3px 0 #00000060;
+  background:
+    linear-gradient(90deg, #000000c0, #00000030 70%, #00000080),
+    url('/decorative/minecraft/game/panorama-0.jpg') center 40% / cover;
+}
+.mc-play-banner-title {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.mc-play-banner-title img {
+  width: 256px;
+  max-width: 100%;
+  height: auto;
+  image-rendering: pixelated;
+}
+.mc-play-banner-title strong {
+  font-size: var(--text-sm);
+  font-weight: 400;
+  color: #ffff55;
+  text-shadow: 2px 2px 0 #3f3f15 !important;
+}
+.minecraft .mc-play-banner button {
+  flex: none;
+  min-width: 200px;
+  height: 44px;
+  padding: 0 20px;
+  color: #fff;
+  font-size: var(--text-base);
+  border: 3px solid transparent !important;
+  border-image: url('/decorative/minecraft/game/button.png') 3 fill / 3px stretch !important;
+  background: none !important;
+  image-rendering: pixelated;
+  text-shadow: 2px 2px 0 #3f3f3f !important;
+  cursor: pointer;
+}
+.minecraft .mc-play-banner button:hover,
+.minecraft .mc-play-banner button:focus-visible {
+  border-image-source: url('/decorative/minecraft/game/button-highlighted.png') !important;
+  color: #ffffa0;
+  outline: none;
+}
+html[data-inferencex-embed] [data-testid='minecraft-play-banner'] {
+  display: none;
+}
+@media (max-width: 640px) {
+  .mc-play-banner {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 16px;
+    gap: 14px;
+  }
+  .minecraft .mc-play-banner button {
+    width: 100%;
+  }
+}
+@media (forced-colors: active) {
+  .mc-play-banner {
+    background: Canvas;
+    color: CanvasText;
+    border-color: CanvasText;
+  }
+}

@@ -4,8 +4,9 @@ These are Nintendo game assets, not assets covered by this repository's code lic
 On 2026-10-05 the requesting maintainer reported that Nintendo had granted permission
 and asked that the assets be sourced directly. That is a maintainer-reported
 permission, not an independently reviewed license or a claim of Nintendo endorsement.
-No music, sound effects, game executable, or game code is included. All sounds in
-the race are synthesized at runtime by `kart-audio.ts`.
+On 2026-10-06 the maintainer reported that the same partnership licenses Nintendo's
+Mario Kart Wii music and sound effects, which are now included under `audio/` (see
+below). No game executable or game code is included.
 
 ## Sources and credits
 
@@ -32,6 +33,35 @@ All archives were downloaded on 2026-10-05 from The Models Resource.
 | Bob-omb                | [300713](https://models.spriters-resource.com/wii/mkwii/asset/300713/) | `72638b95786773bcce48ae49e436becbda1660850e9dc687e9ab5af6b7917edd` | Tyler Cretal                         | `items/item-bobomb.glb`                           |
 | Lightning              | [307222](https://models.spriters-resource.com/wii/mkwii/asset/307222/) | `4464985b5d9270baf299094a292eae9800b021d1352f90e85ca909471052b511` | Tyler Cretal                         | `items/item-lightning.glb`                        |
 | Lakitu                 | [342493](https://models.spriters-resource.com/wii/mkwii/asset/342493/) | `d037bb8e3f590bc8ffaed9646929e527f777f50a4c978e82a610942c57c8ebe0` | BillyGaming964                       | `items/lakitu*.glb`                               |
+
+## Audio
+
+Downloaded on 2026-10-06. Sound effects come from The Sounds Resource
+(ripped by its submitters from the game's sound archive); music comes from the
+KHInsider "Mario Kart Wii: The Complete Gamerip".
+
+| Archive / track                               | Source                                                                             | SHA-256                                                                                                                                                                                                    | Used for                                                                   |
+| --------------------------------------------- | ---------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| Items                                         | [437588](https://www.sounds-resource.com/wii/mkwii/asset/437588/)                  | `e0a61e730fc8411d51153f55ca97e772eb95a7a55671e9baa078616f73ac5ab0`                                                                                                                                         | item box, roulette, shells, banana, Bob-omb, lightning, star               |
+| System Sounds                                 | [437590](https://www.sounds-resource.com/wii/mkwii/asset/437590/)                  | `d48228d8a413576b660e134742926f6d1e0c3e9d549a7e58d1dc7d391fcbbbe1`                                                                                                                                         | countdown, go, lap, final lap, goal, pause                                 |
+| Vehicle Sounds                                | [437589](https://www.sounds-resource.com/wii/mkwii/asset/437589/)                  | `78dd68d8c05bfe185de111be851f35f8b6447a522191f39d3f14e66fba9afc39`                                                                                                                                         | kart engine idle/run loops, rev, drift, sparks, boost, collisions, offroad |
+| 08. Starting Grid                             | [KHInsider](https://downloads.khinsider.com/game-soundtracks/album/mario-kart-wii) | `a4ee32cbe5bf2de1d3574110f2329ba454fd97cabe5e7465b241471d75cc9b3d`                                                                                                                                         | `music-start.mp3`                                                          |
+| 09. Luigi Circuit - Mario Circuit             | KHInsider                                                                          | `1e49ccf96f76e65cada716aa95b63792a8eef3b94c58ebd90eaeccc4e9a27823`                                                                                                                                         | `music-race.mp3`                                                           |
+| 10. Final Lap!                                | KHInsider                                                                          | `919aeaad4af872f839cab21f523f72c6f3ecb8ed71d87c4b0779767c0bb52afa`                                                                                                                                         | `jingle-final-lap.mp3`                                                     |
+| 11. Luigi Circuit - Mario Circuit (Final Lap) | KHInsider                                                                          | `c96b2c31e5134e8978a0d276a4bd1ee56225da5e1bdd0e84cd2c1eb8ca0594a9`                                                                                                                                         | `music-race-final.mp3`                                                     |
+| 57/59/61. Grand Prix fanfares                 | KHInsider                                                                          | `76a0be63ac3c3be2753198e7a205bc98b52c9afb629218488ef8a2e24e63a40d`, `e7f766c82506d9f0e9a060518dedff335a57bbc65e3dedaa175659f97506a6b1`, `8d0237d0c19bd6a11bd335a656bcdfa8576b0392502b9f1a0803a5abbbc68b1a` | `jingle-1st.mp3`, `jingle-podium.mp3`, `jingle-low.mp3`                    |
+
+Conversion (`ffmpeg`, see `kart-audio.ts` for how each file is used):
+
+- One-shot effects: leading silence trimmed, mono, 32 kHz, 80 kbps MP3.
+- `engine.wav`, `engine-idle.wav`, `drift.wav`, `offroad.wav`: mono 22.05 kHz
+  16-bit WAV with an equal-power crossfade at the seam so they loop without a
+  click. The engine loops are pitched by speed and filtered by throttle load at
+  runtime, and every CPU kart plays its own positioned copy with Doppler.
+- Music: cover art and tags stripped, 128 kbps MP3, the race themes trimmed to
+  70 s / 60 s. Loop points (`MUSIC_LOOPS` in `kart-audio.ts`) were measured by
+  sample-level cross-correlation of the decoded files: 8.0 s to 65.600 s for
+  the race theme and 8.0 s to 56.306 s for the final-lap theme.
 
 ## Browser conversion
 
@@ -65,5 +95,5 @@ All archives were downloaded on 2026-10-05 from The Models Resource.
   in this app's renderer, without HUD.
 
 Physics, steering, drifting, item behavior and odds, CPU drivers, collisions,
-lap timing, HUD, and sound are original application code, not Nintendo's game
+lap timing, HUD, and audio mixing are original application code, not Nintendo's game
 implementation.
