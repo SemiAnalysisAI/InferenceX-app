@@ -1,7 +1,12 @@
 import { target, type CityState } from './gta-engine';
 import { distance } from './gta-world';
 
-interface ObjectiveCopy { blockedExit: string; escape: string; aim: string; arrived: string }
+interface ObjectiveCopy {
+  blockedExit: string;
+  escape: string;
+  aim: string;
+  arrived: string;
+}
 
 export function objectiveStatus(state: CityState, copy: ObjectiveCopy) {
   if (state.explorer) return { text: `${Math.round(state.altitude)} m`, warning: false };
