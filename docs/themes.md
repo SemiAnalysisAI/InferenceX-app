@@ -54,6 +54,27 @@ The visual references are Valve's
 Asset provenance and the maintainer-reported permission are recorded in
 `packages/app/public/decorative/csgo/README.md`. Permission is not extended to audio.
 
+### CS:GO development-game entry
+
+The English and Chinese landing pages show a native **Play CS:GO** link only
+while the CS:GO theme is selected. It opens the existing Perplexity development
+preview in a separate tab. Preview access is required; this is not public game
+hosting. The link has `noopener noreferrer nofollow` and no framework prefetch,
+iframe, game-engine import, or audio initialization. Hovering or focusing it
+does not request the game. Other routes retain their existing CS:GO banner.
+
+The launcher lives inside the existing lazy CS:GO theme chunk. The shared
+theme subscription returns no optional theme during SSR or on embed routes.
+Light/dark/system pages therefore do not mount this entry, while the canonical,
+language alternatives, JSON-LD, headings, and benchmark content stay unchanged.
+The shared theme picker and subscription still have a small existing cost;
+resource-isolation tests are not a guarantee of identical field Web Vitals.
+
+PR #1282 remains draft until its separately documented 95% game-completion
+gate passes. This launcher does not qualify game fidelity, bot intelligence,
+asset licenses, or production readiness. Public hosting and access must be
+resolved before offering the game to all site visitors.
+
 ## GTA implementation
 
 GTA follows the CS:GO pattern: it is dark-classified everywhere

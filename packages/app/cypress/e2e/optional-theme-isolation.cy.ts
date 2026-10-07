@@ -1,7 +1,7 @@
 const featureCode =
-  /THREE\.WebGLRenderer|LOS SANTOS 3D|minecraft-click\.mp3|ender-dragon\.mp3|Loading Luigi Circuit|\.csgo-scene|\.gta-scene|\.mc-dragon-flyacross|\.kart-scene|font-family:\s*["']?(?:Monocraft|Pricedown|ChaletComprime)/i;
+  /THREE\.WebGLRenderer|LOS SANTOS 3D|minecraft-click\.mp3|ender-dragon\.mp3|Loading Luigi Circuit|b606a329-d010-4e4a-a228-638a718d71a1|\.csgo-scene|\.gta-scene|\.mc-dragon-flyacross|\.kart-scene|font-family:\s*["']?(?:Monocraft|Pricedown|ChaletComprime)/i;
 const featureAsset =
-  /\/decorative\/(?:minecraft|csgo|gta|kart)\/|minecraft-click\.mp3|youtube\.com|ytimg\.com/;
+  /\/decorative\/(?:minecraft|csgo|gta|kart)\/|minecraft-click\.mp3|youtube\.com|ytimg\.com|perplexity\.ai\/computer\/a\//;
 const seo = (doc: Document) => [
   doc.title,
   doc.querySelector('meta[name="description"]')?.getAttribute('content'),
@@ -13,20 +13,45 @@ const seo = (doc: Document) => [
 ];
 
 describe('optional themes stay off the default page', () => {
+  for (const theme of ['minecraft', 'csgo', 'gta', 'kart']) {
+    it(`suppresses a saved ${theme} theme on embeds`, () => {
+      cy.visit('/embed/model/deepseek-r1?theme=dark', {
+        onBeforeLoad(win) {
+          win.localStorage.setItem('theme', theme);
+        },
+      });
+      cy.get('html').should('have.attr', 'data-inferencex-embed');
+      cy.get('[data-testid$="-theme-banner"], [data-testid="csgo-game-launch"], audio').should(
+        'not.exist',
+      );
+      cy.window().then((win) => {
+        expect(
+          win.performance
+            .getEntriesByType('resource')
+            .filter((resource) => featureAsset.test(resource.name)),
+        ).to.have.length(0);
+      });
+    });
+  }
+
   for (const [theme, route, width] of [
     ['light', '/', 1440],
     ['dark', '/', 390],
     ['light', '/zh', 390],
     ['dark', '/zh', 1440],
+    ['system', '/', 1440],
+    ['fresh', '/zh', 390],
   ] as const) {
     it(`${theme} ${route} at ${width}px does not load theme code, assets or fonts`, () => {
       cy.viewport(width, 900);
       cy.visit(route, {
         onBeforeLoad(win) {
-          win.localStorage.setItem('theme', theme);
+          if (theme === 'fresh') win.localStorage.removeItem('theme');
+          else win.localStorage.setItem('theme', theme);
         },
       });
-      cy.get('html').should('have.class', theme);
+      if (theme === 'light' || theme === 'dark') cy.get('html').should('have.class', theme);
+      else cy.get('html').should(($html) => expect($html.is('.light, .dark')).to.equal(true));
       cy.get('[data-testid="theme-toggle"]').should('be.visible');
       cy.window().then((win) => {
         const resources = win.performance.getEntriesByType('resource');
@@ -45,6 +70,52 @@ describe('optional themes stay off the default page', () => {
       cy.get(
         '[data-testid="kart-game"], [data-testid="gta-theme-banner"], [data-testid="csgo-theme-banner"], .mc-dragon-flyacross',
       ).should('not.exist');
+    });
+  }
+
+  for (const [route, label] of [
+    ['/', 'Play CS:GO'],
+    ['/zh', '试玩 CS:GO'],
+  ] as const) {
+    it(`offers the development game only on the selected CS:GO landing ${route}`, () => {
+      cy.visit(route, {
+        onBeforeLoad(win) {
+          win.localStorage.setItem('theme', 'light');
+        },
+      });
+      cy.get('[data-testid="theme-toggle"]')
+        .should('have.attr', 'aria-label')
+        .and('contain', 'currently');
+      cy.document().then((doc) => {
+        const baseline = seo(doc);
+        cy.get('[data-testid="csgo-game-launch"]').should('not.exist');
+        cy.get('[data-testid="theme-toggle"]').click();
+        cy.get('[data-testid="theme-option-csgo"]').click();
+        cy.get('[data-testid="csgo-game-launch"]')
+          .should('have.text', label)
+          .and('have.attr', 'target', '_blank');
+        cy.get('[data-testid="csgo-game-launch"]').should(
+          'have.attr',
+          'rel',
+          'noopener noreferrer nofollow',
+        );
+        cy.get('[data-testid="csgo-game-launch"]').trigger('mouseover').focus();
+        cy.window().then((win) => {
+          expect(
+            win.performance
+              .getEntriesByType('resource')
+              .filter((resource) =>
+                /perplexity\.ai\/computer\/a\/|\/csgo-assets\/|game\.html/.test(resource.name),
+              ),
+          ).to.have.length(0);
+        });
+        cy.get('iframe, canvas, audio, video').should('not.exist');
+        cy.document().should((current) => expect(seo(current)).to.deep.equal(baseline));
+        cy.get('[data-testid="theme-toggle"]').click();
+        cy.get('[data-testid="theme-option-dark"]').click();
+        cy.get('[data-testid="csgo-game-launch"]').should('not.exist');
+        cy.document().should((current) => expect(seo(current)).to.deep.equal(baseline));
+      });
     });
   }
 

@@ -1,0 +1,146 @@
+{
+  "cold": [
+    {
+      "theme": "light",
+      "route": "/",
+      "width": 1440,
+      "optionalRequests": 0,
+      "optionalCodeChunks": 0,
+      "checkedChunks": 43,
+      "optionalFonts": 0,
+      "encodedResourceBytes": 779923
+    },
+    {
+      "theme": "dark",
+      "route": "/",
+      "width": 390,
+      "optionalRequests": 0,
+      "optionalCodeChunks": 0,
+      "checkedChunks": 38,
+      "optionalFonts": 0,
+      "encodedResourceBytes": 667337
+    },
+    {
+      "theme": "light",
+      "route": "/zh",
+      "width": 390,
+      "optionalRequests": 0,
+      "optionalCodeChunks": 0,
+      "checkedChunks": 38,
+      "optionalFonts": 0,
+      "encodedResourceBytes": 673208
+    },
+    {
+      "theme": "dark",
+      "route": "/zh",
+      "width": 1440,
+      "optionalRequests": 0,
+      "optionalCodeChunks": 0,
+      "checkedChunks": 43,
+      "optionalFonts": 0,
+      "encodedResourceBytes": 789963
+    },
+    {
+      "theme": "system",
+      "route": "/",
+      "width": 1440,
+      "optionalRequests": 0,
+      "optionalCodeChunks": 0,
+      "checkedChunks": 43,
+      "optionalFonts": 0,
+      "encodedResourceBytes": 779919
+    },
+    {
+      "theme": "fresh",
+      "route": "/zh",
+      "width": 390,
+      "optionalRequests": 0,
+      "optionalCodeChunks": 0,
+      "checkedChunks": 38,
+      "optionalFonts": 0,
+      "encodedResourceBytes": 673209
+    }
+  ],
+  "embeds": [
+    {
+      "savedTheme": "minecraft",
+      "optionalRequests": 0
+    },
+    {
+      "savedTheme": "csgo",
+      "optionalRequests": 0
+    },
+    {
+      "savedTheme": "gta",
+      "optionalRequests": 0
+    },
+    {
+      "savedTheme": "kart",
+      "optionalRequests": 0
+    }
+  ],
+  "launchers": [
+    {
+      "route": "/",
+      "width": 1440,
+      "hoverGameRequests": 0,
+      "explicitNewTab": true,
+      "seoUnchanged": true,
+      "noHorizontalOverflow": true,
+      "destination": "https://www.perplexity.ai/computer/a/b606a329-d010-4e4a-a228-638a718d71a1"
+    },
+    {
+      "route": "/zh",
+      "width": 390,
+      "hoverGameRequests": 0,
+      "explicitNewTab": true,
+      "seoUnchanged": true,
+      "noHorizontalOverflow": true,
+      "destination": "https://www.perplexity.ai/computer/a/b606a329-d010-4e4a-a228-638a718d71a1"
+    }
+  ],
+  "switching": [
+    {
+      "theme": "csgo",
+      "unmounted": true,
+      "seoUnchanged": true
+    },
+    {
+      "theme": "gta",
+      "unmounted": true,
+      "seoUnchanged": true
+    },
+    {
+      "theme": "minecraft",
+      "unmounted": true,
+      "seoUnchanged": true
+    },
+    {
+      "theme": "kart",
+      "unmounted": true,
+      "seoUnchanged": true
+    }
+  ],
+  "crawlers": [
+    {
+      "route": "/",
+      "title": true,
+      "description": true,
+      "canonical": true,
+      "hreflang": true,
+      "jsonld": true,
+      "headings": true,
+      "noGame": true
+    },
+    {
+      "route": "/zh",
+      "title": true,
+      "description": true,
+      "canonical": true,
+      "hreflang": true,
+      "jsonld": true,
+      "headings": true,
+      "noGame": true
+    }
+  ]
+}
