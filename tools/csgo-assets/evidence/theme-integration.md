@@ -17,6 +17,9 @@ Node 24, Bun 1.4.0, and Chromium. Fixture data is not current benchmark data.
 
 - Production build and TypeScript passed; 1,485 static pages generated.
 - The 10 focused launcher/decoration/lazy-boundary tests passed.
+- The full app unit suite passed: 6,210 tests across 396 files; four tests skipped.
+  An initial run had two environment failures because `bun` was absent from PATH.
+  A full repeat with Node 24 and Bun 1.4.0 on PATH passed.
 - All 28 existing game/asset tests passed.
 - Repository-wide Oxlint passed with no warnings or errors.
 - Six cold loads covered English/Chinese, desktop/mobile, light/dark/system,
