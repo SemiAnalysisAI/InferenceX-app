@@ -358,6 +358,12 @@ function nonempty(value: unknown, label: string): string {
   return value;
 }
 
+/**
+ * Binds each manifest point to its benchmark row and required matrix row, then
+ * checks, in order: identity, topology, physical GPU count, measurement window,
+ * hash-bound evidence, audit verdict, the collector's telemetry files, and
+ * per-device energy.
+ */
 function verifyPointEvidence(
   manifest: JsonRow,
   expected: Map<string, JsonRow>,
@@ -385,364 +391,487 @@ function verifyPointEvidence(
     if (nonempty(declared.config_key, 'config_key') !== matrix['exp-name'])
       throw new Error(`Required power: config_key differs from required matrix for ${key}`);
     const { row, point } = matched;
-    for (const [field, rawField] of [
-      ['model', 'infmax_model_prefix'],
-      ['hardware', 'hw'],
-      ['framework', 'framework'],
-      ['precision', 'precision'],
-    ]) {
-      if (
-        nonempty(id[field], field) !==
-        (row[rawField] ?? (field === 'model' ? row.model : undefined))
-      )
-        throw new Error(`Required power: ${field} identity differs from benchmark for ${key}`);
-    }
-    for (const [field, matrixField] of [
-      ['model', 'model-prefix'],
-      ['hardware', 'runner'],
-      ['framework', 'framework'],
-      ['precision', 'precision'],
-    ]) {
-      if (id[field] !== matrix[matrixField])
-        throw new Error(
-          `Required power: ${field} identity differs from required matrix for ${key}`,
-        );
-    }
+    verifyDeclaredIdentity(id, row, matrix, key);
     const topology = object(declared.topology, 'point topology');
-    if (
-      topology.disagg !== point.config.disagg ||
-      topology.is_multinode !== point.config.isMultinode ||
-      topology.disagg !== (matrix.disagg === true) ||
-      topology.is_multinode !== (matrix.matrixTopology === 'multi_node')
-    )
-      throw new Error(`Required power: topology differs from benchmark or matrix for ${key}`);
-    const rawGpuCount =
-      row.num_gpus ??
-      (topology.is_multinode
-        ? Number(row.num_prefill_gpu) + Number(row.num_decode_gpu)
-        : Number(row.tp) * Number(row.pp ?? 1) * Number(row.pcp_size ?? 1));
-    if (topology.num_gpus !== rawGpuCount)
-      throw new Error(`Required power: num_gpus topology differs from benchmark for ${key}`);
-    const topologyFields = [
-      'num_prefill_gpu',
-      'num_decode_gpu',
-      'tp',
-      'ep',
-      'dp_attention',
-      'prefill_tp',
-      'prefill_ep',
-      'prefill_num_workers',
-      'decode_tp',
-      'decode_ep',
-      'decode_num_workers',
-      'pp',
-      'pcp_size',
-      'dcp_size',
-      'prefill_pp',
-      'decode_pp',
-      'prefill_pcp_size',
-      'decode_pcp_size',
-      'prefill_dcp_size',
-      'decode_dcp_size',
-      'prefill_dp_attention',
-      'decode_dp_attention',
-    ];
-    for (const field of topologyFields) {
-      if (topology[field] !== row[field])
-        throw new Error(`Required power: ${field} topology differs from benchmark for ${key}`);
-      const role = field.startsWith('prefill_')
-        ? 'prefill'
-        : field.startsWith('decode_')
-          ? 'decode'
-          : null;
-      const roleField = role ? field.slice(role.length + 1) : field;
-      const matrixField =
-        roleField === 'num_workers'
-          ? 'num-worker'
-          : roleField === 'dp_attention'
-            ? 'dp-attn'
-            : roleField.replaceAll('_', '-');
-      let planned = role
-        ? matrix[role]
-          ? object(matrix[role], `${role} matrix`)[matrixField]
-          : matrix[field.replaceAll('_', '-')]
-        : matrix[matrixField];
-      if (
-        role === 'decode' &&
-        matrix.decode &&
-        object(matrix.decode, 'decode matrix')['num-worker'] === 0 &&
-        ['tp', 'ep', 'pp', 'pcp_size', 'dcp_size'].includes(roleField)
-      )
-        planned = ['tp', 'ep'].includes(roleField) ? 0 : 1;
-      let actual =
-        topology[field] ??
-        (['pp', 'pcp_size', 'dcp_size'].includes(roleField)
-          ? 1
-          : roleField === 'dp_attention'
-            ? false
-            : undefined);
-      if (roleField === 'dp_attention' && typeof actual === 'string') actual = actual === 'true';
-      const normalizedPlanned =
-        roleField === 'dp_attention' && typeof planned === 'string' ? planned === 'true' : planned;
-      if (planned !== undefined && actual !== normalizedPlanned)
-        throw new Error(
-          `Required power: ${field} topology differs from required matrix for ${key}`,
-        );
-    }
-    let plannedGpuCount = matrix['num-gpus'];
-    if (matrix.prefill && matrix.decode) {
-      plannedGpuCount = 0;
-      for (const role of ['prefill', 'decode']) {
-        const planned = object(matrix[role], `${role} matrix`);
-        const count =
-          Number(planned.tp) *
-          Number(planned.pp ?? 1) *
-          Number(planned['pcp-size'] ?? 1) *
-          Number(planned['num-worker']);
-        if (count !== topology[`num_${role}_gpu`])
-          throw new Error(
-            `Required power: ${role} GPU count differs from required matrix for ${key}`,
-          );
-        plannedGpuCount = Number(plannedGpuCount) + count;
-      }
-    } else if (plannedGpuCount === undefined && matrix.tp !== undefined) {
-      plannedGpuCount =
-        Number(matrix.tp) * Number(matrix.pp ?? 1) * Number(matrix['pcp-size'] ?? 1);
-    }
-    if (plannedGpuCount !== undefined && plannedGpuCount !== topology.num_gpus)
-      throw new Error(`Required power: physical GPU count differs from required matrix for ${key}`);
-    const expectedCount = positive(topology.num_gpus, 'topology num_gpus');
-    if (!Number.isSafeInteger(expectedCount))
-      throw new Error('Required power: invalid physical GPU count');
+    verifyDeclaredTopology(topology, row, point, matrix, key);
+    const gpuCount = verifyPhysicalGpuCount(topology, matrix, key);
     const window = object(declared.measurement_window, 'measurement window');
     const start = positive(window.start_time_unix, 'window start');
     const end = positive(window.end_time_unix, 'window end');
     if (end <= start) throw new Error('Required power: invalid measurement window boundaries');
-    if (!Array.isArray(declared.artifacts) || declared.artifacts.length === 0)
-      throw new Error('Required power: missing required artifacts');
-    const evidence = new Map<string, Evidence>();
-    for (const value of declared.artifacts) {
-      const artifact = object(value, 'required artifact');
-      const relative = safeArtifactPath(artifact.path);
-      if (evidence.has(relative))
-        throw new Error(`Required power: duplicate required artifact ${relative}`);
-      const file = bundle.get(relative);
-      if (!file || file.bytes === 0)
-        throw new Error(`Required power: missing required artifact ${relative}`);
-      if (
-        artifact.validation_state !== 'valid' ||
-        typeof artifact.sha256 !== 'string' ||
-        !/^[a-f0-9]{64}$/u.test(artifact.sha256) ||
-        file.sha256 !== artifact.sha256
-      )
-        throw new Error(`Required power: invalid artifact validation or hash ${relative}`);
-      evidence.set(relative, file);
+    const evidence = hashBoundEvidence(declared.artifacts, bundle, row, key);
+    const audit = verifiedAudit(evidence, start, end, gpuCount, key);
+    const kind = telemetryKind(audit, topology.is_multinode === true);
+    verifyTelemetryEvidence(kind, evidence, audit);
+    verifyDeviceEnergy(declared.devices, auditDevices(kind, audit, evidence), {
+      key,
+      row,
+      matrix,
+      topology,
+      gpuCount,
+    });
+  }
+}
+
+/** Model, hardware, framework and precision agree across manifest, benchmark and matrix. */
+function verifyDeclaredIdentity(id: JsonRow, row: JsonRow, matrix: JsonRow, key: string): void {
+  for (const [field, rawField] of [
+    ['model', 'infmax_model_prefix'],
+    ['hardware', 'hw'],
+    ['framework', 'framework'],
+    ['precision', 'precision'],
+  ]) {
+    if (
+      nonempty(id[field], field) !== (row[rawField] ?? (field === 'model' ? row.model : undefined))
+    )
+      throw new Error(`Required power: ${field} identity differs from benchmark for ${key}`);
+  }
+  for (const [field, matrixField] of [
+    ['model', 'model-prefix'],
+    ['hardware', 'runner'],
+    ['framework', 'framework'],
+    ['precision', 'precision'],
+  ]) {
+    if (id[field] !== matrix[matrixField])
+      throw new Error(`Required power: ${field} identity differs from required matrix for ${key}`);
+  }
+}
+
+const TOPOLOGY_FIELDS = [
+  'num_prefill_gpu',
+  'num_decode_gpu',
+  'tp',
+  'ep',
+  'dp_attention',
+  'prefill_tp',
+  'prefill_ep',
+  'prefill_num_workers',
+  'decode_tp',
+  'decode_ep',
+  'decode_num_workers',
+  'pp',
+  'pcp_size',
+  'dcp_size',
+  'prefill_pp',
+  'decode_pp',
+  'prefill_pcp_size',
+  'decode_pcp_size',
+  'prefill_dcp_size',
+  'decode_dcp_size',
+  'prefill_dp_attention',
+  'decode_dp_attention',
+];
+
+/** The declared topology equals the benchmark row and the planned matrix parallelism. */
+function verifyDeclaredTopology(
+  topology: JsonRow,
+  row: JsonRow,
+  point: BenchmarkParams,
+  matrix: JsonRow,
+  key: string,
+): void {
+  if (
+    topology.disagg !== point.config.disagg ||
+    topology.is_multinode !== point.config.isMultinode ||
+    topology.disagg !== (matrix.disagg === true) ||
+    topology.is_multinode !== (matrix.matrixTopology === 'multi_node')
+  )
+    throw new Error(`Required power: topology differs from benchmark or matrix for ${key}`);
+  const rawGpuCount =
+    row.num_gpus ??
+    (topology.is_multinode
+      ? Number(row.num_prefill_gpu) + Number(row.num_decode_gpu)
+      : Number(row.tp) * Number(row.pp ?? 1) * Number(row.pcp_size ?? 1));
+  if (topology.num_gpus !== rawGpuCount)
+    throw new Error(`Required power: num_gpus topology differs from benchmark for ${key}`);
+  for (const field of TOPOLOGY_FIELDS) {
+    if (topology[field] !== row[field])
+      throw new Error(`Required power: ${field} topology differs from benchmark for ${key}`);
+    const role = field.startsWith('prefill_')
+      ? 'prefill'
+      : field.startsWith('decode_')
+        ? 'decode'
+        : null;
+    const roleField = role ? field.slice(role.length + 1) : field;
+    const matrixField =
+      roleField === 'num_workers'
+        ? 'num-worker'
+        : roleField === 'dp_attention'
+          ? 'dp-attn'
+          : roleField.replaceAll('_', '-');
+    let planned = role
+      ? matrix[role]
+        ? object(matrix[role], `${role} matrix`)[matrixField]
+        : matrix[field.replaceAll('_', '-')]
+      : matrix[matrixField];
+    if (
+      role === 'decode' &&
+      matrix.decode &&
+      object(matrix.decode, 'decode matrix')['num-worker'] === 0 &&
+      ['tp', 'ep', 'pp', 'pcp_size', 'dcp_size'].includes(roleField)
+    )
+      planned = ['tp', 'ep'].includes(roleField) ? 0 : 1;
+    let actual =
+      topology[field] ??
+      (['pp', 'pcp_size', 'dcp_size'].includes(roleField)
+        ? 1
+        : roleField === 'dp_attention'
+          ? false
+          : undefined);
+    if (roleField === 'dp_attention' && typeof actual === 'string') actual = actual === 'true';
+    const normalizedPlanned =
+      roleField === 'dp_attention' && typeof planned === 'string' ? planned === 'true' : planned;
+    if (planned !== undefined && actual !== normalizedPlanned)
+      throw new Error(`Required power: ${field} topology differs from required matrix for ${key}`);
+  }
+}
+
+/** The declared physical GPU count matches the matrix plan; returns it. */
+function verifyPhysicalGpuCount(topology: JsonRow, matrix: JsonRow, key: string): number {
+  let plannedGpuCount = matrix['num-gpus'];
+  if (matrix.prefill && matrix.decode) {
+    plannedGpuCount = 0;
+    for (const role of ['prefill', 'decode']) {
+      const planned = object(matrix[role], `${role} matrix`);
+      const count =
+        Number(planned.tp) *
+        Number(planned.pp ?? 1) *
+        Number(planned['pcp-size'] ?? 1) *
+        Number(planned['num-worker']);
+      if (count !== topology[`num_${role}_gpu`])
+        throw new Error(
+          `Required power: ${role} GPU count differs from required matrix for ${key}`,
+        );
+      plannedGpuCount = Number(plannedGpuCount) + count;
     }
+  } else if (plannedGpuCount === undefined && matrix.tp !== undefined) {
+    plannedGpuCount = Number(matrix.tp) * Number(matrix.pp ?? 1) * Number(matrix['pcp-size'] ?? 1);
+  }
+  if (plannedGpuCount !== undefined && plannedGpuCount !== topology.num_gpus)
+    throw new Error(`Required power: physical GPU count differs from required matrix for ${key}`);
+  const gpuCount = positive(topology.num_gpus, 'topology num_gpus');
+  if (!Number.isSafeInteger(gpuCount))
+    throw new Error('Required power: invalid physical GPU count');
+  return gpuCount;
+}
+
+/** The point's declared artifacts, each hash-verified, one of which holds its benchmark row. */
+function hashBoundEvidence(
+  artifacts: unknown,
+  bundle: ReadonlyMap<string, Evidence>,
+  row: JsonRow,
+  key: string,
+): Map<string, Evidence> {
+  if (!Array.isArray(artifacts) || artifacts.length === 0)
+    throw new Error('Required power: missing required artifacts');
+  const evidence = new Map<string, Evidence>();
+  for (const value of artifacts) {
+    const artifact = object(value, 'required artifact');
+    const relative = safeArtifactPath(artifact.path);
+    if (evidence.has(relative))
+      throw new Error(`Required power: duplicate required artifact ${relative}`);
+    const file = bundle.get(relative);
+    if (!file || file.bytes === 0)
+      throw new Error(`Required power: missing required artifact ${relative}`);
     if (
-      ![...evidence.values()].some((file) =>
-        file.rows.some((candidate) => isDeepStrictEqual(candidate, row)),
-      )
+      artifact.validation_state !== 'valid' ||
+      typeof artifact.sha256 !== 'string' ||
+      !/^[a-f0-9]{64}$/u.test(artifact.sha256) ||
+      file.sha256 !== artifact.sha256
     )
-      throw new Error(`Required power: benchmark artifact is not hash-bound for ${key}`);
-    const byName = (name: string): Evidence => {
-      const matches = [...evidence.values()].filter(
-        (file) => path.posix.basename(file.path) === name,
-      );
-      if (matches.length !== 1)
-        throw new Error(`Required power: expected one required ${name} artifact`);
-      return matches[0];
-    };
-    const sidecars = [...evidence.values()].filter((file) =>
-      /^power_validation.*\.json$/u.test(path.posix.basename(file.path)),
+      throw new Error(`Required power: invalid artifact validation or hash ${relative}`);
+    evidence.set(relative, file);
+  }
+  if (
+    ![...evidence.values()].some((file) =>
+      file.rows.some((candidate) => isDeepStrictEqual(candidate, row)),
+    )
+  )
+    throw new Error(`Required power: benchmark artifact is not hash-bound for ${key}`);
+  return evidence;
+}
+
+function oneEvidence(evidence: ReadonlyMap<string, Evidence>, name: string): Evidence {
+  const matches = [...evidence.values()].filter((file) => path.posix.basename(file.path) === name);
+  if (matches.length !== 1)
+    throw new Error(`Required power: expected one required ${name} artifact`);
+  return matches[0];
+}
+
+/** The point's one power validation sidecar, valid for its window and every physical GPU. */
+function verifiedAudit(
+  evidence: ReadonlyMap<string, Evidence>,
+  start: number,
+  end: number,
+  gpuCount: number,
+  key: string,
+): JsonRow {
+  const sidecars = [...evidence.values()].filter((file) =>
+    /^power_validation.*\.json$/u.test(path.posix.basename(file.path)),
+  );
+  if (sidecars.length !== 1)
+    throw new Error('Required power: expected one required power validation artifact');
+  const audit = object(JSON.parse(sidecars[0].text()), 'power validation');
+  const auditWindow = object(audit.benchmark_window, 'audit benchmark window');
+  if (
+    audit.power_valid !== true ||
+    auditWindow.start_time_unix !== start ||
+    auditWindow.end_time_unix !== end ||
+    audit.expected_gpu_count !== gpuCount ||
+    audit.observed_gpu_count !== gpuCount
+  )
+    throw new Error(
+      `Required power: invalid audit verdict, window or physical GPU coverage for ${key}`,
     );
-    if (sidecars.length !== 1)
-      throw new Error('Required power: expected one required power validation artifact');
-    const audit = object(JSON.parse(sidecars[0].text()), 'power validation');
-    const auditWindow = object(audit.benchmark_window, 'audit benchmark window');
-    if (
-      audit.power_valid !== true ||
-      auditWindow.start_time_unix !== start ||
-      auditWindow.end_time_unix !== end ||
-      audit.expected_gpu_count !== expectedCount ||
-      audit.observed_gpu_count !== expectedCount
-    )
-      throw new Error(
-        `Required power: invalid audit verdict, window or physical GPU coverage for ${key}`,
-      );
-    if (topology.is_multinode && audit.telemetry_kind === 'native_multinode_smi') {
-      if (!Array.isArray(audit.nodes) || audit.nodes.length === 0)
-        throw new Error('Required power: missing native node receipts');
-      const traces = [...evidence.values()].filter(
-        (file) => path.posix.basename(file.path) === 'gpu_metrics.csv',
-      );
-      if (traces.length !== audit.nodes.length)
-        throw new Error('Required power: missing native node telemetry');
-      for (const file of traces) {
-        const directory = path.posix.dirname(file.path);
-        const manifestFile = evidence.get(`${directory}/manifest.json`);
-        if (!manifestFile) throw new Error('Required power: missing native node manifest');
-        const nodeManifest = object(JSON.parse(manifestFile.text()), 'native node manifest');
-        if (nodeManifest.lifecycle !== 'complete' || nodeManifest.collector_exit_code !== 0)
-          throw new Error('Required power: invalid native node collection');
-        const receipt = (audit.nodes as JsonRow[]).find((node) => node.node === nodeManifest.node);
-        if (
-          !receipt ||
-          receipt.manifest_sha256 !== manifestFile.sha256 ||
-          receipt.telemetry_sha256 !== file.sha256
-        )
-          throw new Error('Required power: native node receipt differs from evidence');
-        for (const hash of [receipt.identity_sha256, receipt.identity_end_sha256])
-          if (
-            ![...evidence.values()].some(
-              (item) => path.posix.dirname(item.path) === directory && item.sha256 === hash,
-            )
-          )
-            throw new Error('Required power: missing native physical identity evidence');
-      }
-    } else if (topology.is_multinode) {
-      byName('samples.csv');
-      byName('manifest.json');
+  return audit;
+}
+
+/**
+ * Which collector produced the evidence. Only native per-node SMI audits name
+ * their kind; central DCGM (multinode) and per-job SMI (single node) audits
+ * carry none. Any other kind is a collector this verifier does not know.
+ */
+type TelemetryKind = 'native_multinode' | 'central_multinode' | 'single_node';
+
+function telemetryKind(audit: JsonRow, isMultinode: boolean): TelemetryKind {
+  const kind = audit.telemetry_kind;
+  if (kind === undefined || kind === null) return isMultinode ? 'central_multinode' : 'single_node';
+  if (kind === 'native_multinode_smi' && isMultinode) return 'native_multinode';
+  throw new Error(
+    `Required power: unsupported telemetry_kind ${JSON.stringify(kind)} for a ${isMultinode ? 'multinode' : 'single-node'} point`,
+  );
+}
+
+/** The collector's own telemetry files are present. */
+function verifyTelemetryEvidence(
+  kind: TelemetryKind,
+  evidence: ReadonlyMap<string, Evidence>,
+  audit: JsonRow,
+): void {
+  switch (kind) {
+    case 'single_node': {
+      oneEvidence(evidence, 'gpu_metrics.csv');
+      break;
+    }
+    case 'central_multinode': {
+      oneEvidence(evidence, 'samples.csv');
+      oneEvidence(evidence, 'manifest.json');
       if (
         ![...evidence.keys()].some((file) => file.includes('/windows/') && file.endsWith('.json'))
       )
         throw new Error('Required power: missing central measurement window artifact');
-    } else byName('gpu_metrics.csv');
-    const energies = object(audit.per_gpu_energy_j, 'audit device energy');
-    let auditDevices: JsonRow[];
-    if (audit.per_gpu_role === undefined) {
-      const nodeFiles = [...evidence.values()].filter((file) =>
-        ['power_node.txt', 'gpu_metrics_node.txt'].includes(path.posix.basename(file.path)),
-      );
-      if (nodeFiles.length !== 1)
-        throw new Error('Required power: expected one node identity artifact');
-      const node = nodeFiles[0].text().trim();
-      const identityFiles = [...evidence.values()].filter((file) =>
-        /^(?:gpu_metrics_identity\.csv|gpu_metrics_devices\.json)$/u.test(
-          path.posix.basename(file.path),
-        ),
-      );
-      if (identityFiles.length !== 1)
-        throw new Error('Required power: expected one physical GPU identity artifact');
-      const uuidRows: [string, string][] = [];
-      if (identityFiles[0].path.endsWith('.csv')) {
-        const lines = identityFiles[0].text().trim().split(/\r?\n/u);
-        const columns = lines
-          .shift()!
-          .split(',')
-          .map((part) => part.trim().replaceAll('"', '').toLowerCase());
-        const indexColumn = columns.indexOf('index');
-        const uuidColumn = columns.indexOf('uuid');
-        if (indexColumn === -1 || uuidColumn === -1)
-          throw new Error('Required power: invalid physical GPU identity CSV');
-        for (const line of lines) {
-          const fields = line.split(',').map((part) => part.trim().replaceAll('"', ''));
-          uuidRows.push([fields[indexColumn], fields[uuidColumn]]);
-        }
-      } else {
-        const visit = (value: unknown): void => {
-          if (Array.isArray(value)) value.forEach(visit);
-          else if (value && typeof value === 'object') {
-            const deviceRow = Object.fromEntries(
-              Object.entries(value).map(([field, item]) => [field.toLowerCase(), item]),
-            );
-            if ('gpu' in deviceRow && 'uuid' in deviceRow)
-              uuidRows.push([String(deviceRow.gpu), String(deviceRow.uuid)]);
-            else Object.values(value).forEach(visit);
-          }
-        };
-        visit(JSON.parse(identityFiles[0].text()));
-      }
-      if (
-        uuidRows.length === 0 ||
-        uuidRows.some(
-          ([index, uuid]) =>
-            !/^\d+$/u.test(index) || !uuid || ['n/a', 'none', 'null'].includes(uuid.toLowerCase()),
-        ) ||
-        new Set(uuidRows.map(([index]) => index)).size !== uuidRows.length ||
-        new Set(uuidRows.map(([, uuid]) => uuid)).size !== uuidRows.length
-      )
-        throw new Error('Required power: invalid or duplicate physical GPU identity');
-      const uuids = new Map(uuidRows);
-      auditDevices = Object.entries(energies).map(([index, energy]) => ({
-        node,
-        gpu_uuid: uuids.get(index),
-        role: 'aggregate',
-        energy_j: energy,
-      }));
-    } else {
-      const roles = object(audit.per_gpu_role, 'audit device roles');
-      const nativeNodes = new Map<string, string>();
-      if (audit.telemetry_kind === 'native_multinode_smi')
-        for (const value of audit.nodes as unknown[]) {
-          const receipt = object(value, 'native node receipt');
-          for (const uuid of Object.values(
-            object(receipt.physical_gpu_ids, 'native GPU identities'),
-          )) {
-            const uuidValue = nonempty(uuid, 'native GPU UUID');
-            if (nativeNodes.has(uuidValue))
-              throw new Error('Required power: duplicate native GPU identity');
-            nativeNodes.set(uuidValue, nonempty(receipt.node, 'native node'));
-          }
-        }
-      auditDevices = Object.entries(energies).map(([device, energy]) => {
-        const slash = device.lastIndexOf('/');
-        return {
-          node: nativeNodes.get(device) ?? device.slice(0, slash),
-          gpu_uuid: nativeNodes.has(device) ? device : device.slice(slash + 1),
-          role: roles[device] === 'agg' ? 'aggregate' : roles[device],
-          energy_j: energy,
-        };
-      });
+      break;
     }
-    if (
-      !Array.isArray(declared.devices) ||
-      declared.devices.length !== expectedCount ||
-      auditDevices.length !== expectedCount
-    )
-      throw new Error(`Required power: missing physical GPU evidence for ${key}`);
-    const devices = new Set<string>();
-    const roles = new Map<string, number>();
-    let totalEnergy = 0;
-    const roleEnergy = new Map<string, number>();
-    const nodes = new Set<string>();
-    for (const value of declared.devices) {
-      const device = object(value, 'physical GPU');
-      const node = nonempty(device.node, 'GPU node');
-      nodes.add(node);
-      const uuid = nonempty(device.gpu_uuid, 'physical GPU UUID');
-      if (['n/a', 'none', 'null'].includes(uuid.toLowerCase()) || devices.has(uuid))
-        throw new Error('Required power: duplicate or invalid physical GPU UUID');
-      devices.add(uuid);
-      if (!['aggregate', 'prefill', 'decode'].includes(String(device.role)))
-        throw new Error('Required power: invalid physical GPU role');
-      roles.set(String(device.role), (roles.get(String(device.role)) ?? 0) + 1);
-      const energy = positive(device.energy_j, 'device energy_j');
-      totalEnergy += energy;
-      roleEnergy.set(String(device.role), (roleEnergy.get(String(device.role)) ?? 0) + energy);
-      if (!auditDevices.some((actual) => isDeepStrictEqual(actual, device)))
-        throw new Error(`Required power: physical GPU evidence differs from audit for ${key}`);
+    case 'native_multinode': {
+      verifyNativeNodeReceipts(evidence, audit);
+      break;
     }
-    if (nodes.size !== (matrix['node-count'] ?? 1))
-      throw new Error(
-        `Required power: participating node count differs from required matrix for ${key}`,
-      );
-    if (topology.disagg) {
-      if (
-        roles.get('prefill') !== positive(topology.num_prefill_gpu, 'prefill GPU count') ||
-        roles.get('decode') !== positive(topology.num_decode_gpu, 'decode GPU count') ||
-        roles.has('aggregate')
-      )
-        throw new Error(`Required power: missing prefill or decode evidence for ${key}`);
-      for (const role of ['prefill', 'decode']) {
-        const energy = positive(row[`${role}_gpu_energy_j`], `${role} energy`);
-        if (Math.abs((roleEnergy.get(role) ?? 0) - energy) > Math.max(0.01, energy * 1e-4))
-          throw new Error(`Required power: ${role} energy differs from device evidence for ${key}`);
-      }
-    } else if (roles.get('aggregate') !== expectedCount) {
-      throw new Error(`Required power: invalid aggregate GPU roles for ${key}`);
-    }
-    const energy = positive(row.total_gpu_energy_j, 'total_gpu_energy_j');
-    if (Math.abs(totalEnergy - energy) > Math.max(0.01, energy * 1e-4))
-      throw new Error(`Required power: total GPU energy differs from device evidence for ${key}`);
   }
+}
+
+/** One complete per-node collection for each receipt, matching its hashes. */
+function verifyNativeNodeReceipts(evidence: ReadonlyMap<string, Evidence>, audit: JsonRow): void {
+  if (!Array.isArray(audit.nodes) || audit.nodes.length === 0)
+    throw new Error('Required power: missing native node receipts');
+  const traces = [...evidence.values()].filter(
+    (file) => path.posix.basename(file.path) === 'gpu_metrics.csv',
+  );
+  if (traces.length !== audit.nodes.length)
+    throw new Error('Required power: missing native node telemetry');
+  for (const file of traces) {
+    const directory = path.posix.dirname(file.path);
+    const manifestFile = evidence.get(`${directory}/manifest.json`);
+    if (!manifestFile) throw new Error('Required power: missing native node manifest');
+    const nodeManifest = object(JSON.parse(manifestFile.text()), 'native node manifest');
+    if (nodeManifest.lifecycle !== 'complete' || nodeManifest.collector_exit_code !== 0)
+      throw new Error('Required power: invalid native node collection');
+    const receipt = (audit.nodes as JsonRow[]).find((node) => node.node === nodeManifest.node);
+    if (
+      !receipt ||
+      receipt.manifest_sha256 !== manifestFile.sha256 ||
+      receipt.telemetry_sha256 !== file.sha256
+    )
+      throw new Error('Required power: native node receipt differs from evidence');
+    for (const hash of [receipt.identity_sha256, receipt.identity_end_sha256])
+      if (
+        ![...evidence.values()].some(
+          (item) => path.posix.dirname(item.path) === directory && item.sha256 === hash,
+        )
+      )
+        throw new Error('Required power: missing native physical identity evidence');
+  }
+}
+
+/**
+ * The audit's per-GPU energy as `{ node, gpu_uuid, role, energy_j }`. Single-node
+ * audits key energy by GPU index and name the node and UUIDs in sibling files.
+ * Multinode audits key it by `node/uuid` with `per_gpu_role`, or by UUID alone for
+ * native collection, whose receipts name each UUID's node.
+ */
+function auditDevices(
+  kind: TelemetryKind,
+  audit: JsonRow,
+  evidence: ReadonlyMap<string, Evidence>,
+): JsonRow[] {
+  const energies = object(audit.per_gpu_energy_j, 'audit device energy');
+  if (kind === 'single_node') {
+    const nodeFiles = [...evidence.values()].filter((file) =>
+      ['power_node.txt', 'gpu_metrics_node.txt'].includes(path.posix.basename(file.path)),
+    );
+    if (nodeFiles.length !== 1)
+      throw new Error('Required power: expected one node identity artifact');
+    const node = nodeFiles[0].text().trim();
+    const uuids = physicalGpuUuids(evidence);
+    return Object.entries(energies).map(([index, energy]) => ({
+      node,
+      gpu_uuid: uuids.get(index),
+      role: 'aggregate',
+      energy_j: energy,
+    }));
+  }
+  const roles = object(audit.per_gpu_role, 'audit device roles');
+  const nativeNodes = new Map<string, string>();
+  if (kind === 'native_multinode')
+    for (const value of audit.nodes as unknown[]) {
+      const receipt = object(value, 'native node receipt');
+      for (const uuid of Object.values(object(receipt.physical_gpu_ids, 'native GPU identities'))) {
+        const uuidValue = nonempty(uuid, 'native GPU UUID');
+        if (nativeNodes.has(uuidValue))
+          throw new Error('Required power: duplicate native GPU identity');
+        nativeNodes.set(uuidValue, nonempty(receipt.node, 'native node'));
+      }
+    }
+  return Object.entries(energies).map(([device, energy]) => {
+    const slash = device.lastIndexOf('/');
+    return {
+      node: nativeNodes.get(device) ?? device.slice(0, slash),
+      gpu_uuid: nativeNodes.has(device) ? device : device.slice(slash + 1),
+      role: roles[device] === 'agg' ? 'aggregate' : roles[device],
+      energy_j: energy,
+    };
+  });
+}
+
+/** GPU index → UUID from the point's one identity file, CSV or JSON. */
+function physicalGpuUuids(evidence: ReadonlyMap<string, Evidence>): Map<string, string> {
+  const identityFiles = [...evidence.values()].filter((file) =>
+    /^(?:gpu_metrics_identity\.csv|gpu_metrics_devices\.json)$/u.test(
+      path.posix.basename(file.path),
+    ),
+  );
+  if (identityFiles.length !== 1)
+    throw new Error('Required power: expected one physical GPU identity artifact');
+  const uuidRows: [string, string][] = [];
+  if (identityFiles[0].path.endsWith('.csv')) {
+    const lines = identityFiles[0].text().trim().split(/\r?\n/u);
+    const columns = lines
+      .shift()!
+      .split(',')
+      .map((part) => part.trim().replaceAll('"', '').toLowerCase());
+    const indexColumn = columns.indexOf('index');
+    const uuidColumn = columns.indexOf('uuid');
+    if (indexColumn === -1 || uuidColumn === -1)
+      throw new Error('Required power: invalid physical GPU identity CSV');
+    for (const line of lines) {
+      const fields = line.split(',').map((part) => part.trim().replaceAll('"', ''));
+      uuidRows.push([fields[indexColumn], fields[uuidColumn]]);
+    }
+  } else {
+    const visit = (value: unknown): void => {
+      if (Array.isArray(value)) value.forEach(visit);
+      else if (value && typeof value === 'object') {
+        const deviceRow = Object.fromEntries(
+          Object.entries(value).map(([field, item]) => [field.toLowerCase(), item]),
+        );
+        if ('gpu' in deviceRow && 'uuid' in deviceRow)
+          uuidRows.push([String(deviceRow.gpu), String(deviceRow.uuid)]);
+        else Object.values(value).forEach(visit);
+      }
+    };
+    visit(JSON.parse(identityFiles[0].text()));
+  }
+  if (
+    uuidRows.length === 0 ||
+    uuidRows.some(
+      ([index, uuid]) =>
+        !/^\d+$/u.test(index) || !uuid || ['n/a', 'none', 'null'].includes(uuid.toLowerCase()),
+    ) ||
+    new Set(uuidRows.map(([index]) => index)).size !== uuidRows.length ||
+    new Set(uuidRows.map(([, uuid]) => uuid)).size !== uuidRows.length
+  )
+    throw new Error('Required power: invalid or duplicate physical GPU identity');
+  return new Map(uuidRows);
+}
+
+/**
+ * Every declared GPU is a distinct audited device, the devices span the planned
+ * nodes and roles, and their energy sums to the benchmark row's totals.
+ */
+function verifyDeviceEnergy(
+  declaredDevices: unknown,
+  audited: readonly JsonRow[],
+  {
+    key,
+    row,
+    matrix,
+    topology,
+    gpuCount,
+  }: {
+    key: string;
+    row: JsonRow;
+    matrix: JsonRow;
+    topology: JsonRow;
+    gpuCount: number;
+  },
+): void {
+  if (
+    !Array.isArray(declaredDevices) ||
+    declaredDevices.length !== gpuCount ||
+    audited.length !== gpuCount
+  )
+    throw new Error(`Required power: missing physical GPU evidence for ${key}`);
+  const devices = new Set<string>();
+  const roles = new Map<string, number>();
+  let totalEnergy = 0;
+  const roleEnergy = new Map<string, number>();
+  const nodes = new Set<string>();
+  for (const value of declaredDevices) {
+    const device = object(value, 'physical GPU');
+    const node = nonempty(device.node, 'GPU node');
+    nodes.add(node);
+    const uuid = nonempty(device.gpu_uuid, 'physical GPU UUID');
+    if (['n/a', 'none', 'null'].includes(uuid.toLowerCase()) || devices.has(uuid))
+      throw new Error('Required power: duplicate or invalid physical GPU UUID');
+    devices.add(uuid);
+    if (!['aggregate', 'prefill', 'decode'].includes(String(device.role)))
+      throw new Error('Required power: invalid physical GPU role');
+    roles.set(String(device.role), (roles.get(String(device.role)) ?? 0) + 1);
+    const energy = positive(device.energy_j, 'device energy_j');
+    totalEnergy += energy;
+    roleEnergy.set(String(device.role), (roleEnergy.get(String(device.role)) ?? 0) + energy);
+    if (!audited.some((actual) => isDeepStrictEqual(actual, device)))
+      throw new Error(`Required power: physical GPU evidence differs from audit for ${key}`);
+  }
+  if (nodes.size !== (matrix['node-count'] ?? 1))
+    throw new Error(
+      `Required power: participating node count differs from required matrix for ${key}`,
+    );
+  if (topology.disagg) {
+    if (
+      roles.get('prefill') !== positive(topology.num_prefill_gpu, 'prefill GPU count') ||
+      roles.get('decode') !== positive(topology.num_decode_gpu, 'decode GPU count') ||
+      roles.has('aggregate')
+    )
+      throw new Error(`Required power: missing prefill or decode evidence for ${key}`);
+    for (const role of ['prefill', 'decode']) {
+      const energy = positive(row[`${role}_gpu_energy_j`], `${role} energy`);
+      if (Math.abs((roleEnergy.get(role) ?? 0) - energy) > Math.max(0.01, energy * 1e-4))
+        throw new Error(`Required power: ${role} energy differs from device evidence for ${key}`);
+    }
+  } else if (roles.get('aggregate') !== gpuCount) {
+    throw new Error(`Required power: invalid aggregate GPU roles for ${key}`);
+  }
+  const energy = positive(row.total_gpu_energy_j, 'total_gpu_energy_j');
+  if (Math.abs(totalEnergy - energy) > Math.max(0.01, energy * 1e-4))
+    throw new Error(`Required power: total GPU energy differs from device evidence for ${key}`);
 }

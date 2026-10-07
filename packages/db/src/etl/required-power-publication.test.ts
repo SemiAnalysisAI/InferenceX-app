@@ -224,6 +224,13 @@ describe('required power publication contract', () => {
       'prefill energy differs',
     );
   });
+  it('rejects an audit from a telemetry collector it does not know', () => {
+    const dir = multinodeFixture();
+    changeArtifact(dir, auditPath, (audit) => {
+      audit.telemetry_kind = 'amd_device_metrics';
+    });
+    expect(() => verifyRequiredPowerArtifacts(dir, source)).toThrow('unsupported telemetry_kind');
+  });
   it('accepts a native multinode bundle with per-node receipts', () => {
     expect(verifyRequiredPowerArtifacts(nativeFixture(), source)?.points).toHaveLength(1);
   });

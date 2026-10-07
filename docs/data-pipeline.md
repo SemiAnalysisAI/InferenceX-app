@@ -106,7 +106,10 @@ The source run and head must match. A successful earlier attempt of that same ru
 may supply retained evidence when failed jobs are rerun; ingestion logs declared
 and current attempts. Required energy must be finite and positive. Missing,
 invalid and measured zero remain different values even though all fail this gate.
-Disaggregated deployments require physical evidence for both roles.
+Disaggregated deployments require physical evidence for both roles. Telemetry
+evidence follows the audit's collector: per-job SMI (single node), central DCGM
+(multinode), or native per-node SMI (`telemetry_kind: native_multinode_smi`); any
+other `telemetry_kind` fails the gate.
 
 This is pure preflight, not atomic publication. Schema migrations occur after
 artifact validation but before the curve check. Concurrent writers and failures
