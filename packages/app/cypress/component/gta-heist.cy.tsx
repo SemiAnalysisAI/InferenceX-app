@@ -3,6 +3,7 @@ import { GtaGame } from '@/components/gta/gta-game';
 type GameWindow = Window & {
   advanceTime: (ms: number) => void;
   render_game_to_text: () => string;
+  gta_state: () => { phase: string };
 };
 describe('GTA 3D city', () => {
   it('preserves sightseeing GPS and explicit fast travel on the San Fierro map', () => {
@@ -45,6 +46,16 @@ describe('GTA 3D city', () => {
     cy.window().then((win) => {
       expect(JSON.parse((win as unknown as GameWindow).render_game_to_text()).camera).to.equal(2);
     });
+    cy.get('[data-testid="heist-map"]').click();
+    for (const phase of ['won', 'busted']) {
+      cy.window().then((win) => {
+        const game = win as unknown as GameWindow;
+        game.gta_state().phase = phase;
+        game.advanceTime(0);
+      });
+      cy.get('[data-testid="tour-drive"]').should('be.disabled');
+      cy.get('[data-testid="tour-visit"]').should('be.disabled');
+    }
   });
   it('loads, drives, pauses, resumes and resets', () => {
     cy.mount(

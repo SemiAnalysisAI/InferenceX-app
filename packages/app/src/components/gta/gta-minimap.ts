@@ -167,6 +167,7 @@ export function paintOverview(
   stops: Point[],
   done: number,
   player: Point,
+  selected = done,
 ) {
   const ctx = out.getContext('2d');
   if (!ctx) return;
@@ -191,6 +192,11 @@ export function paintOverview(
     ctx.beginPath();
     ctx.arc(q.x, q.y, 9, 0, Math.PI * 2);
     ctx.fill();
+    if (i === selected) {
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
     ctx.fillStyle = '#111';
     ctx.fillText(String(i + 1), q.x, q.y + 0.5);
   });

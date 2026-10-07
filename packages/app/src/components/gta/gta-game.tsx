@@ -373,10 +373,11 @@ export function GtaGame({
       (state.current.tour ? TOUR_STOPS.map((stop) => stop.id) : JOB_IDS).map((id) =>
         markerFor(w, id),
       ),
+      state.current.tour ? 0 : state.current.job,
+      state.current.player,
       state.current.tour
         ? TOUR_STOPS.findIndex((stop) => stop.id === state.current!.tour)
         : state.current.job,
-      state.current.player,
     );
   }, [overview, view?.job, view?.tour]);
   const start = (reset = false) => {
@@ -535,7 +536,9 @@ export function GtaGame({
     objective = view && w ? objectiveStatus(w, view, t) : null,
     street = view && w && !view.explorer ? w.street(view.player.x, view.player.z) : '',
     district = view && w && !view.explorer ? w.district(view.player) : null,
-    still = !view || Math.abs(view.player.speed) <= 2;
+    still = !view || Math.abs(view.player.speed) <= 2,
+    canTour =
+      view !== null && !view.explorer && ['ready', 'paused', 'driving'].includes(view.phase);
   return (
     <section className="gta-game" data-testid="heist-game" data-phase={view?.phase ?? 'loading'}>
       <canvas
@@ -756,14 +759,19 @@ export function GtaGame({
             ))}
           </select>
           <div className="gta-tour-actions">
-            <button type="button" data-testid="tour-drive" onClick={() => tour(false)}>
+            <button
+              type="button"
+              data-testid="tour-drive"
+              disabled={!canTour}
+              onClick={() => tour(false)}
+            >
               {t.drive}
             </button>
             <button
               type="button"
               data-testid="tour-visit"
               title={t.travelHelp}
-              disabled={!still}
+              disabled={!still || !canTour}
               onClick={() => tour(true)}
             >
               {t.visit}
