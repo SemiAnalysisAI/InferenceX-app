@@ -40,7 +40,7 @@ contrast branch.
 ## CS:GO implementation
 
 `src/lib/themes.ts` centralizes picker order
-(`light, dark, minecraft, csgo, gta, kart`), dark-background classification, and the
+(`light, dark, minecraft, csgo, gta, kart, doom`), dark-background classification, and the
 chart-palette alias used by CS:GO and GTA. CS:GO retains the
 existing sans-serif font for chart legibility and preserves the dark theme's
 vendor, high-contrast, and overlay palettes. It does not recolor hardware
@@ -103,6 +103,21 @@ track and kart bundle loads only after the launcher is pressed. See
 and the presentation-only API exclusion. Asset provenance and the
 maintainer-reported Nintendo permission are recorded in
 `packages/app/public/decorative/kart/README.md`.
+
+## Doom implementation
+
+Doom follows the CS:GO pattern with no game, audio, Three.js, or custom fonts.
+It is dark-classified (`isDarkTheme`), aliases onto the dark chart seed
+(`chartPaletteTheme`), and keeps the dark vendor, high-contrast, and overlay
+palettes. The picker uses the `Skull` icon.
+
+`DoomDecorations` follows the root class and renders a responsive local DOOM
+(2016) hellscape behind the document (`aria-hidden`, `pointer-events: none`)
+under a dark ember shade. `DoomThemeBanner` shows the classic DOOM wordmark with
+an `E1M1: HANGAR` eyebrow. Cards stay nearly opaque with a hellfire-orange top
+rule; circuit and autumn decorations are hidden. Embed routes suppress both.
+Asset provenance and the maintainer-reported permission are recorded in
+`packages/app/public/decorative/doom/README.md`.
 
 ## Picker accessibility
 

@@ -1,7 +1,7 @@
 'use client';
 
 import { track } from '@/lib/analytics';
-import { Car, Crosshair, Flag, Moon, Pickaxe, Sun, type LucideIcon } from 'lucide-react';
+import { Car, Crosshair, Flag, Moon, Pickaxe, Skull, Sun, type LucideIcon } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import * as React from 'react';
 
@@ -18,6 +18,7 @@ const THEME_ICONS: Record<string, LucideIcon> = {
   csgo: Crosshair,
   gta: Car,
   kart: Flag,
+  doom: Skull,
 };
 
 const STRINGS = {
@@ -30,6 +31,7 @@ const STRINGS = {
       csgo: 'CS:GO',
       gta: 'GTA',
       kart: 'Mario Kart',
+      doom: 'DOOM',
     },
   },
   zh: {
@@ -41,6 +43,7 @@ const STRINGS = {
       csgo: 'CS:GO',
       gta: 'GTA',
       kart: 'Mario Kart',
+      doom: 'DOOM',
     },
   },
 } as const;
