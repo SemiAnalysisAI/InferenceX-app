@@ -17,6 +17,7 @@ import {
 import { createCityRenderer, CITY_ASSET_COUNT, type CityRenderer } from './gta-renderer';
 import { BUILDINGS, DESTINATIONS, distance } from './gta-world';
 import { STREETS_SF, streetRoute } from './gta-geography';
+import { objectiveStatus } from './gta-hud';
 import './gta-game.css';
 
 const COPY = {
@@ -531,6 +532,7 @@ export function GtaGame({ locale = 'en' }: { locale?: 'en' | 'zh' }) {
   );
   const seconds = Math.ceil(view.time),
     job = target(view),
+    objective = objectiveStatus(view, t),
     active = view.phase === 'driving';
   return (
     <section className="gta-game" data-testid="heist-game" data-phase={view.phase}>
@@ -586,18 +588,11 @@ export function GtaGame({ locale = 'en' }: { locale?: 'en' | 'zh' }) {
               : t.free}
         </small>
         <strong>{view.explorer ? t.atlasHelp : locale === 'zh' ? job.zh : job.en}</strong>
-        <span>
-          {view.explorer
-            ? `${Math.round(view.altitude)} m`
-            : view.tour === null
-              ? view.message === 'blocked'
-                ? t.blockedExit
-                : view.heat
-                  ? t.escape
-                  : t.aim
-              : distance(view.player, job) < 18
-                ? t.arrived
-                : `${Math.round(distance(view.player, job))} m · GPS`}
+        <span
+          className={objective.warning ? 'gta-warning' : undefined}
+          aria-live={objective.warning ? 'polite' : 'off'}
+        >
+          {objective.text}
         </span>
       </div>
       <aside className="gta-bottom-hud">

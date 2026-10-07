@@ -317,6 +317,9 @@
   .gta-objective span {
     display: none;
   }
+  .gta-objective .gta-warning {
+    display: block;
+  }
   .gta-tools {
     top: 4.8rem;
     right: 0.5rem;
