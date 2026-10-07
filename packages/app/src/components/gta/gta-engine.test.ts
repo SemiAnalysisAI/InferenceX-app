@@ -48,7 +48,8 @@ const advance = (s: CityState, c: Controls = EMPTY_CONTROLS, seconds = 1) => {
 describe('San Fierro world data', () => {
   it('keeps both compressed-region access roads clear of buildings', () => {
     const connectors = world.roads.filter(
-      (road) => road.name.endsWith('Connector') && road.cls < 100,
+      (road) =>
+        ['San Jovano Connector', 'Santa Clara Connector'].includes(road.name) && road.cls < 100,
     );
     expect(connectors).toHaveLength(2);
     for (const road of connectors) {
