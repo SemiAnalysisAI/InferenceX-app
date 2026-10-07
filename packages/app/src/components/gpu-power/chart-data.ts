@@ -3,7 +3,7 @@ import type { GpuMetricConfig, GpuMetricKey, GpuMetricRow } from './types';
 /**
  * The correlation y-axis to draw. A power-only series (multinode DCGM bundle)
  * has no temperature axis to default to; use the first other collected metric
- * instead of an empty plot. Shared by the explorer and the read-only view.
+ * instead of an empty plot.
  */
 export function correlationYMetric(
   availableMetrics: readonly Pick<GpuMetricConfig, 'key'>[],

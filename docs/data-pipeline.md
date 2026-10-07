@@ -553,7 +553,7 @@ stores one series per host (`file_name` = `LOGS/power/samples.csv#<hostname>`),
 so multinode and disaggregated points get per-GPU power curves with null clocks,
 temperature and utilization. Single-node jobs upload a `power_audit_` bundle too,
 so discovery and backfill pairing use it only for a suffix with no `gpu_metrics_`
-upload. The PowerX explorer used to download and parse the artifacts from GitHub
+upload. PowerX readers used to download and parse the artifacts from GitHub
 on every request and lost them after GitHub's 90-day retention. CI ingest now
 digests them at ingest time, in the same step that links server logs:
 

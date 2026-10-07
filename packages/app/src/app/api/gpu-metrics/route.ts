@@ -19,9 +19,9 @@
  *   (`components/gpu-power/power-audit-bundle.ts`).
  *
  * Two response shapes:
- * - default: every `gpu_metrics_*` artifact's parsed rows (the `/gpu-metrics`
- *   page), from the stored digest when the run is ingested, else from GitHub;
- *   bundles are ignored on the GitHub path;
+ * - default: every `gpu_metrics_*` artifact's parsed rows (the public GPU
+ *   metrics view), from the stored digest when the run is ingested, else from
+ *   GitHub; bundles are ignored on the GitHub path;
  * - `series=power`: compact per-GPU watt series bucketed to one second
  *   (`components/gpu-power/power-series.ts`) for the PowerX timeline, from
  *   CSV artifacts and from bundles cut per validation window. The timeline
@@ -74,7 +74,7 @@ export interface GpuMetricsRouteResponse extends GpuPowerApiResponse {
   artifactNames?: string[];
 }
 
-/** Shape the stored digest like the GitHub payload so the explorer is source-agnostic. */
+/** Shape the stored digest like the GitHub payload so readers are source-agnostic. */
 export function databasePayloadToResponse(payload: GpuMetricsRunPayload): GpuMetricsRouteResponse {
   const run = payload.workflowRun;
   const filesPerArtifact = new Map<string, number>();
@@ -169,7 +169,7 @@ export function GET(request: NextRequest) {
   return readGpuMetrics(request, null);
 }
 
-/** Selecting a host must not discard the explorer's sibling artifact choices. */
+/** Selecting a host must not discard the view's sibling artifact choices. */
 export function readGpuMetricsForView(request: NextRequest, artifact: string | null) {
   return readGpuMetrics(request, null, artifact);
 }
