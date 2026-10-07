@@ -45,17 +45,13 @@ import {
   type GpuMetricsRunSelection,
 } from '@semianalysisai/inferencex-db/queries/gpu-metrics';
 
-import type {
-  GpuPowerRunInfo,
-  GpuMetricsArtifact,
-  GpuPowerApiResponse,
-} from '@/components/gpu-power/types';
+import type { GpuPowerRunInfo, GpuPowerApiResponse } from '@/components/gpu-power/types';
 import { bucketPowerFiles, type GpuPowerSeries } from '@/components/gpu-power/power-series';
 import {
   storedPowerSeries,
   StoredTelemetryIncompleteError,
 } from '@/components/gpu-power/stored-power-series';
-import { ARTIFACT_PREFIX, isWantedBundle, isRequestedArtifact } from './artifact-selection';
+import { ARTIFACT_PREFIX } from './artifact-selection';
 import { fetchGpuMetricsFromGithub } from './github-telemetry';
 
 /** Bundle downloads are latency-bound; match the other artifact routes' budget. */
@@ -66,8 +62,6 @@ const SOURCE_PATTERN = /^power_validation_[A-Za-z0-9._-]{1,200}\.json$/u;
 const MAX_REQUEST_BYTES = 256 * 1024;
 
 export type GpuMetricsSource = 'database' | 'github';
-
-export type GpuMetricsArtifactPayload = GpuMetricsArtifact;
 
 export interface GpuMetricsRouteResponse extends GpuPowerApiResponse {
   source: GpuMetricsSource;
@@ -138,22 +132,6 @@ function powerSeriesResponse(
     { source, runInfo, series, sourceCoverage: sourceCoverage(series, sources) },
     { headers: { 'Cache-Control': 'no-store' } },
   );
-}
-
-/**
- * Narrows a stored run to the artifacts a `prefix` names, mirroring the GitHub
- * listing filter so both sources answer the same request the same way.
- */
-function filterArtifactsByPrefix(
-  artifacts: GpuMetricsArtifactPayload[],
-  prefix: string | null,
-): GpuMetricsArtifactPayload[] {
-  if (prefix === null) return artifacts;
-  const wanted = `${ARTIFACT_PREFIX}${prefix}`;
-  return artifacts.filter((artifact) => {
-    const name = artifact.series?.artifactName ?? artifact.name;
-    return name.startsWith(wanted) || isWantedBundle(name, prefix);
-  });
 }
 
 async function fetchGpuMetricsFromDatabase(
@@ -273,17 +251,12 @@ async function readGpuMetrics(
 
   try {
     if (stored) {
-      const artifacts = filterArtifactsByPrefix(stored.artifacts, prefix).filter((artifact) =>
-        isRequestedArtifact(artifact.series?.artifactName ?? artifact.name, sources),
-      );
-      if (series !== 'power') {
-        return NextResponse.json(
-          { ...stored, artifacts },
-          { headers: { 'Cache-Control': 'no-store' } },
-        );
-      }
+      // The query already scoped series to `prefix` and the requested artifacts;
+      // only the window cut below is finer than an artifact.
+      if (series !== 'power')
+        return NextResponse.json(stored, { headers: { 'Cache-Control': 'no-store' } });
       const storedSeries = storedPowerSeries(
-        artifacts.flatMap((artifact) =>
+        stored.artifacts.flatMap((artifact) =>
           artifact.series ? [{ ...artifact.series, data: artifact.data }] : [],
         ),
       ).filter((entry) => sources === null || sources.includes(seriesSource(entry) ?? ''));

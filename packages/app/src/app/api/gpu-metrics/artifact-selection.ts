@@ -1,4 +1,8 @@
-/** Artifact identity rules shared by stored selection and the live GitHub listing. */
+/**
+ * Artifact identity rules for the live GitHub listing. The stored read in
+ * `queries/gpu-metrics.ts` hand-copies them, with the CSV prefix match, in SQL;
+ * change both together.
+ */
 export const ARTIFACT_PREFIX = 'gpu_metrics_';
 const BUNDLE_PREFIX = 'power_audit_';
 

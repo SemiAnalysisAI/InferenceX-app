@@ -278,7 +278,7 @@ export const apiRouteCatalog = [
       en: 'UI-only PowerX raw/series=power read: one source per run (the DB when the run has stored telemetry, otherwise its GitHub artifacts, never combined), separate host/GPU identities and adjacent CSV context timezone normalization. GET has no expected identities and reports sourceCoverage unknown. Live windows are unique by validation source, preferring CSV over bundle. DB failures return 503 DATABASE_UNAVAILABLE; known-incomplete stored telemetry returns 503 STORED_TELEMETRY_INCOMPLETE without trying GitHub. Responses use no-store. This is not a stable public API.',
       zh: '仅供 PowerX 界面读取原始遥测或 series=power：每个 run 只使用一个数据来源（遥测已入库时只读 DB，否则只读该 run 的 GitHub 产物，两者不混用），保留主机/GPU 身份，并按相邻 CSV context 规范化时区。GET 没有预期身份清单，sourceCoverage 为 unknown。实时窗口按 validation source 去重，优先 CSV，再用 bundle。数据库故障返回 503 DATABASE_UNAVAILABLE；若已入库的遥测已知不完整，则返回 503 STORED_TELEMETRY_INCOMPLETE，不会转而读取 GitHub。响应使用 no-store，不作为稳定公开 API。',
     },
-    sourceSha256: 'cd230b069be257ce8ac7d393992999920a4aedfa565ee2e8950ff0eac98f2cb2',
+    sourceSha256: '7be6c07ada8e2f1d7583ce64038a00b94eb06e610dfdcea513d3d05329dd4f5b',
   },
   {
     source: 'src/app/api/gpu-metrics/route.ts',
@@ -289,7 +289,7 @@ export const apiRouteCatalog = [
       en: 'Read-only Timeline transport with runId, series=power and optional prefix in the query; JSON sources contains 1–1000 validation basenames with RESULT_FILENAME up to 200 ASCII letters/digits/dot/underscore/hyphen, matching prefix. Invalid input returns 400; bodies over 256 KiB return 413. A requested window missing from an ingested run is not fetched from GitHub; the DB response lists it in missingSources with sourceCoverage incomplete. Coverage describes only requested identities, never whole-run/sample completeness. The GET source-selection, no-store and error guarantees also apply. UI-owned, excluded from the stable public API.',
       zh: 'Timeline 只读传输：查询参数为 runId、series=power 和可选 prefix；JSON sources 含 1–1000 个验证文件 basename，RESULT_FILENAME 最长 200 个 ASCII 字母/数字/点/下划线/连字符，且须匹配 prefix。输入错误返回 400，正文超过 256 KiB 返回 413。已入库 run 缺少的请求窗口不会从 GitHub 补齐，DB 响应会将其列入 missingSources，并把 sourceCoverage 标记为 incomplete。覆盖仅针对请求身份，不代表整次 run 或样本完整性。沿用 GET 的单一来源选择、no-store 和错误约束；属于界面接口，不纳入稳定公开 API。',
     },
-    sourceSha256: 'cd230b069be257ce8ac7d393992999920a4aedfa565ee2e8950ff0eac98f2cb2',
+    sourceSha256: '7be6c07ada8e2f1d7583ce64038a00b94eb06e610dfdcea513d3d05329dd4f5b',
   },
   {
     source: 'src/app/api/openapi.json/route.ts',
@@ -845,10 +845,18 @@ export interface ApiContractSourceDigest {
 export const apiContractSourceDigests = [
   {
     source: 'src/app/api/gpu-metrics/artifact-selection.ts',
-    sourceSha256: 'ab1efa13ee06e467a73b3a89946a8e58968c9f3dee1eea533b33fe4770aff08e',
+    sourceSha256: 'f97190d464d15cf03b142ef7746fe3c1186bcf5d9a0a0918b164aa2e206fac6f',
     reviewArea: {
-      en: 'Shared stored/live telemetry artifact prefix and requested-source selection.',
-      zh: '数据库与实时遥测共用的产物前缀及请求 source 选择规则。',
+      en: 'Live telemetry artifact prefix and requested-source selection; queries/gpu-metrics.ts hand-copies the rules in SQL for stored reads.',
+      zh: '实时遥测的产物前缀及请求 source 选择规则；queries/gpu-metrics.ts 在 SQL 中为数据库读取手工复刻同一规则。',
+    },
+  },
+  {
+    source: '../db/src/queries/gpu-metrics.ts',
+    sourceSha256: '9e9f1a2deaa2b34b5b63add6698d17447b7ceae52b7abbad5c7e590e0ae26d9d',
+    reviewArea: {
+      en: 'Stored PowerX telemetry reads: latest attempt, prefix and requested-source scoping, explorer artifact selection and point lookups.',
+      zh: '数据库 PowerX 遥测读取：最新 attempt、前缀与请求 source 范围、explorer 产物选择及单点查询。',
     },
   },
   {
