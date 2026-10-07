@@ -4,15 +4,16 @@ import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
 const src = path.resolve(import.meta.dirname, '..');
-const optionalDirectory = /^components\/(?:minecraft|csgo|gta|kart)\//;
+const optionalDirectory = /^components\/(?:minecraft|csgo|gta|kart|halo)\//;
 // These wrappers contain only activation gates and dynamic imports.
 const wrappers = new Set([
   'components/minecraft/minecraft-splash.tsx',
   'components/minecraft/minecraft-toggles-lazy.tsx',
+  'components/halo/halo-toggles-lazy.tsx',
 ]);
 const engine = /^(?:three|@react-three\/[^/]+|@dimforge\/rapier[^/]*)(?:\/|$)/;
 const optionalAsset =
-  /(?:\/decorative\/(?:minecraft|csgo|gta|kart)\/|minecraft-click\.mp3|Monocraft-|Pricedown|ChaletComprime)/i;
+  /(?:\/decorative\/(?:minecraft|csgo|gta|kart|halo)\/|minecraft-click\.mp3|Monocraft-|Pricedown|ChaletComprime|Industry-)/i;
 
 /** Static runtime imports, including re-exports. Dynamic imports stay behind their gate. */
 function imports(text: string): string[] {

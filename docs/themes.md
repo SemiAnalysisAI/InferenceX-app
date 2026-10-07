@@ -40,8 +40,8 @@ contrast branch.
 ## CS:GO implementation
 
 `src/lib/themes.ts` centralizes picker order
-(`light, dark, minecraft, csgo, gta, kart`), dark-background classification, and the
-chart-palette alias used by CS:GO and GTA. CS:GO retains the
+(`light, dark, minecraft, csgo, gta, kart, halo`), dark-background classification, and the
+chart-palette alias used by CS:GO, GTA, Mario Kart and Halo. CS:GO retains the
 existing sans-serif font for chart legibility and preserves the dark theme's
 vendor, high-contrast, and overlay palettes. It does not recolor hardware
 series into team colors.
@@ -85,6 +85,35 @@ the maintainer-reported Rockstar font agreement are recorded in
 `packages/app/src/app/fonts/GTA-FONTS.md`. Artwork sources, transformations,
 and the separately reported permission are recorded in
 `packages/app/public/decorative/gta/README.md`. These assets are not covered
+by the repository's code license.
+
+## Halo implementation
+
+Halo follows the GTA pattern: it is dark-classified everywhere (`isDarkTheme`),
+aliases onto the dark chart seed (`chartPaletteTheme`), and keeps the dark
+vendor, high-contrast, and overlay palettes. The picker shows it with a shield
+icon after Mario Kart. There is no playable game.
+
+The chrome follows the Halo Infinite menus: deep navy near-opaque panels over
+the Zeta Halo press-kit artwork, Forerunner-cyan accents and selected-tab
+underlines, Industry (Halo Infinite's UI face) for the header, tabs and
+headings, and DM Sans body copy. `HaloThemeBanner` pairs the Master Chief
+"Ring Vista" artwork with the official Halo logo and a live-text "InferenceX"
+wordmark. `HaloDecorations` follows the root class and the embed attribute and
+mounts local responsive WebP images (`aria-hidden`, `pointer-events: none`)
+only while Halo is active.
+
+`HaloMusic` loops the Halo: Combat Evolved title theme from a local MP3 while
+the theme is mounted. Music is on by default; if the browser blocks autoplay,
+playback starts on the next pointer or key press. The header `HaloToggles`
+button (behind the Halo-gated `HaloTogglesLazy` wrapper, also in the mobile
+menu) stores `halo-music` in `localStorage`. Leaving the theme unmounts the
+player and stops playback; embeds never mount it.
+
+Fonts load from the lazy theme CSS only. Provenance and the maintainer-reported
+Bungie/Microsoft permission are recorded in
+`packages/app/src/app/fonts/HALO-FONTS.md` and
+`packages/app/public/decorative/halo/README.md`. These assets are not covered
 by the repository's code license.
 
 ## Playable Minecraft
@@ -141,7 +170,7 @@ and Firefox CI matrix. It covers:
   loaded JS/CSS fingerprints for the optional engines and Minecraft game,
   font registration, and absence of optional theme/game DOM.
 - English/Chinese embeds with each optional theme saved, before and after
-  hydration. Saved music/sound opt-ins must not activate outside Minecraft.
+  hydration. Saved Minecraft and Halo music/sound opt-ins must not activate outside their themes.
 - Raw-HTML metadata and headings for normal and Googlebot requests, preload
   hints, and unchanged SEO metadata when selecting and leaving optional themes.
 

@@ -1,7 +1,7 @@
 const featureCode =
-  /THREE\.WebGLRenderer|WebGLRenderer:|LOS SANTOS 3D|minecraft-click\.mp3|ender-dragon\.mp3|Loading Luigi Circuit|inferencex-minecraft-worlds|mc-panorama-cube|\.mc-hotbar-wrap|\.csgo-scene|\.gta-scene|\.mc-dragon-flyacross|\.kart-scene|font-family:\s*["']?(?:Monocraft|Pricedown|ChaletComprime)/i;
+  /THREE\.WebGLRenderer|WebGLRenderer:|LOS SANTOS 3D|minecraft-click\.mp3|ender-dragon\.mp3|Loading Luigi Circuit|inferencex-minecraft-worlds|mc-panorama-cube|\.mc-hotbar-wrap|\.csgo-scene|\.gta-scene|\.mc-dragon-flyacross|\.kart-scene|\.halo-scene|font-family:\s*["']?(?:Monocraft|Pricedown|ChaletComprime|Industry)/i;
 const featureAsset =
-  /\/decorative\/(?:minecraft|csgo|gta|kart)\/|minecraft-click\.mp3|Monocraft-|Pricedown|ChaletComprime|youtube(?:-nocookie)?\.com|ytimg\.com/i;
+  /\/decorative\/(?:minecraft|csgo|gta|kart|halo)\/|minecraft-click\.mp3|Monocraft-|Pricedown|ChaletComprime|Industry-|youtube(?:-nocookie)?\.com|ytimg\.com/i;
 const featureElements =
   '[data-testid="minecraft-game"], [data-testid="minecraft-play-banner"], [data-testid="kart-game"], [data-testid$="-theme-banner"], .mc-dragon-flyacross';
 const isFeatureAsset = (url: string) => featureAsset.test(decodeURIComponent(url));
@@ -71,7 +71,7 @@ describe('optional themes stay off the default page', () => {
     });
   }
 
-  for (const theme of ['minecraft', 'csgo', 'gta', 'kart']) {
+  for (const theme of ['minecraft', 'csgo', 'gta', 'kart', 'halo']) {
     for (const prefix of ['', '/zh']) {
       it(`${prefix || 'English'} embed ignores saved ${theme} before and after hydration`, () => {
         const requests: string[] = [];
@@ -83,6 +83,7 @@ describe('optional themes stay off the default page', () => {
             win.localStorage.setItem('theme', theme);
             win.localStorage.setItem('minecraft-music', 'true');
             win.localStorage.setItem('minecraft-sound', 'true');
+            win.localStorage.setItem('halo-music', 'true');
           },
         });
         cy.get('html').should('have.class', 'light').and('have.attr', 'data-inferencex-embed');
@@ -117,7 +118,7 @@ describe('optional themes stay off the default page', () => {
         ).to.have.length(0);
         expect(
           doc.querySelector(
-            '[data-testid="kart-game"], [data-testid="gta-theme-banner"], [data-testid="csgo-theme-banner"]',
+            '[data-testid="kart-game"], [data-testid="gta-theme-banner"], [data-testid="csgo-theme-banner"], [data-testid="halo-theme-banner"]',
           ),
         ).to.equal(null);
         // Metadata and indexable headings are in raw HTML, without running JavaScript.
@@ -136,6 +137,7 @@ describe('optional themes stay off the default page', () => {
         win.localStorage.setItem('theme', 'light');
         win.localStorage.setItem('minecraft-music', 'false');
         win.localStorage.setItem('minecraft-sound', 'false');
+        win.localStorage.setItem('halo-music', 'false');
       },
     });
     // The server-rendered trigger is visible before its click handler hydrates.
@@ -144,7 +146,7 @@ describe('optional themes stay off the default page', () => {
       .and('contain', 'currently');
     cy.document().then((doc) => {
       const baseline = seo(doc);
-      for (const theme of ['csgo', 'gta', 'minecraft', 'kart']) {
+      for (const theme of ['csgo', 'gta', 'minecraft', 'kart', 'halo']) {
         cy.get('[data-testid="theme-toggle"]').click();
         cy.get(`[data-testid="theme-option-${theme}"]`).click();
         if (theme === 'minecraft') cy.get('canvas').should('exist');

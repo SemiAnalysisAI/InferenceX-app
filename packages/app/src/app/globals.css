@@ -3,7 +3,7 @@
 @import './motion.css';
 @plugin '@tailwindcss/typography';
 
-@custom-variant dark (&:is(.dark *, .minecraft *, .csgo *, .gta *, .kart *));
+@custom-variant dark (&:is(.dark *, .minecraft *, .csgo *, .gta *, .kart *, .halo *));
 @custom-variant minecraft (&:is(.minecraft *));
 
 /* Allow hash navigation to clear the fixed navbar */
@@ -54,11 +54,11 @@
   color: #7e22ce;
 }
 
-:is(.dark, .minecraft, .csgo, .gta, .kart) .halloween-wordmark {
+:is(.dark, .minecraft, .csgo, .gta, .kart, .halo) .halloween-wordmark {
   color: #fb923c;
 }
 
-:is(.dark, .minecraft, .csgo, .gta, .kart) .halloween-wordmark-x {
+:is(.dark, .minecraft, .csgo, .gta, .kart, .halo) .halloween-wordmark-x {
   color: #c084fc;
 }
 
@@ -302,7 +302,8 @@ html[data-inferencex-embed] .autumn-leaves {
 .dark,
 .csgo,
 .gta,
-.kart {
+.kart,
+.halo {
   /* Base Theme Colors */
   --background: #131416;
   --foreground: #eaebec;
@@ -427,6 +428,39 @@ html[data-inferencex-embed] .autumn-leaves {
   --gta-display: var(--font-pricedown), 'Pricedown', Impact, sans-serif;
   --gta-menu: var(--font-chalet-comprime), 'ChaletComprime', 'Arial Narrow', sans-serif;
 }
+/* Halo Infinite menu chrome: deep navy panels, Forerunner cyan accents. */
+.halo {
+  --font-industry: 'Industry';
+  color-scheme: dark;
+  --background: #070d16;
+  --foreground: #e8f1f8;
+  --card: #0c1622;
+  --card-foreground: #e8f1f8;
+  --popover: #0b1520;
+  --popover-foreground: #e8f1f8;
+  --primary: #5ed1ff;
+  --primary-foreground: #04101a;
+  --secondary: #9fd356;
+  --secondary-foreground: #0a1404;
+  --muted: #182635;
+  --muted-foreground: #a9bccb;
+  --accent: #1c2d3e;
+  --accent-foreground: #e8f1f8;
+  --border: #3b5468;
+  --border-alt: #1d2d3c;
+  --input: #3b5468;
+  --ring: #5ed1ff;
+  --sidebar: #0c1622;
+  --sidebar-foreground: #e8f1f8;
+  --sidebar-primary: #5ed1ff;
+  --sidebar-primary-foreground: #04101a;
+  --sidebar-accent: #1c2d3e;
+  --sidebar-accent-foreground: #e8f1f8;
+  --sidebar-border: #3b5468;
+  --sidebar-ring: #5ed1ff;
+  --radius: 0.125rem;
+  --halo-menu: var(--font-industry), 'Industry', 'Arial Narrow', sans-serif;
+}
 .minecraft {
   --font-minecraft: 'Monocraft';
   --background: #1e1e1e;
@@ -482,7 +516,9 @@ html[data-inferencex-embed] .autumn-leaves {
 .csgo .circuit-bg,
 .csgo .autumn-leaves,
 .gta .circuit-bg,
-.gta .autumn-leaves {
+.gta .autumn-leaves,
+.halo .circuit-bg,
+.halo .autumn-leaves {
   display: none;
 }
 
@@ -494,7 +530,9 @@ html[data-inferencex-embed] .autumn-leaves {
 .gta .shiki,
 .gta .shiki span,
 .kart .shiki,
-.kart .shiki span {
+.kart .shiki span,
+.halo .shiki,
+.halo .shiki span {
   color: var(--shiki-dark);
   background-color: var(--shiki-dark-bg);
 }

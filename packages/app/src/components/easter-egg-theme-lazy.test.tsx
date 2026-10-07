@@ -23,6 +23,10 @@ vi.mock('./kart/kart-decorations', () => {
   loaded('kart');
   return { default: () => <div data-theme="kart" /> };
 });
+vi.mock('./halo/halo-theme', () => {
+  loaded('halo');
+  return { default: () => <div data-theme="halo" /> };
+});
 
 let container: HTMLDivElement;
 let root: Root;
@@ -57,7 +61,7 @@ describe('optional theme boundary', () => {
     async (path) => {
       window.history.replaceState(null, '', path);
       act(() => root.render(<EasterEggThemeLazy />));
-      for (const theme of ['minecraft', 'csgo', 'gta', 'kart']) {
+      for (const theme of ['minecraft', 'csgo', 'gta', 'kart', 'halo']) {
         await change(theme);
         expect(container.innerHTML).toBe('');
         expect(loaded).not.toHaveBeenCalled();
@@ -85,8 +89,9 @@ describe('optional theme boundary', () => {
       csgo: () => import('./csgo/csgo-theme'),
       gta: () => import('./gta/gta-theme'),
       kart: () => import('./kart/kart-decorations'),
+      halo: () => import('./halo/halo-theme'),
     };
-    for (const theme of ['minecraft', 'csgo', 'gta', 'kart'] as const) {
+    for (const theme of ['minecraft', 'csgo', 'gta', 'kart', 'halo'] as const) {
       await change(theme);
       await act(async () => {
         await imports[theme]();
