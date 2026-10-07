@@ -3,7 +3,7 @@
 @import './motion.css';
 @plugin '@tailwindcss/typography';
 
-@custom-variant dark (&:is(.dark *, .minecraft *, .csgo *, .gta *, .kart *, .halo *));
+@custom-variant dark (&:is(.dark *, .minecraft *, .csgo *, .gta *, .kart *, .doom *, .halo *));
 @custom-variant minecraft (&:is(.minecraft *));
 
 /* Allow hash navigation to clear the fixed navbar */
@@ -54,11 +54,11 @@
   color: #7e22ce;
 }
 
-:is(.dark, .minecraft, .csgo, .gta, .kart, .halo) .halloween-wordmark {
+:is(.dark, .minecraft, .csgo, .gta, .kart, .doom, .halo) .halloween-wordmark {
   color: #fb923c;
 }
 
-:is(.dark, .minecraft, .csgo, .gta, .kart, .halo) .halloween-wordmark-x {
+:is(.dark, .minecraft, .csgo, .gta, .kart, .doom, .halo) .halloween-wordmark-x {
   color: #c084fc;
 }
 
@@ -303,6 +303,7 @@ html[data-inferencex-embed] .autumn-leaves {
 .csgo,
 .gta,
 .kart,
+.doom,
 .halo {
   /* Base Theme Colors */
   --background: #131416;
@@ -360,6 +361,27 @@ html[data-inferencex-embed] .autumn-leaves {
 }
 .kart .circuit-bg,
 .kart .autumn-leaves {
+  display: none;
+}
+
+/* Tiny pre-paint shell for persisted Doom selections. Artwork stays lazy. */
+.doom {
+  color-scheme: dark;
+  --background: #140b09;
+  --foreground: #f1e6dc;
+  --card: #1d110d;
+  --card-foreground: #f1e6dc;
+  --popover: #22140f;
+  --popover-foreground: #f1e6dc;
+  --primary: #ff6a2b;
+  --primary-foreground: #140b09;
+  --muted: #33201a;
+  --muted-foreground: #c9b6aa;
+  --accent: #3a2219;
+  --ring: #ffb347;
+}
+.doom .circuit-bg,
+.doom .autumn-leaves {
   display: none;
 }
 
@@ -531,6 +553,8 @@ html[data-inferencex-embed] .autumn-leaves {
 .gta .shiki span,
 .kart .shiki,
 .kart .shiki span,
+.doom .shiki,
+.doom .shiki span,
 .halo .shiki,
 .halo .shiki span {
   color: var(--shiki-dark);
@@ -648,7 +672,8 @@ html[data-inferencex-skin='vllm'] [data-slot='card'] {
 /* Dark backgrounds need no outline — this is the original title-screen look. */
 .dark .splash-text,
 .minecraft .splash-text,
-.csgo .splash-text {
+.csgo .splash-text,
+.doom .splash-text {
   color: #ffff00;
   text-shadow: 2px 2px 0px #3f3f00;
 }

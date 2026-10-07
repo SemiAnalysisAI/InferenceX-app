@@ -8,6 +8,7 @@ const themes = {
   csgo: lazy(() => import('./csgo/csgo-theme')),
   gta: lazy(() => import('./gta/gta-theme')),
   kart: lazy(() => import('./kart/kart-decorations')),
+  doom: lazy(() => import('./doom/doom-theme')),
   halo: lazy(() => import('./halo/halo-theme')),
 };
 
