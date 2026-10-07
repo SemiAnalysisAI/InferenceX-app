@@ -8,7 +8,6 @@
  * replaces samples and digest atomically.
  */
 
-import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 
 import type postgres from 'postgres';
@@ -22,6 +21,7 @@ import {
 
 export { statMetricColumn } from '../lib/gpu-metric-stats.js';
 
+import { sha256Hex } from './benchmark-artifacts.js';
 import type { Sql } from './db-utils.js';
 
 /** Either a pooled client or the transaction handle passed to `sql.begin` callbacks. */
@@ -37,15 +37,19 @@ import {
 import {
   contextUtcOffsetMinutes,
   gpuMetricsArtifactSuffix,
-  listGpuMetricsCsvFiles,
-  listMultinodePowerSampleFiles,
+  isGpuMetricsCsvPath,
   readGpuMetricsSidecars,
   readMultinodePowerManifest,
   readPowerAuditValidations,
+  walkFiles,
   type GpuMetricsArtifact,
   type GpuMetricsSidecars,
 } from './gpu-metrics-artifacts.js';
-import { multinodePowerVendor, parseMultinodePowerSamples } from './multinode-power-samples.js';
+import {
+  isMultinodePowerSamplesPath,
+  multinodePowerVendor,
+  parseMultinodePowerSamples,
+} from './multinode-power-samples.js';
 
 /** Samples are streamed to Postgres in unnest batches of this many rows. */
 const SAMPLE_BATCH_SIZE = 5000;
@@ -54,8 +58,8 @@ function uniqueSamples(samples: readonly GpuMetricSample[]): GpuMetricSample[] {
   const seen = new Set<string>();
   return samples.filter((sample) => {
     const key = `${sample.gpuIndex}:${sample.timestampMs}`;
+    // nvidia-smi can repeat the final sample when the monitor stops and flushes.
     if (seen.has(key)) return false;
-    // Keep the first row, matching INSERT ... ON CONFLICT DO NOTHING.
     seen.add(key);
     return true;
   });
@@ -89,13 +93,13 @@ export interface GpuMetricsIngestResult {
 function prepareMultinodePowerSeries(artifact: GpuMetricsArtifact): PreparedGpuMetricSeries[] {
   const prepared: PreparedGpuMetricSeries[] = [];
   const validations = readPowerAuditValidations(artifact.artifactDir, artifact.artifactName);
-  for (const file of listMultinodePowerSampleFiles(artifact.artifactDir)) {
+  for (const file of walkFiles(artifact.artifactDir, isMultinodePowerSamplesPath)) {
     const csvText = fs.readFileSync(file.path, 'utf8');
     const hosts = parseMultinodePowerSamples(csvText);
     if (!hosts) continue;
     const manifest = readMultinodePowerManifest(file.path);
     const vendor = multinodePowerVendor(manifest);
-    const csvSha256 = createHash('sha256').update(csvText).digest('hex');
+    const csvSha256 = sha256Hex(csvText);
     for (const host of hosts) {
       const samples = uniqueSamples(host.samples);
       const summary = summarizeGpuMetricSamples(samples);
@@ -140,12 +144,12 @@ export function prepareGpuMetricsArtifact(artifact: GpuMetricsArtifact): Prepare
     ? {
         validations: readPowerAuditValidations(artifact.artifactDir, artifact.artifactName),
         powerManifest: (() => {
-          const bundleFile = listMultinodePowerSampleFiles(artifact.artifactDir)[0];
+          const bundleFile = walkFiles(artifact.artifactDir, isMultinodePowerSamplesPath)[0];
           return bundleFile ? readMultinodePowerManifest(bundleFile.path) : null;
         })(),
       }
     : null;
-  for (const file of listGpuMetricsCsvFiles(artifact.artifactDir)) {
+  for (const file of walkFiles(artifact.artifactDir, isGpuMetricsCsvPath)) {
     const csvText = fs.readFileSync(file.path, 'utf8');
     const sidecars = readGpuMetricsSidecars(file.path);
     if (bundle) {
@@ -168,7 +172,7 @@ export function prepareGpuMetricsArtifact(artifact: GpuMetricsArtifact): Prepare
     prepared.push({
       fileName: file.fileName,
       vendor: parsed.vendor,
-      csvSha256: createHash('sha256').update(csvText).digest('hex'),
+      csvSha256: sha256Hex(csvText),
       samples,
       stats: computeGpuMetricStats(samples),
       sampleIntervalS: summary.sampleIntervalS,
@@ -196,41 +200,33 @@ async function insertSampleBatch(
   tx: TxLike,
   seriesId: number,
   batch: readonly GpuMetricSample[],
-): Promise<number> {
-  const inserted = await tx<{ n: number }[]>`
-    with ins as (
-      insert into gpu_metric_samples (
-        series_id, gpu_index, sampled_at,
-        power_w, temperature_c, sm_clock_mhz, mem_clock_mhz, gpu_util_pct, mem_util_pct,
-        edge_temp_c, mem_temp_c, gfx_voltage_mv, soc_voltage_mv, mem_voltage_mv,
-        fclk_mhz, socclk_mhz, mm_activity_pct
-      )
-      select
-        ${seriesId},
-        unnest(${tx.array(batch.map((s) => s.gpuIndex))}::smallint[]),
-        to_timestamp(unnest(${tx.array(batch.map((s) => s.timestampMs / 1000))}::double precision[])),
-        unnest(${tx.array(batch.map((s) => s.powerW))}::real[]),
-        unnest(${tx.array(batch.map((s) => s.temperatureC))}::real[]),
-        unnest(${tx.array(batch.map((s) => s.smClockMhz))}::real[]),
-        unnest(${tx.array(batch.map((s) => s.memClockMhz))}::real[]),
-        unnest(${tx.array(batch.map((s) => s.gpuUtilPct))}::real[]),
-        unnest(${tx.array(batch.map((s) => s.memUtilPct))}::real[]),
-        unnest(${tx.array(batch.map((s) => s.edgeTempC))}::real[]),
-        unnest(${tx.array(batch.map((s) => s.memTempC))}::real[]),
-        unnest(${tx.array(batch.map((s) => s.gfxVoltageMv))}::real[]),
-        unnest(${tx.array(batch.map((s) => s.socVoltageMv))}::real[]),
-        unnest(${tx.array(batch.map((s) => s.memVoltageMv))}::real[]),
-        unnest(${tx.array(batch.map((s) => s.fclkMhz))}::real[]),
-        unnest(${tx.array(batch.map((s) => s.socclkMhz))}::real[]),
-        unnest(${tx.array(batch.map((s) => s.mmActivityPct))}::real[])
-      -- nvidia-smi occasionally repeats the final sample when the monitor is
-      -- stopped and flushed; the primary key makes that a no-op.
-      on conflict (series_id, gpu_index, sampled_at) do nothing
-      returning 1
+): Promise<void> {
+  await tx`
+    insert into gpu_metric_samples (
+      series_id, gpu_index, sampled_at,
+      power_w, temperature_c, sm_clock_mhz, mem_clock_mhz, gpu_util_pct, mem_util_pct,
+      edge_temp_c, mem_temp_c, gfx_voltage_mv, soc_voltage_mv, mem_voltage_mv,
+      fclk_mhz, socclk_mhz, mm_activity_pct
     )
-    select count(*)::int as n from ins
+    select
+      ${seriesId},
+      unnest(${tx.array(batch.map((s) => s.gpuIndex))}::smallint[]),
+      to_timestamp(unnest(${tx.array(batch.map((s) => s.timestampMs / 1000))}::double precision[])),
+      unnest(${tx.array(batch.map((s) => s.powerW))}::real[]),
+      unnest(${tx.array(batch.map((s) => s.temperatureC))}::real[]),
+      unnest(${tx.array(batch.map((s) => s.smClockMhz))}::real[]),
+      unnest(${tx.array(batch.map((s) => s.memClockMhz))}::real[]),
+      unnest(${tx.array(batch.map((s) => s.gpuUtilPct))}::real[]),
+      unnest(${tx.array(batch.map((s) => s.memUtilPct))}::real[]),
+      unnest(${tx.array(batch.map((s) => s.edgeTempC))}::real[]),
+      unnest(${tx.array(batch.map((s) => s.memTempC))}::real[]),
+      unnest(${tx.array(batch.map((s) => s.gfxVoltageMv))}::real[]),
+      unnest(${tx.array(batch.map((s) => s.socVoltageMv))}::real[]),
+      unnest(${tx.array(batch.map((s) => s.memVoltageMv))}::real[]),
+      unnest(${tx.array(batch.map((s) => s.fclkMhz))}::real[]),
+      unnest(${tx.array(batch.map((s) => s.socclkMhz))}::real[]),
+      unnest(${tx.array(batch.map((s) => s.mmActivityPct))}::real[])
   `;
-  return Number(inserted[0]?.n ?? 0);
 }
 
 async function insertStats(
@@ -348,10 +344,9 @@ export function upsertGpuMetricSeries(
       seriesId = Number(row!.id);
     }
 
-    let samplesInserted = 0;
     if (needsSamples) {
       for (let offset = 0; offset < series.samples.length; offset += SAMPLE_BATCH_SIZE) {
-        samplesInserted += await insertSampleBatch(
+        await insertSampleBatch(
           tx,
           seriesId,
           series.samples.slice(offset, offset + SAMPLE_BATCH_SIZE),
@@ -373,7 +368,12 @@ export function upsertGpuMetricSeries(
       `;
     }
 
-    return { seriesId, samplesInserted, replaced, statsUpdated };
+    return {
+      seriesId,
+      samplesInserted: needsSamples ? series.samples.length : 0,
+      replaced,
+      statsUpdated,
+    };
   });
 }
 

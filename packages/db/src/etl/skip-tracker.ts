@@ -14,7 +14,7 @@ export interface Skips {
    * PowerX telemetry failures: a `gpu_metrics_*` digest that could not be
    * stored, or an AgentX window plan that could not be read or attached.
    * Counted apart from `dbError` because they are not fatal: the benchmark
-   * rows land either way, only the per-point telemetry tab or provenance is
+   * rows land either way, only the point's telemetry or provenance is
    * affected, and `admin:db:backfill-gpu-metrics` can repeat the step later.
    * Folding these into `dbError` would let one malformed CSV turn the whole
    * production ingest red, through the publication manifest that
@@ -46,14 +46,7 @@ export interface SkipTracker {
    * @param err - The caught error.
    */
   recordDbError: (context: string, err: Error) => void;
-  /**
-   * Record a non-fatal PowerX telemetry digest failure. Same printing and
-   * suppression as `recordDbError`, but increments `skips.telemetryError` so the
-   * ingest is not failed by it.
-   *
-   * @param context - Human-readable label for where the error occurred.
-   * @param err - The caught error.
-   */
+  /** Same as `recordDbError`, but counts into `skips.telemetryError`. */
   recordTelemetryError: (context: string, err: Error) => void;
   /**
    * Capture a point-in-time snapshot of the current skip counters and
@@ -102,8 +95,19 @@ export function createSkipTracker(): SkipTracker {
   const unmappedModels = new Set<string>();
   const unmappedHws = new Set<string>();
   const unmappedPrecisions = new Set<string>();
-  let dbErrorsPrinted = 0;
-  let telemetryErrorsPrinted = 0;
+  const cappedRecorder = (key: 'dbError' | 'telemetryError', tag: string, noun: string) => {
+    let printed = 0;
+    return (context: string, err: Error): void => {
+      skips[key]++;
+      if (printed < MAX_DB_ERRORS) {
+        console.error(`  [${tag}] ${context}: ${err.message}`);
+        printed++;
+        if (printed === MAX_DB_ERRORS) {
+          console.error(`  [${tag}] further ${noun} errors suppressed; count included in summary`);
+        }
+      }
+    };
+  };
 
   return {
     skips,
@@ -111,29 +115,8 @@ export function createSkipTracker(): SkipTracker {
     unmappedHws,
     unmappedPrecisions,
 
-    recordDbError(context: string, err: Error): void {
-      skips.dbError++;
-      if (dbErrorsPrinted < MAX_DB_ERRORS) {
-        console.error(`  [DB ERROR] ${context}: ${err.message}`);
-        dbErrorsPrinted++;
-        if (dbErrorsPrinted === MAX_DB_ERRORS) {
-          console.error('  [DB ERROR] further DB errors suppressed; count included in summary');
-        }
-      }
-    },
-
-    recordTelemetryError(context: string, err: Error): void {
-      skips.telemetryError++;
-      if (telemetryErrorsPrinted < MAX_DB_ERRORS) {
-        console.error(`  [TELEMETRY] ${context}: ${err.message}`);
-        telemetryErrorsPrinted++;
-        if (telemetryErrorsPrinted === MAX_DB_ERRORS) {
-          console.error(
-            '  [TELEMETRY] further telemetry errors suppressed; count included in summary',
-          );
-        }
-      }
-    },
+    recordDbError: cappedRecorder('dbError', 'DB ERROR', 'DB'),
+    recordTelemetryError: cappedRecorder('telemetryError', 'TELEMETRY', 'telemetry'),
 
     snapshot(): SkipSnapshot {
       return {

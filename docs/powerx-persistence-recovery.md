@@ -28,17 +28,15 @@ bun run admin:db:backfill-gpu-metrics --run RUN_ID --attempt ATTEMPT \
   --artifact EXACT_ARTIFACT_NAME --dry-run
 ```
 
-For a backfill that fills missing AgentX `power_audit`, also set
-`CACHE_INVALIDATE_URL=https://TARGET_ORIGIN/api/v1/invalidate` and
-`CACHE_INVALIDATE_SECRET` or `INVALIDATE_SECRET`. Protected previews need
-`CACHE_PROTECTION_BYPASS_SECRET`. Use the app's existing cache namespace.
-
 Repair the artifact and merge the existing receipt:
 
 ```sh
 bun run admin:db:backfill-gpu-metrics --run RUN_ID --attempt ATTEMPT \
   --artifact EXACT_ARTIFACT_NAME --receipt /path/power-publication.json --yes
 ```
+
+When the repair fills a missing AgentX `power_audit`, the merged receipt's point
+expects the recovered value. After an interruption, rerun the same command.
 
 Unchanged inputs are no-ops. GitHub backfill accepts only the current source attempt.
 Older or expired artifacts require retained original bytes; never substitute another
@@ -48,17 +46,16 @@ attempt's artifacts. For local recovery, set `INGEST_RUN_ID`, `INGEST_RUN_ATTEMP
 credentials. Inspect `reused-ingest-metadata/reuse_source_run.json` first if present;
 it overrides the run/attempt identity. Apply sidecar corrections to the retained tree.
 
-After AgentX audit updates, backfill refreshes `latest_benchmarks`, invalidates the
-benchmark cache, then compares the exact-run API metadata. Failure exits nonzero and
-keeps the checkpoint in the receipt. Retry that phase without downloading or ingesting:
+Both commands refresh `latest_benchmarks`. Then refresh the API cache of the app that
+reads the repaired database, with that app's `INVALIDATE_SECRET` set:
 
 ```sh
-bun run admin:db:backfill-gpu-metrics --run RUN_ID --attempt ATTEMPT \
-  --receipt /path/power-publication.json --refresh-cache-only --yes
+bun run admin:cache:invalidate https://TARGET_ORIGIN
+bun run admin:cache:warmup https://TARGET_ORIGIN
 ```
 
-The receipt's run/attempt, point IDs and endpoint must still match. If interruption
-left planned audit writes unfinished, re-ingest the targeted artifact first.
+These scripts send no Vercel protection bypass header. Invalidate a protected preview
+the way `.github/workflows/ingest-results.yml` does.
 
 ## Verify the repair
 

@@ -95,43 +95,10 @@ export interface PowerPublicationManifest {
   points: PowerPublicationPoint[];
   /** Fatal: verify-power-publication exits non-zero when this is non-empty. */
   ingestErrors?: string[];
-  /**
-   * Non-fatal: PowerX telemetry digest failures. Surfaced in the verification
-   * receipt so they stay visible, but they never fail the ingest — the benchmark
-   * rows landed, and the artifact can be re-digested by the backfill.
-   */
+  /** Copied into the verification receipt, never fatal; see `Skips.telemetryError`. */
   telemetryWarnings?: string[];
   /** Attachment completeness, separate from benchmark/power publication validity. */
   telemetry?: TelemetryReceipt;
-  /** Durable refresh responsibility when telemetry recovery fills benchmark metadata. */
-  benchmarkRefresh?: {
-    status: 'pending' | 'complete' | 'failed';
-    benchmarkResultIds: number[];
-    /** Expected enrichment comes from retained validation, never a DB snapshot. */
-    auditUpdates?: {
-      benchmarkResultId: number;
-      identity: Record<string, unknown>;
-      /** Original mapped identity when the existing historical offload resolver used a fallback. */
-      sourceIdentity?: Record<string, unknown>;
-      powerAudit: { source: string; window_start_unix: number; window_end_unix: number };
-    }[];
-    endpoint?: string;
-    checkedAt?: string;
-    error?: string;
-  };
-}
-/**
- * The errors that fail an ingest. `telemetryWarnings` is deliberately not among
- * them: a gpu_metrics digest failure costs one point's PowerX tab, while the
- * benchmark rows it accompanies are already committed and the artifact can be
- * re-digested by `admin:db:backfill-gpu-metrics`. Folding it in would let one
- * malformed CSV turn a whole production ingest red.
- */
-export function fatalPublicationErrors(
-  manifest: Pick<PowerPublicationManifest, 'ingestErrors' | 'telemetryWarnings'>,
-  verificationErrors: readonly string[],
-): string[] {
-  return [...(manifest.ingestErrors ?? []), ...verificationErrors];
 }
 
 export interface PublishedPowerRow extends Record<string, unknown> {

@@ -11,7 +11,7 @@ import path from 'node:path';
 import { mapBenchmarkRow, type BenchmarkParams } from '../etl/benchmark-mapper.js';
 import { createSkipTracker } from '../etl/skip-tracker.js';
 import type { Sql } from '../etl/db-utils.js';
-import { configCacheKey } from '../etl/config-cache.js';
+import { configCacheKey, loadConfigIds } from '../etl/config-cache.js';
 import { isBenchmarkPointPurged, PURGED_BENCHMARK_POINTS } from '../etl/run-overrides.js';
 import { resolveServerLogResultCandidates } from './server-log-backfill.js';
 
@@ -26,43 +26,21 @@ export async function filterPurgedBenchmarkRows(
   run: BenchmarkRunSelector,
   rows: readonly BenchmarkParams[],
 ): Promise<BenchmarkParams[]> {
-  const configIds = PURGED_BENCHMARK_POINTS.filter(
-    (point) => point.githubRunId === run.github_run_id && point.runAttempt === run.run_attempt,
-  ).map((point) => point.configId);
-  if (configIds.length === 0) return [...rows];
-
-  const configs = new Map<string, number | null>();
-  const retained: BenchmarkParams[] = [];
-  for (const row of rows) {
-    const c = row.config;
-    const key = configCacheKey(c);
-    if (!configs.has(key)) {
-      const [config] = await sql<{ id: number }[]>`
-        select id from configs cfg
-        where cfg.id = any(${configIds}::integer[])
-          and cfg.hardware = ${c.hardware} and cfg.framework = ${c.framework}
-          and cfg.model = ${c.model} and cfg.precision = ${c.precision}
-          and cfg.spec_method = ${c.specMethod} and cfg.disagg = ${c.disagg}
-          and cfg.is_multinode = ${c.isMultinode}
-          and cfg.prefill_tp = ${c.prefillTp} and cfg.prefill_ep = ${c.prefillEp}
-          and cfg.prefill_dp_attention = ${c.prefillDpAttn}
-          and cfg.prefill_num_workers = ${c.prefillNumWorkers}
-          and cfg.decode_tp = ${c.decodeTp} and cfg.decode_ep = ${c.decodeEp}
-          and cfg.decode_dp_attention = ${c.decodeDpAttn}
-          and cfg.decode_num_workers = ${c.decodeNumWorkers}
-          and cfg.num_prefill_gpu = ${c.numPrefillGpu}
-          and cfg.num_decode_gpu = ${c.numDecodeGpu}
-      `;
-      configs.set(key, config ? Number(config.id) : null);
-    }
-    const configId = configs.get(key)!;
-    if (
-      configId === null ||
-      !isBenchmarkPointPurged(run.github_run_id, run.run_attempt, { ...row, configId })
+  if (
+    !PURGED_BENCHMARK_POINTS.some(
+      (point) => point.githubRunId === run.github_run_id && point.runAttempt === run.run_attempt,
     )
-      retained.push(row);
-  }
-  return retained;
+  )
+    return [...rows];
+  const configIds = await loadConfigIds(sql);
+  // A config not stored yet cannot match an id-keyed purge.
+  return rows.filter(
+    (row) =>
+      !isBenchmarkPointPurged(run.github_run_id, run.run_attempt, {
+        ...row,
+        configId: configIds.get(configCacheKey(row.config)) ?? -1,
+      }),
+  );
 }
 
 export async function findBenchmarkResultIds(

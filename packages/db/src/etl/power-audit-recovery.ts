@@ -6,24 +6,22 @@ import { recoveredPowerAudit, type RecoveredPowerAudit } from './power-audit-val
 export type AgentxWindowPlan = ReadonlyMap<number, RecoveredPowerAudit>;
 
 /**
- * One telemetry artifact owns its retained windows. A concurrency named by
- * exactly one recoverable validation maps to that window; a concurrency named
- * by two is conflicting evidence and stays absent. Legacy top-level documents
- * never recover (`recoveredPowerAudit`), so they cannot claim a concurrency.
+ * One telemetry artifact owns its retained windows, keyed by concurrency.
+ * Normalization aliases at most one nested validation per concurrency, and legacy
+ * top-level documents never recover (`recoveredPowerAudit`), so each
+ * concurrency maps to one window.
  */
 export function agentxWindowPlan(
   validations: Readonly<Record<string, Record<string, unknown>>>,
 ): AgentxWindowPlan {
-  const windows = new Map<number, RecoveredPowerAudit | null>();
+  const plan = new Map<number, RecoveredPowerAudit>();
   for (const [source, validation] of Object.entries(validations)) {
     const audit = recoveredPowerAudit(source, validation);
     if (!audit) continue;
     // recoveredPowerAudit accepted the window, so its concurrency is the nested one.
     const { concurrency } = validation.selected_window as { concurrency: number };
-    windows.set(concurrency, windows.has(concurrency) ? null : audit);
+    plan.set(concurrency, audit);
   }
-  const plan = new Map<number, RecoveredPowerAudit>();
-  for (const [concurrency, audit] of windows) if (audit) plan.set(concurrency, audit);
   return plan;
 }
 
@@ -43,10 +41,9 @@ export interface AgentxAuditRefusal {
 /**
  * Attach each retained window to the single agentic point at its concurrency
  * within the covered set (CI: one result file; backfill: one artifact pair).
- * A point that already carries provenance counts toward uniqueness but keeps
- * its own audit. A concurrency shared by two points is refused by name so the
- * caller reports it instead of guessing which measurement the window belongs
- * to. Points come back in input order.
+ * A concurrency shared by two points is refused by name so the caller reports
+ * it instead of guessing which measurement the window belongs to. Points come
+ * back in input order.
  */
 export function attachAgentxAudits<P extends AgentxAuditCandidate>(
   plan: AgentxWindowPlan,
@@ -61,12 +58,8 @@ export function attachAgentxAudits<P extends AgentxAuditCandidate>(
   const refused: AgentxAuditRefusal[] = [];
   const attach = new Set<P>();
   for (const [concurrency, group] of byConcurrency) {
-    if (group.length !== 1) {
-      refused.push({ concurrency, points: group.map(describe) });
-      continue;
-    }
-    const [point] = group;
-    if (point!.powerAudit === undefined || point!.powerAudit === null) attach.add(point!);
+    if (group.length === 1) attach.add(group[0]!);
+    else refused.push({ concurrency, points: group.map(describe) });
   }
   return {
     points: points.map((point) =>

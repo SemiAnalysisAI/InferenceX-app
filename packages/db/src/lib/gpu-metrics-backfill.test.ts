@@ -23,7 +23,7 @@ const unreadable = (artifact: ArtifactMeta): Promise<never> =>
   Promise.reject(new Error(`unreadable ${artifact.name}`));
 
 describe('pairGpuMetricsArtifacts', () => {
-  it('lets a power_audit bundle stand in only when its suffix has no gpu_metrics upload', () => {
+  it('lets a power_audit bundle stand in only when its suffix has no unexpired gpu_metrics upload', () => {
     // The bundle is listed before its gpu_metrics sibling on purpose: input
     // order alone must not decide the winner.
     const pairs = pairGpuMetricsArtifacts([
@@ -33,6 +33,7 @@ describe('pairGpuMetricsArtifacts', () => {
       meta('gpu_metrics_cfg-sn_h200-cw_0', 3),
       meta('bmk_cfg-sn_h200-cw_0', 5),
       meta('power_audit_orphan_b200-slurm_0', 6),
+      meta('gpu_metrics_cfg-mn_b200-slurm_0', 7, '2026-09-11T00:00:00Z', true),
     ]);
     expect(pairs.map((pair) => [pair.gpuMetrics.name, pair.benchmarks.name])).toEqual([
       ['gpu_metrics_cfg-sn_h200-cw_0', 'bmk_cfg-sn_h200-cw_0'],

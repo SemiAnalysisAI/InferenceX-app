@@ -1,10 +1,9 @@
 /**
  * Read side of the PowerX telemetry digest (migration 016).
  *
- * Two entry points: everything recorded during one GitHub Actions run (the
- * PowerX explorer keyed by run ID), and the series linked to one benchmark
- * point (the per-point detail tab). Samples are returned as flat rows with
- * ISO timestamps so the existing D3 charts consume them unchanged.
+ * Two entry points: everything recorded during one GitHub Actions run (keyed by
+ * run ID), and the series linked to one benchmark point. Samples are returned
+ * as flat rows with ISO timestamps, the shape the live artifact parser produces.
  */
 
 import {
@@ -87,14 +86,12 @@ export interface GpuMetricsRunPayload {
     createdAt: string | null;
   };
   series: GpuMetricSeries[];
-  /** Complete explorer labels when only one view artifact's samples were requested. */
+  /** Every artifact label when only one view artifact's samples were requested. */
   artifactNames?: string[];
 }
 
 export interface GpuMetricsRunSelection {
-  prefix?: string | null;
-  sourceResults?: readonly string[] | null;
-  /** Undefined reads all matching artifacts; null selects the first explorer artifact. */
+  /** Undefined reads every artifact; null selects the first artifact name. */
   artifact?: string | null;
 }
 
@@ -417,8 +414,6 @@ async function readGpuMetricsForRun(
       .filter((entry) => entry.name === selected)
       .map((entry) => Number(entry.id));
   }
-  const prefix = selection.prefix ?? null;
-  const sources = selection.sourceResults ?? null;
 
   const seriesRows = (await sql`
     select s.id, s.workflow_run_id, s.artifact_name, s.config_key, s.file_name, s.vendor,
@@ -438,17 +433,6 @@ async function readGpuMetricsForRun(
     from gpu_metric_series s
     where s.workflow_run_id = ${Number(run.id)}
       and (${selectedIds}::bigint[] is null or s.id = any(${selectedIds}::bigint[]))
-      and (${prefix}::text is null or starts_with(s.artifact_name, 'gpu_metrics_' || ${prefix})
-        or (starts_with(s.artifact_name, 'power_audit_') and
-          (starts_with(s.artifact_name, 'power_audit_' || ${prefix})
-            or starts_with('power_audit_' || ${prefix}, s.artifact_name))))
-      and (${sources}::text[] is null or exists (
-        select 1 from unnest(${sources}::text[]) as requested(result)
-        where s.artifact_name = 'gpu_metrics_' || requested.result
-          or (starts_with(s.artifact_name, 'power_audit_') and
-            (starts_with(s.artifact_name, 'power_audit_' || requested.result)
-              or starts_with('power_audit_' || requested.result, s.artifact_name)))
-      ))
     order by s.artifact_name, s.file_name
   `) as unknown as RawSeriesRow[];
 

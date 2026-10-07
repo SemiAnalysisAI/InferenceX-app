@@ -735,10 +735,7 @@ function auditDevices(
     for (const value of audit.nodes as unknown[]) {
       const receipt = object(value, 'native node receipt');
       for (const uuid of Object.values(object(receipt.physical_gpu_ids, 'native GPU identities'))) {
-        const uuidValue = nonempty(uuid, 'native GPU UUID');
-        if (nativeNodes.has(uuidValue))
-          throw new Error('Required power: duplicate native GPU identity');
-        nativeNodes.set(uuidValue, nonempty(receipt.node, 'native node'));
+        nativeNodes.set(nonempty(uuid, 'native GPU UUID'), nonempty(receipt.node, 'native node'));
       }
     }
   return Object.entries(energies).map(([device, energy]) => {

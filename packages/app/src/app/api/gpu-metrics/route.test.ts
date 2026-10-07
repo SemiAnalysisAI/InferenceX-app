@@ -214,10 +214,7 @@ describe('GET /api/gpu-metrics — database first', () => {
     const body = await res.json();
     expect(body.source).toBe('database');
     expect(body.artifacts).toHaveLength(3);
-    expect(mockGetGpuMetricsForRun).toHaveBeenCalledWith({}, 34557177019, {
-      prefix: null,
-      sourceResults: null,
-    });
+    expect(mockGetGpuMetricsForRun).toHaveBeenCalledWith({}, 34557177019, {});
     expect(globalThis.fetch).not.toHaveBeenCalled();
   });
 
@@ -238,11 +235,7 @@ describe('GET /api/gpu-metrics — database first', () => {
       artifactNames: names,
       artifacts: [{ name: names[2] }],
     });
-    expect(mockGetGpuMetricsForRun).toHaveBeenCalledWith({}, 34557177019, {
-      prefix: null,
-      sourceResults: null,
-      artifact: names[2],
-    });
+    expect(mockGetGpuMetricsForRun).toHaveBeenCalledWith({}, 34557177019, { artifact: names[2] });
     mockGetGpuMetricsForRun.mockResolvedValueOnce({
       ...storedRunPayload,
       artifactNames: names,

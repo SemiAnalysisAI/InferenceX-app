@@ -22,9 +22,8 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { createHash } from 'node:crypto';
 
-import { isMultinodePowerSamplesPath } from './multinode-power-samples.js';
+import { sha256Hex } from './benchmark-artifacts.js';
 import {
   isPowerAuditValidationEntry,
   normalizePowerAuditValidations,
@@ -78,35 +77,18 @@ export function expectedTelemetryArtifactNames(suffix: string): string[] {
   return [`${GPU_METRICS_ARTIFACT_PREFIX}${suffix}`, `${POWER_AUDIT_ARTIFACT_PREFIX}${suffix}`];
 }
 
-function isGpuMetricsCsvName(fileName: string): boolean {
-  const lower = fileName.toLowerCase();
+export function isGpuMetricsCsvPath(relativePath: string): boolean {
+  const lower = path.posix.basename(relativePath).toLowerCase();
   if (!lower.startsWith('gpu_metrics') || !lower.endsWith('.csv')) return false;
   // Sidecars share the prefix but are not time series.
   return !lower.includes('_identity') && !lower.includes('_energy_');
 }
 
-/** Recursively list every telemetry CSV under an extracted artifact root. */
-export function listGpuMetricsCsvFiles(root: string): GpuMetricsCsvFile[] {
-  if (!fs.existsSync(root) || !fs.statSync(root).isDirectory()) return [];
-  const files: GpuMetricsCsvFile[] = [];
-  const visit = (directory: string): void => {
-    for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
-      const pathname = path.join(directory, entry.name);
-      if (entry.isDirectory()) visit(pathname);
-      else if (entry.isFile() && isGpuMetricsCsvName(entry.name)) {
-        files.push({
-          fileName: path.relative(root, pathname).split(path.sep).join('/'),
-          path: pathname,
-        });
-      }
-    }
-  };
-  visit(root);
-  return files.toSorted((a, b) => a.fileName.localeCompare(b.fileName));
-}
-
-/** Every multinode power CSV under an extracted `power_audit_` root. */
-export function listMultinodePowerSampleFiles(root: string): GpuMetricsCsvFile[] {
+/** Recursively list the files under an extracted artifact root whose relative path matches. */
+export function walkFiles(
+  root: string,
+  matches: (relativePath: string) => boolean,
+): GpuMetricsCsvFile[] {
   if (!fs.existsSync(root) || !fs.statSync(root).isDirectory()) return [];
   const files: GpuMetricsCsvFile[] = [];
   const visit = (directory: string): void => {
@@ -115,7 +97,7 @@ export function listMultinodePowerSampleFiles(root: string): GpuMetricsCsvFile[]
       if (entry.isDirectory()) visit(pathname);
       else if (entry.isFile()) {
         const fileName = path.relative(root, pathname).split(path.sep).join('/');
-        if (isMultinodePowerSamplesPath(fileName)) files.push({ fileName, path: pathname });
+        if (matches(fileName)) files.push({ fileName, path: pathname });
       }
     }
   };
@@ -160,8 +142,7 @@ export function readPowerAuditValidations(
   for (const validation of validations.values()) {
     if (typeof validation.validation_path !== 'string') continue;
     const original = files.get(validation.validation_path);
-    if (original !== undefined)
-      validation.validation_sha256 = createHash('sha256').update(original).digest('hex');
+    if (original !== undefined) validation.validation_sha256 = sha256Hex(original);
   }
   return Object.fromEntries(validations);
 }

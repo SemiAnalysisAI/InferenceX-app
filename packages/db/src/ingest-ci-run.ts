@@ -38,6 +38,7 @@ import { GPU_KEYS } from '@semianalysisai/inferencex-constants';
 
 import { hasNoSslFlag } from './cli-utils';
 import {
+  assertRequestedRunAttempt,
   dedupeArtifactsByLogicalName,
   downloadArtifact,
   fetchRunAttempt,
@@ -169,13 +170,7 @@ if (isDownloadMode) {
     DEFAULT_REPO;
 
   runAttemptNum = fetchRunAttempt(REPO, runIdStr);
-  const requestedAttempt = input.match(/\/attempts\/(?<attempt>\d+)/u)?.groups?.attempt;
-  if (requestedAttempt && Number(requestedAttempt) !== runAttemptNum) {
-    throw new Error(
-      `GitHub attempt ${runAttemptNum} differs from requested ${requestedAttempt}; ` +
-        'use retained artifacts and exact source metadata for historical-attempt ingestion',
-    );
-  }
+  assertRequestedRunAttempt(input, runAttemptNum);
 
   // Download artifacts
   tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ingest-'));
@@ -778,11 +773,7 @@ async function main(): Promise<void> {
                     `${ingested.seriesSkipped} unchanged (${elapsed(gpuMetricsStart)})`,
                 );
               } catch (error: any) {
-                // Non-fatal on purpose: this point's benchmark rows are already
-                // committed and only its telemetry tab is affected, and
-                // `admin:db:backfill-gpu-metrics --run <id>` can re-digest the
-                // artifact later. Recording it as a DB error instead would reach
-                // the publication manifest and fail the whole production ingest.
+                // Not fatal; see Skips.telemetryError.
                 tracker.recordTelemetryError(`gpu_metrics for ${configKey}`, error);
                 for (const row of toInsert) {
                   const point = telemetryObservations.get(

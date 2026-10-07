@@ -255,15 +255,6 @@ describe('required power publication contract', () => {
       'invalid native node collection',
     );
   });
-  it('rejects duplicate native GPU identities across nodes', () => {
-    const dir = nativeFixture();
-    changeArtifact(dir, auditPath, (audit) => {
-      audit.nodes[1].physical_gpu_ids = { '0': 'GPU-a' };
-    });
-    expect(() => verifyRequiredPowerArtifacts(dir, source)).toThrow(
-      'duplicate native GPU identity',
-    );
-  });
   it('accepts a JSON physical GPU identity file', () => {
     const dir = fixture();
     const csv = 'agentic_golden/gpu_metrics_identity.csv';

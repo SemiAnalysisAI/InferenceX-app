@@ -49,7 +49,6 @@ export function useByIdQuery<T, TSelected = T>(
   id: number | null,
   enabled: boolean,
   select?: (data: T) => TSelected,
-  freshness?: { staleTime: number; refetchOnWindowFocus: boolean },
 ) {
   const selectNullable = useCallback(
     (data: T | null): TSelected | null =>
@@ -68,7 +67,6 @@ export function useByIdQuery<T, TSelected = T>(
     },
     enabled,
     staleTime: STALE_TIME_MS,
-    ...freshness,
     // TanStack Query re-runs select when its function identity changes. Keep
     // this wrapper stable so decoding a large compact payload happens only
     // when the cached wire data or the caller's selector actually changes.

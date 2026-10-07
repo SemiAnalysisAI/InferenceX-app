@@ -13,18 +13,17 @@
  * Usage:
  *   bun run --cwd packages/db db:backfill-gpu-metrics --run 34557177019 --yes
  *   bun run --cwd packages/db db:backfill-gpu-metrics --all --yes
- *   bun run --cwd packages/db db:backfill-gpu-metrics --all --since 2026-08-01 --dry-run
+ *   bun run --cwd packages/db db:backfill-gpu-metrics --all --dry-run
  *   bun run --cwd packages/db db:backfill-gpu-metrics --all --force --limit 20 --yes
  *
  *   bun run --cwd packages/db db:backfill-gpu-metrics --stats-only --all --dry-run
  *   bun run --cwd packages/db db:backfill-gpu-metrics --stats-only --run 34557177019 --yes
  *
  * --stats-only upgrades outdated digests from DB samples without GitHub access.
- * It includes all retained attempts and dates unless explicitly filtered.
+ * It covers every stored attempt and date; --run, --attempt and --artifact narrow it.
  *
  * Runs that already have at least one stored series are skipped unless
- * --force is passed. --parallel N (default 4) bounds concurrent artifact
- * downloads within one run.
+ * --force is passed.
  */
 
 import fs from 'node:fs';
@@ -33,7 +32,7 @@ import path from 'node:path';
 
 import { hasNoSslFlag } from './cli-utils.js';
 import { AsyncSemaphore } from './etl/async-semaphore.js';
-import { createAdminSql } from './etl/db-utils.js';
+import { createAdminSql, refreshLatestBenchmarks } from './etl/db-utils.js';
 import { ingestGpuMetricsArtifact, refreshGpuMetricStats } from './etl/gpu-metrics-ingest.js';
 import { readPowerAuditValidations } from './etl/gpu-metrics-artifacts.js';
 import type { RecoveredPowerAudit } from './etl/power-audit-validations.js';
@@ -41,6 +40,7 @@ import {
   agentxWindowPlan,
   applyAgentxAudits,
   attachAgentxAudits,
+  type AgentxAuditWrite,
 } from './etl/power-audit-recovery.js';
 import {
   benchmarkPublicationIdentity,
@@ -54,11 +54,6 @@ import {
   type TelemetryReceipt,
 } from './etl/telemetry-receipt.js';
 import { retryArtifactOperation } from './lib/artifact-retry.js';
-import {
-  checkpointBenchmarkRefresh,
-  refreshBackfillBenchmarks,
-  type BenchmarkAuditUpdate,
-} from './lib/backfill-benchmark-refresh.js';
 import {
   confirmProceed,
   listBackfillRunArtifacts,
@@ -81,6 +76,7 @@ import { repositoryFromRunUrl } from './lib/runtime-metadata-artifacts.js';
 
 const DEFAULT_REPO = 'SemiAnalysisAI/InferenceX';
 const GITHUB_RETENTION_DAYS = 90;
+const PAIR_CONCURRENCY = 4;
 const sql = createAdminSql({ noSsl: hasNoSslFlag(), max: 4, onnotice: () => {} });
 
 interface CandidateRun {
@@ -96,13 +92,9 @@ interface BackfillFlags {
   all: boolean;
   dryRun: boolean;
   run: number | null;
-  fromRun: number | null;
-  since: string | null;
-  parallel: number;
   attempt: number | null;
   artifact: string | null;
   receipt: string | null;
-  refreshCacheOnly: boolean;
   statsOnly: boolean;
 }
 
@@ -125,29 +117,15 @@ function stringFlag(flag: string): string | null {
 }
 
 function parseFlags(): BackfillFlags {
-  const sinceIndex = process.argv.indexOf('--since');
-  const since = sinceIndex === -1 ? null : (process.argv[sinceIndex + 1] ?? null);
-  if (sinceIndex !== -1 && (!since || !/^\d{4}-\d{2}-\d{2}$/u.test(since))) {
-    throw new Error('--since requires a YYYY-MM-DD date');
-  }
   return {
     all: process.argv.includes('--all'),
     dryRun: process.argv.includes('--dry-run'),
     run: positiveIntFlag('--run'),
-    fromRun: positiveIntFlag('--from-run'),
-    since,
-    parallel: positiveIntFlag('--parallel') ?? 4,
     attempt: positiveIntFlag('--attempt'),
     artifact: stringFlag('--artifact'),
     receipt: stringFlag('--receipt'),
-    refreshCacheOnly: process.argv.includes('--refresh-cache-only'),
     statsOnly: process.argv.includes('--stats-only'),
   };
-}
-
-function isWithinGithubRetention(date: string): boolean {
-  const ageMs = Date.now() - new Date(date).getTime();
-  return ageMs <= GITHUB_RETENTION_DAYS * 24 * 60 * 60 * 1000;
 }
 
 async function loadCandidateRuns(
@@ -158,15 +136,13 @@ async function loadCandidateRuns(
   const cutoff = new Date(Date.now() - GITHUB_RETENTION_DAYS * 24 * 60 * 60 * 1000)
     .toISOString()
     .slice(0, 10);
-  const since = flags.since ?? cutoff;
   const rows = await sql<CandidateRun[]>`
     select wr.id, wr.github_run_id, wr.run_attempt, wr.html_url, wr.date::text as date,
       (select count(*)::int from gpu_metric_series s where s.workflow_run_id = wr.id) as series_count
     from workflow_runs wr
     where exists (select 1 from benchmark_results br where br.workflow_run_id = wr.id)
       and (${flags.run}::bigint is null or wr.github_run_id = ${flags.run})
-      and (${flags.fromRun}::bigint is null or wr.github_run_id >= ${flags.fromRun})
-      and (${flags.run}::bigint is not null or wr.date >= ${since}::date)
+      and (${flags.run}::bigint is not null or wr.date >= ${cutoff}::date)
       and ((${flags.attempt}::integer is not null and wr.run_attempt = ${flags.attempt}) or
         (${flags.attempt}::integer is null and not exists (
           select 1 from workflow_runs newer where newer.github_run_id = wr.github_run_id
@@ -184,6 +160,35 @@ async function loadCandidateRuns(
   return limit === null ? candidates : candidates.slice(0, limit);
 }
 
+/**
+ * The verifier compares the receipt with the database, so a merged CI receipt
+ * that expected no audit must expect the one recovered here. Match by stored
+ * identity: after the offload fallback, the mapped identity differs from it.
+ */
+async function expectRecoveredAudits(
+  manifest: PowerPublicationManifest,
+  audits: readonly AgentxAuditWrite[],
+): Promise<void> {
+  if (audits.length === 0 || manifest.points.length === 0) return;
+  const rows = await sql<Record<string, unknown>[]>`
+    select c.*, br.id, br.benchmark_type, br.isl, br.osl, br.conc, br.offload_mode,
+      br.recipe_fingerprint
+    from benchmark_results br join configs c on c.id = br.config_id
+    where br.id = any(${sql.array(audits.map((audit) => audit.benchmarkResultId))}::bigint[])
+  `;
+  for (const row of rows) {
+    const identity = stablePowerPointIdentity(row);
+    const { powerAudit } = audits.find((audit) => audit.benchmarkResultId === Number(row.id))!;
+    for (const point of manifest.points) {
+      if (
+        (point.power_audit === null || point.power_audit === undefined) &&
+        stablePowerPointIdentity(point.identity) === identity
+      )
+        point.power_audit = powerAudit;
+    }
+  }
+}
+
 type PairOutcome =
   | {
       kind: 'ingested';
@@ -191,6 +196,7 @@ type PairOutcome =
       samplesInserted: number;
       pointsLinked: number;
       expectationsUnknown: boolean;
+      audits: AgentxAuditWrite[];
       auditsWritten: number;
     }
   | { kind: 'unmatched' }
@@ -204,7 +210,6 @@ async function processPair(
   observations: Map<string, TelemetryObservation>,
   expectationErrors: NonNullable<TelemetryReceipt['expectationErrors']>,
   uniqueFallbacks: Map<string, number>,
-  checkpointMetadata: (updates: BenchmarkAuditUpdate[]) => Promise<void>,
 ): Promise<PairOutcome> {
   let benchmarkDir: string | null = null;
   let gpuMetricsDir: string | null = null;
@@ -241,7 +246,6 @@ async function processPair(
       id: number;
       benchmarkType: string;
       conc: number;
-      identity: Record<string, unknown>;
       powerAudit?: RecoveredPowerAudit;
     }[] = [];
     for (const row of mappedRows) {
@@ -251,9 +255,8 @@ async function processPair(
       if (ids.length === 0) throw new Error(`${pair.gpuMetrics.name}: no matching benchmark rows`);
       matchedIds.push(...ids);
       if (row.benchmarkType === 'agentic_traces') {
-        const identity = benchmarkPublicationIdentity(row);
         for (const id of ids)
-          agenticPoints.push({ id, benchmarkType: row.benchmarkType, conc: row.conc, identity });
+          agenticPoints.push({ id, benchmarkType: row.benchmarkType, conc: row.conc });
       }
     }
     const resultIds = [...new Set(matchedIds)];
@@ -266,8 +269,7 @@ async function processPair(
       downloadArtifact(pair.gpuMetrics, tempDir),
     );
     // One plan per pair: the bundle's retained windows attached to the single
-    // stored point at each concurrency. The receipt checkpoints exactly these
-    // writes before the series ingest, and the apply statement writes exactly them.
+    // stored point at each concurrency.
     const plan = agentxWindowPlan(readPowerAuditValidations(gpuMetricsDir, pair.gpuMetrics.name));
     const attached = attachAgentxAudits(plan, agenticPoints, (point) => `benchmark ${point.id}`);
     for (const refusal of attached.refused) {
@@ -276,12 +278,9 @@ async function processPair(
           `covers ${refusal.points.join(', ')}; provenance withheld`,
       );
     }
-    const auditUpdates: BenchmarkAuditUpdate[] = attached.points.flatMap((point) =>
-      point.powerAudit
-        ? [{ benchmarkResultId: point.id, identity: point.identity, powerAudit: point.powerAudit }]
-        : [],
+    const audits: AgentxAuditWrite[] = attached.points.flatMap((point) =>
+      point.powerAudit ? [{ benchmarkResultId: point.id, powerAudit: point.powerAudit }] : [],
     );
-    await checkpointMetadata(auditUpdates);
     const ingested = await ingestGpuMetricsArtifact(sql, {
       workflowRunId: run.id,
       artifact: { artifactName: pair.gpuMetrics.name, artifactDir: gpuMetricsDir },
@@ -291,19 +290,14 @@ async function processPair(
       throw new Error(`${pair.gpuMetrics.name}: no parseable gpu_metrics CSV`);
     }
     // Provenance is written only after every host series is stored and linked.
-    const written = await applyAgentxAudits(sql, {
-      workflowRunId: run.id,
-      writes: auditUpdates.map(({ benchmarkResultId, powerAudit }) => ({
-        benchmarkResultId,
-        powerAudit,
-      })),
-    });
+    const written = await applyAgentxAudits(sql, { workflowRunId: run.id, writes: audits });
     return {
       kind: 'ingested',
       seriesCount: ingested.seriesIds.length,
       samplesInserted: ingested.samplesInserted,
       pointsLinked: resultIds.length,
       expectationsUnknown,
+      audits,
       auditsWritten: written.length,
     };
   } catch (error) {
@@ -333,21 +327,10 @@ async function main(): Promise<void> {
   }
   if ((flags.attempt !== null || flags.artifact || flags.receipt) && flags.run === null)
     throw new Error('--attempt, --artifact and --receipt require --run');
-  if (
-    flags.refreshCacheOnly &&
-    (!flags.run || !flags.receipt || flags.artifact || flags.all || flags.dryRun)
-  )
-    throw new Error(
-      '--refresh-cache-only requires --run and --receipt, without --all, --artifact or --dry-run',
-    );
-  if (flags.refreshCacheOnly && !fs.existsSync(flags.receipt!))
-    throw new Error('--refresh-cache-only requires an existing receipt');
 
   if (flags.statsOnly) {
-    if (flags.refreshCacheOnly || flags.receipt || force)
-      throw new Error(
-        '--stats-only cannot be combined with --refresh-cache-only, --receipt or --force',
-      );
+    if (flags.receipt || force)
+      throw new Error('--stats-only cannot be combined with --receipt or --force');
     const series = await findOutdatedGpuMetricSeries(sql, flags, limit);
     console.log(`${series.length} outdated digest(s); --limit counts series in --stats-only mode`);
     if (flags.dryRun) {
@@ -378,12 +361,7 @@ async function main(): Promise<void> {
 
   console.log('=== backfill-gpu-metrics ===');
   const runs = await loadCandidateRuns(flags, limit, force);
-  const staleRuns = runs.filter((run) => !isWithinGithubRetention(run.date)).length;
-  const staleNote =
-    staleRuns > 0
-      ? ` (${staleRuns} older than GitHub's ${GITHUB_RETENTION_DAYS}-day retention)`
-      : '';
-  console.log(`  ${runs.length} candidate run(s)${staleNote}`);
+  console.log(`  ${runs.length} candidate run(s)`);
   if (runs.length === 0) {
     if (flags.attempt !== null || flags.artifact || flags.receipt)
       throw new Error(
@@ -433,13 +411,7 @@ async function main(): Promise<void> {
     return;
   }
 
-  if (
-    !(await confirmProceed(
-      flags.refreshCacheOnly
-        ? 'Only the recorded benchmark metadata cache will be refreshed.'
-        : `${runs.length} workflow run(s) will be checked for gpu_metrics.`,
-    ))
-  ) {
+  if (!(await confirmProceed(`${runs.length} workflow run(s) will be checked for gpu_metrics.`))) {
     return;
   }
 
@@ -478,46 +450,10 @@ async function main(): Promise<void> {
       fs.writeFileSync(temporary, `${JSON.stringify(manifest, null, 2)}\n`, { flush: true });
       fs.renameSync(temporary, receiptPath);
     };
-    const refresh = async () => {
-      try {
-        await refreshBackfillBenchmarks(sql, manifest, saveReceipt);
-      } catch (error) {
-        process.exitCode = 1;
-        console.error(
-          `  Benchmark metadata refresh failed; retry --refresh-cache-only --run ${runId} --attempt ${run.run_attempt} --receipt ${receiptPath} --yes`,
-          error,
-        );
-      }
-    };
-    if (flags.refreshCacheOnly) {
-      await refresh();
-      continue;
-    }
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), `gpu-metrics-backfill-${runId}-`));
-    const checkpointMetadata = async (updates: BenchmarkAuditUpdate[]) => {
-      if (updates.length === 0) return;
-      const candidates = await sql<{ id: number; offload_mode: string }[]>`
-        select br.id, br.offload_mode from benchmark_results br
-        where br.workflow_run_id = ${run.id}
-          and br.id = any(${sql.array(updates.map((update) => update.benchmarkResultId))}::bigint[])
-          and br.benchmark_type = 'agentic_traces' and br.power_audit is null
-      `;
-      checkpointBenchmarkRefresh(
-        manifest,
-        candidates.map((row) => Number(row.id)),
-        saveReceipt,
-        candidates.map((row) => {
-          const update = updates.find((entry) => entry.benchmarkResultId === Number(row.id))!;
-          return {
-            ...update,
-            sourceIdentity: update.identity,
-            identity: { ...update.identity, offload_mode: row.offload_mode },
-          };
-        }),
-      );
-    };
     const observations = new Map<string, TelemetryObservation>();
     const uniqueFallbacks = new Map<string, number>();
+    const audits: AgentxAuditWrite[] = [];
     let recoveryError: string | undefined;
     let expectationErrors: TelemetryReceipt['expectationErrors'];
     try {
@@ -586,19 +522,11 @@ async function main(): Promise<void> {
         continue;
       }
 
-      const limiter = new AsyncSemaphore(flags.parallel);
+      const limiter = new AsyncSemaphore(PAIR_CONCURRENCY);
       const outcomes = await Promise.all(
         pairs.map((pair) =>
           limiter.run(() =>
-            processPair(
-              run,
-              pair,
-              tempDir,
-              observations,
-              missing.errors,
-              uniqueFallbacks,
-              checkpointMetadata,
-            ),
+            processPair(run, pair, tempDir, observations, missing.errors, uniqueFallbacks),
           ),
         ),
       );
@@ -612,6 +540,7 @@ async function main(): Promise<void> {
             runSeries += outcome.seriesCount;
             runSamples += outcome.samplesInserted;
             pointsLinked += outcome.pointsLinked;
+            audits.push(...outcome.audits);
             auditsWritten += outcome.auditsWritten;
             break;
           }
@@ -637,6 +566,7 @@ async function main(): Promise<void> {
       recoveryError = error instanceof Error ? error.message : String(error);
       console.error(`  ✗ run ${runId}:`, error);
     } finally {
+      await expectRecoveredAudits(manifest, audits);
       manifest.telemetry = await readTelemetryReceipt(
         sql,
         { runId, runAttempt: run.run_attempt },
@@ -651,13 +581,14 @@ async function main(): Promise<void> {
         },
       );
       saveReceipt();
-      if (manifest.benchmarkRefresh && manifest.benchmarkRefresh.status !== 'complete')
-        await refresh();
       console.log(`  PowerX ingest receipt: ${receiptPath}`);
       fs.rmSync(tempDir, { recursive: true, force: true });
     }
   }
 
+  // latest_benchmarks copies the AgentX audits; refresh even when this run wrote
+  // none, so rerunning after an interrupted write still publishes them.
+  await refreshLatestBenchmarks(sql);
   console.log(
     `\n=== backfill complete: ${artifactsProcessed} artifact(s), ${seriesStored} series, ` +
       `${samplesStored} sample(s), ${pointsLinked} point link(s), ` +
@@ -666,7 +597,7 @@ async function main(): Promise<void> {
       `${artifactFailures} failed artifact(s), ${runFailures} failed run(s) ===`,
   );
   console.log(
-    '  Point telemetry reads use the stored revision; API verification is recorded separately.',
+    '  Refresh the API cache: bun run admin:cache:invalidate <origin> && bun run admin:cache:warmup <origin>',
   );
   if (artifactFailures > 0 || runFailures > 0) process.exitCode = 1;
 }

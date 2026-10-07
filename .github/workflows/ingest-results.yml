@@ -9,11 +9,6 @@ on:
         description: InferenceX Actions run ID to ingest
         required: true
         type: string
-      require-power:
-        description: Require the versioned PowerX manifest and all declared evidence
-        required: false
-        default: false
-        type: boolean
       run-attempt:
         description: InferenceX Actions run attempt to ingest
         required: false

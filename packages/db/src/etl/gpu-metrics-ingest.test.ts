@@ -368,14 +368,14 @@ describe('versioned full-record digests', () => {
     await sql`update workflow_runs set date = '2020-01-01' where id = 1`;
     const targets = await findOutdatedGpuMetricSeries(
       sql,
-      { run: null, attempt: null, artifact: null, fromRun: null, since: null },
+      { run: null, attempt: null, artifact: null },
       null,
     );
     expect(targets.map((row) => Number(row.id))).toEqual(first.seriesIds);
     expect(
       await findOutdatedGpuMetricSeries(
         sql,
-        { run: 34557177019, attempt: 2, artifact: null, fromRun: null, since: null },
+        { run: 34557177019, attempt: 2, artifact: null },
         null,
       ),
     ).toEqual([]);

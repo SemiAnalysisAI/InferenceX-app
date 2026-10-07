@@ -16,16 +16,10 @@ export function correlationYMetric(
 }
 export interface ParsedPoint {
   seconds: number;
-  /** Absolute sample time in ms; smoothing and alignment work in this space. */
-  ms: number;
   value: number;
   gpuIndex: number;
-  /** The raw sample behind this point; null once the value has been averaged. */
-  raw: GpuMetricRow | null;
-  /** For the mean line: how many chips contributed at this timestamp. */
-  count?: number;
+  raw: GpuMetricRow;
 }
-
 function parseTimestamp(raw: string): Date | null {
   const isoDate = new Date(raw);
   if (!isNaN(isoDate.getTime())) return isoDate;
@@ -36,11 +30,11 @@ function parseTimestamp(raw: string): Date | null {
   return null;
 }
 
-export function buildTelemetryData(
+export function buildGroupedData(
   data: GpuMetricRow[],
   visibleGpus: Set<number>,
   metricKey: GpuMetricKey,
-): { t0Ms: number; groups: Map<number, ParsedPoint[]> } {
+): Map<number, ParsedPoint[]> {
   // t=0 is the first sample of the whole series, not of the visible chips, so
   // hiding a chip never shifts the time axis under the remaining lines.
   let minTime = Infinity;
@@ -61,7 +55,6 @@ export function buildTelemetryData(
     if (!groups.has(row.index)) groups.set(row.index, []);
     groups.get(row.index)!.push({
       seconds: (ms - minTime) / 1000,
-      ms,
       value,
       gpuIndex: row.index,
       raw: row,
@@ -70,19 +63,7 @@ export function buildTelemetryData(
   for (const points of groups.values()) {
     points.sort((a, b) => a.seconds - b.seconds);
   }
-  return { t0Ms: minTime, groups };
-}
-
-/** Keep the read-only view's serialized point shape while sharing chart preparation. */
-export function buildGroupedData(
-  data: GpuMetricRow[],
-  visibleGpus: Set<number>,
-  metricKey: GpuMetricKey,
-) {
-  const { groups } = buildTelemetryData(data, visibleGpus, metricKey);
-  return new Map(
-    [...groups].map(([index, points]) => [index, points.map(({ ms: _ms, ...point }) => point)]),
-  );
+  return groups;
 }
 
 export function buildCorrelationData(
