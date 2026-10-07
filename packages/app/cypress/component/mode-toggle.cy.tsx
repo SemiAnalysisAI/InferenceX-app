@@ -10,6 +10,7 @@ const ICONS: Record<string, string> = {
   gta: 'lucide-car',
   kart: 'lucide-flag',
   doom: 'lucide-skull',
+  halo: 'lucide-shield',
 };
 
 function pick(theme: string) {
@@ -52,7 +53,7 @@ describe('ModeToggle', () => {
   });
 
   it('selects any theme directly and closes the menu', () => {
-    for (const theme of ['kart', 'doom', 'gta', 'minecraft', 'dark', 'csgo', 'light']) {
+    for (const theme of ['kart', 'doom', 'halo', 'gta', 'minecraft', 'dark', 'csgo', 'light']) {
       pick(theme);
       cy.get('html').should('have.class', theme);
       cy.get('[data-testid="theme-menu"]').should('not.exist');

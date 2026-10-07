@@ -5,7 +5,16 @@ import { generateHighContrastColors } from './chart-utils';
 
 describe('presentation themes', () => {
   it('lists every picker theme in display order', () => {
-    expect(APP_THEMES).toEqual(['light', 'dark', 'minecraft', 'csgo', 'gta', 'kart', 'doom']);
+    expect(APP_THEMES).toEqual([
+      'light',
+      'dark',
+      'minecraft',
+      'csgo',
+      'gta',
+      'kart',
+      'doom',
+      'halo',
+    ]);
   });
 
   it('aliases decorative dark themes onto the dark chart seed only', () => {
@@ -13,6 +22,7 @@ describe('presentation themes', () => {
       'light',
       'dark',
       'minecraft',
+      'dark',
       'dark',
       'dark',
       'dark',
@@ -28,6 +38,7 @@ describe('presentation themes', () => {
     ['gta', true],
     ['kart', true],
     ['doom', true],
+    ['halo', true],
     ['system', false],
     [undefined, false],
   ])('classifies %s for chart and figure contrast', (theme, expected) => {
@@ -61,6 +72,13 @@ describe('presentation themes', () => {
   it('preserves the dark high-contrast palette in Doom for official and overlay keys', () => {
     const keys = ['b200_vllm', 'b300_vllm', 'mi355x_sglang', 'overlay-1', 'overlay-2'];
     expect(generateHighContrastColors(keys, 'doom')).toEqual(
+      generateHighContrastColors(keys, 'dark'),
+    );
+  });
+
+  it('preserves the dark high-contrast palette in Halo for official and overlay keys', () => {
+    const keys = ['b200_vllm', 'b300_vllm', 'mi355x_sglang', 'overlay-1', 'overlay-2'];
+    expect(generateHighContrastColors(keys, 'halo')).toEqual(
       generateHighContrastColors(keys, 'dark'),
     );
   });

@@ -9,6 +9,7 @@ const themes = {
   gta: lazy(() => import('./gta/gta-theme')),
   kart: lazy(() => import('./kart/kart-decorations')),
   doom: lazy(() => import('./doom/doom-theme')),
+  halo: lazy(() => import('./halo/halo-theme')),
 };
 
 export function EasterEggThemeLazy() {

@@ -1,0 +1,219 @@
+@font-face {
+  font-family: 'Industry';
+  src: url('../../app/fonts/Industry-Demi.woff2') format('woff2');
+  font-weight: 600;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Industry';
+  src: url('../../app/fonts/Industry-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-display: swap;
+}
+/* ── Halo Theme ── Halo Infinite menu chrome over the dark chart palettes. */
+
+/* Local Halo Infinite artwork, mounted only while the Halo theme is active. */
+.halo-scene {
+  position: fixed;
+  inset: 0;
+  z-index: -10;
+  pointer-events: none;
+  overflow: hidden;
+  background: #04080e;
+}
+
+.halo-scene-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 40%;
+}
+
+.halo-scene-shade {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse at 50% 30%, #04080e33, #04080ecc 70%),
+    linear-gradient(180deg, #04080e80, #04080ed9 60%, #04080ef2);
+}
+
+.halo-theme-banner {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  min-height: 15rem;
+  margin-block: 0.5rem 1.5rem;
+  padding: 1.5rem 2rem;
+  border: 1px solid #5ed1ff40;
+  border-bottom: 3px solid var(--primary);
+  background: #060c14;
+  box-shadow: 0 0 24px #5ed1ff1f;
+}
+
+.halo-banner-art {
+  position: absolute;
+  inset: 0 0 0 30%;
+  z-index: -2;
+}
+
+.halo-banner-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 30% center;
+}
+
+.halo-banner-shade {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(90deg, #060c14 0%, #060c14f0 28%, #060c1466 55%, #060c1400 80%);
+}
+
+.halo-banner-title {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  max-width: min(26rem, 60%);
+}
+
+.halo-logo {
+  width: 100%;
+  height: auto;
+  filter: drop-shadow(0 0 10px #5ed1ff59);
+}
+
+.halo-wordmark {
+  font-family: var(--halo-menu);
+  font-weight: 700;
+  font-size: clamp(1.5rem, 3vw, 2.25rem);
+  line-height: 1;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: #f2f8fc;
+  text-shadow: 0 0 12px #5ed1ff66;
+}
+
+.halo-tagline {
+  font-family: var(--halo-menu);
+  font-weight: 600;
+  font-size: 0.85rem;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--primary);
+}
+
+@media (max-width: 640px) {
+  .halo-theme-banner {
+    min-height: 11rem;
+    padding: 1rem;
+  }
+
+  .halo-banner-art {
+    left: 0;
+  }
+
+  .halo-banner-shade {
+    background: linear-gradient(90deg, #060c14eb, #060c1499 60%, #060c1440);
+  }
+
+  .halo-banner-title {
+    max-width: 75%;
+  }
+
+  .halo-wordmark {
+    font-size: 1.25rem;
+  }
+
+  .halo-tagline {
+    font-size: 0.7rem;
+  }
+}
+
+/* Header and headings use Halo Infinite's Industry face; body copy stays DM Sans. */
+.halo header {
+  background: #050a11eb;
+  border-bottom: 2px solid #5ed1ff66;
+}
+
+.halo :is(h1, h2, h3, [data-slot='card-title']) {
+  font-family: var(--halo-menu);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.halo header nav a,
+.halo [data-testid='mobile-menu'] a {
+  font-family: var(--halo-menu);
+  font-size: 0.95rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  border-radius: 0;
+}
+
+/* Selected menu tab: cyan underline glow, like the Halo Infinite menu bar. */
+.halo header nav a[aria-current='page'],
+.halo [data-testid='mobile-menu'] a[aria-current='page'] {
+  color: #fff;
+  box-shadow: inset 0 -3px 0 var(--primary);
+  background: #5ed1ff1a;
+}
+
+.halo :is(button, [role='button'], [role='combobox'], input, textarea, a):focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 3px;
+}
+
+.halo :is([data-slot='card'], [data-slot='select-trigger'], [data-slot='tabs-list']) {
+  border-radius: var(--radius);
+}
+
+/* Menu panels: near-opaque navy with a faint Forerunner-cyan frame. */
+.halo [data-slot='card'] {
+  background-color: #08111beb;
+  border-color: #5ed1ff26;
+}
+
+.halo [data-slot='dashboard-navigation'] {
+  border-radius: 0;
+  background: #050a11d9;
+}
+
+.halo [data-slot='dashboard-navigation'] nav :is(a, button) {
+  font-family: var(--halo-menu);
+  font-size: 1.05rem;
+  font-weight: 600;
+  padding: 0.5rem 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.halo [data-slot='dashboard-navigation'] nav [data-tab-active='true'] {
+  color: #fff;
+  box-shadow: inset 0 -3px 0 var(--primary);
+  background: #5ed1ff1f;
+}
+
+.halo [data-slot='popover-content'] {
+  background-color: #050a11f0;
+  border-color: #5ed1ff33;
+}
+
+.halo .splash-text {
+  font-family: var(--halo-menu) !important;
+  font-weight: 700;
+  color: var(--secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  text-shadow: 0 0 8px #9fd35666;
+}
+
+.halo .circuit-bg,
+.halo .autumn-leaves,
+html[data-inferencex-embed] .halo-scene,
+html[data-inferencex-embed] [data-testid='halo-theme-banner'] {
+  display: none;
+}
