@@ -9,6 +9,8 @@ import { WEAPONS, EQUIPMENT } from './weapons.mjs';
 import { Navigation } from './navigation.mjs';
 import { SOUND_NAMES, fireSound, resolveSound } from './audio-map.mjs';
 import { acquireMouse, releaseMouse, isMouseCaptured } from './mouse-capture.mjs';
+import { shouldHideArms } from './viewmodel-visibility.mjs';
+import { actionClip } from './weapon-animation.mjs';
 THREE.Mesh.prototype.raycast = acceleratedRaycast;
 const $ = (id) => document.querySelector(`#${id}`);
 const renderer = new THREE.WebGLRenderer({
@@ -82,7 +84,7 @@ let weaponMixer = null,
   weaponAction = null;
 function animateWeapon(fragment) {
   if (!weaponMixer) return;
-  const clip = weaponClips.find((c) => c.name.toLowerCase().includes(fragment));
+  const clip = actionClip(weaponClips, fragment);
   if (!clip) return;
   const next = weaponMixer.clipAction(clip);
   if (weaponAction) weaponAction.fadeOut(0.08);
@@ -422,8 +424,7 @@ async function showWeapon(id) {
       const model = cloneSkeleton(gltf.scene);
       model.rotation.y = Math.PI;
       model.traverse((o) => {
-        if (o.name.includes('ct_arms') && match?.players[0].team === 'T') o.visible = false;
-        if (o.name.includes('t_arms') && match?.players[0].team === 'CT') o.visible = false;
+        if (shouldHideArms(o.name, match?.players[0].team)) o.visible = false;
         if (o.isMesh) {
           o.frustumCulled = false;
           o.material = Array.isArray(o.material)
@@ -1000,7 +1001,7 @@ function update(dt) {
     weaponMixer.update(dt);
     if (
       weaponAction &&
-      weaponAction.getClip().name.includes('fire') &&
+      weaponAction.loop === THREE.LoopOnce &&
       weaponAction.time >= weaponAction.getClip().duration
     )
       animateWeapon('idle');

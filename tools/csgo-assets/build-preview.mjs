@@ -39,6 +39,7 @@ for (const file of [
   'game-assets-lock.json',
   'GAME.md',
   'README.md',
+  'favicon.svg',
 ])
   await cp(join(root, file), join(output, file));
 await cp(join(root, 'assets'), join(output, 'assets'), { recursive: true });

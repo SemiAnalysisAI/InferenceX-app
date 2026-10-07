@@ -2,6 +2,14 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { WEAPONS } from './weapons.mjs';
+import { actionClip } from './weapon-animation.mjs';
+test('animation binding handles shoot/fire and inspect/lookat aliases', () => {
+  const clips = ['@idle', '@shoot1', '@reload', '@lookat01'].map((name) => ({ name }));
+  assert.equal(actionClip(clips, 'fire').name, '@shoot1');
+  assert.equal(actionClip(clips, 'lookat').name, '@lookat01');
+  assert.equal(actionClip([{ name: 'weapon_fire1' }], 'fire').name, 'weapon_fire1');
+  assert.equal(actionClip([{ name: 'inspect' }], 'lookat').name, 'inspect');
+});
 const root = new URL('assets/viewmodels/', import.meta.url);
 test(
   'all 34 animated viewmodels contain real textures, geometry and animation clips',

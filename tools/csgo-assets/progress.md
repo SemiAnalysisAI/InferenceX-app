@@ -54,7 +54,7 @@ Original prompt: Open a PR for a realistic CS:GO Dust II 5v5 3D game using real 
 
 Current game work:
 
-- 26 local Node tests pass, including all 34 viewmodels, 34 world models, both
+- 28 local Node tests pass, including all 34 viewmodels, 34 world models, both
   characters, firing audio mappings, inventory behavior and map graph connectivity.
 - 73 generated map/model/navigation files have SHA-256 entries. Binary asset
   tests skip in CI when those ignored assets are absent; local results are separate.

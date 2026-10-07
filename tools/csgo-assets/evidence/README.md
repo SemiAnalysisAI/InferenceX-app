@@ -24,4 +24,4 @@ The displayed software-renderer frame rates are not presentation-machine measure
 
 No reference build or original map digest has been approved. These tests do not establish exact layout, materials, lighting, movement, hitboxes, recoil, penetration, grenade physics, economy, animation timing or high-skill bot tactics. One simulated match is not a repeated-seed stability qualification.
 
-The 26 local Node tests pass. Four asset-dependent tests skip in CI when the ignored generated assets are absent. The parity report remains ineligible, intentionally.
+The 28 local Node tests pass. Four asset-dependent tests skip in CI when the ignored generated assets are absent. The parity report remains ineligible, intentionally.
