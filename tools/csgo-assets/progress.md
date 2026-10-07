@@ -58,9 +58,11 @@ Current game work:
   characters, firing audio mappings, inventory behavior and map graph connectivity.
 - 73 generated map/model/navigation files have SHA-256 entries. Binary asset
   tests skip in CI when those ignored assets are absent; local results are separate.
-- The earlier browser run physically traversed all 60 spawn-to-site routes,
-  exercised movement, firing, reloading, buying and two round transitions with
-  no page errors. The updated character/audio build is undergoing another run.
+- The updated browser run physically traversed all 60 spawn-to-site routes,
+  exercised movement, firing, reloading, buying and audio playback, and completed
+  a 21-round simulated match, ending 16–5 after halftime with no page errors.
+  The human slot was inactive during the match simulation; this is not a skilled
+  human playtest or bot-tactics qualification. See `evidence/README.md`.
 - Full-match, reference fidelity and presentation-hardware approval are not inferred
   from these local tests. The parity gate remains unsatisfied.
 

@@ -85,15 +85,15 @@ The search also found:
 “95% of CS:GO.” It includes full-map visuals and collision, weapons, movement,
 grenades, bomb logic, rounds, economy, bots, audio, HUD, spectators, offline 5v5,
 stability and dashboard isolation. Each row must be expanded into reproducible
-reference test cases before signoff. No gameplay category is implemented by this
-asset tooling.
+reference test cases before signoff. The implementation in `game.html` does not
+by itself establish that any reference-parity category has passed.
 
 Before game implementation is accepted, confirm:
 
 - The CS:GO reference build and map digest.
 - Browser integration in InferenceX versus another target.
-- Whether 5v5 requires ten humans, one human plus bots, or both. The proposal
-  conservatively includes both; it does not silently waive networking.
+- The user confirmed one human plus nine bots. Ten-human networking is explicitly
+  outside this iteration's scope; high-skill bot acceptance still needs definition.
 - Presentation hardware, acceptable performance and the presentation date.
 - The final weights, required cases and explicitly excluded cosmetic features.
 

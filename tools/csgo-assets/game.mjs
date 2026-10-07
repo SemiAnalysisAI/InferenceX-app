@@ -54,6 +54,8 @@ let modelId = '',
   sites,
   frame = 0,
   smoothedFps = 60,
+  previousRender = performance.now(),
+  renderedStats = { calls: 0, triangles: 0 },
   last = performance.now(),
   grenades = [],
   effects = [],
@@ -1295,7 +1297,6 @@ window.advanceTime = (ms) => {
 function loop(now) {
   const rawDt = (now - last) / 1000;
   last = now;
-  smoothedFps = smoothedFps * 0.95 + 0.05 / Math.max(0.001, rawDt);
   let remaining = Math.min(0.2, rawDt);
   while (remaining > 0) {
     const dt = Math.min(1 / 60, remaining);
@@ -1303,13 +1304,20 @@ function loop(now) {
     remaining -= dt;
   }
   if (frame++ % 5 === 0) hud();
-  if (frame % 30 === 0)
-    $('performance').textContent =
-      `${Math.round(smoothedFps)} FPS · ${renderer.info.render.calls} draws · ${Math.round(renderer.info.render.triangles / 1000)}k tris`;
   if (ready && (!paused || redraw)) {
     renderer.render(scene, camera);
+    const interval = (now - previousRender) / 1000;
+    smoothedFps =
+      interval > 0 && interval < 1
+        ? smoothedFps * 0.9 + 0.1 / interval
+        : 1 / Math.max(0.001, interval);
+    previousRender = now;
+    renderedStats = { ...renderer.info.render };
     redraw = false;
   }
+  if (frame % 15 === 0)
+    $('performance').textContent =
+      `${paused ? 'PAUSED' : `${Math.round(smoothedFps)} FPS`} · ${renderedStats.calls} draws · ${Math.round(renderedStats.triangles / 1000)}k tris`;
   requestAnimationFrame(loop);
 }
 requestAnimationFrame(loop);

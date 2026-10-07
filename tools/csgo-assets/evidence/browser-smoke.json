@@ -1,0 +1,693 @@
+{
+  "physicalRoutes": [
+    {
+      "team": "T",
+      "spawnIndex": 0,
+      "site": 0,
+      "passed": true,
+      "index": 117,
+      "length": 117
+    },
+    {
+      "team": "T",
+      "spawnIndex": 0,
+      "site": 1,
+      "passed": true,
+      "index": 93,
+      "length": 93
+    },
+    {
+      "team": "T",
+      "spawnIndex": 1,
+      "site": 0,
+      "passed": true,
+      "index": 120,
+      "length": 120
+    },
+    {
+      "team": "T",
+      "spawnIndex": 1,
+      "site": 1,
+      "passed": true,
+      "index": 90,
+      "length": 90
+    },
+    {
+      "team": "T",
+      "spawnIndex": 2,
+      "site": 0,
+      "passed": true,
+      "index": 110,
+      "length": 110
+    },
+    {
+      "team": "T",
+      "spawnIndex": 2,
+      "site": 1,
+      "passed": true,
+      "index": 100,
+      "length": 100
+    },
+    {
+      "team": "T",
+      "spawnIndex": 3,
+      "site": 0,
+      "passed": true,
+      "index": 104,
+      "length": 104
+    },
+    {
+      "team": "T",
+      "spawnIndex": 3,
+      "site": 1,
+      "passed": true,
+      "index": 106,
+      "length": 106
+    },
+    {
+      "team": "T",
+      "spawnIndex": 4,
+      "site": 0,
+      "passed": true,
+      "index": 101,
+      "length": 101
+    },
+    {
+      "team": "T",
+      "spawnIndex": 4,
+      "site": 1,
+      "passed": true,
+      "index": 104,
+      "length": 104
+    },
+    {
+      "team": "T",
+      "spawnIndex": 5,
+      "site": 0,
+      "passed": true,
+      "index": 120,
+      "length": 120
+    },
+    {
+      "team": "T",
+      "spawnIndex": 5,
+      "site": 1,
+      "passed": true,
+      "index": 90,
+      "length": 90
+    },
+    {
+      "team": "T",
+      "spawnIndex": 6,
+      "site": 0,
+      "passed": true,
+      "index": 113,
+      "length": 113
+    },
+    {
+      "team": "T",
+      "spawnIndex": 6,
+      "site": 1,
+      "passed": true,
+      "index": 97,
+      "length": 97
+    },
+    {
+      "team": "T",
+      "spawnIndex": 7,
+      "site": 0,
+      "passed": true,
+      "index": 111,
+      "length": 111
+    },
+    {
+      "team": "T",
+      "spawnIndex": 7,
+      "site": 1,
+      "passed": true,
+      "index": 99,
+      "length": 99
+    },
+    {
+      "team": "T",
+      "spawnIndex": 8,
+      "site": 0,
+      "passed": true,
+      "index": 102,
+      "length": 102
+    },
+    {
+      "team": "T",
+      "spawnIndex": 8,
+      "site": 1,
+      "passed": true,
+      "index": 105,
+      "length": 105
+    },
+    {
+      "team": "T",
+      "spawnIndex": 9,
+      "site": 0,
+      "passed": true,
+      "index": 116,
+      "length": 116
+    },
+    {
+      "team": "T",
+      "spawnIndex": 9,
+      "site": 1,
+      "passed": true,
+      "index": 94,
+      "length": 94
+    },
+    {
+      "team": "T",
+      "spawnIndex": 10,
+      "site": 0,
+      "passed": true,
+      "index": 112,
+      "length": 112
+    },
+    {
+      "team": "T",
+      "spawnIndex": 10,
+      "site": 1,
+      "passed": true,
+      "index": 98,
+      "length": 98
+    },
+    {
+      "team": "T",
+      "spawnIndex": 11,
+      "site": 0,
+      "passed": true,
+      "index": 109,
+      "length": 109
+    },
+    {
+      "team": "T",
+      "spawnIndex": 11,
+      "site": 1,
+      "passed": true,
+      "index": 101,
+      "length": 101
+    },
+    {
+      "team": "T",
+      "spawnIndex": 12,
+      "site": 0,
+      "passed": true,
+      "index": 105,
+      "length": 105
+    },
+    {
+      "team": "T",
+      "spawnIndex": 12,
+      "site": 1,
+      "passed": true,
+      "index": 105,
+      "length": 105
+    },
+    {
+      "team": "T",
+      "spawnIndex": 13,
+      "site": 0,
+      "passed": true,
+      "index": 106,
+      "length": 106
+    },
+    {
+      "team": "T",
+      "spawnIndex": 13,
+      "site": 1,
+      "passed": true,
+      "index": 104,
+      "length": 104
+    },
+    {
+      "team": "T",
+      "spawnIndex": 14,
+      "site": 0,
+      "passed": true,
+      "index": 118,
+      "length": 118
+    },
+    {
+      "team": "T",
+      "spawnIndex": 14,
+      "site": 1,
+      "passed": true,
+      "index": 92,
+      "length": 92
+    },
+    {
+      "team": "CT",
+      "spawnIndex": 0,
+      "site": 0,
+      "passed": true,
+      "index": 104,
+      "length": 104
+    },
+    {
+      "team": "CT",
+      "spawnIndex": 0,
+      "site": 1,
+      "passed": true,
+      "index": 51,
+      "length": 51
+    },
+    {
+      "team": "CT",
+      "spawnIndex": 1,
+      "site": 0,
+      "passed": true,
+      "index": 103,
+      "length": 103
+    },
+    {
+      "team": "CT",
+      "spawnIndex": 1,
+      "site": 1,
+      "passed": true,
+      "index": 50,
+      "length": 50
+    },
+    {
+      "team": "CT",
+      "spawnIndex": 2,
+      "site": 0,
+      "passed": true,
+      "index": 99,
+      "length": 99
+    },
+    {
+      "team": "CT",
+      "spawnIndex": 2,
+      "site": 1,
+      "passed": true,
+      "index": 46,
+      "length": 46
+    },
+    {
+      "team": "CT",
+      "spawnIndex": 3,
+      "site": 0,
+      "passed": true,
+      "index": 103,
+      "length": 103
+    },
+    {
+      "team": "CT",
+      "spawnIndex": 3,
+      "site": 1,
+      "passed": true,
+      "index": 50,
+      "length": 50
+    },
+    {
+      "team": "CT",
+      "spawnIndex": 4,
+      "site": 0,
+      "passed": true,
+      "index": 105,
+      "length": 105
+    },
+    {
+      "team": "CT",
+      "spawnIndex": 4,
+      "site": 1,
+      "passed": true,
+      "index": 52,
+      "length": 52
+    },
+    {
+      "team": "CT",
+      "spawnIndex": 5,
+      "site": 0,
+      "passed": true,
+      "index": 106,
+      "length": 106
+    },
+    {
+      "team": "CT",
+      "spawnIndex": 5,
+      "site": 1,
+      "passed": true,
+      "index": 53,
+      "length": 53
+    },
+    {
+      "team": "CT",
+      "spawnIndex": 6,
+      "site": 0,
+      "passed": true,
+      "index": 104,
+      "length": 104
+    },
+    {
+      "team": "CT",
+      "spawnIndex": 6,
+      "site": 1,
+      "passed": true,
+      "index": 51,
+      "length": 51
+    },
+    {
+      "team": "CT",
+      "spawnIndex": 7,
+      "site": 0,
+      "passed": true,
+      "index": 101,
+      "length": 101
+    },
+    {
+      "team": "CT",
+      "spawnIndex": 7,
+      "site": 1,
+      "passed": true,
+      "index": 48,
+      "length": 48
+    },
+    {
+      "team": "CT",
+      "spawnIndex": 8,
+      "site": 0,
+      "passed": true,
+      "index": 101,
+      "length": 101
+    },
+    {
+      "team": "CT",
+      "spawnIndex": 8,
+      "site": 1,
+      "passed": true,
+      "index": 48,
+      "length": 48
+    },
+    {
+      "team": "CT",
+      "spawnIndex": 9,
+      "site": 0,
+      "passed": true,
+      "index": 103,
+      "length": 103
+    },
+    {
+      "team": "CT",
+      "spawnIndex": 9,
+      "site": 1,
+      "passed": true,
+      "index": 50,
+      "length": 50
+    },
+    {
+      "team": "CT",
+      "spawnIndex": 10,
+      "site": 0,
+      "passed": true,
+      "index": 105,
+      "length": 105
+    },
+    {
+      "team": "CT",
+      "spawnIndex": 10,
+      "site": 1,
+      "passed": true,
+      "index": 52,
+      "length": 52
+    },
+    {
+      "team": "CT",
+      "spawnIndex": 11,
+      "site": 0,
+      "passed": true,
+      "index": 102,
+      "length": 102
+    },
+    {
+      "team": "CT",
+      "spawnIndex": 11,
+      "site": 1,
+      "passed": true,
+      "index": 49,
+      "length": 49
+    },
+    {
+      "team": "CT",
+      "spawnIndex": 12,
+      "site": 0,
+      "passed": true,
+      "index": 104,
+      "length": 104
+    },
+    {
+      "team": "CT",
+      "spawnIndex": 12,
+      "site": 1,
+      "passed": true,
+      "index": 51,
+      "length": 51
+    },
+    {
+      "team": "CT",
+      "spawnIndex": 13,
+      "site": 0,
+      "passed": true,
+      "index": 100,
+      "length": 100
+    },
+    {
+      "team": "CT",
+      "spawnIndex": 13,
+      "site": 1,
+      "passed": true,
+      "index": 47,
+      "length": 47
+    },
+    {
+      "team": "CT",
+      "spawnIndex": 14,
+      "site": 0,
+      "passed": true,
+      "index": 101,
+      "length": 101
+    },
+    {
+      "team": "CT",
+      "spawnIndex": 14,
+      "site": 1,
+      "passed": true,
+      "index": 48,
+      "length": 48
+    }
+  ],
+  "movedAndFired": {
+    "moved": true,
+    "fired": true
+  },
+  "reload": true,
+  "rounds": {
+    "round": 2,
+    "scores": {
+      "T": 1,
+      "CT": 0
+    },
+    "kills": 9,
+    "players": 10
+  },
+  "audio": {
+    "decoded": 17,
+    "played": 17
+  },
+  "fullMatch": [
+    {
+      "time": 281.2223000000626,
+      "round": 4,
+      "scores": {
+        "T": 1,
+        "CT": 2
+      },
+      "phase": "live",
+      "humanTeam": "CT",
+      "kills": 19
+    },
+    {
+      "time": 401.62469999994704,
+      "round": 5,
+      "scores": {
+        "T": 1,
+        "CT": 3
+      },
+      "phase": "live",
+      "humanTeam": "CT",
+      "kills": 30
+    },
+    {
+      "time": 522.627099999831,
+      "round": 6,
+      "scores": {
+        "T": 2,
+        "CT": 3
+      },
+      "phase": "live",
+      "humanTeam": "CT",
+      "kills": 35
+    },
+    {
+      "time": 643.8294999997147,
+      "round": 8,
+      "scores": {
+        "T": 4,
+        "CT": 3
+      },
+      "phase": "live",
+      "humanTeam": "CT",
+      "kills": 44
+    },
+    {
+      "time": 764.431899999599,
+      "round": 9,
+      "scores": {
+        "T": 5,
+        "CT": 3
+      },
+      "phase": "live",
+      "humanTeam": "CT",
+      "kills": 52
+    },
+    {
+      "time": 885.234299999483,
+      "round": 11,
+      "scores": {
+        "T": 6,
+        "CT": 4
+      },
+      "phase": "live",
+      "humanTeam": "CT",
+      "kills": 58
+    },
+    {
+      "time": 1005.4366999993676,
+      "round": 12,
+      "scores": {
+        "T": 7,
+        "CT": 4
+      },
+      "phase": "live",
+      "humanTeam": "CT",
+      "kills": 74
+    },
+    {
+      "time": 1125.6390999999455,
+      "round": 14,
+      "scores": {
+        "T": 8,
+        "CT": 5
+      },
+      "phase": "freeze",
+      "humanTeam": "CT",
+      "kills": 81
+    },
+    {
+      "time": 1246.0415000006485,
+      "round": 15,
+      "scores": {
+        "T": 9,
+        "CT": 5
+      },
+      "phase": "live",
+      "humanTeam": "CT",
+      "kills": 85
+    },
+    {
+      "time": 1366.4439000013515,
+      "round": 16,
+      "scores": {
+        "T": 5,
+        "CT": 10
+      },
+      "phase": "live",
+      "humanTeam": "T",
+      "kills": 99
+    },
+    {
+      "time": 1486.8463000020545,
+      "round": 17,
+      "scores": {
+        "T": 5,
+        "CT": 11
+      },
+      "phase": "live",
+      "humanTeam": "T",
+      "kills": 106
+    },
+    {
+      "time": 1607.0487000027576,
+      "round": 18,
+      "scores": {
+        "T": 5,
+        "CT": 12
+      },
+      "phase": "live",
+      "humanTeam": "T",
+      "kills": 109
+    },
+    {
+      "time": 1727.2511000034608,
+      "round": 19,
+      "scores": {
+        "T": 5,
+        "CT": 13
+      },
+      "phase": "live",
+      "humanTeam": "T",
+      "kills": 111
+    },
+    {
+      "time": 1847.453500004164,
+      "round": 20,
+      "scores": {
+        "T": 5,
+        "CT": 14
+      },
+      "phase": "live",
+      "humanTeam": "T",
+      "kills": 115
+    },
+    {
+      "time": 1967.6559000048671,
+      "round": 21,
+      "scores": {
+        "T": 5,
+        "CT": 15
+      },
+      "phase": "freeze",
+      "humanTeam": "T",
+      "kills": 121
+    },
+    {
+      "time": 2087.8583000050266,
+      "round": 21,
+      "scores": {
+        "T": 5,
+        "CT": 16
+      },
+      "phase": "over",
+      "humanTeam": "T",
+      "kills": 122
+    },
+    {
+      "time": 2208.0607000040955,
+      "round": 21,
+      "scores": {
+        "T": 5,
+        "CT": 16
+      },
+      "phase": "match",
+      "humanTeam": "T",
+      "kills": 122
+    }
+  ],
+  "pageErrors": [],
+  "caveat": "Development smoke tests in software-rendered low-resolution mode. Not a CS:GO parity or presentation-hardware qualification."
+}

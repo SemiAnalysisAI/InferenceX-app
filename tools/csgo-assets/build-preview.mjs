@@ -32,7 +32,14 @@ for (const entry of ['game', 'viewer']) {
     .replace(`${entry}.mjs`, `${entry}.bundle.mjs`);
   await writeFile(join(output, file), html);
 }
-for (const file of ['game.css', 'style.css', 'assets-lock.json', 'game-assets-lock.json'])
+for (const file of [
+  'game.css',
+  'style.css',
+  'assets-lock.json',
+  'game-assets-lock.json',
+  'GAME.md',
+  'README.md',
+])
   await cp(join(root, file), join(output, file));
 await cp(join(root, 'assets'), join(output, 'assets'), { recursive: true });
 console.log(`Built local-engine preview: ${output}`);
