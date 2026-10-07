@@ -797,6 +797,8 @@ export class Game {
     const p = this.player;
     p.dead = true;
     p.deathMessage = cause.replace(' by mob', '');
+    // Return the crafting grid and cursor first so they are scattered too.
+    this.closeScreen();
     // Scatter the inventory like the original.
     for (let i = 0; i < this.inventory.length; i++) {
       const s = this.inventory[i];
@@ -812,7 +814,6 @@ export class Game {
       );
       this.inventory[i] = null;
     }
-    this.closeScreen();
     this.events.push({ type: 'death' });
   }
 
@@ -1485,6 +1486,19 @@ export class Game {
   // Inventory
   // -------------------------------------------------------------------------
   /** Add a stack to the inventory; returns the remainder count. */
+  /** Whether `giveItem(stack)` would place the whole stack. */
+  canFit(stack: Stack): boolean {
+    let room = 0;
+    const limit = maxStack(stack.id);
+    for (let i = 0; i < 36; i++) {
+      const s = this.inventory[i];
+      if (!s) room += limit;
+      else if (s.id === stack.id && !s.wear && !stack.wear) room += Math.max(0, limit - s.count);
+      if (room >= stack.count) return true;
+    }
+    return false;
+  }
+
   giveItem(stack: Stack): number {
     let left = stack.count;
     const limit = maxStack(stack.id);
@@ -1712,11 +1726,9 @@ export class Game {
     let result = this.craftResult();
     for (let guard = 0; result && guard < 64; guard++) {
       if (shift) {
-        const left = this.giveItem(result);
-        if (left) {
-          if (left < result.count) this.consumeGrid();
-          return;
-        }
+        // Like vanilla, shift-crafting stops once a whole result no longer fits.
+        if (!this.canFit(result)) return;
+        this.giveItem(result);
       } else {
         if (
           this.cursor &&

@@ -228,6 +228,35 @@ describe('minecraft gameplay', () => {
     expect(game.craftGrid.every((s) => s === null)).toBe(true);
   });
 
+  it('stops shift-crafting when a whole result no longer fits', () => {
+    const game = newGame();
+    // Fill every slot but one with unstackable items.
+    for (let i = 0; i < 36; i++) game.inventory[i] = { id: 'diamond_pickaxe', count: 1 };
+    game.inventory[35] = { id: 'oak_planks', count: 62 };
+    game.openScreen({ kind: 'inventory' });
+    game.craftGrid[0] = { id: 'oak_log', count: 3 };
+    game.clickSlot({ kind: 'result' }, 'left', true);
+    // 4 planks do not fit in the 2 free places, so nothing is crafted or lost.
+    expect(game.inventory[35]).toEqual({ id: 'oak_planks', count: 62 });
+    expect(game.craftGrid[0]).toEqual({ id: 'oak_log', count: 3 });
+  });
+
+  it('scatters crafting grid and cursor items on death', () => {
+    const game = newGame();
+    pad(game);
+    game.inventory[0] = { id: 'stick', count: 2 };
+    game.openScreen({ kind: 'inventory' });
+    game.craftGrid[0] = { id: 'oak_log', count: 2 };
+    game.cursor = { id: 'cobblestone', count: 5 };
+    game.hurtPlayer(100, 'test');
+    game.respawn();
+    expect(game.inventory.every((s) => s === null)).toBe(true);
+    expect(game.cursor).toBeNull();
+    expect(game.craftGrid.every((s) => s === null)).toBe(true);
+    const dropped = game.entities.filter((e) => e.kind === 'item').map((e) => e.stack?.id);
+    expect(dropped).toEqual(expect.arrayContaining(['stick', 'oak_log', 'cobblestone']));
+  });
+
   it('distributes a dragged stack evenly across slots', () => {
     const game = newGame();
     game.openScreen({ kind: 'inventory' });
@@ -343,6 +372,22 @@ describe('minecraft saves', () => {
     expect(back.furnaces.get(`${cx + 2},${cy + 1},${cz}`)?.input).toEqual({ id: 'sand', count: 5 });
     expect(back.time).toBe(12345);
     expect(back.player.x).toBeCloseTo(game.player.x, 5);
+  });
+
+  it('saves an open crafting grid and the cursor with the inventory', () => {
+    const game = newGame();
+    game.openScreen({ kind: 'inventory' });
+    game.craftGrid[0] = { id: 'oak_log', count: 2 };
+    game.cursor = { id: 'cobblestone', count: 5 };
+    const back = restore(
+      serialize(game, newWorldMeta('Save', 'grid-test', 'survival', 'peaceful')),
+    );
+    expect(back.inventory).toEqual(
+      expect.arrayContaining([
+        { id: 'oak_log', count: 2 },
+        { id: 'cobblestone', count: 5 },
+      ]),
+    );
   });
 });
 

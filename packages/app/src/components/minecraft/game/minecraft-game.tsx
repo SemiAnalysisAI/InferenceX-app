@@ -119,6 +119,7 @@ export function MinecraftGame({ locale, onExit }: { locale: Locale; onExit: () =
   const settingsRef = useRef(settings);
   const [worlds, setWorlds] = useState<WorldMeta[]>([]);
   const [selectedWorld, setSelectedWorld] = useState<string | null>(null);
+  const [worldError, setWorldError] = useState<string | null>(null);
   const [form, setForm] = useState({
     name: '',
     seed: '',
@@ -313,6 +314,20 @@ export function MinecraftGame({ locale, onExit }: { locale: Locale; onExit: () =
       setPhase('loading');
     },
     [setOverlay],
+  );
+  // A listed world whose save is missing or unreadable is never started (starting would
+  // save a fresh world over it); the list shows an error instead.
+  const playWorld = useCallback(
+    (meta: WorldMeta) => {
+      const data = loadWorld(meta.id);
+      if (!data) {
+        setWorldError(meta.id);
+        return;
+      }
+      setWorldError(null);
+      startWorld(meta, data);
+    },
+    [startWorld],
   );
 
   useEffect(() => {
@@ -1013,7 +1028,7 @@ export function MinecraftGame({ locale, onExit }: { locale: Locale; onExit: () =
                       className={`mc-world${selectedWorld === w.id ? ' mc-world-selected' : ''}`}
                       style={{ fontSize: 8 * s, padding: 3 * s, borderWidth: s }}
                       onClick={() => setSelectedWorld(w.id)}
-                      onDoubleClick={() => startWorld(w, loadWorld(w.id))}
+                      onDoubleClick={() => playWorld(w)}
                     >
                       <strong>{w.name}</strong>
                       <span>
@@ -1030,6 +1045,19 @@ export function MinecraftGame({ locale, onExit }: { locale: Locale; onExit: () =
                   ))
                 )}
               </div>
+              {worldError && worlds.some((w) => w.id === worldError) && (
+                <p
+                  className="mc-muted"
+                  role="alert"
+                  data-testid="minecraft-world-error"
+                  style={{ fontSize: 8 * s, marginTop: 4 * s, color: '#ff5555' }}
+                >
+                  {t(
+                    'This world could not be loaded. Its save was kept unchanged.',
+                    '无法加载此世界，存档保持不变。',
+                  )}
+                </p>
+              )}
               <div
                 className="mc-button-grid"
                 style={{ gap: 4 * s, marginTop: 8 * s, width: 308 * s }}
@@ -1041,7 +1069,7 @@ export function MinecraftGame({ locale, onExit }: { locale: Locale; onExit: () =
                   testId="minecraft-play-selected"
                   onClick={() => {
                     const w = worlds.find((x) => x.id === selectedWorld);
-                    if (w) startWorld(w, loadWorld(w.id));
+                    if (w) playWorld(w);
                   }}
                 >
                   {t('Play Selected World', '进入选中的世界')}

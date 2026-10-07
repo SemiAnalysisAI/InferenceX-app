@@ -128,6 +128,27 @@ const cleanStacks = (list: unknown, length: number) =>
     return validStack(s) ? { ...s } : null;
   });
 
+function mergeStack(inventory: (Stack | null)[], stack: Stack): number {
+  let left = stack.count;
+  const limit = ITEMS[stack.id]?.stack ?? 64;
+  for (let i = 0; i < 36 && left; i++) {
+    const s = inventory[i];
+    if (s && s.id === stack.id && !s.wear && !stack.wear && s.count < limit) {
+      const n = Math.min(limit - s.count, left);
+      s.count += n;
+      left -= n;
+    }
+  }
+  for (let i = 0; i < 36 && left; i++) {
+    if (!inventory[i]) {
+      const n = Math.min(limit, left);
+      inventory[i] = { id: stack.id, count: n, wear: stack.wear };
+      left -= n;
+    }
+  }
+  return left;
+}
+
 export function serialize(game: Game, meta: WorldMeta): SaveData {
   const p = game.player as unknown as Record<string, number | boolean | string>;
   const player: SaveData['player'] = {};
@@ -151,8 +172,17 @@ export function serialize(game: Game, meta: WorldMeta): SaveData {
         sheared: e.sheared,
       });
   }
-  // Return any open crafting grid and cursor to the inventory before saving.
+  // Fold any open crafting grid and the cursor into the saved inventory, as closing
+  // the screen would; whatever does not fit is saved as dropped items below.
   const inventory = game.inventory.map((s) => (s ? { ...s } : null));
+  for (const s of [...game.craftGrid, game.cursor]) {
+    if (!s) continue;
+    const left = mergeStack(inventory, s);
+    if (left) {
+      const { x, y, z } = game.player;
+      items.push({ stack: { ...s, count: left }, x, y: y + 1, z, age: 0 });
+    }
+  }
   return {
     version: SAVE_VERSION,
     meta: { ...meta, lastPlayed: Date.now(), mode: game.mode, difficulty: game.difficulty },
