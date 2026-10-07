@@ -39,9 +39,11 @@ for (const file of [
   'game-assets-lock.json',
   'GAME.md',
   'WEAPON-FIDELITY.md',
+  'LIGHTING.md',
   'README.md',
   'favicon.svg',
 ])
   await cp(join(root, file), join(output, file));
 await cp(join(root, 'assets'), join(output, 'assets'), { recursive: true });
+await cp(join(root, 'lighting'), join(output, 'lighting'), { recursive: true });
 console.log(`Built local-engine preview: ${output}`);

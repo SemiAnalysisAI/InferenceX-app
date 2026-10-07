@@ -5,6 +5,13 @@ The implementation reuses the existing @semianalysisai/inferencex-skills package
 Every registered dashboard route is checked against DASHBOARD_API_COVERAGE by
 registry.test.ts, including hidden and feature-gated routes.
 
+## Optional game route
+
+`/games/csgo` is an offline presentation game, not a benchmark-data projection.
+It changes no returned data, filters, metrics or calculations, so its local match
+state is excluded from the public API. The matching skills reference records
+this exclusion. See [the in-site game design](./csgo-game.md).
+
 ## Static editorial content
 
 `/blog/sparse-savings-persistent-demand-inside-glm53` and its `/zh/blog/` sibling

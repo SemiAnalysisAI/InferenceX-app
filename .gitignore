@@ -61,6 +61,9 @@
 # playwright mcp artifacts (per-session snapshots/console logs)
 .playwright-mcp/
 
+# Generated standalone game bundle; restored and verified at build time.
+packages/app/public/games/csgo/
+
 # wsl shenanigans
 C:*
 .vercel

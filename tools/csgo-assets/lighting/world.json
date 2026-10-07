@@ -1,0 +1,228 @@
+{
+  "version": 1,
+  "sourceSha256": "0f91e0a20297ab32eb2bad31e9cd77d585de1ec82cadd6961e9373e7f16962a6",
+  "surfaces": 2773,
+  "atlasWidth": 2048,
+  "atlasHeight": 512,
+  "groups": [
+    {
+      "material": "DUSTPLASTER16",
+      "offset": 0,
+      "count": 102
+    },
+    {
+      "material": "DUSTPLASTER_04",
+      "offset": 102,
+      "count": 642
+    },
+    {
+      "material": "DUSTPLASTER09C",
+      "offset": 744,
+      "count": 1305
+    },
+    {
+      "material": "DUSTPLASTER05",
+      "offset": 2049,
+      "count": 2172
+    },
+    {
+      "material": "PCON2TRIM",
+      "offset": 4221,
+      "count": 2025
+    },
+    {
+      "material": "DUSTPLASTER05B",
+      "offset": 6246,
+      "count": 1479
+    },
+    {
+      "material": "DUSTPLASTER20B",
+      "offset": 7725,
+      "count": 153
+    },
+    {
+      "material": "DUSTPLASTER18",
+      "offset": 7878,
+      "count": 1614
+    },
+    {
+      "material": "DUSTPLASTER18B",
+      "offset": 9492,
+      "count": 759
+    },
+    {
+      "material": "DUSTMUDBRICKPLASTERSMOOTH01",
+      "offset": 10251,
+      "count": 930
+    },
+    {
+      "material": "DUSTMUDBRICKPLASTERSMOOTHBOTTOM01",
+      "offset": 11181,
+      "count": 189
+    },
+    {
+      "material": "DUSTPLASTER11B",
+      "offset": 11370,
+      "count": 483
+    },
+    {
+      "material": "DUSTPLASTER06",
+      "offset": 11853,
+      "count": 2967
+    },
+    {
+      "material": "DUSTPLASTER05C",
+      "offset": 14820,
+      "count": 954
+    },
+    {
+      "material": "DUSTPLASTER06C",
+      "offset": 15774,
+      "count": 183
+    },
+    {
+      "material": "DUSTBREEZEBLOCK01",
+      "offset": 15957,
+      "count": 354
+    },
+    {
+      "material": "DUSTPLASTER17",
+      "offset": 16311,
+      "count": 51
+    },
+    {
+      "material": "DUSTPLASTER18C",
+      "offset": 16362,
+      "count": 1209
+    },
+    {
+      "material": "DUSTPLASTER21B",
+      "offset": 17571,
+      "count": 588
+    },
+    {
+      "material": "DUSTPLASTER17B",
+      "offset": 18159,
+      "count": 249
+    },
+    {
+      "material": "DUSTPLASTER17C",
+      "offset": 18408,
+      "count": 243
+    },
+    {
+      "material": "DUSTPLASTER15",
+      "offset": 18651,
+      "count": 72
+    },
+    {
+      "material": "DUSTPLASTER15C",
+      "offset": 18723,
+      "count": 477
+    },
+    {
+      "material": "DUSTBREEZEBLOCK01_ORANGE",
+      "offset": 19200,
+      "count": 57
+    },
+    {
+      "material": "DUSTPLASTER15B",
+      "offset": 19257,
+      "count": 117
+    },
+    {
+      "material": "DUSTPLASTER13B",
+      "offset": 19374,
+      "count": 60
+    },
+    {
+      "material": "DUSTPLASTER21",
+      "offset": 19434,
+      "count": 108
+    },
+    {
+      "material": "DUSTPLASTER09B",
+      "offset": 19542,
+      "count": 1101
+    },
+    {
+      "material": "DUSTPLASTER09",
+      "offset": 20643,
+      "count": 1473
+    },
+    {
+      "material": "DUSTCONCRETE_02",
+      "offset": 22116,
+      "count": 744
+    },
+    {
+      "material": "DUSTBUILDINGORNAMENT",
+      "offset": 22860,
+      "count": 66
+    },
+    {
+      "material": "DUSTPLASTER06B",
+      "offset": 22926,
+      "count": 423
+    },
+    {
+      "material": "DUSTCONCRETE_04",
+      "offset": 23349,
+      "count": 1140
+    },
+    {
+      "material": "DUSTFLOORTILE03",
+      "offset": 24489,
+      "count": 102
+    },
+    {
+      "material": "DUSTPLASTER21C",
+      "offset": 24591,
+      "count": 9
+    },
+    {
+      "material": "DUSTPLASTER20C",
+      "offset": 24600,
+      "count": 54
+    },
+    {
+      "material": "DUSTSIDEWALK01",
+      "offset": 24654,
+      "count": 12
+    },
+    {
+      "material": "DUSTPLASTER15B2",
+      "offset": 24666,
+      "count": 45
+    },
+    {
+      "material": "ANTENNA_CARD",
+      "offset": 24711,
+      "count": 126
+    },
+    {
+      "material": "SATELLITE_DISH_CARD",
+      "offset": 24837,
+      "count": 168
+    },
+    {
+      "material": "DUSTSAND02",
+      "offset": 25005,
+      "count": 78
+    },
+    {
+      "material": "DUSTWOODCEILING01",
+      "offset": 25083,
+      "count": 117
+    }
+  ],
+  "vertices": 25200,
+  "world.bin.gz": {
+    "bytes": 150018,
+    "sha256": "ffd9556b3419de80c3f0d657ee6a395e1742fee0bb0273096913cf05924a9821"
+  },
+  "atlas.rgbe.gz": {
+    "bytes": 1202080,
+    "sha256": "03f2016aa1e95b8beb7bc76901123acbfa13993537242e02917bccc00a68bd69"
+  }
+}

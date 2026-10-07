@@ -5,17 +5,16 @@ import { useEasterEggTheme } from '@/lib/use-easter-egg-theme';
 import { useLocale } from '@/lib/use-locale';
 import { track } from '@/lib/analytics';
 
-const GAME_PREVIEW = 'https://www.perplexity.ai/computer/a/b606a329-d010-4e4a-a228-638a718d71a1';
 const STRINGS = {
   en: {
     play: 'Play CS:GO',
-    detail: '1 human + 9 bots · Development preview',
-    notice: 'Opens Perplexity in a new tab. Preview access required.',
+    detail: '1 human + 9 bots · Development build',
+    notice: 'Play here on InferenceX. Desktop keyboard and mouse required.',
   },
   zh: {
     play: '试玩 CS:GO',
-    detail: '1 名真人 + 9 名机器人 · 开发预览',
-    notice: '在新标签页打开 Perplexity，需要预览访问权限。',
+    detail: '1 名真人 + 9 名机器人 · 开发版本',
+    notice: '直接在 InferenceX 内游玩，需要桌面键盘和鼠标。',
   },
 } as const;
 
@@ -29,6 +28,8 @@ export function CsgoThemeBanner() {
 
   return (
     <div className="container mx-auto px-4 lg:px-8" data-testid="csgo-theme-banner">
+      {/* Do not hold a dashboard transition snapshot across the heavy WebGL document load. */}
+      {landing && <style>{'@view-transition { navigation: none; }'}</style>}
       <div className="csgo-theme-banner">
         <img
           src="/decorative/csgo/csgo-logo.webp"
@@ -43,12 +44,11 @@ export function CsgoThemeBanner() {
             <span>{t.detail}</span>
             {/* A native link neither prefetches the game nor mounts an iframe in the dashboard. */}
             <a
-              href={GAME_PREVIEW}
-              target="_blank"
-              rel="noopener noreferrer nofollow"
+              href={`/games/csgo?lang=${locale}`}
+              rel="nofollow"
               data-testid="csgo-game-launch"
               aria-describedby="csgo-game-access"
-              onClick={() => track('csgo_game_preview_opened', { surface: 'landing', locale })}
+              onClick={() => track('csgo_game_opened', { surface: 'landing', locale })}
             >
               {t.play}
             </a>

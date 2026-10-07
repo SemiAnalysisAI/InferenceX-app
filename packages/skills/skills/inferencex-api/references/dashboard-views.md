@@ -116,6 +116,10 @@ private prompts, feedback, local uploads and administrative mutations are not
 public read projections. AgentX drilldowns use existing availability, aggregates,
 histograms, request timelines, logs and server metrics operations.
 
+The optional `/games/csgo` page is an offline presentation game, not a
+benchmark-data view. Its local match state and controls are excluded from the
+public read-only API; entering or leaving it changes no returned benchmark data.
+
 Run-specific recognition labels do not rename API framework keys. Run
 `35879254139` displays `UMBP MoRI SGLang` through October 9, 2026 in
 America/New_York (`2026-10-10T04:00:00Z` exclusive); subsequent label resolution

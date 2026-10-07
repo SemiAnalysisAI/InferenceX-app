@@ -1,0 +1,237 @@
+{
+  "archive": "csgo-game-assets-2026-10-06.tar.gz",
+  "bytes": 380768262,
+  "sha256": "f3c57e50a71577d066434f71dcabf9fa5360139120f54baf6d1cf1abfbdcfa07",
+  "parts": [
+    {
+      "path": "csgo-game-assets-2026-10-06.tar.gz.part-000",
+      "bytes": 8388608,
+      "sha256": "dd7d6a8de22e371ef703a2d617a46fb0b40980f377759295c0529fa87b470c25"
+    },
+    {
+      "path": "csgo-game-assets-2026-10-06.tar.gz.part-001",
+      "bytes": 8388608,
+      "sha256": "39c8d8b30a5ee059ce20919c2fb00a07fa48ca2c1bcc7d3b96c9d8c3b2efa94f"
+    },
+    {
+      "path": "csgo-game-assets-2026-10-06.tar.gz.part-002",
+      "bytes": 8388608,
+      "sha256": "5adb96b158484e6b25fe083bd5ec9e61797d7102f40559119c788d3aff7a931d"
+    },
+    {
+      "path": "csgo-game-assets-2026-10-06.tar.gz.part-003",
+      "bytes": 8388608,
+      "sha256": "ac97ad818ea1f73121c7d016e18beded3fa41047f7ca1388d99f6cab9078a7d1"
+    },
+    {
+      "path": "csgo-game-assets-2026-10-06.tar.gz.part-004",
+      "bytes": 8388608,
+      "sha256": "fa9832f1927b7faa9b8e12154fc18f6f5518ee0a8dee3a93e912eb920e962bc7"
+    },
+    {
+      "path": "csgo-game-assets-2026-10-06.tar.gz.part-005",
+      "bytes": 8388608,
+      "sha256": "f8c1734019d9a2929c5fd63494342de9fb30d5010d1968a1fe485a2aa18eaa14"
+    },
+    {
+      "path": "csgo-game-assets-2026-10-06.tar.gz.part-006",
+      "bytes": 8388608,
+      "sha256": "ff3259e039eb6dd5843d6f753670aae58f9d3a09068daf1f2ee95ffcce0ccab7"
+    },
+    {
+      "path": "csgo-game-assets-2026-10-06.tar.gz.part-007",
+      "bytes": 8388608,
+      "sha256": "7635c09ba23f463a3f5680bd3278ff454cc59ad3f9c7ba2dd044d5309397aa0e"
+    },
+    {
+      "path": "csgo-game-assets-2026-10-06.tar.gz.part-008",
+      "bytes": 8388608,
+      "sha256": "151046612d8ace062f638169d19860d8a049786dac4a4882ce06677a79d0c6bd"
+    },
+    {
+      "path": "csgo-game-assets-2026-10-06.tar.gz.part-009",
+      "bytes": 8388608,
+      "sha256": "6c175a908a69d7ad02bd27eda8a559d497689b5a07db8f76ca5cadf48f473842"
+    },
+    {
+      "path": "csgo-game-assets-2026-10-06.tar.gz.part-010",
+      "bytes": 8388608,
+      "sha256": "fba3e8b46bf381022aa93947aa73af24fae5e9ac011a2e761ada405cbfd4ed5c"
+    },
+    {
+      "path": "csgo-game-assets-2026-10-06.tar.gz.part-011",
+      "bytes": 8388608,
+      "sha256": "65e794c03719d0d9560b12f8b15020df6937ca028c2791a096fdb1a6f5a2f70f"
+    },
+    {
+      "path": "csgo-game-assets-2026-10-06.tar.gz.part-012",
+      "bytes": 8388608,
+      "sha256": "41d43f7d273b7016e5ae9b945582a1e750de64cab85b9056dc735ebfa6a740b1"
+    },
+    {
+      "path": "csgo-game-assets-2026-10-06.tar.gz.part-013",
+      "bytes": 8388608,
+      "sha256": "ce859641ae2ecb69ee5c54d83d9a4b0c4c5c7f38cf188069ceb88eb310380ddb"
+    },
+    {
+      "path": "csgo-game-assets-2026-10-06.tar.gz.part-014",
+      "bytes": 8388608,
+      "sha256": "8a56002f188667b93efff3cc1eec3da521606a9c2ff1e1d0595100564298cfaf"
+    },
+    {
+      "path": "csgo-game-assets-2026-10-06.tar.gz.part-015",
+      "bytes": 8388608,
+      "sha256": "aa5ed2a483b8b88579daa71304b30baf924f2d2bd00b0cbf8a34ef13afb38e66"
+    },
+    {
+      "path": "csgo-game-assets-2026-10-06.tar.gz.part-016",
+      "bytes": 8388608,
+      "sha256": "75b967aab14df55c7bbce9ed05993a00c0d92e40f7ea3089f620b2b0a1bf2f4b"
+    },
+    {
+      "path": "csgo-game-assets-2026-10-06.tar.gz.part-017",
+      "bytes": 8388608,
+      "sha256": "8b9ffcd8f2e51d0c7058c3f5996166395a6a3b40726fe98fa20ceca16dd59467"
+    },
+    {
+      "path": "csgo-game-assets-2026-10-06.tar.gz.part-018",
+      "bytes": 8388608,
+      "sha256": "32f1acb190d749f39f92255de3aa7f875399e8c90a741a481e6573b7799787bd"
+    },
+    {
+      "path": "csgo-game-assets-2026-10-06.tar.gz.part-019",
+      "bytes": 8388608,
+      "sha256": "2a22e0ed41307e7d59e1f59780f985593bd5716c17f893324f173fe7f5715e84"
+    },
+    {
+      "path": "csgo-game-assets-2026-10-06.tar.gz.part-020",
+      "bytes": 8388608,
+      "sha256": "79aa8f1ceadf282df209aeba4028f0d252315c1c54625df495286de768f04458"
+    },
+    {
+      "path": "csgo-game-assets-2026-10-06.tar.gz.part-021",
+      "bytes": 8388608,
+      "sha256": "f36cdfa62a505530e954a4cb4b133bc7b03f1c9143470dec669c4669b95b0e75"
+    },
+    {
+      "path": "csgo-game-assets-2026-10-06.tar.gz.part-022",
+      "bytes": 8388608,
+      "sha256": "bacb44ed35ac57ecc0b1aaa3d88a46953d42e496590f64f985a09a7e1a9d6c7f"
+    },
+    {
+      "path": "csgo-game-assets-2026-10-06.tar.gz.part-023",
+      "bytes": 8388608,
+      "sha256": "5e5d865a16632f9a06ca64a6fae97880fc7af5daf71d6df96ace0384b1038423"
+    },
+    {
+      "path": "csgo-game-assets-2026-10-06.tar.gz.part-024",
+      "bytes": 8388608,
+      "sha256": "9da4159ba18493bd0bfdfc19dd12c25ac5c7363f64c876a75fa7f7f738cbb116"
+    },
+    {
+      "path": "csgo-game-assets-2026-10-06.tar.gz.part-025",
+      "bytes": 8388608,
+      "sha256": "b6ac04326cf821da4a330aafe50697ec3c143258084999afdfb361a2fd910792"
+    },
+    {
+      "path": "csgo-game-assets-2026-10-06.tar.gz.part-026",
+      "bytes": 8388608,
+      "sha256": "1bcb75b12b67116c5e410a43a512860e4d9954696ef551d6caeb6607bfccb56c"
+    },
+    {
+      "path": "csgo-game-assets-2026-10-06.tar.gz.part-027",
+      "bytes": 8388608,
+      "sha256": "e7ee44e05d52abaed4bd225b89a400811d7fa95e1b33b3c62970468c93ad40d5"
+    },
+    {
+      "path": "csgo-game-assets-2026-10-06.tar.gz.part-028",
+      "bytes": 8388608,
+      "sha256": "5d372a44ad04b709c5872c73171aa1d11e17790b1b7607c7d2cac55ef7474abe"
+    },
+    {
+      "path": "csgo-game-assets-2026-10-06.tar.gz.part-029",
+      "bytes": 8388608,
+      "sha256": "db95848cc6673ebfe8a0f480dcc9fd46d2816e48f17fc4c783b49a9102b7f2d2"
+    },
+    {
+      "path": "csgo-game-assets-2026-10-06.tar.gz.part-030",
+      "bytes": 8388608,
+      "sha256": "0514917324d2dfcd01e111604f74dbfd20db95aea6fe149a017f52fc135e2820"
+    },
+    {
+      "path": "csgo-game-assets-2026-10-06.tar.gz.part-031",
+      "bytes": 8388608,
+      "sha256": "e4435d6b1885ec9904861488c709f69bac89f8adc7e22aebb7a91785842ea540"
+    },
+    {
+      "path": "csgo-game-assets-2026-10-06.tar.gz.part-032",
+      "bytes": 8388608,
+      "sha256": "58921da666c90d95fff0a9bba770fd88af2470e04a07002816b2f4bb1322dbe0"
+    },
+    {
+      "path": "csgo-game-assets-2026-10-06.tar.gz.part-033",
+      "bytes": 8388608,
+      "sha256": "d4c41cd2fbc7e0692980a326d8bd7e88cca5a454fa12c23865e6b5dfaf4a3204"
+    },
+    {
+      "path": "csgo-game-assets-2026-10-06.tar.gz.part-034",
+      "bytes": 8388608,
+      "sha256": "ada49eb1a956a1a842ea07d60fd95c7225c99b9e16efe56e9b042a276c653dff"
+    },
+    {
+      "path": "csgo-game-assets-2026-10-06.tar.gz.part-035",
+      "bytes": 8388608,
+      "sha256": "d7e0a7376dc0225697f86e090c38e3db6ac43721347874c56b0c1c3ddfb6dbb6"
+    },
+    {
+      "path": "csgo-game-assets-2026-10-06.tar.gz.part-036",
+      "bytes": 8388608,
+      "sha256": "8337d61da18b30a3f017dce723c4d6ecdbc6ce536fde44aee24b99a1b006d713"
+    },
+    {
+      "path": "csgo-game-assets-2026-10-06.tar.gz.part-037",
+      "bytes": 8388608,
+      "sha256": "ee6d5f191bb2f1a78d76f1516687b9226e4e369726beb4c76b1fa599717231a9"
+    },
+    {
+      "path": "csgo-game-assets-2026-10-06.tar.gz.part-038",
+      "bytes": 8388608,
+      "sha256": "b68d66ebf20632f1c8f9bd55b25951c86cb19bb63b300a3045958045eb689db9"
+    },
+    {
+      "path": "csgo-game-assets-2026-10-06.tar.gz.part-039",
+      "bytes": 8388608,
+      "sha256": "977ac91660e4f30d94e60a145a3751a25f992623c00644122192f6e88c4e6620"
+    },
+    {
+      "path": "csgo-game-assets-2026-10-06.tar.gz.part-040",
+      "bytes": 8388608,
+      "sha256": "9f1d3bee27c811394cb390c969124cff35e0ece831aaca29d91a28366a7ad650"
+    },
+    {
+      "path": "csgo-game-assets-2026-10-06.tar.gz.part-041",
+      "bytes": 8388608,
+      "sha256": "c9a7f85c31651b190b57bd1b2e676bbcba10754fe815199aa8e861ffbfef9c7c"
+    },
+    {
+      "path": "csgo-game-assets-2026-10-06.tar.gz.part-042",
+      "bytes": 8388608,
+      "sha256": "04f696c55a05efa3e09592e93537e9e50f645e04d6273d3d7b7b35570840c5f4"
+    },
+    {
+      "path": "csgo-game-assets-2026-10-06.tar.gz.part-043",
+      "bytes": 8388608,
+      "sha256": "6b1bedc4e1432e8bc5840133bb085cc5f77f15ca5b3a44533459c4683f647630"
+    },
+    {
+      "path": "csgo-game-assets-2026-10-06.tar.gz.part-044",
+      "bytes": 8388608,
+      "sha256": "f8bb39e4d7f9dd3babaef60d6ac108c94bc32641bab555deb0809375ca9ffd2c"
+    },
+    {
+      "path": "csgo-game-assets-2026-10-06.tar.gz.part-045",
+      "bytes": 3280902,
+      "sha256": "2fd0a867aff0acecef0b4a13d75c99d4f3797c94049b2d069d89c00476baecd7"
+    }
+  ]
+}

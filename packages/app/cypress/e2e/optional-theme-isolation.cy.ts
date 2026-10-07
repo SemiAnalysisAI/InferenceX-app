@@ -1,7 +1,7 @@
 const featureCode =
-  /THREE\.WebGLRenderer|LOS SANTOS 3D|minecraft-click\.mp3|ender-dragon\.mp3|Loading Luigi Circuit|b606a329-d010-4e4a-a228-638a718d71a1|\.csgo-scene|\.gta-scene|\.mc-dragon-flyacross|\.kart-scene|font-family:\s*["']?(?:Monocraft|Pricedown|ChaletComprime)/i;
+  /THREE\.WebGLRenderer|LOS SANTOS 3D|minecraft-click\.mp3|ender-dragon\.mp3|Loading Luigi Circuit|csgo_game_opened|\.csgo-scene|\.gta-scene|\.mc-dragon-flyacross|\.kart-scene|font-family:\s*["']?(?:Monocraft|Pricedown|ChaletComprime)/i;
 const featureAsset =
-  /\/decorative\/(?:minecraft|csgo|gta|kart)\/|minecraft-click\.mp3|youtube\.com|ytimg\.com|perplexity\.ai\/computer\/a\//;
+  /\/decorative\/(?:minecraft|csgo|gta|kart)\/|\/games\/csgo(?:\/|\?)|minecraft-click\.mp3|youtube\.com|ytimg\.com|perplexity\.ai\/computer\/a\//;
 const seo = (doc: Document) => [
   doc.title,
   doc.querySelector('meta[name="description"]')?.getAttribute('content'),
@@ -93,19 +93,15 @@ describe('optional themes stay off the default page', () => {
         cy.get('[data-testid="theme-option-csgo"]').click();
         cy.get('[data-testid="csgo-game-launch"]')
           .should('have.text', label)
-          .and('have.attr', 'target', '_blank');
-        cy.get('[data-testid="csgo-game-launch"]').should(
-          'have.attr',
-          'rel',
-          'noopener noreferrer nofollow',
-        );
+          .and('have.attr', 'href', `/games/csgo?lang=${route === '/' ? 'en' : 'zh'}`);
+        cy.get('[data-testid="csgo-game-launch"]').should('have.attr', 'rel', 'nofollow');
         cy.get('[data-testid="csgo-game-launch"]').trigger('mouseover').focus();
         cy.window().then((win) => {
           expect(
             win.performance
               .getEntriesByType('resource')
               .filter((resource) =>
-                /perplexity\.ai\/computer\/a\/|\/csgo-assets\/|game\.html/.test(resource.name),
+                /\/games\/csgo(?:\/|\?)|\/csgo-assets\/|game\.html/.test(resource.name),
               ),
           ).to.have.length(0);
         });

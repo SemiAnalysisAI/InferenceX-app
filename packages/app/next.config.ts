@@ -14,6 +14,17 @@ const nextConfig: NextConfig = {
   allowedDevOrigins: allowedDevOriginsFromEnv(),
   transpilePackages: ['@semianalysisai/inferencex-constants'],
   serverExternalPackages: ['shiki'],
+  rewrites() {
+    return Promise.resolve([{ source: '/games/csgo', destination: '/games/csgo/index.html' }]);
+  },
+  headers() {
+    return Promise.resolve([
+      {
+        source: '/games/csgo/:path*',
+        headers: [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }],
+      },
+    ]);
+  },
   redirects() {
     return Promise.resolve([
       ...INFERENCE_MODEL_ALIAS_REDIRECTS,

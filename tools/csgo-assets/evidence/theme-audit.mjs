@@ -2,9 +2,9 @@ const { default: fs } = await import('node:fs/promises');
 const { default: assert } = await import('node:assert/strict');
 
 const asset =
-  /\/decorative\/(?:minecraft|csgo|gta|kart)\/|minecraft-click\.mp3|youtube\.com|ytimg\.com|perplexity\.ai\/computer\/a\//;
+  /\/decorative\/(?:minecraft|csgo|gta|kart)\/|\/games\/csgo(?:\/|\?)|minecraft-click\.mp3|youtube\.com|ytimg\.com|perplexity\.ai\/computer\/a\//;
 const code =
-  /THREE\.WebGLRenderer|LOS SANTOS 3D|minecraft-click\.mp3|ender-dragon\.mp3|Loading Luigi Circuit|b606a329-d010-4e4a-a228-638a718d71a1|\.csgo-scene|\.gta-scene|\.mc-dragon-flyacross|\.kart-scene|font-family:\s*["']?(?:Monocraft|Pricedown|ChaletComprime)/i;
+  /THREE\.WebGLRenderer|LOS SANTOS 3D|minecraft-click\.mp3|ender-dragon\.mp3|Loading Luigi Circuit|csgo_game_opened|\.csgo-scene|\.gta-scene|\.mc-dragon-flyacross|\.kart-scene|font-family:\s*["']?(?:Monocraft|Pricedown|ChaletComprime)/i;
 const seo = () => [
   document.title,
   document.querySelector('meta[name="description"]')?.getAttribute('content'),
@@ -137,8 +137,7 @@ export async function run(
     await link.hover();
     await link.focus();
     assert.equal(
-      requests.filter((n) => /perplexity\.ai\/computer\/a\/|\/csgo-assets\/|game\.html/.test(n))
-        .length,
+      requests.filter((n) => /\/games\/csgo(?:\/|\?)|\/csgo-assets\/|game\.html/.test(n)).length,
       0,
     );
     assert.deepEqual(await page.evaluate(seo), before);
@@ -148,10 +147,10 @@ export async function run(
       false,
     );
     await page.screenshot({ path: `${out}/csgo-landing-${width}.png` });
-    // Capture explicit navigation without downloading the private game during this audit.
+    // Navigation stays on this origin; full game loading has a separate real-asset test.
     const destination = await link.getAttribute('href');
     let opened = false;
-    await ctx.route('https://www.perplexity.ai/**', (r) => {
+    await ctx.route(`${origin}/games/csgo?*`, (r) => {
       opened = true;
       return r.fulfill({
         status: 200,
@@ -159,13 +158,13 @@ export async function run(
         body: '<title>Explicit navigation captured</title>',
       });
     });
-    const popupPromise = page.waitForEvent('popup');
     await link.click();
-    const popup = await popupPromise;
-    await popup.waitForLoadState();
-    assert.equal(popup.url(), destination);
+    await page.waitForURL(origin + destination);
+    assert.equal(page.url(), origin + destination);
     assert.equal(opened, true);
-    await popup.close();
+    assert.equal(ctx.pages().length, 1);
+    await page.goto(origin + route);
+    await ready(page);
     await page.getByTestId('theme-toggle').click();
     await page.getByTestId('theme-option-dark').click();
     await link.waitFor({ state: 'detached' });
@@ -174,7 +173,7 @@ export async function run(
       route,
       width,
       hoverGameRequests: 0,
-      explicitNewTab: true,
+      sameOriginNavigation: true,
       seoUnchanged: true,
       noHorizontalOverflow: true,
       destination,

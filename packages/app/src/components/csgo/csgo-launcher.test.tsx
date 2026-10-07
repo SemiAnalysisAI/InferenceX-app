@@ -57,26 +57,25 @@ describe('CS:GO landing launcher', () => {
     await theme('csgo', true);
     expect(container.innerHTML).toBe('');
   });
-  it('uses a native, explicit new-tab link with no game element or preload', async () => {
+  it('uses a native same-site link without preloading or mounting the game', async () => {
     act(() => root.render(<CsgoThemeBanner />));
     await theme('csgo');
     const link = container.querySelector<HTMLAnchorElement>('[data-testid="csgo-game-launch"]')!;
     expect(link.textContent).toBe('Play CS:GO');
-    expect(link.href).toBe(
-      'https://www.perplexity.ai/computer/a/b606a329-d010-4e4a-a228-638a718d71a1',
-    );
-    expect(link.target).toBe('_blank');
-    expect(link.rel.split(' ')).toEqual(
-      expect.arrayContaining(['noopener', 'noreferrer', 'nofollow']),
+    expect(link.getAttribute('href')).toBe('/games/csgo?lang=en');
+    expect(link.target).toBe('');
+    expect(link.rel).toBe('nofollow');
+    expect(container.querySelector('style')?.textContent).toBe(
+      '@view-transition { navigation: none; }',
     );
     expect(container.querySelectorAll('iframe, canvas, audio, video, link, script')).toHaveLength(
       0,
     );
-    expect(container.textContent).toContain('Development preview');
+    expect(container.textContent).toContain('Development build');
     expect(track).not.toHaveBeenCalled();
     link.addEventListener('click', (event) => event.preventDefault());
     act(() => link.click());
-    expect(track).toHaveBeenCalledWith('csgo_game_preview_opened', {
+    expect(track).toHaveBeenCalledWith('csgo_game_opened', {
       surface: 'landing',
       locale: 'en',
     });
@@ -89,10 +88,12 @@ describe('CS:GO landing launcher', () => {
     act(() => root.render(<CsgoThemeBanner />));
     await theme('csgo');
     expect(container.textContent).toContain('试玩 CS:GO');
-    expect(container.textContent).toContain('需要预览访问权限');
+    expect(container.textContent).toContain('直接在 InferenceX 内游玩');
+    expect(container.querySelector('a')?.getAttribute('href')).toBe('/games/csgo?lang=zh');
     state.pathname = '/zh/about';
     act(() => root.render(<CsgoThemeBanner />));
     expect(container.querySelector('a')).toBeNull();
+    expect(container.querySelector('style')).toBeNull();
     expect(container.textContent).toContain('DUST II');
   });
 });

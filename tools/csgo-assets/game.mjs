@@ -12,6 +12,7 @@ import { acquireMouse, releaseMouse, isMouseCaptured } from './mouse-capture.mjs
 import { shouldHideArms } from './viewmodel-visibility.mjs';
 import { actionClip } from './weapon-animation.mjs';
 import { disposeModelInstance } from './model-lifecycle.mjs';
+import { loadWorldLighting, isWorldBrush } from './world-lighting.mjs';
 import {
   SOURCE_UNIT,
   maxMoveSpeed,
@@ -148,6 +149,7 @@ function basicMaterial(material) {
     depthWrite: !material.transparent,
   });
 }
+let lightingReport = { surfaces: 0, materialGroups: 0 };
 function blockedSmoke(a, b) {
   return effects.some(
     (e) =>
@@ -166,7 +168,7 @@ function sourcePosition(s) {
 }
 async function load() {
   try {
-    const [gltf, entities, manifest, navData] = await Promise.all([
+    const [gltf, entities, manifest, navData, worldLighting] = await Promise.all([
       new GLTFLoader().loadAsync('assets/map/dust2.glb', (e) =>
         loadMessage(
           'Loading converted Dust II geometry and original textures…',
@@ -182,6 +184,7 @@ async function load() {
         if (!r.ok) throw new Error('Missing precomputed navigation');
         return r.json();
       }),
+      loadWorldLighting(),
     ]);
     soundManifest = (manifest.assets || manifest.files || [])
       .filter((x) => x.path?.endsWith('.wav'))
@@ -189,6 +192,7 @@ async function load() {
     gltf.scene.updateMatrixWorld(true);
     const solid = [],
       groups = new Map();
+    const litGroups = new Set();
     let meshCount = 0;
     gltf.scene.traverse((o) => {
       if (!o.isMesh) return;
@@ -209,6 +213,23 @@ async function load() {
         for (const name of Object.keys(c.attributes))
           if (name !== 'position') c.deleteAttribute(name);
         solid.push(c.index ? c.toNonIndexed() : c);
+        const lightmapKey = materials[0].name.toUpperCase();
+        if (
+          isWorldBrush(o) &&
+          materials.length === 1 &&
+          worldLighting.geometries.has(lightmapKey)
+        ) {
+          if (!litGroups.has(lightmapKey)) {
+            const material = basicMaterial(materials[0]);
+            material.lightMap = worldLighting.texture;
+            // MeshBasic's light-map path divides by pi; Source's stored tint does not.
+            material.lightMapIntensity = Math.PI;
+            scene.add(new THREE.Mesh(worldLighting.geometries.get(lightmapKey), material));
+            litGroups.add(lightmapKey);
+          }
+          meshCount++;
+          continue;
+        }
         // Keep glTF material groups; merge single-material surfaces to reduce draw calls.
         if (materials.length === 1) {
           const m = materials[0];
@@ -236,6 +257,7 @@ async function load() {
       const geometry = mergeGeometries(group.geometries);
       if (geometry) scene.add(new THREE.Mesh(geometry, basicMaterial(group.material)));
     }
+    lightingReport = { surfaces: worldLighting.metadata.surfaces, materialGroups: litGroups.size };
     const geometry = mergeGeometries(solid);
     geometry.boundsTree = new MeshBVH(geometry, { maxLeafSize: 12 });
     collision = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }));
@@ -1221,7 +1243,13 @@ $('language').addEventListener('click', () => {
   $('start-t').textContent = lang === 'zh' ? '加入 T 队' : 'Play Terrorists';
   $('start-ct').textContent = lang === 'zh' ? '加入 CT 队' : 'Play Counter-Terrorists';
   $('tour').textContent = lang === 'zh' ? '探索地图' : 'Explore map';
+  $('return-site').textContent = lang === 'zh' ? '返回 InferenceX' : 'Back to InferenceX';
+  $('return-site').href = lang === 'zh' ? '/zh' : '/';
 });
+if (document.querySelector('base[href="/games/csgo/"]')) {
+  $('return-site').hidden = false;
+  if (new URLSearchParams(location.search).get('lang') === 'zh') $('language').click();
+}
 document.addEventListener('keydown', (e) => {
   if (['Space', 'Tab', 'ArrowUp', 'ArrowDown'].includes(e.code)) e.preventDefault();
   if (e.code === 'Escape') {
@@ -1295,6 +1323,9 @@ window.addEventListener('resize', () => {
   camera.updateProjectionMatrix();
 });
 window.__test = {
+  get lighting() {
+    return lightingReport;
+  },
   get match() {
     return match;
   },

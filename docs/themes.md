@@ -57,11 +57,12 @@ Asset provenance and the maintainer-reported permission are recorded in
 ### CS:GO development-game entry
 
 The English and Chinese landing pages show a native **Play CS:GO** link only
-while the CS:GO theme is selected. It opens the existing Perplexity development
-preview in a separate tab. Preview access is required; this is not public game
-hosting. The link has `noopener noreferrer nofollow` and no framework prefetch,
-iframe, game-engine import, or audio initialization. Hovering or focusing it
-does not request the game. Other routes retain their existing CS:GO banner.
+while the CS:GO theme is selected. It navigates in the same tab to
+`/games/csgo?lang=en` or `?lang=zh` on InferenceX. The game is a standalone
+static page served by the website, not a Perplexity link or an external iframe.
+The native link has `nofollow` and no framework prefetch, game-engine import,
+or audio initialization. Hovering or focusing it does not request the game.
+Other routes retain their existing CS:GO banner.
 
 The launcher lives inside the existing lazy CS:GO theme chunk. The shared
 theme subscription returns no optional theme during SSR or on embed routes.
@@ -72,8 +73,8 @@ resource-isolation tests are not a guarantee of identical field Web Vitals.
 
 PR #1282 remains draft until its separately documented 95% game-completion
 gate passes. This launcher does not qualify game fidelity, bot intelligence,
-asset licenses, or production readiness. Public hosting and access must be
-resolved before offering the game to all site visitors.
+asset licenses, or production readiness. See [the in-site game architecture](./csgo-game.md)
+for the pinned asset build and route isolation.
 
 ## GTA implementation
 

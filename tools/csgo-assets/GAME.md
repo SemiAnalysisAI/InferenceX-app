@@ -2,11 +2,12 @@
 
 The requested mode is one human plus nine bots, split into 5v5 teams. Ten-human networking is outside this iteration's scope.
 
-This is a development tool, not a claim of 95% CS:GO parity. Open `game.html` through a local HTTP server after restoring assets. The draft CS:GO landing theme links to the private preview; the normal dashboard, light/dark themes and embeds do not import this tool.
+This is a development tool, not a claim of 95% CS:GO parity. The draft site's CS:GO theme now opens `/games/csgo` on the website itself. Its build restores pinned assets and bundles the standalone game; the normal dashboard, light/dark themes and embeds do not import the game. Open `game.html` through a local HTTP server for direct tool development.
 
 ## Implemented systems
 
 - Imported Dust II geometry, textures and static props from the [de_dust2new Workshop port](https://steamcommunity.com/sharedfiles/filedetails/?id=3068466810). Its author explicitly reports visual downgrades. This is not a verified byte-for-byte original map.
+- Restored the port's baked lighting on 2,773 world surfaces across 42 material groups. Displacements, props, brush entities and characters remain outside this restoration; see [LIGHTING.md](./LIGHTING.md).
 - One human and nine bots, side selection, round freezing, buy time, round clock, elimination and bomb win conditions, halftime, match end and restart.
 - A roster of 34 firearms with pinned Valve item-schema attributes, plus a prototype knife, team restrictions, inventory slots, ammunition, reloading and fire-rate limits. Individual shotgun pellets, weapon-specific armor penetration, hitgroup multipliers, range falloff, movement-dependent accuracy, recovery, recoil and multi-level scopes are described in [WEAPON-FIDELITY.md](./WEAPON-FIDELITY.md). Original engine equivalence is not established.
 - Buying, capped money, win/loss income, dropped weapon rendering, ammunition-preserving weapon pickup and bomb pickup. Firearm prices and kill rewards use the pinned schema; round income and equipment still use prototype rules. Switching weapons cancels reloading.
@@ -57,7 +58,7 @@ Additional conversion steps:
 - For character conversion, pass the pinned `gmod-animations` checkout as the third argument to `convert-model.py`. Use `csgost61pm.mdl` for CT and `csgopheonix1pm.mdl` for T. Restore missing textures with `CSGO_MODELS` pointing at the converted character directory.
 - `repair-map-alpha.py -- MAP_GLB PAKFILE_ZIP PNG_OUTPUT_DIRECTORY` restores 20 alpha-tested/translucent VMT materials from the original VTF data. It does not restore baked lighting.
 
-Generated map, audio, OBJ and GLB files stay outside Git. Their hashes and conversion code are committed.
+Generated map, audio, OBJ and GLB files stay outside the application branch. The approved dedicated asset branch stores the site archive; [site build documentation](../../docs/csgo-game.md) describes its immutable commit and verification. Extracted files remain ignored. Small, compressed baked-lighting data and its extraction code are tracked in the application branch.
 
 The converted assets have structural tests for all 34 viewmodels, including animation clips and absence of missing-texture placeholders. These tests do not certify correct animation timing, materials or pose for every weapon.
 
@@ -72,11 +73,11 @@ Run `npm ci` and `npm run build -- /ABSOLUTE/PREVIEW/DIRECTORY` to create the bu
 ## Still blocking completion
 
 - The February 2023 weapon-data snapshot is not an approved reference build. Exact weapon behavior, economy, movement, penetration, spray/RNG, special fire modes, reloads and grenade physics still need validation against the agreed CS:GO build.
-- The map port, simplified lighting/material conversion and sky are not visually equivalent to the original renderer. Restored alpha materials still need reference-camera comparison.
+- The map port, partially restored baked lighting, material conversion and sky are not visually equivalent to the original renderer. Displacement, prop and character lighting and restored alpha materials still need reference-camera comparison.
 - Character locomotion is retargeted GMod motion. Per-weapon character poses, world-weapon attachment alignment and first-person animation timing need reference review.
 - Bot tactics, grenade use, retakes, obstacle recovery and an entire match need repeatable browser/soak tests. A connected graph alone does not prove successful physical navigation.
 - Audio lacks a complete verified event map, occlusion and radio/announcer coverage.
-- Public game hosting, disposal and full localization remain open. The draft theme's link is not a public game deployment. Presentation-hardware performance has not been measured.
+- Full runtime disposal and localization remain open. The in-site route is implemented on the draft branch, not merged production. Presentation-hardware performance has not been measured.
 - An independent Chinese-copy review and maintainer review are pending.
 
 `node parity-gate.mjs` must continue to fail until these requirements have actual acceptance evidence. Passing unit tests is not evidence of 95% gameplay parity.

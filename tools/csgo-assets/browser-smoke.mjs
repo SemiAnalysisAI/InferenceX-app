@@ -5,8 +5,10 @@ const browser = await chromium.launch({
   headless: true,
   channel: 'chromium',
   ...(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {}),
+  args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'],
 });
 const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+page.setDefaultTimeout(60000);
 const errors = [];
 page.on('pageerror', (error) => errors.push(error.message));
 const output = new URL('screenshots/', import.meta.url);

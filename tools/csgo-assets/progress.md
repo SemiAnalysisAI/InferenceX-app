@@ -45,12 +45,30 @@ Original prompt: Open a PR for a realistic CS:GO Dust II 5v5 3D game using real 
 - Original CS:GO character locomotion, per-weapon pose qualification and complete radio mapping.
 - High-skill bot behavior qualification, full-match reliability and presentation-hardware performance.
 - No approved parity baseline or measured 95% completion.
-- Draft CS:GO landing theme links to the private preview; game assets/engine remain isolated.
+- Draft CS:GO landing theme opens the same-origin `/games/csgo` page; game assets/engine remain isolated from the dashboard.
 - The pinned map is a community CS:GO port, not an independently verified original game build.
 - Independent Chinese copy review and maintainer signoff remain pending.
 - Keep the PR draft and do not enable auto-merge.
 
 ## Verification results
+
+In-site hosting and world-lighting iteration, October 6–7, 2026:
+
+- Replaced the external launcher with same-tab `/games/csgo?lang=en|zh` navigation,
+  native mouse capture, localized return links and game-only noindex headers.
+- Published the explicitly approved asset branch and pinned its immutable commit.
+  A clean build downloaded and verified all archive parts and 1,094 extracted
+  files. Browsers load those assets from the website, not GitHub or Perplexity.
+- Restored the map port's baked light samples for 2,773 world surfaces in 42
+  material groups. This does not restore displacement, prop or character lighting.
+- All 45 game-tool tests pass, with no skips. The production dashboard fixture
+  build and full workspace unit suites pass; the app has 6,210 passing tests and
+  four skips.
+- Repeated the default-theme/embed/SEO audit after native-route integration.
+  No optional resources were requested in the tested default or embed states.
+- Browser-flow and full-game regression evidence is recorded separately in
+  `evidence/site-integration.md`; no 95% fidelity claim or merge authorization
+  follows from these implementation tests.
 
 Weapon iteration, October 6, 2026:
 
