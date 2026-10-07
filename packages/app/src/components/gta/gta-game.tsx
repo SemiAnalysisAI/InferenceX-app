@@ -13,7 +13,7 @@ import {
   type Controls,
   type CityState,
 } from './gta-engine';
-import { createCityRenderer, MODEL_NAMES, type CityRenderer } from './gta-renderer';
+import { createCityRenderer, CITY_ASSET_COUNT, type CityRenderer } from './gta-renderer';
 import { BUILDINGS, JOBS, distance } from './gta-world';
 import { STREETS_SF } from './gta-geography';
 import './gta-game.css';
@@ -678,7 +678,7 @@ export function GtaGame({ locale = 'en' }: { locale?: 'en' | 'zh' }) {
                         ? t.paused
                         : t.title}
             </h3>
-            {!ready && !error && <progress value={loaded} max={MODEL_NAMES.length} />}
+            {!ready && !error && <progress value={loaded} max={CITY_ASSET_COUNT} />}
             {ready && !atlasLoading && <p>{t.brief}</p>}
             {error ? (
               <button type="button" onClick={() => setAttempt((n) => n + 1)}>

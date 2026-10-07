@@ -5,7 +5,7 @@ import { Sky } from 'three/addons/objects/Sky.js';
 import { JOBS, lanePoint, type Point } from './gta-world';
 import type { CityState } from './gta-engine';
 import { clonePedestrian, createPedestrianAnimation, rigPedestrian } from './gta-pedestrian';
-import { loadArchitecture } from './gta-architecture';
+import { ARCHITECTURE_ASSET_COUNT, loadArchitecture } from './gta-architecture';
 import { buildCityscape } from './gta-cityscape';
 
 export const MODEL_NAMES = [
@@ -25,6 +25,7 @@ export const MODEL_NAMES = [
   'dumpster',
 ] as const;
 type ModelName = (typeof MODEL_NAMES)[number];
+export const CITY_ASSET_COUNT = MODEL_NAMES.length + ARCHITECTURE_ASSET_COUNT;
 const BASE = '/decorative/gta/models/';
 
 export function disposeScene(scene: T.Object3D) {
@@ -166,7 +167,12 @@ export async function createCityRenderer(
     for (let i = 0; i < MODEL_NAMES.length; i += 3) {
       await Promise.all(MODEL_NAMES.slice(i, i + 3).map(loadModel));
     }
-    architecture = await loadArchitecture(city, BASE.replace('models/', 'architecture/'), signal);
+    architecture = await loadArchitecture(
+      city,
+      BASE.replace('models/', 'architecture/'),
+      signal,
+      () => onProgress(++done),
+    );
     scene.environment = architecture.environment;
   } catch (error) {
     disposed = true;

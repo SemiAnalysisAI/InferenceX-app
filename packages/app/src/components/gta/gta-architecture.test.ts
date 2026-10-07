@@ -13,7 +13,7 @@ const manifest = JSON.parse(readFileSync(resolve(base, 'manifest.json'), 'utf8')
 }[];
 describe('Optional city architecture asset integrity', () => {
   it('keeps the additional asset pack below 10 MB with explicit provenance', () => {
-    expect(manifest).toHaveLength(7);
+    expect(manifest).toHaveLength(10);
     expect(manifest.reduce((sum, e) => sum + e.bytes, 0)).toBeLessThan(10_000_000);
     expect(
       manifest.every((e) => e.license === 'CC0' && e.source.startsWith('https://polyhaven.com/a/')),

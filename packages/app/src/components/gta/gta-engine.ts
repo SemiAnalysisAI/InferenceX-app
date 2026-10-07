@@ -219,7 +219,23 @@ export function stepCity(s: CityState, c: Controls, seconds: number) {
     }
     while (route.next < route.points.length && distance(cop, route.points[route.next]) < 3)
       route.next++;
-    const goal = distance(cop, s.player) < 35 ? s.player : route.points[route.next];
+    const steps = Math.max(1, Math.ceil(distance(cop, s.player) / 2));
+    let clear = true;
+    for (let i = 1; i <= steps; i++) {
+      if (
+        blocked(
+          {
+            x: cop.x + ((s.player.x - cop.x) * i) / steps,
+            z: cop.z + ((s.player.z - cop.z) * i) / steps,
+          },
+          1.3,
+        )
+      ) {
+        clear = false;
+        break;
+      }
+    }
+    const goal = clear ? s.player : route.points[route.next];
     cop.angle = goal ? Math.atan2(goal.x - cop.x, goal.z - cop.z) : cop.angle;
     cop.speed = goal ? 18 + s.heat * 2 : 0;
     move(cop, dt, 1.3);

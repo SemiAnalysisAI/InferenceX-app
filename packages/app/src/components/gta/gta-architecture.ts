@@ -10,7 +10,13 @@ interface Part {
   material: T.Material | T.Material[];
   matrix: T.Matrix4;
 }
-export async function loadArchitecture(root: T.Group, base: string, signal: AbortSignal) {
+export const ARCHITECTURE_ASSET_COUNT = 10;
+export async function loadArchitecture(
+  root: T.Group,
+  base: string,
+  signal: AbortSignal,
+  onAsset: () => void = () => {},
+) {
   const sources: T.Group[] = [];
   const loader = new GLTFLoader();
   for (const name of [
@@ -25,6 +31,7 @@ export async function loadArchitecture(root: T.Group, base: string, signal: Abor
     root.add(gltf.scene);
     signal.throwIfAborted();
     sources.push(gltf.scene);
+    onAsset();
   }
   const response = await fetch(`${base}urban_street_04_1k.hdr`, { signal });
   if (!response.ok) throw new Error(`Environment: ${response.status}`);
@@ -33,10 +40,18 @@ export async function loadArchitecture(root: T.Group, base: string, signal: Abor
   const environment = new T.DataTexture(hdr.data, hdr.width, hdr.height, T.RGBAFormat, hdr.type);
   environment.mapping = T.EquirectangularReflectionMapping;
   environment.needsUpdate = true;
+  onAsset();
   const textures: T.Texture[] = [];
   try {
-    for (const name of ['Diffuse', 'nor_gl', 'Rough']) {
-      const r = await fetch(`${base}asphalt-${name}.jpg`, { signal });
+    for (const name of [
+      'asphalt-Diffuse',
+      'asphalt-nor_gl',
+      'asphalt-Rough',
+      'facade-apartment',
+      'facade-factory',
+      'facade-glass',
+    ]) {
+      const r = await fetch(`${base}${name}.jpg`, { signal });
       if (!r.ok) throw new Error(`Road texture: ${r.status}`);
       const bitmap = await createImageBitmap(await r.blob(), { imageOrientation: 'flipY' });
       const texture = new T.Texture(bitmap);
@@ -46,6 +61,7 @@ export async function loadArchitecture(root: T.Group, base: string, signal: Abor
       texture.anisotropy = 4;
       textures.push(texture);
       signal.throwIfAborted();
+      onAsset();
     }
   } catch (error) {
     environment.dispose();
@@ -56,6 +72,10 @@ export async function loadArchitecture(root: T.Group, base: string, signal: Abor
     throw error;
   }
   textures[0].colorSpace = T.SRGBColorSpace;
+  textures.slice(3).forEach((t) => {
+    t.colorSpace = T.SRGBColorSpace;
+    t.repeat.set(1 / 3.1, 1 / 3.4);
+  });
   const asphalt = new T.MeshStandardMaterial({
     map: textures[0],
     normalMap: textures[1],
@@ -65,26 +85,13 @@ export async function loadArchitecture(root: T.Group, base: string, signal: Abor
   });
   const nearIds = { value: new Float32Array(6).fill(-1) };
   const nearHeights = { value: new Float32Array(6) };
-  const facadeMaterials = ['#d0bca0', '#a8988a', '#8da5a9', '#bdb7a9'].map((color, i) => {
+  const facadeMaterials = ['#ffffff', '#ffffff', '#e3edf0', '#d4d0ca'].map((color, i) => {
     const m = new T.MeshStandardMaterial({
       color,
-      roughness: i === 2 ? 0.3 : 0.8,
-      metalness: i === 2 ? 0.4 : 0.05,
+      map: textures[i === 2 ? 5 : 3 + (i % 2)],
+      roughness: i === 2 ? 0.4 : 0.85,
+      metalness: i === 2 ? 0.2 : 0.02,
     });
-    if (i !== 2) {
-      const wall = sources[i % 2].getObjectByName('wall_window_centered_large_01') as T.Mesh;
-      const original = (
-        Array.isArray(wall.material) ? wall.material[0] : wall.material
-      ) as T.MeshStandardMaterial;
-      for (const key of ['map', 'normalMap', 'roughnessMap'] as const)
-        if (original[key]) {
-          const texture = original[key].clone();
-          texture.wrapS = T.RepeatWrapping;
-          texture.wrapT = T.RepeatWrapping;
-          texture.repeat.set(0.25, 0.25);
-          m[key] = texture;
-        }
-    }
     m.onBeforeCompile = (shader) => {
       shader.uniforms.nearIds = nearIds;
       shader.uniforms.nearHeights = nearHeights;
@@ -100,13 +107,7 @@ export async function loadArchitecture(root: T.Group, base: string, signal: Abor
           for(int i=0;i<6;i++) {
             if(abs(cityId-nearIds[i])<0.1&&abs(cityNormal.y)<0.5&&cityPosition.y<nearHeights[i])discard;
           }
-          vec2 wallUV=vec2(dot(cityPosition.xz,vec2(-cityNormal.z,cityNormal.x)),cityPosition.y);
-          vec2 bay=fract(wallUV/vec2(3.1,3.4));
-          float windowMask=step(0.19,bay.x)*step(bay.x,0.81)*step(0.21,bay.y)*step(bay.y,0.88)*(1.0-step(0.8,abs(cityNormal.y)));
-          vec3 glass=mix(vec3(0.10,0.15,0.18),vec3(0.35,0.44,0.47),bay.y);
-          diffuseColor.rgb=mix(diffuseColor.rgb,glass,windowMask);
-          float sill=step(0.17,bay.y)*step(bay.y,0.22);
-          diffuseColor.rgb*=1.0-0.15*sill;
+          if(abs(cityNormal.y)>0.8)diffuseColor.rgb=vec3(0.18,0.20,0.19);
         `,
         );
     };
@@ -296,6 +297,15 @@ export async function loadArchitecture(root: T.Group, base: string, signal: Abor
       const shape = new T.Shape(b.ring.map((p) => new T.Vector2(p.x, -p.z)));
       const geometry = new T.ExtrudeGeometry(shape, { depth: b.h, bevelEnabled: false, steps: 1 });
       geometry.rotateX(-Math.PI / 2);
+      const positions = geometry.attributes.position,
+        normals = geometry.attributes.normal,
+        uv = geometry.attributes.uv;
+      for (let v = 0; v < positions.count; v++)
+        uv.setXY(
+          v,
+          -positions.getX(v) * normals.getZ(v) + positions.getZ(v) * normals.getX(v),
+          positions.getY(v) - 0.3,
+        );
       const id = entries.length + 1;
       geometry.setAttribute(
         'cityBuilding',

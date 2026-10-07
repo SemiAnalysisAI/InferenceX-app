@@ -53,5 +53,29 @@
     "license": "CC0",
     "bytes": 347226,
     "sha256": "18a7665e816dfae7f85de581bdca1b4dbc1928fa60c5844648a876def2c1fd6f"
+  },
+  {
+    "file": "facade-apartment.jpg",
+    "source": "https://polyhaven.com/a/modular_urban_apartments_facade",
+    "license": "CC0",
+    "derivation": "Orthographic facade bake; glass is original geometry lit by the CC0 HDR environment",
+    "bytes": 233060,
+    "sha256": "ce4fdf951867022c13c426ccdbbe797abaadb9c1099051bff72d52613462ecb9"
+  },
+  {
+    "file": "facade-factory.jpg",
+    "source": "https://polyhaven.com/a/modular_factory_facade",
+    "license": "CC0",
+    "derivation": "Orthographic facade bake; glass is original geometry lit by the CC0 HDR environment",
+    "bytes": 402020,
+    "sha256": "0cfcb61cd1ce50c77c9bb44ffe03010d317fdfc6b0b0eb6e945cafa826def6a5"
+  },
+  {
+    "file": "facade-glass.jpg",
+    "source": "https://polyhaven.com/a/urban_street_04",
+    "license": "CC0",
+    "derivation": "Orthographic facade bake; glass is original geometry lit by the CC0 HDR environment",
+    "bytes": 22470,
+    "sha256": "af09b7fb55f6ccd26cbfffafecec48835e532bf60a59130dea933ed15a7c8339"
   }
 ]

@@ -16,6 +16,8 @@ Poly Haven's asset license is documented at https://polyhaven.com/license. The H
 
 The models are the 1K glTF exports, repacked into self-contained GLBs. Unused modules were removed, textures recompressed, and geometry simplified with meshoptimizer (target ratio 0.18, error 0.002). The wall/window/door/cornice modules and fire escape components are preserved. `manifest.json` records the shipped byte sizes and SHA-256 hashes.
 
+The apartment and factory façade JPEGs are orthographic texture bakes of those CC0 modules. The glass façade JPEG is an original pane-and-frame material bake. Distant buildings use these repeated atlases; nearby buildings use modeled modules. These are not photographic scans of individual SF buildings. The ten architecture files total 9,837,462 bytes.
+
 ## Geographic data
 
 The optional game's `san-paloma.json` contains a cropped and simplified derivative of these City and County of San Francisco datasets:

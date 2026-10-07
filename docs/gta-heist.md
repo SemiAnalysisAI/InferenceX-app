@@ -6,8 +6,13 @@ not the complete GTA V product or campaign.
 
 ## Playable city
 
-The custom district has a connected street grid, buildings, a waterfront,
-park, decorative amusement pier, and street furniture. Four selectable GTA V
+The fictional San Paloma district uses 1,817 historical DataSF building
+footprints and 611 street centerlines, with approximate heights and polygon
+collisions. A compressed original corridor connects Santa Clara campus stops
+and San Jose blocks. CC0 Poly Haven façade modules, baked distant façades,
+asphalt maps and HDR lighting add architectural detail. The Ferry Building,
+Transamerica Pyramid, Oren's Hummus and campus buildings are simplified
+interpretations, not surveyed replicas. Four selectable GTA V
 cars (Adder, Buffalo, Blista, Taxi) share the roads with 18 traffic vehicles.
 The Michael model represents the player on foot and background pedestrians.
 The police model represents pursuers. Geometry and available textures are
@@ -61,6 +66,9 @@ presentation-only exclusion from API and `inferencex-skills` coverage.
 ## Implementation
 
 - `gta-world.ts`: city geometry and street/traffic paths.
+- `gta-geography.ts`: DataSF projection, street graph and landmark positions.
+- `gta-architecture.ts`: nearby façade instances and distant texture batches.
+- `gta-cityscape.ts`: roads, street furniture and original landmark geometry.
 - `gta-engine.ts`: deterministic simulation, missions and state transitions.
 - `gta-renderer.ts`: asset loading, instanced scenery and disposal.
 - `gta-game.tsx`: bilingual controls, accessibility and lifecycle.
@@ -69,4 +77,6 @@ presentation-only exclusion from API and `inferencex-skills` coverage.
 - Existing optional-theme isolation and sanity specs remain the integration guards.
 
 Asset provenance, processing and permission limitations are recorded in
-`packages/app/public/decorative/gta/models/README.md`.
+`packages/app/public/decorative/gta/models/README.md` and
+`packages/app/public/decorative/gta/architecture/README.md`. The game does
+not reproduce GTA V's complete world, campaign or visual fidelity.

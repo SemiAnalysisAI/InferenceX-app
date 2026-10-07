@@ -147,6 +147,16 @@ describe('GTA 3D simulation', () => {
       for (let d = 0; d < 2500; d += 10) expect(blocked(lanePoint(d, lane))).toBe(false);
     expect(new Set(newCity().traffic.map((t) => t.model)).size).toBe(4);
   });
+  it('police continue from a route endpoint toward a clear mid-block target', () => {
+    const s = driving();
+    s.car = { x: 0, z: 1250, angle: 0, speed: 0 };
+    s.player = { ...s.car };
+    s.heat = 1;
+    s.police = [{ x: 0, z: 1000, angle: 0, speed: 0 }];
+    advance(s, EMPTY_CONTROLS, 4);
+    expect(s.police[0].z).toBeGreaterThan(1070);
+    expect(s.police[0].speed).toBeGreaterThan(0);
+  });
   it('ends the run on timeout or zero health', () => {
     const s = driving();
     s.time = 0.001;
