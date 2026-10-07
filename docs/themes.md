@@ -81,6 +81,13 @@ and the separately reported permission are recorded in
 `packages/app/public/decorative/gta/README.md`. These assets are not covered
 by the repository's code license.
 
+## Playable Minecraft
+
+The Minecraft banner launches an optional, full [playable Minecraft](./minecraft-game.md)
+(survival and creative, infinite seeded worlds, crafting, smelting, mobs, local
+saves). The game bundle and its assets load only after the launcher is pressed.
+Asset provenance is recorded in `packages/app/public/decorative/minecraft/game/README.md`.
+
 ## Mario Kart implementation
 
 Mario Kart adds a flag option to the same picker, dark chart-palette aliasing,

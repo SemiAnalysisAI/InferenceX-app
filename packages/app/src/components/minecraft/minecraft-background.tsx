@@ -128,6 +128,8 @@ export function MinecraftBackground() {
     function onPointerDown(e: PointerEvent) {
       const target = e.target as HTMLElement | null;
       if (!target?.closest(INTERACTIVE)) return;
+      // Inventory slots and the game canvas handle their own sounds.
+      if (target.closest('[data-mc-silent]')) return;
       const ctx = audioCtxRef.current;
       const buffer = bufferRef.current;
       if (!ctx || !buffer) return;
