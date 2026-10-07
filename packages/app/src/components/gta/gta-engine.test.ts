@@ -25,6 +25,16 @@ const advance = (s: ReturnType<typeof newCity>, c = EMPTY_CONTROLS, seconds = 1)
   for (let i = 0; i < Math.round(seconds * 60); i++) stepCity(s, c, 1 / 60);
 };
 describe('GTA 3D simulation', () => {
+  it.each([null, 6])('clears a failed exit warning when driving resumes in mode %s', (tour) => {
+    const s = driving();
+    s.tour = tour;
+    s.message = 'blocked';
+    s.traffic = [];
+    advance(s, EMPTY_CONTROLS, 0.1);
+    expect(s.message).toBe('blocked');
+    advance(s, { ...EMPTY_CONTROLS, forward: true }, 0.1);
+    expect(s.message).toBe('drive');
+  });
   it('offers a driveable, untimed NVIDIA tour without silently teleporting', () => {
     const s = driving();
     const before = { ...s.player };

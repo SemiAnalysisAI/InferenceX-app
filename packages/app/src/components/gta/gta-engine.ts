@@ -207,6 +207,9 @@ export function stepCity(s: CityState, c: Controls, seconds: number) {
   s.immunity = Math.max(0, s.immunity - dt);
   const throttle = Number(c.forward) - Number(c.reverse),
     turn = Number(c.right) - Number(c.left);
+  if (s.message === 'blocked' && (throttle !== 0 || Math.abs(s.car.speed) > 0.5)) {
+    s.message = 'drive';
+  }
   if (s.onFoot) {
     s.player.angle -= turn * 2.4 * dt; // Camera faces the actor's forward direction.
     s.player.speed = throttle * (c.sprint ? 8 : 3.5);
