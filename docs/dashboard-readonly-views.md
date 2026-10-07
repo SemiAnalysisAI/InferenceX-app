@@ -81,8 +81,8 @@ contract.
 Zoom, theme, axis scale, labels, media playback and report expansion are renderer
 state. GPU interactive downsampling does not alter returned raw data or statistics.
 
-Run-specific recognition labels are also presentation-only. Run `35879254139`
-displays `UMBP MoRI SGLang` through October 9, 2026 in America/New_York
+Run-specific recognition labels are also presentation-only. Runs `35879254139`
+and `37181045340` display `UMBP MoRI SGLang` through October 9, 2026 in America/New_York
 (`2026-10-10T04:00:00Z` exclusive). Label resolution after that cutoff returns
 `MoRI SGLang`; an already-open memoized chart may need a refresh. This changes
 neither API selectors nor response data, framework/hardware keys, or raw CSV

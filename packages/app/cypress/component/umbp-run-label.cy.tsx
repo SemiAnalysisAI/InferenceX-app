@@ -4,7 +4,7 @@ import { getInferenceHardwareConfig } from '@/lib/inference-labels';
 import { createMockChartDefinition, createMockInferenceData } from '../support/mock-data';
 import { mountWithProviders } from '../support/test-utils';
 
-const runId = 35879254139;
+const runId = 37181045340;
 const runUrl = `https://github.com/SemiAnalysisAI/InferenceX/actions/runs/${runId}`;
 const hwKey = 'mi355x_mori-sglang';
 
