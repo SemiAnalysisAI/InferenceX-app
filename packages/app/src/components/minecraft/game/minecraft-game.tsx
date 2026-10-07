@@ -1,6 +1,14 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+} from 'react';
 
 import { SPLASHES } from '../minecraft-splash-text';
 import { Audio } from './mc-audio';
@@ -708,6 +716,8 @@ export function MinecraftGame({ locale, onExit }: { locale: Locale; onExit: () =
       setPhase(phase === 'create' ? 'worlds' : 'title');
       return true;
     }
+    // Never close mid-load; the session is being created.
+    if (phase === 'loading') return true;
     if (phase !== 'playing') return false;
     const s = sessionRef.current;
     if (!s) return false;
@@ -736,7 +746,9 @@ export function MinecraftGame({ locale, onExit }: { locale: Locale; onExit: () =
     return true;
   }, [phase, closeScreen, lock, setOverlay]);
 
-  useEffect(() => {
+  // Layout effect: the handler must match the phase before the browser can paint it,
+  // otherwise an Escape right after `playing` renders would close the dialog.
+  useLayoutEffect(() => {
     const el = rootRef.current;
     if (!el) return;
     (el as HTMLDivElement & { mcEscape?: () => boolean }).mcEscape = handleEscape;
