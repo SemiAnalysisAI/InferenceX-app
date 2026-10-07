@@ -1,13 +1,31 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useTheme } from 'next-themes';
+import { usePathname } from 'next/navigation';
+import { useEasterEggTheme } from '@/lib/use-easter-egg-theme';
+import { useLocale } from '@/lib/use-locale';
+import { track } from '@/lib/analytics';
+
+const GAME_PREVIEW = 'https://www.perplexity.ai/computer/a/b606a329-d010-4e4a-a228-638a718d71a1';
+const STRINGS = {
+  en: {
+    play: 'Play CS:GO',
+    detail: '1 human + 9 bots · Development preview',
+    notice: 'Opens Perplexity in a new tab. Preview access required.',
+  },
+  zh: {
+    play: '试玩 CS:GO',
+    detail: '1 名真人 + 9 名机器人 · 开发预览',
+    notice: '在新标签页打开 Perplexity，需要预览访问权限。',
+  },
+} as const;
 
 export function CsgoThemeBanner() {
-  const { resolvedTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
-  if (!mounted || resolvedTheme !== 'csgo') return null;
+  const theme = useEasterEggTheme();
+  const pathname = usePathname();
+  const locale = useLocale();
+  if (theme !== 'csgo') return null;
+  const landing = pathname === '/' || pathname === '/zh' || pathname === '/zh/';
+  const t = STRINGS[locale];
 
   return (
     <div className="container mx-auto px-4 lg:px-8" data-testid="csgo-theme-banner">
@@ -19,28 +37,37 @@ export function CsgoThemeBanner() {
           height={69}
           decoding="async"
         />
-        <span className="text-xs font-mono tracking-eyebrow text-primary">DUST II</span>
+        {landing ? (
+          <div className="csgo-game-launcher">
+            <span className="text-xs font-mono tracking-eyebrow text-primary">DUST II</span>
+            <span>{t.detail}</span>
+            {/* A native link neither prefetches the game nor mounts an iframe in the dashboard. */}
+            <a
+              href={GAME_PREVIEW}
+              target="_blank"
+              rel="noopener noreferrer nofollow"
+              data-testid="csgo-game-launch"
+              aria-describedby="csgo-game-access"
+              onClick={() => track('csgo_game_preview_opened', { surface: 'landing', locale })}
+            >
+              {t.play}
+            </a>
+            <small id="csgo-game-access">{t.notice}</small>
+          </div>
+        ) : (
+          <span className="text-xs font-mono tracking-eyebrow text-primary">DUST II</span>
+        )}
       </div>
     </div>
   );
 }
 
 /**
- * Follow the root class, like Minecraft's decorations, because this mounts
- * outside ThemeProvider. No image requests until CS:GO is selected.
+ * Share the selection/SSR/embed boundary with the parent loader.
  */
 export function CsgoDecorations() {
-  const [active, setActive] = useState(false);
-
-  useEffect(() => {
-    const check = () => setActive(document.documentElement.classList.contains('csgo'));
-    check();
-    const observer = new MutationObserver(check);
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-    return () => observer.disconnect();
-  }, []);
-
-  if (!active) return null;
+  const theme = useEasterEggTheme();
+  if (theme !== 'csgo') return null;
 
   return (
     <div className="csgo-scene" data-testid="csgo-scene" aria-hidden="true">

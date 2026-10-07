@@ -1,0 +1,19 @@
+{
+  "name": "csgo-offline-development",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test *.test.mjs",
+    "verify": "node prepare.mjs --check && node verify-game-assets.mjs",
+    "gate": "node parity-gate.mjs",
+    "build": "node build-preview.mjs"
+  },
+  "dependencies": {
+    "three": "0.180.0",
+    "three-mesh-bvh": "0.9.2"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2",
+    "playwright": "1.63.0"
+  }
+}
