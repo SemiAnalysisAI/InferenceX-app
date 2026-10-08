@@ -182,9 +182,26 @@ function soloLegendSeries(): void {
   cy.get('[data-testid="chart-legend"] ul input[type="checkbox"]:checked').should('have.length', 1);
 }
 
-/** Pin the tooltip on a visible point of the soloed series and open its detail page. */
-function openPointDetail(): void {
-  cy.get(`[data-testid="legend-points-${SOLO_HW_KEY}"]`).should('exist');
+/**
+ * Pin the tooltip on a traced point of the soloed series.
+ *
+ * Soloing widens the legend, which shrinks the chart container. The chart
+ * rebuilds at the new width in a later rendering frame and dismisses any
+ * pinned tooltip when it does, so a pin that lands first is dropped a few
+ * milliseconds later. Pin only once the svg has been rebuilt at the width its
+ * container currently has.
+ */
+function clickTracedPoint(): void {
+  cy.get('[data-testid="inference-chart-display"] [data-testid="d3-chart-svg"]')
+    .first()
+    .should(($svg) => {
+      const svg = $svg[0];
+      const containerWidth = svg.parentElement?.getBoundingClientRect().width ?? 0;
+      expect(
+        Number(svg.getAttribute('width')),
+        'chart rebuilt at the container width',
+      ).to.be.closeTo(containerWidth, 1);
+    });
   cy.get('[data-testid="inference-chart-display"] svg .dot-group')
     .should('have.length.greaterThan', 0)
     .then(($dots) => {
@@ -195,6 +212,12 @@ function openPointDetail(): void {
       expect(target, `a traced ${SOLO_HW_KEY} point`).to.not.equal(undefined);
       cy.wrap(target).find('.visible-shape').click({ force: true });
     });
+}
+
+/** Pin the tooltip on a visible point of the soloed series and open its detail page. */
+function openPointDetail(): void {
+  cy.get(`[data-testid="legend-points-${SOLO_HW_KEY}"]`).should('exist');
+  clickTracedPoint();
   cy.get('[data-chart-tooltip]:visible [data-action="view-charts"]').should('be.visible').click();
 }
 
@@ -222,17 +245,7 @@ describe('Agentic point detail — returning to the chart', () => {
     visitChart('/inference');
     selectTargetModel();
     soloLegendSeries();
-
-    cy.get('[data-testid="inference-chart-display"] svg .dot-group')
-      .should('have.length.greaterThan', 0)
-      .then(($dots) => {
-        const target = [...$dots].find((node) => {
-          const datum = (node as unknown as { __data__?: { hwKey?: string; id?: number } })
-            .__data__;
-          return datum?.hwKey === SOLO_HW_KEY && tracedIds.has(Number(datum?.id));
-        });
-        cy.wrap(target).find('.visible-shape').click({ force: true });
-      });
+    clickTracedPoint();
 
     cy.get('[data-chart-tooltip]:visible [data-action="view-charts"]')
       .should('be.visible')
@@ -295,17 +308,7 @@ describe('Agentic point detail — returning to the chart', () => {
     visitChart('/inference?unofficialruns=987654321');
     selectTargetModel();
     soloLegendSeries();
-
-    cy.get('[data-testid="inference-chart-display"] svg .dot-group')
-      .should('have.length.greaterThan', 0)
-      .then(($dots) => {
-        const target = [...$dots].find((node) => {
-          const datum = (node as unknown as { __data__?: { hwKey?: string; id?: number } })
-            .__data__;
-          return datum?.hwKey === SOLO_HW_KEY && tracedIds.has(Number(datum?.id));
-        });
-        cy.wrap(target).find('.visible-shape').click({ force: true });
-      });
+    clickTracedPoint();
 
     cy.get('[data-chart-tooltip]:visible [data-action="view-charts"]')
       .should('be.visible')
