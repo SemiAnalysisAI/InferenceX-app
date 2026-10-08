@@ -550,13 +550,10 @@ still paired by the bare suffix). The multinode template uploads no `gpu_metrics
 artifact; its telemetry travels inside `power_audit_<suffix>` as
 `LOGS/power/samples.csv`, one deployment-wide CSV written by srt-slurm's
 `dcgm-power` collector (`timestamp_unix, hostname, gpu_index, gpu_uuid, power_w`,
-plus `gpu_util_pct` from samples schema 2 and `temperature_c` from schema 3).
-`etl/multinode-power-samples.ts` regroups it per host and the ingest stores one
-series per host (`file_name` = `LOGS/power/samples.csv#<hostname>`), so multinode
-and disaggregated points get per-GPU power curves, utilization and temperature
-when the producer wrote them, and null clocks. The AMD device-metrics exporter
-reports through the same collector, so the manifest's exporter image decides the
-series vendor. Single-node jobs upload a `power_audit_` bundle too,
+power only). `etl/multinode-power-samples.ts` regroups it per host and the ingest
+stores one series per host (`file_name` = `LOGS/power/samples.csv#<hostname>`),
+so multinode and disaggregated points get per-GPU power curves with null clocks,
+temperature and utilization. Single-node jobs upload a `power_audit_` bundle too,
 so discovery and backfill pairing use it only for a suffix with no `gpu_metrics_`
 upload. A bundle that carries readable `gpu_metrics*.csv` SMI files is stored from
 those files; its DCGM `samples.csv` is used only when no SMI CSV in the bundle parses.

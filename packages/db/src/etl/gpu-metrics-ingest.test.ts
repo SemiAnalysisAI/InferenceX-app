@@ -102,39 +102,16 @@ const MULTINODE_MANIFEST = {
   sample_interval_seconds: 1,
 };
 
-// Schema 3 from an AMD #3781 ladder (run 37787944521): utilization and
-// temperature columns, AMD device-metrics exporter behind the DCGM producer.
-const AMD_SCHEMA3_POWER_CSV = [
-  'schema_version,timestamp_unix,scrape_seq,hostname,gpu_index,gpu_uuid,power_w,gpu_util_pct,sm_active,temperature_c',
-  '3,1791477825.8623333,19,mia1-p01-g15,0,692526014242,239,0,,38',
-  '3,1791477825.8623333,19,mia1-p01-g15,1,692526018761,242,0,,43',
-  '3,1791477826.8623333,20,mia1-p01-g15,0,692526014242,610,97,,61',
-  '3,1791477826.8623333,20,mia1-p01-g15,1,692526018761,640,99,,',
-].join('\n');
-const AMD_SCHEMA3_MANIFEST = {
-  schema_version: 1,
-  producer: 'srt-slurm.dcgm-power',
-  source_metric: 'gpu_power_usage',
-  samples_schema_version: 3,
-  temperature_metric: 'gpu_junction_temperature',
-  dcgm_exporter: {
-    container_image_resolved: 'ghcr.io#semianalysisai/amd-device-metrics-exporter:sha256:8a3fe70b',
-  },
-};
-
-function writePowerAuditArtifact(
-  csv = MULTINODE_POWER_CSV,
-  manifest: Record<string, unknown> = MULTINODE_MANIFEST,
-) {
+function writePowerAuditArtifact() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'gpu-metrics-ingest-'));
   roots.push(root);
   const artifactName = 'power_audit_kimik3_conc8_fp4_dynamo-vllm_b200-slurm_0';
   const artifactDir = path.join(root, artifactName);
   fs.mkdirSync(path.join(artifactDir, 'LOGS', 'power'), { recursive: true });
-  fs.writeFileSync(path.join(artifactDir, 'LOGS', 'power', 'samples.csv'), csv);
+  fs.writeFileSync(path.join(artifactDir, 'LOGS', 'power', 'samples.csv'), MULTINODE_POWER_CSV);
   fs.writeFileSync(
     path.join(artifactDir, 'LOGS', 'power', 'manifest.json'),
-    JSON.stringify(manifest),
+    JSON.stringify(MULTINODE_MANIFEST),
   );
   fs.writeFileSync(path.join(artifactDir, 'agg_kimik3_conc8.json'), '{}');
   return { artifactName, artifactDir };
@@ -166,31 +143,6 @@ describe('prepareGpuMetricsArtifact', () => {
       { hostname: 'host-a', gpu_index: 1, gpu_uuid: 'GPU-a1' },
     ]);
     expect(hostA!.sidecars.energyStart).toBeNull();
-  });
-
-  it('keeps schema-3 utilization and temperature and labels the AMD exporter', () => {
-    const [host] = prepareGpuMetricsArtifact(
-      writePowerAuditArtifact(AMD_SCHEMA3_POWER_CSV, AMD_SCHEMA3_MANIFEST),
-    );
-    expect(host!.vendor).toBe('amd');
-    expect(
-      host!.samples.map(({ gpuIndex, powerW, gpuUtilPct, temperatureC }) => ({
-        gpuIndex,
-        powerW,
-        gpuUtilPct,
-        temperatureC,
-      })),
-    ).toEqual([
-      { gpuIndex: 0, powerW: 239, gpuUtilPct: 0, temperatureC: 38 },
-      { gpuIndex: 1, powerW: 242, gpuUtilPct: 0, temperatureC: 43 },
-      { gpuIndex: 0, powerW: 610, gpuUtilPct: 97, temperatureC: 61 },
-      { gpuIndex: 1, powerW: 640, gpuUtilPct: 99, temperatureC: null },
-    ]);
-    const stats = computeGpuMetricStats(host!.samples);
-    expect(new Set(stats.map((s) => s.metric))).toEqual(
-      new Set(['powerW', 'gpuUtilPct', 'temperatureC']),
-    );
-    expect(stats.find((s) => s.metric === 'temperatureC' && s.gpuIndex === 0)?.max).toBe(61);
   });
 
   it('prefers an SMI CSV in the bundle over its per-host power samples', () => {

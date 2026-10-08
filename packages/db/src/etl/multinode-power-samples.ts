@@ -7,18 +7,15 @@
  * once per second):
  *
  *   schema_version,timestamp_unix,scrape_seq,hostname,gpu_index,gpu_uuid,power_w
- *     [,gpu_util_pct,sm_active[,temperature_c]]
  *
- * `power_w` is required. Utilization (schema 2) and temperature (schema 3) are
- * kept when the producer wrote them; `sm_active` has no sample column, and every
- * other `GpuMetricSample` field stays null. Rows are regrouped per host so each
+ * Only power is scraped, so every other `GpuMetricSample` field stays null and
+ * per-GPU statistics cover `powerW` alone. Rows are regrouped per host so each
  * host becomes its own series, the shape the reader already uses for multinode
  * staging ("one CSV per node"). Pure module: no I/O.
  */
 
 import {
   emptySample,
-  parseMetricCell,
   splitCsvLine,
   type GpuMetricSample,
   type GpuMetricsVendor,
@@ -55,8 +52,6 @@ export function parseMultinodePowerSamples(csvText: string): MultinodePowerHost[
   const column = new Map(header.map((name, index) => [name, index] as const));
   if (REQUIRED_COLUMNS.some((name) => !column.has(name))) return null;
   const at = (cells: string[], name: string): string | undefined => cells[column.get(name)!];
-  const optional = (cells: string[], name: string): number | null =>
-    column.has(name) ? parseMetricCell(at(cells, name)) : null;
 
   const hosts = new Map<string, MultinodePowerHost>();
   for (const line of lines.slice(1)) {
@@ -79,12 +74,7 @@ export function parseMultinodePowerSamples(csvText: string): MultinodePowerHost[
       host = { hostname, samples: [], gpuUuids: {} };
       hosts.set(hostname, host);
     }
-    host.samples.push({
-      ...emptySample(Math.round(seconds * 1000), gpuIndex),
-      powerW,
-      gpuUtilPct: optional(cells, 'gpu_util_pct'),
-      temperatureC: optional(cells, 'temperature_c'),
-    });
+    host.samples.push({ ...emptySample(Math.round(seconds * 1000), gpuIndex), powerW });
     const uuid = at(cells, 'gpu_uuid');
     if (uuid && !(gpuIndex in host.gpuUuids)) host.gpuUuids[gpuIndex] = uuid;
   }
@@ -93,18 +83,12 @@ export function parseMultinodePowerSamples(csvText: string): MultinodePowerHost[
 }
 
 /**
- * The producer manifest names its source metric and exporter image. The AMD
- * device-metrics exporter reports through the same `srt-slurm.dcgm-power`
- * producer with vendor-neutral metric names (`gpu_power_usage`), so its image
- * is the AMD signal. An absent manifest defaults to NVIDIA.
+ * The producer manifest names its source metric; DCGM means NVIDIA. Anything
+ * naming AMD tooling maps to 'amd', and an absent manifest defaults to NVIDIA
+ * because only the DCGM producer writes this layout today.
  */
 export function multinodePowerVendor(manifest: Record<string, unknown> | null): GpuMetricsVendor {
-  const exporter = manifest?.dcgm_exporter;
-  const image =
-    exporter && typeof exporter === 'object'
-      ? (exporter as Record<string, unknown>).container_image_resolved
-      : undefined;
-  const source = [manifest?.source_metric, manifest?.producer, image]
+  const source = [manifest?.source_metric, manifest?.producer]
     .filter((value): value is string => typeof value === 'string')
     .join(' ')
     .toLowerCase();
