@@ -108,9 +108,6 @@ export function partitionChartDataByLimits(
   selectedYAxisMetric: string,
   options: { isTtftX: boolean; isAgentic: boolean },
 ): ProcessedChartData {
-  if (chartDefinition.x_scale_field === 'conc') {
-    return { data: data.filter((point) => Number.isFinite(point.x)), clippedData: [] };
-  }
   const costLimitApplies =
     selectedYAxisMetric.includes('cost') &&
     selectedYAxisMetric !== 'y_costUser' &&

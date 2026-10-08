@@ -371,16 +371,6 @@ export const METRIC_EXPLANATIONS: Record<MetricKey, MetricExplanation> = {
       zh: '整组 GPU P90 功耗（W/芯片）= 各 GPU 功耗之和的时间加权 P90 ÷ GPU 数量',
     },
   },
-  modeledChassisPowerPerGpu: {
-    description: {
-      en: 'Estimated chassis AC power from validated measured GPU power for non-agentic 8k1k runs, divided by the modeled chassis GPU count (eight per chassis). Oren’s draft model adds CPU, DRAM, and platform overheads using the fixed README inference sweep, with CPU and DRAM utilization set to 20%. Supported hardware with known eight-GPU chassis placement is included; a partially allocated chassis is extrapolated to a full chassis at the measured per-GPU power, matching the source sweep. Separate CPU-only frontend/router hosts are excluded. Prefill and decode chassis are modeled separately, then summed. Facility power applies PUE after chassis AC and is shown separately in the point tooltip.',
-      zh: '以非智能体 8k1k 运行中通过验证的 GPU 实测功耗为输入，估算机箱交流功耗，再除以建模机箱的 GPU 总数（每机箱 8 张）。Oren 的功耗模型草案按 README 中的固定推理参数扫描，计入 CPU、DRAM 和平台开销，CPU 与 DRAM 利用率均设为 20%。纳入硬件受支持、八卡机箱位置已知的运行；仅使用部分 GPU 的机箱按实测每卡功耗外推至满机箱，与模型源码的扫描口径一致。不计入独立的纯 CPU 前端或路由主机。Prefill 与 Decode 机箱分别计算后求和。数据中心功耗在机箱交流功耗上应用 PUE，单独显示在数据点提示框中。',
-    },
-    formula: {
-      en: 'W/GPU = sum of modeled chassis AC power (W) ÷ modeled chassis GPU count (8 per chassis); facility W = chassis AC W × PUE',
-      zh: 'W/GPU = 各机箱交流功耗估算之和（W）÷ 建模机箱的 GPU 总数（每机箱 8 张）；数据中心 W = 机箱交流 W × PUE',
-    },
-  },
   measuredPrefillAvgPower: measuredPower('prefill'),
   measuredDecodeAvgPower: measuredPower('decode'),
   measuredJPerOutputToken: measuredJoulesPerToken('output'),
@@ -548,15 +538,9 @@ export const METRIC_EXPLANATIONS: Record<MetricKey, MetricExplanation> = {
  * the percentile prefix. Mirrors the branch logic in `resolveXAxisField` plus
  * the derived agentic x-axis mode handled in `ChartDisplay`.
  */
-export type XAxisKind =
-  | 'concurrency'
-  | 'interactivity'
-  | 'e2eLatency'
-  | 'ttft'
-  | 'e2eNormalizedInteractivity';
+export type XAxisKind = 'interactivity' | 'e2eLatency' | 'ttft' | 'e2eNormalizedInteractivity';
 
 export const X_AXIS_KINDS: readonly XAxisKind[] = [
-  'concurrency',
   'interactivity',
   'e2eLatency',
   'ttft',
@@ -578,13 +562,6 @@ const zhPctl = (pctl: string | null): string =>
 const enPctl = (pctl: string | null): string => (pctl === null ? '' : `${pctl} `);
 
 export const X_AXIS_EXPLANATIONS: Record<XAxisKind, XAxisExplanation> = {
-  concurrency: {
-    name: { en: () => 'Concurrency', zh: () => '并发数' },
-    description: {
-      en: 'The configured number of concurrent requests in each observed benchmark. This is a load setting, not a higher-is-better score. All observed load points are retained; lines only connect the same serving topology and run.',
-      zh: '每个实测基准配置的并发请求数。这是负载设置，不是越高越好的性能分数。保留全部实测负载点，连线仅连接同一服务拓扑、同一次运行的数据。',
-    },
-  },
   interactivity: {
     name: {
       en: (pctl) => `${enPctl(pctl)}Interactivity (tok/s/user)`,
@@ -669,7 +646,6 @@ export function resolveXAxisKind(
     isDerivedNormalizedInteractivity: boolean;
   },
 ): XAxisKind {
-  if (opts.xAxisField === 'conc') return 'concurrency';
   if (opts.isDerivedNormalizedInteractivity) return 'e2eNormalizedInteractivity';
   if (opts.xAxisField.endsWith('ttft')) return 'ttft';
   return chartType === 'e2e' ? 'e2eLatency' : 'interactivity';

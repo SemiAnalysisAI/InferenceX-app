@@ -343,11 +343,6 @@ export interface InferenceData extends Partial<Omit<AggDataEntry, AggDataConflic
   measuredAvgPower?: { y: number; roof: boolean };
   measuredP75Power?: { y: number; roof: boolean };
   measuredP90Power?: { y: number; roof: boolean };
-  /**
-   * Summed modeled chassis AC ÷ modeled chassis GPU count (chassisCount × 8).
-   * Partially allocated chassis are extrapolated; see modeled-system-power.ts chassisBasis.
-   */
-  modeledChassisPowerPerGpu?: { y: number; roof: boolean };
   measuredPrefillAvgPower?: { y: number; roof: boolean };
   measuredDecodeAvgPower?: { y: number; roof: boolean };
   measuredJPerOutputToken?: { y: number; roof: boolean };
@@ -735,7 +730,6 @@ export interface InferenceDisplayContextType {
   powerCompare: PowerCompare;
   isLegendExpanded: boolean;
   hideNonOptimal: boolean;
-  showAllMeasurements: boolean;
   showPointLabels: boolean;
   highContrast: boolean;
   logScale: boolean;
@@ -783,7 +777,6 @@ export interface InferenceActionsContextType {
   setQuickFilterTopologies: (topologies: string[]) => void;
   setIsLegendExpanded: (expanded: boolean) => void;
   setHideNonOptimal: (hide: boolean) => void;
-  setShowAllMeasurements: (show: boolean) => void;
   setShowPointLabels: (show: boolean) => void;
   setHighContrast: (highContrast: boolean) => void;
   setLogScale: (logScale: boolean) => void;

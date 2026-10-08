@@ -7,14 +7,13 @@
  * plotted x/y axes.
  */
 
-import { METRIC_REGISTRY, isAllInMeasuredConfigKey } from '@/components/inference/metric-registry';
+import { isAllInMeasuredConfigKey } from '@/components/inference/metric-registry';
 import {
   allInMeasuredStatusLabel,
   inferenceTableYValue,
 } from '@/components/inference/utils/inference-table-data';
 import type { InferenceData, TrendDataPoint } from '@/components/inference/types';
 import { inferPowerCompare, powerSeriesLabel } from '@/components/inference/utils/power-compare';
-import { chipCounts } from '@/lib/chip-counts';
 import type { SubmissionVolumeRow } from '@/lib/submissions-types';
 
 import { sequenceToIslOsl } from '@semianalysisai/inferencex-constants';
@@ -60,8 +59,6 @@ export function inferenceChartToCsv(
   displayedMetrics?: InferenceCsvDisplayedMetrics,
 ): CsvData {
   const islOsl = sequenceToIslOsl(sequence);
-  const showModeledPower =
-    displayedMetrics?.yPath === METRIC_REGISTRY.modeledChassisPowerPerGpu.field;
   // A power comparison (`i_pcompare`) appends boundary / role clones of the
   // plotted points; name each row's series so the export stays unambiguous.
   const allPoints = [...data, ...overlayData];
@@ -122,7 +119,6 @@ export function inferenceChartToCsv(
     'Run URL',
     'Physical Chips',
     'DP',
-    ...(showModeledPower ? ['Configured Chip Count'] : []),
     ...(showPowerSeries ? ['Power Series'] : []),
     ...(showAllInMeasured ? ['Measured GPU Power (W/chip)', 'All-in Estimate Status'] : []),
   ];
@@ -151,7 +147,6 @@ export function inferenceChartToCsv(
   const rows = allPoints
     .filter((d) => !d.hidden)
     .map((d) => {
-      const chips = chipCounts(d, showModeledPower);
       const row = [
         model,
         islOsl?.isl ?? '',
@@ -194,9 +189,8 @@ export function inferenceChartToCsv(
         d.dp_attention ?? '',
         d.is_multinode ?? '',
         d.run_url ?? '',
-        chips.physical,
+        d.physicalChips ?? d.tp,
         d.dp ?? '',
-        ...(showModeledPower ? [chips.configured] : []),
         ...(showPowerSeries ? [powerSeriesLabel(d, plottedMetric, powerCompare, 'en')] : []),
         ...(showAllInMeasured
           ? [d.measuredAvgPower?.y ?? '', allInMeasuredStatusLabel(d, plottedMetric.slice(2), 'en')]

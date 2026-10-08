@@ -112,8 +112,8 @@ Expanding assumptions or unavailable-estimate details does not change returned d
 All in Measured watts and energy accept validated 8K/1K and AgentX rows through the
 shared chart/API transform, including historical and unofficial rows. AgentX reuses
 the chassis or rack model without independent workload calibration. Telemetry and
-topology gates still apply; NVL72 needs complete Grace or module power. The standalone
-Modeled Chassis AC metric and 8K/1K offline export retain their 8K/1K scope.
+topology gates still apply; NVL72 needs complete Grace or module power. The
+8K/1K offline export retains its 8K/1K scope.
 
 For All in Measured, `tableRows` retains every GPU-valid observation in the selected
 scope and best-series selection, including axis-clipped and non-frontier points.
@@ -200,11 +200,10 @@ These analytical results require JSON; enabling any with CSV returns 400. CSV ex
 同并发表格或分享参数。角色分析和功耗拟合面板仍在仪表板中提供，分别对应 `roleShare` 和
 `powerFit`。来源标识、插值规则、缺失原因和仅 JSON 的响应约束以上文说明为准。
 
-For exact-load comparisons, use `xmode=concurrency`. The response resolves
-`optimal=false` and `best=false`, retains every eligible observed load, and sets
-`frontier.direction=null`; concurrency is not a speed or quality preference.
-Filter `topologies` with one or more exact `point.topologyKey` values from a first
-response (encode with `URLSearchParams`). This selects the same GPU count,
+Concurrency is not an `xmode`: GPU count varies across configurations, so
+concurrency alone is not comparable between them. Each point still reports its
+`concurrency`. Filter `topologies` with one or more exact `point.topologyKey`
+values from a first response (encode with `URLSearchParams`). This selects the same GPU count,
 parallelism, role-pool split and offload mode across hardware without removing
 loads. Unknown metadata stays unknown, not equivalent to an explicit setting.
 Keep hardware, precision, recipe, run/date and software provenance separate;

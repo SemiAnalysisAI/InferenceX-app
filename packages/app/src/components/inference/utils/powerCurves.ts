@@ -15,7 +15,6 @@ const POWER_CURVE_METRICS: ReadonlySet<string> = new Set([
   'y_measuredPrefillAvgPower',
   'y_measuredDecodeAvgPower',
   'y_measuredPowerPercentTdp',
-  'y_modeledChassisPowerPerGpu',
   // Provisioned / modelled boundary gauges: same upper-envelope curve as measured watts.
   'y_gpuProvisionedWatts',
   'y_utilityProvisionedWatts',
@@ -24,17 +23,6 @@ const POWER_CURVE_METRICS: ReadonlySet<string> = new Set([
 
 export function isPowerCurveMetric(metric: string): boolean {
   return POWER_CURVE_METRICS.has(metric);
-}
-
-/**
- * Power gauges whose curve is always the upper envelope and whose Optimal Only
- * toggle only hides off-envelope markers: measured watts plus the provisioned /
- * modelled boundary gauges that sit beside them. A Pareto corner would collapse
- * a flat TDP series to one marker. The modelled chassis axis keeps its legacy
- * Pareto behaviour.
- */
-export function isMeasuredPowerCurveMetric(metric: string): boolean {
-  return isPowerCurveMetric(metric) && metric !== 'y_modeledChassisPowerPerGpu';
 }
 
 /**

@@ -186,9 +186,8 @@ export function powerBasisNormalization(
  * schema v2, or the validated unversioned single-node producer it records as
  * `telemetryBasis: 'validated-unversioned-single-node'`. That is the same
  * measured population the app plots as B1 (`measuredAvgPower`). All in Measured
- * also admits AgentX estimates; the separate `modeledChassisPowerPerGpu` metric
- * retains its 8K/1K workload restriction. The public
- * API's stricter `strictV2` row filter is not re-applied here; it is not
+ * also admits AgentX estimates. The public API's stricter `strictV2` row filter
+ * is not re-applied here; it is not
  * applied to the chart's B1 either.
  */
 export function modeledFacilityWattsPerGpu(

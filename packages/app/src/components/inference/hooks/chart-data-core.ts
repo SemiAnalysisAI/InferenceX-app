@@ -12,15 +12,9 @@ import { supportsChartTokenMetric, type TokenMetricType } from '@/lib/supplement
  * Chart x-axis variant selected by the dropdown in the Chart panel. The
  * inference provider and ChartDisplay import this single definition.
  */
-export type XAxisMode =
-  | 'ttft'
-  | 'e2e'
-  | 'interactivity'
-  | 'e2e-normalized-interactivity'
-  | 'concurrency';
+export type XAxisMode = 'ttft' | 'e2e' | 'interactivity' | 'e2e-normalized-interactivity';
 
 export const X_AXIS_MODES: readonly XAxisMode[] = [
-  'concurrency',
   'ttft',
   'e2e',
   'interactivity',

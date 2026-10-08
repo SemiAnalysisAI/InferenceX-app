@@ -90,8 +90,8 @@ or calculations. Profit comparison `powerLabel` display text follows the same na
 All in Measured watts and energy accept validated 8K/1K and AgentX rows through the
 shared chart/API transform, including historical and unofficial rows. AgentX reuses
 the chassis or rack model without independent workload calibration. Telemetry and
-topology gates still apply; NVL72 needs complete Grace or module power. The standalone
-Modeled Chassis AC metric and 8K/1K offline export retain their 8K/1K scope.
+topology gates still apply; NVL72 needs complete Grace or module power. The
+8K/1K offline export retains its 8K/1K scope.
 
 For All in Measured, `tableRows` retains every GPU-valid observation in the selected
 scope and best-series selection, including axis-clipped and non-frontier points.
@@ -153,7 +153,7 @@ are unchanged by all six display settings. The reusable client helpers are
 `components/gpu-power/power-series.ts`.
 
 Date comparisons are presentation-only as well. With compared dates, `/inference` keeps the
-date-comparison chart on every x-axis mode, including concurrency, draws `?unofficialrun=`
+date-comparison chart on every x-axis mode, draws `?unofficialrun=`
 rows beside the compared series, and the Timeline display follows the same per-date legend
 toggles and colours. The inference view already returns `comparisons` (one projection per
 `dates` or `start`/`end` entry) and `overlays` (one per unofficial run) for every `xmode`.
@@ -171,9 +171,8 @@ The inference view exposes the same mean/median selector as the dashboard throug
 `xstat=median|mean` (default median). Mean streaming speed is **1 / mean TPOT**;
 it is not the arithmetic mean of per-request speeds. Mean TTFT and E2E use their
 recorded mean values. Missing means remain missing; the view never substitutes a
-median. AgentX keeps its selected `percentile`, and concurrency has no statistic:
-`params.xstat` resolves to null in both cases, while `xAxis.statistic` records the
-effective percentile or null.
+median. AgentX keeps its selected `percentile`: `params.xstat` resolves to null,
+while `xAxis.statistic` records the effective percentile.
 
 Equal-service comparisons and the same-concurrency diagnostic are API-only analysis.
 The dashboard has no source-pair selector, target input, comparison curve or matched-concurrency
@@ -187,8 +186,8 @@ Each source's `label` is display text only: hardware and date, plus precision, t
 run or other details only where two sources would otherwise look the same.
 Stale explicit selections remain unavailable. Missing target returns null, not an
 invented operating point. Streaming-speed targets are tok/s/user; TTFT/E2E targets
-are seconds. Concurrency remains a separate observed-load diagnostic, not an
-equal-service comparison axis.
+are seconds. Concurrency is a separate diagnostic, not an equal-service comparison
+axis.
 
 That diagnostic is `matchedConcurrency`, also returned by `serviceCompare=true`: the
 two selected sources paired at every concurrency either one observed. Each side is
@@ -309,7 +308,7 @@ GPU 视图对每个 run 只从一个来源读取遥测：已入库的 run 读取
 使用硬件注册表。原始遥测、全记录统计和 API 响应均不因这些显示设置而改变。
 响应使用 private, no-store，上游 503 保留为错误响应。
 
-日期对比同样只影响显示。选择对比日期后，`/inference` 在所有 X 轴模式（包括并发数）下都使用日期对比图，
+日期对比同样只影响显示。选择对比日期后，`/inference` 在所有 X 轴模式下都使用日期对比图，
 并与对比序列一同绘制 `?unofficialrun=` 数据；时间线显示沿用同一套按日期切换的图例和配色。
 只读 inference 视图已对每种 `xmode` 返回 `comparisons`（每个 `dates` 或 `start`/`end`
 条目一份投影）和 `overlays`（每个非官方运行一份）。按日期显隐属于渲染状态，不是查询参数，

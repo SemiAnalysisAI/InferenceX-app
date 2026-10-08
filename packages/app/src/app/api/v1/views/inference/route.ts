@@ -324,8 +324,8 @@ export function GET(request: NextRequest) {
     const frameworks = parseFrameworkFamiliesParam(search.get('frameworks'));
     const deployment = parseDeploymentParam(search.get('deployment'));
     const spec = parseSpecModesParam(search.get('spec'));
-    const requestedOptimal = parseBoolParam(search.get('optimal'), 'optimal', true);
-    const requestedBest = parseBoolParam(
+    const optimal = parseBoolParam(search.get('optimal'), 'optimal', true);
+    const best = parseBoolParam(
       search.get('best'),
       'best',
       !isBestPerSkuDefaultOff(displayName as Model, sequence),
@@ -357,8 +357,6 @@ export function GET(request: NextRequest) {
           .filter(Boolean),
       ),
     ].toSorted();
-    const optimal = xmode === 'concurrency' ? false : requestedOptimal;
-    const best = xmode === 'concurrency' ? false : requestedBest;
     const allPoints = parseBoolParam(search.get('allPoints'), 'allPoints', false);
     const userCosts = parseNumberMap(search.get('userCosts'), 'userCosts');
     const userPowers = parseNumberMap(search.get('userPowers'), 'userPowers');
@@ -539,7 +537,7 @@ export function GET(request: NextRequest) {
       precisions: data.resolvedPrecisions,
       metric,
       xmode,
-      xstat: sequence === Sequence.AgenticTraces || xmode === 'concurrency' ? null : xstat,
+      xstat: sequence === Sequence.AgenticTraces ? null : xstat,
       xmetric,
       percentile,
       date: date ?? null,

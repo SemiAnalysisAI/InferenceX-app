@@ -104,7 +104,6 @@ describe('power boundaries through the derived-field builder', () => {
       expect(fields.utilityModeledJPerOutputToken?.y).toBeGreaterThan(
         source.metrics.joules_per_output_token,
       );
-      expect(fields.modeledChassisPowerPerGpu).toBeUndefined();
       const historical = rowToLightweightPoint({ ...source, date: '2026-08-01' }, [
         'utilityModeledWatts',
         'utilityModeledJPerOutputToken',
@@ -159,10 +158,6 @@ describe('power boundaries through the derived-field builder', () => {
       expect(fields.utilityModeledJPerOutputToken).toBeUndefined();
     },
   );
-
-  it('retains the standalone 8K/1K chassis AC metric', () => {
-    expect(derive(row()).fields.modeledChassisPowerPerGpu?.y).toBeGreaterThan(0);
-  });
 
   it('serves the same fields to ?unofficialrun= overlays through transformBenchmarkRows', () => {
     const { chartData } = transformBenchmarkRows([row()], 'median', 'external');

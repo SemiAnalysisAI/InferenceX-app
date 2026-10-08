@@ -40,8 +40,7 @@ experimental power controls with ↑↑↓↓ if they are hidden.
    provenance. Start with average W/GPU: energy also requires a valid token
    denominator, and P75/P90 require retained percentile measurements.
 3. Switch to **All in Measured** to inspect facility estimates. This boundary
-   supports 8K/1K single-turn results and AgentX previews. The separate
-   **Modeled Chassis AC** metric remains limited to 8K/1K single-turn results.
+   supports 8K/1K single-turn results and AgentX previews.
 4. For a capacity comparison, open `/profit-estimator-per-gigawatt`, choose the
    model and a supported interactivity target, then select **Compare both** in
    Benchmark Config. Match each result's workload, engine and precision to the

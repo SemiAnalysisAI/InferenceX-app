@@ -314,14 +314,6 @@ describe('GET /api/v1/views/inference', () => {
     expect(body.params.xstat).toBe('mean');
     expect(body.xAxis).toMatchObject({ field: 'mean_tpot_intvty', statistic: 'mean' });
     expect(body.series[0].points[0].x).toBe(40);
-    const diagnostic = await GET(
-      request(
-        '/api/v1/views/inference?model=DeepSeek-R1-0528&metric=tpPerGpu&xstat=mean&xmode=concurrency',
-      ),
-    );
-    const diagnosticBody = await diagnostic.json();
-    expect(diagnosticBody.params.xstat).toBeNull();
-    expect(diagnosticBody.xAxis.statistic).toBeNull();
     const invalid = await GET(
       request('/api/v1/views/inference?model=DeepSeek-R1-0528&xstat=average'),
     );

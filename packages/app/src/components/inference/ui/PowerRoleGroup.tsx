@@ -165,8 +165,6 @@ export default function PowerRoleGroup({
   const t = STRINGS[locale];
   const points = useMemo(() => getRolePoints(data, xField), [data, xField]);
   const label = (key: string) => sources.find((source) => source.key === key)?.label ?? key;
-  const isConcurrency = xField === 'conc';
-  const concurrencies = isConcurrency ? [...new Set(points.map((point) => point.x))] : undefined;
   const sectionId = `${chartId}-roles`;
 
   const panel = (definition: (typeof PANELS)[number]) => {
@@ -216,10 +214,8 @@ export default function PowerRoleGroup({
             xLabel={xLabel}
             yLabel={copy.axis}
             reference={definition.reference ?? null}
-            xLog={isConcurrency}
             yLog={definition.yLog}
             yDomain={definition.yDomain}
-            xTickValues={concurrencies}
             height={300}
           />
         ) : (

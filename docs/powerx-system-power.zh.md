@@ -33,7 +33,7 @@ AgentX 估算属于容量规划预览，不代表已完成 AgentX 校准，也�
    图表上的数据点查看测量来源。先看平均 W/GPU：能耗还需要有效的 token 分母，
    P75/P90 则需要保留相应分位数测量值。
 3. 切换到 **All in Measured** 查看设施功率估算。该边界支持 8K/1K 单轮结果和
-   AgentX 预览；独立的 **Modeled Chassis AC** 指标仍仅支持 8K/1K 单轮结果。
+   AgentX 预览。
 4. 要比较容量，打开 `/profit-estimator-per-gigawatt`，选择模型和曲线支持的
    交互性目标，再在 Benchmark Config 中选择 **Compare both**。逐项核对结果的
    工作负载、引擎和精度是否与推理页面所选一致。悬停或选中柱形查看功耗依据，

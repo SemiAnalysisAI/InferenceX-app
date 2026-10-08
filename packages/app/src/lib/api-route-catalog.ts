@@ -139,7 +139,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-inference-view',
-    sourceSha256: '428fab797ad0d304ee7ee193fd2e115219e986e87294d4f561953ab64e0fd5ef',
+    sourceSha256: 'bf2b36b62cb1ac025931b7d246d67d3f6fb2fa09e9f89535c414ea791f136b4c',
   },
   {
     source: 'src/app/api/v1/views/options/route.ts',
@@ -885,7 +885,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/inference/utils/resolveXAxisField.ts',
-    sourceSha256: '4783579c7b3c1a21b91968cb03e9c35a57a85251f4992cb5667a855ba7c77497',
+    sourceSha256: '9ad30bd2aa389e32326486b407e4503c21a94be5afdfa09dec477e4b1b485357',
     reviewArea: {
       en: 'Shared service-axis resolution: fixed-sequence mean/median, reciprocal mean TPOT, and AgentX percentile isolation.',
       zh: '共用服务轴解析：固定长度工作负载 mean/median、mean TPOT 的倒数，以及 AgentX 独立的分位数选择。',
@@ -893,7 +893,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/inference/utils/equal-service-comparison.ts',
-    sourceSha256: 'ff06f0eb908b6912706bb8dc67d931698d9cbd356546f20850ea8221fedc9354',
+    sourceSha256: '1c4a7f6e7547a89f56b4a0470e3a66d3216518d32da7057cbe7b30aab0054df0',
     reviewArea: {
       en: 'Source-scoped equal-service interpolation, comparator-relative changes, endpoint provenance, prefill share projection and role points.',
       zh: '按完整来源限定的同等服务插值、相对基准变化、端点来源、prefill 占比视图以及各角色数据点。',
@@ -1019,7 +1019,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/components/inference/hooks/chart-data-core.ts',
-    sourceSha256: '8601c33f6979541786362276697e4d4a21278de1d57b50d31f705391b5da041d',
+    sourceSha256: '495395de0142aaac8e89d689fe63288aa992fabbdd8c203a0ecd7cfa15978a08',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -1073,7 +1073,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/series.ts',
-    sourceSha256: '9bf521e64e111965b597cb0f55d2f2b4b765b09f8168e8399e9c4316921cc643',
+    sourceSha256: '73a01a047c033ab843643b0f1cbda0a504e8b4fa45edc16b3eb0c32aa95fd1c3',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
