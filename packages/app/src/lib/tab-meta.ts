@@ -86,6 +86,11 @@ export const TAB_META: Record<DashboardRouteKey, { title: string; description: s
     description:
       'Experimental cross-vendor expert-parallel communication benchmarks. Compare MoE dispatch and combine latency across NVIDIA and AMD chip platforms.',
   },
+  'agentic-workload-explorer': {
+    title: 'Agentic Workload Explorer',
+    description:
+      'Explore a frozen, anonymized snapshot of real coding-agent traffic captured by ProxyTrace: sessions, token flow, prefix-cache reuse, latency, tool use, and cost.',
+  },
   'ai-chart': {
     title: 'AI-Powered Chart Generation',
     description:

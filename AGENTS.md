@@ -91,6 +91,9 @@ API routes (`packages/app/src/app/api/v1/`):
   from a **separate** Neon DB, populated lazily on read from GitHub Actions artifacts and served
   assembled through the shared reader (the one deliberate exception to the raw-rows rule below);
   `runs/[runId]` also handles admin DELETE. See [CollectiveX](./docs/collectivex.md).
+- `agentic-workload-explorer/*` — page-owned (`page-bff`) reads of a frozen, anonymized ProxyTrace
+  snapshot from a **separate** read replica (`DATABASE_PROXYTRACE_READONLY_URL`) backing the
+  feature-gated `/agentic-workload-explorer` pages. See [Agentic Workload Explorer](./docs/agentic-workload-explorer.md).
 - `tco-feed?model=dsv4&workloads=1024x1024,8192x1024&tiers=30,50,75,100&format=csv` — per-hardware Pareto-frontier output-throughput reads at fixed interactivity tiers, for external spreadsheet TCO models (Excel Power Query); `view=scores` (optional `weights`, `workload_weights`, `alpha`) folds them into one tier-weighted, workload-blended, output-equivalent score per hardware
 - `overview?tier=50&engine=community&compare=30d&ref=b200` — a compact, cached page-data response used only by `/overview` selector navigation
 - `pareto` — beta derived frontier/hinterland observations with explicit raw model, workload, metrics and axis preferences; see [Pareto API](./docs/pareto-api.md). This is a documented exception to the raw-row rule, reusing the benchmark source and chart dominance algorithm without UI filtering.
@@ -191,7 +194,7 @@ All interactive elements should have `track()` from `@/lib/analytics` (autocaptu
 
 **Convention**: `[section]_[action]` — e.g., `latency_zoom_reset`, `calculator_bar_selected`, `tab_changed`
 
-**Prefixes**: `latency_`, `interactivity_`, `gpu_timeseries_`, `inference_`, `calculator_`, `evaluation_`, `reliability_`, `tab_`, `selector_`, `blog_`, `whitepaper_`, `social_`
+**Prefixes**: `agentic_workload_`, `latency_`, `interactivity_`, `gpu_timeseries_`, `inference_`, `calculator_`, `evaluation_`, `reliability_`, `tab_`, `selector_`, `blog_`, `whitepaper_`, `social_`
 
 ## Tab Structure
 

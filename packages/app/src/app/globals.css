@@ -214,6 +214,12 @@ html[data-inferencex-embed] .autumn-leaves {
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
 
+  /* Translucent panel and muted-label tokens used by the Agentic Workload
+     Explorer. Derived from the base palette so every theme adapts them. */
+  --color-surface: color-mix(in oklab, var(--background) 20%, transparent);
+  --color-surface-hover: color-mix(in oklab, var(--muted) 55%, transparent);
+  --color-subtle: color-mix(in oklab, var(--muted-foreground) 55%, var(--background));
+
   /* Fonts */
   --font-sans: var(--font-dm-sans);
   --font-mono: ui-monospace, 'SFMono-Regular', 'Menlo', 'Consolas', 'Liberation Mono', monospace;

@@ -68,6 +68,12 @@ export const DASHBOARD_SHELL_CAPABILITY_ROUTES = [
     providers: STANDALONE_DASHBOARD_PROVIDERS,
     dashboardNudge: false,
   },
+  {
+    path: '/agentic-workload-explorer',
+    includeChildren: true,
+    providers: STANDALONE_DASHBOARD_PROVIDERS,
+    dashboardNudge: false,
+  },
 ] as const satisfies readonly DashboardShellCapabilityRoute[];
 
 /**
@@ -234,6 +240,18 @@ export const DASHBOARD_ROUTES = [
     localeMirrored: true,
     providers: STANDALONE_DASHBOARD_PROVIDERS,
     shareParamScopes: ['g_', 'i_'],
+  },
+  // Agentic Workload Explorer: a frozen, anonymized ProxyTrace snapshot read
+  // from its own database (DATABASE_PROXYTRACE_READONLY_URL).
+  {
+    key: 'agentic-workload-explorer',
+    path: '/agentic-workload-explorer',
+    canonicalPath: '/agentic-workload-explorer',
+    navGroup: 'feature-gated',
+    indexable: true,
+    localeMirrored: true,
+    providers: STANDALONE_DASHBOARD_PROVIDERS,
+    shareParamScopes: [],
   },
   {
     key: 'ai-chart',
