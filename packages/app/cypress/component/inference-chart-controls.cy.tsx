@@ -436,6 +436,16 @@ describe('Inference ChartControls grouped measured metrics', () => {
     );
   });
 
+  it('explains in the Boundary menu that All in Measured models unmeasured components', () => {
+    mountMeasuredControls();
+    cy.get('[data-testid="measured-power-basis"]').click();
+    cy.get('[data-testid="option-help-utility-modeled"]').click();
+    cy.get('[data-testid="option-help-content-utility-modeled"]').should(
+      'contain.text',
+      'unmeasured components are modeled',
+    );
+  });
+
   it('resets a fleet percentile to role average and only enables TDP for the whole-fleet average', () => {
     mountMeasuredControls('y_measuredP75Power');
     selectMeasuredSetting('power-scope', 'prefill');

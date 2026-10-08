@@ -69,7 +69,9 @@ control change to the nearest registered key. Consequences:
   the Measured row should call.
 
 The Boundary select tracks `inference_power_basis_changed { basis, family }` in addition to the
-existing `inference_y_axis_metric_selected` fired by `ChartControls`.
+existing `inference_y_axis_metric_selected` fired by `ChartControls`. Its All in Measured option
+carries the (i) help `ALL_IN_MEASURED_NOTE` (unmeasured components are modeled); the chart
+caption states the same boundary, so the controls row has no separate footnote.
 
 ## Missing values
 
