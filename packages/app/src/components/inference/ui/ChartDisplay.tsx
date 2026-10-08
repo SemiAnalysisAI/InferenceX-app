@@ -141,15 +141,11 @@ const STRINGS = {
     updated: 'Updated:',
     e2eNormIntvtyDisclaimer:
       'E2E Normalized Interactivity requires persisted per-request traces, so unofficial-run overlays are unavailable for this experimental view.',
-    systemPowerAssumptions:
-      '8K / 1K estimates from validated telemetry. Eight-GPU chassis assume 20% CPU/DRAM utilization; partial allocations are extrapolated to a full chassis at the measured per-GPU power. NVL72 uses measured Grace or module power plus modeled rack overhead. Facility power applies PUE once: 1.3 for air-cooled chassis, 1.1 for NVL72. Click a point for measurement and model provenance. Unsupported inputs are omitted.',
     completedSequenceLengths: (count: string) =>
       `Completed requests across all resident points (n=${count})`,
     viewMode: 'View mode',
     noChartData:
       'No benchmark data matches the current model, scenario, and filter selection. Adjust the filters above to see results.',
-    noSystemPowerData:
-      'No system-power estimates are available for this selection. Choose 8K / 1K with validated GPU telemetry and a supported chassis or rack power model. NVL72 also needs complete Grace or module telemetry from the same measurement window. Measured GPU power remains available separately where telemetry exists.',
     // Boundary disclosures for the derived power axes (lib/power-basis.ts).
     // Formulas in words; constants named so a screenshot records its method.
     powerBasisAssumptions: {
@@ -178,13 +174,9 @@ const STRINGS = {
     updated: '更新时间：',
     e2eNormIntvtyDisclaimer:
       '端到端归一化交互性需要持久化的逐请求 trace 数据，因此该实验性视图不支持非官方运行覆盖。',
-    systemPowerAssumptions:
-      '基于已验证遥测的 8K / 1K 估算。八卡机箱假设 CPU/DRAM 利用率为 20%；仅使用部分 GPU 时，按实测每卡功耗外推至满机箱。NVL72 使用实测 Grace 或 module 功耗，加上模型估算的机架开销。数据中心功耗只应用一次 PUE：风冷机箱为 1.3，NVL72 为 1.1。点击数据点可查看测量与模型来源。不支持的输入不绘制。',
     completedSequenceLengths: (count: string) => `当前所有数据点的已完成请求（n=${count}）`,
     viewMode: '视图模式',
     noChartData: '当前模型、场景与筛选条件下没有匹配的基准测试数据。请调整上方筛选条件查看结果。',
-    noSystemPowerData:
-      '当前选择没有可用的系统功耗估算。请选择 8K / 1K 场景，并确保 GPU 遥测已验证、机箱或机架功耗模型受支持。NVL72 还需要同一测量窗口内完整的 Grace 或 module 遥测。存在遥测数据时，仍可单独查看 GPU 实测功耗。',
     powerBasisAssumptions: {
       'gpu-provisioned':
         'GPU 额定功耗（TDP）· 功率取硬件注册表中每 GPU 的额定 TDP，因此每种硬件的功率曲线为水平线。每输出 token 能耗 = TDP × 分配的 GPU 数 ÷ 整个部署的输出 tok/s；分离式配置将 prefill 与 decode GPU 一并计入。未公布 TDP 的硬件不绘制。',

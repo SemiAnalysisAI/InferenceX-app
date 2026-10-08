@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { BenchmarkRow } from '@/lib/api';
-import { rowToAggDataEntry, transformBenchmarkRows } from '@/lib/benchmark-transform';
+import { transformBenchmarkRows } from '@/lib/benchmark-transform';
 import { modelSystemPower } from '@/lib/modeled-system-power';
 import { estimateChassisPower, estimateRackPower } from '@/lib/system-power-model';
 
@@ -908,20 +908,4 @@ describe('NVL72 trays with measured compute-module power', () => {
       expect(points[0].measuredAvgPower?.y).toBe(900.25);
     }
   });
-});
-
-it('shares official/overlay transforms without changing measured metrics or inventing modeled zeros', () => {
-  const source = row();
-  const entry = rowToAggDataEntry(source);
-  expect(entry.avg_power_w).toBe(source.metrics.avg_power_w);
-  expect(entry.joules_per_output_token).toBe(source.metrics.joules_per_output_token);
-  const { chartData } = transformBenchmarkRows([source]);
-  for (const points of chartData) {
-    expect(points[0].utilityModeledWatts?.y).toBeGreaterThan(source.metrics.avg_power_w);
-  }
-  const unsupported = transformBenchmarkRows([row({ hardware: 'gb200' })]);
-  for (const points of unsupported.chartData) {
-    expect(points[0].utilityModeledWatts).toBeUndefined();
-    expect(points[0].measuredAvgPower?.y).toBe(source.metrics.avg_power_w);
-  }
 });

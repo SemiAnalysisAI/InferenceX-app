@@ -112,8 +112,8 @@ Expanding assumptions or unavailable-estimate details does not change returned d
 All in Measured watts and energy accept validated 8K/1K and AgentX rows through the
 shared chart/API transform, including historical and unofficial rows. AgentX reuses
 the chassis or rack model without independent workload calibration. Telemetry and
-topology gates still apply; NVL72 needs complete Grace or module power. The
-8K/1K offline export retains its 8K/1K scope.
+topology gates still apply; NVL72 needs complete Grace or module power. The offline
+system-power export remains limited to 8K/1K.
 
 For All in Measured, `tableRows` retains every GPU-valid observation in the selected
 scope and best-series selection, including axis-clipped and non-frontier points.

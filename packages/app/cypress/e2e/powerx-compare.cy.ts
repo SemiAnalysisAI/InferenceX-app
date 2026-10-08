@@ -412,7 +412,7 @@ describe('AgentX All in Measured chart and table', () => {
       cy.location('href').then((href) => {
         const url = new URL(href);
         url.searchParams.set('i_best', '1');
-        url.searchParams.set('i_xmode', 'concurrency');
+        url.searchParams.set('i_xmode', 'e2e');
         cy.visit(url.toString());
       });
       cy.get('[data-testid="inference-table-view-btn"]').first().click();
