@@ -23,10 +23,19 @@ vi.mock('./kart/kart-decorations', () => {
   loaded('kart');
   return { default: () => <div data-theme="kart" /> };
 });
+vi.mock('./doom/doom-theme', () => {
+  loaded('doom');
+  return { default: () => <div data-theme="doom" /> };
+});
+vi.mock('./halo/halo-theme', () => {
+  loaded('halo');
+  return { default: () => <div data-theme="halo" /> };
+});
 
 let container: HTMLDivElement;
 let root: Root;
 beforeEach(() => {
+  window.history.replaceState(null, '', '/');
   document.documentElement.className = 'dark';
   delete document.documentElement.dataset.inferencexEmbed;
   container = document.createElement('div');
@@ -51,6 +60,19 @@ function Probe() {
 }
 
 describe('optional theme boundary', () => {
+  it.each(['/embed/model/deepseek-v4', '/zh/embed/model/deepseek-v4'])(
+    'does not import a saved theme before the embed boot attribute exists at %s',
+    async (path) => {
+      window.history.replaceState(null, '', path);
+      act(() => root.render(<EasterEggThemeLazy />));
+      for (const theme of ['minecraft', 'csgo', 'gta', 'kart', 'doom', 'halo']) {
+        await change(theme);
+        expect(container.innerHTML).toBe('');
+        expect(loaded).not.toHaveBeenCalled();
+      }
+    },
+  );
+
   it('never renders or imports themes on the server or a cold default page', async () => {
     document.documentElement.className = 'kart';
     expect(renderToString(<EasterEggThemeLazy />)).toBe('');
@@ -71,8 +93,10 @@ describe('optional theme boundary', () => {
       csgo: () => import('./csgo/csgo-theme'),
       gta: () => import('./gta/gta-theme'),
       kart: () => import('./kart/kart-decorations'),
+      doom: () => import('./doom/doom-theme'),
+      halo: () => import('./halo/halo-theme'),
     };
-    for (const theme of ['minecraft', 'csgo', 'gta', 'kart'] as const) {
+    for (const theme of ['minecraft', 'csgo', 'gta', 'kart', 'doom', 'halo'] as const) {
       await change(theme);
       await act(async () => {
         await imports[theme]();

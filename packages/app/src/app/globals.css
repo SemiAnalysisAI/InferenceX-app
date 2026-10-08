@@ -3,7 +3,7 @@
 @import './motion.css';
 @plugin '@tailwindcss/typography';
 
-@custom-variant dark (&:is(.dark *, .minecraft *, .csgo *, .gta *, .kart *));
+@custom-variant dark (&:is(.dark *, .minecraft *, .csgo *, .gta *, .kart *, .doom *, .halo *));
 @custom-variant minecraft (&:is(.minecraft *));
 
 /* Allow hash navigation to clear the fixed navbar */
@@ -54,11 +54,11 @@
   color: #7e22ce;
 }
 
-:is(.dark, .minecraft, .csgo, .gta, .kart) .halloween-wordmark {
+:is(.dark, .minecraft, .csgo, .gta, .kart, .doom, .halo) .halloween-wordmark {
   color: #fb923c;
 }
 
-:is(.dark, .minecraft, .csgo, .gta, .kart) .halloween-wordmark-x {
+:is(.dark, .minecraft, .csgo, .gta, .kart, .doom, .halo) .halloween-wordmark-x {
   color: #c084fc;
 }
 
@@ -302,7 +302,9 @@ html[data-inferencex-embed] .autumn-leaves {
 .dark,
 .csgo,
 .gta,
-.kart {
+.kart,
+.doom,
+.halo {
   /* Base Theme Colors */
   --background: #131416;
   --foreground: #eaebec;
@@ -359,6 +361,27 @@ html[data-inferencex-embed] .autumn-leaves {
 }
 .kart .circuit-bg,
 .kart .autumn-leaves {
+  display: none;
+}
+
+/* Tiny pre-paint shell for persisted Doom selections. Artwork stays lazy. */
+.doom {
+  color-scheme: dark;
+  --background: #140b09;
+  --foreground: #f1e6dc;
+  --card: #1d110d;
+  --card-foreground: #f1e6dc;
+  --popover: #22140f;
+  --popover-foreground: #f1e6dc;
+  --primary: #ff6a2b;
+  --primary-foreground: #140b09;
+  --muted: #33201a;
+  --muted-foreground: #c9b6aa;
+  --accent: #3a2219;
+  --ring: #ffb347;
+}
+.doom .circuit-bg,
+.doom .autumn-leaves {
   display: none;
 }
 
@@ -427,6 +450,39 @@ html[data-inferencex-embed] .autumn-leaves {
   --gta-display: var(--font-pricedown), 'Pricedown', Impact, sans-serif;
   --gta-menu: var(--font-chalet-comprime), 'ChaletComprime', 'Arial Narrow', sans-serif;
 }
+/* Halo Infinite menu chrome: deep navy panels, Forerunner cyan accents. */
+.halo {
+  --font-industry: 'Industry';
+  color-scheme: dark;
+  --background: #070d16;
+  --foreground: #e8f1f8;
+  --card: #0c1622;
+  --card-foreground: #e8f1f8;
+  --popover: #0b1520;
+  --popover-foreground: #e8f1f8;
+  --primary: #5ed1ff;
+  --primary-foreground: #04101a;
+  --secondary: #9fd356;
+  --secondary-foreground: #0a1404;
+  --muted: #182635;
+  --muted-foreground: #a9bccb;
+  --accent: #1c2d3e;
+  --accent-foreground: #e8f1f8;
+  --border: #3b5468;
+  --border-alt: #1d2d3c;
+  --input: #3b5468;
+  --ring: #5ed1ff;
+  --sidebar: #0c1622;
+  --sidebar-foreground: #e8f1f8;
+  --sidebar-primary: #5ed1ff;
+  --sidebar-primary-foreground: #04101a;
+  --sidebar-accent: #1c2d3e;
+  --sidebar-accent-foreground: #e8f1f8;
+  --sidebar-border: #3b5468;
+  --sidebar-ring: #5ed1ff;
+  --radius: 0.125rem;
+  --halo-menu: var(--font-industry), 'Industry', 'Arial Narrow', sans-serif;
+}
 .minecraft {
   --font-minecraft: 'Monocraft';
   --background: #1e1e1e;
@@ -482,7 +538,9 @@ html[data-inferencex-embed] .autumn-leaves {
 .csgo .circuit-bg,
 .csgo .autumn-leaves,
 .gta .circuit-bg,
-.gta .autumn-leaves {
+.gta .autumn-leaves,
+.halo .circuit-bg,
+.halo .autumn-leaves {
   display: none;
 }
 
@@ -494,7 +552,11 @@ html[data-inferencex-embed] .autumn-leaves {
 .gta .shiki,
 .gta .shiki span,
 .kart .shiki,
-.kart .shiki span {
+.kart .shiki span,
+.doom .shiki,
+.doom .shiki span,
+.halo .shiki,
+.halo .shiki span {
   color: var(--shiki-dark);
   background-color: var(--shiki-dark-bg);
 }
@@ -610,7 +672,8 @@ html[data-inferencex-skin='vllm'] [data-slot='card'] {
 /* Dark backgrounds need no outline — this is the original title-screen look. */
 .dark .splash-text,
 .minecraft .splash-text,
-.csgo .splash-text {
+.csgo .splash-text,
+.doom .splash-text {
   color: #ffff00;
   text-shadow: 2px 2px 0px #3f3f00;
 }

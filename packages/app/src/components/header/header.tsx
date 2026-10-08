@@ -9,6 +9,7 @@ import { track } from '@/lib/analytics';
 import { ModeToggle } from '@/components/ui/mode-toggle';
 import { HEADER_ACTION_STYLE } from '@/components/ui/control-styles';
 import { NewBadge } from '@/components/ui/new-badge';
+import { HaloTogglesLazy } from '@/components/halo/halo-toggles-lazy';
 import { MinecraftTogglesLazy } from '@/components/minecraft/minecraft-toggles-lazy';
 import { navigateInApp } from '@/lib/client-navigation';
 import { DASHBOARD_ROUTES } from '@/lib/dashboard-routes';
@@ -268,6 +269,7 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
                 a 320px header past its bounds in minecraft mode. */}
             <span className="hidden items-center gap-2 sm:flex">
               <MinecraftTogglesLazy />
+              <HaloTogglesLazy />
             </span>
             <ModeToggle />
 
@@ -338,6 +340,7 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
                   ))}
                   <span className="flex items-center gap-2 px-3 sm:hidden">
                     <MinecraftTogglesLazy />
+                    <HaloTogglesLazy />
                   </span>
                 </div>
               )}

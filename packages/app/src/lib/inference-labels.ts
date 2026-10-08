@@ -25,6 +25,12 @@ const TEMPORARY_UMBP_LABEL_RUNS: Record<string, { label: string; expiresAt: numb
     label: 'UMBP MoRI SGLang',
     expiresAt: Date.parse('2026-10-10T04:00:00Z'),
   },
+  // MegaMoE retune of the same UMBP recipe (InferenceX#3664) replaced 35879254139 as the
+  // official dsv4 MI355X PD curve on 2026-10-04; same cutoff.
+  '37181045340': {
+    label: 'UMBP MoRI SGLang',
+    expiresAt: Date.parse('2026-10-10T04:00:00Z'),
+  },
 };
 
 /** Display-only: never change framework/hardware keys used by filters and history. */

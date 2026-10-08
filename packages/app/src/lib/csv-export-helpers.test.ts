@@ -53,7 +53,7 @@ const makePoint = (overrides: Partial<InferenceData> = {}): InferenceData => ({
 });
 
 describe('inferenceChartToCsv', () => {
-  it.each(['34926284365', '35879254139'])(
+  it.each(['34926284365', '35879254139', '37181045340'])(
     'preserves canonical CSV keys for UMBP run %s and overlays',
     (runId) => {
       const target = makePoint({
