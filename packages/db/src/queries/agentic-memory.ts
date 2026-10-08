@@ -1,6 +1,6 @@
 import type { DbClient } from '../connection.js';
-import { parseAgenticMemory, type MemoryRank, type MemoryFile } from '../lib/agentic-memory.js';
-import { getServerLogChunk, getServerLogFileNames } from './server-logs.js';
+import { parseAgenticMemory, type MemoryRank, type MemoryFile } from '../lib/agentic-memory';
+import { getServerLogChunk, getServerLogFileNames } from './server-logs';
 
 export const MEMORY_LOG_CHARS = 256 * 1024;
 export const MEMORY_MAX_FILES = 16;

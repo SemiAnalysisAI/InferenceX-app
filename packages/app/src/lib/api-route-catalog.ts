@@ -839,7 +839,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/agentic-memory.ts',
-    sourceSha256: '7d0072b2761a0a85ae74c358ce5ab849ed6bfc13988a0287fd3b3aec4007d7dc',
+    sourceSha256: 'd47c6acce40f966feac7e3a412b2623b885d514d881bfc11122e1e7f8890ab82',
     reviewArea: {
       en: 'Bounded startup-log reads, result identity and independent token and occupancy metrics.',
       zh: '有上限的启动日志读取、结果标识，以及单独展示的 token 容量与使用率指标。',
