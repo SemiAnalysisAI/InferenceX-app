@@ -145,7 +145,7 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
     cy.get('[data-testid="x-axis-mode-selector"]').should('contain.text', 'Interactivity');
     cy.get('[data-testid="x-axis-mode-buttons"]').should('not.exist');
     openXAxisMenu();
-    cy.get('[role="grid"] [data-select-option]').should('have.length', 5);
+    cy.get('[role="grid"] [data-select-option]').should('have.length', 4);
     cy.get('[data-testid="x-axis-mode-e2e-normalized-interactivity"]')
       .should('have.text', 'E2E Normalized Interactivity')
       .and('have.attr', 'aria-pressed', 'false');
