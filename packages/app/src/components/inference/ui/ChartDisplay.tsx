@@ -7,7 +7,6 @@ import { BarChart3, Table2 } from 'lucide-react';
 import chartDefinitions, {
   costTierLabel,
   costTierOptionLabel,
-  isModeledSystemPowerConfigKey,
   metricCostTier,
   tokenMetricTypeForConfigKey,
   type MetricKey,
@@ -136,15 +135,11 @@ const STRINGS = {
     updated: 'Updated:',
     e2eNormIntvtyDisclaimer:
       'E2E Normalized Interactivity requires persisted per-request traces, so unofficial-run overlays are unavailable for this experimental view.',
-    systemPowerAssumptions:
-      '8k1k estimate from validated GPU telemetry · CPU/DRAM utilization 20% · Eight-GPU chassis models; a partially allocated chassis is extrapolated to a full chassis at the measured per-GPU power. Chassis AC includes platform overheads; PUE is applied separately for facility power. Click a point for measured GPU power, topology, and power model provenance. Unsupported inputs are omitted.',
     completedSequenceLengths: (count: string) =>
       `Completed requests across all resident points (n=${count})`,
     viewMode: 'View mode',
     noChartData:
       'No benchmark data matches the current model, scenario, and filter selection. Adjust the filters above to see results.',
-    noSystemPowerData:
-      'No system-power estimates are available for this selection. Choose 8K / 1K with validated GPU telemetry, supported hardware, and known eight-GPU chassis placement. Measured GPU power remains available separately where telemetry exists.',
     // Boundary disclosures for the derived power axes (lib/power-basis.ts).
     // Formulas in words; constants named so a screenshot records its method.
     powerBasisAssumptions: {
@@ -173,13 +168,9 @@ const STRINGS = {
     updated: '更新时间：',
     e2eNormIntvtyDisclaimer:
       '端到端归一化交互性需要持久化的逐请求 trace 数据，因此该实验性视图不支持非官方运行覆盖。',
-    systemPowerAssumptions:
-      '基于已验证 GPU 遥测的 8k1k 估算 · CPU/DRAM 利用率 20% · 采用八卡机箱模型；仅使用部分 GPU 的机箱按实测每卡功耗外推至满机箱。机箱交流功耗包含平台开销；数据中心功耗另行应用 PUE。点击数据点可查看 GPU 实测功耗、拓扑和功耗模型来源。不支持的输入不绘制。',
     completedSequenceLengths: (count: string) => `当前所有数据点的已完成请求（n=${count}）`,
     viewMode: '视图模式',
     noChartData: '当前模型、场景与筛选条件下没有匹配的基准测试数据。请调整上方筛选条件查看结果。',
-    noSystemPowerData:
-      '当前选择没有可用的系统功耗估算。请选择 8K / 1K 场景；估算仅覆盖 GPU 遥测已验证、硬件受支持、八卡机箱位置已知的运行。存在遥测数据时，仍可单独查看 GPU 实测功耗。',
     powerBasisAssumptions: {
       'gpu-provisioned':
         'GPU 额定功耗（TDP）· 功率取硬件注册表中每 GPU 的额定 TDP，因此每种硬件的功率曲线为水平线。每输出 token 能耗 = TDP × 分配的 GPU 数 ÷ 整个部署的输出 tok/s；分离式配置将 prefill 与 decode GPU 一并计入。未公布 TDP 的硬件不绘制。',
@@ -804,7 +795,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
   const derivedSpec = useDerivedXAxis ? DERIVED_X_MODE_SPECS[selectedXAxisMode] : undefined;
 
   const renderableGraphs = useMemo(() => {
-    if (!isAgenticSequence || selectedXAxisMode === 'concurrency') return visibleGraphs;
+    if (!isAgenticSequence) return visibleGraphs;
     if (!derivedMetrics) {
       // Legacy AgentX axes can still render transient/non-persisted rows, which
       // have no ids to request.
@@ -881,11 +872,9 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
               className="flex min-h-[320px] items-center justify-center"
             >
               <p className="max-w-md text-center text-sm text-muted-foreground">
-                {isModeledSystemPowerConfigKey(selectedYAxisMetric)
-                  ? t.noSystemPowerData
-                  : selectedPowerBasis === 'utility-modeled'
-                    ? ALL_IN_MEASURED_EMPTY[locale]
-                    : t.noChartData}
+                {selectedPowerBasis === 'utility-modeled'
+                  ? ALL_IN_MEASURED_EMPTY[locale]
+                  : t.noChartData}
               </p>
             </Card>,
           ]
@@ -894,10 +883,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
             const isTimelineMode = Boolean(
               selectedDateRange.startDate && selectedDateRange.endDate && selectedGPUs.length > 0,
             );
-            const replayAvailable =
-              getViewMode(graphIndex) === 'chart' &&
-              !isTimelineMode &&
-              selectedXAxisMode !== 'concurrency';
+            const replayAvailable = getViewMode(graphIndex) === 'chart' && !isTimelineMode;
             // Chart-level notices: the KV-offload halo
             // key, the agentic optimization note, and the ATOM engine
             // footnote. Detected from the same data the chart plots —
@@ -1066,8 +1052,6 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                               {(() => {
                                 // The timeline's x axis is time, not the scatter x metric.
                                 if (isPowerTimeline) return null;
-                                if (selectedXAxisMode === 'concurrency')
-                                  return locale === 'zh' ? '与并发数的关系' : 'vs. Concurrency';
                                 if (!isAgenticSequence) {
                                   const heading = String(graph.chartDefinition.heading);
                                   return locale === 'zh' ? zhHeading(heading) : heading;
@@ -1190,14 +1174,6 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                               userCosts={userCosts}
                               renderCostBadges={renderInferenceTcoBadges}
                             />
-                          )}
-                          {isModeledSystemPowerConfigKey(selectedYAxisMetric) && (
-                            <p
-                              className="mb-2 text-xs text-muted-foreground"
-                              data-testid="modeled-system-power-assumptions"
-                            >
-                              {t.systemPowerAssumptions}
-                            </p>
                           )}
                           {selectedPowerBasis && selectedPowerBasis !== 'gpu-measured' && (
                             <p

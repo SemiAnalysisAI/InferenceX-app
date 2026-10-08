@@ -41,9 +41,8 @@ Every boundary metric has `polarity: 'lower'`. Energy metrics therefore get the 
 lower-is-better Pareto frontier. The three watt keys are listed in `POWER_CURVE_METRICS`
 (`utils/powerCurves.ts`), so `ScatterGraph`/`GPUGraph` draw the upper power envelope for them
 exactly as for `y_measuredAvgPower`, and Optimal Only keeps every load point; the declared
-`lower_*` roofline only drives the ascending Table sort. They stay out of
-`isMeasuredPowerCurveMetric`, like `y_modeledChassisPowerPerGpu`, so telemetry-only decorations
-do not apply. `measured-power-direction.test.ts` pins both halves. A flat provisioned series
+`lower_*` roofline only drives the ascending Table sort. `measured-power-direction.test.ts` pins
+both halves. A flat provisioned series
 (TDP or all-in W is one constant per hardware) has a single envelope vertex per hardware, so no
 envelope line is drawn for it — only the points.
 
@@ -70,7 +69,9 @@ control change to the nearest registered key. Consequences:
   the Measured row should call.
 
 The Boundary select tracks `inference_power_basis_changed { basis, family }` in addition to the
-existing `inference_y_axis_metric_selected` fired by `ChartControls`.
+existing `inference_y_axis_metric_selected` fired by `ChartControls`. Its All in Measured option
+carries the (i) help `ALL_IN_MEASURED_NOTE` (unmeasured components are modeled); the chart
+caption states the same boundary, so the controls row has no separate footnote.
 
 ## Missing values
 
@@ -81,7 +82,7 @@ builders never emit `{ y: 0 }`, and both the official and overlay paths filter b
 The chart caption (`data-testid="power-basis-assumptions"`) names the boundary, the formula in
 words, the PUE constant and the chassis-model revision so a screenshot records its method.
 The pinned tooltip's "Modeled system power" block (`tooltipUtils.ts` `modeledSystemPowerHTML`)
-renders only for `measured*` keys and `y_modeledChassisPowerPerGpu`, so on the boundary keys the
+renders only for `measured*` keys, so on the boundary keys the
 caption is the only per-chart provenance; the caption does not promise more.
 When no point in the selection reports the selected telemetry axis, the chart's empty state says
 the selection has no measured GPU power (`noMeasuredDataHint`) instead of the generic hint.
@@ -352,8 +353,7 @@ see [Dashboard read-only views](./dashboard-readonly-views.md#fixed-sequence-ser
   and date-prefixed end labels.
 - `cypress/component/gpu-graph.cy.tsx`, `cypress/e2e/inference-chart.cy.ts` and
   `lib/d3-chart/layers/rooflines.test.ts` — `?unofficialrun=` runs stay on the date-comparison
-  `GPUGraph` in their run colour and dash on the interactivity and concurrency axes, per-curve
-  dashes survive display updates, and concurrency sweeps split per date, run and topology.
+  `GPUGraph` in their run colour and dash, and per-curve dashes survive display updates.
 - `utils/matched-concurrency.test.ts`, `utils/power-fit.test.ts`, `utils/powerTimeline.test.ts`
   — signed same-concurrency deltas, the least-squares fit and R², disaggregated fits on output
   per allocated GPU, and the peak pool power inside the validated window.

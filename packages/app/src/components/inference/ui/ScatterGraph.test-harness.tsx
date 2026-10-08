@@ -146,8 +146,6 @@ export function baseInferenceState() {
     selectedRunId: '',
     hideNonOptimal: false,
     setHideNonOptimal: noop,
-    showAllMeasurements: false,
-    setShowAllMeasurements: noop,
     hidePointLabels: false,
     setHidePointLabels: noop,
     selectAllHwTypes: noop,

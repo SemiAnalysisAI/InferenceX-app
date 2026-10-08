@@ -250,8 +250,6 @@ export function createMockInferenceContextValues(
     setIsLegendExpanded: namedStub('setIsLegendExpanded'),
     hideNonOptimal: false,
     setHideNonOptimal: namedStub('setHideNonOptimal'),
-    showAllMeasurements: false,
-    setShowAllMeasurements: namedStub('setShowAllMeasurements'),
     showPointLabels: false,
     setShowPointLabels: namedStub('setShowPointLabels'),
     highContrast: false,

@@ -669,7 +669,6 @@ it('uses Optimal Only to filter power boundary dots without replacing official o
     if ($toggle.attr('data-state') === 'unchecked') cy.wrap($toggle).click();
   });
   cy.get('#scatter-hide-non-optimal').should('have.attr', 'data-state', 'checked');
-  cy.get('#scatter-show-all-measurements').should('not.exist');
   assertVisibleMeasuredValues('.dot-group', [650, 700, 900]);
   assertVisibleMeasuredValues('.unofficial-overlay-pt', [700, 750, 950]);
 
@@ -701,7 +700,6 @@ it('uses Optimal Only to filter power boundary dots without replacing official o
             expect(curve.dataset.curveKind).to.equal('power-envelope');
           }
         });
-        cy.get('#scatter-show-all-measurements').should('not.exist');
       }
     });
 
@@ -711,7 +709,6 @@ it('uses Optimal Only to filter power boundary dots without replacing official o
     .click();
   cy.get('[data-testid="chart-figure"] h2').should('contain', 'Measured Joules per Output Token');
   cy.get('#scatter-hide-non-optimal').should('have.attr', 'data-state', 'checked');
-  cy.get('#scatter-show-all-measurements').should('not.exist');
   assertVisibleMeasuredValues('.dot-group', [2, 4, 5]);
   assertVisibleMeasuredValues('.unofficial-overlay-pt', [3, 5, 6]);
   cy.get(curves)
@@ -857,46 +854,41 @@ const withTp4 = (rows: ReturnType<typeof boundaryRows>) => [
   })),
 ];
 
-const assertObservedLoads = (expected: number[]) => {
+const assertVisibleLoads = (expected: number[]) => {
   for (const selector of ['.dot-group', '.unofficial-overlay-pt']) {
     cy.get<SVGElement & { __data__: InferenceData }>(
       `[data-testid="inference-chart-display"] svg ${selector}`,
     ).should(($points) => {
       expect($points).to.have.length(expected.length);
-      expect([...$points].map((element) => element.__data__.x).sort((a, b) => a - b)).to.deep.equal(
-        expected,
-      );
+      expect(
+        [...$points].map((element) => element.__data__.conc).sort((a, b) => a - b),
+      ).to.deep.equal(expected);
       for (const element of $points) expect(getComputedStyle(element).opacity).to.equal('1');
     });
   }
 };
 
 describe('Date comparison with unofficial runs', () => {
-  for (const [axis, xMode] of [
-    ['interactivity', ''],
-    ['concurrency', '&i_xmode=concurrency'],
-  ]) {
-    // Every measurement is shown (i_optimal=0), so both runs plot all four loads.
-    it(`keeps ?unofficialrun= overlays on the ${axis} date comparison`, () => {
-      interceptMeasuredComparison();
-      cy.viewport(1440, 900);
-      cy.visit(
-        `/inference?g_model=DeepSeek-V4-Pro&unofficialrun=${OVERLAY_RUN_ID}&i_seq=1k%2F1k&i_prec=fp4&i_metric=y_measuredAvgPower&i_gpus=b300_sglang&i_dstart=${SINGLE_TURN_DATE}&i_dend=${SINGLE_TURN_DATE}&i_optimal=0${xMode}`,
-        { onBeforeLoad: unlockAgenticGate },
-      );
-      cy.wait('@measuredOverlay');
-      cy.get('[data-testid="gpu-graph"]').should('exist');
-      cy.get('[data-testid="scatter-graph"]').should('not.exist');
-      assertMeasuredValues('.dot-group', [450, 460, 470, 480]);
-      assertMeasuredValues('.unofficial-overlay-pt', [450, 460, 470, 480]);
-      cy.get('[aria-label="Dismiss measured-comparison"]').click();
-      cy.get('[data-testid="gpu-graph"] .unofficial-overlay-pt').should('not.exist');
-      assertMeasuredValues('.dot-group', [450, 460, 470, 480]);
-    });
-  }
+  // Every measurement is shown (i_optimal=0), so both runs plot all four loads.
+  it('keeps ?unofficialrun= overlays on the date comparison', () => {
+    interceptMeasuredComparison();
+    cy.viewport(1440, 900);
+    cy.visit(
+      `/inference?g_model=DeepSeek-V4-Pro&unofficialrun=${OVERLAY_RUN_ID}&i_seq=1k%2F1k&i_prec=fp4&i_metric=y_measuredAvgPower&i_gpus=b300_sglang&i_dstart=${SINGLE_TURN_DATE}&i_dend=${SINGLE_TURN_DATE}&i_optimal=0`,
+      { onBeforeLoad: unlockAgenticGate },
+    );
+    cy.wait('@measuredOverlay');
+    cy.get('[data-testid="gpu-graph"]').should('exist');
+    cy.get('[data-testid="scatter-graph"]').should('not.exist');
+    assertMeasuredValues('.dot-group', [450, 460, 470, 480]);
+    assertMeasuredValues('.unofficial-overlay-pt', [450, 460, 470, 480]);
+    cy.get('[aria-label="Dismiss measured-comparison"]').click();
+    cy.get('[data-testid="gpu-graph"] .unofficial-overlay-pt').should('not.exist');
+    assertMeasuredValues('.dot-group', [450, 460, 470, 480]);
+  });
 });
 
-describe('Observed concurrency and exact topology', () => {
+describe('Exact topology quick filter', () => {
   it('applies the exact-topology filter to official and ?unofficialrun= overlay loads', () => {
     const officialRun = 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/800001';
     const officialBase = boundaryRows(null).map((row) => ({ ...row, run_url: officialRun }));
@@ -904,15 +896,15 @@ describe('Observed concurrency and exact topology', () => {
     interceptMeasuredComparison(withTp4(officialBase), withTp4(overlayBase));
     cy.viewport(1440, 900);
     cy.visit(
-      `/inference?g_model=DeepSeek-V4-Pro&unofficialrun=${OVERLAY_RUN_ID}&i_seq=1k%2F1k&i_prec=fp4&i_metric=y_measuredAvgPower&i_xmode=concurrency&i_optimal=1&i_best=1`,
+      `/inference?g_model=DeepSeek-V4-Pro&unofficialrun=${OVERLAY_RUN_ID}&i_seq=1k%2F1k&i_prec=fp4&i_metric=y_measuredAvgPower&i_optimal=0&i_best=0`,
       { onBeforeLoad: unlockAgenticGate },
     );
     cy.wait('@measuredOverlay');
-    assertObservedLoads([1, 1, 2, 2, 8, 8, 48, 48]);
+    assertVisibleLoads([1, 1, 2, 2, 8, 8, 48, 48]);
     cy.get('[data-testid="scatter-quick-filters"]').click();
     cy.contains('[data-testid="quick-filter-topology-options"] button', /GPU=?4.*TP=?4/u).click();
     cy.get('body').type('{esc}');
     cy.get('[data-testid="quick-filters-dialog"]').should('not.exist');
-    assertObservedLoads([1, 2, 8, 48]);
+    assertVisibleLoads([1, 2, 8, 48]);
   });
 });

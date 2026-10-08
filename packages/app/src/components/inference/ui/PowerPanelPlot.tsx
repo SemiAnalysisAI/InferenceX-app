@@ -29,8 +29,6 @@ export interface PanelLine {
 }
 
 const MARGIN = { top: 20, right: 18, bottom: 64, left: 65 };
-const compactNumber = d3.format('~g');
-const compact = (value: d3.AxisDomain) => compactNumber(Number(value));
 
 /** d3's log labelling: the 1× and 2× steps of each decade get labels, other ticks stay bare. */
 function logTickFormat(domain: [number, number]) {
@@ -77,11 +75,9 @@ export function PowerPanelPlot({
   xLabel,
   yLabel,
   reference = null,
-  xLog = false,
   yLog = false,
   xDomain,
   yDomain,
-  xTickValues,
   height = 320,
 }: {
   chartId: string;
@@ -91,25 +87,19 @@ export function PowerPanelPlot({
   xLabel: string;
   yLabel: string;
   reference?: number | null;
-  xLog?: boolean;
   yLog?: boolean;
   xDomain?: [number, number];
   yDomain?: [number, number];
-  /** Explicit x ticks, e.g. the observed concurrencies of a load sweep. */
-  xTickValues?: number[];
   height?: number;
 }) {
   const visible = (point: { x: number; y: number }) =>
-    Number.isFinite(point.x) &&
-    Number.isFinite(point.y) &&
-    (!xLog || point.x > 0) &&
-    (!yLog || point.y > 0);
+    Number.isFinite(point.x) && Number.isFinite(point.y) && (!yLog || point.y > 0);
   const drawn = markers.filter(visible);
   const drawnLines = lines.filter((line) => line.points.filter(visible).length > 1);
   const everything = [...drawn, ...drawnLines.flatMap((line) => line.points.filter(visible))];
   const xs = everything.map((point) => point.x);
   const ys = everything.map((point) => point.y);
-  const x = xDomain ?? (xLog ? logDomain(xs) : linearXDomain(xs));
+  const x = xDomain ?? linearXDomain(xs);
   const y =
     yDomain ??
     (yLog ? logDomain(ys) : linearYDomain(ys, reference === null ? [0] : [0, reference]));
@@ -168,13 +158,9 @@ export function PowerPanelPlot({
       grabCursor={false}
       instructions=""
       margin={MARGIN}
-      xScale={{ type: xLog ? 'log' : 'linear', domain: x, nice: !xLog }}
+      xScale={{ type: 'linear', domain: x, nice: true }}
       yScale={{ type: yLog ? 'log' : 'linear', domain: y, nice: !yLog }}
-      xAxis={{
-        label: xLabel,
-        tickCount: 4,
-        ...(xTickValues ? { tickValues: xTickValues, tickFormat: compact } : {}),
-      }}
+      xAxis={{ label: xLabel, tickCount: 4 }}
       yAxis={{
         label: yLabel,
         tickCount: 5,

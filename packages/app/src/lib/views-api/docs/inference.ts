@@ -21,13 +21,7 @@ import {
 
 const VIEWS_GROUP: ApiOperation['group'] = 'views';
 
-const X_MODE_ENUM = [
-  'interactivity',
-  'ttft',
-  'e2e',
-  'e2e-normalized-interactivity',
-  'concurrency',
-] as const;
+const X_MODE_ENUM = ['interactivity', 'ttft', 'e2e', 'e2e-normalized-interactivity'] as const;
 
 const parameters: readonly ApiParameter[] = [
   {
@@ -88,8 +82,8 @@ const parameters: readonly ApiParameter[] = [
     required: false,
     type: 'enum',
     description: text(
-      'X-axis mode. concurrency uses observed load levels, with no interpolation or optimization ranking; optimal and best resolve to false. e2e-normalized-interactivity uses persisted derived AgentX metrics; points without eligible derived values are omitted.',
-      'X 轴模式。concurrency 使用实测并发值，不插值、不作优化排名；optimal 和 best 均解析为 false。e2e-normalized-interactivity 使用已持久化的 AgentX 派生指标；没有合格派生值的数据点不参与此视图。',
+      'X-axis mode. e2e-normalized-interactivity uses persisted derived AgentX metrics; points without eligible derived values are omitted.',
+      'X 轴模式。e2e-normalized-interactivity 使用已持久化的 AgentX 派生指标；没有合格派生值的数据点不参与此视图。',
     ),
     schema: { type: 'string', enum: X_MODE_ENUM, default: 'interactivity' },
     example: 'e2e',
@@ -100,8 +94,8 @@ const parameters: readonly ApiParameter[] = [
     required: false,
     type: 'enum',
     description: text(
-      'Fixed-sequence service-axis statistic: median (default) or mean. Mean streaming speed is 1 / mean TPOT, not the arithmetic mean of per-request speeds. Mean TTFT and E2E use their recorded mean fields. Missing values are omitted, never replaced with median. Ignored for AgentX and concurrency; params.xstat then resolves to null and xAxis.statistic records the effective percentile or null.',
-      '固定长度工作负载服务轴的统计量：median（默认）或 mean。Mean streaming speed 为 1 / mean TPOT，不是各请求速度的算术平均；mean TTFT 和 E2E 使用各自记录的均值。缺失时不回退到 median。AgentX 和 concurrency 不使用此参数，params.xstat 为 null，xAxis.statistic 返回实际分位数或 null。',
+      'Fixed-sequence service-axis statistic: median (default) or mean. Mean streaming speed is 1 / mean TPOT, not the arithmetic mean of per-request speeds. Mean TTFT and E2E use their recorded mean fields. Missing values are omitted, never replaced with median. Ignored for AgentX; params.xstat then resolves to null and xAxis.statistic records the effective percentile.',
+      '固定长度工作负载服务轴的统计量：median（默认）或 mean。Mean streaming speed 为 1 / mean TPOT，不是各请求速度的算术平均；mean TTFT 和 E2E 使用各自记录的均值。缺失时不回退到 median。AgentX 不使用此参数，params.xstat 为 null，xAxis.statistic 返回实际分位数。',
     ),
     schema: { type: 'string', enum: ['mean', 'median'], default: 'median' },
     example: 'mean',
@@ -442,13 +436,13 @@ const responseSchema = objectSchema(
       mode: stringSchema,
       field: stringSchema,
       label: stringSchema,
-      statistic: { type: ['string', 'null'] },
+      statistic: stringSchema,
     }),
     frontier: objectSchema({
       direction: {
         type: ['string', 'null'],
         description:
-          'Selected boundary direction; null for observed concurrency, which has no preferred direction. Measured-power gauges use upper_right for interactivity or upper_left for latency, independently of metric.direction.',
+          'Selected boundary direction. Measured-power gauges use upper_right for interactivity or upper_left for latency, independently of metric.direction.',
       },
       points: integerSchema,
     }),

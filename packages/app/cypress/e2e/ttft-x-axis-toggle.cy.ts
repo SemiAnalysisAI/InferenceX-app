@@ -460,12 +460,11 @@ describe('Label defaults for fixed-sequence scenarios', () => {
     cy.get('[data-testid="chart-figure"] h2').should('contain.text', 'Time To First Token');
   });
 
-  it('offers only the four supported axes for fixed sequences', () => {
+  it('offers only the three supported axes for fixed sequences', () => {
     interceptFixedSequenceData();
     cy.visit('/inference?i_seq=8k%2F1k');
     openXAxisMenu();
-    cy.get('[role="grid"] [data-select-option]').should('have.length', 4);
-    cy.get('[data-testid="x-axis-mode-concurrency"]').should('be.visible');
+    cy.get('[role="grid"] [data-select-option]').should('have.length', 3);
     cy.get('[data-testid="x-axis-mode-interactivity"]').should('be.visible');
     cy.get('[data-testid="x-axis-mode-e2e"]').should('be.visible');
     cy.get('[data-testid="x-axis-mode-ttft"]').should('be.visible');

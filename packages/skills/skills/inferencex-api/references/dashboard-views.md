@@ -172,11 +172,10 @@ a plotted-point export.
 同并发表格或分享参数。角色分析和功耗拟合面板仍在仪表板中提供，分别对应 `roleShare` 和
 `powerFit`。来源标识、插值规则、缺失原因和仅 JSON 的响应约束以上文说明为准。
 
-For exact-load comparisons, use `xmode=concurrency`. The response resolves
-`optimal=false` and `best=false`, retains every eligible observed load, and sets
-`frontier.direction=null`; concurrency is not a speed or quality preference.
-Filter `topologies` with one or more exact `point.topologyKey` values from a first
-response (encode with `URLSearchParams`). This selects the same GPU count,
+Concurrency is not an `xmode`: GPU count varies across configurations, so
+concurrency alone is not comparable between them. Each point still reports its
+`concurrency`. Filter `topologies` with one or more exact `point.topologyKey`
+values from a first response (encode with `URLSearchParams`). This selects the same GPU count,
 parallelism, role-pool split and offload mode across hardware without removing
 loads. Unknown metadata stays unknown, not equivalent to an explicit setting.
 Keep hardware, precision, recipe, run/date and software provenance separate;

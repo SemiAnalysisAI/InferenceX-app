@@ -1,4 +1,5 @@
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import { SegmentedToggle } from '@/components/ui/segmented-toggle';
 import {
   Select,
@@ -135,25 +136,29 @@ export function MeasuredMetricControls({
     >
       <div className="flex min-w-0 flex-col gap-1.5">
         <LabelWithTooltip htmlFor={basisId} label={t.basis} tooltip={t.basisHelp} />
-        <Select
+        <SearchableSelect
           value={config.basis}
+          triggerId={basisId}
+          triggerTestId={basisId}
+          placeholder={t.basis}
+          searchable={false}
           onValueChange={(value) => {
             const basis = value as PowerBasis;
             track('inference_power_basis_changed', { basis, family: config.family });
             change({ basis });
           }}
-        >
-          <SelectTrigger id={basisId} data-testid={basisId} className="w-full">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent portalled={false}>
-            {POWER_BASES.map((basis) => (
-              <SelectItem key={basis} value={basis} data-value={basis}>
-                {POWER_BASIS_LABELS[basis][locale]}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+          groups={[
+            {
+              label: '',
+              options: POWER_BASES.map((basis) => ({
+                value: basis,
+                label: POWER_BASIS_LABELS[basis][locale],
+                help:
+                  basis === 'utility-modeled' ? <p>{ALL_IN_MEASURED_NOTE[locale]}</p> : undefined,
+              })),
+            },
+          ]}
+        />
       </div>
       {config.family === 'energy' && (
         <div className="flex min-w-0 flex-col gap-1.5">
@@ -338,14 +343,6 @@ export function MeasuredMetricControls({
             </SelectContent>
           </Select>
         </div>
-      )}
-      {(config.basis === 'utility-modeled' || compare === 'boundaries') && (
-        <p
-          className="col-span-full text-xs text-muted-foreground"
-          data-testid="all-in-measured-note"
-        >
-          {ALL_IN_MEASURED_NOTE[locale]}
-        </p>
       )}
     </div>
   );

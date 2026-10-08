@@ -298,14 +298,6 @@ export const METRIC_REGISTRY = {
     titleZh: '实测整组 GPU P90 功耗（按芯片均摊）',
     polarity: 'lower',
   },
-  modeledChassisPowerPerGpu: {
-    field: 'modeledChassisPowerPerGpu.y',
-    label: 'Modeled Chassis AC Power per GPU (W/GPU)',
-    labelZh: '每 GPU 分摊的机箱交流功耗估算（W/GPU）',
-    title: 'Modeled Chassis AC Power per GPU (8k1k)',
-    titleZh: '每 GPU 分摊的机箱交流功耗估算（8k1k）',
-    polarity: 'lower',
-  },
   measuredPrefillAvgPower: {
     field: 'measuredPrefillAvgPower.y',
     label: 'Measured Prefill Power per Chip (W)',
@@ -721,13 +713,6 @@ export function isAllInMeasuredConfigKey(configKey: string): boolean {
   return configKey === 'y_utilityModeledWatts' || configKey === 'y_utilityModeledJPerOutputToken';
 }
 
-export const MODELED_SYSTEM_POWER_METRIC_CONFIG_KEY = 'y_modeledChassisPowerPerGpu';
-
-/** Whether a y-axis config key plots the modeled chassis AC power metric. */
-export function isModeledSystemPowerConfigKey(configKey: string): boolean {
-  return configKey === MODELED_SYSTEM_POWER_METRIC_CONFIG_KEY;
-}
-
 export const METRIC_CONTROL_GROUPS: readonly MetricControlGroup[] = [
   {
     label: 'Throughput',
@@ -775,11 +760,6 @@ export const METRIC_CONTROL_GROUPS: readonly MetricControlGroup[] = [
     label: 'Measured Energy',
     labelZh: '实测能耗',
     metrics: [...MEASURED_ENERGY_METRIC_CONFIG_KEYS, ...POWER_BASIS_METRIC_CONFIG_KEYS],
-  },
-  {
-    label: 'Modeled System Power',
-    labelZh: '系统功耗估算',
-    metrics: [MODELED_SYSTEM_POWER_METRIC_CONFIG_KEY],
   },
   {
     label: 'Custom User Values',
