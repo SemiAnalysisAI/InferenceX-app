@@ -46,8 +46,9 @@ Explorer 通过 `DATABASE_PROXYTRACE_READONLY_URL` 读取独立的 Neon **只读
 页面只是包装共享客户端视图的服务端组件，因此中英文渲染同一组件。界面文案来自组件内的
 `STRINGS = { en, zh }` 字典，并通过 `useLocale()` 选择。Explorer 内部链接经由 `explorerHref()` /
 `useExplorerHref()` 生成，保证 `/zh` 页面链接到 `/zh` 页面。只有 Explorer 根页面可被索引并收录进
-sitemap；会话详情页为 `noindex`。Explorer 在 `DashboardShell` 内以独立 provider 渲染，自身的分区导航
-（数字键 1–0 快捷切换）和全局 `?version=` trace 版本筛选位于 InferenceX 标签导航下方。
+sitemap；会话详情页为 `noindex`。Explorer 在 `DashboardShell` 内以独立 provider 渲染，并设置
+`tabNav: false`（见 `DASHBOARD_SHELL_CAPABILITY_ROUTES`），因此不显示 InferenceX 仪表板标签栏：
+Explorer 自身的分区导航（数字键 1–0 快捷切换）和全局 `?version=` trace 版本筛选直接位于站点页头下方。
 
 ## API 覆盖
 

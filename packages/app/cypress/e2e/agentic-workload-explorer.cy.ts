@@ -21,6 +21,9 @@ describe('Agentic Workload Explorer', () => {
     cy.get('[data-testid="agentic-workload-explorer"]')
       .should('contain.text', 'Agentic Workload Explorer')
       .and('contain.text', 'Frozen snapshot');
+    // The explorer has its own section nav, so the dashboard tab strip is hidden.
+    cy.get('[data-testid="chart-section-tabs"]').should('not.exist');
+    cy.get('[data-testid="mobile-chart-select"]').should('not.exist');
     cy.get('nav[aria-label="Agentic Workload Explorer sections"]')
       .contains('a', 'Overview')
       .should('have.attr', 'aria-current', 'page');

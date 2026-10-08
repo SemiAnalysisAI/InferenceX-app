@@ -54,9 +54,10 @@ Pages are thin server wrappers around shared client views, so English and Chines
 component. User-visible strings come from component-local `STRINGS = { en, zh }` dictionaries
 selected with `useLocale()`. In-explorer links go through `explorerHref()` / `useExplorerHref()`
 so `/zh` pages link to `/zh` siblings. Only the explorer root is indexable and in the sitemap; session
-pages are `noindex`. The explorer renders inside `DashboardShell` with standalone providers. Its own
-section nav (number-key hotkeys 1–0) and the global `?version=` trace-version filter sit under the
-InferenceX tab nav.
+pages are `noindex`. The explorer renders inside `DashboardShell` with standalone providers and
+`tabNav: false` (`DASHBOARD_SHELL_CAPABILITY_ROUTES`), so the InferenceX dashboard tab strip is hidden:
+the explorer's own section nav (number-key hotkeys 1–0) and the global `?version=` trace-version
+filter sit directly under the site header.
 
 ## API coverage
 
