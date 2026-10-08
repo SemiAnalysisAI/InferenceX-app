@@ -795,7 +795,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
   const derivedSpec = useDerivedXAxis ? DERIVED_X_MODE_SPECS[selectedXAxisMode] : undefined;
 
   const renderableGraphs = useMemo(() => {
-    if (!isAgenticSequence || selectedXAxisMode === 'concurrency') return visibleGraphs;
+    if (!isAgenticSequence) return visibleGraphs;
     if (!derivedMetrics) {
       // Legacy AgentX axes can still render transient/non-persisted rows, which
       // have no ids to request.
@@ -883,10 +883,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
             const isTimelineMode = Boolean(
               selectedDateRange.startDate && selectedDateRange.endDate && selectedGPUs.length > 0,
             );
-            const replayAvailable =
-              getViewMode(graphIndex) === 'chart' &&
-              !isTimelineMode &&
-              selectedXAxisMode !== 'concurrency';
+            const replayAvailable = getViewMode(graphIndex) === 'chart' && !isTimelineMode;
             // Chart-level notices: the KV-offload halo
             // key, the agentic optimization note, and the ATOM engine
             // footnote. Detected from the same data the chart plots —
@@ -1055,8 +1052,6 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                               {(() => {
                                 // The timeline's x axis is time, not the scatter x metric.
                                 if (isPowerTimeline) return null;
-                                if (selectedXAxisMode === 'concurrency')
-                                  return locale === 'zh' ? '与并发数的关系' : 'vs. Concurrency';
                                 if (!isAgenticSequence) {
                                   const heading = String(graph.chartDefinition.heading);
                                   return locale === 'zh' ? zhHeading(heading) : heading;

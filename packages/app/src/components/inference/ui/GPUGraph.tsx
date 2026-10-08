@@ -72,7 +72,6 @@ import type {
   ScatterGraphProps,
 } from '@/components/inference/types';
 import { comparisonEntryLabel } from '@/components/inference/utils/comparisonEntry';
-import { groupConcurrencySeries } from '@/components/inference/utils/concurrency-series';
 import { matchesQuickFilters } from '@/components/inference/utils/quickFilters';
 import {
   generateGPUGraphTooltipContent,
@@ -241,17 +240,11 @@ const GPUGraph = React.memo(
     const showPowerTelemetryRef = useRef(showPowerTelemetry);
     showPowerTelemetryRef.current = showPowerTelemetry;
     const legendT = GPU_STRINGS[locale];
-    // The Concurrency axis plots observed load sweeps: no frontier or power
-    // envelope, same as ScatterGraph.
-    const isConcurrencyAxis = chartDefinition.x_scale_field === 'conc';
-    const frontierDirection = isConcurrencyAxis
-      ? undefined
-      : (chartDefinition[`${selectedYAxisMetric}_roofline` as keyof ChartDefinition] as
-          | ParetoDirection
-          | undefined);
+    const frontierDirection = chartDefinition[
+      `${selectedYAxisMetric}_roofline` as keyof ChartDefinition
+    ] as ParetoDirection | undefined;
     const hideNonOptimal = Boolean(frontierDirection) && savedHideNonOptimal;
-    const isPowerAxis = isPowerCurveMetric(selectedYAxisMetric);
-    const powerEnvelopeMode = !isConcurrencyAxis && isPowerAxis;
+    const powerEnvelopeMode = isPowerCurveMetric(selectedYAxisMetric);
     const noDataHint = isRoleLocalMeasuredEnergyConfigKey(selectedYAxisMetric)
       ? legendT.noRoleEnergyDataHint
       : isMeasuredEnergyConfigKey(selectedYAxisMetric)
@@ -371,17 +364,6 @@ const GPUGraph = React.memo(
     }, [groupedData, frontierDirection]);
 
     const rooflines = useMemo(() => {
-      // One path per observed load sweep, never joined across runs or
-      // topologies (see groupConcurrencySeries).
-      if (isConcurrencyAxis) {
-        const result: Record<string, InferenceData[]> = {};
-        for (const [key, points] of Object.entries(groupedData)) {
-          for (const [segment, sweep] of groupConcurrencySeries(points)) {
-            result[`${key}__${encodeURIComponent(segment)}`] = sweep;
-          }
-        }
-        return result;
-      }
       if (!powerEnvelopeMode) return paretoRooflines;
       const result: Record<string, InferenceData[]> = {};
       for (const [key, points] of Object.entries(groupedData)) {
@@ -393,7 +375,6 @@ const GPUGraph = React.memo(
       }
       return result;
     }, [
-      isConcurrencyAxis,
       powerEnvelopeMode,
       groupedData,
       paretoRooflines,
@@ -1051,8 +1032,7 @@ const GPUGraph = React.memo(
               getColor: getRooflineColor,
               isVisible: isRooflineVisible,
               getDasharray: getRooflineDasharray,
-              // Load sweeps join measured points; they are not fitted curves.
-              curve: isConcurrencyAxis ? d3.curveLinear : d3.curveMonotoneX,
+              curve: d3.curveMonotoneX,
             },
           },
           {
@@ -1295,7 +1275,7 @@ const GPUGraph = React.memo(
                       id: 'gpu-hide-non-optimal',
                       label: legendT.optimalOnly,
                       checked: hideNonOptimal,
-                      ...(isPowerAxis ? { infoTooltip: legendT.powerBoundaryInfo } : {}),
+                      ...(powerEnvelopeMode ? { infoTooltip: legendT.powerBoundaryInfo } : {}),
                       onCheckedChange: (c: boolean) => {
                         setHideNonOptimal(c);
                         track('interactivity_hide_non_optimal_toggled', { enabled: c });

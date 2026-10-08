@@ -593,7 +593,7 @@ describe('GPU comparison power envelopes', () => {
 
 const runUrl = (id: number) => `https://github.com/SemiAnalysisAI/InferenceX/actions/runs/${id}`;
 
-describe('GPU comparison with unofficial runs and load sweeps', () => {
+describe('GPU comparison with unofficial runs', () => {
   const OVERLAY_RUN_URL = runUrl(31415926535);
   const DATES = ['2025-03-01', '2025-03-15'];
   const ALL_SERIES = new Set(DATES.map((date) => `${date}_h100`));
@@ -737,44 +737,7 @@ describe('GPU comparison with unofficial runs and load sweeps', () => {
     cy.get('.sidebar-legend').should('not.contain.text', 'UNOFFICIAL');
   });
 
-  it('draws concurrency load sweeps per date, run and topology without frontier tools', () => {
-    mountComparison(
-      createMockChartDefinition({
-        chartType: 'interactivity',
-        x_scale_field: 'conc',
-        y_tpPerGpu_roofline: 'upper_left',
-      }),
-      [
-        // A load sweep is not a frontier: the dip at c16 stays on the line.
-        ...DATES.flatMap((date, d) => [
-          official(date, 8, 300 + d),
-          official(date, 16, 250 + d),
-          official(date, 32, 320 + d),
-        ]),
-        // Another topology on the later date is a separate sweep.
-        official(DATES[1], 8, 150, 4),
-        official(DATES[1], 16, 180, 4),
-      ],
-      [overlay(8, 400), overlay(16, 380), overlay(32, 450)],
-    );
-
-    cy.get('#gpu-overlay .roofline-path').should('have.length', 4);
-    cy.get('#gpu-overlay .roofline-path').each(($path) => {
-      expect($path.attr('d'), 'straight segments between observations').not.to.contain('C');
-    });
-    cy.get('#gpu-overlay .roofline-path[class*="2025-03-01_h100_fp4"]')
-      .invoke('attr', 'd')
-      .should('match', /^M[^L]+L[^L]+L[^L]+$/u);
-    cy.get('#gpu-overlay .roofline-path[class*="overlay-run0_b200_fp4"]').should(
-      'have.attr',
-      'stroke-dasharray',
-      overlayRooflineDasharray(0),
-    );
-    cy.get('#gpu-overlay .dot-group').should('have.length', 8);
-    cy.get('#gpu-hide-non-optimal').should('not.exist');
-  });
-
-  it('opens the power trace from an official point on the concurrency comparison', () => {
+  it('opens the power trace from an official point on the date comparison', () => {
     const setSelectedYAxisMetric = cy.stub().as('setMetric');
     const audited = (date: string, conc: number, y: number): InferenceData => ({
       ...official(date, conc, y),
@@ -783,7 +746,7 @@ describe('GPU comparison with unofficial runs and load sweeps', () => {
       } as InferenceData['power_audit'],
     });
     mountComparison(
-      createMockChartDefinition({ chartType: 'interactivity', x_scale_field: 'conc' }),
+      createMockChartDefinition({ chartType: 'interactivity' }),
       DATES.flatMap((date, d) => [audited(date, 8, 300 + d), audited(date, 16, 320 + d)]),
       [],
       { selectedYAxisMetric: 'y_measuredAvgPower', setSelectedYAxisMetric },

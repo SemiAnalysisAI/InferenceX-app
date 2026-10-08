@@ -778,8 +778,7 @@ describe('Inference axis selector — Chinese Agentic controls', () => {
     );
     cy.get('[data-testid="inference-secondary-controls"] > button').click();
     cy.get('[data-testid="x-axis-mode-selector"]').should('contain.text', '交互性').click();
-    cy.get('[role="grid"] [data-select-option]').should('have.length', 5);
-    cy.get('[data-testid="x-axis-mode-concurrency"]').should('have.text', '并发数');
+    cy.get('[role="grid"] [data-select-option]').should('have.length', 4);
     cy.get('[data-testid="x-axis-mode-e2e-normalized-interactivity"]').should(
       'have.text',
       '端到端归一化交互性',

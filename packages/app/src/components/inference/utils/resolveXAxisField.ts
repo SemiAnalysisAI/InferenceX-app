@@ -21,7 +21,6 @@ export type FixedSequenceStatistic = 'mean' | 'median';
 
 /** Which rung of the branch ladder chose the x field (drives label choice). */
 export type XAxisBranch =
-  | 'concurrency'
   | 'natural'
   | 'user-input-override'
   | 'config-input-override'
@@ -99,10 +98,7 @@ export function resolveXAxisField(
   let xAxisField: keyof AggDataEntry = naturalX;
   let branch: XAxisBranch = 'natural';
   if (xAxisMode !== undefined) {
-    if (xAxisMode === 'concurrency') {
-      xAxisField = 'conc';
-      branch = 'concurrency';
-    } else if (xAxisMode === 'ttft' && chartDef.chartType === 'e2e') {
+    if (xAxisMode === 'ttft' && chartDef.chartType === 'e2e') {
       xAxisField = serviceField('median_ttft');
       branch = 'e2e-ttft-override';
     }
@@ -123,7 +119,7 @@ export function resolveXAxisField(
     branch = 'e2e-ttft-override';
   }
 
-  if (isAgentic && xAxisMode !== 'concurrency') {
+  if (isAgentic) {
     xAxisField = withPercentile(xAxisField, percentile) as keyof AggDataEntry;
   }
 

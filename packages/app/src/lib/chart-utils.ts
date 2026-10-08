@@ -613,12 +613,9 @@ export function remapInferencePoint(
   const xCandidate = (point as Partial<AggDataEntry>)[xAxisField];
   // Absent TTFT values are zero-filled by the row transform. Neither that
   // sentinel nor an unrelated fallback coordinate is a latency measurement;
-  // the same holds for concurrency and the mean service fields.
+  // the same holds for the mean service fields.
   const requiresMeasuredValue =
-    xAxisField === 'conc' ||
-    xAxisField.endsWith('_ttft') ||
-    xAxisField === 'mean_e2el' ||
-    xAxisField === 'mean_tpot_intvty';
+    xAxisField.endsWith('_ttft') || xAxisField === 'mean_e2el' || xAxisField === 'mean_tpot_intvty';
   const missingMeasuredValue =
     requiresMeasuredValue &&
     (typeof xCandidate !== 'number' || !Number.isFinite(xCandidate) || xCandidate <= 0);
@@ -626,7 +623,7 @@ export function remapInferencePoint(
     ...point,
     x: missingMeasuredValue ? NaN : typeof xCandidate === 'number' ? xCandidate : point.x,
     y: metric?.y ?? point.y,
-    roof: xAxisField === 'conc' ? false : (metric?.roof ?? false),
+    roof: metric?.roof ?? false,
   };
 }
 

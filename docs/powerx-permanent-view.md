@@ -351,8 +351,7 @@ see [Dashboard read-only views](./dashboard-readonly-views.md#fixed-sequence-ser
   and date-prefixed end labels.
 - `cypress/component/gpu-graph.cy.tsx`, `cypress/e2e/inference-chart.cy.ts` and
   `lib/d3-chart/layers/rooflines.test.ts` — `?unofficialrun=` runs stay on the date-comparison
-  `GPUGraph` in their run colour and dash on the interactivity and concurrency axes, per-curve
-  dashes survive display updates, and concurrency sweeps split per date, run and topology.
+  `GPUGraph` in their run colour and dash, and per-curve dashes survive display updates.
 - `utils/matched-concurrency.test.ts`, `utils/power-fit.test.ts`, `utils/powerTimeline.test.ts`
   — signed same-concurrency deltas, the least-squares fit and R², disaggregated fits on output
   per allocated GPU, and the peak pool power inside the validated window.

@@ -62,12 +62,7 @@ import { hardwareLegendLabel, unitFromLabel } from '@/lib/views-api/legend';
 
 /** X-axis modes the API serves. `e2e-normalized-interactivity` is trace-derived
  * client-side and has no server-side data source, so it is not accepted here. */
-export type SeriesXMode =
-  | 'interactivity'
-  | 'ttft'
-  | 'e2e'
-  | 'e2e-normalized-interactivity'
-  | 'concurrency';
+export type SeriesXMode = 'interactivity' | 'ttft' | 'e2e' | 'e2e-normalized-interactivity';
 
 export interface InferenceSeriesOptions {
   readonly sequence: Sequence;
@@ -77,7 +72,7 @@ export interface InferenceSeriesOptions {
   readonly precisions: readonly string[];
   readonly metricConfigKey: MetricConfigKey;
   readonly xmode: SeriesXMode;
-  /** Fixed-sequence service-axis statistic; ignored for Agentic and concurrency. */
+  /** Fixed-sequence service-axis statistic; ignored for Agentic. */
   readonly fixedSequenceStatistic?: FixedSequenceStatistic;
   /** TTFT x metric override (e.g. `p90_ttft`); used by `ttft` mode and input metrics. */
   readonly xmetric: string;
@@ -139,7 +134,7 @@ export interface InferenceSeriesResult {
   readonly hardware: readonly { key: string; label: string; vendor?: string }[];
   readonly frontier: { direction: ParetoDirection | null; points: number };
   readonly metric: InferenceSeriesMetricMeta;
-  readonly xAxis: { mode: SeriesXMode; field: string; label: string; statistic: string | null };
+  readonly xAxis: { mode: SeriesXMode; field: string; label: string; statistic: string };
   /** Scoped observed points before frontier/best-only pruning; not a public raw-row payload. */
   readonly observedPoints: readonly InferenceData[];
   readonly count: number;
@@ -184,7 +179,6 @@ function resolveXAxisLabel(
   percentile: string,
   xAxisField: string,
 ): string {
-  if (branch === 'concurrency') return 'Concurrency';
   let label = chartDef.x_label;
   if (branch === 'e2e-ttft-override') {
     const pctl = (effectiveXMetric ?? 'p90_ttft').replace(/_ttft$/u, '');
@@ -300,24 +294,19 @@ export function buildInferenceSeries(
     resolved.xAxisField !== resolved.naturalX &&
     !(chartDef.chartType === 'e2e' && resolved.isTtftOverride);
   const direction =
-    xmode === 'concurrency'
-      ? null
-      : configuredDirection && xAxisFlipped
-        ? flipRooflineDirection(configuredDirection)
-        : (configuredDirection ?? null);
+    configuredDirection && xAxisFlipped
+      ? flipRooflineDirection(configuredDirection)
+      : (configuredDirection ?? null);
 
   // 7. Frontier flags, scoped per (hwKey, precision, date) like ScatterGraph.
   // Measured power represents load demand, so retain its upper boundary.
   const isMeasuredPower = isPowerCurveMetric(metricConfigKey);
   const maximizePowerX = chartDef.chartType !== 'e2e';
-  const frontierDirection =
-    xmode === 'concurrency'
-      ? null
-      : isMeasuredPower
-        ? maximizePowerX
-          ? 'upper_right'
-          : 'upper_left'
-        : direction;
+  const frontierDirection = isMeasuredPower
+    ? maximizePowerX
+      ? 'upper_right'
+      : 'upper_left'
+    : direction;
   const frontierPoints = new Set<InferenceData>();
   if (direction) {
     const frontierFn = paretoFrontForDirection(direction);
@@ -359,10 +348,7 @@ export function buildInferenceSeries(
     if (best && bestHwKeys.size > 0 && !seriesIsBest) continue;
 
     const allPoints = byHwKey.get(hwKey)!;
-    const kept =
-      optimal && xmode !== 'concurrency'
-        ? allPoints.filter((point) => frontierPoints.has(point))
-        : allPoints;
+    const kept = optimal ? allPoints.filter((point) => frontierPoints.has(point)) : allPoints;
     if (kept.length === 0) continue;
 
     const sample = kept[0];
@@ -425,12 +411,7 @@ export function buildInferenceSeries(
     },
     xAxis: {
       mode: xmode,
-      statistic:
-        xmode === 'concurrency'
-          ? null
-          : isAgentic
-            ? percentile
-            : (options.fixedSequenceStatistic ?? 'median'),
+      statistic: isAgentic ? percentile : (options.fixedSequenceStatistic ?? 'median'),
       field:
         xmode === 'e2e-normalized-interactivity'
           ? `${percentile}_e2e_norm_intvty`

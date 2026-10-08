@@ -328,7 +328,7 @@ export function getPrefillSharePoints(
   points: readonly InferenceData[],
   xField: keyof AggDataEntry,
 ) {
-  if (!serviceAxis(xField) && xField !== 'conc' && !derivedAxis(xField)) return [];
+  if (!serviceAxis(xField) && !derivedAxis(xField)) return [];
   return observedPoints(points)
     .flatMap((point) => {
       const x = roleAxisValue(point, xField);
@@ -363,7 +363,7 @@ export function getRolePoints(
   points: readonly InferenceData[],
   xField: keyof AggDataEntry,
 ): RolePoint[] {
-  if (!serviceAxis(xField) && xField !== 'conc' && !derivedAxis(xField)) return [];
+  if (!serviceAxis(xField) && !derivedAxis(xField)) return [];
   return observedPoints(points)
     .flatMap((point): RolePoint[] => {
       const x = roleAxisValue(point, xField);

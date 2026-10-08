@@ -538,15 +538,9 @@ export const METRIC_EXPLANATIONS: Record<MetricKey, MetricExplanation> = {
  * the percentile prefix. Mirrors the branch logic in `resolveXAxisField` plus
  * the derived agentic x-axis mode handled in `ChartDisplay`.
  */
-export type XAxisKind =
-  | 'concurrency'
-  | 'interactivity'
-  | 'e2eLatency'
-  | 'ttft'
-  | 'e2eNormalizedInteractivity';
+export type XAxisKind = 'interactivity' | 'e2eLatency' | 'ttft' | 'e2eNormalizedInteractivity';
 
 export const X_AXIS_KINDS: readonly XAxisKind[] = [
-  'concurrency',
   'interactivity',
   'e2eLatency',
   'ttft',
@@ -568,13 +562,6 @@ const zhPctl = (pctl: string | null): string =>
 const enPctl = (pctl: string | null): string => (pctl === null ? '' : `${pctl} `);
 
 export const X_AXIS_EXPLANATIONS: Record<XAxisKind, XAxisExplanation> = {
-  concurrency: {
-    name: { en: () => 'Concurrency', zh: () => '并发数' },
-    description: {
-      en: 'The configured number of concurrent requests in each observed benchmark. This is a load setting, not a higher-is-better score. All observed load points are retained; lines only connect the same serving topology and run.',
-      zh: '每个实测基准配置的并发请求数。这是负载设置，不是越高越好的性能分数。保留全部实测负载点，连线仅连接同一服务拓扑、同一次运行的数据。',
-    },
-  },
   interactivity: {
     name: {
       en: (pctl) => `${enPctl(pctl)}Interactivity (tok/s/user)`,
@@ -659,7 +646,6 @@ export function resolveXAxisKind(
     isDerivedNormalizedInteractivity: boolean;
   },
 ): XAxisKind {
-  if (opts.xAxisField === 'conc') return 'concurrency';
   if (opts.isDerivedNormalizedInteractivity) return 'e2eNormalizedInteractivity';
   if (opts.xAxisField.endsWith('ttft')) return 'ttft';
   return chartType === 'e2e' ? 'e2eLatency' : 'interactivity';

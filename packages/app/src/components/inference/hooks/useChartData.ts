@@ -376,10 +376,7 @@ export function useChartData(
 
         let xAxisLabel = chartDef.x_label;
         let xAxisLabelZh = chartDef.x_labelZh;
-        if (resolved.branch === 'concurrency') {
-          xAxisLabel = 'Concurrency';
-          xAxisLabelZh = '并发数';
-        } else if (resolved.branch === 'user-input-override') {
+        if (resolved.branch === 'user-input-override') {
           const labelKey = `${selectedYAxisMetric}_x_label` as keyof ChartDefinition;
           const labelZhKey = `${selectedYAxisMetric}_x_labelZh` as keyof ChartDefinition;
           if (effectiveXMetric === chartDef[`${selectedYAxisMetric}_x` as keyof ChartDefinition]) {
@@ -411,9 +408,7 @@ export function useChartData(
           : selectedXAxisMode === undefined
             ? (chartDef[headingKey] as string) || chartDef.heading
             : chartDef.heading;
-        if (resolved.branch === 'concurrency') {
-          chartHeading = 'vs. Concurrency';
-        } else if (isAgentic) {
+        if (isAgentic) {
           const pctlWord = selectedPercentile.toUpperCase();
           xAxisLabel = applyAgenticPercentileToXLabel(xAxisLabel, pctlWord);
           xAxisLabelZh = applyAgenticPercentileToXLabel(xAxisLabelZh, pctlWord);
@@ -449,13 +444,11 @@ export function useChartData(
           xAxisField !== naturalX && !(chartDef.chartType === 'e2e' && isTtftOverride);
 
         const rooflineOverrides: Partial<ChartDefinition> = {};
-        if (xAxisFlipped || resolved.branch === 'concurrency') {
+        if (xAxisFlipped) {
           for (const key of Object.keys(chartDef) as (keyof ChartDefinition)[]) {
             if (typeof key === 'string' && key.endsWith('_roofline')) {
               const dir = chartDef[key] as string | undefined;
-              if (resolved.branch === 'concurrency') {
-                (rooflineOverrides as any)[key] = undefined;
-              } else if (dir && dir in FLIP_MAP) {
+              if (dir && dir in FLIP_MAP) {
                 (rooflineOverrides as any)[key] = flipRooflineDirection(dir as RooflineDirection);
               }
             }
