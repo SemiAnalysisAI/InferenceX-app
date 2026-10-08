@@ -63,6 +63,7 @@ export const AGENTIC_POINT_DETAIL_STRINGS = {
     requestTimeline: 'Request timeline',
     aggregatesAcrossConfigs: 'Aggregates across configs',
     logs: 'Logs',
+    memory: 'Memory',
     detailView: 'Detail view',
     warmupWord: 'warmup',
     warmupNotePrefix: 'Showing the ',
@@ -96,6 +97,7 @@ export const AGENTIC_POINT_DETAIL_STRINGS = {
     requestTimeline: '请求时间线',
     aggregatesAcrossConfigs: '跨配置聚合',
     logs: '日志',
+    memory: '显存',
     detailView: '详情视图',
     warmupWord: 'warmup',
     warmupNotePrefix: '当前显示 ',
@@ -120,6 +122,7 @@ export const AGENTIC_POINT_DETAIL_STRINGS = {
 const RequestTimelineView = dynamic(() =>
   import('./request-timeline').then((module_) => module_.RequestTimelineView),
 );
+const MemoryView = dynamic(() => import('./memory-view').then((m) => m.MemoryView));
 
 interface Props {
   id: number;
@@ -151,6 +154,7 @@ export function AgenticPointDetail({ id }: Props) {
       { value: 'timeline', label: t.requestTimeline, testId: 'detail-view-timeline' },
       { value: 'aggregates', label: t.aggregatesAcrossConfigs, testId: 'detail-view-aggregates' },
       { value: 'logs', label: t.logs, testId: 'detail-view-logs' },
+      { value: 'memory', label: t.memory, testId: 'detail-view-memory' },
     ],
     [t],
   );
@@ -293,7 +297,7 @@ export function AgenticPointDetail({ id }: Props) {
         <div className="text-sm text-muted-foreground">{t.loadingPoint}</div>
       ) : null}
 
-      {view !== 'logs' && metricsQuery.isError && (
+      {view !== 'logs' && view !== 'memory' && metricsQuery.isError && (
         <RetryableQueryError
           message={withId(t.traceFailure)}
           analyticsEvent="inference_agentic_trace_retry_clicked"
@@ -302,6 +306,7 @@ export function AgenticPointDetail({ id }: Props) {
         />
       )}
       {view !== 'logs' &&
+        view !== 'memory' &&
         metricsQuery.data === null &&
         !metricsQuery.isLoading &&
         !metricsQuery.isError && (
@@ -345,7 +350,9 @@ export function AgenticPointDetail({ id }: Props) {
         />
       )}
 
-      {view === 'logs' ? (
+      {view === 'memory' ? (
+        <MemoryView key={id} id={id} siblings={siblingsData?.siblings ?? []} />
+      ) : view === 'logs' ? (
         <ServerLogViewer id={id} enabled />
       ) : view === 'aggregates' ? (
         aggregatesQuery.isError ? (

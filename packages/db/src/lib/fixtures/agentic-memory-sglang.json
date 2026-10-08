@@ -1,0 +1,32 @@
+{
+  "id": 439758,
+  "url": "https://inferencex.semianalysis.com/api/v1/server-log?id=439758&offset=0&limit=262144",
+  "lines": [
+    "[2026-08-13 05:02:26 TP5] Load weight end. elapsed=230.91 s, type=DeepseekV4ForCausalLM, quant=fp8, fmt=e4m3, avail mem=161.03 GB, mem usage=104.27 GB.",
+    "[2026-08-13 05:02:26 TP2] Load weight end. elapsed=231.05 s, type=DeepseekV4ForCausalLM, quant=fp8, fmt=e4m3, avail mem=161.06 GB, mem usage=104.24 GB.",
+    "[2026-08-13 05:02:26 TP7] Load weight end. elapsed=230.92 s, type=DeepseekV4ForCausalLM, quant=fp8, fmt=e4m3, avail mem=161.03 GB, mem usage=104.27 GB.",
+    "[2026-08-13 05:02:26 TP3] Load weight end. elapsed=231.09 s, type=DeepseekV4ForCausalLM, quant=fp8, fmt=e4m3, avail mem=161.03 GB, mem usage=104.27 GB.",
+    "[2026-08-13 05:02:26 TP0] Load weight end. elapsed=230.97 s, type=DeepseekV4ForCausalLM, quant=fp8, fmt=e4m3, avail mem=161.06 GB, mem usage=104.24 GB.",
+    "[2026-08-13 05:02:26 TP6] Load weight end. elapsed=231.13 s, type=DeepseekV4ForCausalLM, quant=fp8, fmt=e4m3, avail mem=161.03 GB, mem usage=104.27 GB.",
+    "[2026-08-13 05:02:26 TP1] Load weight end. elapsed=231.34 s, type=DeepseekV4ForCausalLM, quant=fp8, fmt=e4m3, avail mem=161.03 GB, mem usage=104.27 GB.",
+    "[2026-08-13 05:02:26 TP4] Load weight end. elapsed=231.39 s, type=DeepseekV4ForCausalLM, quant=fp8, fmt=e4m3, avail mem=161.03 GB, mem usage=104.27 GB.",
+    "[2026-08-13 05:02:31 TP5] Load weight end. elapsed=3.09 s, type=DeepseekV4ForCausalLMNextN, quant=fp8, fmt=e4m3, avail mem=158.42 GB, mem usage=2.60 GB.",
+    "[2026-08-13 05:02:31 TP1] Load weight end. elapsed=3.25 s, type=DeepseekV4ForCausalLMNextN, quant=fp8, fmt=e4m3, avail mem=158.42 GB, mem usage=2.60 GB.",
+    "[2026-08-13 05:02:32 TP2] Load weight end. elapsed=3.54 s, type=DeepseekV4ForCausalLMNextN, quant=fp8, fmt=e4m3, avail mem=158.45 GB, mem usage=2.60 GB.",
+    "[2026-08-13 05:02:32 TP0] Load weight end. elapsed=3.84 s, type=DeepseekV4ForCausalLMNextN, quant=fp8, fmt=e4m3, avail mem=158.45 GB, mem usage=2.60 GB.",
+    "[2026-08-13 05:02:32 TP3] Load weight end. elapsed=3.88 s, type=DeepseekV4ForCausalLMNextN, quant=fp8, fmt=e4m3, avail mem=158.42 GB, mem usage=2.60 GB.",
+    "[2026-08-13 05:02:32 TP4] Load weight end. elapsed=4.11 s, type=DeepseekV4ForCausalLMNextN, quant=fp8, fmt=e4m3, avail mem=158.42 GB, mem usage=2.60 GB.",
+    "[2026-08-13 05:02:32 TP7] Load weight end. elapsed=4.30 s, type=DeepseekV4ForCausalLMNextN, quant=fp8, fmt=e4m3, avail mem=158.42 GB, mem usage=2.60 GB.",
+    "[2026-08-13 05:02:33 TP6] Load weight end. elapsed=4.64 s, type=DeepseekV4ForCausalLMNextN, quant=fp8, fmt=e4m3, avail mem=158.42 GB, mem usage=2.60 GB.",
+    "[2026-08-13 05:04:03 TP1] Capture target verify CUDA graph end. elapsed=84.19 s, mem usage=0.19 GB, avail mem=32.32 GB.",
+    "[2026-08-13 05:04:03 TP3] Capture target verify CUDA graph end. elapsed=84.06 s, mem usage=0.19 GB, avail mem=32.32 GB.",
+    "[2026-08-13 05:04:03 TP0] Capture target verify CUDA graph end. elapsed=84.22 s, mem usage=0.19 GB, avail mem=32.34 GB.",
+    "[2026-08-13 05:04:04 TP6] Capture target verify CUDA graph end. elapsed=84.29 s, mem usage=0.19 GB, avail mem=32.32 GB.",
+    "[2026-08-13 05:04:04 TP7] Capture target verify CUDA graph end. elapsed=84.19 s, mem usage=0.19 GB, avail mem=32.32 GB.",
+    "[2026-08-13 05:04:04 TP2] Capture target verify CUDA graph end. elapsed=84.11 s, mem usage=0.19 GB, avail mem=32.35 GB.",
+    "[2026-08-13 05:04:04 TP5] Capture target verify CUDA graph end. elapsed=84.15 s, mem usage=0.19 GB, avail mem=32.32 GB.",
+    "[2026-08-13 05:04:04 TP4] Capture target verify CUDA graph end. elapsed=84.20 s, mem usage=0.19 GB, avail mem=32.32 GB.",
+    "[2026-08-13 05:04:11 TP0] Capture draft decode CUDA graph end. elapsed=7.48 s, mem usage=0.08 GB, avail mem=32.27 GB.",
+    "[2026-08-13 05:04:12 TP0] Capture draft extend CUDA graph end. elapsed=1.22 s, mem usage=0.04 GB, avail mem=32.22 GB."
+  ]
+}

@@ -46,6 +46,14 @@ export type ApiRouteCatalogEntry = PublishedApiRouteCatalogEntry | ExcludedApiRo
  */
 export const apiRouteCatalog = [
   {
+    source: 'src/app/api/v1/agentic-memory/route.ts',
+    path: '/api/v1/agentic-memory',
+    method: 'GET',
+    classification: 'published-read',
+    operationId: 'get-agentic-memory',
+    sourceSha256: '9cc74dafad781e1dd181dbdf3f4b75fc1bfcc488191bc8ac1d65438cc8af8669',
+  },
+  {
     source: 'src/app/api/v1/views/cache-reuse/route.ts',
     path: '/api/v1/views/cache-reuse',
     method: 'GET',
@@ -821,6 +829,22 @@ export interface ApiContractSourceDigest {
  * touching a route module. Digest changes require an explicit documentation review.
  */
 export const apiContractSourceDigests = [
+  {
+    source: '../db/src/lib/agentic-memory.ts',
+    sourceSha256: '4dd02b90b33c7ddd8e70c0aeba8a52aa61e276f1873c966405a883cd6b55667e',
+    reviewArea: {
+      en: 'Per-worker startup memory parsing, units, nulls, conflicting allocations and evidence.',
+      zh: '逐 worker 启动显存解析、单位、空值、冲突的分配记录与原始依据。',
+    },
+  },
+  {
+    source: '../db/src/queries/agentic-memory.ts',
+    sourceSha256: '7d0072b2761a0a85ae74c358ce5ab849ed6bfc13988a0287fd3b3aec4007d7dc',
+    reviewArea: {
+      en: 'Bounded startup-log reads, result identity and independent token and occupancy metrics.',
+      zh: '有上限的启动日志读取、结果标识，以及单独展示的 token 容量与使用率指标。',
+    },
+  },
   {
     source: 'src/lib/views-api/upstream-error.ts',
     sourceSha256: 'c3f1b4c318e1ae771a67edd85f16d69b7316461334604fd8c892254eface715a',
