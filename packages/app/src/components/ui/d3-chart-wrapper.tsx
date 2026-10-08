@@ -3,12 +3,40 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 
+import { useMediaQuery } from '@/hooks/useMediaQuery';
+import type { Locale } from '@/lib/i18n';
 import { useLocale } from '@/lib/use-locale';
 
 const DEFAULT_CHART_INSTRUCTIONS = {
   en: 'Shift+Scroll to zoom • Drag to pan • Double-click to reset • Click a point to pin tooltip',
   zh: '按住 Shift 滚动以缩放 · 拖动以平移 · 双击以重置 · 点击数据点固定提示框',
 } as const;
+
+/**
+ * Shown instead of the Shift+Scroll guidance on touch-primary devices, where
+ * useChartZoom only accepts two-finger gestures (one finger scrolls the page).
+ */
+const TOUCH_CHART_INSTRUCTIONS = {
+  en: 'Pinch to zoom • Two-finger drag to pan • Double-tap to reset • Tap a point to pin tooltip',
+  zh: '双指捏合以缩放 · 双指拖动以平移 · 双击以重置 · 点按数据点固定提示框',
+} as const;
+
+export const TOUCH_PRIMARY_QUERY = '(hover: none) and (pointer: coarse)';
+
+/**
+ * Picks the hint to render under a chart. When the chart zooms and the device
+ * is touch-primary, the Shift+Scroll guidance (the default, or a chart's own
+ * copy, which also describes mouse zooming) is swapped wholesale for the touch
+ * version. An explicit empty string (embeds) still renders nothing.
+ */
+export function resolveChartInstructions(
+  instructions: string | undefined,
+  locale: Locale,
+  useTouchHint: boolean,
+): string {
+  const resolved = instructions ?? DEFAULT_CHART_INSTRUCTIONS[locale];
+  return useTouchHint && resolved ? TOUCH_CHART_INSTRUCTIONS[locale] : resolved;
+}
 
 /**
  * Renders the d3 tooltip element via React Portal to document.body so it
@@ -63,6 +91,8 @@ export interface D3ChartWrapperProps {
   noDataOverlay?: React.ReactNode;
   caption?: React.ReactNode;
   instructions?: string;
+  /** Whether d3-zoom is attached; gates the touch-device hint swap. */
+  zoomEnabled?: boolean;
   testId?: string;
   grabCursor?: boolean;
   scrollablePlot?: { minWidth: number; label: string; enabled: boolean };
@@ -82,12 +112,18 @@ export function D3ChartWrapper({
   noDataOverlay,
   caption,
   instructions,
+  zoomEnabled = false,
   testId,
   grabCursor = true,
   scrollablePlot,
 }: D3ChartWrapperProps) {
   const locale = useLocale();
-  const resolvedInstructions = instructions ?? DEFAULT_CHART_INSTRUCTIONS[locale];
+  const isTouchPrimary = useMediaQuery(TOUCH_PRIMARY_QUERY);
+  const resolvedInstructions = resolveChartInstructions(
+    instructions,
+    locale,
+    zoomEnabled && isTouchPrimary,
+  );
 
   const plot = (
     <div
@@ -105,7 +141,8 @@ export function D3ChartWrapper({
             data-testid="d3-chart-svg"
             width="100%"
             height={dimensions.height}
-            style={{ cursor: grabCursor ? 'grab' : undefined }}
+            // pan-y lets one-finger swipes scroll the page while d3-zoom handles two-finger gestures.
+            style={{ cursor: grabCursor ? 'grab' : undefined, touchAction: 'pan-y' }}
             onMouseDown={
               grabCursor
                 ? (e) => {

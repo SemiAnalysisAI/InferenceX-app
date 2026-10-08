@@ -2,28 +2,126 @@ name: Ingest Benchmark Results
 
 on:
   repository_dispatch:
-    types: [ingest-results]
+    types: [ingest-results, ingest-agentic-results]
+  workflow_call:
+    inputs:
+      run-id:
+        description: InferenceX Actions run ID to ingest
+        required: true
+        type: string
+      run-attempt:
+        description: InferenceX Actions run attempt to ingest
+        required: false
+        default: '1'
+        type: string
+      database-target:
+        description: Database/cache target for the ingest
+        required: false
+        default: production
+        type: string
+      neon-branch:
+        description: Named Neon branch when database-target is neon-branch
+        required: false
+        default: ''
+        type: string
+      preview-url:
+        description: Preview deployment URL to invalidate for a named Neon branch
+        required: false
+        default: ''
+        type: string
+    secrets:
+      DATABASE_WRITE_URL:
+        description: Production database write connection for direct ingests
+        required: false
+      DATABASE_DEV_WRITE_URL:
+        description: Development database write connection for direct ingests
+        required: false
+      DATABASE_STAGING_WRITE_URL:
+        description: Neon staging branch write connection
+        required: true
+      VERCEL_INVALIDATE_SECRET:
+        description: Production and development cache invalidation bearer token
+        required: false
+      VERCEL_STAGING_BYPASS_SECRET:
+        description: Vercel protection automation bypass token
+        required: true
+      INFX_MAIN_PAT:
+        description: Token used to download InferenceX artifacts
+        required: true
+      NEON_API_KEY:
+        description: Neon API key used to resolve named child branches
+        required: false
+      NEON_PROJECT_ID:
+        description: Neon project containing named child branches
+        required: false
+      SLACK_WEBHOOK_URL:
+        description: Optional failure and unmapped-entity notifications
+        required: false
+  workflow_dispatch:
+    inputs:
+      run-id:
+        description: InferenceX Actions run ID to ingest
+        required: true
+        type: string
+      require-power:
+        description: Require the versioned PowerX manifest and all declared evidence
+        required: false
+        default: false
+        type: boolean
+      run-attempt:
+        description: InferenceX Actions run attempt to ingest
+        required: false
+        default: '1'
+        type: string
+      database-target:
+        description: Database/cache target for the ingest
+        required: false
+        default: production
+        type: choice
+        options:
+          - production
+          - dev
+          - staging
+          - neon-branch
+      neon-branch:
+        description: Named Neon branch when database-target is neon-branch
+        required: false
+        default: ''
+        type: string
+      preview-url:
+        description: Preview deployment URL to invalidate for a named Neon branch
+        required: false
+        default: ''
+        type: string
 
 permissions: {}
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.client_payload.source-run-id ||
-    github.event.client_payload.run-id }}
+    github.event.client_payload.run-id || inputs.run-id }}
   cancel-in-progress: false
 
 jobs:
   ingest:
     name: Ingest benchmark results
-    timeout-minutes: 30
-    runs-on: ubuntu-latest
+    timeout-minutes: ${{ github.event.action == 'ingest-results' && 30 || 180 }}
+    runs-on: ${{ github.event.action == 'ingest-results' && 'ubuntu-latest' ||
+      'blacksmith-16vcpu-ubuntu-2404' }}
     permissions:
       contents: read
+    env:
+      REQUESTED_DATABASE_TARGET: ${{ github.event.client_payload.database-target ||
+        inputs.database-target || 'production' }}
     steps:
       - name: Wait for source run to finish
         if: >-
-          github.event.client_payload.source-run-id == '' ||
-          github.event.client_payload.source-run-id ==
-          github.event.client_payload.merge-run-id
+          github.event_name == 'repository_dispatch' && (
+            github.event.action == 'ingest-results' ||
+            github.event.action == 'ingest-agentic-results'
+          ) && (
+            github.event.client_payload.source-run-id == '' ||
+            github.event.client_payload.source-run-id == github.event.client_payload.merge-run-id
+          )
         run: sleep 300
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -50,59 +148,158 @@ jobs:
         env:
           CYPRESS_INSTALL_BINARY: '0'
 
+      - name: Select ingest target
+        env:
+          DATABASE_WRITE_URL_PRODUCTION: ${{ secrets.DATABASE_WRITE_URL }}
+          DATABASE_WRITE_URL_DEV: ${{ secrets.DATABASE_DEV_WRITE_URL }}
+          DATABASE_WRITE_URL_STAGING: ${{ secrets.DATABASE_STAGING_WRITE_URL }}
+          INVALIDATE_SECRET_DEFAULT: ${{ secrets.VERCEL_INVALIDATE_SECRET }}
+          PROTECTION_BYPASS_SECRET_STAGING: ${{ secrets.VERCEL_STAGING_BYPASS_SECRET }}
+          STAGING_SITE_URL: ${{ vars.STAGING_SITE_URL ||
+            'https://inferencemax-app-git-staging-semianalysisai.vercel.app' }}
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          NEON_PROJECT_ID: ${{ secrets.NEON_PROJECT_ID }}
+          NEON_BRANCH_NAME: ${{ inputs.neon-branch }}
+          PREVIEW_SITE_URL: ${{ inputs.preview-url }}
+        run: |
+          case "$REQUESTED_DATABASE_TARGET" in
+            production)
+              database_write_url="$DATABASE_WRITE_URL_PRODUCTION"
+              cache_invalidate_url="https://inferencex.semianalysis.com/api/v1/invalidate"
+              cache_invalidate_secret="$INVALIDATE_SECRET_DEFAULT"
+              ;;
+            dev)
+              database_write_url="$DATABASE_WRITE_URL_DEV"
+              cache_invalidate_url="https://inferencemax-app-git-feat-agentx-semianalysisai.vercel.app/api/v1/invalidate"
+              cache_invalidate_secret="$INVALIDATE_SECRET_DEFAULT"
+              ;;
+            staging)
+              database_write_url="$DATABASE_WRITE_URL_STAGING"
+              cache_invalidate_url="${STAGING_SITE_URL%/}/api/v1/invalidate"
+              protection_bypass_secret="$PROTECTION_BYPASS_SECRET_STAGING"
+              ;;
+            neon-branch)
+              if [ -z "$NEON_API_KEY" ] || [ -z "$NEON_PROJECT_ID" ] || [ -z "$NEON_BRANCH_NAME" ] || [ -z "$PREVIEW_SITE_URL" ]; then
+                echo "::error::NEON_API_KEY, NEON_PROJECT_ID, neon-branch, and preview-url are required"
+                exit 1
+              fi
+              branches=$(curl --retry 3 --retry-all-errors -sSf \
+                -H "Authorization: Bearer $NEON_API_KEY" \
+                "https://console.neon.tech/api/v2/projects/$NEON_PROJECT_ID/branches?limit=100")
+              branch_id=$(jq -r --arg name "$NEON_BRANCH_NAME" \
+                '.branches[] | select(.name == $name and .parent_id != null and .default != true) | .id' <<<"$branches" | head -n 1)
+              if [ -z "$branch_id" ] || [ "$branch_id" = "null" ]; then
+                echo "::error::Neon branch not found: $NEON_BRANCH_NAME"
+                exit 1
+              fi
+              database_write_url=$(npx --yes neonctl connection-string "$branch_id" \
+                --api-key "$NEON_API_KEY" \
+                --project-id "$NEON_PROJECT_ID" \
+                --database-name neondb \
+                --role-name neondb_owner)
+              endpoints=$(curl --retry 3 --retry-all-errors -sSf \
+                -H "Authorization: Bearer $NEON_API_KEY" \
+                "https://console.neon.tech/api/v2/projects/$NEON_PROJECT_ID/endpoints")
+              database_host=$(DATABASE_URL_TO_CHECK="$database_write_url" node -e \
+                'console.log(new URL(process.env.DATABASE_URL_TO_CHECK).hostname)')
+              if ! jq -e --arg branch "$branch_id" --arg host "$database_host" \
+                '.endpoints[] | select(.branch_id == $branch and .host == $host)' <<<"$endpoints" >/dev/null; then
+                echo "::error::Resolved database host does not belong to the requested child branch"
+                exit 1
+              fi
+              echo "Verified child database: $NEON_BRANCH_NAME ($branch_id), host $database_host"
+              cache_invalidate_url="${PREVIEW_SITE_URL%/}/api/v1/invalidate"
+              cache_invalidate_secret="$INVALIDATE_SECRET_DEFAULT"
+              protection_bypass_secret="$PROTECTION_BYPASS_SECRET_STAGING"
+              ;;
+            *)
+              echo "::error::Unsupported database-target: $REQUESTED_DATABASE_TARGET"
+              exit 1
+              ;;
+          esac
+
+          if [ -z "$database_write_url" ]; then
+            echo "::error::Database secret is empty for target: $REQUESTED_DATABASE_TARGET"
+            exit 1
+          fi
+          if [ "$REQUESTED_DATABASE_TARGET" != "staging" ] && [ "$REQUESTED_DATABASE_TARGET" != "neon-branch" ] && [ -z "$cache_invalidate_secret" ]; then
+            echo "::error::Cache invalidation secret is empty for target: $REQUESTED_DATABASE_TARGET"
+            exit 1
+          fi
+          if { [ "$REQUESTED_DATABASE_TARGET" = "staging" ] || [ "$REQUESTED_DATABASE_TARGET" = "neon-branch" ]; } && [ -z "$protection_bypass_secret" ]; then
+            echo "::error::Vercel protection bypass secret is empty for preview target"
+            exit 1
+          fi
+
+          echo "::add-mask::$database_write_url"
+          if [ -n "$cache_invalidate_secret" ]; then
+            echo "::add-mask::$cache_invalidate_secret"
+          fi
+          if [ -n "$protection_bypass_secret" ]; then
+            echo "::add-mask::$protection_bypass_secret"
+          fi
+          {
+            echo "DATABASE_WRITE_URL=$database_write_url"
+            echo "CACHE_INVALIDATE_SECRET=$cache_invalidate_secret"
+            echo "INGEST_DATABASE_TARGET=$REQUESTED_DATABASE_TARGET"
+            echo "CACHE_INVALIDATE_URL=$cache_invalidate_url"
+            echo "CACHE_PROTECTION_BYPASS_SECRET=$protection_bypass_secret"
+          } >> "$GITHUB_ENV"
+          echo "Selected ingest target: $REQUESTED_DATABASE_TARGET"
+          echo "Cache invalidate URL: $cache_invalidate_url"
+
       - name: Prepare artifacts from InferenceX
         id: artifacts
         env:
           GH_TOKEN: ${{ secrets.INFX_MAIN_PAT }}
           SOURCE_RUN_ID: ${{ github.event.client_payload.source-run-id ||
-            github.event.client_payload.run-id }}
+            github.event.client_payload.run-id || inputs.run-id }}
           MERGE_RUN_ID: ${{ github.event.client_payload.merge-run-id ||
-            github.event.client_payload.run-id }}
+            github.event.client_payload.run-id || inputs.run-id }}
           ARTIFACTS_PATH: ${{ github.workspace }}/artifacts
           INGEST_REPO: SemiAnalysisAI/InferenceX
-          INGEST_REQUIRE_POWER: ${{ github.event.client_payload.require-power == true }}
+          INGEST_REQUIRE_POWER: ${{ github.event.client_payload.require-power == true || inputs.require-power == true }}
         run: bun run admin:db:prepare:ci
 
       - name: Run migrations
-        env:
-          DATABASE_WRITE_URL: ${{ secrets.DATABASE_WRITE_URL }}
         run: bun run admin:db:migrate --yes
 
       - name: Ingest results to DB
         env:
-          DATABASE_WRITE_URL: ${{ secrets.DATABASE_WRITE_URL }}
           GITHUB_TOKEN: ${{ secrets.INFX_MAIN_PAT }}
           INGEST_RUN_ID: ${{ steps.artifacts.outputs.merge-run-id }}
           INGEST_RUN_ATTEMPT: ${{ steps.artifacts.outputs.merge-run-attempt }}
           INGEST_ARTIFACTS_PATH: ${{ github.workspace }}/artifacts
           INGEST_REPO: SemiAnalysisAI/InferenceX
-          INGEST_REQUIRE_POWER: ${{ github.event.client_payload.require-power == true }}
-          POWER_PUBLICATION_MANIFEST: ${{ github.workspace }}/power-publication.json
+          INGEST_REQUIRE_POWER: ${{ github.event.client_payload.require-power == true || inputs.require-power == true }}
           UNMAPPED_ENTITIES_OUTPUT: ${{ github.workspace }}/unmapped-entities.json
+          POWER_PUBLICATION_MANIFEST: ${{ github.workspace }}/power-publication.json
         run: bun run admin:db:ingest:ci
 
       - name: Apply run overrides
         env:
-          DATABASE_WRITE_URL: ${{ secrets.DATABASE_WRITE_URL }}
           OVERRIDE_RUN_ID: ${{ steps.artifacts.outputs.merge-run-id }}
         run: bun run admin:db:apply-overrides --run-id "$OVERRIDE_RUN_ID" --allow-unregistered-run --yes
 
       - name: Verify database
-        env:
-          DATABASE_WRITE_URL: ${{ secrets.DATABASE_WRITE_URL }}
         run: bun run admin:db:verify
 
       - name: Invalidate Vercel cache
-        env:
-          VERCEL_INVALIDATE_SECRET: ${{ secrets.VERCEL_INVALIDATE_SECRET }}
         run: |
-          curl -sSf -X POST "https://inferencex.semianalysis.com/api/v1/invalidate" \
-            -H "Authorization: Bearer $VERCEL_INVALIDATE_SECRET"
+          if [ "$INGEST_DATABASE_TARGET" = "staging" ]; then
+            curl --retry 3 --retry-delay 2 --retry-connrefused -sSf -X POST "$CACHE_INVALIDATE_URL" \
+              -H "x-vercel-protection-bypass: $CACHE_PROTECTION_BYPASS_SECRET"
+          elif [ "$INGEST_DATABASE_TARGET" = "neon-branch" ]; then
+            curl --retry 3 --retry-delay 2 --retry-connrefused -sSf -X POST "$CACHE_INVALIDATE_URL" \
+              -H "x-vercel-protection-bypass: $CACHE_PROTECTION_BYPASS_SECRET" \
+              -H "Authorization: Bearer $CACHE_INVALIDATE_SECRET"
+          else
+            curl --retry 3 --retry-delay 2 --retry-connrefused -sSf -X POST "$CACHE_INVALIDATE_URL" \
+              -H "Authorization: Bearer $CACHE_INVALIDATE_SECRET"
+          fi
 
       - name: Verify PowerX source, database and public API
-        env:
-          DATABASE_WRITE_URL: ${{ secrets.DATABASE_WRITE_URL }}
-        run: bun packages/db/src/verify-power-publication.ts power-publication.json
+        run: bun packages/db/src/verify-power-publication.ts power-publication.json "${CACHE_INVALIDATE_URL%/api/v1/invalidate}"
 
       - name: Retain PowerX publication receipt
         if: always()
@@ -124,10 +321,12 @@ jobs:
             models=$(jq -r '.models // [] | join(", ")' "$f")
             hardware=$(jq -r '.hardware // [] | join(", ")' "$f")
             precisions=$(jq -r '.precisions // [] | join(", ")' "$f")
+            datasets=$(jq -r '.datasets // [] | join(", ")' "$f")
             msg=""
             [ -n "$models" ] && msg="${msg}Models: ${models}\n"
             [ -n "$hardware" ] && msg="${msg}Hardware: ${hardware}\n"
             [ -n "$precisions" ] && msg="${msg}Precisions: ${precisions}\n"
+            [ -n "$datasets" ] && msg="${msg}Datasets missing from datasets table (run ingest-weka-dataset): ${datasets}\n"
             {
               echo 'summary<<EOF'
               echo -e "$msg"
@@ -136,7 +335,8 @@ jobs:
           fi
 
       - name: Notify Slack on unmapped entities
-        if: steps.unmapped.outputs.found == 'true'
+        if: steps.unmapped.outputs.found == 'true' && env.REQUESTED_DATABASE_TARGET !=
+          'staging'
         uses: slackapi/slack-github-action@dcb1066f776dd043e64d0e8ba94ca15cc7e1875d # v4.0.0
         with:
           webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
@@ -147,12 +347,12 @@ jobs:
             }
 
       - name: Notify Slack on failure
-        if: failure()
+        if: failure() && env.REQUESTED_DATABASE_TARGET != 'staging'
         uses: slackapi/slack-github-action@dcb1066f776dd043e64d0e8ba94ca15cc7e1875d # v4.0.0
         with:
           webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
           webhook-type: incoming-webhook
           payload: |
             {
-              "text": ":rotating_light: *Ingest results workflow failed*\nRun ID: ${{ steps.artifacts.outputs.source-run-id || github.event.client_payload.source-run-id || github.event.client_payload.run-id }}\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View run>"
+              "text": ":rotating_light: *Ingest results workflow failed*\nRun ID: ${{ steps.artifacts.outputs.source-run-id || github.event.client_payload.source-run-id || github.event.client_payload.run-id || inputs.run-id }}\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View run>"
             }

@@ -72,7 +72,7 @@ which API selectors belong together.
 | `collectivex`                   | Ordered run selection and suite; EP size/phase/modes/precision/operation/percentile/axis/SKU/backend/series; KV page size/x/y/pull/push/overlap ISL/series; swap direction/layout/metric/percentile/series.                                                                                                                            |
 | `submissions`                   | Search, table sort/direction/offset/limit, weekly/cumulative chart, on-change cutoff and NVIDIA/AMD/total lines. Table search does not filter the independent submission-volume chart.                                                                                                                                                 |
 | `current-inferencex-image`      | Model, sequence, hardware, precision, speculation, node type, framework families and `asOf` for image age/release status.                                                                                                                                                                                                              |
-| `gpu-metrics`                   | Required run, file/host artifact, GPU indices, metric or correlation axes, statistics sorting, chart mode and interactive downsampling preference. DB-first raw-explorer projection; full-record statistics use stored digests. Not a serving-window/role-pool projection. Responses are no-store.                                     |
+| `gpu-metrics`                   | Required run, file/host artifact, GPU indices, metric or correlation axes, statistics sorting, chart mode and interactive downsampling preference. One telemetry source per run; full-record statistics computed on read. Not a serving-window/role-pool projection. Responses are no-store.                                           |
 | `video`                         | CI run/artifact discovery; only already-published artifact reads; source, serving cell, media/fidelity slot, power phase and GPU denominator; same-workload comparisons, axes, deployment costs and selected tradeoff point. No-store.                                                                                                 |
 
 ## Interpretation and maintenance
@@ -222,13 +222,13 @@ response's resolved TCO, utilization, license share, topology and power basis.
 Modeled and provisioned power are distinct. Missing measured evidence is not zero.
 GPU chart projections omit missing metric readings; measured zero remains zero.
 The selected file/host series' full-record statistics include startup and warmup
-and cover all chips regardless of visibility or chart downsampling. Stats rows omit
-the storage-only `metric` column; `params.metric` identifies the selected metric. Current-version stored digests
-are authoritative, including empty or absent metric digests. Outdated or
-unversioned digests are recomputed read-only from retained DB samples. Keep these sample-weighted statistics separate from
-serving-window power, J/token and selected-time-window calculations. The view reads
-stored telemetry first, falls back to artifacts for missing storage, and preserves
-upstream 503 failures. Treat an error as unavailable evidence, not an empty dataset.
+and cover all chips regardless of visibility or chart downsampling. Stats rows carry
+no `metric` field; `params.metric` identifies the selected metric. For stored runs they
+are computed from the stored samples on each read; a series whose stored samples are
+incomplete returns no statistics. Keep these sample-weighted statistics separate from
+serving-window power and J/token. The view reads each run from one source: its stored
+series once the run is ingested, otherwise its artifacts. It preserves upstream 503
+failures. Treat an error as unavailable evidence, not an empty dataset.
 
 Zoom, axis scale, theme, labels, report expansion, media playback and download
 buttons are presentation state, not new datasets. AI-chart provider keys and
@@ -236,8 +236,8 @@ private prompts, feedback, local uploads and administrative mutations are not
 public read projections. AgentX drilldowns use existing availability, aggregates,
 histograms, request timelines, logs and server metrics operations.
 
-Run-specific recognition labels do not rename API framework keys. Run
-`35879254139` displays `UMBP MoRI SGLang` through October 9, 2026 in
+Run-specific recognition labels do not rename API framework keys. Runs
+`35879254139` and `37181045340` display `UMBP MoRI SGLang` through October 9, 2026 in
 America/New_York (`2026-10-10T04:00:00Z` exclusive); subsequent label resolution
 returns `MoRI SGLang`. An already-open memoized chart may need a refresh.
 Keep using `mori-sglang` for API selectors and raw CSV output throughout.

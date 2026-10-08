@@ -91,11 +91,6 @@ export const TAB_META: Record<DashboardRouteKey, { title: string; description: s
     description:
       'Generate custom inference benchmark charts using natural language prompts. Compare chips, costs, and performance with AI assistance.',
   },
-  'gpu-metrics': {
-    title: 'Chip Power & Efficiency Metrics',
-    description:
-      'Chip power consumption and efficiency metrics during AI inference workloads. Compare tokens-per-watt across hardware.',
-  },
   submissions: {
     title: 'Benchmark Submissions',
     description:

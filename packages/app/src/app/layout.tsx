@@ -5,7 +5,6 @@ import { Analytics } from '@vercel/analytics/next';
 import { SpeedInsights } from '@vercel/speed-insights/next';
 import type { Metadata } from 'next';
 import { DM_Sans } from 'next/font/google';
-import localFont from 'next/font/local';
 
 import { Footer } from '@/components/footer/footer';
 import { Header } from '@/components/header/header';
@@ -13,11 +12,8 @@ import { RouteTransition } from '@/components/motion/route-transition';
 import { JsonLd } from '@/components/json-ld';
 import { AutumnLeaves } from '@/components/autumn-leaves';
 import { CircuitBackground } from '@/components/circuit-background';
-import { CsgoDecorations, CsgoThemeBanner } from '@/components/csgo/csgo-decorations';
-import { GtaDecorations, GtaThemeBanner } from '@/components/gta/gta-decorations';
+import { EasterEggThemeLazy } from '@/components/easter-egg-theme-lazy';
 import { APP_THEMES } from '@/lib/themes';
-import { MinecraftBackgroundLazy } from '@/components/minecraft/minecraft-background-lazy';
-import { MinecraftDecorations } from '@/components/minecraft/minecraft-decorations';
 import { ThemeProvider } from '@/components/ui/theme-provider';
 import {
   AUTHOR_HANDLE,
@@ -42,33 +38,6 @@ const dm_sans = DM_Sans({
   subsets: ['latin'],
   display: 'optional',
   variable: '--font-dm-sans',
-});
-
-const monocraft = localFont({
-  src: './fonts/Monocraft.woff2',
-  variable: '--font-minecraft',
-  display: 'swap',
-  preload: false,
-});
-
-// GTA theme fonts. preload:false + selectors scoped to `.gta` mean browsers
-// fetch them only after the GTA theme is selected. See src/app/fonts/GTA-FONTS.md.
-const pricedown = localFont({
-  src: './fonts/Pricedown.woff2',
-  variable: '--font-pricedown',
-  weight: '700',
-  display: 'swap',
-  preload: false,
-});
-
-const chaletComprime = localFont({
-  src: [
-    { path: './fonts/ChaletComprime-Regular.woff2', weight: '400' },
-    { path: './fonts/ChaletComprime-Bold.woff2', weight: '700' },
-  ],
-  variable: '--font-chalet-comprime',
-  display: 'swap',
-  preload: false,
 });
 
 export const metadata: Metadata = {
@@ -214,11 +183,7 @@ export default async function RootLayout({
 }>) {
   const starCount = await fetchStarCount();
   return (
-    <html
-      lang="en"
-      className={`${monocraft.variable} ${pricedown.variable} ${chaletComprime.variable}`}
-      suppressHydrationWarning
-    >
+    <html lang="en" suppressHydrationWarning>
       <head>
         <link
           rel="preload"
@@ -239,10 +204,6 @@ export default async function RootLayout({
           dangerouslySetInnerHTML={{ __html: landingBannerPrepaintScript }}
         />
         <CircuitBackground />
-        <MinecraftBackgroundLazy />
-        <MinecraftDecorations />
-        <CsgoDecorations />
-        <GtaDecorations />
         <AutumnLeaves />
         <PostHogProvider>
           <JsonLd data={jsonLd} />
@@ -257,8 +218,7 @@ export default async function RootLayout({
               <PostHogPageView />
               <VisitTracker />
               <Header starCount={starCount} />
-              <CsgoThemeBanner />
-              <GtaThemeBanner />
+              <EasterEggThemeLazy />
               <div className="grow flex flex-col">
                 <RouteTransition>{children}</RouteTransition>
               </div>

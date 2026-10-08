@@ -8,8 +8,6 @@ import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { NonRetryableArtifactError } from './artifact-retry.js';
-
 export interface ArtifactMeta {
   id?: number;
   name: string;
@@ -34,46 +32,12 @@ export interface ArtifactMeta {
  */
 export const RUNNER_SUFFIX_RE = /_[a-zA-Z][a-zA-Z0-9.-]*_\d+$/u;
 
-/**
- * GitHub no longer has the run (deleted, or purged past retention), so its
- * artifact listing 404s. Distinct from expired artifacts, which still list
- * with `expired: true`.
- */
-export class WorkflowRunNotFoundError extends NonRetryableArtifactError {
-  readonly repo: string;
-  readonly runId: string;
-
-  constructor(repo: string, runId: string) {
-    super(`GitHub has no run ${runId} in ${repo} (HTTP 404)`);
-    this.name = 'WorkflowRunNotFoundError';
-    this.repo = repo;
-    this.runId = runId;
-  }
-}
-
-/** `gh api` reports the HTTP status in its stderr (`gh: Not Found (HTTP 404)`). */
-export function isGithubNotFoundError(error: unknown): boolean {
-  if (typeof error !== 'object' || error === null) return false;
-  const { stderr, message } = error as { stderr?: unknown; message?: unknown };
-  const text = [stderr, message].filter((part) => typeof part === 'string').join('\n');
-  return /\(HTTP 404\)/u.test(text);
-}
-
-/**
- * List a workflow run's artifacts via `gh api` (paginated). Malformed lines
- * are skipped; a 404 surfaces as `WorkflowRunNotFoundError`.
- */
+/** List a workflow run's artifacts via `gh api` (paginated). Malformed lines are skipped. */
 export function listRunArtifacts(repo: string, runId: string): ArtifactMeta[] {
-  let json: string;
-  try {
-    json = execSync(
-      `gh api "repos/${repo}/actions/runs/${runId}/artifacts" --paginate --jq '.artifacts[]'`,
-      { encoding: 'utf8', maxBuffer: 50 * 1024 * 1024 },
-    );
-  } catch (error) {
-    if (isGithubNotFoundError(error)) throw new WorkflowRunNotFoundError(repo, runId);
-    throw error;
-  }
+  const json = execSync(
+    `gh api "repos/${repo}/actions/runs/${runId}/artifacts" --paginate --jq '.artifacts[]'`,
+    { encoding: 'utf8', maxBuffer: 50 * 1024 * 1024 },
+  );
   const out: ArtifactMeta[] = [];
   for (const line of json.trim().split('\n')) {
     if (!line) continue;
@@ -102,6 +66,50 @@ export function dedupeArtifactsByLogicalName(
   return byLogical;
 }
 
+function isNewerArtifact(candidate: ArtifactMeta, existing: ArtifactMeta): boolean {
+  return (
+    candidate.created_at > existing.created_at ||
+    (candidate.created_at === existing.created_at && (candidate.id ?? 0) > (existing.id ?? 0))
+  );
+}
+
+/**
+ * Pair each artifact whose name `suffixOf` recognizes with its exact
+ * `bmk_agentic_<suffix>` or `bmk_<suffix>` sibling, newest upload per name.
+ * Retried jobs upload on different runners, so the newest pair per logical
+ * (runner-suffix-stripped) benchmark name wins.
+ */
+export function pairWithBenchmarkSibling(
+  artifacts: readonly ArtifactMeta[],
+  suffixOf: (name: string) => string | null,
+): { artifact: ArtifactMeta; benchmarks: ArtifactMeta }[] {
+  const byName = new Map<string, ArtifactMeta>();
+  for (const artifact of artifacts) {
+    const existing = byName.get(artifact.name);
+    if (!existing || isNewerArtifact(artifact, existing)) byName.set(artifact.name, artifact);
+  }
+  const byLogicalBenchmark = new Map<
+    string,
+    { artifact: ArtifactMeta; benchmarks: ArtifactMeta }
+  >();
+  for (const artifact of byName.values()) {
+    const suffix = suffixOf(artifact.name);
+    if (!suffix) continue;
+    // Require the exact runner suffix. Eval and benchmark jobs can share the
+    // same logical config while uploading distinct artifacts.
+    const benchmarks = byName.get(`bmk_agentic_${suffix}`) ?? byName.get(`bmk_${suffix}`);
+    if (!benchmarks) continue;
+    const logicalName = benchmarks.name.replace(RUNNER_SUFFIX_RE, '');
+    const existing = byLogicalBenchmark.get(logicalName);
+    if (!existing || isNewerArtifact(benchmarks, existing.benchmarks)) {
+      byLogicalBenchmark.set(logicalName, { artifact, benchmarks });
+    }
+  }
+  return [...byLogicalBenchmark.values()].toSorted((a, b) =>
+    a.artifact.name.localeCompare(b.artifact.name),
+  );
+}
+
 /** Download + unzip one artifact into `<destRoot>/<artifact.name>`; returns that dir. */
 export function downloadArtifact(artifact: ArtifactMeta, destRoot: string): string {
   const zipPath = path.join(destRoot, 'artifact.zip');
@@ -121,6 +129,16 @@ export function fetchRunAttempt(repo: string, runId: string): number {
     encoding: 'utf8',
   }).trim();
   return parseInt(attemptStr || '1', 10);
+}
+
+/** Download mode reads only the current attempt, so an older `/attempts/N` URL cannot be honored. */
+export function assertRequestedRunAttempt(input: string, currentAttempt: number): void {
+  const requested = input.match(/\/attempts\/(?<attempt>\d+)/u)?.groups?.attempt;
+  if (requested && Number(requested) !== currentAttempt)
+    throw new Error(
+      `GitHub attempt ${currentAttempt} differs from requested ${requested}; ` +
+        'use retained artifacts and exact source metadata for historical-attempt ingestion',
+    );
 }
 
 export interface RunMeta {

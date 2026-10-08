@@ -1,6 +1,3 @@
-import type { Sql } from '../etl/db-utils.js';
-import { GPU_STATS_VERSION } from './gpu-metric-stats.js';
-
 /** Pairing rules for the historical gpu_metrics backfill. */
 
 import {
@@ -13,7 +10,7 @@ import { benchmarkPublicationIdentity } from '../etl/power-publication.js';
 import type { TelemetryObservation, TelemetryReceipt } from '../etl/telemetry-receipt.js';
 import {
   dedupeArtifactsByLogicalName,
-  RUNNER_SUFFIX_RE,
+  pairWithBenchmarkSibling,
   type ArtifactMeta,
 } from './github-artifacts.js';
 
@@ -23,50 +20,24 @@ export interface GpuMetricsArtifactPair {
   benchmarks: ArtifactMeta;
 }
 
-function isNewerArtifact(candidate: ArtifactMeta, existing: ArtifactMeta): boolean {
-  return (
-    candidate.created_at > existing.created_at ||
-    (candidate.created_at === existing.created_at && (candidate.id ?? 0) > (existing.id ?? 0))
-  );
-}
-
 /**
- * Pair every unexpired telemetry artifact with its exact bmk sibling. Retried
- * jobs upload on different runners, so the newest artifact per logical
- * (runner-suffix-stripped) benchmark name wins, matching CI ingest. A
- * `power_audit_` bundle pairs only when its suffix has no `gpu_metrics_`
- * upload, the same preference `discoverGpuMetricsArtifacts` applies.
+ * Pair every unexpired telemetry artifact with its exact bmk sibling, matching
+ * CI ingest. A `power_audit_` bundle pairs only when its suffix has no unexpired
+ * `gpu_metrics_` upload, the same preference `discoverGpuMetricsArtifacts` applies.
  */
 export function pairGpuMetricsArtifacts(
   artifacts: readonly ArtifactMeta[],
 ): GpuMetricsArtifactPair[] {
-  const byName = new Map<string, ArtifactMeta>();
-  for (const artifact of artifacts) {
-    if (artifact.expired) continue;
-    const existing = byName.get(artifact.name);
-    if (!existing || isNewerArtifact(artifact, existing)) byName.set(artifact.name, artifact);
-  }
+  const retained = artifacts.filter((artifact) => !artifact.expired);
   const gpuMetricsSuffixes = new Set<string>();
-  for (const name of byName.keys()) {
+  for (const { name } of retained) {
     const suffix = gpuMetricsArtifactSuffix(name);
     if (suffix && !isPowerAuditArtifact(name)) gpuMetricsSuffixes.add(suffix);
   }
-  const byLogicalBenchmark = new Map<string, GpuMetricsArtifactPair>();
-  for (const gpuMetrics of byName.values()) {
-    const suffix = gpuMetricsArtifactSuffix(gpuMetrics.name);
-    if (!suffix) continue;
-    if (isPowerAuditArtifact(gpuMetrics.name) && gpuMetricsSuffixes.has(suffix)) continue;
-    const benchmarks = byName.get(`bmk_agentic_${suffix}`) ?? byName.get(`bmk_${suffix}`);
-    if (!benchmarks) continue;
-    const logicalName = benchmarks.name.replace(RUNNER_SUFFIX_RE, '');
-    const existing = byLogicalBenchmark.get(logicalName);
-    if (!existing || isNewerArtifact(benchmarks, existing.benchmarks)) {
-      byLogicalBenchmark.set(logicalName, { gpuMetrics, benchmarks });
-    }
-  }
-  return [...byLogicalBenchmark.values()].toSorted((a, b) =>
-    a.gpuMetrics.name.localeCompare(b.gpuMetrics.name),
-  );
+  return pairWithBenchmarkSibling(retained, (name) => {
+    const suffix = gpuMetricsArtifactSuffix(name);
+    return suffix && isPowerAuditArtifact(name) && gpuMetricsSuffixes.has(suffix) ? null : suffix;
+  }).map(({ artifact, benchmarks }) => ({ gpuMetrics: artifact, benchmarks }));
 }
 
 /** A corrupt unrelated benchmark sibling must not prevent valid pairs from being repaired. */
@@ -109,30 +80,4 @@ export async function collectMissingTelemetryExpectations(
     }
   }
   return { observations, errors };
-}
-
-/** Stored samples outlive artifacts, including superseded attempts. */
-export function findOutdatedGpuMetricSeries(
-  sql: Sql,
-  flags: {
-    run: number | null;
-    attempt: number | null;
-    artifact: string | null;
-    fromRun: number | null;
-    since: string | null;
-  },
-  limit: number | null,
-) {
-  return sql`
-    select s.id, wr.github_run_id, wr.run_attempt, s.artifact_name, s.file_name
-    from gpu_metric_series s join workflow_runs wr on wr.id = s.workflow_run_id
-    where s.stats_version <> ${GPU_STATS_VERSION}
-      and (${flags.run}::bigint is null or wr.github_run_id = ${flags.run})
-      and (${flags.attempt}::integer is null or wr.run_attempt = ${flags.attempt})
-      and (${flags.artifact}::text is null or s.artifact_name = ${flags.artifact})
-      and (${flags.fromRun}::bigint is null or wr.github_run_id >= ${flags.fromRun})
-      and (${flags.since}::date is null or wr.date >= ${flags.since}::date)
-    order by wr.github_run_id, wr.run_attempt, s.id
-    limit ${limit}::integer
-  `;
 }

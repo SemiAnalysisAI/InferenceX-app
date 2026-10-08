@@ -1,13 +1,12 @@
--- PowerX telemetry digest.
+-- PowerX telemetry.
 --
 -- The producer samples nvidia-smi / amd-smi once per second for the lifetime
 -- of every benchmark job and uploads the CSV as a `gpu_metrics_<suffix>`
 -- artifact next to `bmk_<suffix>`. Until now the app downloaded and parsed
 -- those artifacts from GitHub on every page view, and lost them entirely once
 -- GitHub's 90-day artifact retention expired. These tables move that work to
--- ingest time: raw samples are kept at full resolution, per-GPU summary
--- statistics are digested once, and each benchmark point is linked to the
--- series that was recorded while it ran.
+-- ingest time: raw samples are kept at full resolution, and each benchmark
+-- point is linked to the series that was recorded while it ran.
 
 create table gpu_metric_series (
   id              bigserial   primary key,
@@ -65,25 +64,6 @@ create table gpu_metric_samples (
   mm_activity_pct real,
 
   primary key (series_id, gpu_index, sampled_at)
-);
-
--- Ingest-time digest so readers never rescan samples for summary cards.
-create table gpu_metric_gpu_stats (
-  series_id     bigint   not null references gpu_metric_series(id) on delete cascade,
-  gpu_index     smallint not null,
-  metric        text     not null,
-  sample_count  integer  not null,
-  min_value     real     not null,
-  max_value     real     not null,
-  mean_value    real     not null,
-  median_value  real     not null,
-  p95_value     real     not null,
-  p99_value     real     not null,
-  stddev_value  real     not null,
-
-  constraint gpu_metric_gpu_stats_metric_nonempty check (metric <> ''),
-  constraint gpu_metric_gpu_stats_sample_count_positive check (sample_count > 0),
-  primary key (series_id, gpu_index, metric)
 );
 
 -- Benchmark point ↔ telemetry series. A point can reference several series

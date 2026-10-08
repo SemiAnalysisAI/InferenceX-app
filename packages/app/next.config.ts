@@ -33,6 +33,9 @@ const nextConfig: NextConfig = {
         destination: '/zh/agentx/:path*',
         permanent: true,
       },
+      // PowerX moved into the inference dashboard.
+      { source: '/gpu-metrics', destination: '/inference', permanent: true },
+      { source: '/zh/gpu-metrics', destination: '/zh/inference', permanent: true },
     ]);
   },
   experimental: {

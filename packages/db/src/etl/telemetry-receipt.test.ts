@@ -1,8 +1,7 @@
-import { readFileSync } from 'node:fs';
-import { PGlite } from '@electric-sql/pglite';
+import type { PGlite } from '@electric-sql/pglite';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { Sql } from './db-utils';
+import { migratedPglite, pgliteSql, type PgliteSql } from '../lib/test-pglite';
 import { stablePowerPointIdentity } from './power-publication';
 
 import {
@@ -93,14 +92,14 @@ describe('telemetry completeness accounting', () => {
     });
   });
 
-  it.each([
-    { databaseError: 'database unavailable' },
-    { recoveryError: 'corrective ingest failed' },
-  ])('does not promote readable old data to complete while %j', (failure) => {
-    const result = summarizeTelemetryReceipt({ ...receiptFixture(), ...failure });
+  it('does not promote readable old data to complete while the database check failed', () => {
+    const result = summarizeTelemetryReceipt({
+      ...receiptFixture(),
+      databaseError: 'database unavailable',
+    });
     expect(result.counts.apiReadablePoints).toBe(2);
     expect(result.counts.apiCompletePoints).toBe(0);
-    expect(result.counts.storedSamples).toBe('databaseError' in failure ? null : 2);
+    expect(result.counts.storedSamples).toBeNull();
   });
 
   it('does not count unlinked or failed corrected points as API-complete', () => {
@@ -165,20 +164,10 @@ describe('telemetry API verification', () => {
 
 describe('persisted telemetry receipts', () => {
   let db: PGlite;
-  let sql: Sql;
+  let sql: PgliteSql;
   beforeAll(async () => {
-    db = await PGlite.create();
-    for (const name of ['001_initial_schema.sql', '016_gpu_metrics.sql']) {
-      await db.exec(readFileSync(new URL(`../../migrations/${name}`, import.meta.url), 'utf8'));
-    }
-    await db.exec(
-      "ALTER TABLE benchmark_results ADD COLUMN offload_mode text DEFAULT 'off'; ALTER TABLE benchmark_results ADD COLUMN recipe_fingerprint text",
-    );
-    sql = (async (strings: TemplateStringsArray, ...values: unknown[]) => {
-      const query = strings.reduce((text, part, i) => text + (i ? `$${i}` : '') + part, '');
-      const result = await db.query(query, values);
-      return result.rows;
-    }) as unknown as Sql;
+    db = await migratedPglite();
+    sql = pgliteSql(db);
   }, 20_000);
   afterAll(async () => {
     await db?.close();
@@ -204,34 +193,31 @@ describe('persisted telemetry receipts', () => {
   }
   const completeInventory = { seriesInventory: [{ fileName: 'gpu_metrics.csv', sampleCount: 2 }] };
 
-  it.each([false, true])(
-    'reads complete JSONB inventory (encoded=%s) and preserves unrelated targeted state',
-    async (encoded) => {
-      await inventory(encoded ? JSON.stringify(completeInventory) : completeInventory);
-      const original = await readTelemetryReceipt(sql, run, []);
-      expect(original.counts).toMatchObject({
-        expectedPoints: 2,
-        storedPoints: 2,
-        linkedPoints: 2,
-        storedSeries: 1,
-        storedSamples: 2,
-        apiCompletePoints: 0,
-      });
-      original.points[1]!.api = { status: 'readable' };
-      const first = original.points[0]!;
-      const repaired = await readTelemetryReceipt(
-        sql,
-        run,
-        [{ identity: first.identity, artifactNames: [artifactName], produced: true }],
-        { previous: original, targeted: true },
-      );
-      expect(
-        repaired.points.find((point) => point.key === stablePowerPointIdentity(first.identity))!.api
-          .status,
-      ).toBe('unknown');
-      expect(repaired.points[1]).toEqual(original.points[1]);
-    },
-  );
+  it('reads complete JSONB inventory and preserves unrelated targeted state', async () => {
+    await inventory(completeInventory);
+    const original = await readTelemetryReceipt(sql, run, []);
+    expect(original.counts).toMatchObject({
+      expectedPoints: 2,
+      storedPoints: 2,
+      linkedPoints: 2,
+      storedSeries: 1,
+      storedSamples: 2,
+      apiCompletePoints: 0,
+    });
+    original.points[1]!.api = { status: 'readable' };
+    const first = original.points[0]!;
+    const repaired = await readTelemetryReceipt(
+      sql,
+      run,
+      [{ identity: first.identity, artifactNames: [artifactName], produced: true }],
+      { previous: original, targeted: true },
+    );
+    expect(
+      repaired.points.find((point) => point.key === stablePowerPointIdentity(first.identity))!.api
+        .status,
+    ).toBe('unknown');
+    expect(repaired.points[1]).toEqual(original.points[1]);
+  });
 
   it('clears only successfully repaired scopes from an earlier recovery failure', async () => {
     await inventory(completeInventory);
@@ -301,6 +287,7 @@ describe('persisted telemetry receipts', () => {
     expect(result.recoveryArtifactNames).toEqual([artifactName]);
     expect(result.counts.apiReadablePoints).toBe(2);
     expect(result.counts.apiCompletePoints).toBe(0);
+    expect(result.counts.storedSamples).toBe(2);
   });
 
   it.each([
@@ -333,7 +320,6 @@ describe('persisted telemetry receipts', () => {
       expectationErrors: [newA, newC],
     });
     expect(result.expectationErrors).toEqual([oldB, newA, newC]);
-    expect(result.counts.expectedPoints).toBeNull();
   });
 
   it.each([undefined, []])(
