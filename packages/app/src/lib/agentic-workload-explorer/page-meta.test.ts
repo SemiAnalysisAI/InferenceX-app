@@ -4,11 +4,7 @@ import path from 'node:path';
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
 import { describe, expect, it } from 'vitest';
 
-import {
-  ALL_SECTIONS,
-  isActiveSection,
-  versionQuery,
-} from '@/components/agentic-workload-explorer/section-nav';
+import { ALL_SECTIONS, isActiveSection } from '@/components/agentic-workload-explorer/section-nav';
 
 import {
   EXPLORER_SECTION_META,
@@ -84,12 +80,5 @@ describe('isActiveSection', () => {
     expect(isActiveSection('/sessions/abc/flow', '/sessions')).toBe(true);
     expect(isActiveSection('/session-reuse', '/sessions')).toBe(false);
     expect(isActiveSection(null, '/sessions')).toBe(false);
-  });
-});
-
-describe('versionQuery', () => {
-  it('carries the trace-version selection across section links', () => {
-    expect(versionQuery(null)).toBe('');
-    expect(versionQuery('all')).toBe('?version=all');
   });
 });

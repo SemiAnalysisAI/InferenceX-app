@@ -224,7 +224,7 @@ export default function SessionLayout({ children }: { children: React.ReactNode 
   }
   const { session, requests } = data;
   const { usage } = session;
-  const basePath = explorerHref(`/sessions/${id}`);
+  const sessionPath = `/sessions/${id}`;
 
   function selectReversed(next: boolean) {
     setReversed(next);
@@ -249,8 +249,12 @@ export default function SessionLayout({ children }: { children: React.ReactNode 
     'radix-tree',
   ];
   const navLinks = tabKeys.map((key) => ({
-    href: `${basePath}/${key}`,
+    href: explorerHref(`${sessionPath}/${key}`),
     label: EXPLORER_SESSION_TAB_META[key][locale],
+    // Match on the explorer-relative path; `href` may carry `?version=`.
+    active:
+      relativePath === `${sessionPath}/${key}` ||
+      (key === 'conversation' && relativePath === sessionPath),
   }));
 
   return (
@@ -385,9 +389,7 @@ export default function SessionLayout({ children }: { children: React.ReactNode 
           {/* Scrolls on its own on narrow screens instead of widening the page. */}
           <nav className="flex min-w-0 items-center gap-0.5 overflow-x-auto border border-border rounded-md p-0.5">
             {navLinks.map((link) => {
-              const isActive =
-                pathname === link.href ||
-                (link.href.endsWith('/conversation') && pathname === basePath);
+              const isActive = link.active;
               return (
                 <Link
                   key={link.href}

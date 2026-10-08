@@ -3,6 +3,7 @@
 import { act, type AnchorHTMLAttributes, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type * as NextNavigation from 'next/navigation';
 import type { ErrorData } from '@/lib/agentic-workload-explorer/api-types';
 
 const mocks = vi.hoisted(() => ({
@@ -23,6 +24,12 @@ vi.mock('next/link', () => ({
       {children}
     </a>
   ),
+}));
+
+// Rendered outside the App Router, so `useSearchParams` has no context.
+vi.mock('next/navigation', async (importOriginal) => ({
+  ...(await importOriginal<typeof NextNavigation>()),
+  useSearchParams: () => new URLSearchParams(),
 }));
 
 vi.mock('@/hooks/agentic-workload-explorer/use-trace-version', () => ({

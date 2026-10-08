@@ -5,7 +5,11 @@ import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 
-import { explorerHref, explorerRelativePath } from '@/lib/agentic-workload-explorer/paths';
+import {
+  explorerHref,
+  explorerRelativePath,
+  versionQuery,
+} from '@/lib/agentic-workload-explorer/paths';
 import { track } from '@/lib/analytics';
 import type { Locale } from '@/lib/i18n';
 import { useLocale } from '@/lib/use-locale';
@@ -55,14 +59,6 @@ export function isActiveSection(relativePath: string | null, sectionPath: string
   if (relativePath === null) return false;
   if (sectionPath === '/') return relativePath === '/';
   return relativePath === sectionPath || relativePath.startsWith(`${sectionPath}/`);
-}
-
-/**
- * Query string carried across section links. The trace-version selection
- * lives only in `?version=`, so dropping it would reset the filter.
- */
-export function versionQuery(version: string | null): string {
-  return version === null ? '' : `?version=${encodeURIComponent(version)}`;
 }
 
 /** Number keys 1-9 jump to the first nine sections and 0 to the tenth. */
