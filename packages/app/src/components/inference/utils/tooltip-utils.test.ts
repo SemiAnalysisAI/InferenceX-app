@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { describe, it, expect } from 'vitest';
 
 import type { HardwareConfig, InferenceData } from '@/components/inference/types';
@@ -217,6 +218,23 @@ describe('modeled system-power tooltip', () => {
     expect(html).toContain('No matching chassis model is available');
     expect(html).not.toContain('tooltip-modeled-system-power');
     expect(html).not.toContain('0 W/GPU');
+  });
+
+  it('sets every system-power line in the 11px tooltip text size', () => {
+    for (const isPinned of [true, false]) {
+      const host = document.createElement('div');
+      host.innerHTML = generateTooltipContent(config({ isPinned }));
+      const section = host.querySelector('[data-testid="tooltip-modeled-system-power"]')!;
+      const sizes = new Set<string>();
+      const walker = document.createTreeWalker(section, NodeFilter.SHOW_TEXT);
+      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+        if (!node.textContent?.trim()) continue;
+        let el = node.parentElement;
+        while (el && el !== host && !el.style.fontSize) el = el.parentElement;
+        sizes.add(el && el !== host ? el.style.fontSize : 'inherited');
+      }
+      expect([...sizes]).toEqual(['11px']);
+    }
   });
 
   it('keeps hover compact and leaves unrelated metrics unchanged', () => {
