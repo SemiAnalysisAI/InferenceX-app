@@ -9,7 +9,8 @@ import { track } from '@/lib/analytics';
 import { ModeToggle } from '@/components/ui/mode-toggle';
 import { HEADER_ACTION_STYLE } from '@/components/ui/control-styles';
 import { NewBadge } from '@/components/ui/new-badge';
-import { MinecraftToggles } from '@/components/minecraft/minecraft-toggles';
+import { HaloTogglesLazy } from '@/components/halo/halo-toggles-lazy';
+import { MinecraftTogglesLazy } from '@/components/minecraft/minecraft-toggles-lazy';
 import { navigateInApp } from '@/lib/client-navigation';
 import { DASHBOARD_ROUTES } from '@/lib/dashboard-routes';
 import { useClientPathname } from '@/hooks/useClientPathname';
@@ -267,7 +268,8 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
             {/* Below `sm` these move into the mobile menu — they are what push
                 a 320px header past its bounds in minecraft mode. */}
             <span className="hidden items-center gap-2 sm:flex">
-              <MinecraftToggles />
+              <MinecraftTogglesLazy />
+              <HaloTogglesLazy />
             </span>
             <ModeToggle />
 
@@ -337,7 +339,8 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
                     </Link>
                   ))}
                   <span className="flex items-center gap-2 px-3 sm:hidden">
-                    <MinecraftToggles />
+                    <MinecraftTogglesLazy />
+                    <HaloTogglesLazy />
                   </span>
                 </div>
               )}

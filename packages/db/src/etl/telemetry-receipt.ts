@@ -79,7 +79,7 @@ interface StoredSeries {
   id: number;
   artifact_name: string;
   file_name: string;
-  sidecars: unknown;
+  sidecars: { seriesInventory?: unknown };
   sample_count: number;
   benchmark_result_ids: number[];
 }
@@ -95,20 +95,6 @@ function isInventoryEntry(value: unknown): value is { fileName: string; sampleCo
   );
 }
 
-/** JSONB may contain an encoded object; unavailable inventories remain unknown. */
-function storedSeriesInventory(sidecars: unknown): unknown {
-  if (typeof sidecars === 'string') {
-    try {
-      sidecars = JSON.parse(sidecars) as unknown;
-    } catch {
-      return undefined;
-    }
-  }
-  return sidecars !== null && typeof sidecars === 'object' && !Array.isArray(sidecars)
-    ? (sidecars as { seriesInventory?: unknown }).seriesInventory
-    : undefined;
-}
-
 function seriesCoverageKey(artifact: string, file: string): string {
   return JSON.stringify([artifact, file]);
 }
@@ -122,7 +108,7 @@ function seriesCoverage(
   const inventories = new Map<string, string>();
   let unknown = false;
   for (const entry of series) {
-    const inventory = storedSeriesInventory(entry.sidecars);
+    const inventory = entry.sidecars.seriesInventory;
     if (!Array.isArray(inventory) || inventory.length === 0 || !inventory.every(isInventoryEntry)) {
       unknown = true;
       continue;

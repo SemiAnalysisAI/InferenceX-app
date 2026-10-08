@@ -274,7 +274,6 @@ export const DASHBOARD_API_COVERAGE = {
       'Feature-gated OperatorX explorer uses page-owned routes; no stable public read-only view is published.',
   },
   collectivex: { view: 'collectivex' },
-  'gpu-metrics': { view: 'gpu-metrics' },
   'current-inferencex-image': { view: 'current-inferencex-image' },
   video: { view: 'video' },
   'ai-chart': {

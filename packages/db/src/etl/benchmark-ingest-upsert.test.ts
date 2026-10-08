@@ -1,31 +1,15 @@
-import fs from 'node:fs';
-
-import { PGlite } from '@electric-sql/pglite';
-import type postgres from 'postgres';
+import type { PGlite } from '@electric-sql/pglite';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
+import { migratedPglite, pgliteSql, type PgliteSql } from '../lib/test-pglite';
 import { bulkIngestBenchmarkRows, type BenchmarkPersistenceInput } from './benchmark-ingest';
 
-type Sql = postgres.Sql;
 let db: PGlite;
-let sql: Sql;
-
-function queryClient(database: Pick<PGlite, 'query'>) {
-  const client = async (strings: TemplateStringsArray, ...values: unknown[]) => {
-    const query = strings.reduce((text, part, i) => text + (i ? `$${i}` : '') + part, '');
-    const result = await database.query(query, values);
-    return result.rows;
-  };
-  return Object.assign(client, { json: JSON.stringify, array: (value: unknown) => value });
-}
+let sql: PgliteSql;
 
 beforeAll(async () => {
-  db = await PGlite.create();
-  const dir = new URL('../../migrations/', import.meta.url);
-  for (const name of fs.readdirSync(dir).toSorted()) {
-    if (name.endsWith('.sql')) await db.exec(fs.readFileSync(new URL(name, dir), 'utf8'));
-  }
-  sql = queryClient(db) as unknown as Sql;
+  db = await migratedPglite();
+  sql = pgliteSql(db);
 }, 30_000);
 
 afterAll(async () => {

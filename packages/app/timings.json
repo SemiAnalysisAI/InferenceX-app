@@ -149,12 +149,20 @@
       "duration": 1959
     },
     {
-      "spec": "cypress/e2e/gpu-power.cy.ts",
-      "duration": 11512
-    },
-    {
       "spec": "cypress/e2e/gpu-specs.cy.ts",
       "duration": 10395
+    },
+    {
+      "spec": "cypress/e2e/minecraft-game.cy.ts",
+      "duration": 27000
+    },
+    {
+      "spec": "cypress/e2e/optional-theme-isolation.cy.ts",
+      "duration": 216000
+    },
+    {
+      "spec": "cypress/e2e/kart-mode.cy.ts",
+      "duration": 22000
     },
     {
       "spec": "cypress/e2e/gradient-labels.cy.ts",
