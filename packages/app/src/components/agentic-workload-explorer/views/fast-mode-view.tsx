@@ -10,6 +10,7 @@ import {
   appendTraceVersion,
 } from '@/hooks/agentic-workload-explorer/use-trace-version';
 import { getFastModeMultiplier } from '@semianalysisai/inferencex-db/proxytrace/shared/pricing';
+import { Expandable } from '@/components/agentic-workload-explorer/expandable-chart';
 import { useLocale } from '@/lib/use-locale';
 
 // ── i18n ────────────────────────────────────────────────────────
@@ -198,110 +199,113 @@ function DailyFastModeChart({ daily, t }: { daily: FastModeDaily[]; t: Strings }
   const sy = (v: number) => MARGIN.top + PLOT_H - (v / yMax) * PLOT_H;
 
   return (
-    <div className="rounded-md border border-border bg-surface p-3">
-      <div className="flex items-center justify-end mb-2">
-        <ExportPngButton
-          locale={locale}
-          onClick={() => {
-            if (svgRef.current)
-              exportSvgToPng(svgRef.current, {
-                title: t.exportTitle,
-                filename: 'daily-fast-mode.png',
-                svgWidth: CHART_W,
-                svgHeight: CHART_H,
-              });
-          }}
-        />
-      </div>
-      <svg
-        ref={svgRef}
-        viewBox={`0 0 ${CHART_W} ${CHART_H}`}
-        className="w-full"
-        style={{ maxHeight: 240 }}
-      >
-        {/* Y-axis grid lines and labels */}
-        {yTicks.map((tv) => (
-          <g key={`y-${tv}`}>
-            {tv > 0 && (
-              <line
-                x1={MARGIN.left}
-                y1={sy(tv)}
-                x2={MARGIN.left + PLOT_W}
-                y2={sy(tv)}
-                stroke="currentColor"
-                className="text-border"
-                strokeWidth={0.5}
-                strokeDasharray="3 3"
-              />
-            )}
-            <text
-              x={MARGIN.left - 6}
-              y={sy(tv) + 3}
-              textAnchor="end"
-              className="fill-muted-foreground"
-              style={{ fontSize: SVG_FONT_SIZE, fontFamily: SVG_FONT }}
-            >
-              {tv}%
-            </text>
-          </g>
-        ))}
-
-        {/* Baseline */}
-        <line
-          x1={MARGIN.left}
-          y1={MARGIN.top + PLOT_H}
-          x2={MARGIN.left + PLOT_W}
-          y2={MARGIN.top + PLOT_H}
-          stroke="currentColor"
-          className="text-border"
-          strokeWidth={0.5}
-        />
-
-        {/* Bars */}
-        {data.map((d, i) => {
-          const x = MARGIN.left + i * (barWidth + barGap);
-          const pct = d.totalCount > 0 ? (d.fastCount / d.totalCount) * 100 : 0;
-          const barH = (pct / yMax) * PLOT_H;
-          return (
-            <g key={d.day}>
-              <rect
-                x={x}
-                y={sy(pct)}
-                width={barWidth}
-                height={Math.max(barH, 0.5)}
-                fill="#f59e0b"
-                rx={1}
-              >
-                <title>
-                  {t.tooltipFast(
-                    d.day,
-                    pct.toFixed(1),
-                    d.fastCount,
-                    d.totalCount,
-                    formatDollars(d.fastCost),
-                  )}
-                </title>
-              </rect>
-              {/* X-axis labels: show every 5th */}
-              {i % 5 === 0 && (
-                <text
-                  x={x + barWidth / 2}
-                  y={MARGIN.top + PLOT_H + 14}
-                  textAnchor="middle"
-                  className="fill-muted-foreground"
-                  style={{ fontSize: SVG_FONT_SIZE, fontFamily: SVG_FONT }}
-                >
-                  {new Date(d.day).toLocaleDateString('en-US', {
-                    month: 'short',
-                    day: 'numeric',
-                  })}
-                </text>
+    <Expandable title={t.exportTitle}>
+      <div className="rounded-md border border-border bg-surface p-3">
+        <div className="flex items-center justify-end mb-2">
+          <ExportPngButton
+            locale={locale}
+            onClick={() => {
+              if (svgRef.current)
+                exportSvgToPng(svgRef.current, {
+                  title: t.exportTitle,
+                  filename: 'daily-fast-mode.png',
+                  svgWidth: CHART_W,
+                  svgHeight: CHART_H,
+                });
+            }}
+          />
+        </div>
+        <svg
+          ref={svgRef}
+          viewBox={`0 0 ${CHART_W} ${CHART_H}`}
+          className="w-full"
+          style={{ maxHeight: 240 }}
+        >
+          {/* Y-axis grid lines and labels */}
+          {yTicks.map((tv) => (
+            <g key={`y-${tv}`}>
+              {tv > 0 && (
+                <line
+                  x1={MARGIN.left}
+                  y1={sy(tv)}
+                  x2={MARGIN.left + PLOT_W}
+                  y2={sy(tv)}
+                  stroke="currentColor"
+                  className="text-border"
+                  strokeWidth={0.5}
+                  strokeDasharray="3 3"
+                />
               )}
+              <text
+                x={MARGIN.left - 6}
+                y={sy(tv) + 3}
+                textAnchor="end"
+                className="fill-muted-foreground"
+                style={{ fontSize: SVG_FONT_SIZE, fontFamily: SVG_FONT }}
+              >
+                {tv}%
+              </text>
             </g>
-          );
-        })}
-      </svg>
-    </div>
+          ))}
+
+          {/* Baseline */}
+          <line
+            x1={MARGIN.left}
+            y1={MARGIN.top + PLOT_H}
+            x2={MARGIN.left + PLOT_W}
+            y2={MARGIN.top + PLOT_H}
+            stroke="currentColor"
+            className="text-border"
+            strokeWidth={0.5}
+          />
+
+          {/* Bars */}
+          {data.map((d, i) => {
+            const x = MARGIN.left + i * (barWidth + barGap);
+            const pct = d.totalCount > 0 ? (d.fastCount / d.totalCount) * 100 : 0;
+            const barH = (pct / yMax) * PLOT_H;
+            return (
+              <g key={d.day}>
+                <rect
+                  x={x}
+                  y={sy(pct)}
+                  width={barWidth}
+                  height={Math.max(barH, 0.5)}
+                  fill="#f59e0b"
+                  rx={1}
+                >
+                  <title>
+                    {t.tooltipFast(
+                      d.day,
+                      pct.toFixed(1),
+                      d.fastCount,
+                      d.totalCount,
+                      formatDollars(d.fastCost),
+                    )}
+                  </title>
+                </rect>
+                {/* X-axis labels: show every 5th */}
+                {i % 5 === 0 && (
+                  <text
+                    x={x + barWidth / 2}
+                    y={MARGIN.top + PLOT_H + 14}
+                    textAnchor="middle"
+                    className="fill-muted-foreground"
+                    style={{ fontSize: SVG_FONT_SIZE, fontFamily: SVG_FONT }}
+                  >
+                    {new Date(d.day).toLocaleDateString('en-US', {
+                      timeZone: 'UTC',
+                      month: 'short',
+                      day: 'numeric',
+                    })}
+                  </text>
+                )}
+              </g>
+            );
+          })}
+        </svg>
+      </div>
+    </Expandable>
   );
 }
 

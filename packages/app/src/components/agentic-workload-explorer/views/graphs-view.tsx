@@ -488,13 +488,15 @@ function generateTicks(min: number, max: number, targetCount: number): number[] 
   const spacing = niceNum(range / (targetCount - 1), true);
   const niceMin = Math.floor(min / spacing) * spacing;
   const ticks: number[] = [];
-  for (let t = niceMin; t <= max + spacing * 0.5; t += spacing) {
+  // Keep going until a tick reaches max, so the tallest bar is never clipped.
+  for (let t = niceMin; t - spacing < max - spacing * 1e-9; t += spacing) {
     ticks.push(Math.round(t * 1e10) / 1e10);
   }
   return ticks;
 }
 
 function formatAxisValue(v: number): string {
+  if (v >= 1e9) return `${(v / 1e9).toFixed(v % 1e9 === 0 ? 0 : 1)}B`;
   if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(v % 1_000_000 === 0 ? 0 : 1)}M`;
   if (v >= 1_000) return `${(v / 1_000).toFixed(v % 1_000 === 0 ? 0 : 1)}K`;
   if (Number.isInteger(v)) return String(v);
@@ -590,7 +592,7 @@ function Histogram({
       >
         {/* Y-axis grid lines and labels */}
         {yTicks.map((tv) => (
-          <g key={`y-${t}`}>
+          <g key={`y-${tv}`}>
             {tv > 0 && (
               <line
                 x1={MARGIN.left}
@@ -867,7 +869,7 @@ function HourlyTokenChart({ data }: { data: HourlyToken[] }) {
       <svg ref={svgRef} viewBox={`0 0 ${CW} ${CH}`} className="w-full" style={{ maxHeight: 240 }}>
         {/* Y-axis grid */}
         {yTicks.map((tv) => (
-          <g key={`y-${t}`}>
+          <g key={`y-${tv}`}>
             {tv > 0 && (
               <line
                 x1={M.left}
@@ -1199,7 +1201,7 @@ function WeeklySessionsByHarnessChart({ data }: { data: WeeklySessionPoint[] }) 
         <svg ref={svgRef} viewBox={`0 0 ${CW} ${CH}`} className="w-full" style={{ maxHeight: 280 }}>
           {/* Y-axis grid */}
           {yTicks.map((tv) => (
-            <g key={`y-${t}`}>
+            <g key={`y-${tv}`}>
               {tv > 0 && (
                 <line
                   x1={M.left}
@@ -1413,7 +1415,7 @@ function HourlyCostChart({ data }: { data: HourlyToken[] }) {
       <svg ref={svgRef} viewBox={`0 0 ${CW} ${CH}`} className="w-full" style={{ maxHeight: 200 }}>
         {/* Y-axis grid */}
         {yTicks.map((tv) => (
-          <g key={`y-${t}`}>
+          <g key={`y-${tv}`}>
             {tv > 0 && (
               <line
                 x1={M.left}
@@ -2158,7 +2160,7 @@ function RpsTimeseriesChart({
           >
             {/* Y-axis grid lines */}
             {yTicks.map((tv) => (
-              <g key={`y-${t}`}>
+              <g key={`y-${tv}`}>
                 {tv > 0 && (
                   <line
                     x1={M.left}
@@ -2611,7 +2613,7 @@ function WallClockStackedBarChart({ data }: { data: WallClockDay[] }) {
       </div>
       <svg ref={svgRef} viewBox={`0 0 ${CW} ${CH}`} className="w-full" style={{ maxHeight: 260 }}>
         {yTicks.map((tv) => (
-          <g key={`y-${t}`}>
+          <g key={`y-${tv}`}>
             {tv > 0 && (
               <line
                 x1={M.left}

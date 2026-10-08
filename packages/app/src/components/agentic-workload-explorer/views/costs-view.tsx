@@ -3,7 +3,7 @@
 import { Suspense, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PricingCoverageCard } from '@/components/agentic-workload-explorer/pricing-coverage';
-import { formatNumber, truncateHash } from '@/lib/agentic-workload-explorer/format';
+import { formatDollars, formatNumber, truncateHash } from '@/lib/agentic-workload-explorer/format';
 import { useDashboardData } from '@/hooks/agentic-workload-explorer/use-dashboard-data';
 import { exportSvgToPng, ExportPngButton } from '@/lib/agentic-workload-explorer/export-png';
 import {
@@ -28,6 +28,7 @@ import {
   RangeToggle,
   type DayRange,
 } from '@/components/agentic-workload-explorer/range-toggle';
+import { Expandable } from '@/components/agentic-workload-explorer/expandable-chart';
 import { useLocale } from '@/lib/use-locale';
 import { track } from '@/lib/analytics';
 
@@ -119,13 +120,6 @@ const SVG_FONT_SIZE = '9px';
 
 // ── Helpers ──────────────────────────────────────────────────────
 
-function formatDollars(v: number): string {
-  if (v >= 1000) return `$${(v / 1000).toFixed(1)}K`;
-  if (v >= 100) return `$${v.toFixed(0)}`;
-  if (v >= 10) return `$${v.toFixed(1)}`;
-  return `$${v.toFixed(2)}`;
-}
-
 function formatDollarsAxis(v: number): string {
   if (v >= 1000) return `$${(v / 1000).toFixed(v % 1000 === 0 ? 0 : 1)}K`;
   if (v >= 1) return `$${v.toFixed(v % 1 === 0 ? 0 : 2)}`;
@@ -159,7 +153,8 @@ function generateTicks(min: number, max: number, targetCount: number): number[] 
   const spacing = niceNum(range / (targetCount - 1), true);
   const niceMin = Math.floor(min / spacing) * spacing;
   const ticks: number[] = [];
-  for (let t = niceMin; t <= max + spacing * 0.5; t += spacing) {
+  // Keep going until a tick reaches max, so the tallest bar is never clipped.
+  for (let t = niceMin; t - spacing < max - spacing * 1e-9; t += spacing) {
     ticks.push(Math.round(t * 1e10) / 1e10);
   }
   return ticks;
@@ -230,101 +225,103 @@ function DailyCostChart({
   const sy = (v: number) => MARGIN.top + PLOT_H - (v / yMax) * PLOT_H;
 
   return (
-    <div className="rounded-md border border-border bg-surface p-3">
-      <div className="flex items-center justify-between gap-2 mb-2">
-        {controls}
-        <ExportPngButton
-          locale={locale}
-          onClick={() => {
-            if (svgRef.current)
-              exportSvgToPng(svgRef.current, {
-                title: t.exportTitle,
-                filename: 'daily-cost.png',
-                svgWidth: CHART_W,
-                svgHeight: CHART_H,
-              });
-          }}
-        />
-      </div>
-      <svg
-        ref={svgRef}
-        viewBox={`0 0 ${CHART_W} ${CHART_H}`}
-        className="w-full"
-        style={{ maxHeight: 240 }}
-      >
-        {/* Y-axis grid lines and labels */}
-        {yTicks.map((tv) => (
-          <g key={`y-${tv}`}>
-            {tv > 0 && (
-              <line
-                x1={MARGIN.left}
-                y1={sy(tv)}
-                x2={MARGIN.left + PLOT_W}
-                y2={sy(tv)}
-                stroke="currentColor"
-                className="text-border"
-                strokeWidth={0.5}
-                strokeDasharray="3 3"
-              />
-            )}
-            <text
-              x={MARGIN.left - 6}
-              y={sy(tv) + 3}
-              textAnchor="end"
-              className="fill-muted-foreground"
-              style={{ fontSize: SVG_FONT_SIZE, fontFamily: SVG_FONT }}
-            >
-              {formatDollarsAxis(tv)}
-            </text>
-          </g>
-        ))}
-
-        {/* Baseline */}
-        <line
-          x1={MARGIN.left}
-          y1={MARGIN.top + PLOT_H}
-          x2={MARGIN.left + PLOT_W}
-          y2={MARGIN.top + PLOT_H}
-          stroke="currentColor"
-          className="text-border"
-          strokeWidth={0.5}
-        />
-
-        {/* Bars */}
-        {data.map((d, i) => {
-          const x = MARGIN.left + i * (barWidth + barGap);
-          const barH = (d.cost / yMax) * PLOT_H;
-          return (
-            <g key={d.day}>
-              <rect
-                x={x}
-                y={sy(d.cost)}
-                width={barWidth}
-                height={Math.max(barH, 0.5)}
-                fill="#10b981"
-                rx={1}
-              >
-                <title>
-                  {formatSnapshotDate(d.day)}: {formatDollars(d.cost)} (
-                  {t.tooltipRequests(d.requestCount)})
-                </title>
-              </rect>
-              {i % labelEvery === 0 && (
-                <text
-                  x={x + barWidth / 2}
-                  y={MARGIN.top + PLOT_H + 14}
-                  textAnchor="middle"
-                  className="fill-muted-foreground"
-                  style={{ fontSize: SVG_FONT_SIZE, fontFamily: SVG_FONT }}
-                >
-                  {formatSnapshotDate(d.day)}
-                </text>
+    <Expandable title={t.exportTitle}>
+      <div className="rounded-md border border-border bg-surface p-3">
+        <div className="flex items-center justify-between gap-2 mb-2">
+          {controls}
+          <ExportPngButton
+            locale={locale}
+            onClick={() => {
+              if (svgRef.current)
+                exportSvgToPng(svgRef.current, {
+                  title: t.exportTitle,
+                  filename: 'daily-cost.png',
+                  svgWidth: CHART_W,
+                  svgHeight: CHART_H,
+                });
+            }}
+          />
+        </div>
+        <svg
+          ref={svgRef}
+          viewBox={`0 0 ${CHART_W} ${CHART_H}`}
+          className="w-full"
+          style={{ maxHeight: 240 }}
+        >
+          {/* Y-axis grid lines and labels */}
+          {yTicks.map((tv) => (
+            <g key={`y-${tv}`}>
+              {tv > 0 && (
+                <line
+                  x1={MARGIN.left}
+                  y1={sy(tv)}
+                  x2={MARGIN.left + PLOT_W}
+                  y2={sy(tv)}
+                  stroke="currentColor"
+                  className="text-border"
+                  strokeWidth={0.5}
+                  strokeDasharray="3 3"
+                />
               )}
+              <text
+                x={MARGIN.left - 6}
+                y={sy(tv) + 3}
+                textAnchor="end"
+                className="fill-muted-foreground"
+                style={{ fontSize: SVG_FONT_SIZE, fontFamily: SVG_FONT }}
+              >
+                {formatDollarsAxis(tv)}
+              </text>
             </g>
-          );
-        })}
-      </svg>
-    </div>
+          ))}
+
+          {/* Baseline */}
+          <line
+            x1={MARGIN.left}
+            y1={MARGIN.top + PLOT_H}
+            x2={MARGIN.left + PLOT_W}
+            y2={MARGIN.top + PLOT_H}
+            stroke="currentColor"
+            className="text-border"
+            strokeWidth={0.5}
+          />
+
+          {/* Bars */}
+          {data.map((d, i) => {
+            const x = MARGIN.left + i * (barWidth + barGap);
+            const barH = (d.cost / yMax) * PLOT_H;
+            return (
+              <g key={d.day}>
+                <rect
+                  x={x}
+                  y={sy(d.cost)}
+                  width={barWidth}
+                  height={Math.max(barH, 0.5)}
+                  fill="#10b981"
+                  rx={1}
+                >
+                  <title>
+                    {formatSnapshotDate(d.day)}: {formatDollars(d.cost)} (
+                    {t.tooltipRequests(d.requestCount)})
+                  </title>
+                </rect>
+                {i % labelEvery === 0 && (
+                  <text
+                    x={x + barWidth / 2}
+                    y={MARGIN.top + PLOT_H + 14}
+                    textAnchor="middle"
+                    className="fill-muted-foreground"
+                    style={{ fontSize: SVG_FONT_SIZE, fontFamily: SVG_FONT }}
+                  >
+                    {formatSnapshotDate(d.day)}
+                  </text>
+                )}
+              </g>
+            );
+          })}
+        </svg>
+      </div>
+    </Expandable>
   );
 }
 

@@ -19,12 +19,14 @@ import type {
 import { snapshotNow } from '@/lib/agentic-workload-explorer/snapshot';
 import { useLocale } from '@/lib/use-locale';
 import { track } from '@/lib/analytics';
+import { Expandable } from '@/components/agentic-workload-explorer/expandable-chart';
 
 const STRINGS = {
   en: {
     stats: 'Stats',
     cacheHitRateOverTime: 'Cache Hit Rate Over Time',
     cacheReadVsWriteTrends: 'Cache Read vs Write Trends',
+    cacheReadVsWrite: 'Cache Read vs Write',
     cacheEfficiencyByModel: 'Cache Efficiency by Model',
     cacheByClient: 'Cache by Client',
     cacheEfficiencyPerDev: 'Cache Efficiency per Developer',
@@ -61,6 +63,7 @@ const STRINGS = {
     stats: '统计',
     cacheHitRateOverTime: '缓存命中率趋势',
     cacheReadVsWriteTrends: '缓存读写趋势',
+    cacheReadVsWrite: '缓存读取 vs 写入',
     cacheEfficiencyByModel: '各模型缓存效率',
     cacheByClient: '各客户端缓存',
     cacheEfficiencyPerDev: '各开发者缓存效率',
@@ -137,13 +140,14 @@ function generateTicks(min: number, max: number, targetCount: number): number[] 
   const spacing = niceNum(range / (targetCount - 1), true);
   const niceMin = Math.floor(min / spacing) * spacing;
   const ticks: number[] = [];
-  for (let t = niceMin; t <= max + spacing * 0.5; t += spacing) {
+  for (let t = niceMin; t - spacing < max - spacing * 1e-9; t += spacing) {
     ticks.push(Math.round(t * 1e10) / 1e10);
   }
   return ticks;
 }
 
 function formatAxisValue(v: number): string {
+  if (v >= 1e9) return `${(v / 1e9).toFixed(v % 1e9 === 0 ? 0 : 1)}B`;
   if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(v % 1_000_000 === 0 ? 0 : 1)}M`;
   if (v >= 1_000) return `${(v / 1_000).toFixed(v % 1_000 === 0 ? 0 : 1)}K`;
   if (Number.isInteger(v)) return String(v);
@@ -185,6 +189,7 @@ function CacheEfficiencyHeatmap({ t }: { t: Strings }) {
     inputTokens: number;
     x: number;
     y: number;
+    width: number;
   } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -215,7 +220,10 @@ function CacheEfficiencyHeatmap({ t }: { t: Strings }) {
       if (existing) {
         existing.totalCacheRead += d.cacheRead;
       } else {
-        map.set(d.clientId, { apiKeyHash: d.apiKeyHash, totalCacheRead: d.cacheRead });
+        map.set(d.clientId, {
+          apiKeyHash: d.apiKeyHash,
+          totalCacheRead: d.cacheRead,
+        });
       }
     }
     return Array.from(map, ([id, { apiKeyHash, totalCacheRead }]) => ({
@@ -258,7 +266,7 @@ function CacheEfficiencyHeatmap({ t }: { t: Strings }) {
   for (let i = 0; i < totalDays; i++) {
     const d = new Date(startDate);
     d.setDate(d.getDate() + i);
-    const key = d.toISOString().slice(0, 10);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     currentWeek.push({ date: d, key });
     if (d.getDay() === 6 || i === totalDays - 1) {
       weeks.push(currentWeek);
@@ -286,144 +294,149 @@ function CacheEfficiencyHeatmap({ t }: { t: Strings }) {
   return (
     <div>
       <SectionHeader label={t.cacheEfficiencyPerDev} detail={t.cacheEfficiencyPerDevDetail} />
-      <div className="rounded-md border border-border bg-surface p-3">
-        {/* Client selector */}
-        <div className="flex items-center gap-2 mb-3">
-          <Select
-            value={selectedClient ?? ''}
-            onChange={(v) => {
-              setSelectedClient(v || null);
-              track('agentic_workload_cache_client_changed', { client: v || 'all' });
-            }}
-            options={[
-              { value: '', label: t.allClients },
-              ...clientList.map((c) => ({
-                value: c.id,
-                label: truncateHash(c.apiKeyHash),
-              })),
-            ]}
-          />
-        </div>
+      <Expandable title={t.cacheEfficiencyPerDev} subtitle={t.cacheEfficiencyPerDevDetail} corner>
+        <div className="rounded-md border border-border bg-surface p-3">
+          {/* Client selector */}
+          <div className="flex items-center gap-2 mb-3">
+            <Select
+              value={selectedClient ?? ''}
+              onChange={(v) => {
+                setSelectedClient(v || null);
+                track('agentic_workload_cache_client_changed', { client: v || 'all' });
+              }}
+              options={[
+                { value: '', label: t.allClients },
+                ...clientList.map((c) => ({
+                  value: c.id,
+                  label: truncateHash(c.apiKeyHash),
+                })),
+              ]}
+            />
+          </div>
 
-        {/* Heatmap */}
-        <div ref={containerRef} className="overflow-x-auto relative">
-          <svg width={svgW} height={svgH} className="block">
-            {/* Weekday labels */}
-            {weekdayLabels.map((label, i) =>
-              label ? (
-                <text
-                  key={`wl-${i}`}
-                  x={LABEL_W - 4}
-                  y={20 + i * (CELL_SIZE + CELL_GAP) + CELL_SIZE / 2 + 3}
-                  textAnchor="end"
-                  fill="var(--muted)"
-                  fontSize="8px"
-                  fontFamily="var(--font-mono, ui-monospace, monospace)"
-                >
-                  {label}
-                </text>
-              ) : null,
-            )}
-
-            {/* Month labels */}
-            {weeks.map((week, wi) => {
-              const firstDay = week[0];
-              if (firstDay.date.getDate() <= 7 && wi > 0) {
-                return (
+          {/* Heatmap */}
+          <div ref={containerRef} className="overflow-x-auto relative">
+            <svg viewBox={`0 0 ${svgW} ${svgH}`} className="block w-full max-w-[640px]">
+              {/* Weekday labels */}
+              {weekdayLabels.map((label, i) =>
+                label ? (
                   <text
-                    key={`ml-${wi}`}
-                    x={LABEL_W + wi * (CELL_SIZE + CELL_GAP)}
-                    y={12}
+                    key={`wl-${i}`}
+                    x={LABEL_W - 4}
+                    y={20 + i * (CELL_SIZE + CELL_GAP) + CELL_SIZE / 2 + 3}
+                    textAnchor="end"
                     fill="var(--muted)"
                     fontSize="8px"
                     fontFamily="var(--font-mono, ui-monospace, monospace)"
                   >
-                    {firstDay.date.toLocaleDateString('en-US', { month: 'short' })}
+                    {label}
                   </text>
-                );
-              }
-              return null;
-            })}
+                ) : null,
+              )}
 
-            {/* Cells */}
-            {weeks.map((week, wi) =>
-              week.map((day) => {
-                const dow = day.date.getDay();
-                const x = LABEL_W + wi * (CELL_SIZE + CELL_GAP);
-                const y = 20 + dow * (CELL_SIZE + CELL_GAP);
-                const entry = dayMap.get(day.key);
-                const total = entry ? entry.cacheRead + entry.inputTokens : 0;
-                const efficiency = total > 0 ? entry!.cacheRead / total : 0;
-                const level = !entry || total === 0 ? 0 : Math.min(4, Math.ceil(efficiency * 4));
+              {/* Month labels */}
+              {weeks.map((week, wi) => {
+                const firstDay = week[0];
+                if (firstDay.date.getDate() <= 7 && wi > 0) {
+                  return (
+                    <text
+                      key={`ml-${wi}`}
+                      x={LABEL_W + wi * (CELL_SIZE + CELL_GAP)}
+                      y={12}
+                      fill="var(--muted)"
+                      fontSize="8px"
+                      fontFamily="var(--font-mono, ui-monospace, monospace)"
+                    >
+                      {firstDay.date.toLocaleDateString('en-US', {
+                        month: 'short',
+                      })}
+                    </text>
+                  );
+                }
+                return null;
+              })}
 
-                return (
-                  <rect
-                    key={day.key}
-                    x={x}
-                    y={y}
-                    width={CELL_SIZE}
-                    height={CELL_SIZE}
-                    rx={2}
-                    fill={HEATMAP_COLORS[level]}
-                    opacity={level === 0 ? 0.4 : 0.85}
-                    style={{ cursor: entry ? 'pointer' : 'default' }}
-                    onMouseEnter={(e) => {
-                      if (!entry) return;
-                      const svgRect = e.currentTarget.ownerSVGElement?.getBoundingClientRect();
-                      if (!svgRect) return;
-                      setHoveredCell({
-                        day: day.key,
-                        efficiency: efficiency * 100,
-                        cacheRead: entry.cacheRead,
-                        inputTokens: entry.inputTokens,
-                        x: e.clientX - svgRect.left,
-                        y: e.clientY - svgRect.top,
-                      });
-                    }}
-                    onMouseLeave={() => setHoveredCell(null)}
-                  />
-                );
-              }),
+              {/* Cells */}
+              {weeks.map((week, wi) =>
+                week.map((day) => {
+                  const dow = day.date.getDay();
+                  const x = LABEL_W + wi * (CELL_SIZE + CELL_GAP);
+                  const y = 20 + dow * (CELL_SIZE + CELL_GAP);
+                  const entry = dayMap.get(day.key);
+                  const total = entry ? entry.cacheRead + entry.inputTokens : 0;
+                  const efficiency = total > 0 ? entry!.cacheRead / total : 0;
+                  const level = !entry || total === 0 ? 0 : Math.min(4, Math.ceil(efficiency * 4));
+
+                  return (
+                    <rect
+                      key={day.key}
+                      x={x}
+                      y={y}
+                      width={CELL_SIZE}
+                      height={CELL_SIZE}
+                      rx={2}
+                      fill={HEATMAP_COLORS[level]}
+                      opacity={level === 0 ? 0.4 : 0.85}
+                      style={{ cursor: entry ? 'pointer' : 'default' }}
+                      onMouseEnter={(e) => {
+                        if (!entry) return;
+                        const svgRect = e.currentTarget.ownerSVGElement?.getBoundingClientRect();
+                        if (!svgRect) return;
+                        setHoveredCell({
+                          day: day.key,
+                          efficiency: efficiency * 100,
+                          cacheRead: entry.cacheRead,
+                          inputTokens: entry.inputTokens,
+                          x: e.clientX - svgRect.left,
+                          y: e.clientY - svgRect.top,
+                          width: svgRect.width,
+                        });
+                      }}
+                      onMouseLeave={() => setHoveredCell(null)}
+                    />
+                  );
+                }),
+              )}
+            </svg>
+
+            {/* Tooltip */}
+            {hoveredCell && (
+              <div
+                className="absolute pointer-events-none z-50 bg-background border border-border rounded-md shadow-lg px-2.5 py-1.5"
+                style={{
+                  left: Math.min(hoveredCell.x + 12, hoveredCell.width - 180),
+                  top: hoveredCell.y - 8,
+                  transform: 'translateY(-100%)',
+                }}
+              >
+                <div className="text-3xs font-mono font-medium text-foreground">
+                  {hoveredCell.day}
+                </div>
+                <div className="text-3xs font-mono text-muted-foreground">
+                  {t.efficiency}: {hoveredCell.efficiency.toFixed(1)}%
+                </div>
+                <div className="text-3xs font-mono text-muted-foreground">
+                  {t.cacheReadHeatmap}: {formatNumber(hoveredCell.cacheRead)} · {t.inputHeatmap}:{' '}
+                  {formatNumber(hoveredCell.inputTokens)}
+                </div>
+              </div>
             )}
-          </svg>
+          </div>
 
-          {/* Tooltip */}
-          {hoveredCell && (
-            <div
-              className="absolute pointer-events-none z-50 bg-background border border-border rounded-md shadow-lg px-2.5 py-1.5"
-              style={{
-                left: Math.min(hoveredCell.x + 12, svgW - 180),
-                top: hoveredCell.y - 8,
-                transform: 'translateY(-100%)',
-              }}
-            >
-              <div className="text-3xs font-mono font-medium text-foreground">
-                {hoveredCell.day}
-              </div>
-              <div className="text-3xs font-mono text-muted-foreground">
-                {t.efficiency}: {hoveredCell.efficiency.toFixed(1)}%
-              </div>
-              <div className="text-3xs font-mono text-muted-foreground">
-                {t.cacheReadHeatmap}: {formatNumber(hoveredCell.cacheRead)} · {t.inputHeatmap}:{' '}
-                {formatNumber(hoveredCell.inputTokens)}
-              </div>
-            </div>
-          )}
+          {/* Legend */}
+          <div className="flex items-center gap-1.5 mt-2">
+            <span className="text-3xs font-mono text-muted-foreground">{t.less}</span>
+            {HEATMAP_COLORS.map((color, i) => (
+              <div
+                key={i}
+                className="w-3 h-3 rounded-sm"
+                style={{ backgroundColor: color, opacity: i === 0 ? 0.4 : 0.85 }}
+              />
+            ))}
+            <span className="text-3xs font-mono text-muted-foreground">{t.more}</span>
+          </div>
         </div>
-
-        {/* Legend */}
-        <div className="flex items-center gap-1.5 mt-2">
-          <span className="text-3xs font-mono text-muted-foreground">{t.less}</span>
-          {HEATMAP_COLORS.map((color, i) => (
-            <div
-              key={i}
-              className="w-3 h-3 rounded-sm"
-              style={{ backgroundColor: color, opacity: i === 0 ? 0.4 : 0.85 }}
-            />
-          ))}
-          <span className="text-3xs font-mono text-muted-foreground">{t.more}</span>
-        </div>
-      </div>
+      </Expandable>
     </div>
   );
 }
@@ -487,104 +500,108 @@ function HitRateChart({ daily, t }: { daily: DailyCache[]; t: Strings }) {
 
   const areaD = `${pathD} L${sx(rates.length - 1).toFixed(2)},${sy(0).toFixed(2)} L${sx(0).toFixed(2)},${sy(0).toFixed(2)} Z`;
 
-  // Show every 5th label
   const labelInterval = Math.max(1, Math.ceil(data.length / 6));
 
   return (
-    <div className="rounded-md border border-border bg-surface p-3">
-      <div className="flex items-center justify-end mb-2">
-        <ExportPngButton
-          locale={locale}
-          onClick={() => {
-            if (svgRef.current) {
-              exportSvgToPng(svgRef.current, {
-                title: 'Cache Hit Rate',
-                filename: 'cache-hit-rate.png',
-                svgWidth: CHART_W,
-                svgHeight: CHART_H,
-              });
-            }
-            track('agentic_workload_cache_export_png', { chart: 'hit-rate' });
-          }}
-        />
+    <Expandable title={t.cacheHitRate}>
+      <div className="rounded-md border border-border bg-surface p-3">
+        <div className="flex items-center justify-end mb-2">
+          <ExportPngButton
+            locale={locale}
+            onClick={() => {
+              if (svgRef.current)
+                exportSvgToPng(svgRef.current, {
+                  title: 'Cache Hit Rate',
+                  filename: 'cache-hit-rate.png',
+                  svgWidth: CHART_W,
+                  svgHeight: CHART_H,
+                });
+              track('agentic_workload_cache_export_png', { chart: 'hit-rate' });
+            }}
+          />
+        </div>
+        <svg
+          ref={svgRef}
+          viewBox={`0 0 ${CHART_W} ${CHART_H}`}
+          className="w-full"
+          style={{ maxHeight: 240 }}
+        >
+          {/* Y-axis grid lines and labels */}
+          {yTicks.map((tick) => (
+            <g key={`y-${tick}`}>
+              {tick > 0 && (
+                <line
+                  x1={MARGIN.left}
+                  y1={sy(tick)}
+                  x2={MARGIN.left + PLOT_W}
+                  y2={sy(tick)}
+                  stroke="currentColor"
+                  className="text-border"
+                  strokeWidth={0.5}
+                  strokeDasharray="3 3"
+                />
+              )}
+              <text
+                x={MARGIN.left - 6}
+                y={sy(tick) + 3}
+                textAnchor="end"
+                className="fill-muted-foreground"
+                style={{ fontSize: SVG_FONT_SIZE, fontFamily: SVG_FONT }}
+              >
+                {tick}%
+              </text>
+            </g>
+          ))}
+
+          {/* Baseline */}
+          <line
+            x1={MARGIN.left}
+            y1={MARGIN.top + PLOT_H}
+            x2={MARGIN.left + PLOT_W}
+            y2={MARGIN.top + PLOT_H}
+            stroke="currentColor"
+            className="text-border"
+            strokeWidth={0.5}
+          />
+
+          {/* Area fill */}
+          <path d={areaD} fill="#10b981" fillOpacity={0.1} />
+
+          {/* Line */}
+          <path d={pathD} fill="none" stroke="#10b981" strokeWidth={1.5} strokeLinejoin="round" />
+
+          {/* Data points */}
+          {rates.map((r, i) => (
+            <circle key={data[i].day} cx={sx(i)} cy={sy(r)} r={2} fill="#10b981">
+              <title>
+                {data[i].day}: {r.toFixed(1)}%
+              </title>
+            </circle>
+          ))}
+
+          {/* X-axis labels */}
+          {data.map((d, i) => {
+            if (i % labelInterval !== 0 && i !== data.length - 1) return null;
+            return (
+              <text
+                key={d.day}
+                x={sx(i)}
+                y={MARGIN.top + PLOT_H + 14}
+                textAnchor="middle"
+                className="fill-muted-foreground"
+                style={{ fontSize: SVG_FONT_SIZE, fontFamily: SVG_FONT }}
+              >
+                {new Date(d.day).toLocaleDateString('en-US', {
+                  timeZone: 'UTC',
+                  month: 'short',
+                  day: 'numeric',
+                })}
+              </text>
+            );
+          })}
+        </svg>
       </div>
-      <svg
-        ref={svgRef}
-        viewBox={`0 0 ${CHART_W} ${CHART_H}`}
-        className="w-full"
-        style={{ maxHeight: 240 }}
-      >
-        {/* Y-axis grid lines and labels */}
-        {yTicks.map((tick) => (
-          <g key={`y-${tick}`}>
-            {tick > 0 && (
-              <line
-                x1={MARGIN.left}
-                y1={sy(tick)}
-                x2={MARGIN.left + PLOT_W}
-                y2={sy(tick)}
-                stroke="currentColor"
-                className="text-border"
-                strokeWidth={0.5}
-                strokeDasharray="3 3"
-              />
-            )}
-            <text
-              x={MARGIN.left - 6}
-              y={sy(tick) + 3}
-              textAnchor="end"
-              className="fill-muted-foreground"
-              style={{ fontSize: SVG_FONT_SIZE, fontFamily: SVG_FONT }}
-            >
-              {tick}%
-            </text>
-          </g>
-        ))}
-
-        {/* Baseline */}
-        <line
-          x1={MARGIN.left}
-          y1={MARGIN.top + PLOT_H}
-          x2={MARGIN.left + PLOT_W}
-          y2={MARGIN.top + PLOT_H}
-          stroke="currentColor"
-          className="text-border"
-          strokeWidth={0.5}
-        />
-
-        {/* Area fill */}
-        <path d={areaD} fill="#10b981" fillOpacity={0.1} />
-
-        {/* Line */}
-        <path d={pathD} fill="none" stroke="#10b981" strokeWidth={1.5} strokeLinejoin="round" />
-
-        {/* Data points */}
-        {rates.map((r, i) => (
-          <circle key={data[i].day} cx={sx(i)} cy={sy(r)} r={2} fill="#10b981">
-            <title>
-              {data[i].day}: {r.toFixed(1)}%
-            </title>
-          </circle>
-        ))}
-
-        {/* X-axis labels */}
-        {data.map((d, i) => {
-          if (i % labelInterval !== 0 && i !== data.length - 1) return null;
-          return (
-            <text
-              key={d.day}
-              x={sx(i)}
-              y={MARGIN.top + PLOT_H + 14}
-              textAnchor="middle"
-              className="fill-muted-foreground"
-              style={{ fontSize: SVG_FONT_SIZE, fontFamily: SVG_FONT }}
-            >
-              {new Date(d.day).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-            </text>
-          );
-        })}
-      </svg>
-    </div>
+    </Expandable>
   );
 }
 
@@ -617,124 +634,129 @@ function ReadWriteChart({ daily, t }: { daily: DailyCache[]; t: Strings }) {
   const labelInterval = Math.max(1, Math.ceil(data.length / 6));
 
   return (
-    <div className="rounded-md border border-border bg-surface p-3">
-      <div className="flex items-center justify-between mb-2">
-        {/* Legend */}
-        <div className="flex items-center gap-4 text-3xs font-mono text-muted-foreground">
-          <span className="flex items-center gap-1">
-            <span className="inline-block w-2.5 h-2.5 rounded-sm bg-emerald-500" />{' '}
-            {t.cacheReadLegend}
-          </span>
-          <span className="flex items-center gap-1">
-            <span className="inline-block w-2.5 h-2.5 rounded-sm bg-amber-500" />{' '}
-            {t.cacheWriteLegend}
-          </span>
+    <Expandable title={t.cacheReadVsWrite}>
+      <div className="rounded-md border border-border bg-surface p-3">
+        <div className="flex items-center justify-between mb-2">
+          {/* Legend */}
+          <div className="flex items-center gap-4 text-3xs font-mono text-muted-foreground">
+            <span className="flex items-center gap-1">
+              <span className="inline-block w-2.5 h-2.5 rounded-sm bg-emerald-500" />{' '}
+              {t.cacheReadLegend}
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="inline-block w-2.5 h-2.5 rounded-sm bg-amber-500" />{' '}
+              {t.cacheWriteLegend}
+            </span>
+          </div>
+          <ExportPngButton
+            locale={locale}
+            onClick={() => {
+              if (svgRef.current)
+                exportSvgToPng(svgRef.current, {
+                  title: 'Cache Read vs Write',
+                  filename: 'cache-read-vs-write.png',
+                  svgWidth: CHART_W,
+                  svgHeight: CHART_H,
+                });
+              track('agentic_workload_cache_export_png', { chart: 'read-vs-write' });
+            }}
+          />
         </div>
-        <ExportPngButton
-          locale={locale}
-          onClick={() => {
-            if (svgRef.current) {
-              exportSvgToPng(svgRef.current, {
-                title: 'Cache Read vs Write',
-                filename: 'cache-read-vs-write.png',
-                svgWidth: CHART_W,
-                svgHeight: CHART_H,
-              });
-            }
-            track('agentic_workload_cache_export_png', { chart: 'read-vs-write' });
-          }}
-        />
-      </div>
 
-      <svg
-        ref={svgRef}
-        viewBox={`0 0 ${CHART_W} ${CHART_H}`}
-        className="w-full"
-        style={{ maxHeight: 240 }}
-      >
-        {/* Y-axis grid lines and labels */}
-        {yTicks.map((tick) => (
-          <g key={`y-${tick}`}>
-            {tick > 0 && (
-              <line
-                x1={MARGIN.left}
-                y1={sy(tick)}
-                x2={MARGIN.left + PLOT_W}
-                y2={sy(tick)}
-                stroke="currentColor"
-                className="text-border"
-                strokeWidth={0.5}
-                strokeDasharray="3 3"
-              />
-            )}
-            <text
-              x={MARGIN.left - 6}
-              y={sy(tick) + 3}
-              textAnchor="end"
-              className="fill-muted-foreground"
-              style={{ fontSize: SVG_FONT_SIZE, fontFamily: SVG_FONT }}
-            >
-              {formatAxisValue(tick)}
-            </text>
-          </g>
-        ))}
-
-        {/* Baseline */}
-        <line
-          x1={MARGIN.left}
-          y1={MARGIN.top + PLOT_H}
-          x2={MARGIN.left + PLOT_W}
-          y2={MARGIN.top + PLOT_H}
-          stroke="currentColor"
-          className="text-border"
-          strokeWidth={0.5}
-        />
-
-        {/* Grouped bars */}
-        {data.map((d, i) => (
-          <g key={d.day}>
-            {/* Cache Read bar */}
-            <rect
-              x={sx(i, 0)}
-              y={sy(d.cacheRead)}
-              width={barWidth}
-              height={Math.max((d.cacheRead / yMax) * PLOT_H, 0.5)}
-              fill="#10b981"
-              rx={1}
-            >
-              <title>
-                {d.day} read: {formatNumber(d.cacheRead)}
-              </title>
-            </rect>
-            {/* Cache Write bar */}
-            <rect
-              x={sx(i, 1)}
-              y={sy(d.cacheWrite)}
-              width={barWidth}
-              height={Math.max((d.cacheWrite / yMax) * PLOT_H, 0.5)}
-              fill="#f59e0b"
-              rx={1}
-            >
-              <title>
-                {d.day} write: {formatNumber(d.cacheWrite)}
-              </title>
-            </rect>
-            {/* X-axis label */}
-            {(i % labelInterval === 0 || i === data.length - 1) && (
+        <svg
+          ref={svgRef}
+          viewBox={`0 0 ${CHART_W} ${CHART_H}`}
+          className="w-full"
+          style={{ maxHeight: 240 }}
+        >
+          {/* Y-axis grid lines and labels */}
+          {yTicks.map((tick) => (
+            <g key={`y-${tick}`}>
+              {tick > 0 && (
+                <line
+                  x1={MARGIN.left}
+                  y1={sy(tick)}
+                  x2={MARGIN.left + PLOT_W}
+                  y2={sy(tick)}
+                  stroke="currentColor"
+                  className="text-border"
+                  strokeWidth={0.5}
+                  strokeDasharray="3 3"
+                />
+              )}
               <text
-                x={sx(i, 0) + barWidth}
-                y={MARGIN.top + PLOT_H + 14}
-                textAnchor="middle"
+                x={MARGIN.left - 6}
+                y={sy(tick) + 3}
+                textAnchor="end"
                 className="fill-muted-foreground"
                 style={{ fontSize: SVG_FONT_SIZE, fontFamily: SVG_FONT }}
               >
-                {new Date(d.day).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                {formatAxisValue(tick)}
               </text>
-            )}
-          </g>
-        ))}
-      </svg>
-    </div>
+            </g>
+          ))}
+
+          {/* Baseline */}
+          <line
+            x1={MARGIN.left}
+            y1={MARGIN.top + PLOT_H}
+            x2={MARGIN.left + PLOT_W}
+            y2={MARGIN.top + PLOT_H}
+            stroke="currentColor"
+            className="text-border"
+            strokeWidth={0.5}
+          />
+
+          {/* Grouped bars */}
+          {data.map((d, i) => (
+            <g key={d.day}>
+              {/* Cache Read bar */}
+              <rect
+                x={sx(i, 0)}
+                y={sy(d.cacheRead)}
+                width={barWidth}
+                height={Math.max((d.cacheRead / yMax) * PLOT_H, 0.5)}
+                fill="#10b981"
+                rx={1}
+              >
+                <title>
+                  {d.day} read: {formatNumber(d.cacheRead)}
+                </title>
+              </rect>
+              {/* Cache Write bar */}
+              <rect
+                x={sx(i, 1)}
+                y={sy(d.cacheWrite)}
+                width={barWidth}
+                height={Math.max((d.cacheWrite / yMax) * PLOT_H, 0.5)}
+                fill="#f59e0b"
+                rx={1}
+              >
+                <title>
+                  {d.day} write: {formatNumber(d.cacheWrite)}
+                </title>
+              </rect>
+              {/* X-axis label */}
+              {(i % labelInterval === 0 || i === data.length - 1) && (
+                <text
+                  x={sx(i, 0) + barWidth}
+                  y={MARGIN.top + PLOT_H + 14}
+                  textAnchor="middle"
+                  className="fill-muted-foreground"
+                  style={{ fontSize: SVG_FONT_SIZE, fontFamily: SVG_FONT }}
+                >
+                  {new Date(d.day).toLocaleDateString('en-US', {
+                    timeZone: 'UTC',
+                    month: 'short',
+                    day: 'numeric',
+                  })}
+                </text>
+              )}
+            </g>
+          ))}
+        </svg>
+      </div>
+    </Expandable>
   );
 }
 
@@ -762,7 +784,7 @@ function ModelEfficiencyChart({ byModel, t }: { byModel: ModelCache[]; t: String
       {sorted.map((m) => (
         <div key={m.model} className="flex items-center gap-2">
           <span
-            className="text-2xs font-mono text-foreground shrink-0 w-[200px] truncate"
+            className="text-2xs font-mono text-foreground shrink-0 w-[120px] sm:w-[200px] truncate"
             title={m.model}
           >
             {truncateModel(m.model)}
@@ -776,7 +798,7 @@ function ModelEfficiencyChart({ byModel, t }: { byModel: ModelCache[]; t: String
           <span className="text-2xs font-mono text-foreground shrink-0 w-[64px] text-right">
             {m.hitRate.toFixed(1)}%
           </span>
-          <span className="text-3xs font-mono text-muted-foreground shrink-0 w-[120px] text-right">
+          <span className="hidden sm:inline text-3xs font-mono text-muted-foreground shrink-0 w-[120px] text-right">
             {formatNumber(m.cacheRead)} / {formatNumber(m.cacheWrite)}
           </span>
         </div>
@@ -867,9 +889,9 @@ export default function CachePage() {
 }
 
 function CachePageContent() {
-  const { apiParam: traceVersionParam } = useTraceVersion();
   const locale = useLocale();
   const t = STRINGS[locale];
+  const { apiParam: traceVersionParam } = useTraceVersion();
 
   const { data, loading, error } = useDashboardData<CacheData>({
     fetcher: async (signal) => {

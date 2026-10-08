@@ -1,6 +1,7 @@
 import { type Kysely, sql } from 'kysely';
 import type { Database } from './types';
-import { requestsVisFilter, sessionsVisFilter } from './operations';
+import type { Harness } from './shared/harness';
+import { requestsVisFilter, SESSION_HARNESS_SQL, sessionsVisFilter } from './operations';
 import { assertRollupReady } from './stats';
 import { NOW, TODAY_UTC_DATE, TODAY_UTC_START } from './as-of';
 import { AS_OF_ISO } from './shared/as-of';
@@ -371,6 +372,64 @@ export async function dailyCliVersionMix(
   return res.rows.map((r) => ({
     day: String(r.day),
     cli_version: r.cli_version === null ? null : String(r.cli_version),
+    session_count: Number(r.session_count),
+  }));
+}
+
+export interface DailyHarnessVersionRow {
+  day: string;
+  harness: Harness;
+  version: string | null;
+  session_count: number;
+}
+
+/**
+ * Daily new-session counts by harness and harness version. Only Claude Code
+ * records `cliVersion`, so other harnesses take the version from their user
+ * agent (`codex-tui/0.145.0 …`, `omp/17.3.8`); Pi sends none. Sessions that
+ * match no harness keep the user agent's product token (`OpenAI/JS 6.26.0`).
+ * Live, not cached: the trends cache predates harness detection.
+ */
+export async function dailyHarnessVersionMix(
+  db: Kysely<Database>,
+  vis: string[] | null,
+  traceVersion: number | null,
+): Promise<DailyHarnessVersionRow[]> {
+  const res = await sql<{
+    day: string;
+    harness: Harness;
+    version: string | null;
+    session_count: string;
+  }>`
+    WITH classified AS (
+      SELECT
+        date_trunc('day', sessions.started_at AT TIME ZONE 'UTC')::date AS day,
+        ${SESSION_HARNESS_SQL} AS harness,
+        sessions.metadata ->> 'userAgent' AS user_agent,
+        sessions.metadata ->> 'cliVersion' AS cli_version
+      FROM sessions
+      WHERE sessions.metadata IS NOT NULL
+        AND ${sessionsVisFilter(vis, traceVersion)}
+    )
+    SELECT
+      day::text AS day,
+      harness,
+      CASE harness
+        WHEN 'claude-code' THEN coalesce(cli_version, substring(user_agent FROM '^claude-cli/([^ ]+)'))
+        WHEN 'codex' THEN substring(user_agent FROM '^[^/]+/([^ ]+)')
+        WHEN 'omp' THEN substring(user_agent FROM '^[^/]+/([^ ]+)')
+        WHEN 'pi' THEN NULL
+        ELSE nullif(left(regexp_replace(user_agent, ' [(].*$', ''), 40), '')
+      END AS version,
+      count(*)::int AS session_count
+    FROM classified
+    GROUP BY 1, 2, 3
+    ORDER BY day
+  `.execute(db);
+  return res.rows.map((r) => ({
+    day: String(r.day),
+    harness: r.harness,
+    version: r.version === null ? null : String(r.version),
     session_count: Number(r.session_count),
   }));
 }

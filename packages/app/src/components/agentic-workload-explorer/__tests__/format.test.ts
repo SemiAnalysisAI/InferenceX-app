@@ -31,6 +31,11 @@ describe('formatNumber', () => {
     expect(formatNumber(100000000)).toBe('100.0M');
   });
 
+  it('formats billions and trillions with B and T suffixes', () => {
+    expect(formatNumber(32_416_900_000)).toBe('32.4B');
+    expect(formatNumber(511_191_500_000_000)).toBe('511.2T');
+  });
+
   it('handles decimal inputs', () => {
     expect(formatNumber(1500.7)).toBe('1.5K');
   });

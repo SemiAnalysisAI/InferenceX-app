@@ -9,6 +9,7 @@ import {
   appendTraceVersion,
 } from '@/hooks/agentic-workload-explorer/use-trace-version';
 import { formatSnapshotTime } from '@/lib/agentic-workload-explorer/snapshot';
+import { Expandable } from '@/components/agentic-workload-explorer/expandable-chart';
 import { useLocale } from '@/lib/use-locale';
 
 // ── i18n ────────────────────────────────────────────────────────
@@ -77,7 +78,6 @@ const STRINGS = {
     tooltipTotal: '合计',
   },
 } as const;
-
 // ── Section header ───────────────────────────────────────────────
 
 function SectionHeader({ label, detail }: { label: string; detail?: string }) {
@@ -173,7 +173,8 @@ function generateTicks(min: number, max: number, targetCount: number): number[] 
   const spacing = niceNum(range / (targetCount - 1), true);
   const niceMin = Math.floor(min / spacing) * spacing;
   const ticks: number[] = [];
-  for (let t = niceMin; t <= max + spacing * 0.5; t += spacing) {
+  // Keep going until a tick reaches max, so the tallest bar is never clipped.
+  for (let t = niceMin; t - spacing < max - spacing * 1e-9; t += spacing) {
     ticks.push(Math.round(t * 1e10) / 1e10);
   }
   return ticks;
@@ -305,9 +306,11 @@ function ProxyHealthPageContent() {
       {data.hourlyByEndpoint.length > 0 && (
         <div>
           <SectionHeader label={t.hourlyTraffic} detail={t.final48hours} />
-          <div className="mt-3 rounded-md border border-border bg-surface p-3">
-            <HourlyTrafficChart hourly={data.hourlyByEndpoint} tooltipTotal={t.tooltipTotal} />
-          </div>
+          <Expandable title={t.hourlyTraffic} subtitle={t.final48hours} corner>
+            <div className="mt-3 rounded-md border border-border bg-surface p-3">
+              <HourlyTrafficChart hourly={data.hourlyByEndpoint} tooltipTotal={t.tooltipTotal} />
+            </div>
+          </Expandable>
         </div>
       )}
 

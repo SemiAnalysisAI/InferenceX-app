@@ -28,6 +28,7 @@ export const PRIMARY_SECTIONS: readonly ExplorerNavLink[] = [
   { path: '/tool-analytics', label: { en: 'Tools', zh: '工具' } },
   { path: '/costs', label: { en: 'Costs', zh: '成本' } },
   { path: '/fast-mode', label: { en: 'Fast Mode', zh: 'Fast Mode' } },
+  { path: '/harnesses', label: { en: 'Harnesses', zh: 'Harness' } },
 ];
 
 export const MORE_SECTIONS: readonly ExplorerNavLink[] = [

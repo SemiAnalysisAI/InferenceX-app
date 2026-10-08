@@ -273,6 +273,17 @@ export const apiRouteCatalog = [
     sourceSha256: '46abe3b1f7987e6aac38597cb9005d588c450af609c9105c8ca7766640efba09',
   },
   {
+    source: 'src/app/api/v1/agentic-workload-explorer/harnesses/route.ts',
+    path: '/api/v1/agentic-workload-explorer/harnesses',
+    method: 'GET',
+    classification: 'page-bff',
+    exclusionReason: {
+      en: 'Agentic Workload Explorer page backend over a frozen, anonymized ProxyTrace snapshot; response shapes follow the feature-gated pages and are not a stable public contract.',
+      zh: 'Agentic Workload Explorer 页面后端，读取冻结的匿名 ProxyTrace 快照；响应结构跟随受功能开关控制的页面，不是稳定的公开契约。',
+    },
+    sourceSha256: '5eaa5404736bf2e67050e8c1d0eff04df3c42d36e89e3efa2f673069636c7b8d',
+  },
+  {
     source: 'src/app/api/v1/agentic-workload-explorer/latency/route.ts',
     path: '/api/v1/agentic-workload-explorer/latency',
     method: 'GET',
@@ -380,7 +391,7 @@ export const apiRouteCatalog = [
       en: 'Agentic Workload Explorer page backend over a frozen, anonymized ProxyTrace snapshot; response shapes follow the feature-gated pages and are not a stable public contract.',
       zh: 'Agentic Workload Explorer 页面后端，读取冻结的匿名 ProxyTrace 快照；响应结构跟随受功能开关控制的页面，不是稳定的公开契约。',
     },
-    sourceSha256: '5937f95d45b0ff0724ec40ce52663249af608e6e0e02c6517e9af8a2fb9a813a',
+    sourceSha256: '6187898d15d375546a1d8131d60fe9588c5978ecbb47dfbfc57b473d1219842d',
   },
   {
     source: 'src/app/api/v1/agentic-workload-explorer/sessions/[id]/route.ts',
@@ -413,7 +424,7 @@ export const apiRouteCatalog = [
       en: 'Agentic Workload Explorer page backend over a frozen, anonymized ProxyTrace snapshot; response shapes follow the feature-gated pages and are not a stable public contract.',
       zh: 'Agentic Workload Explorer 页面后端，读取冻结的匿名 ProxyTrace 快照；响应结构跟随受功能开关控制的页面，不是稳定的公开契约。',
     },
-    sourceSha256: 'ca05417373b11d42938c32cf48396bd1f10ea98c4924370e610cf73da5b43f6e',
+    sourceSha256: '82b7adce40b7b93e870a052a8f7bbc5f72ac59689e92adb74483c4c8f6995840',
   },
   {
     source: 'src/app/api/v1/agentic-workload-explorer/streaming/route.ts',
@@ -435,7 +446,7 @@ export const apiRouteCatalog = [
       en: 'Agentic Workload Explorer page backend over a frozen, anonymized ProxyTrace snapshot; response shapes follow the feature-gated pages and are not a stable public contract.',
       zh: 'Agentic Workload Explorer 页面后端，读取冻结的匿名 ProxyTrace 快照；响应结构跟随受功能开关控制的页面，不是稳定的公开契约。',
     },
-    sourceSha256: 'ab32c06301312b86ce83e97eecb29379d8a5b0b992e3b31deb85aba25571c3cc',
+    sourceSha256: '1afd518ebafefc63833779726062317685c21ef434de675a7da65f123ad60217',
   },
   {
     source: 'src/app/api/v1/agentic-workload-explorer/tool-analytics/sequences/route.ts',
@@ -446,7 +457,7 @@ export const apiRouteCatalog = [
       en: 'Agentic Workload Explorer page backend over a frozen, anonymized ProxyTrace snapshot; response shapes follow the feature-gated pages and are not a stable public contract.',
       zh: 'Agentic Workload Explorer 页面后端，读取冻结的匿名 ProxyTrace 快照；响应结构跟随受功能开关控制的页面，不是稳定的公开契约。',
     },
-    sourceSha256: '17f0fa116113f86d7c74849083950980f12422353eff0753425b11b36e9686c7',
+    sourceSha256: '1be4d1eaec96688c9a53bc6a6c5d80904601d92c9c40212de64d8bd2ddb47c3c',
   },
   {
     source: 'src/app/api/v1/agentic-workload-explorer/traffic/route.ts',
@@ -469,6 +480,17 @@ export const apiRouteCatalog = [
       zh: 'Agentic Workload Explorer 页面后端，读取冻结的匿名 ProxyTrace 快照；响应结构跟随受功能开关控制的页面，不是稳定的公开契约。',
     },
     sourceSha256: '51f8b316a9963d16073bcba950c827af19b8c5c7a91c093f4a474f42e9b6085b',
+  },
+  {
+    source: 'src/app/api/v1/agentic-workload-explorer/trends/harness-versions/route.ts',
+    path: '/api/v1/agentic-workload-explorer/trends/harness-versions',
+    method: 'GET',
+    classification: 'page-bff',
+    exclusionReason: {
+      en: 'Agentic Workload Explorer page backend over a frozen, anonymized ProxyTrace snapshot; response shapes follow the feature-gated pages and are not a stable public contract.',
+      zh: 'Agentic Workload Explorer 页面后端，读取冻结的匿名 ProxyTrace 快照；响应结构跟随受功能开关控制的页面，不是稳定的公开契约。',
+    },
+    sourceSha256: '686aab16e8e71b5f5a48eb1c63dfd331de637090e178483fd01b29eb81da03ba',
   },
   {
     source: 'src/app/api/v1/agentic-workload-explorer/web-search/route.ts',

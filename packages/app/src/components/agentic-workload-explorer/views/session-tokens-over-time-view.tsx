@@ -12,6 +12,7 @@ import {
 } from '@/lib/agentic-workload-explorer/tokens-over-time';
 import { TokensOverTimeChart } from '@/components/agentic-workload-explorer/tokens-over-time-chart';
 import { ContextTrajectoriesChart } from '@/components/agentic-workload-explorer/context-trajectories-chart';
+import { Expandable } from '@/components/agentic-workload-explorer/expandable-chart';
 import { useExplorerHref } from '@/hooks/agentic-workload-explorer/use-explorer-href';
 import { useLocale } from '@/lib/use-locale';
 import { track } from '@/lib/analytics';
@@ -24,6 +25,7 @@ const STRINGS = {
     hashBlocks: 'Hash Blocks',
     agentLabel: 'Agent',
     mainAgent: 'Main Agent',
+    tokensOverTimeTitle: 'Tokens Over Time',
   },
   zh: {
     cachedVsUncached: '已缓存 vs 未缓存',
@@ -32,6 +34,7 @@ const STRINGS = {
     hashBlocks: 'Hash Blocks',
     agentLabel: '智能体',
     mainAgent: '主智能体',
+    tokensOverTimeTitle: 'Token 时间分布',
   },
 } as const;
 
@@ -169,15 +172,21 @@ function TokensOverTimePageContent() {
         )}
       </div>
 
-      {view === 'cached' ? (
-        <TokensOverTimeChart
-          points={points}
-          mode={mode}
-          agentLabel={activeAgent?.label ?? t.mainAgent}
-        />
-      ) : (
-        <ContextTrajectoriesChart trajectories={trajectories} />
-      )}
+      <Expandable
+        title={view === 'cached' ? t.tokensOverTimeTitle : t.contextTrajectories}
+        subtitle={view === 'cached' ? (activeAgent?.label ?? t.mainAgent) : undefined}
+        corner
+      >
+        {view === 'cached' ? (
+          <TokensOverTimeChart
+            points={points}
+            mode={mode}
+            agentLabel={activeAgent?.label ?? t.mainAgent}
+          />
+        ) : (
+          <ContextTrajectoriesChart trajectories={trajectories} />
+        )}
+      </Expandable>
     </div>
   );
 }

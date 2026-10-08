@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -59,6 +59,8 @@ const STRINGS = {
     hashLoad: 'Load',
     hashRetry: 'Retry',
     hashNoData: 'No hash data — session has no recorded prompt blocks.',
+    colVersion: 'Version',
+    resetSort: 'Reset sort',
     openSession: (id: string) => `Open session ${id}`,
   },
   zh: {
@@ -67,7 +69,7 @@ const STRINGS = {
     searchPlaceholder: '搜索会话...',
     minReqs: { '20': '> 20 请求', '100': '> 100 请求', '0': '全部' } as Record<string, string>,
     allVersions: '所有版本',
-    allHarnesses: '所有 Harness',
+    allHarnesses: '全部 harness',
     noMatch: '没有符合条件的会话',
     colSession: '会话',
     colUser: '用户',
@@ -85,6 +87,8 @@ const STRINGS = {
     hashLoad: '加载',
     hashRetry: '重试',
     hashNoData: '无 hash 数据 — 此会话没有记录 prompt 块',
+    colVersion: '版本',
+    resetSort: '重置排序',
     openSession: (id: string) => `打开会话 ${id}`,
   },
 } as const;
@@ -119,7 +123,7 @@ type HashStatsState =
 
 const runHashStatsRequest = createTaskLimiter(4);
 
-type SortKey = 'active' | 'started' | 'requests' | 'cost' | 'session' | 'user';
+type SortKey = 'active' | 'started' | 'requests' | 'cost' | 'session' | 'version' | 'user';
 type SortDir = 'asc' | 'desc';
 
 function SortButton({
@@ -142,8 +146,10 @@ function SortButton({
     <button
       type="button"
       onClick={() => onSort(col)}
-      className={`flex items-center gap-1 transition-colors ${
-        align === 'right' ? 'justify-end ml-auto' : ''
+      // Hug the label: a stretched grid item made the click target run well
+      // past the text into the next column's space.
+      className={`flex w-fit items-center gap-1 transition-colors ${
+        align === 'right' ? 'justify-self-end' : 'justify-self-start'
       } ${active ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
     >
       {children}
@@ -175,6 +181,10 @@ const HARNESS_BADGE_CLASSES: Record<Harness, string> = {
   omp: 'border-sky-500/30 bg-sky-500/8 text-sky-500',
   other: 'border-border bg-surface-hover text-muted-foreground',
 };
+
+// Harnesses whose sessions carry a version (see `parseUserAgent`). Pi sends
+// none and "Other" mixes unrelated products, so neither sorts by version.
+const VERSIONED_HARNESSES: readonly HarnessFilter[] = ['claude-code', 'codex', 'omp'];
 
 // The read-only snapshot only contains the current trace version.
 const VERSION_FILTERS: { value: VersionFilter; label: string }[] = [
@@ -242,6 +252,11 @@ function SessionsPageContent() {
     : '20';
   const harnessFilter = parseHarnessFilter(searchParams.get('harness'));
   const versionFilter = parseVersionFilter(searchParams.get('version'));
+  const versionSortable = VERSIONED_HARNESSES.includes(harnessFilter);
+  if (sortKey === 'version' && !versionSortable) {
+    setSortKey('active');
+    setSortDir('desc');
+  }
 
   function setFilter(key: 'minReqs' | 'harness' | 'version', value: string) {
     const params = new URLSearchParams(searchParams.toString());
@@ -268,6 +283,8 @@ function SessionsPageContent() {
   harnessFilterRef.current = harnessFilter;
   const minReqsFilterRef = useRef(minReqsFilter);
   minReqsFilterRef.current = minReqsFilter;
+  const sortRef = useRef({ sortKey, sortDir });
+  sortRef.current = { sortKey, sortDir };
 
   const {
     items: sessions,
@@ -285,6 +302,8 @@ function SessionsPageContent() {
       if (versionFilterRef.current !== 'all') params.set('version', versionFilterRef.current);
       if (harnessFilterRef.current !== 'all') params.set('harness', harnessFilterRef.current);
       if (minReqsFilterRef.current !== '0') params.set('minReqs', minReqsFilterRef.current);
+      params.set('sort', sortRef.current.sortKey);
+      params.set('dir', sortRef.current.sortDir);
       const res = await fetch(`/api/v1/agentic-workload-explorer/sessions?${params}`);
       const data: { sessions: Session[] } = await res.json();
       return { items: data.sessions, hasMore: data.sessions.length >= PAGE_SIZE };
@@ -299,11 +318,15 @@ function SessionsPageContent() {
     if (versionFilter !== 'all') params.set('version', versionFilter);
     if (harnessFilter !== 'all') params.set('harness', harnessFilter);
     if (minReqsFilter !== '0') params.set('minReqs', minReqsFilter);
+    // Sorting runs on the server over every matching session, not just the
+    // pages loaded so far.
+    params.set('sort', sortKey);
+    params.set('dir', sortDir);
     const r = await fetch(`/api/v1/agentic-workload-explorer/sessions?${params}`);
     const data: { sessions: Session[]; stats: SessionStats } = await r.json();
     resetSessions(data.sessions, data.sessions.length >= PAGE_SIZE);
     setStats(data.stats);
-  }, [activeSearch, versionFilter, harnessFilter, minReqsFilter]);
+  }, [activeSearch, versionFilter, harnessFilter, minReqsFilter, sortKey, sortDir]);
 
   const initialLoad = useRef(true);
 
@@ -318,39 +341,11 @@ function SessionsPageContent() {
       });
   }, [fetchSessions]);
 
-  const sortedSessions = useMemo(() => {
-    const sorted = [...sessions].toSorted((a, b) => {
-      let cmp = 0;
-      switch (sortKey) {
-        case 'active': {
-          cmp = new Date(a.lastActiveAt).getTime() - new Date(b.lastActiveAt).getTime();
-          break;
-        }
-        case 'started': {
-          cmp = new Date(a.startedAt).getTime() - new Date(b.startedAt).getTime();
-          break;
-        }
-        case 'requests': {
-          cmp = a.requestCount - b.requestCount;
-          break;
-        }
-        case 'cost': {
-          cmp = Number(a.totalCost) - Number(b.totalCost);
-          break;
-        }
-        case 'session': {
-          cmp = a.id.localeCompare(b.id);
-          break;
-        }
-        case 'user': {
-          cmp = a.clientApiKeyHash.localeCompare(b.clientApiKeyHash);
-          break;
-        }
-      }
-      return sortDir === 'desc' ? -cmp : cmp;
-    });
-    return sorted;
-  }, [sessions, sortKey, sortDir]);
+  const sortChanged = sortKey !== 'active' || sortDir !== 'desc';
+  function resetSort() {
+    setSortKey('active');
+    setSortDir('desc');
+  }
 
   function handleSort(key: SortKey) {
     if (sortKey === key) {
@@ -381,7 +376,7 @@ function SessionsPageContent() {
       </div>
 
       {/* Search + Filter */}
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <div className="relative">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
           <input
@@ -467,6 +462,15 @@ function SessionsPageContent() {
             </button>
           ))}
         </div>
+        {sortChanged && (
+          <button
+            type="button"
+            onClick={resetSort}
+            className="ml-auto px-2.5 py-1 text-3xs font-mono uppercase tracking-wider rounded-md border border-border text-muted-foreground hover:text-foreground hover:bg-surface-hover transition-colors"
+          >
+            {t.resetSort}
+          </button>
+        )}
       </div>
 
       {/* Table */}
@@ -481,12 +485,19 @@ function SessionsPageContent() {
           <p className="text-sm text-muted-foreground">{t.noMatch}</p>
         </div>
       ) : (
-        <div className="rounded-lg border border-border overflow-hidden">
+        <div className="rounded-lg border border-border overflow-x-auto">
           {/* Header */}
-          <div className="grid gap-4 px-4 py-2.5 bg-surface text-3xs font-mono uppercase tracking-wider text-muted-foreground border-b border-border grid-cols-[1fr_140px_72px_80px_88px_112px_80px_80px]">
+          <div className="grid min-w-[1160px] gap-4 px-4 py-2.5 bg-surface text-3xs font-mono uppercase tracking-wider text-muted-foreground border-b border-border grid-cols-[1fr_80px_140px_72px_80px_88px_112px_80px_80px]">
             <SortButton col="session" sortKey={sortKey} sortDir={sortDir} onSort={handleSort}>
               {t.colSession}
             </SortButton>
+            {versionSortable ? (
+              <SortButton col="version" sortKey={sortKey} sortDir={sortDir} onSort={handleSort}>
+                {t.colVersion}
+              </SortButton>
+            ) : (
+              <span className="normal-case">{t.colVersion}</span>
+            )}
             <SortButton col="user" sortKey={sortKey} sortDir={sortDir} onSort={handleSort}>
               {t.colUser}
             </SortButton>
@@ -535,8 +546,8 @@ function SessionsPageContent() {
           </div>
 
           {/* Rows */}
-          <div className="divide-y divide-border">
-            {sortedSessions.map((session) => (
+          <div className="min-w-[1160px] divide-y divide-border">
+            {sessions.map((session) => (
               <SessionRow key={session.id} session={session} />
             ))}
           </div>
@@ -574,9 +585,10 @@ function SessionRow({ session }: { session: Session }) {
   };
 
   const apiHit = apiCacheHitRate(session);
+  const { cliVersion, os } = sessionUaInfo(session);
 
   return (
-    <div className="relative grid gap-4 px-4 py-3 cursor-pointer hover:bg-surface-hover transition-colors items-center grid-cols-[1fr_140px_72px_80px_88px_112px_80px_80px]">
+    <div className="relative grid gap-4 px-4 py-3 cursor-pointer hover:bg-surface-hover transition-colors items-center grid-cols-[1fr_80px_140px_72px_80px_88px_112px_80px_80px]">
       <Link
         href={explorerHref(`/sessions/${session.id}`)}
         aria-label={t.openSession(session.id)}
@@ -600,25 +612,12 @@ function SessionRow({ session }: { session: Session }) {
           })()}
         </div>
         <div className="flex items-center gap-2 text-3xs font-mono text-muted-foreground">
-          {(() => {
-            const ua = sessionUaInfo(session);
-            return (
-              <>
-                {ua.cliVersion && (
-                  <>
-                    <span className="text-border">·</span>
-                    <span>v{ua.cliVersion}</span>
-                  </>
-                )}
-                {ua.os && (
-                  <>
-                    <span className="text-border">·</span>
-                    <span>{ua.os}</span>
-                  </>
-                )}
-              </>
-            );
-          })()}
+          {os && (
+            <>
+              <span className="text-border">·</span>
+              <span>{os}</span>
+            </>
+          )}
           {session.totalOutput > 0 && (
             <>
               <span className="text-border">·</span>
@@ -630,6 +629,15 @@ function SessionRow({ session }: { session: Session }) {
           )}
         </div>
       </div>
+
+      {/* Harness version */}
+      <span className="font-mono text-2xs truncate" title={cliVersion ?? undefined}>
+        {cliVersion ? (
+          <span className="text-muted-foreground">v{cliVersion}</span>
+        ) : (
+          <span className="text-subtle">—</span>
+        )}
+      </span>
 
       {/* User */}
       <span className="font-mono text-2xs truncate">

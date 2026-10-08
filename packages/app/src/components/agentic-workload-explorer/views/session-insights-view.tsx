@@ -23,6 +23,7 @@ import {
   RangeToggle,
   type DayRange,
 } from '@/components/agentic-workload-explorer/range-toggle';
+import { Expandable } from '@/components/agentic-workload-explorer/expandable-chart';
 
 // -- i18n -------------------------------------------------------------------
 
@@ -130,7 +131,8 @@ function generateTicks(min: number, max: number, targetCount: number): number[] 
   const spacing = niceNum(range / (targetCount - 1), true);
   const niceMin = Math.floor(min / spacing) * spacing;
   const ticks: number[] = [];
-  for (let t = niceMin; t <= max + spacing * 0.5; t += spacing) {
+  // Keep going until a tick reaches max, so the tallest bar is never clipped.
+  for (let t = niceMin; t - spacing < max - spacing * 1e-9; t += spacing) {
     ticks.push(Math.round(t * 1e10) / 1e10);
   }
   return ticks;
@@ -212,178 +214,180 @@ function HistogramChart({
   const labelInterval = Math.max(1, Math.floor(bins.length / 5));
 
   return (
-    <div className="rounded-md border border-border bg-surface p-3">
-      {title && (
-        <div className="flex items-center justify-end mb-2">
-          <ExportPngButton
-            locale={locale}
-            onClick={() => {
-              track('agentic_workload_session_histogram_export', {
-                title,
-                filename: exportFilename || 'histogram.png',
-              });
-              if (svgRef.current)
-                exportSvgToPng(svgRef.current, {
+    <Expandable title={title}>
+      <div className="rounded-md border border-border bg-surface p-3">
+        {title && (
+          <div className="flex items-center justify-end mb-2">
+            <ExportPngButton
+              locale={locale}
+              onClick={() => {
+                track('agentic_workload_session_histogram_export', {
                   title,
                   filename: exportFilename || 'histogram.png',
-                  svgWidth: CHART_W,
-                  svgHeight: CHART_H,
                 });
-            }}
-          />
-        </div>
-      )}
-      <svg
-        ref={svgRef}
-        viewBox={`0 0 ${CHART_W} ${CHART_H}`}
-        className="w-full"
-        style={{ maxHeight: 240 }}
-      >
-        {/* Y-axis grid lines and labels */}
-        {yTicks.map((t) => (
-          <g key={`y-${t}`}>
-            {t > 0 && (
-              <line
-                x1={MARGIN.left}
-                y1={sy(t)}
-                x2={MARGIN.left + PLOT_W}
-                y2={sy(t)}
-                stroke="currentColor"
-                className="text-border"
-                strokeWidth={0.5}
-                strokeDasharray="3 3"
-              />
-            )}
-            <text
-              x={MARGIN.left - 6}
-              y={sy(t) + 3}
-              textAnchor="end"
-              className="fill-muted-foreground"
-              style={{ fontSize: SVG_FONT_SIZE, fontFamily: SVG_FONT }}
-            >
-              {formatNumber(t)}
-            </text>
-          </g>
-        ))}
-
-        {/* Baseline */}
-        <line
-          x1={MARGIN.left}
-          y1={MARGIN.top + PLOT_H}
-          x2={MARGIN.left + PLOT_W}
-          y2={MARGIN.top + PLOT_H}
-          stroke="currentColor"
-          className="text-border"
-          strokeWidth={0.5}
-        />
-
-        {/* Bars */}
-        {bins.map((b, i) => {
-          const x = MARGIN.left + i * (barWidth + barGap);
-          const barH = (b.count / yMax) * PLOT_H;
-          return (
-            <g key={i}>
-              <rect
-                x={x}
-                y={sy(b.count)}
-                width={barWidth}
-                height={Math.max(barH, 0.5)}
-                fill={color}
-                rx={1}
-              >
-                <title>
-                  {formatX(b.min)} - {formatX(b.max)}: {b.count}
-                </title>
-              </rect>
-              {i % labelInterval === 0 && (
-                <text
-                  x={x + barWidth / 2}
-                  y={MARGIN.top + PLOT_H + 14}
-                  textAnchor="middle"
-                  className="fill-muted-foreground"
-                  style={{ fontSize: SVG_FONT_SIZE, fontFamily: SVG_FONT }}
-                >
-                  {formatX(b.min)}
-                </text>
+                if (svgRef.current)
+                  exportSvgToPng(svgRef.current, {
+                    title,
+                    filename: exportFilename || 'histogram.png',
+                    svgWidth: CHART_W,
+                    svgHeight: CHART_H,
+                  });
+              }}
+            />
+          </div>
+        )}
+        <svg
+          ref={svgRef}
+          viewBox={`0 0 ${CHART_W} ${CHART_H}`}
+          className="w-full"
+          style={{ maxHeight: 240 }}
+        >
+          {/* Y-axis grid lines and labels */}
+          {yTicks.map((t) => (
+            <g key={`y-${t}`}>
+              {t > 0 && (
+                <line
+                  x1={MARGIN.left}
+                  y1={sy(t)}
+                  x2={MARGIN.left + PLOT_W}
+                  y2={sy(t)}
+                  stroke="currentColor"
+                  className="text-border"
+                  strokeWidth={0.5}
+                  strokeDasharray="3 3"
+                />
               )}
+              <text
+                x={MARGIN.left - 6}
+                y={sy(t) + 3}
+                textAnchor="end"
+                className="fill-muted-foreground"
+                style={{ fontSize: SVG_FONT_SIZE, fontFamily: SVG_FONT }}
+              >
+                {formatNumber(t)}
+              </text>
             </g>
-          );
-        })}
-
-        {/* Percentile vertical lines */}
-        {percentiles &&
-          (() => {
-            const xMin = bins[0].min;
-            const xMax = bins.at(-1)!.max;
-            const xRange = xMax - xMin;
-            if (xRange <= 0) return null;
-            const sx = (v: number) => MARGIN.left + ((v - xMin) / xRange) * PLOT_W;
-            const entries: { label: string; value: number }[] = [
-              { label: 'p25', value: percentiles.p25 },
-              { label: 'p50', value: percentiles.p50 },
-              { label: 'p75', value: percentiles.p75 },
-              { label: 'p90', value: percentiles.p90 },
-              { label: 'p95', value: percentiles.p95 },
-              { label: 'p99', value: percentiles.p99 },
-            ];
-            return entries.map(({ label, value }) => {
-              const px = sx(value);
-              if (px < MARGIN.left || px > MARGIN.left + PLOT_W) return null;
-              return (
-                <g key={label}>
-                  <line
-                    x1={px}
-                    y1={MARGIN.top}
-                    x2={px}
-                    y2={MARGIN.top + PLOT_H}
-                    stroke={PERCENTILE_COLORS[label] || '#94a3b8'}
-                    strokeWidth={1}
-                    strokeDasharray="4 3"
-                    opacity={0.7}
-                  />
-                  <text
-                    x={px}
-                    y={MARGIN.top - 2}
-                    textAnchor="middle"
-                    fill={PERCENTILE_COLORS[label] || '#94a3b8'}
-                    style={{ fontSize: '7px', fontFamily: SVG_FONT }}
-                  >
-                    {label}
-                  </text>
-                </g>
-              );
-            });
-          })()}
-      </svg>
-
-      {/* Percentile stats row */}
-      {percentiles && (
-        <div className="grid grid-cols-6 gap-1.5 mt-3 pt-3 border-t border-border">
-          {(
-            [
-              { label: 'p25', value: percentiles.p25 },
-              { label: 'p50', value: percentiles.p50 },
-              { label: 'p75', value: percentiles.p75 },
-              { label: 'p90', value: percentiles.p90 },
-              { label: 'p95', value: percentiles.p95 },
-              { label: 'p99', value: percentiles.p99 },
-            ] as const
-          ).map((p) => (
-            <div
-              key={p.label}
-              className="rounded-md border border-border bg-surface-hover px-2 py-1.5 text-center"
-            >
-              <div className="text-3xs font-mono font-bold uppercase tracking-eyebrow-wide text-muted-foreground">
-                {p.label}
-              </div>
-              <div className="text-sm font-mono font-bold tracking-tight mt-0.5">
-                {formatX(p.value)}
-              </div>
-            </div>
           ))}
-        </div>
-      )}
-    </div>
+
+          {/* Baseline */}
+          <line
+            x1={MARGIN.left}
+            y1={MARGIN.top + PLOT_H}
+            x2={MARGIN.left + PLOT_W}
+            y2={MARGIN.top + PLOT_H}
+            stroke="currentColor"
+            className="text-border"
+            strokeWidth={0.5}
+          />
+
+          {/* Bars */}
+          {bins.map((b, i) => {
+            const x = MARGIN.left + i * (barWidth + barGap);
+            const barH = (b.count / yMax) * PLOT_H;
+            return (
+              <g key={i}>
+                <rect
+                  x={x}
+                  y={sy(b.count)}
+                  width={barWidth}
+                  height={Math.max(barH, 0.5)}
+                  fill={color}
+                  rx={1}
+                >
+                  <title>
+                    {formatX(b.min)} - {formatX(b.max)}: {b.count}
+                  </title>
+                </rect>
+                {i % labelInterval === 0 && (
+                  <text
+                    x={x + barWidth / 2}
+                    y={MARGIN.top + PLOT_H + 14}
+                    textAnchor="middle"
+                    className="fill-muted-foreground"
+                    style={{ fontSize: SVG_FONT_SIZE, fontFamily: SVG_FONT }}
+                  >
+                    {formatX(b.min)}
+                  </text>
+                )}
+              </g>
+            );
+          })}
+
+          {/* Percentile vertical lines */}
+          {percentiles &&
+            (() => {
+              const xMin = bins[0].min;
+              const xMax = bins.at(-1)!.max;
+              const xRange = xMax - xMin;
+              if (xRange <= 0) return null;
+              const sx = (v: number) => MARGIN.left + ((v - xMin) / xRange) * PLOT_W;
+              const entries: { label: string; value: number }[] = [
+                { label: 'p25', value: percentiles.p25 },
+                { label: 'p50', value: percentiles.p50 },
+                { label: 'p75', value: percentiles.p75 },
+                { label: 'p90', value: percentiles.p90 },
+                { label: 'p95', value: percentiles.p95 },
+                { label: 'p99', value: percentiles.p99 },
+              ];
+              return entries.map(({ label, value }) => {
+                const px = sx(value);
+                if (px < MARGIN.left || px > MARGIN.left + PLOT_W) return null;
+                return (
+                  <g key={label}>
+                    <line
+                      x1={px}
+                      y1={MARGIN.top}
+                      x2={px}
+                      y2={MARGIN.top + PLOT_H}
+                      stroke={PERCENTILE_COLORS[label] || '#94a3b8'}
+                      strokeWidth={1}
+                      strokeDasharray="4 3"
+                      opacity={0.7}
+                    />
+                    <text
+                      x={px}
+                      y={MARGIN.top - 2}
+                      textAnchor="middle"
+                      fill={PERCENTILE_COLORS[label] || '#94a3b8'}
+                      style={{ fontSize: '7px', fontFamily: SVG_FONT }}
+                    >
+                      {label}
+                    </text>
+                  </g>
+                );
+              });
+            })()}
+        </svg>
+
+        {/* Percentile stats row */}
+        {percentiles && (
+          <div className="grid grid-cols-6 gap-1.5 mt-3 pt-3 border-t border-border">
+            {(
+              [
+                { label: 'p25', value: percentiles.p25 },
+                { label: 'p50', value: percentiles.p50 },
+                { label: 'p75', value: percentiles.p75 },
+                { label: 'p90', value: percentiles.p90 },
+                { label: 'p95', value: percentiles.p95 },
+                { label: 'p99', value: percentiles.p99 },
+              ] as const
+            ).map((p) => (
+              <div
+                key={p.label}
+                className="rounded-md border border-border bg-surface-hover px-2 py-1.5 text-center"
+              >
+                <div className="text-3xs font-mono font-bold uppercase tracking-eyebrow-wide text-muted-foreground">
+                  {p.label}
+                </div>
+                <div className="text-sm font-mono font-bold tracking-tight mt-0.5">
+                  {formatX(p.value)}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </Expandable>
   );
 }
 
@@ -421,101 +425,103 @@ function DailySessionsChart({
   const sy = (v: number) => MARGIN.top + PLOT_H - (v / yMax) * PLOT_H;
 
   return (
-    <div className="rounded-md border border-border bg-surface p-3">
-      <div className="flex items-center justify-between gap-2 mb-2">
-        {controls}
-        <ExportPngButton
-          locale={locale}
-          onClick={() => {
-            track('agentic_workload_daily_sessions_export');
-            if (svgRef.current)
-              exportSvgToPng(svgRef.current, {
-                title: exportTitle,
-                filename: 'daily-sessions.png',
-                svgWidth: CHART_W,
-                svgHeight: CHART_H,
-              });
-          }}
-        />
-      </div>
-      <svg
-        ref={svgRef}
-        viewBox={`0 0 ${CHART_W} ${CHART_H}`}
-        className="w-full"
-        style={{ maxHeight: 240 }}
-      >
-        {/* Y-axis */}
-        {yTicks.map((t) => (
-          <g key={`y-${t}`}>
-            {t > 0 && (
-              <line
-                x1={MARGIN.left}
-                y1={sy(t)}
-                x2={MARGIN.left + PLOT_W}
-                y2={sy(t)}
-                stroke="currentColor"
-                className="text-border"
-                strokeWidth={0.5}
-                strokeDasharray="3 3"
-              />
-            )}
-            <text
-              x={MARGIN.left - 6}
-              y={sy(t) + 3}
-              textAnchor="end"
-              className="fill-muted-foreground"
-              style={{ fontSize: SVG_FONT_SIZE, fontFamily: SVG_FONT }}
-            >
-              {formatNumber(t)}
-            </text>
-          </g>
-        ))}
-
-        {/* Baseline */}
-        <line
-          x1={MARGIN.left}
-          y1={MARGIN.top + PLOT_H}
-          x2={MARGIN.left + PLOT_W}
-          y2={MARGIN.top + PLOT_H}
-          stroke="currentColor"
-          className="text-border"
-          strokeWidth={0.5}
-        />
-
-        {/* Bars */}
-        {slice.map((d, i) => {
-          const x = MARGIN.left + i * (barWidth + barGap);
-          const barH = (d.sessionCount / yMax) * PLOT_H;
-          return (
-            <g key={d.day}>
-              <rect
-                x={x}
-                y={sy(d.sessionCount)}
-                width={barWidth}
-                height={Math.max(barH, 0.5)}
-                fill="#8b5cf6"
-                rx={1}
-              >
-                <title>
-                  {formatSnapshotDate(d.day)}: {tooltipSessions(d.sessionCount)}
-                </title>
-              </rect>
-              {i % labelEvery === 0 && (
-                <text
-                  x={x + barWidth / 2}
-                  y={MARGIN.top + PLOT_H + 14}
-                  textAnchor="middle"
-                  className="fill-muted-foreground"
-                  style={{ fontSize: SVG_FONT_SIZE, fontFamily: SVG_FONT }}
-                >
-                  {formatSnapshotDate(d.day)}
-                </text>
+    <Expandable title={exportTitle}>
+      <div className="rounded-md border border-border bg-surface p-3">
+        <div className="flex items-center justify-between gap-2 mb-2">
+          {controls}
+          <ExportPngButton
+            locale={locale}
+            onClick={() => {
+              track('agentic_workload_daily_sessions_export');
+              if (svgRef.current)
+                exportSvgToPng(svgRef.current, {
+                  title: exportTitle,
+                  filename: 'daily-sessions.png',
+                  svgWidth: CHART_W,
+                  svgHeight: CHART_H,
+                });
+            }}
+          />
+        </div>
+        <svg
+          ref={svgRef}
+          viewBox={`0 0 ${CHART_W} ${CHART_H}`}
+          className="w-full"
+          style={{ maxHeight: 240 }}
+        >
+          {/* Y-axis */}
+          {yTicks.map((t) => (
+            <g key={`y-${t}`}>
+              {t > 0 && (
+                <line
+                  x1={MARGIN.left}
+                  y1={sy(t)}
+                  x2={MARGIN.left + PLOT_W}
+                  y2={sy(t)}
+                  stroke="currentColor"
+                  className="text-border"
+                  strokeWidth={0.5}
+                  strokeDasharray="3 3"
+                />
               )}
+              <text
+                x={MARGIN.left - 6}
+                y={sy(t) + 3}
+                textAnchor="end"
+                className="fill-muted-foreground"
+                style={{ fontSize: SVG_FONT_SIZE, fontFamily: SVG_FONT }}
+              >
+                {formatNumber(t)}
+              </text>
             </g>
-          );
-        })}
-      </svg>
-    </div>
+          ))}
+
+          {/* Baseline */}
+          <line
+            x1={MARGIN.left}
+            y1={MARGIN.top + PLOT_H}
+            x2={MARGIN.left + PLOT_W}
+            y2={MARGIN.top + PLOT_H}
+            stroke="currentColor"
+            className="text-border"
+            strokeWidth={0.5}
+          />
+
+          {/* Bars */}
+          {slice.map((d, i) => {
+            const x = MARGIN.left + i * (barWidth + barGap);
+            const barH = (d.sessionCount / yMax) * PLOT_H;
+            return (
+              <g key={d.day}>
+                <rect
+                  x={x}
+                  y={sy(d.sessionCount)}
+                  width={barWidth}
+                  height={Math.max(barH, 0.5)}
+                  fill="#8b5cf6"
+                  rx={1}
+                >
+                  <title>
+                    {formatSnapshotDate(d.day)}: {tooltipSessions(d.sessionCount)}
+                  </title>
+                </rect>
+                {i % labelEvery === 0 && (
+                  <text
+                    x={x + barWidth / 2}
+                    y={MARGIN.top + PLOT_H + 14}
+                    textAnchor="middle"
+                    className="fill-muted-foreground"
+                    style={{ fontSize: SVG_FONT_SIZE, fontFamily: SVG_FONT }}
+                  >
+                    {formatSnapshotDate(d.day)}
+                  </text>
+                )}
+              </g>
+            );
+          })}
+        </svg>
+      </div>
+    </Expandable>
   );
 }
 
@@ -667,10 +673,13 @@ function ConcurrentSessionsChart({
 // -- Main page --------------------------------------------------------------
 
 export default function SessionInsightsPage() {
+  const t = STRINGS[useLocale()];
   return (
-    <Suspense>
-      <SessionInsightsPageContent />
-    </Suspense>
+    <Expandable title={t.concurrentSessions}>
+      <Suspense>
+        <SessionInsightsPageContent />
+      </Suspense>
+    </Expandable>
   );
 }
 

@@ -1,5 +1,7 @@
 import type { Locale } from '@/lib/i18n';
 
+import { ExpandTrigger } from '@/components/agentic-workload-explorer/expandable-chart';
+
 const STRINGS = {
   en: {
     exportPng: 'Export PNG',
@@ -90,13 +92,16 @@ export function ExportPngButton({
   const t = STRINGS[locale];
   const ariaLabel = label ?? t.exportPng;
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-label={ariaLabel}
-      className="px-2 py-0.5 text-3xs font-mono rounded border border-border text-subtle hover:text-foreground hover:bg-surface-hover transition-colors"
-    >
-      {t.exportPng}
-    </button>
+    <>
+      <button
+        type="button"
+        onClick={onClick}
+        aria-label={ariaLabel}
+        className="px-2 py-0.5 text-3xs font-mono rounded border border-border text-subtle hover:text-foreground hover:bg-surface-hover transition-colors"
+      >
+        {t.exportPng}
+      </button>
+      <ExpandTrigger />
+    </>
   );
 }

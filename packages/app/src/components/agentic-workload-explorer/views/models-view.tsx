@@ -17,6 +17,8 @@ import type {
   TokensByModel,
   ModelTimeSeries,
 } from '@/lib/agentic-workload-explorer/api-types';
+import { formatSnapshotDate } from '@/lib/agentic-workload-explorer/snapshot';
+import { Expandable } from '@/components/agentic-workload-explorer/expandable-chart';
 
 // ── i18n ────────────────────────────────────────────────────────
 
@@ -25,7 +27,7 @@ const STRINGS = {
     stats: 'Stats',
     modelsUsed: 'Models Used',
     totalTokens: 'Total Tokens',
-    fastModePct: 'Fast Mode %',
+    fastModePct: 'Fast Mode % (tokens)',
     cacheHitRatio: 'Cache Hit Ratio',
     failedToLoad: 'Failed to load model data',
     tokenDistByModel: 'Token Distribution by Model',
@@ -49,7 +51,7 @@ const STRINGS = {
     requestsTooltip: (model: string, count: number, day: string) =>
       `${model}: ${count} requests (${day})`,
     inOut: (inp: string, out: string) => `${inp} in / ${out} out`,
-    fastOfTotal: (fast: string, total: string) => `${fast} fast of ${total} total`,
+    fastOfTotal: (fast: string, total: string) => `${fast} fast of ${total} tokens`,
     readEligible: (read: string, eligible: string) => `${read} read / ${eligible} eligible`,
     exportModelUsage: 'Model Usage Over Time',
   },
@@ -57,7 +59,7 @@ const STRINGS = {
     stats: '统计',
     modelsUsed: '使用模型数',
     totalTokens: '总 Token 数',
-    fastModePct: 'Fast Mode 占比',
+    fastModePct: 'Fast Mode %（token）',
     cacheHitRatio: 'Cache 命中率',
     failedToLoad: '加载模型数据失败',
     tokenDistByModel: '按模型的 Token 分布',
@@ -81,7 +83,7 @@ const STRINGS = {
     requestsTooltip: (model: string, count: number, day: string) =>
       `${model}: ${count} 次请求（${day}）`,
     inOut: (inp: string, out: string) => `${inp} in / ${out} out`,
-    fastOfTotal: (fast: string, total: string) => `${fast} fast / ${total} 总计`,
+    fastOfTotal: (fast: string, total: string) => `${fast} fast / ${total} token`,
     readEligible: (read: string, eligible: string) => `${read} read / ${eligible} 可用`,
     exportModelUsage: '模型使用趋势',
   },
@@ -275,12 +277,12 @@ function FastModeAnalysis({
         Number(m.inputTokens) -
         Number(m.fastInputTokens) +
         (Number(m.outputTokens) - Number(m.fastOutputTokens)) +
-        (Number(m.cacheReadInputTokens) - Number(m.fastCacheReadTokens)) +
+        (Number(m.cacheReadInputTokens) - Number(m.fastCacheReadInputTokens)) +
         (Number(m.cacheWriteTokens) - Number(m.fastCacheWriteTokens));
       const fast =
         Number(m.fastInputTokens) +
         Number(m.fastOutputTokens) +
-        Number(m.fastCacheReadTokens) +
+        Number(m.fastCacheReadInputTokens) +
         Number(m.fastCacheWriteTokens);
       const total = regular + fast;
       if (total > max) max = total;
@@ -308,12 +310,12 @@ function FastModeAnalysis({
             Number(m.inputTokens) -
             Number(m.fastInputTokens) +
             (Number(m.outputTokens) - Number(m.fastOutputTokens)) +
-            (Number(m.cacheReadInputTokens) - Number(m.fastCacheReadTokens)) +
+            (Number(m.cacheReadInputTokens) - Number(m.fastCacheReadInputTokens)) +
             (Number(m.cacheWriteTokens) - Number(m.fastCacheWriteTokens));
           const fastTokens =
             Number(m.fastInputTokens) +
             Number(m.fastOutputTokens) +
-            Number(m.fastCacheReadTokens) +
+            Number(m.fastCacheReadInputTokens) +
             Number(m.fastCacheWriteTokens);
           const total = regularTokens + fastTokens;
           const barScale = maxTokens > 0 ? (total / maxTokens) * 100 : 0;
@@ -395,13 +397,15 @@ function generateTicks(min: number, max: number, targetCount: number): number[] 
   const spacing = niceNum(range / (targetCount - 1), true);
   const niceMin = Math.floor(min / spacing) * spacing;
   const ticks: number[] = [];
-  for (let t = niceMin; t <= max + spacing * 0.5; t += spacing) {
+  // Keep going until a tick reaches max, so the tallest bar is never clipped.
+  for (let t = niceMin; t - spacing < max - spacing * 1e-9; t += spacing) {
     ticks.push(Math.round(t * 1e10) / 1e10);
   }
   return ticks;
 }
 
 function formatAxisValue(v: number): string {
+  if (v >= 1e9) return `${(v / 1e9).toFixed(v % 1e9 === 0 ? 0 : 1)}B`;
   if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(v % 1_000_000 === 0 ? 0 : 1)}M`;
   if (v >= 1_000) return `${(v / 1_000).toFixed(v % 1_000 === 0 ? 0 : 1)}K`;
   if (Number.isInteger(v)) return String(v);
@@ -431,7 +435,8 @@ function ModelUsageChart({
     }
 
     // Sort days
-    const sortedDays = [...dayMap.keys()].toSorted();
+    // Days arrive as Date strings ("Wed Aug 26 2026 …"), so sort by time.
+    const sortedDays = [...dayMap.keys()].toSorted((a, b) => Date.parse(a) - Date.parse(b));
 
     // Compute max stacked total
     let max = 0;
@@ -564,7 +569,9 @@ function ModelUsageChart({
                 fill={colorMap[model]}
                 rx={1}
               >
-                <title>{s.requestsTooltip(shortenModel(model), count, day)}</title>
+                <title>
+                  {s.requestsTooltip(shortenModel(model), count, formatSnapshotDate(day))}
+                </title>
               </rect>,
             );
             yOffset += count;
@@ -617,10 +624,14 @@ function ModelUsageChart({
 // ── Main page ────────────────────────────────────────────────────
 
 export default function ModelsPage() {
+  const locale = useLocale();
+  const s = STRINGS[locale];
   return (
-    <Suspense>
-      <ModelsPageContent />
-    </Suspense>
+    <Expandable title={s.modelUsageOverTime}>
+      <Suspense>
+        <ModelsPageContent />
+      </Suspense>
+    </Expandable>
   );
 }
 
@@ -657,8 +668,7 @@ function ModelsPageContent() {
   let totalCacheRead = 0;
   let totalCacheWrite = 0;
   let totalOutput = 0;
-  let totalFastCount = 0;
-  let totalRequests = 0;
+  let totalFastTokens = 0;
 
   if (data) {
     for (const m of data.tokensByModel) {
@@ -671,15 +681,17 @@ function ModelsPageContent() {
       totalCacheWrite += cacheWrite;
       totalOutput += output;
       totalTokens += input + cacheRead + cacheWrite + output;
-      totalFastCount += Number(m.fastModeCount);
-    }
-
-    for (const entry of data.timeSeries) {
-      totalRequests += Number(entry.requestCount);
+      totalFastTokens +=
+        Number(m.fastInputTokens) +
+        Number(m.fastCacheReadInputTokens) +
+        Number(m.fastCacheWriteTokens) +
+        Number(m.fastOutputTokens);
     }
   }
 
-  const fastModePct = totalRequests > 0 ? ((totalFastCount / totalRequests) * 100).toFixed(1) : '0';
+  // Token share: tokensByModel covers all time, while timeSeries covers only
+  // recent days, so a request share would mix windows.
+  const fastModePct = totalTokens > 0 ? ((totalFastTokens / totalTokens) * 100).toFixed(1) : '0';
 
   const cacheHitRatio =
     totalCacheRead + totalInput > 0
@@ -715,7 +727,7 @@ function ModelsPageContent() {
             <StatCard
               label={t.fastModePct}
               value={`${fastModePct}%`}
-              detail={t.fastOfTotal(formatNumber(totalFastCount), formatNumber(totalRequests))}
+              detail={t.fastOfTotal(formatNumber(totalFastTokens), formatNumber(totalTokens))}
             />
             <StatCard
               label={t.cacheHitRatio}

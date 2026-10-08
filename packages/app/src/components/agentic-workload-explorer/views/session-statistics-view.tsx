@@ -5,6 +5,11 @@ import { useParams } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ExpandableChart } from '@/components/agentic-workload-explorer/expandable-chart';
 import {
+  buildHistogram,
+  DistributionHistogram,
+  type HistogramEntry,
+} from '@/components/agentic-workload-explorer/distribution-histogram';
+import {
   Table,
   TableBody,
   TableCell,
@@ -17,12 +22,16 @@ import { Badge } from '@/components/ui/badge';
 import {
   formatNumber,
   formatDuration,
-  formatInteractivity,
-  formatPrefillSpeed,
+  formatInteractivityCompact,
+  formatPrefillSpeedCompact,
   computePrefillSpeed,
 } from '@/lib/agentic-workload-explorer/format';
 import { useSession } from '@/lib/agentic-workload-explorer/session-context';
-import { type StatRow, buildStatRows } from '@/lib/agentic-workload-explorer/stat-rows';
+import {
+  type StatRow,
+  buildStatRows,
+  flattenStatRowsChronologically,
+} from '@/lib/agentic-workload-explorer/stat-rows';
 import { computeSessionCacheHitRates } from '@/lib/agentic-workload-explorer/tokens-over-time';
 import { useLocale } from '@/lib/use-locale';
 import { track } from '@/lib/analytics';
@@ -47,7 +56,7 @@ const STRINGS = {
     total: 'Total',
     nReq: (n: number) => `${n} req`,
     childRequest: (n: number) => `└ request ${n}`,
-    tokens: 'Tokens',
+    tokens: 'tokens',
     colTurn: 'Turn',
     colTimestamp: 'Timestamp (UTC)',
     colType: 'Type',
@@ -58,15 +67,19 @@ const STRINGS = {
     colOutput: 'Output',
     colCost: 'Cost',
     colTTFT: 'TTFT',
-    colPrefillSpeed: 'Prefill Speed',
+    colPrefillSpeed: 'Prefill (tok/s)',
     colTPOT: 'TPOT',
-    colInteractivity: 'Interactivity',
+    colInteractivity: 'Interactivity (tok/s)',
     colDuration: 'Duration',
     colGap: 'Gap',
     ttft: 'TTFT',
     tpot: 'TPOT',
     interactivity: 'Interactivity',
     prefillSpeed: 'Prefill Speed',
+    axisLabelTTFT: 'Time to first token',
+    axisLabelTPOT: 'Time per output token (ms)',
+    axisLabelInteractivity: 'Output tok/s/user',
+    axisLabelPrefillSpeed: 'Input tok/s/query',
   },
   zh: {
     apiCacheHitRate: 'API 缓存命中率',
@@ -86,7 +99,7 @@ const STRINGS = {
     total: '合计',
     nReq: (n: number) => `${n} 个请求`,
     childRequest: (n: number) => `└ 请求 ${n}`,
-    tokens: 'Token',
+    tokens: 'token',
     colTurn: '轮次',
     colTimestamp: '时间戳 (UTC)',
     colType: '类型',
@@ -97,20 +110,25 @@ const STRINGS = {
     colOutput: '输出',
     colCost: '成本',
     colTTFT: 'TTFT',
-    colPrefillSpeed: 'Prefill 速度',
+    colPrefillSpeed: 'Prefill (tok/s)',
     colTPOT: 'TPOT',
-    colInteractivity: '交互性',
+    colInteractivity: '交互性 (tok/s)',
     colDuration: '耗时',
     colGap: '间隔',
     ttft: 'TTFT',
     tpot: 'TPOT',
     interactivity: '交互性',
     prefillSpeed: 'Prefill 速度',
+    axisLabelTTFT: '首 token 延迟',
+    axisLabelTPOT: '每输出 token 时间 (ms)',
+    axisLabelInteractivity: 'Output tok/s/user',
+    axisLabelPrefillSpeed: 'Input tok/s/query',
   },
 };
 
 interface StatsEntry {
   request: number;
+  requestId: string;
   cacheRead: number;
   cacheWrite: number;
   output: number;
@@ -136,10 +154,10 @@ export default function StatisticsPage() {
   const [selectedBucket, setSelectedBucket] = useState<{
     key: string;
     bucketIdx: number;
-    entries: { request: number; value: number }[];
+    entries: HistogramEntry[];
   } | null>(null);
   const [loadingRequest, setLoadingRequest] = useState<number | null>(null);
-  const pendingScrollRef = useRef<number | null>(null);
+  const pendingScrollRef = useRef<HistogramEntry | null>(null);
 
   useEffect(() => {
     fetch(`/api/v1/agentic-workload-explorer/sessions/${id}/stats`)
@@ -152,26 +170,35 @@ export default function StatisticsPage() {
   useEffect(() => {
     const target = pendingScrollRef.current;
     if (target === null) return;
-    const turn = requestToTurn(target, rows);
-    if (turn) {
+    const info = findTurn(target.requestId, rows);
+    if (info) {
       pendingScrollRef.current = null;
       setLoadingRequest(null);
-      // Wait for DOM update
-      requestAnimationFrame(() => scrollToRow(turn));
+      revealTurn(info);
+    } else {
+      // loadUntil fetches one page at a time; keep going until the request arrives.
+      void loadUntil(target.request);
     }
   }, [requests.length, rows]);
 
-  async function navigateToRequest(requestNum: number) {
-    // Already loaded — scroll immediately
-    const turn = requestToTurn(requestNum, rows);
-    if (turn) {
-      scrollToRow(turn);
+  function revealTurn(info: TurnInfo) {
+    if (info.kind === 'subagent_group') {
+      setExpandedGroups((prev) => new Set(prev).add(info.turn));
+    }
+    // Wait for the DOM update
+    requestAnimationFrame(() => scrollToRow(info.turn));
+  }
+
+  async function navigateToRequest(entry: HistogramEntry) {
+    const info = findTurn(entry.requestId, rows);
+    if (info) {
+      revealTurn(info);
       return;
     }
     // Need to load more
-    setLoadingRequest(requestNum);
-    pendingScrollRef.current = requestNum;
-    await loadUntil(requestNum);
+    setLoadingRequest(entry.request);
+    pendingScrollRef.current = entry;
+    await loadUntil(entry.request);
   }
 
   function toggleGroup(turn: number) {
@@ -218,14 +245,54 @@ export default function StatisticsPage() {
     return diffMs / 1000;
   });
 
-  const chartConfigs: {
+  const tokenCharts: { title: string; key: 'cacheRead' | 'cacheWrite' | 'output' }[] = [
+    { title: t.cacheRead, key: 'cacheRead' },
+    { title: t.cacheWrite, key: 'cacheWrite' },
+    { title: t.output, key: 'output' },
+  ];
+
+  // Timing distributions are per request; group rows sum tokens across many
+  // subagent requests but keep a single TTFT.
+  const leaves = flattenStatRowsChronologically(rows).map((l) => l.row);
+  const tpotRows = leaves.filter((r) => r.tpotMs !== null && r.tpotMs > 0);
+  const timingCharts: {
     title: string;
-    color: string;
-    key: 'cacheRead' | 'cacheWrite' | 'output';
+    values: number[];
+    format: (v: number) => string;
+    axisLabel: string;
+    sourceValues?: number[];
+    sourceTransform?: (v: number) => number;
   }[] = [
-    { title: t.cacheRead, color: 'bg-cyan-500', key: 'cacheRead' },
-    { title: t.cacheWrite, color: 'bg-amber-500', key: 'cacheWrite' },
-    { title: t.output, color: 'bg-emerald-500', key: 'output' },
+    {
+      title: t.ttft,
+      values: leaves.filter((r) => r.ttftMs !== null).map((r) => r.ttftMs!),
+      format: formatDuration,
+      axisLabel: t.axisLabelTTFT,
+    },
+    {
+      title: t.tpot,
+      values: leaves.filter((r) => r.tpotMs !== null).map((r) => r.tpotMs!),
+      format: (v) => `${v.toFixed(1)}ms`,
+      axisLabel: t.axisLabelTPOT,
+    },
+    {
+      title: t.interactivity,
+      values: tpotRows.map((r) => 1000 / r.tpotMs!).filter((v) => v <= 200),
+      format: (v) => v.toFixed(1),
+      axisLabel: t.axisLabelInteractivity,
+      sourceValues: tpotRows.map((r) => r.tpotMs!),
+      sourceTransform: (v) => 1000 / v,
+    },
+    {
+      title: t.prefillSpeed,
+      values: leaves
+        .filter(
+          (r) => r.ttftMs !== null && r.ttftMs > 0 && (r.cacheRead ?? 0) + (r.cacheWrite ?? 0) > 0,
+        )
+        .map((r) => ((r.cacheRead ?? 0) + (r.cacheWrite ?? 0)) / (r.ttftMs! / 1000)),
+      format: formatPrefillSpeedCompact,
+      axisLabel: t.axisLabelPrefillSpeed,
+    },
   ];
 
   // Whole-session cache hit rates — the API number alongside the trie-derived
@@ -249,53 +316,18 @@ export default function StatisticsPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {chartConfigs.map(({ title, color, key }) => {
+        {tokenCharts.map(({ title, key }) => {
           const indexed = statsEntries
-            .map((e) => ({ request: e.request, value: e[key] }))
+            .map((e) => ({ request: e.request, requestId: e.requestId, value: e[key] }))
             .filter((e) => e.value > 0);
-          if (indexed.length === 0) {
-            return (
-              <Card key={key}>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm">
-                    {title} {t.distribution}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-xs text-muted-foreground">{t.noData}</p>
-                </CardContent>
-              </Card>
-            );
-          }
-          const buckets = buildHistogramWithEntries(indexed, 50);
-          const maxCount = Math.max(...buckets.map((b) => b.entries.length), 1);
-          const isSelected = selectedBucket?.key === key;
-          const sortedVals = [...indexed].toSorted((a, b) => a.value - b.value).map((e) => e.value);
-          const pct = (p: number) =>
-            sortedVals[Math.min(Math.floor((p / 100) * sortedVals.length), sortedVals.length - 1)];
-          const median = sortedVals[Math.floor(sortedVals.length / 2)];
-          const percentiles = [
-            { label: 'p25', value: pct(25) },
-            { label: 'p50', value: pct(50) },
-            { label: 'p75', value: pct(75) },
-            { label: 'p90', value: pct(90) },
-            { label: 'p99', value: pct(99) },
-          ];
-
-          const xMin = buckets[0].min;
-          const xMax = buckets.at(-1)!.max;
-          const yTicks = generateNiceTicks(0, maxCount, 5);
-          const yMax = yTicks.at(-1) || maxCount;
-          const xTicks = generateNiceTicks(xMin, xMax, 10);
-
-          const CW = 460;
-          const CH = 160;
-          const M = { top: 6, right: 8, bottom: 30, left: 40 };
-          const PW = CW - M.left - M.right;
-          const PH = CH - M.top - M.bottom;
-
-          const sx = (v: number) => M.left + ((v - xMin) / (xMax - xMin || 1)) * PW;
-          const sy = (v: number) => M.top + PH - (v / yMax) * PH;
+          if (indexed.length === 0) return <EmptyDistribution key={key} title={title} t={t} />;
+          const buckets = buildHistogram(indexed, 50);
+          const sorted = indexed.map((e) => e.value).toSorted((a, b) => a - b);
+          const percentiles = ['p25', 'p50', 'p75', 'p90', 'p99'].map((label) => ({
+            label,
+            value: percentileOf(sorted, Number(label.slice(1))),
+          }));
+          const selectedIdx = selectedBucket?.key === key ? selectedBucket.bucketIdx : null;
 
           return (
             <ExpandableChart
@@ -307,460 +339,131 @@ export default function StatisticsPage() {
                 </>
               }
             >
-              <svg viewBox={`0 0 ${CW} ${CH}`} className="w-full" style={{ maxHeight: 180 }}>
-                {/* Y-axis grid */}
-                {yTicks.map((tick) => (
-                  <g key={`y-${tick}`}>
-                    {tick > 0 && (
-                      <line
-                        x1={M.left}
-                        y1={sy(tick)}
-                        x2={M.left + PW}
-                        y2={sy(tick)}
-                        stroke="currentColor"
-                        className="text-border"
-                        strokeWidth={0.5}
-                        strokeDasharray="3 3"
-                      />
-                    )}
-                    <text
-                      x={M.left - 4}
-                      y={sy(tick) + 3}
-                      textAnchor="end"
-                      className="fill-muted-foreground"
-                      style={{
-                        fontSize: '8px',
-                        fontFamily: 'var(--font-mono, ui-monospace, monospace)',
-                      }}
-                    >
-                      {fmtAxis(tick)}
-                    </text>
-                  </g>
-                ))}
-
-                {/* Axes */}
-                <line
-                  x1={M.left}
-                  y1={M.top}
-                  x2={M.left}
-                  y2={M.top + PH}
-                  stroke="currentColor"
-                  className="text-muted-foreground"
-                  strokeWidth={1}
-                />
-                <line
-                  x1={M.left}
-                  y1={M.top + PH}
-                  x2={M.left + PW}
-                  y2={M.top + PH}
-                  stroke="currentColor"
-                  className="text-muted-foreground"
-                  strokeWidth={1}
-                />
-
-                {/* Bars */}
-                {buckets.map((bucket, bi) => {
-                  if (bucket.entries.length === 0) return null;
-                  const x = sx(bucket.min);
-                  const w = sx(bucket.max) - sx(bucket.min);
-                  const h = (bucket.entries.length / yMax) * PH;
-                  const active = isSelected && selectedBucket?.bucketIdx === bi;
-                  return (
-                    <rect
-                      key={bi}
-                      x={x}
-                      y={sy(bucket.entries.length)}
-                      width={Math.max(w - 0.5, 1)}
-                      height={h}
-                      fill={color}
-                      opacity={active ? 1 : 0.75}
-                      stroke={active ? 'white' : color}
-                      strokeWidth={active ? 1.5 : 0.5}
-                      className="cursor-pointer"
-                      onClick={() => {
-                        track('agentic_workload_statistics_bucket_selected', {
-                          key,
-                          bucketIdx: bi,
-                        });
-                        if (active) setSelectedBucket(null);
-                        else setSelectedBucket({ key, bucketIdx: bi, entries: bucket.entries });
-                      }}
-                    />
-                  );
-                })}
-
-                {/* Percentile lines */}
-                {[
-                  { val: pct(25), color: '#94a3b8', label: 'p25' },
-                  { val: median, color: '#ef4444', label: 'p50' },
-                  { val: pct(75), color: '#94a3b8', label: 'p75' },
-                  { val: pct(90), color: '#f59e0b', label: 'p90' },
-                ].map(({ val, color: c, label }) => {
-                  const px = sx(val);
-                  if (px < M.left || px > M.left + PW) return null;
-                  return (
-                    <g key={label}>
-                      <line
-                        x1={px}
-                        y1={M.top}
-                        x2={px}
-                        y2={M.top + PH}
-                        stroke={c}
-                        strokeWidth={1}
-                        strokeDasharray="4 3"
-                      />
-                      <text
-                        x={px}
-                        y={M.top - 2}
-                        textAnchor="middle"
-                        fill={c}
-                        style={{ fontSize: '7px', fontFamily: 'var(--font-mono)' }}
-                      >
-                        {label}
-                      </text>
-                    </g>
-                  );
-                })}
-
-                {/* X-axis ticks */}
-                {xTicks.map((tick) => {
-                  const x = sx(tick);
-                  if (x < M.left - 1 || x > M.left + PW + 1) return null;
-                  return (
-                    <g key={`x-${tick}`}>
-                      <line
-                        x1={x}
-                        y1={M.top + PH}
-                        x2={x}
-                        y2={M.top + PH + 3}
-                        stroke="currentColor"
-                        className="text-muted-foreground"
-                        strokeWidth={1}
-                      />
-                      <text
-                        x={x}
-                        y={M.top + PH + 12}
-                        textAnchor="middle"
-                        className="fill-muted-foreground"
-                        style={{
-                          fontSize: '8px',
-                          fontFamily: 'var(--font-mono, ui-monospace, monospace)',
-                        }}
-                      >
-                        {formatNumber(tick)}
-                      </text>
-                    </g>
-                  );
-                })}
-
-                {/* X-axis label */}
-                <text
-                  x={M.left + PW / 2}
-                  y={CH - 2}
-                  textAnchor="middle"
-                  className="fill-muted-foreground"
-                  style={{
-                    fontSize: '8px',
-                    fontFamily: 'var(--font-mono, ui-monospace, monospace)',
-                  }}
-                >
-                  {title} {t.tokens}
-                </text>
-              </svg>
-
-              {/* Selected bucket detail */}
-              {isSelected && selectedBucket && (
-                <div className="mt-2 border border-border rounded-md p-2 bg-muted/30 max-h-48 overflow-y-auto">
-                  <p className="text-3xs text-muted-foreground mb-1.5 font-medium">
-                    {t.requestsInRange(
-                      selectedBucket.entries.length,
-                      formatNumber(buckets[selectedBucket.bucketIdx].min),
-                      formatNumber(buckets[selectedBucket.bucketIdx].max),
-                    )}
-                  </p>
-                  <div className="space-y-0.5">
-                    {selectedBucket.entries.map((e) => {
-                      const turnInfo = getTurnInfo(e.request, rows);
-                      const isLoading = loadingRequest === e.request;
-                      return (
-                        <button
-                          key={e.request}
-                          disabled={isLoading}
-                          className="w-full flex items-center justify-between text-xs px-1.5 py-1 rounded hover:bg-muted transition-colors text-left disabled:opacity-50"
-                          onClick={(ev) => {
-                            ev.stopPropagation();
-                            track('agentic_workload_statistics_request_navigated', {
-                              request: e.request,
-                            });
-                            navigateToRequest(e.request);
-                          }}
-                        >
-                          <span className="font-mono flex items-center gap-1.5">
-                            {isLoading && (
-                              <span className="inline-block w-3 h-3 border border-current border-t-transparent rounded-full animate-spin" />
-                            )}
-                            {turnInfo ? (
-                              <>
-                                <span>{t.turn(turnInfo.turn)}</span>
-                                {turnInfo.kind === 'subagent_group' ? (
-                                  <Badge
-                                    variant="outline"
-                                    className="text-3xs px-1 py-0 border-purple-500/30 text-purple-400"
-                                  >
-                                    {turnInfo.label}
-                                  </Badge>
-                                ) : (
-                                  <span className="text-muted-foreground">{t.main}</span>
-                                )}
-                              </>
-                            ) : (
-                              <span>{t.reqNum(e.request)}</span>
-                            )}
-                          </span>
-                          <span className="font-mono">{formatNumber(e.value)}</span>
-                        </button>
+              {(expanded, close) => (
+                <>
+                  <DistributionHistogram
+                    buckets={buckets}
+                    percentiles={percentiles}
+                    format={formatNumber}
+                    axisLabel={`${title} ${t.tokens}`}
+                    total={indexed.length}
+                    expanded={expanded}
+                    selectedIdx={selectedIdx}
+                    onBucketClick={(bi) => {
+                      track('agentic_workload_statistics_bucket_selected', {
+                        key,
+                        bucketIdx: bi,
+                      });
+                      setSelectedBucket(
+                        selectedIdx === bi
+                          ? null
+                          : { key, bucketIdx: bi, entries: buckets[bi].entries },
                       );
-                    })}
-                  </div>
-                </div>
+                    }}
+                  />
+                  {selectedIdx !== null && selectedBucket && (
+                    <div className="mt-3 border border-border rounded-md p-2 bg-muted/30 max-h-48 overflow-y-auto">
+                      <p className="text-3xs text-muted-foreground mb-1.5 font-medium">
+                        {t.requestsInRange(
+                          selectedBucket.entries.length,
+                          formatNumber(buckets[selectedIdx].min),
+                          formatNumber(buckets[selectedIdx].max),
+                        )}
+                      </p>
+                      <div className="space-y-0.5">
+                        {selectedBucket.entries.map((e) => {
+                          const turnInfo = findTurn(e.requestId, rows);
+                          const isLoading = loadingRequest === e.request;
+                          return (
+                            <button
+                              key={e.request}
+                              disabled={isLoading}
+                              className="w-full flex items-center justify-between text-xs px-1.5 py-1 rounded hover:bg-muted transition-colors text-left disabled:opacity-50"
+                              onClick={(ev) => {
+                                ev.stopPropagation();
+                                track('agentic_workload_statistics_request_navigated', {
+                                  request: e.request,
+                                });
+                                // The table is behind the dialog.
+                                close();
+                                void navigateToRequest(e);
+                              }}
+                            >
+                              <span className="font-mono flex items-center gap-1.5">
+                                {isLoading && (
+                                  <span className="inline-block w-3 h-3 border border-current border-t-transparent rounded-full animate-spin" />
+                                )}
+                                {turnInfo ? (
+                                  <>
+                                    <span>{t.turn(turnInfo.turn)}</span>
+                                    {turnInfo.kind === 'subagent_group' ? (
+                                      <Badge
+                                        variant="outline"
+                                        className="text-3xs px-1 py-0 border-purple-500/30 text-purple-400"
+                                      >
+                                        {turnInfo.label}
+                                      </Badge>
+                                    ) : (
+                                      <span className="text-muted-foreground">{t.main}</span>
+                                    )}
+                                  </>
+                                ) : (
+                                  <span>{t.reqNum(e.request)}</span>
+                                )}
+                              </span>
+                              <span className="font-mono">{formatNumber(e.value)}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
-
-              {/* Percentile stats */}
-              <div className="grid grid-cols-5 gap-1 mt-3 pt-3 border-t border-border">
-                {percentiles.map((p) => (
-                  <div
-                    key={p.label}
-                    className="rounded-md border border-border bg-surface-hover px-1.5 py-1 text-center"
-                  >
-                    <div className="text-3xs font-mono font-bold uppercase tracking-eyebrow-wide text-muted-foreground">
-                      {p.label}
-                    </div>
-                    <div className="text-2xs font-mono font-bold tracking-tight mt-0.5">
-                      {formatNumber(p.value)}
-                    </div>
-                  </div>
-                ))}
-              </div>
             </ExpandableChart>
           );
         })}
       </div>
 
       {/* TTFT / TPOT / Interactivity / Prefill Speed Distributions */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-        {(() => {
-          const timingCharts: {
-            title: string;
-            color: string;
-            values: number[];
-            format: (v: number) => string;
-
-            sourceValues?: number[];
-            sourceTransform?: (v: number) => number;
-          }[] = [
-            {
-              title: t.ttft,
-              color: 'bg-emerald-500',
-              values: rows.filter((r) => r.ttftMs !== null).map((r) => r.ttftMs!),
-              format: formatDuration,
-            },
-            {
-              title: t.tpot,
-              color: 'bg-violet-500',
-              values: rows.filter((r) => r.tpotMs !== null).map((r) => r.tpotMs!),
-              format: (v) => `${v.toFixed(1)}ms/tok`,
-            },
-            {
-              title: t.interactivity,
-              color: 'bg-amber-500',
-              values: rows
-                .filter((r) => r.tpotMs !== null && r.tpotMs > 0)
-                .map((r) => 1000 / r.tpotMs!)
-                .filter((v) => v <= 200),
-              format: (v) => `${v.toFixed(1)} tok/s`,
-              sourceValues: rows
-                .filter((r) => r.tpotMs !== null && r.tpotMs > 0)
-                .map((r) => r.tpotMs!),
-              sourceTransform: (v: number) => 1000 / v,
-            },
-            {
-              title: t.prefillSpeed,
-              color: 'bg-sky-500',
-              values: rows
-                .filter(
-                  (r) =>
-                    r.ttftMs !== null &&
-                    r.ttftMs > 0 &&
-                    (r.cacheRead ?? 0) + (r.cacheWrite ?? 0) > 0,
-                )
-                .map((r) => ((r.cacheRead ?? 0) + (r.cacheWrite ?? 0)) / (r.ttftMs! / 1000)),
-              format: formatPrefillSpeed,
-            },
-          ];
-
-          return timingCharts.map(
-            ({ title, color, values, format, sourceValues, sourceTransform }) => {
-              if (values.length === 0) {
-                return (
-                  <Card key={title}>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm">
-                        {title} {t.distribution}
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-xs text-muted-foreground">{t.noData}</p>
-                    </CardContent>
-                  </Card>
-                );
-              }
-
-              const indexed = values.map((v, i) => ({ request: i, value: v }));
-              const buckets = buildHistogramWithEntries(indexed, 30);
-              const maxCount = Math.max(...buckets.map((b) => b.entries.length), 1);
-              const sortedVals = [...values].toSorted((a, b) => a - b);
-              const srcSorted = sourceValues
-                ? [...sourceValues].toSorted((a, b) => a - b)
-                : sortedVals;
-              const transform = sourceTransform || ((v: number) => v);
-              const pct = (p: number) =>
-                transform(
-                  srcSorted[
-                    Math.min(Math.floor((p / 100) * srcSorted.length), srcSorted.length - 1)
-                  ],
-                );
-              const percentiles = [
-                { label: 'p50', value: pct(50) },
-                { label: 'p75', value: pct(75) },
-                { label: 'p90', value: pct(90) },
-                { label: 'p95', value: pct(95) },
-                { label: 'p99', value: pct(99) },
-              ];
-
-              const xMin = buckets[0].min;
-              const xMax = buckets.at(-1)!.max;
-              const yTicks = generateNiceTicks(0, maxCount, 5);
-              const yMax = yTicks.at(-1) || maxCount;
-
-              const CW = 460;
-              const CH = 160;
-              const M = { top: 6, right: 8, bottom: 30, left: 40 };
-              const PW = CW - M.left - M.right;
-              const PH = CH - M.top - M.bottom;
-
-              const sx = (v: number) => M.left + ((v - xMin) / (xMax - xMin || 1)) * PW;
-              const sy = (v: number) => M.top + PH - (v / yMax) * PH;
-
-              return (
-                <ExpandableChart
-                  key={title}
-                  title={
-                    <>
-                      {title} {t.distribution}{' '}
-                      <span className="text-muted-foreground font-normal">(N={values.length})</span>
-                    </>
-                  }
-                >
-                  <svg viewBox={`0 0 ${CW} ${CH}`} className="w-full" style={{ maxHeight: 180 }}>
-                    {yTicks.map((tick) => (
-                      <g key={`y-${tick}`}>
-                        {tick > 0 && (
-                          <line
-                            x1={M.left}
-                            y1={sy(tick)}
-                            x2={CW - M.right}
-                            y2={sy(tick)}
-                            stroke="currentColor"
-                            className="text-border"
-                            strokeWidth={0.5}
-                            strokeDasharray="3 3"
-                          />
-                        )}
-                        <text
-                          x={M.left - 4}
-                          y={sy(tick) + 3}
-                          textAnchor="end"
-                          className="fill-muted-foreground"
-                          style={{ fontSize: '7px', fontFamily: 'var(--font-mono)' }}
-                        >
-                          {tick}
-                        </text>
-                      </g>
-                    ))}
-                    <line
-                      x1={M.left}
-                      y1={M.top + PH}
-                      x2={CW - M.right}
-                      y2={M.top + PH}
-                      stroke="currentColor"
-                      className="text-border"
-                      strokeWidth={0.5}
-                    />
-                    {buckets.map((b, i) => {
-                      const barW = Math.max(0.5, PW / buckets.length - 0.5);
-                      const x = M.left + (i / buckets.length) * PW;
-                      const barH = (b.entries.length / yMax) * PH;
-                      return (
-                        <rect
-                          key={i}
-                          x={x}
-                          y={sy(b.entries.length)}
-                          width={barW}
-                          height={Math.max(barH, 0)}
-                          className={color.replace('bg-', 'fill-')}
-                          opacity={0.8}
-                          rx={0.5}
-                        >
-                          <title>
-                            {format(b.min)} – {format(b.max)}: {b.entries.length}
-                          </title>
-                        </rect>
-                      );
-                    })}
-                    {/* Percentile lines */}
-                    {[
-                      { val: pct(50), color: '#ef4444', label: 'p50' },
-                      { val: pct(75), color: '#94a3b8', label: 'p75' },
-                      { val: pct(90), color: '#f59e0b', label: 'p90' },
-                    ].map(({ val, color: c, label }) => {
-                      const px = sx(val);
-                      if (px < M.left || px > CW - M.right) return null;
-                      return (
-                        <g key={label}>
-                          <line
-                            x1={px}
-                            y1={M.top}
-                            x2={px}
-                            y2={M.top + PH}
-                            stroke={c}
-                            strokeWidth={1}
-                            strokeDasharray="4 3"
-                          />
-                          <text
-                            x={px}
-                            y={M.top - 2}
-                            textAnchor="middle"
-                            fill={c}
-                            style={{ fontSize: '7px', fontFamily: 'var(--font-mono)' }}
-                          >
-                            {label}
-                          </text>
-                        </g>
-                      );
-                    })}
-                  </svg>
-                  <div className="flex justify-between text-3xs font-mono text-muted-foreground px-1 mt-1">
-                    {percentiles.map(({ label, value: v }) => (
-                      <span key={label}>
-                        {label}: {format(v)}
-                      </span>
-                    ))}
-                  </div>
-                </ExpandableChart>
-              );
-            },
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {timingCharts.map(({ title, values, format, axisLabel, sourceValues, sourceTransform }) => {
+          if (values.length === 0) return <EmptyDistribution key={title} title={title} t={t} />;
+          const buckets = buildHistogram(
+            values.map((value, request) => ({ request, value })),
+            30,
           );
-        })()}
+          // Interactivity percentiles come from TPOT so p90 is the slow tail.
+          const source = (sourceValues ?? values).toSorted((a, b) => a - b);
+          const transform = sourceTransform ?? ((v: number) => v);
+          const percentiles = ['p50', 'p75', 'p90', 'p95', 'p99'].map((label) => ({
+            label,
+            value: transform(percentileOf(source, Number(label.slice(1)))),
+          }));
+
+          return (
+            <ExpandableChart
+              key={title}
+              title={
+                <>
+                  {title} {t.distribution}{' '}
+                  <span className="text-muted-foreground font-normal">(N={values.length})</span>
+                </>
+              }
+            >
+              {(expanded) => (
+                <DistributionHistogram
+                  buckets={buckets}
+                  percentiles={percentiles}
+                  format={format}
+                  axisLabel={axisLabel}
+                  total={values.length}
+                  expanded={expanded}
+                />
+              )}
+            </ExpandableChart>
+          );
+        })}
       </div>
 
       <Card>
@@ -781,9 +484,9 @@ export default function StatisticsPage() {
                 <TableHead className="text-right">{t.colOutput}</TableHead>
                 <TableHead className="text-right">{t.colCost}</TableHead>
                 <TableHead className="text-right">{t.colTTFT}</TableHead>
-                <TableHead className="text-right">{t.colPrefillSpeed}</TableHead>
+                <TableHead className="text-right whitespace-nowrap">{t.colPrefillSpeed}</TableHead>
                 <TableHead className="text-right">{t.colTPOT}</TableHead>
-                <TableHead className="text-right">{t.colInteractivity}</TableHead>
+                <TableHead className="text-right whitespace-nowrap">{t.colInteractivity}</TableHead>
                 <TableHead className="text-right">{t.colDuration}</TableHead>
                 <TableHead className="text-right">{t.colGap}</TableHead>
               </TableRow>
@@ -824,14 +527,14 @@ export default function StatisticsPage() {
                       <TableCell className="text-right font-mono text-xs text-sky-500">
                         {(() => {
                           const ps = computePrefillSpeed(row.cacheRead, row.cacheWrite, row.ttftMs);
-                          return ps === null ? '—' : formatPrefillSpeed(ps);
+                          return ps === null ? '—' : formatPrefillSpeedCompact(ps);
                         })()}
                       </TableCell>
                       <TableCell className="text-right font-mono text-xs">
                         {row.tpotMs === null ? '—' : formatDuration(row.tpotMs)}
                       </TableCell>
                       <TableCell className="text-right font-mono text-xs">
-                        {row.tpotMs === null ? '—' : formatInteractivity(row.tpotMs)}
+                        {row.tpotMs === null ? '—' : formatInteractivityCompact(row.tpotMs)}
                       </TableCell>
                       <TableCell className="text-right font-mono text-xs">
                         {row.durationMs > 0 ? formatDuration(row.durationMs) : '—'}
@@ -845,7 +548,6 @@ export default function StatisticsPage() {
                 return (
                   <Fragment key={row.turn}>
                     <TableRow
-                      key={row.turn}
                       id={`turn-${row.turn}`}
                       className="cursor-pointer bg-purple-500/5 hover:bg-purple-500/10"
                       onClick={() => {
@@ -869,7 +571,7 @@ export default function StatisticsPage() {
                             {t.nReq(row.requestCount)}
                           </span>
                           <span className="text-xs text-muted-foreground">
-                            {isExpanded ? '\u25B2' : '\u25BC'}
+                            {isExpanded ? '▲' : '▼'}
                           </span>
                         </div>
                       </TableCell>
@@ -895,14 +597,14 @@ export default function StatisticsPage() {
                       <TableCell className="text-right font-mono text-xs text-sky-500">
                         {(() => {
                           const ps = computePrefillSpeed(row.cacheRead, row.cacheWrite, row.ttftMs);
-                          return ps === null ? '—' : formatPrefillSpeed(ps);
+                          return ps === null ? '—' : formatPrefillSpeedCompact(ps);
                         })()}
                       </TableCell>
                       <TableCell className="text-right font-mono text-xs">
                         {row.tpotMs === null ? '—' : formatDuration(row.tpotMs)}
                       </TableCell>
                       <TableCell className="text-right font-mono text-xs">
-                        {row.tpotMs === null ? '—' : formatInteractivity(row.tpotMs)}
+                        {row.tpotMs === null ? '—' : formatInteractivityCompact(row.tpotMs)}
                       </TableCell>
                       <TableCell className="text-right font-mono text-xs">
                         {row.durationMs > 0 ? formatDuration(row.durationMs) : '—'}
@@ -953,14 +655,16 @@ export default function StatisticsPage() {
                                   child.cacheWrite,
                                   child.ttftMs,
                                 );
-                                return ps === null ? '—' : formatPrefillSpeed(ps);
+                                return ps === null ? '—' : formatPrefillSpeedCompact(ps);
                               })()}
                             </TableCell>
                             <TableCell className="text-right font-mono text-xs">
                               {child.tpotMs === null ? '—' : formatDuration(child.tpotMs)}
                             </TableCell>
                             <TableCell className="text-right font-mono text-xs">
-                              {child.tpotMs === null ? '—' : formatInteractivity(child.tpotMs)}
+                              {child.tpotMs === null
+                                ? '—'
+                                : formatInteractivityCompact(child.tpotMs)}
                             </TableCell>
                             <TableCell className="text-right font-mono text-xs">
                               {child.durationMs > 0 ? formatDuration(child.durationMs) : '—'}
@@ -1003,7 +707,7 @@ export default function StatisticsPage() {
                   {(() => {
                     const avgTtft = totals.ttftCount > 0 ? totals.ttftMs / totals.ttftCount : null;
                     const ps = computePrefillSpeed(totals.cacheRead, totals.cacheWrite, avgTtft);
-                    return ps === null ? '—' : formatPrefillSpeed(ps);
+                    return ps === null ? '—' : formatPrefillSpeedCompact(ps);
                   })()}
                 </TableCell>
                 <TableCell className="text-right font-mono text-xs">
@@ -1013,7 +717,7 @@ export default function StatisticsPage() {
                 </TableCell>
                 <TableCell className="text-right font-mono text-xs">
                   {totals.tpotTokenCount > 0
-                    ? formatInteractivity(totals.tpotWeightedMs / totals.tpotTokenCount)
+                    ? formatInteractivityCompact(totals.tpotWeightedMs / totals.tpotTokenCount)
                     : '—'}
                 </TableCell>
                 <TableCell className="text-right font-mono text-xs">
@@ -1063,97 +767,38 @@ function formatUTC(ts: string): string {
     .replace(/\.\d+Z$/u, ' UTC');
 }
 
-function buildHistogramWithEntries(
-  indexed: { request: number; value: number }[],
-  bucketCount: number,
-) {
-  if (indexed.length === 0) return [];
-  const sorted = [...indexed].toSorted((a, b) => a.value - b.value);
-  if (sorted[0].value === sorted.at(-1)!.value) {
-    return [{ min: sorted[0].value, max: sorted[0].value, entries: sorted }];
-  }
-  const min = sorted[0].value;
-  // Clip at p95 + 10% margin so outliers don't stretch the x-axis
-  const p95Idx = Math.min(Math.floor(0.95 * sorted.length), sorted.length - 1);
-  const p95Val = sorted[p95Idx].value;
-  const max = p95Val + (p95Val - min) * 0.1 || sorted.at(-1)!.value;
-  const step = (max - min) / bucketCount;
-  const buckets = Array.from({ length: bucketCount }, (_, i) => ({
-    min: min + i * step,
-    max: min + (i + 1) * step,
-    entries: [] as typeof sorted,
-  }));
-  for (const entry of indexed) {
-    if (entry.value > max) continue;
-    let idx = Math.floor((entry.value - min) / step);
-    if (idx >= bucketCount) idx = bucketCount - 1;
-    buckets[idx].entries.push(entry);
-  }
-  return buckets;
+function percentileOf(sorted: number[], p: number): number {
+  return sorted[Math.min(Math.floor((p / 100) * sorted.length), sorted.length - 1)];
 }
 
-function niceNum(range: number, round: boolean): number {
-  const exponent = Math.floor(Math.log10(range));
-  const fraction = range / 10 ** exponent;
-  let niceFraction: number;
-  if (round) {
-    if (fraction < 1.5) niceFraction = 1;
-    else if (fraction < 3) niceFraction = 2;
-    else if (fraction < 7) niceFraction = 5;
-    else niceFraction = 10;
-  } else if (fraction <= 1) {
-    niceFraction = 1;
-  } else if (fraction <= 2) {
-    niceFraction = 2;
-  } else if (fraction <= 5) {
-    niceFraction = 5;
-  } else {
-    niceFraction = 10;
-  }
-  return niceFraction * 10 ** exponent;
+function EmptyDistribution({ title, t }: { title: string; t: (typeof STRINGS)['en'] }) {
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm">
+          {title} {t.distribution}
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <p className="text-xs text-muted-foreground">{t.noData}</p>
+      </CardContent>
+    </Card>
+  );
 }
 
-function generateNiceTicks(min: number, max: number, targetCount: number): number[] {
-  if (max <= min) return [min];
-  const range = niceNum(max - min, false);
-  const spacing = niceNum(range / (targetCount - 1), true);
-  const niceMin = Math.floor(min / spacing) * spacing;
-  const ticks: number[] = [];
-  for (let t = niceMin; t <= max + spacing * 0.5; t += spacing) {
-    ticks.push(Math.round(t * 1e10) / 1e10);
-  }
-  return ticks;
+interface TurnInfo {
+  turn: number;
+  kind: 'main' | 'subagent_group';
+  label?: string;
 }
 
-function fmtAxis(v: number): string {
-  if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(v % 1_000_000 === 0 ? 0 : 1)}M`;
-  if (v >= 1_000) return `${(v / 1_000).toFixed(v % 1_000 === 0 ? 0 : 1)}K`;
-  if (Number.isInteger(v)) return String(v);
-  return v.toFixed(1);
-}
-
-function requestToTurn(requestNum: number, rows: StatRow[]): number | null {
-  const info = getTurnInfo(requestNum, rows);
-  return info?.turn ?? null;
-}
-
-function getTurnInfo(
-  requestNum: number,
-  rows: StatRow[],
-): { turn: number; kind: 'main' | 'subagent_group'; label?: string } | null {
-  let reqCounter = 0;
+/** The table row holding a request: its own row, or the subagent group containing it. */
+function findTurn(requestId: string | undefined, rows: StatRow[]): TurnInfo | null {
   for (const row of rows) {
-    if (row.kind === 'subagent_group') {
-      const groupSize = row.children.length;
-      if (requestNum > reqCounter && requestNum <= reqCounter + groupSize) {
-        return { turn: row.turn, kind: 'subagent_group', label: row.label };
-      }
-      reqCounter += groupSize;
-    } else {
-      reqCounter++;
-      if (reqCounter === requestNum) {
-        return { turn: row.turn, kind: 'main' };
-      }
+    if (row.kind === 'main') {
+      if (row.requestId === requestId) return { turn: row.turn, kind: 'main' };
+    } else if (row.children.some((c) => c.requestId === requestId)) {
+      return { turn: row.turn, kind: 'subagent_group', label: row.label };
     }
   }
   return null;

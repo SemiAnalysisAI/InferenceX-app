@@ -348,7 +348,7 @@ export default function SessionLayout({ children }: { children: React.ReactNode 
         </div>
       </div>
 
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-3">
           <span className="text-3xs font-mono font-bold uppercase tracking-eyebrow-wide text-muted-foreground">
             {t.requestsHeading}
@@ -357,8 +357,8 @@ export default function SessionLayout({ children }: { children: React.ReactNode 
             {requests.length} / {data.total}
           </span>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-0.5 border border-border rounded-md p-0.5">
+        <div className="flex min-w-0 max-w-full items-center gap-2">
+          <div className="flex shrink-0 items-center gap-0.5 border border-border rounded-md p-0.5">
             <button
               onClick={() => {
                 track('agentic_workload_session_sort_changed', { reversed: false });
@@ -382,7 +382,8 @@ export default function SessionLayout({ children }: { children: React.ReactNode 
               {t.newest}
             </button>
           </div>
-          <nav className="flex items-center gap-0.5 border border-border rounded-md p-0.5">
+          {/* Scrolls on its own on narrow screens instead of widening the page. */}
+          <nav className="flex min-w-0 items-center gap-0.5 overflow-x-auto border border-border rounded-md p-0.5">
             {navLinks.map((link) => {
               const isActive =
                 pathname === link.href ||
@@ -391,7 +392,7 @@ export default function SessionLayout({ children }: { children: React.ReactNode 
                 <Link
                   key={link.href}
                   href={link.href}
-                  className={`px-2.5 py-1 text-2xs font-mono rounded transition-colors ${
+                  className={`shrink-0 whitespace-nowrap px-2.5 py-1 text-2xs font-mono rounded transition-colors ${
                     isActive
                       ? 'bg-surface-hover text-foreground'
                       : 'text-subtle hover:text-foreground'

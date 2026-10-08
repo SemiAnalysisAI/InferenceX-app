@@ -5,6 +5,12 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import ToolAnalyticsPage from '@/components/agentic-workload-explorer/views/tool-analytics-view';
 
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ replace: vi.fn() }),
+  useSearchParams: () => new URLSearchParams(),
+  usePathname: () => '/tool-analytics',
+}));
+
 const READY_ANALYTICS = {
   toolCounts: [],
   transitions: [],

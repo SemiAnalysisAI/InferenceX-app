@@ -83,6 +83,18 @@ export const EXPLORER_SECTION_META = {
     },
     zh: { title: 'Fast Mode', description: 'Fast Mode 请求与标准请求在用量、延迟和成本上的对比。' },
   },
+  '/harnesses': {
+    en: {
+      title: 'Harnesses',
+      description:
+        'Compare agent harnesses (Claude Code, Codex and others) by token usage, sessions, versions and tool use.',
+    },
+    zh: {
+      title: 'Harness 对比',
+      description:
+        '按 token 用量、会话、版本与工具调用对比各智能体 harness（Claude Code、Codex 等）。',
+    },
+  },
   '/models': {
     en: { title: 'Models', description: 'Request volume, tokens and latency by model.' },
     zh: { title: '模型', description: '按模型统计的请求量、token 与延迟。' },

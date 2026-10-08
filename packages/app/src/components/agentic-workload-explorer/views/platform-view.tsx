@@ -15,6 +15,8 @@ import type {
   PlatformStat,
   PlatformTimeSeries,
 } from '@/lib/agentic-workload-explorer/api-types';
+import { formatSnapshotDate } from '@/lib/agentic-workload-explorer/snapshot';
+import { Expandable } from '@/components/agentic-workload-explorer/expandable-chart';
 
 const STRINGS = {
   en: {
@@ -182,13 +184,15 @@ function generateTicks(min: number, max: number, targetCount: number): number[] 
   const spacing = niceNum(range / (targetCount - 1), true);
   const niceMin = Math.floor(min / spacing) * spacing;
   const ticks: number[] = [];
-  for (let t = niceMin; t <= max + spacing * 0.5; t += spacing) {
+  // Keep going until a tick reaches max, so the tallest bar is never clipped.
+  for (let t = niceMin; t - spacing < max - spacing * 1e-9; t += spacing) {
     ticks.push(Math.round(t * 1e10) / 1e10);
   }
   return ticks;
 }
 
 function formatAxisValue(v: number): string {
+  if (v >= 1e9) return `${(v / 1e9).toFixed(v % 1e9 === 0 ? 0 : 1)}B`;
   if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(v % 1_000_000 === 0 ? 0 : 1)}M`;
   if (v >= 1_000) return `${(v / 1_000).toFixed(v % 1_000 === 0 ? 0 : 1)}K`;
   if (Number.isInteger(v)) return String(v);
@@ -221,7 +225,8 @@ function PlatformTrendsChart({
       dayData[os] = (dayData[os] || 0) + Number(entry.sessionCount);
     }
 
-    const sortedDays = [...dayMap.keys()].toSorted();
+    // Days arrive as Date strings ("Wed Aug 26 2026 …"), so sort by time.
+    const sortedDays = [...dayMap.keys()].toSorted((a, b) => Date.parse(a) - Date.parse(b));
 
     let max = 0;
     for (const dayData of dayMap.values()) {
@@ -287,14 +292,14 @@ function PlatformTrendsChart({
 
       <svg ref={svgRef} viewBox={`0 0 ${CHART_W} ${CHART_H}`} className="w-full">
         {/* Y-axis grid lines + labels */}
-        {yTicks.map((t) => (
-          <g key={`y-${t}`}>
-            {t > 0 && (
+        {yTicks.map((tick) => (
+          <g key={`y-${tick}`}>
+            {tick > 0 && (
               <line
                 x1={MARGIN.left}
-                y1={sy(t)}
+                y1={sy(tick)}
                 x2={MARGIN.left + PLOT_W}
-                y2={sy(t)}
+                y2={sy(tick)}
                 stroke="currentColor"
                 className="text-border"
                 strokeWidth={0.5}
@@ -303,7 +308,7 @@ function PlatformTrendsChart({
             )}
             <text
               x={MARGIN.left - 6}
-              y={sy(t) + 3}
+              y={sy(tick) + 3}
               textAnchor="end"
               className="fill-muted-foreground"
               style={{
@@ -311,7 +316,7 @@ function PlatformTrendsChart({
                 fontFamily: 'var(--font-mono, ui-monospace, monospace)',
               }}
             >
-              {formatAxisValue(t)}
+              {formatAxisValue(tick)}
             </text>
           </g>
         ))}
@@ -346,7 +351,7 @@ function PlatformTrendsChart({
                 fill={colorMap[os]}
                 rx={1}
               >
-                <title>{tooltipSessions(os, count, day)}</title>
+                <title>{tooltipSessions(os, count, formatSnapshotDate(day))}</title>
               </rect>,
             );
             yOffset += count;
@@ -398,10 +403,13 @@ function PlatformTrendsChart({
 // ── Main page ────────────────────────────────────────────────────
 
 export default function PlatformPage() {
+  const t = STRINGS[useLocale()];
   return (
-    <Suspense>
-      <PlatformPageContent />
-    </Suspense>
+    <Expandable title={t.platformTrends}>
+      <Suspense>
+        <PlatformPageContent />
+      </Suspense>
+    </Expandable>
   );
 }
 

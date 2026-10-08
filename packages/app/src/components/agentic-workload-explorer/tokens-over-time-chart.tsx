@@ -314,6 +314,7 @@ export function TokensOverTimeChart({
         </div>
         <svg
           width={width - 32}
+          viewBox={`0 0 ${width - 32} ${HEIGHT}`}
           height={HEIGHT}
           className="block"
           onMouseMove={handleMouseMove}

@@ -1,6 +1,12 @@
 'use client';
 
-import { useMemo, useRef, useState } from 'react';
+import { Suspense, useMemo, useRef, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import {
+  HARNESSES,
+  isHarness,
+  type Harness,
+} from '@semianalysisai/inferencex-db/proxytrace/shared/harness';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -12,6 +18,7 @@ import { exportSvgToPng, ExportPngButton } from '@/lib/agentic-workload-explorer
 import { getToolColor } from '@/lib/agentic-workload-explorer/tool-colors';
 import { useLocale } from '@/lib/use-locale';
 import { track } from '@/lib/analytics';
+import { Expandable } from '@/components/agentic-workload-explorer/expandable-chart';
 
 // ── Types ────────────────────────────────────────────────────────
 
@@ -68,7 +75,9 @@ interface ToolAnalyticsData {
     count: number;
   }[];
   toolTimings: ToolTimings;
-  cachedAt: string;
+  cachedAt?: string;
+  /** Present for single-harness views, which run live over a session sample. */
+  sample?: { sessions: number; totalSessions: number; requests: number; totalRequests: number };
 }
 
 interface ToolTimingStat {
@@ -212,13 +221,15 @@ function generateTicks(min: number, max: number, targetCount: number): number[] 
   const spacing = niceNum(range / (targetCount - 1), true);
   const niceMin = Math.floor(min / spacing) * spacing;
   const ticks: number[] = [];
-  for (let t = niceMin; t <= max + spacing * 0.5; t += spacing) {
+  // Keep going until a tick reaches max, so the tallest bar is never clipped.
+  for (let t = niceMin; t - spacing < max - spacing * 1e-9; t += spacing) {
     ticks.push(Math.round(t * 1e10) / 1e10);
   }
   return ticks;
 }
 
 function formatAxisValue(v: number): string {
+  if (v >= 1e9) return `${(v / 1e9).toFixed(v % 1e9 === 0 ? 0 : 1)}B`;
   if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(v % 1_000_000 === 0 ? 0 : 1)}M`;
   if (v >= 1_000) return `${(v / 1_000).toFixed(v % 1_000 === 0 ? 0 : 1)}K`;
   if (Number.isInteger(v)) return String(v);
@@ -279,6 +290,8 @@ type OutcomeKey = ToolAnalyticsData['sessionOutcomeCounts'][number]['outcome'];
 // clients share Codex's tool names and land under 'codex'.
 const AGENT_FILTERS = ['all', 'claude', 'codex'] as const;
 type AgentFilter = (typeof AGENT_FILTERS)[number];
+
+type HarnessFilter = 'all' | Harness;
 
 const STRINGS = {
   en: {
@@ -446,6 +459,21 @@ const STRINGS = {
       AgentFilter,
       string
     >,
+    harnessFilterLabels: {
+      all: 'All Harnesses',
+      'claude-code': 'Claude Code',
+      codex: 'Codex',
+      pi: 'Pi',
+      omp: 'Oh My Pi',
+      other: 'Other',
+    } as Record<HarnessFilter, string>,
+    sessionSample: (
+      sessions: string,
+      totalSessions: string,
+      requests: string,
+      totalRequests: string,
+    ) =>
+      `Session sample: ${sessions} of ${totalSessions} sessions, ${requests} of ${totalRequests} requests`,
   },
   zh: {
     sessions: '会话数',
@@ -596,6 +624,20 @@ const STRINGS = {
       AgentFilter,
       string
     >,
+    harnessFilterLabels: {
+      all: '全部 harness',
+      'claude-code': 'Claude Code',
+      codex: 'Codex',
+      pi: 'Pi',
+      omp: 'Oh My Pi',
+      other: '其他',
+    } as Record<HarnessFilter, string>,
+    sessionSample: (
+      sessions: string,
+      totalSessions: string,
+      requests: string,
+      totalRequests: string,
+    ) => `会话样本：${sessions} / ${totalSessions} 个会话，${requests} / ${totalRequests} 个请求`,
   },
 };
 
@@ -627,6 +669,7 @@ function Histogram({
   yAxisLabel?: string;
 }) {
   const locale = useLocale();
+  const t = STRINGS[locale];
   const svgRef = useRef<SVGSVGElement>(null);
   const sorted = useMemo(() => [...values].toSorted((a, b) => a - b), [values]);
 
@@ -662,183 +705,190 @@ function Histogram({
   ];
 
   return (
-    <div>
-      {title && (
-        <div className="flex items-center justify-end mb-2">
-          <ExportPngButton
-            locale={locale}
-            onClick={() => {
-              if (svgRef.current)
-                exportSvgToPng(svgRef.current, {
-                  title,
-                  filename: exportFilename || 'histogram.png',
-                  svgWidth: CHART_WIDTH,
-                  svgHeight: CHART_HEIGHT,
-                });
-            }}
-          />
-        </div>
-      )}
-      <svg
-        ref={svgRef}
-        viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
-        className="w-full"
-        style={{ maxHeight: 220 }}
-      >
-        {yTicks.map((t) => (
-          <g key={`y-${t}`}>
-            {t > 0 && (
-              <line
-                x1={MARGIN.left}
-                y1={sy(t)}
-                x2={MARGIN.left + PLOT_W}
-                y2={sy(t)}
-                stroke="currentColor"
-                className="text-border"
-                strokeWidth={0.5}
-                strokeDasharray="3 3"
-              />
-            )}
-            <text
-              x={MARGIN.left - 6}
-              y={sy(t) + 3}
-              textAnchor="end"
-              className="fill-muted-foreground"
-              style={{ fontSize: '9px', fontFamily: 'var(--font-mono, ui-monospace, monospace)' }}
-            >
-              {formatAxisValue(t)}
-            </text>
-          </g>
-        ))}
-        <text
-          x={12}
-          y={MARGIN.top + PLOT_H / 2}
-          textAnchor="middle"
-          transform={`rotate(-90, 12, ${MARGIN.top + PLOT_H / 2})`}
-          className="fill-muted-foreground"
-          style={{ fontSize: '9px', fontFamily: 'var(--font-mono, ui-monospace, monospace)' }}
-        >
-          {yAxisLabel ?? 'Sessions'}
-        </text>
-        <line
-          x1={MARGIN.left}
-          y1={MARGIN.top}
-          x2={MARGIN.left}
-          y2={MARGIN.top + PLOT_H}
-          stroke="currentColor"
-          className="text-muted-foreground"
-          strokeWidth={1}
-        />
-        <line
-          x1={MARGIN.left}
-          y1={MARGIN.top + PLOT_H}
-          x2={MARGIN.left + PLOT_W}
-          y2={MARGIN.top + PLOT_H}
-          stroke="currentColor"
-          className="text-muted-foreground"
-          strokeWidth={1}
-        />
-        {buckets.map((bucket, i) => {
-          const x = sx(bucket.min);
-          const w = sx(bucket.max) - sx(bucket.min);
-          const h = (bucket.count / yMax) * PLOT_H;
-          if (bucket.count === 0) return null;
-          return (
-            <rect
-              key={i}
-              x={x}
-              y={sy(bucket.count)}
-              width={Math.max(w - 0.5, 1)}
-              height={h}
-              fill={color}
-              opacity={0.75}
-              stroke={color}
-              strokeWidth={0.5}
+    <Expandable title={title}>
+      <div>
+        {title && (
+          <div className="flex items-center justify-end mb-2">
+            <ExportPngButton
+              locale={locale}
+              onClick={() => {
+                if (svgRef.current)
+                  exportSvgToPng(svgRef.current, {
+                    title,
+                    filename: exportFilename || 'histogram.png',
+                    svgWidth: CHART_WIDTH,
+                    svgHeight: CHART_HEIGHT,
+                  });
+              }}
             />
-          );
-        })}
-        {/* Percentile lines */}
-        {sorted.length > 0 &&
-          percentiles.map(({ label, value: val }) => {
-            const px = sx(val);
-            if (px < MARGIN.left || px > MARGIN.left + PLOT_W) return null;
-            const lineColor = percentileColors[label] || '#94a3b8';
-            return (
-              <g key={label}>
+          </div>
+        )}
+        <svg
+          ref={svgRef}
+          viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
+          className="w-full"
+          style={{ maxHeight: 220 }}
+        >
+          {yTicks.map((tick) => (
+            <g key={`y-${tick}`}>
+              {tick > 0 && (
                 <line
-                  x1={px}
-                  y1={MARGIN.top}
-                  x2={px}
-                  y2={MARGIN.top + PLOT_H}
-                  stroke={lineColor}
+                  x1={MARGIN.left}
+                  y1={sy(tick)}
+                  x2={MARGIN.left + PLOT_W}
+                  y2={sy(tick)}
+                  stroke="currentColor"
+                  className="text-border"
+                  strokeWidth={0.5}
+                  strokeDasharray="3 3"
+                />
+              )}
+              <text
+                x={MARGIN.left - 6}
+                y={sy(tick) + 3}
+                textAnchor="end"
+                className="fill-muted-foreground"
+                style={{ fontSize: '9px', fontFamily: 'var(--font-mono, ui-monospace, monospace)' }}
+              >
+                {formatAxisValue(tick)}
+              </text>
+            </g>
+          ))}
+          <text
+            x={12}
+            y={MARGIN.top + PLOT_H / 2}
+            textAnchor="middle"
+            transform={`rotate(-90, 12, ${MARGIN.top + PLOT_H / 2})`}
+            className="fill-muted-foreground"
+            style={{ fontSize: '9px', fontFamily: 'var(--font-mono, ui-monospace, monospace)' }}
+          >
+            {yAxisLabel ?? t.sessions}
+          </text>
+          <line
+            x1={MARGIN.left}
+            y1={MARGIN.top}
+            x2={MARGIN.left}
+            y2={MARGIN.top + PLOT_H}
+            stroke="currentColor"
+            className="text-muted-foreground"
+            strokeWidth={1}
+          />
+          <line
+            x1={MARGIN.left}
+            y1={MARGIN.top + PLOT_H}
+            x2={MARGIN.left + PLOT_W}
+            y2={MARGIN.top + PLOT_H}
+            stroke="currentColor"
+            className="text-muted-foreground"
+            strokeWidth={1}
+          />
+          {buckets.map((bucket, i) => {
+            const x = sx(bucket.min);
+            const w = sx(bucket.max) - sx(bucket.min);
+            const h = (bucket.count / yMax) * PLOT_H;
+            if (bucket.count === 0) return null;
+            return (
+              <rect
+                key={i}
+                x={x}
+                y={sy(bucket.count)}
+                width={Math.max(w - 0.5, 1)}
+                height={h}
+                fill={color}
+                opacity={0.75}
+                stroke={color}
+                strokeWidth={0.5}
+              />
+            );
+          })}
+          {/* Percentile lines */}
+          {sorted.length > 0 &&
+            percentiles.map(({ label, value: val }) => {
+              const px = sx(val);
+              if (px < MARGIN.left || px > MARGIN.left + PLOT_W) return null;
+              const lineColor = percentileColors[label] || '#94a3b8';
+              return (
+                <g key={label}>
+                  <line
+                    x1={px}
+                    y1={MARGIN.top}
+                    x2={px}
+                    y2={MARGIN.top + PLOT_H}
+                    stroke={lineColor}
+                    strokeWidth={1}
+                    strokeDasharray="4 3"
+                  />
+                  <text
+                    x={px}
+                    y={MARGIN.top - 2}
+                    textAnchor="middle"
+                    fill={lineColor}
+                    style={{
+                      fontSize: '7px',
+                      fontFamily: 'var(--font-mono, ui-monospace, monospace)',
+                    }}
+                  >
+                    {label}
+                  </text>
+                </g>
+              );
+            })}
+          {xTicks.map((tick) => {
+            const x = sx(tick);
+            if (x < MARGIN.left - 1 || x > MARGIN.left + PLOT_W + 1) return null;
+            return (
+              <g key={`x-${tick}`}>
+                <line
+                  x1={x}
+                  y1={MARGIN.top + PLOT_H}
+                  x2={x}
+                  y2={MARGIN.top + PLOT_H + 4}
+                  stroke="currentColor"
+                  className="text-muted-foreground"
                   strokeWidth={1}
-                  strokeDasharray="4 3"
                 />
                 <text
-                  x={px}
-                  y={MARGIN.top - 2}
+                  x={x}
+                  y={MARGIN.top + PLOT_H + 14}
                   textAnchor="middle"
-                  fill={lineColor}
+                  className="fill-muted-foreground"
                   style={{
-                    fontSize: '7px',
+                    fontSize: '9px',
                     fontFamily: 'var(--font-mono, ui-monospace, monospace)',
                   }}
                 >
-                  {label}
+                  {fmt(tick)}
                 </text>
               </g>
             );
           })}
-        {xTicks.map((t) => {
-          const x = sx(t);
-          if (x < MARGIN.left - 1 || x > MARGIN.left + PLOT_W + 1) return null;
-          return (
-            <g key={`x-${t}`}>
-              <line
-                x1={x}
-                y1={MARGIN.top + PLOT_H}
-                x2={x}
-                y2={MARGIN.top + PLOT_H + 4}
-                stroke="currentColor"
-                className="text-muted-foreground"
-                strokeWidth={1}
-              />
-              <text
-                x={x}
-                y={MARGIN.top + PLOT_H + 14}
-                textAnchor="middle"
-                className="fill-muted-foreground"
-                style={{ fontSize: '9px', fontFamily: 'var(--font-mono, ui-monospace, monospace)' }}
-              >
-                {fmt(t)}
-              </text>
-            </g>
-          );
-        })}
-        <text
-          x={MARGIN.left + PLOT_W / 2}
-          y={CHART_HEIGHT - 2}
-          textAnchor="middle"
-          className="fill-muted-foreground"
-          style={{ fontSize: '9px', fontFamily: 'var(--font-mono, ui-monospace, monospace)' }}
-        >
-          {axisLabel}
-        </text>
-      </svg>
-      <div className="grid grid-cols-6 gap-1.5 mt-3 pt-3 border-t border-border">
-        {percentiles.map((p) => (
-          <div
-            key={p.label}
-            className="rounded-md border border-border bg-surface-hover px-2 py-1.5 text-center"
+          <text
+            x={MARGIN.left + PLOT_W / 2}
+            y={CHART_HEIGHT - 2}
+            textAnchor="middle"
+            className="fill-muted-foreground"
+            style={{ fontSize: '9px', fontFamily: 'var(--font-mono, ui-monospace, monospace)' }}
           >
-            <div className="text-3xs font-mono font-bold uppercase tracking-eyebrow-wide text-muted-foreground">
-              {p.label}
+            {axisLabel}
+          </text>
+        </svg>
+        <div className="grid grid-cols-6 gap-1.5 mt-3 pt-3 border-t border-border">
+          {percentiles.map((p) => (
+            <div
+              key={p.label}
+              className="rounded-md border border-border bg-surface-hover px-2 py-1.5 text-center"
+            >
+              <div className="text-3xs font-mono font-bold uppercase tracking-eyebrow-wide text-muted-foreground">
+                {p.label}
+              </div>
+              <div className="text-sm font-mono font-bold tracking-tight mt-0.5">
+                {fmt(p.value)}
+              </div>
             </div>
-            <div className="text-sm font-mono font-bold tracking-tight mt-0.5">{fmt(p.value)}</div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
-    </div>
+    </Expandable>
   );
 }
 
@@ -928,119 +978,121 @@ function TransitionHeatmap({
   }
 
   return (
-    <div>
-      <div className="flex items-center justify-end gap-2 mb-2">
-        <button
-          type="button"
-          onClick={() => {
-            track('agentic_workload_transition_hide_small_toggled', { hideSmall: !hideSmall });
-            setHideSmall((h) => !h);
-          }}
-          className={`px-2 py-0.5 text-3xs font-mono rounded border transition-colors ${
-            hideSmall
-              ? 'bg-foreground text-background border-foreground'
-              : 'border-border text-subtle hover:text-foreground hover:bg-surface-hover'
-          }`}
-        >
-          {hideSmallLabel}
-        </button>
-        <ExportPngButton
-          locale={locale}
-          onClick={() => {
-            if (svgRef.current)
-              exportSvgToPng(svgRef.current, {
-                title: 'Tool Transition Matrix',
-                filename: 'tool-transition-matrix.png',
-                svgWidth: W,
-                svgHeight: H,
-              });
-          }}
-        />
-      </div>
-      <svg ref={svgRef} viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ maxHeight: H }}>
-        {/* Column labels (to tools) — vertical */}
-        {tools.map((tool, j) => {
-          const label = tool.length > 14 ? `${tool.slice(0, 13)}…` : tool;
-          const cx = ROW_LABEL_W + j * CELL + CELL / 2;
-          return (
-            <text
-              key={`col-${tool}`}
-              x={cx}
-              y={COL_LABEL_H - 4}
-              textAnchor="start"
-              transform={`rotate(-90, ${cx}, ${COL_LABEL_H - 4})`}
-              style={{
-                fontSize: '9px',
-                fontFamily: 'var(--font-mono, ui-monospace, monospace)',
-                fill: getToolColor(tool),
-              }}
-            >
-              {label}
-            </text>
-          );
-        })}
-
-        {/* Row labels (from tools) */}
-        {tools.map((tool, i) => {
-          const label = tool.length > 14 ? `${tool.slice(0, 13)}…` : tool;
-          return (
-            <text
-              key={`row-${tool}`}
-              x={ROW_LABEL_W - 6}
-              y={COL_LABEL_H + i * CELL + CELL / 2 + 3}
-              textAnchor="end"
-              style={{
-                fontSize: '9px',
-                fontFamily: 'var(--font-mono, ui-monospace, monospace)',
-                fill: getToolColor(tool),
-              }}
-            >
-              {label}
-            </text>
-          );
-        })}
-
-        {/* Grid cells */}
-        {tools.map((_fromTool, i) =>
-          tools.map((_toTool, j) => {
-            const raw = matrix[i][j];
-            const hidden = hideSmall && raw < 5;
-            const intensity = hidden ? 0 : cellIntensity(i, j);
-            const x = ROW_LABEL_W + j * CELL;
-            const y = COL_LABEL_H + i * CELL;
+    <Expandable title={'Tool Transition Matrix'}>
+      <div>
+        <div className="flex items-center justify-end gap-2 mb-2">
+          <button
+            type="button"
+            onClick={() => {
+              track('agentic_workload_transition_hide_small_toggled', { hideSmall: !hideSmall });
+              setHideSmall((h) => !h);
+            }}
+            className={`px-2 py-0.5 text-3xs font-mono rounded border transition-colors ${
+              hideSmall
+                ? 'bg-foreground text-background border-foreground'
+                : 'border-border text-subtle hover:text-foreground hover:bg-surface-hover'
+            }`}
+          >
+            {hideSmallLabel}
+          </button>
+          <ExportPngButton
+            locale={locale}
+            onClick={() => {
+              if (svgRef.current)
+                exportSvgToPng(svgRef.current, {
+                  title: 'Tool Transition Matrix',
+                  filename: 'tool-transition-matrix.png',
+                  svgWidth: W,
+                  svgHeight: H,
+                });
+            }}
+          />
+        </div>
+        <svg ref={svgRef} viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ maxHeight: H }}>
+          {/* Column labels (to tools) — vertical */}
+          {tools.map((tool, j) => {
+            const label = tool.length > 14 ? `${tool.slice(0, 13)}…` : tool;
+            const cx = ROW_LABEL_W + j * CELL + CELL / 2;
             return (
-              <g key={`${i}-${j}`}>
-                <rect
-                  x={x}
-                  y={y}
-                  width={CELL}
-                  height={CELL}
-                  fill={cellColor(intensity)}
-                  stroke="currentColor"
-                  className="text-border"
-                  strokeWidth={0.5}
-                />
-                {raw > 0 && !hidden && (
-                  <text
-                    x={x + CELL / 2}
-                    y={y + CELL / 2 + 3}
-                    textAnchor="middle"
-                    fill={intensity > 0.5 ? '#ffffff' : 'currentColor'}
-                    className={intensity > 0.5 ? undefined : 'fill-muted-foreground'}
-                    style={{
-                      fontSize: '7.5px',
-                      fontFamily: 'var(--font-mono, ui-monospace, monospace)',
-                    }}
-                  >
-                    {cellLabel(i, j)}
-                  </text>
-                )}
-              </g>
+              <text
+                key={`col-${tool}`}
+                x={cx}
+                y={COL_LABEL_H - 4}
+                textAnchor="start"
+                transform={`rotate(-90, ${cx}, ${COL_LABEL_H - 4})`}
+                style={{
+                  fontSize: '9px',
+                  fontFamily: 'var(--font-mono, ui-monospace, monospace)',
+                  fill: getToolColor(tool),
+                }}
+              >
+                {label}
+              </text>
             );
-          }),
-        )}
-      </svg>
-    </div>
+          })}
+
+          {/* Row labels (from tools) */}
+          {tools.map((tool, i) => {
+            const label = tool.length > 14 ? `${tool.slice(0, 13)}…` : tool;
+            return (
+              <text
+                key={`row-${tool}`}
+                x={ROW_LABEL_W - 6}
+                y={COL_LABEL_H + i * CELL + CELL / 2 + 3}
+                textAnchor="end"
+                style={{
+                  fontSize: '9px',
+                  fontFamily: 'var(--font-mono, ui-monospace, monospace)',
+                  fill: getToolColor(tool),
+                }}
+              >
+                {label}
+              </text>
+            );
+          })}
+
+          {/* Grid cells */}
+          {tools.map((_fromTool, i) =>
+            tools.map((_toTool, j) => {
+              const raw = matrix[i][j];
+              const hidden = hideSmall && raw < 5;
+              const intensity = hidden ? 0 : cellIntensity(i, j);
+              const x = ROW_LABEL_W + j * CELL;
+              const y = COL_LABEL_H + i * CELL;
+              return (
+                <g key={`${i}-${j}`}>
+                  <rect
+                    x={x}
+                    y={y}
+                    width={CELL}
+                    height={CELL}
+                    fill={cellColor(intensity)}
+                    stroke="currentColor"
+                    className="text-border"
+                    strokeWidth={0.5}
+                  />
+                  {raw > 0 && !hidden && (
+                    <text
+                      x={x + CELL / 2}
+                      y={y + CELL / 2 + 3}
+                      textAnchor="middle"
+                      fill={intensity > 0.5 ? '#ffffff' : 'currentColor'}
+                      className={intensity > 0.5 ? undefined : 'fill-muted-foreground'}
+                      style={{
+                        fontSize: '7.5px',
+                        fontFamily: 'var(--font-mono, ui-monospace, monospace)',
+                      }}
+                    >
+                      {cellLabel(i, j)}
+                    </text>
+                  )}
+                </g>
+              );
+            }),
+          )}
+        </svg>
+      </div>
+    </Expandable>
   );
 }
 
@@ -1104,13 +1156,17 @@ function ToolChip({ tool, avgRun }: { tool: string; avgRun?: number }) {
   );
 }
 
-function WorkflowPatterns() {
+function WorkflowPatterns({ harness }: { harness: HarnessFilter }) {
   const t = STRINGS[useLocale()];
   const { data, loading, error, reload } = useDashboardData<SequenceInsightsPayload>({
+    key: harness,
     fetcher: async (signal) => {
-      const response = await fetch('/api/v1/agentic-workload-explorer/tool-analytics/sequences', {
-        signal,
-      });
+      const response = await fetch(
+        `/api/v1/agentic-workload-explorer/tool-analytics/sequences${harnessQuery(harness)}`,
+        {
+          signal,
+        },
+      );
       const body: unknown = await response.json().catch(() => null);
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       if (!body || typeof body !== 'object' || !('motifs' in body) || !Array.isArray(body.motifs)) {
@@ -1650,257 +1706,261 @@ function OsTurnaroundCards({ byOs }: { byOs: ToolTimings['byOs'] }) {
   for (let bin = Math.ceil(lo / 8) * 8; bin <= hi; bin += 8) decadeTicks.push(bin);
 
   return (
-    <div className="mt-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
-      <Card>
-        <CardHeader className="pb-2">
-          <div className="flex items-center justify-between gap-2">
-            <CardTitle>{t.turnaroundShapeByOs}</CardTitle>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  track('agentic_workload_turnaround_split_arch_toggled', {
-                    splitArch: !splitArch,
-                  });
-                  setSplitArch((v) => !v);
-                }}
-                className={`px-2 py-0.5 text-3xs font-mono rounded border transition-colors ${
-                  splitArch
-                    ? 'bg-foreground text-background border-foreground'
-                    : 'border-border text-subtle hover:text-foreground hover:bg-surface-hover'
-                }`}
-              >
-                {t.splitByArch}
-              </button>
-              <ExportPngButton
-                locale={locale}
-                onClick={() => {
-                  if (svgRef.current)
-                    exportSvgToPng(svgRef.current, {
-                      title: `${activeTool} turnaround by ${splitArch ? 'OS/arch' : 'OS'}`,
-                      filename: `turnaround-by-os-${activeTool.toLowerCase()}.png`,
-                      svgWidth: CHART_WIDTH,
-                      svgHeight: CHART_HEIGHT,
+    <Expandable title={`${activeTool} turnaround by ${splitArch ? 'OS/arch' : 'OS'}`}>
+      <div className="mt-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <Card>
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between gap-2">
+              <CardTitle>{t.turnaroundShapeByOs}</CardTitle>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    track('agentic_workload_turnaround_split_arch_toggled', {
+                      splitArch: !splitArch,
                     });
-                }}
-              />
-            </div>
-          </div>
-          <p className="text-3xs font-mono text-subtle mt-0.5">{t.turnaroundShapeDescription}</p>
-          <div className="mt-1.5 space-y-1">
-            <div className="flex items-start gap-2">
-              <span className="w-12 shrink-0 pt-1 text-3xs font-mono font-bold uppercase tracking-eyebrow-wide text-muted-foreground">
-                {t.agent}
-              </span>
-              <div className="flex flex-wrap items-center gap-1">
-                {availableAgents.map((agent) => (
-                  <button
-                    key={agent}
-                    type="button"
-                    onClick={() => {
-                      track('agentic_workload_turnaround_agent_filter_changed', { agent });
-                      setAgentFilter(agent);
-                    }}
-                    className={`px-2 py-0.5 text-3xs font-mono rounded border transition-colors ${
-                      agent === agentFilter
-                        ? 'bg-foreground text-background border-foreground'
-                        : 'border-border text-subtle hover:text-foreground hover:bg-surface-hover'
-                    }`}
-                  >
-                    {t.agentLabels[agent]}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="flex items-start gap-2">
-              <span className="w-12 shrink-0 pt-1 text-3xs font-mono font-bold uppercase tracking-eyebrow-wide text-muted-foreground">
-                {t.tool}
-              </span>
-              <div className="flex flex-wrap items-center gap-1">
-                {selectableTools.map((tool) => (
-                  <button
-                    key={tool}
-                    type="button"
-                    onClick={() => {
-                      track('agentic_workload_turnaround_tool_selected', { tool });
-                      setSelected(tool);
-                    }}
-                    className={`px-2 py-0.5 text-3xs font-mono rounded border transition-colors ${
-                      tool === activeTool
-                        ? 'bg-foreground text-background border-foreground'
-                        : 'border-border text-subtle hover:text-foreground hover:bg-surface-hover'
-                    }`}
-                  >
-                    {tool}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <svg
-            ref={svgRef}
-            viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
-            className="w-full"
-            style={{ maxHeight: 220 }}
-          >
-            <line
-              x1={MARGIN.left}
-              y1={MARGIN.top + PLOT_H}
-              x2={MARGIN.left + PLOT_W}
-              y2={MARGIN.top + PLOT_H}
-              stroke="currentColor"
-              className="text-muted-foreground"
-              strokeWidth={1}
-            />
-            {decadeTicks.map((bin) => (
-              <g key={bin}>
-                <line
-                  x1={sx(bin)}
-                  y1={MARGIN.top}
-                  x2={sx(bin)}
-                  y2={MARGIN.top + PLOT_H}
-                  stroke="currentColor"
-                  className="text-border"
-                  strokeWidth={0.5}
-                  strokeDasharray="3 3"
-                />
-                <text
-                  x={sx(bin)}
-                  y={MARGIN.top + PLOT_H + 14}
-                  textAnchor="middle"
-                  className="fill-muted-foreground"
-                  style={{
-                    fontSize: '9px',
-                    fontFamily: 'var(--font-mono, ui-monospace, monospace)',
+                    setSplitArch((v) => !v);
                   }}
+                  className={`px-2 py-0.5 text-3xs font-mono rounded border transition-colors ${
+                    splitArch
+                      ? 'bg-foreground text-background border-foreground'
+                      : 'border-border text-subtle hover:text-foreground hover:bg-surface-hover'
+                  }`}
                 >
-                  {formatMs(fineBinMs(bin))}
-                </text>
-              </g>
-            ))}
-            {series.map(({ key, bins, total, p50Ms }) => {
-              if (total === 0) return null;
-              const color = platformColor(key);
-              const points = [];
-              for (let bin = lo; bin <= hi; bin++) {
-                points.push(
-                  `${sx(bin + 0.5).toFixed(1)},${sy((bins.get(bin) ?? 0) / total).toFixed(1)}`,
-                );
-              }
-              const baseline = (MARGIN.top + PLOT_H).toFixed(1);
-              const area = `M ${sx(lo + 0.5).toFixed(1)} ${baseline} L ${points.join(' L ')} L ${sx(hi + 0.5).toFixed(1)} ${baseline} Z`;
-              const p50Bin =
-                p50Ms === null
-                  ? null
-                  : Math.log10(Math.max(Number(p50Ms), 1)) * FINE_BINS_PER_DECADE;
-              return (
-                <g key={key}>
-                  <path d={area} fill={color} fillOpacity={0.1} />
-                  <polyline
-                    points={points.join(' ')}
-                    fill="none"
-                    stroke={color}
-                    strokeWidth={1.5}
-                  />
-                  {p50Bin !== null && p50Bin >= lo && p50Bin <= hi && (
-                    <line
-                      x1={sx(p50Bin)}
-                      y1={MARGIN.top}
-                      x2={sx(p50Bin)}
-                      y2={MARGIN.top + PLOT_H}
-                      stroke={color}
-                      strokeWidth={1}
-                      strokeDasharray="4 3"
-                      opacity={0.6}
-                    />
-                  )}
-                </g>
-              );
-            })}
-            <text
-              x={MARGIN.left + PLOT_W / 2}
-              y={CHART_HEIGHT - 2}
-              textAnchor="middle"
-              className="fill-muted-foreground"
-              style={{ fontSize: '9px', fontFamily: 'var(--font-mono, ui-monospace, monospace)' }}
-            >
-              {t.turnaroundAxisLabel}
-            </text>
-          </svg>
-          <div className="flex flex-wrap gap-x-5 gap-y-1 mt-2">
-            {series.map(({ key, total, p50Ms, sessions }) => (
-              <span key={key} className="flex items-center gap-1.5 text-3xs font-mono">
-                <span
-                  className="w-2.5 h-2.5 rounded-full shrink-0"
-                  style={{ backgroundColor: platformColor(key) }}
+                  {t.splitByArch}
+                </button>
+                <ExportPngButton
+                  locale={locale}
+                  onClick={() => {
+                    if (svgRef.current)
+                      exportSvgToPng(svgRef.current, {
+                        title: `${activeTool} turnaround by ${splitArch ? 'OS/arch' : 'OS'}`,
+                        filename: `turnaround-by-os-${activeTool.toLowerCase()}.png`,
+                        svgWidth: CHART_WIDTH,
+                        svgHeight: CHART_HEIGHT,
+                      });
+                  }}
                 />
-                <span style={{ color: platformColor(key) }}>{key}</span>
-                <span className="text-muted-foreground">
-                  n={total.toLocaleString()}
-                  {sessions !== null && ` · ${sessions.toLocaleString()} sess`}
-                  {p50Ms !== null && ` · p50 ${formatMs(p50Ms)}`}
+              </div>
+            </div>
+            <p className="text-3xs font-mono text-subtle mt-0.5">{t.turnaroundShapeDescription}</p>
+            <div className="mt-1.5 space-y-1">
+              <div className="flex items-start gap-2">
+                <span className="w-12 shrink-0 pt-1 text-3xs font-mono font-bold uppercase tracking-eyebrow-wide text-muted-foreground">
+                  {t.agent}
                 </span>
-              </span>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle>{t.medianTurnaroundByOs(splitArch)}</CardTitle>
-          <p className="text-3xs font-mono text-subtle mt-0.5">
-            {t.medianTurnaroundDescription(splitArch)}
-          </p>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full text-2xs font-mono">
-              <thead className="text-muted-foreground border-b border-border">
-                <tr>
-                  <th className="text-left py-1.5 font-medium">{t.colTool}</th>
-                  {tableColumns.map((col) => (
-                    <th key={col.key} className="text-right py-1.5 font-medium">
-                      <span
-                        className="inline-block w-2 h-2 rounded-full mr-1.5"
-                        style={{ backgroundColor: platformColor(col.key) }}
-                      />
-                      {col.arch ? `${col.os} ${col.arch}` : col.os}
-                    </th>
+                <div className="flex flex-wrap items-center gap-1">
+                  {availableAgents.map((agent) => (
+                    <button
+                      key={agent}
+                      type="button"
+                      onClick={() => {
+                        track('agentic_workload_turnaround_agent_filter_changed', { agent });
+                        setAgentFilter(agent);
+                      }}
+                      className={`px-2 py-0.5 text-3xs font-mono rounded border transition-colors ${
+                        agent === agentFilter
+                          ? 'bg-foreground text-background border-foreground'
+                          : 'border-border text-subtle hover:text-foreground hover:bg-surface-hover'
+                      }`}
+                    >
+                      {t.agentLabels[agent]}
+                    </button>
                   ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {filteredTools.map((tool) => (
-                  <tr key={tool}>
-                    <td className="py-1.5 font-medium" style={{ color: getToolColor(tool) }}>
+                </div>
+              </div>
+              <div className="flex items-start gap-2">
+                <span className="w-12 shrink-0 pt-1 text-3xs font-mono font-bold uppercase tracking-eyebrow-wide text-muted-foreground">
+                  {t.tool}
+                </span>
+                <div className="flex flex-wrap items-center gap-1">
+                  {selectableTools.map((tool) => (
+                    <button
+                      key={tool}
+                      type="button"
+                      onClick={() => {
+                        track('agentic_workload_turnaround_tool_selected', { tool });
+                        setSelected(tool);
+                      }}
+                      className={`px-2 py-0.5 text-3xs font-mono rounded border transition-colors ${
+                        tool === activeTool
+                          ? 'bg-foreground text-background border-foreground'
+                          : 'border-border text-subtle hover:text-foreground hover:bg-surface-hover'
+                      }`}
+                    >
                       {tool}
-                    </td>
-                    {tableColumns.map((col) => {
-                      const stat = statFor(col, tool);
-                      return (
-                        <td key={col.key} className="py-1.5 text-right align-top">
-                          {stat ? (
-                            <>
-                              <div>{formatMs(stat.p50Ms)}</div>
-                              <div className="text-3xs text-subtle">p90 {formatMs(stat.p90Ms)}</div>
-                            </>
-                          ) : (
-                            <span className="text-subtle">—</span>
-                          )}
-                        </td>
-                      );
-                    })}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <svg
+              ref={svgRef}
+              viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
+              className="w-full"
+              style={{ maxHeight: 220 }}
+            >
+              <line
+                x1={MARGIN.left}
+                y1={MARGIN.top + PLOT_H}
+                x2={MARGIN.left + PLOT_W}
+                y2={MARGIN.top + PLOT_H}
+                stroke="currentColor"
+                className="text-muted-foreground"
+                strokeWidth={1}
+              />
+              {decadeTicks.map((bin) => (
+                <g key={bin}>
+                  <line
+                    x1={sx(bin)}
+                    y1={MARGIN.top}
+                    x2={sx(bin)}
+                    y2={MARGIN.top + PLOT_H}
+                    stroke="currentColor"
+                    className="text-border"
+                    strokeWidth={0.5}
+                    strokeDasharray="3 3"
+                  />
+                  <text
+                    x={sx(bin)}
+                    y={MARGIN.top + PLOT_H + 14}
+                    textAnchor="middle"
+                    className="fill-muted-foreground"
+                    style={{
+                      fontSize: '9px',
+                      fontFamily: 'var(--font-mono, ui-monospace, monospace)',
+                    }}
+                  >
+                    {formatMs(fineBinMs(bin))}
+                  </text>
+                </g>
+              ))}
+              {series.map(({ key, bins, total, p50Ms }) => {
+                if (total === 0) return null;
+                const color = platformColor(key);
+                const points = [];
+                for (let bin = lo; bin <= hi; bin++) {
+                  points.push(
+                    `${sx(bin + 0.5).toFixed(1)},${sy((bins.get(bin) ?? 0) / total).toFixed(1)}`,
+                  );
+                }
+                const baseline = (MARGIN.top + PLOT_H).toFixed(1);
+                const area = `M ${sx(lo + 0.5).toFixed(1)} ${baseline} L ${points.join(' L ')} L ${sx(hi + 0.5).toFixed(1)} ${baseline} Z`;
+                const p50Bin =
+                  p50Ms === null
+                    ? null
+                    : Math.log10(Math.max(Number(p50Ms), 1)) * FINE_BINS_PER_DECADE;
+                return (
+                  <g key={key}>
+                    <path d={area} fill={color} fillOpacity={0.1} />
+                    <polyline
+                      points={points.join(' ')}
+                      fill="none"
+                      stroke={color}
+                      strokeWidth={1.5}
+                    />
+                    {p50Bin !== null && p50Bin >= lo && p50Bin <= hi && (
+                      <line
+                        x1={sx(p50Bin)}
+                        y1={MARGIN.top}
+                        x2={sx(p50Bin)}
+                        y2={MARGIN.top + PLOT_H}
+                        stroke={color}
+                        strokeWidth={1}
+                        strokeDasharray="4 3"
+                        opacity={0.6}
+                      />
+                    )}
+                  </g>
+                );
+              })}
+              <text
+                x={MARGIN.left + PLOT_W / 2}
+                y={CHART_HEIGHT - 2}
+                textAnchor="middle"
+                className="fill-muted-foreground"
+                style={{ fontSize: '9px', fontFamily: 'var(--font-mono, ui-monospace, monospace)' }}
+              >
+                {t.turnaroundAxisLabel}
+              </text>
+            </svg>
+            <div className="flex flex-wrap gap-x-5 gap-y-1 mt-2">
+              {series.map(({ key, total, p50Ms, sessions }) => (
+                <span key={key} className="flex items-center gap-1.5 text-3xs font-mono">
+                  <span
+                    className="w-2.5 h-2.5 rounded-full shrink-0"
+                    style={{ backgroundColor: platformColor(key) }}
+                  />
+                  <span style={{ color: platformColor(key) }}>{key}</span>
+                  <span className="text-muted-foreground">
+                    n={total.toLocaleString()}
+                    {sessions !== null && ` · ${sessions.toLocaleString()} sess`}
+                    {p50Ms !== null && ` · p50 ${formatMs(p50Ms)}`}
+                  </span>
+                </span>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle>{t.medianTurnaroundByOs(splitArch)}</CardTitle>
+            <p className="text-3xs font-mono text-subtle mt-0.5">
+              {t.medianTurnaroundDescription(splitArch)}
+            </p>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <table className="w-full text-2xs font-mono">
+                <thead className="text-muted-foreground border-b border-border">
+                  <tr>
+                    <th className="text-left py-1.5 font-medium">{t.colTool}</th>
+                    {tableColumns.map((col) => (
+                      <th key={col.key} className="text-right py-1.5 font-medium">
+                        <span
+                          className="inline-block w-2 h-2 rounded-full mr-1.5"
+                          style={{ backgroundColor: platformColor(col.key) }}
+                        />
+                        {col.arch ? `${col.os} ${col.arch}` : col.os}
+                      </th>
+                    ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {filteredTools.map((tool) => (
+                    <tr key={tool}>
+                      <td className="py-1.5 font-medium" style={{ color: getToolColor(tool) }}>
+                        {tool}
+                      </td>
+                      {tableColumns.map((col) => {
+                        const stat = statFor(col, tool);
+                        return (
+                          <td key={col.key} className="py-1.5 text-right align-top">
+                            {stat ? (
+                              <>
+                                <div>{formatMs(stat.p50Ms)}</div>
+                                <div className="text-3xs text-subtle">
+                                  p90 {formatMs(stat.p90Ms)}
+                                </div>
+                              </>
+                            ) : (
+                              <span className="text-subtle">—</span>
+                            )}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </Expandable>
   );
 }
 
@@ -2287,139 +2347,200 @@ function PieChartSection({
   return (
     <section>
       <SectionHeader label={t.usageBreakdown} count={toolCounts.length} />
-      <div ref={containerRef} className="rounded-md border border-border bg-surface p-4 relative">
-        <div className="flex flex-col lg:flex-row items-center gap-6">
-          {/* SVG Pie */}
-          <div className="shrink-0">
-            <svg viewBox="-1.1 -1.1 2.2 2.2" width={220} height={220}>
-              {(() => {
-                // Pre-compute paths for all slices
-                const paths: { slice: PieSlice; d: string }[] = [];
-                let cumAngle = -Math.PI / 2;
-                for (const slice of slices) {
-                  const angle = slice.fraction * Math.PI * 2;
-                  const x1 = Math.cos(cumAngle);
-                  const y1 = Math.sin(cumAngle);
-                  cumAngle += angle;
-                  const x2 = Math.cos(cumAngle);
-                  const y2 = Math.sin(cumAngle);
-                  const largeArc = angle > Math.PI ? 1 : 0;
-                  paths.push({
-                    slice,
-                    d: `M 0 0 L ${x1} ${y1} A 1 1 0 ${largeArc} 1 ${x2} ${y2} Z`,
+      <Expandable title={t.usageBreakdown} corner>
+        <div ref={containerRef} className="rounded-md border border-border bg-surface p-4 relative">
+          <div className="flex flex-col lg:flex-row items-center gap-6">
+            {/* SVG Pie */}
+            <div className="shrink-0">
+              <svg viewBox="-1.1 -1.1 2.2 2.2" width={220} height={220}>
+                {(() => {
+                  // Pre-compute paths for all slices
+                  const paths: { slice: PieSlice; d: string }[] = [];
+                  let cumAngle = -Math.PI / 2;
+                  for (const slice of slices) {
+                    const angle = slice.fraction * Math.PI * 2;
+                    const x1 = Math.cos(cumAngle);
+                    const y1 = Math.sin(cumAngle);
+                    cumAngle += angle;
+                    const x2 = Math.cos(cumAngle);
+                    const y2 = Math.sin(cumAngle);
+                    const largeArc = angle > Math.PI ? 1 : 0;
+                    paths.push({
+                      slice,
+                      d: `M 0 0 L ${x1} ${y1} A 1 1 0 ${largeArc} 1 ${x2} ${y2} Z`,
+                    });
+                  }
+                  // Render hovered slice last so it paints on top
+                  const sorted = hoveredSlice
+                    ? [
+                        ...paths.filter((p) => p.slice.label !== hoveredSlice.label),
+                        ...paths.filter((p) => p.slice.label === hoveredSlice.label),
+                      ]
+                    : paths;
+                  return sorted.map(({ slice, d }) => {
+                    const isHovered = hoveredSlice?.label === slice.label;
+                    return (
+                      <path
+                        key={slice.label}
+                        d={d}
+                        fill={slice.color}
+                        fillOpacity={hoveredSlice ? (isHovered ? 1 : 0.4) : 0.85}
+                        stroke="var(--bg)"
+                        strokeWidth={0.02}
+                        style={{
+                          cursor: 'pointer',
+                          transform: isHovered ? 'scale(1.04)' : 'scale(1)',
+                          transformOrigin: 'center',
+                          transition: 'fill-opacity 150ms, transform 150ms',
+                        }}
+                        onMouseEnter={(e) => {
+                          setHoveredSlice(slice);
+                          const rect = containerRef.current?.getBoundingClientRect();
+                          if (rect) {
+                            setTooltipPos({
+                              x: e.clientX - rect.left,
+                              y: e.clientY - rect.top,
+                            });
+                          }
+                        }}
+                        onMouseMove={(e) => {
+                          const rect = containerRef.current?.getBoundingClientRect();
+                          if (rect) {
+                            setTooltipPos({
+                              x: e.clientX - rect.left,
+                              y: e.clientY - rect.top,
+                            });
+                          }
+                        }}
+                        onMouseLeave={() => setHoveredSlice(null)}
+                      />
+                    );
                   });
-                }
-                // Render hovered slice last so it paints on top
-                const sorted = hoveredSlice
-                  ? [
-                      ...paths.filter((p) => p.slice.label !== hoveredSlice.label),
-                      ...paths.filter((p) => p.slice.label === hoveredSlice.label),
-                    ]
-                  : paths;
-                return sorted.map(({ slice, d }) => {
-                  const isHovered = hoveredSlice?.label === slice.label;
-                  return (
-                    <path
-                      key={slice.label}
-                      d={d}
-                      fill={slice.color}
-                      fillOpacity={hoveredSlice ? (isHovered ? 1 : 0.4) : 0.85}
-                      stroke="var(--bg)"
-                      strokeWidth={0.02}
-                      style={{
-                        cursor: 'pointer',
-                        transform: isHovered ? 'scale(1.04)' : 'scale(1)',
-                        transformOrigin: 'center',
-                        transition: 'fill-opacity 150ms, transform 150ms',
-                      }}
-                      onMouseEnter={(e) => {
-                        setHoveredSlice(slice);
-                        const rect = containerRef.current?.getBoundingClientRect();
-                        if (rect) {
-                          setTooltipPos({
-                            x: e.clientX - rect.left,
-                            y: e.clientY - rect.top,
-                          });
-                        }
-                      }}
-                      onMouseMove={(e) => {
-                        const rect = containerRef.current?.getBoundingClientRect();
-                        if (rect) {
-                          setTooltipPos({
-                            x: e.clientX - rect.left,
-                            y: e.clientY - rect.top,
-                          });
-                        }
-                      }}
-                      onMouseLeave={() => setHoveredSlice(null)}
-                    />
-                  );
-                });
-              })()}
-            </svg>
-          </div>
-
-          {/* Legend */}
-          <div className="flex-1 grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-1.5">
-            {slices.map((slice) => (
-              <div
-                key={slice.label}
-                className="flex items-center gap-2"
-                onMouseEnter={() => setHoveredSlice(slice)}
-                onMouseLeave={() => setHoveredSlice(null)}
-              >
-                <span
-                  className="w-2.5 h-2.5 rounded-full shrink-0"
-                  style={{ backgroundColor: slice.color }}
-                />
-                <span className="text-2xs font-mono truncate">{slice.label}</span>
-                <span className="text-3xs font-mono text-muted-foreground ml-auto tabular-nums">
-                  {(slice.fraction * 100).toFixed(1)}%
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Hover tooltip */}
-        {hoveredSlice && (
-          <div
-            className="absolute z-50 pointer-events-none rounded-md border border-border bg-background shadow-lg px-3 py-2 text-2xs font-mono max-w-[240px]"
-            style={{
-              left: Math.min(tooltipPos.x + 16, (containerRef.current?.clientWidth || 500) - 250),
-              top: tooltipPos.y > 200 ? tooltipPos.y - 20 : tooltipPos.y + 16,
-            }}
-          >
-            <div className="font-bold mb-1">
-              {hoveredSlice.label}: {hoveredSlice.count.toLocaleString()} (
-              {(hoveredSlice.fraction * 100).toFixed(1)}%)
+                })()}
+              </svg>
             </div>
-            {hoveredSlice.items && (
-              <div className="space-y-0.5 border-t border-border pt-1 mt-1">
-                {hoveredSlice.items.map((item) => (
-                  <div
-                    key={item.toolName}
-                    className="flex justify-between gap-3 text-muted-foreground"
-                  >
-                    <span>{item.toolName}</span>
-                    <span className="tabular-nums">
-                      {Number(item.count).toLocaleString()} (
-                      {((Number(item.count) / totalToolCalls) * 100).toFixed(2)}%)
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
+
+            {/* Legend */}
+            <div className="flex-1 grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-1.5">
+              {slices.map((slice) => (
+                <div
+                  key={slice.label}
+                  className="flex items-center gap-2"
+                  onMouseEnter={() => setHoveredSlice(slice)}
+                  onMouseLeave={() => setHoveredSlice(null)}
+                >
+                  <span
+                    className="w-2.5 h-2.5 rounded-full shrink-0"
+                    style={{ backgroundColor: slice.color }}
+                  />
+                  <span className="text-2xs font-mono truncate">{slice.label}</span>
+                  <span className="text-3xs font-mono text-muted-foreground ml-auto tabular-nums">
+                    {(slice.fraction * 100).toFixed(1)}%
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
-        )}
-      </div>
+
+          {/* Hover tooltip */}
+          {hoveredSlice && (
+            <div
+              className="absolute z-50 pointer-events-none rounded-md border border-border bg-background shadow-lg px-3 py-2 text-2xs font-mono max-w-[240px]"
+              style={{
+                left: Math.min(tooltipPos.x + 16, (containerRef.current?.clientWidth || 500) - 250),
+                top: tooltipPos.y > 200 ? tooltipPos.y - 20 : tooltipPos.y + 16,
+              }}
+            >
+              <div className="font-bold mb-1">
+                {hoveredSlice.label}: {hoveredSlice.count.toLocaleString()} (
+                {(hoveredSlice.fraction * 100).toFixed(1)}%)
+              </div>
+              {hoveredSlice.items && (
+                <div className="space-y-0.5 border-t border-border pt-1 mt-1">
+                  {hoveredSlice.items.map((item) => (
+                    <div
+                      key={item.toolName}
+                      className="flex justify-between gap-3 text-muted-foreground"
+                    >
+                      <span>{item.toolName}</span>
+                      <span className="tabular-nums">
+                        {Number(item.count).toLocaleString()} (
+                        {((Number(item.count) / totalToolCalls) * 100).toFixed(2)}%)
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </Expandable>
     </section>
   );
 }
 
 // ── Main Page ────────────────────────────────────────────────────
 
+const HARNESS_FILTERS: { value: HarnessFilter }[] = [
+  { value: 'all' },
+  ...HARNESSES.map((h) => ({ value: h })),
+];
+
+function harnessQuery(harness: HarnessFilter): string {
+  return harness === 'all' ? '' : `?harness=${harness}`;
+}
+
 export default function ToolAnalyticsPage() {
+  return (
+    <Suspense>
+      <ToolAnalyticsPageContent />
+    </Suspense>
+  );
+}
+
+function ToolAnalyticsPageContent() {
+  const locale = useLocale();
+  const t = STRINGS[locale];
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const raw = searchParams.get('harness');
+  const harness: HarnessFilter = isHarness(raw) ? raw : 'all';
+
+  function setHarness(value: HarnessFilter) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (value === 'all') params.delete('harness');
+    else params.set('harness', value);
+    const qs = params.toString();
+    router.replace(`/tool-analytics${qs ? `?${qs}` : ''}`, { scroll: false });
+  }
+
+  return (
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-center gap-1">
+        {HARNESS_FILTERS.map((f) => (
+          <button
+            key={f.value}
+            type="button"
+            onClick={() => {
+              track('agentic_workload_harness_filter_changed', { harness: f.value });
+              setHarness(f.value);
+            }}
+            className={`px-2.5 py-1 text-3xs font-mono uppercase tracking-wider rounded-md transition-colors ${
+              harness === f.value
+                ? 'bg-foreground text-background'
+                : 'text-muted-foreground hover:text-foreground hover:bg-surface-hover'
+            }`}
+          >
+            {t.harnessFilterLabels[f.value]}
+          </button>
+        ))}
+      </div>
+      <ToolAnalyticsView harness={harness} />
+    </div>
+  );
+}
+
+function ToolAnalyticsView({ harness }: { harness: HarnessFilter }) {
   const t = STRINGS[useLocale()];
   const [showProbability, setShowProbability] = useState(false);
 
@@ -2429,8 +2550,12 @@ export default function ToolAnalyticsPage() {
     error: loadError,
     reload,
   } = useDashboardData<ToolAnalyticsResponse>({
+    key: harness,
     fetcher: async (signal) => {
-      const r = await fetch('/api/v1/agentic-workload-explorer/tool-analytics', { signal });
+      const r = await fetch(
+        `/api/v1/agentic-workload-explorer/tool-analytics${harnessQuery(harness)}`,
+        { signal },
+      );
       const body: unknown = await r.json().catch(() => null);
       if (!r.ok) {
         const message =
@@ -2573,7 +2698,16 @@ export default function ToolAnalyticsPage() {
 
   return (
     <div className="space-y-5">
-      {/* ── Cache freshness ────────────────────────────────────── */}
+      {data.sample && (
+        <div className="text-3xs font-mono text-muted-foreground">
+          {t.sessionSample(
+            data.sample.sessions.toLocaleString(),
+            data.sample.totalSessions.toLocaleString(),
+            data.sample.requests.toLocaleString(),
+            data.sample.totalRequests.toLocaleString(),
+          )}
+        </div>
+      )}
 
       {/* ── Summary Stats ──────────────────────────────────────── */}
       <section>
@@ -2763,7 +2897,7 @@ export default function ToolAnalyticsPage() {
       </section>
 
       {/* ── Workflow Patterns ─────────────────────────────────── */}
-      <WorkflowPatterns />
+      <WorkflowPatterns harness={harness} />
 
       {/* ── Tool Error Rates ───────────────────────────────────── */}
       <section>

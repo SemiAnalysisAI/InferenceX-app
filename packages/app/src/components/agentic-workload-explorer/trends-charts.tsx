@@ -1,6 +1,12 @@
 'use client';
 
-import { useMemo, useRef } from 'react';
+import { useMemo, useRef, useState, type RefObject } from 'react';
+import {
+  ChartDialog,
+  ExpandButton,
+  Expandable,
+} from '@/components/agentic-workload-explorer/expandable-chart';
+import { cn } from '@/lib/utils';
 import { exportSvgToPng, ExportPngButton } from '@/lib/agentic-workload-explorer/export-png';
 import { track } from '@/lib/analytics';
 import { useLocale } from '@/lib/use-locale';
@@ -76,13 +82,15 @@ function generateTicks(min: number, max: number, targetCount: number): number[] 
   const spacing = niceNum(range / (targetCount - 1), true);
   const niceMin = Math.floor(min / spacing) * spacing;
   const ticks: number[] = [];
-  for (let t = niceMin; t <= max + spacing * 0.5; t += spacing) {
+  // Keep going until a tick reaches max, so the tallest bar is never clipped.
+  for (let t = niceMin; t - spacing < max - spacing * 1e-9; t += spacing) {
     ticks.push(Math.round(t * 1e10) / 1e10);
   }
   return ticks;
 }
 
 export function formatAxisNumber(v: number): string {
+  if (v >= 1e9) return `${(v / 1e9).toFixed(v % 1e9 === 0 ? 0 : 1)}B`;
   if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(v % 1_000_000 === 0 ? 0 : 1)}M`;
   if (v >= 1_000) return `${(v / 1_000).toFixed(v % 1_000 === 0 ? 0 : 1)}K`;
   if (Number.isInteger(v)) return String(v);
@@ -101,6 +109,9 @@ function dayLabel(day: string): string {
 
 const CHART_W = 640;
 const CHART_H = 220;
+/** Wider and taller than the inline chart so text renders smaller in the dialog. */
+const EXPANDED_W = 1100;
+const EXPANDED_H = 460;
 const MARGIN = { top: 8, right: 12, bottom: 36, left: 52 };
 const PLOT_W = CHART_W - MARGIN.left - MARGIN.right;
 const PLOT_H = CHART_H - MARGIN.top - MARGIN.bottom;
@@ -149,7 +160,8 @@ export function TrendsLineChart({
   const { days, valuesByKey, yMax, yTicks } = useMemo(() => {
     const daySet = new Set<string>();
     for (const s of series) for (const p of s.points) daySet.add(p.day);
-    const sortedDays = [...daySet].toSorted();
+    // Days may be Date strings ("Fri Sep 25 2026 …"), so sort by time.
+    const sortedDays = [...daySet].toSorted((a, b) => Date.parse(a) - Date.parse(b));
     const dayIndex = new Map(sortedDays.map((d, i) => [d, i]));
 
     const perSeriesValues = new Map<string, (number | null)[]>();
@@ -199,94 +211,105 @@ export function TrendsLineChart({
   const labelInterval = Math.max(1, Math.floor(days.length / 6));
 
   return (
-    <div className="rounded-md border border-border bg-surface p-3">
-      <div className="flex items-center justify-between">
-        <SectionHeader label={title} subtext={subtext} />
-        <ExportPngButton
-          locale={locale}
-          onClick={() => {
-            track('agentic_workload_trends_line_chart_export', { title, filename });
-            if (svgRef.current)
-              exportSvgToPng(svgRef.current, {
-                title,
-                filename,
-                svgWidth: CHART_W,
-                svgHeight: CHART_H,
-              });
-          }}
-        />
-      </div>
-
-      {series.length > 1 && (
-        <div className="flex flex-wrap items-center gap-3 text-3xs font-mono text-muted-foreground mb-2">
-          {series.map((s) => (
-            <span key={s.key} className="flex items-center gap-1">
-              <span
-                className="inline-block w-2.5 h-2.5 rounded-sm"
-                style={{ backgroundColor: s.color }}
-              />
-              {s.label}
-            </span>
-          ))}
+    <Expandable title={title}>
+      <div className="rounded-md border border-border bg-surface p-3">
+        <div className="flex items-center justify-between">
+          <SectionHeader label={title} subtext={subtext} />
+          <ExportPngButton
+            locale={locale}
+            onClick={() => {
+              track('agentic_workload_trends_line_chart_export', { title, filename });
+              if (svgRef.current)
+                exportSvgToPng(svgRef.current, {
+                  title,
+                  filename,
+                  svgWidth: CHART_W,
+                  svgHeight: CHART_H,
+                });
+            }}
+          />
         </div>
-      )}
 
-      <svg ref={svgRef} viewBox={`0 0 ${CHART_W} ${CHART_H}`} className="w-full">
-        {yTicks.map((t) => (
-          <g key={`y-${t}`}>
+        {series.length > 1 && (
+          <div className="flex flex-wrap items-center gap-3 text-3xs font-mono text-muted-foreground mb-2">
+            {series.map((s) => (
+              <span key={s.key} className="flex items-center gap-1">
+                <span
+                  className="inline-block w-2.5 h-2.5 rounded-sm"
+                  style={{ backgroundColor: s.color }}
+                />
+                {s.label}
+              </span>
+            ))}
+          </div>
+        )}
+
+        {/* Narrow screens scroll the chart rather than shrinking its text. */}
+        <div className="overflow-x-auto">
+          <svg ref={svgRef} viewBox={`0 0 ${CHART_W} ${CHART_H}`} className="w-full min-w-[640px]">
+            {yTicks.map((t) => (
+              <g key={`y-${t}`}>
+                <line
+                  x1={MARGIN.left}
+                  y1={yOf(t)}
+                  x2={MARGIN.left + PLOT_W}
+                  y2={yOf(t)}
+                  stroke="currentColor"
+                  className="text-border"
+                  strokeWidth={0.5}
+                  strokeDasharray="3 3"
+                />
+                <text
+                  x={MARGIN.left - 6}
+                  y={yOf(t) + 3}
+                  textAnchor="end"
+                  className="fill-muted-foreground"
+                  style={{
+                    fontSize: '9px',
+                    fontFamily: 'var(--font-mono, ui-monospace, monospace)',
+                  }}
+                >
+                  {yFormatter(t)}
+                </text>
+              </g>
+            ))}
+
             <line
               x1={MARGIN.left}
-              y1={yOf(t)}
+              y1={MARGIN.top + PLOT_H}
               x2={MARGIN.left + PLOT_W}
-              y2={yOf(t)}
+              y2={MARGIN.top + PLOT_H}
               stroke="currentColor"
               className="text-border"
               strokeWidth={0.5}
-              strokeDasharray="3 3"
             />
-            <text
-              x={MARGIN.left - 6}
-              y={yOf(t) + 3}
-              textAnchor="end"
-              className="fill-muted-foreground"
-              style={{ fontSize: '9px', fontFamily: 'var(--font-mono, ui-monospace, monospace)' }}
-            >
-              {yFormatter(t)}
-            </text>
-          </g>
-        ))}
 
-        <line
-          x1={MARGIN.left}
-          y1={MARGIN.top + PLOT_H}
-          x2={MARGIN.left + PLOT_W}
-          y2={MARGIN.top + PLOT_H}
-          stroke="currentColor"
-          className="text-border"
-          strokeWidth={0.5}
-        />
+            {paths.map((p) => (
+              <path key={p.key} d={p.d} fill="none" stroke={p.color} strokeWidth={1.75} />
+            ))}
 
-        {paths.map((p) => (
-          <path key={p.key} d={p.d} fill="none" stroke={p.color} strokeWidth={1.75} />
-        ))}
-
-        {days.map((day, i) => {
-          if (i % labelInterval !== 0 && i !== days.length - 1) return null;
-          return (
-            <text
-              key={`x-${day}`}
-              x={xOf(i)}
-              y={MARGIN.top + PLOT_H + 16}
-              textAnchor="middle"
-              className="fill-muted-foreground"
-              style={{ fontSize: '9px', fontFamily: 'var(--font-mono, ui-monospace, monospace)' }}
-            >
-              {dayLabel(day)}
-            </text>
-          );
-        })}
-      </svg>
-    </div>
+            {days.map((day, i) => {
+              if (i % labelInterval !== 0 && i !== days.length - 1) return null;
+              return (
+                <text
+                  key={`x-${day}`}
+                  x={xOf(i)}
+                  y={MARGIN.top + PLOT_H + 16}
+                  textAnchor="middle"
+                  className="fill-muted-foreground"
+                  style={{
+                    fontSize: '9px',
+                    fontFamily: 'var(--font-mono, ui-monospace, monospace)',
+                  }}
+                >
+                  {dayLabel(day)}
+                </text>
+              );
+            })}
+          </svg>
+        </div>
+      </div>
+    </Expandable>
   );
 }
 
@@ -319,6 +342,9 @@ export function TrendsStackedChart({
   const locale = useLocale();
   const resolvedEmptyLabel = emptyLabel ?? STRINGS[locale].noData;
   const svgRef = useRef<SVGSVGElement>(null);
+  const [expanded, setExpanded] = useState(false);
+  // Series under the pointer, from the legend or a bar segment; the others fade.
+  const [hovered, setHovered] = useState<string | null>(null);
 
   const { bars, maxY } = useMemo(() => {
     if (mode === 'share') {
@@ -345,51 +371,53 @@ export function TrendsStackedChart({
   if (bars.length === 0) return <EmptyChart title={title} label={resolvedEmptyLabel} />;
 
   const yTicks = mode === 'share' ? [0, 25, 50, 75, 100] : generateTicks(0, maxY, 5);
-  const barWidth = Math.max(1, PLOT_W / bars.length - 2);
-  const barGap = PLOT_W / bars.length - barWidth;
-  const sx = (i: number) => MARGIN.left + i * (barWidth + barGap) + barGap / 2;
-  const sy = (v: number) => MARGIN.top + PLOT_H - (v / maxY) * PLOT_H;
-  const labelInterval = Math.max(1, Math.floor(bars.length / 6));
 
-  return (
-    <div className="rounded-md border border-border bg-surface p-3">
-      <div className="flex items-center justify-between">
-        <SectionHeader label={title} subtext={subtext} />
-        <ExportPngButton
-          locale={locale}
-          onClick={() => {
-            track('agentic_workload_trends_stacked_chart_export', { title, filename });
-            if (svgRef.current)
-              exportSvgToPng(svgRef.current, {
-                title,
-                filename,
-                svgWidth: CHART_W,
-                svgHeight: CHART_H,
-              });
-          }}
-        />
-      </div>
+  const legend = (
+    <div
+      className="flex flex-wrap items-center gap-x-3 gap-y-1 text-3xs font-mono text-muted-foreground mb-2"
+      onMouseLeave={() => setHovered(null)}
+    >
+      {seriesKeys.map((k) => (
+        <span
+          key={k}
+          className={cn(
+            'flex cursor-default items-center gap-1 transition-opacity',
+            hovered === k && 'text-foreground',
+            hovered !== null && hovered !== k && 'opacity-40',
+          )}
+          onMouseEnter={() => setHovered(k)}
+        >
+          <span className="inline-block w-2.5 h-2.5" style={{ backgroundColor: colorFor(k) }} />
+          {labelFor(k)}
+        </span>
+      ))}
+    </div>
+  );
 
-      <div className="flex flex-wrap items-center gap-3 text-3xs font-mono text-muted-foreground mb-2">
-        {seriesKeys.map((k) => (
-          <span key={k} className="flex items-center gap-1">
-            <span
-              className="inline-block w-2.5 h-2.5 rounded-sm"
-              style={{ backgroundColor: colorFor(k) }}
-            />
-            {labelFor(k)}
-          </span>
-        ))}
-      </div>
+  const renderSvg = (width: number, height: number, ref?: RefObject<SVGSVGElement | null>) => {
+    const plotW = width - MARGIN.left - MARGIN.right;
+    const plotH = height - MARGIN.top - MARGIN.bottom;
+    const slot = plotW / bars.length;
+    const barWidth = Math.max(1, slot - 2);
+    const sx = (i: number) => MARGIN.left + i * slot + (slot - barWidth) / 2;
+    const sy = (v: number) => MARGIN.top + plotH - (v / maxY) * plotH;
+    const labelInterval = Math.max(1, Math.floor(bars.length / (width / 110)));
+    const fontStyle = { fontSize: '9px', fontFamily: 'var(--font-mono, ui-monospace, monospace)' };
 
-      <svg ref={svgRef} viewBox={`0 0 ${CHART_W} ${CHART_H}`} className="w-full">
+    return (
+      <svg
+        ref={ref}
+        viewBox={`0 0 ${width} ${height}`}
+        className="w-full"
+        onMouseLeave={() => setHovered(null)}
+      >
         {yTicks.map((t) => (
           <g key={`y-${t}`}>
             {t > 0 && (
               <line
                 x1={MARGIN.left}
                 y1={sy(t)}
-                x2={MARGIN.left + PLOT_W}
+                x2={MARGIN.left + plotW}
                 y2={sy(t)}
                 stroke="currentColor"
                 className="text-border"
@@ -402,7 +430,7 @@ export function TrendsStackedChart({
               y={sy(t) + 3}
               textAnchor="end"
               className="fill-muted-foreground"
-              style={{ fontSize: '9px', fontFamily: 'var(--font-mono, ui-monospace, monospace)' }}
+              style={fontStyle}
             >
               {mode === 'share' ? formatAxisPercent(t) : formatAxisNumber(t)}
             </text>
@@ -411,9 +439,9 @@ export function TrendsStackedChart({
 
         <line
           x1={MARGIN.left}
-          y1={MARGIN.top + PLOT_H}
-          x2={MARGIN.left + PLOT_W}
-          y2={MARGIN.top + PLOT_H}
+          y1={MARGIN.top + plotH}
+          x2={MARGIN.left + plotW}
+          y2={MARGIN.top + plotH}
           stroke="currentColor"
           className="text-border"
           strokeWidth={0.5}
@@ -425,16 +453,16 @@ export function TrendsStackedChart({
           for (const key of seriesKeys) {
             const v = values[key] || 0;
             if (v === 0) continue;
-            const barH = (v / maxY) * PLOT_H;
             rects.push(
               <rect
                 key={`${day}-${key}`}
                 x={sx(i)}
                 y={sy(yOffset + v)}
                 width={barWidth}
-                height={barH}
+                height={(v / maxY) * plotH}
                 fill={colorFor(key)}
-                rx={1}
+                opacity={hovered === null || hovered === key ? 1 : 0.15}
+                onMouseEnter={() => setHovered(key)}
               >
                 <title>
                   {labelFor(key)}: {mode === 'share' ? `${v.toFixed(1)}%` : formatAxisNumber(v)} (
@@ -453,16 +481,64 @@ export function TrendsStackedChart({
             <text
               key={`x-${day}`}
               x={sx(i) + barWidth / 2}
-              y={MARGIN.top + PLOT_H + 16}
+              y={MARGIN.top + plotH + 16}
               textAnchor="middle"
               className="fill-muted-foreground"
-              style={{ fontSize: '9px', fontFamily: 'var(--font-mono, ui-monospace, monospace)' }}
+              style={fontStyle}
             >
               {dayLabel(day)}
             </text>
           );
         })}
       </svg>
+    );
+  };
+
+  return (
+    <div
+      className="rounded-md border border-border bg-surface p-3"
+      onMouseLeave={() => setHovered(null)}
+    >
+      <div className="flex items-center justify-between gap-2">
+        <SectionHeader label={title} subtext={subtext} />
+        <div className="flex items-center gap-3">
+          <ExportPngButton
+            locale={locale}
+            onClick={() => {
+              track('agentic_workload_trends_stacked_chart_export', { title, filename });
+              if (svgRef.current)
+                exportSvgToPng(svgRef.current, {
+                  title,
+                  filename,
+                  svgWidth: CHART_W,
+                  svgHeight: CHART_H,
+                });
+            }}
+          />
+          <ExpandButton
+            onClick={() => {
+              track('agentic_workload_chart_expanded');
+              setExpanded(true);
+            }}
+          />
+        </div>
+      </div>
+
+      {legend}
+      <div className="overflow-x-auto">
+        <div className="min-w-[640px]">{renderSvg(CHART_W, CHART_H, svgRef)}</div>
+      </div>
+
+      <ChartDialog open={expanded} onOpenChange={setExpanded} title={title} subtitle={subtext}>
+        <div onMouseLeave={() => setHovered(null)}>
+          {legend}
+          {/* Phones get the card-sized chart; the wide one would shrink its text. */}
+          <div className="overflow-x-auto sm:hidden">
+            <div className="min-w-[640px]">{renderSvg(CHART_W, CHART_H)}</div>
+          </div>
+          <div className="hidden sm:block">{renderSvg(EXPANDED_W, EXPANDED_H)}</div>
+        </div>
+      </ChartDialog>
     </div>
   );
 }

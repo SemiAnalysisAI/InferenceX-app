@@ -23,6 +23,7 @@ import {
   RangeToggle,
   type DayRange,
 } from '@/components/agentic-workload-explorer/range-toggle';
+import { Expandable } from '@/components/agentic-workload-explorer/expandable-chart';
 import { useExplorerHref } from '@/hooks/agentic-workload-explorer/use-explorer-href';
 import { useLocale } from '@/lib/use-locale';
 import { track } from '@/lib/analytics';
@@ -61,6 +62,7 @@ const STRINGS = {
     tooltipCost: (cost: string, count: number) => `${cost} (${count} searches)`,
     exportSearchesTitle: 'Web Searches Over Time',
     exportCostTitle: 'Web Search Cost',
+    searchPctTooltip: "Share of this model's requests that searched",
   },
   zh: {
     stats: '统计',
@@ -91,6 +93,7 @@ const STRINGS = {
     tooltipCost: (cost: string, count: number) => `${cost}（${count} 次搜索）`,
     exportSearchesTitle: 'Web 搜索趋势',
     exportCostTitle: 'Web 搜索成本',
+    searchPctTooltip: '该模型请求中包含搜索的比例',
   },
 } as const;
 
@@ -136,13 +139,15 @@ function generateTicks(min: number, max: number, targetCount: number): number[] 
   const spacing = niceNum(range / (targetCount - 1), true);
   const niceMin = Math.floor(min / spacing) * spacing;
   const ticks: number[] = [];
-  for (let t = niceMin; t <= max + spacing * 0.5; t += spacing) {
+  // Keep going until a tick reaches max, so the tallest bar is never clipped.
+  for (let t = niceMin; t - spacing < max - spacing * 1e-9; t += spacing) {
     ticks.push(Math.round(t * 1e10) / 1e10);
   }
   return ticks;
 }
 
 function formatAxisValue(v: number): string {
+  if (v >= 1e9) return `${(v / 1e9).toFixed(v % 1e9 === 0 ? 0 : 1)}B`;
   if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(v % 1_000_000 === 0 ? 0 : 1)}M`;
   if (v >= 1_000) return `${(v / 1_000).toFixed(v % 1_000 === 0 ? 0 : 1)}K`;
   if (Number.isInteger(v)) return String(v);
@@ -226,101 +231,103 @@ function SearchesOverTimeChart({
   const sy = (v: number) => MARGIN.top + PLOT_H - (v / yMax) * PLOT_H;
 
   return (
-    <div className="rounded-md border border-border bg-surface p-3">
-      <div className="flex items-center justify-between gap-2 mb-2">
-        {controls}
-        <ExportPngButton
-          locale={locale}
-          onClick={() => {
-            if (svgRef.current)
-              exportSvgToPng(svgRef.current, {
-                title: t.exportSearchesTitle,
-                filename: 'web-searches-over-time.png',
-                svgWidth: CHART_W,
-                svgHeight: CHART_H,
-              });
-          }}
-        />
-      </div>
-      <svg
-        ref={svgRef}
-        viewBox={`0 0 ${CHART_W} ${CHART_H}`}
-        className="w-full"
-        style={{ maxHeight: 240 }}
-      >
-        {/* Y-axis grid lines and labels */}
-        {yTicks.map((tick) => (
-          <g key={`y-${tick}`}>
-            {tick > 0 && (
-              <line
-                x1={MARGIN.left}
-                y1={sy(tick)}
-                x2={MARGIN.left + PLOT_W}
-                y2={sy(tick)}
-                stroke="currentColor"
-                className="text-border"
-                strokeWidth={0.5}
-                strokeDasharray="3 3"
-              />
-            )}
-            <text
-              x={MARGIN.left - 6}
-              y={sy(tick) + 3}
-              textAnchor="end"
-              className="fill-muted-foreground"
-              style={{ fontSize: SVG_FONT_SIZE, fontFamily: SVG_FONT }}
-            >
-              {formatAxisValue(tick)}
-            </text>
-          </g>
-        ))}
-
-        {/* Baseline */}
-        <line
-          x1={MARGIN.left}
-          y1={MARGIN.top + PLOT_H}
-          x2={MARGIN.left + PLOT_W}
-          y2={MARGIN.top + PLOT_H}
-          stroke="currentColor"
-          className="text-border"
-          strokeWidth={0.5}
-        />
-
-        {/* Bars */}
-        {data.map((d, i) => {
-          const x = MARGIN.left + i * (barWidth + barGap);
-          const barH = (d.searchCount / yMax) * PLOT_H;
-          return (
-            <g key={d.day}>
-              <rect
-                x={x}
-                y={sy(d.searchCount)}
-                width={barWidth}
-                height={Math.max(barH, 0.5)}
-                fill="#6366f1"
-                rx={1}
-              >
-                <title>
-                  {formatSnapshotDate(d.day)}:{' '}
-                  {t.tooltipSearches(d.searchCount, d.requestsWithSearch)}
-                </title>
-              </rect>
-              {i % labelEvery === 0 && (
-                <text
-                  x={x + barWidth / 2}
-                  y={MARGIN.top + PLOT_H + 14}
-                  textAnchor="middle"
-                  className="fill-muted-foreground"
-                  style={{ fontSize: SVG_FONT_SIZE, fontFamily: SVG_FONT }}
-                >
-                  {formatSnapshotDate(d.day)}
-                </text>
+    <Expandable title={t.exportSearchesTitle}>
+      <div className="rounded-md border border-border bg-surface p-3">
+        <div className="flex items-center justify-between gap-2 mb-2">
+          {controls}
+          <ExportPngButton
+            locale={locale}
+            onClick={() => {
+              if (svgRef.current)
+                exportSvgToPng(svgRef.current, {
+                  title: t.exportSearchesTitle,
+                  filename: 'web-searches-over-time.png',
+                  svgWidth: CHART_W,
+                  svgHeight: CHART_H,
+                });
+            }}
+          />
+        </div>
+        <svg
+          ref={svgRef}
+          viewBox={`0 0 ${CHART_W} ${CHART_H}`}
+          className="w-full"
+          style={{ maxHeight: 240 }}
+        >
+          {/* Y-axis grid lines and labels */}
+          {yTicks.map((tick) => (
+            <g key={`y-${tick}`}>
+              {tick > 0 && (
+                <line
+                  x1={MARGIN.left}
+                  y1={sy(tick)}
+                  x2={MARGIN.left + PLOT_W}
+                  y2={sy(tick)}
+                  stroke="currentColor"
+                  className="text-border"
+                  strokeWidth={0.5}
+                  strokeDasharray="3 3"
+                />
               )}
+              <text
+                x={MARGIN.left - 6}
+                y={sy(tick) + 3}
+                textAnchor="end"
+                className="fill-muted-foreground"
+                style={{ fontSize: SVG_FONT_SIZE, fontFamily: SVG_FONT }}
+              >
+                {formatAxisValue(tick)}
+              </text>
             </g>
-          );
-        })}
-      </svg>
-    </div>
+          ))}
+
+          {/* Baseline */}
+          <line
+            x1={MARGIN.left}
+            y1={MARGIN.top + PLOT_H}
+            x2={MARGIN.left + PLOT_W}
+            y2={MARGIN.top + PLOT_H}
+            stroke="currentColor"
+            className="text-border"
+            strokeWidth={0.5}
+          />
+
+          {/* Bars */}
+          {data.map((d, i) => {
+            const x = MARGIN.left + i * (barWidth + barGap);
+            const barH = (d.searchCount / yMax) * PLOT_H;
+            return (
+              <g key={d.day}>
+                <rect
+                  x={x}
+                  y={sy(d.searchCount)}
+                  width={barWidth}
+                  height={Math.max(barH, 0.5)}
+                  fill="#6366f1"
+                  rx={1}
+                >
+                  <title>
+                    {formatSnapshotDate(d.day)}:{' '}
+                    {t.tooltipSearches(d.searchCount, d.requestsWithSearch)}
+                  </title>
+                </rect>
+                {i % labelEvery === 0 && (
+                  <text
+                    x={x + barWidth / 2}
+                    y={MARGIN.top + PLOT_H + 14}
+                    textAnchor="middle"
+                    className="fill-muted-foreground"
+                    style={{ fontSize: SVG_FONT_SIZE, fontFamily: SVG_FONT }}
+                  >
+                    {formatSnapshotDate(d.day)}
+                  </text>
+                )}
+              </g>
+            );
+          })}
+        </svg>
+      </div>
+    </Expandable>
   );
 }
 
@@ -334,7 +341,24 @@ function SearchesByModelChart({
   locale: Locale;
 }) {
   const t = STRINGS[locale];
-  const sorted = [...byModel].toSorted((a, b) => b.searchCount - a.searchCount);
+  // Merge dated and undated ids of the same model under its short name.
+  const merged = new Map<string, WebSearchModelEntry>();
+  for (const m of byModel) {
+    const model = shortenModel(m.model);
+    const prev = merged.get(model);
+    merged.set(
+      model,
+      prev
+        ? {
+            ...prev,
+            searchCount: prev.searchCount + m.searchCount,
+            requestsWithSearch: prev.requestsWithSearch + m.requestsWithSearch,
+            totalRequests: prev.totalRequests + m.totalRequests,
+          }
+        : { ...m, model },
+    );
+  }
+  const sorted = [...merged.values()].toSorted((a, b) => b.searchCount - a.searchCount);
   const maxCount = sorted.length > 0 ? sorted[0].searchCount : 1;
 
   if (sorted.length === 0) {
@@ -360,18 +384,21 @@ function SearchesByModelChart({
                 className="text-2xs font-mono text-foreground shrink-0 w-[180px] truncate"
                 title={m.model}
               >
-                {shortenModel(m.model)}
+                {m.model}
               </span>
               <div className="flex-1 h-4 bg-border/30 rounded-sm overflow-hidden relative">
                 <div
                   className="h-full bg-indigo-500 rounded-sm"
-                  style={{ width: `${Math.max(pct, 1)}%` }}
+                  style={{ width: m.searchCount > 0 ? `${Math.max(pct, 1)}%` : 0 }}
                 />
               </div>
               <span className="text-2xs font-mono text-foreground shrink-0 w-[56px] text-right">
                 {formatNumber(m.searchCount)}
               </span>
-              <span className="text-3xs font-mono text-muted-foreground shrink-0 w-[56px] text-right">
+              <span
+                className="text-3xs font-mono text-muted-foreground shrink-0 w-[56px] text-right"
+                title={t.searchPctTooltip}
+              >
                 {searchPct}%
               </span>
             </div>
@@ -416,108 +443,111 @@ function SearchCostChart({ daily, locale }: { daily: WebSearchDailyEntry[]; loca
   const labelInterval = Math.max(1, Math.floor(data.length / 6));
 
   return (
-    <div className="rounded-md border border-border bg-surface p-3">
-      <div className="flex items-center justify-end mb-2">
-        <ExportPngButton
-          locale={locale}
-          onClick={() => {
-            if (svgRef.current)
-              exportSvgToPng(svgRef.current, {
-                title: t.exportCostTitle,
-                filename: 'web-search-cost.png',
-                svgWidth: CHART_W,
-                svgHeight: CHART_H,
-              });
-          }}
-        />
+    <Expandable title={t.exportCostTitle}>
+      <div className="rounded-md border border-border bg-surface p-3">
+        <div className="flex items-center justify-end mb-2">
+          <ExportPngButton
+            locale={locale}
+            onClick={() => {
+              if (svgRef.current)
+                exportSvgToPng(svgRef.current, {
+                  title: t.exportCostTitle,
+                  filename: 'web-search-cost.png',
+                  svgWidth: CHART_W,
+                  svgHeight: CHART_H,
+                });
+            }}
+          />
+        </div>
+        <svg
+          ref={svgRef}
+          viewBox={`0 0 ${CHART_W} ${CHART_H}`}
+          className="w-full"
+          style={{ maxHeight: 240 }}
+        >
+          {/* Y-axis grid lines and labels */}
+          {yTicks.map((tick) => (
+            <g key={`y-${tick}`}>
+              {tick > 0 && (
+                <line
+                  x1={MARGIN.left}
+                  y1={sy(tick)}
+                  x2={MARGIN.left + PLOT_W}
+                  y2={sy(tick)}
+                  stroke="currentColor"
+                  className="text-border"
+                  strokeWidth={0.5}
+                  strokeDasharray="3 3"
+                />
+              )}
+              <text
+                x={MARGIN.left - 6}
+                y={sy(tick) + 3}
+                textAnchor="end"
+                className="fill-muted-foreground"
+                style={{ fontSize: SVG_FONT_SIZE, fontFamily: SVG_FONT }}
+              >
+                {formatDollarsAxis(tick)}
+              </text>
+            </g>
+          ))}
+
+          {/* Baseline */}
+          <line
+            x1={MARGIN.left}
+            y1={MARGIN.top + PLOT_H}
+            x2={MARGIN.left + PLOT_W}
+            y2={MARGIN.top + PLOT_H}
+            stroke="currentColor"
+            className="text-border"
+            strokeWidth={0.5}
+          />
+
+          {/* Area fill */}
+          <path d={areaPath} fill="#10b981" opacity={0.15} />
+
+          {/* Line */}
+          <polyline
+            points={linePoints}
+            fill="none"
+            stroke="#10b981"
+            strokeWidth={1.5}
+            strokeLinejoin="round"
+            strokeLinecap="round"
+          />
+
+          {/* Dots */}
+          {data.map((_, i) => (
+            <circle key={i} cx={sx(i)} cy={sy(costs[i])} r={2} fill="#10b981">
+              <title>
+                {data[i].day}: {t.tooltipCost(formatDollars(costs[i]), data[i].searchCount)}
+              </title>
+            </circle>
+          ))}
+
+          {/* X-axis labels */}
+          {data.map((d, i) => {
+            if (i % labelInterval !== 0 && i !== data.length - 1) return null;
+            return (
+              <text
+                key={`x-${d.day}`}
+                x={sx(i)}
+                y={MARGIN.top + PLOT_H + 14}
+                textAnchor="middle"
+                className="fill-muted-foreground"
+                style={{ fontSize: SVG_FONT_SIZE, fontFamily: SVG_FONT }}
+              >
+                {new Date(d.day).toLocaleDateString('en-US', {
+                  timeZone: 'UTC',
+                  month: 'short',
+                  day: 'numeric',
+                })}
+              </text>
+            );
+          })}
+        </svg>
       </div>
-      <svg
-        ref={svgRef}
-        viewBox={`0 0 ${CHART_W} ${CHART_H}`}
-        className="w-full"
-        style={{ maxHeight: 240 }}
-      >
-        {/* Y-axis grid lines and labels */}
-        {yTicks.map((tick) => (
-          <g key={`y-${tick}`}>
-            {tick > 0 && (
-              <line
-                x1={MARGIN.left}
-                y1={sy(tick)}
-                x2={MARGIN.left + PLOT_W}
-                y2={sy(tick)}
-                stroke="currentColor"
-                className="text-border"
-                strokeWidth={0.5}
-                strokeDasharray="3 3"
-              />
-            )}
-            <text
-              x={MARGIN.left - 6}
-              y={sy(tick) + 3}
-              textAnchor="end"
-              className="fill-muted-foreground"
-              style={{ fontSize: SVG_FONT_SIZE, fontFamily: SVG_FONT }}
-            >
-              {formatDollarsAxis(tick)}
-            </text>
-          </g>
-        ))}
-
-        {/* Baseline */}
-        <line
-          x1={MARGIN.left}
-          y1={MARGIN.top + PLOT_H}
-          x2={MARGIN.left + PLOT_W}
-          y2={MARGIN.top + PLOT_H}
-          stroke="currentColor"
-          className="text-border"
-          strokeWidth={0.5}
-        />
-
-        {/* Area fill */}
-        <path d={areaPath} fill="#10b981" opacity={0.15} />
-
-        {/* Line */}
-        <polyline
-          points={linePoints}
-          fill="none"
-          stroke="#10b981"
-          strokeWidth={1.5}
-          strokeLinejoin="round"
-          strokeLinecap="round"
-        />
-
-        {/* Dots */}
-        {data.map((_, i) => (
-          <circle key={i} cx={sx(i)} cy={sy(costs[i])} r={2} fill="#10b981">
-            <title>
-              {data[i].day}: {t.tooltipCost(formatDollars(costs[i]), data[i].searchCount)}
-            </title>
-          </circle>
-        ))}
-
-        {/* X-axis labels */}
-        {data.map((d, i) => {
-          if (i % labelInterval !== 0 && i !== data.length - 1) return null;
-          return (
-            <text
-              key={`x-${d.day}`}
-              x={sx(i)}
-              y={MARGIN.top + PLOT_H + 14}
-              textAnchor="middle"
-              className="fill-muted-foreground"
-              style={{ fontSize: SVG_FONT_SIZE, fontFamily: SVG_FONT }}
-            >
-              {new Date(d.day).toLocaleDateString('en-US', {
-                month: 'short',
-                day: 'numeric',
-              })}
-            </text>
-          );
-        })}
-      </svg>
-    </div>
+    </Expandable>
   );
 }
 

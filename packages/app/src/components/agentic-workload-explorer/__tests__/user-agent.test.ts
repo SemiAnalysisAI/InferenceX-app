@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { harnessFromUserAgent } from '@semianalysisai/inferencex-db/proxytrace/shared/harness';
 import { normalizePlatformOs } from '@semianalysisai/inferencex-db/proxytrace/shared/platform';
-import { parseUserAgent } from '@/lib/agentic-workload-explorer/user-agent';
+import { compareVersions, parseUserAgent } from '@/lib/agentic-workload-explorer/user-agent';
 
 describe('platform OS normalization', () => {
   it.each([
@@ -42,5 +42,30 @@ describe('harness detection', () => {
     [undefined, 'other'],
   ])('classifies %s as %s', (userAgent, expected) => {
     expect(harnessFromUserAgent(userAgent)).toBe(expected);
+  });
+});
+
+describe('harness versions', () => {
+  it.each([
+    ['claude-cli/2.1.97 (external, cli)', '2.1.97'],
+    ['codex_exec/0.144.0', '0.144.0'],
+    ['Codex Desktop/0.146.0 (Mac OS 26.5.2; arm64)', '0.146.0'],
+    ['omp/18.0.8', '18.0.8'],
+    ['pi/17.2.10 (darwin 25.5.0; arm64)', '17.2.10'],
+    ['pi (linux 7.2.5-1-default; x64)', null],
+  ])('reads the version from %s', (userAgent, expected) => {
+    expect(parseUserAgent(userAgent).cliVersion).toBe(expected);
+  });
+
+  it('orders versions numerically, releases after prereleases', () => {
+    const versions = ['2.1.9', '2.0.100', '0.130.0', '2.1.10', '2.1.10-beta.2', '2.1.10-beta.10'];
+    expect(versions.toSorted(compareVersions)).toEqual([
+      '0.130.0',
+      '2.0.100',
+      '2.1.9',
+      '2.1.10-beta.2',
+      '2.1.10-beta.10',
+      '2.1.10',
+    ]);
   });
 });

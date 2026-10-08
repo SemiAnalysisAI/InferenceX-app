@@ -1,8 +1,18 @@
 export function formatNumber(n: number): string {
   if (n === null || n === undefined || isNaN(n)) return '0';
+  if (n >= 1e12) return `${(n / 1e12).toFixed(1)}T`;
+  if (n >= 1e9) return `${(n / 1e9).toFixed(1)}B`;
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
   if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
   return n.toString();
+}
+
+export function formatDollars(v: number): string {
+  if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(1)}M`;
+  if (v >= 1000) return `$${(v / 1000).toFixed(1)}K`;
+  if (v >= 100) return `$${v.toFixed(0)}`;
+  if (v >= 10) return `$${v.toFixed(1)}`;
+  return `$${v.toFixed(2)}`;
 }
 
 export function formatDuration(ms: number): string {
@@ -16,6 +26,12 @@ export function formatInteractivity(tpotMs: number): string {
   if (tpotMs <= 0) return '---';
   const tokPerSec = 1000 / tpotMs;
   return `${tokPerSec.toFixed(1)} output tok/s/user`;
+}
+
+/** Interactivity without the unit, for table cells. */
+export function formatInteractivityCompact(tpotMs: number): string {
+  if (tpotMs <= 0) return '---';
+  return (1000 / tpotMs).toFixed(1);
 }
 
 /** Format prefill speed (input tok/s/query). */

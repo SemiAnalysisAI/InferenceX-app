@@ -374,7 +374,7 @@ export interface TokensByModel {
   fastModeCount: number;
   fastInputTokens: number;
   fastOutputTokens: number;
-  fastCacheReadTokens: number;
+  fastCacheReadInputTokens: number;
   fastCacheWriteTokens: number;
 }
 

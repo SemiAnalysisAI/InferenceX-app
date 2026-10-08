@@ -22,6 +22,7 @@ import type {
 import { SNAPSHOT_RANGE_LABEL } from '@/lib/agentic-workload-explorer/snapshot';
 import { useLocale } from '@/lib/use-locale';
 import { track } from '@/lib/analytics';
+import { Expandable, ExpandTrigger } from '@/components/agentic-workload-explorer/expandable-chart';
 
 // -- Types ------------------------------------------------------------------
 
@@ -270,7 +271,8 @@ function generateTicks(min: number, max: number, targetCount: number): number[] 
   const spacing = niceNum(range / (targetCount - 1), true);
   const niceMin = Math.floor(min / spacing) * spacing;
   const ticks: number[] = [];
-  for (let t = niceMin; t <= max + spacing * 0.5; t += spacing) {
+  // Keep going until a tick reaches max, so the tallest bar is never clipped.
+  for (let t = niceMin; t - spacing < max - spacing * 1e-9; t += spacing) {
     ticks.push(Math.round(t * 1e10) / 1e10);
   }
   return ticks;
@@ -989,6 +991,7 @@ function CacheHeatmap({
         >
           {t.exportPng}
         </button>
+        <ExpandTrigger />
       </div>
       <svg
         ref={svgRef}
@@ -1223,6 +1226,7 @@ function InteractivityHeatmap({
         >
           {t.hideSmall}
         </button>
+        <ExpandTrigger />
       </div>
       <svg viewBox={`0 0 ${svgW} ${svgH}`} className="w-full" style={{ maxHeight: 400 }}>
         {/* X-axis labels (cache total) */}
@@ -1455,6 +1459,7 @@ function FacetedHeatmap({ data }: { data: HeatmapByOutputCell[] }) {
             {t.local}
           </button>
         </div>
+        <ExpandTrigger />
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -1788,29 +1793,37 @@ function LatencyPageContent() {
           {/* -- Cache Read x Write Heatmap ------------------------------------- */}
           <div>
             <SectionHeader label={t.cacheHeatmapLabel} detail={t.cacheHeatmapDetail} />
-            <CacheHeatmap data={data.cacheHeatmap} />
+            <Expandable title={t.cacheHeatmapLabel} subtitle={t.cacheHeatmapDetail}>
+              <CacheHeatmap data={data.cacheHeatmap} />
+            </Expandable>
           </div>
 
           {/* -- Faceted by Output Tokens --------------------------------------- */}
           <div>
             <SectionHeader label={t.facetedLabel} detail={t.facetedDetail} />
-            <FacetedHeatmap data={data.cacheHeatmapByOutput} />
+            <Expandable title={t.facetedLabel} subtitle={t.facetedDetail}>
+              <FacetedHeatmap data={data.cacheHeatmapByOutput} />
+            </Expandable>
           </div>
 
           {/* -- Cache Read x Write → p90 TTFT ----------------------------------- */}
           <div>
             <SectionHeader label={t.cacheTtftLabel} detail={t.cacheTtftDetail} />
-            <CacheHeatmap data={data.cacheHeatmapTTFT} />
+            <Expandable title={t.cacheTtftLabel} subtitle={t.cacheTtftDetail}>
+              <CacheHeatmap data={data.cacheHeatmapTTFT} />
+            </Expandable>
           </div>
 
           {/* -- Cache Read x Write → p90 Prefill Speed -------------------------- */}
           <div>
             <SectionHeader label={t.cachePrefillLabel} detail={t.cachePrefillDetail} />
-            <CacheHeatmap
-              data={data.cacheHeatmapPrefillSpeed}
-              formatValue={formatPrefillSpeed}
-              formatCellValue={formatPrefillSpeedCompact}
-            />
+            <Expandable title={t.cachePrefillLabel} subtitle={t.cachePrefillDetail}>
+              <CacheHeatmap
+                data={data.cacheHeatmapPrefillSpeed}
+                formatValue={formatPrefillSpeed}
+                formatCellValue={formatPrefillSpeedCompact}
+              />
+            </Expandable>
           </div>
 
           {/* -- Cache Total vs Output → p90 Interactivity ----------------------- */}
@@ -1819,13 +1832,17 @@ function LatencyPageContent() {
               label={t.interactivityHeatmapLabel}
               detail={t.interactivityHeatmapDetail}
             />
-            <InteractivityHeatmap data={data.cacheTotalVsOutputInteractivity} />
+            <Expandable title={t.interactivityHeatmapLabel} subtitle={t.interactivityHeatmapDetail}>
+              <InteractivityHeatmap data={data.cacheTotalVsOutputInteractivity} />
+            </Expandable>
           </div>
 
           {/* -- Cache Read vs E2E Latency ----------------------------------------- */}
           <div>
             <SectionHeader label={t.cacheReadLabel} detail={t.cacheReadDetail} />
-            <CacheReadLatencyChart data={data.cacheReadVsLatency} />
+            <Expandable title={t.cacheReadLabel} subtitle={t.cacheReadDetail} corner>
+              <CacheReadLatencyChart data={data.cacheReadVsLatency} />
+            </Expandable>
           </div>
 
           {/* -- E2E Latency Distribution Histogram -------------------------------- */}
@@ -1834,7 +1851,13 @@ function LatencyPageContent() {
               label={t.e2eDistLabel}
               detail={t.samples(formatNumber(data.distribution.n))}
             />
-            <DistributionHistogram distribution={data.distribution} stats={data.stats} />
+            <Expandable
+              title={t.e2eDistLabel}
+              subtitle={t.samples(formatNumber(data.distribution.n))}
+              corner
+            >
+              <DistributionHistogram distribution={data.distribution} stats={data.stats} />
+            </Expandable>
           </div>
 
           {/* -- TTFT Distribution ---------------------------------------------- */}
@@ -1843,11 +1866,17 @@ function LatencyPageContent() {
               label={t.ttftDistLabel}
               detail={t.streamingSamples(formatNumber(data.ttftDistribution.n))}
             />
-            <GenericDistributionHistogram
-              histogram={data.ttftDistribution}
-              stats={data.ttftStats}
-              color="#10b981"
-            />
+            <Expandable
+              title={t.ttftDistLabel}
+              subtitle={t.streamingSamples(formatNumber(data.ttftDistribution.n))}
+              corner
+            >
+              <GenericDistributionHistogram
+                histogram={data.ttftDistribution}
+                stats={data.ttftStats}
+                color="#10b981"
+              />
+            </Expandable>
           </div>
 
           {/* -- TPOT Distribution ---------------------------------------------- */}
@@ -1856,12 +1885,18 @@ function LatencyPageContent() {
               label={t.tpotDistLabel}
               detail={t.streamingSamples(formatNumber(data.tpotDistribution.n))}
             />
-            <GenericDistributionHistogram
-              histogram={data.tpotDistribution}
-              stats={data.tpotStats}
-              color="#8b5cf6"
-              formatLabel={(v) => `${v.toFixed(1)}ms/tok`}
-            />
+            <Expandable
+              title={t.tpotDistLabel}
+              subtitle={t.streamingSamples(formatNumber(data.tpotDistribution.n))}
+              corner
+            >
+              <GenericDistributionHistogram
+                histogram={data.tpotDistribution}
+                stats={data.tpotStats}
+                color="#8b5cf6"
+                formatLabel={(v) => `${v.toFixed(1)}ms/tok`}
+              />
+            </Expandable>
           </div>
 
           {/* -- Prefill Speed Distribution ------------------------------------- */}
@@ -1870,12 +1905,18 @@ function LatencyPageContent() {
               label={t.prefillDistLabel}
               detail={t.prefillDistDetail(formatNumber(data.prefillSpeedDistribution.n))}
             />
-            <GenericDistributionHistogram
-              histogram={data.prefillSpeedDistribution}
-              stats={data.prefillSpeedStats}
-              color="#0ea5e9"
-              formatLabel={formatPrefillSpeed}
-            />
+            <Expandable
+              title={t.prefillDistLabel}
+              subtitle={t.prefillDistDetail(formatNumber(data.prefillSpeedDistribution.n))}
+              corner
+            >
+              <GenericDistributionHistogram
+                histogram={data.prefillSpeedDistribution}
+                stats={data.prefillSpeedStats}
+                color="#0ea5e9"
+                formatLabel={formatPrefillSpeed}
+              />
+            </Expandable>
           </div>
 
           {/* -- Interactivity Distribution ------------------------------------ */}
@@ -1884,25 +1925,33 @@ function LatencyPageContent() {
               label={t.interactDistLabel}
               detail={t.interactDistDetail(formatNumber(data.interactivityDistribution.n))}
             />
-            <GenericDistributionHistogram
-              histogram={data.interactivityDistribution}
-              stats={{
-                p50: data.tpotStats.p50 > 0 ? 1000 / data.tpotStats.p50 : 0,
-                p90: data.tpotStats.p90 > 0 ? 1000 / data.tpotStats.p90 : 0,
-                p95: data.tpotStats.p95 > 0 ? 1000 / data.tpotStats.p95 : 0,
-                p99: data.tpotStats.p99 > 0 ? 1000 / data.tpotStats.p99 : 0,
-                avg: data.tpotStats.avg > 0 ? 1000 / data.tpotStats.avg : 0,
-                count: data.tpotStats.count,
-              }}
-              color="#f59e0b"
-              formatLabel={(v) => `${v.toFixed(1)} tok/s`}
-            />
+            <Expandable
+              title={t.interactDistLabel}
+              subtitle={t.interactDistDetail(formatNumber(data.interactivityDistribution.n))}
+              corner
+            >
+              <GenericDistributionHistogram
+                histogram={data.interactivityDistribution}
+                stats={{
+                  p50: data.tpotStats.p50 > 0 ? 1000 / data.tpotStats.p50 : 0,
+                  p90: data.tpotStats.p90 > 0 ? 1000 / data.tpotStats.p90 : 0,
+                  p95: data.tpotStats.p95 > 0 ? 1000 / data.tpotStats.p95 : 0,
+                  p99: data.tpotStats.p99 > 0 ? 1000 / data.tpotStats.p99 : 0,
+                  avg: data.tpotStats.avg > 0 ? 1000 / data.tpotStats.avg : 0,
+                  count: data.tpotStats.count,
+                }}
+                color="#f59e0b"
+                formatLabel={(v) => `${v.toFixed(1)} tok/s`}
+              />
+            </Expandable>
           </div>
 
           {/* -- E2E Latency Over Time --------------------------------------------- */}
           <div>
             <SectionHeader label={t.hourlyLabel} detail={t.hourlyDetail} />
-            <HourlyLatencyChart hourly={data.hourly} />
+            <Expandable title={t.hourlyLabel} subtitle={t.hourlyDetail} corner>
+              <HourlyLatencyChart hourly={data.hourly} />
+            </Expandable>
           </div>
 
           {/* -- E2E Latency by Model ---------------------------------------------- */}

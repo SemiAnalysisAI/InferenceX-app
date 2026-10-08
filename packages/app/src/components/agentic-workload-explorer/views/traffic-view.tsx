@@ -22,6 +22,7 @@ import {
   RangeToggle,
   type DayRange,
 } from '@/components/agentic-workload-explorer/range-toggle';
+import { Expandable } from '@/components/agentic-workload-explorer/expandable-chart';
 import { useLocale } from '@/lib/use-locale';
 import { track } from '@/lib/analytics';
 
@@ -120,7 +121,8 @@ function generateTicks(min: number, max: number, targetCount: number): number[] 
   const spacing = niceNum(range / (targetCount - 1), true);
   const niceMin = Math.floor(min / spacing) * spacing;
   const ticks: number[] = [];
-  for (let t = niceMin; t <= max + spacing * 0.5; t += spacing) {
+  // Keep going until a tick reaches max, so the tallest bar is never clipped.
+  for (let t = niceMin; t - spacing < max - spacing * 1e-9; t += spacing) {
     ticks.push(Math.round(t * 1e10) / 1e10);
   }
   return ticks;
@@ -194,100 +196,102 @@ function DailyRequestsChart({
   const sy = (v: number) => MARGIN.top + PLOT_H - (v / yMax) * PLOT_H;
 
   return (
-    <div className="rounded-md border border-border bg-surface p-3">
-      <div className="flex items-center justify-between gap-2 mb-2">
-        {controls}
-        <ExportPngButton
-          locale={locale}
-          onClick={() => {
-            if (svgRef.current)
-              exportSvgToPng(svgRef.current, {
-                title: strings.exportDaily,
-                filename: 'daily-requests.png',
-                svgWidth: CHART_W,
-                svgHeight: CHART_H,
-              });
-          }}
-        />
-      </div>
-      <svg
-        ref={svgRef}
-        viewBox={`0 0 ${CHART_W} ${CHART_H}`}
-        className="w-full"
-        style={{ maxHeight: 240 }}
-      >
-        {/* Y-axis grid lines and labels */}
-        {yTicks.map((t) => (
-          <g key={`y-${t}`}>
-            {t > 0 && (
-              <line
-                x1={MARGIN.left}
-                y1={sy(t)}
-                x2={MARGIN.left + PLOT_W}
-                y2={sy(t)}
-                stroke="currentColor"
-                className="text-border"
-                strokeWidth={0.5}
-                strokeDasharray="3 3"
-              />
-            )}
-            <text
-              x={MARGIN.left - 6}
-              y={sy(t) + 3}
-              textAnchor="end"
-              className="fill-muted-foreground"
-              style={{ fontSize: SVG_FONT_SIZE, fontFamily: SVG_FONT }}
-            >
-              {formatNumber(t)}
-            </text>
-          </g>
-        ))}
-
-        {/* Baseline */}
-        <line
-          x1={MARGIN.left}
-          y1={MARGIN.top + PLOT_H}
-          x2={MARGIN.left + PLOT_W}
-          y2={MARGIN.top + PLOT_H}
-          stroke="currentColor"
-          className="text-border"
-          strokeWidth={0.5}
-        />
-
-        {/* Bars */}
-        {data.map((d, i) => {
-          const x = MARGIN.left + i * (barWidth + barGap);
-          const barH = (d.requestCount / yMax) * PLOT_H;
-          return (
-            <g key={d.day}>
-              <rect
-                x={x}
-                y={sy(d.requestCount)}
-                width={barWidth}
-                height={Math.max(barH, 0.5)}
-                fill="#6366f1"
-                rx={1}
-              >
-                <title>
-                  {formatSnapshotDate(d.day)}: {formatNumber(d.requestCount)} {strings.requests}
-                </title>
-              </rect>
-              {i % labelEvery === 0 && (
-                <text
-                  x={x + barWidth / 2}
-                  y={MARGIN.top + PLOT_H + 14}
-                  textAnchor="middle"
-                  className="fill-muted-foreground"
-                  style={{ fontSize: SVG_FONT_SIZE, fontFamily: SVG_FONT }}
-                >
-                  {formatSnapshotDate(d.day)}
-                </text>
+    <Expandable title={strings.exportDaily}>
+      <div className="rounded-md border border-border bg-surface p-3">
+        <div className="flex items-center justify-between gap-2 mb-2">
+          {controls}
+          <ExportPngButton
+            locale={locale}
+            onClick={() => {
+              if (svgRef.current)
+                exportSvgToPng(svgRef.current, {
+                  title: strings.exportDaily,
+                  filename: 'daily-requests.png',
+                  svgWidth: CHART_W,
+                  svgHeight: CHART_H,
+                });
+            }}
+          />
+        </div>
+        <svg
+          ref={svgRef}
+          viewBox={`0 0 ${CHART_W} ${CHART_H}`}
+          className="w-full"
+          style={{ maxHeight: 240 }}
+        >
+          {/* Y-axis grid lines and labels */}
+          {yTicks.map((t) => (
+            <g key={`y-${t}`}>
+              {t > 0 && (
+                <line
+                  x1={MARGIN.left}
+                  y1={sy(t)}
+                  x2={MARGIN.left + PLOT_W}
+                  y2={sy(t)}
+                  stroke="currentColor"
+                  className="text-border"
+                  strokeWidth={0.5}
+                  strokeDasharray="3 3"
+                />
               )}
+              <text
+                x={MARGIN.left - 6}
+                y={sy(t) + 3}
+                textAnchor="end"
+                className="fill-muted-foreground"
+                style={{ fontSize: SVG_FONT_SIZE, fontFamily: SVG_FONT }}
+              >
+                {formatNumber(t)}
+              </text>
             </g>
-          );
-        })}
-      </svg>
-    </div>
+          ))}
+
+          {/* Baseline */}
+          <line
+            x1={MARGIN.left}
+            y1={MARGIN.top + PLOT_H}
+            x2={MARGIN.left + PLOT_W}
+            y2={MARGIN.top + PLOT_H}
+            stroke="currentColor"
+            className="text-border"
+            strokeWidth={0.5}
+          />
+
+          {/* Bars */}
+          {data.map((d, i) => {
+            const x = MARGIN.left + i * (barWidth + barGap);
+            const barH = (d.requestCount / yMax) * PLOT_H;
+            return (
+              <g key={d.day}>
+                <rect
+                  x={x}
+                  y={sy(d.requestCount)}
+                  width={barWidth}
+                  height={Math.max(barH, 0.5)}
+                  fill="#6366f1"
+                  rx={1}
+                >
+                  <title>
+                    {formatSnapshotDate(d.day)}: {formatNumber(d.requestCount)} {strings.requests}
+                  </title>
+                </rect>
+                {i % labelEvery === 0 && (
+                  <text
+                    x={x + barWidth / 2}
+                    y={MARGIN.top + PLOT_H + 14}
+                    textAnchor="middle"
+                    className="fill-muted-foreground"
+                    style={{ fontSize: SVG_FONT_SIZE, fontFamily: SVG_FONT }}
+                  >
+                    {formatSnapshotDate(d.day)}
+                  </text>
+                )}
+              </g>
+            );
+          })}
+        </svg>
+      </div>
+    </Expandable>
   );
 }
 
@@ -336,69 +340,83 @@ function HourlyHeatmap({
   const cellH = gridH / 7;
 
   return (
-    <div className="rounded-md border border-border bg-surface p-3">
-      <div className="flex items-center justify-end gap-2 mb-2">
-        <button
-          type="button"
-          onClick={() => {
-            setHideSmall((h) => !h);
-            track('agentic_workload_traffic_heatmap_toggle', { hideSmall: !hideSmall });
-          }}
-          className={`px-2 py-0.5 text-3xs font-mono rounded border transition-colors ${
-            hideSmall
-              ? 'bg-foreground text-background border-foreground'
-              : 'border-border text-subtle hover:text-foreground hover:bg-surface-hover'
-          }`}
-        >
-          {strings.hideSmall}
-        </button>
-        <ExportPngButton
-          locale={locale}
-          onClick={() => {
-            if (svgRef.current)
-              exportSvgToPng(svgRef.current, {
-                title: strings.exportHeatmap,
-                filename: 'request-heatmap.png',
-                svgWidth: 600,
-                svgHeight: 200,
-              });
-          }}
-        />
-      </div>
-      <svg ref={svgRef} viewBox="0 0 600 200" className="w-full" style={{ maxHeight: 240 }}>
-        {/* Row labels (day names) */}
-        {strings.dayLabels.map((label, dow) => (
-          <text
-            key={`row-${dow}`}
-            x={labelW - 4}
-            y={4 + dow * cellH + cellH / 2 + 3}
-            textAnchor="end"
-            className="fill-muted-foreground"
-            style={{ fontSize: '8px', fontFamily: SVG_FONT }}
+    <Expandable title={strings.exportHeatmap}>
+      <div className="rounded-md border border-border bg-surface p-3">
+        <div className="flex items-center justify-end gap-2 mb-2">
+          <button
+            type="button"
+            onClick={() => {
+              setHideSmall((h) => !h);
+              track('agentic_workload_traffic_heatmap_toggle', { hideSmall: !hideSmall });
+            }}
+            className={`px-2 py-0.5 text-3xs font-mono rounded border transition-colors ${
+              hideSmall
+                ? 'bg-foreground text-background border-foreground'
+                : 'border-border text-subtle hover:text-foreground hover:bg-surface-hover'
+            }`}
           >
-            {label}
-          </text>
-        ))}
+            {strings.hideSmall}
+          </button>
+          <ExportPngButton
+            locale={locale}
+            onClick={() => {
+              if (svgRef.current)
+                exportSvgToPng(svgRef.current, {
+                  title: strings.exportHeatmap,
+                  filename: 'request-heatmap.png',
+                  svgWidth: 600,
+                  svgHeight: 200,
+                });
+            }}
+          />
+        </div>
+        <svg ref={svgRef} viewBox="0 0 600 200" className="w-full" style={{ maxHeight: 240 }}>
+          {/* Row labels (day names) */}
+          {strings.dayLabels.map((label, dow) => (
+            <text
+              key={`row-${dow}`}
+              x={labelW - 4}
+              y={4 + dow * cellH + cellH / 2 + 3}
+              textAnchor="end"
+              className="fill-muted-foreground"
+              style={{ fontSize: '8px', fontFamily: SVG_FONT }}
+            >
+              {label}
+            </text>
+          ))}
 
-        {/* Column labels (hours, every 4h) */}
-        {Array.from({ length: 7 }, (_, i) => i * 4).map((h) => (
-          <text
-            key={`col-${h}`}
-            x={labelW + h * cellW + cellW / 2}
-            y={4 + 7 * cellH + 12}
-            textAnchor="middle"
-            className="fill-muted-foreground"
-            style={{ fontSize: '8px', fontFamily: SVG_FONT }}
-          >
-            {h}
-          </text>
-        ))}
+          {/* Column labels (hours, every 4h) */}
+          {Array.from({ length: 7 }, (_, i) => i * 4).map((h) => (
+            <text
+              key={`col-${h}`}
+              x={labelW + h * cellW + cellW / 2}
+              y={4 + 7 * cellH + 12}
+              textAnchor="middle"
+              className="fill-muted-foreground"
+              style={{ fontSize: '8px', fontFamily: SVG_FONT }}
+            >
+              {h}
+            </text>
+          ))}
 
-        {/* Grid cells */}
-        {Array.from({ length: 7 }, (_row, dow) =>
-          Array.from({ length: 24 }, (_col, hour) => {
-            const count = lookup.get(`${dow}-${hour}`) || 0;
-            if (hideSmall && count < 5) {
+          {/* Grid cells */}
+          {Array.from({ length: 7 }, (_row, dow) =>
+            Array.from({ length: 24 }, (_col, hour) => {
+              const count = lookup.get(`${dow}-${hour}`) || 0;
+              if (hideSmall && count < 5) {
+                return (
+                  <rect
+                    key={`${dow}-${hour}`}
+                    x={labelW + hour * cellW}
+                    y={4 + dow * cellH}
+                    width={cellW - 1}
+                    height={cellH - 1}
+                    rx={2}
+                    fill="transparent"
+                  />
+                );
+              }
+              const intensity = maxCount > 0 ? count / maxCount : 0;
               return (
                 <rect
                   key={`${dow}-${hour}`}
@@ -407,31 +425,19 @@ function HourlyHeatmap({
                   width={cellW - 1}
                   height={cellH - 1}
                   rx={2}
-                  fill="transparent"
-                />
+                  fill="#6366f1"
+                  fillOpacity={intensity}
+                >
+                  <title>
+                    {strings.dayLabels[dow]} {hour}:00 - {formatNumber(count)} {strings.requests}
+                  </title>
+                </rect>
               );
-            }
-            const intensity = maxCount > 0 ? count / maxCount : 0;
-            return (
-              <rect
-                key={`${dow}-${hour}`}
-                x={labelW + hour * cellW}
-                y={4 + dow * cellH}
-                width={cellW - 1}
-                height={cellH - 1}
-                rx={2}
-                fill="#6366f1"
-                fillOpacity={intensity}
-              >
-                <title>
-                  {strings.dayLabels[dow]} {hour}:00 - {formatNumber(count)} {strings.requests}
-                </title>
-              </rect>
-            );
-          }),
-        )}
-      </svg>
-    </div>
+            }),
+          )}
+        </svg>
+      </div>
+    </Expandable>
   );
 }
 
@@ -576,6 +582,7 @@ function StreamingChart({
                   style={{ fontSize: SVG_FONT_SIZE, fontFamily: SVG_FONT }}
                 >
                   {new Date(d.day).toLocaleDateString('en-US', {
+                    timeZone: 'UTC',
                     month: 'short',
                     day: 'numeric',
                   })}
@@ -604,10 +611,14 @@ function StreamingChart({
 // -- Main page --------------------------------------------------------------
 
 export default function TrafficPage() {
+  const locale = useLocale();
+  const t = STRINGS[locale];
   return (
-    <Suspense>
-      <TrafficPageContent />
-    </Suspense>
+    <Expandable title={t.exportStreaming}>
+      <Suspense>
+        <TrafficPageContent />
+      </Suspense>
+    </Expandable>
   );
 }
 

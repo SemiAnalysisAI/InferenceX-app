@@ -2,6 +2,8 @@ import { isHarness } from '@semianalysisai/inferencex-db/proxytrace/shared/harne
 import {
   getRecentSessions,
   getSessionStats,
+  SESSION_SORT_KEYS,
+  type SessionSort,
 } from '@semianalysisai/inferencex-db/proxytrace/operations';
 import { withExplorerRoute } from '@/lib/agentic-workload-explorer/api';
 import { parsePagination } from '@/lib/agentic-workload-explorer/request';
@@ -18,6 +20,11 @@ function parseMinReqs(raw: string | null): number {
   return Number.isInteger(n) && n > 0 ? n : 0;
 }
 
+function parseSort(params: URLSearchParams): SessionSort {
+  const key = SESSION_SORT_KEYS.find((k) => k === params.get('sort')) ?? 'active';
+  return { key, dir: params.get('dir') === 'asc' ? 'asc' : 'desc' };
+}
+
 export const GET = withExplorerRoute(async ({ vis, req }) => {
   const searchParams = req.nextUrl.searchParams;
   const { limit, offset } = parsePagination(searchParams);
@@ -26,6 +33,7 @@ export const GET = withExplorerRoute(async ({ vis, req }) => {
   const harness = searchParams.get('harness');
   const harnessFilter = isHarness(harness) ? harness : null;
   const minReqs = parseMinReqs(searchParams.get('minReqs'));
+  const sort = parseSort(searchParams);
 
   // Privacy-mode filtering is admin-only upstream; the read-only viewer only
   // ever sees anonymized sessions, so it is always unfiltered here.
@@ -43,6 +51,7 @@ export const GET = withExplorerRoute(async ({ vis, req }) => {
       privacyMode,
       harnessFilter,
       minReqs,
+      sort,
     ),
     offset === 0
       ? getSessionStats(vis, traceVersion, privacyMode, harnessFilter, minReqs)

@@ -3,6 +3,7 @@
 import { Suspense, useState } from 'react';
 import { DashboardOverviewSkeleton } from '@/components/agentic-workload-explorer/dashboard-skeleton';
 import {
+  formatDollars,
   formatNumber,
   formatDuration,
   formatInteractivity,
@@ -122,6 +123,7 @@ const STRINGS = {
     utcDays: 'UTC 天',
   },
 } as const;
+import { Expandable, ExpandTrigger } from '@/components/agentic-workload-explorer/expandable-chart';
 
 const MIX_COLORS = {
   input: 'bg-sky-500',
@@ -323,7 +325,7 @@ function OverviewPageContent() {
           {/* Est. Cost — expandable */}
           <StatCard
             label={t.estCost}
-            value={`$${(stats.totalCost ?? 0).toFixed(2)}`}
+            value={formatDollars(stats.totalCost ?? 0)}
             expandable
             isExpanded={expanded === 'cost'}
             onClick={() => toggle('cost')}
@@ -435,7 +437,7 @@ interface HistModeProps {
 function formatUsageTotal(v: number, mode: HistMode, t: T) {
   switch (mode) {
     case 'cost': {
-      return `$${v.toFixed(2)}`;
+      return formatDollars(v);
     }
     case 'requests': {
       return t.fmtRequests(formatNumber(v));
@@ -491,44 +493,49 @@ function UsagePanel({ stats, t }: { stats: OverviewStats; t: T }) {
           }}
         />
       </div>
-      {period === '24h' && (
-        <UsageHistogram
-          data={stats.usageHistogram}
-          mode={mode}
-          setMode={setMode}
-          histModes={histModes}
-          t={t}
-        />
-      )}
-      {period === 'lastDay' && (
-        <UtcDayUsageHistogram
-          data={stats.usageHistogramTodayUtc}
-          dayOffset={0}
-          mode={mode}
-          setMode={setMode}
-          histModes={histModes}
-          t={t}
-        />
-      )}
-      {period === 'prevDay' && (
-        <UtcDayUsageHistogram
-          data={stats.usageHistogramYesterdayUtc}
-          dayOffset={1}
-          mode={mode}
-          setMode={setMode}
-          histModes={histModes}
-          t={t}
-        />
-      )}
-      {period === '14d' && (
-        <DailyUsageHistogram
-          data={stats.dailyUsageHistogram}
-          mode={mode}
-          setMode={setMode}
-          histModes={histModes}
-          t={t}
-        />
-      )}
+      <Expandable
+        title={t.usage}
+        subtitle={`${usagePeriods.find((p) => p.id === period)?.title ?? period} \u00B7 ${formatUsageTotal(total, mode, t)}`}
+      >
+        {period === '24h' && (
+          <UsageHistogram
+            data={stats.usageHistogram}
+            mode={mode}
+            setMode={setMode}
+            histModes={histModes}
+            t={t}
+          />
+        )}
+        {period === 'lastDay' && (
+          <UtcDayUsageHistogram
+            data={stats.usageHistogramTodayUtc}
+            dayOffset={0}
+            mode={mode}
+            setMode={setMode}
+            histModes={histModes}
+            t={t}
+          />
+        )}
+        {period === 'prevDay' && (
+          <UtcDayUsageHistogram
+            data={stats.usageHistogramYesterdayUtc}
+            dayOffset={1}
+            mode={mode}
+            setMode={setMode}
+            histModes={histModes}
+            t={t}
+          />
+        )}
+        {period === '14d' && (
+          <DailyUsageHistogram
+            data={stats.dailyUsageHistogram}
+            mode={mode}
+            setMode={setMode}
+            histModes={histModes}
+            t={t}
+          />
+        )}
+      </Expandable>
     </section>
   );
 }
@@ -636,7 +643,7 @@ function formatBarTooltip(v: number, mode: HistMode, t: T) {
 function formatYTick(tick: number, mode: HistMode) {
   switch (mode) {
     case 'cost': {
-      return `$${tick.toFixed(2)}`;
+      return formatDollars(tick);
     }
     case 'tokens': {
       return formatNumber(tick);
@@ -682,6 +689,9 @@ function UsageHistogram({
     <div className="rounded-md border border-border bg-surface p-3">
       <div className="flex items-center gap-2 mb-2">
         <HistModeButtons mode={mode} setMode={setMode} histModes={histModes} />
+        <span className="ml-auto">
+          <ExpandTrigger />
+        </span>
       </div>
       <svg
         viewBox={`0 0 ${HIST_W} ${HIST_H}`}
@@ -865,6 +875,7 @@ function UtcDayUsageHistogram({
       <div className="flex items-center gap-2 mb-2">
         <HistModeButtons mode={mode} setMode={setMode} histModes={histModes} />
         <span className="text-3xs font-mono text-subtle ml-auto">{t.utcHours}</span>
+        <ExpandTrigger />
       </div>
       <svg
         viewBox={`0 0 ${HIST_W} ${HIST_H}`}
@@ -1022,6 +1033,7 @@ function DailyUsageHistogram({
       <div className="flex items-center gap-2 mb-2">
         <HistModeButtons mode={mode} setMode={setMode} histModes={histModes} />
         <span className="text-3xs font-mono text-subtle ml-auto">{t.utcDays}</span>
+        <ExpandTrigger />
       </div>
       <svg
         viewBox={`0 0 ${HIST_W} ${HIST_H}`}

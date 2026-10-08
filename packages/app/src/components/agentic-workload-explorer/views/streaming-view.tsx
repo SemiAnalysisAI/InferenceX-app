@@ -24,6 +24,7 @@ import type {
   ModelBreakdown,
   StreamingData,
 } from '@/lib/agentic-workload-explorer/api-types';
+import { Expandable } from '@/components/agentic-workload-explorer/expandable-chart';
 
 // ── i18n ────────────────────────────────────────────────────────
 
@@ -157,13 +158,15 @@ function generateTicks(min: number, max: number, targetCount: number): number[] 
   const spacing = niceNum(range / (targetCount - 1), true);
   const niceMin = Math.floor(min / spacing) * spacing;
   const ticks: number[] = [];
-  for (let t = niceMin; t <= max + spacing * 0.5; t += spacing) {
+  // Keep going until a tick reaches max, so the tallest bar is never clipped.
+  for (let t = niceMin; t - spacing < max - spacing * 1e-9; t += spacing) {
     ticks.push(Math.round(t * 1e10) / 1e10);
   }
   return ticks;
 }
 
 function formatAxisValue(v: number): string {
+  if (v >= 1e9) return `${(v / 1e9).toFixed(v % 1e9 === 0 ? 0 : 1)}B`;
   if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(v % 1_000_000 === 0 ? 0 : 1)}M`;
   if (v >= 1_000) return `${(v / 1_000).toFixed(v % 1_000 === 0 ? 0 : 1)}K`;
   if (Number.isInteger(v)) return String(v);
@@ -258,115 +261,117 @@ function StreamingRatioChart({
   const labelInterval = Math.max(1, Math.floor(points.length / 6));
 
   return (
-    <div className="rounded-md border border-border bg-surface p-3">
-      <div className="flex items-center justify-between mb-2">
-        <SectionHeader label={headerLabel} />
-        <ExportPngButton
-          locale={locale}
-          onClick={() => {
-            track('agentic_workload_streaming_ratio_export');
-            if (svgRef.current) {
-              exportSvgToPng(svgRef.current, {
-                title: exportTitle,
-                filename: 'streaming-ratio.png',
-                svgWidth: CHART_W,
-                svgHeight: CHART_H,
-              });
-            }
-          }}
-        />
+    <Expandable title={exportTitle}>
+      <div className="rounded-md border border-border bg-surface p-3">
+        <div className="flex items-center justify-between mb-2">
+          <SectionHeader label={headerLabel} />
+          <ExportPngButton
+            locale={locale}
+            onClick={() => {
+              track('agentic_workload_streaming_ratio_export');
+              if (svgRef.current) {
+                exportSvgToPng(svgRef.current, {
+                  title: exportTitle,
+                  filename: 'streaming-ratio.png',
+                  svgWidth: CHART_W,
+                  svgHeight: CHART_H,
+                });
+              }
+            }}
+          />
+        </div>
+        <svg ref={svgRef} viewBox={`0 0 ${CHART_W} ${CHART_H}`} className="w-full">
+          {/* Y-axis grid lines + labels */}
+          {yTicks.map((t) => (
+            <g key={`y-${t}`}>
+              {t > 0 && (
+                <line
+                  x1={MARGIN.left}
+                  y1={sy(t)}
+                  x2={MARGIN.left + PLOT_W}
+                  y2={sy(t)}
+                  stroke="currentColor"
+                  className="text-border"
+                  strokeWidth={0.5}
+                  strokeDasharray="3 3"
+                />
+              )}
+              <text
+                x={MARGIN.left - 6}
+                y={sy(t) + 3}
+                textAnchor="end"
+                className="fill-muted-foreground"
+                style={{
+                  fontSize: '9px',
+                  fontFamily: 'var(--font-mono, ui-monospace, monospace)',
+                }}
+              >
+                {t}%
+              </text>
+            </g>
+          ))}
+
+          {/* Baseline */}
+          <line
+            x1={MARGIN.left}
+            y1={MARGIN.top + PLOT_H}
+            x2={MARGIN.left + PLOT_W}
+            y2={MARGIN.top + PLOT_H}
+            stroke="currentColor"
+            className="text-border"
+            strokeWidth={0.5}
+          />
+
+          {/* Line */}
+          <path d={pathD} fill="none" stroke="#06b6d4" strokeWidth={2} strokeLinejoin="round" />
+
+          {/* Dots */}
+          {points.map((p, i) => (
+            <circle key={p.day} cx={sx(i)} cy={sy(p.pct)} r={2.5} fill="#06b6d4">
+              <title>
+                {p.day}: {p.pct.toFixed(1)}%
+              </title>
+            </circle>
+          ))}
+
+          {/* X-axis labels */}
+          {points.map((p, i) => {
+            if (i % labelInterval !== 0 && i !== points.length - 1) return null;
+            const d = new Date(p.day);
+            const label = `${d.getUTCMonth() + 1}/${d.getUTCDate()}`;
+            return (
+              <text
+                key={`x-${p.day}`}
+                x={sx(i)}
+                y={MARGIN.top + PLOT_H + 16}
+                textAnchor="middle"
+                className="fill-muted-foreground"
+                style={{
+                  fontSize: '9px',
+                  fontFamily: 'var(--font-mono, ui-monospace, monospace)',
+                }}
+              >
+                {label}
+              </text>
+            );
+          })}
+
+          {/* Axis label */}
+          <text
+            x={MARGIN.left + PLOT_W / 2}
+            y={CHART_H - 2}
+            textAnchor="middle"
+            className="fill-muted-foreground"
+            style={{
+              fontSize: '9px',
+              fontFamily: 'var(--font-mono, ui-monospace, monospace)',
+            }}
+          >
+            {axisLabel}
+          </text>
+        </svg>
       </div>
-      <svg ref={svgRef} viewBox={`0 0 ${CHART_W} ${CHART_H}`} className="w-full">
-        {/* Y-axis grid lines + labels */}
-        {yTicks.map((t) => (
-          <g key={`y-${t}`}>
-            {t > 0 && (
-              <line
-                x1={MARGIN.left}
-                y1={sy(t)}
-                x2={MARGIN.left + PLOT_W}
-                y2={sy(t)}
-                stroke="currentColor"
-                className="text-border"
-                strokeWidth={0.5}
-                strokeDasharray="3 3"
-              />
-            )}
-            <text
-              x={MARGIN.left - 6}
-              y={sy(t) + 3}
-              textAnchor="end"
-              className="fill-muted-foreground"
-              style={{
-                fontSize: '9px',
-                fontFamily: 'var(--font-mono, ui-monospace, monospace)',
-              }}
-            >
-              {t}%
-            </text>
-          </g>
-        ))}
-
-        {/* Baseline */}
-        <line
-          x1={MARGIN.left}
-          y1={MARGIN.top + PLOT_H}
-          x2={MARGIN.left + PLOT_W}
-          y2={MARGIN.top + PLOT_H}
-          stroke="currentColor"
-          className="text-border"
-          strokeWidth={0.5}
-        />
-
-        {/* Line */}
-        <path d={pathD} fill="none" stroke="#06b6d4" strokeWidth={2} strokeLinejoin="round" />
-
-        {/* Dots */}
-        {points.map((p, i) => (
-          <circle key={p.day} cx={sx(i)} cy={sy(p.pct)} r={2.5} fill="#06b6d4">
-            <title>
-              {p.day}: {p.pct.toFixed(1)}%
-            </title>
-          </circle>
-        ))}
-
-        {/* X-axis labels */}
-        {points.map((p, i) => {
-          if (i % labelInterval !== 0 && i !== points.length - 1) return null;
-          const d = new Date(p.day);
-          const label = `${d.getUTCMonth() + 1}/${d.getUTCDate()}`;
-          return (
-            <text
-              key={`x-${p.day}`}
-              x={sx(i)}
-              y={MARGIN.top + PLOT_H + 16}
-              textAnchor="middle"
-              className="fill-muted-foreground"
-              style={{
-                fontSize: '9px',
-                fontFamily: 'var(--font-mono, ui-monospace, monospace)',
-              }}
-            >
-              {label}
-            </text>
-          );
-        })}
-
-        {/* Axis label */}
-        <text
-          x={MARGIN.left + PLOT_W / 2}
-          y={CHART_H - 2}
-          textAnchor="middle"
-          className="fill-muted-foreground"
-          style={{
-            fontSize: '9px',
-            fontFamily: 'var(--font-mono, ui-monospace, monospace)',
-          }}
-        >
-          {axisLabel}
-        </text>
-      </svg>
-    </div>
+    </Expandable>
   );
 }
 
@@ -422,178 +427,180 @@ function Histogram({
   const sy = (v: number) => MARGIN.top + PLOT_H - (v / yMax) * PLOT_H;
 
   return (
-    <div>
-      {title && exportFilename && (
-        <div className="flex justify-end mb-1">
-          <ExportPngButton
-            locale={locale}
-            onClick={() => {
-              track('agentic_workload_streaming_histogram_export', {
-                title,
-                filename: exportFilename,
-              });
-              if (svgRef.current) {
-                exportSvgToPng(svgRef.current, {
+    <Expandable title={title}>
+      <div>
+        {title && exportFilename && (
+          <div className="flex justify-end mb-1">
+            <ExportPngButton
+              locale={locale}
+              onClick={() => {
+                track('agentic_workload_streaming_histogram_export', {
                   title,
                   filename: exportFilename,
-                  svgWidth: HIST_W,
-                  svgHeight: HIST_H,
                 });
-              }
-            }}
-          />
-        </div>
-      )}
-      <svg
-        ref={svgRef}
-        viewBox={`0 0 ${CHART_W} ${CHART_H}`}
-        className="w-full"
-        style={{ maxHeight: 220 }}
-      >
-        {/* Y-axis grid lines and labels */}
-        {yTicks.map((t) => (
-          <g key={`y-${t}`}>
-            {t > 0 && (
-              <line
-                x1={MARGIN.left}
-                y1={sy(t)}
-                x2={MARGIN.left + PLOT_W}
-                y2={sy(t)}
-                stroke="currentColor"
-                className="text-border"
-                strokeWidth={0.5}
-                strokeDasharray="3 3"
-              />
-            )}
-            <text
-              x={MARGIN.left - 6}
-              y={sy(t) + 3}
-              textAnchor="end"
-              className="fill-muted-foreground"
-              style={{
-                fontSize: '9px',
-                fontFamily: 'var(--font-mono, ui-monospace, monospace)',
+                if (svgRef.current) {
+                  exportSvgToPng(svgRef.current, {
+                    title,
+                    filename: exportFilename,
+                    svgWidth: HIST_W,
+                    svgHeight: HIST_H,
+                  });
+                }
               }}
-            >
-              {formatAxisValue(t)}
-            </text>
-          </g>
-        ))}
-
-        {/* Axes */}
-        <line
-          x1={MARGIN.left}
-          y1={MARGIN.top}
-          x2={MARGIN.left}
-          y2={MARGIN.top + PLOT_H}
-          stroke="currentColor"
-          className="text-muted-foreground"
-          strokeWidth={1}
-        />
-        <line
-          x1={MARGIN.left}
-          y1={MARGIN.top + PLOT_H}
-          x2={MARGIN.left + PLOT_W}
-          y2={MARGIN.top + PLOT_H}
-          stroke="currentColor"
-          className="text-muted-foreground"
-          strokeWidth={1}
-        />
-
-        {/* Bars */}
-        {buckets.map((bucket, i) => {
-          const x = sx(bucket.min);
-          const w = sx(bucket.max) - sx(bucket.min);
-          const h = (bucket.count / yMax) * PLOT_H;
-          if (bucket.count === 0) return null;
-          return (
-            <rect
-              key={i}
-              x={x}
-              y={sy(bucket.count)}
-              width={Math.max(w - 0.5, 1)}
-              height={h}
-              fill={color}
-              opacity={0.75}
-              stroke={color}
-              strokeWidth={0.5}
             />
-          );
-        })}
-
-        {/* Percentile lines */}
-        {percentiles.map(({ label, value: val }) => {
-          const px = sx(val);
-          if (px < MARGIN.left || px > MARGIN.left + PLOT_W) return null;
-          const lineColor = label === 'p50' ? '#ef4444' : label === 'p90' ? '#f59e0b' : '#f43f5e';
-          return (
-            <g key={label}>
-              <line
-                x1={px}
-                y1={MARGIN.top}
-                x2={px}
-                y2={MARGIN.top + PLOT_H}
-                stroke={lineColor}
-                strokeWidth={1}
-                strokeDasharray="4 3"
-              />
+          </div>
+        )}
+        <svg
+          ref={svgRef}
+          viewBox={`0 0 ${CHART_W} ${CHART_H}`}
+          className="w-full"
+          style={{ maxHeight: 220 }}
+        >
+          {/* Y-axis grid lines and labels */}
+          {yTicks.map((t) => (
+            <g key={`y-${t}`}>
+              {t > 0 && (
+                <line
+                  x1={MARGIN.left}
+                  y1={sy(t)}
+                  x2={MARGIN.left + PLOT_W}
+                  y2={sy(t)}
+                  stroke="currentColor"
+                  className="text-border"
+                  strokeWidth={0.5}
+                  strokeDasharray="3 3"
+                />
+              )}
               <text
-                x={px}
-                y={MARGIN.top - 2}
-                textAnchor="middle"
-                fill={lineColor}
-                style={{ fontSize: '7px', fontFamily: 'var(--font-mono)' }}
+                x={MARGIN.left - 6}
+                y={sy(t) + 3}
+                textAnchor="end"
+                className="fill-muted-foreground"
+                style={{
+                  fontSize: '9px',
+                  fontFamily: 'var(--font-mono, ui-monospace, monospace)',
+                }}
               >
-                {label}
+                {formatAxisValue(t)}
               </text>
             </g>
-          );
-        })}
+          ))}
 
-        {/* X-axis tick labels */}
-        {xTicks.map((t) => {
-          if (t < xMin || t > xMax) return null;
-          return (
-            <text
-              key={`x-${t}`}
-              x={sx(t)}
-              y={MARGIN.top + PLOT_H + 16}
-              textAnchor="middle"
-              className="fill-muted-foreground"
-              style={{
-                fontSize: '9px',
-                fontFamily: 'var(--font-mono, ui-monospace, monospace)',
-              }}
-            >
-              {fmt(t)}
-            </text>
-          );
-        })}
+          {/* Axes */}
+          <line
+            x1={MARGIN.left}
+            y1={MARGIN.top}
+            x2={MARGIN.left}
+            y2={MARGIN.top + PLOT_H}
+            stroke="currentColor"
+            className="text-muted-foreground"
+            strokeWidth={1}
+          />
+          <line
+            x1={MARGIN.left}
+            y1={MARGIN.top + PLOT_H}
+            x2={MARGIN.left + PLOT_W}
+            y2={MARGIN.top + PLOT_H}
+            stroke="currentColor"
+            className="text-muted-foreground"
+            strokeWidth={1}
+          />
 
-        {/* Axis label */}
-        <text
-          x={MARGIN.left + PLOT_W / 2}
-          y={CHART_H - 2}
-          textAnchor="middle"
-          className="fill-muted-foreground"
-          style={{
-            fontSize: '9px',
-            fontFamily: 'var(--font-mono, ui-monospace, monospace)',
-          }}
-        >
-          {axisLabel}
-        </text>
-      </svg>
+          {/* Bars */}
+          {buckets.map((bucket, i) => {
+            const x = sx(bucket.min);
+            const w = sx(bucket.max) - sx(bucket.min);
+            const h = (bucket.count / yMax) * PLOT_H;
+            if (bucket.count === 0) return null;
+            return (
+              <rect
+                key={i}
+                x={x}
+                y={sy(bucket.count)}
+                width={Math.max(w - 0.5, 1)}
+                height={h}
+                fill={color}
+                opacity={0.75}
+                stroke={color}
+                strokeWidth={0.5}
+              />
+            );
+          })}
 
-      {/* Percentile stats */}
-      <div className="flex items-center gap-3 mt-1 text-3xs font-mono text-muted-foreground">
-        {percentiles.map((p) => (
-          <span key={p.label}>
-            {p.label}: {fmt(p.value)}
-          </span>
-        ))}
+          {/* Percentile lines */}
+          {percentiles.map(({ label, value: val }) => {
+            const px = sx(val);
+            if (px < MARGIN.left || px > MARGIN.left + PLOT_W) return null;
+            const lineColor = label === 'p50' ? '#ef4444' : label === 'p90' ? '#f59e0b' : '#f43f5e';
+            return (
+              <g key={label}>
+                <line
+                  x1={px}
+                  y1={MARGIN.top}
+                  x2={px}
+                  y2={MARGIN.top + PLOT_H}
+                  stroke={lineColor}
+                  strokeWidth={1}
+                  strokeDasharray="4 3"
+                />
+                <text
+                  x={px}
+                  y={MARGIN.top - 2}
+                  textAnchor="middle"
+                  fill={lineColor}
+                  style={{ fontSize: '7px', fontFamily: 'var(--font-mono)' }}
+                >
+                  {label}
+                </text>
+              </g>
+            );
+          })}
+
+          {/* X-axis tick labels */}
+          {xTicks.map((t) => {
+            if (t < xMin || t > xMax) return null;
+            return (
+              <text
+                key={`x-${t}`}
+                x={sx(t)}
+                y={MARGIN.top + PLOT_H + 16}
+                textAnchor="middle"
+                className="fill-muted-foreground"
+                style={{
+                  fontSize: '9px',
+                  fontFamily: 'var(--font-mono, ui-monospace, monospace)',
+                }}
+              >
+                {fmt(t)}
+              </text>
+            );
+          })}
+
+          {/* Axis label */}
+          <text
+            x={MARGIN.left + PLOT_W / 2}
+            y={CHART_H - 2}
+            textAnchor="middle"
+            className="fill-muted-foreground"
+            style={{
+              fontSize: '9px',
+              fontFamily: 'var(--font-mono, ui-monospace, monospace)',
+            }}
+          >
+            {axisLabel}
+          </text>
+        </svg>
+
+        {/* Percentile stats */}
+        <div className="flex items-center gap-3 mt-1 text-3xs font-mono text-muted-foreground">
+          {percentiles.map((p) => (
+            <span key={p.label}>
+              {p.label}: {fmt(p.value)}
+            </span>
+          ))}
+        </div>
       </div>
-    </div>
+    </Expandable>
   );
 }
 

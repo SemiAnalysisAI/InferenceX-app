@@ -17,6 +17,7 @@ export const GET = withExplorerRoute(async ({ vis, params }) => {
   const rows = await getSessionTokenStats(id, vis);
   const entries = rows.map((r, i) => ({
     request: i + 1,
+    requestId: r.id,
     cacheRead: r.cacheReadInputTokens ?? 0,
     cacheWrite: r.cacheWriteTokens ?? 0,
     output: r.outputTokens ?? 0,

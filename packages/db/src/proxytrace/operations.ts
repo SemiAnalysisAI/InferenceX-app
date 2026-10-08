@@ -71,6 +71,24 @@ export function traceVersionFilter(traceVersion: number | null, alias = 'request
   return sql`${sql.raw(alias)}.trace_version = ${traceVersion}`;
 }
 
+/** Restricts a scan to the given sessions; `null` leaves it unrestricted. */
+function sessionIdFilter(sessionIds: readonly string[] | null, column: string) {
+  return sessionIds === null ? sql`TRUE` : sql`${sql.ref(column)} = ANY(${sessionIds}::text[])`;
+}
+
+/**
+ * Joins `request_stats` as `rs`. For a session sample the planner overestimates
+ * the matching requests and seq-scans all of request_stats; the OFFSET 0
+ * lateral keeps it to one index lookup per request.
+ */
+function requestStatsJoin(requestId: string, sessionIds: readonly string[] | null) {
+  return sessionIds === null
+    ? sql`JOIN request_stats rs ON rs.request_id = ${sql.ref(requestId)}`
+    : sql`CROSS JOIN LATERAL (
+        SELECT * FROM request_stats WHERE request_id = ${sql.ref(requestId)} OFFSET 0
+      ) rs`;
+}
+
 export async function getDistinctModels(visibleClientIds: string[] | null = null) {
   const db = getDb();
   const result = await sql<{ model: string }>`
@@ -84,7 +102,7 @@ export async function getDistinctModels(visibleClientIds: string[] | null = null
 }
 
 /** SQL mirror of `harnessFromUserAgent` in `./shared/harness`. */
-const SESSION_HARNESS_SQL = sql<Harness>`CASE
+export const SESSION_HARNESS_SQL = sql<Harness>`CASE
   WHEN sessions.metadata ->> 'userAgent' LIKE 'claude-cli/%' THEN 'claude-code'
   WHEN sessions.metadata ->> 'userAgent' ~* '^codex' THEN 'codex'
   WHEN sessions.metadata ->> 'userAgent' LIKE 'pi (%' THEN 'pi'
@@ -131,6 +149,60 @@ function sessionFilterConditions(
  * `_visibleClientIds` is always the anon marker; a session is visible iff it
  * has a session_summary row.
  */
+export const SESSION_SORT_KEYS = [
+  'active',
+  'started',
+  'requests',
+  'cost',
+  'session',
+  'user',
+  'version',
+] as const;
+export type SessionSortKey = (typeof SESSION_SORT_KEYS)[number];
+export interface SessionSort {
+  key: SessionSortKey;
+  dir: 'asc' | 'desc';
+}
+
+// Mirrors parseUserAgent's CLI_VERSION_RE (Postgres uses \m for a word start).
+const UA_VERSION_RE = String.raw`\m(?:claude-cli|codex[\w-]*|Codex Desktop|omp|pi)/(\S+)`;
+
+/**
+ * ORDER BY for the sessions list, applied over every matching session so the
+ * first page of a sort is the true first page. Versions order like
+ * compareVersions: numeric dot parts, then a release after its prerelease,
+ * with versionless sessions last in both directions.
+ */
+function sessionOrderBy(sort: SessionSort | null) {
+  const d = sort?.dir === 'asc' ? sql`ASC` : sql`DESC`;
+  switch (sort?.key) {
+    case 'started': {
+      return sql`sessions.started_at ${d}`;
+    }
+    case 'requests': {
+      return sql`ss.request_count ${d}`;
+    }
+    case 'cost': {
+      return sql`ss.total_cost ${d}`;
+    }
+    case 'session': {
+      return sql`sessions.id ${d}`;
+    }
+    case 'user': {
+      return sql`clients.api_key_hash ${d}`;
+    }
+    case 'version': {
+      return sql`(ver.v IS NULL),
+        string_to_array(coalesce(nullif(ver.core, ''), '0'), '.')::numeric[] ${d},
+        (substr(ver.v, length(ver.core) + 1) = '') ${d},
+        substr(ver.v, length(ver.core) + 1) ${d}`;
+    }
+    default: {
+      return sql`sessions.last_active_at ${d}`;
+    }
+  }
+}
+
 export async function getRecentSessions(
   limit = 50,
   offset = 0,
@@ -140,6 +212,7 @@ export async function getRecentSessions(
   privacyMode: PrivacyMode | null = null,
   harnessFilter: Harness | null = null,
   minReqs = 0,
+  sort: SessionSort | null = null,
 ) {
   const db = getDb();
 
@@ -191,12 +264,21 @@ export async function getRecentSessions(
     FROM sessions
     JOIN session_summary ss ON ss.session_id = sessions.id
     LEFT JOIN clients ON sessions.client_id = clients.id
+    CROSS JOIN LATERAL (
+      SELECT v, coalesce(substring(v FROM '^\\d+(?:\\.\\d+)*'), '') AS core
+      FROM (
+        SELECT coalesce(
+          sessions.metadata->>'cliVersion',
+          substring(sessions.metadata->>'userAgent' FROM ${UA_VERSION_RE})
+        ) AS v
+      ) raw
+    ) ver
     WHERE ${searchCondition}
       AND ${versionCondition}
       AND ${privacyCondition}
       AND ${harnessCondition}
       AND ${minReqsFilter}
-    ORDER BY sessions.last_active_at DESC
+    ORDER BY ${sessionOrderBy(sort)}, sessions.last_active_at DESC, sessions.id
     LIMIT ${limit}
     OFFSET ${offset}
   `.execute(db);
@@ -507,11 +589,13 @@ export async function getSessionTokenStats(
 ) {
   const db = getDb();
   const result = await sql<{
+    id: string;
     cacheReadInputTokens: number | null;
     cacheWriteTokens: number | null;
     outputTokens: number | null;
   }>`
     SELECT
+      id,
       cache_read_input_tokens AS "cacheReadInputTokens",
       cache_write_tokens AS "cacheWriteTokens",
       output_tokens AS "outputTokens"
@@ -3052,7 +3136,7 @@ export async function getDailyCacheEfficiencyByClient(
     SELECT
       u.client_id AS client_id,
       clients.api_key_hash AS api_key_hash,
-      u.day AS day,
+      u.day::text AS day,
       sum(u.cache_read) AS cache_read,
       sum(u.input_tokens) AS input_tokens
     FROM daily_client_usage u
@@ -3065,7 +3149,7 @@ export async function getDailyCacheEfficiencyByClient(
   return result.rows.map((r) => ({
     clientId: String(r.client_id),
     apiKeyHash: String(r.api_key_hash),
-    day: String(r.day).slice(0, 10),
+    day: r.day,
     cacheRead: Number(r.cache_read),
     inputTokens: Number(r.input_tokens),
   }));
@@ -3730,6 +3814,7 @@ async function getToolAnalyticsFromDb(
   visibleClientIds: string[] | null,
   db: Kysely<Database>,
   traceVersion: number | null,
+  sessionIds: readonly string[] | null,
 ): Promise<
   {
     toolCounts: ToolAnalyticsSqlRow['tool_counts'];
@@ -3747,11 +3832,13 @@ async function getToolAnalyticsFromDb(
         r.timestamp
       FROM requests r
       WHERE ${requestsVisFilter(visibleClientIds, 'r', traceVersion)}
+        AND ${sessionIdFilter(sessionIds, 'r.session_id')}
     ),
     session_universe AS MATERIALIZED (
       SELECT sessions.id AS session_id
       FROM sessions
       WHERE ${sessionsVisFilter(visibleClientIds, traceVersion)}
+        AND ${sessionIdFilter(sessionIds, 'sessions.id')}
     ),
     tool_uses AS MATERIALIZED (
       SELECT
@@ -3763,7 +3850,7 @@ async function getToolAnalyticsFromDb(
         coalesce(elem ->> 'name', 'unknown') AS tool_name,
         elem ->> 'verification_kind' AS verification_kind
       FROM visible_requests vr
-      JOIN request_stats rs ON rs.request_id = vr.request_id
+      ${requestStatsJoin('vr.request_id', sessionIds)}
       CROSS JOIN LATERAL jsonb_array_elements(rs.tool_uses)
         WITH ORDINALITY AS item(elem, array_ordinality)
       WHERE rs.tool_uses <> '[]'::jsonb
@@ -3774,7 +3861,7 @@ async function getToolAnalyticsFromDb(
         coalesce((elem ->> 'is_error')::boolean, false) AS is_error,
         coalesce(elem ->> 'status', 'unknown') AS status
       FROM visible_requests vr
-      JOIN request_stats rs ON rs.request_id = vr.request_id
+      ${requestStatsJoin('vr.request_id', sessionIds)}
       CROSS JOIN LATERAL jsonb_array_elements(rs.tool_results)
         WITH ORDINALITY AS result_item(elem, array_ordinality)
       WHERE rs.tool_results <> '[]'::jsonb
@@ -4164,15 +4251,17 @@ export function getToolAnalytics(
   visibleClientIds: string[] | null = null,
   dbOverride?: Kysely<Database>,
   traceVersion: number | null = null,
+  sessionIds: readonly string[] | null = null,
 ) {
   const db = dbOverride ?? getDb();
-  return getToolAnalyticsFromDb(visibleClientIds, db, traceVersion);
+  return getToolAnalyticsFromDb(visibleClientIds, db, traceVersion, sessionIds);
 }
 
 export async function getToolSequences(
   visibleClientIds: string[] | null = null,
   dbOverride?: Kysely<Database>,
   traceVersion: number | null = null,
+  sessionIds: readonly string[] | null = null,
 ) {
   const db = dbOverride ?? getDb();
   const result = await sql<{
@@ -4186,10 +4275,11 @@ export async function getToolSequences(
         (elem ->> 'ordinality')::int AS ord,
         (elem ->> 'name') AS tool_name
       FROM requests
-        JOIN request_stats ON request_stats.request_id = requests.id,
-        jsonb_array_elements(request_stats.tool_uses) AS elem
+        ${requestStatsJoin('requests.id', sessionIds)},
+        jsonb_array_elements(rs.tool_uses) AS elem
       WHERE ${requestsVisFilter(visibleClientIds, 'requests', traceVersion)}
-        AND request_stats.tool_uses <> '[]'::jsonb
+        AND ${sessionIdFilter(sessionIds, 'requests.session_id')}
+        AND rs.tool_uses <> '[]'::jsonb
     )
     SELECT
       array_agg(tool_name ORDER BY ts, request_id, ord) AS tool_sequence
@@ -4293,6 +4383,7 @@ export async function getToolTimings(
   visibleClientIds: string[] | null = null,
   dbOverride?: Kysely<Database>,
   traceVersion: number | null = null,
+  sessionIds: readonly string[] | null = null,
 ): Promise<ToolTimings> {
   const db = dbOverride ?? getDb();
   const binEdges = sql.raw(`ARRAY[${TIMING_BIN_EDGES_MS.join(', ')}]::float8[]`);
@@ -4318,8 +4409,9 @@ export async function getToolTimings(
         coalesce(rs.tool_uses -> 0 ->> 'verification_kind', 'other') AS first_bash_kind,
         coalesce(rs.tool_uses -> 0 ->> 'command_binary', '(unknown)') AS first_bash_binary
       FROM requests r
-      JOIN request_stats rs ON rs.request_id = r.id
+      ${requestStatsJoin('r.id', sessionIds)}
       WHERE ${requestsVisFilter(visibleClientIds, 'r', traceVersion)}
+        AND ${sessionIdFilter(sessionIds, 'r.session_id')}
     ),
     turn AS MATERIALIZED (
       SELECT
@@ -4797,6 +4889,65 @@ export async function getWallClockBreakdown(
       idle_ms: Number(d.idle_ms),
       requests: Number(d.requests),
     })),
+  };
+}
+
+// ── Per-harness tool-analytics sample ──
+
+/**
+ * Request budget for a single-harness view of /tool-analytics. The cache only
+ * holds the all-harness payload and the snapshot is read-only, so a harness
+ * view runs the same queries live over whole sessions picked in md5(id)
+ * order until the budget is reached (the session that crosses it is kept).
+ * ~20k requests read in ~4 s cold; a full pass over a large harness takes
+ * 30 s or more.
+ */
+export const HARNESS_TOOL_SAMPLE_REQUESTS = 20_000;
+
+export interface HarnessToolSample {
+  sessionIds: string[];
+  sessions: number;
+  totalSessions: number;
+  requests: number;
+  totalRequests: number;
+}
+
+export async function getHarnessToolSample(
+  db: Kysely<Database>,
+  harness: Harness,
+): Promise<HarnessToolSample> {
+  const result = await sql<{
+    id: string;
+    request_count: number;
+    total_sessions: number;
+    total_requests: number;
+  }>`
+    WITH ranked AS (
+      SELECT
+        sessions.id,
+        ss.request_count,
+        sum(ss.request_count) OVER (ORDER BY md5(sessions.id), sessions.id) AS cum,
+        count(*) OVER () AS total_sessions,
+        sum(ss.request_count) OVER () AS total_requests
+      FROM sessions
+      JOIN session_summary ss ON ss.session_id = sessions.id
+      WHERE ${SESSION_HARNESS_SQL} = ${harness}
+    )
+    SELECT
+      id,
+      request_count::int AS request_count,
+      total_sessions::int AS total_sessions,
+      total_requests::float8 AS total_requests
+    FROM ranked
+    WHERE cum - request_count < ${HARNESS_TOOL_SAMPLE_REQUESTS}
+  `.execute(db);
+  const first = result.rows[0];
+  return {
+    sessionIds: result.rows.map((r) => r.id),
+    sessions: result.rows.length,
+    totalSessions: Number(first?.total_sessions ?? 0),
+    requests: result.rows.reduce((n, r) => n + Number(r.request_count), 0),
+    totalRequests: Number(first?.total_requests ?? 0),
   };
 }
 

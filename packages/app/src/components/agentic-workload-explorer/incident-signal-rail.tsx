@@ -4,6 +4,7 @@ import { type KeyboardEvent, useMemo, useRef, useState } from 'react';
 import { formatNumber } from '@/lib/agentic-workload-explorer/format';
 import { exportSvgToPng, ExportPngButton } from '@/lib/agentic-workload-explorer/export-png';
 import type { ErrorData } from '@/lib/agentic-workload-explorer/api-types';
+import { Expandable } from '@/components/agentic-workload-explorer/expandable-chart';
 import { useLocale } from '@/lib/use-locale';
 import { track } from '@/lib/analytics';
 
@@ -47,6 +48,7 @@ const SEVERITY_META: Record<Severity, { fill: string; badge: string }> = {
 
 const STRINGS = {
   en: {
+    title: 'Hourly Incident Signals',
     noSignals: 'No hourly error signals are available for this trace version.',
     baselineNote: (hours: number, anomalyCount: number) =>
       `Median + MAD baseline over the prior ${hours} hours · ${anomalyCount} anomalous ${anomalyCount === 1 ? 'hour' : 'hours'}`,
@@ -80,6 +82,7 @@ const STRINGS = {
     },
   },
   zh: {
+    title: '逐小时事件信号',
     noSignals: '该 trace 版本暂无逐小时错误信号。',
     baselineNote: (hours: number, anomalyCount: number) =>
       `基于前 ${hours} 小时的中位数 + MAD 基线 · ${anomalyCount} 个异常小时`,
@@ -244,275 +247,277 @@ export function IncidentSignalRail({ data }: { data: ErrorData['timeline'] }) {
   };
 
   return (
-    <div className="space-y-3">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-3xs font-mono font-bold uppercase tracking-eyebrow">
-            {(Object.keys(SEVERITY_META) as Severity[]).map((severity) => (
-              <span
-                key={severity}
-                className="inline-flex items-center gap-1.5 text-muted-foreground"
-              >
+    <Expandable title={t.title}>
+      <div className="space-y-3">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-3xs font-mono font-bold uppercase tracking-eyebrow">
+              {(Object.keys(SEVERITY_META) as Severity[]).map((severity) => (
                 <span
-                  aria-hidden="true"
-                  className="size-2 border border-black/10"
-                  style={{ backgroundColor: SEVERITY_META[severity].fill }}
-                />
-                {t.severity[severity].label}
-              </span>
-            ))}
-          </div>
-          <p className="mt-1 text-3xs font-mono text-muted-foreground">
-            {t.baselineNote(TRAILING_HOURS, anomalyCount)}
-          </p>
-        </div>
-        <ExportPngButton
-          locale={locale}
-          label={t.exportLabel}
-          onClick={() => {
-            track('agentic_workload_incident_rail_export_png');
-            if (svgRef.current) {
-              exportSvgToPng(svgRef.current, {
-                title: t.exportTitle,
-                filename: 'hourly-incident-signals.png',
-                svgWidth: chartWidth,
-                svgHeight: CHART_HEIGHT,
-              });
-            }
-          }}
-        />
-      </div>
-
-      <div className="overflow-x-auto border-y border-border bg-background/30">
-        <svg
-          ref={svgRef}
-          viewBox={`0 0 ${chartWidth} ${CHART_HEIGHT}`}
-          className="h-[244px] min-w-[760px]"
-          style={{ width: chartWidth }}
-          role="group"
-          aria-label={t.ariaLabel}
-        >
-          <text
-            x={LEFT - 10}
-            y={RATE_TOP + 8}
-            textAnchor="end"
-            fill="currentColor"
-            opacity={0.55}
-            className="text-3xs font-mono"
-          >
-            {formatRate(maxRate)}
-          </text>
-          <text
-            x={LEFT - 10}
-            y={RATE_TOP + RATE_HEIGHT}
-            textAnchor="end"
-            dominantBaseline="middle"
-            fill="currentColor"
-            opacity={0.55}
-            className="text-3xs font-mono"
-          >
-            0%
-          </text>
-          <text
-            x={LEFT - 10}
-            y={VOLUME_TOP + VOLUME_HEIGHT / 2}
-            textAnchor="end"
-            dominantBaseline="middle"
-            fill="currentColor"
-            opacity={0.55}
-            className="text-3xs font-mono"
-          >
-            {t.requests}
-          </text>
-
-          {[0, 0.5, 1].map((fraction) => {
-            const y = RATE_TOP + RATE_HEIGHT * fraction;
-            return (
-              <line
-                key={fraction}
-                x1={LEFT}
-                x2={chartWidth - RIGHT}
-                y1={y}
-                y2={y}
-                stroke="currentColor"
-                strokeOpacity={fraction === 1 ? 0.18 : 0.08}
-                strokeDasharray={fraction === 1 ? undefined : '2 3'}
-              />
-            );
-          })}
-
-          <polyline
-            points={points
-              .map((point, index) => {
-                const x = LEFT + index * slotWidth + slotWidth / 2;
-                return `${x},${RATE_TOP + RATE_HEIGHT - (point.baselineRate / maxRate) * RATE_HEIGHT}`;
-              })
-              .join(' ')}
-            fill="none"
-            stroke="currentColor"
-            strokeOpacity={0.42}
-            strokeWidth={1}
-            strokeDasharray="3 3"
-            aria-hidden="true"
-          />
-
-          {points.map((point, index) => {
-            const x = LEFT + index * slotWidth + (slotWidth - barWidth) / 2;
-            const y = RATE_TOP + RATE_HEIGHT - (point.rate / maxRate) * RATE_HEIGHT;
-            const height = Math.max(1, RATE_TOP + RATE_HEIGHT - y);
-            const volumeHeight = Math.max(1, (point.totalCount / maxVolume) * VOLUME_HEIGHT);
-            const isSelected = index === activeIndex;
-            const hourLabel = formatHourUtc(point.hour);
-            const baselineLabel = point.hasBaseline
-              ? t.trailingBaselineLabel(formatRate(point.baselineRate))
-              : t.baselineLearning;
-            const accessibleLabel = t.accessibleLabel(
-              hourLabel,
-              t.severity[point.severity].label,
-              point.errorCount,
-              point.totalCount,
-              formatRate(point.rate),
-              baselineLabel,
-            );
-
-            return (
-              <g
-                key={point.hour}
-                ref={(node) => {
-                  pointRefs.current[index] = node;
-                }}
-                role="button"
-                tabIndex={isSelected ? 0 : -1}
-                aria-label={accessibleLabel}
-                aria-pressed={isSelected}
-                className="cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground"
-                onClick={() => {
-                  setSelectedHour(point.hour);
-                  track('agentic_workload_incident_hour_selected', {
-                    hour: point.hour,
-                    severity: point.severity,
-                  });
-                }}
-                onFocus={() => setSelectedHour(point.hour)}
-                onKeyDown={(event) => selectAdjacent(event, index)}
-              >
-                <rect
-                  x={LEFT + index * slotWidth}
-                  y={RATE_TOP - 5}
-                  width={slotWidth}
-                  height={VOLUME_TOP + VOLUME_HEIGHT - RATE_TOP + 10}
-                  fill="transparent"
-                />
-                {isSelected && (
-                  <rect
-                    x={LEFT + index * slotWidth + 0.5}
-                    y={RATE_TOP - 4.5}
-                    width={Math.max(1, slotWidth - 1)}
-                    height={VOLUME_TOP + VOLUME_HEIGHT - RATE_TOP + 9}
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth={1}
-                    strokeOpacity={0.8}
-                    strokeDasharray="2 2"
+                  key={severity}
+                  className="inline-flex items-center gap-1.5 text-muted-foreground"
+                >
+                  <span
+                    aria-hidden="true"
+                    className="size-2 border border-black/10"
+                    style={{ backgroundColor: SEVERITY_META[severity].fill }}
                   />
-                )}
-                <rect
-                  x={x}
-                  y={y}
-                  width={barWidth}
-                  height={height}
-                  fill={SEVERITY_META[point.severity].fill}
-                  opacity={isSelected ? 1 : 0.78}
-                />
-                <rect
-                  x={x}
-                  y={VOLUME_TOP + VOLUME_HEIGHT - volumeHeight}
-                  width={barWidth}
-                  height={volumeHeight}
-                  fill="#38bdf8"
-                  opacity={isSelected ? 0.9 : 0.45}
-                />
-                <title>{accessibleLabel}</title>
-              </g>
-            );
-          })}
+                  {t.severity[severity].label}
+                </span>
+              ))}
+            </div>
+            <p className="mt-1 text-3xs font-mono text-muted-foreground">
+              {t.baselineNote(TRAILING_HOURS, anomalyCount)}
+            </p>
+          </div>
+          <ExportPngButton
+            locale={locale}
+            label={t.exportLabel}
+            onClick={() => {
+              track('agentic_workload_incident_rail_export_png');
+              if (svgRef.current) {
+                exportSvgToPng(svgRef.current, {
+                  title: t.exportTitle,
+                  filename: 'hourly-incident-signals.png',
+                  svgWidth: chartWidth,
+                  svgHeight: CHART_HEIGHT,
+                });
+              }
+            }}
+          />
+        </div>
 
-          <text
-            x={LEFT}
-            y={CHART_HEIGHT - 12}
-            fill="currentColor"
-            opacity={0.55}
-            className="text-3xs font-mono"
+        <div className="overflow-x-auto border-y border-border bg-background/30">
+          <svg
+            ref={svgRef}
+            viewBox={`0 0 ${chartWidth} ${CHART_HEIGHT}`}
+            className="h-[244px] min-w-[760px]"
+            style={{ width: chartWidth }}
+            role="group"
+            aria-label={t.ariaLabel}
           >
-            {new Date(points[0].hour).toLocaleDateString('en-US', {
-              month: 'short',
-              day: 'numeric',
-              timeZone: 'UTC',
-            })}
-          </text>
-          <text
-            x={chartWidth - RIGHT}
-            y={CHART_HEIGHT - 12}
-            textAnchor="end"
-            fill="currentColor"
-            opacity={0.55}
-            className="text-3xs font-mono"
-          >
-            {formatHourUtc(points.at(-1)!.hour)}
-          </text>
-        </svg>
-      </div>
-
-      <div
-        className="grid gap-3 border border-border bg-background/40 p-3 sm:grid-cols-[minmax(0,1.5fr)_repeat(3,minmax(0,1fr))]"
-        aria-live="polite"
-        aria-atomic="true"
-      >
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <span
-              className={`inline-flex border px-1.5 py-0.5 text-3xs font-mono font-bold uppercase tracking-eyebrow ${SEVERITY_META[selected.severity].badge}`}
+            <text
+              x={LEFT - 10}
+              y={RATE_TOP + 8}
+              textAnchor="end"
+              fill="currentColor"
+              opacity={0.55}
+              className="text-3xs font-mono"
             >
-              {t.severity[selected.severity].label}
-            </span>
-            <span className="truncate text-2xs font-mono font-bold">
-              {formatHourUtc(selected.hour)}
-            </span>
-          </div>
-          <p className="mt-1 text-3xs font-mono text-muted-foreground">
-            {t.severity[selected.severity].description}
-          </p>
+              {formatRate(maxRate)}
+            </text>
+            <text
+              x={LEFT - 10}
+              y={RATE_TOP + RATE_HEIGHT}
+              textAnchor="end"
+              dominantBaseline="middle"
+              fill="currentColor"
+              opacity={0.55}
+              className="text-3xs font-mono"
+            >
+              0%
+            </text>
+            <text
+              x={LEFT - 10}
+              y={VOLUME_TOP + VOLUME_HEIGHT / 2}
+              textAnchor="end"
+              dominantBaseline="middle"
+              fill="currentColor"
+              opacity={0.55}
+              className="text-3xs font-mono"
+            >
+              {t.requests}
+            </text>
+
+            {[0, 0.5, 1].map((fraction) => {
+              const y = RATE_TOP + RATE_HEIGHT * fraction;
+              return (
+                <line
+                  key={fraction}
+                  x1={LEFT}
+                  x2={chartWidth - RIGHT}
+                  y1={y}
+                  y2={y}
+                  stroke="currentColor"
+                  strokeOpacity={fraction === 1 ? 0.18 : 0.08}
+                  strokeDasharray={fraction === 1 ? undefined : '2 3'}
+                />
+              );
+            })}
+
+            <polyline
+              points={points
+                .map((point, index) => {
+                  const x = LEFT + index * slotWidth + slotWidth / 2;
+                  return `${x},${RATE_TOP + RATE_HEIGHT - (point.baselineRate / maxRate) * RATE_HEIGHT}`;
+                })
+                .join(' ')}
+              fill="none"
+              stroke="currentColor"
+              strokeOpacity={0.42}
+              strokeWidth={1}
+              strokeDasharray="3 3"
+              aria-hidden="true"
+            />
+
+            {points.map((point, index) => {
+              const x = LEFT + index * slotWidth + (slotWidth - barWidth) / 2;
+              const y = RATE_TOP + RATE_HEIGHT - (point.rate / maxRate) * RATE_HEIGHT;
+              const height = Math.max(1, RATE_TOP + RATE_HEIGHT - y);
+              const volumeHeight = Math.max(1, (point.totalCount / maxVolume) * VOLUME_HEIGHT);
+              const isSelected = index === activeIndex;
+              const hourLabel = formatHourUtc(point.hour);
+              const baselineLabel = point.hasBaseline
+                ? t.trailingBaselineLabel(formatRate(point.baselineRate))
+                : t.baselineLearning;
+              const accessibleLabel = t.accessibleLabel(
+                hourLabel,
+                t.severity[point.severity].label,
+                point.errorCount,
+                point.totalCount,
+                formatRate(point.rate),
+                baselineLabel,
+              );
+
+              return (
+                <g
+                  key={point.hour}
+                  ref={(node) => {
+                    pointRefs.current[index] = node;
+                  }}
+                  role="button"
+                  tabIndex={isSelected ? 0 : -1}
+                  aria-label={accessibleLabel}
+                  aria-pressed={isSelected}
+                  className="cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground"
+                  onClick={() => {
+                    setSelectedHour(point.hour);
+                    track('agentic_workload_incident_hour_selected', {
+                      hour: point.hour,
+                      severity: point.severity,
+                    });
+                  }}
+                  onFocus={() => setSelectedHour(point.hour)}
+                  onKeyDown={(event) => selectAdjacent(event, index)}
+                >
+                  <rect
+                    x={LEFT + index * slotWidth}
+                    y={RATE_TOP - 5}
+                    width={slotWidth}
+                    height={VOLUME_TOP + VOLUME_HEIGHT - RATE_TOP + 10}
+                    fill="transparent"
+                  />
+                  {isSelected && (
+                    <rect
+                      x={LEFT + index * slotWidth + 0.5}
+                      y={RATE_TOP - 4.5}
+                      width={Math.max(1, slotWidth - 1)}
+                      height={VOLUME_TOP + VOLUME_HEIGHT - RATE_TOP + 9}
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={1}
+                      strokeOpacity={0.8}
+                      strokeDasharray="2 2"
+                    />
+                  )}
+                  <rect
+                    x={x}
+                    y={y}
+                    width={barWidth}
+                    height={height}
+                    fill={SEVERITY_META[point.severity].fill}
+                    opacity={isSelected ? 1 : 0.78}
+                  />
+                  <rect
+                    x={x}
+                    y={VOLUME_TOP + VOLUME_HEIGHT - volumeHeight}
+                    width={barWidth}
+                    height={volumeHeight}
+                    fill="#38bdf8"
+                    opacity={isSelected ? 0.9 : 0.45}
+                  />
+                  <title>{accessibleLabel}</title>
+                </g>
+              );
+            })}
+
+            <text
+              x={LEFT}
+              y={CHART_HEIGHT - 12}
+              fill="currentColor"
+              opacity={0.55}
+              className="text-3xs font-mono"
+            >
+              {new Date(points[0].hour).toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                timeZone: 'UTC',
+              })}
+            </text>
+            <text
+              x={chartWidth - RIGHT}
+              y={CHART_HEIGHT - 12}
+              textAnchor="end"
+              fill="currentColor"
+              opacity={0.55}
+              className="text-3xs font-mono"
+            >
+              {formatHourUtc(points.at(-1)!.hour)}
+            </text>
+          </svg>
         </div>
-        <div>
-          <div className="text-3xs font-mono font-bold uppercase tracking-eyebrow text-muted-foreground">
-            {t.errorRate}
+
+        <div
+          className="grid gap-3 border border-border bg-background/40 p-3 sm:grid-cols-[minmax(0,1.5fr)_repeat(3,minmax(0,1fr))]"
+          aria-live="polite"
+          aria-atomic="true"
+        >
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <span
+                className={`inline-flex border px-1.5 py-0.5 text-3xs font-mono font-bold uppercase tracking-eyebrow ${SEVERITY_META[selected.severity].badge}`}
+              >
+                {t.severity[selected.severity].label}
+              </span>
+              <span className="truncate text-2xs font-mono font-bold">
+                {formatHourUtc(selected.hour)}
+              </span>
+            </div>
+            <p className="mt-1 text-3xs font-mono text-muted-foreground">
+              {t.severity[selected.severity].description}
+            </p>
           </div>
-          <div className="text-sm font-mono font-bold">{formatRate(selected.rate)}</div>
-          <div className="text-3xs font-mono text-muted-foreground">
-            {formatNumber(selected.errorCount)} {t.errors}
+          <div>
+            <div className="text-3xs font-mono font-bold uppercase tracking-eyebrow text-muted-foreground">
+              {t.errorRate}
+            </div>
+            <div className="text-sm font-mono font-bold">{formatRate(selected.rate)}</div>
+            <div className="text-3xs font-mono text-muted-foreground">
+              {formatNumber(selected.errorCount)} {t.errors}
+            </div>
           </div>
-        </div>
-        <div>
-          <div className="text-3xs font-mono font-bold uppercase tracking-eyebrow text-muted-foreground">
-            {t.volume}
+          <div>
+            <div className="text-3xs font-mono font-bold uppercase tracking-eyebrow text-muted-foreground">
+              {t.volume}
+            </div>
+            <div className="text-sm font-mono font-bold">{formatNumber(selected.totalCount)}</div>
+            <div className="text-3xs font-mono text-muted-foreground">{t.requests}</div>
           </div>
-          <div className="text-sm font-mono font-bold">{formatNumber(selected.totalCount)}</div>
-          <div className="text-3xs font-mono text-muted-foreground">{t.requests}</div>
-        </div>
-        <div>
-          <div className="text-3xs font-mono font-bold uppercase tracking-eyebrow text-muted-foreground">
-            {t.trailingBaseline}
-          </div>
-          <div className="text-sm font-mono font-bold">
-            {selected.hasBaseline ? formatRate(selected.baselineRate) : t.learning}
-          </div>
-          <div className="text-3xs font-mono text-muted-foreground">
-            {selected.hasBaseline
-              ? `+${Math.max(0, selected.rate - selected.baselineRate).toFixed(2)} pp`
-              : t.needs3Hours}
+          <div>
+            <div className="text-3xs font-mono font-bold uppercase tracking-eyebrow text-muted-foreground">
+              {t.trailingBaseline}
+            </div>
+            <div className="text-sm font-mono font-bold">
+              {selected.hasBaseline ? formatRate(selected.baselineRate) : t.learning}
+            </div>
+            <div className="text-3xs font-mono text-muted-foreground">
+              {selected.hasBaseline
+                ? `+${Math.max(0, selected.rate - selected.baselineRate).toFixed(2)} pp`
+                : t.needs3Hours}
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </Expandable>
   );
 }

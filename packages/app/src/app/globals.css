@@ -904,3 +904,22 @@ html[data-inferencex-skin='vllm'] [data-slot='card'] {
     animation: none;
   }
 }
+
+/* Expanded charts (ChartZoom): --k is screen px per SVG unit, so text, dots and
+   strokes stay at their drawn size while the chart scales up or zooms. */
+.chart-zoom svg:not(.lucide) text:not([transform]),
+.chart-zoom svg:not(.lucide) circle {
+  transform-box: fill-box;
+  transform-origin: center;
+  transform: scale(calc(1 / var(--k, 1)));
+}
+.chart-zoom svg:not(.lucide) text:not([transform]):not([text-anchor]),
+.chart-zoom svg:not(.lucide) text:not([transform])[text-anchor='start'] {
+  transform-origin: left center;
+}
+.chart-zoom svg:not(.lucide) text:not([transform])[text-anchor='end'] {
+  transform-origin: right center;
+}
+.chart-zoom svg:not(.lucide) :is(line, path, polyline, polygon, rect, circle, ellipse) {
+  vector-effect: non-scaling-stroke;
+}
