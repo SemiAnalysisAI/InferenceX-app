@@ -3,7 +3,6 @@ import { DB_MODEL_TO_DISPLAY } from '@semianalysisai/inferencex-constants';
 import { createAdminSql } from './etl/db-utils';
 import { verifyTelemetryApi } from './etl/telemetry-receipt';
 import {
-  fatalPublicationErrors,
   verifyPowerPublication,
   type PowerPublicationManifest,
   type PublishedPowerRow,
@@ -23,6 +22,8 @@ if (
 )
   throw new Error('Invalid PowerX publication manifest');
 const origin = process.argv[3] ?? 'https://inferencex.semianalysis.com';
+const bypassSecret = process.env.CACHE_PROTECTION_BYPASS_SECRET;
+const headers = bypassSecret ? { 'x-vercel-protection-bypass': bypassSecret } : undefined;
 const sql = createAdminSql();
 try {
   const rows = await sql`
@@ -35,10 +36,10 @@ try {
     join workflow_runs wr on wr.id = br.workflow_run_id
     where wr.github_run_id = ${manifest.runId} and wr.run_attempt = ${manifest.runAttempt}
   `;
-  const errors = fatalPublicationErrors(
-    manifest,
-    verifyPowerPublication(manifest.points, rows as unknown as PublishedPowerRow[], 'database'),
-  );
+  const errors = [
+    ...(manifest.ingestErrors ?? []),
+    ...verifyPowerPublication(manifest.points, rows as unknown as PublishedPowerRow[], 'database'),
+  ];
   const publicRows: PublishedPowerRow[] = [];
   const models = [
     ...new Set(manifest.points.map((point) => DB_MODEL_TO_DISPLAY[String(point.identity.model)])),
@@ -51,12 +52,7 @@ try {
       runId: String(manifest.runId),
       exactRun: 'true',
     }).toString();
-    const response = await fetch(url, {
-      signal: AbortSignal.timeout(30_000),
-      headers: process.env.CACHE_PROTECTION_BYPASS_SECRET
-        ? { 'x-vercel-protection-bypass': process.env.CACHE_PROTECTION_BYPASS_SECRET }
-        : undefined,
-    });
+    const response = await fetch(url, { signal: AbortSignal.timeout(30_000), headers });
     if (!response.ok)
       throw new Error(`Public PowerX verification returned HTTP ${response.status}: ${url}`);
     const body: unknown = await response.json();
@@ -76,11 +72,7 @@ try {
       manifest.telemetry.runAttempt !== manifest.runAttempt
     )
       throw new Error('Telemetry receipt belongs to a different run/attempt');
-    manifest.telemetry = await verifyTelemetryApi(manifest.telemetry, origin, {
-      headers: process.env.CACHE_PROTECTION_BYPASS_SECRET
-        ? { 'x-vercel-protection-bypass': process.env.CACHE_PROTECTION_BYPASS_SECRET }
-        : undefined,
-    });
+    manifest.telemetry = await verifyTelemetryApi(manifest.telemetry, origin, { headers });
     fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
   }
   const counts = { strict: 0, invalid: 0, other: 0 };
@@ -99,8 +91,6 @@ try {
     status:
       errors.length > 0 ? 'failed' : manifest.points.length > 0 ? 'matched' : 'no_power_points',
     errors,
-    // Kept out of `errors` on purpose: a telemetry digest failure costs one
-    // point's PowerX tab, not its benchmark data, so it must not fail the ingest.
     telemetryWarnings: manifest.telemetryWarnings ?? [],
     ...(manifest.telemetry ? { telemetry: manifest.telemetry } : {}),
   };

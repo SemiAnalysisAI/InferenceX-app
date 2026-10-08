@@ -43,7 +43,13 @@ export type SystemPowerEstimate =
       deploymentFacilityWatts: number;
       pue: number;
       telemetryBasis: 'validated-v2' | 'validated-unversioned-single-node';
-      topologyBasis: 'single-node' | 'worker-hosts';
+      /**
+       * 'single-node': one host, one chassis. 'worker-hosts': one chassis per
+       * measured worker, each at its own telemetry. 'uniform-hosts': an
+       * aggregate multinode deployment whose producer emitted no per-worker
+       * telemetry; every eight-GPU chassis is modeled at the deployment mean.
+       */
+      topologyBasis: 'single-node' | 'worker-hosts' | 'uniform-hosts';
       /**
        * 'full': every chassis had all eight GPUs measured. 'extrapolated': at least
        * one chassis was partially allocated; its model input is the measured per-GPU
@@ -138,7 +144,7 @@ export function modelSystemPower(
   }
 
   const chassis: MeasuredChassis[] = [];
-  let topologyBasis: 'single-node' | 'worker-hosts';
+  let topologyBasis: 'single-node' | 'worker-hosts' | 'uniform-hosts';
   if (row.disagg === false && row.is_multinode === false) {
     // One host cannot hold more than one chassis.
     if (gpuCount > CHASSIS_GPU_COUNT) return unavailable('topology');
@@ -173,6 +179,36 @@ export function modelSystemPower(
           ? m.avg_total_gpu_power_w
           : m.avg_power_w * CHASSIS_GPU_COUNT,
     });
+  } else if (row.disagg === false && (!Array.isArray(row.workers) || row.workers.length === 0)) {
+    // Aggregate multinode producers emit no per-worker telemetry. Symmetric
+    // TP/PP/DP shards load every host alike, so each full eight-GPU chassis is
+    // modeled at the deployment mean; the supported hardware only ships in
+    // eight-GPU hosts, so the count must fill whole chassis on several hosts.
+    // Disaggregated roles differ in load and stay on the worker path.
+    const hostCount = gpuCount / CHASSIS_GPU_COUNT;
+    if (!count(hostCount) || hostCount < 2) return unavailable('topology');
+    const tp = row.decode_tp > 0 ? row.decode_tp : row.prefill_tp;
+    const pp = Math.max(m.pp ?? 1, m.decode_pp ?? 1, m.prefill_pp ?? 1);
+    const pcp = Math.max(m.pcp_size ?? 1, m.decode_pcp_size ?? 1, m.prefill_pcp_size ?? 1);
+    // Data-parallel replicas widen the deployment beyond one TP×PP×PCP group.
+    const replicas = Math.max(1, row.decode_num_workers);
+    if (
+      !count(tp) ||
+      !count(pp) ||
+      !count(pcp) ||
+      !count(replicas) ||
+      tp * pp * pcp * replicas !== gpuCount
+    ) {
+      return unavailable('gpu-count');
+    }
+    topologyBasis = 'uniform-hosts';
+    for (let host = 0; host < hostCount; host++) {
+      chassis.push({
+        measuredGpus: CHASSIS_GPU_COUNT,
+        // Partition the producer's exact total so the chassis inputs sum back to it.
+        modelInputWatts: m.avg_total_gpu_power_w / hostCount,
+      });
+    }
   } else {
     // A role average across several hosts is insufficient for nonlinear
     // fan/PSU evaluation. Require one chassis per measured worker and a

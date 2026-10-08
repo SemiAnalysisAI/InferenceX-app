@@ -207,15 +207,11 @@ export async function fetchGpuMetricsFromGithub(
   const jobs: TelemetryJob[] = artifacts
     .filter((a) => a.name.startsWith(wanted) && isRequestedArtifact(a.name, sources))
     .map((artifact) => ({ kind: 'csv', artifact }));
-  const csvNames = new Set(jobs.map((job) => job.artifact.name));
+  const csvNames = new Set(jobs.map(({ artifact }) => artifact.name));
   for (const artifact of artifacts) {
     if (!isWantedBundle(artifact.name, prefix) || !isRequestedArtifact(artifact.name, sources))
       continue;
-    if (
-      !includeBundles &&
-      csvNames.has(`${ARTIFACT_PREFIX}${artifact.name.slice(BUNDLE_PREFIX.length)}`)
-    )
-      continue;
+    if (csvNames.has(`${ARTIFACT_PREFIX}${artifact.name.slice(BUNDLE_PREFIX.length)}`)) continue;
     jobs.push({ kind: includeBundles ? 'bundle' : 'native', artifact });
   }
   if (jobs.length === 0) {

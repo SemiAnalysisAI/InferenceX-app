@@ -63,7 +63,6 @@ describe('power chart semantics', () => {
     expect(isPowerCurveMetric('y_measuredP75Power')).toBe(true);
     expect(isPowerCurveMetric('y_measuredP90Power')).toBe(true);
     expect(isPowerCurveMetric('y_measuredPowerPercentTdp')).toBe(true);
-    expect(isPowerCurveMetric('y_modeledChassisPowerPerGpu')).toBe(true);
     expect(isPowerCurveMetric('y_measuredJPerOutputToken')).toBe(false);
     expect(isPowerCurveMetric('y_tpPerGpu')).toBe(false);
     const points = [point(1, 200, 4), point(8, 100, 1)];
@@ -94,8 +93,12 @@ describe('upper power envelope', () => {
   it('mirrors the boundary for latency and resolves tied coordinates deterministically', () => {
     const fast = point(1, 1, 350);
     const middle = point(8, 2, 700);
+    const plateau = point(16, 3, 700);
     const slow = point(32, 4, 950);
-    const samples = [slow, point(16, 3, 700), point(4, 2, 500), middle, { ...middle }, fast];
+    // Measured watts: a tie at the running maximum is a repeat marker, so the
+    // plateau leaves the boundary and Optimal Only can collapse it; a repeated
+    // X keeps only its first vertex.
+    const samples = [slow, plateau, point(4, 2, 500), middle, { ...middle }, fast];
     expect(upperPowerEnvelope(samples, false)).toEqual([fast, middle, slow]);
     expect(
       upperPowerEnvelope(
@@ -103,6 +106,8 @@ describe('upper power envelope', () => {
         true,
       ).map((p) => p.y),
     ).toEqual([950, 700, 350]);
+    // A gauge keeps the plateau: it is part of the outer edge it draws.
+    expect(upperPowerEnvelope(samples, false, true)).toEqual([fast, middle, plateau, slow]);
   });
 
   it('uses only finite positive coordinates and preserves singleton boundaries', () => {

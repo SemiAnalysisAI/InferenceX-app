@@ -1,17 +1,5 @@
 const DEFAULT_RETRY_DELAYS_MS = [5_000, 15_000, 30_000, 60_000, 120_000] as const;
 
-/**
- * Marks a failure no retry can fix (the run or artifact is gone, not
- * unreachable). `retryArtifactOperation` rethrows it immediately instead of
- * burning the full backoff schedule on it.
- */
-export class NonRetryableArtifactError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'NonRetryableArtifactError';
-  }
-}
-
 interface ArtifactRetryOptions {
   delaysMs?: readonly number[];
   wait?: (delayMs: number) => Promise<void>;
@@ -38,7 +26,6 @@ export async function retryArtifactOperation<T>(
     try {
       return await operation();
     } catch (error) {
-      if (error instanceof NonRetryableArtifactError) throw error;
       lastError = error;
       if (attempt >= delaysMs.length) break;
       const delayMs = delaysMs[attempt];

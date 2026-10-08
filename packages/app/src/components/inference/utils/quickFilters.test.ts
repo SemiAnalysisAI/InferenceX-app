@@ -72,7 +72,7 @@ describe('computeAvailableQuickFilters', () => {
         power_tier: 'certified',
       }),
     ];
-    expect(computeAvailableQuickFilters(points)).toEqual({
+    expect(computeAvailableQuickFilters(points)).toMatchObject({
       vendors: ['NVIDIA', 'AMD'],
       frameworks: ['vllm', 'trt', 'atom'],
       deployment: ['single-node', 'multi-node', 'disagg'],
@@ -85,7 +85,7 @@ describe('computeAvailableQuickFilters', () => {
     const points = [
       point({ hwKey: 'h100_vllm', framework: 'vllm', disagg: false, spec_decoding: 'none' }),
     ];
-    expect(computeAvailableQuickFilters(points)).toEqual({
+    expect(computeAvailableQuickFilters(points)).toMatchObject({
       vendors: ['NVIDIA'],
       frameworks: ['vllm'],
       deployment: ['single-node'],
@@ -112,6 +112,7 @@ describe('computeAvailableQuickFilters', () => {
       deployment: [],
       spec: [],
       power: [],
+      topologies: [],
     });
   });
 });

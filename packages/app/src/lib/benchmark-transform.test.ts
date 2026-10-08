@@ -69,13 +69,25 @@ function makeRow(overrides: Partial<BenchmarkRow> = {}): BenchmarkRow {
 }
 
 describe('rowToAggDataEntry', () => {
+  it('carries the curve snapshot identity of append-only rows and leaves legacy rows without one', () => {
+    const stitched = rowToAggDataEntry(
+      makeRow({ curve_date: '2026-09-20', curve_workflow_run_id: 35843506474 }),
+    );
+    expect([stitched.curve_date, stitched.curve_workflow_run_id]).toEqual([
+      '2026-09-20',
+      35843506474,
+    ]);
+    const legacy = rowToAggDataEntry(makeRow());
+    expect([legacy.curve_date, legacy.curve_workflow_run_id]).toEqual([undefined, undefined]);
+  });
+
   it.each([1, undefined])(
-    'labels run 35879254139 in the official/overlay legend without changing data (DB id %s)',
+    'labels run 37181045340 in the official/overlay legend without changing data (DB id %s)',
     (id) => {
       const clock = vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-10-09T23:59:59-04:00'));
       try {
         const run_url =
-          'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/35879254139/attempts/1';
+          'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/37181045340/attempts/1';
         const row = makeRow({ id, hardware: 'mi355x', framework: 'mori-sglang', run_url });
         const active = transformBenchmarkRows([row]);
         expect(Object.keys(active.hardwareConfig)).toEqual(['mi355x_mori-sglang']);

@@ -8,13 +8,18 @@
  *
  *   schema_version,timestamp_unix,scrape_seq,hostname,gpu_index,gpu_uuid,power_w
  *
- * Version 3 adds optional GPU temperature in Celsius. Missing temperature
- * stays null, including in historical power-only files. Rows are regrouped per host; each host
- * becomes its own series, the shape the reader already uses for multinode
+ * Version 3 adds optional GPU temperature in Celsius; historical power-only
+ * files and missing readings retain null. Rows are regrouped per host so each
+ * host becomes its own series, the shape the reader already uses for multinode
  * staging ("one CSV per node"). Pure module: no I/O.
  */
 
-import { splitCsvLine, type GpuMetricSample, type GpuMetricsVendor } from './gpu-metrics-csv';
+import {
+  emptySample,
+  splitCsvLine,
+  type GpuMetricSample,
+  type GpuMetricsVendor,
+} from './gpu-metrics-csv.js';
 
 export interface MultinodePowerHost {
   hostname: string;
@@ -30,27 +35,6 @@ const REQUIRED_COLUMNS = ['timestamp_unix', 'hostname', 'gpu_index', 'power_w'] 
 export function isMultinodePowerSamplesPath(relativePath: string): boolean {
   const posix = relativePath.split('\\').join('/');
   return /^LOGS\/(?:[^/]+\/)*samples\.csv$/u.test(posix);
-}
-
-function powerSample(timestampMs: number, gpuIndex: number, powerW: number): GpuMetricSample {
-  return {
-    timestampMs,
-    gpuIndex,
-    powerW,
-    temperatureC: null,
-    smClockMhz: null,
-    memClockMhz: null,
-    gpuUtilPct: null,
-    memUtilPct: null,
-    edgeTempC: null,
-    memTempC: null,
-    gfxVoltageMv: null,
-    socVoltageMv: null,
-    memVoltageMv: null,
-    fclkMhz: null,
-    socclkMhz: null,
-    mmActivityPct: null,
-  };
 }
 
 /**
@@ -90,7 +74,7 @@ export function parseMultinodePowerSamples(csvText: string): MultinodePowerHost[
       host = { hostname, samples: [], gpuUuids: {} };
       hosts.set(hostname, host);
     }
-    const sample = powerSample(Math.round(seconds * 1000), gpuIndex, powerW);
+    const sample = { ...emptySample(Math.round(seconds * 1000), gpuIndex), powerW };
     const temperatureText = at(cells, 'temperature_c');
     const temperature = temperatureText ? Number(temperatureText) : Number.NaN;
     // DCGM reserves INT32_BLANK and larger values for unavailable readings.

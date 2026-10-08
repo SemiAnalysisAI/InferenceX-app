@@ -1,10 +1,11 @@
 /**
- * Parser and digest for the producer's `gpu_metrics.csv` telemetry.
+ * Parser and per-GPU statistics for the producer's `gpu_metrics.csv` telemetry.
  *
  * The InferenceX runner samples `nvidia-smi --query-gpu=…` or `amd-smi metric
  * --csv` once per second for the lifetime of a benchmark job. This module is
- * pure (no I/O) so the CI ingest, the historical backfill, and the app's
- * GitHub fallback path all normalize the two vendor formats identically.
+ * pure (no I/O): CI ingest and the historical backfill parse with it, stored
+ * reads compute statistics with it, and the app's GitHub fallback path shares
+ * its timestamp and CSV line parsers.
  */
 
 export type GpuMetricsVendor = 'nvidia' | 'amd';
@@ -34,7 +35,7 @@ export interface ParsedGpuMetricsCsv {
   samples: GpuMetricSample[];
 }
 
-/** Sample columns that participate in the per-GPU statistics digest. */
+/** Sample columns that per-GPU statistics cover. */
 export const GPU_METRIC_STAT_KEYS = [
   'powerW',
   'temperatureC',
@@ -139,7 +140,7 @@ export function parseAmdTimestamp(raw: string): number | null {
   return Number.isFinite(iso) ? iso : null;
 }
 
-function emptySample(timestampMs: number, gpuIndex: number): GpuMetricSample {
+export function emptySample(timestampMs: number, gpuIndex: number): GpuMetricSample {
   return {
     timestampMs,
     gpuIndex,

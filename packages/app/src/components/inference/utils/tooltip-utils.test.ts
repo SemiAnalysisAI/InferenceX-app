@@ -129,7 +129,7 @@ describe('modeled system-power tooltip', () => {
   const config = (overrides: Partial<TooltipConfig> = {}) =>
     tooltipConfig({
       data: pt({ modeledSystemPower: systemPower }),
-      selectedYAxisMetric: 'y_modeledChassisPowerPerGpu',
+      selectedYAxisMetric: 'y_measuredAvgPower',
       isPinned: true,
       ...overrides,
     });
@@ -252,31 +252,6 @@ describe('modeled system-power tooltip', () => {
       expect(match?.groups?.normalization.length).toBeLessThanOrEqual(80);
       expect(match?.groups?.boundary.length).toBeLessThanOrEqual(80);
     }
-  });
-
-  it('uses validated model topology while preserving legacy configuration counts separately', () => {
-    const data = pt({
-      physicalChips: 64,
-      modeledSystemPower: {
-        ...systemPower,
-        gpuCount: 8,
-        chassisCount: 1,
-        modeledGpuCount: 8,
-        chassisAcWatts: 6000,
-        deploymentAcWatts: 6000,
-        topologyBasis: 'single-node',
-        telemetryBasis: 'validated-unversioned-single-node',
-      },
-    });
-    const html = generateTooltipContent(config({ data }));
-    expect(html).toContain('<strong>Total Chips:</strong> 8');
-    expect(html).toContain('<strong>Configured Chip Count:</strong> 64');
-    expect(html).toContain('1 full eight-GPU chassis · 8 GPUs');
-    const measured = generateTooltipContent(
-      config({ data, selectedYAxisMetric: 'y_measuredAvgPower' }),
-    );
-    expect(measured).toContain('<strong>Total Chips:</strong> 64');
-    expect(measured).not.toContain('Configured Chip Count');
   });
 });
 
@@ -528,6 +503,28 @@ describe('generateTooltipContent', () => {
   it('shows "Click elsewhere to dismiss" when isPinned is true', () => {
     const html = generateTooltipContent(tooltipConfig({ isPinned: true }));
     expect(html).toContain('Click elsewhere to dismiss');
+  });
+
+  it('caps pinned tooltip height so stacked actions stay inside the mobile viewport', () => {
+    const html = generateTooltipContent(
+      tooltipConfig({
+        isPinned: true,
+        hasTrace: true,
+        hasLog: true,
+        showPowerTelemetry: true,
+        selectedYAxisMetric: 'y_measuredAvgPower',
+        data: pt({
+          id: 42,
+          benchmark_type: 'agentic_traces',
+          power_audit: { source: 'power_validation_h100_conc8.json' },
+          run_url: 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/1',
+        }),
+      }),
+    );
+    expect(html).toContain('max-height: min(70vh, calc(100dvh - 16px))');
+    expect(html).toContain('overflow-y: auto');
+    expect(html).toContain('max-width: min(320px, calc(100vw - 16px))');
+    expect(html).toContain('data-action="view-power-trace"');
   });
 
   it('does not show dismiss text when isPinned is false', () => {

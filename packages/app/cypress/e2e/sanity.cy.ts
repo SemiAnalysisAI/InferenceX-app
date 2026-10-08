@@ -174,6 +174,39 @@ describe('Theme Toggle', () => {
     cy.get('[data-testid="csgo-theme-banner"]').should('not.exist');
   });
 
+  it('loads Doom on demand, persists it, and removes decorations on exit', () => {
+    cy.visit('/', {
+      onBeforeLoad(win) {
+        win.localStorage.setItem('theme', 'light');
+        win.localStorage.setItem('minecraft-music', 'false');
+        win.localStorage.setItem('minecraft-sound', 'false');
+      },
+    });
+    cy.get('[data-testid="doom-scene"]').should('not.exist');
+    cy.window().then((win) => {
+      expect(
+        win.performance
+          .getEntriesByType('resource')
+          .some((r) => r.name.includes('/decorative/doom/')),
+      ).to.eq(false);
+    });
+    pickTheme('doom');
+    cy.get('html').should('have.class', 'doom');
+    cy.get('[data-testid="doom-theme-banner"]').should('be.visible');
+    cy.get('[data-testid="doom-scene"]')
+      .should('have.attr', 'aria-hidden', 'true')
+      .and('have.css', 'pointer-events', 'none');
+    cy.reload();
+    cy.get('html').should('have.class', 'doom');
+    cy.get('[data-testid="doom-scene"] img').should(($img) => {
+      expect(($img[0] as HTMLImageElement).naturalWidth).to.be.greaterThan(0);
+    });
+    pickTheme('light');
+    cy.get('html').should('have.class', 'light');
+    cy.get('[data-testid="doom-scene"]').should('not.exist');
+    cy.get('[data-testid="doom-theme-banner"]').should('not.exist');
+  });
+
   it('applies GTA from the picker, persists it, and removes decorations on exit', () => {
     cy.visit('/', {
       onBeforeLoad(win) {

@@ -64,7 +64,6 @@ jobs:
         run: bun run admin:db:migrate --yes
 
       - name: Apply run overrides
-        id: apply
         env:
           DATABASE_WRITE_URL: ${{ secrets.DATABASE_WRITE_URL }}
           RUN_ID: ${{ inputs.run_id }}
@@ -80,15 +79,10 @@ jobs:
           DATABASE_WRITE_URL: ${{ secrets.DATABASE_WRITE_URL }}
         run: bun run admin:db:verify
 
-      # Once the overrides are in the database the CDN is stale, so these must run
-      # even if the verify step above fails. Skipping them leaves the dashboard
-      # serving pre-override data with only a red workflow as the signal.
       - name: Invalidate production cache
-        if: ${{ always() && steps.apply.outcome == 'success' }}
         env:
           INVALIDATE_SECRET: ${{ secrets.VERCEL_INVALIDATE_SECRET }}
         run: bun run admin:cache:invalidate https://inferencex.semianalysis.com
 
       - name: Warm production cache
-        if: ${{ always() && steps.apply.outcome == 'success' }}
         run: bun run admin:cache:warmup https://inferencex.semianalysis.com

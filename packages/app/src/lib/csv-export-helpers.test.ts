@@ -8,6 +8,7 @@ import {
   historicalTrendToCsv,
 } from './csv-export-helpers';
 import type { InferenceData } from '@/components/inference/types';
+import { expandPowerCompareSeries } from '@/components/inference/utils/power-compare';
 
 const makePoint = (overrides: Partial<InferenceData> = {}): InferenceData => ({
   x: 100,
@@ -53,7 +54,7 @@ const makePoint = (overrides: Partial<InferenceData> = {}): InferenceData => ({
 });
 
 describe('inferenceChartToCsv', () => {
-  it.each(['34926284365', '35879254139'])(
+  it.each(['34926284365', '35879254139', '37181045340'])(
     'preserves canonical CSV keys for UMBP run %s and overlays',
     (runId) => {
       const target = makePoint({
@@ -147,61 +148,6 @@ describe('inferenceChartToCsv', () => {
     expect(rows[1][headers.indexOf('Cost per Million Total Tokens ($)')]).toBe(0.431);
     expect(rows[1][headers.indexOf('Interactivity (tok/s/user)')]).toBe(37);
     expect(rows.every((row) => row.length === headers.length)).toBe(true);
-  });
-
-  it('exports modeled chassis watts per GPU for official and overlay rows and leaves unavailable blank', () => {
-    const { headers, rows } = inferenceChartToCsv(
-      [makePoint({ modeledChassisPowerPerGpu: { y: 750.125, roof: false } }), makePoint()],
-      'deepseek-r1',
-      '8k/1k',
-      [makePoint({ modeledChassisPowerPerGpu: { y: 1050.25, roof: false } })],
-      {
-        yHeader: 'Modeled Chassis AC Power per GPU (W/GPU)',
-        yPath: 'modeledChassisPowerPerGpu.y',
-        xHeader: 'Interactivity (tok/s/user)',
-      },
-    );
-    const column = headers.indexOf('Modeled Chassis AC Power per GPU (W/GPU)');
-    expect(rows.map((row) => row[column])).toEqual([750.125, '', 1050.25]);
-    expect(rows.every((row) => row.length === headers.length)).toBe(true);
-  });
-
-  it('exports validated modeled topology separately from legacy configured chip counts', () => {
-    const point = makePoint({
-      physicalChips: 64,
-      modeledChassisPowerPerGpu: { y: 750, roof: false },
-      modeledSystemPower: {
-        status: 'supported',
-        hardware: 'h100',
-        modelRevision: 'reference-revision',
-        modelPath: 'chassis/H100.py',
-        gpuCount: 8,
-        chassisCount: 1,
-        chassisAcWatts: 6000,
-        chassisAcWattsPerGpu: 750,
-        facilityWatts: 7200,
-        pue: 1.2,
-        measuredGpuWattsPerGpu: 500,
-        modeledGpuCount: 8,
-        deploymentAcWatts: 6000,
-        deploymentFacilityWatts: 7200,
-        topologyBasis: 'single-node',
-        chassisBasis: 'full',
-        telemetryBasis: 'validated-unversioned-single-node',
-      },
-    });
-    const csv = inferenceChartToCsv([point], 'deepseek-r1', '8k/1k', [point], {
-      yHeader: 'Modeled Chassis AC Power per GPU (W/GPU)',
-      yPath: 'modeledChassisPowerPerGpu.y',
-      xHeader: 'Interactivity (tok/s/user)',
-    });
-    for (const row of csv.rows) {
-      expect(row[csv.headers.indexOf('Physical Chips')]).toBe(8);
-      expect(row[csv.headers.indexOf('Configured Chip Count')]).toBe(64);
-    }
-    const baseline = inferenceChartToCsv([point], 'deepseek-r1', '8k/1k');
-    expect(baseline.rows[0][baseline.headers.indexOf('Physical Chips')]).toBe(64);
-    expect(baseline.headers).not.toContain('Configured Chip Count');
   });
 
   it('does not duplicate an agentic P99 X metric already in the fixed schema', () => {
@@ -750,5 +696,41 @@ describe('historicalTrendToCsv (mirrors HistoricalTrendsDisplay export)', () => 
     expect(rows[0][headers.indexOf('Cost per Million Tokens ($)')]).toBe(800);
     expect(rows[0][headers.indexOf('Target Interactivity (tok/s/user)')]).toBe(50);
     expect(rows[1][headers.indexOf('Date')]).toBe('2025-01-15');
+  });
+});
+
+describe('inferenceChartToCsv power comparison', () => {
+  it.each([false, true])('exports plotted role values with overlay=%s', (overlay) => {
+    const base = makePoint({
+      hwKey: 'gb300_dynamo-trt',
+      y: 708.1,
+      measuredAvgPower: { y: 708.1, roof: false },
+      measuredPrefillAvgPower: { y: 760.442, roof: false },
+      measuredDecodeAvgPower: { y: 690.652, roof: false },
+      run_url: 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/35532106109',
+    });
+    const points = expandPowerCompareSeries([base], 'y_measuredAvgPower', 'roles');
+    const { headers, rows } = inferenceChartToCsv(
+      overlay ? [] : points,
+      'Kimi-K3',
+      'agentic-traces',
+      overlay ? points : [],
+      {
+        yHeader: 'Measured Power per Chip (W)',
+        yPath: 'measuredAvgPower.y',
+        xHeader: 'Interactivity (tok/s/user)',
+      },
+    );
+    expect(
+      rows.map((row) => [
+        row[headers.indexOf('Power Series')],
+        row[headers.indexOf('Measured Power per Chip (W)')],
+      ]),
+    ).toEqual([
+      ['All GPUs', 708.1],
+      ['Prefill GPUs', 760.442],
+      ['Decode GPUs', 690.652],
+    ]);
+    expect(points.every((point) => point.measuredAvgPower?.y === 708.1)).toBe(true);
   });
 });

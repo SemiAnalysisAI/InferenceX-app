@@ -57,7 +57,6 @@ const TAB_LABELS_EN: Record<DashboardRouteKey, string> = {
   operatorx: 'OperatorX',
   collectivex: 'CollectiveX',
   'ai-chart': 'AI Chart',
-  'gpu-metrics': 'PowerX',
   'current-inferencex-image': 'Images',
   video: 'Video',
   feedback: 'Feedback',

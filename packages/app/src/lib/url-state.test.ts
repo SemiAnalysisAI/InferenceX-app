@@ -99,6 +99,22 @@ describe('PARAM_DEFAULTS', () => {
     expect(PARAM_DEFAULTS.i_advlabel).toBe('');
   });
 
+  it('drops retired comparison controls from old share links while preserving analysis toggles', async () => {
+    setupWindow(
+      '?i_servicecompare=1&i_servicebase=baseline&i_servicepeer=comparator&i_servicetarget=8&i_roleshare=1&i_powerfit=1',
+    );
+    const { readUrlParams, buildShareUrl } = await import('@/lib/url-state');
+    const params = readUrlParams();
+    const shared = new URL(buildShareUrl()).searchParams;
+    expect(params).toMatchObject({ i_roleshare: '1', i_powerfit: '1' });
+    expect(shared.get('i_roleshare')).toBe('1');
+    expect(shared.get('i_powerfit')).toBe('1');
+    for (const key of ['i_servicecompare', 'i_servicebase', 'i_servicepeer', 'i_servicetarget']) {
+      expect(params).not.toHaveProperty(key);
+      expect(shared.has(key)).toBe(false);
+    }
+  });
+
   it('strips the normalized revenue source but preserves OpenRouter as explicit state', async () => {
     const { PARAM_DEFAULTS } = await import('@/lib/url-state');
     expect(PARAM_DEFAULTS.i_revenue).toBe('normalized');
@@ -459,33 +475,6 @@ describe('writeUrlParams + buildShareUrl', () => {
     writeUrlParams({ g_model: 'DeepSeek-V4-Pro' });
 
     expect(readUrlParams().g_model).toBeUndefined();
-  });
-
-  it('preserves all-measurement visibility across metric changes and shared links', async () => {
-    const { location } = setupWindow('?i_optimal=0', '/inference');
-    const { readUrlParams, writeUrlParams, buildShareUrl, refreshUrlParams } =
-      await import('@/lib/url-state');
-
-    expect(readUrlParams().i_allpoints).toBeUndefined();
-    expect(buildShareUrl()).not.toContain('i_allpoints');
-
-    writeUrlParams({ i_allpoints: '1', i_metric: 'y_measuredAvgPower' });
-    const powerUrl = new URL(buildShareUrl());
-    expect(powerUrl.searchParams.get('i_allpoints')).toBe('1');
-    expect(powerUrl.searchParams.get('i_optimal')).toBe('0');
-
-    writeUrlParams({ i_metric: 'y_tpPerGpu' });
-    location.search = new URL(buildShareUrl()).search;
-    expect(refreshUrlParams()).toMatchObject({
-      i_allpoints: '1',
-      i_metric: 'y_tpPerGpu',
-      i_optimal: '0',
-    });
-
-    writeUrlParams({ i_allpoints: '' });
-    expect(buildShareUrl()).not.toContain('i_allpoints');
-    expect(readUrlParams().i_allpoints).toBeUndefined();
-    expect(readUrlParams().i_optimal).toBe('0');
   });
 });
 

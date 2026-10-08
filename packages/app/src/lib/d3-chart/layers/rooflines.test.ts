@@ -19,7 +19,12 @@ vi.mock('d3', async () => {
   };
 });
 
-import { renderRooflines, updateRooflinesOnZoom, type RooflineConfig } from './rooflines';
+import {
+  renderRooflines,
+  updateRooflinesForDisplay,
+  updateRooflinesOnZoom,
+  type RooflineConfig,
+} from './rooflines';
 
 // ── Fixtures ─────────────────────────────────────────────────────────
 
@@ -199,6 +204,31 @@ describe('renderRooflines', () => {
     for (const el of paths.elements) {
       expect(el.attrs['stroke-dasharray']).toBe('5,3');
     }
+  });
+
+  it('dashes each curve from getDasharray and keeps the dashes on display updates', () => {
+    const group = createMockGroup();
+    const { xScale, yScale } = makeScales();
+    // A null dash is a solid curve even when a chart-wide dash is also set.
+    const config = makeConfig({
+      strokeDasharray: '5,3',
+      getDasharray: (key) => (key === 'modelB' ? '2 3' : null),
+    });
+    const dashes = () =>
+      Object.fromEntries(
+        group
+          .selectAll('.roofline-path')
+          .elements.map((el) => [el.attrs['class'], el.attrs['stroke-dasharray']]),
+      );
+    const expected = {
+      'roofline-path roofline-modelA': null,
+      'roofline-path roofline-modelB': '2 3',
+    };
+
+    renderRooflines(group as any, SAMPLE_ROOFLINES, xScale, yScale, config);
+    expect(dashes()).toEqual(expected);
+    updateRooflinesForDisplay(group as any, config);
+    expect(dashes()).toEqual(expected);
   });
 
   it('does not set strokeDasharray when not specified', () => {

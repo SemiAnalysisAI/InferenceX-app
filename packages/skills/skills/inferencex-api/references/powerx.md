@@ -65,8 +65,8 @@ CPU measurements require `cpu_power_valid === 1`, independently of GPU validity.
 `powerValid=strictV2` filters GPU measurements only. Read `power_audit.cpu` for
 sensor type, collector, socket coverage, and validation reasons. Grace socket
 readings combine CPU and LPDDR5X power; a module reading already includes GPU
-power. Missing measurements stay unavailable. These fields do not add CPU
-samples to the GPU timeline or change the CLI export format.
+power. Missing measurements stay unavailable. These fields add no CPU samples to
+the `gpu-metrics` view and do not change the CLI export format.
 
 ## GPU temperature telemetry
 

@@ -22,28 +22,28 @@ All endpoints are GET under /api/v1/views. Unsupported and repeated keys return 
 This table records accepted query names; behavioral tests exercise representative
 combinations, not the full Cartesian product of all possible filter values.
 
-| View                            | Accepted query keys                                                                                                                                                                                                                                                                                      |
-| ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `cache-reuse`                   | `config`, `date`, `gpus`, `model`, `percentile`, `precisions`, `recipe`, `runId`, `sequence`, `tcoBasis`, `unofficialrun`                                                                                                                                                                                |
-| `calculator`                    | `costProvider`, `costType`, `costcap`, `date`, `format`, `gpus`, `hideSkuAboveConfigLimit`, `mode`, `model`, `mw`, `percentile`, `precisions`, `runId`, `sequence`, `target`, `tcoBasis`, `unofficialrun`                                                                                                |
-| `collectivex`                   | `activeSeries`, `kvSeries`, `swapSeries`, `backend`, `epSize`, `kvOp`, `kvX`, `kvY`, `modes`, `operation`, `overlapIsl`, `pageTokens`, `percentile`, `phase`, `precision`, `runs`, `sku`, `suite`, `swapDirection`, `swapLayout`, `swapMetric`, `swapPercentile`, `version`, `yAxis`                     |
-| `compare`                       | `format`, `gpus`, `model`, `scenario`, `slug`, `tiers`, `variant`                                                                                                                                                                                                                                        |
-| `current-inferencex-image`      | `asOf`, `frameworks`, `hardware`, `model`, `nodeType`, `precision`, `sequence`, `spec`                                                                                                                                                                                                                   |
-| `evaluation`                    | `unofficialrun`, `benchmark`, `date`, `format`, `gpus`, `model`, `precisions`                                                                                                                                                                                                                            |
-| `first-token`                   | `caps`, `costProvider`, `costType`, `date`, `gpus`, `minInteractivity`, `model`, `percentile`, `precisions`, `runId`, `sequence`, `tcoBasis`, `unofficialrun`                                                                                                                                            |
-| `fleet`                         | `cache`, `costProvider`, `costType`, `format`, `gpus`, `horizon`, `metric`, `model`, `mtbi`, `mw`, `oprice`, `percentile`, `precisions`, `price`, `ramp`, `recovery`, `sequence`, `target`, `tcoBasis`                                                                                                   |
-| `gpu-metrics`                   | `artifact`, `chartView`, `corrXMetric`, `corrYMetric`, `direction`, `downsample`, `gpus`, `metric`, `runId`, `sort`                                                                                                                                                                                      |
-| `gpu-specs`                     | `format`, `metric`                                                                                                                                                                                                                                                                                       |
-| `historical`                    | `deployment`, `end`, `extendToDate`, `format`, `frameworks`, `gpus`, `metric`, `model`, `precisions`, `priceSource`, `sequence`, `start`, `target`, `tcoBasis`, `vendors`                                                                                                                                |
-| `inference`                     | `allPoints`, `best`, `date`, `dates`, `deployment`, `end`, `format`, `frameworks`, `gpus`, `metric`, `model`, `optimal`, `percentile`, `power`, `precisions`, `priceSource`, `runId`, `sequence`, `spec`, `start`, `tcoBasis`, `unofficialrun`, `userCosts`, `userPowers`, `vendors`, `xmetric`, `xmode` |
-| `options`                       | `format`                                                                                                                                                                                                                                                                                                 |
-| `overview`                      | `compare`, `engine`, `format`, `hwrows`, `models`, `ref`, `rows`, `tier`                                                                                                                                                                                                                                 |
-| `profit-estimator`              | `cachedInputPrice`, `costProvider`, `customCosts`, `date`, `dates`, `end`, `gpus`, `inputPrice`, `labCut`, `model`, `outputPrice`, `percentile`, `powerBasis`, `precisions`, `priceSource`, `runId`, `sequence`, `start`, `target`, `tcoBasis`, `unofficialrun`, `utilization`                           |
-| `profit-estimator-per-gigawatt` | `cachedInputPrice`, `costProvider`, `customCosts`, `date`, `dates`, `end`, `gpus`, `inputPrice`, `labCut`, `model`, `outputPrice`, `percentile`, `powerBasis`, `precisions`, `priceSource`, `runId`, `sequence`, `start`, `target`, `tcoBasis`, `unofficialrun`, `utilization`                           |
-| `rankings`                      | `format`, `kind`, `model`, `scenario`                                                                                                                                                                                                                                                                    |
-| `reliability`                   | `asOf`, `format`, `gpus`, `range`                                                                                                                                                                                                                                                                        |
-| `submissions`                   | `direction`, `limit`, `lines`, `mode`, `offset`, `onChangeOnly`, `search`, `sort`                                                                                                                                                                                                                        |
-| `video`                         | `artifact`, `cell`, `compare`, `costs`, `gpuBasis`, `page`, `phase`, `run`, `selected`, `slot`, `source`, `view`, `workload`, `xAxis`, `yAxis`                                                                                                                                                           |
+| View                            | Accepted query keys                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `cache-reuse`                   | `config`, `date`, `gpus`, `model`, `percentile`, `precisions`, `recipe`, `runId`, `sequence`, `tcoBasis`, `unofficialrun`                                                                                                                                                                                                                                                                                                           |
+| `calculator`                    | `costProvider`, `costType`, `costcap`, `date`, `format`, `gpus`, `hideSkuAboveConfigLimit`, `mode`, `model`, `mw`, `percentile`, `precisions`, `runId`, `sequence`, `target`, `tcoBasis`, `unofficialrun`                                                                                                                                                                                                                           |
+| `collectivex`                   | `activeSeries`, `kvSeries`, `swapSeries`, `backend`, `epSize`, `kvOp`, `kvX`, `kvY`, `modes`, `operation`, `overlapIsl`, `pageTokens`, `percentile`, `phase`, `precision`, `runs`, `sku`, `suite`, `swapDirection`, `swapLayout`, `swapMetric`, `swapPercentile`, `version`, `yAxis`                                                                                                                                                |
+| `compare`                       | `format`, `gpus`, `model`, `scenario`, `slug`, `tiers`, `variant`                                                                                                                                                                                                                                                                                                                                                                   |
+| `current-inferencex-image`      | `asOf`, `frameworks`, `hardware`, `model`, `nodeType`, `precision`, `sequence`, `spec`                                                                                                                                                                                                                                                                                                                                              |
+| `evaluation`                    | `unofficialrun`, `benchmark`, `date`, `format`, `gpus`, `model`, `precisions`                                                                                                                                                                                                                                                                                                                                                       |
+| `first-token`                   | `caps`, `costProvider`, `costType`, `date`, `gpus`, `minInteractivity`, `model`, `percentile`, `precisions`, `runId`, `sequence`, `tcoBasis`, `unofficialrun`                                                                                                                                                                                                                                                                       |
+| `fleet`                         | `cache`, `costProvider`, `costType`, `format`, `gpus`, `horizon`, `metric`, `model`, `mtbi`, `mw`, `oprice`, `percentile`, `precisions`, `price`, `ramp`, `recovery`, `sequence`, `target`, `tcoBasis`                                                                                                                                                                                                                              |
+| `gpu-metrics`                   | `artifact`, `chartView`, `corrXMetric`, `corrYMetric`, `direction`, `downsample`, `gpus`, `metric`, `runId`, `sort`                                                                                                                                                                                                                                                                                                                 |
+| `gpu-specs`                     | `format`, `metric`                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `historical`                    | `deployment`, `end`, `extendToDate`, `format`, `frameworks`, `gpus`, `metric`, `model`, `precisions`, `priceSource`, `sequence`, `start`, `target`, `tcoBasis`, `vendors`                                                                                                                                                                                                                                                           |
+| `inference`                     | `allPoints`, `best`, `date`, `dates`, `deployment`, `end`, `format`, `frameworks`, `gpus`, `metric`, `model`, `optimal`, `percentile`, `power`, `precisions`, `priceSource`, `runId`, `sequence`, `spec`, `start`, `tcoBasis`, `topologies`, `unofficialrun`, `userCosts`, `userPowers`, `vendors`, `xmetric`, `xmode`, `xstat`, `serviceCompare`, `serviceBaseline`, `serviceComparator`, `serviceTarget`, `roleShare`, `powerFit` |
+| `options`                       | `format`                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `overview`                      | `compare`, `engine`, `format`, `hwrows`, `models`, `ref`, `rows`, `tier`                                                                                                                                                                                                                                                                                                                                                            |
+| `profit-estimator`              | `cacheHitMode`, `cachedInputPrice`, `costProvider`, `customCosts`, `date`, `dates`, `end`, `gpus`, `inputPrice`, `labCut`, `model`, `outputPrice`, `percentile`, `powerBasis`, `precisions`, `priceSource`, `runId`, `sequence`, `start`, `target`, `tcoBasis`, `unofficialrun`, `utilization`                                                                                                                                      |
+| `profit-estimator-per-gigawatt` | `cacheHitMode`, `cachedInputPrice`, `costProvider`, `customCosts`, `date`, `dates`, `end`, `gpus`, `inputPrice`, `labCut`, `model`, `outputPrice`, `percentile`, `powerBasis`, `precisions`, `priceSource`, `runId`, `sequence`, `start`, `target`, `tcoBasis`, `unofficialrun`, `utilization`                                                                                                                                      |
+| `rankings`                      | `format`, `kind`, `model`, `scenario`                                                                                                                                                                                                                                                                                                                                                                                               |
+| `reliability`                   | `asOf`, `format`, `gpus`, `range`                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `submissions`                   | `direction`, `limit`, `lines`, `mode`, `offset`, `onChangeOnly`, `search`, `sort`                                                                                                                                                                                                                                                                                                                                                   |
+| `video`                         | `artifact`, `cell`, `compare`, `costs`, `gpuBasis`, `page`, `phase`, `run`, `selected`, `slot`, `source`, `view`, `workload`, `xAxis`, `yAxis`                                                                                                                                                                                                                                                                                      |
 
 Cache reuse returns `data.recipes` and the resolved `params.recipe`. Pass a returned key as `recipe` (the UI uses `c_recipe`) to select the same TP/EP/DP-attention, worker, GPU, speculation, offload and fingerprint combination. Omitted or stale keys use the shared dashboard default. Runs use that recipe if available, otherwise their own best-covered recipe; inspect each bar's source row for its identity. Overlay-only configurations expose their own recipe choices. Layout orientation and label placement are presentation-only controls.
 
@@ -63,9 +63,9 @@ alignment changes no API parameters, response schemas, or stored model identitie
 - Evaluation/reliability: chart-data, date resolution and rolling aggregation.
 - CollectiveX: selected EP/KV/swap chart and fit helpers.
 - Submissions/images: existing table, weekly/cumulative and image freshness helpers.
-- GPU metrics: shared line/correlation transforms and stored full-record per-GPU
-  digests. Live artifacts alone calculate statistics from samples; empty stored
-  digests remain empty. File/host identity and missing-versus-zero semantics persist.
+- GPU metrics: shared line/correlation transforms and full-record per-GPU statistics
+  computed from the stored samples, or from the samples of live artifacts. File/host
+  identity and missing-versus-zero semantics persist.
 - Video: checksum-verified stored bundles, serving/fidelity selectors and tradeoffs.
 - Overview/rankings/compare: existing discovery-page assembly and scenario helpers.
 
@@ -82,22 +82,161 @@ OperatorX is feature-gated in navigation and uses page-owned
 contract.
 Zoom, theme, axis scale, labels, media playback and report expansion are renderer
 state. GPU interactive downsampling does not alter returned raw data or statistics.
+Power boundary labels are GPU Level Measured, GPU Level Provisioned (TDP), All in
+Provisioned, and All in Measured. The last combines measured GPU power with modeled
+unmeasured components and PUE; it is not a wall-meter measurement. These labels and
+collapsed power-assumption/availability notes do not change metric IDs, API selectors,
+or calculations. Profit comparison `powerLabel` display text follows the same names.
 GPU telemetry lines retain gaps at explicitly missing metric readings, including
 rolling averages and chip means with no contributors. Gap markers are internal
 renderer state: the API still returns measured chart points only, while `rows`
 preserves timestamps with unavailable fields. Statistics and raw data are unchanged.
-The GPU statistics table includes startup and warmup for all chips in the selected
-series, regardless of chip visibility. It is separate from serving-window power,
-J/token and selected-time-window calculations. Run telemetry is DB-first with an
-artifact fallback for missing storage; the public view returns private, no-store
+GPU statistics include startup and warmup for all chips in the selected series,
+regardless of chip visibility. They are separate from serving-window power and
+J/token. Runs with stored telemetry read the DB; other runs read their artifacts.
+The public view returns private, no-store
 responses and preserves upstream 503 failures.
 
-Run-specific recognition labels are also presentation-only. Run `35879254139`
-displays `UMBP MoRI SGLang` through October 9, 2026 in America/New_York
+Run-specific recognition labels are also presentation-only. Runs `35879254139`
+and `37181045340` display `UMBP MoRI SGLang` through October 9, 2026 in America/New_York
 (`2026-10-10T04:00:00Z` exclusive). Label resolution after that cutoff returns
 `MoRI SGLang`; an already-open memoized chart may need a refresh. This changes
 neither API selectors nor response data, framework/hardware keys, or raw CSV
 exports, so no API or OpenAPI contract change is required.
+
+The `/inference` Power Timeline is a different surface from the raw `gpu-metrics`
+explorer. Its existing read-only `/api/gpu-metrics?series=power` source returns
+one-second per-device buckets, role assignments and validation-source identities;
+benchmark `power_audit` supplies the exact serving-window bounds. The public
+`/api/v1/views/gpu-metrics` projection alone does not return that combined evidence
+and must not be described as a serving-window or role-pool projection.
+
+Timeline share fields `i_ptaxis`, `i_ptlines`, `i_ptwindow`, `i_ptfocus`, `i_ptutility`
+and `i_ptconc` are renderer state, not parameters of the raw explorer API. `i_ptconc`
+keeps the chart's rows at one concurrency, so platforms can be read at one load. Window-only
+display selects retained bucket timestamps within the recorded inclusive bounds;
+serving-relative display uses `(bucket UTC ms - window start UTC ms) / 1000`.
+Missing, nonfinite or non-increasing bounds omit that trace in either mode.
+No boundary samples are interpolated, and no stored window statistics or energy
+values are recomputed. Per-GPU/mean/role-pool modes reuse the existing device identity
+and pool-sum calculations. Focus only dims other traces and the utility toggle only
+adds registry references. The validated-window summary below the chart lists each
+trace's run, attempt, validation file and per-run telemetry source (database, or
+GitHub artifact fallback when any requested series was read live), then per pool the
+row's validated average as stored, the largest drawn pool bucket inside the window,
+and GPUs × registry TDP. Raw telemetry, full-record statistics and API responses
+are unchanged by all six display settings. The reusable client helpers are
+`parsePowerTimelineParams`, `powerTimelineSampleX` and `tracePools` in
+`components/inference/utils/powerTimeline.ts`, and `sumPowerAt` in
+`components/gpu-power/power-series.ts`.
+
+Date comparisons are presentation-only as well. With compared dates, `/inference` keeps the
+date-comparison chart on every x-axis mode, draws `?unofficialrun=`
+rows beside the compared series, and the Timeline display follows the same per-date legend
+toggles and colours. The inference view already returns `comparisons` (one projection per
+`dates` or `start`/`end` entry) and `overlays` (one per unofficial run) for every `xmode`.
+The per-date toggles are renderer state, not query keys, so no API or OpenAPI contract
+change is required.
+
+Perf Ruler share state (`i_rulers`) also stays in the browser. Both the primary
+scatter chart and date/run comparison chart restore it; run-qualified curve IDs
+retain `~rRUN_ID`. Tooltip scrolling and viewport limits only keep existing actions
+reachable. Neither changes returned values or adds a views API parameter.
+
+## Fixed-sequence service comparisons
+
+The inference view exposes the same mean/median selector as the dashboard through
+`xstat=median|mean` (default median). Mean streaming speed is **1 / mean TPOT**;
+it is not the arithmetic mean of per-request speeds. Mean TTFT and E2E use their
+recorded mean values. Missing means remain missing; the view never substitutes a
+median. AgentX keeps its selected `percentile`: `params.xstat` resolves to null,
+while `xAxis.statistic` records the effective percentile.
+
+Equal-service comparisons and the same-concurrency diagnostic are API-only analysis.
+The dashboard has no source-pair selector, target input, comparison curve or matched-concurrency
+table. Its role and power-fit panels remain available.
+
+`serviceCompare=true` adds `serviceSources`, `equalServiceCurve`, and (when
+`serviceTarget` is present) `equalServiceComparison`. Select exact opaque
+`serviceBaseline` and `serviceComparator` keys returned by `serviceSources`,
+encoded with `URLSearchParams`; omitted selections use its first two entries.
+Each source's `label` is display text only: hardware and date, plus precision, topology,
+run or other details only where two sources would otherwise look the same.
+Stale explicit selections remain unavailable. Missing target returns null, not an
+invented operating point. Streaming-speed targets are tok/s/user; TTFT/E2E targets
+are seconds. Concurrency is a separate diagnostic, not an equal-service comparison
+axis.
+
+That diagnostic is `matchedConcurrency`, also returned by `serviceCompare=true`: the
+two selected sources paired at every concurrency either one observed. Each side is
+`observed` (J/output token, mean W/GPU and streaming speed at the selected statistic,
+named by `interactivityField`, plus its point identity), `missing`, or `ambiguous`
+when one source's observations at that load disagree; all are listed and none is
+chosen. `changePercent` is `100 × (comparator / baseline − 1)` only when both sides
+were observed. Same-load pairs usually serve different speeds, so interpret this
+diagnostic separately from an equal-service comparison.
+
+The service-comparison API uses `equal-service-comparison.ts` and consumes scoped
+observed points after chart coverage/limits, before frontier and best-per-SKU
+pruning, with power-comparison clones excluded. `allPoints=true` restores clipped
+observations. Source keys retain hardware, precision, source run, source date,
+recipe, topology and workload identity; changing display dates does not create a
+new measured source. The source run is the logical curve snapshot
+(`curve_workflow_run_id` / `curve_date`, see
+[Append-Only Curve Extensions](./data-pipeline.md#append-only-curve-extensions)), so
+points an append-only run stitched onto an older curve stay one source even when their
+telemetry producer or exporter hashes differ. Recipe, image and topology remain separate
+configuration identities. Rows without a snapshot id, such as unofficial overlays, retain
+their own run URL, measured date and telemetry producer/exporter hashes, and
+an unknown run never joins distinct rows. Comparisons never join different sources into one
+interpolation bracket. All three metrics use bounded numerical linear
+interpolation of the underlying quantities, then compute
+`100 × (comparator / baseline − 1)`. No log-axis interpolation, extrapolation,
+missing-endpoint bridging or averaging of conflicting duplicate x-values occurs.
+
+Metrics are mean measured GPU board W/GPU, whole-deployment output tokens/s, and
+validated measured GPU J/output token. Each estimate returns its bracket point
+IDs, source/run/topology/recipe identities, endpoint x/value, and whether it was
+interpolated. Unavailable comparisons return explicit reasons and null metrics,
+not zero. This is an operating-point comparison, not proof of a hardware-only
+causal effect. Official, historical and unofficial source identities remain
+visible.
+
+`roleShare=true` returns `roleEnergyShares` and `rolePoints` through the same shared
+role helper. Each role point carries prefill and decode mean W/GPU, role-local
+prefill J/input and decode J/output, and the output-token reconstruction below;
+any missing figure is null. Role points follow the response's `xAxis.field`, including
+the derived `p75_e2e_norm_intvty` / `p90_e2e_norm_intvty` axes; `equalServiceComparison`
+does not interpolate on those axes.
+Validated disaggregated prefill J/input is multiplied by same-window aggregate
+J/output ÷ J/input, then compared with decode J/output. The percentage denominator
+is reconstructed prefill + decode energy on one output-token basis. Missing or
+invalid role measurements are omitted. This view does not mix pool-local token
+denominators or claim the reconstructed sum was independently measured.
+
+`powerFit=true` returns `powerFits`: per source, an ordinary least-squares line of
+measured mean W/GPU (over all allocated GPUs) against whole-deployment output tok/s
+per allocated GPU. Each fit reports intercept `P₀`, slope `m` (J/output token), R²,
+n and the fitted x-range, plus registry `tdpWatts` and every observation with its
+point identity. Fewer than three distinct output rates return `fit: null` with
+`reason: "too-few-points"`. `P₀` is an extrapolated intercept, not measured idle
+power, and R² is null when power did not vary.
+
+These analytical results are JSON-only: `format=csv` with any analysis enabled returns
+400, rather than silently exporting only the primary chart. Ordinary CSV retains
+its existing plotted-point contract.
+
+| Surface                                        | Dashboard control / share parameter               | Read-only API coverage                                                    |
+| ---------------------------------------------- | ------------------------------------------------- | ------------------------------------------------------------------------- |
+| Fixed-sequence statistic                       | `i_mstat`                                         | `xstat`                                                                   |
+| Equal-service and matched-concurrency analysis | API-only; no dashboard control or share parameter | `serviceCompare`, `serviceBaseline`, `serviceComparator`, `serviceTarget` |
+| Prefill / decode roles                         | `i_roleshare`                                     | `roleShare`                                                               |
+| Power vs output-rate fit                       | `i_powerfit`                                      | `powerFit`                                                                |
+
+The scatter chart's Frontier points table (shown with `i_frontier` on a measured
+power metric) lists the drawn cross-platform frontier with each point's run and
+attempt, and exports it as CSV. The views API has no global-frontier parameter, so
+that table remains dashboard-only.
 
 ## Verification scope
 
@@ -119,10 +258,56 @@ those properties.
 私有上传、密钥、提示词、反馈及管理操作不作为公开读取接口。
 OperatorX 的入口受功能开关控制，页面使用专属的 `/api/v1/operatorx/*`
 接口；目前没有发布 `/api/v1/views/operatorx` 契约。
-GPU 视图优先读取已存遥测，缺少存储数据时回退到产物。全记录统计使用所选文件、
-主机序列的全部芯片摘要，包含启动与 warmup；已有摘要为空时不补算，缺失读数不补零。
+GPU 视图对每个 run 只从一个来源读取遥测：已入库的 run 读取已存序列，其余 run 读取产物。
+全记录统计在读取时由所选文件、主机序列的全部芯片样本计算，包含启动与 warmup；缺失读数不补零。
 芯片显隐和图表降采样不改变该统计，也不改变 serving-window 或 J/token 的计算口径。
+
+`/inference` 的 Power Timeline 与原始 `gpu-metrics` 浏览器是两个不同视图。
+时间线通过现有只读 `/api/gpu-metrics?series=power` 获取逐秒采样、设备角色和验证来源，
+再结合基准测试 `power_audit` 中的服务窗口边界；公开的 `/api/v1/views/gpu-metrics`
+本身不返回这组完整证据，不能称为服务窗口或 GPU 池投影视图。
+六个 `i_pt*` 分享字段只控制显示，不是原始浏览器 API 的参数；`i_ptconc` 只保留同一并发数的
+行，便于在同一负载下对照多个平台。窗口模式仅显示已记录
+边界内的采样点（含边界），服务起点模式将 UTC 时间减去窗口起点后换算为秒。
+边界缺失、非有限值或结束不晚于开始时，不绘制对应曲线；不插值补点，也不重算已存储的
+窗口统计或能耗。图下的有效测量窗口汇总列出每条曲线的运行、尝试次数、验证文件和
+遥测来源（数据库，或有序列需实时读取时的 GitHub 产物回退），并按 GPU 池列出基准测试行
+存储的有效平均值、窗口内所绘曲线的最大值，以及 GPU 数 × 注册表 TDP。GPU 池模式复用已有设备角色和求和函数；聚焦仅调暗其他曲线，参考线
+使用硬件注册表。原始遥测、全记录统计和 API 响应均不因这些显示设置而改变。
 响应使用 private, no-store，上游 503 保留为错误响应。
+
+日期对比同样只影响显示。选择对比日期后，`/inference` 在所有 X 轴模式下都使用日期对比图，
+并与对比序列一同绘制 `?unofficialrun=` 数据；时间线显示沿用同一套按日期切换的图例和配色。
+只读 inference 视图已对每种 `xmode` 返回 `comparisons`（每个 `dates` 或 `start`/`end`
+条目一份投影）和 `overlays`（每个非官方运行一份）。按日期显隐属于渲染状态，不是查询参数，
+因此无需修改 API 或 OpenAPI 契约。
+
+同等服务条件下的对比和相同并发下的诊断仅通过 API 提供。仪表板不提供这两项分析的来源选择、
+目标值输入、对比曲线或同并发表格；prefill/decode 角色分析和功耗拟合面板继续保留。
+`serviceCompare`、`serviceBaseline`、`serviceComparator`、`serviceTarget` 仍为 API 查询参数，
+不对应仪表板控件或分享参数。固定长度工作负载的统计量、角色分析和功耗拟合的分享参数与 API
+参数仍一一对应：`i_mstat` → `xstat`、`i_roleshare` → `roleShare`、`i_powerfit` → `powerFit`。
+
+`serviceSources` 中各数据源的 `label` 仅供显示，由硬件和日期组成；只有两个数据源无法区分时，
+才补充精度、拓扑、运行等信息。选择数据源时应使用其 `key`。
+数据源的运行标识取自逻辑曲线快照（`curve_workflow_run_id` / `curve_date`）：append-only 运行
+拼接到旧曲线上的数据点仍视为同一数据源，即使其 telemetry producer 或 exporter hash 不同；
+测试配置指纹、镜像和拓扑仍用于区分不同配置。没有快照标识的行（例如非官方叠加数据）继续按各自的
+运行 URL、实测日期和 telemetry producer/exporter hash 区分数据源；运行未知的行不会与其他行合并为同一数据源。
+
+`serviceCompare=true` 还返回 `matchedConcurrency`：按并发数逐行配对两个所选数据源，任一方在
+该并发数下有观测即列出一行；每侧为 `observed`、`missing`，或同一负载下观测值不一致时的
+`ambiguous`（全部列出、不选其一）；仅当两侧都有观测时才计算变化百分比。同一并发下两者
+的服务速度通常不同，因此该表只作诊断，不替代同等服务对比。`roleShare=true` 另返回
+`rolePoints`（各角色 W/GPU、按本池 token 计的能耗及按输出 token 重建的能耗）。角色数据点沿用
+响应的 `xAxis.field`，包括派生的 `p75_e2e_norm_intvty` / `p90_e2e_norm_intvty` 横轴；
+`equalServiceComparison` 不在这些横轴上插值。
+`powerFit=true` 返回 `powerFits`：每个数据源以最小二乘法拟合平均 W/GPU 与每个已分配
+GPU 的输出 tok/s，给出 `P₀`、`m`（J/输出 token）、R²、点数、拟合范围和注册表 TDP；
+不同输出速率少于 3 个时不拟合。`P₀` 是外推截距，不是实测空载功耗。这些分析结果只支持
+JSON。散点图的前沿点表（`i_frontier` 开启且为实测功耗
+指标时显示）列出跨平台前沿各点的运行和尝试次数，并可导出 CSV；只读 API 没有全局前沿
+参数。
 
 测试覆盖契约同步及代表性的筛选行为，并未穷举所有参数组合。生产数据库上的
 完整 UI/API 对照仍需集成审查，不能仅凭单元测试宣称已完成。

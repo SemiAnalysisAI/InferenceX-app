@@ -30,6 +30,9 @@ const URL_STATE_KEYS = [
   // Token-revenue sale-price source: normalized $1/M or live OpenRouter catalog.
   'i_revenue',
   'i_pctl',
+  'i_mstat',
+  'i_roleshare',
+  'i_powerfit',
   'i_xmetric',
   'i_e2e_xmetric',
   'i_xmode',
@@ -39,7 +42,6 @@ const URL_STATE_KEYS = [
   'i_dstart',
   'i_dend',
   'i_optimal',
-  'i_allpoints',
   'i_best',
   'i_label',
   // Legacy alias of `i_label` with inverted semantics — read-only on load so
@@ -63,6 +65,20 @@ const URL_STATE_KEYS = [
   'i_spec',
   // Measured-power certification tiers ('certified' / 'legacy', comma-joined).
   'i_power',
+  'i_topology',
+  'i_ptlines',
+  'i_ptaxis',
+  'i_ptwindow',
+  'i_ptfocus',
+  'i_ptutility',
+  // Power Timeline concurrency filter: one positive integer, empty = every load.
+  'i_ptconc',
+  // Completed Perf Rulers on the primary inference chart: `isoX|curveA|curveB`
+  // entries joined by `;` (see serializePerfRulers in d3-chart/layers/perf-ruler).
+  'i_rulers',
+  // Comparison series overlaid on a gated power metric: `boundaries` (every
+  // power boundary) or `roles` (prefill / decode pools). Empty = the metric alone.
+  'i_pcompare',
   // Exact serving-envelope pair behind an Overview 30-day comparison cell.
   'i_overview_current',
   'i_overview_baseline',
@@ -156,6 +172,9 @@ export const PARAM_DEFAULTS: Record<UrlStateKey, string> = {
   i_metric: DEFAULT_Y_AXIS_METRIC,
   i_revenue: 'normalized',
   i_pctl: 'p90',
+  i_mstat: 'median',
+  i_roleshare: '0',
+  i_powerfit: '0',
   i_xmetric: 'p90_ttft',
   i_e2e_xmetric: 'p90_ttft',
   i_xmode: '',
@@ -165,7 +184,6 @@ export const PARAM_DEFAULTS: Record<UrlStateKey, string> = {
   i_dstart: '',
   i_dend: '',
   i_optimal: '',
-  i_allpoints: '',
   i_best: '',
   i_label: '',
   i_nolabel: '',
@@ -183,6 +201,15 @@ export const PARAM_DEFAULTS: Record<UrlStateKey, string> = {
   i_disagg: '',
   i_spec: '',
   i_power: '',
+  i_topology: '',
+  i_ptlines: '',
+  i_ptaxis: '',
+  i_ptwindow: '',
+  i_ptfocus: '',
+  i_ptutility: '',
+  i_ptconc: '',
+  i_rulers: '',
+  i_pcompare: '',
   i_overview_current: '',
   i_overview_baseline: '',
   e_rundate: '',
@@ -498,6 +525,26 @@ export function rememberChartStateInUrl(): string {
     `${pathname}${search ? `?${search}` : ''}${hash}`,
   );
   return chartParams.toString();
+}
+
+/**
+ * The current page's URL carrying its chart state plus `overrides`,
+ * canonicalised like `rememberChartStateInUrl`: chart params and both
+ * unofficial-run spellings are dropped from the live address bar before the
+ * store's state (and the overrides) are layered on. For anchors that must
+ * work with open-in-new-tab, where the in-memory state would otherwise be lost.
+ */
+export function chartStateHref(overrides: Record<string, string>): string {
+  const { origin, pathname, hash, search } = window.location;
+  const merged = new URLSearchParams(search);
+  for (const key of URL_STATE_KEYS) merged.delete(key);
+  // Collected first: deleting while iterating the params would skip entries.
+  const staleRunKeys = [...merged.keys()].filter((key) => UNOFFICIAL_RUN_PARAM_RE.test(key));
+  for (const key of staleRunKeys) merged.delete(key);
+  for (const [key, value] of collectTabParams()) merged.set(key, value);
+  for (const [key, value] of Object.entries(overrides)) merged.set(key, value);
+  const query = merged.toString();
+  return `${origin}${pathname}${query ? `?${query}` : ''}${hash}`;
 }
 
 /**

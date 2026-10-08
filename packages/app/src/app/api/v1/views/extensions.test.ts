@@ -138,6 +138,63 @@ describe('new dashboard projections', () => {
     expect(result.status).toBe(503);
     expect(await result.json()).toEqual({ error: 'Source data unavailable' });
   });
+  it("returns the reader's all-chip statistics instead of recomputing them from GPU-filtered rows", async () => {
+    const stats = [0, 1].map((gpuIndex) => ({
+      gpuIndex,
+      metric: 'power_w',
+      count: 10,
+      min: 0,
+      max: 800,
+      mean: 350,
+      median: 300,
+      p95: 750,
+      p99: 790,
+      stddev: 200,
+    }));
+    mocks.metrics.mockImplementation(() =>
+      Response.json({
+        runInfo: { id: 123 },
+        artifacts: [{ name: 'h200', data: metricRows, series: { stats } }],
+      }),
+    );
+    const response = await gpu(req('gpu-metrics', 'runId=123&gpus=0'));
+    const body = await response.json();
+    expect(body.stats).toEqual(stats.map(({ metric: _metric, ...stat }) => stat));
+    expect(mocks.metrics.mock.calls[0][0].nextUrl.searchParams.get('runId')).toBe('123');
+  });
+  it('returns no statistics when the reader withholds them for incomplete samples', async () => {
+    mocks.metrics.mockImplementation(() =>
+      Response.json({
+        runInfo: { id: 123 },
+        artifacts: [{ name: 'h200', data: metricRows, series: { stats: [] } }],
+      }),
+    );
+    const response = await gpu(req('gpu-metrics', 'runId=123'));
+    const body = await response.json();
+    expect(body.stats).toEqual([]);
+  });
+  it('reports the correlation y-axis it draws when the series has no temperature', async () => {
+    const data = [
+      { timestamp: '2026-09-08T00:00:00Z', index: 0, power: 100, smClock: 1500 },
+      { timestamp: '2026-09-08T00:00:01Z', index: 0, power: 300, smClock: 1900 },
+    ];
+    mocks.metrics.mockImplementation(() =>
+      Response.json({ runInfo: { id: 123 }, artifacts: [{ name: 'h200', data }] }),
+    );
+    const correlation = async (query: string) => {
+      const response = await gpu(req('gpu-metrics', `runId=123&chartView=correlation${query}`));
+      return response.json();
+    };
+    const defaulted = await correlation('');
+    expect(defaulted.params.corrYMetric).toBe('smClock');
+    expect(defaulted.chart).toEqual([
+      { x: 100, y: 1500, gpuIndex: 0, raw: data[0] },
+      { x: 300, y: 1900, gpuIndex: 0, raw: data[1] },
+    ]);
+    const explicit = await correlation('&corrYMetric=temperature');
+    expect(explicit.params.corrYMetric).toBe('temperature');
+    expect(explicit.chart).toEqual([]);
+  });
   it('reads published video evidence without triggering artifact publication', async () => {
     mocks.video.mockImplementation(() => new Response(null, { status: 204 }));
     const result = await video(req('video', 'run=123&artifact=456'));
@@ -416,7 +473,7 @@ describe('new dashboard projections', () => {
         expect(output.skipped).toEqual([]);
         expect(output.rows.map((row: { powerLabel: string }) => row.powerLabel)).toEqual(
           powerBasis === 'compare'
-            ? ['Provisioned', 'Measured + modeled · Full-chassis extrapolation']
+            ? ['All in Provisioned', 'All in Measured · Full-chassis extrapolation']
             : ['Full-chassis extrapolation'],
         );
       }

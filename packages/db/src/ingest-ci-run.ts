@@ -25,6 +25,7 @@
 import fs from 'fs';
 import {
   powerPublicationPoint,
+  rawPowerWorkloadOf,
   publicationIdentity,
   benchmarkPublicationIdentity,
   stablePowerPointIdentity,
@@ -37,6 +38,7 @@ import { GPU_KEYS } from '@semianalysisai/inferencex-constants';
 
 import { hasNoSslFlag } from './cli-utils';
 import {
+  assertRequestedRunAttempt,
   dedupeArtifactsByLogicalName,
   downloadArtifact,
   fetchRunAttempt,
@@ -168,13 +170,7 @@ if (isDownloadMode) {
     DEFAULT_REPO;
 
   runAttemptNum = fetchRunAttempt(REPO, runIdStr);
-  const requestedAttempt = input.match(/\/attempts\/(?<attempt>\d+)/u)?.groups?.attempt;
-  if (requestedAttempt && Number(requestedAttempt) !== runAttemptNum) {
-    throw new Error(
-      `GitHub attempt ${runAttemptNum} differs from requested ${requestedAttempt}; ` +
-        'use retained artifacts and exact source metadata for historical-attempt ingestion',
-    );
-  }
+  assertRequestedRunAttempt(input, runAttemptNum);
 
   // Download artifacts
   tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ingest-'));
@@ -356,22 +352,23 @@ async function main(): Promise<void> {
     }
   }
 
-  // One read of the run's benchmark JSON for verification and the ingest loop.
+  // One read of the run's benchmark JSON: lent to the required-power verifier
+  // and the curve preflight, consumed by the ingest loop.
   let benchmarkFilesRead: BenchmarkArtifactFile[] | undefined;
   const benchmarkFiles = () =>
     (benchmarkFilesRead ??= readBenchmarkArtifacts(artifactsDir, { runId: runIdStr, tracker }));
 
-  const requiredPowerPoints = verifyRequiredPowerArtifacts(
+  const powerSource = { runId, runAttempt: runAttemptNum, headSha: ghInfo?.headSha ?? null };
+  const requiredPower = verifyRequiredPowerArtifacts(
     artifactsDir,
-    {
-      runId,
-      runAttempt: runAttemptNum,
-      headSha: ghInfo?.headSha ?? null,
-    },
+    powerSource,
     process.env.INGEST_REQUIRE_POWER === 'true',
+    benchmarkFiles,
   );
-  if (requiredPowerPoints.length > 0)
-    console.log(`  Required power: ${requiredPowerPoints.length} source benchmark points verified`);
+  if (requiredPower)
+    console.log(
+      `  Required power: ${requiredPower.points.length} source benchmark points verified`,
+    );
 
   await preloadConfigs();
   console.log(`  ${configCache.size} configs preloaded`);
@@ -438,20 +435,15 @@ async function main(): Promise<void> {
   }
   const appendOnly = hasAppendOnlyFlag(changelogs);
   const evalsOnly = hasEvalsOnlyFlag(changelogs);
-  if (evalsOnly && requiredPowerPoints.length > 0)
+  if (evalsOnly && requiredPower)
     throw new Error('Required power: benchmark scope cannot be published as an evals-only run');
 
-  if (requiredPowerPoints.length > 0)
-    await preflightRequiredPowerCurves(
-      sql,
-      artifactsDir,
-      {
-        runId,
-        runAttempt: runAttemptNum,
-        headSha: ghInfo?.headSha ?? null,
-      },
-      { date, runStartedAt: workflowGhInfo?.runStartedAt ?? null, appendOnly },
-    );
+  if (requiredPower)
+    await preflightRequiredPowerCurves(sql, requiredPower, benchmarkFiles(), powerSource, {
+      date,
+      runStartedAt: workflowGhInfo?.runStartedAt ?? null,
+      appendOnly,
+    });
 
   const workflowRunId = await getOrCreateWorkflowRun({
     githubRunId: runId,
@@ -521,7 +513,7 @@ async function main(): Promise<void> {
     }
     // PowerX telemetry: `gpu_metrics_<key>` is uploaded next to `bmk_<key>` by
     // every single-node job; multinode jobs carry it inside `power_audit_<key>`
-    // instead (see migration 016). Digested here so the dashboard never
+    // instead (see migration 016). Stored here so the dashboard never
     // re-downloads GitHub artifacts and keeps the series past retention.
     const gpuMetricsArtifacts = discoverGpuMetricsArtifacts(artifactsDir);
     if (gpuMetricsArtifacts.size > 0) {
@@ -578,11 +570,16 @@ async function main(): Promise<void> {
       // and unmappable rows leave an unknown number of attachment expectations.
       let fileExpectationsUnknown = file.nonObjectRows > 0;
       const rows = file.rows.flatMap(({ raw, mapped, failed }) => {
-        if (!mapped && !failed) fileExpectationsUnknown = true;
-        if (!mapped && Number(raw.isl) === 8192 && Number(raw.osl) === 1024) {
-          powerPublicationErrors.push(`Unmapped or failed 8K/1K result: ${relativeFile}`);
-        }
-        return mapped ? [mapped] : [];
+        if (mapped) return [mapped];
+        if (!failed) fileExpectationsUnknown = true;
+        // A PowerX-workload row that did not map is a hole in the published
+        // curve, so it fails the receipt; every POWER_WORKLOADS scenario counts.
+        const workload = rawPowerWorkloadOf(raw);
+        if (workload)
+          powerPublicationErrors.push(
+            `Unmapped or failed ${workload.scenario} result: ${relativeFile}`,
+          );
+        return [];
       });
       if (fileExpectationsUnknown) telemetryExpectationsUnknown = true;
 
@@ -711,7 +708,7 @@ async function main(): Promise<void> {
           );
           totalNewBmk += newCount;
           totalDupBmk += dupCount;
-          if (requiredPowerPoints.length > 0) retainedPowerPoints.push(...toInsert);
+          if (requiredPower) retainedPowerPoints.push(...toInsert);
 
           // Build availability only after successful insert
           for (const r of toInsert) {
@@ -776,11 +773,7 @@ async function main(): Promise<void> {
                     `${ingested.seriesSkipped} unchanged (${elapsed(gpuMetricsStart)})`,
                 );
               } catch (error: any) {
-                // Non-fatal on purpose: this point's benchmark rows are already
-                // committed and only its telemetry tab is affected, and
-                // `admin:db:backfill-gpu-metrics --run <id>` can re-digest the
-                // artifact later. Recording it as a DB error instead would reach
-                // the publication manifest and fail the whole production ingest.
+                // Not fatal; see Skips.telemetryError.
                 tracker.recordTelemetryError(`gpu_metrics for ${configKey}`, error);
                 for (const row of toInsert) {
                   const point = telemetryObservations.get(
@@ -885,7 +878,8 @@ async function main(): Promise<void> {
       await Promise.all(traceTasks);
     }
     await traceWorkerPool.close();
-    assertRequiredPowerPointsRetained(requiredPowerPoints, retainedPowerPoints, 'after_insert');
+    if (requiredPower)
+      assertRequiredPowerPointsRetained(requiredPower.points, retainedPowerPoints, 'after_insert');
     console.log(`  Benchmarks: +${totalNewBmk} new, ${totalDupBmk} dup`);
     if (totalTraceReplayLinked > 0 || tracker.skips.traceReplayMissing > 0) {
       console.log(
@@ -1167,9 +1161,7 @@ main()
     process.exitCode = 1;
   })
   .finally(async () => {
-    const publicationPath =
-      process.env.POWER_PUBLICATION_MANIFEST ??
-      `power-publication-${runIdNum}-attempt-${runAttemptNum}.json`;
+    const publicationPath = process.env.POWER_PUBLICATION_MANIFEST;
     if (publicationPath) {
       const telemetry = checkTelemetry
         ? await readTelemetryReceipt(
@@ -1198,7 +1190,9 @@ main()
             ],
             // Reported but not fatal — see Skips.telemetryError.
             telemetryWarnings: tracker.skips.telemetryError
-              ? [`${tracker.skips.telemetryError} gpu_metrics digest errors`]
+              ? [
+                  `${tracker.skips.telemetryError} telemetry errors (gpu_metrics digest or AgentX window)`,
+                ]
               : [],
             ...(telemetry ? { telemetry } : {}),
           },

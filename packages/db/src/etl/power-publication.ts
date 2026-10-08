@@ -1,6 +1,6 @@
 import { isDeepStrictEqual } from 'node:util';
 import { MEASURED_POWER_METRIC_KEYS } from '@semianalysisai/inferencex-constants';
-import type { BenchmarkParams } from './benchmark-mapper';
+import { isAgenticRow, type BenchmarkParams } from './benchmark-mapper';
 import type { ConfigParams } from './config-cache';
 import type { TelemetryReceipt } from './telemetry-receipt';
 
@@ -42,7 +42,8 @@ const POWER_FIELDS = [
 ];
 /**
  * The workloads PowerX publishes. The receipt predicate, the required-power
- * matrix scenarios and the ingest diagnostics derive from this one table.
+ * matrix scenarios and the ingest's unmapped-row diagnostic derive from this
+ * one table.
  */
 export const POWER_WORKLOADS = [
   { scenario: 'agentic', benchmarkType: 'agentic_traces', isl: null, osl: null },
@@ -67,6 +68,15 @@ export function powerWorkloadOf(row: {
   );
 }
 
+/** The workload of a raw artifact row the mapper rejected, by the mapper's own type rule. */
+export function rawPowerWorkloadOf(raw: Record<string, unknown>): PowerWorkload | null {
+  return powerWorkloadOf(
+    isAgenticRow(raw)
+      ? { benchmarkType: 'agentic_traces', isl: null, osl: null }
+      : { benchmarkType: 'single_turn', isl: Number(raw.isl), osl: Number(raw.osl) },
+  );
+}
+
 export function powerWorkloadForScenario(scenario: string): PowerWorkload | undefined {
   return POWER_WORKLOADS.find((workload) => workload.scenario === scenario);
 }
@@ -85,43 +95,10 @@ export interface PowerPublicationManifest {
   points: PowerPublicationPoint[];
   /** Fatal: verify-power-publication exits non-zero when this is non-empty. */
   ingestErrors?: string[];
-  /**
-   * Non-fatal: PowerX telemetry digest failures. Surfaced in the verification
-   * receipt so they stay visible, but they never fail the ingest — the benchmark
-   * rows landed, and the artifact can be re-digested by the backfill.
-   */
+  /** Copied into the verification receipt, never fatal; see `Skips.telemetryError`. */
   telemetryWarnings?: string[];
   /** Attachment completeness, separate from benchmark/power publication validity. */
   telemetry?: TelemetryReceipt;
-  /** Durable refresh responsibility when telemetry recovery fills benchmark metadata. */
-  benchmarkRefresh?: {
-    status: 'pending' | 'complete' | 'failed';
-    benchmarkResultIds: number[];
-    /** Expected enrichment comes from retained validation, never a DB snapshot. */
-    auditUpdates?: {
-      benchmarkResultId: number;
-      identity: Record<string, unknown>;
-      /** Original mapped identity when the existing historical offload resolver used a fallback. */
-      sourceIdentity?: Record<string, unknown>;
-      powerAudit: { source: string; window_start_unix: number; window_end_unix: number };
-    }[];
-    endpoint?: string;
-    checkedAt?: string;
-    error?: string;
-  };
-}
-/**
- * The errors that fail an ingest. `telemetryWarnings` is deliberately not among
- * them: a gpu_metrics digest failure costs one point's PowerX tab, while the
- * benchmark rows it accompanies are already committed and the artifact can be
- * re-digested by `admin:db:backfill-gpu-metrics`. Folding it in would let one
- * malformed CSV turn a whole production ingest red.
- */
-export function fatalPublicationErrors(
-  manifest: Pick<PowerPublicationManifest, 'ingestErrors' | 'telemetryWarnings'>,
-  verificationErrors: readonly string[],
-): string[] {
-  return [...(manifest.ingestErrors ?? []), ...verificationErrors];
 }
 
 export interface PublishedPowerRow extends Record<string, unknown> {

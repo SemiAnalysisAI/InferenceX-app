@@ -26,7 +26,7 @@ export interface GpuPowerRunInfo {
 export interface GpuMetricsArtifact {
   name: string;
   data: GpuMetricRow[];
-  /** Only database-backed artifacts carry the full-record digest. */
+  /** Only database-backed artifacts carry full-record statistics. */
   series?: Omit<GpuMetricSeries, 'data'>;
 }
 
@@ -200,10 +200,6 @@ export function getAvailableMetrics(data: GpuMetricRow[]): GpuMetricConfig[] {
   return ALL_METRIC_OPTIONS.filter((m) => data.some((row) => Number.isFinite(row[m.key])));
 }
 
-/**
- * Detect GPU SKU from an artifact name and return its TDP in watts.
- * Artifact names look like: gpu_metrics_dsr1_1k8k_fp8_sglang_tp8_..._h200-nb_0
- */
 /** TDP for a known hardware key, e.g. the benchmark point's own `hardware`. */
 export function tdpForHardware(hardware: string | undefined): { sku: string; tdp: number } | null {
   const key = hardware?.toLowerCase();
@@ -211,6 +207,10 @@ export function tdpForHardware(hardware: string | undefined): { sku: string; tdp
   return entry ? { sku: key!.toUpperCase(), tdp: entry.tdp } : null;
 }
 
+/**
+ * Detect GPU SKU from an artifact name and return its TDP in watts.
+ * Artifact names look like: gpu_metrics_dsr1_1k8k_fp8_sglang_tp8_..._h200-nb_0
+ */
 export function detectTdpFromArtifactName(
   artifactName: string,
 ): { sku: string; tdp: number } | null {
@@ -387,7 +387,7 @@ export function parseCsvData(csvText: string): GpuMetricRow[] {
       ? parseAmdCsv(lines, buildColumnMap(lines[0]))
       : parseNvidiaCsv(lines);
   // Normalize one CSV at a time: host-local indices may repeat in other files.
-  // Keep the first device/timestamp sample, matching the persisted digest.
+  // Keep the first device/timestamp sample, matching the stored samples.
   const seen = new Set<string>();
   return rows.filter((row) => {
     // NVIDIA's naive collector clock must not use the reader's local DST rules.

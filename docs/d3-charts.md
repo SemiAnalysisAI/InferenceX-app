@@ -81,7 +81,7 @@ For machine-readable frontier and hinterland observations, see the
 [Pareto boundary API](./pareto-api.md). The server and chart share
 `src/lib/pareto-frontier.ts`; their input-selection pipelines differ.
 
-Every inference scatter chart exposes a **Pareto Frontier** switch under
+Inference scatter charts with a performance-preference X axis expose a **Pareto Frontier** switch under
 **Advanced**, off by default.
 Collapsing Advanced does not turn off an enabled highlight.
 `i_frontier=1` preserves plain shading in share links; value `2` restores the scenic background.
@@ -118,15 +118,21 @@ updates with visibility, log scales and zoom without taking point pointer events
 One-dimensional GPU, history and evaluation charts have no two-objective Pareto
 region and do not expose this switch.
 
-The six measured-power metrics (average, prefill, decode, P75, P90 and percentage of TDP) draw a fixed upper power boundary across tested configurations. **Optimal Only** shows boundary points when on and all measurements when off, preserving curve geometry, axis domains and zoom. These views use no separate **Show all measurements** switch. The boundary describes power demand across the load sweep; energy-per-token metrics retain their lower-energy Pareto frontiers.
+The six measured-power metrics (average, prefill, decode, P75, P90 and percentage of TDP) draw a fixed upper power boundary across tested configurations. **Optimal Only** shows boundary points when on and all measurements when off, preserving curve geometry, axis domains and zoom. The boundary describes power demand across the load sweep; energy-per-token metrics retain their lower-energy Pareto frontiers.
 
-Modeled chassis power retains its existing behavior: **Optimal Only** on shows the minimum-power Pareto frontier, which can legitimately contain one point. Turning it off draws the upper power boundary. In that mode, the separate **Show all measurements** switch (`i_allpoints=1`) reveals off-boundary points without changing the curve.
-
-Dividing watts by one hardware's positive, constant TDP preserves its boundary membership. A lower percentage across different chips is not, by itself, an energy-efficiency comparison. Historical rings remain attached to visible historical points.
+Dividing watts by one hardware's positive, constant TDP preserves its boundary membership. A lower percentage across different chips is not, by itself, an energy-efficiency comparison.
 
 Upper boundaries use monotone interpolation between unique-X vertices, including after zoom. Curves are grouped by hardware, precision and date, and additionally by run for unofficial overlays; unrelated dates and runs never share a curve.
 
-**Perf Ruler** is available on all six measured-power axes in the single-run scatter chart (`ScatterGraph`) only; the date-comparison chart (`GPUGraph`) has no ruler. It measures the ratio of the drawn upper-boundary values at the same X coordinate, using the rendered paths after zoom; clicking an off-boundary dot selects its series' boundary, clamped to the curves' shared X range. The ratio compares power or percentage of TDP, not energy efficiency. Optimal Only changes point visibility without moving the ruler. Hidden or removed curves cannot be measured, and changing either axis clears existing rulers. Modeled chassis power keeps its existing ruler restriction while showing an upper boundary; energy and other Pareto views retain their ruler behavior.
+**Perf Ruler** is available on all six measured-power axes in the single-run scatter chart (`ScatterGraph`) only; the date-comparison chart (`GPUGraph`) has no ruler. It measures the ratio of the drawn upper-boundary values at the same X coordinate, using the rendered paths after zoom; clicking an off-boundary dot selects its series' boundary, clamped to the curves' shared X range. The ratio compares power or percentage of TDP, not energy efficiency. Optimal Only changes point visibility without moving the ruler. Hidden or removed curves cannot be measured, and changing either axis clears existing rulers. Energy and other Pareto views retain their ruler behavior.
+
+### Concurrency is not an x-axis
+
+There is no concurrency x-axis mode. GPU count varies across configurations, so the same concurrency is not a comparable load between them; `conc` stays a point attribute in tooltips, tables, CSV and the API. Exact topology quick filters (`pointTopologyKey`) select allocation and parallelism without filtering concurrency.
+
+### Unofficial runs in date comparisons
+
+`GPUGraph` plots `?unofficialrun=` rows next to the compared dates as their own (run, hardware) series, `overlay-run<index>_<hwKey>`. They pass the same precision, quick-filter and overlay-hardware (`activeOverlayHwTypes`) gates as `ScatterGraph`, draw as X markers in `overlayRunColor(runIndex)`, and their curves take `overlayRooflineDasharray(runIndex)` through the roofline layer's per-curve `getDasharray`. They are not date series, so `activeDates` toggles leave them on; the legend lists them first, one `UNOFFICIAL: <branch>` group per run, and dismissing the run removes them. Pinned tooltips, official and overlay alike, offer **View power trace**, which opens the comparison Timeline focused on that trace; official points also keep **View PowerX**.
 
 ## Gradient Roofline Labels
 

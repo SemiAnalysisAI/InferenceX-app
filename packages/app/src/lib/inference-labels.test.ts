@@ -150,8 +150,11 @@ describe('temporary DSpark UMBP run label', () => {
   });
 });
 
-describe('temporary UMBP linker gamma-6 run label', () => {
-  const linkerUrl = 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/35879254139';
+describe.each([
+  ['UMBP linker gamma-6', '35879254139'],
+  ['MegaMoE UMBP retune', '37181045340'],
+])('temporary %s run %s label', (_name, runId) => {
+  const linkerUrl = `https://github.com/SemiAnalysisAI/InferenceX/actions/runs/${runId}`;
   const dsparkUrl = 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/35166686551';
   const expiresAt = Date.parse('2026-10-10T04:00:00Z');
 
@@ -179,9 +182,9 @@ describe('temporary UMBP linker gamma-6 run label', () => {
   );
 
   it('leaves neighboring run IDs and mixed historical points correctly labeled', () => {
-    for (const id of ['35879254138', '35879254140', '358792541390']) {
+    for (const id of [String(Number(runId) - 1), String(Number(runId) + 1), `${runId}0`]) {
       expect(
-        inferenceFrameworkLabelOverride('mori-sglang', linkerUrl.replace('35879254139', id)),
+        inferenceFrameworkLabelOverride('mori-sglang', linkerUrl.replace(runId, id)),
       ).toBeUndefined();
     }
     expect(

@@ -25,6 +25,8 @@
 export interface LabelAttrs {
   /** `data-hw-key` — base hardware key, shared across a hw's curves. */
   hwKey?: string;
+  /** `data-line-key` — `overlay-…` marks an unofficial-run curve's label. */
+  lineKey?: string;
   /** `data-precision` — set on parallelism labels, absent on line labels. */
   precision?: string;
   /** `data-visible` — `'1'`/`'0'`; only line labels set this. */
@@ -50,16 +52,24 @@ export const labelOpacityForHover = (attrs: LabelAttrs, hoveredHwKey: string): 0
  * filter-change sync effect. Line labels (no precision) show when their
  * hardware is active **and** the render kept them; parallelism labels show when
  * their hardware is active and their precision is selected.
+ *
+ * An `?unofficialrun=` overlay curve answers to the overlay legend rows, not
+ * the official ones: its label follows `activeOverlayHwTypes`, so soloing an
+ * official hardware no longer hides the overlay pills of every other hardware
+ * (and hiding an official row keeps its overlay twin labelled).
  */
 export const labelOpacityForActiveState = (
   attrs: LabelAttrs,
   activeHwTypes: ReadonlySet<string>,
   selectedPrecisions: readonly string[],
+  activeOverlayHwTypes?: ReadonlySet<string>,
 ): 0 | 1 => {
   const { hwKey, precision } = attrs;
   if (!hwKey) return 0;
+  const isOverlay = attrs.lineKey?.startsWith('overlay-') ?? false;
+  const active = isOverlay && activeOverlayHwTypes ? activeOverlayHwTypes : activeHwTypes;
   if (!precision) {
-    return activeHwTypes.has(hwKey) && renderKept(attrs) ? 1 : 0;
+    return active.has(hwKey) && renderKept(attrs) ? 1 : 0;
   }
-  return activeHwTypes.has(hwKey) && selectedPrecisions.includes(precision) ? 1 : 0;
+  return active.has(hwKey) && selectedPrecisions.includes(precision) ? 1 : 0;
 };

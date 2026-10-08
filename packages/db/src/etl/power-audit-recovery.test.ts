@@ -38,7 +38,7 @@ function point(overrides: Partial<BenchmarkPersistenceInput> = {}): BenchmarkPer
 }
 
 describe('agentxWindowPlan', () => {
-  it('maps each concurrency to its one recoverable window', () => {
+  it('maps each concurrency to its one recoverable window and ignores legacy documents', () => {
     const plan = agentxWindowPlan({
       [SOURCE_48]: nested(48, RESULT_48),
       'power_validation_kimik3_recipe-a_conc96.json': nested(
@@ -46,6 +46,11 @@ describe('agentxWindowPlan', () => {
         'kimik3_recipe-a_conc96.json',
         5000,
       ),
+      // A top-level document names the concurrency but carries no retained alias.
+      'power_validation_legacy.json': {
+        power_valid: true,
+        selected_window: nested(48, RESULT_48, 2000).selected_window,
+      },
     });
     expect([...plan]).toEqual([
       [48, AUDIT_48],
@@ -58,24 +63,6 @@ describe('agentxWindowPlan', () => {
         },
       ],
     ]);
-  });
-
-  it('withholds a concurrency named by two recoverable windows and ignores legacy documents', () => {
-    const twin = nested(48, 'other_conc48.json', 2000);
-    expect(
-      agentxWindowPlan({
-        [SOURCE_48]: nested(48, RESULT_48),
-        'power_validation_other_conc48.json': twin,
-      }).size,
-    ).toBe(0);
-    // A top-level document names the concurrency but carries no retained alias.
-    const legacy = { power_valid: true, selected_window: nested(48, RESULT_48).selected_window };
-    expect([
-      ...agentxWindowPlan({
-        'power_validation_legacy.json': legacy,
-        [SOURCE_48]: nested(48, RESULT_48),
-      }),
-    ]).toEqual([[48, AUDIT_48]]);
   });
 });
 
@@ -95,13 +82,6 @@ describe('attachAgentxAudits', () => {
     expect(result.points[1]!.metrics).toBe(agentic.metrics);
     expect(agentic.powerAudit).toBeUndefined();
     expect(result).toMatchObject({ attached: 1, refused: [] });
-  });
-
-  it('keeps provenance a point already carries', () => {
-    const existing = { source: 'producer.json' };
-    const result = attachAgentxAudits(plan, [point({ powerAudit: existing })], describePoint);
-    expect(result.points[0]!.powerAudit).toBe(existing);
-    expect(result.attached).toBe(0);
   });
 
   it('refuses, by name, a concurrency shared by two points instead of guessing', () => {

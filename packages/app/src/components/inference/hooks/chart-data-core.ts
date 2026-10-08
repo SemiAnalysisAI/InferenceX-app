@@ -115,7 +115,7 @@ const X_LABEL_STAT_PREFIX_RE = /^(?:Median|Mean|P75|P90|P95|P99(?:\.9)?)\b\s*/iu
  * existing leading statistic word (e.g. the TTFT override's "P90 Time To
  * First Token (s)") or prefixes the percentile when the configured label has
  * none (e.g. "Interactivity (tok/s/user)" → "P90 Interactivity (tok/s/user)").
- * Only call for agentic sequences — fixed-seq labels must stay untouched.
+ * Also used for the explicit Mean/Median labels on fixed-sequence service axes.
  */
 export function applyAgenticPercentileToXLabel(label: string, pctlWord: string): string {
   return X_LABEL_STAT_PREFIX_RE.test(label)

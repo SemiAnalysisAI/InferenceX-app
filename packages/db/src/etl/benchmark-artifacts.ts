@@ -1,7 +1,9 @@
 /**
- * One read of a run's benchmark JSON artifacts. Required-power verification,
- * the curve preflight and the ingest loop all consume the same files, so the
- * walk, the hash and the row mapping happen once per process here.
+ * The walker for a run's `bmk_*` / `results_*` benchmark JSON: listing,
+ * hashing and row mapping. The ingest process reads once (`ingest-ci-run.ts`)
+ * and lends that read to the required-power verifier and the curve preflight;
+ * the standalone commands read for themselves. Sidecar backfills read one
+ * downloaded artifact recursively through `lib/benchmark-result-lookup.ts`.
  */
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';

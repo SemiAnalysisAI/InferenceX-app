@@ -18,6 +18,7 @@ import { fetchOpenRouterPricing } from '@/hooks/api/use-openrouter-pricing';
 import { cachedJson } from '@/lib/api-cache';
 import { getGpuSpecs } from '@/lib/constants';
 import { getOpenRouterModelId, Sequence, type Model } from '@/lib/data-mappings';
+import { POWER_BASIS_LABELS } from '@/lib/power-basis';
 import type { NextRequest } from 'next/server';
 import { runViewsRoute, ViewsApiParamError } from './errors';
 import {
@@ -217,8 +218,8 @@ export function calculatorExtension(view: CalculatorExtension, request: NextRequ
         powerBasis,
         target,
         {
-          provisioned: 'Provisioned',
-          modeled: 'Measured + modeled',
+          provisioned: POWER_BASIS_LABELS['utility-provisioned'].en,
+          modeled: POWER_BASIS_LABELS['utility-modeled'].en,
           extrapolated: 'Full-chassis extrapolation',
         },
       );

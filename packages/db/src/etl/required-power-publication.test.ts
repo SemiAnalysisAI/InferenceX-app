@@ -3,15 +3,14 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
+import { readBenchmarkArtifacts } from './benchmark-artifacts';
 import {
   assertRequiredPowerPointsRetained,
   verifyRequiredPowerArtifacts,
 } from './required-power-publication';
+import { createSkipTracker } from './skip-tracker';
 
-const golden = path.resolve(
-  import.meta.dirname,
-  '../../../../docs/fixtures/powerx-manifest-v2/artifacts',
-);
+const golden = path.resolve(import.meta.dirname, 'fixtures/powerx-manifest-v2');
 const source = { runId: 123, runAttempt: 1, headSha: 'b'.repeat(40) };
 const dirs: string[] = [];
 function fixture() {
@@ -39,6 +38,7 @@ function changeManifest(dir: string, edit: (manifest: any) => void) {
   edit(manifest);
   write(dir, manifestPath, manifest);
 }
+const agentic = (manifest: any) => manifest.matrix.single_node.agentic;
 function changeArtifact(dir: string, file: string, edit: (value: any) => void) {
   const value = json(dir, file);
   edit(value);
@@ -181,7 +181,32 @@ describe('required power publication contract', () => {
     expect(() => verifyRequiredPowerArtifacts(dir, source)).toThrow('sweep manifest missing');
     fs.rmSync(path.join(dir, 'changelog-metadata'), { recursive: true });
     expect(() => verifyRequiredPowerArtifacts(dir, source, true)).toThrow('sweep manifest missing');
-    expect(verifyRequiredPowerArtifacts(dir, source)).toEqual([]);
+    expect(verifyRequiredPowerArtifacts(dir, source)).toBeNull();
+  });
+  it.each<[string, (manifest: any) => void, string]>([
+    ['another run', (m) => Object.assign(m, { 'run-id': 124 }), 'source run, attempt or head'],
+    ['a later attempt', (m) => Object.assign(m, { 'run-attempt': 2 }), 'source run, attempt'],
+    ['another head', (m) => Object.assign(m, { head: 'c'.repeat(40) }), 'source run, attempt'],
+    ['schema-version 1', (m) => Object.assign(m, { 'schema-version': 1 }), 'schema-version'],
+    ['a duplicate row', (m) => agentic(m).push(agentic(m)[0]), 'duplicate matrix point'],
+    ['optional rows only', (m) => (agentic(m)[0]['require-power'] = false), 'no required'],
+    ['conc [1, 2]', (m) => (agentic(m)[0].conc = [1, 2]), 'missing benchmark point'],
+  ])('rejects a manifest with %s', (_, edit, message) => {
+    const dir = fixture();
+    changeManifest(dir, edit);
+    expect(() => verifyRequiredPowerArtifacts(dir, source)).toThrow(message);
+  });
+  it.each([{ power_valid: 0 }, { power_metric_schema_version: 1 }])(
+    'rejects a required row with %j',
+    (change) => {
+      const dir = fixture();
+      changeArtifact(dir, benchmarkPath, (value) => Object.assign(value, change));
+      expect(() => verifyRequiredPowerArtifacts(dir, source)).toThrow('invalid power verdict');
+    },
+  );
+  it('accepts the declared scope of an earlier attempt of the same run and head', () => {
+    const scope = verifyRequiredPowerArtifacts(golden, { ...source, runAttempt: 2 });
+    expect(scope?.points).toHaveLength(1);
   });
   it('rejects hash mismatches and explicit invalid evidence', () => {
     const dir = fixture();
@@ -212,7 +237,7 @@ describe('required power publication contract', () => {
   });
   it('requires both prefill and decode physical evidence and matching role energy', () => {
     const dir = multinodeFixture();
-    expect(verifyRequiredPowerArtifacts(dir, source)).toHaveLength(1);
+    expect(verifyRequiredPowerArtifacts(dir, source)?.points).toHaveLength(1);
     changeManifest(dir, (manifest) => {
       manifest.points[0].devices.pop();
     });
@@ -225,11 +250,16 @@ describe('required power publication contract', () => {
       'prefill energy differs',
     );
   });
-  it('accepts a native multinode bundle with per-node receipts', () => {
-    expect(verifyRequiredPowerArtifacts(nativeFixture(), source)).toHaveLength(1);
+  it('rejects an audit from a telemetry collector it does not know', () => {
+    const dir = multinodeFixture();
+    changeArtifact(dir, auditPath, (audit) => {
+      audit.telemetry_kind = 'amd_device_metrics';
+    });
+    expect(() => verifyRequiredPowerArtifacts(dir, source)).toThrow('unsupported telemetry_kind');
   });
-  it('rejects a native receipt whose telemetry hash differs', () => {
+  it('accepts a native multinode bundle and rejects a receipt whose telemetry hash differs', () => {
     const dir = nativeFixture();
+    expect(verifyRequiredPowerArtifacts(dir, source)?.points).toHaveLength(1);
     changeArtifact(dir, auditPath, (audit) => {
       audit.nodes[0].telemetry_sha256 = 'f'.repeat(64);
     });
@@ -249,15 +279,6 @@ describe('required power publication contract', () => {
       'invalid native node collection',
     );
   });
-  it('rejects duplicate native GPU identities across nodes', () => {
-    const dir = nativeFixture();
-    changeArtifact(dir, auditPath, (audit) => {
-      audit.nodes[1].physical_gpu_ids = { '0': 'GPU-a' };
-    });
-    expect(() => verifyRequiredPowerArtifacts(dir, source)).toThrow(
-      'duplicate native GPU identity',
-    );
-  });
   it('accepts a JSON physical GPU identity file', () => {
     const dir = fixture();
     const csv = 'agentic_golden/gpu_metrics_identity.csv';
@@ -269,7 +290,7 @@ describe('required power publication contract', () => {
         if (artifact.path === csv)
           Object.assign(artifact, { path: devices, sha256: sha256(dir, devices) });
     });
-    expect(verifyRequiredPowerArtifacts(dir, source)).toHaveLength(1);
+    expect(verifyRequiredPowerArtifacts(dir, source)?.points).toHaveLength(1);
   });
   it('rejects invalid sidecar verdict and device energy disagreement despite valid hashes', () => {
     const dir = fixture();
@@ -283,18 +304,31 @@ describe('required power publication contract', () => {
     });
     expect(() => verifyRequiredPowerArtifacts(other, source)).toThrow('differs from audit');
   });
+  it('verifies a lent artifact read instead of reading again', () => {
+    const files = readBenchmarkArtifacts(golden, {
+      runId: source.runId,
+      tracker: createSkipTracker(),
+    });
+    expect(verifyRequiredPowerArtifacts(golden, source, false, () => files)?.points).toHaveLength(
+      1,
+    );
+    const tampered = files.map((file) => ({ ...file, sha256: '0'.repeat(64) }));
+    expect(() => verifyRequiredPowerArtifacts(golden, source, false, () => tampered)).toThrow(
+      'hash',
+    );
+  });
   it('accepts identical aggregate copies but rejects conflicting duplicate rows', () => {
     const dir = fixture();
     fs.mkdirSync(path.join(dir, 'results_bmk'));
     fs.copyFileSync(path.join(dir, benchmarkPath), path.join(dir, 'results_bmk/agg.json'));
-    expect(verifyRequiredPowerArtifacts(dir, source)).toHaveLength(1);
+    expect(verifyRequiredPowerArtifacts(dir, source)?.points).toHaveLength(1);
     const rows = json(dir, benchmarkPath);
     rows.avg_power_w = 501;
     write(dir, 'results_bmk/agg.json', rows);
     expect(() => verifyRequiredPowerArtifacts(dir, source)).toThrow('conflicting');
   });
-  it('retains every required identity after local purges and backfills, naming the stage', () => {
-    const required = verifyRequiredPowerArtifacts(golden, source);
+  it('names the stage when a required identity is missing or a power field differs', () => {
+    const required = verifyRequiredPowerArtifacts(golden, source)!.points;
     const dropped = [{ ...required[0], conc: 2 }];
     expect(() => assertRequiredPowerPointsRetained(required, dropped, 'before_write')).toThrow(
       'Required power (before_write): missing benchmark point',

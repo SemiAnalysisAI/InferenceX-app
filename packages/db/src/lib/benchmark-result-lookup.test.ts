@@ -1,27 +1,23 @@
 import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 
-import { PGlite } from '@electric-sql/pglite';
-import type postgres from 'postgres';
+import type { PGlite } from '@electric-sql/pglite';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { mapBenchmarkRow, type BenchmarkParams } from '../etl/benchmark-mapper';
 import { createSkipTracker } from '../etl/skip-tracker';
-import { filterPurgedBenchmarkRows, findBenchmarkResultIds } from './benchmark-result-lookup';
+import {
+  filterPurgedBenchmarkRows,
+  findBenchmarkResultIds,
+  readMappedBenchmarkRows,
+} from './benchmark-result-lookup';
 import { collectMissingTelemetryExpectations } from './gpu-metrics-backfill';
+import { migratedPglite, pgliteSql, type PgliteSql } from './test-pglite';
 
-type Sql = postgres.Sql;
 let db: PGlite;
-let sql: Sql;
+let sql: PgliteSql;
 const roots: string[] = [];
-
-function queryClient(database: Pick<PGlite, 'query'>) {
-  const client = async (strings: TemplateStringsArray, ...values: unknown[]) => {
-    const query = strings.reduce((text, part, i) => text + (i ? `$${i}` : '') + part, '');
-    const result = await database.query(query, values);
-    return result.rows;
-  };
-  return Object.assign(client, { json: JSON.stringify, array: (value: unknown) => value });
-}
 
 const GITHUB_RUN_ID = 34557177019;
 const RUN = { github_run_id: GITHUB_RUN_ID, run_attempt: 2 };
@@ -51,12 +47,8 @@ function mapped(raw: Record<string, unknown>): BenchmarkParams {
 }
 
 beforeAll(async () => {
-  db = await PGlite.create();
-  const dir = new URL('../../migrations/', import.meta.url);
-  for (const name of fs.readdirSync(dir).toSorted()) {
-    if (name.endsWith('.sql')) await db.exec(fs.readFileSync(new URL(name, dir), 'utf8'));
-  }
-  sql = queryClient(db) as unknown as Sql;
+  db = await migratedPglite();
+  sql = pgliteSql(db);
 }, 30_000);
 
 afterEach(() => {
@@ -161,4 +153,32 @@ it('excludes exact purges from mixed artifacts and missing-artifact expectations
   );
   expect(missing.observations.map((entry) => entry.identity.conc)).toEqual([1]);
   expect(missing.errors).toEqual([]);
+});
+
+describe('readMappedBenchmarkRows', () => {
+  it('maps rows with the run id, so run-scoped legacy repairs apply', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'bmk-rows-'));
+    roots.push(root);
+    fs.mkdirSync(path.join(root, 'bmk_tpu'));
+    fs.writeFileSync(
+      path.join(root, 'bmk_tpu/legacy.json'),
+      JSON.stringify({
+        hw: 'tpuv7',
+        model: 'Qwen/Qwen3.5-397B-A17B-FP8',
+        framework: 'vllm',
+        precision: 'fp8',
+        spec_decoding: 'none',
+        isl: 8192,
+        osl: 1024,
+        conc: 4,
+        tp: 1,
+        ep: 1,
+        tput_per_gpu: 800,
+      }),
+    );
+    const gpus = (runId: number | null) =>
+      readMappedBenchmarkRows(root, () => {}, runId).map((row) => row.config.numDecodeGpu);
+    expect(gpus(30864013158)).toEqual([4]);
+    expect(gpus(null)).not.toEqual([4]);
+  });
 });
