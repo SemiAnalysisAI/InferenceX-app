@@ -12,8 +12,7 @@ import { RouteTransition } from '@/components/motion/route-transition';
 import { JsonLd } from '@/components/json-ld';
 import { AutumnLeaves } from '@/components/autumn-leaves';
 import { CircuitBackground } from '@/components/circuit-background';
-import { EasterEggThemeLazy } from '@/components/easter-egg-theme-lazy';
-import { APP_THEMES } from '@/lib/themes';
+import { APP_THEMES, retiredThemePrepaintScript } from '@/lib/themes';
 import { ThemeProvider } from '@/components/ui/theme-provider';
 import {
   AUTHOR_HANDLE,
@@ -199,6 +198,11 @@ export default async function RootLayout({
           dangerouslySetInnerHTML={{ __html: landingBannerPrepaintStyle }}
         />
         <script
+          id="retired-theme-prepaint"
+          suppressHydrationWarning
+          dangerouslySetInnerHTML={{ __html: retiredThemePrepaintScript }}
+        />
+        <script
           id="landing-banner-prepaint"
           suppressHydrationWarning
           dangerouslySetInnerHTML={{ __html: landingBannerPrepaintScript }}
@@ -218,7 +222,6 @@ export default async function RootLayout({
               <PostHogPageView />
               <VisitTracker />
               <Header starCount={starCount} />
-              <EasterEggThemeLazy />
               <div className="grow flex flex-col">
                 <RouteTransition>{children}</RouteTransition>
               </div>

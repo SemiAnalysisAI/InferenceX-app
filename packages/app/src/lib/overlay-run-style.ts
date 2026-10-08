@@ -18,7 +18,7 @@
  * Number of entries in the overlay-run palette. The actual color values are
  * theme-aware CSS custom properties defined in `globals.css` as
  * `--overlay-run-0` .. `--overlay-run-<N-1>`; light mode uses darker/saturated
- * hues for contrast on a light background, dark/minecraft modes use the
+ * hues for contrast on a light background, dark mode uses the
  * lighter hues this file used to hard-code.
  */
 const RUN_PALETTE_SIZE = 8;

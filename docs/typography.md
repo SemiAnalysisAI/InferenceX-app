@@ -50,7 +50,7 @@ All help surfaces share `HELP_CONTENT_CLASS_NAME`: `text-sm`, relaxed line heigh
 
 ## Chart text
 
-Chart font sizes live in TypeScript, not CSS variables: `CHART_TYPE` in `src/lib/d3-chart/typography.ts`, with the `px()` helper for `.attr('font-size', …)`. The PNG export path (`useChartExport`) serializes the chart with html-to-image, which cannot resolve `var(--*)`; its `resolveCssVarsForExport()` only bakes color-type attributes, so a CSS-variable font-size silently collapses in exports. The shared export font stacks (`CHART_FONT_SANS`, `CHART_FONT_MINECRAFT`) live in the same module.
+Chart font sizes live in TypeScript, not CSS variables: `CHART_TYPE` in `src/lib/d3-chart/typography.ts`, with the `px()` helper for `.attr('font-size', …)`. The PNG export path (`useChartExport`) serializes the chart with html-to-image, which cannot resolve `var(--*)`; its `resolveCssVarsForExport()` only bakes color-type attributes, so a CSS-variable font-size silently collapses in exports. The shared export font stack (`CHART_FONT_SANS`) lives in the same module.
 
 OG-image renderers (Satori: `opengraph-image.tsx`, `og-image-render.tsx`, `compare-og.tsx`) draw on a fixed canvas and intentionally hardcode display sizes — they are exempt from all of this.
 

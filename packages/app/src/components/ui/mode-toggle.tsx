@@ -1,17 +1,7 @@
 'use client';
 
 import { track } from '@/lib/analytics';
-import {
-  Car,
-  Crosshair,
-  Flag,
-  Moon,
-  Pickaxe,
-  Shield,
-  Skull,
-  Sun,
-  type LucideIcon,
-} from 'lucide-react';
+import { Moon, Sun, type LucideIcon } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import * as React from 'react';
 
@@ -24,12 +14,6 @@ import { HEADER_ACTION_STYLE } from './control-styles';
 const THEME_ICONS: Record<string, LucideIcon> = {
   light: Sun,
   dark: Moon,
-  minecraft: Pickaxe,
-  csgo: Crosshair,
-  gta: Car,
-  kart: Flag,
-  doom: Skull,
-  halo: Shield,
 };
 
 const STRINGS = {
@@ -38,12 +22,6 @@ const STRINGS = {
     labels: {
       light: 'Light',
       dark: 'Dark',
-      minecraft: 'Minecraft',
-      csgo: 'CS:GO',
-      gta: 'GTA',
-      kart: 'Mario Kart',
-      doom: 'DOOM',
-      halo: 'Halo',
     },
   },
   zh: {
@@ -51,12 +29,6 @@ const STRINGS = {
     labels: {
       light: '浅色',
       dark: '深色',
-      minecraft: 'Minecraft',
-      csgo: 'CS:GO',
-      gta: 'GTA',
-      kart: 'Mario Kart',
-      doom: 'DOOM',
-      halo: 'Halo',
     },
   },
 } as const;
