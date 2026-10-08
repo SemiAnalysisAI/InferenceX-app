@@ -42,3 +42,4 @@ export function px(size: number): string {
  */
 export const CHART_FONT_SANS =
   'var(--font-dm-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+export const CHART_FONT_MINECRAFT = 'var(--font-minecraft), "Monocraft", monospace';

@@ -51,7 +51,7 @@ describe('Header', () => {
 
   beforeEach(() => {
     // ThemeProvider reads persisted state, so isolate each header story from
-    // the preceding theme-cycle story.
+    // the preceding theme-cycle story (including the minecraft audio tools).
     cy.window().then((win) => win.localStorage.setItem('theme', 'light'));
     mockRouter = createMockRouter();
     mountHeader('/');
@@ -386,6 +386,21 @@ describe('Header', () => {
       cy.get('[data-testid="mobile-menu"] a').each(($link) => {
         const rect = $link[0].getBoundingClientRect();
         expect(rect.height, `${$link.text()} link height`).to.be.at.least(MIN_TOUCH_PX - EPSILON);
+      });
+    });
+
+    it('exposes the minecraft audio toggles in the mobile menu without overflowing', () => {
+      cy.get('[data-testid="theme-toggle"]').click();
+      cy.get('[data-testid="theme-option-minecraft"]').click();
+      cy.get('html').should('have.class', 'minecraft');
+      cy.get('[data-testid="mobile-menu-toggle"]').click();
+      cy.get('[data-testid="mobile-menu"]').within(() => {
+        cy.get('button[aria-label="Mute music"]').should('be.visible');
+        cy.get('button[aria-label="Mute click sounds"]').should('be.visible');
+      });
+      cy.get('[data-testid="header"]').then(($header) => {
+        const header = $header[0];
+        expect(header.scrollWidth, 'header scrollWidth').to.be.at.most(header.clientWidth);
       });
     });
   });

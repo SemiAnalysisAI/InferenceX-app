@@ -19,7 +19,7 @@ interface CompareIndexTrackedLinkProps extends React.ComponentProps<typeof Link>
   analyticsSurface?: string;
   /** Route the click through `navigateInApp`, the way the header nav and the
    *  landing card already do for `/overview` and `/inference`, keeping the
-   *  transition same-document. */
+   *  transition same-document so the Minecraft music persists. */
   appNavigation?: boolean;
 }
 

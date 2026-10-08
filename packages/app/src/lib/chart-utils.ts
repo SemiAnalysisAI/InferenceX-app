@@ -94,6 +94,7 @@ export const generateHighContrastColors = (
   vendorKeyFor?: (key: string) => string,
 ): Record<string, string> => {
   if (keys.length === 0) return {};
+  // Reuse the dark seed as well as its lightness bounds for CS:GO and GTA.
   theme = chartPaletteTheme(theme);
 
   const colors: Record<string, string> = {};

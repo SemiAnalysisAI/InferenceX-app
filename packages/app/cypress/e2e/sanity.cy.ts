@@ -133,7 +133,7 @@ describe('Splash text', () => {
     cy.get('html').should('not.have.class', 'dark');
     cy.get('[data-testid="splash-text"]').should('be.visible').and('have.text', 'AgentX is here!!');
 
-    // Same splash after switching themes.
+    // Same splash after switching themes — it is no longer minecraft-only.
     pickTheme('dark');
     cy.get('html').should('have.class', 'dark');
     cy.get('[data-testid="splash-text"]').should('be.visible').and('have.text', 'AgentX is here!!');
@@ -141,15 +141,115 @@ describe('Splash text', () => {
 });
 
 describe('Theme Toggle', () => {
-  it('resets a saved retired theme to dark', () => {
+  it('loads CS:GO on demand, persists it, and removes decorations on exit', () => {
     cy.visit('/', {
       onBeforeLoad(win) {
-        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-        win.localStorage.setItem('theme', 'minecraft');
+        win.localStorage.setItem('theme', 'light');
+        win.localStorage.setItem('minecraft-music', 'false');
+        win.localStorage.setItem('minecraft-sound', 'false');
       },
     });
-    cy.get('html').should('have.class', 'dark').and('not.have.class', 'minecraft');
-    cy.window().then((win) => expect(win.localStorage.getItem('theme')).to.eq('dark'));
+    cy.get('[data-testid="csgo-scene"]').should('not.exist');
+    cy.window().then((win) => {
+      expect(
+        win.performance
+          .getEntriesByType('resource')
+          .some((r) => r.name.includes('/decorative/csgo/')),
+      ).to.eq(false);
+    });
+    pickTheme('csgo');
+    cy.get('html').should('have.class', 'csgo');
+    cy.get('[data-testid="csgo-theme-banner"]').should('be.visible');
+    cy.get('[data-testid="csgo-scene"]')
+      .should('have.attr', 'aria-hidden', 'true')
+      .and('have.css', 'pointer-events', 'none');
+    cy.reload();
+    cy.get('html').should('have.class', 'csgo');
+    cy.get('[data-testid="csgo-scene"] img').should(($img) => {
+      expect(($img[0] as HTMLImageElement).naturalWidth).to.be.greaterThan(0);
+    });
+    pickTheme('light');
+    cy.get('html').should('have.class', 'light');
+    cy.get('[data-testid="csgo-scene"]').should('not.exist');
+    cy.get('[data-testid="csgo-theme-banner"]').should('not.exist');
+  });
+
+  it('loads Doom on demand, persists it, and removes decorations on exit', () => {
+    cy.visit('/', {
+      onBeforeLoad(win) {
+        win.localStorage.setItem('theme', 'light');
+        win.localStorage.setItem('minecraft-music', 'false');
+        win.localStorage.setItem('minecraft-sound', 'false');
+      },
+    });
+    cy.get('[data-testid="doom-scene"]').should('not.exist');
+    cy.window().then((win) => {
+      expect(
+        win.performance
+          .getEntriesByType('resource')
+          .some((r) => r.name.includes('/decorative/doom/')),
+      ).to.eq(false);
+    });
+    pickTheme('doom');
+    cy.get('html').should('have.class', 'doom');
+    cy.get('[data-testid="doom-theme-banner"]').should('be.visible');
+    cy.get('[data-testid="doom-scene"]')
+      .should('have.attr', 'aria-hidden', 'true')
+      .and('have.css', 'pointer-events', 'none');
+    cy.reload();
+    cy.get('html').should('have.class', 'doom');
+    cy.get('[data-testid="doom-scene"] img').should(($img) => {
+      expect(($img[0] as HTMLImageElement).naturalWidth).to.be.greaterThan(0);
+    });
+    pickTheme('light');
+    cy.get('html').should('have.class', 'light');
+    cy.get('[data-testid="doom-scene"]').should('not.exist');
+    cy.get('[data-testid="doom-theme-banner"]').should('not.exist');
+  });
+
+  it('applies GTA from the picker, persists it, and removes decorations on exit', () => {
+    cy.visit('/', {
+      onBeforeLoad(win) {
+        win.localStorage.setItem('theme', 'light');
+      },
+    });
+    cy.get('[data-testid="gta-scene"]').should('not.exist');
+    cy.window().then((win) => {
+      expect(
+        win.performance
+          .getEntriesByType('resource')
+          .some((r) => r.name.includes('/decorative/gta/')),
+      ).to.eq(false);
+    });
+    pickTheme('gta');
+    cy.get('html').should('have.class', 'gta');
+    cy.get('[data-testid="gta-theme-banner"]').should('be.visible');
+    cy.get('[data-testid="gta-theme-banner"] .gta-wordmark')
+      .should('have.text', 'Grand Theft InferenceX')
+      .and('have.css', 'font-family')
+      .and('match', /Pricedown/i);
+    cy.get('[data-testid="gta-theme-banner"] .gta-banner-art img').should(($img) => {
+      expect(($img[0] as HTMLImageElement).naturalWidth).to.be.greaterThan(0);
+    });
+    cy.get('[data-testid="gta-scene"]')
+      .should('have.attr', 'aria-hidden', 'true')
+      .and('have.css', 'pointer-events', 'none');
+    cy.reload();
+    cy.get('html').should('have.class', 'gta');
+    cy.get('[data-testid="gta-scene"]').should('exist');
+    cy.get('[data-testid="gta-scene"] img').should(($img) => {
+      expect(($img[0] as HTMLImageElement).naturalWidth).to.be.greaterThan(0);
+    });
+    cy.get('[data-testid="gta-heist-launch"]').click();
+    cy.get('[data-testid="heist-game"]').should('have.attr', 'data-phase', 'ready');
+    cy.get('[data-testid="heist-start"]').click();
+    cy.get('[data-testid="heist-canvas"]').should('have.focus').type('{esc}');
+    cy.get('[data-testid="heist-game"]').should('not.exist');
+    cy.get('[data-testid="gta-heist-launch"]').should('have.focus');
+    pickTheme('light');
+    cy.get('html').should('have.class', 'light');
+    cy.get('[data-testid="gta-scene"]').should('not.exist');
+    cy.get('[data-testid="gta-theme-banner"]').should('not.exist');
   });
 
   it('theme persists across page reload (localStorage)', () => {

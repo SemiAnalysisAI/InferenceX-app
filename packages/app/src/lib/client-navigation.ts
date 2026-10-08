@@ -77,7 +77,7 @@ export function replaceRouterPathname(target: string, dropParams: readonly strin
 
 /**
  * Same-document navigation for in-app links: preventDefault + `router.push`
- * keeps the transition soft while
+ * keeps the transition soft (the Minecraft music keeps playing) while
  * preserving modified-click, middle-click and `target` behaviors.
  *
  * History note: this used to re-push after 250ms because the first
