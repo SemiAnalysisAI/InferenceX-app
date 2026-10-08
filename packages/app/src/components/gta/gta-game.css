@@ -1,0 +1,410 @@
+.heist-dialog {
+  width: calc(100vw - 2rem);
+  max-width: 100rem;
+  height: calc(100dvh - 2rem);
+  padding: 0;
+  gap: 0;
+  background: #10171b;
+  border: 1px solid #738275;
+  overflow: hidden;
+  z-index: 80;
+  border-radius: 0;
+}
+.heist-dialog-overlay {
+  z-index: 79;
+  background: #06100ee8;
+}
+.heist-dialog > button:last-child {
+  z-index: 20;
+  color: white;
+}
+.gta-game {
+  position: relative;
+  height: 100%;
+  min-height: 0;
+  background: #263e45;
+  color: #fff;
+  font-family: Arial, sans-serif;
+  overflow: hidden;
+}
+.gta-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none;
+}
+.gta-canvas:focus-visible {
+  outline: 2px solid #c8e29f;
+  outline-offset: -3px;
+}
+.gta-game button {
+  font:
+    700 0.75rem Arial,
+    sans-serif;
+  border: 1px solid #77877c;
+  background: #17261eea;
+  color: #f2f4e9;
+  padding: 0.65rem 0.85rem;
+  cursor: pointer;
+  min-height: 2.75rem;
+}
+.gta-game button:hover {
+  background: #4b6542;
+}
+.gta-game button:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+.gta-game button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.gta-game-top {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.2rem 3.5rem 2rem 1.5rem;
+  background: linear-gradient(#071110d9, transparent);
+  pointer-events: none;
+}
+.gta-game-top span {
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  display: block;
+}
+.gta-game h2 {
+  font-family: var(--gta-display, Arial, sans-serif);
+  font-size: clamp(1.5rem, 2.4vw, 2.4rem);
+  margin: 0;
+  color: #fff;
+  text-shadow: 2px 2px #000;
+}
+.gta-cash {
+  color: #b5dda2;
+  font-size: 1.5rem;
+  font-weight: 700;
+  text-align: right;
+  text-shadow: 2px 2px #000;
+}
+.gta-cash span {
+  font-size: 1.4rem;
+  color: #fff;
+}
+.gta-objective {
+  position: absolute;
+  top: 6.8rem;
+  left: 1.5rem;
+  max-width: 22rem;
+  background: #111b19d9;
+  border-left: 3px solid #d9c17b;
+  padding: 0.75rem 1rem;
+  pointer-events: none;
+}
+.gta-objective small,
+.gta-objective strong,
+.gta-objective span {
+  display: block;
+}
+.gta-objective small {
+  font-size: 0.75rem;
+  color: #d9c17b;
+}
+.gta-objective strong {
+  font-size: 1rem;
+  margin: 0.3rem 0;
+}
+.gta-objective span {
+  font-size: 0.75rem;
+  color: #d3dbcf;
+  line-height: 1.5;
+}
+.gta-tools {
+  position: absolute;
+  right: 1.2rem;
+  top: 6.8rem;
+  display: grid;
+  grid-template-columns: repeat(2, auto);
+  gap: 0.35rem;
+  max-width: 17rem;
+}
+.gta-bottom-hud {
+  position: absolute;
+  bottom: 5.5rem;
+  left: 1.5rem;
+  right: 1.5rem;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  pointer-events: none;
+}
+.gta-radar {
+  width: 180px;
+  box-shadow: 0 2px 10px #0009;
+  border: 3px solid #17241d;
+}
+.gta-radar canvas {
+  width: 100%;
+  display: block;
+}
+.gta-health {
+  height: 7px;
+  background: #631c24;
+}
+.gta-health i {
+  height: 100%;
+  display: block;
+  background: #9ec779;
+}
+.gta-telemetry {
+  display: flex;
+  flex-direction: column;
+  text-align: right;
+  gap: 0.3rem;
+  text-shadow: 2px 2px #000;
+  background: #0b141ba8;
+  padding: 0.8rem 1rem;
+}
+.gta-telemetry strong {
+  font-size: 2.3rem;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.gta-telemetry small,
+.gta-telemetry span {
+  font-size: 0.75rem;
+}
+.gta-game-controls {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding: 0.7rem 1rem;
+  background: #081510ed;
+}
+.gta-pad {
+  display: flex;
+  gap: 0.35rem;
+}
+.gta-pad button {
+  font-size: 1.2rem;
+  min-width: 3rem;
+  touch-action: none;
+  user-select: none;
+}
+.gta-game .gta-interact {
+  background: #b4d58b;
+  color: #172318;
+}
+.gta-game-cover {
+  position: absolute;
+  inset: 0;
+  background: #091914a1;
+  display: grid;
+  place-items: center;
+  padding: 1.5rem;
+  z-index: 5;
+  backdrop-filter: blur(3px);
+}
+.gta-game-cover > div {
+  background: #0d1818f0;
+  border-top: 3px solid #b2cf86;
+  max-width: 38rem;
+  padding: 2rem;
+  text-align: center;
+  box-shadow: 0 10px 60px #0006;
+}
+.gta-game-cover h3 {
+  font-family: var(--gta-display, Arial, sans-serif);
+  font-size: clamp(1.8rem, 4vw, 3.8rem);
+  line-height: 1.1;
+  color: #fff;
+  margin: 0.75rem 0 1rem;
+}
+.gta-game-cover p {
+  font-size: 0.9rem;
+  line-height: 1.6;
+  color: #d6dfd5;
+}
+.gta-game-cover small {
+  font-size: 0.75rem;
+  line-height: 1.5;
+  display: block;
+  color: #a6b6ae;
+  margin-top: 1rem;
+}
+.gta-game-cover button {
+  font-size: 1rem;
+  background: #b1d18e;
+  color: #162619;
+  padding: 0.8rem 2rem;
+  margin: 0.5rem;
+}
+.gta-game-cover progress {
+  width: 80%;
+  accent-color: #acd28e;
+}
+.gta-kicker {
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 0.75rem !important;
+  color: #bbd594 !important;
+}
+.gta-map-panel {
+  position: absolute;
+  left: 1.5rem;
+  top: 12rem;
+  background: #0d1818ed;
+  padding: 1rem;
+  font-size: 0.85rem;
+}
+.gta-map-panel p {
+  margin: 0.5rem 0;
+}
+.gta-map-panel h3 {
+  font-size: 1.2rem;
+  margin: 0;
+}
+.gta-notice {
+  position: absolute;
+  top: 5rem;
+  left: 25%;
+  right: 25%;
+  z-index: 8;
+  background: #663c2b;
+  padding: 0.7rem;
+  font-size: 0.8rem;
+}
+.gta-mobile-help {
+  display: none;
+}
+@media (max-width: 700px) {
+  .heist-dialog {
+    width: 100vw;
+    max-width: 100vw;
+    height: 100dvh;
+    border: 0;
+  }
+  .gta-game-top {
+    padding: 0.65rem 2.5rem 0.7rem 0.7rem;
+  }
+  .gta-game-top h2 {
+    font-size: 1.35rem;
+  }
+  .gta-cash {
+    font-size: 1rem;
+  }
+  .gta-cash span {
+    font-size: 1rem;
+  }
+  .gta-objective {
+    top: 4.8rem;
+    left: 0.6rem;
+    max-width: 57%;
+    padding: 0.5rem;
+  }
+  .gta-objective strong {
+    font-size: 0.8rem;
+  }
+  .gta-objective span {
+    display: none;
+  }
+  .gta-tools {
+    top: 4.8rem;
+    right: 0.5rem;
+    grid-template-columns: 1fr;
+    max-width: 38%;
+    gap: 0.2rem;
+  }
+  .gta-tools button {
+    font-size: 0.7rem;
+    padding: 0.3rem 0.45rem;
+    min-height: 2.1rem;
+  }
+  .gta-bottom-hud {
+    bottom: 8rem;
+    left: 0.6rem;
+    right: 0.6rem;
+  }
+  .gta-radar {
+    width: 110px;
+  }
+  .gta-telemetry {
+    padding: 0.5rem;
+  }
+  .gta-telemetry strong {
+    font-size: 1.6rem;
+  }
+  .gta-game-controls {
+    padding: 0.5rem;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+  }
+  .gta-game-controls > button {
+    flex: 1;
+  }
+  .gta-pad {
+    gap: 0.25rem;
+  }
+  .gta-pad button {
+    min-width: 2.8rem;
+    padding: 0.4rem;
+  }
+  .gta-game-cover {
+    padding: 0.8rem;
+  }
+  .gta-game-cover > div {
+    padding: 1.2rem;
+  }
+  .gta-game-cover p {
+    font-size: 0.85rem;
+  }
+  .gta-game-cover h3 {
+    font-size: 2rem;
+  }
+  .gta-desktop-help {
+    display: none;
+  }
+  .gta-mobile-help {
+    display: block;
+  }
+  .gta-map-panel {
+    left: 0.5rem;
+    top: 10rem;
+    max-width: 55%;
+    font-size: 0.75rem;
+  }
+}
+@media (max-height: 600px) {
+  .gta-game-cover > div {
+    padding: 0.8rem;
+    max-width: 45rem;
+  }
+  .gta-game-cover h3 {
+    font-size: 1.8rem;
+    margin: 0.3rem;
+  }
+  .gta-game-cover p {
+    margin: 0.4rem;
+  }
+  .gta-game-cover small {
+    margin: 0.3rem;
+  }
+  .gta-bottom-hud {
+    bottom: 5rem;
+  }
+  .gta-radar {
+    width: 110px;
+  }
+  .gta-tools {
+    grid-template-columns: repeat(2, auto);
+  }
+}

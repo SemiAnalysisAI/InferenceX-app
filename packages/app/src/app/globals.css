@@ -3,7 +3,8 @@
 @import './motion.css';
 @plugin '@tailwindcss/typography';
 
-@custom-variant dark (&:is(.dark *));
+@custom-variant dark (&:is(.dark *, .minecraft *, .csgo *, .gta *, .kart *, .doom *, .halo *));
+@custom-variant minecraft (&:is(.minecraft *));
 
 /* Allow hash navigation to clear the fixed navbar */
 .blog-prose h2[id],
@@ -53,11 +54,11 @@
   color: #7e22ce;
 }
 
-.dark .halloween-wordmark {
+:is(.dark, .minecraft, .csgo, .gta, .kart, .doom, .halo) .halloween-wordmark {
   color: #fb923c;
 }
 
-.dark .halloween-wordmark-x {
+:is(.dark, .minecraft, .csgo, .gta, .kart, .doom, .halo) .halloween-wordmark-x {
   color: #c084fc;
 }
 
@@ -298,7 +299,12 @@ html[data-inferencex-embed] .autumn-leaves {
   --overlay-run-7: oklch(0.6 0.17 60); /* amber-orange */
 }
 
-.dark {
+.dark,
+.csgo,
+.gta,
+.kart,
+.doom,
+.halo {
   /* Base Theme Colors */
   --background: #131416;
   --foreground: #eaebec;
@@ -341,6 +347,218 @@ html[data-inferencex-embed] .autumn-leaves {
   --overlay-run-5: oklch(0.7 0.22 330);
   --overlay-run-6: oklch(0.72 0.2 230);
   --overlay-run-7: oklch(0.78 0.18 60);
+}
+
+/* Tiny pre-paint shell for persisted Kart selections. No assets, fonts or
+ * animations here; artwork and gameplay styles remain in the lazy bundle. */
+.kart {
+  --primary: #ffd640;
+  --primary-foreground: #162237;
+  --ring: #ffd640;
+  --background: #111b2b;
+  --card: #152237;
+  --popover: #152237;
+}
+.kart .circuit-bg,
+.kart .autumn-leaves {
+  display: none;
+}
+
+/* Tiny pre-paint shell for persisted Doom selections. Artwork stays lazy. */
+.doom {
+  color-scheme: dark;
+  --background: #140b09;
+  --foreground: #f1e6dc;
+  --card: #1d110d;
+  --card-foreground: #f1e6dc;
+  --popover: #22140f;
+  --popover-foreground: #f1e6dc;
+  --primary: #ff6a2b;
+  --primary-foreground: #140b09;
+  --muted: #33201a;
+  --muted-foreground: #c9b6aa;
+  --accent: #3a2219;
+  --ring: #ffb347;
+}
+.doom .circuit-bg,
+.doom .autumn-leaves {
+  display: none;
+}
+
+/* Scoped pre-paint palettes for persisted themes. No assets or animation. */
+.csgo {
+  color-scheme: dark;
+  --background: #101820;
+  --foreground: #f0eee7;
+  --card: #18232d;
+  --card-foreground: #f0eee7;
+  --popover: #1b2732;
+  --popover-foreground: #f0eee7;
+  --primary: #e6bd68;
+  --primary-foreground: #101820;
+  --secondary: #8eb7d4;
+  --secondary-foreground: #101820;
+  --muted: #293744;
+  --muted-foreground: #b9c3ca;
+  --accent: #303e49;
+  --accent-foreground: #f0eee7;
+  --border: #60707c;
+  --border-alt: #35444e;
+  --input: #60707c;
+  --ring: #e6bd68;
+  --sidebar: #18232d;
+  --sidebar-foreground: #f0eee7;
+  --sidebar-primary: #e6bd68;
+  --sidebar-primary-foreground: #101820;
+  --sidebar-accent: #303e49;
+  --sidebar-accent-foreground: #f0eee7;
+  --sidebar-border: #60707c;
+  --sidebar-ring: #e6bd68;
+  --radius: 0.125rem;
+}
+.gta {
+  --font-pricedown: 'Pricedown';
+  --font-chalet-comprime: 'ChaletComprime';
+  color-scheme: dark;
+  --background: #0a0a0b;
+  --foreground: #f5f5f5;
+  --card: #111113;
+  --card-foreground: #f5f5f5;
+  --popover: #0d0d0f;
+  --popover-foreground: #f5f5f5;
+  --primary: #72cc72;
+  --primary-foreground: #0a0a0b;
+  --secondary: #5d9bd5;
+  --secondary-foreground: #0a0a0b;
+  --muted: #232326;
+  --muted-foreground: #b8b8bd;
+  --accent: #2c2c30;
+  --accent-foreground: #f5f5f5;
+  --border: #3a3a3f;
+  --border-alt: #26262a;
+  --input: #4a4a50;
+  --ring: #ffffff;
+  --sidebar: #111113;
+  --sidebar-foreground: #f5f5f5;
+  --sidebar-primary: #72cc72;
+  --sidebar-primary-foreground: #0a0a0b;
+  --sidebar-accent: #2c2c30;
+  --sidebar-accent-foreground: #f5f5f5;
+  --sidebar-border: #3a3a3f;
+  --sidebar-ring: #ffffff;
+  --radius: 0.125rem;
+  --gta-display: var(--font-pricedown), 'Pricedown', Impact, sans-serif;
+  --gta-menu: var(--font-chalet-comprime), 'ChaletComprime', 'Arial Narrow', sans-serif;
+}
+/* Halo Infinite menu chrome: deep navy panels, Forerunner cyan accents. */
+.halo {
+  --font-industry: 'Industry';
+  color-scheme: dark;
+  --background: #070d16;
+  --foreground: #e8f1f8;
+  --card: #0c1622;
+  --card-foreground: #e8f1f8;
+  --popover: #0b1520;
+  --popover-foreground: #e8f1f8;
+  --primary: #5ed1ff;
+  --primary-foreground: #04101a;
+  --secondary: #9fd356;
+  --secondary-foreground: #0a1404;
+  --muted: #182635;
+  --muted-foreground: #a9bccb;
+  --accent: #1c2d3e;
+  --accent-foreground: #e8f1f8;
+  --border: #3b5468;
+  --border-alt: #1d2d3c;
+  --input: #3b5468;
+  --ring: #5ed1ff;
+  --sidebar: #0c1622;
+  --sidebar-foreground: #e8f1f8;
+  --sidebar-primary: #5ed1ff;
+  --sidebar-primary-foreground: #04101a;
+  --sidebar-accent: #1c2d3e;
+  --sidebar-accent-foreground: #e8f1f8;
+  --sidebar-border: #3b5468;
+  --sidebar-ring: #5ed1ff;
+  --radius: 0.125rem;
+  --halo-menu: var(--font-industry), 'Industry', 'Arial Narrow', sans-serif;
+}
+.minecraft {
+  --font-minecraft: 'Monocraft';
+  --background: #1e1e1e;
+  --foreground: #ffffff;
+  --card: #1e1e1e;
+  --card-foreground: #ffffff;
+  --popover: #2a2a2a;
+  --popover-foreground: #ffffff;
+  --primary: #f7b041;
+  --primary-foreground: #1e1e1e;
+  --secondary: #0b86d1;
+  --secondary-foreground: #ffffff;
+  --brand: var(--primary);
+  --muted: #3a3a3a;
+  --muted-foreground: rgba(255, 255, 255, 0.55);
+  --accent: #2a2a2a;
+  --accent-foreground: #ffffff;
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: #555555;
+  --border-alt: #333333;
+  --input: rgba(255, 255, 255, 0.15);
+  --ring: #ffffff;
+
+  /* Sidebar */
+  --sidebar: #1a1a1a;
+  --sidebar-foreground: #ffffff;
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #2a2a2a;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: #555555;
+  --sidebar-ring: #888888;
+
+  /* Override ALL fonts to pixel font */
+  --font-dm-sans: var(--font-minecraft, 'Monocraft', monospace);
+  --font-mono: var(--font-minecraft, 'Monocraft', monospace);
+
+  /* Kill all border radius — Minecraft has no curves */
+  --radius: 0px;
+
+  /* Overlay-run palette (minecraft theme): same as dark since background is
+   * also dark (#1e1e1e). */
+  --overlay-run-0: oklch(0.72 0.22 25);
+  --overlay-run-1: oklch(0.75 0.2 190);
+  --overlay-run-2: oklch(0.78 0.2 90);
+  --overlay-run-3: oklch(0.7 0.22 290);
+  --overlay-run-4: oklch(0.75 0.2 150);
+  --overlay-run-5: oklch(0.7 0.22 330);
+  --overlay-run-6: oklch(0.72 0.2 230);
+  --overlay-run-7: oklch(0.78 0.18 60);
+}
+.minecraft .circuit-bg,
+.csgo .circuit-bg,
+.csgo .autumn-leaves,
+.gta .circuit-bg,
+.gta .autumn-leaves,
+.halo .circuit-bg,
+.halo .autumn-leaves {
+  display: none;
+}
+
+/* Shiki code blocks: reuse dark theme in minecraft mode */
+.minecraft .shiki,
+.minecraft .shiki span,
+.csgo .shiki,
+.csgo .shiki span,
+.gta .shiki,
+.gta .shiki span,
+.kart .shiki,
+.kart .shiki span,
+.doom .shiki,
+.doom .shiki span,
+.halo .shiki,
+.halo .shiki span {
+  color: var(--shiki-dark);
+  background-color: var(--shiki-dark-bg);
 }
 
 /* Embed routes (/embed/model/[slug]) render one chart inside a third-party
@@ -433,7 +651,7 @@ html[data-inferencex-skin='vllm'] [data-slot='card'] {
 .splash-text {
   display: inline-block;
   /* Light mode paints this over a white card, where flat #ffff00 all but
-     disappears — keep the yellow but ring it with a dark outline. */
+     disappears — keep the Minecraft yellow but ring it with a dark outline. */
   color: #ffcc00;
   font-weight: bold;
   font-size: 0.85rem;
@@ -452,13 +670,17 @@ html[data-inferencex-skin='vllm'] [data-slot='card'] {
 }
 
 /* Dark backgrounds need no outline — this is the original title-screen look. */
-.dark .splash-text {
+.dark .splash-text,
+.minecraft .splash-text,
+.csgo .splash-text,
+.doom .splash-text {
   color: #ffff00;
   text-shadow: 2px 2px 0px #3f3f00;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .splash-text {
+  .splash-text,
+  .minecraft .splash-text {
     animation: none;
   }
 }

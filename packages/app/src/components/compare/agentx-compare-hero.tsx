@@ -1,6 +1,7 @@
 import { ArrowRight } from 'lucide-react';
 
 import { Card } from '@/components/ui/card';
+import { MinecraftSplash } from '@/components/minecraft/minecraft-splash';
 import { NewBadge } from '@/components/ui/new-badge';
 import {
   agentxDashboardHref,
@@ -8,7 +9,6 @@ import {
   isNewAgentxModel,
 } from '@/lib/compare-agentx';
 
-import { AgentxSplash } from './agentx-splash';
 import { CompareIndexTrackedLink } from './compare-index-tracked-link';
 
 /**
@@ -492,7 +492,7 @@ export function AgentXCompareHero({
               <Heading className="mt-3 max-w-2xl text-2xl/[1.8rem] font-semibold tracking-tight text-foreground lg:text-[2.4rem]/[2.4rem]">
                 {t.title}
               </Heading>
-              {surface === 'landing' && <AgentxSplash />}
+              {surface === 'landing' && <MinecraftSplash />}
             </div>
             <p className="mt-3 max-w-3xl text-base leading-7 text-muted-foreground lg:text-lg">
               {t.description}
