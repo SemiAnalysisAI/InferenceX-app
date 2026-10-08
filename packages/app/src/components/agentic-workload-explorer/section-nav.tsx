@@ -2,8 +2,8 @@
 
 import { ChevronDown } from 'lucide-react';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 
 import { explorerHref, explorerRelativePath } from '@/lib/agentic-workload-explorer/paths';
 import { track } from '@/lib/analytics';
@@ -57,8 +57,16 @@ export function isActiveSection(relativePath: string | null, sectionPath: string
   return relativePath === sectionPath || relativePath.startsWith(`${sectionPath}/`);
 }
 
+/**
+ * Query string carried across section links. The trace-version selection
+ * lives only in `?version=`, so dropping it would reset the filter.
+ */
+export function versionQuery(version: string | null): string {
+  return version === null ? '' : `?version=${encodeURIComponent(version)}`;
+}
+
 /** Number keys 1-9 jump to the first nine sections and 0 to the tenth. */
-function useSectionHotkeys(locale: Locale) {
+function useSectionHotkeys(locale: Locale, query: string) {
   const router = useRouter();
 
   useEffect(() => {
@@ -74,11 +82,11 @@ function useSectionHotkeys(locale: Locale) {
       if (!section) return;
       e.preventDefault();
       track('agentic_workload_section_hotkey', { section: section.path });
-      router.push(explorerHref(section.path, locale));
+      router.push(explorerHref(section.path, locale) + query);
     }
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, [locale, router]);
+  }, [locale, query, router]);
 }
 
 const tabClass = (active: boolean) =>
@@ -89,7 +97,15 @@ const tabClass = (active: boolean) =>
       : 'border-transparent text-muted-foreground hover:border-muted-foreground/30',
   );
 
-function MoreMenu({ relativePath, locale }: { relativePath: string | null; locale: Locale }) {
+function MoreMenu({
+  relativePath,
+  locale,
+  query,
+}: {
+  relativePath: string | null;
+  locale: Locale;
+  query: string;
+}) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const activeLink = MORE_SECTIONS.find((link) => isActiveSection(relativePath, link.path));
@@ -131,7 +147,7 @@ function MoreMenu({ relativePath, locale }: { relativePath: string | null; local
           {MORE_SECTIONS.map((link) => (
             <Link
               key={link.path}
-              href={explorerHref(link.path, locale)}
+              href={explorerHref(link.path, locale) + query}
               onClick={() => track('agentic_workload_section_clicked', { section: link.path })}
               className={cn(
                 'rounded-sm px-2.5 py-1.5 text-sm transition-colors',
@@ -149,14 +165,31 @@ function MoreMenu({ relativePath, locale }: { relativePath: string | null; local
   );
 }
 
-/** Explorer section tabs (desktop) and a section picker (mobile). */
+function SectionNavWithVersion() {
+  const searchParams = useSearchParams();
+  return <SectionNavInner query={versionQuery(searchParams.get('version'))} />;
+}
+
+/**
+ * Explorer section tabs (desktop) and a section picker (mobile). Links keep
+ * the current `?version=` selection; `useSearchParams` needs a Suspense
+ * boundary, so the static render falls back to links without it.
+ */
 export function SectionNav() {
+  return (
+    <Suspense fallback={<SectionNavInner query="" />}>
+      <SectionNavWithVersion />
+    </Suspense>
+  );
+}
+
+function SectionNavInner({ query }: { query: string }) {
   const pathname = usePathname();
   const router = useRouter();
   const locale = useLocale();
   const relativePath = explorerRelativePath(pathname ?? '');
   const strings = STRINGS[locale];
-  useSectionHotkeys(locale);
+  useSectionHotkeys(locale, query);
 
   const activePath = useMemo(
     () => ALL_SECTIONS.find((link) => isActiveSection(relativePath, link.path))?.path ?? '',
@@ -171,7 +204,7 @@ export function SectionNav() {
           value={activePath}
           onChange={(e) => {
             track('agentic_workload_section_selected', { section: e.target.value });
-            router.push(explorerHref(e.target.value, locale));
+            router.push(explorerHref(e.target.value, locale) + query);
           }}
           className="h-9 min-w-0 flex-1 rounded-md border border-border bg-background px-2 text-sm"
         >
@@ -193,7 +226,7 @@ export function SectionNav() {
             return (
               <Link
                 key={link.path}
-                href={explorerHref(link.path, locale)}
+                href={explorerHref(link.path, locale) + query}
                 aria-current={active ? 'page' : undefined}
                 title={`${link.label[locale]} (${index + 1})`}
                 onClick={() => track('agentic_workload_section_clicked', { section: link.path })}
@@ -203,7 +236,7 @@ export function SectionNav() {
               </Link>
             );
           })}
-          <MoreMenu relativePath={relativePath} locale={locale} />
+          <MoreMenu relativePath={relativePath} locale={locale} query={query} />
         </div>
       </nav>
     </>

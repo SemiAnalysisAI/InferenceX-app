@@ -624,14 +624,10 @@ function ModelUsageChart({
 // ── Main page ────────────────────────────────────────────────────
 
 export default function ModelsPage() {
-  const locale = useLocale();
-  const s = STRINGS[locale];
   return (
-    <Expandable title={s.modelUsageOverTime}>
-      <Suspense>
-        <ModelsPageContent />
-      </Suspense>
-    </Expandable>
+    <Suspense>
+      <ModelsPageContent />
+    </Suspense>
   );
 }
 
@@ -756,12 +752,14 @@ function ModelsPageContent() {
           <FastModeAnalysis data={data.tokensByModel} strings={t} />
 
           {/* Model Usage Over Time */}
-          <ModelUsageChart
-            timeSeries={data.timeSeries}
-            colorMap={colorMap}
-            allModels={allModels}
-            strings={t}
-          />
+          <Expandable title={t.modelUsageOverTime}>
+            <ModelUsageChart
+              timeSeries={data.timeSeries}
+              colorMap={colorMap}
+              allModels={allModels}
+              strings={t}
+            />
+          </Expandable>
         </>
       )}
     </div>

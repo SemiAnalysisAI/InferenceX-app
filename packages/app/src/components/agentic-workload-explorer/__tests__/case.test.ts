@@ -110,4 +110,18 @@ describe('camelKeys', () => {
       totalOutputTokens: 200,
     });
   });
+
+  it('renames raw payload fields but keeps their snake_case contents', () => {
+    expect(
+      camelKeys({
+        request_id: 'r1',
+        request_body: { max_tokens: 1, system: [{ cache_control: { type: 'ephemeral' } }] },
+        response_body: { body: { stop_reason: 'end_turn' } },
+      }),
+    ).toEqual({
+      requestId: 'r1',
+      requestBody: { max_tokens: 1, system: [{ cache_control: { type: 'ephemeral' } }] },
+      responseBody: { body: { stop_reason: 'end_turn' } },
+    });
+  });
 });
