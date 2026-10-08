@@ -2,6 +2,7 @@ import type { InferenceData } from '@/components/inference/types';
 import {
   isFrontierEligible,
   paretoFrontForDirection,
+  paretoMaximizesX,
   type ParetoDirection,
 } from '@/lib/chart-utils';
 
@@ -39,13 +40,15 @@ export function chartFrontier(
 
 /**
  * Higher-power outer boundary across tested configurations, not an efficiency
- * frontier. Unique X vertices avoid concurrency backtracking during smoothing.
+ * frontier. It starts from the X end the chart's frontier `direction` favors.
+ * Unique X vertices avoid concurrency backtracking during smoothing.
  * Callers scope the samples by hardware, precision, date and overlay run.
  */
 export function upperPowerEnvelope(
   points: readonly InferenceData[],
-  maximizeX: boolean,
+  direction: ParetoDirection,
 ): InferenceData[] {
+  const maximizeX = paretoMaximizesX(direction);
   const sorted = points
     .filter((point) => isFrontierEligible(point) && Number.isFinite(point.y) && point.y > 0)
     .sort((a, b) => (maximizeX ? b.x - a.x : a.x - b.x) || b.y - a.y);
