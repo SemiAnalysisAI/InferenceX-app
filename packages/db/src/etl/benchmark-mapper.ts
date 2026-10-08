@@ -26,6 +26,7 @@ import {
 } from './normalizers';
 import { normalizeLegacyTpuRow, physicalChipCount, roleChipCount } from './tpu-normalization';
 import { extractRuntimeMetadata } from './runtime-metadata';
+import { hasSupportedResultSchemaVersion } from './result-schema-version';
 
 export { flattenAgenticAggRow };
 
@@ -189,8 +190,9 @@ export interface BenchmarkParams {
  * - **v3** (2026-07-02+, agentic only): nested `request_metrics`/`server_metrics`
  *   containers, flattened to the v2 flat schema up front by `flattenAgenticAggRow`.
  *
- * When mapping fails (unknown model, unknown hardware, or missing ISL/OSL/conc),
- * the appropriate skip counter on `tracker` is incremented and `null` is returned.
+ * When mapping fails (unsupported `result_schema_version`, unknown model, unknown
+ * hardware, or missing ISL/OSL/conc), the appropriate skip counter on `tracker`
+ * is incremented and `null` is returned.
  *
  * @param row - Raw benchmark dict from the artifact JSON.
  * @param tracker - Shared skip tracker; counters are mutated in place on failure.
@@ -204,6 +206,10 @@ export function mapBenchmarkRow(
   islOslFallback?: { isl: number; osl: number } | null,
   runId?: string | number | null,
 ): BenchmarkParams | null {
+  if (!hasSupportedResultSchemaVersion(row)) {
+    tracker.skips.unsupportedVersion++;
+    return null;
+  }
   // v3 agentic rows nest their metrics; flatten to the canonical flat schema
   // first so the rest of the mapper (auto-capture, intvty invariant, guards)
   // is version-agnostic. No-op for v1/v2 rows.

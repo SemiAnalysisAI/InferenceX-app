@@ -36,6 +36,8 @@ export function printIngestSummaryFooter(
   skipLines.push(
     ['unmapped model', skips.unmappedModel],
     ['unmapped hw', skips.unmappedHw],
+    ['unsupported result_schema_version', skips.unsupportedVersion],
+    ['quarantined by InferenceX', skips.quarantined],
     ['bad/empty zip', skips.badZip],
     ['DB errors', skips.dbError],
   );

@@ -14,6 +14,7 @@
  *   changelog-metadata_*   → changelog entries (base_ref, head_ref, entries[])
  *   server_logs_*          → every recursively nested .log/.out file
  *   multinode_server_logs_* → same, including files inside multinode_server_logs.tar.gz
+ *   rejected_rows_*        → rows InferenceX quarantined; their bmk_/eval_ copies are skipped
  *
  * All inserts are idempotent (ON CONFLICT DO UPDATE/NOTHING), so re-running is safe.
  *
@@ -43,7 +44,7 @@ import {
 } from './etl/run-overrides';
 import { createSkipTracker, type Skips } from './etl/skip-tracker';
 import { printIngestSummaryFooter } from './etl/ingest-summary';
-import { GPU_KEYS, parseIslOsl } from './etl/normalizers';
+import { parseIslOsl } from './etl/normalizers';
 import { createConfigCache } from './etl/config-cache';
 import { createWorkflowRunServices, type GithubRunInfo } from './etl/workflow-run';
 import { mapBenchmarkRow, type BenchmarkParams } from './etl/benchmark-mapper';
@@ -54,6 +55,8 @@ import {
   insertServerLogFiles,
 } from './etl/benchmark-ingest';
 import { mapEvalRow, mapAggEvalRow, type EvalParams } from './etl/eval-mapper';
+import { indexRejectedRows, isRejectedRowsArtifact } from './etl/rejected-rows';
+import { mapRunStats } from './etl/run-stats-mapper';
 import { ingestEvalRow } from './etl/eval-ingest';
 import { mapEvalSamples } from './etl/eval-samples-mapper';
 import { bulkIngestEvalSamples } from './etl/eval-samples-ingest';
@@ -162,6 +165,11 @@ async function pMap<T, R>(
 
 // ── Phase 1: map a single workflow dir (no DB) ────────────────────────────────
 
+/** Backup ZIPs are named `<artifact name>_<artifact id>.zip`. */
+function backupArtifactName(zipFile: string): string {
+  return zipFile.replace(/_\d+\.zip$/u, '');
+}
+
 async function mapWorkflowDir(
   dateDir: string,
   workflowDir: string,
@@ -257,6 +265,16 @@ async function mapWorkflowDir(
   const local = createSkipTracker();
   const warnings: string[] = [];
 
+  // An unreadable list throws, so this run is skipped instead of restoring quarantined rows.
+  const rejectedRows = indexRejectedRows(
+    zipFiles
+      .filter((zipFile) => isRejectedRowsArtifact(backupArtifactName(zipFile)))
+      .map((zipFile) => ({
+        name: backupArtifactName(zipFile),
+        data: readZipJson(path.join(artifactsPath, zipFile)),
+      })),
+  );
+
   // ── Index server log ZIPs (deferred read — too large for memory) ─────────
   // Map configKey → ZIP metadata. .log/.out files are extracted lazily in phase 2.
   const serverLogArtifacts = new Map<string, { zipPath: string; artifactName: string }>();
@@ -301,7 +319,14 @@ async function mapWorkflowDir(
       continue;
     }
     const rawRows: Record<string, any>[] = [];
-    for (const data of allJsons.values()) {
+    for (const [fileName, data] of allJsons) {
+      if (rejectedRows.hasBenchmarkFile(`${backupArtifactName(zipFile)}/${fileName}`, data)) {
+        local.skips.quarantined += Array.isArray(data) ? data.length : 1;
+        warnings.push(
+          `  [WARN] ${dateDir}/${zipFile}: ${fileName} skipped; quarantined by InferenceX`,
+        );
+        continue;
+      }
       if (Array.isArray(data)) rawRows.push(...data);
       else if (typeof data === 'object' && data !== null) rawRows.push(data as Record<string, any>);
     }
@@ -348,15 +373,7 @@ async function mapWorkflowDir(
       warnings.push(`  [WARN] ${dateDir}/${zipFile}: bad/empty zip — skipped`);
       continue;
     }
-    for (const [hwKey, stats] of Object.entries(data as Record<string, any>)) {
-      if (!GPU_KEYS.has(hwKey)) continue;
-      if (typeof stats?.n_success !== 'number' || typeof stats?.total !== 'number') continue;
-      statsRows.push({
-        hardware: hwKey,
-        nSuccess: stats.n_success,
-        total: stats.total,
-      });
-    }
+    statsRows.push(...mapRunStats(data, local));
   }
 
   // ── Map individual eval ZIPs ──────────────────────────────────────────────
@@ -410,7 +427,15 @@ async function mapWorkflowDir(
       if (m) samplesByTask.set(m[1].toLowerCase(), text);
     }
 
+    const evalSource = `${backupArtifactName(zipFile)}/${resultsEntry[0]}`;
     for (const params of mapped) {
+      if (rejectedRows.hasEvalTask(evalSource, params.task)) {
+        local.skips.quarantined++;
+        warnings.push(
+          `  [WARN] ${dateDir}/${zipFile}: ${params.task} skipped; quarantined by InferenceX`,
+        );
+        continue;
+      }
       evalRows.push({
         params,
         samplesText: samplesByTask.get(params.task) ?? null,
@@ -509,6 +534,8 @@ async function mapWorkflowDir(
       failedRun: local.skips.failedRun,
       // GCS backup doesn't ingest aiperf trace files; counter stays 0.
       traceReplayMissing: local.skips.traceReplayMissing,
+      unsupportedVersion: local.skips.unsupportedVersion,
+      quarantined: local.skips.quarantined,
     },
     localUnmappedModels: new Set(local.unmappedModels),
     localUnmappedHws: new Set(local.unmappedHws),
@@ -834,6 +861,8 @@ async function main(): Promise<void> {
     tracker.skips.unmappedModel += wr.localSkips.unmappedModel;
     tracker.skips.unmappedHw += wr.localSkips.unmappedHw;
     tracker.skips.noIslOsl += wr.localSkips.noIslOsl;
+    tracker.skips.unsupportedVersion += wr.localSkips.unsupportedVersion;
+    tracker.skips.quarantined += wr.localSkips.quarantined;
     for (const m of wr.localUnmappedModels) tracker.unmappedModels.add(m);
     for (const h of wr.localUnmappedHws) tracker.unmappedHws.add(h);
 

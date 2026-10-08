@@ -12,6 +12,10 @@ export interface Skips {
   dbError: number;
   /** Agentic point whose sibling `agentic_<suffix>` artifact had no trace_replay files. */
   traceReplayMissing: number;
+  /** Row stamped with a `result_schema_version` this ingest does not support. */
+  unsupportedVersion: number;
+  /** Per-config row an InferenceX collector rejected (listed in `rejected_rows_*`). */
+  quarantined: number;
 }
 
 export interface SkipSnapshot {
@@ -77,6 +81,8 @@ export function createSkipTracker(): SkipTracker {
     failedRun: 0,
     dbError: 0,
     traceReplayMissing: 0,
+    unsupportedVersion: 0,
+    quarantined: 0,
   };
   const unmappedModels = new Set<string>();
   const unmappedHws = new Set<string>();

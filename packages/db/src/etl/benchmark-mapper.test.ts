@@ -1636,3 +1636,30 @@ describe('mapBenchmarkRow — v3 agentic nested agg schema', () => {
     expect(result!.offloadMode).toBe('on');
   });
 });
+
+describe('mapBenchmarkRow result_schema_version', () => {
+  it.each([
+    ['fixed-sequence', makeV1Row],
+    ['nested AgentX', makeV3AgenticRow],
+  ])('maps a %s row stamped with version 1', (_kind, makeRow) => {
+    const tracker = createSkipTracker();
+
+    expect(mapBenchmarkRow(makeRow({ result_schema_version: 1 }), tracker)).not.toBeNull();
+    expect(tracker.skips.unsupportedVersion).toBe(0);
+  });
+
+  it.each([
+    ['fixed-sequence', makeV1Row],
+    ['nested AgentX', makeV3AgenticRow],
+  ])('refuses a %s row stamped with a newer version', (_kind, makeRow) => {
+    const tracker = createSkipTracker();
+
+    expect(mapBenchmarkRow(makeRow({ result_schema_version: 2 }), tracker)).toBeNull();
+    expect(tracker.skips).toMatchObject({
+      unsupportedVersion: 1,
+      unmappedModel: 0,
+      noIslOsl: 0,
+      failedRun: 0,
+    });
+  });
+});
