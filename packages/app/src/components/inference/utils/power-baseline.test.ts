@@ -32,7 +32,7 @@ describe('powerBaselineMetric', () => {
     expect(powerBaselineMetric('y_measuredAvgPower')).toBe('meanWattsPerGpu');
     expect(powerBaselineMetric('y_measuredJPerOutputToken')).toBe('joulesPerOutputToken');
     expect(powerBaselineMetric('y_tpPerGpu')).toBeNull();
-    expect(powerBaselineMetric('y_modeledChassisPowerPerGpu')).toBeNull();
+    expect(powerBaselineMetric('y_utilityModeledJPerOutputToken')).toBeNull();
   });
 });
 
