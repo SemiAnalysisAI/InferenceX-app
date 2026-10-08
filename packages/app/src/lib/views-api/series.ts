@@ -25,10 +25,7 @@ import type {
 } from '@/components/inference/types';
 import { partitionChartDataByLimits } from '@/components/inference/utils';
 import { bestSeriesPerSku } from '@/components/inference/utils/best-series-per-sku';
-import {
-  isMeasuredPowerCurveMetric,
-  upperPowerEnvelope,
-} from '@/components/inference/utils/powerCurves';
+import { isPowerCurveMetric, upperPowerEnvelope } from '@/components/inference/utils/powerCurves';
 import { pointDeploymentMode, type QuickFilters } from '@/components/inference/utils/quickFilters';
 import { pointTopologyKey } from '@/components/inference/utils/topology-filter';
 import {
@@ -311,7 +308,7 @@ export function buildInferenceSeries(
 
   // 7. Frontier flags, scoped per (hwKey, precision, date) like ScatterGraph.
   // Measured power represents load demand, so retain its upper boundary.
-  const isMeasuredPower = isMeasuredPowerCurveMetric(metricConfigKey);
+  const isMeasuredPower = isPowerCurveMetric(metricConfigKey);
   const maximizePowerX = chartDef.chartType !== 'e2e';
   const frontierDirection =
     xmode === 'concurrency'

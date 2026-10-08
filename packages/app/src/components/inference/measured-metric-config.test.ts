@@ -33,7 +33,6 @@ describe('measured metric configuration', () => {
     for (const key of MEASURED_ENERGY_METRIC_CONFIG_KEYS) {
       expect(getMeasuredMetricConfig(key)?.basis, key).toBe('gpu-measured');
     }
-    expect(getMeasuredMetricConfig('y_modeledChassisPowerPerGpu')).toBeUndefined();
     expect(getMeasuredMetricConfig('y_removedMetric')).toBeUndefined();
     expect(getMeasuredMetricConfig('')).toBeUndefined();
   });

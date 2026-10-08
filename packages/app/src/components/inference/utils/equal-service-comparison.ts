@@ -1,5 +1,4 @@
 import type { AggDataEntry, InferenceData } from '../types';
-import { chipCounts } from '@/lib/chip-counts';
 import { getHardwareConfig } from '@/lib/constants';
 import { isPositive, powerBasisNormalization } from '@/lib/power-basis';
 import { getDisplayLabel } from '@/lib/utils';
@@ -207,7 +206,7 @@ function deploymentOutput(point: InferenceData): number | undefined {
       }).totalOutputTokPerSec ?? undefined
     );
   }
-  const count = chipCounts(point, false).physical;
+  const count = point.physicalChips ?? point.tp;
   return isPositive(count) && Number.isSafeInteger(count)
     ? point.output_tput_per_gpu * count
     : undefined;

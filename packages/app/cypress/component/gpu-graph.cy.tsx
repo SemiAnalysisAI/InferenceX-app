@@ -522,7 +522,6 @@ describe('GPU comparison power envelopes', () => {
 
   it('reveals off-boundary measurements without changing power envelopes or axes', () => {
     mountGpuGraph(<PowerComparison />);
-    cy.get('#gpu-show-all-measurements').should('not.exist');
     cy.get('#gpu-power-curves .dot-group').should('have.length', 6);
     cy.get('#gpu-power-curves .roofline-path')
       .should('have.length', 2)
@@ -549,7 +548,6 @@ describe('GPU comparison power envelopes', () => {
           Array.from($current[0].querySelectorAll('.x-axis, .y-axis'), (axis) => axis.innerHTML),
         ).to.deep.equal(axes);
       });
-      cy.get('#gpu-show-all-measurements').should('not.exist');
       cy.get('#gpu-hide-non-optimal').click({ force: true });
       cy.get('#gpu-power-curves .dot-group').should('have.length', 6);
     });
@@ -579,16 +577,13 @@ describe('GPU comparison power envelopes', () => {
       cy.get('#gpu-hide-non-optimal').should('have.attr', 'data-state', 'checked');
       cy.get('#gpu-power-curves .dot-group').should('have.length', 6);
       cy.get('#gpu-power-curves .roofline-path').should('have.length', 2);
-      cy.get('#gpu-show-all-measurements').should('not.exist');
       cy.get('#gpu-hide-non-optimal').click({ force: true });
       cy.get('#gpu-power-curves .dot-group').should('have.length', 12);
       cy.get('#gpu-power-curves .roofline-path').should('have.length', 2);
-      cy.get('#gpu-show-all-measurements').should('not.exist');
       cy.get('#gpu-hide-non-optimal').click({ force: true });
       cy.get('#gpu-power-curves .dot-group').should('have.length', 6);
     }
     cy.contains('button', 'Energy').click();
-    cy.get('#gpu-show-all-measurements').should('not.exist');
     cy.get('#gpu-hide-non-optimal').should('have.attr', 'data-state', 'checked');
     cy.get('#gpu-power-curves .roofline-path')
       .should('have.length', 2)

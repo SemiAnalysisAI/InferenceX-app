@@ -63,7 +63,6 @@ describe('power chart semantics', () => {
     expect(isPowerCurveMetric('y_measuredP75Power')).toBe(true);
     expect(isPowerCurveMetric('y_measuredP90Power')).toBe(true);
     expect(isPowerCurveMetric('y_measuredPowerPercentTdp')).toBe(true);
-    expect(isPowerCurveMetric('y_modeledChassisPowerPerGpu')).toBe(true);
     expect(isPowerCurveMetric('y_measuredJPerOutputToken')).toBe(false);
     expect(isPowerCurveMetric('y_tpPerGpu')).toBe(false);
     const points = [point(1, 200, 4), point(8, 100, 1)];

@@ -123,7 +123,6 @@ import {
   upperPowerEnvelope,
   isPowerCurveMetric,
   isPowerGaugeSeries,
-  isMeasuredPowerCurveMetric,
 } from '@/components/inference/utils/powerCurves';
 import type {
   ChartDefinition,
@@ -454,7 +453,6 @@ const SCATTER_STRINGS = {
     paretoFrontier: 'Pareto Frontier',
     paretoFrontierInfo:
       'Dotted line connecting the best visible results, with green shading beyond it. Switch off and on again for a sunny butterfly castle background; repeat to return to green.',
-    showAllMeasurements: 'Show all measurements',
     optimalInfo: 'Optimal points form the Pareto frontier for the selected axes.',
     powerBoundaryInfo:
       'Show only points on the upper measured power boundary. Turn off to show all measurements; the boundary stays the same. This is a power-load boundary, not an energy-efficiency frontier.',
@@ -492,7 +490,6 @@ const SCATTER_STRINGS = {
     paretoFrontier: 'Pareto 前沿',
     paretoFrontierInfo:
       '用点线连接所有可见系列的最优边界点，并在更优一侧填充绿色。关闭后再次开启，切换为阳光、蝴蝶和城堡背景；再重复一次恢复绿色。',
-    showAllMeasurements: '显示全部测量点',
     optimalInfo: '最优点构成当前所选坐标轴的 Pareto 前沿。',
     powerBoundaryInfo:
       '仅显示实测功率上边界上的点。关闭后显示全部测量点，边界曲线保持不变。这是功率负载边界，不是能效前沿。',
@@ -562,7 +559,6 @@ const ScatterGraph = React.memo(
     const {
       selectedYAxisMetric,
       hideNonOptimal: preferOptimalOnly,
-      showAllMeasurements: savedShowAllMeasurements,
       showPointLabels,
       highContrast,
       logScale,
@@ -581,7 +577,6 @@ const ScatterGraph = React.memo(
       removeHwType,
       resolveComparisonSelection,
       setHideNonOptimal,
-      setShowAllMeasurements,
       setShowPointLabels,
       selectAllHwTypes,
       setHighContrast,
@@ -605,14 +600,10 @@ const ScatterGraph = React.memo(
     ) as ParetoDirection | undefined;
     const hideNonOptimal = preferOptimalOnly && Boolean(paretoDirection);
     const isPowerAxis = isPowerCurveMetric(selectedYAxisMetric);
-    const isMeasuredPowerAxis = isMeasuredPowerCurveMetric(selectedYAxisMetric);
     // Measured power describes the load sweep. Keep its boundary fixed while
     // Optimal Only changes marker visibility, as on the other scatter charts.
-    const showPowerEnvelope =
-      !isConcurrencyAxis && isPowerAxis && (isMeasuredPowerAxis || !hideNonOptimal);
-    const showAllMeasurements = isMeasuredPowerAxis ? !hideNonOptimal : savedShowAllMeasurements;
-    const supportsGradientLabels =
-      !isConcurrencyAxis && (!showPowerEnvelope || isMeasuredPowerAxis);
+    const showPowerEnvelope = !isConcurrencyAxis && isPowerAxis;
+    const supportsGradientLabels = !isConcurrencyAxis;
     const showGradientLabels = preferGradientLabels && supportsGradientLabels;
     const groupDisplayedPoints = useCallback(
       (points: InferenceData[]) => {
@@ -931,11 +922,11 @@ const ScatterGraph = React.memo(
     }, [showPowerEnvelope, groupedData, groupDisplayedPoints]);
 
     const optimalPointKeys = useMemo(() => {
-      if (isMeasuredPowerAxis) return powerEnvelopePointKeys;
+      if (isPowerAxis) return powerEnvelopePointKeys;
       const keys = new Set<string>();
       Object.values(rooflines).forEach((pts) => pts.forEach((p) => keys.add(optimalPointKey(p))));
       return keys;
-    }, [rooflines, isMeasuredPowerAxis, powerEnvelopePointKeys]);
+    }, [rooflines, isPowerAxis, powerEnvelopePointKeys]);
 
     const effectiveActiveHwTypes = useMemo(() => {
       if (showAllHardwareTypes) {
@@ -1245,17 +1236,12 @@ const ScatterGraph = React.memo(
     const overlayOptimalPoints = useMemo(() => {
       const set = new Set<InferenceData>();
       for (const group of Object.values(
-        isMeasuredPowerAxis ? displayedOverlayRooflines : overlayRooflines,
+        isPowerAxis ? displayedOverlayRooflines : overlayRooflines,
       )) {
         for (const p of group.points) set.add(p);
       }
       return set;
-    }, [overlayRooflines, isMeasuredPowerAxis, displayedOverlayRooflines]);
-
-    const overlayEnvelopePoints = useMemo(
-      () => new Set(Object.values(displayedOverlayRooflines).flatMap((group) => group.points)),
-      [displayedOverlayRooflines],
-    );
+    }, [overlayRooflines, isPowerAxis, displayedOverlayRooflines]);
 
     const overlayGradientLabelPoints = useMemo(() => {
       const labels = new Set<InferenceData>();
@@ -1282,16 +1268,8 @@ const ScatterGraph = React.memo(
     const isOverlayPointVisible = useCallback(
       (d: InferenceData) =>
         !hiddenPowerVariants.has(powerVariantId(d.powerVariant)) &&
-        (!hideNonOptimal || overlayOptimalPoints.has(d)) &&
-        (!showPowerEnvelope || showAllMeasurements || overlayEnvelopePoints.has(d)),
-      [
-        hiddenPowerVariants,
-        hideNonOptimal,
-        overlayOptimalPoints,
-        showPowerEnvelope,
-        showAllMeasurements,
-        overlayEnvelopePoints,
-      ],
+        (!hideNonOptimal || overlayOptimalPoints.has(d)),
+      [hiddenPowerVariants, hideNonOptimal, overlayOptimalPoints],
     );
 
     // All official points for rendering (unfiltered — visibility via opacity)
@@ -1603,19 +1581,13 @@ const ScatterGraph = React.memo(
         effectiveActiveHwTypes.has(d.hwKey as string) &&
         selectedPrecisions.includes(d.precision) &&
         !hiddenPowerVariants.has(powerVariantId(d.powerVariant)) &&
-        (!hideNonOptimal || optimalPointKeys.has(optimalPointKey(d))) &&
-        (!showPowerEnvelope ||
-          showAllMeasurements ||
-          powerEnvelopePointKeys.has(optimalPointKey(d))),
+        (!hideNonOptimal || optimalPointKeys.has(optimalPointKey(d))),
       [
         effectiveActiveHwTypes,
         selectedPrecisions,
         hiddenPowerVariants,
         hideNonOptimal,
         optimalPointKeys,
-        showPowerEnvelope,
-        showAllMeasurements,
-        powerEnvelopePointKeys,
       ],
     );
 
@@ -1942,8 +1914,7 @@ const ScatterGraph = React.memo(
         persistedRulers !== undefined &&
         (persistedRulers.pending !== null || persistedRulers.state.rulers.length > 0),
     );
-    const perfRulerMode =
-      !isConcurrencyAxis && preferPerfRulerMode && (!showPowerEnvelope || isMeasuredPowerAxis);
+    const perfRulerMode = !isConcurrencyAxis && preferPerfRulerMode;
     const [localPerfRulerState, setLocalPerfRulerState] =
       useState<PerfRulerState>(EMPTY_PERF_RULER_STATE);
     const perfRulerState = persistedRulers ? persistedRulers.state : localPerfRulerState;
@@ -3328,7 +3299,7 @@ const ScatterGraph = React.memo(
         const overlayPoints = zoomGroup.selectAll<SVGGElement, InferenceData>(
           '.unofficial-overlay-pt',
         );
-        const powerLabels = isMeasuredPowerAxis && showGradientLabels;
+        const powerLabels = isPowerAxis && showGradientLabels;
         const showLabels = powerLabels || (showPointLabels && !showGradientLabels);
         overlayPoints.each(function (d) {
           const lines = (
@@ -3809,7 +3780,7 @@ const ScatterGraph = React.memo(
       pinLineLabels,
       gradientColorByPoint,
       overlayGradientLabelPoints,
-      isMeasuredPowerAxis,
+      isPowerAxis,
       chartId,
       pointsData,
       showPointLabels,
@@ -4165,14 +4136,7 @@ const ScatterGraph = React.memo(
     // Dismiss tooltip on filter changes
     useEffect(() => {
       chartRef.current?.dismissTooltip();
-    }, [
-      selectedPrecisions,
-      selectedYAxisMetric,
-      hideNonOptimal,
-      showAllMeasurements,
-      overlayData,
-      chartId,
-    ]);
+    }, [selectedPrecisions, selectedYAxisMetric, hideNonOptimal, overlayData, chartId]);
 
     // Dismiss when pinned point's hardware becomes hidden
     useEffect(() => {
@@ -4453,9 +4417,9 @@ const ScatterGraph = React.memo(
                           setHideNonOptimal(checked);
                           track('latency_hide_non_optimal_toggled', { enabled: checked });
                         },
-                        ...(isMeasuredPowerAxis || selectedSequence === Sequence.AgenticTraces
+                        ...(isPowerAxis || selectedSequence === Sequence.AgenticTraces
                           ? {
-                              infoTooltip: isMeasuredPowerAxis
+                              infoTooltip: isPowerAxis
                                 ? legendT.powerBoundaryInfo
                                 : legendT.optimalInfo,
                             }
@@ -4470,19 +4434,6 @@ const ScatterGraph = React.memo(
                         onCheckedChange: (checked: boolean) => {
                           setShowParetoFrontier(checked);
                           track('inference_pareto_frontier_toggled', { enabled: checked });
-                        },
-                      },
-                    ]
-                  : []),
-                ...(showPowerEnvelope && !isMeasuredPowerAxis
-                  ? [
-                      {
-                        id: 'scatter-show-all-measurements',
-                        label: legendT.showAllMeasurements,
-                        checked: showAllMeasurements,
-                        onCheckedChange: (checked: boolean) => {
-                          setShowAllMeasurements(checked);
-                          track('latency_show_all_measurements_toggled', { enabled: checked });
                         },
                       },
                     ]
@@ -4559,7 +4510,7 @@ const ScatterGraph = React.memo(
                     track('latency_line_labels_toggled', { enabled: checked });
                   },
                 },
-                ...(isConcurrencyAxis || (showPowerEnvelope && !isMeasuredPowerAxis)
+                ...(isConcurrencyAxis
                   ? []
                   : [
                       {

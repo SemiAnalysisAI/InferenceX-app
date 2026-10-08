@@ -669,7 +669,6 @@ it('uses Optimal Only to filter power boundary dots without replacing official o
     if ($toggle.attr('data-state') === 'unchecked') cy.wrap($toggle).click();
   });
   cy.get('#scatter-hide-non-optimal').should('have.attr', 'data-state', 'checked');
-  cy.get('#scatter-show-all-measurements').should('not.exist');
   assertVisibleMeasuredValues('.dot-group', [650, 700, 900]);
   assertVisibleMeasuredValues('.unofficial-overlay-pt', [700, 750, 950]);
 
@@ -701,7 +700,6 @@ it('uses Optimal Only to filter power boundary dots without replacing official o
             expect(curve.dataset.curveKind).to.equal('power-envelope');
           }
         });
-        cy.get('#scatter-show-all-measurements').should('not.exist');
       }
     });
 
@@ -711,7 +709,6 @@ it('uses Optimal Only to filter power boundary dots without replacing official o
     .click();
   cy.get('[data-testid="chart-figure"] h2').should('contain', 'Measured Joules per Output Token');
   cy.get('#scatter-hide-non-optimal').should('have.attr', 'data-state', 'checked');
-  cy.get('#scatter-show-all-measurements').should('not.exist');
   assertVisibleMeasuredValues('.dot-group', [2, 4, 5]);
   assertVisibleMeasuredValues('.unofficial-overlay-pt', [3, 5, 6]);
   cy.get(curves)

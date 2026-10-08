@@ -7,14 +7,10 @@ import { frameworkFamily } from '@/lib/framework-family';
 import type { Locale } from '@/lib/i18n';
 import { isKvOffloadEnabled } from '@/lib/kv-offload';
 import { chartStateHref } from '@/lib/url-state';
-import { chipCounts } from '@/lib/chip-counts';
 import type { SystemPowerUnsupportedReason } from '@/lib/modeled-system-power';
 
 import type { HardwareConfig, InferenceData, OverlayData } from '@/components/inference/types';
-import {
-  isMeasuredEnergyConfigKey,
-  isModeledSystemPowerConfigKey,
-} from '@/components/inference/metric-registry';
+import { isMeasuredEnergyConfigKey } from '@/components/inference/metric-registry';
 import { getMeasuredMetricConfig } from '@/components/inference/measured-metric-config';
 import { powerVariantLabel } from '@/components/inference/utils/power-compare';
 import {
@@ -158,7 +154,6 @@ const TOOLTIP_STRINGS = {
     branch: 'Branch',
     chipConfig: 'Chip Config',
     totalChips: 'Total Chips',
-    configuredChips: 'Configured Chip Count',
     concurrency: 'Concurrency',
     precision: 'Precision',
     inputTputPerChip: 'Input Token Throughput per Chip',
@@ -179,7 +174,6 @@ const TOOLTIP_STRINGS = {
     branch: '分支',
     chipConfig: '芯片配置',
     totalChips: '芯片总数',
-    configuredChips: '配置中的芯片数',
     concurrency: '并发数',
     precision: '精度',
     inputTputPerChip: '每芯片输入 token 吞吐量',
@@ -219,18 +213,6 @@ const powerVariantHTML = (
     }
   }
   return html;
-};
-
-const totalChipsHTML = (d: InferenceData, selectedYAxisMetric: string, locale: Locale): string => {
-  const t = TOOLTIP_STRINGS[locale];
-  const { physical, configured } = chipCounts(
-    d,
-    isModeledSystemPowerConfigKey(selectedYAxisMetric),
-  );
-  return (
-    tooltipLine(t.totalChips, physical) +
-    (physical === configured ? '' : tooltipLine(t.configuredChips, configured))
-  );
 };
 
 /**
@@ -325,13 +307,7 @@ const modeledSystemPowerHTML = (
   locale: Locale,
 ): string => {
   const estimate = d.modeledSystemPower;
-  if (
-    !estimate ||
-    (!isMeasuredEnergyConfigKey(selectedYAxisMetric) &&
-      !isModeledSystemPowerConfigKey(selectedYAxisMetric))
-  ) {
-    return '';
-  }
+  if (!estimate || !isMeasuredEnergyConfigKey(selectedYAxisMetric)) return '';
   const t = SYSTEM_POWER_STRINGS[locale];
   if (estimate.status === 'unsupported') {
     if (!isPinned || estimate.reason === 'workload') return '';
@@ -852,7 +828,7 @@ export const generateTooltipContent = (config: TooltipConfig): string => {
       ${powerTierHTML(d, selectedYAxisMetric, locale)}
       ${powerVariantHTML(d, selectedYAxisMetric, locale)}
       ${modeledSystemPowerHTML(d, selectedYAxisMetric, isPinned, locale)}
-      ${totalChipsHTML(d, selectedYAxisMetric, locale)}
+      ${tooltipLine(t.totalChips, d.physicalChips ?? d.tp)}
       ${generateParallelismHTML(d, locale)}
       ${tooltipLine(t.concurrency, `${d.conc}`)}
       ${tooltipLine(t.precision, `${d.precision.toUpperCase()}`)}
@@ -905,7 +881,7 @@ export const generateOverlayTooltipContent = (config: OverlayTooltipConfig): str
       ${powerTierHTML(d, selectedYAxisMetric, locale)}
       ${powerVariantHTML(d, selectedYAxisMetric, locale)}
       ${modeledSystemPowerHTML(d, selectedYAxisMetric, isPinned, locale)}
-      ${totalChipsHTML(d, selectedYAxisMetric, locale)}
+      ${tooltipLine(t.totalChips, d.physicalChips ?? d.tp)}
       ${generateParallelismHTML(d, locale)}
       ${tooltipLine(t.concurrency, `${d.conc}`)}
       ${tooltipLine(t.precision, `${d.precision.toUpperCase()}`)}
@@ -975,7 +951,7 @@ export const generateGPUGraphTooltipContent = (config: TooltipConfig): string =>
       ${powerTierHTML(d, selectedYAxisMetric, locale)}
       ${powerVariantHTML(d, selectedYAxisMetric, locale)}
       ${modeledSystemPowerHTML(d, selectedYAxisMetric, isPinned, locale)}
-      ${totalChipsHTML(d, selectedYAxisMetric, locale)}
+      ${tooltipLine(t.totalChips, d.physicalChips ?? d.tp)}
       ${generateParallelismHTML(d, locale)}
       ${tooltipLine(t.concurrency, `${d.conc}`)}
       ${tooltipLine(t.precision, `${d.precision.toUpperCase()}`)}

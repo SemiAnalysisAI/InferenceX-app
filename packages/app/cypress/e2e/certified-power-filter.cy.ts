@@ -183,9 +183,8 @@ describe('Validated vs historical measured power', () => {
       },
     }));
     const powerView = '&i_metric=y_measuredAvgPower&i_best=0';
-    visitCertifiedPowerChart(`${powerView}&i_optimal=1&i_allpoints=1`, curveBenchmarks);
+    visitCertifiedPowerChart(`${powerView}&i_optimal=1`, curveBenchmarks);
     cy.get('#scatter-hide-non-optimal').should('have.attr', 'data-state', 'checked');
-    cy.get('#scatter-show-all-measurements').should('not.exist');
     visiblePowerPoints().should('have.length', 4);
 
     // Let the initial ResizeObserver update reach the SVG before saving geometry.
@@ -225,9 +224,8 @@ describe('Validated vs historical measured power', () => {
         });
       });
 
-    visitCertifiedPowerChart(`${powerView}&i_optimal=0&i_allpoints=0`, curveBenchmarks);
+    visitCertifiedPowerChart(`${powerView}&i_optimal=0`, curveBenchmarks);
     cy.get('#scatter-hide-non-optimal').should('have.attr', 'data-state', 'unchecked');
-    cy.get('#scatter-show-all-measurements').should('not.exist');
     visiblePowerPoints().should('have.length', 6);
   });
 });

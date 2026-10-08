@@ -180,8 +180,7 @@ export function powerBasisNormalization(
  * telemetry admission: `modelSystemPower` requires `power_valid === 1` plus
  * schema v2, or the validated unversioned single-node producer it records as
  * `telemetryBasis: 'validated-unversioned-single-node'`. That is the same
- * population the app plots as B1 (`measuredAvgPower`) and as
- * `modeledChassisPowerPerGpu`, so B4 renders exactly where they do. The public
+ * telemetry admission the app applies to B1 (`measuredAvgPower`). The public
  * API's stricter `strictV2` row filter is not re-applied here; it is not
  * applied to the chart's B1 either.
  */

@@ -95,17 +95,6 @@ describe('InferenceTable sorting logic', () => {
     },
   );
 
-  it('sorts supported modeled estimates by ascending power', () => {
-    const definition = chartDefinitions[0];
-    const metric = 'y_modeledChassisPowerPerGpu';
-    const points = [
-      makePoint({ modeledChassisPowerPerGpu: { y: 1200, roof: false } }),
-      makePoint({ modeledChassisPowerPerGpu: { y: 750, roof: false } }),
-    ];
-    const sorted = sortRowsByYMetric(points, definition, metric);
-    expect(sorted.map((point) => point.modeledChassisPowerPerGpu?.y)).toEqual([750, 1200]);
-  });
-
   it('provides locale-aware table headers without changing the English source', () => {
     const headerLabels = (
       inferenceTableModule as typeof inferenceTableModule & {

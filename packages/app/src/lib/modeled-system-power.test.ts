@@ -545,11 +545,11 @@ describe('modeled system power admission and accounting', () => {
     expect(entry.joules_per_output_token).toBe(source.metrics.joules_per_output_token);
     const { chartData } = transformBenchmarkRows([source]);
     for (const points of chartData) {
-      expect(points[0].modeledChassisPowerPerGpu?.y).toBeGreaterThan(source.metrics.avg_power_w);
+      expect(points[0].utilityModeledWatts?.y).toBeGreaterThan(source.metrics.avg_power_w);
     }
     const unsupported = transformBenchmarkRows([row({ hardware: 'gb200' })]);
     for (const points of unsupported.chartData) {
-      expect(points[0].modeledChassisPowerPerGpu).toBeUndefined();
+      expect(points[0].utilityModeledWatts).toBeUndefined();
       expect(points[0].measuredAvgPower?.y).toBe(source.metrics.avg_power_w);
     }
   });
