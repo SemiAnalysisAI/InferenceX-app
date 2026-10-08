@@ -504,12 +504,14 @@ export const METRIC_EXPLANATIONS: Record<MetricKey, MetricExplanation> = {
   utilityModeledWatts: {
     description: {
       en:
-        'Modeled facility power per allocated accelerator: measured GPU power is scaled to chassis ' +
-        'AC by the system power model and then multiplied once by PUE. Only hardware with a known ' +
-        'eight-GPU chassis profile on 8k1k runs is supported; NVL72 systems show no value.',
+        'Modeled facility power per allocated accelerator: measured GPU power (plus measured Grace ' +
+        'or module power on NVL72) is scaled to chassis AC by the system power model and then ' +
+        'multiplied once by PUE. Supported on 8k1k and AgentX runs for hardware with a known ' +
+        'eight-GPU chassis profile, or NVL72 with complete Grace or module telemetry; other runs ' +
+        'show no value.',
       zh:
-        '每已分配加速器的整体实测功耗：先由系统功耗模型将 GPU 实测功耗换算为机箱交流功耗，再乘以一次 PUE。' +
-        '仅支持在 8k1k 运行中具有已知八卡机箱模型的硬件；NVL72 系统不显示数值。',
+        '每已分配加速器的整体实测功耗：先由系统功耗模型将 GPU 实测功耗（NVL72 还包括实测 Grace 或 module 功耗）换算为机箱交流功耗，再乘以一次 PUE。' +
+        '支持 8k1k 和 AgentX 运行，硬件需具有已知八卡机箱模型，或为 Grace 或 module 遥测完整的 NVL72；其他运行不显示数值。',
     },
     formula: {
       en: 'W/GPU = modeled chassis AC power (W) × PUE ÷ allocated GPUs',
