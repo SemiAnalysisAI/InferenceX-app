@@ -28,7 +28,6 @@ function series(id: number, host: string, base: number): GpuMetricSeries {
   return {
     id,
     artifactName: 'gpu_metrics_qwen35_b200',
-    configKey: 'qwen35_b200_tp8',
     fileName: `${host}/gpu_metrics.csv`,
     vendor: 'nvidia',
     sampleIntervalS: 1,
@@ -37,7 +36,6 @@ function series(id: number, host: string, base: number): GpuMetricSeries {
     startedAt: data[0].timestamp,
     endedAt: data.at(-1)!.timestamp,
     sidecars: {},
-    benchmarkResultIds: [ID],
     stats: [0, 1].map((gpuIndex) => ({
       gpuIndex,
       metric: 'power_w',

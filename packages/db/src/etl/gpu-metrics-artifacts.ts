@@ -22,9 +22,8 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { createHash } from 'node:crypto';
 
-import { isMultinodePowerSamplesPath } from './multinode-power-samples.js';
+import { sha256Hex } from './benchmark-artifacts.js';
 import {
   isPowerAuditValidationEntry,
   normalizePowerAuditValidations,
@@ -78,17 +77,17 @@ export function expectedTelemetryArtifactNames(suffix: string): string[] {
   return [`${GPU_METRICS_ARTIFACT_PREFIX}${suffix}`, `${POWER_AUDIT_ARTIFACT_PREFIX}${suffix}`];
 }
 
-function isGpuMetricsCsvName(fileName: string): boolean {
-  const lower = fileName.toLowerCase();
+export function isGpuMetricsCsvPath(relativePath: string): boolean {
+  const lower = path.posix.basename(relativePath).toLowerCase();
   if (!lower.startsWith('gpu_metrics') || !lower.endsWith('.csv')) return false;
   // Sidecars share the prefix but are not time series.
   return !lower.includes('_identity') && !lower.includes('_energy_');
 }
 
-/** Recursively list the files under `root` whose POSIX-relative name passes `matches`. */
-function listFiles(
+/** Recursively list the files under an extracted artifact root whose relative path matches. */
+export function walkFiles(
   root: string,
-  matches: (fileName: string, baseName: string) => boolean,
+  matches: (relativePath: string) => boolean,
 ): GpuMetricsCsvFile[] {
   if (!fs.existsSync(root) || !fs.statSync(root).isDirectory()) return [];
   const files: GpuMetricsCsvFile[] = [];
@@ -98,7 +97,7 @@ function listFiles(
       if (entry.isDirectory()) visit(pathname);
       else if (entry.isFile()) {
         const fileName = path.relative(root, pathname).split(path.sep).join('/');
-        if (matches(fileName, entry.name)) files.push({ fileName, path: pathname });
+        if (matches(fileName)) files.push({ fileName, path: pathname });
       }
     }
   };
@@ -106,19 +105,12 @@ function listFiles(
   return files.toSorted((a, b) => a.fileName.localeCompare(b.fileName));
 }
 
-/** Recursively list every telemetry CSV under an extracted artifact root. */
-export function listGpuMetricsCsvFiles(root: string): GpuMetricsCsvFile[] {
-  return listFiles(root, (_fileName, baseName) => isGpuMetricsCsvName(baseName));
-}
-
-/** Every multinode power CSV under an extracted `power_audit_` root. */
-export function listMultinodePowerSampleFiles(root: string): GpuMetricsCsvFile[] {
-  return listFiles(root, isMultinodePowerSamplesPath);
-}
-
 /** The producer manifest next to `samples.csv`; null when absent or malformed. */
 export function readMultinodePowerManifest(samplesPath: string): Record<string, unknown> | null {
-  return readJsonObjectIfPresent(path.join(path.dirname(samplesPath), 'manifest.json'));
+  const parsed = readJsonIfPresent(path.join(path.dirname(samplesPath), 'manifest.json'));
+  return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+    ? (parsed as Record<string, unknown>)
+    : null;
 }
 
 /** Preserve window boundaries and role overrides before GitHub artifact expiry. */
@@ -150,8 +142,7 @@ export function readPowerAuditValidations(
   for (const validation of validations.values()) {
     if (typeof validation.validation_path !== 'string') continue;
     const original = files.get(validation.validation_path);
-    if (original !== undefined)
-      validation.validation_sha256 = createHash('sha256').update(original).digest('hex');
+    if (original !== undefined) validation.validation_sha256 = sha256Hex(original);
   }
   return Object.fromEntries(validations);
 }
@@ -163,14 +154,6 @@ function readJsonIfPresent(pathname: string): unknown | null {
   } catch {
     return null;
   }
-}
-
-/** Like `readJsonIfPresent`, but only a plain JSON object counts as present. */
-function readJsonObjectIfPresent(pathname: string): Record<string, unknown> | null {
-  const parsed = readJsonIfPresent(pathname);
-  return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
-    ? (parsed as Record<string, unknown>)
-    : null;
 }
 
 /** `gpu,total_energy_consumption` two-column CSV → { "<gpu>": joules }. */
@@ -223,8 +206,11 @@ export function readGpuMetricsSidecars(csvPath: string): GpuMetricsSidecars {
     )
     .sort();
   for (const entry of contextFiles) {
-    context = readJsonObjectIfPresent(path.join(dir, entry));
-    if (context) break;
+    const parsed = readJsonIfPresent(path.join(dir, entry));
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      context = parsed as Record<string, unknown>;
+      break;
+    }
   }
   const energyStartPath = path.join(dir, 'gpu_metrics_energy_start.csv');
   const energyEndPath = path.join(dir, 'gpu_metrics_energy_end.csv');
@@ -258,7 +244,10 @@ export function contextUtcOffsetMinutes(context: Record<string, unknown> | null)
 /**
  * Index every extracted telemetry artifact by its shared suffix. A
  * `gpu_metrics_` upload wins over the `power_audit_` bundle for the same
- * suffix; the bundle only fills in for multinode jobs that have no other.
+ * suffix. Single-node jobs upload both, with legacy top-level validations
+ * only; multinode jobs upload the bundle alone, and it is the one carrier of
+ * nested AgentX windows (`normalizePowerAuditValidations`). A single-node
+ * bundle that started carrying nested windows would be shadowed here.
  */
 export function discoverGpuMetricsArtifacts(artifactsDir: string): Map<string, GpuMetricsArtifact> {
   const discovered = new Map<string, GpuMetricsArtifact>();

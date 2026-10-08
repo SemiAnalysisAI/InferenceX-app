@@ -45,17 +45,16 @@ combinations, not the full Cartesian product of all possible filter values.
 | `submissions`                   | `direction`, `limit`, `lines`, `mode`, `offset`, `onChangeOnly`, `search`, `sort`                                                                                                                                                                                                                                                                                                                                                   |
 | `video`                         | `artifact`, `cell`, `compare`, `costs`, `gpuBasis`, `page`, `phase`, `run`, `selected`, `slot`, `source`, `view`, `workload`, `xAxis`, `yAxis`                                                                                                                                                                                                                                                                                      |
 
-PowerX navigation and power-control visibility are presentation-only: `/gpu-metrics`
-is linked from the footer, inference power metrics are selectable without unlocking,
-and per-GW `c_power=modeled|compare` works while locked. The existing read-only
-`gpu-metrics`, `inference` and `profit-estimator-per-gigawatt` projections already
-expose those data and `powerBasis` choices; selectors, calculations and response
-contracts are unchanged.
+Power-control visibility is presentation-only: inference power metrics are
+selectable without unlocking, and per-GW `c_power=modeled|compare` works while
+locked. The existing read-only `gpu-metrics`, `inference` and
+`profit-estimator-per-gigawatt` projections already expose those data and
+`powerBasis` choices; selectors, calculations and response contracts are unchanged.
 
-PowerX 入口和功耗控件的显示仅属于展示层改动：页脚提供 `/gpu-metrics` 链接，推理页的
-功耗指标无需解锁即可选择，每 GW 页的 `c_power=modeled|compare` 在锁定状态下同样可用。
-现有只读视图 `gpu-metrics`、`inference` 和 `profit-estimator-per-gigawatt` 已覆盖这些
-数据和 `powerBasis` 选项，查询参数、计算逻辑和响应格式均不变。
+功耗控件的显示仅属于展示层改动：推理页的功耗指标无需解锁即可选择，每 GW 页的
+`c_power=modeled|compare` 在锁定状态下同样可用。现有只读视图 `gpu-metrics`、
+`inference` 和 `profit-estimator-per-gigawatt` 已覆盖这些数据和 `powerBasis` 选项，
+查询参数、计算逻辑和响应格式均不变。
 
 Cache reuse returns `data.recipes` and the resolved `params.recipe`. Pass a returned key as `recipe` (the UI uses `c_recipe`) to select the same TP/EP/DP-attention, worker, GPU, speculation, offload and fingerprint combination. Omitted or stale keys use the shared dashboard default. Runs use that recipe if available, otherwise their own best-covered recipe; inspect each bar's source row for its identity. Overlay-only configurations expose their own recipe choices. Layout orientation and label placement are presentation-only controls.
 
@@ -75,9 +74,9 @@ alignment changes no API parameters, response schemas, or stored model identitie
 - Evaluation/reliability: chart-data, date resolution and rolling aggregation.
 - CollectiveX: selected EP/KV/swap chart and fit helpers.
 - Submissions/images: existing table, weekly/cumulative and image freshness helpers.
-- GPU metrics: shared line/correlation transforms and stored full-record per-GPU
-  digests. Live artifacts alone calculate statistics from samples; empty stored
-  digests remain empty. File/host identity and missing-versus-zero semantics persist.
+- GPU metrics: shared line/correlation transforms and full-record per-GPU statistics
+  computed from the stored samples, or from the samples of live artifacts. File/host
+  identity and missing-versus-zero semantics persist.
 - Video: checksum-verified stored bundles, serving/fidelity selectors and tradeoffs.
 - Overview/rankings/compare: existing discovery-page assembly and scenario helpers.
 
@@ -99,14 +98,14 @@ Provisioned, and All in Measured. The last combines measured GPU power with mode
 unmeasured components and PUE; it is not a wall-meter measurement. These labels and
 collapsed power-assumption/availability notes do not change metric IDs, API selectors,
 or calculations. Profit comparison `powerLabel` display text follows the same names.
-The GPU statistics table includes startup and warmup for all chips in the selected
-series, regardless of chip visibility. It is separate from serving-window power,
-J/token and selected-time-window calculations. Run telemetry is DB-first with an
-artifact fallback for missing storage; the public view returns private, no-store
+GPU statistics include startup and warmup for all chips in the selected series,
+regardless of chip visibility. They are separate from serving-window power and
+J/token. Run telemetry comes from one source per run: stored series once the run is
+ingested, otherwise its artifacts. The public view returns private, no-store
 responses and preserves upstream 503 failures.
 
-Run-specific recognition labels are also presentation-only. Run `35879254139`
-displays `UMBP MoRI SGLang` through October 9, 2026 in America/New_York
+Run-specific recognition labels are also presentation-only. Runs `35879254139`
+and `37181045340` display `UMBP MoRI SGLang` through October 9, 2026 in America/New_York
 (`2026-10-10T04:00:00Z` exclusive). Label resolution after that cutoff returns
 `MoRI SGLang`; an already-open memoized chart may need a refresh. This changes
 neither API selectors nor response data, framework/hardware keys, or raw CSV
@@ -267,8 +266,8 @@ those properties.
 私有上传、密钥、提示词、反馈及管理操作不作为公开读取接口。
 OperatorX 的入口受功能开关控制，页面使用专属的 `/api/v1/operatorx/*`
 接口；目前没有发布 `/api/v1/views/operatorx` 契约。
-GPU 视图优先读取已存遥测，缺少存储数据时回退到产物。全记录统计使用所选文件、
-主机序列的全部芯片摘要，包含启动与 warmup；已有摘要为空时不补算，缺失读数不补零。
+GPU 视图对每个 run 只从一个来源读取遥测：已入库的 run 读取已存序列，其余 run 读取产物。
+全记录统计在读取时由所选文件、主机序列的全部芯片样本计算，包含启动与 warmup；缺失读数不补零。
 芯片显隐和图表降采样不改变该统计，也不改变 serving-window 或 J/token 的计算口径。
 
 `/inference` 的 Power Timeline 与原始 `gpu-metrics` 浏览器是两个不同视图。

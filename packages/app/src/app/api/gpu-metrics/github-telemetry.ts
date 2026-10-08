@@ -174,8 +174,13 @@ export async function fetchGpuMetricsFromGithub(
     .filter((a) => a.name.startsWith(wanted) && isRequestedArtifact(a.name, sources))
     .map((artifact) => ({ kind: 'csv', artifact }));
   if (includeBundles) {
+    const csvNames = new Set(jobs.map(({ artifact }) => artifact.name));
     for (const artifact of artifacts) {
-      if (isWantedBundle(artifact.name, prefix) && isRequestedArtifact(artifact.name, sources))
+      if (
+        isWantedBundle(artifact.name, prefix) &&
+        isRequestedArtifact(artifact.name, sources) &&
+        !csvNames.has(`${ARTIFACT_PREFIX}${artifact.name.slice('power_audit_'.length)}`)
+      )
         jobs.push({ kind: 'bundle', artifact });
     }
   }

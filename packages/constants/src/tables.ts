@@ -7,7 +7,6 @@ export const TABLE_NAMES = {
   serverLogs: 'server_logs',
   gpuMetricSeries: 'gpu_metric_series',
   gpuMetricSamples: 'gpu_metric_samples',
-  gpuMetricGpuStats: 'gpu_metric_gpu_stats',
   benchmarkResultGpuMetrics: 'benchmark_result_gpu_metrics',
   runStats: 'run_stats',
   evalResults: 'eval_results',

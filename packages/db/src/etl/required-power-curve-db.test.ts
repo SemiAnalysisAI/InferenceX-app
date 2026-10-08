@@ -1,31 +1,30 @@
-import { PGlite } from '@electric-sql/pglite';
+import type { PGlite } from '@electric-sql/pglite';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { beforeAll, beforeEach, afterAll, describe, it, expect } from 'vitest';
-import type { DbClient } from '../connection';
+import { migratedPglite, pgliteSql, type PgliteSql } from '../lib/test-pglite';
+import { readBenchmarkArtifacts } from './benchmark-artifacts';
 import { preflightRequiredPowerCurves } from './required-power-curve';
+import { verifyRequiredPowerArtifacts } from './required-power-publication';
+import { createSkipTracker } from './skip-tracker';
 import { getLatestBenchmarks } from '../queries/benchmarks';
 let db: PGlite;
-const sql: DbClient = async (strings, ...values) => {
-  const query = strings.reduce((text, part, index) => text + (index ? `$${index}` : '') + part, '');
-  const result = await db.query<Record<string, unknown>>(query, values);
-  return result.rows;
-};
-const golden = path.resolve(
-  import.meta.dirname,
-  '../../../../docs/fixtures/powerx-manifest-v2/artifacts',
-);
+let sql: PgliteSql;
+const golden = path.resolve(import.meta.dirname, 'fixtures/powerx-manifest-v2');
 const source = { runId: 123, runAttempt: 1, headSha: 'b'.repeat(40) };
 const options = { date: '2026-09-16', runStartedAt: '2026-09-16T00:00:00Z', appendOnly: false };
+function preflight(root: string, runSource = source) {
+  const files = readBenchmarkArtifacts(root, {
+    runId: runSource.runId,
+    tracker: createSkipTracker(),
+  });
+  const required = verifyRequiredPowerArtifacts(root, runSource, true, () => files)!;
+  return preflightRequiredPowerCurves(sql, required, files, runSource, options);
+}
 beforeAll(async () => {
-  db = await PGlite.create();
-  const dir = new URL('../../migrations/', import.meta.url);
-  for (const file of fs
-    .readdirSync(dir)
-    .filter((name) => name.endsWith('.sql'))
-    .sort())
-    await db.exec(fs.readFileSync(new URL(file, dir), 'utf8'));
+  db = await migratedPglite();
+  sql = pgliteSql(db);
 }, 20000);
 afterAll(async () => {
   await db?.close();
@@ -47,9 +46,7 @@ describe('read-only required-power DB preflight', () => {
     await addPoint(1);
     await addPoint(64);
     const before = await sql`SELECT count(*)::int AS n FROM benchmark_results`;
-    await expect(preflightRequiredPowerCurves(sql, golden, source, options)).rejects.toThrow(
-      'shrink',
-    );
+    await expect(preflight(golden)).rejects.toThrow('shrink');
     expect(await sql`SELECT count(*)::int AS n FROM benchmark_results`).toEqual(before);
     expect(await sql`SELECT count(*)::int AS n FROM workflow_runs`).toEqual([{ n: 1 }]);
     const published = await getLatestBenchmarks(sql, 'qwen3.5', '9999-12-31');
@@ -59,9 +56,7 @@ describe('read-only required-power DB preflight', () => {
     await sql`UPDATE workflow_runs SET github_run_id=123`;
     await sql`UPDATE configs SET hardware='h200'`;
     await addPoint(64);
-    await expect(
-      preflightRequiredPowerCurves(sql, golden, { ...source, runAttempt: 2 }, options),
-    ).rejects.toThrow('shrink');
+    await expect(preflight(golden, { ...source, runAttempt: 2 })).rejects.toThrow('shrink');
     expect(await sql`SELECT count(*)::int AS n FROM workflow_runs`).toEqual([{ n: 1 }]);
   });
   it('protects optional fixed workloads outside the power receipt whitelist', async () => {
@@ -79,9 +74,7 @@ describe('read-only required-power DB preflight', () => {
       delete row.users;
       Object.assign(row, { isl: 4096, osl: 1024, recipe_fingerprint: 'c'.repeat(64) });
       fs.writeFileSync(path.join(dir, 'results_optional/extra.json'), JSON.stringify(row));
-      await expect(preflightRequiredPowerCurves(sql, dir, source, options)).rejects.toThrow(
-        'shrink',
-      );
+      await expect(preflight(dir)).rejects.toThrow('shrink');
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }

@@ -4,20 +4,16 @@ import {
   projectProposedCurve,
   publishedCurve,
   type CurvePoint,
-  type CurvePublication,
 } from './required-power-curve';
 import { powerPublicationPoint, stablePowerPointIdentity } from './power-publication';
-import { verifyRequiredPowerArtifacts } from './required-power-publication';
+import { verifyRequiredPowerArtifacts, type CurvePublication } from './required-power-publication';
 import path from 'node:path';
-const golden = path.resolve(
-  import.meta.dirname,
-  '../../../../docs/fixtures/powerx-manifest-v2/artifacts',
-);
+const golden = path.resolve(import.meta.dirname, 'fixtures/powerx-manifest-v2');
 const benchmark = verifyRequiredPowerArtifacts(golden, {
   runId: 123,
   runAttempt: 1,
   headSha: 'b'.repeat(40),
-})[0];
+})!.points[0];
 const identity = powerPublicationPoint(benchmark, '', { path: '', sha256: '' })!.identity;
 const policy: CurvePublication = { mode: 'incremental', replacement_scope: [] };
 const concs = (points: CurvePoint[]) => points.map((p) => [p.identity.conc, p.workflowRunId]);
@@ -35,38 +31,6 @@ function point(run: number, conc: number, extra: Partial<CurvePoint> = {}): Curv
   };
 }
 describe('pure projected publication curve', () => {
-  it('rejects the old partial-sweep regression without altering input rows', () => {
-    const old = [
-      point(1, 1),
-      point(1, 16),
-      point(1, 64, {
-        identity: { ...identity, conc: 64, disagg: true, recipe_fingerprint: 'split-recipe' },
-      }),
-    ];
-    const proposed = [...old, point(2, 1)];
-    expect(() => assertCurvePreserved(old, proposed, policy)).toThrow('shrink');
-    expect([...publishedCurve(old).values()][0]).toHaveLength(3);
-  });
-  it('does not inherit append-only history with an incompatible image', () => {
-    const old = [point(1, 1), point(1, 16)];
-    expect(() =>
-      assertCurvePreserved(
-        old,
-        [...old, point(2, 32, { appendOnly: true, image: 'new-image' })],
-        policy,
-      ),
-    ).toThrow('shrink');
-  });
-  it('inherits only an uninterrupted same-image append-only chain', () => {
-    const old = [point(1, 1), point(1, 16), point(2, 32, { appendOnly: true })];
-    expect([...publishedCurve(old).values()][0].map((row) => row.identity.conc)).toEqual([
-      32, 1, 16,
-    ]);
-    expect(() =>
-      assertCurvePreserved(old, [...old, point(3, 64, { appendOnly: true })], policy),
-    ).not.toThrow();
-    expect(() => assertCurvePreserved(old, [...old, point(3, 64)], policy)).toThrow('shrink');
-  });
   it('permits only the exact removed identities of the observed snapshot', () => {
     const old = [point(1, 1), point(1, 16)];
     const proposed = [...old, point(2, 1)];

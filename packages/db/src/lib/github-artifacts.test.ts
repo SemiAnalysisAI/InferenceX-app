@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { RUNNER_SUFFIX_RE, dedupeArtifactsByLogicalName } from './github-artifacts.js';
+
+import {
+  RUNNER_SUFFIX_RE,
+  assertRequestedRunAttempt,
+  dedupeArtifactsByLogicalName,
+} from './github-artifacts.js';
 
 const art = (name: string, created_at: string) => ({
   name,
@@ -38,4 +43,12 @@ describe('dedupeArtifactsByLogicalName', () => {
     const deduped = dedupeArtifactsByLogicalName([art('run-stats', '2026-06-01T00:00:00Z')]);
     expect(deduped.get('run-stats')?.name).toBe('run-stats');
   });
+});
+
+it('rejects a run URL whose requested attempt is no longer the current one', () => {
+  const url = 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/1/attempts/1';
+  expect(() => assertRequestedRunAttempt(url, 2)).toThrow(
+    'GitHub attempt 2 differs from requested 1',
+  );
+  expect(() => assertRequestedRunAttempt(url, 1)).not.toThrow();
 });

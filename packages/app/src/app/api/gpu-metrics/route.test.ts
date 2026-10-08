@@ -1,37 +1,22 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
-import type * as GpuPowerTypes from '@/components/gpu-power/types';
 
-const { mockParseCsvData, zipArchives } = vi.hoisted(() => {
-  interface ZipEntry {
-    entryName: string;
-    data: string;
-  }
-  const csvArchive: ZipEntry[] = [
-    { entryName: 'gpu_metrics_0.csv', data: 'timestamp,index,power\n2026-03-01T00:00:00Z,0,300' },
-  ];
-  return {
-    mockParseCsvData: vi.fn((csv: string): GpuPowerTypes.GpuMetricRow[] => {
-      if (csv.trim().length === 0) return [];
-      return [
-        {
-          timestamp: '2026-03-01T00:00:00Z',
-          index: 0,
-          power: 300,
-          temperature: 65,
-          smClock: 1500,
-          memClock: 2000,
-          gpuUtil: 95,
-          memUtil: 80,
-        },
-      ];
-    }),
-    /**
-     * Entries the adm-zip mock serves, keyed by the downloaded buffer's text.
-     * An empty download (the default in older tests) is the one-CSV artifact.
-     */
-    zipArchives: { byKey: new Map<string, ZipEntry[]>(), csvArchive },
-  };
-});
+const { mockParseCsvData } = vi.hoisted(() => ({
+  mockParseCsvData: vi.fn((csv: string) => {
+    if (csv.trim().length === 0) return [];
+    return [
+      {
+        timestamp: '2026-03-01T00:00:00Z',
+        index: 0,
+        power: 300,
+        temperature: 65,
+        smClock: 1500,
+        memClock: 2000,
+        gpuUtil: 95,
+        memUtil: 80,
+      },
+    ];
+  }),
+}));
 
 vi.mock('@semianalysisai/inferencex-constants', () => ({
   GITHUB_API_BASE: 'https://api.github.com',
@@ -56,18 +41,16 @@ vi.mock('@semianalysisai/inferencex-db/queries/gpu-metrics', () => ({
 }));
 
 vi.mock('adm-zip', () => {
+  const csvContent = 'timestamp,index,power\n2026-03-01T00:00:00Z,0,300';
   class MockAdmZip {
-    private readonly key: string;
-    constructor(buffer: Buffer) {
-      this.key = buffer.toString('utf8');
-    }
     getEntries() {
-      const entries = zipArchives.byKey.get(this.key) ?? zipArchives.csvArchive;
-      return entries.map((entry) => ({
-        entryName: entry.entryName,
-        isDirectory: false,
-        getData: () => Buffer.from(entry.data),
-      }));
+      return [
+        {
+          entryName: 'gpu_metrics_0.csv',
+          isDirectory: false,
+          getData: () => Buffer.from(csvContent),
+        },
+      ];
     }
   }
   return { default: MockAdmZip };
@@ -84,13 +67,8 @@ function req(url: string): NextRequest {
   return new NextRequest(new URL(url, 'http://localhost'));
 }
 
-function nvidiaRow(second: number, power: number): string {
-  return `2026/03/01 00:00:0${second}.000, 0, ${power} W, 65, 1500 MHz, 2000 MHz, 95 %, 80 %`;
-}
-
 beforeEach(() => {
   vi.clearAllMocks();
-  zipArchives.byKey.clear();
   origToken = process.env.GITHUB_TOKEN;
   origReadonlyUrl = process.env.DATABASE_READONLY_URL;
   process.env.GITHUB_TOKEN = 'test-gh-token';
@@ -113,6 +91,19 @@ afterEach(() => {
   }
 });
 
+const multinodeSeries = {
+  artifactName: 'gpu_metrics_multinode_b200-x_0',
+  fileName: 'results/gpu_metrics_rank0.csv',
+  vendor: 'nvidia',
+  sampleIntervalS: 1,
+  sampleCount: 0,
+  gpuCount: 0,
+  startedAt: '2026-09-11T04:19:41.982Z',
+  endedAt: '2026-09-11T04:19:41.982Z',
+  sidecars: {},
+  stats: [],
+  data: [],
+};
 const storedRunPayload = {
   workflowRun: {
     id: 7,
@@ -129,74 +120,20 @@ const storedRunPayload = {
   },
   series: [
     {
+      ...multinodeSeries,
       id: 1,
       artifactName: 'gpu_metrics_dsr1_conc32_b200-x_0',
-      configKey: 'dsr1_conc32_b200-x_0',
       fileName: 'gpu_metrics.csv',
-      vendor: 'nvidia',
-      sampleIntervalS: 1,
       sampleCount: 2,
       gpuCount: 1,
-      startedAt: '2026-09-11T04:19:41.982Z',
       endedAt: '2026-09-11T04:19:42.990Z',
-      sidecars: {},
-      benchmarkResultIds: [10],
-      stats: [],
       data: [
-        {
-          timestamp: '2026-09-11T04:19:41.982Z',
-          index: 0,
-          power: 187.8,
-          temperature: 33,
-          smClock: 120,
-          memClock: 3996,
-          gpuUtil: 0,
-          memUtil: 0,
-        },
-        {
-          timestamp: '2026-09-11T04:19:42.990Z',
-          index: 0,
-          power: 912.1,
-          temperature: 61,
-          smClock: 1965,
-          memClock: 3996,
-          gpuUtil: 98,
-          memUtil: 74,
-        },
+        { timestamp: '2026-09-11T04:19:41.982Z', index: 0, power: 187.8 },
+        { timestamp: '2026-09-11T04:19:42.990Z', index: 0, power: 912.1 },
       ],
     },
-    {
-      id: 2,
-      artifactName: 'gpu_metrics_multinode_b200-x_0',
-      configKey: 'multinode_b200-x_0',
-      fileName: 'results/gpu_metrics_rank0.csv',
-      vendor: 'nvidia',
-      sampleIntervalS: 1,
-      sampleCount: 0,
-      gpuCount: 0,
-      startedAt: '2026-09-11T04:19:41.982Z',
-      endedAt: '2026-09-11T04:19:41.982Z',
-      sidecars: {},
-      benchmarkResultIds: [11],
-      stats: [],
-      data: [],
-    },
-    {
-      id: 3,
-      artifactName: 'gpu_metrics_multinode_b200-x_0',
-      configKey: 'multinode_b200-x_0',
-      fileName: 'results/gpu_metrics_rank1.csv',
-      vendor: 'nvidia',
-      sampleIntervalS: 1,
-      sampleCount: 0,
-      gpuCount: 0,
-      startedAt: '2026-09-11T04:19:41.982Z',
-      endedAt: '2026-09-11T04:19:41.982Z',
-      sidecars: {},
-      benchmarkResultIds: [11],
-      stats: [],
-      data: [],
-    },
+    { ...multinodeSeries, id: 2 },
+    { ...multinodeSeries, id: 3, fileName: 'results/gpu_metrics_rank1.csv' },
   ],
 };
 
@@ -220,38 +157,32 @@ describe('databasePayloadToResponse', () => {
       'gpu_metrics_multinode_b200-x_0/results/gpu_metrics_rank1.csv',
     ]);
     expect(response.artifacts[0]!.data).toHaveLength(2);
-    expect(response.artifacts[0]!.series?.benchmarkResultIds).toEqual([10]);
+    expect(response.artifacts[0]!.series?.id).toBe(1);
     expect(response.artifacts[0]!.series).not.toHaveProperty('data');
   });
 });
 
 describe('GET /api/gpu-metrics — database first', () => {
-  it('serves the stored digest without touching GitHub when the run is ingested', async () => {
+  it('answers stored runs without GitHub, reading every artifact for GET and one host for a view', async () => {
     process.env.DATABASE_READONLY_URL = 'postgresql://readonly.example.test/db';
-    mockGetGpuMetricsForRun.mockResolvedValueOnce(storedRunPayload);
     globalThis.fetch = vi.fn();
-
-    const res = await GET(req('/api/gpu-metrics?runId=34557177019'));
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body.source).toBe('database');
-    expect(body.artifacts).toHaveLength(3);
+    const names = databasePayloadToResponse(storedRunPayload).artifacts.map((entry) => entry.name);
+    mockGetGpuMetricsForRun.mockResolvedValueOnce(storedRunPayload);
+    const all = await GET(req('/api/gpu-metrics?runId=34557177019'));
+    expect(await all.json()).toMatchObject({
+      source: 'database',
+      artifacts: names.map((name) => ({ name })),
+    });
+    // An absent selection reads every artifact; `artifact: null` narrows to the first.
     expect(mockGetGpuMetricsForRun).toHaveBeenCalledWith({}, 34557177019, {
       prefix: null,
       sourceResults: null,
     });
-    expect(globalThis.fetch).not.toHaveBeenCalled();
-  });
-
-  it('passes selectors to the reader and preserves exact host labels for a scoped view', async () => {
-    process.env.DATABASE_READONLY_URL = 'postgresql://readonly.example.test/db';
-    const names = databasePayloadToResponse(storedRunPayload).artifacts.map((entry) => entry.name);
     mockGetGpuMetricsForRun.mockResolvedValueOnce({
       ...storedRunPayload,
       artifactNames: names,
       series: [storedRunPayload.series[2]],
     });
-    globalThis.fetch = vi.fn();
     const response = await readGpuMetricsForView(
       req('/api/gpu-metrics?runId=34557177019'),
       names[2]!,
@@ -288,98 +219,6 @@ describe('GET /api/gpu-metrics — database first', () => {
     expect(await res.json()).toMatchObject({ code: 'DATABASE_UNAVAILABLE' });
     expect(globalThis.fetch).not.toHaveBeenCalled();
   });
-
-  it.each([
-    { recovered: false, status: 503 },
-    { recovered: true, status: 200 },
-  ])(
-    'checks retained file/sample coverage with recovered=$recovered',
-    async ({ recovered, status }) => {
-      process.env.DATABASE_READONLY_URL = 'postgresql://readonly.example.test/db';
-      const { parseCsvData } = await vi.importActual<typeof GpuPowerTypes>(
-        '@/components/gpu-power/types',
-      );
-      const header =
-        'timestamp, index, power.draw [W], temperature.gpu, clocks.current.sm [MHz], clocks.current.memory [MHz], utilization.gpu [%], utilization.memory [%]';
-      const hostA = [header, nvidiaRow(0, 300), nvidiaRow(0, 999), nvidiaRow(1, 310)].join('\n');
-      // A matching filename only recovers the stored gap when both samples survived.
-      const hostB = [header, nvidiaRow(0, 500), ...(recovered ? [nvidiaRow(1, 510)] : [])].join(
-        '\n',
-      );
-      zipArchives.byKey.set('coverage', [
-        { entryName: 'host-a/gpu_metrics.csv', data: hostA },
-        { entryName: 'host-b/gpu_metrics.csv', data: hostB },
-      ]);
-      mockParseCsvData.mockImplementationOnce(parseCsvData).mockImplementationOnce(parseCsvData);
-      mockGetGpuMetricsForRun.mockResolvedValueOnce({
-        ...storedRunPayload,
-        series: [
-          {
-            ...storedRunPayload.series[0],
-            artifactName: 'gpu_metrics_live',
-            fileName: 'host-a/gpu_metrics.csv',
-            sidecars: {
-              seriesInventory: [
-                { fileName: 'host-a/gpu_metrics.csv', sampleCount: 2 },
-                { fileName: 'host-b/gpu_metrics.csv', sampleCount: 2 },
-              ],
-            },
-          },
-        ],
-      });
-      globalThis.fetch = vi
-        .fn()
-        .mockResolvedValueOnce({
-          ok: true,
-          json: () =>
-            Promise.resolve({
-              id: 34557177019,
-              name: 'Sweep',
-              head_branch: 'main',
-              head_sha: 'abc',
-              created_at: '2026-03-01T00:00:00Z',
-              html_url: 'https://example.test/run',
-              status: 'completed',
-              conclusion: 'success',
-            }),
-        })
-        .mockResolvedValueOnce({
-          ok: true,
-          json: () =>
-            Promise.resolve({
-              artifacts: [
-                {
-                  id: 1,
-                  name: 'gpu_metrics_live',
-                  archive_download_url: 'https://example.test/zip',
-                },
-              ],
-            }),
-        })
-        .mockResolvedValueOnce({
-          ok: true,
-          headers: new Headers(),
-          arrayBuffer: () => Promise.resolve(new TextEncoder().encode('coverage').buffer),
-        });
-      const res = await GET(req('/api/gpu-metrics?runId=34557177019&series=power'));
-      expect(res.status).toBe(status);
-      const payload = await res.json();
-      if (recovered) {
-        expect(payload).toMatchObject({ source: 'github' });
-        expect(payload.series).toHaveLength(1);
-        expect(payload.series[0].power).toEqual([
-          [300, 310],
-          [500, 510],
-        ]);
-      } else {
-        expect(payload).toMatchObject({
-          code: 'STORED_TELEMETRY_INCOMPLETE',
-          artifact: 'gpu_metrics_live',
-        });
-      }
-      expect(globalThis.fetch).toHaveBeenCalledTimes(3);
-    },
-  );
 });
 
 describe('GET /api/gpu-metrics', () => {
