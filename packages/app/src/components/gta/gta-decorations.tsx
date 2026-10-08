@@ -59,7 +59,7 @@ export function GtaThemeBanner() {
           ))}
         </div>
         <div className="gta-heist-launcher">
-          <span>{locale === 'zh' ? '湾区劫案' : 'BAY AREA HEIST'}</span>
+          <span>{locale === 'zh' ? 'Los Santos 3D' : 'LOS SANTOS 3D'}</span>
           <button
             type="button"
             data-testid="gta-heist-launch"

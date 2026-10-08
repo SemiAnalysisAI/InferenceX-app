@@ -129,7 +129,7 @@ describe('modeled system-power tooltip', () => {
   const config = (overrides: Partial<TooltipConfig> = {}) =>
     tooltipConfig({
       data: pt({ modeledSystemPower: systemPower }),
-      selectedYAxisMetric: 'y_modeledChassisPowerPerGpu',
+      selectedYAxisMetric: 'y_measuredAvgPower',
       isPinned: true,
       ...overrides,
     });
@@ -252,31 +252,6 @@ describe('modeled system-power tooltip', () => {
       expect(match?.groups?.normalization.length).toBeLessThanOrEqual(80);
       expect(match?.groups?.boundary.length).toBeLessThanOrEqual(80);
     }
-  });
-
-  it('uses validated model topology while preserving legacy configuration counts separately', () => {
-    const data = pt({
-      physicalChips: 64,
-      modeledSystemPower: {
-        ...systemPower,
-        gpuCount: 8,
-        chassisCount: 1,
-        modeledGpuCount: 8,
-        chassisAcWatts: 6000,
-        deploymentAcWatts: 6000,
-        topologyBasis: 'single-node',
-        telemetryBasis: 'validated-unversioned-single-node',
-      },
-    });
-    const html = generateTooltipContent(config({ data }));
-    expect(html).toContain('<strong>Total Chips:</strong> 8');
-    expect(html).toContain('<strong>Configured Chip Count:</strong> 64');
-    expect(html).toContain('1 full eight-GPU chassis · 8 GPUs');
-    const measured = generateTooltipContent(
-      config({ data, selectedYAxisMetric: 'y_measuredAvgPower' }),
-    );
-    expect(measured).toContain('<strong>Total Chips:</strong> 64');
-    expect(measured).not.toContain('Configured Chip Count');
   });
 });
 

@@ -298,14 +298,6 @@ export const METRIC_REGISTRY = {
     titleZh: '实测整组 GPU P90 功耗（按芯片均摊）',
     polarity: 'lower',
   },
-  modeledChassisPowerPerGpu: {
-    field: 'modeledChassisPowerPerGpu.y',
-    label: 'Modeled Chassis AC Power per GPU (W/GPU)',
-    labelZh: '每 GPU 分摊的机箱交流功耗估算（W/GPU）',
-    title: 'Modeled Chassis AC Power per GPU (8k1k)',
-    titleZh: '每 GPU 分摊的机箱交流功耗估算（8k1k）',
-    polarity: 'lower',
-  },
   measuredPrefillAvgPower: {
     field: 'measuredPrefillAvgPower.y',
     label: 'Measured Prefill Power per Chip (W)',
@@ -721,13 +713,6 @@ export function isAllInMeasuredConfigKey(configKey: string): boolean {
   return configKey === 'y_utilityModeledWatts' || configKey === 'y_utilityModeledJPerOutputToken';
 }
 
-export const MODELED_SYSTEM_POWER_METRIC_CONFIG_KEY = 'y_modeledChassisPowerPerGpu';
-
-/** Whether a y-axis config key plots the modeled chassis AC power metric. */
-export function isModeledSystemPowerConfigKey(configKey: string): boolean {
-  return configKey === MODELED_SYSTEM_POWER_METRIC_CONFIG_KEY;
-}
-
 export const METRIC_CONTROL_GROUPS: readonly MetricControlGroup[] = [
   {
     label: 'Throughput',
@@ -771,22 +756,15 @@ export const METRIC_CONTROL_GROUPS: readonly MetricControlGroup[] = [
     labelZh: '每 token 全电源配置能耗',
     metrics: ['y_jTotal', 'y_jOutput', 'y_jInput'],
   },
-  // Runner power telemetry and the chassis model built on it are still being
-  // validated, so both groups stay behind the ↑↑↓↓ feature gate until the
-  // measurements are stable enough to publish.
-  // The derived boundaries ride along so the same gate and the same
+  // Runner power telemetry is still being validated, so this group stays
+  // behind the ↑↑↓↓ feature gate until the measurements are stable enough to
+  // publish. The derived boundaries ride along so the same gate and the same
   // shared-URL exception (a gated metric selected by `i_metric` still renders
   // while locked) apply to them.
   {
     label: 'Measured Energy',
     labelZh: '实测能耗',
     metrics: [...MEASURED_ENERGY_METRIC_CONFIG_KEYS, ...POWER_BASIS_METRIC_CONFIG_KEYS],
-    gated: true,
-  },
-  {
-    label: 'Modeled System Power',
-    labelZh: '系统功耗估算',
-    metrics: [MODELED_SYSTEM_POWER_METRIC_CONFIG_KEY],
     gated: true,
   },
   {

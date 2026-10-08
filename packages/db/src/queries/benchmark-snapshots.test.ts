@@ -4,7 +4,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { benchmarkCurveScope } from '@semianalysisai/inferencex-constants';
 import type { DbClient } from '../connection';
 import { stablePowerPointIdentity } from '../etl/power-publication';
-import { type CurvePoint, publishedCurve } from '../etl/required-power-curve';
+import { loadStoredCurvePoints, publishedCurve } from '../etl/required-power-curve';
 import { applyBenchmarkPointBackfill } from '../etl/run-overrides';
 import { getAllBenchmarksForHistory, getBenchmarksForRun, getLatestBenchmarks } from './benchmarks';
 
@@ -87,28 +87,8 @@ interface CurveEntry {
 }
 const byEntry = (a: CurveEntry, b: CurveEntry) =>
   a.scope.localeCompare(b.scope) || a.point.localeCompare(b.point) || a.run - b.run;
-/** The stored-point query of preflightRequiredPowerCurves, restricted to one model. */
-async function loadCurvePoints(): Promise<CurvePoint[]> {
-  const rows = await sql`
-    SELECT c.*, br.benchmark_type, br.isl, br.osl, br.conc, br.offload_mode,
-      br.recipe_fingerprint, br.image, br.date::text AS point_date,
-      wr.id AS workflow_run_id, wr.github_run_id, wr.run_attempt,
-      wr.run_started_at::text, wr.append_only
-    FROM benchmark_results br
-    JOIN configs c ON c.id = br.config_id
-    JOIN latest_workflow_runs wr ON wr.id = br.workflow_run_id
-    WHERE br.error IS NULL AND c.model = ${CURVE_MODEL}`;
-  return rows.map((row): CurvePoint => ({
-    identity: row,
-    image: row.image as string | null,
-    workflowRunId: Number(row.workflow_run_id),
-    githubRunId: Number(row.github_run_id),
-    runAttempt: Number(row.run_attempt),
-    date: String(row.point_date),
-    runStartedAt: row.run_started_at as string | null,
-    appendOnly: Boolean(row.append_only),
-  }));
-}
+/** The preflight's own stored-point loader, restricted to one model; no run has GitHub id 0. */
+const loadCurvePoints = () => loadStoredCurvePoints(sql, [CURVE_MODEL], 0);
 /**
  * publishedCurve has no SQL execution of its own, so this is the only place the TypeScript
  * projection and both PostgreSQL read paths are held to one answer. The TypeScript snapshot
@@ -469,56 +449,53 @@ describe('AgentX curve snapshots in PostgreSQL', () => {
     expect(ids(await getLatestBenchmarks(sql, 'glm5.2', '2026-09-11', true))).toEqual([8]);
   });
   it('projects the same curve in TypeScript as latest_benchmarks and the dated query', async () => {
-    // Clause 8: configs 1 (AGG, prefill_tp 8, offload off) and 2 (disagg, prefill_tp 4, offload on)
+    // Configs 1 (AGG, prefill_tp 8, offload off) and 2 (disagg, prefill_tp 4, offload on)
     // share one agentic scope, so run 11 replaces point 1; sglang and fp8 keep their own scopes.
     await addPoint(100, 1, 3, 1);
     await addPoint(101, 1, 4, 1);
-    await expectSameCurve('clause 8: agentic scope collapses topology and offload variants');
-    // Clause 9: recipe_fingerprint is point identity. A new fingerprint at conc 1 sits next to
+    await expectSameCurve('agentic scope collapses topology and offload variants');
+    // recipe_fingerprint is point identity. A new fingerprint at conc 1 sits next to
     // point 2 while the repeated recipe-3 fingerprint at conc 20 replaces point 3.
     await addRun(12, { append: true });
     await addPoint(8, 12, 2, 1, { fingerprint: 'alternate-recipe' });
     await addPoint(9, 12, 2, 20, { fingerprint: 'recipe-3' });
-    await expectSameCurve('clause 9: recipe fingerprint distinguishes points');
-    // Clause 4: a second same-image append-only run inherits through run 12 back to run 11.
+    await expectSameCurve('recipe fingerprint distinguishes points');
     await addRun(13, { append: true });
     await addPoint(10, 13, 1, 300, { offload: 'off' });
-    await expectSameCurve('clause 4: same-image append-only chain inherits earlier points');
-    // Clause 2: run 14 shares run 13's date but started earlier, so run 13 stays the seed despite
+    await expectSameCurve('same-image append-only chain inherits earlier points');
+    // Run 14 shares run 13's date but started earlier, so run 13 stays the seed despite
     // the lower id; run 14 is a full snapshot, so the chain ends there.
     await addRun(14, { date: '2026-09-13', started: '2026-09-13T06:00:00Z' });
     await addPoint(11, 14, 2, 500);
-    await expectSameCurve('clause 2: same-date tie resolved by run_started_at');
-    // Clause 3: a NULL run_started_at ranks after both timed same-date runs and is never reached.
+    await expectSameCurve('same-date tie resolved by run_started_at');
+    // A NULL run_started_at ranks after both timed same-date runs and is never reached.
     await addRun(15, { date: '2026-09-13', append: true });
     await sql`UPDATE workflow_runs SET run_started_at = NULL WHERE id = 15`;
     await addPoint(12, 15, 2, 600);
-    await expectSameCurve('clause 3: NULL run_started_at sorts last');
-    // Clause 5: a different image stops inheritance at the first older run.
+    await expectSameCurve('NULL run_started_at sorts last');
     await addRun(16, { append: true });
     await addPoint(13, 16, 2, 700, { image: 'trt:rc27' });
-    await expectSameCurve('clause 5: image mismatch stops the chain');
-    // Clause 6: image_count > 1. A mixed-image run publishes only itself as the seed and is not
+    await expectSameCurve('image mismatch stops the chain');
+    // image_count > 1: a mixed-image run publishes only itself as the seed and is not
     // inherited as an older run even though min(image) equals the root image.
     await addRun(17, { append: true });
     await addPoint(14, 17, 2, 800, { image: 'trt:rc27' });
     await addPoint(15, 17, 2, 900, { image: 'trt:rc28' });
-    await expectSameCurve('clause 6a: mixed-image seed publishes only itself');
+    await expectSameCurve('mixed-image seed publishes only itself');
     await addRun(18, { append: true });
     await addPoint(16, 18, 2, 1000, { image: 'trt:rc27' });
-    await expectSameCurve('clause 6b: mixed-image older run is not inherited');
-    // Clause 7: images_complete. One NULL image keeps image_count = 1 yet blocks the chain in
+    await expectSameCurve('mixed-image older run is not inherited');
+    // images_complete: one NULL image keeps image_count = 1 yet blocks the chain in
     // both positions.
     await addRun(19, { append: true });
     await addPoint(17, 19, 2, 1100, { image: 'trt:rc27' });
     await addPoint(18, 19, 2, 1200, { image: null });
-    await expectSameCurve('clause 7a: partially NULL-image seed publishes only itself');
+    await expectSameCurve('partially NULL-image seed publishes only itself');
     await addRun(20, { append: true });
     await addPoint(19, 20, 2, 1300, { image: 'trt:rc27' });
-    await expectSameCurve('clause 7b: partially NULL-image older run is not inherited');
-    // Clause 1: attempt 2 of run 20's GitHub run replaces attempt 1 in latest_workflow_runs.
+    await expectSameCurve('partially NULL-image older run is not inherited');
     await addRun(21, { date: '2026-09-20', githubId: 20, attempt: 2 });
     await addPoint(20, 21, 2, 1400, { image: 'trt:rc27' });
-    await expectSameCurve('clause 1: newer attempt supersedes the older attempt');
+    await expectSameCurve('newer attempt supersedes the older attempt');
   });
 });

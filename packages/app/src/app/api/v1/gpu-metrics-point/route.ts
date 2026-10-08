@@ -25,8 +25,8 @@ const getCachedGpuMetricsForPoint = cachedQuery(
  * GET /api/v1/gpu-metrics-point?id=N
  *
  * PowerX telemetry recorded while one benchmark point ran: every linked
- * gpu_metrics series with full-resolution per-GPU samples and the ingest-time
- * per-GPU statistics digest. 404 when the point has no linked series (its
+ * gpu_metrics series with full-resolution per-GPU samples and the per-GPU
+ * statistics computed from them. 404 when the point has no linked series (its
  * run predates migration 016 and the artifacts have expired, or the job
  * uploaded no gpu_metrics artifact).
  */

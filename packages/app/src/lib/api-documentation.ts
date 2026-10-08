@@ -298,7 +298,7 @@ const powerAuditSchema: ApiSchema = {
   },
   additionalProperties: true,
   description:
-    'Compact power measurement-window audit emitted alongside the power_valid verdict: window bounds, expected vs. observed GPU counts, sample statistics, and producer identity (producer_sha / exporter_image_sha256 are null for single-node telemetry without an srt-slurm producer). source is a relative path within the source run artifact bundle; observed_gpu_ids contains producer device identifiers, which may be indices rather than physical UUIDs. cpu carries the NVL72 CPU-side leg’s provenance when that leg ran. Present on valid and invalid rows when emitted; absence alone does not establish age or validity.',
+    'Compact power measurement-window audit emitted alongside the power_valid verdict: window bounds, expected vs. observed GPU counts, sample statistics, and producer identity (producer_sha / exporter_image_sha256 are null for single-node telemetry without an srt-slurm producer). source names the validation document: a relative path within the source run artifact bundle or, on AgentX rows whose retained window ingest or backfill recovered, the alias power_validation_<stem>_conc<N>.json for LOGS/agentic/conc_<N>/power_validation.json in the power_audit_<stem> artifact (such rows carry only source and the window bounds); observed_gpu_ids contains producer device identifiers, which may be indices rather than physical UUIDs. cpu carries the NVL72 CPU-side leg’s provenance when that leg ran. Present on valid and invalid rows when emitted; absence alone does not establish age or validity.',
 };
 const workerPowerSchema = objectSchemaWithOptional(
   {

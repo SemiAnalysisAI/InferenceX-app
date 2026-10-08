@@ -8,6 +8,9 @@ const ICONS: Record<string, string> = {
   minecraft: 'lucide-pickaxe',
   csgo: 'lucide-crosshair',
   gta: 'lucide-car',
+  kart: 'lucide-flag',
+  doom: 'lucide-skull',
+  halo: 'lucide-shield',
 };
 
 function pick(theme: string) {
@@ -50,7 +53,7 @@ describe('ModeToggle', () => {
   });
 
   it('selects any theme directly and closes the menu', () => {
-    for (const theme of ['gta', 'minecraft', 'dark', 'csgo', 'light']) {
+    for (const theme of ['kart', 'doom', 'halo', 'gta', 'minecraft', 'dark', 'csgo', 'light']) {
       pick(theme);
       cy.get('html').should('have.class', theme);
       cy.get('[data-testid="theme-menu"]').should('not.exist');
@@ -68,14 +71,14 @@ describe('ModeToggle', () => {
     cy.focused().type('{downArrow}');
     cy.focused().should('have.attr', 'data-testid', 'theme-option-dark');
     cy.focused().type('{upArrow}{upArrow}');
-    cy.focused().should('have.attr', 'data-testid', 'theme-option-gta');
+    cy.focused().should('have.attr', 'data-testid', `theme-option-${APP_THEMES.at(-1)}`);
     cy.focused().click();
-    cy.get('html').should('have.class', 'gta');
+    cy.get('html').should('have.class', APP_THEMES.at(-1)!);
     cy.get('[data-testid="theme-menu"]').should('not.exist');
     cy.get('[data-testid="theme-toggle"]').click();
-    cy.focused().should('have.attr', 'data-testid', 'theme-option-gta');
+    cy.focused().should('have.attr', 'data-testid', `theme-option-${APP_THEMES.at(-1)}`);
     cy.focused().type('{esc}');
     cy.get('[data-testid="theme-menu"]').should('not.exist');
-    cy.get('html').should('have.class', 'gta');
+    cy.get('html').should('have.class', APP_THEMES.at(-1)!);
   });
 });

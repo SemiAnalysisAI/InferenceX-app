@@ -2937,7 +2937,6 @@ describe('Power envelopes', () => {
       .filter((_, element) => element.style.opacity !== '0')
       .should('have.length', 3)
       .each(($point) => cy.wrap($point).should('have.css', 'opacity', '1'));
-    cy.get('#scatter-show-all-measurements').should('not.exist');
     cy.get('#power-sweep .dot-group')
       .filter((_, element) => element.style.opacity === '0')
       .should('have.css', 'pointer-events', 'none');
@@ -2949,7 +2948,6 @@ describe('Power envelopes', () => {
           .should('have.length', 4)
           .each(($point) => cy.wrap($point).should('have.css', 'opacity', '1'));
         cy.get('#power-sweep .roofline-path').should('have.attr', 'd', boundary);
-        cy.get('#scatter-show-all-measurements').should('not.exist');
         cy.get('#scatter-hide-non-optimal').click({ force: true });
         cy.get('#power-sweep .dot-group')
           .filter((_, element) => element.style.opacity !== '0')
@@ -2966,12 +2964,10 @@ describe('Power envelopes', () => {
       cy.get('#power-sweep .dot-group')
         .filter((_, element) => element.style.opacity !== '0')
         .should('have.length', 3);
-      cy.get('#scatter-show-all-measurements').should('not.exist');
     }
     cy.contains('button', 'Energy').click();
     cy.get('#scatter-hide-non-optimal').should('have.attr', 'data-state', 'checked');
     cy.get('#power-sweep .roofline-path[data-curve-kind="pareto"]').should('have.length', 1);
-    cy.get('#scatter-show-all-measurements').should('not.exist');
   });
 
   for (const metric of ['measuredAvgPower', 'measuredP75Power'] as const) {
@@ -3098,7 +3094,6 @@ describe('Power envelopes', () => {
       cy.get(`${officialSelector}, ${overlaySelector}`).then(($paths) => {
         const geometry = [...$paths].map((path) => path.getAttribute('d'));
         cy.get('#scatter-hide-non-optimal').click({ force: true });
-        cy.get('#scatter-show-all-measurements').should('not.exist');
         cy.get('#power-overlay .dot-group')
           .filter((_, element) => element.style.opacity !== '0')
           .should('have.length', 9);

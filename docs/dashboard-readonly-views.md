@@ -63,9 +63,9 @@ alignment changes no API parameters, response schemas, or stored model identitie
 - Evaluation/reliability: chart-data, date resolution and rolling aggregation.
 - CollectiveX: selected EP/KV/swap chart and fit helpers.
 - Submissions/images: existing table, weekly/cumulative and image freshness helpers.
-- GPU metrics: shared line/correlation transforms and stored full-record per-GPU
-  digests. Live artifacts alone calculate statistics from samples; empty stored
-  digests remain empty. File/host identity and missing-versus-zero semantics persist.
+- GPU metrics: shared line/correlation transforms and full-record per-GPU statistics
+  computed from the stored samples, or from the samples of live artifacts. File/host
+  identity and missing-versus-zero semantics persist.
 - Video: checksum-verified stored bundles, serving/fidelity selectors and tradeoffs.
 - Overview/rankings/compare: existing discovery-page assembly and scenario helpers.
 
@@ -87,14 +87,14 @@ Provisioned, and All in Measured. The last combines measured GPU power with mode
 unmeasured components and PUE; it is not a wall-meter measurement. These labels and
 collapsed power-assumption/availability notes do not change metric IDs, API selectors,
 or calculations. Profit comparison `powerLabel` display text follows the same names.
-The GPU statistics table includes startup and warmup for all chips in the selected
-series, regardless of chip visibility. It is separate from serving-window power,
-J/token and selected-time-window calculations. Run telemetry is DB-first with an
-artifact fallback for missing storage; the public view returns private, no-store
+GPU statistics include startup and warmup for all chips in the selected series,
+regardless of chip visibility. They are separate from serving-window power and
+J/token. Run telemetry comes from one source per run: stored series once the run is
+ingested, otherwise its artifacts. The public view returns private, no-store
 responses and preserves upstream 503 failures.
 
-Run-specific recognition labels are also presentation-only. Run `35879254139`
-displays `UMBP MoRI SGLang` through October 9, 2026 in America/New_York
+Run-specific recognition labels are also presentation-only. Runs `35879254139`
+and `37181045340` display `UMBP MoRI SGLang` through October 9, 2026 in America/New_York
 (`2026-10-10T04:00:00Z` exclusive). Label resolution after that cutoff returns
 `MoRI SGLang`; an already-open memoized chart may need a refresh. This changes
 neither API selectors nor response data, framework/hardware keys, or raw CSV
@@ -127,7 +127,7 @@ are unchanged by all six display settings. The reusable client helpers are
 `components/gpu-power/power-series.ts`.
 
 Date comparisons are presentation-only as well. With compared dates, `/inference` keeps the
-date-comparison chart on every x-axis mode, including concurrency, draws `?unofficialrun=`
+date-comparison chart on every x-axis mode, draws `?unofficialrun=`
 rows beside the compared series, and the Timeline display follows the same per-date legend
 toggles and colours. The inference view already returns `comparisons` (one projection per
 `dates` or `start`/`end` entry) and `overlays` (one per unofficial run) for every `xmode`.
@@ -145,9 +145,8 @@ The inference view exposes the same mean/median selector as the dashboard throug
 `xstat=median|mean` (default median). Mean streaming speed is **1 / mean TPOT**;
 it is not the arithmetic mean of per-request speeds. Mean TTFT and E2E use their
 recorded mean values. Missing means remain missing; the view never substitutes a
-median. AgentX keeps its selected `percentile`, and concurrency has no statistic:
-`params.xstat` resolves to null in both cases, while `xAxis.statistic` records the
-effective percentile or null.
+median. AgentX keeps its selected `percentile`: `params.xstat` resolves to null,
+while `xAxis.statistic` records the effective percentile.
 
 Equal-service comparisons are API-only analysis: the dashboard has no target input or
 comparison curve, and the chart's Perf Ruler remains its same-speed comparison. The Table view
@@ -165,8 +164,8 @@ Each source's `label` is display text only: hardware and date, plus precision, t
 run or other details only where two sources would otherwise look the same.
 Stale explicit selections remain unavailable. Missing target returns null, not an
 invented operating point. Streaming-speed targets are tok/s/user; TTFT/E2E targets
-are seconds. Concurrency remains a separate observed-load diagnostic, not an
-equal-service comparison axis.
+are seconds. Concurrency is a separate diagnostic, not an equal-service comparison
+axis.
 
 That diagnostic is `matchedConcurrency`, also returned by `serviceCompare=true`: the
 two selected sources paired at every concurrency either one observed. Each side is
@@ -260,8 +259,8 @@ those properties.
 私有上传、密钥、提示词、反馈及管理操作不作为公开读取接口。
 OperatorX 的入口受功能开关控制，页面使用专属的 `/api/v1/operatorx/*`
 接口；目前没有发布 `/api/v1/views/operatorx` 契约。
-GPU 视图优先读取已存遥测，缺少存储数据时回退到产物。全记录统计使用所选文件、
-主机序列的全部芯片摘要，包含启动与 warmup；已有摘要为空时不补算，缺失读数不补零。
+GPU 视图对每个 run 只从一个来源读取遥测：已入库的 run 读取已存序列，其余 run 读取产物。
+全记录统计在读取时由所选文件、主机序列的全部芯片样本计算，包含启动与 warmup；缺失读数不补零。
 芯片显隐和图表降采样不改变该统计，也不改变 serving-window 或 J/token 的计算口径。
 
 `/inference` 的 Power Timeline 与原始 `gpu-metrics` 浏览器是两个不同视图。
@@ -278,7 +277,7 @@ GPU 视图优先读取已存遥测，缺少存储数据时回退到产物。全�
 使用硬件注册表。原始遥测、全记录统计和 API 响应均不因这些显示设置而改变。
 响应使用 private, no-store，上游 503 保留为错误响应。
 
-日期对比同样只影响显示。选择对比日期后，`/inference` 在所有 X 轴模式（包括并发数）下都使用日期对比图，
+日期对比同样只影响显示。选择对比日期后，`/inference` 在所有 X 轴模式下都使用日期对比图，
 并与对比序列一同绘制 `?unofficialrun=` 数据；时间线显示沿用同一套按日期切换的图例和配色。
 只读 inference 视图已对每种 `xmode` 返回 `comparisons`（每个 `dates` 或 `start`/`end`
 条目一份投影）和 `overlays`（每个非官方运行一份）。按日期显隐属于渲染状态，不是查询参数，

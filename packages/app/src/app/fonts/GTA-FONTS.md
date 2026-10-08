@@ -1,6 +1,8 @@
 # GTA theme fonts
 
-Used only by the GTA presentation theme (`.gta` selectors in `globals.css`).
+Used only by the GTA presentation theme (`.gta` selectors in the dynamically
+loaded `components/gta/gta-theme.css`). Font declarations and files are not
+loaded by the default light/dark page.
 Files are WOFF2 conversions, unmodified otherwise, of the webfonts Rockstar
 Games serves on [rockstargames.com/gta-v](https://www.rockstargames.com/gta-v).
 

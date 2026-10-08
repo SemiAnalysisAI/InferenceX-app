@@ -49,7 +49,6 @@ function stored(name: string, power = 100): GpuMetricSeries {
   return {
     id: 1,
     artifactName: csvName(name),
-    configKey: name,
     fileName: 'gpu_metrics.csv',
     vendor: 'nvidia',
     sampleIntervalS: 1,
@@ -60,7 +59,6 @@ function stored(name: string, power = 100): GpuMetricSeries {
     sidecars: {
       seriesInventory: [{ fileName: 'gpu_metrics.csv', sampleCount: 2 }],
     },
-    benchmarkResultIds: [1],
     stats: [],
     data: parseCsvData(csv(power)).map((row, index) => ({
       ...row,

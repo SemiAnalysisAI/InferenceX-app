@@ -65,7 +65,6 @@ import {
   upperPowerEnvelope,
   isPowerCurveMetric,
   isPowerGaugeSeries,
-  isMeasuredPowerCurveMetric,
 } from '@/components/inference/utils/powerCurves';
 import type {
   ChartDefinition,
@@ -73,7 +72,6 @@ import type {
   ScatterGraphProps,
 } from '@/components/inference/types';
 import { comparisonEntryLabel } from '@/components/inference/utils/comparisonEntry';
-import { groupConcurrencySeries } from '@/components/inference/utils/concurrency-series';
 import { matchesQuickFilters } from '@/components/inference/utils/quickFilters';
 import {
   generateGPUGraphTooltipContent,
@@ -142,7 +140,6 @@ const GPU_STRINGS = {
     logScale: 'Log Scale',
     highContrast: 'High Contrast',
     optimalOnly: 'Optimal Only',
-    showAllMeasurements: 'Show all measurements',
     powerBoundaryInfo:
       'Show only points on the upper measured power boundary. Turn off to show all measurements; the boundary stays the same. This is a power-load boundary, not an energy-efficiency frontier.',
     labels: 'Labels',
@@ -163,7 +160,6 @@ const GPU_STRINGS = {
     logScale: '对数缩放',
     highContrast: '高对比度',
     optimalOnly: '仅最优',
-    showAllMeasurements: '显示全部测量点',
     powerBoundaryInfo:
       '仅显示实测功率上边界上的点。关闭后显示全部测量点，边界曲线保持不变。这是功率负载边界，不是能效前沿。',
     labels: '标签',
@@ -209,7 +205,6 @@ const GPUGraph = React.memo(
     const {
       selectedYAxisMetric,
       hideNonOptimal: savedHideNonOptimal,
-      showAllMeasurements: savedShowAllMeasurements,
       showPointLabels,
       logScale,
       isLegendExpanded,
@@ -223,7 +218,6 @@ const GPUGraph = React.memo(
       toggleActiveDate,
       removeActiveDate,
       setHideNonOptimal,
-      setShowAllMeasurements,
       setShowPointLabels,
       setLogScale,
       setIsLegendExpanded,
@@ -246,20 +240,11 @@ const GPUGraph = React.memo(
     const showPowerTelemetryRef = useRef(showPowerTelemetry);
     showPowerTelemetryRef.current = showPowerTelemetry;
     const legendT = GPU_STRINGS[locale];
-    // The Concurrency axis plots observed load sweeps: no frontier or power
-    // envelope, same as ScatterGraph.
-    const isConcurrencyAxis = chartDefinition.x_scale_field === 'conc';
-    const frontierDirection = isConcurrencyAxis
-      ? undefined
-      : (chartDefinition[`${selectedYAxisMetric}_roofline` as keyof ChartDefinition] as
-          | ParetoDirection
-          | undefined);
+    const frontierDirection = chartDefinition[
+      `${selectedYAxisMetric}_roofline` as keyof ChartDefinition
+    ] as ParetoDirection | undefined;
     const hideNonOptimal = Boolean(frontierDirection) && savedHideNonOptimal;
-    const powerCurveMetric = isPowerCurveMetric(selectedYAxisMetric);
-    const isMeasuredPowerAxis = isMeasuredPowerCurveMetric(selectedYAxisMetric);
-    const powerEnvelopeMode =
-      !isConcurrencyAxis && powerCurveMetric && (isMeasuredPowerAxis || !hideNonOptimal);
-    const showAllMeasurements = isMeasuredPowerAxis ? !hideNonOptimal : savedShowAllMeasurements;
+    const powerEnvelopeMode = isPowerCurveMetric(selectedYAxisMetric);
     const noDataHint = isRoleLocalMeasuredEnergyConfigKey(selectedYAxisMetric)
       ? legendT.noRoleEnergyDataHint
       : isMeasuredEnergyConfigKey(selectedYAxisMetric)
@@ -379,17 +364,6 @@ const GPUGraph = React.memo(
     }, [groupedData, frontierDirection]);
 
     const rooflines = useMemo(() => {
-      // One path per observed load sweep, never joined across runs or
-      // topologies (see groupConcurrencySeries).
-      if (isConcurrencyAxis) {
-        const result: Record<string, InferenceData[]> = {};
-        for (const [key, points] of Object.entries(groupedData)) {
-          for (const [segment, sweep] of groupConcurrencySeries(points)) {
-            result[`${key}__${encodeURIComponent(segment)}`] = sweep;
-          }
-        }
-        return result;
-      }
       if (!powerEnvelopeMode) return paretoRooflines;
       const result: Record<string, InferenceData[]> = {};
       for (const [key, points] of Object.entries(groupedData)) {
@@ -401,7 +375,6 @@ const GPUGraph = React.memo(
       }
       return result;
     }, [
-      isConcurrencyAxis,
       powerEnvelopeMode,
       groupedData,
       paretoRooflines,
@@ -429,17 +402,9 @@ const GPUGraph = React.memo(
     );
 
     const filteredData = useMemo(() => {
-      if (hideNonOptimal || (powerEnvelopeMode && !showAllMeasurements))
-        return activeData.filter((p) => boundaryPointKeys.has(boundaryKeyOf(p)));
+      if (hideNonOptimal) return activeData.filter((p) => boundaryPointKeys.has(boundaryKeyOf(p)));
       return activeData;
-    }, [
-      activeData,
-      hideNonOptimal,
-      powerEnvelopeMode,
-      showAllMeasurements,
-      boundaryPointKeys,
-      boundaryKeyOf,
-    ]);
+    }, [activeData, hideNonOptimal, boundaryPointKeys, boundaryKeyOf]);
     // Official points join the scatter layer; unofficial ones draw as X markers.
     const officialPoints = useMemo(
       () => filteredData.filter((point) => !overlayPointSet.has(point)),
@@ -794,7 +759,6 @@ const GPUGraph = React.memo(
       selectedGPUs,
       selectedDates,
       selectedDateRange,
-      showAllMeasurements,
       overlayData,
     ]);
 
@@ -1068,8 +1032,7 @@ const GPUGraph = React.memo(
               getColor: getRooflineColor,
               isVisible: isRooflineVisible,
               getDasharray: getRooflineDasharray,
-              // Load sweeps join measured points; they are not fitted curves.
-              curve: isConcurrencyAxis ? d3.curveLinear : d3.curveMonotoneX,
+              curve: d3.curveMonotoneX,
             },
           },
           {
@@ -1312,23 +1275,10 @@ const GPUGraph = React.memo(
                       id: 'gpu-hide-non-optimal',
                       label: legendT.optimalOnly,
                       checked: hideNonOptimal,
-                      ...(isMeasuredPowerAxis ? { infoTooltip: legendT.powerBoundaryInfo } : {}),
+                      ...(powerEnvelopeMode ? { infoTooltip: legendT.powerBoundaryInfo } : {}),
                       onCheckedChange: (c: boolean) => {
                         setHideNonOptimal(c);
                         track('interactivity_hide_non_optimal_toggled', { enabled: c });
-                      },
-                    },
-                  ]
-                : []),
-              ...(powerEnvelopeMode && !isMeasuredPowerAxis
-                ? [
-                    {
-                      id: 'gpu-show-all-measurements',
-                      label: legendT.showAllMeasurements,
-                      checked: showAllMeasurements,
-                      onCheckedChange: (c: boolean) => {
-                        setShowAllMeasurements(c);
-                        track('gpu_timeseries_show_all_measurements_toggled', { enabled: c });
                       },
                     },
                   ]

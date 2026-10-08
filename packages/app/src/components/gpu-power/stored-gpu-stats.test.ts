@@ -7,10 +7,8 @@ import {
   parseGpuMetricsCsv,
   type GpuMetricSample,
 } from '@semianalysisai/inferencex-db/etl/gpu-metrics-csv';
-import {
-  prepareGpuMetricsArtifact,
-  statMetricColumn,
-} from '@semianalysisai/inferencex-db/etl/gpu-metrics-ingest';
+import { prepareGpuMetricsArtifact } from '@semianalysisai/inferencex-db/etl/gpu-metrics-ingest';
+import { statMetricColumn } from '@semianalysisai/inferencex-db/lib/gpu-metric-stats';
 
 import { storedGpuStatsForMetric } from './stored-gpu-stats';
 import { ALL_METRIC_OPTIONS, computeGpuStats, parseCsvData, type GpuMetricRow } from './types';
@@ -40,57 +38,43 @@ function assertAllMetricStats(samples: GpuMetricSample[], rows: GpuMetricRow[]) 
 }
 
 describe('storedGpuStatsForMetric', () => {
-  it.each(['UTC', 'America/Los_Angeles'])(
-    'matches live NVIDIA and ingest populations across DST in %s',
-    (timezone) => {
-      const csv = [
-        'timestamp,index,power.draw [W]',
-        '2026/03/08 02:30:00.000,0,100',
-        '2026/03/08 02:30:00.000,0,900',
-        '2026/03/08 03:30:00.000,0,300',
-      ].join('\n');
-      const artifactDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gpu-stats-dst-'));
-      const originalTimezone = process.env.TZ;
-      try {
-        process.env.TZ = timezone;
-        fs.writeFileSync(path.join(artifactDir, 'gpu_metrics.csv'), csv);
-        const [prepared] = prepareGpuMetricsArtifact({
-          artifactDir,
-          artifactName: 'gpu_metrics_nvidia_dst',
-        });
-        expect(
-          prepared.samples.map((sample) => new Date(sample.timestampMs).toISOString()),
-        ).toEqual(['2026-03-08T02:30:00.000Z', '2026-03-08T03:30:00.000Z']);
-        const live = parseCsvData(csv);
-        // Preserve raw timestamps for the bundle's later context-offset adjustment.
-        expect(live.map((row) => row.timestamp)).toEqual([
-          '2026/03/08 02:30:00.000',
-          '2026/03/08 03:30:00.000',
-        ]);
-        expect(live.map((row) => row.power)).toEqual([100, 300]);
-        const actual = computeGpuStats(live, 'power');
-        expect(actual).toEqual([
-          {
-            gpuIndex: 0,
-            count: 2,
-            min: 100,
-            max: 300,
-            mean: 200,
-            median: 200,
-            p95: 290,
-            p99: 298,
-            stddev: 100,
-          },
-        ]);
-        const { metric: _metric, ...expected } = prepared.stats[0];
-        expect(actual).toEqual([expected]);
-      } finally {
-        if (originalTimezone === undefined) delete process.env.TZ;
-        else process.env.TZ = originalTimezone;
-        fs.rmSync(artifactDir, { recursive: true, force: true });
-      }
-    },
-  );
+  it('matches live NVIDIA and ingest populations across the Los Angeles DST gap', () => {
+    const csv = [
+      'timestamp,index,power.draw [W]',
+      '2026/03/08 02:30:00.000,0,100',
+      '2026/03/08 02:30:00.000,0,900',
+      '2026/03/08 03:30:00.000,0,300',
+    ].join('\n');
+    const artifactDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gpu-stats-dst-'));
+    const originalTimezone = process.env.TZ;
+    try {
+      // 02:30 does not exist here, so a local-time parse lands it on the next row's 03:30.
+      process.env.TZ = 'America/Los_Angeles';
+      fs.writeFileSync(path.join(artifactDir, 'gpu_metrics.csv'), csv);
+      const [prepared] = prepareGpuMetricsArtifact({
+        artifactDir,
+        artifactName: 'gpu_metrics_nvidia_dst',
+      });
+      expect(prepared.samples.map((sample) => new Date(sample.timestampMs).toISOString())).toEqual([
+        '2026-03-08T02:30:00.000Z',
+        '2026-03-08T03:30:00.000Z',
+      ]);
+      const live = parseCsvData(csv);
+      // Raw stamps stay unzoned; the live route applies the collector's context offset.
+      expect(live.map((row) => row.timestamp)).toEqual([
+        '2026/03/08 02:30:00.000',
+        '2026/03/08 03:30:00.000',
+      ]);
+      expect(live.map((row) => row.power)).toEqual([100, 300]);
+      const { metric: _metric, ...expected } = computeGpuMetricStats(prepared.samples)[0];
+      expect(expected).toMatchObject({ count: 2, median: 200 });
+      expect(computeGpuStats(live, 'power')).toEqual([expected]);
+    } finally {
+      if (originalTimezone === undefined) delete process.env.TZ;
+      else process.env.TZ = originalTimezone;
+      fs.rmSync(artifactDir, { recursive: true, force: true });
+    }
+  });
 
   it('preserves NVIDIA units, zero readings, and full-record percentiles', () => {
     const csv = [

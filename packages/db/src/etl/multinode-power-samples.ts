@@ -9,8 +9,8 @@
  *   schema_version,timestamp_unix,scrape_seq,hostname,gpu_index,gpu_uuid,power_w
  *
  * Only power is scraped, so every other `GpuMetricSample` field stays null and
- * the digest carries `powerW` alone. Rows are regrouped per host so each host
- * becomes its own series, the shape the reader already uses for multinode
+ * per-GPU statistics cover `powerW` alone. Rows are regrouped per host so each
+ * host becomes its own series, the shape the reader already uses for multinode
  * staging ("one CSV per node"). Pure module: no I/O.
  */
 

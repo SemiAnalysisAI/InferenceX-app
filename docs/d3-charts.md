@@ -118,23 +118,17 @@ updates with visibility, log scales and zoom without taking point pointer events
 One-dimensional GPU, history and evaluation charts have no two-objective Pareto
 region and do not expose this switch.
 
-The six measured-power metrics (average, prefill, decode, P75, P90 and percentage of TDP) draw a fixed upper power boundary across tested configurations. **Optimal Only** shows boundary points when on and all measurements when off, preserving curve geometry, axis domains and zoom. These views use no separate **Show all measurements** switch. The boundary describes power demand across the load sweep; energy-per-token metrics retain their lower-energy Pareto frontiers.
-
-Modeled chassis power retains its existing behavior: **Optimal Only** on shows the minimum-power Pareto frontier, which can legitimately contain one point. Turning it off draws the upper power boundary. In that mode, the separate **Show all measurements** switch (`i_allpoints=1`) reveals off-boundary points without changing the curve.
+The six measured-power metrics (average, prefill, decode, P75, P90 and percentage of TDP) draw a fixed upper power boundary across tested configurations. **Optimal Only** shows boundary points when on and all measurements when off, preserving curve geometry, axis domains and zoom. The boundary describes power demand across the load sweep; energy-per-token metrics retain their lower-energy Pareto frontiers.
 
 Dividing watts by one hardware's positive, constant TDP preserves its boundary membership. A lower percentage across different chips is not, by itself, an energy-efficiency comparison.
 
 Upper boundaries use monotone interpolation between unique-X vertices, including after zoom. Curves are grouped by hardware, precision and date, and additionally by run for unofficial overlays; unrelated dates and runs never share a curve.
 
-**Perf Ruler** is available on all six measured-power axes in the single-run scatter chart (`ScatterGraph`) only; the date-comparison chart (`GPUGraph`) has no ruler. It measures the ratio of the drawn upper-boundary values at the same X coordinate, using the rendered paths after zoom; clicking an off-boundary dot selects its series' boundary, clamped to the curves' shared X range. The ratio compares power or percentage of TDP, not energy efficiency. Optimal Only changes point visibility without moving the ruler. Hidden or removed curves cannot be measured, and changing either axis clears existing rulers. Modeled chassis power keeps its existing ruler restriction while showing an upper boundary; energy and other Pareto views retain their ruler behavior.
+**Perf Ruler** is available on all six measured-power axes in the single-run scatter chart (`ScatterGraph`) only; the date-comparison chart (`GPUGraph`) has no ruler. It measures the ratio of the drawn upper-boundary values at the same X coordinate, using the rendered paths after zoom; clicking an off-boundary dot selects its series' boundary, clamped to the curves' shared X range. The ratio compares power or percentage of TDP, not energy efficiency. Optimal Only changes point visibility without moving the ruler. Hidden or removed curves cannot be measured, and changing either axis clears existing rulers. Energy and other Pareto views retain their ruler behavior.
 
-### Observed concurrency sweeps
+### Concurrency is not an x-axis
 
-`i_xmode=concurrency` is an observed-load view, not an optimization axis. It uses the exact positive `conc` values and a linear X scale. Valid metric-bearing load points remain visible even when saved Optimal Only or Best per SKU preferences are enabled; Pareto Frontier, gradient strategy labels, Perf Ruler and Replay are unavailable in this mode. Y-axis units and measured/modelled boundaries do not change.
-
-`groupConcurrencySeries` groups straight-line segments by hardware, precision, topology (`pointTopologyKey`), recipe fingerprint, date, run and power-comparison variant. It never joins TP4 to TP8 or 4P/4D to 16P/16D. A group with repeated concurrency values, or points without run provenance, stays as markers instead of being reduced to an arbitrary average or envelope. Markers retain their original values and identities. These segments connect observations; they do not establish a hardware-controlled comparison or estimate untested loads.
-
-Official and unofficial paths share this behavior. Date comparisons stay on `GPUGraph` and split each compared (date, hardware) series and each unofficial run into the same segments, drawn with linear curves and without frontier, power envelope or Optimal Only; each series keeps one line label, on its longest segment. Exact topology quick filters retain that topology's entire load sweep. Share URLs, tables and CSV exports preserve the selected `conc` coordinates.
+There is no concurrency x-axis mode. GPU count varies across configurations, so the same concurrency is not a comparable load between them; `conc` stays a point attribute in tooltips, tables, CSV and the API. Exact topology quick filters (`pointTopologyKey`) select allocation and parallelism without filtering concurrency.
 
 ### Unofficial runs in date comparisons
 

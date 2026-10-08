@@ -26,7 +26,7 @@ export interface GpuPowerRunInfo {
 export interface GpuMetricsArtifact {
   name: string;
   data: GpuMetricRow[];
-  /** Only database-backed artifacts carry the full-record digest. */
+  /** Only database-backed artifacts carry full-record statistics. */
   series?: Omit<GpuMetricSeries, 'data'>;
 }
 
@@ -387,7 +387,7 @@ export function parseCsvData(csvText: string): GpuMetricRow[] {
       ? parseAmdCsv(lines, buildColumnMap(lines[0]))
       : parseNvidiaCsv(lines);
   // Normalize one CSV at a time: host-local indices may repeat in other files.
-  // Keep the first device/timestamp sample, matching the persisted digest.
+  // Keep the first device/timestamp sample, matching the stored samples.
   const seen = new Set<string>();
   return rows.filter((row) => {
     // NVIDIA's naive collector clock must not use the reader's local DST rules.

@@ -1,14 +1,14 @@
 /**
- * PowerX telemetry for one GitHub Actions run.
+ * PowerX telemetry for one GitHub Actions run, answered from one source per run.
  *
- * Reads the ingest-time telemetry digest first (migration 016: series,
- * samples, per-GPU statistics, point links). Runs that have not been ingested
- * yet, including runs still in progress, fall back to the live GitHub
- * artifacts exactly as before.
+ * A run with stored telemetry (migration 016: series, samples, per-GPU
+ * statistics, point links) is read from the database only. A run without it
+ * (not yet ingested, still in progress, or unofficial) is read from its live
+ * GitHub artifacts only.
  *
- * DO NOT ADD CACHING (blob, CDN, or unstable_cache) to this route. The
- * fallback fetches live GitHub Actions artifacts which change while a run is
- * in progress, and stored telemetry must reflect a successful re-ingest immediately.
+ * DO NOT ADD CACHING (blob, CDN, or unstable_cache) to this route. Live
+ * GitHub Actions artifacts change while a run is in progress, and stored
+ * telemetry must reflect a successful re-ingest immediately.
  *
  * Two telemetry collectors publish GPU power for a run:
  * - single-node runners (nvidia-smi / amd-smi) publish one `gpu_metrics_<RESULT_FILENAME>`
@@ -19,9 +19,9 @@
  *   (`components/gpu-power/power-audit-bundle.ts`).
  *
  * Two response shapes:
- * - default: every `gpu_metrics_*` artifact's parsed rows (the `/gpu-metrics`
- *   page), from the stored digest when the run is ingested, else from GitHub;
- *   bundles are ignored on the GitHub path;
+ * - default: every `gpu_metrics_*` artifact's parsed rows (the public GPU
+ *   metrics view), from the stored digest when the run is ingested, else from
+ *   GitHub; bundles are ignored on the GitHub path;
  * - `series=power`: compact per-GPU watt series bucketed to one second
  *   (`components/gpu-power/power-series.ts`) for the PowerX timeline, from
  *   CSV artifacts and from bundles cut per validation window. The timeline
@@ -32,9 +32,9 @@
  * one model / workload / precision so a full nightly sweep is not downloaded
  * for one chart. A bundle names a whole sweep, so it also matches when the
  * prefix extends past its name into the per-concurrency suffix.
- * Timeline POSTs sorted validation basenames in `{ sources: [...] }` to recover
- * missing siblings while keeping fully covered DB reads independent of GitHub.
- * `sourceCoverage` describes those requested identities, not full-run completeness.
+ * Timeline POSTs sorted validation basenames in `{ sources: [...] }` to read
+ * only the windows its points need. `sourceCoverage` describes those requested
+ * identities, not full-run completeness.
  */
 import { type NextRequest, NextResponse } from 'next/server';
 
@@ -45,22 +45,14 @@ import {
   type GpuMetricsRunSelection,
 } from '@semianalysisai/inferencex-db/queries/gpu-metrics';
 
-import type {
-  GpuPowerRunInfo,
-  GpuMetricsArtifact,
-  GpuPowerApiResponse,
-} from '@/components/gpu-power/types';
-import {
-  bucketPowerFiles,
-  parseTelemetryTimestampUtc,
-  type GpuPowerSeries,
-} from '@/components/gpu-power/power-series';
+import type { GpuPowerRunInfo, GpuPowerApiResponse } from '@/components/gpu-power/types';
+import { bucketPowerFiles, type GpuPowerSeries } from '@/components/gpu-power/power-series';
 import {
   storedPowerSeries,
   StoredTelemetryIncompleteError,
 } from '@/components/gpu-power/stored-power-series';
-import { ARTIFACT_PREFIX, isWantedBundle, isRequestedArtifact } from './artifact-selection';
-import { fetchGpuMetricsFromGithub, type GithubArtifactPayload } from './github-telemetry';
+import { ARTIFACT_PREFIX } from './artifact-selection';
+import { fetchGpuMetricsFromGithub } from './github-telemetry';
 
 /** Bundle downloads are latency-bound; match the other artifact routes' budget. */
 export const maxDuration = 300;
@@ -71,14 +63,12 @@ const MAX_REQUEST_BYTES = 256 * 1024;
 
 export type GpuMetricsSource = 'database' | 'github';
 
-export type GpuMetricsArtifactPayload = GpuMetricsArtifact;
-
 export interface GpuMetricsRouteResponse extends GpuPowerApiResponse {
   source: GpuMetricsSource;
   artifactNames?: string[];
 }
 
-/** Shape the stored digest like the GitHub payload so the explorer is source-agnostic. */
+/** Shape stored series like the GitHub payload so readers are source-agnostic. */
 export function databasePayloadToResponse(payload: GpuMetricsRunPayload): GpuMetricsRouteResponse {
   const run = payload.workflowRun;
   const filesPerArtifact = new Map<string, number>();
@@ -144,65 +134,6 @@ function powerSeriesResponse(
   );
 }
 
-/**
- * Narrows a stored run to the artifacts a `prefix` names, mirroring the GitHub
- * listing filter so both sources answer the same request the same way.
- */
-function filterArtifactsByPrefix(
-  artifacts: GpuMetricsArtifactPayload[],
-  prefix: string | null,
-): GpuMetricsArtifactPayload[] {
-  if (prefix === null) return artifacts;
-  const wanted = `${ARTIFACT_PREFIX}${prefix}`;
-  return artifacts.filter((artifact) => {
-    const name = artifact.series?.artifactName ?? artifact.name;
-    return name.startsWith(wanted) || isWantedBundle(name, prefix);
-  });
-}
-
-/** A live artifact repairs a stored gap only when its retained file/sample inventory matches. */
-function assertStoredArtifactsRecovered(
-  stored: GpuMetricsRouteResponse | null,
-  artifacts: GithubArtifactPayload[],
-  incomplete: StoredTelemetryIncompleteError[],
-): void {
-  for (const missing of incomplete) {
-    const incompleteArtifact = missing.artifact;
-    const live = artifacts.find((artifact) => artifact.name === incompleteArtifact);
-    const inventory = stored?.artifacts.find(
-      (artifact) => artifact.series?.artifactName === incompleteArtifact,
-    )?.series?.sidecars.seriesInventory;
-    // A matching name alone cannot prove that missing hosts/samples recovered.
-    // Bundle cuts do not retain the raw inventory, so known-incomplete bundles
-    // require re-ingest; ordinary un-ingested bundle fallback stays available.
-    if (!live || !Array.isArray(inventory) || inventory.length === 0) throw missing;
-    const counts = new Map(
-      live.files.map((file) => [
-        file.name,
-        new Set(
-          file.data.flatMap((row) => {
-            const time = parseTelemetryTimestampUtc(row.timestamp);
-            return time === null || !Number.isInteger(row.index) || !Number.isFinite(row.power)
-              ? []
-              : [`${row.index}:${time}`];
-          }),
-        ).size,
-      ]),
-    );
-    if (
-      !inventory.every(
-        (expected) =>
-          expected !== null &&
-          typeof expected === 'object' &&
-          typeof expected.fileName === 'string' &&
-          typeof expected.sampleCount === 'number' &&
-          counts.get(expected.fileName) === expected.sampleCount,
-      )
-    )
-      throw missing;
-  }
-}
-
 async function fetchGpuMetricsFromDatabase(
   runId: string,
   selection: GpuMetricsRunSelection,
@@ -216,7 +147,7 @@ export function GET(request: NextRequest) {
   return readGpuMetrics(request, null);
 }
 
-/** Selecting a host must not discard the explorer's sibling artifact choices. */
+/** Selecting a host must not discard the view's sibling artifact choices. */
 export function readGpuMetricsForView(request: NextRequest, artifact: string | null) {
   return readGpuMetrics(request, null, artifact);
 }
@@ -318,77 +249,39 @@ async function readGpuMetrics(
     );
   }
 
-  const incomplete: StoredTelemetryIncompleteError[] = [];
-  const databaseSeries: GpuPowerSeries[] = [];
-  let githubFallbackStarted = false;
   try {
     if (stored) {
-      const artifacts = filterArtifactsByPrefix(stored.artifacts, prefix).filter((artifact) =>
-        isRequestedArtifact(artifact.series?.artifactName ?? artifact.name, sources),
-      );
-      if (series === 'power') {
-        const groups = Map.groupBy(
-          artifacts.flatMap((artifact) =>
-            artifact.series ? [{ ...artifact.series, data: artifact.data }] : [],
-          ),
-          (entry) => entry.artifactName,
-        );
-        for (const entries of groups.values()) {
-          try {
-            databaseSeries.push(
-              ...storedPowerSeries(entries).filter(
-                (entry) => sources === null || sources.includes(seriesSource(entry) ?? ''),
-              ),
-            );
-          } catch (error) {
-            if (!(error instanceof StoredTelemetryIncompleteError)) throw error;
-            incomplete.push(error);
-            console.warn(
-              'gpu-metrics: incomplete stored telemetry, trying artifacts:',
-              error.message,
-            );
-          }
-        }
-        if (
-          incomplete.length === 0 &&
-          databaseSeries.length > 0 &&
-          sourceCoverage(databaseSeries, sources).missingSources.length === 0
-        ) {
-          return powerSeriesResponse('database', stored.runInfo, databaseSeries, sources);
-        }
-      } else if (artifacts.length > 0 || stored.artifactNames) {
-        return NextResponse.json(
-          { ...stored, artifacts },
-          { headers: { 'Cache-Control': 'no-store' } },
-        );
-      }
+      // The query already scoped series to `prefix` and the requested artifacts;
+      // only the window cut below is finer than an artifact.
+      if (series !== 'power')
+        return NextResponse.json(stored, { headers: { 'Cache-Control': 'no-store' } });
+      const storedSeries = storedPowerSeries(
+        stored.artifacts.flatMap((artifact) =>
+          artifact.series ? [{ ...artifact.series, data: artifact.data }] : [],
+        ),
+      ).filter((entry) => sources === null || sources.includes(seriesSource(entry) ?? ''));
+      return powerSeriesResponse('database', stored.runInfo, storedSeries, sources);
     }
     if (series === 'power') {
-      githubFallbackStarted = true;
       const { runInfo, artifacts, bundleSeries } = await fetchGpuMetricsFromGithub(
         runId,
         prefix,
         true,
-        sources === null ? null : sourceCoverage(databaseSeries, sources).missingSources,
+        sources,
       );
       const powerSeries = artifacts
         .map((artifact) => bucketPowerFiles(artifact.name, artifact.files))
         .filter((entry): entry is GpuPowerSeries => entry !== null);
-      // A fallback response can combine durable history with live recovery.
-      // Keep healthy stored windows even when their GitHub copies expired,
-      // and never replace or duplicate them with a live copy. source='github'
-      // records that this response required fallback, not that every row is live.
-      const databaseSources = new Set(databaseSeries.map(seriesSource));
-      const combined = [
-        ...databaseSeries,
-        ...[...powerSeries, ...bundleSeries].filter(
-          (entry) =>
-            !databaseSources.has(seriesSource(entry)) &&
-            (sources === null || sources.includes(seriesSource(entry) ?? '')),
-        ),
-      ];
-      assertStoredArtifactsRecovered(stored, artifacts, incomplete);
-      return powerSeriesResponse('github', runInfo, combined, sources);
+      const seenSources = new Set<string>();
+      const liveSeries: GpuPowerSeries[] = [];
+      for (const entry of [...powerSeries, ...bundleSeries]) {
+        const source = seriesSource(entry);
+        if (sources !== null && !sources.includes(source ?? '')) continue;
+        if (source !== null && seenSources.has(source)) continue;
+        liveSeries.push(entry);
+        if (source !== null) seenSources.add(source);
+      }
+      return powerSeriesResponse('github', runInfo, liveSeries, sources);
     }
     const live = await fetchGpuMetricsFromGithub(runId, prefix, false);
     return NextResponse.json(
@@ -406,10 +299,7 @@ async function readGpuMetrics(
     );
   } catch (error) {
     console.error('Error fetching GPU power data:', error);
-    const missing = error instanceof StoredTelemetryIncompleteError ? error : incomplete[0];
-    if (githubFallbackStarted && !missing && stored && databaseSeries.length > 0) {
-      return powerSeriesResponse('database', stored.runInfo, databaseSeries, sources);
-    }
+    const missing = error instanceof StoredTelemetryIncompleteError ? error : null;
     return NextResponse.json(
       missing
         ? {
