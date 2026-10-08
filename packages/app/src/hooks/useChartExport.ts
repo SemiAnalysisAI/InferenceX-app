@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 
-import { CHART_FONT_MINECRAFT, CHART_FONT_SANS } from '@/lib/d3-chart/typography';
+import { CHART_FONT_SANS } from '@/lib/d3-chart/typography';
 import { getExportFooterText } from '@/lib/export-footer';
 import { useLocale } from '@/lib/use-locale';
 import { hasDarkTheme } from '@/lib/themes';
@@ -30,15 +30,6 @@ function applyStyles(el: HTMLElement | null, styles: Partial<CSSStyleDeclaration
 const CSS_VAR_RE = /var\(--(?<varName>[^)]+)\)/u;
 
 export function getExportFontFamily(): string {
-  const isMinecraftTheme =
-    typeof document !== 'undefined' &&
-    (document.documentElement.classList.contains('minecraft') ||
-      document.body.classList.contains('minecraft'));
-
-  if (isMinecraftTheme) {
-    return CHART_FONT_MINECRAFT;
-  }
-
   return CHART_FONT_SANS;
 }
 
@@ -139,9 +130,9 @@ function resolveCssVarsForExport(root: HTMLElement) {
 }
 
 /**
- * Bake computed font-family into inline styles so html-to-image retains
- * Minecraft typography even when ancestor-based selectors (e.g. .minecraft *)
- * are not preserved in its internal clone tree.
+ * Bake computed font-family into inline styles so html-to-image retains the
+ * page typography even when ancestor-based selectors are not preserved in its
+ * internal clone tree.
  */
 function inlineComputedFontFamilyForExport(root: HTMLElement, resolvedFontFamily: string) {
   const elements = [root, ...root.querySelectorAll<HTMLElement>('*')];
@@ -468,7 +459,7 @@ export function useChartExport({
 
       // Resolve all CSS var(--*) references in SVG elements (html-to-image can't resolve them)
       resolveCssVarsForExport(exportElement);
-      // Inline computed font family to preserve Minecraft pixel font in PNG exports.
+      // Inline computed font family so PNG exports keep the page typography.
       inlineComputedFontFamilyForExport(exportElement, resolvedExportFontFamily);
 
       // Normalize font sizes and SVG widths

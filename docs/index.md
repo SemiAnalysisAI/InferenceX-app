@@ -4,8 +4,7 @@ Design rationale and non-obvious conventions. See [CLAUDE.md](../CLAUDE.md) for 
 
 ## Docs
 
-- [Presentation Themes](./themes.md): Minecraft activation and assets, CS:GO, GTA and Halo styling, Halo theme music, icon-only theme picker, dark-chart/export integration, and presentation-only API exclusion.
-- [Playable Minecraft](./minecraft-game.md): the opt-in game launched from the Minecraft theme, controls, saves, lifecycle and verification.
+- [Presentation Themes](./themes.md): light/dark persistence, retired-theme reset, icon-only theme picker, and presentation-only API exclusion.
 
 - [Dashboard Read-only Views](./dashboard-readonly-views.md): API/filter inventory, source audit and verification scope
 - [Pareto Boundary API](./pareto-api.md): Query frontier and hinterland observations, preserve provenance, and distinguish API scope from chart highlights.
