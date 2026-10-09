@@ -108,23 +108,25 @@ function solveCooling(
   return null;
 }
 
-/** Tray 48 V converter loss; null above its continuous capacity. */
+/** Tray 48 V converter loss; null above its continuous capacity or past the curve's last knot. */
 function trayConverterLoss(converter: RackProfile['trayConverter'], output: number): number | null {
   const fraction = output / converter.capacityWatts;
   if (fraction > 1) return null;
   const curve = converter.lossCurve;
   const i = curve.findIndex((point, k) => k > 0 && fraction <= point.outputFraction);
+  if (i === -1) return null;
   const [left, right] = [curve[i - 1], curve[i]];
   const weight = (fraction - left.outputFraction) / (right.outputFraction - left.outputFraction);
   return left.lossWatts + weight * (right.lossWatts - left.lossWatts);
 }
 
-/** Shelf PSU AC/DC loss; null outside the curve (below its first knot or above capacity). */
+/** Shelf PSU AC/DC loss; null outside the curve (below its first knot, past its last, or above capacity). */
 function psuConversionLoss(shelves: PowerShelves, output: number): number | null {
   const curve = shelves.psuEfficiencyCurve;
   const load = output / shelves.psuCapacityWatts;
   if (load < curve[0].loadFraction || load > 1) return null;
   const i = curve.findIndex((point, k) => k > 0 && load <= point.loadFraction);
+  if (i === -1) return null;
   const [left, right] = [curve[i - 1], curve[i]];
   const weight = (load - left.loadFraction) / (right.loadFraction - left.loadFraction);
   const efficiency = left.efficiency + weight * (right.efficiency - left.efficiency);

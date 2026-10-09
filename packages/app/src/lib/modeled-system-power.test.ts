@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import type { BenchmarkRow } from '@/lib/api';
 import { rowToAggDataEntry, transformBenchmarkRows } from '@/lib/benchmark-transform';
@@ -13,6 +13,7 @@ import {
   estimateRackPower,
   type SystemPowerHardware,
 } from '@/lib/system-power-model';
+import profileData from '@/lib/system-power-model.profiles.json';
 
 const chassis = (hardware: SystemPowerHardware, gpuWatts: number, scaleOut = false) =>
   estimateChassisPower(hardware, gpuWatts, { workload: 'fixed-seq-len', scaleOut })!;
@@ -800,5 +801,26 @@ describe('NVL72 rack estimate from measured GPU boards and Grace sockets', () =>
     const overloaded = gb300AggregateRow();
     Object.assign(overloaded.metrics, { avg_power_w: 1700, avg_total_gpu_power_w: 1700 * 16 });
     expect(modelSystemPower(overloaded)).toMatchObject({ reason: 'model-domain' });
+  });
+
+  type RackProfile = (typeof profileData.rackProfiles)['gb300'];
+  it.each([
+    ['tray converter', (rack: RackProfile) => rack.trayConverter.lossCurve.splice(3)],
+    ['power-shelf PSU', (rack: RackProfile) => rack.powerShelves.psuEfficiencyCurve.splice(3)],
+  ])('reports a rack load past the last %s curve knot as model-domain', async (_, truncate) => {
+    const profiles = structuredClone(profileData);
+    // The pinned curves end at full load; ending one at 20% puts this fixture's load past it.
+    truncate(profiles.rackProfiles.gb300);
+    vi.resetModules();
+    vi.doMock('@/lib/system-power-model.profiles.json', () => ({ default: profiles }));
+    try {
+      const { modelSystemPower: truncatedModel } = await import('@/lib/modeled-system-power');
+      expect(truncatedModel(gb300AggregateRow())).toMatchObject({
+        status: 'unsupported',
+        reason: 'model-domain',
+      });
+    } finally {
+      vi.doUnmock('@/lib/system-power-model.profiles.json');
+    }
   });
 });
