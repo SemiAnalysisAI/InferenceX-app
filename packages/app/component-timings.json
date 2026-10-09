@@ -1,0 +1,196 @@
+{
+  "durations": [
+    {
+      "spec": "cypress/component/agentic-distribution.cy.tsx",
+      "duration": 2423
+    },
+    {
+      "spec": "cypress/component/autumn-leaves-gutter.cy.tsx",
+      "duration": 1970
+    },
+    {
+      "spec": "cypress/component/blog-shared-chrome.cy.tsx",
+      "duration": 1386
+    },
+    {
+      "spec": "cypress/component/chart-buttons.cy.tsx",
+      "duration": 3466
+    },
+    {
+      "spec": "cypress/component/chart-legend.cy.tsx",
+      "duration": 5654
+    },
+    {
+      "spec": "cypress/component/chart-selectors.cy.tsx",
+      "duration": 19524
+    },
+    {
+      "spec": "cypress/component/collectivex-swap.cy.tsx",
+      "duration": 2983
+    },
+    {
+      "spec": "cypress/component/component-css.cy.tsx",
+      "duration": 8379
+    },
+    {
+      "spec": "cypress/component/cost-tier-selector.cy.tsx",
+      "duration": 3955
+    },
+    {
+      "spec": "cypress/component/data-table.cy.tsx",
+      "duration": 3397
+    },
+    {
+      "spec": "cypress/component/dataset-list.cy.tsx",
+      "duration": 2276
+    },
+    {
+      "spec": "cypress/component/date-picker.cy.tsx",
+      "duration": 4433
+    },
+    {
+      "spec": "cypress/component/date-range-picker.cy.tsx",
+      "duration": 3655
+    },
+    {
+      "spec": "cypress/component/distribution-card.cy.tsx",
+      "duration": 1843
+    },
+    {
+      "spec": "cypress/component/engine-comparison-confirmation.cy.tsx",
+      "duration": 2718
+    },
+    {
+      "spec": "cypress/component/error-boundary.cy.tsx",
+      "duration": 1792
+    },
+    {
+      "spec": "cypress/component/eval-bar-chart.cy.tsx",
+      "duration": 3250
+    },
+    {
+      "spec": "cypress/component/eval-chart-controls.cy.tsx",
+      "duration": 3681
+    },
+    {
+      "spec": "cypress/component/faq-question-link.cy.tsx",
+      "duration": 1643
+    },
+    {
+      "spec": "cypress/component/footer.cy.tsx",
+      "duration": 2767
+    },
+    {
+      "spec": "cypress/component/gpu-graph.cy.tsx",
+      "duration": 3612
+    },
+    {
+      "spec": "cypress/component/gpu-specs-bar-chart.cy.tsx",
+      "duration": 2495
+    },
+    {
+      "spec": "cypress/component/gta-heist.cy.tsx",
+      "duration": 29346
+    },
+    {
+      "spec": "cypress/component/header.cy.tsx",
+      "duration": 4446
+    },
+    {
+      "spec": "cypress/component/inference-chart-controls.cy.tsx",
+      "duration": 30401
+    },
+    {
+      "spec": "cypress/component/inference-tco-badges.cy.tsx",
+      "duration": 3404
+    },
+    {
+      "spec": "cypress/component/inferencex-wordmark.cy.tsx",
+      "duration": 3759
+    },
+    {
+      "spec": "cypress/component/mode-toggle.cy.tsx",
+      "duration": 2141
+    },
+    {
+      "spec": "cypress/component/multi-select.cy.tsx",
+      "duration": 5046
+    },
+    {
+      "spec": "cypress/component/normalized-interactivity-help-link.cy.tsx",
+      "duration": 1478
+    },
+    {
+      "spec": "cypress/component/power-metric-availability.cy.tsx",
+      "duration": 2303
+    },
+    {
+      "spec": "cypress/component/profit-estimator-chart.cy.tsx",
+      "duration": 4245
+    },
+    {
+      "spec": "cypress/component/quick-filters-dialog.cy.tsx",
+      "duration": 10710
+    },
+    {
+      "spec": "cypress/component/quotes-content.cy.tsx",
+      "duration": 1859
+    },
+    {
+      "spec": "cypress/component/reliability-bar-chart.cy.tsx",
+      "duration": 1908
+    },
+    {
+      "spec": "cypress/component/reliability-chart-controls.cy.tsx",
+      "duration": 1903
+    },
+    {
+      "spec": "cypress/component/scale-up-topology.cy.tsx",
+      "duration": 2027
+    },
+    {
+      "spec": "cypress/component/scatter-graph.cy.tsx",
+      "duration": 13350
+    },
+    {
+      "spec": "cypress/component/scatter-label-overlap.cy.tsx",
+      "duration": 1804
+    },
+    {
+      "spec": "cypress/component/submissions-table.cy.tsx",
+      "duration": 2052
+    },
+    {
+      "spec": "cypress/component/tab-nav.cy.tsx",
+      "duration": 2674
+    },
+    {
+      "spec": "cypress/component/trace-flamegraph.cy.tsx",
+      "duration": 1630
+    },
+    {
+      "spec": "cypress/component/umbp-run-label.cy.tsx",
+      "duration": 2374
+    },
+    {
+      "spec": "cypress/component/unofficial-banner.cy.tsx",
+      "duration": 1686
+    },
+    {
+      "spec": "cypress/component/video-ci-runs.cy.tsx",
+      "duration": 7795
+    },
+    {
+      "spec": "cypress/component/video-fidelity.cy.tsx",
+      "duration": 2405
+    },
+    {
+      "spec": "cypress/component/video-serving-results.cy.tsx",
+      "duration": 3977
+    },
+    {
+      "spec": "cypress/component/video-tradeoff.cy.tsx",
+      "duration": 5338
+    }
+  ]
+}

@@ -29,7 +29,7 @@ bun run test:e2e
 
 The local `bun run test:e2e` command is a curated smoke suite across the core page, chart, overlay, localization, and component paths. It is the default agent and developer check and is intended to stay under one minute once the app is running.
 
-The complete suite is `bun run test:e2e:full`. It runs all Cypress component and integration specs. GitHub Actions runs that same coverage as one component job plus four integration shards per browser, Chrome and Firefox. The CI workflow is the merge gate for the full E2E suite.
+The complete suite is `bun run test:e2e:full`. It runs all Cypress component and integration specs. GitHub Actions runs that same coverage as four component shards (Chrome) plus four integration shards per browser, Chrome and Firefox. The CI workflow is the merge gate for the full E2E suite.
 
 `packages/app/timings.json` is the committed `cypress-split` baseline. Its unit guard requires one positive timing for every integration spec and rejects removed entries. Regenerate the baseline from an observed full integration run when specs are added, removed, or materially rebalanced.
 
@@ -46,6 +46,8 @@ E2E_FIXTURES=1 \
 ```
 
 `SPLIT=1` intentionally runs every spec in one chunk so one process records the complete baseline. CI uses `SPLIT=4` only for parallel execution and writes each shard's timing output to a throwaway file.
+
+`packages/app/component-timings.json` is the matching baseline for component specs, guarded the same way. Component durations include each spec's webpack bundling, so they track wall time rather than only test time. Regenerate it with the same `SPLIT=1` variables, `SPLIT_FILE=component-timings.json` and `SPLIT_OUTPUT_FILE=component-timings.json`, and `bun run --cwd packages/app test:e2e:component`; no app server is needed.
 
 `E2E_FIXTURES=1` serves the committed API snapshots under `packages/app/cypress/fixtures/api/`. Refresh them with `bun run --cwd packages/app capture:fixtures`. The capture script updates `_manifest.json`, which records the fixture shape, byte length, checksum, source, and capture timestamp. The manifest guard rejects partial or hand-edited snapshots; benchmark history must also contain at least two dates so replay tests cannot silently skip their substantive path.
 
