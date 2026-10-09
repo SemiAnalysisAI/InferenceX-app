@@ -96,6 +96,8 @@ export function DistributionHistogram({
     const padding = Math.max(Math.abs(min) * 0.1, 1);
     const maxCount = Math.max(1, ...buckets.map((b) => b.entries.length));
     const indices = new Map(buckets.map((bucket, i) => [bucket, i]));
+    const opacityFor = (bucket: HistogramBucket) =>
+      indices.get(bucket) === selectedIdx ? 0.9 : selectedIdx === null ? 0.55 : 0.3;
     const render = (
       group: d3.Selection<SVGGElement, unknown, null, undefined>,
       ctx: RenderContext,
@@ -112,9 +114,7 @@ export function DistributionHistogram({
         .attr('y', (b) => sy(b.entries.length))
         .attr('height', (b) => Math.max(0, sy(0) - sy(b.entries.length)))
         .attr('fill', 'currentColor')
-        .attr('opacity', (b) =>
-          indices.get(b) === selectedIdx ? 0.9 : selectedIdx === null ? 0.55 : 0.3,
-        )
+        .attr('opacity', opacityFor)
         .style('cursor', onBucketClick ? 'pointer' : 'default');
       group
         .selectAll<SVGLineElement, Percentile>('.histogram-guide')
@@ -168,6 +168,12 @@ export function DistributionHistogram({
       tooltip: {
         rulerType: 'none',
         attachToLayer: 0,
+        onHoverStart: (selection, bucket) => {
+          selection.attr('opacity', Math.max(0.75, opacityFor(bucket)));
+        },
+        onHoverEnd: (selection, bucket) => {
+          selection.attr('opacity', opacityFor(bucket));
+        },
         content: (b) =>
           `${escapeHtml(format(b.min))} – ${escapeHtml(format(b.max))}: ${b.entries.length} ${b.entries.length === 1 ? t.request : t.requests}`,
         onPointClick: onBucketClick ? (b) => onBucketClick(indices.get(b)!) : undefined,

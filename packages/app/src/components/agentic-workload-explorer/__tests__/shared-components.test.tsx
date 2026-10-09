@@ -8,10 +8,15 @@ import { TrendsLineChart, TrendsStackedChart, type LineSeries } from '../trends-
 import { buildHistogram, DistributionHistogram } from '../distribution-histogram';
 import { DAY_RANGES, RangeToggle } from '../range-toggle';
 import { ModelFilter } from '../model-filter';
+import { stubMatchMedia } from '@/test/match-media-stub';
 
 vi.mock('@/lib/analytics', () => ({ track: vi.fn() }));
 vi.mock('@/lib/use-locale', () => ({ useLocale: () => 'en' }));
-vi.mock('@/hooks/useMediaQuery', () => ({ useMediaQuery: () => false }));
+vi.mock('@/hooks/useMediaQuery', () => ({
+  useMediaQuery: () => false,
+  useIsMobileViewport: () => false,
+  useIsCoarsePointer: () => false,
+}));
 vi.mock('@/hooks/useResponsiveChartDimensions', () => ({
   useResponsiveChartDimensions: ({ height }: { height: number }) => ({
     dimensions: { width: 640, height },
@@ -23,6 +28,7 @@ let container: HTMLDivElement;
 let root: Root;
 
 beforeEach(() => {
+  stubMatchMedia();
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   container = document.createElement('div');
   document.body.append(container);
@@ -232,6 +238,9 @@ describe('shared histogram renderer', () => {
     const bar = container.querySelector('.histogram-bar')!;
     expect(bar.getAttribute('width')).toBe('32');
     expect(bar.getAttribute('opacity')).toBe('0.9');
+    act(() => bar.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true })));
+    act(() => bar.dispatchEvent(new MouseEvent('mouseleave', { bubbles: true })));
+    expect(bar.getAttribute('opacity')).toBe('0.9');
     act(() => bar.dispatchEvent(new MouseEvent('click', { bubbles: true })));
     expect(onBucketClick).toHaveBeenCalledWith(0);
   });
@@ -246,6 +255,35 @@ describe('shared histogram renderer', () => {
     expect(container.textContent).toContain('No data');
     expect(container.querySelectorAll('.histogram-bar')).toHaveLength(0);
   });
+
+  it.each([
+    [null, '0.55'],
+    [0, '0.3'],
+  ] as const)(
+    'restores unselected histogram opacity after hover with selection %s',
+    (selectedIdx, expected) => {
+      const buckets = [
+        { min: 0, max: 1, entries: [{ request: 0, value: 0.5 }] },
+        { min: 1, max: 2, entries: [{ request: 1, value: 1.5 }] },
+      ];
+      act(() =>
+        root.render(
+          <DistributionHistogram
+            buckets={buckets}
+            percentiles={[]}
+            format={String}
+            axisLabel="Tokens"
+            selectedIdx={selectedIdx}
+          />,
+        ),
+      );
+      const bar = container.querySelectorAll('.histogram-bar')[1];
+      act(() => bar.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true })));
+      expect(bar.getAttribute('opacity')).toBe('0.75');
+      act(() => bar.dispatchEvent(new MouseEvent('mouseleave', { bubbles: true })));
+      expect(bar.getAttribute('opacity')).toBe(expected);
+    },
+  );
 });
 
 describe('shared controls', () => {
