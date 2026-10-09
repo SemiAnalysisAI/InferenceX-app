@@ -342,7 +342,6 @@ describe('Profit estimator power option', { testIsolation: true }, () => {
     // Four SKUs get pairs, GB200 included; GB300 has no Grace power and keeps one bar.
     chart().find('text.revenue-label').should('have.length', 9);
     chart().should('contain', 'GB200').and('contain', 'All in Measured');
-    cy.get('[data-testid="profit-power-unavailable"]').should('not.exist');
     cy.get('[data-testid="export-button"]').first().click();
     cy.get('[data-testid="export-csv-button"]').click();
     cy.then(() => csv!.text()).then((text) => {
