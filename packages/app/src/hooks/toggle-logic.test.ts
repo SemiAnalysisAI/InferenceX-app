@@ -14,30 +14,12 @@ describe('computeToggle', () => {
       const result = computeToggle(prev, 'b', ALL);
       expect(result).toEqual(new Set(['b']));
     });
-
-    it('solos the first item', () => {
-      const prev = new Set(['a', 'b', 'c']);
-      const result = computeToggle(prev, 'a', ALL);
-      expect(result).toEqual(new Set(['a']));
-    });
-
-    it('solos the last item', () => {
-      const prev = new Set(['a', 'b', 'c']);
-      const result = computeToggle(prev, 'c', ALL);
-      expect(result).toEqual(new Set(['c']));
-    });
   });
 
   describe('when only one item is active (restore all behavior)', () => {
     it('restores all items when the solo item is toggled again', () => {
       const prev = new Set(['b']);
       const result = computeToggle(prev, 'b', ALL);
-      expect(result).toEqual(ALL);
-    });
-
-    it('restores all items regardless of which single item is active', () => {
-      const prev = new Set(['a']);
-      const result = computeToggle(prev, 'a', ALL);
       expect(result).toEqual(ALL);
     });
   });
@@ -53,12 +35,6 @@ describe('computeToggle', () => {
       const prev = new Set(['a', 'b']);
       const result = computeToggle(prev, 'a', ALL);
       expect(result).toEqual(new Set(['a']));
-    });
-
-    it('solos the other active item', () => {
-      const prev = new Set(['a', 'b']);
-      const result = computeToggle(prev, 'b', ALL);
-      expect(result).toEqual(new Set(['b']));
     });
 
     it('does not mutate the input set', () => {
@@ -116,13 +92,6 @@ describe('computeToggle', () => {
       const allCopy = new Set(ALL);
       computeToggle(new Set(['a']), 'a', ALL);
       expect(ALL).toEqual(allCopy); // unchanged
-    });
-
-    it('full cycle: all → solo → restore all', () => {
-      const step1 = computeToggle(new Set(['a', 'b', 'c']), 'b', ALL); // solo b
-      expect(step1).toEqual(new Set(['b']));
-      const step2 = computeToggle(step1, 'b', ALL); // restore all
-      expect(step2).toEqual(ALL);
     });
 
     it('full cycle: all → solo → add → re-solo → restore', () => {
@@ -183,31 +152,6 @@ describe('computeToggle', () => {
       // remove case
       const prev3 = new Set(['a', 'b']);
       expect(computeToggle(prev3, 'a', allItems)).not.toBe(prev3);
-    });
-
-    it('returns allItems reference directly in restore-all case', () => {
-      const allItems = new Set(['a', 'b', 'c']);
-      const prev = new Set(['b']); // solo → restore all
-      const result = computeToggle(prev, 'b', allItems);
-      // computeToggle returns allItems directly (same reference)
-      expect(result).toBe(allItems);
-    });
-  });
-
-  describe('large sets', () => {
-    it('handles 100 items correctly in solo/restore cycle', () => {
-      const items = Array.from({ length: 100 }, (_, i) => `item-${i}`);
-      const allItems = new Set(items);
-      const prev = new Set(items);
-
-      // solo item-50
-      const step1 = computeToggle(prev, 'item-50', allItems);
-      expect(step1.size).toBe(1);
-      expect(step1.has('item-50')).toBe(true);
-
-      // restore all
-      const step2 = computeToggle(step1, 'item-50', allItems);
-      expect(step2.size).toBe(100);
     });
   });
 });

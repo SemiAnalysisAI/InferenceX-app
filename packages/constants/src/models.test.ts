@@ -9,6 +9,19 @@ import {
 } from './models';
 
 describe('DB_MODEL_TO_DISPLAY / DISPLAY_MODEL_TO_DB consistency', () => {
+  it('preserves the legacy database and display identities', () => {
+    expect(DB_MODEL_TO_DISPLAY).toMatchObject({
+      dsr1: 'DeepSeek-R1-0528',
+      gptoss120b: 'gpt-oss-120b',
+      llama70b: 'Llama-3.3-70B-Instruct-FP8',
+      'qwen3.5': 'Qwen-3.5-397B-A17B',
+      'kimik2.5': 'Kimi-K2.5',
+      'minimaxm2.5': 'MiniMax-M2.5',
+    });
+    expect(DISPLAY_MODEL_TO_DB['DeepSeek-R1-0528']).toEqual(['dsr1']);
+    expect(DISPLAY_MODEL_TO_DB['gpt-oss-120b']).toEqual(['gptoss120b']);
+  });
+
   it('DISPLAY_MODEL_TO_DB is the complete inverse of DB_MODEL_TO_DISPLAY (many-to-one)', () => {
     for (const [dbKey, displayName] of Object.entries(DB_MODEL_TO_DISPLAY)) {
       expect(DISPLAY_MODEL_TO_DB[displayName]).toContain(dbKey);

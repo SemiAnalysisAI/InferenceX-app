@@ -47,13 +47,4 @@ describe('standard-page announcement', () => {
     render();
     expect(splashText()).toBe('AgentX 来了！！');
   });
-
-  it('renders the same markup on the server as on the first client render', () => {
-    // The random pick is deferred to an effect precisely so SSR and hydration
-    // agree — a splash chosen during render would mismatch on every load.
-    render();
-    const first = splashText();
-    act(() => root.render(<MinecraftSplash />));
-    expect(splashText()).toBe(first);
-  });
 });

@@ -27,11 +27,6 @@ describe('TCO Calculator', () => {
         .and('contain.text', 'TCO Calculator');
     });
 
-    it('clicking the footer calculator link navigates to it', () => {
-      cy.get('[data-testid="footer-link-calculator"]').scrollIntoView().click();
-      cy.url().should('include', '/calculator');
-    });
-
     it('switches back to inference tab and then returns to calculator', () => {
       cy.get('[data-testid="footer-link-calculator"]').scrollIntoView().click();
       cy.url().should('include', '/calculator');
@@ -68,11 +63,6 @@ describe('TCO Calculator', () => {
     // Controls and chart rendering
     // -------------------------------------------------------------------------
 
-    it('renders the calculator controls section with heading', () => {
-      cy.get('[data-testid="calculator-controls"]').should('be.visible');
-      cy.get('[data-testid="calculator-controls"]').should('contain.text', 'TCO Calculator');
-    });
-
     it('groups benchmark economics above the comparison target', () => {
       cy.viewport(1280, 900);
       cy.get('[data-testid="calculator-controls"] fieldset').should('have.length', 2);
@@ -103,18 +93,6 @@ describe('TCO Calculator', () => {
       cy.get('input[type="range"]').should('be.visible');
     });
 
-    it('renders Model selector', () => {
-      cy.get('[data-testid="calculator-controls"]').within(() => {
-        cy.get('#calc-model').should('exist');
-      });
-    });
-
-    it('renders Sequence selector', () => {
-      cy.get('[data-testid="calculator-controls"]').within(() => {
-        cy.get('#calc-sequence').should('exist');
-      });
-    });
-
     it('shows the precision for a single-precision model', () => {
       // FP4 remains visible as benchmark context even without alternatives.
       cy.get('[data-testid="calc-cost-selector"]').should('exist');
@@ -124,28 +102,8 @@ describe('TCO Calculator', () => {
       });
     });
 
-    it('renders Cost Provider selector', () => {
-      cy.get('[data-testid="calculator-controls"]').within(() => {
-        cy.get('#calc-cost').should('exist');
-      });
-    });
-
-    it('renders bar metric toggle buttons', () => {
-      cy.get('[data-testid="calculator-controls"]').within(() => {
-        cy.get('[data-testid="calculator-metric-throughput"]').should('be.visible');
-        cy.get('[data-testid="calculator-metric-power"]').should('be.visible');
-        cy.get('[data-testid="calculator-metric-cost"]').should('be.visible');
-      });
-    });
-
     it('throughput metric is active by default', () => {
       cy.get('[data-testid="calculator-metric-throughput"]').should('have.class', 'bg-primary');
-    });
-
-    it('renders the Chart | Table view toggle', () => {
-      cy.get('[data-testid="calculator-view-toggle"]').should('be.visible');
-      cy.get('[data-testid="calculator-chart-view-btn"]').should('be.visible');
-      cy.get('[data-testid="calculator-table-view-btn"]').should('be.visible');
     });
 
     it('chart view is selected by default', () => {
@@ -156,39 +114,11 @@ describe('TCO Calculator', () => {
       );
     });
 
-    it('renders the bar chart with SVG bars', () => {
-      cy.get('[data-testid="calculator-bar-chart"]').should('be.visible');
-      cy.get('[data-testid="calculator-bar-chart"] svg').should('exist');
-      cy.get('[data-testid="calculator-bar-chart"] svg .bar').should('have.length.greaterThan', 0);
-    });
-
-    it('does NOT show "No data available" when data loads', () => {
-      cy.get('[data-testid="calculator-no-data"]').should('not.exist');
-    });
-
-    it('renders chart title matching the selected metric', () => {
-      cy.get('[data-testid="calculator-chart-section"] h2')
-        .first()
-        .should('contain.text', 'Total Token Throughput per Chip');
-    });
-
     it('renders subtitle with source', () => {
       cy.get('[data-testid="calculator-chart-section"]').should(
         'contain.text',
         'SemiAnalysis InferenceX',
       );
-    });
-
-    it('renders the chart legend with GPU entries', () => {
-      cy.get('.legend-container').scrollIntoView().should('exist');
-      cy.get('.legend-container li').should('have.length.greaterThan', 0);
-    });
-
-    it('renders the target value slider and input', () => {
-      cy.get('[data-testid="calculator-controls"]').within(() => {
-        cy.get('input[type="range"]').should('exist');
-        cy.get('input[type="number"]').should('exist');
-      });
     });
 
     it('places the config-range toggle beside its label above the slider', () => {

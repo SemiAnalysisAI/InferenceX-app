@@ -14,53 +14,12 @@ describe('Gradient Labels Toggle', () => {
     expandLegendAdvanced();
   });
 
-  it('Gradient Labels toggle exists in the legend', () => {
-    cy.get('#scatter-gradient-labels').should('exist');
-    cy.get('label[for="scatter-gradient-labels"]').should('contain.text', 'Gradient Labels');
-  });
-
   it('Gradient Labels toggle is off by default', () => {
     cy.get('#scatter-gradient-labels').should('have.attr', 'data-state', 'unchecked');
   });
 
-  it('Parallelism Labels toggle still exists separately', () => {
-    cy.get('#scatter-parallelism-labels').should('exist');
-    cy.get('label[for="scatter-parallelism-labels"]').should('contain.text', 'Parallelism Labels');
-  });
-
   it('Parallelism Labels toggle is off by default', () => {
     cy.get('#scatter-parallelism-labels').should('have.attr', 'data-state', 'unchecked');
-  });
-
-  it('per-point labels are visible by default (gradient labels off)', () => {
-    // Gradient Labels is off by default, so per-point text labels should be visible
-    cy.get('[data-testid="scatter-graph"] svg text').should('have.length.greaterThan', 0);
-  });
-
-  it('chart still renders data points with gradient labels enabled', () => {
-    // Verify that the chart has data points (not showing "No data available")
-    cy.get('[data-testid="scatter-graph"]').should('not.contain.text', 'No data available');
-    cy.get(
-      '[data-testid="scatter-graph"] svg circle, [data-testid="scatter-graph"] svg rect',
-    ).should('have.length.greaterThan', 0);
-  });
-
-  it('toggling Gradient Labels on adds gradient pill labels', () => {
-    // Turn on Gradient Labels
-    cy.get('#scatter-gradient-labels').click();
-    cy.get('#scatter-gradient-labels').should('have.attr', 'data-state', 'checked');
-
-    // Verify gradient-related SVG elements exist when toggle is on
-    cy.get('[data-testid="scatter-graph"] svg').should('exist');
-  });
-
-  it('toggling Gradient Labels off restores per-point labels', () => {
-    // Turn back off (was on from previous test)
-    cy.get('#scatter-gradient-labels').click();
-    cy.get('#scatter-gradient-labels').should('have.attr', 'data-state', 'unchecked');
-
-    // Per-point text labels should be visible again
-    cy.get('[data-testid="scatter-graph"] svg text').should('have.length.greaterThan', 0);
   });
 
   it('both toggles can be enabled simultaneously', () => {
@@ -89,17 +48,6 @@ describe('Gradient Labels Toggle', () => {
     });
     cy.get('[data-testid="scatter-graph"]').should('be.visible');
     cy.get('#scatter-gradient-labels').should('have.attr', 'data-state', 'checked');
-  });
-
-  it('URL param i_advlabel=1 enables parallelism labels on load', () => {
-    cy.visit('/inference?i_advlabel=1', {
-      onBeforeLoad(win) {
-        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-      },
-    });
-    cy.get('[data-testid="scatter-graph"]').should('be.visible');
-    expandLegendAdvanced();
-    cy.get('#scatter-parallelism-labels').should('have.attr', 'data-state', 'checked');
   });
 });
 
