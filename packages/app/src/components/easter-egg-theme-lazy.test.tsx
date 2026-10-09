@@ -19,10 +19,6 @@ vi.mock('./gta/gta-theme', () => {
   loaded('gta');
   return { default: () => <div data-theme="gta" /> };
 });
-vi.mock('./kart/kart-decorations', () => {
-  loaded('kart');
-  return { default: () => <div data-theme="kart" /> };
-});
 vi.mock('./doom/doom-theme', () => {
   loaded('doom');
   return { default: () => <div data-theme="doom" /> };
@@ -65,7 +61,7 @@ describe('optional theme boundary', () => {
     async (path) => {
       window.history.replaceState(null, '', path);
       act(() => root.render(<EasterEggThemeLazy />));
-      for (const theme of ['minecraft', 'csgo', 'gta', 'kart', 'doom', 'halo']) {
+      for (const theme of ['minecraft', 'csgo', 'gta', 'doom', 'halo']) {
         await change(theme);
         expect(container.innerHTML).toBe('');
         expect(loaded).not.toHaveBeenCalled();
@@ -74,7 +70,7 @@ describe('optional theme boundary', () => {
   );
 
   it('never renders or imports themes on the server or a cold default page', async () => {
-    document.documentElement.className = 'kart';
+    document.documentElement.className = 'gta';
     expect(renderToString(<EasterEggThemeLazy />)).toBe('');
     document.documentElement.className = 'dark';
     act(() => root.render(<EasterEggThemeLazy />));
@@ -92,11 +88,10 @@ describe('optional theme boundary', () => {
       minecraft: () => import('./minecraft/minecraft-theme'),
       csgo: () => import('./csgo/csgo-theme'),
       gta: () => import('./gta/gta-theme'),
-      kart: () => import('./kart/kart-decorations'),
       doom: () => import('./doom/doom-theme'),
       halo: () => import('./halo/halo-theme'),
     };
-    for (const theme of ['minecraft', 'csgo', 'gta', 'kart', 'doom', 'halo'] as const) {
+    for (const theme of ['minecraft', 'csgo', 'gta', 'doom', 'halo'] as const) {
       await change(theme);
       await act(async () => {
         await imports[theme]();
@@ -110,6 +105,12 @@ describe('optional theme boundary', () => {
       await change('dark');
       expect(container.innerHTML).toBe('');
     }
+  });
+
+  it('does not activate the retired kart theme', async () => {
+    act(() => root.render(<EasterEggThemeLazy />));
+    await change('kart');
+    expect(container.innerHTML).toBe('');
   });
 
   it('shares one observer across consumers and disconnects after the last unmount', async () => {

@@ -165,10 +165,6 @@
       "duration": 216000
     },
     {
-      "spec": "cypress/e2e/kart-mode.cy.ts",
-      "duration": 22000
-    },
-    {
       "spec": "cypress/e2e/gradient-labels.cy.ts",
       "duration": 4951
     },
