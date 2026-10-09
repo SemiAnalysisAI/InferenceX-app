@@ -21,6 +21,7 @@ const STRINGS = {
     testTooltip: 'The ubenchX microbenchmark to display.',
     memBwTitle: 'Device-Memory Copy Bandwidth',
     smL2Title: 'SM-SM L2 Latency Difference',
+    tpcGroupingTitle: 'TPC per GPC Grouping',
   },
   zh: {
     title: 'ubenchX 微基准测试（Beta）',
@@ -29,12 +30,14 @@ const STRINGS = {
     testTooltip: '要显示的 ubenchX 微基准测试。',
     memBwTitle: '显存拷贝带宽',
     smL2Title: 'SM 间 L2 延迟差异',
+    tpcGroupingTitle: 'TPC per GPC 分组',
   },
 } as const;
 
 export const UBENCHX_TESTS = [
   { slug: 'mem-bw', titleKey: 'memBwTitle' },
   { slug: 'sm-l2-distance', titleKey: 'smL2Title' },
+  { slug: 'tpc-grouping', titleKey: 'tpcGroupingTitle' },
 ] as const;
 
 export type UbenchxTestSlug = (typeof UBENCHX_TESTS)[number]['slug'];

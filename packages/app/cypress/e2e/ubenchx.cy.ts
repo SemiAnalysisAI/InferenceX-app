@@ -30,6 +30,37 @@ describe('ubenchX hub and test routes', () => {
     cy.get('[data-testid="ubenchx-test-select"]').should('contain', 'SM-SM L2 Latency Difference');
   });
 
+  it('switches to the TPC per GPC grouping table with the test selector', () => {
+    cy.visit('/ubenchx/mem-bw', dismissModal);
+    cy.get('[data-testid="ubenchx-test-select"]').click();
+    cy.contains('[role="option"]', 'TPC per GPC Grouping').click();
+    cy.url().should('include', '/ubenchx/tpc-grouping');
+    cy.contains('h2', 'TPC per GPC Grouping').should('be.visible');
+    cy.get('[data-testid="tpc-grouping-table"] th').then(($th) => {
+      expect([...$th].map((th) => th.textContent)).to.deep.equal([
+        'Product',
+        'Measured TPC Groupings',
+      ]);
+    });
+    cy.get('[data-testid="tpc-grouping-table"] tbody tr').should('have.length', 5);
+    cy.contains('[data-testid="tpc-grouping-table"] tr', 'H100 SXM').should(
+      'contain',
+      '[9, 9, 8, 8, 8, 8, 8, 4, 1, 1, 1, 1]',
+    );
+    cy.contains('[data-testid="tpc-grouping-table"] tr', 'B200 SXM').should(
+      'contain',
+      '[10, 10, 10, 9, 9, 9, 9, 5, 1, 1, 1]',
+    );
+    cy.get('meta[name="robots"]').should('have.attr', 'content').and('contain', 'noindex');
+  });
+
+  it('renders the Chinese TPC per GPC grouping page', () => {
+    cy.visit('/zh/ubenchx/tpc-grouping', dismissModal);
+    cy.contains('h2', 'TPC per GPC 分组').should('be.visible');
+    cy.contains('[data-testid="tpc-grouping-table"] th', '实测 TPC 分组').should('be.visible');
+    cy.get('[data-testid="tpc-grouping-table"] tbody tr').should('have.length', 5);
+  });
+
   it('renders the mem-bw page directly with noindex', () => {
     cy.visit('/ubenchx/mem-bw', dismissModal);
     cy.contains('ubenchX').should('be.visible');
