@@ -1,35 +1,34 @@
 import type { Metadata } from 'next';
 
-import { UbenchxContent } from '@/components/ubenchx/UbenchxContent';
+import { TpcSkylineContent } from '@/components/ubenchx/TpcSkylineContent';
 import { UbenchxHub } from '@/components/ubenchx/UbenchxHub';
-import { zhAlternates, ZH_OG_LOCALE } from '@/lib/i18n';
+import { enAlternates } from '@/lib/i18n';
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
 
-const TITLE = 'ubenchX：HBM 带宽';
+const TITLE = 'ubenchX: TPC Skyline';
 const DESCRIPTION =
-  '在 NVIDIA 和 AMD GPU 上测量显存拷贝带宽的微基准测试：展示从 8 B 到 16 GiB 各消息大小下的延迟、带宽和显存带宽利用率（MBU）。';
+  'Measured TPC per GPC groupings on NVIDIA GPUs, found from thread-block cluster co-scheduling.';
 
 export const metadata: Metadata = {
   title: TITLE,
   description: DESCRIPTION,
-  alternates: zhAlternates('/ubenchx/mem-bw'),
+  alternates: enAlternates('/ubenchx/tpc-skyline'),
   robots: { index: false, follow: false },
   openGraph: {
     title: `${TITLE} | InferenceX`,
     description: DESCRIPTION,
-    url: `${SITE_URL}/zh/ubenchx/mem-bw`,
-    locale: ZH_OG_LOCALE,
+    url: `${SITE_URL}/ubenchx/tpc-skyline`,
   },
   twitter: { title: `${TITLE} | InferenceX`, description: DESCRIPTION },
 };
 
-export default function UbenchxMemBwPageZh() {
+export default function UbenchxTpcSkylinePage() {
   return (
     <main className="relative">
       <div className="container mx-auto px-4 pb-8 lg:px-8">
         <div className="space-y-8">
-          <UbenchxHub current="mem-bw" />
-          <UbenchxContent />
+          <UbenchxHub current="tpc-skyline" />
+          <TpcSkylineContent />
         </div>
       </div>
     </main>

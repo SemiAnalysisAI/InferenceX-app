@@ -1,5 +1,7 @@
 import { SM_L2_RUNS } from '@/components/ubenchx/sm-l2-data';
 import { transformSmL2Run } from '@/components/ubenchx/sm-l2-transform';
+import { TPC_SKYLINE_RUNS } from '@/components/ubenchx/tpc-skyline-data';
+import { transformTpcSkylineRun } from '@/components/ubenchx/tpc-skyline-transform';
 import { UBENCHX_GPU_KEYS, UBENCHX_RUNS } from '@/components/ubenchx/ubenchx-data';
 import { transformUbenchxRun } from '@/components/ubenchx/ubenchx-transform';
 import { NextRequest } from 'next/server';
@@ -22,9 +24,10 @@ describe('ubenchx view', () => {
     expect(body.view).toBe('ubenchx');
     expect(body.apiVersion).toBe('v1');
     expect(body.test).toBe('all');
-    expect(body.tests).toEqual(['mem-bw', 'sm-l2-distance']);
+    expect(body.tests).toEqual(['mem-bw', 'sm-l2-distance', 'tpc-skyline']);
     expect(body.memBw.gpus).toHaveLength(1);
     expect(body.smL2Distance.gpus.length).toBeGreaterThanOrEqual(1);
+    expect(body.tpcSkyline.gpus).toHaveLength(Object.keys(TPC_SKYLINE_RUNS).length);
   });
 
   it('returns only mem-bw data when test=mem-bw', async () => {
@@ -68,6 +71,44 @@ describe('ubenchx view', () => {
     expect(first.matrix.length).toBe(first.numSms);
     expect(first.stats.intraGpcMean).toBeGreaterThan(0);
     expect(first.stats.crossDieMean).toBeGreaterThan(first.stats.intraGpcMean);
+  });
+
+  it('returns every TPC Skyline grouping by default when test=tpc-skyline', async () => {
+    const response = await GET(request({ test: 'tpc-skyline' }));
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.test).toBe('tpc-skyline');
+    expect(body.params).toEqual({ test: 'tpc-skyline', gpu: 'all' });
+    expect(body.gpus.map((g: { gpu: string }) => g.gpu)).toEqual(Object.keys(TPC_SKYLINE_RUNS));
+    const b200 = body.gpus.find((g: { gpu: string }) => g.gpu === 'B200 SXM');
+    expect(b200.tpcsPerGpc).toEqual([10, 10, 10, 9, 9, 9, 9, 5, 1, 1, 1]);
+    expect(b200).toMatchObject({ gpcCount: 11, tpcCount: 74, smCount: 148 });
+  });
+
+  it('returns one GPU and rejects unknown GPUs for tpc-skyline', async () => {
+    const oneResponse = await GET(request({ test: 'tpc-skyline', gpu: 'H100 SXM' }));
+    const one = await oneResponse.json();
+    expect(one.gpus).toHaveLength(1);
+    expect(one.gpus[0].tpcsPerGpc).toEqual([9, 9, 8, 8, 8, 8, 8, 4, 1, 1, 1, 1]);
+    const bad = await GET(request({ test: 'tpc-skyline', gpu: 'MI355X' }));
+    expect(bad.status).toBe(400);
+  });
+
+  it('filters the test=all TPC Skyline section by a case-insensitive GPU key', async () => {
+    // B200 SXM is the one GPU every ubenchX test covers, so test=all accepts it.
+    const response = await GET(request({ gpu: 'b200 sxm' }));
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.memBw.gpus.map((g: { gpu: string }) => g.gpu)).toEqual(['B200 SXM']);
+    expect(body.tpcSkyline.gpus.map((g: { gpu: string }) => g.gpu)).toEqual(['B200 SXM']);
+  });
+
+  it('matches the shared UI transform for every TPC Skyline grouping (parity)', async () => {
+    const response = await GET(request({ test: 'tpc-skyline' }));
+    const body = await response.json();
+    expect(body.gpus).toEqual(
+      Object.entries(TPC_SKYLINE_RUNS).map(([key, run]) => transformTpcSkylineRun(key, run)),
+    );
   });
 
   it('rejects unknown query keys', async () => {

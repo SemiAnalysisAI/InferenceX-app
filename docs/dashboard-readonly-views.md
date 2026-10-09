@@ -19,12 +19,12 @@ data; do not interpret the historical article figures as current API results.
 ## Standalone ubenchX pages
 
 `/ubenchx` (Beta) is linked from the header navigation and redirects to `/ubenchx/mem-bw`.
-Each test page (`/ubenchx/mem-bw`, `/ubenchx/sm-l2-distance`, plus `/zh` siblings) shares a
+Each test page (`/ubenchx/mem-bw`, `/ubenchx/sm-l2-distance`, `/ubenchx/tpc-skyline`, plus `/zh` siblings) shares a
 header whose Microbenchmark selector navigates between tests; it maps to the view's `test`
 parameter rather than adding a new one. They are not
 dashboard tabs, so they have no `DASHBOARD_API_COVERAGE` entry. Their data is published
 by the `ubenchx` view (`GET /api/v1/views/ubenchx?test=<test>&gpu=<gpu|all>`), which
-runs the same `transformUbenchxRun` and `transformSmL2Run` as the pages. The mem-bw
+runs the same `transformUbenchxRun`, `transformSmL2Run`, and `transformTpcSkylineRun` as the pages. The mem-bw
 Y-axis selector (MBU, bandwidth, latency) is presentation-only: every view response
 already includes all three metrics, so it adds no query parameter.
 

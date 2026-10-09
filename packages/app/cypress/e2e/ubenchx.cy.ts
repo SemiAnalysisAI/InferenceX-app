@@ -1,3 +1,7 @@
+import { TPC_SKYLINE_RUNS } from '@/components/ubenchx/tpc-skyline-data';
+
+const TPC_SKYLINE_GPU_COUNT = Object.keys(TPC_SKYLINE_RUNS).length;
+
 const dismissModal = {
   onBeforeLoad(win: Cypress.AUTWindow) {
     win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
@@ -10,7 +14,8 @@ describe('ubenchX hub and test routes', () => {
     cy.url().should('include', '/ubenchx/mem-bw');
     cy.contains('h1', 'ubenchX Microbenchmarks (Beta)').should('be.visible');
     cy.get('[data-testid="nav-link-ubenchx"]').should('have.attr', 'href', '/ubenchx');
-    cy.get('[data-testid="ubenchx-test-select"]').should('contain', 'Device-Memory Copy Bandwidth');
+    cy.get('[data-testid="ubenchx-test-select"]').should('contain', 'HBM Bandwidth');
+    cy.contains('h2', 'HBM Bandwidth').should('be.visible');
     cy.get('meta[name="robots"]').should('have.attr', 'content').and('contain', 'noindex');
     cy.contains('H100 SXM').should('be.visible');
     cy.get('[data-testid="ubenchx-metric-select"]').should('contain', 'MBU');
@@ -28,6 +33,48 @@ describe('ubenchX hub and test routes', () => {
     cy.url().should('include', '/ubenchx/sm-l2-distance');
     cy.get('[data-testid="sm-l2-heatmap"]').should('be.visible');
     cy.get('[data-testid="ubenchx-test-select"]').should('contain', 'SM-SM L2 Latency Difference');
+  });
+
+  it('switches to the TPC Skyline table with the test selector', () => {
+    cy.visit('/ubenchx/mem-bw', dismissModal);
+    cy.get('[data-testid="ubenchx-test-select"]').click();
+    cy.contains('[role="option"]', 'TPC Skyline').click();
+    cy.url().should('include', '/ubenchx/tpc-skyline');
+    cy.contains('h2', 'TPC Skyline').should('be.visible');
+    cy.get('[data-testid="tpc-skyline-table"] th').then(($th) => {
+      expect([...$th].map((th) => th.textContent)).to.deep.equal([
+        'Product',
+        'Measured # of GPCs',
+        'Measured # of SMs',
+        'Measured TPC Groupings',
+      ]);
+    });
+    cy.get('[data-testid="tpc-skyline-table"] tbody tr').should(
+      'have.length',
+      TPC_SKYLINE_GPU_COUNT,
+    );
+    cy.contains('[data-testid="tpc-skyline-table"] tr', 'H100 SXM')
+      .should('contain', '[9, 9, 8, 8, 8, 8, 8, 4, 1, 1, 1, 1]')
+      .find('td')
+      .then(($td) => {
+        expect($td.eq(1).text()).to.equal('12');
+        expect($td.eq(2).text()).to.equal('132');
+      });
+    cy.contains('[data-testid="tpc-skyline-table"] tr', 'B200 SXM').should(
+      'contain',
+      '[10, 10, 10, 9, 9, 9, 9, 5, 1, 1, 1]',
+    );
+    cy.get('meta[name="robots"]').should('have.attr', 'content').and('contain', 'noindex');
+  });
+
+  it('renders the Chinese TPC Skyline page', () => {
+    cy.visit('/zh/ubenchx/tpc-skyline', dismissModal);
+    cy.contains('h2', 'TPC Skyline').should('be.visible');
+    cy.contains('[data-testid="tpc-skyline-table"] th', '实测 TPC 分组').should('be.visible');
+    cy.get('[data-testid="tpc-skyline-table"] tbody tr').should(
+      'have.length',
+      TPC_SKYLINE_GPU_COUNT,
+    );
   });
 
   it('renders the mem-bw page directly with noindex', () => {
@@ -66,7 +113,7 @@ describe('ubenchX hub and test routes', () => {
     cy.visit('/zh/ubenchx', dismissModal);
     cy.url().should('include', '/zh/ubenchx/mem-bw');
     cy.contains('h1', 'ubenchX 微基准测试（Beta）').should('be.visible');
-    cy.get('[data-testid="ubenchx-test-select"]').should('contain', '显存拷贝带宽');
+    cy.get('[data-testid="ubenchx-test-select"]').should('contain', 'HBM 带宽');
     cy.get('meta[name="robots"]').should('have.attr', 'content').and('contain', 'noindex');
     cy.get('link[rel="alternate"][hreflang="en"]')
       .invoke('attr', 'href')
@@ -75,7 +122,7 @@ describe('ubenchX hub and test routes', () => {
 
   it('renders the Chinese mem-bw page', () => {
     cy.visit('/zh/ubenchx/mem-bw', dismissModal);
-    cy.contains('显存拷贝带宽').should('be.visible');
+    cy.contains('h2', 'HBM 带宽').should('be.visible');
     cy.get('[data-testid="ubenchx-metric-select"]').should('contain', 'MBU');
     cy.get('meta[name="robots"]').should('have.attr', 'content').and('contain', 'noindex');
   });

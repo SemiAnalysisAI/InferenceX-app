@@ -1,5 +1,7 @@
 import { SM_L2_RUNS } from '@/components/ubenchx/sm-l2-data';
 import { transformSmL2Run } from '@/components/ubenchx/sm-l2-transform';
+import { TPC_SKYLINE_RUNS } from '@/components/ubenchx/tpc-skyline-data';
+import { transformTpcSkylineRun } from '@/components/ubenchx/tpc-skyline-transform';
 import { UBENCHX_RUNS } from '@/components/ubenchx/ubenchx-data';
 import { transformUbenchxRun } from '@/components/ubenchx/ubenchx-transform';
 import { cachedJson } from '@/lib/api-cache';
@@ -10,13 +12,35 @@ import type { NextRequest } from 'next/server';
 
 export const dynamic = 'force-dynamic';
 
-const AVAILABLE_TESTS = ['mem-bw', 'sm-l2-distance'] as const;
+const AVAILABLE_TESTS = ['mem-bw', 'sm-l2-distance', 'tpc-skyline'] as const;
+
+/** TPC per GPC groupings for every GPU (`gpu=all`, the default) or one GPU. */
+function tpcSkylineResults(gpu: string) {
+  return gpu === 'all'
+    ? Object.entries(TPC_SKYLINE_RUNS).map(([key, run]) => transformTpcSkylineRun(key, run))
+    : [transformTpcSkylineRun(gpu, TPC_SKYLINE_RUNS[gpu])];
+}
 
 export function GET(request: NextRequest) {
   return runViewsRoute('ubenchx', () => {
     validateViewParams(request.nextUrl.searchParams, VIEW_QUERY_PARAMS.ubenchx);
     const s = request.nextUrl.searchParams;
     const test = parseEnumParam(s.get('test'), 'test', ['all', ...AVAILABLE_TESTS], 'all');
+    const rawGpu = s.get('gpu');
+
+    if (test === 'tpc-skyline') {
+      const gpuKeys = Object.keys(TPC_SKYLINE_RUNS);
+      const gpu = parseEnumParam(s.get('gpu'), 'gpu', ['all', ...gpuKeys], 'all');
+      return Promise.resolve(
+        cachedJson({
+          apiVersion: 'v1',
+          view: 'ubenchx',
+          test: 'tpc-skyline',
+          params: { test: 'tpc-skyline', gpu },
+          gpus: tpcSkylineResults(gpu),
+        }),
+      );
+    }
 
     if (test === 'mem-bw' || test === 'all') {
       const gpuKeys = Object.keys(UBENCHX_RUNS);
@@ -39,7 +63,7 @@ export function GET(request: NextRequest) {
         );
       }
 
-      // test === 'all': return both
+      // test === 'all': return every test
       const smL2GpuKeys = Object.keys(SM_L2_RUNS);
       const smL2Gpu = parseEnumParam(s.get('gpu'), 'gpu', ['all', ...smL2GpuKeys], 'all');
       const smL2Results =
@@ -58,6 +82,15 @@ export function GET(request: NextRequest) {
           tests: AVAILABLE_TESTS,
           memBw: { gpus: memBwResults },
           smL2Distance: { gpus: smL2Results },
+          // Like smL2Distance, default to every GPU rather than mem-bw's first one, and
+          // match the GPU key case-insensitively as parseEnumParam does for the others.
+          tpcSkyline: {
+            gpus: tpcSkylineResults(
+              Object.keys(TPC_SKYLINE_RUNS).find(
+                (key) => key.toLowerCase() === rawGpu?.toLowerCase(),
+              ) ?? 'all',
+            ),
+          },
         }),
       );
     }
