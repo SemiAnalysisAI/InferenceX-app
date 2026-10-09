@@ -394,6 +394,13 @@ const VENDOR_MARKS: readonly {
   },
 ] as const;
 
+// Models kept off the landing ledger. Qwen 3.5 stays reachable through the TPU card.
+const LANDING_HIDDEN_LEDGER_MODELS: ReadonlySet<string> = new Set([
+  'deepseek-v4',
+  'qwen-3-8-flash-next',
+  'qwen-3-5',
+]);
+
 const LANDING_HARDWARE_RESULTS = [
   {
     id: 'tpu',
@@ -472,9 +479,7 @@ export function AgentXCompareHero({
   // Landing curation must not change compare coverage or dashboard defaults.
   const ledgerModels =
     surface === 'landing'
-      ? FEATURED_AGENTX_MODELS.filter(
-          (model) => model.slug !== 'deepseek-v4' && model.slug !== 'qwen-3-8-flash-next',
-        )
+      ? FEATURED_AGENTX_MODELS.filter((model) => !LANDING_HIDDEN_LEDGER_MODELS.has(model.slug))
       : FEATURED_AGENTX_MODELS;
 
   return (
@@ -571,6 +576,57 @@ export function AgentXCompareHero({
           </div>
 
           <div className="border-t border-border/70 bg-muted/15 lg:border-t-0 lg:border-l">
+            {/* Landing shows the hardware results first, above the model ledger. */}
+            {surface === 'landing' && (
+              <div className="divide-y divide-border/70 border-b border-border/70">
+                {LANDING_HARDWARE_RESULTS.map((result) => {
+                  const mark = VENDOR_MARKS.find((vendor) => vendor.name === result.vendor)!;
+                  return (
+                    <CompareIndexTrackedLink
+                      key={result.id}
+                      data-testid={`landing-${result.id}-results-link`}
+                      href={`${prefix}${result.href}`}
+                      analyticsEvent={result.analyticsEvent}
+                      analyticsTarget={result.model}
+                      analyticsSurface={surface}
+                      appNavigation
+                      className="group flex min-h-14 items-center justify-between gap-4 px-5 py-2.5 transition-colors hover:bg-brand/5 focus-visible:outline-none"
+                    >
+                      <span className="flex min-w-0 items-center gap-3">
+                        <svg
+                          data-testid={`landing-${result.id}-${result.vendor.toLowerCase()}-logo`}
+                          xmlns="http://www.w3.org/2000/svg"
+                          viewBox={mark.viewBox}
+                          width={32}
+                          height={32}
+                          aria-hidden="true"
+                          className="size-8 shrink-0 text-foreground"
+                        >
+                          {mark.paths.map((path) => (
+                            <path key={path.d} d={path.d} fill={path.fill} />
+                          ))}
+                        </svg>
+                        <span className="min-w-0">
+                          <span className="block text-sm font-semibold leading-tight text-foreground group-hover:text-brand">
+                            {locale === 'zh' ? result.titleZh : result.title}
+                          </span>
+                          <span className="mt-1 block font-mono text-3xs tracking-eyebrow text-brand uppercase">
+                            {result.subtitle}
+                          </span>
+                        </span>
+                      </span>
+                      <span className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-muted-foreground group-hover:text-foreground">
+                        {t.modelAction}
+                        <ArrowRight
+                          aria-hidden="true"
+                          className="size-3.5 motion-safe:transition-transform motion-safe:duration-200 motion-safe:group-hover:translate-x-0.5"
+                        />
+                      </span>
+                    </CompareIndexTrackedLink>
+                  );
+                })}
+              </div>
+            )}
             {/* The visible ledger header is dropped; `ledgerTitle` stays as the
                 nav's accessible name so screen readers still get the label. */}
             <nav aria-label={t.ledgerTitle} className="divide-y divide-border/70">
@@ -619,53 +675,6 @@ export function AgentXCompareHero({
                 </CompareIndexTrackedLink>
               ))}
             </nav>
-            {surface === 'landing' &&
-              LANDING_HARDWARE_RESULTS.map((result) => {
-                const mark = VENDOR_MARKS.find((vendor) => vendor.name === result.vendor)!;
-                return (
-                  <CompareIndexTrackedLink
-                    key={result.id}
-                    data-testid={`landing-${result.id}-results-link`}
-                    href={`${prefix}${result.href}`}
-                    analyticsEvent={result.analyticsEvent}
-                    analyticsTarget={result.model}
-                    analyticsSurface={surface}
-                    appNavigation
-                    className="group flex min-h-14 items-center justify-between gap-4 border-t border-border/70 px-5 py-2.5 transition-colors hover:bg-brand/5 focus-visible:outline-none"
-                  >
-                    <span className="flex min-w-0 items-center gap-3">
-                      <svg
-                        data-testid={`landing-${result.id}-${result.vendor.toLowerCase()}-logo`}
-                        xmlns="http://www.w3.org/2000/svg"
-                        viewBox={mark.viewBox}
-                        width={32}
-                        height={32}
-                        aria-hidden="true"
-                        className="size-8 shrink-0 text-foreground"
-                      >
-                        {mark.paths.map((path) => (
-                          <path key={path.d} d={path.d} fill={path.fill} />
-                        ))}
-                      </svg>
-                      <span className="min-w-0">
-                        <span className="block text-sm font-semibold leading-tight text-foreground group-hover:text-brand">
-                          {locale === 'zh' ? result.titleZh : result.title}
-                        </span>
-                        <span className="mt-1 block font-mono text-3xs tracking-eyebrow text-brand uppercase">
-                          {result.subtitle}
-                        </span>
-                      </span>
-                    </span>
-                    <span className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-muted-foreground group-hover:text-foreground">
-                      {t.modelAction}
-                      <ArrowRight
-                        aria-hidden="true"
-                        className="size-3.5 motion-safe:transition-transform motion-safe:duration-200 motion-safe:group-hover:translate-x-0.5"
-                      />
-                    </span>
-                  </CompareIndexTrackedLink>
-                );
-              })}
           </div>
         </div>
       </Card>

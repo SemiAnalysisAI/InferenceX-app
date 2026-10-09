@@ -14,7 +14,7 @@ import { StarButton } from './footer-star-cta';
 const STRINGS = {
   en: {
     description:
-      'Continuous open-source agentic inference benchmarking. Real-world, reproducible, auditable performance data trusted by trillion dollar AI infrastructure operators like OpenAI, Meta, Oracle, Microsoft, etc.',
+      'Continuous open-source AI accelerator system benchmarking. Real-world, reproducible, auditable performance data trusted by trillion dollar AI infrastructure operators like OpenAI, Meta, Oracle, Microsoft, etc.',
     semianalysis: 'SemiAnalysis',
     mainSite: 'Main Site',
     newsletter: 'Newsletter',
@@ -53,7 +53,7 @@ const STRINGS = {
   },
   zh: {
     description:
-      'InferenceX 持续开展开源的 agentic 推理基准测试，发布来自真实环境、可复现、可审计的性能数据，并获得 OpenAI、Meta、Oracle、Microsoft 等万亿美元级 AI 基础设施运营方的信赖。',
+      'InferenceX 持续开展开源的 AI 加速器系统基准测试，发布来自真实环境、可复现、可审计的性能数据，并获得 OpenAI、Meta、Oracle、Microsoft 等万亿美元级 AI 基础设施运营方的信赖。',
     semianalysis: 'SemiAnalysis',
     mainSite: 'SemiAnalysis 官网',
     newsletter: '订阅通讯',
