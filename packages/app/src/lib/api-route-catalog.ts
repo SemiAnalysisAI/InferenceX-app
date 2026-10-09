@@ -391,7 +391,7 @@ export const apiRouteCatalog = [
       en: 'Agentic Workload Explorer page backend over a frozen, anonymized ProxyTrace snapshot; response shapes follow the feature-gated pages and are not a stable public contract.',
       zh: 'Agentic Workload Explorer 页面后端，读取冻结的匿名 ProxyTrace 快照；响应结构跟随受功能开关控制的页面，不是稳定的公开契约。',
     },
-    sourceSha256: '6187898d15d375546a1d8131d60fe9588c5978ecbb47dfbfc57b473d1219842d',
+    sourceSha256: 'b91dc0ffd6405d8b6602b7334644cc0f60efa24aeb684c6198595dcc717bec20',
   },
   {
     source: 'src/app/api/v1/agentic-workload-explorer/sessions/[id]/route.ts',

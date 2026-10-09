@@ -82,6 +82,8 @@ OperatorX is feature-gated in navigation and has no published
 `/api/v1/views/operatorx` contract. Its `/api/v1/operatorx/*` routes belong to
 the page and are not part of this skill's read-only view API.
 
+The explorer's session-list version filter uses the same parser as its other
+pages: absent, `all`, invalid, or out-of-range versions mean no version filter.
 The Agentic Workload Explorer is also feature-gated and has no published
 `/api/v1/views/agentic-workload-explorer` contract. Its
 `/api/v1/agentic-workload-explorer/*` routes serve a frozen, anonymized
