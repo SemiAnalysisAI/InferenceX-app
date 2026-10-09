@@ -25,7 +25,7 @@ import tarfile
 import tempfile
 
 sys.dont_write_bytecode = True
-REVISION = "ebbf89d9d9491757e62a403d99403f76f7fb7b7c"
+REVISION = "e585238d268ae090708a7da8f58530512f19e3d6"
 SOURCE_PATH = "power_model"
 SOURCE_URL = f"https://github.com/SemiAnalysisAI/InferenceX/tree/{REVISION}/{SOURCE_PATH}"
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -270,7 +270,7 @@ def rack_profile(system):
     for workload, scale_out in itertools.product(WORKLOADS, SCALE_OUT):
         state = OperatingState(workload_state=workload, using_scale_out=scale_out)
         # With zero GPU and socket input the tray's component load is its NICs, optics and drives.
-        empty = tray.estimate_breakdown(0.0, cpu_socket_measured_power=0.0, operating_state=state)
+        empty = tray.estimate_breakdown(0.0, cpu_and_dram_measured_power_per_socket=0.0, operating_state=state)
         watts = dict(empty.details)["dc_component_power_w"]
         if auxiliary.setdefault(flag(scale_out), watts) != watts:
             raise SystemExit(f"{system} tray auxiliaries depend on the workload state")
@@ -411,7 +411,7 @@ def rack_models(system):
 
 def upstream_rack(model, gpu_watts_per_gpu, socket_watts):
     try:
-        result = model.estimate_breakdown(gpu_watts_per_gpu, cpu_socket_measured_power=socket_watts)
+        result = model.estimate_breakdown(gpu_watts_per_gpu, cpu_and_dram_measured_power_per_socket=socket_watts)
     except ValueError as error:
         return None, str(error)
     return {"itWatts": result.it_power_w, "facilityWatts": result.facility_power_w}, None

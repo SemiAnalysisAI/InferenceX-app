@@ -75,7 +75,7 @@ original GPU measurements or require a per-run database backfill.
    form reproduces `create_power_model(...).estimate_breakdown(g)` to a relative
    1e-12 over a dense grid of GPU watts, fan and PSU knots, and the capacity
    edge, for every system, workload state, and scale-out flag. Racks are checked
-   the same way against `estimate_breakdown(g, cpu_socket_measured_power=s)`
+   the same way against `estimate_breakdown(g, cpu_and_dram_measured_power_per_socket=s)`
    over GPU watts at four Grace-socket inputs and both domain edges. Only then
    does it write `system-power-model.profiles.json` and
    `system-power-model.reference.json`. A failed assertion means the upstream
@@ -139,7 +139,7 @@ without workers. The socket count must equal trays × 2.
 
 Admitted rows are evaluated with `estimateRackPower`, the upstream
 `GB200NVL72RackScaleSystem` / `GB300NVL72RackScaleSystem` with
-`--gpu-level-power-per-gpu` and `--cpu-socket-measured-power`. Upstream models one
+`--gpu-level-power-per-gpu` and `--cpu-and-dram-measured-power-per-socket`. Upstream models one
 rack of 18 identical compute trays, 9 NVSwitch trays, and 8 power shelves:
 
 | Step      | Watts                                                                                                                                            |
@@ -397,7 +397,7 @@ producer 舍入误差内等于 `avg_cpu_socket_power_w`（每 socket 平均值�
 socket 数必须等于 tray 数 × 2。
 
 通过检查的数据由 `estimateRackPower` 计算，对应上游 `power_model` 的 GB200/GB300 NVL72
-机架模型，输入为 `--gpu-level-power-per-gpu` 和 `--cpu-socket-measured-power`。上游以
+机架模型，输入为 `--gpu-level-power-per-gpu` 和 `--cpu-and-dram-measured-power-per-socket`。上游以
 一个机架建模：18 个相同的计算 tray、9 个 NVSwitch tray 和 8 个电源架。每个 tray 的负载为
 两块 Bianca 板（各含 2 张 GPU 和 1 个实测 Grace socket）加上网卡、光模块和 NVMe，再计入
 风扇和 48 V 转换损耗；机架再计入 NVSwitch tray 和电源架损耗，加上机架分摊的 scale-out

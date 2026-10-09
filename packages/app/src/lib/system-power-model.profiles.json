@@ -1,7 +1,7 @@
 {
-  "modelRevision": "ebbf89d9d9491757e62a403d99403f76f7fb7b7c",
-  "sourceTree": "b417e24d8f355a637b4574a29123ebad5932eaf1",
-  "sourceUrl": "https://github.com/SemiAnalysisAI/InferenceX/tree/ebbf89d9d9491757e62a403d99403f76f7fb7b7c/power_model",
+  "modelRevision": "e585238d268ae090708a7da8f58530512f19e3d6",
+  "sourceTree": "42225371bbd318dbf33127c43688ced65c6ef175",
+  "sourceUrl": "https://github.com/SemiAnalysisAI/InferenceX/tree/e585238d268ae090708a7da8f58530512f19e3d6/power_model",
   "profiles": {
     "h100": {
       "system": "hopper",
