@@ -175,6 +175,10 @@ export function TabNav({ footer }: { footer?: ReactNode }) {
           gatedLabel={locale === 'zh' ? '隐藏' : 'Hidden'}
           tabLabel={tabLabel}
           tabHref={(path) => tabHref(localePath(path, locale))}
+          isCurrentPage={(route) => {
+            const enPath = pathname === '/zh' ? '/' : pathname.replace(/^\/zh(?=\/)/u, '');
+            return enPath === route.path || enPath === route.canonicalPath;
+          }}
           onSelect={handleMobileSelect}
         />
 
@@ -309,6 +313,7 @@ function MobileTabStrip({
   gatedLabel,
   tabLabel,
   tabHref,
+  isCurrentPage,
   onSelect,
 }: {
   ariaLabel: string;
@@ -318,6 +323,7 @@ function MobileTabStrip({
   gatedLabel: string;
   tabLabel: (route: DashboardRoute) => string;
   tabHref: (path: string) => string;
+  isCurrentPage: (route: DashboardRoute) => boolean;
   onSelect: (tab: DashboardRouteKey) => void;
 }) {
   const scrollerRef = useRef<HTMLElement>(null);
@@ -361,9 +367,10 @@ function MobileTabStrip({
         data-testid={`mobile-tab-${route.key}`}
         data-ph-capture-attribute-tab={route.key}
         onClick={(event) => {
-          // Already on this chart: tabHref keeps only `unofficialruns`, so
-          // navigating would drop the selector state held in the URL.
-          if (active) {
+          // Already on this exact chart page: tabHref keeps only
+          // `unofficialruns`, so navigating would drop the selector state held
+          // in the URL. Child pages (e.g. /inference/agentic) still navigate.
+          if (active && isCurrentPage(route)) {
             event.preventDefault();
             return;
           }

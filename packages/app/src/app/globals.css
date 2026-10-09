@@ -866,13 +866,19 @@ html[data-inferencex-skin='vllm'] [data-slot='card'] {
   }
   /* "Click elsewhere to dismiss" is desktop copy; the sheet has its own
      backdrop and swipe affordances. */
-  [data-chart-tooltip][data-sheet='true'] > div > div:first-child[style*='italic'] {
+  [data-chart-tooltip][data-sheet='true'] > div > div:first-child[style*='italic'],
+  [data-chart-tooltip][data-sheet='true'] > div > div:first-child.italic {
     display: none;
   }
   /* Bigger targets for the in-sheet actions (View charts / View logs). */
   [data-chart-tooltip][data-sheet='true'] button,
-  [data-chart-tooltip][data-sheet='true'] a[role='button'] {
+  [data-chart-tooltip][data-sheet='true'] a[role='button'],
+  [data-chart-tooltip][data-sheet='true'] a[data-action] {
     min-height: 44px;
+  }
+  [data-chart-tooltip][data-sheet='true'] a[data-action] {
+    display: inline-flex;
+    align-items: center;
   }
 }
 
