@@ -3,7 +3,7 @@
 @import './motion.css';
 @plugin '@tailwindcss/typography';
 
-@custom-variant dark (&:is(.dark *, .minecraft *, .csgo *, .gta *, .kart *, .doom *, .halo *));
+@custom-variant dark (&:is(.dark *, .minecraft *, .csgo *, .gta *, .doom *, .halo *));
 @custom-variant minecraft (&:is(.minecraft *));
 
 /* Allow hash navigation to clear the fixed navbar */
@@ -54,11 +54,11 @@
   color: #7e22ce;
 }
 
-:is(.dark, .minecraft, .csgo, .gta, .kart, .doom, .halo) .halloween-wordmark {
+:is(.dark, .minecraft, .csgo, .gta, .doom, .halo) .halloween-wordmark {
   color: #fb923c;
 }
 
-:is(.dark, .minecraft, .csgo, .gta, .kart, .doom, .halo) .halloween-wordmark-x {
+:is(.dark, .minecraft, .csgo, .gta, .doom, .halo) .halloween-wordmark-x {
   color: #c084fc;
 }
 
@@ -302,7 +302,6 @@ html[data-inferencex-embed] .autumn-leaves {
 .dark,
 .csgo,
 .gta,
-.kart,
 .doom,
 .halo {
   /* Base Theme Colors */
@@ -347,21 +346,6 @@ html[data-inferencex-embed] .autumn-leaves {
   --overlay-run-5: oklch(0.7 0.22 330);
   --overlay-run-6: oklch(0.72 0.2 230);
   --overlay-run-7: oklch(0.78 0.18 60);
-}
-
-/* Tiny pre-paint shell for persisted Kart selections. No assets, fonts or
- * animations here; artwork and gameplay styles remain in the lazy bundle. */
-.kart {
-  --primary: #ffd640;
-  --primary-foreground: #162237;
-  --ring: #ffd640;
-  --background: #111b2b;
-  --card: #152237;
-  --popover: #152237;
-}
-.kart .circuit-bg,
-.kart .autumn-leaves {
-  display: none;
 }
 
 /* Tiny pre-paint shell for persisted Doom selections. Artwork stays lazy. */
@@ -551,8 +535,6 @@ html[data-inferencex-embed] .autumn-leaves {
 .csgo .shiki span,
 .gta .shiki,
 .gta .shiki span,
-.kart .shiki,
-.kart .shiki span,
 .doom .shiki,
 .doom .shiki span,
 .halo .shiki,

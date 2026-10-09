@@ -39,8 +39,8 @@ contrast branch.
 ## CS:GO implementation
 
 `src/lib/themes.ts` centralizes toggle order
-(`light, dark, minecraft, csgo, gta, kart, doom, halo`), dark-background classification, and the
-chart-palette alias used by CS:GO, GTA, Mario Kart, DOOM and Halo. CS:GO retains the
+(`light, dark, minecraft, csgo, gta, doom, halo`), dark-background classification, and the
+chart-palette alias used by CS:GO, GTA, DOOM and Halo. CS:GO retains the
 existing sans-serif font for chart legibility and preserves the dark theme's
 vendor, high-contrast, and overlay palettes. It does not recolor hardware
 series into team colors.
@@ -122,16 +122,6 @@ The Minecraft banner launches an optional, full [playable Minecraft](./minecraft
 saves). The game bundle and its assets load only after the launcher is pressed.
 Asset provenance is recorded in `packages/app/public/decorative/minecraft/game/README.md`.
 
-## Mario Kart implementation
-
-Mario Kart adds a flag icon to the same toggle, dark chart-palette aliasing,
-local responsive Luigi Circuit artwork, and an opt-in 3D race dialog. The
-track and kart bundle loads only after the launcher is pressed. See
-[Mario Kart theme and race](./mario-kart.md) for controls, lifecycle, verification,
-and the presentation-only API exclusion. Asset provenance and the
-maintainer-reported Nintendo permission are recorded in
-`packages/app/public/decorative/kart/README.md`.
-
 ## Doom implementation
 
 Doom follows the CS:GO pattern with no game, audio, Three.js, or custom fonts.
@@ -159,6 +149,10 @@ stays on the button after each change. An unknown or system preference advances
 to light, matching the original toggle behavior; saved themes remain supported.
 
 ## Data/API coverage
+
+Mario Kart has been removed, including its race and assets. The provider migrates
+saved `kart` selections to `dark` on hydration and removes the retired root class.
+The English and Chinese pickers share the same remaining options.
 
 This is a presentation-only control: no filter, metric, calculation, route,
 share parameter, or returned data changes. Under the documented

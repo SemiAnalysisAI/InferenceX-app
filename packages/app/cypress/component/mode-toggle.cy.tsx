@@ -9,7 +9,6 @@ const ICONS: Record<string, string> = {
   minecraft: 'lucide-pickaxe',
   csgo: 'lucide-crosshair',
   gta: 'lucide-car',
-  kart: 'lucide-flag',
   doom: 'lucide-skull',
   halo: 'lucide-shield',
 };

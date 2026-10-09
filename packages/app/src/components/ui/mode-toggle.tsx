@@ -1,17 +1,7 @@
 'use client';
 
 import { track } from '@/lib/analytics';
-import {
-  Car,
-  Crosshair,
-  Flag,
-  Moon,
-  Pickaxe,
-  Shield,
-  Skull,
-  Sun,
-  type LucideIcon,
-} from 'lucide-react';
+import { Car, Crosshair, Moon, Pickaxe, Shield, Skull, Sun, type LucideIcon } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import * as React from 'react';
 
@@ -25,7 +15,6 @@ const THEME_ICONS: Record<string, LucideIcon> = {
   minecraft: Pickaxe,
   csgo: Crosshair,
   gta: Car,
-  kart: Flag,
   doom: Skull,
   halo: Shield,
 };
