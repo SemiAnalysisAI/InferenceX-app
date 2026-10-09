@@ -1,5 +1,7 @@
 # Presentation themes
 
+> **Just for fun.** Easter egg themes and games do not need stable infrastructure, may be deleted at any point, and must never have tests. Any tests referenced below are legacy and should be deleted, not fixed or extended. See [Testing](./testing.md#easter-egg-themes-and-games).
+
 ## How Minecraft works
 
 The root `ThemeProvider` in `packages/app/src/app/layout.tsx` uses `next-themes`

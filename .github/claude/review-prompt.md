@@ -127,6 +127,8 @@ When reviewing a PR diff, check if new code was added WITHOUT corresponding test
 
 **If new code is added WITHOUT tests, this is a 🔴 BLOCKING issue.**
 
+**Exception: easter egg themes and games.** They are just for fun and must never have tests. Do not flag missing tests on them, and flag any newly added easter egg tests for removal. See `docs/testing.md#easter-egg-themes-and-games`.
+
 Use `mcp__github_inline_comment__create_inline_comment` to leave an inline comment with:
 
 🔴 **BLOCKING**: Missing tests for new code.

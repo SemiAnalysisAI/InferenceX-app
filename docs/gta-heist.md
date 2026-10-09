@@ -1,5 +1,7 @@
 # GTA V 3D presentation game
 
+> **Just for fun.** Easter egg themes and games do not need stable infrastructure, may be deleted at any point, and must never have tests. Any tests referenced below are legacy and should be deleted, not fixed or extended. See [Testing](./testing.md#easter-egg-themes-and-games).
+
 Select the GTA theme, then **Start heist**. The game is a browser-scale city sandbox,
 not the complete GTA V product or campaign.
 

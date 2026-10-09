@@ -16,6 +16,15 @@ Enforced by `@pr-claude` — missing/low-quality tests are flagged 🔴 BLOCKING
 4. Bug fixes → regression test at the narrowest layer that reproduces the bug
 5. Run `bun run test:unit` and the local smoke suite, `bun run test:e2e`, before considering a task complete. The full E2E suite runs in CI and is available locally as `bun run test:e2e:full`.
 
+## Easter egg themes and games
+
+Easter egg themes (Minecraft, CS:GO, GTA, DOOM, Halo, and any future optional theme) and every game launched from them are just for fun. They do not need stable infrastructure, have no compatibility or uptime guarantees, and may be deleted at any point without notice or migration.
+
+- They must **never** have tests. Do not add unit, Cypress component, Cypress E2E, or CI checks for them.
+- The mandatory test requirements above do not apply to them. Reviewers, including `@pr-claude`, must not flag missing tests on easter egg code as blocking or request them.
+- When an existing easter egg test fails or slows CI, delete it. Do not fix or extend it.
+- Do not add CI jobs, shards, fixtures, or infrastructure for them.
+
 ## Pre-commit Checklist
 
 ```bash

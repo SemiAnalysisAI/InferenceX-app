@@ -3,6 +3,7 @@
 For detailed subsystem docs, see [docs/index.md](./docs/index.md).
 
 - Pareto logic changes must update both InferenceX and InferenceX-app with matching regression tests and cross-linked PRs.
+- **Easter egg themes and games are just for fun.** Optional themes (Minecraft, CS:GO, GTA, DOOM, Halo, and any future ones) and the games launched from them do not need stable infrastructure, carry no compatibility or uptime guarantees, and may be deleted at any time without notice or migration. They must **never** have tests: do not add unit, component, E2E, or CI checks for them, do not ask for them in review, and delete existing ones rather than fixing or extending them. See [Easter egg policy](./docs/testing.md#easter-egg-themes-and-games).
 - Any added, changed, or removed filter, frontend view, or page MUST include the corresponding API and `inferencex-skills` changes in the same PR. Missing updates are BLOCKING on PR review. See [Read-only coverage for public views](#read-only-coverage-for-public-views) for coverage requirements and documented exclusions.
 
 ## AI model disclosure
@@ -175,7 +176,7 @@ See `.env.example`. Key vars: `GITHUB_TOKEN`, `DATABASE_READONLY_URL`, `DATABASE
 
 ## Testing
 
-See [Testing](./docs/testing.md) for full requirements, quality standards, and pre-commit checklist. Tests are **mandatory** — missing/low-quality tests are 🔴 BLOCKING on PR review.
+See [Testing](./docs/testing.md) for full requirements, quality standards, and pre-commit checklist. Tests are **mandatory** — missing/low-quality tests are 🔴 BLOCKING on PR review. **Exception:** easter egg themes and games must never have tests (see the policy at the top of this file).
 
 ### E2E Runtime and PR Workflow
 
