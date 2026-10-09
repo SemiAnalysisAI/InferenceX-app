@@ -10,7 +10,7 @@ import {
 } from '@/lib/dashboard-routes';
 
 export const LANDING_META_ZH = {
-  title: '开源智能体推理基准测试',
+  title: 'AI 加速器系统基准测试',
   description:
     '比较不同芯片和推理框架在 AgentX 与固定序列场景下的推理性能。AgentX 是 InferenceX 面向长上下文、多轮编码的测试场景；NVIDIA 和 AMD 的公开运行结果会随配置变化更新。',
 };

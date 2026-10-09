@@ -15,7 +15,9 @@ import {
 } from '@/lib/model-routes';
 
 export const LANDING_META = {
-  title: 'Open-Source Agentic Inference Benchmark',
+  title: 'AI Accelerator System Benchmark',
+  /** Landing-only brand suffix; other pages keep the root layout's `| InferenceX by SemiAnalysis`. */
+  brand: 'AcceleratorX by SemiAnalysis',
   description:
     "Compare AgentX, InferenceX's long-context, multi-turn coding scenario, with fixed-sequence AI inference across chips and frameworks. Public NVIDIA and AMD runs update when configurations change.",
 };
