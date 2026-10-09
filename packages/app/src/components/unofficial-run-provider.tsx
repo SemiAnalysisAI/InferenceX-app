@@ -9,6 +9,7 @@ import {
   useEffect,
   useMemo,
   useReducer,
+  useState,
 } from 'react';
 
 import type { ChartDefinition, HardwareConfig, InferenceData } from '@/components/inference/types';
@@ -78,6 +79,8 @@ export interface OverlayScopeInput {
 
 export interface UnofficialRunContextType {
   isUnofficialRun: boolean;
+  removeUnofficialBg: boolean;
+  setRemoveUnofficialBg?: (checked: boolean) => void;
   unofficialRunInfo: UnofficialRunInfo | null;
   unofficialRunInfos: UnofficialRunInfo[];
   runIndexByUrl: Record<string, number>;
@@ -375,6 +378,7 @@ export function UnofficialRunProvider({
   children: ReactNode;
   showBanner?: boolean;
 }) {
+  const [removeUnofficialBg, setRemoveUnofficialBg] = useState(false);
   const queryClient = useQueryClient();
   const search = useClientSearch();
   const runIds = useMemo(() => parseUnofficialRunIds(search), [search]);
@@ -488,6 +492,8 @@ export function UnofficialRunProvider({
   const contextValue = useMemo<UnofficialRunContextType>(
     () => ({
       isUnofficialRun: unofficialRunInfos.length > 0,
+      removeUnofficialBg,
+      setRemoveUnofficialBg,
       unofficialRunInfo,
       unofficialRunInfos,
       runIndexByUrl,
@@ -508,6 +514,7 @@ export function UnofficialRunProvider({
       resetOverlaySelection,
     }),
     [
+      removeUnofficialBg,
       unofficialRunInfos,
       unofficialRunInfo,
       runIndexByUrl,
@@ -539,11 +546,19 @@ export function UnofficialRunProvider({
 
 /** Allows dashboard navigation to own banner placement while the provider owns its state. */
 export function UnofficialRunBanner({ attached = false }: { attached?: boolean }) {
-  const { unofficialRunInfos, dismissRun, clearUnofficialRun } = useUnofficialRun();
+  const {
+    unofficialRunInfos,
+    dismissRun,
+    clearUnofficialRun,
+    removeUnofficialBg,
+    setRemoveUnofficialBg,
+  } = useUnofficialRun();
   return (
     <UnofficialBanner
       runs={unofficialRunInfos}
       attached={attached}
+      removeUnofficialBg={removeUnofficialBg}
+      onRemoveUnofficialBgChange={setRemoveUnofficialBg}
       onDismissRun={dismissRun}
       onDismissAll={clearUnofficialRun}
     />
