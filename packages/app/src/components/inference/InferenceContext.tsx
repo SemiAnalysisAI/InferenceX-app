@@ -47,6 +47,7 @@ import type {
   TokenRevenuePriceSource,
 } from '@/components/inference/types';
 import { resolveMetricConfigKey } from '@/components/inference/metric-registry';
+import { getMeasuredMetricConfig } from '@/components/inference/measured-metric-config';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -74,7 +75,7 @@ import {
 } from '@/components/inference/perf-ruler-store';
 import { useParetoHighlightToggle } from './hooks/useParetoHighlightToggle';
 import { useOpenRouterPricing } from '@/hooks/api/use-openrouter-pricing';
-import { DEFAULT_Y_AXIS_METRIC } from '@/lib/url-state';
+import { defaultYAxisMetric } from '@/lib/url-state';
 import { computeToggle } from '@/hooks/useTogglableSet';
 import { buildAvailabilityHwKey } from '@/lib/chart-utils';
 import { getHardwareConfig, getModelSortIndex, isKnownGpu } from '@/lib/constants';
@@ -124,6 +125,9 @@ import {
   type QuickFilters,
   type SpecMode,
 } from './utils/quickFilters';
+
+const splitUrlList = (value: string | undefined): string[] =>
+  value ? value.split(',').filter(Boolean) : [];
 
 const InferenceDataContext = createContext<InferenceDataContextType | undefined>(undefined);
 const InferenceFiltersContext = createContext<InferenceFiltersContextType | undefined>(undefined);
@@ -445,7 +449,11 @@ export function InferenceProvider({
     }
   }, [selectedGpuResolution]);
   const [selectedYAxisMetric, setSelectedYAxisMetric] = useState<string>(() =>
-    resolveMetricConfigKey(getUrlParam('i_metric'), initialYAxisMetric ?? DEFAULT_Y_AXIS_METRIC),
+    resolveMetricConfigKey(
+      getUrlParam('i_metric'),
+      initialYAxisMetric ??
+        defaultYAxisMetric(parsePowerTiers(splitUrlList(getUrlParam('i_power')))),
+    ),
   );
   const [tokenRevenuePriceSource, setTokenRevenuePriceSource] = useState<TokenRevenuePriceSource>(
     () => (getUrlParam('i_revenue') === 'openrouter' ? 'openrouter' : 'normalized'),
@@ -557,10 +565,8 @@ export function InferenceProvider({
   const [quickFilterPower, setQuickFilterPower] = useState<PowerTier[]>([]);
   const [quickFilterTopologies, setQuickFilterTopologies] = useState<string[]>([]);
   useEffect(() => {
-    const parse = (key: 'i_vendor' | 'i_fw' | 'i_disagg' | 'i_spec' | 'i_power' | 'i_topology') => {
-      const v = getUrlParam(key);
-      return v ? v.split(',').filter(Boolean) : [];
-    };
+    const parse = (key: 'i_vendor' | 'i_fw' | 'i_disagg' | 'i_spec' | 'i_power' | 'i_topology') =>
+      splitUrlList(getUrlParam(key));
     const vendors = parse('i_vendor');
     const frameworks = parse('i_fw');
     // Preserve old shared links: `agg` used to mean every non-disaggregated
@@ -989,6 +995,22 @@ export function InferenceProvider({
       clearPresetOnChange();
     },
     [setSelectedYAxisMetric, clearPresetOnChange],
+  );
+  // A tier filter is only meaningful on a power chart. The move happens once, on
+  // entry, so a metric picked while the filter is on survives later tier edits.
+  // The URL restore keeps the raw setter so a link's explicit `i_metric` wins.
+  const setQuickFilterPowerAndMetric = useCallback(
+    (tiers: PowerTier[]) => {
+      setQuickFilterPower(tiers);
+      if (
+        quickFilterPower.length === 0 &&
+        tiers.length > 0 &&
+        !getMeasuredMetricConfig(selectedYAxisMetric)
+      ) {
+        setSelectedYAxisMetricAndClear(defaultYAxisMetric(tiers));
+      }
+    },
+    [quickFilterPower, selectedYAxisMetric, setSelectedYAxisMetricAndClear],
   );
   const setSelectedGPUsAndClear = useCallback(
     (next: string[]) => {
@@ -1677,7 +1699,10 @@ export function InferenceProvider({
 
   useUrlStateSync(
     {
-      i_metric: selectedYAxisMetric,
+      i_metric:
+        selectedYAxisMetric === (initialYAxisMetric ?? defaultYAxisMetric(quickFilterPower))
+          ? ''
+          : selectedYAxisMetric,
       i_revenue: usesTokenSalePricing(selectedYAxisMetric) ? tokenRevenuePriceSource : 'normalized',
       i_mstat: fixedSequenceStatistic,
       i_gpus: selectedGPUs.join(','),
@@ -1716,6 +1741,7 @@ export function InferenceProvider({
     },
     [
       selectedYAxisMetric,
+      initialYAxisMetric,
       tokenRevenuePriceSource,
       selectedXAxisMetric,
       selectedE2eXAxisMetric,
@@ -2028,7 +2054,7 @@ export function InferenceProvider({
     setQuickFilterFrameworks,
     setQuickFilterDeployment,
     setQuickFilterSpec,
-    setQuickFilterPower,
+    setQuickFilterPower: setQuickFilterPowerAndMetric,
     setQuickFilterTopologies,
     setIsLegendExpanded,
     setHideNonOptimal,

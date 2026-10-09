@@ -46,15 +46,13 @@ describe('PARAM_DEFAULTS', () => {
     expect(PARAM_DEFAULTS.i_seq).toBe('');
   });
 
-  it('strips i_metric against the same default the dashboard opens on', async () => {
-    // A share link omits any value equal to PARAM_DEFAULTS. If this drifted
-    // from DEFAULT_Y_AXIS_METRIC, a link captured on the *other* metric would
-    // be written without `i_metric` and reopen on the dashboard default.
-    const { PARAM_DEFAULTS, DEFAULT_Y_AXIS_METRIC } = await import('@/lib/url-state');
+  it('opens on tokens per dollar, or on measured power under any power tier filter', async () => {
+    const { defaultYAxisMetric } = await import('@/lib/url-state');
     const { DEFAULT_METRIC_CONFIG_KEY } = await import('@/components/inference/metric-registry');
-    expect(PARAM_DEFAULTS.i_metric).toBe(DEFAULT_Y_AXIS_METRIC);
-    expect(DEFAULT_Y_AXIS_METRIC).toBe('y_tokensPerDollarH');
-    expect(DEFAULT_Y_AXIS_METRIC).toBe(DEFAULT_METRIC_CONFIG_KEY);
+    expect(defaultYAxisMetric([])).toBe('y_tokensPerDollarH');
+    expect(defaultYAxisMetric([])).toBe(DEFAULT_METRIC_CONFIG_KEY);
+    expect(defaultYAxisMetric(['certified'])).toBe('y_measuredAvgPower');
+    expect(defaultYAxisMetric(['legacy'])).toBe('y_measuredAvgPower');
   });
 
   it('has expected default for r_range', async () => {
@@ -373,6 +371,19 @@ describe('writeUrlParams + buildShareUrl', () => {
 
     const url = buildShareUrl();
     expect(url).toContain('g_model=test-model');
+  });
+
+  it('keeps an explicit tokens-per-dollar metric, whose default status depends on i_power', async () => {
+    setupWindow('', '/inference');
+    const { writeUrlParams, buildShareUrl, DEFAULT_Y_AXIS_METRIC } =
+      await import('@/lib/url-state');
+
+    writeUrlParams({ i_metric: DEFAULT_Y_AXIS_METRIC, i_power: 'certified' });
+    await vi.advanceTimersByTimeAsync(200);
+
+    const params = new URL(buildShareUrl()).searchParams;
+    expect(params.get('i_metric')).toBe('y_tokensPerDollarH');
+    expect(params.get('i_power')).toBe('certified');
   });
 
   it('removes params that match their default value', async () => {

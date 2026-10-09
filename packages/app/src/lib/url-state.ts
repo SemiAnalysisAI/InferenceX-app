@@ -13,6 +13,7 @@
  * Only non-default values are written to keep URLs short.
  */
 import { LIFECYCLE_DEFAULTS } from '@/components/calculator/lifecycle';
+import { MEASURED_METRIC_DEFAULTS } from '@/components/inference/measured-metric-config';
 import { dashboardRouteForPathname, getDashboardRoute } from '@/lib/dashboard-routes';
 import { routeModelForPathname } from '@/lib/model-routes';
 
@@ -135,18 +136,21 @@ export type UrlStateParams = Partial<Record<UrlStateKey, string>>;
 /** Default values for each parameter. Params matching their default are omitted from share URLs. */
 /**
  * Dashboard default y-axis: total tokens purchased per $1 of Hyperscaler
- * ownership TCO. It leads with infrastructure purchasing power, which depends
- * only on measured throughput and hardware cost, so the opening view does not
- * assume a token sale price. Token Revenue per GPU Hour remains one selector
- * click away for revenue-side questions.
- * `?i_metric=` still wins, so existing shared links are unaffected.
- *
- * Lives here rather than in `InferenceContext` because `PARAM_DEFAULTS` below
- * strips any value equal to the default from share links. If the two drifted,
- * a link captured on the *other* metric would be written without `i_metric`
- * and reopen on this one.
+ * ownership TCO. It depends only on measured throughput and hardware cost, so
+ * the opening view does not assume a token sale price.
  */
 export const DEFAULT_Y_AXIS_METRIC = 'y_tokensPerDollarH';
+
+/**
+ * The y-axis a link without `i_metric` opens on. A measured-power tier filter
+ * (`i_power`) is only meaningful on a power chart, so any tier opens the
+ * measured power scatter. `InferenceContext` resolves links and strips
+ * `i_metric` from share links with this one function; if those two defaults
+ * differed, a link would reopen on a metric other than the one it captured.
+ */
+export function defaultYAxisMetric(powerTiers: readonly string[]): string {
+  return powerTiers.length > 0 ? MEASURED_METRIC_DEFAULTS.power : DEFAULT_Y_AXIS_METRIC;
+}
 
 /** Shared defaults for the fleet lifecycle and calculator MW controls. */
 export const DEFAULT_FLEET_MW = '10';
@@ -169,7 +173,10 @@ export const PARAM_DEFAULTS: Record<UrlStateKey, string> = {
   // explicitly, so an explicit FP4 selection must survive (not be stripped as a
   // "default") or it would silently revert to the per-model auto default on reload.
   i_prec: '',
-  i_metric: DEFAULT_Y_AXIS_METRIC,
+  // No strippable default: the no-param metric depends on `i_power` and on a
+  // route's seeded metric, so `InferenceContext` writes '' when the metric
+  // equals that resolved default and the explicit key otherwise.
+  i_metric: '',
   i_revenue: 'normalized',
   i_pctl: 'p90',
   i_mstat: 'median',

@@ -1,3 +1,5 @@
+import { assertShareLinkParams } from '../support/share-link';
+
 // Deterministic intercepted rows exercise the validated/historical power UI:
 // one row has power_valid=1 and one has no validation verdict.
 
@@ -95,6 +97,15 @@ function visitCertifiedPowerChart(extraParams = '', benchmarks = powerBenchmarks
   cy.get('[data-testid="chart-figure"]').should('have.length.at.least', 1);
 }
 
+const MEASURED_POWER_OPTION = 'Measured Power';
+const MEASURED_POWER_TITLE = 'Measured Average Power per Chip';
+const TOKENS_PER_DOLLAR_TITLE = 'Total Tokens per $1 TCO';
+
+const assertYAxisMetric = (option: string, title: string) => {
+  cy.get('[data-testid="yaxis-metric-selector"]').should('contain.text', option);
+  cy.get('[data-testid="chart-figure"] h2').should('contain.text', title);
+};
+
 const visiblePowerPoints = () =>
   cy.get<SVGGElement>('.dot-group').filter((_, element) => element.style.opacity !== '0');
 
@@ -171,6 +182,39 @@ describe('Validated vs historical measured power', () => {
       'true',
     );
     cy.get('[data-testid="quick-filters-selected-count"]').should('contain.text', '1 selected');
+  });
+
+  it('opens a shared i_power link without i_metric on the measured power scatter', () => {
+    visitCertifiedPowerChart('&i_power=certified');
+
+    assertYAxisMetric(MEASURED_POWER_OPTION, MEASURED_POWER_TITLE);
+    cy.get('.dot-group[data-hw-key^="mi300x"]').should('exist');
+    cy.get('.dot-group[data-hw-key^="b200"]').should('not.exist');
+    assertShareLinkParams({ i_power: 'certified', i_metric: null });
+  });
+
+  it('keeps an explicit tokens-per-dollar metric next to a power tier filter', () => {
+    visitCertifiedPowerChart('&i_metric=y_tokensPerDollarH&i_power=certified');
+
+    assertYAxisMetric(TOKENS_PER_DOLLAR_TITLE, TOKENS_PER_DOLLAR_TITLE);
+    assertShareLinkParams({ i_metric: 'y_tokensPerDollarH', i_power: 'certified' });
+  });
+
+  it('moves the default chart to measured power when Validated turns on, not when cleared', () => {
+    visitCertifiedPowerChart();
+    assertYAxisMetric(TOKENS_PER_DOLLAR_TITLE, TOKENS_PER_DOLLAR_TITLE);
+
+    cy.get('[data-testid="scatter-quick-filters"]').click();
+    cy.get('[data-testid="quick-filter-power-certified"]').click();
+    cy.get('[data-testid="quick-filters-selected-count"]').should('contain.text', '1 selected');
+    assertYAxisMetric(MEASURED_POWER_OPTION, MEASURED_POWER_TITLE);
+
+    cy.contains('button', 'Clear filters').click();
+    cy.get('[data-testid="quick-filters-selected-count"]').should('not.exist');
+    assertYAxisMetric(MEASURED_POWER_OPTION, MEASURED_POWER_TITLE);
+    cy.get('[data-testid="quick-filters-dialog"]').contains('button', 'Done').click();
+
+    assertShareLinkParams({ i_metric: 'y_measuredAvgPower', i_power: null });
   });
 
   it('uses Optimal Only for measured markers while preserving the power boundary', () => {
