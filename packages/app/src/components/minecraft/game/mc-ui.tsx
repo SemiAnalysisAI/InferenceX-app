@@ -12,6 +12,7 @@ import {
 import { ICON, ICON_COLUMNS, ICON_ROWS, type IconName } from './mc-atlas';
 import { xpForLevel, type Game, type SlotRef } from './mc-game';
 import { ITEMS, itemName, type Stack } from './mc-items';
+import { DIMENSION_NAMES } from './mc-dimensions';
 
 export const GAME_ASSETS = '/decorative/minecraft/game/';
 type Locale = 'en' | 'zh';
@@ -169,8 +170,31 @@ export function Hud({
   const visibleChat = chatOpen
     ? chat.slice(-20)
     : chat.filter((c) => now - c.time < 10_000).slice(-10);
+  const dragon = game.entities.find((e) => e.kind === 'dragon' && !e.removed && e.health > 0);
   return (
     <div className="mc-hud" data-mc-silent>
+      <div className="mc-dimension" data-testid="minecraft-dimension">
+        {DIMENSION_NAMES[game.dimension][locale]}
+        {game.endgame.portalTicks > 0
+          ? ` · ${tr(locale, 'Entering portal', '正在进入传送门')}`
+          : ''}
+      </div>
+      {dragon ? (
+        <div
+          className="mc-boss"
+          data-testid="minecraft-dragon-boss"
+          role="meter"
+          aria-label={tr(locale, 'Ender Dragon health', '末影龙生命值')}
+          aria-valuemin={0}
+          aria-valuemax={dragon.maxHealth}
+          aria-valuenow={dragon.health}
+        >
+          <span>{tr(locale, 'Ender Dragon', '末影龙')}</span>
+          <div>
+            <i style={{ width: `${(dragon.health / dragon.maxHealth) * 100}%` }} />
+          </div>
+        </div>
+      ) : null}
       <img
         className="mc-crosshair"
         src={`${GAME_ASSETS}crosshair.png`}

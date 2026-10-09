@@ -127,6 +127,7 @@ function faceUV(face: number, px: number, py: number, pz: number): [number, numb
 }
 
 export function tileFor(def: BlockDef, face: number, meta: number): number {
+  if (def.id === B.endFrame && face === 2 && meta & 4) return TILE.item_ender_eye;
   if (def.id === B.wheat) return TILE.wheat_stage0 + Math.min(7, meta);
   if (def.id === B.door) {
     if (face === 2 || face === 3) return TILE.oak_planks;
@@ -230,7 +231,9 @@ export function meshChunk(world: World, cx: number, cz: number) {
             break;
           }
           case 'box': {
-            for (const b of def.boxes ?? []) box(def, meta, x, y, z, b, false);
+            if (id === B.netherPortal && meta & 1)
+              box(def, meta, x, y, z, [7, 0, 0, 9, 16, 16], false);
+            else for (const b of def.boxes ?? []) box(def, meta, x, y, z, b, false);
             break;
           }
           case 'door': {

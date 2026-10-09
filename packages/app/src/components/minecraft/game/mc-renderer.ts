@@ -17,11 +17,16 @@ import {
 } from './mc-models';
 import { raycast, selectionBox } from './mc-physics';
 import { CHUNK, chunkKey, HEIGHT, type Chunk } from './mc-world';
+import { buildEndgameModel, type EndgameModel } from './mc-endgame-models';
 
 export const ASSET_BASE = '/decorative/minecraft/game/';
 const ATLAS_W = ATLAS_COLUMNS * 16;
 const ATLAS_H = ATLAS_ROWS * 16;
 const SKINS = [
+  'dragon',
+  'enderman',
+  'blaze',
+  'end_crystal',
   'steve',
   'zombie',
   'skeleton',
@@ -57,6 +62,7 @@ function pixelTexture(image: HTMLImageElement | HTMLCanvasElement) {
 function loadImage(src: string) {
   return new Promise<HTMLImageElement>((resolve, reject) => {
     const img = new Image();
+    img.crossOrigin = 'anonymous';
     img.decoding = 'async';
     img.addEventListener('load', () => resolve(img), { once: true });
     img.addEventListener('error', () => reject(new Error(`Failed to load ${src}`)), { once: true });
@@ -674,7 +680,17 @@ export class Renderer {
   }
 
   /** Rebuild dirty chunk meshes near the player within a time budget (ms). */
+  private worldEpoch = -1;
+
   updateChunks(budgetMs: number) {
+    if (this.worldEpoch !== this.game.worldEpoch) {
+      this.worldEpoch = this.game.worldEpoch;
+      for (const mesh of this.chunkMeshes.values()) this.disposeChunk(mesh);
+      this.chunkMeshes.clear();
+      for (const view of this.entityViews.values()) this.disposeEntityView(view);
+      this.entityViews.clear();
+      for (const chunk of this.game.world.chunks.values()) chunk.dirty = true;
+    }
     const start = performance.now();
     const world = this.game.world;
     const p = this.game.player;
@@ -898,7 +914,7 @@ export class Renderer {
     const l = this.game.world.getLight(Math.floor(x), Math.floor(y), Math.floor(z));
     const sky = lightCurve((l >> 4) / 15) * daylight(this.game.time);
     const blk = lightCurve((l & 15) / 15);
-    const b = Math.max(sky, blk) * 0.95 + 0.05;
+    const b = Math.max(sky, blk, this.game.dimension === 'overworld' ? 0 : 0.55) * 0.95 + 0.05;
     const g = this.terrainUniforms.uGamma.value;
     return lerp(b, 1 - (1 - b) ** 3, g);
   }
@@ -976,6 +992,16 @@ export class Renderer {
       return { object: group, materials: [material], geometries: [], kind: e.kind };
     }
     if (e.kind === 'arrow') {
+      if (e.fireball) {
+        const material = new THREE.MeshBasicMaterial({
+          color: this.game.dimension === 'end' ? '#d95bff' : '#ffaa33',
+        });
+        const mesh = new THREE.Mesh(
+          this.cachedGeometry('fireball', () => new THREE.IcosahedronGeometry(0.28, 0)),
+          material,
+        );
+        return { object: mesh, materials: [material], geometries: [], kind: e.kind };
+      }
       const material = new THREE.MeshBasicMaterial({ color: '#8b6b3d' });
       const shaft = new THREE.Mesh(
         this.cachedGeometry('arrow', () => new THREE.BoxGeometry(0.04, 0.04, 0.5)),
@@ -1000,7 +1026,11 @@ export class Renderer {
         kind: e.kind,
       };
     }
-    const kind = e.kind as MobKind;
+    if (['dragon', 'crystal', 'blaze', 'enderman'].includes(e.kind)) {
+      const kind = e.kind as EndgameModel;
+      return buildEndgameModel(kind, this.assets.skins[kind === 'crystal' ? 'end_crystal' : kind]);
+    }
+    const kind = e.kind as Exclude<MobKind, EndgameModel>;
     const name: ModelName = kind;
     const skin = this.assets.skins[kind as SkinName];
     const model = buildModel(
@@ -1022,6 +1052,7 @@ export class Renderer {
     this.scene.remove(v.object);
     if (v.model) disposeModel(v.model);
     else for (const m of v.materials) m.dispose();
+    for (const geometry of v.geometries) geometry.dispose();
   }
 
   private updateEntities(alpha: number) {
@@ -1070,6 +1101,42 @@ export class Renderer {
           o.rotation.y = Math.atan2(-e.vx, -e.vz);
           o.rotation.x = Math.atan2(e.vy, speed);
         }
+      } else if (['dragon', 'crystal', 'blaze', 'enderman'].includes(view.kind)) {
+        o.rotation.y = lerpAngle(e.pyaw, e.yaw, alpha);
+        const t = e.age + alpha;
+        if (view.kind === 'dragon') {
+          for (const side of [-1, 1]) {
+            const wing = o.getObjectByName(`wing${side}`);
+            if (wing) wing.rotation.z = side * (0.15 + Math.sin(t / 5) * 0.55);
+          }
+        } else if (view.kind === 'crystal') {
+          const core = o.getObjectByName('core')!;
+          core.rotation.set(t / 25, t / 18, Math.PI / 4);
+          const beam = o.getObjectByName('beam')!;
+          const dragon = game.entities.find(
+            (entity) => entity.kind === 'dragon' && entity.health > 0 && !entity.removed,
+          );
+          const nearest = dragon
+            ? game.entities
+                .filter((entity) => entity.kind === 'crystal' && !entity.removed)
+                .toSorted(
+                  (a, b) =>
+                    Math.hypot(a.x - dragon.x, a.z - dragon.z) -
+                    Math.hypot(b.x - dragon.x, b.z - dragon.z),
+                )[0]
+            : undefined;
+          beam.visible = nearest?.id === e.id;
+          if (dragon) {
+            const destination = o.worldToLocal(new THREE.Vector3(dragon.x, dragon.y + 1, dragon.z));
+            beam.position.copy(destination).multiplyScalar(0.5);
+            beam.scale.y = destination.length();
+            beam.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), destination.normalize());
+          }
+        } else if (view.kind === 'blaze') {
+          o.rotation.y = t / 20;
+        }
+        const material = view.materials[0];
+        if (material instanceof THREE.MeshBasicMaterial) material.color.copy(tint);
       } else if (view.model && view.modelName) {
         const yaw = lerpAngle(e.pyaw, e.yaw, alpha);
         o.rotation.set(0, yaw, 0);
@@ -1277,6 +1344,13 @@ export class Renderer {
     const [lx, , lz] = game.lookVector();
     const facing = Math.max(0, lx * sunDir.x + lz * sunDir.z);
     fogColor.lerp(rgb(0.95, 0.55, 0.3), glow * facing * 0.5);
+    if (game.dimension !== 'overworld') {
+      const color = game.dimension === 'nether' ? rgb(0.24, 0.045, 0.025) : rgb(0.055, 0.025, 0.08);
+      fogColor.copy(color);
+      this.skyUniforms.uTop.value.copy(color);
+      this.skyUniforms.uHorizon.value.copy(color);
+      this.skyUniforms.uGlowAmount.value = 0;
+    }
     const rd = game.renderDistance * CHUNK;
     let fogNear = rd * 0.55;
     let fogFar = rd - 4;
@@ -1297,7 +1371,7 @@ export class Renderer {
     }
     const u = this.terrainUniforms;
     u.uTime.value = this.elapsed;
-    u.uDaylight.value = day;
+    u.uDaylight.value = game.dimension === 'overworld' ? day : 0.8;
     u.uGamma.value = options.gamma;
     u.uFogColor.value.copy(fogColor);
     u.uFogNear.value = fogNear;
@@ -1320,6 +1394,9 @@ export class Renderer {
     this.skyCamera.fov = cam.fov;
     this.skyCamera.updateProjectionMatrix();
     this.sun.position.copy(sunDir).multiplyScalar(300);
+    this.sun.visible = game.dimension === 'overworld';
+    this.moon.visible = game.dimension === 'overworld';
+    this.stars.visible = game.dimension === 'overworld';
     this.sun.lookAt(0, 0, 0);
     this.moon.position.copy(sunDir).multiplyScalar(-300);
     this.moon.lookAt(0, 0, 0);
@@ -1337,7 +1414,7 @@ export class Renderer {
     // Clouds drift slowly to the west.
     const cloudSize = Math.max(256, rd * 4);
     const cm = this.clouds;
-    cm.visible = options.clouds && !p.eyesInWater;
+    cm.visible = options.clouds && !p.eyesInWater && game.dimension === 'overworld';
     cm.position.set(ex, 108.33, ez);
     cm.scale.set(cloudSize, cloudSize, 1);
     const texWorld = 256 * 12;

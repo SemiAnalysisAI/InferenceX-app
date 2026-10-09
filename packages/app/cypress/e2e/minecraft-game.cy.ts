@@ -103,4 +103,56 @@ describe('Playable Minecraft', () => {
       '单人游戏',
     );
   });
+
+  it('resumes an End save, finishes through the exit, and persists completion', () => {
+    const game = new Game({
+      name: 'End exit regression',
+      seed: '2',
+      mode: 'survival',
+      difficulty: 'normal',
+    });
+    game.endgame.travel('end', [0.5, 63, 0.5]);
+    game.entities = [];
+    game.endgame.progress.dragonDefeated = true;
+    game.world.setBlock(0, 63, 0, B.endPortal, 0, false);
+    const meta = newWorldMeta('End exit regression', '2', 'survival', 'normal');
+    const data = serialize(game, meta);
+    cy.viewport(1280, 720);
+    cy.visit('/about', {
+      onBeforeLoad(win) {
+        win.localStorage.setItem('theme', 'minecraft');
+        win.localStorage.setItem('inferencex-minecraft-worlds', JSON.stringify([data.meta]));
+        win.localStorage.setItem(`inferencex-minecraft-world-${meta.id}`, JSON.stringify(data));
+        win.localStorage.setItem(
+          'inferencex-minecraft-options',
+          JSON.stringify({ renderDistance: 2, volume: 0 }),
+        );
+      },
+    });
+    cy.get('[data-testid="minecraft-launch"]').click();
+    cy.get('[data-testid="minecraft-singleplayer"]').click();
+    cy.contains('[role="option"]', 'End exit regression').click();
+    cy.get('[data-testid="minecraft-play-selected"]').click();
+    cy.get('[data-testid="minecraft-dimension"]').should('contain', 'The End');
+    cy.get('[data-testid="minecraft-ending"]').should('be.visible').and('contain', 'Free the End');
+    cy.window().then((win) => {
+      const saved = JSON.parse(win.localStorage.getItem(`inferencex-minecraft-world-${meta.id}`)!);
+      expect(saved.version).to.equal(2);
+      expect(saved.dimension).to.equal('overworld');
+      expect(saved.progress.completed).to.equal(true);
+      expect(saved.dimensions).to.have.property('end');
+    });
+    cy.get('[data-testid="minecraft-ending-continue"]').click();
+    cy.get('[data-testid="minecraft-dimension"]').should('contain', 'Overworld');
+    cy.get('body').type('{esc}');
+    cy.get('[data-testid="minecraft-save-quit"]').click();
+    cy.get('[data-testid="minecraft-singleplayer"]').click();
+    cy.contains('[role="option"]', 'End exit regression').click();
+    cy.get('[data-testid="minecraft-play-selected"]').click();
+    cy.get('[data-testid="minecraft-dimension"]').should('contain', 'Overworld');
+    cy.get('[data-testid="minecraft-ending"]').should('not.exist');
+  });
 });
+import { B } from '../../src/components/minecraft/game/mc-blocks';
+import { Game } from '../../src/components/minecraft/game/mc-game';
+import { newWorldMeta, serialize } from '../../src/components/minecraft/game/mc-save';

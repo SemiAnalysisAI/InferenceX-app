@@ -158,7 +158,7 @@
     },
     {
       "spec": "cypress/e2e/minecraft-game.cy.ts",
-      "duration": 27000
+      "duration": 41000
     },
     {
       "spec": "cypress/e2e/optional-theme-isolation.cy.ts",
