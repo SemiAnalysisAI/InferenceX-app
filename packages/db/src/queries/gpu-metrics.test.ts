@@ -185,15 +185,35 @@ it('withholds statistics for a series with incomplete samples, keeping sibling h
   );
 });
 
+it('scopes prefix and source reads in SQL, including containing power-audit bundles', async () => {
+  await db.exec(`INSERT INTO gpu_metric_series
+    (id, workflow_run_id, artifact_name, config_key, file_name, vendor, csv_sha256,
+      sample_count, gpu_count, started_at, ended_at)
+    VALUES (110, 1, 'power_audit_dsr1_8k1k_fp4_sglang', 'bundle', 'samples.csv', 'nvidia', 'bundle',
+      0, 1, now(), now()),
+      (111, 1, 'gpu_metrics_dsr1X8k1k_fp4_sglang_conc32_b200-x_0', 'other', 'gpu_metrics.csv', 'nvidia', 'other',
+      0, 1, now(), now());`);
+  const sampleIds: unknown[] = [];
+  const observed: DbClient = (strings, ...values) => {
+    if (strings.join('').includes('from gpu_metric_samples')) sampleIds.push(values[0]);
+    return sql(strings, ...values);
+  };
+  const payload = await getGpuMetricsForRun(observed, WITH_SERIES, {
+    prefix: 'dsr1_8k1k_fp4_sglang_conc32',
+    sourceResults: ['dsr1_8k1k_fp4_sglang_conc32_b200-x_0'],
+  });
+  expect(payload?.series.map((series) => series.id)).toEqual([100, 101, 110]);
+  expect(sampleIds).toEqual([[100, 101, 110]]);
+});
+
 it('returns null only when the run has no stored series', async () => {
   await db.exec(`INSERT INTO workflow_runs (id, github_run_id, run_attempt, name, created_at, date)
     VALUES (5, ${NO_SERIES}, 1, 'Run Sweep', '2026-09-14T04:19:00Z', '2026-09-14')`);
-  expect(await getGpuMetricsForRun(sql, WITH_SERIES, { artifact: 'missing' })).toMatchObject({
-    workflowRun: { githubRunId: WITH_SERIES },
-    series: [],
-  });
+  expect(await getGpuMetricsForRun(sql, WITH_SERIES, { sourceResults: ['missing'] })).toMatchObject(
+    { workflowRun: { githubRunId: WITH_SERIES }, series: [] },
+  );
   expect(await getGpuMetricsForRun(sql, NO_SERIES)).toBeNull();
-  expect(await getGpuMetricsForRun(sql, NO_SERIES, { artifact: 'missing' })).toBeNull();
+  expect(await getGpuMetricsForRun(sql, NO_SERIES, { sourceResults: ['missing'] })).toBeNull();
 });
 
 it('reads only the selected view host while retaining every exact explorer label', async () => {

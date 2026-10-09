@@ -13,6 +13,7 @@
  * Only non-default values are written to keep URLs short.
  */
 import { LIFECYCLE_DEFAULTS } from '@/components/calculator/lifecycle';
+import { MEASURED_METRIC_DEFAULTS } from '@/components/inference/measured-metric-config';
 import { dashboardRouteForPathname, getDashboardRoute } from '@/lib/dashboard-routes';
 import { routeModelForPathname } from '@/lib/model-routes';
 
@@ -30,6 +31,9 @@ const URL_STATE_KEYS = [
   // Token-revenue sale-price source: normalized $1/M or live OpenRouter catalog.
   'i_revenue',
   'i_pctl',
+  'i_mstat',
+  'i_roleshare',
+  'i_powerfit',
   'i_xmetric',
   'i_e2e_xmetric',
   'i_xmode',
@@ -39,7 +43,6 @@ const URL_STATE_KEYS = [
   'i_dstart',
   'i_dend',
   'i_optimal',
-  'i_allpoints',
   'i_best',
   'i_label',
   // Legacy alias of `i_label` with inverted semantics — read-only on load so
@@ -63,6 +66,20 @@ const URL_STATE_KEYS = [
   'i_spec',
   // Measured-power certification tiers ('certified' / 'legacy', comma-joined).
   'i_power',
+  'i_topology',
+  'i_ptlines',
+  'i_ptaxis',
+  'i_ptwindow',
+  'i_ptfocus',
+  'i_ptutility',
+  // Power Timeline concurrency filter: one positive integer, empty = every load.
+  'i_ptconc',
+  // Completed Perf Rulers on the primary inference chart: `isoX|curveA|curveB`
+  // entries joined by `;` (see serializePerfRulers in d3-chart/layers/perf-ruler).
+  'i_rulers',
+  // Comparison series overlaid on a gated power metric: `boundaries` (every
+  // power boundary) or `roles` (prefill / decode pools). Empty = the metric alone.
+  'i_pcompare',
   // Exact serving-envelope pair behind an Overview 30-day comparison cell.
   'i_overview_current',
   'i_overview_baseline',
@@ -119,18 +136,21 @@ export type UrlStateParams = Partial<Record<UrlStateKey, string>>;
 /** Default values for each parameter. Params matching their default are omitted from share URLs. */
 /**
  * Dashboard default y-axis: total tokens purchased per $1 of Hyperscaler
- * ownership TCO. It leads with infrastructure purchasing power, which depends
- * only on measured throughput and hardware cost, so the opening view does not
- * assume a token sale price. Token Revenue per GPU Hour remains one selector
- * click away for revenue-side questions.
- * `?i_metric=` still wins, so existing shared links are unaffected.
- *
- * Lives here rather than in `InferenceContext` because `PARAM_DEFAULTS` below
- * strips any value equal to the default from share links. If the two drifted,
- * a link captured on the *other* metric would be written without `i_metric`
- * and reopen on this one.
+ * ownership TCO. It depends only on measured throughput and hardware cost, so
+ * the opening view does not assume a token sale price.
  */
 export const DEFAULT_Y_AXIS_METRIC = 'y_tokensPerDollarH';
+
+/**
+ * The y-axis a link without `i_metric` opens on. A measured-power tier filter
+ * (`i_power`) is only meaningful on a power chart, so any tier opens the
+ * measured power scatter. `InferenceContext` resolves links and strips
+ * `i_metric` from share links with this one function; if those two defaults
+ * differed, a link would reopen on a metric other than the one it captured.
+ */
+export function defaultYAxisMetric(powerTiers: readonly string[]): string {
+  return powerTiers.length > 0 ? MEASURED_METRIC_DEFAULTS.power : DEFAULT_Y_AXIS_METRIC;
+}
 
 /** Shared defaults for the fleet lifecycle and calculator MW controls. */
 export const DEFAULT_FLEET_MW = '10';
@@ -153,9 +173,15 @@ export const PARAM_DEFAULTS: Record<UrlStateKey, string> = {
   // explicitly, so an explicit FP4 selection must survive (not be stripped as a
   // "default") or it would silently revert to the per-model auto default on reload.
   i_prec: '',
-  i_metric: DEFAULT_Y_AXIS_METRIC,
+  // No strippable default: the no-param metric depends on `i_power` and on a
+  // route's seeded metric, so `InferenceContext` writes '' when the metric
+  // equals that resolved default and the explicit key otherwise.
+  i_metric: '',
   i_revenue: 'normalized',
   i_pctl: 'p90',
+  i_mstat: 'median',
+  i_roleshare: '0',
+  i_powerfit: '0',
   i_xmetric: 'p90_ttft',
   i_e2e_xmetric: 'p90_ttft',
   i_xmode: '',
@@ -165,7 +191,6 @@ export const PARAM_DEFAULTS: Record<UrlStateKey, string> = {
   i_dstart: '',
   i_dend: '',
   i_optimal: '',
-  i_allpoints: '',
   i_best: '',
   i_label: '',
   i_nolabel: '',
@@ -183,6 +208,15 @@ export const PARAM_DEFAULTS: Record<UrlStateKey, string> = {
   i_disagg: '',
   i_spec: '',
   i_power: '',
+  i_topology: '',
+  i_ptlines: '',
+  i_ptaxis: '',
+  i_ptwindow: '',
+  i_ptfocus: '',
+  i_ptutility: '',
+  i_ptconc: '',
+  i_rulers: '',
+  i_pcompare: '',
   i_overview_current: '',
   i_overview_baseline: '',
   e_rundate: '',
@@ -498,6 +532,26 @@ export function rememberChartStateInUrl(): string {
     `${pathname}${search ? `?${search}` : ''}${hash}`,
   );
   return chartParams.toString();
+}
+
+/**
+ * The current page's URL carrying its chart state plus `overrides`,
+ * canonicalised like `rememberChartStateInUrl`: chart params and both
+ * unofficial-run spellings are dropped from the live address bar before the
+ * store's state (and the overrides) are layered on. For anchors that must
+ * work with open-in-new-tab, where the in-memory state would otherwise be lost.
+ */
+export function chartStateHref(overrides: Record<string, string>): string {
+  const { origin, pathname, hash, search } = window.location;
+  const merged = new URLSearchParams(search);
+  for (const key of URL_STATE_KEYS) merged.delete(key);
+  // Collected first: deleting while iterating the params would skip entries.
+  const staleRunKeys = [...merged.keys()].filter((key) => UNOFFICIAL_RUN_PARAM_RE.test(key));
+  for (const key of staleRunKeys) merged.delete(key);
+  for (const [key, value] of collectTabParams()) merged.set(key, value);
+  for (const [key, value] of Object.entries(overrides)) merged.set(key, value);
+  const query = merged.toString();
+  return `${origin}${pathname}${query ? `?${query}` : ''}${hash}`;
 }
 
 /**

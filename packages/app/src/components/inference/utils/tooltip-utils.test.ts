@@ -3,6 +3,10 @@ import { describe, it, expect } from 'vitest';
 
 import type { HardwareConfig, InferenceData } from '@/components/inference/types';
 import type { SystemPowerEstimate } from '@/lib/modeled-system-power';
+import {
+  SYSTEM_POWER_MODEL_REVISION,
+  SYSTEM_POWER_MODEL_SOURCE_URL,
+} from '@/lib/system-power-model';
 import { getInferenceHardwareConfig } from '@/lib/inference-labels';
 import {
   getPointLabel,
@@ -73,17 +77,17 @@ function tooltipConfig(overrides: Partial<TooltipConfig> = {}): TooltipConfig {
 const systemPower = {
   status: 'supported',
   hardware: 'h100',
-  modelRevision: 'ca4403aa527069857351ad8047dbb726844b3382',
-  modelPath: 'chassis/H100.py',
+  modelRevision: SYSTEM_POWER_MODEL_REVISION,
+  operatingState: { workload: 'agentic' as const, scaleOut: true },
   gpuCount: 16,
   chassisCount: 2,
-  chassisAcWatts: 12000,
-  chassisAcWattsPerGpu: 750,
+  itWatts: 12000,
+  itWattsPerGpu: 750,
   facilityWatts: 14400,
   pue: 1.2,
   measuredGpuWattsPerGpu: 500,
   modeledGpuCount: 16,
-  deploymentAcWatts: 12000,
+  deploymentItWatts: 12000,
   deploymentFacilityWatts: 14400,
   topologyBasis: 'worker-hosts',
   chassisBasis: 'full',
@@ -130,12 +134,12 @@ describe('modeled system-power tooltip', () => {
   const config = (overrides: Partial<TooltipConfig> = {}) =>
     tooltipConfig({
       data: pt({ modeledSystemPower: systemPower }),
-      selectedYAxisMetric: 'y_modeledChassisPowerPerGpu',
+      selectedYAxisMetric: 'y_measuredAvgPower',
       isPinned: true,
       ...overrides,
     });
 
-  it('separates measured input, normalized chassis AC, and whole-deployment facility power', () => {
+  it('separates measured input, normalized IT power, and whole-deployment facility power', () => {
     const html = generateTooltipContent(config());
     expect(html).toContain('500 W/GPU');
     expect(html).toContain('750 W/GPU');
@@ -143,11 +147,11 @@ describe('modeled system-power tooltip', () => {
     expect(html).toContain('14,400 W');
     expect(html).toContain('PUE 1.2');
     expect(html).toContain('2 full eight-GPU chassis · 16 GPUs');
-    expect(html).toContain('CPU/DRAM utilization: 20%');
+    expect(html).toContain('Operating state:</strong> agentic · scale-out on');
     expect(html).toContain(
       'Includes GPU chassis CPUs; excludes separate CPU-only frontend/router hosts.',
     );
-    expect(html).toContain(`/blob/${systemPower.modelRevision}/${systemPower.modelPath}`);
+    expect(html).toContain(SYSTEM_POWER_MODEL_SOURCE_URL);
     expect(html).not.toContain('12,000 W/GPU');
     expect(html).not.toContain('Unmeasured chassis GPUs');
   });
@@ -160,9 +164,9 @@ describe('modeled system-power tooltip', () => {
         gpuCount: 4,
         chassisCount: 1,
         modeledGpuCount: 8,
-        chassisAcWatts: 6000,
+        itWatts: 6000,
         facilityWatts: 7200,
-        deploymentAcWatts: 3000,
+        deploymentItWatts: 3000,
         deploymentFacilityWatts: 3600,
         topologyBasis: 'single-node',
         chassisBasis: 'extrapolated',
@@ -249,10 +253,10 @@ describe('modeled system-power tooltip', () => {
   it('localizes the measurement boundary and occupancy assumptions', () => {
     const html = generateTooltipContent(config({ locale: 'zh' }));
     expect(html).toContain('GPU 实测功耗');
-    expect(html).toContain('整个部署的机箱交流功耗估算');
+    expect(html).toContain('整个部署的 IT 功耗估算');
     expect(html).toContain('数据中心功耗估算');
     expect(html).toContain('2 个完整八卡机箱 · 16 张 GPU');
-    expect(html).toContain('CPU/DRAM 利用率：20%');
+    expect(html).toContain('运行状态：</strong> 智能体 · scale-out 开启');
     expect(html).toContain('计入 GPU 机箱内的 CPU');
     expect(html).toContain('不计入独立的纯 CPU 前端或路由主机。');
   });
@@ -270,31 +274,6 @@ describe('modeled system-power tooltip', () => {
       expect(match?.groups?.normalization.length).toBeLessThanOrEqual(80);
       expect(match?.groups?.boundary.length).toBeLessThanOrEqual(80);
     }
-  });
-
-  it('uses validated model topology while preserving legacy configuration counts separately', () => {
-    const data = pt({
-      physicalChips: 64,
-      modeledSystemPower: {
-        ...systemPower,
-        gpuCount: 8,
-        chassisCount: 1,
-        modeledGpuCount: 8,
-        chassisAcWatts: 6000,
-        deploymentAcWatts: 6000,
-        topologyBasis: 'single-node',
-        telemetryBasis: 'validated-unversioned-single-node',
-      },
-    });
-    const html = generateTooltipContent(config({ data }));
-    expect(html).toContain('<strong>Total Chips:</strong> 8');
-    expect(html).toContain('<strong>Configured Chip Count:</strong> 64');
-    expect(html).toContain('1 full eight-GPU chassis · 8 GPUs');
-    const measured = generateTooltipContent(
-      config({ data, selectedYAxisMetric: 'y_measuredAvgPower' }),
-    );
-    expect(measured).toContain('<strong>Total Chips:</strong> 64');
-    expect(measured).not.toContain('Configured Chip Count');
   });
 });
 
@@ -546,6 +525,28 @@ describe('generateTooltipContent', () => {
   it('shows "Click elsewhere to dismiss" when isPinned is true', () => {
     const html = generateTooltipContent(tooltipConfig({ isPinned: true }));
     expect(html).toContain('Click elsewhere to dismiss');
+  });
+
+  it('caps pinned tooltip height so stacked actions stay inside the mobile viewport', () => {
+    const html = generateTooltipContent(
+      tooltipConfig({
+        isPinned: true,
+        hasTrace: true,
+        hasLog: true,
+        showPowerTelemetry: true,
+        selectedYAxisMetric: 'y_measuredAvgPower',
+        data: pt({
+          id: 42,
+          benchmark_type: 'agentic_traces',
+          power_audit: { source: 'power_validation_h100_conc8.json' },
+          run_url: 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/1',
+        }),
+      }),
+    );
+    expect(html).toContain('max-height: min(70vh, calc(100dvh - 16px))');
+    expect(html).toContain('overflow-y: auto');
+    expect(html).toContain('max-width: min(320px, calc(100vw - 16px))');
+    expect(html).toContain('data-action="view-power-trace"');
   });
 
   it('does not show dismiss text when isPinned is false', () => {

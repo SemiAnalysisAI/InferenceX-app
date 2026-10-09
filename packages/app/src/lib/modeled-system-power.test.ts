@@ -3,7 +3,10 @@ import { describe, expect, it } from 'vitest';
 import type { BenchmarkRow } from '@/lib/api';
 import { rowToAggDataEntry, transformBenchmarkRows } from '@/lib/benchmark-transform';
 import { modelSystemPower } from '@/lib/modeled-system-power';
-import { estimateChassisPower } from '@/lib/system-power-model';
+import { estimateChassisPower, type SystemPowerHardware } from '@/lib/system-power-model';
+
+const chassis = (hardware: SystemPowerHardware, gpuWatts: number, scaleOut = false) =>
+  estimateChassisPower(hardware, gpuWatts, { workload: 'fixed-seq-len', scaleOut })!;
 
 // Qwen3.5 B200 c1, run 34175132645: actual rounded telemetry, eight GPUs.
 function row(overrides: Partial<BenchmarkRow> = {}): BenchmarkRow {
@@ -50,37 +53,21 @@ function row(overrides: Partial<BenchmarkRow> = {}): BenchmarkRow {
 }
 
 describe('modeled system power admission and accounting', () => {
-  it('defaults air-cooled chassis to PUE 1.3 and preserves explicit facility overrides', () => {
-    // Pinned Python b200_chassis_power, fixed README utilization inputs.
-    expect(modelSystemPower(row())).toMatchObject({
-      pue: 1.3,
-      chassisAcWatts: 4837.2,
-      facilityWatts: 6288.4,
-      measuredGpuWattsPerGpu: 349.859,
-    });
-    expect(modelSystemPower(row(), 1.1)).toMatchObject({
-      pue: 1.1,
-      chassisAcWatts: 4837.2,
-      facilityWatts: 5320.9,
-      measuredGpuWattsPerGpu: 349.859,
-    });
-  });
-
   it('uses the validated physical count without summing aggregate aliases or multiplying by EP', () => {
     const source = row({ num_prefill_gpu: 64, num_decode_gpu: 64, prefill_ep: 8, decode_ep: 8 });
     const result = modelSystemPower(source);
     expect(result.status).toBe('supported');
     if (result.status !== 'supported') throw new Error(result.reason);
-    const reference = estimateChassisPower('b200', 2798.868, 1.3)!;
+    const reference = chassis('b200', 2798.868);
     expect(result).toMatchObject({
       gpuCount: 8,
       chassisCount: 1,
       measuredGpuWattsPerGpu: 349.859,
-      chassisAcWatts: reference.chassisAcWatts,
-      chassisAcWattsPerGpu: reference.chassisAcWatts / 8,
+      itWatts: reference.itWatts,
+      itWattsPerGpu: reference.itWatts / 8,
       facilityWatts: reference.facilityWatts,
       modeledGpuCount: 8,
-      deploymentAcWatts: reference.chassisAcWatts,
+      deploymentItWatts: reference.itWatts,
       deploymentFacilityWatts: reference.facilityWatts,
       topologyBasis: 'single-node',
       chassisBasis: 'full',
@@ -98,15 +85,45 @@ describe('modeled system power admission and accounting', () => {
     },
   );
 
-  it.each([{ benchmark_type: 'agentic_traces' }, { isl: 1024 }, { osl: 8192 }, { isl: null }])(
-    'keeps non-8k1k workloads unavailable: %j',
-    (overrides) => {
-      expect(modelSystemPower(row(overrides))).toMatchObject({
-        status: 'unsupported',
-        reason: 'workload',
-      });
-    },
-  );
+  it('models every single_turn sequence and leaves other benchmark types unavailable', () => {
+    expect(modelSystemPower(row({ isl: 1024, osl: 1024 }))).toMatchObject({
+      status: 'supported',
+      operatingState: { workload: 'fixed-seq-len', scaleOut: false },
+    });
+    expect(modelSystemPower(row({ benchmark_type: 'multi_turn' }))).toMatchObject({
+      status: 'unsupported',
+      reason: 'workload',
+    });
+  });
+
+  it('models AgentX rows in the agentic state, with KV offload and Mooncake raising host power', () => {
+    const agentic = row({ benchmark_type: 'agentic_traces', isl: null, osl: null });
+    const plain = modelSystemPower(agentic);
+    expect(plain).toMatchObject({
+      status: 'supported',
+      operatingState: { workload: 'agentic', scaleOut: false },
+    });
+    Object.assign(agentic.metrics, { kv_offloading: 'dram' });
+    const offload = modelSystemPower(agentic);
+    expect(offload).toMatchObject({
+      status: 'supported',
+      operatingState: { workload: 'agentic-cpu-offloading', scaleOut: false },
+    });
+    Object.assign(agentic.metrics, { kv_offload_backend: 'mooncake' });
+    const mooncake = modelSystemPower(agentic);
+    expect(mooncake).toMatchObject({
+      operatingState: { workload: 'agentic-cpu-offloading', scaleOut: true },
+    });
+    if (
+      plain.status !== 'supported' ||
+      offload.status !== 'supported' ||
+      mooncake.status !== 'supported'
+    ) {
+      throw new Error('Expected every AgentX state to be supported');
+    }
+    expect(offload.deploymentFacilityWatts).toBeGreaterThan(plain.deploymentFacilityWatts);
+    expect(mooncake.deploymentFacilityWatts).toBeGreaterThan(offload.deploymentFacilityWatts);
+  });
 
   it.each([
     { power_valid: 0 },
@@ -138,7 +155,9 @@ describe('modeled system power admission and accounting', () => {
     const twoHosts = row({ prefill_tp: 16, decode_tp: 16 });
     twoHosts.metrics.avg_total_gpu_power_w = twoHosts.metrics.avg_power_w * 16;
     expect(modelSystemPower(twoHosts)).toMatchObject({ reason: 'topology' });
-    expect(modelSystemPower(row(), 0.9)).toMatchObject({ reason: 'model-domain' });
+    const overload = row();
+    Object.assign(overload.metrics, { avg_power_w: 1800, avg_total_gpu_power_w: 14_400 });
+    expect(modelSystemPower(overload)).toMatchObject({ reason: 'model-domain' });
   });
 
   it('extrapolates a partially allocated single-node chassis at the measured per-GPU power', () => {
@@ -148,16 +167,16 @@ describe('modeled system power admission and accounting', () => {
     expect(result.status).toBe('supported');
     if (result.status !== 'supported') throw new Error(result.reason);
     // The source sweep's input for the whole chassis: n_gpu × W/GPU.
-    const reference = estimateChassisPower('b200', 349.859 * 8, 1.3)!;
+    const reference = chassis('b200', 349.859 * 8);
     expect(result).toMatchObject({
       gpuCount: 4,
       chassisCount: 1,
       modeledGpuCount: 8,
       measuredGpuWattsPerGpu: 349.859,
-      chassisAcWatts: reference.chassisAcWatts,
-      chassisAcWattsPerGpu: reference.chassisAcWatts / 8,
+      itWatts: reference.itWatts,
+      itWattsPerGpu: reference.itWatts / 8,
       facilityWatts: reference.facilityWatts,
-      deploymentAcWatts: reference.chassisAcWatts / 2,
+      deploymentItWatts: reference.itWatts / 2,
       deploymentFacilityWatts: reference.facilityWatts / 2,
       topologyBasis: 'single-node',
       chassisBasis: 'extrapolated',
@@ -168,10 +187,10 @@ describe('modeled system power admission and accounting', () => {
     const fullResult = modelSystemPower(full);
     expect(fullResult).toMatchObject({
       chassisBasis: 'full',
-      deploymentAcWatts: reference.chassisAcWatts,
+      deploymentItWatts: reference.itWatts,
     });
-    expect(fullResult.status === 'supported' && fullResult.chassisAcWattsPerGpu).toBe(
-      result.chassisAcWattsPerGpu,
+    expect(fullResult.status === 'supported' && fullResult.itWattsPerGpu).toBe(
+      result.itWattsPerGpu,
     );
     // Four measured GPUs cannot establish a TP8 width.
     partial.prefill_tp = 8;
@@ -198,16 +217,16 @@ describe('modeled system power admission and accounting', () => {
         decode_avg_power_w: 700,
       },
     });
-    const prefill = estimateChassisPower('b200', 2400, 1.3)!;
-    const decode = estimateChassisPower('b200', 5600, 1.3)!;
+    const prefill = chassis('b200', 2400, true);
+    const decode = chassis('b200', 5600, true);
     expect(modelSystemPower(source)).toMatchObject({
       status: 'supported',
       gpuCount: 12,
       chassisCount: 2,
       modeledGpuCount: 16,
-      chassisAcWatts: prefill.chassisAcWatts + decode.chassisAcWatts,
-      chassisAcWattsPerGpu: (prefill.chassisAcWatts + decode.chassisAcWatts) / 16,
-      deploymentAcWatts: prefill.chassisAcWatts / 2 + decode.chassisAcWatts,
+      itWatts: prefill.itWatts + decode.itWatts,
+      itWattsPerGpu: (prefill.itWatts + decode.itWatts) / 16,
+      deploymentItWatts: prefill.itWatts / 2 + decode.itWatts,
       deploymentFacilityWatts: prefill.facilityWatts / 2 + decode.facilityWatts,
       topologyBasis: 'worker-hosts',
       chassisBasis: 'extrapolated',
@@ -220,6 +239,89 @@ describe('modeled system power admission and accounting', () => {
     source.workers![0].num_gpus = 4;
     source.num_prefill_gpu = 8;
     expect(modelSystemPower(source)).toMatchObject({ reason: 'role-power' });
+  });
+
+  it('models an aggregate multinode deployment without worker telemetry at the deployment mean', () => {
+    // Kimi K3 B200 dynamo-vLLM TP8/PP2 (prod rows, 2026-09-17): two eight-GPU hosts,
+    // aggregate producer, no per-worker array. The K3 H200 vLLM row below is
+    // TP16 × 2 DP replicas across four hosts.
+    const b200 = row({
+      is_multinode: true,
+      num_prefill_gpu: 16,
+      num_decode_gpu: 16,
+      decode_num_workers: 1,
+      metrics: {
+        power_valid: 1,
+        power_metric_schema_version: 2,
+        avg_power_w: 715.095,
+        avg_total_gpu_power_w: 11441.513,
+        decode_pp: 2,
+      },
+    });
+    const perChassis = chassis('b200', 11441.513 / 2, true);
+    const estimate = modelSystemPower(b200);
+    expect(estimate).toMatchObject({
+      status: 'supported',
+      topologyBasis: 'uniform-hosts',
+      chassisBasis: 'full',
+      gpuCount: 16,
+      chassisCount: 2,
+      modeledGpuCount: 16,
+    });
+    if (estimate.status !== 'supported') throw new Error('unreachable');
+    expect(estimate.itWatts).toBeCloseTo(perChassis.itWatts * 2, 6);
+    expect(estimate.deploymentFacilityWatts).toBe(estimate.facilityWatts);
+    expect(estimate.itWattsPerGpu).toBeCloseTo(perChassis.itWatts / 8, 6);
+
+    const h200 = row({
+      hardware: 'h200',
+      is_multinode: true,
+      prefill_tp: 16,
+      decode_tp: 16,
+      decode_ep: 32,
+      decode_dp_attention: true,
+      decode_num_workers: 2,
+      num_prefill_gpu: 32,
+      num_decode_gpu: 32,
+      metrics: {
+        power_valid: 1,
+        power_metric_schema_version: 2,
+        avg_power_w: 167.357,
+        avg_total_gpu_power_w: 5355.413,
+        decode_pp: 1,
+      },
+    });
+    expect(modelSystemPower(h200)).toMatchObject({
+      status: 'supported',
+      topologyBasis: 'uniform-hosts',
+      chassisCount: 4,
+      gpuCount: 32,
+    });
+
+    // A replica count that does not explain the telemetry width is not guessed around.
+    expect(modelSystemPower({ ...h200, decode_num_workers: 1 })).toMatchObject({
+      reason: 'gpu-count',
+    });
+    // Twelve GPUs cannot fill whole eight-GPU hosts; placement is unknown.
+    const twelve = row({ is_multinode: true, decode_tp: 12, prefill_tp: 12 });
+    twelve.metrics.avg_total_gpu_power_w = twelve.metrics.avg_power_w * 12;
+    expect(modelSystemPower(twelve)).toMatchObject({ reason: 'topology' });
+    // Per-worker telemetry, when present, keeps the more exact worker path.
+    const withWorkers = {
+      ...b200,
+      workers: ['host-a', 'host-b'].map((host, worker_idx) => ({
+        role: 'agg',
+        worker_idx,
+        hosts: [host],
+        num_gpus: 8,
+        avg_power_w: 715.095,
+      })),
+    };
+    expect(modelSystemPower(withWorkers)).toMatchObject({
+      status: 'supported',
+      topologyBasis: 'worker-hosts',
+      chassisCount: 2,
+    });
   });
 
   it('preserves meaningful aggregate PP and PCP aliases before checking physical width', () => {
@@ -293,7 +395,7 @@ describe('modeled system power admission and accounting', () => {
     if (legacy.status !== 'supported' || versioned.status !== 'supported') {
       throw new Error('Expected both validated single-node producers to be supported');
     }
-    expect(legacy.chassisAcWatts).toBe(versioned.chassisAcWatts);
+    expect(legacy.itWatts).toBe(versioned.itWatts);
     expect(legacy.measuredGpuWattsPerGpu).toBe(versioned.measuredGpuWattsPerGpu);
     delete source.metrics.power_valid;
     expect(modelSystemPower(source)).toMatchObject({
@@ -339,34 +441,6 @@ describe('modeled system power admission and accounting', () => {
     });
   });
 
-  it('rejects deployment overflow even when every chassis result remains finite', () => {
-    const source = row({
-      hardware: 'h100',
-      is_multinode: true,
-      workers: [0, 1, 2].map((index) => ({
-        role: 'agg',
-        worker_idx: index,
-        num_gpus: 8,
-        hosts: [`node${index}`],
-        avg_power_w: 500,
-      })),
-      metrics: {
-        power_valid: 1,
-        power_metric_schema_version: 2,
-        avg_power_w: 500,
-        avg_total_gpu_power_w: 12000,
-      },
-    });
-    expect(modelSystemPower(source)).toMatchObject({ status: 'supported', chassisCount: 3 });
-    const oneChassis = estimateChassisPower('h100', 4000, 1e304);
-    expect(oneChassis).not.toBeNull();
-    expect(Number.isFinite(oneChassis!.facilityWatts)).toBe(true);
-    expect(modelSystemPower(source, 1e304)).toMatchObject({
-      status: 'unsupported',
-      reason: 'model-domain',
-    });
-  });
-
   it('models distinct prefill/decode chassis separately before summing the deployment', () => {
     const source = row({
       disagg: true,
@@ -385,22 +459,16 @@ describe('modeled system power admission and accounting', () => {
       },
     });
     const result = modelSystemPower(source);
-    const prefill = estimateChassisPower('b200', 2400, 1.3)!;
-    const decode = estimateChassisPower('b200', 5600, 1.3)!;
+    const prefill = chassis('b200', 2400, true);
+    const decode = chassis('b200', 5600, true);
     expect(result).toMatchObject({
       status: 'supported',
+      operatingState: { workload: 'fixed-seq-len', scaleOut: true },
       gpuCount: 16,
       chassisCount: 2,
-      chassisAcWatts: prefill.chassisAcWatts + decode.chassisAcWatts,
+      itWatts: prefill.itWatts + decode.itWatts,
       facilityWatts: prefill.facilityWatts + decode.facilityWatts,
     });
-    const noPue = modelSystemPower(source, 1);
-    expect(noPue.status === 'supported' && noPue.facilityWatts).toBe(
-      prefill.chassisAcWatts + decode.chassisAcWatts,
-    );
-    expect(noPue.status === 'supported' && noPue.chassisAcWatts).toBe(
-      prefill.chassisAcWatts + decode.chassisAcWatts,
-    );
     source.workers![1].hosts = ['prefill-node'];
     expect(modelSystemPower(source)).toMatchObject({ reason: 'topology' });
     source.workers![1].hosts = ['decode-node'];
@@ -462,11 +530,20 @@ describe('modeled system power admission and accounting', () => {
     expect(entry.joules_per_output_token).toBe(source.metrics.joules_per_output_token);
     const { chartData } = transformBenchmarkRows([source]);
     for (const points of chartData) {
-      expect(points[0].modeledChassisPowerPerGpu?.y).toBeGreaterThan(source.metrics.avg_power_w);
+      expect(points[0].utilityModeledWatts?.y).toBeGreaterThan(source.metrics.avg_power_w);
+    }
+    // Unofficial-run overlays reuse this transform with these arguments (unofficial-run-provider).
+    const overlay = transformBenchmarkRows(
+      [row({ benchmark_type: 'agentic_traces', isl: null, osl: null })],
+      'median',
+      'external',
+    );
+    for (const points of overlay.chartData) {
+      expect(points[0].utilityModeledWatts?.y).toBeGreaterThan(source.metrics.avg_power_w);
     }
     const unsupported = transformBenchmarkRows([row({ hardware: 'gb200' })]);
     for (const points of unsupported.chartData) {
-      expect(points[0].modeledChassisPowerPerGpu).toBeUndefined();
+      expect(points[0].utilityModeledWatts).toBeUndefined();
       expect(points[0].measuredAvgPower?.y).toBe(source.metrics.avg_power_w);
     }
   });

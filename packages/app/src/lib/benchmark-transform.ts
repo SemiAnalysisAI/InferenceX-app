@@ -199,6 +199,9 @@ export function rowToAggDataEntry(row: BenchmarkRow): AggDataEntry {
     p99_tpot: m.p99_tpot ?? 0,
     'p99.9_tpot': m['p99.9_tpot'] ?? 0,
     mean_intvty: m.mean_intvty ?? 0,
+    ...(typeof m.mean_tpot === 'number' && Number.isFinite(m.mean_tpot) && m.mean_tpot > 0
+      ? { mean_tpot_intvty: 1 / m.mean_tpot }
+      : {}),
     median_intvty: m.median_intvty ?? 0,
     std_intvty: m.std_intvty ?? 0,
     p75_intvty: m.p75_intvty ?? 0,
@@ -312,6 +315,8 @@ export function rowToAggDataEntry(row: BenchmarkRow): AggDataEntry {
     date: row.date,
     actualDate: (row as any).actualDate ?? row.date,
     run_url: row.run_url ?? undefined,
+    curve_date: row.curve_date,
+    curve_workflow_run_id: row.curve_workflow_run_id,
     benchmark_type: row.benchmark_type,
     isl: row.isl,
     osl: row.osl,

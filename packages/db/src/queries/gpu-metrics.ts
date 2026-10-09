@@ -1,10 +1,11 @@
 /**
  * Read side of the stored PowerX telemetry (migration 016).
  *
- * Two entry points: everything recorded during one GitHub Actions run (keyed by
- * run ID), and the series linked to one benchmark point. Samples are returned
- * as flat rows with ISO timestamps, the shape the live artifact parser produces.
- * Per-GPU statistics are computed from the stored samples on every read.
+ * Two entry points: everything recorded during one GitHub Actions run (the
+ * PowerX explorer keyed by run ID), and the series linked to one benchmark
+ * point (the per-point detail tab). Samples are returned as flat rows with
+ * ISO timestamps so the existing D3 charts consume them unchanged. Per-GPU
+ * statistics are computed from the stored samples on every read.
  */
 
 import {
@@ -84,12 +85,14 @@ export interface GpuMetricsRunPayload {
     createdAt: string | null;
   };
   series: GpuMetricSeries[];
-  /** Every artifact label when only one view artifact's samples were requested. */
+  /** Complete explorer labels when only one view artifact's samples were requested. */
   artifactNames?: string[];
 }
 
 export interface GpuMetricsRunSelection {
-  /** Undefined reads every artifact; null selects the first artifact name. */
+  prefix?: string | null;
+  sourceResults?: readonly string[] | null;
+  /** Undefined reads all matching artifacts; null selects the first explorer artifact. */
   artifact?: string | null;
 }
 
@@ -183,11 +186,20 @@ function toSampleRow(raw: RawSampleRow): GpuMetricSampleRow {
 /** Series rows of one run (optionally only `seriesIds`) or linked to one benchmark point. */
 async function readSeriesRows(
   sql: DbClient,
-  scope: { workflowRunId: number; seriesIds: number[] | null } | { benchmarkResultId: number },
+  scope:
+    | {
+        workflowRunId: number;
+        seriesIds: number[] | null;
+        prefix: string | null;
+        sources: readonly string[] | null;
+      }
+    | { benchmarkResultId: number },
 ): Promise<RawSeriesRow[]> {
   const runId = 'workflowRunId' in scope ? scope.workflowRunId : null;
   const seriesIds = 'workflowRunId' in scope ? scope.seriesIds : null;
   const pointId = 'benchmarkResultId' in scope ? scope.benchmarkResultId : null;
+  const prefix = 'workflowRunId' in scope ? scope.prefix : null;
+  const sources = 'workflowRunId' in scope ? scope.sources : null;
   // Under the null guard, `in (select ...)` would scan every series; an array
   // keeps the point lookup on the link and series primary keys.
   return (await sql`
@@ -202,6 +214,17 @@ async function readSeriesRows(
     from gpu_metric_series s
     where (${runId}::bigint is null or s.workflow_run_id = ${runId})
       and (${seriesIds}::bigint[] is null or s.id = any(${seriesIds}::bigint[]))
+      and (${prefix}::text is null or starts_with(s.artifact_name, 'gpu_metrics_' || ${prefix})
+        or (starts_with(s.artifact_name, 'power_audit_') and
+          (starts_with(s.artifact_name, 'power_audit_' || ${prefix})
+            or starts_with('power_audit_' || ${prefix}, s.artifact_name))))
+      and (${sources}::text[] is null or exists (
+        select 1 from unnest(${sources}::text[]) as requested(result)
+        where s.artifact_name = 'gpu_metrics_' || requested.result
+          or (starts_with(s.artifact_name, 'power_audit_') and
+            (starts_with(s.artifact_name, 'power_audit_' || requested.result)
+              or starts_with('power_audit_' || requested.result, s.artifact_name)))
+      ))
       and (${pointId}::bigint is null or s.id = any(array(
         select link.series_id from benchmark_result_gpu_metrics link
         where link.benchmark_result_id = ${pointId})))
@@ -363,10 +386,14 @@ async function readGpuMetricsForRun(
       .filter((entry) => entry.name === selected)
       .map((entry) => Number(entry.id));
   }
+  const prefix = selection.prefix ?? null;
+  const sources = selection.sourceResults ?? null;
 
   const seriesRows = await readSeriesRows(sql, {
     workflowRunId: Number(run.id),
     seriesIds: selectedIds,
+    prefix,
+    sources,
   });
 
   return {

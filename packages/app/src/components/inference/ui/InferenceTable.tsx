@@ -4,9 +4,8 @@ import { useMemo } from 'react';
 
 import type { ChartDefinition, InferenceData } from '@/components/inference/types';
 import { type DataTableColumn, DataTable } from '@/components/ui/data-table';
-import { chipCounts } from '@/lib/chip-counts';
 import { getNestedYValue, metricLabel, xAxisLabel } from '@/lib/chart-utils';
-import { isModeledSystemPowerConfigKey } from '@/components/inference/metric-registry';
+import { inferPowerCompare, powerSeriesLabel } from '@/components/inference/utils/power-compare';
 import { sortRowsByYMetric } from '@/components/inference/ui/inference-table-sort';
 import { type Precision, getPrecisionLabel } from '@/lib/data-mappings';
 import { getDisplayLabel } from '@/lib/utils';
@@ -41,8 +40,8 @@ export function inferenceTableHeaderLabels(
     precision: locale === 'zh' ? '精度' : 'Precision',
     tensorParallelism: 'TP',
     physicalChips: locale === 'zh' ? '物理芯片数' : 'Physical Chips',
-    configuredChips: locale === 'zh' ? '配置中的芯片数' : 'Configured Chip Count',
     concurrency: locale === 'zh' ? '并发数' : 'Conc',
+    series: locale === 'zh' ? '系列' : 'Series',
     yMetric: metricLabel(chartDefinition, selectedYAxisMetric, locale),
     xMetric: xAxisLabel(chartDefinition, locale),
     throughput: locale === 'zh' ? '单芯片吞吐量 (tok/s)' : 'Throughput/Chip (tok/s)',
@@ -56,7 +55,6 @@ export default function InferenceTable({
 }: InferenceTableProps) {
   const locale = useLocale();
   const yPath = chartDefinition[selectedYAxisMetric as keyof ChartDefinition] as string | undefined;
-  const showModeledPower = isModeledSystemPowerConfigKey(selectedYAxisMetric);
   const headers = useMemo(
     () => inferenceTableHeaderLabels(chartDefinition, selectedYAxisMetric, locale),
     [chartDefinition, selectedYAxisMetric, locale],
@@ -66,6 +64,9 @@ export default function InferenceTable({
     () => sortRowsByYMetric(data, chartDefinition, selectedYAxisMetric),
     [data, chartDefinition, selectedYAxisMetric],
   );
+  // Boundary / role clones (`i_pcompare`) share every config column with their
+  // base row; the series column is what tells them apart.
+  const powerCompare = useMemo(() => inferPowerCompare(data), [data]);
 
   const columns = useMemo<DataTableColumn<InferenceData>[]>(
     () => [
@@ -85,6 +86,19 @@ export default function InferenceTable({
         className: 'whitespace-nowrap',
         importance: 'key',
       },
+      ...(powerCompare === 'none'
+        ? []
+        : [
+            {
+              header: headers.series,
+              cell: (row: InferenceData) =>
+                powerSeriesLabel(row, selectedYAxisMetric, powerCompare, locale),
+              sortValue: (row: InferenceData) =>
+                powerSeriesLabel(row, selectedYAxisMetric, powerCompare, locale),
+              className: 'whitespace-nowrap',
+              importance: 'key' as const,
+            },
+          ]),
       {
         header: headers.tensorParallelism,
         align: 'right',
@@ -96,21 +110,10 @@ export default function InferenceTable({
       {
         header: headers.physicalChips,
         align: 'right',
-        cell: (row) => chipCounts(row, showModeledPower).physical,
-        sortValue: (row) => chipCounts(row, showModeledPower).physical,
+        cell: (row) => row.physicalChips ?? row.tp,
+        sortValue: (row) => row.physicalChips ?? row.tp,
         importance: 'secondary',
       },
-      ...(showModeledPower
-        ? [
-            {
-              header: headers.configuredChips,
-              align: 'right' as const,
-              cell: (row: InferenceData) => chipCounts(row, showModeledPower).configured,
-              sortValue: (row: InferenceData) => chipCounts(row, showModeledPower).configured,
-              importance: 'secondary' as const,
-            },
-          ]
-        : []),
       {
         header: 'DP',
         align: 'right',
@@ -129,8 +132,12 @@ export default function InferenceTable({
       {
         header: headers.yMetric,
         align: 'right',
-        cell: (row) => formatInferenceTableNumber(yPath ? getNestedYValue(row, yPath) : row.y),
-        sortValue: (row) => (yPath ? getNestedYValue(row, yPath) : row.y),
+        // Comparison clones keep the source metrics; y holds the plotted role/boundary.
+        cell: (row) =>
+          formatInferenceTableNumber(
+            row.powerVariant || !yPath ? row.y : getNestedYValue(row, yPath),
+          ),
+        sortValue: (row) => (row.powerVariant || !yPath ? row.y : getNestedYValue(row, yPath)),
         className: 'tabular-nums',
         importance: 'key',
       },
@@ -151,7 +158,7 @@ export default function InferenceTable({
         importance: 'key',
       },
     ],
-    [yPath, headers, showModeledPower],
+    [yPath, headers, powerCompare, selectedYAxisMetric, locale],
   );
 
   return (

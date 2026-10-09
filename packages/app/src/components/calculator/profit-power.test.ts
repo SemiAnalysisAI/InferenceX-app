@@ -44,6 +44,9 @@ const source: BenchmarkRow = {
     avg_total_gpu_power_w: 6369.045,
   },
 };
+// python -m power_model --gpu-level-power-per-gpu=796.130625 --system=mi355 --workload=agentic:
+// All-in W/GPU × the estimator's 1.1 planning margin, in kW.
+const MODELED_KW_PER_GPU = 1.4900494869888934;
 const point: GPUDataPoint = {
   sourceRow: source,
   hwKey: 'mi355x_atom',
@@ -126,7 +129,7 @@ describe('profit power basis preview', () => {
         const interpolated = interpolateForGPU(points, 45, 'interactivity_to_throughput', 'costh');
         expect(interpolated).not.toBeNull();
         expect(modeledPowerAtTarget(interpolated!, 45)).toMatchObject({
-          kwPerGpu: expect.closeTo(1.5976675, 5),
+          kwPerGpu: expect.closeTo(MODELED_KW_PER_GPU, 5),
           extrapolated: gpus !== 8,
         });
       }
@@ -148,7 +151,7 @@ describe('profit power basis preview', () => {
       decode_tp: 4,
       metrics: { ...source.metrics, avg_power_w: 500, avg_total_gpu_power_w: 2000 },
     };
-    expect(modelSystemPower(partial, undefined, true)).toMatchObject({
+    expect(modelSystemPower(partial)).toMatchObject({
       status: 'supported',
       chassisBasis: 'extrapolated',
     });
@@ -157,11 +160,10 @@ describe('profit power basis preview', () => {
     ).toMatchObject({ extrapolated: true });
   });
 
-  it('leaves the default estimator and default AgentX model gate unchanged', () => {
+  it('leaves the default provisioned estimator unchanged', () => {
     expect(
       estimateProfitByPower([result], specs, pricing, assumptions, 'provisioned', 45, labels),
     ).toEqual(estimateProfitRows([result], specs, pricing, assumptions));
-    expect(modelSystemPower(source)).toMatchObject({ status: 'unsupported', reason: 'workload' });
   });
 
   it.each([2, 4])(
@@ -226,7 +228,7 @@ describe('profit power basis preview', () => {
 
   it('only changes GPU-hours in the paired calculation, preserving unit economics and margin', () => {
     expect(modeledPowerAtTarget(result, 45)).toMatchObject({
-      kwPerGpu: expect.closeTo(1.5976675, 8),
+      kwPerGpu: expect.closeTo(MODELED_KW_PER_GPU, 8),
       extrapolated: false,
     });
     const output = estimateProfitByPower(
@@ -241,7 +243,7 @@ describe('profit power basis preview', () => {
     expect(output.skipped).toEqual([]);
     const [baseline, modeled] = output.rows;
     expect(modeled.revenuePerGpuHour).toBe(baseline.revenuePerGpuHour);
-    const ratio = 2.09 / 1.5976675;
+    const ratio = 2.09 / MODELED_KW_PER_GPU;
     for (const field of ['gpuHours', 'revenue', 'tco', 'labCut', 'profit'] as const) {
       expect(modeled[field] / baseline[field]).toBeCloseTo(ratio, 10);
     }
@@ -262,7 +264,7 @@ describe('profit power basis preview', () => {
       estimateProfitByPower([bracket], specs, pricing, assumptions, 'compare', 45, labels),
     ).toMatchObject({ rows: [], skipped: [{ reason: 'no-measured-power' }] });
     expect(modeledPowerAtTarget({ ...result, nearestPoints: [point, missing] }, 45)).toMatchObject({
-      kwPerGpu: expect.closeTo(1.5976675, 8),
+      kwPerGpu: expect.closeTo(MODELED_KW_PER_GPU, 8),
       extrapolated: false,
     });
     expect(modeledPowerAtTarget({ ...result, clamped: true }, 45)).toEqual({
@@ -279,7 +281,7 @@ describe('profit power basis preview', () => {
       ],
     };
     expect(modeledPowerAtTarget(bracket, 45)).toMatchObject({
-      kwPerGpu: expect.closeTo(1.5976675, 8),
+      kwPerGpu: expect.closeTo(MODELED_KW_PER_GPU, 8),
       extrapolated: false,
     });
     expect(modeledPowerAtTarget(bracket, 75)).toEqual({ reason: 'outside-measured-range' });

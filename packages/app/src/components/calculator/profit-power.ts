@@ -21,7 +21,7 @@ type PlanningPower =
 function planningPower(point: GPUDataPoint): PlanningPower {
   const row = point.sourceRow;
   if (!row || row.metrics.power_metric_schema_version !== 2) return { reason: 'no-measured-power' };
-  const estimate = modelSystemPower(row, undefined, true);
+  const estimate = modelSystemPower(row);
   if (estimate.status !== 'supported') {
     switch (estimate.reason) {
       case 'hardware': {
@@ -40,8 +40,12 @@ function planningPower(point: GPUDataPoint): PlanningPower {
       }
     }
   }
-  // Full-chassis planning requires whole replicas to fit on one eight-GPU host.
-  if (estimate.topologyBasis !== 'single-node' || 8 % estimate.gpuCount !== 0)
+  // Partial allocations must tile one host; fully measured multi-host estimates
+  // retain their validated worker-hosts or uniform-hosts topology.
+  if (
+    estimate.chassisBasis === 'extrapolated' &&
+    (estimate.topologyBasis !== 'single-node' || 8 % estimate.gpuCount !== 0)
+  )
     return { reason: 'unsupported-power-topology' };
   return {
     kwPerGpu: (estimate.deploymentFacilityWatts / estimate.gpuCount / 1000) * 1.1,

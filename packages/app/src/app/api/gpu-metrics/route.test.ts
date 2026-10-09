@@ -174,7 +174,10 @@ describe('GET /api/gpu-metrics — database first', () => {
       artifacts: names.map((name) => ({ name })),
     });
     // An absent selection reads every artifact; `artifact: null` narrows to the first.
-    expect(mockGetGpuMetricsForRun).toHaveBeenCalledWith({}, 34557177019, {});
+    expect(mockGetGpuMetricsForRun).toHaveBeenCalledWith({}, 34557177019, {
+      prefix: null,
+      sourceResults: null,
+    });
     mockGetGpuMetricsForRun.mockResolvedValueOnce({
       ...storedRunPayload,
       artifactNames: names,
@@ -188,7 +191,11 @@ describe('GET /api/gpu-metrics — database first', () => {
       artifactNames: names,
       artifacts: [{ name: names[2] }],
     });
-    expect(mockGetGpuMetricsForRun).toHaveBeenCalledWith({}, 34557177019, { artifact: names[2] });
+    expect(mockGetGpuMetricsForRun).toHaveBeenCalledWith({}, 34557177019, {
+      prefix: null,
+      sourceResults: null,
+      artifact: names[2],
+    });
     mockGetGpuMetricsForRun.mockResolvedValueOnce({
       ...storedRunPayload,
       artifactNames: names,

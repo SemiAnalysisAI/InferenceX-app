@@ -16,7 +16,7 @@ vi.mock('@/lib/github-artifacts', async (importOriginal) => ({
   fetchGithubRunArtifacts: listArtifacts,
 }));
 
-import { fetchGpuMetricsFromGithub, parsePowerCsvData } from './github-telemetry';
+import { fetchGpuMetricsFromGithub } from './github-telemetry';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -62,7 +62,7 @@ describe('live telemetry acquisition', () => {
     const pending = artifacts.map(() => Promise.withResolvers<Response>());
     download.mockImplementation((url: string) => pending[Number(url.split('/').at(-1))].promise);
 
-    const response = fetchGpuMetricsFromGithub('12345');
+    const response = fetchGpuMetricsFromGithub('12345', 'dsr1_', false);
     await vi.waitFor(() => expect(download).toHaveBeenCalledTimes(4));
     pending[3].resolve(csvArchive(303));
     await vi.waitFor(() => expect(download).toHaveBeenCalledTimes(5));
@@ -77,22 +77,6 @@ describe('live telemetry acquisition', () => {
     expect(result.artifacts.map((artifact) => artifact.files[0].data[0].power)).toEqual([
       300, 302, 303, 304, 305,
     ]);
-  });
-});
-
-describe('parsePowerCsvData', () => {
-  const NVIDIA_CSV = [
-    'timestamp, index, power.draw [W], temperature.gpu, clocks.current.sm [MHz], clocks.current.memory [MHz], utilization.gpu [%], utilization.memory [%]',
-    '2026/09/11 04:19:41.123, 0, 350.5 W, 60, 1980 MHz, 2619 MHz, 90 %, 50 %',
-  ].join('\n');
-  const timestamps = (context: Record<string, unknown> | null) =>
-    parsePowerCsvData(NVIDIA_CSV, context).map((row) => row.timestamp);
-
-  it('normalizes collector wall-clock stamps to ISO UTC like the stored path', () => {
-    // A zone-less stamp left as-is would be parsed as browser-local by `new Date`.
-    for (const context of [null, { timestamp_timezone: 'UTC' }, { timestamp_timezone: '+00:00' }]) {
-      expect(timestamps(context)).toEqual(['2026-09-11T04:19:41.123Z']);
-    }
-    expect(timestamps({ timestamp_timezone: '+08:00' })).toEqual(['2026-09-10T20:19:41.123Z']);
+    expect(result.bundleSeries).toEqual([]);
   });
 });

@@ -1,11 +1,11 @@
 /** Live PowerX artifact acquisition; the route owns DB fallback and HTTP responses. */
-import { parseNvidiaTimestamp } from '@semianalysisai/inferencex-db/etl/gpu-metrics-csv';
-
+import type { GpuMetricRow, GpuPowerRunInfo } from '@/components/gpu-power/types';
 import {
-  parseCsvData,
-  type GpuMetricRow,
-  type GpuPowerRunInfo,
-} from '@/components/gpu-power/types';
+  cutPowerAuditBundle,
+  isPowerAuditBundleEntry,
+  parsePowerCsvData,
+} from '@/components/gpu-power/power-audit-bundle';
+import type { GpuPowerSeries } from '@/components/gpu-power/power-series';
 import {
   downloadGithubArtifact,
   extractZipEntries,
@@ -13,47 +13,46 @@ import {
   fetchGithubWorkflowRun,
   getGithubToken,
   normalizeGithubRunInfo,
+  readZipEntries,
   type GithubArtifact,
   type GithubWorkflowRun,
 } from '@/lib/github-artifacts';
 
+import { ARTIFACT_PREFIX, isWantedBundle, isRequestedArtifact } from './artifact-selection';
+
 const MAX_ARTIFACT_BYTES = 50 * 1024 * 1024;
+/** Bundles carry a whole sweep (215 MB seen for nw8); only the power entries are decoded. */
+const MAX_BUNDLE_BYTES = 256 * 1024 * 1024;
 /** Parallel artifact downloads; GitHub's zip redirects are latency-bound, not CPU-bound. */
 const DOWNLOAD_CONCURRENCY = 4;
 
-interface GithubArtifactPayload {
+/** The GitHub path also carries the bundle series the timeline draws. */
+export interface GithubArtifactPayload {
   name: string;
   files: { name: string; data: GpuMetricRow[] }[];
 }
 
-/**
- * Normalize NVIDIA's unzoned wall-clock timestamps to ISO UTC, matching the ingest
- * parser: the adjacent collector context supplies the offset and missing or UTC
- * context means zero. Live and stored reads then agree, so a run does not shift by
- * the browser timezone before ingest. ISO and AMD timestamps pass through unchanged.
- */
-export function parsePowerCsvData(
-  text: string,
-  context: Record<string, unknown> | null,
-): GpuMetricRow[] {
-  const zone = context?.timestamp_timezone;
-  const offset =
-    typeof zone === 'string'
-      ? /^(?<sign>[+-])(?<h>\d{2}):?(?<m>\d{2})$/u.exec(zone.trim())?.groups
-      : null;
-  const offsetMinutes = offset
-    ? (offset.sign === '-' ? -1 : 1) * (Number(offset.h) * 60 + Number(offset.m))
-    : 0;
-  return parseCsvData(text).map((row) => {
-    const timestamp = parseNvidiaTimestamp(row.timestamp, offsetMinutes);
-    return timestamp === null ? row : { ...row, timestamp: new Date(timestamp).toISOString() };
-  });
+interface GithubGpuMetricsResponse {
+  runInfo: GpuPowerRunInfo;
+  artifacts: GithubArtifactPayload[];
+  source: 'github';
+  bundleSeries: GpuPowerSeries[];
 }
 
-async function downloadArtifact(
+type TelemetryJob =
+  | { kind: 'csv'; artifact: GithubArtifact }
+  | { kind: 'bundle'; artifact: GithubArtifact };
+
+type TelemetryResult =
+  | { kind: 'csv'; parsed: GithubArtifactPayload }
+  | { kind: 'bundle'; series: GpuPowerSeries[] };
+
+/** Fetches one artifact zip, or `null` (with a warning) when it fails or exceeds `maxBytes`. */
+async function downloadZip(
   artifact: GithubArtifact,
   githubToken: string,
-): Promise<GithubArtifactPayload | null> {
+  maxBytes: number,
+): Promise<Buffer | null> {
   const dlResp = await downloadGithubArtifact(artifact.archive_download_url, githubToken);
   if (!dlResp.ok) {
     console.warn(`Failed to download artifact ${artifact.name}: ${dlResp.statusText}`);
@@ -61,11 +60,19 @@ async function downloadArtifact(
   }
 
   const contentLength = dlResp.headers.get('Content-Length');
-  if (contentLength && parseInt(contentLength, 10) > MAX_ARTIFACT_BYTES) {
-    console.warn(`Artifact ${artifact.name} exceeds 50 MB, skipping`);
+  if (contentLength && parseInt(contentLength, 10) > maxBytes) {
+    console.warn(`Artifact ${artifact.name} exceeds ${maxBytes / (1024 * 1024)} MB, skipping`);
     return null;
   }
-  const buffer = Buffer.from(await dlResp.arrayBuffer());
+  return Buffer.from(await dlResp.arrayBuffer());
+}
+
+async function downloadArtifact(
+  artifact: GithubArtifact,
+  githubToken: string,
+): Promise<GithubArtifactPayload | null> {
+  const buffer = await downloadZip(artifact, githubToken, MAX_ARTIFACT_BYTES);
+  if (!buffer) return null;
   const contexts = new Map<string, Record<string, unknown>>();
   const contextFiles = extractZipEntries(buffer, '.json', (name, contents) => {
     const base = name.slice(name.lastIndexOf('/') + 1);
@@ -96,47 +103,62 @@ async function downloadArtifact(
   return files.length > 0 ? { name: artifact.name, files } : null;
 }
 
-/**
- * A corrupt or truncated archive is that artifact's failure alone: it is logged
- * and skipped so the other series of the run still reach the reader.
- */
-async function readArtifact(
+async function downloadBundle(
   artifact: GithubArtifact,
   githubToken: string,
-): Promise<GithubArtifactPayload | null> {
+): Promise<GpuPowerSeries[] | null> {
+  const buffer = await downloadZip(artifact, githubToken, MAX_BUNDLE_BYTES);
+  if (!buffer) return null;
+  const series = cutPowerAuditBundle(
+    artifact.name,
+    readZipEntries(buffer, isPowerAuditBundleEntry),
+  );
+  return series.length > 0 ? series : null;
+}
+
+/**
+ * One artifact download and parse. A corrupt or truncated archive is that
+ * artifact's failure alone: it is logged and skipped so the other series of
+ * the run still reach the chart (the client would otherwise retry the whole
+ * multi-hundred-megabyte request).
+ */
+async function runJob(job: TelemetryJob, githubToken: string): Promise<TelemetryResult | null> {
   try {
-    return await downloadArtifact(artifact, githubToken);
+    if (job.kind === 'csv') {
+      const parsed = await downloadArtifact(job.artifact, githubToken);
+      return parsed ? { kind: 'csv', parsed } : null;
+    }
+    const series = await downloadBundle(job.artifact, githubToken);
+    return series ? { kind: 'bundle', series } : null;
   } catch (error) {
-    console.warn(`Failed to read artifact ${artifact.name}:`, error);
+    console.warn(`Failed to read artifact ${job.artifact.name}:`, error);
     return null;
   }
 }
 
 /** Downloads in listing order with a bounded number of requests in flight. */
 async function downloadTelemetry(
-  artifacts: GithubArtifact[],
+  jobs: TelemetryJob[],
   githubToken: string,
-): Promise<GithubArtifactPayload[]> {
-  const results: (GithubArtifactPayload | null)[] = Array.from(
-    { length: artifacts.length },
-    () => null,
-  );
+): Promise<TelemetryResult[]> {
+  const results: (TelemetryResult | null)[] = Array.from({ length: jobs.length }, () => null);
   let next = 0;
   const worker = async () => {
-    while (next < artifacts.length) {
+    while (next < jobs.length) {
       const index = next++;
-      results[index] = await readArtifact(artifacts[index], githubToken);
+      results[index] = await runJob(jobs[index], githubToken);
     }
   };
-  await Promise.all(
-    Array.from({ length: Math.min(DOWNLOAD_CONCURRENCY, artifacts.length) }, worker),
-  );
-  return results.filter((result): result is GithubArtifactPayload => result !== null);
+  await Promise.all(Array.from({ length: Math.min(DOWNLOAD_CONCURRENCY, jobs.length) }, worker));
+  return results.filter((result): result is TelemetryResult => result !== null);
 }
 
 export async function fetchGpuMetricsFromGithub(
   runId: string,
-): Promise<{ runInfo: GpuPowerRunInfo; artifacts: GithubArtifactPayload[] }> {
+  prefix: string | null,
+  includeBundles: boolean,
+  sources: string[] | null = null,
+): Promise<GithubGpuMetricsResponse> {
   const githubToken = getGithubToken();
   if (!githubToken) throw new Error('GitHub token not configured');
 
@@ -147,14 +169,42 @@ export async function fetchGpuMetricsFromGithub(
   const artifacts = await fetchGithubRunArtifacts(runId, githubToken);
 
   // `eval_gpu_metrics_*` artifacts are excluded by the bare `gpu_metrics` test.
-  const telemetry = artifacts.filter((a) => a.name.startsWith('gpu_metrics'));
-  if (telemetry.length === 0) throw new Error('No gpu_metrics artifacts found for this run');
+  const wanted = prefix ? `${ARTIFACT_PREFIX}${prefix}` : 'gpu_metrics';
+  const jobs: TelemetryJob[] = artifacts
+    .filter((a) => a.name.startsWith(wanted) && isRequestedArtifact(a.name, sources))
+    .map((artifact) => ({ kind: 'csv', artifact }));
+  if (includeBundles) {
+    const csvNames = new Set(jobs.map(({ artifact }) => artifact.name));
+    for (const artifact of artifacts) {
+      if (
+        isWantedBundle(artifact.name, prefix) &&
+        isRequestedArtifact(artifact.name, sources) &&
+        !csvNames.has(`${ARTIFACT_PREFIX}${artifact.name.slice('power_audit_'.length)}`)
+      )
+        jobs.push({ kind: 'bundle', artifact });
+    }
+  }
+  if (jobs.length === 0) {
+    throw new Error(
+      includeBundles
+        ? 'No telemetry artifacts (gpu_metrics or power_audit) found for this run'
+        : 'No gpu_metrics artifacts found for this run',
+    );
+  }
 
-  const parsed = await downloadTelemetry(telemetry, githubToken);
-  if (parsed.length === 0) throw new Error('No Chip metrics data found in artifacts');
+  const results = await downloadTelemetry(jobs, githubToken);
+  if (results.length === 0) throw new Error('No Chip metrics data found in artifacts');
 
+  const parsedArtifacts: GithubArtifactPayload[] = [];
+  const bundleSeries: GpuPowerSeries[] = [];
+  for (const result of results) {
+    if (result.kind === 'csv') parsedArtifacts.push(result.parsed);
+    else bundleSeries.push(...result.series);
+  }
   return {
+    source: 'github',
     runInfo: normalizeGithubRunInfo(run) as GpuPowerRunInfo,
-    artifacts: parsed,
+    artifacts: parsedArtifacts,
+    bundleSeries,
   };
 }

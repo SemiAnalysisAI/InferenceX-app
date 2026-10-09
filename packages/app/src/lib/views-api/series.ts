@@ -25,12 +25,13 @@ import type {
 } from '@/components/inference/types';
 import { partitionChartDataByLimits } from '@/components/inference/utils';
 import { bestSeriesPerSku } from '@/components/inference/utils/best-series-per-sku';
-import {
-  isMeasuredPowerCurveMetric,
-  upperPowerEnvelope,
-} from '@/components/inference/utils/powerCurves';
+import { isPowerCurveMetric, upperPowerEnvelope } from '@/components/inference/utils/powerCurves';
 import { pointDeploymentMode, type QuickFilters } from '@/components/inference/utils/quickFilters';
-import { resolveXAxisField } from '@/components/inference/utils/resolveXAxisField';
+import { pointTopologyKey } from '@/components/inference/utils/topology-filter';
+import {
+  resolveXAxisField,
+  type FixedSequenceStatistic,
+} from '@/components/inference/utils/resolveXAxisField';
 import type { DerivedAgenticMetricMap } from '@/hooks/api/use-derived-agentic-metrics';
 import type { BenchmarkRow } from '@/lib/api';
 import { transformBenchmarkRows } from '@/lib/benchmark-transform';
@@ -72,6 +73,8 @@ export interface InferenceSeriesOptions {
   readonly precisions: readonly string[];
   readonly metricConfigKey: MetricConfigKey;
   readonly xmode: SeriesXMode;
+  /** Fixed-sequence service-axis statistic; ignored for Agentic. */
+  readonly fixedSequenceStatistic?: FixedSequenceStatistic;
   /** TTFT x metric override (e.g. `p90_ttft`); used by `ttft` mode and input metrics. */
   readonly xmetric: string;
   /** Explicit hwKey / bare-GPU selection; empty = all. */
@@ -95,6 +98,7 @@ export interface InferenceSeriesPoint {
   readonly x: number;
   readonly y: number;
   readonly concurrency: number;
+  readonly topologyKey: string;
   readonly tp: number;
   readonly date: string;
   readonly runId?: number;
@@ -131,7 +135,9 @@ export interface InferenceSeriesResult {
   readonly hardware: readonly { key: string; label: string; vendor?: string }[];
   readonly frontier: { direction: ParetoDirection | null; points: number };
   readonly metric: InferenceSeriesMetricMeta;
-  readonly xAxis: { mode: SeriesXMode; field: string; label: string };
+  readonly xAxis: { mode: SeriesXMode; field: string; label: string; statistic: string };
+  /** Scoped observed points before frontier/best-only pruning; not a public raw-row payload. */
+  readonly observedPoints: readonly InferenceData[];
   readonly count: number;
 }
 
@@ -172,6 +178,7 @@ function resolveXAxisLabel(
   effectiveXMetric: string | null,
   isAgentic: boolean,
   percentile: string,
+  xAxisField: string,
 ): string {
   let label = chartDef.x_label;
   if (branch === 'e2e-ttft-override') {
@@ -179,9 +186,10 @@ function resolveXAxisLabel(
     const pctlWord = pctl === 'median' ? 'Median' : pctl.toUpperCase();
     label = `${pctlWord} Time To First Token (s)`;
   }
-  if (isAgentic) {
-    label = applyAgenticPercentileToXLabel(label, percentile.toUpperCase());
-  }
+  label = applyAgenticPercentileToXLabel(
+    label,
+    isAgentic ? percentile.toUpperCase() : xAxisField.startsWith('mean_') ? 'Mean' : 'Median',
+  );
   return label;
 }
 
@@ -222,6 +230,7 @@ export function buildInferenceSeries(
     isAgentic,
     percentile,
     xAxisMode: xmode,
+    fixedSequenceStatistic: options.fixedSequenceStatistic,
   });
 
   // 4. Precision + scope filters (GPU picks and vendor/framework/deployment/spec pills).
@@ -260,10 +269,15 @@ export function buildInferenceSeries(
   const remapped = scoped
     .filter((point) => metricKey in point && supportsPointTokenMetric(point, tokenType))
     .map((point) => remapInferencePoint(point, metricKey, resolved.xAxisField));
-  const partition = partitionChartDataByLimits(remapped, chartDef, metricConfigKey, {
-    isTtftX: resolved.xAxisField.endsWith('_ttft'),
-    isAgentic,
-  });
+  const partition = partitionChartDataByLimits(
+    remapped,
+    { ...chartDef, x_scale_field: resolved.xAxisField },
+    metricConfigKey,
+    {
+      isTtftX: resolved.xAxisField.endsWith('_ttft'),
+      isAgentic,
+    },
+  );
   let mapped = options.allPoints ? remapped : partition.data;
   if (xmode === 'e2e-normalized-interactivity')
     mapped = mapped.flatMap((point) => {
@@ -287,7 +301,7 @@ export function buildInferenceSeries(
 
   // 7. Frontier flags, scoped per (hwKey, precision, date) like ScatterGraph.
   // Measured power represents load demand, so retain its upper boundary.
-  const isMeasuredPower = isMeasuredPowerCurveMetric(metricConfigKey);
+  const isMeasuredPower = isPowerCurveMetric(metricConfigKey);
   const maximizePowerX = direction !== null && paretoMaximizesX(direction);
   const frontierDirection = isMeasuredPower
     ? maximizePowerX
@@ -364,6 +378,7 @@ export function buildInferenceSeries(
           x: point.x,
           y: point.y,
           concurrency: point.conc ?? 0,
+          topologyKey: pointTopologyKey(point),
           tp: point.tp ?? 0,
           date: point.date ?? '',
           ...(runIdFromUrl(point.run_url) === undefined
@@ -397,6 +412,7 @@ export function buildInferenceSeries(
     },
     xAxis: {
       mode: xmode,
+      statistic: isAgentic ? percentile : (options.fixedSequenceStatistic ?? 'median'),
       field:
         xmode === 'e2e-normalized-interactivity'
           ? `${percentile}_e2e_norm_intvty`
@@ -404,8 +420,16 @@ export function buildInferenceSeries(
       label:
         xmode === 'e2e-normalized-interactivity'
           ? `${percentile.toUpperCase()} E2E Normalized Interactivity (tok/s/user)`
-          : resolveXAxisLabel(chartDef, resolved.branch, effectiveXMetric, isAgentic, percentile),
+          : resolveXAxisLabel(
+              chartDef,
+              resolved.branch,
+              effectiveXMetric,
+              isAgentic,
+              percentile,
+              String(resolved.xAxisField),
+            ),
     },
+    observedPoints: mapped,
     count,
   };
 }

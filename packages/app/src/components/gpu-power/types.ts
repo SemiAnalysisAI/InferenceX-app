@@ -1,3 +1,4 @@
+import { HW_REGISTRY } from '@semianalysisai/inferencex-constants';
 import {
   parseAmdTimestamp,
   parseNvidiaTimestamp,
@@ -57,6 +58,14 @@ export interface GpuMetricConfig {
   unit: string;
   yAxisLabel: string;
   yAxisLabelZh: string;
+}
+
+export function getGpuMetricLabel(metric: GpuMetricConfig, locale: 'en' | 'zh'): string {
+  return locale === 'zh' ? metric.labelZh : metric.label;
+}
+
+export function getGpuMetricYAxisLabel(metric: GpuMetricConfig, locale: 'en' | 'zh'): string {
+  return locale === 'zh' ? metric.yAxisLabelZh : metric.yAxisLabel;
 }
 
 /** Common metrics available on both NVIDIA and AMD GPUs. */
@@ -189,6 +198,31 @@ export const ALL_METRIC_OPTIONS: GpuMetricConfig[] = [...GPU_METRIC_OPTIONS, ...
 export function getAvailableMetrics(data: GpuMetricRow[]): GpuMetricConfig[] {
   if (data.length === 0) return GPU_METRIC_OPTIONS;
   return ALL_METRIC_OPTIONS.filter((m) => data.some((row) => Number.isFinite(row[m.key])));
+}
+
+/** TDP for a known hardware key, e.g. the benchmark point's own `hardware`. */
+export function tdpForHardware(hardware: string | undefined): { sku: string; tdp: number } | null {
+  const key = hardware?.toLowerCase();
+  const entry = key ? HW_REGISTRY[key] : undefined;
+  return entry ? { sku: key!.toUpperCase(), tdp: entry.tdp } : null;
+}
+
+/**
+ * Detect GPU SKU from an artifact name and return its TDP in watts.
+ * Artifact names look like: gpu_metrics_dsr1_1k8k_fp8_sglang_tp8_..._h200-nb_0
+ */
+export function detectTdpFromArtifactName(
+  artifactName: string,
+): { sku: string; tdp: number } | null {
+  const lower = artifactName.toLowerCase();
+  // Sorted longest-first to avoid partial matches (e.g., gb200 before b200)
+  const keys = Object.keys(HW_REGISTRY).toSorted((a, b) => b.length - a.length);
+  for (const key of keys) {
+    if (lower.includes(key)) {
+      return { sku: key.toUpperCase(), tdp: HW_REGISTRY[key].tdp };
+    }
+  }
+  return null;
 }
 
 function parseTimestampToMs(raw: string): number | null {

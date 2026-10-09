@@ -46,15 +46,13 @@ describe('PARAM_DEFAULTS', () => {
     expect(PARAM_DEFAULTS.i_seq).toBe('');
   });
 
-  it('strips i_metric against the same default the dashboard opens on', async () => {
-    // A share link omits any value equal to PARAM_DEFAULTS. If this drifted
-    // from DEFAULT_Y_AXIS_METRIC, a link captured on the *other* metric would
-    // be written without `i_metric` and reopen on the dashboard default.
-    const { PARAM_DEFAULTS, DEFAULT_Y_AXIS_METRIC } = await import('@/lib/url-state');
+  it('opens on tokens per dollar, or on measured power under any power tier filter', async () => {
+    const { defaultYAxisMetric } = await import('@/lib/url-state');
     const { DEFAULT_METRIC_CONFIG_KEY } = await import('@/components/inference/metric-registry');
-    expect(PARAM_DEFAULTS.i_metric).toBe(DEFAULT_Y_AXIS_METRIC);
-    expect(DEFAULT_Y_AXIS_METRIC).toBe('y_tokensPerDollarH');
-    expect(DEFAULT_Y_AXIS_METRIC).toBe(DEFAULT_METRIC_CONFIG_KEY);
+    expect(defaultYAxisMetric([])).toBe('y_tokensPerDollarH');
+    expect(defaultYAxisMetric([])).toBe(DEFAULT_METRIC_CONFIG_KEY);
+    expect(defaultYAxisMetric(['certified'])).toBe('y_measuredAvgPower');
+    expect(defaultYAxisMetric(['legacy'])).toBe('y_measuredAvgPower');
   });
 
   it('has expected default for r_range', async () => {
@@ -97,6 +95,22 @@ describe('PARAM_DEFAULTS', () => {
   it('has empty string default for i_advlabel', async () => {
     const { PARAM_DEFAULTS } = await import('@/lib/url-state');
     expect(PARAM_DEFAULTS.i_advlabel).toBe('');
+  });
+
+  it('drops retired comparison controls from old share links while preserving analysis toggles', async () => {
+    setupWindow(
+      '?i_servicecompare=1&i_servicebase=baseline&i_servicepeer=comparator&i_servicetarget=8&i_roleshare=1&i_powerfit=1',
+    );
+    const { readUrlParams, buildShareUrl } = await import('@/lib/url-state');
+    const params = readUrlParams();
+    const shared = new URL(buildShareUrl()).searchParams;
+    expect(params).toMatchObject({ i_roleshare: '1', i_powerfit: '1' });
+    expect(shared.get('i_roleshare')).toBe('1');
+    expect(shared.get('i_powerfit')).toBe('1');
+    for (const key of ['i_servicecompare', 'i_servicebase', 'i_servicepeer', 'i_servicetarget']) {
+      expect(params).not.toHaveProperty(key);
+      expect(shared.has(key)).toBe(false);
+    }
   });
 
   it('strips the normalized revenue source but preserves OpenRouter as explicit state', async () => {
@@ -359,6 +373,19 @@ describe('writeUrlParams + buildShareUrl', () => {
     expect(url).toContain('g_model=test-model');
   });
 
+  it('keeps an explicit tokens-per-dollar metric, whose default status depends on i_power', async () => {
+    setupWindow('', '/inference');
+    const { writeUrlParams, buildShareUrl, DEFAULT_Y_AXIS_METRIC } =
+      await import('@/lib/url-state');
+
+    writeUrlParams({ i_metric: DEFAULT_Y_AXIS_METRIC, i_power: 'certified' });
+    await vi.advanceTimersByTimeAsync(200);
+
+    const params = new URL(buildShareUrl()).searchParams;
+    expect(params.get('i_metric')).toBe('y_tokensPerDollarH');
+    expect(params.get('i_power')).toBe('certified');
+  });
+
   it('removes params that match their default value', async () => {
     setupWindow('', '/inference');
     const { writeUrlParams, buildShareUrl } = await import('@/lib/url-state');
@@ -459,33 +486,6 @@ describe('writeUrlParams + buildShareUrl', () => {
     writeUrlParams({ g_model: 'DeepSeek-V4-Pro' });
 
     expect(readUrlParams().g_model).toBeUndefined();
-  });
-
-  it('preserves all-measurement visibility across metric changes and shared links', async () => {
-    const { location } = setupWindow('?i_optimal=0', '/inference');
-    const { readUrlParams, writeUrlParams, buildShareUrl, refreshUrlParams } =
-      await import('@/lib/url-state');
-
-    expect(readUrlParams().i_allpoints).toBeUndefined();
-    expect(buildShareUrl()).not.toContain('i_allpoints');
-
-    writeUrlParams({ i_allpoints: '1', i_metric: 'y_measuredAvgPower' });
-    const powerUrl = new URL(buildShareUrl());
-    expect(powerUrl.searchParams.get('i_allpoints')).toBe('1');
-    expect(powerUrl.searchParams.get('i_optimal')).toBe('0');
-
-    writeUrlParams({ i_metric: 'y_tpPerGpu' });
-    location.search = new URL(buildShareUrl()).search;
-    expect(refreshUrlParams()).toMatchObject({
-      i_allpoints: '1',
-      i_metric: 'y_tpPerGpu',
-      i_optimal: '0',
-    });
-
-    writeUrlParams({ i_allpoints: '' });
-    expect(buildShareUrl()).not.toContain('i_allpoints');
-    expect(readUrlParams().i_allpoints).toBeUndefined();
-    expect(readUrlParams().i_optimal).toBe('0');
   });
 });
 

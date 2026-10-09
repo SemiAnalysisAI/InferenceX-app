@@ -1,12 +1,40 @@
 /**
- * PowerX telemetry for one GitHub Actions run, answered from one source per run:
- * a run with stored telemetry (migration 016) is read from the database only; a
- * run without it (not yet ingested, still in progress, or unofficial) is read
- * from its live GitHub artifacts only.
+ * PowerX telemetry for one GitHub Actions run, answered from one source per run.
+ *
+ * A run with stored telemetry (migration 016: series, samples, per-GPU
+ * statistics, point links) is read from the database only. A run without it
+ * (not yet ingested, still in progress, or unofficial) is read from its live
+ * GitHub artifacts only.
  *
  * DO NOT ADD CACHING (blob, CDN, or unstable_cache) to this route. Live
  * GitHub Actions artifacts change while a run is in progress, and stored
  * telemetry must reflect a successful re-ingest immediately.
+ *
+ * Two telemetry collectors publish GPU power for a run:
+ * - single-node runners (nvidia-smi / amd-smi) publish one `gpu_metrics_<RESULT_FILENAME>`
+ *   CSV artifact per benchmark config;
+ * - Slurm / Dynamo disaggregated runners (DCGM) publish one `power_audit_<RESULT_FILENAME>`
+ *   bundle per concurrency sweep, holding the sweep's samples plus one
+ *   `power_validation_*.json` window per config
+ *   (`components/gpu-power/power-audit-bundle.ts`).
+ *
+ * Two response shapes:
+ * - default: every `gpu_metrics_*` artifact's parsed rows (the public GPU
+ *   metrics view), from the stored digest when the run is ingested, else from
+ *   GitHub; bundles are ignored on the GitHub path;
+ * - `series=power`: compact per-GPU watt series bucketed to one second
+ *   (`components/gpu-power/power-series.ts`) for the PowerX timeline, from
+ *   CSV artifacts and from bundles cut per validation window. The timeline
+ *   joins them to chart points by `source` (bundle) or artifact name (CSV).
+ *   Persisted samples and validation windows use the same bucketing/cut
+ *   transform as artifacts, so historical runs survive artifact expiry.
+ * `prefix=<RESULT_FILENAME prefix>` narrows either shape to the artifacts of
+ * one model / workload / precision so a full nightly sweep is not downloaded
+ * for one chart. A bundle names a whole sweep, so it also matches when the
+ * prefix extends past its name into the per-concurrency suffix.
+ * Timeline POSTs sorted validation basenames in `{ sources: [...] }` to read
+ * only the windows its points need. `sourceCoverage` describes those requested
+ * identities, not full-run completeness.
  */
 import { type NextRequest, NextResponse } from 'next/server';
 
@@ -17,14 +45,26 @@ import {
   type GpuMetricsRunSelection,
 } from '@semianalysisai/inferencex-db/queries/gpu-metrics';
 
-import type { GpuPowerApiResponse } from '@/components/gpu-power/types';
+import type { GpuPowerRunInfo, GpuPowerApiResponse } from '@/components/gpu-power/types';
+import { bucketPowerFiles, type GpuPowerSeries } from '@/components/gpu-power/power-series';
+import {
+  storedPowerSeries,
+  StoredTelemetryIncompleteError,
+} from '@/components/gpu-power/stored-power-series';
+import { ARTIFACT_PREFIX } from './artifact-selection';
 import { fetchGpuMetricsFromGithub } from './github-telemetry';
 
-/** Artifact downloads are latency-bound; match the other artifact routes' budget. */
+/** Bundle downloads are latency-bound; match the other artifact routes' budget. */
 export const maxDuration = 300;
+/** RESULT_FILENAME characters: model, workload, precision, framework, parallelism, host, hash. */
+const PREFIX_PATTERN = /^[A-Za-z0-9._-]{1,200}$/u;
+const SOURCE_PATTERN = /^power_validation_[A-Za-z0-9._-]{1,200}\.json$/u;
+const MAX_REQUEST_BYTES = 256 * 1024;
+
+export type GpuMetricsSource = 'database' | 'github';
 
 export interface GpuMetricsRouteResponse extends GpuPowerApiResponse {
-  source: 'database' | 'github';
+  source: GpuMetricsSource;
   artifactNames?: string[];
 }
 
@@ -63,6 +103,37 @@ export function databasePayloadToResponse(payload: GpuMetricsRunPayload): GpuMet
   };
 }
 
+/** Validation basenames identify individual windows, including siblings in one bundle. */
+function seriesSource(series: GpuPowerSeries): string | null {
+  return (
+    series.source ??
+    (series.artifact.startsWith(ARTIFACT_PREFIX)
+      ? `power_validation_${series.artifact.slice(ARTIFACT_PREFIX.length)}.json`
+      : null)
+  );
+}
+
+function sourceCoverage(series: GpuPowerSeries[], sources: string[] | null) {
+  const available = new Set(series.map(seriesSource));
+  const missingSources = sources?.filter((source) => !available.has(source)) ?? [];
+  return {
+    status: sources === null ? 'unknown' : missingSources.length > 0 ? 'incomplete' : 'complete',
+    missingSources,
+  };
+}
+
+function powerSeriesResponse(
+  source: GpuMetricsSource,
+  runInfo: GpuPowerRunInfo,
+  series: GpuPowerSeries[],
+  sources: string[] | null,
+) {
+  return NextResponse.json(
+    { source, runInfo, series, sourceCoverage: sourceCoverage(series, sources) },
+    { headers: { 'Cache-Control': 'no-store' } },
+  );
+}
+
 async function fetchGpuMetricsFromDatabase(
   runId: string,
   selection: GpuMetricsRunSelection,
@@ -73,24 +144,99 @@ async function fetchGpuMetricsFromDatabase(
 }
 
 export function GET(request: NextRequest) {
-  return readGpuMetrics(request, {});
+  return readGpuMetrics(request, null);
 }
 
 /** Selecting a host must not discard the view's sibling artifact choices. */
 export function readGpuMetricsForView(request: NextRequest, artifact: string | null) {
-  return readGpuMetrics(request, { artifact });
+  return readGpuMetrics(request, null, artifact);
 }
 
-async function readGpuMetrics(request: NextRequest, selection: GpuMetricsRunSelection) {
-  const runId = request.nextUrl.searchParams.get('runId');
+/** Read-only Timeline transport; the body avoids URL limits for a run's point identities. */
+export async function POST(request: NextRequest) {
+  const reader = request.body?.getReader();
+  const chunks: Uint8Array[] = [];
+  let bytes = 0;
+  try {
+    if (reader) {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        bytes += value.byteLength;
+        if (bytes > MAX_REQUEST_BYTES) {
+          await reader.cancel();
+          return NextResponse.json({ error: 'Request body exceeds 256 KiB' }, { status: 413 });
+        }
+        chunks.push(value);
+      }
+    }
+    const body: unknown = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+    const sources =
+      body && typeof body === 'object' && !Array.isArray(body) && 'sources' in body
+        ? body.sources
+        : null;
+    if (
+      !Array.isArray(sources) ||
+      sources.length === 0 ||
+      sources.length > 1000 ||
+      !sources.every(
+        (source): source is string => typeof source === 'string' && SOURCE_PATTERN.test(source),
+      )
+    ) {
+      return NextResponse.json(
+        { error: 'sources must contain 1–1000 power_validation_<RESULT_FILENAME>.json basenames' },
+        { status: 400 },
+      );
+    }
+    if (request.nextUrl.searchParams.get('series') !== 'power') {
+      return NextResponse.json({ error: 'POST requires series=power' }, { status: 400 });
+    }
+    const prefix = request.nextUrl.searchParams.get('prefix');
+    if (
+      prefix !== null &&
+      sources.some((source) => !source.startsWith(`power_validation_${prefix}`))
+    ) {
+      return NextResponse.json({ error: 'Every source must match prefix' }, { status: 400 });
+    }
+    return readGpuMetrics(request, [...new Set(sources)].sort());
+  } catch {
+    return NextResponse.json({ error: 'Request body must be valid JSON' }, { status: 400 });
+  } finally {
+    reader?.releaseLock();
+  }
+}
+
+async function readGpuMetrics(
+  request: NextRequest,
+  sources: string[] | null,
+  selectedArtifact?: string | null,
+) {
+  const params = request.nextUrl.searchParams;
+  const runId = params.get('runId');
 
   if (!runId || !/^\d+$/u.test(runId)) {
     return NextResponse.json({ error: 'runId must be a numeric workflow run ID' }, { status: 400 });
   }
+  const prefix = params.get('prefix');
+  if (prefix !== null && !PREFIX_PATTERN.test(prefix)) {
+    return NextResponse.json(
+      { error: 'prefix must be a RESULT_FILENAME prefix (letters, digits, . _ -)' },
+      { status: 400 },
+    );
+  }
+  const series = params.get('series');
+  if (series !== null && series !== 'power') {
+    return NextResponse.json({ error: 'series must be "power" when present' }, { status: 400 });
+  }
 
   let stored: GpuMetricsRouteResponse | null;
   try {
-    stored = await fetchGpuMetricsFromDatabase(runId, selection);
+    stored = await fetchGpuMetricsFromDatabase(runId, {
+      prefix,
+      sourceResults:
+        sources?.map((source) => source.slice('power_validation_'.length, -'.json'.length)) ?? null,
+      ...(selectedArtifact === undefined ? {} : { artifact: selectedArtifact }),
+    });
   } catch (error) {
     // Missing data may use live artifacts; a failed read cannot establish absence.
     console.error(`gpu-metrics: database lookup failed for run ${runId}:`, error);
@@ -102,13 +248,45 @@ async function readGpuMetrics(request: NextRequest, selection: GpuMetricsRunSele
       { status: 503, headers: { 'Cache-Control': 'no-store' } },
     );
   }
-  if (stored) return NextResponse.json(stored, { headers: { 'Cache-Control': 'no-store' } });
 
   try {
-    const live = await fetchGpuMetricsFromGithub(runId);
+    if (stored) {
+      // The query already scoped series to `prefix` and the requested artifacts;
+      // only the window cut below is finer than an artifact.
+      if (series !== 'power')
+        return NextResponse.json(stored, { headers: { 'Cache-Control': 'no-store' } });
+      const storedSeries = storedPowerSeries(
+        stored.artifacts.flatMap((artifact) =>
+          artifact.series ? [{ ...artifact.series, data: artifact.data }] : [],
+        ),
+      ).filter((entry) => sources === null || sources.includes(seriesSource(entry) ?? ''));
+      return powerSeriesResponse('database', stored.runInfo, storedSeries, sources);
+    }
+    if (series === 'power') {
+      const { runInfo, artifacts, bundleSeries } = await fetchGpuMetricsFromGithub(
+        runId,
+        prefix,
+        true,
+        sources,
+      );
+      const powerSeries = artifacts
+        .map((artifact) => bucketPowerFiles(artifact.name, artifact.files))
+        .filter((entry): entry is GpuPowerSeries => entry !== null);
+      const seenSources = new Set<string>();
+      const liveSeries: GpuPowerSeries[] = [];
+      for (const entry of [...powerSeries, ...bundleSeries]) {
+        const source = seriesSource(entry);
+        if (sources !== null && !sources.includes(source ?? '')) continue;
+        if (source !== null && seenSources.has(source)) continue;
+        liveSeries.push(entry);
+        if (source !== null) seenSources.add(source);
+      }
+      return powerSeriesResponse('github', runInfo, liveSeries, sources);
+    }
+    const live = await fetchGpuMetricsFromGithub(runId, prefix, false);
     return NextResponse.json(
       {
-        source: 'github',
+        source: live.source,
         runInfo: live.runInfo,
         artifacts: live.artifacts.flatMap(({ name, files }) =>
           files.map((file) => ({
@@ -121,9 +299,16 @@ async function readGpuMetrics(request: NextRequest, selection: GpuMetricsRunSele
     );
   } catch (error) {
     console.error('Error fetching GPU power data:', error);
+    const missing = error instanceof StoredTelemetryIncompleteError ? error : null;
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Unknown error occurred' },
-      { status: 500, headers: { 'Cache-Control': 'no-store' } },
+      missing
+        ? {
+            error: missing.message,
+            code: 'STORED_TELEMETRY_INCOMPLETE',
+            artifact: missing.artifact,
+          }
+        : { error: error instanceof Error ? error.message : 'Unknown error occurred' },
+      { status: missing ? 503 : 500, headers: { 'Cache-Control': 'no-store' } },
     );
   }
 }
