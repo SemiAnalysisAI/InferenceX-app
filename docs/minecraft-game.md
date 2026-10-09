@@ -1,5 +1,7 @@
 # Playable Minecraft
 
+> **Just for fun.** Easter egg themes and games do not need stable infrastructure, may be deleted at any point, and must never have tests. Any tests referenced below are legacy and should be deleted, not fixed or extended. See [Testing](./testing.md#easter-egg-themes-and-games).
+
 Select **Minecraft** in the theme picker, then **Play Minecraft** in the banner
 under the header. The game opens in a dialog and is imported only after the
 button is pressed; the dashboard, charts and data are unchanged.
