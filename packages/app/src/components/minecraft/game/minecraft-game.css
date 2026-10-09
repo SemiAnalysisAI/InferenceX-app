@@ -757,3 +757,12 @@ img.mc-hud-icon {
   text-align: center;
   padding: 24px;
 }
+
+@media (pointer: coarse) {
+  .mc-dimension {
+    top: 58px;
+  }
+  .mc-boss {
+    top: 84px;
+  }
+}
