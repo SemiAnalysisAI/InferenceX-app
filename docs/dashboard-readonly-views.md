@@ -91,7 +91,7 @@ All in Measured watts and energy accept validated `single_turn` and AgentX rows
 through the shared chart/API transform, including historical and unofficial rows.
 AgentX uses the power model's agentic workload state without independent workload
 calibration. Telemetry and topology gates still apply; NVL72 rows need complete
-Grace-socket telemetry and stay unavailable until the rack model is ported.
+Grace-socket telemetry, and each compute tray then takes an equal share of a modeled rack.
 
 For All in Measured, `tableRows` retains every GPU-valid observation in the selected
 scope and best-series selection, including axis-clipped and non-frontier points.

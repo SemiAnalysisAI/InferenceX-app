@@ -123,8 +123,8 @@ comparison and unofficial overlay has its own `tableRows`; latest does not pool 
 
 NVL72 rows first need valid GPU power plus validated Grace-socket power with complete
 socket coverage (`unavailableReason: "cpu-telemetry"` otherwise); CPU-rail-only and
-module readings are not accepted. Admitted NVL72 rows stay `hardware` until the rack
-model is ported from the InferenceX `power_model`. Read `powerSource` for topology, PUE
+module readings are not accepted. Admitted NVL72 rows take an equal compute-tray share
+of the InferenceX `power_model` rack at PUE 1.1. Read `powerSource` for topology, PUE
 and the pinned InferenceX `power_model` commit. Model-only updates recalculate retained
 valid measurements after deployment; they do not require telemetry backfill. For
 GW-year estimates, `modeled` first selects
