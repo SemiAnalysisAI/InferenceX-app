@@ -232,6 +232,7 @@ export interface RayHit {
 
 /** Outline box used for selection and ray tests, in 1/16 units. */
 export function selectionBox(id: number, meta: number): Box {
+  if (id === B.netherPortal && meta & 1) return [7, 0, 0, 9, 16, 16];
   const def = BLOCKS[id];
   switch (def.render) {
     case 'cross': {
