@@ -31,7 +31,7 @@ const STRINGS = {
   en: {
     pageTitle: 'ubenchX: Device-Memory Copy Bandwidth',
     pageSubtitle:
-      'Microbenchmark measuring device-memory copy bandwidth across message sizes on NVIDIA GPUs.',
+      'Microbenchmark measuring device-memory copy bandwidth across message sizes on NVIDIA and AMD GPUs.',
     latencyTitle: 'Latency vs Message Size',
     latencyY: 'Latency (ms)',
     mbuTitle: 'Memory Bandwidth Utilization (MBU) vs Message Size',
@@ -56,7 +56,7 @@ const STRINGS = {
   },
   zh: {
     pageTitle: 'ubenchX：显存拷贝带宽',
-    pageSubtitle: '在 NVIDIA GPU 上测量不同消息大小的显存拷贝带宽微基准测试。',
+    pageSubtitle: '在 NVIDIA 和 AMD GPU 上测量不同消息大小的显存拷贝带宽微基准测试。',
     latencyTitle: '延迟 vs 消息大小',
     latencyY: '延迟（ms）',
     mbuTitle: '显存带宽利用率（MBU）vs 消息大小',
@@ -179,6 +179,16 @@ function UbenchxChart({
     [allPoints],
   );
 
+  // Log axes get one tick per decade; d3's default log ticks crowd the axis.
+  const yTickValues = useMemo(() => {
+    if (yScaleType !== 'log') return undefined;
+    const [lo, hi] = yDomain;
+    const ticks: number[] = [];
+    for (let e = Math.ceil(Math.log10(lo)); e <= Math.floor(Math.log10(hi)); e++)
+      ticks.push(10 ** e);
+    return ticks;
+  }, [yScaleType, yDomain]);
+
   const xTickValues = useMemo(() => {
     const all = [...new Set(allPoints.map((p) => p.x))].sort((a, b) => a - b);
     return all.filter((_, i) => i % 3 === 0 || i === all.length - 1);
@@ -204,11 +214,13 @@ function UbenchxChart({
       yAxis={{
         label: yLabel,
         tickCount: 6,
+        tickValues: yTickValues,
         tickFormat: (value) => {
           const v = Number(value);
+          if (v === 0) return '0';
           if (v >= 1000) return `${(v / 1000).toFixed(v >= 10000 ? 0 : 1)}k`;
           if (v >= 1) return v.toFixed(v >= 100 ? 0 : v >= 10 ? 1 : 2);
-          return v.toFixed(4);
+          return String(Number(v.toPrecision(2)));
         },
       }}
       layers={[

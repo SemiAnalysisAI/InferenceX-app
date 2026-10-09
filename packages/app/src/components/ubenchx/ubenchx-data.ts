@@ -1,7 +1,8 @@
 /**
  * Static microbenchmark data for ubenchX device-memory copy bandwidth.
  *
- * Source: ubenchX/mem_bw/bench.py in SemiAnalysisAI/InferenceX PR #3874.
+ * Source: ubenchX/mem_bw/bench.py and ubenchX/mem_bw/results/*.csv in SemiAnalysisAI/InferenceX
+ * (PRs #3874, #3879, #3880).
  * Methodology: times `b.copy_(a)` on float32 tensors with `triton.testing.do_bench`,
  * power-of-two sizes 8 B .. 16 GiB, bandwidth = 2 * bytes / time (read + write).
  */
@@ -142,7 +143,7 @@ export const UBENCHX_RUNS: Record<string, UbenchxRun> = {
       driver: '580.159.03',
       torch: '2.13.0+cu130',
       triton: '3.7.1',
-      container: 'lmsysorg/sglang:nightly-dev-cu13-20260922-582389ce',
+      container: 'lmsysorg/sglang nightly 2026-09-22 (582389ce)',
       date: '2026-10-09',
       sourceUrl: 'https://github.com/SemiAnalysisAI/InferenceX/pull/3879',
     },
