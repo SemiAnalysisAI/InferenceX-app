@@ -57,11 +57,11 @@ export function dimensionBlocks(
           set(
             y,
             y === room.y - 1 || y === room.y + 5 || Math.abs(dx) === 6 || Math.abs(dz) === 6
-              ? 47
+              ? B.stoneBricks
               : B.air,
           );
         if (PORTAL_RING.some(([px, pz]) => px === dx && pz === dz)) set(room.y, B.endFrame);
-        if (Math.abs(dx) === 5 && Math.abs(dz) === 5) set(room.y + 3, 38);
+        if (Math.abs(dx) === 5 && Math.abs(dz) === 5) set(room.y + 3, B.glowstone);
       } else if (dimension === 'nether') {
         const floor = Math.floor(38 + 7 * Math.sin(wx / 23) * Math.cos(wz / 29));
         for (let y = 0; y < 128; y++) {
@@ -69,7 +69,7 @@ export function dimensionBlocks(
           if (y === 0 || y === 127) id = B.bedrock;
           else if (y <= floor || y >= 115 + Math.sin(wx / 19 + wz / 23) * 4) id = B.netherrack;
           if (y > floor && y < 34) id = B.lava;
-          if (y === 112 && hash3(seed, wx, y, wz) < 0.03) id = 38;
+          if (y === 112 && hash3(seed, wx, y, wz) < 0.03) id = B.glowstone;
           set(y, id);
         }
         // Repeating fortress bridges and crossing platforms, reachable from any portal.

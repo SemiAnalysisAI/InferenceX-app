@@ -1583,6 +1583,8 @@ export const B = {
   sandstone: 34,
   tnt: 36,
   obsidian: 37,
+  glowstone: 38,
+  stoneBricks: 48,
   shortGrass: 39,
   dandelion: 40,
   poppy: 41,

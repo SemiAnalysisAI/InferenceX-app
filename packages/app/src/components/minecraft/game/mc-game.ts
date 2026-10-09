@@ -100,6 +100,7 @@ export interface Entity extends Body {
   blockMeta?: number;
   owner?: 'player' | 'mob';
   fireball?: boolean;
+  shooter?: 'blaze' | 'dragon';
 }
 
 export interface Player extends Body {
@@ -2644,7 +2645,13 @@ export class Game {
       const speed = Math.hypot(e.vx, e.vy, e.vz);
       this.hurtPlayer(
         e.fireball ? 5 : Math.ceil(speed * 2),
-        `${this.t('was shot by Skeleton', '被骷髅射杀了')} by mob`,
+        `${
+          e.fireball
+            ? e.shooter === 'dragon'
+              ? this.t('was burned by Ender Dragon', '被末影龙烧死了')
+              : this.t('was burned by Blaze', '被烈焰人烧死了')
+            : this.t('was shot by Skeleton', '被骷髅射杀了')
+        } by mob`,
         e.vx * 0.3,
         e.vz * 0.3,
       );
@@ -2733,7 +2740,7 @@ export class Game {
           const n = dist || 1;
           this.hurtPlayer(
             3,
-            `${this.t('was slain by Zombie', '被僵尸杀死了')} by mob`,
+            `${kind === 'enderman' ? this.t('was slain by Enderman', '被末影人杀死了') : this.t('was slain by Zombie', '被僵尸杀死了')} by mob`,
             dx / n,
             dz / n,
           );

@@ -455,6 +455,7 @@ export class Endgame {
       vz: (dz / norm) * speed,
       owner: 'mob',
       fireball: true,
+      shooter: e.kind === 'dragon' ? 'dragon' : 'blaze',
     });
     g.entities.push(arrow);
   }

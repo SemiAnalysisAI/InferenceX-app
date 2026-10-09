@@ -98,6 +98,9 @@ describe('Minecraft endgame progression', () => {
     expect([...end.ensureChunk(20, 20).blocks].every((id) => id === B.air)).toBe(true);
     const overworld = new World(2),
       target = stronghold(2);
+    overworld.ensureChunk(target.x >> 4, target.z >> 4);
+    expect(overworld.getBlock(target.x, target.y - 1, target.z)).toBe(B.stoneBricks);
+    expect(overworld.getBlock(target.x, target.y + 5, target.z)).toBe(B.stoneBricks);
     for (const [dx, dz] of PORTAL_RING) {
       overworld.ensureChunk((target.x + dx) >> 4, (target.z + dz) >> 4);
       expect(overworld.getBlock(target.x + dx, target.y, target.z + dz)).toBe(B.endFrame);
@@ -221,5 +224,23 @@ describe('Minecraft endgame progression', () => {
     expect(target.health).toBeLessThan(20);
     expect(g.player.health).toBe(20);
     expect(g.inventory[1]).toBeNull();
+  });
+
+  it.each([
+    ['blaze', 'en', 'was burned by Blaze'],
+    ['dragon', 'en', 'was burned by Ender Dragon'],
+    ['blaze', 'zh', '被烈焰人烧死了'],
+    ['dragon', 'zh', '被末影龙烧死了'],
+  ] as const)('attributes %s fireballs in %s', (shooter, locale, message) => {
+    const g = game();
+    g.locale = locale;
+    g.player.health = 1;
+    const p = g.player;
+    const projectile = g.newEntity('arrow', p.x, p.y + 1, p.z, 0.3, 0.3);
+    Object.assign(projectile, { owner: 'mob', fireball: true, shooter, vy: 0.01 });
+    g.entities.push(projectile);
+    g.update(0.05, NO_INPUT);
+    expect(p.dead).toBe(true);
+    expect(p.deathMessage).toBe(message);
   });
 });
