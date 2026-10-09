@@ -2930,10 +2930,9 @@ describe('Power envelopes', () => {
   // flips the corner toward higher x.
   it('starts the power boundary at the high E2E Normalized Interactivity end', () => {
     mountWithProviders(<PowerHarness normalized />, { unofficial: {} });
-    cy.get('[data-testid="measured-power-summary"]').should(
-      'contain.text',
-      'Showing 3 of 4 measured points',
-    );
+    cy.get('#power-sweep .dot-group')
+      .filter((_, element) => element.style.opacity !== '0')
+      .should('have.length', 3);
   });
 
   it('keeps a fixed measured-power boundary while Optimal Only changes measurement visibility', () => {

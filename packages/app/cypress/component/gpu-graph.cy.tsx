@@ -567,7 +567,7 @@ describe('GPU comparison power envelopes', () => {
   // ChartDisplay draws E2E Normalized Interactivity on the e2e definition and
   // flips the corner toward higher x.
   it('keeps boundary measurements toward higher E2E Normalized Interactivity', () => {
-    mountWithProviders(<PowerComparison normalized />);
+    mountGpuGraph(<PowerComparison normalized />);
     cy.get('#gpu-power-curves .dot-group').should('have.length', 6);
   });
 
