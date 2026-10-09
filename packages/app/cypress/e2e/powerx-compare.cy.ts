@@ -131,14 +131,18 @@ function interceptCheaperOverlayRows() {
   }).as('unofficialRun');
 }
 
-function visitChart(extraParams: string, officialRunUrl: string) {
+function visitChart(extraParams: string, officialRunUrl: string, locale: 'en' | 'zh' = 'en') {
   interceptRows(officialRunUrl);
-  cy.visit(`/inference?g_model=DeepSeek-V4-Pro&i_seq=8k/1k&i_prec=fp4${extraParams}`, {
-    onBeforeLoad(win) {
-      win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-      win.localStorage.setItem('inferencex-feature-gate', '1');
+  cy.visit(
+    `${locale === 'zh' ? '/zh' : ''}/inference?g_model=DeepSeek-V4-Pro&i_seq=8k/1k&i_prec=fp4${extraParams}`,
+    {
+      onBeforeLoad(win) {
+        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+        win.localStorage.setItem('inferencex-feature-gate', '1');
+        win.sessionStorage.setItem('inferencex-reproducibility-nudge-shown', '1');
+      },
     },
-  });
+  );
   cy.wait(['@availability', '@benchmarks']);
   cy.get('[data-testid="inference-chart-display"]').should('exist');
   cy.get('[data-testid="chart-figure"]').should('have.length.at.least', 1);
@@ -214,5 +218,60 @@ describe('PowerX article panels', () => {
       i_powerfit: '1',
       i_frontier: '1',
     });
+  });
+
+  for (const locale of ['en', 'zh'] as const) {
+    it(`differences every visible Table row from one baseline source (${locale})`, () => {
+      interceptCheaperOverlayRows();
+      visitChart(
+        `&unofficialrun=${OVERLAY_RUN_ID}&i_metric=y_measuredJPerOutputToken&i_optimal=0&i_best=0`,
+        OFFICIAL_RUN_URL,
+        locale,
+      );
+      cy.wait('@unofficialRun');
+      cy.get('[data-testid="inference-table-view-btn"]').first().click();
+      const tableRows = '[data-testid="inference-results-table"] tbody tr';
+      cy.get(tableRows).should('have.length', CONFIGS.length * 2);
+      cy.get('[data-testid="inference-results-table"] th').should(
+        'contain.text',
+        locale === 'zh' ? '相对基准差值' : 'Δ vs baseline',
+      );
+
+      // The first visible source is the baseline; the 10% cheaper overlay tableRows
+      // differ from it at each shared load, in the metric column's own units.
+      cy.get('[data-testid="inference-table-baseline-trigger"]').should('contain.text', 'B200');
+      const baselineWord = locale === 'zh' ? '基准' : 'baseline';
+      cy.get(`${tableRows}:contains("B200")`)
+        .should('have.length', CONFIGS.length)
+        .each(($row) => expect($row.text()).to.include(baselineWord));
+      for (const delta of ['-0.240 (-10.0%)', '-0.160 (-10.0%)', '-0.100 (-10.0%)']) {
+        cy.contains(tableRows, delta).should('contain.text', 'H200');
+      }
+
+      // Choosing the overlay as baseline flips the sign; nothing is interpolated.
+      cy.get('[data-testid="inference-table-baseline-trigger"]').click();
+      cy.contains('[role="option"]', 'H200').click();
+      cy.contains(tableRows, '+0.240 (+11.1%)').should('contain.text', 'B200');
+      cy.get(`${tableRows}:contains("H200")`).each(($row) =>
+        expect($row.text()).to.include(baselineWord),
+      );
+
+      cy.viewport(390, 844);
+      cy.get('[data-testid="inference-table-baseline-trigger"]').should(($trigger) => {
+        const bounds = $trigger[0].getBoundingClientRect();
+        expect(bounds.left).to.be.at.least(0);
+        expect(bounds.right).to.be.at.most(390);
+      });
+    });
+  }
+
+  it('keeps the baseline column off non-power metrics', () => {
+    visitChart('&i_metric=y_tpPerGpu', OFFICIAL_RUN_URL);
+    cy.get('[data-testid="inference-table-view-btn"]').first().click();
+    cy.get('[data-testid="inference-results-table"] tbody tr').should(
+      'have.length',
+      CONFIGS.length,
+    );
+    cy.get('[data-testid="inference-table-baseline"]').should('not.exist');
   });
 });

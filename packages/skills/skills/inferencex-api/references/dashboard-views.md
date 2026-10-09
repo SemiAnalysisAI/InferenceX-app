@@ -116,10 +116,11 @@ TTFT/E2E use recorded means. Default is median; absent means are not replaced.
 AgentX still uses `percentile`; concurrency uses no statistic. Check resolved
 `params.xstat` and `xAxis.statistic`, not the requested parameter alone.
 
-Equal-service and matched-concurrency analysis are API-only. The dashboard keeps role and
-power-fit panels, but has no service-comparison control, source selector, target input or
-matched-concurrency table. Use `serviceCompare`, `serviceBaseline`, `serviceComparator` and
-`serviceTarget` as API query parameters; they have no dashboard share-parameter equivalents.
+Equal-service analysis is API-only: the dashboard has no target input or comparison curve. Its
+Table view does show same-concurrency differences from one baseline source (a `Δ vs baseline`
+column on measured GPU W/GPU and J/output token; table-local, no share parameter), and the API
+equivalent is `matchedConcurrency`. Use `serviceCompare`, `serviceBaseline`, `serviceComparator`
+and `serviceTarget` as API query parameters; they have no dashboard share-parameter equivalents.
 
 `serviceCompare=true` returns exact opaque `serviceSources` keys, an
 `equalServiceCurve`, and an optional `equalServiceComparison` at `serviceTarget`.
