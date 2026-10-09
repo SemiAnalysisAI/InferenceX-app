@@ -22,6 +22,8 @@ const STRINGS = {
     tooltipDie: 'Die',
     tooltipValue: 'Value',
     tooltipDismiss: 'Click elsewhere to dismiss',
+    tooltipRow: 'row',
+    tooltipCol: 'column',
     methodology: 'Methodology',
     methodologyText:
       'L2 pointer-chase benchmark: each SM walks a linked-list through L2 cache lines, recording per-hop latency via clock64(). The matrix shows mean |diff| between per-address latency vectors of each SM pair, revealing shared L2 partition proximity.',
@@ -42,6 +44,8 @@ const STRINGS = {
     tooltipDie: 'Die',
     tooltipValue: '值',
     tooltipDismiss: '点击其他区域关闭',
+    tooltipRow: '行',
+    tooltipCol: '列',
     methodology: '测试方法',
     methodologyText:
       'L2 指针追踪基准测试：每个 SM 沿链表遍历 L2 缓存行，通过 clock64() 记录每跳延迟。矩阵展示每对 SM 的逐地址延迟向量的平均绝对差，揭示 L2 分区的共享亲和度。',
@@ -238,10 +242,10 @@ function SmL2HeatmapChart({ result, locale }: { result: SmL2ViewResult; locale: 
             ${val.toFixed(1)} cycles
           </div>
           <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;">
-            <strong>${t.tooltipSm} (row):</strong> ${infoI.sm} &middot; ${t.tooltipGpc} ${infoI.gpc} &middot; ${t.tooltipDie} ${infoI.die}
+            <strong>${t.tooltipSm} (${t.tooltipRow}):</strong> ${infoI.sm} &middot; ${t.tooltipGpc} ${infoI.gpc} &middot; ${t.tooltipDie} ${infoI.die}
           </div>
           <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;">
-            <strong>${t.tooltipSm} (col):</strong> ${infoJ.sm} &middot; ${t.tooltipGpc} ${infoJ.gpc} &middot; ${t.tooltipDie} ${infoJ.die}
+            <strong>${t.tooltipSm} (${t.tooltipCol}):</strong> ${infoJ.sm} &middot; ${t.tooltipGpc} ${infoJ.gpc} &middot; ${t.tooltipDie} ${infoJ.die}
           </div>
         </div>
       `;
