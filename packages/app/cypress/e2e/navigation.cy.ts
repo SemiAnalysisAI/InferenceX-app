@@ -138,7 +138,7 @@ describe('First-load navigation', () => {
         // on first load, and its corner card would sit over the footer links
         // these specs click.
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-        win.localStorage.removeItem('inferencex-rubin-banner-dismissed');
+        win.localStorage.removeItem('inferencex-rubin-minimax-m3-banner-dismissed');
       },
     });
 
@@ -223,29 +223,31 @@ describe('First-load navigation', () => {
   });
 });
 
-describe('Rubin launch banner', { testIsolation: true }, () => {
+describe('Rubin MiniMax M3 launch banner', { testIsolation: true }, () => {
   for (const locale of ['', '/zh']) {
-    it(`opens DeepSeek V4 results from ${locale || '/'} landing page`, () => {
+    it(`opens MiniMax M3 results from ${locale || '/'} landing page`, () => {
       cy.visit(locale || '/', {
         onBeforeLoad(win) {
-          // Dismissing the previous launch must not hide the Rubin banner.
-          win.localStorage.setItem('inferencex-tpuv7-banner-dismissed', '1');
-          win.localStorage.removeItem('inferencex-rubin-banner-dismissed');
+          // Dismissing the previous Rubin launch must not hide this banner.
+          win.localStorage.setItem('inferencex-rubin-banner-dismissed', '1');
+          win.localStorage.removeItem('inferencex-rubin-minimax-m3-banner-dismissed');
           win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
         },
       });
       cy.get('[data-testid="launch-banner"]')
-        .should('have.attr', 'href', `${locale}/inference/deepseek-v4`)
+        .should('have.attr', 'href', `${locale}/inference/minimax-m3`)
         .and(
           'contain.text',
-          locale ? 'Rubin 智能体推理性能' : 'Rubin Agentic Inference Performance',
+          locale ? 'Rubin vLLM MiniMax M3 预览版现已上线' : 'Rubin vLLM MiniMax M3 Preview is Here',
         )
         .and(
           'contain.text',
-          locale ? '速度达 Blackwell Ultra 的 67 倍' : '67x Faster than Blackwell Ultra',
+          locale
+            ? 'NVIDIA Rubin 上 MiniMax M3 的 vLLM 早期结果'
+            : 'Early vLLM results for MiniMax M3 on NVIDIA Rubin',
         )
         .click();
-      cy.location('pathname').should('eq', `${locale}/inference/deepseek-v4`);
+      cy.location('pathname').should('eq', `${locale}/inference/minimax-m3`);
       cy.get('[data-testid="inference-chart-display"]').should('be.visible');
     });
   }

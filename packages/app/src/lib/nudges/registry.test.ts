@@ -77,7 +77,7 @@ describe('NUDGE_REGISTRY integrity', () => {
       'filter-hint',
       'gradient-label',
       'reproducibility',
-      'rubin-agentic-inference-banner',
+      'rubin-minimax-m3-banner',
       'star-nudge',
     ]);
   });
@@ -102,28 +102,28 @@ describe('NUDGE_REGISTRY integrity', () => {
     reproducibility.content.action?.onClick();
     expect(location.href).toBe('/zh/about#reproducibility');
 
-    const banner = NUDGE_REGISTRY.find((nudge) => nudge.id === 'rubin-agentic-inference-banner');
+    const banner = NUDGE_REGISTRY.find((nudge) => nudge.id === 'rubin-minimax-m3-banner');
     if (banner?.type !== 'banner') throw new Error('Missing launch banner');
     // New storage key so visitors who dismissed the previous launch banner
     // see this one; cypress specs seed/clear this key and must stay in sync.
-    expect(banner.storageKey).toBe('inferencex-rubin-banner-dismissed');
-    expect(banner.content.href).toBe('/inference/deepseek-v4');
-    expect(banner.content.title).toBe('Rubin Agentic Inference Performance');
-    expect(banner.content.description).toBe('67x Faster than Blackwell Ultra');
-    expect(banner.content.titleZh).toBe('Rubin 智能体推理性能');
-    expect(banner.content.descriptionZh).toBe('速度达 Blackwell Ultra 的 67 倍');
+    expect(banner.storageKey).toBe('inferencex-rubin-minimax-m3-banner-dismissed');
+    expect(banner.content.href).toBe('/inference/minimax-m3');
+    expect(banner.content.title).toBe('Rubin vLLM MiniMax M3 Preview is Here');
+    expect(banner.content.description).toBe('Early vLLM results for MiniMax M3 on NVIDIA Rubin');
+    expect(banner.content.titleZh).toBe('Rubin vLLM MiniMax M3 预览版现已上线');
+    expect(banner.content.descriptionZh).toBe('NVIDIA Rubin 上 MiniMax M3 的 vLLM 早期结果');
     expect(banner.analytics).toEqual({
-      shown: 'inference_rubin_banner_shown',
-      dismissed: 'inference_rubin_banner_dismissed',
-      action: 'inference_rubin_banner_clicked',
+      shown: 'inference_rubin_minimax_m3_banner_shown',
+      dismissed: 'inference_rubin_minimax_m3_banner_dismissed',
+      action: 'inference_rubin_minimax_m3_banner_clicked',
       properties: {
-        banner_id: 'rubin-agentic-inference',
+        banner_id: 'rubin-minimax-m3',
         destination: 'inference',
       },
     });
     // Clicks preserve the Chinese locale and model-specific destination.
     banner.content.onLinkClick?.();
-    expect(location.href).toBe('/zh/inference/deepseek-v4');
+    expect(location.href).toBe('/zh/inference/minimax-m3');
   });
 
   it('gives every coach mark an anchor to point at', () => {
