@@ -1,129 +1,311 @@
 'use client';
 
-import { useMemo, useRef, useState, type RefObject } from 'react';
-import {
-  ChartDialog,
-  ExpandButton,
-  Expandable,
-} from '@/components/agentic-workload-explorer/expandable-chart';
-import { cn } from '@/lib/utils';
-import { exportSvgToPng, ExportPngButton } from '@/lib/agentic-workload-explorer/export-png';
-import { track } from '@/lib/analytics';
+import { useMemo, useState } from 'react';
+import * as d3 from 'd3';
+import { D3ChartCard } from '@/components/ui/d3-chart-card';
+import type { D3ChartProps, LayerConfig, RenderContext } from '@/lib/d3-chart/D3Chart';
+import { escapeHtml } from '@/lib/utils';
 import { useLocale } from '@/lib/use-locale';
+import { Card, CardContent } from '@/components/ui/card';
+import { DashboardSectionHeader } from '@/components/ui/dashboard-section-header';
 
-const STRINGS = {
-  en: {
-    noData: 'No data in this window',
-  },
-  zh: {
-    noData: '该时间窗口内无数据',
-  },
-} as const;
+const PALETTE = ['var(--chart-1)', 'var(--chart-2)', 'var(--chart-3)', 'var(--chart-4)'];
 
-export function SectionHeader({ label, subtext }: { label: string; subtext?: string }) {
-  return (
-    <div className="mb-2">
-      <div className="flex items-center gap-2">
-        <span className="text-3xs font-mono font-bold uppercase tracking-eyebrow-wide text-muted-foreground">
-          {label}
-        </span>
-        <span className="flex-1 h-px bg-border" />
-      </div>
-      {subtext && <div className="mt-1 text-3xs font-mono text-subtle">{subtext}</div>}
-    </div>
-  );
+interface LinePoint {
+  x: number;
+  y: number;
+  label?: string;
 }
 
-export function StatCard({
-  label,
-  value,
-  detail,
-}: {
+interface NumericLineSeries {
+  key: string;
   label: string;
-  value: string;
-  detail?: string;
+  color?: string;
+  points: LinePoint[];
+}
+
+interface StackedBarBucket {
+  label: string;
+  values: Record<string, number>;
+}
+
+function tooltipHtml(label: string, rows: { label: string; value: string }[]) {
+  return `<div class="space-y-1 text-xs"><div class="font-semibold">${escapeHtml(label)}</div>${rows
+    .map((row) => `<div>${escapeHtml(row.label)}: ${escapeHtml(row.value)}</div>`)
+    .join('')}</div>`;
+}
+
+function Legend({
+  series,
+  onHighlight,
+}: {
+  series: { key: string; label: string; color: string }[];
+  onHighlight?: (key: string | null) => void;
 }) {
   return (
-    <div className="rounded-md border border-border bg-surface p-3">
-      <div className="text-3xs font-mono font-bold uppercase tracking-eyebrow text-muted-foreground">
-        {label}
-      </div>
-      <div className="text-lg font-mono font-bold mt-1">{value}</div>
-      {detail && <div className="text-3xs font-mono text-muted-foreground mt-0.5">{detail}</div>}
+    <div className="flex flex-wrap gap-x-4 gap-y-1 px-2 text-xs text-muted-foreground">
+      {series.map((item) => (
+        <span
+          key={item.key}
+          className="inline-flex items-center gap-1.5"
+          onMouseEnter={onHighlight ? () => onHighlight(item.key) : undefined}
+          onMouseLeave={onHighlight ? () => onHighlight(null) : undefined}
+        >
+          <span className="size-2 rounded-sm" style={{ backgroundColor: item.color }} />
+          {item.label}
+        </span>
+      ))}
     </div>
   );
 }
 
-function niceNum(range: number, round: boolean): number {
-  if (range <= 0) return 1;
-  const exponent = Math.floor(Math.log10(range));
-  const fraction = range / 10 ** exponent;
-  let niceFraction: number;
-  if (round) {
-    if (fraction < 1.5) niceFraction = 1;
-    else if (fraction < 3) niceFraction = 2;
-    else if (fraction < 7) niceFraction = 5;
-    else niceFraction = 10;
-  } else if (fraction <= 1) {
-    niceFraction = 1;
-  } else if (fraction <= 2) {
-    niceFraction = 2;
-  } else if (fraction <= 5) {
-    niceFraction = 5;
-  } else {
-    niceFraction = 10;
-  }
-  return niceFraction * 10 ** exponent;
-}
+function TrendLineChart({
+  title,
+  series,
+  xTick,
+  yTick = formatAxisNumber,
+  subtext,
+  yMin = 0,
+  filename,
+  emptyLabel,
+  xTicks,
+}: {
+  title: string;
+  series: NumericLineSeries[];
+  xTick?: (x: number) => string;
+  yTick?: (y: number) => string;
+  subtext?: string;
+  yMin?: number;
+  filename?: string;
+  emptyLabel?: string;
+  xTicks?: number[];
+}) {
+  const chart = useMemo<D3ChartProps<LinePoint>>(() => {
+    const colored = series.map((s, i) => ({
+      ...s,
+      color: s.color ?? PALETTE[i % PALETTE.length],
+    }));
+    const data = colored
+      .flatMap((s) => s.points)
+      .filter((p) => Number.isFinite(p.x) && Number.isFinite(p.y))
+      .sort((a, b) => a.x - b.x);
+    const pointColors = new Map(colored.flatMap((s) => s.points.map((p) => [p, s.color] as const)));
+    const xMin = d3.min(data, (p) => p.x) ?? 0;
+    const xMax = d3.max(data, (p) => p.x) ?? 1;
+    const yMax = d3.max(data, (p) => p.y) ?? 0;
+    // Index keys keep arbitrary model IDs out of D3's CSS selectors.
+    const lines = Object.fromEntries(
+      colored.map((s, i) => [
+        String(i),
+        s.points.filter((p) => Number.isFinite(p.x)).toSorted((a, b) => a.x - b.x),
+      ]),
+    );
+    return {
+      chartId: '',
+      data,
+      height: 260,
+      margin: { top: 16, right: 18, bottom: 42, left: 66 },
+      watermark: 'none',
+      xScale: {
+        type: 'linear',
+        domain: xMin === xMax ? [xMin - 0.5, xMax + 0.5] : [xMin, xMax],
+        nice: false,
+      },
+      yScale: { type: 'linear', domain: [yMin, Math.max(yMin + 1, yMax * 1.12)], nice: false },
+      xAxis: {
+        tickCount: 5,
+        tickValues: xTicks,
+        tickFormat: (x) => xTick?.(Number(x)) ?? String(x),
+      },
+      yAxis: { tickCount: 4, tickFormat: (y) => yTick(Number(y)) },
+      layers: [
+        {
+          type: 'line',
+          lines,
+          config: {
+            getColor: (key) => colored[Number(key)].color,
+            curve: d3.curveLinear,
+            isDefined: (p) => Number.isFinite(p.y),
+          },
+        },
+        {
+          type: 'point',
+          data,
+          config: {
+            getX: (p) => p.x,
+            getY: (p) => p.y,
+            getCx: () => 0,
+            getCy: () => 0,
+            getColor: (p) => pointColors.get(p) ?? PALETTE[0],
+            getRadius: () => 2,
+            maxPoints: Infinity,
+          },
+        },
+      ],
+      zoom: { enabled: true },
+      tooltip: {
+        rulerType: 'vertical',
+        proximityHover: true,
+        getDataX: (p) => p.x,
+        getRulerX: (p, scale) => (scale as d3.ScaleLinear<number, number>)(p.x),
+        content: (p) =>
+          tooltipHtml(
+            p.label ?? xTick?.(p.x) ?? String(p.x),
+            colored.flatMap((s) => {
+              const point = s.points.find((item) => item.x === p.x && Number.isFinite(item.y));
+              return point ? [{ label: s.label, value: yTick(point.y) }] : [];
+            }),
+          ),
+      },
+      legendElement: <Legend series={colored} />,
+      noDataOverlay:
+        data.length === 0 ? (
+          <p className="p-8 text-center text-muted-foreground">{emptyLabel}</p>
+        ) : undefined,
+    };
+  }, [series, xTick, yTick, xTicks, yMin, emptyLabel]);
 
-function generateTicks(min: number, max: number, targetCount: number): number[] {
-  if (max <= min) return [min];
-  const range = niceNum(max - min, false);
-  const spacing = niceNum(range / (targetCount - 1), true);
-  const niceMin = Math.floor(min / spacing) * spacing;
-  const ticks: number[] = [];
-  // Keep going until a tick reaches max, so the tallest bar is never clipped.
-  for (let t = niceMin; t - spacing < max - spacing * 1e-9; t += spacing) {
-    ticks.push(Math.round(t * 1e10) / 1e10);
-  }
-  return ticks;
-}
-
-export function formatAxisNumber(v: number): string {
-  if (v >= 1e9) return `${(v / 1e9).toFixed(v % 1e9 === 0 ? 0 : 1)}B`;
-  if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(v % 1_000_000 === 0 ? 0 : 1)}M`;
-  if (v >= 1_000) return `${(v / 1_000).toFixed(v % 1_000 === 0 ? 0 : 1)}K`;
-  if (Number.isInteger(v)) return String(v);
-  return v.toFixed(1);
-}
-
-export function formatAxisPercent(v: number): string {
-  return `${Math.round(v)}%`;
-}
-
-function dayLabel(day: string): string {
-  const d = new Date(day);
-  if (Number.isNaN(d.getTime())) return day;
-  return `${d.getUTCMonth() + 1}/${d.getUTCDate()}`;
-}
-
-const CHART_W = 640;
-const CHART_H = 220;
-/** Wider and taller than the inline chart so text renders smaller in the dialog. */
-const EXPANDED_W = 1100;
-const EXPANDED_H = 460;
-const MARGIN = { top: 8, right: 12, bottom: 36, left: 52 };
-const PLOT_W = CHART_W - MARGIN.left - MARGIN.right;
-const PLOT_H = CHART_H - MARGIN.top - MARGIN.bottom;
-
-function EmptyChart({ title, label }: { title: string; label: string }) {
   return (
-    <div className="rounded-md border border-border bg-surface p-3">
-      <SectionHeader label={title} />
-      <div className="flex items-center justify-center h-40 text-2xs font-mono text-muted-foreground">
-        {label}
-      </div>
-    </div>
+    <D3ChartCard
+      title={title}
+      subtitle={subtext}
+      analyticsPrefix="agentic_workload"
+      chart={chart}
+      filename={filename}
+    />
+  );
+}
+
+interface Segment {
+  bucket: StackedBarBucket;
+  index: number;
+  key: string;
+  color: string;
+  low: number;
+  high: number;
+}
+
+function StackedBarChart({
+  title,
+  buckets,
+  keys,
+  colors,
+  yTick = formatAxisNumber,
+  subtext,
+  fixedMax,
+  filename,
+  emptyLabel,
+}: {
+  title: string;
+  buckets: StackedBarBucket[];
+  keys: { key: string; label: string }[];
+  colors?: Record<string, string>;
+  yTick?: (y: number) => string;
+  subtext?: string;
+  fixedMax?: number;
+  filename?: string;
+  emptyLabel?: string;
+}) {
+  const [highlighted, setHighlighted] = useState<string | null>(null);
+  const chart = useMemo<D3ChartProps<Segment>>(() => {
+    const colored = keys.map((s, i) => ({
+      ...s,
+      color: colors?.[s.key] ?? PALETTE[i % PALETTE.length],
+    }));
+    const segments = buckets.flatMap((bucket, index) => {
+      let low = 0;
+      return colored.map((s): Segment => {
+        const high = low + Math.max(0, bucket.values[s.key] ?? 0);
+        const segment = { bucket, index, key: s.key, color: s.color, low, high };
+        low = high;
+        return segment;
+      });
+    });
+    const renderSegments = (
+      ctx: RenderContext,
+      yScale = ctx.yScale as d3.ScaleLinear<number, number>,
+    ) => {
+      const xScale = ctx.xScale as d3.ScaleBand<string>;
+      return ctx.layout.zoomGroup
+        .selectAll<SVGRectElement, Segment>('.stacked-segment')
+        .data(segments, (s) => `${s.index}:${s.key}`)
+        .join('rect')
+        .attr('class', 'stacked-segment')
+        .attr('x', (s) => xScale(String(s.index)) ?? 0)
+        .attr('width', xScale.bandwidth())
+        .attr('y', (s) => yScale(s.high))
+        .attr('height', (s) => Math.max(0, yScale(s.low) - yScale(s.high)))
+        .attr('fill', (s) => s.color);
+    };
+    // The shared renderer owns axes, resize, zoom and tooltips. Only stacking is custom.
+    const layers: LayerConfig<Segment>[] = [
+      {
+        type: 'custom',
+        key: 'stacked-segments',
+        render: (_, ctx) => renderSegments(ctx),
+        onZoom: (_, ctx) => renderSegments(ctx, ctx.newYScale as d3.ScaleLinear<number, number>),
+      },
+    ];
+    const tickStep = Math.max(1, Math.ceil(buckets.length / 6));
+    return {
+      chartId: '',
+      data: segments,
+      height: 260,
+      margin: { top: 16, right: 18, bottom: 42, left: 66 },
+      watermark: 'none',
+      xScale: { type: 'band', domain: buckets.map((_, i) => String(i)), padding: 0.18 },
+      yScale: {
+        type: 'linear',
+        domain: [0, fixedMax ?? Math.max(1, (d3.max(segments, (s) => s.high) ?? 0) * 1.12)],
+        nice: false,
+      },
+      xAxis: {
+        tickFormat: (value) => {
+          const i = Number(value);
+          return i % tickStep === 0 || i === buckets.length - 1 ? (buckets[i]?.label ?? '') : '';
+        },
+      },
+      yAxis: { tickCount: 4, tickFormat: (y) => yTick(Number(y)) },
+      layers,
+      zoom: { enabled: true, axes: 'y' },
+      tooltip: {
+        rulerType: 'none',
+        attachToLayer: 0,
+        onHoverStart: (_, segment) => setHighlighted(segment.key),
+        onHoverEnd: () => setHighlighted(null),
+        content: ({ bucket }) =>
+          tooltipHtml(
+            bucket.label,
+            colored.map((s) => ({
+              label: s.label,
+              value: yTick(bucket.values[s.key] ?? 0),
+            })),
+          ),
+      },
+      legendElement: <Legend series={colored} onHighlight={setHighlighted} />,
+      noDataOverlay:
+        buckets.length === 0 ? (
+          <p className="p-8 text-center text-muted-foreground">{emptyLabel}</p>
+        ) : undefined,
+    };
+  }, [buckets, keys, colors, yTick, fixedMax, emptyLabel]);
+
+  return (
+    <D3ChartCard
+      title={title}
+      subtitle={subtext}
+      analyticsPrefix="agentic_workload"
+      chart={{
+        ...chart,
+        displayIdentity: highlighted ?? '',
+        onDisplayUpdate: (ctx) => {
+          ctx.layout.zoomGroup
+            .selectAll<SVGRectElement, Segment>('.stacked-segment')
+            .attr('opacity', (s) => (highlighted === null || s.key === highlighted ? 1 : 0.2));
+        },
+      }}
+      filename={filename}
+    />
   );
 }
 
@@ -131,186 +313,7 @@ export interface LineSeries {
   key: string;
   label: string;
   color: string;
-  /** One value per day; missing days are gaps (line breaks, not zeros). */
   points: { day: string; value: number }[];
-}
-
-export function TrendsLineChart({
-  title,
-  subtext,
-  series,
-  yFormatter = formatAxisNumber,
-  filename,
-  emptyLabel,
-  yMin = 0,
-}: {
-  title: string;
-  subtext?: string;
-  series: LineSeries[];
-  yFormatter?: (v: number) => string;
-  filename: string;
-  emptyLabel?: string;
-  /** Force the y-axis floor (e.g. leave undefined/0 for counts, or a fixed min for ratios). */
-  yMin?: number;
-}) {
-  const locale = useLocale();
-  const resolvedEmptyLabel = emptyLabel ?? STRINGS[locale].noData;
-  const svgRef = useRef<SVGSVGElement>(null);
-
-  const { days, valuesByKey, yMax, yTicks } = useMemo(() => {
-    const daySet = new Set<string>();
-    for (const s of series) for (const p of s.points) daySet.add(p.day);
-    // Days may be Date strings ("Fri Sep 25 2026 …"), so sort by time.
-    const sortedDays = [...daySet].toSorted((a, b) => Date.parse(a) - Date.parse(b));
-    const dayIndex = new Map(sortedDays.map((d, i) => [d, i]));
-
-    const perSeriesValues = new Map<string, (number | null)[]>();
-    let max = 0;
-    for (const s of series) {
-      const arr: (number | null)[] = Array.from({ length: sortedDays.length }, () => null);
-      for (const p of s.points) {
-        const i = dayIndex.get(p.day);
-        if (i === undefined) continue;
-        arr[i] = p.value;
-        if (p.value > max) max = p.value;
-      }
-      perSeriesValues.set(s.key, arr);
-    }
-
-    const ticks = max > 0 ? generateTicks(yMin, max, 5) : [yMin, 1];
-    return {
-      days: sortedDays,
-      valuesByKey: perSeriesValues,
-      yMax: ticks.at(-1) || max || 1,
-      yTicks: ticks,
-    };
-  }, [series, yMin]);
-
-  if (days.length === 0) return <EmptyChart title={title} label={resolvedEmptyLabel} />;
-
-  const xOf = (i: number) =>
-    MARGIN.left + (days.length <= 1 ? PLOT_W / 2 : (i / (days.length - 1)) * PLOT_W);
-  const yOf = (v: number) => MARGIN.top + PLOT_H - ((v - yMin) / (yMax - yMin || 1)) * PLOT_H;
-
-  const paths = series.map((s) => {
-    const values = valuesByKey.get(s.key) ?? [];
-    const segments: string[] = [];
-    let open = false;
-    for (let i = 0; i < values.length; i++) {
-      const v = values[i];
-      if (v === null) {
-        open = false;
-        continue;
-      }
-      segments.push(`${open ? 'L' : 'M'} ${xOf(i)} ${yOf(v)}`);
-      open = true;
-    }
-    return { key: s.key, label: s.label, color: s.color, d: segments.join(' ') };
-  });
-
-  const labelInterval = Math.max(1, Math.floor(days.length / 6));
-
-  return (
-    <Expandable title={title}>
-      <div className="rounded-md border border-border bg-surface p-3">
-        <div className="flex items-center justify-between">
-          <SectionHeader label={title} subtext={subtext} />
-          <ExportPngButton
-            locale={locale}
-            onClick={() => {
-              track('agentic_workload_trends_line_chart_export', { title, filename });
-              if (svgRef.current)
-                exportSvgToPng(svgRef.current, {
-                  title,
-                  filename,
-                  svgWidth: CHART_W,
-                  svgHeight: CHART_H,
-                });
-            }}
-          />
-        </div>
-
-        {series.length > 1 && (
-          <div className="flex flex-wrap items-center gap-3 text-3xs font-mono text-muted-foreground mb-2">
-            {series.map((s) => (
-              <span key={s.key} className="flex items-center gap-1">
-                <span
-                  className="inline-block w-2.5 h-2.5 rounded-sm"
-                  style={{ backgroundColor: s.color }}
-                />
-                {s.label}
-              </span>
-            ))}
-          </div>
-        )}
-
-        {/* Narrow screens scroll the chart rather than shrinking its text. */}
-        <div className="overflow-x-auto">
-          <svg ref={svgRef} viewBox={`0 0 ${CHART_W} ${CHART_H}`} className="w-full min-w-[640px]">
-            {yTicks.map((t) => (
-              <g key={`y-${t}`}>
-                <line
-                  x1={MARGIN.left}
-                  y1={yOf(t)}
-                  x2={MARGIN.left + PLOT_W}
-                  y2={yOf(t)}
-                  stroke="currentColor"
-                  className="text-border"
-                  strokeWidth={0.5}
-                  strokeDasharray="3 3"
-                />
-                <text
-                  x={MARGIN.left - 6}
-                  y={yOf(t) + 3}
-                  textAnchor="end"
-                  className="fill-muted-foreground"
-                  style={{
-                    fontSize: '9px',
-                    fontFamily: 'var(--font-mono, ui-monospace, monospace)',
-                  }}
-                >
-                  {yFormatter(t)}
-                </text>
-              </g>
-            ))}
-
-            <line
-              x1={MARGIN.left}
-              y1={MARGIN.top + PLOT_H}
-              x2={MARGIN.left + PLOT_W}
-              y2={MARGIN.top + PLOT_H}
-              stroke="currentColor"
-              className="text-border"
-              strokeWidth={0.5}
-            />
-
-            {paths.map((p) => (
-              <path key={p.key} d={p.d} fill="none" stroke={p.color} strokeWidth={1.75} />
-            ))}
-
-            {days.map((day, i) => {
-              if (i % labelInterval !== 0 && i !== days.length - 1) return null;
-              return (
-                <text
-                  key={`x-${day}`}
-                  x={xOf(i)}
-                  y={MARGIN.top + PLOT_H + 16}
-                  textAnchor="middle"
-                  className="fill-muted-foreground"
-                  style={{
-                    fontSize: '9px',
-                    fontFamily: 'var(--font-mono, ui-monospace, monospace)',
-                  }}
-                >
-                  {dayLabel(day)}
-                </text>
-              );
-            })}
-          </svg>
-        </div>
-      </div>
-    </Expandable>
-  );
 }
 
 export interface StackedDayPoint {
@@ -318,16 +321,76 @@ export interface StackedDayPoint {
   values: Record<string, number>;
 }
 
+export function formatAxisNumber(v: number): string {
+  if (v >= 1e9) return `${(v / 1e9).toFixed(v % 1e9 === 0 ? 0 : 1)}B`;
+  if (v >= 1e6) return `${(v / 1e6).toFixed(v % 1e6 === 0 ? 0 : 1)}M`;
+  if (v >= 1e3) return `${(v / 1e3).toFixed(v % 1e3 === 0 ? 0 : 1)}K`;
+  return Number.isInteger(v) ? String(v) : v.toFixed(1);
+}
+
+export function formatAxisPercent(v: number): string {
+  return `${Math.round(v)}%`;
+}
+
+function dayLabel(day: string): string {
+  const date = new Date(day);
+  return Number.isNaN(date.getTime()) ? day : `${date.getUTCMonth() + 1}/${date.getUTCDate()}`;
+}
+
+export function TrendsLineChart({
+  series,
+  yFormatter,
+  emptyLabel,
+  ...props
+}: {
+  title: string;
+  subtext?: string;
+  series: LineSeries[];
+  yFormatter?: (value: number) => string;
+  filename: string;
+  emptyLabel?: string;
+  yMin?: number;
+}) {
+  const locale = useLocale();
+  const { days, numeric } = useMemo(() => {
+    const sortedDays = [...new Set(series.flatMap((s) => s.points.map((p) => p.day)))].toSorted(
+      (a, b) => Date.parse(a) - Date.parse(b),
+    );
+    const numericSeries = series.map((s) => {
+      const values = new Map(s.points.map((p) => [p.day, p.value]));
+      return {
+        ...s,
+        // Explicit NaNs preserve gaps instead of connecting across missing days.
+        points: sortedDays.map((day, x) => ({
+          x,
+          y: values.get(day) ?? NaN,
+          label: dayLabel(day),
+        })),
+      };
+    });
+    return { days: sortedDays, numeric: numericSeries };
+  }, [series]);
+  const step = Math.max(1, Math.ceil(days.length / 6));
+  return (
+    <TrendLineChart
+      {...props}
+      series={numeric}
+      yTick={yFormatter}
+      xTick={(x) => (days[x] ? dayLabel(days[x]) : '')}
+      xTicks={days.flatMap((_, i) => (i % step === 0 || i === days.length - 1 ? [i] : []))}
+      emptyLabel={emptyLabel ?? (locale === 'zh' ? '该时间窗口内无数据' : 'No data in this window')}
+    />
+  );
+}
+
 export function TrendsStackedChart({
-  title,
-  subtext,
   days,
   seriesKeys,
   labelFor,
   colorFor,
   mode,
-  filename,
   emptyLabel,
+  ...props
 }: {
   title: string;
   subtext?: string;
@@ -340,206 +403,61 @@ export function TrendsStackedChart({
   emptyLabel?: string;
 }) {
   const locale = useLocale();
-  const resolvedEmptyLabel = emptyLabel ?? STRINGS[locale].noData;
-  const svgRef = useRef<SVGSVGElement>(null);
-  const [expanded, setExpanded] = useState(false);
-  // Series under the pointer, from the legend or a bar segment; the others fade.
-  const [hovered, setHovered] = useState<string | null>(null);
-
-  const { bars, maxY } = useMemo(() => {
-    if (mode === 'share') {
-      const b = days.map((d) => {
-        const total = seriesKeys.reduce((acc, k) => acc + (d.values[k] || 0), 0);
-        const pct: Record<string, number> =
-          total > 0
-            ? Object.fromEntries(seriesKeys.map((k) => [k, ((d.values[k] || 0) / total) * 100]))
-            : {};
-        return { day: d.day, values: pct, total: total > 0 ? 100 : 0 };
-      });
-      return { bars: b, maxY: 100 };
-    }
-    let max = 0;
-    const b = days.map((d) => {
-      const total = seriesKeys.reduce((acc, k) => acc + (d.values[k] || 0), 0);
-      if (total > max) max = total;
-      return { day: d.day, values: d.values, total };
-    });
-    const ticks = max > 0 ? generateTicks(0, max, 5) : [0];
-    return { bars: b, maxY: ticks.at(-1) || max || 1 };
-  }, [days, seriesKeys, mode]);
-
-  if (bars.length === 0) return <EmptyChart title={title} label={resolvedEmptyLabel} />;
-
-  const yTicks = mode === 'share' ? [0, 25, 50, 75, 100] : generateTicks(0, maxY, 5);
-
-  const legend = (
-    <div
-      className="flex flex-wrap items-center gap-x-3 gap-y-1 text-3xs font-mono text-muted-foreground mb-2"
-      onMouseLeave={() => setHovered(null)}
-    >
-      {seriesKeys.map((k) => (
-        <span
-          key={k}
-          className={cn(
-            'flex cursor-default items-center gap-1 transition-opacity',
-            hovered === k && 'text-foreground',
-            hovered !== null && hovered !== k && 'opacity-40',
-          )}
-          onMouseEnter={() => setHovered(k)}
-        >
-          <span className="inline-block w-2.5 h-2.5" style={{ backgroundColor: colorFor(k) }} />
-          {labelFor(k)}
-        </span>
-      ))}
-    </div>
+  const buckets = useMemo(
+    () =>
+      days.map((day) => {
+        const total = seriesKeys.reduce((sum, key) => sum + (day.values[key] ?? 0), 0);
+        return {
+          label: dayLabel(day.day),
+          values:
+            mode === 'count'
+              ? day.values
+              : Object.fromEntries(
+                  seriesKeys.map((key) => [
+                    key,
+                    total > 0 ? ((day.values[key] ?? 0) / total) * 100 : 0,
+                  ]),
+                ),
+        };
+      }),
+    [days, seriesKeys, mode],
   );
-
-  const renderSvg = (width: number, height: number, ref?: RefObject<SVGSVGElement | null>) => {
-    const plotW = width - MARGIN.left - MARGIN.right;
-    const plotH = height - MARGIN.top - MARGIN.bottom;
-    const slot = plotW / bars.length;
-    const barWidth = Math.max(1, slot - 2);
-    const sx = (i: number) => MARGIN.left + i * slot + (slot - barWidth) / 2;
-    const sy = (v: number) => MARGIN.top + plotH - (v / maxY) * plotH;
-    const labelInterval = Math.max(1, Math.floor(bars.length / (width / 110)));
-    const fontStyle = { fontSize: '9px', fontFamily: 'var(--font-mono, ui-monospace, monospace)' };
-
-    return (
-      <svg
-        ref={ref}
-        viewBox={`0 0 ${width} ${height}`}
-        className="w-full"
-        onMouseLeave={() => setHovered(null)}
-      >
-        {yTicks.map((t) => (
-          <g key={`y-${t}`}>
-            {t > 0 && (
-              <line
-                x1={MARGIN.left}
-                y1={sy(t)}
-                x2={MARGIN.left + plotW}
-                y2={sy(t)}
-                stroke="currentColor"
-                className="text-border"
-                strokeWidth={0.5}
-                strokeDasharray="3 3"
-              />
-            )}
-            <text
-              x={MARGIN.left - 6}
-              y={sy(t) + 3}
-              textAnchor="end"
-              className="fill-muted-foreground"
-              style={fontStyle}
-            >
-              {mode === 'share' ? formatAxisPercent(t) : formatAxisNumber(t)}
-            </text>
-          </g>
-        ))}
-
-        <line
-          x1={MARGIN.left}
-          y1={MARGIN.top + plotH}
-          x2={MARGIN.left + plotW}
-          y2={MARGIN.top + plotH}
-          stroke="currentColor"
-          className="text-border"
-          strokeWidth={0.5}
-        />
-
-        {bars.map(({ day, values }, i) => {
-          let yOffset = 0;
-          const rects: React.ReactNode[] = [];
-          for (const key of seriesKeys) {
-            const v = values[key] || 0;
-            if (v === 0) continue;
-            rects.push(
-              <rect
-                key={`${day}-${key}`}
-                x={sx(i)}
-                y={sy(yOffset + v)}
-                width={barWidth}
-                height={(v / maxY) * plotH}
-                fill={colorFor(key)}
-                opacity={hovered === null || hovered === key ? 1 : 0.15}
-                onMouseEnter={() => setHovered(key)}
-              >
-                <title>
-                  {labelFor(key)}: {mode === 'share' ? `${v.toFixed(1)}%` : formatAxisNumber(v)} (
-                  {day})
-                </title>
-              </rect>,
-            );
-            yOffset += v;
-          }
-          return <g key={day}>{rects}</g>;
-        })}
-
-        {bars.map(({ day }, i) => {
-          if (i % labelInterval !== 0 && i !== bars.length - 1) return null;
-          return (
-            <text
-              key={`x-${day}`}
-              x={sx(i) + barWidth / 2}
-              y={MARGIN.top + plotH + 16}
-              textAnchor="middle"
-              className="fill-muted-foreground"
-              style={fontStyle}
-            >
-              {dayLabel(day)}
-            </text>
-          );
-        })}
-      </svg>
-    );
-  };
-
   return (
-    <div
-      className="rounded-md border border-border bg-surface p-3"
-      onMouseLeave={() => setHovered(null)}
-    >
-      <div className="flex items-center justify-between gap-2">
-        <SectionHeader label={title} subtext={subtext} />
-        <div className="flex items-center gap-3">
-          <ExportPngButton
-            locale={locale}
-            onClick={() => {
-              track('agentic_workload_trends_stacked_chart_export', { title, filename });
-              if (svgRef.current)
-                exportSvgToPng(svgRef.current, {
-                  title,
-                  filename,
-                  svgWidth: CHART_W,
-                  svgHeight: CHART_H,
-                });
-            }}
-          />
-          <ExpandButton
-            onClick={() => {
-              track('agentic_workload_chart_expanded');
-              setExpanded(true);
-            }}
-          />
-        </div>
-      </div>
+    <StackedBarChart
+      {...props}
+      buckets={buckets}
+      keys={seriesKeys.map((key) => ({ key, label: labelFor(key) }))}
+      colors={Object.fromEntries(seriesKeys.map((key) => [key, colorFor(key)]))}
+      yTick={mode === 'share' ? formatAxisPercent : formatAxisNumber}
+      fixedMax={mode === 'share' ? 100 : undefined}
+      emptyLabel={emptyLabel ?? (locale === 'zh' ? '该时间窗口内无数据' : 'No data in this window')}
+    />
+  );
+}
 
-      {legend}
-      <div className="overflow-x-auto">
-        <div className="min-w-[640px]">{renderSvg(CHART_W, CHART_H, svgRef)}</div>
-      </div>
+export function SectionHeader({ label, subtext }: { label: string; subtext?: string }) {
+  return <DashboardSectionHeader title={label} description={subtext} className="mb-2" />;
+}
 
-      <ChartDialog open={expanded} onOpenChange={setExpanded} title={title} subtitle={subtext}>
-        <div onMouseLeave={() => setHovered(null)}>
-          {legend}
-          {/* Phones get the card-sized chart; the wide one would shrink its text. */}
-          <div className="overflow-x-auto sm:hidden">
-            <div className="min-w-[640px]">{renderSvg(CHART_W, CHART_H)}</div>
-          </div>
-          <div className="hidden sm:block">{renderSvg(EXPANDED_W, EXPANDED_H)}</div>
+export function StatCard({
+  label,
+  value,
+  detail,
+}: {
+  label: string;
+  value: string;
+  detail?: string;
+}) {
+  return (
+    <Card className="gap-0 py-3">
+      <CardContent className="px-3">
+        <div className="text-3xs font-mono font-bold uppercase tracking-eyebrow text-muted-foreground">
+          {label}
         </div>
-      </ChartDialog>
-    </div>
+        <div className="text-lg font-mono font-bold mt-1">{value}</div>
+        {detail && <div className="text-3xs font-mono text-muted-foreground mt-0.5">{detail}</div>}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -556,7 +474,5 @@ export const CHART_COLORS = [
 ];
 
 export function buildColorMap(keys: string[]): Record<string, string> {
-  const map: Record<string, string> = {};
-  for (let i = 0; i < keys.length; i++) map[keys[i]] = CHART_COLORS[i % CHART_COLORS.length];
-  return map;
+  return Object.fromEntries(keys.map((key, i) => [key, CHART_COLORS[i % CHART_COLORS.length]]));
 }

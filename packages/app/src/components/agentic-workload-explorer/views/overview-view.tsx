@@ -9,7 +9,7 @@ import {
   formatInteractivity,
   formatPrefillSpeed,
 } from '@/lib/agentic-workload-explorer/format';
-import { InfoTooltip } from '@/components/agentic-workload-explorer/ui/info-tooltip';
+import { InfoHelp } from '@/components/ui/option-info';
 import { useDashboardData } from '@/hooks/agentic-workload-explorer/use-dashboard-data';
 import { useModelFilter } from '@/hooks/agentic-workload-explorer/use-model-filter';
 import { ModelFilter } from '@/components/agentic-workload-explorer/model-filter';
@@ -402,7 +402,11 @@ function StatCard({
         <div className="text-3xs font-mono font-bold uppercase tracking-eyebrow-wide text-muted-foreground">
           {label}
         </div>
-        {tooltip && <InfoTooltip>{tooltip}</InfoTooltip>}
+        {tooltip && (
+          <InfoHelp label={label} value={label} analyticsEvent="selector_help_opened">
+            {tooltip}
+          </InfoHelp>
+        )}
         {expandable && (
           <svg
             className={`w-2.5 h-2.5 text-muted-foreground transition-transform ${isExpanded ? 'rotate-180' : ''}`}

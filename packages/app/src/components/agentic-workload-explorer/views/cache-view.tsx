@@ -2,7 +2,13 @@
 
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Select } from '@/components/agentic-workload-explorer/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { formatNumber, truncateHash } from '@/lib/agentic-workload-explorer/format';
 import { useDashboardData } from '@/hooks/agentic-workload-explorer/use-dashboard-data';
 import { exportSvgToPng, ExportPngButton } from '@/lib/agentic-workload-explorer/export-png';
@@ -299,19 +305,25 @@ function CacheEfficiencyHeatmap({ t }: { t: Strings }) {
           {/* Client selector */}
           <div className="flex items-center gap-2 mb-3">
             <Select
-              value={selectedClient ?? ''}
-              onChange={(v) => {
-                setSelectedClient(v || null);
-                track('agentic_workload_cache_client_changed', { client: v || 'all' });
+              value={selectedClient === null ? 'all' : `client:${selectedClient}`}
+              onValueChange={(v) => {
+                const client = v === 'all' ? null : v.slice('client:'.length);
+                setSelectedClient(client);
+                track('agentic_workload_cache_client_changed', { client: client ?? 'all' });
               }}
-              options={[
-                { value: '', label: t.allClients },
-                ...clientList.map((c) => ({
-                  value: c.id,
-                  label: truncateHash(c.apiKeyHash),
-                })),
-              ]}
-            />
+            >
+              <SelectTrigger aria-label={t.allClients}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t.allClients}</SelectItem>
+                {clientList.map((client) => (
+                  <SelectItem key={client.id} value={`client:${client.id}`}>
+                    {truncateHash(client.apiKeyHash)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Heatmap */}
