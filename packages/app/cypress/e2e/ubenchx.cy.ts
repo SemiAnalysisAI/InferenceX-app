@@ -5,22 +5,13 @@ const dismissModal = {
 };
 
 describe('ubenchX hub and test routes', () => {
-  it('renders the hub page with test cards', () => {
+  it('opens /ubenchx on the mem-bw view with the Beta title and test selector', () => {
     cy.visit('/ubenchx', dismissModal);
-    cy.contains('ubenchX').should('be.visible');
-    cy.get('[data-testid="nav-link-ubenchx"]').should('have.attr', 'href', '/ubenchx');
-    cy.get('[data-testid="ubenchx-test-mem-bw"]').should('be.visible');
-    cy.get('[data-testid="ubenchx-test-sm-l2-distance"]').should('be.visible');
-    cy.get('meta[name="robots"]').should('have.attr', 'content').and('contain', 'noindex');
-    cy.get('link[rel="alternate"][hreflang="zh-CN"]')
-      .invoke('attr', 'href')
-      .should('include', '/zh/ubenchx');
-  });
-
-  it('navigates to mem-bw from the hub', () => {
-    cy.visit('/ubenchx', dismissModal);
-    cy.get('[data-testid="ubenchx-test-mem-bw"]').click();
     cy.url().should('include', '/ubenchx/mem-bw');
+    cy.contains('h1', 'ubenchX Microbenchmarks (Beta)').should('be.visible');
+    cy.get('[data-testid="nav-link-ubenchx"]').should('have.attr', 'href', '/ubenchx');
+    cy.get('[data-testid="ubenchx-test-select"]').should('contain', 'Device-Memory Copy Bandwidth');
+    cy.get('meta[name="robots"]').should('have.attr', 'content').and('contain', 'noindex');
     cy.contains('H100 SXM').should('be.visible');
     cy.get('[data-testid="ubenchx-metric-select"]').should('contain', 'MBU');
     cy.contains('h2', 'Memory Bandwidth Utilization').should('be.visible');
@@ -30,12 +21,13 @@ describe('ubenchX hub and test routes', () => {
     cy.get('[data-testid="ubenchx-metric-select"]').should('contain', 'TB/s');
   });
 
-  it('navigates to sm-l2-distance from the hub', () => {
-    cy.visit('/ubenchx', dismissModal);
-    cy.get('[data-testid="ubenchx-test-sm-l2-distance"]').click();
+  it('switches to sm-l2-distance with the test selector', () => {
+    cy.visit('/ubenchx/mem-bw', dismissModal);
+    cy.get('[data-testid="ubenchx-test-select"]').click();
+    cy.contains('[role="option"]', 'SM-SM L2 Latency Difference').click();
     cy.url().should('include', '/ubenchx/sm-l2-distance');
     cy.get('[data-testid="sm-l2-heatmap"]').should('be.visible');
-    cy.contains('SM-SM L2 Latency Difference').should('be.visible');
+    cy.get('[data-testid="ubenchx-test-select"]').should('contain', 'SM-SM L2 Latency Difference');
   });
 
   it('renders the mem-bw page directly with noindex', () => {
@@ -70,15 +62,15 @@ describe('ubenchX hub and test routes', () => {
       });
   });
 
-  it('renders the Chinese hub page with noindex', () => {
+  it('opens /zh/ubenchx on the Chinese mem-bw view with the Beta title', () => {
     cy.visit('/zh/ubenchx', dismissModal);
-    cy.contains('ubenchX').should('be.visible');
-    cy.contains('微基准测试').should('be.visible');
-    cy.get('[data-testid="ubenchx-test-mem-bw"]').should('be.visible');
+    cy.url().should('include', '/zh/ubenchx/mem-bw');
+    cy.contains('h1', 'ubenchX 微基准测试（Beta）').should('be.visible');
+    cy.get('[data-testid="ubenchx-test-select"]').should('contain', '显存拷贝带宽');
     cy.get('meta[name="robots"]').should('have.attr', 'content').and('contain', 'noindex');
     cy.get('link[rel="alternate"][hreflang="en"]')
       .invoke('attr', 'href')
-      .should('include', '/ubenchx');
+      .should('include', '/ubenchx/mem-bw');
   });
 
   it('renders the Chinese mem-bw page', () => {

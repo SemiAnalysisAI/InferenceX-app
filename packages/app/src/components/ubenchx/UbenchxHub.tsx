@@ -1,73 +1,78 @@
 'use client';
 
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
+import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { track } from '@/lib/analytics';
 import { useLocale } from '@/lib/use-locale';
 
 const STRINGS = {
   en: {
-    title: 'ubenchX Microbenchmarks',
+    title: 'ubenchX Microbenchmarks (Beta)',
     subtitle: 'Low-level GPU microbenchmarks measuring fundamental hardware characteristics.',
+    test: 'Microbenchmark',
+    testTooltip: 'The ubenchX microbenchmark to display.',
     memBwTitle: 'Device-Memory Copy Bandwidth',
-    memBwDesc:
-      'Measures device-memory copy bandwidth across message sizes from 8 B to 16 GiB on NVIDIA and AMD GPUs.',
     smL2Title: 'SM-SM L2 Latency Difference',
-    smL2Desc:
-      'L2 pointer-chase benchmark revealing SM-to-SM latency differences and GPC/die topology structure.',
   },
   zh: {
-    title: 'ubenchX 微基准测试',
+    title: 'ubenchX 微基准测试（Beta）',
     subtitle: '底层 GPU 微基准测试，测量基础硬件特性。',
+    test: '微基准测试',
+    testTooltip: '要显示的 ubenchX 微基准测试。',
     memBwTitle: '显存拷贝带宽',
-    memBwDesc: '在 NVIDIA 和 AMD GPU 上测量 8 B 至 16 GiB 各消息大小的显存拷贝带宽。',
     smL2Title: 'SM 间 L2 延迟差异',
-    smL2Desc: '基于 L2 指针追踪的基准测试，揭示 SM 间延迟差异和 GPC/die 拓扑结构。',
   },
 } as const;
 
-const TESTS = [
-  {
-    slug: 'mem-bw',
-    titleKey: 'memBwTitle' as const,
-    descKey: 'memBwDesc' as const,
-    icon: '📊',
-  },
-  {
-    slug: 'sm-l2-distance',
-    titleKey: 'smL2Title' as const,
-    descKey: 'smL2Desc' as const,
-    icon: '🔬',
-  },
-];
+export const UBENCHX_TESTS = [
+  { slug: 'mem-bw', titleKey: 'memBwTitle' },
+  { slug: 'sm-l2-distance', titleKey: 'smL2Title' },
+] as const;
 
-export function UbenchxHub() {
+export type UbenchxTestSlug = (typeof UBENCHX_TESTS)[number]['slug'];
+
+/** Shared ubenchX page header: title plus a selector that switches between test views. */
+export function UbenchxHub({ current }: { current: UbenchxTestSlug }) {
   const locale = useLocale();
+  const router = useRouter();
   const t = STRINGS[locale];
   const prefix = locale === 'zh' ? '/zh' : '';
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-4">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">{t.title}</h1>
         <p className="text-sm text-muted-foreground mt-1">{t.subtitle}</p>
       </div>
-
-      <div className="grid gap-4 sm:grid-cols-2">
-        {TESTS.map((test) => (
-          <Link
-            key={test.slug}
-            href={`${prefix}/ubenchx/${test.slug}`}
-            className="group block rounded-lg border p-5 transition-colors hover:border-foreground/30 hover:bg-muted/50"
-            data-testid={`ubenchx-test-${test.slug}`}
-            onClick={() => track('ubenchx_test_selected', { test: test.slug })}
-          >
-            <div className="text-lg font-semibold group-hover:text-foreground">
-              {t[test.titleKey]}
-            </div>
-            <p className="mt-1.5 text-sm text-muted-foreground">{t[test.descKey]}</p>
-          </Link>
-        ))}
+      <div className="flex flex-col space-y-1.5 sm:w-[320px]">
+        <LabelWithTooltip htmlFor="ubenchx-test-select" label={t.test} tooltip={t.testTooltip} />
+        <Select
+          value={current}
+          onValueChange={(value) => {
+            if (value === current) return;
+            track('ubenchx_test_selected', { test: value });
+            router.push(`${prefix}/ubenchx/${value}`);
+          }}
+        >
+          <SelectTrigger id="ubenchx-test-select" data-testid="ubenchx-test-select">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {UBENCHX_TESTS.map((test) => (
+              <SelectItem key={test.slug} value={test.slug}>
+                {t[test.titleKey]}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
     </div>
   );

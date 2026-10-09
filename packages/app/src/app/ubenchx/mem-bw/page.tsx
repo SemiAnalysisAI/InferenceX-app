@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 
 import { UbenchxContent } from '@/components/ubenchx/UbenchxContent';
+import { UbenchxHub } from '@/components/ubenchx/UbenchxHub';
 import { enAlternates } from '@/lib/i18n';
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
 
@@ -25,7 +26,10 @@ export default function UbenchxMemBwPage() {
   return (
     <main className="relative">
       <div className="container mx-auto px-4 pb-8 lg:px-8">
-        <UbenchxContent />
+        <div className="space-y-8">
+          <UbenchxHub current="mem-bw" />
+          <UbenchxContent />
+        </div>
       </div>
     </main>
   );

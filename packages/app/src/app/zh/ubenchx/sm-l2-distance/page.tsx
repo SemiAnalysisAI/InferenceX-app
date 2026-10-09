@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 
 import { SmL2Content } from '@/components/ubenchx/SmL2Heatmap';
+import { UbenchxHub } from '@/components/ubenchx/UbenchxHub';
 import { zhAlternates, ZH_OG_LOCALE } from '@/lib/i18n';
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
 
@@ -26,7 +27,10 @@ export default function UbenchxSmL2DistancePageZh() {
   return (
     <main className="relative">
       <div className="container mx-auto px-4 pb-8 lg:px-8">
-        <SmL2Content />
+        <div className="space-y-8">
+          <UbenchxHub current="sm-l2-distance" />
+          <SmL2Content />
+        </div>
       </div>
     </main>
   );

@@ -65,18 +65,6 @@ const NAV_LINKS: readonly NavLink[] = [
     testId: 'nav-link-ubenchx',
     event: 'header_ubenchx_clicked',
   },
-  {
-    href: '/compare',
-    label: 'Comparisons',
-    testId: 'nav-link-compare',
-    event: 'header_compare_clicked',
-  },
-  {
-    href: '/blog',
-    label: 'Articles',
-    testId: 'nav-link-articles',
-    event: 'header_articles_clicked',
-  },
   { href: '/about', label: 'About', testId: 'nav-link-about', event: 'header_about_clicked' },
 ] as const;
 
@@ -104,8 +92,8 @@ function isActive(pathname: string, href: string): boolean {
  * Whether the link lands on the page already on screen. Deliberately not
  * `isActive`, which also lights up for every sibling dashboard tab and for
  * child routes — those are real destinations, so treating their clicks as
- * no-ops would strand the user (Dashboard from `/evaluation`, Comparisons
- * from `/compare/<slug>`).
+ * no-ops would strand the user (Dashboard from `/evaluation`, AgentX from
+ * `/agentx/<slug>`).
  */
 function isCurrentPage(pathname: string, displayHref: string): boolean {
   return pathname === displayHref;
