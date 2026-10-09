@@ -515,6 +515,27 @@ source values differ. Database recovery rejects the mismatch before writing.
 P90 replays require numeric `power_valid: 1`, schema version 2, and the exact
 original average power, including when checking an already-applied correction.
 
+### Evaluation physical topology
+
+Both individual eval artifacts and `agg_eval_all.json` use the same eval mapper.
+For SGLang and Dynamo-SGLang artifacts with an explicit `is_multinode` marker,
+missing physical GPU counts are derived as TP × PP × PCP × workers; EP and DCP share TP devices. Explicit
+`num_gpus` or role GPU counts take precedence. Other frameworks and artifacts
+without a recognized marker retain their legacy count fallback.
+
+Single-node SGLang eval metadata can mirror one aggregate worker into both
+prefill and decode fields. When both roles match the top-level topology, each
+has one worker, and no framework/explicit disaggregation signal is present,
+ingestion normalizes them to one aggregate configuration. Its mirrored config
+columns each hold the same physical count, with zero role-worker counts, matching
+the throughput convention. Asymmetric and explicitly disaggregated pools keep
+their separate roles.
+
+This corrects mapping of retained artifacts on future ingest; it does not rewrite
+existing database rows. Because topology participates in config identity,
+already-ingested evals require an audited reconciliation rather than a blind
+re-ingest that could leave the incorrect config alongside the corrected one.
+
 ### Power Audit Provenance (`power_invalid_reasons`, `power_audit`)
 
 Producers (`aggregate_power.py`) annotate every aggregate result row with two optional provenance fields alongside the `power_valid` verdict:

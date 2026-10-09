@@ -227,7 +227,10 @@ export function mapAggEvalRow(
  *   `num_workers` defaults to 0, `is_multinode` is false.
  * - **v2** (disagg / multinode, 2025-12-19+): separate `prefill_tp`/`decode_tp` etc.
  *   with `prefill_num_workers`/`decode_num_workers` and `is_multinode`. Presence of
- *   `prefill_tp` on the source selects the v2 branch.
+ *   `prefill_tp` on the source selects the v2 branch, except mirrored single-node
+ *   SGLang metadata, which describes one aggregate worker in both role fields.
+ * SGLang rows with explicit topology markers use TP × PP × PCP for GPU fallbacks;
+ * EP and DCP share TP devices. Explicit physical counts remain authoritative.
  *
  * An explicit `disagg: false` on a Dynamo row is authoritative for a direct
  * deployment unless a non-zero decode worker pool proves disaggregation.
@@ -243,13 +246,34 @@ function buildEvalConfig(
   specMethod: string,
   disaggFromFw: boolean,
 ): ConfigParams {
-  const isMultinode = parseBool(src.is_multinode);
+  const topologyMarker = parseOptionalBool(src.is_multinode);
+  const isMultinode = topologyMarker === true;
+  // SGLang shares EP/DCP devices with TP. Keep legacy/other-framework
+  // fallbacks unless the artifact explicitly identifies its topology.
+  const sharedEpDevices = framework === 'sglang' || framework === 'dynamo-sglang';
+  const gpuCount = (tp: number, ep: number, prefix = '') =>
+    topologyMarker === undefined || !sharedEpDevices
+      ? tp * ep
+      : tp * (parseInt2(src[`${prefix}pp`]) ?? 1) * (parseInt2(src[`${prefix}pcp_size`]) ?? 1);
+  const mirroredAggregate =
+    topologyMarker === false &&
+    framework === 'sglang' &&
+    !disaggFromFw &&
+    parseInt2(src.prefill_num_workers) === 1 &&
+    parseInt2(src.decode_num_workers) === 1 &&
+    ['tp', 'ep', 'pp', 'pcp_size'].every(
+      (key) =>
+        (parseInt2(src[`prefill_${key}`]) ?? 1) === (parseInt2(src[key]) ?? 1) &&
+        (parseInt2(src[`decode_${key}`]) ?? 1) === (parseInt2(src[key]) ?? 1),
+    ) &&
+    parseBool(src.prefill_dp_attention) === parseBool(src.dp_attention) &&
+    parseBool(src.decode_dp_attention) === parseBool(src.dp_attention);
 
   let prefillTp: number, prefillEp: number, prefillDpAttn: boolean, prefillNumWorkers: number;
   let decodeTp: number, decodeEp: number, decodeDpAttn: boolean, decodeNumWorkers: number;
   let numPrefillGpu: number, numDecodeGpu: number;
 
-  if ('prefill_tp' in src) {
+  if ('prefill_tp' in src && !mirroredAggregate) {
     prefillTp = parseInt2(src.prefill_tp) ?? 1;
     prefillEp = parseInt2(src.prefill_ep) ?? 1;
     prefillDpAttn = parseBool(src.prefill_dp_attention);
@@ -263,13 +287,13 @@ function buildEvalConfig(
       (disaggFromFw || (parseInt2(src.decode_num_workers) ?? 0) > 0
         ? undefined
         : physicalChipCount(src.num_gpus)) ??
-      prefillTp * prefillEp * Math.max(prefillNumWorkers, 1);
+      gpuCount(prefillTp, prefillEp, 'prefill_') * Math.max(prefillNumWorkers, 1);
     numDecodeGpu =
       roleChipCount(src.num_decode_gpu) ??
       (disaggFromFw || (parseInt2(src.decode_num_workers) ?? 0) > 0
         ? undefined
         : physicalChipCount(src.num_gpus)) ??
-      decodeTp * decodeEp * Math.max(decodeNumWorkers, 1);
+      gpuCount(decodeTp, decodeEp, 'decode_') * Math.max(decodeNumWorkers, 1);
   } else {
     const tp = parseInt2(src.tp) ?? 1;
     const ep = parseInt2(src.ep) ?? 1;
@@ -282,8 +306,10 @@ function buildEvalConfig(
     decodeDpAttn = dpAttn;
     prefillNumWorkers = 0;
     decodeNumWorkers = 0;
-    numPrefillGpu = physicalChipCount(src.num_gpus) ?? tp * ep;
-    numDecodeGpu = physicalChipCount(src.num_gpus) ?? tp * ep;
+    numPrefillGpu =
+      roleChipCount(src.num_prefill_gpu) ?? physicalChipCount(src.num_gpus) ?? gpuCount(tp, ep);
+    numDecodeGpu =
+      roleChipCount(src.num_decode_gpu) ?? physicalChipCount(src.num_gpus) ?? gpuCount(tp, ep);
   }
 
   const explicitDisagg = parseOptionalBool(src.disagg);
