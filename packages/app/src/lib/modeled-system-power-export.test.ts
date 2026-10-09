@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildComparison,
   csv,
+  flatRows,
   type ComparisonInput,
 } from '../../scripts/export-modeled-system-power';
 import { gb300DisaggRow } from '@/lib/nvl72-power.fixture';
@@ -238,6 +239,10 @@ describe('offline modeled PowerX comparisons', () => {
       },
       modeled: { status: 'supported', unit: 'nvl72-tray', chassisCount: 2, pue: 1.1 },
     });
+    const provenance = { app_revision: 'test', input_sha256: 'test', generated_at: 'test' };
+    const [x86Flat, gb300Flat] = flatRows(result, { ...result.metadata, ...provenance }, {});
+    expect(gb300Flat.measured_total_grace_j).toBe(41_346.013);
+    expect(x86Flat.measured_total_grace_j).toBeUndefined();
     // The x86 row and its cell are byte-identical to an export without the NVL72 row.
     expect(result.rows[0]).toEqual(baseline.rows[0]);
     expect(result.cells[0]).toEqual(baseline.cells[0]);

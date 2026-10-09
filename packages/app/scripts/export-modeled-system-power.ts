@@ -308,45 +308,19 @@ export function csv(records: Record<string, unknown>[]): string {
   return `${[columns.map(csvValue).join(','), ...records.map((row) => columns.map((key) => csvValue(row[key])).join(','))].join('\r\n')}\r\n`;
 }
 
-async function main() {
-  const { values } = parseArgs({
-    options: {
-      input: { type: 'string' },
-      output: { type: 'string' },
-    },
-  });
-  if (!values.input || !values.output)
-    throw new Error(
-      'Usage: bun packages/app/scripts/export-modeled-system-power.ts --input cohort.json --output NEW_DIRECTORY',
-    );
-  const inputBytes = await readFile(values.input);
-  const result = buildComparison(JSON.parse(inputBytes.toString('utf8')));
-  const root = resolve(import.meta.dirname, '../../..');
-  const codePaths = [
-    'packages/app/scripts/export-modeled-system-power.ts',
-    'packages/app/src/lib/modeled-system-power.ts',
-    'packages/app/src/lib/system-power-model.ts',
-    'packages/app/src/lib/system-power-model.profiles.json',
-  ];
-  const hashes: Record<string, string> = {};
-  for (const path of codePaths)
-    hashes[path] = createHash('sha256')
-      .update(await readFile(resolve(root, path)))
-      .digest('hex');
-  const metadata = {
-    ...result.metadata,
-    generated_at: new Date().toISOString(),
-    input_file: resolve(values.input),
-    input_sha256: createHash('sha256').update(inputBytes).digest('hex'),
-    app_revision: execFileSync('git', ['rev-parse', 'HEAD'], {
-      cwd: root,
-      encoding: 'utf8',
-    }).trim(),
-    app_worktree_dirty:
-      execFileSync('git', ['status', '--porcelain'], { cwd: root, encoding: 'utf8' }).trim() !== '',
-    implementation_sha256: hashes,
-  };
-  const flat = result.rows.map((row) => ({
+type Comparison = ReturnType<typeof buildComparison>;
+
+/** One CSV record per row: the comparison row flattened with the export's provenance. */
+export function flatRows(
+  result: Comparison,
+  metadata: Comparison['metadata'] & {
+    app_revision: string;
+    input_sha256: string;
+    generated_at: string;
+  },
+  hashes: Record<string, string>,
+) {
+  return result.rows.map((row) => ({
     cohort: metadata.cohort,
     id: row.id,
     cell: row.cell,
@@ -372,6 +346,7 @@ async function main() {
     measured_gpu_j_per_output_token: row.measured_inputs?.gpu_j_per_output_token,
     cpu_power_valid: row.measured_inputs?.cpu_power_valid,
     measured_total_grace_w: row.measured_inputs?.total_grace_w,
+    measured_total_grace_j: row.measured_inputs?.total_grace_j,
     modeled_status: row.modeled.status,
     modeled_unit: row.modeled.status === 'supported' ? row.modeled.unit : null,
     unsupported_reason: row.modeled.status === 'unsupported' ? row.modeled.reason : null,
@@ -411,6 +386,47 @@ async function main() {
     profile_sha256: hashes['packages/app/src/lib/system-power-model.profiles.json'],
     generated_at: metadata.generated_at,
   }));
+}
+
+async function main() {
+  const { values } = parseArgs({
+    options: {
+      input: { type: 'string' },
+      output: { type: 'string' },
+    },
+  });
+  if (!values.input || !values.output)
+    throw new Error(
+      'Usage: bun packages/app/scripts/export-modeled-system-power.ts --input cohort.json --output NEW_DIRECTORY',
+    );
+  const inputBytes = await readFile(values.input);
+  const result = buildComparison(JSON.parse(inputBytes.toString('utf8')));
+  const root = resolve(import.meta.dirname, '../../..');
+  const codePaths = [
+    'packages/app/scripts/export-modeled-system-power.ts',
+    'packages/app/src/lib/modeled-system-power.ts',
+    'packages/app/src/lib/system-power-model.ts',
+    'packages/app/src/lib/system-power-model.profiles.json',
+  ];
+  const hashes: Record<string, string> = {};
+  for (const path of codePaths)
+    hashes[path] = createHash('sha256')
+      .update(await readFile(resolve(root, path)))
+      .digest('hex');
+  const metadata = {
+    ...result.metadata,
+    generated_at: new Date().toISOString(),
+    input_file: resolve(values.input),
+    input_sha256: createHash('sha256').update(inputBytes).digest('hex'),
+    app_revision: execFileSync('git', ['rev-parse', 'HEAD'], {
+      cwd: root,
+      encoding: 'utf8',
+    }).trim(),
+    app_worktree_dirty:
+      execFileSync('git', ['status', '--porcelain'], { cwd: root, encoding: 'utf8' }).trim() !== '',
+    implementation_sha256: hashes,
+  };
+  const flat = flatRows(result, metadata, hashes);
   await mkdir(values.output);
   await writeFile(
     resolve(values.output, 'comparison.json'),
