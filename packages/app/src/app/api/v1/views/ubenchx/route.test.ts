@@ -94,6 +94,15 @@ describe('ubenchx view', () => {
     expect(bad.status).toBe(400);
   });
 
+  it('filters the test=all TPC Skyline section by a case-insensitive GPU key', async () => {
+    // B200 SXM is the one GPU every ubenchX test covers, so test=all accepts it.
+    const response = await GET(request({ gpu: 'b200 sxm' }));
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.memBw.gpus.map((g: { gpu: string }) => g.gpu)).toEqual(['B200 SXM']);
+    expect(body.tpcSkyline.gpus.map((g: { gpu: string }) => g.gpu)).toEqual(['B200 SXM']);
+  });
+
   it('matches the shared UI transform for every TPC Skyline grouping (parity)', async () => {
     const response = await GET(request({ test: 'tpc-skyline' }));
     const body = await response.json();

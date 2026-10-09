@@ -82,9 +82,14 @@ export function GET(request: NextRequest) {
           tests: AVAILABLE_TESTS,
           memBw: { gpus: memBwResults },
           smL2Distance: { gpus: smL2Results },
-          // Like smL2Distance, default to every GPU rather than mem-bw's first one.
+          // Like smL2Distance, default to every GPU rather than mem-bw's first one, and
+          // match the GPU key case-insensitively as parseEnumParam does for the others.
           tpcSkyline: {
-            gpus: tpcSkylineResults(rawGpu && rawGpu in TPC_SKYLINE_RUNS ? rawGpu : 'all'),
+            gpus: tpcSkylineResults(
+              Object.keys(TPC_SKYLINE_RUNS).find(
+                (key) => key.toLowerCase() === rawGpu?.toLowerCase(),
+              ) ?? 'all',
+            ),
           },
         }),
       );

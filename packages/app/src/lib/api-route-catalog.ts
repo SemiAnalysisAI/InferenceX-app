@@ -510,7 +510,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-ubenchx-view',
-    sourceSha256: '23f843858230a02cc663a4d003c8212635ae9a0855b3b3619896642291093e1f',
+    sourceSha256: '038edc81c1523bdc4207bafc0c943b3a6587595bb5afbdc2cd6a69ae6eefc11e',
   },
   {
     source: 'src/app/api/v1/operatorx/runs/route.ts',
