@@ -2,15 +2,17 @@
 
 import { useLocale } from '@/lib/use-locale';
 
-import { TPC_GROUPING_RUNS } from './tpc-grouping-data';
-import { transformTpcGroupingRun } from './tpc-grouping-transform';
+import { TPC_SKYLINE_RUNS } from './tpc-skyline-data';
+import { transformTpcSkylineRun } from './tpc-skyline-transform';
 
 const STRINGS = {
   en: {
-    pageTitle: 'TPC per GPC Grouping',
+    pageTitle: 'TPC Skyline',
     pageSubtitle:
       'Measured number of TPCs in each GPC, found by observing which SMs thread-block clusters are co-scheduled on.',
     product: 'Product',
+    gpcs: 'Measured # of GPCs',
+    sms: 'Measured # of SMs',
     grouping: 'Measured TPC Groupings',
     methodology: 'Methodology',
     methodologyText:
@@ -18,12 +20,14 @@ const STRINGS = {
     driver: 'Driver',
     container: 'Container',
     source: 'Source',
-    aria: 'ubenchX TPC per GPC grouping table',
+    aria: 'ubenchX TPC Skyline table',
   },
   zh: {
-    pageTitle: 'TPC per GPC 分组',
+    pageTitle: 'TPC Skyline',
     pageSubtitle: '通过观察线程块集群被协同调度到哪些 SM 上，实测每个 GPC 中的 TPC 数量。',
     product: '产品',
+    gpcs: '实测 GPC 数量',
+    sms: '实测 SM 数量',
     grouping: '实测 TPC 分组',
     methodology: '测试方法',
     methodologyText:
@@ -31,15 +35,15 @@ const STRINGS = {
     driver: '驱动',
     container: '容器',
     source: '数据来源',
-    aria: 'ubenchX TPC per GPC 分组表',
+    aria: 'ubenchX TPC Skyline 表',
   },
 } as const;
 
-const RESULTS = Object.entries(TPC_GROUPING_RUNS).map(([key, run]) =>
-  transformTpcGroupingRun(key, run),
+const RESULTS = Object.entries(TPC_SKYLINE_RUNS).map(([key, run]) =>
+  transformTpcSkylineRun(key, run),
 );
 
-export function TpcGroupingContent() {
+export function TpcSkylineContent() {
   const t = STRINGS[useLocale()];
   const sourceUrls = [...new Set(RESULTS.map((r) => r.metadata.sourceUrl))];
 
@@ -51,11 +55,17 @@ export function TpcGroupingContent() {
       </div>
 
       <div className="overflow-x-auto rounded-lg border">
-        <table className="w-full text-sm" aria-label={t.aria} data-testid="tpc-grouping-table">
+        <table className="w-full text-sm" aria-label={t.aria} data-testid="tpc-skyline-table">
           <thead className="bg-muted/50">
             <tr>
               <th scope="col" className="px-4 py-2.5 text-left font-semibold">
                 {t.product}
+              </th>
+              <th scope="col" className="px-4 py-2.5 text-left font-semibold">
+                {t.gpcs}
+              </th>
+              <th scope="col" className="px-4 py-2.5 text-left font-semibold">
+                {t.sms}
               </th>
               <th scope="col" className="px-4 py-2.5 text-left font-semibold">
                 {t.grouping}
@@ -66,6 +76,8 @@ export function TpcGroupingContent() {
             {RESULTS.map((r) => (
               <tr key={r.gpu} className="border-t">
                 <td className="px-4 py-2.5 whitespace-nowrap">{r.gpu}</td>
+                <td className="px-4 py-2.5 tabular-nums">{r.gpcCount}</td>
+                <td className="px-4 py-2.5 tabular-nums">{r.smCount}</td>
                 <td className="px-4 py-2.5 font-mono">[{r.tpcsPerGpc.join(', ')}]</td>
               </tr>
             ))}

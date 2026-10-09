@@ -19,25 +19,25 @@ const STRINGS = {
     subtitle: 'Low-level GPU microbenchmarks measuring fundamental hardware characteristics.',
     test: 'Microbenchmark',
     testTooltip: 'The ubenchX microbenchmark to display.',
-    memBwTitle: 'Device-Memory Copy Bandwidth',
+    memBwTitle: 'HBM Bandwidth',
     smL2Title: 'SM-SM L2 Latency Difference',
-    tpcGroupingTitle: 'TPC per GPC Grouping',
+    tpcSkylineTitle: 'TPC Skyline',
   },
   zh: {
     title: 'ubenchX 微基准测试（Beta）',
     subtitle: '底层 GPU 微基准测试，测量基础硬件特性。',
     test: '微基准测试',
     testTooltip: '要显示的 ubenchX 微基准测试。',
-    memBwTitle: '显存拷贝带宽',
+    memBwTitle: 'HBM 带宽',
     smL2Title: 'SM 间 L2 延迟差异',
-    tpcGroupingTitle: 'TPC per GPC 分组',
+    tpcSkylineTitle: 'TPC Skyline',
   },
 } as const;
 
 export const UBENCHX_TESTS = [
   { slug: 'mem-bw', titleKey: 'memBwTitle' },
   { slug: 'sm-l2-distance', titleKey: 'smL2Title' },
-  { slug: 'tpc-grouping', titleKey: 'tpcGroupingTitle' },
+  { slug: 'tpc-skyline', titleKey: 'tpcSkylineTitle' },
 ] as const;
 
 export type UbenchxTestSlug = (typeof UBENCHX_TESTS)[number]['slug'];

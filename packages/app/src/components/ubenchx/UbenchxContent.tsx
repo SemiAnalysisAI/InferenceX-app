@@ -37,7 +37,7 @@ const GPU_COLORS: Record<string, string> = {
 
 const STRINGS = {
   en: {
-    pageTitle: 'Device-Memory Copy Bandwidth',
+    pageTitle: 'HBM Bandwidth',
     pageSubtitle:
       'Microbenchmark measuring device-memory copy bandwidth across message sizes on NVIDIA and AMD GPUs.',
     latencyTitle: 'Latency vs Message Size',
@@ -64,7 +64,7 @@ const STRINGS = {
     aria: 'ubenchX device-memory copy bandwidth charts',
   },
   zh: {
-    pageTitle: '显存拷贝带宽',
+    pageTitle: 'HBM 带宽',
     pageSubtitle: '在 NVIDIA 和 AMD GPU 上测量不同消息大小的显存拷贝带宽微基准测试。',
     latencyTitle: '延迟 vs 消息大小',
     latencyY: '延迟（ms）',

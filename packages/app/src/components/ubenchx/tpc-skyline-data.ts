@@ -1,12 +1,12 @@
 /**
- * Static ubenchX TPC per GPC grouping data.
+ * Static ubenchX TPC Skyline data: measured TPC per GPC groupings.
  *
  * Source: ubenchX/gpc_query in SemiAnalysisAI/InferenceX (ported from
  * microbench-blackwell tools/gpc_query.cu). Each run lists TPCs per GPC, sorted
  * descending, as printed by the tool; the order carries no physical GPC index.
  */
 
-export interface TpcGroupingRun {
+export interface TpcSkylineRun {
   readonly gpu: string;
   readonly driver: string;
   readonly cuda: string;
@@ -21,7 +21,7 @@ const SOURCE_URL = 'https://github.com/SemiAnalysisAI/InferenceX/tree/main/ubenc
 const CONTAINER = 'nvidia/cuda:13.0.3-devel-ubuntu24.04';
 
 /** GPU keys in display order; keys match GPU_SPECS names used by the other ubenchX tests. */
-export const TPC_GROUPING_RUNS: Record<string, TpcGroupingRun> = {
+export const TPC_SKYLINE_RUNS: Record<string, TpcSkylineRun> = {
   'H100 SXM': {
     gpu: 'NVIDIA H100 80GB HBM3',
     driver: '580.159.03',

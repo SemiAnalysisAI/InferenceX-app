@@ -5,7 +5,7 @@ import { UbenchxHub } from '@/components/ubenchx/UbenchxHub';
 import { zhAlternates, ZH_OG_LOCALE } from '@/lib/i18n';
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
 
-const TITLE = 'ubenchX：显存拷贝带宽';
+const TITLE = 'ubenchX：HBM 带宽';
 const DESCRIPTION =
   '在 NVIDIA 和 AMD GPU 上测量显存拷贝带宽的微基准测试：展示从 8 B 到 16 GiB 各消息大小下的延迟、带宽和显存带宽利用率（MBU）。';
 
