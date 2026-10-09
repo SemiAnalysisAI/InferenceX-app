@@ -493,13 +493,16 @@ All normalizer logic lives in `packages/db/src/etl/normalizers.ts`. The function
 
 ### Schema Version Detection
 
-`mapBenchmarkRow()` distinguishes legacy flat and role-shaped topology with the `prefill_tp` field, and recognizes modern AgentX single-node metadata separately:
+`mapBenchmarkRow()`, `mapEvalRow()`, and `mapAggEvalRow()` all use
+`resolveConfigTopology()` in `packages/db/src/etl/topology.ts`. It resolves
+flat and role-shaped metadata, physical GPU counts, disaggregation, and aggregate
+role mirroring before config identity is created:
 
 - **v1 (pre-2025-12-19)**: Only `tp`, `ep`, and `dp_attention` are present. These are copied symmetrically: `prefillTp = decodeTp = tp`, `prefillEp = decodeEp = ep`. Both `numPrefillGpu` and `numDecodeGpu` are set to `tp * ep`.
-- **v2 (2025-12-19+)**: Separate `prefill_tp` / `decode_tp` / `prefill_ep` / `decode_ep` / `prefill_dp_attention` / `decode_dp_attention` / `prefill_num_workers` / `decode_num_workers` / `num_prefill_gpu` / `num_decode_gpu` fields are present. These map directly; `num_prefill_gpu` / `num_decode_gpu` fall back to `tp * ep` if absent.
-- **v3 AgentX single-node**: Nested `request_metrics` with explicit `is_multinode: false` and `disagg: false` uses the producer's physical count, `tp * pp * pcp_size`, when `num_gpus` is absent. EP and DCP share TP devices. Explicit counts win; flat legacy rows and role-shaped multinode rows retain their existing rules. For example, Qwen3.8 H200 TP4/EP4 uses four GPUs, mirrored into both aggregate role columns. GPU counts participate in config identity, so correcting ingestion does not repair existing rows: historical data needs explicit reconciliation against retained artifacts rather than blind reingestion.
+- **v2 (2025-12-19+)**: Separate `prefill_tp` / `decode_tp` / `prefill_ep` / `decode_ep` / `prefill_dp_attention` / `decode_dp_attention` / `prefill_num_workers` / `decode_num_workers` / `num_prefill_gpu` / `num_decode_gpu` fields are present. These map directly; `num_prefill_gpu` / `num_decode_gpu` fall back to the per-worker count times the role worker count if absent. Legacy per-worker counts use `tp * ep`; explicitly identified SGLang AgentX topology uses `tp * pp * pcp_size`.
+- **v3 AgentX single-node**: Nested `request_metrics` with explicit `is_multinode: false` and `disagg: false` uses the producer's physical count, `tp * pp * pcp_size`, when `num_gpus` is absent. EP and DCP share TP devices. Explicit counts win; ambiguous legacy rows retain the TP × EP per-worker fallback. For example, Qwen3.8 H200 TP4/EP4 uses four GPUs, mirrored into both aggregate role columns. GPU counts participate in config identity, so correcting ingestion does not repair existing rows: historical data needs explicit reconciliation against retained artifacts rather than blind reingestion.
 
-The v1/v2 role-shape check is `'prefill_tp' in row`; the v3 fallback additionally checks the nested metrics and explicit topology flags. No version field is required in the artifact.
+The shared v1/v2 role-shape check is `'prefill_tp' in row`; the v3 fallback additionally checks the nested metrics and explicit topology flags. No version field is required in the artifact.
 
 Backfill audit provenance may identify the production config or an exact public
 benchmark row (`productionBenchmarkId`); at least one positive ID is required.
@@ -514,6 +517,37 @@ requires a known, matching run attempt and leaves the row unchanged if those
 source values differ. Database recovery rejects the mismatch before writing.
 P90 replays require numeric `power_valid: 1`, schema version 2, and the exact
 original average power, including when checking an already-applied correction.
+
+### Shared evaluation and performance topology
+
+Both individual eval artifacts and `agg_eval_all.json` use the same topology
+resolver as performance artifacts; their adapters only handle identity and metrics.
+For SGLang and Dynamo-SGLang AgentX artifacts with an explicit `is_multinode` marker,
+missing physical GPU counts are derived as TP × PP × PCP × workers; EP and DCP share TP devices. Explicit
+`num_gpus` or role GPU counts take precedence. Other frameworks and artifacts
+without a recognized marker retain their legacy count fallback. AgentX is identified
+by its scenario or the eval producer's zero ISL/OSL sentinels. Historical fixed-sequence
+artifacts keep their existing GPU-count convention so audited config identities
+and run corrections continue to match.
+
+Single-node SGLang eval metadata can mirror one aggregate worker into both
+prefill and decode fields. When both roles match the top-level topology, each
+has one worker, and no framework/explicit disaggregation signal is present,
+ingestion normalizes them to one aggregate configuration. Its mirrored config
+columns each hold the same physical count, with zero role-worker counts, matching
+the throughput convention. Asymmetric and explicitly disaggregated pools keep
+their separate roles.
+
+Node placement (`is_multinode`) does not by itself imply disaggregation. A
+prefill-only aggregate deployment can span multiple physical nodes. Actual decode
+worker pools and explicit/framework disaggregation signals determine the split.
+Legacy role-count fallbacks now include worker multiplicity consistently in both
+paths; the old performance fallback omitted it while eval included it.
+
+This corrects mapping of retained artifacts on future ingest; it does not rewrite
+existing database rows. Because topology participates in config identity,
+already-ingested evals require an audited reconciliation rather than a blind
+re-ingest that could leave the incorrect config alongside the corrected one.
 
 ### Power Audit Provenance (`power_invalid_reasons`, `power_audit`)
 
