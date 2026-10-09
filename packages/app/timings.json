@@ -21,6 +21,10 @@
       "duration": 2596
     },
     {
+      "spec": "cypress/e2e/agentic-workload-explorer.cy.ts",
+      "duration": 4000
+    },
+    {
       "spec": "cypress/e2e/agentx-dataset-click-path.cy.ts",
       "duration": 1249
     },

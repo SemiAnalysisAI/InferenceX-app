@@ -91,6 +91,10 @@ locally generated assets do not become public API data. Feedback is sensitive.
 OperatorX is feature-gated in navigation and uses page-owned
 `/api/v1/operatorx/*` routes; it has no published `/api/v1/views/operatorx`
 contract.
+The Agentic Workload Explorer is feature-gated in navigation and reads a frozen,
+anonymized ProxyTrace snapshot from a separate database through page-owned
+`/api/v1/agentic-workload-explorer/*` routes (catalogued as `page-bff`); it has
+no published `/api/v1/views/agentic-workload-explorer` contract.
 Zoom, theme, axis scale, labels, media playback and report expansion are renderer
 state. GPU interactive downsampling does not alter returned raw data or statistics.
 
@@ -121,6 +125,10 @@ those properties.
 私有上传、密钥、提示词、反馈及管理操作不作为公开读取接口。
 OperatorX 的入口受功能开关控制，页面使用专属的 `/api/v1/operatorx/*`
 接口；目前没有发布 `/api/v1/views/operatorx` 契约。
+Agentic Workload Explorer 的入口同样受功能开关控制，它通过页面专属的
+`/api/v1/agentic-workload-explorer/*` 接口（在路由目录中归类为 `page-bff`）
+从独立数据库读取冻结的匿名 ProxyTrace 快照；目前没有发布
+`/api/v1/views/agentic-workload-explorer` 契约。
 
 测试覆盖契约同步及代表性的筛选行为，并未穷举所有参数组合。生产数据库上的
 完整 UI/API 对照仍需集成审查，不能仅凭单元测试宣称已完成。

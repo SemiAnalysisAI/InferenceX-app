@@ -262,6 +262,10 @@ export const DASHBOARD_API_COVERAGE = {
   reliability: { view: 'reliability' },
   'gpu-specs': { view: 'gpu-specs' },
   submissions: { view: 'submissions' },
+  'agentic-workload-explorer': {
+    exclusion:
+      'Feature-gated Agentic Workload Explorer reads a frozen, anonymized ProxyTrace snapshot from a separate database through page-owned /api/v1/agentic-workload-explorer/* routes whose shapes follow the pages; no stable public read-only view is published.',
+  },
   operatorx: {
     exclusion:
       'Feature-gated OperatorX explorer uses page-owned routes; no stable public read-only view is published.',

@@ -82,6 +82,13 @@ OperatorX is feature-gated in navigation and has no published
 `/api/v1/views/operatorx` contract. Its `/api/v1/operatorx/*` routes belong to
 the page and are not part of this skill's read-only view API.
 
+The explorer's session-list version filter uses the same parser as its other
+pages: absent, `all`, invalid, or out-of-range versions mean no version filter.
+The Agentic Workload Explorer is also feature-gated and has no published
+`/api/v1/views/agentic-workload-explorer` contract. Its
+`/api/v1/agentic-workload-explorer/*` routes serve a frozen, anonymized
+ProxyTrace snapshot to the page and are not part of this skill's read-only view API.
+
 Use positive safe run IDs written as plain digits (`1e3`, `0x10`, and `+5` are
 rejected); run lists such as `unofficialrun` and `runs` take up to eight unique IDs.
 Overlay run indices follow the input order after trimming whitespace and removing
