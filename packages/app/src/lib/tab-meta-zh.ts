@@ -183,6 +183,7 @@ export type HeaderNavHref =
   | '/agentx'
   | '/overview'
   | '/inference'
+  | '/ubenchx'
   | '/compare'
   | '/blog'
   | '/about';
@@ -192,6 +193,7 @@ export const NAV_LABELS_ZH: Record<HeaderNavHref, string> = {
   '/': '首页',
   '/overview': '总览',
   '/inference': '仪表板',
+  '/ubenchx': 'ubenchX',
   '/compare': '性能对比',
   '/blog': '技术文章',
   '/agentx': 'AgentX',

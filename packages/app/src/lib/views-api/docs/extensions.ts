@@ -334,6 +334,10 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
     'JSON object mapping video point IDs to {hourly,source,date} strings; hourly is nonnegative USD/deployment-hour.',
     'JSON 对象，将视频数据点 ID 映射为 {hourly,source,date} 字符串；hourly 为非负 USD/deployment-hour。',
   ],
+  gpu: [
+    'GPU key, e.g. "H100 SXM"; default first available GPU. "all" returns every GPU.',
+    'GPU 键，如 "H100 SXM"；默认首个可用 GPU。设为 "all" 返回全部 GPU。',
+  ],
   view: ['Video results (default) or tradeoff.', '视频 results（默认）或 tradeoff。'],
 };
 
@@ -426,6 +430,7 @@ const NEW_VIEWS = {
       discovery: object,
     },
   ],
+  ubenchx: ['ubenchX device-memory copy bandwidth', 'ubenchX 显存拷贝带宽', { gpus: objects }],
 } as const;
 
 export const operations: ApiOperation[] = Object.entries(NEW_VIEWS).map(

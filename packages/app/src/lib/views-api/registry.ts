@@ -240,6 +240,7 @@ export const VIEW_QUERY_PARAMS = {
     'xAxis',
     'yAxis',
   ],
+  ubenchx: ['gpu'],
 } as const;
 export type ReadonlyView = keyof typeof VIEW_QUERY_PARAMS;
 

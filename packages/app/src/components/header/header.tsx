@@ -60,6 +60,12 @@ const NAV_LINKS: readonly NavLink[] = [
     event: 'header_dashboard_clicked',
   },
   {
+    href: '/ubenchx',
+    label: 'ubenchX',
+    testId: 'nav-link-ubenchx',
+    event: 'header_ubenchx_clicked',
+  },
+  {
     href: '/compare',
     label: 'Comparisons',
     testId: 'nav-link-compare',
