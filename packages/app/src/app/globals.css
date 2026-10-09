@@ -685,8 +685,37 @@ html[data-inferencex-skin='vllm'] [data-slot='card'] {
   * {
     @apply border-border outline-ring/50;
   }
+  html {
+    /* Keep iOS from inflating text after rotation, and let pages own
+       horizontal overflow (wide tables scroll inside their own containers). */
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
   body {
     @apply bg-background text-foreground font-sans;
+    /* Replace the grey iOS/Android tap flash with our own :active states. */
+    -webkit-tap-highlight-color: transparent;
+  }
+  /* Remove the 300ms double-tap-zoom delay on controls without disabling
+     pinch zoom for the page. */
+  a,
+  button,
+  [role='button'],
+  [role='tab'],
+  [role='option'],
+  label,
+  summary {
+    touch-action: manipulation;
+  }
+  /* iOS Safari zooms the whole page when focusing a field whose font is
+     smaller than 16px. Hold form fields at 16px on phones; desktop keeps the
+     compact design sizes. */
+  @media (max-width: 767px) and (pointer: coarse) {
+    input:not([type='checkbox'], [type='radio'], [type='range'], [type='color']),
+    select,
+    textarea {
+      font-size: max(16px, 1em);
+    }
   }
   button {
     cursor: pointer;
@@ -774,4 +803,98 @@ html[data-inferencex-skin='vllm'] [data-slot='card'] {
   box-shadow: 0 0 8px 2px oklch(85% 0.18 85 / 40%);
   animation: star-glow 2s ease-in-out infinite;
   pointer-events: none;
+}
+
+/* Horizontal scrollers (mobile tab strip, chip rows) hide the scrollbar but
+   remain scrollable by touch, trackpad and keyboard. */
+.no-scrollbar {
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* ── Mobile chart detail sheet ────────────────────────────────────────────
+   On phones a pinned chart tooltip becomes a bottom sheet instead of a
+   floating card that covers the plot and runs off-screen. The d3 layer still
+   writes viewport left/top for desktop placement; the sheet overrides them. */
+@media (max-width: 767px) {
+  [data-chart-tooltip][data-sheet='true'] {
+    left: 0 !important;
+    right: 0 !important;
+    top: auto !important;
+    bottom: 0 !important;
+    width: auto !important;
+    max-width: none !important;
+    max-height: min(72dvh, 640px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    padding: 0 0 env(safe-area-inset-bottom);
+    background: var(--popover);
+    border-top: 1px solid var(--border);
+    border-radius: 1rem 1rem 0 0;
+    box-shadow: 0 -12px 32px -12px rgb(0 0 0 / 0.45);
+    animation: chart-sheet-in 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  /* Grab handle */
+  [data-chart-tooltip][data-sheet='true']::before {
+    content: '';
+    position: sticky;
+    top: 0;
+    display: block;
+    width: 100%;
+    height: 20px;
+    background:
+      linear-gradient(var(--muted-foreground), var(--muted-foreground)) center 8px / 36px 4px
+        no-repeat,
+      var(--popover);
+    opacity: 0.9;
+    z-index: 1;
+  }
+  /* The generated tooltip card is the sheet body: drop its own chrome. */
+  [data-chart-tooltip][data-sheet='true'] > div {
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    background: transparent !important;
+    max-width: none !important;
+    width: auto !important;
+    padding: 0 16px 16px !important;
+    font-size: 13px;
+  }
+  /* "Click elsewhere to dismiss" is desktop copy; the sheet has its own
+     backdrop and swipe affordances. */
+  [data-chart-tooltip][data-sheet='true'] > div > div:first-child[style*='italic'],
+  [data-chart-tooltip][data-sheet='true'] > div > div:first-child.italic {
+    display: none;
+  }
+  /* Bigger targets for the in-sheet actions (View charts / View logs). */
+  [data-chart-tooltip][data-sheet='true'] button,
+  [data-chart-tooltip][data-sheet='true'] a[role='button'],
+  [data-chart-tooltip][data-sheet='true'] a[data-action] {
+    min-height: 44px;
+  }
+  [data-chart-tooltip][data-sheet='true'] a[data-action] {
+    display: inline-flex;
+    align-items: center;
+  }
+}
+
+@keyframes chart-sheet-in {
+  from {
+    transform: translateY(24px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-chart-tooltip][data-sheet='true'] {
+    animation: none;
+  }
 }

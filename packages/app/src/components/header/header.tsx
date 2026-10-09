@@ -277,6 +277,7 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
                 aria-expanded={mobileMenuOpen}
                 aria-label={isZh ? '导航菜单' : 'Navigation menu'}
               >
+                {/* Three bars that fold into an X while the menu is open. */}
                 <svg
                   width="20"
                   height="20"
@@ -286,16 +287,57 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
                   strokeWidth="1"
                   strokeLinecap="round"
                   strokeLinejoin="round"
+                  aria-hidden
+                  className="overflow-visible"
                 >
-                  <line x1="1" y1="4" x2="19" y2="4" />
-                  <line x1="1" y1="10" x2="19" y2="10" />
-                  <line x1="1" y1="16" x2="19" y2="16" />
+                  <line
+                    x1="1"
+                    y1="4"
+                    x2="19"
+                    y2="4"
+                    className="origin-center transition-transform duration-200 motion-reduce:transition-none"
+                    style={
+                      mobileMenuOpen ? { transform: 'translateY(6px) rotate(45deg)' } : undefined
+                    }
+                  />
+                  <line
+                    x1="1"
+                    y1="10"
+                    x2="19"
+                    y2="10"
+                    className="transition-opacity duration-150 motion-reduce:transition-none"
+                    style={mobileMenuOpen ? { opacity: 0 } : undefined}
+                  />
+                  <line
+                    x1="1"
+                    y1="16"
+                    x2="19"
+                    y2="16"
+                    className="origin-center transition-transform duration-200 motion-reduce:transition-none"
+                    style={
+                      mobileMenuOpen ? { transform: 'translateY(-6px) rotate(-45deg)' } : undefined
+                    }
+                  />
                 </svg>
               </button>
               {mobileMenuOpen && (
+                /* Phones: dim the page behind the menu so it reads as a layer
+                   and a tap anywhere outside closes it. The header's
+                   backdrop-filter makes it the containing block for fixed
+                   children, so size from its top edge rather than bottom-0. */
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  aria-hidden
+                  data-testid="mobile-menu-backdrop"
+                  onClick={toggleMenu}
+                  className="fixed inset-x-0 top-14 h-[100dvh] z-40 cursor-default bg-black/40 animate-in fade-in-0 duration-150 sm:hidden"
+                />
+              )}
+              {mobileMenuOpen && (
                 <div
                   data-testid="mobile-menu"
-                  className="motion-pop-in absolute right-0 top-full mt-2 z-50 flex flex-col rounded-lg border border-border bg-background p-1.5 shadow-lg min-w-40"
+                  className="motion-pop-in fixed inset-x-3 top-[3.75rem] z-50 flex max-h-[calc(100dvh-4.5rem)] flex-col overflow-y-auto overscroll-contain rounded-xl border border-border bg-background p-1.5 shadow-lg sm:absolute sm:inset-x-auto sm:right-0 sm:top-full sm:mt-2 sm:min-w-40 sm:rounded-lg"
                 >
                   {navLinks.map(({ href, displayHref, label, badgeLabel, event }) => (
                     <Link
@@ -304,7 +346,7 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
                       prefetch={isActive(pathname, href) ? false : undefined}
                       aria-current={isActive(pathname, href) ? 'page' : undefined}
                       className={cn(
-                        'flex items-center min-h-11 px-3 rounded-md text-sm font-medium transition-colors',
+                        'flex items-center min-h-12 px-4 rounded-lg text-base font-medium transition-colors sm:min-h-11 sm:px-3 sm:rounded-md sm:text-sm',
                         isActive(pathname, href)
                           ? 'text-brand bg-brand/10'
                           : 'text-muted-foreground hover:text-foreground hover:bg-muted',
@@ -332,7 +374,7 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
                       )}
                     </Link>
                   ))}
-                  <span className="flex items-center gap-2 px-3 sm:hidden">
+                  <span className="mt-1 flex items-center gap-2 border-t border-border/60 px-3 pt-2 pb-1 sm:hidden">
                     <MinecraftTogglesLazy />
                     <HaloTogglesLazy />
                   </span>

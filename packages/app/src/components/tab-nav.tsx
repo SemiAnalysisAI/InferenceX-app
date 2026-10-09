@@ -2,7 +2,7 @@
 
 import { ChevronDown } from 'lucide-react';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import {
   type ReactNode,
   useCallback,
@@ -18,7 +18,6 @@ import {
   DASHBOARD_ROUTES,
   dashboardRouteForPathname,
   getDashboardRoute,
-  isDashboardRouteKey,
   type DashboardRoute,
   type DashboardRouteKey,
 } from '@/lib/dashboard-routes';
@@ -26,18 +25,7 @@ import { localePath } from '@/lib/i18n';
 import { TAB_LABELS_ZH } from '@/lib/tab-meta-zh';
 import { useFeatureGate } from '@/lib/use-feature-gate';
 import { Card } from '@/components/ui/card';
-import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectSeparator,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { useClientSearchParams } from '@/hooks/useClientSearch';
 import { cn } from '@/lib/utils';
 
@@ -79,6 +67,11 @@ const currentTabClass = (active: boolean) =>
   active
     ? 'border-secondary dark:border-primary text-secondary dark:text-primary'
     : 'hover:border-muted-foreground/30';
+
+function handleMobileSelect(tab: DashboardRouteKey) {
+  window.dispatchEvent(new CustomEvent('inferencex:tab-change'));
+  track('tab_changed', { tab, surface: 'mobile_strip' });
+}
 
 function handleDesktopClick(tab: DashboardRouteKey) {
   window.dispatchEvent(new CustomEvent('inferencex:tab-change'));
@@ -148,12 +141,10 @@ function useTabIndicator(current: DashboardRouteKey, gateUnlocked: boolean) {
 
 export function TabNav({ footer }: { footer?: ReactNode }) {
   const pathname = usePathname();
-  const router = useRouter();
   const featureGateUnlocked = useFeatureGate();
   const locale = pathname === '/zh' || pathname.startsWith('/zh/') ? 'zh' : 'en';
   const current = dashboardRouteForPathname(pathname)?.key ?? 'inference';
   const currentRoute = getDashboardRoute(current);
-  const selectedTab = currentRoute.navGroup === 'footer-only' ? '' : current;
   const lockedCurrentGatedTab =
     !featureGateUnlocked && currentRoute.navGroup === 'feature-gated' ? currentRoute : null;
   const tabLabel = (route: DashboardRoute) =>
@@ -170,61 +161,26 @@ export function TabNav({ footer }: { footer?: ReactNode }) {
   const tabHref = (path: string) =>
     unofficialIds ? `${path}?unofficialruns=${unofficialIds}` : path;
 
-  const handleMobileChange = (value: string) => {
-    if (!isDashboardRouteKey(value)) return;
-    window.dispatchEvent(new CustomEvent('inferencex:tab-change'));
-    track('tab_changed', { tab: value });
-    router.push(tabHref(localePath(getDashboardRoute(value).path, locale)));
-  };
-
   return (
-    <div className="mb-4 pt-6 lg:pt-0">
+    <div className="mb-1 pt-3 lg:mb-4 lg:pt-0">
       <Card className="vt-dashboard-tabs p-0 md:p-0" data-slot="dashboard-navigation">
-        {/* Mobile: Dropdown */}
-        <div className="space-y-2 p-4 md:p-6 lg:hidden">
-          <Label htmlFor="chart-select">{locale === 'zh' ? '选择图表' : 'Select Chart'}</Label>
-          <Select value={selectedTab} onValueChange={handleMobileChange}>
-            <SelectTrigger id="chart-select" data-testid="mobile-chart-select" className="w-full">
-              <SelectValue placeholder={locale === 'zh' ? '选择图表' : 'Select Chart'} />
-            </SelectTrigger>
-            <SelectContent>
-              {PRIMARY_TABS.map((route) => (
-                <SelectItem
-                  key={route.key}
-                  value={route.key}
-                  data-ph-capture-attribute-tab={route.key}
-                >
-                  {tabLabel(route)}
-                </SelectItem>
-              ))}
-              {lockedCurrentGatedTab && (
-                <SelectItem
-                  value={lockedCurrentGatedTab.key}
-                  data-ph-capture-attribute-tab={lockedCurrentGatedTab.key}
-                >
-                  {tabLabel(lockedCurrentGatedTab)}
-                </SelectItem>
-              )}
-              {featureGateUnlocked && (
-                <>
-                  <SelectSeparator />
-                  <SelectGroup>
-                    <SelectLabel>{locale === 'zh' ? '隐藏' : 'Hidden'}</SelectLabel>
-                    {GATED_TABS.map((route) => (
-                      <SelectItem
-                        key={route.key}
-                        value={route.key}
-                        data-ph-capture-attribute-tab={route.key}
-                      >
-                        {tabLabel(route)}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </>
-              )}
-            </SelectContent>
-          </Select>
-        </div>
+        {/* Mobile: one-tap, horizontally scrollable chart tabs. Every primary
+            chart is visible as a pill (no dropdown round-trip), the active one
+            is scrolled into view, and edge fades hint at overflow. */}
+        <MobileTabStrip
+          ariaLabel={locale === 'zh' ? '选择图表' : 'Select Chart'}
+          current={current}
+          routes={[...PRIMARY_TABS, ...(lockedCurrentGatedTab ? [lockedCurrentGatedTab] : [])]}
+          gatedRoutes={featureGateUnlocked ? GATED_TABS : []}
+          gatedLabel={locale === 'zh' ? '隐藏' : 'Hidden'}
+          tabLabel={tabLabel}
+          tabHref={(path) => tabHref(localePath(path, locale))}
+          isCurrentPage={(route) => {
+            const enPath = pathname === '/zh' ? '/' : pathname.replace(/^\/zh(?=\/)/u, '');
+            return enPath === route.path || enPath === route.canonicalPath;
+          }}
+          onSelect={handleMobileSelect}
+        />
 
         {/* Desktop: Nav links */}
         <div className="hidden overflow-x-auto p-6 lg:block">
@@ -339,5 +295,137 @@ function HiddenTabsPopover({
         </ul>
       </PopoverContent>
     </Popover>
+  );
+}
+
+/**
+ * Mobile chart navigation: every primary chart as a one-tap pill in a
+ * horizontally scrollable strip. Replaces the old Select dropdown, which hid
+ * the five destinations behind an extra tap and a full-screen listbox.
+ * The active pill is scrolled into view on mount and on route change, and the
+ * strip fades at whichever edge has more content.
+ */
+function MobileTabStrip({
+  ariaLabel,
+  current,
+  routes,
+  gatedRoutes,
+  gatedLabel,
+  tabLabel,
+  tabHref,
+  isCurrentPage,
+  onSelect,
+}: {
+  ariaLabel: string;
+  current: DashboardRouteKey;
+  routes: readonly DashboardRoute[];
+  gatedRoutes: readonly DashboardRoute[];
+  gatedLabel: string;
+  tabLabel: (route: DashboardRoute) => string;
+  tabHref: (path: string) => string;
+  isCurrentPage: (route: DashboardRoute) => boolean;
+  onSelect: (tab: DashboardRouteKey) => void;
+}) {
+  const scrollerRef = useRef<HTMLElement>(null);
+  const [edges, setEdges] = useState({ start: false, end: false });
+
+  const updateEdges = useCallback(() => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    const start = el.scrollLeft > 4;
+    const end = el.scrollLeft + el.clientWidth < el.scrollWidth - 4;
+    setEdges((prev) => (prev.start === start && prev.end === end ? prev : { start, end }));
+  }, []);
+
+  useLayoutEffect(() => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    const active = el.querySelector<HTMLElement>('[aria-current="page"]');
+    if (active) {
+      // Centre the active pill without moving the page vertically.
+      const target = active.offsetLeft - (el.clientWidth - active.offsetWidth) / 2;
+      el.scrollLeft = Math.max(0, target);
+    }
+    updateEdges();
+  }, [current, updateEdges, gatedRoutes.length]);
+
+  useEffect(() => {
+    const el = scrollerRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(updateEdges);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [updateEdges]);
+
+  const renderPill = (route: DashboardRoute) => {
+    const active = current === route.key;
+    return (
+      <Link
+        key={route.key}
+        href={tabHref(route.path)}
+        aria-current={active ? 'page' : undefined}
+        data-testid={`mobile-tab-${route.key}`}
+        data-ph-capture-attribute-tab={route.key}
+        onClick={(event) => {
+          // Already on this exact chart page: tabHref keeps only
+          // `unofficialruns`, so navigating would drop the selector state held
+          // in the URL. Child pages (e.g. /inference/agentic) still navigate.
+          if (active && isCurrentPage(route)) {
+            event.preventDefault();
+            return;
+          }
+          onSelect(route.key);
+        }}
+        className={cn(
+          'inline-flex min-h-10 shrink-0 items-center rounded-full border px-4 text-sm font-medium whitespace-nowrap',
+          'transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+          active
+            ? 'border-secondary bg-secondary text-secondary-foreground dark:border-primary dark:bg-primary dark:text-primary-foreground'
+            : 'border-border/60 bg-background/40 text-muted-foreground active:bg-accent',
+        )}
+      >
+        {tabLabel(route)}
+      </Link>
+    );
+  };
+
+  return (
+    <div className="relative lg:hidden">
+      <nav
+        ref={scrollerRef}
+        id="chart-select"
+        aria-label={ariaLabel}
+        data-testid="mobile-chart-select"
+        onScroll={updateEdges}
+        className="no-scrollbar flex gap-2 overflow-x-auto overscroll-x-contain p-3"
+      >
+        {routes.map(renderPill)}
+        {gatedRoutes.length > 0 && (
+          <>
+            <span
+              aria-hidden
+              className="shrink-0 self-center px-1 text-2xs font-medium uppercase tracking-eyebrow text-muted-foreground/70"
+            >
+              {gatedLabel}
+            </span>
+            {gatedRoutes.map(renderPill)}
+          </>
+        )}
+      </nav>
+      <span
+        aria-hidden
+        className={cn(
+          'pointer-events-none absolute inset-y-0 left-0 w-6 rounded-l-xl bg-gradient-to-r from-background to-transparent transition-opacity',
+          edges.start ? 'opacity-100' : 'opacity-0',
+        )}
+      />
+      <span
+        aria-hidden
+        className={cn(
+          'pointer-events-none absolute inset-y-0 right-0 w-8 rounded-r-xl bg-gradient-to-l from-background to-transparent transition-opacity',
+          edges.end ? 'opacity-100' : 'opacity-0',
+        )}
+      />
+    </div>
   );
 }
