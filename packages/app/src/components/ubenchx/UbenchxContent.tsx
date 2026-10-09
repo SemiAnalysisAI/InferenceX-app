@@ -1,8 +1,16 @@
 'use client';
 
 import * as d3 from 'd3';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { track } from '@/lib/analytics';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
 import { useLocale } from '@/lib/use-locale';
 import type { Locale } from '@/lib/i18n';
@@ -37,8 +45,9 @@ const STRINGS = {
     mbuTitle: 'Memory Bandwidth Utilization (MBU) vs Message Size',
     mbuY: 'MBU (%)',
     bwTitle: 'Bandwidth vs Message Size',
-    bwY: 'Bandwidth (GB/s)',
+    bwY: 'Bandwidth (TB/s)',
     xAxis: 'Message Size',
+    yMetric: 'Y-axis',
     peakNote: "MBU is relative to each GPU's own peak HBM bandwidth from GPU_SPECS.",
     methodology: 'Methodology',
     methodologyText:
@@ -46,7 +55,7 @@ const STRINGS = {
     source: 'Source',
     instructions:
       'Shift+Scroll to zoom · Drag to pan · Double-click to reset · Click a point to pin tooltip',
-    tooltipGpu: 'GPU',
+    dismiss: 'Click elsewhere to dismiss',
     tooltipSize: 'Size',
     tooltipLatency: 'Latency',
     tooltipBandwidth: 'Bandwidth',
@@ -62,15 +71,16 @@ const STRINGS = {
     mbuTitle: '显存带宽利用率（MBU）vs 消息大小',
     mbuY: 'MBU（%）',
     bwTitle: '带宽 vs 消息大小',
-    bwY: '带宽（GB/s）',
+    bwY: '带宽（TB/s）',
     xAxis: '消息大小',
+    yMetric: 'Y 轴',
     peakNote: 'MBU 基于各 GPU 自身在 GPU_SPECS 中的峰值 HBM 带宽计算。',
     methodology: '测试方法',
     methodologyText:
       '使用 triton.testing.do_bench 计时 b.copy_(a)（float32 张量）；带宽 = 2 * bytes / time（读 + 写）。消息大小为 2 的幂次，从 8 B 到 16 GiB。',
     source: '数据来源',
     instructions: 'Shift+滚轮缩放 · 拖动平移 · 双击重置 · 点击数据点固定提示框',
-    tooltipGpu: 'GPU',
+    dismiss: '点击其他区域关闭',
     tooltipSize: '大小',
     tooltipLatency: '延迟',
     tooltipBandwidth: '带宽',
@@ -81,6 +91,17 @@ const STRINGS = {
 } as const;
 
 type ChartType = 'latency' | 'mbu' | 'bandwidth';
+
+const Y_METRICS: readonly {
+  key: ChartType;
+  title: 'latencyTitle' | 'mbuTitle' | 'bwTitle';
+  label: 'latencyY' | 'mbuY' | 'bwY';
+  scale: 'log' | 'linear';
+}[] = [
+  { key: 'mbu', title: 'mbuTitle', label: 'mbuY', scale: 'linear' },
+  { key: 'bandwidth', title: 'bwTitle', label: 'bwY', scale: 'linear' },
+  { key: 'latency', title: 'latencyTitle', label: 'latencyY', scale: 'log' },
+];
 
 interface ChartPoint extends UbenchxDerivedRow {
   x: number;
@@ -98,7 +119,12 @@ function makePoints(
   return rows.map((row) => ({
     ...row,
     x: row.bytes,
-    y: chart === 'latency' ? row.timeMs : chart === 'mbu' ? row.mbuPercent : row.bandwidthGbps,
+    y:
+      chart === 'latency'
+        ? row.timeMs
+        : chart === 'mbu'
+          ? row.mbuPercent
+          : row.bandwidthGbps / 1000,
     gpuKey,
     peakBandwidthGbps,
   }));
@@ -111,16 +137,25 @@ function paddedDomain(values: number[]): [number, number] {
   return min === max ? [min / 2, max * 2] : [min / 1.2, max * 1.2];
 }
 
-function formatTooltip(point: ChartPoint, t: (typeof STRINGS)[Locale]): string {
-  const lines = [
-    `<strong>${t.tooltipGpu}:</strong> ${point.gpuKey}`,
-    `<strong>${t.tooltipSize}:</strong> ${point.sizeLabel}`,
-    `<strong>${t.tooltipLatency}:</strong> ${point.timeMs < 0.01 ? point.timeMs.toFixed(4) : point.timeMs.toFixed(4)} ms`,
-    `<strong>${t.tooltipBandwidth}:</strong> ${point.bandwidthGbps.toFixed(2)} GB/s`,
-    `<strong>${t.tooltipMbu}:</strong> ${point.mbuPercent.toFixed(2)}%`,
-    `<strong>${t.tooltipPeak}:</strong> ${point.peakBandwidthGbps.toFixed(0)} GB/s`,
-  ];
-  return lines.join('<br>');
+// Same card and row styling as the /inference scatter tooltips (tooltipUtils.ts).
+const tooltipLine = (label: string, value: string) =>
+  `<div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>${label}:</strong> ${value}</div>`;
+
+function formatTooltip(point: ChartPoint, isPinned: boolean, t: (typeof STRINGS)[Locale]): string {
+  const color = GPU_COLORS[point.gpuKey] ?? '#888';
+  return `
+    <div style="background: var(--popover); border: 1px solid var(--border); border-radius: 8px; padding: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); user-select: ${isPinned ? 'text' : 'none'};">
+      ${isPinned ? `<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">${t.dismiss}</div>` : ''}
+      <div style="display: flex; align-items: center; gap: 6px; color: var(--foreground); font-size: 12px; font-weight: 600; margin-bottom: 8px;">
+        <span style="display: inline-block; width: 8px; height: 8px; border-radius: 9999px; background: ${color};"></span>${point.gpuKey}
+      </div>
+      ${tooltipLine(t.tooltipSize, point.sizeLabel)}
+      ${tooltipLine(t.tooltipLatency, `${point.timeMs.toFixed(4)} ms`)}
+      ${tooltipLine(t.tooltipBandwidth, `${(point.bandwidthGbps / 1000).toFixed(3)} TB/s`)}
+      ${tooltipLine(t.tooltipMbu, `${point.mbuPercent.toFixed(1)}%`)}
+      ${tooltipLine(t.tooltipPeak, `${point.peakBandwidthGbps / 1000} TB/s`)}
+    </div>
+  `;
 }
 
 /** Simple inline legend rendered above charts. */
@@ -258,7 +293,8 @@ function UbenchxChart({
       }}
       tooltip={{
         rulerType: 'crosshair',
-        content: (point) => formatTooltip(point, STRINGS[locale]),
+        attachToLayer: 1,
+        content: (point, isPinned) => formatTooltip(point, isPinned, STRINGS[locale]),
       }}
     />
   );
@@ -276,24 +312,19 @@ export function UbenchxContent() {
     [],
   );
 
+  const [metricKey, setMetricKey] = useState<ChartType>('mbu');
+  const metric = Y_METRICS.find((m) => m.key === metricKey) ?? Y_METRICS[0];
+
+  const points = useMemo(
+    () => viewResults.flatMap((r) => makePoints(r.rows, metric.key, r.gpu, r.peakBandwidthGbps)),
+    [viewResults, metric.key],
+  );
+
   if (viewResults.length === 0) {
     return <p className="text-sm text-muted-foreground">No data available.</p>;
   }
 
   const gpuKeys = viewResults.map((r) => r.gpu);
-
-  const latencyPoints = useMemo(
-    () => viewResults.flatMap((r) => makePoints(r.rows, 'latency', r.gpu, r.peakBandwidthGbps)),
-    [viewResults],
-  );
-  const mbuPoints = useMemo(
-    () => viewResults.flatMap((r) => makePoints(r.rows, 'mbu', r.gpu, r.peakBandwidthGbps)),
-    [viewResults],
-  );
-  const bwPoints = useMemo(
-    () => viewResults.flatMap((r) => makePoints(r.rows, 'bandwidth', r.gpu, r.peakBandwidthGbps)),
-    [viewResults],
-  );
 
   // Deduplicate source URLs for the footer.
   const sourceUrls = [...new Set(viewResults.map((r) => r.metadata.sourceUrl))];
@@ -305,44 +336,49 @@ export function UbenchxContent() {
         <p className="text-sm text-muted-foreground mt-1">{t.pageSubtitle}</p>
       </div>
 
+      <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-3">
+        <label
+          htmlFor="ubenchx-metric-select"
+          className="text-sm font-medium text-muted-foreground"
+        >
+          {t.yMetric}
+        </label>
+        <Select
+          value={metric.key}
+          onValueChange={(value) => {
+            setMetricKey(value as ChartType);
+            track('ubenchx_metric_changed', { metric: value });
+          }}
+        >
+          <SelectTrigger
+            id="ubenchx-metric-select"
+            className="w-full sm:w-[240px]"
+            data-testid="ubenchx-metric-select"
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {Y_METRICS.map((m) => (
+              <SelectItem key={m.key} value={m.key}>
+                {t[m.label]}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
       <GpuLegend gpuKeys={gpuKeys} />
 
-      {/* Chart 1: Latency */}
       <section>
-        <h2 className="text-lg font-semibold mb-2">{t.latencyTitle}</h2>
+        <h2 className="text-lg font-semibold mb-2">{t[metric.title]}</h2>
+        {metric.key === 'mbu' && <p className="text-xs text-muted-foreground mb-1">{t.peakNote}</p>}
         <UbenchxChart
-          chartId="ubenchx-latency"
-          allPoints={latencyPoints}
+          key={metric.key}
+          chartId={`ubenchx-${metric.key}`}
+          allPoints={points}
           gpuKeys={gpuKeys}
-          yLabel={t.latencyY}
-          yScaleType="log"
-          locale={locale}
-        />
-      </section>
-
-      {/* Chart 2: MBU */}
-      <section>
-        <h2 className="text-lg font-semibold mb-2">{t.mbuTitle}</h2>
-        <p className="text-xs text-muted-foreground mb-1">{t.peakNote}</p>
-        <UbenchxChart
-          chartId="ubenchx-mbu"
-          allPoints={mbuPoints}
-          gpuKeys={gpuKeys}
-          yLabel={t.mbuY}
-          yScaleType="linear"
-          locale={locale}
-        />
-      </section>
-
-      {/* Chart 3: Bandwidth */}
-      <section>
-        <h2 className="text-lg font-semibold mb-2">{t.bwTitle}</h2>
-        <UbenchxChart
-          chartId="ubenchx-bandwidth"
-          allPoints={bwPoints}
-          gpuKeys={gpuKeys}
-          yLabel={t.bwY}
-          yScaleType="linear"
+          yLabel={t[metric.label]}
+          yScaleType={metric.scale}
           locale={locale}
         />
       </section>
@@ -355,7 +391,7 @@ export function UbenchxContent() {
           <p key={r.gpu}>
             <strong>{r.gpu}:</strong> {r.metadata.gpu} | Driver: {r.metadata.driver} | PyTorch:{' '}
             {r.metadata.torch} | Triton: {r.metadata.triton} | Container: {r.metadata.container} |
-            Peak: {r.peakBandwidthGbps} GB/s ({r.peakBandwidthSource})
+            Peak: {r.peakBandwidthGbps / 1000} TB/s (GPU_SPECS)
           </p>
         ))}
         {sourceUrls.map((url) => (
