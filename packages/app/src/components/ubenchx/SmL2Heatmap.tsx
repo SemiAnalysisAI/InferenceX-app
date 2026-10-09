@@ -12,7 +12,7 @@ import { transformSmL2Run, type SmL2ViewResult } from './sm-l2-transform';
 
 const STRINGS = {
   en: {
-    pageTitle: 'ubenchX: SM-SM L2 Latency Difference',
+    pageTitle: 'SM-SM L2 Latency Difference',
     pageSubtitle:
       'Pointer-chase L2 cache benchmark revealing SM-to-SM latency differences and GPC/die topology.',
     heatmapTitle: 'SM-SM L2 Latency Difference',
@@ -35,7 +35,7 @@ const STRINGS = {
     noData: 'No SM-L2 distance data available.',
   },
   zh: {
-    pageTitle: 'ubenchX：SM 间 L2 延迟差异',
+    pageTitle: 'SM 间 L2 延迟差异',
     pageSubtitle: '基于指针追踪的 L2 缓存基准测试，揭示 SM 间延迟差异和 GPC/die 拓扑结构。',
     heatmapTitle: 'SM 间 L2 延迟差异',
     colorBarLabel: '每地址平均 |差值|（周期）',
@@ -382,7 +382,7 @@ export function SmL2Content() {
   return (
     <div className="space-y-8" role="group" aria-label={t.aria}>
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">{t.pageTitle}</h1>
+        <h2 className="text-xl font-semibold tracking-tight">{t.pageTitle}</h2>
         <p className="text-sm text-muted-foreground mt-1">{t.pageSubtitle}</p>
       </div>
 

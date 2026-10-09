@@ -37,7 +37,7 @@ const GPU_COLORS: Record<string, string> = {
 
 const STRINGS = {
   en: {
-    pageTitle: 'ubenchX: Device-Memory Copy Bandwidth',
+    pageTitle: 'Device-Memory Copy Bandwidth',
     pageSubtitle:
       'Microbenchmark measuring device-memory copy bandwidth across message sizes on NVIDIA and AMD GPUs.',
     latencyTitle: 'Latency vs Message Size',
@@ -64,7 +64,7 @@ const STRINGS = {
     aria: 'ubenchX device-memory copy bandwidth charts',
   },
   zh: {
-    pageTitle: 'ubenchX：显存拷贝带宽',
+    pageTitle: '显存拷贝带宽',
     pageSubtitle: '在 NVIDIA 和 AMD GPU 上测量不同消息大小的显存拷贝带宽微基准测试。',
     latencyTitle: '延迟 vs 消息大小',
     latencyY: '延迟（ms）',
@@ -332,7 +332,7 @@ export function UbenchxContent() {
   return (
     <div className="space-y-8" role="group" aria-label={t.aria}>
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">{t.pageTitle}</h1>
+        <h2 className="text-xl font-semibold tracking-tight">{t.pageTitle}</h2>
         <p className="text-sm text-muted-foreground mt-1">{t.pageSubtitle}</p>
       </div>
 
