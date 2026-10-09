@@ -7,7 +7,7 @@ import { SITE_URL } from '@semianalysisai/inferencex-constants';
 
 const TITLE = 'ubenchX: TPC Skyline';
 const DESCRIPTION =
-  'Measured TPC per GPC groupings on NVIDIA H100, H200, B200, B300, and GB200, found from thread-block cluster co-scheduling.';
+  'Measured TPC per GPC groupings on NVIDIA GPUs, found from thread-block cluster co-scheduling.';
 
 export const metadata: Metadata = {
   title: TITLE,

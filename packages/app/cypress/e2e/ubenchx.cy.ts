@@ -1,3 +1,7 @@
+import { TPC_SKYLINE_RUNS } from '@/components/ubenchx/tpc-skyline-data';
+
+const TPC_SKYLINE_GPU_COUNT = Object.keys(TPC_SKYLINE_RUNS).length;
+
 const dismissModal = {
   onBeforeLoad(win: Cypress.AUTWindow) {
     win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
@@ -45,7 +49,10 @@ describe('ubenchX hub and test routes', () => {
         'Measured TPC Groupings',
       ]);
     });
-    cy.get('[data-testid="tpc-skyline-table"] tbody tr').should('have.length', 5);
+    cy.get('[data-testid="tpc-skyline-table"] tbody tr').should(
+      'have.length',
+      TPC_SKYLINE_GPU_COUNT,
+    );
     cy.contains('[data-testid="tpc-skyline-table"] tr', 'H100 SXM')
       .should('contain', '[9, 9, 8, 8, 8, 8, 8, 4, 1, 1, 1, 1]')
       .find('td')
@@ -64,7 +71,10 @@ describe('ubenchX hub and test routes', () => {
     cy.visit('/zh/ubenchx/tpc-skyline', dismissModal);
     cy.contains('h2', 'TPC Skyline').should('be.visible');
     cy.contains('[data-testid="tpc-skyline-table"] th', '实测 TPC 分组').should('be.visible');
-    cy.get('[data-testid="tpc-skyline-table"] tbody tr').should('have.length', 5);
+    cy.get('[data-testid="tpc-skyline-table"] tbody tr').should(
+      'have.length',
+      TPC_SKYLINE_GPU_COUNT,
+    );
   });
 
   it('renders the mem-bw page directly with noindex', () => {

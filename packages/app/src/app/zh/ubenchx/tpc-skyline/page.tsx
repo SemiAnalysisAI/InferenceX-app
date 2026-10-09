@@ -6,8 +6,7 @@ import { zhAlternates, ZH_OG_LOCALE } from '@/lib/i18n';
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
 
 const TITLE = 'ubenchX：TPC Skyline';
-const DESCRIPTION =
-  '基于线程块集群协同调度，实测 NVIDIA H100、H200、B200、B300 和 GB200 的 TPC per GPC 分组。';
+const DESCRIPTION = '基于线程块集群协同调度，实测 NVIDIA GPU 的 TPC per GPC 分组。';
 
 export const metadata: Metadata = {
   title: TITLE,

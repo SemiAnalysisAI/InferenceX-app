@@ -4,6 +4,11 @@
  * Source: ubenchX/gpc_query in SemiAnalysisAI/InferenceX (ported from
  * microbench-blackwell tools/gpc_query.cu). Each run lists TPCs per GPC, sorted
  * descending, as printed by the tool; the order carries no physical GPC index.
+ *
+ * To add a GPU, append one entry below and paste the tool's output line into
+ * `tpcsPerGpc`. The table rows, GPC/SM counts, and the /api/v1/views/ubenchx
+ * `test=tpc-skyline` response are all derived from this record; nothing else
+ * needs to change. Use a GPU_SPECS name as the key, matching the other tests.
  */
 
 export interface TpcSkylineRun {
