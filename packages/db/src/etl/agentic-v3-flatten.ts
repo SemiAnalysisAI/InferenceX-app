@@ -61,19 +61,11 @@ const V3_SCALAR_PATHS: [string[], string][] = [
   [['request_metrics', 'throughput', 'per_gpu', 'output_tput_tps'], 'output_tput_per_gpu'],
   [['request_metrics', 'throughput', 'per_gpu', 'input_tput_tps'], 'input_tput_per_gpu'],
   [['request_metrics', 'cache', 'theoretical_cache_hit_rate'], 'theoretical_cache_hit_rate'],
-  // server-side prefix-cache observability (same fields v2 emitted flat)
-  [['server_metrics', 'cache', 'gpu_cache_hit_rate'], 'server_gpu_cache_hit_rate'],
-  [['server_metrics', 'cache', 'cpu_cache_hit_rate'], 'server_cpu_cache_hit_rate'],
-  [['server_metrics', 'cache', 'external_cache_hit_rate'], 'server_external_cache_hit_rate'],
-  // KV-cache occupancy (gpu key predates v3 as a flat auto-captured field)
-  [['server_metrics', 'kv_cache', 'gpu_usage_pct'], 'gpu_kv_cache_usage_pct'],
-  // server token totals
-  [['server_metrics', 'tokens', 'prompt_total'], 'total_prompt_tokens'],
-  [['server_metrics', 'tokens', 'generation_total'], 'total_generation_tokens'],
-  [['server_metrics', 'tokens', 'requests_completed'], 'total_requests_completed'],
-  // Deliberately NOT mapped (yet): cache.overall/prefix_cache_hits/queries,
-  // kv_cache.cpu_*, tokens.prompt_by_source, sources[] — new v3 detail we don't
-  // consume anywhere; add here + METRIC_KEYS when a view needs them.
+  // One completed request per successful profiled record.
+  [['num_requests_successful'], 'total_requests_completed'],
+  // `server_metrics` is deliberately not read: AgentX server metrics are
+  // derived from the raw scrape and server logs (etl/agentx-server-metrics),
+  // and any producer-computed values are ignored.
 ];
 
 /** Walk a nested object path; returns undefined on any non-object hop. */

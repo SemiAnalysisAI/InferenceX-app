@@ -77,9 +77,7 @@ async function main(): Promise<void> {
   if (!prepared.timelineRequests || !prepared.chartWindows)
     throw new Error('Recovered trace is empty');
   // Attach only the missing sidecar; published benchmark measurements remain immutable.
-  prepared.cacheHitRates = null;
   prepared.fullResponseMetrics = {};
-  prepared.atomKvCacheBlocks = null;
   await persistPreparedTraceReplay(sql, [row.id], prepared);
   const [after] = await sql<{ fingerprint: string; profile_hash: string; server_hash: string }[]>`
     select md5((to_jsonb(br)-'trace_replay_id')::text) as fingerprint,

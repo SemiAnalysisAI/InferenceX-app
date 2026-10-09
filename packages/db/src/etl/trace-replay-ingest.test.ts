@@ -43,7 +43,6 @@ function preparedFixture(): PreparedTraceReplay {
     timelineRequests: 3,
     compressionMs: 10,
     computeMs: 20,
-    cacheHitRates: null,
     fullResponseMetrics: {
       median_full_response_itl: 0.005,
       median_full_response_intvty: 200,
@@ -53,10 +52,7 @@ function preparedFixture(): PreparedTraceReplay {
   };
 }
 
-function mockSqlWithTransaction(
-  lockedRows: { id: number }[],
-  capacityLog?: string,
-): {
+function mockSqlWithTransaction(lockedRows: { id: number }[]): {
   sql: Parameters<typeof persistPreparedTraceReplay>[0];
   calls: SqlCall[];
 } {
@@ -66,12 +62,6 @@ function mockSqlWithTransaction(
     calls.push({ text, values });
     if (text.includes('for update')) return Promise.resolve(lockedRows);
     if (text.includes('insert into agentic_trace_replay')) return Promise.resolve([{ id: 123 }]);
-    if (text.includes('select br.id') && capacityLog) {
-      return Promise.resolve([{ id: 41, server_log_id: 7 }]);
-    }
-    if (text.includes('with chunk') && capacityLog) {
-      return Promise.resolve([{ has_more: false, line: capacityLog }]);
-    }
     return Promise.resolve([]);
   };
   const tx = Object.assign(execute, {
@@ -141,18 +131,6 @@ describe('gzipTraceReplayInput', () => {
 });
 
 describe('persistPreparedTraceReplay', () => {
-  it('derives ATOM capacity from the stored startup log during ingestion', async () => {
-    const { sql, calls } = mockSqlWithTransaction(
-      [{ id: 41 }],
-      'Concurrent capacity vs context length (max_model_len=1048576, block_size=128, max_slots=32, pool_blocks=8687, dcp=8 (blk/req is per-rank)):',
-    );
-    const prepared = { ...preparedFixture(), atomKvCacheBlocks: 8414 };
-    await expect(persistPreparedTraceReplay(sql, [41], prepared)).resolves.toBe(1);
-    const update = calls.find((call) =>
-      call.text.includes("jsonb_set(metrics, '{kv_cache_pool_tokens}'"),
-    );
-    expect(update?.values).toEqual([8615936, 41, 8615936]);
-  });
   it('rechecks links under a row lock and avoids creating an orphan after a concurrent ingest', async () => {
     const { sql, calls } = mockSqlWithTransaction([]);
 

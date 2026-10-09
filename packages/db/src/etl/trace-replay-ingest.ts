@@ -14,7 +14,6 @@ import { createGzip, gzipSync } from 'node:zlib';
 
 import type postgres from 'postgres';
 
-import { updateAtomKvCachePoolTokens } from './atom-kv-capacity.js';
 import { computeTraceDerivedPayloads } from './compute-trace-derived.js';
 import { fullResponseMetricsFromGzip } from './full-response-interactivity.js';
 import type { ServerMetricsContext } from './server-metrics-adapters';
@@ -62,9 +61,7 @@ export interface PreparedTraceReplay {
   timelineRequests: number;
   compressionMs: number;
   computeMs: number;
-  cacheHitRates: { gpu: number; cpu: number | null } | null;
   fullResponseMetrics: Record<string, number>;
-  atomKvCacheBlocks?: number | null;
 }
 
 function formatBytes(bytes: number | null | undefined): string {
@@ -84,30 +81,6 @@ function elapsed(startMs: number): string {
 function jsonBuffer(value: unknown | null): Buffer | null {
   if (value === null) return null;
   return Buffer.from(JSON.stringify(structuredClone(value)), 'utf8');
-}
-
-function cacheHitRatesFromChartSeries(
-  chartSeries: Awaited<ReturnType<typeof computeTraceDerivedPayloads>>['chartSeries'],
-): PreparedTraceReplay['cacheHitRates'] {
-  if (!chartSeries || chartSeries.prefillTps.length === 0) return null;
-  const sumPrompts = chartSeries.prefillTps.reduce((sum, point) => sum + point.value, 0);
-  if (!(sumPrompts > 0)) return null;
-
-  const sumOf = (name: string): number =>
-    (chartSeries.promptTokensBySource[name] ?? []).reduce((sum, point) => sum + point.value, 0);
-  // Preserve the historical source aliases exactly: SGLang hicache reports
-  // HBM/CPU labels while vLLM LMCache reports local/external transfer labels.
-  const cpuHits = sumOf('cache hit (CPU offload)') + sumOf('external_kv_transfer');
-  const hbmFromBreakdown = sumOf('cache hit (HBM)') + sumOf('cache hit') + sumOf('local_cache_hit');
-  const gpuHits =
-    hbmFromBreakdown > 0
-      ? hbmFromBreakdown
-      : chartSeries.prefixCacheHitsTps.reduce((sum, point) => sum + point.value, 0);
-
-  return {
-    gpu: gpuHits / sumPrompts,
-    cpu: cpuHits > 0 ? cpuHits / sumPrompts : null,
-  };
 }
 
 /**
@@ -196,8 +169,11 @@ export async function prepareTraceReplay(
   const compressionMs = Date.now() - compressionStart;
 
   const computeStart = Date.now();
-  const { aggregateStats, chartSeries, requestTimeline, atomKvCacheBlocks } =
-    await computeTraceDerivedPayloads(profile.data, metricsJson.data, metricsContext);
+  const { aggregateStats, chartSeries, requestTimeline } = await computeTraceDerivedPayloads(
+    profile.data,
+    metricsJson.data,
+    metricsContext,
+  );
   const computeMs = Date.now() - computeStart;
   const fullResponseMetrics = fullResponseMetricsFromGzip(profile.data);
 
@@ -215,9 +191,7 @@ export async function prepareTraceReplay(
     timelineRequests: requestTimeline?.requests.length ?? 0,
     compressionMs,
     computeMs,
-    cacheHitRates: cacheHitRatesFromChartSeries(chartSeries),
     fullResponseMetrics,
-    atomKvCacheBlocks,
   };
 }
 
@@ -247,7 +221,6 @@ export async function persistPreparedTraceReplay(
     aggregateStatsJson,
     chartSeriesJson,
     requestTimelineJson,
-    cacheHitRates,
     fullResponseMetrics,
   } = prepared;
 
@@ -353,25 +326,6 @@ export async function persistPreparedTraceReplay(
     `;
     log(`linked benchmark rows (${elapsed(updateStart)})`);
 
-    if (cacheHitRates) {
-      await tx`
-        update benchmark_results
-        set metrics = jsonb_set(
-          case when ${cacheHitRates.cpu}::numeric is not null
-            then jsonb_set(
-              metrics,
-              '{server_cpu_cache_hit_rate}',
-              to_jsonb(${cacheHitRates.cpu}::numeric)
-            )
-            else metrics
-          end,
-          '{server_gpu_cache_hit_rate}',
-          to_jsonb(${cacheHitRates.gpu}::numeric)
-        )
-        where id = any(${tx.array(unlinked.map((row) => row.id))}::bigint[])
-      `;
-      log('updated cache-hit metrics from chart series');
-    }
     if (Object.keys(fullResponseMetrics).length > 0) {
       await tx`
         update benchmark_results
@@ -382,11 +336,6 @@ export async function persistPreparedTraceReplay(
       log('filled full-response ITL and interactivity from the AIPerf profile');
     }
     linkedCount = unlinked.length;
-    await updateAtomKvCachePoolTokens(
-      tx,
-      unlinked.map((row) => row.id),
-      prepared.atomKvCacheBlocks ?? null,
-    );
   });
   if (linkedCount > 0) log(`inserted trace_replay payload (${elapsed(insertStart)})`);
   return linkedCount;

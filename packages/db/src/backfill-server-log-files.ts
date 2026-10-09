@@ -24,6 +24,7 @@ import path from 'node:path';
 
 import { hasNoSslFlag } from './cli-utils.js';
 import { mapBenchmarkRow, type BenchmarkParams } from './etl/benchmark-mapper.js';
+import { recomputeAgentxServerMetrics } from './etl/agentx-server-metrics/db.js';
 import { insertServerLogFilePaths } from './etl/benchmark-ingest.js';
 import { createAdminSql } from './etl/db-utils.js';
 import { listServerLogFilePaths, serverLogArtifactRoot } from './etl/server-log-artifacts.js';
@@ -342,6 +343,8 @@ async function main(): Promise<void> {
             continue;
           }
           await insertServerLogFilePaths(sql, resultIds, logFiles);
+          // Restored logs complete the inputs of AgentX KV-pool derivation.
+          await recomputeAgentxServerMetrics(sql, resultIds);
           artifactsProcessed++;
           filesStored += logFiles.length;
           pointsLinked += resultIds.length;

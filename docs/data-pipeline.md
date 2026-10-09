@@ -274,13 +274,67 @@ selected pool and already sums independent DP pools. Do not sum worker estimates
 or multiply by TP. Checkpoints may share this nominal pool with token KV storage.
 Missing or inconsistent capacity metadata stays unset rather than guessed.
 
-Ingestion derives `metrics.kv_cache_pool_tokens` when it links the trace artifact.
-The startup lines are pulled from `server_logs.server_log` in bounded 64 MiB character
-chunks (with a small overlap) because PostgreSQL's regex engine needs 4 bytes per
-character and rejects a single allocation over 1 GiB; LMCache runs store 290–690 MiB logs.
-The `db:backfill-atom-kv-capacity --run-id <id> --yes` command applies the same logic
-to stored artifacts. The workflow's `atom-kv-capacity-only` option skips chart and
-aggregate recomputation; no benchmark rerun or raw-artifact replacement is needed.
+### AgentX Server Metrics
+
+The app is the only place AgentX server-side metrics are computed. Producers
+upload raw data only: AIPerf's `server_metrics_export.*` scrape and the server-log
+bundle. Ingest discards any server values an older aggregate still carries
+(`server_metrics.*`, top-level `kv_cache_pool_tokens`, v2 flat fields) and
+`etl/agentx-server-metrics` derives `kv_cache_pool_tokens`,
+`kv_cache_pool_prefill_tokens`, `kv_cache_pool_decode_tokens`,
+`server_{gpu,cpu,external}_cache_hit_rate`, `gpu_kv_cache_usage_pct`, and
+`total_{prompt,generation}_tokens` from stored inputs:
+
+- Scalars come from the profiling-phase summaries in `server_metrics_export.csv`,
+  the same window as the request metrics. A disaggregated row reads hit rates from
+  prefill endpoints only: decode workers would dilute prefix hits, and vLLM decode
+  workers count KV received from prefill as `external_kv_transfer` prompt tokens,
+  which is not a cache hit. A hit rate above 1 means the hit and query counters'
+  windows do not line up, so it is null. Token totals use the Dynamo frontend counters when
+  scraped, which count each request once. Engine counters count a disaggregated
+  request on both roles, so they are used only for aggregated rows; otherwise the
+  client-side request totals apply. KV usage is the peak engine gauge, else the
+  Dynamo component gauge.
+- KV pools come from worker startup logs, identified by file name
+  (`<host>_<role>_w<N>.out`, `<role>[N]_<host>.log`, single-node `server.log`).
+  Each role sums its workers; a disaggregated role must have one log per
+  configured worker. Disaggregated rows keep both role pools and use the decode
+  pool as `kv_cache_pool_tokens`, because requests' KV lives there after prefill.
+- A value that cannot be derived correctly is removed, never estimated. Examples:
+  a missing worker log, a DP rank set that was not fully logged, or TensorRT-LLM
+  attention-DP workers, whose exporter reports rank 0's capacity only.
+
+Each inference server is one parser (`vllm.ts`, `sglang.ts`, `trtllm.ts`,
+`atom.ts`) implementing `EngineParser`: scrape scalars, the startup lines and
+argument tokens to read, and a role's pool from its workers' lines and endpoints.
+`ENGINE_PARSERS` maps each canonical framework, including orchestrated ones such
+as `dynamo-vllm` or `mori-sglang`, to its engine's parser. Worker and role
+identification, per-role scrape filtering, Dynamo orchestrator metrics,
+completeness checks shared by log parsers, and the disaggregated headline live in
+`index.ts`. Adding a server is one parser file, one registry entry, and its test.
+
+Engine specifics: vLLM sums one `GPU KV cache size` line per DP engine core.
+SGLang's `max_total_num_tokens` is one DP rank's pool shared by its TP ranks; a
+single logged rank is scaled by `dp_size`. TensorRT-LLM capacity is each worker
+endpoint's exported blocks times tokens per block. ATOM's nominal capacity is
+`allocated blocks × resolved block_size × DCP`: startup `Concurrent capacity vs
+context length` lines supply the block size and DCP width, while
+`atom:kv_cache_blocks_total` supplies the selected pool, which already sums
+independent DP pools. Startup `pool_blocks` estimates differ between TP workers
+and are not used. Checkpoints may share this nominal pool with token KV storage.
+
+Startup lines are filtered inside PostgreSQL in 16 MiB character slices with
+overlap, because PostgreSQL's regex engine needs 4 bytes per character and LMCache
+runs store 290–690 MiB logs. Only complete lines match, so a slice boundary never
+yields a truncated value. Ingest derives the metrics after a run's trace and log
+sidecars are linked, and `db:backfill-server-log-files` re-derives rows whose logs
+it restores. `db:backfill-agentx-server-metrics` recomputes stored rows
+(`--run-id`, `--shard-count`/`--shard-index`, `--dry-run`, `--report FILE`) and only
+writes rows whose values change. Audited point backfills that pin these metrics
+keep their pinned values. Unofficial-run overlays apply the same derivation to
+the `server_metrics_export.csv` of each point's `agentic_*` artifact, read with
+HTTP range requests rather than a full download; overlays read no server logs,
+so their KV pools are absent.
 
 The Recompute Agentic Metrics workflow accepts an optional `neon-branch` to
 rebuild a stored run in an existing child database. It verifies the child and
@@ -293,7 +347,9 @@ Use `run-id: all` for a stale-only repair across historical and current AgentX
 points. Eight independent shards recompute charts, aggregates, and request
 timelines using the checked-out code's versions. Each shard records database-side
 fingerprints before writing and verifies that benchmark rows, raw artifacts, and
-already-current timelines are unchanged afterward. Previously populated metrics
+already-current timelines are unchanged afterward; only then does it recompute
+the AgentX server metrics on its benchmark rows (`server-metrics-only` runs just
+that step). Previously populated metrics
 cannot be replaced with empty output; parsing failures fail the job and preserve
 the old payload. Integrity manifests are retained as workflow artifacts.
 
