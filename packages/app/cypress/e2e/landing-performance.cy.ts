@@ -187,6 +187,10 @@ describe('Landing page performance', () => {
       },
     });
 
+    // The trigger label names the saved theme only once the client has mounted.
+    cy.get('[data-testid="theme-toggle"]')
+      .should('have.attr', 'aria-label')
+      .and('contain', 'currently');
     cy.get('[data-testid="theme-toggle"]').click();
     cy.get('html').should('have.class', 'minecraft');
     cy.window().should((win) => {

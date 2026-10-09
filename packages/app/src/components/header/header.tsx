@@ -6,11 +6,11 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { track } from '@/lib/analytics';
 
-import { AutumnLeavesToggle } from '@/components/autumn-leaves-toggle';
 import { ModeToggle } from '@/components/ui/mode-toggle';
 import { HEADER_ACTION_STYLE } from '@/components/ui/control-styles';
 import { NewBadge } from '@/components/ui/new-badge';
-import { MinecraftToggles } from '@/components/minecraft/minecraft-toggles';
+import { HaloTogglesLazy } from '@/components/halo/halo-toggles-lazy';
+import { MinecraftTogglesLazy } from '@/components/minecraft/minecraft-toggles-lazy';
 import { navigateInApp } from '@/lib/client-navigation';
 import { DASHBOARD_ROUTES } from '@/lib/dashboard-routes';
 import { useClientPathname } from '@/hooks/useClientPathname';
@@ -229,6 +229,7 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
                 data-testid={testId}
                 href={displayHref}
                 prefetch={isActive(pathname, href) ? false : undefined}
+                aria-current={isActive(pathname, href) ? 'page' : undefined}
                 className={cn(
                   'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors',
                   isActive(pathname, href)
@@ -267,10 +268,8 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
             {/* Below `sm` these move into the mobile menu — they are what push
                 a 320px header past its bounds in minecraft mode. */}
             <span className="hidden items-center gap-2 sm:flex">
-              <MinecraftToggles />
-            </span>
-            <span className="hidden sm:flex">
-              <AutumnLeavesToggle isZh={isZh} />
+              <MinecraftTogglesLazy />
+              <HaloTogglesLazy />
             </span>
             <ModeToggle />
 
@@ -351,6 +350,7 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
                       key={href}
                       href={displayHref}
                       prefetch={isActive(pathname, href) ? false : undefined}
+                      aria-current={isActive(pathname, href) ? 'page' : undefined}
                       className={cn(
                         'flex items-center min-h-12 px-4 rounded-lg text-base font-medium transition-colors sm:min-h-11 sm:px-3 sm:rounded-md sm:text-sm',
                         isActive(pathname, href)
@@ -381,8 +381,8 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
                     </Link>
                   ))}
                   <span className="mt-1 flex items-center gap-2 border-t border-border/60 px-3 pt-2 pb-1 sm:hidden">
-                    <AutumnLeavesToggle isZh={isZh} />
-                    <MinecraftToggles />
+                    <MinecraftTogglesLazy />
+                    <HaloTogglesLazy />
                   </span>
                 </div>
               )}

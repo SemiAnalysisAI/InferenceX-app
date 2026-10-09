@@ -2,7 +2,7 @@ import { InferenceXWordmark } from '@/components/header/inferencex-wordmark';
 
 describe('Halloween wordmark', () => {
   for (const width of [320, 375, 1440]) {
-    for (const theme of ['light', 'dark', 'minecraft']) {
+    for (const theme of ['light', 'dark', 'minecraft', 'csgo', 'gta']) {
       it(`keeps the pumpkin over the wordmark at ${width}px in ${theme} mode`, () => {
         cy.viewport(width, 800);
         cy.mount(

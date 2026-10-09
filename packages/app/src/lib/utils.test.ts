@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 
 import type * as ConstantsModule from '@/lib/constants';
+import { Model, MODEL_PREFIX_MAPPING } from '@/lib/data-mappings';
 import type { AggDataEntry, InferenceData } from '@/components/inference/types';
 import {
   formatNumber,
@@ -362,6 +363,23 @@ function makeRun(configKeys: string[][], overrides: Record<string, any> = {}) {
 }
 
 describe('filterRunsByModel', () => {
+  it('keeps GLM-5.3 FP8 runs and their changelogs in the GLM-5.2 display bucket', () => {
+    const runs = {
+      '37007419426': makeRun([['glm5.3-fp8-mi300x-mori-sglang-agentic']]),
+      '37009331168': makeRun([['glm5.3-fp8-mi325x-mori-sglang-agentic-umbp']]),
+      '36997573694': makeRun([['glm5.2-fp4-gb300-dynamo-sglang-agentic-agg']]),
+      '36955640992': makeRun([['dsv41flash-fp4-gb300-vllm-agentic-dspark']]),
+    };
+    const prefixes = Object.entries(MODEL_PREFIX_MAPPING)
+      .filter(([, model]) => model === Model.GLM_5_2)
+      .map(([prefix]) => prefix);
+
+    expect(filterRunsByModel(runs, prefixes, ['fp8'])).toEqual({
+      '37007419426': runs['37007419426'],
+      '37009331168': runs['37009331168'],
+    });
+  });
+
   it('returns null when availableRuns is null', () => {
     expect(filterRunsByModel(null, ['gptoss'])).toBeNull();
   });

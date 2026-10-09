@@ -5,9 +5,10 @@
  *   `mapAggEvalRow()` — compiled aggregate (flat row from `agg_eval_all.json`)
  */
 
-import { normalizeLegacyTpuRow, physicalChipCount, roleChipCount } from './tpu-normalization';
+import { normalizeLegacyTpuRow, physicalChipCount } from './tpu-normalization';
 import { PRECISION_KEYS } from '@semianalysisai/inferencex-constants';
 import type { ConfigParams } from './config-cache';
+import { resolveConfigTopology } from './topology';
 import type { SkipTracker } from './skip-tracker';
 import {
   resolveModelKey,
@@ -15,8 +16,6 @@ import {
   normalizeFramework,
   normalizePrecision,
   normalizeSpecMethod,
-  parseBool,
-  parseOptionalBool,
   parseNum,
   parseInt2,
   parseIslOsl,
@@ -97,15 +96,14 @@ export function mapEvalRow(
   }
   const specMethod = normalizeSpecMethod(meta.spec_decoding);
   const lmEvalVersion = results.lm_eval_version ? String(results.lm_eval_version) : null;
-  const config = buildEvalConfig(
-    meta,
-    gpuKey,
+  const config: ConfigParams = {
+    hardware: gpuKey,
     framework,
-    modelKey,
+    model: modelKey,
     precision,
     specMethod,
-    disaggFromFw,
-  );
+    ...resolveConfigTopology(meta, framework, disaggFromFw),
+  };
 
   const nSamples = results['n-samples'] as Record<string, any> | undefined;
   // AgentX uses zero for variable sequence lengths; eval rows represent these as NULL.
@@ -209,138 +207,19 @@ export function mapAggEvalRow(
   if (dp !== undefined) metrics.dp = dp;
 
   return {
-    config: buildEvalConfig(row, gpuKey, framework, modelKey, precision, specMethod, disaggFromFw),
+    config: {
+      hardware: gpuKey,
+      framework,
+      model: modelKey,
+      precision,
+      specMethod,
+      ...resolveConfigTopology(row, framework, disaggFromFw),
+    },
     task,
     isl: islOsl?.isl ?? null,
     osl: islOsl?.osl ?? null,
     conc: parseInt2(row.conc) ?? null,
     lmEvalVersion: null,
     metrics,
-  };
-}
-
-/**
- * Build a `ConfigParams` from an eval source row (either an agg row or a meta_env dict).
- *
- * Handles both schemas that appear in the artifacts:
- * - **v1** (legacy single-node): only `tp`/`ep`/`dp_attention` — prefill = decode,
- *   `num_workers` defaults to 0, `is_multinode` is false.
- * - **v2** (disagg / multinode, 2025-12-19+): separate `prefill_tp`/`decode_tp` etc.
- *   with `prefill_num_workers`/`decode_num_workers` and `is_multinode`. Presence of
- *   `prefill_tp` on the source selects the v2 branch.
- *
- * An explicit `disagg: false` on a Dynamo row is authoritative for a direct
- * deployment unless a non-zero decode worker pool proves disaggregation.
- * When the field is absent, the framework, multi-node marker, and worker
- * topology retain the legacy inference behavior.
- */
-function buildEvalConfig(
-  src: Record<string, any>,
-  hardware: string,
-  framework: string,
-  model: string,
-  precision: string,
-  specMethod: string,
-  disaggFromFw: boolean,
-): ConfigParams {
-  const isMultinode = parseBool(src.is_multinode);
-
-  let prefillTp: number, prefillEp: number, prefillDpAttn: boolean, prefillNumWorkers: number;
-  let decodeTp: number, decodeEp: number, decodeDpAttn: boolean, decodeNumWorkers: number;
-  let numPrefillGpu: number, numDecodeGpu: number;
-
-  if ('prefill_tp' in src) {
-    prefillTp = parseInt2(src.prefill_tp) ?? 1;
-    prefillEp = parseInt2(src.prefill_ep) ?? 1;
-    prefillDpAttn = parseBool(src.prefill_dp_attention);
-    prefillNumWorkers = parseInt2(src.prefill_num_workers) ?? 0;
-    decodeTp = parseInt2(src.decode_tp) ?? 1;
-    decodeEp = parseInt2(src.decode_ep) ?? 1;
-    decodeDpAttn = parseBool(src.decode_dp_attention);
-    decodeNumWorkers = parseInt2(src.decode_num_workers) ?? 0;
-    numPrefillGpu =
-      roleChipCount(src.num_prefill_gpu) ??
-      (disaggFromFw || (parseInt2(src.decode_num_workers) ?? 0) > 0
-        ? undefined
-        : physicalChipCount(src.num_gpus)) ??
-      prefillTp * prefillEp * Math.max(prefillNumWorkers, 1);
-    numDecodeGpu =
-      roleChipCount(src.num_decode_gpu) ??
-      (disaggFromFw || (parseInt2(src.decode_num_workers) ?? 0) > 0
-        ? undefined
-        : physicalChipCount(src.num_gpus)) ??
-      decodeTp * decodeEp * Math.max(decodeNumWorkers, 1);
-  } else {
-    const tp = parseInt2(src.tp) ?? 1;
-    const ep = parseInt2(src.ep) ?? 1;
-    const dpAttn = parseBool(src.dp_attention);
-    prefillTp = tp;
-    decodeTp = tp;
-    prefillEp = ep;
-    decodeEp = ep;
-    prefillDpAttn = dpAttn;
-    decodeDpAttn = dpAttn;
-    prefillNumWorkers = 0;
-    decodeNumWorkers = 0;
-    numPrefillGpu = physicalChipCount(src.num_gpus) ?? tp * ep;
-    numDecodeGpu = physicalChipCount(src.num_gpus) ?? tp * ep;
-  }
-
-  const explicitDisagg = parseOptionalBool(src.disagg);
-  const disagg =
-    disaggFromFw ||
-    decodeNumWorkers > 0 ||
-    (explicitDisagg === undefined && (isMultinode || prefillNumWorkers > 0));
-
-  if (!disagg) {
-    const usePrefill =
-      decodeTp <= 0 ||
-      decodeEp <= 0 ||
-      (decodeNumWorkers <= 0 && numDecodeGpu <= 0 && (prefillNumWorkers > 0 || numPrefillGpu > 0));
-    const aggregate = usePrefill
-      ? {
-          tp: prefillTp,
-          ep: prefillEp,
-          dpAttn: prefillDpAttn,
-          numWorkers: prefillNumWorkers,
-          numGpu: numPrefillGpu,
-        }
-      : {
-          tp: decodeTp,
-          ep: decodeEp,
-          dpAttn: decodeDpAttn,
-          numWorkers: decodeNumWorkers,
-          numGpu: numDecodeGpu,
-        };
-    prefillTp = aggregate.tp;
-    decodeTp = aggregate.tp;
-    prefillEp = aggregate.ep;
-    decodeEp = aggregate.ep;
-    prefillDpAttn = aggregate.dpAttn;
-    decodeDpAttn = aggregate.dpAttn;
-    prefillNumWorkers = aggregate.numWorkers;
-    decodeNumWorkers = aggregate.numWorkers;
-    numPrefillGpu = aggregate.numGpu;
-    numDecodeGpu = aggregate.numGpu;
-  }
-
-  return {
-    hardware,
-    framework,
-    model,
-    precision,
-    specMethod,
-    disagg,
-    isMultinode,
-    prefillTp,
-    prefillEp,
-    prefillDpAttn,
-    prefillNumWorkers,
-    decodeTp,
-    decodeEp,
-    decodeDpAttn,
-    decodeNumWorkers,
-    numPrefillGpu,
-    numDecodeGpu,
   };
 }

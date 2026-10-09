@@ -1,0 +1,218 @@
+@font-face {
+  font-family: 'Monocraft';
+  src: url('../../app/fonts/Monocraft.woff2') format('woff2');
+  font-display: swap;
+}
+
+/* ── Minecraft Theme ── */
+
+.minecraft .splash-text {
+  animation: splash-bounce 1.5s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .minecraft .splash-text {
+    animation: none;
+  }
+}
+
+/* Force pixel font on everything in minecraft mode */
+.minecraft,
+.minecraft * {
+  font-family: var(--font-minecraft, 'Monocraft', monospace) !important;
+}
+
+/* Minecraft text shadow on all text */
+.minecraft * {
+  text-shadow: 1.5px 1.5px 0px rgba(0, 0, 0, 0.4);
+}
+
+/* Disable font smoothing for crisp pixel font */
+.minecraft {
+  -webkit-font-smoothing: none;
+  -moz-osx-font-smoothing: unset;
+}
+
+/* Minecraft-style beveled buttons — raised 3D effect */
+.minecraft button,
+.minecraft [role='button'],
+.minecraft a[class*='rounded'] {
+  border: 2px solid !important;
+  border-color: #ffffff80 #37373780 #37373780 #ffffff80 !important;
+  border-radius: 0 !important;
+}
+.minecraft button:hover,
+.minecraft [role='button']:hover {
+  background-color: rgba(170, 170, 221, 0.15) !important;
+  border-color: #ffffffe0 #6666aa80 #6666aa80 #ffffffe0 !important;
+}
+.minecraft button:active,
+.minecraft [role='button']:active {
+  border-color: #37373780 #ffffff80 #ffffff80 #37373780 !important;
+}
+
+/* Force square corners on everything */
+.minecraft [class*='rounded'] {
+  border-radius: 0 !important;
+}
+
+/* Pixelated rendering for images */
+.minecraft img {
+  image-rendering: pixelated;
+}
+
+/* Minecraft header grass-block top accent */
+.minecraft header {
+  border-bottom: 3px solid transparent !important;
+  border-image: linear-gradient(to right, #7fb238, #5d9b47, #7fb238, #526935, #7fb238) 1 !important;
+}
+
+/* Sunken slot effect on cards */
+.minecraft .border-border {
+  border: 2px solid;
+  border-color: #373737 #ffffff40 #ffffff40 #373737;
+}
+
+/* Input fields — sunken slot style */
+.minecraft input,
+.minecraft select,
+.minecraft textarea {
+  border: 2px solid !important;
+  border-color: #373737 #c6c6c680 #c6c6c680 #373737 !important;
+  border-radius: 0 !important;
+  background-color: rgba(0, 0, 0, 0.3) !important;
+}
+
+/* Hide circuit background in minecraft mode */
+.minecraft .circuit-bg {
+  display: none;
+}
+
+/* Ender-dragon fly-across — one-shot animation on minecraft theme activation,
+ * triggered from minecraft-decorations.tsx. Plays once (iteration-count: 1)
+ * and lands the dragon off-screen left so the GIF stops being rendered. The
+ * dragon hovers in the center between 35% and 60% (4.2s–7.2s of the 12s
+ * total) so the canonical 3s growl SFX from minecraft-decorations.tsx lines
+ * up with a deliberate mid-screen pause rather than a moving target. */
+@keyframes mc-dragon-flyacross {
+  0% {
+    transform: translate(110vw, 0) scale(1);
+    opacity: 0;
+  }
+  8% {
+    opacity: 0.95;
+  }
+  35% {
+    transform: translate(40vw, -2vh) scale(1.05);
+  }
+  60% {
+    transform: translate(40vw, -2vh) scale(1.05);
+  }
+  92% {
+    opacity: 0.95;
+  }
+  100% {
+    transform: translate(-130vw, 1vh) scale(1);
+    opacity: 0;
+  }
+}
+
+.mc-dragon-flyacross {
+  animation: mc-dragon-flyacross 12s cubic-bezier(0.4, 0, 0.6, 1) 1 forwards;
+  will-change: transform, opacity;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mc-dragon-flyacross {
+    animation: none;
+    display: none;
+  }
+}
+
+/* Splash text — yellow bouncing rotated text (Minecraft title screen style) */
+@keyframes splash-bounce {
+  0%,
+  100% {
+    transform: translate(2rem, 2.25rem) rotate(10deg) scale(1);
+  }
+  50% {
+    transform: translate(2rem, 2.25rem) rotate(10deg) scale(1.1);
+  }
+}
+
+/* Playable Minecraft launcher banner (the game itself loads on click). */
+.mc-play-banner {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  margin-block: 16px;
+  padding: 18px 24px;
+  color: #fff;
+  border: 3px solid #000;
+  box-shadow:
+    inset 3px 3px 0 #ffffff40,
+    inset -3px -3px 0 #00000060;
+  background:
+    linear-gradient(90deg, #000000c0, #00000030 70%, #00000080),
+    url('/decorative/minecraft/game/panorama-0.jpg') center 40% / cover;
+}
+.mc-play-banner-title {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.mc-play-banner-title img {
+  width: 256px;
+  max-width: 100%;
+  height: auto;
+  image-rendering: pixelated;
+}
+.mc-play-banner-title strong {
+  font-size: var(--text-sm);
+  font-weight: 400;
+  color: #ffff55;
+  text-shadow: 2px 2px 0 #3f3f15 !important;
+}
+.minecraft .mc-play-banner button {
+  flex: none;
+  min-width: 200px;
+  height: 44px;
+  padding: 0 20px;
+  color: #fff;
+  font-size: var(--text-base);
+  border: 3px solid transparent !important;
+  border-image: url('/decorative/minecraft/game/button.png') 3 fill / 3px stretch !important;
+  background: none !important;
+  image-rendering: pixelated;
+  text-shadow: 2px 2px 0 #3f3f3f !important;
+  cursor: pointer;
+}
+.minecraft .mc-play-banner button:hover,
+.minecraft .mc-play-banner button:focus-visible {
+  border-image-source: url('/decorative/minecraft/game/button-highlighted.png') !important;
+  color: #ffffa0;
+  outline: none;
+}
+html[data-inferencex-embed] [data-testid='minecraft-play-banner'] {
+  display: none;
+}
+@media (max-width: 640px) {
+  .mc-play-banner {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 16px;
+    gap: 14px;
+  }
+  .minecraft .mc-play-banner button {
+    width: 100%;
+  }
+}
+@media (forced-colors: active) {
+  .mc-play-banner {
+    background: Canvas;
+    color: CanvasText;
+    border-color: CanvasText;
+  }
+}

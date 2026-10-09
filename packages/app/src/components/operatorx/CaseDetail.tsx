@@ -3,6 +3,7 @@
 import { ticks } from 'd3';
 import { Loader2 } from 'lucide-react';
 import { useTheme } from 'next-themes';
+import { isDarkTheme } from '@/lib/themes';
 import { useMemo, useState } from 'react';
 
 import type { ComparisonOp, ComparisonView } from '@semianalysisai/inferencex-db/operatorx/compare';
@@ -287,7 +288,7 @@ function CaseTimelines({
   caseIndex: number;
 }) {
   const refs = useMemo(() => caseRefs(view, hardware, caseIndex), [view, hardware, caseIndex]);
-  const palette = CATEGORY_COLORS[useTheme().resolvedTheme === 'dark' ? 'dark' : 'light'];
+  const palette = CATEGORY_COLORS[isDarkTheme(useTheme().resolvedTheme) ? 'dark' : 'light'];
   const { data, error, isLoading, refetch } = useOperatorXTimelines(
     op,
     refs.map((r) => r.ref),

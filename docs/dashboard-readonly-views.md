@@ -5,6 +5,17 @@ The implementation reuses the existing @semianalysisai/inferencex-skills package
 Every registered dashboard route is checked against DASHBOARD_API_COVERAGE by
 registry.test.ts, including hidden and feature-gated routes.
 
+## Static editorial content
+
+`/blog/sparse-savings-persistent-demand-inside-glm53` and its `/zh/blog/` sibling
+reproduce the public GLM-5.3 newsletter article, with the September 28, 2026
+benchmark snapshot and original figures. They add no data selectors, calculations,
+or API contracts. Existing `/llms.txt`, `/llms-full.txt`, `/feed.xml`, and sitemap
+handlers discover the post through the shared blog registry. The subscriber-only
+continuation stays on the newsletter and is not included in these feeds.
+Use the existing inference, first-token, and cache-reuse view contracts for live
+data; do not interpret the historical article figures as current API results.
+
 ## Exact query-key inventory
 
 All endpoints are GET under /api/v1/views. Unsupported and repeated keys return 400.
@@ -13,7 +24,7 @@ combinations, not the full Cartesian product of all possible filter values.
 
 | View                            | Accepted query keys                                                                                                                                                                                                                                                                                      |
 | ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `cache-reuse`                   | `config`, `date`, `gpus`, `model`, `percentile`, `precisions`, `runId`, `sequence`, `tcoBasis`, `unofficialrun`                                                                                                                                                                                          |
+| `cache-reuse`                   | `config`, `date`, `gpus`, `model`, `percentile`, `precisions`, `recipe`, `runId`, `sequence`, `tcoBasis`, `unofficialrun`                                                                                                                                                                                |
 | `calculator`                    | `costProvider`, `costType`, `costcap`, `date`, `format`, `gpus`, `hideSkuAboveConfigLimit`, `mode`, `model`, `mw`, `percentile`, `precisions`, `runId`, `sequence`, `target`, `tcoBasis`, `unofficialrun`                                                                                                |
 | `collectivex`                   | `activeSeries`, `kvSeries`, `swapSeries`, `backend`, `epSize`, `kvOp`, `kvX`, `kvY`, `modes`, `operation`, `overlapIsl`, `pageTokens`, `percentile`, `phase`, `precision`, `runs`, `sku`, `suite`, `swapDirection`, `swapLayout`, `swapMetric`, `swapPercentile`, `version`, `yAxis`                     |
 | `compare`                       | `format`, `gpus`, `model`, `scenario`, `slug`, `tiers`, `variant`                                                                                                                                                                                                                                        |
@@ -34,7 +45,15 @@ combinations, not the full Cartesian product of all possible filter values.
 | `submissions`                   | `direction`, `limit`, `lines`, `mode`, `offset`, `onChangeOnly`, `search`, `sort`                                                                                                                                                                                                                        |
 | `video`                         | `artifact`, `cell`, `compare`, `costs`, `gpuBasis`, `page`, `phase`, `run`, `selected`, `slot`, `source`, `view`, `workload`, `xAxis`, `yAxis`                                                                                                                                                           |
 
+Cache reuse returns `data.recipes` and the resolved `params.recipe`. Pass a returned key as `recipe` (the UI uses `c_recipe`) to select the same TP/EP/DP-attention, worker, GPU, speculation, offload and fingerprint combination. Omitted or stale keys use the shared dashboard default. Runs use that recipe if available, otherwise their own best-covered recipe; inspect each bar's source row for its identity. Overlay-only configurations expose their own recipe choices. Layout orientation and label placement are presentation-only controls.
+
 ## Source audit and shared computations
+
+The inference run selector uses the same `DISPLAY_MODEL_TO_DB` aliases as benchmark
+queries. For example, the `GLM-5.2` display/API model includes raw `glm5.2` and
+`glm5.3` rows. `/api/v1/workflow-info` remains date-scoped across models; the UI
+filters its changelog keys by those aliases and the selected precision. This
+alignment changes no API parameters, response schemas, or stored model identities.
 
 - Inference: global/date/quick-filter contexts, metric registry, useChartData,
   Pareto selection, compare-date parsing and trace-derived normalized metrics.
@@ -62,8 +81,8 @@ contract.
 Zoom, theme, axis scale, labels, media playback and report expansion are renderer
 state. GPU interactive downsampling does not alter returned raw data or statistics.
 
-Run-specific recognition labels are also presentation-only. Run `35879254139`
-displays `UMBP MoRI SGLang` through October 9, 2026 in America/New_York
+Run-specific recognition labels are also presentation-only. Runs `35879254139`
+and `37181045340` display `UMBP MoRI SGLang` through October 9, 2026 in America/New_York
 (`2026-10-10T04:00:00Z` exclusive). Label resolution after that cutoff returns
 `MoRI SGLang`; an already-open memoized chart may need a refresh. This changes
 neither API selectors nor response data, framework/hardware keys, or raw CSV
