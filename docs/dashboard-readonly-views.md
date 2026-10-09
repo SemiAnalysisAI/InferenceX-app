@@ -87,11 +87,11 @@ Provisioned, and All in Measured. The last combines measured GPU power with mode
 unmeasured components and PUE; it is not a wall-meter measurement. These labels and
 power-assumption notes do not change metric IDs, API selectors,
 or calculations. Profit comparison `powerLabel` display text follows the same names.
-All in Measured watts and energy accept validated 8K/1K and AgentX rows through the
-shared chart/API transform, including historical and unofficial rows. AgentX reuses
-the chassis or rack model without independent workload calibration. Telemetry and
-topology gates still apply; NVL72 needs complete Grace or module power. The offline
-system-power export remains limited to 8K/1K.
+All in Measured watts and energy accept validated `single_turn` and AgentX rows
+through the shared chart/API transform, including historical and unofficial rows.
+AgentX uses the power model's agentic workload state without independent workload
+calibration. Telemetry and topology gates still apply; NVL72 rows need complete
+Grace-socket telemetry and stay unavailable until the rack model is ported.
 
 For All in Measured, `tableRows` retains every GPU-valid observation in the selected
 scope and best-series selection, including axis-clipped and non-frontier points.
@@ -105,7 +105,7 @@ curve at the same target, without extrapolation or another snapshot. `compare` u
 the same valid-curve throughput for both power budgets, retaining the original
 provisioned estimate when no valid curve covers the target. Provisioned-only keeps
 the original performance curve. Official, comparison and unofficial scopes remain
-independent; CPU/module telemetry and compatible sensor-basis requirements still apply.
+independent; NVL72 Grace-socket telemetry and matching model revision/PUE requirements still apply.
 
 Dense profit charts reserve readable space per bar and scroll within the plot on narrow
 screens; captions and controls stay fixed. This is presentation-only: API selectors,
@@ -285,7 +285,7 @@ Latest 不会合并历史数据。
 按 GW 年估算利润时，modeled 先筛选满足系统功耗要求的数据点，再在原目标值上构建曲线，
 不外推，也不借用其他快照。compare 的两种功耗方案使用同一条有效曲线的吞吐量；
 没有有效曲线覆盖目标时，保留原曲线的预配估算。provisioned 单独使用时沿用原性能曲线。
-官方数据、日期对比和非官方叠加各自独立计算；CPU/模块遥测要求和传感器口径兼容性要求同样不变。
+官方数据、日期对比和非官方叠加各自独立计算；NVL72 Grace socket 遥测要求以及模型版本/PUE 一致性要求同样不变。
 
 私有上传、密钥、提示词、反馈及管理操作不作为公开读取接口。
 OperatorX 的入口受功能开关控制，页面使用专属的 `/api/v1/operatorx/*`

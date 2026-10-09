@@ -107,8 +107,7 @@ export const PROFIT_SKUS: ProfitSku[] = [
 
 /**
  * One GB200 NVL72 compute tray (four GPUs, two Grace sockets) with the CPU-side
- * keys the srt-slurm CPU power leg publishes, module sensor included, so the
- * smart-provisioning basis can price NVL72. Kept out of `PROFIT_SKUS` so the
+ * keys the srt-slurm CPU power leg publishes. Kept out of `PROFIT_SKUS` so the
  * default bar counts the other specs lock down do not move. Watts are
  * controlled inputs, not published constants.
  */
@@ -127,7 +126,6 @@ const NVL72_SKU: ProfitSku = {
     avg_total_gpu_power_w: 3601,
     avg_cpu_socket_power_w: 250.5,
     avg_total_cpu_power_w: 501,
-    avg_total_module_power_w: 4300.75,
   },
 };
 
@@ -171,12 +169,12 @@ export const profitBenchmarkRows = (
     })),
   );
 
-/** GB200 NVL72 rows with measured compute-module power, for the smart-provisioning basis. */
+/** GB200 NVL72 rows with measured Grace-socket power, for the smart-provisioning basis. */
 export const profitNvl72Rows = (dbKey: string = PROFIT_MODEL_DB_KEY, date = PROFIT_DATE) =>
   profitBenchmarkRows(dbKey, date, undefined, [NVL72_SKU]).map((row) => ({
     ...row,
     power_audit: {
-      cpu: { sensor_kind: 'module', expected_sockets: 2, observed_sockets: 2 },
+      cpu: { sensor_kind: 'grace_socket', expected_sockets: 2, observed_sockets: 2 },
     },
   }));
 

@@ -504,18 +504,16 @@ export const METRIC_EXPLANATIONS: Record<MetricKey, MetricExplanation> = {
   utilityModeledWatts: {
     description: {
       en:
-        'Modeled facility power per allocated accelerator: measured GPU power (plus measured Grace ' +
-        'or module power on NVL72) is scaled to chassis AC by the system power model and then ' +
-        'multiplied once by PUE. Supported on 8k1k and AgentX runs for hardware with a known ' +
-        'eight-GPU chassis profile, or NVL72 with complete Grace or module telemetry; other runs ' +
-        'show no value.',
+        'Modeled facility power per allocated accelerator: the InferenceX power model carries measured ' +
+        'GPU power to IT power for the run’s workload state and scale-out, then multiplies once by PUE. ' +
+        'Only hardware with an eight-GPU HGX/OAM chassis model is supported; NVL72 systems show no value.',
       zh:
-        '每已分配加速器的整体实测功耗：先由系统功耗模型将 GPU 实测功耗（NVL72 还包括实测 Grace 或 module 功耗）换算为机箱交流功耗，再乘以一次 PUE。' +
-        '支持 8k1k 和 AgentX 运行，硬件需具有已知八卡机箱模型，或为 Grace 或 module 遥测完整的 NVL72；其他运行不显示数值。',
+        '每已分配加速器的整体实测功耗：InferenceX 功耗模型根据该次运行的工作负载状态和 scale-out 设置，将 GPU 实测功耗换算为 IT 功耗，再乘以一次 PUE。' +
+        '仅支持具有八卡 HGX/OAM 机箱模型的硬件；NVL72 系统不显示数值。',
     },
     formula: {
-      en: 'W/GPU = modeled chassis AC power (W) × PUE ÷ allocated GPUs',
-      zh: 'W/GPU = 机箱交流建模功耗（W）× PUE ÷ 已分配 GPU 数',
+      en: 'W/GPU = modeled IT power (W) × PUE ÷ allocated GPUs',
+      zh: 'W/GPU = IT 建模功耗（W）× PUE ÷ 已分配 GPU 数',
     },
   },
   utilityModeledJPerOutputToken: {

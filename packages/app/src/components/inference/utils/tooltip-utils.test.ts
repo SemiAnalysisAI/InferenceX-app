@@ -1,7 +1,12 @@
-import { describe, it, expect, vi } from 'vitest';
+// @vitest-environment jsdom
+import { describe, it, expect } from 'vitest';
 
 import type { HardwareConfig, InferenceData } from '@/components/inference/types';
 import type { SystemPowerEstimate } from '@/lib/modeled-system-power';
+import {
+  SYSTEM_POWER_MODEL_REVISION,
+  SYSTEM_POWER_MODEL_SOURCE_URL,
+} from '@/lib/system-power-model';
 import { getInferenceHardwareConfig } from '@/lib/inference-labels';
 import {
   getPointLabel,
@@ -72,17 +77,17 @@ function tooltipConfig(overrides: Partial<TooltipConfig> = {}): TooltipConfig {
 const systemPower = {
   status: 'supported',
   hardware: 'h100',
-  modelRevision: `app-sha256:${'a'.repeat(64)}`,
-  modelPath: 'packages/app/src/lib/system-power-model.ts',
+  modelRevision: SYSTEM_POWER_MODEL_REVISION,
+  operatingState: { workload: 'agentic' as const, scaleOut: true },
   gpuCount: 16,
   chassisCount: 2,
-  chassisAcWatts: 12000,
-  chassisAcWattsPerGpu: 750,
+  itWatts: 12000,
+  itWattsPerGpu: 750,
   facilityWatts: 14400,
   pue: 1.2,
   measuredGpuWattsPerGpu: 500,
   modeledGpuCount: 16,
-  deploymentAcWatts: 12000,
+  deploymentItWatts: 12000,
   deploymentFacilityWatts: 14400,
   topologyBasis: 'worker-hosts',
   chassisBasis: 'full',
@@ -134,27 +139,7 @@ describe('modeled system-power tooltip', () => {
       ...overrides,
     });
 
-  it.each(['en', 'zh'] as const)(
-    'discloses the AgentX estimate in the %s All in Measured tooltip',
-    (locale) => {
-      const html = generateTooltipContent(
-        config({
-          locale,
-          selectedYAxisMetric: 'y_utilityModeledWatts',
-          data: pt({ modeledSystemPower: systemPower, benchmark_type: 'agentic_traces' }),
-        }),
-      );
-      expect(html).toContain('AgentX');
-      expect(html).toContain(
-        locale === 'en'
-          ? 'not been independently calibrated'
-          : '尚未针对 AgentX 工作负载进行独立校准',
-      );
-      expect(html).not.toContain('8k1k');
-    },
-  );
-
-  it('separates measured input, normalized chassis AC, and whole-deployment facility power', () => {
+  it('separates measured input, normalized IT power, and whole-deployment facility power', () => {
     const html = generateTooltipContent(config());
     expect(html).toContain('500 W/GPU');
     expect(html).toContain('750 W/GPU');
@@ -162,31 +147,13 @@ describe('modeled system-power tooltip', () => {
     expect(html).toContain('14,400 W');
     expect(html).toContain('PUE 1.2');
     expect(html).toContain('2 full eight-GPU chassis · 16 GPUs');
-    expect(html).toContain('CPU/DRAM utilization: 20%');
+    expect(html).toContain('Operating state:</strong> agentic · scale-out on');
     expect(html).toContain(
       'Includes GPU chassis CPUs; excludes separate CPU-only frontend/router hosts.',
     );
-    expect(html).toContain(`/blob/master/${systemPower.modelPath}`);
+    expect(html).toContain(SYSTEM_POWER_MODEL_SOURCE_URL);
     expect(html).not.toContain('12,000 W/GPU');
     expect(html).not.toContain('Unmeasured chassis GPUs');
-  });
-
-  it.each(['zh'] as const)('links %s model provenance to the deployed app source', (locale) => {
-    const buildRef = 'b'.repeat(40);
-    vi.stubEnv('NEXT_PUBLIC_APP_SOURCE_REF', buildRef);
-    try {
-      const html = generateTooltipContent(config({ locale }));
-      const app = `https://github.com/SemiAnalysisAI/InferenceX-app/blob/${buildRef}`;
-      expect(html).toContain(`${app}/${systemPower.modelPath}`);
-      expect(html).toContain(`${app}/docs/powerx-system-power${locale === 'zh' ? '.zh' : ''}.md`);
-      expect(html).toContain(locale === 'zh' ? '功耗模型与假设' : 'Power model assumptions');
-      expect(html).toContain(`title="${systemPower.modelRevision}"`);
-      expect(html).toContain('h100 · aaaaaaaaaaaa');
-      expect(html).not.toContain('inferencex_power_model');
-      expect(html).not.toContain(`/blob/${systemPower.modelRevision}/`);
-    } finally {
-      vi.unstubAllEnvs();
-    }
   });
 
   it('labels an extrapolated partial chassis and reports the measured GPUs’ share', () => {
@@ -197,9 +164,9 @@ describe('modeled system-power tooltip', () => {
         gpuCount: 4,
         chassisCount: 1,
         modeledGpuCount: 8,
-        chassisAcWatts: 6000,
+        itWatts: 6000,
         facilityWatts: 7200,
-        deploymentAcWatts: 3000,
+        deploymentItWatts: 3000,
         deploymentFacilityWatts: 3600,
         topologyBasis: 'single-node',
         chassisBasis: 'extrapolated',
@@ -221,56 +188,6 @@ describe('modeled system-power tooltip', () => {
     expect(zh).toContain('假设机箱内未实测的 GPU 运行相同负载');
     expect(zh).toContain('3000 W');
     expect(zh).not.toContain('6000 W');
-  });
-
-  it('names NVL72 compute trays and the measured basis instead of eight-GPU chassis', () => {
-    const trays = {
-      ...systemPower,
-      hardware: 'gb200',
-      modelPath: 'packages/app/src/lib/system-power-model.ts',
-      gpuCount: 8,
-      chassisCount: 2,
-      modeledGpuCount: 8,
-      pue: 1.1,
-      topologyBasis: 'nvl72-trays',
-      measuredBasis: 'module',
-      sensorKind: 'module',
-    } satisfies SystemPowerEstimate;
-    const html = generateTooltipContent(config({ data: pt({ modeledSystemPower: trays }) }));
-    expect(html).toContain('2 full NVL72 compute trays · 8 GPUs');
-    expect(html).toContain('Measured: module sensor (GPU + HBM + Grace + LPDDR5X)');
-    expect(html).toContain('Rack AC is divided by all 72 GPUs');
-    expect(html).toContain('Grace CPU and LPDDR5X are measured');
-    expect(html).toContain('PUE 1.1');
-    expect(html).not.toContain('eight-GPU chassis');
-    expect(html).not.toContain('CPU/DRAM utilization');
-    expect(html).not.toContain('Includes GPU chassis CPUs');
-
-    const partial = pt({
-      physicalChips: 3,
-      modeledSystemPower: {
-        ...trays,
-        gpuCount: 3,
-        chassisCount: 1,
-        modeledGpuCount: 4,
-        chassisBasis: 'extrapolated',
-        measuredBasis: 'gpu-plus-grace',
-        sensorKind: 'grace-socket',
-      },
-    });
-    const en = generateTooltipContent(config({ data: partial }));
-    expect(en).toContain('1 NVL72 compute tray · 3 of 4 GPUs measured, extrapolated to full tray');
-    expect(en).toContain('Unmeasured tray GPUs are assumed to run the same workload');
-    expect(en).toContain('Measured: GPU board + Grace socket. Modeled: regulator loss');
-    expect(en).not.toContain('Unmeasured chassis GPUs');
-
-    const zh = generateTooltipContent(config({ data: partial, locale: 'zh' }));
-    expect(zh).toContain('1 个 NVL72 计算 tray · 实测 3/4 张 GPU，按满 tray 外推');
-    expect(zh).toContain('假设 tray 内未实测的 GPU 运行相同负载');
-    expect(zh).toContain('实测：GPU 板卡 + Grace socket');
-    expect(zh).toContain('Grace CPU 与 LPDDR5X 为实测值');
-    expect(zh).not.toContain('八卡机箱');
-    expect(zh).not.toContain('CPU/DRAM 利用率');
   });
 
   it('preserves the same model provenance in unofficial and date-comparison tooltips', () => {
@@ -307,6 +224,23 @@ describe('modeled system-power tooltip', () => {
     expect(html).not.toContain('0 W/GPU');
   });
 
+  it('sets every system-power line in the 11px tooltip text size', () => {
+    for (const isPinned of [true, false]) {
+      const host = document.createElement('div');
+      host.innerHTML = generateTooltipContent(config({ isPinned }));
+      const section = host.querySelector('[data-testid="tooltip-modeled-system-power"]')!;
+      const sizes = new Set<string>();
+      const walker = document.createTreeWalker(section, NodeFilter.SHOW_TEXT);
+      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+        if (!node.textContent?.trim()) continue;
+        let el = node.parentElement;
+        while (el && el !== host && !el.style.fontSize) el = el.parentElement;
+        sizes.add(el && el !== host ? el.style.fontSize : 'inherited');
+      }
+      expect([...sizes]).toEqual(['11px']);
+    }
+  });
+
   it('keeps hover compact and leaves unrelated metrics unchanged', () => {
     const hover = generateTooltipContent(config({ isPinned: false }));
     expect(hover).toContain('500 W/GPU');
@@ -314,6 +248,17 @@ describe('modeled system-power tooltip', () => {
     expect(generateTooltipContent(config({ selectedYAxisMetric: 'y_tpPerGpu' }))).not.toContain(
       'tooltip-modeled-system-power',
     );
+  });
+
+  it('localizes the measurement boundary and occupancy assumptions', () => {
+    const html = generateTooltipContent(config({ locale: 'zh' }));
+    expect(html).toContain('GPU 实测功耗');
+    expect(html).toContain('整个部署的 IT 功耗估算');
+    expect(html).toContain('数据中心功耗估算');
+    expect(html).toContain('2 个完整八卡机箱 · 16 张 GPU');
+    expect(html).toContain('运行状态：</strong> 智能体 · scale-out 开启');
+    expect(html).toContain('计入 GPU 机箱内的 CPU');
+    expect(html).toContain('不计入独立的纯 CPU 前端或路由主机。');
   });
 
   it('breaks normalization and host scope into two compact lines in pinned tooltips', () => {

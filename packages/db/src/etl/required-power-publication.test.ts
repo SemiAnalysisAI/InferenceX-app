@@ -218,13 +218,13 @@ describe('required power publication contract', () => {
     });
     expect(() => verifyRequiredPowerArtifacts(invalid, source)).toThrow('validation');
   });
-  it('rejects a measured zero energy', () => {
+  it('rejects a measured zero energy per output token', () => {
     const dir = fixture();
     changeArtifact(dir, benchmarkPath, (rows) => {
-      rows.total_gpu_energy_j = 0;
+      rows.joules_per_output_token = 0;
     });
     expect(() => verifyRequiredPowerArtifacts(dir, source)).toThrow(
-      'total_gpu_energy_j must be finite and positive',
+      'joules_per_output_token must be finite and positive',
     );
   });
   it('does not replace canonical AgentX users with a conflicting raw conc', () => {

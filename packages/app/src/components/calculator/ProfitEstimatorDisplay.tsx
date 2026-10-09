@@ -96,7 +96,7 @@ import {
   type ProfitEstimatorRow,
 } from './profit-estimator';
 import { powerBasisLabel, profitEstimatorChartStrings, rowLabel } from './ProfitEstimatorChart';
-import { estimateProfitByPower, powerSourceKey, type ProfitPowerBasis } from './profit-power';
+import { estimateProfitByPower, type ProfitPowerBasis } from './profit-power';
 import {
   buildProfitHistoryResults,
   historyFadeShare,
@@ -219,12 +219,10 @@ const STRINGS = {
       modeled: POWER_BASIS_LABELS['utility-modeled'].en,
       extrapolated: 'Full-chassis extrapolation',
     },
-    powerPreview: `${ALL_IN_MEASURED_NOTE.en} AgentX system power is not yet qualified.`,
+    powerPreview: `${ALL_IN_MEASURED_NOTE.en} Host power follows the AgentX workload state, including whether KV cache offload is on.`,
     powerDetails:
-      'GPU power is interpolated between the same throughput points. Includes PUE 1.3 for air-cooled chassis or 1.1 for NVL72, and 10% headroom. Aggregate multinode hosts use the measured deployment mean. Full-chassis extrapolation fills an eight-GPU server with replicas of the measured 1/2/4-GPU workload at the same per-GPU power and throughput; it does not measure a partly idle server.',
-    powerNvl72Note: (hardware: string, basis: string, pue: number) =>
-      `${hardware}: ${basis}. Modeled: NVSwitch trays, NICs/DPUs, NVMe, power shelves, DLC PUE ${pue}.`,
-    csvPowerHeaders: ['Power basis', 'Power sensor', 'System power profile'],
+      'GPU power is interpolated between the same throughput points. Includes PUE 1.3 and 10% headroom. Aggregate multinode hosts use the measured deployment mean. Full-chassis extrapolation fills an eight-GPU server with replicas of the measured 1/2/4-GPU workload at the same per-GPU power and throughput; it does not measure a partly idle server.',
+    csvPowerHeaders: ['Power basis', 'Power model revision'],
     pricingGroup: 'Pricing Config',
     costProviderLabel: 'Cost Provider',
     costProviderTooltip:
@@ -340,12 +338,10 @@ const STRINGS = {
       modeled: POWER_BASIS_LABELS['utility-modeled'].zh,
       extrapolated: '整机外推',
     },
-    powerPreview: `${ALL_IN_MEASURED_NOTE.zh} AgentX 系统功耗模型尚未完成验证。`,
+    powerPreview: `${ALL_IN_MEASURED_NOTE.zh} 主机功耗按 AgentX 工作负载状态建模，并区分是否启用 KV cache offload。`,
     powerDetails:
-      'GPU 功耗在相同的吞吐量数据点间插值，风冷机箱 PUE 为 1.3，NVL72 为 1.1，另加 10% 功耗余量。聚合多节点按部署平均功耗估算各台服务器。整机外推假设八卡服务器部署多个相同的实测单卡、双卡或四卡实例，每卡功耗和吞吐量保持不变；它不代表部分 GPU 闲置时的整机实测功耗。',
-    powerNvl72Note: (hardware: string, basis: string, pue: number) =>
-      `${hardware}：${basis}。建模部分：NVSwitch tray、网卡/DPU、NVMe、电源架，液冷 PUE ${pue}。`,
-    csvPowerHeaders: ['功耗口径', '功耗传感器', '系统功耗 profile'],
+      'GPU 功耗在相同的吞吐量数据点间插值，计入 PUE 1.3 和 10% 功耗余量。聚合多节点按部署平均功耗估算各台服务器。整机外推假设八卡服务器部署多个相同的实测单卡、双卡或四卡实例，每卡功耗和吞吐量保持不变；它不代表部分 GPU 闲置时的整机实测功耗。',
+    csvPowerHeaders: ['功耗口径', '功耗模型版本'],
     pricingGroup: '定价配置',
     costProviderLabel: '成本供应商',
     costProviderTooltip:
@@ -1373,25 +1369,6 @@ function ProfitEstimatorInner({
     historyCurrentRunIds,
   ]);
 
-  const powerBasisNotes = useMemo(() => {
-    const notes = new Map<string, string>();
-    for (const row of estimate.rows) {
-      const source = row.powerSource;
-      if (source?.topology !== 'nvl72-trays') continue;
-      const key = `${row.hwKey}|${powerSourceKey(source)}`;
-      if (notes.has(key)) continue;
-      notes.set(
-        key,
-        t.powerNvl72Note(
-          rowLabel({ hwKey: row.hwKey }, hardwareConfig),
-          powerBasisLabel(source, locale),
-          source.pue,
-        ),
-      );
-    }
-    return [...notes.values()];
-  }, [estimate.rows, hardwareConfig, locale, t]);
-
   // Rendered as the chart's figcaption so it is part of the PNG export.
   const caption = useMemo(() => {
     if (!pricing) return null;
@@ -1521,17 +1498,12 @@ function ProfitEstimatorInner({
   const handleExportCsv = useCallback(() => {
     // Whole dollars are plenty per GW-year; per chip-hour the cents are the figure.
     const usd = (value: number) => (basis === 'gw-year' ? Math.round(value) : value.toFixed(4));
-    // Measured + modeled rows name their basis, sensor, and pinned profile so a
-    // spreadsheet can tell a measured module from a modeled chassis per row.
+    // Measured + modeled rows name their basis and pinned power-model revision per row.
     const includeBasis = powerControlsEnabled && powerBasis !== 'provisioned';
     const basisColumns = (row: ProfitEstimatorRow) => {
       const source = row.powerSource;
-      if (!source) return [t.powerBarLabels.provisioned, '', ''];
-      return [
-        powerBasisLabel(source, locale),
-        source.topology === 'nvl72-trays' ? source.sensorKind : '',
-        `${source.modelPath} @ ${source.modelRevision}${source.profileSha256 ? ` sha256:${source.profileSha256}` : ''}`,
-      ];
+      if (!source) return [t.powerBarLabels.provisioned, ''];
+      return [powerBasisLabel(source, locale), source.modelRevision];
     };
     const rows = estimate.rows.map((row) => [
       rowLabel({ ...row, date: undefined }, hardwareConfig),
@@ -1562,9 +1534,7 @@ function ProfitEstimatorInner({
       ...(powerControlsEnabled
         ? [
             `${t.powerLabel}: ${t.powerOptions[powerBasis]}`,
-            ...(powerBasis === 'provisioned'
-              ? []
-              : [t.powerPreview, t.powerDetails, ...powerBasisNotes]),
+            ...(powerBasis === 'provisioned' ? [] : [t.powerPreview, t.powerDetails]),
           ]
         : []),
     ]);
@@ -1579,7 +1549,6 @@ function ProfitEstimatorInner({
     selectedRunDate,
     cacheHitMode,
     powerBasis,
-    powerBasisNotes,
     powerControlsEnabled,
   ]);
 
@@ -1685,12 +1654,7 @@ function ProfitEstimatorInner({
                       <LabelWithTooltip
                         htmlFor="profit-power"
                         label={t.powerLabel}
-                        tooltip={[
-                          t.powerTooltip,
-                          t.powerPreview,
-                          t.powerDetails,
-                          ...powerBasisNotes,
-                        ].join(' ')}
+                        tooltip={`${t.powerTooltip} ${t.powerPreview} ${t.powerDetails}`}
                       />
                       <div data-testid="profit-power-selector">
                         <MultiSelect

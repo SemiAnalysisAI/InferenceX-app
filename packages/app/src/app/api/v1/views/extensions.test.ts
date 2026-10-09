@@ -517,93 +517,27 @@ describe('new dashboard projections', () => {
       expect(baseline.data.rows[0].revenuePerGpuHour).toBeGreaterThan(17.159765625);
     },
   );
-  it('returns NVL72 measured basis and matching capacity for official and overlay estimates', async () => {
-    const tray = agenticRow({
-      hardware: 'gb200',
-      prefill_tp: 4,
-      decode_tp: 4,
-      num_prefill_gpu: 4,
-      num_decode_gpu: 4,
-      power_audit: {
-        cpu: { sensor_kind: 'module', expected_sockets: 2, observed_sockets: 2 },
-      },
-      metrics: {
-        ...agenticRow().metrics,
-        avg_power_w: 900.25,
-        avg_total_gpu_power_w: 3601,
-        cpu_power_valid: 1,
-        avg_total_module_power_w: 4300.75,
-        theoretical_cache_hit_rate: 0.99,
-      },
-    });
-    mocks.benchmarks.mockImplementation(() => Response.json([tray]));
-    mocks.unofficial.mockImplementation(() =>
-      Response.json({ benchmarks: [{ ...tray, id: 456 }], evaluations: [] }),
-    );
-    const response = await gw(
-      req(
-        'profit-estimator-per-gigawatt',
-        'model=DeepSeek-V4-Pro&target=45&priceSource=custom&powerBasis=compare&unofficialrun=456',
-      ),
-    );
-    expect(response.status).toBe(200);
-    const body = await response.json();
-    for (const output of [body.data, body.overlays]) {
-      expect(output.skipped).toEqual([]);
-      expect(output.rows).toHaveLength(2);
-      const [provisioned, modeled] = output.rows;
-      expect(provisioned.powerLabel).toBe('All in Provisioned');
-      expect(provisioned.powerSource).toBeUndefined();
-      expect(modeled.powerLabel).toBe('All in Measured');
-      expect(modeled.powerSource).toMatchObject({
-        topology: 'nvl72-trays',
-        measuredBasis: 'module',
-        sensorKind: 'module',
-        pue: 1.1,
-        modelPath: 'packages/app/src/lib/system-power-model.ts',
-        modelRevision: expect.stringMatching(/^app-sha256:[0-9a-f]{64}$/u),
-        profileSha256: expect.stringMatching(/^[0-9a-f]{64}$/u),
-      });
-      // Pinned rack reference: 1.6077325 kW/GPU, including PUE and planning margin.
-      expect(modeled.gpuHours).toBeCloseTo((1_000_000 / 1.6077325) * 8760, 2);
-      expect(modeled.revenuePerGpuHour).toBe(provisioned.revenuePerGpuHour);
-    }
-    const theoreticalResponse = await gw(
-      req(
-        'profit-estimator-per-gigawatt',
-        'model=DeepSeek-V4-Pro&target=45&priceSource=custom&powerBasis=compare&cacheHitMode=theoretical&unofficialrun=456',
-      ),
-    );
-    expect(theoreticalResponse.status).toBe(200);
-    const theoretical = await theoreticalResponse.json();
-    expect(theoretical.params.cacheHitMode).toBe('theoretical');
-    for (const [actual, projected] of [
-      [body.data, theoretical.data],
-      [body.overlays, theoretical.overlays],
-    ]) {
-      expect(projected.rows).toHaveLength(2);
-      expect(projected.rows[1].powerSource).toEqual(actual.rows[1].powerSource);
-      expect(projected.rows[1].gpuHours).toBe(actual.rows[1].gpuHours);
-      expect(projected.rows[1].revenuePerGpuHour).toBeLessThan(actual.rows[1].revenuePerGpuHour);
-    }
-  });
   it.each([
-    [1, 'no-cpu-power'],
-    [0, 'no-measured-power'],
+    ['GPU-only telemetry', {}, 'no-cpu-power'],
+    ['invalid GPU telemetry', { power_valid: 0 }, 'no-measured-power'],
+    [
+      'Grace telemetry before the rack model is ported',
+      { cpu_power_valid: 1, avg_cpu_socket_power_w: 250.5, avg_total_cpu_power_w: 501 },
+      'unsupported-power-hardware',
+    ],
   ] as const)(
-    'retains provisioned NVL72 estimates with GPU verdict %i and explains missing measured power',
-    async (powerValid, reason) => {
+    'retains provisioned NVL72 estimates with %s and explains missing measured power',
+    async (_name, metrics, reason) => {
       const missing = agenticRow({
         hardware: 'gb300',
         prefill_tp: 4,
         decode_tp: 4,
         num_prefill_gpu: 4,
         num_decode_gpu: 4,
-        metrics: {
-          ...agenticRow().metrics,
-          avg_total_gpu_power_w: 2400,
-          power_valid: powerValid,
+        power_audit: {
+          cpu: { sensor_kind: 'grace_socket', expected_sockets: 2, observed_sockets: 2 },
         },
+        metrics: { ...agenticRow().metrics, avg_total_gpu_power_w: 2400, ...metrics },
       });
       mocks.benchmarks.mockImplementation(() => Response.json([missing]));
       for (const powerBasis of ['compare', 'modeled']) {

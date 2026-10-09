@@ -109,11 +109,10 @@ wall power. Metric IDs and API selector values are unchanged. Profit `powerBasis
 still accepts `provisioned`, `modeled`, or `compare`; `powerLabel` is display text.
 Expanding assumptions or unavailable-estimate details does not change returned data.
 
-All in Measured watts and energy accept validated 8K/1K and AgentX rows through the
-shared chart/API transform, including historical and unofficial rows. AgentX reuses
-the chassis or rack model without independent workload calibration. Telemetry and
-topology gates still apply; NVL72 needs complete Grace or module power. The offline
-system-power export remains limited to 8K/1K.
+All in Measured watts and energy accept validated `single_turn` and AgentX rows
+through the shared chart/API transform, including historical and unofficial rows.
+AgentX uses the power model's agentic workload state without independent workload
+calibration. Telemetry and topology gates still apply.
 
 For All in Measured, `tableRows` retains every GPU-valid observation in the selected
 scope and best-series selection, including axis-clipped and non-frontier points.
@@ -122,20 +121,19 @@ Missing system estimates use `y: null`, `status: "unavailable"`, and
 with blank missing values. Numeric `series` and `count` are unchanged. Each date
 comparison and unofficial overlay has its own `tableRows`; latest does not pool history.
 
-NVL72 estimates require valid GPU power plus validated Grace-socket or compute-module
-power with complete socket coverage. CPU-rail-only readings do not establish the
-Grace/LPDDR boundary. A module reading already includes GPU power; do not add GPU
-watts again. Read `powerSource` for topology, measured basis, sensor, PUE, model
-content revision, app TypeScript source path and source hash. Equations and parameters
-are maintained in InferenceX-app; the revision is a content digest, not a private-repository
-Git commit. Model-only updates recalculate retained valid measurements after deployment;
-they do not require telemetry backfill. For GW-year estimates, `modeled` first selects
+NVL72 rows first need valid GPU power plus validated Grace-socket power with complete
+socket coverage (`unavailableReason: "cpu-telemetry"` otherwise); CPU-rail-only and
+module readings are not accepted. Admitted NVL72 rows stay `hardware` until the rack
+model is ported from the InferenceX `power_model`. Read `powerSource` for topology, PUE
+and the pinned InferenceX `power_model` commit. Model-only updates recalculate retained
+valid measurements after deployment; they do not require telemetry backfill. For
+GW-year estimates, `modeled` first selects
 points with valid system-power inputs, then builds the curve at the requested target.
 It does not extrapolate or substitute historical snapshots. `compare` uses the same
 valid-curve throughput for both budgets; if no valid curve covers the target, it keeps
 the original provisioned estimate. `provisioned` alone retains the original performance
 curve. Official, comparison and unofficial scopes are evaluated independently.
-`skipped.reason` distinguishes missing CPU power and incompatible sensor bases;
+`skipped.reason` distinguishes missing CPU power and incompatible power bases;
 modeled estimates never substitute provisioned watts.
 
 Prefer equal-service comparisons for article-facing hardware analysis. Use

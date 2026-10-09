@@ -869,7 +869,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/calculator/profit-power.ts',
-    sourceSha256: 'ff92b0a954afb78769ab8a29ca6ca7bdc52f83bb49379e2f2f274ef4c179330a',
+    sourceSha256: 'bec602714cc9dd00be80d764045b750099322a97f90a4845a8e52c0e84aaa747',
     reviewArea: {
       en: 'Power-valid curve selection at fixed targets, compatible power bases, paired throughput and provisioned fallback shared by Profit UI and API.',
       zh: '利润界面与 API 共用的有效功耗曲线选择、固定目标值、功耗口径兼容性、配对吞吐量与预配估算回退。',
@@ -877,7 +877,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/inference/utils/inference-table-data.ts',
-    sourceSha256: '816eb0dbc416f6c322fd3955af13fc03f8c6988704d82f36a9bfd8ec9abc9669',
+    sourceSha256: '023a4f3097318a9fa124c5d846eeb1706dd26ba5edcc461de6d26072b61fc33c',
     reviewArea: {
       en: 'All in Measured table eligibility, nullable values and unavailable reasons shared by UI, CSV and public views.',
       zh: '界面、CSV 和公开视图共用的整体实测表格行筛选、可空数值与不可用原因。',
@@ -925,7 +925,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/benchmark-transform.ts',
-    sourceSha256: 'e92e215ead748eafa2a6b496201adcd0f9387110d0843cb8fe7ebfdbcd8a59ef',
+    sourceSha256: '53fb9102b1ddd0c597b3b2a414894564d2deda3da5ea2cf0059f997b2db852c8',
     reviewArea: {
       en: 'Raw benchmark means and derived reciprocal mean-TPOT interactivity used by Dashboard and read-only views.',
       zh: '仪表板和只读视图共用的原始 benchmark 均值与 mean TPOT 倒数形式的 interactivity。',
@@ -1073,7 +1073,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/series.ts',
-    sourceSha256: '73a01a047c033ab843643b0f1cbda0a504e8b4fa45edc16b3eb0c32aa95fd1c3',
+    sourceSha256: '6bc6e7b196c08547d6473dc366771b160f06360e6babf457b8c1b96b19d5c450',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',

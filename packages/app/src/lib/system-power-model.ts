@@ -1,257 +1,69 @@
 import profileData from './system-power-model.profiles.json';
-import provenance from './system-power-model.provenance.json';
 
-export const SYSTEM_POWER_MODEL_REVISION = provenance.modelRevision;
-export const SYSTEM_POWER_MODEL_SOURCE = provenance.source;
-export const SYSTEM_POWER_MODEL_METADATA = { ...provenance, ...profileData };
-export const SYSTEM_POWER_ASSUMPTIONS = profileData.assumptions;
-export const SYSTEM_POWER_PROFILES = profileData.profiles;
-export type SystemPowerHardware = keyof typeof SYSTEM_POWER_PROFILES;
-export const SUPPORTED_SYSTEM_POWER_HARDWARE = Object.keys(
-  SYSTEM_POWER_PROFILES,
-) as SystemPowerHardware[];
-export const SYSTEM_POWER_RACK_ASSUMPTIONS = profileData.rackAssumptions;
-export const SYSTEM_POWER_RACK_PROFILES = profileData.rackProfiles;
-export type SystemPowerRackHardware = keyof typeof SYSTEM_POWER_RACK_PROFILES;
-export const SUPPORTED_SYSTEM_POWER_RACK_HARDWARE = Object.keys(
-  SYSTEM_POWER_RACK_PROFILES,
-) as SystemPowerRackHardware[];
+export const SYSTEM_POWER_MODEL_REVISION = profileData.modelRevision;
+export const SYSTEM_POWER_MODEL_SOURCE_URL = profileData.sourceUrl;
+const PROFILES = profileData.profiles;
+export type SystemPowerHardware = keyof typeof PROFILES;
 
-export type RackMeasuredBasis = 'module' | 'gpu-plus-grace';
+/** Every supported chassis is air-cooled upstream (the generator asserts it); captions quote this PUE. */
+export const AIR_COOLED_SYSTEM_PUE = PROFILES.h100.pue;
 
-/** The full revision also covers profile parameters and the admission/PUE adapter. */
-export function systemPowerSourceSha256(modelPath: string): string | null {
-  const hashes: Readonly<Record<string, string>> = provenance.sourceSha256;
-  return Object.hasOwn(hashes, modelPath) ? hashes[modelPath] : null;
-}
+export const isSystemPowerHardware = (hardware: string): hardware is SystemPowerHardware =>
+  Object.hasOwn(PROFILES, hardware);
 
-/**
- * Measured compute-module input for every tray of one NVL72 rack. `module` is the
- * sum of the two Module Power sensors per tray (Grace + 2 Blackwell + HBM + LPDDR5X +
- * regulator loss). `gpu-plus-grace` is four GPU-board readings plus two Grace socket
- * readings; the model then adds the sourced regulator-loss allowance on the GPU share.
- */
-export type RackMeasuredInput =
-  | { basis: 'module'; moduleWattsPerTray: number }
-  | { basis: 'gpu-plus-grace'; gpuBoardWattsPerTray: number; graceSocketWattsPerTray: number };
+/** Upstream workload states: CPU and DRAM power for each serving pattern. */
+export type SystemPowerWorkload = 'fixed-seq-len' | 'agentic' | 'agentic-cpu-offloading';
 
-export interface RackPowerEstimate {
-  hardware: SystemPowerRackHardware;
-  basis: RackMeasuredBasis;
-  /** Measured watts handed to the model for every compute tray, before any allowance. */
-  measuredWattsPerTray: number;
-  /** Sourced regulator-loss allowance on the GPU-board share; zero on the module basis. */
-  regulatorAllowanceWattsPerTray: number;
-  computeModulesDcWatts: number;
-  regulatorAllowanceWatts: number;
-  trayStaticDcWatts: number;
-  nvswitchTraysDcWatts: number;
-  trayConversionLossWatts: number;
-  rackDcWatts: number;
-  powerShelfEfficiency: number;
-  powerShelfLossWatts: number;
-  rackAcWatts: number;
-  facilityWatts: number;
-  perGpuAcWatts: number;
-  perGpuFacilityWatts: number;
-  pue: number;
-  computeTrayCount: number;
-  /** GPUs in the modeled rack (72); the rack figures are amortised over all of them. */
-  gpuCount: number;
-  modelRevision: string;
-  modelPath: string;
+export interface SystemPowerOperatingState {
+  workload: SystemPowerWorkload;
+  /** Active NICs and scale-out switches instead of idle ones. */
+  scaleOut: boolean;
 }
 
 export interface ChassisPowerEstimate {
-  hardware: SystemPowerHardware;
-  /** Original measured total for all eight SXM/OAM GPUs in this chassis. */
-  measuredGpuWatts: number;
-  preFanDcWatts: number;
-  fanWatts: number;
-  dcWatts: number;
-  psuEfficiency: number;
-  psuLossWatts: number;
-  chassisAcWatts: number;
+  /** Chassis AC plus the chassis's share of scale-out networking, before PUE. */
+  itWatts: number;
+  /** IT watts × the PUE of the chassis's upstream cooling mode. */
   facilityWatts: number;
   pue: number;
-  modelRevision: string;
-  modelPath: string;
 }
 
-/** Python round uses ties-to-even; toFixed uses ties-away at exact decimal midpoints. */
-function pythonRound(value: number, digits = 1): number {
-  const factor = 10 ** digits;
-  const lower = Math.floor(value * factor);
-  // An exactly representable decimal midpoint has an odd numerator over 2^(digits+1).
-  const numerator = value * 2 ** (digits + 1);
-  if (Number.isInteger(numerator) && numerator % 2 === 1 && lower % 2 === 0) {
-    return lower / factor;
-  }
-  return Number(value.toFixed(digits));
-}
+type PsuEfficiencyCurve = (typeof PROFILES)[SystemPowerHardware]['psu']['efficiencyCurve'];
 
-/** Clamping avoids extrapolating beyond the profile's efficiency knots. */
-function interpolateEfficiency(loadFraction: number, curve: number[][]): number {
-  const [first, last] = [curve[0], curve.at(-1)!];
-  if (loadFraction <= first[0]) return first[1];
-  if (loadFraction >= last[0]) return last[1];
-  for (let i = 1; i < curve.length; i++) {
-    const [x0, y0] = curve[i - 1];
-    const [x1, y1] = curve[i];
-    if (x0 <= loadFraction && loadFraction <= x1) {
-      return y0 + ((y1 - y0) * (loadFraction - x0)) / (x1 - x0);
-    }
-  }
-  return last[1];
+function psuEfficiency(curve: PsuEfficiencyCurve, loadFraction: number): number {
+  const first = curve[0];
+  const last = curve.at(-1)!;
+  if (loadFraction <= first.loadFraction) return first.efficiency;
+  if (loadFraction >= last.loadFraction) return last.efficiency;
+  const i = curve.findIndex((point) => loadFraction <= point.loadFraction);
+  const [left, right] = [curve[i - 1], curve[i]];
+  const weight = (loadFraction - left.loadFraction) / (right.loadFraction - left.loadFraction);
+  return left.efficiency + weight * (right.efficiency - left.efficiency);
 }
 
 /**
- * One complete 8-GPU chassis. Only fan and PSU loads vary at runtime; the remaining
- * component parameters stay fixed at the profile's recorded inference assumptions.
+ * The pinned InferenceX power model for one complete eight-GPU HGX/OAM chassis,
+ * as the closed form the generator verified against it: fixed host DC for the
+ * operating state, a thermal fan curve, PSU efficiency, then scale-out
+ * networking (outside the PSU) and PUE. Returns null outside the PSU capacity.
  */
 export function estimateChassisPower(
-  hardware: string,
-  measuredGpuWatts: number,
-  pue = SYSTEM_POWER_ASSUMPTIONS.pue,
+  hardware: SystemPowerHardware,
+  chassisGpuWatts: number,
+  state: SystemPowerOperatingState,
 ): ChassisPowerEstimate | null {
-  const key = hardware.toLowerCase();
-  if (
-    !Object.hasOwn(SYSTEM_POWER_PROFILES, key) ||
-    !Number.isFinite(measuredGpuWatts) ||
-    measuredGpuWatts <= 0 ||
-    !Number.isFinite(pue) ||
-    pue < 1
-  ) {
-    return null;
-  }
-  const canonicalHardware = key as SystemPowerHardware;
-  const profile = SYSTEM_POWER_PROFILES[canonicalHardware];
-  // Preserve the source's summation order and intermediate component rounding.
-  const preFanDc = Object.values(profile.fixedComponentsDcWatts).reduce(
-    (sum, watts) => sum + watts,
-    pythonRound(measuredGpuWatts),
-  );
-  const fan = profile.fan;
-  const loadFraction = Math.min(1, preFanDc / fan.fullCoolingLoadWatts);
+  if (!Number.isFinite(chassisGpuWatts) || chassisGpuWatts < 0) return null;
+  const { fixedDcWatts, fan, psu, networkWatts, pue } = PROFILES[hardware];
+  const componentDc = chassisGpuWatts + fixedDcWatts[state.workload][`${state.scaleOut}`];
+  const load = Math.min(1, componentDc / fan.fullCoolingLoadWatts);
   const pwm = Math.min(
     fan.maxPwm,
-    Math.max(fan.minPwm, fan.minPwm + (fan.maxPwm - fan.minPwm) * loadFraction ** fan.exponent),
+    Math.max(fan.minPwm, fan.minPwm + (fan.maxPwm - fan.minPwm) * load ** fan.exponent),
   );
-  const fanWatts = pythonRound(
-    fan.electricalGroupsWatts.reduce((sum, watts) => sum + watts * pwm ** 3, 0),
-  );
-  const dc = preFanDc + fanWatts;
-  const psu = profile.psu;
-  if (dc > psu.maxDcWatts) return null;
-
-  const efficiency = interpolateEfficiency(dc / psu.loadSharingCapacityWatts, psu.efficiencyCurve);
-  const ac = pythonRound(dc / efficiency);
-  // The Python chassis wrappers apply PUE to the already-rounded PSU AC output.
-  const facility = pythonRound(ac + ac * (pue - 1));
-  if (!Number.isFinite(facility)) return null;
-  return {
-    hardware: canonicalHardware,
-    measuredGpuWatts,
-    preFanDcWatts: pythonRound(preFanDc),
-    fanWatts,
-    dcWatts: pythonRound(dc),
-    psuEfficiency: pythonRound(efficiency, 4),
-    psuLossWatts: pythonRound(dc / efficiency - dc),
-    chassisAcWatts: ac,
-    facilityWatts: facility,
-    pue,
-    modelRevision: SYSTEM_POWER_MODEL_REVISION,
-    modelPath: profile.modelPath,
-  };
-}
-
-/**
- * One NVL72 rack whose 18 compute trays all carry the given measured compute-module
- * input. Only the power-shelf efficiency curve is load dependent; switch trays, tray
- * static electronics, management switches, and the tray input-conversion stage stay
- * fixed at the recorded assumptions. The Grace CPU and LPDDR5X are never modelled:
- * they are inside the measured reading. Rounding follows the source: rack AC is
- * rounded before PUE, and every reported total is rounded once at the end.
- */
-export function estimateRackPower(
-  hardware: string,
-  input: RackMeasuredInput,
-  pue = SYSTEM_POWER_RACK_ASSUMPTIONS.pue,
-): RackPowerEstimate | null {
-  const key = hardware.toLowerCase();
-  const gpuShare = input.basis === 'module' ? 0 : input.gpuBoardWattsPerTray;
-  const graceShare = input.basis === 'module' ? 0 : input.graceSocketWattsPerTray;
-  const measured = input.basis === 'module' ? [input.moduleWattsPerTray] : [gpuShare, graceShare];
-  if (
-    !Object.hasOwn(SYSTEM_POWER_RACK_PROFILES, key) ||
-    measured.some((watts) => !Number.isFinite(watts) || watts <= 0) ||
-    !Number.isFinite(pue) ||
-    pue < 1
-  ) {
-    return null;
-  }
-  const canonicalHardware = key as SystemPowerRackHardware;
-  const profile = SYSTEM_POWER_RACK_PROFILES[canonicalHardware];
-  const trays = profile.computeTrayCount;
-  const measuredWattsPerTray =
-    input.basis === 'module'
-      ? input.moduleWattsPerTray
-      : input.gpuBoardWattsPerTray + input.graceSocketWattsPerTray;
-
-  // Grace tuning guide: regulator loss is 15% of the TDP limit, so loss / delivered =
-  // f / (1 - f) on the GPU-board share. The Grace socket reading already includes its own.
-  const frac = profile.regulatorLossFracOfTdp;
-  const allowanceBase = gpuShare + (profile.regulatorAllowanceIncludesGrace ? graceShare : 0);
-  const allowancePerTray =
-    input.basis === 'gpu-plus-grace' ? (allowanceBase * frac) / (1 - frac) : 0;
-  const computeModulesDc = trays * measuredWattsPerTray + trays * allowancePerTray;
-
-  // Per-tray static blocks keep the source's summation order.
-  const trayStaticPerTray = Object.values(profile.computeTrayStaticDcWatts).reduce(
-    (sum, watts) => sum + watts,
-    0,
-  );
-  const trayStaticDc = trays * trayStaticPerTray;
-  const nvswitchTraysDc =
-    profile.nvswitchTrayCount *
-    (profile.nvswitchTraySiliconWatts + profile.nvswitchTrayResidualWatts);
-  const trayLoads = computeModulesDc + trayStaticDc + nvswitchTraysDc;
-  const trayConversionLoss = trayLoads * (1 / profile.trayInputConversionEfficiency - 1);
-  const managementDc = profile.managementSwitchCount * profile.managementSwitchWatts;
-  const rackDc = trayLoads + trayConversionLoss + managementDc;
-
-  const shelf = profile.powerShelf;
-  if (rackDc > shelf.installedCapacityWatts) return null;
-  const efficiency = interpolateEfficiency(
-    rackDc / shelf.installedCapacityWatts,
-    shelf.efficiencyCurve,
-  );
-  const ac = rackDc / efficiency;
-  const rackAc = pythonRound(ac);
-  // PUE applies once, to the already-rounded shelf AC output.
-  const facility = pythonRound(rackAc + rackAc * (pue - 1));
-  if (!Number.isFinite(facility)) return null;
-  return {
-    hardware: canonicalHardware,
-    basis: input.basis,
-    measuredWattsPerTray,
-    regulatorAllowanceWattsPerTray: allowancePerTray,
-    computeModulesDcWatts: pythonRound(computeModulesDc),
-    regulatorAllowanceWatts: pythonRound(trays * allowancePerTray),
-    trayStaticDcWatts: pythonRound(trayStaticDc),
-    nvswitchTraysDcWatts: pythonRound(nvswitchTraysDc),
-    trayConversionLossWatts: pythonRound(trayConversionLoss),
-    rackDcWatts: pythonRound(rackDc),
-    powerShelfEfficiency: pythonRound(efficiency, 4),
-    powerShelfLossWatts: pythonRound(ac - rackDc),
-    rackAcWatts: rackAc,
-    facilityWatts: facility,
-    perGpuAcWatts: pythonRound(rackAc / profile.gpuCount),
-    perGpuFacilityWatts: pythonRound(facility / profile.gpuCount),
-    pue,
-    computeTrayCount: trays,
-    gpuCount: profile.gpuCount,
-    modelRevision: SYSTEM_POWER_MODEL_REVISION,
-    modelPath: profile.modelPath,
-  };
+  const dc = componentDc + fan.electricalNameplateWatts * pwm ** 3;
+  if (dc > psu.modeledCapacityWatts) return null;
+  const itWatts =
+    dc / psuEfficiency(psu.efficiencyCurve, dc / psu.loadSharingCapacityWatts) +
+    networkWatts[`${state.scaleOut}`];
+  return { itWatts, facilityWatts: itWatts * pue, pue };
 }

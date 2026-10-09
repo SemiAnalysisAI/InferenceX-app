@@ -40,13 +40,13 @@ export const ALL_IN_MEASURED_NOTE = {
 };
 
 export const ALL_IN_MEASURED_AGENTIC_NOTE = {
-  en: 'AgentX estimates reuse the chassis or rack model; they have not been independently calibrated for AgentX workloads.',
-  zh: 'AgentX 估算复用机箱或机架功耗模型，尚未针对 AgentX 工作负载进行独立校准。',
+  en: 'AgentX estimates use the power model’s agentic workload state; they have not been calibrated against measured AgentX system power.',
+  zh: 'AgentX 估算采用功耗模型的智能体工作负载状态，尚未用 AgentX 系统实测功耗校准。',
 };
 
 export const ALL_IN_MEASURED_EMPTY = {
-  en: 'No values are available for All in Measured in this selection. This boundary needs 8K / 1K or AgentX, validated GPU telemetry, and a supported chassis or rack power model. NVL72 also needs complete Grace or module telemetry from the same measurement window. Choose another boundary to keep the points.',
-  zh: '当前选择没有可用的整体实测功耗数值。该边界需要 8K / 1K 或 AgentX 场景、已验证的 GPU 遥测，以及受支持的机箱或机架功耗模型。NVL72 还需要同一测量窗口内完整的 Grace 或 module 遥测。可切换到其他功耗边界以保留数据点。',
+  en: 'No values are available for All in Measured in this selection. This boundary needs validated GPU telemetry and hardware covered by the InferenceX power model (eight-GPU HGX/OAM systems, not NVL72). Choose another boundary to keep the points.',
+  zh: '当前选择没有可用的整体实测功耗数值。该边界需要已验证的 GPU 遥测，且硬件在 InferenceX 功耗模型覆盖范围内（八卡 HGX/OAM 系统，不含 NVL72）。可切换到其他功耗边界以保留数据点。',
 };
 
 /** InferenceData keys per derived basis and quantity. B1 lives on the measured* fields. */
@@ -185,9 +185,9 @@ export function powerBasisNormalization(
  * telemetry admission: `modelSystemPower` requires `power_valid === 1` plus
  * schema v2, or the validated unversioned single-node producer it records as
  * `telemetryBasis: 'validated-unversioned-single-node'`. That is the same
- * telemetry admission the app applies to B1 (`measuredAvgPower`); All in
- * Measured also admits AgentX estimates. The public API's stricter `strictV2`
- * row filter is not re-applied here; it is not applied to the chart's B1 either.
+ * telemetry admission the app applies to B1 (`measuredAvgPower`). The public
+ * API's stricter `strictV2` row filter is not re-applied here; it is not
+ * applied to the chart's B1 either.
  */
 export function modeledFacilityWattsPerGpu(
   entry: Pick<PowerBasisEntry, 'modeledSystemPower'>,

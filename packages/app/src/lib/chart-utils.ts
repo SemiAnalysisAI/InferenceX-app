@@ -785,6 +785,15 @@ export const paretoFrontForDirection = (
   dir: ParetoDirection,
 ): ((points: InferenceData[]) => InferenceData[]) => PARETO_BY_DIRECTION[dir];
 
+/**
+ * Whether a roofline direction favors higher X. The names are historical:
+ * upper_left maximizes X and upper_right minimizes X. Read X direction from
+ * the resolved corner, never from chart type: trace-derived and custom X
+ * metrics reuse a chart definition whose natural X runs the other way.
+ */
+export const paretoMaximizesX = (dir: ParetoDirection): boolean =>
+  dir === 'upper_left' || dir === 'lower_right';
+
 // ---------------------------------------------------------------------------
 // Locale-aware metric label/title helpers
 // ---------------------------------------------------------------------------

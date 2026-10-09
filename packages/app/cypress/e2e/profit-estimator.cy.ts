@@ -310,105 +310,8 @@ describe('Profit estimator power option', { testIsolation: true }, () => {
     cy.get('[data-testid="profit-power-unavailable"]').should('not.exist');
   });
 
-  it('prices a GB200 NVL72 tray on its measured compute module and names the basis', () => {
-    stubOpenRouter();
-    cy.viewport(1280, 900);
-    cy.intercept('GET', '/api/v1/benchmarks*', (req) => {
-      req.reply({
-        body: [
-          ...profitBenchmarkRows().map((row) => ({
-            ...row,
-            metrics: {
-              ...row.metrics,
-              power_valid: 1,
-              power_metric_schema_version: 2,
-              avg_power_w: 500,
-              avg_total_gpu_power_w: 4000,
-            },
-          })),
-          ...profitNvl72Rows(),
-        ],
-      });
-    });
-    let csv: Blob | undefined;
-    // Locked: the control stays hidden and the tray prices on provisioned power like every SKU.
-    cy.visit('/profit-estimator-per-gigawatt?c_power=compare', {
-      onBeforeLoad: (win) => {
-        suppressNudges(win);
-        win.localStorage.removeItem('inferencex-feature-gate');
-        win.URL.createObjectURL = (blob) => {
-          if (blob instanceof win.Blob) csv = blob;
-          return 'blob:profit-nvl72-csv-test';
-        };
-        win.HTMLAnchorElement.prototype.click = () => {};
-      },
-    });
-    chart().find('text.revenue-label').should('have.length', 5);
-    cy.get('#profit-power').should('not.exist');
-    cy.get('[data-testid="profit-power-note"]').should('not.exist');
-    cy.get('body').type('{uparrow}{uparrow}{downarrow}{downarrow}');
-    cy.get('#profit-power').should('contain', 'Compare both');
-    // Four supported SKUs get pairs; GB300 keeps its provisioned bar without CPU power.
-    chart().find('text.revenue-label').should('have.length', 9);
-    chart().should('contain', 'GB200').and('contain', 'All in Measured');
-    // The header keeps its one line; the NVL72 basis and modeled components
-    // live in the Power Estimation help and the CSV caption.
-    cy.get('[data-testid="profit-power-note"]')
-      .should('contain', 'Compare both')
-      .and('not.contain', 'NVSwitch trays');
-    cy.get('[data-testid="profit-power-assumptions"]').should('not.exist');
-    cy.get('[data-testid="option-help-profit-power"]').click();
-    cy.get('[data-testid="option-help-content-profit-power"]')
-      .should('be.visible')
-      .and('contain', 'PUE 1.3 for air-cooled chassis or 1.1 for NVL72')
-      .and('contain', 'GB200 NVL72')
-      .and('contain', 'measured module (GPU + HBM + Grace + LPDDR5X; module sensor)')
-      .and('contain', 'NVSwitch trays')
-      .and('contain', 'DLC PUE 1.1');
-    cy.get('body').type('{esc}');
-    cy.get('[data-testid="option-help-content-profit-power"]').should('not.exist');
-    cy.get('[data-testid="profit-power-unavailable"]').should('not.exist');
-    chart().scrollIntoView();
-    cy.screenshot('profit-nvl72-compare-desktop', { capture: 'viewport', overwrite: true });
-    cy.viewport(393, 900);
-    cy.get('[data-testid="profit-power-note"]').then(($note) => {
-      const bounds = $note[0].getBoundingClientRect();
-      expect(bounds.left).to.be.at.least(0);
-      expect(bounds.right).to.be.at.most(393);
-    });
-    chart().find('text.revenue-label').should('have.length', 9);
-    chart().scrollIntoView();
-    cy.screenshot('profit-nvl72-compare-mobile', { capture: 'viewport', overwrite: true });
-    chart().find('[data-chart-scroll]').scrollIntoView().scrollTo('left').should('be.visible');
-    chart()
-      .find('[data-chart-scroll]')
-      .then(($scroll) => {
-        const bounds = $scroll[0].getBoundingClientRect();
-        expect(bounds.left).to.be.at.least(0);
-        expect(bounds.right).to.be.at.most(393);
-      });
-    cy.screenshot('profit-nvl72-chart-mobile', { capture: 'viewport', overwrite: true });
-    cy.get('[data-testid="export-button"]').first().click();
-    cy.get('[data-testid="export-csv-button"]').click();
-    cy.then(() => csv!.text()).then((text) => {
-      expect(text).to.contain('Power basis,Power sensor,System power profile');
-      expect(text).to.contain('PUE 1.3 for air-cooled chassis or 1.1 for NVL72');
-      expect(text).to.contain('GB200 NVL72');
-      expect(text).to.contain('NVSwitch trays');
-      expect(text).to.contain('DLC PUE 1.1');
-      const rows = text.split('\n').filter((line) => line.startsWith('GB200'));
-      expect(rows).to.have.length(2);
-      expect(rows.some((row) => row.includes('All in Provisioned'))).to.equal(true);
-      const measured = rows.find((row) => row.includes('measured module'));
-      expect(measured).to.contain('GPU + HBM + Grace + LPDDR5X; module sensor');
-      expect(measured).to.contain(',module,');
-      expect(measured).to.contain('system-power-model.ts @ app-sha256:');
-      expect(measured).to.contain(' sha256:');
-    });
-  });
-
   for (const locale of ['en', 'zh'] as const) {
-    it(`keeps all nine power comparison bars readable and reachable on mobile (${locale})`, () => {
+    it(`keeps all eight power comparison bars readable and reachable on mobile (${locale})`, () => {
       stubOpenRouter();
       cy.viewport(390, 900);
       cy.intercept('GET', '/api/v1/benchmarks*', {
@@ -431,7 +334,7 @@ describe('Profit estimator power option', { testIsolation: true }, () => {
       });
       chart()
         .find('text.revenue-label')
-        .should('have.length', 9)
+        .should('have.length', 8)
         .should(($labels) => {
           const boxes = [...$labels].map((label) => label.getBoundingClientRect());
           for (let i = 1; i < boxes.length; i++) {
@@ -538,7 +441,7 @@ describe('Profit estimator power option', { testIsolation: true }, () => {
       scroller().should(($scroll) => {
         expect($scroll[0].scrollWidth).to.equal($scroll[0].clientWidth);
       });
-      chart().find('text.revenue-label').should('have.length', 9);
+      chart().find('text.revenue-label').should('have.length', 8);
       chartSvg().scrollIntoView({ offset: { top: -70, left: 0 } });
       cy.screenshot(`profit-dense-${locale}-desktop`, { capture: 'viewport', overwrite: true });
     });

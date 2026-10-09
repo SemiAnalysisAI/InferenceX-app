@@ -45,8 +45,8 @@ const REASONS: Record<UnavailableReason, Record<Locale, string>> = {
   hardware: { en: 'Unsupported hardware', zh: '不支持此硬件' },
   telemetry: { en: 'GPU telemetry missing or invalid', zh: 'GPU 遥测缺失或无效' },
   'cpu-telemetry': {
-    en: 'Grace or module telemetry missing or invalid',
-    zh: 'Grace 或 module 遥测缺失或无效',
+    en: 'Grace-socket telemetry missing or invalid',
+    zh: 'Grace socket 遥测缺失或无效',
   },
   'gpu-count': { en: 'GPU count missing or inconsistent', zh: 'GPU 数量缺失或不一致' },
   topology: { en: 'Unsupported topology', zh: '不支持此拓扑' },

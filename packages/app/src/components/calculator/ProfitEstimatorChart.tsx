@@ -271,9 +271,6 @@ const STRINGS = {
     powerBasis: 'Power basis',
     powerBasisLabels: {
       chassis: 'measured GPU board; CPU, DRAM, networking, storage, board, fans and PSU modeled',
-      module: 'measured module (GPU + HBM + Grace + LPDDR5X; module sensor)',
-      'grace-socket':
-        'measured GPU board + Grace socket (Grace socket sensor), regulator loss modeled',
     },
     noData: 'No SKU can be priced for the current selection.',
     scrollHint: 'Scroll horizontally to view the full chart.',
@@ -305,9 +302,6 @@ const STRINGS = {
     powerBasis: '功耗口径',
     powerBasisLabels: {
       chassis: '实测 GPU 板卡功耗；CPU、DRAM、网络、存储、主板、风扇和 PSU 由模型估算',
-      module: '实测模块功耗（GPU + HBM + Grace + LPDDR5X；模块传感器）',
-      'grace-socket':
-        '实测 GPU 板卡 + Grace socket 功耗（Grace socket 传感器），稳压损耗由模型估算',
     },
     noData: '当前选择下没有可定价的 SKU。',
     scrollHint: '横向滚动查看完整图表。',
@@ -321,7 +315,7 @@ export function profitEstimatorChartStrings(locale: Locale) {
 /** Name what a measured + modeled row's power was measured on. */
 export function powerBasisLabel(source: ProfitPowerSource, locale: Locale): string {
   const labels = STRINGS[locale].powerBasisLabels;
-  return labels[source.topology === 'chassis' ? 'chassis' : source.sensorKind];
+  return labels[source.topology];
 }
 
 /** Segment label lines that fit a given pixel height: name and amount, amount only, or none. */

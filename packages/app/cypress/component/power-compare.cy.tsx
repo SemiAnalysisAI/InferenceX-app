@@ -5,6 +5,10 @@ import type { InferenceData } from '@/components/inference/types';
 import { expandPowerCompareSeries } from '@/components/inference/utils/power-compare';
 import { Precision } from '@/lib/data-mappings';
 import { overlayRunColor } from '@/lib/overlay-run-style';
+import {
+  SYSTEM_POWER_MODEL_REVISION,
+  SYSTEM_POWER_MODEL_SOURCE_URL,
+} from '@/lib/system-power-model';
 
 import {
   createMockChartDefinition,
@@ -190,7 +194,7 @@ describe('Modeled power source links', () => {
   for (const locale of ['en', 'zh'] as const) {
     for (const width of [1280, 390]) {
       const overlay = width === 390;
-      it(`links to app-owned source and ${locale} assumptions from a ${overlay ? 'mobile overlay' : 'desktop official'} tooltip`, () => {
+      it(`links to the pinned power model from a ${locale} ${overlay ? 'mobile overlay' : 'desktop official'} tooltip`, () => {
         cy.viewport(width, 720);
         const modeledCurve = (hwKey: string, runUrl?: string) =>
           measuredCurve(hwKey, runUrl).map((point) =>
@@ -200,16 +204,16 @@ describe('Modeled power source links', () => {
               modeledSystemPower: {
                 status: 'supported',
                 hardware: hwKey,
-                modelRevision: 'model-content-digest-for-tooltip-fixture',
-                modelPath: 'packages/app/src/lib/system-power-model.ts',
+                modelRevision: SYSTEM_POWER_MODEL_REVISION,
+                operatingState: { workload: 'fixed-seq-len', scaleOut: false },
                 gpuCount: 8,
                 chassisCount: 1,
                 modeledGpuCount: 8,
                 measuredGpuWattsPerGpu: 600,
-                chassisAcWatts: 6400,
-                chassisAcWattsPerGpu: 800,
+                itWatts: 6400,
+                itWattsPerGpu: 800,
                 facilityWatts: 8320,
-                deploymentAcWatts: 6400,
+                deploymentItWatts: 6400,
                 deploymentFacilityWatts: 8320,
                 pue: 1.3,
                 topologyBasis: 'single-node',
@@ -228,20 +232,8 @@ describe('Modeled power source links', () => {
         cy.get('[data-chart-tooltip]:visible').within(() => {
           if (overlay) cy.contains('powerx-compare').should('exist');
           cy.get('[data-testid="tooltip-modeled-system-power"]').within(() => {
-            const base = `https://github.com/SemiAnalysisAI/InferenceX-app/blob/${process.env.NEXT_PUBLIC_APP_SOURCE_REF ?? 'master'}`;
-            cy.get(`a[href="${base}/packages/app/src/lib/system-power-model.ts"]`)
-              .should('have.attr', 'title', 'model-content-digest-for-tooltip-fixture')
-              .and('have.attr', 'target', '_blank')
-              .and('have.attr', 'rel', 'noopener noreferrer')
-              .scrollIntoView()
-              .should('be.visible');
-            cy.contains('a', locale === 'zh' ? '功耗模型与假设' : 'Power model assumptions')
-              .should(
-                'have.attr',
-                'href',
-                `${base}/docs/powerx-system-power${locale === 'zh' ? '.zh' : ''}.md`,
-              )
-              .and('have.attr', 'target', '_blank')
+            cy.get(`a[href="${SYSTEM_POWER_MODEL_SOURCE_URL}"]`)
+              .should('have.attr', 'target', '_blank')
               .and('have.attr', 'rel', 'noopener noreferrer')
               .then(($link) => {
                 $link[0].scrollIntoView({ block: 'center' });

@@ -67,7 +67,7 @@ import {
 import { XAxisModeSelector } from './XAxisModeSelector';
 import { showsTcoBasisSelector, Sequence, type Model } from '@/lib/data-mappings';
 import { useLocale } from '@/lib/use-locale';
-import { DEFAULT_Y_AXIS_METRIC } from '@/lib/url-state';
+import { defaultYAxisMetric } from '@/lib/url-state';
 
 const STRINGS = {
   en: {
@@ -207,8 +207,14 @@ export default function ChartControls({
   useEffect(() => setMounted(true), []);
 
   const { openDropdown, handleDropdownOpenChange } = useOpenDropdown<string>();
-  const { selectedModel, selectedSequence, selectedPrecisions, selectedGPUs, selectedDateRange } =
-    useInferenceFilters();
+  const {
+    selectedModel,
+    selectedSequence,
+    selectedPrecisions,
+    selectedGPUs,
+    selectedDateRange,
+    quickFilters,
+  } = useInferenceFilters();
   const {
     graphs,
     availableGPUs,
@@ -449,7 +455,7 @@ export default function ChartControls({
   };
 
   const secondaryCount =
-    (selectedYAxisMetric === DEFAULT_Y_AXIS_METRIC ? 0 : 1) +
+    (selectedYAxisMetric === defaultYAxisMetric(quickFilters.power) ? 0 : 1) +
     (showXAxisMode && selectedXAxisMode !== 'interactivity' ? 1 : 0) +
     (selectedXAxisMetric === undefined || selectedXAxisMetric === 'p90_ttft' ? 0 : 1) +
     (scaleType === 'auto' ? 0 : 1) +

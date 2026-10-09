@@ -1,5 +1,4 @@
-import { modelSystemPower, type SystemPowerSensorKind } from '@/lib/modeled-system-power';
-import { type RackMeasuredBasis, systemPowerSourceSha256 } from '@/lib/system-power-model';
+import { modelSystemPower } from '@/lib/modeled-system-power';
 import type { TokenRevenuePricing } from '@/components/inference/types';
 
 import {
@@ -16,27 +15,17 @@ import type { CalculatorMode, CostProvider, GPUDataPoint, InterpolatedResult } f
 
 export type ProfitPowerBasis = 'provisioned' | 'modeled' | 'compare';
 
-interface ProfitPowerProfile {
-  /** Facility PUE the estimate applied once at the chassis or rack AC boundary. */
-  pue: number;
-  modelPath: string;
-  modelRevision: string;
-  /** Equation-file hash; modelRevision also covers parameters and admission/PUE policy. */
-  profileSha256: string | null;
-}
-
 /**
- * What the measured + modeled budget was measured on. An eight-GPU x86 chassis
- * measures the GPU boards and models the rest; an NVL72 tray measures the compute
- * module (or GPU board + Grace socket) and models only the rack residual.
+ * What the measured + modeled budget was measured on: an eight-GPU chassis
+ * measures the GPU boards and models the rest. NVL72 trays join once their rack
+ * model is ported (see modelSystemPower).
  */
-export type ProfitPowerSource =
-  | (ProfitPowerProfile & { topology: 'chassis' })
-  | (ProfitPowerProfile & {
-      topology: 'nvl72-trays';
-      measuredBasis: RackMeasuredBasis;
-      sensorKind: SystemPowerSensorKind;
-    });
+export interface ProfitPowerSource {
+  topology: 'chassis';
+  /** Facility PUE the estimate applied once after IT power. */
+  pue: number;
+  modelRevision: string;
+}
 
 export interface ProfitPlanningPower {
   kwPerGpu: number;
@@ -46,13 +35,7 @@ export interface ProfitPlanningPower {
 
 /** Identity of a source for deduplicating notes and refusing to mix bases between knots. */
 export function powerSourceKey(source: ProfitPowerSource): string {
-  return [
-    source.topology,
-    source.pue,
-    source.modelPath,
-    source.modelRevision,
-    source.topology === 'nvl72-trays' ? `${source.measuredBasis}/${source.sensorKind}` : '',
-  ].join('|');
+  return [source.topology, source.pue, source.modelRevision].join('|');
 }
 
 type PlanningPower = ProfitPlanningPower | { reason: ProfitEstimatorSkipReason };
@@ -60,7 +43,7 @@ type PlanningPower = ProfitPlanningPower | { reason: ProfitEstimatorSkipReason }
 function planningPower(point: GPUDataPoint): PlanningPower {
   const row = point.sourceRow;
   if (!row || row.metrics.power_metric_schema_version !== 2) return { reason: 'no-measured-power' };
-  const estimate = modelSystemPower(row, undefined, true);
+  const estimate = modelSystemPower(row);
   if (estimate.status !== 'supported') {
     switch (estimate.reason) {
       case 'hardware': {
@@ -89,25 +72,10 @@ function planningPower(point: GPUDataPoint): PlanningPower {
     (estimate.topologyBasis !== 'single-node' || 8 % estimate.gpuCount !== 0)
   )
     return { reason: 'unsupported-power-topology' };
-  const profile: ProfitPowerProfile = {
-    pue: estimate.pue,
-    modelPath: estimate.modelPath,
-    modelRevision: estimate.modelRevision,
-    profileSha256: systemPowerSourceSha256(estimate.modelPath),
-  };
-  const source: ProfitPowerSource =
-    estimate.topologyBasis === 'nvl72-trays'
-      ? {
-          ...profile,
-          topology: 'nvl72-trays',
-          measuredBasis: estimate.measuredBasis,
-          sensorKind: estimate.sensorKind,
-        }
-      : { ...profile, topology: 'chassis' };
   return {
     kwPerGpu: (estimate.deploymentFacilityWatts / estimate.gpuCount / 1000) * 1.1,
     extrapolated: estimate.chassisBasis === 'extrapolated',
-    source,
+    source: { topology: 'chassis', pue: estimate.pue, modelRevision: estimate.modelRevision },
   };
 }
 

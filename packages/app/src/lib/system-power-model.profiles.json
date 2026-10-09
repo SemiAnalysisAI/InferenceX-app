@@ -1,479 +1,392 @@
 {
-  "assumptions": {
-    "u_pcie": 0.05,
-    "u_cpu": 0.2,
-    "u_ram": 0.2,
-    "u_nvme": 0.0,
-    "pue": 1.2
-  },
-  "rackAssumptions": {
-    "u_nvlink": 0.5,
-    "u_ib": 0.0,
-    "u_pcie": 0.05,
-    "pue": 1.2
-  },
+  "modelRevision": "dc717fb5d58620bee3bbb579b5e25160b21ce45d",
+  "sourceTree": "b46cce20b000ccae335fbdd05c7d789632ed7076",
+  "sourceUrl": "https://github.com/SemiAnalysisAI/InferenceX/tree/dc717fb5d58620bee3bbb579b5e25160b21ce45d/power_model",
   "profiles": {
     "h100": {
-      "modelPath": "packages/app/src/lib/system-power-model.ts",
-      "gpuCount": 8,
-      "assumptions": {
-        "u_pcie": 0.05,
-        "u_cpu": 0.2,
-        "u_ram": 0.2,
-        "u_nvme": 0.0,
-        "pue": 1.2,
-        "u_nvlink": 0.5,
-        "u_ib": 0.0,
-        "fan_pwm": null
+      "system": "hopper",
+      "fixedDcWatts": {
+        "fixed-seq-len": {
+          "false": 1271.6,
+          "true": 1351.6
+        },
+        "agentic": {
+          "false": 1331.6,
+          "true": 1411.6
+        },
+        "agentic-cpu-offloading": {
+          "false": 1534.0,
+          "true": 1614.0
+        }
       },
-      "fixedComponentsDcWatts": {
-        "hopper_nvswitch_4x": 485.8,
-        "hopper_pcie_retimers_8x": 92.4,
-        "hopper_ubb_residual_static": 45.0,
-        "host_cpu_2x_socket_input": 367.9,
-        "host_ddr5_dimms": 154.9,
-        "connectx7_compute_8x_with_optics": 252.0,
-        "connectx7_storage_mgmt_2x_static": 60.0,
-        "cpu_tray_pcie_switches_4x": 163.7,
-        "nvme_idle": 44.0,
-        "chassis_residual_static": 45.0
+      "networkWatts": {
+        "false": 405.0,
+        "true": 473.625
       },
       "fan": {
-        "electricalNameplateWatts": 1100.0,
-        "electricalGroupsWatts": [1100.0],
+        "fullCoolingLoadWatts": 7214.0,
+        "electricalNameplateWatts": 835.3052631578948,
         "minPwm": 0.22,
         "maxPwm": 0.8,
-        "fullCoolingLoadWatts": 9500.0,
-        "exponent": 1.1
+        "exponent": 1.0
       },
       "psu": {
         "loadSharingCapacityWatts": 19800.0,
-        "maxDcWatts": 13200.0,
+        "modeledCapacityWatts": 13200.0,
         "efficiencyCurve": [
-          [0.05, 0.885],
-          [0.1, 0.92],
-          [0.2, 0.94],
-          [0.5, 0.96],
-          [1.0, 0.955]
+          {
+            "loadFraction": 0.05,
+            "efficiency": 0.8864
+          },
+          {
+            "loadFraction": 0.1,
+            "efficiency": 0.9238
+          },
+          {
+            "loadFraction": 0.2,
+            "efficiency": 0.9448
+          },
+          {
+            "loadFraction": 0.5,
+            "efficiency": 0.964
+          },
+          {
+            "loadFraction": 1.0,
+            "efficiency": 0.9556
+          }
         ]
-      }
+      },
+      "pue": 1.3
     },
     "h200": {
-      "modelPath": "packages/app/src/lib/system-power-model.ts",
-      "gpuCount": 8,
-      "assumptions": {
-        "u_pcie": 0.05,
-        "u_cpu": 0.2,
-        "u_ram": 0.2,
-        "u_nvme": 0.0,
-        "pue": 1.2,
-        "u_nvlink": 0.5,
-        "u_ib": 0.0,
-        "fan_pwm": null
+      "system": "hopper",
+      "fixedDcWatts": {
+        "fixed-seq-len": {
+          "false": 1271.6,
+          "true": 1351.6
+        },
+        "agentic": {
+          "false": 1331.6,
+          "true": 1411.6
+        },
+        "agentic-cpu-offloading": {
+          "false": 1534.0,
+          "true": 1614.0
+        }
       },
-      "fixedComponentsDcWatts": {
-        "hopper_nvswitch_4x": 485.8,
-        "hopper_pcie_retimers_8x": 92.4,
-        "hopper_ubb_residual_static": 45.0,
-        "host_cpu_2x_socket_input": 367.9,
-        "host_ddr5_dimms": 154.9,
-        "connectx7_compute_8x_with_optics": 252.0,
-        "connectx7_storage_mgmt_2x_static": 60.0,
-        "cpu_tray_pcie_switches_4x": 163.7,
-        "nvme_idle": 44.0,
-        "chassis_residual_static": 45.0
+      "networkWatts": {
+        "false": 405.0,
+        "true": 473.625
       },
       "fan": {
-        "electricalNameplateWatts": 1100.0,
-        "electricalGroupsWatts": [1100.0],
+        "fullCoolingLoadWatts": 7214.0,
+        "electricalNameplateWatts": 835.3052631578948,
         "minPwm": 0.22,
         "maxPwm": 0.8,
-        "fullCoolingLoadWatts": 9500.0,
-        "exponent": 1.1
+        "exponent": 1.0
       },
       "psu": {
         "loadSharingCapacityWatts": 19800.0,
-        "maxDcWatts": 13200.0,
+        "modeledCapacityWatts": 13200.0,
         "efficiencyCurve": [
-          [0.05, 0.885],
-          [0.1, 0.92],
-          [0.2, 0.94],
-          [0.5, 0.96],
-          [1.0, 0.955]
+          {
+            "loadFraction": 0.05,
+            "efficiency": 0.8864
+          },
+          {
+            "loadFraction": 0.1,
+            "efficiency": 0.9238
+          },
+          {
+            "loadFraction": 0.2,
+            "efficiency": 0.9448
+          },
+          {
+            "loadFraction": 0.5,
+            "efficiency": 0.964
+          },
+          {
+            "loadFraction": 1.0,
+            "efficiency": 0.9556
+          }
         ]
-      }
+      },
+      "pue": 1.3
     },
     "b200": {
-      "modelPath": "packages/app/src/lib/system-power-model.ts",
-      "gpuCount": 8,
-      "assumptions": {
-        "u_pcie": 0.05,
-        "u_cpu": 0.2,
-        "u_ram": 0.2,
-        "u_nvme": 0.0,
-        "pue": 1.2,
-        "u_nvlink": 0.5,
-        "u_ib": 0.0,
-        "u_dpu": 0.0,
-        "fan_pwm": null
+      "system": "b200",
+      "fixedDcWatts": {
+        "fixed-seq-len": {
+          "false": 1271.6,
+          "true": 1351.6
+        },
+        "agentic": {
+          "false": 1331.6,
+          "true": 1411.6
+        },
+        "agentic-cpu-offloading": {
+          "false": 1534.0,
+          "true": 1614.0
+        }
       },
-      "fixedComponentsDcWatts": {
-        "nvswitch5_2x": 406.4,
-        "ubb_pcie_retimers_8x": 92.4,
-        "ubb_residual_static": 62.0,
-        "host_cpu_2x_socket_input": 363.9,
-        "host_ddr5_dimms": 154.9,
-        "connectx7_8x_with_optics": 252.0,
-        "bluefield3_dpu_idle": 65.0,
-        "cpu_tray_pcie_switches_4x": 163.7,
-        "nvme_idle": 54.0,
-        "chassis_residual_static": 45.0
+      "networkWatts": {
+        "false": 405.0,
+        "true": 473.625
       },
       "fan": {
-        "electricalNameplateWatts": 1900.0,
-        "electricalGroupsWatts": [1800.0, 100.0],
-        "minPwm": 0.25,
-        "maxPwm": 0.78,
-        "fullCoolingLoadWatts": 12000.0,
-        "exponent": 1.15
+        "fullCoolingLoadWatts": 9614.0,
+        "electricalNameplateWatts": 1113.2,
+        "minPwm": 0.22,
+        "maxPwm": 0.8,
+        "exponent": 1.0
       },
       "psu": {
         "loadSharingCapacityWatts": 15750.0,
-        "maxDcWatts": 15750.0,
+        "modeledCapacityWatts": 15750.0,
         "efficiencyCurve": [
-          [0.05, 0.8864],
-          [0.1, 0.9238],
-          [0.2, 0.9448],
-          [0.5, 0.964],
-          [1.0, 0.9556]
+          {
+            "loadFraction": 0.05,
+            "efficiency": 0.8864
+          },
+          {
+            "loadFraction": 0.1,
+            "efficiency": 0.9238
+          },
+          {
+            "loadFraction": 0.2,
+            "efficiency": 0.9448
+          },
+          {
+            "loadFraction": 0.5,
+            "efficiency": 0.964
+          },
+          {
+            "loadFraction": 1.0,
+            "efficiency": 0.9556
+          }
         ]
-      }
+      },
+      "pue": 1.3
     },
     "b300": {
-      "modelPath": "packages/app/src/lib/system-power-model.ts",
-      "gpuCount": 8,
-      "assumptions": {
-        "u_pcie": 0.05,
-        "u_cpu": 0.2,
-        "u_ram": 0.2,
-        "u_nvme": 0.0,
-        "pue": 1.2,
-        "u_nvlink": 0.5,
-        "u_ib": 0.0,
-        "u_dpu": 0.0,
-        "fan_pwm": null
+      "system": "b300",
+      "fixedDcWatts": {
+        "fixed-seq-len": {
+          "false": 1171.6,
+          "true": 1331.6
+        },
+        "agentic": {
+          "false": 1231.6,
+          "true": 1391.6
+        },
+        "agentic-cpu-offloading": {
+          "false": 1434.0,
+          "true": 1594.0
+        }
       },
-      "fixedComponentsDcWatts": {
-        "nvswitch5_2x": 406.4,
-        "connectx8_8x_integrated_pcie_with_optics": 630.0,
-        "b300_ubb_residual_static": 85.0,
-        "host_cpu_2x_socket_input": 373.4,
-        "host_ddr5_dimms": 154.9,
-        "bluefield3_dpu_2x_idle": 130.0,
-        "nvme_idle": 40.0,
-        "chassis_residual_static": 55.0
+      "networkWatts": {
+        "false": 562.125,
+        "true": 697.5
       },
       "fan": {
-        "electricalNameplateWatts": 2000.0,
-        "electricalGroupsWatts": [2000.0],
+        "fullCoolingLoadWatts": 11194.0,
+        "electricalNameplateWatts": 1296.1473684210525,
         "minPwm": 0.22,
-        "maxPwm": 0.85,
-        "fullCoolingLoadWatts": 12000.0,
-        "exponent": 1.08
+        "maxPwm": 0.8,
+        "exponent": 1.0
       },
       "psu": {
         "loadSharingCapacityWatts": 39600.0,
-        "maxDcWatts": 15000.0,
+        "modeledCapacityWatts": 15000.0,
         "efficiencyCurve": [
-          [0.05, 0.885],
-          [0.1, 0.92],
-          [0.2, 0.94],
-          [0.5, 0.96],
-          [1.0, 0.955]
+          {
+            "loadFraction": 0.05,
+            "efficiency": 0.8864
+          },
+          {
+            "loadFraction": 0.1,
+            "efficiency": 0.9238
+          },
+          {
+            "loadFraction": 0.2,
+            "efficiency": 0.9448
+          },
+          {
+            "loadFraction": 0.5,
+            "efficiency": 0.964
+          },
+          {
+            "loadFraction": 1.0,
+            "efficiency": 0.9556
+          }
         ]
-      }
+      },
+      "pue": 1.3
     },
     "mi300x": {
-      "modelPath": "packages/app/src/lib/system-power-model.ts",
-      "gpuCount": 8,
-      "assumptions": {
-        "u_pcie": 0.05,
-        "u_cpu": 0.2,
-        "u_ram": 0.2,
-        "u_nvme": 0.0,
-        "pue": 1.2,
-        "u_eth": 0.0,
-        "fan_pwm": null
+      "system": "mi300",
+      "fixedDcWatts": {
+        "fixed-seq-len": {
+          "false": 911.6,
+          "true": 991.6
+        },
+        "agentic": {
+          "false": 971.6,
+          "true": 1051.6
+        },
+        "agentic-cpu-offloading": {
+          "false": 1174.0,
+          "true": 1254.0
+        }
       },
-      "fixedComponentsDcWatts": {
-        "pcie5_x16_retimers_8x": 92.4,
-        "amd_oam_ubb_residual_static": 45.0,
-        "thor2_8x_with_optics": 239.2,
-        "pcie5_144lane_switches_4x": 163.7,
-        "host_cpu_2x_socket_input": 390.2,
-        "host_ddr5_dimms": 145.0,
-        "nvme_idle": 58.0,
-        "chassis_residual_static": 66.0
+      "networkWatts": {
+        "false": 281.0625,
+        "true": 348.75
       },
       "fan": {
-        "electricalNameplateWatts": 1800.0,
-        "electricalGroupsWatts": [1800.0],
+        "fullCoolingLoadWatts": 7254.0,
+        "electricalNameplateWatts": 839.9368421052633,
         "minPwm": 0.22,
-        "maxPwm": 0.82,
-        "fullCoolingLoadWatts": 8500.0,
-        "exponent": 1.08
+        "maxPwm": 0.8,
+        "exponent": 1.0
       },
       "psu": {
         "loadSharingCapacityWatts": 18000.0,
-        "maxDcWatts": 9000.0,
+        "modeledCapacityWatts": 9000.0,
         "efficiencyCurve": [
-          [0.05, 0.885],
-          [0.1, 0.92],
-          [0.2, 0.94],
-          [0.5, 0.96],
-          [1.0, 0.955]
+          {
+            "loadFraction": 0.05,
+            "efficiency": 0.8864
+          },
+          {
+            "loadFraction": 0.1,
+            "efficiency": 0.9238
+          },
+          {
+            "loadFraction": 0.2,
+            "efficiency": 0.9448
+          },
+          {
+            "loadFraction": 0.5,
+            "efficiency": 0.964
+          },
+          {
+            "loadFraction": 1.0,
+            "efficiency": 0.9556
+          }
         ]
-      }
+      },
+      "pue": 1.3
     },
     "mi325x": {
-      "modelPath": "packages/app/src/lib/system-power-model.ts",
-      "gpuCount": 8,
-      "assumptions": {
-        "u_pcie": 0.05,
-        "u_cpu": 0.2,
-        "u_ram": 0.2,
-        "u_nvme": 0.0,
-        "pue": 1.2,
-        "u_eth": 0.0,
-        "fan_pwm": null
+      "system": "mi325",
+      "fixedDcWatts": {
+        "fixed-seq-len": {
+          "false": 911.6,
+          "true": 991.6
+        },
+        "agentic": {
+          "false": 971.6,
+          "true": 1051.6
+        },
+        "agentic-cpu-offloading": {
+          "false": 1174.0,
+          "true": 1254.0
+        }
       },
-      "fixedComponentsDcWatts": {
-        "pcie5_x16_retimers_8x": 92.4,
-        "amd_oam_ubb_residual_static": 45.0,
-        "thor2_8x_with_optics": 239.2,
-        "pcie5_144lane_switches_4x": 163.7,
-        "host_cpu_2x_socket_input": 432.6,
-        "host_ddr5_dimms": 220.8,
-        "nvme_idle": 40.0,
-        "chassis_residual_static": 74.0
+      "networkWatts": {
+        "false": 281.0625,
+        "true": 348.75
       },
       "fan": {
-        "electricalNameplateWatts": 2600.0,
-        "electricalGroupsWatts": [2600.0],
-        "minPwm": 0.24,
-        "maxPwm": 0.88,
-        "fullCoolingLoadWatts": 12000.0,
-        "exponent": 1.06
+        "fullCoolingLoadWatts": 9254.0,
+        "electricalNameplateWatts": 1071.5157894736844,
+        "minPwm": 0.22,
+        "maxPwm": 0.8,
+        "exponent": 1.0
       },
       "psu": {
         "loadSharingCapacityWatts": 31500.0,
-        "maxDcWatts": 15750.0,
+        "modeledCapacityWatts": 15750.0,
         "efficiencyCurve": [
-          [0.05, 0.885],
-          [0.1, 0.92],
-          [0.2, 0.94],
-          [0.5, 0.96],
-          [1.0, 0.955]
+          {
+            "loadFraction": 0.05,
+            "efficiency": 0.8864
+          },
+          {
+            "loadFraction": 0.1,
+            "efficiency": 0.9238
+          },
+          {
+            "loadFraction": 0.2,
+            "efficiency": 0.9448
+          },
+          {
+            "loadFraction": 0.5,
+            "efficiency": 0.964
+          },
+          {
+            "loadFraction": 1.0,
+            "efficiency": 0.9556
+          }
         ]
-      }
+      },
+      "pue": 1.3
     },
     "mi355x": {
-      "modelPath": "packages/app/src/lib/system-power-model.ts",
-      "gpuCount": 8,
-      "assumptions": {
-        "u_pcie": 0.05,
-        "u_cpu": 0.2,
-        "u_ram": 0.2,
-        "u_nvme": 0.0,
-        "pue": 1.2,
-        "u_eth": 0.0,
-        "fan_pwm": null
+      "system": "mi355",
+      "fixedDcWatts": {
+        "fixed-seq-len": {
+          "false": 911.6,
+          "true": 991.6
+        },
+        "agentic": {
+          "false": 971.6,
+          "true": 1051.6
+        },
+        "agentic-cpu-offloading": {
+          "false": 1174.0,
+          "true": 1254.0
+        }
       },
-      "fixedComponentsDcWatts": {
-        "pcie5_x16_retimers_8x": 92.4,
-        "amd_oam_ubb_residual_static": 45.0,
-        "pollara400_8x_with_optics": 280.0,
-        "pcie5_144lane_switches_4x": 163.7,
-        "host_cpu_2x_socket_input": 432.6,
-        "host_ddr5_dimms": 220.8,
-        "nvme_idle": 40.0,
-        "chassis_residual_static": 82.0
+      "networkWatts": {
+        "false": 281.0625,
+        "true": 348.75
       },
       "fan": {
-        "electricalNameplateWatts": 3600.0,
-        "electricalGroupsWatts": [3600.0],
-        "minPwm": 0.25,
-        "maxPwm": 0.92,
-        "fullCoolingLoadWatts": 15500.0,
-        "exponent": 1.04
+        "fullCoolingLoadWatts": 12454.0,
+        "electricalNameplateWatts": 1442.042105263158,
+        "minPwm": 0.22,
+        "maxPwm": 0.8,
+        "exponent": 1.0
       },
       "psu": {
         "loadSharingCapacityWatts": 39600.0,
-        "maxDcWatts": 26400.0,
+        "modeledCapacityWatts": 26400.0,
         "efficiencyCurve": [
-          [0.05, 0.885],
-          [0.1, 0.92],
-          [0.2, 0.94],
-          [0.5, 0.96],
-          [1.0, 0.955]
-        ]
-      }
-    }
-  },
-  "rackProfiles": {
-    "gb200": {
-      "modelPath": "packages/app/src/lib/system-power-model.ts",
-      "topology": "nvl72-rack",
-      "gpuCount": 72,
-      "computeTrayCount": 18,
-      "gpusPerComputeTray": 4,
-      "graceSocketsPerComputeTray": 2,
-      "nvswitchTrayCount": 9,
-      "assumptions": {
-        "u_nvlink": 0.5,
-        "u_ib": 0.0,
-        "u_pcie": 0.05,
-        "pue": 1.2
-      },
-      "computeTrayStaticDcWatts": {
-        "connectx7_nics_with_optics": 126.0,
-        "bluefield3_dpu_idle": 130.0,
-        "nvme_idle": 22.0,
-        "compute_tray_fans_unverified": 130.0,
-        "compute_tray_board_residual_unverified": 40.0
-      },
-      "computeTrayStaticDetails": {
-        "nic_generation": "connectx7",
-        "per_nic_w": 31.5,
-        "n_nic": 4,
-        "n_dpu": 2,
-        "dpu_model": "idle_only",
-        "nvme_model": "idle_only"
-      },
-      "nvswitchTraySiliconWatts": 406.4,
-      "nvswitchTrayResidualWatts": 50.0,
-      "managementSwitchCount": 2,
-      "managementSwitchWatts": 100.0,
-      "trayInputConversionEfficiency": 0.9725,
-      "regulatorLossFracOfTdp": 0.15,
-      "regulatorAllowanceIncludesGrace": false,
-      "powerShelf": {
-        "installedCapacityWatts": 264000.0,
-        "redundantCapacityWatts": 132000.0,
-        "efficiencyCurve": [
-          [0.1, 0.9],
-          [0.2, 0.94],
-          [0.3, 0.965],
-          [1.0, 0.965]
+          {
+            "loadFraction": 0.05,
+            "efficiency": 0.8864
+          },
+          {
+            "loadFraction": 0.1,
+            "efficiency": 0.9238
+          },
+          {
+            "loadFraction": 0.2,
+            "efficiency": 0.9448
+          },
+          {
+            "loadFraction": 0.5,
+            "efficiency": 0.964
+          },
+          {
+            "loadFraction": 1.0,
+            "efficiency": 0.9556
+          }
         ]
       },
-      "unverifiedParameters": {
-        "compute_tray_fans_w": {
-          "low": 40.0,
-          "high": 220.0,
-          "default": 130.0,
-          "unit": "W per compute tray",
-          "why": "8 dual-rotor 40x56 fans per tray are documented (Lenovo LP2357, SemiAnalysis) but no tray fan power is published. High end = 8 x 27.24 W rated Delta GFC0412DS-SM06B0G; low end = deep PWM on a liquid-cooled tray where only NICs/DPU/NVMe/PDB are air cooled."
-        },
-        "compute_tray_board_residual_w": {
-          "low": 20.0,
-          "high": 60.0,
-          "default": 40.0,
-          "unit": "W per compute tray",
-          "why": "BMC module, CPLD/ERoT, clocks, sensors, leak detection and PDB housekeeping. No public rail. Anchored to the repo chassis residual note (35-70 W for a full HGX chassis) scaled to a 1RU tray."
-        },
-        "tray_input_conversion_efficiency": {
-          "low": 0.96,
-          "high": 0.985,
-          "default": 0.9725,
-          "unit": "fraction",
-          "why": "Trays take 50 V DC from the busbar and feed the boards at 12 V (SemiAnalysis: 4x RapidLock 12 V connectors per Bianca board). The 50 V to 12 V stage sits outside the module sensor. No efficiency is published for it."
-        },
-        "nvswitch_tray_residual_w": {
-          "low": 20.0,
-          "high": 80.0,
-          "default": 50.0,
-          "unit": "W per NVLink switch tray",
-          "why": "Switch tray BMC, two OOB 1GbE ports, console, CPLDs, clocks and NVSwitch VR loss outside the ASIC figure. Lenovo front/rear views show coolant, busbar and cartridge connectors and no fans. No public rail."
-        }
-      }
-    },
-    "gb300": {
-      "modelPath": "packages/app/src/lib/system-power-model.ts",
-      "topology": "nvl72-rack",
-      "gpuCount": 72,
-      "computeTrayCount": 18,
-      "gpusPerComputeTray": 4,
-      "graceSocketsPerComputeTray": 2,
-      "nvswitchTrayCount": 9,
-      "assumptions": {
-        "u_nvlink": 0.5,
-        "u_ib": 0.0,
-        "u_pcie": 0.05,
-        "pue": 1.2
-      },
-      "computeTrayStaticDcWatts": {
-        "connectx8_nics_integrated_pcie_with_optics": 315.0,
-        "bluefield3_dpu_idle": 130.0,
-        "nvme_idle": 22.0,
-        "compute_tray_fans_unverified": 130.0,
-        "compute_tray_board_residual_unverified": 40.0
-      },
-      "computeTrayStaticDetails": {
-        "nic_generation": "connectx8",
-        "per_nic_w": 78.8,
-        "n_nic": 4,
-        "n_dpu": 2,
-        "dpu_model": "idle_only",
-        "nvme_model": "idle_only"
-      },
-      "nvswitchTraySiliconWatts": 406.4,
-      "nvswitchTrayResidualWatts": 50.0,
-      "managementSwitchCount": 2,
-      "managementSwitchWatts": 100.0,
-      "trayInputConversionEfficiency": 0.9725,
-      "regulatorLossFracOfTdp": 0.15,
-      "regulatorAllowanceIncludesGrace": false,
-      "powerShelf": {
-        "installedCapacityWatts": 264000.0,
-        "redundantCapacityWatts": 132000.0,
-        "efficiencyCurve": [
-          [0.1, 0.9],
-          [0.2, 0.94],
-          [0.3, 0.965],
-          [1.0, 0.965]
-        ]
-      },
-      "unverifiedParameters": {
-        "compute_tray_fans_w": {
-          "low": 40.0,
-          "high": 220.0,
-          "default": 130.0,
-          "unit": "W per compute tray",
-          "why": "8 dual-rotor 40x56 fans per tray are documented (Lenovo LP2357, SemiAnalysis) but no tray fan power is published. High end = 8 x 27.24 W rated Delta GFC0412DS-SM06B0G; low end = deep PWM on a liquid-cooled tray where only NICs/DPU/NVMe/PDB are air cooled."
-        },
-        "compute_tray_board_residual_w": {
-          "low": 20.0,
-          "high": 60.0,
-          "default": 40.0,
-          "unit": "W per compute tray",
-          "why": "BMC module, CPLD/ERoT, clocks, sensors, leak detection and PDB housekeeping. No public rail. Anchored to the repo chassis residual note (35-70 W for a full HGX chassis) scaled to a 1RU tray."
-        },
-        "tray_input_conversion_efficiency": {
-          "low": 0.96,
-          "high": 0.985,
-          "default": 0.9725,
-          "unit": "fraction",
-          "why": "Trays take 50 V DC from the busbar and feed the boards at 12 V (SemiAnalysis: 4x RapidLock 12 V connectors per Bianca board). The 50 V to 12 V stage sits outside the module sensor. No efficiency is published for it."
-        },
-        "nvswitch_tray_residual_w": {
-          "low": 20.0,
-          "high": 80.0,
-          "default": 50.0,
-          "unit": "W per NVLink switch tray",
-          "why": "Switch tray BMC, two OOB 1GbE ports, console, CPLDs, clocks and NVSwitch VR loss outside the ASIC figure. Lenovo front/rear views show coolant, busbar and cartridge connectors and no fans. No public rail."
-        }
-      }
+      "pue": 1.3
     }
   }
 }

@@ -454,7 +454,13 @@ describe('GPUGraph', () => {
 });
 
 describe('GPU comparison power envelopes', () => {
-  function PowerComparison({ latency = false }: { latency?: boolean }) {
+  function PowerComparison({
+    latency = false,
+    normalized = false,
+  }: {
+    latency?: boolean;
+    normalized?: boolean;
+  }) {
     const [optimal, setOptimal] = useState(true);
     const [metric, setMetric] = useState('y_measuredAvgPower');
     const [activeDates, setActiveDates] = useState(new Set(['2026-09-09_h100', '2026-09-10_h100']));
@@ -511,7 +517,7 @@ describe('GPU comparison power envelopes', () => {
             xLabel={latency ? 'Latency' : 'Interactivity'}
             yLabel="Power"
             chartDefinition={createMockChartDefinition({
-              chartType: latency ? 'e2e' : 'interactivity',
+              chartType: latency || normalized ? 'e2e' : 'interactivity',
               [`${metric}_roofline`]: latency ? 'lower_left' : 'lower_right',
             })}
           />
@@ -556,6 +562,13 @@ describe('GPU comparison power envelopes', () => {
     cy.get('#gpu-power-curves .roofline-path').should('have.length', 1);
     cy.get('#gpu-power-curves .dot-group').should('have.length', 3);
     cy.get('#gpu-power-curves .line-label').should('have.length', 1);
+  });
+
+  // ChartDisplay draws E2E Normalized Interactivity on the e2e definition and
+  // flips the corner toward higher x.
+  it('keeps boundary measurements toward higher E2E Normalized Interactivity', () => {
+    mountGpuGraph(<PowerComparison normalized />);
+    cy.get('#gpu-power-curves .dot-group').should('have.length', 6);
   });
 
   it('keeps boundary measurements by default toward lower latency', () => {

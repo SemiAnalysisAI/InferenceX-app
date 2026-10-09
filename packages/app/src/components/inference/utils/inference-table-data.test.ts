@@ -67,7 +67,7 @@ describe('All in Measured table values', () => {
         selectedYAxisMetric: 'y_utilityModeledWatts',
       }),
     );
-    expect(html).toContain('Grace or module telemetry missing or invalid');
+    expect(html).toContain('Grace-socket telemetry missing or invalid');
     expect(html).toContain('450');
     expect(html).toContain('—');
     expect(html).not.toContain('NaN');
@@ -88,7 +88,7 @@ describe('All in Measured table values', () => {
     expect(csv.rows[0][csv.headers.indexOf('All in Measured')]).toBe('');
     expect(csv.rows[0][csv.headers.indexOf('Measured GPU Power (W/chip)')]).toBe(450);
     expect(csv.rows[0][csv.headers.indexOf('All-in Estimate Status')]).toBe(
-      'Grace or module telemetry missing or invalid',
+      'Grace-socket telemetry missing or invalid',
     );
     expect(csv.rows[0][csv.headers.indexOf('Interactivity')]).toBe('');
     const cloneCsv = inferenceChartToCsv(

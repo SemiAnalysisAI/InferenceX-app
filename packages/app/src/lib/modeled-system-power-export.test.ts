@@ -5,7 +5,10 @@ import {
   csv,
   type ComparisonInput,
 } from '../../scripts/export-modeled-system-power';
-import { estimateChassisPower, estimateRackPower } from '@/lib/system-power-model';
+import { estimateChassisPower } from '@/lib/system-power-model';
+
+const h200 = (gpuWatts: number) =>
+  estimateChassisPower('h200', gpuWatts, { workload: 'fixed-seq-len', scaleOut: false })!;
 
 // Original H200 c1, run 31672765610, artifact 9171086754; schema marker was absent.
 function input(): ComparisonInput {
@@ -86,26 +89,17 @@ describe('offline modeled PowerX comparisons', () => {
     const source = input();
     const before = structuredClone(source);
     const result = buildComparison(source);
-    expect(result.metadata.model.source).toBe('https://github.com/SemiAnalysisAI/InferenceX-app');
-    expect(result.metadata.model.modelRevision).toMatch(/^app-sha256:[0-9a-f]{64}$/u);
-    expect(result.rows[0].model_path).toBe('packages/app/src/lib/system-power-model.ts');
-    expect(result.rows[0].modeled.modelRevision).toBe(result.metadata.model.modelRevision);
-    expect(result.metadata.pue_override).toBeNull();
-    expect(result.metadata.pue_defaults).toEqual({ air_cooled_chassis: 1.3, dlc_nvl72_rack: 1.1 });
-    expect(result.metadata.model.assumptions.pue).toBe(1.2);
-    expect(result.rows[0].pue).toBe(1.3);
     expect(result.rows[0].modeled).toMatchObject({ pue: 1.3 });
-    expect(result.rows[0].assumptions).toMatchObject({ pue: 1.3 });
-    expect(result.cells[0].pue).toBe(1.3);
-    const overridden = buildComparison(source, 1.1);
-    expect(overridden.metadata.pue_override).toBe(1.1);
-    expect(overridden.rows[0]).toMatchObject({ pue: 1.1, modeled: { pue: 1.1 } });
     expect(result.rows[0].estimated_energy).toMatchObject({
       status: 'estimated',
       output_tokens: 9303,
       integration_seconds: 64.67805051803589,
-      chassis_ac_j_per_output_token: 26.8855733804468,
     });
+    // python -m power_model --gpu-level-power-per-gpu=229.002875 --system=h200: IT 3810.904 W.
+    expect(result.rows[0].estimated_energy.it_j_per_output_token).toBeCloseTo(
+      26.494877309376715,
+      9,
+    );
     expect(result.rows[0].measured_inputs?.gpu_j_per_output_token).toBe(12.736929);
     expect(result.rows[0].benchmark.metrics).not.toHaveProperty('power_metric_schema_version');
     expect(source).toEqual(before);
@@ -138,25 +132,25 @@ describe('offline modeled PowerX comparisons', () => {
     });
     const result = buildComparison(source);
     const row = result.rows[0];
-    const reference = estimateChassisPower('h200', entry.benchmark.metrics.avg_power_w * 8, 1.3)!;
+    const reference = h200(entry.benchmark.metrics.avg_power_w * 8);
     expect(row.modeled).toMatchObject({
       status: 'supported',
       gpuCount: 4,
       modeledGpuCount: 8,
       chassisBasis: 'extrapolated',
-      chassisAcWatts: reference.chassisAcWatts,
-      deploymentAcWatts: reference.chassisAcWatts / 2,
+      itWatts: reference.itWatts,
+      deploymentItWatts: reference.itWatts / 2,
     });
     expect(row.estimated_energy).toMatchObject({
       status: 'estimated',
-      chassis_ac_j: (reference.chassisAcWatts / 2) * w.integration_duration_s,
-      chassis_ac_j_per_output_token:
-        ((reference.chassisAcWatts / 2) * w.integration_duration_s) / w.total_output_tokens,
+      it_j: (reference.itWatts / 2) * w.integration_duration_s,
+      it_j_per_output_token:
+        ((reference.itWatts / 2) * w.integration_duration_s) / w.total_output_tokens,
     });
     expect(result.cells[0]).toMatchObject({
-      modeled_chassis_ac_w_mean: reference.chassisAcWatts,
-      modeled_chassis_ac_w_per_gpu_mean: reference.chassisAcWatts / 8,
-      modeled_deployment_ac_w_mean: reference.chassisAcWatts / 2,
+      modeled_it_w_mean: reference.itWatts,
+      modeled_it_w_per_gpu_mean: reference.itWatts / 8,
+      modeled_deployment_it_w_mean: reference.itWatts / 2,
       modeled_deployment_facility_w_mean: reference.facilityWatts / 2,
       modeled_facility_w_mean: reference.facilityWatts,
     });
@@ -210,29 +204,33 @@ describe('offline modeled PowerX comparisons', () => {
     second.benchmark.metrics.avg_total_gpu_power_w = 1848.074;
     source.rows.push(second);
     const result = buildComparison(source);
-    expect(result.cells[0].modeled_chassis_ac_w_mean).toBe(3875.6499999999996);
-    expect(result.cells[0].estimated_chassis_ac_j_per_output_token_mean).toBeNull();
+    expect(result.cells[0].modeled_it_w_mean).toBe(
+      (h200(1832.023).itWatts + h200(1848.074).itWatts) / 2,
+    );
+    expect(result.cells[0].estimated_it_j_per_output_token_mean).toBeNull();
     second.benchmark.metrics.power_valid = 0;
     const invalid = buildComparison(source);
     expect(invalid.rows).toHaveLength(2);
     expect(invalid.rows[1].measured_inputs).toBeNull();
     expect(invalid.rows[1].raw_input).toMatchObject({ metrics: { avg_power_w: 231.009 } });
-    expect(invalid.cells[0].modeled_chassis_ac_w_mean).toBeNull();
+    expect(invalid.cells[0].modeled_it_w_mean).toBeNull();
     second.benchmark.hardware = 'b200';
     expect(() => buildComparison(source)).toThrow('different benchmark configurations');
   });
 
-  it('routes GB200 NVL72 rows through the tray estimate with the DLC PUE and leaves x86 rows unchanged', () => {
+  it('exports measured Grace inputs for NVL72 rows and leaves x86 rows unchanged', () => {
     const source = input();
     const baseline = buildComparison(structuredClone(source));
-    // One GB200 compute tray on the module basis, as the dashboard would receive it.
+    // One GB200 compute tray with Grace-socket telemetry, as the dashboard would receive it.
     const gb200 = structuredClone(source.rows[0]);
     gb200.id = 'gb200:tray';
     gb200.cell = 'gb200:c1';
     gb200.audit = undefined;
     Object.assign(gb200.benchmark, {
       hardware: 'gb200',
-      power_audit: { cpu: { sensor_kind: 'module', expected_sockets: 2, observed_sockets: 2 } },
+      power_audit: {
+        cpu: { sensor_kind: 'grace_socket', expected_sockets: 2, observed_sockets: 2 },
+      },
       framework: 'dynamo-trt',
       prefill_tp: 4,
       decode_tp: 4,
@@ -248,69 +246,38 @@ describe('offline modeled PowerX comparisons', () => {
         avg_total_gpu_power_w: 3601,
         avg_cpu_socket_power_w: 250.5,
         avg_total_cpu_power_w: 501,
-        avg_total_module_power_w: 4300.75,
-        total_module_energy_j: 258045,
+        total_cpu_energy_j: 30060,
       },
     });
     source.rows.push(gb200);
     const result = buildComparison(source);
-    const rack = estimateRackPower('gb200', { basis: 'module', moduleWattsPerTray: 4300.75 }, 1.1)!;
     expect(result.rows[1]).toMatchObject({
-      pue: 1.1,
-      measured_basis: 'module',
-      sensor_kind: 'module',
-      model_path: 'packages/app/src/lib/system-power-model.ts',
-      assumptions: { u_nvlink: 0.5, pue: 1.1 },
       measured_inputs: {
         avg_gpu_w: 900.25,
         cpu_power_valid: 1,
         total_grace_w: 501,
-        total_module_w: 4300.75,
-        total_module_j: 258045,
+        total_grace_j: 30060,
       },
-      modeled: {
-        status: 'supported',
-        topologyBasis: 'nvl72-trays',
-        pue: 1.1,
-        chassisAcWatts: rack.rackAcWatts / 18,
-        facilityWatts: rack.facilityWatts / 18,
-      },
-    });
-    expect(result.rows[1].calculation_boundary).toContain('NVL72');
-    expect(result.rows[1].extrapolation_note).toContain('tray');
-    expect(result.cells[1]).toMatchObject({
-      cell: 'gb200:c1',
-      pue: 1.1,
-      measured_bases: ['module'],
-      modeled_chassis_ac_w_mean: rack.rackAcWatts / 18,
+      modeled: { status: 'unsupported', reason: 'hardware' },
     });
     // The x86 row and its cell are byte-identical to an export without the NVL72 row.
     expect(result.rows[0]).toEqual(baseline.rows[0]);
     expect(result.cells[0]).toEqual(baseline.cells[0]);
-    expect(result.rows[0].measured_inputs).not.toHaveProperty('total_module_w');
-    expect(result.rows[0]).toMatchObject({ measured_basis: null, sensor_kind: null });
-    // An explicit --pue still overrides every row, rack and chassis alike.
-    const overridden = buildComparison(source, 1.3);
-    expect(overridden.rows.map((row) => row.pue)).toEqual([1.3, 1.3]);
-    expect(overridden.rows[1].modeled).toMatchObject({ pue: 1.3, topologyBasis: 'nvl72-trays' });
-    // Without cpu_power_valid the row stays unavailable and reports no CPU-side inputs.
+    expect(result.rows[0].measured_inputs).not.toHaveProperty('total_grace_w');
+    // Without cpu_power_valid the row reports no Grace-side inputs.
     delete gb200.benchmark.metrics.cpu_power_valid;
     const unavailable = buildComparison(source).rows[1];
     expect(unavailable.modeled).toMatchObject({ status: 'unsupported', reason: 'cpu-telemetry' });
     expect(unavailable.measured_inputs).toMatchObject({
       cpu_power_valid: null,
-      total_module_w: null,
+      total_grace_w: null,
     });
   });
 
   it('retains unsupported hardware and missing values, and escapes CSV text', () => {
     const source = input();
     source.rows[0].benchmark.hardware = 'H200';
-    expect(buildComparison(source).rows[0]).toMatchObject({
-      assumptions: { u_cpu: 0.2 },
-      model_path: 'packages/app/src/lib/system-power-model.ts',
-    });
-    // NVL72 rows need the schema-v2 contract; the unversioned exception is x86 single-node only.
+    expect(buildComparison(source).rows[0].modeled).toMatchObject({ status: 'supported' });
     source.rows[0].benchmark.hardware = 'gb200';
     expect(buildComparison(source).rows[0].modeled).toMatchObject({
       status: 'unsupported',

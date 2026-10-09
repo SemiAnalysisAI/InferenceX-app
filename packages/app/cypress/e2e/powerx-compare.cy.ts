@@ -317,7 +317,7 @@ describe('AgentX All in Measured chart and table', () => {
         .first()
         .should(
           'contain.text',
-          locale === 'en' ? 'not been independently calibrated' : '尚未针对 AgentX',
+          locale === 'en' ? 'not been calibrated against measured AgentX' : '尚未用 AgentX',
         );
       // A fixed page header otherwise repeats over the stitched element capture.
       cy.get('header').invoke('css', 'visibility', 'hidden');
@@ -339,8 +339,8 @@ describe('AgentX All in Measured chart and table', () => {
             expect(row.textContent).to.contain('450').and.contain('—');
             expect(row.textContent).to.contain(
               locale === 'en'
-                ? 'Grace or module telemetry missing or invalid'
-                : 'Grace 或 module 遥测缺失或无效',
+                ? 'Grace-socket telemetry missing or invalid'
+                : 'Grace socket 遥测缺失或无效',
             );
           }
         });
@@ -388,7 +388,7 @@ describe('AgentX All in Measured chart and table', () => {
           expect(row[10]).to.equal('');
           expect(row[columns.indexOf('Measured GPU Power (W/chip)')]).to.equal('450');
           expect(row[columns.indexOf('All-in Estimate Status')]).to.equal(
-            'Grace or module telemetry missing or invalid',
+            'Grace-socket telemetry missing or invalid',
           );
         }
       });

@@ -494,8 +494,7 @@ describe('ScatterGraph', () => {
       'be.visible',
     );
     cy.contains('No measurements to plot for this selection.').should('not.exist');
-    cy.contains('NVL72 also needs complete Grace or module telemetry').should('be.visible');
-    cy.contains('not NVL72 systems').should('not.exist');
+    cy.contains('eight-GPU HGX/OAM systems, not NVL72').should('be.visible');
     cy.screenshot('nvl72-empty-en-desktop', { overwrite: true });
   });
 
@@ -527,8 +526,7 @@ describe('ScatterGraph', () => {
 
     cy.contains('当前选择没有可用的整体实测功耗数值。').should('be.visible');
     cy.contains('当前选择没有可绘制的测量数据。').should('not.exist');
-    cy.contains('NVL72 还需要同一测量窗口内完整的 Grace 或 module 遥测').should('be.visible');
-    cy.contains('不含 NVL72 系统').should('not.exist');
+    cy.contains('八卡 HGX/OAM 系统，不含 NVL72').should('be.visible');
     cy.screenshot('nvl72-empty-zh-mobile', { overwrite: true });
   });
 
@@ -1797,7 +1795,7 @@ describe('ScatterGraph', () => {
 
 describe('ChartDisplay modeled power disclosures', () => {
   for (const locale of ['en', 'zh'] as const) {
-    it(`explains NVL72 telemetry and cooling PUE without hiding its modeled point (${locale})`, () => {
+    it(`states the air-cooled PUE and the NVL72 omission without overflow (${locale})`, () => {
       const point = createMockInferenceData({
         hwKey: 'gb200',
         hw: 'NVIDIA GB200',
@@ -1836,20 +1834,18 @@ describe('ChartDisplay modeled power disclosures', () => {
         cy.get('[data-testid="power-basis-assumptions"]')
           .should('be.visible')
           .and('contain.text', 'PUE 1.3')
-          .and('contain.text', 'PUE 1.1')
-          .and('contain.text', 'Grace')
-          .and('not.contain.text', 'app-sha')
+          .and('not.contain.text', 'PUE 1.1')
           .and(
-            'not.contain.text',
+            'contain.text',
             locale === 'en'
-              ? 'NVL72 systems (GB200, GB300) and points without values are omitted'
+              ? 'NVL72 systems (GB200, GB300) and points without values are omitted from the chart'
               : 'NVL72 系统（GB200、GB300）及缺少数值的数据点不绘制',
           )
           .should(($note) => {
             expect($note[0].scrollWidth).to.be.at.most($note[0].clientWidth);
           });
         cy.get('.dot-group .visible-shape').should('exist');
-        cy.screenshot(`nvl72-boundary-${locale}-${width}`, { overwrite: true });
+        cy.screenshot(`all-in-measured-boundary-${locale}-${width}`, { overwrite: true });
       }
     });
   }
@@ -2643,7 +2639,13 @@ describe('Power envelopes', () => {
     });
   }
 
-  function PowerHarness({ singleConfiguration = false }: { singleConfiguration?: boolean }) {
+  function PowerHarness({
+    singleConfiguration = false,
+    normalized = false,
+  }: {
+    singleConfiguration?: boolean;
+    normalized?: boolean;
+  }) {
     const [optimal, setOptimal] = useState(true);
     const [gradientLabels, setGradientLabels] = useState(false);
     const [metric, setMetric] = useState('y_measuredAvgPower');
@@ -2688,7 +2690,7 @@ describe('Power envelopes', () => {
       hwTypesWithData: new Set(['b200_trt']),
     });
     const definition = createMockChartDefinition({
-      chartType: 'interactivity',
+      chartType: normalized ? 'e2e' : 'interactivity',
       [`${metric}_roofline`]: 'lower_right',
     });
     return (
@@ -2987,6 +2989,15 @@ describe('Power envelopes', () => {
     cy.get('#power-sweep .parallelism-label .pl-text')
       .should('have.length', 1)
       .and('have.text', 'TP2');
+  });
+
+  // ChartDisplay draws E2E Normalized Interactivity on the e2e definition and
+  // flips the corner toward higher x.
+  it('starts the power boundary at the high E2E Normalized Interactivity end', () => {
+    mountWithProviders(<PowerHarness normalized />, { unofficial: {} });
+    cy.get('#power-sweep .dot-group')
+      .filter((_, element) => element.style.opacity !== '0')
+      .should('have.length', 3);
   });
 
   it('keeps a fixed measured-power boundary while Optimal Only changes measurement visibility', () => {
