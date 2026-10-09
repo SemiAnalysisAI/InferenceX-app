@@ -6,16 +6,17 @@ import { LANDING_META } from '@/lib/tab-meta';
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
 
 export const metadata: Metadata = {
-  title: LANDING_META.title,
+  // Absolute, so the root layout's `| InferenceX by SemiAnalysis` template is not appended.
+  title: { absolute: `${LANDING_META.title} | ${LANDING_META.brand}` },
   description: LANDING_META.description,
   alternates: enAlternates('/'),
   openGraph: {
-    title: `${LANDING_META.title} | InferenceX`,
+    title: `${LANDING_META.title} | AcceleratorX`,
     description: LANDING_META.description,
     url: SITE_URL,
   },
   twitter: {
-    title: `${LANDING_META.title} | InferenceX`,
+    title: `${LANDING_META.title} | AcceleratorX`,
     description: LANDING_META.description,
   },
 };
