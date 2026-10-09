@@ -25,7 +25,7 @@ import tarfile
 import tempfile
 
 sys.dont_write_bytecode = True
-REVISION = "c4adf83c3bab29e258d94e9d5e7e67432f5edd46"
+REVISION = "ebbf89d9d9491757e62a403d99403f76f7fb7b7c"
 SOURCE_PATH = "power_model"
 SOURCE_URL = f"https://github.com/SemiAnalysisAI/InferenceX/tree/{REVISION}/{SOURCE_PATH}"
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -274,7 +274,8 @@ def rack_profile(system):
         watts = dict(empty.details)["dc_component_power_w"]
         if auxiliary.setdefault(flag(scale_out), watts) != watts:
             raise SystemExit(f"{system} tray auxiliaries depend on the workload state")
-        heat = tray.board.air_heat_w(state)
+        board = tray.board.estimate_breakdown(0.0, operating_state=state)
+        heat = dict(board.details)["air_heat_w"]
         if board_air.setdefault(workload, heat) != heat:
             raise SystemExit(f"{system} board air heat depends on scale-out")
         watts = math.fsum(
