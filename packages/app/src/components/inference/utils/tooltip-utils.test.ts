@@ -210,18 +210,26 @@ describe('modeled system-power tooltip', () => {
   });
 
   it('preserves the same model provenance in unofficial and date-comparison tooltips', () => {
-    const official = config();
-    const overlay = generateOverlayTooltipContent({
-      ...official,
-      overlayData: {
-        label: 'PowerX comparison',
-        hardwareConfig: mockHardwareConfig,
-      } as OverlayTooltipConfig['overlayData'],
-    });
-    for (const html of [overlay, generateGPUGraphTooltipContent(official)]) {
-      expect(html).toContain('500 W/GPU');
-      expect(html).toContain('750 W/GPU');
-      expect(html).toContain(systemPower.modelRevision);
+    const cases: [InferenceData, string[]][] = [
+      [pt({ modeledSystemPower: systemPower }), ['500 W/GPU', '750 W/GPU', 'PUE 1.2']],
+      [
+        pt({ hwKey: 'gb300', modeledSystemPower: modelSystemPower(gb300DisaggRow()) }),
+        ['2 full NVL72 compute trays · 8 GPUs', '98.066 W/socket', 'PUE 1.1'],
+      ],
+    ];
+    for (const [data, expected] of cases) {
+      const official = config({ data });
+      const overlay = generateOverlayTooltipContent({
+        ...official,
+        overlayData: {
+          label: 'PowerX comparison',
+          hardwareConfig: mockHardwareConfig,
+        } as OverlayTooltipConfig['overlayData'],
+      });
+      for (const html of [overlay, generateGPUGraphTooltipContent(official)]) {
+        for (const text of expected) expect(html).toContain(text);
+        expect(html).toContain(SYSTEM_POWER_MODEL_REVISION);
+      }
     }
   });
 
