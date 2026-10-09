@@ -138,7 +138,7 @@ describe('modeled system-power tooltip', () => {
       ...overrides,
     });
 
-  it('separates measured input, normalized chassis AC, and whole-deployment facility power', () => {
+  it('separates measured input, normalized IT power, and whole-deployment facility power', () => {
     const html = generateTooltipContent(config());
     expect(html).toContain('500 W/GPU');
     expect(html).toContain('750 W/GPU');
@@ -146,7 +146,7 @@ describe('modeled system-power tooltip', () => {
     expect(html).toContain('14,400 W');
     expect(html).toContain('PUE 1.2');
     expect(html).toContain('2 full eight-GPU chassis · 16 GPUs');
-    expect(html).toContain('CPU/DRAM utilization: 20%');
+    expect(html).toContain('Operating state:</strong> agentic · scale-out on');
     expect(html).toContain(
       'Includes GPU chassis CPUs; excludes separate CPU-only frontend/router hosts.',
     );
@@ -235,10 +235,10 @@ describe('modeled system-power tooltip', () => {
   it('localizes the measurement boundary and occupancy assumptions', () => {
     const html = generateTooltipContent(config({ locale: 'zh' }));
     expect(html).toContain('GPU 实测功耗');
-    expect(html).toContain('整个部署的机箱交流功耗估算');
+    expect(html).toContain('整个部署的 IT 功耗估算');
     expect(html).toContain('数据中心功耗估算');
     expect(html).toContain('2 个完整八卡机箱 · 16 张 GPU');
-    expect(html).toContain('CPU/DRAM 利用率：20%');
+    expect(html).toContain('运行状态：</strong> 智能体 · scale-out 开启');
     expect(html).toContain('计入 GPU 机箱内的 CPU');
     expect(html).toContain('不计入独立的纯 CPU 前端或路由主机。');
   });

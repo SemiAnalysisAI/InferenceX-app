@@ -40,8 +40,8 @@ export const ALL_IN_MEASURED_NOTE = {
 };
 
 export const ALL_IN_MEASURED_EMPTY = {
-  en: 'No values are available for All in Measured in this selection. This boundary needs 8K / 1K, validated GPU telemetry, and hardware covered by the chassis power model (not NVL72 systems). Choose another boundary to keep the points.',
-  zh: '当前选择没有可用的整体实测功耗数值。该边界需要 8K / 1K 场景、已验证的 GPU 遥测，且硬件在机箱功耗模型覆盖范围内（不含 NVL72 系统）。可切换到其他功耗边界以保留数据点。',
+  en: 'No values are available for All in Measured in this selection. This boundary needs validated GPU telemetry and hardware covered by the InferenceX power model (eight-GPU HGX/OAM systems, not NVL72). Choose another boundary to keep the points.',
+  zh: '当前选择没有可用的整体实测功耗数值。该边界需要已验证的 GPU 遥测，且硬件在 InferenceX 功耗模型覆盖范围内（八卡 HGX/OAM 系统，不含 NVL72）。可切换到其他功耗边界以保留数据点。',
 };
 
 /** InferenceData keys per derived basis and quantity. B1 lives on the measured* fields. */

@@ -53,8 +53,8 @@ export type SystemPowerEstimate =
        * 'full': every chassis had all eight GPUs measured. 'extrapolated': at least
        * one chassis was partially allocated; its model input is the measured per-GPU
        * power × 8, assuming the unmeasured GPUs run the same workload. This is the
-       * source README sweep's own n_gpu × W/GPU input, not a proportional share of a
-       * chassis evaluated at partial load.
+       * upstream model's full-chassis input, not a proportional share of a chassis
+       * evaluated at partial load.
        */
       chassisBasis: 'full' | 'extrapolated';
     };

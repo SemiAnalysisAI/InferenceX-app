@@ -387,7 +387,7 @@ export interface InferenceData extends Partial<Omit<AggDataEntry, AggDataConflic
    * allocated GPU, so it is (P + D) / D × `jOutput` on disaggregated rows.
    */
   utilityProvisionedJPerOutputToken?: { y: number; roof: boolean };
-  /** B4 W/GPU: modeled deployment facility watts (chassis AC × PUE, applied once) ÷ measured GPUs. */
+  /** B4 W/GPU: modeled deployment facility watts (IT × PUE, applied once) ÷ measured GPUs. */
   utilityModeledWatts?: { y: number; roof: boolean };
   /** B4 J/out: B1 `joules_per_output_token` × (B4 W ÷ B1 W); inherits B1's token denominator. */
   utilityModeledJPerOutputToken?: { y: number; roof: boolean };

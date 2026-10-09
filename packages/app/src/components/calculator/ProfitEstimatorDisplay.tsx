@@ -220,7 +220,7 @@ const STRINGS = {
       modeled: POWER_BASIS_LABELS['utility-modeled'].en,
       extrapolated: 'Full-chassis extrapolation',
     },
-    powerPreview: `${ALL_IN_MEASURED_NOTE.en} AgentX system power is not yet qualified.`,
+    powerPreview: `${ALL_IN_MEASURED_NOTE.en} Host power follows the AgentX workload state, including whether KV cache offload is on.`,
     powerDetails:
       'GPU power is interpolated between the same throughput points. Includes PUE 1.3 and 10% headroom. Full-chassis extrapolation fills an eight-GPU server with replicas of the measured 1/2/4-GPU workload at the same per-GPU power and throughput; it does not measure a partly idle server.',
     unavailableEstimates: (count: number) => `Unavailable estimates (${count})`,
@@ -351,7 +351,7 @@ const STRINGS = {
       modeled: POWER_BASIS_LABELS['utility-modeled'].zh,
       extrapolated: '整机外推',
     },
-    powerPreview: `${ALL_IN_MEASURED_NOTE.zh} AgentX 系统功耗模型尚未完成验证。`,
+    powerPreview: `${ALL_IN_MEASURED_NOTE.zh} 主机功耗按 AgentX 工作负载状态建模，并区分是否启用 KV cache offload。`,
     powerDetails:
       'GPU 功耗在相同的吞吐量数据点间插值，计入 PUE 1.3 和 10% 功耗余量。整机外推假设八卡服务器部署多个相同的实测单卡、双卡或四卡实例，每卡功耗和吞吐量保持不变；它不代表部分 GPU 闲置时的整机实测功耗。',
     unavailableEstimates: (count: number) => `无法估算（${count} 项）`,
