@@ -49,6 +49,33 @@ const seo = (doc: Document) => [
 ];
 
 describe('optional themes stay off the default page', () => {
+  for (const route of ['/', '/zh']) {
+    it(`${route} migrates a retired kart preference and keeps the picker usable`, () => {
+      const requests: string[] = [];
+      cy.intercept('GET', '**', (request) => {
+        requests.push(request.url);
+      });
+      cy.visit(route, {
+        onBeforeLoad(win) {
+          win.localStorage.setItem('theme', 'kart');
+        },
+      });
+      cy.get('html').should('have.class', 'dark').and('not.have.class', 'kart');
+      cy.window().should((win) => expect(win.localStorage.getItem('theme')).to.equal('dark'));
+      cy.get('[data-testid="theme-toggle"]').click();
+      cy.get('[data-testid="theme-option-kart"]').should('not.exist');
+      cy.get('[data-testid="theme-menu"] [role="radio"]').should('have.length', 7);
+      cy.get('[data-testid="theme-option-light"]').click();
+      cy.get('html').should('have.class', 'light').and('not.have.class', 'kart');
+      cy.reload();
+      cy.get('html').should('have.class', 'light').and('not.have.class', 'kart');
+      cy.then(() => {
+        expect(requests.filter((url) => url.includes('/decorative/kart/'))).to.deep.equal([]);
+      });
+      expectNoOptionalResources(requests);
+    });
+  }
+
   for (const [theme, route, width] of [
     ['light', '/', 1440],
     ['dark', '/', 390],

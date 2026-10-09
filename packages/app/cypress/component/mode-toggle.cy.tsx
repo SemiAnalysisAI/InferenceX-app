@@ -8,7 +8,6 @@ const ICONS: Record<string, string> = {
   minecraft: 'lucide-pickaxe',
   csgo: 'lucide-crosshair',
   gta: 'lucide-car',
-  kart: 'lucide-flag',
   doom: 'lucide-skull',
   halo: 'lucide-shield',
 };
@@ -39,6 +38,7 @@ describe('ModeToggle', () => {
       .click()
       .should('have.attr', 'aria-expanded', 'true');
     cy.get('[data-testid="theme-menu"] [role="radio"]').should('have.length', APP_THEMES.length);
+    cy.get('[data-testid="theme-option-kart"]').should('not.exist');
     for (const theme of APP_THEMES) {
       cy.get(`[data-testid="theme-option-${theme}"]`)
         .should('have.attr', 'aria-label')
@@ -53,7 +53,7 @@ describe('ModeToggle', () => {
   });
 
   it('selects any theme directly and closes the menu', () => {
-    for (const theme of ['kart', 'doom', 'halo', 'gta', 'minecraft', 'dark', 'csgo', 'light']) {
+    for (const theme of ['doom', 'halo', 'gta', 'minecraft', 'dark', 'csgo', 'light']) {
       pick(theme);
       cy.get('html').should('have.class', theme);
       cy.get('[data-testid="theme-menu"]').should('not.exist');
