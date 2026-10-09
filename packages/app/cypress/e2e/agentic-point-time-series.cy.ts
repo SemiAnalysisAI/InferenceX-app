@@ -150,6 +150,34 @@ describe('Agentic point request metric time series', () => {
     cy.contains('button', 'TP8/DCP8 • c=8').should('be.visible');
   });
 
+  it('opens memory without a trace and preserves the view in the URL', () => {
+    cy.intercept('GET', '/api/v1/agentic-memory?id=206885', {
+      id: 206885,
+      model: 'kimik3',
+      framework: 'vllm',
+      hardware: 'b300',
+      date: '2026-08-15',
+      image: null,
+      conc: 8,
+      disagg: false,
+      ranks: [],
+      files: [],
+      filesOmitted: 0,
+      status: 'missing',
+      kvPoolTokens: null,
+      kvUsageMaxFraction: null,
+    }).as('memory');
+    cy.get('[data-testid="detail-view-memory"]').click();
+    cy.wait('@memory');
+    cy.location('search').should('contain', 'view=memory');
+    cy.contains('No supported allocation report').should('be.visible');
+    cy.reload();
+    cy.get('[data-testid="memory-view"]').should('be.visible');
+    cy.contains('No supported allocation report').should('be.visible');
+    cy.get('[data-testid="detail-view-point"]').click();
+    cy.location('search').should('not.contain', 'view=memory');
+  });
+
   it('opens the stored server log and loads it incrementally', () => {
     const longServerLogPath =
       'agentic/conc_1152/aiperf_artifacts/logs/aiperf/2026-08-20/server.log';

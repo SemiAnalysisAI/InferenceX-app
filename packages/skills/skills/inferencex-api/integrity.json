@@ -3,7 +3,7 @@
   "package_version": "1.1.0",
   "files": {
     "SKILL.md": "7710946ab835ba9943ad6f2b9b549b7a1c0b520e9661e3c6b563bd1ec5446666",
-    "references/agentx.md": "8144ab786a66f2a9be1b1534cb06fe4ef62b402717a22f260be8a4d9362c735b",
+    "references/agentx.md": "dafdda84443b385437bb99a67a2be4e0c43b25aed1ff99ac06a3268ea4bcda60",
     "references/chart-templates.md": "aed6854627142019a4a5df4a2d07523b1a64e5814dd2bbdcc74ee18beb083912",
     "references/cli-contract.md": "fa44faa38d889b4fbdee5ba42752b47758ee3706fab150513bd4e6db87a86cb0",
     "references/cli.md": "96b228f34cb3600f4548f4dc84df8506531747286763c56ca834c77bee05e1eb",

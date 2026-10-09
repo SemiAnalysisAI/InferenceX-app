@@ -19,8 +19,8 @@
  * grows another chart.
  */
 export const AGENTIC_DETAIL_SURFACE = {
-  /** SegmentedToggle options: per-point, request timeline, aggregates. */
-  views: 3,
+  /** SegmentedToggle options: per-point, timeline, aggregates, logs, memory. */
+  views: 5,
   /** Cards in the per-point grid, in render order. */
   perPointCharts: [
     'input-sequence-length',
@@ -126,11 +126,11 @@ export const AGENTX_TELEMETRY_GUIDE: TelemetryGuide = {
   lead: 'A single AgentX datapoint represents thousands of requests across growing conversations, subagents, warmup periods, cache states, and dynamically changing in-flight load. This is how to open one up.',
   intro: [
     'AgentX required more than a new benchmark harness and dataset. We also spent some time rebuilding parts of the InferenceX visualization to make agentic results easier to explore and digest. A single point on a Pareto curve can hide a lot of useful information, so every point on an AgentX chart is now a doorway into the run behind it.',
-    'This tutorial walks through what that doorway leads to: how the curves themselves are constructed, what the point tooltip exposes, the eleven per-point telemetry charts on the detail page, the request timeline, and the per-conversation flamegraph on the AgentX dataset pages.',
+    'This tutorial walks through what that doorway leads to: how the curves themselves are constructed, what the point tooltip exposes, the eleven per-point telemetry charts on the detail page, the request timeline, and the per-conversation flamegraph on the AgentX dataset pages. The Logs tab exposes stored runtime output; Memory compares reported startup allocations across concurrency for the same run and topology. Missing memory components remain unknown.',
   ],
   highlights: [
     { value: '11', label: 'per-point telemetry charts' },
-    { value: '3', label: 'views per point' },
+    { value: '5', label: 'views per point' },
     { value: '2', label: 'replay stages' },
     { value: '1', label: 'curve per model, SKU, and engine' },
   ],

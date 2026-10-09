@@ -68,6 +68,40 @@ whole-deployment energy, or rank energy.
 
 ## Start with AgentX
 
+### Startup memory across concurrency
+
+Open `/inference/agentic/<id>?view=memory` (or `/zh/inference/agentic/<id>?view=memory`).
+Read the same values through `GET /api/v1/agentic-memory?id=<id>`.
+This is a beta diagnostic for every AgentX model; verified parser families are
+vLLM and SGLang. Other frameworks return `status: unsupported`, not zeros.
+
+Use `benchmark-siblings?id=<id>` for the same-run comparison set. The UI keeps
+only aggregated-serving rows whose prefill/decode TP, EP, PP, DCP, PCP, DP-attention,
+worker counts, GPU counts, multinode flag and offload mode equal the selected
+point. Sort by `conc`, then ID; each page has eight points. Concurrency is client
+count, not batch size. Inspect `image` in each memory response before attributing
+a difference to concurrency; do not silently combine different images or dates.
+
+Each `ranks` entry retains file, rank, process, `totalGiB`, `gib`, `percent`,
+`weightBasis`, `conflicts`, and source line evidence. Values remain per reporting
+worker. `percent = gib / totalGiB * 100`; without a reported device total,
+percentages are null. SGLang `GB` allocation logs use binary GiB; its weight and
+graph measurements are free-memory deltas, not exact resident tensor bytes.
+Never normalize to the sum of known components or fill missing values with zero.
+Repeated ambiguous SGLang allocation labels are null with conflicts.
+
+Scan coverage is bounded to the first 262144 characters of up to 16 files;
+`files[].truncated` and `filesOmitted` report the limits. `reported` means some
+recognized evidence exists, not complete GPU coverage or a complete memory census.
+Open the Logs view when a report is missing. Capacity budgets and virtual-address
+upper bounds are excluded. `kvPoolTokens` and `kvUsageMaxFraction` remain separate:
+the latter is the maximum across reporting series, not an average GPU or a
+simultaneous deployment total. No tokens-to-bytes conversion is made.
+
+The GiB/% control is presentation-only: both values are in the API response.
+Unpersisted unofficial overlays have no DB ID or stored startup logs and are
+excluded from this diagnostic. No new benchmark or ingestion write is performed.
+
 First discover the replay data using the installed
 [dataset cookbook](public-api-examples.md#dataset-discovery-and-conversation-inspection),
 then export available AgentX observations. Start with this request:
