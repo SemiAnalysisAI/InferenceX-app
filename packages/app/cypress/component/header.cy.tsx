@@ -181,6 +181,7 @@ describe('Header', () => {
       'AgentX',
       'Overview',
       'Dashboard',
+      'ubenchX',
       'Comparisons',
       'Articles',
       'About',
