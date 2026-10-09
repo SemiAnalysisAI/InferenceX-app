@@ -24,10 +24,12 @@ import { mountWithProviders } from '../support/test-utils';
 const OVERLAY_RUN_ID = 31415926535;
 const OVERLAY_RUN_URL = `https://github.com/SemiAnalysisAI/InferenceX/actions/runs/${OVERLAY_RUN_ID}`;
 const hwConfig = createMockHardwareConfig();
+// `lower_right` is what the registry resolves for a lower-is-better metric on
+// the interactivity chart; the power envelope walks from that corner.
 const chartDefinition = createMockChartDefinition({
   chartType: 'interactivity',
   y_measuredAvgPower: 'measuredAvgPower.y',
-  y_measuredAvgPower_roofline: 'lower_left',
+  y_measuredAvgPower_roofline: 'lower_right',
 });
 
 const metric = (y: number) => ({ y, roof: false });
