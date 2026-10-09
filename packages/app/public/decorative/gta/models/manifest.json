@@ -9,6 +9,44 @@
     "images": 10
   },
   {
+    "file": "asea-lod.glb",
+    "bytes": 213712,
+    "sha256": "057ef894aecc8d730e0720105e7208f55de5a71ca16efa4609f6bb144d4bb397",
+    "originalBytes": 6190964,
+    "originalSha256": "a3017c39d9d7a182773aae79d625ede59e1ae9521d421c6f6e4308189ad883d6",
+    "meshes": 13,
+    "images": 11,
+    "lodOf": "asea.glb"
+  },
+  {
+    "file": "asea.glb",
+    "bytes": 314628,
+    "sha256": "09d580723227a271ede99fde340e08970af08683f51c3872f5492d543731575b",
+    "originalBytes": 6190964,
+    "originalSha256": "a3017c39d9d7a182773aae79d625ede59e1ae9521d421c6f6e4308189ad883d6",
+    "meshes": 14,
+    "images": 11
+  },
+  {
+    "file": "baller-lod.glb",
+    "bytes": 117076,
+    "sha256": "c71bab15c2f789bb99789853f5868965b1b7e43e181fac92371dbb12cd4d62fd",
+    "originalBytes": 5950204,
+    "originalSha256": "6591b829c7ce530a4695598d535690f6721c63275f8bbfa578a590dd80aa1e7e",
+    "meshes": 10,
+    "images": 9,
+    "lodOf": "baller.glb"
+  },
+  {
+    "file": "baller.glb",
+    "bytes": 220852,
+    "sha256": "b2071874fffb62adab9e9a9bd4280d4a3e28a02200c49ca39c2819f9e2c8d055",
+    "originalBytes": 5950204,
+    "originalSha256": "6591b829c7ce530a4695598d535690f6721c63275f8bbfa578a590dd80aa1e7e",
+    "meshes": 11,
+    "images": 9
+  },
+  {
     "file": "bench.glb",
     "bytes": 139200,
     "sha256": "1d3c0aeff22f33527504f23b9d7c4e7f315bf94c5181d81f282fd9c2dcdedbf5",
@@ -25,6 +63,14 @@
     "originalSha256": "23b4c8becfbf352d88a07d5d18937a0878032bfb57f3c7d14019306d4a7242a8",
     "meshes": 4,
     "images": 2
+  },
+  {
+    "file": "blista-lod.glb",
+    "bytes": 136528,
+    "sha256": "5dee84b1e0fd48df03e02b6c9bee5aef4a6729f1002ff2aeb0c11e77ba3bf9b1",
+    "meshes": 11,
+    "images": 10,
+    "lodOf": "blista.glb"
   },
   {
     "file": "blista.glb",
@@ -45,22 +91,51 @@
     "images": 9
   },
   {
-    "file": "cone.glb",
-    "bytes": 10236,
-    "sha256": "db023049a9f79c8598f5914eadd02cee17bae4b7eeb6f01bded7be1269f0cee6",
-    "originalBytes": 10220,
-    "originalSha256": "cdfbc1030fa5964aff2d72acbc80d1bbed2f0ab01babe7cbf195d416f6e96065",
-    "meshes": 1,
-    "images": 0
+    "file": "bus-lod.glb",
+    "bytes": 168772,
+    "sha256": "108ac37dc7005d0e1f26d5c8e9a43c61ced944ea356298973a5a93a659332c88",
+    "originalBytes": 6119760,
+    "originalSha256": "229acf83e37279cd8bbbfe70d2ca7fa6548a6c8c016714f3e772e162cac37176",
+    "meshes": 8,
+    "images": 10,
+    "lodOf": "bus.glb"
   },
   {
-    "file": "dumpster.glb",
-    "bytes": 266940,
-    "sha256": "80f2a08ebaa77e399cb2e6bb6333660b8af63e7d4d8cc37ea51a81b0b97bc311",
-    "originalBytes": 322656,
-    "originalSha256": "aea48a3912ac1e1d594c9a2af6f5384a3a1dbcffdad8999e3215f321a8a3e73c",
-    "meshes": 2,
-    "images": 2
+    "file": "bus.glb",
+    "bytes": 343056,
+    "sha256": "a83e030e0fc41af2cd20883e6c71bdbe5d99cff40f8a8c5187f3ab6e331d0ae2",
+    "originalBytes": 6119760,
+    "originalSha256": "229acf83e37279cd8bbbfe70d2ca7fa6548a6c8c016714f3e772e162cac37176",
+    "meshes": 11,
+    "images": 10
+  },
+  {
+    "file": "busstop.glb",
+    "bytes": 76112,
+    "sha256": "4022bb6b2975c81f3fae27f67ca3571d15cb3d541819fe649506136306dd8b66",
+    "originalBytes": 361548,
+    "originalSha256": "3fa7a4f69eaf377f1588f5cf95d98ab4ef7f3863a2e318785629070926901ad4",
+    "meshes": 3,
+    "images": 3
+  },
+  {
+    "file": "dilettante-lod.glb",
+    "bytes": 134652,
+    "sha256": "7bb7c233cb7bdc2130bee61dc060900bfc01df4f60559affa8db35bc588017d7",
+    "originalBytes": 5885416,
+    "originalSha256": "98006c5523dbc72165836beeec6e617fe24f5b25171ff6d2d10382c57a7115f2",
+    "meshes": 9,
+    "images": 9,
+    "lodOf": "dilettante.glb"
+  },
+  {
+    "file": "dilettante.glb",
+    "bytes": 229680,
+    "sha256": "bde04eb2d8b811a9254349a22b6294ddb644b758f81c26a25671da1d11b8e666",
+    "originalBytes": 5885416,
+    "originalSha256": "98006c5523dbc72165836beeec6e617fe24f5b25171ff6d2d10382c57a7115f2",
+    "meshes": 11,
+    "images": 9
   },
   {
     "file": "frogger.glb",
@@ -72,21 +147,21 @@
     "images": 5
   },
   {
-    "file": "hydrant.glb",
-    "bytes": 130996,
-    "sha256": "dd9ab040e7f2defc18881b35be018a2c104ab7ca328311f950b406a4e62bc176",
-    "originalBytes": 145860,
-    "originalSha256": "98125dfbbfdb43a9f94e005a510dd70c59608148a72222d7fc2248c2b173483b",
-    "meshes": 3,
-    "images": 1
+    "file": "hydrant-b.glb",
+    "bytes": 54080,
+    "sha256": "17a876690c1aeab2490da9f268289ee048d57bcec923c92a765b999714148ead",
+    "originalBytes": 511108,
+    "originalSha256": "8ca04baab3a9a6df1edd08c0a71a8cf0738df107cc96b3250c73b015bffa2538",
+    "meshes": 2,
+    "images": 2
   },
   {
-    "file": "lamp.glb",
-    "bytes": 225736,
-    "sha256": "631e1f8011e44f2ef51f27193795acc3cac9db32920ca558fcb1f8b686f630ff",
-    "originalBytes": 341384,
-    "originalSha256": "bb4a12321de2e53778c45bdd15df00132eb9a1ccc88f43b3c5b063479381c03b",
-    "meshes": 7,
+    "file": "lamp-b.glb",
+    "bytes": 84172,
+    "sha256": "c887dd0b1f29e3c9df56148a19af0e15d02de9abcd85d1e2e240633bfac2e11e",
+    "originalBytes": 814352,
+    "originalSha256": "869eee0cc684135f281fab6515df7792240d12405144708ccc7c781296881e40",
+    "meshes": 4,
     "images": 4
   },
   {
@@ -99,6 +174,15 @@
     "images": 44
   },
   {
+    "file": "meter.glb",
+    "bytes": 3968,
+    "sha256": "ec9840f44d2d0c67f1a70f01a046e4c79c935d2d40ac28b980d622fad9a7ffaf",
+    "originalBytes": 16652,
+    "originalSha256": "6f06fc5d578515fc3d4f8542ee5c3affdd06d12b74688d2c348b0a62f1b344a5",
+    "meshes": 1,
+    "images": 0
+  },
+  {
     "file": "michael.glb",
     "bytes": 3001752,
     "sha256": "bf17b639e82bc5890f2c431eea99309526adde99911a7002a16c8cb8f3488e6e",
@@ -108,13 +192,93 @@
     "images": 12
   },
   {
-    "file": "palm.glb",
-    "bytes": 157096,
-    "sha256": "56de5d1c9258af70de6e626138a44859bb11bf4eaa9bc9e40727cf882aed50cf",
-    "originalBytes": 157080,
-    "originalSha256": "addae6414cd74e89d450ca4c2c910567deacfdbe6ea74b4d5495d0d31b45f0f8",
-    "meshes": 7,
-    "images": 0
+    "file": "newsbox.glb",
+    "bytes": 212848,
+    "sha256": "a4cc89431a8d5cdfcc54b281d8431f86e4c40e3aefd751d29e443a48188306d8",
+    "originalBytes": 394168,
+    "originalSha256": "2884373848f82d9407ef23dbbf535c7d8d1a4365dfac76111cede00cb5f8d768",
+    "meshes": 3,
+    "images": 3
+  },
+  {
+    "file": "ped-business-f.glb",
+    "bytes": 356488,
+    "sha256": "1d34d067cf05bee7e7bc9a046151f51e30fb592b0708a71c1e05e84c7f44f226",
+    "originalBytes": 1302680,
+    "originalSha256": "54ae9ae47457e63a547c85160fb40ed8e10a47a4532a339386f199411e7422f9",
+    "meshes": 4,
+    "images": 4
+  },
+  {
+    "file": "ped-business-m.glb",
+    "bytes": 163244,
+    "sha256": "cdf29c1d2d3bf3acc44ce7b778a0a284b0f6e392128ecfd99641ac1565404a4a",
+    "originalBytes": 730196,
+    "originalSha256": "62691051712d484bcf1876b618163afa7fdf40f15ca1183ea2770c09d93547cd",
+    "meshes": 5,
+    "images": 5
+  },
+  {
+    "file": "ped-downtown.glb",
+    "bytes": 214348,
+    "sha256": "6ac68b4635246d57d848694ccc6ede0d9a7cc43df4768ccf94b11bb5de36527a",
+    "originalBytes": 1023300,
+    "originalSha256": "e7e0f0e269cab7119f1a5cc009619815ffc8544971d6797b5c20eccb9140b004",
+    "meshes": 3,
+    "images": 3
+  },
+  {
+    "file": "ped-genhot.glb",
+    "bytes": 651724,
+    "sha256": "88566c0d858d6d6a31c3416fd69d8c4da1dc00285d725dbdebb1197270c2112b",
+    "originalBytes": 1067092,
+    "originalSha256": "4425197bb1a609691eb26fed5f0e7293ef3d139d015e2ed3e2eb8284de781b8c",
+    "meshes": 5,
+    "images": 5
+  },
+  {
+    "file": "ped-hipster.glb",
+    "bytes": 317424,
+    "sha256": "2d65d6a5bf6205f6bb16e9887f19d989e79d113bd95052b6a4ba24fffcb241e4",
+    "originalBytes": 928804,
+    "originalSha256": "894ea83b02761c255e7c94a99e93e5ddfd1acd476925f4df8dacf671ae3fa95b",
+    "meshes": 5,
+    "images": 5
+  },
+  {
+    "file": "ped-stbla.glb",
+    "bytes": 318476,
+    "sha256": "541b1b79340b116be8c797f819abb1c4e510f995b1e2c09bd129a4ba24fea84b",
+    "originalBytes": 809140,
+    "originalSha256": "326a9d41a84b0a76fca53f6d065385fdf8b494fbca01ed64d0752dc5d33f5ac6",
+    "meshes": 5,
+    "images": 5
+  },
+  {
+    "file": "ped-tourist-f.glb",
+    "bytes": 314072,
+    "sha256": "5e3403233c2a3ece55864f83037ca001fe06d354af4aebf721693c158ccaaf2f",
+    "originalBytes": 996708,
+    "originalSha256": "776aee8e996cf8775c2ecff9a933ab851033fc6a41e154eb369ad0cddeb5ed47",
+    "meshes": 5,
+    "images": 5
+  },
+  {
+    "file": "ped-tourist-m.glb",
+    "bytes": 354984,
+    "sha256": "b84e290ecf68d5868ebe39a4be6f5769497eaa6444d969981d3555c5f0385736",
+    "originalBytes": 960080,
+    "originalSha256": "858ac5ad2166c28a13b47a5bf7afae0652afa8e9cf67e4c625685b1d766f9c22",
+    "meshes": 6,
+    "images": 6
+  },
+  {
+    "file": "police-lod.glb",
+    "bytes": 242904,
+    "sha256": "328411be19f0535959e1b2a32f6c7e1648b23877f853021f5fe195d2ff09d0af",
+    "meshes": 11,
+    "images": 11,
+    "lodOf": "police.glb"
   },
   {
     "file": "police.glb",
@@ -126,13 +290,78 @@
     "images": 11
   },
   {
-    "file": "signal.glb",
-    "bytes": 114400,
-    "sha256": "2888e9efc6da71938f0364bcf392417dd4376e6643e997ae1049dd59e8ebc68c",
-    "originalBytes": 114388,
-    "originalSha256": "233c2170fc05543117201c5c3b3fd6c14cd338131bd8f9fbad828f5f4e9a43c3",
-    "meshes": 13,
+    "file": "raiden-lod.glb",
+    "bytes": 149324,
+    "sha256": "89b58326092e2163eeb2ed63e4416a32e13dcbebed08017df6c515f0ac4726d8",
+    "originalBytes": 5838136,
+    "originalSha256": "03f081ea1af7236af4887facd32f89349973d4d42f54414bd004a0ee5aacc823",
+    "meshes": 14,
+    "images": 11,
+    "lodOf": "raiden.glb"
+  },
+  {
+    "file": "raiden.glb",
+    "bytes": 285320,
+    "sha256": "130127992405f143b29f74c2267aeeed6205513946487c0e20cdefd865ba1172",
+    "originalBytes": 5838136,
+    "originalSha256": "03f081ea1af7236af4887facd32f89349973d4d42f54414bd004a0ee5aacc823",
+    "meshes": 15,
+    "images": 11
+  },
+  {
+    "file": "signal-b.glb",
+    "bytes": 10088,
+    "sha256": "22d2a59b3b564e69c2a559c9b83e9ac640c01824124e63db573dbb82e84a0389",
+    "originalBytes": 67156,
+    "originalSha256": "97900dbafecc160402ce5c8da7f0a20706a19abb446e78c5a1282f70ed60c882",
+    "meshes": 1,
     "images": 0
+  },
+  {
+    "file": "speedo-lod.glb",
+    "bytes": 177456,
+    "sha256": "07623ba61e0a51012678ded76a62344ab839f8240605ee4a2cc4d3dd47f9b542",
+    "originalBytes": 5776136,
+    "originalSha256": "6c01679d0afd635e092bd14cabffcf544993e8535212f07805d97e7f1580089b",
+    "meshes": 12,
+    "images": 10,
+    "lodOf": "speedo.glb"
+  },
+  {
+    "file": "speedo.glb",
+    "bytes": 273320,
+    "sha256": "226431b46c99f4ba9821aea4140da428114dff7a06f03cc2bdf72b1040a6f4fe",
+    "originalBytes": 5776136,
+    "originalSha256": "6c01679d0afd635e092bd14cabffcf544993e8535212f07805d97e7f1580089b",
+    "meshes": 13,
+    "images": 10
+  },
+  {
+    "file": "stanier-lod.glb",
+    "bytes": 128692,
+    "sha256": "6413f8579a9d8ee50e225150a8617b9b169777819a0b8b2eaf1eff878182b220",
+    "originalBytes": 5799552,
+    "originalSha256": "8fa4b1d22c7375308d527f2b2b32d1b6423bd4149ee56b6bfb9b0596dc8abe55",
+    "meshes": 9,
+    "images": 9,
+    "lodOf": "stanier.glb"
+  },
+  {
+    "file": "stanier.glb",
+    "bytes": 211400,
+    "sha256": "9fad249ef016348e07c5589e0902f6a969b968f5f3085f71fe6edf9fddb61429",
+    "originalBytes": 5799552,
+    "originalSha256": "8fa4b1d22c7375308d527f2b2b32d1b6423bd4149ee56b6bfb9b0596dc8abe55",
+    "meshes": 11,
+    "images": 9
+  },
+  {
+    "file": "taxi-lod.glb",
+    "bytes": 336332,
+    "sha256": "577c8ba61eb959d0cd04ca0b7666a8b29bd89f65ddca4b0cf012df7c44355b0a",
+    "meshes": 13,
+    "images": 12,
+    "lodOf": "taxi.glb"
   },
   {
     "file": "taxi.glb",
@@ -142,5 +371,33 @@
     "originalSha256": "291331618776e74d3d712bc99519371378698b4c90d645c3d03244d0bc72c5cb",
     "meshes": 18,
     "images": 12
+  },
+  {
+    "file": "tree-cypress.glb",
+    "bytes": 218476,
+    "sha256": "a5d74fd75b5980710555190c952f97104833f803d2f00c7e6a5ed757df0b0d8c",
+    "originalBytes": 6529496,
+    "originalSha256": "3835a8b6b1e4a60d91dce23a14499a2554e932cf04fb5dff07b0cf6e63f5f3c0",
+    "meshes": 3,
+    "images": 3
+  },
+  {
+    "file": "washington-lod.glb",
+    "bytes": 204184,
+    "sha256": "d76a117da49a59f795f3f57dca2f76cdb847e1ae17b90662fe33c26185a3aa29",
+    "originalBytes": 6079416,
+    "originalSha256": "080fe220cdfbc03a732963a519e0ab5547aa8f6315604a1a4fd60b919acbe5cc",
+    "meshes": 10,
+    "images": 10,
+    "lodOf": "washington.glb"
+  },
+  {
+    "file": "washington.glb",
+    "bytes": 309996,
+    "sha256": "68257567b7f0b0a5998d73fd914e564c632d03777cd076c24e9d22dde4c9ce6f",
+    "originalBytes": 6079416,
+    "originalSha256": "080fe220cdfbc03a732963a519e0ab5547aa8f6315604a1a4fd60b919acbe5cc",
+    "meshes": 11,
+    "images": 10
   }
 ]

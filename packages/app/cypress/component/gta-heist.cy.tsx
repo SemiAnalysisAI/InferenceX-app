@@ -3,8 +3,60 @@ import { GtaGame } from '@/components/gta/gta-game';
 type GameWindow = Window & {
   advanceTime: (ms: number) => void;
   render_game_to_text: () => string;
+  gta_state: () => { phase: string };
 };
 describe('GTA 3D city', () => {
+  it('preserves sightseeing GPS and explicit fast travel on the San Fierro map', () => {
+    cy.mount(
+      <div style={{ height: 750 }}>
+        <GtaGame />
+      </div>,
+    );
+    cy.get('[data-testid="heist-start"]', { timeout: 60000 }).should('be.visible');
+    cy.window().then((win) => (win as unknown as GameWindow).advanceTime(0));
+    let x: number, z: number;
+    cy.window().then((win) => {
+      const state = JSON.parse((win as unknown as GameWindow).render_game_to_text());
+      x = state.car.x;
+      z = state.car.z;
+    });
+    cy.contains('button', 'Explore Bay Area').click();
+    cy.get('#gta-destination').select('nvidia_endeavor');
+    cy.get('[data-testid="tour-drive"]').click();
+    cy.window().then((win) => {
+      const state = JSON.parse((win as unknown as GameWindow).render_game_to_text());
+      expect(state.car.x).to.equal(x);
+      expect(state.car.z).to.equal(z);
+      expect(state.tour).to.equal('nvidia_endeavor');
+    });
+    cy.get('[data-testid="heist-timer"]').should('have.text', '∞');
+    cy.get('[data-testid="heist-map"]').click();
+    cy.get('[data-testid="tour-map-stop"]').should('have.length', 9);
+    cy.get('[data-testid="tour-map-stop"]').eq(6).should('contain.text', 'NVIDIA HQ');
+    cy.get('#gta-destination').select('sjdt');
+    cy.get('[data-testid="tour-visit"]').click();
+    cy.window().then((win) => {
+      const state = JSON.parse((win as unknown as GameWindow).render_game_to_text());
+      expect(state.car.z).to.be.greaterThan(5000);
+      expect(state.tour).to.equal('sjdt');
+      expect(state.cash).to.equal(0);
+    });
+    cy.get('[data-testid="heist-canvas"]').trigger('keydown', { code: 'KeyC' });
+    cy.get('[data-testid="heist-canvas"]').trigger('keydown', { code: 'KeyC' });
+    cy.window().then((win) => {
+      expect(JSON.parse((win as unknown as GameWindow).render_game_to_text()).camera).to.equal(2);
+    });
+    cy.get('[data-testid="heist-map"]').click();
+    for (const phase of ['won', 'busted']) {
+      cy.window().then((win) => {
+        const game = win as unknown as GameWindow;
+        game.gta_state().phase = phase;
+        game.advanceTime(0);
+      });
+      cy.get('[data-testid="tour-drive"]').should('be.disabled');
+      cy.get('[data-testid="tour-visit"]').should('be.disabled');
+    }
+  });
   it('loads, drives, pauses, resumes and resets', () => {
     cy.mount(
       <div style={{ height: 750 }}>
@@ -21,10 +73,15 @@ describe('GTA 3D city', () => {
       .trigger('keydown', { code: 'KeyW' });
     cy.window().then((win) => {
       const game = win as unknown as GameWindow;
+      const before = JSON.parse(game.render_game_to_text());
       game.advanceTime(1000);
       const state = JSON.parse(game.render_game_to_text());
-      expect(state.car.z).to.be.lessThan(25);
-      expect(state.car.speed).to.be.greaterThan(10);
+      expect(Math.hypot(state.car.x - before.car.x, state.car.z - before.car.z)).to.be.greaterThan(
+        3,
+      );
+      // The Buffalo starts at 7.5 m/s² before drag and the street's grade.
+      expect(state.car.speed).to.be.within(5, 7.5);
+      expect(state.district).to.be.a('string');
     });
     cy.get('[data-testid="heist-canvas"]').trigger('keyup', { code: 'KeyW' });
     cy.get('[data-testid="heist-pause"]').click();
@@ -36,6 +93,17 @@ describe('GTA 3D city', () => {
       expect(game.render_game_to_text()).to.equal(before);
     });
     cy.get('[data-testid="heist-start"]').click();
+    cy.get('[data-testid="heist-canvas"]').trigger('keydown', { code: 'Space' });
+    cy.window().then((win) => (win as unknown as GameWindow).advanceTime(4000));
+    cy.get('[data-testid="heist-canvas"]').trigger('keyup', { code: 'Space' });
+    cy.get('[data-testid="heist-travel-south"]').click();
+    cy.window().then((win) => {
+      const state = JSON.parse((win as unknown as GameWindow).render_game_to_text());
+      expect(state.car.z).to.be.greaterThan(4300);
+    });
+    cy.get('[data-testid="heist-travel-south"]').should('have.attr', 'aria-pressed', 'true');
+    cy.get('[data-testid="heist-travel-city"]').click();
+    cy.get('[data-testid="heist-travel-city"]').should('have.attr', 'aria-pressed', 'true');
     cy.get('[data-testid="heist-reset"]').click();
     cy.get('[data-testid="heist-speed"]').should('contain.text', '000');
   });
