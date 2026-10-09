@@ -332,6 +332,7 @@ export default function StatisticsPage() {
           return (
             <ExpandableChart
               key={key}
+              sharedZoom
               title={
                 <>
                   {title} {t.distribution}{' '}
@@ -444,6 +445,7 @@ export default function StatisticsPage() {
           return (
             <ExpandableChart
               key={title}
+              sharedZoom
               title={
                 <>
                   {title} {t.distribution}{' '}

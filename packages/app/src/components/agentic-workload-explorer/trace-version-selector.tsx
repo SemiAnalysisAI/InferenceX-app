@@ -1,6 +1,12 @@
 'use client';
 
-import { Select } from '@/components/agentic-workload-explorer/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { CURRENT_TRACE_VERSION } from '@semianalysisai/inferencex-db/proxytrace/shared/trace';
 import { useTraceVersion } from '@/hooks/agentic-workload-explorer/use-trace-version';
 import { useLocale } from '@/lib/use-locale';
@@ -33,15 +39,23 @@ export function TraceVersionSelector() {
 
   return (
     <Select
-      size="sm"
       value={selection === 'all' ? 'all' : String(selection)}
-      onChange={(v) => {
+      onValueChange={(v) => {
         const newSelection = v === 'all' ? 'all' : Number(v);
         setSelection(newSelection);
         track('agentic_workload_trace_version_changed', { version: newSelection });
       }}
-      options={options}
-      className="min-w-[110px]"
-    />
+    >
+      <SelectTrigger size="sm" aria-label={t.allVersions} className="min-w-[110px]">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        {options.map((option) => (
+          <SelectItem key={option.value} value={option.value}>
+            {option.label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   );
 }

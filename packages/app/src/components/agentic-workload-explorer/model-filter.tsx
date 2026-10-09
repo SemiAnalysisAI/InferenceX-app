@@ -1,6 +1,12 @@
 'use client';
 
-import { Select } from '@/components/agentic-workload-explorer/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { useLocale } from '@/lib/use-locale';
 import { track } from '@/lib/analytics';
 
@@ -25,12 +31,24 @@ export function ModelFilter({ models, selectedModel, onModelChange }: ModelFilte
 
   return (
     <Select
-      value={selectedModel ?? ''}
-      onChange={(v = '') => {
-        onModelChange(v || null);
-        track('agentic_workload_model_filter_changed', { model: v || null });
+      value={selectedModel === null ? 'all' : `model:${selectedModel}`}
+      onValueChange={(v) => {
+        const model = v === 'all' ? null : v.slice('model:'.length);
+        onModelChange(model);
+        track('agentic_workload_model_filter_changed', { model });
       }}
-      options={[{ value: '', label: t.allModels }, ...models.map((m) => ({ value: m, label: m }))]}
-    />
+    >
+      <SelectTrigger aria-label={t.allModels} className="max-w-full">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="all">{t.allModels}</SelectItem>
+        {models.map((model) => (
+          <SelectItem key={model} value={`model:${model}`}>
+            {model}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   );
 }

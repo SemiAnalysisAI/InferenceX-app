@@ -1,7 +1,7 @@
 'use client';
 
 import { useLocale } from '@/lib/use-locale';
-import { cn } from '@/lib/utils';
+import { SegmentedToggle } from '@/components/ui/segmented-toggle';
 
 export interface RangeOption<T extends string> {
   id: T;
@@ -24,25 +24,18 @@ export function RangeToggle<T extends string>({
 }) {
   const zh = useLocale() === 'zh';
   return (
-    <div className="inline-flex flex-wrap items-stretch gap-0.5 rounded-lg border border-border p-0.5">
-      {options.map((o) => (
-        <button
-          key={o.id}
-          type="button"
-          title={zh ? (o.titleZh ?? o.title) : o.title}
-          aria-pressed={value === o.id}
-          onClick={() => onChange(o.id)}
-          className={cn(
-            'inline-flex min-h-6 items-center rounded-md px-2 py-0.5 text-xs font-medium transition-colors',
-            value === o.id
-              ? 'bg-muted text-foreground'
-              : 'text-muted-foreground hover:text-foreground',
-          )}
-        >
-          {zh ? (o.labelZh ?? o.label) : o.label}
-        </button>
-      ))}
-    </div>
+    <SegmentedToggle
+      value={value}
+      onValueChange={onChange}
+      role="group"
+      ariaLabel={zh ? '时间范围' : 'Time range'}
+      className="flex-wrap"
+      options={options.map((option) => ({
+        value: option.id,
+        label: zh ? (option.labelZh ?? option.label) : option.label,
+        title: zh ? (option.titleZh ?? option.title) : option.title,
+      }))}
+    />
   );
 }
 

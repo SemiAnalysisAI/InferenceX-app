@@ -186,12 +186,14 @@ export function ChartDialog({
   title,
   subtitle,
   children,
+  sharedZoom = false,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   title: ReactNode;
   subtitle?: ReactNode;
   children: ReactNode;
+  sharedZoom?: boolean;
 }) {
   const t = STRINGS[useLocale()];
   return (
@@ -212,7 +214,7 @@ export function ChartDialog({
           {/* Ensure an accessible title is always present, even if title is non-text */}
           {!title && <DialogTitle className="sr-only">{t.expandChart}</DialogTitle>}
         </div>
-        <ChartZoom>{children}</ChartZoom>
+        {sharedZoom ? children : <ChartZoom>{children}</ChartZoom>}
       </DialogContent>
     </Dialog>
   );
@@ -228,10 +230,12 @@ export function ExpandableChart({
   title,
   subtitle,
   children,
+  sharedZoom = false,
 }: {
   title: ReactNode;
   subtitle?: ReactNode;
   children: ReactNode | ((expanded: boolean, close: () => void) => ReactNode);
+  sharedZoom?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [bodyHeight, setBodyHeight] = useState<number>();
@@ -262,7 +266,13 @@ export function ExpandableChart({
       <CardContent ref={bodyRef} style={open && !isRender ? { minHeight: bodyHeight } : undefined}>
         {(isRender || !open) && render(false)}
       </CardContent>
-      <ChartDialog open={open} onOpenChange={setOpen} title={title} subtitle={subtitle}>
+      <ChartDialog
+        open={open}
+        onOpenChange={setOpen}
+        title={title}
+        subtitle={subtitle}
+        sharedZoom={sharedZoom}
+      >
         {open && (
           <div className={isRender ? undefined : '[&_svg]:!max-h-[calc(92vh-180px)]'}>
             {render(true)}

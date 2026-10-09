@@ -7,7 +7,6 @@ import {
 } from '@/hooks/agentic-workload-explorer/use-trace-version';
 import { useDashboardData } from '@/hooks/agentic-workload-explorer/use-dashboard-data';
 import { formatDuration, formatNumber } from '@/lib/agentic-workload-explorer/format';
-import { cn } from '@/lib/utils';
 import {
   ChartSkeleton,
   SkeletonSectionHeader,
@@ -35,6 +34,7 @@ import {
   SNAPSHOT_NOW_MS,
 } from '@/lib/agentic-workload-explorer/snapshot';
 import { useLocale } from '@/lib/use-locale';
+import { SegmentedToggle } from '@/components/ui/segmented-toggle';
 import { track } from '@/lib/analytics';
 
 // ── i18n ────────────────────────────────────────────────────────────────
@@ -316,26 +316,17 @@ function ToggleGroup<T extends string>({
   trackEvent?: string;
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-1">
-      {options.map((o) => (
-        <button
-          key={o.key}
-          type="button"
-          onClick={() => {
-            if (trackEvent) track(trackEvent, { value: o.key });
-            onChange(o.key);
-          }}
-          className={cn(
-            'px-2 py-0.5 text-3xs font-mono rounded border transition-colors',
-            value === o.key
-              ? 'border-foreground text-foreground bg-surface-hover'
-              : 'border-border text-muted-foreground hover:text-foreground hover:bg-surface-hover',
-          )}
-        >
-          {o.label}
-        </button>
-      ))}
-    </div>
+    <SegmentedToggle
+      value={value}
+      options={options.map((option) => ({ value: option.key, label: option.label }))}
+      onValueChange={(next) => {
+        if (trackEvent) track(trackEvent, { value: next });
+        onChange(next);
+      }}
+      ariaLabel={options.map((option) => option.label).join(' / ')}
+      role="group"
+      className="flex-wrap"
+    />
   );
 }
 
@@ -607,7 +598,7 @@ function TrendsPageContent() {
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
         <div className="text-3xs font-mono text-muted-foreground">{t.description}</div>
         <ToggleGroup
           value={windowChoice}

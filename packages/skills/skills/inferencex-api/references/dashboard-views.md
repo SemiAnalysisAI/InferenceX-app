@@ -88,6 +88,10 @@ The Agentic Workload Explorer is also feature-gated and has no published
 `/api/v1/views/agentic-workload-explorer` contract. Its
 `/api/v1/agentic-workload-explorer/*` routes serve a frozen, anonymized
 ProxyTrace snapshot to the page and are not part of this skill's read-only view API.
+Its shared select/toggle controls retain the same model, client, time-window, and
+trace-version query semantics. Shared-D3 chart expansion, zoom/reset, tooltip,
+and PNG export are presentation-only controls; they add no API routes or writable
+snapshot access.
 
 Use positive safe run IDs written as plain digits (`1e3`, `0x10`, and `+5` are
 rejected); run lists such as `unofficialrun` and `runs` take up to eight unique IDs.
