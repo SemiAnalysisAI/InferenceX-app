@@ -98,6 +98,10 @@ function dirtyPowerPayload(): Record<string, any> {
     total_cpu_energy_j: 601200,
     avg_total_module_power_w: 17203,
     total_module_energy_j: 10321800,
+    avg_total_cpu_rail_power_w: 504.6,
+    total_cpu_rail_energy_j: 302760,
+    avg_total_cpu_sysio_power_w: 64.6,
+    total_cpu_sysio_energy_j: 38760,
     workers: [
       { role: 'prefill', worker_idx: 0, hosts: ['pn0'], num_gpus: 4, avg_power_w: 612.3 },
       { role: 'decode', worker_idx: 0, hosts: ['dn0'], num_gpus: 8, avg_power_w: 701.5 },

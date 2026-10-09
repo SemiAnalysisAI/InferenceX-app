@@ -10,7 +10,7 @@ import {
 } from './metric-keys';
 
 describe('CPU_SIDE_POWER_METRIC_KEYS', () => {
-  it('names exactly the NVL72 Grace-side and compute-module keys, all of them measured keys', () => {
+  it('names exactly the NVL72 Grace-side, compute-module and rail keys, all of them measured keys', () => {
     expect(new Set(CPU_SIDE_POWER_METRIC_KEY_LIST)).toEqual(
       new Set([
         'avg_cpu_socket_power_w',
@@ -18,9 +18,13 @@ describe('CPU_SIDE_POWER_METRIC_KEYS', () => {
         'total_cpu_energy_j',
         'avg_total_module_power_w',
         'total_module_energy_j',
+        'avg_total_cpu_rail_power_w',
+        'total_cpu_rail_energy_j',
+        'avg_total_cpu_sysio_power_w',
+        'total_cpu_sysio_energy_j',
       ]),
     );
-    expect(CPU_SIDE_POWER_METRIC_KEYS.size).toBe(5);
+    expect(CPU_SIDE_POWER_METRIC_KEYS.size).toBe(9);
     for (const key of CPU_SIDE_POWER_METRIC_KEYS) {
       expect(MEASURED_POWER_METRIC_KEYS.has(key)).toBe(true);
     }
@@ -64,9 +68,13 @@ describe('MEASURED_POWER_METRIC_KEYS', () => {
         'total_cpu_energy_j',
         'avg_total_module_power_w',
         'total_module_energy_j',
+        'avg_total_cpu_rail_power_w',
+        'total_cpu_rail_energy_j',
+        'avg_total_cpu_sysio_power_w',
+        'total_cpu_sysio_energy_j',
       ]),
     );
-    expect(MEASURED_POWER_METRIC_KEYS.size).toBe(24);
+    expect(MEASURED_POWER_METRIC_KEYS.size).toBe(28);
   });
 
   it('never contains the contract discriminators or invalid-verdict companion fields', () => {
@@ -105,6 +113,6 @@ describe('POWER_METRIC_KEYS', () => {
         ...MEASURED_POWER_METRIC_KEY_LIST,
       ]),
     );
-    expect(POWER_METRIC_KEYS).toHaveLength(27);
+    expect(POWER_METRIC_KEYS).toHaveLength(31);
   });
 });
