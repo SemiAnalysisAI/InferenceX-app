@@ -83,6 +83,10 @@ export function buildInferenceCompareUrl(
   // (gptoss120b, glm5.1, kimik2.6, kimik2.7-code, minimaxm2.7, llama70b).
   const displayModel = DB_MODEL_TO_DISPLAY[currentRow.model];
   if (!displayModel) return null;
+  // Summary rows carry no benchmark_type, so this key keeps the spec-method
+  // suffix (e.g. `b200_vllm_mtp`). Agentic scopes key hardware without it;
+  // InferenceContext reconciles the selection (reconcileGpuSelection) so the
+  // chip config is remapped instead of dropped when the chart lands on AgentX.
   const hwKey = buildAvailabilityHwKey(
     currentRow.hardware,
     currentRow.framework,
