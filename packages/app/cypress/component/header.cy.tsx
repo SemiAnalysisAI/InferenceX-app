@@ -136,9 +136,9 @@ describe('Header', () => {
     cy.get('[data-testid="nav-link-dashboard"]').should('have.attr', 'href', '/inference');
   });
 
-  it('shows Comparisons nav link', () => {
-    cy.get('[data-testid="nav-link-compare"]').should('be.visible');
-    cy.get('[data-testid="nav-link-compare"]').should('have.attr', 'href', '/compare');
+  it('keeps Comparisons and Articles out of the header nav (they live in the footer)', () => {
+    cy.get('[data-testid="nav-link-compare"]').should('not.exist');
+    cy.get('[data-testid="nav-link-articles"]').should('not.exist');
   });
 
   it('shows AgentX as a top-level nav link and highlights AgentX child pages', () => {
@@ -177,16 +177,7 @@ describe('Header', () => {
   });
 
   it('orders the nav with Home first and AgentX second', () => {
-    const expected = [
-      'Home',
-      'AgentX',
-      'Overview',
-      'Dashboard',
-      'ubenchX',
-      'Comparisons',
-      'Articles',
-      'About',
-    ];
+    const expected = ['Home', 'AgentX', 'Overview', 'Dashboard', 'ubenchX', 'About'];
     cy.get('[data-testid^="nav-link-"]').then(($links) => {
       // Strip the NEW badge so the comparison is against the label alone.
       const labels = [...$links].map((link) => (link.textContent ?? '').replace('NEW', '').trim());
@@ -237,13 +228,14 @@ describe('Header', () => {
     cy.get('[data-testid="mobile-menu"]').within(() => {
       cy.contains('a', 'Overview').should('be.visible').and('have.attr', 'href', '/overview');
       cy.contains('a', 'Dashboard').should('be.visible').and('have.attr', 'href', '/inference');
-      cy.contains('a', 'Comparisons').should('be.visible').and('have.attr', 'href', '/compare');
+      cy.contains('a', 'ubenchX').should('be.visible').and('have.attr', 'href', '/ubenchx');
       cy.contains('a', 'AgentX')
         .should('be.visible')
         .and('have.attr', 'href', '/agentx')
         .find('[data-nav-badge="agentx"]')
         .should('have.text', 'NEW');
-      cy.contains('a', 'Articles').should('be.visible').and('have.attr', 'href', '/blog');
+      cy.contains('a', 'Comparisons').should('not.exist');
+      cy.contains('a', 'Articles').should('not.exist');
       cy.contains('a', 'Supporters').should('not.exist');
       cy.contains('a', 'Telemetry').should('not.exist');
     });
@@ -375,12 +367,10 @@ describe('Header', () => {
       cy.get('[data-testid="mobile-menu-toggle"]').click();
       cy.get('[data-testid="mobile-menu"]').should('be.visible');
       cy.get('[data-testid="mobile-menu"]').within(() => {
-        ['Home', 'Overview', 'Dashboard', 'Comparisons', 'Articles', 'AgentX', 'About'].forEach(
-          (label) => {
-            cy.contains('a', label).should('be.visible');
-          },
-        );
-        ['Supporters', 'Telemetry'].forEach((label) => {
+        ['Home', 'Overview', 'Dashboard', 'ubenchX', 'AgentX', 'About'].forEach((label) => {
+          cy.contains('a', label).should('be.visible');
+        });
+        ['Comparisons', 'Articles', 'Supporters', 'Telemetry'].forEach((label) => {
           cy.contains('a', label).should('not.exist');
         });
       });

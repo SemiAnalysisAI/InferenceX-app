@@ -155,8 +155,8 @@ describe('First-load navigation', () => {
     cy.location('pathname').should('eq', '/inference');
   });
 
-  it('navigates to comparisons from the header with one click', () => {
-    cy.get('[data-testid="nav-link-compare"]').click();
+  it('navigates to comparisons from the footer with one click', () => {
+    cy.get('[data-testid="footer-link-compare"]').click();
     cy.location('pathname').should('eq', '/compare');
   });
 

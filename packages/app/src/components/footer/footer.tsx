@@ -31,6 +31,7 @@ const STRINGS = {
     supporters: 'Supporters',
     agentx: 'AgentX',
     telemetry: 'Telemetry',
+    comparisons: 'Comparisons',
     articles: 'Articles',
     whitepapers: 'Whitepapers',
     apiReference: 'API Reference',
@@ -69,6 +70,7 @@ const STRINGS = {
     supporters: '业界评价',
     agentx: 'AgentX',
     telemetry: '遥测数据',
+    comparisons: '性能对比',
     articles: '技术文章',
     whitepapers: '白皮书',
     historicalTrends: '历史趋势',
@@ -255,6 +257,14 @@ export const Footer = ({ starCount }: { starCount?: number | null }) => {
                   className="inline-flex min-h-11 items-center rounded-sm py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:outline-none md:min-h-8"
                 >
                   {t.telemetry}
+                </Link>
+                <Link
+                  data-testid="footer-link-compare"
+                  href={`${prefix}/compare`}
+                  onClick={() => track('footer_compare_clicked')}
+                  className="inline-flex min-h-11 items-center rounded-sm py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground hover:underline hover:underline-offset-4 focus-visible:outline-none md:min-h-8"
+                >
+                  {t.comparisons}
                 </Link>
                 <Link
                   data-testid="footer-link-articles"
