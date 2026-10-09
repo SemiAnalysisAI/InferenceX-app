@@ -1,0 +1,90 @@
+[
+  {
+    "id": "modular_urban_apartments_facade",
+    "source": "https://polyhaven.com/a/modular_urban_apartments_facade",
+    "download": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/modular_urban_apartments_facade/modular_urban_apartments_facade_1k.gltf",
+    "license": "CC0",
+    "bytes": 1778920,
+    "sha256": "6db0d97132b0d2660faf0499096a5622f08b3ada667a507d3ba6fb62c161cd61",
+    "file": "modular_urban_apartments_facade.glb"
+  },
+  {
+    "id": "modular_factory_facade",
+    "source": "https://polyhaven.com/a/modular_factory_facade",
+    "download": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/modular_factory_facade/modular_factory_facade_1k.gltf",
+    "license": "CC0",
+    "bytes": 2811312,
+    "sha256": "94ab1edf6463f673f6d4b2b04fb55bfff8673fe4a8104dafb8a611a18382fb3e",
+    "file": "modular_factory_facade.glb"
+  },
+  {
+    "id": "modular_fire_escape",
+    "source": "https://polyhaven.com/a/modular_fire_escape",
+    "download": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/modular_fire_escape/modular_fire_escape_1k.gltf",
+    "license": "CC0",
+    "bytes": 1387736,
+    "sha256": "b0a6cc837cb815d4755cb5e6f8834bf09e9491a64aa3e97693edadb8268b9fc9",
+    "file": "modular_fire_escape.glb"
+  },
+  {
+    "file": "urban_street_04_1k.hdr",
+    "source": "https://polyhaven.com/a/urban_street_04",
+    "license": "CC0",
+    "bytes": 1724368,
+    "sha256": "d0b515b6741e44ceaa7dc2e42a64ec30f61871ae313762729c6a14f5343484f2"
+  },
+  {
+    "file": "asphalt-Diffuse.jpg",
+    "source": "https://polyhaven.com/a/asphalt_02",
+    "license": "CC0",
+    "bytes": 488459,
+    "sha256": "832c979d383a6c215a2d7dcb098c93e1478ea8f2c16aeac1f768b8d61889e2b2"
+  },
+  {
+    "file": "asphalt-nor_gl.jpg",
+    "source": "https://polyhaven.com/a/asphalt_02",
+    "license": "CC0",
+    "bytes": 641891,
+    "sha256": "47711ba0ecadbae1eb1da153d0fe25ea6f781c90769bb830d0b1c53cd129a0bc"
+  },
+  {
+    "file": "asphalt-Rough.jpg",
+    "source": "https://polyhaven.com/a/asphalt_02",
+    "license": "CC0",
+    "bytes": 347226,
+    "sha256": "18a7665e816dfae7f85de581bdca1b4dbc1928fa60c5844648a876def2c1fd6f"
+  },
+  {
+    "file": "facade-apartment.jpg",
+    "source": "https://polyhaven.com/a/modular_urban_apartments_facade",
+    "license": "CC0",
+    "derivation": "Orthographic facade bake; glass is original geometry lit by the CC0 HDR environment",
+    "bytes": 233060,
+    "sha256": "ce4fdf951867022c13c426ccdbbe797abaadb9c1099051bff72d52613462ecb9"
+  },
+  {
+    "file": "facade-factory.jpg",
+    "source": "https://polyhaven.com/a/modular_factory_facade",
+    "license": "CC0",
+    "derivation": "Orthographic facade bake; glass is original geometry lit by the CC0 HDR environment",
+    "bytes": 402020,
+    "sha256": "0cfcb61cd1ce50c77c9bb44ffe03010d317fdfc6b0b0eb6e945cafa826def6a5"
+  },
+  {
+    "file": "facade-glass.jpg",
+    "source": "https://polyhaven.com/a/urban_street_04",
+    "license": "CC0",
+    "derivation": "Orthographic facade bake; glass is original geometry lit by the CC0 HDR environment",
+    "bytes": 22470,
+    "sha256": "af09b7fb55f6ccd26cbfffafecec48835e532bf60a59130dea933ed15a7c8339"
+  },
+  {
+    "file": "jacaranda-canopy.webp",
+    "source": "https://polyhaven.com/a/jacaranda_tree",
+    "license": "CC0",
+    "author": "Rob Tuytel, Rico Cilliers",
+    "derivation": "Transparent orthographic bake of the 1K Jacaranda Tree model. Crossed cards replace the full mesh for runtime performance.",
+    "bytes": 172854,
+    "sha256": "e8fde17ce7f5c96999b8357349c560d69f6fd44ee84b436990dff6e87d5396e9"
+  }
+]

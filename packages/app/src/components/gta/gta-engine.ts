@@ -3,12 +3,26 @@ import {
   distance,
   GARAGE,
   JOBS,
+  DESTINATIONS,
   lanePoint,
   START,
+  START_ANGLE,
   VEHICLES,
   type Point,
   type Vehicle,
 } from './gta-world';
+import { BAY_LANDMARKS, roadHeading, streetRoute } from './gta-geography';
+const TOUR_LOOK_AT: Record<number, Point> = {
+  1: BAY_LANDMARKS[1],
+  2: BAY_LANDMARKS[0],
+  3: { x: 290, z: 256 },
+  4: { x: -600, z: -1060 },
+  5: { x: -1150, z: -1350 },
+  6: { x: -125, z: 1850 },
+  7: { x: 260, z: 2130 },
+  8: { x: 570, z: 2680 },
+};
+const pursuitRoutes = new WeakMap<Actor, { points: Point[]; next: number; until: number }>();
 export interface Controls {
   forward: boolean;
   reverse: boolean;
@@ -47,12 +61,13 @@ export interface CityState {
   camera: number;
   explorer: boolean;
   altitude: number;
+  tour: number | null;
 }
 export function newCity(): CityState {
   return {
     phase: 'ready',
-    player: { ...START, angle: Math.PI, speed: 0 },
-    car: { ...START, angle: Math.PI, speed: 0 },
+    player: { ...START, angle: START_ANGLE, speed: 0 },
+    car: { ...START, angle: START_ANGLE, speed: 0 },
     onFoot: false,
     vehicle: 'adder',
     health: 100,
@@ -80,9 +95,29 @@ export function newCity(): CityState {
     camera: 0,
     explorer: false,
     altitude: 800,
+    tour: null,
   };
 }
-export const target = (s: CityState) => JOBS[Math.min(s.job, JOBS.length - 1)];
+export const target = (s: CityState) =>
+  s.tour === null ? JOBS[Math.min(s.job, JOBS.length - 1)] : DESTINATIONS[s.tour];
+export function beginTour(s: CityState, index: number, fastTravel = false) {
+  if (!Number.isInteger(index) || !DESTINATIONS[index] || s.explorer) return false;
+  s.tour = index;
+  s.phase = 'driving';
+  s.health = 100;
+  s.heat = 0;
+  s.police = [];
+  s.message = 'drive';
+  if (fastTravel) {
+    const p = DESTINATIONS[index];
+    const lookAt = TOUR_LOOK_AT[index];
+    const viewAngle = lookAt ? Math.atan2(lookAt.x - p.x, lookAt.z - p.z) : roadHeading(p);
+    s.car = { x: p.x, z: p.z, angle: viewAngle, speed: 0 };
+    s.player = { ...s.car };
+    s.onFoot = false;
+  }
+  return true;
+}
 export function enterExit(s: CityState) {
   if (s.phase !== 'driving' || s.explorer) return false;
   if (s.onFoot) {
@@ -118,6 +153,10 @@ export function enterExit(s: CityState) {
 export function interact(s: CityState) {
   if (s.phase !== 'driving' || s.explorer) return false;
   if (distance(s.player, target(s)) > 13 || Math.abs(s.player.speed) > 3) return false;
+  if (s.tour !== null) {
+    s.message = 'repair';
+    return true;
+  }
   s.cash += 1000;
   s.job++;
   s.message = 'pickup';
@@ -164,10 +203,13 @@ export function stepCity(s: CityState, c: Controls, seconds: number) {
     );
     return;
   }
-  s.time = Math.max(0, s.time - dt);
+  if (s.tour === null) s.time = Math.max(0, s.time - dt);
   s.immunity = Math.max(0, s.immunity - dt);
   const throttle = Number(c.forward) - Number(c.reverse),
     turn = Number(c.right) - Number(c.left);
+  if (s.message === 'blocked' && (throttle !== 0 || Math.abs(s.car.speed) > 0.5)) {
+    s.message = 'drive';
+  }
   if (s.onFoot) {
     s.player.angle -= turn * 2.4 * dt; // Camera faces the actor's forward direction.
     s.player.speed = throttle * (c.sprint ? 8 : 3.5);
@@ -209,22 +251,32 @@ export function stepCity(s: CityState, c: Controls, seconds: number) {
     }
   }
   for (const cop of s.police) {
-    const dx = s.player.x - cop.x,
-      dz = s.player.z - cop.z;
-    // Axis-aligned route choices keep pursuit on connected city streets.
-    const alignedX = Math.abs(dx) < 8,
-      alignedZ = Math.abs(dz) < 8;
-    let desired =
-      Math.abs(dx) > Math.abs(dz) ? (Math.sign(dx) * Math.PI) / 2 : dz > 0 ? 0 : Math.PI;
-    if (!alignedX && !alignedZ) {
-      const vertical = Math.abs(Math.sin(cop.angle)) < 0.5;
-      const atCross =
-        Math.abs((vertical ? cop.z : cop.x) - Math.round((vertical ? cop.z : cop.x) / 100) * 100) <
-        4;
-      if (!atCross) desired = cop.angle;
+    let route = pursuitRoutes.get(cop);
+    if (!route || route.until < s.elapsed) {
+      route = { points: streetRoute(cop, s.player), next: 0, until: s.elapsed + 3 };
+      pursuitRoutes.set(cop, route);
     }
-    cop.angle = desired;
-    cop.speed = 18 + s.heat * 2;
+    while (route.next < route.points.length && distance(cop, route.points[route.next]) < 3)
+      route.next++;
+    const steps = Math.max(1, Math.ceil(distance(cop, s.player) / 2));
+    let clear = true;
+    for (let i = 1; i <= steps; i++) {
+      if (
+        blocked(
+          {
+            x: cop.x + ((s.player.x - cop.x) * i) / steps,
+            z: cop.z + ((s.player.z - cop.z) * i) / steps,
+          },
+          1.3,
+        )
+      ) {
+        clear = false;
+        break;
+      }
+    }
+    const goal = clear ? s.player : route.points[route.next];
+    cop.angle = goal ? Math.atan2(goal.x - cop.x, goal.z - cop.z) : cop.angle;
+    cop.speed = goal ? 18 + s.heat * 2 : 0;
     move(cop, dt, 1.3);
     if (distance(cop, s.player) < 3 && !s.immunity) {
       s.health = Math.max(0, s.health - 12);
@@ -241,10 +293,10 @@ export function stepCity(s: CityState, c: Controls, seconds: number) {
       s.message = 'escape';
     }
   }
-  if (distance(s.player, GARAGE) < 10 && Math.abs(s.player.speed) < 1) {
+  if (s.health > 0 && !s.heat && distance(s.player, GARAGE) < 10 && Math.abs(s.player.speed) < 1) {
     s.health = Math.min(100, s.health + dt * 10);
   }
-  if (s.time === 0 || s.health === 0) {
+  if ((s.tour === null && s.time === 0) || s.health === 0) {
     s.phase = 'busted';
     s.car.speed = 0;
     s.player.speed = 0;

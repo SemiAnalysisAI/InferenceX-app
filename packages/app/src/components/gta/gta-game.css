@@ -317,6 +317,9 @@
   .gta-objective span {
     display: none;
   }
+  .gta-objective .gta-warning {
+    display: block;
+  }
   .gta-tools {
     top: 4.8rem;
     right: 0.5rem;
@@ -406,5 +409,39 @@
   }
   .gta-tools {
     grid-template-columns: repeat(2, auto);
+  }
+}
+.gta-performance {
+  position: absolute;
+  top: 5.1rem;
+  left: 1.5rem;
+  color: #d5dcd8;
+  font: 10px/1.4 monospace;
+  pointer-events: none;
+  z-index: 2;
+}
+.gta-map-panel select {
+  display: block;
+  width: 100%;
+  min-height: 42px;
+  padding: 8px;
+  margin: 8px 0 16px;
+  color: #f1f0df;
+  background: #172725;
+  border: 1px solid #92a58f;
+  font: inherit;
+}
+.gta-map-panel {
+  max-height: calc(100% - 180px);
+  overflow-y: auto;
+}
+.gta-map-panel button {
+  margin: 4px;
+}
+@media (max-width: 700px) {
+  .gta-performance {
+    top: 3.7rem;
+    left: 0.7rem;
+    font-size: 9px;
   }
 }

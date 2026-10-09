@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   changeVehicle,
+  beginTour,
   cityText,
   EMPTY_CONTROLS,
   enterExit,
@@ -9,12 +10,55 @@ import {
   stepCity,
   target,
 } from './gta-engine';
-import { blocked, BUILDINGS, GARAGE, JOBS, lanePoint, START } from './gta-world';
+import {
+  blocked,
+  BUILDINGS,
+  DESTINATIONS,
+  GARAGE,
+  JOBS,
+  lanePoint,
+  START,
+  START_ANGLE,
+} from './gta-world';
 const driving = (): ReturnType<typeof newCity> => ({ ...newCity(), phase: 'driving' });
 const advance = (s: ReturnType<typeof newCity>, c = EMPTY_CONTROLS, seconds = 1) => {
   for (let i = 0; i < Math.round(seconds * 60); i++) stepCity(s, c, 1 / 60);
 };
 describe('GTA 3D simulation', () => {
+  it.each([null, 6])('clears a failed exit warning when driving resumes in mode %s', (tour) => {
+    const s = driving();
+    s.tour = tour;
+    s.message = 'blocked';
+    s.traffic = [];
+    advance(s, EMPTY_CONTROLS, 0.1);
+    expect(s.message).toBe('blocked');
+    advance(s, { ...EMPTY_CONTROLS, forward: true }, 0.1);
+    expect(s.message).toBe('drive');
+  });
+  it('offers a driveable, untimed NVIDIA tour without silently teleporting', () => {
+    const s = driving();
+    const before = { ...s.player };
+    expect(beginTour(s, 6)).toBe(true);
+    expect(s.player).toEqual(before);
+    s.time = 0.01;
+    advance(s);
+    expect(s.time).toBe(0.01);
+    expect(s.phase).toBe('driving');
+    expect(target(s).en).toContain('NVIDIA');
+  });
+  it('fast travels explicitly to safe destinations without advancing missions', () => {
+    for (let i = 0; i < DESTINATIONS.length; i++) {
+      const s = driving();
+      expect(beginTour(s, i, true)).toBe(true);
+      expect(blocked(s.player, 1.3)).toBe(false);
+      expect(s.car.x).toBe(DESTINATIONS[i].x);
+      expect(interact(s)).toBe(true);
+      expect(s.job).toBe(0);
+      expect(s.cash).toBe(0);
+    }
+    const s = driving();
+    expect(beginTour(s, -1, true)).toBe(false);
+  });
   it('starts independently at a clear spawn', () => {
     const a = newCity(),
       b = newCity();
@@ -27,7 +71,7 @@ describe('GTA 3D simulation', () => {
     const s = driving();
     advance(s, { ...EMPTY_CONTROLS, forward: true });
     expect(s.car.z).toBeLessThan(START.z - 5);
-    expect(s.car.angle).toBe(Math.PI);
+    expect(s.car.angle).toBe(START_ANGLE);
     const speed = s.car.speed;
     advance(s, { ...EMPTY_CONTROLS, brake: true });
     expect(s.car.speed).toBeLessThan(speed / 2);
@@ -37,15 +81,14 @@ describe('GTA 3D simulation', () => {
   it('steers in the requested direction', () => {
     const s = driving();
     advance(s, { ...EMPTY_CONTROLS, forward: true, right: true }, 0.8);
-    expect(s.car.x).toBeGreaterThan(START.x);
-    expect(s.car.angle).toBeLessThan(Math.PI);
+    expect(s.car.angle).toBeLessThan(START_ANGLE);
   });
   it('collides with buildings and cannot leave the bounded city', () => {
-    expect(BUILDINGS.every((b) => blocked(b))).toBe(true);
+    expect(BUILDINGS.every((b) => blocked(b.ring[0]))).toBe(true);
     const s = driving();
-    s.car = { x: 0, z: -127, angle: Math.PI, speed: 40 };
+    s.car = { x: 948, z: 1500, angle: Math.PI / 2, speed: 40 };
     advance(s, EMPTY_CONTROLS, 0.2);
-    expect(s.car.z).toBeGreaterThan(-129);
+    expect(s.car.x).toBeLessThan(950);
     expect(s.health).toBeLessThan(100);
   });
   it.each(['ready', 'paused', 'won', 'busted'] as const)('freezes %s completely', (phase) => {
@@ -77,11 +120,11 @@ describe('GTA 3D simulation', () => {
   });
   it('exits through the opposite door when parked beside a building', () => {
     const s = driving();
-    s.car = { x: 14, z: 31, angle: 0, speed: 0 };
+    s.car = { x: 348, z: 2130, angle: Math.PI, speed: 0 };
     expect(blocked(s.car)).toBe(false);
-    expect(blocked({ x: 17, z: 31 }, 0.4)).toBe(true);
+    expect(blocked({ x: 345, z: 2130 }, 0.4)).toBe(true);
     expect(enterExit(s)).toBe(true);
-    expect(s.player.x).toBe(11);
+    expect(s.player.x).toBeCloseTo(351);
     expect(blocked(s.player, 0.4)).toBe(false);
   });
   it('reports an obstructed exit without moving the player', () => {
@@ -105,6 +148,7 @@ describe('GTA 3D simulation', () => {
   });
   it('requires each pickup and garage delivery to win', () => {
     const s = driving();
+    s.player.x += 40;
     expect(interact(s)).toBe(false);
     for (const job of JOBS) {
       s.player = { ...job, angle: 0, speed: 0 };
@@ -146,6 +190,16 @@ describe('GTA 3D simulation', () => {
     for (let lane = 0; lane < 3; lane++)
       for (let d = 0; d < 2500; d += 10) expect(blocked(lanePoint(d, lane))).toBe(false);
     expect(new Set(newCity().traffic.map((t) => t.model)).size).toBe(4);
+  });
+  it('police continue from a route endpoint toward a clear mid-block target', () => {
+    const s = driving();
+    s.car = { x: 0, z: 1250, angle: 0, speed: 0 };
+    s.player = { ...s.car };
+    s.heat = 1;
+    s.police = [{ x: 0, z: 1000, angle: 0, speed: 0 }];
+    advance(s, EMPTY_CONTROLS, 4);
+    expect(s.police[0].z).toBeGreaterThan(1070);
+    expect(s.police[0].speed).toBeGreaterThan(0);
   });
   it('ends the run on timeout or zero health', () => {
     const s = driving();

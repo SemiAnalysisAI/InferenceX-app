@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   changeVehicle,
+  beginTour,
   cityText,
   EMPTY_CONTROLS,
   enterExit,
@@ -13,14 +14,22 @@ import {
   type Controls,
   type CityState,
 } from './gta-engine';
-import { createCityRenderer, MODEL_NAMES, type CityRenderer } from './gta-renderer';
-import { BUILDINGS, JOBS, STREETS, distance } from './gta-world';
+import { createCityRenderer, CITY_ASSET_COUNT, type CityRenderer } from './gta-renderer';
+import { BUILDINGS, DESTINATIONS, distance } from './gta-world';
+import { STREETS_SF, streetRoute } from './gta-geography';
+import { objectiveStatus } from './gta-hud';
 import './gta-game.css';
 
 const COPY = {
   en: {
-    title: 'Los Santos After Hours',
-    subtitle: 'GTA V assets · custom city sandbox',
+    title: 'San Paloma After Hours',
+    explore: 'Explore Bay Area',
+    destination: 'Destination',
+    drive: 'Set GPS and drive',
+    visit: 'Fast travel',
+    free: 'Free roam · no time limit',
+    arrived: 'Destination reached. Stop and explore on foot.',
+    subtitle: 'SF street geometry · Bay Area sandbox',
     brief:
       'Collect four packages across the city, then return to the garage. Stop in a gold ring and press E. Police respond to pickups and collisions. Stay more than 110 m away for 15 seconds to lose them.',
     start: 'Start engine',
@@ -55,7 +64,7 @@ const COPY = {
     brake: 'Brake / descend',
     sprint: 'Sprint / climb',
     disclaimer:
-      'Playable custom district, not the complete GTA V game. Flight explores an actual low-detail San Andreas model.',
+      'A fictional Bay Area city using SF street and building footprints. Façades and landmarks are interpretations; the South Bay route is compressed. Not the complete GTA V game.',
     atlasHelp:
       'W / S fly · A / D turn · Shift climb · Space descend. This is an aerial explorer, not a flight simulator.',
     camera: 'Camera',
@@ -72,8 +81,14 @@ const COPY = {
     failedAtlas: 'The full map failed to load. You can keep playing the city or try flight again.',
   },
   zh: {
-    title: 'Los Santos 夜行',
-    subtitle: 'GTA V 资源 · 自定义城市沙盒',
+    title: 'San Paloma 夜行',
+    explore: '探索湾区',
+    destination: '目的地',
+    drive: '设置导航并驾车前往',
+    visit: '快速旅行',
+    free: '自由探索 · 无时间限制',
+    arrived: '已到达目的地，可停车下车探索。',
+    subtitle: '旧金山街道数据 · 湾区沙盒',
     brief:
       '在城内收集四个包裹，再返回车库。在金色圆圈内停车并按 E。取货或碰撞会引来警察；保持 110 米以上距离 15 秒即可摆脱追捕。',
     start: '发动引擎',
@@ -107,7 +122,8 @@ const COPY = {
     right: '右转',
     brake: '刹车 / 下降',
     sprint: '冲刺 / 上升',
-    disclaimer: '可玩的自定义街区，并非完整 GTA V。飞行模式使用 San Andreas 的真实低精度模型。',
+    disclaimer:
+      '基于旧金山街道和建筑轮廓的虚构湾区城市。立面与地标为艺术改编，南湾路线经过压缩。并非完整 GTA V。',
     atlasHelp:
       'W / S 前后飞行 · A / D 转向 · Shift 上升 · 空格 下降。这是空中探索模式，并非飞行模拟器。',
     camera: '镜头',
@@ -142,48 +158,61 @@ const KEYS: Record<string, keyof Controls> = {
   ShiftRight: 'sprint',
 };
 
+let cachedRoute = { key: '', points: [] as { x: number; z: number }[] };
 function paintMap(canvas: HTMLCanvasElement, s: CityState) {
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
-  const scale = 180 / 680,
-    coord = (v: number) => (v + 140) * scale;
+  const scale = 180 / 1000,
+    cx = (v: number) => (v - s.player.x) * scale + 90,
+    cz = (v: number) => (v - s.player.z) * scale + 90;
   ctx.fillStyle = '#274747';
   ctx.fillRect(0, 0, 180, 180);
   ctx.fillStyle = '#a3a29a';
-  ctx.fillRect(coord(-129), coord(-129), 658 * scale, 658 * scale);
+  ctx.fillRect(0, 0, 180, 180);
   ctx.strokeStyle = '#e1ded3';
-  ctx.lineWidth = 26 * scale;
-  for (const v of STREETS) {
+  for (const street of STREETS_SF) {
+    ctx.lineWidth = street.width * scale;
     ctx.beginPath();
-    ctx.moveTo(coord(-129), coord(v));
-    ctx.lineTo(coord(529), coord(v));
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(coord(v), coord(-129));
-    ctx.lineTo(coord(v), coord(529));
+    street.points.forEach((p, i) =>
+      i ? ctx.lineTo(cx(p.x), cz(p.z)) : ctx.moveTo(cx(p.x), cz(p.z)),
+    );
     ctx.stroke();
   }
   ctx.fillStyle = '#606365';
-  for (const b of BUILDINGS)
-    ctx.fillRect(coord(b.x - b.w / 2), coord(b.z - b.d / 2), b.w * scale, b.d * scale);
+  for (const b of BUILDINGS) {
+    if (Math.abs(b.x - s.player.x) > 600 || Math.abs(b.z - s.player.z) > 600) continue;
+    ctx.beginPath();
+    b.ring.forEach((p, i) => (i ? ctx.lineTo(cx(p.x), cz(p.z)) : ctx.moveTo(cx(p.x), cz(p.z))));
+    ctx.closePath();
+    ctx.fill();
+  }
   const t = target(s);
   ctx.strokeStyle = '#b774d2';
   ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.moveTo(coord(s.player.x), coord(s.player.z));
-  ctx.lineTo(coord(t.x), coord(s.player.z));
-  ctx.lineTo(coord(t.x), coord(t.z));
+  ctx.moveTo(90, 90);
+  const routeKey = `${Math.floor(s.player.x / 25)},${Math.floor(s.player.z / 25)},${t.x},${t.z}`;
+  if (routeKey !== cachedRoute.key)
+    cachedRoute = { key: routeKey, points: streetRoute(s.player, t) };
+  for (const p of cachedRoute.points) ctx.lineTo(cx(p.x), cz(p.z));
+  ctx.lineTo(cx(t.x), cz(t.z));
   ctx.stroke();
   ctx.fillStyle = '#ffe17e';
   ctx.beginPath();
-  ctx.arc(coord(t.x), coord(t.z), 4, 0, Math.PI * 2);
+  ctx.arc(
+    Math.max(5, Math.min(175, cx(t.x))),
+    Math.max(5, Math.min(175, cz(t.z))),
+    4,
+    0,
+    Math.PI * 2,
+  );
   ctx.fill();
   for (const p of s.police) {
     ctx.fillStyle = '#ef5c68';
-    ctx.fillRect(coord(p.x) - 2, coord(p.z) - 2, 4, 4);
+    ctx.fillRect(cx(p.x) - 2, cz(p.z) - 2, 4, 4);
   }
   ctx.save();
-  ctx.translate(coord(s.player.x), coord(s.player.z));
+  ctx.translate(90, 90);
   ctx.rotate(-s.player.angle);
   ctx.fillStyle = '#fff';
   ctx.beginPath();
@@ -194,12 +223,14 @@ function paintMap(canvas: HTMLCanvasElement, s: CityState) {
   ctx.restore();
 }
 export function GtaGame({ locale = 'en' }: { locale?: 'en' | 'zh' }) {
+  const [destination, setDestination] = useState(6);
   const t = COPY[locale],
     state = useRef(newCity()),
     input = useRef<Controls>({ ...EMPTY_CONTROLS });
   const canvas = useRef<HTMLCanvasElement>(null),
     minimap = useRef<HTMLCanvasElement>(null),
     graphics = useRef<CityRenderer | null>(null);
+  const performanceHud = useRef<HTMLOutputElement>(null);
   const dirty = useRef(true),
     manual = useRef(false),
     map = useRef(false),
@@ -241,6 +272,7 @@ export function GtaGame({ locale = 'en' }: { locale?: 'en' | 'zh' }) {
     setLoaded(0);
     const el = canvas.current!;
     const loop = (now: number) => {
+      const frameDuration = last ? now - last : 0;
       const dt = last ? Math.min((now - last) / 1000, 0.1) : 0;
       last = now;
       if (!manual.current) {
@@ -258,6 +290,14 @@ export function GtaGame({ locale = 'en' }: { locale?: 'en' | 'zh' }) {
         hud = now;
         setView({ ...state.current });
         if (minimap.current) paintMap(minimap.current, state.current);
+        const stats = handle?.stats();
+        if (performanceHud.current && stats) {
+          const fps =
+            manual.current || state.current.phase !== 'driving'
+              ? '--'
+              : (1000 / Math.max(frameDuration, 1)).toFixed(0);
+          performanceHud.current.textContent = `${fps} FPS · ${stats.calls} draws · ${(stats.triangles / 1000000).toFixed(2)}M tris`;
+        }
       }
       const a = audio.current;
       if (a) {
@@ -438,6 +478,16 @@ export function GtaGame({ locale = 'en' }: { locale?: 'en' | 'zh' }) {
     else void audio.current.ctx.suspend();
     focus();
   };
+  const explore = (fast: boolean) => {
+    clear();
+    if (!beginTour(state.current, destination, fast)) return;
+    map.current = false;
+    setOverview(false);
+    manual.current = false;
+    graphics.current?.resetCamera();
+    sync();
+    focus();
+  };
   const action = (key: string) => {
     if (key === 'KeyP') {
       if (state.current.phase === 'driving') pause();
@@ -446,7 +496,10 @@ export function GtaGame({ locale = 'en' }: { locale?: 'en' | 'zh' }) {
     if (key === 'KeyM') toggleMap();
     if (key === 'KeyF') enterExit(state.current);
     if (key === 'KeyE') interact(state.current);
-    if (key === 'KeyC') state.current.camera = (state.current.camera + 1) % 2;
+    if (key === 'KeyC') {
+      state.current.camera = (state.current.camera + 1) % 3;
+      graphics.current?.resetCamera();
+    }
     sync();
     focus();
   };
@@ -479,6 +532,7 @@ export function GtaGame({ locale = 'en' }: { locale?: 'en' | 'zh' }) {
   );
   const seconds = Math.ceil(view.time),
     job = target(view),
+    objective = objectiveStatus(view, t),
     active = view.phase === 'driving';
   return (
     <section className="gta-game" data-testid="heist-game" data-phase={view.phase}>
@@ -518,17 +572,27 @@ export function GtaGame({ locale = 'en' }: { locale?: 'en' | 'zh' }) {
           </span>
         </div>
       </header>
+      {process.env.NODE_ENV !== 'production' && (
+        <output
+          ref={performanceHud}
+          className="gta-performance"
+          aria-label={locale === 'zh' ? '渲染性能' : 'Rendering performance'}
+        />
+      )}
       <div className="gta-objective">
-        <small>{view.explorer ? t.atlas : `${Math.min(view.job + 1, 5)} / 5`}</small>
-        <strong>{view.explorer ? t.atlasHelp : locale === 'zh' ? job.zh : job.en}</strong>
-        <span>
+        <small>
           {view.explorer
-            ? `${Math.round(view.altitude)} m`
-            : view.message === 'blocked'
-              ? t.blockedExit
-              : view.heat
-                ? t.escape
-                : t.aim}
+            ? t.atlas
+            : view.tour === null
+              ? `${Math.min(view.job + 1, 5)} / 5`
+              : t.free}
+        </small>
+        <strong>{view.explorer ? t.atlasHelp : locale === 'zh' ? job.zh : job.en}</strong>
+        <span
+          className={objective.warning ? 'gta-warning' : undefined}
+          aria-live={objective.warning ? 'polite' : 'off'}
+        >
+          {objective.text}
         </span>
       </div>
       <aside className="gta-bottom-hud">
@@ -555,7 +619,9 @@ export function GtaGame({ locale = 'en' }: { locale?: 'en' | 'zh' }) {
           <span>
             {t.health} {Math.ceil(view.health)}% ·{' '}
             <b data-testid="heist-timer">
-              {Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, '0')}
+              {view.tour === null
+                ? `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`
+                : '∞'}
             </b>
           </span>
         </div>
@@ -624,11 +690,25 @@ export function GtaGame({ locale = 'en' }: { locale?: 'en' | 'zh' }) {
       {overview && (
         <div className="gta-map-panel">
           <h3>{t.map}</h3>
-          {JOBS.map((p, i) => (
-            <p key={p.en}>
-              {i + 1}. {locale === 'zh' ? p.zh : p.en} {i < view.job ? '✓' : ''}
-            </p>
-          ))}
+          <p>{t.free}</p>
+          <label htmlFor="gta-destination">{t.destination}</label>
+          <select
+            id="gta-destination"
+            value={destination}
+            onChange={(e) => setDestination(Number(e.target.value))}
+          >
+            {DESTINATIONS.map((p, i) => (
+              <option value={i} key={p.en}>
+                {locale === 'zh' ? p.zh : p.en}
+              </option>
+            ))}
+          </select>
+          <button type="button" data-testid="tour-drive" onClick={() => explore(false)}>
+            {t.drive}
+          </button>
+          <button type="button" data-testid="tour-visit" onClick={() => explore(true)}>
+            {t.visit}
+          </button>
           <button type="button" onClick={() => start()}>
             {t.resume}
           </button>
@@ -653,7 +733,7 @@ export function GtaGame({ locale = 'en' }: { locale?: 'en' | 'zh' }) {
                         ? t.paused
                         : t.title}
             </h3>
-            {!ready && !error && <progress value={loaded} max={MODEL_NAMES.length} />}
+            {!ready && !error && <progress value={loaded} max={CITY_ASSET_COUNT} />}
             {ready && !atlasLoading && <p>{t.brief}</p>}
             {error ? (
               <button type="button" onClick={() => setAttempt((n) => n + 1)}>
@@ -676,6 +756,11 @@ export function GtaGame({ locale = 'en' }: { locale?: 'en' | 'zh' }) {
               )
             )}
             <p className="gta-desktop-help">{t.controls}</p>
+            {ready && !atlasLoading && !view.explorer && (
+              <button type="button" onClick={toggleMap}>
+                {t.explore}
+              </button>
+            )}
             <p className="gta-mobile-help">{t.mobile}</p>
             <small>{t.disclaimer}</small>
           </div>
