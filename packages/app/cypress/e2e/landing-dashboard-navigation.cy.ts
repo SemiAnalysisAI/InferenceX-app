@@ -16,7 +16,26 @@
  * natively.
  */
 
-import { interceptVrPublicationData, vrPublicationRows } from '../support/vr-publication-fixtures';
+import { vrPublicationRows } from '../support/vr-publication-fixtures';
+
+// The landing Rubin card links to MiniMax M3; reuse the synthetic Rubin curve under its DB key.
+const minimaxM3RubinRows = vrPublicationRows.map((row) => ({ ...row, model: 'minimaxm3' }));
+
+function interceptMinimaxM3RubinData(rows: typeof minimaxM3RubinRows = minimaxM3RubinRows): void {
+  cy.fixture('api/availability.json').then((availability) => {
+    cy.intercept('GET', '/api/v1/availability*', {
+      body: [
+        ...availability.filter((row: { model: string }) => row.model !== 'minimaxm3'),
+        ...rows.map(({ metrics: _metrics, ...row }) => row),
+      ],
+    });
+  });
+  cy.intercept('GET', '/api/v1/benchmarks*', (request) => {
+    if (String(request.query.model).includes('MiniMax-M3')) {
+      request.reply({ body: rows });
+    }
+  });
+}
 
 const TARGET = '/inference/kimi-k3';
 
@@ -68,8 +87,8 @@ describe('landing model curation', () => {
         cy.get('[data-testid="landing-tpu-results-link"]')
           .next()
           .should('have.attr', 'data-testid', 'landing-rubin-results-link')
-          .and('have.attr', 'href', `${prefix}/inference/deepseek-v4`)
-          .and('contain.text', 'DeepSeek V4 Pro');
+          .and('have.attr', 'href', `${prefix}/inference/minimax-m3`)
+          .and('contain.text', 'MiniMax M3');
         cy.get('[data-testid="landing-rubin-results-link"]')
           .next()
           .should('have.attr', 'data-testid', 'landing-jalapeno-results-link')
@@ -120,10 +139,10 @@ describe('landing model curation', () => {
     });
 
     it(`opens Rubin AgentX results from ${prefix || '/'}`, () => {
-      interceptVrPublicationData();
+      interceptMinimaxM3RubinData();
       cy.visit(prefix || '/');
       cy.get('[data-testid="landing-rubin-results-link"]').click();
-      cy.location('pathname').should('eq', `${prefix}/inference/deepseek-v4`);
+      cy.location('pathname').should('eq', `${prefix}/inference/minimax-m3`);
       cy.location('search').should('not.contain', 'i_spec=');
       cy.get('[data-testid^="remove-filter-spec-"]').should('not.exist');
       cy.get('[data-testid="scenario-selector"]').should(
@@ -160,8 +179,8 @@ describe('landing model curation', () => {
       // Include FP8 as well as Rubin's FP4: FP4-only fixtures mask stale FP8
       // because the availability validator falls back to the only precision.
       const rubinRows = [
-        ...vrPublicationRows,
-        ...vrPublicationRows
+        ...minimaxM3RubinRows,
+        ...minimaxM3RubinRows
           .filter((row) => row.hardware === 'vr200')
           .map((row) => ({
             ...row,
@@ -170,19 +189,7 @@ describe('landing model curation', () => {
             precision: 'fp8',
           })),
       ];
-      cy.fixture('api/availability.json').then((availability) => {
-        cy.intercept('GET', '/api/v1/availability*', {
-          body: [
-            ...availability.filter((row: { model: string }) => row.model !== 'dsv4'),
-            ...rubinRows.map(({ metrics: _metrics, ...row }) => row),
-          ],
-        });
-      });
-      cy.intercept('GET', '/api/v1/benchmarks*', (request) => {
-        if (String(request.query.model).includes('DeepSeek-V4')) {
-          request.reply({ body: rubinRows });
-        }
-      });
+      interceptMinimaxM3RubinData(rubinRows);
       cy.visit(prefix || '/');
       cy.get('[data-testid="landing-tpu-results-link"]').click();
       assertTpuView();
