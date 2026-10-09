@@ -5,6 +5,7 @@ import {
   csv,
   type ComparisonInput,
 } from '../../scripts/export-modeled-system-power';
+import { gb300DisaggRow } from '@/lib/nvl72-power.fixture';
 import { estimateChassisPower } from '@/lib/system-power-model';
 
 const h200 = (gpuWatts: number) =>
@@ -218,54 +219,31 @@ describe('offline modeled PowerX comparisons', () => {
     expect(() => buildComparison(source)).toThrow('different benchmark configurations');
   });
 
-  it('exports measured Grace inputs for NVL72 rows and leaves x86 rows unchanged', () => {
+  it('exports measured Grace inputs and the rack-share estimate for NVL72 rows, leaving x86 rows unchanged', () => {
     const source = input();
     const baseline = buildComparison(structuredClone(source));
-    // One GB200 compute tray with Grace-socket telemetry, as the dashboard would receive it.
-    const gb200 = structuredClone(source.rows[0]);
-    gb200.id = 'gb200:tray';
-    gb200.cell = 'gb200:c1';
-    gb200.audit = undefined;
-    Object.assign(gb200.benchmark, {
-      hardware: 'gb200',
-      power_audit: {
-        cpu: { sensor_kind: 'grace_socket', expected_sockets: 2, observed_sockets: 2 },
-      },
-      framework: 'dynamo-trt',
-      prefill_tp: 4,
-      decode_tp: 4,
-      num_prefill_gpu: 4,
-      num_decode_gpu: 4,
-      metrics: {
-        pp: 1,
-        pcp_size: 1,
-        power_valid: 1,
-        power_metric_schema_version: 2,
-        cpu_power_valid: 1,
-        avg_power_w: 900.25,
-        avg_total_gpu_power_w: 3601,
-        avg_cpu_socket_power_w: 250.5,
-        avg_total_cpu_power_w: 501,
-        total_cpu_energy_j: 30060,
-      },
-    });
-    source.rows.push(gb200);
+    const gb300 = structuredClone(source.rows[0]);
+    gb300.id = 'gb300:1p1d';
+    gb300.cell = 'gb300:c32';
+    gb300.audit = undefined;
+    gb300.benchmark = gb300DisaggRow();
+    source.rows.push(gb300);
     const result = buildComparison(source);
     expect(result.rows[1]).toMatchObject({
       measured_inputs: {
-        avg_gpu_w: 900.25,
+        avg_gpu_w: 594.191,
         cpu_power_valid: 1,
-        total_grace_w: 501,
-        total_grace_j: 30060,
+        total_grace_w: 392.264,
+        total_grace_j: 41_346.013,
       },
-      modeled: { status: 'unsupported', reason: 'hardware' },
+      modeled: { status: 'supported', unit: 'nvl72-tray', chassisCount: 2, pue: 1.1 },
     });
     // The x86 row and its cell are byte-identical to an export without the NVL72 row.
     expect(result.rows[0]).toEqual(baseline.rows[0]);
     expect(result.cells[0]).toEqual(baseline.cells[0]);
     expect(result.rows[0].measured_inputs).not.toHaveProperty('total_grace_w');
     // Without cpu_power_valid the row reports no Grace-side inputs.
-    delete gb200.benchmark.metrics.cpu_power_valid;
+    delete gb300.benchmark.metrics.cpu_power_valid;
     const unavailable = buildComparison(source).rows[1];
     expect(unavailable.modeled).toMatchObject({ status: 'unsupported', reason: 'cpu-telemetry' });
     expect(unavailable.measured_inputs).toMatchObject({

@@ -106,10 +106,10 @@ export const PROFIT_SKUS: ProfitSku[] = [
 ];
 
 /**
- * One GB200 NVL72 compute tray (four GPUs, two Grace sockets) with the CPU-side
- * keys the srt-slurm CPU power leg publishes. Kept out of `PROFIT_SKUS` so the
- * default bar counts the other specs lock down do not move. Watts are
- * controlled inputs, not published constants.
+ * A GB200 NVL72 aggregate deployment as the srt-slurm CPU power leg publishes it:
+ * two four-GPU compute trays on separate hosts, no per-worker telemetry, four
+ * Grace sockets. Kept out of `PROFIT_SKUS` so the default bar counts the other
+ * specs lock down do not move. Watts reuse a GB300 NVL72 replay's means.
  */
 const NVL72_SKU: ProfitSku = {
   hardware: 'gb200',
@@ -117,15 +117,15 @@ const NVL72_SKU: ProfitSku = {
   precision: 'fp4',
   curve: WIDE_CURVE,
   tputScale: 1.3,
-  gpus: 4,
+  gpus: 8,
   metrics: {
     power_valid: 1,
     power_metric_schema_version: 2,
     cpu_power_valid: 1,
-    avg_power_w: 900.25,
-    avg_total_gpu_power_w: 3601,
-    avg_cpu_socket_power_w: 250.5,
-    avg_total_cpu_power_w: 501,
+    avg_power_w: 594.191,
+    avg_total_gpu_power_w: 4753.528,
+    avg_cpu_socket_power_w: 98.066,
+    avg_total_cpu_power_w: 392.264,
   },
 };
 
@@ -173,8 +173,15 @@ export const profitBenchmarkRows = (
 export const profitNvl72Rows = (dbKey: string = PROFIT_MODEL_DB_KEY, date = PROFIT_DATE) =>
   profitBenchmarkRows(dbKey, date, undefined, [NVL72_SKU]).map((row) => ({
     ...row,
+    is_multinode: true,
+    decode_num_workers: 1,
     power_audit: {
-      cpu: { sensor_kind: 'grace_socket', expected_sockets: 2, observed_sockets: 2 },
+      cpu: {
+        sensor_kind: 'grace_socket',
+        source: 'acpi',
+        expected_sockets: 4,
+        observed_sockets: 4,
+      },
     },
   }));
 

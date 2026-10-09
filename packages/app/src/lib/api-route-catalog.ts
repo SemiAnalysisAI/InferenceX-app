@@ -869,7 +869,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/calculator/profit-power.ts',
-    sourceSha256: 'bec602714cc9dd00be80d764045b750099322a97f90a4845a8e52c0e84aaa747',
+    sourceSha256: '35e265ec33c28e4429534fadf757490b7132e9fff87cbfaa107eb919baf6f879',
     reviewArea: {
       en: 'Power-valid curve selection at fixed targets, compatible power bases, paired throughput and provisioned fallback shared by Profit UI and API.',
       zh: '利润界面与 API 共用的有效功耗曲线选择、固定目标值、功耗口径兼容性、配对吞吐量与预配估算回退。',

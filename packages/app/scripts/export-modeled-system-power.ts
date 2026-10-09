@@ -280,7 +280,7 @@ export function buildComparison(input: ComparisonInput) {
       aggregation:
         'Each replicate is modeled first. Cell means include every replicate; any unavailable value leaves its cell mean unavailable.',
       boundary:
-        'Measured GPU-board inputs; modeled IT power is GPU-chassis AC (CPU, DRAM, other host components, fans, and PSU loss) plus each chassis share of scale-out networking. Separate CPU-only frontend/router hosts are excluded. Facility power applies the chassis cooling PUE after IT power.',
+        'Measured GPU-board inputs; modeled IT power is GPU-chassis AC (CPU, DRAM, other host components, fans, and PSU loss) plus each chassis share of scale-out networking. GB200/GB300 NVL72 rows add measured Grace-socket inputs: the measured trays fold into an 18-tray rack at their mean GPU and socket power (tray NICs, optics, drives, fans and 48 V conversion; NVSwitch trays, power shelves and the rack share of scale-out networking), and each tray takes 1/18 of it. Separate CPU-only frontend/router hosts are excluded. Facility power applies the system cooling PUE after IT power.',
       extrapolation:
         'A partially allocated chassis is modeled at measured per-GPU power × 8 (the upstream model input for a full chassis), assuming the unmeasured GPUs run the same workload. Deployment values are the measured GPUs’ share of that chassis; per-GPU values divide by the modeled chassis GPU count.',
       energy_caveat:
@@ -373,6 +373,7 @@ async function main() {
     cpu_power_valid: row.measured_inputs?.cpu_power_valid,
     measured_total_grace_w: row.measured_inputs?.total_grace_w,
     modeled_status: row.modeled.status,
+    modeled_unit: row.modeled.status === 'supported' ? row.modeled.unit : null,
     unsupported_reason: row.modeled.status === 'unsupported' ? row.modeled.reason : null,
     modeled_it_w: row.modeled.status === 'supported' ? row.modeled.itWatts : null,
     modeled_it_w_per_gpu: row.modeled.status === 'supported' ? row.modeled.itWattsPerGpu : null,

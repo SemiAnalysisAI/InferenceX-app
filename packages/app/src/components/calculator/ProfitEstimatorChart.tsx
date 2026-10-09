@@ -271,6 +271,8 @@ const STRINGS = {
     powerBasis: 'Power basis',
     powerBasisLabels: {
       chassis: 'measured GPU board; CPU, DRAM, networking, storage, board, fans and PSU modeled',
+      'nvl72-tray':
+        'measured GPU board and Grace socket; tray networking, storage, fans and conversion, NVSwitch trays and power shelves modeled',
     },
     noData: 'No SKU can be priced for the current selection.',
     scrollHint: 'Scroll horizontally to view the full chart.',
@@ -302,6 +304,8 @@ const STRINGS = {
     powerBasis: '功耗口径',
     powerBasisLabels: {
       chassis: '实测 GPU 板卡功耗；CPU、DRAM、网络、存储、主板、风扇和 PSU 由模型估算',
+      'nvl72-tray':
+        '实测 GPU 板卡和 Grace socket 功耗；tray 内网络、存储、风扇和电源转换，以及 NVSwitch tray 和电源架由模型估算',
     },
     noData: '当前选择下没有可定价的 SKU。',
     scrollHint: '横向滚动查看完整图表。',

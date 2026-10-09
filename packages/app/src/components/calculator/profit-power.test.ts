@@ -2,6 +2,11 @@ import { describe, expect, it } from 'vitest';
 
 import type { BenchmarkRow } from '@/lib/api';
 import { modelSystemPower } from '@/lib/modeled-system-power';
+import {
+  gb300AggregateRow,
+  gb300DisaggRow,
+  upstreamRackWattsPerGpu,
+} from '@/lib/nvl72-power.fixture';
 import { SYSTEM_POWER_MODEL_REVISION } from '@/lib/system-power-model';
 import { Percentile, Sequence } from '@/lib/data-mappings';
 import { buildGpuGroups, interpolateForGPU } from './useThroughputData';
@@ -105,29 +110,8 @@ const labels = {
   extrapolated: 'Full-chassis extrapolation',
 };
 
-// One GB200 NVL72 compute tray on the AgentX workload: four GPUs on one host, two
-// Grace sockets. Watts are controlled inputs, not published constants; the CPU-side
-// keys follow the producer contract (InferenceX docs/results-and-ingestion.md).
-const GRACE = { avg_cpu_socket_power_w: 250.5, avg_total_cpu_power_w: 501 };
-const traySource: BenchmarkRow = {
-  ...source,
-  hardware: 'gb200',
-  framework: 'sglang',
-  prefill_tp: 4,
-  decode_tp: 4,
-  num_prefill_gpu: 4,
-  num_decode_gpu: 4,
-  power_audit: { cpu: { sensor_kind: 'grace_socket', expected_sockets: 2, observed_sockets: 2 } },
-  metrics: {
-    power_valid: 1,
-    power_metric_schema_version: 2,
-    cpu_power_valid: 1,
-    avg_power_w: 900.25,
-    avg_total_gpu_power_w: 3601,
-    ...GRACE,
-  },
-};
-const trayPoint: GPUDataPoint = { ...point, sourceRow: traySource, hwKey: 'gb200_sglang', tp: 4 };
+const traySource = gb300DisaggRow();
+const trayPoint: GPUDataPoint = { ...point, sourceRow: traySource, hwKey: 'gb300_dynamo-sglang' };
 
 describe('profit power basis preview', () => {
   it('retains the existing Steffen result for the Kimi K3 MI355X valid knots at 45', () => {
@@ -324,12 +308,23 @@ describe('profit power basis preview', () => {
     },
   );
 
-  it('distinguishes partial chassis from NVL72 rows without a rack model or CPU power', () => {
-    for (const hardware of ['gb200', 'gb300']) {
-      const tray = { ...trayPoint, sourceRow: { ...traySource, hardware } };
-      expect(modeledPowerAtTarget({ ...result, nearestPoints: [tray] }, 45)).toEqual({
-        reason: 'unsupported-power-hardware',
+  it('prices NVL72 trays on the measured-Grace rack model and refuses rows without Grace power', () => {
+    for (const [sourceRow, scaleOut] of [
+      [traySource, true],
+      [gb300AggregateRow(), false],
+    ] as const) {
+      expect(
+        modeledPowerAtTarget({ ...result, nearestPoints: [{ ...trayPoint, sourceRow }] }, 45),
+      ).toEqual({
+        kwPerGpu: expect.closeTo(
+          (upstreamRackWattsPerGpu('gb300', 594.191, 98.066, scaleOut) / 1000) * 1.1,
+          9,
+        ),
+        extrapolated: false,
+        source: { topology: 'nvl72-tray', pue: 1.1, modelRevision: SYSTEM_POWER_MODEL_REVISION },
       });
+    }
+    for (const hardware of ['gb200', 'gb300']) {
       expect(
         modeledPowerAtTarget(
           { ...result, nearestPoints: [{ ...point, sourceRow: { ...source, hardware } }] },

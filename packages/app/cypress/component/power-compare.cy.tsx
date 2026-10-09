@@ -203,6 +203,7 @@ describe('Modeled power source links', () => {
               disagg: false,
               modeledSystemPower: {
                 status: 'supported',
+                unit: 'chassis',
                 hardware: hwKey,
                 modelRevision: SYSTEM_POWER_MODEL_REVISION,
                 operatingState: { workload: 'fixed-seq-len', scaleOut: false },

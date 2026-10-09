@@ -2,7 +2,8 @@
 import { describe, it, expect } from 'vitest';
 
 import type { HardwareConfig, InferenceData } from '@/components/inference/types';
-import type { SystemPowerEstimate } from '@/lib/modeled-system-power';
+import { modelSystemPower, type SystemPowerEstimate } from '@/lib/modeled-system-power';
+import { gb300DisaggRow } from '@/lib/nvl72-power.fixture';
 import {
   SYSTEM_POWER_MODEL_REVISION,
   SYSTEM_POWER_MODEL_SOURCE_URL,
@@ -76,6 +77,7 @@ function tooltipConfig(overrides: Partial<TooltipConfig> = {}): TooltipConfig {
 
 const systemPower = {
   status: 'supported',
+  unit: 'chassis',
   hardware: 'h100',
   modelRevision: SYSTEM_POWER_MODEL_REVISION,
   operatingState: { workload: 'agentic' as const, scaleOut: true },
@@ -188,6 +190,23 @@ describe('modeled system-power tooltip', () => {
     expect(zh).toContain('假设机箱内未实测的 GPU 运行相同负载');
     expect(zh).toContain('3000 W');
     expect(zh).not.toContain('6000 W');
+  });
+
+  it('names NVL72 trays, the measured Grace socket, and the rack-share basis (en/zh)', () => {
+    const data = pt({ hwKey: 'gb300', modeledSystemPower: modelSystemPower(gb300DisaggRow()) });
+    const html = generateTooltipContent(config({ data }));
+    expect(html).toContain('2 full NVL72 compute trays · 8 GPUs');
+    expect(html).toContain('Measured Grace socket power:</strong> 98.066 W/socket');
+    expect(html).toContain('Measured: GPU boards and whole Grace sockets');
+    expect(html).toContain('each tray takes 1/18 of the rack');
+    expect(html).toContain('PUE 1.1');
+    expect(html).not.toContain('eight-GPU chassis');
+    expect(html).not.toContain('regulator');
+
+    const zh = generateTooltipContent(config({ data, locale: 'zh' }));
+    expect(zh).toContain('2 个完整 NVL72 计算 tray · 8 张 GPU');
+    expect(zh).toContain('Grace socket 实测功耗');
+    expect(zh).toContain('每个 tray 分摊机架的 1/18');
   });
 
   it('preserves the same model provenance in unofficial and date-comparison tooltips', () => {

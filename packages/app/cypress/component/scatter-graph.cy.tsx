@@ -494,7 +494,9 @@ describe('ScatterGraph', () => {
       'be.visible',
     );
     cy.contains('No measurements to plot for this selection.').should('not.exist');
-    cy.contains('eight-GPU HGX/OAM systems, not NVL72').should('be.visible');
+    cy.contains('eight-GPU HGX/OAM systems, or NVL72 with validated Grace-socket telemetry').should(
+      'be.visible',
+    );
     cy.screenshot('nvl72-empty-en-desktop', { overwrite: true });
   });
 
@@ -526,7 +528,7 @@ describe('ScatterGraph', () => {
 
     cy.contains('当前选择没有可用的整体实测功耗数值。').should('be.visible');
     cy.contains('当前选择没有可绘制的测量数据。').should('not.exist');
-    cy.contains('八卡 HGX/OAM 系统，不含 NVL72').should('be.visible');
+    cy.contains('八卡 HGX/OAM 系统，或具备已验证 Grace socket 遥测的 NVL72').should('be.visible');
     cy.screenshot('nvl72-empty-zh-mobile', { overwrite: true });
   });
 
@@ -1795,7 +1797,7 @@ describe('ScatterGraph', () => {
 
 describe('ChartDisplay modeled power disclosures', () => {
   for (const locale of ['en', 'zh'] as const) {
-    it(`states the air-cooled PUE and the NVL72 omission without overflow (${locale})`, () => {
+    it(`states the chassis and NVL72 PUEs and the NVL72 Grace input without overflow (${locale})`, () => {
       const point = createMockInferenceData({
         hwKey: 'gb200',
         hw: 'NVIDIA GB200',
@@ -1834,12 +1836,12 @@ describe('ChartDisplay modeled power disclosures', () => {
         cy.get('[data-testid="power-basis-assumptions"]')
           .should('be.visible')
           .and('contain.text', 'PUE 1.3')
-          .and('not.contain.text', 'PUE 1.1')
+          .and('contain.text', 'PUE 1.1')
           .and(
             'contain.text',
             locale === 'en'
-              ? 'NVL72 systems (GB200, GB300) and points without values are omitted from the chart'
-              : 'NVL72 系统（GB200、GB300）及缺少数值的数据点不绘制',
+              ? 'measured Grace-socket power replaces the modeled CPU and memory'
+              : '以 Grace socket 实测功耗代替 CPU 和内存的估算值',
           )
           .should(($note) => {
             expect($note[0].scrollWidth).to.be.at.most($note[0].clientWidth);

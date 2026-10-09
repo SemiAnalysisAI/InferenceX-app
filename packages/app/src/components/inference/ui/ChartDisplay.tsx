@@ -13,7 +13,11 @@ import chartDefinitions, {
 } from '@/components/inference/metric-registry';
 import { metricRowLabel } from '@/components/inference/axis-metric-explanations';
 import { getMeasuredMetricConfig } from '@/components/inference/measured-metric-config';
-import { AIR_COOLED_SYSTEM_PUE, SYSTEM_POWER_MODEL_REVISION } from '@/lib/system-power-model';
+import {
+  AIR_COOLED_SYSTEM_PUE,
+  LIQUID_COOLED_RACK_PUE,
+  SYSTEM_POWER_MODEL_REVISION,
+} from '@/lib/system-power-model';
 import {
   ALL_IN_MEASURED_AGENTIC_NOTE,
   ALL_IN_MEASURED_EMPTY,
@@ -150,7 +154,7 @@ const STRINGS = {
         'GPU Level Provisioned (TDP) · Watts are the rated TDP per GPU from the hardware registry, so the power curve is flat per hardware. Joules per output token = TDP × allocated GPUs ÷ whole-deployment output tok/s; disaggregated configurations count prefill and decode GPUs together. Hardware without a published TDP is omitted.',
       'utility-provisioned':
         'All in Provisioned · Watts are the all-in provisioned utility power per GPU from the hardware registry (SemiAnalysis Datacenter Industry Model), so the power curve is flat per hardware. Joules per output token = all-in W × allocated GPUs ÷ whole-deployment output tok/s; disaggregated configurations count prefill and decode GPUs together, unlike the ungated All-in Provisioned J per Output Token, which divides per decode GPU.',
-      'utility-modeled': `All in Measured · Measured GPU power carried through the InferenceX power model to the utility meter: modeled IT power (chassis CPU, DRAM, NICs, fans, and PSU losses, plus the chassis share of scale-out switches) × PUE ${AIR_COOLED_SYSTEM_PUE} (air-cooled, applied once), divided by the measured GPUs; joules per output token scale measured joules by the same ratio. Host power follows each run's workload state (fixed sequence length, agentic, or agentic with KV cache offload) and whether scale-out is on (multi-node, disaggregated, or Mooncake KV store runs). Power model revision ${SYSTEM_POWER_MODEL_REVISION.slice(0, 7)}. Requires validated telemetry on supported eight-GPU HGX/OAM hardware; NVL72 systems (GB200, GB300) and points without values are omitted from the chart, while the table keeps them with their measured GPU power and reason.`,
+      'utility-modeled': `All in Measured · Measured GPU power carried through the InferenceX power model to the utility meter: modeled IT power (chassis CPU, DRAM, NICs, fans, and PSU losses, plus the chassis share of scale-out switches) × PUE ${AIR_COOLED_SYSTEM_PUE} (air-cooled, applied once), divided by the measured GPUs; joules per output token scale measured joules by the same ratio. On GB200/GB300 NVL72, measured Grace-socket power replaces the modeled CPU and memory; each tray adds NICs, drives, fans, and conversion loss and an equal share of its rack's NVSwitch trays, power shelves, and scale-out switches, × PUE ${LIQUID_COOLED_RACK_PUE} (liquid-cooled). Host power follows each run's workload state (fixed sequence length, agentic, or agentic with KV cache offload) and whether scale-out is on (more than one chassis or NVL72 rack, disaggregated, or Mooncake KV store runs). Power model revision ${SYSTEM_POWER_MODEL_REVISION.slice(0, 7)}. Requires validated telemetry on supported eight-GPU HGX/OAM hardware, or validated Grace-socket telemetry on NVL72; points without values are omitted from the chart, while the table keeps them with their measured GPU power and reason.`,
     },
     vsTtft: (word: string) => `vs. ${word} Time To First Token`,
     vsE2eLatency: (pctl?: string) =>
@@ -179,7 +183,7 @@ const STRINGS = {
         'GPU 额定功耗（TDP）· 功率取硬件注册表中每 GPU 的额定 TDP，因此每种硬件的功率曲线为水平线。每输出 token 能耗 = TDP × 分配的 GPU 数 ÷ 整个部署的输出 tok/s；分离式配置将 prefill 与 decode GPU 一并计入。未公布 TDP 的硬件不绘制。',
       'utility-provisioned':
         '整体预配功耗 · 功率取硬件注册表中每 GPU 的全电源配置（all-in）市电功率（来源：SemiAnalysis Datacenter Industry Model），因此每种硬件的功率曲线为水平线。每输出 token 能耗 = all-in 功率 × 分配的 GPU 数 ÷ 整个部署的输出 tok/s；分离式配置将 prefill 与 decode GPU 一并计入，这与未加门控的“每输出 token 全电源配置能耗”按 decode GPU 计算不同。',
-      'utility-modeled': `整体实测功耗 · 将 GPU 实测功耗经 InferenceX 功耗模型推算至市电侧：IT 功耗估算（机箱内 CPU、DRAM、NIC、风扇与 PSU 损耗，加上该机箱分摊的 scale-out 交换机功耗）× PUE ${AIR_COOLED_SYSTEM_PUE}（风冷，仅应用一次），再除以实测 GPU 数；每输出 token 能耗按同一比例放大实测能耗。主机功耗按每次运行的工作负载状态（固定序列长度、智能体，或带 KV cache offload 的智能体）以及是否开启 scale-out（多节点、分离式部署或使用 Mooncake KV 存储的运行）建模。功耗模型版本 ${SYSTEM_POWER_MODEL_REVISION.slice(0, 7)}。需要已验证的遥测数据及受支持的八卡 HGX/OAM 硬件；NVL72 系统（GB200、GB300）及缺少数值的数据点不绘制，但表格仍保留这些数据点，并显示实测 GPU 功耗和不可用原因。`,
+      'utility-modeled': `整体实测功耗 · 将 GPU 实测功耗经 InferenceX 功耗模型推算至市电侧：IT 功耗估算（机箱内 CPU、DRAM、NIC、风扇与 PSU 损耗，加上该机箱分摊的 scale-out 交换机功耗）× PUE ${AIR_COOLED_SYSTEM_PUE}（风冷，仅应用一次），再除以实测 GPU 数；每输出 token 能耗按同一比例放大实测能耗。GB200/GB300 NVL72 以 Grace socket 实测功耗代替 CPU 和内存的估算值；每个 tray 另计网卡、硬盘、风扇和转换损耗，并平均分摊所在机架的 NVSwitch tray、电源架和 scale-out 交换机功耗，再 × PUE ${LIQUID_COOLED_RACK_PUE}（液冷）。主机功耗按每次运行的工作负载状态（固定序列长度、智能体，或带 KV cache offload 的智能体）以及是否开启 scale-out（跨多个机箱或 NVL72 机架、分离式部署或使用 Mooncake KV 存储的运行）建模。功耗模型版本 ${SYSTEM_POWER_MODEL_REVISION.slice(0, 7)}。需要已验证的遥测数据及受支持的八卡 HGX/OAM 硬件，NVL72 还需要已验证的 Grace socket 遥测；缺少数值的数据点不绘制，但表格仍保留这些数据点，并显示实测 GPU 功耗和不可用原因。`,
     },
     vsTtft: (word: string) => `vs. ${word === 'Median' ? '中位' : word} 首 token 延迟（TTFT）`,
     vsE2eLatency: (pctl?: string) => (pctl ? `vs. ${pctl} 端到端延迟` : 'vs. 端到端延迟'),

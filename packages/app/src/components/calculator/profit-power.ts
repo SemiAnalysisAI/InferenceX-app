@@ -1,4 +1,4 @@
-import { modelSystemPower } from '@/lib/modeled-system-power';
+import { modelSystemPower, type SystemPowerUnit } from '@/lib/modeled-system-power';
 import type { TokenRevenuePricing } from '@/components/inference/types';
 
 import {
@@ -17,11 +17,11 @@ export type ProfitPowerBasis = 'provisioned' | 'modeled' | 'compare';
 
 /**
  * What the measured + modeled budget was measured on: an eight-GPU chassis
- * measures the GPU boards and models the rest. NVL72 trays join once their rack
- * model is ported (see modelSystemPower).
+ * measures the GPU boards and models the rest; an NVL72 tray also measures its
+ * Grace sockets and takes an equal share of a modeled rack.
  */
 export interface ProfitPowerSource {
-  topology: 'chassis';
+  topology: SystemPowerUnit;
   /** Facility PUE the estimate applied once after IT power. */
   pue: number;
   modelRevision: string;
@@ -67,15 +67,16 @@ function planningPower(point: GPUDataPoint): PlanningPower {
   }
   // Partial allocations must tile one host; fully measured multi-host estimates
   // retain their validated worker-hosts or uniform-hosts topology.
+  const unitGpus = estimate.modeledGpuCount / estimate.chassisCount;
   if (
     estimate.chassisBasis === 'extrapolated' &&
-    (estimate.topologyBasis !== 'single-node' || 8 % estimate.gpuCount !== 0)
+    (estimate.topologyBasis !== 'single-node' || unitGpus % estimate.gpuCount !== 0)
   )
     return { reason: 'unsupported-power-topology' };
   return {
     kwPerGpu: (estimate.deploymentFacilityWatts / estimate.gpuCount / 1000) * 1.1,
     extrapolated: estimate.chassisBasis === 'extrapolated',
-    source: { topology: 'chassis', pue: estimate.pue, modelRevision: estimate.modelRevision },
+    source: { topology: estimate.unit, pue: estimate.pue, modelRevision: estimate.modelRevision },
   };
 }
 

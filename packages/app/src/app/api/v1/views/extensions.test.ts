@@ -2,6 +2,7 @@ import { buildCorrelationData, buildGroupedData } from '@/components/gpu-power/c
 import { servingFixture } from '@/components/video-benchmark/serving.fixture';
 import type { StoredArtifact } from '@/components/video-benchmark/stored';
 import type { BenchmarkRow } from '@/lib/api';
+import { SYSTEM_POWER_MODEL_REVISION } from '@/lib/system-power-model';
 import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { GET as cache } from './cache-reuse/route';
@@ -517,17 +518,18 @@ describe('new dashboard projections', () => {
       expect(baseline.data.rows[0].revenuePerGpuHour).toBeGreaterThan(17.159765625);
     },
   );
+  const grace = {
+    cpu_power_valid: 1,
+    avg_cpu_socket_power_w: 98.066,
+    avg_total_cpu_power_w: 196.132,
+  };
   it.each([
-    ['GPU-only telemetry', {}, 'no-cpu-power'],
-    ['invalid GPU telemetry', { power_valid: 0 }, 'no-measured-power'],
-    [
-      'Grace telemetry before the rack model is ported',
-      { cpu_power_valid: 1, avg_cpu_socket_power_w: 250.5, avg_total_cpu_power_w: 501 },
-      'unsupported-power-hardware',
-    ],
+    ['GPU-only telemetry', {}, 'grace_socket', 'no-cpu-power'],
+    ['invalid GPU telemetry', { power_valid: 0 }, 'grace_socket', 'no-measured-power'],
+    ['a module-sensor CPU audit', grace, 'module', 'no-cpu-power'],
   ] as const)(
     'retains provisioned NVL72 estimates with %s and explains missing measured power',
-    async (_name, metrics, reason) => {
+    async (_name, metrics, sensor, reason) => {
       const missing = agenticRow({
         hardware: 'gb300',
         prefill_tp: 4,
@@ -535,7 +537,7 @@ describe('new dashboard projections', () => {
         num_prefill_gpu: 4,
         num_decode_gpu: 4,
         power_audit: {
-          cpu: { sensor_kind: 'grace_socket', expected_sockets: 2, observed_sockets: 2 },
+          cpu: { sensor_kind: sensor, expected_sockets: 2, observed_sockets: 2 },
         },
         metrics: { ...agenticRow().metrics, avg_total_gpu_power_w: 2400, ...metrics },
       });
@@ -558,6 +560,40 @@ describe('new dashboard projections', () => {
       }
     },
   );
+  it('prices an NVL72 aggregate on its measured GPU and Grace-socket rack share', async () => {
+    const trays = agenticRow({
+      hardware: 'gb300',
+      is_multinode: true,
+      prefill_tp: 16,
+      decode_tp: 16,
+      num_prefill_gpu: 16,
+      num_decode_gpu: 16,
+      power_audit: {
+        cpu: { sensor_kind: 'grace_socket', expected_sockets: 8, observed_sockets: 8 },
+      },
+      metrics: {
+        ...agenticRow().metrics,
+        avg_power_w: 594.191,
+        avg_total_gpu_power_w: 9507.056,
+        ...grace,
+        avg_total_cpu_power_w: 784.528,
+      },
+    });
+    mocks.benchmarks.mockImplementation(() => Response.json([trays]));
+    const response = await gw(
+      req(
+        'profit-estimator-per-gigawatt',
+        'model=DeepSeek-V4-Pro&target=45&priceSource=custom&powerBasis=compare',
+      ),
+    );
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.data.skipped).toEqual([]);
+    expect(body.data.rows.map((row: { powerSource?: unknown }) => row.powerSource)).toEqual([
+      undefined,
+      { topology: 'nvl72-tray', pue: 1.1, modelRevision: SYSTEM_POWER_MODEL_REVISION },
+    ]);
+  });
   it.each(['modeled'])(
     'labels full-chassis extrapolation for official and overlay %s estimates',
     async (powerBasis) => {
