@@ -45,6 +45,17 @@ combinations, not the full Cartesian product of all possible filter values.
 | `submissions`                   | `direction`, `limit`, `lines`, `mode`, `offset`, `onChangeOnly`, `search`, `sort`                                                                                                                                                                                                                                                                                                                                                   |
 | `video`                         | `artifact`, `cell`, `compare`, `costs`, `gpuBasis`, `page`, `phase`, `run`, `selected`, `slot`, `source`, `view`, `workload`, `xAxis`, `yAxis`                                                                                                                                                                                                                                                                                      |
 
+Power-control visibility is presentation-only: inference power metrics are
+selectable without unlocking, and per-GW `c_power=modeled|compare` works while
+locked. The existing read-only `gpu-metrics`, `inference` and
+`profit-estimator-per-gigawatt` projections already expose those data and
+`powerBasis` choices; selectors, calculations and response contracts are unchanged.
+
+功耗控件的显示仅属于展示层改动：推理页的功耗指标无需解锁即可选择，每 GW 页的
+`c_power=modeled|compare` 在锁定状态下同样可用。现有只读视图 `gpu-metrics`、
+`inference` 和 `profit-estimator-per-gigawatt` 已覆盖这些数据和 `powerBasis` 选项，
+查询参数、计算逻辑和响应格式均不变。
+
 Cache reuse returns `data.recipes` and the resolved `params.recipe`. Pass a returned key as `recipe` (the UI uses `c_recipe`) to select the same TP/EP/DP-attention, worker, GPU, speculation, offload and fingerprint combination. Omitted or stale keys use the shared dashboard default. Runs use that recipe if available, otherwise their own best-covered recipe; inspect each bar's source row for its identity. Overlay-only configurations expose their own recipe choices. Layout orientation and label placement are presentation-only controls.
 
 ## Source audit and shared computations

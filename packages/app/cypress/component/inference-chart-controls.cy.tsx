@@ -12,13 +12,9 @@ import {
   type MockInferenceContextValues,
 } from '../support/mock-data';
 
-/**
- * Measured Energy sits behind the ↑↑↓↓ feature gate while power telemetry is
- * WIP. Unlock it and remount so the gated group is listed; the gate hook reads
- * localStorage on mount.
- */
-function mountWithPowerGroupsUnlocked() {
-  cy.window().then((win) => win.localStorage.setItem('inferencex-feature-gate', '1'));
+/** Power controls must remain available without the insider feature gate. */
+function mountWithPowerGroups() {
+  cy.window().then((win) => win.localStorage.removeItem('inferencex-feature-gate'));
   mountWithProviders(<InferenceChartControls showXAxisMode />, { inference: {}, unofficial: {} });
 }
 
@@ -40,7 +36,7 @@ function StatefulMeasuredControls({ context }: { context: MockInferenceContextVa
 }
 
 function mountMeasuredControls(metric = 'y_measuredAvgPower', locale = 'en') {
-  cy.window().then((win) => win.localStorage.setItem('inferencex-feature-gate', '1'));
+  cy.window().then((win) => win.localStorage.removeItem('inferencex-feature-gate'));
   mountWithProviders(
     <PathnameContext.Provider value={locale === 'zh' ? '/zh/inference' : '/inference'}>
       <StatefulMeasuredControls
@@ -65,13 +61,14 @@ describe('Inference ChartControls', () => {
     cy.window().then((win) => win.localStorage.removeItem('inferencex-feature-gate'));
   });
 
-  it('hides the Measured Energy group while the gate is locked', () => {
+  it('lists the measured power families and boundaries without the feature gate', () => {
+    mountWithPowerGroups();
     cy.get('[data-testid="yaxis-metric-selector"]').click('right');
-    cy.get('[data-slot="select-content"]').should('exist');
-    cy.contains('Throughput').should('exist');
-    cy.contains('Measured Power').should('not.exist');
-    cy.contains('Measured Energy').should('not.exist');
-    cy.contains('[data-slot="select-item"]', 'Measured Average Power per Chip').should('not.exist');
+    cy.contains('[data-slot="select-item"]', /^Measured Power$/u).should('exist');
+    cy.contains('[data-slot="select-item"]', /^Measured Energy$/u).should('exist');
+    cy.get('input[aria-label="Search options"]').type('All in Measured Power per Chip');
+    cy.contains('[data-slot="select-item"]', 'All in Measured Power per Chip').click();
+    cy.get('@setSelectedYAxisMetric').should('have.been.calledWith', 'y_utilityModeledWatts');
   });
 
   it('renders the model selector with the current model', () => {
@@ -111,7 +108,7 @@ describe('Inference ChartControls', () => {
   });
 
   it('finds the existing schema-v2 metric names through search', () => {
-    mountWithPowerGroupsUnlocked();
+    mountWithPowerGroups();
     const options = [
       {
         key: 'y_measuredJPerSuccessfulQuery',
