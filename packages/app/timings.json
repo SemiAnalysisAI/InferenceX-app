@@ -277,6 +277,10 @@
       "duration": 13842
     },
     {
+      "spec": "cypress/e2e/ubenchx.cy.ts",
+      "duration": 10000
+    },
+    {
       "spec": "cypress/e2e/unofficial-watermark.cy.ts",
       "duration": 1640
     },

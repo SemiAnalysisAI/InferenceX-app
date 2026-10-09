@@ -16,6 +16,16 @@ continuation stays on the newsletter and is not included in these feeds.
 Use the existing inference, first-token, and cache-reuse view contracts for live
 data; do not interpret the historical article figures as current API results.
 
+## Standalone ubenchX pages
+
+`/ubenchx` is a multi-test hub linked from the header navigation, with sub-routes
+`/ubenchx/mem-bw` and `/ubenchx/sm-l2-distance` (plus `/zh` siblings). They are not
+dashboard tabs, so they have no `DASHBOARD_API_COVERAGE` entry. Their data is published
+by the `ubenchx` view (`GET /api/v1/views/ubenchx?test=<test>&gpu=<gpu|all>`), which
+runs the same `transformUbenchxRun` and `transformSmL2Run` as the pages. The mem-bw
+Y-axis selector (MBU, bandwidth, latency) is presentation-only: every view response
+already includes all three metrics, so it adds no query parameter.
+
 ## Exact query-key inventory
 
 All endpoints are GET under /api/v1/views. Unsupported and repeated keys return 400.
@@ -43,6 +53,7 @@ combinations, not the full Cartesian product of all possible filter values.
 | `rankings`                      | `format`, `kind`, `model`, `scenario`                                                                                                                                                                                                                                                                    |
 | `reliability`                   | `asOf`, `format`, `gpus`, `range`                                                                                                                                                                                                                                                                        |
 | `submissions`                   | `direction`, `limit`, `lines`, `mode`, `offset`, `onChangeOnly`, `search`, `sort`                                                                                                                                                                                                                        |
+| `ubenchx`                       | `gpu`, `test`                                                                                                                                                                                                                                                                                            |
 | `video`                         | `artifact`, `cell`, `compare`, `costs`, `gpuBasis`, `page`, `phase`, `run`, `selected`, `slot`, `source`, `view`, `workload`, `xAxis`, `yAxis`                                                                                                                                                           |
 
 Cache reuse returns `data.recipes` and the resolved `params.recipe`. Pass a returned key as `recipe` (the UI uses `c_recipe`) to select the same TP/EP/DP-attention, worker, GPU, speculation, offload and fingerprint combination. Omitted or stale keys use the shared dashboard default. Runs use that recipe if available, otherwise their own best-covered recipe; inspect each bar's source row for its identity. Overlay-only configurations expose their own recipe choices. Layout orientation and label placement are presentation-only controls.
