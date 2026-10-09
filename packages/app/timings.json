@@ -149,10 +149,6 @@
       "duration": 1959
     },
     {
-      "spec": "cypress/e2e/gpu-power.cy.ts",
-      "duration": 11512
-    },
-    {
       "spec": "cypress/e2e/gpu-specs.cy.ts",
       "duration": 10395
     },

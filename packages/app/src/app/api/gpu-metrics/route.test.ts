@@ -28,6 +28,18 @@ vi.mock('@/components/gpu-power/types', () => ({
   parseCsvData: mockParseCsvData,
 }));
 
+const { mockGetGpuMetricsForRun } = vi.hoisted(() => ({
+  mockGetGpuMetricsForRun: vi.fn(),
+}));
+
+vi.mock('@semianalysisai/inferencex-db/connection', () => ({
+  getDb: () => ({}),
+}));
+
+vi.mock('@semianalysisai/inferencex-db/queries/gpu-metrics', () => ({
+  getGpuMetricsForRun: mockGetGpuMetricsForRun,
+}));
+
 vi.mock('adm-zip', () => {
   const csvContent = 'timestamp,index,power\n2026-03-01T00:00:00Z,0,300';
   class MockAdmZip {
@@ -44,11 +56,12 @@ vi.mock('adm-zip', () => {
   return { default: MockAdmZip };
 });
 
-import { GET } from './route';
+import { databasePayloadToResponse, GET, readGpuMetricsForView } from './route';
 import { NextRequest } from 'next/server';
 
 const originalFetch = globalThis.fetch;
 let origToken: string | undefined;
+let origReadonlyUrl: string | undefined;
 
 function req(url: string): NextRequest {
   return new NextRequest(new URL(url, 'http://localhost'));
@@ -57,7 +70,11 @@ function req(url: string): NextRequest {
 beforeEach(() => {
   vi.clearAllMocks();
   origToken = process.env.GITHUB_TOKEN;
+  origReadonlyUrl = process.env.DATABASE_READONLY_URL;
   process.env.GITHUB_TOKEN = 'test-gh-token';
+  // No readonly URL: the GitHub fallback is exercised unless a test opts in.
+  delete process.env.DATABASE_READONLY_URL;
+  mockGetGpuMetricsForRun.mockResolvedValue(null);
 });
 
 afterEach(() => {
@@ -67,6 +84,134 @@ afterEach(() => {
   } else {
     process.env.GITHUB_TOKEN = origToken;
   }
+  if (origReadonlyUrl === undefined) {
+    delete process.env.DATABASE_READONLY_URL;
+  } else {
+    process.env.DATABASE_READONLY_URL = origReadonlyUrl;
+  }
+});
+
+const multinodeSeries = {
+  artifactName: 'gpu_metrics_multinode_b200-x_0',
+  fileName: 'results/gpu_metrics_rank0.csv',
+  vendor: 'nvidia',
+  sampleIntervalS: 1,
+  sampleCount: 0,
+  gpuCount: 0,
+  startedAt: '2026-09-11T04:19:41.982Z',
+  endedAt: '2026-09-11T04:19:41.982Z',
+  sidecars: {},
+  stats: [],
+  data: [],
+};
+const storedRunPayload = {
+  workflowRun: {
+    id: 7,
+    githubRunId: 34557177019,
+    runAttempt: 1,
+    name: 'Run Sweep - dsr1 fp4 b200',
+    date: '2026-09-11',
+    htmlUrl: 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/34557177019',
+    headBranch: 'main',
+    headSha: 'deadbeef',
+    conclusion: 'success',
+    status: 'completed',
+    createdAt: '2026-09-11T04:00:00.000Z',
+  },
+  series: [
+    {
+      ...multinodeSeries,
+      id: 1,
+      artifactName: 'gpu_metrics_dsr1_conc32_b200-x_0',
+      fileName: 'gpu_metrics.csv',
+      sampleCount: 2,
+      gpuCount: 1,
+      endedAt: '2026-09-11T04:19:42.990Z',
+      data: [
+        { timestamp: '2026-09-11T04:19:41.982Z', index: 0, power: 187.8 },
+        { timestamp: '2026-09-11T04:19:42.990Z', index: 0, power: 912.1 },
+      ],
+    },
+    { ...multinodeSeries, id: 2 },
+    { ...multinodeSeries, id: 3, fileName: 'results/gpu_metrics_rank1.csv' },
+  ],
+};
+
+describe('databasePayloadToResponse', () => {
+  it('shapes the stored digest like the GitHub payload and disambiguates multinode CSVs', () => {
+    const response = databasePayloadToResponse(storedRunPayload);
+    expect(response.source).toBe('database');
+    expect(response.runInfo).toEqual({
+      id: 34557177019,
+      name: 'Run Sweep - dsr1 fp4 b200',
+      branch: 'main',
+      sha: 'deadbeef',
+      createdAt: '2026-09-11T04:00:00.000Z',
+      url: 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/34557177019',
+      conclusion: 'success',
+      status: 'completed',
+    });
+    expect(response.artifacts.map((artifact) => artifact.name)).toEqual([
+      'gpu_metrics_dsr1_conc32_b200-x_0',
+      'gpu_metrics_multinode_b200-x_0/results/gpu_metrics_rank0.csv',
+      'gpu_metrics_multinode_b200-x_0/results/gpu_metrics_rank1.csv',
+    ]);
+    expect(response.artifacts[0]!.data).toHaveLength(2);
+    expect(response.artifacts[0]!.series?.id).toBe(1);
+    expect(response.artifacts[0]!.series).not.toHaveProperty('data');
+  });
+});
+
+describe('GET /api/gpu-metrics — database first', () => {
+  it('answers stored runs without GitHub, reading every artifact for GET and one host for a view', async () => {
+    process.env.DATABASE_READONLY_URL = 'postgresql://readonly.example.test/db';
+    globalThis.fetch = vi.fn();
+    const names = databasePayloadToResponse(storedRunPayload).artifacts.map((entry) => entry.name);
+    mockGetGpuMetricsForRun.mockResolvedValueOnce(storedRunPayload);
+    const all = await GET(req('/api/gpu-metrics?runId=34557177019'));
+    expect(await all.json()).toMatchObject({
+      source: 'database',
+      artifacts: names.map((name) => ({ name })),
+    });
+    // An absent selection reads every artifact; `artifact: null` narrows to the first.
+    expect(mockGetGpuMetricsForRun).toHaveBeenCalledWith({}, 34557177019, {});
+    mockGetGpuMetricsForRun.mockResolvedValueOnce({
+      ...storedRunPayload,
+      artifactNames: names,
+      series: [storedRunPayload.series[2]],
+    });
+    const response = await readGpuMetricsForView(
+      req('/api/gpu-metrics?runId=34557177019'),
+      names[2]!,
+    );
+    expect(await response.json()).toMatchObject({
+      artifactNames: names,
+      artifacts: [{ name: names[2] }],
+    });
+    expect(mockGetGpuMetricsForRun).toHaveBeenCalledWith({}, 34557177019, { artifact: names[2] });
+    mockGetGpuMetricsForRun.mockResolvedValueOnce({
+      ...storedRunPayload,
+      artifactNames: names,
+      series: [],
+    });
+    const missing = await readGpuMetricsForView(
+      req('/api/gpu-metrics?runId=34557177019'),
+      'missing',
+    );
+    expect(await missing.json()).toMatchObject({ artifactNames: names, artifacts: [] });
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+
+  it('reports a database failure separately instead of treating it as missing data', async () => {
+    process.env.DATABASE_READONLY_URL = 'postgresql://readonly.example.test/db';
+    mockGetGpuMetricsForRun.mockRejectedValueOnce(new Error('relation does not exist'));
+    globalThis.fetch = vi.fn().mockResolvedValueOnce({ ok: false, status: 404 });
+
+    const res = await GET(req('/api/gpu-metrics?runId=99'));
+    expect(res.status).toBe(503);
+    expect(await res.json()).toMatchObject({ code: 'DATABASE_UNAVAILABLE' });
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
 });
 
 describe('GET /api/gpu-metrics', () => {
