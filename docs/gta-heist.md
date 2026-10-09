@@ -1,6 +1,6 @@
 # GTA V 3D presentation game
 
-> **Just for fun.** Easter egg themes and games do not need stable infrastructure, may be deleted at any point, and must never have tests. Any tests referenced below are legacy and should be deleted, not fixed or extended. See [Testing](./testing.md#easter-egg-themes-and-games).
+> **Just for fun.** Easter egg themes and games do not need stable infrastructure and may be deleted at any point. Keep only `optional-theme-imports.test.ts` and `optional-theme-isolation.cy.ts` to protect normal pages and SEO; do not add feature tests. See [Testing](./testing.md#easter-egg-themes-and-games).
 
 Select the GTA theme, then **Start heist**. The game is a browser-scale city sandbox,
 not the complete GTA V product or campaign.
@@ -94,9 +94,10 @@ presentation-only exclusion from API and `inferencex-skills` coverage.
 - `gta-renderer.ts`: asset loading, lighting, post-processing, cameras and disposal.
 - `gta-minimap.ts`: the radar and overview map drawn from the city data.
 - `gta-game.tsx`: bilingual controls, accessibility and lifecycle.
-- `gta-engine.test.ts`: simulation tests on the real street network.
-- `cypress/component/gta-heist.cy.tsx`: integrated controls, quick travel and Chinese UI.
-- Existing optional-theme isolation and sanity specs remain the integration guards.
+
+Game unit, component, and E2E tests have been removed. Only the two
+[main-site isolation checks](./themes.md#verification-inventory) remain;
+they do not qualify gameplay.
 
 The data pipeline that produced `sf/` is not part of the app bundle; the
 README in that directory records each source and license.

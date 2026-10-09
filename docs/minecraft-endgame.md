@@ -1,6 +1,6 @@
 # Minecraft endgame
 
-> **Just for fun.** Easter egg themes and games do not need stable infrastructure, may be deleted at any point, and must never have tests. Any tests referenced below are legacy and should be deleted, not fixed or extended. See [Testing](./testing.md#easter-egg-themes-and-games).
+> **Just for fun.** Easter egg themes and games do not need stable infrastructure and may be deleted at any point. Keep only `optional-theme-imports.test.ts` and `optional-theme-isolation.cy.ts` to protect normal pages and SEO; do not add feature tests. See [Testing](./testing.md#easter-egg-themes-and-games).
 
 The optional Minecraft game now has a survival completion route. It remains an
 independent browser implementation, with simplified terrain and combat rather
@@ -59,12 +59,9 @@ This is a presentation-only easter egg. No benchmark data, filter, data view,
 API, skill output, route, metadata or sharing parameter changes; the public-view
 API/skills parity requirement is therefore excluded.
 
-`mc-endgame.test.ts` covers frame validation, both portal orientations,
-round-trip travel, terrain generation, twelve-eye activation, dragon/crystal
-combat, rewards, completion, versioned saves, death and arrow collision.
-`mc-game.test.ts` retains the existing crafting, mining, physics and save
-regressions. Browser tests cover launched-game interactions separately from the
-default light/dark resource and SEO checks.
+Game unit, component, and E2E tests have been removed. Only the two
+[main-site isolation checks](./themes.md#verification-inventory) remain;
+they do not qualify gameplay or the endgame completion path.
 
 ## 中文说明
 
@@ -83,6 +80,6 @@ Minecraft 彩蛋新增了可通关的生存流程：搭建并点燃黑曜石传�
 切换时清理旧的区块和实体渲染资源。
 
 所有新增代码、贴图和样式仍位于用户主动启动游戏之后的动态加载边界内。
-新增单元测试并扩展默认主题的资源隔离检查；现有 SEO 检查保持不变。
+已移除游戏功能测试，仅保留 `optional-theme-imports.test.ts` 和 `optional-theme-isolation.cy.ts`，用于保护普通页面的资源隔离和 SEO。
 未修改基准测试数据、筛选项、公开数据视图、API、skills、路由或页面元数据，
 因此按纯展示彩蛋处理，不涉及 API/skills 数据对等变更。

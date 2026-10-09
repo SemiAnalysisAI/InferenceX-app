@@ -1,6 +1,6 @@
 # Playable Minecraft
 
-> **Just for fun.** Easter egg themes and games do not need stable infrastructure, may be deleted at any point, and must never have tests. Any tests referenced below are legacy and should be deleted, not fixed or extended. See [Testing](./testing.md#easter-egg-themes-and-games).
+> **Just for fun.** Easter egg themes and games do not need stable infrastructure and may be deleted at any point. Keep only `optional-theme-imports.test.ts` and `optional-theme-isolation.cy.ts` to protect normal pages and SEO; do not add feature tests. See [Testing](./testing.md#easter-egg-themes-and-games).
 
 Select **Minecraft** in the theme picker, then **Play Minecraft** in the banner
 under the header. The game opens in a dialog and is imported only after the
@@ -129,14 +129,8 @@ exclusion from API and `@semianalysisai/inferencex-skills` parity.
 
 ## Verification
 
-- `mc-game.test.ts`: deterministic generation, bedrock and ores, lighting,
-  crafting (shaped, shifted, shapeless, 3×3 only), smelting, vanilla mining
-  times and harvest tiers, gravity and collision, raycasts, drops and pickup,
-  placement, inventory clicks and drag distribution, furnace smelting, fluids
-  and obsidian/cobblestone, fall damage, death and respawn, commands, mob
-  determinism and save round trips.
-- `cypress/e2e/minecraft-game.cy.ts`: asset isolation on light and dark, launch
-  from the theme, world creation, Escape to pause, Save and Quit, Escape closing
-  the dialog with focus restored, and the Chinese mobile launcher.
+- Game unit, component, and E2E tests have been removed. The two retained
+  [isolation checks](./themes.md#verification-inventory) protect normal pages
+  and SEO; they do not qualify gameplay.
 - Development builds expose `render_game_to_text()` and `mc_debug()`; production
   builds do not.

@@ -20,10 +20,17 @@ Enforced by `@pr-claude` — missing/low-quality tests are flagged 🔴 BLOCKING
 
 Easter egg themes (Minecraft, CS:GO, GTA, DOOM, Halo, and any future optional theme) and every game launched from them are just for fun. They do not need stable infrastructure, have no compatibility or uptime guarantees, and may be deleted at any point without notice or migration.
 
-- They must **never** have tests. Do not add unit, Cypress component, Cypress E2E, or CI checks for them.
+- Do not add unit, Cypress component, Cypress E2E, or CI checks for easter egg features. The only exceptions are the two main-site isolation checks listed below.
 - The mandatory test requirements above do not apply to them. Reviewers, including `@pr-claude`, must not flag missing tests on easter egg code as blocking or request them.
-- When an existing easter egg test fails or slows CI, delete it. Do not fix or extend it.
+- When an existing easter egg feature test fails or slows CI, delete it. Do not fix or extend it. This does not apply to the two retained isolation checks.
 - Do not add CI jobs, shards, fixtures, or infrastructure for them.
+
+Retain and maintain exactly these two checks:
+
+- `packages/app/src/lib/optional-theme-imports.test.ts`: prevents eager optional code, engine, asset, and font imports into normal pages.
+- `packages/app/cypress/e2e/optional-theme-isolation.cy.ts`: checks normal light/dark pages, embeds, resource loading, and SEO, including theme activation/cleanup needed to verify isolation.
+
+Keep their existing support helper and E2E browser setup. Do not expand these checks into gameplay, decorative styling, or visual-fidelity tests. Ordinary light/dark UI, dashboard, export, and announcement tests remain required; those are not easter egg tests.
 
 ## Pre-commit Checklist
 
@@ -40,7 +47,7 @@ The local `bun run test:e2e` command is a curated smoke suite across the core pa
 
 The complete suite is `bun run test:e2e:full`. It runs all Cypress component and integration specs. GitHub Actions runs that same coverage as four component shards (Chrome) plus four integration shards per browser, Chrome and Firefox. The CI workflow is the merge gate for the full E2E suite.
 
-`packages/app/timings.json` is the committed `cypress-split` baseline. Its unit guard requires one positive timing for every integration spec and rejects removed entries. Regenerate the baseline from an observed full integration run when specs are added, removed, or materially rebalanced.
+`packages/app/timings.json` is the committed `cypress-split` baseline. Its unit guard requires one positive timing for every integration spec and rejects removed entries. When deleting specs, remove only their entries and preserve the remaining observed timings. Regenerate the baseline from an observed full integration run when specs are added or materially rebalanced; do not invent durations.
 
 With an `E2E_FIXTURES=1` app server running on port 3000, run this from the repository root:
 

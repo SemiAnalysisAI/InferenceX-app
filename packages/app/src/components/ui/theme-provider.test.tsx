@@ -40,17 +40,8 @@ async function renderSavedTheme(theme: string) {
   });
 }
 
-describe('saved theme migration', () => {
-  it('replaces retired kart state, storage and CSS class with dark', async () => {
-    await renderSavedTheme('kart');
-    expect(container.querySelector('span')?.textContent).toBe('dark');
-    expect(localStorage.getItem('theme')).toBe('dark');
-    expect(document.documentElement.classList.contains('dark')).toBe(true);
-    expect(document.documentElement.classList.contains('kart')).toBe(false);
-    expect(document.documentElement.classList.contains('test-font')).toBe(true);
-  });
-
-  it.each([...APP_THEMES, 'system'])('preserves the saved %s preference', async (theme) => {
+describe('saved standard theme preferences', () => {
+  it.each(['light', 'dark', 'system'])('preserves the saved %s preference', async (theme) => {
     await renderSavedTheme(theme);
     expect(container.querySelector('span')?.textContent).toBe(theme);
     expect(localStorage.getItem('theme')).toBe(theme);

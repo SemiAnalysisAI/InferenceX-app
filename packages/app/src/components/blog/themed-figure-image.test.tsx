@@ -53,9 +53,6 @@ describe('ThemedFigureImage', () => {
   it.each([
     ['light', '/chart-light.png'],
     ['dark', '/chart-dark.png'],
-    ['minecraft', '/chart-dark.png'],
-    ['csgo', '/chart-dark.png'],
-    ['gta', '/chart-dark.png'],
   ])('gives an eager cold %s render exactly one active source', (theme, expectedSrc) => {
     document.documentElement.className = theme;
     renderUi(
@@ -109,7 +106,7 @@ describe('ThemedFigureImage', () => {
     const image = container.querySelector(':scope > img');
     expect(image?.getAttribute('src')).toBe('/chart-light.png');
 
-    themeState.resolvedTheme = 'csgo';
+    themeState.resolvedTheme = 'dark';
     renderUi(
       <ThemedFigureImage
         srcLight="/chart-light.png"

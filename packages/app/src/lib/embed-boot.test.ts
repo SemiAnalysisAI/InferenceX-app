@@ -1,7 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it } from 'vitest';
 import { embedBootScript } from './embed';
-import { APP_THEMES } from './themes';
 
 afterEach(() => {
   document.documentElement.className = '';
@@ -11,7 +10,7 @@ afterEach(() => {
 });
 
 describe('embed theme prepaint', () => {
-  for (const savedTheme of APP_THEMES) {
+  for (const savedTheme of ['light', 'dark']) {
     it.each(['light', 'dark'] as const)(
       `replaces saved ${savedTheme} with the requested %s skin before hydration`,
       (embedTheme) => {

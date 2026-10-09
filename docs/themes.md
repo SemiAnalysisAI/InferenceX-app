@@ -1,6 +1,6 @@
 # Presentation themes
 
-> **Just for fun.** Easter egg themes and games do not need stable infrastructure, may be deleted at any point, and must never have tests. Any tests referenced below are legacy and should be deleted, not fixed or extended. See [Testing](./testing.md#easter-egg-themes-and-games).
+> **Just for fun.** Easter egg themes and games do not need stable infrastructure and may be deleted at any point. Keep only `optional-theme-imports.test.ts` and `optional-theme-isolation.cy.ts` to protect normal pages and SEO; do not add feature tests. See [Testing](./testing.md#easter-egg-themes-and-games).
 
 ## How Minecraft works
 
@@ -200,15 +200,6 @@ Crawler and theme-switch comparisons also cover robots, Open Graph and Twitter
 metadata. Run these tests on the implementation's final commit before merge;
 passing an earlier commit does not verify later changes.
 
-- Cycling through every theme and wrapping to light, keyboard activation,
-  persistence after reload, and cleanup on exit.
-- No CS:GO image requests on a cold light/dark landing; images load only
-  after selection, with a smaller mobile crop.
-- No GTA artwork requests on a cold light/dark landing; responsive artwork
-  loads on selection, the Pricedown wordmark renders, persist after reload, and unmount on exit.
-- CS:GO uses dark figure sources and chart colors, including high-contrast.
-  PNG/MP4 footer contrast uses the same shared dark-theme classifier.
-- Desktop and narrow mobile landing/chart views, keyboard focus, Chinese
-  routes, and reduced-motion preference.
-- Existing Minecraft decoration/splash tests, shared header utility geometry,
-  and wordmark contrast run alongside the new tests.
+These are the only retained easter-egg-related test suites. Theme styling,
+gameplay, and decorative feature tests have been removed. Shared header,
+wordmark, figure, and export tests cover only normal light/dark behavior.

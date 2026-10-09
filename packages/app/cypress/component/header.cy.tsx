@@ -6,7 +6,6 @@ import { Header } from '@/components/header/header';
 import { ThemeProvider } from '@/components/ui/theme-provider';
 import { APP_THEMES } from '@/lib/themes';
 import { createMockRouter } from '../support/mock-router';
-import { cycleToTheme } from '../support/theme';
 
 // Mounted outside the Next app shell; next-style-loader inserts the global
 // stylesheet before this anchor, so it must exist before the import below.
@@ -51,8 +50,7 @@ describe('Header', () => {
   }
 
   beforeEach(() => {
-    // ThemeProvider reads persisted state, so isolate each header story from
-    // the preceding theme-cycle story (including the minecraft audio tools).
+    // ThemeProvider reads persisted state; isolate each header story.
     cy.window().then((win) => win.localStorage.setItem('theme', 'light'));
     mockRouter = createMockRouter();
     mountHeader('/');
@@ -241,9 +239,9 @@ describe('Header', () => {
     });
   });
 
-  it('uses the same resting icon color and shape for all three header utilities in each theme', () => {
+  it('uses the same resting icon color and shape for all three header utilities in light and dark', () => {
     cy.viewport(390, 844);
-    for (const [index, theme] of APP_THEMES.entries()) {
+    for (const theme of ['light', 'dark']) {
       cy.get('[data-testid="theme-toggle"]').should(
         'have.attr',
         'aria-label',
@@ -261,8 +259,7 @@ describe('Header', () => {
           });
         }
       });
-      const next = APP_THEMES[index + 1];
-      if (next) {
+      if (theme === 'light') {
         cy.get('[data-testid="theme-toggle"]').click();
       }
     }
@@ -377,20 +374,6 @@ describe('Header', () => {
       cy.get('[data-testid="mobile-menu"] a').each(($link) => {
         const rect = $link[0].getBoundingClientRect();
         expect(rect.height, `${$link.text()} link height`).to.be.at.least(MIN_TOUCH_PX - EPSILON);
-      });
-    });
-
-    it('exposes the minecraft audio toggles in the mobile menu without overflowing', () => {
-      cycleToTheme('minecraft');
-      cy.get('html').should('have.class', 'minecraft');
-      cy.get('[data-testid="mobile-menu-toggle"]').click();
-      cy.get('[data-testid="mobile-menu"]').within(() => {
-        cy.get('button[aria-label="Mute music"]').should('be.visible');
-        cy.get('button[aria-label="Mute click sounds"]').should('be.visible');
-      });
-      cy.get('[data-testid="header"]').then(($header) => {
-        const header = $header[0];
-        expect(header.scrollWidth, 'header scrollWidth').to.be.at.most(header.clientWidth);
       });
     });
   });

@@ -17,7 +17,7 @@ This prompt is runtime context. Do not assume any file path from it without veri
   - Charts MUST render real data. If you see "No data available" or "Please change the model, sequence, precision, date range or GPU", the task is NOT complete — keep debugging.
   - If you touched inference or evaluation, verify the unofficial-run overlay path too. AGENTS.md §"Unofficial Run Support" lists the exact code paths and the `?unofficialrun=<github-actions-run-id>` URL pattern; do not skip it.
   - New interactive elements get a `track()` call per AGENTS.md §"Analytics Requirement" (`[section]_[action]` naming).
-  - Tests added/updated per `docs/testing.md` (unit tests colocated as `<module>.test.ts`; E2E tests in `packages/app/cypress/e2e/`). Missing or low-quality tests are blocking. Exception: easter egg themes and games must never have tests.
+  - Tests added/updated per `docs/testing.md` (unit tests colocated as `<module>.test.ts`; E2E tests in `packages/app/cypress/e2e/`). Missing or low-quality tests are blocking. Exception: easter egg themes and games have no feature tests. Retain and maintain only `packages/app/src/lib/optional-theme-imports.test.ts` and `packages/app/cypress/e2e/optional-theme-isolation.cy.ts` to protect normal pages, embeds, resource loading, and SEO; do not expand them into gameplay or visual-fidelity coverage.
   - Run `bun run typecheck && bun run lint && bun run test:unit && bun run test:e2e` — all green before commit.
 - code — backend / DB / ETL / ingest / lib / API-route logic, no UI surface:
   - Add or update colocated unit tests (`<module>.test.ts`) per `docs/testing.md`; run `bun run typecheck && bun run lint && bun run test:unit`.
