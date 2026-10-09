@@ -1,5 +1,5 @@
 {
-  "modelRevision": "dc717fb5d58620bee3bbb579b5e25160b21ce45d",
+  "modelRevision": "c4adf83c3bab29e258d94e9d5e7e67432f5edd46",
   "cases": [
     {
       "hardware": "h100",
@@ -2016,6 +2016,896 @@
       "gpuWattsPerGpu": 3060.0,
       "expected": null,
       "referenceError": "DC load 26472.3 W exceeds modeled PSU capacity 26400 W (4+2)"
+    }
+  ],
+  "rackCases": [
+    {
+      "hardware": "gb200",
+      "workload": "fixed-seq-len",
+      "scaleOut": false,
+      "gpuWattsPerGpu": 594.191,
+      "graceSocketWatts": 98.066,
+      "expected": {
+        "itWatts": 62837.97441815042,
+        "facilityWatts": 69121.77185996546
+      }
+    },
+    {
+      "hardware": "gb200",
+      "workload": "fixed-seq-len",
+      "scaleOut": false,
+      "gpuWattsPerGpu": 824.0,
+      "graceSocketWatts": 98.8,
+      "expected": {
+        "itWatts": 80674.0345377182,
+        "facilityWatts": 88741.43799149002
+      }
+    },
+    {
+      "hardware": "gb200",
+      "workload": "fixed-seq-len",
+      "scaleOut": false,
+      "gpuWattsPerGpu": 0.0,
+      "graceSocketWatts": 98.066,
+      "expected": null,
+      "referenceError": "Rack PSU load below 5% requires a calibrated low-load profile"
+    },
+    {
+      "hardware": "gb200",
+      "workload": "fixed-seq-len",
+      "scaleOut": false,
+      "gpuWattsPerGpu": 1200.0,
+      "graceSocketWatts": 98.066,
+      "expected": {
+        "itWatts": 110013.3440240909,
+        "facilityWatts": 121014.6784265
+      }
+    },
+    {
+      "hardware": "gb200",
+      "workload": "fixed-seq-len",
+      "scaleOut": false,
+      "gpuWattsPerGpu": 594.191,
+      "graceSocketWatts": 500.0,
+      "expected": {
+        "itWatts": 78419.13923761019,
+        "facilityWatts": 86261.05316137121
+      }
+    },
+    {
+      "hardware": "gb200",
+      "workload": "fixed-seq-len",
+      "scaleOut": false,
+      "gpuWattsPerGpu": 1590.0,
+      "graceSocketWatts": 98.066,
+      "expected": {
+        "itWatts": 140228.60818643487,
+        "facilityWatts": 154251.46900507837
+      }
+    },
+    {
+      "hardware": "gb200",
+      "workload": "fixed-seq-len",
+      "scaleOut": false,
+      "gpuWattsPerGpu": 1600.0,
+      "graceSocketWatts": 98.066,
+      "expected": null,
+      "referenceError": "Rack bus load exceeds redundant power-shelf capacity"
+    },
+    {
+      "hardware": "gb200",
+      "workload": "fixed-seq-len",
+      "scaleOut": true,
+      "gpuWattsPerGpu": 594.191,
+      "graceSocketWatts": 98.066,
+      "expected": {
+        "itWatts": 64402.129335522135,
+        "facilityWatts": 70842.34226907436
+      }
+    },
+    {
+      "hardware": "gb200",
+      "workload": "fixed-seq-len",
+      "scaleOut": true,
+      "gpuWattsPerGpu": 824.0,
+      "graceSocketWatts": 98.8,
+      "expected": {
+        "itWatts": 82242.11046166682,
+        "facilityWatts": 90466.3215078335
+      }
+    },
+    {
+      "hardware": "gb200",
+      "workload": "fixed-seq-len",
+      "scaleOut": true,
+      "gpuWattsPerGpu": 0.0,
+      "graceSocketWatts": 98.066,
+      "expected": null,
+      "referenceError": "Rack PSU load below 5% requires a calibrated low-load profile"
+    },
+    {
+      "hardware": "gb200",
+      "workload": "fixed-seq-len",
+      "scaleOut": true,
+      "gpuWattsPerGpu": 1200.0,
+      "graceSocketWatts": 98.066,
+      "expected": {
+        "itWatts": 111624.90585418598,
+        "facilityWatts": 122787.39643960459
+      }
+    },
+    {
+      "hardware": "gb200",
+      "workload": "fixed-seq-len",
+      "scaleOut": true,
+      "gpuWattsPerGpu": 594.191,
+      "graceSocketWatts": 500.0,
+      "expected": {
+        "itWatts": 79986.7029975338,
+        "facilityWatts": 87985.37329728718
+      }
+    },
+    {
+      "hardware": "gb200",
+      "workload": "fixed-seq-len",
+      "scaleOut": true,
+      "gpuWattsPerGpu": 1580.0,
+      "graceSocketWatts": 98.066,
+      "expected": {
+        "itWatts": 141096.6561564812,
+        "facilityWatts": 155206.3217721293
+      }
+    },
+    {
+      "hardware": "gb200",
+      "workload": "fixed-seq-len",
+      "scaleOut": true,
+      "gpuWattsPerGpu": 1590.0,
+      "graceSocketWatts": 98.066,
+      "expected": null,
+      "referenceError": "Rack bus load exceeds redundant power-shelf capacity"
+    },
+    {
+      "hardware": "gb200",
+      "workload": "agentic",
+      "scaleOut": false,
+      "gpuWattsPerGpu": 594.191,
+      "graceSocketWatts": 98.066,
+      "expected": {
+        "itWatts": 62849.19766010339,
+        "facilityWatts": 69134.11742611373
+      }
+    },
+    {
+      "hardware": "gb200",
+      "workload": "agentic",
+      "scaleOut": false,
+      "gpuWattsPerGpu": 824.0,
+      "graceSocketWatts": 98.8,
+      "expected": {
+        "itWatts": 80685.98365465685,
+        "facilityWatts": 88754.58202012254
+      }
+    },
+    {
+      "hardware": "gb200",
+      "workload": "agentic",
+      "scaleOut": false,
+      "gpuWattsPerGpu": 0.0,
+      "graceSocketWatts": 98.066,
+      "expected": null,
+      "referenceError": "Rack PSU load below 5% requires a calibrated low-load profile"
+    },
+    {
+      "hardware": "gb200",
+      "workload": "agentic",
+      "scaleOut": false,
+      "gpuWattsPerGpu": 1200.0,
+      "graceSocketWatts": 98.066,
+      "expected": {
+        "itWatts": 110027.66141052607,
+        "facilityWatts": 121030.42755157869
+      }
+    },
+    {
+      "hardware": "gb200",
+      "workload": "agentic",
+      "scaleOut": false,
+      "gpuWattsPerGpu": 594.191,
+      "graceSocketWatts": 500.0,
+      "expected": {
+        "itWatts": 78430.9953503426,
+        "facilityWatts": 86274.09488537686
+      }
+    },
+    {
+      "hardware": "gb200",
+      "workload": "agentic",
+      "scaleOut": false,
+      "gpuWattsPerGpu": 1590.0,
+      "graceSocketWatts": 98.066,
+      "expected": {
+        "itWatts": 140245.48272783787,
+        "facilityWatts": 154270.03100062168
+      }
+    },
+    {
+      "hardware": "gb200",
+      "workload": "agentic",
+      "scaleOut": false,
+      "gpuWattsPerGpu": 1600.0,
+      "graceSocketWatts": 98.066,
+      "expected": null,
+      "referenceError": "Rack bus load exceeds redundant power-shelf capacity"
+    },
+    {
+      "hardware": "gb200",
+      "workload": "agentic",
+      "scaleOut": true,
+      "gpuWattsPerGpu": 594.191,
+      "graceSocketWatts": 98.066,
+      "expected": {
+        "itWatts": 64414.64107014584,
+        "facilityWatts": 70856.10517716043
+      }
+    },
+    {
+      "hardware": "gb200",
+      "workload": "agentic",
+      "scaleOut": true,
+      "gpuWattsPerGpu": 824.0,
+      "graceSocketWatts": 98.8,
+      "expected": {
+        "itWatts": 82255.38306695975,
+        "facilityWatts": 90480.92137365573
+      }
+    },
+    {
+      "hardware": "gb200",
+      "workload": "agentic",
+      "scaleOut": true,
+      "gpuWattsPerGpu": 0.0,
+      "graceSocketWatts": 98.066,
+      "expected": null,
+      "referenceError": "Rack PSU load below 5% requires a calibrated low-load profile"
+    },
+    {
+      "hardware": "gb200",
+      "workload": "agentic",
+      "scaleOut": true,
+      "gpuWattsPerGpu": 1200.0,
+      "graceSocketWatts": 98.066,
+      "expected": {
+        "itWatts": 111640.72603329082,
+        "facilityWatts": 122804.7986366199
+      }
+    },
+    {
+      "hardware": "gb200",
+      "workload": "agentic",
+      "scaleOut": true,
+      "gpuWattsPerGpu": 594.191,
+      "graceSocketWatts": 500.0,
+      "expected": {
+        "itWatts": 79999.87819095406,
+        "facilityWatts": 87999.86601004947
+      }
+    },
+    {
+      "hardware": "gb200",
+      "workload": "agentic",
+      "scaleOut": true,
+      "gpuWattsPerGpu": 1580.0,
+      "graceSocketWatts": 98.066,
+      "expected": {
+        "itWatts": 141115.08455399313,
+        "facilityWatts": 155226.59300939247
+      }
+    },
+    {
+      "hardware": "gb200",
+      "workload": "agentic",
+      "scaleOut": true,
+      "gpuWattsPerGpu": 1590.0,
+      "graceSocketWatts": 98.066,
+      "expected": null,
+      "referenceError": "Rack bus load exceeds redundant power-shelf capacity"
+    },
+    {
+      "hardware": "gb200",
+      "workload": "agentic-cpu-offloading",
+      "scaleOut": false,
+      "gpuWattsPerGpu": 594.191,
+      "graceSocketWatts": 98.066,
+      "expected": {
+        "itWatts": 62942.08402613086,
+        "facilityWatts": 69236.29242874395
+      }
+    },
+    {
+      "hardware": "gb200",
+      "workload": "agentic-cpu-offloading",
+      "scaleOut": false,
+      "gpuWattsPerGpu": 824.0,
+      "graceSocketWatts": 98.8,
+      "expected": {
+        "itWatts": 80784.76263128986,
+        "facilityWatts": 88863.23889441886
+      }
+    },
+    {
+      "hardware": "gb200",
+      "workload": "agentic-cpu-offloading",
+      "scaleOut": false,
+      "gpuWattsPerGpu": 0.0,
+      "graceSocketWatts": 98.066,
+      "expected": null,
+      "referenceError": "Rack PSU load below 5% requires a calibrated low-load profile"
+    },
+    {
+      "hardware": "gb200",
+      "workload": "agentic-cpu-offloading",
+      "scaleOut": false,
+      "gpuWattsPerGpu": 1200.0,
+      "graceSocketWatts": 98.066,
+      "expected": {
+        "itWatts": 110145.74838705028,
+        "facilityWatts": 121160.32322575532
+      }
+    },
+    {
+      "hardware": "gb200",
+      "workload": "agentic-cpu-offloading",
+      "scaleOut": false,
+      "gpuWattsPerGpu": 594.191,
+      "graceSocketWatts": 500.0,
+      "expected": {
+        "itWatts": 78529.01951325682,
+        "facilityWatts": 86381.92146458251
+      }
+    },
+    {
+      "hardware": "gb200",
+      "workload": "agentic-cpu-offloading",
+      "scaleOut": false,
+      "gpuWattsPerGpu": 1590.0,
+      "graceSocketWatts": 98.066,
+      "expected": {
+        "itWatts": 140384.31814996662,
+        "facilityWatts": 154422.7499649633
+      }
+    },
+    {
+      "hardware": "gb200",
+      "workload": "agentic-cpu-offloading",
+      "scaleOut": false,
+      "gpuWattsPerGpu": 1600.0,
+      "graceSocketWatts": 98.066,
+      "expected": null,
+      "referenceError": "Rack bus load exceeds redundant power-shelf capacity"
+    },
+    {
+      "hardware": "gb200",
+      "workload": "agentic-cpu-offloading",
+      "scaleOut": true,
+      "gpuWattsPerGpu": 594.191,
+      "graceSocketWatts": 98.066,
+      "expected": {
+        "itWatts": 64518.00992889223,
+        "facilityWatts": 70969.81092178146
+      }
+    },
+    {
+      "hardware": "gb200",
+      "workload": "agentic-cpu-offloading",
+      "scaleOut": true,
+      "gpuWattsPerGpu": 824.0,
+      "graceSocketWatts": 98.8,
+      "expected": {
+        "itWatts": 82364.92349896567,
+        "facilityWatts": 90601.41584886225
+      }
+    },
+    {
+      "hardware": "gb200",
+      "workload": "agentic-cpu-offloading",
+      "scaleOut": true,
+      "gpuWattsPerGpu": 0.0,
+      "graceSocketWatts": 98.066,
+      "expected": null,
+      "referenceError": "Rack PSU load below 5% requires a calibrated low-load profile"
+    },
+    {
+      "hardware": "gb200",
+      "workload": "agentic-cpu-offloading",
+      "scaleOut": true,
+      "gpuWattsPerGpu": 1200.0,
+      "graceSocketWatts": 98.066,
+      "expected": {
+        "itWatts": 111771.02500758128,
+        "facilityWatts": 122948.12750833941
+      }
+    },
+    {
+      "hardware": "gb200",
+      "workload": "agentic-cpu-offloading",
+      "scaleOut": true,
+      "gpuWattsPerGpu": 594.191,
+      "graceSocketWatts": 500.0,
+      "expected": {
+        "itWatts": 80108.62867386066,
+        "facilityWatts": 88119.49154124672
+      }
+    },
+    {
+      "hardware": "gb200",
+      "workload": "agentic-cpu-offloading",
+      "scaleOut": true,
+      "gpuWattsPerGpu": 1570.0,
+      "graceSocketWatts": 98.066,
+      "expected": {
+        "itWatts": 140495.1228960112,
+        "facilityWatts": 154544.63518561234
+      }
+    },
+    {
+      "hardware": "gb200",
+      "workload": "agentic-cpu-offloading",
+      "scaleOut": true,
+      "gpuWattsPerGpu": 1580.0,
+      "graceSocketWatts": 98.066,
+      "expected": null,
+      "referenceError": "Rack PSU output exceeds continuous capacity"
+    },
+    {
+      "hardware": "gb300",
+      "workload": "fixed-seq-len",
+      "scaleOut": false,
+      "gpuWattsPerGpu": 594.191,
+      "graceSocketWatts": 98.066,
+      "expected": {
+        "itWatts": 66359.6284996607,
+        "facilityWatts": 72995.59134962677
+      }
+    },
+    {
+      "hardware": "gb300",
+      "workload": "fixed-seq-len",
+      "scaleOut": false,
+      "gpuWattsPerGpu": 824.0,
+      "graceSocketWatts": 98.8,
+      "expected": {
+        "itWatts": 84204.98329573697,
+        "facilityWatts": 92625.48162531067
+      }
+    },
+    {
+      "hardware": "gb300",
+      "workload": "fixed-seq-len",
+      "scaleOut": false,
+      "gpuWattsPerGpu": 0.0,
+      "graceSocketWatts": 98.066,
+      "expected": {
+        "itWatts": 20546.66363840935,
+        "facilityWatts": 22601.330002250288
+      }
+    },
+    {
+      "hardware": "gb300",
+      "workload": "fixed-seq-len",
+      "scaleOut": false,
+      "gpuWattsPerGpu": 1400.0,
+      "graceSocketWatts": 98.066,
+      "expected": {
+        "itWatts": 129219.90903655815,
+        "facilityWatts": 142141.89994021397
+      }
+    },
+    {
+      "hardware": "gb300",
+      "workload": "fixed-seq-len",
+      "scaleOut": false,
+      "gpuWattsPerGpu": 594.191,
+      "graceSocketWatts": 500.0,
+      "expected": {
+        "itWatts": 81948.87700246178,
+        "facilityWatts": 90143.76470270797
+      }
+    },
+    {
+      "hardware": "gb300",
+      "workload": "fixed-seq-len",
+      "scaleOut": false,
+      "gpuWattsPerGpu": 1560.0,
+      "graceSocketWatts": 98.066,
+      "expected": {
+        "itWatts": 141585.13978948956,
+        "facilityWatts": 155743.65376843853
+      }
+    },
+    {
+      "hardware": "gb300",
+      "workload": "fixed-seq-len",
+      "scaleOut": false,
+      "gpuWattsPerGpu": 1570.0,
+      "graceSocketWatts": 98.066,
+      "expected": null,
+      "referenceError": "Rack bus load exceeds redundant power-shelf capacity"
+    },
+    {
+      "hardware": "gb300",
+      "workload": "fixed-seq-len",
+      "scaleOut": true,
+      "gpuWattsPerGpu": 594.191,
+      "graceSocketWatts": 98.066,
+      "expected": {
+        "itWatts": 69578.692882237,
+        "facilityWatts": 76536.5621704607
+      }
+    },
+    {
+      "hardware": "gb300",
+      "workload": "fixed-seq-len",
+      "scaleOut": true,
+      "gpuWattsPerGpu": 824.0,
+      "graceSocketWatts": 98.8,
+      "expected": {
+        "itWatts": 87434.59823282536,
+        "facilityWatts": 96178.0580561079
+      }
+    },
+    {
+      "hardware": "gb300",
+      "workload": "fixed-seq-len",
+      "scaleOut": true,
+      "gpuWattsPerGpu": 0.0,
+      "graceSocketWatts": 98.066,
+      "expected": {
+        "itWatts": 23766.7803505017,
+        "facilityWatts": 26143.458385551872
+      }
+    },
+    {
+      "hardware": "gb300",
+      "workload": "fixed-seq-len",
+      "scaleOut": true,
+      "gpuWattsPerGpu": 1400.0,
+      "graceSocketWatts": 98.066,
+      "expected": {
+        "itWatts": 132163.4492620041,
+        "facilityWatts": 145379.79418820454
+      }
+    },
+    {
+      "hardware": "gb300",
+      "workload": "fixed-seq-len",
+      "scaleOut": true,
+      "gpuWattsPerGpu": 594.191,
+      "graceSocketWatts": 500.0,
+      "expected": {
+        "itWatts": 85177.12628933658,
+        "facilityWatts": 93694.83891827024
+      }
+    },
+    {
+      "hardware": "gb300",
+      "workload": "fixed-seq-len",
+      "scaleOut": true,
+      "gpuWattsPerGpu": 1540.0,
+      "graceSocketWatts": 98.066,
+      "expected": {
+        "itWatts": 142803.51478948956,
+        "facilityWatts": 157083.86626843852
+      }
+    },
+    {
+      "hardware": "gb300",
+      "workload": "fixed-seq-len",
+      "scaleOut": true,
+      "gpuWattsPerGpu": 1550.0,
+      "graceSocketWatts": 98.066,
+      "expected": null,
+      "referenceError": "Rack bus load exceeds redundant power-shelf capacity"
+    },
+    {
+      "hardware": "gb300",
+      "workload": "agentic",
+      "scaleOut": false,
+      "gpuWattsPerGpu": 594.191,
+      "graceSocketWatts": 98.066,
+      "expected": {
+        "itWatts": 66373.78106910313,
+        "facilityWatts": 73011.15917601345
+      }
+    },
+    {
+      "hardware": "gb300",
+      "workload": "agentic",
+      "scaleOut": false,
+      "gpuWattsPerGpu": 824.0,
+      "graceSocketWatts": 98.8,
+      "expected": {
+        "itWatts": 84219.938213029,
+        "facilityWatts": 92641.93203433191
+      }
+    },
+    {
+      "hardware": "gb300",
+      "workload": "agentic",
+      "scaleOut": false,
+      "gpuWattsPerGpu": 0.0,
+      "graceSocketWatts": 98.066,
+      "expected": {
+        "itWatts": 20559.217112266575,
+        "facilityWatts": 22615.138823493235
+      }
+    },
+    {
+      "hardware": "gb300",
+      "workload": "agentic",
+      "scaleOut": false,
+      "gpuWattsPerGpu": 1400.0,
+      "graceSocketWatts": 98.066,
+      "expected": {
+        "itWatts": 129239.06412869992,
+        "facilityWatts": 142162.97054156993
+      }
+    },
+    {
+      "hardware": "gb300",
+      "workload": "agentic",
+      "scaleOut": false,
+      "gpuWattsPerGpu": 594.191,
+      "graceSocketWatts": 500.0,
+      "expected": {
+        "itWatts": 81963.72928360812,
+        "facilityWatts": 90160.10221196894
+      }
+    },
+    {
+      "hardware": "gb300",
+      "workload": "agentic",
+      "scaleOut": false,
+      "gpuWattsPerGpu": 1560.0,
+      "graceSocketWatts": 98.066,
+      "expected": {
+        "itWatts": 141585.13978948956,
+        "facilityWatts": 155743.65376843853
+      }
+    },
+    {
+      "hardware": "gb300",
+      "workload": "agentic",
+      "scaleOut": false,
+      "gpuWattsPerGpu": 1570.0,
+      "graceSocketWatts": 98.066,
+      "expected": null,
+      "referenceError": "Rack bus load exceeds redundant power-shelf capacity"
+    },
+    {
+      "hardware": "gb300",
+      "workload": "agentic",
+      "scaleOut": true,
+      "gpuWattsPerGpu": 594.191,
+      "graceSocketWatts": 98.066,
+      "expected": {
+        "itWatts": 69595.81129624568,
+        "facilityWatts": 76555.39242587026
+      }
+    },
+    {
+      "hardware": "gb300",
+      "workload": "agentic",
+      "scaleOut": true,
+      "gpuWattsPerGpu": 824.0,
+      "graceSocketWatts": 98.8,
+      "expected": {
+        "itWatts": 87452.58691568681,
+        "facilityWatts": 96197.8456072555
+      }
+    },
+    {
+      "hardware": "gb300",
+      "workload": "agentic",
+      "scaleOut": true,
+      "gpuWattsPerGpu": 0.0,
+      "graceSocketWatts": 98.066,
+      "expected": {
+        "itWatts": 23782.027793627734,
+        "facilityWatts": 26160.23057299051
+      }
+    },
+    {
+      "hardware": "gb300",
+      "workload": "agentic",
+      "scaleOut": true,
+      "gpuWattsPerGpu": 1400.0,
+      "graceSocketWatts": 98.066,
+      "expected": {
+        "itWatts": 132163.4492620041,
+        "facilityWatts": 145379.79418820454
+      }
+    },
+    {
+      "hardware": "gb300",
+      "workload": "agentic",
+      "scaleOut": true,
+      "gpuWattsPerGpu": 594.191,
+      "graceSocketWatts": 500.0,
+      "expected": {
+        "itWatts": 85195.00378029885,
+        "facilityWatts": 93714.50415832874
+      }
+    },
+    {
+      "hardware": "gb300",
+      "workload": "agentic",
+      "scaleOut": true,
+      "gpuWattsPerGpu": 1540.0,
+      "graceSocketWatts": 98.066,
+      "expected": {
+        "itWatts": 142803.51478948956,
+        "facilityWatts": 157083.86626843852
+      }
+    },
+    {
+      "hardware": "gb300",
+      "workload": "agentic",
+      "scaleOut": true,
+      "gpuWattsPerGpu": 1550.0,
+      "graceSocketWatts": 98.066,
+      "expected": null,
+      "referenceError": "Rack bus load exceeds redundant power-shelf capacity"
+    },
+    {
+      "hardware": "gb300",
+      "workload": "agentic-cpu-offloading",
+      "scaleOut": false,
+      "gpuWattsPerGpu": 594.191,
+      "graceSocketWatts": 98.066,
+      "expected": {
+        "itWatts": 66490.48715116392,
+        "facilityWatts": 73139.53586628032
+      }
+    },
+    {
+      "hardware": "gb300",
+      "workload": "agentic-cpu-offloading",
+      "scaleOut": false,
+      "gpuWattsPerGpu": 824.0,
+      "graceSocketWatts": 98.8,
+      "expected": {
+        "itWatts": 84343.14651741722,
+        "facilityWatts": 92777.46116915895
+      }
+    },
+    {
+      "hardware": "gb300",
+      "workload": "agentic-cpu-offloading",
+      "scaleOut": false,
+      "gpuWattsPerGpu": 0.0,
+      "graceSocketWatts": 98.066,
+      "expected": {
+        "itWatts": 20662.958678774354,
+        "facilityWatts": 22729.25454665179
+      }
+    },
+    {
+      "hardware": "gb300",
+      "workload": "agentic-cpu-offloading",
+      "scaleOut": false,
+      "gpuWattsPerGpu": 1400.0,
+      "graceSocketWatts": 98.066,
+      "expected": {
+        "itWatts": 129396.4236949979,
+        "facilityWatts": 142336.0660644977
+      }
+    },
+    {
+      "hardware": "gb300",
+      "workload": "agentic-cpu-offloading",
+      "scaleOut": false,
+      "gpuWattsPerGpu": 594.191,
+      "graceSocketWatts": 500.0,
+      "expected": {
+        "itWatts": 82086.10599140775,
+        "facilityWatts": 90294.71659054853
+      }
+    },
+    {
+      "hardware": "gb300",
+      "workload": "agentic-cpu-offloading",
+      "scaleOut": false,
+      "gpuWattsPerGpu": 1560.0,
+      "graceSocketWatts": 98.066,
+      "expected": {
+        "itWatts": 141585.13978948956,
+        "facilityWatts": 155743.65376843853
+      }
+    },
+    {
+      "hardware": "gb300",
+      "workload": "agentic-cpu-offloading",
+      "scaleOut": false,
+      "gpuWattsPerGpu": 1570.0,
+      "graceSocketWatts": 98.066,
+      "expected": null,
+      "referenceError": "Rack bus load exceeds redundant power-shelf capacity"
+    },
+    {
+      "hardware": "gb300",
+      "workload": "agentic-cpu-offloading",
+      "scaleOut": true,
+      "gpuWattsPerGpu": 594.191,
+      "graceSocketWatts": 98.066,
+      "expected": {
+        "itWatts": 69736.59790892138,
+        "facilityWatts": 76710.25769981352
+      }
+    },
+    {
+      "hardware": "gb300",
+      "workload": "agentic-cpu-offloading",
+      "scaleOut": true,
+      "gpuWattsPerGpu": 824.0,
+      "graceSocketWatts": 98.8,
+      "expected": {
+        "itWatts": 87600.4172544885,
+        "facilityWatts": 96360.45897993735
+      }
+    },
+    {
+      "hardware": "gb300",
+      "workload": "agentic-cpu-offloading",
+      "scaleOut": true,
+      "gpuWattsPerGpu": 0.0,
+      "graceSocketWatts": 98.066,
+      "expected": {
+        "itWatts": 23907.63198172559,
+        "facilityWatts": 26298.39517989815
+      }
+    },
+    {
+      "hardware": "gb300",
+      "workload": "agentic-cpu-offloading",
+      "scaleOut": true,
+      "gpuWattsPerGpu": 1400.0,
+      "graceSocketWatts": 98.066,
+      "expected": {
+        "itWatts": 132163.4492620041,
+        "facilityWatts": 145379.79418820454
+      }
+    },
+    {
+      "hardware": "gb300",
+      "workload": "agentic-cpu-offloading",
+      "scaleOut": true,
+      "gpuWattsPerGpu": 594.191,
+      "graceSocketWatts": 500.0,
+      "expected": {
+        "itWatts": 85341.93431040499,
+        "facilityWatts": 93876.1277414455
+      }
+    },
+    {
+      "hardware": "gb300",
+      "workload": "agentic-cpu-offloading",
+      "scaleOut": true,
+      "gpuWattsPerGpu": 1540.0,
+      "graceSocketWatts": 98.066,
+      "expected": {
+        "itWatts": 142803.51478948956,
+        "facilityWatts": 157083.86626843852
+      }
+    },
+    {
+      "hardware": "gb300",
+      "workload": "agentic-cpu-offloading",
+      "scaleOut": true,
+      "gpuWattsPerGpu": 1550.0,
+      "graceSocketWatts": 98.066,
+      "expected": null,
+      "referenceError": "Rack bus load exceeds redundant power-shelf capacity"
     }
   ]
 }
