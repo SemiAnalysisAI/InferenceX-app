@@ -7,7 +7,7 @@ describe('Page Load & Navigation', () => {
   });
 
   it('page loads with correct title', () => {
-    cy.title().should('contain', 'InferenceX');
+    cy.title().should('eq', 'AI Accelerator System Benchmark | AcceleratorX by SemiAnalysis');
   });
 
   it('page renders without JavaScript errors', () => {
