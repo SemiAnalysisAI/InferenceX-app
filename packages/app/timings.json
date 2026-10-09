@@ -21,6 +21,10 @@
       "duration": 2596
     },
     {
+      "spec": "cypress/e2e/agentic-workload-explorer.cy.ts",
+      "duration": 4000
+    },
+    {
       "spec": "cypress/e2e/agentx-dataset-click-path.cy.ts",
       "duration": 1249
     },
@@ -157,6 +161,10 @@
       "duration": 10395
     },
     {
+      "spec": "cypress/e2e/optional-theme-isolation.cy.ts",
+      "duration": 216000
+    },
+    {
       "spec": "cypress/e2e/gradient-labels.cy.ts",
       "duration": 4951
     },
@@ -267,6 +275,10 @@
     {
       "spec": "cypress/e2e/ttft-x-axis-toggle.cy.ts",
       "duration": 13842
+    },
+    {
+      "spec": "cypress/e2e/ubenchx.cy.ts",
+      "duration": 10000
     },
     {
       "spec": "cypress/e2e/unofficial-watermark.cy.ts",

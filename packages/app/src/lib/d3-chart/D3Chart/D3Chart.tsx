@@ -154,6 +154,7 @@ function D3ChartInner<T>(
       dismissTooltip={dismissTooltip}
       hideTooltipElements={hideTooltipElements}
       instructions={instructions}
+      zoomEnabled={zoomConfig?.enabled ?? false}
       testId={testId}
       grabCursor={grabCursor}
       legendElement={legendElement}

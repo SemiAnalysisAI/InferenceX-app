@@ -205,6 +205,313 @@ export const apiRouteCatalog = [
     operationId: 'get-video-view',
     sourceSha256: '566405f7db1eb5ea141b54384238e1b531bfe616c7fcd65b8653aed30d7ba007',
   },
+  // Agentic Workload Explorer page backend (frozen ProxyTrace snapshot).
+  {
+    source: 'src/app/api/v1/agentic-workload-explorer/cache/route.ts',
+    path: '/api/v1/agentic-workload-explorer/cache',
+    method: 'GET',
+    classification: 'page-bff',
+    exclusionReason: {
+      en: 'Agentic Workload Explorer page backend over a frozen, anonymized ProxyTrace snapshot; response shapes follow the feature-gated pages and are not a stable public contract.',
+      zh: 'Agentic Workload Explorer 页面后端，读取冻结的匿名 ProxyTrace 快照；响应结构跟随受功能开关控制的页面，不是稳定的公开契约。',
+    },
+    sourceSha256: '370214e2ea83499c508d1856e2c8961150aba2c20d54c8ca21b5ba24756ab2c5',
+  },
+  {
+    source: 'src/app/api/v1/agentic-workload-explorer/cache/heatmap/route.ts',
+    path: '/api/v1/agentic-workload-explorer/cache/heatmap',
+    method: 'GET',
+    classification: 'page-bff',
+    exclusionReason: {
+      en: 'Agentic Workload Explorer page backend over a frozen, anonymized ProxyTrace snapshot; response shapes follow the feature-gated pages and are not a stable public contract.',
+      zh: 'Agentic Workload Explorer 页面后端，读取冻结的匿名 ProxyTrace 快照；响应结构跟随受功能开关控制的页面，不是稳定的公开契约。',
+    },
+    sourceSha256: '07c479c3a0ec7d1c94d1cda29a79ecdfb3eb9bb83fea7db380999423c46a978e',
+  },
+  {
+    source: 'src/app/api/v1/agentic-workload-explorer/costs/route.ts',
+    path: '/api/v1/agentic-workload-explorer/costs',
+    method: 'GET',
+    classification: 'page-bff',
+    exclusionReason: {
+      en: 'Agentic Workload Explorer page backend over a frozen, anonymized ProxyTrace snapshot; response shapes follow the feature-gated pages and are not a stable public contract.',
+      zh: 'Agentic Workload Explorer 页面后端，读取冻结的匿名 ProxyTrace 快照；响应结构跟随受功能开关控制的页面，不是稳定的公开契约。',
+    },
+    sourceSha256: 'dc520d1902bf3a1a2a575d07ca19d6836e40e7bc12edadd05fad6c1cbc644e86',
+  },
+  {
+    source: 'src/app/api/v1/agentic-workload-explorer/errors/route.ts',
+    path: '/api/v1/agentic-workload-explorer/errors',
+    method: 'GET',
+    classification: 'page-bff',
+    exclusionReason: {
+      en: 'Agentic Workload Explorer page backend over a frozen, anonymized ProxyTrace snapshot; response shapes follow the feature-gated pages and are not a stable public contract.',
+      zh: 'Agentic Workload Explorer 页面后端，读取冻结的匿名 ProxyTrace 快照；响应结构跟随受功能开关控制的页面，不是稳定的公开契约。',
+    },
+    sourceSha256: '005d87694eebf066477903a1eb2ca458ad8d1fd7b00a606a05b288f8fa524537',
+  },
+  {
+    source: 'src/app/api/v1/agentic-workload-explorer/fast-mode/route.ts',
+    path: '/api/v1/agentic-workload-explorer/fast-mode',
+    method: 'GET',
+    classification: 'page-bff',
+    exclusionReason: {
+      en: 'Agentic Workload Explorer page backend over a frozen, anonymized ProxyTrace snapshot; response shapes follow the feature-gated pages and are not a stable public contract.',
+      zh: 'Agentic Workload Explorer 页面后端，读取冻结的匿名 ProxyTrace 快照；响应结构跟随受功能开关控制的页面，不是稳定的公开契约。',
+    },
+    sourceSha256: '46716a72bf3cec5e1c08caf6dda5c886e30e01010c8f422d66c2c687f1af82bc',
+  },
+  {
+    source: 'src/app/api/v1/agentic-workload-explorer/graphs/route.ts',
+    path: '/api/v1/agentic-workload-explorer/graphs',
+    method: 'GET',
+    classification: 'page-bff',
+    exclusionReason: {
+      en: 'Agentic Workload Explorer page backend over a frozen, anonymized ProxyTrace snapshot; response shapes follow the feature-gated pages and are not a stable public contract.',
+      zh: 'Agentic Workload Explorer 页面后端，读取冻结的匿名 ProxyTrace 快照；响应结构跟随受功能开关控制的页面，不是稳定的公开契约。',
+    },
+    sourceSha256: '46abe3b1f7987e6aac38597cb9005d588c450af609c9105c8ca7766640efba09',
+  },
+  {
+    source: 'src/app/api/v1/agentic-workload-explorer/harnesses/route.ts',
+    path: '/api/v1/agentic-workload-explorer/harnesses',
+    method: 'GET',
+    classification: 'page-bff',
+    exclusionReason: {
+      en: 'Agentic Workload Explorer page backend over a frozen, anonymized ProxyTrace snapshot; response shapes follow the feature-gated pages and are not a stable public contract.',
+      zh: 'Agentic Workload Explorer 页面后端，读取冻结的匿名 ProxyTrace 快照；响应结构跟随受功能开关控制的页面，不是稳定的公开契约。',
+    },
+    sourceSha256: '5eaa5404736bf2e67050e8c1d0eff04df3c42d36e89e3efa2f673069636c7b8d',
+  },
+  {
+    source: 'src/app/api/v1/agentic-workload-explorer/latency/route.ts',
+    path: '/api/v1/agentic-workload-explorer/latency',
+    method: 'GET',
+    classification: 'page-bff',
+    exclusionReason: {
+      en: 'Agentic Workload Explorer page backend over a frozen, anonymized ProxyTrace snapshot; response shapes follow the feature-gated pages and are not a stable public contract.',
+      zh: 'Agentic Workload Explorer 页面后端，读取冻结的匿名 ProxyTrace 快照；响应结构跟随受功能开关控制的页面，不是稳定的公开契约。',
+    },
+    sourceSha256: '89422bfc202739688f35d19c0e5380aa81bb19d9543f8d3600c211643868552f',
+  },
+  {
+    source: 'src/app/api/v1/agentic-workload-explorer/models/route.ts',
+    path: '/api/v1/agentic-workload-explorer/models',
+    method: 'GET',
+    classification: 'page-bff',
+    exclusionReason: {
+      en: 'Agentic Workload Explorer page backend over a frozen, anonymized ProxyTrace snapshot; response shapes follow the feature-gated pages and are not a stable public contract.',
+      zh: 'Agentic Workload Explorer 页面后端，读取冻结的匿名 ProxyTrace 快照；响应结构跟随受功能开关控制的页面，不是稳定的公开契约。',
+    },
+    sourceSha256: '965cf0517fc20ba13fe65fea9ffb4380e1a85b1039b08186d9ac39b0511a46cf',
+  },
+  {
+    source: 'src/app/api/v1/agentic-workload-explorer/overview/route.ts',
+    path: '/api/v1/agentic-workload-explorer/overview',
+    method: 'GET',
+    classification: 'page-bff',
+    exclusionReason: {
+      en: 'Agentic Workload Explorer page backend over a frozen, anonymized ProxyTrace snapshot; response shapes follow the feature-gated pages and are not a stable public contract.',
+      zh: 'Agentic Workload Explorer 页面后端，读取冻结的匿名 ProxyTrace 快照；响应结构跟随受功能开关控制的页面，不是稳定的公开契约。',
+    },
+    sourceSha256: '43ff1d2c7db95c428569262a5a8effbb7697acdf91c3d353651b6e293dc64299',
+  },
+  {
+    source: 'src/app/api/v1/agentic-workload-explorer/platform/route.ts',
+    path: '/api/v1/agentic-workload-explorer/platform',
+    method: 'GET',
+    classification: 'page-bff',
+    exclusionReason: {
+      en: 'Agentic Workload Explorer page backend over a frozen, anonymized ProxyTrace snapshot; response shapes follow the feature-gated pages and are not a stable public contract.',
+      zh: 'Agentic Workload Explorer 页面后端，读取冻结的匿名 ProxyTrace 快照；响应结构跟随受功能开关控制的页面，不是稳定的公开契约。',
+    },
+    sourceSha256: 'aecf2db2cfccbd990bceba07c89d92265f7f73a2ea2d36c91af10474910af29f',
+  },
+  {
+    source: 'src/app/api/v1/agentic-workload-explorer/proxy-health/route.ts',
+    path: '/api/v1/agentic-workload-explorer/proxy-health',
+    method: 'GET',
+    classification: 'page-bff',
+    exclusionReason: {
+      en: 'Agentic Workload Explorer page backend over a frozen, anonymized ProxyTrace snapshot; response shapes follow the feature-gated pages and are not a stable public contract.',
+      zh: 'Agentic Workload Explorer 页面后端，读取冻结的匿名 ProxyTrace 快照；响应结构跟随受功能开关控制的页面，不是稳定的公开契约。',
+    },
+    sourceSha256: 'b7d543b31e29a7f902029a67034ae94fb9c913e47dd3e468673e97d40cfae4f6',
+  },
+  {
+    source: 'src/app/api/v1/agentic-workload-explorer/requests/[id]/hash-ids/route.ts',
+    path: '/api/v1/agentic-workload-explorer/requests/{id}/hash-ids',
+    method: 'GET',
+    classification: 'page-bff',
+    exclusionReason: {
+      en: 'Agentic Workload Explorer page backend over a frozen, anonymized ProxyTrace snapshot; response shapes follow the feature-gated pages and are not a stable public contract.',
+      zh: 'Agentic Workload Explorer 页面后端，读取冻结的匿名 ProxyTrace 快照；响应结构跟随受功能开关控制的页面，不是稳定的公开契约。',
+    },
+    sourceSha256: 'd0c295e551207552e8e9cba0d015afaad2be0d224658f3388edf6d81c680ea78',
+  },
+  {
+    source: 'src/app/api/v1/agentic-workload-explorer/rps/route.ts',
+    path: '/api/v1/agentic-workload-explorer/rps',
+    method: 'GET',
+    classification: 'page-bff',
+    exclusionReason: {
+      en: 'Agentic Workload Explorer page backend over a frozen, anonymized ProxyTrace snapshot; response shapes follow the feature-gated pages and are not a stable public contract.',
+      zh: 'Agentic Workload Explorer 页面后端，读取冻结的匿名 ProxyTrace 快照；响应结构跟随受功能开关控制的页面，不是稳定的公开契约。',
+    },
+    sourceSha256: 'c7fe747051c826efd14897da8ae11a13de2f9ad5bccc0f0fad2e3571713c2808',
+  },
+  {
+    source: 'src/app/api/v1/agentic-workload-explorer/session-insights/route.ts',
+    path: '/api/v1/agentic-workload-explorer/session-insights',
+    method: 'GET',
+    classification: 'page-bff',
+    exclusionReason: {
+      en: 'Agentic Workload Explorer page backend over a frozen, anonymized ProxyTrace snapshot; response shapes follow the feature-gated pages and are not a stable public contract.',
+      zh: 'Agentic Workload Explorer 页面后端，读取冻结的匿名 ProxyTrace 快照；响应结构跟随受功能开关控制的页面，不是稳定的公开契约。',
+    },
+    sourceSha256: '0c8703e7d056fe13fea239ce400be49bbca8ea59e12e539fa5e49058db9c4a32',
+  },
+  {
+    source: 'src/app/api/v1/agentic-workload-explorer/session-reuse/route.ts',
+    path: '/api/v1/agentic-workload-explorer/session-reuse',
+    method: 'GET',
+    classification: 'page-bff',
+    exclusionReason: {
+      en: 'Agentic Workload Explorer page backend over a frozen, anonymized ProxyTrace snapshot; response shapes follow the feature-gated pages and are not a stable public contract.',
+      zh: 'Agentic Workload Explorer 页面后端，读取冻结的匿名 ProxyTrace 快照；响应结构跟随受功能开关控制的页面，不是稳定的公开契约。',
+    },
+    sourceSha256: 'a18261a34726be9475a27a240bde43db5b46ae270bbb0a6b528af14f3fd472f2',
+  },
+  {
+    source: 'src/app/api/v1/agentic-workload-explorer/sessions/route.ts',
+    path: '/api/v1/agentic-workload-explorer/sessions',
+    method: 'GET',
+    classification: 'page-bff',
+    exclusionReason: {
+      en: 'Agentic Workload Explorer page backend over a frozen, anonymized ProxyTrace snapshot; response shapes follow the feature-gated pages and are not a stable public contract.',
+      zh: 'Agentic Workload Explorer 页面后端，读取冻结的匿名 ProxyTrace 快照；响应结构跟随受功能开关控制的页面，不是稳定的公开契约。',
+    },
+    sourceSha256: 'b91dc0ffd6405d8b6602b7334644cc0f60efa24aeb684c6198595dcc717bec20',
+  },
+  {
+    source: 'src/app/api/v1/agentic-workload-explorer/sessions/[id]/route.ts',
+    path: '/api/v1/agentic-workload-explorer/sessions/{id}',
+    method: 'GET',
+    classification: 'page-bff',
+    exclusionReason: {
+      en: 'Agentic Workload Explorer page backend over a frozen, anonymized ProxyTrace snapshot; response shapes follow the feature-gated pages and are not a stable public contract.',
+      zh: 'Agentic Workload Explorer 页面后端，读取冻结的匿名 ProxyTrace 快照；响应结构跟随受功能开关控制的页面，不是稳定的公开契约。',
+    },
+    sourceSha256: '7f8a78150b2e45a1bd12c1f811cd3cd3e5cb8d92e9614bad633f054fcdd547c5',
+  },
+  {
+    source: 'src/app/api/v1/agentic-workload-explorer/sessions/[id]/hash-stats/route.ts',
+    path: '/api/v1/agentic-workload-explorer/sessions/{id}/hash-stats',
+    method: 'GET',
+    classification: 'page-bff',
+    exclusionReason: {
+      en: 'Agentic Workload Explorer page backend over a frozen, anonymized ProxyTrace snapshot; response shapes follow the feature-gated pages and are not a stable public contract.',
+      zh: 'Agentic Workload Explorer 页面后端，读取冻结的匿名 ProxyTrace 快照；响应结构跟随受功能开关控制的页面，不是稳定的公开契约。',
+    },
+    sourceSha256: '420e8c77979b7736ce24645299dff889d4fe108dd3a9809c32ce03ef8d1e1db8',
+  },
+  {
+    source: 'src/app/api/v1/agentic-workload-explorer/sessions/[id]/stats/route.ts',
+    path: '/api/v1/agentic-workload-explorer/sessions/{id}/stats',
+    method: 'GET',
+    classification: 'page-bff',
+    exclusionReason: {
+      en: 'Agentic Workload Explorer page backend over a frozen, anonymized ProxyTrace snapshot; response shapes follow the feature-gated pages and are not a stable public contract.',
+      zh: 'Agentic Workload Explorer 页面后端，读取冻结的匿名 ProxyTrace 快照；响应结构跟随受功能开关控制的页面，不是稳定的公开契约。',
+    },
+    sourceSha256: '82b7adce40b7b93e870a052a8f7bbc5f72ac59689e92adb74483c4c8f6995840',
+  },
+  {
+    source: 'src/app/api/v1/agentic-workload-explorer/streaming/route.ts',
+    path: '/api/v1/agentic-workload-explorer/streaming',
+    method: 'GET',
+    classification: 'page-bff',
+    exclusionReason: {
+      en: 'Agentic Workload Explorer page backend over a frozen, anonymized ProxyTrace snapshot; response shapes follow the feature-gated pages and are not a stable public contract.',
+      zh: 'Agentic Workload Explorer 页面后端，读取冻结的匿名 ProxyTrace 快照；响应结构跟随受功能开关控制的页面，不是稳定的公开契约。',
+    },
+    sourceSha256: '9ee7e049d30950b8a94b86e75bcafbf63f9551d9bbcb50519e7374ded4775e30',
+  },
+  {
+    source: 'src/app/api/v1/agentic-workload-explorer/tool-analytics/route.ts',
+    path: '/api/v1/agentic-workload-explorer/tool-analytics',
+    method: 'GET',
+    classification: 'page-bff',
+    exclusionReason: {
+      en: 'Agentic Workload Explorer page backend over a frozen, anonymized ProxyTrace snapshot; response shapes follow the feature-gated pages and are not a stable public contract.',
+      zh: 'Agentic Workload Explorer 页面后端，读取冻结的匿名 ProxyTrace 快照；响应结构跟随受功能开关控制的页面，不是稳定的公开契约。',
+    },
+    sourceSha256: '1afd518ebafefc63833779726062317685c21ef434de675a7da65f123ad60217',
+  },
+  {
+    source: 'src/app/api/v1/agentic-workload-explorer/tool-analytics/sequences/route.ts',
+    path: '/api/v1/agentic-workload-explorer/tool-analytics/sequences',
+    method: 'GET',
+    classification: 'page-bff',
+    exclusionReason: {
+      en: 'Agentic Workload Explorer page backend over a frozen, anonymized ProxyTrace snapshot; response shapes follow the feature-gated pages and are not a stable public contract.',
+      zh: 'Agentic Workload Explorer 页面后端，读取冻结的匿名 ProxyTrace 快照；响应结构跟随受功能开关控制的页面，不是稳定的公开契约。',
+    },
+    sourceSha256: '1be4d1eaec96688c9a53bc6a6c5d80904601d92c9c40212de64d8bd2ddb47c3c',
+  },
+  {
+    source: 'src/app/api/v1/agentic-workload-explorer/traffic/route.ts',
+    path: '/api/v1/agentic-workload-explorer/traffic',
+    method: 'GET',
+    classification: 'page-bff',
+    exclusionReason: {
+      en: 'Agentic Workload Explorer page backend over a frozen, anonymized ProxyTrace snapshot; response shapes follow the feature-gated pages and are not a stable public contract.',
+      zh: 'Agentic Workload Explorer 页面后端，读取冻结的匿名 ProxyTrace 快照；响应结构跟随受功能开关控制的页面，不是稳定的公开契约。',
+    },
+    sourceSha256: '6d628b258d8460f29ce46688920df318d9a7e2ebcc763cb9a781e1741a031081',
+  },
+  {
+    source: 'src/app/api/v1/agentic-workload-explorer/trends/route.ts',
+    path: '/api/v1/agentic-workload-explorer/trends',
+    method: 'GET',
+    classification: 'page-bff',
+    exclusionReason: {
+      en: 'Agentic Workload Explorer page backend over a frozen, anonymized ProxyTrace snapshot; response shapes follow the feature-gated pages and are not a stable public contract.',
+      zh: 'Agentic Workload Explorer 页面后端，读取冻结的匿名 ProxyTrace 快照；响应结构跟随受功能开关控制的页面，不是稳定的公开契约。',
+    },
+    sourceSha256: '51f8b316a9963d16073bcba950c827af19b8c5c7a91c093f4a474f42e9b6085b',
+  },
+  {
+    source: 'src/app/api/v1/agentic-workload-explorer/trends/harness-versions/route.ts',
+    path: '/api/v1/agentic-workload-explorer/trends/harness-versions',
+    method: 'GET',
+    classification: 'page-bff',
+    exclusionReason: {
+      en: 'Agentic Workload Explorer page backend over a frozen, anonymized ProxyTrace snapshot; response shapes follow the feature-gated pages and are not a stable public contract.',
+      zh: 'Agentic Workload Explorer 页面后端，读取冻结的匿名 ProxyTrace 快照；响应结构跟随受功能开关控制的页面，不是稳定的公开契约。',
+    },
+    sourceSha256: '686aab16e8e71b5f5a48eb1c63dfd331de637090e178483fd01b29eb81da03ba',
+  },
+  {
+    source: 'src/app/api/v1/agentic-workload-explorer/web-search/route.ts',
+    path: '/api/v1/agentic-workload-explorer/web-search',
+    method: 'GET',
+    classification: 'page-bff',
+    exclusionReason: {
+      en: 'Agentic Workload Explorer page backend over a frozen, anonymized ProxyTrace snapshot; response shapes follow the feature-gated pages and are not a stable public contract.',
+      zh: 'Agentic Workload Explorer 页面后端，读取冻结的匿名 ProxyTrace 快照；响应结构跟随受功能开关控制的页面，不是稳定的公开契约。',
+    },
+    sourceSha256: '48c4e1c195df50347807518ab2adc7db259bb77400898fde705da18a433b9d65',
+  },
+  // End Agentic Workload Explorer page backend.
+  {
+    source: 'src/app/api/v1/views/ubenchx/route.ts',
+    path: '/api/v1/views/ubenchx',
+    method: 'GET',
+    classification: 'published-read',
+    operationId: 'get-ubenchx-view',
+    sourceSha256: 'd4f10db463732d39b4ab43da67ddafcbe9a12ae85a453169adc7fe83aabecdcf',
+  },
   {
     source: 'src/app/api/v1/operatorx/runs/route.ts',
     path: '/api/v1/operatorx/runs',
@@ -261,6 +568,14 @@ export const apiRouteCatalog = [
     sourceSha256: 'dbd2a0022410ac80203a1bd3c4b2290719b2691fe8813168d0d13c698cfd89e3',
   },
 
+  {
+    source: 'src/app/api/v1/pareto/route.ts',
+    path: '/api/v1/pareto',
+    method: 'GET',
+    classification: 'published-read',
+    operationId: 'get-pareto',
+    sourceSha256: '40f350f1b947d223597132effb351960658494549ec35201aa13491d21d9f94d',
+  },
   {
     source: 'src/app/api/gpu-metrics/route.ts',
     path: '/api/gpu-metrics',
@@ -887,7 +1202,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/components/calculator/throughput-data.ts',
-    sourceSha256: '4d12f2f267c939def090843b2f221a9ae5d92956b8307c4866ef6c09065096aa',
+    sourceSha256: '4ff72d6273e20036a4e05c886c0441cdf55d0d6d7ef4b6632c4c0b53fd1d3beb',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -905,7 +1220,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/calculator-extensions.ts',
-    sourceSha256: '0e2b050b483b505b9118336f6639594c8f82470e885c6356c4f2dc5790d39fec',
+    sourceSha256: '74c15d1dc1bca33de2ee74e22e9bf1186521c7623c6fd609d34677960c5d9633',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -923,7 +1238,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/series.ts',
-    sourceSha256: 'b5ebddee9d9ea6b85a8fdab2cf8fcc50bbf05e0fa10564987698abd38a6d4488',
+    sourceSha256: '8290913d9632434148a4b1951259492c4d5e67031b37a8ded12feb640c72bf38',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -932,7 +1247,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/registry.ts',
-    sourceSha256: '2f787cabdb65a3549eb2fbd1ce7d3929dd5e5b18d7f34fce1fd7af26100b7954',
+    sourceSha256: '04b833c0dbf1bfdc767aba5d7132b46c4ce9dd64134e3d1b7859b85053330e29',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -948,6 +1263,22 @@ export const apiContractSourceDigests = [
     },
   },
 
+  {
+    source: 'src/lib/pareto-api.ts',
+    sourceSha256: '6854dc8b0d883503bdcdd6edf3022386c4a3b0e54f4b6b100e921d534d228c72',
+    reviewArea: {
+      en: 'Pareto selectors, validation, source scope, missing-axis counts and boundary observations.',
+      zh: 'Pareto 选择条件、验证、来源范围、缺失坐标计数和边界观测值。',
+    },
+  },
+  {
+    source: 'src/lib/pareto-frontier.ts',
+    sourceSha256: '03a09b631f9dd933d21189e684ea729259e9a228274d55b1da65d2af102a9a4a',
+    reviewArea: {
+      en: 'Shared chart/API dominance directions, tie handling and boundary ordering.',
+      zh: '图表与 API 共用的支配方向、同坐标处理和边界排序。',
+    },
+  },
   {
     source: 'src/lib/api-cache.ts',
     sourceSha256: 'cf710c1dca9cfae794cf3d14d3dad6a153bbd7151cedc9d9f0b27b792aeade24',
@@ -1186,7 +1517,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/trace-server-metrics.ts',
-    sourceSha256: '4f70c310675c36ce062fe78861925f0a9e99b05396a6d2b5d0afc9221a89edd7',
+    sourceSha256: '5e5409267997e2ca5df90e6ffa74042090a332ac5bd29e3a52055b8674725bdb',
     reviewArea: {
       en: 'Trace server metric metadata, time-series groups, source labels, and units.',
       zh: '跟踪服务器指标元数据、时间序列分组、来源标签和单位。',

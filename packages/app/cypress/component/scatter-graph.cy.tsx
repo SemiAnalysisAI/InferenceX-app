@@ -2511,7 +2511,13 @@ describe('Power envelopes', () => {
     });
   }
 
-  function PowerHarness({ singleConfiguration = false }: { singleConfiguration?: boolean }) {
+  function PowerHarness({
+    singleConfiguration = false,
+    normalized = false,
+  }: {
+    singleConfiguration?: boolean;
+    normalized?: boolean;
+  }) {
     const [optimal, setOptimal] = useState(true);
     const [gradientLabels, setGradientLabels] = useState(false);
     const [metric, setMetric] = useState('y_measuredAvgPower');
@@ -2556,7 +2562,7 @@ describe('Power envelopes', () => {
       hwTypesWithData: new Set(['b200_trt']),
     });
     const definition = createMockChartDefinition({
-      chartType: 'interactivity',
+      chartType: normalized ? 'e2e' : 'interactivity',
       [`${metric}_roofline`]: 'lower_right',
     });
     return (
@@ -2855,6 +2861,16 @@ describe('Power envelopes', () => {
     cy.get('#power-sweep .parallelism-label .pl-text')
       .should('have.length', 1)
       .and('have.text', 'TP2');
+  });
+
+  // ChartDisplay draws E2E Normalized Interactivity on the e2e definition and
+  // flips the corner toward higher x.
+  it('starts the power boundary at the high E2E Normalized Interactivity end', () => {
+    mountWithProviders(<PowerHarness normalized />, { unofficial: {} });
+    cy.get('[data-testid="measured-power-summary"]').should(
+      'contain.text',
+      'Showing 3 of 4 measured points',
+    );
   });
 
   it('keeps a fixed measured-power boundary while Optimal Only changes measurement visibility', () => {

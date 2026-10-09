@@ -132,6 +132,37 @@ function measureTextWidth(node: SVGTextElement | null, chars: number, fontSize: 
   return chars * fontSize * 0.58;
 }
 
+/**
+ * Ellipsize `full` into `target` until the measured width fits `maxWidth`.
+ * `measureNode` is the element whose rendered width is read (the parent
+ * <text> when `target` is a <tspan>). Returns the final width.
+ */
+function fitTextToWidth(
+  target:
+    | d3.Selection<SVGTextElement, unknown, null, undefined>
+    | d3.Selection<SVGTSpanElement, unknown, null, undefined>,
+  full: string,
+  maxWidth: number,
+  fontSize: number,
+  measureNode?: d3.Selection<SVGTextElement, unknown, null, undefined>,
+): number {
+  const node = (
+    measureNode ?? (target as d3.Selection<SVGTextElement, unknown, null, undefined>)
+  ).node();
+  let chars = full.length;
+  let width = measureTextWidth(node, chars, fontSize);
+  while (chars > 1 && width > maxWidth) {
+    // Jump close to the target using the current average glyph width, then
+    // step down one character at a time.
+    const ratio = maxWidth / width;
+    chars = Math.max(1, Math.min(chars - 1, Math.floor(chars * ratio)));
+    const text = `${full.slice(0, chars).trimEnd()}…`;
+    target.text(text);
+    width = measureTextWidth(node, text.length, fontSize);
+  }
+  return Math.min(width, maxWidth);
+}
+
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
@@ -227,15 +258,29 @@ export function renderKnownIssueAnnotations(
         .text(issue.issueRef);
     }
 
-    const w1 = measureTextWidth(text1.node(), label.length, LINE1_SIZE) + SWATCH_SPACE;
-    const w2 = measureTextWidth(
+    const boxRight = width - BOX_RIGHT_GAP - (opts.rightInset ?? 0);
+    // Narrow (phone-width) plots: keep the box inside the plot instead of
+    // letting its text run past the right edge. Preview notices drop to their
+    // short summary first; anything still too wide is ellipsized.
+    const maxTextW = Math.max(0, boxRight - 2 - PAD_X * 2);
+    let w1 = measureTextWidth(text1.node(), label.length, LINE1_SIZE) + SWATCH_SPACE;
+    if (w1 > maxTextW) {
+      w1 = fitTextToWidth(text1, label, maxTextW - SWATCH_SPACE, LINE1_SIZE) + SWATCH_SPACE;
+    }
+    let w2 = measureTextWidth(
       text2.node(),
       detail.length + (issue?.issueRef.length ?? 0),
       LINE2_SIZE,
     );
+    if (w2 > maxTextW && issue === undefined) {
+      const detailTspan = text2.select<SVGTSpanElement>('tspan');
+      const summary = preview!.summary;
+      detailTspan.text(summary);
+      w2 = measureTextWidth(text2.node(), summary.length, LINE2_SIZE);
+      if (w2 > maxTextW) w2 = fitTextToWidth(detailTspan, summary, maxTextW, LINE2_SIZE, text2);
+    }
     const boxW = Math.max(w1, w2) + PAD_X * 2;
     const boxH = PAD_Y * 2 + LINE1_H + LINE2_H;
-    const boxRight = width - BOX_RIGHT_GAP - (opts.rightInset ?? 0);
     const bx = Math.max(2, boxRight - boxW);
     const by = yCursor;
 

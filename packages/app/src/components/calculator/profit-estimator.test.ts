@@ -4,6 +4,7 @@ import type { TokenRevenuePricing } from '@/components/inference/types';
 import { Model } from '@/lib/data-mappings';
 
 import {
+  applyCacheHitMode,
   clampPercent,
   DEFAULT_LAB_CUT_PCT,
   DEFAULT_PROFIT_INTERACTIVITY,
@@ -465,5 +466,68 @@ describe('profitModelDefaults', () => {
       ),
     );
     expect(priced.revenue).toBeCloseTo(0.5 * 0.26 + 0.5 * 4.4, 9);
+  });
+});
+
+describe('applyCacheHitMode', () => {
+  const items = [
+    { cacheHitRate: 0.5, theoreticalCacheHitRate: 0.97, hwKey: 'a' },
+    { cacheHitRate: 0.3, theoreticalCacheHitRate: undefined, hwKey: 'b' },
+    { cacheHitRate: undefined, theoreticalCacheHitRate: 0.8, hwKey: 'c' },
+  ];
+
+  it('returns items unchanged in actual mode', () => {
+    const applied = applyCacheHitMode(items, 'actual');
+    expect(applied).toBe(items); // same reference
+  });
+
+  it('replaces cacheHitRate with theoreticalCacheHitRate in theoretical mode', () => {
+    const applied = applyCacheHitMode(items, 'theoretical');
+    expect(applied[0].cacheHitRate).toBe(0.97);
+    expect(applied[0].theoreticalCacheHitRate).toBe(0.97);
+  });
+
+  it('keeps measured cacheHitRate when theoretical is absent', () => {
+    const applied = applyCacheHitMode(items, 'theoretical');
+    expect(applied[1].cacheHitRate).toBe(0.3);
+  });
+
+  it('sets cacheHitRate from theoretical even when measured is absent', () => {
+    const applied = applyCacheHitMode(items, 'theoretical');
+    expect(applied[2].cacheHitRate).toBe(0.8);
+  });
+
+  it('uses the theoretical rate in the profit calculation for higher revenue', () => {
+    const actualResult = {
+      hwKey: 'b200',
+      resultKey: 'b200',
+      value: 1_000,
+      inputTokenShare: 0.8,
+      cacheHitRate: 0.5,
+      theoreticalCacheHitRate: 0.97,
+    };
+    // With a higher cache hit rate, more input tokens are billed at the lower
+    // cached price, so revenue changes.
+    const [actual] = applyCacheHitMode([actualResult], 'actual');
+    const [theoretical] = applyCacheHitMode([actualResult], 'theoretical');
+    expect(actual.cacheHitRate).toBe(0.5);
+    expect(theoretical.cacheHitRate).toBe(0.97);
+    // Both feed into estimateSkuProfit — the cache discount lowers input revenue,
+    // so theoretical (higher cache hit) should yield lower revenue when cached
+    // price is less than input price.
+    const pricingWithDiscount: TokenRevenuePricing = {
+      source: 'normalized',
+      inputPerMillion: 2,
+      cachedInputPerMillion: 0.2,
+      outputPerMillion: 4,
+    };
+    const specs = { powerKwPerGpu: 2, costPerGpuHour: 1 };
+    const assumptions = { utilizationPct: 100, labCutPct: 0, basis: 'chip-hour' as const };
+    const actualRow = row(estimateSkuProfit(actual, specs, pricingWithDiscount, assumptions));
+    const theoreticalRow = row(
+      estimateSkuProfit(theoretical, specs, pricingWithDiscount, assumptions),
+    );
+    // Higher cache hit = more tokens at $0.2 instead of $2 = lower revenue
+    expect(theoreticalRow.revenue).toBeLessThan(actualRow.revenue);
   });
 });

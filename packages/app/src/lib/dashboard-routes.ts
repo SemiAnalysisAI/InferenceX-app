@@ -9,6 +9,8 @@ export interface DashboardProviderCapabilities {
 export interface DashboardShellCapabilities {
   readonly providers: DashboardProviderCapabilities;
   readonly dashboardNudge: boolean;
+  /** Whether the InferenceX dashboard tab strip renders above the page. */
+  readonly tabNav: boolean;
 }
 
 interface DashboardRouteDefinition {
@@ -55,18 +57,30 @@ export const DASHBOARD_SHELL_CAPABILITY_ROUTES = [
     includeChildren: false,
     providers: STANDALONE_DASHBOARD_PROVIDERS,
     dashboardNudge: false,
+    tabNav: true,
   },
   {
     path: '/inference/agentic',
     includeChildren: true,
     providers: STANDALONE_DASHBOARD_PROVIDERS,
     dashboardNudge: false,
+    tabNav: true,
   },
   {
     path: '/collectivex',
     includeChildren: true,
     providers: STANDALONE_DASHBOARD_PROVIDERS,
     dashboardNudge: false,
+    tabNav: true,
+  },
+  {
+    // The explorer has its own section nav; the dashboard tab strip would
+    // stack a second, unrelated navigation bar above it.
+    path: '/agentic-workload-explorer',
+    includeChildren: true,
+    providers: STANDALONE_DASHBOARD_PROVIDERS,
+    dashboardNudge: false,
+    tabNav: false,
   },
 ] as const satisfies readonly DashboardShellCapabilityRoute[];
 
@@ -235,6 +249,18 @@ export const DASHBOARD_ROUTES = [
     providers: STANDALONE_DASHBOARD_PROVIDERS,
     shareParamScopes: ['g_', 'i_'],
   },
+  // Agentic Workload Explorer: a frozen, anonymized ProxyTrace snapshot read
+  // from its own database (DATABASE_PROXYTRACE_READONLY_URL).
+  {
+    key: 'agentic-workload-explorer',
+    path: '/agentic-workload-explorer',
+    canonicalPath: '/agentic-workload-explorer',
+    navGroup: 'feature-gated',
+    indexable: true,
+    localeMirrored: true,
+    providers: STANDALONE_DASHBOARD_PROVIDERS,
+    shareParamScopes: [],
+  },
   {
     key: 'ai-chart',
     path: '/ai-chart',
@@ -307,6 +333,7 @@ export function dashboardRouteForPathname(pathname: string): DashboardRoute | un
 const DEFAULT_DASHBOARD_SHELL_CAPABILITIES: DashboardShellCapabilities = {
   providers: FILTERED_DASHBOARD_PROVIDERS,
   dashboardNudge: true,
+  tabNav: true,
 };
 
 /** Resolve providers and dashboard nudges for an English or Chinese pathname. */
@@ -323,6 +350,7 @@ export function dashboardShellCapabilitiesForPathname(
     return {
       providers: capabilityRoute.providers,
       dashboardNudge: capabilityRoute.dashboardNudge,
+      tabNav: capabilityRoute.tabNav,
     };
   }
 
@@ -334,5 +362,6 @@ export function dashboardShellCapabilitiesForPathname(
     // mounted dashboard nudges on standalone tabs too; only explicit shell
     // overrides suppress them.
     dashboardNudge: true,
+    tabNav: true,
   };
 }

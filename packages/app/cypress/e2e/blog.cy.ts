@@ -38,17 +38,19 @@ describe('Blog', () => {
   });
 
   describe('Blog listing page', () => {
-    before(() => {
-      // Listing content and links must not depend on remote thumbnail availability.
+    // Card thumbnails are the only load-blocking subresources the listing adds
+    // on top of the shared chrome, and the featured card plus the first grid
+    // row are eager. Serve every optimizer request from a fixture so the visit
+    // never waits on image resizing or a remote thumbnail host; the optimizer
+    // itself is covered by the cy.request check below. Visiting per test
+    // instead of once in before-all lets Cypress retries cover a lost Firefox
+    // load event, which otherwise fails the hook and skips the whole suite.
+    beforeEach(() => {
       cy.intercept(
-        {
-          method: 'GET',
-          pathname: '/_next/image',
-          query: { url: /^https:\/\/substack-post-media\.s3\.amazonaws\.com\// },
-        },
-        { statusCode: 204 },
+        { method: 'GET', pathname: '/_next/image' },
+        { fixture: '1x1.png', headers: { 'content-type': 'image/png' } },
       );
-      cy.visit('/blog');
+      cy.visit('/blog', { timeout: 20_000 });
     });
 
     it('renders the blog page with heading', () => {
@@ -72,12 +74,27 @@ describe('Blog', () => {
     it('post cards link to individual posts', () => {
       cy.get('a[href^="/blog/"]').should('have.length.gte', 1);
     });
+
+    it('serves local card thumbnails through the image optimizer', () => {
+      // The browser never fetches these (stubbed above), so check the real
+      // optimizer response directly for the first local thumbnail on the page.
+      cy.get('[data-testid="blog-post-grid"] img[src^="/_next/image?url=%2Fimages%2F"]')
+        .first()
+        .invoke('attr', 'src')
+        .then((src) => {
+          cy.request({ url: String(src), encoding: 'binary' }).then((response) => {
+            expect(response.status).to.eq(200);
+            expect(response.headers['content-type']).to.match(/^image\//u);
+          });
+        });
+    });
   });
 
   describe('Blog post page', () => {
     before(() => {
       cy.intercept('GET', 'https://substack-post-media.s3.amazonaws.com/**', {
-        statusCode: 204,
+        fixture: '1x1.png',
+        headers: { 'content-type': 'image/png' },
       });
       cy.visit('/blog/inferencemax-open-source-inference-benchmarking');
     });

@@ -1,0 +1,110 @@
+{
+  "sessions": [
+    {
+      "id": "8c0b158fef07f21ff1546c4a2884ccf1e956",
+      "clientId": "cd4d6624-5038-4e2a-be3c-0a42c4f5152b",
+      "startedAt": "2026-09-26T07:38:21.763Z",
+      "lastActiveAt": "2026-09-26T08:07:22.259Z",
+      "metadata": {
+        "os": "Windows",
+        "arch": "x64",
+        "userAgent": "claude-cli/2.1.283 (external, cli)",
+        "cliVersion": "2.1.283",
+        "nodeVersion": "v26.3.0"
+      },
+      "privacyMode": "anon",
+      "clientApiKeyHash": "054be4eff2035299d1841620174827d5d7e617a7537d6be820ae4a98d92c54d5",
+      "requestCount": 322,
+      "totalInput": "332966",
+      "totalCacheRead": "83708852",
+      "totalCacheWrite": "2064340",
+      "totalOutput": "461827",
+      "totalCost": 37.631874084472656
+    },
+    {
+      "id": "37d8e4edd41e53f1ac78e95dcdb4cb2ddc96",
+      "clientId": "08d5af1a-6c51-4624-94ea-8d2cf505005b",
+      "startedAt": "2026-09-26T08:01:56.127Z",
+      "lastActiveAt": "2026-09-26T08:06:28.304Z",
+      "metadata": {
+        "os": "Linux",
+        "arch": "x64",
+        "userAgent": "claude-cli/2.1.280",
+        "cliVersion": "2.1.280",
+        "nodeVersion": "v26.7.0"
+      },
+      "privacyMode": "anon",
+      "clientApiKeyHash": "505ebf7241b24b1f52f1e7ebda191e2d6c46edfd761b1b31ea3f532432e9a206",
+      "requestCount": 2,
+      "totalInput": "4",
+      "totalCacheRead": "1131380",
+      "totalCacheWrite": "0",
+      "totalOutput": "2",
+      "totalCost": 0.22633199393749237
+    },
+    {
+      "id": "f4d3c69bfea75b1f53d244539c08f60a8c66",
+      "clientId": "08d5af1a-6c51-4624-94ea-8d2cf505005b",
+      "startedAt": "2026-09-26T07:07:24.253Z",
+      "lastActiveAt": "2026-09-26T07:57:21.703Z",
+      "metadata": {
+        "os": "Linux",
+        "arch": "x64",
+        "userAgent": "claude-cli/2.1.280",
+        "cliVersion": "2.1.280",
+        "nodeVersion": "v26.7.0"
+      },
+      "privacyMode": "anon",
+      "clientApiKeyHash": "505ebf7241b24b1f52f1e7ebda191e2d6c46edfd761b1b31ea3f532432e9a206",
+      "requestCount": 22,
+      "totalInput": "48",
+      "totalCacheRead": "12159592",
+      "totalCacheWrite": "1246252",
+      "totalOutput": "15497",
+      "totalCost": 8.973309516906738
+    },
+    {
+      "id": "ca77dd9ad0cbc23869aa94c0fe24c91091e7",
+      "clientId": "157a3e83-4f3f-4a6b-bd04-07bcaa52e0f0",
+      "startedAt": "2026-09-26T02:24:05.664Z",
+      "lastActiveAt": "2026-09-26T07:43:45.942Z",
+      "metadata": {
+        "os": "Linux",
+        "arch": "x64",
+        "userAgent": "claude-cli/2.1.280 (external, cli)",
+        "cliVersion": "2.1.280",
+        "nodeVersion": "v26.3.0"
+      },
+      "privacyMode": "anon",
+      "clientApiKeyHash": "4d60b08f3c21a50d16cd5b9ca19c8157d3c16f76e5dc53b70a8b249ba5fb2f82",
+      "requestCount": 375,
+      "totalInput": "38733",
+      "totalCacheRead": "206039763",
+      "totalCacheWrite": "466012",
+      "totalOutput": "285274",
+      "totalCost": 113.25796508789062
+    },
+    {
+      "id": "42d840ab10d027a74e41f36943f6dd84b57c",
+      "clientId": "cd4d6624-5038-4e2a-be3c-0a42c4f5152b",
+      "startedAt": "2026-09-26T06:59:03.291Z",
+      "lastActiveAt": "2026-09-26T07:26:03.491Z",
+      "metadata": {
+        "os": "Windows",
+        "arch": "x64",
+        "userAgent": "claude-cli/2.1.282 (external, cli)",
+        "cliVersion": "2.1.282",
+        "nodeVersion": "v26.3.0"
+      },
+      "privacyMode": "anon",
+      "clientApiKeyHash": "054be4eff2035299d1841620174827d5d7e617a7537d6be820ae4a98d92c54d5",
+      "requestCount": 49,
+      "totalInput": "2922",
+      "totalCacheRead": "17713777",
+      "totalCacheWrite": "1979369",
+      "totalOutput": "86248",
+      "totalCost": 15.176248550415039
+    }
+  ],
+  "stats": { "total": 13735, "last48h": 187, "last7d": 613 }
+}

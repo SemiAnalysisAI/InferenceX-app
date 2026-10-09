@@ -9,7 +9,8 @@ import { track } from '@/lib/analytics';
 import { ModeToggle } from '@/components/ui/mode-toggle';
 import { HEADER_ACTION_STYLE } from '@/components/ui/control-styles';
 import { NewBadge } from '@/components/ui/new-badge';
-import { MinecraftToggles } from '@/components/minecraft/minecraft-toggles';
+import { HaloTogglesLazy } from '@/components/halo/halo-toggles-lazy';
+import { MinecraftTogglesLazy } from '@/components/minecraft/minecraft-toggles-lazy';
 import { navigateInApp } from '@/lib/client-navigation';
 import { DASHBOARD_ROUTES } from '@/lib/dashboard-routes';
 import { useClientPathname } from '@/hooks/useClientPathname';
@@ -20,6 +21,7 @@ import { NAV_LABELS_ZH, type HeaderNavHref } from '@/lib/tab-meta-zh';
 import { cn } from '@/lib/utils';
 
 import { GitHubStars } from './GithubStars';
+import { InferenceXWordmark } from './inferencex-wordmark';
 
 const DASHBOARD_TABS = DASHBOARD_ROUTES.map((route) => route.path);
 
@@ -58,16 +60,10 @@ const NAV_LINKS: readonly NavLink[] = [
     event: 'header_dashboard_clicked',
   },
   {
-    href: '/compare',
-    label: 'Comparisons',
-    testId: 'nav-link-compare',
-    event: 'header_compare_clicked',
-  },
-  {
-    href: '/blog',
-    label: 'Articles',
-    testId: 'nav-link-articles',
-    event: 'header_articles_clicked',
+    href: '/ubenchx',
+    label: 'ubenchX',
+    testId: 'nav-link-ubenchx',
+    event: 'header_ubenchx_clicked',
   },
   { href: '/about', label: 'About', testId: 'nav-link-about', event: 'header_about_clicked' },
 ] as const;
@@ -96,8 +92,8 @@ function isActive(pathname: string, href: string): boolean {
  * Whether the link lands on the page already on screen. Deliberately not
  * `isActive`, which also lights up for every sibling dashboard tab and for
  * child routes — those are real destinations, so treating their clicks as
- * no-ops would strand the user (Dashboard from `/evaluation`, Comparisons
- * from `/compare/<slug>`).
+ * no-ops would strand the user (Dashboard from `/evaluation`, AgentX from
+ * `/agentx/<slug>`).
  */
 function isCurrentPage(pathname: string, displayHref: string): boolean {
   return pathname === displayHref;
@@ -206,7 +202,7 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
             data-testid="header-brand"
             className="flex items-center min-h-11 gap-2 shrink-0"
           >
-            <span className="pride-wordmark text-lg font-bold tracking-tight">InferenceX</span>
+            <InferenceXWordmark />
             <span className="hidden sm:flex items-center gap-1.5 text-xs text-muted-foreground">
               by
               <Image
@@ -227,6 +223,7 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
                 data-testid={testId}
                 href={displayHref}
                 prefetch={isActive(pathname, href) ? false : undefined}
+                aria-current={isActive(pathname, href) ? 'page' : undefined}
                 className={cn(
                   'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors',
                   isActive(pathname, href)
@@ -265,7 +262,8 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
             {/* Below `sm` these move into the mobile menu — they are what push
                 a 320px header past its bounds in minecraft mode. */}
             <span className="hidden items-center gap-2 sm:flex">
-              <MinecraftToggles />
+              <MinecraftTogglesLazy />
+              <HaloTogglesLazy />
             </span>
             <ModeToggle />
 
@@ -279,6 +277,7 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
                 aria-expanded={mobileMenuOpen}
                 aria-label={isZh ? '导航菜单' : 'Navigation menu'}
               >
+                {/* Three bars that fold into an X while the menu is open. */}
                 <svg
                   width="20"
                   height="20"
@@ -288,24 +287,66 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
                   strokeWidth="1"
                   strokeLinecap="round"
                   strokeLinejoin="round"
+                  aria-hidden
+                  className="overflow-visible"
                 >
-                  <line x1="1" y1="4" x2="19" y2="4" />
-                  <line x1="1" y1="10" x2="19" y2="10" />
-                  <line x1="1" y1="16" x2="19" y2="16" />
+                  <line
+                    x1="1"
+                    y1="4"
+                    x2="19"
+                    y2="4"
+                    className="origin-center transition-transform duration-200 motion-reduce:transition-none"
+                    style={
+                      mobileMenuOpen ? { transform: 'translateY(6px) rotate(45deg)' } : undefined
+                    }
+                  />
+                  <line
+                    x1="1"
+                    y1="10"
+                    x2="19"
+                    y2="10"
+                    className="transition-opacity duration-150 motion-reduce:transition-none"
+                    style={mobileMenuOpen ? { opacity: 0 } : undefined}
+                  />
+                  <line
+                    x1="1"
+                    y1="16"
+                    x2="19"
+                    y2="16"
+                    className="origin-center transition-transform duration-200 motion-reduce:transition-none"
+                    style={
+                      mobileMenuOpen ? { transform: 'translateY(-6px) rotate(-45deg)' } : undefined
+                    }
+                  />
                 </svg>
               </button>
               {mobileMenuOpen && (
+                /* Phones: dim the page behind the menu so it reads as a layer
+                   and a tap anywhere outside closes it. The header's
+                   backdrop-filter makes it the containing block for fixed
+                   children, so size from its top edge rather than bottom-0. */
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  aria-hidden
+                  data-testid="mobile-menu-backdrop"
+                  onClick={toggleMenu}
+                  className="fixed inset-x-0 top-14 h-[100dvh] z-40 cursor-default bg-black/40 animate-in fade-in-0 duration-150 sm:hidden"
+                />
+              )}
+              {mobileMenuOpen && (
                 <div
                   data-testid="mobile-menu"
-                  className="motion-pop-in absolute right-0 top-full mt-2 z-50 flex flex-col rounded-lg border border-border bg-background p-1.5 shadow-lg min-w-40"
+                  className="motion-pop-in fixed inset-x-3 top-[3.75rem] z-50 flex max-h-[calc(100dvh-4.5rem)] flex-col overflow-y-auto overscroll-contain rounded-xl border border-border bg-background p-1.5 shadow-lg sm:absolute sm:inset-x-auto sm:right-0 sm:top-full sm:mt-2 sm:min-w-40 sm:rounded-lg"
                 >
                   {navLinks.map(({ href, displayHref, label, badgeLabel, event }) => (
                     <Link
                       key={href}
                       href={displayHref}
                       prefetch={isActive(pathname, href) ? false : undefined}
+                      aria-current={isActive(pathname, href) ? 'page' : undefined}
                       className={cn(
-                        'flex items-center min-h-11 px-3 rounded-md text-sm font-medium transition-colors',
+                        'flex items-center min-h-12 px-4 rounded-lg text-base font-medium transition-colors sm:min-h-11 sm:px-3 sm:rounded-md sm:text-sm',
                         isActive(pathname, href)
                           ? 'text-brand bg-brand/10'
                           : 'text-muted-foreground hover:text-foreground hover:bg-muted',
@@ -333,8 +374,9 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
                       )}
                     </Link>
                   ))}
-                  <span className="flex items-center gap-2 px-3 sm:hidden">
-                    <MinecraftToggles />
+                  <span className="mt-1 flex items-center gap-2 border-t border-border/60 px-3 pt-2 pb-1 sm:hidden">
+                    <MinecraftTogglesLazy />
+                    <HaloTogglesLazy />
                   </span>
                 </div>
               )}

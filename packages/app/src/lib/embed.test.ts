@@ -53,7 +53,7 @@ describe('parseEmbedOptions', () => {
   it('accepts light or dark and falls back to dark', () => {
     expect(parseEmbedOptions({ theme: 'light' }).theme).toBe('light');
     expect(parseEmbedOptions({ theme: 'Dark' }).theme).toBe('dark');
-    expect(parseEmbedOptions({ theme: 'minecraft' }).theme).toBe('dark');
+    expect(parseEmbedOptions({ theme: 'unknown' }).theme).toBe('dark');
     expect(parseEmbedOptions({ theme: 'light' }).skin).toBeUndefined();
   });
 

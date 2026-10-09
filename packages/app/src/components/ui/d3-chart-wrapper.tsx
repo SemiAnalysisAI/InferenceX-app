@@ -1,8 +1,10 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
+import { useIsCoarsePointer, useIsMobileViewport, useMediaQuery } from '@/hooks/useMediaQuery';
+import type { Locale } from '@/lib/i18n';
 import { useLocale } from '@/lib/use-locale';
 
 const DEFAULT_CHART_INSTRUCTIONS = {
@@ -10,27 +12,117 @@ const DEFAULT_CHART_INSTRUCTIONS = {
   zh: '按住 Shift 滚动以缩放 · 拖动以平移 · 双击以重置 · 点击数据点固定提示框',
 } as const;
 
+const SHEET_STRINGS = {
+  en: { title: 'Point details', close: 'Close point details' },
+  zh: { title: '数据点详情', close: '关闭数据点详情' },
+} as const;
+
+/** Downward swipe distance (px) that dismisses the mobile detail sheet. */
+const SHEET_SWIPE_DISMISS_PX = 64;
+
+/**
+ * Shown instead of the Shift+Scroll guidance on touch-primary devices, where
+ * useChartZoom only accepts two-finger gestures (one finger scrolls the page).
+ */
+const TOUCH_CHART_INSTRUCTIONS = {
+  en: 'Pinch to zoom • Two-finger drag to pan • Double-tap to reset • Tap a point to pin tooltip',
+  zh: '双指捏合以缩放 · 双指拖动以平移 · 双击以重置 · 点按数据点固定提示框',
+} as const;
+
+export const TOUCH_PRIMARY_QUERY = '(hover: none) and (pointer: coarse)';
+
+/**
+ * Picks the hint to render under a chart. When the chart zooms and the device
+ * is touch-primary, the Shift+Scroll guidance (the default, or a chart's own
+ * copy, which also describes mouse zooming) is swapped wholesale for the touch
+ * version. An explicit empty string (embeds) still renders nothing.
+ */
+export function resolveChartInstructions(
+  instructions: string | undefined,
+  locale: Locale,
+  useTouchHint: boolean,
+): string {
+  const resolved = instructions ?? DEFAULT_CHART_INSTRUCTIONS[locale];
+  return useTouchHint && resolved ? TOUCH_CHART_INSTRUCTIONS[locale] : resolved;
+}
+
 /**
  * Renders the d3 tooltip element via React Portal to document.body so it
  * escapes any parent stacking context (e.g. the chart Card's backdrop-filter
  * creates one, trapping z-index inside it). Position is set as viewport
  * coordinates by the d3 layer.
+ *
+ * On phones a pinned tooltip is presented as a bottom sheet (`data-sheet`,
+ * styled in globals.css) over a dimmed backdrop: the full per-point metrics
+ * and the View charts / View logs actions stay reachable without covering
+ * the plot or running off-screen. Tapping the backdrop or swiping the sheet
+ * down dismisses it.
  */
 function PortalTooltip({
   chartId,
   tooltipRef,
   pinned,
+  onSheetDismiss,
 }: {
   chartId: string;
   tooltipRef: React.RefObject<HTMLDivElement | null>;
   pinned: boolean;
+  onSheetDismiss: () => void;
 }) {
+  const locale = useLocale();
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
+  // Bottom sheet only on touch phones. A narrow desktop window driven by a
+  // mouse keeps the floating tooltip so pin-then-hover comparisons still work.
+  const isMobile = useIsMobileViewport();
+  const isTouch = useIsCoarsePointer();
+  const sheet = pinned && isMobile && isTouch;
+
+  const onSheetDismissRef = useRef(onSheetDismiss);
+  onSheetDismissRef.current = onSheetDismiss;
+
+  // Swipe-down-to-dismiss, only when the sheet is scrolled to its top so the
+  // gesture never fights scrolling through a long metrics list.
+  useEffect(() => {
+    const el = tooltipRef.current;
+    if (!sheet || !el) return;
+    let startY: number | null = null;
+    const onStart = (event: TouchEvent) => {
+      startY = el.scrollTop <= 0 && event.touches.length === 1 ? event.touches[0]!.clientY : null;
+    };
+    const onEnd = (event: TouchEvent) => {
+      if (startY === null) return;
+      const originY = startY;
+      startY = null;
+      const endY = event.changedTouches[0]?.clientY ?? originY;
+      if (endY - originY > SHEET_SWIPE_DISMISS_PX) onSheetDismissRef.current();
+    };
+    el.addEventListener('touchstart', onStart, { passive: true });
+    el.addEventListener('touchend', onEnd, { passive: true });
+    return () => {
+      el.removeEventListener('touchstart', onStart);
+      el.removeEventListener('touchend', onEnd);
+    };
+  }, [sheet, tooltipRef]);
+
+  // Escape closes the sheet for keyboard and switch-access users.
+  useEffect(() => {
+    if (!sheet) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onSheetDismissRef.current();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [sheet]);
+
   const node = (
     <div
       ref={tooltipRef}
       data-chart-tooltip={chartId}
+      data-sheet={sheet ? 'true' : undefined}
+      role={sheet ? 'dialog' : undefined}
+      aria-modal={sheet ? false : undefined}
+      aria-label={sheet ? SHEET_STRINGS[locale].title : undefined}
       style={{
         position: 'fixed',
         left: 0,
@@ -43,7 +135,24 @@ function PortalTooltip({
     />
   );
   if (!mounted || typeof document === 'undefined') return node;
-  return createPortal(node, document.body);
+  return createPortal(
+    <>
+      {sheet && (
+        <button
+          type="button"
+          data-testid="chart-sheet-backdrop"
+          aria-label={SHEET_STRINGS[locale].close}
+          onClick={(event) => {
+            event.stopPropagation();
+            onSheetDismissRef.current();
+          }}
+          className="fixed inset-0 z-[9998] cursor-default bg-black/45 backdrop-blur-[1px] animate-in fade-in-0 duration-200 md:hidden"
+        />
+      )}
+      {node}
+    </>,
+    document.body,
+  );
 }
 
 export interface D3ChartWrapperProps {
@@ -63,6 +172,8 @@ export interface D3ChartWrapperProps {
   noDataOverlay?: React.ReactNode;
   caption?: React.ReactNode;
   instructions?: string;
+  /** Whether d3-zoom is attached; gates the touch-device hint swap. */
+  zoomEnabled?: boolean;
   testId?: string;
   grabCursor?: boolean;
 }
@@ -81,11 +192,17 @@ export function D3ChartWrapper({
   noDataOverlay,
   caption,
   instructions,
+  zoomEnabled = false,
   testId,
   grabCursor = true,
 }: D3ChartWrapperProps) {
   const locale = useLocale();
-  const resolvedInstructions = instructions ?? DEFAULT_CHART_INSTRUCTIONS[locale];
+  const isTouchPrimary = useMediaQuery(TOUCH_PRIMARY_QUERY);
+  const resolvedInstructions = resolveChartInstructions(
+    instructions,
+    locale,
+    zoomEnabled && isTouchPrimary,
+  );
 
   return (
     <div id={chartId} data-testid={testId}>
@@ -102,7 +219,9 @@ export function D3ChartWrapper({
               data-testid="d3-chart-svg"
               width="100%"
               height={dimensions.height}
-              style={{ cursor: grabCursor ? 'grab' : undefined }}
+              // pan-y lets a one-finger vertical swipe scroll the page while
+              // the browser still hands two-finger pinch/drag to d3-zoom.
+              style={{ cursor: grabCursor ? 'grab' : undefined, touchAction: 'pan-y' }}
               onMouseDown={
                 grabCursor
                   ? (e) => {
@@ -132,6 +251,10 @@ export function D3ChartWrapper({
               chartId={chartId}
               tooltipRef={tooltipRef}
               pinned={Boolean(pinnedPoint)}
+              onSheetDismiss={() => {
+                dismissTooltip();
+                hideTooltipElements(tooltipRef, svgRef);
+              }}
             />
             {noDataOverlay}
           </div>

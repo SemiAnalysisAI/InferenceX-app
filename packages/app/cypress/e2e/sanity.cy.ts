@@ -123,8 +123,9 @@ describe('Splash text', () => {
     cy.get('html').should('not.have.class', 'dark');
     cy.get('[data-testid="splash-text"]').should('be.visible').and('have.text', 'AgentX is here!!');
 
-    // Same splash after switching themes — it is no longer minecraft-only.
-    cy.get('[data-testid="theme-toggle"]').click();
+    cy.get('[data-testid="theme-toggle"]')
+      .should('have.attr', 'aria-label', 'Switch theme (currently light mode)')
+      .click();
     cy.get('html').should('have.class', 'dark');
     cy.get('[data-testid="splash-text"]').should('be.visible').and('have.text', 'AgentX is here!!');
   });
@@ -137,7 +138,9 @@ describe('Theme Toggle', () => {
       win.localStorage.setItem('theme', 'light');
     });
     cy.visit('/');
-    cy.get('[data-testid="theme-toggle"]').click();
+    cy.get('[data-testid="theme-toggle"]')
+      .should('have.attr', 'aria-label', 'Switch theme (currently light mode)')
+      .click();
     cy.get('html').should('have.class', 'dark');
     cy.reload();
     cy.get('html').should('have.class', 'dark');

@@ -6,6 +6,7 @@
 
 import { GOOGLE_BLUE, resolveFrameworkAlias } from '@semianalysisai/inferencex-constants';
 import iwanthue from 'iwanthue';
+import { chartPaletteTheme, isDarkTheme } from '@/lib/themes';
 
 import type {
   AggDataEntry,
@@ -93,9 +94,11 @@ export const generateHighContrastColors = (
   vendorKeyFor?: (key: string) => string,
 ): Record<string, string> => {
   if (keys.length === 0) return {};
+  // Reuse the dark seed as well as its lightness bounds for CS:GO and GTA.
+  theme = chartPaletteTheme(theme);
 
   const colors: Record<string, string> = {};
-  const [lmin, lmax] = theme === 'dark' || theme === 'minecraft' ? [50, 100] : [30, 65];
+  const [lmin, lmax] = isDarkTheme(theme) ? [50, 100] : [30, 65];
 
   // Group keys by vendor. When vendorKeyFor is provided, vendor is derived
   // from the mapped key (e.g. a hwKey) so callers can output colors keyed by
@@ -754,6 +757,15 @@ export type ParetoDirection = keyof typeof PARETO_BY_DIRECTION;
 export const paretoFrontForDirection = (
   dir: ParetoDirection,
 ): ((points: InferenceData[]) => InferenceData[]) => PARETO_BY_DIRECTION[dir];
+
+/**
+ * Whether a roofline direction favors higher X. The names are historical:
+ * upper_left maximizes X and upper_right minimizes X. Read X direction from
+ * the resolved corner, never from chart type: trace-derived and custom X
+ * metrics reuse a chart definition whose natural X runs the other way.
+ */
+export const paretoMaximizesX = (dir: ParetoDirection): boolean =>
+  dir === 'upper_left' || dir === 'lower_right';
 
 // ---------------------------------------------------------------------------
 // Locale-aware metric label/title helpers

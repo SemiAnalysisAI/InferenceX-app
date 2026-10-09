@@ -80,6 +80,11 @@ export const TAB_META_ZH: Record<DashboardRouteKey, { title: string; description
     description:
       '查看 OperatorX 实测 GEMM、attention 和路由 MoE 的单卡 TFLOPS 与延迟，按形状、精度和后端筛选，并检查运行覆盖情况。',
   },
+  'agentic-workload-explorer': {
+    title: 'Agentic Workload Explorer 智能体负载探索',
+    description:
+      '浏览 ProxyTrace 采集的真实 coding agent 流量冻结匿名快照：会话、token 流向、前缀缓存复用、延迟、工具调用与成本。',
+  },
   collectivex: {
     title: 'CollectiveX 通信基准测试',
     description:
@@ -141,6 +146,8 @@ export const TAB_INTRO_ZH: Record<DashboardRouteKey, string> = {
     '本页面展示芯片功耗与能效指标（PowerX）：推理负载下的实测功耗、每瓦 token 数与每兆瓦 token 产出。',
   operatorx:
     '本页面展示 OperatorX 的 GEMM、attention 和路由 MoE 单卡 TFLOPS、实测延迟及完整测试覆盖情况。',
+  'agentic-workload-explorer':
+    '本页面基于 ProxyTrace 采集的匿名 coding agent trace 冻结快照，展示真实智能体负载的会话结构、输入/输出 token、前缀缓存命中、首 token 延迟（TTFT）与工具调用分布。快照数据不再更新，所有时间窗口均以快照截止时间为准。',
   collectivex:
     '本页面展示 CollectiveX 专家并行（EP）通信基准测试结果：在统一工作负载、正确性校验与采样协议下，对比 DeepEP、MoRI、UCCL 及 NCCL/RCCL 参考实现的分发（dispatch）、合并（combine）与完整往返延迟。跨芯片速率均按逻辑载荷计算；只有发布器确认完整且稳定的官方队列才会生成排名与推荐。',
   submissions:
@@ -171,6 +178,7 @@ export const TAB_LABELS_ZH: Record<DashboardRouteKey, string> = {
   'gpu-metrics': '芯片功耗',
   operatorx: 'OperatorX 算子',
   collectivex: 'CollectiveX 通信',
+  'agentic-workload-explorer': '智能体负载',
   submissions: '提交记录',
   'ai-chart': 'AI 图表',
   'current-inferencex-image': '镜像',
@@ -178,22 +186,14 @@ export const TAB_LABELS_ZH: Record<DashboardRouteKey, string> = {
   feedback: '反馈',
 };
 
-export type HeaderNavHref =
-  | '/'
-  | '/agentx'
-  | '/overview'
-  | '/inference'
-  | '/compare'
-  | '/blog'
-  | '/about';
+export type HeaderNavHref = '/' | '/agentx' | '/overview' | '/inference' | '/ubenchx' | '/about';
 
 /** Chinese labels for the site header nav, keyed by its exact English href set. */
 export const NAV_LABELS_ZH: Record<HeaderNavHref, string> = {
   '/': '首页',
   '/overview': '总览',
   '/inference': '仪表板',
-  '/compare': '性能对比',
-  '/blog': '技术文章',
+  '/ubenchx': 'ubenchX',
   '/agentx': 'AgentX',
   '/about': '关于',
 };

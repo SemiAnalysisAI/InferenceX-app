@@ -1068,7 +1068,13 @@ const entries = [
     benchmarkContext:
       'InferenceX tracks model-specific sparse-attention stacks such as DSA on GLM-5 and DeepSeek-V4. Engine versions and backend choices are part of the result because support has changed rapidly.',
     relatedTerms: ['multi-head-latent-attention', 'kv-cache', 'decode', 'inference-engine'],
-    articleSlugs: [B200_GLM5, MI355X_DSV4, GB300_DSV4, KIMI_K3],
+    articleSlugs: [
+      B200_GLM5,
+      MI355X_DSV4,
+      GB300_DSV4,
+      KIMI_K3,
+      'sparse-savings-persistent-demand-inside-glm53',
+    ],
   },
   {
     slug: 'cuda',

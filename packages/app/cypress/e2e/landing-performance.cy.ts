@@ -118,8 +118,6 @@ describe('Landing page performance', () => {
       expect(resourceNames.some((name) => name.includes('/brand/left-pattern-full.svg'))).to.eq(
         false,
       );
-      expect(resourceNames.some((name) => name.includes('/minecraft-click.mp3'))).to.eq(false);
-      expect(resourceNames.some((name) => name.includes('/Monocraft-'))).to.eq(false);
       // The landing AgentX ledger has five lazy model marks. A mobile viewport may
       // fetch any visible subset, but the text-only supporter strip must not pull
       // in its former logo set.
@@ -176,22 +174,6 @@ describe('Landing page performance', () => {
       // The supporters band no longer renders a quote block, so no supporter
       // logo is visible on the landing page and none should be preloaded.
       expect([...logos]).to.have.length(0);
-    });
-  });
-
-  it('loads Minecraft assets after the theme is activated', () => {
-    cy.visit('/', {
-      onBeforeLoad(win) {
-        win.localStorage.setItem('theme', 'dark');
-        win.localStorage.setItem('minecraft-music', 'false');
-      },
-    });
-
-    cy.get('[data-testid="theme-toggle"]').click();
-    cy.get('html').should('have.class', 'minecraft');
-    cy.window().should((win) => {
-      const resourceNames = win.performance.getEntriesByType('resource').map((entry) => entry.name);
-      expect(resourceNames.some((name) => name.includes('/minecraft-click.mp3'))).to.eq(true);
     });
   });
 });

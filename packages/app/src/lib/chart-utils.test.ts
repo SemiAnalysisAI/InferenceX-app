@@ -466,63 +466,6 @@ describe('getNestedYValue', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Pareto front x-ordering — gradient labels require ascending x
-// ---------------------------------------------------------------------------
-describe('paretoFront x-ordering for gradient labels', () => {
-  it('paretoFrontUpperRight returns points in ascending x order', () => {
-    const points = [pt(3, 30), pt(1, 10), pt(2, 20)];
-    const front = paretoFrontUpperRight(points);
-    for (let i = 1; i < front.length; i++) {
-      expect(front[i].x).toBeGreaterThanOrEqual(front[i - 1].x);
-    }
-  });
-
-  it('paretoFrontLowerRight returns points in descending x order', () => {
-    // This is the documented behavior that causes gradient labels to break
-    // when points are not re-sorted to ascending x.
-    // Use data where y decreases as x decreases so multiple points land on front:
-    // lower_right: sort desc x, push when y < minY
-    const points = [pt(3, 20), pt(2, 15), pt(1, 10)];
-    const front = paretoFrontLowerRight(points);
-    expect(front.length).toBeGreaterThanOrEqual(2);
-    // Verify descending order
-    for (let i = 1; i < front.length; i++) {
-      expect(front[i].x).toBeLessThanOrEqual(front[i - 1].x);
-    }
-  });
-
-  it('paretoFrontLowerRight sorted ascending fixes gradient label compatibility', () => {
-    // Regression test: sorting the output of paretoFrontLowerRight by
-    // ascending x ensures computeGradientStops gets a positive totalRange.
-    const points = [pt(3, 20), pt(2, 15), pt(1, 10)];
-    const front = paretoFrontLowerRight(points);
-    expect(front.length).toBeGreaterThanOrEqual(2);
-    // Apply the fix from ScatterGraph.tsx
-    front.sort((a, b) => a.x - b.x);
-    // Now ascending
-    for (let i = 1; i < front.length; i++) {
-      expect(front[i].x).toBeGreaterThanOrEqual(front[i - 1].x);
-    }
-  });
-
-  it('paretoFrontUpperLeft returns points in ascending x order', () => {
-    const points = [pt(3, 10), pt(1, 30), pt(2, 20)];
-    const front = paretoFrontUpperLeft(points);
-    for (let i = 1; i < front.length; i++) {
-      expect(front[i].x).toBeGreaterThanOrEqual(front[i - 1].x);
-    }
-  });
-
-  it('paretoFrontLowerLeft returns points in ascending x order', () => {
-    const points = [pt(3, 30), pt(1, 10), pt(2, 20)];
-    const front = paretoFrontLowerLeft(points);
-    for (let i = 1; i < front.length; i++) {
-      expect(front[i].x).toBeGreaterThanOrEqual(front[i - 1].x);
-    }
-  });
-});
-
 // ===========================================================================
 // getHardwareKey
 // ===========================================================================

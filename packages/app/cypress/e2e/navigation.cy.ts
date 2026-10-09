@@ -85,10 +85,15 @@ describe('Chart Section Tabs — E2E', () => {
     cy.get('[data-testid="gpu-specs-content"]').should('exist');
   });
 
-  it('shows mobile chart select dropdown on small viewport', () => {
+  it('shows one-tap mobile chart tabs on small viewport', () => {
     cy.viewport(375, 812);
     cy.visit('/inference');
     cy.get('[data-testid="mobile-chart-select"]').should('be.visible');
+    cy.get('[data-testid="mobile-tab-inference"]').should('have.attr', 'aria-current', 'page');
+    cy.get('[data-testid="mobile-tab-evaluation"]').should('have.attr', 'href', '/evaluation');
+    cy.visit('/evaluation');
+    cy.get('[data-testid="mobile-tab-evaluation"]').should('have.attr', 'aria-current', 'page');
+    cy.get('[data-testid="mobile-tab-inference"]').should('not.have.attr', 'aria-current');
   });
 
   it('keeps the sliding indicator aligned after the ↑↑↓↓ unlock inserts the Hidden trigger', () => {
@@ -155,8 +160,8 @@ describe('First-load navigation', () => {
     cy.location('pathname').should('eq', '/inference');
   });
 
-  it('navigates to comparisons from the header with one click', () => {
-    cy.get('[data-testid="nav-link-compare"]').click();
+  it('navigates to comparisons from the footer with one click', () => {
+    cy.get('[data-testid="footer-link-compare"]').click();
     cy.location('pathname').should('eq', '/compare');
   });
 

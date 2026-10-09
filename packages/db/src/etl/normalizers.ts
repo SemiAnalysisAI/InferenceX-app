@@ -155,11 +155,10 @@ export function resolveModelKey(row: Record<string, any>): string | null {
  * Handles special cases: `sglang-disagg` is normalized to `mori-sglang` + `disagg=true`;
  * `dynamo-trtllm` is renamed to `dynamo-trt`.
  *
- * An explicit `disagg` value from the artifact is authoritative for Dynamo:
- * Dynamo can orchestrate a non-disaggregated server. Legacy Dynamo artifacts
- * that omit the field still fall back to `disagg=true`, preserving their
- * historical classification. Canonical `mori-*` frameworks and aliases that
- * explicitly declare `disagg: true` remain intrinsically disaggregated.
+ * Explicit topology is authoritative for canonical Dynamo and MoRI frameworks:
+ * their series can contain aggregate and disaggregated servers. Legacy artifacts
+ * without the field still default to disaggregation. Aliases that explicitly
+ * declare `disagg: true` remain intrinsically disaggregated.
  *
  * @param fw - Raw framework value from the artifact (e.g. `"sglang"`, `"sglang-disagg"` → `"mori-sglang"`).
  * @param disaggField - Raw disagg field from the artifact (boolean or string true/false).
@@ -175,7 +174,8 @@ export function normalizeFramework(
   const explicitDisagg = parseOptionalBool(disaggField);
   const disagg =
     alias?.disagg ??
-    (canonical.startsWith('mori-') ? true : (explicitDisagg ?? canonical.startsWith('dynamo-')));
+    explicitDisagg ??
+    (canonical.startsWith('mori-') || canonical.startsWith('dynamo-'));
   return { framework: canonical, disagg };
 }
 

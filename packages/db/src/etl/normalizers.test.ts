@@ -304,8 +304,16 @@ describe('normalizeFramework', () => {
     });
   });
 
-  it('forces disagg=true for mori-* canonicals regardless of disaggField', () => {
+  it('preserves explicit MoRI topology and infers disaggregation only for legacy rows', () => {
     expect(normalizeFramework('mori-sglang', false)).toEqual({
+      framework: 'mori-sglang',
+      disagg: false,
+    });
+    expect(normalizeFramework('mori-sglang', 'False')).toEqual({
+      framework: 'mori-sglang',
+      disagg: false,
+    });
+    expect(normalizeFramework('mori-sglang', true)).toEqual({
       framework: 'mori-sglang',
       disagg: true,
     });

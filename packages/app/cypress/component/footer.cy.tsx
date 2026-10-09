@@ -69,6 +69,9 @@ describe('Footer', () => {
     cy.get('[data-testid="footer-link-agentx"]')
       .should('contain.text', 'AgentX')
       .and('have.attr', 'href', '/agentx');
+    cy.get('[data-testid="footer-link-compare"]')
+      .should('contain.text', 'Comparisons')
+      .and('have.attr', 'href', '/compare');
     cy.get('[data-testid="footer-link-articles"]')
       .should('contain.text', 'Articles')
       .and('have.attr', 'href', '/blog');

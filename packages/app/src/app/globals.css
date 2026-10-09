@@ -3,7 +3,7 @@
 @import './motion.css';
 @plugin '@tailwindcss/typography';
 
-@custom-variant dark (&:is(.dark *, .minecraft *));
+@custom-variant dark (&:is(.dark *, .minecraft *, .csgo *, .gta *, .doom *, .halo *));
 @custom-variant minecraft (&:is(.minecraft *));
 
 /* Allow hash navigation to clear the fixed navbar */
@@ -41,26 +41,120 @@
   content: none;
 }
 
-/* September theme for the InferenceX wordmark — Childhood Cancer Awareness Month
-   ("Go Gold"). The gold awareness ribbon's palette painted onto the brand text
-   via a clipped gradient, running from deep goldenrod through bright gold and
-   back. The darker anchors keep the clipped wordmark legible on the light
-   header, the same treatment the earlier flag themes used. Fixed colors,
-   independent of the theme tokens, so it renders the same in light, dark, and
-   minecraft modes. */
-.pride-wordmark {
-  background-image: linear-gradient(
-    90deg,
-    #9a6a00 0%,
-    #d4a017 30%,
-    #ffd700 50%,
-    #d4a017 70%,
-    #9a6a00 100%
-  );
-  background-clip: text;
-  -webkit-background-clip: text;
-  color: transparent;
-  -webkit-text-fill-color: transparent;
+/* October header treatment; keep chart and export branding unchanged. */
+.halloween-wordmark {
+  color: #b54708;
+  /* Hinted glyph advances at 18px left DM Sans visibly uneven ("Inf e r");
+     unhinted advances plus explicit kerning keep the letters evenly set. */
+  text-rendering: geometricPrecision;
+  font-kerning: normal;
+}
+
+.halloween-wordmark-x {
+  color: #7e22ce;
+}
+
+:is(.dark, .minecraft, .csgo, .gta, .doom, .halo) .halloween-wordmark {
+  color: #fb923c;
+}
+
+:is(.dark, .minecraft, .csgo, .gta, .doom, .halo) .halloween-wordmark-x {
+  color: #c084fc;
+}
+
+.halloween-wordmark-pumpkin {
+  font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif;
+  transform: rotate(12deg);
+}
+
+@media (forced-colors: active) {
+  .halloween-wordmark,
+  .halloween-wordmark-x {
+    color: LinkText;
+  }
+}
+
+/* October decoration: leaves falling down the left edge (autumn-leaves.tsx).
+   Sits under the sticky header (z-50) and never takes pointer input. */
+.autumn-leaves {
+  position: fixed;
+  inset: 0 auto 0 0;
+  z-index: 40;
+  /* At container breakpoints only the page padding remains available. */
+  width: clamp(14px, calc((100vw - 1280px) / 2), 96px);
+  --leaf-sway-scale: 1;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.autumn-leaf {
+  position: absolute;
+  top: 0;
+  left: var(--leaf-left);
+  width: var(--leaf-size);
+  height: var(--leaf-size);
+  opacity: 0.85;
+  animation: autumn-leaf-fall var(--leaf-duration) linear var(--leaf-delay) infinite;
+  will-change: transform;
+}
+
+.autumn-leaf-sway {
+  display: block;
+  width: 100%;
+  height: 100%;
+  animation: autumn-leaf-sway calc(var(--leaf-duration) / 4) ease-in-out var(--leaf-delay) infinite
+    alternate;
+}
+
+/* Tablet and laptop breakpoints need the same protection as phones. */
+@media (max-width: 1359px) {
+  .autumn-leaves {
+    --leaf-sway-scale: 0.1;
+  }
+  .autumn-leaf {
+    left: calc(var(--leaf-left) * 0.4);
+    width: calc(var(--leaf-size) * 0.25);
+    height: calc(var(--leaf-size) * 0.25);
+  }
+}
+
+@keyframes autumn-leaf-fall {
+  from {
+    transform: translateY(-10vh);
+  }
+  to {
+    transform: translateY(110vh);
+  }
+}
+
+@keyframes autumn-leaf-sway {
+  from {
+    transform: translateX(calc(var(--leaf-sway) * var(--leaf-sway-scale) * -1)) rotate(-35deg);
+  }
+  to {
+    transform: translateX(calc(var(--leaf-sway) * var(--leaf-sway-scale))) rotate(40deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .autumn-leaf,
+  .autumn-leaf-sway {
+    animation: none;
+  }
+  .autumn-leaf {
+    top: var(--leaf-rest);
+    transform: rotate(-20deg);
+  }
+}
+
+@media (forced-colors: active) {
+  .autumn-leaves {
+    display: none;
+  }
+}
+
+html[data-inferencex-embed] .autumn-leaves {
+  display: none;
 }
 
 /* Benchmark log viewer gutter. Line numbers come from a CSS counter rather than
@@ -119,6 +213,12 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
+
+  /* Translucent panel and muted-label tokens used by the Agentic Workload
+     Explorer. Derived from the base palette so every theme adapts them. */
+  --color-surface: color-mix(in oklab, var(--background) 20%, transparent);
+  --color-surface-hover: color-mix(in oklab, var(--muted) 55%, transparent);
+  --color-subtle: color-mix(in oklab, var(--muted-foreground) 55%, var(--background));
 
   /* Fonts */
   --font-sans: var(--font-dm-sans);
@@ -205,7 +305,11 @@
   --overlay-run-7: oklch(0.6 0.17 60); /* amber-orange */
 }
 
-.dark {
+.dark,
+.csgo,
+.gta,
+.doom,
+.halo {
   /* Base Theme Colors */
   --background: #131416;
   --foreground: #eaebec;
@@ -250,8 +354,127 @@
   --overlay-run-7: oklch(0.78 0.18 60);
 }
 
-/* ── Minecraft Theme ── */
+/* Tiny pre-paint shell for persisted Doom selections. Artwork stays lazy. */
+.doom {
+  color-scheme: dark;
+  --background: #140b09;
+  --foreground: #f1e6dc;
+  --card: #1d110d;
+  --card-foreground: #f1e6dc;
+  --popover: #22140f;
+  --popover-foreground: #f1e6dc;
+  --primary: #ff6a2b;
+  --primary-foreground: #140b09;
+  --muted: #33201a;
+  --muted-foreground: #c9b6aa;
+  --accent: #3a2219;
+  --ring: #ffb347;
+}
+.doom .circuit-bg,
+.doom .autumn-leaves {
+  display: none;
+}
+
+/* Scoped pre-paint palettes for persisted themes. No assets or animation. */
+.csgo {
+  color-scheme: dark;
+  --background: #101820;
+  --foreground: #f0eee7;
+  --card: #18232d;
+  --card-foreground: #f0eee7;
+  --popover: #1b2732;
+  --popover-foreground: #f0eee7;
+  --primary: #e6bd68;
+  --primary-foreground: #101820;
+  --secondary: #8eb7d4;
+  --secondary-foreground: #101820;
+  --muted: #293744;
+  --muted-foreground: #b9c3ca;
+  --accent: #303e49;
+  --accent-foreground: #f0eee7;
+  --border: #60707c;
+  --border-alt: #35444e;
+  --input: #60707c;
+  --ring: #e6bd68;
+  --sidebar: #18232d;
+  --sidebar-foreground: #f0eee7;
+  --sidebar-primary: #e6bd68;
+  --sidebar-primary-foreground: #101820;
+  --sidebar-accent: #303e49;
+  --sidebar-accent-foreground: #f0eee7;
+  --sidebar-border: #60707c;
+  --sidebar-ring: #e6bd68;
+  --radius: 0.125rem;
+}
+.gta {
+  --font-pricedown: 'Pricedown';
+  --font-chalet-comprime: 'ChaletComprime';
+  color-scheme: dark;
+  --background: #0a0a0b;
+  --foreground: #f5f5f5;
+  --card: #111113;
+  --card-foreground: #f5f5f5;
+  --popover: #0d0d0f;
+  --popover-foreground: #f5f5f5;
+  --primary: #72cc72;
+  --primary-foreground: #0a0a0b;
+  --secondary: #5d9bd5;
+  --secondary-foreground: #0a0a0b;
+  --muted: #232326;
+  --muted-foreground: #b8b8bd;
+  --accent: #2c2c30;
+  --accent-foreground: #f5f5f5;
+  --border: #3a3a3f;
+  --border-alt: #26262a;
+  --input: #4a4a50;
+  --ring: #ffffff;
+  --sidebar: #111113;
+  --sidebar-foreground: #f5f5f5;
+  --sidebar-primary: #72cc72;
+  --sidebar-primary-foreground: #0a0a0b;
+  --sidebar-accent: #2c2c30;
+  --sidebar-accent-foreground: #f5f5f5;
+  --sidebar-border: #3a3a3f;
+  --sidebar-ring: #ffffff;
+  --radius: 0.125rem;
+  --gta-display: var(--font-pricedown), 'Pricedown', Impact, sans-serif;
+  --gta-menu: var(--font-chalet-comprime), 'ChaletComprime', 'Arial Narrow', sans-serif;
+}
+/* Halo Infinite menu chrome: deep navy panels, Forerunner cyan accents. */
+.halo {
+  --font-industry: 'Industry';
+  color-scheme: dark;
+  --background: #070d16;
+  --foreground: #e8f1f8;
+  --card: #0c1622;
+  --card-foreground: #e8f1f8;
+  --popover: #0b1520;
+  --popover-foreground: #e8f1f8;
+  --primary: #5ed1ff;
+  --primary-foreground: #04101a;
+  --secondary: #9fd356;
+  --secondary-foreground: #0a1404;
+  --muted: #182635;
+  --muted-foreground: #a9bccb;
+  --accent: #1c2d3e;
+  --accent-foreground: #e8f1f8;
+  --border: #3b5468;
+  --border-alt: #1d2d3c;
+  --input: #3b5468;
+  --ring: #5ed1ff;
+  --sidebar: #0c1622;
+  --sidebar-foreground: #e8f1f8;
+  --sidebar-primary: #5ed1ff;
+  --sidebar-primary-foreground: #04101a;
+  --sidebar-accent: #1c2d3e;
+  --sidebar-accent-foreground: #e8f1f8;
+  --sidebar-border: #3b5468;
+  --sidebar-ring: #5ed1ff;
+  --radius: 0.125rem;
+  --halo-menu: var(--font-industry), 'Industry', 'Arial Narrow', sans-serif;
+}
 .minecraft {
+  --font-minecraft: 'Monocraft';
   --background: #1e1e1e;
   --foreground: #ffffff;
   --card: #1e1e1e;
@@ -301,84 +524,29 @@
   --overlay-run-6: oklch(0.72 0.2 230);
   --overlay-run-7: oklch(0.78 0.18 60);
 }
-
-/* Force pixel font on everything in minecraft mode */
-.minecraft,
-.minecraft * {
-  font-family: var(--font-minecraft, 'Monocraft', monospace) !important;
-}
-
-/* Minecraft text shadow on all text */
-.minecraft * {
-  text-shadow: 1.5px 1.5px 0px rgba(0, 0, 0, 0.4);
-}
-
-/* Disable font smoothing for crisp pixel font */
-.minecraft {
-  -webkit-font-smoothing: none;
-  -moz-osx-font-smoothing: unset;
-}
-
-/* Minecraft-style beveled buttons — raised 3D effect */
-.minecraft button,
-.minecraft [role='button'],
-.minecraft a[class*='rounded'] {
-  border: 2px solid !important;
-  border-color: #ffffff80 #37373780 #37373780 #ffffff80 !important;
-  border-radius: 0 !important;
-}
-.minecraft button:hover,
-.minecraft [role='button']:hover {
-  background-color: rgba(170, 170, 221, 0.15) !important;
-  border-color: #ffffffe0 #6666aa80 #6666aa80 #ffffffe0 !important;
-}
-.minecraft button:active,
-.minecraft [role='button']:active {
-  border-color: #37373780 #ffffff80 #ffffff80 #37373780 !important;
-}
-
-/* Force square corners on everything */
-.minecraft [class*='rounded'] {
-  border-radius: 0 !important;
-}
-
-/* Pixelated rendering for images */
-.minecraft img {
-  image-rendering: pixelated;
-}
-
-/* Minecraft header grass-block top accent */
-.minecraft header {
-  border-bottom: 3px solid transparent !important;
-  border-image: linear-gradient(to right, #7fb238, #5d9b47, #7fb238, #526935, #7fb238) 1 !important;
-}
-
-/* Sunken slot effect on cards */
-.minecraft .border-border {
-  border: 2px solid;
-  border-color: #373737 #ffffff40 #ffffff40 #373737;
-}
-
-/* Input fields — sunken slot style */
-.minecraft input,
-.minecraft select,
-.minecraft textarea {
-  border: 2px solid !important;
-  border-color: #373737 #c6c6c680 #c6c6c680 #373737 !important;
-  border-radius: 0 !important;
-  background-color: rgba(0, 0, 0, 0.3) !important;
+.minecraft .circuit-bg,
+.csgo .circuit-bg,
+.csgo .autumn-leaves,
+.gta .circuit-bg,
+.gta .autumn-leaves,
+.halo .circuit-bg,
+.halo .autumn-leaves {
+  display: none;
 }
 
 /* Shiki code blocks: reuse dark theme in minecraft mode */
 .minecraft .shiki,
-.minecraft .shiki span {
+.minecraft .shiki span,
+.csgo .shiki,
+.csgo .shiki span,
+.gta .shiki,
+.gta .shiki span,
+.doom .shiki,
+.doom .shiki span,
+.halo .shiki,
+.halo .shiki span {
   color: var(--shiki-dark);
   background-color: var(--shiki-dark-bg);
-}
-
-/* Hide circuit background in minecraft mode */
-.minecraft .circuit-bg {
-  display: none;
 }
 
 /* Embed routes (/embed/model/[slug]) render one chart inside a third-party
@@ -458,58 +626,6 @@ html[data-inferencex-skin='vllm'] [data-slot='card'] {
   backdrop-filter: none;
 }
 
-/* Ender-dragon fly-across — one-shot animation on minecraft theme activation,
- * triggered from minecraft-decorations.tsx. Plays once (iteration-count: 1)
- * and lands the dragon off-screen left so the GIF stops being rendered. The
- * dragon hovers in the center between 35% and 60% (4.2s–7.2s of the 12s
- * total) so the canonical 3s growl SFX from minecraft-decorations.tsx lines
- * up with a deliberate mid-screen pause rather than a moving target. */
-@keyframes mc-dragon-flyacross {
-  0% {
-    transform: translate(110vw, 0) scale(1);
-    opacity: 0;
-  }
-  8% {
-    opacity: 0.95;
-  }
-  35% {
-    transform: translate(40vw, -2vh) scale(1.05);
-  }
-  60% {
-    transform: translate(40vw, -2vh) scale(1.05);
-  }
-  92% {
-    opacity: 0.95;
-  }
-  100% {
-    transform: translate(-130vw, 1vh) scale(1);
-    opacity: 0;
-  }
-}
-
-.mc-dragon-flyacross {
-  animation: mc-dragon-flyacross 12s cubic-bezier(0.4, 0, 0.6, 1) 1 forwards;
-  will-change: transform, opacity;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .mc-dragon-flyacross {
-    animation: none;
-    display: none;
-  }
-}
-
-/* Splash text — yellow bouncing rotated text (Minecraft title screen style) */
-@keyframes splash-bounce {
-  0%,
-  100% {
-    transform: translate(2rem, 2.25rem) rotate(10deg) scale(1);
-  }
-  50% {
-    transform: translate(2rem, 2.25rem) rotate(10deg) scale(1.1);
-  }
-}
-
 .splash-wrapper {
   display: none;
   position: absolute;
@@ -537,23 +653,22 @@ html[data-inferencex-skin='vllm'] [data-slot='card'] {
   /* The keyframes re-declare this; keeping it on the element means the splash
      still sits where it belongs when the animation is off (reduced motion). */
   transform: translate(2rem, 2.25rem) rotate(10deg);
-  animation: splash-bounce 1.5s ease-in-out infinite;
   transform-origin: center;
-  /* Always use Minecraft font & style regardless of active theme */
-  font-family: var(--font-minecraft, 'Monocraft', monospace) !important;
-  -webkit-font-smoothing: none;
-  -moz-osx-font-smoothing: unset;
+  font-family: inherit;
 }
 
 /* Dark backgrounds need no outline — this is the original title-screen look. */
 .dark .splash-text,
-.minecraft .splash-text {
+.minecraft .splash-text,
+.csgo .splash-text,
+.doom .splash-text {
   color: #ffff00;
   text-shadow: 2px 2px 0px #3f3f00;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .splash-text {
+  .splash-text,
+  .minecraft .splash-text {
     animation: none;
   }
 }
@@ -576,8 +691,37 @@ html[data-inferencex-skin='vllm'] [data-slot='card'] {
   * {
     @apply border-border outline-ring/50;
   }
+  html {
+    /* Keep iOS from inflating text after rotation, and let pages own
+       horizontal overflow (wide tables scroll inside their own containers). */
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
   body {
     @apply bg-background text-foreground font-sans;
+    /* Replace the grey iOS/Android tap flash with our own :active states. */
+    -webkit-tap-highlight-color: transparent;
+  }
+  /* Remove the 300ms double-tap-zoom delay on controls without disabling
+     pinch zoom for the page. */
+  a,
+  button,
+  [role='button'],
+  [role='tab'],
+  [role='option'],
+  label,
+  summary {
+    touch-action: manipulation;
+  }
+  /* iOS Safari zooms the whole page when focusing a field whose font is
+     smaller than 16px. Hold form fields at 16px on phones; desktop keeps the
+     compact design sizes. */
+  @media (max-width: 767px) and (pointer: coarse) {
+    input:not([type='checkbox'], [type='radio'], [type='range'], [type='color']),
+    select,
+    textarea {
+      font-size: max(16px, 1em);
+    }
   }
   button {
     cursor: pointer;
@@ -665,4 +809,117 @@ html[data-inferencex-skin='vllm'] [data-slot='card'] {
   box-shadow: 0 0 8px 2px oklch(85% 0.18 85 / 40%);
   animation: star-glow 2s ease-in-out infinite;
   pointer-events: none;
+}
+
+/* Horizontal scrollers (mobile tab strip, chip rows) hide the scrollbar but
+   remain scrollable by touch, trackpad and keyboard. */
+.no-scrollbar {
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* ── Mobile chart detail sheet ────────────────────────────────────────────
+   On phones a pinned chart tooltip becomes a bottom sheet instead of a
+   floating card that covers the plot and runs off-screen. The d3 layer still
+   writes viewport left/top for desktop placement; the sheet overrides them. */
+@media (max-width: 767px) {
+  [data-chart-tooltip][data-sheet='true'] {
+    left: 0 !important;
+    right: 0 !important;
+    top: auto !important;
+    bottom: 0 !important;
+    width: auto !important;
+    max-width: none !important;
+    max-height: min(72dvh, 640px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    padding: 0 0 env(safe-area-inset-bottom);
+    background: var(--popover);
+    border-top: 1px solid var(--border);
+    border-radius: 1rem 1rem 0 0;
+    box-shadow: 0 -12px 32px -12px rgb(0 0 0 / 0.45);
+    animation: chart-sheet-in 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  /* Grab handle */
+  [data-chart-tooltip][data-sheet='true']::before {
+    content: '';
+    position: sticky;
+    top: 0;
+    display: block;
+    width: 100%;
+    height: 20px;
+    background:
+      linear-gradient(var(--muted-foreground), var(--muted-foreground)) center 8px / 36px 4px
+        no-repeat,
+      var(--popover);
+    opacity: 0.9;
+    z-index: 1;
+  }
+  /* The generated tooltip card is the sheet body: drop its own chrome. */
+  [data-chart-tooltip][data-sheet='true'] > div {
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    background: transparent !important;
+    max-width: none !important;
+    width: auto !important;
+    padding: 0 16px 16px !important;
+    font-size: 13px;
+  }
+  /* "Click elsewhere to dismiss" is desktop copy; the sheet has its own
+     backdrop and swipe affordances. */
+  [data-chart-tooltip][data-sheet='true'] > div > div:first-child[style*='italic'],
+  [data-chart-tooltip][data-sheet='true'] > div > div:first-child.italic {
+    display: none;
+  }
+  /* Bigger targets for the in-sheet actions (View charts / View logs). */
+  [data-chart-tooltip][data-sheet='true'] button,
+  [data-chart-tooltip][data-sheet='true'] a[role='button'],
+  [data-chart-tooltip][data-sheet='true'] a[data-action] {
+    min-height: 44px;
+  }
+  [data-chart-tooltip][data-sheet='true'] a[data-action] {
+    display: inline-flex;
+    align-items: center;
+  }
+}
+
+@keyframes chart-sheet-in {
+  from {
+    transform: translateY(24px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-chart-tooltip][data-sheet='true'] {
+    animation: none;
+  }
+}
+
+/* Expanded charts (ChartZoom): --k is screen px per SVG unit, so text, dots and
+   strokes stay at their drawn size while the chart scales up or zooms. */
+.chart-zoom svg:not(.lucide) text:not([transform]),
+.chart-zoom svg:not(.lucide) circle {
+  transform-box: fill-box;
+  transform-origin: center;
+  transform: scale(calc(1 / var(--k, 1)));
+}
+.chart-zoom svg:not(.lucide) text:not([transform]):not([text-anchor]),
+.chart-zoom svg:not(.lucide) text:not([transform])[text-anchor='start'] {
+  transform-origin: left center;
+}
+.chart-zoom svg:not(.lucide) text:not([transform])[text-anchor='end'] {
+  transform-origin: right center;
+}
+.chart-zoom svg:not(.lucide) :is(line, path, polyline, polygon, rect, circle, ellipse) {
+  vector-effect: non-scaling-stroke;
 }

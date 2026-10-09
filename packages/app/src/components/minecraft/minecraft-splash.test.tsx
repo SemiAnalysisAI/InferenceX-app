@@ -9,20 +9,13 @@ vi.mock('next/navigation', () => ({
   usePathname: () => pathnameStub.value,
 }));
 
-import { MinecraftSplash, SPLASHES } from './minecraft-splash';
+import { MinecraftSplash } from './minecraft-splash';
 
 let container: HTMLDivElement;
 let root: Root;
 
 function render() {
   act(() => root.render(<MinecraftSplash />));
-}
-
-/** MutationObserver callbacks land on the microtask queue. */
-async function flush() {
-  await act(async () => {
-    await Promise.resolve();
-  });
 }
 
 function splashText(): string | null {
@@ -43,8 +36,8 @@ afterEach(() => {
   document.documentElement.className = '';
 });
 
-describe('MinecraftSplash', () => {
-  it('announces AgentX outside the minecraft theme (light + dark)', () => {
+describe('standard-page announcement', () => {
+  it('announces AgentX on standard pages', () => {
     render();
     expect(splashText()).toBe('AgentX is here!!');
   });
@@ -53,25 +46,6 @@ describe('MinecraftSplash', () => {
     pathnameStub.value = '/zh';
     render();
     expect(splashText()).toBe('AgentX 来了！！');
-  });
-
-  it('swaps to a random splash from the list when the minecraft theme is on', async () => {
-    document.documentElement.classList.add('minecraft');
-    render();
-    await flush();
-    expect(SPLASHES).toContain(splashText());
-  });
-
-  it('falls back to the announcement when the minecraft theme is turned off', async () => {
-    document.documentElement.classList.add('minecraft');
-    render();
-    await flush();
-
-    await act(async () => {
-      document.documentElement.classList.remove('minecraft');
-      await Promise.resolve();
-    });
-    expect(splashText()).toBe('AgentX is here!!');
   });
 
   it('renders the same markup on the server as on the first client render', () => {

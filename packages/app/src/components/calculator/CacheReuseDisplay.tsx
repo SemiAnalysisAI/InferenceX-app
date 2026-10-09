@@ -57,7 +57,7 @@ import {
   CACHE_TIER_COLORS,
   defaultCacheReuseGroup,
   formatShare,
-  tieredRowCount,
+  recipeLabelOf,
   type CacheReuseBar,
 } from './cache-reuse';
 import CacheReuseChart, { CACHE_REUSE_STRINGS, configLabel, tierLabel } from './CacheReuseChart';
@@ -66,14 +66,16 @@ import { useThroughputData, type GroupMeta } from './useThroughputData';
 const STRINGS = {
   en: {
     title: 'Prefix Cache Reuse',
-    description:
-      'Where a configuration finds its prompt tokens as concurrency rises: served from the chip’s HBM cache, from the host tier behind it, or recomputed. Each stacked bar is one measured row, read from the runtime’s own cache counters.',
     benchmarkGroup: 'Benchmark Config',
     chartGroup: 'Chart Config',
     configLabel: 'Configuration',
     configTooltip:
       'The chip and serving framework whose sweep is plotted. Configurations that reported no cache tier for this selection are listed but draw no bars.',
     configPlaceholder: 'Configuration',
+    recipeLabel: 'Recipe',
+    recipeTooltip:
+      'Parallelism, speculative decoding, and KV offload of the plotted rows. A configuration can run several recipes at the same concurrency; each is plotted on its own so one sweep never mixes them.',
+    recipeOption: (label: string, rows: number) => `${label} (${rows} rows)`,
     ceiling: 'Theoretical ceiling',
     errorLoading: 'Error loading data. Please try a different selection.',
     noData:
@@ -82,53 +84,45 @@ const STRINGS = {
       'Fixed-sequence runs record no prefix-cache tiers, so there is nothing to stack here. Switch the scenario to AgentX.',
     noTiers:
       'None of the measured rows for this configuration reported a prefix-cache tier. Try another configuration or run date.',
-    captionRows: (tiered: number, measured: number) =>
-      `${tiered} of ${measured} measured rows report cache tiers`,
     captionSource: 'Source: SemiAnalysis InferenceX',
     unofficialRun: 'Unofficial run',
-    note: 'Note:',
-    methodology:
-      ' Shares are the runtime’s own prefix-cache hit counters over all prompt tokens of the run, so HBM, host, and not-reused sum to 100%. The host tier is the CPU-offload rate (HiCache and similar host-memory caches) and falls back to the router’s external cache rate only when a row reports no CPU figure; the two are never added together. TensorRT-LLM with offload enabled reports both tiers as one figure, drawn as a single reused segment. The dashed tick is the trace’s infinite-cache ceiling.',
     colSeries: 'Series',
     colConcurrency: 'Concurrency',
     colHbm: 'HBM',
     colHost: 'Host',
     colUnreused: 'Not reused',
     colCeiling: 'Ceiling',
-    colTp: 'TP',
+    colRecipe: 'Recipe',
     colRun: 'Run',
     viewRun: 'View',
     official: 'Official',
   },
   zh: {
     title: '前缀缓存复用',
-    description:
-      '随并发数上升，一个配置的 prompt token 从哪里来：命中芯片 HBM 缓存、命中其后的主机层缓存，还是重新计算。每个堆叠柱形对应一行实测数据，数值取自运行时自身的缓存计数。',
     benchmarkGroup: '基准测试配置',
     chartGroup: '图表配置',
     configLabel: '配置',
     configTooltip:
       '要绘制的芯片与推理框架组合。当前选择下未上报任何缓存层级的配置仍会列出，但不绘制柱形。',
     configPlaceholder: '配置',
+    recipeLabel: '方案',
+    recipeTooltip:
+      '所绘数据行的并行方式、投机解码与 KV offload 设置。同一配置在相同并发数下可能有多个方案，每次只绘制一个，避免在同一条扫描中混用。',
+    recipeOption: (label: string, rows: number) => `${label}（${rows} 行）`,
     ceiling: '理论上限',
     errorLoading: '加载数据出错，请尝试其他选择。',
     noData: '当前选择没有实测数据。请尝试其他模型、工作负载或精度。',
     noTiersFixed: '固定序列的运行不记录前缀缓存层级，此处没有可堆叠的数据。请将场景切换为 AgentX。',
     noTiers: '该配置的实测数据行均未上报前缀缓存层级。请尝试其他配置或运行日期。',
-    captionRows: (tiered: number, measured: number) =>
-      `${measured} 行实测数据中有 ${tiered} 行上报缓存层级`,
     captionSource: '来源：SemiAnalysis InferenceX',
     unofficialRun: '非官方运行',
-    note: '注：',
-    methodology:
-      ' 占比取自运行时自身的前缀缓存命中计数，分母为本次运行的全部 prompt token，因此 HBM、主机与未复用三者之和为 100%。主机层取 CPU offload 命中率（HiCache 等主机内存缓存），仅当数据行未上报 CPU 数值时才改用 router 的外部缓存命中率，两者不会相加。TensorRT-LLM 开启 offload 时将两层合并上报，图中绘制为单个复用段。虚线刻度为该 trace 的无限缓存理论上限。',
     colSeries: '系列',
     colConcurrency: '并发数',
     colHbm: 'HBM',
     colHost: '主机',
     colUnreused: '未复用',
     colCeiling: '理论上限',
-    colTp: 'TP',
+    colRecipe: '方案',
     colRun: '运行记录',
     viewRun: '查看',
     official: '官方',
@@ -143,7 +137,7 @@ interface CacheReuseRow {
   host: number | null;
   unreused: number;
   ceiling: number | null;
-  tp: number;
+  recipe: string;
   runUrl: string | null;
 }
 
@@ -190,6 +184,9 @@ function CacheReuseInner() {
   // "the configuration with the most tiered rows", which is why the default
   // is never written back.
   const [configInput, setConfigInput] = useState<string>(() => readUrlParams().c_cfg ?? '');
+  // Empty means the recipe with the most tiered rows; like `c_cfg`, the
+  // default is never written back.
+  const [recipeInput, setRecipeInput] = useState<string>(() => readUrlParams().c_recipe ?? '');
   const [showCeiling, setShowCeiling] = useState(false);
   const [isLegendExpanded, setIsLegendExpanded] = useState(true);
 
@@ -292,12 +289,23 @@ function CacheReuseInner() {
         overlayMeta: overlayGroupMeta,
         overlayLabels,
         config: selectedConfig?.meta ?? { hwKey: '' },
+        recipe: recipeInput || undefined,
       }),
-    [officialPoints, overlayGpuDataByGroupKey, overlayGroupMeta, overlayLabels, selectedConfig],
+    [
+      officialPoints,
+      overlayGpuDataByGroupKey,
+      overlayGroupMeta,
+      overlayLabels,
+      selectedConfig,
+      recipeInput,
+    ],
   );
   const hasAnyData = hasData || hasOverlayData;
+  const plottedRecipeLabel =
+    result.recipes.length > 1
+      ? (result.recipes.find((r) => r.key === result.recipe)?.label ?? '')
+      : '';
   const hasBars = result.bars.length > 0;
-  const tieredRows = useMemo(() => tieredRowCount(officialPoints), [officialPoints]);
 
   const handleModelChange = useCallback(
     (value: string) => {
@@ -320,9 +328,16 @@ function CacheReuseInner() {
     },
     [setSelectedPrecisions],
   );
+  const handleRecipeChange = useCallback((key: string) => {
+    setRecipeInput(key);
+    writeUrlParams({ c_recipe: key });
+    track('cache_reuse_recipe_selected', { recipe: key });
+  }, []);
   const handleConfigChange = useCallback((key: string) => {
     setConfigInput(key);
-    writeUrlParams({ c_cfg: key });
+    // Recipe keys belong to one configuration; carry none across a switch.
+    setRecipeInput('');
+    writeUrlParams({ c_cfg: key, c_recipe: '' });
     track('cache_reuse_config_selected', { config: key });
   }, []);
 
@@ -373,7 +388,7 @@ function CacheReuseInner() {
         host: bar.share.combined ? null : bar.share.host,
         unreused: bar.share.unreused,
         ceiling: bar.share.theoretical,
-        tp: bar.point.tp,
+        recipe: recipeLabelOf(bar.point),
         runUrl:
           bar.runIndex === undefined
             ? (bar.point.sourceRow?.run_url ?? null)
@@ -415,7 +430,7 @@ function CacheReuseInner() {
         sortValue: (r) => r.ceiling ?? -1,
         align: 'right',
       },
-      { header: t.colTp, cell: (r) => r.tp, sortValue: (r) => r.tp, align: 'right' },
+      { header: t.colRecipe, cell: (r) => r.recipe, sortValue: (r) => r.recipe },
       {
         header: t.colRun,
         cell: (r) =>
@@ -446,7 +461,7 @@ function CacheReuseInner() {
       t.colHost,
       t.colUnreused,
       t.colCeiling,
-      t.colTp,
+      t.colRecipe,
       t.colRun,
     ];
     const body = tableRows.map((r) => [
@@ -456,15 +471,16 @@ function CacheReuseInner() {
       r.host ?? '',
       r.unreused,
       r.ceiling ?? '',
-      r.tp,
+      r.recipe,
       r.runUrl ?? '',
     ]);
     exportToCsv(`InferenceX_cache_reuse_${selectedModel}.csv`, headers, body, [
       `${getModelLabel(selectedModel)} • ${getSequenceLabel(selectedSequence, locale)}`,
       selectedConfig?.label ?? '',
+      plottedRecipeLabel,
     ]);
     track('cache_reuse_csv_exported', { model: selectedModel });
-  }, [t, tableRows, selectedModel, selectedSequence, locale, selectedConfig]);
+  }, [t, tableRows, selectedModel, selectedSequence, locale, selectedConfig, plottedRecipeLabel]);
 
   const legendHwKeys = useMemo(
     () => [...new Set([...availableHwKeys, ...(isUnofficialRun ? overlayAvailableHwKeys : [])])],
@@ -481,8 +497,8 @@ function CacheReuseInner() {
       </Heading>
       <p className="text-sm text-muted-foreground mb-2">
         {getModelLabel(selectedModel)} • {getSequenceLabel(selectedSequence, locale)}
-        {selectedConfig ? ` • ${selectedConfig.label}` : ''} •{' '}
-        {t.captionRows(tieredRows, officialPoints.length)} • {t.captionSource}
+        {selectedConfig ? ` • ${selectedConfig.label}` : ''}
+        {plottedRecipeLabel ? ` • ${plottedRecipeLabel}` : ''} • {t.captionSource}
       </p>
     </>
   );
@@ -526,11 +542,7 @@ function CacheReuseInner() {
       <section data-testid="cache-reuse-controls">
         <Card className="relative z-30">
           <div className="flex flex-col gap-4">
-            <DashboardSectionHeader
-              title={t.title}
-              description={t.description}
-              actions={<ChartShareActions />}
-            />
+            <DashboardSectionHeader title={t.title} actions={<ChartShareActions />} />
 
             <TooltipProvider delayDuration={0}>
               <ControlPanel
@@ -601,6 +613,37 @@ function CacheReuseInner() {
                     />
                   </div>
                 </div>
+                {result.recipes.length > 1 && (
+                  <div className="flex min-w-0 flex-col space-y-1.5">
+                    <LabelWithTooltip
+                      htmlFor="cache-reuse-recipe"
+                      label={t.recipeLabel}
+                      tooltip={t.recipeTooltip}
+                    />
+                    <div data-testid="cache-reuse-recipe-selector">
+                      <MultiSelect
+                        triggerId="cache-reuse-recipe"
+                        options={result.recipes.map((r) => ({
+                          value: r.key,
+                          label: t.recipeOption(r.label, r.tiered),
+                        }))}
+                        value={result.recipe ? [result.recipe] : []}
+                        onChange={(values) => {
+                          const next = values[0];
+                          if (next) handleRecipeChange(next);
+                        }}
+                        open={openDropdown === 'recipe'}
+                        onOpenChange={handleDropdownOpenChange('recipe')}
+                        placeholder={t.recipeLabel}
+                        minSelections={1}
+                        maxSelections={1}
+                        showClearAll={false}
+                        plainSelectedText
+                        showSelectionSummary={false}
+                      />
+                    </div>
+                  </div>
+                )}
               </ControlPanel>
             </TooltipProvider>
           </div>
@@ -658,11 +701,6 @@ function CacheReuseInner() {
               </>
             )}
           </figure>
-
-          <p className="mt-4 text-xs text-muted-foreground">
-            <strong>{t.note}</strong>
-            {t.methodology}
-          </p>
 
           {tableRows.length > 0 && (
             <div className="mt-4">

@@ -258,7 +258,7 @@ describe('component CSS harness', () => {
   });
 
   for (const width of [390, 1280]) {
-    for (const theme of ['light', 'dark', 'minecraft']) {
+    for (const theme of ['light', 'dark']) {
       it(`keeps selected segments concentric with their outlines at ${width}px in ${theme} mode`, () => {
         cy.viewport(width, 720);
         cy.mount(
@@ -580,7 +580,8 @@ describe('component CSS harness', () => {
         const direct = card
           .querySelector('[data-testid="direct-content"]')!
           .getBoundingClientRect();
-        const padding = width < 768 ? 16 : 24;
+        // Phones get a tighter 12px inset so content has room; sm+ keeps 16px, md+ 24px.
+        const padding = width < 640 ? 12 : width < 768 ? 16 : 24;
         expect(getComputedStyle(card).paddingLeft).to.equal(`${padding}px`);
         for (const slot of ['card-header', 'card-content', 'card-footer']) {
           const bounds = card.querySelector(`[data-slot="${slot}"]`)!.getBoundingClientRect();

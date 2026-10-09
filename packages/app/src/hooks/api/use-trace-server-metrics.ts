@@ -22,6 +22,17 @@ export interface PointMeta {
   spec_method: string;
   disagg: boolean;
   is_multinode: boolean;
+  prefill_tp: number;
+  prefill_ep: number;
+  prefill_dp_attention: boolean;
+  prefill_num_workers: number;
+  decode_tp: number;
+  decode_ep: number;
+  decode_dp_attention: boolean;
+  decode_num_workers: number;
+  num_prefill_gpu: number;
+  num_decode_gpu: number;
+  recipe_fingerprint: string | null;
   conc: number;
   offload_mode: string | null;
   kv_offloading: string | null;
