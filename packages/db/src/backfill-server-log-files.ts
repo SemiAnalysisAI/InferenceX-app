@@ -12,6 +12,10 @@
  *   bun run --cwd packages/db db:backfill-server-log-files --all --from-run 26606969606 --yes
  *   bun run --cwd packages/db db:backfill-server-log-files --all --source gcs --dry-run
  *   bun run --cwd packages/db db:backfill-server-log-files --all --source auto --yes
+ *   bun run --cwd packages/db db:backfill-server-log-files --run 36470443155 --force --yes
+ *
+ * --force revisits bundles already marked complete; only missing filenames are
+ * inserted, so it picks up files a newer artifact reader can see.
  */
 
 import fs from 'node:fs';
@@ -204,7 +208,7 @@ async function main(): Promise<void> {
     throw new Error('--run and --from-run cannot be combined');
   }
   const flags = parseBackfillFlags();
-  const { limit } = parseLimitForceFlags();
+  const { limit, force } = parseLimitForceFlags();
   const runs = await sql<CandidateRun[]>`
     select distinct wr.github_run_id, wr.run_attempt, wr.html_url, wr.date::text as date
     from workflow_runs wr
@@ -318,7 +322,7 @@ async function main(): Promise<void> {
             console.warn(`  [WARN] ${pair.serverLogs.name}: no matching benchmark rows`);
             continue;
           }
-          if (await resultLogsAreComplete(resultIds)) {
+          if (!force && (await resultLogsAreComplete(resultIds))) {
             completeSkipped++;
             continue;
           }

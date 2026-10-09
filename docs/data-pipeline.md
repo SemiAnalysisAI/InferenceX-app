@@ -335,7 +335,12 @@ Server-log artifacts are stored as filename-keyed bundles rather than as a hard-
 router, worker, or benchmark roles. Ingest recursively retains every regular `.log` and `.out`
 file and preserves its artifact-relative path. This applies to both `server_logs_*` ZIPs and
 `multinode_server_logs_*` artifacts whose files are nested inside
-`multinode_server_logs.tar.gz`.
+`multinode_server_logs.tar.gz`. Native srt-slurm single-node runs (fixed-sequence from
+2026-09-24, AgentX from 2026-09-26) keep the client logs at the `server_logs_*` artifact root and
+put the job's `logs/` directory, including the server worker log `<host>_agg_w0.out`, in
+`srt-single-node-logs.tar.gz`. Ingest extracts that archive in place, so its files are stored
+under `srt-single-node-logs/` next to the root files; artifacts without the archive read as
+before.
 
 The primary file remains in `server_logs.server_log` for compatibility and KV-cache metadata
 extraction; `server_log_files` holds the remaining files. `server_logs.file_name` records the
@@ -346,7 +351,9 @@ for complete DB history, `--source gcs` to exercise only the backup path, and `-
 inventory pair counts and compressed download size without writing. `--run <id>`, `--limit <n>`,
 and `--yes` remain available for targeted, idempotent recovery. Bundles already marked
 `files_complete` are skipped after their small benchmark artifact is mapped, avoiding repeated
-large log downloads.
+large log downloads. `--force` revisits those bundles and inserts only filenames they do not
+already hold, which recovers files a newer artifact reader exposes, such as the single-node
+srt-slurm archive.
 
 Full-bundle search stays inside PostgreSQL: each file is scanned through overlapping 16 MiB
 character slices, and the API returns at most 50 match contexts rather than transferring the
