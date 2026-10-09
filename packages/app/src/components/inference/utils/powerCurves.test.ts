@@ -86,7 +86,7 @@ describe('upper power envelope', () => {
     const dominated = point(64, 20.51, 344.95, { decode_ep: 8 });
     const slower = point(256, 4.65, 372.9, { decode_ep: 8 });
     const input = Object.freeze([fast, middle, dominated, peak, slower]);
-    expect(upperPowerEnvelope(input, true)).toEqual([peak, middle, fast]);
+    expect(upperPowerEnvelope(input, 'lower_right')).toEqual([peak, middle, fast]);
     expect(input).toEqual([fast, middle, dominated, peak, slower]);
     expect(chartFrontier([...input], 'lower_right')).toEqual([fast]);
   });
@@ -96,18 +96,18 @@ describe('upper power envelope', () => {
     const middle = point(8, 2, 700);
     const slow = point(32, 4, 950);
     const samples = [slow, point(16, 3, 700), point(4, 2, 500), middle, { ...middle }, fast];
-    expect(upperPowerEnvelope(samples, false)).toEqual([fast, middle, slow]);
+    expect(upperPowerEnvelope(samples, 'lower_left')).toEqual([fast, middle, slow]);
     expect(
       upperPowerEnvelope(
         samples.map((p) => ({ ...p, x: 1000 / p.x })),
-        true,
+        'lower_right',
       ).map((p) => p.y),
     ).toEqual([950, 700, 350]);
   });
 
   it('uses only finite positive coordinates and preserves singleton boundaries', () => {
     const valid = point(1, 200, 350);
-    expect(upperPowerEnvelope([], true)).toEqual([]);
+    expect(upperPowerEnvelope([], 'lower_right')).toEqual([]);
     expect(
       upperPowerEnvelope(
         [
@@ -120,7 +120,7 @@ describe('upper power envelope', () => {
           point(1, 10, -1),
           valid,
         ],
-        true,
+        'lower_right',
       ),
     ).toEqual([valid]);
   });

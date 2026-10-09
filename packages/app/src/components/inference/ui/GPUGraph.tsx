@@ -395,13 +395,13 @@ const GPUGraph = React.memo(
     }, [groupedData, frontierDirection]);
 
     const rooflines = useMemo(() => {
-      if (!powerEnvelopeMode) return paretoRooflines;
+      if (!powerEnvelopeMode || !frontierDirection) return paretoRooflines;
       const result: Record<string, InferenceData[]> = {};
       for (const [key, points] of Object.entries(groupedData)) {
-        result[key] = upperPowerEnvelope(points, chartDefinition.chartType !== 'e2e');
+        result[key] = upperPowerEnvelope(points, frontierDirection);
       }
       return result;
-    }, [powerEnvelopeMode, groupedData, paretoRooflines, chartDefinition.chartType]);
+    }, [powerEnvelopeMode, groupedData, paretoRooflines, frontierDirection]);
 
     const boundaryPointKeys = useMemo(() => {
       const keys = new Set<string>();
