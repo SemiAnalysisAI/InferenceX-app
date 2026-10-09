@@ -338,6 +338,10 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
     'GPU key, e.g. "H100 SXM"; default first available GPU. "all" returns every GPU.',
     'GPU 键，如 "H100 SXM"；默认首个可用 GPU。设为 "all" 返回全部 GPU。',
   ],
+  test: [
+    'ubenchX test selector: mem-bw, sm-l2-distance, or all (default). Determines which benchmark data is returned.',
+    'ubenchX 测试选择：mem-bw、sm-l2-distance 或 all（默认），决定返回哪种基准测试数据。',
+  ],
   view: ['Video results (default) or tradeoff.', '视频 results（默认）或 tradeoff。'],
 };
 
@@ -430,7 +434,11 @@ const NEW_VIEWS = {
       discovery: object,
     },
   ],
-  ubenchx: ['ubenchX device-memory copy bandwidth', 'ubenchX 显存拷贝带宽', { gpus: objects }],
+  ubenchx: [
+    'ubenchX microbenchmarks (mem-bw and sm-l2-distance)',
+    'ubenchX 微基准测试（mem-bw 和 sm-l2-distance）',
+    { gpus: objects, tests: strings, memBw: object, smL2Distance: object },
+  ],
 } as const;
 
 export const operations: ApiOperation[] = Object.entries(NEW_VIEWS).map(
