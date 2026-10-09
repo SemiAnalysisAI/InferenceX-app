@@ -417,9 +417,9 @@ const LANDING_HARDWARE_RESULTS = [
     vendor: 'NVIDIA',
     title: 'Rubin Results',
     titleZh: 'Rubin 结果',
-    subtitle: 'DeepSeek V4 Pro · AgentX',
-    href: '/inference/deepseek-v4',
-    model: 'deepseek-v4',
+    subtitle: 'MiniMax M3 · AgentX',
+    href: '/inference/minimax-m3',
+    model: 'minimax-m3',
     analyticsEvent: 'landing_rubin_results_clicked',
   },
   {
