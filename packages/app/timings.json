@@ -157,14 +157,6 @@
       "duration": 10395
     },
     {
-      "spec": "cypress/e2e/minecraft-game.cy.ts",
-      "duration": 27000
-    },
-    {
-      "spec": "cypress/e2e/optional-theme-isolation.cy.ts",
-      "duration": 216000
-    },
-    {
       "spec": "cypress/e2e/gradient-labels.cy.ts",
       "duration": 4951
     },
@@ -201,6 +193,10 @@
       "duration": 1953
     },
     {
+      "spec": "cypress/e2e/minecraft-game.cy.ts",
+      "duration": 27000
+    },
+    {
       "spec": "cypress/e2e/model-architecture.cy.ts",
       "duration": 14249
     },
@@ -219,6 +215,10 @@
     {
       "spec": "cypress/e2e/operatorx.cy.ts",
       "duration": 3342
+    },
+    {
+      "spec": "cypress/e2e/optional-theme-isolation.cy.ts",
+      "duration": 216000
     },
     {
       "spec": "cypress/e2e/overlay-legend-remove.cy.ts",
@@ -275,6 +275,10 @@
     {
       "spec": "cypress/e2e/ttft-x-axis-toggle.cy.ts",
       "duration": 13842
+    },
+    {
+      "spec": "cypress/e2e/ubenchx.cy.ts",
+      "duration": 10000
     },
     {
       "spec": "cypress/e2e/unofficial-watermark.cy.ts",

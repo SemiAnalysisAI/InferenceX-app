@@ -206,6 +206,14 @@ export const apiRouteCatalog = [
     sourceSha256: '566405f7db1eb5ea141b54384238e1b531bfe616c7fcd65b8653aed30d7ba007',
   },
   {
+    source: 'src/app/api/v1/views/ubenchx/route.ts',
+    path: '/api/v1/views/ubenchx',
+    method: 'GET',
+    classification: 'published-read',
+    operationId: 'get-ubenchx-view',
+    sourceSha256: 'f699fe7cc0c641af3b59f73fadf7ef6d651a041872682b338378c95e2e2c8ec7',
+  },
+  {
     source: 'src/app/api/v1/operatorx/runs/route.ts',
     path: '/api/v1/operatorx/runs',
     method: 'GET',
@@ -940,7 +948,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/registry.ts',
-    sourceSha256: '1958ff6a851aa32a167c4acafbdaf69c7ef18bac9ca59851d2153300dbf88a59',
+    sourceSha256: 'd25daf154a9255fb7bf9543cf2b55170c8332b41480ebbc9e523224861422581',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',

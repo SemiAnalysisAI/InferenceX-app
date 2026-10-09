@@ -1,0 +1,31 @@
+describe('ubenchX localized routes', () => {
+  it('renders the English page with three charts and noindex', () => {
+    cy.visit('/ubenchx', {
+      onBeforeLoad(win) {
+        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+      },
+    });
+    cy.contains('ubenchX').should('be.visible');
+    cy.contains('H100 SXM').should('be.visible');
+    cy.get('svg').should('have.length.at.least', 3);
+    cy.get('meta[name="robots"]').should('have.attr', 'content').and('contain', 'noindex');
+    cy.get('link[rel="alternate"][hreflang="zh-CN"]')
+      .invoke('attr', 'href')
+      .should('include', '/zh/ubenchx');
+  });
+
+  it('renders the Chinese page with noindex and zh tab intro', () => {
+    cy.visit('/zh/ubenchx', {
+      onBeforeLoad(win) {
+        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+      },
+    });
+    cy.contains('ubenchX').should('be.visible');
+    cy.contains('显存拷贝带宽').should('be.visible');
+    cy.get('svg').should('have.length.at.least', 3);
+    cy.get('meta[name="robots"]').should('have.attr', 'content').and('contain', 'noindex');
+    cy.get('link[rel="alternate"][hreflang="en"]')
+      .invoke('attr', 'href')
+      .should('include', '/ubenchx');
+  });
+});

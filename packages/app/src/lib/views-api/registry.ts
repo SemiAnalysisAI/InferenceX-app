@@ -240,6 +240,7 @@ export const VIEW_QUERY_PARAMS = {
     'xAxis',
     'yAxis',
   ],
+  ubenchx: ['gpu'],
 } as const;
 export type ReadonlyView = keyof typeof VIEW_QUERY_PARAMS;
 
@@ -274,6 +275,7 @@ export const DASHBOARD_API_COVERAGE = {
     exclusion:
       'Provider keys, private prompts, and locally generated charts are not public datasets.',
   },
+  ubenchx: { view: 'ubenchx' },
   feedback: {
     exclusion:
       'Private user feedback and its write endpoint are sensitive; no public read projection.',

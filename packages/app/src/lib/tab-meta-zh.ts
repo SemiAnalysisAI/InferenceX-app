@@ -99,6 +99,11 @@ export const TAB_META_ZH: Record<DashboardRouteKey, { title: string; description
     description:
       '各模型、芯片 SKU 和配置的当前 InferenceX Docker 镜像标签。对比已部署镜像与最新 vLLM 和 SGLang 发布版本，标记过期标签。',
   },
+  ubenchx: {
+    title: 'ubenchX 显存拷贝带宽',
+    description:
+      'H100 SXM 显存拷贝带宽微基准测试：延迟、带宽与显存带宽利用率（MBU），消息大小从 8 B 到 16 GiB。',
+  },
   video: {
     title: 'H3 视频基准测试',
     description: '查看 H3 原始视频、音频、测量结果与 CI 来源记录。',
@@ -149,6 +154,8 @@ export const TAB_INTRO_ZH: Record<DashboardRouteKey, string> = {
     '本页面提供 AI 驱动的图表生成工具：用自然语言描述您想查看的图表，系统会根据 InferenceX 基准测试数据自动生成可视化结果。',
   'current-inferencex-image':
     '本页面展示 InferenceX 当前使用的 Docker 镜像标签：按模型、芯片 SKU 和配置列出已部署版本，并与上游 vLLM、SGLang 最新发布版本对比，方便排查过期镜像。',
+  ubenchx:
+    '本页面展示 ubenchX 显存拷贝带宽微基准测试结果：在 NVIDIA H100 SXM 上，测量从 8 B 到 16 GiB 各消息大小的拷贝延迟、实测带宽和显存带宽利用率（MBU）。MBU 以 GPU_SPECS 中的峰值 HBM 带宽为基准计算。',
   video:
     '本页面在浏览器中读取 H3 CI 产物，展示执行状态、测量数据与比较结论；比较阈值在后端标注校准前保持未校准。',
   feedback:
@@ -174,6 +181,7 @@ export const TAB_LABELS_ZH: Record<DashboardRouteKey, string> = {
   submissions: '提交记录',
   'ai-chart': 'AI 图表',
   'current-inferencex-image': '镜像',
+  ubenchx: 'ubenchX 显存带宽',
   video: '视频基准测试',
   feedback: '反馈',
 };

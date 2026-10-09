@@ -73,6 +73,7 @@ which controls belong together.
 | `submissions`                   | Search, table sort/direction/offset/limit, weekly/cumulative chart, on-change cutoff and NVIDIA/AMD/total lines. Table search does not filter the independent submission-volume chart.                                                                    |
 | `current-inferencex-image`      | Model, sequence, hardware, precision, speculation, node type, framework families and `asOf` for image age/release status.                                                                                                                                 |
 | `gpu-metrics`                   | Required run, artifact, GPU indices, metric or correlation axes, statistics sorting, chart mode and interactive downsampling preference. Raw rows and statistics remain unsampled; live response is no-store.                                             |
+| `ubenchx`                       | GPU selector; static device-memory copy bandwidth rows with derived MBU and latency. Peak bandwidth sourced from GPU_SPECS.                                                                                                                               |
 | `video`                         | CI run/artifact discovery; only already-published artifact reads; source, serving cell, media/fidelity slot, power phase and GPU denominator; same-workload comparisons, axes, deployment costs and selected tradeoff point. No-store.                    |
 
 ## Interpretation and maintenance

@@ -266,6 +266,16 @@ export const DASHBOARD_ROUTES = [
     shareParamScopes: ['g_', 'i_'],
   },
   {
+    key: 'ubenchx',
+    path: '/ubenchx',
+    canonicalPath: '/ubenchx',
+    navGroup: 'feature-gated',
+    indexable: false,
+    localeMirrored: true,
+    providers: STANDALONE_DASHBOARD_PROVIDERS,
+    shareParamScopes: [],
+  },
+  {
     key: 'feedback',
     path: '/feedback',
     canonicalPath: '/feedback',
