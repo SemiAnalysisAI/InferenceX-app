@@ -1,10 +1,5 @@
-const choose = (theme: string) => {
-  cy.get('[data-testid="theme-toggle"]')
-    .should('have.attr', 'aria-label')
-    .and('include', 'currently');
-  cy.get('[data-testid="theme-toggle"]').click();
-  cy.get(`[data-testid="theme-option-${theme}"]`).click();
-};
+import { cycleToTheme as choose } from '../support/theme';
+
 describe('Mario Kart mode', () => {
   for (const theme of ['light', 'dark']) {
     it(`keeps Kart code, CSS and assets off the ${theme} initial path`, () => {

@@ -1,4 +1,5 @@
 import { APP_THEMES } from '../../src/lib/themes';
+import { cycleToTheme } from '../support/theme';
 
 const optionalThemes = APP_THEMES.filter((theme) => !['light', 'dark', 'system'].includes(theme));
 const featureCode =
@@ -79,10 +80,9 @@ describe('optional themes stay off the default page', () => {
         const splash = win.document.querySelector('.splash-text');
         if (splash) expect(win.getComputedStyle(splash).animationName).to.equal('none');
       });
-      // Merely viewing options and interacting with the page must not activate a theme.
-      cy.get('[data-testid="theme-toggle"]').click();
-      cy.get('[data-testid="theme-option-minecraft"]').should('be.visible');
-      cy.get('body').type('{esc}');
+      // Focusing the toggle must not activate a theme or fetch optional assets.
+      cy.get('[data-testid="theme-toggle"]').focus();
+      cy.get('[data-testid="theme-menu"]').should('not.exist');
       cy.scrollTo('bottom');
       expectNoOptionalResources(requests);
     });
@@ -156,13 +156,11 @@ describe('optional themes stay off the default page', () => {
     cy.document().then((doc) => {
       const baseline = seo(doc);
       for (const theme of optionalThemes) {
-        cy.get('[data-testid="theme-toggle"]').click();
-        cy.get(`[data-testid="theme-option-${theme}"]`).click();
+        cycleToTheme(theme);
         if (theme === 'minecraft') cy.get('canvas').should('exist');
         else cy.get(`[data-testid="${theme}-theme-banner"]`).should('be.visible');
         cy.document().should((current) => expect(seo(current)).to.deep.equal(baseline));
-        cy.get('[data-testid="theme-toggle"]').click();
-        cy.get('[data-testid="theme-option-dark"]').click();
+        cycleToTheme('dark');
         cy.get(`canvas, audio, iframe, ${featureElements}`).should('not.exist');
         cy.document().should((current) => expect(seo(current)).to.deep.equal(baseline));
       }

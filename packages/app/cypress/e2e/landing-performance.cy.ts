@@ -192,7 +192,6 @@ describe('Landing page performance', () => {
       .should('have.attr', 'aria-label')
       .and('contain', 'currently');
     cy.get('[data-testid="theme-toggle"]').click();
-    cy.get('[data-testid="theme-option-minecraft"]').click();
     cy.get('html').should('have.class', 'minecraft');
     cy.window().should((win) => {
       const resourceNames = win.performance.getEntriesByType('resource').map((entry) => entry.name);

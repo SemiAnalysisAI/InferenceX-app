@@ -1,15 +1,7 @@
 // Merged from basic.cy.ts, navigation.cy.ts, theme-toggle.cy.ts, and land-acknowledgement.cy.ts
 // to reduce per-file Cypress startup overhead (~500ms per file)
 
-/** Open the header theme picker after the client mount and choose `theme`. */
-function pickTheme(theme: string) {
-  // The trigger label names the saved theme only once the client has mounted.
-  cy.get('[data-testid="theme-toggle"]')
-    .should('have.attr', 'aria-label')
-    .and('contain', 'currently');
-  cy.get('[data-testid="theme-toggle"]').click();
-  cy.get(`[data-testid="theme-option-${theme}"]`).click();
-}
+import { cycleToTheme as pickTheme } from '../support/theme';
 
 describe('Page Load & Navigation', () => {
   before(() => {
