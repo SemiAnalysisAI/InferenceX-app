@@ -37,6 +37,7 @@ import { transformBenchmarkRows } from '@/lib/benchmark-transform';
 import {
   isFrontierEligible,
   paretoFrontForDirection,
+  paretoMaximizesX,
   remapInferencePoint,
   type ParetoDirection,
 } from '@/lib/chart-utils';
@@ -287,7 +288,7 @@ export function buildInferenceSeries(
   // 7. Frontier flags, scoped per (hwKey, precision, date) like ScatterGraph.
   // Measured power represents load demand, so retain its upper boundary.
   const isMeasuredPower = isMeasuredPowerCurveMetric(metricConfigKey);
-  const maximizePowerX = chartDef.chartType !== 'e2e';
+  const maximizePowerX = direction !== null && paretoMaximizesX(direction);
   const frontierDirection = isMeasuredPower
     ? maximizePowerX
       ? 'upper_right'
@@ -305,7 +306,7 @@ export function buildInferenceSeries(
     }
     for (const bucket of byHwDate.values()) {
       const frontier = isMeasuredPower
-        ? upperPowerEnvelope(bucket, maximizePowerX)
+        ? upperPowerEnvelope(bucket, direction)
         : frontierFn(bucket.filter(isFrontierEligible));
       for (const point of frontier) {
         frontierPoints.add(point);
