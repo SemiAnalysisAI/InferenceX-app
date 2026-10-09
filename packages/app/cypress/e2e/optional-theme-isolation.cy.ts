@@ -51,7 +51,7 @@ const seo = (doc: Document) => [
 
 describe('optional themes stay off the default page', () => {
   for (const route of ['/', '/zh']) {
-    it(`${route} migrates a retired kart preference and keeps the picker usable`, () => {
+    it(`${route} migrates a retired kart preference and keeps the toggle usable`, () => {
       const requests: string[] = [];
       cy.intercept('GET', '**', (request) => {
         requests.push(request.url);
@@ -63,17 +63,18 @@ describe('optional themes stay off the default page', () => {
       });
       cy.get('html').should('have.class', 'dark').and('not.have.class', 'kart');
       cy.window().should((win) => expect(win.localStorage.getItem('theme')).to.equal('dark'));
-      cy.get('[data-testid="theme-toggle"]').click();
+      cy.get('[data-testid="theme-toggle"]').focus();
       cy.get('[data-testid="theme-option-kart"]').should('not.exist');
-      cy.get('[data-testid="theme-menu"] [role="radio"]').should('have.length', 7);
-      cy.get('[data-testid="theme-option-light"]').click();
+      cy.get('[data-testid="theme-menu"]').should('not.exist');
+      expectNoOptionalResources(requests);
+      // Cycling intentionally activates optional themes before returning to light.
+      cycleToTheme('light');
       cy.get('html').should('have.class', 'light').and('not.have.class', 'kart');
       cy.reload();
       cy.get('html').should('have.class', 'light').and('not.have.class', 'kart');
       cy.then(() => {
         expect(requests.filter((url) => url.includes('/decorative/kart/'))).to.deep.equal([]);
       });
-      expectNoOptionalResources(requests);
     });
   }
 
