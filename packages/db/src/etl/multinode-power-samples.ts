@@ -8,8 +8,8 @@
  *
  *   schema_version,timestamp_unix,scrape_seq,hostname,gpu_index,gpu_uuid,power_w
  *
- * Only power is scraped, so every other `GpuMetricSample` field stays null and
- * per-GPU statistics cover `powerW` alone. Rows are regrouped per host so each
+ * Version 3 adds optional GPU temperature in Celsius; historical power-only
+ * files and missing readings retain null. Rows are regrouped per host so each
  * host becomes its own series, the shape the reader already uses for multinode
  * staging ("one CSV per node"). Pure module: no I/O.
  */
@@ -74,7 +74,14 @@ export function parseMultinodePowerSamples(csvText: string): MultinodePowerHost[
       host = { hostname, samples: [], gpuUuids: {} };
       hosts.set(hostname, host);
     }
-    host.samples.push({ ...emptySample(Math.round(seconds * 1000), gpuIndex), powerW });
+    const sample = { ...emptySample(Math.round(seconds * 1000), gpuIndex), powerW };
+    const temperatureText = at(cells, 'temperature_c');
+    const temperature = temperatureText ? Number(temperatureText) : Number.NaN;
+    // DCGM reserves INT32_BLANK and larger values for unavailable readings.
+    if (Number.isFinite(temperature) && temperature >= -273.15 && temperature < 2147483632) {
+      sample.temperatureC = temperature;
+    }
+    host.samples.push(sample);
     const uuid = at(cells, 'gpu_uuid');
     if (uuid && !(gpuIndex in host.gpuUuids)) host.gpuUuids[gpuIndex] = uuid;
   }

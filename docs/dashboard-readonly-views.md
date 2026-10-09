@@ -87,10 +87,14 @@ Provisioned, and All in Measured. The last combines measured GPU power with mode
 unmeasured components and PUE; it is not a wall-meter measurement. These labels and
 collapsed power-assumption/availability notes do not change metric IDs, API selectors,
 or calculations. Profit comparison `powerLabel` display text follows the same names.
+GPU telemetry lines retain gaps at explicitly missing metric readings, including
+rolling averages and chip means with no contributors. Gap markers are internal
+renderer state: the API still returns measured chart points only, while `rows`
+preserves timestamps with unavailable fields. Statistics and raw data are unchanged.
 GPU statistics include startup and warmup for all chips in the selected series,
 regardless of chip visibility. They are separate from serving-window power and
-J/token. Run telemetry comes from one source per run: stored series once the run is
-ingested, otherwise its artifacts. The public view returns private, no-store
+J/token. Runs with stored telemetry read the DB; other runs read their artifacts.
+The public view returns private, no-store
 responses and preserves upstream 503 failures.
 
 Run-specific recognition labels are also presentation-only. Runs `35879254139`

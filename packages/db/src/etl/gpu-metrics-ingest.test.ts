@@ -118,6 +118,28 @@ function writePowerAuditArtifact() {
 }
 
 describe('prepareGpuMetricsArtifact', () => {
+  it('retains native temperature samples and statistics through ingestion preparation', () => {
+    const artifact = writePowerAuditArtifact();
+    fs.writeFileSync(
+      path.join(artifact.artifactDir, 'LOGS/power/samples.csv'),
+      [
+        'schema_version,timestamp_unix,scrape_seq,hostname,gpu_index,gpu_uuid,power_w,gpu_util_pct,sm_active,temperature_c',
+        '3,1789194365,0,host-a,0,GPU-a0,700,,,60',
+        '3,1789194366,1,host-a,0,GPU-a0,702,,,70',
+        '3,1789194367,2,host-a,0,GPU-a0,704,,,',
+      ].join('\n'),
+    );
+    const [series] = prepareGpuMetricsArtifact(artifact);
+    expect(series!.samples.map((s) => s.temperatureC)).toEqual([60, 70, null]);
+    expect(
+      computeGpuMetricStats(series!.samples).find((s) => s.metric === 'temperatureC'),
+    ).toMatchObject({
+      count: 2,
+      min: 60,
+      max: 70,
+    });
+  });
+
   it('falls back to the multinode power bundle, one power-only series per host', () => {
     const prepared = prepareGpuMetricsArtifact(writePowerAuditArtifact());
     expect(prepared.map((series) => series.fileName)).toEqual([

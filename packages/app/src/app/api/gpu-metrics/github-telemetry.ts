@@ -1,4 +1,9 @@
 /** Live PowerX artifact acquisition; the route owns DB fallback and HTTP responses. */
+import {
+  isMultinodePowerSamplesPath,
+  parseMultinodePowerSamples,
+} from '@semianalysisai/inferencex-db/etl/multinode-power-samples';
+
 import type { GpuMetricRow, GpuPowerRunInfo } from '@/components/gpu-power/types';
 import {
   cutPowerAuditBundle,
@@ -18,7 +23,12 @@ import {
   type GithubWorkflowRun,
 } from '@/lib/github-artifacts';
 
-import { ARTIFACT_PREFIX, isWantedBundle, isRequestedArtifact } from './artifact-selection';
+import {
+  ARTIFACT_PREFIX,
+  BUNDLE_PREFIX,
+  isWantedBundle,
+  isRequestedArtifact,
+} from './artifact-selection';
 
 const MAX_ARTIFACT_BYTES = 50 * 1024 * 1024;
 /** Bundles carry a whole sweep (215 MB seen for nw8); only the power entries are decoded. */
@@ -40,7 +50,7 @@ interface GithubGpuMetricsResponse {
 }
 
 type TelemetryJob =
-  | { kind: 'csv'; artifact: GithubArtifact }
+  | { kind: 'csv' | 'native'; artifact: GithubArtifact }
   | { kind: 'bundle'; artifact: GithubArtifact };
 
 type TelemetryResult =
@@ -103,6 +113,27 @@ async function downloadArtifact(
   return files.length > 0 ? { name: artifact.name, files } : null;
 }
 
+async function downloadNativeSamples(
+  artifact: GithubArtifact,
+  githubToken: string,
+): Promise<GithubArtifactPayload | null> {
+  const buffer = await downloadZip(artifact, githubToken, MAX_BUNDLE_BYTES);
+  if (!buffer) return null;
+  const files = extractZipEntries(buffer, '.csv', (name, contents) => {
+    if (!isMultinodePowerSamplesPath(name)) return [];
+    return (parseMultinodePowerSamples(contents) ?? []).map((host) => ({
+      name: `${name}#${host.hostname}`,
+      data: host.samples.map((sample) => ({
+        timestamp: new Date(sample.timestampMs).toISOString(),
+        index: sample.gpuIndex,
+        power: sample.powerW!,
+        ...(sample.temperatureC === null ? {} : { temperature: sample.temperatureC }),
+      })),
+    }));
+  });
+  return files.length > 0 ? { name: artifact.name, files } : null;
+}
+
 async function downloadBundle(
   artifact: GithubArtifact,
   githubToken: string,
@@ -124,8 +155,11 @@ async function downloadBundle(
  */
 async function runJob(job: TelemetryJob, githubToken: string): Promise<TelemetryResult | null> {
   try {
-    if (job.kind === 'csv') {
-      const parsed = await downloadArtifact(job.artifact, githubToken);
+    if (job.kind === 'csv' || job.kind === 'native') {
+      const parsed = await (job.kind === 'native' ? downloadNativeSamples : downloadArtifact)(
+        job.artifact,
+        githubToken,
+      );
       return parsed ? { kind: 'csv', parsed } : null;
     }
     const series = await downloadBundle(job.artifact, githubToken);
@@ -173,23 +207,15 @@ export async function fetchGpuMetricsFromGithub(
   const jobs: TelemetryJob[] = artifacts
     .filter((a) => a.name.startsWith(wanted) && isRequestedArtifact(a.name, sources))
     .map((artifact) => ({ kind: 'csv', artifact }));
-  if (includeBundles) {
-    const csvNames = new Set(jobs.map(({ artifact }) => artifact.name));
-    for (const artifact of artifacts) {
-      if (
-        isWantedBundle(artifact.name, prefix) &&
-        isRequestedArtifact(artifact.name, sources) &&
-        !csvNames.has(`${ARTIFACT_PREFIX}${artifact.name.slice('power_audit_'.length)}`)
-      )
-        jobs.push({ kind: 'bundle', artifact });
-    }
+  const csvNames = new Set(jobs.map(({ artifact }) => artifact.name));
+  for (const artifact of artifacts) {
+    if (!isWantedBundle(artifact.name, prefix) || !isRequestedArtifact(artifact.name, sources))
+      continue;
+    if (csvNames.has(`${ARTIFACT_PREFIX}${artifact.name.slice(BUNDLE_PREFIX.length)}`)) continue;
+    jobs.push({ kind: includeBundles ? 'bundle' : 'native', artifact });
   }
   if (jobs.length === 0) {
-    throw new Error(
-      includeBundles
-        ? 'No telemetry artifacts (gpu_metrics or power_audit) found for this run'
-        : 'No gpu_metrics artifacts found for this run',
-    );
+    throw new Error('No telemetry artifacts (gpu_metrics or power_audit) found for this run');
   }
 
   const results = await downloadTelemetry(jobs, githubToken);

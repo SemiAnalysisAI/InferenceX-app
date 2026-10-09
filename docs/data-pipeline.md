@@ -550,10 +550,11 @@ still paired by the bare suffix). The multinode template uploads no `gpu_metrics
 artifact; its telemetry travels inside `power_audit_<suffix>` as
 `LOGS/power/samples.csv`, one deployment-wide CSV written by srt-slurm's
 `dcgm-power` collector (`timestamp_unix, hostname, gpu_index, gpu_uuid, power_w`,
-power only). `etl/multinode-power-samples.ts` regroups it per host and the ingest
+with optional `temperature_c` in samples schema v3). `etl/multinode-power-samples.ts` regroups it per host and the ingest
 stores one series per host (`file_name` = `LOGS/power/samples.csv#<hostname>`),
-so multinode and disaggregated points get per-GPU power curves with null clocks,
-temperature and utilization. Single-node jobs upload a `power_audit_` bundle too,
+so multinode and disaggregated points get per-GPU power and available temperature
+curves, with null clocks and utilization. Missing/invalid temperature stays null;
+zero Celsius remains a real reading. Historical v1/v2 files remain readable. Single-node jobs upload a `power_audit_` bundle too,
 so discovery and backfill pairing use it only for a suffix with no `gpu_metrics_`
 upload. A bundle that carries readable `gpu_metrics*.csv` SMI files is stored from
 those files; its DCGM `samples.csv` is used only when no SMI CSV in the bundle parses.
@@ -616,6 +617,10 @@ before the benchmark upsert. The backfill writes it only into the run's AgentX r
 whose `power_audit` is NULL, even when samples are unchanged; metrics and validity stay
 untouched. The backfill refreshes `latest_benchmarks` but not the API cache; refresh
 that as in the [PowerX recovery runbook](./powerx-persistence-recovery.md).
+
+The live GPU metrics read uses native `power_audit_` samples when no matching
+`gpu_metrics_` CSV exists. Version 3 samples can carry optional temperature in
+Celsius; missing values stay unavailable and GPU indices remain host-local.
 
 `/api/v1/gpu-metrics-point?id=` returns the series linked to one benchmark point with
 their samples and statistics; the CI publication verifier reads it after each ingest.

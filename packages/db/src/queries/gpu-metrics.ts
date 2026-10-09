@@ -21,8 +21,7 @@ export interface GpuMetricSampleRow {
   index: number;
   power: number;
   /**
-   * Absent when the collector did not sample the metric (the multinode DCGM
-   * power bundle scrapes power only), so readers can tell "not collected"
+   * Absent when the collector did not sample the metric, so readers can tell "not collected"
    * from a genuine zero reading.
    */
   temperature?: number;

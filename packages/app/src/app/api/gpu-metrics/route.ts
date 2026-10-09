@@ -19,9 +19,9 @@
  *   (`components/gpu-power/power-audit-bundle.ts`).
  *
  * Two response shapes:
- * - default: every `gpu_metrics_*` artifact's parsed rows (the public GPU
- *   metrics view), from the stored digest when the run is ingested, else from
- *   GitHub; bundles are ignored on the GitHub path;
+ * - default: parsed metric rows for the public GPU metrics view, from storage
+ *   when the run is ingested, else from GitHub; native bundle samples provide
+ *   per-host temperature when no CSV sibling exists;
  * - `series=power`: compact per-GPU watt series bucketed to one second
  *   (`components/gpu-power/power-series.ts`) for the PowerX timeline, from
  *   CSV artifacts and from bundles cut per validation window. The timeline
