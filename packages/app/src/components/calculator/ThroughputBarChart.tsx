@@ -749,12 +749,20 @@ export default function ThroughputBarChart({
     };
   }, [sortedResults, hardwareConfig]);
 
-  // Phones: fewer, SI-compact ticks ("100k") so tick labels never collide.
+  // Phones: fewer ticks, SI-compact only for large values ("100k") so labels
+  // never collide. Small values (e.g. cost) keep plain decimals: '~s' would
+  // turn 0.1 into "100m".
   const isMobileViewport = useIsMobileViewport();
   const xAxisConfig = useMemo(
     () =>
       isMobileViewport
-        ? { tickCount: 4, tickFormat: (d: d3.AxisDomain) => d3.format('~s')(Number(d)) }
+        ? {
+            tickCount: 4,
+            tickFormat: (d: d3.AxisDomain) => {
+              const n = Number(d);
+              return Math.abs(n) >= 1000 ? d3.format('~s')(n) : d3.format('~g')(n);
+            },
+          }
         : { tickCount: 6 },
     [isMobileViewport],
   );

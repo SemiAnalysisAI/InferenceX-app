@@ -360,7 +360,15 @@ function MobileTabStrip({
         aria-current={active ? 'page' : undefined}
         data-testid={`mobile-tab-${route.key}`}
         data-ph-capture-attribute-tab={route.key}
-        onClick={() => onSelect(route.key)}
+        onClick={(event) => {
+          // Already on this chart: tabHref keeps only `unofficialruns`, so
+          // navigating would drop the selector state held in the URL.
+          if (active) {
+            event.preventDefault();
+            return;
+          }
+          onSelect(route.key);
+        }}
         className={cn(
           'inline-flex min-h-10 shrink-0 items-center rounded-full border px-4 text-sm font-medium whitespace-nowrap',
           'transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',

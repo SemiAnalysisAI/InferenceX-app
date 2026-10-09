@@ -77,4 +77,15 @@ describe('BottomToast swipe to dismiss', () => {
     act(() => vi.advanceTimersByTime(400));
     expect(onDismiss).not.toHaveBeenCalled();
   });
+
+  it('stays open when a vertical page-scroll gesture starts on it', () => {
+    const onDismiss = vi.fn();
+    const toast = renderToast(onDismiss);
+    act(() => {
+      toast.dispatchEvent(touch('touchstart', 200, 600));
+      toast.dispatchEvent(touch('touchend', 230, 760));
+    });
+    act(() => vi.advanceTimersByTime(400));
+    expect(onDismiss).not.toHaveBeenCalled();
+  });
 });

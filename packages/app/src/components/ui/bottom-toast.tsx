@@ -76,7 +76,6 @@ export function BottomToast({
   if (!visible) return null;
 
   const dragOffset = drag ? drag.dx : 0;
-  const dragLift = drag ? Math.max(0, drag.dy) : 0;
 
   return (
     <div
@@ -104,7 +103,9 @@ export function BottomToast({
         if (!start || !touch) return;
         const dx = touch.clientX - start.x;
         const dy = touch.clientY - start.y;
-        if (Math.abs(dx) > SWIPE_DISMISS_PX || dy > SWIPE_DISMISS_PX / 2) {
+        // Horizontal-dominant swipes only: vertical motion belongs to page
+        // scroll (`touch-pan-y`), so it must never dismiss the toast.
+        if (Math.abs(dx) > SWIPE_DISMISS_PX && Math.abs(dx) > Math.abs(dy)) {
           dismiss();
         }
       }}
@@ -115,7 +116,7 @@ export function BottomToast({
       style={
         drag
           ? {
-              transform: `translate(${dragOffset}px, ${dragLift}px)`,
+              transform: `translateX(${dragOffset}px)`,
               opacity: Math.max(0.2, 1 - Math.abs(dragOffset) / 240),
               transition: 'none',
             }
