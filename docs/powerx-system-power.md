@@ -152,9 +152,10 @@ rack of 18 identical compute trays, 9 NVSwitch trays, and 8 power shelves:
 | IT        | rack AC + `networkWatts[scaleOut]`, the rack share of scale-out switches                                                                         |
 | Facility  | IT × the liquid-cooled PUE, 1.1, applied once                                                                                                    |
 
-`g` is measured W/GPU and `s` measured W per Grace socket. The socket reading
-covers the CPU and SysIO rails, LPDDR5X, and socket regulation, so it replaces
-the modeled Grace CPU and LPDDR5X; nothing is added on top of either input. GPU
+`g` is measured W/GPU and `s` measured W per Grace socket. NVIDIA defines the
+socket sensor only as "Power of Grace socket"; upstream treats it as the CPU and
+SysIO rails, LPDDR5X, and socket regulation (see the `power_model` README), so it
+replaces the modeled Grace CPU and LPDDR5X; nothing is added on top of either input. GPU
 board telemetry already includes the GPU module's own regulation. Tray fans still
 take the modeled LPDDR5X heat as air heat, as upstream does.
 

@@ -243,7 +243,7 @@ const powerMetricDescriptions: Readonly<Record<(typeof POWER_METRIC_KEYS)[number
   cpu_power_valid:
     'NVL72 CPU-side leg verdict, independent of power_valid: 1 = the Grace-side (and module, when present) keys were integrated over the validated window with full socket coverage; 0 = the leg failed and no CPU-side keys are emitted; absent = the run had no CPU-side leg. Ingest withholds the CPU-side keys unless this verdict is 1, and power_valid = 0 does not remove them. GPU power and energy never change because of this verdict.',
   avg_cpu_socket_power_w:
-    'Mean over Grace sockets of each socket’s window-mean Grace-side power in watts (CPU and SysIO rails, LPDDR5X and socket regulation, ACPI hwmon Grace Power Socket sensor) over the same validated window as GPU energy. NVL72 only.',
+    'Mean over Grace sockets of each socket’s window-mean Grace-side power in watts (ACPI hwmon Grace Power Socket sensor, which NVIDIA defines only as the Grace socket power; modeled as the CPU and SysIO rails, LPDDR5X and socket regulation) over the same validated window as GPU energy. NVL72 only.',
   avg_total_cpu_power_w:
     'Sum over every Grace socket in the deployment of window-mean Grace-side power in watts; dividing by avg_cpu_socket_power_w recovers the socket count (two per compute tray). NVL72 only.',
   total_cpu_energy_j:
