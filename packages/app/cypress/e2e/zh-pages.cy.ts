@@ -7,7 +7,7 @@ describe('Chinese (/zh) pages', () => {
     });
 
     it('renders the Chinese landing content', () => {
-      cy.get('[data-testid="intro-section"]').should('contain.text', '智能体推理基准测试');
+      cy.get('[data-testid="intro-section"]').should('contain.text', 'AI 加速器系统基准测试');
       cy.get('[data-testid="splash-text"]').should('have.text', 'AgentX 来了！！');
       // Quick Comparisons is hidden behind SHOW_QUICK_COMPARISONS in
       // landing-page.tsx; the card and its Chinese strings still exist in the
@@ -42,7 +42,7 @@ describe('Chinese (/zh) pages', () => {
           .and('have.attr', 'href', '/zh/inference/kimi-k3');
         cy.get('[data-testid="compare-agentx-methodology-link"]').should('not.exist');
         // Ledger NEW pills localize to 新 on the Chinese landing page.
-        cy.get('[data-testid^="compare-agentx-model-"]').should('have.length', 5);
+        cy.get('[data-testid^="compare-agentx-model-"]').should('have.length', 4);
         cy.get('[data-testid^="compare-agentx-model-"] [data-new-badge="agentx-ledger"]')
           .should('have.length', 3)
           .each(($badge) => expect($badge.text()).to.equal('新'));
@@ -52,7 +52,7 @@ describe('Chinese (/zh) pages', () => {
     it('footer renders in Chinese with zh-internal links', () => {
       cy.get('[data-testid="footer-brand-description"]').should(
         'contain.text',
-        'InferenceX 持续开展开源的 agentic 推理基准测试',
+        'InferenceX 持续开展开源的 AI 加速器系统基准测试',
       );
       cy.get('[data-testid="footer-link-supporters"]')
         .should('contain.text', '业界评价')

@@ -41,17 +41,22 @@ describe('landing model curation', () => {
       cy.get('[data-testid="compare-agentx-primary"]').within(() => {
         cy.get('[data-testid^="compare-agentx-model-"]').should(($links) => {
           expect([...$links].map((link) => link.getAttribute('href'))).to.deep.eq(
-            ['kimi-k3', 'deepseek-v41-flash', 'glm-5-3', 'minimax-m3', 'qwen-3-5'].map(
+            ['kimi-k3', 'deepseek-v41-flash', 'glm-5-3', 'minimax-m3'].map(
               (slug) => `${prefix}/inference/${slug}`,
             ),
           );
         });
         cy.get('[data-testid="compare-agentx-model-deepseek-v4"]').should('not.exist');
         cy.get('[data-testid="compare-agentx-model-qwen-3-8-flash-next"]').should('not.exist');
-        cy.get('[data-testid="compare-agentx-model-qwen-3-5"]')
+        // Qwen 3.5 is reached through the TPU card, and the hardware cards sit above the ledger.
+        cy.get('[data-testid="compare-agentx-model-qwen-3-5"]').should('not.exist');
+        cy.get('[data-testid="landing-tpu-results-link"]')
+          .should('match', ':first-child')
           .parent()
-          .next()
-          .should('have.attr', 'data-testid', 'landing-tpu-results-link');
+          .next('nav')
+          .find('[data-testid^="compare-agentx-model-"]')
+          .first()
+          .should('have.attr', 'data-testid', 'compare-agentx-model-kimi-k3');
         cy.get('[data-testid="landing-tpu-results-link"]')
           .should('contain.text', prefix ? 'TPU 结果' : 'TPU Results')
           .and(
@@ -93,7 +98,7 @@ describe('landing model curation', () => {
         cy.get('[data-testid="landing-rubin-results-link"]').should('not.exist');
         cy.get('[data-testid="landing-jalapeno-results-link"]').should('not.exist');
         cy.get('[data-testid^="compare-agentx-model-"]').should('have.length', 7);
-        for (const slug of ['deepseek-v4', 'qwen-3-8-flash-next']) {
+        for (const slug of ['deepseek-v4', 'qwen-3-8-flash-next', 'qwen-3-5']) {
           cy.get(`[data-testid="compare-agentx-model-${slug}"]`).should(
             'have.attr',
             'href',
