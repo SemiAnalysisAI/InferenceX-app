@@ -77,6 +77,7 @@ const systemPower = {
   status: 'supported',
   hardware: 'h100',
   modelRevision: SYSTEM_POWER_MODEL_REVISION,
+  operatingState: { workload: 'agentic' as const, scaleOut: true },
   gpuCount: 16,
   chassisCount: 2,
   itWatts: 12000,

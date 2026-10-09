@@ -44,9 +44,9 @@ const source: BenchmarkRow = {
     avg_total_gpu_power_w: 6369.045,
   },
 };
-// python -m power_model --gpu-level-power-per-gpu=796.130625 --system=mi355:
+// python -m power_model --gpu-level-power-per-gpu=796.130625 --system=mi355 --workload=agentic:
 // All-in W/GPU × the estimator's 1.1 planning margin, in kW.
-const MODELED_KW_PER_GPU = 1.4784698586977099;
+const MODELED_KW_PER_GPU = 1.4900494869888934;
 const point: GPUDataPoint = {
   sourceRow: source,
   hwKey: 'mi355x_atom',
@@ -151,7 +151,7 @@ describe('profit power basis preview', () => {
       decode_tp: 4,
       metrics: { ...source.metrics, avg_power_w: 500, avg_total_gpu_power_w: 2000 },
     };
-    expect(modelSystemPower(partial, true)).toMatchObject({
+    expect(modelSystemPower(partial)).toMatchObject({
       status: 'supported',
       chassisBasis: 'extrapolated',
     });
@@ -160,11 +160,10 @@ describe('profit power basis preview', () => {
     ).toMatchObject({ extrapolated: true });
   });
 
-  it('leaves the default estimator and default AgentX model gate unchanged', () => {
+  it('leaves the default provisioned estimator unchanged', () => {
     expect(
       estimateProfitByPower([result], specs, pricing, assumptions, 'provisioned', 45, labels),
     ).toEqual(estimateProfitRows([result], specs, pricing, assumptions));
-    expect(modelSystemPower(source)).toMatchObject({ status: 'unsupported', reason: 'workload' });
   });
 
   it.each([2, 4])(

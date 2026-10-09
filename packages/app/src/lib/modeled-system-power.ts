@@ -1,8 +1,10 @@
 import type { BenchmarkRow } from '@/lib/api';
+import { isKvOffloadEnabled } from '@/lib/kv-offload';
 import {
   estimateChassisPower,
   isSystemPowerHardware,
   SYSTEM_POWER_MODEL_REVISION,
+  type SystemPowerOperatingState,
 } from '@/lib/system-power-model';
 
 /** Every supported chassis model describes one complete eight-GPU HGX/OAM system. */
@@ -23,6 +25,7 @@ export type SystemPowerEstimate =
       status: 'supported';
       hardware: string;
       modelRevision: string;
+      operatingState: SystemPowerOperatingState;
       /** Physical GPUs covered by the validated telemetry. */
       gpuCount: number;
       chassisCount: number;
@@ -86,22 +89,34 @@ function unavailable(reason: SystemPowerUnsupportedReason): SystemPowerEstimate 
   return { status: 'unsupported', reason, modelRevision: SYSTEM_POWER_MODEL_REVISION };
 }
 
+/** Offload descriptors are strings inside the numerically typed metrics JSONB. */
+function descriptor(row: BenchmarkRow, key: string): string | null {
+  const value: unknown = row.metrics[key];
+  return typeof value === 'string' ? value : null;
+}
+
+/** The upstream operating state of a row on its resolved chassis count; null for other workloads. */
+function operatingState(row: BenchmarkRow, chassisCount: number): SystemPowerOperatingState | null {
+  let workload: SystemPowerOperatingState['workload'];
+  if (row.benchmark_type === 'single_turn') workload = 'fixed-seq-len';
+  else if (row.benchmark_type === 'agentic_traces') {
+    const offload = {
+      kv_offloading: descriptor(row, 'kv_offloading'),
+      offload_mode: row.offload_mode ?? descriptor(row, 'offload_mode'),
+    };
+    workload = isKvOffloadEnabled(offload) ? 'agentic-cpu-offloading' : 'agentic';
+  } else return null;
+  // A Mooncake store moves KV over the RDMA NICs even on one node.
+  const mooncake = descriptor(row, 'kv_offload_backend')?.trim().toLowerCase() === 'mooncake';
+  return { workload, scaleOut: row.disagg || chassisCount > 1 || mooncake };
+}
+
 /**
  * Model the mean GPU telemetry on known eight-GPU chassis.
  * This is f(mean GPU power), not a time-integrated wall-power measurement.
  * Do not use display counts here: legacy ingest can encode TP * EP twice.
  */
-export function modelSystemPower(
-  row: BenchmarkRow,
-  /** Opt in so AgentX estimates do not widen the ordinary 8K/1K chart policy. */
-  allowAgenticPreview = false,
-): SystemPowerEstimate {
-  if (
-    !(allowAgenticPreview && row.benchmark_type === 'agentic_traces') &&
-    (row.benchmark_type !== 'single_turn' || row.isl !== 8192 || row.osl !== 1024)
-  ) {
-    return unavailable('workload');
-  }
+export function modelSystemPower(row: BenchmarkRow): SystemPowerEstimate {
   if (typeof row.hardware !== 'string') return unavailable('hardware');
   const hardware = row.hardware.toLowerCase();
   if (!isSystemPowerHardware(hardware)) return unavailable('hardware');
@@ -262,12 +277,11 @@ export function modelSystemPower(
     topologyBasis = 'worker-hosts';
   }
 
+  const state = operatingState(row, chassis.length);
+  if (!state) return unavailable('workload');
   const results = chassis.map((c) => ({
     ...c,
-    model: estimateChassisPower(hardware, c.modelInputWatts, {
-      workload: 'fixed-seq-len',
-      scaleOut: false,
-    }),
+    model: estimateChassisPower(hardware, c.modelInputWatts, state),
   }));
   if (results.some((r) => r.model === null)) return unavailable('model-domain');
   const modeledGpuCount = chassis.length * CHASSIS_GPU_COUNT;
@@ -280,6 +294,7 @@ export function modelSystemPower(
     status: 'supported',
     hardware,
     modelRevision: SYSTEM_POWER_MODEL_REVISION,
+    operatingState: state,
     gpuCount,
     chassisCount: chassis.length,
     modeledGpuCount,

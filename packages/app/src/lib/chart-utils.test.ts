@@ -943,6 +943,7 @@ describe('createChartDataPoint power-boundary fields', () => {
     status: 'supported' as const,
     hardware: 'h100',
     modelRevision: 'test',
+    operatingState: { workload: 'agentic' as const, scaleOut: true },
     gpuCount: 8,
     chassisCount: 2,
     modeledGpuCount: 16,

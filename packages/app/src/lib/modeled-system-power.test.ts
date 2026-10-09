@@ -5,8 +5,8 @@ import { rowToAggDataEntry, transformBenchmarkRows } from '@/lib/benchmark-trans
 import { modelSystemPower } from '@/lib/modeled-system-power';
 import { estimateChassisPower, type SystemPowerHardware } from '@/lib/system-power-model';
 
-const chassis = (hardware: SystemPowerHardware, gpuWatts: number) =>
-  estimateChassisPower(hardware, gpuWatts, { workload: 'fixed-seq-len', scaleOut: false })!;
+const chassis = (hardware: SystemPowerHardware, gpuWatts: number, scaleOut = false) =>
+  estimateChassisPower(hardware, gpuWatts, { workload: 'fixed-seq-len', scaleOut })!;
 
 // Qwen3.5 B200 c1, run 34175132645: actual rounded telemetry, eight GPUs.
 function row(overrides: Partial<BenchmarkRow> = {}): BenchmarkRow {
@@ -85,15 +85,45 @@ describe('modeled system power admission and accounting', () => {
     },
   );
 
-  it.each([{ benchmark_type: 'agentic_traces' }, { isl: 1024 }, { osl: 8192 }, { isl: null }])(
-    'keeps non-8k1k workloads unavailable: %j',
-    (overrides) => {
-      expect(modelSystemPower(row(overrides))).toMatchObject({
-        status: 'unsupported',
-        reason: 'workload',
-      });
-    },
-  );
+  it('models every single_turn sequence and leaves other benchmark types unavailable', () => {
+    expect(modelSystemPower(row({ isl: 1024, osl: 1024 }))).toMatchObject({
+      status: 'supported',
+      operatingState: { workload: 'fixed-seq-len', scaleOut: false },
+    });
+    expect(modelSystemPower(row({ benchmark_type: 'multi_turn' }))).toMatchObject({
+      status: 'unsupported',
+      reason: 'workload',
+    });
+  });
+
+  it('models AgentX rows in the agentic state, with KV offload and Mooncake raising host power', () => {
+    const agentic = row({ benchmark_type: 'agentic_traces', isl: null, osl: null });
+    const plain = modelSystemPower(agentic);
+    expect(plain).toMatchObject({
+      status: 'supported',
+      operatingState: { workload: 'agentic', scaleOut: false },
+    });
+    Object.assign(agentic.metrics, { kv_offloading: 'dram' });
+    const offload = modelSystemPower(agentic);
+    expect(offload).toMatchObject({
+      status: 'supported',
+      operatingState: { workload: 'agentic-cpu-offloading', scaleOut: false },
+    });
+    Object.assign(agentic.metrics, { kv_offload_backend: 'mooncake' });
+    const mooncake = modelSystemPower(agentic);
+    expect(mooncake).toMatchObject({
+      operatingState: { workload: 'agentic-cpu-offloading', scaleOut: true },
+    });
+    if (
+      plain.status !== 'supported' ||
+      offload.status !== 'supported' ||
+      mooncake.status !== 'supported'
+    ) {
+      throw new Error('Expected every AgentX state to be supported');
+    }
+    expect(offload.deploymentFacilityWatts).toBeGreaterThan(plain.deploymentFacilityWatts);
+    expect(mooncake.deploymentFacilityWatts).toBeGreaterThan(offload.deploymentFacilityWatts);
+  });
 
   it.each([
     { power_valid: 0 },
@@ -187,8 +217,8 @@ describe('modeled system power admission and accounting', () => {
         decode_avg_power_w: 700,
       },
     });
-    const prefill = chassis('b200', 2400);
-    const decode = chassis('b200', 5600);
+    const prefill = chassis('b200', 2400, true);
+    const decode = chassis('b200', 5600, true);
     expect(modelSystemPower(source)).toMatchObject({
       status: 'supported',
       gpuCount: 12,
@@ -228,7 +258,7 @@ describe('modeled system power admission and accounting', () => {
         decode_pp: 2,
       },
     });
-    const perChassis = chassis('b200', 11441.513 / 2);
+    const perChassis = chassis('b200', 11441.513 / 2, true);
     const estimate = modelSystemPower(b200);
     expect(estimate).toMatchObject({
       status: 'supported',
@@ -429,10 +459,11 @@ describe('modeled system power admission and accounting', () => {
       },
     });
     const result = modelSystemPower(source);
-    const prefill = chassis('b200', 2400);
-    const decode = chassis('b200', 5600);
+    const prefill = chassis('b200', 2400, true);
+    const decode = chassis('b200', 5600, true);
     expect(result).toMatchObject({
       status: 'supported',
+      operatingState: { workload: 'fixed-seq-len', scaleOut: true },
       gpuCount: 16,
       chassisCount: 2,
       itWatts: prefill.itWatts + decode.itWatts,
@@ -499,6 +530,15 @@ describe('modeled system power admission and accounting', () => {
     expect(entry.joules_per_output_token).toBe(source.metrics.joules_per_output_token);
     const { chartData } = transformBenchmarkRows([source]);
     for (const points of chartData) {
+      expect(points[0].utilityModeledWatts?.y).toBeGreaterThan(source.metrics.avg_power_w);
+    }
+    // Unofficial-run overlays reuse this transform with these arguments (unofficial-run-provider).
+    const overlay = transformBenchmarkRows(
+      [row({ benchmark_type: 'agentic_traces', isl: null, osl: null })],
+      'median',
+      'external',
+    );
+    for (const points of overlay.chartData) {
       expect(points[0].utilityModeledWatts?.y).toBeGreaterThan(source.metrics.avg_power_w);
     }
     const unsupported = transformBenchmarkRows([row({ hardware: 'gb200' })]);
