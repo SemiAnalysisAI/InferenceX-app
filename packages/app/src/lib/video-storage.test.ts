@@ -1,14 +1,15 @@
 import { createHash } from 'node:crypto';
 import { strToU8, zipSync } from 'fflate';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { head, put } from '@vercel/blob';
+import { head, put, list } from '@vercel/blob';
 import type * as BlobSdk from '@vercel/blob';
-import { readStoredArtifact, storeVideoArtifact } from './video-storage';
+import { publishedVideoHistory, readStoredArtifact, storeVideoArtifact } from './video-storage';
 import { storedBundle, storedFidelityBundle } from '@/components/video-benchmark/stored';
 import { fidelityFixture } from '@/components/video-benchmark/fidelity.fixture';
 
 vi.mock('@vercel/blob', async (original) => ({
   ...(await original<typeof BlobSdk>()),
+  list: vi.fn(),
   head: vi.fn((path: string) =>
     Promise.resolve({
       url: `https://test.public.blob.vercel-storage.com/${path}`,
@@ -248,6 +249,56 @@ describe('persistent H3 media', () => {
     await expect(
       storeVideoArtifact('10', artifact, archive(true), new AbortController().signal),
     ).rejects.toThrow('checksum mismatch');
+    expect(put).not.toHaveBeenCalled();
+  });
+});
+
+const blob = (id: number) => ({
+  pathname: `h3-video-media/v1/runs/${id}/h3-video-${id}-1_${id}.json`,
+  url: `https://test.public.blob.vercel-storage.com/${id}`,
+  downloadUrl: '',
+  size: 1,
+  etag: 'synthetic',
+  uploadedAt: new Date(`2026-09-${String(id).padStart(2, '0')}T00:00:00Z`),
+});
+
+describe('published video history catalog', () => {
+  it('lists every index page, orders by publication date, and reads only ten indexes without media writes', async () => {
+    vi.stubEnv('BLOB_READ_WRITE_TOKEN', 'synthetic-test-token');
+    vi.mocked(list)
+      .mockResolvedValueOnce({ blobs: [blob(1)], hasMore: true, cursor: 'next' })
+      .mockResolvedValueOnce({
+        blobs: Array.from({ length: 11 }, (_, i) => blob(12 - i)),
+        hasMore: false,
+        cursor: undefined,
+      });
+    const fetcher = vi.spyOn(globalThis, 'fetch').mockImplementation((url) => {
+      const id = String(url).split('/').at(-1)!;
+      return Promise.resolve(
+        Response.json({
+          storageVersion: 1,
+          runId: id,
+          artifact: { id: Number(id), name: `h3-video-${id}-1`, expired: false, size_in_bytes: 1 },
+          sources: [],
+        }),
+      );
+    });
+    const page = await publishedVideoHistory(1);
+    expect(page.entries.map((entry) => entry.runId)).toEqual([
+      '12',
+      '11',
+      '10',
+      '9',
+      '8',
+      '7',
+      '6',
+      '5',
+      '4',
+      '3',
+    ]);
+    expect(page.nextPage).toBe(2);
+    expect(fetcher).toHaveBeenCalledTimes(10);
+    expect(list).toHaveBeenLastCalledWith({ prefix: 'h3-video-media/v1/runs/', cursor: 'next' });
     expect(put).not.toHaveBeenCalled();
   });
 });
