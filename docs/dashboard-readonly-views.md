@@ -16,6 +16,15 @@ continuation stays on the newsletter and is not included in these feeds.
 Use the existing inference, first-token, and cache-reuse view contracts for live
 data; do not interpret the historical article figures as current API results.
 
+## Standalone ubenchX page
+
+`/ubenchx` and `/zh/ubenchx` are standalone pages linked from the header navigation,
+not dashboard tabs, so they have no `DASHBOARD_API_COVERAGE` entry. Their data is
+published by the `ubenchx` view (`GET /api/v1/views/ubenchx?gpu=<gpu|all>`), which runs
+the same `transformUbenchxRun` as the page. The page's Y-axis selector (MBU, bandwidth,
+latency) is presentation-only: every view response already includes all three metrics,
+so it adds no query parameter.
+
 ## Exact query-key inventory
 
 All endpoints are GET under /api/v1/views. Unsupported and repeated keys return 400.

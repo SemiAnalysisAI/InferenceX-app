@@ -106,11 +106,6 @@ export const TAB_META: Record<DashboardRouteKey, { title: string; description: s
     description:
       'Current InferenceX Docker image tags per model, chip SKU, and configuration. Compares deployed images against latest vLLM and SGLang releases to flag outdated tags.',
   },
-  ubenchx: {
-    title: 'ubenchX Device-Memory Copy Bandwidth',
-    description:
-      'H100 SXM device-memory copy bandwidth microbenchmark: latency, bandwidth, and memory bandwidth utilization (MBU) across message sizes from 8 B to 16 GiB.',
-  },
   video: {
     title: 'H3 Video Benchmark',
     description: 'Inspect original H3 video, audio, measurements and CI provenance.',

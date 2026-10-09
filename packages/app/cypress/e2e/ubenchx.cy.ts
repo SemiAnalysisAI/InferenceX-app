@@ -7,6 +7,8 @@ describe('ubenchX localized routes', () => {
     });
     cy.contains('ubenchX').should('be.visible');
     cy.contains('H100 SXM').should('be.visible');
+    cy.get('[data-testid="nav-link-ubenchx"]').should('have.attr', 'href', '/ubenchx');
+    cy.get('[data-testid="chart-section-tabs"]').should('not.exist');
     cy.get('[data-testid="ubenchx-metric-select"]').should('contain', 'MBU');
     cy.contains('h2', 'Memory Bandwidth Utilization').should('be.visible');
     cy.get('[data-testid="ubenchx-metric-select"]').click();
