@@ -653,7 +653,8 @@ function BannerRenderer({
         </span>
         <div className="relative flex flex-1 flex-col sm:flex-row sm:items-center sm:gap-3 min-w-0">
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold leading-tight break-words">
+            {/* leading-snug leaves room for the NEW badge when the title wraps on narrow screens. */}
+            <p className="text-sm font-semibold leading-snug break-words">
               <span className="align-middle">
                 {localized(locale, content.title, content.titleZh)}
               </span>
