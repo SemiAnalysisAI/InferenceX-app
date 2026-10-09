@@ -48,7 +48,7 @@ maps to `agentic-cpu-offloading`. Scale-out is on for disaggregated rows, for ro
 modeled on more than one chassis or more than one NVL72 rack (19 or more compute
 trays), and for a Mooncake KV store (`kv_offload_backend: 'mooncake'`), which
 moves KV over the RDMA NICs even on one node. Compute trays inside one rack share
-its NVLink domain, so an aggregate NVL72 row on up to 18 trays stays off.
+its NVLink domain, so spanning trays of one rack does not by itself turn it on.
 Scale-out switches the NICs and the network share from idle to active power.
 
 ## Updating the model for historical results
@@ -369,8 +369,9 @@ DRAM 和 NIC 功耗取决于运行状态：`single_turn` 对应 `fixed-seq-len`�
 的 AgentX 数据对应 `agentic-cpu-offloading`（包括仅 offload 到 NVMe 的情况），其余
 AgentX 数据对应 `agentic`。分离式部署、跨多个机箱或多个 NVL72 机架（19 个及以上计算
 tray）的部署，或使用 Mooncake KV 存储时开启 scale-out，NIC 与交换机按活跃功耗计，否则
-按空闲功耗计；同一机架内的计算 tray 通过 NVLink 互联，不开启 scale-out。这些是模型参数，不是实测
-利用率。数值一致性只说明实现与上游等价，不代表完成了实机校准。
+按空闲功耗计。同一机架内的计算 tray 共享 NVLink 域，仅在单个机架内跨 tray 不会开启
+scale-out。这些是模型参数，不是实测利用率。数值一致性只说明实现与上游等价，不代表
+完成了实机校准。
 
 PUE 取自上游模型的冷却方式：当前支持的机箱均为风冷，PUE 为 1.3；NVL72 机架为液冷，
 PUE 为 1.1。PUE 仅作用于 IT 功耗一次，不改变 GPU 实测功率。这里的冷却方式指建模机箱，并非已核实的测试站点配置。

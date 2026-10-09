@@ -123,7 +123,8 @@ function descriptor(row: BenchmarkRow, key: string): string | null {
 /**
  * The upstream operating state of a row spanning `systems` chassis or NVL72
  * racks; null for other workloads. Trays within one rack share its NVLink
- * domain, so only more than one system needs the scale-out fabric.
+ * domain, so spanning them does not by itself need the scale-out fabric;
+ * disaggregated and Mooncake rows still do.
  */
 function operatingState(row: BenchmarkRow, systems: number): SystemPowerOperatingState | null {
   let workload: SystemPowerOperatingState['workload'];
