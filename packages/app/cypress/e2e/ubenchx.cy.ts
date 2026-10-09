@@ -57,6 +57,19 @@ describe('ubenchX hub and test routes', () => {
       .should('include', '/zh/ubenchx/sm-l2-distance');
   });
 
+  it('keeps a pinned sm-l2-distance tooltip on its cell while the pointer moves', () => {
+    cy.visit('/ubenchx/sm-l2-distance', dismissModal);
+    cy.get('[data-testid="sm-l2-heatmap"] svg rect').last().as('overlay');
+    cy.get('@overlay').click(520, 120, { force: true });
+    cy.get('[data-testid="sm-l2-tooltip"]')
+      .should('be.visible')
+      .invoke('text')
+      .then((pinned) => {
+        cy.get('@overlay').trigger('mousemove', 60, 60, { force: true });
+        cy.get('[data-testid="sm-l2-tooltip"]').should('be.visible').and('have.text', pinned);
+      });
+  });
+
   it('renders the Chinese hub page with noindex', () => {
     cy.visit('/zh/ubenchx', dismissModal);
     cy.contains('ubenchX').should('be.visible');

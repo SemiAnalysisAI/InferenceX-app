@@ -289,7 +289,12 @@ function SmL2HeatmapChart({ result, locale }: { result: SmL2ViewResult; locale: 
         .attr('opacity', 0.6);
     };
 
+    // Redraws (e.g. after pinning) clear the SVG; restore the pinned crosshair.
+    if (pinnedCell) drawCrosshair(pinnedCell.i, pinnedCell.j);
+
     overlay.on('mousemove', (event: MouseEvent) => {
+      // A pinned tooltip stays on its cell until dismissed.
+      if (pinnedCell) return;
       const [mx, my] = d3.pointer(event);
       const i = Math.floor(my / cellSize);
       const j = Math.floor(mx / cellSize);
@@ -300,9 +305,10 @@ function SmL2HeatmapChart({ result, locale }: { result: SmL2ViewResult; locale: 
     });
 
     overlay.on('mouseleave', () => {
+      if (pinnedCell) return;
       crosshairG.selectAll('*').remove();
       const tooltip = tooltipRef.current;
-      if (tooltip && !pinnedCell) tooltip.style.display = 'none';
+      if (tooltip) tooltip.style.display = 'none';
     });
 
     overlay.on('click', (event: MouseEvent) => {
@@ -348,6 +354,7 @@ function SmL2HeatmapChart({ result, locale }: { result: SmL2ViewResult; locale: 
       <svg ref={svgRef} className="block" />
       <div
         ref={tooltipRef}
+        data-testid="sm-l2-tooltip"
         className="absolute z-50 pointer-events-none"
         style={{ display: 'none' }}
       />
