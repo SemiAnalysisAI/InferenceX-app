@@ -93,4 +93,32 @@ describe('attachAgentxAudits', () => {
     expect(result.points.map((p) => p.powerAudit)).toEqual([undefined, undefined]);
     expect(result.refused).toEqual([{ concurrency: 48, points: ['48/on', '48/off'] }]);
   });
+
+  it('keeps a producer-carried audit, CPU leg included, instead of the recovered window', () => {
+    const producerAudit = {
+      source: 'LOGS/agentic/conc_48/power_validation.json',
+      window_start_unix: 990,
+      window_end_unix: 1110,
+      cpu: {
+        sensor_kind: 'grace_socket' as const,
+        source: 'acpi',
+        expected_sockets: 8,
+        observed_sockets: 8,
+      },
+    };
+    const single = attachAgentxAudits(plan, [point({ powerAudit: producerAudit })], describePoint);
+    expect(single.points[0]!.powerAudit).toBe(producerAudit);
+    expect(single).toMatchObject({ attached: 0, refused: [] });
+
+    // Nothing is withheld when every point at the concurrency already carries one.
+    const shared = attachAgentxAudits(
+      plan,
+      [
+        point({ offloadMode: 'on', powerAudit: producerAudit }),
+        point({ offloadMode: 'off', powerAudit: producerAudit }),
+      ],
+      describePoint,
+    );
+    expect(shared).toMatchObject({ attached: 0, refused: [] });
+  });
 });

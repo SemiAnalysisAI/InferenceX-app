@@ -609,9 +609,11 @@ AgentX nested validation documents get a canonical validation filename alias onl
 when their root result and retained window agree; stored sidecars keep the original
 path, result filename and validation hash. A retained window becomes the
 `power_audit` source and window of the single AgentX point at its concurrency, and is
-refused when several points share that concurrency. CI attaches it before the
-benchmark upsert. The backfill writes it only into the run's AgentX rows whose
-`power_audit` is NULL, even when samples are unchanged; metrics and validity stay
+refused when several points share that concurrency. A producer-carried `power_audit`
+(including its `cpu` leg) wins: points that already have one keep it, and a
+concurrency whose points all have one is neither attached nor refused. CI attaches it
+before the benchmark upsert. The backfill writes it only into the run's AgentX rows
+whose `power_audit` is NULL, even when samples are unchanged; metrics and validity stay
 untouched. The backfill refreshes `latest_benchmarks` but not the API cache; refresh
 that as in the [PowerX recovery runbook](./powerx-persistence-recovery.md).
 
