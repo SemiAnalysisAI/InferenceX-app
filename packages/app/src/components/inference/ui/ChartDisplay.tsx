@@ -13,8 +13,7 @@ import chartDefinitions, {
 } from '@/components/inference/metric-registry';
 import { metricRowLabel } from '@/components/inference/axis-metric-explanations';
 import { getMeasuredMetricConfig } from '@/components/inference/measured-metric-config';
-import { AIR_COOLED_SYSTEM_PUE } from '@/lib/modeled-system-power';
-import { SYSTEM_POWER_MODEL_REVISION } from '@/lib/system-power-model';
+import { AIR_COOLED_SYSTEM_PUE, SYSTEM_POWER_MODEL_REVISION } from '@/lib/system-power-model';
 import { ALL_IN_MEASURED_EMPTY, ALL_IN_MEASURED_NOTE } from '@/lib/power-basis';
 import {
   applyTokenRevenuePricing,

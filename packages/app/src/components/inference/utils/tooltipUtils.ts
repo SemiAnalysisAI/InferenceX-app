@@ -8,6 +8,7 @@ import type { Locale } from '@/lib/i18n';
 import { isKvOffloadEnabled } from '@/lib/kv-offload';
 import { chartStateHref } from '@/lib/url-state';
 import type { SystemPowerUnsupportedReason } from '@/lib/modeled-system-power';
+import { SYSTEM_POWER_MODEL_SOURCE_URL } from '@/lib/system-power-model';
 
 import type { HardwareConfig, InferenceData, OverlayData } from '@/components/inference/types';
 import { isMeasuredEnergyConfigKey } from '@/components/inference/metric-registry';
@@ -245,7 +246,6 @@ const SYSTEM_POWER_STRINGS = {
     facility: 'Modeled facility power',
     assumptions: 'CPU/DRAM utilization: 20%; PCIe: 5%; NVMe: 0%; fans: auto.',
     platformAssumptions: 'NVIDIA NVLink: 50%, IB: 0%; AMD Ethernet: 0%.',
-    sweep: 'Fixed README inference sweep',
     topology: (chassis: number, measured: number, modeled: number) =>
       measured === modeled
         ? `${chassis} full eight-GPU chassis · ${measured} GPUs`
@@ -276,7 +276,6 @@ const SYSTEM_POWER_STRINGS = {
     facility: '数据中心功耗估算',
     assumptions: 'CPU/DRAM 利用率：20%；PCIe：5%；NVMe：0%；风扇：自动。',
     platformAssumptions: 'NVIDIA NVLink：50%，IB：0%；AMD Ethernet：0%。',
-    sweep: 'README 中的固定推理参数扫描',
     topology: (chassis: number, measured: number, modeled: number) =>
       measured === modeled
         ? `${chassis} 个完整八卡机箱 · ${measured} 张 GPU`
@@ -313,20 +312,17 @@ const modeledSystemPowerHTML = (
     if (!isPinned || estimate.reason === 'workload') return '';
     return tooltipLine(t.unavailable, t.reasons[estimate.reason]);
   }
-  const sourceUrl = `https://github.com/SemiAnalysisAI/inferencex_power_model/blob/${estimate.modelRevision}/${estimate.modelPath}`;
-  const readmeUrl = `https://github.com/SemiAnalysisAI/inferencex_power_model/blob/${estimate.modelRevision}/README.md`;
   return `<div data-testid="tooltip-modeled-system-power" style="margin-top: 8px; border-top: 1px solid var(--border); padding-top: 6px;">
     <strong>${t.heading}</strong>
     ${tooltipLine(t.measuredGpu, `${fmt(estimate.measuredGpuWattsPerGpu)} W/GPU`)}
-    ${tooltipLine(t.normalizedAc, `${fmt(estimate.chassisAcWattsPerGpu)} W/GPU`)}
+    ${tooltipLine(t.normalizedAc, `${fmt(estimate.itWattsPerGpu)} W/GPU`)}
     ${
       isPinned
         ? `
-      ${tooltipLine(t.deploymentAc, `${fmt(estimate.deploymentAcWatts)} W`)}
+      ${tooltipLine(t.deploymentAc, `${fmt(estimate.deploymentItWatts)} W`)}
       ${tooltipLine(`${t.facility} (PUE ${fmt(estimate.pue)})`, `${fmt(estimate.deploymentFacilityWatts)} W`)}
       <div style="color: var(--muted-foreground); margin-bottom: 4px;">${t.topology(estimate.chassisCount, estimate.gpuCount, estimate.modeledGpuCount)}${estimate.chassisBasis === 'extrapolated' ? `<br/>${t.extrapolation}` : ''}${estimate.topologyBasis === 'uniform-hosts' ? `<br/>${t.uniformHosts}` : ''}<br/>${t.assumptions}<br/>${t.platformAssumptions}<br/>${t.normalization}<br/>${t.boundary}</div>
-      ${tooltipLine(t.model, `<a href="${escapeHtml(sourceUrl)}" target="_blank" rel="noopener noreferrer" style="text-decoration: underline;">${escapeHtml(estimate.hardware)} · ${escapeHtml(estimate.modelRevision.slice(0, 12))}</a>`)}
-      <a href="${escapeHtml(readmeUrl)}" target="_blank" rel="noopener noreferrer" style="text-decoration: underline;">${t.sweep}</a>
+      ${tooltipLine(t.model, `<a href="${escapeHtml(SYSTEM_POWER_MODEL_SOURCE_URL)}" target="_blank" rel="noopener noreferrer" style="text-decoration: underline;">${escapeHtml(estimate.hardware)} · ${escapeHtml(estimate.modelRevision.slice(0, 12))}</a>`)}
     `
         : ''
     }

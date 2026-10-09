@@ -2,6 +2,10 @@ import { describe, it, expect } from 'vitest';
 
 import type { HardwareConfig, InferenceData } from '@/components/inference/types';
 import type { SystemPowerEstimate } from '@/lib/modeled-system-power';
+import {
+  SYSTEM_POWER_MODEL_REVISION,
+  SYSTEM_POWER_MODEL_SOURCE_URL,
+} from '@/lib/system-power-model';
 import { getInferenceHardwareConfig } from '@/lib/inference-labels';
 import {
   getPointLabel,
@@ -72,17 +76,16 @@ function tooltipConfig(overrides: Partial<TooltipConfig> = {}): TooltipConfig {
 const systemPower = {
   status: 'supported',
   hardware: 'h100',
-  modelRevision: 'ca4403aa527069857351ad8047dbb726844b3382',
-  modelPath: 'chassis/H100.py',
+  modelRevision: SYSTEM_POWER_MODEL_REVISION,
   gpuCount: 16,
   chassisCount: 2,
-  chassisAcWatts: 12000,
-  chassisAcWattsPerGpu: 750,
+  itWatts: 12000,
+  itWattsPerGpu: 750,
   facilityWatts: 14400,
   pue: 1.2,
   measuredGpuWattsPerGpu: 500,
   modeledGpuCount: 16,
-  deploymentAcWatts: 12000,
+  deploymentItWatts: 12000,
   deploymentFacilityWatts: 14400,
   topologyBasis: 'worker-hosts',
   chassisBasis: 'full',
@@ -146,7 +149,7 @@ describe('modeled system-power tooltip', () => {
     expect(html).toContain(
       'Includes GPU chassis CPUs; excludes separate CPU-only frontend/router hosts.',
     );
-    expect(html).toContain(`/blob/${systemPower.modelRevision}/${systemPower.modelPath}`);
+    expect(html).toContain(SYSTEM_POWER_MODEL_SOURCE_URL);
     expect(html).not.toContain('12,000 W/GPU');
     expect(html).not.toContain('Unmeasured chassis GPUs');
   });
@@ -159,9 +162,9 @@ describe('modeled system-power tooltip', () => {
         gpuCount: 4,
         chassisCount: 1,
         modeledGpuCount: 8,
-        chassisAcWatts: 6000,
+        itWatts: 6000,
         facilityWatts: 7200,
-        deploymentAcWatts: 3000,
+        deploymentItWatts: 3000,
         deploymentFacilityWatts: 3600,
         topologyBasis: 'single-node',
         chassisBasis: 'extrapolated',

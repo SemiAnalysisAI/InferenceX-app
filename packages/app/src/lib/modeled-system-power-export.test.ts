@@ -7,6 +7,9 @@ import {
 } from '../../scripts/export-modeled-system-power';
 import { estimateChassisPower } from '@/lib/system-power-model';
 
+const h200 = (gpuWatts: number) =>
+  estimateChassisPower('h200', gpuWatts, { workload: 'fixed-seq-len', scaleOut: false })!;
+
 // Original H200 c1, run 31672765610, artifact 9171086754; schema marker was absent.
 function input(): ComparisonInput {
   return {
@@ -86,17 +89,17 @@ describe('offline modeled PowerX comparisons', () => {
     const source = input();
     const before = structuredClone(source);
     const result = buildComparison(source);
-    expect(result.metadata.pue).toBe(1.3);
-    expect(result.metadata.model.assumptions.pue).toBe(1.2);
     expect(result.rows[0].modeled).toMatchObject({ pue: 1.3 });
-    expect(result.rows[0].assumptions).toMatchObject({ pue: 1.3 });
-    expect(buildComparison(source, 1.1).rows[0].modeled).toMatchObject({ pue: 1.1 });
     expect(result.rows[0].estimated_energy).toMatchObject({
       status: 'estimated',
       output_tokens: 9303,
       integration_seconds: 64.67805051803589,
-      chassis_ac_j_per_output_token: 26.8855733804468,
     });
+    // python -m power_model --gpu-level-power-per-gpu=229.002875 --system=h200: IT 3810.904 W.
+    expect(result.rows[0].estimated_energy.it_j_per_output_token).toBeCloseTo(
+      26.494877309376715,
+      9,
+    );
     expect(result.rows[0].measured_inputs?.gpu_j_per_output_token).toBe(12.736929);
     expect(result.rows[0].benchmark.metrics).not.toHaveProperty('power_metric_schema_version');
     expect(source).toEqual(before);
@@ -129,25 +132,25 @@ describe('offline modeled PowerX comparisons', () => {
     });
     const result = buildComparison(source);
     const row = result.rows[0];
-    const reference = estimateChassisPower('h200', entry.benchmark.metrics.avg_power_w * 8, 1.3)!;
+    const reference = h200(entry.benchmark.metrics.avg_power_w * 8);
     expect(row.modeled).toMatchObject({
       status: 'supported',
       gpuCount: 4,
       modeledGpuCount: 8,
       chassisBasis: 'extrapolated',
-      chassisAcWatts: reference.chassisAcWatts,
-      deploymentAcWatts: reference.chassisAcWatts / 2,
+      itWatts: reference.itWatts,
+      deploymentItWatts: reference.itWatts / 2,
     });
     expect(row.estimated_energy).toMatchObject({
       status: 'estimated',
-      chassis_ac_j: (reference.chassisAcWatts / 2) * w.integration_duration_s,
-      chassis_ac_j_per_output_token:
-        ((reference.chassisAcWatts / 2) * w.integration_duration_s) / w.total_output_tokens,
+      it_j: (reference.itWatts / 2) * w.integration_duration_s,
+      it_j_per_output_token:
+        ((reference.itWatts / 2) * w.integration_duration_s) / w.total_output_tokens,
     });
     expect(result.cells[0]).toMatchObject({
-      modeled_chassis_ac_w_mean: reference.chassisAcWatts,
-      modeled_chassis_ac_w_per_gpu_mean: reference.chassisAcWatts / 8,
-      modeled_deployment_ac_w_mean: reference.chassisAcWatts / 2,
+      modeled_it_w_mean: reference.itWatts,
+      modeled_it_w_per_gpu_mean: reference.itWatts / 8,
+      modeled_deployment_it_w_mean: reference.itWatts / 2,
       modeled_deployment_facility_w_mean: reference.facilityWatts / 2,
       modeled_facility_w_mean: reference.facilityWatts,
     });
@@ -204,14 +207,16 @@ describe('offline modeled PowerX comparisons', () => {
     second.benchmark.metrics.avg_total_gpu_power_w = 1848.074;
     source.rows.push(second);
     const result = buildComparison(source);
-    expect(result.cells[0].modeled_chassis_ac_w_mean).toBe(3875.6499999999996);
-    expect(result.cells[0].estimated_chassis_ac_j_per_output_token_mean).toBeNull();
+    expect(result.cells[0].modeled_it_w_mean).toBe(
+      (h200(1832.023).itWatts + h200(1848.074).itWatts) / 2,
+    );
+    expect(result.cells[0].estimated_it_j_per_output_token_mean).toBeNull();
     second.benchmark.metrics.power_valid = 0;
     const invalid = buildComparison(source);
     expect(invalid.rows).toHaveLength(2);
     expect(invalid.rows[1].measured_inputs).toBeNull();
     expect(invalid.rows[1].raw_input).toMatchObject({ metrics: { avg_power_w: 231.009 } });
-    expect(invalid.cells[0].modeled_chassis_ac_w_mean).toBeNull();
+    expect(invalid.cells[0].modeled_it_w_mean).toBeNull();
     second.benchmark.hardware = 'b200';
     expect(() => buildComparison(source)).toThrow('different benchmark configurations');
   });
@@ -219,10 +224,7 @@ describe('offline modeled PowerX comparisons', () => {
   it('retains unsupported hardware and missing values, and escapes CSV text', () => {
     const source = input();
     source.rows[0].benchmark.hardware = 'H200';
-    expect(buildComparison(source).rows[0]).toMatchObject({
-      assumptions: { u_cpu: 0.2 },
-      model_path: 'human_verified/hgx_h200_chassis/h200_chassis_power_model.py',
-    });
+    expect(buildComparison(source).rows[0].modeled).toMatchObject({ status: 'supported' });
     source.rows[0].benchmark.hardware = 'gb200';
     expect(buildComparison(source).rows[0].modeled).toMatchObject({
       status: 'unsupported',

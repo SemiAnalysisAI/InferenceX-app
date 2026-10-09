@@ -1,12 +1,9 @@
 import type { BenchmarkRow } from '@/lib/api';
 import {
   estimateChassisPower,
-  SUPPORTED_SYSTEM_POWER_HARDWARE,
+  isSystemPowerHardware,
   SYSTEM_POWER_MODEL_REVISION,
 } from '@/lib/system-power-model';
-
-// Application policy for the air-cooled chassis profiles; the pinned Python default stays 1.2.
-export const AIR_COOLED_SYSTEM_PUE = 1.3;
 
 /** Every supported chassis model describes one complete eight-GPU HGX/OAM system. */
 const CHASSIS_GPU_COUNT = 8;
@@ -26,20 +23,19 @@ export type SystemPowerEstimate =
       status: 'supported';
       hardware: string;
       modelRevision: string;
-      modelPath: string;
       /** Physical GPUs covered by the validated telemetry. */
       gpuCount: number;
       chassisCount: number;
       /** GPUs the chassis models were evaluated for: chassisCount × 8. Exceeds gpuCount when extrapolated. */
       modeledGpuCount: number;
       measuredGpuWattsPerGpu: number;
-      /** Modeled AC for every full chassis, summed. */
-      chassisAcWatts: number;
-      /** chassisAcWatts ÷ modeledGpuCount: the plotted metric. */
-      chassisAcWattsPerGpu: number;
+      /** Modeled IT power (chassis AC plus its scale-out network share) for every full chassis, summed. */
+      itWatts: number;
+      /** itWatts ÷ modeledGpuCount. */
+      itWattsPerGpu: number;
       facilityWatts: number;
       /** Share of the modeled chassis attributable to the measured GPUs; equals the totals for full chassis. */
-      deploymentAcWatts: number;
+      deploymentItWatts: number;
       deploymentFacilityWatts: number;
       pue: number;
       telemetryBasis: 'validated-v2' | 'validated-unversioned-single-node';
@@ -97,7 +93,6 @@ function unavailable(reason: SystemPowerUnsupportedReason): SystemPowerEstimate 
  */
 export function modelSystemPower(
   row: BenchmarkRow,
-  pue: number = AIR_COOLED_SYSTEM_PUE,
   /** Opt in so AgentX estimates do not widen the ordinary 8K/1K chart policy. */
   allowAgenticPreview = false,
 ): SystemPowerEstimate {
@@ -109,9 +104,7 @@ export function modelSystemPower(
   }
   if (typeof row.hardware !== 'string') return unavailable('hardware');
   const hardware = row.hardware.toLowerCase();
-  if (!(SUPPORTED_SYSTEM_POWER_HARDWARE as readonly string[]).includes(hardware)) {
-    return unavailable('hardware');
-  }
+  if (!isSystemPowerHardware(hardware)) return unavailable('hardware');
   if (typeof row.disagg !== 'boolean' || typeof row.is_multinode !== 'boolean') {
     return unavailable('topology');
   }
@@ -271,36 +264,32 @@ export function modelSystemPower(
 
   const results = chassis.map((c) => ({
     ...c,
-    model: estimateChassisPower(hardware, c.modelInputWatts, pue),
+    model: estimateChassisPower(hardware, c.modelInputWatts, {
+      workload: 'fixed-seq-len',
+      scaleOut: false,
+    }),
   }));
   if (results.some((r) => r.model === null)) return unavailable('model-domain');
-  const first = results[0].model!;
   const modeledGpuCount = chassis.length * CHASSIS_GPU_COUNT;
   const extrapolated = chassis.some((c) => c.measuredGpus !== CHASSIS_GPU_COUNT);
-  const chassisAcWatts = results.reduce((sum, r) => sum + r.model!.chassisAcWatts, 0);
+  const itWatts = results.reduce((sum, r) => sum + r.model!.itWatts, 0);
   const facilityWatts = results.reduce((sum, r) => sum + r.model!.facilityWatts, 0);
   const share = (watts: (r: (typeof results)[number]) => number) =>
     results.reduce((sum, r) => sum + (watts(r) * r.measuredGpus) / CHASSIS_GPU_COUNT, 0);
-  const deploymentAcWatts = extrapolated ? share((r) => r.model!.chassisAcWatts) : chassisAcWatts;
-  const deploymentFacilityWatts = extrapolated
-    ? share((r) => r.model!.facilityWatts)
-    : facilityWatts;
-  if (!positive(chassisAcWatts) || !positive(facilityWatts)) return unavailable('model-domain');
   return {
     status: 'supported',
     hardware,
-    modelRevision: first.modelRevision,
-    modelPath: first.modelPath,
+    modelRevision: SYSTEM_POWER_MODEL_REVISION,
     gpuCount,
     chassisCount: chassis.length,
     modeledGpuCount,
     measuredGpuWattsPerGpu: m.avg_power_w,
-    chassisAcWatts,
-    chassisAcWattsPerGpu: chassisAcWatts / modeledGpuCount,
+    itWatts,
+    itWattsPerGpu: itWatts / modeledGpuCount,
     facilityWatts,
-    deploymentAcWatts,
-    deploymentFacilityWatts,
-    pue,
+    deploymentItWatts: extrapolated ? share((r) => r.model!.itWatts) : itWatts,
+    deploymentFacilityWatts: extrapolated ? share((r) => r.model!.facilityWatts) : facilityWatts,
+    pue: results[0].model!.pue,
     telemetryBasis: unversionedSingleNode ? 'validated-unversioned-single-node' : 'validated-v2',
     topologyBasis,
     chassisBasis: extrapolated ? 'extrapolated' : 'full',
