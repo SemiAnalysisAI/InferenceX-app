@@ -20,14 +20,12 @@ import {
 } from './compute-chart-series.js';
 import { computeRequestTimeline, type RequestTimeline } from './compute-request-timeline.js';
 import { collectMetricPhases } from './gzip-json-stream.js';
-import { ATOM_KV_BLOCKS_METRIC, atomKvCacheBlocksFromMetricPhases } from './atom-kv-capacity.js';
 import type { ServerMetricsContext } from './server-metrics-adapters.js';
 
 export interface TraceDerivedPayloads {
   aggregateStats: AggregateStats;
   chartSeries: ChartSeries | null;
   requestTimeline: RequestTimeline | null;
-  atomKvCacheBlocks: number | null;
 }
 
 export interface TraceDerivedComputeOptions {
@@ -35,11 +33,7 @@ export interface TraceDerivedComputeOptions {
   maxInMemoryBytes?: number;
 }
 
-const DERIVED_SERVER_METRIC_KEYS = new Set([
-  ...CHART_METRIC_KEYS,
-  ...AGGREGATE_SERVER_METRIC_KEYS,
-  ATOM_KV_BLOCKS_METRIC,
-]);
+const DERIVED_SERVER_METRIC_KEYS = new Set([...CHART_METRIC_KEYS, ...AGGREGATE_SERVER_METRIC_KEYS]);
 
 function selectMetrics(metrics: MetricsMap, wanted: ReadonlySet<string>): MetricsMap {
   const selected: MetricsMap = {};
@@ -105,8 +99,5 @@ export async function computeTraceDerivedPayloads(
     aggregateStats,
     chartSeries,
     requestTimeline,
-    atomKvCacheBlocks: phases
-      ? atomKvCacheBlocksFromMetricPhases(phases.metrics, phases.warmupMetrics)
-      : null,
   };
 }

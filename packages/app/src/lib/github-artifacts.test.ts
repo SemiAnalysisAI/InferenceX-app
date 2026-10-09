@@ -8,6 +8,7 @@ import {
   fetchGithubRunArtifacts,
   getRunDate,
   normalizeGithubRunInfo,
+  readRemoteZipEntries,
   type GithubArtifact,
   type GithubWorkflowRun,
 } from './github-artifacts';
@@ -138,5 +139,53 @@ describe('extractZipEntries', () => {
 
     expect(rows).toEqual([{ entryName: 'good.json', payload: { id: 1 } }]);
     expect(parseErrors).toEqual(['bad.json']);
+  });
+});
+
+/** Serve a buffer the way blob storage answers HTTP range requests. */
+function rangeServer(archive: Buffer) {
+  const ranges: string[] = [];
+  const serve = ((_url: string, init?: RequestInit) => {
+    const range = new Headers(init?.headers).get('range')!.replace('bytes=', '');
+    ranges.push(range);
+    const [from, to] = range.split('-');
+    const start = from === '' ? archive.length - Number(to) : Number(from);
+    const end = from === '' || to === '' ? archive.length : Number(to) + 1;
+    const body = archive.subarray(Math.max(0, start), end);
+    return Promise.resolve(
+      new Response(new Uint8Array(body), {
+        status: 206,
+        headers: { 'content-range': `bytes ${start}-${end - 1}/${archive.length}` },
+      }),
+    );
+  }) as typeof fetch;
+  return { serve, ranges };
+}
+
+describe('readRemoteZipEntries', () => {
+  it('reads only the matching entries of a remote archive', async () => {
+    const zip = new AdmZip();
+    const csv = 'Endpoint,Type,Metric\n'.repeat(200);
+    zip.addFile('conc_8/aiperf_artifacts/server_metrics_export.csv', Buffer.from(csv));
+    zip.addFile('conc_8/aiperf_artifacts/profile_export.jsonl', Buffer.alloc(200_000, 7));
+    const { serve, ranges } = rangeServer(zip.toBuffer());
+
+    const entries = await readRemoteZipEntries(
+      'https://blob/artifact.zip',
+      (name) => name.endsWith('.csv'),
+      serve,
+    );
+
+    expect([...entries.keys()]).toEqual(['conc_8/aiperf_artifacts/server_metrics_export.csv']);
+    expect(entries.values().next().value!.toString()).toBe(csv);
+    // End record, local header, and entry data; the large profile is never requested.
+    expect(ranges).toHaveLength(3);
+  });
+
+  it('refuses a server that ignores range requests', async () => {
+    const full = (() => Promise.resolve(new Response('zip', { status: 200 }))) as typeof fetch;
+    await expect(readRemoteZipEntries('https://blob/a.zip', () => true, full)).rejects.toThrow(
+      'ZIP range read failed: 200',
+    );
   });
 });

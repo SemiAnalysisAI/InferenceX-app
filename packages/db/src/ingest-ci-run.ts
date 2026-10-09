@@ -70,6 +70,7 @@ import {
   bulkUpsertAvailability,
   insertServerLogFiles,
 } from './etl/benchmark-ingest';
+import { recomputeAgentxServerMetrics } from './etl/agentx-server-metrics/db';
 import { findUnlinkedTraceReplayIds, persistPreparedTraceReplay } from './etl/trace-replay-ingest';
 import {
   resolveTraceReplayWorkerCount,
@@ -499,6 +500,7 @@ async function main(): Promise<void> {
     const traceWorkerPool = new TraceReplayWorkerPool(traceWorkerCount);
     const traceUploadLimiter = new AsyncSemaphore(Math.min(2, traceWorkerCount));
     const traceTasks: Promise<void>[] = [];
+    const agenticIds: number[] = [];
     if (traceReplayPaths.size > 0) {
       console.log(
         `  Trace preparation: ${traceWorkerCount} worker(s) across ${os.availableParallelism()} vCPU(s), ` +
@@ -638,6 +640,7 @@ async function main(): Promise<void> {
           }
 
           const parentDir = path.basename(path.dirname(file));
+          if (toInsert[0]?.benchmarkType === 'agentic_traces') agenticIds.push(...insertedIds);
           if (parentDir.startsWith('bmk_') && insertedIds.length > 0) {
             // Single-turn artifacts are `bmk_<key>` paired with
             // `server_logs_<key>`. Agentic artifacts are `bmk_agentic_<key>`
@@ -761,6 +764,14 @@ async function main(): Promise<void> {
       await Promise.all(traceTasks);
     }
     await traceWorkerPool.close();
+    // AgentX server metrics need both the scrape and the server-log bundle, so
+    // derive them once every sidecar of this run is linked.
+    try {
+      const derived = await recomputeAgentxServerMetrics(sql, agenticIds);
+      console.log(`  AgentX server metrics: ${derived.length} row(s) derived`);
+    } catch (error: any) {
+      tracker.recordDbError('agentx server metrics', error);
+    }
     assertRequiredPowerPointsRetained(requiredPowerPoints, retainedPowerPoints);
     console.log(`  Benchmarks: +${totalNewBmk} new, ${totalDupBmk} dup`);
     if (totalTraceReplayLinked > 0 || tracker.skips.traceReplayMissing > 0) {

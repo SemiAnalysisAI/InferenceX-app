@@ -32,7 +32,6 @@ function fingerprint(prepared: PreparedTraceReplay) {
     requestTimelineJson: sha256(prepared.requestTimelineJson),
     chartWindows: prepared.chartWindows,
     timelineRequests: prepared.timelineRequests,
-    cacheHitRates: prepared.cacheHitRates,
     fullResponseMetrics: prepared.fullResponseMetrics,
   };
 }

@@ -8,6 +8,7 @@ import path from 'node:path';
 import type postgres from 'postgres';
 import { cleanLogText, type ServerLogFile, type ServerLogFilePath } from './server-log-artifacts';
 import type { BenchmarkType, PowerAudit, WorkerPower } from './benchmark-mapper';
+import { AGENTX_SERVER_METRIC_KEYS } from './agentx-server-metrics';
 import { kvCachePoolTokensFromServerLog } from './server-log-metrics';
 
 type Sql = ReturnType<typeof postgres>;
@@ -123,11 +124,16 @@ export async function bulkIngestBenchmarkRows(
     )
     do update set
       -- Replace metrics with the fresh artifact values, but carry over
-      -- kv_cache_pool_tokens: it is derived from the server log at
-      -- insertServerLog time (not present in any artifact JSON), so a later
-      -- upsert from the aggregated results_bmk artifact would silently wipe it.
-      metrics = excluded.metrics || jsonb_strip_nulls(
-        jsonb_build_object('kv_cache_pool_tokens', benchmark_results.metrics->'kv_cache_pool_tokens')
+      -- app-derived metrics that no artifact JSON holds: kv_cache_pool_tokens
+      -- (from the server log at insertServerLog time for single-turn rows),
+      -- and every AgentX server metric (etl/agentx-server-metrics). A later
+      -- upsert from the aggregated results_bmk artifact would otherwise wipe them.
+      metrics = excluded.metrics || (
+        select coalesce(jsonb_object_agg(key, value), '{}'::jsonb)
+        from jsonb_each(benchmark_results.metrics)
+        where key = 'kv_cache_pool_tokens'
+          or (excluded.benchmark_type = 'agentic_traces'
+            and key = any(${sql.array([...AGENTX_SERVER_METRIC_KEYS])}::text[]))
       ),
       image = excluded.image,
       workers = excluded.workers,
@@ -235,9 +241,9 @@ async function insertDeferredServerLogFiles(
       }
     }
 
-    // Derive the KV-cache pool size (tokens) from the authoritative server.log
-    // when the artifact includes one. Multinode bundles without server.log are
-    // still stored in full; they simply cannot contribute this derived metric.
+    // Derive the single-turn KV-cache pool size (tokens) from the
+    // authoritative server.log when the artifact includes one. AgentX rows are
+    // derived from the whole bundle by etl/agentx-server-metrics instead.
     if (kvCachePoolTokens !== null) {
       await tx`
         update benchmark_results
@@ -247,6 +253,7 @@ async function insertDeferredServerLogFiles(
           to_jsonb(${kvCachePoolTokens}::bigint)
         )
         where id = any(${tx.array(rows.map((row) => row.id))}::bigint[])
+          and benchmark_type <> 'agentic_traces'
       `;
     }
   });

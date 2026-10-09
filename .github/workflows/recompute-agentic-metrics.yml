@@ -12,6 +12,8 @@ on:
       - 'packages/db/src/etl/compute-chart-series.ts'
       - 'packages/db/src/etl/compute-request-timeline.ts'
       - 'packages/db/src/queries/agentic-shared.ts'
+      - 'packages/db/src/backfill-agentx-server-metrics.ts'
+      - 'packages/db/src/etl/agentx-server-metrics/**'
   workflow_dispatch:
     inputs:
       run-id:
@@ -22,8 +24,8 @@ on:
         description: Optional existing Neon child branch; omit for production on master
         required: false
         type: string
-      atom-kv-capacity-only:
-        description: Backfill only ATOM KV capacity from stored logs and metrics
+      server-metrics-only:
+        description: Recompute only AgentX server metrics (KV pools, cache hits, KV usage, token totals)
         required: false
         type: boolean
         default: false
@@ -55,12 +57,11 @@ jobs:
       - id: scope
         env:
           RUN_ID: ${{ inputs.run-id || 'all' }}
-          ATOM_ONLY: ${{ inputs.atom-kv-capacity-only }}
           RESTORE_TRACE: ${{ inputs.restore-missing-trace }}
         run: |
           if [[ "$RUN_ID" == all ]]; then
-            if [[ "$ATOM_ONLY" == true || "$RESTORE_TRACE" == true ]]; then
-              echo '::error::Artifact recovery and ATOM capacity require a specific run'
+            if [[ "$RESTORE_TRACE" == true ]]; then
+              echo '::error::Artifact recovery requires a specific run'
               exit 1
             fi
             echo 'shards=[0,1,2,3,4,5,6,7]' >> "$GITHUB_OUTPUT"
@@ -146,7 +147,7 @@ jobs:
           RUN_ID: ${{ inputs.run-id }}
         run: bun packages/db/src/backfill-missing-agentic-trace.ts --run-id "$RUN_ID" --yes
       - name: Snapshot, recompute, and verify derived data
-        if: inputs.atom-kv-capacity-only != true
+        if: inputs.server-metrics-only != true
         env:
           RUN_ID: ${{ inputs.run-id || 'all' }}
           STALE_ONLY: ${{ inputs.stale-only }}
@@ -164,17 +165,23 @@ jobs:
           bun run --cwd packages/db db:backfill-request-timeline "${args[@]}"
           bun packages/db/src/verify-agentic-backfill.ts "${args[@]}" --verify "$manifest"
       - name: Retain integrity evidence
-        if: ${{ always() && inputs.atom-kv-capacity-only != true }}
+        if: ${{ always() && inputs.server-metrics-only != true }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: agentx-integrity-${{ matrix.shard }}
           path: ${{ runner.temp }}/agentx-integrity.json
           retention-days: 14
-      - name: Backfill ATOM KV capacity
-        if: inputs.atom-kv-capacity-only == true
+      # Server metrics are benchmark-row fields, so they are rewritten after the
+      # integrity check above, which requires benchmark rows to stay unchanged.
+      - name: Recompute AgentX server metrics
         env:
-          RUN_ID: ${{ inputs.run-id }}
-        run: bun run --cwd packages/db db:backfill-atom-kv-capacity --run-id "$RUN_ID" --yes
+          RUN_ID: ${{ inputs.run-id || 'all' }}
+          SHARD_COUNT: ${{ needs.scope.outputs.count }}
+          SHARD_INDEX: ${{ matrix.shard }}
+        run: |
+          args=(--yes --shard-count "$SHARD_COUNT" --shard-index "$SHARD_INDEX")
+          if [[ "$RUN_ID" != all ]]; then args+=(--run-id "$RUN_ID"); fi
+          bun run --cwd packages/db db:backfill-agentx-server-metrics "${args[@]}"
   invalidate:
     name: Invalidate production cache
     needs: recompute

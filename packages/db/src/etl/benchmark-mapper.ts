@@ -13,6 +13,7 @@ import {
   PRECISION_KEYS,
 } from '@semianalysisai/inferencex-constants';
 import { flattenAgenticAggRow } from './agentic-v3-flatten';
+import { AGENTX_SERVER_METRIC_KEYS } from './agentx-server-metrics';
 import { preferFullResponseMetrics } from './full-response-interactivity';
 import {
   resolveModelKey,
@@ -282,6 +283,9 @@ export function mapBenchmarkRow(
   let metrics = captureNumericMetrics(row);
   normalizePowerContractMetrics(row, metrics);
   if (isAgentic) metrics = preferFullResponseMetrics(metrics);
+  // AgentX server metrics come from the raw scrape and logs (etl/agentx-server-metrics),
+  // never from producer-computed fields in old or new artifacts.
+  if (isAgentic) for (const key of AGENTX_SERVER_METRIC_KEYS) delete metrics[key];
   if (!topology.disagg && (metrics.prefill_pp !== undefined || metrics.decode_pp !== undefined)) {
     const pp = Math.max(metrics.prefill_pp ?? 1, metrics.decode_pp ?? 1);
     metrics.prefill_pp = pp;

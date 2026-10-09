@@ -600,8 +600,8 @@ describe('GET /api/unofficial-run', () => {
           status: 'completed',
         }),
     });
-    // Artifacts: no results_bmk — only per-config agentic artifacts (plus the
-    // big sibling `agentic_*` trace blobs the route must NOT download).
+    // Artifacts: no results_bmk — only per-config agentic artifacts, plus the
+    // big sibling `agentic_*` raw artifacts the route must NOT download whole.
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: () =>
@@ -627,7 +627,8 @@ describe('GET /api/unofficial-run', () => {
       .mockReturnValueOnce([
         {
           entryName: 'dsv4_conc72.json',
-          getData: () => Buffer.from(JSON.stringify(rawAgenticRow())),
+          getData: () =>
+            Buffer.from(JSON.stringify(rawAgenticRow({ server_gpu_cache_hit_rate: 0.9 }))),
         },
       ])
       .mockReturnValueOnce([
@@ -636,6 +637,9 @@ describe('GET /api/unofficial-run', () => {
           getData: () => Buffer.from(JSON.stringify(rawAgenticRow({ users: 56 }))),
         },
       ]);
+
+    // The raw artifact redirect lacks a location, so its scrape summary is unavailable.
+    mockFetch.mockResolvedValueOnce({ status: 302, headers: new Headers() });
 
     const res = await GET(makeRequest('runId=777'));
     expect(res.status).toBe(200);
@@ -649,8 +653,15 @@ describe('GET /api/unofficial-run', () => {
     expect(body.benchmarks[0].benchmark_type).toBe('agentic_traces');
     expect(body.benchmarks[0].hardware).toBe('mi355x');
     expect(body.benchmarks[0].run_url).toBe('http://github.com/run/777');
-    // Only the two bmk_* artifacts were downloaded: run + artifacts + 2 downloads.
-    expect(mockFetch).toHaveBeenCalledTimes(4);
+    // run + artifacts + 2 bmk_* downloads + one redirect lookup for the raw
+    // artifact, whose scrape summary is then read by range, never downloaded whole.
+    expect(mockFetch).toHaveBeenCalledTimes(5);
+    expect(mockFetch).toHaveBeenLastCalledWith(
+      'http://dl-blob',
+      expect.objectContaining({ redirect: 'manual' }),
+    );
+    // Producer-computed server metrics never reach the overlay.
+    expect(body.benchmarks[0].metrics.server_gpu_cache_hit_rate).toBeUndefined();
   });
 
   it('does not download per-config bmk_* artifacts when results_bmk exists', async () => {

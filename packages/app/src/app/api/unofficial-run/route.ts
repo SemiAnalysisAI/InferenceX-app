@@ -13,6 +13,11 @@ import {
   localArtifactPreviewEnabled,
   readLocalArtifactPreview,
 } from '@/lib/local-artifact-preview';
+import {
+  isScrapeCsvEntry,
+  pointScrapeCsv,
+  withOverlayServerMetrics,
+} from '@/lib/agentx-overlay-server-metrics';
 import type { BenchmarkRow, EvalRow } from '@/lib/api';
 import {
   downloadGithubArtifact,
@@ -20,6 +25,8 @@ import {
   fetchGithubRunArtifacts,
   fetchGithubWorkflowRun,
   getGithubToken,
+  readRemoteZipEntries,
+  resolveGithubArtifactUrl,
   getRunDate,
   normalizeGithubRunInfo,
   type GithubArtifact,
@@ -180,19 +187,80 @@ export function normalizeEvalArtifactRows(
   return { rows, maxConfigId: configIdOffset + (nextLocalId - 1) };
 }
 
+interface RawArtifactRow {
+  /** Result-file name shared by a point's `bmk_*` and `agentic_*` artifacts. */
+  suffix: string;
+  row: Record<string, unknown>;
+}
+
 /** Extract all valid JSON files from a ZIP buffer; malformed JSON entries are skipped. */
-function extractJsonFromZip(buffer: Buffer): Record<string, unknown>[] {
-  return extractZipEntries(buffer, '.json', (_entryName, contents) => {
+function extractJsonFromZip(buffer: Buffer, artifactSuffix: string | null): RawArtifactRow[] {
+  return extractZipEntries(buffer, '.json', (entryName, contents) => {
     const data = JSON.parse(contents) as Record<string, unknown> | Record<string, unknown>[];
-    return Array.isArray(data) ? data : [data];
+    const suffix = artifactSuffix ?? entryName.replace(/^.*\//u, '').replace(/\.json$/u, '');
+    return (Array.isArray(data) ? data : [data]).map((row) => ({ suffix, row }));
   });
 }
 
-async function downloadArtifactRows(archiveUrl: string, githubToken: string) {
+/**
+ * Normalize rows and derive AgentX server metrics from each point's raw
+ * `agentic_<suffix>` artifact exactly as ingest does, reading only its scrape
+ * summary through range requests.
+ */
+async function normalizeWithServerMetrics(
+  entries: readonly RawArtifactRow[],
+  artifacts: readonly GithubArtifact[],
+  githubToken: string,
+  date: string,
+  runUrl: string | null,
+): Promise<BenchmarkRow[]> {
+  const rawArtifacts = new Map<string, GithubArtifact>();
+  for (const artifact of artifacts) {
+    const previous = rawArtifacts.get(artifact.name);
+    if (artifact.name.startsWith('agentic_') && (!previous || artifact.id > previous.id)) {
+      rawArtifacts.set(artifact.name, artifact);
+    }
+  }
+  const points = entries.flatMap(({ suffix, row }) =>
+    normalizeArtifactRows([row], date, runUrl).map((normalized) => ({
+      row: normalized,
+      artifact:
+        normalized.benchmark_type === 'agentic_traces'
+          ? (rawArtifacts.get(`agentic_${suffix}`) ??
+            rawArtifacts.get(`agentic_${suffix.replace(/_conc\d+$/u, '')}`))
+          : undefined,
+    })),
+  );
+  const needed = [...new Set(points.flatMap(({ artifact }) => (artifact ? [artifact] : [])))];
+  const scrapes = new Map<string, ReadonlyMap<string, Buffer>>();
+  for (let i = 0; i < needed.length; i += PER_CONFIG_DOWNLOAD_BATCH_SIZE) {
+    await Promise.all(
+      needed.slice(i, i + PER_CONFIG_DOWNLOAD_BATCH_SIZE).map(async (artifact) => {
+        try {
+          const url = await resolveGithubArtifactUrl(artifact.archive_download_url, githubToken);
+          scrapes.set(artifact.name, await readRemoteZipEntries(url, isScrapeCsvEntry));
+        } catch (error) {
+          console.warn(`Unofficial run: no scrape summary from ${artifact.name}:`, error);
+        }
+      }),
+    );
+  }
+  return points.map(({ row, artifact }) => {
+    if (row.benchmark_type !== 'agentic_traces') return row;
+    const scrape = artifact ? scrapes.get(artifact.name) : undefined;
+    return withOverlayServerMetrics(row, scrape ? pointScrapeCsv(scrape, row.conc) : null);
+  });
+}
+
+async function downloadArtifactRows(
+  archiveUrl: string,
+  githubToken: string,
+  artifactSuffix: string | null = null,
+) {
   const response = await downloadGithubArtifact(archiveUrl, githubToken);
   if (!response.ok) {
     return {
-      rows: [] as Record<string, unknown>[],
+      rows: [] as RawArtifactRow[],
       errorResponse: NextResponse.json(
         { error: `Artifact download failed: ${response.statusText}` },
         { status: response.status },
@@ -200,7 +268,7 @@ async function downloadArtifactRows(archiveUrl: string, githubToken: string) {
     };
   }
 
-  const rows = extractJsonFromZip(Buffer.from(await response.arrayBuffer()));
+  const rows = extractJsonFromZip(Buffer.from(await response.arrayBuffer()), artifactSuffix);
   return { rows, errorResponse: null };
 }
 
@@ -251,7 +319,13 @@ async function processSingleRun(
     return {
       errorResponse: null,
       runInfo: { ...normalizeGithubRunInfo(run), isNonMainBranch: true },
-      benchmarks: normalizeArtifactRows(preview.benchmarks, date, run.html_url),
+      benchmarks: await normalizeWithServerMetrics(
+        preview.benchmarks.map((row) => ({ suffix: '', row })),
+        [],
+        '',
+        date,
+        run.html_url,
+      ),
       evaluations: normalized.rows,
       nextEvalConfigIdOffset: normalized.maxConfigId,
     };
@@ -324,20 +398,38 @@ async function processSingleRun(
       githubToken,
     );
     if (errorResponse) return { errorResponse };
-    benchmarks = normalizeArtifactRows(rows, date, runUrl || null);
+    benchmarks = await normalizeWithServerMetrics(
+      rows,
+      artifacts,
+      githubToken,
+      date,
+      runUrl || null,
+    );
   } else if (perConfigBmkArtifacts.length > 0) {
-    const rawRows: Record<string, unknown>[] = [];
+    const rawRows: RawArtifactRow[] = [];
     for (let i = 0; i < perConfigBmkArtifacts.length; i += PER_CONFIG_DOWNLOAD_BATCH_SIZE) {
       const batch = perConfigBmkArtifacts.slice(i, i + PER_CONFIG_DOWNLOAD_BATCH_SIZE);
       const results = await Promise.all(
-        batch.map((a) => downloadArtifactRows(a.archive_download_url, githubToken)),
+        batch.map((a) =>
+          downloadArtifactRows(
+            a.archive_download_url,
+            githubToken,
+            a.name.replace(/^bmk_/u, '').replace(/^agentic_/u, ''),
+          ),
+        ),
       );
       for (const result of results) {
         if (result.errorResponse) return { errorResponse: result.errorResponse };
         rawRows.push(...result.rows);
       }
     }
-    benchmarks = normalizeArtifactRows(rawRows, date, runUrl || null);
+    benchmarks = await normalizeWithServerMetrics(
+      rawRows,
+      artifacts,
+      githubToken,
+      date,
+      runUrl || null,
+    );
   }
 
   if (evalArtifact) {
@@ -346,7 +438,13 @@ async function processSingleRun(
       githubToken,
     );
     if (errorResponse) return { errorResponse };
-    const normalized = normalizeEvalArtifactRows(rows, date, timestamp, runUrl, evalConfigIdOffset);
+    const normalized = normalizeEvalArtifactRows(
+      rows.map(({ row }) => row),
+      date,
+      timestamp,
+      runUrl,
+      evalConfigIdOffset,
+    );
     evaluations = normalized.rows;
     nextEvalConfigIdOffset = normalized.maxConfigId;
   }

@@ -1314,6 +1314,7 @@ function makeV3AgenticRow(overrides: Record<string, any> = {}): Record<string, a
     kv_offload_backend: '',
     num_requests_total: 1648,
     num_requests_successful: 1648,
+    kv_cache_pool_tokens: 4_194_304,
     dataset: {
       source_type: 'public_dataset',
       hf_dataset_name: 'semianalysisai/cc-traces-weka-062126',
@@ -1508,12 +1509,18 @@ describe('mapBenchmarkRow — v3 agentic nested agg schema', () => {
     expect(m.duration_seconds).toBeCloseTo(7222.04352, 3);
     // cache / kv / totals
     expect(m.theoretical_cache_hit_rate).toBeCloseTo(0.97509, 6);
-    expect(m.server_gpu_cache_hit_rate).toBeCloseTo(0.78539, 6);
-    expect(m.server_external_cache_hit_rate).toBe(0);
-    expect(m.gpu_kv_cache_usage_pct).toBeCloseTo(0.82134, 6);
-    expect(m.total_prompt_tokens).toBe(261750519);
-    expect(m.total_generation_tokens).toBe(1422696);
     expect(m.total_requests_completed).toBe(1648);
+    // Producer-computed server metrics are ignored; the app derives them from raw data.
+    for (const key of [
+      'server_gpu_cache_hit_rate',
+      'server_external_cache_hit_rate',
+      'gpu_kv_cache_usage_pct',
+      'total_prompt_tokens',
+      'total_generation_tokens',
+      'kv_cache_pool_tokens',
+    ]) {
+      expect(m).not.toHaveProperty(key);
+    }
     // nested containers must not leak into metrics
     expect(m).not.toHaveProperty('request_metrics');
     expect(m).not.toHaveProperty('server_metrics');
