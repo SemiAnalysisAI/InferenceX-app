@@ -536,6 +536,15 @@ describe('mapAggEvalRow', () => {
 
       expect(result).toBeNull();
     });
+
+    it('refuses rows stamped with an unsupported result_schema_version', () => {
+      const tracker = createSkipTracker();
+
+      expect(mapAggEvalRow(makeAggRow({ result_schema_version: 2 }), tracker)).toBeNull();
+      expect(tracker.skips.unsupportedVersion).toBe(1);
+      expect(mapAggEvalRow(makeAggRow({ result_schema_version: 1 }), tracker)).not.toBeNull();
+      expect(tracker.skips.unsupportedVersion).toBe(1);
+    });
   });
 
   describe('edge cases', () => {

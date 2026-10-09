@@ -229,6 +229,28 @@ Configs are preloaded into an in-memory Map at ingest start. `getOrCreateConfig(
 
 Unmapped models/hardware are tracked (not silently dropped) so operators can see what new GPU or model names appeared in CI artifacts. This is how new GPUs get added to the system — the skip tracker acts as a change detection mechanism.
 
+### InferenceX Result Contract
+
+InferenceX stamps published rows with `result_schema_version`
+([InferenceX#3806](https://github.com/SemiAnalysisAI/InferenceX/pull/3806)). The benchmark,
+aggregate eval, and run-stats mappers refuse any stamp other than `1` and count the row as
+`unsupported result_schema_version`. Unstamped rows predate the contract and are ingested as before.
+
+InferenceX collectors leave rows that break the contract out of `results_<prefix>` and
+`eval_results_<prefix>` and list them in `rejected_rows_<prefix>` and
+`rejected_rows_eval_<prefix>`. The per-config `bmk_*` and `eval_*` artifacts still contain those
+rows, so the CI and GCS ingests read the lists before writing and skip the per-config copies.
+A benchmark file is skipped when its `<artifact>/<file>` path equals an entry's `source` and its
+content equals the entry's `row`. Comparing content keeps a list left by an earlier attempt from
+hiding a file that a later attempt re-uploaded under the same name. An eval task is skipped when its
+results file and task match the entry's `row.source` and `row.task`. Eval sources start with the
+collector's download directory, so only their last two segments (`<artifact>/<file>`) are compared.
+
+Skipped rows count as `quarantined by InferenceX`, and a quarantined 8K/1K result is a PowerX
+publication error, like a failed one. A list that is not standard JSON, or whose entries lack these
+identifiers, fails the CI ingest before any write and skips that run in a GCS restore. Ingest does
+not read `rejected_rows_run_stats` because `run-stats` already omits those entries.
+
 ### Server-Metric Orchestrator Adapters
 
 AIPerf defines the `server_metrics_export.json` envelope, but labels such as worker role and rank belong to the serving orchestrator. The chart-series ETL therefore normalizes raw series through an orchestrator-specific adapter before exposing per-worker metrics. For example, the Dynamo adapter maps `dynamo_component=prefill|backend` to canonical `prefill|decode` roles and uses the endpoint, worker ID, DP rank, and engine together as the source identity.

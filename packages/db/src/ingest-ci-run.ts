@@ -32,8 +32,6 @@ import {
 import os from 'os';
 import path from 'path';
 
-import { GPU_KEYS } from '@semianalysisai/inferencex-constants';
-
 import { hasNoSslFlag } from './cli-utils';
 import {
   dedupeArtifactsByLogicalName,
@@ -64,6 +62,9 @@ import {
   assertRequiredPowerPointsRetained,
   verifyRequiredPowerArtifacts,
 } from './etl/required-power-publication';
+import { readRejectedRows } from './etl/rejected-rows';
+import { mapRunStats, type RunStatsParams } from './etl/run-stats-mapper';
+import { hasSupportedResultSchemaVersion } from './etl/result-schema-version';
 import {
   bulkIngestBenchmarkRows,
   bulkIngestRunStats,
@@ -347,6 +348,11 @@ async function main(): Promise<void> {
   if (!fs.existsSync(artifactsDir)) {
     throw new Error(`Artifacts directory does not exist: ${artifactsDir}`);
   }
+  // Read before any write so an unreadable list fails the ingest instead of being ignored.
+  const rejectedRows = readRejectedRows(artifactsDir);
+  if (rejectedRows.size > 0) {
+    console.log(`  Rejected rows: ${rejectedRows.size} quarantined by InferenceX`);
+  }
 
   const date = workflowGhInfo?.createdAt
     ? workflowGhInfo.createdAt.split('T')[0]
@@ -529,8 +535,19 @@ async function main(): Promise<void> {
         : [data as Record<string, any>];
       console.log(`    raw rows: ${rawRows.length}`);
 
+      if (rejectedRows.hasBenchmarkFile(relativeFile, data)) {
+        tracker.skips.quarantined += rawRows.length;
+        if (rawRows.some((r) => Number(r?.isl) === 8192 && Number(r?.osl) === 1024)) {
+          powerPublicationErrors.push(`Quarantined 8K/1K result: ${relativeFile}`);
+        }
+        console.log(`    skipped; quarantined by InferenceX (${elapsed(fileStart)})`);
+        continue;
+      }
+
       for (const rawRow of rawRows) {
-        if (!rawRow || typeof rawRow !== 'object') continue;
+        if (!rawRow || typeof rawRow !== 'object' || !hasSupportedResultSchemaVersion(rawRow)) {
+          continue;
+        }
         const datasetSlug = datasetSlugFromBenchmarkRow(rawRow);
         if (datasetSlug) datasetSlugs.add(datasetSlug);
       }
@@ -812,15 +829,11 @@ async function main(): Promise<void> {
     const statsDir = path.join(artifactsDir, ARTIFACT_NAMES.runStats);
     const statsFiles = findJsonFiles(statsDir);
 
-    const statsRows: { hardware: string; nSuccess: number; total: number }[] = [];
+    const statsRows: RunStatsParams[] = [];
     for (const file of statsFiles) {
       const data = readJson(file) as Record<string, any> | null;
       if (!data || typeof data !== 'object' || Array.isArray(data)) continue;
-      for (const [hwKey, stats] of Object.entries(data)) {
-        if (!GPU_KEYS.has(hwKey)) continue;
-        if (typeof stats?.n_success !== 'number' || typeof stats?.total !== 'number') continue;
-        statsRows.push({ hardware: hwKey, nSuccess: stats.n_success, total: stats.total });
-      }
+      statsRows.push(...mapRunStats(data, tracker));
     }
 
     if (statsRows.length > 0) {
@@ -927,7 +940,13 @@ async function main(): Promise<void> {
       }
     }
 
+    const evalSource = `${path.basename(dir)}/${resultsName}`;
     for (const params of evalParamsList) {
+      if (rejectedRows.hasEvalTask(evalSource, params.task)) {
+        tracker.skips.quarantined++;
+        console.log(`  ${evalSource} [${params.task}]: skipped; quarantined by InferenceX`);
+        continue;
+      }
       try {
         const configId = await getOrCreateConfig(params.config);
         const { id: evalResultId } = await ingestEvalRow(

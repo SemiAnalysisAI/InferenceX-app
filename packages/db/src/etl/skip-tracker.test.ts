@@ -10,6 +10,8 @@ describe('createSkipTracker', () => {
     expect(tracker.skips.noIslOsl).toBe(0);
     expect(tracker.skips.dbError).toBe(0);
     expect(tracker.skips.traceReplayMissing).toBe(0);
+    expect(tracker.skips.unsupportedVersion).toBe(0);
+    expect(tracker.skips.quarantined).toBe(0);
   });
 
   it('initializes with empty unmapped sets', () => {

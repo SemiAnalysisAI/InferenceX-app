@@ -8,6 +8,7 @@
 import { normalizeLegacyTpuRow, physicalChipCount, roleChipCount } from './tpu-normalization';
 import { PRECISION_KEYS } from '@semianalysisai/inferencex-constants';
 import type { ConfigParams } from './config-cache';
+import { hasSupportedResultSchemaVersion } from './result-schema-version';
 import type { SkipTracker } from './skip-tracker';
 import {
   resolveModelKey,
@@ -148,8 +149,9 @@ export function mapEvalRow(
  * across two files. ISL/OSL are not present as explicit fields; they are parsed
  * from the `source` path using the `{n}k{m}k` filename convention.
  *
- * Returns `null` and increments the appropriate skip counter when the model,
- * hardware, or task cannot be resolved.
+ * Returns `null` and increments the appropriate skip counter when the row carries
+ * an unsupported `result_schema_version` or the model, hardware, or task cannot
+ * be resolved.
  *
  * @param row - A single flat row from the aggregate eval JSON array.
  * @param tracker - Shared skip tracker; counters are mutated in place on failure.
@@ -160,6 +162,10 @@ export function mapAggEvalRow(
   tracker: SkipTracker,
   runId?: string | number | null,
 ): EvalParams | null {
+  if (!hasSupportedResultSchemaVersion(row)) {
+    tracker.skips.unsupportedVersion++;
+    return null;
+  }
   row = normalizeLegacyTpuRow(row, runId);
   const modelKey = resolveModelKey(row);
   if (!modelKey) {
