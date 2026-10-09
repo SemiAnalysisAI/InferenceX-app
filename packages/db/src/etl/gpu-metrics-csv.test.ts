@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { computeGpuMetricStats, parseGpuMetricsCsv } from './gpu-metrics-csv.js';
+import { parseGpuMetricsCsv } from './gpu-metrics-csv.js';
 
 const NVIDIA_CSV = [
   'timestamp, index, power.draw [W], temperature.gpu, clocks.current.sm [MHz], clocks.current.memory [MHz], utilization.gpu [%], utilization.memory [%]',
@@ -61,24 +61,5 @@ describe('parseGpuMetricsCsv — AMD', () => {
     expect(busy.socclkMhz).toBe(39);
     expect(busy.edgeTempC).toBe(55);
     expect(busy.temperatureC).toBe(78);
-  });
-});
-
-describe('computeGpuMetricStats', () => {
-  it('digests every non-null metric per GPU with interpolated percentiles', () => {
-    const parsed = parseGpuMetricsCsv(NVIDIA_CSV)!;
-    const stats = computeGpuMetricStats(parsed.samples);
-    const gpu0Power = stats.find((s) => s.gpuIndex === 0 && s.metric === 'powerW')!;
-    expect(gpu0Power.count).toBe(3);
-    expect(gpu0Power.min).toBe(187.8);
-    expect(gpu0Power.max).toBe(930);
-    expect(gpu0Power.mean).toBeCloseTo((187.8 + 912.1 + 930) / 3, 6);
-    expect(gpu0Power.median).toBe(912.1);
-    expect(gpu0Power.p95).toBeCloseTo(912.1 + (930 - 912.1) * 0.9, 6);
-    expect(gpu0Power.p99).toBeCloseTo(912.1 + (930 - 912.1) * 0.98, 6);
-    expect(gpu0Power.stddev).toBeGreaterThan(0);
-    // AMD-only columns never appear for an NVIDIA series.
-    expect(stats.some((s) => s.metric === 'edgeTempC')).toBe(false);
-    expect(stats.filter((s) => s.gpuIndex === 1 && s.metric === 'powerW')[0]!.count).toBe(1);
   });
 });

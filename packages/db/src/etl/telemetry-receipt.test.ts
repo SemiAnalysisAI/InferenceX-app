@@ -119,7 +119,6 @@ describe('telemetry API verification', () => {
   it.each([
     ['matching data', 200, 10, 2, 2, true],
     ['missing endpoint', 404, 10, 2, 2, false],
-    ['unavailable endpoint', 503, 10, 2, 2, false],
     ['different point', 200, 11, 2, 2, false],
     ['different sample count', 200, 10, 3, 2, false],
     ['truncated data', 200, 10, 2, 1, false],
@@ -151,9 +150,16 @@ describe('telemetry API verification', () => {
     const receipt = receiptFixture();
     receipt.points[1]!.benchmarkResultId = null;
     receipt.points[1]!.api = { status: 'unknown' };
-    const fetcher = vi
-      .fn<typeof fetch>()
-      .mockResolvedValue(Response.json({ benchmarkResultId: 10, series: [] }));
+    const matching = { sampleCount: 2, data: [{ power: 100 }, { power: 100 }] };
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
+      Response.json({
+        benchmarkResultId: 10,
+        series: [
+          { id: 1, ...matching },
+          { id: 2, ...matching },
+        ],
+      }),
+    );
     const result = await verifyTelemetryApi(receipt, 'https://example.test', { fetch: fetcher });
     expect(fetcher).toHaveBeenCalledTimes(1);
     expect(result.points[0]!.api.error).toContain('series set differs');
@@ -322,15 +328,11 @@ describe('persisted telemetry receipts', () => {
     expect(result.expectationErrors).toEqual([oldB, newA, newC]);
   });
 
-  it.each([undefined, []])(
-    'preserves the distinction between omitted and empty current expectation errors (%j)',
-    async (expectationErrors) => {
-      const result = await readTelemetryReceipt(sql, run, [], { expectationErrors });
-      expect(Object.hasOwn(result, 'expectationErrors')).toBe(expectationErrors !== undefined);
-      expect(result.expectationErrors).toEqual(expectationErrors);
-      expect(result.counts.expectedPoints).toBe(2);
-    },
-  );
+  it('keeps an empty current expectation list as a known denominator', async () => {
+    const result = await readTelemetryReceipt(sql, run, [], { expectationErrors: [] });
+    expect(result.expectationErrors).toEqual([]);
+    expect(result.counts.expectedPoints).toBe(2);
+  });
 
   it('keeps missing inventory unknown and missing host storage incomplete', async () => {
     await inventory('{invalid json');

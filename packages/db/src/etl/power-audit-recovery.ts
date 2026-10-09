@@ -42,8 +42,9 @@ export interface AgentxAuditRefusal {
  * Attach each retained window to the single agentic point at its concurrency
  * within the covered set (CI: one result file; backfill: one artifact pair).
  * A concurrency shared by two points is refused by name so the caller reports
- * it instead of guessing which measurement the window belongs to. Points come
- * back in input order.
+ * it instead of guessing which measurement the window belongs to. A
+ * producer-carried audit wins, as in the upsert: the window only fills absence.
+ * Points come back in input order.
  */
 export function attachAgentxAudits<P extends AgentxAuditCandidate>(
   plan: AgentxWindowPlan,
@@ -58,6 +59,7 @@ export function attachAgentxAudits<P extends AgentxAuditCandidate>(
   const refused: AgentxAuditRefusal[] = [];
   const attach = new Set<P>();
   for (const [concurrency, group] of byConcurrency) {
+    if (group.every((point) => point.powerAudit)) continue;
     if (group.length === 1) attach.add(group[0]!);
     else refused.push({ concurrency, points: group.map(describe) });
   }

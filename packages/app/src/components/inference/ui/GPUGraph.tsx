@@ -364,23 +364,17 @@ const GPUGraph = React.memo(
     }, [groupedData, frontierDirection]);
 
     const rooflines = useMemo(() => {
-      if (!powerEnvelopeMode) return paretoRooflines;
+      if (!powerEnvelopeMode || !frontierDirection) return paretoRooflines;
       const result: Record<string, InferenceData[]> = {};
       for (const [key, points] of Object.entries(groupedData)) {
         result[key] = upperPowerEnvelope(
           points,
-          chartDefinition.chartType !== 'e2e',
+          frontierDirection,
           isPowerGaugeSeries(selectedYAxisMetric, points[0]),
         );
       }
       return result;
-    }, [
-      powerEnvelopeMode,
-      groupedData,
-      paretoRooflines,
-      chartDefinition.chartType,
-      selectedYAxisMetric,
-    ]);
+    }, [powerEnvelopeMode, groupedData, paretoRooflines, frontierDirection, selectedYAxisMetric]);
 
     const boundaryKeyOf = useCallback(
       (p: InferenceData) => `${seriesIdOf(p)}_${p.precision}-${p.x}-${p.y}`,

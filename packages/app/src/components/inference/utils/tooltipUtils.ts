@@ -328,7 +328,7 @@ const modeledSystemPowerHTML = (
     if (!isPinned || estimate.reason === 'workload') return '';
     return tooltipLine(t.unavailable, t.reasons[estimate.reason]);
   }
-  return `<div data-testid="tooltip-modeled-system-power" style="margin-top: 8px; border-top: 1px solid var(--border); padding-top: 6px;">
+  return `<div data-testid="tooltip-modeled-system-power" style="margin-top: 8px; border-top: 1px solid var(--border); padding-top: 6px; font-size: 11px;">
     <strong>${t.heading}</strong>
     ${tooltipLine(t.measuredGpu, `${fmt(estimate.measuredGpuWattsPerGpu)} W/GPU`)}
     ${tooltipLine(t.itPerGpu, `${fmt(estimate.itWattsPerGpu)} W/GPU`)}

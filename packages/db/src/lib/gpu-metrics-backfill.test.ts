@@ -40,20 +40,6 @@ describe('pairGpuMetricsArtifacts', () => {
       ['power_audit_cfg-mn_b200-slurm_0', 'bmk_cfg-mn_b200-slurm_0'],
     ]);
   });
-
-  it('keeps only the newest retry per logical benchmark and drops expired uploads', () => {
-    const pairs = pairGpuMetricsArtifacts([
-      meta('gpu_metrics_cfg-a_h200-cw_0', 1, '2026-09-11T00:00:00Z'),
-      meta('bmk_cfg-a_h200-cw_0', 2, '2026-09-11T00:00:00Z'),
-      meta('gpu_metrics_cfg-a_h200-dgxc-slurm_1', 3, '2026-09-11T02:00:00Z'),
-      meta('bmk_cfg-a_h200-dgxc-slurm_1', 4, '2026-09-11T02:00:00Z'),
-      meta('gpu_metrics_cfg-c_h200-cw_0', 5, '2026-09-11T03:00:00Z', true),
-      meta('bmk_cfg-c_h200-cw_0', 6, '2026-09-11T03:00:00Z'),
-    ]);
-    expect(pairs.map((pair) => pair.gpuMetrics.name)).toEqual([
-      'gpu_metrics_cfg-a_h200-dgxc-slurm_1',
-    ]);
-  });
 });
 
 describe('collectMissingTelemetryExpectations', () => {

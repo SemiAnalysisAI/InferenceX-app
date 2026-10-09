@@ -111,7 +111,7 @@ import {
   getShapeKeyForPrecision,
 } from '@/lib/chart-rendering';
 import { useThemeColors } from '@/hooks/useThemeColors';
-import { isFrontierEligible, type ParetoDirection } from '@/lib/chart-utils';
+import { isFrontierEligible, paretoMaximizesX, type ParetoDirection } from '@/lib/chart-utils';
 import { frontierHardwareKeys } from '@/components/inference/utils/pareto-series';
 import {
   globalParetoFrontier,
@@ -599,13 +599,13 @@ const ScatterGraph = React.memo(
     const groupDisplayedPoints = useCallback(
       (points: InferenceData[]) => {
         const groups = groupPointsByDate(points);
-        if (showPowerEnvelope) {
+        if (showPowerEnvelope && paretoDirection) {
           for (const [date, samples] of groups) {
             groups.set(
               date,
               upperPowerEnvelope(
                 samples,
-                chartDefinition.chartType !== 'e2e',
+                paretoDirection,
                 isPowerGaugeSeries(selectedYAxisMetric, samples[0]),
               ),
             );
@@ -613,7 +613,7 @@ const ScatterGraph = React.memo(
         }
         return groups;
       },
-      [showPowerEnvelope, chartDefinition.chartType, selectedYAxisMetric],
+      [showPowerEnvelope, paretoDirection, selectedYAxisMetric],
     );
     const locale = useLocale();
     const featureGateUnlocked = useFeatureGate();
@@ -1565,10 +1565,7 @@ const ScatterGraph = React.memo(
       ],
     );
 
-    // Roofline direction names are historical: upper_left maximizes X,
-    // upper_right minimizes X. Use the resolved definition, which also covers
-    // custom X metrics such as TTFT, rather than inferring from chart type.
-    const maximizeParetoX = paretoDirection === 'upper_left' || paretoDirection === 'lower_right';
+    const maximizeParetoX = paretoDirection !== undefined && paretoMaximizesX(paretoDirection);
     const maximizeParetoY = paretoDirection?.startsWith('upper') ?? true;
     const globalParetoPoints = useMemo(
       () =>
