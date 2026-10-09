@@ -1,31 +1,31 @@
 import type { Metadata } from 'next';
 
-import { UbenchxHub } from '@/components/ubenchx/UbenchxHub';
+import { SmL2Content } from '@/components/ubenchx/SmL2Heatmap';
 import { enAlternates } from '@/lib/i18n';
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
 
-const TITLE = 'ubenchX Microbenchmarks';
+const TITLE = 'ubenchX: SM-SM L2 Latency Difference';
 const DESCRIPTION =
-  'Low-level GPU microbenchmarks measuring fundamental hardware characteristics: device-memory copy bandwidth, SM-to-SM L2 latency topology, and more.';
+  'L2 pointer-chase microbenchmark showing SM-to-SM latency differences, revealing GPC and die topology structure on NVIDIA Blackwell GPUs.';
 
 export const metadata: Metadata = {
   title: TITLE,
   description: DESCRIPTION,
-  alternates: enAlternates('/ubenchx'),
+  alternates: enAlternates('/ubenchx/sm-l2-distance'),
   robots: { index: false, follow: false },
   openGraph: {
     title: `${TITLE} | InferenceX`,
     description: DESCRIPTION,
-    url: `${SITE_URL}/ubenchx`,
+    url: `${SITE_URL}/ubenchx/sm-l2-distance`,
   },
   twitter: { title: `${TITLE} | InferenceX`, description: DESCRIPTION },
 };
 
-export default function UbenchxPage() {
+export default function UbenchxSmL2DistancePage() {
   return (
     <main className="relative">
       <div className="container mx-auto px-4 pb-8 lg:px-8">
-        <UbenchxHub />
+        <SmL2Content />
       </div>
     </main>
   );
