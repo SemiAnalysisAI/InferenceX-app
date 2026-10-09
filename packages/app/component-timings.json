@@ -89,10 +89,6 @@
       "duration": 3857
     },
     {
-      "spec": "cypress/component/gta-heist.cy.tsx",
-      "duration": 372139
-    },
-    {
       "spec": "cypress/component/header.cy.tsx",
       "duration": 5164
     },

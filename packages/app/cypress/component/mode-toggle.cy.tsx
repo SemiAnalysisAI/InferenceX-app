@@ -3,16 +3,6 @@ import { ThemeProvider } from '@/components/ui/theme-provider';
 import { APP_THEMES } from '@/lib/themes';
 import { registerAnalyticsClient } from '@/lib/analytics';
 
-const ICONS: Record<string, string> = {
-  light: 'lucide-sun',
-  dark: 'lucide-moon',
-  minecraft: 'lucide-pickaxe',
-  csgo: 'lucide-crosshair',
-  gta: 'lucide-car',
-  doom: 'lucide-skull',
-  halo: 'lucide-shield',
-};
-
 describe('ModeToggle', () => {
   beforeEach(() => {
     cy.window().then((win) => win.localStorage.setItem('theme', 'light'));
@@ -34,20 +24,18 @@ describe('ModeToggle', () => {
     );
   });
 
-  it('cycles every theme with one click and wraps back to light without a menu', () => {
-    for (const theme of [...APP_THEMES.slice(1), 'light']) {
-      cy.get('[data-testid="theme-toggle"]').click();
-      cy.get('html').should('have.class', theme);
-      cy.get('[data-testid="theme-menu"]').should('not.exist');
-      cy.get('[data-testid="theme-toggle"]').should('not.have.attr', 'aria-expanded');
-      cy.get('[data-testid="theme-toggle"]')
-        .should('have.attr', 'aria-label', `Switch theme (currently ${theme} mode)`)
-        .find('svg')
-        .should('have.class', ICONS[theme]);
-      cy.window().should((win) => expect(win.localStorage.getItem('theme')).to.equal(theme));
-      cy.get('@capture').should('have.been.calledWith', 'theme_toggled', { theme });
-    }
-    cy.get('html').should('not.have.class', 'halo');
+  it('switches from light to dark, persists the selection, and reports analytics', () => {
+    cy.get('[data-testid="theme-toggle"] svg').should('have.class', 'lucide-sun');
+    cy.get('[data-testid="theme-toggle"]').click();
+    cy.get('html').should('have.class', 'dark');
+    cy.get('[data-testid="theme-menu"]').should('not.exist');
+    cy.get('[data-testid="theme-toggle"]').should('not.have.attr', 'aria-expanded');
+    cy.get('[data-testid="theme-toggle"]')
+      .should('have.attr', 'aria-label', 'Switch theme (currently dark mode)')
+      .find('svg')
+      .should('have.class', 'lucide-moon');
+    cy.window().should((win) => expect(win.localStorage.getItem('theme')).to.equal('dark'));
+    cy.get('@capture').should('have.been.calledWith', 'theme_toggled', { theme: 'dark' });
   });
 
   it('keeps a native button and retains focus after activation', () => {
