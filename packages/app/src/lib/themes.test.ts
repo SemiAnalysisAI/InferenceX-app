@@ -1,11 +1,26 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
-import { APP_THEMES, chartPaletteTheme, hasDarkTheme, isDarkTheme } from './themes';
+import { APP_THEMES, chartPaletteTheme, hasDarkTheme, isDarkTheme, nextTheme } from './themes';
 import { generateHighContrastColors } from './chart-utils';
 
 describe('presentation themes', () => {
-  it('lists every picker theme in display order', () => {
+  it('lists every theme in toggle order', () => {
     expect(APP_THEMES).toEqual(['light', 'dark', 'minecraft', 'csgo', 'gta', 'doom', 'halo']);
+  });
+
+  it.each([
+    ['light', 'dark'],
+    ['dark', 'minecraft'],
+    ['minecraft', 'csgo'],
+    ['csgo', 'gta'],
+    ['gta', 'doom'],
+    ['doom', 'halo'],
+    ['halo', 'light'],
+    ['system', 'light'],
+    ['unknown', 'light'],
+    [undefined, 'light'],
+  ])('cycles %s to %s', (current, next) => {
+    expect(nextTheme(current)).toBe(next);
   });
 
   it('aliases decorative dark themes onto the dark chart seed only', () => {

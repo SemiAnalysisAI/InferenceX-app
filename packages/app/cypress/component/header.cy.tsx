@@ -6,6 +6,7 @@ import { Header } from '@/components/header/header';
 import { ThemeProvider } from '@/components/ui/theme-provider';
 import { APP_THEMES } from '@/lib/themes';
 import { createMockRouter } from '../support/mock-router';
+import { cycleToTheme } from '../support/theme';
 
 // Mounted outside the Next app shell; next-style-loader inserts the global
 // stylesheet before this anchor, so it must exist before the import below.
@@ -270,7 +271,6 @@ describe('Header', () => {
       const next = APP_THEMES[index + 1];
       if (next) {
         cy.get('[data-testid="theme-toggle"]').click();
-        cy.get(`[data-testid="theme-option-${next}"]`).click();
       }
     }
   });
@@ -390,8 +390,7 @@ describe('Header', () => {
     });
 
     it('exposes the minecraft audio toggles in the mobile menu without overflowing', () => {
-      cy.get('[data-testid="theme-toggle"]').click();
-      cy.get('[data-testid="theme-option-minecraft"]').click();
+      cycleToTheme('minecraft');
       cy.get('html').should('have.class', 'minecraft');
       cy.get('[data-testid="mobile-menu-toggle"]').click();
       cy.get('[data-testid="mobile-menu"]').within(() => {

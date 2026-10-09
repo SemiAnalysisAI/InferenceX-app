@@ -4,10 +4,9 @@
 
 The root `ThemeProvider` in `packages/app/src/app/layout.tsx` uses `next-themes`
 to persist a theme and apply its class to `<html>` before hydration. The
-header's `ModeToggle` is an icon-only picker: the trigger shows the active
-theme's icon and expands a compact column with one icon button per theme in
-`APP_THEMES` order, so any theme is one tap away. Selecting a theme emits
-`theme_toggled`.
+header's `ModeToggle` is a single icon button: each click advances through
+`APP_THEMES` in order and wraps from Halo back to light. The icon shows the
+active theme, and each change emits `theme_toggled`. There is no dropdown.
 The existing default remains dark; the system setting remains supported.
 
 The root `EasterEggThemeLazy` boundary imports only the selected optional theme.
@@ -39,7 +38,7 @@ contrast branch.
 
 ## CS:GO implementation
 
-`src/lib/themes.ts` centralizes picker order
+`src/lib/themes.ts` centralizes toggle order
 (`light, dark, minecraft, csgo, gta, doom, halo`), dark-background classification, and the
 chart-palette alias used by CS:GO, GTA, DOOM and Halo. CS:GO retains the
 existing sans-serif font for chart legibility and preserves the dark theme's
@@ -91,7 +90,7 @@ by the repository's code license.
 
 Halo follows the GTA pattern: it is dark-classified everywhere (`isDarkTheme`),
 aliases onto the dark chart seed (`chartPaletteTheme`), and keeps the dark
-vendor, high-contrast, and overlay palettes. The picker shows it with a shield
+vendor, high-contrast, and overlay palettes. The toggle shows it with a shield
 icon after DOOM. There is no playable game.
 
 The chrome follows the Halo Infinite menus: deep navy near-opaque panels over
@@ -128,7 +127,7 @@ Asset provenance is recorded in `packages/app/public/decorative/minecraft/game/R
 Doom follows the CS:GO pattern with no game, audio, Three.js, or custom fonts.
 It is dark-classified (`isDarkTheme`), aliases onto the dark chart seed
 (`chartPaletteTheme`), and keeps the dark vendor, high-contrast, and overlay
-palettes. The picker uses the `Skull` icon.
+palettes. The toggle uses the `Skull` icon.
 
 `DoomDecorations` follows the root class and renders a responsive local DOOM
 (2016) hellscape behind the document (`aria-hidden`, `pointer-events: none`)
@@ -138,16 +137,16 @@ rule; circuit and autumn decorations are hidden. Embed routes suppress both.
 Asset provenance and the maintainer-reported permission are recorded in
 `packages/app/public/decorative/doom/README.md`.
 
-## Picker accessibility
+## Toggle accessibility
 
 The GTA banner also launches the optional [Bay Area heist game](./gta-heist.md).
 The game loads on demand and does not alter benchmark controls or data.
 
 The trigger keeps `data-testid="theme-toggle"` and its
-`Switch theme (currently <theme> mode)` label. Options are `role="radio"` in a
-labelled `radiogroup` (`data-testid="theme-option-<theme>"`), with localized
-`aria-label`/`title` text, roving tab index, arrow/Home/End navigation, and
-Escape to close. Options stay 44px on phones and 36px from `md`.
+`Switch theme (currently <theme> mode)` label. It is a native button with
+Enter/Space activation and a 44px target on desktop and mobile. Keyboard focus
+stays on the button after each change. An unknown or system preference advances
+to light, matching the original toggle behavior; saved themes remain supported.
 
 ## Data/API coverage
 
@@ -174,7 +173,7 @@ are still checked. Dynamic imports are verified separately by browser tests.
 and Firefox CI matrix. It covers:
 
 - English/Chinese desktop/mobile light/dark landings, no saved preference and
-  system preference, including opening the picker and scrolling.
+  system preference, including focusing the toggle and scrolling.
 - Network requests from navigation onward (including requests still in flight),
   loaded JS/CSS fingerprints for the optional engines and Minecraft game,
   font registration, and absence of optional theme/game DOM.
@@ -199,7 +198,7 @@ Crawler and theme-switch comparisons also cover robots, Open Graph and Twitter
 metadata. Run these tests on the implementation's final commit before merge;
 passing an earlier commit does not verify later changes.
 
-- Direct selection of every theme from the picker, keyboard navigation,
+- Cycling through every theme and wrapping to light, keyboard activation,
   persistence after reload, and cleanup on exit.
 - No CS:GO image requests on a cold light/dark landing; images load only
   after selection, with a smaller mobile crop.

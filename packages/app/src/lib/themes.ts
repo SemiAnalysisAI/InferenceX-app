@@ -1,6 +1,10 @@
 /** Presentation themes; benchmark data and share URLs do not depend on these. */
 export const APP_THEMES = ['light', 'dark', 'minecraft', 'csgo', 'gta', 'doom', 'halo'];
 
+export function nextTheme(theme: string | undefined): string {
+  return APP_THEMES[(APP_THEMES.indexOf(theme ?? '') + 1) % APP_THEMES.length];
+}
+
 /** Themes that draw on the dark palette (charts, figures, exports). */
 const DARK_THEMES = new Set(['dark', 'minecraft', 'csgo', 'gta', 'doom', 'halo']);
 

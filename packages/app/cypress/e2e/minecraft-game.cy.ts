@@ -1,10 +1,4 @@
-const chooseTheme = (theme: string) => {
-  cy.get('[data-testid="theme-toggle"]')
-    .should('have.attr', 'aria-label')
-    .and('include', 'currently');
-  cy.get('[data-testid="theme-toggle"]').click();
-  cy.get(`[data-testid="theme-option-${theme}"]`).click();
-};
+import { cycleToTheme as chooseTheme } from '../support/theme';
 
 const gameResources = (win: Window) =>
   win.performance
