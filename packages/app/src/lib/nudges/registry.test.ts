@@ -108,10 +108,6 @@ describe('NUDGE_REGISTRY integrity', () => {
     // see this one; cypress specs seed/clear this key and must stay in sync.
     expect(banner.storageKey).toBe('inferencex-rubin-minimax-m3-banner-dismissed');
     expect(banner.content.href).toBe('/inference/minimax-m3');
-    expect(banner.content.title).toBe('Rubin vLLM MiniMax M3 Preview is Here');
-    expect(banner.content.description).toBe('Early vLLM results for MiniMax M3 on NVIDIA Rubin');
-    expect(banner.content.titleZh).toBe('Rubin vLLM MiniMax M3 预览版现已上线');
-    expect(banner.content.descriptionZh).toBe('NVIDIA Rubin 上 MiniMax M3 的 vLLM 早期结果');
     expect(banner.analytics).toEqual({
       shown: 'inference_rubin_minimax_m3_banner_shown',
       dismissed: 'inference_rubin_minimax_m3_banner_dismissed',

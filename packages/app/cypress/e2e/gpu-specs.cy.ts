@@ -42,10 +42,6 @@ describe('GPU Specs Tab', () => {
     cy.get('h2').contains('Chip Specifications').should('exist');
   });
 
-  it('tab renders with correct title', () => {
-    cy.get('h2').should('contain.text', 'Chip Specifications');
-  });
-
   it('specs table is visible with all GPUs', () => {
     // Dismiss any open dialogs first
     cy.get('body').then(($body) => {

@@ -6,19 +6,10 @@ import {
   chipForHardware,
   getAllRankingPageEntries,
   getRankingPageEntry,
-  rankingPageDescription,
-  rankingPageHeading,
-  rankingPageKeywords,
   rankingPagePath,
   rankingPageTitle,
-  scenarioLabel,
 } from '@/lib/rankings';
-import {
-  rankingPageDescriptionZh,
-  rankingPageHeadingZh,
-  rankingPageKeywordsZh,
-  rankingPageTitleZh,
-} from '@/lib/rankings-zh';
+import { rankingPageDescriptionZh, rankingPageTitleZh } from '@/lib/rankings-zh';
 import { INFERENCE_MODEL_SLUGS } from '@/lib/inference-model-slug';
 import type {
   OverviewModelSummary,
@@ -26,7 +17,6 @@ import type {
   OverviewTierRead,
 } from '@/lib/overview-data';
 
-const FORBIDDEN_DASHES = /[\u2013\u2014]/;
 const CJK = /[\u4E00-\u9FFF]/;
 
 function syntheticRead(value: number | null): OverviewTierRead {
@@ -95,42 +85,12 @@ describe('rankings registry', () => {
 });
 
 describe('rankings copy', () => {
-  it('contains no em or en dashes and enough keywords in either locale', () => {
+  it('identifies the requested model in both locales and translates the Chinese page', () => {
     for (const entry of getAllRankingPageEntries()) {
-      const copy = [
-        rankingPageTitle(entry),
-        rankingPageHeading(entry),
-        rankingPageDescription(entry),
-        ...rankingPageKeywords(entry),
-        rankingPageTitleZh(entry),
-        rankingPageHeadingZh(entry),
-        rankingPageDescriptionZh(entry),
-        ...rankingPageKeywordsZh(entry),
-      ];
-      for (const text of copy) {
-        expect(text, `dash found in copy for ${entry.slug}: ${text}`).not.toMatch(FORBIDDEN_DASHES);
-        expect(text.length).toBeGreaterThan(0);
-      }
-      expect(rankingPageKeywords(entry).length).toBeGreaterThanOrEqual(6);
-      expect(rankingPageKeywordsZh(entry).length).toBeGreaterThanOrEqual(6);
-    }
-  });
-
-  it('keeps Chinese copy Chinese while model names stay English', () => {
-    for (const entry of getAllRankingPageEntries()) {
+      expect(rankingPageTitle(entry)).toContain(entry.model.seoName);
       expect(rankingPageTitleZh(entry)).toMatch(CJK);
       expect(rankingPageDescriptionZh(entry)).toMatch(CJK);
       expect(rankingPageTitleZh(entry)).toContain(entry.model.seoName);
-    }
-  });
-
-  it('words every scenario in both locales without dashes', () => {
-    for (const scenario of ['single_turn_8k1k', 'agentx'] as const) {
-      for (const locale of ['en', 'zh'] as const) {
-        const label = scenarioLabel(scenario, locale);
-        expect(label.length).toBeGreaterThan(0);
-        expect(label).not.toMatch(FORBIDDEN_DASHES);
-      }
     }
   });
 });

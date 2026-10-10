@@ -74,6 +74,8 @@ Server-cache performance regressions must assert source-reader call counts for r
 See the [October 2026 test suite audit](./test-suite-audit.md) for concrete examples
 of redundant coverage, disconnected test-only implementations, and the meaningful
 regression checks retained when pruning the suite.
+The [exact-text follow-up](./test-copy-audit.md) distinguishes incidental copy
+snapshots from assertions that protect units, data identity, and real behavior.
 
 1. **No tautological tests** — every test must verify a real transformation
 2. **Cover edge cases** — empty input, null, boundary values, error paths
