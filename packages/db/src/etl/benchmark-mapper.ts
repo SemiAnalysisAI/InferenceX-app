@@ -5,6 +5,7 @@
  */
 
 import type { ConfigParams } from './config-cache';
+import { resolveConfigTopology } from './topology';
 import type { SkipTracker } from './skip-tracker';
 import {
   CPU_SIDE_POWER_METRIC_KEYS,
@@ -20,12 +21,10 @@ import {
   normalizeFramework,
   normalizePrecision,
   normalizeSpecMethod,
-  parseBool,
-  parseOptionalBool,
   parseNum,
   parseInt2,
 } from './normalizers';
-import { normalizeLegacyTpuRow, physicalChipCount, roleChipCount } from './tpu-normalization';
+import { normalizeLegacyTpuRow } from './tpu-normalization';
 import { extractRuntimeMetadata } from './runtime-metadata';
 
 export { flattenAgenticAggRow };
@@ -297,71 +296,20 @@ export function mapBenchmarkRow(
     String(row.framework ?? ''),
     row.disagg,
   );
-  const isMultinode = parseBool(row.is_multinode);
   const precision = normalizePrecision(String(row.precision ?? ''));
   if (!PRECISION_KEYS.has(precision)) {
     tracker.unmappedPrecisions.add(precision);
   }
   const specMethod = normalizeSpecMethod(row.spec_decoding);
 
-  let parallelism = resolveParallelism(row, frameworkDisagg);
-  // An explicit non-disagg Dynamo artifact is authoritative for direct
-  // deployments such as one distributed vLLM server. A non-zero decode worker
-  // pool, however, is structural proof of disaggregation and preserves older
-  // Dynamo artifacts that incorrectly emitted disagg=false.
-  const disagg = frameworkDisagg || parallelism.decodeNumWorkers > 0;
+  const topology = resolveConfigTopology(row, framework, frameworkDisagg);
   let metrics = captureNumericMetrics(row);
   normalizePowerContractMetrics(row, metrics);
   if (isAgentic) metrics = preferFullResponseMetrics(metrics);
-  if (!disagg) {
-    const usePrefill =
-      parallelism.decodeTp <= 0 ||
-      parallelism.decodeEp <= 0 ||
-      (parallelism.decodeNumWorkers <= 0 &&
-        parallelism.numDecodeGpu <= 0 &&
-        (parallelism.prefillNumWorkers > 0 || parallelism.numPrefillGpu > 0));
-    const aggregate = usePrefill
-      ? {
-          tp: parallelism.prefillTp,
-          ep: parallelism.prefillEp,
-          dpAttn: parallelism.prefillDpAttn,
-          numWorkers: parallelism.prefillNumWorkers,
-          numGpu: parallelism.numPrefillGpu,
-          pp:
-            metrics.prefill_pp !== undefined || metrics.decode_pp !== undefined
-              ? Math.max(metrics.prefill_pp ?? 1, metrics.decode_pp ?? 1)
-              : undefined,
-        }
-      : {
-          tp: parallelism.decodeTp,
-          ep: parallelism.decodeEp,
-          dpAttn: parallelism.decodeDpAttn,
-          numWorkers: parallelism.decodeNumWorkers,
-          numGpu: parallelism.numDecodeGpu,
-          pp:
-            metrics.prefill_pp !== undefined || metrics.decode_pp !== undefined
-              ? Math.max(metrics.prefill_pp ?? 1, metrics.decode_pp ?? 1)
-              : undefined,
-        };
-    // The configs schema retains prefill/decode-shaped columns for backwards
-    // compatibility, but an aggregate deployment has only one engine. Mirror
-    // that engine into both halves so every reader sees the same topology.
-    parallelism = {
-      prefillTp: aggregate.tp,
-      prefillEp: aggregate.ep,
-      prefillDpAttn: aggregate.dpAttn,
-      prefillNumWorkers: aggregate.numWorkers,
-      decodeTp: aggregate.tp,
-      decodeEp: aggregate.ep,
-      decodeDpAttn: aggregate.dpAttn,
-      decodeNumWorkers: aggregate.numWorkers,
-      numPrefillGpu: aggregate.numGpu,
-      numDecodeGpu: aggregate.numGpu,
-    };
-    if (aggregate.pp !== undefined) {
-      metrics.prefill_pp = aggregate.pp;
-      metrics.decode_pp = aggregate.pp;
-    }
+  if (!topology.disagg && (metrics.prefill_pp !== undefined || metrics.decode_pp !== undefined)) {
+    const pp = Math.max(metrics.prefill_pp ?? 1, metrics.decode_pp ?? 1);
+    metrics.prefill_pp = pp;
+    metrics.decode_pp = pp;
   }
 
   // Agentic rows emit `offload_mode: "on" | "off"` (or older `offloading: "none"|...`)
@@ -428,9 +376,7 @@ export function mapBenchmarkRow(
       model: modelKey,
       precision,
       specMethod,
-      disagg,
-      isMultinode,
-      ...parallelism,
+      ...topology,
     },
     benchmarkType,
     isl,
@@ -443,93 +389,6 @@ export function mapBenchmarkRow(
     workers,
     powerInvalidReasons,
     powerAudit,
-  };
-}
-
-/** The parallelism slice of `ConfigParams`, resolved from either artifact schema. */
-type ParallelismParams = Pick<
-  ConfigParams,
-  | 'prefillTp'
-  | 'prefillEp'
-  | 'prefillDpAttn'
-  | 'prefillNumWorkers'
-  | 'decodeTp'
-  | 'decodeEp'
-  | 'decodeDpAttn'
-  | 'decodeNumWorkers'
-  | 'numPrefillGpu'
-  | 'numDecodeGpu'
->;
-
-/**
- * Resolve prefill/decode parallelism from a raw row. v2 rows (2025-12-19+)
- * carry full disagg fields keyed by the presence of `prefill_tp`; v1 rows have
- * a single `tp`/`ep` that applies to both phases.
- */
-function resolveParallelism(row: Record<string, any>, frameworkDisagg: boolean): ParallelismParams {
-  if ('prefill_tp' in row) {
-    // v2 schema: full disagg parallelism fields
-    const prefillTp = parseInt2(row.prefill_tp) ?? 1;
-    const prefillEp = parseInt2(row.prefill_ep) ?? 1;
-    const decodeTp = parseInt2(row.decode_tp) ?? 1;
-    const decodeEp = parseInt2(row.decode_ep) ?? 1;
-    return {
-      prefillTp,
-      prefillEp,
-      prefillDpAttn: parseBool(row.prefill_dp_attention),
-      prefillNumWorkers: parseInt2(row.prefill_num_workers) ?? 0,
-      decodeTp,
-      decodeEp,
-      decodeDpAttn: parseBool(row.decode_dp_attention),
-      decodeNumWorkers: parseInt2(row.decode_num_workers) ?? 0,
-      numPrefillGpu:
-        roleChipCount(row.num_prefill_gpu) ??
-        (frameworkDisagg || (parseInt2(row.decode_num_workers) ?? 0) > 0
-          ? undefined
-          : physicalChipCount(row.num_gpus)) ??
-        prefillTp * prefillEp,
-      numDecodeGpu:
-        roleChipCount(row.num_decode_gpu) ??
-        (frameworkDisagg || (parseInt2(row.decode_num_workers) ?? 0) > 0
-          ? undefined
-          : physicalChipCount(row.num_gpus)) ??
-        decodeTp * decodeEp,
-    };
-  }
-  // v1 schema: single tp/ep, prefill = decode
-  const tp = parseInt2(row.tp) ?? 1;
-  const ep = parseInt2(row.ep) ?? 1;
-  const dpAttn = parseBool(row.dp_attention);
-  let numGpus = physicalChipCount(row.num_gpus);
-  if (
-    row.num_gpus === undefined &&
-    !frameworkDisagg &&
-    isAgenticRow(row) &&
-    row.request_metrics &&
-    typeof row.request_metrics === 'object' &&
-    !Array.isArray(row.request_metrics) &&
-    parseOptionalBool(row.is_multinode) === false &&
-    parseOptionalBool(row.disagg) === false
-  ) {
-    // Match the v3 AgentX producer's physical-device count. EP and DCP share
-    // TP devices; PP and PCP add devices. Legacy flat rows keep their fallback.
-    const physicalTp = physicalChipCount(row.tp);
-    const pp = physicalChipCount(row.pp === undefined ? 1 : row.pp);
-    const pcp = physicalChipCount(row.pcp_size === undefined ? 1 : row.pcp_size);
-    if (physicalTp && pp && pcp) numGpus = physicalChipCount(physicalTp * pp * pcp);
-  }
-  numGpus ??= tp * ep;
-  return {
-    prefillTp: tp,
-    prefillEp: ep,
-    prefillDpAttn: dpAttn,
-    prefillNumWorkers: 0,
-    decodeTp: tp,
-    decodeEp: ep,
-    decodeDpAttn: dpAttn,
-    decodeNumWorkers: 0,
-    numPrefillGpu: numGpus,
-    numDecodeGpu: numGpus,
   };
 }
 

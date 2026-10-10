@@ -213,11 +213,23 @@ export const TILE = {
   item_diamond_sword: 207,
   item_diamond_hoe: 208,
   item_oak_door: 209,
+  netherrack: 210,
+  nether_bricks: 211,
+  end_stone: 212,
+  end_portal_frame_top: 213,
+  end_portal_frame_side: 214,
+  nether_portal: 215,
+  item_ender_pearl: 216,
+  item_ender_eye: 217,
+  item_blaze_rod: 218,
+  item_blaze_powder: 219,
+  item_bow: 220,
+  item_arrow: 221,
 } as const;
 export type TileName = keyof typeof TILE;
 
 export const ICON_COLUMNS = 16;
-export const ICON_ROWS = 10;
+export const ICON_ROWS = 11;
 export const ICON = {
   grass_block: 0,
   snowy_grass: 1,
@@ -373,6 +385,18 @@ export const ICON = {
   diamond_shovel: 151,
   diamond_sword: 152,
   diamond_hoe: 153,
+  netherrack: 154,
+  nether_bricks: 155,
+  end_stone: 156,
+  end_portal_frame_top: 157,
+  end_portal_frame_side: 158,
+  nether_portal: 159,
+  ender_pearl: 160,
+  ender_eye: 161,
+  blaze_rod: 162,
+  blaze_powder: 163,
+  bow: 164,
+  arrow: 165,
 } as const;
 export type IconName = keyof typeof ICON;
 

@@ -1,8 +1,9 @@
 import { APP_THEMES } from '../../src/lib/themes';
+import { cycleToTheme } from '../support/theme';
 
 const optionalThemes = APP_THEMES.filter((theme) => !['light', 'dark', 'system'].includes(theme));
 const featureCode =
-  /THREE\.WebGLRenderer|WebGLRenderer:|LOS SANTOS 3D|minecraft-click\.mp3|ender-dragon\.mp3|Loading Luigi Circuit|inferencex-minecraft-worlds|mc-panorama-cube|\.mc-hotbar-wrap|\.csgo-scene|\.gta-scene|\.mc-dragon-flyacross|\.kart-scene|\.doom-scene|\.halo-scene|halo-theme\.css|font-family:\s*["']?(?:Monocraft|Pricedown|ChaletComprime|Industry|Halo)/i;
+  /THREE\.WebGLRenderer|WebGLRenderer:|LOS SANTOS 3D|minecraft-click\.mp3|ender-dragon\.mp3|Loading Luigi Circuit|inferencex-minecraft-worlds|mc-panorama-cube|\.mc-hotbar-wrap|\.mc-boss|\.mc-endgame-guide|\.csgo-scene|\.gta-scene|\.mc-dragon-flyacross|\.kart-scene|\.doom-scene|\.halo-scene|halo-theme\.css|font-family:\s*["']?(?:Monocraft|Pricedown|ChaletComprime|Industry|Halo)/i;
 const featureAsset = new RegExp(
   `/decorative/(?:${optionalThemes.join('|')})/|minecraft-click\\.mp3|Monocraft-|Pricedown|ChaletComprime|Industry-|halo[^/]*\\.(?:woff2?|ttf|otf|mp3|ogg|wav)|youtube(?:-nocookie)?\\.com|ytimg\\.com`,
   'i',
@@ -49,6 +50,34 @@ const seo = (doc: Document) => [
 ];
 
 describe('optional themes stay off the default page', () => {
+  for (const route of ['/', '/zh']) {
+    it(`${route} migrates a retired kart preference and keeps the toggle usable`, () => {
+      const requests: string[] = [];
+      cy.intercept('GET', '**', (request) => {
+        requests.push(request.url);
+      });
+      cy.visit(route, {
+        onBeforeLoad(win) {
+          win.localStorage.setItem('theme', 'kart');
+        },
+      });
+      cy.get('html').should('have.class', 'dark').and('not.have.class', 'kart');
+      cy.window().should((win) => expect(win.localStorage.getItem('theme')).to.equal('dark'));
+      cy.get('[data-testid="theme-toggle"]').focus();
+      cy.get('[data-testid="theme-option-kart"]').should('not.exist');
+      cy.get('[data-testid="theme-menu"]').should('not.exist');
+      expectNoOptionalResources(requests);
+      // Cycling intentionally activates optional themes before returning to light.
+      cycleToTheme('light');
+      cy.get('html').should('have.class', 'light').and('not.have.class', 'kart');
+      cy.reload();
+      cy.get('html').should('have.class', 'light').and('not.have.class', 'kart');
+      cy.then(() => {
+        expect(requests.filter((url) => url.includes('/decorative/kart/'))).to.deep.equal([]);
+      });
+    });
+  }
+
   for (const [theme, route, width] of [
     ['light', '/', 1440],
     ['dark', '/', 390],
@@ -79,10 +108,9 @@ describe('optional themes stay off the default page', () => {
         const splash = win.document.querySelector('.splash-text');
         if (splash) expect(win.getComputedStyle(splash).animationName).to.equal('none');
       });
-      // Merely viewing options and interacting with the page must not activate a theme.
-      cy.get('[data-testid="theme-toggle"]').click();
-      cy.get('[data-testid="theme-option-minecraft"]').should('be.visible');
-      cy.get('body').type('{esc}');
+      // Focusing the toggle must not activate a theme or fetch optional assets.
+      cy.get('[data-testid="theme-toggle"]').focus();
+      cy.get('[data-testid="theme-menu"]').should('not.exist');
       cy.scrollTo('bottom');
       expectNoOptionalResources(requests);
     });
@@ -156,13 +184,11 @@ describe('optional themes stay off the default page', () => {
     cy.document().then((doc) => {
       const baseline = seo(doc);
       for (const theme of optionalThemes) {
-        cy.get('[data-testid="theme-toggle"]').click();
-        cy.get(`[data-testid="theme-option-${theme}"]`).click();
+        cycleToTheme(theme);
         if (theme === 'minecraft') cy.get('canvas').should('exist');
         else cy.get(`[data-testid="${theme}-theme-banner"]`).should('be.visible');
         cy.document().should((current) => expect(seo(current)).to.deep.equal(baseline));
-        cy.get('[data-testid="theme-toggle"]').click();
-        cy.get('[data-testid="theme-option-dark"]').click();
+        cycleToTheme('dark');
         cy.get(`canvas, audio, iframe, ${featureElements}`).should('not.exist');
         cy.document().should((current) => expect(seo(current)).to.deep.equal(baseline));
       }

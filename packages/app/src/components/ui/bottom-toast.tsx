@@ -8,6 +8,9 @@ import { useLocale } from '@/lib/use-locale';
 
 const DISMISS_EVENT = 'inferencex:dismiss-toast';
 
+/** Horizontal swipe distance (px) that dismisses the toast on touch screens. */
+const SWIPE_DISMISS_PX = 80;
+
 interface BottomToastProps {
   /** Icon to display on the left */
   icon: React.ReactNode;
@@ -39,6 +42,8 @@ export function BottomToast({
   const [animate, setAnimate] = useState(false);
   const [visible, setVisible] = useState(true);
   const actionClickedRef = useRef(false);
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+  const [drag, setDrag] = useState<{ dx: number; dy: number } | null>(null);
   const onDismissRef = useRef(onDismiss);
   onDismissRef.current = onDismiss;
 
@@ -70,33 +75,79 @@ export function BottomToast({
 
   if (!visible) return null;
 
+  const dragOffset = drag ? drag.dx : 0;
+
   return (
     <div
       data-testid={testId}
-      className={`fixed bottom-6 right-6 z-50 max-w-sm transition-all duration-300 ease-out ${
+      role="status"
+      aria-live="polite"
+      onTouchStart={(event) => {
+        const touch = event.touches[0];
+        if (!touch || event.touches.length !== 1) return;
+        touchStartRef.current = { x: touch.clientX, y: touch.clientY };
+      }}
+      onTouchMove={(event) => {
+        const start = touchStartRef.current;
+        const touch = event.touches[0];
+        if (!start || !touch) return;
+        setDrag({ dx: touch.clientX - start.x, dy: touch.clientY - start.y });
+      }}
+      onTouchEnd={(event) => {
+        // Measure from the gesture's own end point: the `drag` state can lag
+        // the last touchmove, and a quick flick may never set it at all.
+        const start = touchStartRef.current;
+        const touch = event.changedTouches[0];
+        touchStartRef.current = null;
+        setDrag(null);
+        if (!start || !touch) return;
+        const dx = touch.clientX - start.x;
+        const dy = touch.clientY - start.y;
+        // Horizontal-dominant swipes only: vertical motion belongs to page
+        // scroll (`touch-pan-y`), so it must never dismiss the toast.
+        if (Math.abs(dx) > SWIPE_DISMISS_PX && Math.abs(dx) > Math.abs(dy)) {
+          dismiss();
+        }
+      }}
+      onTouchCancel={() => {
+        touchStartRef.current = null;
+        setDrag(null);
+      }}
+      style={
+        drag
+          ? {
+              transform: `translateX(${dragOffset}px)`,
+              opacity: Math.max(0.2, 1 - Math.abs(dragOffset) / 240),
+              transition: 'none',
+            }
+          : undefined
+      }
+      className={`fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+0.75rem)] z-50 touch-pan-y transition-all duration-300 ease-out sm:inset-x-auto sm:right-6 sm:bottom-6 sm:max-w-sm ${
         animate ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'
       }`}
     >
-      <div className="relative flex items-start gap-3 rounded-lg border border-border bg-card p-4 shadow-lg">
+      <div className="relative flex items-start gap-3 rounded-xl border border-border bg-card p-3 shadow-lg sm:rounded-lg sm:p-4">
         <button
           type="button"
           onClick={dismiss}
-          className="absolute top-2 right-2 text-muted-foreground hover:text-foreground transition-colors"
+          className="absolute top-1 right-1 inline-flex size-9 items-center justify-center rounded-md text-muted-foreground hover:text-foreground transition-colors sm:top-2 sm:right-2 sm:size-auto"
           aria-label={locale === 'zh' ? '关闭' : 'Dismiss'}
         >
-          <X className="size-3.5" />
+          <X className="size-4 sm:size-3.5" />
         </button>
 
         <div className="shrink-0 mt-0.5 [&_svg]:h-3.5 [&_svg]:w-3.5">{icon}</div>
 
-        <div className="flex flex-col gap-2">
+        <div className="flex min-w-0 flex-1 flex-col gap-1.5 pr-7 sm:gap-2 sm:pr-0">
           <p className="text-sm font-medium text-foreground">{title}</p>
-          <p className="text-xs text-muted-foreground">{description}</p>
+          <p className="line-clamp-2 text-xs text-muted-foreground sm:line-clamp-none">
+            {description}
+          </p>
           {action && (
             <button
               type="button"
               onClick={handleAction}
-              className="flex items-center gap-1.5 self-end px-3 py-1.5 rounded-md text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+              className="flex min-h-9 items-center gap-1.5 self-end px-3 py-1.5 rounded-md text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors sm:min-h-0"
             >
               {action.icon}
               {action.label}

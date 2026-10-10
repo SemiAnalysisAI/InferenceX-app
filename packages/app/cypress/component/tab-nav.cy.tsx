@@ -197,6 +197,33 @@ describe('TabNav — Hidden popover for gated tabs', () => {
     cy.get('[data-testid="tab-trigger-collectivex"]').should('not.exist');
   });
 
+  it('shows every primary chart as a one-tap mobile pill with the current one marked', () => {
+    cy.viewport(390, 844);
+    cy.window().then((win) => win.localStorage.removeItem('inferencex-feature-gate'));
+    mountTabNav({ pathname: '/evaluation' });
+    cy.get('[data-testid="mobile-chart-select"]').should('be.visible');
+    for (const key of [
+      'inference',
+      'profit-estimator-per-gigawatt',
+      'profit-estimator',
+      'evaluation',
+      'submissions',
+    ]) {
+      cy.get(`[data-testid="mobile-tab-${key}"]`).should('exist');
+    }
+    cy.get('[data-testid="mobile-tab-evaluation"]')
+      .should('have.attr', 'aria-current', 'page')
+      .and('have.attr', 'href', '/evaluation');
+    cy.get('[data-testid="mobile-tab-inference"]').should('not.have.attr', 'aria-current');
+    cy.get('[data-testid="mobile-tab-evaluation"]').should(($pill) => {
+      const bounds = $pill[0]!.getBoundingClientRect();
+      expect(bounds.height, 'mobile touch target').to.be.at.least(40);
+    });
+    cy.document().then((doc) => {
+      expect(doc.documentElement.scrollWidth).to.be.at.most(doc.documentElement.clientWidth);
+    });
+  });
+
   it('still names the current gated page in the locked mobile selector', () => {
     cy.viewport(390, 844);
     cy.window().then((win) => win.localStorage.removeItem('inferencex-feature-gate'));

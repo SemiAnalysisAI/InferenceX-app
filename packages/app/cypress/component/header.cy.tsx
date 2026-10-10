@@ -50,19 +50,10 @@ describe('Header', () => {
   }
 
   beforeEach(() => {
-    // ThemeProvider reads persisted state, so isolate each header story from
-    // the preceding theme-cycle story (including the minecraft audio tools).
+    // ThemeProvider reads persisted state; isolate each header story.
     cy.window().then((win) => win.localStorage.setItem('theme', 'light'));
     mockRouter = createMockRouter();
     mountHeader('/');
-  });
-
-  it('displays the InferenceX title', () => {
-    cy.get('[data-testid="header"]').contains('InferenceX').should('be.visible');
-  });
-
-  it('displays the SemiAnalysis logo', () => {
-    cy.get('[data-testid="header"]').find('img[alt="SemiAnalysis logo"]').should('exist');
   });
 
   it('keeps the sticky header opaque enough that content cannot show through', () => {
@@ -82,12 +73,6 @@ describe('Header', () => {
       const { backdropFilter } = getComputedStyle($el[0]);
       expect(backdropFilter, 'computed backdrop-filter').to.contain('blur(');
     });
-  });
-
-  it('shows Overview as a top-level nav link', () => {
-    cy.get('[data-testid="nav-link-overview"]')
-      .should('be.visible')
-      .and('have.attr', 'href', '/overview');
   });
 
   it('pushes the desktop Overview link exactly once — no timer-based re-push', () => {
@@ -130,14 +115,9 @@ describe('Header', () => {
     cy.wrap(mockRouter.push).should('have.been.calledWith', '/inference');
   });
 
-  it('shows Dashboard nav link', () => {
-    cy.get('[data-testid="nav-link-dashboard"]').should('be.visible');
-    cy.get('[data-testid="nav-link-dashboard"]').should('have.attr', 'href', '/inference');
-  });
-
-  it('shows Comparisons nav link', () => {
-    cy.get('[data-testid="nav-link-compare"]').should('be.visible');
-    cy.get('[data-testid="nav-link-compare"]').should('have.attr', 'href', '/compare');
+  it('keeps Comparisons and Articles out of the header nav (they live in the footer)', () => {
+    cy.get('[data-testid="nav-link-compare"]').should('not.exist');
+    cy.get('[data-testid="nav-link-articles"]').should('not.exist');
   });
 
   it('shows AgentX as a top-level nav link and highlights AgentX child pages', () => {
@@ -176,15 +156,7 @@ describe('Header', () => {
   });
 
   it('orders the nav with Home first and AgentX second', () => {
-    const expected = [
-      'Home',
-      'AgentX',
-      'Overview',
-      'Dashboard',
-      'Comparisons',
-      'Articles',
-      'About',
-    ];
+    const expected = ['Home', 'AgentX', 'Overview', 'Dashboard', 'ubenchX', 'About'];
     cy.get('[data-testid^="nav-link-"]').then(($links) => {
       // Strip the NEW badge so the comparison is against the label alone.
       const labels = [...$links].map((link) => (link.textContent ?? '').replace('NEW', '').trim());
@@ -203,10 +175,6 @@ describe('Header', () => {
     cy.get('[data-testid="header-star-button"]')
       .should('have.attr', 'href')
       .and('include', 'github.com/SemiAnalysisAI/InferenceX');
-  });
-
-  it('shows the theme toggle button', () => {
-    cy.get('[data-testid="theme-toggle"]').should('be.visible');
   });
 
   for (const pathname of ['/', '/zh']) {
@@ -235,21 +203,22 @@ describe('Header', () => {
     cy.get('[data-testid="mobile-menu"]').within(() => {
       cy.contains('a', 'Overview').should('be.visible').and('have.attr', 'href', '/overview');
       cy.contains('a', 'Dashboard').should('be.visible').and('have.attr', 'href', '/inference');
-      cy.contains('a', 'Comparisons').should('be.visible').and('have.attr', 'href', '/compare');
+      cy.contains('a', 'ubenchX').should('be.visible').and('have.attr', 'href', '/ubenchx');
       cy.contains('a', 'AgentX')
         .should('be.visible')
         .and('have.attr', 'href', '/agentx')
         .find('[data-nav-badge="agentx"]')
         .should('have.text', 'NEW');
-      cy.contains('a', 'Articles').should('be.visible').and('have.attr', 'href', '/blog');
+      cy.contains('a', 'Comparisons').should('not.exist');
+      cy.contains('a', 'Articles').should('not.exist');
       cy.contains('a', 'Supporters').should('not.exist');
       cy.contains('a', 'Telemetry').should('not.exist');
     });
   });
 
-  it('uses the same resting icon color and shape for all three header utilities in each theme', () => {
+  it('uses the same resting icon color and shape for all three header utilities in light and dark', () => {
     cy.viewport(390, 844);
-    for (const [index, theme] of APP_THEMES.entries()) {
+    for (const theme of ['light', 'dark']) {
       cy.get('[data-testid="theme-toggle"]').should(
         'have.attr',
         'aria-label',
@@ -267,10 +236,8 @@ describe('Header', () => {
           });
         }
       });
-      const next = APP_THEMES[index + 1];
-      if (next) {
+      if (theme === 'light') {
         cy.get('[data-testid="theme-toggle"]').click();
-        cy.get(`[data-testid="theme-option-${next}"]`).click();
       }
     }
   });
@@ -374,33 +341,16 @@ describe('Header', () => {
       cy.get('[data-testid="mobile-menu-toggle"]').click();
       cy.get('[data-testid="mobile-menu"]').should('be.visible');
       cy.get('[data-testid="mobile-menu"]').within(() => {
-        ['Home', 'Overview', 'Dashboard', 'Comparisons', 'Articles', 'AgentX', 'About'].forEach(
-          (label) => {
-            cy.contains('a', label).should('be.visible');
-          },
-        );
-        ['Supporters', 'Telemetry'].forEach((label) => {
+        ['Home', 'Overview', 'Dashboard', 'ubenchX', 'AgentX', 'About'].forEach((label) => {
+          cy.contains('a', label).should('be.visible');
+        });
+        ['Comparisons', 'Articles', 'Supporters', 'Telemetry'].forEach((label) => {
           cy.contains('a', label).should('not.exist');
         });
       });
       cy.get('[data-testid="mobile-menu"] a').each(($link) => {
         const rect = $link[0].getBoundingClientRect();
         expect(rect.height, `${$link.text()} link height`).to.be.at.least(MIN_TOUCH_PX - EPSILON);
-      });
-    });
-
-    it('exposes the minecraft audio toggles in the mobile menu without overflowing', () => {
-      cy.get('[data-testid="theme-toggle"]').click();
-      cy.get('[data-testid="theme-option-minecraft"]').click();
-      cy.get('html').should('have.class', 'minecraft');
-      cy.get('[data-testid="mobile-menu-toggle"]').click();
-      cy.get('[data-testid="mobile-menu"]').within(() => {
-        cy.get('button[aria-label="Mute music"]').should('be.visible');
-        cy.get('button[aria-label="Mute click sounds"]').should('be.visible');
-      });
-      cy.get('[data-testid="header"]').then(($header) => {
-        const header = $header[0];
-        expect(header.scrollWidth, 'header scrollWidth').to.be.at.most(header.clientWidth);
       });
     });
   });

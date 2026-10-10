@@ -85,6 +85,7 @@ describe('dashboard route registry', () => {
       expect(dashboardShellCapabilitiesForPathname(pathname)).toEqual({
         providers: { globalFilters: false, unofficialRuns: false },
         dashboardNudge: false,
+        tabNav: true,
       });
     },
   );
@@ -95,6 +96,7 @@ describe('dashboard route registry', () => {
       expect(dashboardShellCapabilitiesForPathname(pathname)).toEqual({
         providers: { globalFilters: false, unofficialRuns: false },
         dashboardNudge: false,
+        tabNav: true,
       });
     },
   );
@@ -105,9 +107,23 @@ describe('dashboard route registry', () => {
       expect(dashboardShellCapabilitiesForPathname(pathname)).toEqual({
         providers: { globalFilters: false, unofficialRuns: false },
         dashboardNudge: false,
+        tabNav: true,
       });
     },
   );
+
+  it.each([
+    '/agentic-workload-explorer',
+    '/zh/agentic-workload-explorer',
+    '/agentic-workload-explorer/sessions/abc/timeline',
+    '/zh/agentic-workload-explorer/tool-analytics',
+  ])('hides the dashboard tab strip on the explorer, which has its own nav, at %s', (pathname) => {
+    expect(dashboardShellCapabilitiesForPathname(pathname)).toEqual({
+      providers: { globalFilters: false, unofficialRuns: false },
+      dashboardNudge: false,
+      tabNav: false,
+    });
+  });
 
   it.each(['/reliability', '/gpu-specs', '/submissions', '/feedback'])(
     'keeps dashboard nudges active on provider-free route %s',

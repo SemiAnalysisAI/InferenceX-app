@@ -48,7 +48,7 @@ import './minecraft-game.css';
 
 type Locale = 'en' | 'zh';
 type Phase = 'title' | 'worlds' | 'create' | 'options' | 'loading' | 'playing' | 'error';
-type Overlay = null | 'pause' | 'options' | 'chat' | 'death';
+type Overlay = null | 'pause' | 'options' | 'chat' | 'death' | 'ending';
 
 interface Settings {
   fov: number;
@@ -109,6 +109,7 @@ const GAME_KEYS = new Set([
 export function MinecraftGame({ locale, onExit }: { locale: Locale; onExit: () => void }) {
   const t = useCallback((en: string, zh: string) => tr(locale, en, zh), [locale]);
   const [phase, setPhase] = useState<Phase>('title');
+  const [canvasGeneration, setCanvasGeneration] = useState(0);
   const [overlay, setOverlayState] = useState<Overlay>(null);
   const overlayRef = useRef<Overlay>(null);
   const setOverlay = useCallback((o: Overlay) => {
@@ -307,6 +308,8 @@ export function MinecraftGame({ locale, onExit }: { locale: Locale; onExit: () =
   // -------------------------------------------------------------------------
   const startWorld = useCallback(
     (meta: WorldMeta, data: ReturnType<typeof loadWorld>) => {
+      // Renderer disposal loses its WebGL context; a new world needs a new canvas.
+      setCanvasGeneration((generation) => generation + 1);
       pendingRef.current = { meta, data };
       setProgress(0);
       setChat([]);
@@ -471,7 +474,10 @@ export function MinecraftGame({ locale, onExit }: { locale: Locale; onExit: () =
         }
         game.streamChunks(3);
         renderer.updateChunks(4);
-        const paused = overlayRef.current === 'pause' || overlayRef.current === 'options';
+        const paused =
+          overlayRef.current === 'pause' ||
+          overlayRef.current === 'options' ||
+          overlayRef.current === 'ending';
         let alpha = 1;
         if (!paused) alpha = game.update(dt, buildInput());
         // Events.
@@ -505,6 +511,12 @@ export function MinecraftGame({ locale, onExit }: { locale: Locale; onExit: () =
             case 'death': {
               if (document.pointerLockElement) document.exitPointerLock();
               setOverlay('death');
+              break;
+            }
+            case 'ending': {
+              if (document.pointerLockElement) document.exitPointerLock();
+              setOverlay('ending');
+              save();
               break;
             }
             default: {
@@ -584,7 +596,8 @@ export function MinecraftGame({ locale, onExit }: { locale: Locale; onExit: () =
       const o = overlayRef.current;
       const target = e.target as HTMLElement | null;
       if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) return;
-      if (o === 'chat' || o === 'pause' || o === 'options' || o === 'death') return;
+      if (o === 'chat' || o === 'pause' || o === 'options' || o === 'death' || o === 'ending')
+        return;
       if (GAME_KEYS.has(e.code) || e.code.startsWith('F')) e.preventDefault();
       if (e.code === 'F3') {
         setDebug((d) => !d);
@@ -755,7 +768,7 @@ export function MinecraftGame({ locale, onExit }: { locale: Locale; onExit: () =
       lock();
       return true;
     }
-    if (o === 'death') return true;
+    if (o === 'death' || o === 'ending') return true;
     setOverlay('pause');
     if (document.pointerLockElement) document.exitPointerLock();
     return true;
@@ -784,6 +797,11 @@ export function MinecraftGame({ locale, onExit }: { locale: Locale; onExit: () =
         phase,
         overlay: overlayRef.current,
         mode: g.mode,
+        dimension: g.dimension,
+        progression: g.endgame.progress,
+        boss: g.entities
+          .filter((e) => e.kind === 'dragon' || e.kind === 'crystal')
+          .map((e) => ({ kind: e.kind, health: e.health, x: e.x, y: e.y, z: e.z })),
         time: g.dayTime,
         player: {
           x: Number(p.x.toFixed(2)),
@@ -946,6 +964,7 @@ export function MinecraftGame({ locale, onExit }: { locale: Locale; onExit: () =
       onContextMenu={(e) => e.preventDefault()}
     >
       <canvas
+        key={canvasGeneration}
         ref={canvasRef}
         className="mc-canvas"
         aria-label={t('Minecraft world', 'Minecraft 世界')}
@@ -1410,6 +1429,33 @@ export function MinecraftGame({ locale, onExit }: { locale: Locale; onExit: () =
           ) : null}
           {overlay === 'pause' ? (
             <div className="mc-pause" data-testid="minecraft-pause">
+              <details className="mc-endgame-guide" data-testid="minecraft-endgame-guide">
+                <summary>{t('How to reach the End', '如何前往末地')}</summary>
+                <p>
+                  {t(
+                    'Build an obsidian frame with a 2×3 empty interior. Use flint and steel inside it, then stand in the portal for 3 seconds.',
+                    '用黑曜石搭建内部留有 2×3 空间的门框。用打火石点燃内部，然后在传送门中停留 3 秒。',
+                  )}
+                </p>
+                <p>
+                  {t(
+                    'In the Nether, find the brick fortress bridges (near X/Z 64, repeating every 128 blocks). Defeat blazes for rods and endermen for pearls. Six rods make twelve blaze powder; combine powder and pearls into twelve Eyes of Ender.',
+                    '在下界寻找下界砖桥梁（靠近 X/Z 64，每隔 128 格重复）。击败烈焰人获得烈焰棒，击败末影人获得珍珠。六根烈焰棒可制作十二份烈焰粉，再与珍珠合成十二颗末影之眼。',
+                  )}
+                </p>
+                <p>
+                  {t(
+                    'Return through your portal. Use an Eye of Ender to locate the underground stronghold; fill its twelve portal frames. In the End, destroy the healing crystals, then defeat the dragon with a bow or attack while it perches. Enter the centre exit portal to finish and keep playing your world.',
+                    '返回主世界，用末影之眼定位地下要塞，填满十二个传送门框架。进入末地后先摧毁治疗水晶，再用弓攻击末影龙，或在它降落时近战攻击。进入中央出口传送门即可通关，之后仍可继续游玩。',
+                  )}
+                </p>
+                <p>
+                  {t(
+                    'Craft a bow with sticks and string (one wool makes four string); arrows use flint, sticks and feathers. Survival progression needs Easy, Normal or Hard difficulty. This browser edition has simplified dimensions and combat.',
+                    '用木棍和线制作弓（一块羊毛可制成四根线），用燧石、木棍和羽毛制作箭。生存通关需要简单、普通或困难难度。此浏览器版本的维度和战斗机制经过简化。',
+                  )}
+                </p>
+              </details>
               <h2
                 style={{
                   fontSize: 8 * s,
@@ -1523,6 +1569,29 @@ export function MinecraftGame({ locale, onExit }: { locale: Locale; onExit: () =
                   refresh();
                 }}
               />
+            </div>
+          ) : null}
+          {overlay === 'ending' ? (
+            <div className="mc-pause mc-ending" data-testid="minecraft-ending">
+              <h2>{t('Free the End', '解放末地')}</h2>
+              <p>{t('The dragon is defeated. You are home.', '末影龙已被击败。你回到了家。')}</p>
+              <p>
+                {t(
+                  'Your worlds and progress are saved. There is more to build.',
+                  '你的世界和进度已保存。继续创造吧。',
+                )}
+              </p>
+              <McButton
+                scale={s}
+                testId="minecraft-ending-continue"
+                onClick={() => {
+                  game.endgame.ending = false;
+                  setOverlay(null);
+                  lock();
+                }}
+              >
+                {t('Continue Playing', '继续游戏')}
+              </McButton>
             </div>
           ) : null}
           {overlay === 'death' ? (

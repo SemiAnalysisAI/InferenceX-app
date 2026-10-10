@@ -6,6 +6,21 @@ implementation. No permission from Mojang has been independently verified for
 this use. Review the [Minecraft Usage Guidelines](https://www.minecraft.net/en-us/usage-guidelines)
 before any public release, and remove this folder if they do not allow it.
 
+Oren confirmed that SemiAnalysis has permission covering redistribution of
+these textures and sounds in this browser game in the
+[implementation thread](https://github.com/SemiAnalysisAI/InferenceX-app/pull/1287#issuecomment-6029170517).
+This records the user's authorization; it is not an independent license review.
+
+## Endgame additions
+
+The Nether/End blocks, items and entity skins are Java 1.20.1 textures from
+[the Minecraft assets mirror, commit af628ec0e7977ec2f07c917d51413b4618a8cfcc](https://github.com/InventivetalentDev/minecraft-assets/tree/af628ec0e7977ec2f07c917d51413b4618a8cfcc/assets/minecraft/textures).
+`scripts/build-minecraft-endgame-assets.py` appends them to the generated atlas
+without renumbering existing tiles and copies the four entity PNGs. Run it after
+the base asset builder, passing a directory with the listed source PNGs by
+basename. The additional renderer and models are independent code, not Mojang
+game code. All of these files remain under the existing optional launch boundary.
+
 ## Sources
 
 Extracted on 2026-10-06 by `packages/app/scripts/build-minecraft-game-assets.py`:

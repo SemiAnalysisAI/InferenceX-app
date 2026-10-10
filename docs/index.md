@@ -4,7 +4,7 @@ Design rationale and non-obvious conventions. See [CLAUDE.md](../CLAUDE.md) for 
 
 ## Docs
 
-- [Presentation Themes](./themes.md): Minecraft activation and assets, CS:GO, GTA and Halo styling, Halo theme music, icon-only theme picker, dark-chart/export integration, and presentation-only API exclusion.
+- [Presentation Themes](./themes.md): Minecraft activation and assets, CS:GO, GTA and Halo styling, Halo theme music, single-button theme toggle, dark-chart/export integration, and presentation-only API exclusion.
 - [Playable Minecraft](./minecraft-game.md): the opt-in game launched from the Minecraft theme, controls, saves, lifecycle and verification.
 
 - [Dashboard Read-only Views](./dashboard-readonly-views.md): API/filter inventory, source audit and verification scope
@@ -34,4 +34,5 @@ Design rationale and non-obvious conventions. See [CLAUDE.md](../CLAUDE.md) for 
 - [Chinese Pages (/zh)](./i18n.md) — Why hand-authored /zh pages instead of an i18n framework, hreflang pairing, blog translation pairing, html lang workaround, CJK reading time/slugs
 - [Chinese Copy Editorial Guide](./chinese-copy.md) — Audience, surface-specific register, context-aware terminology, rewrite workflow, manual-review process, and PR checklist
 
+- [Agentic Workload Explorer](./agentic-workload-explorer.md) — feature-gated, read-only explorer over a frozen anonymized ProxyTrace snapshot: separate read replica, Kysely query layer, page-bff routes, bilingual views
 - [OperatorX](./operatorx.md) — hidden GEMM, attention, and routed MoE explorer, per-GPU TFLOPS, raw artifact persistence, and local verification

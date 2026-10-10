@@ -226,7 +226,14 @@ async function insertDeferredServerLogFiles(
             files_complete = true
         where id = ${logId}
       `;
+      // Skip names the bundle already stores so forced backfills do not
+      // re-read and re-send large multinode files only to hit the conflict.
+      const stored = await tx<{ file_name: string }[]>`
+        select file_name from server_log_files where server_log_id = ${logId}
+      `;
+      const storedNames = new Set(stored.map((row) => row.file_name));
       for (const file of additional) {
+        if (storedNames.has(file.fileName)) continue;
         const logText = file.readText();
         await tx`
           insert into server_log_files (server_log_id, file_name, log_text)

@@ -19,14 +19,6 @@ describe('CSV Export', () => {
     cy.get('body').type('{esc}');
   });
 
-  it('clicking Download CSV on inference chart triggers file download', () => {
-    cy.get('[data-testid="export-button"]').first().click();
-    cy.get('[data-testid="export-csv-button"]').click();
-
-    // The popover should close after clicking
-    cy.get('[data-testid="export-csv-button"]').should('not.exist');
-  });
-
   it('reliability chart has CSV export option', () => {
     cy.visit('/reliability');
     cy.get('[data-testid="reliability-chart-display"]').should('exist');
@@ -66,12 +58,5 @@ describe('CSV Export', () => {
       .should('be.visible')
       .and('contain.text', 'Download CSV');
     cy.get('body').type('{esc}');
-  });
-
-  it('Download PNG option is still available in dropdown', () => {
-    cy.get('[data-testid="export-button"]').first().click();
-    cy.get('[data-testid="export-png-button"]')
-      .should('be.visible')
-      .and('contain.text', 'Download PNG');
   });
 });

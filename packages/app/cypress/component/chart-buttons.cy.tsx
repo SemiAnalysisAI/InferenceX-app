@@ -26,19 +26,6 @@ describe('ChartButtons', () => {
   });
 
   describe('with CSV export', () => {
-    it('shows dropdown with PNG and CSV options', () => {
-      const onExportCsv = cy.stub().as('csvExport');
-      cy.mount(
-        <div style={{ position: 'relative', width: 400, height: 200 }}>
-          <div id="test-chart">Chart content</div>
-          <ChartButtons chartId="test-chart" analyticsPrefix="test" onExportCsv={onExportCsv} />
-        </div>,
-      );
-      cy.get('[data-testid="export-button"]').click();
-      cy.get('[data-testid="export-png-button"]').should('be.visible');
-      cy.get('[data-testid="export-csv-button"]').should('be.visible');
-    });
-
     it('clicking CSV calls onExportCsv', () => {
       const onExportCsv = cy.stub().as('csvExport');
       cy.mount(

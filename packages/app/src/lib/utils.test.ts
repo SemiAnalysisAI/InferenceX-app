@@ -4,6 +4,7 @@ import type * as ConstantsModule from '@/lib/constants';
 import { Model, MODEL_PREFIX_MAPPING } from '@/lib/data-mappings';
 import type { AggDataEntry, InferenceData } from '@/components/inference/types';
 import {
+  cn,
   formatNumber,
   updateRepoUrl,
   calculateCostsForGpus,
@@ -15,6 +16,19 @@ import {
   getHardwareLabel,
   getDisplayLabel,
 } from '@/lib/utils';
+
+describe('cn merging of custom typography tokens', () => {
+  it('resolves conflicts between named tracking tokens and built-ins (last wins)', () => {
+    expect(cn('tracking-eyebrow', 'tracking-tight')).toBe('tracking-tight');
+    expect(cn('tracking-tight', 'tracking-eyebrow')).toBe('tracking-eyebrow');
+    expect(cn('tracking-eyebrow', 'tracking-eyebrow-wide')).toBe('tracking-eyebrow-wide');
+  });
+
+  it('resolves conflicts between micro size tokens and the standard scale', () => {
+    expect(cn('text-sm', 'text-2xs')).toBe('text-2xs');
+    expect(cn('text-3xs', 'text-lg')).toBe('text-lg');
+  });
+});
 
 vi.mock('@/lib/constants', async (importOriginal) => {
   const actual = await importOriginal<typeof ConstantsModule>();

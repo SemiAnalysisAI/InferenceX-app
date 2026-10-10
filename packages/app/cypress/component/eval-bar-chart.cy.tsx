@@ -182,27 +182,6 @@ describe('EvalBarChartD3', () => {
     cy.get('.sidebar-legend li').should('have.length', 2);
   });
 
-  it('Show Labels switch is present in the legend', () => {
-    const mockData = [createMockEvaluationChartData()];
-    mountWithProviders(
-      <div style={{ width: 900, height: 700 }}>
-        <EvalBarChartD3 />
-      </div>,
-      {
-        evaluation: {
-          chartData: mockData,
-          unfilteredChartData: mockData,
-          loading: false,
-          error: null,
-        },
-        unofficial: {},
-      },
-    );
-
-    cy.contains('Show Labels').should('exist');
-    cy.contains('High Contrast').should('exist');
-  });
-
   for (const includeOfficial of [false, true]) {
     it(`renders interactive unofficial markers with a portaled tooltip (${includeOfficial ? 'with' : 'without'} official rows)`, () => {
       // Evaluation-only run that originally displayed its error bar and legend

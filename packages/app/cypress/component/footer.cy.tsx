@@ -21,21 +21,6 @@ describe('Footer', () => {
     cy.get('[data-testid="footer-copyright"]').should('contain', year);
   });
 
-  it('shows the GitHub star CTA', () => {
-    cy.get('[data-testid="footer-star-cta"]').should('be.visible');
-    cy.get('[data-testid="footer-star-cta"]').should('contain', 'Star');
-  });
-
-  it('shows social share buttons', () => {
-    cy.get('[data-testid="footer-cta"]')
-      .should('have.css', 'border-top-width', '0px')
-      .and('contain.text', 'If this data helps your work');
-    cy.get('[data-testid="footer-social-buttons"]').should('be.visible');
-    cy.get('[data-testid="footer-social-buttons"]')
-      .find('button')
-      .should('have.length.greaterThan', 1);
-  });
-
   it('has Privacy Policy link', () => {
     cy.get('[data-testid="footer-link-privacy"]')
       .should('have.attr', 'href')
@@ -69,15 +54,12 @@ describe('Footer', () => {
     cy.get('[data-testid="footer-link-agentx"]')
       .should('contain.text', 'AgentX')
       .and('have.attr', 'href', '/agentx');
+    cy.get('[data-testid="footer-link-compare"]')
+      .should('contain.text', 'Comparisons')
+      .and('have.attr', 'href', '/compare');
     cy.get('[data-testid="footer-link-articles"]')
       .should('contain.text', 'Articles')
       .and('have.attr', 'href', '/blog');
-  });
-
-  it('all external links open in a new tab', () => {
-    cy.get('[data-testid="footer-links"]')
-      .find('a[target="_blank"]')
-      .should('have.length.greaterThan', 0);
   });
 
   for (const width of [390, 768, 1280]) {

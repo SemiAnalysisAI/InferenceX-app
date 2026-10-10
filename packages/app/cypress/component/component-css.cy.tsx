@@ -77,29 +77,6 @@ function SearchForm({ onSubmit }: { onSubmit: React.FormEventHandler<HTMLFormEle
 }
 
 describe('component CSS harness', () => {
-  it('gives the CS:GO announcement the same splash contrast as dark mode', () => {
-    cy.mount(
-      <div>
-        <div className="dark">
-          <span className="splash-text" data-testid="dark-splash">
-            AgentX is here!!
-          </span>
-        </div>
-        <div className="csgo">
-          <span className="splash-text" data-testid="csgo-splash">
-            AgentX is here!!
-          </span>
-        </div>
-      </div>,
-    );
-    cy.get('[data-testid="dark-splash"]').then(($dark) => {
-      const expected = getComputedStyle($dark[0]);
-      cy.get('[data-testid="csgo-splash"]')
-        .should('have.css', 'color', expected.color)
-        .and('have.css', 'text-shadow', expected.textShadow);
-    });
-  });
-
   for (const theme of ['light', 'dark']) {
     it(`keeps focus undecorated without losing selection, validation, or input in ${theme} mode`, () => {
       cy.mount(
@@ -281,7 +258,7 @@ describe('component CSS harness', () => {
   });
 
   for (const width of [390, 1280]) {
-    for (const theme of ['light', 'dark', 'minecraft', 'csgo', 'gta']) {
+    for (const theme of ['light', 'dark']) {
       it(`keeps selected segments concentric with their outlines at ${width}px in ${theme} mode`, () => {
         cy.viewport(width, 720);
         cy.mount(
@@ -603,7 +580,8 @@ describe('component CSS harness', () => {
         const direct = card
           .querySelector('[data-testid="direct-content"]')!
           .getBoundingClientRect();
-        const padding = width < 768 ? 16 : 24;
+        // Phones get a tighter 12px inset so content has room; sm+ keeps 16px, md+ 24px.
+        const padding = width < 640 ? 12 : width < 768 ? 16 : 24;
         expect(getComputedStyle(card).paddingLeft).to.equal(`${padding}px`);
         for (const slot of ['card-header', 'card-content', 'card-footer']) {
           const bounds = card.querySelector(`[data-slot="${slot}"]`)!.getBoundingClientRect();

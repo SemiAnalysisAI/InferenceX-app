@@ -1,0 +1,877 @@
+{
+  "clients": 1938,
+  "cost24h": 2572.402,
+  "requests": 2892653,
+  "sessions": 13735,
+  "totalCost": 660986.3254062944,
+  "tpotStats": {
+    "avg": 23.006598471305807,
+    "p50": 12.713455200195312,
+    "p90": 36.64011039733889,
+    "p95": 60.5,
+    "p99": 187.22584396362302,
+    "count": 2458398
+  },
+  "ttftStats": {
+    "avg": 3355.1669767869103,
+    "p50": 2298,
+    "p90": 6483,
+    "p95": 8976,
+    "p99": 18425,
+    "count": 2460336
+  },
+  "sessions24h": 96,
+  "costTodayUtc": 363.78635,
+  "sessionsGt20": 7399,
+  "costBreakdown": {
+    "input": 30630.994014450003,
+    "output": 85215.4436697,
+    "cacheRead": 344623.09760843,
+    "cacheWrite": 154821.72266824997
+  },
+  "gapPercentiles": {
+    "p25": 0.654,
+    "p50": 3.792,
+    "p75": 11.527,
+    "p90": 28.851,
+    "p99": 334.1859599999997
+  },
+  "recentRequests": [
+    {
+      "id": "214476ac-bb82-413f-89e6-198d0cbc90f0",
+      "error": null,
+      "model": "claude-opus-5-5",
+      "tpotMs": 0.014256619,
+      "ttftMs": 6033,
+      "costUsd": 0.0958116,
+      "endpoint": "/proxy/v1/messages",
+      "timestamp": "2026-09-26T08:07:08.365Z",
+      "sessionId": "8c0b158fef07f21ff1546c4a2884ccf1e956",
+      "durationMs": 6040,
+      "inputTokens": 2,
+      "isFastMode": false,
+      "isStreaming": true,
+      "outputTokens": 492,
+      "cacheWriteTokens": 2100,
+      "responseStatusCode": 200,
+      "cacheReadInputTokens": 377318
+    },
+    {
+      "id": "7f0cf6b4-7e6b-4d0a-957e-a7c2bebf46d0",
+      "error": null,
+      "model": "claude-opus-5-5",
+      "tpotMs": 9.548556,
+      "ttftMs": 2111,
+      "costUsd": 0.1294406,
+      "endpoint": "/proxy/v1/messages",
+      "timestamp": "2026-09-26T08:07:07.843Z",
+      "sessionId": "8c0b158fef07f21ff1546c4a2884ccf1e956",
+      "durationMs": 13025,
+      "inputTokens": 2,
+      "isFastMode": false,
+      "isStreaming": true,
+      "outputTokens": 1144,
+      "cacheWriteTokens": 1847,
+      "responseStatusCode": 200,
+      "cacheReadInputTokens": 486588
+    },
+    {
+      "id": "fae28414-ce6a-4e1a-9f1d-371df6ee117e",
+      "error": null,
+      "model": "claude-opus-5-5",
+      "tpotMs": 0.5,
+      "ttftMs": 1656,
+      "costUsd": 0.105068,
+      "endpoint": "/proxy/v1/messages",
+      "timestamp": "2026-09-26T08:07:07.055Z",
+      "sessionId": "8c0b158fef07f21ff1546c4a2884ccf1e956",
+      "durationMs": 1664,
+      "inputTokens": 1716,
+      "isFastMode": false,
+      "isStreaming": true,
+      "outputTokens": 17,
+      "cacheWriteTokens": 6740,
+      "responseStatusCode": 200,
+      "cacheReadInputTokens": 320820
+    },
+    {
+      "id": "221a9f69-7f65-4ee6-891d-1e011182d452",
+      "error": null,
+      "model": "claude-opus-5-5",
+      "tpotMs": 0.55,
+      "ttftMs": 2049,
+      "costUsd": 0.0877586,
+      "endpoint": "/proxy/v1/messages",
+      "timestamp": "2026-09-26T08:07:04.528Z",
+      "sessionId": "8c0b158fef07f21ff1546c4a2884ccf1e956",
+      "durationMs": 2060,
+      "inputTokens": 3144,
+      "isFastMode": false,
+      "isStreaming": true,
+      "outputTokens": 21,
+      "cacheWriteTokens": 1307,
+      "responseStatusCode": 200,
+      "cacheReadInputTokens": 341138
+    },
+    {
+      "id": "08697da2-e304-4ff5-aee0-096d084f9c3e",
+      "error": null,
+      "model": "claude-opus-5-5",
+      "tpotMs": 0,
+      "ttftMs": 1888,
+      "costUsd": 0.0959764,
+      "endpoint": "/proxy/v1/messages",
+      "timestamp": "2026-09-26T08:07:04.340Z",
+      "sessionId": "8c0b158fef07f21ff1546c4a2884ccf1e956",
+      "durationMs": 1888,
+      "inputTokens": 2244,
+      "isFastMode": false,
+      "isStreaming": true,
+      "outputTokens": 21,
+      "cacheWriteTokens": 2399,
+      "responseStatusCode": 200,
+      "cacheReadInputTokens": 372927
+    },
+    {
+      "id": "85c80d69-f178-4e4a-b057-a26e23f4d3aa",
+      "error": null,
+      "model": "claude-opus-5-5",
+      "tpotMs": 10.2191105,
+      "ttftMs": 2214,
+      "costUsd": 0.1322432,
+      "endpoint": "/proxy/v1/messages",
+      "timestamp": "2026-09-26T08:06:50.721Z",
+      "sessionId": "8c0b158fef07f21ff1546c4a2884ccf1e956",
+      "durationMs": 14620,
+      "inputTokens": 2,
+      "isFastMode": false,
+      "isStreaming": true,
+      "outputTokens": 1215,
+      "cacheWriteTokens": 2212,
+      "responseStatusCode": 200,
+      "cacheReadInputTokens": 484376
+    },
+    {
+      "id": "1c10983c-1387-45c1-a6c9-9c3186ff2344",
+      "error": null,
+      "model": "claude-opus-5-5",
+      "tpotMs": 9.002412,
+      "ttftMs": 2074,
+      "costUsd": 0.1380284,
+      "endpoint": "/proxy/v1/messages",
+      "timestamp": "2026-09-26T08:06:47.071Z",
+      "sessionId": "8c0b158fef07f21ff1546c4a2884ccf1e956",
+      "durationMs": 20736,
+      "inputTokens": 2,
+      "isFastMode": false,
+      "isStreaming": true,
+      "outputTokens": 2074,
+      "cacheWriteTokens": 4391,
+      "responseStatusCode": 200,
+      "cacheReadInputTokens": 372927
+    },
+    {
+      "id": "8af83fc4-0fd1-4b8d-bbef-b08abc890110",
+      "error": null,
+      "model": "claude-opus-5-5",
+      "tpotMs": 8.854701,
+      "ttftMs": 1676,
+      "costUsd": 0.1407556,
+      "endpoint": "/proxy/v1/messages",
+      "timestamp": "2026-09-26T08:06:45.694Z",
+      "sessionId": "8c0b158fef07f21ff1546c4a2884ccf1e956",
+      "durationMs": 24468,
+      "inputTokens": 2,
+      "isFastMode": false,
+      "isStreaming": true,
+      "outputTokens": 2575,
+      "cacheWriteTokens": 4204,
+      "responseStatusCode": 200,
+      "cacheReadInputTokens": 341138
+    },
+    {
+      "id": "e0889a08-477f-43bd-b643-37bf2c80e563",
+      "error": null,
+      "model": "claude-opus-5-5",
+      "tpotMs": 9.706395,
+      "ttftMs": 2009,
+      "costUsd": 0.1096918,
+      "endpoint": "/proxy/v1/messages",
+      "timestamp": "2026-09-26T08:06:45.674Z",
+      "sessionId": "8c0b158fef07f21ff1546c4a2884ccf1e956",
+      "durationMs": 5348,
+      "inputTokens": 7974,
+      "isFastMode": false,
+      "isStreaming": true,
+      "outputTokens": 345,
+      "cacheWriteTokens": 944,
+      "responseStatusCode": 200,
+      "cacheReadInputTokens": 330879
+    },
+    {
+      "id": "661317cd-d290-453a-b2d6-f3561371f500",
+      "error": null,
+      "model": "claude-opus-5-5",
+      "tpotMs": 10.444114,
+      "ttftMs": 2016,
+      "costUsd": 0.1269352,
+      "endpoint": "/proxy/v1/messages",
+      "timestamp": "2026-09-26T08:06:33.982Z",
+      "sessionId": "8c0b158fef07f21ff1546c4a2884ccf1e956",
+      "durationMs": 16032,
+      "inputTokens": 2,
+      "isFastMode": false,
+      "isStreaming": true,
+      "outputTokens": 1343,
+      "cacheWriteTokens": 665,
+      "responseStatusCode": 200,
+      "cacheReadInputTokens": 483711
+    }
+  ],
+  "recentSessions": [
+    {
+      "id": "8c0b158fef07f21ff1546c4a2884ccf1e956",
+      "clientId": "cd4d6624-5038-4e2a-be3c-0a42c4f5152b",
+      "metadata": {
+        "os": "Windows",
+        "arch": "x64",
+        "userAgent": "claude-cli/2.1.283 (external, cli)",
+        "cliVersion": "2.1.283",
+        "nodeVersion": "v26.3.0"
+      },
+      "startedAt": "2026-09-26T07:38:21.763Z",
+      "totalCost": 37.631874084472656,
+      "totalInput": "332966",
+      "privacyMode": "anon",
+      "totalOutput": "461827",
+      "lastActiveAt": "2026-09-26T08:07:22.259Z",
+      "requestCount": 322,
+      "totalCacheRead": "83708852",
+      "totalCacheWrite": "2064340",
+      "clientApiKeyHash": "054be4eff2035299d1841620174827d5d7e617a7537d6be820ae4a98d92c54d5"
+    },
+    {
+      "id": "37d8e4edd41e53f1ac78e95dcdb4cb2ddc96",
+      "clientId": "08d5af1a-6c51-4624-94ea-8d2cf505005b",
+      "metadata": {
+        "os": "Linux",
+        "arch": "x64",
+        "userAgent": "claude-cli/2.1.280",
+        "cliVersion": "2.1.280",
+        "nodeVersion": "v26.7.0"
+      },
+      "startedAt": "2026-09-26T08:01:56.127Z",
+      "totalCost": 0.22633199393749237,
+      "totalInput": "4",
+      "privacyMode": "anon",
+      "totalOutput": "2",
+      "lastActiveAt": "2026-09-26T08:06:28.304Z",
+      "requestCount": 2,
+      "totalCacheRead": "1131380",
+      "totalCacheWrite": "0",
+      "clientApiKeyHash": "505ebf7241b24b1f52f1e7ebda191e2d6c46edfd761b1b31ea3f532432e9a206"
+    },
+    {
+      "id": "f4d3c69bfea75b1f53d244539c08f60a8c66",
+      "clientId": "08d5af1a-6c51-4624-94ea-8d2cf505005b",
+      "metadata": {
+        "os": "Linux",
+        "arch": "x64",
+        "userAgent": "claude-cli/2.1.280",
+        "cliVersion": "2.1.280",
+        "nodeVersion": "v26.7.0"
+      },
+      "startedAt": "2026-09-26T07:07:24.253Z",
+      "totalCost": 8.973309516906738,
+      "totalInput": "48",
+      "privacyMode": "anon",
+      "totalOutput": "15497",
+      "lastActiveAt": "2026-09-26T07:57:21.703Z",
+      "requestCount": 22,
+      "totalCacheRead": "12159592",
+      "totalCacheWrite": "1246252",
+      "clientApiKeyHash": "505ebf7241b24b1f52f1e7ebda191e2d6c46edfd761b1b31ea3f532432e9a206"
+    },
+    {
+      "id": "ca77dd9ad0cbc23869aa94c0fe24c91091e7",
+      "clientId": "157a3e83-4f3f-4a6b-bd04-07bcaa52e0f0",
+      "metadata": {
+        "os": "Linux",
+        "arch": "x64",
+        "userAgent": "claude-cli/2.1.280 (external, cli)",
+        "cliVersion": "2.1.280",
+        "nodeVersion": "v26.3.0"
+      },
+      "startedAt": "2026-09-26T02:24:05.664Z",
+      "totalCost": 113.25796508789062,
+      "totalInput": "38733",
+      "privacyMode": "anon",
+      "totalOutput": "285274",
+      "lastActiveAt": "2026-09-26T07:43:45.942Z",
+      "requestCount": 375,
+      "totalCacheRead": "206039763",
+      "totalCacheWrite": "466012",
+      "clientApiKeyHash": "4d60b08f3c21a50d16cd5b9ca19c8157d3c16f76e5dc53b70a8b249ba5fb2f82"
+    },
+    {
+      "id": "42d840ab10d027a74e41f36943f6dd84b57c",
+      "clientId": "cd4d6624-5038-4e2a-be3c-0a42c4f5152b",
+      "metadata": {
+        "os": "Windows",
+        "arch": "x64",
+        "userAgent": "claude-cli/2.1.282 (external, cli)",
+        "cliVersion": "2.1.282",
+        "nodeVersion": "v26.3.0"
+      },
+      "startedAt": "2026-09-26T06:59:03.291Z",
+      "totalCost": 15.176248550415039,
+      "totalInput": "2922",
+      "privacyMode": "anon",
+      "totalOutput": "86248",
+      "lastActiveAt": "2026-09-26T07:26:03.491Z",
+      "requestCount": 49,
+      "totalCacheRead": "17713777",
+      "totalCacheWrite": "1979369",
+      "clientApiKeyHash": "054be4eff2035299d1841620174827d5d7e617a7537d6be820ae4a98d92c54d5"
+    }
+  ],
+  "totalCacheRead": 511191535879,
+  "usageHistogram": [
+    {
+      "hour": "Fri Sep 25 2026 04:00:00 GMT-0400 (Eastern Daylight Time)",
+      "totalCost": 80.59253,
+      "newSessions": 1,
+      "totalTokens": 125889512,
+      "requestCount": 434
+    },
+    {
+      "hour": "Fri Sep 25 2026 05:00:00 GMT-0400 (Eastern Daylight Time)",
+      "totalCost": 194.0453,
+      "newSessions": 1,
+      "totalTokens": 108300759,
+      "requestCount": 236
+    },
+    {
+      "hour": "Fri Sep 25 2026 06:00:00 GMT-0400 (Eastern Daylight Time)",
+      "totalCost": 69.05664,
+      "newSessions": 1,
+      "totalTokens": 211883970,
+      "requestCount": 429
+    },
+    {
+      "hour": "Fri Sep 25 2026 07:00:00 GMT-0400 (Eastern Daylight Time)",
+      "totalCost": 25.817524,
+      "newSessions": 2,
+      "totalTokens": 85133752,
+      "requestCount": 167
+    },
+    {
+      "hour": "Fri Sep 25 2026 08:00:00 GMT-0400 (Eastern Daylight Time)",
+      "totalCost": 44.80588,
+      "newSessions": 2,
+      "totalTokens": 132592984,
+      "requestCount": 339
+    },
+    {
+      "hour": "Fri Sep 25 2026 09:00:00 GMT-0400 (Eastern Daylight Time)",
+      "totalCost": 64.98521,
+      "newSessions": 7,
+      "totalTokens": 105500281,
+      "requestCount": 375
+    },
+    {
+      "hour": "Fri Sep 25 2026 10:00:00 GMT-0400 (Eastern Daylight Time)",
+      "totalCost": 164.82765,
+      "newSessions": 4,
+      "totalTokens": 252391887,
+      "requestCount": 1034
+    },
+    {
+      "hour": "Fri Sep 25 2026 11:00:00 GMT-0400 (Eastern Daylight Time)",
+      "totalCost": 212.3183,
+      "newSessions": 2,
+      "totalTokens": 190700901,
+      "requestCount": 586
+    },
+    {
+      "hour": "Fri Sep 25 2026 12:00:00 GMT-0400 (Eastern Daylight Time)",
+      "totalCost": 296.0165,
+      "newSessions": 5,
+      "totalTokens": 290990435,
+      "requestCount": 980
+    },
+    {
+      "hour": "Fri Sep 25 2026 13:00:00 GMT-0400 (Eastern Daylight Time)",
+      "totalCost": 155.5019,
+      "newSessions": 3,
+      "totalTokens": 314882145,
+      "requestCount": 718
+    },
+    {
+      "hour": "Fri Sep 25 2026 14:00:00 GMT-0400 (Eastern Daylight Time)",
+      "totalCost": 204.71146,
+      "newSessions": 4,
+      "totalTokens": 420274131,
+      "requestCount": 1331
+    },
+    {
+      "hour": "Fri Sep 25 2026 15:00:00 GMT-0400 (Eastern Daylight Time)",
+      "totalCost": 288.0275,
+      "newSessions": 4,
+      "totalTokens": 534873282,
+      "requestCount": 1304
+    },
+    {
+      "hour": "Fri Sep 25 2026 16:00:00 GMT-0400 (Eastern Daylight Time)",
+      "totalCost": 145.66081,
+      "newSessions": 3,
+      "totalTokens": 295425777,
+      "requestCount": 867
+    },
+    {
+      "hour": "Fri Sep 25 2026 17:00:00 GMT-0400 (Eastern Daylight Time)",
+      "totalCost": 144.56978,
+      "newSessions": 1,
+      "totalTokens": 297460032,
+      "requestCount": 638
+    },
+    {
+      "hour": "Fri Sep 25 2026 18:00:00 GMT-0400 (Eastern Daylight Time)",
+      "totalCost": 84.49942,
+      "newSessions": 1,
+      "totalTokens": 171074073,
+      "requestCount": 382
+    },
+    {
+      "hour": "Fri Sep 25 2026 19:00:00 GMT-0400 (Eastern Daylight Time)",
+      "totalCost": 33.173916,
+      "newSessions": 2,
+      "totalTokens": 58188840,
+      "requestCount": 111
+    },
+    {
+      "hour": "Fri Sep 25 2026 20:00:00 GMT-0400 (Eastern Daylight Time)",
+      "totalCost": 37.37996,
+      "newSessions": 5,
+      "totalTokens": 94602579,
+      "requestCount": 333
+    },
+    {
+      "hour": "Fri Sep 25 2026 21:00:00 GMT-0400 (Eastern Daylight Time)",
+      "totalCost": 24.72836,
+      "newSessions": 1,
+      "totalTokens": 50775384,
+      "requestCount": 173
+    },
+    {
+      "hour": "Fri Sep 25 2026 22:00:00 GMT-0400 (Eastern Daylight Time)",
+      "totalCost": 41.435448,
+      "newSessions": 2,
+      "totalTokens": 74778271,
+      "requestCount": 164
+    },
+    {
+      "hour": "Fri Sep 25 2026 23:00:00 GMT-0400 (Eastern Daylight Time)",
+      "totalCost": 42.002148,
+      "newSessions": 1,
+      "totalTokens": 80702437,
+      "requestCount": 227
+    },
+    {
+      "hour": "Sat Sep 26 2026 00:00:00 GMT-0400 (Eastern Daylight Time)",
+      "totalCost": 43.504887,
+      "newSessions": 2,
+      "totalTokens": 118038049,
+      "requestCount": 366
+    },
+    {
+      "hour": "Sat Sep 26 2026 01:00:00 GMT-0400 (Eastern Daylight Time)",
+      "totalCost": 42.961353,
+      "newSessions": 3,
+      "totalTokens": 103753252,
+      "requestCount": 265
+    },
+    {
+      "hour": "Sat Sep 26 2026 02:00:00 GMT-0400 (Eastern Daylight Time)",
+      "totalCost": 42.259075,
+      "newSessions": 1,
+      "totalTokens": 103604546,
+      "requestCount": 288
+    },
+    {
+      "hour": "Sat Sep 26 2026 03:00:00 GMT-0400 (Eastern Daylight Time)",
+      "totalCost": 77.926674,
+      "newSessions": 2,
+      "totalTokens": 156848962,
+      "requestCount": 425
+    },
+    {
+      "hour": "Sat Sep 26 2026 04:00:00 GMT-0400 (Eastern Daylight Time)",
+      "totalCost": 11.588966,
+      "newSessions": 0,
+      "totalTokens": 32752724,
+      "requestCount": 93
+    }
+  ],
+  "totalCacheWrite": 16635892222,
+  "activeClients24h": 33,
+  "costYesterdayUtc": 3345.3752,
+  "sessionsGt20_24h": 70,
+  "sessionsTodayUtc": 32,
+  "totalInputTokens": 5448047024,
+  "turnsPercentiles": { "p25": 6, "p50": 25, "p75": 104, "p90": 324, "p99": 3072.239999999998 },
+  "prefillSpeedStats": {
+    "avg": 88194.13135787692,
+    "p50": 71193.7212863706,
+    "p90": 180859.47782502772,
+    "p95": 217963.50656787472,
+    "p99": 287976.9641285684,
+    "count": 2232473
+  },
+  "totalOutputTokens": 2381026749,
+  "dailyUsageHistogram": [
+    {
+      "day": "Sat Sep 12 2026 00:00:00 GMT-0400 (Eastern Daylight Time)",
+      "totalCost": 2111.8962,
+      "newSessions": 28,
+      "totalTokens": 1520441980,
+      "requestCount": 5038
+    },
+    {
+      "day": "Sun Sep 13 2026 00:00:00 GMT-0400 (Eastern Daylight Time)",
+      "totalCost": 2845.4785,
+      "newSessions": 30,
+      "totalTokens": 1236282690,
+      "requestCount": 4625
+    },
+    {
+      "day": "Mon Sep 14 2026 00:00:00 GMT-0400 (Eastern Daylight Time)",
+      "totalCost": 4528.395,
+      "newSessions": 47,
+      "totalTokens": 1855401058,
+      "requestCount": 9096
+    },
+    {
+      "day": "Tue Sep 15 2026 00:00:00 GMT-0400 (Eastern Daylight Time)",
+      "totalCost": 985.11816,
+      "newSessions": 42,
+      "totalTokens": 795623257,
+      "requestCount": 4566
+    },
+    {
+      "day": "Wed Sep 16 2026 00:00:00 GMT-0400 (Eastern Daylight Time)",
+      "totalCost": 2616.2537,
+      "newSessions": 44,
+      "totalTokens": 1468592556,
+      "requestCount": 7702
+    },
+    {
+      "day": "Thu Sep 17 2026 00:00:00 GMT-0400 (Eastern Daylight Time)",
+      "totalCost": 2076.6528,
+      "newSessions": 44,
+      "totalTokens": 985602935,
+      "requestCount": 4641
+    },
+    {
+      "day": "Fri Sep 18 2026 00:00:00 GMT-0400 (Eastern Daylight Time)",
+      "totalCost": 5672.119,
+      "newSessions": 45,
+      "totalTokens": 5542613692,
+      "requestCount": 27837
+    },
+    {
+      "day": "Sat Sep 19 2026 00:00:00 GMT-0400 (Eastern Daylight Time)",
+      "totalCost": 2841.5703,
+      "newSessions": 24,
+      "totalTokens": 2955310522,
+      "requestCount": 16394
+    },
+    {
+      "day": "Sun Sep 20 2026 00:00:00 GMT-0400 (Eastern Daylight Time)",
+      "totalCost": 1219.2267,
+      "newSessions": 12,
+      "totalTokens": 1203127671,
+      "requestCount": 5221
+    },
+    {
+      "day": "Mon Sep 21 2026 00:00:00 GMT-0400 (Eastern Daylight Time)",
+      "totalCost": 2754.7615,
+      "newSessions": 40,
+      "totalTokens": 1751225649,
+      "requestCount": 6740
+    },
+    {
+      "day": "Tue Sep 22 2026 00:00:00 GMT-0400 (Eastern Daylight Time)",
+      "totalCost": 6099.855,
+      "newSessions": 68,
+      "totalTokens": 3787944451,
+      "requestCount": 12271
+    },
+    {
+      "day": "Wed Sep 23 2026 00:00:00 GMT-0400 (Eastern Daylight Time)",
+      "totalCost": 2814.3997,
+      "newSessions": 49,
+      "totalTokens": 3392863584,
+      "requestCount": 10779
+    },
+    {
+      "day": "Thu Sep 24 2026 00:00:00 GMT-0400 (Eastern Daylight Time)",
+      "totalCost": 5847.4575,
+      "newSessions": 63,
+      "totalTokens": 5145964457,
+      "requestCount": 15832
+    },
+    {
+      "day": "Fri Sep 25 2026 00:00:00 GMT-0400 (Eastern Daylight Time)",
+      "totalCost": 3345.3752,
+      "newSessions": 68,
+      "totalTokens": 4481204910,
+      "requestCount": 12414
+    },
+    {
+      "day": "Sat Sep 26 2026 00:00:00 GMT-0400 (Eastern Daylight Time)",
+      "totalCost": 363.78635,
+      "newSessions": 17,
+      "totalTokens": 815856204,
+      "requestCount": 2334
+    }
+  ],
+  "sessionsGt20TodayUtc": 19,
+  "sessionsYesterdayUtc": 97,
+  "usageHistogramTodayUtc": [
+    {
+      "hour": "Sat Sep 26 2026 00:00:00 GMT-0400 (Eastern Daylight Time)",
+      "totalCost": 37.37996,
+      "newSessions": 5,
+      "totalTokens": 94602579,
+      "requestCount": 333
+    },
+    {
+      "hour": "Sat Sep 26 2026 01:00:00 GMT-0400 (Eastern Daylight Time)",
+      "totalCost": 24.72836,
+      "newSessions": 1,
+      "totalTokens": 50775384,
+      "requestCount": 173
+    },
+    {
+      "hour": "Sat Sep 26 2026 02:00:00 GMT-0400 (Eastern Daylight Time)",
+      "totalCost": 41.435448,
+      "newSessions": 2,
+      "totalTokens": 74778271,
+      "requestCount": 164
+    },
+    {
+      "hour": "Sat Sep 26 2026 03:00:00 GMT-0400 (Eastern Daylight Time)",
+      "totalCost": 42.002148,
+      "newSessions": 1,
+      "totalTokens": 80702437,
+      "requestCount": 227
+    },
+    {
+      "hour": "Sat Sep 26 2026 04:00:00 GMT-0400 (Eastern Daylight Time)",
+      "totalCost": 43.504887,
+      "newSessions": 2,
+      "totalTokens": 118038049,
+      "requestCount": 366
+    },
+    {
+      "hour": "Sat Sep 26 2026 05:00:00 GMT-0400 (Eastern Daylight Time)",
+      "totalCost": 42.961353,
+      "newSessions": 3,
+      "totalTokens": 103753252,
+      "requestCount": 265
+    },
+    {
+      "hour": "Sat Sep 26 2026 06:00:00 GMT-0400 (Eastern Daylight Time)",
+      "totalCost": 42.259075,
+      "newSessions": 1,
+      "totalTokens": 103604546,
+      "requestCount": 288
+    },
+    {
+      "hour": "Sat Sep 26 2026 07:00:00 GMT-0400 (Eastern Daylight Time)",
+      "totalCost": 77.926674,
+      "newSessions": 2,
+      "totalTokens": 156848962,
+      "requestCount": 425
+    },
+    {
+      "hour": "Sat Sep 26 2026 08:00:00 GMT-0400 (Eastern Daylight Time)",
+      "totalCost": 11.588966,
+      "newSessions": 0,
+      "totalTokens": 32752724,
+      "requestCount": 93
+    }
+  ],
+  "sessionsGt20YesterdayUtc": 71,
+  "usageHistogramYesterdayUtc": [
+    {
+      "hour": "Fri Sep 25 2026 00:00:00 GMT-0400 (Eastern Daylight Time)",
+      "totalCost": 13.74867,
+      "newSessions": 0,
+      "totalTokens": 8535206,
+      "requestCount": 18
+    },
+    {
+      "hour": "Fri Sep 25 2026 01:00:00 GMT-0400 (Eastern Daylight Time)",
+      "totalCost": 116.03847,
+      "newSessions": 1,
+      "totalTokens": 40892352,
+      "requestCount": 97
+    },
+    {
+      "hour": "Fri Sep 25 2026 02:00:00 GMT-0400 (Eastern Daylight Time)",
+      "totalCost": 204.18463,
+      "newSessions": 7,
+      "totalTokens": 143137665,
+      "requestCount": 435
+    },
+    {
+      "hour": "Fri Sep 25 2026 03:00:00 GMT-0400 (Eastern Daylight Time)",
+      "totalCost": 159.75157,
+      "newSessions": 2,
+      "totalTokens": 142199380,
+      "requestCount": 317
+    },
+    {
+      "hour": "Fri Sep 25 2026 04:00:00 GMT-0400 (Eastern Daylight Time)",
+      "totalCost": 155.83617,
+      "newSessions": 4,
+      "totalTokens": 62860867,
+      "requestCount": 255
+    },
+    {
+      "hour": "Fri Sep 25 2026 05:00:00 GMT-0400 (Eastern Daylight Time)",
+      "totalCost": 24.798767,
+      "newSessions": 3,
+      "totalTokens": 12065290,
+      "requestCount": 110
+    },
+    {
+      "hour": "Fri Sep 25 2026 06:00:00 GMT-0400 (Eastern Daylight Time)",
+      "totalCost": 158.81453,
+      "newSessions": 3,
+      "totalTokens": 256568506,
+      "requestCount": 629
+    },
+    {
+      "hour": "Fri Sep 25 2026 07:00:00 GMT-0400 (Eastern Daylight Time)",
+      "totalCost": 268.837,
+      "newSessions": 3,
+      "totalTokens": 202978963,
+      "requestCount": 555
+    },
+    {
+      "hour": "Fri Sep 25 2026 08:00:00 GMT-0400 (Eastern Daylight Time)",
+      "totalCost": 115.33179,
+      "newSessions": 3,
+      "totalTokens": 142293432,
+      "requestCount": 501
+    },
+    {
+      "hour": "Fri Sep 25 2026 09:00:00 GMT-0400 (Eastern Daylight Time)",
+      "totalCost": 194.0453,
+      "newSessions": 1,
+      "totalTokens": 108300759,
+      "requestCount": 236
+    },
+    {
+      "hour": "Fri Sep 25 2026 10:00:00 GMT-0400 (Eastern Daylight Time)",
+      "totalCost": 69.05664,
+      "newSessions": 1,
+      "totalTokens": 211883970,
+      "requestCount": 429
+    },
+    {
+      "hour": "Fri Sep 25 2026 11:00:00 GMT-0400 (Eastern Daylight Time)",
+      "totalCost": 25.817524,
+      "newSessions": 2,
+      "totalTokens": 85133752,
+      "requestCount": 167
+    },
+    {
+      "hour": "Fri Sep 25 2026 12:00:00 GMT-0400 (Eastern Daylight Time)",
+      "totalCost": 44.80588,
+      "newSessions": 2,
+      "totalTokens": 132592984,
+      "requestCount": 339
+    },
+    {
+      "hour": "Fri Sep 25 2026 13:00:00 GMT-0400 (Eastern Daylight Time)",
+      "totalCost": 64.98521,
+      "newSessions": 7,
+      "totalTokens": 105500281,
+      "requestCount": 375
+    },
+    {
+      "hour": "Fri Sep 25 2026 14:00:00 GMT-0400 (Eastern Daylight Time)",
+      "totalCost": 164.82765,
+      "newSessions": 4,
+      "totalTokens": 252391887,
+      "requestCount": 1034
+    },
+    {
+      "hour": "Fri Sep 25 2026 15:00:00 GMT-0400 (Eastern Daylight Time)",
+      "totalCost": 212.3183,
+      "newSessions": 2,
+      "totalTokens": 190700901,
+      "requestCount": 586
+    },
+    {
+      "hour": "Fri Sep 25 2026 16:00:00 GMT-0400 (Eastern Daylight Time)",
+      "totalCost": 296.0165,
+      "newSessions": 5,
+      "totalTokens": 290990435,
+      "requestCount": 980
+    },
+    {
+      "hour": "Fri Sep 25 2026 17:00:00 GMT-0400 (Eastern Daylight Time)",
+      "totalCost": 155.5019,
+      "newSessions": 3,
+      "totalTokens": 314882145,
+      "requestCount": 718
+    },
+    {
+      "hour": "Fri Sep 25 2026 18:00:00 GMT-0400 (Eastern Daylight Time)",
+      "totalCost": 204.71146,
+      "newSessions": 4,
+      "totalTokens": 420274131,
+      "requestCount": 1331
+    },
+    {
+      "hour": "Fri Sep 25 2026 19:00:00 GMT-0400 (Eastern Daylight Time)",
+      "totalCost": 288.0275,
+      "newSessions": 4,
+      "totalTokens": 534873282,
+      "requestCount": 1304
+    },
+    {
+      "hour": "Fri Sep 25 2026 20:00:00 GMT-0400 (Eastern Daylight Time)",
+      "totalCost": 145.66081,
+      "newSessions": 3,
+      "totalTokens": 295425777,
+      "requestCount": 867
+    },
+    {
+      "hour": "Fri Sep 25 2026 21:00:00 GMT-0400 (Eastern Daylight Time)",
+      "totalCost": 144.56978,
+      "newSessions": 1,
+      "totalTokens": 297460032,
+      "requestCount": 638
+    },
+    {
+      "hour": "Fri Sep 25 2026 22:00:00 GMT-0400 (Eastern Daylight Time)",
+      "totalCost": 84.49942,
+      "newSessions": 1,
+      "totalTokens": 171074073,
+      "requestCount": 382
+    },
+    {
+      "hour": "Fri Sep 25 2026 23:00:00 GMT-0400 (Eastern Daylight Time)",
+      "totalCost": 33.173916,
+      "newSessions": 2,
+      "totalTokens": 58188840,
+      "requestCount": 111
+    }
+  ]
+}

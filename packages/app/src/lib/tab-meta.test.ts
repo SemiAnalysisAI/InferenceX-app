@@ -16,7 +16,8 @@ import {
 
 describe('agentic inference positioning', () => {
   it('uses agentic inference for the category and AgentX for the scenario', () => {
-    expect(LANDING_META.title).toContain('Agentic Inference Benchmark');
+    expect(LANDING_META.title).toBe('AI Accelerator System Benchmark');
+    expect(LANDING_META.brand).toBe('AcceleratorX by SemiAnalysis');
     expect(LANDING_META.title).not.toContain('AgentX');
     expect(LANDING_META.description).toMatch(/AgentX.*scenario/u);
     expect(LANDING_META.description).toContain('fixed-sequence');

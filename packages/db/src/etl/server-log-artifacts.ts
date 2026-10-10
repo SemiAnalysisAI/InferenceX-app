@@ -81,21 +81,34 @@ export function primaryServerLogFile(files: readonly ServerLogFile[]): ServerLog
   );
 }
 
-/**
- * Resolve the root containing logs for an extracted GitHub artifact.
- * Multinode uploads wrap their files in multinode_server_logs.tar.gz.
- */
-export function serverLogArtifactRoot(artifactDir: string, artifactName: string): string | null {
-  if (artifactName.startsWith('server_logs_')) return artifactDir;
-  if (!artifactName.startsWith('multinode_server_logs_')) return null;
-
-  const archivePath = path.join(artifactDir, 'multinode_server_logs.tar.gz');
-  const extractedDir = path.join(artifactDir, 'multinode_server_logs');
+/** Extract `archivePath` into `extractedDir` once; returns whether `extractedDir` exists. */
+function extractArchiveOnce(archivePath: string, extractedDir: string): boolean {
   if (!fs.existsSync(extractedDir) && fs.existsSync(archivePath)) {
     fs.mkdirSync(extractedDir, { recursive: true });
     execFileSync('tar', ['-xzf', archivePath, '-C', extractedDir], { stdio: 'ignore' });
   }
-  return fs.existsSync(extractedDir) && fs.statSync(extractedDir).isDirectory()
+  return fs.existsSync(extractedDir) && fs.statSync(extractedDir).isDirectory();
+}
+
+/**
+ * Resolve the root containing logs for an extracted GitHub artifact.
+ * Multinode uploads wrap their files in multinode_server_logs.tar.gz. Native
+ * srt-slurm single-node uploads keep the client logs at the artifact root and
+ * wrap the job's logs directory, including the server worker logs, in
+ * srt-single-node-logs.tar.gz; it is extracted in place so both are listed.
+ */
+export function serverLogArtifactRoot(artifactDir: string, artifactName: string): string | null {
+  if (artifactName.startsWith('server_logs_')) {
+    extractArchiveOnce(
+      path.join(artifactDir, 'srt-single-node-logs.tar.gz'),
+      path.join(artifactDir, 'srt-single-node-logs'),
+    );
+    return artifactDir;
+  }
+  if (!artifactName.startsWith('multinode_server_logs_')) return null;
+
+  const extractedDir = path.join(artifactDir, 'multinode_server_logs');
+  return extractArchiveOnce(path.join(artifactDir, 'multinode_server_logs.tar.gz'), extractedDir)
     ? extractedDir
     : null;
 }

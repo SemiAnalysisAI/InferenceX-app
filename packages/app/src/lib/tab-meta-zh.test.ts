@@ -17,7 +17,7 @@ const HAN_REGEX = /\p{Script=Han}/u;
 
 describe('Chinese agentic inference positioning', () => {
   it('uses the category name for titles and AgentX for the scenario', () => {
-    expect(LANDING_META_ZH.title).toContain('智能体推理基准测试');
+    expect(LANDING_META_ZH.title).toBe('AI 加速器系统基准测试');
     expect(LANDING_META_ZH.title).not.toContain('AgentX');
     expect(LANDING_META_ZH.description).toMatch(/AgentX.*场景/u);
     expect(LANDING_META_ZH.description).toContain('固定序列');

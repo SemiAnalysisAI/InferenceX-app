@@ -15,7 +15,9 @@ import {
 } from '@/lib/model-routes';
 
 export const LANDING_META = {
-  title: 'Open-Source Agentic Inference Benchmark',
+  title: 'AI Accelerator System Benchmark',
+  /** Landing-only brand suffix; other pages keep the root layout's `| InferenceX by SemiAnalysis`. */
+  brand: 'AcceleratorX by SemiAnalysis',
   description:
     "Compare AgentX, InferenceX's long-context, multi-turn coding scenario, with fixed-sequence AI inference across chips and frameworks. Public NVIDIA and AMD runs update when configurations change.",
 };
@@ -85,6 +87,11 @@ export const TAB_META: Record<DashboardRouteKey, { title: string; description: s
     title: 'CollectiveX Communication Benchmarks',
     description:
       'Experimental cross-vendor expert-parallel communication benchmarks. Compare MoE dispatch and combine latency across NVIDIA and AMD chip platforms.',
+  },
+  'agentic-workload-explorer': {
+    title: 'Agentic Workload Explorer',
+    description:
+      'Explore a frozen, anonymized snapshot of real coding-agent traffic captured by ProxyTrace: sessions, token flow, prefix-cache reuse, latency, tool use, and cost.',
   },
   'ai-chart': {
     title: 'AI-Powered Chart Generation',

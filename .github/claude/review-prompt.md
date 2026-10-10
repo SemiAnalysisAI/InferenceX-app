@@ -127,6 +127,8 @@ When reviewing a PR diff, check if new code was added WITHOUT corresponding test
 
 **If new code is added WITHOUT tests, this is a 🔴 BLOCKING issue.**
 
+**Exception: easter egg themes and games.** They are just for fun and have no feature tests. Do not flag missing feature tests on them, and flag newly added easter egg feature tests for removal. Retain and maintain only `packages/app/src/lib/optional-theme-imports.test.ts` and `packages/app/cypress/e2e/optional-theme-isolation.cy.ts`, which protect normal pages, embeds, resource loading, and SEO. Do not expand them into gameplay or visual-fidelity coverage. See `docs/testing.md#easter-egg-themes-and-games`.
+
 Use `mcp__github_inline_comment__create_inline_comment` to leave an inline comment with:
 
 🔴 **BLOCKING**: Missing tests for new code.

@@ -52,7 +52,7 @@ function localizedNudgeHref(enPath: string): string {
   return localePath(enPath, isZhPathname(window.location.pathname) ? 'zh' : 'en');
 }
 
-const RUBIN_RESULTS_URL = '/inference/deepseek-v4';
+const RUBIN_MINIMAX_M3_URL = '/inference/minimax-m3';
 
 export const TELEMETRY_TUTORIAL_STORAGE_KEY = 'inferencex-agentx-telemetry-tutorial-dismissed';
 
@@ -322,7 +322,7 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
   // dashboard scope is the only overlay star prompt.
   // -------------------------------------------------------------------------
   {
-    id: 'rubin-agentic-inference-banner',
+    id: 'rubin-minimax-m3-banner',
     type: 'banner',
     trigger: { type: 'immediate' },
     dismissal: { type: 'permanent' },
@@ -333,26 +333,26 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
     content: {
       icon: Sparkles,
       iconClassName: 'text-brand',
-      title: 'Rubin Agentic Inference Performance',
-      titleZh: 'Rubin 智能体推理性能',
-      description: '67x Faster than Blackwell Ultra',
-      descriptionZh: '速度达 Blackwell Ultra 的 67 倍',
+      title: 'Rubin vLLM MiniMax M3 Preview is Here',
+      titleZh: 'Rubin vLLM MiniMax M3 预览版现已上线',
+      description: 'Early vLLM results for MiniMax M3 on NVIDIA Rubin',
+      descriptionZh: 'NVIDIA Rubin 上 MiniMax M3 的 vLLM 早期结果',
       testId: 'launch-banner',
       badge: 'New',
       badgeZh: '最新',
-      href: RUBIN_RESULTS_URL,
+      href: RUBIN_MINIMAX_M3_URL,
       linkLabel: 'View results',
       linkLabelZh: '查看结果',
       onLinkClick: () => {
-        window.location.href = localizedNudgeHref(RUBIN_RESULTS_URL);
+        window.location.href = localizedNudgeHref(RUBIN_MINIMAX_M3_URL);
       },
     },
     analytics: {
-      shown: 'inference_rubin_banner_shown',
-      dismissed: 'inference_rubin_banner_dismissed',
-      action: 'inference_rubin_banner_clicked',
+      shown: 'inference_rubin_minimax_m3_banner_shown',
+      dismissed: 'inference_rubin_minimax_m3_banner_dismissed',
+      action: 'inference_rubin_minimax_m3_banner_clicked',
       properties: {
-        banner_id: 'rubin-agentic-inference',
+        banner_id: 'rubin-minimax-m3',
         destination: 'inference',
       },
     },

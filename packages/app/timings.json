@@ -21,6 +21,10 @@
       "duration": 2596
     },
     {
+      "spec": "cypress/e2e/agentic-workload-explorer.cy.ts",
+      "duration": 4000
+    },
+    {
       "spec": "cypress/e2e/agentx-dataset-click-path.cy.ts",
       "duration": 1249
     },
@@ -153,16 +157,8 @@
       "duration": 10395
     },
     {
-      "spec": "cypress/e2e/minecraft-game.cy.ts",
-      "duration": 27000
-    },
-    {
       "spec": "cypress/e2e/optional-theme-isolation.cy.ts",
       "duration": 216000
-    },
-    {
-      "spec": "cypress/e2e/kart-mode.cy.ts",
-      "duration": 22000
     },
     {
       "spec": "cypress/e2e/gradient-labels.cy.ts",
@@ -237,14 +233,6 @@
       "duration": 26944
     },
     {
-      "spec": "cypress/e2e/performance-over-time-removal.cy.ts",
-      "duration": 1325
-    },
-    {
-      "spec": "cypress/e2e/performance.cy.ts",
-      "duration": 2377
-    },
-    {
       "spec": "cypress/e2e/profit-estimator.cy.ts",
       "duration": 39450
     },
@@ -275,6 +263,10 @@
     {
       "spec": "cypress/e2e/ttft-x-axis-toggle.cy.ts",
       "duration": 13842
+    },
+    {
+      "spec": "cypress/e2e/ubenchx.cy.ts",
+      "duration": 10000
     },
     {
       "spec": "cypress/e2e/unofficial-watermark.cy.ts",

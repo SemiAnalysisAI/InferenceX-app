@@ -10,8 +10,11 @@ import { usePathname } from 'next/navigation';
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { providers: providerCapabilities, dashboardNudge } =
-    dashboardShellCapabilitiesForPathname(pathname);
+  const {
+    providers: providerCapabilities,
+    dashboardNudge,
+    tabNav,
+  } = dashboardShellCapabilitiesForPathname(pathname);
 
   let content = children;
   if (providerCapabilities.globalFilters) {
@@ -27,14 +30,18 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       </GlobalFilterProvider>
     );
   }
-  content = (
-    <>
-      <TabNav
-        footer={providerCapabilities.unofficialRuns ? <UnofficialRunBanner attached /> : undefined}
-      />
-      {content}
-    </>
-  );
+  if (tabNav) {
+    content = (
+      <>
+        <TabNav
+          footer={
+            providerCapabilities.unofficialRuns ? <UnofficialRunBanner attached /> : undefined
+          }
+        />
+        {content}
+      </>
+    );
+  }
   if (providerCapabilities.unofficialRuns) {
     content = <UnofficialRunProvider showBanner={false}>{content}</UnofficialRunProvider>;
   }

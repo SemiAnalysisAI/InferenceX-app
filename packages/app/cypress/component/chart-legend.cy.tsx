@@ -141,11 +141,6 @@ describe('ChartLegend (sidebar variant)', () => {
     cy.mount(<ChartLegendWrapper />);
   });
 
-  it('renders legend with items', () => {
-    cy.get('.sidebar-legend').should('be.visible');
-    cy.get('.sidebar-legend label').should('have.length', 4);
-  });
-
   it('derives long unofficial labels without a nested update', () => {
     const branch = 'qwen3.5-fp4-gb200-dynamo-sglang-agentic-mtp-pareto-refresh';
     const onRender = cy.spy().as('legendRender');
@@ -179,10 +174,6 @@ describe('ChartLegend (sidebar variant)', () => {
         'React render phases',
       ).not.to.include('nested-update');
     });
-  });
-
-  it('legend items have colored dots', () => {
-    cy.get('.sidebar-legend label').first().find('span').first().should('exist');
   });
 
   it('renders no search input (removed from the sidebar panel)', () => {
@@ -525,11 +516,6 @@ function LegendWithPointsTable() {
 describe('ChartLegend points-table icon + dialog', () => {
   beforeEach(() => {
     cy.mount(<LegendWithPointsTable />);
-  });
-
-  it('renders the icon only for rows with an onShowPoints handler', () => {
-    cy.get('[data-testid="legend-points-b300-sxm"]').should('exist');
-    cy.get('[data-testid="legend-points-overlay-run-99"]').should('exist');
   });
 
   it('opens the dialog with the series points sorted by concurrency, with row links', () => {

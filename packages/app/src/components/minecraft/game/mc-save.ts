@@ -6,12 +6,16 @@ import {
   type Game,
   type GameMode,
   type MobKind,
+  type DimensionState,
 } from './mc-game';
 import { ITEMS, type Stack } from './mc-items';
+import { DIMENSIONS, type Dimension } from './mc-dimensions';
+import type { Progress } from './mc-endgame';
+import { World } from './mc-world';
 
 const LIST_KEY = 'inferencex-minecraft-worlds';
 const WORLD_PREFIX = 'inferencex-minecraft-world-';
-export const SAVE_VERSION = 1;
+export const SAVE_VERSION = 2;
 
 export interface WorldMeta {
   id: string;
@@ -31,6 +35,7 @@ interface SavedMob {
   yaw: number;
   health: number;
   sheared?: boolean;
+  age?: number;
 }
 
 interface SavedItem {
@@ -41,7 +46,16 @@ interface SavedItem {
   age: number;
 }
 
-export interface SaveData {
+export interface SavedDimension {
+  edits: Record<string, string>;
+  furnaces: Record<string, Furnace>;
+  chests: Record<string, (Stack | null)[]>;
+  mobs: SavedMob[];
+  items: SavedItem[];
+  animalChunks: number[];
+}
+
+export interface SaveData extends SavedDimension {
   version: number;
   meta: WorldMeta;
   time: number;
@@ -58,6 +72,9 @@ export interface SaveData {
   mobs: SavedMob[];
   items: SavedItem[];
   animalChunks: number[];
+  dimension?: Dimension;
+  dimensions?: Partial<Record<Dimension, SavedDimension>>;
+  progress?: Progress;
 }
 
 const PLAYER_FIELDS = [
@@ -149,15 +166,12 @@ function mergeStack(inventory: (Stack | null)[], stack: Stack): number {
   return left;
 }
 
-export function serialize(game: Game, meta: WorldMeta): SaveData {
-  const p = game.player as unknown as Record<string, number | boolean | string>;
-  const player: SaveData['player'] = {};
-  for (const f of PLAYER_FIELDS) player[f] = p[f];
+function serializeDimension(state: DimensionState): SavedDimension {
   const edits: Record<string, string> = {};
-  for (const [key, map] of game.world.allEdits()) if (map.size > 0) edits[key] = encodeEdits(map);
+  for (const [key, map] of state.world.allEdits()) if (map.size > 0) edits[key] = encodeEdits(map);
   const mobs: SavedMob[] = [];
   const items: SavedItem[] = [];
-  for (const e of game.entities) {
+  for (const e of state.entities) {
     if (e.removed || e.deathTime > 0) continue;
     if (e.kind === 'item' && e.stack)
       items.push({ stack: { ...e.stack }, x: e.x, y: e.y, z: e.z, age: e.age });
@@ -170,8 +184,28 @@ export function serialize(game: Game, meta: WorldMeta): SaveData {
         yaw: e.yaw,
         health: e.health,
         sheared: e.sheared,
+        age: e.age,
       });
   }
+  return {
+    edits,
+    mobs,
+    items,
+    furnaces: Object.fromEntries(state.furnaces),
+    chests: Object.fromEntries(state.chests),
+    animalChunks: [...state.animalChunks],
+  };
+}
+
+export function serialize(game: Game, meta: WorldMeta): SaveData {
+  const p = game.player as unknown as Record<string, number | boolean | string>;
+  const player: SaveData['player'] = {};
+  for (const f of PLAYER_FIELDS) player[f] = p[f];
+  const active = serializeDimension(game.dimensionState());
+  const { items } = active;
+  const dimensions: Partial<Record<Dimension, SavedDimension>> = {};
+  for (const [dimension, state] of game.dimensions)
+    if (dimension !== game.dimension) dimensions[dimension] = serializeDimension(state);
   // Fold any open crafting grid and the cursor into the saved inventory, as closing
   // the screen would; whatever does not fit is saved as dropped items below.
   const inventory = game.inventory.map((s) => (s ? { ...s } : null));
@@ -184,6 +218,7 @@ export function serialize(game: Game, meta: WorldMeta): SaveData {
     }
   }
   return {
+    ...active,
     version: SAVE_VERSION,
     meta: { ...meta, lastPlayed: Date.now(), mode: game.mode, difficulty: game.difficulty },
     time: game.time,
@@ -193,12 +228,9 @@ export function serialize(game: Game, meta: WorldMeta): SaveData {
     player,
     inventory,
     selected: game.selected,
-    edits,
-    furnaces: Object.fromEntries(game.furnaces),
-    chests: Object.fromEntries(game.chests),
-    mobs,
-    items,
-    animalChunks: [...game.animalChunks],
+    dimension: game.dimension,
+    dimensions,
+    progress: structuredClone(game.endgame.progress),
   };
 }
 
@@ -211,15 +243,24 @@ export function restore(data: SaveData): Game {
   });
   game.time = Number(data.time) || 0;
   game.ticks = Number(data.ticks) || 0;
-  const edits = new Map<number, Map<number, number>>();
-  for (const [key, text] of Object.entries(data.edits ?? {})) {
-    try {
-      edits.set(Number(key), decodeEdits(text));
-    } catch {
-      /* skip corrupt chunk */
-    }
+  const dimension = DIMENSIONS.includes(data.dimension!) ? data.dimension! : 'overworld';
+  for (const id of DIMENSIONS) {
+    const saved = id === dimension ? data : data.dimensions?.[id];
+    if (!saved) continue;
+    game.world = new World(game.seedNumber, id);
+    game.entities = [];
+    game.chests = new Map();
+    game.furnaces = new Map();
+    game.animalChunks = new Set();
+    restoreDimension(game, saved);
+    game.dimensions.set(id, game.dimensionState());
   }
-  game.world.loadEdits(edits);
+  const active = game.dimensions.get(dimension)!;
+  game.dimension = dimension;
+  Object.assign(game, active);
+  game.resetDimension();
+  if (data.progress) game.endgame.progress = { ...game.endgame.progress, ...data.progress };
+  game.endgame.portalCooldown = 100;
   const p = game.player as unknown as Record<string, number | boolean | string>;
   for (const f of PLAYER_FIELDS) {
     const v = data.player?.[f];
@@ -230,6 +271,19 @@ export function restore(data: SaveData): Game {
   game.player.pz = game.player.z;
   game.inventory = cleanStacks(data.inventory, 36);
   game.selected = Math.max(0, Math.min(8, Number(data.selected) || 0));
+  return game;
+}
+
+function restoreDimension(game: Game, data: SavedDimension) {
+  const edits = new Map<number, Map<number, number>>();
+  for (const [key, text] of Object.entries(data.edits ?? {})) {
+    try {
+      edits.set(Number(key), decodeEdits(text));
+    } catch {
+      /* skip corrupt chunk */
+    }
+  }
+  game.world.loadEdits(edits);
   for (const [key, f] of Object.entries(data.furnaces ?? {}))
     game.furnaces.set(key, {
       input: validStack(f.input) ? f.input : null,
@@ -243,16 +297,32 @@ export function restore(data: SaveData): Game {
     game.chests.set(key, cleanStacks(c, 27));
   for (const k of data.animalChunks ?? []) game.animalChunks.add(k);
   for (const m of data.mobs ?? []) {
+    if (
+      ![
+        'zombie',
+        'creeper',
+        'skeleton',
+        'pig',
+        'cow',
+        'sheep',
+        'chicken',
+        'blaze',
+        'enderman',
+        'dragon',
+        'crystal',
+      ].includes(m.kind)
+    )
+      continue;
     const e: Entity = game.spawnMob(m.kind, m.x, m.y, m.z);
     e.yaw = m.yaw;
     e.pyaw = m.yaw;
     e.health = Math.min(e.maxHealth, m.health);
     e.sheared = m.sheared;
+    e.age = m.age ?? 0;
   }
   for (const it of data.items ?? [])
     if (validStack(it.stack))
       game.spawnItem(it.stack, it.x, it.y + 0.125, it.z, 0, 0, 0, 0).age = it.age;
-  return game;
 }
 
 export function listWorlds(): WorldMeta[] {
@@ -286,7 +356,7 @@ export function loadWorld(id: string): SaveData | null {
     const raw = localStorage.getItem(WORLD_PREFIX + id);
     if (!raw) return null;
     const data = JSON.parse(raw) as SaveData;
-    return data.version === SAVE_VERSION ? data : null;
+    return data.version === 1 || data.version === SAVE_VERSION ? data : null;
   } catch {
     return null;
   }
