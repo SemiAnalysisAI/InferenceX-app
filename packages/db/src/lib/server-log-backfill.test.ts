@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
 import type { ArtifactMeta } from './github-artifacts.js';
-import { pairServerLogArtifacts, resolveServerLogResultCandidates } from './server-log-backfill.js';
+import {
+  isGithubNotFound,
+  pairServerLogArtifacts,
+  resolveServerLogResultCandidates,
+} from './server-log-backfill.js';
 
 const artifact = (name: string, created_at = '2026-08-12T00:00:00Z'): ArtifactMeta => ({
   name,
@@ -101,5 +105,14 @@ describe('resolveServerLogResultCandidates', () => {
         'off',
       ),
     ).toEqual({ ids: [], usedUniqueFallback: false });
+  });
+});
+
+describe('isGithubNotFound', () => {
+  it('matches gh api 404 failures only', () => {
+    expect(isGithubNotFound(new Error('Command failed: gh api x\ngh: Not Found (HTTP 404)'))).toBe(
+      true,
+    );
+    expect(isGithubNotFound(new Error('gh: API rate limit exceeded (HTTP 403)'))).toBe(false);
   });
 });
