@@ -831,6 +831,13 @@ describe('mapBenchmarkRow', () => {
       expect(result!.metrics).not.toHaveProperty('workers');
     });
 
+    it('does not store result_schema_version as a metric', () => {
+      const tracker = createSkipTracker();
+      const result = mapBenchmarkRow(makeV1Row({ result_schema_version: 1 }), tracker);
+
+      expect(result!.metrics).not.toHaveProperty('result_schema_version');
+    });
+
     it('captures new cluster-wide temp / util / mem scalars into metrics', () => {
       // These are flat scalars on the agg row (sibling of avg_power_w), so
       // the auto-capture path must store them under their raw keys without

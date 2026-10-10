@@ -46,6 +46,7 @@ const NON_METRIC_KEYS = new Set([
   'image',
   'recipe_fingerprint',
   'recipe-fingerprint',
+  'result_schema_version',
   'disagg',
   'is_multinode',
   'spec_decoding',
