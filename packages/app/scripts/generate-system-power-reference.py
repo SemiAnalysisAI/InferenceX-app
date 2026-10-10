@@ -25,7 +25,7 @@ import tarfile
 import tempfile
 
 sys.dont_write_bytecode = True
-REVISION = "e585238d268ae090708a7da8f58530512f19e3d6"
+REVISION = "1e509932e09f2382f778d0e793893b534b02737b"
 SOURCE_PATH = "power_model"
 SOURCE_URL = f"https://github.com/SemiAnalysisAI/InferenceX/tree/{REVISION}/{SOURCE_PATH}"
 REPO_ROOT = Path(__file__).resolve().parents[3]
