@@ -96,6 +96,11 @@ export const OPTIMIZATION_FIGURES = {
     width: 2048,
     height: 638,
   },
+  umbpStoreLinker: {
+    src: '/images/agentx-optimizations/umbp-store-linker.png',
+    width: 2048,
+    height: 760,
+  },
 } as const;
 
 export type OptimizationFigureKey = keyof typeof OPTIMIZATION_FIGURES;
@@ -115,7 +120,11 @@ export interface OptimizationSection {
   id: string;
   heading: string;
   paragraphs: readonly string[];
-  figure?: { key: OptimizationFigureKey } & OptimizationFigureCopy;
+  figure?: {
+    key: OptimizationFigureKey;
+    /** Omit the "View full-resolution image" call to action under the caption. */
+    hideFullResolutionCta?: boolean;
+  } & OptimizationFigureCopy;
   prs?: readonly UpstreamPr[];
   links?: readonly ReferenceLink[];
 }
@@ -964,11 +973,11 @@ const FRAMEWORKS: readonly OptimizationFramework[] = [
     layer: 'kv-cache',
     summary:
       'A deduplicated, shareable DRAM KV pool wired straight into SGLang’s radix tree through the KVCache Store Linker, plus incremental prefill-to-decode KV transfer over MoRI.',
-    lead: 'MoRI UMBP (Unified Memory & Bandwidth Pool) is the tiered, distributed KV-cache component of AMD’s MoRI library, built together with Moonshot AI from the agentic workload up rather than adapted from a chat-era cache. It reached SGLang first as a HiCache L3 backend and then as a first-class backend of the KVCache Store Linker, and it is the KV pool behind the MI355X DeepSeek-V4-Pro disaggregated AgentX results.',
+    lead: 'MoRI UMBP (Unified Memory & Bandwidth Pool) is the tiered, distributed KV-cache component of AMD’s MoRI library. It first reached SGLang as a HiCache L3 backend, then became a first-class backend of the KVCache Store Linker. The headline results below were measured on AgentX, serving DeepSeek-V4-Pro disaggregated on MI355X with UMBP as the KV pool.',
     highlights: [
       { value: '8 → 1', label: 'stored copies of replicated MLA and DSA KV at TP8' },
       { value: '−35%', label: 'P90 TTFT at concurrency 256 with UMBP on' },
-      { value: '+24–34%', label: 'throughput per GPU on 25% fewer GPUs' },
+      { value: '+26–34%', label: 'throughput per GPU on 25% fewer GPUs' },
     ],
     sections: [
       {
@@ -988,25 +997,20 @@ const FRAMEWORKS: readonly OptimizationFramework[] = [
         ],
       },
       {
-        id: 'hicache-backend',
-        heading: 'First landing: a HiCache L3 backend',
-        paragraphs: [
-          'UMBP first reached SGLang as a HiCache L3 storage backend selected with --hicache-storage-backend mori. UMBPStore issues pointer-based batch gets and puts directly against the host KV page buffers, and the host allocator hands out a hugepage-backed, NUMA-bound, prefaulted tensor, so the buffer is registered for RDMA once and each put or get becomes exactly one RDMA operation. In distributed mode, ranks join a master-led pool that deduplicates puts across DP ranks. A follow-up made the backend usable for DeepSeek-V4, whose host pool is a group of side pools behind a logical anchor that holds no KV tensor; before it, UMBP crashed at startup and could not store those side pools at all.',
-          'On a Kimi-K2.6 agentic-coding workload at concurrency 128 on a 1P2D topology, carving 32 GB of each rank’s 96 GB L2 into a shareable L3 barely moved the cumulative hit rate but raised the hit rate of cold or resumed first calls from 58.2% to 79.3%. With loadback prefetch and an SDMA restore path that uses no compute units, P99 TTFT fell from 17.3 s to 5.4 s and total-token throughput rose 7.7%. In a second run that forced sessions to migrate between prefill workers, the shareable L3 recovered prefixes a worker-local L2 could not reach, however large, and cut P99 TTFT by 1.6×.',
-        ],
-        prs: [
-          { repo: 'sgl-project/sglang', number: 25377 },
-          { repo: 'sgl-project/sglang', number: 30762 },
-        ],
-      },
-      {
         id: 'store-linker',
         heading: 'The KVCache Store Linker: a direct path from HBM to the pool',
         paragraphs: [
-          'Running that configuration on AgentX exposed six limits of putting L3 behind L2. The per-rank L2 host cache held DRAM that could have served the shareable tier. KV moved between HBM and L3 only by way of L2. Each rank made cache decisions from local information alone. Under MLA with TP, every rank replicated and moved the same KV. The fetch from L3 into L2 was not layer-pipelined and had to finish before compute started. And the host cache died with the engine.',
-          'AMD proposed bypassing the L2 tier entirely, a direction that matched the SGLang community’s own plans, and the MoRI team co-designed the KVCache Store Linker with SGLang maintainers, with UMBP as a first-class backend next to Mooncake. The UMBP direct linker connects SGLang’s radix tree straight to the distributed DRAM pool with layer-wise loading, grouped ranged multi-buffer I/O, batched offload, and direct GPU-buffer registration. In standalone mode the pool lives in a separate per-node process, so several SGLang workers share one long-lived tier and restarts and upgrades reuse a warm cache. A follow-up added DeepSeek-V4 unified KV to both the UMBP and Mooncake direct linkers.',
-          'The linker also deduplicates replicated KV: a TP-N prefill stores and fetches one copy of the MLA and DSA KV instead of N, so at TP8 eight keys become one, which multiplies effective DRAM capacity and cuts host traffic by the same factor. An open change goes further and splits each restore across TP ranks, with every rank reading a share of the pages and one all-gather per layer group recovering the rest.',
+          'UMBP first reached SGLang as a HiCache L3 storage backend, sitting behind a separate L2 host cache on every GPU rank. Running it that way on AgentX exposed six problems, numbered on the left of the figure below. The right side shows, with the same numbers, how the redesign described next fixes each one.',
+          'AMD proposed skipping the per-GPU host cache altogether, which matched where the SGLang community was already heading. The MoRI team and SGLang maintainers then built the KVCache Store Linker together, with UMBP supported as a first-class backend alongside HiCache. The linker lets SGLang read cached KV straight from a shared pool in CPU memory and load it into the GPU layer by layer, so the model can start computing before the whole prefix has arrived. The pool can also run as its own process on each machine, so it keeps its contents when the inference engine restarts or is upgraded, and several engine instances can share it.',
+          'The linker also stops storing the same data several times. With models like DeepSeek-V4, every GPU in a tensor-parallel group keeps an identical copy of the KV cache, so an 8-GPU group used to write eight copies to CPU memory. Now it writes one: the same memory holds eight times as much cache, and eight times less data moves between CPU memory and the GPUs. A change still under review goes further: instead of every GPU loading the full copy back, each loads a slice and the GPUs exchange the pieces with each other.',
         ],
+        figure: {
+          key: 'umbpStoreLinker',
+          hideFullResolutionCta: true,
+          alt: 'Before and after diagram. Before: GPU ranks inside the engine process each keep their own L2 host cache holding the same KV copy, and every load passes through that L2 to a separate UMBP L3 pool. After: GPU ranks connect directly, layer by layer, to one shared UMBP DRAM pool that runs in its own process and keeps one copy per TP group. Six numbered problems on the left map to six numbered fixes on the right.',
+          caption:
+            'UMBP as a HiCache L3 behind per-rank L2 caches, and UMBP behind the KVCache Store Linker. Each numbered problem on the left is solved by the matching number on the right.',
+        },
         prs: [
           { repo: 'sgl-project/sglang', number: 37578 },
           { repo: 'sgl-project/sglang', number: 38269 },
@@ -1017,26 +1021,28 @@ const FRAMEWORKS: readonly OptimizationFramework[] = [
         id: 'agentx-results',
         heading: 'What it changed on AgentX',
         paragraphs: [
-          'The gain appears even when the DRAM tier is barely used. With the same 1P1D TP8 + TP8 recipe on 16 MI355X GPUs, a 600 GB DRAM KV budget, and consistent-hash routing, HBM already served about 95.6% of prompt tokens at concurrency 128–256 and DRAM less than 1%. Turning UMBP on still raised throughput per GPU by 8.3% and cut P90 TTFT by 35% at concurrency 256, and by 2.7% and 34% at concurrency 128. With UMBP off, the host KV pool filled to 72% and 100% while serving at most 0.1% of prompt tokens, so the improvement comes from the direct path rather than from offload.',
-          'A large enough cache then changes the topology. Once deduplicated DRAM holds the KV, prefill no longer needs TP8 just for capacity: at concurrency 16–48 the recipe runs a TP4 prefill with a TP8 decode on 12 GPUs instead of 16. UMBP served 30%, 52%, and 75% of prompt tokens at concurrency 16, 32, and 48 while fewer than 3% were recomputed, and throughput per GPU rose 24–34% on 25% fewer GPUs.',
-          'Together with parallel SGLang work for DeepSeek-V4-Pro — an FP4 sparse-attention indexer on AITER kernels, optimistic prefill with request-owned speculative KV, and per-stream split-K for MLA decode — peak MI355X throughput per GPU rose 2.4×, from 22.9k to 55.8k at concurrency 256, between the August 21 baseline and the September 25 run. AMD reports a peak of 69M total tokens per dollar of TCO on the AgentX dashboard as of September 25, against 46M for B200 running Dynamo SGLang.',
+          'The gain appears even when the DRAM tier is barely used. HBM already served about 95.6% of prompt tokens at concurrency 128–256 and DRAM less than 1%. Turning UMBP on still raised throughput per GPU by **8.3%** and cut P90 TTFT by **35%** at concurrency 256, and by 2.7% and 34% at concurrency 128. With UMBP off, the host KV pool filled to 72% and 100% while serving at most 0.1% of prompt tokens, so the improvement comes from the direct path rather than from offload.',
+          'A large enough cache then changes the topology. Once deduplicated DRAM holds the KV, prefill no longer needs TP8 just for capacity: at concurrency 16–48 the recipe runs a TP4 prefill with a TP8 decode on **12 GPUs instead of 16**. UMBP served 34%, 71%, and 75% of prompt tokens at concurrency 16, 32, and 48 while fewer than 3% were recomputed, and throughput per GPU rose **26–34%** on 25% fewer GPUs.',
+          'Further SGLang optimizations for DeepSeek-V4-Pro on MI355X build on top of UMBP, raising throughput per GPU at concurrency 256 from **55.8k to 62.0k** and extending the curve to concurrency 384 and 512. The full configuration is in the October 4 sweep linked below.',
         ],
-        prs: [{ repo: 'sgl-project/sglang', number: 41024 }],
+        prs: [
+          { repo: 'sgl-project/sglang', number: 41024 },
+          { repo: 'sgl-project/sglang', number: 35619 },
+        ],
         links: [
+          {
+            label: 'October 4 AgentX sweep on InferenceX CI (full configuration)',
+            href: 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/37181045340/attempts/1',
+          },
+          {
+            label: 'InferenceX #3664: DeepSeek-V4 disaggregated UMBP recipe on MI355X',
+            href: 'https://github.com/SemiAnalysisAI/InferenceX/pull/3664',
+          },
           {
             label: 'MoRI UMBP on the public AgentX leaderboard — AMD',
             href: 'https://www.amd.com/en/developer/resources/technical-articles/2026/mori-umbp-empowers-amd-instinct-gpus.html',
           },
         ],
-      },
-      {
-        id: 'incremental-transfer',
-        heading: 'Incremental KV transfer across the prefill and decode split',
-        paragraphs: [
-          'The same reuse principle applies on the network. In PD disaggregation a naive handoff re-ships the whole accumulated prefix every turn, so turn N pays again for everything turns 0 through N−1 already sent. Extending decode-side radix caching to the MoRI transfer backend lets prefill send only the pages beyond what decode already holds.',
-          'On a two-node 1P1D MI355X micro-benchmark with DeepSeek-R1 MXFP4 at DP8 and TP8, round-one TTFT fell from 2.44 s to 1.06 s and round-two TTFT from 1.24 s to 0.78 s, about 21% lower on average across the first three rounds. The bytes that are not sent also free prefill-side NIC egress, which one prefill shares across every decode it feeds, so the benefit compounds under load.',
-        ],
-        prs: [{ repo: 'sgl-project/sglang', number: 26288 }],
       },
     ],
   },

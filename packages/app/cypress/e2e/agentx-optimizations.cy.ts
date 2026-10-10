@@ -87,6 +87,19 @@ describe('AgentX optimizations', () => {
     cy.location('pathname').should('eq', '/agentx/optimizations/vllm');
   });
 
+  it('hides the full-resolution call to action only on figures that opt out', () => {
+    cy.visit('/agentx/optimizations/mori-umbp', { onBeforeLoad: unlockAgenticGate });
+    cy.get('[data-testid="agentx-optimizations-figure-umbpStoreLinker"]')
+      .should('be.visible')
+      .and('not.contain.text', 'View full-resolution image');
+
+    cy.visit('/agentx/optimizations/vllm', { onBeforeLoad: unlockAgenticGate });
+    cy.get('[data-testid="agentx-optimizations-figure-vllmSelectiveRetention"]').should(
+      'contain.text',
+      'View full-resolution image',
+    );
+  });
+
   it('renders a project page with its measurements, figures, and PR links', () => {
     cy.visit('/agentx/optimizations/vllm', { onBeforeLoad: unlockAgenticGate });
 

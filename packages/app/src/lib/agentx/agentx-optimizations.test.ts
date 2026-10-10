@@ -110,6 +110,18 @@ describe('AgentX optimizations registry', () => {
     expect(new Set(used)).toEqual(new Set(Object.keys(OPTIMIZATION_FIGURES)));
   });
 
+  it('balances every **bold** marker in section prose, in both locales', () => {
+    const zhSections = [
+      ...getOptimizationsOverview('zh').sections,
+      ...getLocalizedFrameworks('zh').flatMap((framework) => framework.sections),
+    ];
+    for (const section of [...allSections(), ...zhSections]) {
+      for (const paragraph of section.paragraphs) {
+        expect(paragraph.split('**').length % 2, section.id).toBe(1);
+      }
+    }
+  });
+
   it('carries no unresolved editorial notes from the source document', () => {
     const prose = [
       OPTIMIZATIONS_OVERVIEW.lead,
