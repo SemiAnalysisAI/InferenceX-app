@@ -1,7 +1,8 @@
 'use client';
 
-import { lazy, Suspense } from 'react';
+import { lazy } from 'react';
 import { useEasterEggTheme } from '@/lib/themes/use-easter-egg-theme';
+import { OptionalThemeBoundary } from './optional-theme-boundary';
 
 const themes = {
   minecraft: lazy(() => import('../minecraft/minecraft-theme')),
@@ -16,8 +17,8 @@ export function EasterEggThemeLazy() {
   if (!theme) return null;
   const Theme = themes[theme];
   return (
-    <Suspense key={theme} fallback={null}>
+    <OptionalThemeBoundary key={theme}>
       <Theme />
-    </Suspense>
+    </OptionalThemeBoundary>
   );
 }

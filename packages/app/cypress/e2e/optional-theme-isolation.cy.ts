@@ -67,9 +67,10 @@ describe('optional themes stay off the default page', () => {
       cy.get('[data-testid="theme-option-kart"]').should('not.exist');
       cy.get('[data-testid="theme-menu"]').should('not.exist');
       expectNoOptionalResources(requests);
-      // Cycling intentionally activates optional themes before returning to light.
+      // Returning to a default theme must not pass through optional themes.
       cycleToTheme('light');
       cy.get('html').should('have.class', 'light').and('not.have.class', 'kart');
+      expectNoOptionalResources(requests);
       cy.reload();
       cy.get('html').should('have.class', 'light').and('not.have.class', 'kart');
       cy.then(() => {
@@ -113,6 +114,17 @@ describe('optional themes stay off the default page', () => {
       cy.get('[data-testid="theme-menu"]').should('not.exist');
       cy.scrollTo('bottom');
       expectNoOptionalResources(requests);
+      cy.document().then((doc) => {
+        const baseline = seo(doc);
+        const initial = doc.documentElement.classList.contains('dark') ? 'dark' : 'light';
+        for (const next of [initial === 'dark' ? 'light' : 'dark', initial]) {
+          cy.get('[data-testid="theme-toggle"]').click();
+          cy.get('html').should('have.class', next);
+          cy.window().should((win) => expect(win.localStorage.getItem('theme')).to.equal(next));
+          cy.document().should((current) => expect(seo(current)).to.deep.equal(baseline));
+        }
+        expectNoOptionalResources(requests);
+      });
     });
   }
 
@@ -194,4 +206,53 @@ describe('optional themes stay off the default page', () => {
       }
     });
   });
+
+  for (const route of ['/about', '/zh/about']) {
+    it(`${route} keeps the page and default toggle working when optional chunks fail`, () => {
+      cy.viewport(1440, 900);
+      cy.visit(route, {
+        onBeforeLoad(win) {
+          win.localStorage.setItem('theme', 'dark');
+          saveMediaOptIns(win, false);
+          // Next captures console.error during bootstrap for caught React errors.
+          cy.spy(win.console, 'error').as('caughtThemeError');
+        },
+      });
+      cy.get('[data-testid="theme-toggle"]')
+        .should('have.attr', 'aria-label')
+        .and('contain', 'currently dark');
+      cy.document().then((doc) => {
+        const baseline = seo(doc);
+        // Only start failing lazy chunks after the normal page has hydrated.
+        cy.window().then((win) => {
+          const append = win.document.head.appendChild.bind(win.document.head);
+          cy.stub(win.document.head, 'appendChild').callsFake((node: Node) => {
+            // Earlier cases may have cached these chunks. Force a real network
+            // failure instead of silently executing a cached optional module.
+            if (node instanceof win.HTMLScriptElement && node.src.includes('/_next/static/')) {
+              const url = new URL(node.src);
+              url.searchParams.set('optional-theme-failure', '1');
+              node.src = url.href;
+            }
+            return append(node);
+          });
+        });
+        cy.intercept('GET', '**/_next/static/chunks/*.js*', { forceNetworkError: true }).as(
+          'optionalChunk',
+        );
+        cycleToTheme('minecraft');
+        cy.wait('@optionalChunk');
+        cy.get('@caughtThemeError').should(
+          'have.been.calledWithMatch',
+          Cypress.sinon.match((error: unknown) => /Failed to load chunk/.test(String(error))),
+        );
+        cy.document().should((current) => expect(seo(current)).to.deep.equal(baseline));
+        // The shared header remains interactive even after a rejected lazy import.
+        cycleToTheme('light');
+        cycleToTheme('dark');
+        cy.get(`canvas, audio, iframe, ${featureElements}`).should('not.exist');
+        cy.document().should((current) => expect(seo(current)).to.deep.equal(baseline));
+      });
+    });
+  }
 });

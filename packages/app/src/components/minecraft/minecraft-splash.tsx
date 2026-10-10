@@ -1,9 +1,10 @@
 'use client';
 
-import { lazy, Suspense, useState, useEffect } from 'react';
+import { lazy, useState, useEffect } from 'react';
 
 import { useLocale } from '@/lib/i18n/use-locale';
 import { useEasterEggTheme } from '@/lib/themes/use-easter-egg-theme';
+import { OptionalThemeBoundary } from '../effects/optional-theme-boundary';
 const RandomSplash = lazy(() => import('./minecraft-splash-text'));
 
 /**
@@ -49,9 +50,9 @@ export function MinecraftSplash() {
     <div className="splash-wrapper" data-testid="splash-text">
       <span className="splash-text">
         {theme === 'minecraft' ? (
-          <Suspense fallback={ANNOUNCEMENT[locale]}>
+          <OptionalThemeBoundary fallback={ANNOUNCEMENT[locale]}>
             <RandomSplash />
-          </Suspense>
+          </OptionalThemeBoundary>
         ) : (
           ANNOUNCEMENT[locale]
         )}

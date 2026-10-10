@@ -5,7 +5,7 @@ import { Car, Crosshair, Moon, Pickaxe, Shield, Skull, Sun, type LucideIcon } fr
 import { useTheme } from 'next-themes';
 import * as React from 'react';
 
-import { nextTheme } from '@/lib/themes/themes';
+import { isDarkTheme, nextTheme } from '@/lib/themes/themes';
 import { cn } from '@/lib/shared/utils';
 import { HEADER_ACTION_STYLE } from './control-styles';
 
@@ -28,9 +28,9 @@ function PendingIcon() {
   );
 }
 
-/** One click advances to the next presentation theme. */
+/** Normal clicks stay in light/dark; Shift-click explicitly opts into the Easter eggs. */
 export function ModeToggle() {
-  const { setTheme, theme } = useTheme();
+  const { setTheme, theme, resolvedTheme } = useTheme();
   const [mounted, setMounted] = React.useState(false);
 
   React.useEffect(() => {
@@ -43,8 +43,12 @@ export function ModeToggle() {
   const current = mounted ? theme : undefined;
   const ActiveIcon = THEME_ICONS[current ?? ''];
 
-  const toggleTheme = () => {
-    const next = nextTheme(theme);
+  const toggleTheme = (event: React.MouseEvent<HTMLButtonElement>) => {
+    const next = event.shiftKey
+      ? nextTheme(theme)
+      : isDarkTheme(resolvedTheme ?? theme)
+        ? 'light'
+        : 'dark';
     setTheme(next);
     track('theme_toggled', { theme: next });
   };
