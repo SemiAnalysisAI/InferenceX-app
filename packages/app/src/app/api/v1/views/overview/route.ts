@@ -6,7 +6,7 @@ import {
 import { VIEW_QUERY_PARAMS } from '@/lib/views-api/registry';
 import type { NextRequest } from 'next/server';
 
-import { cachedJson } from '@/lib/api-cache';
+import { cachedJson } from '@/lib/cache/api-cache';
 import {
   OVERVIEW_DEFAULT_COMPARISON_MODE,
   OVERVIEW_DEFAULT_ENGINE_SCOPE,
@@ -24,8 +24,8 @@ import {
   type OverviewModelScope,
   type OverviewRowScope,
   type OverviewTier,
-} from '@/lib/overview-data';
-import { getOverviewPageData } from '@/lib/overview-data.server';
+} from '@/lib/overview/overview-data';
+import { getOverviewPageData } from '@/lib/overview/overview-data.server';
 import { csvResponse } from '@/lib/views-api/csv';
 import { runViewsRoute, ViewsApiParamError } from '@/lib/views-api/errors';
 import {

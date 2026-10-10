@@ -4,21 +4,21 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { track } from '@/lib/analytics';
+import { track } from '@/lib/analytics/analytics';
 
 import { ModeToggle } from '@/components/ui/mode-toggle';
 import { HEADER_ACTION_STYLE } from '@/components/ui/control-styles';
 import { NewBadge } from '@/components/ui/new-badge';
 import { HaloTogglesLazy } from '@/components/halo/halo-toggles-lazy';
 import { MinecraftTogglesLazy } from '@/components/minecraft/minecraft-toggles-lazy';
-import { navigateInApp } from '@/lib/client-navigation';
-import { DASHBOARD_ROUTES } from '@/lib/dashboard-routes';
+import { navigateInApp } from '@/lib/routing/client-navigation';
+import { DASHBOARD_ROUTES } from '@/lib/routing/dashboard-routes';
 import { useClientPathname } from '@/hooks/useClientPathname';
 import { useClientSearch } from '@/hooks/useClientSearch';
-import { isEmbedPathname } from '@/lib/embed-route';
-import { hasZhSibling, isZhPathname, switchLocalePath, ZH_PREFIX, zhPath } from '@/lib/i18n';
-import { NAV_LABELS_ZH, type HeaderNavHref } from '@/lib/tab-meta-zh';
-import { cn } from '@/lib/utils';
+import { isEmbedPathname } from '@/lib/embed/embed-route';
+import { hasZhSibling, isZhPathname, switchLocalePath, ZH_PREFIX, zhPath } from '@/lib/i18n/i18n';
+import { NAV_LABELS_ZH, type HeaderNavHref } from '@/lib/routing/tab-meta-zh';
+import { cn } from '@/lib/shared/utils';
 
 import { GitHubStars } from './GithubStars';
 import { InferenceXWordmark } from './inferencex-wordmark';

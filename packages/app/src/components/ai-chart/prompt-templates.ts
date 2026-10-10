@@ -6,8 +6,8 @@ import {
   SPEC_METHOD_KEYS,
   HW_REGISTRY,
 } from '@semianalysisai/inferencex-constants';
-import { Y_AXIS_METRICS } from '@/lib/chart-utils';
-import type { Locale } from '@/lib/i18n';
+import { Y_AXIS_METRICS } from '@/lib/charts/chart-utils';
+import type { Locale } from '@/lib/i18n/i18n';
 
 // ---------------------------------------------------------------------------
 // Derived enum strings (built once at import time)

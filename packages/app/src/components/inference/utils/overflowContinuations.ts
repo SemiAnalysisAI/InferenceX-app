@@ -2,7 +2,7 @@ import {
   isFrontierEligible,
   paretoFrontForDirection,
   type ParetoDirection,
-} from '@/lib/chart-utils';
+} from '@/lib/charts/chart-utils';
 
 import type { ClippedInferenceData, InferenceData } from '../types';
 import { canonicalParetoIntersection } from './canonicalFrontier';

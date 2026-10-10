@@ -1,9 +1,9 @@
 import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { BenchmarkRow } from '@/lib/api';
-import type { ComparePageDerivedData } from '@/lib/compare-page-data.server';
-import { computeCompareTableData, summarize } from '@/lib/compare-ssr';
+import type { BenchmarkRow } from '@/lib/api/api';
+import type { ComparePageDerivedData } from '@/lib/compare/compare-page-data.server';
+import { computeCompareTableData, summarize } from '@/lib/compare/compare-ssr';
 import { buildCompareTable } from '@/lib/views-api/compare-view';
 
 const { mockGetComparePageDerivedData, mockCachedJson, mockCachedText } = vi.hoisted(() => ({
@@ -15,15 +15,15 @@ const { mockGetComparePageDerivedData, mockCachedJson, mockCachedText } = vi.hoi
   ),
 }));
 
-vi.mock('@/lib/compare-page-data.server', () => ({
+vi.mock('@/lib/compare/compare-page-data.server', () => ({
   getComparePageDerivedData: mockGetComparePageDerivedData,
 }));
 
-vi.mock('@/lib/benchmark-data.server', () => ({
+vi.mock('@/lib/benchmarks/benchmark-data.server', () => ({
   getCachedBenchmarks: vi.fn(),
 }));
 
-vi.mock('@/lib/api-cache', () => ({
+vi.mock('@/lib/cache/api-cache', () => ({
   cachedJson: mockCachedJson,
   cachedText: mockCachedText,
 }));

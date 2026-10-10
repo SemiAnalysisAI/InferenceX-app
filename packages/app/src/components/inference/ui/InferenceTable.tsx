@@ -4,15 +4,15 @@ import { useMemo } from 'react';
 
 import type { ChartDefinition, InferenceData } from '@/components/inference/types';
 import { type DataTableColumn, DataTable } from '@/components/ui/data-table';
-import { chipCounts } from '@/lib/chip-counts';
-import { getNestedYValue, metricLabel, xAxisLabel } from '@/lib/chart-utils';
+import { chipCounts } from '@/lib/benchmarks/chip-counts';
+import { getNestedYValue, metricLabel, xAxisLabel } from '@/lib/charts/chart-utils';
 import { isModeledSystemPowerConfigKey } from '@/components/inference/metric-registry';
 import { sortRowsByYMetric } from '@/components/inference/ui/inference-table-sort';
-import { type Precision, getPrecisionLabel } from '@/lib/data-mappings';
-import { getDisplayLabel } from '@/lib/utils';
-import { getInferenceHardwareConfig } from '@/lib/inference-labels';
-import type { Locale } from '@/lib/i18n';
-import { useLocale } from '@/lib/use-locale';
+import { type Precision, getPrecisionLabel } from '@/lib/catalog/data-mappings';
+import { getDisplayLabel } from '@/lib/shared/utils';
+import { getInferenceHardwareConfig } from '@/lib/benchmarks/inference-labels';
+import type { Locale } from '@/lib/i18n/i18n';
+import { useLocale } from '@/lib/i18n/use-locale';
 
 interface InferenceTableProps {
   data: InferenceData[];

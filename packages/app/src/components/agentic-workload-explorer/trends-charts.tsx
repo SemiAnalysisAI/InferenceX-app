@@ -4,8 +4,8 @@ import { useMemo, useState } from 'react';
 import * as d3 from 'd3';
 import { D3ChartCard } from '@/components/ui/d3-chart-card';
 import type { D3ChartProps, LayerConfig, RenderContext } from '@/lib/d3-chart/D3Chart';
-import { escapeHtml } from '@/lib/utils';
-import { useLocale } from '@/lib/use-locale';
+import { escapeHtml } from '@/lib/shared/utils';
+import { useLocale } from '@/lib/i18n/use-locale';
 import { Card, CardContent } from '@/components/ui/card';
 import { DashboardSectionHeader } from '@/components/ui/dashboard-section-header';
 

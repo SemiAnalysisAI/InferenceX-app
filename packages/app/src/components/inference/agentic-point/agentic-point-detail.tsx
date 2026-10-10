@@ -14,13 +14,13 @@ import {
   useTraceServerMetricSource,
 } from '@/hooks/api/use-trace-server-metrics';
 import { useBenchmarkSiblings } from '@/hooks/api/use-benchmark-siblings';
-import { NudgeEngine } from '@/components/nudge-engine';
+import { NudgeEngine } from '@/components/nudges/nudge-engine';
 import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/segmented-toggle';
 import { RetryableQueryError } from '@/components/ui/retryable-query-error';
-import { track } from '@/lib/analytics';
-import { useLocale } from '@/lib/use-locale';
-import { isZhPathname, ZH_PREFIX } from '@/lib/i18n';
-import { withChartState } from '@/lib/url-state';
+import { track } from '@/lib/analytics/analytics';
+import { useLocale } from '@/lib/i18n/use-locale';
+import { isZhPathname, ZH_PREFIX } from '@/lib/i18n/i18n';
+import { withChartState } from '@/lib/routing/url-state';
 
 import { AggregatesGrid } from './aggregates-grid';
 import { MetricSourceToolbar } from './metric-source-toolbar';

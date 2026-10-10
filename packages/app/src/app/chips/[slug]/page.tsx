@@ -7,8 +7,8 @@ import {
   getChipPage,
   getChipVsPage,
   type ChipVsPage,
-} from '@/lib/chip-pages';
-import { enAlternates } from '@/lib/i18n';
+} from '@/lib/catalog/chip-pages';
+import { enAlternates } from '@/lib/i18n/i18n';
 import {
   AUTHOR_HANDLE,
   AUTHOR_NAME,

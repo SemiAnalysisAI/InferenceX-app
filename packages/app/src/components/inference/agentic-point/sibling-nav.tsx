@@ -16,9 +16,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { track } from '@/lib/analytics';
-import { isZhPathname, ZH_PREFIX } from '@/lib/i18n';
-import { useLocale } from '@/lib/use-locale';
+import { track } from '@/lib/analytics/analytics';
+import { isZhPathname, ZH_PREFIX } from '@/lib/i18n/i18n';
+import { useLocale } from '@/lib/i18n/use-locale';
 
 const HW_LABELS: Record<string, string> = {
   b200: 'B200',

@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { COARSE_POINTER_QUERY, MOBILE_VIEWPORT_QUERY } from '@/hooks/useMediaQuery';
 import { stubMatchMedia } from '@/test/match-media-stub';
 
-vi.mock('@/lib/use-locale', () => ({ useLocale: () => 'en' }));
+vi.mock('@/lib/i18n/use-locale', () => ({ useLocale: () => 'en' }));
 
 import { D3ChartWrapper } from './d3-chart-wrapper';
 

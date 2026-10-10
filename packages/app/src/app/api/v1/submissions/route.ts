@@ -6,8 +6,8 @@ import {
   getSubmissionVolume,
 } from '@semianalysisai/inferencex-db/queries/submissions';
 
-import { cachedJson, cachedQuery } from '@/lib/api-cache';
-import { loadFixture } from '@/lib/test-fixtures';
+import { cachedJson, cachedQuery } from '@/lib/cache/api-cache';
+import { loadFixture } from '@/lib/testing/test-fixtures';
 
 export const dynamic = 'force-dynamic';
 

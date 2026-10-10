@@ -5,7 +5,7 @@ import {
   type EvalSamplesLiveContext,
   fetchEvalSamples,
   fetchEvalSamplesLive,
-} from '@/lib/api';
+} from '@/lib/api/api';
 
 interface UseEvalSamplesArgs {
   /** `eval_results.id` for an ingested run; `<= 0` (typically -1) signals "use live fetch". */

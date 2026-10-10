@@ -1,0 +1,483 @@
+import { describe, it, expect } from 'vitest';
+
+import {
+  getModelAndSequence,
+  getModelAndSequenceFromArtifact,
+  getModelLabel,
+  getOpenRouterModelId,
+  MODEL_OPTIONS,
+  getModelExclusion,
+  getSequenceDefaultExclusionGroup,
+  getSequenceExclusion,
+  getSequenceExclusionFamilies,
+  getSequenceExclusionPolicy,
+  getSequenceLabel,
+  getPrecisionLabel,
+  getEvalBenchmarkLabel,
+  isModelDeprecated,
+  isModelMaintenance,
+  isSequenceDeprecated,
+  isSequenceDeprecatedForModel,
+  isSequenceHiddenForModel,
+  getModelDefaultPrecisions,
+  getSequenceCategoryForModel,
+  isBestPerSkuDefaultOff,
+  showsTcoBasisSelector,
+  Model,
+  Sequence,
+  Precision,
+  EvalBenchmark,
+} from '@/lib/catalog/data-mappings';
+
+// ===========================================================================
+// getModelAndSequence
+// ===========================================================================
+describe('getModelAndSequence', () => {
+  it('parses artifact name with 70b model and 1k1k sequence', () => {
+    const result = getModelAndSequence('results_70b_1k1k_fp8');
+    expect(result).toEqual({ model: Model.Llama3_3_70B, sequence: Sequence.OneK_OneK });
+  });
+
+  it('parses artifact name with 70b model and 1k8k sequence', () => {
+    const result = getModelAndSequence('results_70b_1k8k');
+    expect(result).toEqual({ model: Model.Llama3_3_70B, sequence: Sequence.OneK_EightK });
+  });
+
+  it('parses artifact name with 70b model and 8k1k sequence', () => {
+    const result = getModelAndSequence('results_70b_8k1k');
+    expect(result).toEqual({ model: Model.Llama3_3_70B, sequence: Sequence.EightK_OneK });
+  });
+
+  it('parses artifact name with dsr1 model prefix', () => {
+    const result = getModelAndSequence('results_dsr1_1k1k');
+    expect(result).toEqual({ model: Model.DeepSeek_R1, sequence: Sequence.OneK_OneK });
+  });
+
+  it('parses artifact name with gptoss model prefix', () => {
+    const result = getModelAndSequence('results_gptoss_1k8k');
+    expect(result).toEqual({ model: Model.GptOss, sequence: Sequence.OneK_EightK });
+  });
+
+  it('parses artifact name with qwen3.5 model prefix', () => {
+    const result = getModelAndSequence('results_qwen3.5_8k1k');
+    expect(result).toEqual({ model: Model.Qwen3_5, sequence: Sequence.EightK_OneK });
+  });
+
+  it('parses artifact name with kimik2.5 model prefix', () => {
+    const result = getModelAndSequence('results_kimik2.5_1k1k');
+    expect(result).toEqual({ model: Model.Kimi_K2_5, sequence: Sequence.OneK_OneK });
+  });
+
+  it('prefers the specific glm5.2 prefix over the glm5 family prefix', () => {
+    const result = getModelAndSequence('results_glm5.2_1k1k');
+    expect(result).toEqual({ model: Model.GLM_5_2, sequence: Sequence.OneK_OneK });
+  });
+
+  it.each(['glm5.2', 'glm5.3'])('recognizes the %s alias in unofficial artifacts', (prefix) => {
+    expect(getModelAndSequence(`results_${prefix}_1k1k`)).toEqual({
+      model: Model.GLM_5_2,
+      sequence: Sequence.OneK_OneK,
+    });
+    expect(
+      getModelAndSequenceFromArtifact({ infmax_model_prefix: prefix, isl: 1024, osl: 1024 }),
+    ).toEqual({ model: Model.GLM_5_2, sequence: Sequence.OneK_OneK });
+  });
+
+  it('returns undefined for unrecognized model prefix', () => {
+    expect(getModelAndSequence('results_unknown_1k1k')).toBeUndefined();
+  });
+
+  it('returns undefined for recognized model but no sequence', () => {
+    expect(getModelAndSequence('results_70b_nosequence')).toBeUndefined();
+  });
+
+  it('returns undefined for recognized sequence but no model', () => {
+    expect(getModelAndSequence('results_1k1k')).toBeUndefined();
+  });
+
+  it('returns undefined for empty string', () => {
+    expect(getModelAndSequence('')).toBeUndefined();
+  });
+
+  it('returns undefined for completely unrelated string', () => {
+    expect(getModelAndSequence('foo_bar_baz')).toBeUndefined();
+  });
+});
+
+// ===========================================================================
+// getModelAndSequenceFromArtifact
+// ===========================================================================
+describe('getModelAndSequenceFromArtifact', () => {
+  it('parses structured artifact with dsr1 prefix and 1k/1k ISL/OSL', () => {
+    const result = getModelAndSequenceFromArtifact({
+      infmax_model_prefix: 'dsr1',
+      isl: 1024,
+      osl: 1024,
+    });
+    expect(result).toEqual({ model: Model.DeepSeek_R1, sequence: Sequence.OneK_OneK });
+  });
+
+  it('parses structured artifact with 70b prefix and 1k/8k ISL/OSL', () => {
+    const result = getModelAndSequenceFromArtifact({
+      infmax_model_prefix: '70b',
+      isl: 1024,
+      osl: 8192,
+    });
+    expect(result).toEqual({ model: Model.Llama3_3_70B, sequence: Sequence.OneK_EightK });
+  });
+
+  it('parses structured artifact with gptoss prefix and 8k/1k ISL/OSL', () => {
+    const result = getModelAndSequenceFromArtifact({
+      infmax_model_prefix: 'gptoss',
+      isl: 8192,
+      osl: 1024,
+    });
+    expect(result).toEqual({ model: Model.GptOss, sequence: Sequence.EightK_OneK });
+  });
+
+  it('parses structured artifact with qwen3.5 prefix', () => {
+    const result = getModelAndSequenceFromArtifact({
+      infmax_model_prefix: 'qwen3.5',
+      isl: 1024,
+      osl: 1024,
+    });
+    expect(result).toEqual({ model: Model.Qwen3_5, sequence: Sequence.OneK_OneK });
+  });
+
+  it('parses structured artifact with kimik2.5 prefix', () => {
+    const result = getModelAndSequenceFromArtifact({
+      infmax_model_prefix: 'kimik2.5',
+      isl: 8192,
+      osl: 1024,
+    });
+    expect(result).toEqual({ model: Model.Kimi_K2_5, sequence: Sequence.EightK_OneK });
+  });
+
+  it('returns undefined for unknown model prefix', () => {
+    const result = getModelAndSequenceFromArtifact({
+      infmax_model_prefix: 'unknown',
+      isl: 1024,
+      osl: 1024,
+    });
+    expect(result).toBeUndefined();
+  });
+
+  it('returns undefined for unknown ISL/OSL combination (8k/8k)', () => {
+    const result = getModelAndSequenceFromArtifact({
+      infmax_model_prefix: 'dsr1',
+      isl: 8192,
+      osl: 8192,
+    });
+    expect(result).toBeUndefined();
+  });
+});
+
+// ===========================================================================
+// isModelDeprecated
+// ===========================================================================
+describe('isModelDeprecated', () => {
+  it('returns true for deprecated model Llama3_3_70B', () => {
+    expect(isModelDeprecated(Model.Llama3_3_70B)).toBe(true);
+  });
+
+  it('returns true for deprecated model MiniMax_M2_5 (superseded by M3)', () => {
+    expect(isModelDeprecated(Model.MiniMax_M2_5)).toBe(true);
+  });
+
+  it('returns true for deprecated model GptOss', () => {
+    expect(isModelDeprecated(Model.GptOss)).toBe(true);
+  });
+
+  it('returns true for deprecated GLM-5/5.1', () => {
+    expect(isModelDeprecated(Model.GLM_5)).toBe(true);
+  });
+
+  it('returns true for Kimi K2.5/2.6/2.7-Code, fully retired after 2026-08-06', () => {
+    expect(isModelDeprecated(Model.Kimi_K2_5)).toBe(true);
+  });
+
+  it('keeps Kimi K3 active', () => {
+    expect(isModelDeprecated(Model.Kimi_K3)).toBe(false);
+  });
+
+  it('keeps GLM-5.2 active', () => {
+    expect(isModelDeprecated(Model.GLM_5_2)).toBe(false);
+  });
+
+  it('returns false for non-deprecated model DeepSeek_R1', () => {
+    expect(isModelDeprecated(Model.DeepSeek_R1)).toBe(false);
+  });
+});
+
+// ===========================================================================
+// isModelMaintenance
+// ===========================================================================
+describe('isModelMaintenance', () => {
+  it('returns true for maintenance-mode models', () => {
+    expect(isModelMaintenance(Model.DeepSeek_R1)).toBe(true);
+  });
+
+  it('keeps deprecated and default models out of maintenance mode', () => {
+    expect(isModelMaintenance(Model.Llama3_3_70B)).toBe(false);
+    expect(isModelMaintenance(Model.MiniMax_M2_5)).toBe(false);
+    expect(isModelMaintenance(Model.GptOss)).toBe(false);
+  });
+});
+
+// ===========================================================================
+// isSequenceDeprecated
+// ===========================================================================
+describe('isSequenceDeprecated', () => {
+  it('returns true for deprecated sequence OneK_EightK', () => {
+    expect(isSequenceDeprecated(Sequence.OneK_EightK)).toBe(true);
+  });
+
+  it('returns true for deprecated sequence OneK_OneK', () => {
+    expect(isSequenceDeprecated(Sequence.OneK_OneK)).toBe(true);
+  });
+
+  it('returns false for non-deprecated sequence EightK_OneK', () => {
+    expect(isSequenceDeprecated(Sequence.EightK_OneK)).toBe(false);
+  });
+});
+
+// ===========================================================================
+// per-model sequence retirement
+// ===========================================================================
+describe('isSequenceDeprecatedForModel / getSequenceCategoryForModel', () => {
+  it('marks 8K/1K deprecated for MiniMax M3 (retired 2026-08-04, InferenceX#2493)', () => {
+    expect(isSequenceDeprecatedForModel(Model.MiniMax_M3, Sequence.EightK_OneK)).toBe(true);
+    expect(getSequenceCategoryForModel(Sequence.EightK_OneK, Model.MiniMax_M3)).toBe('deprecated');
+  });
+
+  it('marks 8K/1K deprecated for DeepSeek V4 Pro (last sweep 2026-09-08, InferenceX#2728)', () => {
+    expect(isSequenceDeprecatedForModel(Model.DeepSeek_V4_Pro, Sequence.EightK_OneK)).toBe(true);
+    expect(getSequenceCategoryForModel(Sequence.EightK_OneK, Model.DeepSeek_V4_Pro)).toBe(
+      'deprecated',
+    );
+  });
+
+  it('keeps 8K/1K default for models still sweeping it', () => {
+    expect(isSequenceDeprecatedForModel(Model.Qwen3_5, Sequence.EightK_OneK)).toBe(false);
+    expect(getSequenceCategoryForModel(Sequence.EightK_OneK, Model.Qwen3_5)).toBe('default');
+  });
+
+  it('does not un-deprecate globally deprecated sequences', () => {
+    expect(getSequenceCategoryForModel(Sequence.OneK_OneK, Model.MiniMax_M3)).toBe('deprecated');
+    expect(getSequenceCategoryForModel(Sequence.OneK_OneK, Model.DeepSeek_V4_Pro)).toBe(
+      'deprecated',
+    );
+  });
+
+  it('falls back to the global category when no model is given', () => {
+    expect(getSequenceCategoryForModel(Sequence.EightK_OneK)).toBe('default');
+    expect(getSequenceCategoryForModel(Sequence.EightK_OneK, null)).toBe('default');
+  });
+
+  it('leaves MiniMax M3 agentic traces active', () => {
+    expect(isSequenceDeprecatedForModel(Model.MiniMax_M3, Sequence.AgenticTraces)).toBe(false);
+    expect(getSequenceCategoryForModel(Sequence.AgenticTraces, Model.MiniMax_M3)).toBe('default');
+  });
+
+  it('leaves DeepSeek V4 Pro agentic traces active', () => {
+    expect(isSequenceDeprecatedForModel(Model.DeepSeek_V4_Pro, Sequence.AgenticTraces)).toBe(false);
+    expect(getSequenceCategoryForModel(Sequence.AgenticTraces, Model.DeepSeek_V4_Pro)).toBe(
+      'default',
+    );
+  });
+});
+
+// ===========================================================================
+// per-model Best per SKU default
+// ===========================================================================
+describe('isBestPerSkuDefaultOff', () => {
+  it('opens Qwen3.5 8K/1K and agentic charts with Best per SKU enabled', () => {
+    expect(isBestPerSkuDefaultOff(Model.Qwen3_5, Sequence.EightK_OneK)).toBe(false);
+    expect(isBestPerSkuDefaultOff(Model.Qwen3_5, Sequence.AgenticTraces)).toBe(false);
+  });
+
+  it('keeps Best per SKU on for other Qwen3.5 scenarios and other models', () => {
+    expect(isBestPerSkuDefaultOff(Model.Qwen3_5, Sequence.OneK_OneK)).toBe(false);
+    expect(isBestPerSkuDefaultOff(Model.DeepSeek_V4_Pro, Sequence.EightK_OneK)).toBe(false);
+    expect(isBestPerSkuDefaultOff(Model.Qwen3_8_Flash_Next, Sequence.AgenticTraces)).toBe(false);
+  });
+
+  it('treats a missing model or scenario as the global default', () => {
+    expect(isBestPerSkuDefaultOff(null, Sequence.EightK_OneK)).toBe(false);
+    expect(isBestPerSkuDefaultOff(Model.Qwen3_5, undefined)).toBe(false);
+  });
+});
+
+// ===========================================================================
+// per-model TCO Basis selector
+// ===========================================================================
+describe('showsTcoBasisSelector', () => {
+  it('shows the selector only for Qwen3.5 on 8K/1K', () => {
+    expect(showsTcoBasisSelector(Model.Qwen3_5, Sequence.EightK_OneK)).toBe(true);
+    expect(showsTcoBasisSelector(Model.Qwen3_5, Sequence.AgenticTraces)).toBe(false);
+    expect(showsTcoBasisSelector(Model.Qwen3_5, Sequence.OneK_OneK)).toBe(false);
+    expect(showsTcoBasisSelector(Model.DeepSeek_V4_Pro, Sequence.EightK_OneK)).toBe(false);
+  });
+
+  it('hides the selector when the model or scenario is unknown', () => {
+    expect(showsTcoBasisSelector(null, Sequence.EightK_OneK)).toBe(false);
+    expect(showsTcoBasisSelector(Model.Qwen3_5, undefined)).toBe(false);
+  });
+});
+
+describe('comparison exclusions', () => {
+  it('keeps the existing DeepSeek V4 MTP rule model-scoped', () => {
+    expect(getModelExclusion(Model.DeepSeek_V4_Pro).map((spec) => spec.suffix)).toEqual(['_mtp']);
+    expect(getModelExclusion(Model.DeepSeek_R1)).toEqual([]);
+  });
+
+  it('applies the unsuffixed STP rule to Agentic Traces and 8K/1K only', () => {
+    expect(getSequenceExclusion(Sequence.AgenticTraces).map((spec) => spec.suffix)).toEqual([null]);
+    expect(getSequenceExclusion(Sequence.EightK_OneK).map((spec) => spec.suffix)).toEqual([null]);
+    expect(getSequenceExclusion(Sequence.OneK_OneK)).toEqual([]);
+    expect(getSequenceExclusion(Sequence.OneK_EightK)).toEqual([]);
+  });
+
+  it('guards only vLLM and SGLang on both 8K/1K and Agentic', () => {
+    expect(getSequenceExclusionFamilies(Sequence.EightK_OneK)).toEqual(['vllm', 'sglang']);
+    expect(getSequenceExclusionFamilies(Sequence.AgenticTraces)).toEqual(['vllm', 'sglang']);
+    // Deprecated fixed sequences carry no scenario rule of their own; only the
+    // model-level MTP spec applies there.
+    expect(getSequenceExclusionFamilies(Sequence.OneK_OneK)).toBeNull();
+  });
+
+  it('shares one STP spec between the scenarios that carry it', () => {
+    // The scenarios differ only in which families they guard, not in the rule.
+    expect(getSequenceExclusion(Sequence.EightK_OneK)).toEqual(
+      getSequenceExclusion(Sequence.AgenticTraces),
+    );
+    expect(
+      getSequenceExclusion(Sequence.EightK_OneK).map((spec) => spec.participatingFamilies),
+    ).toEqual([undefined]);
+  });
+
+  it('keeps one engine group on the scenarios that restrict STP engines', () => {
+    expect(getSequenceExclusionPolicy(Sequence.EightK_OneK)).toBe('keep-sticky');
+    expect(getSequenceExclusionPolicy(Sequence.AgenticTraces)).toBe('keep-sticky');
+    expect(getSequenceExclusionPolicy(Sequence.OneK_OneK)).toBe('clear-all');
+    expect(getSequenceDefaultExclusionGroup(Sequence.EightK_OneK)).toBe('vllm');
+    expect(getSequenceDefaultExclusionGroup(Sequence.AgenticTraces)).toBe('vllm');
+    expect(getSequenceDefaultExclusionGroup(Sequence.OneK_OneK)).toBeNull();
+  });
+});
+
+// ===========================================================================
+// getModelLabel
+// ===========================================================================
+describe('getModelLabel', () => {
+  it('returns correct label for each known model', () => {
+    expect(getModelLabel(Model.Llama3_3_70B)).toBe('Llama 3.3 70B Instruct');
+    expect(getModelLabel(Model.Llama3_1_70B)).toBe('Llama 3.1 70B Instruct');
+    expect(getModelLabel(Model.DeepSeek_R1)).toBe('DeepSeek R1 0528 671B');
+    expect(getModelLabel(Model.DeepSeek_V4_Pro)).toBe('DeepSeek V4 Pro 0813 1.6T');
+    expect(getModelLabel(Model.GptOss)).toBe('gpt-oss 120B');
+    expect(getModelLabel(Model.Qwen3_5)).toBe('Qwen3.5 397B');
+    expect(getModelLabel(Model.Kimi_K2_5)).toBe('Kimi K2.5/2.6/2.7-Code 1T');
+    expect(getModelLabel(Model.GLM_5)).toBe('GLM5/5.1 744B');
+    expect(getModelLabel(Model.GLM_5_2)).toBe('GLM5.2/GLM5.3 744B');
+    expect(getModelLabel(Model.MiniMax_M2_5)).toBe('MiniMax M2.5/2.7 230B');
+  });
+
+  it('falls back to the model value for unknown model', () => {
+    const result = getModelLabel('NewModel-XYZ' as Model);
+    expect(result).toBe('NewModel-XYZ');
+  });
+});
+
+describe('getOpenRouterModelId', () => {
+  it('maps every selectable dashboard model to an exact OpenRouter catalog id', () => {
+    for (const model of MODEL_OPTIONS) {
+      expect(getOpenRouterModelId(model), model).toMatch(/^[^/]+\/[^/]+$/u);
+    }
+    expect(getOpenRouterModelId(Model.DeepSeek_V4_Pro)).toBe('deepseek/deepseek-v4-pro-0813');
+  });
+});
+
+// ===========================================================================
+// getSequenceLabel
+// ===========================================================================
+describe('getSequenceLabel', () => {
+  it('returns correct label for each known sequence', () => {
+    expect(getSequenceLabel(Sequence.OneK_OneK)).toBe('1K / 1K');
+    expect(getSequenceLabel(Sequence.OneK_EightK)).toBe('1K / 8K');
+    expect(getSequenceLabel(Sequence.EightK_OneK)).toBe('8K / 1K');
+    expect(getSequenceLabel(Sequence.AgenticTraces)).toBe('Agentic');
+  });
+
+  it('returns the Chinese agentic scenario label for the zh locale', () => {
+    expect(getSequenceLabel(Sequence.AgenticTraces, 'zh')).toBe('智能体');
+  });
+
+  it('falls back to the sequence value for unknown sequence', () => {
+    const result = getSequenceLabel('16k/16k' as Sequence);
+    expect(result).toBe('16k/16k');
+  });
+});
+
+// ===========================================================================
+// getPrecisionLabel
+// ===========================================================================
+describe('getPrecisionLabel', () => {
+  it('returns correct label for each known precision', () => {
+    expect(getPrecisionLabel(Precision.FP4)).toBe('FP4');
+    expect(getPrecisionLabel(Precision.FP4FP8)).toBe('FP4+FP8');
+    expect(getPrecisionLabel(Precision.FP8)).toBe('FP8');
+    expect(getPrecisionLabel(Precision.BF16)).toBe('BF16');
+    expect(getPrecisionLabel(Precision.INT4)).toBe('INT4');
+  });
+
+  it('falls back to the precision value for unknown precision', () => {
+    const result = getPrecisionLabel('fp32' as Precision);
+    expect(result).toBe('fp32');
+  });
+});
+
+// ===========================================================================
+// getEvalBenchmarkLabel
+// ===========================================================================
+describe('getEvalBenchmarkLabel', () => {
+  it('returns correct label for GSM8K', () => {
+    expect(getEvalBenchmarkLabel(EvalBenchmark.GSM8K)).toBe('GSM8K');
+  });
+
+  it('falls back to the benchmark value for unknown benchmark', () => {
+    const result = getEvalBenchmarkLabel('humaneval' as EvalBenchmark);
+    expect(result).toBe('humaneval');
+  });
+});
+
+describe('isSequenceHiddenForModel', () => {
+  it('hides 8K/1K for GLM-5.2 / GLM-5.3 and keeps Agentic coding', () => {
+    expect(isSequenceHiddenForModel(Model.GLM_5_2, Sequence.EightK_OneK)).toBe(true);
+    expect(isSequenceHiddenForModel(Model.GLM_5_2, Sequence.AgenticTraces)).toBe(false);
+  });
+
+  it('also marks the hidden GLM 8K/1K retired for category consumers', () => {
+    expect(getSequenceCategoryForModel(Sequence.EightK_OneK, Model.GLM_5_2)).toBe('deprecated');
+    expect(getSequenceCategoryForModel(Sequence.AgenticTraces, Model.GLM_5_2)).toBe('default');
+  });
+
+  it('leaves other models untouched', () => {
+    expect(isSequenceHiddenForModel(Model.Qwen3_5, Sequence.EightK_OneK)).toBe(false);
+    expect(isSequenceHiddenForModel(Model.MiniMax_M3, Sequence.EightK_OneK)).toBe(false);
+  });
+});
+
+describe('getModelDefaultPrecisions', () => {
+  it('opens GLM-5.2 / GLM-5.3 Agentic coding on FP4 and FP8', () => {
+    expect(getModelDefaultPrecisions(Model.GLM_5_2, Sequence.AgenticTraces)).toEqual([
+      Precision.FP4,
+      Precision.FP8,
+    ]);
+  });
+
+  it('leaves other scenarios and models on the auto default', () => {
+    expect(getModelDefaultPrecisions(Model.GLM_5_2, Sequence.EightK_OneK)).toBeUndefined();
+    expect(getModelDefaultPrecisions(Model.Qwen3_5, Sequence.AgenticTraces)).toBeUndefined();
+  });
+});

@@ -3,7 +3,7 @@
 import { ChevronDownIcon } from 'lucide-react';
 import React, { useId, useState } from 'react';
 
-import { cn } from '@/lib/utils';
+import { cn } from '@/lib/shared/utils';
 
 export interface CollapsibleSectionProps {
   /** Section heading. */

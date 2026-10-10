@@ -3,9 +3,9 @@
 import * as d3 from 'd3';
 import { type ReactNode, useCallback, useMemo, useState, useSyncExternalStore } from 'react';
 
-import { track } from '@/lib/analytics';
-import { useLocale } from '@/lib/use-locale';
-import type { Locale } from '@/lib/i18n';
+import { track } from '@/lib/analytics/analytics';
+import { useLocale } from '@/lib/i18n/use-locale';
+import type { Locale } from '@/lib/i18n/i18n';
 import ChartLegend from '@/components/ui/chart-legend';
 import {
   D3Chart,
@@ -13,7 +13,7 @@ import {
   type RenderContext,
   type ZoomContext,
 } from '@/lib/d3-chart/D3Chart';
-import type { SubmissionVolumeRow } from '@/lib/submissions-types';
+import type { SubmissionVolumeRow } from '@/lib/submissions/submissions-types';
 
 import {
   computeCumulative,

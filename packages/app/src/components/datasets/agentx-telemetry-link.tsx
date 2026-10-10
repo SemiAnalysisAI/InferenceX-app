@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 
-import { track } from '@/lib/analytics';
+import { track } from '@/lib/analytics/analytics';
 
 /**
  * Analytics-instrumented link for the AgentX telemetry tutorial. The tutorial

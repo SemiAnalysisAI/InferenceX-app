@@ -12,7 +12,7 @@
  * fixed-seq-only today so its missing percentile handling is inert, but it
  * should adopt this resolver if replay ever grows agentic support.)
  */
-import { withPercentile } from '@/lib/benchmark-transform';
+import { withPercentile } from '@/lib/benchmarks/benchmark-transform';
 
 import type { AggDataEntry, ChartDefinition } from '../types';
 import type { XAxisMode } from '../hooks/useChartData';

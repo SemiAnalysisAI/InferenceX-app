@@ -52,8 +52,8 @@ boundary for analysis.
 
 ## Maintenance
 
-`src/lib/pareto-frontier.ts` owns the shared algorithm;
-`src/lib/pareto-api.ts` owns request validation and response computation.
+`src/lib/charts/pareto-frontier.ts` owns the shared algorithm;
+`src/lib/api/pareto-api.ts` owns request validation and response computation.
 The route, shared contracts and generated documentation are tracked by the API
 catalog guard. Update the bilingual registry, skill recipe and tests when
 changing the contract.

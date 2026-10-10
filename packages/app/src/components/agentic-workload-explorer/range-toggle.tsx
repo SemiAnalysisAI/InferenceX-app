@@ -1,6 +1,6 @@
 'use client';
 
-import { useLocale } from '@/lib/use-locale';
+import { useLocale } from '@/lib/i18n/use-locale';
 import { SegmentedToggle } from '@/components/ui/segmented-toggle';
 
 export interface RangeOption<T extends string> {

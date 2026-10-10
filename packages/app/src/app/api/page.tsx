@@ -1,8 +1,8 @@
 import type { Metadata } from 'next';
 
 import { ApiReferencePage } from '@/components/api-documentation/api-reference-page';
-import { getApiDocumentation } from '@/lib/api-documentation';
-import { enAlternates } from '@/lib/i18n';
+import { getApiDocumentation } from '@/lib/api/api-documentation';
+import { enAlternates } from '@/lib/i18n/i18n';
 import { SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
 const documentation = getApiDocumentation('en');

@@ -1,5 +1,5 @@
-import { POINT_SIZE } from '@/lib/chart-rendering';
-import { useLocale } from '@/lib/use-locale';
+import { POINT_SIZE } from '@/lib/charts/chart-rendering';
+import { useLocale } from '@/lib/i18n/use-locale';
 
 // Nested outside the KV-offload halo (POINT_SIZE + 4, '3 2' dashes) with a
 // dotted dasharray so both decorations stay legible on one point.

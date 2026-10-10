@@ -2,8 +2,8 @@ import { getDb } from '@semianalysisai/inferencex-db/connection';
 
 import { getAvailabilityData } from '@semianalysisai/inferencex-db/queries/workflow-info';
 
-import { cachedReadRoute } from '@/lib/cached-read-route';
-import { loadFixture } from '@/lib/test-fixtures';
+import { cachedReadRoute } from '@/lib/api/cached-read-route';
+import { loadFixture } from '@/lib/testing/test-fixtures';
 
 export const dynamic = 'force-dynamic';
 

@@ -1,9 +1,9 @@
-import { getAllPosts } from '@/lib/blog';
-import { getAllChipPages, getAllChipVsPages } from '@/lib/chip-pages';
-import { getAllRankingPageEntries, rankingPageHeading } from '@/lib/rankings';
-import { inferenceModelMeta } from '@/lib/inference-model-meta';
-import { INFERENCE_MODEL_SLUGS } from '@/lib/inference-model-slug';
-import { getAllWhitepapers } from '@/lib/whitepapers';
+import { getAllPosts } from '@/lib/blog/blog';
+import { getAllChipPages, getAllChipVsPages } from '@/lib/catalog/chip-pages';
+import { getAllRankingPageEntries, rankingPageHeading } from '@/lib/live-seo/rankings';
+import { inferenceModelMeta } from '@/lib/routing/inference-model-meta';
+import { INFERENCE_MODEL_SLUGS } from '@/lib/routing/inference-model-slug';
+import { getAllWhitepapers } from '@/lib/content/whitepapers';
 import { AUTHOR_NAME, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
 // oxlint-disable-next-line require-await

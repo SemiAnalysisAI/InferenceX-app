@@ -7,7 +7,7 @@ import {
   type MetricSourceSeries,
 } from '@semianalysisai/inferencex-db/queries/trace-server-metrics';
 
-import { cachedJson, cachedQuery } from '@/lib/api-cache';
+import { cachedJson, cachedQuery } from '@/lib/cache/api-cache';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;

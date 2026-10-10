@@ -9,9 +9,9 @@ import {
   modelRoutePath,
   pathWithSearchParams,
   resolveModelRouteSlug,
-} from '@/lib/model-routes';
-import { modelTabCanonicalPath } from '@/lib/tab-meta';
-import { MODEL_TAB_META_ZH, modelTabMetadataZh } from '@/lib/tab-meta-zh';
+} from '@/lib/routing/model-routes';
+import { modelTabCanonicalPath } from '@/lib/routing/tab-meta';
+import { MODEL_TAB_META_ZH, modelTabMetadataZh } from '@/lib/routing/tab-meta-zh';
 
 /** Chinese sibling of `/historical/<model>` (see that page for the routing
  *  and client-side model-switch behavior). */

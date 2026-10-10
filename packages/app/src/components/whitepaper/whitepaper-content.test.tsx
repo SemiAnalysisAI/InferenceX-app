@@ -5,7 +5,7 @@ vi.mock('next-themes', () => ({
   useTheme: () => ({ resolvedTheme: undefined }),
 }));
 
-import { getWhitepaper, WHITEPAPER_COPY } from '@/lib/whitepapers';
+import { getWhitepaper, WHITEPAPER_COPY } from '@/lib/content/whitepapers';
 
 import { WhitepaperDetailContent } from './whitepaper-detail-content';
 import { WhitepaperIndexContent } from './whitepaper-index-content';

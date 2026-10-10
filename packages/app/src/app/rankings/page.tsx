@@ -2,12 +2,12 @@ import type { Metadata } from 'next';
 
 import { SITE_NAME, SITE_URL, SUPPORTERS_LINE } from '@semianalysisai/inferencex-constants';
 
-import { JsonLd } from '@/components/json-ld';
+import { JsonLd } from '@/components/seo/json-ld';
 import { Card } from '@/components/ui/card';
 import { CatalogLinkCard } from '@/components/catalog/catalog-link-card';
-import { enAlternates } from '@/lib/i18n';
-import { INFERENCE_MODEL_SLUGS } from '@/lib/inference-model-slug';
-import { getAllRankingPageEntries } from '@/lib/rankings';
+import { enAlternates } from '@/lib/i18n/i18n';
+import { INFERENCE_MODEL_SLUGS } from '@/lib/routing/inference-model-slug';
+import { getAllRankingPageEntries } from '@/lib/live-seo/rankings';
 
 const title = 'GPU Rankings for LLM Inference';
 const description =

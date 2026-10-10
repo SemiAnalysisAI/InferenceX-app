@@ -3,10 +3,10 @@
 import { Check, Link as LinkIcon } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { ShareLinkedInButton, ShareTwitterButton } from '@/components/share-buttons';
+import { ShareLinkedInButton, ShareTwitterButton } from '@/components/ui/share-buttons';
 import { Button } from '@/components/ui/button';
-import { track } from '@/lib/analytics';
-import { cn } from '@/lib/utils';
+import { track } from '@/lib/analytics/analytics';
+import { cn } from '@/lib/shared/utils';
 
 interface BlogShareRowProps {
   /** Post title, used as the pre-filled X post text. */

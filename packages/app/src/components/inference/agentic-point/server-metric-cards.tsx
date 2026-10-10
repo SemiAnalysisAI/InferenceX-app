@@ -6,9 +6,9 @@ import type { RequestChartData } from '@/hooks/api/use-request-chart-data';
 import type { MetricSourceDescriptor, QueueDepthPoint } from '@/hooks/api/use-trace-server-metrics';
 import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/segmented-toggle';
 import { MultiSelect } from '@/components/ui/multi-select';
-import { track } from '@/lib/analytics';
-import type { Locale } from '@/lib/i18n';
-import { useLocale } from '@/lib/use-locale';
+import { track } from '@/lib/analytics/analytics';
+import type { Locale } from '@/lib/i18n/i18n';
+import { useLocale } from '@/lib/i18n/use-locale';
 
 import { CHART_SIZES, ChartEmpty, ChartSkeleton } from './chart-shared';
 import { ExpandableChart } from './expandable-chart';

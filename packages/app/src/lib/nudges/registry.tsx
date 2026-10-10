@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import { GITHUB_OWNER, GITHUB_REPO } from '@semianalysisai/inferencex-constants';
 
-import { isZhPathname, localePath } from '@/lib/i18n';
+import { isZhPathname, localePath } from '@/lib/i18n/i18n';
 import {
   AGENTIC_COACH_MARK_STORAGE_KEY,
   AGENTIC_POINT_ACTION_SELECTOR,
@@ -24,7 +24,7 @@ import {
 import { LANDING_BANNER_STORAGE_KEY } from '@/lib/nudges/landing-banner';
 
 import { GitHubIcon } from '@/components/ui/github-icon';
-import { STARRED_EVENT, STARRED_KEY } from '@/lib/star-storage';
+import { STARRED_EVENT, STARRED_KEY } from '@/lib/github/star-storage';
 import type { NudgeDefinition } from './types';
 
 const GITHUB_REPO_URL = `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}`;

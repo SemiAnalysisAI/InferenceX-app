@@ -1,15 +1,15 @@
 'use client';
 
 import { type ReactNode, useMemo, useState, useCallback } from 'react';
-import { track } from '@/lib/analytics';
+import { track } from '@/lib/analytics/analytics';
 
 import type * as d3 from 'd3';
 
-import { GPU_SPECS, GPU_CHART_METRICS, type GpuSpec } from '@/lib/gpu-specs';
+import { GPU_SPECS, GPU_CHART_METRICS, type GpuSpec } from '@/lib/catalog/gpu-specs';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
 import type { LayerConfig } from '@/lib/d3-chart/D3Chart/types';
 import type { RadarDot } from '@/lib/d3-chart/layers/radar';
-import { useLocale } from '@/lib/use-locale';
+import { useLocale } from '@/lib/i18n/use-locale';
 import ChartLegend from '@/components/ui/chart-legend';
 
 const NVIDIA_COLOR = '#76b900';

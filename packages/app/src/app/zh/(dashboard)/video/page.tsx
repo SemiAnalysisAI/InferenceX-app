@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import VideoCIRuns from '@/components/video-benchmark/VideoCIRuns';
-import { tabMetadataZh } from '@/lib/tab-meta-zh';
+import { tabMetadataZh } from '@/lib/routing/tab-meta-zh';
 
 export const metadata: Metadata = {
   ...tabMetadataZh('video'),

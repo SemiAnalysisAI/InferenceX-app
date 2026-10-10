@@ -1,7 +1,7 @@
 import { HW_REGISTRY } from '@semianalysisai/inferencex-constants';
 
 import type { CostTier } from '@/components/inference/metric-registry';
-import { getGpuSpecs, type TcoBasis } from '@/lib/constants';
+import { getGpuSpecs, type TcoBasis } from '@/lib/catalog/constants';
 
 /**
  * The published $/chip/hr of every registry GPU on `tier`. Custom User Values

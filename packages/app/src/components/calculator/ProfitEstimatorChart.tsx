@@ -6,9 +6,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useResponsiveChartDimensions } from '@/hooks/useResponsiveChartDimensions';
 
 import type { HardwareConfig } from '@/components/inference/types';
-import { track } from '@/lib/analytics';
-import { getHardwareConfig } from '@/lib/constants';
-import { getChartWatermark } from '@/lib/data-mappings';
+import { track } from '@/lib/analytics/analytics';
+import { getHardwareConfig } from '@/lib/catalog/constants';
+import { getChartWatermark } from '@/lib/catalog/data-mappings';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
 import type {
   D3ChartHandle,
@@ -17,10 +17,10 @@ import type {
   ScaleConfig,
 } from '@/lib/d3-chart/D3Chart/types';
 import { CHART_TYPE, px } from '@/lib/d3-chart/typography';
-import type { Locale } from '@/lib/i18n';
-import { useLocale } from '@/lib/use-locale';
-import { escapeHtml, getDisplayLabel } from '@/lib/utils';
-import { getAxisVendorIcon } from '@/lib/vendor-logos';
+import type { Locale } from '@/lib/i18n/i18n';
+import { useLocale } from '@/lib/i18n/use-locale';
+import { escapeHtml, getDisplayLabel } from '@/lib/shared/utils';
+import { getAxisVendorIcon } from '@/lib/catalog/vendor-logos';
 
 import {
   formatProfitUsd,

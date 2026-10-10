@@ -1,11 +1,11 @@
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { CopyableCodeBlock } from '@/components/ui/copyable-code-block';
-import { JsonLd } from '@/components/json-ld';
+import { JsonLd } from '@/components/seo/json-ld';
 import { ApiAgentExamplesLink } from './api-agent-examples-link';
-import { getApiDocumentation, type ApiDocumentationLocale } from '@/lib/api-documentation';
-import { ZH_LANG_TAG } from '@/lib/i18n';
-import PUBLISHED_SKILL from '@/lib/published-inferencex-skills.json';
+import { getApiDocumentation, type ApiDocumentationLocale } from '@/lib/api/api-documentation';
+import { ZH_LANG_TAG } from '@/lib/i18n/i18n';
+import PUBLISHED_SKILL from '@/lib/api/published-inferencex-skills.json';
 import { AUTHOR_NAME, AUTHOR_URL, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
 const UI_COPY = {

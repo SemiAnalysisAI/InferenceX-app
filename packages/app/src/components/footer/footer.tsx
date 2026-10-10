@@ -4,10 +4,10 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
-import { ShareTwitterButton, ShareLinkedInButton } from '@/components/share-buttons';
-import { track } from '@/lib/analytics';
-import { isEmbedPathname } from '@/lib/embed-route';
-import { useLocale } from '@/lib/use-locale';
+import { ShareTwitterButton, ShareLinkedInButton } from '@/components/ui/share-buttons';
+import { track } from '@/lib/analytics/analytics';
+import { isEmbedPathname } from '@/lib/embed/embed-route';
+import { useLocale } from '@/lib/i18n/use-locale';
 
 import { StarButton } from './footer-star-cta';
 

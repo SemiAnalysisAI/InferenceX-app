@@ -1,6 +1,6 @@
-import type { ParetoCoordinate } from '@/lib/pareto-frontier';
+import type { ParetoCoordinate } from '@/lib/charts/pareto-frontier';
 
-export { globalParetoFrontier, type ParetoCoordinate } from '@/lib/pareto-frontier';
+export { globalParetoFrontier, type ParetoCoordinate } from '@/lib/charts/pareto-frontier';
 
 const coordinates = (point: ParetoCoordinate) => `${point.x},${point.y}`;
 

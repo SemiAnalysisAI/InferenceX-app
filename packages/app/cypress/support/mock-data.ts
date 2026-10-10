@@ -22,10 +22,10 @@ import type {
   GlobalFilterRunContextType,
   GlobalFilterSelectionContextType,
   GlobalFilterWorkflowContextType,
-} from '@/components/GlobalFilterContext';
-import type { UnofficialRunContextType } from '@/components/unofficial-run-provider';
+} from '@/providers/GlobalFilterContext';
+import type { UnofficialRunContextType } from '@/providers/unofficial-run-provider';
 import { computeToggle } from '@/hooks/useTogglableSet';
-import { Model, Sequence, Precision } from '@/lib/data-mappings';
+import { Model, Sequence, Precision } from '@/lib/catalog/data-mappings';
 import React from 'react';
 
 /** cy.stub() with .as() alias — cast to any to work around Cypress type limitation. */

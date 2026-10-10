@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 
 import { useUnofficialDomain } from '@/hooks/useUnofficialDomain';
-import { track } from '@/lib/analytics';
+import { track } from '@/lib/analytics/analytics';
 import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/segmented-toggle';
 import { CONTROL_SEARCH_CLEAR_STYLE, CONTROL_SEARCH_STYLE } from '@/components/ui/control-styles';
 import {
@@ -22,7 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { useLocale } from '@/lib/use-locale';
+import { useLocale } from '@/lib/i18n/use-locale';
 
 export interface DataTableColumn<T> {
   /** Column header text. */

@@ -5,7 +5,7 @@ Explains the full chain from raw API response to chart-ready scatter points. Goa
 ## Type Hierarchy
 
 ```
-BenchmarkRow   (lib/api.ts)
+BenchmarkRow   (lib/api/api.ts)
     |
     v  rowToAggDataEntry()
 AggDataEntry   (components/inference/types.ts)
@@ -17,7 +17,7 @@ InferenceData  (components/inference/types.ts)
 RenderableGraph[]  (consumed by ScatterGraph)
 ```
 
-**`BenchmarkRow`** (`lib/api.ts`) — raw DB row. The `metrics` field is a loose `Record<string, number>` containing every measured stat. Config fields (hardware, framework, concurrency, topology) are top-level.
+**`BenchmarkRow`** (`lib/api/api.ts`) — raw DB row. The `metrics` field is a loose `Record<string, number>` containing every measured stat. Config fields (hardware, framework, concurrency, topology) are top-level.
 
 **`AggDataEntry`** (`components/inference/types.ts`) — flattened, fully-typed working representation. All metric keys are promoted to top-level fields with `?? 0` defaults. The display model name is resolved here. `hwKey` starts as an empty string and is filled in by `transformBenchmarkRows` after calling `getHardwareKey`. The `actualDate` field holds the real DB date when the `date` field has been overridden to a user-selected comparison date.
 
@@ -29,7 +29,7 @@ RenderableGraph[]  (consumed by ScatterGraph)
 
 ## Transformation Steps
 
-### Step 1: API row to AggDataEntry (`lib/benchmark-transform.ts`)
+### Step 1: API row to AggDataEntry (`lib/benchmarks/benchmark-transform.ts`)
 
 **`rowToAggDataEntry(row)`** — does three things:
 
@@ -48,7 +48,7 @@ RenderableGraph[]  (consumed by ScatterGraph)
 
 Returns `{ chartData: InferenceData[][], hardwareConfig: HardwareConfig }`.
 
-### Step 2: AggDataEntry to InferenceData (`lib/chart-utils.ts`)
+### Step 2: AggDataEntry to InferenceData (`lib/charts/chart-utils.ts`)
 
 **`createChartDataPoint(date, entry, xKey, yKey, hwKey, derivedFields?)`** spreads `entry` first, then overrides chart coordinates and metadata. The full transform passes precomputed derived fields; direct callers may omit them.
 
@@ -66,7 +66,7 @@ Returns `{ chartData: InferenceData[][], hardwareConfig: HardwareConfig }`.
 - Infrastructure purchasing-power fields divide tokens per hour by the same hourly costs. Total (`tokensPerDollarH`/`R`), output-only (`outputTokensPerDollarH`/`R`), and input-only (`inputTokensPerDollarH`/`R`) are separate USD Y-axis metrics. The former ¥-priced `tokensPerRmb*` axes and the Neocloud `*PerDollarN` axes were removed; their share-link keys alias to the matching hyperscaler-volume $ metric. The dashboard defaults to the hyperscaler-volume total-tokens-per-dollar axis (`y_tokensPerDollarH`). Links created for the removed API-price `i_metric=y_tokensPerDollar` axis resolve to the same hyperscaler-volume variant.
 - Energy fields — `jTotal` / `jOutput` / `jInput`: `(hardwarePower * 1000) / tputPerGpu` (Joules per token, where power in kW is converted to W).
 
-**GPU specs lookup** happens inside `buildDerivedChartFields`. `getGpuSpecs(hwKey)` (`lib/constants.ts`) splits on `[-_]` to extract the base GPU token (for example, `"b200_trt_mtp"` becomes `"b200"`) and looks it up in `HW_REGISTRY`. Missing keys return zeroed specs, producing `0` cost/energy values rather than crashing.
+**GPU specs lookup** happens inside `buildDerivedChartFields`. `getGpuSpecs(hwKey)` (`lib/catalog/constants.ts`) splits on `[-_]` to extract the base GPU token (for example, `"b200_trt_mtp"` becomes `"b200"`) and looks it up in `HW_REGISTRY`. Missing keys return zeroed specs, producing `0` cost/energy values rather than crashing.
 
 ### Step 3: Filtering, memoization, and rendering (`hooks/useChartData.ts`)
 
@@ -90,7 +90,7 @@ The Prefix Cache Reuse tab stacks, per concurrency, where one configuration's pr
 
 Why the shares are built the way they are:
 
-- **The host segment is the CPU-offload rate**, falling back to `server_external_cache_hit_rate` only when a row reports no CPU figure, and the two are never summed. This deliberately differs from `measuredCacheHitRate` in `lib/cache-pricing.ts`, which prefers the external figure to price cached input conservatively: that protects a revenue number from double-counting, while this chart names the tier a token came from, and on SGLang HiCache rows the host tier is the CPU figure (it is also what the GLM-5.3 article plotted).
+- **The host segment is the CPU-offload rate**, falling back to `server_external_cache_hit_rate` only when a row reports no CPU figure, and the two are never summed. This deliberately differs from `measuredCacheHitRate` in `lib/calculator/cache-pricing.ts`, which prefers the external figure to price cached input conservatively: that protects a revenue number from double-counting, while this chart names the tier a token came from, and on SGLang HiCache rows the host tier is the CPU figure (it is also what the GLM-5.3 article plotted).
 - **TensorRT-LLM with offload reports one combined figure.** The point summary already labels it "Combined chip + CPU"; the tab draws it as a single reused segment (`combined: true`) instead of inventing a split.
 - **Clamping is visible, not silent.** Some rows report a GPU rate above 1 (GB300 Dynamo, 1.012). Shares are clamped so the bar sums to 100%, and the unclamped `reportedTotal` is kept for the tooltip caveat.
 - **Rows without any tier are drawn as gaps, not zeros.** A GB300 sweep scraped only at the Dynamo frontend has a theoretical ceiling but no server counters; those concurrencies get a marker and remain in the API’s `unmeasured` list.
@@ -98,13 +98,13 @@ Why the shares are built the way they are:
 
 The configuration selector defaults to the group with the most tiered rows, preferring SGLang on a tie because SGLang separates the two tiers; `c_cfg` seeds it from a share link. Within that group, `c_recipe` selects a serving recipe by TP/EP/DP attention, workers, physical GPU counts, disaggregation, speculation, offload and fingerprint. Missing or stale keys use the recipe with the most tiered rows, then most rows, then label. The selector uses overlay recipes only when official rows are absent. Table and CSV rows identify their recipe. Overlay runs on the same hardware become their own outlined series so a branch can be read against the published curve concurrency by concurrency. Each run uses the selected recipe when available, otherwise its own best-covered recipe; no series mixes recipes. Cypress fixtures: `interceptOverlayRun` (agentic rows with gpu 0.8 / external 0.1 / cpu 0.05, which must render as 80 / 5 / 15).
 
-The tab is footer-only, so the agentic chart links into it: `CacheReuseLink` sits in the chart's status-notes footer (chart state rides along via `withChartState`) and in the point summary of an agentic detail page, where `cacheReuseHref` (`lib/cache-reuse-link.ts`) writes the point's own `g_model`, `g_rundate`, `i_seq`, `i_prec`, `c_cfg`, and `c_recipe` (clearing an inherited `g_runid`) because a reader who landed cold has no in-memory chart state to inherit; pinning one precision matters because with several selected the groups are keyed `hwKey__precision` and a bare hardware key would miss.
+The tab is footer-only, so the agentic chart links into it: `CacheReuseLink` sits in the chart's status-notes footer (chart state rides along via `withChartState`) and in the point summary of an agentic detail page, where `cacheReuseHref` (`lib/calculator/cache-reuse-link.ts`) writes the point's own `g_model`, `g_rundate`, `i_seq`, `i_prec`, `c_cfg`, and `c_recipe` (clearing an inherited `g_runid`) because a reader who landed cold has no in-memory chart state to inherit; pinning one precision matters because with several selected the groups are keyed `hwKey__precision` and a bare hardware key would miss.
 
 ## Hardware Key Construction
 
 This is the most complex and bug-prone part of the pipeline. A bad hardware key produces either a missing legend entry, zeroed cost/energy metrics (because `getGpuSpecs` returns zeros), or a chart point that never matches the active hardware filter.
 
-**`getHardwareKey(entry)`** (`lib/chart-utils.ts`) — builds the canonical key:
+**`getHardwareKey(entry)`** (`lib/charts/chart-utils.ts`) — builds the canonical key:
 
 1. Base GPU: `entry.hw.split('-')[0]` strips any `-DP` / `-MN` variant suffix from the hardware field (e.g. `"h100-8"` → `"h100"`).
 2. Framework suffix: appends `_${entry.framework}`. The direct key (`h100_trt`) is tested via `isKnownGpu()` (checks whether the base GPU exists in `HW_REGISTRY`). If the direct key's base is unknown and `entry.disagg` is true, a `-disagg` variant is tried.
@@ -115,10 +115,10 @@ The resulting key's base GPU must exist in `HW_REGISTRY`. Display fields (label,
 **Three variants exist for different data sources:**
 
 - `getHardwareKey(entry: AggDataEntry)` — for benchmark data (the normal path described above).
-- `normalizeEvalHardwareKey(hw, framework?, specDecoding?)` (`lib/chart-utils.ts`) — for evaluation/reliability rows which use looser naming (e.g. `"B200 NB"`, `"H200 CW"`). Strips known qualifiers (`nb`, `cw`, `nv`, etc.) before building the key. Returns `'unknown'` if the base GPU is not in `HW_REGISTRY`.
-- `buildAvailabilityHwKey(hardware, framework?, specMethod?, disagg?)` (`lib/chart-utils.ts`) — for availability rows. Follows the same disagg-variant logic as `getHardwareKey` but uses `resolveFrameworkAlias` to normalize framework aliases before lookup.
+- `normalizeEvalHardwareKey(hw, framework?, specDecoding?)` (`lib/charts/chart-utils.ts`) — for evaluation/reliability rows which use looser naming (e.g. `"B200 NB"`, `"H200 CW"`). Strips known qualifiers (`nb`, `cw`, `nv`, etc.) before building the key. Returns `'unknown'` if the base GPU is not in `HW_REGISTRY`.
+- `buildAvailabilityHwKey(hardware, framework?, specMethod?, disagg?)` (`lib/charts/chart-utils.ts`) — for availability rows. Follows the same disagg-variant logic as `getHardwareKey` but uses `resolveFrameworkAlias` to normalize framework aliases before lookup.
 
-**Alias remapping** (`lib/constants.ts`) — `GPU_KEY_ALIASES` maps a canonical key to one or more legacy keys (e.g. `gb200_dynamo-trtllm` was renamed to `gb200_dynamo-trt`). The inverse map `GPU_ALIAS_TO_CANONICAL` is used in `filterByGPU` to treat alias keys as their canonical equivalent when the user selects a GPU from the filter panel.
+**Alias remapping** (`lib/catalog/constants.ts`) — `GPU_KEY_ALIASES` maps a canonical key to one or more legacy keys (e.g. `gb200_dynamo-trtllm` was renamed to `gb200_dynamo-trt`). The inverse map `GPU_ALIAS_TO_CANONICAL` is used in `filterByGPU` to treat alias keys as their canonical equivalent when the user selects a GPU from the filter panel.
 
 ---
 

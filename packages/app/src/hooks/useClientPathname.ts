@@ -2,7 +2,10 @@
 
 import { useSyncExternalStore } from 'react';
 
-import { CLIENT_PATHNAME_CHANGE_EVENT, getClientPathnameOverride } from '@/lib/client-navigation';
+import {
+  CLIENT_PATHNAME_CHANGE_EVENT,
+  getClientPathnameOverride,
+} from '@/lib/routing/client-navigation';
 
 const subscribers = new Set<() => void>();
 let listening = false;

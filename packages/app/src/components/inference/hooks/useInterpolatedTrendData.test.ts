@@ -3,7 +3,7 @@ import { describe, it, expect } from 'vitest';
 import type { InferenceData } from '@/components/inference/types';
 import { NORMALIZED_TOKEN_REVENUE_PRICING } from '@/components/inference/token-revenue';
 
-import type { BenchmarkRow } from '@/lib/api';
+import type { BenchmarkRow } from '@/lib/api/api';
 
 import {
   interpolateMetricAtInteractivity,
@@ -11,7 +11,7 @@ import {
   rowSupportsTrendMetric,
   trendMetricDependencies,
 } from './useInterpolatedTrendData';
-import { SUPPLEMENTAL_BENCHMARK_ROWS } from '@/lib/supplemental-benchmarks';
+import { SUPPLEMENTAL_BENCHMARK_ROWS } from '@/lib/benchmarks/supplemental-benchmarks';
 
 // ─── Factory ───
 

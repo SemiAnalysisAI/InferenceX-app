@@ -8,9 +8,9 @@
 import Link from 'next/link';
 
 import { fmtCostPerMtok, fmtThroughput, pctCheaper, pctFaster } from '@/components/live-seo/format';
-import type { RankingPageData } from '@/lib/run-rankings-data.server';
-import type { RankingPageEntry, RankingRow } from '@/lib/rankings';
-import { getRunPageEntry } from '@/lib/run-pages';
+import type { RankingPageData } from '@/lib/live-seo/run-rankings-data.server';
+import type { RankingPageEntry, RankingRow } from '@/lib/live-seo/rankings';
+import { getRunPageEntry } from '@/lib/live-seo/run-pages';
 
 export interface RankingsStrings {
   backLabel: string;

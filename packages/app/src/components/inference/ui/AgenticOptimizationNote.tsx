@@ -1,5 +1,5 @@
 import { InfoHelp } from '@/components/ui/option-info';
-import { useLocale } from '@/lib/use-locale';
+import { useLocale } from '@/lib/i18n/use-locale';
 
 const STRINGS = {
   en: {

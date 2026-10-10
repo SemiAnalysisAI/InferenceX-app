@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 
-import { fetchFrameworkReleases } from '@/lib/api';
+import { fetchFrameworkReleases } from '@/lib/api/api';
 
 export function useFrameworkReleases() {
   return useQuery({

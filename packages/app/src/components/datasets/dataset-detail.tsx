@@ -18,8 +18,8 @@ import {
   useDatasetConversations,
   type ConversationSort,
 } from '@/hooks/api/use-datasets';
-import { track } from '@/lib/analytics';
-import { useLocale } from '@/lib/use-locale';
+import { track } from '@/lib/analytics/analytics';
+import { useLocale } from '@/lib/i18n/use-locale';
 import { getDatasetDescription } from './dataset-description';
 import { compact, formatPct, formatShare, localeNumber, perConversation } from './format';
 import { Stat } from './stat';

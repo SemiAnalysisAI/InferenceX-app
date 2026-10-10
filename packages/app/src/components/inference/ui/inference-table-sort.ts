@@ -1,5 +1,5 @@
 import type { ChartDefinition, InferenceData } from '@/components/inference/types';
-import { getNestedYValue } from '@/lib/chart-utils';
+import { getNestedYValue } from '@/lib/charts/chart-utils';
 
 /**
  * Default row order for the inference table.

@@ -17,10 +17,13 @@ import {
   collectiveXCacheTag,
   cachedJson,
   purgeCollectiveX,
-} from '@/lib/api-cache';
-import { bearerMatches } from '@/lib/bearer-auth';
-import { collectiveXSweepErrorStatus, ensureCollectiveXRun } from '@/lib/collectivex-lazy-ingest';
-import { loadFixture } from '@/lib/test-fixtures';
+} from '@/lib/cache/api-cache';
+import { bearerMatches } from '@/lib/api/bearer-auth';
+import {
+  collectiveXSweepErrorStatus,
+  ensureCollectiveXRun,
+} from '@/lib/collectivex/collectivex-lazy-ingest';
+import { loadFixture } from '@/lib/testing/test-fixtures';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';

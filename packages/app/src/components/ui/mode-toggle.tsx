@@ -1,12 +1,12 @@
 'use client';
 
-import { track } from '@/lib/analytics';
+import { track } from '@/lib/analytics/analytics';
 import { Car, Crosshair, Moon, Pickaxe, Shield, Skull, Sun, type LucideIcon } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import * as React from 'react';
 
-import { nextTheme } from '@/lib/themes';
-import { cn } from '@/lib/utils';
+import { nextTheme } from '@/lib/themes/themes';
+import { cn } from '@/lib/shared/utils';
 import { HEADER_ACTION_STYLE } from './control-styles';
 
 const THEME_ICONS: Record<string, LucideIcon> = {

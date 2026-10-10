@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-import { bearerMatches } from '@/lib/bearer-auth';
+import { bearerMatches } from '@/lib/api/bearer-auth';
 
 import {
   COLLECTIVEX_CACHE_SCOPE,
@@ -8,7 +8,7 @@ import {
   purgeAll,
   purgeCollectiveX,
   purgeOperatorX,
-} from '@/lib/api-cache';
+} from '@/lib/cache/api-cache';
 
 export async function POST(request: Request) {
   const secret = process.env.INVALIDATE_SECRET;

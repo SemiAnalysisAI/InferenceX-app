@@ -1,6 +1,6 @@
 import ScatterGraph from '@/components/inference/ui/ScatterGraph';
-import { Precision } from '@/lib/data-mappings';
-import { getInferenceHardwareConfig } from '@/lib/inference-labels';
+import { Precision } from '@/lib/catalog/data-mappings';
+import { getInferenceHardwareConfig } from '@/lib/benchmarks/inference-labels';
 import { createMockChartDefinition, createMockInferenceData } from '../support/mock-data';
 import { mountWithProviders } from '../support/test-utils';
 

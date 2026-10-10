@@ -8,11 +8,11 @@
  */
 import Link from 'next/link';
 
-import { JsonLd } from '@/components/json-ld';
+import { JsonLd } from '@/components/seo/json-ld';
 import { Card } from '@/components/ui/card';
 import { CatalogLinkCard } from '@/components/catalog/catalog-link-card';
 import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
-import { getPostBySlug } from '@/lib/blog';
+import { getPostBySlug } from '@/lib/blog/blog';
 import {
   CHIP_VS_HIGHLIGHT_LABELS_EN,
   buildChipFaq,
@@ -25,18 +25,18 @@ import {
   getAllChipVsPages,
   getChipHw,
   getChipSpec,
-} from '@/lib/chip-pages';
+} from '@/lib/catalog/chip-pages';
 import {
   CHIP_VS_HIGHLIGHT_LABELS_ZH,
   buildZhChipFaq,
   buildZhChipVsFaq,
   getZhChipTranslation,
   localizeVsHighlightValueZh,
-} from '@/lib/chip-pages-zh';
-import { getGlossaryEntry } from '@/lib/glossary';
-import { getZhGlossaryEntry } from '@/lib/glossary-zh';
-import { formatScaleUpTopology } from '@/lib/gpu-specs';
-import { type Locale, localePath, ZH_LANG_TAG } from '@/lib/i18n';
+} from '@/lib/catalog/chip-pages-zh';
+import { getGlossaryEntry } from '@/lib/content/glossary';
+import { getZhGlossaryEntry } from '@/lib/content/glossary-zh';
+import { formatScaleUpTopology } from '@/lib/catalog/gpu-specs';
+import { type Locale, localePath, ZH_LANG_TAG } from '@/lib/i18n/i18n';
 import {
   ACCELERATOR_MODEL_TITLE,
   ACCELERATOR_MODEL_URL,

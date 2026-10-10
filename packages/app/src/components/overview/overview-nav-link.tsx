@@ -2,8 +2,8 @@
 
 import { type ComponentPropsWithoutRef, type MouseEvent, useEffect, useRef } from 'react';
 
-import { track } from '@/lib/analytics';
-import type { OverviewSearchKey } from '@/lib/overview-links';
+import { track } from '@/lib/analytics/analytics';
+import type { OverviewSearchKey } from '@/lib/overview/overview-links';
 
 import { useOverviewNavigation } from './overview-navigation';
 

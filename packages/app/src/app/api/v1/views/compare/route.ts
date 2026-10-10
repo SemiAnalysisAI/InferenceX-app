@@ -10,18 +10,18 @@ import type { NextRequest } from 'next/server';
 
 import { GPU_KEYS, sequenceToIslOsl } from '@semianalysisai/inferencex-constants';
 
-import { cachedJson } from '@/lib/api-cache';
-import { comparisonScenarioForModel } from '@/lib/compare-agentx';
-import { getComparePageDerivedData } from '@/lib/compare-page-data.server';
+import { cachedJson } from '@/lib/cache/api-cache';
+import { comparisonScenarioForModel } from '@/lib/compare/compare-agentx';
+import { getComparePageDerivedData } from '@/lib/compare/compare-page-data.server';
 import {
   canonicalCompareSlug,
   COMPARE_MODEL_SLUGS,
   getModelSlugEntryForDisplayName,
   parseCompareSlug,
   type CompareModelSlug,
-} from '@/lib/compare-slug';
-import { computeCompareStat } from '@/lib/compare-ssr';
-import { Sequence } from '@/lib/data-mappings';
+} from '@/lib/compare/compare-slug';
+import { computeCompareStat } from '@/lib/compare/compare-ssr';
+import { Sequence } from '@/lib/catalog/data-mappings';
 import {
   buildCompareTable,
   buildPrecisionBreakdown,
@@ -42,7 +42,7 @@ export const dynamic = 'force-dynamic';
  * Pair selection accepts either the page slug (`slug=deepseek-v4-b200-vs-mi355x`)
  * or `model=` + `gpus=<a>,<b>`; both are canonicalized the way the pages
  * redirect, so the two spellings of a pair return identical payloads. All
- * interpolation reuses `lib/compare-page-data.server.ts` / `lib/compare-ssr.ts`.
+ * interpolation reuses `lib/compare/compare-page-data.server.ts` / `lib/compare/compare-ssr.ts`.
  */
 
 const MAX_CUSTOM_TIERS = 12;

@@ -1,7 +1,7 @@
 'use client';
 
-import { track } from '@/lib/analytics';
-import type { ApiDocumentationLocale } from '@/lib/api-documentation';
+import { track } from '@/lib/analytics/analytics';
+import type { ApiDocumentationLocale } from '@/lib/api/api-documentation';
 
 export function ApiAgentExamplesLink({
   label,

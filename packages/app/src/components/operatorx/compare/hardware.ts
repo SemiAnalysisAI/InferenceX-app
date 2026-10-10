@@ -1,7 +1,7 @@
 import { HW_REGISTRY } from '@semianalysisai/inferencex-constants';
 
-import { GPU_SPECS, type GpuSpec } from '@/lib/gpu-specs';
-import { getModelSortIndex } from '@/lib/constants';
+import { GPU_SPECS, type GpuSpec } from '@/lib/catalog/gpu-specs';
+import { getModelSortIndex } from '@/lib/catalog/constants';
 import type { ComputePrecision } from '@semianalysisai/inferencex-db/operatorx/compare';
 
 export function hardwareLabel(key: string): string {

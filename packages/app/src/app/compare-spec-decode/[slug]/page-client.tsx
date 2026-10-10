@@ -13,14 +13,14 @@ import {
   GlobalFilterProvider,
   useGlobalFilterRun,
   useGlobalFilterSelection,
-} from '@/components/GlobalFilterContext';
+} from '@/providers/GlobalFilterContext';
 import { InferenceProvider } from '@/components/inference/InferenceContext';
 import InferenceChartDisplay from '@/components/inference/ui/ChartDisplay';
 import { Card } from '@/components/ui/card';
-import { track } from '@/lib/analytics';
-import { toModel, toPrecisions, toSequence } from '@/lib/compare-enum-coerce';
-import { SPEC_METHODS_ACTIVE } from '@/lib/compare-variant-slug';
-import type { AgenticScenarioIntro } from '@/lib/compare-ssr';
+import { track } from '@/lib/analytics/analytics';
+import { toModel, toPrecisions, toSequence } from '@/lib/compare/compare-enum-coerce';
+import { SPEC_METHODS_ACTIVE } from '@/lib/compare/compare-variant-slug';
+import type { AgenticScenarioIntro } from '@/lib/compare/compare-ssr';
 
 const STRINGS = {
   en: {

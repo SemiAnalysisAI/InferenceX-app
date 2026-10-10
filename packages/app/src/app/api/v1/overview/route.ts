@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from 'next/server';
 
-import { cachedJson } from '@/lib/api-cache';
+import { cachedJson } from '@/lib/cache/api-cache';
 import {
   resolveOverviewComparisonMode,
   resolveOverviewEngineScope,
@@ -9,8 +9,8 @@ import {
   resolveOverviewReferenceHardware,
   resolveOverviewRowScope,
   resolveOverviewTier,
-} from '@/lib/overview-data';
-import { getOverviewPageData } from '@/lib/overview-data.server';
+} from '@/lib/overview/overview-data';
+import { getOverviewPageData } from '@/lib/overview/overview-data.server';
 
 export const dynamic = 'force-dynamic';
 

@@ -1,11 +1,11 @@
 'use client';
 
-import { useGlobalFilterSelection } from '@/components/GlobalFilterContext';
+import { useGlobalFilterSelection } from '@/providers/GlobalFilterContext';
 
 import Link from 'next/link';
 import { useCallback, useMemo, useState } from 'react';
 
-import { track } from '@/lib/analytics';
+import { track } from '@/lib/analytics/analytics';
 import type { HardwareConfig } from '@/components/inference/types';
 import { Card } from '@/components/ui/card';
 import { CollapsibleSection } from '@/components/ui/collapsible-section';
@@ -14,10 +14,10 @@ import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
 import { Input } from '@/components/ui/input';
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
 import { TooltipProvider } from '@/components/ui/tooltip';
-import { getGpuSpecs, getHardwareConfig } from '@/lib/constants';
-import { readUrlParams, writeUrlParams } from '@/lib/url-state';
-import { getDisplayLabel } from '@/lib/utils';
-import { useLocale } from '@/lib/use-locale';
+import { getGpuSpecs, getHardwareConfig } from '@/lib/catalog/constants';
+import { readUrlParams, writeUrlParams } from '@/lib/routing/url-state';
+import { getDisplayLabel } from '@/lib/shared/utils';
+import { useLocale } from '@/lib/i18n/use-locale';
 
 import { computeFleetStats, formatCompact } from './fleet';
 import { interpolateForGPU, maxInteractivityAtCost } from './interpolation';

@@ -64,19 +64,19 @@ Present what you inferred and get confirmation + category in a single step. Incl
 - `MODEL_TO_KEY` — add paths visible in the run's job names and artifact names (HF paths, mount paths). Don't speculatively add paths you haven't seen.
 - `PREFIX_ALIASES` — **skip if the prefix matches the DB key after stripping precision suffixes** (the common case). Only needed for non-obvious aliases (e.g. `gptoss` → `gptoss120b`).
 
-**`packages/app/src/lib/data-mappings.ts`**:
+**`packages/app/src/lib/catalog/data-mappings.ts`**:
 
 1. `Model` enum — add member (value must match display name in `DB_MODEL_TO_DISPLAY`)
 2. `MODEL_CONFIG` — add one entry with `{ label, prefix, category }`
 
 Everything else (`MODEL_OPTIONS`, `DEFAULT_MODELS`, `EXPERIMENTAL_MODELS`, `DEPRECATED_MODELS`, `MODEL_PREFIX_MAPPING`, `getModelLabel()`) is derived automatically.
 
-**`packages/app/src/lib/compare-slug.ts`** (easy to miss — the /compare and /compare-per-dollar pages do NOT derive from `MODEL_CONFIG`):
+**`packages/app/src/lib/compare/compare-slug.ts`** (easy to miss — the /compare and /compare-per-dollar pages do NOT derive from `MODEL_CONFIG`):
 
 - `COMPARE_MODEL_SLUGS` — add an entry with `{ slug, displayName, dbKeys, label }`. `displayName` must match the `Model` enum value; `dbKeys` lists the DB buckets to query. Place it per the ordering comment (Chinese-lab flagships first, newer family member leads). Without this entry the model is absent from /compare, /compare-per-dollar, the sitemap, and their OG images.
 - `COMPARE_MODEL_ALIASES` — only if a family-level or older-version slug should 308 to the new entry.
 
-**`packages/app/src/lib/compare-ssr.ts`**:
+**`packages/app/src/lib/compare/compare-ssr.ts`**:
 
 - `KNOWN_MODELS` — add the display name so `?g_model=` URL overrides validate on compare pages.
 
@@ -84,7 +84,7 @@ Everything else (`MODEL_OPTIONS`, `DEFAULT_MODELS`, `EXPERIMENTAL_MODELS`, `DEPR
 
 - `DESCRIPTION` — these SEO meta strings hardcode a sample model list ("…, Qwen 3.5 397B-A17B, and more"). Add the new model if it should appear in the catalog blurb.
 
-**`packages/app/src/lib/model-architectures.ts`** (optional — powers the per-model architecture diagram on the inference tab):
+**`packages/app/src/lib/catalog/model-architectures.ts`** (optional — powers the per-model architecture diagram on the inference tab):
 
 - `MODEL_ARCHITECTURES` — add a `[Model.X]` entry with verified config.json values. Omitted models simply render no diagram (`getModelArchitecture` returns `undefined`), so this is non-blocking but expected for parity with other models.
 
@@ -154,7 +154,7 @@ From the model name, derive (MiniMax M3 shown as the worked example):
 - **Modal** (under "Landing modals"): `id: 'SLUG-launch-modal'`, `storageKey: 'inferencex-SLUG-modal-dismissed'`, `title: 'DISPLAY is live'`, day-zero `description`, `testId: 'launch-modal'`, `primaryAction.onClick` → `/inference?preset=SLUG-launch`, analytics `SLUG_modal_shown`/`_dismissed`/`_explored`.
 - **Banner** (under "Landing banner"): `id: 'SLUG-launch-banner'`, `storageKey: 'inferencex-SLUG-banner-dismissed'`, `title: 'DISPLAY benchmarks are live'`, `testId: 'launch-banner'`, `href`/`onLinkClick` → `/inference?preset=SLUG-launch`, keep the generic `launch_banner_*` analytics events but set `properties: { banner_id: 'SLUG-launch', preset_id: 'SLUG-launch' }`.
 
-**`packages/app/src/lib/url-state.ts`** _(only if making it the site default)_:
+**`packages/app/src/lib/routing/url-state.ts`** _(only if making it the site default)_:
 
 - Set `PARAM_DEFAULTS.g_model` to `'G_MODEL'`. Most launches **leave this unchanged** — only change it for a true flagship (DeepSeek V4 Pro got it; MiniMax M3 did not).
 
@@ -162,7 +162,7 @@ From the model name, derive (MiniMax M3 shown as the worked example):
 
 - **`packages/app/src/lib/nudges/registry.test.ts`** — update the **sorted** expected-ids array ("contains the expected set of migrated nudges") to the new `SLUG-launch-banner`/`SLUG-launch-modal` ids.
 - **`packages/app/cypress/e2e/nudge-system.cy.ts`** and **`navigation.cy.ts`** — replace the old `inferencex-<old-slug>-{modal,banner}-dismissed` storage keys with the new ones. TestId selectors stay generic (`launch-modal`, `launch-banner`); update any `it(...)` titles that name the old model.
-- **`packages/app/src/lib/url-state.test.ts`** _(only if the default changed)_ — two specs hardcode the default `g_model`; update both.
+- **`packages/app/src/lib/routing/url-state.test.ts`** _(only if the default changed)_ — two specs hardcode the default `g_model`; update both.
 
 > **Don't touch:** blog MDX `?g_model=…` / `?preset=<old-slug>-launch` links (historical, correct), `packages/constants/src/models.ts` DB-key maps, or the outgoing model's data-mapping / architecture entries — it still exists, it's just no longer the headline.
 
@@ -197,13 +197,13 @@ Present what you inferred and ask about anything not visible in artifacts:
 **`packages/constants/src/gpu-keys.ts`** (single source of truth):
 
 - Add one entry to `HW_REGISTRY` with all fields: `vendor`, `arch`, `label`, `sort`, `tdp`, `power`, `costh`, `costr`. **If power/cost are unknown, use `9.99` as an obvious placeholder** — the test suite requires `power > 0`.
-- If this is a **new vendor** (not NVIDIA or AMD), also add color zones to `VENDOR_OKLCH_ZONES` and `VENDOR_HSL_ZONES` in the same file, and extend the `Vendor` type in `src/lib/dynamic-colors.ts`.
+- If this is a **new vendor** (not NVIDIA or AMD), also add color zones to `VENDOR_OKLCH_ZONES` and `VENDOR_HSL_ZONES` in the same file, and extend the `Vendor` type in `src/lib/charts/dynamic-colors.ts`.
 
 **`packages/db/src/etl/normalizers.ts`**:
 
 - `hwToGpuKey()` — add `.replace()` for any new artifact suffixes
 
-**`packages/app/src/lib/gpu-specs.ts`** (if specs provided):
+**`packages/app/src/lib/catalog/gpu-specs.ts`** (if specs provided):
 
 - Add `GpuSpec` entry with full hardware data
 - Add topology config in `getTopologyConfig()` / `getScaleUpTopologyConfig()`
@@ -233,14 +233,14 @@ Present what you inferred and ask about anything not visible in artifacts:
 
 - `PRECISION_SUFFIX` regex — add the keyword if it appears as a model name suffix
 
-**`packages/app/src/lib/data-mappings.ts`**:
+**`packages/app/src/lib/catalog/data-mappings.ts`**:
 
 1. `Precision` enum — add member
 2. `PRECISION_CONFIG` — add one entry with `{ label }`
 
 Everything else (`PRECISION_OPTIONS`, `getPrecisionLabel()`) is derived automatically.
 
-**`packages/app/src/lib/chart-rendering.ts`** (if new shape):
+**`packages/app/src/lib/charts/chart-rendering.ts`** (if new shape):
 
 - `SHAPE_CONFIG` — add shape definition with normal/hover states
 - `getShapeConfig()` — add condition
@@ -267,7 +267,7 @@ Present what you inferred and ask about anything not visible in artifacts:
 1. `sequenceToIslOsl()` — add forward mapping
 2. `islOslToSequence()` — add reverse mapping
 
-**`packages/app/src/lib/data-mappings.ts`**:
+**`packages/app/src/lib/catalog/data-mappings.ts`**:
 
 1. `Sequence` enum — add member
 2. `SEQUENCE_CONFIG` — add one entry with `{ label, compact }`

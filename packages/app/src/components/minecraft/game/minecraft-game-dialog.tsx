@@ -1,7 +1,7 @@
 'use client';
 
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
-import { useLocale } from '@/lib/use-locale';
+import { useLocale } from '@/lib/i18n/use-locale';
 import { MinecraftGame } from './minecraft-game';
 
 type EscapeHost = HTMLElement & { mcEscape?: () => boolean };

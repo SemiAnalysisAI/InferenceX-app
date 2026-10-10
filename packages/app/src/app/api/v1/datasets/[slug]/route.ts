@@ -4,7 +4,7 @@ import { getDb } from '@semianalysisai/inferencex-db/connection';
 
 import { getDataset, type DatasetDetail } from '@semianalysisai/inferencex-db/queries/datasets';
 
-import { cachedJson, cachedQuery } from '@/lib/api-cache';
+import { cachedJson, cachedQuery } from '@/lib/cache/api-cache';
 
 export const dynamic = 'force-dynamic';
 

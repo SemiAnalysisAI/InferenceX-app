@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-import { PUBLIC_API_ERRORS, publicApiError } from '@/lib/public-api-errors';
+import { PUBLIC_API_ERRORS, publicApiError } from '@/lib/api/public-api-errors';
 import { ViewsUpstreamError } from './upstream-error';
 
 export { ViewsUpstreamError } from './upstream-error';

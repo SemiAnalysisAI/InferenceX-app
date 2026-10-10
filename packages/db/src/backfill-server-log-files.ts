@@ -38,6 +38,7 @@ import { confirmProceed, parseLimitForceFlags, runBackfillMain } from './lib/bac
 import { retryArtifactOperation } from './lib/artifact-retry.js';
 import { repositoryFromRunUrl } from './lib/runtime-metadata-artifacts.js';
 import {
+  isGithubNotFound,
   pairServerLogArtifacts,
   resolveServerLogResultCandidates,
 } from './lib/server-log-backfill.js';
@@ -287,7 +288,15 @@ async function main(): Promise<void> {
       ) {
         const artifacts = await retryArtifactOperation(
           `listing GitHub artifacts for run ${runId}`,
-          () => listRunArtifacts(repository, String(runId)),
+          () => {
+            try {
+              return listRunArtifacts(repository, String(runId));
+            } catch (error) {
+              if (!isGithubNotFound(error)) throw error;
+              console.warn(`  [WARN] ${repository} run ${runId}: GitHub 404, not visible to token`);
+              return [];
+            }
+          },
         );
         pairs = pairServerLogArtifacts(artifacts.filter((artifact) => !artifact.expired));
         if (pairs.length > 0) {

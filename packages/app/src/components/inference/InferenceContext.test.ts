@@ -10,7 +10,7 @@ import {
   useInferenceActions,
   useInferenceFilters,
 } from '@/components/inference/InferenceContext';
-import { Sequence } from '@/lib/data-mappings';
+import { Sequence } from '@/lib/catalog/data-mappings';
 import type {
   InferenceActionsContextType,
   InferenceDataContextType,

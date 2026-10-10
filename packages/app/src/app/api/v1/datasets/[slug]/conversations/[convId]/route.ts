@@ -7,7 +7,7 @@ import {
   type ConversationDetail,
 } from '@semianalysisai/inferencex-db/queries/datasets';
 
-import { cachedJson, cachedQuery } from '@/lib/api-cache';
+import { cachedJson, cachedQuery } from '@/lib/cache/api-cache';
 
 export const dynamic = 'force-dynamic';
 

@@ -3,7 +3,7 @@
 import type { ReactNode } from 'react';
 
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
-import { track } from '@/lib/analytics';
+import { track } from '@/lib/analytics/analytics';
 import { ModelLogo } from '@/components/ui/model-logo';
 import { MultiSelect } from '@/components/ui/multi-select';
 import { SearchableSelect } from '@/components/ui/searchable-select';
@@ -30,8 +30,8 @@ import {
   getSequenceLabel,
   groupByCategory,
   sequenceKind,
-} from '@/lib/data-mappings';
-import { useLocale } from '@/lib/use-locale';
+} from '@/lib/catalog/data-mappings';
+import { useLocale } from '@/lib/i18n/use-locale';
 
 const STRINGS = {
   en: {

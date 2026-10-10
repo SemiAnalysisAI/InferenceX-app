@@ -4,7 +4,7 @@ import {
   seriesMatchesSelection,
 } from '@/components/collectivex/data';
 import { makeCollectiveXDataset } from '@/components/collectivex/test-fixture';
-import { Model } from '@/lib/data-mappings';
+import { Model } from '@/lib/catalog/data-mappings';
 import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { GET as collective } from './collectivex/route';
@@ -20,7 +20,7 @@ vi.mock('@/app/api/v1/collectivex/runs/route', () => ({ GET: mocks.runs }));
 vi.mock('@/app/api/v1/collectivex/runs/[runId]/route', () => ({ GET: mocks.run }));
 vi.mock('@/app/api/v1/latest-images/route', () => ({ GET: mocks.images }));
 vi.mock('@/app/api/v1/framework-releases/route', () => ({ GET: mocks.releases }));
-vi.mock('@/lib/api-cache', () => ({
+vi.mock('@/lib/cache/api-cache', () => ({
   cachedJson: (data: unknown) => Response.json(data),
   cachedQuery: (fn: unknown) => fn,
 }));

@@ -32,25 +32,25 @@ import {
 import { pointDeploymentMode, type QuickFilters } from '@/components/inference/utils/quickFilters';
 import { resolveXAxisField } from '@/components/inference/utils/resolveXAxisField';
 import type { DerivedAgenticMetricMap } from '@/hooks/api/use-derived-agentic-metrics';
-import type { BenchmarkRow } from '@/lib/api';
-import { transformBenchmarkRows } from '@/lib/benchmark-transform';
+import type { BenchmarkRow } from '@/lib/api/api';
+import { transformBenchmarkRows } from '@/lib/benchmarks/benchmark-transform';
 import {
   isFrontierEligible,
   paretoFrontForDirection,
   paretoMaximizesX,
   remapInferencePoint,
   type ParetoDirection,
-} from '@/lib/chart-utils';
+} from '@/lib/charts/chart-utils';
 import {
   type TcoBasis,
   GPU_ALIAS_TO_CANONICAL,
   getModelSortIndex,
   hardwareKeyMatchesBase,
-} from '@/lib/constants';
+} from '@/lib/catalog/constants';
 
-import { Sequence } from '@/lib/data-mappings';
-import { isKvOffloadEnabled } from '@/lib/kv-offload';
-import { calculateCostsForGpus, calculatePowerForGpus } from '@/lib/utils';
+import { Sequence } from '@/lib/catalog/data-mappings';
+import { isKvOffloadEnabled } from '@/lib/benchmarks/kv-offload';
+import { calculateCostsForGpus, calculatePowerForGpus } from '@/lib/shared/utils';
 import { hardwareLegendLabel, unitFromLabel } from '@/lib/views-api/legend';
 
 /**

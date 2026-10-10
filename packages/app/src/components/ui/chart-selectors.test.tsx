@@ -5,7 +5,7 @@ import { expect, it, vi } from 'vitest';
 
 import { ScenarioSelector } from './chart-selectors';
 import { TooltipProvider } from './tooltip';
-import { Sequence } from '@/lib/data-mappings';
+import { Sequence } from '@/lib/catalog/data-mappings';
 
 const route = vi.hoisted(() => ({ pathname: '/inference' }));
 vi.mock('next/navigation', () => ({ usePathname: () => route.pathname }));

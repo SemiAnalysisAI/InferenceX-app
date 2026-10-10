@@ -1,5 +1,5 @@
-import { getModelDeveloperLogo, isMonochromeLogo } from '@/lib/model-logos';
-import type { Locale } from '@/lib/i18n';
+import { getModelDeveloperLogo, isMonochromeLogo } from '@/lib/catalog/model-logos';
+import type { Locale } from '@/lib/i18n/i18n';
 
 import { MODEL_PAGE_COPY } from './model-page-copy';
 

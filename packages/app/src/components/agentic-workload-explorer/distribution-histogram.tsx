@@ -3,8 +3,8 @@
 import { useId, useMemo } from 'react';
 import type * as d3 from 'd3';
 import { D3Chart, type D3ChartProps, type RenderContext } from '@/lib/d3-chart/D3Chart';
-import { escapeHtml } from '@/lib/utils';
-import { useLocale } from '@/lib/use-locale';
+import { escapeHtml } from '@/lib/shared/utils';
+import { useLocale } from '@/lib/i18n/use-locale';
 
 const STRINGS = {
   en: {

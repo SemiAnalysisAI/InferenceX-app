@@ -20,8 +20,8 @@ import type {
   PerformancePercentileStats,
 } from '@/lib/agentic-workload-explorer/api-types';
 import { SNAPSHOT_RANGE_LABEL } from '@/lib/agentic-workload-explorer/snapshot';
-import { useLocale } from '@/lib/use-locale';
-import { track } from '@/lib/analytics';
+import { useLocale } from '@/lib/i18n/use-locale';
+import { track } from '@/lib/analytics/analytics';
 import { Expandable, ExpandTrigger } from '@/components/agentic-workload-explorer/expandable-chart';
 
 // -- Types ------------------------------------------------------------------

@@ -14,18 +14,18 @@ import {
   RunDetailContent,
   type RunStrings,
 } from '@/components/live-seo/run-page-sections';
-import { JsonLd } from '@/components/json-ld';
-import { ZH_LANG_TAG, ZH_OG_LOCALE, zhAlternates } from '@/lib/i18n';
-import { scenarioLabel } from '@/lib/rankings';
-import { getRunPageEntry, type RunPageEntry } from '@/lib/run-pages';
+import { JsonLd } from '@/components/seo/json-ld';
+import { ZH_LANG_TAG, ZH_OG_LOCALE, zhAlternates } from '@/lib/i18n/i18n';
+import { scenarioLabel } from '@/lib/live-seo/rankings';
+import { getRunPageEntry, type RunPageEntry } from '@/lib/live-seo/run-pages';
 import {
   runPageDescriptionZh,
   runPageFaqQuestionsZh,
   runPageHeadingZh,
   runPageTitleZh,
   runPageKeywordsZh,
-} from '@/lib/run-pages-zh';
-import { getRunPageData, type RunPageData } from '@/lib/run-rankings-data.server';
+} from '@/lib/live-seo/run-pages-zh';
+import { getRunPageData, type RunPageData } from '@/lib/live-seo/run-rankings-data.server';
 
 export const dynamic = 'force-dynamic';
 

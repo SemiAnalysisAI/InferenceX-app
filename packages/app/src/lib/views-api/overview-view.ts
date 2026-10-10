@@ -18,7 +18,7 @@ import {
   type OverviewMissingReason,
   type OverviewPageData,
   type OverviewScenario,
-} from '@/lib/overview-data';
+} from '@/lib/overview/overview-data';
 
 export interface OverviewViewCellConfig {
   framework: string;

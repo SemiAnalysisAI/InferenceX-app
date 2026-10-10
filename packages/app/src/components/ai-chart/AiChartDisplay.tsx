@@ -3,9 +3,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import { AlertCircle, ArrowUpRight, Eye, EyeOff, Sparkles } from 'lucide-react';
 
-import { track } from '@/lib/analytics';
-import { PROVIDER_OPTIONS, getProviderLabel } from '@/lib/ai-providers';
-import { useLocale } from '@/lib/use-locale';
+import { track } from '@/lib/analytics/analytics';
+import { PROVIDER_OPTIONS, getProviderLabel } from '@/lib/ai-chart/ai-providers';
+import { useLocale } from '@/lib/i18n/use-locale';
 import { useAiChart } from '@/hooks/api/use-ai-chart';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';

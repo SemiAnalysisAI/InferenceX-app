@@ -1,5 +1,5 @@
 import type { ChartDefinition } from './types';
-import type { TokenMetricType } from '@/lib/supplemental-benchmarks';
+import type { TokenMetricType } from '@/lib/benchmarks/supplemental-benchmarks';
 
 export type RooflineDirection = 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
 

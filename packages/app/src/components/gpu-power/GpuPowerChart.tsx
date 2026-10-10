@@ -5,7 +5,7 @@ import React, { useMemo } from 'react';
 import { buildGroupedData, type ParsedPoint } from './chart-data';
 
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
-import { useLocale } from '@/lib/use-locale';
+import { useLocale } from '@/lib/i18n/use-locale';
 import {
   ALL_METRIC_OPTIONS,
   detectTdpFromArtifactName,

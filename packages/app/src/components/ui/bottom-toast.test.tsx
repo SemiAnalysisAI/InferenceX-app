@@ -4,8 +4,8 @@ import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('@/lib/use-locale', () => ({ useLocale: () => 'en' }));
-vi.mock('@/lib/analytics', () => ({ track: vi.fn() }));
+vi.mock('@/lib/i18n/use-locale', () => ({ useLocale: () => 'en' }));
+vi.mock('@/lib/analytics/analytics', () => ({ track: vi.fn() }));
 
 import { BottomToast } from './bottom-toast';
 

@@ -1,4 +1,4 @@
-import { APP_THEMES } from '../../src/lib/themes';
+import { APP_THEMES } from '../../src/lib/themes/themes';
 import { cycleToTheme } from '../support/theme';
 
 const optionalThemes = APP_THEMES.filter((theme) => !['light', 'dark', 'system'].includes(theme));

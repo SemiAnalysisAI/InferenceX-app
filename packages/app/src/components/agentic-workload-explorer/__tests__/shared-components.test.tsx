@@ -10,8 +10,8 @@ import { DAY_RANGES, RangeToggle } from '../range-toggle';
 import { ModelFilter } from '../model-filter';
 import { stubMatchMedia } from '@/test/match-media-stub';
 
-vi.mock('@/lib/analytics', () => ({ track: vi.fn() }));
-vi.mock('@/lib/use-locale', () => ({ useLocale: () => 'en' }));
+vi.mock('@/lib/analytics/analytics', () => ({ track: vi.fn() }));
+vi.mock('@/lib/i18n/use-locale', () => ({ useLocale: () => 'en' }));
 vi.mock('@/hooks/useMediaQuery', () => ({
   useMediaQuery: () => false,
   useIsMobileViewport: () => false,

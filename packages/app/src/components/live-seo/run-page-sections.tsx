@@ -8,9 +8,9 @@
 import Link from 'next/link';
 
 import { fmtCostPerMtok, fmtGpuHour, fmtMs, fmtThroughput } from '@/components/live-seo/format';
-import { getChipHw } from '@/lib/chip-pages';
-import type { RunPageData } from '@/lib/run-rankings-data.server';
-import type { RunPageEntry } from '@/lib/run-pages';
+import { getChipHw } from '@/lib/catalog/chip-pages';
+import type { RunPageData } from '@/lib/live-seo/run-rankings-data.server';
+import type { RunPageEntry } from '@/lib/live-seo/run-pages';
 
 export interface RunStrings {
   backHref: string;

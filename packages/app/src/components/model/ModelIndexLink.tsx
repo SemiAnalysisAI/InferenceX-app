@@ -4,9 +4,9 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import type { ComponentProps } from 'react';
 
-import { track } from '@/lib/analytics';
-import { navigateInApp } from '@/lib/client-navigation';
-import type { Locale } from '@/lib/i18n';
+import { track } from '@/lib/analytics/analytics';
+import { navigateInApp } from '@/lib/routing/client-navigation';
+import type { Locale } from '@/lib/i18n/i18n';
 
 interface ModelIndexLinkProps extends Omit<ComponentProps<typeof Link>, 'href'> {
   href: string;

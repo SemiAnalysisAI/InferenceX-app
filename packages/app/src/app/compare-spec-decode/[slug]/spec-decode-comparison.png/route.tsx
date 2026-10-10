@@ -1,21 +1,21 @@
 import { HW_REGISTRY } from '@semianalysisai/inferencex-constants';
 
-import { trackServer } from '@/lib/analytics-server';
-import { getCachedBenchmarks } from '@/lib/compare-ssr';
+import { trackServer } from '@/lib/analytics/analytics-server';
+import { getCachedBenchmarks } from '@/lib/compare/compare-ssr';
 import {
   computeVariantCompareImageRows,
   computeVariantCompareTableData,
   pickVariantPairDefaults,
   type VariantCompareSide,
-} from '@/lib/compare-variant-ssr';
+} from '@/lib/compare/compare-variant-ssr';
 import {
   canonicalSpecDecodeCompareSlug,
   parseSpecDecodeCompareSlug,
   precisionDisplayLabel,
   specMethodDisplayLabel,
-} from '@/lib/compare-variant-slug';
-import { getLogoSrc } from '@/lib/og-assets';
-import { renderComparePngChart } from '@/lib/png-chart';
+} from '@/lib/compare/compare-variant-slug';
+import { getLogoSrc } from '@/lib/seo/og-assets';
+import { renderComparePngChart } from '@/lib/compare/png-chart';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';

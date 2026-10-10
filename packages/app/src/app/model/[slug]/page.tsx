@@ -5,10 +5,10 @@ import 'katex/dist/katex.min.css';
 
 import ModelDetailContent from '@/components/model/ModelDetailContent';
 import { modelAliasDestination } from '@/components/model/model-page-copy';
-import { COMPARE_MODEL_ALIASES } from '@/lib/compare-slug';
-import { modelDetailMetadata } from '@/lib/model-page-metadata';
-import { getModelPageSlugs } from '@/lib/model-pages';
-import { getLocalizedModelPage } from '@/lib/model-pages-zh';
+import { COMPARE_MODEL_ALIASES } from '@/lib/compare/compare-slug';
+import { modelDetailMetadata } from '@/lib/catalog/model-page-metadata';
+import { getModelPageSlugs } from '@/lib/catalog/model-pages';
+import { getLocalizedModelPage } from '@/lib/catalog/model-pages-zh';
 
 interface Props {
   params: Promise<{ slug: string }>;

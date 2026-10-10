@@ -3,8 +3,8 @@
 import { useEffect, useState } from 'react';
 import { useTheme } from 'next-themes';
 import dynamic from 'next/dynamic';
-import { useLocale } from '@/lib/use-locale';
-import { track } from '@/lib/analytics';
+import { useLocale } from '@/lib/i18n/use-locale';
+import { track } from '@/lib/analytics/analytics';
 
 const GtaHeistDialog = dynamic(() => import('./gta-heist-dialog'), { ssr: false });
 

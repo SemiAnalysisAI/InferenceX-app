@@ -3,7 +3,7 @@
 import { ArrowRight } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
-import { track } from '@/lib/analytics';
+import { track } from '@/lib/analytics/analytics';
 
 import { HwVendorLogo } from '@/components/ui/hw-vendor-logo';
 

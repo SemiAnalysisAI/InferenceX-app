@@ -7,7 +7,7 @@ import {
   isFrontierEligible,
   paretoFrontForDirection,
   type ParetoDirection,
-} from '@/lib/chart-utils';
+} from '@/lib/charts/chart-utils';
 
 /**
  * Regression coverage for the Pareto direction of the measured-power axes.

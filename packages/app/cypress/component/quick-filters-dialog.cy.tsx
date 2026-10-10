@@ -2,7 +2,7 @@ import { QuickFiltersDialog } from '@/components/inference/ui/QuickFiltersDialog
 import { ActiveQuickFilters } from '@/components/inference/ui/ActiveQuickFilters';
 import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.shared-runtime';
 import type { QuickFilters } from '@/components/inference/types';
-import { Sequence } from '@/lib/data-mappings';
+import { Sequence } from '@/lib/catalog/data-mappings';
 import { mountWithProviders } from '../support/test-utils';
 
 const availableQuickFilters: QuickFilters = {

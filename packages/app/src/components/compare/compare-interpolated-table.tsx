@@ -4,9 +4,9 @@ import { useCallback, useMemo, useState } from 'react';
 
 import { interpolateForGPU } from '@/components/calculator/interpolation';
 import type { GPUDataPoint, InterpolatedResult } from '@/components/calculator/types';
-import { track } from '@/lib/analytics';
-import { cn } from '@/lib/utils';
-import { useLocale } from '@/lib/use-locale';
+import { track } from '@/lib/analytics/analytics';
+import { cn } from '@/lib/shared/utils';
+import { useLocale } from '@/lib/i18n/use-locale';
 import { Input } from '@/components/ui/input';
 
 const STRINGS = {

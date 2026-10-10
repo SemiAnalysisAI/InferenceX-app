@@ -2,13 +2,13 @@ import { notFound } from 'next/navigation';
 
 import { HW_REGISTRY } from '@semianalysisai/inferencex-constants';
 
-import { renderCompareOg } from '@/lib/compare-og';
-import { getAllComparablePrecisionSlugs } from '@/lib/compare-variant-availability';
+import { renderCompareOg } from '@/lib/compare/compare-og';
+import { getAllComparablePrecisionSlugs } from '@/lib/compare/compare-variant-availability';
 import {
   canonicalPrecisionCompareSlug,
   parsePrecisionCompareSlug,
   precisionDisplayLabel,
-} from '@/lib/compare-variant-slug';
+} from '@/lib/compare/compare-variant-slug';
 
 export const alt = 'Chip precision inference benchmark comparison';
 export const size = { width: 1200, height: 630 };

@@ -1,6 +1,6 @@
 import type { BenchmarkRow } from '@semianalysisai/inferencex-db/queries/benchmarks';
 // The website advertises the verified public release, which can lag the source candidate.
-import PUBLISHED_SKILL from '../../src/lib/published-inferencex-skills.json';
+import PUBLISHED_SKILL from '../../src/lib/api/published-inferencex-skills.json';
 
 const SITE_URL = 'https://inferencex.semianalysis.com';
 

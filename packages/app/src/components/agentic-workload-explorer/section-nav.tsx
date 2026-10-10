@@ -10,10 +10,10 @@ import {
   explorerRelativePath,
   versionQuery,
 } from '@/lib/agentic-workload-explorer/paths';
-import { track } from '@/lib/analytics';
-import type { Locale } from '@/lib/i18n';
-import { useLocale } from '@/lib/use-locale';
-import { cn } from '@/lib/utils';
+import { track } from '@/lib/analytics/analytics';
+import type { Locale } from '@/lib/i18n/i18n';
+import { useLocale } from '@/lib/i18n/use-locale';
+import { cn } from '@/lib/shared/utils';
 
 export interface ExplorerNavLink {
   /** Explorer-relative path, e.g. `/sessions`. */
