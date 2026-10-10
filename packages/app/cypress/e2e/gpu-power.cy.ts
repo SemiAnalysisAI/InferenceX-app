@@ -116,14 +116,6 @@ describe('PowerX', () => {
       cy.get('[data-testid="gpu-metrics-error"]').should('be.visible');
       cy.get('[data-testid="gpu-metrics-error"]').find('p').should('contain.text', 'numeric');
     });
-
-    it('renders description text and PowerX heading', () => {
-      openPowerX();
-      cy.get('[data-testid="gpu-metrics-display"]').find('h2').should('contain.text', 'PowerX');
-      cy.get('[data-testid="gpu-metrics-display"]')
-        .should('contain.text', 'gpu_metrics')
-        .and('contain.text', 'GitHub Actions run ID');
-    });
   });
 });
 

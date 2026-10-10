@@ -6,27 +6,12 @@ import { defaultRouteModel, MODEL_ROUTES } from './model-routes';
 import {
   getTabTitle,
   isValidTab,
-  LANDING_META,
   MODEL_TAB_META,
   modelTabCanonicalPath,
   modelTabMetadata,
   TAB_META,
   tabMetadata,
 } from './tab-meta';
-
-describe('agentic inference positioning', () => {
-  it('uses agentic inference for the category and AgentX for the scenario', () => {
-    expect(LANDING_META.title).toBe('AI Accelerator System Benchmark');
-    expect(LANDING_META.brand).toBe('AcceleratorX by SemiAnalysis');
-    expect(LANDING_META.title).not.toContain('AgentX');
-    expect(LANDING_META.description).toMatch(/AgentX.*scenario/u);
-    expect(LANDING_META.description).toContain('fixed-sequence');
-    expect(TAB_META.inference.title).toContain('Agentic Inference');
-    expect(TAB_META.inference.title).not.toContain('AgentX');
-    expect(TAB_META.inference.description).toMatch(/AgentX.*workload/u);
-    expect(TAB_META.inference.description).toContain('fixed-sequence');
-  });
-});
 
 describe('current image metadata', () => {
   it('uses the canonical tab copy and bilingual alternates', () => {

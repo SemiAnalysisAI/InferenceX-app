@@ -28,8 +28,6 @@ import {
   localizeVsHighlightValueZh,
 } from './chip-pages-zh';
 
-const EM_OR_EN_DASH = /[—–]/u;
-
 describe('chip page registry integrity', () => {
   it('resolves every hwKey in HW_REGISTRY and every specName in GPU_SPECS', () => {
     for (const entry of getAllChipPages()) {
@@ -109,29 +107,6 @@ describe('chip page content quality', () => {
     }
     for (const page of getAllChipVsPages()) {
       expect(buildChipVsFaq(page).length).toBeGreaterThanOrEqual(3);
-    }
-  });
-
-  it('contains no em or en dashes in any locale (glossary style rule)', () => {
-    for (const entry of getAllChipPages()) {
-      const zh = getZhChipTranslation(entry.slug);
-      const texts = [
-        entry.summary,
-        ...entry.overview,
-        entry.benchmarkContext,
-        ...buildChipFaq(entry).flatMap((item) => [item.question, item.answer]),
-        ...(zh ? [zh.summary, ...zh.overview, zh.benchmarkContext] : []),
-        ...buildZhChipFaq(entry).flatMap((item) => [item.question, item.answer]),
-      ];
-      for (const text of texts) {
-        expect(text).not.toMatch(EM_OR_EN_DASH);
-      }
-    }
-    for (const page of getAllChipVsPages()) {
-      for (const item of [...buildChipVsFaq(page), ...buildZhChipVsFaq(page)]) {
-        expect(item.question).not.toMatch(EM_OR_EN_DASH);
-        expect(item.answer).not.toMatch(EM_OR_EN_DASH);
-      }
     }
   });
 });

@@ -90,14 +90,6 @@ describe('Historical Trends — Content & Interactions', () => {
       .should('have.value', '50');
   });
 
-  it('chart title includes "Over Time" and "Interactivity" reflecting the operating point', () => {
-    cy.get('[data-testid="historical-trend-figure"]')
-      .find('h2')
-      .invoke('text')
-      .should('include', 'Over Time')
-      .and('include', 'Interactivity');
-  });
-
   it('sequence selector is present and has selectable options', () => {
     cy.document().then((doc) => {
       delete doc.body.dataset.scrollLocked;

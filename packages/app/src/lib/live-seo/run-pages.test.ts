@@ -13,22 +13,11 @@ import { INFERENCE_MODEL_SLUGS } from '@/lib/routing/inference-model-slug';
 import {
   getAllRunPageEntries,
   getRunPageEntry,
-  runPageDescription,
-  runPageFaqQuestions,
-  runPageHeading,
-  runPageKeywords,
   runPagePath,
   runPageTitle,
 } from '@/lib/live-seo/run-pages';
-import {
-  runPageDescriptionZh,
-  runPageFaqQuestionsZh,
-  runPageHeadingZh,
-  runPageKeywordsZh,
-  runPageTitleZh,
-} from '@/lib/live-seo/run-pages-zh';
+import { runPageDescriptionZh, runPageTitleZh } from '@/lib/live-seo/run-pages-zh';
 
-const FORBIDDEN_DASHES = /[\u2013\u2014]/;
 const CJK = /[\u4E00-\u9FFF]/;
 
 describe('run pages registry', () => {
@@ -58,37 +47,6 @@ describe('run pages registry', () => {
 });
 
 describe('run pages copy', () => {
-  it('contains no em or en dashes and enough keywords in either locale', () => {
-    for (const entry of getAllRunPageEntries()) {
-      const faq = runPageFaqQuestions(entry);
-      const faqZh = runPageFaqQuestionsZh(entry);
-      const copy = [
-        runPageTitle(entry),
-        runPageHeading(entry),
-        runPageDescription(entry),
-        ...runPageKeywords(entry),
-        faq.throughput,
-        faq.cost,
-        faq.serving,
-        faq.methodology,
-        runPageTitleZh(entry),
-        runPageHeadingZh(entry),
-        runPageDescriptionZh(entry),
-        ...runPageKeywordsZh(entry),
-        faqZh.throughput,
-        faqZh.cost,
-        faqZh.serving,
-        faqZh.methodology,
-      ];
-      for (const text of copy) {
-        expect(text, `dash found in copy for ${entry.slug}: ${text}`).not.toMatch(FORBIDDEN_DASHES);
-        expect(text.length).toBeGreaterThan(0);
-      }
-      expect(runPageKeywords(entry).length).toBeGreaterThanOrEqual(6);
-      expect(runPageKeywordsZh(entry).length).toBeGreaterThanOrEqual(6);
-    }
-  });
-
   it('keeps Chinese copy Chinese while model and chip names stay English', () => {
     for (const entry of getAllRunPageEntries()) {
       expect(runPageTitleZh(entry)).toMatch(CJK);

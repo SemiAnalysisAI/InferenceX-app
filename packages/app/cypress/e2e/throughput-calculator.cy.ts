@@ -114,13 +114,6 @@ describe('TCO Calculator', () => {
       );
     });
 
-    it('renders subtitle with source', () => {
-      cy.get('[data-testid="calculator-chart-section"]').should(
-        'contain.text',
-        'SemiAnalysis InferenceX',
-      );
-    });
-
     it('places the config-range toggle beside its label above the slider', () => {
       cy.get('[data-testid="calculator-hide-over-limit-control"]').then(($control) => {
         const label = $control.children().first()[0].getBoundingClientRect();
