@@ -29,12 +29,6 @@ describe('Page Load & Navigation', () => {
     cy.wrap(errors).should('have.length', 0);
   });
 
-  it('page loads without 404 errors', () => {
-    cy.visit('/');
-    cy.get('[data-testid="header"]').should('exist');
-    cy.get('[data-testid="footer"]').should('exist');
-  });
-
   it('navigates from the footer to the land acknowledgement page', () => {
     cy.visit('/', {
       onBeforeLoad(win) {

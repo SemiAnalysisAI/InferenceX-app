@@ -51,10 +51,13 @@ describe('withExplorerRoute', () => {
     expect(res).toBe(notFound);
   });
 
-  it('returns an uncached 500 when the handler throws', async () => {
-    const res = await withExplorerRoute(() => Promise.reject(new Error('boom')))(makeRequest());
+  it('returns a sanitized, uncached 500 when the handler throws', async () => {
+    const res = await withExplorerRoute(() =>
+      Promise.reject(new Error('ECONNREFUSED postgres://private-host/internal-database')),
+    )(makeRequest());
     expect(res.status).toBe(500);
     expect(res.headers.get('Cache-Control')).toBeNull();
+    await expect(res.json()).resolves.toEqual({ error: 'Internal server error' });
   });
 
   it('retries replica recovery conflicts (40001) and then succeeds', async () => {

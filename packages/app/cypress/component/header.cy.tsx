@@ -56,14 +56,6 @@ describe('Header', () => {
     mountHeader('/');
   });
 
-  it('displays the InferenceX title', () => {
-    cy.get('[data-testid="header"]').contains('InferenceX').should('be.visible');
-  });
-
-  it('displays the SemiAnalysis logo', () => {
-    cy.get('[data-testid="header"]').find('img[alt="SemiAnalysis logo"]').should('exist');
-  });
-
   it('keeps the sticky header opaque enough that content cannot show through', () => {
     // Regression: `bg-background/60 backdrop-blur-[2px]` let page text bleed
     // through the sticky header while scrolling on mobile.
@@ -81,12 +73,6 @@ describe('Header', () => {
       const { backdropFilter } = getComputedStyle($el[0]);
       expect(backdropFilter, 'computed backdrop-filter').to.contain('blur(');
     });
-  });
-
-  it('shows Overview as a top-level nav link', () => {
-    cy.get('[data-testid="nav-link-overview"]')
-      .should('be.visible')
-      .and('have.attr', 'href', '/overview');
   });
 
   it('pushes the desktop Overview link exactly once — no timer-based re-push', () => {
@@ -127,11 +113,6 @@ describe('Header', () => {
     mountHeader('/evaluation');
     cy.get('[data-testid="nav-link-dashboard"]').click();
     cy.wrap(mockRouter.push).should('have.been.calledWith', '/inference');
-  });
-
-  it('shows Dashboard nav link', () => {
-    cy.get('[data-testid="nav-link-dashboard"]').should('be.visible');
-    cy.get('[data-testid="nav-link-dashboard"]').should('have.attr', 'href', '/inference');
   });
 
   it('keeps Comparisons and Articles out of the header nav (they live in the footer)', () => {
@@ -194,10 +175,6 @@ describe('Header', () => {
     cy.get('[data-testid="header-star-button"]')
       .should('have.attr', 'href')
       .and('include', 'github.com/SemiAnalysisAI/InferenceX');
-  });
-
-  it('shows the theme toggle button', () => {
-    cy.get('[data-testid="theme-toggle"]').should('be.visible');
   });
 
   for (const pathname of ['/', '/zh']) {

@@ -237,14 +237,6 @@
       "duration": 26944
     },
     {
-      "spec": "cypress/e2e/performance-over-time-removal.cy.ts",
-      "duration": 1325
-    },
-    {
-      "spec": "cypress/e2e/performance.cy.ts",
-      "duration": 2377
-    },
-    {
       "spec": "cypress/e2e/profit-estimator.cy.ts",
       "duration": 39450
     },

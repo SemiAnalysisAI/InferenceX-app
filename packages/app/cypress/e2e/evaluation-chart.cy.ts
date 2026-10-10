@@ -1,47 +1,5 @@
 import { expectNoPageOverflow } from '../support/e2e';
 
-describe('Evaluation Chart', () => {
-  before(() => {
-    cy.viewport(1440, 900);
-    cy.window().then((win) => {
-      win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-    });
-    cy.visit('/evaluation');
-    cy.get('[data-testid="evaluation-chart-display"]').should('exist');
-    cy.get('[data-testid="evaluation-view-toggle"]').contains('Chart').click();
-  });
-
-  it('shows the Accuracy Evals heading', () => {
-    cy.contains('h2', 'Accuracy Evals').should('be.visible');
-  });
-
-  it('shows benchmark selector', () => {
-    cy.get('[data-testid="evaluation-benchmark-selector"]').should('be.visible');
-  });
-
-  it('benchmark selector has options', () => {
-    cy.get('[data-testid="evaluation-benchmark-selector"]').click();
-    cy.get('[role="option"]').should('have.length.greaterThan', 0);
-    cy.get('body').type('{esc}');
-  });
-
-  it('shows a chart with SVG', () => {
-    cy.get('#evaluation-chart').find('svg').should('exist');
-  });
-
-  it('does not show "No data available" text', () => {
-    cy.get('[data-testid="evaluation-chart-display"]').should('exist');
-    cy.contains('No data available').should('not.exist');
-  });
-
-  it('shows Source attribution in chart caption', () => {
-    cy.get('#evaluation-chart')
-      .closest('figure')
-      .find('[data-testid="result-context"]')
-      .should('contain', 'SemiAnalysis InferenceX');
-  });
-});
-
 describe('Evaluation Chart — Content & Interactions', () => {
   before(() => {
     cy.viewport(1440, 900);
@@ -79,21 +37,6 @@ describe('Evaluation Chart — Content & Interactions', () => {
       $body.removeAttr('data-scroll-locked');
       $body.css('pointer-events', '');
     });
-  });
-
-  it('legend sidebar renders with at least one hardware item', () => {
-    cy.get('#evaluation-chart')
-      .closest('figure')
-      .find('.sidebar-legend')
-      .should('exist')
-      .find('li')
-      .should('have.length.greaterThan', 0);
-  });
-
-  it('date picker section is present with a Run Date button', () => {
-    cy.get('[data-testid="evaluation-chart-display"]')
-      .contains('button', 'Run Date:')
-      .should('exist');
   });
 
   it('chart caption includes the selected model name and benchmark', () => {

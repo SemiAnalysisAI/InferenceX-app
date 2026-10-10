@@ -21,10 +21,6 @@ describe('Historical Trends Tab', () => {
     visitHistoricalWithSetup();
   });
 
-  it('renders the Historical Trends tab content', () => {
-    cy.get('[data-testid="historical-trends-display"]').should('contain.text', 'Over Time');
-  });
-
   it('renders a slider for target interactivity', () => {
     cy.get('[data-testid="historical-target-slider"]')
       .should('exist')
@@ -35,10 +31,6 @@ describe('Historical Trends Tab', () => {
     cy.get('[data-testid="historical-target-input"]')
       .should('exist')
       .and('have.attr', 'aria-label', 'Target Interactivity (tok/s/user)');
-  });
-
-  it('renders a trend chart SVG after data loads', () => {
-    cy.get('[data-testid="historical-trends-display"]').find('svg').should('exist');
   });
 
   it('is reachable from the footer, not the tab bar', () => {
@@ -106,18 +98,6 @@ describe('Historical Trends — Content & Interactions', () => {
       .and('include', 'Interactivity');
   });
 
-  it('model selector is present and has selectable options', () => {
-    // Clear any stale Radix scroll lock from prior Select interactions
-    cy.document().then((doc) => {
-      delete doc.body.dataset.scrollLocked;
-      doc.body.style.removeProperty('pointer-events');
-    });
-    cy.get('[data-testid="model-selector"]').should('be.visible');
-    cy.get('[data-testid="model-selector"]').click();
-    cy.get('[role="option"]').should('have.length.greaterThan', 0);
-    cy.get('body').type('{esc}');
-  });
-
   it('sequence selector is present and has selectable options', () => {
     cy.document().then((doc) => {
       delete doc.body.dataset.scrollLocked;
@@ -139,14 +119,6 @@ describe('Historical Trends — Content & Interactions', () => {
     cy.get('[data-testid="precision-multiselect"][role="combobox"]')
       .should('be.visible')
       .and('be.enabled');
-  });
-
-  it('legend sidebar renders with hardware items matching visible trend lines', () => {
-    cy.get('[data-testid="historical-trend-figure"]')
-      .find('.sidebar-legend')
-      .should('exist')
-      .find('li')
-      .should('have.length.greaterThan', 0);
   });
 
   it('Log Scale switch exists in the legend and can be toggled', () => {

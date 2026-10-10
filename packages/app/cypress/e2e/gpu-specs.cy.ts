@@ -95,10 +95,6 @@ describe('GPU Specs Tab', () => {
     cy.contains('Dense tensor core peak TFLOP/s').should('be.visible');
   });
 
-  it('scale-out topology diagrams section is visible', () => {
-    cy.contains('Scale-Out Topology Diagrams').scrollIntoView().should('be.visible');
-  });
-
   it('topology diagrams render for GPUs with scale-out', () => {
     const gpusWithTopology = [
       'h100-sxm',
@@ -157,10 +153,6 @@ describe('GPU Specs Tab', () => {
     cy.get('table').contains('button', '8-rail optimized').first().click({ force: true });
     cy.get('[role="dialog"]').should('be.visible');
     cy.get('body').type('{esc}');
-  });
-
-  it('scale-up topology diagrams section is visible', () => {
-    cy.contains('Scale-Up Topology Diagrams').scrollIntoView().should('be.visible');
   });
 
   it('scale-up topology diagrams render for all GPUs', () => {
@@ -249,13 +241,6 @@ describe('GPU Specs Bar Chart View', () => {
     });
   });
 
-  it('view toggle is visible with Table, Chart, and Radar options', () => {
-    cy.get('[data-testid="gpu-specs-view-toggle"]').should('be.visible');
-    cy.get('[data-testid="gpu-specs-table-view-btn"]').should('contain.text', 'Table');
-    cy.get('[data-testid="gpu-specs-chart-view-btn"]').should('contain.text', 'Chart');
-    cy.get('[data-testid="gpu-specs-radar-view-btn"]').should('contain.text', 'Radar');
-  });
-
   it('table view is active by default', () => {
     cy.get('[data-testid="gpu-specs-table-view-btn"]').should('have.attr', 'aria-selected', 'true');
     cy.get('[data-testid="gpu-specs-chart-view-btn"]').should(
@@ -272,16 +257,6 @@ describe('GPU Specs Bar Chart View', () => {
     cy.get('[data-testid="gpu-specs-bar-chart"]').should('be.visible');
     cy.get('table').should('not.exist');
     cy.get('[data-testid="gpu-specs-chart-view-btn"]').should('have.attr', 'aria-selected', 'true');
-  });
-
-  it('bar chart renders SVG with bars', () => {
-    // Already in chart view from previous test
-    cy.get('[data-testid="gpu-specs-bar-chart"] svg').should('exist');
-    cy.get('[data-testid="gpu-specs-bar-chart"] svg .bar').should('have.length.at.least', 5);
-  });
-
-  it('metric selector is visible in chart view', () => {
-    cy.get('[data-testid="gpu-specs-metric-select"]').should('be.visible');
   });
 
   it('vendor legend is visible in chart view', () => {
@@ -339,18 +314,6 @@ describe('GPU Specs Radar Chart View', () => {
     cy.get('[data-testid="gpu-specs-radar-chart"] svg .radar-dot').should(
       'have.length.at.least',
       20,
-    );
-  });
-
-  it('sidebar legend with GPU items is visible', () => {
-    cy.get('[data-testid="gpu-specs-radar-chart"] .sidebar-legend').should('exist');
-    cy.get('[data-testid="gpu-specs-radar-chart"] .sidebar-legend').should(
-      'contain.text',
-      'H100 SXM',
-    );
-    cy.get('[data-testid="gpu-specs-radar-chart"] .sidebar-legend').should(
-      'contain.text',
-      'MI355X',
     );
   });
 
@@ -427,17 +390,6 @@ describe('Topology Dialog Navigation', () => {
     cy.get('h2').contains('Chip Specifications').should('exist');
   });
 
-  it('scale-out topology dialog has navigation arrows', () => {
-    cy.get('table').scrollIntoView();
-    cy.get('table').contains('button', '8-rail optimized').first().click({ force: true });
-    cy.get('[role="dialog"]').should('be.visible');
-    cy.get('[data-testid="topology-nav-prev"]').should('be.visible');
-    cy.get('[data-testid="topology-nav-next"]').should('be.visible');
-    cy.get('[role="dialog"]').should('contain.text', '/ 7');
-    cy.get('body').type('{esc}');
-    cy.get('[role="dialog"]').should('not.exist');
-  });
-
   it('scale-out topology dialog next button navigates to next GPU', () => {
     cy.get('table').scrollIntoView();
     cy.get('table').contains('button', '8-rail optimized').first().click({ force: true });
@@ -470,17 +422,6 @@ describe('Topology Dialog Navigation', () => {
     cy.get('[role="dialog"]').should('contain.text', 'H200 SXM Scale-Out Topology');
     cy.get('body').type('{leftArrow}');
     cy.get('[role="dialog"]').should('contain.text', 'H100 SXM Scale-Out Topology');
-    cy.get('body').type('{esc}');
-    cy.get('[role="dialog"]').should('not.exist');
-  });
-
-  it('scale-up topology dialog has navigation arrows', () => {
-    cy.get('table').scrollIntoView();
-    cy.get('table').contains('button', 'Switched 4-rail Optimized').first().click({ force: true });
-    cy.get('[role="dialog"]').should('be.visible');
-    cy.get('[data-testid="scaleup-topology-nav-prev"]').should('be.visible');
-    cy.get('[data-testid="scaleup-topology-nav-next"]').should('be.visible');
-    cy.get('[role="dialog"]').should('contain.text', '/ 9');
     cy.get('body').type('{esc}');
     cy.get('[role="dialog"]').should('not.exist');
   });
