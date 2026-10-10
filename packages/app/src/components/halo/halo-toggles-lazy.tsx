@@ -1,7 +1,7 @@
 'use client';
 
 import { lazy, Suspense } from 'react';
-import { useEasterEggTheme } from '@/lib/use-easter-egg-theme';
+import { useEasterEggTheme } from '@/lib/themes/use-easter-egg-theme';
 
 const Toggles = lazy(() =>
   import('./halo-toggles').then((module) => ({

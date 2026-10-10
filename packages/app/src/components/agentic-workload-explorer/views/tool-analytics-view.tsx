@@ -16,8 +16,8 @@ import {
 import { useDashboardData } from '@/hooks/agentic-workload-explorer/use-dashboard-data';
 import { exportSvgToPng, ExportPngButton } from '@/lib/agentic-workload-explorer/export-png';
 import { getToolColor } from '@/lib/agentic-workload-explorer/tool-colors';
-import { useLocale } from '@/lib/use-locale';
-import { track } from '@/lib/analytics';
+import { useLocale } from '@/lib/i18n/use-locale';
+import { track } from '@/lib/analytics/analytics';
 import { Expandable } from '@/components/agentic-workload-explorer/expandable-chart';
 
 // ── Types ────────────────────────────────────────────────────────

@@ -6,7 +6,7 @@ import { join } from 'node:path';
 
 import { ImageResponse } from 'next/og';
 
-import type { BlogPostMeta } from '@/lib/blog';
+import type { BlogPostMeta } from '@/lib/blog/blog';
 
 export const size = { width: 1200, height: 630 };
 

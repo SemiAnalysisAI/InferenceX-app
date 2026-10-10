@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { InferenceData } from '@/components/inference/types';
 import { chartDefinitions } from '@/components/inference/metric-registry';
-import type { ParetoDirection } from '@/lib/chart-utils';
+import type { ParetoDirection } from '@/lib/charts/chart-utils';
 
 import { chartFrontier, isPowerCurveMetric, upperPowerEnvelope } from './powerCurves';
 

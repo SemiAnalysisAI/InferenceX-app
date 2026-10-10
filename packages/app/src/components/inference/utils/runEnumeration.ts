@@ -16,8 +16,8 @@
  */
 
 import type { AggDataEntry } from '@/components/inference/types';
-import type { RunConfigRow } from '@/lib/api';
-import { getHardwareKey } from '@/lib/chart-utils';
+import type { RunConfigRow } from '@/lib/api/api';
+import { getHardwareKey } from '@/lib/charts/chart-utils';
 
 export interface DataRun {
   /** GitHub run id (string). */

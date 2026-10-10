@@ -7,8 +7,8 @@ import {
   useSessionReplay,
   ReplayControls,
 } from '@/components/agentic-workload-explorer/session-replay';
-import { useLocale } from '@/lib/use-locale';
-import { track } from '@/lib/analytics';
+import { useLocale } from '@/lib/i18n/use-locale';
+import { track } from '@/lib/analytics/analytics';
 
 // ── Strings ─────────────────────────────────────────────────────
 

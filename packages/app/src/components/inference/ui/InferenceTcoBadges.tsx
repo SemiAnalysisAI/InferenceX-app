@@ -4,7 +4,7 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react';
 
 import { HW_REGISTRY } from '@semianalysisai/inferencex-constants';
 
-import { useGlobalFilterSelection } from '@/components/GlobalFilterContext';
+import { useGlobalFilterSelection } from '@/providers/GlobalFilterContext';
 
 import {
   useInferenceActions,
@@ -19,8 +19,8 @@ import {
 } from '@/components/inference/metric-registry';
 import { publishedCostsForTier } from '@/components/inference/published-costs';
 import { EditableTcoBadges } from '@/components/ui/editable-tco-badges';
-import { track } from '@/lib/analytics';
-import { useLocale } from '@/lib/use-locale';
+import { track } from '@/lib/analytics/analytics';
+import { useLocale } from '@/lib/i18n/use-locale';
 
 /** `y_costUser` → `costUser`, `y_costh` → `costh`; `undefined` off the registry. */
 function metricKeyOf(selectedYAxisMetric: string) {

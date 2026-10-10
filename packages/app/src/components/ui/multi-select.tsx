@@ -3,8 +3,8 @@
 import { CheckIcon, ChevronDownIcon, SearchIcon, XIcon } from 'lucide-react';
 import * as React from 'react';
 
-import { track } from '@/lib/analytics';
-import { cn } from '@/lib/utils';
+import { track } from '@/lib/analytics/analytics';
+import { cn } from '@/lib/shared/utils';
 import {
   CONTROL_MIN_HEIGHT,
   CONTROL_FOCUS,
@@ -13,7 +13,7 @@ import {
   CONTROL_SEARCH_STYLE,
   CONTROL_SEARCH_CLEAR_STYLE,
 } from './control-styles';
-import { useLocale } from '@/lib/use-locale';
+import { useLocale } from '@/lib/i18n/use-locale';
 
 const STRINGS = {
   en: {

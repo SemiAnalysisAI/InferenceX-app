@@ -9,7 +9,7 @@
  * point and owned-datacenter economics for the selected TCO tier.
  */
 
-import type { GpuSpecs } from '@/lib/constants';
+import type { GpuSpecs } from '@/lib/catalog/constants';
 
 import { MS_PER_MONTH, outputTokPerChip, splitTokenStreams } from './lifecycle';
 import { getThroughputForType } from './power-ranking';

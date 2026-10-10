@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 
-import { fetchReliability } from '@/lib/api';
+import { fetchReliability } from '@/lib/api/api';
 
 export function useReliability() {
   return useQuery({

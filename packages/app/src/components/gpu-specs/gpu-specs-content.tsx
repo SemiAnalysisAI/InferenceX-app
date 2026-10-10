@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useRef, useState } from 'react';
-import { track } from '@/lib/analytics';
+import { track } from '@/lib/analytics/analytics';
 import { BarChart3, Radar, Table2 } from 'lucide-react';
 
 import { Card } from '@/components/ui/card';
@@ -19,7 +19,7 @@ import {
   GPU_CHART_METRICS,
   GPU_SPECS,
   type GpuSpec,
-} from '@/lib/gpu-specs';
+} from '@/lib/catalog/gpu-specs';
 import {
   TopologyDiagram,
   type TopologyDiagramHandle,
@@ -30,7 +30,7 @@ import {
 } from '@/components/gpu-specs/scale-up-topology-diagram';
 import { GpuSpecsBarChart } from '@/components/gpu-specs/gpu-specs-bar-chart';
 import { GpuSpecsRadarChart } from '@/components/gpu-specs/gpu-specs-radar-chart';
-import { useLocale } from '@/lib/use-locale';
+import { useLocale } from '@/lib/i18n/use-locale';
 
 function SpecCell({
   children,

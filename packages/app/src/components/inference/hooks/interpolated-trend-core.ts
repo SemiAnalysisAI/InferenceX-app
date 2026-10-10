@@ -21,13 +21,20 @@ import type {
   TrendDataPoint,
   YAxisMetricKey,
 } from '@/components/inference/types';
-import type { BenchmarkRow } from '@/lib/api';
-import { benchmarkCurveDate, dedupeAgenticHistoryRuns } from '@/lib/benchmark-run-selection';
-import { rowToAggDataEntry } from '@/lib/benchmark-transform';
-import { pricingCacheHitRate } from '@/lib/cache-pricing';
-import { buildDerivedChartFields, getHardwareKey, type DerivedMetricKey } from '@/lib/chart-utils';
-import { DEFAULT_TCO_BASIS, isKnownGpu, type TcoBasis } from '@/lib/constants';
-import { supportsTokenMetric } from '@/lib/supplemental-benchmarks';
+import type { BenchmarkRow } from '@/lib/api/api';
+import {
+  benchmarkCurveDate,
+  dedupeAgenticHistoryRuns,
+} from '@/lib/benchmarks/benchmark-run-selection';
+import { rowToAggDataEntry } from '@/lib/benchmarks/benchmark-transform';
+import { pricingCacheHitRate } from '@/lib/calculator/cache-pricing';
+import {
+  buildDerivedChartFields,
+  getHardwareKey,
+  type DerivedMetricKey,
+} from '@/lib/charts/chart-utils';
+import { DEFAULT_TCO_BASIS, isKnownGpu, type TcoBasis } from '@/lib/catalog/constants';
+import { supportsTokenMetric } from '@/lib/benchmarks/supplemental-benchmarks';
 
 /** Snapshot-scoped token metric support for raw historical rows. */
 export function rowSupportsTrendMetric(row: BenchmarkRow, selectedYAxisMetric: string): boolean {

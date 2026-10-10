@@ -975,7 +975,7 @@ describe('GET /api/unofficial-run', () => {
 // Retained outputs of the real producer CLI, with synthetic input traces.
 import validProcessorPower from '../../../../../db/src/etl/fixtures/power-processor/valid-power.json';
 import missingProcessorPower from '../../../../../db/src/etl/fixtures/power-processor/missing-power.json';
-import { transformBenchmarkRows } from '@/lib/benchmark-transform';
+import { transformBenchmarkRows } from '@/lib/benchmarks/benchmark-transform';
 
 it('carries the actual processor audit and power through API mapping into measured chart fields', () => {
   const rows = normalizeArtifactRows([validProcessorPower, missingProcessorPower], '2026-09-11');

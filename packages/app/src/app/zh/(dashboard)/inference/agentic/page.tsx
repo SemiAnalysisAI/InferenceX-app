@@ -2,9 +2,9 @@ import type { Metadata } from 'next';
 
 import { AgenticCatalogHero } from '@/components/inference/agentic-catalog/agentic-catalog-hero';
 import { AgenticCatalogList } from '@/components/inference/agentic-catalog/agentic-catalog-list';
-import { JsonLd } from '@/components/json-ld';
-import { getAgenticCatalogGroups } from '@/lib/agentic-catalog';
-import { ZH_OG_LOCALE, zhAlternates } from '@/lib/i18n';
+import { JsonLd } from '@/components/seo/json-ld';
+import { getAgenticCatalogGroups } from '@/lib/agentx/agentic-catalog';
+import { ZH_OG_LOCALE, zhAlternates } from '@/lib/i18n/i18n';
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
 
 const TITLE = 'AgentX 遥测数据';

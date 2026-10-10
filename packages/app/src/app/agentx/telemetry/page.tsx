@@ -1,9 +1,9 @@
 import type { Metadata } from 'next';
 
 import { AgentXTelemetryArticle } from '@/components/datasets/agentx-telemetry-article';
-import { JsonLd } from '@/components/json-ld';
-import { AGENTX_TELEMETRY_GUIDE } from '@/lib/agentx-telemetry';
-import { enAlternates } from '@/lib/i18n';
+import { JsonLd } from '@/components/seo/json-ld';
+import { AGENTX_TELEMETRY_GUIDE } from '@/lib/agentx/agentx-telemetry';
+import { enAlternates } from '@/lib/i18n/i18n';
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
 
 const TITLE = 'Exploring Agentic Workloads: Detailed Telemetry';

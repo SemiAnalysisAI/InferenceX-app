@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 
-import { fetchSubmissions } from '@/lib/api';
+import { fetchSubmissions } from '@/lib/api/api';
 
 export function useSubmissions() {
   return useQuery({

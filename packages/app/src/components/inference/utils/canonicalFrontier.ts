@@ -8,12 +8,12 @@
  * only points that belong to both sets may be drawn as optimal.
  */
 import type { DerivedAgenticMetricMap } from '@/hooks/api/use-derived-agentic-metrics';
-import { isPersistedBenchmarkId } from '@/lib/benchmark-id';
+import { isPersistedBenchmarkId } from '@/lib/benchmarks/benchmark-id';
 import {
   isFrontierEligible,
   paretoFrontForDirection,
   type ParetoDirection,
-} from '@/lib/chart-utils';
+} from '@/lib/charts/chart-utils';
 
 import type { InferenceData } from '../types';
 

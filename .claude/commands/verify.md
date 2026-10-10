@@ -88,7 +88,7 @@ Required: all tests pass
   - New utility functions → colocated unit test
   - New UI features → E2E test
   - Bug fixes → regression test with exact triggering input
-- Check: do new interactive elements have `track()` from `@/lib/analytics`?
+- Check: do new interactive elements have `track()` from `@/lib/analytics/analytics`?
 
 ## Output Format
 

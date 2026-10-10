@@ -1,7 +1,7 @@
 'use client';
 
 import { Badge } from '@/components/ui/badge';
-import { cn } from '@/lib/utils';
+import { cn } from '@/lib/shared/utils';
 
 export interface EditableTcoBadgeItem {
   /** Hardware key, e.g. `gb300`. Used for ids and analytics. */

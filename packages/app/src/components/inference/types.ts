@@ -1,10 +1,10 @@
 import type React from 'react';
 import type { PowerAudit, WorkerPower } from '@semianalysisai/inferencex-db/queries/benchmarks';
 
-import type { HardwareEntry } from '@/lib/constants';
-import type { Model, Sequence } from '@/lib/data-mappings';
-import type { PowerTier } from '@/lib/power-tier';
-import type { SystemPowerEstimate } from '@/lib/modeled-system-power';
+import type { HardwareEntry } from '@/lib/catalog/constants';
+import type { Model, Sequence } from '@/lib/catalog/data-mappings';
+import type { PowerTier } from '@/lib/power/power-tier';
+import type { SystemPowerEstimate } from '@/lib/power/modeled-system-power';
 import type { MetricKey } from './metric-registry';
 
 export type { WorkerPower };
@@ -579,7 +579,7 @@ export interface QuickFilters {
   frameworks: string[];
   deployment: DeploymentMode[];
   spec: SpecMode[];
-  /** Measured-power certification tiers (see `@/lib/power-tier`). */
+  /** Measured-power certification tiers (see `@/lib/power/power-tier`). */
   power: PowerTier[];
 }
 

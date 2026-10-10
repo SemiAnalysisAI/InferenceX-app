@@ -1,5 +1,8 @@
-import { getLocalizedFrameworks, getOptimizationsOverview } from '@/lib/agentx-optimizations-zh';
-import type { Locale } from '@/lib/i18n';
+import {
+  getLocalizedFrameworks,
+  getOptimizationsOverview,
+} from '@/lib/agentx/agentx-optimizations-zh';
+import type { Locale } from '@/lib/i18n/i18n';
 
 import { AgentXOptimizationsLink } from './agentx-optimizations-link';
 

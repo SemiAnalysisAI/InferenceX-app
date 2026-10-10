@@ -7,7 +7,7 @@ import { AggregateChart, type AggregatePoint, type PercentileKey } from './aggre
 import { CHART_SIZES } from './chart-shared';
 import { ExpandableChart } from './expandable-chart';
 import { chipLabel } from './sibling-nav';
-import { useLocale } from '@/lib/use-locale';
+import { useLocale } from '@/lib/i18n/use-locale';
 
 /** Bundle per-percentile values for one sibling into the shape AggregateChart wants. */
 function toAggPoint(

@@ -1,4 +1,4 @@
-import type { ScenarioKind } from '@/lib/data-mappings';
+import type { ScenarioKind } from '@/lib/catalog/data-mappings';
 
 export interface LabelState {
   showPointLabels: boolean;

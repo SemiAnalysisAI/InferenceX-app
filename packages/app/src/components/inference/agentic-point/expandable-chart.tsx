@@ -4,8 +4,8 @@ import { useState, type ReactNode } from 'react';
 import { Maximize2 } from 'lucide-react';
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { track } from '@/lib/analytics';
-import { useLocale } from '@/lib/use-locale';
+import { track } from '@/lib/analytics/analytics';
+import { useLocale } from '@/lib/i18n/use-locale';
 
 /**
  * Wraps a chart in a card with a header + expand button. Click the button to

@@ -1,12 +1,12 @@
 import Link from 'next/link';
 
-import { JsonLd } from '@/components/json-ld';
+import { JsonLd } from '@/components/seo/json-ld';
 import { Card } from '@/components/ui/card';
 import { Heading } from '@/components/ui/heading';
-import { compileBlogMdx } from '@/lib/blog-mdx';
-import { comparisonScenarioForModel } from '@/lib/compare-agentx';
-import type { Locale } from '@/lib/i18n';
-import type { ModelPage } from '@/lib/model-pages';
+import { compileBlogMdx } from '@/lib/blog/blog-mdx';
+import { comparisonScenarioForModel } from '@/lib/compare/compare-agentx';
+import type { Locale } from '@/lib/i18n/i18n';
+import type { ModelPage } from '@/lib/catalog/model-pages';
 import { SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
 import EmbeddedModelDashboard from './EmbeddedModelDashboard';

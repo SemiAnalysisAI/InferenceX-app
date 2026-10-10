@@ -2,7 +2,7 @@
 
 import { Card } from '@/components/ui/card';
 import { Heading } from '@/components/ui/heading';
-import { useLocale } from '@/lib/use-locale';
+import { useLocale } from '@/lib/i18n/use-locale';
 
 import {
   COLLECTIVEX_KNOWN_FOOTNOTES,

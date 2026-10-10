@@ -2,9 +2,9 @@
 
 import { useState } from 'react';
 
-import { getModelLogo, type Model } from '@/lib/data-mappings';
-import { isMonochromeLogo } from '@/lib/model-logos';
-import { cn } from '@/lib/utils';
+import { getModelLogo, type Model } from '@/lib/catalog/data-mappings';
+import { isMonochromeLogo } from '@/lib/catalog/model-logos';
+import { cn } from '@/lib/shared/utils';
 
 /**
  * Small inline logo for the model creator, rendered beside the model name

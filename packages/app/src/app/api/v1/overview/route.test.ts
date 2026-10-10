@@ -6,11 +6,11 @@ const { mockGetOverviewPageData, mockCachedJson } = vi.hoisted(() => ({
   mockCachedJson: vi.fn((data: unknown) => Response.json(data)),
 }));
 
-vi.mock('@/lib/overview-data.server', () => ({
+vi.mock('@/lib/overview/overview-data.server', () => ({
   getOverviewPageData: mockGetOverviewPageData,
 }));
 
-vi.mock('@/lib/api-cache', () => ({
+vi.mock('@/lib/cache/api-cache', () => ({
   cachedJson: mockCachedJson,
 }));
 

@@ -177,7 +177,7 @@ Structure (~3 elements, in order):
 
 1. **One short intro paragraph** — name the two SKUs and their generation, then explain that the radar normalizes each axis to the cross-vendor maximum in [`/gpu-specs`](/gpu-specs), so the visible polygons compress against axes where a different SKU (typically GB200/GB300 NVL72 for scale-up-domain axes, GB300 NVL72 for FP4) sets the ceiling.
 2. **`<Figure>` for the radar.** Save the user's radar screenshot to `packages/app/public/images/{slug}/specs-radar-light.png` (and `-dark.png` — copy the same file in if they only have one). The caption should call out (a) which SKU sets the ceiling on the most-visually-compressed axes and the absolute max value (e.g. "FP4 max is GB300 NVL72 at 15 PFLOP/s/GPU, so B200's 9 PFLOP/s reads ~60%"), (b) that the older-gen SKU reads 0% on the FP4 axis when it has no FP4 tensor cores.
-3. **Absolute specs table.** Pull values directly from `packages/app/src/lib/gpu-specs.ts` — never paraphrase from memory or a vendor datasheet, because the spec file is the source of truth the dashboard renders. Include both per-GPU and scale-up-domain rows so the reader can audit the implications paragraph.
+3. **Absolute specs table.** Pull values directly from `packages/app/src/lib/catalog/gpu-specs.ts` — never paraphrase from memory or a vendor datasheet, because the spec file is the source of truth the dashboard renders. Include both per-GPU and scale-up-domain rows so the reader can audit the implications paragraph.
 
 Standard row set (10 rows, in this order; drop rows that are identical and uninteresting for a same-vendor same-generation comparison):
 

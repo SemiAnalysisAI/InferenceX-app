@@ -2,7 +2,7 @@
 
 import { formatNumber } from '@/lib/agentic-workload-explorer/format';
 import type { PricingCoverage } from '@/lib/agentic-workload-explorer/api-types';
-import { useLocale } from '@/lib/use-locale';
+import { useLocale } from '@/lib/i18n/use-locale';
 
 function formatCoverage(value: number | null): string {
   return value === null ? '—' : `${(value * 100).toFixed(2)}%`;

@@ -12,7 +12,7 @@ import {
 } from '@/components/ai-chart/types';
 import { buildParsePrompt, buildSummaryPrompt } from '@/components/ai-chart/prompt-templates';
 import type { InferenceData } from '@/components/inference/types';
-import { callLlm } from '@/lib/ai-providers';
+import { callLlm } from '@/lib/ai-chart/ai-providers';
 import {
   fetchBenchmarks,
   fetchBenchmarkHistory,
@@ -20,15 +20,15 @@ import {
   fetchReliability,
   type EvalRow,
   type ReliabilityRow,
-} from '@/lib/api';
-import { transformBenchmarkRows } from '@/lib/benchmark-transform';
+} from '@/lib/api/api';
+import { transformBenchmarkRows } from '@/lib/benchmarks/benchmark-transform';
 import {
   dedupeAgenticHistoryRuns,
   dedupeRowsToLatestPerConfig,
-} from '@/lib/benchmark-run-selection';
-import { normalizeEvalHardwareKey, generateHighContrastColors } from '@/lib/chart-utils';
-import { getHardwareConfig, getModelSortIndex } from '@/lib/constants';
-import type { Locale } from '@/lib/i18n';
+} from '@/lib/benchmarks/benchmark-run-selection';
+import { normalizeEvalHardwareKey, generateHighContrastColors } from '@/lib/charts/chart-utils';
+import { getHardwareConfig, getModelSortIndex } from '@/lib/catalog/constants';
+import type { Locale } from '@/lib/i18n/i18n';
 
 import {
   buildAiLineData,

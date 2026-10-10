@@ -4,7 +4,7 @@ import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { OverviewPageData } from '@/lib/overview-data';
+import type { OverviewPageData } from '@/lib/overview/overview-data';
 
 import { OverviewPageContent } from './overview-page';
 import type { OverviewLocale } from './overview-strings';

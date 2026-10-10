@@ -5,7 +5,7 @@
  */
 
 import type { RequestRecord } from '@/hooks/api/use-request-timeline';
-import { localePath, type Locale } from '@/lib/i18n';
+import { localePath, type Locale } from '@/lib/i18n/i18n';
 
 export type RowMode = 'conversation' | 'worker';
 

@@ -1,4 +1,4 @@
-import type { LatestImageRow } from '@/lib/api';
+import type { LatestImageRow } from '@/lib/api/api';
 import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { GET } from './route';
@@ -6,7 +6,7 @@ import { GET } from './route';
 const mocks = vi.hoisted(() => ({ images: vi.fn(), releases: vi.fn() }));
 vi.mock('@/app/api/v1/latest-images/route', () => ({ GET: mocks.images }));
 vi.mock('@/app/api/v1/framework-releases/route', () => ({ GET: mocks.releases }));
-vi.mock('@/lib/api-cache', () => ({
+vi.mock('@/lib/cache/api-cache', () => ({
   cachedJson: (data: unknown) => Response.json(data),
   cachedQuery: (fn: unknown) => fn,
 }));

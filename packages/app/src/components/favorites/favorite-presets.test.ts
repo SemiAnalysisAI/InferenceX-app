@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { Model, Sequence } from '@/lib/data-mappings';
+import { Model, Sequence } from '@/lib/catalog/data-mappings';
 
 import {
   FAVORITE_PRESETS,

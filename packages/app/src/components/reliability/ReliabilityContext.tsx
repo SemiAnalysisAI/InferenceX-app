@@ -19,7 +19,7 @@ import {
   useUrlStateSync,
 } from '@/hooks/useChartContext';
 import { useUrlState } from '@/hooks/useUrlState';
-import { getHardwareConfig, getModelSortIndex } from '@/lib/constants';
+import { getHardwareConfig, getModelSortIndex } from '@/lib/catalog/constants';
 
 import type { ModelSuccessRateData, ReliabilityChartContextType } from './types';
 

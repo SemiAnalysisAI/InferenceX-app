@@ -1,7 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { track } from '@/lib/analytics';
+import { track } from '@/lib/analytics/analytics';
 import * as d3 from 'd3';
 import { BarChart3, Check, Link as LinkIcon, Lock, Loader2, ScatterChart } from 'lucide-react';
 import { useRouter } from 'next/navigation';
@@ -25,9 +25,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 
-import { localePath, type Locale } from '@/lib/i18n';
-import { relockFeatureGate } from '@/lib/use-feature-gate';
-import { useLocale } from '@/lib/use-locale';
+import { localePath, type Locale } from '@/lib/i18n/i18n';
+import { relockFeatureGate } from '@/lib/runtime/use-feature-gate';
+import { useLocale } from '@/lib/i18n/use-locale';
 import { useClientSearchParams } from '@/hooks/useClientSearch';
 
 import GpuCorrelationChart from './GpuCorrelationChart';

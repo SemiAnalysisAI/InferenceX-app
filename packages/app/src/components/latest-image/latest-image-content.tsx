@@ -19,11 +19,11 @@ import {
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { useFrameworkReleases } from '@/hooks/api/use-framework-releases';
 import { useLatestImages } from '@/hooks/api/use-latest-images';
-import type { LatestImageRow } from '@/lib/api';
-import { track } from '@/lib/analytics';
-import { Sequence, getSequenceLabel } from '@/lib/data-mappings';
-import { useLocale } from '@/lib/use-locale';
-import { getFrameworkLabel } from '@/lib/utils';
+import type { LatestImageRow } from '@/lib/api/api';
+import { track } from '@/lib/analytics/analytics';
+import { Sequence, getSequenceLabel } from '@/lib/catalog/data-mappings';
+import { useLocale } from '@/lib/i18n/use-locale';
+import { getFrameworkLabel } from '@/lib/shared/utils';
 import {
   AGE_MAX_RED_DAYS,
   ageColorStyle,

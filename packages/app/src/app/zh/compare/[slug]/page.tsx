@@ -4,27 +4,36 @@ import { Suspense } from 'react';
 
 import { HW_REGISTRY, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
-import { JsonLd } from '@/components/json-ld';
+import { JsonLd } from '@/components/seo/json-ld';
 import {
   isAgenticSequence,
   type ScenarioSegment,
   sequenceForScenarioSegment,
-} from '@/lib/compare-scenario-route';
-import { comparisonScenarioForModel } from '@/lib/compare-agentx';
-import { canonicalCompareSlug, compareModelSeoName, parseCompareSlug } from '@/lib/compare-slug';
-import { KNOWN_MODELS, KNOWN_PRECISIONS, KNOWN_SEQUENCES, pickString } from '@/lib/compare-ssr';
+} from '@/lib/compare/compare-scenario-route';
+import { comparisonScenarioForModel } from '@/lib/compare/compare-agentx';
+import {
+  canonicalCompareSlug,
+  compareModelSeoName,
+  parseCompareSlug,
+} from '@/lib/compare/compare-slug';
+import {
+  KNOWN_MODELS,
+  KNOWN_PRECISIONS,
+  KNOWN_SEQUENCES,
+  pickString,
+} from '@/lib/compare/compare-ssr';
 import {
   getComparePageDerivedData,
   initialCompareBenchmarkRows,
-} from '@/lib/compare-page-data.server';
+} from '@/lib/compare/compare-page-data.server';
 import {
   AGENTIC_SCENARIO_INTRO_ZH,
   buildBreadcrumbJsonLdZh,
   buildJsonLdZh,
   compareMetaDescriptionZh,
   compareTableNarrativeZh,
-} from '@/lib/compare-ssr-zh';
-import { ZH_OG_LOCALE, zhAlternates } from '@/lib/i18n';
+} from '@/lib/compare/compare-ssr-zh';
+import { ZH_OG_LOCALE, zhAlternates } from '@/lib/i18n/i18n';
 import { CompareDetailRouteSkeleton } from '@/components/motion/route-skeletons';
 
 import ComparePageClient from '../../../compare/[slug]/page-client';

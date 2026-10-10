@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { TokenRevenuePricing } from '@/components/inference/types';
-import { Model } from '@/lib/data-mappings';
+import { Model } from '@/lib/catalog/data-mappings';
 
 import {
   applyCacheHitMode,

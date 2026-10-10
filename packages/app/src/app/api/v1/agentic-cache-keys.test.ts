@@ -17,7 +17,7 @@ vi.mock('@semianalysisai/inferencex-db/connection', () => ({
   FIXTURES_MODE: false,
 }));
 
-vi.mock('@/lib/api-cache', () => ({
+vi.mock('@/lib/cache/api-cache', () => ({
   // Passthrough so importing the route doesn't touch blob storage; the key is
   // still exported as CACHE_KEY_PREFIX for us to assert on.
   cachedQuery: (fn: (...args: unknown[]) => unknown) => fn,

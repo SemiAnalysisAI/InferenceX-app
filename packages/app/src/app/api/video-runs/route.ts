@@ -5,13 +5,13 @@ import {
   GITHUB_REPO,
   SITE_URL,
 } from '@semianalysisai/inferencex-constants';
-import { getGithubToken } from '@/lib/github-artifacts';
+import { getGithubToken } from '@/lib/github/github-artifacts';
 import {
   readStoredArtifact,
   storedArtifacts,
   storeVideoArtifact,
   videoStorageEnabled,
-} from '@/lib/video-storage';
+} from '@/lib/video/video-storage';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;

@@ -1,7 +1,7 @@
 import { buildCorrelationData, buildGroupedData } from '@/components/gpu-power/chart-data';
 import { servingFixture } from '@/components/video-benchmark/serving.fixture';
 import type { StoredArtifact } from '@/components/video-benchmark/stored';
-import type { BenchmarkRow } from '@/lib/api';
+import type { BenchmarkRow } from '@/lib/api/api';
 import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { GET as cache } from './cache-reuse/route';
@@ -24,7 +24,7 @@ vi.mock('@/app/api/video-runs/route', () => ({ GET: mocks.video }));
 vi.mock('@/app/api/v1/benchmarks/route', () => ({ GET: mocks.benchmarks }));
 vi.mock('@/app/api/unofficial-run/route', () => ({ GET: mocks.unofficial }));
 vi.mock('@/app/api/v1/submissions/route', () => ({ GET: mocks.submissions }));
-vi.mock('@/lib/api-cache', () => ({ cachedJson: (data: unknown) => Response.json(data) }));
+vi.mock('@/lib/cache/api-cache', () => ({ cachedJson: (data: unknown) => Response.json(data) }));
 const req = (view: string, query = '') =>
   new NextRequest(`https://example.test/api/v1/views/${view}?${query}`);
 

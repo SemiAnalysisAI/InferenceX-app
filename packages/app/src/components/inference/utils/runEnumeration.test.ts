@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import type { RunConfigRow } from '@/lib/api';
+import type { RunConfigRow } from '@/lib/api/api';
 
 import { dataRunsForDate } from './runEnumeration';
 

@@ -1,4 +1,4 @@
-import { getAllPosts, getPostBySlug } from '@/lib/blog';
+import { getAllPosts, getPostBySlug } from '@/lib/blog/blog';
 import { AUTHOR_NAME, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
 // oxlint-disable-next-line require-await

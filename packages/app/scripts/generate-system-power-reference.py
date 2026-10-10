@@ -37,7 +37,7 @@ def git(repo, *args):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("model_repo", type=Path)
-    parser.add_argument("--output-dir", type=Path, default=Path(__file__).resolve().parents[1] / "src/lib")
+    parser.add_argument("--output-dir", type=Path, default=Path(__file__).resolve().parents[1] / "src/lib/power")
     args = parser.parse_args()
     repo = args.model_repo.resolve()
     if git(repo, "rev-parse", "HEAD") != REVISION:

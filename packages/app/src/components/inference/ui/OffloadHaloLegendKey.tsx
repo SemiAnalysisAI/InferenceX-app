@@ -1,6 +1,6 @@
-import { POINT_SIZE } from '@/lib/chart-rendering';
-import type { Locale } from '@/lib/i18n';
-import { useLocale } from '@/lib/use-locale';
+import { POINT_SIZE } from '@/lib/charts/chart-rendering';
+import type { Locale } from '@/lib/i18n/i18n';
+import { useLocale } from '@/lib/i18n/use-locale';
 
 export const OFFLOAD_HALO_RADIUS = POINT_SIZE + 4;
 export const OFFLOAD_HALO_STROKE_WIDTH = 1.5;

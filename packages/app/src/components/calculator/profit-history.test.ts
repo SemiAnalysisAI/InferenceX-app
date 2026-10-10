@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import type { AvailabilityRow, BenchmarkRow, RunConfigRow } from '@/lib/api';
-import { Percentile } from '@/lib/data-mappings';
+import type { AvailabilityRow, BenchmarkRow, RunConfigRow } from '@/lib/api/api';
+import { Percentile } from '@/lib/catalog/data-mappings';
 
 import {
   buildProfitHistoryResults,

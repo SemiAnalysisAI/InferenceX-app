@@ -1,8 +1,8 @@
 import type { Metadata } from 'next';
 
 import { LandingPage } from '@/components/landing/landing-page';
-import { enAlternates } from '@/lib/i18n';
-import { LANDING_META } from '@/lib/tab-meta';
+import { enAlternates } from '@/lib/i18n/i18n';
+import { LANDING_META } from '@/lib/routing/tab-meta';
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
 
 export const metadata: Metadata = {

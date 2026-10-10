@@ -3,8 +3,8 @@
 import { useCallback } from 'react';
 
 import { useClientSearchParams } from '@/hooks/useClientSearch';
-import { track } from '@/lib/analytics';
-import { replaceClientSearch } from '@/lib/client-navigation';
+import { track } from '@/lib/analytics/analytics';
+import { replaceClientSearch } from '@/lib/routing/client-navigation';
 
 export type DetailView = 'point' | 'timeline' | 'aggregates' | 'logs';
 

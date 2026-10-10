@@ -9,7 +9,7 @@ import {
   readUrlParams,
   refreshUrlParamsOnNavigation,
   writeUrlParams,
-} from '@/lib/url-state';
+} from '@/lib/routing/url-state';
 
 /**
  * Marks a subtree whose chart providers must treat the shared URL-state store

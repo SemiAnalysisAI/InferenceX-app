@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { resolveCalculatorUrlSeed } from './url-seed';
-import { Model, Percentile, Precision, Sequence } from '@/lib/data-mappings';
+import { Model, Percentile, Precision, Sequence } from '@/lib/catalog/data-mappings';
 
 describe('resolveCalculatorUrlSeed', () => {
   it('returns the model when g_model is a known enum value', () => {

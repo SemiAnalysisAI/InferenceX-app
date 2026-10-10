@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 
 import type { TokenRevenuePricing } from '@/components/inference/types';
-import { DEFAULT_CACHED_INPUT_PRICE_RATIO } from '@/lib/cache-pricing';
+import { DEFAULT_CACHED_INPUT_PRICE_RATIO } from '@/lib/calculator/cache-pricing';
 
 export const OPENROUTER_MODELS_URL = 'https://openrouter.ai/api/v1/models';
 

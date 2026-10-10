@@ -1,5 +1,5 @@
 import ScatterGraph from '@/components/inference/ui/ScatterGraph';
-import { Precision } from '@/lib/data-mappings';
+import { Precision } from '@/lib/catalog/data-mappings';
 
 import {
   createMockChartDefinition,

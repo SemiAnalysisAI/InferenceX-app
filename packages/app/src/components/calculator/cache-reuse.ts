@@ -1,7 +1,7 @@
 import { parallelismLabel } from '@/components/inference/utils/parallelism-label';
-import type { BenchmarkRow } from '@/lib/api';
-import { frameworkFamily } from '@/lib/framework-family';
-import { isKvOffloadEnabled } from '@/lib/kv-offload';
+import type { BenchmarkRow } from '@/lib/api/api';
+import { frameworkFamily } from '@/lib/catalog/framework-family';
+import { isKvOffloadEnabled } from '@/lib/benchmarks/kv-offload';
 
 import type { GPUDataPoint } from './types';
 import type { GroupMeta, OverlayGroupMeta } from './useThroughputData';

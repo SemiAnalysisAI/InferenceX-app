@@ -1,0 +1,757 @@
+import { DISPLAY_MODEL_TO_DB } from '@semianalysisai/inferencex-constants/models';
+
+import type { ExclusionConflictPolicy, ExclusionSpec } from '../benchmarks/exclusion';
+
+export enum Model {
+  Llama3_3_70B = 'Llama-3.3-70B-Instruct-FP8',
+  Llama3_1_70B = 'Llama-3.1-70B-Instruct-FP8-KV',
+  DeepSeek_R1 = 'DeepSeek-R1-0528',
+  GptOss = 'gpt-oss-120b',
+  Qwen3_5 = 'Qwen-3.5-397B-A17B',
+  Qwen3_8_Flash_Next = 'Qwen3.8-Flash-Next',
+  Qwen3_8_27B = 'Qwen3.8-27B',
+  Qwen3_8_27B_Eager = 'Qwen3.8-27B-Eager',
+  Kimi_K2_5 = 'Kimi-K2.5',
+  Kimi_K3 = 'Kimi-K3',
+  MiniMax_M2_5 = 'MiniMax-M2.5',
+  MiniMax_M3 = 'MiniMax-M3',
+  GLM_5 = 'GLM-5',
+  GLM_5_2 = 'GLM-5.2',
+  DeepSeek_V4_Pro = 'DeepSeek-V4-Pro',
+  DeepSeek_V4_1_Flash = 'DeepSeek-V4.1-Flash',
+}
+
+export type CategoryTag = 'default' | 'experimental' | 'maintenance' | 'deprecated' | 'hidden';
+
+/**
+ * Partition a list of values by their category using a classifier function.
+ */
+export function groupByCategory<T>(
+  items: T[],
+  classify: (item: T) => CategoryTag,
+): Record<CategoryTag, T[]> {
+  const groups: Record<CategoryTag, T[]> = {
+    default: [],
+    experimental: [],
+    maintenance: [],
+    deprecated: [],
+    hidden: [],
+  };
+  for (const item of items) {
+    groups[classify(item)].push(item);
+  }
+  return groups;
+}
+
+/**
+ * Single source of truth for model metadata. To add a model:
+ * 1. Add an enum member to `Model` above.
+ * 2. Add one entry here.
+ */
+interface ModelConfig {
+  label: string;
+  prefix: string;
+  category: CategoryTag;
+  /** Exact public model id in OpenRouter's `/api/v1/models` catalog. */
+  openRouterModelId?: string;
+  /**
+   * Filename under `public/logos/` for the model creator's logo, shown beside
+   * the model name in UI surfaces such as the inference chart caption. Absent =
+   * no logo rendered. Monochrome `currentColor`/black SVGs are inverted in dark
+   * mode by `ModelLogo`; colored raster assets (`.webp`) are shown as-is.
+   */
+  logo?: string;
+  /**
+   * Data-driven exclusion rules for this model (see `exclusion.ts`). Each spec
+   * partitions matching config keys into comparability groups that can't share
+   * a graph with each other. Absent/empty = no exclusion.
+   */
+  exclusion?: ExclusionSpec[];
+}
+
+/**
+ * dsv4 MTP exclusion: MTP configs (`*_mtp`) from different engine families can't
+ * be active together because their acceptance-rate forcing implementations
+ * differ. ATOM and SGLang share the upstream ROCm MTP path, so they form one
+ * comparability group; vLLM is its own group.
+ *
+ * Scoped to `hardware` for the same reason the STP rule below is: the guard
+ * exists to stop two engines being read off one SKU's curve, not to stop a
+ * chart holding two SKUs. B200 vLLM MTP next to B300 SGLang MTP compares
+ * hardware, which is the point of the chart. Where only one engine has a run
+ * for a SKU there is nothing to confuse, so that SKU is free to show it.
+ *
+ * ATOM is its own family and is deliberately NOT grouped with SGLang, so it
+ * stays comparable with everything — including both vLLM and SGLang on the
+ * SKUs where it runs.
+ */
+const MTP_ENGINE_EXCLUSION: ExclusionSpec[] = [
+  {
+    suffix: '_mtp',
+    stripPrefixes: ['dynamo-', 'mori-', 'llmd-', 'mooncake-'],
+    scope: 'hardware',
+  },
+];
+
+/**
+ * STP exclusion: unsuffixed standard-token configs for the same hardware SKU
+ * can't mix engine families, because each engine tunes its serving path
+ * differently. Different hardware may use different engines on one graph.
+ * `dynamo-`/`mori-`/`llmd-`/`mooncake-` are routers, not engines, so
+ * `dynamo-sglang` is SGLang and is guarded as such.
+ *
+ * ATOM is its own family and is not aliased to SGLang — it stays comparable
+ * with everything.
+ */
+const STP_ENGINE_EXCLUSION: ExclusionSpec[] = [
+  {
+    suffix: null,
+    stripPrefixes: ['dynamo-', 'mori-', 'llmd-', 'mooncake-'],
+    scope: 'hardware',
+  },
+];
+
+/**
+ * Engine families guarded on the 8K/1K and Agentic Traces charts. vLLM and
+ * SGLang tune their runs against engine-specific serving paths, so their
+ * numbers aren't directly comparable on one SKU — for standard-token and MTP
+ * configs alike. The resulting matrix, per SKU:
+ *
+ *   vLLM ↔ SGLang           blocked  (standard-token and MTP)
+ *   TRTLLM ↔ vLLM           allowed
+ *   TRTLLM ↔ SGLang         allowed
+ *   TRTLLM ↔ ATOM           allowed
+ *   ATOM ↔ vLLM or SGLang   allowed
+ *
+ * Every engine outside this list is comparable with everything: TRTLLM, ATOM,
+ * and Mooncake ATOMesh stay freely selectable next to either guarded engine and
+ * next to each other. Because the list is matched before `groupAliases`, ATOM
+ * escapes even though the MTP rule folds it into SGLang's comparability group.
+ *
+ * Both scenarios share the list. AgentX guarded every engine family while the
+ * agentic benchmark was new; that blocked TRTLLM against vLLM, SGLang, and ATOM
+ * on the same SKU, which the pairs above now allow.
+ */
+const GUARDED_ENGINE_FAMILIES = ['vllm', 'sglang'] as const;
+
+// Total parameter counts appended to each label so users can compare model
+// scale at a glance in the dropdown. For Llama and gpt-oss the count is
+// already part of the canonical name (Llama 3.3 70B, gpt-oss 120B) so no
+// duplication needed.
+const MODEL_CONFIG: Record<Model, ModelConfig> = {
+  [Model.DeepSeek_V4_Pro]: {
+    label: 'DeepSeek V4 Pro 0813 1.6T',
+    prefix: 'dsv4',
+    category: 'default',
+    openRouterModelId: 'deepseek/deepseek-v4-pro-0813',
+    logo: 'deepseek-color.svg',
+    exclusion: MTP_ENGINE_EXCLUSION,
+  },
+  [Model.DeepSeek_V4_1_Flash]: {
+    // Separate architecture from V4-Pro (Causal Encoder-Decoder + CSA2), not a
+    // point release, so it keeps its own DB bucket and dropdown entry. Label
+    // carries the 552B backbone total; the 196B Engram conditional-memory table
+    // is sparsely accessed via token lookup and is excluded, matching how the
+    // separate MTP head is excluded elsewhere.
+    label: 'DeepSeek V4.1 Flash 552B',
+    prefix: 'dsv41flash',
+    category: 'default',
+    openRouterModelId: 'deepseek/deepseek-v4.1-flash',
+    logo: 'deepseek-color.svg',
+  },
+  [Model.Kimi_K3]: {
+    // K3 is a separate 2.8T KDA/MLA-hybrid architecture, not a K2 point release,
+    // so it stays out of the K2.5/2.6/2.7-Code grouping below.
+    label: 'Kimi K3 2.8T',
+    prefix: 'kimik3',
+    category: 'default',
+    openRouterModelId: 'moonshotai/kimi-k3',
+    logo: 'kimi-color.svg',
+  },
+  [Model.Kimi_K2_5]: {
+    // K2.5, K2.6, and K2.7-Code share an architecture, so the dropdown surfaces
+    // all versions joined with a slash — matches the GLM5/5.1 pattern. The
+    // hyphenated `Model.Kimi_K2_5` enum value stays as-is for internal
+    // routing / DB key mapping.
+    //
+    // Fully retired after 2026-08-06 per MODELS.md: agentic coding was
+    // deprecated first, then Single-turn 8k1k — its last active scenario — so
+    // no scenario remains. Kimi-K3 (launched 2026-07-27) takes the cluster
+    // time. Historical rows stay queryable; the model just leaves the active
+    // groups in the selector.
+    label: 'Kimi K2.5/2.6/2.7-Code 1T',
+    prefix: 'kimik2.5',
+    category: 'deprecated',
+    openRouterModelId: 'moonshotai/kimi-k2.7-code',
+    logo: 'kimi-color.svg',
+  },
+  [Model.MiniMax_M3]: {
+    label: 'MiniMax M3 428B',
+    prefix: 'minimaxm3',
+    category: 'default',
+    openRouterModelId: 'minimax/minimax-m3',
+    logo: 'minimax-color.svg',
+  },
+  [Model.DeepSeek_R1]: {
+    label: 'DeepSeek R1 0528 671B',
+    prefix: 'dsr1',
+    category: 'maintenance',
+    openRouterModelId: 'deepseek/deepseek-r1-0528',
+    logo: 'deepseek-color.svg',
+  },
+  [Model.GLM_5]: {
+    label: 'GLM5/5.1 744B',
+    prefix: 'glm5',
+    category: 'deprecated',
+    openRouterModelId: 'z-ai/glm-5.1',
+    logo: 'zai-color.svg',
+  },
+  // GLM-5.2 and GLM-5.3 share the same architecture and inference profile, so
+  // the selector presents both releases over the existing GLM-5.2 data bucket.
+  [Model.GLM_5_2]: {
+    label: 'GLM5.2/GLM5.3 744B',
+    prefix: 'glm5.2',
+    category: 'default',
+    openRouterModelId: 'z-ai/glm-5.3',
+    logo: 'zai-color.svg',
+  },
+  [Model.Qwen3_5]: {
+    label: 'Qwen3.5 397B',
+    prefix: 'qwen3.5',
+    category: 'default',
+    openRouterModelId: 'qwen/qwen3.5-397b-a17b',
+    logo: 'qwen-color.svg',
+  },
+  // 176B total: a 125B main model plus a 51B n-gram embedding table, 6B active
+  // per forward pass, and a separate 4B MTP head the parameter count excludes.
+  // Default alongside the other current models, so it appears in the /overview
+  // matrix from day zero. The matrix is built from DEFAULT_MODELS, so its
+  // fixed-sequence row stays empty until the sweep covers 8k1k as well as the
+  // agentic scenario.
+  [Model.Qwen3_8_Flash_Next]: {
+    label: 'Qwen3.8 Flash Next 176B',
+    prefix: 'qwen3.8next',
+    category: 'default',
+    openRouterModelId: 'qwen/qwen3.8-flash',
+    logo: 'qwen-color.svg',
+  },
+  // Dense 27B (27B active) on the Qwen3.8 hybrid GDN backbone, served bf16 on
+  // one GPU with the RadixArk DSpark drafter (single-turn 1k1k, InferenceX#3260).
+  // Experimental until the first sweeps land on the official pipeline.
+  [Model.Qwen3_8_27B]: {
+    label: 'Qwen3.8 27B',
+    prefix: 'qwen3.827b',
+    category: 'experimental',
+    openRouterModelId: 'qwen/qwen3.8-27b',
+    logo: 'qwen-color.svg',
+  },
+  // The same checkpoint served with CUDA graphs disabled on both the target and
+  // the DSpark drafter (--enforce-eager, InferenceX#3262). A separate bucket so
+  // the eager and graph-captured points never overlap on one chart.
+  [Model.Qwen3_8_27B_Eager]: {
+    label: 'Qwen3.8 27B (eager)',
+    prefix: 'qwen3.827beager',
+    category: 'experimental',
+    // Same checkpoint, so the same public catalog id.
+    openRouterModelId: 'qwen/qwen3.8-27b',
+    logo: 'qwen-color.svg',
+  },
+  [Model.GptOss]: {
+    label: 'gpt-oss 120B',
+    prefix: 'gptoss',
+    category: 'deprecated',
+    openRouterModelId: 'openai/gpt-oss-120b',
+    logo: 'openai.svg',
+  },
+  [Model.MiniMax_M2_5]: {
+    // M2.5 and M2.7 share an architecture — same GLM5/5.1 pattern as Kimi.
+    // Superseded by MiniMax M3, so it's deprecated (no longer actively benchmarked).
+    label: 'MiniMax M2.5/2.7 230B',
+    prefix: 'minimaxm2.5',
+    category: 'deprecated',
+    openRouterModelId: 'minimax/minimax-m2.7',
+    logo: 'minimax-color.svg',
+  },
+  [Model.Llama3_3_70B]: {
+    label: 'Llama 3.3 70B Instruct',
+    prefix: '70b',
+    category: 'deprecated',
+    openRouterModelId: 'meta-llama/llama-3.3-70b-instruct',
+    logo: 'meta-color.svg',
+  },
+  [Model.Llama3_1_70B]: {
+    label: 'Llama 3.1 70B Instruct',
+    prefix: '',
+    category: 'hidden',
+    openRouterModelId: 'meta-llama/llama-3.1-70b-instruct',
+    logo: 'meta-color.svg',
+  },
+};
+
+function modelsByCategory(cat: CategoryTag): ReadonlySet<Model> {
+  return new Set(
+    (Object.entries(MODEL_CONFIG) as [Model, (typeof MODEL_CONFIG)[Model]][])
+      .filter(([, c]) => c.category === cat)
+      .map(([m]) => m),
+  );
+}
+
+export const MODEL_OPTIONS = (Object.keys(MODEL_CONFIG) as Model[]).filter(
+  (m) => MODEL_CONFIG[m].category !== 'hidden',
+);
+
+export const DEFAULT_MODELS: ReadonlySet<Model> = modelsByCategory('default');
+export const MAINTENANCE_MODELS: ReadonlySet<Model> = modelsByCategory('maintenance');
+export const DEPRECATED_MODELS: ReadonlySet<Model> = modelsByCategory('deprecated');
+export const EXPERIMENTAL_MODELS: ReadonlySet<Model> = modelsByCategory('experimental');
+
+export function isModelDefault(model: Model): boolean {
+  return DEFAULT_MODELS.has(model);
+}
+export function isModelDeprecated(model: Model): boolean {
+  return DEPRECATED_MODELS.has(model);
+}
+export function isModelMaintenance(model: Model): boolean {
+  return MAINTENANCE_MODELS.has(model);
+}
+export function isModelExperimental(model: Model): boolean {
+  return EXPERIMENTAL_MODELS.has(model);
+}
+
+export function getModelCategory(model: Model): CategoryTag {
+  return MODEL_CONFIG[model]?.category ?? 'default';
+}
+
+export function getModelLabel(model: Model): string {
+  return MODEL_CONFIG[model]?.label ?? model;
+}
+
+/** Exact OpenRouter catalog model used for live input/output pricing. */
+export function getOpenRouterModelId(model: Model): string | null {
+  return MODEL_CONFIG[model]?.openRouterModelId ?? null;
+}
+
+/**
+ * Filename under `public/logos/` for the model creator's logo, or null when the
+ * model has no configured logo. Callers render it via `ModelLogo`, which
+ * handles dark-mode inversion and load-failure fallback.
+ */
+export function getModelLogo(model: Model): string | null {
+  return MODEL_CONFIG[model]?.logo ?? null;
+}
+
+/**
+ * Exclusion specs configured for a model (see `exclusion.ts`). Empty when the
+ * model has no exclusion rules.
+ */
+export function getModelExclusion(model: Model | string | null | undefined): ExclusionSpec[] {
+  if (!model) return [];
+  return MODEL_CONFIG[model as Model]?.exclusion ?? [];
+}
+
+/** True if the model has any config-exclusion rule. */
+export function hasExclusion(model: Model | string | null | undefined): boolean {
+  return getModelExclusion(model).length > 0;
+}
+
+/**
+ * Pick the chart watermark for a given run state. Unofficial-run charts get
+ * the red unofficial-run warning; everything else gets the logo.
+ */
+export function getChartWatermark(isUnofficialRun = false): 'logo' | 'unofficial' {
+  return isUnofficialRun ? 'unofficial' : 'logo';
+}
+
+export const MODEL_PREFIX_MAPPING: Record<string, Model> = Object.fromEntries(
+  (Object.entries(MODEL_CONFIG) as [Model, (typeof MODEL_CONFIG)[Model]][])
+    .filter(([, c]) => c.prefix)
+    // Include every DB point-release alias, while retaining legacy artifact prefixes.
+    .flatMap(([m, c]) =>
+      [...new Set([c.prefix, ...(DISPLAY_MODEL_TO_DB[m] ?? [])])].map((prefix) => [prefix, m]),
+    ),
+);
+
+// Specific point-release prefixes must win over family prefixes such as
+// `glm5`; precompute once rather than sorting for every artifact.
+const MODEL_PREFIXES_LONGEST_FIRST = Object.keys(MODEL_PREFIX_MAPPING).toSorted(
+  (a, b) => b.length - a.length,
+);
+
+// ---------------------------------------------------------------------------
+// Sequences
+// ---------------------------------------------------------------------------
+
+export enum Sequence {
+  OneK_OneK = '1k/1k',
+  OneK_EightK = '1k/8k',
+  EightK_OneK = '8k/1k',
+  AgenticTraces = 'agentic-traces',
+}
+
+/**
+ * Top-level scenario kind. Fixed-seq sequences cluster under a single group
+ * in the selector; agentic traces sit alongside as their own kind.
+ */
+export type ScenarioKind = 'fixed-seq' | 'agentic';
+
+export function sequenceKind(seq: Sequence): ScenarioKind {
+  return seq === Sequence.AgenticTraces ? 'agentic' : 'fixed-seq';
+}
+
+interface SequenceConfig {
+  label: string;
+  labelZh: string;
+  compact: string;
+  category: CategoryTag;
+  kind: ScenarioKind;
+  exclusion?: ExclusionSpec[];
+  /**
+   * How this scenario resolves a selection that spans several comparability
+   * groups. `clear-all` (the default) deselects every conflicting group so the
+   * user opts into one; `keep-sticky` keeps a single group so the chart still
+   * renders data on load.
+   */
+  exclusionPolicy?: ExclusionConflictPolicy;
+  /**
+   * Comparability group preferred when `keep-sticky` has to choose and the
+   * user has no prior selection to honor. Without it the tie-break is
+   * alphabetical, which would silently land on a different engine.
+   */
+  defaultExclusionGroup?: string;
+  /**
+   * The only engine families guarded on this scenario, narrowing EVERY rule in
+   * scope — the model's variant specs as well as this sequence's own. Families
+   * outside the list are comparable with everything here. Omit to let each spec
+   * decide (by default: every family participates).
+   */
+  exclusionFamilies?: readonly string[];
+}
+
+const SEQUENCE_CONFIG: Record<Sequence, SequenceConfig> = {
+  [Sequence.OneK_OneK]: {
+    label: '1K / 1K',
+    labelZh: '1K / 1K',
+    compact: '1k1k',
+    category: 'deprecated',
+    kind: 'fixed-seq',
+  },
+  [Sequence.OneK_EightK]: {
+    label: '1K / 8K',
+    labelZh: '1K / 8K',
+    compact: '1k8k',
+    category: 'deprecated',
+    kind: 'fixed-seq',
+  },
+  [Sequence.EightK_OneK]: {
+    label: '8K / 1K',
+    labelZh: '8K / 1K',
+    compact: '8k1k',
+    category: 'default',
+    kind: 'fixed-seq',
+    exclusion: STP_ENGINE_EXCLUSION,
+    exclusionPolicy: 'keep-sticky',
+    defaultExclusionGroup: 'vllm',
+    exclusionFamilies: GUARDED_ENGINE_FAMILIES,
+  },
+  [Sequence.AgenticTraces]: {
+    label: 'Agentic',
+    labelZh: '智能体',
+    compact: 'agentic',
+    category: 'default',
+    kind: 'agentic',
+    exclusion: STP_ENGINE_EXCLUSION,
+    exclusionPolicy: 'keep-sticky',
+    defaultExclusionGroup: 'vllm',
+    exclusionFamilies: GUARDED_ENGINE_FAMILIES,
+  },
+};
+
+/** Exclusion specs configured for a sequence. Empty when no rule applies. */
+export function getSequenceExclusion(
+  sequence: Sequence | string | null | undefined,
+): ExclusionSpec[] {
+  if (!sequence) return [];
+  return SEQUENCE_CONFIG[sequence as Sequence]?.exclusion ?? [];
+}
+
+/** Multi-group conflict policy for a sequence. Defaults to `clear-all`. */
+export function getSequenceExclusionPolicy(
+  sequence: Sequence | string | null | undefined,
+): ExclusionConflictPolicy {
+  if (!sequence) return 'clear-all';
+  return SEQUENCE_CONFIG[sequence as Sequence]?.exclusionPolicy ?? 'clear-all';
+}
+
+/** Preferred comparability group for a sequence, or null when unconfigured. */
+export function getSequenceDefaultExclusionGroup(
+  sequence: Sequence | string | null | undefined,
+): string | null {
+  if (!sequence) return null;
+  return SEQUENCE_CONFIG[sequence as Sequence]?.defaultExclusionGroup ?? null;
+}
+
+/**
+ * The only engine families guarded on a sequence, or null when the sequence
+ * doesn't narrow its rules.
+ */
+export function getSequenceExclusionFamilies(
+  sequence: Sequence | string | null | undefined,
+): readonly string[] | null {
+  if (!sequence) return null;
+  return SEQUENCE_CONFIG[sequence as Sequence]?.exclusionFamilies ?? null;
+}
+
+export const SEQUENCE_OPTIONS = Object.keys(SEQUENCE_CONFIG) as Sequence[];
+
+/**
+ * Percentile of the latency distribution used for the chart x-axis when
+ * viewing agentic traces. Agentic rows carry median/p75/p90/p95/p99/p99.9
+ * variants for ttft, ttlt (=e2el), and itl (and intvty derived from itl);
+ * p75 and p90 are surfaced in the UI.
+ */
+export enum Percentile {
+  P75 = 'p75',
+  P90 = 'p90',
+}
+
+const PERCENTILE_CONFIG: Record<Percentile, { label: string }> = {
+  [Percentile.P75]: { label: 'p75' },
+  [Percentile.P90]: { label: 'p90' },
+};
+
+export const PERCENTILE_OPTIONS = Object.keys(PERCENTILE_CONFIG) as Percentile[];
+
+export function getPercentileLabel(p: Percentile): string {
+  return PERCENTILE_CONFIG[p]?.label ?? p;
+}
+
+export const DEPRECATED_SEQUENCES: ReadonlySet<Sequence> = new Set(
+  (Object.entries(SEQUENCE_CONFIG) as [Sequence, (typeof SEQUENCE_CONFIG)[Sequence]][])
+    .filter(([, c]) => c.category === 'deprecated')
+    .map(([s]) => s),
+);
+
+export function isSequenceDeprecated(sequence: Sequence): boolean {
+  return DEPRECATED_SEQUENCES.has(sequence);
+}
+
+export function getSequenceCategory(sequence: Sequence): CategoryTag {
+  return SEQUENCE_CONFIG[sequence]?.category ?? 'default';
+}
+
+/**
+ * Scenarios retired for a specific model while staying active for others.
+ * `SEQUENCE_CONFIG` categories are global — 8K/1K is `default` because most
+ * fixed-seq models still sweep it — so a per-model retirement needs its own
+ * table. Listing a scenario here moves it under the Deprecated group in the
+ * scenario selector for that model only; historical rows stay queryable, the
+ * scenario just stops presenting as actively benchmarked.
+ *
+ * MiniMax M3: the Single-turn 8k1k sweep was removed on 2026-08-04
+ * (InferenceX#2493, per MODELS.md "Scenario and precision retirements");
+ * Agentic coding is the model's only active scenario.
+ *
+ * DeepSeek V4 Pro: 2026-09-08 was the last day of its Single-turn 8k1k sweep
+ * (InferenceX#2728, per MODELS.md "Deprecation Notice"); Agentic coding,
+ * including the MTP and DSpark arms, stays active and the model is not retired.
+ *
+ * GLM-5.2 / GLM-5.3: Agentic coding only. The scenario dropdown also hides
+ * 8K/1K (MODEL_HIDDEN_SEQUENCES); listing it here keeps the other consumers of
+ * the category, such as the latest-images page, from treating it as live.
+ */
+const MODEL_DEPRECATED_SEQUENCES: Partial<Record<Model, ReadonlySet<Sequence>>> = {
+  [Model.MiniMax_M3]: new Set([Sequence.EightK_OneK]),
+  [Model.DeepSeek_V4_Pro]: new Set([Sequence.EightK_OneK]),
+  [Model.GLM_5_2]: new Set([Sequence.EightK_OneK]),
+};
+
+/** Whether this model retired the scenario even though it is globally active. */
+export function isSequenceDeprecatedForModel(model: Model, sequence: Sequence): boolean {
+  return MODEL_DEPRECATED_SEQUENCES[model]?.has(sequence) ?? false;
+}
+
+/**
+ * Scenarios removed from a model's scenario dropdown entirely. GLM-5.2 and
+ * GLM-5.3 share one bucket (see MODEL_CONFIG) and are benchmarked on Agentic
+ * coding only, so their 8K/1K rows are not offered.
+ */
+const MODEL_HIDDEN_SEQUENCES: Partial<Record<Model, ReadonlySet<Sequence>>> = {
+  [Model.GLM_5_2]: new Set([Sequence.EightK_OneK]),
+};
+
+/** Whether this model's scenario dropdown omits the scenario. */
+export function isSequenceHiddenForModel(model: Model, sequence: Sequence): boolean {
+  return MODEL_HIDDEN_SEQUENCES[model]?.has(sequence) ?? false;
+}
+
+/**
+ * Sequence category as seen from one model's point of view: the global
+ * category, overridden to `deprecated` when the model retired the scenario.
+ * Selectors pass the selected model so a per-model retirement (MiniMax M3's
+ * 8K/1K) groups under Deprecated without touching other models.
+ */
+export function getSequenceCategoryForModel(sequence: Sequence, model?: Model | null): CategoryTag {
+  if (model && isSequenceDeprecatedForModel(model, sequence)) return 'deprecated';
+  return getSequenceCategory(sequence);
+}
+
+/**
+ * Model + scenario pairs where Best per SKU starts switched off. The Quick
+ * Filters toggle stays available and an explicit `i_best` URL value still wins;
+ * only the default for readers who have not chosen changes, so these charts
+ * open with every configuration visible.
+ *
+ * Keep defaults aligned with the read-only inference view API.
+ */
+const MODEL_BEST_PER_SKU_DEFAULT_OFF: Partial<Record<Model, ReadonlySet<Sequence>>> = {};
+
+/** Whether Best per SKU defaults to off for this model and scenario. */
+export function isBestPerSkuDefaultOff(
+  model: Model | null | undefined,
+  sequence: Sequence | null | undefined,
+): boolean {
+  if (!model || !sequence) return false;
+  return MODEL_BEST_PER_SKU_DEFAULT_OFF[model]?.has(sequence) ?? false;
+}
+
+/**
+ * Model/scenario pairs that expose the external/internal TCO Basis selector.
+ * The basis only reprices hardware with a distinct owner cost (TPUv7 today),
+ * so the control is shown only where that hardware is benchmarked.
+ */
+const MODEL_TCO_BASIS_SELECTOR: Partial<Record<Model, ReadonlySet<Sequence>>> = {
+  [Model.Qwen3_5]: new Set([Sequence.EightK_OneK]),
+};
+
+/** Whether the TCO Basis selector is shown for this model and scenario. */
+export function showsTcoBasisSelector(
+  model: Model | null | undefined,
+  sequence: Sequence | null | undefined,
+): boolean {
+  if (!model || !sequence) return false;
+  return MODEL_TCO_BASIS_SELECTOR[model]?.has(sequence) ?? false;
+}
+
+export function getSequenceLabel(sequence: Sequence, locale: 'en' | 'zh' = 'en'): string {
+  const config = SEQUENCE_CONFIG[sequence];
+  if (!config) return sequence;
+  return locale === 'zh' ? config.labelZh : config.label;
+}
+
+const SEQUENCE_PREFIX_MAPPING: Record<string, Sequence> = Object.fromEntries(
+  (Object.entries(SEQUENCE_CONFIG) as [Sequence, (typeof SEQUENCE_CONFIG)[Sequence]][]).map(
+    ([s, c]) => [c.compact, s],
+  ),
+);
+
+// ---------------------------------------------------------------------------
+// Precisions
+// ---------------------------------------------------------------------------
+
+export enum Precision {
+  FP4 = 'fp4',
+  FP4FP8 = 'fp4fp8',
+  FP8 = 'fp8',
+  BF16 = 'bf16',
+  INT4 = 'int4',
+}
+
+const PRECISION_CONFIG: Record<Precision, { label: string }> = {
+  [Precision.FP4]: { label: 'FP4' },
+  [Precision.FP4FP8]: { label: 'FP4+FP8' },
+  [Precision.FP8]: { label: 'FP8' },
+  [Precision.BF16]: { label: 'BF16' },
+  [Precision.INT4]: { label: 'INT4' },
+};
+
+export const PRECISION_OPTIONS = Object.keys(PRECISION_CONFIG) as Precision[];
+
+export function getPrecisionLabel(precision: Precision): string {
+  return PRECISION_CONFIG[precision]?.label ?? precision;
+}
+
+/**
+ * Model + scenario pairs whose dashboard opens on a fixed precision set instead
+ * of the densest-precision auto default. An explicit `i_prec`, a preset or a
+ * manual toggle still wins; precisions the scenario lacks are dropped.
+ *
+ * GLM-5.2 / GLM-5.3 Agentic coding: FP4 and FP8 both carry full fleets.
+ *
+ * Declared after `Precision`: TypeScript enums are initialised in module order.
+ */
+const MODEL_DEFAULT_PRECISIONS: Partial<
+  Record<Model, Partial<Record<Sequence, readonly Precision[]>>>
+> = {
+  [Model.GLM_5_2]: { [Sequence.AgenticTraces]: [Precision.FP4, Precision.FP8] },
+};
+
+/** The fixed default precision set for this model and scenario, if any. */
+export function getModelDefaultPrecisions(
+  model: Model,
+  sequence: Sequence,
+): readonly Precision[] | undefined {
+  return MODEL_DEFAULT_PRECISIONS[model]?.[sequence];
+}
+
+// ---------------------------------------------------------------------------
+// Eval benchmarks
+// ---------------------------------------------------------------------------
+
+export enum EvalBenchmark {
+  GSM8K = 'gsm8k',
+}
+
+const EVAL_BENCHMARK_CONFIG: Record<EvalBenchmark, { label: string }> = {
+  [EvalBenchmark.GSM8K]: { label: 'GSM8K' },
+};
+
+export function getEvalBenchmarkLabel(benchmark: EvalBenchmark): string {
+  return EVAL_BENCHMARK_CONFIG[benchmark]?.label ?? benchmark;
+}
+
+// ---------------------------------------------------------------------------
+// Artifact parsing
+// ---------------------------------------------------------------------------
+
+export function getModelAndSequence(
+  artifactName: string,
+): { model: Model; sequence: Sequence } | undefined {
+  let model: Model | undefined;
+  let sequence: Sequence | undefined;
+
+  for (const key of MODEL_PREFIXES_LONGEST_FIRST) {
+    if (artifactName.includes(key)) {
+      model = MODEL_PREFIX_MAPPING[key];
+      break;
+    }
+  }
+
+  for (const key in SEQUENCE_PREFIX_MAPPING) {
+    if (artifactName.includes(key)) {
+      sequence = SEQUENCE_PREFIX_MAPPING[key];
+      break;
+    }
+  }
+
+  if (model && sequence) {
+    return { model, sequence };
+  }
+
+  return undefined;
+}
+
+export function getModelAndSequenceFromArtifact(
+  artifact: any,
+): { model: Model; sequence: Sequence } | undefined {
+  let seq = '';
+  seq += artifact.isl === 1024 ? '1k' : '8k';
+  seq += artifact.osl === 1024 ? '1k' : '8k';
+
+  const model = MODEL_PREFIX_MAPPING[artifact.infmax_model_prefix as string];
+  const sequence = SEQUENCE_PREFIX_MAPPING[seq];
+  if (model && sequence) {
+    return { model, sequence };
+  }
+
+  return undefined;
+}

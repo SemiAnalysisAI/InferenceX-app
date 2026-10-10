@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({ locale: 'en' as 'en' | 'zh' }));
 
-vi.mock('@/lib/use-locale', () => ({ useLocale: () => mocks.locale }));
+vi.mock('@/lib/i18n/use-locale', () => ({ useLocale: () => mocks.locale }));
 
 import { D3ChartWrapper, TOUCH_PRIMARY_QUERY, resolveChartInstructions } from './d3-chart-wrapper';
 

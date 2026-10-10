@@ -1,7 +1,7 @@
 'use client';
 
-import { track } from '@/lib/analytics';
-import { useLocale } from '@/lib/use-locale';
+import { track } from '@/lib/analytics/analytics';
+import { useLocale } from '@/lib/i18n/use-locale';
 import React, { useCallback, useMemo, useState } from 'react';
 
 import {
@@ -10,7 +10,7 @@ import {
   useInferenceDisplay,
   useInferenceFilters,
 } from '@/components/inference/InferenceContext';
-import { useGlobalFilterSelection } from '@/components/GlobalFilterContext';
+import { useGlobalFilterSelection } from '@/providers/GlobalFilterContext';
 import { useInterpolatedTrendData } from '@/components/inference/hooks/useInterpolatedTrendData';
 import type { TrendLineConfig } from '@/components/inference/types';
 import ChartControls from '@/components/inference/ui/ChartControls';
@@ -23,14 +23,14 @@ import { DashboardSectionHeader } from '@/components/ui/dashboard-section-header
 import { Heading } from '@/components/ui/heading';
 import { UnofficialDomainNotice } from '@/components/ui/unofficial-domain-notice';
 import { ResultContext } from '@/components/ui/result-context';
-import { exportToCsv } from '@/lib/csv-export';
-import { historicalTrendToCsv } from '@/lib/csv-export-helpers';
+import { exportToCsv } from '@/lib/export/csv-export';
+import { historicalTrendToCsv } from '@/lib/export/csv-export-helpers';
 import ChartLegend from '@/components/ui/chart-legend';
 import { Input } from '@/components/ui/input';
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { Skeleton } from '@/components/ui/skeleton';
-import { getModelSortIndex } from '@/lib/constants';
+import { getModelSortIndex } from '@/lib/catalog/constants';
 import {
   type Model,
   type Precision,
@@ -38,8 +38,8 @@ import {
   getModelLabel,
   getPrecisionLabel,
   getSequenceLabel,
-} from '@/lib/data-mappings';
-import { getDisplayLabel } from '@/lib/utils';
+} from '@/lib/catalog/data-mappings';
+import { getDisplayLabel } from '@/lib/shared/utils';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import {
   includesJalapenoResult,
@@ -48,8 +48,8 @@ import {
   JalapenoOfficialPreviewNotice,
   VeraRubinOfficialPreviewNotice,
   Tpuv7OfficialPreviewNotice,
-} from '@/components/official-preview-notice';
-import { metricChartTitle, metricLabel } from '@/lib/chart-utils';
+} from '@/components/ui/official-preview-notice';
+import { metricChartTitle, metricLabel } from '@/lib/charts/chart-utils';
 import {
   costTierOptionLabel,
   metricCostTier,

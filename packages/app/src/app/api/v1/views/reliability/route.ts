@@ -21,9 +21,9 @@ import {
   DEFAULT_RELIABILITY_RANGE,
   RELIABILITY_RANGES,
 } from '@/components/reliability/aggregate';
-import { cachedJson, cachedQuery } from '@/lib/api-cache';
-import { getModelSortIndex } from '@/lib/constants';
-import { loadFixture } from '@/lib/test-fixtures';
+import { cachedJson, cachedQuery } from '@/lib/cache/api-cache';
+import { getModelSortIndex } from '@/lib/catalog/constants';
+import { loadFixture } from '@/lib/testing/test-fixtures';
 import { csvResponse } from '@/lib/views-api/csv';
 import { runViewsRoute } from '@/lib/views-api/errors';
 import { hardwareLegendLabel } from '@/lib/views-api/legend';

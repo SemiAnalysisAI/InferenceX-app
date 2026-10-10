@@ -14,15 +14,15 @@ import {
   useGlobalFilterAvailability,
   useGlobalFilterRun,
   useGlobalFilterSelection,
-} from '@/components/GlobalFilterContext';
+} from '@/providers/GlobalFilterContext';
 import { InferenceProvider } from '@/components/inference/InferenceContext';
 import InferenceChartDisplay from '@/components/inference/ui/ChartDisplay';
 import { Card } from '@/components/ui/card';
-import { track } from '@/lib/analytics';
-import type { BenchmarkRow } from '@/lib/api';
-import { toCalculatorBenchmarkRows } from '@/lib/benchmark-api-view';
-import { toModel, toPrecisions, toSequence } from '@/lib/compare-enum-coerce';
-import type { AgenticScenarioIntro } from '@/lib/compare-ssr';
+import { track } from '@/lib/analytics/analytics';
+import type { BenchmarkRow } from '@/lib/api/api';
+import { toCalculatorBenchmarkRows } from '@/lib/benchmarks/benchmark-api-view';
+import { toModel, toPrecisions, toSequence } from '@/lib/compare/compare-enum-coerce';
+import type { AgenticScenarioIntro } from '@/lib/compare/compare-ssr';
 
 const STRINGS = {
   en: {

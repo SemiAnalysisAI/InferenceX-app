@@ -22,7 +22,7 @@
 
 import { tokenRevenueFromRatesPerGpuHour } from '@/components/inference/token-revenue';
 import type { TokenRevenuePricing } from '@/components/inference/types';
-import { Model } from '@/lib/data-mappings';
+import { Model } from '@/lib/catalog/data-mappings';
 
 import type { InterpolatedResult } from './types';
 

@@ -13,9 +13,14 @@ import {
   type DeploymentMode,
   type SpecMode,
 } from '@/components/inference/utils/quickFilters';
-import { COMPARE_MODEL_ALIASES, COMPARE_MODEL_SLUGS } from '@/lib/compare-slug';
-import { DEFAULT_TCO_BASIS, type TcoBasis } from '@/lib/constants';
-import { Percentile, PRECISION_OPTIONS, Sequence, type Precision } from '@/lib/data-mappings';
+import { COMPARE_MODEL_ALIASES, COMPARE_MODEL_SLUGS } from '@/lib/compare/compare-slug';
+import { DEFAULT_TCO_BASIS, type TcoBasis } from '@/lib/catalog/constants';
+import {
+  Percentile,
+  PRECISION_OPTIONS,
+  Sequence,
+  type Precision,
+} from '@/lib/catalog/data-mappings';
 
 import { ViewsApiParamError } from './errors';
 

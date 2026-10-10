@@ -1,9 +1,9 @@
 import type { Metadata } from 'next';
 
 import { AgentXTelemetryArticle } from '@/components/datasets/agentx-telemetry-article';
-import { JsonLd } from '@/components/json-ld';
-import { getTelemetryGuide } from '@/lib/agentx-telemetry-zh';
-import { zhAlternates, ZH_LANG_TAG, ZH_OG_LOCALE } from '@/lib/i18n';
+import { JsonLd } from '@/components/seo/json-ld';
+import { getTelemetryGuide } from '@/lib/agentx/agentx-telemetry-zh';
+import { zhAlternates, ZH_LANG_TAG, ZH_OG_LOCALE } from '@/lib/i18n/i18n';
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
 
 const TITLE = '通过详细遥测数据解析智能体负载';

@@ -11,7 +11,7 @@ Everything is driven by two sources of truth:
 
 | Artifact                                                         | Source of truth                                                                 |
 | ---------------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| Landing page, index card, sitemap, `llms.txt`, JSON-LD, metadata | one entry in `packages/app/src/lib/whitepapers.ts` (`WHITEPAPERS`)              |
+| Landing page, index card, sitemap, `llms.txt`, JSON-LD, metadata | one entry in `packages/app/src/lib/content/whitepapers.ts` (`WHITEPAPERS`)      |
 | PDF cover, pages, charts                                         | one spec JSON consumed by `pipeline/` (example: `examples/mi355x-kimi-k3.json`) |
 
 Both carry the same numbers, so compute the numbers once, write them to the spec, and copy them into the registry from there.
@@ -116,7 +116,7 @@ Delete any asset a previous revision no longer references; `whitepapers.test.ts`
 
 ## Step 5: Register the paper
 
-Add one object to `WHITEPAPERS` in `packages/app/src/lib/whitepapers.ts`. The type doc comments describe every field; the important ones:
+Add one object to `WHITEPAPERS` in `packages/app/src/lib/content/whitepapers.ts`. The type doc comments describe every field; the important ones:
 
 - `slug` (URL-safe, unique), `publishedDate`, `dataDate` (benchmark snapshot), `pageCount` (content pages, cover excluded), `tags`.
 - `pdfPath`, `coverImagePath` (also `heroImagePath`; used by the sitemap and JSON-LD image), `chipImagePath` with `chipImageWidth`/`chipImageHeight` from `cutout.py`.
@@ -139,13 +139,13 @@ Design rules for any change to these components: site tokens only (`--background
 
 Update or extend, never delete:
 
-- `packages/app/src/lib/whitepapers.test.ts`: unique slugs, asset paths exist, en/zh parity (same array lengths for findings, kpis, method, assumptions, sources, figures), headline numbers for the new paper, metadata and JSON-LD per locale.
+- `packages/app/src/lib/content/whitepapers.test.ts`: unique slugs, asset paths exist, en/zh parity (same array lengths for findings, kpis, method, assumptions, sources, figures), headline numbers for the new paper, metadata and JSON-LD per locale.
 - `packages/app/src/components/whitepaper/whitepaper-content.test.tsx`: KPI tiles, figure cards, sidebar, index card render from the registry.
-- `packages/app/src/app/sitemap.test.ts` and `src/lib/i18n.test.ts` if a route or mirrored path changes.
+- `packages/app/src/app/sitemap.test.ts` and `src/lib/i18n/i18n.test.ts` if a route or mirrored path changes.
 
 ```bash
 PATH=$HOME/.bun/bin:$PATH bun run lint && bun run check:typography && bunx oxfmt --check
-cd packages/app && bunx vitest run src/lib/whitepapers.test.ts src/components/whitepaper src/app/sitemap.test.ts src/lib/i18n.test.ts
+cd packages/app && bunx vitest run src/lib/content/whitepapers.test.ts src/components/whitepaper src/app/sitemap.test.ts src/lib/i18n/i18n.test.ts
 bunx tsc --noEmit -p tsconfig.json 2>&1 | rg -i whitepaper   # must print nothing
 ```
 

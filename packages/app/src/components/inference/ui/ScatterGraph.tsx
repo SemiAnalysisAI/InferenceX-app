@@ -1,9 +1,9 @@
 'use client';
 
-import { track } from '@/lib/analytics';
-import { isPersistedBenchmarkId } from '@/lib/benchmark-id';
+import { track } from '@/lib/analytics/analytics';
+import { isPersistedBenchmarkId } from '@/lib/benchmarks/benchmark-id';
 import { useEphemeralUrlState } from '@/hooks/useUrlState';
-import { rememberChartStateInUrl } from '@/lib/url-state';
+import { rememberChartStateInUrl } from '@/lib/routing/url-state';
 import * as d3 from 'd3';
 import dynamic from 'next/dynamic';
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
@@ -33,21 +33,28 @@ import {
   labelOpacityForHover,
 } from '@/components/inference/ui/line-label-visibility';
 import ChartLegend from '@/components/ui/chart-legend';
-import { useUnofficialRun } from '@/components/unofficial-run-provider';
-import { OFFICIAL_PREVIEW_SERIES } from '@/components/official-preview-notice';
-import { getHardwareConfig, getModelSortIndex, hardwareKeyMatchesAnyBase } from '@/lib/constants';
+import { useUnofficialRun } from '@/providers/unofficial-run-provider';
+import { OFFICIAL_PREVIEW_SERIES } from '@/components/ui/official-preview-notice';
+import {
+  getHardwareConfig,
+  getModelSortIndex,
+  hardwareKeyMatchesAnyBase,
+} from '@/lib/catalog/constants';
 import {
   getChartWatermark,
   getPrecisionLabel,
   getSequenceLabel,
   type Precision,
   Sequence,
-} from '@/lib/data-mappings';
-import { matchKnownConfigIssues, pointMatchesIssue } from '@/lib/known-issues';
-import { useLocale } from '@/lib/use-locale';
-import { getLineLabelVendorIcon } from '@/lib/vendor-logos';
-import { formatNumber, getDisplayLabel, updateRepoUrl } from '@/lib/utils';
-import { getInferenceHardwareConfig, getInferenceRunLabel } from '@/lib/inference-labels';
+} from '@/lib/catalog/data-mappings';
+import { matchKnownConfigIssues, pointMatchesIssue } from '@/lib/benchmarks/known-issues';
+import { useLocale } from '@/lib/i18n/use-locale';
+import { getLineLabelVendorIcon } from '@/lib/catalog/vendor-logos';
+import { formatNumber, getDisplayLabel, updateRepoUrl } from '@/lib/shared/utils';
+import {
+  getInferenceHardwareConfig,
+  getInferenceRunLabel,
+} from '@/lib/benchmarks/inference-labels';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
 import type {
   CustomLayerConfig,
@@ -90,7 +97,7 @@ import {
   overlayRooflineDasharray,
   overlayRunColor,
   overlayRunIndex,
-} from '@/lib/overlay-run-style';
+} from '@/lib/charts/overlay-run-style';
 import {
   HIT_AREA_RADIUS,
   formatLargeNumber,
@@ -98,9 +105,13 @@ import {
   applyHoverState,
   applyNormalState,
   getShapeKeyForPrecision,
-} from '@/lib/chart-rendering';
+} from '@/lib/charts/chart-rendering';
 import { useThemeColors } from '@/hooks/useThemeColors';
-import { isFrontierEligible, paretoMaximizesX, type ParetoDirection } from '@/lib/chart-utils';
+import {
+  isFrontierEligible,
+  paretoMaximizesX,
+  type ParetoDirection,
+} from '@/lib/charts/chart-utils';
 import { frontierHardwareKeys } from '@/components/inference/utils/pareto-series';
 import {
   globalParetoFrontier,

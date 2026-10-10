@@ -1,7 +1,7 @@
-import { updateRepoUrl } from '@/lib/utils';
-import { agenticDetailHref } from '@/lib/agentic-detail-link';
-import { isPersistedBenchmarkId } from '@/lib/benchmark-id';
-import type { Locale } from '@/lib/i18n';
+import { updateRepoUrl } from '@/lib/shared/utils';
+import { agenticDetailHref } from '@/lib/agentx/agentic-detail-link';
+import { isPersistedBenchmarkId } from '@/lib/benchmarks/benchmark-id';
+import type { Locale } from '@/lib/i18n/i18n';
 
 import type { InferenceData } from '@/components/inference/types';
 import { fmt, getPointLabel } from '@/components/inference/utils/tooltipUtils';

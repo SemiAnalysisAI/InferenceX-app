@@ -2,9 +2,9 @@
 
 import { AlertTriangle, ExternalLink, X } from 'lucide-react';
 
-import { track } from '@/lib/analytics';
-import { overlayRunColor } from '@/lib/overlay-run-style';
-import { cn } from '@/lib/utils';
+import { track } from '@/lib/analytics/analytics';
+import { overlayRunColor } from '@/lib/charts/overlay-run-style';
+import { cn } from '@/lib/shared/utils';
 
 interface RunInfo {
   id: number;

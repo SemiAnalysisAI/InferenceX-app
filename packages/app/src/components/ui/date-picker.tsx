@@ -3,7 +3,7 @@
 import { Calendar, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import { useState } from 'react';
 
-import { track } from '@/lib/analytics';
+import { track } from '@/lib/analytics/analytics';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -26,7 +26,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import { useLocale } from '@/lib/use-locale';
+import { useLocale } from '@/lib/i18n/use-locale';
 
 const STRINGS = {
   en: {

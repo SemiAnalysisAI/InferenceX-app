@@ -2,7 +2,7 @@
 
 import { type ChangeEvent, useEffect, useRef, useState } from 'react';
 
-import { track } from '@/lib/analytics';
+import { track } from '@/lib/analytics/analytics';
 import {
   OVERVIEW_TIERS,
   type OverviewComparisonMode,
@@ -12,8 +12,8 @@ import {
   type OverviewReferenceHardware,
   type OverviewRowScope,
   type OverviewTier,
-} from '@/lib/overview-data';
-import { overviewTierHref } from '@/lib/overview-links';
+} from '@/lib/overview/overview-data';
+import { overviewTierHref } from '@/lib/overview/overview-links';
 
 import { useOverviewNavigation, useOverviewNavigationError } from './overview-navigation';
 

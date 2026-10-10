@@ -1,7 +1,7 @@
 import { useQueries } from '@tanstack/react-query';
 import { useMemo } from 'react';
 
-import { type ChangelogRow, type RunConfigRow, type WorkflowInfoResponse } from '@/lib/api';
+import { type ChangelogRow, type RunConfigRow, type WorkflowInfoResponse } from '@/lib/api/api';
 import { workflowInfoQueryOptions } from '@/hooks/api/use-workflow-info';
 
 export interface ComparisonChangelogEntry {

@@ -1,6 +1,6 @@
 import type { InferenceData } from '@/components/inference/types';
 import { getPointLabel } from '@/components/inference/utils/tooltipUtils';
-import { isKvOffloadEnabled } from '@/lib/kv-offload';
+import { isKvOffloadEnabled } from '@/lib/benchmarks/kv-offload';
 
 // Color palette for Pareto frontier section labels
 export const PARETO_LABEL_COLORS = [

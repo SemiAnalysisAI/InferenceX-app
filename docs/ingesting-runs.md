@@ -196,7 +196,7 @@ done | sort -n
 
 Compare matching configurations and units, accounting for rounding in the displayed query. Also check output throughput, E2EL, and TPOT where present. Agentic ITL and interactivity can differ from legacy artifact fields because ingest uses full-response metrics and can reconstruct them from the AIPerf profile; do not assume a fixed tolerance for that difference.
 
-Finally, open the target dashboard's model page in the AgentX view and verify the run's points. Model slugs live in `packages/app/src/lib/compare-slug.ts`; use a model present in the approved run.
+Finally, open the target dashboard's model page in the AgentX view and verify the run's points. Model slugs live in `packages/app/src/lib/compare/compare-slug.ts`; use a model present in the approved run.
 
 ## Behavior to expect
 

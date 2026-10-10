@@ -1,7 +1,7 @@
 import * as d3 from 'd3';
 import { useCallback, useRef, useState } from 'react';
 
-import { type ShapeKey, applyNormalState } from '@/lib/chart-rendering';
+import { type ShapeKey, applyNormalState } from '@/lib/charts/chart-rendering';
 
 const VALID_SHAPE_KEYS: ReadonlySet<ShapeKey> = new Set([
   'circle',

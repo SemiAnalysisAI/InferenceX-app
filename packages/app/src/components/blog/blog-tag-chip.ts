@@ -1,4 +1,4 @@
-import { cn } from '@/lib/utils';
+import { cn } from '@/lib/shared/utils';
 
 /** Shared chip recipe for tag links and the "More tags" disclosure summary. */
 export const TAG_CHIP_CLASS =

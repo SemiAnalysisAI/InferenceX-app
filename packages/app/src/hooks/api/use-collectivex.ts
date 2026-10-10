@@ -1,6 +1,6 @@
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import { deleteCollectiveXRun, fetchCollectiveXRun, fetchCollectiveXRunList } from '@/lib/api';
+import { deleteCollectiveXRun, fetchCollectiveXRun, fetchCollectiveXRunList } from '@/lib/api/api';
 import {
   COLLECTIVEX_DEFAULT_VERSION,
   type CollectiveXVersion,

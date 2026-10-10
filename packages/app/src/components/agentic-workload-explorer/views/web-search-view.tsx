@@ -25,9 +25,9 @@ import {
 } from '@/components/agentic-workload-explorer/range-toggle';
 import { Expandable } from '@/components/agentic-workload-explorer/expandable-chart';
 import { useExplorerHref } from '@/hooks/agentic-workload-explorer/use-explorer-href';
-import { useLocale } from '@/lib/use-locale';
-import { track } from '@/lib/analytics';
-import type { Locale } from '@/lib/i18n';
+import { useLocale } from '@/lib/i18n/use-locale';
+import { track } from '@/lib/analytics/analytics';
+import type { Locale } from '@/lib/i18n/i18n';
 
 // ── i18n ────────────────────────────────────────────────────────
 

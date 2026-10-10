@@ -1,4 +1,4 @@
-import { APP_THEMES } from '../../src/lib/themes';
+import { APP_THEMES } from '../../src/lib/themes/themes';
 
 /** Reach a theme through the real toggle, waiting for each React update. */
 export function cycleToTheme(theme: string, remaining = APP_THEMES.length): void {

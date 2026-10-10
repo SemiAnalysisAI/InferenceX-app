@@ -1,7 +1,7 @@
 'use client';
 
-import { track } from '@/lib/analytics';
-import type { Locale } from '@/lib/i18n';
+import { track } from '@/lib/analytics/analytics';
+import type { Locale } from '@/lib/i18n/i18n';
 
 const STRINGS = {
   en: 'What does E2E Normalized Interactivity mean?',

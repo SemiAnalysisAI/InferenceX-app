@@ -4,7 +4,7 @@ import { useState } from 'react';
 import VideoSelect from './VideoSelect';
 import { Card } from '@/components/ui/card';
 import { Heading } from '@/components/ui/heading';
-import { useLocale } from '@/lib/use-locale';
+import { useLocale } from '@/lib/i18n/use-locale';
 import { at, entries, number, ROLES, rows, text, type Json } from './bundle';
 
 const STRINGS = {

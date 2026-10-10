@@ -8,7 +8,7 @@ import {
   createMockHardwareConfig,
   createMockInferenceContextValues,
 } from '../support/mock-data';
-import { Precision, Sequence } from '@/lib/data-mappings';
+import { Precision, Sequence } from '@/lib/catalog/data-mappings';
 import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.shared-runtime';
 
 const defaultChartDef = createMockChartDefinition();

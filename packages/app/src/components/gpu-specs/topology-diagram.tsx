@@ -3,8 +3,8 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import * as d3 from 'd3';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { track } from '@/lib/analytics';
-import { isUnofficialHostname } from '@/lib/unofficial-domain';
+import { track } from '@/lib/analytics/analytics';
+import { isUnofficialHostname } from '@/lib/runtime/unofficial-domain';
 
 import {
   Dialog,
@@ -19,8 +19,8 @@ import {
   getScaleOutExpandAriaLabel,
   getTopologyConfig,
   type GpuSpec,
-} from '@/lib/gpu-specs';
-import { useLocale } from '@/lib/use-locale';
+} from '@/lib/catalog/gpu-specs';
+import { useLocale } from '@/lib/i18n/use-locale';
 
 const STRINGS = {
   en: {

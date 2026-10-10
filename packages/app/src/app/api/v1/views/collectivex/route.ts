@@ -14,7 +14,7 @@ import {
   seriesMatchesSelection,
 } from '@/components/collectivex/data';
 import { swapChartPoints, swapRooflines } from '@/components/collectivex/swap-data';
-import { cachedJson } from '@/lib/api-cache';
+import { cachedJson } from '@/lib/cache/api-cache';
 import { runViewsRoute, ViewsApiParamError } from '@/lib/views-api/errors';
 import {
   assertRunIdList,

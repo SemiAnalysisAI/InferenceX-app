@@ -4,7 +4,7 @@ import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { getAllChipPages, getChipPage, getChipSpec } from '@/lib/chip-pages';
+import { getAllChipPages, getChipPage, getChipSpec } from '@/lib/catalog/chip-pages';
 
 import { SpecTable } from './chip-page-sections';
 

@@ -1,6 +1,6 @@
 import { Card } from '@/components/ui/card';
-import type { DashboardRouteKey } from '@/lib/dashboard-routes';
-import { TAB_INTRO_ZH, TAB_META_ZH } from '@/lib/tab-meta-zh';
+import type { DashboardRouteKey } from '@/lib/routing/dashboard-routes';
+import { TAB_INTRO_ZH, TAB_META_ZH } from '@/lib/routing/tab-meta-zh';
 
 /**
  * Server-rendered Chinese intro above the interactive dashboard on /zh tab

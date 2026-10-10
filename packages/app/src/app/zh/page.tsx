@@ -1,9 +1,9 @@
 import type { Metadata } from 'next';
 
 import { LandingPage } from '@/components/landing/landing-page';
-import { ZH_OG_LOCALE, zhAlternates } from '@/lib/i18n';
-import { LANDING_META } from '@/lib/tab-meta';
-import { LANDING_META_ZH } from '@/lib/tab-meta-zh';
+import { ZH_OG_LOCALE, zhAlternates } from '@/lib/i18n/i18n';
+import { LANDING_META } from '@/lib/routing/tab-meta';
+import { LANDING_META_ZH } from '@/lib/routing/tab-meta-zh';
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
 
 export const metadata: Metadata = {
