@@ -127,6 +127,17 @@ describe('Chart Section Tabs — E2E', () => {
     // Re-lock so the unlock doesn't leak into later tests (testIsolation off).
     cy.window().then((win) => win.localStorage.removeItem('inferencex-feature-gate'));
   });
+
+  it('permanently redirects the retired PowerX page to the inference dashboard', () => {
+    cy.request({ url: '/gpu-metrics?gm_runId=12345', followRedirect: false }).then((response) => {
+      expect(response.status).to.eq(308);
+      expect(response.headers.location).to.eq('/inference?gm_runId=12345');
+    });
+    cy.request({ url: '/zh/gpu-metrics', followRedirect: false }).then((response) => {
+      expect(response.status).to.eq(308);
+      expect(response.headers.location).to.eq('/zh/inference');
+    });
+  });
 });
 
 describe('First-load navigation', () => {

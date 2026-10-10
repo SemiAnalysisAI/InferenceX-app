@@ -53,6 +53,16 @@ jobs:
         env:
           CYPRESS_INSTALL_BINARY: '0'
 
+      # This workflow fires on a push to run-overrides.ts, which can land before the
+      # next ingest dispatch has applied a pending migration. admin:db:verify counts
+      # every table it knows about, so without this step it fails on a schema the
+      # checked-out ref expects but production does not have yet. Same command and
+      # ordering as ingest-results.yml; migrations are idempotent by filename.
+      - name: Run migrations
+        env:
+          DATABASE_WRITE_URL: ${{ secrets.DATABASE_WRITE_URL }}
+        run: bun run admin:db:migrate --yes
+
       - name: Apply run overrides
         env:
           DATABASE_WRITE_URL: ${{ secrets.DATABASE_WRITE_URL }}

@@ -71,10 +71,6 @@ export const TAB_META_ZH: Record<DashboardRouteKey, { title: string; description
     description:
       '面向 AI 推理的详细芯片规格。对比 NVIDIA、AMD 与 Intel 芯片的显存带宽、FLOPS、互连与拓扑。',
   },
-  'gpu-metrics': {
-    title: '芯片功耗与能效指标',
-    description: 'AI 推理负载下的芯片功耗与能效指标。跨硬件对比每瓦 token 数。',
-  },
   operatorx: {
     title: 'OperatorX GEMM、Attention 和 MoE 基准测试',
     description:
@@ -142,8 +138,6 @@ export const TAB_INTRO_ZH: Record<DashboardRouteKey, string> = {
     '本页面展示基准测试基础设施的可靠性指标：各芯片集群与服务商的运行成功率、错误率与可用性。',
   'gpu-specs':
     '本页面提供芯片规格对比：NVIDIA、AMD 等厂商加速器的显存容量、显存带宽、FLOPS、互连拓扑与功耗规格。',
-  'gpu-metrics':
-    '本页面展示芯片功耗与能效指标（PowerX）：推理负载下的实测功耗、每瓦 token 数与每兆瓦 token 产出。',
   operatorx:
     '本页面展示 OperatorX 的 GEMM、attention 和路由 MoE 单卡 TFLOPS、实测延迟及完整测试覆盖情况。',
   'agentic-workload-explorer':
@@ -175,7 +169,6 @@ export const TAB_LABELS_ZH: Record<DashboardRouteKey, string> = {
   'profit-estimator-per-gigawatt': '每吉瓦利润估算',
   reliability: '可靠性',
   'gpu-specs': '芯片规格',
-  'gpu-metrics': '芯片功耗',
   operatorx: 'OperatorX 算子',
   collectivex: 'CollectiveX 通信',
   'agentic-workload-explorer': '智能体负载',

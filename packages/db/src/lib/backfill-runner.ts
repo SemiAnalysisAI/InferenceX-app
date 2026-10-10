@@ -8,6 +8,8 @@
 
 import { confirm, hasYesFlag } from '../cli-utils.js';
 import type { Sql } from '../etl/db-utils.js';
+import { retryArtifactOperation } from './artifact-retry.js';
+import { listRunArtifacts, type ArtifactMeta } from './github-artifacts.js';
 
 export interface LimitForceFlags {
   limit: number | null;
@@ -158,6 +160,26 @@ export async function runCandidateIdBackfill(
   if (!(await confirmProceed(formatCandidates(ids.length)))) return false;
   await runPerIdBackfill(ids, processRow);
   return true;
+}
+
+/**
+ * List a candidate run's GitHub artifacts with transient-failure retry.
+ * Returns `null` when GitHub no longer has the run at all, so a sweep over
+ * months of history reports the gap and moves on instead of aborting.
+ */
+export function listBackfillRunArtifacts(
+  repository: string,
+  runId: number,
+): Promise<ArtifactMeta[] | null> {
+  return retryArtifactOperation(`listing GitHub artifacts for run ${runId}`, () => {
+    try {
+      return listRunArtifacts(repository, String(runId));
+    } catch (error) {
+      // A 404 is final, so return before the backoff; `gh` writes `gh: Not Found (HTTP 404)`.
+      if (/\(HTTP 404\)/u.test(String((error as { stderr?: unknown } | null)?.stderr))) return null;
+      throw error;
+    }
+  });
 }
 
 /**

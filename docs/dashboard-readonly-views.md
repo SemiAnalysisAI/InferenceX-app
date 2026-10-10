@@ -76,7 +76,9 @@ alignment changes no API parameters, response schemas, or stored model identitie
 - Evaluation/reliability: chart-data, date resolution and rolling aggregation.
 - CollectiveX: selected EP/KV/swap chart and fit helpers.
 - Submissions/images: existing table, weekly/cumulative and image freshness helpers.
-- GPU metrics: shared line/correlation transforms and unsampled statistics.
+- GPU metrics: shared line/correlation transforms and full-record per-GPU statistics
+  computed from the stored samples, or from the samples of live artifacts. File/host
+  identity and missing-versus-zero semantics persist.
 - Video: checksum-verified stored bundles, serving/fidelity selectors and tradeoffs.
 - Overview/rankings/compare: existing discovery-page assembly and scenario helpers.
 
@@ -97,6 +99,11 @@ anonymized ProxyTrace snapshot from a separate database through page-owned
 no published `/api/v1/views/agentic-workload-explorer` contract.
 Zoom, theme, axis scale, labels, media playback and report expansion are renderer
 state. GPU interactive downsampling does not alter returned raw data or statistics.
+GPU statistics include startup and warmup for all chips in the selected series,
+regardless of chip visibility. They are separate from serving-window power and
+J/token. Run telemetry comes from one source per run: stored series once the run is
+ingested, otherwise its artifacts. The public view returns private, no-store
+responses and preserves upstream 503 failures.
 
 Run-specific recognition labels are also presentation-only. Runs `35879254139`
 and `37181045340` display `UMBP MoRI SGLang` through October 9, 2026 in America/New_York
@@ -125,6 +132,10 @@ those properties.
 私有上传、密钥、提示词、反馈及管理操作不作为公开读取接口。
 OperatorX 的入口受功能开关控制，页面使用专属的 `/api/v1/operatorx/*`
 接口；目前没有发布 `/api/v1/views/operatorx` 契约。
+GPU 视图对每个 run 只从一个来源读取遥测：已入库的 run 读取已存序列，其余 run 读取产物。
+全记录统计在读取时由所选文件、主机序列的全部芯片样本计算，包含启动与 warmup；缺失读数不补零。
+芯片显隐和图表降采样不改变该统计，也不改变 serving-window 或 J/token 的计算口径。
+响应使用 private, no-store，上游 503 保留为错误响应。
 Agentic Workload Explorer 的入口同样受功能开关控制，它通过页面专属的
 `/api/v1/agentic-workload-explorer/*` 接口（在路由目录中归类为 `page-bff`）
 从独立数据库读取冻结的匿名 ProxyTrace 快照；目前没有发布

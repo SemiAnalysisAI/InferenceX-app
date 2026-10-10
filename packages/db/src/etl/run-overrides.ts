@@ -1114,7 +1114,7 @@ export function validateRunBackfills(
   }
 }
 
-interface BackfillablePoint extends BenchmarkPointKey {
+export interface BackfillablePoint extends BenchmarkPointKey {
   config: ConfigParams;
   metrics: Record<string, unknown>;
 }
@@ -1306,6 +1306,27 @@ export function isBenchmarkPointPurged(
       candidate.offloadMode === point.offloadMode &&
       (candidate.recipeFingerprint ?? null) === (point.recipeFingerprint ?? null),
   );
+}
+
+export type BenchmarkPointPlan<T extends BackfillablePoint> =
+  | { kind: 'purged' }
+  | { kind: 'planned'; point: T; backfillId: string | null };
+
+/**
+ * The one decision every ingest path makes per artifact row, in this order: an
+ * exact purge wins over any correction; a matching backfill patches the row;
+ * two source rows collapsing onto one corrected identity fail the batch.
+ * Callers log and persist; this owner only decides.
+ */
+export function planBenchmarkPoint<T extends BackfillablePoint>(
+  run: { githubRunId: number; runAttempt: number | null | undefined },
+  point: T,
+  seen: Map<string, string>,
+): BenchmarkPointPlan<T> {
+  if (isBenchmarkPointPurged(run.githubRunId, run.runAttempt, point)) return { kind: 'purged' };
+  const applied = applyBenchmarkPointBackfill(run.githubRunId, run.runAttempt, point);
+  recordBackfilledPointIdentity(seen, applied.sourceIdentity, applied.desiredIdentity);
+  return { kind: 'planned', point: applied.point, backfillId: applied.backfillId };
 }
 
 /**
