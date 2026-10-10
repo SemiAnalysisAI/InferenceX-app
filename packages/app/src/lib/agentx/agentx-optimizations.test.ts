@@ -51,6 +51,7 @@ describe('AgentX optimizations registry', () => {
 
   it('resolves a framework by slug and rejects unknown ones', () => {
     expect(getOptimizationFramework('vllm')?.name).toBe('vLLM');
+    expect(getOptimizationFramework('mori-umbp')?.name).toBe('MoRI UMBP');
     expect(getOptimizationFramework('not-a-framework')).toBeUndefined();
   });
 

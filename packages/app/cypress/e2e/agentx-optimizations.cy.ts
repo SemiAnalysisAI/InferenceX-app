@@ -9,6 +9,7 @@ const FRAMEWORK_SLUGS = [
   'dynamo',
   'lmcache',
   'mooncake',
+  'mori-umbp',
 ] as const;
 
 const FRAMEWORK_NAMES: Record<(typeof FRAMEWORK_SLUGS)[number], string> = {
@@ -20,6 +21,7 @@ const FRAMEWORK_NAMES: Record<(typeof FRAMEWORK_SLUGS)[number], string> = {
   dynamo: 'NVIDIA Dynamo',
   lmcache: 'LMCache',
   mooncake: 'Mooncake',
+  'mori-umbp': 'MoRI UMBP',
 };
 
 const ROUTE_VIEWPORTS = [
@@ -48,6 +50,9 @@ describe('AgentX optimizations', () => {
         'href',
         '/agentx/optimizations/sglang',
       );
+      cy.get(
+        '[data-testid="agentx-optimizations-framework-link"][data-framework="mori-umbp"]',
+      ).should('have.attr', 'href', '/agentx/optimizations/mori-umbp');
       cy.get('[data-testid="agentx-optimizations-cta"]')
         .should('contain.text', 'Read the optimizations')
         .click();
@@ -110,7 +115,7 @@ describe('AgentX optimizations', () => {
   it('renders the index and representative projects at 1440px and 390px in both locales', () => {
     // Project pages share one template and differ only in typechecked data, so
     // the route matrix visits two representatives (one with a hyphenated slug)
-    // instead of all eight; the tests above deep-cover vllm (en) and sglang (zh).
+    // instead of all nine; the tests above deep-cover vllm (en) and sglang (zh).
     const matrixSlugs = ['tensorrt-llm', 'mooncake'] as const;
     for (const viewport of ROUTE_VIEWPORTS) {
       for (const locale of ['', '/zh']) {
