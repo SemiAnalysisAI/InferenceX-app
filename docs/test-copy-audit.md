@@ -77,6 +77,11 @@ from the detail title failed the revised test. Both mutations were restored.
 This distinguishes an editorial change from lost data without adding a CI test
 that tries to mechanically classify other tests.
 
+The metadata check matches complete hardware names: `B200` must not pass merely
+because `GB200 NVL72` is present. Temporary omissions of `B200` and `B300` from
+the generated platform list each failed both locale cases; restored source
+passed all four metadata cases.
+
 Final unit, browser, lint, formatting, and typecheck results are recorded in the
 PR. Full browser CI covers every changed spec; no timing baseline is adjusted
 because no browser spec is deleted and no new duration has been measured.

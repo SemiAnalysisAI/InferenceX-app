@@ -10,7 +10,9 @@ describe('buildOverviewMetadata', () => {
     const metadata = buildOverviewMetadata(locale);
 
     for (const hardware of OVERVIEW_HARDWARE) {
-      expect(metadata.description).toContain(overviewHardwareLabel(hardware));
+      const label = RegExp.escape(overviewHardwareLabel(hardware));
+      // B200/B300 must not match only the GB200/GB300 rack names.
+      expect(metadata.description).toMatch(new RegExp(`\\b${label}\\b`, 'u'));
     }
     if (locale === 'zh') {
       expect(metadata.title).toMatch(/\p{Script=Han}/u);
