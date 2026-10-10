@@ -1,9 +1,9 @@
 import type { Metadata } from 'next';
 
 import { AgentXOptimizationsIndex } from '@/components/datasets/agentx-optimizations-article';
-import { JsonLd } from '@/components/json-ld';
-import { OPTIMIZATIONS_OVERVIEW } from '@/lib/agentx-optimizations';
-import { enAlternates } from '@/lib/i18n';
+import { JsonLd } from '@/components/seo/json-ld';
+import { OPTIMIZATIONS_OVERVIEW } from '@/lib/agentx/agentx-optimizations';
+import { enAlternates } from '@/lib/i18n/i18n';
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
 
 const TITLE = 'AgentX Industry Impact: Optimizations for Agentic Workloads';

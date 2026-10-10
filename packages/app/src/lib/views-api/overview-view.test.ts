@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import type { OverviewPageData } from '@/lib/overview-data';
+import type { OverviewPageData } from '@/lib/overview/overview-data';
 
 import { overviewViewGeneratedAt, projectOverviewView } from './overview-view';
 

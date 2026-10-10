@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 
-import { computeToggle } from '@/lib/toggle-set';
+import { computeToggle } from '@/lib/shared/toggle-set';
 
 export { computeToggle };
 

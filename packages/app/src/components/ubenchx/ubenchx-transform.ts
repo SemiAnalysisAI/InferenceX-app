@@ -5,7 +5,7 @@
  * silently calculate different results (AGENTS.md read-only coverage rule).
  */
 
-import { GPU_SPECS, parseNumericFromString } from '@/lib/gpu-specs';
+import { GPU_SPECS, parseNumericFromString } from '@/lib/catalog/gpu-specs';
 import type { UbenchxRow, UbenchxRun } from './ubenchx-data';
 
 export interface UbenchxDerivedRow extends UbenchxRow {

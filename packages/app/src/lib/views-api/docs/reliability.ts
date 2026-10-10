@@ -1,5 +1,10 @@
-import type { ApiOperation, ApiParameter, ApiResponse, ApiSchema } from '@/lib/api-documentation';
-import { API_BASE_URL } from '@/lib/api-documentation-base';
+import type {
+  ApiOperation,
+  ApiParameter,
+  ApiResponse,
+  ApiSchema,
+} from '@/lib/api/api-documentation';
+import { API_BASE_URL } from '@/lib/api/api-documentation-base';
 import {
   text,
   stringSchema,
@@ -7,7 +12,7 @@ import {
   integerSchema,
   objectSchema,
   arraySchema,
-} from '@/lib/api-documentation-helpers';
+} from '@/lib/api/api-documentation-helpers';
 
 /**
  * Docs fragment for GET /api/v1/views/reliability.

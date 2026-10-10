@@ -21,8 +21,8 @@ import {
 } from '@/components/evaluation/chart-data';
 import { resolveEvaluationDate } from '@/components/evaluation/date-resolution';
 import type { EvaluationChartData } from '@/components/evaluation/types';
-import { cachedJson, cachedQuery } from '@/lib/api-cache';
-import { loadFixture } from '@/lib/test-fixtures';
+import { cachedJson, cachedQuery } from '@/lib/cache/api-cache';
+import { loadFixture } from '@/lib/testing/test-fixtures';
 import { csvResponse } from '@/lib/views-api/csv';
 import { runViewsRoute, ViewsApiParamError } from '@/lib/views-api/errors';
 

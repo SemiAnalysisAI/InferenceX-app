@@ -1,23 +1,23 @@
 'use client';
 
-import { track } from '@/lib/analytics';
+import { track } from '@/lib/analytics/analytics';
 import { ChevronDown, ChevronUp, ExternalLink } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTheme } from 'next-themes';
-import { isDarkTheme } from '@/lib/themes';
-import type { Locale } from '@/lib/i18n';
-import { useLocale } from '@/lib/use-locale';
+import { isDarkTheme } from '@/lib/themes/themes';
+import type { Locale } from '@/lib/i18n/i18n';
+import { useLocale } from '@/lib/i18n/use-locale';
 
 import { getModelReleaseDate } from '@semianalysisai/inferencex-constants';
 
 import { Badge } from '@/components/ui/badge';
-import type { Model } from '@/lib/data-mappings';
+import type { Model } from '@/lib/catalog/data-mappings';
 import {
   type ModelArchitecture,
   formatParamCount,
   getModelArchitecture,
-} from '@/lib/model-architectures';
+} from '@/lib/catalog/model-architectures';
 import { renderDiagram } from './model-architecture-diagram-renderer';
 
 interface ModelArchitectureDiagramProps {

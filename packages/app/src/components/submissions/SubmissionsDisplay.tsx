@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import { track } from '@/lib/analytics';
+import { track } from '@/lib/analytics/analytics';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ChartButtons } from '@/components/ui/chart-buttons';
@@ -10,10 +10,10 @@ import { ChartShareActions } from '@/components/ui/chart-display-helpers';
 import { DashboardSectionHeader } from '@/components/ui/dashboard-section-header';
 import { Heading } from '@/components/ui/heading';
 import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/segmented-toggle';
-import { exportToCsv } from '@/lib/csv-export';
-import { submissionsVolumeToCsv } from '@/lib/csv-export-helpers';
+import { exportToCsv } from '@/lib/export/csv-export';
+import { submissionsVolumeToCsv } from '@/lib/export/csv-export-helpers';
 import { useSubmissions } from '@/hooks/api/use-submissions';
-import { useLocale } from '@/lib/use-locale';
+import { useLocale } from '@/lib/i18n/use-locale';
 
 import SubmissionsChart, { type ChartMode } from './SubmissionsChart';
 import SubmissionsTable from './SubmissionsTable';

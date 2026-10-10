@@ -79,7 +79,7 @@ The metric registry declares whether higher or lower values are preferable. Char
 
 For machine-readable frontier and hinterland observations, see the
 [Pareto boundary API](./pareto-api.md). The server and chart share
-`src/lib/pareto-frontier.ts`; their input-selection pipelines differ.
+`src/lib/charts/pareto-frontier.ts`; their input-selection pipelines differ.
 
 Every inference scatter chart exposes a **Pareto Frontier** switch under
 **Advanced**, off by default.

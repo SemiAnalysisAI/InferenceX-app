@@ -2,7 +2,7 @@ import { Suspense } from 'react';
 import type { Metadata } from 'next';
 
 import { ConversationView } from '@/components/datasets/conversation-view';
-import { enAlternates } from '@/lib/i18n';
+import { enAlternates } from '@/lib/i18n/i18n';
 
 interface Props {
   params: Promise<{ slug: string; convId: string }>;

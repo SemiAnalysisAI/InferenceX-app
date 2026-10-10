@@ -2,12 +2,12 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
 import { AgentXOptimizationsArticle } from '@/components/datasets/agentx-optimizations-article';
-import { JsonLd } from '@/components/json-ld';
+import { JsonLd } from '@/components/seo/json-ld';
 import {
   AGENTX_OPTIMIZATION_FRAMEWORKS,
   getOptimizationFramework,
-} from '@/lib/agentx-optimizations';
-import { enAlternates } from '@/lib/i18n';
+} from '@/lib/agentx/agentx-optimizations';
+import { enAlternates } from '@/lib/i18n/i18n';
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
 
 interface Props {

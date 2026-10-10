@@ -8,8 +8,8 @@ import {
   modelRoutePath,
   pathWithSearchParams,
   resolveModelRouteSlug,
-} from '@/lib/model-routes';
-import { modelTabMetadata } from '@/lib/tab-meta';
+} from '@/lib/routing/model-routes';
+import { modelTabMetadata } from '@/lib/routing/tab-meta';
 
 /**
  * `/profit-estimator/<model>` — the GW-year profit estimator seeded to a

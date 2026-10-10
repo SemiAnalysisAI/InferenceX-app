@@ -25,9 +25,9 @@ import { RetryableQueryError } from '@/components/ui/retryable-query-error';
 import { useServerLogFiles } from '@/hooks/api/use-server-log-files';
 import { useServerLogSearch } from '@/hooks/api/use-server-log-search';
 import { SERVER_LOG_CHUNK_SIZE, useServerLog } from '@/hooks/api/use-server-log';
-import { track } from '@/lib/analytics';
-import { cn } from '@/lib/utils';
-import { useLocale } from '@/lib/use-locale';
+import { track } from '@/lib/analytics/analytics';
+import { cn } from '@/lib/shared/utils';
+import { useLocale } from '@/lib/i18n/use-locale';
 
 import {
   buildLogLines,

@@ -1,10 +1,10 @@
 import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { BenchmarkRow } from '@/lib/api';
-import { Model } from '@/lib/data-mappings';
-import { buildOverviewModelSummary } from '@/lib/overview-data';
-import { buildRankingRows } from '@/lib/rankings';
+import type { BenchmarkRow } from '@/lib/api/api';
+import { Model } from '@/lib/catalog/data-mappings';
+import { buildOverviewModelSummary } from '@/lib/overview/overview-data';
+import { buildRankingRows } from '@/lib/live-seo/rankings';
 
 const { mockGetCachedBenchmarks, mockCachedJson, mockCachedText } = vi.hoisted(() => ({
   mockGetCachedBenchmarks: vi.fn(),
@@ -15,11 +15,11 @@ const { mockGetCachedBenchmarks, mockCachedJson, mockCachedText } = vi.hoisted((
   ),
 }));
 
-vi.mock('@/lib/benchmark-data.server', () => ({
+vi.mock('@/lib/benchmarks/benchmark-data.server', () => ({
   getCachedBenchmarks: mockGetCachedBenchmarks,
 }));
 
-vi.mock('@/lib/api-cache', () => ({
+vi.mock('@/lib/cache/api-cache', () => ({
   cachedDerivedData: <T, Args extends unknown[]>(fn: (...args: Args) => Promise<T>) => fn,
   cachedJson: mockCachedJson,
   cachedText: mockCachedText,

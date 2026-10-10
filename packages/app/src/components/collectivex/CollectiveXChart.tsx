@@ -4,8 +4,8 @@ import * as d3 from 'd3';
 import { useMemo } from 'react';
 
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
-import { useLocale } from '@/lib/use-locale';
-import type { Locale } from '@/lib/i18n';
+import { useLocale } from '@/lib/i18n/use-locale';
+import type { Locale } from '@/lib/i18n/i18n';
 
 import { chartPoints, collectiveXColorKey, collectiveXRunDasharray, fitAlphaBeta } from './data';
 import type {

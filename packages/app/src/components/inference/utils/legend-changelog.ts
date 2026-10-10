@@ -1,6 +1,6 @@
 import type { ChangelogMetadata, InferenceData, RunInfo } from '../types';
-import { MODEL_PREFIX_MAPPING } from '@/lib/data-mappings';
-import { runIdFromRunUrl } from '@/lib/known-issues';
+import { MODEL_PREFIX_MAPPING } from '@/lib/catalog/data-mappings';
+import { runIdFromRunUrl } from '@/lib/benchmarks/known-issues';
 import { configKeyMatchesHwKey } from './changelogFormatters';
 
 type LegendPoint = Pick<InferenceData, 'hwKey' | 'model' | 'precision' | 'run_url'>;

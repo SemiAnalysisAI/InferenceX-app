@@ -7,8 +7,8 @@ import type {
   QuickFilters,
   SpecMode,
 } from '@/components/inference/types';
-import { frameworkFamily } from '@/lib/framework-family';
-import type { PowerTier } from '@/lib/power-tier';
+import { frameworkFamily } from '@/lib/catalog/framework-family';
+import type { PowerTier } from '@/lib/power/power-tier';
 
 export type { AvailableQuickFilters, DeploymentMode, PowerTier, QuickFilters, SpecMode };
 

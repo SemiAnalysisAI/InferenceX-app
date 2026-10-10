@@ -2,7 +2,7 @@ import { validateParams as validateViewParams, parseFormatParam } from '@/lib/vi
 import { VIEW_QUERY_PARAMS } from '@/lib/views-api/registry';
 import type { NextRequest } from 'next/server';
 
-import { cachedJson } from '@/lib/api-cache';
+import { cachedJson } from '@/lib/cache/api-cache';
 import {
   getScaleUpDomainMemoryBwNumeric,
   getScaleUpDomainMemoryNumeric,
@@ -10,7 +10,7 @@ import {
   GPU_SPECS,
   parseNumericFromString,
   type GpuSpec,
-} from '@/lib/gpu-specs';
+} from '@/lib/catalog/gpu-specs';
 import { csvResponse } from '@/lib/views-api/csv';
 import { runViewsRoute, ViewsApiParamError } from '@/lib/views-api/errors';
 
@@ -19,7 +19,7 @@ export const dynamic = 'force-dynamic';
 /**
  * GET /api/v1/views/gpu-specs
  *
- * Static chip specifications behind the `/gpu-specs` page (`lib/gpu-specs.ts`:
+ * Static chip specifications behind the `/gpu-specs` page (`lib/catalog/gpu-specs.ts`:
  * `GPU_SPECS`) plus the chartable metric metadata (`GPU_CHART_METRICS`).
  * No database read — the payload is compiled-in.
  *

@@ -1,4 +1,4 @@
-import { NudgeEngine } from '@/components/nudge-engine';
+import { NudgeEngine } from '@/components/nudges/nudge-engine';
 
 /**
  * `/overview` sits outside DashboardShell: it has no TabNav, and it reads none

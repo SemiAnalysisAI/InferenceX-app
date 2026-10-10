@@ -8,8 +8,8 @@ import { type ContentBlock } from '@/lib/agentic-workload-explorer/subagent';
 import { formatDuration, formatNumber } from '@/lib/agentic-workload-explorer/format';
 import { TOOL_COLORS as BASE_TOOL_COLORS } from '@/lib/agentic-workload-explorer/tool-colors';
 import { useExplorerHref } from '@/hooks/agentic-workload-explorer/use-explorer-href';
-import { useLocale } from '@/lib/use-locale';
-import { track } from '@/lib/analytics';
+import { useLocale } from '@/lib/i18n/use-locale';
+import { track } from '@/lib/analytics/analytics';
 
 const STRINGS = {
   en: {

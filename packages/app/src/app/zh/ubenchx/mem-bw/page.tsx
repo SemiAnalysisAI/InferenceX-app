@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 
 import { UbenchxContent } from '@/components/ubenchx/UbenchxContent';
 import { UbenchxHub } from '@/components/ubenchx/UbenchxHub';
-import { zhAlternates, ZH_OG_LOCALE } from '@/lib/i18n';
+import { zhAlternates, ZH_OG_LOCALE } from '@/lib/i18n/i18n';
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
 
 const TITLE = 'ubenchX：HBM 带宽';

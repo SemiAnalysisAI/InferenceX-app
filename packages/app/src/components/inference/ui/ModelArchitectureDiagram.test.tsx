@@ -4,8 +4,8 @@ import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { Model } from '@/lib/data-mappings';
-import { getModelArchitecture } from '@/lib/model-architectures';
+import { Model } from '@/lib/catalog/data-mappings';
+import { getModelArchitecture } from '@/lib/catalog/model-architectures';
 
 const mocks = vi.hoisted(() => ({
   renderDiagram: vi.fn(),
@@ -24,7 +24,7 @@ vi.mock('next/link', () => ({
     <a {...props}>{children}</a>
   ),
 }));
-vi.mock('@/lib/analytics', () => ({ track: vi.fn() }));
+vi.mock('@/lib/analytics/analytics', () => ({ track: vi.fn() }));
 vi.mock('next/navigation', () => ({ usePathname: () => mocks.pathname.value }));
 
 import ModelArchitectureDiagram from './ModelArchitectureDiagram';

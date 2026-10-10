@@ -12,8 +12,8 @@ import { Heading } from '@/components/ui/heading';
 import { SegmentedToggle } from '@/components/ui/segmented-toggle';
 import ChartLegend from '@/components/ui/chart-legend';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
-import { track } from '@/lib/analytics';
-import { useLocale } from '@/lib/use-locale';
+import { track } from '@/lib/analytics/analytics';
+import { useLocale } from '@/lib/i18n/use-locale';
 import { collectiveXRunDasharray } from './data';
 import { formatSwapBytes, swapChartPoints, swapRooflines, type SwapChartPoint } from './swap-data';
 

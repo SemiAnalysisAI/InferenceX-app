@@ -10,10 +10,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { track } from '@/lib/analytics';
+import { track } from '@/lib/analytics/analytics';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
-import { useLocale } from '@/lib/use-locale';
-import type { Locale } from '@/lib/i18n';
+import { useLocale } from '@/lib/i18n/use-locale';
+import type { Locale } from '@/lib/i18n/i18n';
 
 import { UBENCHX_GPU_KEYS, UBENCHX_RUNS } from './ubenchx-data';
 import { transformUbenchxRun, formatBytes, type UbenchxDerivedRow } from './ubenchx-transform';

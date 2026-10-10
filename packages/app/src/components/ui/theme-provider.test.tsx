@@ -3,7 +3,7 @@ import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { useTheme } from 'next-themes';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { APP_THEMES } from '@/lib/themes';
+import { APP_THEMES } from '@/lib/themes/themes';
 import { ThemeProvider } from './theme-provider';
 
 let container: HTMLDivElement;

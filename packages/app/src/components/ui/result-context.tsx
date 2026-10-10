@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 
-import type { Locale } from '@/lib/i18n';
+import type { Locale } from '@/lib/i18n/i18n';
 
 /**
  * Trigger styling for a select that sits inside the caption's Cost Tier

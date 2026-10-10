@@ -3,13 +3,13 @@ import Image from 'next/image';
 import type { CSSProperties, ReactNode } from 'react';
 
 import { ThemedFigureImage } from '@/components/blog/themed-figure-image';
-import { JsonLd } from '@/components/json-ld';
+import { JsonLd } from '@/components/seo/json-ld';
 import { Badge } from '@/components/ui/badge';
 import { Eyebrow } from '@/components/ui/eyebrow';
 import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
 import { Heading } from '@/components/ui/heading';
 import { ResultContext } from '@/components/ui/result-context';
-import { type Locale, localePath } from '@/lib/i18n';
+import { type Locale, localePath } from '@/lib/i18n/i18n';
 import {
   buildWhitepaperBreadcrumbJsonLd,
   buildWhitepaperJsonLd,
@@ -19,8 +19,8 @@ import {
   type WhitepaperKpiIcon,
   whitepaperCopy,
   whitepaperIndexPath,
-} from '@/lib/whitepapers';
-import { cn } from '@/lib/utils';
+} from '@/lib/content/whitepapers';
+import { cn } from '@/lib/shared/utils';
 
 import {
   WhitepaperBackLink,

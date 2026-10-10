@@ -4,7 +4,7 @@ import {
   paretoFrontForDirection,
   paretoMaximizesX,
   type ParetoDirection,
-} from '@/lib/chart-utils';
+} from '@/lib/charts/chart-utils';
 
 import { canonicalParetoIntersection } from './canonicalFrontier';
 

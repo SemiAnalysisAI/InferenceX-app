@@ -1,6 +1,6 @@
 'use client';
 
-import { track } from '@/lib/analytics';
+import { track } from '@/lib/analytics/analytics';
 
 import { useReliabilityContext } from '@/components/reliability/ReliabilityContext';
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
@@ -12,7 +12,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { TooltipProvider } from '@/components/ui/tooltip';
-import { useLocale } from '@/lib/use-locale';
+import { useLocale } from '@/lib/i18n/use-locale';
 
 const STRINGS = {
   en: {

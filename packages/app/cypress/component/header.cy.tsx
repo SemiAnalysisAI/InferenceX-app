@@ -4,7 +4,7 @@ import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.share
 
 import { Header } from '@/components/header/header';
 import { ThemeProvider } from '@/components/ui/theme-provider';
-import { APP_THEMES } from '@/lib/themes';
+import { APP_THEMES } from '@/lib/themes/themes';
 import { createMockRouter } from '../support/mock-router';
 
 // Mounted outside the Next app shell; next-style-loader inserts the global

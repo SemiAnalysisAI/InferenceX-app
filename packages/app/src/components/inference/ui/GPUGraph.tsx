@@ -1,14 +1,14 @@
 'use client';
 
-import { track } from '@/lib/analytics';
-import { isPersistedBenchmarkId } from '@/lib/benchmark-id';
+import { track } from '@/lib/analytics/analytics';
+import { isPersistedBenchmarkId } from '@/lib/benchmarks/benchmark-id';
 import { useEphemeralUrlState } from '@/hooks/useUrlState';
-import { rememberChartStateInUrl } from '@/lib/url-state';
+import { rememberChartStateInUrl } from '@/lib/routing/url-state';
 import * as d3 from 'd3';
 import dynamic from 'next/dynamic';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTheme } from 'next-themes';
-import { isDarkTheme } from '@/lib/themes';
+import { isDarkTheme } from '@/lib/themes/themes';
 
 import {
   useInferenceActions,
@@ -18,13 +18,20 @@ import {
 } from '@/components/inference/InferenceContext';
 import ChartLegend from '@/components/ui/chart-legend';
 import { Button } from '@/components/ui/button';
-import { OFFICIAL_PREVIEW_SERIES } from '@/components/official-preview-notice';
-import { getHardwareConfig, getModelSortIndex, hardwareKeyMatchesAnyBase } from '@/lib/constants';
-import { getInferenceHardwareConfig } from '@/lib/inference-labels';
-import { getChartWatermark, Sequence } from '@/lib/data-mappings';
-import { generateGpuDateColors, generateHighContrastGpuDateColors } from '@/lib/dynamic-colors';
-import { useLocale } from '@/lib/use-locale';
-import { formatNumber, getDisplayLabel, updateRepoUrl } from '@/lib/utils';
+import { OFFICIAL_PREVIEW_SERIES } from '@/components/ui/official-preview-notice';
+import {
+  getHardwareConfig,
+  getModelSortIndex,
+  hardwareKeyMatchesAnyBase,
+} from '@/lib/catalog/constants';
+import { getInferenceHardwareConfig } from '@/lib/benchmarks/inference-labels';
+import { getChartWatermark, Sequence } from '@/lib/catalog/data-mappings';
+import {
+  generateGpuDateColors,
+  generateHighContrastGpuDateColors,
+} from '@/lib/charts/dynamic-colors';
+import { useLocale } from '@/lib/i18n/use-locale';
+import { formatNumber, getDisplayLabel, updateRepoUrl } from '@/lib/shared/utils';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useTraceAvailability } from '@/hooks/api/use-trace-availability';
 import { useLogAvailability } from '@/hooks/api/use-log-availability';
@@ -42,8 +49,8 @@ import {
   formatLargeNumber,
   getShapeKeyForPrecision,
   logTickFormat,
-} from '@/lib/chart-rendering';
-import type { ParetoDirection } from '@/lib/chart-utils';
+} from '@/lib/charts/chart-rendering';
+import type { ParetoDirection } from '@/lib/charts/chart-utils';
 import {
   chartFrontier,
   upperPowerEnvelope,
@@ -68,7 +75,7 @@ import {
   type KnownIssueAnnotation,
   createKnownIssueLayer,
 } from '@/components/inference/utils/knownIssueAnnotations';
-import { matchKnownConfigIssues, pointMatchesIssue } from '@/lib/known-issues';
+import { matchKnownConfigIssues, pointMatchesIssue } from '@/lib/benchmarks/known-issues';
 import { renderOffloadHalo } from '@/components/inference/utils/offload-halo';
 import { renderLegacyPowerRing } from '@/components/inference/utils/legacy-power-marker';
 import {

@@ -3,7 +3,7 @@
 import { ticks } from 'd3';
 import { Loader2 } from 'lucide-react';
 import { useTheme } from 'next-themes';
-import { isDarkTheme } from '@/lib/themes';
+import { isDarkTheme } from '@/lib/themes/themes';
 import { useMemo, useState } from 'react';
 
 import type { ComparisonOp, ComparisonView } from '@semianalysisai/inferencex-db/operatorx/compare';

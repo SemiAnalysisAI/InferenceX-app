@@ -1,6 +1,6 @@
 import { Card } from '@/components/ui/card';
-import type { AgenticCatalogModelGroup } from '@/lib/agentic-catalog';
-import type { Locale } from '@/lib/i18n';
+import type { AgenticCatalogModelGroup } from '@/lib/agentx/agentic-catalog';
+import type { Locale } from '@/lib/i18n/i18n';
 
 import { AgenticCatalogCardLink } from './agentic-catalog-link';
 

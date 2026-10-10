@@ -15,7 +15,7 @@ vi.mock('@semianalysisai/inferencex-db/queries/reliability', () => ({
   getReliabilityStats: mockGetReliabilityStats,
 }));
 
-vi.mock('@/lib/api-cache', () => ({
+vi.mock('@/lib/cache/api-cache', () => ({
   cachedQuery: (fn: (...args: unknown[]) => unknown) => fn,
   cachedJson: (data: unknown) => Response.json(data),
   cachedText: (data: string, contentType: string) =>

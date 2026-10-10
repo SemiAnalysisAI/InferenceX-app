@@ -1,6 +1,6 @@
 import { ImageResponse } from 'next/og';
 
-import { getAllPosts, getPostBySlug } from '@/lib/blog';
+import { getAllPosts, getPostBySlug } from '@/lib/blog/blog';
 
 // The OG renderer's default Satori font has no CJK glyphs, so Chinese posts
 // reuse the ENGLISH post metadata for the image — same visual as the original

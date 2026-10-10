@@ -3,8 +3,8 @@
 import Link from 'next/link';
 import { ArrowUpRight } from 'lucide-react';
 
-import { track } from '@/lib/analytics';
-import type { Locale } from '@/lib/i18n';
+import { track } from '@/lib/analytics/analytics';
+import type { Locale } from '@/lib/i18n/i18n';
 
 interface CatalogLinkCardProps {
   href: string;

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.shared-runtime';
-import { EngineComparisonConfirmation } from '@/components/engine-comparison-confirmation';
+import { EngineComparisonConfirmation } from '@/components/inference/ui/engine-comparison-confirmation';
 
 function Harness({ confirm, cancel }: { confirm: () => void; cancel: () => void }) {
   const [open, setOpen] = useState(true);

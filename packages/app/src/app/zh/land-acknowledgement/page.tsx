@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 
 import { Card } from '@/components/ui/card';
-import { zhAlternates, ZH_OG_LOCALE } from '@/lib/i18n';
+import { zhAlternates, ZH_OG_LOCALE } from '@/lib/i18n/i18n';
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
 
 const REGIONAL_ACKNOWLEDGEMENTS_ZH = [

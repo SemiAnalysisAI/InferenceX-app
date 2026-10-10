@@ -4,7 +4,7 @@ import {
   type TraceAvailabilityMap,
 } from '@semianalysisai/inferencex-db/queries/trace-availability';
 
-import { cachedQuery } from '@/lib/api-cache';
+import { cachedQuery } from '@/lib/cache/api-cache';
 
 import { idsQueryRoute } from '../id-routes';
 

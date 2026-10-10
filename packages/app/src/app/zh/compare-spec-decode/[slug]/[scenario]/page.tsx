@@ -1,7 +1,10 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
-import { type ScenarioSegment, sequenceForScenarioSegment } from '@/lib/compare-scenario-route';
+import {
+  type ScenarioSegment,
+  sequenceForScenarioSegment,
+} from '@/lib/compare/compare-scenario-route';
 
 import { buildSpecDecodeMetadataZh, renderSpecDecodePageZh } from '../page';
 

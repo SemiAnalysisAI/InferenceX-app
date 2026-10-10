@@ -2,7 +2,7 @@ import {
   buildOverviewMetadata,
   type OverviewRoutePageProps,
   renderOverviewPage,
-} from '@/lib/overview-route.server';
+} from '@/lib/overview/overview-route.server';
 
 export const dynamic = 'force-dynamic';
 

@@ -10,10 +10,10 @@ import {
   powerMetricState,
   type PowerAvailabilityState,
 } from '../utils/power-metric-availability';
-import { useUnofficialRun } from '@/components/unofficial-run-provider';
-import { hardwareKeyMatchesAnyBase } from '@/lib/constants';
-import { useLocale } from '@/lib/use-locale';
-import { track } from '@/lib/analytics';
+import { useUnofficialRun } from '@/providers/unofficial-run-provider';
+import { hardwareKeyMatchesAnyBase } from '@/lib/catalog/constants';
+import { useLocale } from '@/lib/i18n/use-locale';
+import { track } from '@/lib/analytics/analytics';
 
 const STRINGS = {
   en: {

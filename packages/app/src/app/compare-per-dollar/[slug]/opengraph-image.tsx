@@ -1,8 +1,12 @@
 import { notFound } from 'next/navigation';
 
-import { getAllComparableCompareSlugs } from '@/lib/compare-availability';
-import { renderCompareOg } from '@/lib/compare-og';
-import { canonicalCompareSlug, compareDisplayLabel, parseCompareSlug } from '@/lib/compare-slug';
+import { getAllComparableCompareSlugs } from '@/lib/compare/compare-availability';
+import { renderCompareOg } from '@/lib/compare/compare-og';
+import {
+  canonicalCompareSlug,
+  compareDisplayLabel,
+  parseCompareSlug,
+} from '@/lib/compare/compare-slug';
 
 export const alt = 'Chip performance-per-dollar inference benchmark comparison';
 export const size = { width: 1200, height: 630 };

@@ -6,7 +6,7 @@ import {
   type RequestTimeline,
 } from '@semianalysisai/inferencex-db/queries/request-timeline';
 
-import { cachedQuery } from '@/lib/api-cache';
+import { cachedQuery } from '@/lib/cache/api-cache';
 
 import { idQueryRoute } from '../id-routes';
 

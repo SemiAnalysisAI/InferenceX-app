@@ -23,7 +23,7 @@ vi.mock('@semianalysisai/inferencex-db/queries/collectivex', () => ({
   collectiveXDatasetFromRow: mockFromRow,
 }));
 
-vi.mock('@/lib/collectivex-lazy-ingest', () => ({
+vi.mock('@/lib/collectivex/collectivex-lazy-ingest', () => ({
   ensureCollectiveXRun: mockEnsureRun,
   collectiveXSweepErrorStatus: (error: unknown) => {
     const code = error instanceof Error && 'code' in error ? (error.code as string) : null;
@@ -34,7 +34,7 @@ vi.mock('@/lib/collectivex-lazy-ingest', () => ({
   },
 }));
 
-vi.mock('@/lib/api-cache', () => ({
+vi.mock('@/lib/cache/api-cache', () => ({
   COLLECTIVEX_CACHE_SCOPE: 'collectivex',
   COLLECTIVEX_CACHE_CONTROL: 'public, max-age=0, s-maxage=60',
   cachedJson: (data: unknown) => Response.json(data),

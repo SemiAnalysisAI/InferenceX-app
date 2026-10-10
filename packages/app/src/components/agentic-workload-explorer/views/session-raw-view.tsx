@@ -13,8 +13,8 @@ import {
 } from '@/lib/agentic-workload-explorer/format';
 import { useSession } from '@/lib/agentic-workload-explorer/session-context';
 import { formatSnapshotTime } from '@/lib/agentic-workload-explorer/snapshot';
-import { useLocale } from '@/lib/use-locale';
-import { track } from '@/lib/analytics';
+import { useLocale } from '@/lib/i18n/use-locale';
+import { track } from '@/lib/analytics/analytics';
 
 const STRINGS = {
   en: {

@@ -5,15 +5,15 @@ import React, { useMemo, useRef } from 'react';
 
 import type { HardwareConfig } from '@/components/inference/types';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
-import { getHardwareConfig } from '@/lib/constants';
+import { getHardwareConfig } from '@/lib/catalog/constants';
 import { CHART_TYPE, px } from '@/lib/d3-chart/typography';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
 import type { CustomLayerConfig, D3ChartHandle, RenderContext } from '@/lib/d3-chart/D3Chart/types';
-import { getChartWatermark } from '@/lib/data-mappings';
-import type { Locale } from '@/lib/i18n';
-import { overlayRunColor } from '@/lib/overlay-run-style';
-import { useLocale } from '@/lib/use-locale';
-import { escapeHtml, getDisplayLabel } from '@/lib/utils';
+import { getChartWatermark } from '@/lib/catalog/data-mappings';
+import type { Locale } from '@/lib/i18n/i18n';
+import { overlayRunColor } from '@/lib/charts/overlay-run-style';
+import { useLocale } from '@/lib/i18n/use-locale';
+import { escapeHtml, getDisplayLabel } from '@/lib/shared/utils';
 
 import {
   CACHE_TIER_COLORS,

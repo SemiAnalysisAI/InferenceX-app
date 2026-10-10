@@ -1,5 +1,5 @@
 import * as d3 from 'd3';
-import type { Locale } from '@/lib/i18n';
+import type { Locale } from '@/lib/i18n/i18n';
 
 import {
   type ArchSubBlock,
@@ -15,7 +15,7 @@ import {
   ffnVariantLabel,
   getHybridAttentionSubBlocks,
   sharedExpertCount,
-} from '@/lib/model-architectures';
+} from '@/lib/catalog/model-architectures';
 
 const ARCHITECTURE_TEXT_ZH: Record<string, string> = {
   'Token Embedding': 'Token 嵌入',

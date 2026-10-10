@@ -40,7 +40,7 @@ contrast branch.
 
 ## CS:GO implementation
 
-`src/lib/themes.ts` centralizes toggle order
+`src/lib/themes/themes.ts` centralizes toggle order
 (`light, dark, minecraft, csgo, gta, doom, halo`), dark-background classification, and the
 chart-palette alias used by CS:GO, GTA, DOOM and Halo. CS:GO retains the
 existing sans-serif font for chart legibility and preserves the dark theme's

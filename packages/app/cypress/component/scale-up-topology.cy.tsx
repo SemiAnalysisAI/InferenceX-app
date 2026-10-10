@@ -1,5 +1,5 @@
 import { ScaleUpTopologyDiagram } from '@/components/gpu-specs/scale-up-topology-diagram';
-import type { GpuSpec } from '@/lib/gpu-specs';
+import type { GpuSpec } from '@/lib/catalog/gpu-specs';
 
 // Three real specs covering all topology types: switched 4-rail, switched NVL72, full mesh
 const H100_SXM: GpuSpec = {

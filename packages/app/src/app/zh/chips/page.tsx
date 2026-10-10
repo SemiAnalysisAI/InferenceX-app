@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 
 import { ChipsIndexContent } from '@/components/chips/chip-page-sections';
-import { ZH_OG_LOCALE, zhAlternates } from '@/lib/i18n';
+import { ZH_OG_LOCALE, zhAlternates } from '@/lib/i18n/i18n';
 import { SITE_NAME, SITE_URL, SUPPORTERS_LINE_ZH } from '@semianalysisai/inferencex-constants';
 
 const TITLE = '面向 LLM 推理的 AI 芯片：规格、价格与基准测试';

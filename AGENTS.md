@@ -32,7 +32,7 @@ InferenceX App — Next.js 16 dashboard for ML inference benchmark data. DB-back
 - **Charts**: D3.js — shared library at `src/lib/d3-chart/`, scatter/GPU/bar charts
 - **Data**: Neon DB → API routes (`/api/v1/*`) → React Query hooks → Context providers
 - **Deployment**: Vercel with daily cron-triggered rebuilds
-- **Analytics**: PostHog (`posthog-js`) via `@/lib/analytics` — recommended on all interactive elements (autocapture provides baseline coverage)
+- **Analytics**: PostHog (`posthog-js`) via `@/lib/analytics/analytics` — recommended on all interactive elements (autocapture provides baseline coverage)
 
 ## Quick Start
 
@@ -140,11 +140,11 @@ sensitive.
 ### API reference and contract synchronization
 
 The public API reference at `/api` and `/zh/api`, plus the OpenAPI 3.1 document at
-`/api/openapi.json`, are generated from `packages/app/src/lib/api-documentation.ts`.
+`/api/openapi.json`, are generated from `packages/app/src/lib/api/api-documentation.ts`.
 
 **Any change to an API route, request parameter, response shape, status code, authentication,
 caching behavior, or shared API type MUST update the documentation registry in the same change.**
-Keep `packages/app/src/lib/api-route-catalog.ts` synchronized with every handler under
+Keep `packages/app/src/lib/api/api-route-catalog.ts` synchronized with every handler under
 `packages/app/src/app/api/`; the catalog classifies unpublished routes and records review digests
 for handlers and shared contract sources. Do not update a digest without first confirming whether
 the human reference, Chinese copy, examples, or OpenAPI schema also need changes.
@@ -152,14 +152,14 @@ the human reference, Chinese copy, examples, or OpenAPI schema also need changes
 Run the synchronization guard from `packages/app`:
 
 ```bash
-bun --env-file=../../.env vitest run src/lib/api-route-catalog.test.ts
+bun --env-file=../../.env vitest run src/lib/api/api-route-catalog.test.ts
 ```
 
 Static content routes (no DB):
 
 - `/blog` — blog listing (statically generated from MDX files in `content/blog/`)
 - `/blog/[slug]` — blog post page with MDX rendering and OG image generation
-- `/whitepaper` — whitepaper index; `/whitepaper/[slug]` — research-paper landing page (registry in `src/lib/whitepapers.ts`; PDF, cover, hardware render, and light/dark figure PNGs under `public/whitepaper/<slug>/`). Load `.claude/skills/write-inferencex-whitepaper/` to write or update a paper: it holds the numbers workflow, copy rules, the PDF/chart pipeline, and the registry checklist.
+- `/whitepaper` — whitepaper index; `/whitepaper/[slug]` — research-paper landing page (registry in `src/lib/content/whitepapers.ts`; PDF, cover, hardware render, and light/dark figure PNGs under `public/whitepaper/<slug>/`). Load `.claude/skills/write-inferencex-whitepaper/` to write or update a paper: it holds the numbers workflow, copy rules, the PDF/chart pipeline, and the registry checklist.
 - `/feed.xml` — RSS 2.0 feed
 - `/llms.txt` — LLM-readable site index
 - `/llms-full.txt` — full article content for LLM ingestion
@@ -190,7 +190,7 @@ See [Testing](./docs/testing.md) for full requirements, quality standards, and p
 
 ## Analytics Requirement
 
-All interactive elements should have `track()` from `@/lib/analytics` (autocapture provides baseline coverage).
+All interactive elements should have `track()` from `@/lib/analytics/analytics` (autocapture provides baseline coverage).
 
 **Convention**: `[section]_[action]` — e.g., `latency_zoom_reset`, `calculator_bar_selected`, `tab_changed`
 
@@ -198,11 +198,11 @@ All interactive elements should have `track()` from `@/lib/analytics` (autocaptu
 
 ## Tab Structure
 
-Dashboard route keys, paths, primary/feature-gated/footer-only navigation, indexability, provider capabilities, `/zh` mirroring, and share-parameter scopes are defined once in `packages/app/src/lib/dashboard-routes.ts`. `TabNav`, `DashboardShell`, metadata, i18n, share URLs, and the sitemap derive from that registry; do not add a second route array.
+Dashboard route keys, paths, primary/feature-gated/footer-only navigation, indexability, provider capabilities, `/zh` mirroring, and share-parameter scopes are defined once in `packages/app/src/lib/routing/dashboard-routes.ts`. `TabNav`, `DashboardShell`, metadata, i18n, share URLs, and the sitemap derive from that registry; do not add a second route array.
 
 ## Unofficial Run Support — Mandatory for Inference / Evaluation Features
 
-Any new feature that operates on inference or evaluation chart data **must** also work for unofficial run overlays — not just the official run rendering path. The overlay path is a separate code branch (`overlayData`, `processedOverlayData`, `overlayRooflines`, `activeOverlayHwTypes`, `overlayRunColor`/`overlayRunIndex` from `@/lib/overlay-run-style`, `useUnofficialRun()` from `@/components/unofficial-run-provider`) that is easy to forget — features that only handle the official path silently degrade for users who load an unofficial run via `?unofficialrun=…`.
+Any new feature that operates on inference or evaluation chart data **must** also work for unofficial run overlays — not just the official run rendering path. The overlay path is a separate code branch (`overlayData`, `processedOverlayData`, `overlayRooflines`, `activeOverlayHwTypes`, `overlayRunColor`/`overlayRunIndex` from `@/lib/charts/overlay-run-style`, `useUnofficialRun()` from `@/providers/unofficial-run-provider`) that is easy to forget — features that only handle the official path silently degrade for users who load an unofficial run via `?unofficialrun=…`.
 
 When adding a chart feature (toggle, label, overlay, filter, export, share-link param, tooltip enrichment, …):
 
@@ -216,22 +216,22 @@ If the feature genuinely cannot apply to overlays (e.g., it depends on data only
 
 ## Chinese Website Pages (/zh) — Mandatory for All Indexable Surfaces
 
-The site ships a hand-authored Simplified Chinese sibling for every indexable page under the `/zh` route prefix (`/` ↔ `/zh`, `/about` ↔ `/zh/about`, `/blog/<slug>` ↔ `/zh/blog/<slug>`, …) so the site is crawled and indexed in Chinese as well as English. There is no i18n framework — each `/zh` page is a real page that reuses the shared helpers in `packages/app/src/lib/i18n.ts` (`zhAlternates`, `enAlternates`, `ZH_OG_LOCALE`, `ZH_MIRRORED_ROUTES`) and `src/lib/tab-meta-zh.ts`. The translation quality bar above applies to all site content.
+The site ships a hand-authored Simplified Chinese sibling for every indexable page under the `/zh` route prefix (`/` ↔ `/zh`, `/about` ↔ `/zh/about`, `/blog/<slug>` ↔ `/zh/blog/<slug>`, …) so the site is crawled and indexed in Chinese as well as English. There is no i18n framework — each `/zh` page is a real page that reuses the shared helpers in `packages/app/src/lib/i18n/i18n.ts` (`zhAlternates`, `enAlternates`, `ZH_OG_LOCALE`, `ZH_MIRRORED_ROUTES`) and `src/lib/routing/tab-meta-zh.ts`. The translation quality bar above applies to all site content.
 
 **Every new indexable page, dashboard tab, or blog post MUST ship its Chinese version in the same PR:**
 
-1. **New page** → create `packages/app/src/app/zh/<route>/page.tsx` with fully translated content and metadata. Metadata: `alternates: zhAlternates('<en-path>')` plus `openGraph.locale: ZH_OG_LOCALE`. Switch the English page's `alternates` to `enAlternates('<en-path>')` so both sides carry bidirectional hreflang. Register non-dashboard routes in `ZH_MIRRORED_ROUTES` (`src/lib/i18n.ts`) so the header nav and EN↔中文 toggle link to them, and add them to the sitemap via `localizedPair()`.
-2. **New dashboard tab** → add one entry to `src/lib/dashboard-routes.ts`, then add exact entries to `TAB_META_ZH`, `TAB_INTRO_ZH`, and `TAB_LABELS_ZH` in `src/lib/tab-meta-zh.ts`. Create `src/app/zh/(dashboard)/<tab>/page.tsx` mirroring the English page with `tabMetadataZh('<tab>')` and a `<ZhTabIntro tab="<tab>" />` block above the chart; the registry automatically supplies `/zh` route matching and indexable sitemap entries. The chart's own UI strings must follow rule 5. Registry and metadata tests enforce route parity and dictionary completeness.
+1. **New page** → create `packages/app/src/app/zh/<route>/page.tsx` with fully translated content and metadata. Metadata: `alternates: zhAlternates('<en-path>')` plus `openGraph.locale: ZH_OG_LOCALE`. Switch the English page's `alternates` to `enAlternates('<en-path>')` so both sides carry bidirectional hreflang. Register non-dashboard routes in `ZH_MIRRORED_ROUTES` (`src/lib/i18n/i18n.ts`) so the header nav and EN↔中文 toggle link to them, and add them to the sitemap via `localizedPair()`.
+2. **New dashboard tab** → add one entry to `src/lib/routing/dashboard-routes.ts`, then add exact entries to `TAB_META_ZH`, `TAB_INTRO_ZH`, and `TAB_LABELS_ZH` in `src/lib/routing/tab-meta-zh.ts`. Create `src/app/zh/(dashboard)/<tab>/page.tsx` mirroring the English page with `tabMetadataZh('<tab>')` and a `<ZhTabIntro tab="<tab>" />` block above the chart; the registry automatically supplies `/zh` route matching and indexable sitemap entries. The chart's own UI strings must follow rule 5. Registry and metadata tests enforce route parity and dictionary completeness.
 3. **New blog post** → the translation `packages/app/content/blog/zh/<same-filename>.mdx` is REQUIRED in the same PR. Translate frontmatter `title`/`subtitle` and the body; keep `date`, `publishDate`, `modifiedDate`, `tags`, and the filename/slug identical (English and Chinese posts pair by filename; visibility gating always follows the English post's `publishDate`). Rewrite internal `/blog/<slug>` links to `/zh/blog/<slug>`; never alter numbers, code blocks, or `<Figure>`/`<JsonLd>` structure. The `/zh/blog` listing, hreflang, and sitemap pick the file up automatically.
 4. **Editing an existing English page or post** → update its Chinese sibling in the same PR. Omitting the required Chinese sibling update is a 🔴 BLOCKING review issue. Fidelity or wording issues inside an updated Chinese sibling follow the advisory workflow below; serious findings require Chinese maintainer confirmation.
-5. **ALL user-visible UI strings MUST have a Chinese equivalent** — no carve-outs for "chart internals" or "option labels". This includes: headers/footers, card titles/descriptions, control and filter labels, buttons, toggles (Log Scale, Optimal Only, …), nudges, dropdown OPTION display names (Y-axis metric names, token types, scale modes), searchable-select placeholders ("Search…"), table column headers and action buttons ("Prompts"), modal/drawer chrome, legend footnotes, and empty/loading/error messages. Mechanism: client components call `useLocale()` (`src/lib/use-locale.ts`) and read from a component-local `STRINGS = { en, zh }` dict; server components take an optional `locale` prop passed from the /zh page; registry-defined display names (e.g. `Y_AXIS_METRICS`, legend toggle configs) carry a `labelZh` field resolved through a locale-aware label helper at render time. The `en` values must keep the exact original strings so English pages stay byte-identical.
+5. **ALL user-visible UI strings MUST have a Chinese equivalent** — no carve-outs for "chart internals" or "option labels". This includes: headers/footers, card titles/descriptions, control and filter labels, buttons, toggles (Log Scale, Optimal Only, …), nudges, dropdown OPTION display names (Y-axis metric names, token types, scale modes), searchable-select placeholders ("Search…"), table column headers and action buttons ("Prompts"), modal/drawer chrome, legend footnotes, and empty/loading/error messages. Mechanism: client components call `useLocale()` (`src/lib/i18n/use-locale.ts`) and read from a component-local `STRINGS = { en, zh }` dict; server components take an optional `locale` prop passed from the /zh page; registry-defined display names (e.g. `Y_AXIS_METRICS`, legend toggle configs) carry a `labelZh` field resolved through a locale-aware label helper at render time. The `en` values must keep the exact original strings so English pages stay byte-identical.
 6. **What stays English**: brand/product names, hardware SKUs, model/framework/precision names, units (tok/s/user, GB/s, $/M tok), code identifiers and flags — per the translation quality bar — plus established English technical terms and phrases that Chinese ML infrastructure engineers normally use in English, as documented contextually in `docs/chinese-copy.md` (`warmup`, `seed`, and `offload` are non-exhaustive examples), and DB-stored _content_ (benchmark rows, dataset conversation text, run logs), which is data, not UI.
-7. **Compare slug narrative sync**: the per-slug compare pages are mirrored at `/zh/compare/[slug]` and `/zh/compare-per-dollar/[slug]`; their Chinese prose templates live in `src/lib/compare-ssr-zh.ts`, a 1:1 port of the English templates in `compare-ssr.ts`. The variant compare pages (`/zh/compare-precision/[slug]` and `/zh/compare-spec-decode/[slug]`) have their Chinese templates in `src/lib/compare-variant-ssr-zh.ts`, porting `compare-variant-ssr.ts`. Any PR that changes the English narrative templates MUST update the zh port in the same commit.
+7. **Compare slug narrative sync**: the per-slug compare pages are mirrored at `/zh/compare/[slug]` and `/zh/compare-per-dollar/[slug]`; their Chinese prose templates live in `src/lib/compare/compare-ssr-zh.ts`, a 1:1 port of the English templates in `compare-ssr.ts`. The variant compare pages (`/zh/compare-precision/[slug]` and `/zh/compare-spec-decode/[slug]`) have their Chinese templates in `src/lib/compare/compare-variant-ssr-zh.ts`, porting `compare-variant-ssr.ts`. Any PR that changes the English narrative templates MUST update the zh port in the same commit.
 8. **Every route gets a /zh sibling, including hidden or feature-gated ones** (`/agentx`, `/ai-chart`, `/current-inferencex-image`, `/feedback`, agentic detail pages). Noindex routes keep their noindex on both sides. The only exceptions are `feed.xml` and `llms.txt` (single-language machine feeds) plus per-post OG images. Chinese posts reuse the English post's OG image because the renderer font has no CJK glyphs.
 
 > **Claude reviews every changed user-visible Chinese string, but the Chinese maintainer makes the final decision.** Load `review-zh-copy` before opening or reviewing any PR that touches user-visible Chinese text, including refactors whose filenames do not contain `zh`. The skill evaluates semantic fidelity and natural Chinese as separate gates and follows [docs/chinese-copy.md](./docs/chinese-copy.md). Its findings never block another contributor's merge. Do not mention `@edwingao28` for a clean review, routine coverage, or an ordinary wording or naturalness suggestion. Mention `@edwingao28` only for a high-confidence semantic or factual error, changed attribution or speaker voice, or unresolved high-impact ambiguity, and ask for confirmation. The Chinese maintainer makes the final editorial decision.
 
-> **Chinese copy has a narrow objective CI guard.** `packages/app/src/lib/zh-objective-guard.test.ts` checks direction-aware App Router page parity (the documented Chinese-only `/zh/[...notFound]` catch-all is the sole current exception), explicit `en`/`zh` object-literal key shape, Blog filename and non-translatable MDX structure, and English-byte preservation for PRs labeled `chinese-copy-only`. `packages/app/src/lib/zh-copy.test.ts` retains its separately hand-checked mechanical cases. New objective rules must use the same parsing logic in the real source scan and their mutation tests. These guards do **not** judge fluency, clause order, sentence structure, register, contextual pronouns, marketing tone, quotation voice, English-token ratios, or contextual terminology; those require page context and human review. See `docs/chinese-copy.md` for the complete boundary.
+> **Chinese copy has a narrow objective CI guard.** `packages/app/src/lib/i18n/zh-objective-guard.test.ts` checks direction-aware App Router page parity (the documented Chinese-only `/zh/[...notFound]` catch-all is the sole current exception), explicit `en`/`zh` object-literal key shape, Blog filename and non-translatable MDX structure, and English-byte preservation for PRs labeled `chinese-copy-only`. `packages/app/src/lib/i18n/zh-copy.test.ts` retains its separately hand-checked mechanical cases. New objective rules must use the same parsing logic in the real source scan and their mutation tests. These guards do **not** judge fluency, clause order, sentence structure, register, contextual pronouns, marketing tone, quotation voice, English-token ratios, or contextual terminology; those require page context and human review. See `docs/chinese-copy.md` for the complete boundary.
 
 ## Chart Interpolation — TS and Python Helpers MUST Stay in Sync
 
@@ -259,7 +259,7 @@ The Python file has a header comment explaining the pipeline and a `_cli()` entr
 
 ## Model Parameter Counts (verified)
 
-Authoritative total / active parameter counts for every model in the dashboard. Use these when updating `MODEL_CONFIG` labels in `packages/app/src/lib/data-mappings.ts` or any blog/docs prose. Verify against the HF model card before adding a new model — point releases (e.g. K2 → K2.5, GLM-4.5 → GLM-5) often keep or change sizes in non-obvious ways.
+Authoritative total / active parameter counts for every model in the dashboard. Use these when updating `MODEL_CONFIG` labels in `packages/app/src/lib/catalog/data-mappings.ts` or any blog/docs prose. Verify against the HF model card before adding a new model — point releases (e.g. K2 → K2.5, GLM-4.5 → GLM-5) often keep or change sizes in non-obvious ways.
 
 | Model                  | Total | Active      | HF ID                               | Source                             |
 | ---------------------- | ----- | ----------- | ----------------------------------- | ---------------------------------- |
@@ -314,7 +314,7 @@ Authoritative total / active parameter counts for every model in the dashboard. 
 ### Add/modify a metric
 
 1. Register the field, bilingual labels/titles, polarity, and custom-source metadata in `src/components/inference/metric-registry.ts` (`METRIC_REGISTRY`).
-2. Add or reuse the derived field in `buildDerivedChartFields` (`src/lib/chart-utils.ts`) and the corresponding optional `InferenceData` field. Historical trends request the same selective builder; do not duplicate formulas.
+2. Add or reuse the derived field in `buildDerivedChartFields` (`src/lib/charts/chart-utils.ts`) and the corresponding optional `InferenceData` field. Historical trends request the same selective builder; do not duplicate formulas.
 3. Add the metric to `METRIC_CONTROL_GROUPS` when it belongs in a selector group. Chart definitions and metric key types derive from the registry.
 4. Add subtitle/disclaimer copy in `ChartDisplay.tsx` if the metric depends on assumed constants.
 5. Add the disaggregated-config caveat banner for per-GPU or per-MW metrics.
@@ -331,7 +331,7 @@ See [Blog](./docs/blog.md) for content format, available MDX components, and des
 
 ### Modify blog components
 
-- Blog library (posts, headings, reading time): `src/lib/blog.ts`
+- Blog library (posts, headings, reading time): `src/lib/blog/blog.ts`
 - Blog list page: `src/app/blog/page.tsx`
 - Blog post page: `src/app/blog/[slug]/page.tsx`
 - MDX components: `src/components/blog/mdx-components.tsx`
@@ -346,8 +346,8 @@ See [Blog](./docs/blog.md) for content format, available MDX components, and des
 
 ### Adding a new tab
 
-1. Add the canonical route entry to `packages/app/src/lib/dashboard-routes.ts`, including navigation group, indexability, provider capabilities, locale mirroring, and share scopes.
-2. Add explicit English metadata in `src/lib/tab-meta.ts` and Chinese metadata, intro, and label entries in `src/lib/tab-meta-zh.ts`.
+1. Add the canonical route entry to `packages/app/src/lib/routing/dashboard-routes.ts`, including navigation group, indexability, provider capabilities, locale mirroring, and share scopes.
+2. Add explicit English metadata in `src/lib/routing/tab-meta.ts` and Chinese metadata, intro, and label entries in `src/lib/routing/tab-meta-zh.ts`.
 3. Create the English and Chinese App Router pages. `dashboard-routes.test.ts` enforces structural parity.
 4. Add the tab content and any section-specific provider only when the route actually needs one; declare dashboard-wide provider needs in the registry.
 5. Use `ChartLegend` with `variant="sidebar"`, sorted by `HW_REGISTRY` sort order, default expanded.

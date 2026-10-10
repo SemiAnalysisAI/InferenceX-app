@@ -1,4 +1,4 @@
-import type { Locale } from '@/lib/i18n';
+import type { Locale } from '@/lib/i18n/i18n';
 
 /**
  * Hand-written UI strings for the article index and post pages. Both locales

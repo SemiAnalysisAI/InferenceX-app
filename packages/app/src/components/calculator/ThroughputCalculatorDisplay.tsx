@@ -2,11 +2,11 @@
 
 import { ControlPanel } from '@/components/ui/control-panel';
 import { MobileControlSection } from '@/components/ui/mobile-control-section';
-import { track } from '@/lib/analytics';
+import { track } from '@/lib/analytics/analytics';
 import Link from 'next/link';
 import { BarChart3, Table2 } from 'lucide-react';
-import { useFeatureGate } from '@/lib/use-feature-gate';
-import { useLocale } from '@/lib/use-locale';
+import { useFeatureGate } from '@/lib/runtime/use-feature-gate';
+import { useLocale } from '@/lib/i18n/use-locale';
 import { useCallback, useMemo, useState } from 'react';
 
 import {
@@ -25,7 +25,7 @@ import {
   useGlobalFilterRun,
   useGlobalFilterSelection,
   useGlobalFilterWorkflow,
-} from '@/components/GlobalFilterContext';
+} from '@/providers/GlobalFilterContext';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { CollapsibleSection } from '@/components/ui/collapsible-section';
@@ -51,11 +51,11 @@ import {
   JalapenoOfficialPreviewNotice,
   VeraRubinOfficialPreviewNotice,
   Tpuv7OfficialPreviewNotice,
-} from '@/components/official-preview-notice';
-import { useUnofficialRun } from '@/components/unofficial-run-provider';
-import { overlayRunColor } from '@/lib/overlay-run-style';
-import { localePath } from '@/lib/i18n';
-import { DEFAULT_FLEET_MW, readUrlParams, writeUrlParams } from '@/lib/url-state';
+} from '@/components/ui/official-preview-notice';
+import { useUnofficialRun } from '@/providers/unofficial-run-provider';
+import { overlayRunColor } from '@/lib/charts/overlay-run-style';
+import { localePath } from '@/lib/i18n/i18n';
+import { DEFAULT_FLEET_MW, readUrlParams, writeUrlParams } from '@/lib/routing/url-state';
 import { Switch } from '@/components/ui/switch';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { MultiSelect } from '@/components/ui/multi-select';
@@ -71,15 +71,15 @@ import {
   getModelLabel,
   getPrecisionLabel,
   getSequenceLabel,
-} from '@/lib/data-mappings';
-import { getGpuSpecs, getHardwareConfig, getModelSortIndex } from '@/lib/constants';
+} from '@/lib/catalog/data-mappings';
+import { getGpuSpecs, getHardwareConfig, getModelSortIndex } from '@/lib/catalog/constants';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useUrlState } from '@/hooks/useUrlState';
 import { useOpenDropdown } from '@/hooks/useOpenDropdown';
 
-import { getDisplayLabel } from '@/lib/utils';
-import { exportToCsv } from '@/lib/csv-export';
-import { calculatorChartToCsv } from '@/lib/csv-export-helpers';
+import { getDisplayLabel } from '@/lib/shared/utils';
+import { exportToCsv } from '@/lib/export/csv-export';
+import { calculatorChartToCsv } from '@/lib/export/csv-export-helpers';
 
 import ThroughputBarChart, {
   getChartTitle,

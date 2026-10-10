@@ -6,7 +6,7 @@ import {
   formatScaleUpTopology,
   GPU_CHART_METRICS,
   GPU_SPECS,
-} from '@/lib/gpu-specs';
+} from '@/lib/catalog/gpu-specs';
 
 const RADAR_METRICS = GPU_CHART_METRICS.filter(
   (m) => m.key !== 'scaleUpWorldSize' && m.key !== 'scaleOutBandwidth',

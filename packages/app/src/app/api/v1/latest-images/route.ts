@@ -1,7 +1,7 @@
 import { getDb } from '@semianalysisai/inferencex-db/connection';
 import { getLatestImages } from '@semianalysisai/inferencex-db/queries/latest-images';
 
-import { cachedReadRoute } from '@/lib/cached-read-route';
+import { cachedReadRoute } from '@/lib/api/cached-read-route';
 
 export const dynamic = 'force-dynamic';
 

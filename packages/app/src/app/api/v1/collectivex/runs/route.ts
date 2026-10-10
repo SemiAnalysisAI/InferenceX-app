@@ -4,12 +4,12 @@ import { parseCollectiveXVersion } from '@semianalysisai/inferencex-db/collectiv
 import { FIXTURES_MODE, getCollectiveXWriteDb } from '@semianalysisai/inferencex-db/connection';
 import { listCollectiveXRuns } from '@semianalysisai/inferencex-db/queries/collectivex';
 
-import { COLLECTIVEX_CACHE_CONTROL, cachedJson, collectiveXCacheTag } from '@/lib/api-cache';
+import { COLLECTIVEX_CACHE_CONTROL, cachedJson, collectiveXCacheTag } from '@/lib/cache/api-cache';
 import {
   collectiveXSweepErrorStatus,
   ensureCollectiveXRunsList,
-} from '@/lib/collectivex-lazy-ingest';
-import { loadFixture } from '@/lib/test-fixtures';
+} from '@/lib/collectivex/collectivex-lazy-ingest';
+import { loadFixture } from '@/lib/testing/test-fixtures';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';

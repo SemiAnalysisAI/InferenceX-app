@@ -3,8 +3,8 @@
 import { useCallback, useMemo, useState } from 'react';
 import { BarChart3, Table2 } from 'lucide-react';
 
-import { track } from '@/lib/analytics';
-import { useLocale } from '@/lib/use-locale';
+import { track } from '@/lib/analytics/analytics';
+import { useLocale } from '@/lib/i18n/use-locale';
 import { useEvaluation } from '@/components/evaluation/EvaluationContext';
 import EvaluationTable from '@/components/evaluation/ui/EvaluationTable';
 import { Card } from '@/components/ui/card';
@@ -17,11 +17,11 @@ import { ResultContext } from '@/components/ui/result-context';
 import { type SegmentedToggleOption, SegmentedToggle } from '@/components/ui/segmented-toggle';
 import { RetryableQueryError } from '@/components/ui/retryable-query-error';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useUnofficialRun } from '@/components/unofficial-run-provider';
-import { type Precision, getPrecisionLabel } from '@/lib/data-mappings';
-import { exportToCsv } from '@/lib/csv-export';
-import { evaluationChartToCsv } from '@/lib/csv-export-helpers';
-import type { Locale } from '@/lib/i18n';
+import { useUnofficialRun } from '@/providers/unofficial-run-provider';
+import { type Precision, getPrecisionLabel } from '@/lib/catalog/data-mappings';
+import { exportToCsv } from '@/lib/export/csv-export';
+import { evaluationChartToCsv } from '@/lib/export/csv-export-helpers';
+import type { Locale } from '@/lib/i18n/i18n';
 
 import EvaluationChartControls from './ChartControls';
 import EvalBarChartD3, { formatEvaluationDate } from './BarChartD3';

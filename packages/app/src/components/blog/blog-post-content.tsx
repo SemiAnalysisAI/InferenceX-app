@@ -10,8 +10,8 @@ import {
   type BlogPostMeta,
   formatBlogDate,
   type TocHeading,
-} from '@/lib/blog';
-import { type Locale, localePath } from '@/lib/i18n';
+} from '@/lib/blog/blog';
+import { type Locale, localePath } from '@/lib/i18n/i18n';
 import { AUTHOR_NAME } from '@semianalysisai/inferencex-constants';
 
 import { BlogBackLink } from './blog-back-link';

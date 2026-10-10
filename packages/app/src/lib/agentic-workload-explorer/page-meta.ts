@@ -3,7 +3,7 @@ import type { Metadata } from 'next';
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
 
 import { EXPLORER_BASE_PATH } from '@/lib/agentic-workload-explorer/paths';
-import { enAlternates, type Locale, ZH_OG_LOCALE, zhAlternates } from '@/lib/i18n';
+import { enAlternates, type Locale, ZH_OG_LOCALE, zhAlternates } from '@/lib/i18n/i18n';
 
 interface SectionCopy {
   title: string;

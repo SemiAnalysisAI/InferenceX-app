@@ -12,8 +12,8 @@ import {
   resolveSelectedSequence,
   sequenceOptionsForModel,
 } from '@/components/latest-image/latest-image-utils';
-import type { FrameworkReleases, LatestImageRow } from '@/lib/api';
-import { cachedJson } from '@/lib/api-cache';
+import type { FrameworkReleases, LatestImageRow } from '@/lib/api/api';
+import { cachedJson } from '@/lib/cache/api-cache';
 import { runViewsRoute } from '@/lib/views-api/errors';
 import {
   parseDateParam,

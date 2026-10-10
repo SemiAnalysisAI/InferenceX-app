@@ -7,8 +7,8 @@
  * explanation fails CI.
  *
  * Formulas are structural descriptions of the derived-field math in
- * `buildDerivedChartFields` (src/lib/chart-utils.ts) and the glossary
- * (src/lib/glossary.ts) — they describe how a value is computed, they do not
+ * `buildDerivedChartFields` (src/lib/charts/chart-utils.ts) and the glossary
+ * (src/lib/content/glossary.ts) — they describe how a value is computed, they do not
  * restate assumed constants.
  */
 import { metricOptionTitle, type MetricKey } from './metric-registry';
@@ -283,7 +283,7 @@ function measuredRoleJoulesPerToken(role: 'prefill' | 'decode'): MetricExplanati
 
 /**
  * Every `METRIC_REGISTRY` key gets a bilingual explanation and a structural
- * formula. Grounded in `buildDerivedChartFields` (src/lib/chart-utils.ts) and
+ * formula. Grounded in `buildDerivedChartFields` (src/lib/charts/chart-utils.ts) and
  * the glossary entries for throughput, cost per million tokens, tokens per
  * dollar, tokens per megawatt, and energy per token.
  */

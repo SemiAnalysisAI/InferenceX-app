@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 
 import { ChartHover, type HoverItem } from './chart-hover';
 import { ChartEmpty, PERCENTILE_COLORS } from './chart-shared';
-import { useLocale } from '@/lib/use-locale';
+import { useLocale } from '@/lib/i18n/use-locale';
 
 export type PercentileKey = 'mean' | 'p50' | 'p75' | 'p90' | 'p95' | 'p99';
 

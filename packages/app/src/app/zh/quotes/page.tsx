@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 
 import { QuotesContent } from '@/components/quotes/quotes-content';
-import { ZH_OG_LOCALE, zhAlternates } from '@/lib/i18n';
+import { ZH_OG_LOCALE, zhAlternates } from '@/lib/i18n/i18n';
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
 
 export const metadata: Metadata = {

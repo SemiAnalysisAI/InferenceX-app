@@ -6,7 +6,7 @@ import {
   type RequestChartDataWire,
 } from '@semianalysisai/inferencex-db/queries/request-chart-data';
 
-import { cachedQuery } from '@/lib/api-cache';
+import { cachedQuery } from '@/lib/cache/api-cache';
 
 import { idQueryRoute } from '../id-routes';
 

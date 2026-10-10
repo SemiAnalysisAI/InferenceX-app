@@ -5,7 +5,7 @@ import {
   type BenchmarkSiblings,
 } from '@semianalysisai/inferencex-db/queries/benchmark-siblings';
 
-import { cachedQuery } from '@/lib/api-cache';
+import { cachedQuery } from '@/lib/cache/api-cache';
 
 import { idQueryRoute } from '../id-routes';
 

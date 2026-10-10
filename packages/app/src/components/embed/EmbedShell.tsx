@@ -1,7 +1,7 @@
 import { Inter, JetBrains_Mono } from 'next/font/google';
 import type { ReactNode } from 'react';
 
-import { UnofficialRunProvider } from '@/components/unofficial-run-provider';
+import { UnofficialRunProvider } from '@/providers/unofficial-run-provider';
 
 /*
  * Fonts used by embed skins. They are published as `--font-embed-*` on a

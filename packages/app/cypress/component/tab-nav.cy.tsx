@@ -1,12 +1,12 @@
 import { AppRouterContext } from 'next/dist/shared/lib/app-router-context.shared-runtime';
 import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.shared-runtime';
 
-import { TabNav } from '@/components/tab-nav';
+import { TabNav } from '@/components/dashboard/tab-nav';
 import {
   UnofficialRunBanner,
   UnofficialRunContext,
   type UnofficialRunContextType,
-} from '@/components/unofficial-run-provider';
+} from '@/providers/unofficial-run-provider';
 import { createMockUnofficialRunContext } from '../support/mock-data';
 import { createMockRouter } from '../support/mock-router';
 

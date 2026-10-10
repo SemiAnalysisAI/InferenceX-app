@@ -4,14 +4,14 @@ import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { CLIENT_SEARCH_CHANGE_EVENT } from '@/lib/client-navigation';
-import type { OverviewPageData } from '@/lib/overview-data';
+import { CLIENT_SEARCH_CHANGE_EVENT } from '@/lib/routing/client-navigation';
+import type { OverviewPageData } from '@/lib/overview/overview-data';
 
 const routerStub = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn() }));
 const trackStub = vi.hoisted(() => vi.fn());
 
 vi.mock('next/navigation', () => ({ useRouter: () => routerStub }));
-vi.mock('@/lib/analytics', () => ({ track: trackStub }));
+vi.mock('@/lib/analytics/analytics', () => ({ track: trackStub }));
 
 import { OverviewNavigationProvider, useOverviewNavigation } from './overview-navigation';
 import { DesktopOverviewMatrix, overviewFormatters } from './overview-scorecard';

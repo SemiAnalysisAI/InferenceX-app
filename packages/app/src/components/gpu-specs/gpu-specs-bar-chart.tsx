@@ -1,15 +1,15 @@
 'use client';
 
 import { type ReactNode, useMemo } from 'react';
-import { track } from '@/lib/analytics';
+import { track } from '@/lib/analytics/analytics';
 
 import { select, type Selection, type ScaleLinear, type ScaleBand } from 'd3';
 
 import { contrastColors } from '@/lib/d3-chart/contrast-colors';
 import { measureTextWidth } from '@/lib/d3-chart/dynamic-margins';
-import { GPU_SPECS, GPU_CHART_METRICS } from '@/lib/gpu-specs';
+import { GPU_SPECS, GPU_CHART_METRICS } from '@/lib/catalog/gpu-specs';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
-import { useLocale } from '@/lib/use-locale';
+import { useLocale } from '@/lib/i18n/use-locale';
 import type {
   CustomLayerConfig,
   HorizontalBarLayerConfig,

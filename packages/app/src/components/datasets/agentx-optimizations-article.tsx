@@ -8,9 +8,12 @@ import {
   type OptimizationHighlight,
   type OptimizationSection,
   type OptimizationsOverview,
-} from '@/lib/agentx-optimizations';
-import { getLocalizedFrameworks, getOptimizationsOverview } from '@/lib/agentx-optimizations-zh';
-import type { Locale } from '@/lib/i18n';
+} from '@/lib/agentx/agentx-optimizations';
+import {
+  getLocalizedFrameworks,
+  getOptimizationsOverview,
+} from '@/lib/agentx/agentx-optimizations-zh';
+import type { Locale } from '@/lib/i18n/i18n';
 
 import { AgentXOptimizationsLink } from './agentx-optimizations-link';
 

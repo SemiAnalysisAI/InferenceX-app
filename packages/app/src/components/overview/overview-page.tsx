@@ -6,8 +6,8 @@ import { TCO_SOURCE_URL } from '@semianalysisai/inferencex-constants';
 
 import { Card } from '@/components/ui/card';
 import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
-import { OVERVIEW_HISTORY_WINDOW_DAYS, type OverviewPageData } from '@/lib/overview-data';
-import { overviewHref } from '@/lib/overview-links';
+import { OVERVIEW_HISTORY_WINDOW_DAYS, type OverviewPageData } from '@/lib/overview/overview-data';
+import { overviewHref } from '@/lib/overview/overview-links';
 
 import {
   DesktopOverviewMatrix,

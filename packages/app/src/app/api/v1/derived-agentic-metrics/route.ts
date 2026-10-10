@@ -6,7 +6,7 @@ import {
   type DerivedAgenticMetricMap,
 } from '@semianalysisai/inferencex-db/queries/derived-agentic-metrics';
 
-import { cachedQuery } from '@/lib/api-cache';
+import { cachedQuery } from '@/lib/cache/api-cache';
 
 import { idsQueryRoute } from '../id-routes';
 

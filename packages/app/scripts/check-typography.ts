@@ -10,7 +10,7 @@
  * shared D3 chart library, then compares per-file counts against
  * scripts/typography-allowlist.json. New offenders fail immediately; the
  * allowlisted ones are the migration burndown and may only ever decrease.
- * Rules and exemptions live in src/lib/typography-gate.ts; docs/typography.md
+ * Rules and exemptions live in src/lib/testing/typography-gate.ts; docs/typography.md
  * explains the token system these rules point at.
  */
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -21,7 +21,7 @@ import {
   countViolations,
   scanSource,
   type ViolationCounts,
-} from '../src/lib/typography-gate';
+} from '../src/lib/testing/typography-gate';
 
 const APP_ROOT = path.resolve(import.meta.dirname, '..');
 const ALLOWLIST_PATH = path.join(import.meta.dirname, 'typography-allowlist.json');

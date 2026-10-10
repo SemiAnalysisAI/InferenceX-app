@@ -3,10 +3,10 @@
 import { useEffect, useRef, useState } from 'react';
 
 import { Eyebrow } from '@/components/ui/eyebrow';
-import { track } from '@/lib/analytics';
-import type { TocHeading } from '@/lib/blog';
-import type { Locale } from '@/lib/i18n';
-import { cn } from '@/lib/utils';
+import { track } from '@/lib/analytics/analytics';
+import type { TocHeading } from '@/lib/blog/blog';
+import type { Locale } from '@/lib/i18n/i18n';
+import { cn } from '@/lib/shared/utils';
 
 const STRINGS = {
   en: {

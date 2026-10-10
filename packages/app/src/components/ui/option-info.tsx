@@ -12,9 +12,9 @@ import {
 
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { HELP_CONTENT_CLASS_NAME } from './tooltip';
-import { track } from '@/lib/analytics';
-import { useLocale } from '@/lib/use-locale';
-import { cn } from '@/lib/utils';
+import { track } from '@/lib/analytics/analytics';
+import { useLocale } from '@/lib/i18n/use-locale';
+import { cn } from '@/lib/shared/utils';
 
 /** Closed-field help sits beside the value, independently of the select button. */
 export function SelectedOptionInfo({

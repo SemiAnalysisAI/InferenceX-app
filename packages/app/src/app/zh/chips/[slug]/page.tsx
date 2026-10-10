@@ -7,9 +7,9 @@ import {
   getChipPage,
   getChipVsPage,
   type ChipVsPage,
-} from '@/lib/chip-pages';
-import { getZhChipTranslation } from '@/lib/chip-pages-zh';
-import { ZH_OG_LOCALE, zhAlternates } from '@/lib/i18n';
+} from '@/lib/catalog/chip-pages';
+import { getZhChipTranslation } from '@/lib/catalog/chip-pages-zh';
+import { ZH_OG_LOCALE, zhAlternates } from '@/lib/i18n/i18n';
 import {
   AUTHOR_HANDLE,
   AUTHOR_NAME,

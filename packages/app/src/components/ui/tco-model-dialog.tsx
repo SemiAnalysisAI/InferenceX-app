@@ -13,11 +13,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { track } from '@/lib/analytics';
-import { useLocale } from '@/lib/use-locale';
-import { cn } from '@/lib/utils';
+import { track } from '@/lib/analytics/analytics';
+import { useLocale } from '@/lib/i18n/use-locale';
+import { cn } from '@/lib/shared/utils';
 
-import type { Locale } from '@/lib/i18n';
+import type { Locale } from '@/lib/i18n/i18n';
 
 import {
   LOCKED_RENT_TIERS,

@@ -6,7 +6,7 @@ import {
   type AgenticAggregateMap,
 } from '@semianalysisai/inferencex-db/queries/agentic-aggregates';
 
-import { cachedQuery } from '@/lib/api-cache';
+import { cachedQuery } from '@/lib/cache/api-cache';
 
 import { idsQueryRoute } from '../id-routes';
 

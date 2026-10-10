@@ -1,6 +1,6 @@
-import { Model, Sequence, Precision } from '@/lib/data-mappings';
-import { Y_AXIS_METRICS } from '@/lib/chart-utils';
-import type { Locale } from '@/lib/i18n';
+import { Model, Sequence, Precision } from '@/lib/catalog/data-mappings';
+import { Y_AXIS_METRICS } from '@/lib/charts/chart-utils';
+import type { Locale } from '@/lib/i18n/i18n';
 import { isMetricKey, METRIC_REGISTRY } from '@/components/inference/metric-registry';
 import { HW_REGISTRY, FRAMEWORK_KEYS } from '@semianalysisai/inferencex-constants';
 

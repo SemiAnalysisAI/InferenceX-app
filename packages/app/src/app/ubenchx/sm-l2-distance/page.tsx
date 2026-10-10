@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 
 import { SmL2Content } from '@/components/ubenchx/SmL2Heatmap';
 import { UbenchxHub } from '@/components/ubenchx/UbenchxHub';
-import { enAlternates } from '@/lib/i18n';
+import { enAlternates } from '@/lib/i18n/i18n';
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
 
 const TITLE = 'ubenchX: SM-SM L2 Latency Difference';

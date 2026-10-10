@@ -1,5 +1,5 @@
-import type { BenchmarkRow } from '@/lib/api';
-import { getModelExclusion, Model, Sequence } from '@/lib/data-mappings';
+import type { BenchmarkRow } from '@/lib/api/api';
+import { getModelExclusion, Model, Sequence } from '@/lib/catalog/data-mappings';
 
 export interface FavoritePreset {
   id: string;

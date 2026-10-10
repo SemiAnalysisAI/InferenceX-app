@@ -1,14 +1,14 @@
 'use client';
 
-import { track } from '@/lib/analytics';
+import { track } from '@/lib/analytics/analytics';
 import { Download, FileSpreadsheet, Image, RotateCcw, Video } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
 
 import { useChartExport } from '@/hooks/useChartExport';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { cn } from '@/lib/utils';
-import { useLocale } from '@/lib/use-locale';
+import { cn } from '@/lib/shared/utils';
+import { useLocale } from '@/lib/i18n/use-locale';
 
 interface ChartButtonsProps {
   /** Unique chart ID for export targeting */

@@ -2,16 +2,16 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
-import { JsonLd } from '@/components/json-ld';
+import { JsonLd } from '@/components/seo/json-ld';
 import { Card } from '@/components/ui/card';
-import { getPostBySlug } from '@/lib/blog';
+import { getPostBySlug } from '@/lib/blog/blog';
 import {
   getAdjacentGlossaryEntries,
   getAllGlossaryEntries,
   getGlossaryEntry,
   getRelatedGlossaryEntries,
-} from '@/lib/glossary';
-import { enAlternates } from '@/lib/i18n';
+} from '@/lib/content/glossary';
+import { enAlternates } from '@/lib/i18n/i18n';
 import {
   AUTHOR_HANDLE,
   AUTHOR_NAME,

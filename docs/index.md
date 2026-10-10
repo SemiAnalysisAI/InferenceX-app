@@ -4,6 +4,8 @@ Design rationale and non-obvious conventions. See [CLAUDE.md](../CLAUDE.md) for 
 
 ## Docs
 
+- [App Source Organization](./source-organization.md) — Component/provider ownership, library domains, and import/refactor conventions
+
 - [Presentation Themes](./themes.md): Minecraft activation and assets, CS:GO, GTA and Halo styling, Halo theme music, single-button theme toggle, dark-chart/export integration, and presentation-only API exclusion.
 - [Playable Minecraft](./minecraft-game.md): the opt-in game launched from the Minecraft theme, controls, saves, lifecycle and verification.
 

@@ -18,9 +18,9 @@ import { computeLeftMargin } from '@/lib/d3-chart/dynamic-margins';
 import { twoRowYAxisLabels } from '@/lib/d3-chart/axis-labels';
 
 import { ChartButtons } from '@/components/ui/chart-buttons';
-import { getHardwareConfig } from '@/lib/constants';
+import { getHardwareConfig } from '@/lib/catalog/constants';
 import DOMPurify from 'dompurify';
-import { useLocale } from '@/lib/use-locale';
+import { useLocale } from '@/lib/i18n/use-locale';
 
 import type { AiChartBarPoint, AiChartSpec } from './types';
 import type { AiSingleChartResult, AiRadarItem } from '@/hooks/api/use-ai-chart';

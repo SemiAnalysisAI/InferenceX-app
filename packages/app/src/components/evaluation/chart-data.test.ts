@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import type { EvalRow } from '@/lib/api';
-import { Model, Precision } from '@/lib/data-mappings';
+import type { EvalRow } from '@/lib/api/api';
+import { Model, Precision } from '@/lib/catalog/data-mappings';
 
 import {
   aggregateEvaluationChartRows,

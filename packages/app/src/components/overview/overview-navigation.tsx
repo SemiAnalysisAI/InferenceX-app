@@ -12,8 +12,8 @@ import {
   useState,
 } from 'react';
 
-import { track } from '@/lib/analytics';
-import { notifyClientSearchChange } from '@/lib/client-navigation';
+import { track } from '@/lib/analytics/analytics';
+import { notifyClientSearchChange } from '@/lib/routing/client-navigation';
 import {
   OVERVIEW_DEFAULT_REFERENCE_HARDWARE,
   type OverviewComparisonMode,
@@ -26,7 +26,7 @@ import {
   resolveOverviewReferenceHardware,
   resolveOverviewRowScope,
   resolveOverviewTier,
-} from '@/lib/overview-data';
+} from '@/lib/overview/overview-data';
 import {
   mergeOverviewControlHref,
   OVERVIEW_CLIENT_ONLY_KEYS,
@@ -34,7 +34,7 @@ import {
   type OverviewClientOnlySearchKey,
   overviewHref,
   type OverviewSearchKey,
-} from '@/lib/overview-links';
+} from '@/lib/overview/overview-links';
 
 const OVERVIEW_SERVER_SEARCH_KEYS = OVERVIEW_SEARCH_ORDER.filter(
   (key): key is Exclude<OverviewSearchKey, OverviewClientOnlySearchKey> =>

@@ -2,7 +2,7 @@
 import * as d3 from 'd3';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { KNOWN_CONFIG_ISSUES } from '@/lib/known-issues';
+import { KNOWN_CONFIG_ISSUES } from '@/lib/benchmarks/known-issues';
 
 import {
   type AnnotationRenderOptions,

@@ -1,4 +1,4 @@
-import { MODEL_OPTIONS, SEQUENCE_OPTIONS } from '@/lib/data-mappings';
+import { MODEL_OPTIONS, SEQUENCE_OPTIONS } from '@/lib/catalog/data-mappings';
 import { sequenceToIslOsl } from '@semianalysisai/inferencex-constants';
 
 /**

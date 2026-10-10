@@ -18,7 +18,7 @@ import {
   useGlobalFilterAvailability,
   useGlobalFilterRun,
   useGlobalFilterSelection,
-} from '@/components/GlobalFilterContext';
+} from '@/providers/GlobalFilterContext';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ControlPanel } from '@/components/ui/control-panel';
@@ -42,13 +42,13 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useOpenDropdown } from '@/hooks/useOpenDropdown';
 import { useUrlState } from '@/hooks/useUrlState';
-import { track } from '@/lib/analytics';
-import { getModelSortIndex } from '@/lib/constants';
-import { Percentile, Sequence, type Model } from '@/lib/data-mappings';
-import { DEFAULT_FLEET_MW, readUrlParams, writeUrlParams } from '@/lib/url-state';
-import { useFeatureGate } from '@/lib/use-feature-gate';
-import { useLocale } from '@/lib/use-locale';
-import { getDisplayLabel } from '@/lib/utils';
+import { track } from '@/lib/analytics/analytics';
+import { getModelSortIndex } from '@/lib/catalog/constants';
+import { Percentile, Sequence, type Model } from '@/lib/catalog/data-mappings';
+import { DEFAULT_FLEET_MW, readUrlParams, writeUrlParams } from '@/lib/routing/url-state';
+import { useFeatureGate } from '@/lib/runtime/use-feature-gate';
+import { useLocale } from '@/lib/i18n/use-locale';
+import { getDisplayLabel } from '@/lib/shared/utils';
 
 import type { CostProvider, CostType } from './types';
 import { useThroughputData } from './useThroughputData';

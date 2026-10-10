@@ -3,10 +3,10 @@
 import type { ReactNode } from 'react';
 
 import type { PointMeta } from '@/hooks/api/use-trace-server-metrics';
-import { frameworkFamily } from '@/lib/framework-family';
-import type { Locale } from '@/lib/i18n';
-import { isKvOffloadEnabled } from '@/lib/kv-offload';
-import { useLocale } from '@/lib/use-locale';
+import { frameworkFamily } from '@/lib/catalog/framework-family';
+import type { Locale } from '@/lib/i18n/i18n';
+import { isKvOffloadEnabled } from '@/lib/benchmarks/kv-offload';
+import { useLocale } from '@/lib/i18n/use-locale';
 import { CacheReuseLink } from '@/components/inference/ui/CacheReuseLink';
 import {
   offloadTypeLabel,

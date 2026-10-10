@@ -1,10 +1,10 @@
 'use client';
 
-import { track } from '@/lib/analytics';
+import { track } from '@/lib/analytics/analytics';
 import { type ReactNode, useMemo, useRef } from 'react';
 import * as d3 from 'd3';
 
-import { getHardwareConfig, getModelSortIndex } from '@/lib/constants';
+import { getHardwareConfig, getModelSortIndex } from '@/lib/catalog/constants';
 import { contrastColors } from '@/lib/d3-chart/contrast-colors';
 import { D3Chart, type LayerConfig } from '@/lib/d3-chart/D3Chart';
 import type { ContinuousScale } from '@/lib/d3-chart/types';
@@ -14,8 +14,8 @@ import { computeLeftMargin, measureTextWidth } from '@/lib/d3-chart/dynamic-marg
 import { useReliabilityContext } from '@/components/reliability/ReliabilityContext';
 import type { ModelSuccessRateData } from '@/components/reliability/types';
 import { useThemeColors } from '@/hooks/useThemeColors';
-import { type Locale } from '@/lib/i18n';
-import { useLocale } from '@/lib/use-locale';
+import { type Locale } from '@/lib/i18n/i18n';
+import { useLocale } from '@/lib/i18n/use-locale';
 import ChartLegend from '@/components/ui/chart-legend';
 import { Button } from '@/components/ui/button';
 

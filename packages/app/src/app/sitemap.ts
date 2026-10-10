@@ -2,33 +2,36 @@ import type { MetadataRoute } from 'next';
 import { FIXTURES_MODE, getDb } from '@semianalysisai/inferencex-db/connection';
 import { listDatasets } from '@semianalysisai/inferencex-db/queries/datasets';
 
-import { AGENTX_OPTIMIZATION_SLUGS } from '@/lib/agentx-optimizations';
-import { DASHBOARD_ROUTES } from '@/lib/dashboard-routes';
-import { getAllPosts } from '@/lib/blog';
-import { getModelPageSlugs } from '@/lib/model-pages';
-import { getAllComparableCompareSlugs } from '@/lib/compare-availability';
-import { canonicalCompareSlug } from '@/lib/compare-slug';
+import { AGENTX_OPTIMIZATION_SLUGS } from '@/lib/agentx/agentx-optimizations';
+import { DASHBOARD_ROUTES } from '@/lib/routing/dashboard-routes';
+import { getAllPosts } from '@/lib/blog/blog';
+import { getModelPageSlugs } from '@/lib/catalog/model-pages';
+import { getAllComparableCompareSlugs } from '@/lib/compare/compare-availability';
+import { canonicalCompareSlug } from '@/lib/compare/compare-slug';
 import {
   getAllComparablePrecisionSlugs,
   getAllComparableSpecDecodeSlugs,
-} from '@/lib/compare-variant-availability';
+} from '@/lib/compare/compare-variant-availability';
 import {
   canonicalPrecisionCompareSlug,
   canonicalSpecDecodeCompareSlug,
-} from '@/lib/compare-variant-slug';
-import { getAllChipRouteSlugs } from '@/lib/chip-pages';
-import { getAllGlossaryEntries } from '@/lib/glossary';
-import { ACTIVE_INFERENCE_MODEL_SLUGS, INFERENCE_MODEL_SLUGS } from '@/lib/inference-model-slug';
-import { languageAlternates, zhPath } from '@/lib/i18n';
+} from '@/lib/compare/compare-variant-slug';
+import { getAllChipRouteSlugs } from '@/lib/catalog/chip-pages';
+import { getAllGlossaryEntries } from '@/lib/content/glossary';
+import {
+  ACTIVE_INFERENCE_MODEL_SLUGS,
+  INFERENCE_MODEL_SLUGS,
+} from '@/lib/routing/inference-model-slug';
+import { languageAlternates, zhPath } from '@/lib/i18n/i18n';
 import {
   defaultRouteModel,
   MODEL_ROUTE_TABS,
   modelRoutePath,
   modelRoutesForTab,
-} from '@/lib/model-routes';
-import { getAllRankingPageEntries } from '@/lib/rankings';
-import { getAvailableRunEntries } from '@/lib/run-rankings-data.server';
-import { getAllWhitepapers } from '@/lib/whitepapers';
+} from '@/lib/routing/model-routes';
+import { getAllRankingPageEntries } from '@/lib/live-seo/rankings';
+import { getAvailableRunEntries } from '@/lib/live-seo/run-rankings-data.server';
+import { getAllWhitepapers } from '@/lib/content/whitepapers';
 import { SITE_URL as BASE_URL } from '@semianalysisai/inferencex-constants';
 
 type SitemapEntry = MetadataRoute.Sitemap[number];

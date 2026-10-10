@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 
 import chartDefinitions from '@/components/inference/metric-registry';
-import { dedupeAgenticHistoryRuns } from '@/lib/benchmark-run-selection';
+import { dedupeAgenticHistoryRuns } from '@/lib/benchmarks/benchmark-run-selection';
 
 import type { InferenceData } from '@/components/inference/types';
 import { EMPTY_QUICK_FILTERS } from '@/components/inference/utils/quickFilters';

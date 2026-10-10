@@ -1,5 +1,5 @@
-import type { ApiOperation, ApiParameter, ApiResponse } from '@/lib/api-documentation';
-import { API_BASE_URL } from '@/lib/api-documentation-base';
+import type { ApiOperation, ApiParameter, ApiResponse } from '@/lib/api/api-documentation';
+import { API_BASE_URL } from '@/lib/api/api-documentation-base';
 import {
   text,
   stringSchema,
@@ -10,8 +10,8 @@ import {
   errorSchema,
   objectSchema,
   arraySchema,
-} from '@/lib/api-documentation-helpers';
-import { GPU_CHART_METRICS } from '@/lib/gpu-specs';
+} from '@/lib/api/api-documentation-helpers';
+import { GPU_CHART_METRICS } from '@/lib/catalog/gpu-specs';
 
 /**
  * Docs fragment for GET /api/v1/views/gpu-specs.

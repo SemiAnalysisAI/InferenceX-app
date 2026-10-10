@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/tooltip';
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
 import { OptionInfo, SelectedOptionInfo } from '@/components/ui/option-info';
-import { Model, Sequence } from '@/lib/data-mappings';
+import { Model, Sequence } from '@/lib/catalog/data-mappings';
 
 describe('Consistent informational help', () => {
   for (const locale of ['en', 'zh'] as const) {

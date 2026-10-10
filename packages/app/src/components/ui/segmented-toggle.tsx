@@ -2,7 +2,7 @@
 
 import { type ReactNode } from 'react';
 
-import { cn } from '@/lib/utils';
+import { cn } from '@/lib/shared/utils';
 import { SEGMENTED_CONTAINER_STYLE } from '@/components/ui/control-styles';
 
 interface SegmentedToggleOptionBase<TValue extends string> {

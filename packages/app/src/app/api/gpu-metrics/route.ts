@@ -13,7 +13,7 @@ import {
   getGithubToken,
   normalizeGithubRunInfo,
   type GithubWorkflowRun,
-} from '@/lib/github-artifacts';
+} from '@/lib/github/github-artifacts';
 
 const MAX_ARTIFACT_BYTES = 50 * 1024 * 1024;
 

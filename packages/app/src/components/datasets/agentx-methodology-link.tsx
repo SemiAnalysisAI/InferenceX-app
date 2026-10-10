@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 
-import { track } from '@/lib/analytics';
+import { track } from '@/lib/analytics/analytics';
 
 interface AgentXMethodologyLinkProps extends Omit<React.ComponentProps<typeof Link>, 'href'> {
   href: string;

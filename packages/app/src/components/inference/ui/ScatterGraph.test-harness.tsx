@@ -8,7 +8,7 @@ import { computeToggle } from '@/hooks/useTogglableSet';
 import type * as NextNavigation from 'next/navigation';
 
 vi.mock('@/lib/d3-chart/chart-setup', { spy: true });
-vi.mock('@/lib/analytics', () => ({ track: vi.fn() }));
+vi.mock('@/lib/analytics/analytics', () => ({ track: vi.fn() }));
 vi.mock('next-themes', () => ({ useTheme: () => ({ resolvedTheme: 'dark' }) }));
 vi.hoisted(() => {
   globalThis.__scatterPathnameState = { value: '/inference' };
@@ -50,7 +50,7 @@ vi.mock('@/components/inference/InferenceContext', () => ({
   useInferenceDisplay: () => globalThis.__scatterInferenceState.current,
   useInferenceFilters: () => globalThis.__scatterInferenceState.current,
 }));
-vi.mock('@/components/unofficial-run-provider', () => ({
+vi.mock('@/providers/unofficial-run-provider', () => ({
   useUnofficialRun: () => globalThis.__scatterOverlayState.current,
 }));
 

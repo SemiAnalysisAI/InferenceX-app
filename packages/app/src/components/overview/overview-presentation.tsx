@@ -11,10 +11,13 @@ import {
   useState,
 } from 'react';
 
-import { track } from '@/lib/analytics';
-import { notifyClientSearchChange } from '@/lib/client-navigation';
-import { OVERVIEW_DEFAULT_HISTORY_WINDOW, type OverviewComparisonMode } from '@/lib/overview-data';
-import { overviewHref } from '@/lib/overview-links';
+import { track } from '@/lib/analytics/analytics';
+import { notifyClientSearchChange } from '@/lib/routing/client-navigation';
+import {
+  OVERVIEW_DEFAULT_HISTORY_WINDOW,
+  type OverviewComparisonMode,
+} from '@/lib/overview/overview-data';
+import { overviewHref } from '@/lib/overview/overview-links';
 
 import {
   useOverviewData,

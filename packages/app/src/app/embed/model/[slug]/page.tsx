@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 
 import EmbedModelPage, { type EmbedSearchParams } from '@/components/embed/EmbedModelPage';
-import { getCompareModelBySlug } from '@/lib/compare-slug';
+import { getCompareModelBySlug } from '@/lib/compare/compare-slug';
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -11,7 +11,7 @@ interface Props {
 /**
  * Embeddable single-model chart: `/embed/model/<slug>?framework=vllm`.
  *
- * Query options are documented on `parseEmbedOptions` in `@/lib/embed`. The
+ * Query options are documented on `parseEmbedOptions` in `@/lib/embed/embed`. The
  * route is rendered per request because the framework lock, theme, and
  * scenario come from the query string.
  */

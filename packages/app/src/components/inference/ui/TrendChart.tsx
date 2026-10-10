@@ -1,6 +1,6 @@
 'use client';
 
-import { track } from '@/lib/analytics';
+import { track } from '@/lib/analytics/analytics';
 import * as d3 from 'd3';
 import React, { useCallback, useMemo } from 'react';
 
@@ -16,9 +16,9 @@ import {
   formatLargeNumber,
   getShapeKeyForPrecision,
   logTickFormat,
-} from '@/lib/chart-rendering';
-import { getChartWatermark } from '@/lib/data-mappings';
-import { useLocale } from '@/lib/use-locale';
+} from '@/lib/charts/chart-rendering';
+import { getChartWatermark } from '@/lib/catalog/data-mappings';
+import { useLocale } from '@/lib/i18n/use-locale';
 
 import type { TrendDataPoint, TrendLineConfig } from '../types';
 

@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { DataTable } from './data-table';
 
-vi.mock('@/lib/use-locale', () => ({
+vi.mock('@/lib/i18n/use-locale', () => ({
   useLocale: () => 'en',
 }));
 

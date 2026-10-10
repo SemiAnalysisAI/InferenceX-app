@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 // api-cache transitively imports next/cache + blob deps that don't load in the
 // unit-test environment; route tests mock it the same way.
-vi.mock('@/lib/api-cache', () => ({
+vi.mock('@/lib/cache/api-cache', () => ({
   cachedText: (data: string, contentType: string) =>
     new Response(data, { headers: { 'Content-Type': contentType } }),
 }));

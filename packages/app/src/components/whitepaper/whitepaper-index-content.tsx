@@ -1,10 +1,10 @@
 import Image from 'next/image';
 
-import { JsonLd } from '@/components/json-ld';
+import { JsonLd } from '@/components/seo/json-ld';
 import { Badge } from '@/components/ui/badge';
 import { Eyebrow } from '@/components/ui/eyebrow';
 import { Heading } from '@/components/ui/heading';
-import type { Locale } from '@/lib/i18n';
+import type { Locale } from '@/lib/i18n/i18n';
 import {
   buildWhitepaperIndexJsonLd,
   formatWhitepaperDate,
@@ -12,7 +12,7 @@ import {
   WHITEPAPER_COPY,
   whitepaperCopy,
   whitepaperDetailPath,
-} from '@/lib/whitepapers';
+} from '@/lib/content/whitepapers';
 
 import { WhitepaperCard, WhitepaperPdfButton, WhitepaperReadLink } from './whitepaper-links';
 

@@ -5,14 +5,14 @@
  */
 import { type NextRequest, NextResponse } from 'next/server';
 
-import { extractDemonstrations } from '@/lib/eval-sample-utils';
-import { parseEvalSampleWindow } from '@/lib/eval-sample-params';
+import { extractDemonstrations } from '@/lib/evaluation/eval-sample-utils';
+import { parseEvalSampleWindow } from '@/lib/evaluation/eval-sample-params';
 import {
   type EvalArtifactConfig,
   fetchAndParseSamples,
   findEvalSampleArtifact,
-} from '@/lib/eval-samples-live';
-import { fetchGithubRunArtifacts, getGithubToken } from '@/lib/github-artifacts';
+} from '@/lib/evaluation/eval-samples-live';
+import { fetchGithubRunArtifacts, getGithubToken } from '@/lib/github/github-artifacts';
 
 export const dynamic = 'force-dynamic';
 

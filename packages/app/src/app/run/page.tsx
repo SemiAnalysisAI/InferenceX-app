@@ -2,13 +2,13 @@ import type { Metadata } from 'next';
 
 import { SITE_NAME, SITE_URL, SUPPORTERS_LINE } from '@semianalysisai/inferencex-constants';
 
-import { JsonLd } from '@/components/json-ld';
+import { JsonLd } from '@/components/seo/json-ld';
 import { CatalogLinkCard } from '@/components/catalog/catalog-link-card';
 import { Card } from '@/components/ui/card';
-import { enAlternates } from '@/lib/i18n';
-import { INFERENCE_MODEL_SLUGS } from '@/lib/inference-model-slug';
-import { runPageHeading, type RunPageEntry } from '@/lib/run-pages';
-import { getAvailableRunEntries } from '@/lib/run-rankings-data.server';
+import { enAlternates } from '@/lib/i18n/i18n';
+import { INFERENCE_MODEL_SLUGS } from '@/lib/routing/inference-model-slug';
+import { runPageHeading, type RunPageEntry } from '@/lib/live-seo/run-pages';
+import { getAvailableRunEntries } from '@/lib/live-seo/run-rankings-data.server';
 
 export const dynamic = 'force-dynamic';
 

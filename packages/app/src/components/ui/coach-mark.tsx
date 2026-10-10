@@ -11,7 +11,7 @@ import {
   type Size,
 } from '@/lib/nudges/anchor';
 import type { NudgeAnchor } from '@/lib/nudges/types';
-import { useLocale } from '@/lib/use-locale';
+import { useLocale } from '@/lib/i18n/use-locale';
 
 const STRINGS = {
   en: { close: 'Dismiss tip' },

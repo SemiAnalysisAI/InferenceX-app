@@ -4,7 +4,7 @@ import { createRoot } from 'react-dom/client';
 import { renderToString } from 'react-dom/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { CLIENT_SEARCH_CHANGE_EVENT } from '@/lib/client-navigation';
+import { CLIENT_SEARCH_CHANGE_EVENT } from '@/lib/routing/client-navigation';
 
 import { useClientSearch } from './useClientSearch';
 

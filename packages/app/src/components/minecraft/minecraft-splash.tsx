@@ -2,8 +2,8 @@
 
 import { lazy, Suspense, useState, useEffect } from 'react';
 
-import { useLocale } from '@/lib/use-locale';
-import { useEasterEggTheme } from '@/lib/use-easter-egg-theme';
+import { useLocale } from '@/lib/i18n/use-locale';
+import { useEasterEggTheme } from '@/lib/themes/use-easter-egg-theme';
 const RandomSplash = lazy(() => import('./minecraft-splash-text'));
 
 /**

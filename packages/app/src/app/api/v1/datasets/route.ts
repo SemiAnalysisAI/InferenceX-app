@@ -2,7 +2,7 @@ import { getDb } from '@semianalysisai/inferencex-db/connection';
 
 import { listDatasets, type DatasetRecord } from '@semianalysisai/inferencex-db/queries/datasets';
 
-import { cachedReadRoute } from '@/lib/cached-read-route';
+import { cachedReadRoute } from '@/lib/api/cached-read-route';
 
 export const dynamic = 'force-dynamic';
 

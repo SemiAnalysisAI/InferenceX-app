@@ -9,9 +9,9 @@ import {
   getWorkflowRunsByDate,
 } from '@semianalysisai/inferencex-db/queries/workflow-info';
 
-import { cachedJson, cachedQuery } from '@/lib/api-cache';
-import { PUBLIC_API_ERRORS, publicApiError } from '@/lib/public-api-errors';
-import { loadFixture } from '@/lib/test-fixtures';
+import { cachedJson, cachedQuery } from '@/lib/cache/api-cache';
+import { PUBLIC_API_ERRORS, publicApiError } from '@/lib/api/public-api-errors';
+import { loadFixture } from '@/lib/testing/test-fixtures';
 
 export const dynamic = 'force-dynamic';
 

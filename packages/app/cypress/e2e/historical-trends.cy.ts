@@ -2,7 +2,7 @@
  * Tests for the "Historical Trends" tab.
  * Shows interpolated GPU performance over time at a user-selected interactivity level.
  */
-import type { BenchmarkRow } from '@/lib/api';
+import type { BenchmarkRow } from '@/lib/api/api';
 
 const visitHistoricalWithSetup = () => {
   cy.visit('/historical', {

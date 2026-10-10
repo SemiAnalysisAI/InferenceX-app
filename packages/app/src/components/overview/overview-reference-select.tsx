@@ -7,8 +7,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { track } from '@/lib/analytics';
-import type { OverviewReferenceHardware } from '@/lib/overview-data';
+import { track } from '@/lib/analytics/analytics';
+import type { OverviewReferenceHardware } from '@/lib/overview/overview-data';
 
 import { useOverviewNavigation, useOverviewReference } from './overview-navigation';
 import { useIsPresenting } from './overview-presentation';
