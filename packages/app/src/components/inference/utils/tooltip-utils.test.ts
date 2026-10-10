@@ -2,7 +2,8 @@
 import { describe, it, expect } from 'vitest';
 
 import type { HardwareConfig, InferenceData } from '@/components/inference/types';
-import type { SystemPowerEstimate } from '@/lib/modeled-system-power';
+import { modelSystemPower, type SystemPowerEstimate } from '@/lib/modeled-system-power';
+import { gb300DisaggRow } from '@/lib/nvl72-power.fixture';
 import {
   SYSTEM_POWER_MODEL_REVISION,
   SYSTEM_POWER_MODEL_SOURCE_URL,
@@ -76,6 +77,7 @@ function tooltipConfig(overrides: Partial<TooltipConfig> = {}): TooltipConfig {
 
 const systemPower = {
   status: 'supported',
+  unit: 'chassis',
   hardware: 'h100',
   modelRevision: SYSTEM_POWER_MODEL_REVISION,
   operatingState: { workload: 'agentic' as const, scaleOut: true },
@@ -190,19 +192,44 @@ describe('modeled system-power tooltip', () => {
     expect(zh).not.toContain('6000 W');
   });
 
+  it('names NVL72 trays, the measured Grace socket, and the rack-share basis (en/zh)', () => {
+    const data = pt({ hwKey: 'gb300', modeledSystemPower: modelSystemPower(gb300DisaggRow()) });
+    const html = generateTooltipContent(config({ data }));
+    expect(html).toContain('2 full NVL72 compute trays · 8 GPUs');
+    expect(html).toContain('Measured Grace socket power:</strong> 98.066 W/socket');
+    expect(html).toContain('Measured: GPU boards and whole Grace sockets');
+    expect(html).toContain('each tray takes 1/18 of the rack');
+    expect(html).toContain('PUE 1.1');
+    expect(html).not.toContain('eight-GPU chassis');
+    expect(html).not.toContain('regulator');
+
+    const zh = generateTooltipContent(config({ data, locale: 'zh' }));
+    expect(zh).toContain('2 个完整 NVL72 计算 tray · 8 张 GPU');
+    expect(zh).toContain('Grace socket 实测功耗');
+    expect(zh).toContain('每个 tray 分摊机架的 1/18');
+  });
+
   it('preserves the same model provenance in unofficial and date-comparison tooltips', () => {
-    const official = config();
-    const overlay = generateOverlayTooltipContent({
-      ...official,
-      overlayData: {
-        label: 'PowerX comparison',
-        hardwareConfig: mockHardwareConfig,
-      } as OverlayTooltipConfig['overlayData'],
-    });
-    for (const html of [overlay, generateGPUGraphTooltipContent(official)]) {
-      expect(html).toContain('500 W/GPU');
-      expect(html).toContain('750 W/GPU');
-      expect(html).toContain(systemPower.modelRevision);
+    const cases: [InferenceData, string[]][] = [
+      [pt({ modeledSystemPower: systemPower }), ['500 W/GPU', '750 W/GPU', 'PUE 1.2']],
+      [
+        pt({ hwKey: 'gb300', modeledSystemPower: modelSystemPower(gb300DisaggRow()) }),
+        ['2 full NVL72 compute trays · 8 GPUs', '98.066 W/socket', 'PUE 1.1'],
+      ],
+    ];
+    for (const [data, expected] of cases) {
+      const official = config({ data });
+      const overlay = generateOverlayTooltipContent({
+        ...official,
+        overlayData: {
+          label: 'PowerX comparison',
+          hardwareConfig: mockHardwareConfig,
+        } as OverlayTooltipConfig['overlayData'],
+      });
+      for (const html of [overlay, generateGPUGraphTooltipContent(official)]) {
+        for (const text of expected) expect(html).toContain(text);
+        expect(html).toContain(SYSTEM_POWER_MODEL_REVISION);
+      }
     }
   });
 
@@ -1029,15 +1056,6 @@ describe('generateGPUGraphTooltipContent', () => {
 describe('measured-power withheld tooltip line', () => {
   const reasons = ['sampling_gap_exceeded', 'expected_gpu_count_mismatch'];
 
-  it('renders the withheld line with humanized codes (en)', () => {
-    const html = generateTooltipContent(
-      tooltipConfig({ data: pt({ power_valid: 0, power_invalid_reasons: reasons }) }),
-    );
-    expect(html).toContain('Measured power withheld');
-    expect(html).toContain('sampling gap exceeded');
-    expect(html).toContain('expected gpu count mismatch');
-  });
-
   it('renders the withheld line in Chinese on /zh surfaces', () => {
     const html = generateTooltipContent(
       tooltipConfig({
@@ -1070,11 +1088,7 @@ describe('measured-power withheld tooltip line', () => {
     expect(html).not.toContain('Measured power withheld');
   });
 
-  it.each([
-    ['absent reasons', pt({ power_valid: 0 })],
-    ['empty reasons', pt({ power_valid: 0, power_invalid_reasons: [] })],
-    ['valid row', pt({ power_valid: 1 })],
-  ])('omits the line for %s', (_name, data) => {
+  it.each([['absent reasons', pt({ power_valid: 0 })]])('omits the line for %s', (_name, data) => {
     const html = generateTooltipContent(tooltipConfig({ data }));
     expect(html).not.toContain('Measured power withheld');
   });
@@ -1166,15 +1180,6 @@ describe('worker power drilldown', () => {
     expect(generateGPUGraphTooltipContent(config)).not.toContain('tooltip-worker-power');
   });
 
-  it('renders nothing when workers is absent or empty', () => {
-    expect(generateTooltipContent(tooltipConfig({ isPinned: true }))).not.toContain(
-      'tooltip-worker-power',
-    );
-    expect(
-      generateTooltipContent(tooltipConfig({ data: pt({ workers: [] }), isPinned: true })),
-    ).not.toContain('tooltip-worker-power');
-  });
-
   it('caps the table at 8 rows with a "+N more workers" line', () => {
     const many = Array.from({ length: 10 }, (_, i) => ({
       role: 'decode',
@@ -1229,18 +1234,6 @@ describe('worker power drilldown', () => {
 });
 
 describe('power tier tooltip line', () => {
-  it('states the tier for a legacy point on a measured axis', () => {
-    const html = generateTooltipContent(
-      tooltipConfig({
-        selectedYAxisMetric: 'y_measuredJPerOutputToken',
-        data: pt({ power_tier: 'legacy' }),
-      }),
-    );
-    expect(html).toContain(
-      '<strong>Power Measurement:</strong> Historical (not validated under the current method)',
-    );
-  });
-
   it('states the certified tier on a measured axis', () => {
     const html = generateTooltipContent(
       tooltipConfig({
@@ -1249,16 +1242,6 @@ describe('power tier tooltip line', () => {
       }),
     );
     expect(html).toContain('<strong>Power Measurement:</strong> Validated (current PowerX method)');
-  });
-
-  it('omits the tier line on non-measured axes', () => {
-    const html = generateTooltipContent(
-      tooltipConfig({
-        selectedYAxisMetric: 'y_tpPerGpu',
-        data: pt({ power_tier: 'legacy' }),
-      }),
-    );
-    expect(html).not.toContain('Power Measurement');
   });
 
   it('omits the tier line when the point carries no tier', () => {

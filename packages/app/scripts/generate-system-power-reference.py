@@ -7,8 +7,9 @@ PATH is a local SemiAnalysisAI/InferenceX clone that contains REVISION (default:
 $INFERENCEX_REPO, else an InferenceX checkout next to this repository). The script
 extracts power_model at REVISION into a temporary directory and imports it, so it
 needs Python >= 3.12 with pydantic 2, the upstream package's only dependency.
-It asserts that the closed form evaluated by system-power-model.ts reproduces
-the upstream estimate before writing anything. Output is byte-stable across reruns.
+It asserts that the chassis and NVL72 rack evaluations in system-power-model.ts
+reproduce the upstream estimates before writing anything. Output is byte-stable
+across reruns.
 """
 
 import argparse
@@ -24,11 +25,11 @@ import tarfile
 import tempfile
 
 sys.dont_write_bytecode = True
-REVISION = "dc717fb5d58620bee3bbb579b5e25160b21ce45d"
+REVISION = "1e509932e09f2382f778d0e793893b534b02737b"
 SOURCE_PATH = "power_model"
 SOURCE_URL = f"https://github.com/SemiAnalysisAI/InferenceX/tree/{REVISION}/{SOURCE_PATH}"
 REPO_ROOT = Path(__file__).resolve().parents[3]
-# App hardware identity -> upstream system key. GB200/GB300 are rack-scale models, not chassis.
+# App hardware identity -> upstream eight-GPU chassis system key.
 SYSTEMS = {
     "h100": "hopper",
     "h200": "hopper",
@@ -38,8 +39,15 @@ SYSTEMS = {
     "mi325x": "mi325",
     "mi355x": "mi355",
 }
+# App hardware identity -> upstream NVL72 rack system key.
+RACKS = {"gb200": "gb200-nvl72", "gb300": "gb300-nvl72"}
+# modelSystemPower admits NVL72 telemetry as four-GPU, two-Grace compute trays.
+TRAY_GPUS = 4
+TRAY_GRACE_SOCKETS = 2
 WORKLOADS = ("fixed-seq-len", "agentic", "agentic-cpu-offloading")
 SCALE_OUT = (False, True)
+# Measured W per Grace socket for the rack grid; 98.066 W is a GB300 NVL72 replay mean.
+SOCKET_WATTS = (0.0, 98.066, 250.0, 500.0)
 REL_TOL = 1e-12
 
 
@@ -231,6 +239,266 @@ def reference_cases(hardware, p):
     return cases
 
 
+def fan_parameters(assembly):
+    return {
+        "count": assembly.fan_count,
+        "ratedWattsPerFan": assembly.rated_power_w_per_fan,
+        "minSpeed": assembly.minimum_speed_fraction,
+        "maxSpeed": assembly.maximum_speed_fraction,
+        "designAirHeatWatts": assembly.design_air_heat_w,
+    }
+
+
+def rack_profile(system):
+    from power_model import OperatingState
+    from power_model.models.advanced.systems.catalog import get_system_class
+    from power_model.models.advanced.systems.rack_scale.rack_scale import RackScaleSystem
+
+    system_class = get_system_class(system)
+    rack = system_class()
+    tray = rack.compute_tray if isinstance(rack, RackScaleSystem) else None
+    if (
+        tray is None
+        or tray.board_count != TRAY_GRACE_SOCKETS
+        or tray.board_count * tray.board.gpu_count != TRAY_GPUS
+        or rack.compute_tray_count * TRAY_GPUS != rack.gpu_count
+    ):
+        raise SystemExit(f"{system} is not an NVL72 rack of four-GPU, two-Grace compute trays")
+    if system_class.default_cooling.mode != "liquid":
+        raise SystemExit(f"{system} is not liquid-cooled; the app describes NVL72 as liquid-cooled")
+    auxiliary, board_air, network = {}, {}, {}
+    for workload, scale_out in itertools.product(WORKLOADS, SCALE_OUT):
+        state = OperatingState(workload_state=workload, using_scale_out=scale_out)
+        # With zero GPU and socket input the tray's component load is its NICs, optics and drives.
+        empty = tray.estimate_breakdown(0.0, cpu_and_dram_measured_power_per_socket=0.0, operating_state=state)
+        watts = dict(empty.details)["dc_component_power_w"]
+        if auxiliary.setdefault(flag(scale_out), watts) != watts:
+            raise SystemExit(f"{system} tray auxiliaries depend on the workload state")
+        board = tray.board.estimate_breakdown(0.0, operating_state=state)
+        heat = dict(board.details)["air_heat_w"]
+        if board_air.setdefault(workload, heat) != heat:
+            raise SystemExit(f"{system} board air heat depends on scale-out")
+        watts = math.fsum(
+            group.estimate_breakdown(operating_state=state).power_w
+            for group in system_class.default_networking
+        )
+        if network.setdefault(flag(scale_out), watts) != watts:
+            raise SystemExit(f"{system} network power depends on the workload state")
+    supply = rack.power_supply
+    psu = supply.shelf.psu
+    return {
+        "system": system,
+        "computeTrayCount": rack.compute_tray_count,
+        "boardsPerTray": tray.board_count,
+        "gpusPerBoard": tray.board.gpu_count,
+        "trayAuxiliaryWatts": auxiliary,
+        "boardAirHeatWatts": board_air,
+        "trayFans": fan_parameters(tray.fans),
+        "trayConverter": {
+            "capacityWatts": tray.converter.module_capacity_w,
+            "lossCurve": [
+                {"outputFraction": point.output_fraction, "lossWatts": point.loss_w}
+                for point in tray.converter.loss_curve
+            ],
+        },
+        "switchTrayCount": rack.switch_tray_count,
+        "switchTrayWatts": rack.switch_tray.estimate_breakdown().power_w,
+        "powerShelves": {
+            "activeShelves": supply.active_shelves,
+            "survivingShelves": supply.surviving_shelves,
+            "controllerWatts": supply.shelf.controller_power_w,
+            "psusPerShelf": supply.shelf.psu_count,
+            "psuCapacityWatts": psu.capacity_w,
+            "psuEfficiencyCurve": [
+                {"loadFraction": point.load_fraction, "efficiency": point.efficiency}
+                for point in psu.efficiency_curve
+            ],
+            "psuFans": fan_parameters(psu.fans),
+        },
+        "networkWatts": network,
+        "pue": system_class.default_cooling.pue,
+    }
+
+
+def fan_watts(fans, air_heat):
+    speed = fans["minSpeed"] + (fans["maxSpeed"] - fans["minSpeed"]) * min(
+        air_heat / fans["designAirHeatWatts"], 1
+    )
+    return fans["count"] * fans["ratedWattsPerFan"] * speed**3
+
+
+def solve_cooling(load, air_heat, fans, conversion_loss):
+    fan = fan_watts(fans, air_heat)
+    for _ in range(128):
+        loss = conversion_loss(load + fan)
+        if loss is None:
+            return None
+        updated = fan_watts(fans, air_heat + loss)
+        if abs(updated - fan) < 1e-8:
+            return updated
+        fan = updated
+    return None
+
+
+def tray_converter_loss(converter, output):
+    fraction = output / converter["capacityWatts"]
+    if fraction > 1:
+        return None
+    curve = converter["lossCurve"]
+    for left, right in zip(curve, curve[1:]):
+        if fraction <= right["outputFraction"]:
+            weight = (fraction - left["outputFraction"]) / (
+                right["outputFraction"] - left["outputFraction"]
+            )
+            return left["lossWatts"] + weight * (right["lossWatts"] - left["lossWatts"])
+
+
+def psu_conversion_loss(shelves, output):
+    curve = shelves["psuEfficiencyCurve"]
+    load = output / shelves["psuCapacityWatts"]
+    if load < curve[0]["loadFraction"] or load > 1:
+        return None
+    for left, right in zip(curve, curve[1:]):
+        if load <= right["loadFraction"]:
+            weight = (load - left["loadFraction"]) / (right["loadFraction"] - left["loadFraction"])
+            efficiency = left["efficiency"] + weight * (right["efficiency"] - left["efficiency"])
+            return output * (1 / efficiency - 1)
+
+
+def shelf_overhead(shelves, shelf_dc):
+    psu_dc = (shelf_dc + shelves["controllerWatts"]) / shelves["psusPerShelf"]
+    fan = solve_cooling(psu_dc, 0, shelves["psuFans"], lambda w: psu_conversion_loss(shelves, w))
+    loss = None if fan is None else psu_conversion_loss(shelves, psu_dc + fan)
+    if loss is None:
+        return None
+    return shelves["psusPerShelf"] * (loss + fan) + shelves["controllerWatts"]
+
+
+def rack_closed_form(p, gpu_watts_per_gpu, socket_watts, workload, scale_out):
+    """The estimateRackPower evaluation, line for line."""
+    auxiliary = p["trayAuxiliaryWatts"][flag(scale_out)]
+    load = p["boardsPerTray"] * (p["gpusPerBoard"] * gpu_watts_per_gpu + socket_watts) + auxiliary
+    air_heat = p["boardsPerTray"] * p["boardAirHeatWatts"][workload] + auxiliary
+    converter = p["trayConverter"]
+    fan = solve_cooling(load, air_heat, p["trayFans"], lambda w: tray_converter_loss(converter, w))
+    loss = None if fan is None else tray_converter_loss(converter, load + fan)
+    if loss is None:
+        return None
+    bus = p["computeTrayCount"] * (load + fan + loss) + p["switchTrayCount"] * p["switchTrayWatts"]
+    shelves = p["powerShelves"]
+    surviving = shelves["survivingShelves"]
+    if bus > surviving * shelves["psusPerShelf"] * shelves["psuCapacityWatts"]:
+        return None
+    if shelf_overhead(shelves, bus / surviving) is None:
+        return None
+    overhead = shelf_overhead(shelves, bus / shelves["activeShelves"])
+    if overhead is None:
+        return None
+    it = bus + shelves["activeShelves"] * overhead + p["networkWatts"][flag(scale_out)]
+    return {"itWatts": it, "facilityWatts": it * p["pue"]}
+
+
+def rack_models(system):
+    from power_model import create_power_model
+
+    return {
+        (workload, scale_out): create_power_model(
+            system=system, workload_state=workload, using_scale_out=scale_out
+        )
+        for workload, scale_out in itertools.product(WORKLOADS, SCALE_OUT)
+    }
+
+
+def upstream_rack(model, gpu_watts_per_gpu, socket_watts):
+    try:
+        result = model.estimate_breakdown(gpu_watts_per_gpu, cpu_and_dram_measured_power_per_socket=socket_watts)
+    except ValueError as error:
+        return None, str(error)
+    return {"itWatts": result.it_power_w, "facilityWatts": result.facility_power_w}, None
+
+
+def rack_domain(p, socket_watts, workload, scale_out):
+    """In-domain GPU watts per GPU at this socket input: [low, high], bisected to 1e-9 W."""
+
+    def inside(gpu_watts):
+        return rack_closed_form(p, gpu_watts, socket_watts, workload, scale_out) is not None
+
+    def edge(a, b):
+        for _ in range(100):
+            mid = (a + b) / 2
+            a, b = (mid, b) if inside(mid) == inside(a) else (a, mid)
+        return a, b
+
+    probe = 600.0
+    if not inside(probe) or inside(10_000.0):
+        raise SystemExit(f"{p['system']} {workload} has no bounded domain around {probe} W/GPU")
+    low = 0.0 if inside(0.0) else edge(0.0, probe)[1]
+    return low, edge(probe, 10_000.0)[0]
+
+
+def assert_rack(p, models):
+    worst = 0.0
+    for (workload, scale_out), model in models.items():
+        for socket_watts in SOCKET_WATTS:
+            low, high = rack_domain(p, socket_watts, workload, scale_out)
+            # The edges themselves are rounding ties: sample either side, never on them.
+            grid = [high * 1.25 * i / 401 for i in range(402)]
+            grid += [e + d for e in (low, high) for d in (-0.001, 0.001) if e + d >= 0]
+            for gpu_watts in grid:
+                expected, error = upstream_rack(model, gpu_watts, socket_watts)
+                actual = rack_closed_form(p, gpu_watts, socket_watts, workload, scale_out)
+                where = (
+                    f"{p['system']} {workload} scale_out={scale_out} "
+                    f"gpu={gpu_watts!r} socket={socket_watts!r}"
+                )
+                if (expected is None) != (actual is None):
+                    raise SystemExit(f"Domain mismatch at {where}: upstream={error or expected}")
+                for key in expected or {}:
+                    worst = max(worst, abs(actual[key] - expected[key]) / expected[key])
+                    if not math.isclose(actual[key], expected[key], rel_tol=REL_TOL):
+                        raise SystemExit(
+                            f"{key} mismatch at {where}: {actual[key]} != {expected[key]}"
+                        )
+    return worst
+
+
+def rack_reference_cases(hardware, p, models):
+    from power_model.models.advanced.systems.catalog import get_system_class
+
+    tdp = float(get_system_class(p["system"])().compute_tray.board.gpu_tdp_w)
+    replay = 98.066
+    cases = []
+    for (workload, scale_out), model in models.items():
+        high = rack_domain(p, replay, workload, scale_out)[1]
+        # A GB300 NVL72 replay, a hotter decode tray, idle GPUs, TDP, a heavy Grace socket,
+        # and the last in-domain and first out-of-domain whole 10 W.
+        samples = (
+            (594.191, replay),
+            (824.0, 98.8),
+            (0.0, replay),
+            (tdp, replay),
+            (594.191, 500.0),
+            (math.floor(high / 10) * 10.0, replay),
+            (math.ceil(high / 10) * 10.0, replay),
+        )
+        for gpu_watts, socket_watts in samples:
+            expected, error = upstream_rack(model, gpu_watts, socket_watts)
+            case = {
+                "hardware": hardware,
+                "workload": workload,
+                "scaleOut": scale_out,
+                "gpuWattsPerGpu": gpu_watts,
+                "graceSocketWatts": socket_watts,
+                "expected": expected,
+            }
+            if error:
+                case["referenceError"] = error
+            cases.append(case)
+    if all(case["expected"] is not None for case in cases):
+        raise SystemExit(f"{hardware} has no out-of-domain reference case")
+    return cases
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument(
@@ -246,21 +514,34 @@ def main():
         worst = max(assert_closed_form(system, p) for system, p in systems.items())
         profiles = {hardware: systems[system] for hardware, system in SYSTEMS.items()}
         cases = [case for hardware, p in profiles.items() for case in reference_cases(hardware, p)]
+        rack_profiles, rack_cases = {}, []
+        for hardware, system in RACKS.items():
+            p = rack_profile(system)
+            models = rack_models(system)
+            worst = max(worst, assert_rack(p, models))
+            rack_profiles[hardware] = p
+            rack_cases += rack_reference_cases(hardware, p, models)
     outputs = {
         "system-power-model.profiles.json": {
             "modelRevision": REVISION,
             "sourceTree": tree,
             "sourceUrl": SOURCE_URL,
             "profiles": profiles,
+            "rackProfiles": rack_profiles,
         },
-        "system-power-model.reference.json": {"modelRevision": REVISION, "cases": cases},
+        "system-power-model.reference.json": {
+            "modelRevision": REVISION,
+            "cases": cases,
+            "rackCases": rack_cases,
+        },
     }
     args.output_dir.mkdir(parents=True, exist_ok=True)
     for filename, payload in outputs.items():
         (args.output_dir / filename).write_text(json.dumps(payload, indent=2, allow_nan=False) + "\n")
     print(
-        f"Closed form matches upstream within {worst:.1e} relative; wrote {len(profiles)} profiles "
-        f"and {len(cases)} reference cases at {REVISION[:12]} (tree {tree[:12]})"
+        f"Chassis and rack evaluations match upstream within {worst:.1e} relative; wrote "
+        f"{len(profiles)} chassis and {len(rack_profiles)} rack profiles, {len(cases)} chassis and "
+        f"{len(rack_cases)} rack reference cases at {REVISION[:12]} (tree {tree[:12]})"
     )
 
 

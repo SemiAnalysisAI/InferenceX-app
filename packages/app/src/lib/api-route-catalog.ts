@@ -139,7 +139,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-inference-view',
-    sourceSha256: '4c896b625133a14b12c8ab6854f8cbce905e16b1f13b7d2aa11ed9e5d002f6bf',
+    sourceSha256: 'bf2b36b62cb1ac025931b7d246d67d3f6fb2fa09e9f89535c414ea791f136b4c',
   },
   {
     source: 'src/app/api/v1/views/options/route.ts',
@@ -868,6 +868,22 @@ export const apiContractSourceDigests = [
     },
   },
   {
+    source: 'src/components/calculator/profit-power.ts',
+    sourceSha256: '35e265ec33c28e4429534fadf757490b7132e9fff87cbfaa107eb919baf6f879',
+    reviewArea: {
+      en: 'Power-valid curve selection at fixed targets, compatible power bases, paired throughput and provisioned fallback shared by Profit UI and API.',
+      zh: '利润界面与 API 共用的有效功耗曲线选择、固定目标值、功耗口径兼容性、配对吞吐量与预配估算回退。',
+    },
+  },
+  {
+    source: 'src/components/inference/utils/inference-table-data.ts',
+    sourceSha256: '023a4f3097318a9fa124c5d846eeb1706dd26ba5edcc461de6d26072b61fc33c',
+    reviewArea: {
+      en: 'All in Measured table eligibility, nullable values and unavailable reasons shared by UI, CSV and public views.',
+      zh: '界面、CSV 和公开视图共用的整体实测表格行筛选、可空数值与不可用原因。',
+    },
+  },
+  {
     source: 'src/components/inference/utils/resolveXAxisField.ts',
     sourceSha256: '9ad30bd2aa389e32326486b407e4503c21a94be5afdfa09dec477e4b1b485357',
     reviewArea: {
@@ -1039,7 +1055,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/calculator-extensions.ts',
-    sourceSha256: 'c585d3827fb84e1142bb7ebc4ddbdb905098d7c427352b7809ddab66cb01ff19',
+    sourceSha256: '33e3f193205c0a62a284ea2279d27f04233a1c64e3bd37b8f0468e326d680ad8',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -1057,7 +1073,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/series.ts',
-    sourceSha256: 'bc478165a1fe50abc8d093c47577a0d2ba5dd5f85aeed1e6a06ca1a157c9dc4c',
+    sourceSha256: '6bc6e7b196c08547d6473dc366771b160f06360e6babf457b8c1b96b19d5c450',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',

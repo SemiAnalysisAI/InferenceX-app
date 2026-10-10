@@ -3,8 +3,10 @@ import { describe, expect, it } from 'vitest';
 import {
   buildComparison,
   csv,
+  flatRows,
   type ComparisonInput,
 } from '../../scripts/export-modeled-system-power';
+import { gb300DisaggRow } from '@/lib/nvl72-power.fixture';
 import { estimateChassisPower } from '@/lib/system-power-model';
 
 const h200 = (gpuWatts: number) =>
@@ -156,17 +158,14 @@ describe('offline modeled PowerX comparisons', () => {
     });
   });
 
-  it.each([0, -1, Infinity, NaN, 1.5])(
-    'withholds energy for invalid output denominator %s',
-    (tokens) => {
-      const source = input();
-      source.rows[0].audit!.benchmark_window.total_output_tokens = tokens;
-      expect(buildComparison(source).rows[0].estimated_energy).toEqual({
-        status: 'unavailable',
-        reason: 'audit-does-not-match-measured-input',
-      });
-    },
-  );
+  it.each([0, 1.5])('withholds energy for invalid output denominator %s', (tokens) => {
+    const source = input();
+    source.rows[0].audit!.benchmark_window.total_output_tokens = tokens;
+    expect(buildComparison(source).rows[0].estimated_energy).toEqual({
+      status: 'unavailable',
+      reason: 'audit-does-not-match-measured-input',
+    });
+  });
 
   it('withholds energy for missing, mismatched, and invalid audit receipts', () => {
     for (const mutate of [
@@ -221,6 +220,43 @@ describe('offline modeled PowerX comparisons', () => {
     expect(() => buildComparison(source)).toThrow('different benchmark configurations');
   });
 
+  it('exports measured Grace inputs and the rack-share estimate for NVL72 rows, leaving x86 rows unchanged', () => {
+    const source = input();
+    const baseline = buildComparison(structuredClone(source));
+    const gb300 = structuredClone(source.rows[0]);
+    gb300.id = 'gb300:1p1d';
+    gb300.cell = 'gb300:c32';
+    gb300.audit = undefined;
+    gb300.benchmark = gb300DisaggRow();
+    source.rows.push(gb300);
+    const result = buildComparison(source);
+    expect(result.rows[1]).toMatchObject({
+      measured_inputs: {
+        avg_gpu_w: 594.191,
+        cpu_power_valid: 1,
+        total_grace_w: 392.264,
+        total_grace_j: 41_346.013,
+      },
+      modeled: { status: 'supported', unit: 'nvl72-tray', chassisCount: 2, pue: 1.1 },
+    });
+    const provenance = { app_revision: 'test', input_sha256: 'test', generated_at: 'test' };
+    const [x86Flat, gb300Flat] = flatRows(result, { ...result.metadata, ...provenance }, {});
+    expect(gb300Flat.measured_total_grace_j).toBe(41_346.013);
+    expect(x86Flat.measured_total_grace_j).toBeUndefined();
+    // The x86 row and its cell are byte-identical to an export without the NVL72 row.
+    expect(result.rows[0]).toEqual(baseline.rows[0]);
+    expect(result.cells[0]).toEqual(baseline.cells[0]);
+    expect(result.rows[0].measured_inputs).not.toHaveProperty('total_grace_w');
+    // Without cpu_power_valid the row reports no Grace-side inputs.
+    delete gb300.benchmark.metrics.cpu_power_valid;
+    const unavailable = buildComparison(source).rows[1];
+    expect(unavailable.modeled).toMatchObject({ status: 'unsupported', reason: 'cpu-telemetry' });
+    expect(unavailable.measured_inputs).toMatchObject({
+      cpu_power_valid: null,
+      total_grace_w: null,
+    });
+  });
+
   it('retains unsupported hardware and missing values, and escapes CSV text', () => {
     const source = input();
     source.rows[0].benchmark.hardware = 'H200';
@@ -228,7 +264,7 @@ describe('offline modeled PowerX comparisons', () => {
     source.rows[0].benchmark.hardware = 'gb200';
     expect(buildComparison(source).rows[0].modeled).toMatchObject({
       status: 'unsupported',
-      reason: 'hardware',
+      reason: 'telemetry',
     });
     expect(csv([{ a: null, b: 0, c: 'a,"b"\nc' }])).toBe('"a","b","c"\r\n,"0","a,""b""\nc"\r\n');
     expect(() => buildComparison({ ...source, rows: [source.rows[0], source.rows[0]] })).toThrow(

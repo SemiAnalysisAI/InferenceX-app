@@ -16,8 +16,10 @@ import { rowToSequence } from '@semianalysisai/inferencex-constants';
 import { useQueries, useQuery } from '@tanstack/react-query';
 
 import chartDefinitions, {
+  isAllInMeasuredConfigKey,
   tokenMetricTypeForConfigKey,
 } from '@/components/inference/metric-registry';
+import { allInMeasuredTableData } from '@/components/inference/utils/inference-table-data';
 import {
   applyTokenRevenuePricing,
   usesTokenSalePricing,
@@ -590,6 +592,15 @@ export function useChartData(
           chartDefinition,
           data: processedData,
           clippedData,
+          ...(isAllInMeasuredConfigKey(selectedYAxisMetric)
+            ? {
+                tableData: expandPowerCompareSeries(
+                  allInMeasuredTableData(filteredData, metricKey, xAxisField),
+                  selectedYAxisMetric,
+                  powerCompare,
+                ),
+              }
+            : {}),
         };
       },
     );

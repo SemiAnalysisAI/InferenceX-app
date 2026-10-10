@@ -1,9 +1,19 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import type { BenchmarkRow } from '@/lib/api';
 import { rowToAggDataEntry, transformBenchmarkRows } from '@/lib/benchmark-transform';
 import { modelSystemPower } from '@/lib/modeled-system-power';
-import { estimateChassisPower, type SystemPowerHardware } from '@/lib/system-power-model';
+import {
+  gb300AggregateRow,
+  gb300DisaggRow,
+  upstreamRackWattsPerGpu,
+} from '@/lib/nvl72-power.fixture';
+import {
+  estimateChassisPower,
+  estimateRackPower,
+  type SystemPowerHardware,
+} from '@/lib/system-power-model';
+import profileData from '@/lib/system-power-model.profiles.json';
 
 const chassis = (hardware: SystemPowerHardware, gpuWatts: number, scaleOut = false) =>
   estimateChassisPower(hardware, gpuWatts, { workload: 'fixed-seq-len', scaleOut })!;
@@ -52,6 +62,42 @@ function row(overrides: Partial<BenchmarkRow> = {}): BenchmarkRow {
   };
 }
 
+// One GB200 NVL72 compute tray: four GPUs on one host, two Grace sockets. The
+// CPU-side keys follow the producer contract (sums over every socket, same window).
+// Watts are controlled inputs, not published constants.
+const GRACE = { avg_cpu_socket_power_w: 250.5, avg_total_cpu_power_w: 501 };
+function nvl72Row(
+  metrics: Record<string, number | undefined> = {},
+  overrides: Partial<BenchmarkRow> = {},
+): BenchmarkRow {
+  const sockets = Math.round(
+    (metrics.avg_total_cpu_power_w ?? 501) / (metrics.avg_cpu_socket_power_w ?? 250.5),
+  );
+  return row({
+    hardware: 'gb200',
+    framework: 'dynamo-trt',
+    prefill_tp: 4,
+    decode_tp: 4,
+    num_prefill_gpu: 4,
+    num_decode_gpu: 4,
+    power_audit: {
+      cpu: { sensor_kind: 'grace_socket', expected_sockets: sockets, observed_sockets: sockets },
+    },
+    metrics: {
+      power_valid: 1,
+      power_metric_schema_version: 2,
+      cpu_power_valid: 1,
+      avg_power_w: 900.25,
+      avg_total_gpu_power_w: 3601,
+      ...GRACE,
+      pp: 1,
+      pcp_size: 1,
+      ...(metrics as Record<string, number>),
+    },
+    ...overrides,
+  });
+}
+
 describe('modeled system power admission and accounting', () => {
   it('uses the validated physical count without summing aggregate aliases or multiplying by EP', () => {
     const source = row({ num_prefill_gpu: 64, num_decode_gpu: 64, prefill_ep: 8, decode_ep: 8 });
@@ -75,15 +121,18 @@ describe('modeled system power admission and accounting', () => {
     expect(source.metrics.joules_per_output_token).toBe(12.937902);
   });
 
-  it.each(['gb200', 'gb300', 'rtx6000pro', 'tpuv7', 'b200-nvl'])(
-    'does not substitute for %s',
-    (hardware) => {
-      expect(modelSystemPower(row({ hardware }))).toMatchObject({
-        status: 'unsupported',
-        reason: 'hardware',
-      });
-    },
-  );
+  it.each(['rtx6000pro', 'tpuv7', 'b200-nvl'])('does not substitute for %s', (hardware) => {
+    expect(modelSystemPower(row({ hardware }))).toMatchObject({
+      status: 'unsupported',
+      reason: 'hardware',
+    });
+  });
+
+  it('ignores CPU-side keys on x86 chassis rows', () => {
+    const source = row();
+    Object.assign(source.metrics, GRACE, { cpu_power_valid: 1 });
+    expect(modelSystemPower(source)).toEqual(modelSystemPower(row()));
+  });
 
   it('models every single_turn sequence and leaves other benchmark types unavailable', () => {
     expect(modelSystemPower(row({ isl: 1024, osl: 1024 }))).toMatchObject({
@@ -545,6 +594,233 @@ describe('modeled system power admission and accounting', () => {
     for (const points of unsupported.chartData) {
       expect(points[0].utilityModeledWatts).toBeUndefined();
       expect(points[0].measuredAvgPower?.y).toBe(source.metrics.avg_power_w);
+    }
+  });
+});
+
+describe('NVL72 Grace-socket telemetry gate', () => {
+  it.each([
+    [
+      'GPU-only telemetry',
+      nvl72Row({ cpu_power_valid: undefined, avg_total_cpu_power_w: undefined }),
+    ],
+    ['an invalid CPU verdict', nvl72Row({ cpu_power_valid: 0 })],
+    ['a missing CPU audit', nvl72Row({}, { power_audit: undefined })],
+    [
+      'a CPU rail mislabeled as Grace power',
+      nvl72Row(
+        {},
+        {
+          power_audit: {
+            cpu: { sensor_kind: 'dcgm_cpu_rail', expected_sockets: 2, observed_sockets: 2 },
+          },
+        },
+      ),
+    ],
+    [
+      'the module sensor',
+      nvl72Row(
+        {},
+        {
+          power_audit: { cpu: { sensor_kind: 'module', expected_sockets: 2, observed_sockets: 2 } },
+        },
+      ),
+    ],
+    [
+      'incomplete socket coverage',
+      nvl72Row(
+        {},
+        {
+          power_audit: {
+            cpu: { sensor_kind: 'grace_socket', expected_sockets: 2, observed_sockets: 1 },
+          },
+        },
+      ),
+    ],
+    [
+      'a socket total that disagrees with the per-socket mean',
+      nvl72Row({ avg_total_cpu_power_w: 600 }),
+    ],
+  ])('keeps NVL72 rows with %s unavailable', (_name, source) => {
+    expect(modelSystemPower(source)).toMatchObject({
+      status: 'unsupported',
+      reason: 'cpu-telemetry',
+    });
+  });
+
+  it('requires schema-v2 GPU telemetry before reading the Grace side', () => {
+    const legacy = nvl72Row({ power_metric_schema_version: undefined });
+    expect(modelSystemPower(legacy)).toMatchObject({ reason: 'telemetry' });
+  });
+
+  it('requires two Grace sockets per four-GPU compute tray', () => {
+    const disagg = nvl72Row(
+      {
+        avg_power_w: 500,
+        avg_total_gpu_power_w: 4000,
+        prefill_avg_power_w: 250,
+        decode_avg_power_w: 750,
+        avg_cpu_socket_power_w: 260,
+        avg_total_cpu_power_w: 1040,
+      },
+      {
+        hardware: 'gb300',
+        disagg: true,
+        is_multinode: true,
+        workers: [
+          { role: 'prefill', worker_idx: 0, num_gpus: 4, hosts: ['tray-a'], avg_power_w: 250 },
+          { role: 'decode', worker_idx: 0, num_gpus: 4, hosts: ['tray-b'], avg_power_w: 750 },
+        ],
+      },
+    );
+    expect(modelSystemPower(disagg)).toMatchObject({ status: 'supported', chassisCount: 2 });
+    const threeSockets = {
+      ...disagg,
+      metrics: { ...disagg.metrics, avg_total_cpu_power_w: 260 * 3 },
+      power_audit: {
+        cpu: { sensor_kind: 'grace_socket' as const, expected_sockets: 3, observed_sockets: 3 },
+      },
+    };
+    expect(modelSystemPower(threeSockets)).toMatchObject({ reason: 'cpu-telemetry' });
+    disagg.workers![1].num_gpus = 5;
+    expect(modelSystemPower(disagg)).toMatchObject({ reason: 'topology' });
+
+    // Aggregate multinode rows without workers infer GPU count ÷ 4 trays.
+    const aggregate = nvl72Row(
+      { avg_power_w: 441.741, avg_total_gpu_power_w: 7067.859, avg_total_cpu_power_w: 2004 },
+      { is_multinode: true, prefill_tp: 16, decode_tp: 0, num_prefill_gpu: 16, num_decode_gpu: 16 },
+    );
+    expect(modelSystemPower(aggregate)).toMatchObject({ status: 'supported', chassisCount: 4 });
+    expect(
+      modelSystemPower({
+        ...aggregate,
+        metrics: { ...aggregate.metrics, avg_total_cpu_power_w: 250.5 * 6 },
+        power_audit: {
+          cpu: { sensor_kind: 'grace_socket', expected_sockets: 6, observed_sockets: 6 },
+        },
+      }),
+    ).toMatchObject({ reason: 'cpu-telemetry' });
+    expect(
+      modelSystemPower({
+        ...aggregate,
+        prefill_tp: 18,
+        metrics: { ...aggregate.metrics, avg_total_gpu_power_w: 441.741 * 18 },
+      }),
+    ).toMatchObject({ reason: 'gpu-count' });
+
+    // Eight GPUs cannot sit on one tray.
+    const twoTraysOneHost = nvl72Row(
+      { avg_total_gpu_power_w: 7202, avg_total_cpu_power_w: 1002 },
+      { prefill_tp: 8, decode_tp: 8, num_prefill_gpu: 8, num_decode_gpu: 8 },
+    );
+    expect(modelSystemPower(twoTraysOneHost)).toMatchObject({ reason: 'topology' });
+  });
+});
+
+describe('NVL72 rack estimate from measured GPU boards and Grace sockets', () => {
+  it('models a disaggregated GB300 replay as two trays sharing one rack, exactly as upstream', () => {
+    const result = modelSystemPower(gb300DisaggRow());
+    expect(result).toMatchObject({
+      status: 'supported',
+      unit: 'nvl72-tray',
+      hardware: 'gb300',
+      gpuCount: 8,
+      chassisCount: 2,
+      modeledGpuCount: 8,
+      measuredGpuWattsPerGpu: 594.191,
+      measuredGraceSocketWatts: 98.066,
+      operatingState: { workload: 'fixed-seq-len', scaleOut: true },
+      topologyBasis: 'worker-hosts',
+      chassisBasis: 'full',
+      pue: 1.1,
+    });
+    if (result.status !== 'supported') throw new Error(result.reason);
+    // Prefill and decode trays fold into one rack at their mean, 594.191 W/GPU,
+    // with no allowance on top of the measured GPU and Grace-socket inputs.
+    const perGpu = upstreamRackWattsPerGpu('gb300', 594.191, 98.066, true);
+    expect(result.deploymentFacilityWatts / result.gpuCount / perGpu - 1).toBeCloseTo(0, 12);
+    expect(result.facilityWatts).toBeCloseTo(result.deploymentFacilityWatts, 9);
+    expect(result.itWatts * 1.1).toBeCloseTo(result.facilityWatts, 9);
+  });
+
+  it('models an aggregate deployment without workers at the mean, inside one rack without scale-out', () => {
+    const result = modelSystemPower(gb300AggregateRow());
+    expect(result).toMatchObject({
+      status: 'supported',
+      unit: 'nvl72-tray',
+      gpuCount: 16,
+      chassisCount: 4,
+      topologyBasis: 'uniform-hosts',
+      operatingState: { workload: 'fixed-seq-len', scaleOut: false },
+    });
+    if (result.status !== 'supported') throw new Error(result.reason);
+    // 1013.83 W/GPU: the upstream CLI's GB300 figure for these inputs.
+    const perGpu = upstreamRackWattsPerGpu('gb300', 594.191, 98.066, false);
+    expect(result.deploymentFacilityWatts / result.gpuCount / perGpu - 1).toBeCloseTo(0, 12);
+    expect(perGpu).toBeCloseTo(1013.828, 3);
+    // Twenty trays span two racks, so the deployment needs the scale-out fabric.
+    expect(modelSystemPower(gb300AggregateRow(20))).toMatchObject({
+      chassisCount: 20,
+      operatingState: { scaleOut: true },
+    });
+  });
+
+  it('shares a partially measured tray’s rack estimate by its measured GPUs', () => {
+    const source = gb300DisaggRow();
+    source.workers![1] = { ...source.workers![1], num_gpus: 2 };
+    Object.assign(source, { num_prefill_gpu: 2, prefill_tp: 2 });
+    Object.assign(source.metrics, {
+      avg_total_gpu_power_w: 691.906 * 4 + 496.476 * 2,
+      avg_power_w: (691.906 * 4 + 496.476 * 2) / 6,
+    });
+    const result = modelSystemPower(source);
+    expect(result).toMatchObject({
+      status: 'supported',
+      gpuCount: 6,
+      modeledGpuCount: 8,
+      chassisBasis: 'extrapolated',
+    });
+    if (result.status !== 'supported') throw new Error(result.reason);
+    const rack = estimateRackPower('gb300', (691.906 + 496.476) / 2, 98.066, {
+      workload: 'fixed-seq-len',
+      scaleOut: true,
+    })!;
+    expect(result.deploymentFacilityWatts).toBeCloseTo((rack.facilityWatts / 72) * 6, 9);
+    expect(result.itWattsPerGpu).toBeCloseTo(rack.itWatts / 72, 9);
+  });
+
+  it('keeps GB200 trays on their own rack profile and outside the model domain unavailable', () => {
+    const gb200 = modelSystemPower(gb300DisaggRow({ hardware: 'gb200' }));
+    expect(gb200).toMatchObject({ status: 'supported', unit: 'nvl72-tray', hardware: 'gb200' });
+    if (gb200.status !== 'supported') throw new Error(gb200.reason);
+    const gb300 = modelSystemPower(gb300DisaggRow());
+    if (gb300.status !== 'supported') throw new Error(gb300.reason);
+    expect(gb200.itWattsPerGpu).toBeLessThan(gb300.itWattsPerGpu);
+
+    // Beyond the redundant power-shelf capacity upstream refuses the rack.
+    const overloaded = gb300AggregateRow();
+    Object.assign(overloaded.metrics, { avg_power_w: 1700, avg_total_gpu_power_w: 1700 * 16 });
+    expect(modelSystemPower(overloaded)).toMatchObject({ reason: 'model-domain' });
+  });
+
+  type RackProfile = (typeof profileData.rackProfiles)['gb300'];
+  it.each([
+    ['tray converter', (rack: RackProfile) => rack.trayConverter.lossCurve.splice(3)],
+    ['power-shelf PSU', (rack: RackProfile) => rack.powerShelves.psuEfficiencyCurve.splice(3)],
+  ])('reports a rack load past the last %s curve knot as model-domain', async (_, truncate) => {
+    const profiles = structuredClone(profileData);
+    // The pinned curves end at full load; ending one at 20% puts this fixture's load past it.
+    truncate(profiles.rackProfiles.gb300);
+    vi.resetModules();
+    vi.doMock('@/lib/system-power-model.profiles.json', () => ({ default: profiles }));
+    try {
+      const { modelSystemPower: truncatedModel } = await import('@/lib/modeled-system-power');
+      expect(truncatedModel(gb300AggregateRow())).toMatchObject({
+        status: 'unsupported',
+        reason: 'model-domain',
+      });
+    } finally {
+      vi.doUnmock('@/lib/system-power-model.profiles.json');
     }
   });
 });

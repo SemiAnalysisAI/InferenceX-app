@@ -85,13 +85,39 @@ state. GPU interactive downsampling does not alter returned raw data or statisti
 Power boundary labels are GPU Level Measured, GPU Level Provisioned (TDP), All in
 Provisioned, and All in Measured. The last combines measured GPU power with modeled
 unmeasured components and PUE; it is not a wall-meter measurement. These labels and
-collapsed power-assumption/availability notes do not change metric IDs, API selectors,
+power-assumption notes do not change metric IDs, API selectors,
 or calculations. Profit comparison `powerLabel` display text follows the same names.
-GPU statistics include startup and warmup for all chips in the selected series,
-regardless of chip visibility. They are separate from serving-window power and
-J/token. Run telemetry comes from one source per run: stored series once the run is
-ingested, otherwise its artifacts. The public view returns private, no-store
-responses and preserves upstream 503 failures.
+All in Measured watts and energy accept validated `single_turn` and AgentX rows
+through the shared chart/API transform, including historical and unofficial rows.
+AgentX uses the power model's agentic workload state without independent workload
+calibration. Telemetry and topology gates still apply; NVL72 rows need complete
+Grace-socket telemetry, and each compute tray then takes an equal share of a modeled rack.
+
+For All in Measured, `tableRows` retains every GPU-valid observation in the selected
+scope and best-series selection, including axis-clipped and non-frontier points.
+Missing system estimates use `y: null`, `status: "unavailable"`, and
+`unavailableReason`; `measuredGpuWatts` remains available. CSV exports these rows
+with blank missing values. Numeric `series` and `count` are unchanged. Each date
+comparison and unofficial overlay has its own `tableRows`; latest does not pool history.
+
+For GW-year profit, `modeled` selects valid system-power points before building the
+curve at the same target, without extrapolation or another snapshot. `compare` uses
+the same valid-curve throughput for both power budgets, retaining the original
+provisioned estimate when no valid curve covers the target. Provisioned-only keeps
+the original performance curve. Official, comparison and unofficial scopes remain
+independent; NVL72 Grace-socket telemetry and matching model revision/PUE requirements still apply.
+
+Dense profit charts reserve readable space per bar and scroll within the plot on narrow
+screens; captions and controls stay fixed. This is presentation-only: API selectors,
+calculations, source identities and CSV rows are unchanged. PNG export includes the full
+plot regardless of its current scroll position, so no API or skills contract change is needed.
+Profit charts omit the per-configuration unavailable-estimate list. This is presentation-only;
+the API retains skipped rows and reasons, and calculations and CSV exports are unchanged.
+The GPU statistics table includes startup and warmup for all chips in the selected
+series, regardless of chip visibility. It is separate from serving-window power,
+J/token and selected-time-window calculations. Run telemetry comes from one source
+per run: stored series once ingested, otherwise its artifacts. The public view returns
+private, no-store responses and preserves upstream 503 failures.
 
 Run-specific recognition labels are also presentation-only. Runs `35879254139`
 and `37181045340` display `UMBP MoRI SGLang` through October 9, 2026 in America/New_York
@@ -219,8 +245,7 @@ point identity. Fewer than three distinct output rates return `fit: null` with
 power, and R² is null when power did not vary.
 
 These analytical results are JSON-only: `format=csv` with any analysis enabled returns
-400, rather than silently exporting only the primary chart. Ordinary CSV retains
-its existing plotted-point contract.
+400, rather than silently exporting only the primary chart. CSV exports plotted points except for All in Measured, which exports `tableRows`.
 
 | Surface                                        | Dashboard control / share parameter               | Read-only API coverage                                                    |
 | ---------------------------------------------- | ------------------------------------------------- | ------------------------------------------------------------------------- |
@@ -251,6 +276,17 @@ those properties.
 @semianalysisai/inferencex-skills 包。所有仪表板路由（含隐藏和功能开关控制的
 视图）均在覆盖表中登记；上表列出各只读接口接受的全部查询参数名。
 接口复用现有计算函数，公开运行与非官方叠加数据保留各自来源。
+整体实测指标的 `tableRows` 保留当前筛选范围和最优曲线选择内所有 GPU 遥测有效的观测点，
+不按前沿或坐标轴显示范围裁剪。估算不可用时 `y` 为 null，`status` 为 `unavailable`，
+`unavailableReason` 给出原因；`measuredGpuWatts` 保留实测 GPU 功耗。CSV 导出同一组行，缺失值留空。
+`series` 和 `count` 保持不变，仍只包含可绘制的数值点；各日期对比和非官方叠加分别返回自己的 `tableRows`，
+Latest 不会合并历史数据。
+
+按 GW 年估算利润时，modeled 先筛选满足系统功耗要求的数据点，再在原目标值上构建曲线，
+不外推，也不借用其他快照。compare 的两种功耗方案使用同一条有效曲线的吞吐量；
+没有有效曲线覆盖目标时，保留原曲线的预配估算。provisioned 单独使用时沿用原性能曲线。
+官方数据、日期对比和非官方叠加各自独立计算；NVL72 Grace socket 遥测要求以及模型版本/PUE 一致性要求同样不变。
+
 私有上传、密钥、提示词、反馈及管理操作不作为公开读取接口。
 OperatorX 的入口受功能开关控制，页面使用专属的 `/api/v1/operatorx/*`
 接口；目前没有发布 `/api/v1/views/operatorx` 契约。

@@ -489,6 +489,8 @@ export interface RenderableGraph {
   sequence: string;
   chartDefinition: ChartDefinition;
   data: InferenceData[];
+  /** All GPU-valid rows for the All in Measured table, including unavailable estimates. */
+  tableData?: InferenceData[];
   clippedData?: ClippedInferenceData[];
 }
 /**
@@ -506,6 +508,7 @@ export interface RenderableGraph {
 export interface OverlayData {
   /** The data points to overlay */
   data: InferenceData[];
+  tableData?: InferenceData[];
   /** Overlay points hidden by the same display limits as official data. */
   clippedData?: ClippedInferenceData[];
   /** Hardware configuration for the overlay data (may have different hardware types) */

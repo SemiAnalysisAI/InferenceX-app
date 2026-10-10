@@ -2,6 +2,7 @@ import { buildCorrelationData, buildGroupedData } from '@/components/gpu-power/c
 import { servingFixture } from '@/components/video-benchmark/serving.fixture';
 import type { StoredArtifact } from '@/components/video-benchmark/stored';
 import type { BenchmarkRow } from '@/lib/api';
+import { SYSTEM_POWER_MODEL_REVISION } from '@/lib/system-power-model';
 import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { GET as cache } from './cache-reuse/route';
@@ -406,7 +407,7 @@ describe('new dashboard projections', () => {
       expect([firstFetchCount, mocks.unofficial.mock.calls.length]).toEqual([1, 2]);
     },
   );
-  it.each(['modeled', 'compare'])(
+  it.each(['modeled'])(
     'uses exact comparison snapshots with %s power while keeping the primary date cutoff',
     async (powerBasis) => {
       const rows = [
@@ -448,6 +449,152 @@ describe('new dashboard projections', () => {
     },
   );
   it.each(['modeled', 'compare'])(
+    'uses valid power curves at the same target in official, historical and overlay %s estimates',
+    async (powerBasis) => {
+      const curve = (scale: number, date: string) =>
+        [
+          [20, 9000, 1],
+          [40, 8000, 0],
+          [60, 3000, 1],
+        ].map(([interactivity, throughput, powerValid], index) =>
+          agenticRow({
+            id: scale * 100 + index,
+            conc: 3 - index,
+            // The exact logical snapshot includes a retained endpoint from an
+            // older producer run; power selection must not split that curve.
+            date: scale === 2 && index === 0 ? '2026-09-08' : date,
+            run_url:
+              scale === 2 && index === 0
+                ? 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/122'
+                : agenticRow().run_url,
+            curve_workflow_run_id: scale * 1000,
+            curve_date: date,
+            metrics: {
+              ...agenticRow().metrics,
+              p90_itl: 1 / interactivity,
+              tput_per_gpu: throughput * scale,
+              input_tput_per_gpu: throughput * scale * 0.9,
+              output_tput_per_gpu: throughput * scale * 0.1,
+              power_valid: powerValid,
+            },
+          }),
+        );
+      mocks.benchmarks.mockImplementation((request: NextRequest) =>
+        Response.json(
+          request.nextUrl.searchParams.get('exact') === 'true'
+            ? curve(2, '2026-09-09')
+            : curve(1, '2026-09-10'),
+        ),
+      );
+      mocks.unofficial.mockImplementation(() =>
+        Response.json({ benchmarks: curve(3, '2026-09-10'), evaluations: [] }),
+      );
+      const query = `model=DeepSeek-V4-Pro&precisions=fp4&target=45&priceSource=custom&inputPrice=1&cachedInputPrice=1&outputPrice=1&powerBasis=${powerBasis}&dates=2026-09-09&unofficialrun=456`;
+      const response = await gw(req('profit-estimator-per-gigawatt', query));
+      expect(response.status).toBe(200);
+      const body = await response.json();
+      for (const [output, scale] of [
+        [body.data, 1],
+        [body.comparisons[0].data, 2],
+        [body.overlays, 3],
+      ]) {
+        expect(output.skipped).toEqual([]);
+        expect(output.rows).toHaveLength(powerBasis === 'compare' ? 2 : 1);
+        // The existing Steffen curve over valid endpoints at 20/60 yields
+        // 4766.6015625 tok/s/GPU at 45.
+        // Both power budgets use that throughput, even though the full performance
+        // frontier includes the faster, power-invalid knot at 40.
+        for (const row of output.rows)
+          expect(row.revenuePerGpuHour).toBeCloseTo(17.159765625 * scale);
+      }
+      const provisioned = await gw(
+        req(
+          'profit-estimator-per-gigawatt',
+          query.replace(`powerBasis=${powerBasis}`, 'powerBasis=provisioned'),
+        ),
+      );
+      const baseline = await provisioned.json();
+      expect(baseline.data.rows).toHaveLength(1);
+      expect(baseline.data.rows[0].revenuePerGpuHour).toBeGreaterThan(17.159765625);
+    },
+  );
+  const grace = {
+    cpu_power_valid: 1,
+    avg_cpu_socket_power_w: 98.066,
+    avg_total_cpu_power_w: 196.132,
+  };
+  it.each([
+    ['GPU-only telemetry', {}, 'grace_socket', 'no-cpu-power'],
+    ['invalid GPU telemetry', { power_valid: 0 }, 'grace_socket', 'no-measured-power'],
+    ['a module-sensor CPU audit', grace, 'module', 'no-cpu-power'],
+  ] as const)(
+    'retains provisioned NVL72 estimates with %s and explains missing measured power',
+    async (_name, metrics, sensor, reason) => {
+      const missing = agenticRow({
+        hardware: 'gb300',
+        prefill_tp: 4,
+        decode_tp: 4,
+        num_prefill_gpu: 4,
+        num_decode_gpu: 4,
+        power_audit: {
+          cpu: { sensor_kind: sensor, expected_sockets: 2, observed_sockets: 2 },
+        },
+        metrics: { ...agenticRow().metrics, avg_total_gpu_power_w: 2400, ...metrics },
+      });
+      mocks.benchmarks.mockImplementation(() => Response.json([missing]));
+      for (const powerBasis of ['compare', 'modeled']) {
+        const response = await gw(
+          req(
+            'profit-estimator-per-gigawatt',
+            `model=DeepSeek-V4-Pro&target=45&priceSource=custom&powerBasis=${powerBasis}`,
+          ),
+        );
+        expect(response.status).toBe(200);
+        const body = await response.json();
+        expect(body.data.rows).toHaveLength(powerBasis === 'compare' ? 1 : 0);
+        if (powerBasis === 'compare') {
+          expect(body.data.rows[0].powerLabel).toBe('All in Provisioned');
+          expect(body.data.rows[0].powerSource).toBeUndefined();
+        }
+        expect(body.data.skipped).toMatchObject([{ reason }]);
+      }
+    },
+  );
+  it('prices an NVL72 aggregate on its measured GPU and Grace-socket rack share', async () => {
+    const trays = agenticRow({
+      hardware: 'gb300',
+      is_multinode: true,
+      prefill_tp: 16,
+      decode_tp: 16,
+      num_prefill_gpu: 16,
+      num_decode_gpu: 16,
+      power_audit: {
+        cpu: { sensor_kind: 'grace_socket', expected_sockets: 8, observed_sockets: 8 },
+      },
+      metrics: {
+        ...agenticRow().metrics,
+        avg_power_w: 594.191,
+        avg_total_gpu_power_w: 9507.056,
+        ...grace,
+        avg_total_cpu_power_w: 784.528,
+      },
+    });
+    mocks.benchmarks.mockImplementation(() => Response.json([trays]));
+    const response = await gw(
+      req(
+        'profit-estimator-per-gigawatt',
+        'model=DeepSeek-V4-Pro&target=45&priceSource=custom&powerBasis=compare',
+      ),
+    );
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.data.skipped).toEqual([]);
+    expect(body.data.rows.map((row: { powerSource?: unknown }) => row.powerSource)).toEqual([
+      undefined,
+      { topology: 'nvl72-tray', pue: 1.1, modelRevision: SYSTEM_POWER_MODEL_REVISION },
+    ]);
+  });
+  it.each(['modeled'])(
     'labels full-chassis extrapolation for official and overlay %s estimates',
     async (powerBasis) => {
       const partial = agenticRow({

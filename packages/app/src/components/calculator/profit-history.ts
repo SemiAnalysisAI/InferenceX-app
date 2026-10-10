@@ -29,7 +29,7 @@ import { getHardwareConfig, getModelSortIndex, isKnownGpu } from '@/lib/constant
 import { type Percentile, Sequence } from '@/lib/data-mappings';
 import { getDisplayLabel } from '@/lib/utils';
 
-import { interpolateForGPU } from './interpolation';
+import { interpolateProfitForGPU, type ProfitPowerBasis } from './profit-power';
 import type { ProfitEstimatorRow } from './profit-estimator';
 import { buildGpuGroups, type GroupMeta } from './throughput-data';
 import type { CalculatorMode, CostProvider, InterpolatedResult } from './types';
@@ -168,6 +168,7 @@ export function buildProfitHistoryResults(
     targetValue: number;
     mode: CalculatorMode;
     costProvider: CostProvider;
+    powerBasis?: ProfitPowerBasis;
     /**
      * Per chip, the run its current bar is built from
      * (`profitHistoryCurrentRunIds`); a pinned run entry for that same run is
@@ -183,6 +184,7 @@ export function buildProfitHistoryResults(
     targetValue,
     mode,
     costProvider,
+    powerBasis = 'provisioned',
     currentRunIds = {},
   } = options;
   if (selectedGPUs.length === 0) return [];
@@ -211,7 +213,7 @@ export function buildProfitHistoryResults(
     for (const [groupKey, points] of Object.entries(grouped)) {
       const meta = groupMeta[groupKey];
       if (!meta) continue;
-      const result = interpolateForGPU(points, targetValue, mode, costProvider);
+      const result = interpolateProfitForGPU(points, targetValue, mode, costProvider, powerBasis);
       if (!result || !(result.value > 0)) continue;
       results.push({
         ...result,

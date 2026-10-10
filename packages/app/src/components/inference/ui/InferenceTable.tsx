@@ -4,7 +4,12 @@ import { useMemo } from 'react';
 
 import type { ChartDefinition, InferenceData } from '@/components/inference/types';
 import { type DataTableColumn, DataTable } from '@/components/ui/data-table';
-import { getNestedYValue, metricLabel, xAxisLabel } from '@/lib/chart-utils';
+import { metricLabel, xAxisLabel } from '@/lib/chart-utils';
+import { isAllInMeasuredConfigKey } from '@/components/inference/metric-registry';
+import {
+  allInMeasuredStatusLabel,
+  inferenceTableYValue,
+} from '@/components/inference/utils/inference-table-data';
 import { inferPowerCompare, powerSeriesLabel } from '@/components/inference/utils/power-compare';
 import { sortRowsByYMetric } from '@/components/inference/ui/inference-table-sort';
 import { type Precision, getPrecisionLabel } from '@/lib/data-mappings';
@@ -20,7 +25,8 @@ interface InferenceTableProps {
 }
 
 /** Format a number for table display — picks sensible precision and groups thousands. */
-export function formatInferenceTableNumber(value: number, decimals?: number): string {
+export function formatInferenceTableNumber(value: number | null, decimals?: number): string {
+  if (value === null || !Number.isFinite(value)) return '—';
   const fixedDecimals =
     decimals ??
     (Math.abs(value) >= 100 ? 0 : Math.abs(value) >= 1 ? 1 : Math.abs(value) >= 0.01 ? 3 : 4);
@@ -45,6 +51,8 @@ export function inferenceTableHeaderLabels(
     yMetric: metricLabel(chartDefinition, selectedYAxisMetric, locale),
     xMetric: xAxisLabel(chartDefinition, locale),
     throughput: locale === 'zh' ? '单芯片吞吐量 (tok/s)' : 'Throughput/Chip (tok/s)',
+    measuredGpuPower: locale === 'zh' ? 'GPU 实测功耗 (W/芯片)' : 'Measured GPU Power (W/chip)',
+    estimateStatus: locale === 'zh' ? '整体估算状态' : 'All-in Estimate Status',
   };
 }
 
@@ -55,6 +63,7 @@ export default function InferenceTable({
 }: InferenceTableProps) {
   const locale = useLocale();
   const yPath = chartDefinition[selectedYAxisMetric as keyof ChartDefinition] as string | undefined;
+  const showAllInMeasured = isAllInMeasuredConfigKey(selectedYAxisMetric);
   const headers = useMemo(
     () => inferenceTableHeaderLabels(chartDefinition, selectedYAxisMetric, locale),
     [chartDefinition, selectedYAxisMetric, locale],
@@ -133,14 +142,33 @@ export default function InferenceTable({
         header: headers.yMetric,
         align: 'right',
         // Comparison clones keep the source metrics; y holds the plotted role/boundary.
-        cell: (row) =>
-          formatInferenceTableNumber(
-            row.powerVariant || !yPath ? row.y : getNestedYValue(row, yPath),
-          ),
-        sortValue: (row) => (row.powerVariant || !yPath ? row.y : getNestedYValue(row, yPath)),
-        className: 'tabular-nums',
+        cell: (row) => formatInferenceTableNumber(inferenceTableYValue(row, yPath)),
+        sortValue: (row) => inferenceTableYValue(row, yPath) ?? '',
+        className: showAllInMeasured ? 'tabular-nums min-w-36' : 'tabular-nums',
         importance: 'key',
       },
+      ...(showAllInMeasured
+        ? [
+            {
+              header: headers.measuredGpuPower,
+              align: 'right' as const,
+              cell: (row: InferenceData) =>
+                formatInferenceTableNumber(row.measuredAvgPower?.y ?? null),
+              sortValue: (row: InferenceData) => row.measuredAvgPower?.y ?? '',
+              className: 'tabular-nums min-w-32',
+              importance: 'key' as const,
+            },
+            {
+              header: headers.estimateStatus,
+              cell: (row: InferenceData) =>
+                allInMeasuredStatusLabel(row, selectedYAxisMetric.slice(2), locale),
+              sortValue: (row: InferenceData) =>
+                allInMeasuredStatusLabel(row, selectedYAxisMetric.slice(2), locale),
+              className: 'w-32 min-w-32 sm:w-auto sm:min-w-48',
+              importance: 'key' as const,
+            },
+          ]
+        : []),
       {
         header: headers.xMetric,
         align: 'right',
@@ -158,7 +186,7 @@ export default function InferenceTable({
         importance: 'key',
       },
     ],
-    [yPath, headers, powerCompare, selectedYAxisMetric, locale],
+    [yPath, headers, showAllInMeasured, powerCompare, selectedYAxisMetric, locale],
   );
 
   return (

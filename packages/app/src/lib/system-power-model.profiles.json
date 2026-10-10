@@ -1,7 +1,7 @@
 {
-  "modelRevision": "dc717fb5d58620bee3bbb579b5e25160b21ce45d",
-  "sourceTree": "b46cce20b000ccae335fbdd05c7d789632ed7076",
-  "sourceUrl": "https://github.com/SemiAnalysisAI/InferenceX/tree/dc717fb5d58620bee3bbb579b5e25160b21ce45d/power_model",
+  "modelRevision": "1e509932e09f2382f778d0e793893b534b02737b",
+  "sourceTree": "42225371bbd318dbf33127c43688ced65c6ef175",
+  "sourceUrl": "https://github.com/SemiAnalysisAI/InferenceX/tree/1e509932e09f2382f778d0e793893b534b02737b/power_model",
   "profiles": {
     "h100": {
       "system": "hopper",
@@ -387,6 +387,188 @@
         ]
       },
       "pue": 1.3
+    }
+  },
+  "rackProfiles": {
+    "gb200": {
+      "system": "gb200-nvl72",
+      "computeTrayCount": 18,
+      "boardsPerTray": 2,
+      "gpusPerBoard": 2,
+      "trayAuxiliaryWatts": {
+        "false": 132.0,
+        "true": 172.0
+      },
+      "boardAirHeatWatts": {
+        "fixed-seq-len": 4.800962312499999,
+        "agentic": 6.20584925,
+        "agentic-cpu-offloading": 17.44223125
+      },
+      "trayFans": {
+        "count": 8,
+        "ratedWattsPerFan": 30.24,
+        "minSpeed": 0.4,
+        "maxSpeed": 0.8,
+        "designAirHeatWatts": 500.0
+      },
+      "trayConverter": {
+        "capacityWatts": 8000.0,
+        "lossCurve": [
+          {
+            "outputFraction": 0.0,
+            "lossWatts": 25.0
+          },
+          {
+            "outputFraction": 0.1,
+            "lossWatts": 51.06382978723411
+          },
+          {
+            "outputFraction": 0.2,
+            "lossWatts": 66.66666666666674
+          },
+          {
+            "outputFraction": 0.5,
+            "lossWatts": 136.50465356773566
+          },
+          {
+            "outputFraction": 1.0,
+            "lossWatts": 333.33333333333394
+          }
+        ]
+      },
+      "switchTrayCount": 9,
+      "switchTrayWatts": 477.5173169913098,
+      "powerShelves": {
+        "activeShelves": 8,
+        "survivingShelves": 4,
+        "controllerWatts": 10.0,
+        "psusPerShelf": 6,
+        "psuCapacityWatts": 5500.0,
+        "psuEfficiencyCurve": [
+          {
+            "loadFraction": 0.05,
+            "efficiency": 0.8864
+          },
+          {
+            "loadFraction": 0.1,
+            "efficiency": 0.9238
+          },
+          {
+            "loadFraction": 0.2,
+            "efficiency": 0.9448
+          },
+          {
+            "loadFraction": 0.5,
+            "efficiency": 0.964
+          },
+          {
+            "loadFraction": 1.0,
+            "efficiency": 0.9556
+          }
+        ],
+        "psuFans": {
+          "count": 1,
+          "ratedWattsPerFan": 30.24,
+          "minSpeed": 0.4,
+          "maxSpeed": 0.8,
+          "designAirHeatWatts": 250.0
+        }
+      },
+      "networkWatts": {
+        "false": 3645.0,
+        "true": 4262.625
+      },
+      "pue": 1.1
+    },
+    "gb300": {
+      "system": "gb300-nvl72",
+      "computeTrayCount": 18,
+      "boardsPerTray": 2,
+      "gpusPerBoard": 2,
+      "trayAuxiliaryWatts": {
+        "false": 220.0,
+        "true": 300.0
+      },
+      "boardAirHeatWatts": {
+        "fixed-seq-len": 4.800962312499999,
+        "agentic": 6.20584925,
+        "agentic-cpu-offloading": 17.44223125
+      },
+      "trayFans": {
+        "count": 8,
+        "ratedWattsPerFan": 30.24,
+        "minSpeed": 0.4,
+        "maxSpeed": 0.8,
+        "designAirHeatWatts": 500.0
+      },
+      "trayConverter": {
+        "capacityWatts": 8000.0,
+        "lossCurve": [
+          {
+            "outputFraction": 0.0,
+            "lossWatts": 25.0
+          },
+          {
+            "outputFraction": 0.1,
+            "lossWatts": 51.06382978723411
+          },
+          {
+            "outputFraction": 0.2,
+            "lossWatts": 66.66666666666674
+          },
+          {
+            "outputFraction": 0.5,
+            "lossWatts": 136.50465356773566
+          },
+          {
+            "outputFraction": 1.0,
+            "lossWatts": 333.33333333333394
+          }
+        ]
+      },
+      "switchTrayCount": 9,
+      "switchTrayWatts": 477.5173169913098,
+      "powerShelves": {
+        "activeShelves": 8,
+        "survivingShelves": 4,
+        "controllerWatts": 10.0,
+        "psusPerShelf": 6,
+        "psuCapacityWatts": 5500.0,
+        "psuEfficiencyCurve": [
+          {
+            "loadFraction": 0.05,
+            "efficiency": 0.8864
+          },
+          {
+            "loadFraction": 0.1,
+            "efficiency": 0.9238
+          },
+          {
+            "loadFraction": 0.2,
+            "efficiency": 0.9448
+          },
+          {
+            "loadFraction": 0.5,
+            "efficiency": 0.964
+          },
+          {
+            "loadFraction": 1.0,
+            "efficiency": 0.9556
+          }
+        ],
+        "psuFans": {
+          "count": 1,
+          "ratedWattsPerFan": 30.24,
+          "minSpeed": 0.4,
+          "maxSpeed": 0.8,
+          "designAirHeatWatts": 250.0
+        }
+      },
+      "networkWatts": {
+        "false": 5059.125,
+        "true": 6277.5
+      },
+      "pue": 1.1
     }
   }
 }

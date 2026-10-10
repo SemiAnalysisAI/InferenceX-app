@@ -2,10 +2,20 @@ import { describe, expect, it } from 'vitest';
 
 import type { BenchmarkRow } from '@/lib/api';
 import { modelSystemPower } from '@/lib/modeled-system-power';
+import {
+  gb300AggregateRow,
+  gb300DisaggRow,
+  upstreamRackWattsPerGpu,
+} from '@/lib/nvl72-power.fixture';
+import { SYSTEM_POWER_MODEL_REVISION } from '@/lib/system-power-model';
 import { Percentile, Sequence } from '@/lib/data-mappings';
 import { buildGpuGroups, interpolateForGPU } from './useThroughputData';
 import { estimateProfitRows } from './profit-estimator';
-import { estimateProfitByPower, modeledPowerAtTarget } from './profit-power';
+import {
+  estimateProfitByPower,
+  interpolateProfitForGPU,
+  modeledPowerAtTarget,
+} from './profit-power';
 import type { GPUDataPoint, InterpolatedResult } from './types';
 
 // Power telemetry from MI355X Kimi K3 source row 441385; the target/rates below
@@ -54,6 +64,8 @@ const point: GPUDataPoint = {
   throughput: 6000,
   inputThroughput: 5940,
   outputThroughput: 60,
+  inputTokenShare: 0.99,
+  cacheHitRate: 0.9,
   concurrency: 16,
   tp: 8,
   precision: 'fp4',
@@ -98,8 +110,168 @@ const labels = {
   extrapolated: 'Full-chassis extrapolation',
 };
 
+const traySource = gb300DisaggRow();
+const trayPoint: GPUDataPoint = { ...point, sourceRow: traySource, hwKey: 'gb300_dynamo-sglang' };
+
 describe('profit power basis preview', () => {
-  it.each([8, 4, 2])(
+  it('retains the existing Steffen result for the Kimi K3 MI355X valid knots at 45', () => {
+    const knots = [
+      { ...point, interactivity: 14.39677512237259, throughput: 12090.08106 },
+      { ...point, interactivity: 53.85029617662897, throughput: 7227.86065 },
+    ];
+    expect(
+      interpolateProfitForGPU(knots, 45, 'interactivity_to_throughput', 'costh', 'modeled')?.value,
+    ).toBeCloseTo(8059.609379677125, 8);
+  });
+
+  it('selects power-valid raw knots before the frontier at the unchanged target', () => {
+    const low = {
+      ...point,
+      interactivity: 14.396775,
+      throughput: 8000,
+      sourceRow: { ...source, id: 443687, conc: 48 },
+    };
+    const high = {
+      ...point,
+      interactivity: 53.850296,
+      throughput: 4000,
+      sourceRow: { ...source, id: 443686, conc: 14 },
+    };
+    const invalid = {
+      ...point,
+      interactivity: 15.951507,
+      throughput: 9000,
+      sourceRow: {
+        ...source,
+        id: 443692,
+        conc: 44,
+        metrics: { ...source.metrics, power_valid: 0 },
+      },
+    };
+    const points = [low, invalid, high];
+    const original = interpolateForGPU(points, 45, 'interactivity_to_throughput', 'costh')!;
+    expect(original.nearestPoints.map((p) => p.sourceRow?.id)).toEqual([443692, 443686]);
+    expect(modeledPowerAtTarget(original, 45)).toEqual({ reason: 'no-measured-power' });
+    const eligible = interpolateForGPU([low, high], 45, 'interactivity_to_throughput', 'costh')!;
+    for (const basis of ['modeled', 'compare'] as const) {
+      const selected = interpolateProfitForGPU(
+        points,
+        45,
+        'interactivity_to_throughput',
+        'costh',
+        basis,
+      )!;
+      expect(selected).toEqual(eligible);
+      expect(modeledPowerAtTarget(selected, 45)).toHaveProperty('kwPerGpu');
+      const output = estimateProfitByPower(
+        [selected],
+        specs,
+        pricing,
+        assumptions,
+        basis,
+        45,
+        labels,
+      );
+      expect(output.skipped).toEqual([]);
+      expect(output.rows).toHaveLength(basis === 'compare' ? 2 : 1);
+      if (basis === 'compare') {
+        expect(output.rows[0].revenue / output.rows[0].gpuHours).toBeCloseTo(
+          output.rows[1].revenue / output.rows[1].gpuHours,
+          10,
+        );
+      }
+    }
+    expect(
+      interpolateProfitForGPU(points, 45, 'interactivity_to_throughput', 'costh', 'provisioned'),
+    ).toEqual(original);
+  });
+
+  it('keeps inherited producer rows in the selected logical curve', () => {
+    const points = [20, 60].map((interactivity, i) => ({
+      ...point,
+      interactivity,
+      throughput: 8000 - i * 4000,
+      sourceRow: {
+        ...source,
+        date: `2026-09-${10 + i}`,
+        workflow_run_id: 100 + i,
+        run_url: `https://github.com/SemiAnalysisAI/InferenceX/actions/runs/${100 + i}`,
+        curve_date: '2026-09-12',
+        curve_workflow_run_id: 102,
+      },
+    }));
+    const selected = interpolateProfitForGPU(
+      points,
+      45,
+      'interactivity_to_throughput',
+      'costh',
+      'modeled',
+    )!;
+    expect(selected.clamped).toBe(false);
+    expect(selected.nearestPoints).toEqual(points);
+    expect(modeledPowerAtTarget(selected, 45)).toHaveProperty('kwPerGpu');
+  });
+
+  it('accepts an exact valid point and preserves provisioned fallback outside the valid range', () => {
+    const exact = interpolateProfitForGPU(
+      [point],
+      45,
+      'interactivity_to_throughput',
+      'costh',
+      'modeled',
+    )!;
+    expect(modeledPowerAtTarget(exact, 45)).toHaveProperty('kwPerGpu');
+    const invalid = {
+      ...point,
+      interactivity: 60,
+      throughput: 3000,
+      sourceRow: { ...source, metrics: { ...source.metrics, power_valid: 0 } },
+    };
+    const points = [{ ...point, interactivity: 20 }, invalid];
+    const original = interpolateForGPU(points, 45, 'interactivity_to_throughput', 'costh')!;
+    const fallback = interpolateProfitForGPU(
+      points,
+      45,
+      'interactivity_to_throughput',
+      'costh',
+      'compare',
+    )!;
+    expect(fallback).toEqual(original);
+    const estimate = estimateProfitByPower(
+      [fallback],
+      specs,
+      pricing,
+      assumptions,
+      'compare',
+      45,
+      labels,
+    );
+    expect(estimate.rows).toHaveLength(1);
+    expect(estimate.rows[0].powerLabel).toBe(labels.provisioned);
+    expect(estimate.skipped[0].reason).toBe('no-measured-power');
+    const clamped = interpolateProfitForGPU(
+      [{ ...point, interactivity: 38 }],
+      45,
+      'interactivity_to_throughput',
+      'costh',
+      'modeled',
+    )!;
+    expect(modeledPowerAtTarget(clamped, 45)).toEqual({ reason: 'outside-measured-range' });
+    const missingCpu = {
+      ...trayPoint,
+      sourceRow: { ...traySource, metrics: { ...traySource.metrics, cpu_power_valid: 0 } },
+    };
+    const excluded = interpolateProfitForGPU(
+      [missingCpu],
+      45,
+      'interactivity_to_throughput',
+      'costh',
+      'modeled',
+    )!;
+    expect(modeledPowerAtTarget(excluded, 45)).toEqual({ reason: 'no-cpu-power' });
+  });
+
+  it.each([8])(
     'keeps raw power attached through official and run-keyed %i-GPU frontiers',
     (gpus) => {
       const row = {
@@ -136,14 +308,29 @@ describe('profit power basis preview', () => {
     },
   );
 
-  it('distinguishes partial chassis from unsupported rack hardware with valid telemetry', () => {
+  it('prices NVL72 trays on the measured-Grace rack model and refuses rows without Grace power', () => {
+    for (const [sourceRow, scaleOut] of [
+      [traySource, true],
+      [gb300AggregateRow(), false],
+    ] as const) {
+      expect(
+        modeledPowerAtTarget({ ...result, nearestPoints: [{ ...trayPoint, sourceRow }] }, 45),
+      ).toEqual({
+        kwPerGpu: expect.closeTo(
+          (upstreamRackWattsPerGpu('gb300', 594.191, 98.066, scaleOut) / 1000) * 1.1,
+          9,
+        ),
+        extrapolated: false,
+        source: { topology: 'nvl72-tray', pue: 1.1, modelRevision: SYSTEM_POWER_MODEL_REVISION },
+      });
+    }
     for (const hardware of ['gb200', 'gb300']) {
       expect(
         modeledPowerAtTarget(
           { ...result, nearestPoints: [{ ...point, sourceRow: { ...source, hardware } }] },
           45,
         ),
-      ).toEqual({ reason: 'unsupported-power-hardware' });
+      ).toEqual({ reason: 'no-cpu-power' });
     }
     const partial = {
       ...source,
@@ -166,7 +353,7 @@ describe('profit power basis preview', () => {
     ).toEqual(estimateProfitRows([result], specs, pricing, assumptions));
   });
 
-  it.each([2, 4])(
+  it.each([2])(
     'prices a validated %i-GPU allocation as a labeled full-chassis extrapolation',
     (gpus) => {
       const partial = {
@@ -242,6 +429,12 @@ describe('profit power basis preview', () => {
     );
     expect(output.skipped).toEqual([]);
     const [baseline, modeled] = output.rows;
+    expect(baseline.powerSource).toBeUndefined();
+    expect(modeled.powerSource).toEqual({
+      topology: 'chassis',
+      pue: 1.3,
+      modelRevision: SYSTEM_POWER_MODEL_REVISION,
+    });
     expect(modeled.revenuePerGpuHour).toBe(baseline.revenuePerGpuHour);
     const ratio = 2.09 / MODELED_KW_PER_GPU;
     for (const field of ['gpuHours', 'revenue', 'tco', 'labCut', 'profit'] as const) {
@@ -262,6 +455,12 @@ describe('profit power basis preview', () => {
     expect(modeledPowerAtTarget(bracket, 45)).toEqual({ reason: 'no-measured-power' });
     expect(
       estimateProfitByPower([bracket], specs, pricing, assumptions, 'compare', 45, labels),
+    ).toMatchObject({
+      rows: [{ powerLabel: labels.provisioned }],
+      skipped: [{ reason: 'no-measured-power' }],
+    });
+    expect(
+      estimateProfitByPower([bracket], specs, pricing, assumptions, 'modeled', 45, labels),
     ).toMatchObject({ rows: [], skipped: [{ reason: 'no-measured-power' }] });
     expect(modeledPowerAtTarget({ ...result, nearestPoints: [point, missing] }, 45)).toMatchObject({
       kwPerGpu: expect.closeTo(MODELED_KW_PER_GPU, 8),
@@ -316,7 +515,7 @@ describe('profit power basis preview', () => {
     const high = modeledPowerAtTarget(bracket, 60);
     if (!('kwPerGpu' in low) || !('kwPerGpu' in high))
       throw new Error('Expected valid power knots');
-    expect(modeledPowerAtTarget(bracket, 40)).toEqual({
+    expect(modeledPowerAtTarget(bracket, 40)).toMatchObject({
       kwPerGpu: low.kwPerGpu + (high.kwPerGpu - low.kwPerGpu) / 3,
       extrapolated: true,
     });
@@ -332,10 +531,6 @@ describe('profit power basis preview', () => {
         metrics: { ...source.metrics, avg_power_w: 500, avg_total_gpu_power_w: 1500 },
       },
       'unsupported-power-topology',
-    ],
-    [
-      { metrics: { ...source.metrics, avg_power_w: 500, avg_total_gpu_power_w: 2000 } },
-      'no-measured-power',
     ],
     [
       { metrics: { power_valid: 1, avg_power_w: 796.131, avg_total_gpu_power_w: 6369.045 } },

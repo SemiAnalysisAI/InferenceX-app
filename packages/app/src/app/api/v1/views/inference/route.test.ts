@@ -102,6 +102,68 @@ beforeEach(() => {
 });
 
 describe('GET /api/v1/views/inference', () => {
+  it('keeps unavailable all-in table rows in official, compared and unofficial scopes and CSV', async () => {
+    const gpuOnly = makeRow({
+      hardware: 'gb200',
+      metrics: {
+        ...makeRow().metrics,
+        avg_power_w: 500,
+        avg_total_gpu_power_w: 4000,
+        power_valid: 1,
+        power_metric_schema_version: 2,
+      },
+    });
+    const historical = { ...gpuOnly, id: 998, date: '2026-02-28' };
+    const unofficial = {
+      ...gpuOnly,
+      id: 999,
+      run_url: 'https://github.com/org/repo/actions/runs/999',
+    };
+    mockGetLatestBenchmarks.mockImplementation((_db, _models, date) =>
+      Promise.resolve(date === historical.date ? [historical] : [gpuOnly]),
+    );
+    mockUnofficialRun.mockImplementation(() =>
+      Response.json({ benchmarks: [unofficial], evaluations: [] }),
+    );
+    const query =
+      '/api/v1/views/inference?model=DeepSeek-R1-0528&metric=utilityModeledWatts&best=false&optimal=true&dates=2026-02-28&unofficialrun=999';
+    const response = await GET(request(query));
+    const body = await response.json();
+    expect(response.status).toBe(200);
+    for (const [scope, id] of [
+      [body, gpuOnly.id],
+      [body.comparisons[0], historical.id],
+      [body.overlays[0], unofficial.id],
+    ]) {
+      expect(scope.series).toEqual([]);
+      expect(scope.count).toBe(0);
+      expect(scope.tableRows).toMatchObject([
+        {
+          id,
+          y: null,
+          measuredGpuWatts: 500,
+          status: 'unavailable',
+          unavailableReason: 'cpu-telemetry',
+        },
+      ]);
+      expect(scope).not.toHaveProperty('observedPoints');
+    }
+    expect(body.comparisons[0].tableRows[0].date).toBe(historical.date);
+    expect(body.overlays[0].tableRows[0].runId).toBe(999);
+
+    const csvResponse = await GET(request(`${query}&format=csv`));
+    const csv = await csvResponse.text();
+    const [header, ...lines] = csv.trim().split('\r\n');
+    const columns = header.split(',');
+    expect(lines).toHaveLength(3);
+    for (const line of lines) {
+      const values = line.split(',');
+      expect(values[columns.indexOf('y')]).toBe('');
+      expect(values[columns.indexOf('measuredGpuWatts')]).toBe('500');
+      expect(values[columns.indexOf('unavailableReason')]).toBe('cpu-telemetry');
+    }
+  });
+
   it('compares stitched observations before frontier pruning and preserves each producer endpoint', async () => {
     const rows = ['h200', 'mi300x'].flatMap((hardware, index) =>
       [20, 60].map((x, position) =>

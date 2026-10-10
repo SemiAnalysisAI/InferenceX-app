@@ -62,6 +62,7 @@ import { SearchableSelect } from '@/components/ui/searchable-select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { ALL_IN_MEASURED_NOTE, POWER_BASIS_LABELS } from '@/lib/power-basis';
+import { AIR_COOLED_SYSTEM_PUE, LIQUID_COOLED_RACK_PUE } from '@/lib/system-power-model';
 import { useComparisonChangelogs } from '@/hooks/api/use-comparison-changelogs';
 import { useOpenRouterPricing } from '@/hooks/api/use-openrouter-pricing';
 import { useOpenDropdown } from '@/hooks/useOpenDropdown';
@@ -94,9 +95,8 @@ import {
   type CacheHitMode,
   type ProfitBasis,
   type ProfitEstimatorRow,
-  type ProfitEstimatorSkipReason,
 } from './profit-estimator';
-import { profitEstimatorChartStrings, rowLabel } from './ProfitEstimatorChart';
+import { powerBasisLabel, profitEstimatorChartStrings, rowLabel } from './ProfitEstimatorChart';
 import { estimateProfitByPower, type ProfitPowerBasis } from './profit-power';
 import {
   buildProfitHistoryResults,
@@ -209,7 +209,7 @@ const STRINGS = {
     benchmarkGroup: 'Benchmark Config',
     powerLabel: 'Power Estimation',
     powerTooltip:
-      'Change only the power budget used to scale the same benchmark result to one GW. Pricing, throughput, utilization and unit costs stay the same.',
+      'All in Measured uses the best power-valid curve at the selected target. Compare both uses that same curve for both bars when available. Pricing, utilization and unit costs stay the same.',
     powerOptions: {
       provisioned: POWER_BASIS_LABELS['utility-provisioned'].en,
       modeled: POWER_BASIS_LABELS['utility-modeled'].en,
@@ -221,9 +221,8 @@ const STRINGS = {
       extrapolated: 'Full-chassis extrapolation',
     },
     powerPreview: `${ALL_IN_MEASURED_NOTE.en} Host power follows the AgentX workload state, including whether KV cache offload is on.`,
-    powerDetails:
-      'GPU power is interpolated between the same throughput points. Includes PUE 1.3 and 10% headroom. Full-chassis extrapolation fills an eight-GPU server with replicas of the measured 1/2/4-GPU workload at the same per-GPU power and throughput; it does not measure a partly idle server.',
-    unavailableEstimates: (count: number) => `Unavailable estimates (${count})`,
+    powerDetails: `GPU power is interpolated between the same throughput points. Includes PUE ${AIR_COOLED_SYSTEM_PUE} (air-cooled chassis) or ${LIQUID_COOLED_RACK_PUE} (liquid-cooled NVL72) and 10% headroom. Aggregate multinode hosts use the measured deployment mean. NVL72 trays also use measured Grace-socket power and share one modeled rack equally. Full-chassis extrapolation fills an eight-GPU server with replicas of the measured 1/2/4-GPU workload at the same per-GPU power and throughput; it does not measure a partly idle server.`,
+    csvPowerHeaders: ['Power basis', 'Power model revision'],
     pricingGroup: 'Pricing Config',
     costProviderLabel: 'Cost Provider',
     costProviderTooltip:
@@ -307,18 +306,6 @@ const STRINGS = {
         'Revenue ($/GPU/hr, 100% util)',
       ],
     },
-    skipped: (entries: string) => `Not priced: ${entries}.`,
-    skipReason: {
-      'outside-measured-range': 'no measured point at the target interactivity',
-      'no-power': 'no all-in power figure',
-      'no-measured-power': 'no usable measured power for these benchmark points',
-      'unsupported-power-hardware': 'no system power model for this hardware',
-      'unsupported-power-topology':
-        'this topology cannot be modeled as whole replicas on one eight-GPU server',
-      'outside-power-model': 'these benchmark points are outside the supported power model',
-      'no-cost': 'no TCO for this tier',
-      'no-token-mix': 'no input/output token mix recorded',
-    } satisfies Record<ProfitEstimatorSkipReason, string>,
     compareHistory: 'Compare history',
     gpuConfig: 'Chip Config',
     gpuConfigTooltip: `Select up to ${PROFIT_HISTORY_MAX_GPUS} chip configurations to compare how their estimated revenue and profit have moved over time. Each config is priced again on every compared date (the ends of the date range, plus any date or run added from the Config Changelog below) using the run measured then, so software updates show up as a change in the bar.`,
@@ -340,7 +327,7 @@ const STRINGS = {
     benchmarkGroup: '基准测试配置',
     powerLabel: '功耗估算方式',
     powerTooltip:
-      '仅更改将同一基准测试结果换算为每 GW 收益时采用的功耗预算。价格、吞吐量、利用率和单位成本保持不变。',
+      '整体实测功耗在选定目标下采用功耗有效的最优曲线。对比两种估算方式时，若实测估算可用，两根柱子采用同一条曲线。价格、利用率和单位成本保持不变。',
     powerOptions: {
       provisioned: POWER_BASIS_LABELS['utility-provisioned'].zh,
       modeled: POWER_BASIS_LABELS['utility-modeled'].zh,
@@ -352,9 +339,8 @@ const STRINGS = {
       extrapolated: '整机外推',
     },
     powerPreview: `${ALL_IN_MEASURED_NOTE.zh} 主机功耗按 AgentX 工作负载状态建模，并区分是否启用 KV cache offload。`,
-    powerDetails:
-      'GPU 功耗在相同的吞吐量数据点间插值，计入 PUE 1.3 和 10% 功耗余量。整机外推假设八卡服务器部署多个相同的实测单卡、双卡或四卡实例，每卡功耗和吞吐量保持不变；它不代表部分 GPU 闲置时的整机实测功耗。',
-    unavailableEstimates: (count: number) => `无法估算（${count} 项）`,
+    powerDetails: `GPU 功耗在相同的吞吐量数据点间插值，计入 PUE（风冷机箱为 ${AIR_COOLED_SYSTEM_PUE}，液冷 NVL72 为 ${LIQUID_COOLED_RACK_PUE}）和 10% 功耗余量。聚合多节点按部署平均功耗估算各台服务器。NVL72 tray 还使用 Grace socket 实测功耗，并平均分摊同一个建模机架的功耗。整机外推假设八卡服务器部署多个相同的实测单卡、双卡或四卡实例，每卡功耗和吞吐量保持不变；它不代表部分 GPU 闲置时的整机实测功耗。`,
+    csvPowerHeaders: ['功耗口径', '功耗模型版本'],
     pricingGroup: '定价配置',
     costProviderLabel: '成本供应商',
     costProviderTooltip:
@@ -438,17 +424,6 @@ const STRINGS = {
         '收入（$/GPU/hr，100% 利用率）',
       ],
     },
-    skipped: (entries: string) => `未定价：${entries}。`,
-    skipReason: {
-      'outside-measured-range': '未在该交互性下实测',
-      'no-power': '缺少全电源配置功率数据',
-      'no-measured-power': '同一组基准测试数据点缺少有效功耗',
-      'unsupported-power-hardware': '该硬件暂无适用的系统功耗模型',
-      'unsupported-power-topology': '该拓扑无法按完整实例部署在单台八卡服务器上建模',
-      'outside-power-model': '这些基准测试数据点超出功耗模型的适用范围',
-      'no-cost': '该层级无 TCO 数据',
-      'no-token-mix': '未记录输入/输出 token 比例',
-    } satisfies Record<ProfitEstimatorSkipReason, string>,
     compareHistory: '对比历史趋势',
     gpuConfig: '芯片配置',
     gpuConfigTooltip: `最多选择 ${PROFIT_HISTORY_MAX_GPUS} 个芯片配置，对比其收入与利润估算随时间的变化。每个配置都会用当日实测的运行结果，在每个对比日期（日期范围的起止两端，以及从下方配置变更日志中添加的日期或运行）重新估价，软件更新带来的差异会直接体现在柱形上。`,
@@ -1025,7 +1000,15 @@ function ProfitEstimatorInner({
   // from that date's run with the same target, prices, and TCO tier.
   const fullEstimate = useMemo(() => {
     if (!hasData || !pricing) return { rows: [], skipped: [] };
-    const current = getResults(targetValue, mode, interpolationCostProvider);
+    const curvePowerBasis = basis === 'gw-year' ? powerBasis : 'provisioned';
+    const current = getResults(
+      targetValue,
+      mode,
+      interpolationCostProvider,
+      undefined,
+      false,
+      curvePowerBasis,
+    );
     const results = historyActive
       ? [
           ...current.filter((r) => selectedGPUs.includes(r.hwKey)),
@@ -1036,6 +1019,7 @@ function ProfitEstimatorInner({
             targetValue,
             mode,
             costProvider: interpolationCostProvider,
+            powerBasis: curvePowerBasis,
             currentRunIds: historyCurrentRunIds,
           }),
         ]
@@ -1064,6 +1048,7 @@ function ProfitEstimatorInner({
     hasData,
     pricing,
     getResults,
+    basis,
     cacheHitMode,
     powerBasis,
     t.powerBarLabels,
@@ -1383,22 +1368,6 @@ function ProfitEstimatorInner({
     historyCurrentRunIds,
   ]);
 
-  const powerUnavailable = useMemo(
-    () =>
-      t.skipped(
-        fullEstimate.skipped
-          .map((row) => {
-            const label = rowLabel(
-              { ...row, dateLabel: row.date ? historyEntryLabel(row.date) : undefined },
-              hardwareConfig,
-            );
-            return `${label}: ${t.skipReason[row.reason]}`;
-          })
-          .join('; '),
-      ),
-    [fullEstimate.skipped, hardwareConfig, historyEntryLabel, t],
-  );
-
   // Rendered as the chart's figcaption so it is part of the PNG export.
   const caption = useMemo(() => {
     if (!pricing) return null;
@@ -1419,20 +1388,6 @@ function ProfitEstimatorInner({
           <p className="mb-2 text-xs text-muted-foreground" data-testid="profit-power-note">
             {t.powerLabel}: {t.powerOptions[powerBasis]}
           </p>
-        )}
-        {basis === 'gw-year' && powerBasis !== 'provisioned' && fullEstimate.skipped.length > 0 && (
-          <details
-            className="mb-2 text-xs text-muted-foreground"
-            data-testid="profit-power-unavailable"
-          >
-            <summary
-              className="cursor-pointer"
-              onClick={() => track('profit_estimator_power_unavailable_toggled')}
-            >
-              {t.unavailableEstimates(fullEstimate.skipped.length)}
-            </summary>
-            <p className="mt-1">{powerUnavailable}</p>
-          </details>
         )}
         <ResultContext
           locale={locale}
@@ -1510,8 +1465,6 @@ function ProfitEstimatorInner({
     pricing,
     powerBasis,
     powerControlsEnabled,
-    powerUnavailable,
-    fullEstimate.skipped,
     hardwareConfig,
     effectivePriceSource,
     listPricing,
@@ -1544,6 +1497,13 @@ function ProfitEstimatorInner({
   const handleExportCsv = useCallback(() => {
     // Whole dollars are plenty per GW-year; per chip-hour the cents are the figure.
     const usd = (value: number) => (basis === 'gw-year' ? Math.round(value) : value.toFixed(4));
+    // Measured + modeled rows name their basis and pinned power-model revision per row.
+    const includeBasis = powerControlsEnabled && powerBasis !== 'provisioned';
+    const basisColumns = (row: ProfitEstimatorRow) => {
+      const source = row.powerSource;
+      if (!source) return [t.powerBarLabels.provisioned, ''];
+      return [powerBasisLabel(source, locale), source.modelRevision];
+    };
     const rows = estimate.rows.map((row) => [
       rowLabel({ ...row, date: undefined }, hardwareConfig),
       row.precision?.toUpperCase() ?? '',
@@ -1557,9 +1517,17 @@ function ProfitEstimatorInner({
       row.revenuePerGpuHour.toFixed(4),
       // GPU-hours is 1 per chip-hour, so that basis has no column for it.
       ...(basis === 'gw-year' ? [Math.round(row.gpuHours)] : []),
+      ...(includeBasis ? basisColumns(row) : []),
     ]);
     const [sku, precision, ...rest] = t.csvHeaders[basis];
-    exportToCsv(exportFileName, [sku, precision, t.csvDateHeader, ...rest], rows, [
+    const headers = [
+      sku,
+      precision,
+      t.csvDateHeader,
+      ...rest,
+      ...(includeBasis ? t.csvPowerHeaders : []),
+    ];
+    exportToCsv(exportFileName, headers, rows, [
       t.captionFormula[basis](assumptions.utilizationPct, assumptions.labCutPct),
       `${t.cacheHitLabel}: ${t.cacheHitOptions[cacheHitMode]}`,
       ...(powerControlsEnabled
@@ -1574,6 +1542,7 @@ function ProfitEstimatorInner({
     hardwareConfig,
     exportFileName,
     t,
+    locale,
     assumptions,
     basis,
     selectedRunDate,
@@ -1962,16 +1931,6 @@ function ProfitEstimatorInner({
           )}
           {pricing ? (
             <figure data-testid="profit-figure" className="relative rounded-lg">
-              {basis === 'gw-year' &&
-                estimate.rows.length === 0 &&
-                powerBasis !== 'provisioned' && (
-                  <p
-                    className="mb-3 text-xs text-muted-foreground"
-                    data-testid="profit-power-unavailable"
-                  >
-                    {t.powerPreview} {powerUnavailable}
-                  </p>
-                )}
               <ChartButtons
                 chartId="profit-estimator-chart"
                 analyticsPrefix="profit_estimator"

@@ -6,7 +6,7 @@ import { pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
 
 import type { BenchmarkRow } from '../src/lib/api';
-import { modelSystemPower } from '../src/lib/modeled-system-power';
+import { isNvl72Hardware, modelSystemPower } from '../src/lib/modeled-system-power';
 import profileData from '../src/lib/system-power-model.profiles.json';
 
 interface PowerAudit {
@@ -147,6 +147,8 @@ export function buildComparison(input: ComparisonInput) {
         : row.metrics.power_valid === 0
           ? 'invalid'
           : 'unverified';
+    // NVL72 Grace-side keys carry their own verdict.
+    const cpuValid = row.metrics.cpu_power_valid === 1;
     return {
       id: entry.id,
       cell: entry.cell ?? null,
@@ -161,6 +163,13 @@ export function buildComparison(input: ComparisonInput) {
               total_gpu_w: measurement(row.metrics.avg_total_gpu_power_w),
               total_gpu_j: measurement(row.metrics.total_gpu_energy_j),
               gpu_j_per_output_token: measurement(row.metrics.joules_per_output_token),
+              ...(isNvl72Hardware(row.hardware)
+                ? {
+                    cpu_power_valid: row.metrics.cpu_power_valid ?? null,
+                    total_grace_w: cpuValid ? measurement(row.metrics.avg_total_cpu_power_w) : null,
+                    total_grace_j: cpuValid ? measurement(row.metrics.total_cpu_energy_j) : null,
+                  }
+                : {}),
             }
           : null,
       modeled,
@@ -271,7 +280,7 @@ export function buildComparison(input: ComparisonInput) {
       aggregation:
         'Each replicate is modeled first. Cell means include every replicate; any unavailable value leaves its cell mean unavailable.',
       boundary:
-        'Measured GPU-board inputs; modeled IT power is GPU-chassis AC (CPU, DRAM, other host components, fans, and PSU loss) plus each chassis share of scale-out networking. Separate CPU-only frontend/router hosts are excluded. Facility power applies the chassis cooling PUE after IT power.',
+        'Measured GPU-board inputs; modeled IT power is GPU-chassis AC (CPU, DRAM, other host components, fans, and PSU loss) plus each chassis share of scale-out networking. GB200/GB300 NVL72 rows add measured Grace-socket inputs: the measured trays fold into an 18-tray rack at their mean GPU and socket power (tray NICs, optics, drives, fans and 48 V conversion; NVSwitch trays, power shelves and the rack share of scale-out networking), and each tray takes 1/18 of it. Separate CPU-only frontend/router hosts are excluded. Facility power applies the system cooling PUE after IT power.',
       extrapolation:
         'A partially allocated chassis is modeled at measured per-GPU power × 8 (the upstream model input for a full chassis), assuming the unmeasured GPUs run the same workload. Deployment values are the measured GPUs’ share of that chassis; per-GPU values divide by the modeled chassis GPU count.',
       energy_caveat:
@@ -297,6 +306,86 @@ const csvValue = (item: unknown) =>
 export function csv(records: Record<string, unknown>[]): string {
   const columns = [...new Set(records.flatMap(Object.keys))];
   return `${[columns.map(csvValue).join(','), ...records.map((row) => columns.map((key) => csvValue(row[key])).join(','))].join('\r\n')}\r\n`;
+}
+
+type Comparison = ReturnType<typeof buildComparison>;
+
+/** One CSV record per row: the comparison row flattened with the export's provenance. */
+export function flatRows(
+  result: Comparison,
+  metadata: Comparison['metadata'] & {
+    app_revision: string;
+    input_sha256: string;
+    generated_at: string;
+  },
+  hashes: Record<string, string>,
+) {
+  return result.rows.map((row) => ({
+    cohort: metadata.cohort,
+    id: row.id,
+    cell: row.cell,
+    hardware: row.benchmark.hardware,
+    model: row.benchmark.model,
+    concurrency: row.benchmark.conc,
+    precision: row.benchmark.precision,
+    framework: row.benchmark.framework,
+    disagg: row.benchmark.disagg,
+    is_multinode: row.benchmark.is_multinode,
+    prefill_tp: row.benchmark.prefill_tp,
+    decode_tp: row.benchmark.decode_tp,
+    num_prefill_gpu: row.benchmark.num_prefill_gpu,
+    num_decode_gpu: row.benchmark.num_decode_gpu,
+    prefill_workers: row.benchmark.prefill_num_workers,
+    decode_workers: row.benchmark.decode_num_workers,
+    measurement_status: row.measurement_status,
+    power_valid: row.benchmark.metrics.power_valid,
+    power_metric_schema_version: row.benchmark.metrics.power_metric_schema_version,
+    measured_gpu_w_per_gpu: row.measured_inputs?.avg_gpu_w,
+    measured_total_gpu_w: row.measured_inputs?.total_gpu_w,
+    measured_total_gpu_j: row.measured_inputs?.total_gpu_j,
+    measured_gpu_j_per_output_token: row.measured_inputs?.gpu_j_per_output_token,
+    cpu_power_valid: row.measured_inputs?.cpu_power_valid,
+    measured_total_grace_w: row.measured_inputs?.total_grace_w,
+    measured_total_grace_j: row.measured_inputs?.total_grace_j,
+    modeled_status: row.modeled.status,
+    modeled_unit: row.modeled.status === 'supported' ? row.modeled.unit : null,
+    unsupported_reason: row.modeled.status === 'unsupported' ? row.modeled.reason : null,
+    modeled_it_w: row.modeled.status === 'supported' ? row.modeled.itWatts : null,
+    modeled_it_w_per_gpu: row.modeled.status === 'supported' ? row.modeled.itWattsPerGpu : null,
+    modeled_facility_w: row.modeled.status === 'supported' ? row.modeled.facilityWatts : null,
+    modeled_deployment_it_w:
+      row.modeled.status === 'supported' ? row.modeled.deploymentItWatts : null,
+    modeled_deployment_facility_w:
+      row.modeled.status === 'supported' ? row.modeled.deploymentFacilityWatts : null,
+    physical_gpu_count: row.modeled.status === 'supported' ? row.modeled.gpuCount : null,
+    modeled_gpu_count: row.modeled.status === 'supported' ? row.modeled.modeledGpuCount : null,
+    chassis_count: row.modeled.status === 'supported' ? row.modeled.chassisCount : null,
+    chassis_basis: row.modeled.status === 'supported' ? row.modeled.chassisBasis : null,
+    telemetry_basis: row.modeled.status === 'supported' ? row.modeled.telemetryBasis : null,
+    topology_basis: row.modeled.status === 'supported' ? row.modeled.topologyBasis : null,
+    model_revision: row.modeled.modelRevision,
+    calculation_boundary: metadata.boundary,
+    extrapolation_note: metadata.extrapolation,
+    energy_caveat: metadata.energy_caveat,
+    pue: row.modeled.status === 'supported' ? row.modeled.pue : null,
+    estimated_energy: row.estimated_energy,
+    estimated_energy_status: row.estimated_energy.status,
+    estimated_energy_reason: row.estimated_energy.reason,
+    integration_seconds: row.estimated_energy.integration_seconds,
+    output_tokens: row.estimated_energy.output_tokens,
+    estimated_it_j: row.estimated_energy.it_j,
+    estimated_facility_j: row.estimated_energy.facility_j,
+    estimated_it_j_per_output_token: row.estimated_energy.it_j_per_output_token,
+    estimated_facility_j_per_output_token: row.estimated_energy.facility_j_per_output_token,
+    run_url: row.benchmark.run_url,
+    measurement_date: row.benchmark.date,
+    source: row.source,
+    raw_topology_and_metrics: row.benchmark,
+    app_revision: metadata.app_revision,
+    input_sha256: metadata.input_sha256,
+    profile_sha256: hashes['packages/app/src/lib/system-power-model.profiles.json'],
+    generated_at: metadata.generated_at,
+  }));
 }
 
 async function main() {
@@ -337,68 +426,7 @@ async function main() {
       execFileSync('git', ['status', '--porcelain'], { cwd: root, encoding: 'utf8' }).trim() !== '',
     implementation_sha256: hashes,
   };
-  const flat = result.rows.map((row) => ({
-    cohort: metadata.cohort,
-    id: row.id,
-    cell: row.cell,
-    hardware: row.benchmark.hardware,
-    model: row.benchmark.model,
-    concurrency: row.benchmark.conc,
-    precision: row.benchmark.precision,
-    framework: row.benchmark.framework,
-    disagg: row.benchmark.disagg,
-    is_multinode: row.benchmark.is_multinode,
-    prefill_tp: row.benchmark.prefill_tp,
-    decode_tp: row.benchmark.decode_tp,
-    num_prefill_gpu: row.benchmark.num_prefill_gpu,
-    num_decode_gpu: row.benchmark.num_decode_gpu,
-    prefill_workers: row.benchmark.prefill_num_workers,
-    decode_workers: row.benchmark.decode_num_workers,
-    measurement_status: row.measurement_status,
-    power_valid: row.benchmark.metrics.power_valid,
-    power_metric_schema_version: row.benchmark.metrics.power_metric_schema_version,
-    measured_gpu_w_per_gpu: row.measured_inputs?.avg_gpu_w,
-    measured_total_gpu_w: row.measured_inputs?.total_gpu_w,
-    measured_total_gpu_j: row.measured_inputs?.total_gpu_j,
-    measured_gpu_j_per_output_token: row.measured_inputs?.gpu_j_per_output_token,
-    modeled_status: row.modeled.status,
-    unsupported_reason: row.modeled.status === 'unsupported' ? row.modeled.reason : null,
-    modeled_it_w: row.modeled.status === 'supported' ? row.modeled.itWatts : null,
-    modeled_it_w_per_gpu: row.modeled.status === 'supported' ? row.modeled.itWattsPerGpu : null,
-    modeled_facility_w: row.modeled.status === 'supported' ? row.modeled.facilityWatts : null,
-    modeled_deployment_it_w:
-      row.modeled.status === 'supported' ? row.modeled.deploymentItWatts : null,
-    modeled_deployment_facility_w:
-      row.modeled.status === 'supported' ? row.modeled.deploymentFacilityWatts : null,
-    physical_gpu_count: row.modeled.status === 'supported' ? row.modeled.gpuCount : null,
-    modeled_gpu_count: row.modeled.status === 'supported' ? row.modeled.modeledGpuCount : null,
-    chassis_count: row.modeled.status === 'supported' ? row.modeled.chassisCount : null,
-    chassis_basis: row.modeled.status === 'supported' ? row.modeled.chassisBasis : null,
-    telemetry_basis: row.modeled.status === 'supported' ? row.modeled.telemetryBasis : null,
-    topology_basis: row.modeled.status === 'supported' ? row.modeled.topologyBasis : null,
-    model_revision: row.modeled.modelRevision,
-    calculation_boundary: metadata.boundary,
-    extrapolation_note: metadata.extrapolation,
-    energy_caveat: metadata.energy_caveat,
-    pue: row.modeled.status === 'supported' ? row.modeled.pue : null,
-    estimated_energy: row.estimated_energy,
-    estimated_energy_status: row.estimated_energy.status,
-    estimated_energy_reason: row.estimated_energy.reason,
-    integration_seconds: row.estimated_energy.integration_seconds,
-    output_tokens: row.estimated_energy.output_tokens,
-    estimated_it_j: row.estimated_energy.it_j,
-    estimated_facility_j: row.estimated_energy.facility_j,
-    estimated_it_j_per_output_token: row.estimated_energy.it_j_per_output_token,
-    estimated_facility_j_per_output_token: row.estimated_energy.facility_j_per_output_token,
-    run_url: row.benchmark.run_url,
-    measurement_date: row.benchmark.date,
-    source: row.source,
-    raw_topology_and_metrics: row.benchmark,
-    app_revision: metadata.app_revision,
-    input_sha256: metadata.input_sha256,
-    profile_sha256: hashes['packages/app/src/lib/system-power-model.profiles.json'],
-    generated_at: metadata.generated_at,
-  }));
+  const flat = flatRows(result, metadata, hashes);
   await mkdir(values.output);
   await writeFile(
     resolve(values.output, 'comparison.json'),

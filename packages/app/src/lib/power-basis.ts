@@ -39,9 +39,14 @@ export const ALL_IN_MEASURED_NOTE = {
   zh: 'GPU 功耗来自实测；未实测的组件功耗由模型估算，并计入数据中心 PUE。',
 };
 
+export const ALL_IN_MEASURED_AGENTIC_NOTE = {
+  en: 'AgentX estimates use the power model’s agentic workload state; they have not been calibrated against measured AgentX system power.',
+  zh: 'AgentX 估算采用功耗模型的智能体工作负载状态，尚未用 AgentX 系统实测功耗校准。',
+};
+
 export const ALL_IN_MEASURED_EMPTY = {
-  en: 'No values are available for All in Measured in this selection. This boundary needs validated GPU telemetry and hardware covered by the InferenceX power model (eight-GPU HGX/OAM systems, not NVL72). Choose another boundary to keep the points.',
-  zh: '当前选择没有可用的整体实测功耗数值。该边界需要已验证的 GPU 遥测，且硬件在 InferenceX 功耗模型覆盖范围内（八卡 HGX/OAM 系统，不含 NVL72）。可切换到其他功耗边界以保留数据点。',
+  en: 'No values are available for All in Measured in this selection. This boundary needs validated GPU telemetry and hardware covered by the InferenceX power model (eight-GPU HGX/OAM systems, or NVL72 with validated Grace-socket telemetry). Choose another boundary to keep the points.',
+  zh: '当前选择没有可用的整体实测功耗数值。该边界需要已验证的 GPU 遥测，且硬件在 InferenceX 功耗模型覆盖范围内（八卡 HGX/OAM 系统，或具备已验证 Grace socket 遥测的 NVL72）。可切换到其他功耗边界以保留数据点。',
 };
 
 /** InferenceData keys per derived basis and quantity. B1 lives on the measured* fields. */
