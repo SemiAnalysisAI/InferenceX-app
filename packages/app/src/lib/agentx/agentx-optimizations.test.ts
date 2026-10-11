@@ -51,6 +51,7 @@ describe('AgentX optimizations registry', () => {
 
   it('resolves a framework by slug and rejects unknown ones', () => {
     expect(getOptimizationFramework('vllm')?.name).toBe('vLLM');
+    expect(getOptimizationFramework('mori-umbp')?.name).toBe('MoRI UMBP');
     expect(getOptimizationFramework('not-a-framework')).toBeUndefined();
   });
 
@@ -107,6 +108,18 @@ describe('AgentX optimizations registry', () => {
       .filter((key): key is NonNullable<typeof key> => Boolean(key));
     expect(new Set(used).size).toBe(used.length);
     expect(new Set(used)).toEqual(new Set(Object.keys(OPTIMIZATION_FIGURES)));
+  });
+
+  it('balances every **bold** marker in section prose, in both locales', () => {
+    const zhSections = [
+      ...getOptimizationsOverview('zh').sections,
+      ...getLocalizedFrameworks('zh').flatMap((framework) => framework.sections),
+    ];
+    for (const section of [...allSections(), ...zhSections]) {
+      for (const paragraph of section.paragraphs) {
+        expect(paragraph.split('**').length % 2, section.id).toBe(1);
+      }
+    }
   });
 
   it('carries no unresolved editorial notes from the source document', () => {
