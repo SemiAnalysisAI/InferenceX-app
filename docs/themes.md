@@ -6,13 +6,10 @@
 
 The root `ThemeProvider` in `packages/app/src/app/layout.tsx` uses `next-themes`
 to persist a theme and apply its class to `<html>` before hydration. The
-header's `ModeToggle` is a single icon button: ordinary clicks switch directly
-between light and dark, using the resolved palette for the system setting.
-Shift-click explicitly opts into cycling through `APP_THEMES` in order and
-wraps from Halo back to light. An ordinary click leaves any optional theme for
-light. Switching between the default themes never loads an optional theme on
-the way. The icon shows the
-active theme, and each change emits `theme_toggled`. There is no dropdown.
+header's `ModeToggle` is a single icon button: each ordinary click advances
+through `APP_THEMES` (`light, dark, minecraft, csgo, gta, doom, halo`) and wraps
+from Halo back to light. No modifier key is required. The icon shows the active
+theme, and each change emits `theme_toggled`. There is no dropdown.
 The existing default remains dark; the system setting remains supported.
 
 The root `EasterEggThemeLazy` boundary imports only the selected optional theme.
@@ -20,6 +17,12 @@ Light/dark pages, first-time visits, system-theme visits and embeds do not rende
 that boundary's content. The shared activation hook checks both the embed
 pathname and the pre-paint attribute so a saved optional theme cannot start
 loading while a streamed embed is waiting for its boot markup.
+
+The performance boundary is the selected theme, not the rotation: landing on
+light/dark and switching from light to dark must not fetch optional resources.
+Cycling from dark to light intentionally selects the optional themes in between,
+so their resources may load while selected. Returning to a default theme unmounts
+the decorations and players; already downloaded resources may remain cached.
 
 Each optional lazy subtree (theme, header toggles and random splash) has a
 local error boundary as well as Suspense. Rejected chunks and React rendering
@@ -157,9 +160,8 @@ The game loads on demand and does not alter benchmark controls or data.
 The trigger keeps `data-testid="theme-toggle"` and its
 `Switch theme (currently <theme> mode)` label. It is a native button with
 Enter/Space activation and a 44px target on desktop and mobile. Keyboard focus
-stays on the button after each change. The system preference switches to the
-opposite resolved light/dark palette; saved optional themes remain supported.
-Shift-click is the optional-theme shortcut.
+stays on the button after each change. An unknown or system preference advances
+to light; saved optional themes remain supported in the ordinary rotation.
 
 ## Data/API coverage
 
@@ -187,14 +189,15 @@ and Firefox CI matrix. It covers:
 
 - English/Chinese desktop/mobile light/dark landings, no saved preference and
   system preference, including focusing the toggle, scrolling and switching
-  between light and dark without optional downloads.
+  from light to dark without optional downloads.
 - Network requests from navigation onward (including requests still in flight),
   loaded JS/CSS fingerprints for the optional engines and Minecraft game,
   font registration, and absence of optional theme/game DOM.
 - English/Chinese embeds with each optional theme saved, before and after
   hydration. Saved Minecraft and Halo music/sound opt-ins must not activate outside their themes.
 - Raw-HTML metadata and headings for normal and Googlebot requests, preload
-  hints, and unchanged SEO metadata when selecting and leaving optional themes.
+  hints, and unchanged SEO metadata when selecting and leaving optional themes
+  through ordinary clicks.
 - Failed optional chunk loads on English/Chinese pages, preserving indexable
   content and the ability to return to light/dark using the shared header.
 
