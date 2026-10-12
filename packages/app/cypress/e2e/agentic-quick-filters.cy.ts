@@ -133,12 +133,7 @@ describe('Agentic Quick Filters', () => {
     cy.get('.dot-group[data-hw-key^="b200"]').should('exist');
     cy.get('.dot-group[data-hw-key^="mi300x"]').should('exist');
     cy.get('[data-testid="quick-filters-selected-count"]').should('not.exist');
-  });
 
-  it('clears Quick Filters from the legend reset action', () => {
-    visitAgenticQuickFilters();
-
-    cy.get('[data-testid="scatter-quick-filters"]').click();
     cy.get('[data-testid="quick-filter-vendor-AMD"]').click();
     cy.get('[data-testid="quick-filters-dialog"]').contains('button', 'Done').click();
 

@@ -297,9 +297,7 @@ describe('Chinese (/zh) pages', () => {
 
     it('renders KaTeX in the translation too', () => {
       cy.get('article.prose .katex').should('have.length.gte', 1);
-    });
 
-    it('keeps figures and their Chinese captions', () => {
       cy.get('article.prose figure img').should('have.length.gte', 20);
       cy.get('article.prose figcaption').first().should('contain.text', '来源');
     });

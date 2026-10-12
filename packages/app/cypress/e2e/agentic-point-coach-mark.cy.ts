@@ -105,6 +105,15 @@ describe('Agentic point coach mark', () => {
         expect(hit, 'pointer ends on an agentic point').to.eq(true);
       });
     });
+
+    cy.window().then((win) => {
+      const rect = win.document.querySelector(COACH_MARK)!.getBoundingClientRect();
+      const { clientWidth, clientHeight } = win.document.documentElement;
+      expect(rect.left, 'left edge').to.be.at.least(0);
+      expect(rect.top, 'top edge').to.be.at.least(0);
+      expect(rect.right, 'right edge').to.be.at.most(clientWidth);
+      expect(rect.bottom, 'bottom edge').to.be.at.most(clientHeight);
+    });
   });
 
   it('waits for the chart to be on screen before pointing at anything', () => {
@@ -150,20 +159,6 @@ describe('Agentic point coach mark', () => {
         expect(cx).to.be.within(bounds!.left, bounds!.right);
         expect(cy).to.be.within(bounds!.top, bounds!.bottom);
       });
-    });
-  });
-
-  it('keeps the card fully on screen', () => {
-    visitAgenticChart();
-    cy.get(COACH_MARK).should('be.visible');
-
-    cy.window().then((win) => {
-      const rect = win.document.querySelector(COACH_MARK)!.getBoundingClientRect();
-      const { clientWidth, clientHeight } = win.document.documentElement;
-      expect(rect.left, 'left edge').to.be.at.least(0);
-      expect(rect.top, 'top edge').to.be.at.least(0);
-      expect(rect.right, 'right edge').to.be.at.most(clientWidth);
-      expect(rect.bottom, 'bottom edge').to.be.at.most(clientHeight);
     });
   });
 

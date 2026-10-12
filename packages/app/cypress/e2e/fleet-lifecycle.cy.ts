@@ -374,9 +374,7 @@ describe('Fleet — Fleet Lifecycle', () => {
       'contain.text',
       'SemiAnalysis Datacenter Industry Model',
     );
-  });
 
-  it('offers a download, and disables the PNG where a PNG is meaningless', () => {
     exportMenu().should('be.visible').click();
     cy.get('[data-testid="export-csv-button"]').should('be.visible');
     // On the chart a PNG is a real artefact.

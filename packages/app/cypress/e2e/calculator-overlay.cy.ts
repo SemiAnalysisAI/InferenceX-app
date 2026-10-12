@@ -110,23 +110,18 @@ describe('TCO calculator — unofficial run overlay', () => {
   describe('hardware visibility', () => {
     beforeEach(visitCalculatorWithOverlay);
 
-    it('hides a GPU official and overlay bar together when another GPU is soloed', () => {
+    it('brings hidden overlay bars back when the available hardware changes', () => {
       // Clicking one entry while all are visible solos it.
       cy.get('.sidebar-legend label').contains(OVERLAY_ONLY_HARDWARE.toUpperCase()).click();
       // Only the MI355X overlay bar survives — both B300 bars (official AND
       // overlay) are gone, proving one legend entry governs both series.
       cy.get(BARS).should('have.length', 1);
       cy.get(Y_TICKS).should('not.contain.text', 'B300');
-    });
 
-    it('brings hidden overlay bars back when the available hardware changes', () => {
       // Regression: overlay visibility used to live in a second, provider-shared
       // set that the legend reset did not reseed. Hiding a GPU, then changing
       // the selection, left the legend showing it as active while its overlay
       // bar stayed hidden by the earlier filter.
-      cy.get('.sidebar-legend label').contains(OVERLAY_ONLY_HARDWARE.toUpperCase()).click();
-      cy.get(BARS).should('have.length', 1);
-
       // 8k/1k covers different hardware, so switching there and back reseeds
       // the legend's available set.
       selectSequence(ALT_SEQUENCE_LABEL);

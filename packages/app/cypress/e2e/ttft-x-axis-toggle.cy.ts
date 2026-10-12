@@ -378,15 +378,13 @@ describe('Default scenario', () => {
     });
   }
 
-  it('restores the labeled scenario field on the Chinese dashboard', () => {
+  it('keeps 8K / 1K when the link asks for it explicitly', () => {
     interceptAgenticData();
     cy.visit('/zh/inference');
     cy.get('label[for="scenario-select"]').should('be.visible').and('have.text', '场景');
     cy.get('fieldset [data-testid="scenario-selector"]').should('be.visible');
     cy.get('h2 [data-testid="scenario-selector"]').should('not.exist');
-  });
 
-  it('keeps 8K / 1K when the link asks for it explicitly', () => {
     // An explicit selection always beats the availability-driven default.
     interceptFixedSequenceData();
     cy.visit('/inference?i_seq=8k%2F1k', {

@@ -1,15 +1,18 @@
 # E2E usefulness audit, October 2026
 
-This audit ranks the 916 source-level `it()` declarations at revision
-`3f52f8becd7906abdd4eb8e90f7b1594077cd0ca`. It retires 229 standalone
-declarations, exactly 25%, leaving 687. This is a declaration count, not a
-claim that a quarter of browser work or all assertions were removed.
-Parameterized tests can register multiple runtime cases.
+This audit ranks all 996 registered runtime tests from the
+[full baseline run](https://github.com/SemiAnalysisAI/InferenceX-app/actions/runs/38309315659).
+Chrome and Firefox each registered the same 996 cases. It retires 249,
+exactly 25%, leaving 747. Those cases came from 916 source-level `it()`
+declarations at revision `3f52f8becd7906abdd4eb8e90f7b1594077cd0ca`; the
+remaining suite has 667 declarations because parameterized tests register
+multiple runtime cases. A case reduction is not a claim that the same
+fraction of browser execution time or assertions disappeared.
 
 ## Ranking and selection
 
 The adjacent JSON contains every original test's rank, file, original line,
-suite, title, initial review score, final marginal-usefulness score, action,
+suite, runtime title, source title, initial review score, final marginal-usefulness score, action,
 and rationale. Consolidations name the surviving assertion owner using its
 original identity. Rank 1 is least useful as a standalone E2E case.
 
@@ -23,7 +26,7 @@ original identity. Rank 1 is least useful as a standalone E2E case.
   No initially score-4 or score-5 declaration was retired.
 
 The change deletes 118 low-signal checks and consolidates the useful assertions
-from 111 others. This deliberately distinguishes deletion from consolidation.
+from 131 others. This deliberately distinguishes deletion from consolidation.
 Examples of deletion include a second SVG-presence assertion, title-only
 snapshots, and hydration tests that never checked their claimed parameter
 semantics. Examples of consolidation include expand/collapse pairs, metric

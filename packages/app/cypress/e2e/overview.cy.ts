@@ -259,6 +259,19 @@ describe('Overview page', () => {
   it('preserves pending selections when controls are changed rapidly', () => {
     cy.viewport(1280, 900);
     cy.visit('/overview');
+    cy.intercept('GET', '**/api/v1/overview*', (request) => {
+      request.continue((response) => {
+        response.setDelay(800);
+      });
+    }).as('overviewJson');
+
+    selectOverviewTier(75);
+    cy.get('[data-testid="overview-page"] [aria-busy="true"]').should('exist');
+    cy.wait('@overviewJson');
+    cy.get('[data-testid="overview-page"] [aria-busy="true"]').should('not.exist');
+
+    cy.viewport(1280, 900);
+    cy.visit('/overview');
     // Hold the first response open so the second click lands inside the pending
     // window; without the delay the clicks may serialize and never race.
     cy.intercept('GET', '**/api/v1/overview*', (request) => {
@@ -282,21 +295,6 @@ describe('Overview page', () => {
     }).should('have.attr', 'data-tier', '75');
     cy.get('[data-overview-engine-scope="all"]').should('have.attr', 'aria-current', 'true');
     cy.location('search').should('eq', '?tier=75&engine=all');
-  });
-
-  it('shows a busy state while an uncached selection loads', () => {
-    cy.viewport(1280, 900);
-    cy.visit('/overview');
-    cy.intercept('GET', '**/api/v1/overview*', (request) => {
-      request.continue((response) => {
-        response.setDelay(800);
-      });
-    }).as('overviewJson');
-
-    selectOverviewTier(75);
-    cy.get('[data-testid="overview-page"] [aria-busy="true"]').should('exist');
-    cy.wait('@overviewJson');
-    cy.get('[data-testid="overview-page"] [aria-busy="true"]').should('not.exist');
   });
 
   it('keeps the last matrix and history entry when a popstate request fails', () => {
@@ -1565,9 +1563,7 @@ describe('Overview page', () => {
         });
       });
     }
-  });
 
-  it('uses the same five-row comparison layout on phones and tablets', () => {
     for (const width of [320, 390, 768, 1024, 1279]) {
       cy.viewport(width, 900);
       cy.visit('/overview');
@@ -1614,9 +1610,7 @@ describe('Overview page', () => {
         });
       });
     }
-  });
 
-  it('keeps the cost value aligned above configuration metadata', () => {
     cy.viewport(390, 844);
     cy.visit('/overview');
 

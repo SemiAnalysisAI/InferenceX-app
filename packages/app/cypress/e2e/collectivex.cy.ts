@@ -161,7 +161,7 @@ describe('CollectiveX neutral run view', () => {
     cy.then(() => expect(requests).to.be.gte(2));
   });
 
-  it('only exposes dimensions that vary in the current matrix', () => {
+  it('selects the EP16 series through the identity controls', () => {
     cy.get('[data-testid="collectivex-ep-select"]').should('be.visible');
     cy.get('[data-testid="collectivex-phase-toggle"]').should('be.visible');
     cy.get('[data-testid="collectivex-precision-toggle"]').should('be.visible');
@@ -170,9 +170,7 @@ describe('CollectiveX neutral run view', () => {
     cy.get('[data-testid="collectivex-mode-select"]').should('not.exist');
     cy.get('[data-testid="collectivex-fabric-scope-toggle"]').should('not.exist');
     cy.get('[data-testid="collectivex-routing-select"]').should('not.exist');
-  });
 
-  it('selects the EP16 series through the identity controls', () => {
     cy.get('[data-testid="collectivex-main-chart"]')
       .should('contain.text', 'Round trip (measured) · decode · p99')
       .and('contain.text', 'deepep-v2');
@@ -185,9 +183,7 @@ describe('CollectiveX neutral run view', () => {
       .should('contain.text', 'mori')
       .and('contain.text', 'EP16');
     cy.get('[data-testid="collectivex-explorer-chart"] .line-path').should('have.length', 1);
-  });
 
-  it('renders an nccl-ep backend series end to end', () => {
     const ncclEp = buildDataset({
       shards: [makeRawShard({ backend: 'nccl-ep', implName: 'nccl-ep' })],
     });
@@ -529,7 +525,7 @@ describe('CollectiveX neutral run view', () => {
     cy.get('[data-testid="collectivex-support-matrices"]').should('be.visible');
   });
 
-  it('localizes the suite filter on the Chinese route', () => {
+  it('localizes the complete chart and run-table click path on the Chinese route', () => {
     cy.visit('/zh/collectivex');
     cy.wait('@runs');
     cy.wait('@run');
@@ -553,9 +549,7 @@ describe('CollectiveX neutral run view', () => {
       .invoke('attr', 'aria-label')
       .should('match', /（注 \d+）/u)
       .and('not.include', '(note ');
-  });
 
-  it('localizes the complete chart and run-table click path on the Chinese route', () => {
     cy.viewport(1440, 900);
     cy.visit('/zh/collectivex');
     cy.wait('@runs');
@@ -581,9 +575,7 @@ describe('CollectiveX neutral run view', () => {
       .and('contain.text', '常规')
       .and('contain.text', '解码')
       .and('contain.text', '延迟 p50 / p90 / p95 / p99');
-  });
 
-  it('keeps a selected cancelled run localized instead of showing it as pending', () => {
     const cancelled = buildDataset({
       shards: [makeRawShard()],
       meta: { run_id: '179', generated_at: '2026-08-29T12:20:00Z', conclusion: 'cancelled' },
@@ -744,7 +736,7 @@ describe('CollectiveX availability states', () => {
     cy.get('[data-testid="collectivex-error-version-select"]').should('contain.text', 'V1');
   });
 
-  it('reports an unavailable backend', () => {
+  it('shows a safe localized error on the Chinese route', () => {
     cy.intercept('GET', '/api/v1/collectivex/runs?*', {
       statusCode: 503,
       body: { error: 'unavailable' },
@@ -755,9 +747,7 @@ describe('CollectiveX availability states', () => {
       .should('be.visible')
       .and('contain.text', 'The CollectiveX dataset failed to load.')
       .and('not.contain.text', 'API error: 503');
-  });
 
-  it('shows a safe localized error on the Chinese route', () => {
     let failRequests = true;
     cy.intercept('GET', '/api/v1/collectivex/runs?*', (request) => {
       request.reply(
@@ -790,7 +780,7 @@ describe('CollectiveX availability states', () => {
     cy.get('[data-testid="collectivex-display"]').should('be.visible');
   });
 
-  it('renders the loading state while the run resolves', () => {
+  it('does not query database availability for the isolated page', () => {
     installRuns();
     cy.intercept('GET', `/api/v1/collectivex/runs/${runId}*`, {
       body: dataset,
@@ -801,9 +791,7 @@ describe('CollectiveX availability states', () => {
     cy.get('[data-testid="collectivex-selected-runs-loading"]').should('be.visible');
     cy.wait('@slowRun');
     cy.get('[data-testid="collectivex-display"]').should('be.visible');
-  });
 
-  it('does not query database availability for the isolated page', () => {
     let availabilityRequests = 0;
     cy.intercept('GET', '/api/v1/availability', (request) => {
       availabilityRequests += 1;
