@@ -24,7 +24,7 @@ const point = (overrides: Partial<InferenceData> = {}): InferenceData =>
     hw: 'gb200',
     precision: 'fp4',
     measuredAvgPower: { y: 450, roof: false },
-    modeledSystemPower: { status: 'unsupported', reason: 'cpu-telemetry', modelRevision: 'test' },
+    modeledSystemPower: { status: 'unsupported', reason: 'model-domain', modelRevision: 'test' },
     ...overrides,
   }) as InferenceData;
 
@@ -42,13 +42,13 @@ describe('All in Measured table values', () => {
     expect(rows).toHaveLength(1);
     expect(rows[0].y).toBeNaN();
     expect(inferenceTableYValue(rows[0], 'utilityModeledWatts.y')).toBeNull();
-    expect(allInMeasuredUnavailableReason(rows[0], 'utilityModeledWatts')).toBe('cpu-telemetry');
+    expect(allInMeasuredUnavailableReason(rows[0], 'utilityModeledWatts')).toBe('model-domain');
     expect(
       allInMeasuredUnavailableReason(
         { ...rows[0], y: 1400, powerVariant: { kind: 'basis', id: 'gpu-provisioned' } },
         'utilityModeledWatts',
       ),
-    ).toBe('cpu-telemetry');
+    ).toBe('model-domain');
   });
 
   it('sorts unavailable estimates last and renders their measured watts and reason', () => {
@@ -67,7 +67,7 @@ describe('All in Measured table values', () => {
         selectedYAxisMetric: 'y_utilityModeledWatts',
       }),
     );
-    expect(html).toContain('Grace-socket telemetry missing or invalid');
+    expect(html).toContain('Outside model range');
     expect(html).toContain('450');
     expect(html).toContain('—');
     expect(html).not.toContain('NaN');
@@ -87,9 +87,7 @@ describe('All in Measured table values', () => {
     });
     expect(csv.rows[0][csv.headers.indexOf('All in Measured')]).toBe('');
     expect(csv.rows[0][csv.headers.indexOf('Measured GPU Power (W/chip)')]).toBe(450);
-    expect(csv.rows[0][csv.headers.indexOf('All-in Estimate Status')]).toBe(
-      'Grace-socket telemetry missing or invalid',
-    );
+    expect(csv.rows[0][csv.headers.indexOf('All-in Estimate Status')]).toBe('Outside model range');
     expect(csv.rows[0][csv.headers.indexOf('Interactivity')]).toBe('');
     const cloneCsv = inferenceChartToCsv(
       [{ ...rows[0], powerVariant: { kind: 'basis', id: 'utility-modeled' } }],

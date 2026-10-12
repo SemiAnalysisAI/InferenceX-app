@@ -237,21 +237,37 @@ describe('offline modeled PowerX comparisons', () => {
         total_grace_w: 392.264,
         total_grace_j: 41_346.013,
       },
-      modeled: { status: 'supported', unit: 'nvl72-tray', chassisCount: 2, pue: 1.1 },
+      modeled: {
+        status: 'supported',
+        unit: 'nvl72-tray',
+        cpuBasis: 'measured',
+        chassisCount: 2,
+        pue: 1.1,
+      },
     });
     const provenance = { app_revision: 'test', input_sha256: 'test', generated_at: 'test' };
     const [x86Flat, gb300Flat] = flatRows(result, { ...result.metadata, ...provenance }, {});
     expect(gb300Flat.measured_total_grace_j).toBe(41_346.013);
+    expect(gb300Flat.cpu_basis).toBe('measured');
+    expect(x86Flat.cpu_basis).toBeNull();
     expect(x86Flat.measured_total_grace_j).toBeUndefined();
     // The x86 row and its cell are byte-identical to an export without the NVL72 row.
     expect(result.rows[0]).toEqual(baseline.rows[0]);
     expect(result.cells[0]).toEqual(baseline.cells[0]);
     expect(result.rows[0].measured_inputs).not.toHaveProperty('total_grace_w');
-    // Without cpu_power_valid the row reports no Grace-side inputs.
+    // Without cpu_power_valid the row reports no Grace-side inputs, and the rack
+    // model's Grace profile stands in for the sockets.
     delete gb300.benchmark.metrics.cpu_power_valid;
-    const unavailable = buildComparison(source).rows[1];
-    expect(unavailable.modeled).toMatchObject({ status: 'unsupported', reason: 'cpu-telemetry' });
-    expect(unavailable.measured_inputs).toMatchObject({
+    const modeledCpu = buildComparison(source).rows[1];
+    expect(modeledCpu.modeled).toMatchObject({
+      status: 'supported',
+      cpuBasis: 'modeled',
+      measuredGraceSocketWatts: null,
+    });
+    expect(
+      flatRows(buildComparison(source), { ...result.metadata, ...provenance }, {})[1].cpu_basis,
+    ).toBe('modeled');
+    expect(modeledCpu.measured_inputs).toMatchObject({
       cpu_power_valid: null,
       total_grace_w: null,
     });

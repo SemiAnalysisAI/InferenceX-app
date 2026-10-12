@@ -1176,7 +1176,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/calculator/profit-power.ts',
-    sourceSha256: 'fd5989e6d02b4515e19bf05c91ba00991e2faec6e9cc751971614eb018a0e4bf',
+    sourceSha256: 'e2b76e9625af7f2aba4968c41525f9939727477dce81215a57974a100998cd23',
     reviewArea: {
       en: 'Power-valid curve selection at fixed targets, compatible power bases, paired throughput and provisioned fallback shared by Profit UI and API.',
       zh: '利润界面与 API 共用的有效功耗曲线选择、固定目标值、功耗口径兼容性、配对吞吐量与预配估算回退。',
@@ -1184,7 +1184,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/inference/utils/inference-table-data.ts',
-    sourceSha256: '06f9097824b1945e0e203ac07e320972ba86d2f9b352c98eaa398ad67b04bedb',
+    sourceSha256: '69b7c57385575177fc942b6be1f30856ad1298bb3d0c72edcdcf873f09529975',
     reviewArea: {
       en: 'All in Measured table eligibility, nullable values and unavailable reasons shared by UI, CSV and public views.',
       zh: '界面、CSV 和公开视图共用的整体实测表格行筛选、可空数值与不可用原因。',

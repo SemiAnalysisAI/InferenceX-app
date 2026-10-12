@@ -268,7 +268,31 @@ describe('profit power basis preview', () => {
       'costh',
       'modeled',
     )!;
-    expect(modeledPowerAtTarget(excluded, 45)).toEqual({ reason: 'no-cpu-power' });
+    // Without Grace telemetry the tray is priced on the rack model's Grace profile.
+    expect(modeledPowerAtTarget(excluded, 45)).toMatchObject({
+      kwPerGpu: expect.closeTo(
+        (upstreamRackWattsPerGpu('gb300', 594.191, null, true) / 1000) * 1.1,
+        9,
+      ),
+      source: { topology: 'nvl72-tray', cpu: 'modeled' },
+    });
+    // A measured-Grace knot and a modeled-Grace knot are different power bases:
+    // they are never blended, and the profit curve does not bridge them.
+    const knots = [
+      { ...trayPoint, interactivity: 40 },
+      { ...missingCpu, interactivity: 50 },
+    ];
+    expect(modeledPowerAtTarget({ ...result, nearestPoints: knots }, 45)).toEqual({
+      reason: 'incompatible-power-basis',
+    });
+    const unbridged = interpolateProfitForGPU(
+      knots,
+      45,
+      'interactivity_to_throughput',
+      'costh',
+      'modeled',
+    )!;
+    expect(modeledPowerAtTarget(unbridged, 45)).not.toHaveProperty('kwPerGpu');
   });
 
   it.each([8])(
@@ -308,7 +332,7 @@ describe('profit power basis preview', () => {
     },
   );
 
-  it('prices NVL72 trays on the measured-Grace rack model and refuses rows without Grace power', () => {
+  it('prices NVL72 trays on the measured-Grace rack model and refuses rows that are not whole trays', () => {
     for (const [sourceRow, scaleOut] of [
       [traySource, true],
       [gb300AggregateRow(), false],
@@ -321,16 +345,22 @@ describe('profit power basis preview', () => {
           9,
         ),
         extrapolated: false,
-        source: { topology: 'nvl72-tray', pue: 1.1, modelRevision: SYSTEM_POWER_MODEL_REVISION },
+        source: {
+          topology: 'nvl72-tray',
+          cpu: 'measured',
+          pue: 1.1,
+          modelRevision: SYSTEM_POWER_MODEL_REVISION,
+        },
       });
     }
+    // Eight GPUs on one node are not whole four-GPU compute trays.
     for (const hardware of ['gb200', 'gb300']) {
       expect(
         modeledPowerAtTarget(
           { ...result, nearestPoints: [{ ...point, sourceRow: { ...source, hardware } }] },
           45,
         ),
-      ).toEqual({ reason: 'no-cpu-power' });
+      ).toEqual({ reason: 'unsupported-power-topology' });
     }
     const partial = {
       ...source,
@@ -432,6 +462,7 @@ describe('profit power basis preview', () => {
     expect(baseline.powerSource).toBeUndefined();
     expect(modeled.powerSource).toEqual({
       topology: 'chassis',
+      cpu: 'modeled',
       pue: 1.3,
       modelRevision: SYSTEM_POWER_MODEL_REVISION,
     });

@@ -127,10 +127,11 @@ describe('buildInferenceSeries', () => {
       joules_per_output_token: 2,
     });
     const supported = makeRow({ metrics: measured });
-    const noCpu = makeRow({ hardware: 'gb200', metrics: measured });
+    // Eight GPUs on one node are not whole four-GPU NVL72 compute trays.
+    const untiled = makeRow({ hardware: 'gb200', metrics: measured });
     const invalid = makeRow({ hardware: 'b200', metrics: { ...measured, power_valid: 0 } });
     const otherPrecision = makeRow({ hardware: 'gb300', precision: 'fp4', metrics: measured });
-    const result = buildInferenceSeries([supported, noCpu, invalid, otherPrecision], {
+    const result = buildInferenceSeries([supported, untiled, invalid, otherPrecision], {
       ...BASE_OPTIONS,
       metricConfigKey: 'y_utilityModeledWatts',
       optimal: true,
@@ -147,12 +148,12 @@ describe('buildInferenceSeries', () => {
       status: 'available',
       unavailableReason: null,
     });
-    expect(result.tableRows?.find((point) => point.id === noCpu.id)).toMatchObject({
+    expect(result.tableRows?.find((point) => point.id === untiled.id)).toMatchObject({
       hwKey: 'gb200_trt',
       y: null,
       measuredGpuWatts: 500,
       status: 'unavailable',
-      unavailableReason: 'cpu-telemetry',
+      unavailableReason: 'topology',
       frontier: false,
     });
   });

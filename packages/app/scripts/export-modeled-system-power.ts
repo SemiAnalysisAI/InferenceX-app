@@ -1,13 +1,13 @@
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
 
 import type { BenchmarkRow } from '../src/lib/api/api';
 import { isNvl72Hardware, modelSystemPower } from '../src/lib/power/modeled-system-power';
-import profileData from '../src/lib/power/system-power-model.profiles.json';
+import modelManifest from '../src/lib/power/power-model.manifest.json';
 
 interface PowerAudit {
   power_valid: boolean;
@@ -214,7 +214,7 @@ export function buildComparison(input: ComparisonInput) {
       replicate_ids: replicates.map((row) => row.id),
       replicate_count: replicates.length,
       supported_replicates: replicates.filter((row) => row.modeled.status === 'supported').length,
-      model_revision: profileData.modelRevision,
+      model_revision: modelManifest.modelRevision,
       status: complete ? 'supported' : 'unsupported',
       unsupported_reasons: [
         ...new Set(
@@ -280,12 +280,16 @@ export function buildComparison(input: ComparisonInput) {
       aggregation:
         'Each replicate is modeled first. Cell means include every replicate; any unavailable value leaves its cell mean unavailable.',
       boundary:
-        'Measured GPU-board inputs; modeled IT power is GPU-chassis AC (CPU, DRAM, other host components, fans, and PSU loss) plus each chassis share of scale-out networking. GB200/GB300 NVL72 rows add measured Grace-socket inputs: the measured trays fold into an 18-tray rack at their mean GPU and socket power (tray NICs, optics, drives, fans and 48 V conversion; NVSwitch trays, power shelves and the rack share of scale-out networking), and each tray takes 1/18 of it. Separate CPU-only frontend/router hosts are excluded. Facility power applies the system cooling PUE after IT power.',
+        'Measured GPU-board inputs; modeled IT power is GPU-chassis AC (CPU, DRAM, other host components, fans, and PSU loss) plus each chassis share of scale-out networking. GB200/GB300 NVL72 rows add measured Grace-socket inputs when their socket telemetry is complete and validated (cpu_basis measured; otherwise the upstream Grace profile, cpu_basis modeled): the measured trays fold into an 18-tray rack at their mean GPU and socket power (tray NICs, optics, drives, fans and 48 V conversion; NVSwitch trays, power shelves and the rack share of scale-out networking), and each tray takes 1/18 of it. Separate CPU-only frontend/router hosts are excluded. Facility power applies the system cooling PUE after IT power.',
       extrapolation:
         'A partially allocated chassis is modeled at measured per-GPU power × 8 (the upstream model input for a full chassis), assuming the unmeasured GPUs run the same workload. Deployment values are the measured GPUs’ share of that chassis; per-GPU values divide by the modeled chassis GPU count.',
       energy_caveat:
         'Energy from modeled average power is an estimate. Nonlinear fan/PSU behavior is not integrated over time. Energy requires an exact matching audit window and successful token counts.',
-      model: profileData,
+      model: {
+        revision: modelManifest.modelRevision,
+        source_tree: modelManifest.sourceTree,
+        source_url: modelManifest.sourceUrl,
+      },
       row_count: rows.length,
       supported_rows: rows.filter((row) => row.modeled.status === 'supported').length,
       estimated_energy_rows: rows.filter((row) => row.estimated_energy.status === 'estimated')
@@ -311,6 +315,9 @@ export function csv(records: Record<string, unknown>[]): string {
 type Comparison = ReturnType<typeof buildComparison>;
 
 /** One CSV record per row: the comparison row flattened with the export's provenance. */
+/** The TypeScript port; hashed as one digest over its sorted files. */
+const POWER_MODEL_DIR = 'packages/app/src/lib/power/power_model/';
+
 export function flatRows(
   result: Comparison,
   metadata: Comparison['metadata'] & {
@@ -349,6 +356,10 @@ export function flatRows(
     measured_total_grace_j: row.measured_inputs?.total_grace_j,
     modeled_status: row.modeled.status,
     modeled_unit: row.modeled.status === 'supported' ? row.modeled.unit : null,
+    cpu_basis:
+      row.modeled.status === 'supported' && row.modeled.unit === 'nvl72-tray'
+        ? row.modeled.cpuBasis
+        : null,
     unsupported_reason: row.modeled.status === 'unsupported' ? row.modeled.reason : null,
     modeled_it_w: row.modeled.status === 'supported' ? row.modeled.itWatts : null,
     modeled_it_w_per_gpu: row.modeled.status === 'supported' ? row.modeled.itWattsPerGpu : null,
@@ -383,7 +394,8 @@ export function flatRows(
     raw_topology_and_metrics: row.benchmark,
     app_revision: metadata.app_revision,
     input_sha256: metadata.input_sha256,
-    profile_sha256: hashes['packages/app/src/lib/power/system-power-model.profiles.json'],
+    model_source_tree: modelManifest.sourceTree,
+    power_model_sha256: hashes[POWER_MODEL_DIR],
     generated_at: metadata.generated_at,
   }));
 }
@@ -406,13 +418,20 @@ async function main() {
     'packages/app/scripts/export-modeled-system-power.ts',
     'packages/app/src/lib/power/modeled-system-power.ts',
     'packages/app/src/lib/power/system-power-model.ts',
-    'packages/app/src/lib/power/system-power-model.profiles.json',
+    'packages/app/src/lib/power/power-model.manifest.json',
   ];
   const hashes: Record<string, string> = {};
   for (const path of codePaths)
     hashes[path] = createHash('sha256')
       .update(await readFile(resolve(root, path)))
       .digest('hex');
+  const portListing = await readdir(resolve(root, POWER_MODEL_DIR), { recursive: true });
+  const portFiles = portListing.filter((file) => file.endsWith('.ts')).toSorted();
+  const port = createHash('sha256');
+  for (const file of portFiles) {
+    port.update(`${file}\0`).update(await readFile(resolve(root, POWER_MODEL_DIR, file)));
+  }
+  hashes[POWER_MODEL_DIR] = port.digest('hex');
   const metadata = {
     ...result.metadata,
     generated_at: new Date().toISOString(),

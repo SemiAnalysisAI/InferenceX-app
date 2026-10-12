@@ -282,6 +282,8 @@ const SYSTEM_POWER_STRINGS = {
       'nvl72-tray': {
         assumptions:
           'Measured: GPU boards and whole Grace sockets (CPU, SysIO, LPDDR5X). Modeled: tray NICs, optics, drives, fans, and 48 V conversion; NVSwitch trays and power shelves.',
+        modeledCpuAssumptions:
+          'Measured: GPU boards. Modeled: Grace CPUs and LPDDR5X for the operating state (no validated Grace-socket telemetry for this run), tray NICs, optics, drives, fans, and 48 V conversion; NVSwitch trays and power shelves.',
         network:
           'IT power adds the rack share of scale-out switches, at idle power when scale-out is off.',
         topology: (units: number, measured: number, modeled: number) => {
@@ -295,7 +297,7 @@ const SYSTEM_POWER_STRINGS = {
         uniformHosts:
           'No per-host telemetry for this multinode deployment; every tray is modeled at the deployment-mean GPU power.',
         normalization:
-          'The measured trays fold into an 18-tray rack at their mean GPU and Grace power; each tray takes 1/18 of the rack, divided by its four GPUs.',
+          'The measured trays fold into an 18-tray rack at their mean GPU power (and measured Grace power, when available); each tray takes 1/18 of the rack, divided by its four GPUs.',
         boundary:
           'Includes the trays’ Grace CPUs; excludes separate CPU-only frontend/router hosts.',
       },
@@ -310,8 +312,6 @@ const SYSTEM_POWER_STRINGS = {
       topology: 'The available topology does not establish chassis placement.',
       'role-power': 'Valid measured power and topology are required for every GPU worker role.',
       'model-domain': 'The measured input is outside the source model’s supported range.',
-      'cpu-telemetry':
-        'NVL72 compute trays need validated Grace-socket power for every socket; CPU-rail-only and module-sensor readings are not model inputs.',
     } satisfies Record<SystemPowerUnsupportedReason, string>,
   },
   zh: {
@@ -346,6 +346,8 @@ const SYSTEM_POWER_STRINGS = {
       'nvl72-tray': {
         assumptions:
           '实测：GPU 板卡和整个 Grace socket（CPU、SysIO、LPDDR5X）。建模：tray 内的网卡、光模块、硬盘、风扇和 48 V 转换损耗，以及 NVSwitch tray 和电源架。',
+        modeledCpuAssumptions:
+          '实测：GPU 板卡。建模：按运行状态估算的 Grace CPU 和 LPDDR5X（该运行没有通过验证的 Grace socket 遥测），tray 内的网卡、光模块、硬盘、风扇和 48 V 转换损耗，以及 NVSwitch tray 和电源架。',
         network: 'IT 功耗包含机架分摊的 scale-out 交换机功耗；scale-out 关闭时按空闲功耗计。',
         topology: (units: number, measured: number, modeled: number) =>
           measured === modeled
@@ -355,7 +357,7 @@ const SYSTEM_POWER_STRINGS = {
           '假设 tray 内未实测的 GPU 运行相同负载、功耗与实测每卡功耗相同；部署数值为实测 GPU 所占份额。',
         uniformHosts: '该多节点部署没有逐主机功耗数据；每个 tray 按部署平均每卡功耗建模。',
         normalization:
-          '实测 tray 按 GPU 和 Grace 平均功耗合并为一个 18 tray 的机架；每个 tray 分摊机架的 1/18，再除以 tray 内 4 张 GPU。',
+          '实测 tray 按 GPU 平均功耗（以及可用时的 Grace 实测功耗）合并为一个 18 tray 的机架；每个 tray 分摊机架的 1/18，再除以 tray 内 4 张 GPU。',
         boundary: '计入 tray 内的 Grace CPU；不计入独立的纯 CPU 前端或路由主机。',
       },
     } satisfies Record<SystemPowerUnit, unknown>,
@@ -369,8 +371,6 @@ const SYSTEM_POWER_STRINGS = {
       topology: '现有拓扑信息无法确认 GPU 所在的机箱。',
       'role-power': '每个 GPU worker 角色都需要有效的实测功耗和拓扑信息。',
       'model-domain': '实测输入超出功耗模型的支持范围。',
-      'cpu-telemetry':
-        'NVL72 计算 tray 需要每个 socket 都通过验证的 Grace socket 功耗；仅有 CPU rail 或模块传感器读数不能作为模型输入。',
     } satisfies Record<SystemPowerUnsupportedReason, string>,
   },
 } as const;
@@ -398,7 +398,7 @@ const modeledSystemPowerHTML = (
   return `<div data-testid="tooltip-modeled-system-power" style="margin-top: 8px; border-top: 1px solid var(--border); padding-top: 6px; font-size: 11px;">
     <strong>${t.heading}</strong>
     ${tooltipLine(t.measuredGpu, `${fmt(estimate.measuredGpuWattsPerGpu)} W/GPU`)}
-    ${estimate.unit === 'nvl72-tray' ? tooltipLine(t.graceSocket, `${fmt(estimate.measuredGraceSocketWatts)} W/socket`) : ''}
+    ${estimate.unit === 'nvl72-tray' && estimate.measuredGraceSocketWatts !== null ? tooltipLine(t.graceSocket, `${fmt(estimate.measuredGraceSocketWatts)} W/socket`) : ''}
     ${tooltipLine(t.itPerGpu, `${fmt(estimate.itWattsPerGpu)} W/GPU`)}
     ${
       isPinned
@@ -406,7 +406,7 @@ const modeledSystemPowerHTML = (
       ${tooltipLine(t.state, `${t.workloads[estimate.operatingState.workload]} · ${t.scaleOut(estimate.operatingState.scaleOut)}`)}
       ${tooltipLine(t.deploymentIt, `${fmt(estimate.deploymentItWatts)} W`)}
       ${tooltipLine(`${t.facility} (PUE ${fmt(estimate.pue)})`, `${fmt(estimate.deploymentFacilityWatts)} W`)}
-      <div style="color: var(--muted-foreground); margin-bottom: 4px;">${u.topology(estimate.chassisCount, estimate.gpuCount, estimate.modeledGpuCount)}${estimate.chassisBasis === 'extrapolated' ? `<br/>${u.extrapolation}` : ''}${estimate.topologyBasis === 'uniform-hosts' ? `<br/>${u.uniformHosts}` : ''}<br/>${u.assumptions}<br/>${u.network}<br/>${u.normalization}<br/>${u.boundary}</div>
+      <div style="color: var(--muted-foreground); margin-bottom: 4px;">${u.topology(estimate.chassisCount, estimate.gpuCount, estimate.modeledGpuCount)}${estimate.chassisBasis === 'extrapolated' ? `<br/>${u.extrapolation}` : ''}${estimate.topologyBasis === 'uniform-hosts' ? `<br/>${u.uniformHosts}` : ''}<br/>${estimate.unit === 'nvl72-tray' && estimate.cpuBasis === 'modeled' ? t.units['nvl72-tray'].modeledCpuAssumptions : u.assumptions}<br/>${u.network}<br/>${u.normalization}<br/>${u.boundary}</div>
       ${tooltipLine(t.model, `<a href="${escapeHtml(SYSTEM_POWER_MODEL_SOURCE_URL)}" target="_blank" rel="noopener noreferrer" style="text-decoration: underline;">${escapeHtml(estimate.hardware)} · ${escapeHtml(estimate.modelRevision.slice(0, 12))}</a>`)}
     `
         : ''

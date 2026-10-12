@@ -491,7 +491,7 @@ describe('ScatterGraph', () => {
       'be.visible',
     );
     cy.contains('No measurements to plot for this selection.').should('not.exist');
-    cy.contains('eight-GPU HGX/OAM systems, or NVL72 with validated Grace-socket telemetry').should(
+    cy.contains('eight-GPU HGX/OAM systems, or whole GB200/GB300 NVL72 compute trays').should(
       'be.visible',
     );
     cy.screenshot('nvl72-empty-en-desktop', { overwrite: true });
@@ -525,7 +525,7 @@ describe('ScatterGraph', () => {
 
     cy.contains('当前选择没有可用的整体实测功耗数值。').should('be.visible');
     cy.contains('当前选择没有可绘制的测量数据。').should('not.exist');
-    cy.contains('八卡 HGX/OAM 系统，或具备已验证 Grace socket 遥测的 NVL72').should('be.visible');
+    cy.contains('八卡 HGX/OAM 系统，或完整的 GB200/GB300 NVL72 计算 tray').should('be.visible');
     cy.screenshot('nvl72-empty-zh-mobile', { overwrite: true });
   });
 

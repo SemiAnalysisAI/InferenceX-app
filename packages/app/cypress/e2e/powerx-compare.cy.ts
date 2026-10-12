@@ -218,10 +218,11 @@ describe('PowerX article panels', () => {
 });
 
 // Aggregate role counts describe shared devices: B200 TP8 × PP2, H200 TP16 × 2 workers.
+// GB200 TP8 on one node is not whole four-GPU NVL72 compute trays, so it has no All in Measured.
 const agenticRows = [
   ['b200', 'dynamo-vllm', 8, 2, 1, 16, 760],
   ['h200', 'vllm', 16, 1, 2, 32, 168],
-  ['gb200', 'trt', 4, 1, 1, 4, 450],
+  ['gb200', 'trt', 8, 1, 1, 8, 450],
   ['b300', 'vllm', 8, 1, 1, 8, 0],
 ].map(([hardware, framework, tp, pp, replicas, chips, watts], index) => ({
   ...rows(null, 'b200')[0],
@@ -338,9 +339,7 @@ describe('AgentX All in Measured chart and table', () => {
           for (const row of missing) {
             expect(row.textContent).to.contain('450').and.contain('—');
             expect(row.textContent).to.contain(
-              locale === 'en'
-                ? 'Grace-socket telemetry missing or invalid'
-                : 'Grace socket 遥测缺失或无效',
+              locale === 'en' ? 'Unsupported topology' : '不支持此拓扑',
             );
           }
         });
@@ -382,14 +381,12 @@ describe('AgentX All in Measured chart and table', () => {
         ]);
         expect(
           values.map((row) => Number(row[columns.indexOf('Physical Chips')])).sort((a, b) => a - b),
-        ).to.deep.equal([4, 4, 16, 32, 32]);
+        ).to.deep.equal([8, 8, 16, 32, 32]);
         const missing = values.filter((row) => row[columns.indexOf('Hardware')] === 'gb200');
         for (const row of missing) {
           expect(row[10]).to.equal('');
           expect(row[columns.indexOf('Measured GPU Power (W/chip)')]).to.equal('450');
-          expect(row[columns.indexOf('All-in Estimate Status')]).to.equal(
-            'Grace-socket telemetry missing or invalid',
-          );
+          expect(row[columns.indexOf('All-in Estimate Status')]).to.equal('Unsupported topology');
         }
       });
       cy.document().then((doc) => expect(doc.documentElement.scrollWidth).to.be.at.most(width));

@@ -8,27 +8,36 @@ benchmark producer and the raw benchmark API keep returning the original
 measurements.
 
 The model is the `power_model` package in SemiAnalysisAI/InferenceX
-(GPL-3.0-only, labeled "Beta Experimental" upstream), pinned at `REVISION` in
-`packages/app/scripts/generate-system-power-reference.py`.
-`system-power-model.profiles.json` records that commit, the git tree id of the
-pinned `power_model` directory, and per-hardware constants read from the
-upstream objects. For the eight-GPU HGX/OAM chassis the app supports, the
-upstream estimate reduces to one closed form per chassis, which
-`estimateChassisPower` in `system-power-model.ts` evaluates without rounding
-(GB200/GB300 NVL72 racks are described in [NVL72 racks](#nvl72-racks)):
+(GPL-3.0-only, labeled "Beta Experimental" upstream), ported to TypeScript file
+for file in `packages/app/src/lib/power/power_model/`: one `.ts` module per
+upstream `.py` module (`__init__.py` → `index.ts`), with the same class, field
+and method names, so `model_dump()` matches pydantic's JSON. Only the command
+line (`cli.py`, `__main__.py`) is not ported. `power-model.manifest.json`
+records the pinned commit, the git tree id of its `power_model` directory, and
+every upstream module.
 
-| Step         | Watts per chassis                                                                                                                   |
-| ------------ | ----------------------------------------------------------------------------------------------------------------------------------- |
-| Component DC | `8 × g + fixedDcWatts[workload][scaleOut]`: board non-GPU parts, CPUs, DIMMs, NICs, NVMe, PCIe switches, and transceivers           |
-| Fans         | `nameplate × pwm³`, with `pwm = clamp(minPwm + (maxPwm − minPwm) × min(1, componentDc ÷ fullCoolingLoad)^exponent, minPwm, maxPwm)` |
-| DC load      | component DC + fans; above the PSU's modeled capacity the estimate is unavailable (`reason: 'model-domain'`)                        |
-| Chassis AC   | DC ÷ PSU efficiency at `DC ÷ loadSharingCapacity` (linear interpolation, clamped at the ends of the curve)                          |
-| IT           | chassis AC + `networkWatts[scaleOut]`, the chassis share of the scale-out switches, which bypasses the PSU and fans                 |
-| Facility     | IT × the PUE of the system's upstream cooling mode (1.3 for every supported air-cooled chassis)                                     |
+`system-power-model.ts` is the app's entry point. It maps InferenceX hardware
+names onto upstream systems (table below), calls
+`create_power_model({ system, workload_state, using_scale_out }).estimate_breakdown(g, { cpu_and_dram_measured_power_per_socket })`
+for one system, and returns null where upstream raises `ValueError` (for example
+above the modeled PSU or power-shelf capacity: `reason: 'model-domain'`). Any
+other error is a defect and propagates. `estimateChassisPower` takes chassis GPU
+watts and passes `g` = chassis watts ÷ 8; `estimateRackPower` takes W/GPU and an
+optional measured W per Grace socket (GB200/GB300 NVL72 racks are described in
+[NVL72 racks](#nvl72-racks)). For an eight-GPU HGX/OAM chassis upstream adds
+the UBB's non-GPU parts, CPUs, DIMMs, NICs, NVMe, PCIe switches and
+transceivers for the operating state, fans sized to that load, PSU conversion
+loss, the chassis share of the scale-out switches (which bypasses the PSU and
+fans), and the PUE of the system's upstream cooling mode (1.3 for every
+supported air-cooled chassis).
 
-`g` is the mean measured watts per GPU on that chassis. Numerical parity with the
-upstream model establishes implementation equivalence, not empirical chassis
-calibration.
+`g` is the mean measured watts per GPU. `power-model-parity.test.ts` holds the
+port to the pinned revision: every upstream module has a counterpart and no
+module lacks one, and the port reproduces the upstream model's own output to a
+relative 1e-12 for every catalog system, workload state, scale-out flag, a
+sweep of GPU watts and Grace-socket inputs, and every rejection (component
+trees, provenance and configuration included). Numerical parity establishes
+implementation equivalence, not empirical chassis calibration.
 
 ## Operating state
 
@@ -57,37 +66,30 @@ Modeled power is derived from retained measurements when the browser or a shared
 views API transforms a benchmark row. Changing the model does not rewrite the
 original GPU measurements or require a per-run database backfill.
 
-1. Set `REVISION` in `packages/app/scripts/generate-system-power-reference.py` to
-   the intended SemiAnalysisAI/InferenceX commit, and map any new upstream
-   chassis in `SYSTEMS` or NVL72 rack in `RACKS`.
-2. Run the generator with Python 3.12 or newer and pydantic 2, the upstream
-   package's only dependency (for example the venv from the upstream README's
-   install step). `--inferencex` names a local InferenceX clone that contains
-   the commit; it defaults to `$INFERENCEX_REPO`, then to `../InferenceX` beside
-   this repository:
+1. Port the upstream change into `packages/app/src/lib/power/power_model/`,
+   module for module, and map any new upstream system in `system-power-model.ts`.
+2. Set `REVISION` in `packages/app/scripts/generate-power-model-parity.py` to the
+   intended SemiAnalysisAI/InferenceX commit and run it with Python 3.12 or newer
+   and pydantic 2, the upstream package's only dependency (for example the venv
+   from the upstream README's install step). `--inferencex` names a local
+   InferenceX clone that contains the commit; it defaults to `$INFERENCEX_REPO`,
+   then to `../InferenceX` beside this repository:
 
    ```sh
-   python packages/app/scripts/generate-system-power-reference.py --inferencex ../InferenceX
+   python packages/app/scripts/generate-power-model-parity.py --inferencex ../InferenceX
    ```
 
    The script extracts `power_model` at the pin with `git archive`, imports it,
-   reads every constant from the upstream objects, and asserts that the closed
-   form reproduces `create_power_model(...).estimate_breakdown(g)` to a relative
-   1e-12 over a dense grid of GPU watts, fan and PSU knots, and the capacity
-   edge, for every system, workload state, and scale-out flag. Racks are checked
-   the same way against `estimate_breakdown(g, cpu_and_dram_measured_power_per_socket=s)`
-   over GPU watts at four Grace-socket inputs and both domain edges. Only then
-   does it write `system-power-model.profiles.json` and
-   `system-power-model.reference.json`. A failed assertion means the upstream
-   equations changed; update `closed_form` or `rack_closed_form` in the
-   generator together with `estimateChassisPower` or `estimateRackPower`.
-   Rerunning at the same pin is byte-identical.
+   and writes `power-model.manifest.json` (the upstream module list) and
+   `power-model.parity.json` (upstream output for the parity grid). Rerunning at
+   the same pin is byte-identical.
 
-3. Run `src/lib/system-power-model.test.ts` (parity with every chassis and rack reference case)
-   and the admission tests, then deploy the app. Existing browser sessions need
-   the updated bundle. Derived API responses need the normal authenticated cache
-   invalidation or cache expiry; deployment alone does not establish that every
-   cached response uses the new revision.
+3. Run `src/lib/power/power-model-parity.test.ts` and the admission tests: a
+   missing or extra module, or any numerical or error difference, fails. Then
+   deploy the app. Existing browser sessions need the updated bundle. Derived
+   API responses need the normal authenticated cache invalidation or cache
+   expiry; deployment alone does not establish that every cached response uses
+   the new revision.
 4. Regenerate frozen CSV/JSON exports separately. If the revised model needs
    inputs that were never recorded, those rows stay unavailable until the input
    gap is resolved. A new benchmark's power must not be attached to an older
@@ -120,37 +122,42 @@ never substituted with B200 or B300.
 
 ### NVL72 racks
 
-GB200 and GB300 NVL72 rows first pass the same GPU contract, then a Grace-side
-check from the same validated window:
+GB200 and GB300 NVL72 rows pass the same GPU contract. Their Grace sockets are
+measured when the same validated window also passes a Grace-side check:
 
 - `cpu_power_valid=1`, a verdict independent of `power_valid`.
 - `power_audit.cpu.sensor_kind: 'grace_socket'` with matching `expected_sockets`
   and `observed_sockets`.
 - Positive `avg_total_cpu_power_w` (sum over sockets) that equals
   `avg_cpu_socket_power_w` (mean per socket) × sockets within producer rounding.
+- The socket count equals trays × 2.
 
-Otherwise the row returns `reason: 'cpu-telemetry'`. The CPU rail alone
-(`dcgm_cpu_rail`) omits SysIO and LPDDR5X. A `module` audit names only the
-headline sensor, so it does not establish which sensor fed the Grace-side keys,
-and `power_model` has no module input. Module keys stay stored as data. The
-topology resolves to four-GPU compute trays: one tray per measured worker host,
-or GPU count ÷ 4 trays at the deployment mean for an aggregate multinode row
-without workers. The socket count must equal trays × 2.
+Otherwise the rack model's own Grace CPU and LPDDR5X profile for the operating
+state stands in for the sockets. The estimate records which with `cpuBasis:
+'measured' | 'modeled'` (`measuredGraceSocketWatts` is null when modeled); the
+tooltip, Profit Estimator and export label it, and the Profit Estimator never
+interpolates between a measured-Grace and a modeled-Grace knot. The CPU rail
+alone (`dcgm_cpu_rail`) omits SysIO and LPDDR5X. A `module` audit names only
+the headline sensor, so it does not establish which sensor fed the Grace-side
+keys, and `power_model` has no module input; such rows use the modeled sockets.
+Module keys stay stored as data. The topology resolves to four-GPU compute
+trays: one tray per measured worker host, or GPU count ÷ 4 trays at the
+deployment mean for an aggregate multinode row without workers.
 
-Admitted rows are evaluated with `estimateRackPower`, the upstream
+Rows are evaluated with `estimateRackPower`, the upstream
 `GB200NVL72RackScaleSystem` / `GB300NVL72RackScaleSystem` with
-`--gpu-level-power-per-gpu` and `--cpu-and-dram-measured-power-per-socket`. Upstream models one
+`--gpu-level-power-per-gpu` and, when measured, `--cpu-and-dram-measured-power-per-socket`. Upstream models one
 rack of 18 identical compute trays, 9 NVSwitch trays, and 8 power shelves:
 
-| Step      | Watts                                                                                                                                            |
-| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Tray load | `2 × (2g + s) + trayAuxiliaryWatts[scaleOut]`: two Bianca boards, each two GPUs and one measured Grace socket, plus NICs, optics, and NVMe       |
-| Tray fans | 8 fans cooling the modeled LPDDR5X heat, the auxiliaries, and the converter loss (upstream `solve_cooling` fixed point)                          |
-| Tray      | load + fans + 48 V converter loss from its loss curve; above the converter capacity the estimate is unavailable (`reason: 'model-domain'`)       |
-| Rack bus  | 18 trays + 9 NVSwitch trays                                                                                                                      |
-| Rack AC   | bus + power-shelf PSU loss, PSU fans, and controllers; the bus must fit the 4 surviving shelves and the PSU curve, else `reason: 'model-domain'` |
-| IT        | rack AC + `networkWatts[scaleOut]`, the rack share of scale-out switches                                                                         |
-| Facility  | IT × the liquid-cooled PUE, 1.1, applied once                                                                                                    |
+| Step      | Watts                                                                                                                                                    |
+| --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Tray load | `2 × (2g + s) + trayAuxiliaryWatts[scaleOut]`: two Bianca boards, each two GPUs and one Grace socket (measured `s`, or modeled), plus NICs, optics, NVMe |
+| Tray fans | 8 fans cooling the modeled LPDDR5X heat, the auxiliaries, and the converter loss (upstream `solve_cooling` fixed point)                                  |
+| Tray      | load + fans + 48 V converter loss from its loss curve; above the converter capacity the estimate is unavailable (`reason: 'model-domain'`)               |
+| Rack bus  | 18 trays + 9 NVSwitch trays                                                                                                                              |
+| Rack AC   | bus + power-shelf PSU loss, PSU fans, and controllers; the bus must fit the 4 surviving shelves and the PSU curve, else `reason: 'model-domain'`         |
+| IT        | rack AC + `networkWatts[scaleOut]`, the rack share of scale-out switches                                                                                 |
+| Facility  | IT × the liquid-cooled PUE, 1.1, applied once                                                                                                            |
 
 `g` is measured W/GPU and `s` measured W per Grace socket. NVIDIA defines the
 socket sensor only as "Power of Grace socket"; upstream treats it as the CPU and
@@ -243,7 +250,7 @@ including interpolation with one partial knot. Hardware without a model,
 partial multi-host allocations, disaggregated deployments without per-worker
 telemetry, allocations that cannot tile eight GPUs, and missing/invalid
 measurements stay unavailable with distinct reasons; NVL72 rows without complete
-Grace-socket telemetry report missing CPU power. Host power follows the row's
+Grace-socket telemetry use the modeled Grace sockets (`powerSource.cpu: 'modeled'`). Host power follows the row's
 AgentX workload state, including KV offload.
 
 Measured + modeled power first keeps the points with a supported estimate, then
@@ -353,12 +360,15 @@ dropping that replicate.
 ## 中文说明
 
 模型结果在浏览器或共享 views API 转换 benchmark 数据时计算，不写回原始 GPU
-测量值。更新模型时，先修改生成脚本中固定的 InferenceX commit，再用装有 pydantic 2
-的 Python 3.12+ 运行脚本并指向本地 InferenceX 仓库。脚本用 `git archive` 取出该
-commit 的 `power_model`，从上游对象读取全部常量，并在写出 profiles 和 reference
-JSON 之前断言闭式公式与上游 `estimate_breakdown` 一致；断言失败说明上游公式有变，
-需同步修改脚本中的 `closed_form` 和 TypeScript 实现。同一 commit 重复运行，输出
-逐字节相同。通过一致性及准入测试后部署，刷新浏览器，并使派生 API 缓存失效或等待其过期。
+测量值。功耗模型以 TypeScript 逐文件移植在 `packages/app/src/lib/power/power_model/`：
+每个上游 `.py` 模块对应一个 `.ts` 模块（`__init__.py` → `index.ts`），类、字段和方法同名，
+仅命令行（`cli.py`、`__main__.py`）未移植。更新模型时，先把上游改动逐模块移植过来，
+再修改 `generate-power-model-parity.py` 中固定的 InferenceX commit，用装有 pydantic 2
+的 Python 3.12+ 运行脚本并指向本地 InferenceX 仓库。脚本用 `git archive` 取出该 commit
+的 `power_model`，写出上游模块清单和上游模型自身的输出；`power-model-parity.test.ts`
+检查模块一一对应，并要求移植版本在全部系统、运行状态、GPU 功耗和 Grace socket 输入以及
+所有报错情况下与上游结果一致（相对误差 1e-12）。同一 commit 重复运行，输出逐字节相同。
+通过一致性及准入测试后部署，刷新浏览器，并使派生 API 缓存失效或等待其过期。
 冻结的 CSV/JSON 需另行导出。通常无需逐 run 回填数据库；若新模型需要历史记录中
 没有的输入，应保留不可用状态，也不能把新一轮测得的功耗配到旧吞吐结果上。
 
@@ -386,17 +396,20 @@ GB200、GB300 在上游是机架级系统，使用各自的机架模型，不套
 无效和不支持的情况保持不可用。纯 CPU frontend worker 不计入 GPU 机箱数；独立的纯 CPU
 frontend/router 主机不在估算范围内，GPU 机箱内的 CPU 功耗按运行状态建模。
 
-NVL72 数据在 GPU 检查之外，还需通过同一窗口的 Grace 侧检查：`cpu_power_valid=1`；
-`power_audit.cpu.sensor_kind` 为 `grace_socket`，且 `expected_sockets` 与
-`observed_sockets` 一致；`avg_total_cpu_power_w`（各 socket 之和）为正值，并在
-producer 舍入误差内等于 `avg_cpu_socket_power_w`（每 socket 平均值）× socket 数。
-否则返回 `reason: 'cpu-telemetry'`：CPU rail（`dcgm_cpu_rail`）不含 SysIO 和 LPDDR5X；
+NVL72 数据通过 GPU 检查后，若同一窗口还通过 Grace 侧检查，则使用 Grace socket 实测功耗：
+`cpu_power_valid=1`；`power_audit.cpu.sensor_kind` 为 `grace_socket`，且 `expected_sockets`
+与 `observed_sockets` 一致；`avg_total_cpu_power_w`（各 socket 之和）为正值，并在
+producer 舍入误差内等于 `avg_cpu_socket_power_w`（每 socket 平均值）× socket 数；
+socket 数等于 tray 数 × 2。否则使用机架模型按运行状态估算的 Grace CPU 和 LPDDR5X 功耗。
+结果以 `cpuBasis: 'measured' | 'modeled'` 标明口径（估算时 `measuredGraceSocketWatts`
+为 null），tooltip、Profit Estimator 和导出均会标注，Profit Estimator 不会在实测与估算
+Grace 口径的数据点之间插值。CPU rail（`dcgm_cpu_rail`）不含 SysIO 和 LPDDR5X；
 `module` 审计只记录主传感器，无法确认 Grace 侧指标来自哪个传感器，且 `power_model`
-没有模块功耗输入，模块指标仅作为数据保留。拓扑按四卡计算 tray 解析：每个实测 worker
-主机一个 tray；没有 worker 数据的聚合多节点记录按 GPU 数 ÷ 4 个 tray 使用部署平均值；
-socket 数必须等于 tray 数 × 2。
+没有模块功耗输入，这类数据使用 Grace 估算值，模块指标仅作为数据保留。拓扑按四卡计算
+tray 解析：每个实测 worker 主机一个 tray；没有 worker 数据的聚合多节点记录按 GPU 数 ÷ 4
+个 tray 使用部署平均值。
 
-通过检查的数据由 `estimateRackPower` 计算，对应上游 `power_model` 的 GB200/GB300 NVL72
+NVL72 数据由 `estimateRackPower` 计算，对应上游 `power_model` 的 GB200/GB300 NVL72
 机架模型，输入为 `--gpu-level-power-per-gpu` 和 `--cpu-and-dram-measured-power-per-socket`。上游以
 一个机架建模：18 个相同的计算 tray、9 个 NVSwitch tray 和 8 个电源架。每个 tray 的负载为
 两块 Bianca 板（各含 2 张 GPU 和 1 个实测 Grace socket）加上网卡、光模块和 NVMe，再计入

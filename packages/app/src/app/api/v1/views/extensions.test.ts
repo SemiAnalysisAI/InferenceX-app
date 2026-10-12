@@ -523,41 +523,64 @@ describe('new dashboard projections', () => {
     avg_cpu_socket_power_w: 98.066,
     avg_total_cpu_power_w: 196.132,
   };
-  it.each([
-    ['GPU-only telemetry', {}, 'grace_socket', 'no-cpu-power'],
-    ['invalid GPU telemetry', { power_valid: 0 }, 'grace_socket', 'no-measured-power'],
-    ['a module-sensor CPU audit', grace, 'module', 'no-cpu-power'],
-  ] as const)(
-    'retains provisioned NVL72 estimates with %s and explains missing measured power',
-    async (_name, metrics, sensor, reason) => {
-      const missing = agenticRow({
-        hardware: 'gb300',
-        prefill_tp: 4,
-        decode_tp: 4,
-        num_prefill_gpu: 4,
-        num_decode_gpu: 4,
-        power_audit: {
-          cpu: { sensor_kind: sensor, expected_sockets: 2, observed_sockets: 2 },
-        },
-        metrics: { ...agenticRow().metrics, avg_total_gpu_power_w: 2400, ...metrics },
-      });
-      mocks.benchmarks.mockImplementation(() => Response.json([missing]));
-      for (const powerBasis of ['compare', 'modeled']) {
-        const response = await gw(
-          req(
-            'profit-estimator-per-gigawatt',
-            `model=DeepSeek-V4-Pro&target=45&priceSource=custom&powerBasis=${powerBasis}`,
-          ),
-        );
-        expect(response.status).toBe(200);
-        const body = await response.json();
-        expect(body.data.rows).toHaveLength(powerBasis === 'compare' ? 1 : 0);
-        if (powerBasis === 'compare') {
-          expect(body.data.rows[0].powerLabel).toBe('All in Provisioned');
-          expect(body.data.rows[0].powerSource).toBeUndefined();
-        }
-        expect(body.data.skipped).toMatchObject([{ reason }]);
+  const nvl72Tray = (metrics: Record<string, number>, sensor: 'grace_socket' | 'module') =>
+    agenticRow({
+      hardware: 'gb300',
+      prefill_tp: 4,
+      decode_tp: 4,
+      num_prefill_gpu: 4,
+      num_decode_gpu: 4,
+      power_audit: {
+        cpu: { sensor_kind: sensor, expected_sockets: 2, observed_sockets: 2 },
+      },
+      metrics: { ...agenticRow().metrics, avg_total_gpu_power_w: 2400, ...metrics },
+    });
+  it('retains provisioned NVL72 estimates with invalid GPU telemetry and explains missing measured power', async () => {
+    mocks.benchmarks.mockImplementation(() =>
+      Response.json([nvl72Tray({ power_valid: 0 }, 'grace_socket')]),
+    );
+    for (const powerBasis of ['compare', 'modeled']) {
+      const response = await gw(
+        req(
+          'profit-estimator-per-gigawatt',
+          `model=DeepSeek-V4-Pro&target=45&priceSource=custom&powerBasis=${powerBasis}`,
+        ),
+      );
+      expect(response.status).toBe(200);
+      const body = await response.json();
+      expect(body.data.rows).toHaveLength(powerBasis === 'compare' ? 1 : 0);
+      if (powerBasis === 'compare') {
+        expect(body.data.rows[0].powerLabel).toBe('All in Provisioned');
+        expect(body.data.rows[0].powerSource).toBeUndefined();
       }
+      expect(body.data.skipped).toMatchObject([{ reason: 'no-measured-power' }]);
+    }
+  });
+  it.each([
+    ['GPU-only telemetry', {}, 'grace_socket'],
+    ['a module-sensor CPU audit', grace, 'module'],
+  ] as const)(
+    'prices NVL72 trays with %s on the modeled Grace sockets',
+    async (_name, metrics, sensor) => {
+      mocks.benchmarks.mockImplementation(() => Response.json([nvl72Tray(metrics, sensor)]));
+      const response = await gw(
+        req(
+          'profit-estimator-per-gigawatt',
+          'model=DeepSeek-V4-Pro&target=45&priceSource=custom&powerBasis=compare',
+        ),
+      );
+      expect(response.status).toBe(200);
+      const body = await response.json();
+      expect(body.data.skipped).toEqual([]);
+      expect(body.data.rows.map((row: { powerSource?: unknown }) => row.powerSource)).toEqual([
+        undefined,
+        {
+          topology: 'nvl72-tray',
+          cpu: 'modeled',
+          pue: 1.1,
+          modelRevision: SYSTEM_POWER_MODEL_REVISION,
+        },
+      ]);
     },
   );
   it('prices an NVL72 aggregate on its measured GPU and Grace-socket rack share', async () => {
@@ -591,7 +614,12 @@ describe('new dashboard projections', () => {
     expect(body.data.skipped).toEqual([]);
     expect(body.data.rows.map((row: { powerSource?: unknown }) => row.powerSource)).toEqual([
       undefined,
-      { topology: 'nvl72-tray', pue: 1.1, modelRevision: SYSTEM_POWER_MODEL_REVISION },
+      {
+        topology: 'nvl72-tray',
+        cpu: 'measured',
+        pue: 1.1,
+        modelRevision: SYSTEM_POWER_MODEL_REVISION,
+      },
     ]);
   });
   it.each(['modeled'])(

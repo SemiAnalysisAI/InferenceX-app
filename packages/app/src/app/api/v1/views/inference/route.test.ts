@@ -103,7 +103,8 @@ beforeEach(() => {
 
 describe('GET /api/v1/views/inference', () => {
   it('keeps unavailable all-in table rows in official, compared and unofficial scopes and CSV', async () => {
-    const gpuOnly = makeRow({
+    // Eight GPUs on one node are not whole four-GPU NVL72 compute trays.
+    const untiled = makeRow({
       hardware: 'gb200',
       metrics: {
         ...makeRow().metrics,
@@ -113,14 +114,14 @@ describe('GET /api/v1/views/inference', () => {
         power_metric_schema_version: 2,
       },
     });
-    const historical = { ...gpuOnly, id: 998, date: '2026-02-28' };
+    const historical = { ...untiled, id: 998, date: '2026-02-28' };
     const unofficial = {
-      ...gpuOnly,
+      ...untiled,
       id: 999,
       run_url: 'https://github.com/org/repo/actions/runs/999',
     };
     mockGetLatestBenchmarks.mockImplementation((_db, _models, date) =>
-      Promise.resolve(date === historical.date ? [historical] : [gpuOnly]),
+      Promise.resolve(date === historical.date ? [historical] : [untiled]),
     );
     mockUnofficialRun.mockImplementation(() =>
       Response.json({ benchmarks: [unofficial], evaluations: [] }),
@@ -131,7 +132,7 @@ describe('GET /api/v1/views/inference', () => {
     const body = await response.json();
     expect(response.status).toBe(200);
     for (const [scope, id] of [
-      [body, gpuOnly.id],
+      [body, untiled.id],
       [body.comparisons[0], historical.id],
       [body.overlays[0], unofficial.id],
     ]) {
@@ -143,7 +144,7 @@ describe('GET /api/v1/views/inference', () => {
           y: null,
           measuredGpuWatts: 500,
           status: 'unavailable',
-          unavailableReason: 'cpu-telemetry',
+          unavailableReason: 'topology',
         },
       ]);
       expect(scope).not.toHaveProperty('observedPoints');
@@ -160,7 +161,7 @@ describe('GET /api/v1/views/inference', () => {
       const values = line.split(',');
       expect(values[columns.indexOf('y')]).toBe('');
       expect(values[columns.indexOf('measuredGpuWatts')]).toBe('500');
-      expect(values[columns.indexOf('unavailableReason')]).toBe('cpu-telemetry');
+      expect(values[columns.indexOf('unavailableReason')]).toBe('topology');
     }
   });
 

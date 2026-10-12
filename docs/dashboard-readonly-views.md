@@ -107,8 +107,9 @@ or calculations. Profit comparison `powerLabel` display text follows the same na
 All in Measured watts and energy accept validated `single_turn` and AgentX rows
 through the shared chart/API transform, including historical and unofficial rows.
 AgentX uses the power model's agentic workload state without independent workload
-calibration. Telemetry and topology gates still apply; NVL72 rows need complete
-Grace-socket telemetry, and each compute tray then takes an equal share of a modeled rack.
+calibration. Telemetry and topology gates still apply; each NVL72 compute tray takes an
+equal share of a modeled rack, with measured Grace-socket power when the row has complete
+Grace-socket telemetry and the modeled Grace profile otherwise.
 
 For All in Measured, `tableRows` retains every GPU-valid observation in the selected
 scope and best-series selection, including axis-clipped and non-frontier points.
@@ -122,7 +123,7 @@ curve at the same target, without extrapolation or another snapshot. `compare` u
 the same valid-curve throughput for both power budgets, retaining the original
 provisioned estimate when no valid curve covers the target. Provisioned-only keeps
 the original performance curve. Official, comparison and unofficial scopes remain
-independent; NVL72 Grace-socket telemetry and matching model revision/PUE requirements still apply.
+independent; both interpolation knots must share a power basis (including measured or modeled NVL72 Grace power), model revision and PUE.
 
 Dense profit charts reserve readable space per bar and scroll within the plot on narrow
 screens; captions and controls stay fixed. This is presentation-only: API selectors,

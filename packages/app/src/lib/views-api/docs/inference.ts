@@ -363,7 +363,6 @@ const tableRowSchema = objectSchema(
             'workload',
             'hardware',
             'telemetry',
-            'cpu-telemetry',
             'gpu-count',
             'topology',
             'role-power',

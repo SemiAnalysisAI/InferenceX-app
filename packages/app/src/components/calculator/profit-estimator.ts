@@ -242,7 +242,6 @@ export interface ProfitEstimatorRow {
  */
 export type ProfitEstimatorSkipReason =
   | 'no-measured-power'
-  | 'no-cpu-power'
   | 'incompatible-power-basis'
   | 'unsupported-power-hardware'
   | 'unsupported-power-topology'

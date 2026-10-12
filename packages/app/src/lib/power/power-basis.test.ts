@@ -132,18 +132,41 @@ describe('power boundaries through the derived-field builder', () => {
   );
 
   it.each(['single_turn', 'agentic_traces'] as const)(
-    'keeps %s GPU boundaries when NVL72 CPU telemetry is unavailable',
+    'keeps %s GPU boundaries when an NVL72 row is not whole compute trays',
     (benchmark_type) => {
+      // Eight GPUs on one node cannot be one four-GPU NVL72 tray.
       const { entry, fields } = derive(row({ hardware: 'gb200', benchmark_type }));
-      expect(entry.modeledSystemPower).toMatchObject({
-        status: 'unsupported',
-        reason: 'cpu-telemetry',
-      });
+      expect(entry.modeledSystemPower).toMatchObject({ status: 'unsupported', reason: 'topology' });
       expect(fields.measuredAvgPower).toBeDefined();
       expect(fields.gpuProvisionedWatts).toBeDefined();
       expect(fields.utilityProvisionedWatts).toBeDefined();
       expect(fields.utilityModeledWatts).toBeUndefined();
       expect(fields.utilityModeledJPerOutputToken).toBeUndefined();
+    },
+  );
+
+  it.each(['single_turn', 'agentic_traces'] as const)(
+    'derives %s All in Measured for an NVL72 tray with GPU-only telemetry',
+    (benchmark_type) => {
+      const tray = row({
+        hardware: 'gb200',
+        benchmark_type,
+        prefill_tp: 4,
+        decode_tp: 4,
+        num_prefill_gpu: 4,
+        num_decode_gpu: 4,
+        metrics: { ...row().metrics, avg_total_gpu_power_w: 1399.436 },
+      });
+      const { entry, fields } = derive(tray);
+      expect(entry.modeledSystemPower).toMatchObject({
+        status: 'supported',
+        unit: 'nvl72-tray',
+        cpuBasis: 'modeled',
+      });
+      expect(fields.utilityModeledWatts?.y).toBeGreaterThan(tray.metrics.avg_power_w);
+      expect(fields.utilityModeledJPerOutputToken?.y).toBeGreaterThan(
+        tray.metrics.joules_per_output_token,
+      );
     },
   );
 

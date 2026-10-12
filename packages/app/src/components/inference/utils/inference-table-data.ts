@@ -44,10 +44,6 @@ const REASONS: Record<UnavailableReason, Record<Locale, string>> = {
   workload: { en: 'Unsupported workload', zh: '不支持此工作负载' },
   hardware: { en: 'Unsupported hardware', zh: '不支持此硬件' },
   telemetry: { en: 'GPU telemetry missing or invalid', zh: 'GPU 遥测缺失或无效' },
-  'cpu-telemetry': {
-    en: 'Grace-socket telemetry missing or invalid',
-    zh: 'Grace socket 遥测缺失或无效',
-  },
   'gpu-count': { en: 'GPU count missing or inconsistent', zh: 'GPU 数量缺失或不一致' },
   topology: { en: 'Unsupported topology', zh: '不支持此拓扑' },
   'role-power': { en: 'Role power incomplete', zh: 'Prefill 或 decode 功耗不完整' },

@@ -40,7 +40,7 @@ describe('All in Measured table coverage', () => {
           measuredAvgPower: { y: 500, roof: false },
           modeledSystemPower: {
             status: 'unsupported',
-            reason: 'cpu-telemetry',
+            reason: 'model-domain',
             modelRevision: 'test',
           },
         }),

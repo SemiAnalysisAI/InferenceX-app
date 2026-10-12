@@ -17,11 +17,13 @@ export type ProfitPowerBasis = 'provisioned' | 'modeled' | 'compare';
 
 /**
  * What the measured + modeled budget was measured on: an eight-GPU chassis
- * measures the GPU boards and models the rest; an NVL72 tray also measures its
- * Grace sockets and takes an equal share of a modeled rack.
+ * measures the GPU boards and models the rest; an NVL72 tray takes an equal
+ * share of a modeled rack and measures its Grace sockets when telemetry allows.
  */
 export interface ProfitPowerSource {
   topology: SystemPowerUnit;
+  /** Grace sockets on NVL72 trays: measured, or the model's profile. Chassis CPUs are always modeled. */
+  cpu: 'measured' | 'modeled';
   /** Facility PUE the estimate applied once after IT power. */
   pue: number;
   modelRevision: string;
@@ -35,7 +37,7 @@ export interface ProfitPlanningPower {
 
 /** Identity of a source for deduplicating notes and refusing to mix bases between knots. */
 export function powerSourceKey(source: ProfitPowerSource): string {
-  return [source.topology, source.pue, source.modelRevision].join('|');
+  return [source.topology, source.cpu, source.pue, source.modelRevision].join('|');
 }
 
 type PlanningPower = ProfitPlanningPower | { reason: ProfitEstimatorSkipReason };
@@ -52,9 +54,6 @@ function planningPower(point: GPUDataPoint): PlanningPower {
       case 'topology':
       case 'role-power': {
         return { reason: 'unsupported-power-topology' };
-      }
-      case 'cpu-telemetry': {
-        return { reason: 'no-cpu-power' };
       }
       case 'telemetry':
       case 'gpu-count': {
@@ -76,7 +75,12 @@ function planningPower(point: GPUDataPoint): PlanningPower {
   return {
     kwPerGpu: (estimate.deploymentFacilityWatts / estimate.gpuCount / 1000) * 1.1,
     extrapolated: estimate.chassisBasis === 'extrapolated',
-    source: { topology: estimate.unit, pue: estimate.pue, modelRevision: estimate.modelRevision },
+    source: {
+      topology: estimate.unit,
+      cpu: estimate.unit === 'nvl72-tray' ? estimate.cpuBasis : 'modeled',
+      pue: estimate.pue,
+      modelRevision: estimate.modelRevision,
+    },
   };
 }
 

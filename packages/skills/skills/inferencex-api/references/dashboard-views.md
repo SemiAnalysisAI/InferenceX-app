@@ -133,11 +133,11 @@ Missing system estimates use `y: null`, `status: "unavailable"`, and
 with blank missing values. Numeric `series` and `count` are unchanged. Each date
 comparison and unofficial overlay has its own `tableRows`; latest does not pool history.
 
-NVL72 rows first need valid GPU power plus validated Grace-socket power with complete
-socket coverage (`unavailableReason: "cpu-telemetry"` otherwise); CPU-rail-only and
-module readings are not accepted. Admitted NVL72 rows take an equal compute-tray share
-of the InferenceX `power_model` rack at PUE 1.1. Read `powerSource` for topology, PUE
-and the pinned InferenceX `power_model` commit. Model-only updates recalculate retained
+NVL72 rows need valid GPU power and take an equal compute-tray share of the InferenceX
+`power_model` rack at PUE 1.1. Validated Grace-socket power with complete socket
+coverage replaces the modeled Grace CPU and memory; otherwise (including CPU-rail-only
+and module readings) the rack's modeled Grace profile is used. Read `powerSource` for
+topology, `cpu` (measured or modeled), PUE and the pinned InferenceX `power_model` commit. Model-only updates recalculate retained
 valid measurements after deployment; they do not require telemetry backfill. For
 GW-year estimates, `modeled` first selects
 points with valid system-power inputs, then builds the curve at the requested target.

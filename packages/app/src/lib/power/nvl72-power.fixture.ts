@@ -1,5 +1,7 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import type { BenchmarkRow } from '@/lib/api/api';
-import reference from '@/lib/power/system-power-model.reference.json';
 
 /**
  * GB300 NVL72 1P1D disaggregated row as the #3296 producer emits it: Qwen3.5
@@ -125,21 +127,43 @@ export function gb300AggregateRow(trays = 4): BenchmarkRow {
   });
 }
 
-/** Upstream facility W per GPU of a fixed-sequence-length rack, from the generator's reference cases. */
+interface ParityCase {
+  model: string;
+  system: string;
+  workload_state: string;
+  using_scale_out: boolean;
+  systems: number;
+  gpu_level_power_per_gpu: number;
+  cpu_and_dram_measured_power_per_socket: number | null;
+  estimate?: { AllInPower_per_gpu: number };
+  summary?: { AllInPower_per_gpu: number };
+}
+
+/**
+ * Upstream facility W per GPU of one fixed-sequence-length rack, read from the
+ * pinned Python model's own output (power-model.parity.json); null socket
+ * watts models the Grace sockets.
+ */
 export function upstreamRackWattsPerGpu(
-  hardware: string,
+  hardware: 'gb200' | 'gb300',
   gpuWattsPerGpu: number,
-  graceSocketWatts: number,
+  graceSocketWatts: number | null,
   scaleOut: boolean,
 ): number {
-  const match = reference.rackCases.find(
+  const { cases } = JSON.parse(
+    readFileSync(join(__dirname, 'power-model.parity.json'), 'utf8'),
+  ) as { cases: ParityCase[] };
+  const match = cases.find(
     (c) =>
-      c.hardware === hardware &&
-      c.workload === 'fixed-seq-len' &&
-      c.scaleOut === scaleOut &&
-      c.gpuWattsPerGpu === gpuWattsPerGpu &&
-      c.graceSocketWatts === graceSocketWatts,
+      c.model === 'oss' &&
+      c.system === `${hardware}-nvl72` &&
+      c.workload_state === 'fixed-seq-len' &&
+      c.using_scale_out === scaleOut &&
+      c.systems === 1 &&
+      c.gpu_level_power_per_gpu === gpuWattsPerGpu &&
+      c.cpu_and_dram_measured_power_per_socket === graceSocketWatts,
   );
-  if (!match?.expected) throw new Error('No in-domain reference case for these inputs');
-  return match.expected.facilityWatts / 72;
+  const result = match?.estimate ?? match?.summary;
+  if (!result) throw new Error('No in-domain upstream case for these inputs');
+  return result.AllInPower_per_gpu;
 }

@@ -273,6 +273,8 @@ const STRINGS = {
       chassis: 'measured GPU board; CPU, DRAM, networking, storage, board, fans and PSU modeled',
       'nvl72-tray':
         'measured GPU board and Grace socket; tray networking, storage, fans and conversion, NVSwitch trays and power shelves modeled',
+      'nvl72-tray-modeled-cpu':
+        'measured GPU board; Grace CPU and memory, tray networking, storage, fans and conversion, NVSwitch trays and power shelves modeled',
     },
     noData: 'No SKU can be priced for the current selection.',
     scrollHint: 'Scroll horizontally to view the full chart.',
@@ -306,6 +308,8 @@ const STRINGS = {
       chassis: '实测 GPU 板卡功耗；CPU、DRAM、网络、存储、主板、风扇和 PSU 由模型估算',
       'nvl72-tray':
         '实测 GPU 板卡和 Grace socket 功耗；tray 内网络、存储、风扇和电源转换，以及 NVSwitch tray 和电源架由模型估算',
+      'nvl72-tray-modeled-cpu':
+        '实测 GPU 板卡功耗；Grace CPU 和内存、tray 内网络、存储、风扇和电源转换，以及 NVSwitch tray 和电源架由模型估算',
     },
     noData: '当前选择下没有可定价的 SKU。',
     scrollHint: '横向滚动查看完整图表。',
@@ -319,6 +323,9 @@ export function profitEstimatorChartStrings(locale: Locale) {
 /** Name what a measured + modeled row's power was measured on. */
 export function powerBasisLabel(source: ProfitPowerSource, locale: Locale): string {
   const labels = STRINGS[locale].powerBasisLabels;
+  if (source.topology === 'nvl72-tray' && source.cpu === 'modeled') {
+    return labels['nvl72-tray-modeled-cpu'];
+  }
   return labels[source.topology];
 }
 

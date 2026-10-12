@@ -45,7 +45,11 @@ WORKLOADS = ("idle", "fixed-seq-len", "agentic", "agentic-cpu-offloading")
 SCALE_OUT = (False, True)
 SYSTEM_COUNTS = (1, 4)
 # Spans idle, typical, TDP, and both PSU-capacity and rack-shelf limits; -1 is rejected.
-GPU_WATTS = (-1.0, 0.0, 150.5, 350.0, 612.375, 700.0, 1000.0, 1200.0, 1400.0, 1430.0, 1440.0, 1600.0, 2400.0)
+# 594.191 W/GPU is the measured GB300 NVL72 Qwen3.5 8k/1k replay mean (app NVL72 fixtures).
+GPU_WATTS = (
+    -1.0, 0.0, 150.5, 350.0, 594.191, 612.375, 700.0, 1000.0,
+    1200.0, 1400.0, 1430.0, 1440.0, 1600.0, 2400.0,
+)
 # Other socket inputs use this subset of GPU watts.
 SPARSE_WATTS = (0.0, 700.0, 1400.0)
 # Four-system clusters scale the shared network allocation.

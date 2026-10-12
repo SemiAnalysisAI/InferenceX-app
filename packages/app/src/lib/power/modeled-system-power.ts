@@ -13,7 +13,7 @@ import {
 
 /** Every supported chassis model describes one complete eight-GPU HGX/OAM system. */
 const CHASSIS_GPU_COUNT = 8;
-/** A GB200/GB300 NVL72 compute tray: four GPUs and two Grace sockets (the generator asserts it). */
+/** A GB200/GB300 NVL72 compute tray: four GPUs and two Grace sockets (the upstream tray inventory). */
 const TRAY_GPU_COUNT = 4;
 const TRAY_GRACE_SOCKETS = 2;
 
@@ -24,8 +24,6 @@ export type SystemPowerUnsupportedReason =
   | 'workload'
   | 'hardware'
   | 'telemetry'
-  /** NVL72 only: complete, matching Grace-socket telemetry from the GPU window. */
-  | 'cpu-telemetry'
   | 'gpu-count'
   | 'topology'
   | 'role-power'
@@ -81,8 +79,14 @@ export type SystemPowerEstimate =
   | (SupportedSystemPower & { unit: 'chassis' })
   | (SupportedSystemPower & {
       unit: 'nvl72-tray';
-      /** Measured mean W per Grace socket, the rack model's whole-socket input. */
-      measuredGraceSocketWatts: number;
+      /**
+       * 'measured': complete, matching Grace-socket telemetry from the GPU
+       * window replaces the modeled Grace CPU and LPDDR5X. 'modeled': the row
+       * has no such telemetry, so the upstream model's Grace profile is used.
+       */
+      cpuBasis: 'measured' | 'modeled';
+      /** Measured mean W per Grace socket when cpuBasis is 'measured', else null. */
+      measuredGraceSocketWatts: number | null;
     });
 
 interface MeasuredChassis {
@@ -143,7 +147,7 @@ function operatingState(row: BenchmarkRow, systems: number): SystemPowerOperatin
 
 /**
  * Model the mean GPU telemetry on known eight-GPU chassis, or on NVL72 compute
- * trays with measured Grace sockets.
+ * trays (with measured Grace sockets when the row carries them).
  * This is f(mean power), not a time-integrated wall-power measurement.
  * Do not use display counts here: legacy ingest can encode TP * EP twice.
  */
@@ -194,26 +198,23 @@ export function modelSystemPower(row: BenchmarkRow): SystemPowerEstimate {
 
   // The rack model takes the whole Grace socket. The CPU rail alone omits
   // SysIO and LPDDR5X, and a module-sensor audit does not establish which sensor
-  // fed the Grace-side keys; require Grace-socket readings with complete socket
-  // coverage from the same window.
+  // fed the Grace-side keys; only Grace-socket readings with complete socket
+  // coverage from the same window replace the modeled sockets.
   const cpuAudit = row.power_audit?.cpu;
   const graceSocketWatts = m.avg_cpu_socket_power_w;
-  if (
+  let measuredSockets =
     rack &&
-    (m.cpu_power_valid !== 1 ||
-      cpuAudit?.sensor_kind !== 'grace_socket' ||
-      !count(cpuAudit.expected_sockets) ||
-      cpuAudit.observed_sockets !== cpuAudit.expected_sockets ||
-      !positive(m.avg_total_cpu_power_w) ||
-      !positive(graceSocketWatts) ||
-      !matchingWatts(
-        m.avg_total_cpu_power_w,
-        graceSocketWatts * cpuAudit.observed_sockets,
-        cpuAudit.observed_sockets,
-      ))
-  ) {
-    return unavailable('cpu-telemetry');
-  }
+    m.cpu_power_valid === 1 &&
+    cpuAudit?.sensor_kind === 'grace_socket' &&
+    count(cpuAudit.expected_sockets) &&
+    cpuAudit.observed_sockets === cpuAudit.expected_sockets &&
+    positive(m.avg_total_cpu_power_w) &&
+    positive(graceSocketWatts) &&
+    matchingWatts(
+      m.avg_total_cpu_power_w,
+      graceSocketWatts * cpuAudit.observed_sockets,
+      cpuAudit.observed_sockets,
+    );
 
   const chassis: MeasuredChassis[] = [];
   let topologyBasis: 'single-node' | 'worker-hosts' | 'uniform-hosts';
@@ -341,10 +342,10 @@ export function modelSystemPower(row: BenchmarkRow): SystemPowerEstimate {
     }
     topologyBasis = 'worker-hosts';
   }
-  // Every compute tray carries two Grace sockets; another count is not a tray topology.
-  if (rack && cpuAudit?.observed_sockets !== chassis.length * TRAY_GRACE_SOCKETS) {
-    return unavailable('cpu-telemetry');
-  }
+  // Every compute tray carries two Grace sockets; another count does not
+  // describe the measured trays, so their sockets stay modeled.
+  measuredSockets &&= cpuAudit?.observed_sockets === chassis.length * TRAY_GRACE_SOCKETS;
+  const socketInput = measuredSockets ? graceSocketWatts! : null;
 
   let models: (SystemUnitPower | null)[];
   let state: SystemPowerOperatingState | null;
@@ -352,7 +353,8 @@ export function modelSystemPower(row: BenchmarkRow): SystemPowerEstimate {
     // Trays share their rack's switch trays, power shelves and network, and the
     // upstream rack takes one W/GPU and one W/socket for all 18 trays. Fold the
     // measured trays into racks of identical trays at their mean full-tray GPU
-    // input and the measured mean socket; every tray takes an equal rack share.
+    // input and the measured mean socket (or modeled sockets); every tray takes
+    // an equal rack share.
     const traysPerRack = rackComputeTrayCount(system.hardware);
     state = operatingState(row, Math.ceil(chassis.length / traysPerRack));
     if (!state) return unavailable('workload');
@@ -360,7 +362,7 @@ export function modelSystemPower(row: BenchmarkRow): SystemPowerEstimate {
     const rackModel = estimateRackPower(
       system.hardware,
       trayInputs / (chassis.length * TRAY_GPU_COUNT),
-      graceSocketWatts!,
+      socketInput,
       state,
     );
     const tray = rackModel && {
@@ -405,6 +407,11 @@ export function modelSystemPower(row: BenchmarkRow): SystemPowerEstimate {
     chassisBasis: extrapolated ? 'extrapolated' : 'full',
   };
   return system.unit === 'nvl72-tray'
-    ? { ...estimate, unit: 'nvl72-tray', measuredGraceSocketWatts: graceSocketWatts! }
+    ? {
+        ...estimate,
+        unit: 'nvl72-tray',
+        cpuBasis: socketInput === null ? 'modeled' : 'measured',
+        measuredGraceSocketWatts: socketInput,
+      }
     : { ...estimate, unit: 'chassis' };
 }
