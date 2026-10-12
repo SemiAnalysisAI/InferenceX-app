@@ -8,3 +8,6 @@
 packages/app/cypress/fixtures/api/collectivex-latest.json
 packages/app/cypress/fixtures/api/collectivex-run-*.json
 packages/app/cypress/fixtures/api/collectivex-runs.json
+# The power-model parity fixture is upstream Python output, regenerated wholesale by
+# packages/app/scripts/generate-power-model-parity.py; pretty-printed it is ~5x larger.
+packages/app/src/lib/power/power-model.parity.json
