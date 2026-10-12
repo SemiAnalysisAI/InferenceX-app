@@ -1837,8 +1837,8 @@ describe('ChartDisplay modeled power disclosures', () => {
           .and(
             'contain.text',
             locale === 'en'
-              ? 'measured Grace-socket power replaces the modeled CPU and memory'
-              : '以 Grace socket 实测功耗代替 CPU 和内存的估算值',
+              ? 'measured Grace-socket power replaces the modeled CPU and memory when the run has validated socket telemetry'
+              : '以实测功耗代替 CPU 和内存的估算值（否则二者均按模型估算）',
           )
           .should(($note) => {
             expect($note[0].scrollWidth).to.be.at.most($note[0].clientWidth);
