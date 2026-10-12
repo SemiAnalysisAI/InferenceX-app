@@ -142,4 +142,38 @@ describe('SiteSearchEngine', () => {
     expect(paths).toContain('/zh/chips/b200');
     expect(paths).toContain('/zh/agentx');
   });
+
+  it('links untranslated /zh family members to the English page instead of a 404', async () => {
+    const llms = `## Articles
+
+- [Untranslated post](https://inferencex.semianalysis.com/blog/untranslated-post): English only
+- [B200](https://inferencex.semianalysis.com/chips/b200): chip page
+`;
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const path = String(input);
+      if (path === '/llms.txt') return Promise.resolve(response(llms, 'text/plain'));
+      if (path === '/zh/blog/untranslated-post') {
+        return Promise.resolve(new Response('missing', { status: 404 }));
+      }
+      if (path === '/blog/untranslated-post') {
+        return Promise.resolve(response(html('Untranslated post', '<p>Sunflower rack scale.</p>')));
+      }
+      if (path === '/zh/chips/b200') {
+        return Promise.resolve(response(html('B200 中文', '<p>Blackwell 中文页面</p>')));
+      }
+      return Promise.resolve(new Response('missing', { status: 404 }));
+    });
+    const engine = new SiteSearchEngine('zh', fetchMock as typeof fetch);
+
+    // Before anything is crawled, seeds link the English page, which always exists.
+    await engine.seed();
+    expect(engine.search('untranslated')[0].url).toBe('/blog/untranslated-post');
+
+    engine.start();
+    await settle(engine);
+    expect(engine.search('sunflower')[0].url).toBe('/blog/untranslated-post');
+    // Translated pages switch to /zh once that page loads, replacing the English seed.
+    expect(engine.search('blackwell').map((r) => r.url)).toEqual(['/zh/chips/b200']);
+    expect(engine.search('chip').every((r) => r.url !== '/chips/b200')).toBe(true);
+  });
 });

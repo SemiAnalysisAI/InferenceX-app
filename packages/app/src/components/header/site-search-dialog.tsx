@@ -110,6 +110,9 @@ export function SiteSearchDialog({
   );
 
   useEffect(() => setActiveIndex(0), [query]);
+  // The crawl can shrink the list under the cursor; clamp so the highlight and
+  // Enter always target a real row.
+  const selected = results.length === 0 ? 0 : Math.min(activeIndex, results.length - 1);
 
   useEffect(() => {
     const trimmed = query.trim();
@@ -124,9 +127,9 @@ export function SiteSearchDialog({
 
   useEffect(() => {
     listRef.current
-      ?.querySelector<HTMLElement>(`[data-index="${activeIndex}"]`)
+      ?.querySelector<HTMLElement>(`[data-index="${selected}"]`)
       ?.scrollIntoView({ block: 'nearest' });
-  }, [activeIndex]);
+  }, [selected]);
 
   const close = () => onOpenChange(false);
 
@@ -134,13 +137,13 @@ export function SiteSearchDialog({
     if (results.length === 0) return;
     if (event.key === 'ArrowDown') {
       event.preventDefault();
-      setActiveIndex((i) => (i + 1) % results.length);
+      setActiveIndex((selected + 1) % results.length);
     } else if (event.key === 'ArrowUp') {
       event.preventDefault();
-      setActiveIndex((i) => (i - 1 + results.length) % results.length);
+      setActiveIndex((selected - 1 + results.length) % results.length);
     } else if (event.key === 'Enter') {
       event.preventDefault();
-      listRef.current?.querySelector<HTMLAnchorElement>(`[data-index="${activeIndex}"]`)?.click();
+      listRef.current?.querySelector<HTMLAnchorElement>(`[data-index="${selected}"]`)?.click();
     }
   };
 
@@ -186,7 +189,7 @@ export function SiteSearchDialog({
             role="combobox"
             aria-expanded={results.length > 0}
             aria-controls={listId}
-            aria-activedescendant={results.length > 0 ? `${listId}-${activeIndex}` : undefined}
+            aria-activedescendant={results.length > 0 ? `${listId}-${selected}` : undefined}
             aria-autocomplete="list"
             autoComplete="off"
             spellCheck={false}
@@ -248,7 +251,7 @@ export function SiteSearchDialog({
                   key={`${result.url}-${index}`}
                   id={`${listId}-${index}`}
                   role="option"
-                  aria-selected={index === activeIndex}
+                  aria-selected={index === selected}
                 >
                   <Link
                     href={result.url}
@@ -257,7 +260,7 @@ export function SiteSearchDialog({
                     data-testid="site-search-result"
                     className={cn(
                       'block rounded-md px-3 py-2.5 transition-colors',
-                      index === activeIndex ? 'bg-muted' : 'hover:bg-muted/60',
+                      index === selected ? 'bg-muted' : 'hover:bg-muted/60',
                     )}
                     onMouseMove={() => setActiveIndex(index)}
                     onClick={() => {

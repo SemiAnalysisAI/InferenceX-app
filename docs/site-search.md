@@ -15,8 +15,10 @@ site's pages. There is no search backend, API route, or build-time index.
    time. Each page's sections replace its seed doc and results refresh live. Pages whose seed
    metadata matches the current query are fetched first.
 
-The index is in memory for the tab's lifetime, one per locale. `/zh` sessions crawl `/zh`
-siblings where they exist.
+The index is in memory for the tab's lifetime, one per locale. Pages are queued and seeded by
+their English path, which always exists. `/zh` sessions try the `/zh` sibling first and link it
+only after it loads; `hasZhSibling` is a route-family check, so untranslated members such as
+some blog posts fall back to the English page instead of linking a 404.
 
 ## Ranking
 

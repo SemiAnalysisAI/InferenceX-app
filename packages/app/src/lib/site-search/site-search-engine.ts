@@ -47,9 +47,20 @@ const MAX_HTML_BYTES = 2_500_000;
 /** Core destinations crawled first so primary navigation is fully searchable. */
 const CORE_PATHS = ['/', '/agentx', '/overview', '/about', '/blog', '/ubenchx'];
 
-function localize(path: string, locale: Locale): string {
-  if (locale !== 'zh') return path;
-  return hasZhSibling(path) ? zhPath(path) : path;
+/**
+ * Candidate `/zh` URL for an English path. `hasZhSibling` is a route-family
+ * check, so some family members (untranslated blog posts) still 404 at the
+ * candidate; the crawler only links a `/zh` URL after fetching it successfully.
+ */
+function zhCandidate(path: string, locale: Locale): string | null {
+  if (locale !== 'zh' || !hasZhSibling(path)) return null;
+  return zhPath(path);
+}
+
+/** English canonical path for a (possibly `/zh`) pathname. */
+function canonicalPath(path: string): string {
+  if (path === '/zh') return '/';
+  return path.startsWith('/zh/') ? path.slice(3) : path;
 }
 
 function idle(): Promise<void> {
@@ -119,9 +130,12 @@ export class SiteSearchEngine {
   indexLiveDocument(path: string, doc: Document = document): void {
     const docs = extractSections(doc, path);
     if (docs.length === 0) return;
+    const canonical = canonicalPath(path);
+    // A live /zh page supersedes its English seed.
+    if (canonical !== path) this.index.removePage(canonical);
     this.index.replacePages(docs);
-    this.crawled.add(path);
-    this.dequeue(path);
+    this.crawled.add(canonical);
+    this.dequeue(canonical);
     this.emit();
   }
 
@@ -142,19 +156,21 @@ export class SiteSearchEngine {
     this.seeding ??= (async () => {
       for (const route of DASHBOARD_ROUTES) {
         if (route.indexable && route.navGroup === 'primary') {
-          this.enqueue(localize(route.path, this.locale));
+          this.enqueue(route.path);
         }
       }
-      for (const path of CORE_PATHS) this.enqueue(localize(path, this.locale));
+      for (const path of CORE_PATHS) this.enqueue(path);
       try {
         const res = await this.fetchImpl('/llms.txt');
         if (res.ok) {
           const origins = [SITE_URL, window.location.origin];
           const pages = parseLlmsTxt(await res.text(), origins);
           for (const page of pages) {
-            const path = localize(page.path, this.locale);
-            this.seeds.set(path, { ...page, path });
-            if (!this.index.hasPage(path)) {
+            // Queue, seed and link by the English path, which always exists;
+            // the crawl swaps in the /zh URL once that page loads.
+            const { path } = page;
+            this.seeds.set(path, page);
+            if (!this.crawled.has(path) && !this.index.hasPage(path)) {
               this.index.add({
                 url: path,
                 pageTitle: page.title,
@@ -228,33 +244,53 @@ export class SiteSearchEngine {
     }
   }
 
+  /**
+   * Fetch one page as HTML. Returns null for errors, non-HTML responses,
+   * oversized bodies and redirects to a different path (a missing `/zh` page
+   * can redirect home), so callers can fall back to another URL.
+   */
+  private async fetchHtml(url: string, signal: AbortSignal): Promise<string | null> {
+    const res = await this.fetchImpl(url, {
+      signal,
+      credentials: 'same-origin',
+      headers: { Accept: 'text/html' },
+    });
+    const type = res.headers.get('content-type') ?? '';
+    if (!res.ok || !type.includes('text/html')) return null;
+    if (res.redirected && res.url && new URL(res.url, window.location.href).pathname !== url) {
+      return null;
+    }
+    const html = await res.text();
+    return html.length > MAX_HTML_BYTES ? null : html;
+  }
+
+  /** Crawl an English canonical path, preferring its `/zh` sibling for zh sessions. */
   private async crawl(path: string): Promise<void> {
     const controller = new AbortController();
     this.controllers.add(controller);
     try {
-      const res = await this.fetchImpl(path, {
-        signal: controller.signal,
-        credentials: 'same-origin',
-        headers: { Accept: 'text/html' },
-      });
-      const type = res.headers.get('content-type') ?? '';
-      if (!res.ok || !type.includes('text/html')) {
-        this.crawled.add(path);
-        return;
+      const zh = zhCandidate(path, this.locale);
+      let url = path;
+      let html: string | null = null;
+      if (zh) {
+        html = await this.fetchHtml(zh, controller.signal);
+        if (html !== null) url = zh;
       }
-      const html = await res.text();
-      if (html.length > MAX_HTML_BYTES) {
+      html ??= await this.fetchHtml(path, controller.signal);
+      if (html === null) {
         this.crawled.add(path);
         return;
       }
       await idle();
       if (controller.signal.aborted) throw new DOMException('Aborted', 'AbortError');
       const parsed = new DOMParser().parseFromString(html, 'text/html');
-      const docs = extractSections(parsed, path);
+      const docs = extractSections(parsed, url);
       const seed = this.seeds.get(path);
       if (docs.length > 0) {
         // Prefer the curated seed title when the page's <title> is generic.
-        if (seed) for (const doc of docs) if (doc.pageTitle === path) doc.pageTitle = seed.title;
+        if (seed) for (const doc of docs) if (doc.pageTitle === url) doc.pageTitle = seed.title;
+        // The English seed is superseded by the /zh page when that loaded.
+        if (url !== path) this.index.removePage(path);
         this.index.replacePages(docs);
       }
       this.crawled.add(path);
