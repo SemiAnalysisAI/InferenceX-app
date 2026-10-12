@@ -298,15 +298,10 @@ export class SiteSearchEngine {
       }
       const { html, path: url } = page;
       const finalCanonical = canonicalPath(url);
-      if (finalCanonical !== path) {
-        // Redirected: mark the destination done too, and skip it if the live
-        // page or an earlier crawl already indexed it.
-        this.dequeue(finalCanonical);
-        if (this.crawled.has(finalCanonical)) {
-          this.crawled.add(path);
-          return;
-        }
-        this.crawled.add(finalCanonical);
+      // Redirected to a page the live DOM or an earlier crawl already indexed.
+      if (finalCanonical !== path && this.crawled.has(finalCanonical)) {
+        this.crawled.add(path);
+        return;
       }
       await idle();
       if (controller.signal.aborted) throw new DOMException('Aborted', 'AbortError');
@@ -320,7 +315,13 @@ export class SiteSearchEngine {
         if (url !== path) this.index.removePage(path);
         this.index.replacePages(docs);
       }
+      // Marked only after indexing, so an abort before this point re-queues
+      // the source and leaves the redirect destination eligible.
       this.crawled.add(path);
+      if (finalCanonical !== path) {
+        this.crawled.add(finalCanonical);
+        this.dequeue(finalCanonical);
+      }
     } catch (error) {
       if ((error as Error).name === 'AbortError') {
         // Paused mid-flight: try again on the next open.

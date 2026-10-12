@@ -216,4 +216,30 @@ describe('SiteSearchEngine', () => {
       .filter((p) => p !== '/llms.txt');
     expect(crawlOrder[0]).toBe('/chips/mi355x');
   });
+
+  it('still indexes a redirect destination after a mid-crawl pause', async () => {
+    let calls = 0;
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const path = String(input);
+      if (path !== '/ubenchx') return Promise.resolve(new Response('missing', { status: 404 }));
+      calls++;
+      const res = response(
+        html('Memory bandwidth', '<h2 id="sweep">Sweep</h2><p>Okapi bandwidth.</p>'),
+      );
+      Object.defineProperty(res, 'redirected', { value: true });
+      Object.defineProperty(res, 'url', { value: `${window.location.origin}/ubenchx/mem-bw` });
+      // First attempt: the dialog closes while the page waits for idle time
+      // to be parsed, after the redirect has already been observed.
+      if (calls === 1) setTimeout(() => engine.stop(), 5);
+      return Promise.resolve(res);
+    });
+    const engine = new SiteSearchEngine('en', fetchMock as typeof fetch);
+    engine.start();
+    await engine.seed();
+    await settle(engine);
+    engine.start();
+    await settle(engine);
+    expect(calls).toBeGreaterThanOrEqual(2);
+    expect(engine.search('okapi')[0].url).toBe('/ubenchx/mem-bw#sweep');
+  });
 });
