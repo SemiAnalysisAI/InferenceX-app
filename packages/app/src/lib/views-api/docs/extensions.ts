@@ -411,7 +411,15 @@ const NEW_VIEWS = {
   collectivex: [
     'CollectiveX EP, KV and swap views',
     'CollectiveX EP、KV 与 swap 视图',
-    { runs: objects, ep: object, kv: object, swap: object, options: object },
+    {
+      runs: objects,
+      ep: object,
+      kv: object,
+      swap: object,
+      options: object,
+      knownSupport: object,
+      knownSupportFootnotes: object,
+    },
   ],
   submissions: [
     'Submission table and weekly volume',
