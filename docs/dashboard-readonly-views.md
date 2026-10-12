@@ -28,6 +28,10 @@ runs the same `transformUbenchxRun`, `transformSmL2Run`, and `transformTpcSkylin
 Y-axis selector (MBU, bandwidth, latency) is presentation-only: every view response
 already includes all three metrics, so it adds no query parameter.
 
+The profit estimators' responsive control grouping and widths are presentation-only.
+They do not change selectors, URL parameters, calculations, or returned data, so
+the existing profit view API and `inferencex-skills` contracts are unchanged.
+
 ## Site search exclusion
 
 The header site search is presentation-only navigation over public page text. It has no

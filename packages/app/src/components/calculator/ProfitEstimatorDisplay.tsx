@@ -80,7 +80,7 @@ import {
 import { modelRoutesForTab, type ModelRouteTab } from '@/lib/routing/model-routes';
 import { useFeatureGate } from '@/lib/runtime/use-feature-gate';
 import { useLocale } from '@/lib/i18n/use-locale';
-import { getDisplayLabel } from '@/lib/shared/utils';
+import { cn, getDisplayLabel } from '@/lib/shared/utils';
 
 import {
   applyCacheHitMode,
@@ -1584,13 +1584,16 @@ function ProfitEstimatorInner({
             <DashboardSectionHeader title={t.title[basis]} actions={<ChartShareActions />} />
 
             <TooltipProvider delayDuration={0}>
-              <div className="grid min-w-0 items-start gap-4 xl:grid-cols-5">
+              <div className="grid min-w-0 items-start gap-4 xl:grid-cols-4">
                 <ControlPanel
                   legend={t.benchmarkGroup}
                   data-testid="profit-benchmark-panel"
-                  className="grid-cols-1 md:grid-cols-2 xl:col-span-2"
+                  className={cn(
+                    'grid-cols-1 items-end md:grid-cols-3 xl:[&_label]:min-h-10 xl:[&_label]:items-start',
+                    effectivePriceSource === 'custom' ? 'xl:col-span-4' : 'xl:col-span-3',
+                  )}
                 >
-                  <div className="min-w-0 md:col-span-2">
+                  <div className="min-w-0">
                     <ModelSelector
                       id="profit-model"
                       data-testid="profit-model-selector"
@@ -1601,17 +1604,7 @@ function ProfitEstimatorInner({
                       availableModels={agenticModels}
                     />
                   </div>
-                  {featureGateUnlocked && (
-                    <div className="min-w-0 md:col-span-2">
-                      <PercentileSelector
-                        id="profit-percentile"
-                        data-testid="profit-percentile-selector"
-                        value={selectedPercentile}
-                        onChange={handlePercentileChange}
-                      />
-                    </div>
-                  )}
-                  <div className="flex min-w-0 flex-col space-y-1.5 md:col-span-2">
+                  <div className="flex min-w-0 flex-col space-y-1.5">
                     <LabelWithTooltip
                       htmlFor="profit-target"
                       label={t.targetAgenticLabel(percentileLabel)}
@@ -1630,7 +1623,7 @@ function ProfitEstimatorInner({
                       onBlur={handleTargetBlur}
                     />
                   </div>
-                  <div className="flex min-w-0 flex-col space-y-1.5 md:col-span-2">
+                  <div className="flex min-w-0 flex-col space-y-1.5">
                     <LabelWithTooltip
                       htmlFor="profit-cache-hit"
                       label={t.cacheHitLabel}
@@ -1662,8 +1655,18 @@ function ProfitEstimatorInner({
                       />
                     </div>
                   </div>
+                  {featureGateUnlocked && (
+                    <div className="min-w-0">
+                      <PercentileSelector
+                        id="profit-percentile"
+                        data-testid="profit-percentile-selector"
+                        value={selectedPercentile}
+                        onChange={handlePercentileChange}
+                      />
+                    </div>
+                  )}
                   {powerControlsEnabled && (
-                    <div className="flex min-w-0 flex-col space-y-1.5 md:col-span-2">
+                    <div className="flex min-w-0 flex-col space-y-1.5">
                       <LabelWithTooltip
                         htmlFor="profit-power"
                         label={t.powerLabel}
@@ -1701,7 +1704,10 @@ function ProfitEstimatorInner({
                 <ControlPanel
                   legend={t.pricingGroup}
                   data-testid="profit-pricing-panel"
-                  className="grid-cols-1 md:grid-cols-2 xl:col-span-3"
+                  className={cn(
+                    'grid-cols-1 items-end xl:[&_label]:min-h-10 xl:[&_label]:items-start',
+                    effectivePriceSource === 'custom' && 'xl:col-span-4 xl:grid-cols-4',
+                  )}
                 >
                   <div className="flex min-w-0 flex-col space-y-1.5">
                     <LabelWithTooltip
@@ -1745,11 +1751,11 @@ function ProfitEstimatorInner({
                       />
                     </div>
                   </div>
-                  {/* Custom token prices get their own row so the main controls keep their width. */}
+                  {/* Expand pricing to a full row rather than squeezing three price inputs. */}
                   {effectivePriceSource === 'custom' && (
                     <div
                       data-testid="profit-custom-prices"
-                      className="grid min-w-0 gap-4 md:col-span-2 md:grid-cols-3"
+                      className="grid min-w-0 items-end gap-4 md:grid-cols-3 xl:col-span-3"
                     >
                       <div className="flex min-w-0 flex-col space-y-1.5">
                         <Label htmlFor="profit-input-price">{t.inputPriceLabel}</Label>
@@ -1815,7 +1821,7 @@ function ProfitEstimatorInner({
                   )}
 
                   {showsTcoBasis && (
-                    <div className="flex min-w-0 max-w-48 flex-col space-y-1.5 md:col-span-2">
+                    <div className="flex min-w-0 max-w-48 flex-col space-y-1.5">
                       <LabelWithTooltip
                         label={locale === 'zh' ? 'TCO 口径' : 'TCO Basis'}
                         tooltip={
@@ -1831,7 +1837,9 @@ function ProfitEstimatorInner({
               </div>
 
               <ControlPanel legend={t.compareHistory} data-testid="profit-history-panel">
-                <div className="grid min-w-0 gap-3 md:grid-cols-2">
+                <div
+                  className={cn('grid min-w-0 gap-3', selectedGPUs.length > 0 && 'md:grid-cols-2')}
+                >
                   <div className="flex min-w-0 flex-col space-y-1.5">
                     <LabelWithTooltip
                       htmlFor="profit-history-gpu"
