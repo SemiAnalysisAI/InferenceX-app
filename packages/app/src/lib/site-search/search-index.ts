@@ -56,6 +56,10 @@ const MAX_PREFIX_EXPANSIONS = 24;
 const SNIPPET_WORDS = 28;
 // Seeds are thin placeholders; fetched page sections should win ties.
 const SEED_PENALTY = 0.8;
+// Results scoring at least this share of the best score are "relevant" and
+// ordered by page tier first; weaker matches follow in score order so a
+// barely related main page cannot outrank a strong article match.
+const RELEVANCE_FLOOR = 0.25;
 
 export function pagePath(url: string): string {
   const hash = url.indexOf('#');
@@ -94,6 +98,12 @@ export class SiteSearchIndex {
   private totalBodyLength = 0;
   private aliveCount = 0;
   private sortedTerms: string[] | null = null;
+  private readonly tierOf: (url: string) => number;
+
+  /** `tierOf` orders relevant results by page type (lower first); default is score-only. */
+  constructor(tierOf: (url: string) => number = () => 0) {
+    this.tierOf = tierOf;
+  }
 
   get size(): number {
     return this.aliveCount;
@@ -274,12 +284,32 @@ export class SiteSearchIndex {
       .sort((a, b) => b.score - a.score);
 
     const perPageCount = new Map<string, number>();
-    const results: SearchResult[] = [];
-    for (const { id, score } of ranked) {
-      const doc = this.docs[id];
+    const seenUrls = new Set<string>();
+    const picked: { id: number; score: number }[] = [];
+    for (const entry of ranked) {
+      const doc = this.docs[entry.id];
       const count = perPageCount.get(doc.page) ?? 0;
-      if (count >= perPage) continue;
+      // Sections without their own anchor share a URL; show that link once.
+      if (count >= perPage || seenUrls.has(doc.url)) continue;
+      seenUrls.add(doc.url);
       perPageCount.set(doc.page, count + 1);
+      picked.push(entry);
+    }
+
+    const floor = (picked[0]?.score ?? 0) * RELEVANCE_FLOOR;
+    const tierOrdered = picked
+      .map((entry) => ({ ...entry, tier: this.tierOf(this.docs[entry.id].page) }))
+      .sort((a, b) => {
+        const aRelevant = a.score >= floor;
+        const bRelevant = b.score >= floor;
+        if (aRelevant !== bRelevant) return aRelevant ? -1 : 1;
+        if (aRelevant && a.tier !== b.tier) return a.tier - b.tier;
+        return b.score - a.score;
+      });
+
+    const results: SearchResult[] = [];
+    for (const { id, score } of tierOrdered) {
+      const doc = this.docs[id];
       results.push({
         url: doc.url,
         pageTitle: doc.pageTitle,

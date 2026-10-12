@@ -300,6 +300,7 @@ describe('Header', () => {
         const bounds = $header[0].getBoundingClientRect();
         const selectors = [
           '[data-testid="header-brand"]',
+          '[data-testid="site-search-toggle"]',
           '[data-testid="language-toggle"]',
           '[data-testid="theme-toggle"]',
           '[data-testid="mobile-menu-toggle"]',
@@ -322,7 +323,11 @@ describe('Header', () => {
     });
 
     it('gives the icon controls a 44px touch target in both dimensions', () => {
-      ['[data-testid="theme-toggle"]', '[data-testid="mobile-menu-toggle"]'].forEach((selector) => {
+      [
+        '[data-testid="site-search-toggle"]',
+        '[data-testid="theme-toggle"]',
+        '[data-testid="mobile-menu-toggle"]',
+      ].forEach((selector) => {
         rectOf(selector).then((rect) => {
           expect(rect.width, `${selector} width`).to.be.at.least(MIN_TOUCH_PX - EPSILON);
           expect(rect.height, `${selector} height`).to.be.at.least(MIN_TOUCH_PX - EPSILON);

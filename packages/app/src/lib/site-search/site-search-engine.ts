@@ -3,6 +3,7 @@ import { SITE_URL } from '@semianalysisai/inferencex-constants';
 import { hasZhSibling, type Locale, zhPath } from '@/lib/i18n/i18n';
 import { DASHBOARD_ROUTES } from '@/lib/routing/dashboard-routes';
 
+import { pageTier } from './page-tiers';
 import { extractSections, parseLlmsTxt, type SeedPage } from './extract';
 import { type SearchResult, SiteSearchIndex } from './search-index';
 import { tokenize } from './tokenize';
@@ -67,7 +68,7 @@ function saveDataEnabled(): boolean {
 }
 
 export class SiteSearchEngine {
-  readonly index = new SiteSearchIndex();
+  readonly index = new SiteSearchIndex(pageTier);
   private readonly locale: Locale;
   private readonly fetchImpl: typeof fetch;
   private queue: string[] = [];

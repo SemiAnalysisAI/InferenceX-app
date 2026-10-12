@@ -254,8 +254,9 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
             ))}
           </nav>
 
-          {/* Right side */}
-          <div className="ml-auto flex items-center gap-2">
+          {/* Right side. Tighter gaps below `sm` keep five 44px touch targets
+              (search, language, theme, menu) inside a 320px header. */}
+          <div className="ml-auto flex items-center gap-0.5 sm:gap-2">
             <span className="hidden sm:flex">
               <GitHubStars owner="SemiAnalysisAI" repo="InferenceX" starCount={starCount} />
             </span>

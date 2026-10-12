@@ -28,7 +28,12 @@ siblings where they exist.
 - Concept groups in `concepts.ts` give semantic reach without an embedding model: "energy"
   matches power and J/token content, "cheapest" matches TCO. Concept-only matches score lower
   and earn partial coverage credit, so literal matches of every query term rank first.
-- At most two sections per page are shown.
+- At most two sections per page are shown, and each URL appears once.
+- Results are ordered by page type (`page-tiers.ts`): main pages (landing, AgentX, every
+  dashboard tab, About, uBenchX) first, then reference pages (chips, comparisons, rankings,
+  models, glossary), then Overview, then articles (blog and whitepapers). Tier ordering applies
+  only to results scoring at least 25% of the best match; weaker matches follow in score order,
+  so a barely related main page cannot outrank a strong article match.
 
 Chinese text is indexed as character bigrams. Concept groups include Chinese members.
 

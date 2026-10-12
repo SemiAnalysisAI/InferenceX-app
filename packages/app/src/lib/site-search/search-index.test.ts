@@ -172,4 +172,25 @@ describe('buildSnippet', () => {
     const parts = buildSnippet('每 token 能耗在仪表板上持续测量', new Set(['能耗']));
     expect(parts.filter((part) => part.hit).map((part) => part.text)).toEqual(['能耗']);
   });
+
+  it('shows a URL once even when several unanchored sections match', () => {
+    const index = new SiteSearchIndex();
+    index.replacePages([
+      {
+        url: '/ubenchx',
+        pageTitle: 'uBenchX',
+        section: 'MI355X bandwidth',
+        text: 'MI355X',
+        source: 'page',
+      },
+      {
+        url: '/ubenchx',
+        pageTitle: 'uBenchX',
+        section: 'MI355X latency',
+        text: 'MI355X',
+        source: 'page',
+      },
+    ]);
+    expect(index.search('mi355x').map((r) => r.url)).toEqual(['/ubenchx']);
+  });
 });
