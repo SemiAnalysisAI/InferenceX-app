@@ -77,12 +77,21 @@ jobs:
         env:
           CI: true
           # cypress-split picks this shard's component specs, balanced by the
-          # committed component-timings.json; timing updates go to a throwaway file.
+          # committed component-timings.json.
           SPLIT: 4
           SPLIT_INDEX1: ${{ matrix.shard }}
           SPLIT_FILE: component-timings.json
           SPLIT_OUTPUT_FILE: /tmp/cypress-split-component-out.json
           SPLIT_SUMMARY: 'false'
+          CYPRESS_TIMING_OUTPUT: /tmp/cypress-timings/observation.json
+      - name: Upload component timing observations
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: cypress-timings-component-chrome-${{ matrix.shard }}
+          path: /tmp/cypress-timings/observation.json
+          if-no-files-found: error
+          retention-days: 14
 
   cypress:
     name: E2E (${{ matrix.browser }}, shard ${{ matrix.shard }})
@@ -201,10 +210,56 @@ jobs:
           # cypress-split picks the subset of specs for this shard.
           # SPLIT_INDEX1 is 1-based to match matrix.shard values [1..8].
           # SPLIT_FILE seeds the balance from observed timings;
-          # SPLIT_OUTPUT_FILE redirects on-disk updates to a throwaway path
-          # so CI never tries to mutate the committed timings.json.
+          # Each browser uses its own measurements. Raw per-test observations
+          # are uploaded separately; the plugin's merged output is not evidence.
           SPLIT: 8
           SPLIT_INDEX1: ${{ matrix.shard }}
-          SPLIT_FILE: timings.json
+          SPLIT_FILE: ${{ matrix.browser == 'firefox' && 'timings-firefox.json' || 'timings.json' }}
           SPLIT_OUTPUT_FILE: /tmp/cypress-split-out.json
           SPLIT_SUMMARY: 'false'
+          CYPRESS_TIMING_OUTPUT: /tmp/cypress-timings/observation.json
+      - name: Upload integration timing observations
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: cypress-timings-e2e-${{ matrix.browser }}-${{ matrix.shard }}
+          path: /tmp/cypress-timings/observation.json
+          if-no-files-found: error
+          retention-days: 14
+
+  timings:
+    name: Validate timings and shard balance
+    needs: [component-tests, cypress]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+      - run: bun install --frozen-lockfile
+        env:
+          CYPRESS_INSTALL_BINARY: '0'
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          pattern: cypress-timings-*
+          path: timing-observations
+      - name: Validate complete observations and generate baselines
+        run: bun packages/app/scripts/refresh-cypress-timings.ts timing-observations
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: cypress-timing-baselines
+          path: |
+            packages/app/timings.json
+            packages/app/timings-firefox.json
+            packages/app/component-timings.json
+            packages/app/cypress-balance.json
+          if-no-files-found: error
+          retention-days: 14
