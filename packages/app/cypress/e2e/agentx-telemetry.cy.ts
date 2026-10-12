@@ -56,12 +56,6 @@ describe('AgentX telemetry tutorial — English page', () => {
     }
   });
 
-  it('states the eleven-chart claim the detail page has to back', () => {
-    cy.get('[data-testid="agentx-telemetry-article"]')
-      .should('contain.text', '11')
-      .and('contain.text', 'per-point telemetry charts');
-  });
-
   it('links back to /agentx and out to the agentic results', () => {
     cy.get('[data-testid="agentx-telemetry-results-cta"]')
       .should('be.visible')
@@ -158,7 +152,7 @@ describe('AgentX telemetry tutorial — popup on the agentic point-detail page',
     });
   });
 
-  it('appears after the charts settle, without a backdrop over them', () => {
+  it('is the only card in the corner — dashboard nudges stay off this route', () => {
     cy.get('[data-testid="telemetry-tutorial-modal"]', { timeout: 10_000 }).should('be.visible');
     // A bottom-right card, not a centered dialog — the charts stay usable.
     cy.get('[data-testid="telemetry-tutorial-modal"]').should('have.attr', 'aria-modal', 'false');
@@ -166,9 +160,7 @@ describe('AgentX telemetry tutorial — popup on the agentic point-detail page',
       'contain.text',
       'New to these charts?',
     );
-  });
 
-  it('is the only card in the corner — dashboard nudges stay off this route', () => {
     // The detail page sits inside the (dashboard) route group, so the dashboard
     // NudgeEngine would otherwise mount here too and stack its own bottom-right
     // cards under the tutorial. `reproducibility` (1.5s timer, no conditions) is

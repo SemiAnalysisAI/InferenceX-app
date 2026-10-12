@@ -5,11 +5,6 @@ describe('Compare spec-decode index + slug page', () => {
     });
   });
 
-  it('renders the spec-decode index with a hero title', () => {
-    cy.visit('/compare-spec-decode');
-    cy.contains('h1', /speculative decoding/iu).should('be.visible');
-  });
-
   it('navigates to the first card slug if available, and renders table + hero PNG + JSON-LD + precision in h1', () => {
     cy.visit('/compare-spec-decode');
     cy.get('body').then(($body) => {

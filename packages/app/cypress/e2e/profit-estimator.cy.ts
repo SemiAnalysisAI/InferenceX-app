@@ -474,9 +474,7 @@ describe('Profit Estimator per GW', () => {
     cy.get('[data-testid="footer-link-fleet"]')
       .should('have.attr', 'href', '/fleet')
       .and('contain.text', 'Fleet Lifecycle');
-  });
 
-  it('stacks TCO first and labels every bar with its revenue', () => {
     chart()
       .find('rect.bar-tco')
       .its('length')
@@ -529,6 +527,11 @@ describe('Profit Estimator per GW', () => {
 
     cy.get('[data-testid="profit-utilization-input"]').clear().type('60').blur();
     cy.get('[data-testid="profit-formula-notes"]').should('contain.text', '60% utilization');
+
+    cy.get('[data-testid="profit-target-input"]').clear().type('60').blur();
+    cy.get('[data-testid="profit-caption"] h2').should('contain.text', 'at P90 60 tok/s/user');
+    cy.get('[data-testid="profit-target-input"]').clear().type('45').blur();
+    cy.get('[data-testid="profit-caption"] h2').should('contain.text', 'at P90 45 tok/s/user');
   });
 
   it('clamps utilization and the license fee to 0–100 on blur', () => {
@@ -542,13 +545,6 @@ describe('Profit Estimator per GW', () => {
     );
     cy.get('[data-testid="profit-lab-cut-input"]').clear().type('30').blur();
     cy.get('[data-testid="profit-lab-cut-input"]').should('have.value', '30');
-  });
-
-  it('retypes the target interactivity and rewrites the heading', () => {
-    cy.get('[data-testid="profit-target-input"]').clear().type('60').blur();
-    cy.get('[data-testid="profit-caption"] h2').should('contain.text', 'at P90 60 tok/s/user');
-    cy.get('[data-testid="profit-target-input"]').clear().type('45').blur();
-    cy.get('[data-testid="profit-caption"] h2').should('contain.text', 'at P90 45 tok/s/user');
   });
 
   it('uses the SKU legend as the bar filter', () => {

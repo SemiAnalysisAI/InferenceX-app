@@ -76,9 +76,7 @@ describe('Agentic Workload Explorer', () => {
     cy.location('pathname').should('eq', '/agentic-workload-explorer/sessions');
     cy.wait('@sessions');
     cy.get('a[href^="/agentic-workload-explorer/sessions/"]').should('have.length.at.least', 1);
-  });
 
-  it('keeps Chinese pages and in-explorer links under /zh', () => {
     cy.visit('/zh/agentic-workload-explorer/sessions');
     cy.wait('@sessions');
     cy.get('[data-testid="agentic-workload-explorer"]').should('contain.text', '冻结快照');

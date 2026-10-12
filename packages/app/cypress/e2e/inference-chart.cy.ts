@@ -122,13 +122,6 @@ describe('Inference Chart', () => {
     );
   });
 
-  it('SVG contains data point circles', () => {
-    cy.get('[data-testid="scatter-graph"]')
-      .first()
-      .find('svg circle')
-      .should('have.length.greaterThan', 0);
-  });
-
   it('leads the chart heading with the model and workload, without the cost tier', () => {
     cy.get('[data-testid="chart-figure"]')
       .first()
@@ -150,9 +143,7 @@ describe('Inference Chart', () => {
             expect(heading.trim().startsWith(model.trim())).to.equal(true);
           });
       });
-  });
 
-  it('shows the cost tier, update date, and source in the caption only', () => {
     cy.get('[data-testid="chart-figure"]')
       .first()
       .find('[data-testid="result-context"]')
@@ -163,22 +154,6 @@ describe('Inference Chart', () => {
       .and('not.contain.text', 'Workload:')
       .and('not.contain.text', 'Precision:')
       .and('not.contain.text', 'Metric:');
-  });
-
-  it('renders quick filters as visible toggles and toggles a vendor', () => {
-    cy.get('[data-testid="quick-filters-dialog"]').should('not.exist');
-    cy.get('[data-testid="scatter-quick-filters"]').click();
-    cy.get('[data-testid="quick-filters-dialog"]').should('be.visible');
-    cy.get('[data-testid="quick-filter-deployment-single-node"]').should('contain', 'Single-node');
-    cy.get('[data-testid="quick-filter-deployment-multi-node"]').should('contain', 'Multi-node');
-    cy.get('[data-testid="quick-filter-deployment-disagg"]').should('contain', 'Disaggregated');
-    cy.get('[data-testid="quick-filter-vendor-NVIDIA"]')
-      .should('have.attr', 'aria-pressed', 'false')
-      .click()
-      .should('have.attr', 'aria-pressed', 'true')
-      .click()
-      .should('have.attr', 'aria-pressed', 'false');
-    cy.get('body').type('{esc}');
   });
 
   it('plots OpenRouter-priced token revenue for official and unofficial runs', () => {

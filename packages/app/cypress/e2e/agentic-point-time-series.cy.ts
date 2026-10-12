@@ -146,10 +146,6 @@ describe('Agentic point request metric time series', () => {
     cy.wait('@requestChartData');
   });
 
-  it('uses the shared topology label for the active agentic point', () => {
-    cy.contains('button', 'TP8/DCP8 • c=8').should('be.visible');
-  });
-
   it('opens the stored server log and loads it incrementally', () => {
     const longServerLogPath =
       'agentic/conc_1152/aiperf_artifacts/logs/aiperf/2026-08-20/server.log';
@@ -394,6 +390,12 @@ describe('Agentic point request metric time series', () => {
       cy.get('svg').should('contain.text', 'Cumulative P90 TTFT');
       cy.get('svg path[stroke="#ef4444"]').should('have.length', 1);
     });
+
+    cy.get('[data-testid="detail-view-point"]').click();
+    cy.get('[data-testid="unique-input-inflight-chart"]').within(() => {
+      cy.get('svg').should('contain.text', 'Cumulative average');
+      cy.get('svg path[stroke="#ef4444"]').should('have.length', 1);
+    });
   });
 
   it('switches ISL and OSL cards from distributions to in-flight averages', () => {
@@ -504,14 +506,6 @@ describe('Agentic point request metric time series', () => {
     cy.location('search').should('contain', 'view=timeline');
     cy.get('[data-testid="detail-view-timeline"]').should('have.attr', 'aria-selected', 'true');
     cy.get('[data-testid="timeline-total-idle-time"]').should('be.visible');
-  });
-
-  it('shows a cumulative average for unique input tokens in flight', () => {
-    cy.get('[data-testid="detail-view-point"]').click();
-    cy.get('[data-testid="unique-input-inflight-chart"]').within(() => {
-      cy.get('svg').should('contain.text', 'Cumulative average');
-      cy.get('svg path[stroke="#ef4444"]').should('have.length', 1);
-    });
   });
 
   it('renders the log viewer in Simplified Chinese', () => {

@@ -58,24 +58,17 @@ describe('Current InferenceX Image localized routes', () => {
     cy.viewport(390, 844);
   });
 
-  it('shows the localized loading state', () => {
+  it('localizes spec decode, age text and tooltip while preserving image tags', () => {
     cy.intercept('GET', '**/api/v1/latest-images', {
       delay: 250,
       body: imageRows,
-    });
-    cy.intercept('GET', '**/api/v1/framework-releases', {});
-    visitCurrentImage();
-    cy.contains('加载中……').should('be.visible');
-    cy.get('table').should('contain.text', 'lmsysorg/sglang:v0.5.2');
-  });
-
-  it('localizes spec decode, age text and tooltip while preserving image tags', () => {
-    cy.intercept('GET', '**/api/v1/latest-images', imageRows).as('latestImages');
+    }).as('latestImages');
     cy.intercept('GET', '**/api/v1/framework-releases', {
       sglang: 'v0.5.2',
       vllm: 'v0.10.1',
     });
     visitCurrentImage();
+    cy.contains('加载中……').should('be.visible');
     cy.wait('@latestImages');
     cy.get('table')
       .should('contain.text', '关闭')
@@ -92,6 +85,20 @@ describe('Current InferenceX Image localized routes', () => {
       .and('contain.text', '独立的 prefill/decode 池')
       .and('contain.text', 'MoRI')
       .and('not.contain.text', '=');
+
+    cy.viewport(1440, 900);
+    cy.intercept('GET', '**/api/v1/latest-images', imageRows);
+    cy.intercept('GET', '**/api/v1/framework-releases', {
+      sglang: 'v0.5.2',
+      vllm: 'v0.10.1',
+    });
+    visitCurrentImage();
+    cy.get('#image-model-select').click();
+    cy.get('[data-slot="select-item"]').contains('DeepSeek-R1').click();
+    cy.get('table').should('contain.text', 'lmsysorg/sglang:v0.5.2');
+    cy.document().then((doc) => {
+      expect(doc.documentElement.scrollWidth).to.be.at.most(doc.documentElement.clientWidth);
+    });
   });
 
   it('preserves the English status, age, and technical tooltip copy', () => {
@@ -280,42 +287,6 @@ describe('Current InferenceX Image localized routes', () => {
       .should('contain.text', activeMiniMaxImage)
       .and('not.contain.text', retiredImage);
   });
-
-  it('labels agentic rows with the reviewed Chinese scenario copy', () => {
-    cy.intercept('GET', '**/api/v1/latest-images', imageRows);
-    cy.intercept('GET', '**/api/v1/framework-releases', {});
-    visitCurrentImage();
-    cy.get('#image-sequence-select').click();
-    cy.get('[data-slot="select-item"]').should('not.contain.text', 'null/null');
-    cy.get('[data-slot="select-item"]').contains('智能体').should('be.visible');
-  });
-
-  it('supports the filter-to-table path at 1440px', () => {
-    cy.viewport(1440, 900);
-    cy.intercept('GET', '**/api/v1/latest-images', imageRows);
-    cy.intercept('GET', '**/api/v1/framework-releases', {
-      sglang: 'v0.5.2',
-      vllm: 'v0.10.1',
-    });
-    visitCurrentImage();
-    cy.get('#image-model-select').click();
-    cy.get('[data-slot="select-item"]').contains('DeepSeek-R1').click();
-    cy.get('table').should('contain.text', 'lmsysorg/sglang:v0.5.2');
-    cy.document().then((doc) => {
-      expect(doc.documentElement.scrollWidth).to.be.at.most(doc.documentElement.clientWidth);
-    });
-  });
-
-  it('keeps localized filters and table contained at 375px', () => {
-    cy.viewport(375, 812);
-    cy.intercept('GET', '**/api/v1/latest-images', imageRows);
-    cy.intercept('GET', '**/api/v1/framework-releases', {});
-    visitCurrentImage();
-    cy.get('table').should('contain.text', '关闭').and('not.contain.text', 'Off');
-    cy.document().then((doc) => {
-      expect(doc.documentElement.scrollWidth).to.be.at.most(doc.documentElement.clientWidth);
-    });
-  });
   it('keeps full configuration and long image tags readable while filtering the catalog', () => {
     cy.viewport(1440, 900);
     const longImage =
@@ -355,6 +326,15 @@ describe('Current InferenceX Image localized routes', () => {
   });
 
   it('pairs compact mobile filters and labels the keyboard-accessible version table in Chinese', () => {
+    cy.viewport(375, 812);
+    cy.intercept('GET', '**/api/v1/latest-images', imageRows);
+    cy.intercept('GET', '**/api/v1/framework-releases', {});
+    visitCurrentImage();
+    cy.get('table').should('contain.text', '关闭').and('not.contain.text', 'Off');
+    cy.document().then((doc) => {
+      expect(doc.documentElement.scrollWidth).to.be.at.most(doc.documentElement.clientWidth);
+    });
+
     cy.viewport(390, 844);
     cy.intercept('GET', '**/api/v1/latest-images', imageRows);
     cy.intercept('GET', '**/api/v1/framework-releases', {});

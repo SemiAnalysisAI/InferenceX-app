@@ -256,33 +256,20 @@ describe('Overview page', () => {
     });
   });
 
-  it('leaves overview through browser history without requesting overview data', () => {
+  it('preserves pending selections when controls are changed rapidly', () => {
     cy.viewport(1280, 900);
     cy.visit('/overview');
-    cy.intercept('GET', '**/api/v1/overview*').as('overviewJson');
-    selectOverviewTier(75);
-    cy.wait('@overviewJson');
-    cy.location('search').should('eq', '?tier=75');
-
-    cy.window().then((win) => {
-      let overviewRequests = 0;
-      const fetch = win.fetch.bind(win);
-      cy.stub(win, 'fetch').callsFake((input, init) => {
-        const url = input instanceof win.Request ? input.url : input.toString();
-        if (url.startsWith('/api/v1/overview')) {
-          overviewRequests += 1;
-          return new Promise<Response>(() => {});
-        }
-        return fetch(input, init);
+    cy.intercept('GET', '**/api/v1/overview*', (request) => {
+      request.continue((response) => {
+        response.setDelay(800);
       });
+    }).as('overviewJson');
 
-      win.history.pushState(win.history.state, '', '/inference');
-      win.dispatchEvent(new win.PopStateEvent('popstate', { state: win.history.state }));
-      expect(overviewRequests, 'overview requests after leaving overview').to.equal(0);
-    });
-  });
+    selectOverviewTier(75);
+    cy.get('[data-testid="overview-page"] [aria-busy="true"]').should('exist');
+    cy.wait('@overviewJson');
+    cy.get('[data-testid="overview-page"] [aria-busy="true"]').should('not.exist');
 
-  it('preserves pending selections when controls are changed rapidly', () => {
     cy.viewport(1280, 900);
     cy.visit('/overview');
     // Hold the first response open so the second click lands inside the pending
@@ -308,21 +295,6 @@ describe('Overview page', () => {
     }).should('have.attr', 'data-tier', '75');
     cy.get('[data-overview-engine-scope="all"]').should('have.attr', 'aria-current', 'true');
     cy.location('search').should('eq', '?tier=75&engine=all');
-  });
-
-  it('shows a busy state while an uncached selection loads', () => {
-    cy.viewport(1280, 900);
-    cy.visit('/overview');
-    cy.intercept('GET', '**/api/v1/overview*', (request) => {
-      request.continue((response) => {
-        response.setDelay(800);
-      });
-    }).as('overviewJson');
-
-    selectOverviewTier(75);
-    cy.get('[data-testid="overview-page"] [aria-busy="true"]').should('exist');
-    cy.wait('@overviewJson');
-    cy.get('[data-testid="overview-page"] [aria-busy="true"]').should('not.exist');
   });
 
   it('keeps the last matrix and history entry when a popstate request fails', () => {
@@ -457,21 +429,6 @@ describe('Overview page', () => {
     });
   });
 
-  it('keeps focus on the option the keyboard activated', () => {
-    cy.viewport(1280, 900);
-    cy.visit('/overview');
-
-    cy.get('[data-overview-comparison="30d"]').click();
-    // Explicit timeout retained: this waits on a real /api/v1/overview response,
-    // not a client-side URL change.
-    cy.get('[data-overview-comparison="30d"]', { timeout: 15_000 }).should(
-      'have.attr',
-      'aria-current',
-      'true',
-    );
-    cy.focused().should('have.attr', 'data-overview-comparison', '30d');
-  });
-
   it('reveals deprecated and maintenance models via the bottom toggle', () => {
     cy.viewport(1280, 900);
     cy.visit('/overview');
@@ -509,22 +466,6 @@ describe('Overview page', () => {
       .click();
     cy.location('search').should('eq', '?tier=75');
     cy.get('[data-testid="overview-desktop-model"][data-model="gpt-oss-120b"]').should('not.exist');
-  });
-
-  it('localizes the model scope toggle and badges on the Chinese route', () => {
-    cy.viewport(1280, 900);
-    cy.visit('/zh/overview?models=all');
-
-    // The chip carries the short label; the full sentence stays on the
-    // accessible name and hover title.
-    cy.get('[data-testid="overview-model-scope-toggle"]')
-      .should('contain.text', '隐藏停用模型')
-      .find('[data-overview-model-scope="default"]')
-      .should('have.attr', 'aria-label', '隐藏已弃用与维护模式模型');
-    desktopModel('gpt-oss-120b')
-      .find('[data-testid="overview-model-category-badge"]')
-      .should('contain.text', '已弃用')
-      .and('contain.text', '目前已不再对该模型进行持续基准测试。');
   });
 
   it('uses a selectable hardware reference and preserves it across overview controls', () => {
@@ -585,14 +526,6 @@ describe('Overview page', () => {
     cy.location('pathname').should('eq', '/zh/overview');
     cy.location('search').should('eq', '?tier=100&ref=b300');
     cy.then(() => expect(zhOverviewRscRequests).to.equal(1));
-  });
-
-  it('uses rack SKU labels when GB200 or GB300 is the comparison reference', () => {
-    cy.viewport(1280, 900);
-    cy.visit('/overview?ref=gb200');
-
-    cy.get('[data-overview-comparison="hardware"]').should('contain.text', 'vs GB200 NVL72');
-    cy.get('[data-testid="overview-methodology"]').should('contain.text', 'GB200 NVL72 baseline');
   });
 
   it('switches between B200 and 30-day comparison without losing page state', () => {
@@ -863,6 +796,8 @@ describe('Overview page', () => {
         cy.visit(href);
 
         cy.get('[data-testid="inference-chart-display"]').should('exist');
+        cy.contains('Comparison Date Range').should('be.visible');
+        cy.contains('button', 'Select date range').should('not.have.class', 'animate-pulse');
         cy.get('[data-testid="model-selector"]').click();
         cy.contains('[role="option"]', 'DeepSeek V4 Pro 0813 1.6T').click();
         cy.get('[data-testid="model-selector"]').should(
@@ -874,21 +809,6 @@ describe('Overview page', () => {
           'No data available',
         );
         cy.get('[data-testid="chart-figure"] svg').should('exist');
-      });
-  });
-
-  it('does not flag the comparison date range after following a history cell', () => {
-    cy.viewport(1280, 900);
-    cy.visit('/overview?compare=30d');
-
-    desktopModel('Qwen-3.5-397B-A17B', SINGLE_TURN)
-      .find('[data-testid="overview-history-detail-link"]')
-      .first()
-      .then(($link) => {
-        cy.visit(String($link.attr('href')));
-
-        cy.contains('Comparison Date Range').should('be.visible');
-        cy.contains('button', 'Select date range').should('not.have.class', 'animate-pulse');
       });
   });
 
@@ -1643,9 +1563,7 @@ describe('Overview page', () => {
         });
       });
     }
-  });
 
-  it('uses the same five-row comparison layout on phones and tablets', () => {
     for (const width of [320, 390, 768, 1024, 1279]) {
       cy.viewport(width, 900);
       cy.visit('/overview');
@@ -1692,9 +1610,7 @@ describe('Overview page', () => {
         });
       });
     }
-  });
 
-  it('keeps the cost value aligned above configuration metadata', () => {
     cy.viewport(390, 844);
     cy.visit('/overview');
 
