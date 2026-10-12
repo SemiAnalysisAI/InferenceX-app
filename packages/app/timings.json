@@ -5015,6 +5015,10 @@
       ]
     },
     {
+      "spec": "cypress/e2e/site-search.cy.ts",
+      "duration": 9000
+    },
+    {
       "spec": "cypress/e2e/throughput-calculator.cy.ts",
       "duration": 30854,
       "tests": [

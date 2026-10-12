@@ -22,6 +22,7 @@ import { cn } from '@/lib/shared/utils';
 
 import { GitHubStars } from './GithubStars';
 import { InferenceXWordmark } from './inferencex-wordmark';
+import { SiteSearchButton } from './site-search-button';
 
 const DASHBOARD_TABS = DASHBOARD_ROUTES.map((route) => route.path);
 
@@ -258,6 +259,7 @@ export const Header = ({ starCount }: { starCount?: number | null }) => {
             <span className="hidden sm:flex">
               <GitHubStars owner="SemiAnalysisAI" repo="InferenceX" starCount={starCount} />
             </span>
+            <SiteSearchButton />
             <LanguageToggle pathname={pathname} router={router} />
             {/* Below `sm` these move into the mobile menu — they are what push
                 a 320px header past its bounds in minecraft mode. */}
