@@ -93,6 +93,7 @@ export class SiteSearchEngine {
   private seeding: Promise<void> | null = null;
   private controllers = new Set<AbortController>();
   private version = 0;
+  private lastQuery = '';
 
   constructor(locale: Locale, fetchImpl: typeof fetch = (...args) => fetch(...args)) {
     this.locale = locale;
@@ -195,6 +196,9 @@ export class SiteSearchEngine {
    * queue, so the pages most likely to answer it are fetched next.
    */
   prioritize(query: string): void {
+    // Remembered so seeds that arrive after the user started typing are
+    // reordered too (see `start`).
+    this.lastQuery = query;
     const terms = new Set(tokenize(query));
     if (terms.size === 0 || this.queue.length === 0) return;
     const score = (path: string) => {
@@ -217,7 +221,10 @@ export class SiteSearchEngine {
   start(): void {
     if (this.running) return;
     this.running = true;
-    void this.seed().then(() => this.pump());
+    void this.seed().then(() => {
+      this.prioritize(this.lastQuery);
+      this.pump();
+    });
     this.emit();
   }
 
@@ -245,11 +252,15 @@ export class SiteSearchEngine {
   }
 
   /**
-   * Fetch one page as HTML. Returns null for errors, non-HTML responses,
-   * oversized bodies and redirects to a different path (a missing `/zh` page
-   * can redirect home), so callers can fall back to another URL.
+   * Fetch one page as HTML and report the final same-origin path after
+   * redirects (`/ubenchx` lands on `/ubenchx/mem-bw`), so sections are indexed
+   * and deep-linked where they actually live. Returns null for errors,
+   * non-HTML responses, oversized bodies and cross-origin redirects.
    */
-  private async fetchHtml(url: string, signal: AbortSignal): Promise<string | null> {
+  private async fetchHtml(
+    url: string,
+    signal: AbortSignal,
+  ): Promise<{ html: string; path: string } | null> {
     const res = await this.fetchImpl(url, {
       signal,
       credentials: 'same-origin',
@@ -257,11 +268,14 @@ export class SiteSearchEngine {
     });
     const type = res.headers.get('content-type') ?? '';
     if (!res.ok || !type.includes('text/html')) return null;
-    if (res.redirected && res.url && new URL(res.url, window.location.href).pathname !== url) {
-      return null;
+    let path = url;
+    if (res.redirected && res.url) {
+      const final = new URL(res.url, window.location.href);
+      if (final.origin !== window.location.origin) return null;
+      path = final.pathname.replace(/(?<=.)\/$/u, '');
     }
     const html = await res.text();
-    return html.length > MAX_HTML_BYTES ? null : html;
+    return html.length > MAX_HTML_BYTES ? null : { html, path };
   }
 
   /** Crawl an English canonical path, preferring its `/zh` sibling for zh sessions. */
@@ -270,16 +284,29 @@ export class SiteSearchEngine {
     this.controllers.add(controller);
     try {
       const zh = zhCandidate(path, this.locale);
-      let url = path;
-      let html: string | null = null;
+      let page: { html: string; path: string } | null = null;
       if (zh) {
-        html = await this.fetchHtml(zh, controller.signal);
-        if (html !== null) url = zh;
+        page = await this.fetchHtml(zh, controller.signal);
+        // A missing /zh page can redirect elsewhere (e.g. the /zh home); only
+        // accept the candidate itself or a page beneath it.
+        if (page && page.path !== zh && !page.path.startsWith(`${zh}/`)) page = null;
       }
-      html ??= await this.fetchHtml(path, controller.signal);
-      if (html === null) {
+      page ??= await this.fetchHtml(path, controller.signal);
+      if (page === null) {
         this.crawled.add(path);
         return;
+      }
+      const { html, path: url } = page;
+      const finalCanonical = canonicalPath(url);
+      if (finalCanonical !== path) {
+        // Redirected: mark the destination done too, and skip it if the live
+        // page or an earlier crawl already indexed it.
+        this.dequeue(finalCanonical);
+        if (this.crawled.has(finalCanonical)) {
+          this.crawled.add(path);
+          return;
+        }
+        this.crawled.add(finalCanonical);
       }
       await idle();
       if (controller.signal.aborted) throw new DOMException('Aborted', 'AbortError');

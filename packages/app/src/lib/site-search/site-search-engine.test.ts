@@ -176,4 +176,44 @@ describe('SiteSearchEngine', () => {
     expect(engine.search('blackwell').map((r) => r.url)).toEqual(['/zh/chips/b200']);
     expect(engine.search('chip').every((r) => r.url !== '/chips/b200')).toBe(true);
   });
+
+  it('indexes redirected pages under their final path so anchors survive', async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const path = String(input);
+      if (path === '/ubenchx') {
+        const res = response(
+          html('Memory bandwidth', '<h2 id="sweep">Sweep</h2><p>Zebrafish bandwidth.</p>'),
+        );
+        Object.defineProperty(res, 'redirected', { value: true });
+        Object.defineProperty(res, 'url', { value: `${window.location.origin}/ubenchx/mem-bw` });
+        return Promise.resolve(res);
+      }
+      return Promise.resolve(new Response('missing', { status: 404 }));
+    });
+    const engine = new SiteSearchEngine('en', fetchMock as typeof fetch);
+    engine.start();
+    await engine.seed();
+    await settle(engine);
+    expect(engine.search('zebrafish')[0].url).toBe('/ubenchx/mem-bw#sweep');
+  });
+
+  it('applies a query typed before the seed list loads to the seeded queue', async () => {
+    const { promise: seedsLoaded, resolve: releaseSeeds } = Promise.withResolvers<Response>();
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const path = String(input);
+      if (path === '/llms.txt') return seedsLoaded;
+      return Promise.resolve(response(html(path, `<p>${path}</p>`)));
+    });
+    const engine = new SiteSearchEngine('en', fetchMock as typeof fetch);
+    engine.start();
+    // The user types while /llms.txt is still in flight.
+    engine.prioritize('mi355x');
+    releaseSeeds(response(LLMS_TXT, 'text/plain'));
+    await engine.seed();
+    await settle(engine);
+    const crawlOrder = fetchMock.mock.calls
+      .map(([input]) => String(input))
+      .filter((p) => p !== '/llms.txt');
+    expect(crawlOrder[0]).toBe('/chips/mi355x');
+  });
 });
