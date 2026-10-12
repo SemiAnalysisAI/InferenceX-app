@@ -28,6 +28,12 @@ runs the same `transformUbenchxRun`, `transformSmL2Run`, and `transformTpcSkylin
 Y-axis selector (MBU, bandwidth, latency) is presentation-only: every view response
 already includes all three metrics, so it adds no query parameter.
 
+## Site search exclusion
+
+The header site search is presentation-only navigation over public page text. It has no
+data selector, filter, unit or calculation and calls no `/api/v1` route, so it needs no view
+API or skills entry. See [Site Search](./site-search.md).
+
 ## Exact query-key inventory
 
 All endpoints are GET under /api/v1/views. Unsupported and repeated keys return 400.
