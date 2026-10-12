@@ -7,7 +7,7 @@ import { SITE_URL } from '@semianalysisai/inferencex-constants';
 
 const TITLE = 'AgentX 行业影响：面向智能体负载的优化';
 const DESCRIPTION =
-  'AgentX 推动了 vLLM、SGLang、TensorRT-LLM、ATOM、AITER、Dynamo、LMCache 与 Mooncake 等项目的 50 多个上游 PR。';
+  'AgentX 推动了 vLLM、SGLang、TensorRT-LLM、ATOM、AITER、Dynamo、LMCache、Mooncake 与 MoRI UMBP 等项目的 50 多个上游 PR。';
 
 export const metadata: Metadata = {
   title: 'AgentX 行业影响',

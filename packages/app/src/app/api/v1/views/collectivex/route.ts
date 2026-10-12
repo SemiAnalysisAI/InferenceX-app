@@ -1,3 +1,7 @@
+import {
+  COLLECTIVEX_KNOWN_SUPPORT,
+  COLLECTIVEX_KNOWN_FOOTNOTES,
+} from '@/components/collectivex/known-support';
 import { GET as run } from '@/app/api/v1/collectivex/runs/[runId]/route';
 import { GET as runs } from '@/app/api/v1/collectivex/runs/route';
 import {
@@ -192,6 +196,8 @@ export function GET(request: NextRequest) {
     return cachedJson({
       apiVersion: 'v1',
       view: 'collectivex',
+      knownSupport: COLLECTIVEX_KNOWN_SUPPORT,
+      knownSupportFootnotes: COLLECTIVEX_KNOWN_FOOTNOTES,
       params: {
         version,
         runs: runIds,

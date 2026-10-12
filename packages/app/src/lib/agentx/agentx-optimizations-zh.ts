@@ -535,6 +535,56 @@ const FRAMEWORKS_ZH: Readonly<Record<string, FrameworkTranslation>> = {
       },
     },
   },
+  'mori-umbp': {
+    summary:
+      '一个去重、可共享的 DRAM KV 池，通过 KVCache Store Linker 直接接入 SGLang 的 radix tree，并借助 MoRI 实现 prefill 到 decode 的增量 KV 传输。',
+    lead: 'MoRI UMBP（Unified Memory & Bandwidth Pool）是 AMD MoRI 库中的分层分布式 KV cache 组件。它最初以 HiCache L3 后端的形式进入 SGLang，随后成为 KVCache Store Linker 的一等后端。下文的主要结果均在 AgentX 上测得：在 MI355X 上以 disaggregated 方式部署 DeepSeek-V4-Pro，并以 UMBP 作为 KV 池。',
+    highlights: [
+      'TP8 下被复制的 MLA 与 DSA KV 的存储份数',
+      '开启 UMBP 后并发 256 下的 P90 TTFT',
+      'GPU 数量减少 25% 时的单 GPU 吞吐量',
+    ],
+    sections: {
+      'agentic-cache': {
+        heading: '为什么智能体服务需要的不只是被动的字节存储',
+        paragraphs: [
+          'AgentX 会话平均约 43 轮，整个生命周期内产生约 1M token 的上下文流量；每轮输入 token 的中位数为 142K，而输出只有 444 个。超过 96% 的 prompt token 是服务端已经见过的 prefix 的重复，因此在智能体并发下，一个 token 的成本取决于它的 KV 存放在哪里，而不是重算它有多快。',
+          '对于 MI355X 上的 DeepSeek-V4-Pro，这带来三个问题。一旦大量长会话及其 subagent 同时在线，KV cache 就放不进 HBM；它也无法在 TP rank 之间切分，因为 MLA latent 与 DSA indexer KV 会在每个 rank 上完整复制；而位于引擎进程内部的主机 cache，每次重启、每次滚动升级都会丢失。',
+          '大多数 L3 KV 后端——文件存储、Mooncake、NIXL、HF3FS——都是被动的字节存储：HBM 满了，引擎就把页下推；命中时再拉回来。UMBP 则围绕一个覆盖 HBM、主机 DRAM、UMBP DRAM 池和 SSD 的集群级放置目录来设计。它的 master 记录每个 key 的访问历史、节点容量和取回延迟，让 router 将来不仅能问“谁持有这个 prefix”，还能问“谁能最快提供它”；放置、淘汰与加载策略也都是可插拔接口，而不是写死的 LRU。',
+        ],
+        links: [
+          'GitHub 上的 MoRI',
+          'Rebuilding Agentic AI from First Principles for AMD GPU — AMD',
+        ],
+      },
+      'store-linker': {
+        heading: 'KVCache Store Linker：从 HBM 直达 KV 池',
+        paragraphs: [
+          'UMBP 最初以 HiCache L3 存储后端的形式进入 SGLang，位于每个 GPU rank 各自的 L2 主机 cache 之后。以这种方式在 AgentX 上运行暴露出六个问题，即下图左侧的编号项；右侧用相同的编号展示了下文介绍的新设计如何逐一解决这些问题。',
+          'AMD 提出完全跳过每张 GPU 各自的主机 cache，这与 SGLang 社区自身的规划不谋而合。随后，MoRI 团队与 SGLang 维护者共同开发了 KVCache Store Linker，UMBP 作为一等后端获得支持，与 HiCache 并列。借助这个 linker，SGLang 可以直接从 CPU 内存中的共享池读取已缓存的 KV，并逐层加载到 GPU 上，不必等整个 prefix 传完就能开始计算。这个池还可以在每台机器上作为独立进程运行，因此推理引擎重启或升级时 cache 不会丢失，多个引擎实例也能共享它。',
+          'linker 还避免了重复存储同一份数据。在 DeepSeek-V4 这类模型上，张量并行（tensor parallelism）组里的每张 GPU 都持有一份完全相同的 KV cache，因此一个 8 卡组过去会向 CPU 内存写入八份。现在只写一份：同样的内存可以容纳八倍的 cache，CPU 内存与 GPU 之间搬运的数据也减少到八分之一。一个仍在评审中的改动更进一步：不再让每张 GPU 都把完整副本读回来，而是各自读取一部分，再由 GPU 之间互相交换。',
+        ],
+        figure: {
+          alt: '前后对比示意图。之前：engine 进程内的每个 GPU rank 各自维护一个 L2 主机 cache，里面存着相同的 KV 副本，所有加载都要先经过这个 L2，再到达独立的 UMBP L3 池。之后：各 GPU rank 逐层直接连接到一个共享的 UMBP DRAM 池，该池运行在独立进程中，每个 TP 组只保存一份副本。左侧编号的六个问题与右侧编号的六项改进一一对应。',
+          caption:
+            '左：UMBP 作为 HiCache L3，位于每个 rank 的 L2 cache 之后；右：UMBP 接在 KVCache Store Linker 之后。左侧每个编号的问题，都由右侧相同编号的改进解决。',
+        },
+      },
+      'agentx-results': {
+        heading: '它在 AgentX 上带来的变化',
+        paragraphs: [
+          '即使 DRAM 层几乎没被用到，收益也会出现。并发 128–256 时 HBM 已经承担了约 95.6% 的 prompt token，DRAM 不到 1%。开启 UMBP 后，并发 256 下单 GPU 吞吐量仍提升 **8.3%**、P90 TTFT 降低 **35%**，并发 128 下分别为 2.7% 与 34%。关闭 UMBP 时，主机 KV 池占用率达到 72% 和 100%，却最多只承担了 0.1% 的 prompt token——因此收益来自直连路径，而不是 offload 本身。',
+          '足够大的 cache 进而改变了部署拓扑。一旦去重后的 DRAM 承载了 KV，prefill 就不再仅为容量而需要 TP8：在并发 16–48 时，配方改用 TP4 prefill 加 TP8 decode，共 **12 张 GPU，而不是 16 张**。在并发 16、32、48 下，UMBP 分别承担了 34%、71% 和 75% 的 prompt token，重算比例不到 3%；单 GPU 吞吐量在 GPU 数量减少 25% 的情况下提升 **26–34%**。',
+          'SGLang 针对 MI355X 上 DeepSeek-V4-Pro 的其他优化在 UMBP 之上进一步叠加，把并发 256 下的单 GPU 吞吐量从 **55.8k 提升到 62.0k**，并把曲线延伸到并发 384 和 512。完整配置见下方 10 月 4 日的 sweep 链接。',
+        ],
+        links: [
+          'InferenceX CI 上 10 月 4 日的 AgentX sweep（完整配置）',
+          'InferenceX #3664：MI355X 上的 DeepSeek-V4 disaggregated UMBP 配方',
+          'MoRI UMBP 登上公开 AgentX 排行榜 — AMD',
+        ],
+      },
+    },
+  },
 };
 
 function localizeSection(

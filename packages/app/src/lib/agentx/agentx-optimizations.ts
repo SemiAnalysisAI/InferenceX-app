@@ -96,6 +96,11 @@ export const OPTIMIZATION_FIGURES = {
     width: 2048,
     height: 638,
   },
+  umbpStoreLinker: {
+    src: '/images/agentx-optimizations/umbp-store-linker.png',
+    width: 2048,
+    height: 760,
+  },
 } as const;
 
 export type OptimizationFigureKey = keyof typeof OPTIMIZATION_FIGURES;
@@ -115,7 +120,11 @@ export interface OptimizationSection {
   id: string;
   heading: string;
   paragraphs: readonly string[];
-  figure?: { key: OptimizationFigureKey } & OptimizationFigureCopy;
+  figure?: {
+    key: OptimizationFigureKey;
+    /** Omit the "View full-resolution image" call to action under the caption. */
+    hideFullResolutionCta?: boolean;
+  } & OptimizationFigureCopy;
   prs?: readonly UpstreamPr[];
   links?: readonly ReferenceLink[];
 }
@@ -173,7 +182,7 @@ export const OPTIMIZATIONS_OVERVIEW: OptimizationsOverview = {
   ],
   highlights: [
     { value: '50+', label: 'upstream PRs' },
-    { value: '8', label: 'upstream projects' },
+    { value: '9', label: 'upstream projects' },
     { value: '5', label: 'layers of the stack' },
     { value: 'AgentX', label: 'the north star trace' },
   ],
@@ -953,6 +962,85 @@ const FRAMEWORKS: readonly OptimizationFramework[] = [
           {
             label: 'mooncake-transfer-engine on PyPI',
             href: 'https://pypi.org/project/mooncake-transfer-engine/',
+          },
+        ],
+      },
+    ],
+  },
+  {
+    slug: 'mori-umbp',
+    name: 'MoRI UMBP',
+    layer: 'kv-cache',
+    summary:
+      'A deduplicated, shareable DRAM KV pool wired straight into SGLang’s radix tree through the KVCache Store Linker, plus incremental prefill-to-decode KV transfer over MoRI.',
+    lead: 'MoRI UMBP (Unified Memory & Bandwidth Pool) is the tiered, distributed KV-cache component of AMD’s MoRI library. It first reached SGLang as a HiCache L3 backend, then became a first-class backend of the KVCache Store Linker. The headline results below were measured on AgentX, serving DeepSeek-V4-Pro disaggregated on MI355X with UMBP as the KV pool.',
+    highlights: [
+      { value: '8 → 1', label: 'stored copies of replicated MLA and DSA KV at TP8' },
+      { value: '−35%', label: 'P90 TTFT at concurrency 256 with UMBP on' },
+      { value: '+26–34%', label: 'throughput per GPU on 25% fewer GPUs' },
+    ],
+    sections: [
+      {
+        id: 'agentic-cache',
+        heading: 'Why agentic serving needs more than a passive byte store',
+        paragraphs: [
+          'AgentX sessions run about 43 turns and push roughly 1M tokens of context traffic over their life, with a median of 142K input tokens against 444 output tokens per turn. More than 96% of prompt tokens repeat a prefix the server has already seen, so at agentic concurrency the cost of a token is set by where its KV lives rather than by how fast it can be recomputed.',
+          'For DeepSeek-V4-Pro on MI355X that raises three problems. The KV cache does not fit in HBM once many long sessions and their subagents are live. It is not sharded across TP ranks, because the MLA latent and the DSA indexer KV are replicated in full on every rank. And a host cache that lives inside the engine process is lost on every restart and every rolling upgrade.',
+          'Most L3 KV backends — file stores, Mooncake, NIXL, HF3FS — are passive byte stores: the engine pushes pages down when HBM fills and pulls them back on a hit. UMBP was designed instead around a cluster-wide placement directory spanning HBM, host DRAM, the UMBP DRAM pool, and SSD. Its master tracks per-key access history, node capacity, and fetch latency, so a router can eventually ask not only who holds a prefix but who can serve it fastest, and placement, eviction, and load policies are pluggable interfaces rather than a hard-coded LRU.',
+        ],
+        links: [
+          { label: 'MoRI on GitHub', href: 'https://github.com/ROCm/mori' },
+          {
+            label: 'Rebuilding Agentic AI from First Principles for AMD GPU — AMD',
+            href: 'https://www.amd.com/en/developer/resources/technical-articles/2026/rebuilding-agentic-ai-for-amd-gpu.html',
+          },
+        ],
+      },
+      {
+        id: 'store-linker',
+        heading: 'The KVCache Store Linker: a direct path from HBM to the pool',
+        paragraphs: [
+          'UMBP first reached SGLang as a HiCache L3 storage backend, sitting behind a separate L2 host cache on every GPU rank. Running it that way on AgentX exposed six problems, numbered on the left of the figure below. The right side shows, with the same numbers, how the redesign described next fixes each one.',
+          'AMD proposed skipping the per-GPU host cache altogether, which matched where the SGLang community was already heading. The MoRI team and SGLang maintainers then built the KVCache Store Linker together, with UMBP supported as a first-class backend alongside HiCache. The linker lets SGLang read cached KV straight from a shared pool in CPU memory and load it into the GPU layer by layer, so the model can start computing before the whole prefix has arrived. The pool can also run as its own process on each machine, so it keeps its contents when the inference engine restarts or is upgraded, and several engine instances can share it.',
+          'The linker also stops storing the same data several times. With models like DeepSeek-V4, every GPU in a tensor-parallel group keeps an identical copy of the KV cache, so an 8-GPU group used to write eight copies to CPU memory. Now it writes one: the same memory holds eight times as much cache, and eight times less data moves between CPU memory and the GPUs. A change still under review goes further: instead of every GPU loading the full copy back, each loads a slice and the GPUs exchange the pieces with each other.',
+        ],
+        figure: {
+          key: 'umbpStoreLinker',
+          hideFullResolutionCta: true,
+          alt: 'Before and after diagram. Before: GPU ranks inside the engine process each keep their own L2 host cache holding the same KV copy, and every load passes through that L2 to a separate UMBP L3 pool. After: GPU ranks connect directly, layer by layer, to one shared UMBP DRAM pool that runs in its own process and keeps one copy per TP group. Six numbered problems on the left map to six numbered fixes on the right.',
+          caption:
+            'UMBP as a HiCache L3 behind per-rank L2 caches, and UMBP behind the KVCache Store Linker. Each numbered problem on the left is solved by the matching number on the right.',
+        },
+        prs: [
+          { repo: 'sgl-project/sglang', number: 37578 },
+          { repo: 'sgl-project/sglang', number: 38269 },
+          { repo: 'sgl-project/sglang', number: 39911 },
+        ],
+      },
+      {
+        id: 'agentx-results',
+        heading: 'What it changed on AgentX',
+        paragraphs: [
+          'The gain appears even when the DRAM tier is barely used. HBM already served about 95.6% of prompt tokens at concurrency 128–256 and DRAM less than 1%. Turning UMBP on still raised throughput per GPU by **8.3%** and cut P90 TTFT by **35%** at concurrency 256, and by 2.7% and 34% at concurrency 128. With UMBP off, the host KV pool filled to 72% and 100% while serving at most 0.1% of prompt tokens, so the improvement comes from the direct path rather than from offload.',
+          'A large enough cache then changes the topology. Once deduplicated DRAM holds the KV, prefill no longer needs TP8 just for capacity: at concurrency 16–48 the recipe runs a TP4 prefill with a TP8 decode on **12 GPUs instead of 16**. UMBP served 34%, 71%, and 75% of prompt tokens at concurrency 16, 32, and 48 while fewer than 3% were recomputed, and throughput per GPU rose **26–34%** on 25% fewer GPUs.',
+          'Further SGLang optimizations for DeepSeek-V4-Pro on MI355X build on top of UMBP, raising throughput per GPU at concurrency 256 from **55.8k to 62.0k** and extending the curve to concurrency 384 and 512. The full configuration is in the October 4 sweep linked below.',
+        ],
+        prs: [
+          { repo: 'sgl-project/sglang', number: 41024 },
+          { repo: 'sgl-project/sglang', number: 35619 },
+        ],
+        links: [
+          {
+            label: 'October 4 AgentX sweep on InferenceX CI (full configuration)',
+            href: 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/37181045340/attempts/1',
+          },
+          {
+            label: 'InferenceX #3664: DeepSeek-V4 disaggregated UMBP recipe on MI355X',
+            href: 'https://github.com/SemiAnalysisAI/InferenceX/pull/3664',
+          },
+          {
+            label: 'MoRI UMBP on the public AgentX leaderboard — AMD',
+            href: 'https://www.amd.com/en/developer/resources/technical-articles/2026/mori-umbp-empowers-amd-instinct-gpus.html',
           },
         ],
       },

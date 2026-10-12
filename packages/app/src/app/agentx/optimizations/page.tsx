@@ -8,7 +8,7 @@ import { SITE_URL } from '@semianalysisai/inferencex-constants';
 
 const TITLE = 'AgentX Industry Impact: Optimizations for Agentic Workloads';
 const DESCRIPTION =
-  'The 50+ upstream pull requests AgentX drove across vLLM, SGLang, TensorRT-LLM, ATOM, AITER, Dynamo, LMCache, and Mooncake.';
+  'The 50+ upstream pull requests AgentX drove across vLLM, SGLang, TensorRT-LLM, ATOM, AITER, Dynamo, LMCache, Mooncake, and MoRI UMBP.';
 
 export const metadata: Metadata = {
   title: 'AgentX Industry Impact',

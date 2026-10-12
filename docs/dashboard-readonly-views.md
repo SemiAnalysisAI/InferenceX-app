@@ -105,6 +105,31 @@ and `37181045340` display `UMBP MoRI SGLang` through October 9, 2026 in America/
 neither API selectors nor response data, framework/hardware keys, or raw CSV
 exports, so no API or OpenAPI contract change is required.
 
+## Staged-run chart link coverage
+
+The staging callback's links select existing inference controls: `g_model`,
+`i_seq`, `i_prec`, `i_gpus`, and the run-qualified
+`i_dates=YYYY-MM-DD~rRUN_ID`, with throughput/interactivity axes. Their read-only
+counterparts are the existing `/api/v1/views/inference` `model`, `sequence`,
+`precisions`, `gpus`, `dates`, `metric=tpPerGpu` and `xmode=interactivity`
+parameters. `optimal=true&best=false` returns the selected line's Pareto points.
+The `comparisons[].entry` field identifies the requested exact logical snapshot;
+primary `runId` can instead select that snapshot as the main result.
+
+The API already preserves every run-qualified comparison, including one matching
+its primary `runId`: `comparisonSelections` parses entries independently of the
+main run, and the inference handler fetches and projects every comparison scope.
+The frontend correction removes its same-run fetch suppression, bringing it back
+into agreement with that existing contract. No endpoint, query key, response
+shape or calculation changes. The API source digest is refreshed because the
+shared chart-data module changed; the existing OpenAPI exact-run description
+continues to apply.
+
+Line-label visibility (`i_linelabel`) and the callback's descriptive link text are
+presentation-only. Staging ingestion and its callback remain privileged mutations,
+so they do not gain public API endpoints. The companion skill reference documents
+selector translation and preserving the staging deployment origin.
+
 ## Verification scope
 
 Route tests cover baseline views and selected extension behavior, including
@@ -132,3 +157,14 @@ Agentic Workload Explorer 的入口同样受功能开关控制，它通过页面
 
 测试覆盖契约同步及代表性的筛选行为，并未穷举所有参数组合。生产数据库上的
 完整 UI/API 对照仍需集成审查，不能仅凭单元测试宣称已完成。
+
+### CollectiveX kernel qualification / Kernel 验证情况
+
+The CollectiveX view also returns `knownSupport` and `knownSupportFootnotes` from
+the same curated source as the website, independently of selected runs. Status
+values are `works`, `broken`, and `na`; read each note to distinguish unavailable
+combinations from pending qualification. Footnotes contain both `en` and `zh`.
+
+CollectiveX 视图另返回 `knownSupport` 和 `knownSupportFootnotes`，与网站共用人工维护
+的数据源，不受所选运行影响。状态值为 `works`、`broken` 和 `na`；请结合注释区分
+不可用与待验证的配置。注释同时包含 `en` 和 `zh`。

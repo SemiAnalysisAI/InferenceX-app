@@ -2,6 +2,7 @@ import { PGlite } from '@electric-sql/pglite';
 import { readFileSync, readdirSync } from 'node:fs';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { benchmarkCurveScope } from '@semianalysisai/inferencex-constants';
+import { getStagedChartScopes } from './staged-chart-links';
 import type { DbClient } from '../connection';
 import { applyBenchmarkPointBackfill } from '../etl/run-overrides';
 import { getAllBenchmarksForHistory, getBenchmarksForRun, getLatestBenchmarks } from './benchmarks';
@@ -398,5 +399,38 @@ describe('AgentX curve snapshots in PostgreSQL', () => {
       ids(await getLatestBenchmarks(sql, 'glm5.2', '2026-09-11', false, '34413290524')),
     ).toEqual(currentIds);
     expect(ids(await getLatestBenchmarks(sql, 'glm5.2', '2026-09-11', true))).toEqual([8]);
+  });
+});
+
+describe('staged chart scope discovery in PostgreSQL', () => {
+  it('reads successful lines from the latest attempt and preserves workload/precision identity', async () => {
+    await addRun(12, { githubId: 34413290524, attempt: 2, conclusion: 'failure' });
+    await addPoint(20, 12, 3, 1);
+    await addPoint(21, 12, 3, 2);
+    await addPoint(22, 12, 4, 3, { type: 'single_turn', isl: 8192, osl: 1024 });
+    await addPoint(23, 12, 1, 4, { error: 'failed' });
+    const scopes = await getStagedChartScopes(sql, '34413290524');
+    expect(scopes).toHaveLength(2);
+    expect(scopes).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          framework: 'sglang',
+          precision: 'fp4',
+          benchmark_type: 'agentic_traces',
+          isl: null,
+          osl: null,
+          date: '2026-09-12',
+        }),
+        expect.objectContaining({
+          framework: 'dynamo-trt',
+          precision: 'fp8',
+          benchmark_type: 'single_turn',
+          isl: 8192,
+          osl: 1024,
+          date: '2026-09-12',
+        }),
+      ]),
+    );
+    expect(await getStagedChartScopes(sql, '999999999')).toEqual([]);
   });
 });
