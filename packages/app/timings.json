@@ -5016,7 +5016,35 @@
     },
     {
       "spec": "cypress/e2e/site-search.cy.ts",
-      "duration": 9000
+      "duration": 2254,
+      "tests": [
+        {
+          "title": ["Site search", "does not load the search chunk or fetch pages until opened"],
+          "duration": 179,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Site search",
+            "indexes the current page immediately and crawled pages as they load"
+          ],
+          "duration": 628,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Site search",
+            "opens with Ctrl+K, navigates results with the keyboard and closes on selection"
+          ],
+          "duration": 851,
+          "attempts": 1
+        },
+        {
+          "title": ["Site search", "serves Chinese UI and crawls /zh siblings on Chinese pages"],
+          "duration": 575,
+          "attempts": 1
+        }
+      ]
     },
     {
       "spec": "cypress/e2e/throughput-calculator.cy.ts",
